@@ -16,9 +16,10 @@ import styles from "./album.module.css";
 type PageProps = {
   album?: Content;
   edit?: boolean;
+  editable?: boolean;
 };
 
-const Album: NextPage<PageProps> = ({ album, edit }) => {
+const Album: NextPage<PageProps> = ({ album, edit, editable }) => {
   if (!album) {
     return <div></div>;
   }
@@ -99,7 +100,8 @@ const Album: NextPage<PageProps> = ({ album, edit }) => {
       <Head>
         <title>{statefulAlbum.title}</title>
       </Head>
-      <Nav isEditing={Boolean(edit)} />
+
+      <Nav isEditing={Boolean(edit)} editable={Boolean(editable)} />
       {edit ? (
         <div className={styles.edit}>
           Edit mode
@@ -137,6 +139,8 @@ export const getStaticProps: GetStaticProps<
     return {
       props: {
         album: undefined,
+        // Can't edit on edge workers
+        editable: process.env.NODE_ENV !== "production",
       },
     };
   }
@@ -146,6 +150,7 @@ export const getStaticProps: GetStaticProps<
       props: {
         album: await getAlbumFromName(context.params?.slug?.[0]),
         edit: true,
+        editable: process.env.NODE_ENV !== "production",
       },
     };
   }
@@ -154,6 +159,7 @@ export const getStaticProps: GetStaticProps<
     props: {
       album: await getAlbumFromName(context.params?.slug?.[0]),
       edit: false,
+      editable: process.env.NODE_ENV !== "production",
     },
   };
 };

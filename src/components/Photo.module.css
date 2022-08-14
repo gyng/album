@@ -10,6 +10,7 @@
 .permalink {
   text-align: right;
   color: var(--c-bg-contrast-light);
+  align-self: flex-end;
 }
 
 .details {
@@ -23,6 +24,7 @@
   right: var(--m-l);
   place-self: start end;
   max-width: calc(100svw - var(--m-l));
+  max-width: calc(100vw - var(--m-l));
   scrollbar-gutter: stable;
   background-color: var(--c-overlay);
   background-blend-mode: darken;
@@ -31,6 +33,10 @@
   display: flex;
   flex-direction: column;
   align-items: flex-end;
+}
+
+.details details {
+  display: flex;
 }
 
 .details summary {
@@ -58,8 +64,7 @@
 .image {
   max-height: 90vh;
   max-height: 90svh;
-  width: auto;
-  max-width: min(90svw, 100%);
+  max-width: min(90vw, 100%);
   height: auto;
   display: block;
 }

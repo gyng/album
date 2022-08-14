@@ -277,9 +277,10 @@ export const Picture: React.FC<{ block: PhotoBlock; thumb?: boolean }> = (
       <img
         className={styles.image}
         src={props.block.data.src}
-        height={props.block._build.height}
-        width={props.block._build.width}
         loading="lazy"
+        style={{
+          aspectRatio: `${props.block._build.width} / ${props.block._build.height}`,
+        }}
         alt={
           props.block.data.title ??
           props.block.data.kicker ??
@@ -323,12 +324,12 @@ export const PhotoBlockEl: React.FC<{
       </div>
 
       <div className={styles.details}>
-        <a className={styles.permalink} href={`#${props.block.id}`}>
-          Permalink
-        </a>
-
         <details>
           <summary>Details</summary>
+          <a className={styles.permalink} href={`#${props.block.id}`}>
+            Permalink
+          </a>
+
           <div className={styles.exif}>
             <ExifTable
               rows={[

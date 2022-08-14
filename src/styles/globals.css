@@ -7,7 +7,12 @@ body {
   font-size: var(--fs-m);
   color: white;
   background-color: var(--c-bg);
-  scrollbar-gutter: stable both-edges;
+  scrollbar-gutter: stable;
+}
+
+body {
+  /* Chrome has a hard time with vw and svw units */
+  overflow-x: hidden;
 }
 
 a {

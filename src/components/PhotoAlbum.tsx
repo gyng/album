@@ -45,7 +45,7 @@ export const PhotoAlbum: React.FC<{
       <div className={styles.album}>
         {props.album.blocks.map((b, i) => {
           return (
-            <div key={b.id} className={styles.block}>
+            <div key={`${b.id}-${i}`} className={styles.block}>
               {props.blockControl.isEditing ? (
                 <BlockControl
                   currentIndex={i}

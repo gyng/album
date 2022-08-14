@@ -4,7 +4,7 @@
 
 Very very rough Next.JS photo album weekend project.
 
-- JSON-defined albums, with editor interface
+- JSON-defined albums, with editor interface in development mode
 - EXIF support
 - Next.JS static build, deployed on Vercel (due to filesize concerns)
 - Custom image optimisation, skipping `next/image`

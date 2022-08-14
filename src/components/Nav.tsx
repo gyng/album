@@ -2,7 +2,9 @@ import Link from "next/link";
 import { useRouter } from "next/router";
 import styles from "./Nav.module.css";
 
-export const Nav: React.FC<{ isEditing: boolean }> = (props) => {
+export const Nav: React.FC<{ isEditing: boolean; editable: boolean }> = (
+  props
+) => {
   const router = useRouter();
 
   return (
@@ -14,7 +16,7 @@ export const Nav: React.FC<{ isEditing: boolean }> = (props) => {
           </Link>
         </li>
 
-        {!props.isEditing ? (
+        {props.editable && !props.isEditing ? (
           <li>
             <Link href={router.asPath + "/edit"}>
               <a>Edit</a>
@@ -22,7 +24,7 @@ export const Nav: React.FC<{ isEditing: boolean }> = (props) => {
           </li>
         ) : null}
 
-        {props.isEditing ? (
+        {props.editable && props.isEditing ? (
           <li>
             <Link href={router.asPath.replace("/edit", "")}>
               <a>Exit edit mode</a>
