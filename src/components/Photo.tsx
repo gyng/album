@@ -137,15 +137,24 @@ const ExifCoordinatesRow: React.FC<{ row: ExifCoordinatesRowProps }> = (
     .filter(Boolean)
     .join(" ");
 
-  const convertDMSToDegree = (coords?: number[]): number | null => {
+  const convertDMSToDegree = (
+    coords: number[],
+    isSOrW: boolean
+  ): number | null => {
     if (!coords || coords.length !== 3) {
       return null;
     }
-    return coords[0] + coords[1] / 60 + coords[2] / 3600;
+    return (isSOrW ? -1 : 1) * (coords[0] + coords[1] / 60 + coords[2] / 3600);
   };
 
-  const decLng = convertDMSToDegree(props.row.data.GPSLongitude);
-  const decLat = convertDMSToDegree(props.row.data.GPSLatitude);
+  const decLng = convertDMSToDegree(
+    props.row.data.GPSLongitude,
+    props.row.data.GPSLongitudeRef === "W"
+  );
+  const decLat = convertDMSToDegree(
+    props.row.data.GPSLatitude,
+    props.row.data.GPSLatitudeRef === "S"
+  );
 
   return (
     <>
