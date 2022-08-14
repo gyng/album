@@ -1,0 +1,23 @@
+.page {
+  display: flex;
+  align-items: center;
+  flex-direction: column;
+}
+
+.album {
+  /* max-width: 70vw; */
+  width: 100svw;
+  display: flex;
+  align-items: center;
+  flex-direction: column;
+  gap: var(--m-xl);
+}
+
+.block {
+  width: 100%;
+  display: grid;
+}
+
+.noMargin {
+  margin: 0;
+}

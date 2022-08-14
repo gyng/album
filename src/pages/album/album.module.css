@@ -1,0 +1,25 @@
+.edit {
+  background-color: var(--c-bg-edit);
+  position: fixed;
+  top: calc(3 * var(--m-xl));
+  left: var(--m-l);
+  color: black;
+  font-weight: bolder;
+  padding: var(--m-m);
+  border-radius: var(--m);
+  z-index: 9999;
+  font-family: monospace;
+}
+
+.editDetails {
+  max-height: 80vh;
+  max-height: 80svh;
+  overflow: auto;
+  scrollbar-gutter: stable;
+  font-size: var(--fs-s);
+}
+
+.edit summary {
+  cursor: pointer;
+  user-select: none;
+}

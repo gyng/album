@@ -1,0 +1,39 @@
+html,
+body {
+  padding: 0;
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Oxygen,
+    Ubuntu, Cantarell, Fira Sans, Droid Sans, Helvetica Neue, sans-serif;
+  font-size: var(--fs-m);
+  color: white;
+  background-color: var(--c-bg);
+  scrollbar-gutter: stable both-edges;
+}
+
+a {
+  color: inherit;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+input,
+textarea {
+  padding: var(--m);
+}
+
+:root {
+  --m: 4px;
+  --m-m: 12px;
+  --m-l: 20px;
+  --m-xl: 40px;
+  --fs-s: 11px;
+  --fs-m: 18px;
+  --fs-l: 24px;
+  --fs-xl: 64px;
+  --c-bg: rgba(44, 44, 44, 1);
+  --c-overlay: rgba(44, 44, 44, 0.5);
+  --c-bg-edit: rgb(238, 245, 197);
+  --c-bg-contrast-light: rgba(200, 200, 200, 1);
+}

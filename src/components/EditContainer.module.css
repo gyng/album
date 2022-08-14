@@ -1,0 +1,84 @@
+.editContainer {
+  max-width: 900px;
+  min-width: 300px;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--c-bg-edit);
+  border-radius: var(--m);
+  padding: 0 var(--m-l) var(--m-l);
+  color: black;
+  padding: var(--m-l);
+  margin: var(--m-l);
+  z-index: 99999;
+  font-family: monospace;
+}
+
+.small {
+  max-width: 300px;
+}
+
+.fixedRight {
+  position: absolute;
+  top: calc(2 * var(--m-xl));
+  right: 0;
+}
+
+.gridRight {
+  position: unset;
+  place-self: end end;
+  grid-row: 1;
+  grid-column: 1;
+  margin: var(--m-l);
+}
+
+.gridLeft {
+  position: unset;
+  place-self: end start;
+  grid-row: 1;
+  grid-column: 1;
+  margin: var(--m-l);
+}
+
+.gridCenter {
+  position: unset;
+  place-self: start center;
+  grid-row: 1;
+  grid-column: 1;
+  margin: var(--m-l);
+}
+
+.floatRight {
+  float: right;
+}
+
+.center {
+  display: inline-block;
+  align-self: center;
+  position: relative;
+}
+
+.noHeight {
+  height: 0;
+}
+
+.editContainer input[type="text"],
+.editContainer textarea {
+  width: 100%;
+}
+
+.editContainer p {
+  margin: 0 0 var(--m);
+}
+
+.editContainer label {
+  user-select: none;
+}
+
+.editContainer label + label {
+  margin: var(--m-l) 0 0;
+}
+
+.checkboxRow {
+  display: inline-flex;
+  gap: var(--m);
+}

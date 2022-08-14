@@ -1,0 +1,41 @@
+{
+  "name": "test-manifest",
+  "title": "manifest",
+  "kicker": "",
+  "formatting": {
+    "overlay": true
+  },
+  "blocks": [
+    {
+      "kind": "photo",
+      "data": {
+        "src": "DSCF0593.jpg",
+        "title": "manifest",
+        "kicker": "kicker",
+        "description": "description"
+      },
+      "formatting": {
+        "immersive": true
+      }
+    },
+    {
+      "kind": "photo",
+      "data": {
+        "src": "DSCF0506-2.jpg",
+        "description": "The quick brown fox jumps over the lazy dog!"
+      }
+    },
+    {
+      "kind": "photo",
+      "data": {
+        "src": "DSCF2485-2.jpg"
+      }
+    },
+    {
+      "kind": "photo",
+      "data": {
+        "src": "DSCF2581-2_2.jpg"
+      }
+    }
+  ]
+}

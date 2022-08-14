@@ -1,0 +1,17 @@
+.error {
+  width: 100vw;
+  height: 100vh;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  grid-template-rows: 60% 1fr;
+}
+
+.error h1 {
+  font-size: 1000%;
+}
+
+.error a {
+  font-size: var(--fs-l);
+}

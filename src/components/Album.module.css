@@ -1,0 +1,35 @@
+.list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+  grid-template-rows: repeat(auto-fit, minmax(600px, max-content));
+  gap: var(--m-xl);
+  max-width: 1400px;
+}
+
+.name {
+  margin: var(--m-l) 0 var(--m);
+  font-size: var(--fs-m);
+}
+
+.date {
+  text-decoration: none;
+}
+
+.item {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.itemLink {
+  height: 100%;
+}
+
+.itemLink img {
+  object-fit: cover;
+  height: 100%;
+  width: 100%;
+}

@@ -1,0 +1,35 @@
+.title {
+  font-size: var(--fs-xl);
+  margin-top: min(400px, 20svh);
+  text-align: center;
+  padding: 0 var(--m-xl);
+}
+
+.kicker {
+  font-size: var(--fs-l);
+  white-space: pre-line;
+  text-align: center;
+  padding: 0 var(--m-xl);
+}
+
+.description {
+  white-space: pre-line;
+  text-align: center;
+}
+
+.overlayHeader {
+  grid-row: 1;
+  grid-column: 1;
+  z-index: 200;
+  text-align: center;
+  text-shadow: 0 0 8px rgba(0, 0, 0, 0.5);
+}
+
+.block {
+  grid-area: 1 / 1;
+  display: grid;
+}
+
+.content {
+  grid-area: 1 / 1;
+}
