@@ -98,7 +98,11 @@ const Album: NextPage<PageProps> = ({ album, edit, editable }) => {
   return (
     <>
       <Head>
-        <title>{statefulAlbum.title}</title>
+        <title>
+          {statefulAlbum.title ??
+            statefulAlbum.name ??
+            statefulAlbum._build.slug}
+        </title>
       </Head>
 
       <Nav isEditing={Boolean(edit)} editable={Boolean(editable)} />
