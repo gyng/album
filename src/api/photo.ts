@@ -48,7 +48,7 @@ export const optimiseImages = async (
   const dirname = path.dirname(photoPath);
 
   return Promise.all([
-    ...OPTIMISED_SIZES.map((size) => {
+    ...OPTIMISED_SIZES.sort((a, b) => a - b).map((size) => {
       const newFile = path.join(
         dirname,
         RESIZED_IMAGE_DIR,
