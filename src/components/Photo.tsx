@@ -279,7 +279,7 @@ export const Picture: React.FC<{ block: PhotoBlock; thumb?: boolean }> = (
         <source
           key={srcset.src}
           srcSet={srcset.src}
-          media={`(max-width: ${srcset.width * (props.thumb ? 0.5 : 0.9)}px)`}
+          media={`(max-width: ${srcset.width * (props.thumb ? 3 : 1.1)}px)`}
         />
       ))}
 
