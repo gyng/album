@@ -7,3 +7,13 @@
 .main h1 {
   margin: var(--m-xl) 0;
 }
+
+.footer {
+  color: var(--c-bg-contrast-light);
+  text-align: center;
+  margin: calc(2 * var(--m-xl)) 0 var(--m-xl);
+}
+
+.footer a {
+  text-decoration: none;
+}

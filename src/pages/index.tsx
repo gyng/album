@@ -23,6 +23,16 @@ const Home: NextPage<PageProps> = (context) => {
         <h1>Albums</h1>
         <Albums albums={context.albums} />
       </main>
+
+      <footer className={styles.footer}>
+        <a
+          href="https://www.github.com/gyng/album"
+          target="_blank"
+          rel="noopener"
+        >
+          GitHub
+        </a>
+      </footer>
     </div>
   );
 };
