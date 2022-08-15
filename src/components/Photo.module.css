@@ -118,11 +118,12 @@
   grid-row: 1;
   grid-column: 1;
   z-index: 200;
-
+  pointer-events: none;
   text-shadow: 0 0 8px rgba(0, 0, 0, 0.5);
 }
 
 .immersive .title {
+  pointer-events: auto;
   margin-top: min(400px, 20svh);
 }
 
@@ -132,6 +133,11 @@
   text-shadow: black;
   font-size: var(--fs-l);
   margin-top: auto;
+  pointer-events: auto;
+}
+
+.immersive .kicker {
+  pointer-events: auto;
 }
 
 .immersive .details {
