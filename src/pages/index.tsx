@@ -28,7 +28,7 @@ const Home: NextPage<PageProps> = (context) => {
         <a
           href="https://www.github.com/gyng/album"
           target="_blank"
-          rel="noopener"
+          rel="noreferrer"
         >
           GitHub
         </a>

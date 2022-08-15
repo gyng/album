@@ -436,7 +436,7 @@ export const PhotoBlockEl: React.FC<{
 
               <div className={styles.viewOriginal}>
                 View{" "}
-                <a href={props.block.data.src} target="_blank" rel="noopener">
+                <a href={props.block.data.src} target="_blank" rel="noreferrer">
                   original
                 </a>
                 {props.block._build.srcset.length > 0 ? (
