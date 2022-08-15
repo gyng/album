@@ -30,6 +30,7 @@ textarea {
 
 :root {
   --m: 4px;
+  --m-s: 8px;
   --m-m: 12px;
   --m-l: 20px;
   --m-xl: 40px;
