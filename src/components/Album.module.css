@@ -3,7 +3,7 @@
   padding: 0;
   margin: 0;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
   grid-template-rows: repeat(auto-fit, minmax(600px, max-content));
   gap: var(--m-xl);
   max-width: 1400px;
@@ -14,7 +14,7 @@
 }
 
 .name h2 {
-  margin: var(--m-m) 0 var(--m);
+  margin: var(--m-s) 0 var(--m);
   font-size: var(--fs-m);
 }
 

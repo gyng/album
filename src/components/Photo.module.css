@@ -61,8 +61,6 @@
 .imageWrapper {
   grid-column: 1;
   grid-row: 1;
-  position: sticky;
-  left: var(--m-l);
   place-self: center;
 }
 
