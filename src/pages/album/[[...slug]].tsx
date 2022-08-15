@@ -103,6 +103,11 @@ const Album: NextPage<PageProps> = ({ album, edit, editable }) => {
             statefulAlbum.name ??
             statefulAlbum._build.slug}
         </title>
+        {album.kicker ? (
+          <meta name="description" content={album.kicker} />
+        ) : null}
+        <link rel="icon" href="/favicon.svg" />
+        <meta name="theme-color" content="#2c2c2c" />
       </Head>
 
       <Nav isEditing={Boolean(edit)} editable={Boolean(editable)} />
