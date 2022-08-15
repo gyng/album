@@ -290,6 +290,9 @@ export const Picture: React.FC<{ block: PhotoBlock; thumb?: boolean }> = (
         style={{
           aspectRatio: `${props.block._build.width} / ${props.block._build.height}`,
         }}
+        // placeholder image sizes
+        width={props.block._build.width}
+        height={props.block._build.height}
         alt={
           props.block.data.title ??
           props.block.data.kicker ??

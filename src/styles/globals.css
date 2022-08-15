@@ -41,4 +41,5 @@ textarea {
   --c-overlay: rgba(44, 44, 44, 0.5);
   --c-bg-edit: rgb(238, 245, 197);
   --c-bg-contrast-light: rgba(200, 200, 200, 1);
+  --c-bg-contrast-dark: rgb(51, 51, 51);
 }

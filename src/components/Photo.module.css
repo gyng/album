@@ -71,7 +71,9 @@
   max-height: 90svh;
   max-width: min(90vw, 100%);
   height: auto;
+  width: auto;
   display: block;
+  background-color: var(--c-bg-contrast-dark);
 }
 
 .th {
