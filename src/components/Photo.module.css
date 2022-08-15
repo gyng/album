@@ -111,6 +111,7 @@
   width: 100svw;
   height: 100vh;
   height: 100svh;
+  margin: 0 auto;
 }
 
 .immersive .overlayHeader {
