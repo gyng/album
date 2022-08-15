@@ -419,6 +419,11 @@ export const PhotoBlockEl: React.FC<{
                       props.block._build.exif.Model
                   ),
                 },
+                {
+                  kind: "kv",
+                  k: "Description",
+                  v: props.block._build.exif.ImageDescription,
+                },
                 //   { kind: "kv", k: "Software", v: [props.block._build.exif.Software].join(" ") },
               ]}
             />
