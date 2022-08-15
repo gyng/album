@@ -26,13 +26,18 @@
   max-width: calc(100svw - var(--m-l));
   max-width: calc(100vw - var(--m-l));
   scrollbar-gutter: stable;
-  background-color: var(--c-overlay);
   background-blend-mode: darken;
-  padding: var(--m) var(--m-m);
   z-index: 300;
+  margin-top: -40px;
+}
+
+.detailsContent {
   display: flex;
-  flex-direction: column;
   align-items: flex-end;
+  flex-direction: column;
+  padding: var(--m-m);
+  margin-top: var(--m-m);
+  background-color: var(--c-overlay);
 }
 
 .details details {
@@ -124,7 +129,8 @@
 
 .immersive .title {
   pointer-events: auto;
-  margin-top: min(400px, 20svh);
+  margin-top: min(400px, 25vh);
+  margin-top: min(400px, 25svh);
 }
 
 .immersive .description {
@@ -142,6 +148,7 @@
 
 .immersive .details {
   margin: var(--m-m) 0 0;
+  padding: var(--m) var(--m-m) var(--m) var(--m-l);
 }
 
 .title {

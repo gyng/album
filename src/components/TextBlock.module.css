@@ -1,6 +1,7 @@
 .title {
   font-size: var(--fs-xl);
-  margin-top: min(400px, 20svh);
+  margin-top: min(400px, 25vh);
+  margin-top: min(400px, 25svh);
   text-align: center;
   padding: 0 var(--m-xl);
 }

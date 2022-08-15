@@ -23,8 +23,8 @@ export const Albums: React.FC<{ albums: Content[] }> = (props) => {
 
             <div>
               <Link href={`/album/${album._build.slug}`}>
-                <a>
-                  <h2 className={styles.name}>{album.title ?? album.name}</h2>
+                <a className={styles.name}>
+                  <h2>{album.title ?? album.name}</h2>
                 </a>
               </Link>
 

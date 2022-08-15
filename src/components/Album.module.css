@@ -10,7 +10,11 @@
 }
 
 .name {
-  margin: var(--m-l) 0 var(--m);
+  text-decoration: none;
+}
+
+.name h2 {
+  margin: var(--m-m) 0 var(--m);
   font-size: var(--fs-m);
 }
 

@@ -3,3 +3,7 @@
   margin: var(--m-xl) auto;
   padding: 0 var(--m-xl);
 }
+
+.main h1 {
+  margin: calc(2 * var(--m-xl)) 0 var(--m-xl);
+}
