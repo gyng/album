@@ -29,6 +29,10 @@ Very very rough Next.JS photo album weekend project.
 
 Due to the large size of `public/data/*` (and a long time taken to optimise images), deploys are done manually from your (my?) local machine.
 
+Image optimisations/resizes are cached locally on `next build` or `vercel build`, so clear out `.resized_images` first if you want to regenerate them.
+
+If Next.js times out during `vercel build`, it's probably image optimisation taking way too long. In that case, run `npm run build` to optimise images first.
+
 ```
 npm g -i vercel
 vercel login

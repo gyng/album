@@ -65,16 +65,20 @@ export const optimiseImages = async (
         return optimised;
       }
 
-      return sharp(photoPath)
-        .resize(size)
-        .toFile(newFile)
-        .then(() => {
-          return optimised;
-        })
-        .catch((err) => {
-          console.error(`Failed to optimise ${photoPath}`);
-          throw err;
-        });
+      return (
+        sharp(photoPath)
+          .rotate()
+          .resize(size)
+          // .withMetadata() // larger filesize than .rotate(), but preserves more metadata (eg, width/height)
+          .toFile(newFile)
+          .then(() => {
+            return optimised;
+          })
+          .catch((err) => {
+            console.error(`Failed to optimise ${photoPath}`);
+            throw err;
+          })
+      );
     }),
   ]);
 };
