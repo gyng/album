@@ -11,23 +11,21 @@ export const Nav: React.FC<{ isEditing: boolean; editable: boolean }> = (
     <nav className={styles.nav}>
       <ul>
         <li>
-          <Link href="/">
-            <a style={{ textDecoration: "none" }}>← Album list</a>
+          <Link href="/" style={{ textDecoration: "none" }}>
+            ← Album list
           </Link>
         </li>
 
         {props.editable && !props.isEditing ? (
           <li>
-            <Link href={router.asPath + "/edit"}>
-              <a>Edit</a>
-            </Link>
+            <Link href={router.asPath + "/edit"}>Edit</Link>
           </li>
         ) : null}
 
         {props.editable && props.isEditing ? (
           <li>
             <Link href={router.asPath.replace("/edit", "")}>
-              <a>Exit edit mode</a>
+              Exit edit mode
             </Link>
           </li>
         ) : null}

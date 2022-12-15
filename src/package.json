@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint && prettier --check ."
+    "lint": "next lint && prettier --check .",
+    "lint:fix": "prettier --write ."
   },
   "dependencies": {
     "exifr": "^7.1.3",

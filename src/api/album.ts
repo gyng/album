@@ -5,6 +5,7 @@ import { deserializeContentBlock } from "./deserialize";
 import {
   Block,
   Content,
+  PhotoBlock,
   SerializedContent,
   SerializedPhotoBlock,
   SerializedTextBlock,
@@ -119,6 +120,13 @@ export const getAlbum = async (
   if (isManifest) {
     return getAlbumWithManifest(albumPath);
   } else {
-    return getAlbumWithoutManifest(albumPath);
+    let manifest = await getAlbumWithoutManifest(albumPath);
+    manifest.blocks = manifest.blocks.sort((a, b) => {
+      return (
+        Date.parse((a as PhotoBlock)._build?.exif?.DateTimeOriginal ?? 0) -
+        Date.parse((b as PhotoBlock)._build?.exif?.DateTimeOriginal ?? 0)
+      );
+    });
+    return manifest;
   }
 };

@@ -15,17 +15,19 @@ export const Albums: React.FC<{ albums: Content[] }> = (props) => {
 
         return (
           <li key={album._build.slug} className={styles.item}>
-            <Link href={`/album/${album._build.slug}`}>
-              <a className={styles.itemLink}>
-                {cover ? <Picture block={cover as PhotoBlock} thumb /> : null}
-              </a>
+            <Link
+              href={`/album/${album._build.slug}`}
+              className={styles.itemLink}
+            >
+              {cover ? <Picture block={cover as PhotoBlock} thumb /> : null}
             </Link>
 
             <div>
-              <Link href={`/album/${album._build.slug}`}>
-                <a className={styles.name}>
-                  <h2>{album.title ?? album.name}</h2>
-                </a>
+              <Link
+                href={`/album/${album._build.slug}`}
+                className={styles.name}
+              >
+                <h2>{album.title ?? album.name}</h2>
               </Link>
 
               {timeRange[0] && timeRange[1] && timeRange[0] !== timeRange[1] ? (

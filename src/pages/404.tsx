@@ -7,9 +7,7 @@ export default function FourOhFour() {
   return (
     <div className={styles.error}>
       <h1>🔥</h1>
-      <Link href="/">
-        <a>404. Back to album list</a>
-      </Link>
+      <Link href="/">404. Back to album list</Link>
     </div>
   );
 }
