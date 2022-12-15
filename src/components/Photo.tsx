@@ -372,10 +372,12 @@ export const PhotoBlockEl: React.FC<{
                     k: "Shutter speed",
                     v:
                       props.block._build.exif.ExposureTime < 1
-                        ? new Fraction(props.block._build.exif.ExposureTime)
+                        ? `${new Fraction(props.block._build.exif.ExposureTime)
                             .toFraction()
-                            .replace("/", FRACTION_SLASH) // FRACTION_SLASH gives us nice ligatured fractions (eg, 1⁄10)
-                        : props.block._build.exif.ExposureTime,
+                            .replace("/", FRACTION_SLASH)}; ${
+                            props.block._build.exif.ExposureTime
+                          }s` // FRACTION_SLASH gives us nice ligatured fractions (eg, 1⁄10)
+                        : `${props.block._build.exif.ExposureTime}s`,
                   },
                   {
                     kind: "kv",
@@ -397,7 +399,11 @@ export const PhotoBlockEl: React.FC<{
                   {
                     kind: "kv",
                     k: "Focal length",
-                    v: `${props.block._build.exif.FocalLength}mm (actual)`,
+                    v: `${props.block._build.exif.FocalLength}mm (actual)${
+                      props.block._build.exif.FocalLengthIn35mmFormat
+                        ? `; ${props.block._build.exif.FocalLengthIn35mmFormat}mm (35mm equivalent)`
+                        : ""
+                    }`,
                     valid: Boolean(props.block._build.exif.FocalLength),
                   },
                   {
@@ -430,6 +436,16 @@ export const PhotoBlockEl: React.FC<{
                     k: "Description",
                     v: props.block._build.exif.ImageDescription,
                   },
+                  {
+                    kind: "kv",
+                    k: "Lens",
+                    v: `${props.block._build.exif.LensMake} ${props.block._build.exif.LensModel}`,
+                    valid: Boolean(
+                      props.block._build.exif.LensMake ||
+                        props.block._build.exif.LensModel
+                    ),
+                  },
+
                   //   { kind: "kv", k: "Software", v: [props.block._build.exif.Software].join(" ") },
                 ]}
               />
