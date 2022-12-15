@@ -127,6 +127,17 @@ export const getAlbum = async (
         Date.parse((b as PhotoBlock)._build?.exif?.DateTimeOriginal ?? 0)
       );
     });
+
+    const title = manifest.blocks.at(0);
+    if (title?.kind === "text") {
+      const range = getImageTimestampRange(manifest).map((ts) =>
+        new Date(ts!).getFullYear()
+      ) ?? [0, 0];
+      title.data.kicker = `${range[0]}${
+        range[1] === range[0] ? "" : `–${range[1]}`
+      }`;
+    }
+
     return manifest;
   }
 };
