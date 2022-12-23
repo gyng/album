@@ -48,7 +48,7 @@ export const optimiseImages = async (
   const dirname = path.dirname(photoPath);
 
   return Promise.all([
-    ...OPTIMISED_SIZES.sort((a, b) => a - b).map((size) => {
+    ...OPTIMISED_SIZES.sort((a, b) => a - b).map(async (size) => {
       const newFile = path.join(
         dirname,
         RESIZED_IMAGE_DIR,
@@ -63,7 +63,14 @@ export const optimiseImages = async (
 
       if (fs.existsSync(newFile)) {
         console.log(`Already optimised ${newFile}, using cached version`);
-        return optimised;
+
+        // Check if file is valid
+        const stat = fs.statSync(newFile);
+        if (stat.size > 0) {
+          return optimised;
+        } else {
+          console.log(`Optimised file is bad? size 0: ${newFile}`);
+        }
       }
 
       console.log(`Optimising ${newFile}...`);
