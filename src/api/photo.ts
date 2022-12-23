@@ -62,14 +62,17 @@ export const optimiseImages = async (
       };
 
       if (fs.existsSync(newFile)) {
+        console.log(`Already optimised ${newFile}, using cached version`);
         return optimised;
       }
 
+      console.log(`Optimising ${newFile}...`);
       return (
         sharp(photoPath)
           .rotate()
           .resize(size)
           // .withMetadata() // larger filesize than .rotate(), but preserves more metadata (eg, width/height)
+          .webp({ quality: 90, smartSubsample: true })
           .toFile(newFile)
           .then(() => {
             return optimised;
