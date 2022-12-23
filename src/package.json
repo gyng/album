@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "deploy:vercel": "npx vercel build --prod && npx vercel deploy --prebuilt --prod",
     "dev": "next dev",
     "build": "next build",
     "start": "next start",

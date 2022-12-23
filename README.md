@@ -1,18 +1,21 @@
 # album
 
-[https://album-bice.vercel.app/](https://album-bice.vercel.app/)
+[Demo](https://album-gyng.vercel.app/)
 
-Very very rough Next.JS photo album weekend project.
+A zero-config static album generator
 
-- JSON-defined albums, with editor interface in development mode
+- Dump your photos in a directory and run one command to deploy
+- Optionally, create JSON-defined albums, with editor interface in development mode
 - EXIF support
-- Next.JS static build, deployed on Vercel (due to filesize concerns)
-- Custom image optimisation, skipping `next/image`
+- Next.JS static build, deployed on Vercel
+- Custom image optimisation, resizing
+
+This is a weekend project! Very, very, rough Next.JS project.
 
 ## Usage
 
 1. Each album is a directory in `public/data/`. Optionally add a `manifest.json` in this directory. If there is no `manifest.json`, a default one is automatically used.
-2. Deploy to GHA, or deploy as a normal Next.js app elsewhere.
+2. Deploy to GHA, or deploy as a normal Next.js app elsewhere. The demo site is deployed to Vercel for convenience.
 
 ## Wishlist
 
