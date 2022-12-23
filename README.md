@@ -2,6 +2,10 @@
 
 [Demo](https://album-gyng.vercel.app/)
 
+| Index                                                                                                         | Album                                                                                                         | Edit                                                                                                              |
+| ------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| ![Index](https://user-images.githubusercontent.com/370496/209406151-e13ef6fc-eb25-41a0-a7d3-293bc69d9c09.png) | ![Album](https://user-images.githubusercontent.com/370496/209406166-e47e6a0e-abda-4b47-8856-862424fd3966.png) | ![Edit mode](https://user-images.githubusercontent.com/370496/209406238-be8a6a82-eb64-4455-a4a5-7e70eba7c15f.png) |
+
 A zero-config static album generator
 
 - Dump your photos in a directory and run one command to deploy
