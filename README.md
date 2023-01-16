@@ -18,18 +18,20 @@ This is a weekend project! Very, very, rough Next.JS project.
 
 ## Usage
 
-1. Each album is a directory in `public/data/`. Optionally add a `manifest.json` in this directory. If there is no `manifest.json`, a default one is automatically used.
+1. Each album is a directory in `src/public/data/`. Optionally add a `manifest.json` in this directory. If there is no `manifest.json`, a default one is automatically used.
    ```
-   /
-   └ public
-     └ data
-       ├ my-album
-       │ ├ pic1.jpg
-       │ └ pic2.jpg
-       └ my-album-with-manifest
-         ├ manifest.json
-         └ pic.jpg
+   /src
+   └─public
+     └─data
+       └─albums
+         ├─my-album
+         │ ├─pic1.jpg
+         │ └─pic2.jpg
+         └─my-album-with-manifest
+           ├─manifest.json
+           └─pic.jpg
    ```
+   See [/src/public/data/albums](/src/public/data/albums) for examples.
 
 2. Deploy to GHA, or deploy as a normal Next.js app elsewhere. The demo site is deployed to Vercel for convenience.
 
