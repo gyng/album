@@ -33,14 +33,14 @@ You will need Node installed. The following steps are for deployment on Vercel, 
    ```
 
 1. Add your photos in a directory! Each album is a directory in `src/public/data/albums`.
-   ```
+   ```diff
    /src
    └─public
      └─data
        └─albums
-         ├─my-album
-         │ ├─pic1.jpg
-         │ └─pic2.jpg
+   +     ├─my-album
+   +     │ ├─pic1.jpg
+   +     │ └─pic2.jpg
          └─my-album-with-manifest
            ├─manifest.json
            └─pic.jpg
