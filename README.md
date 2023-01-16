@@ -17,8 +17,10 @@ A zero-config static album generator
 Constraints
 
 - Minimal friction between camera and publishing on web
+- No running infrastructure
 - EXIF and GPS data
 - Photos are size-optimised for mobile viewing
+- Free hosting!
 
 This is a weekend project! Very, very, rough Next.JS project.
 
