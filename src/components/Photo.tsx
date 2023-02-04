@@ -478,14 +478,14 @@ export const PhotoBlockEl: React.FC<{
                 ) : null}
               </div>
 
-              <details>
-                <summary>License</summary>
-                <License />
-              </details>
-
               <details className={styles.rawDetails}>
                 <summary>Raw EXIF</summary>
                 <pre>{JSON.stringify(props.block._build.exif, null, 2)}</pre>
+              </details>
+
+              <details>
+                <summary>License</summary>
+                <License />
               </details>
             </div>
           </div>
