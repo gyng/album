@@ -7,6 +7,7 @@ import React from "react";
 import { MoveControl } from "./editor/MoveBlock";
 import { InputFieldControl } from "./editor/InputFieldControl";
 import { DeleteBlock } from "./editor/DeleteBlock";
+import { License } from "../License";
 
 type ExifCoordinatesRowProps = {
   kind: "coordinates";
@@ -476,6 +477,11 @@ export const PhotoBlockEl: React.FC<{
                   </>
                 ) : null}
               </div>
+
+              <details>
+                <summary>License</summary>
+                <License />
+              </details>
 
               <details className={styles.rawDetails}>
                 <summary>Raw EXIF</summary>

@@ -62,6 +62,8 @@ You will need Node installed. The following steps are for deployment on Vercel, 
   
 3. To use the manifest creator, run `npm run dev` or `yarn dev` and visit your album's page. Click the `Edit` link at the top.
 
+Be sure to configure your license for _all_ images in `src/License.tsx`. By default all photos are licensed under CC BY-NC 4.0.
+
 ## Wishlist
 
 - Camera RAW
