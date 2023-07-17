@@ -7,12 +7,6 @@
   padding: 0 var(--m) var(--m) 0;
 }
 
-.permalink {
-  text-align: right;
-  color: var(--c-bg-contrast-light);
-  align-self: flex-end;
-}
-
 .details {
   grid-column: 1;
   grid-row: 1;
@@ -36,8 +30,9 @@
   align-items: flex-end;
   flex-direction: column;
   padding: var(--m-m);
-  margin-top: var(--m-m);
+  margin-top: var(--m-s);
   background-color: var(--c-overlay);
+  backdrop-filter: blur(8px);
 }
 
 .details details {

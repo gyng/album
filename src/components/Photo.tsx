@@ -294,9 +294,11 @@ export type PhotoBlockEditDetails = {
   description: string;
 };
 
-export const Picture: React.FC<{ block: PhotoBlock; thumb?: boolean }> = (
-  props
-) => {
+export const Picture: React.FC<{
+  block: PhotoBlock;
+  thumb?: boolean;
+  lazy?: boolean;
+}> = (props) => {
   return (
     <picture className={styles.imageWrapper} data-testid="picture">
       {props.block._build.srcset.map((srcset) => (
@@ -304,13 +306,15 @@ export const Picture: React.FC<{ block: PhotoBlock; thumb?: boolean }> = (
           key={srcset.src}
           srcSet={srcset.src}
           media={`(max-width: ${srcset.width * (props.thumb ? 3 : 1.1)}px)`}
+          width={props.block._build.width}
+          height={props.block._build.height}
         />
       ))}
 
       <img
         className={styles.image}
         src={props.block.data.src}
-        loading="lazy"
+        loading={props.lazy === false ? "eager" : "lazy"}
         style={{
           aspectRatio: `${props.block._build.width} / ${props.block._build.height}`,
         }}
@@ -344,7 +348,7 @@ export const PhotoBlockEl: React.FC<{
       ref={anchorRef}
       data-testid="photoblockel"
     >
-      <Picture block={props.block} />
+      <Picture block={props.block} lazy={props.currentIndex < 2} />
 
       <div className={styles.overlayHeader}>
         {props.block.data.title ? (
@@ -362,14 +366,13 @@ export const PhotoBlockEl: React.FC<{
 
       <div className={styles.details}>
         <details>
-          <summary title="More details&hellip;">
+          <summary
+            title="More details&hellip;"
+            className={styles.detailsSummary}
+          >
             <span>ⓘ</span>
           </summary>
           <div className={styles.detailsContent}>
-            <a className={styles.permalink} href={`#${props.block.id}`}>
-              Permalink
-            </a>
-
             <div className={styles.exif}>
               <ExifTable
                 rows={[
@@ -470,12 +473,17 @@ export const PhotoBlockEl: React.FC<{
                         props.block._build.exif.LensModel
                     ),
                   },
-
                   //   { kind: "kv", k: "Software", v: [props.block._build.exif.Software].join(" ") },
+                  {
+                    kind: "kv",
+                    k: "Original size",
+                    v: `${props.block._build.width}px × ${props.block._build.height}px`,
+                  },
                 ]}
               />
 
               <div className={styles.viewOriginal}>
+                <a href={`#${props.block.id}`}>Permalink</a>&nbsp;&middot;&nbsp;
                 View{" "}
                 <a href={props.block.data.src} target="_blank" rel="noreferrer">
                   original

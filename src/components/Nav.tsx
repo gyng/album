@@ -12,7 +12,7 @@ export const Nav: React.FC<{ isEditing: boolean; editable: boolean }> = (
       <ul>
         <li>
           <Link href="/" style={{ textDecoration: "none" }}>
-            ← Album list
+            ← Albums
           </Link>
         </li>
 

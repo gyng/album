@@ -1,7 +1,7 @@
 .marker {
-  font-size: 32px;
-  text-shadow: 1px 1px 2px black, -1px -1px 2px black, -1px 1px 2px black,
-    1px -1px 2px black;
+  fill: red;
+  stroke: var(--c-bg-contrast-light);
+  stroke-width: 1px;
 }
 
 .viewOn {
