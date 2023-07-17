@@ -7,8 +7,7 @@
     auto-fit,
     minmax(min(calc(100svw - 2 * var(--m-xl)), 320px), 1fr)
   );
-  grid-template-rows: repeat(auto-fit, minmax(500px, max-content));
-  grid-template-rows: masonry;
+  grid-auto-rows: 1fr;
   gap: var(--m-xl);
   max-width: 1400px;
 }
