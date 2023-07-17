@@ -27,6 +27,7 @@ export interface PhotoBlock extends IBlock {
   };
   formatting?: {
     immersive?: boolean;
+    cover?: boolean;
   };
   _build: {
     height: number;
@@ -45,6 +46,7 @@ export interface SerializedPhotoBlock extends Partial<PhotoBlock> {
   };
   formatting?: {
     immersive?: boolean;
+    cover?: boolean;
   };
 }
 

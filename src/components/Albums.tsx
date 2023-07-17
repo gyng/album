@@ -7,7 +7,10 @@ export const Albums: React.FC<{ albums: Content[] }> = (props) => {
   return (
     <ul className={styles.list}>
       {props.albums.map((album) => {
-        const cover = album.blocks.find((b) => b.kind === "photo");
+        const firstPhoto = album.blocks.find((b) => b.kind === "photo");
+        const cover =
+          album.blocks.find((b) => b.kind === "photo" && b.formatting?.cover) ??
+          firstPhoto;
 
         const timeRange = album._build?.timeRange
           ?.filter(Boolean)

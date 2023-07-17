@@ -88,9 +88,13 @@ export const getAlbumWithoutManifest = async (
     },
   }));
 
+  const coverBlock: SerializedPhotoBlock | null =
+    photoBlocks.find((b) => b.data.src.includes("cover")) ?? null;
+
   const anonymousManifest: SerializedContent = {
     name: dirname,
     title: dirname,
+    ...(coverBlock ? { cover: coverBlock } : {}),
     formatting: {},
     blocks: [titleBlock, ...photoBlocks],
   };

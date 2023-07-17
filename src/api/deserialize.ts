@@ -40,6 +40,10 @@ export const deserializePhotoBlock = async (
 
   const copy: PhotoBlock = {
     ...block,
+    formatting: {
+      cover: block.data.src.includes("cover"),
+      ...block.formatting,
+    },
     data: {
       ...block.data,
       src: stripPublicFromPath(path.join(options.dirname, block.data.src)),

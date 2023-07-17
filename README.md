@@ -29,12 +29,14 @@ This is a weekend project! Very, very, rough Next.JS project.
 You will need Node installed. The following steps are for deployment on Vercel, but you can deploy elsewhere &mdash; this is a standard Next.js application.
 
 0. Clone the repo and then log in to Vercel
+
    ```
    $ git clone https://github.com/gyng/album.git
    $ cd album/src/public/data/albums
    ```
 
 1. Add your photos in a directory! Each album is a directory in `src/public/data/albums`.
+
    ```diff
    /src
    └─public
@@ -42,12 +44,15 @@ You will need Node installed. The following steps are for deployment on Vercel, 
        └─albums
    +     ├─my-album
    +     │ ├─pic1.jpg
-   +     │ └─pic2.jpg
+   +     │ └─cover.pic2.jpg
          └─my-album-with-manifest
            ├─manifest.json
            └─pic.jpg
    ```
-   Optionally, add a `manifest.json` in this directory to add annotations basic layout, and other text. If there is no `manifest.json`, a default one is automatically used. See [/src/public/data/albums](/src/public/data/albums) for examples.
+
+   Include `cover` in the filename to set it as the album cover on the index page. The first photo is otherwise used by default.
+
+   Optionally, add a `manifest.json` in this directory to add annotations basic layout, and other text. If there is no `manifest.json`, a default one is automatically used. See [/src/public/data/albums](/src/public/data/albums) for examples. When using a manual manifest, explicitly set a photo block's `formatting.cover` to `true`.
 
 2. Deploy on Vercel (or elsewhere).
 
@@ -58,7 +63,7 @@ You will need Node installed. The following steps are for deployment on Vercel, 
    $ npx vercel@latest build --prod
    $ npx vercel@latest deploy --prebuilt --prod
    ```
-  
+
 3. To use the manifest creator, run `npm run dev` or `yarn dev` and visit your album's page. Click the `Edit` link at the top.
 
 Be sure to configure your license for _all_ images in `src/License.tsx`. By default all photos are licensed under CC BY-NC 4.0.

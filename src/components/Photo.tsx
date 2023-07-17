@@ -114,6 +114,29 @@ const EditPhotoBlock: React.FC<{
           <span>Full-width</span>
         </div>
       </label>
+
+      <label>
+        <div className={editStyles.checkboxRow}>
+          <input
+            type="checkbox"
+            checked={props.block.formatting?.immersive}
+            onChange={(ev) => {
+              props.edit.onEdit(
+                {
+                  ...props.block,
+                  data: { ...props.block.data },
+                  formatting: {
+                    ...props.block.formatting,
+                    cover: ev.target.checked,
+                  },
+                },
+                props.currentIndex
+              );
+            }}
+          />
+          <span>Use as album cover</span>
+        </div>
+      </label>
     </div>
   );
 };

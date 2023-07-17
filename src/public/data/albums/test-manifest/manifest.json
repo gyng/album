@@ -2,6 +2,7 @@
   "name": "test-manifest",
   "title": "manifest",
   "kicker": "",
+  "cover": null,
   "formatting": {
     "overlay": true
   },
@@ -35,6 +36,9 @@
       "kind": "photo",
       "data": {
         "src": "DSCF2581-2_2.jpg"
+      },
+      "formatting": {
+        "cover": true
       }
     }
   ]
