@@ -298,7 +298,7 @@ export const Picture: React.FC<{ block: PhotoBlock; thumb?: boolean }> = (
   props
 ) => {
   return (
-    <picture className={styles.imageWrapper}>
+    <picture className={styles.imageWrapper} data-testid="picture">
       {props.block._build.srcset.map((srcset) => (
         <source
           key={srcset.src}
@@ -342,6 +342,7 @@ export const PhotoBlockEl: React.FC<{
       }`}
       id={props.block.id}
       ref={anchorRef}
+      data-testid="photoblockel"
     >
       <Picture block={props.block} />
 
