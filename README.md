@@ -84,3 +84,7 @@ Be sure to configure your license for _all_ images in `src/License.tsx`. By defa
 - Themes
 - Polish
 - Don't optimise all images until export/build-time
+
+## Privacy notes
+
+Analytics is integrated into the app at `_app.tsx`. Remove the `<Analytics />` component to remove any analytics. See [Next.js docs on analytics](https://vercel.com/docs/concepts/analytics) for more details.
