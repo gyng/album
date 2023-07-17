@@ -24,7 +24,12 @@ export const Albums: React.FC<{ albums: Content[] }> = (props) => {
               aria-label={`View photo album: ${album._build.slug}`}
             >
               {cover ? (
-                <Picture block={cover as PhotoBlock} thumb lazy={i > 9} />
+                <Picture
+                  block={cover as PhotoBlock}
+                  thumb
+                  lazy={i > 9}
+                  alt={`Album cover for ${album._build.slug}`}
+                />
               ) : null}
             </Link>
 
