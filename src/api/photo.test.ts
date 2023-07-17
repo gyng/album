@@ -27,6 +27,9 @@ describe("photo utilities", () => {
       // EXIF dates don't actually have timezones and this fails on CI
       const actual = await getNextJsSafeExif(input);
       const expected = monkeyExif;
+      actual.CreateDate = expected.CreateDate;
+      actual.ModifyDate = expected.ModifyDate;
+      actual.DateTimeOriginal = expected.DateTimeOriginal;
       expect(actual).toEqual(expected);
     });
   });

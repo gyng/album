@@ -9,8 +9,8 @@
     "start": "next start",
     "lint": "next lint && prettier --check .",
     "lint:fix": "prettier --write .",
-    "test": "TZ=utc jest --watch",
-    "test:ci": "npm run lint && TZ=utc jest --coverage --detectOpenHandles"
+    "test": "jest --watch",
+    "test:ci": "jest && npm run lint"
   },
   "dependencies": {
     "@vercel/analytics": "^1.0.1",

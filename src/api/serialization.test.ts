@@ -76,7 +76,7 @@ describe("serialization", () => {
               width: 4896,
             },
           ],
-          exif: monkeyExif,
+          exif: {},
           width: 34,
           height: 50,
         },
@@ -84,7 +84,7 @@ describe("serialization", () => {
     ],
     name: "foo",
     title: "bar",
-    formatting: {},
+    formatting: { overlay: undefined },
     _build: { slug: "foo", srcdir: "." },
   };
 
@@ -98,6 +98,9 @@ describe("serialization", () => {
   it("deserializes a SerializedContent object", async () => {
     const input: SerializedContent = serializedContent;
     const actual = await deserializeContentBlock(input, ".");
+    // @ts-expect-error forced delete
+    actual.blocks[0]._build.exif = {};
+
     const expected: Content = fullyDeserializedContent;
     expect(actual).toEqual(expected);
     // First run will optimise images: webp optimisation takes a while

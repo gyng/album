@@ -2,3 +2,4 @@ public/data
 next.config.js
 .next/
 .vercel/
+coverage
