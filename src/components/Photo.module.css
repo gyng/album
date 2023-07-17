@@ -17,10 +17,9 @@
   position: sticky;
   right: var(--m-l);
   place-self: start end;
-  max-width: calc(100svw - var(--m-l));
-  max-width: calc(100vw - var(--m-l));
+  max-width: calc(100svw - var(--m-m));
+  max-width: calc(100vw - var(--m-m));
   scrollbar-gutter: stable;
-  background-blend-mode: darken;
   z-index: 300;
   margin-top: -40px;
 }
@@ -56,7 +55,14 @@
 .imageWrapper {
   grid-column: 1;
   grid-row: 1;
-  place-self: center;
+  /* place-self: center; */
+  container-type: inline-size;
+}
+
+@container (min-height: 100px) {
+  .image {
+    height: 90svh;
+  }
 }
 
 .image {

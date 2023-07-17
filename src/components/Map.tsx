@@ -40,7 +40,8 @@ export const MMap: React.FC<MapProps> = (props) => {
     <div
       style={{
         height: 300,
-        width: 300,
+        maxWidth: 300,
+        width: "auto",
         display: "flex",
         flexDirection: "column",
       }}
