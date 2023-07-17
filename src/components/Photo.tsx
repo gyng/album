@@ -406,6 +406,7 @@ export const PhotoBlockEl: React.FC<{
                             props.block._build.exif.ExposureTime
                           }s` // FRACTION_SLASH gives us nice ligatured fractions (eg, 1⁄10)
                         : `${props.block._build.exif.ExposureTime}s`,
+                    valid: Boolean(props.block._build.exif.ExposureTime),
                   },
                   {
                     kind: "kv",
