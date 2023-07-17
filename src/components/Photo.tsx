@@ -348,7 +348,7 @@ export const PhotoBlockEl: React.FC<{
       ref={anchorRef}
       data-testid="photoblockel"
     >
-      <Picture block={props.block} lazy={props.currentIndex < 2} />
+      <Picture block={props.block} lazy={props.currentIndex > 2} />
 
       <div className={styles.overlayHeader}>
         {props.block.data.title ? (
