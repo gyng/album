@@ -305,7 +305,7 @@ export const Picture: React.FC<{
         <source
           key={srcset.src}
           srcSet={srcset.src}
-          media={`(max-width: ${srcset.width * (props.thumb ? 3 : 1.1)}px)`}
+          media={`(max-width: ${srcset.width * (props.thumb ? 2 : 1.1)}px)`}
           width={props.block._build.width}
           height={props.block._build.height}
         />

@@ -3,8 +3,12 @@
   padding: 0;
   margin: 0;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-  grid-template-rows: repeat(auto-fit, minmax(600px, max-content));
+  grid-template-columns: repeat(
+    auto-fit,
+    minmax(min(calc(100svw - 2 * var(--m-xl)), 320px), 1fr)
+  );
+  grid-template-rows: repeat(auto-fit, minmax(500px, max-content));
+  grid-template-rows: masonry;
   gap: var(--m-xl);
   max-width: 1400px;
 }
