@@ -441,7 +441,7 @@ export const PhotoBlockEl: React.FC<{
                   },
                   {
                     kind: "kv",
-                    k: "Datetime",
+                    k: "Camera datetime",
                     v: props.block._build.exif.DateTimeOriginal?.replace(
                       /Z$/,
                       ""
