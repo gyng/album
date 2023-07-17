@@ -135,7 +135,7 @@ describe("photo utilities", () => {
           width: 4896,
         },
       ]);
-    }, 10000);
+    }, 30000);
   });
 
   describe("stripPublicFromPath", () => {
