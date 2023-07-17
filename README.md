@@ -28,7 +28,7 @@ This is a weekend project! Very, very, rough Next.JS project.
 
 You will need Node installed. The following steps are for deployment on Vercel, but you can deploy elsewhere &mdash; this is a standard Next.js application.
 
-0. Clone the repo and then log in to Vercel
+0. Clone the repo
 
    ```
    $ git clone https://github.com/gyng/album.git
