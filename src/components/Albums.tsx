@@ -6,7 +6,7 @@ import styles from "./Album.module.css";
 export const Albums: React.FC<{ albums: Content[] }> = (props) => {
   return (
     <ul className={styles.list}>
-      {props.albums.map((album) => {
+      {props.albums.map((album, i) => {
         const firstPhoto = album.blocks.find((b) => b.kind === "photo");
         const cover =
           album.blocks.find((b) => b.kind === "photo" && b.formatting?.cover) ??
@@ -22,7 +22,9 @@ export const Albums: React.FC<{ albums: Content[] }> = (props) => {
               href={`/album/${album._build.slug}`}
               className={styles.itemLink}
             >
-              {cover ? <Picture block={cover as PhotoBlock} thumb /> : null}
+              {cover ? (
+                <Picture block={cover as PhotoBlock} thumb lazy={i > 9} />
+              ) : null}
             </Link>
 
             <div>
