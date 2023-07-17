@@ -55,14 +55,6 @@
 .imageWrapper {
   grid-column: 1;
   grid-row: 1;
-  /* place-self: center; */
-  container-type: inline-size;
-}
-
-@container (min-height: 100px) {
-  .image {
-    height: 90svh;
-  }
 }
 
 .image {
@@ -70,10 +62,9 @@
   max-height: 90svh;
   max-width: min(90vw, 100%);
   height: auto;
-  width: auto;
   display: block;
-  background-color: var(--c-bg-contrast-dark);
   margin: 0 auto;
+  object-fit: contain;
 }
 
 .th {
