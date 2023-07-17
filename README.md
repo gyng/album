@@ -52,7 +52,9 @@ You will need Node installed. The following steps are for deployment on Vercel, 
 
    Include `cover` in the filename to set it as the album cover on the index page. The first photo is otherwise used by default.
 
-   Optionally, add a `manifest.json` in this directory to add annotations basic layout, and other text. If there is no `manifest.json`, a default one is automatically used. See [/src/public/data/albums](/src/public/data/albums) for examples. When using a manual manifest, explicitly set a photo block's `formatting.cover` to `true`.
+   Optionally, add a `manifest.json` in this directory to add annotations basic layout, and other text. If there is no `manifest.json`, a default one is automatically used.
+
+   Manifest creation mode is only enabled in local (`npm run dev`). Copy the manifest output from this mode into the album's directory as `manifest.json`. See [/src/public/data/albums](/src/public/data/albums) for examples.
 
 2. Deploy on Vercel (or elsewhere).
 
