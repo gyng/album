@@ -30,10 +30,10 @@ export const getPhotoSize = async (
 // TODO: typedef any
 export const getNextJsSafeExif = async (filepath: string): Promise<any> => {
   // EXIF dates are resolved to relative datetime: this is wrong behaviour
-  // so turn that off
+  // but we are lazy and don't want to turn that off as we need to compare dates
   // https://github.com/MikeKovarik/exifr/issues/51
   return exifr
-    .parse(filepath, { reviveValues: false })
+    .parse(filepath, { reviveValues: true })
     .then((res) => {
       // Next.js doesn't serialize Date objects
       return JSON.parse(JSON.stringify(res));
