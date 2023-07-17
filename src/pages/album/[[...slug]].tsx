@@ -95,19 +95,39 @@ const Album: NextPage<PageProps> = ({ album, edit, editable }) => {
     },
   };
 
+  // SEO/Meta tag generation
+  const title =
+    statefulAlbum.title ?? statefulAlbum.name ?? statefulAlbum._build.slug;
+
+  const imageCount = statefulAlbum.blocks.filter(
+    (b) => b.kind === "photo"
+  ).length;
+
+  const cover =
+    statefulAlbum.blocks.find(
+      (b) => b.kind === "photo" && b.formatting?.cover
+    ) ?? statefulAlbum.blocks.find((b) => b.kind === "photo");
+
   return (
     <>
       <Head>
-        <title>
-          {statefulAlbum.title ??
-            statefulAlbum.name ??
-            statefulAlbum._build.slug}
-        </title>
+        <title>{title}</title>
         {album.kicker ? (
           <meta name="description" content={album.kicker} />
-        ) : null}
+        ) : (
+          <meta
+            name="description"
+            content={`${title} photo album: ${imageCount} photos`}
+          />
+        )}
         <link rel="icon" href="/favicon.svg" />
         <meta name="theme-color" content="#2c2c2c" />
+        {cover ? (
+          <meta
+            property="og:image"
+            content={(cover as PhotoBlock)._build.srcset?.[0].src}
+          />
+        ) : null}
       </Head>
 
       <Nav isEditing={Boolean(edit)} editable={Boolean(editable)} />

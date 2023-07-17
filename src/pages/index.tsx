@@ -14,7 +14,7 @@ const Home: NextPage<PageProps> = (context) => {
     <div className={styles.container}>
       <Head>
         <title>Albums</title>
-        <meta name="description" content="Snapshots." />
+        <meta name="description" content="Snapshots from a better era." />
         <link rel="icon" href="/favicon.svg" />
         <meta name="theme-color" content="#2c2c2c" />
       </Head>
