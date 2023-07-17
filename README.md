@@ -74,6 +74,7 @@ Be sure to configure your license for _all_ images in `src/License.tsx`. By defa
 
 ## Wishlist
 
+- EXIF stripping via filename
 - Camera RAW
 - Split data from app
 - Automatic external storage
