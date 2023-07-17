@@ -21,6 +21,7 @@ export const Albums: React.FC<{ albums: Content[] }> = (props) => {
             <Link
               href={`/album/${album._build.slug}`}
               className={styles.itemLink}
+              aria-label={`View photo album: ${album._build.slug}`}
             >
               {cover ? (
                 <Picture block={cover as PhotoBlock} thumb lazy={i > 9} />
@@ -31,6 +32,7 @@ export const Albums: React.FC<{ albums: Content[] }> = (props) => {
               <Link
                 href={`/album/${album._build.slug}`}
                 className={styles.name}
+                aria-label={`View photo album: ${album._build.slug}`}
               >
                 <h2>{album.title ?? album.name}</h2>
               </Link>
