@@ -1,7 +1,7 @@
 import path from "path";
 import fs from "fs";
 import { OptimisedPhoto } from "./types";
-import exifr from "exifr";
+import exifr, { Exifr } from "exifr";
 import sizeOf from "image-size";
 import sharp from "sharp";
 
@@ -29,8 +29,11 @@ export const getPhotoSize = async (
 
 // TODO: typedef any
 export const getNextJsSafeExif = async (filepath: string): Promise<any> => {
+  // EXIF dates are resolved to relative datetime: this is wrong behaviour
+  // so turn that off
+  // https://github.com/MikeKovarik/exifr/issues/51
   return exifr
-    .parse(filepath)
+    .parse(filepath, { reviveValues: false })
     .then((res) => {
       // Next.js doesn't serialize Date objects
       return JSON.parse(JSON.stringify(res));
