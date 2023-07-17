@@ -298,7 +298,7 @@ export const Picture: React.FC<{
   block: PhotoBlock;
   thumb?: boolean;
   lazy?: boolean;
-  alt?: string;
+  label?: string;
 }> = (props) => {
   return (
     <picture className={styles.imageWrapper} data-testid="picture">
@@ -323,11 +323,11 @@ export const Picture: React.FC<{
         width={props.block._build.width}
         height={props.block._build.height}
         alt={
-          props.alt ??
           props.block.data.title ??
           props.block.data.kicker ??
           props.block.data.description
         }
+        aria-label={props.label}
       />
     </picture>
   );

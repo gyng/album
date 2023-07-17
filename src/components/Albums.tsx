@@ -28,7 +28,7 @@ export const Albums: React.FC<{ albums: Content[] }> = (props) => {
                   block={cover as PhotoBlock}
                   thumb
                   lazy={i > 9}
-                  alt={`Album cover for ${album._build.slug}`}
+                  label={`Album cover for ${album._build.slug}`}
                 />
               ) : null}
             </Link>
