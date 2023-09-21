@@ -2,9 +2,9 @@
 
 [Demo](https://album-gyng.vercel.app/)
 
-| Index                                                                                                         | Album                                                                                                         | Edit                                                                                                              |
-| ------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| ![Index](https://user-images.githubusercontent.com/370496/209406151-e13ef6fc-eb25-41a0-a7d3-293bc69d9c09.png) | ![Album](https://user-images.githubusercontent.com/370496/209406166-e47e6a0e-abda-4b47-8856-862424fd3966.png) | ![Edit mode](https://user-images.githubusercontent.com/370496/209406238-be8a6a82-eb64-4455-a4a5-7e70eba7c15f.png) |
+| Index                                                                                                         | Album                                                                                                         |
+| ------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| ![Index](https://user-images.githubusercontent.com/370496/209406151-e13ef6fc-eb25-41a0-a7d3-293bc69d9c09.png) | ![Album](https://user-images.githubusercontent.com/370496/209406166-e47e6a0e-abda-4b47-8856-862424fd3966.png) |
 
 A zero-config static album generator
 
@@ -46,15 +46,31 @@ You will need Node installed. The following steps are for deployment on Vercel, 
    +     │ ├─pic1.jpg
    +     │ └─cover.pic2.jpg
          └─my-album-with-manifest
-           ├─manifest.json
+           ├─album.json
            └─pic.jpg
    ```
 
    Include `cover` in the filename to set it as the album cover on the index page. The first photo is otherwise used by default.
 
+   ### Album configuration
+
+   Optionally, add an `album.json` to the album directory to do album-level configuration.
+
+   ```ts
+   {
+      // Defaults to oldest-first
+      sort?: "newest-first" | "oldest-first"
+   }
+   ```
+
+   <details>
+   <summary>v1 manifest (deprecated)</summary>
+   V1 manifest is overly difficult to use and will be removed.
+
    Optionally, add a `manifest.json` in this directory to add annotations, basic layout, and other text. If there is no `manifest.json`, a default one is automatically used.
 
    Manifest creation mode is only enabled in local (`npm run dev`). Copy the manifest output from this mode into the album's directory as `manifest.json`. See [/src/public/data/albums](/src/public/data/albums) for examples.
+   </details>
 
 2. Deploy on Vercel (or elsewhere).
 

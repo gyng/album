@@ -69,6 +69,7 @@ export type Content = {
   order?: number;
   formatting: {
     overlay?: boolean;
+    sort?: "newest-first" | "oldest-first";
   };
   _build: {
     slug: string;
@@ -85,7 +86,14 @@ export interface SerializedContent {
   blocks: SerializedBlock[];
   formatting: {
     overlay?: boolean;
+    sort?: "newest-first" | "oldest-first";
   };
+}
+
+export interface V2AlbumMetadata {
+  sort?: "newest-first" | "oldest-first";
+  // cover?: string;
+  // TODO: use EXIF for title/notes
 }
 
 export type OnEditFn = (newBlock: IBlock, newIndex?: number) => void;

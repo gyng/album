@@ -9,10 +9,16 @@ import {
   SerializedContent,
   SerializedPhotoBlock,
   SerializedTextBlock,
+  V2AlbumMetadata,
 } from "./types";
 
 export const ALBUMS_DIR = "public/data/albums";
 export const MANIFEST_NAME = "manifest.json";
+export const MANIFEST_V2_NAME = "album.json";
+
+export const stripDirectoryCommands = (input: string): string => {
+  return input.replaceAll(".newest-first", "");
+};
 
 export const getImageTimestampRange = (
   album: Content
@@ -95,7 +101,9 @@ export const getAlbumWithoutManifest = async (
     name: dirname,
     title: dirname,
     ...(coverBlock ? { cover: coverBlock } : {}),
-    formatting: {},
+    formatting: {
+      sort: dirname.includes(".newest-first") ? "newest-first" : "oldest-first",
+    },
     blocks: [titleBlock, ...photoBlocks],
   };
 
@@ -119,12 +127,18 @@ export const getAlbum = async (
   /** Directory, eg, public/data/albums/simple */
   albumPath: string
 ): Promise<Content> => {
+  // v1 manifest: legacy support from LoL, internal serialisation format
   const isManifest = fs.existsSync(path.join(albumPath, MANIFEST_NAME));
 
-  if (isManifest) {
+  // V2 manifest exists: use it instead of v1 manifest
+  const isV2Manifest = fs.existsSync(path.join(albumPath, MANIFEST_V2_NAME));
+
+  if (isManifest && !isV2Manifest) {
     return getAlbumWithManifest(albumPath);
   } else {
     let manifest = await getAlbumWithoutManifest(albumPath);
+
+    // Sort by date
     manifest.blocks = manifest.blocks.sort((a, b) => {
       return (
         Date.parse((a as PhotoBlock)._build?.exif?.DateTimeOriginal ?? 0) -
@@ -132,6 +146,7 @@ export const getAlbum = async (
       );
     });
 
+    // Set defaults
     const title = manifest.blocks.at(0);
     if (title?.kind === "text") {
       const range = getImageTimestampRange(manifest).map((ts) =>
@@ -140,6 +155,41 @@ export const getAlbum = async (
       title.data.kicker = `${range[0]}${
         range[1] === range[0] ? "" : `–${range[1]}`
       }`;
+    }
+
+    // TODO: clean this up by splitting this up
+    // and default behaviour (no v1 manifest or v2 manifest)
+    if (isV2Manifest) {
+      const v2Config = fs.readFileSync(
+        path.join(albumPath, MANIFEST_V2_NAME),
+        "utf-8"
+      );
+      const v2Manifest = JSON.parse(v2Config) as V2AlbumMetadata;
+      if (v2Manifest.sort === "newest-first") {
+        manifest.blocks = manifest.blocks.sort((a, b) => {
+          return (
+            Date.parse(
+              (b as PhotoBlock)._build?.exif?.DateTimeOriginal ??
+                Number.MAX_VALUE
+            ) -
+            Date.parse(
+              (a as PhotoBlock)._build?.exif?.DateTimeOriginal ??
+                Number.MAX_VALUE
+            )
+          );
+        });
+
+        // TODO: DRY this out with above
+        const title = manifest.blocks.at(0);
+        if (title?.kind === "text") {
+          const range = getImageTimestampRange(manifest).map((ts) =>
+            new Date(ts!).getFullYear()
+          ) ?? [0, 0];
+          title.data.kicker = `${range[1]}${
+            range[1] === range[0] ? "" : `–${range[0]}`
+          }`;
+        }
+      }
     }
 
     return manifest;
