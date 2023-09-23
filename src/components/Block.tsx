@@ -1,4 +1,4 @@
-import { Block, PhotoBlock, TextBlock } from "../api/types";
+import { Block, PhotoBlock, TextBlock } from "../services/types";
 import { EditPhotoBlockOptions, PhotoBlockEl } from "./Photo";
 import { EditTextBlockOptions, TextBlockEl } from "./TextBlock";
 

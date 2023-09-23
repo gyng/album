@@ -1,7 +1,7 @@
 /* eslint react-hooks/exhaustive-deps: 0 */
 
 import React from "react";
-import { IBlock } from "../../api/types";
+import { IBlock } from "../../services/types";
 import styles from "../Photo.module.css";
 
 export const MoveControl: React.FC<{

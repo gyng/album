@@ -2,8 +2,9 @@ import type { GetStaticProps, NextPage } from "next";
 import Head from "next/head";
 import { Albums } from "../components/Albums";
 import styles from "./Index.module.css";
-import { getAlbums, getImageTimestampRange } from "../api/album";
-import { Content } from "../api/types";
+import { getAlbums, getImageTimestampRange } from "../services/album";
+import { Content } from "../services/types";
+import DynamicSearchWithCoi from "../components/search/DynamicSearchWithCoi";
 
 type PageProps = {
   albums: Content[];
@@ -13,14 +14,15 @@ const Home: NextPage<PageProps> = (context) => {
   return (
     <div className={styles.container}>
       <Head>
-        <title>Albums</title>
-        <meta name="description" content="Snapshots from a better era." />
+        <title>Snapshots</title>
+        <meta name="description" content="Snapshots from a better era" />
         <link rel="icon" href="/favicon.svg" />
         <meta name="theme-color" content="#2c2c2c" />
       </Head>
 
       <main className={styles.main}>
-        <h1>Albums</h1>
+        <h1>Snapshots</h1>
+        <DynamicSearchWithCoi />
         <Albums albums={context.albums} />
       </main>
 
@@ -51,6 +53,8 @@ export const getStaticProps: GetStaticProps<PageProps> = async (context) => {
     props: {
       albums: albums.map((a) => ({
         ...a,
+        // Reduce page data size by only providing a partial list
+        blocks: [...a.blocks.slice(0, 3)],
         _build: { ...a._build, timeRange: getImageTimestampRange(a) }, // FIXME: Unoptimal
       })),
     },

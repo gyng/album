@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Content, PhotoBlock } from "../api/types";
+import { Content, PhotoBlock } from "../services/types";
 import { Picture } from "./Photo";
 import styles from "./Album.module.css";
 

@@ -1,4 +1,4 @@
-import { Content, IBlock, PhotoBlock, TextBlock } from "../api/types";
+import { Content, IBlock, PhotoBlock, TextBlock } from "../services/types";
 import { BlockControl, BlockControlOptions } from "./editor/BlockControl";
 import { EditPhotoBlockOptions, PhotoBlockEl } from "./Photo";
 import styles from "./PhotoAlbum.module.css";

@@ -1,4 +1,4 @@
-import { OnDeleteFn, OnEditFn, TextBlock } from "../api/types";
+import { OnDeleteFn, OnEditFn, TextBlock } from "../services/types";
 import styles from "./TextBlock.module.css";
 import editStyles from "./EditContainer.module.css";
 import { MoveControl } from "./editor/MoveBlock";

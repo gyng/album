@@ -1,4 +1,4 @@
-import { OnDeleteFn, OnEditFn } from "../../api/types";
+import { OnDeleteFn, OnEditFn } from "../../services/types";
 
 export type DeleteBlockOptions = {
   isEditing: boolean;

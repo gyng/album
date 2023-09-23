@@ -1,5 +1,5 @@
 import { render, screen } from "@testing-library/react";
-import { PhotoBlock } from "../api/types";
+import { PhotoBlock } from "../services/types";
 import { PhotoBlockEl } from "./Photo";
 
 describe("PhotoBlockEl", () => {
@@ -14,6 +14,7 @@ describe("PhotoBlockEl", () => {
         height: 100,
         width: 100,
         exif: {},
+        tags: {},
         srcset: [
           { src: "monkey.optimised.jpg", width: 100 },
           { src: "monkey.optimised.2.jpg", width: 100 },

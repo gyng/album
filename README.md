@@ -9,7 +9,7 @@
 A zero-config static album generator
 
 - Dump your photos in a directory and run one command to deploy
-- Optionally, create JSON-defined albums, with editor interface in development mode
+- Index and search images using YOLOv8/ImageNet classifications
 - EXIF support
 - Next.JS static build, deployed on Vercel
 - Custom image optimisation, resizing
@@ -80,11 +80,22 @@ You will need Node installed. The following steps are for deployment on Vercel, 
    $ npx vercel@latest login
    $ npx vercel@latest build --prod
    $ npx vercel@latest deploy --prebuilt --prod
+   # If you hit the file limit
+   $ npx vercel@latest deploy --prebuilt --prod --archive=tgz
    ```
 
    If the build fails, try removing `.vercel` and reinitialising the project. Somehow this seems to happen a lot.
 
-3. To use the manifest creator, run `npm run dev` or `yarn dev` and visit your album's page. Click the `Edit` link at the top.
+3. Index images by running the script at `/index/index.py` amd copying the result to `/src/public`. You need CUDA installed: see [index/README.md](index/README.md)
+
+   ```sh
+   $ cd index
+   $ poetry install
+   $ poetry run python index.py index --glob "../src/public/data/albums/**/*.jpg" --dbpath "search.sqlite"
+   $ cp search.sqlite ../src/public/search.sqlite
+   ```
+
+4. To use the manifest creator, run `npm run dev` or `yarn dev` and visit your album's page. Click the `Edit` link at the top.
 
 Be sure to configure your license for _all_ images in `src/License.tsx`. By default all photos are licensed under CC BY-NC 4.0.
 
@@ -105,3 +116,20 @@ Be sure to configure your license for _all_ images in `src/License.tsx`. By defa
 ## Privacy notes
 
 Analytics is integrated into the app at `_app.tsx`. Remove the `<Analytics />` component to remove any analytics. See [Next.js docs on analytics](https://vercel.com/docs/concepts/analytics) for more details.
+
+## Dev notes
+
+Image search is implemented using Sqlite on the browser (!real serverless!). An [analysis process](index/index.py) creates this database which is dumped into Next.js's `/public` directory.
+
+The following fields are currently indexed
+
+- YOLOv8/Imagenet tags
+- EXIF
+- Geocoded locations
+- Colour palette
+
+Sqlite in the browser then loads this database and runs a trigram full-text search. The library uses SharedArrayBuffers, which requires `Cross-Origin-Embedder-Policy` on the JS files and `Cross-Origin-Opener-Policy` on the page.
+
+Vercel is unable to serve the library's JS files from Next.js's `_next/` build directory with these headers, even with configuration set up in next.config.js and vercel.json. Middleware and API functions cannot redirect or add headers to these files either.
+
+A service worker modified from [coi-serviceworker](https://github.com/gzuidhof/coi-serviceworker) is used to add headers instead. This works, but has an unfortunate downside of requiring a page reload after initial install.
