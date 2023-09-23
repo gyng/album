@@ -1,11 +1,11 @@
 import Head from "next/head";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Search from "./Search";
 
 export const SearchWithCoi = () => {
   const [coiLoaded, setCoiLoaded] = useState(false);
 
-  const checkLoop = async () => {
+  const checkLoop = useCallback(async () => {
     const isCoiActive = async () => {
       const registrations = await navigator.serviceWorker.getRegistrations();
       return registrations.find(
@@ -23,11 +23,11 @@ export const SearchWithCoi = () => {
     } else {
       setCoiLoaded(true);
     }
-  };
+  }, []);
 
   useEffect(() => {
     setTimeout(checkLoop);
-  }, []);
+  }, [checkLoop]);
 
   return (
     <>
