@@ -9,7 +9,7 @@
 A zero-config static album generator
 
 - Dump your photos in a directory and run one command to deploy
-- Optionally, create JSON-defined albums, with editor interface in development mode
+- Index and search images using YOLOv8/ImageNet classifications
 - EXIF support
 - Next.JS static build, deployed on Vercel
 - Custom image optimisation, resizing
@@ -84,7 +84,16 @@ You will need Node installed. The following steps are for deployment on Vercel, 
 
    If the build fails, try removing `.vercel` and reinitialising the project. Somehow this seems to happen a lot.
 
-3. To use the manifest creator, run `npm run dev` or `yarn dev` and visit your album's page. Click the `Edit` link at the top.
+3. Index images by running the script at `/index/index.py` amd copying the result to `/src/public`. You need CUDA installed: see [index/README.md](index/README.md)
+
+   ```sh
+   $ cd index
+   $ poetry install
+   $ poetry run python index.py index --glob "../src/public/data/albums/**/*.jpg" --dbpath "search.sqlite"
+   $ cp search.sqlite ../src/public/search.sqlite
+   ```
+
+4. To use the manifest creator, run `npm run dev` or `yarn dev` and visit your album's page. Click the `Edit` link at the top.
 
 Be sure to configure your license for _all_ images in `src/License.tsx`. By default all photos are licensed under CC BY-NC 4.0.
 

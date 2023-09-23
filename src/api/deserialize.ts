@@ -15,6 +15,7 @@ import {
   SerializedTextBlock,
   TextBlock,
 } from "./types";
+const sqlite3 = require("sqlite3").verbose();
 
 export const deserializeTextBlock = async (
   serialized: SerializedTextBlock
@@ -23,6 +24,39 @@ export const deserializeTextBlock = async (
   return new Promise((resolve) => {
     resolve(copy);
   });
+};
+
+const getPhotoDetailsFromSearchIndex = async (
+  path: string,
+  dbPath = "public/search.sqlite"
+): Promise<any[]> => {
+  const promise = new Promise<any[]>((resolve, reject) => {
+    // This is really unoptimal
+    const db = new sqlite3.Database(dbPath);
+    const sql = "SELECT * FROM images WHERE path = ? LIMIT 1;";
+    // In index
+    // ../src/public/data/albums/kanto/DSCF3871_2.jpg
+    const filepathInDatabase = `../src/${path}`;
+    const result: any[] = [];
+    db.get(sql, [filepathInDatabase], (err: Error, row: any) => {
+      if (err) {
+        reject(err);
+      }
+      result.push(row);
+
+      if (row?.colors) {
+        const jsonified = row?.colors
+          ?.replaceAll("(", "[")
+          .replaceAll(")", "]");
+        row.colors = JSON.parse(jsonified);
+      }
+
+      db.close();
+      resolve(result);
+    });
+  });
+
+  return promise;
 };
 
 export const deserializePhotoBlock = async (
@@ -37,6 +71,8 @@ export const deserializePhotoBlock = async (
   const { width, height } = await getPhotoSize(localFilepath);
   const exif = await getNextJsSafeExif(localFilepath);
   const srcset = await optimiseImages(localFilepath);
+  const tags =
+    (await getPhotoDetailsFromSearchIndex(localFilepath))?.[0] ?? null;
 
   const copy: PhotoBlock = {
     ...block,
@@ -51,6 +87,7 @@ export const deserializePhotoBlock = async (
     _build: {
       srcset,
       exif: exif,
+      tags: tags,
       width,
       height,
     },

@@ -23,6 +23,9 @@
     "react-dom": "18.2.0",
     "react-leaflet": "^4.2.1",
     "sharp": "^0.32.1",
+    "sqlite-wasm-http": "^1.1.1",
+    "sqlite3": "^5.1.6",
+    "use-debounce": "^9.0.4",
     "uuid": "^9.0.0"
   },
   "devDependencies": {

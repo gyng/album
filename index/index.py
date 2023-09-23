@@ -1,15 +1,34 @@
 import click
 import glob as _glob
+from pathlib import Path
 import pprint
-from PIL import Image, ExifTags
+from colorthief import ColorThief
 import exifread
 import reverse_geocode
-import sys
 import sqlite3
-
+from ultralytics import YOLO
 import typing
 from typing import IO, TYPE_CHECKING, Mapping, Optional, Tuple
 import os
+
+
+class Classifier:
+    def init_model(self) -> None:
+        print("Loading YOLOv8...")
+        self.model = YOLO("yolov8n-cls.pt")
+
+    def predict(self, path: str):
+        results = self.model(path, conf=0.7)
+        if len(results) > 0:
+            classes = results[0].names
+            top5 = results[0].probs.top5
+            top5_mapped = [f"{classes[x]}" for x in top5]
+            return top5_mapped
+        return {}
+
+
+def classify(fh: IO[any]):
+    None
 
 
 def convert_to_degress(value: exifread.utils.Ratio) -> float:
@@ -19,8 +38,12 @@ def convert_to_degress(value: exifread.utils.Ratio) -> float:
     return d + (m / 60.0) + (s / 3600.0)
 
 
-def get_image_geocode(lat_deg: float, lng_deg: float):
-    return reverse_geocode.search([(lat_deg, lng_deg)])
+def get_image_geocode(lat_deg: float, lng_deg: float) -> Mapping:
+    results = reverse_geocode.search([(lat_deg, lng_deg)])
+    if len(results) > 0:
+        return results[0]
+    else:
+        return {}
 
 
 def get_exif(fh: IO[any]):
@@ -28,36 +51,44 @@ def get_exif(fh: IO[any]):
     return tags
 
 
+def get_album_relative_path(path: str) -> str:
+    # Specific hack for album project
+    # album-relative is /myalbum/asdf.jpg
+    p = Path(path)
+    return f"/album/{p.parts[-2]}#{p.parts[-1]}"
+
+
+def get_filename(path: str) -> str:
+    return str(os.path.basename(Path(path)))
+
+
 class Sqlite3Client:
     def __init__(self, db_path: typing.Union[str, bytes, os.PathLike]):
         self.con = sqlite3.connect(db_path)
-        print(sqlite3.sqlite_version)
+
+    def info(self):
+        print(f"""sqlite:\t{sqlite3.sqlite_version}""")
 
     def setup_tables(self):
         cur = self.con.cursor()
         cur.execute(
-            "CREATE VIRTUAL TABLE IF NOT EXISTS images USING fts5(path, geocode, exif, tags, colors, tokenize='trigram')"
+            "CREATE VIRTUAL TABLE IF NOT EXISTS images USING fts5(path, album_relative_path, filename, geocode, exif, tags, colors, tokenize='porter trigram')"
         )
-
-    def index_geocode(self, path: str, geocode: str):
-        cur = self.con.cursor()
-        # Upsert is not implemented for virtual tables
-        cur.execute("BEGIN")
-        count = cur.execute(
-            "SELECT COUNT(*) FROM images WHERE path = ?;", (path,)
-        ).fetchall()
-
-        if len(count) > 0 and count[0][0] > 0:
-            cur.execute(
-                "UPDATE images SET geocode = ? WHERE path = ?;", (geocode, path)
-            )
-        else:
-            # No point INSERT OR IGNORE-ing: fts5 auto creates a random primary key
-            cur.execute(
-                "INSERT INTO images (path, geocode) VALUES (?, ?);",
-                (path, geocode),
-            )
+        cur.execute("PRAGMA journal_mode = delete;")
+        cur.execute("PRAGMA page_size = 1024;")
+        cur.execute("INSERT INTO images(images) VALUES ('optimize');")
         cur.execute("COMMIT")
+        cur.execute("VACUUM")
+
+    def already_exists(self, path: str) -> bool:
+        cur = self.con.cursor()
+        result = cur.execute(
+            "SELECT COUNT(*) FROM images WHERE path = ?", (path,)
+        ).fetchall()
+        return len(result) > 0
+
+    def insert_geocode(self, path: str, geocode: str):
+        self.insert_field(path, value=geocode, field="geocode")
 
     def inspect(self):
         cur = self.con.cursor()
@@ -67,19 +98,45 @@ class Sqlite3Client:
 
     def search(self, query: str, limit: Optional[int] = None):
         cur = self.con.cursor()
+        # SELECT *, snippet(images, -1, '<i class="snippet">', '</i>', '…', 12) FROM images WHERE images MATCH ? ORDER BY rank
+        statement = f"""
+          SELECT *, snippet(images, -1, '<i class="snippet">', '</i>', '…', 12) FROM images WHERE images MATCH ? ORDER BY rank {"LIMIT ?" if limit else ""}
+        """
+        excluded_columns = "path album_relative_path"
         if limit:
             res = cur.execute(
-                "SELECT * FROM images WHERE images MATCH ? ORDER BY rank LIMIT ?",
-                (f"geocode:{query} OR path:{query}", limit),
+                statement,
+                (
+                    f"- {{{excluded_columns}}} : {query}",
+                    limit,
+                ),
             )
         else:
             res = cur.execute(
-                "SELECT * FROM images WHERE images MATCH ? ORDER BY rank",
-                (f"geocode:{query} OR path:{query}",),
+                statement,
+                (f"- {{{excluded_columns}}} : {query}",),
             )
 
         resolved = res.fetchall()
         return resolved
+
+    def insert_field(self, path: str, field: str, value: str):
+        cur = self.con.cursor()
+        # Upsert is not implemented for virtual tables
+        cur.execute("BEGIN")
+        count = cur.execute(
+            "SELECT COUNT(*) FROM images WHERE path = ?;", (path,)
+        ).fetchall()
+
+        if len(count) > 0 and count[0][0] > 0:
+            cur.execute(f"UPDATE images SET {field} = ? WHERE path = ?;", (value, path))
+        else:
+            # No point INSERT OR IGNORE-ing: fts5 auto creates a random primary key
+            cur.execute(
+                f"INSERT INTO images (path, {field}) VALUES (?, ?);",
+                (path, value),
+            )
+        cur.execute("COMMIT")
 
 
 @click.group()
@@ -91,21 +148,47 @@ def cli(ctx):
 @cli.command("index")
 @click.option("--glob", help="glob to recursively index.")
 @click.option("--dbpath", default="testdb.sqlite", help="sqlite database path to use.")
-@click.option("--ignore", default=[".resized_images"], help="Paths to ignore.")
-@click.option("--dry-run", default=False, help="Dry run.")
-def index(glob: str, dbpath: str, ignore: str, dry_run: bool):
-    sqlite = Sqlite3Client(dbpath)
-    sqlite.setup_tables()
+@click.option("--dry-run", is_flag=True, default=False, help="Dry run.")
+def index(glob: str, dbpath: str, dry_run: bool):
+    db = Sqlite3Client(dbpath)
+    db.setup_tables()
+    print(db.info())
 
     files = _glob.glob(glob)
+    valid_files = [f for f in files if not db.already_exists(f)]
+
     pprint.pprint(files)
-    print(f"Found the above {len(files)} files for the glob {glob}")
+    print(f"Found {len(files)} files for the the glob pattern {glob}")
+
+    pprint.pprint(valid_files)
+    print(
+        f"Indexing {len(valid_files)} unindexed files (skipping {len(files) - len(valid_files)} already-indexed)"
+    )
 
     if not dry_run:
-        for path in files:
+        classifier = Classifier()
+        classifier.init_model()
+
+        for path in valid_files:
             with open(path, "rb") as fh:
-                analysed = analyze_image(fh)
-                sqlite.index_geocode(glob, analysed.get("geocode"))
+                print(f"Indexing {path}...")
+                analysed = analyze_image(fh, classifier=classifier, path=path)
+                db.insert_field(path, field="filename", value=get_filename(path))
+                db.insert_field(
+                    path,
+                    field="album_relative_path",
+                    value=get_album_relative_path(path),
+                )
+                db.insert_field(
+                    path, field="exif", value=format_mapping(analysed.get("exif"))
+                )
+                db.insert_field(
+                    path, field="colors", value=format_mapping(analysed.get("colors"))
+                )
+                db.insert_geocode(path, format_mapping(analysed.get("geocode")))
+                db.insert_field(
+                    path, field="tags", value=", ".join(analysed.get("tags"))
+                )
 
 
 @cli.command("search")
@@ -113,22 +196,22 @@ def index(glob: str, dbpath: str, ignore: str, dry_run: bool):
 @click.option("--query", default="", help="Search query.")
 @click.option("--limit", default=None, help="Search query limit.")
 def search(dbpath: str, query: str, limit: Optional[int]):
-    sqlite = Sqlite3Client(dbpath)
-    sqlite.setup_tables()
-    results = sqlite.search(query, limit)
+    db = Sqlite3Client(dbpath)
+    db.setup_tables()
+    results = db.search(query, limit)
     pprint.pprint(results)
 
 
 @cli.command("dump")
 @click.option("--dbpath", default="testdb.sqlite", help="sqlite database path to use.")
 def dump(dbpath: str):
-    sqlite = Sqlite3Client(dbpath)
-    sqlite.setup_tables()
-    results = sqlite.inspect()
+    db = Sqlite3Client(dbpath)
+    db.setup_tables()
+    results = db.inspect()
     pprint.pprint(results)
 
 
-def analyze_image(fh: IO[bytes]) -> Mapping[str, str]:
+def analyze_image(fh: IO[bytes], classifier: Classifier, path: str) -> Mapping:
     exif_full = get_exif(fh)
     exif = {k: v for k, v in exif_full.items() if not isinstance(v, bytes)}
 
@@ -138,32 +221,24 @@ def analyze_image(fh: IO[bytes]) -> Mapping[str, str]:
     if lat and lng:
         lat_deg = convert_to_degress(lat)
         lng_deg = convert_to_degress(lng)
+        geo = get_image_geocode(lat_deg, lng_deg)
+    else:
+        geo = {}
 
-    geo = get_image_geocode(lat_deg, lng_deg)
+    color_thief = ColorThief(fh)
+    colors = color_thief.get_palette(color_count=3)
 
-    return {"exif": str(exif), "geocode": str(geo)}
+    tags = classifier.predict(path=path)
+
+    return {"exif": exif, "geocode": geo, "colors": colors, "tags": tags}
+
+
+def format_mapping(mapping: Optional[Mapping[str, str]]) -> str:
+    if not mapping or not hasattr(mapping, "items"):
+        return str(mapping)
+    return "\n".join([f"{k}: {v}" for k, v in mapping.items()])
 
 
 if __name__ == "__main__":
+    print(f"cwd:\t{os.getcwd()}")
     cli(obj={})
-
-    print(f"cwd: {os.getcwd()}")
-    path = sys.argv[1]
-    fh = open(path, "rb")
-    exif_full = get_exif(fh)
-    exif = {k: v for k, v in exif_full.items() if not isinstance(v, bytes)}
-
-    lat = exif.get("GPS GPSLatitude", exif.get("GPS GPSLatitudeRef", None))
-    lng = exif.get("GPS GPSLongitude", exif.get("GPS GPSLongitudeRef", None))
-
-    if lat and lng:
-        lat_deg = convert_to_degress(lat)
-        lng_deg = convert_to_degress(lng)
-
-    geo = get_image_geocode(lat_deg, lng_deg)
-
-    sqlite = Sqlite3Client("testdb.sqlite")
-    sqlite.setup_tables()
-    sqlite.index_geocode(path, str(geo))
-    print(sqlite._inspect())
-    print(sqlite._search("Singapore"))

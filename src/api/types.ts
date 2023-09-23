@@ -33,6 +33,7 @@ export interface PhotoBlock extends IBlock {
     height: number;
     width: number;
     exif: any;
+    tags: any;
     srcset: OptimisedPhoto[];
   };
 }

@@ -14,6 +14,7 @@ describe("PhotoBlockEl", () => {
         height: 100,
         width: 100,
         exif: {},
+        tags: {},
         srcset: [
           { src: "monkey.optimised.jpg", width: 100 },
           { src: "monkey.optimised.2.jpg", width: 100 },

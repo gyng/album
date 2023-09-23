@@ -346,7 +346,7 @@ export const PhotoBlockEl: React.FC<{
       className={`${styles.block} ${
         props.block.formatting?.immersive ? styles.immersive : ""
       }`}
-      id={props.block.id}
+      id={props.block.id ?? props.block.data.src}
       ref={anchorRef}
       data-testid="photoblockel"
     >
@@ -482,12 +482,43 @@ export const PhotoBlockEl: React.FC<{
                     k: "Original size",
                     v: `${props.block._build.width}px × ${props.block._build.height}px`,
                   },
+                  {
+                    kind: "kv",
+                    k: "Tags",
+                    v: props.block._build?.tags?.tags,
+                    valid: Boolean(props.block._build.tags),
+                  },
+                  {
+                    kind: "kv",
+                    k: "Colours",
+                    v: (
+                      <div className={styles.colorswatches}>
+                        {props.block._build?.tags?.colors.map(
+                          (rgb: number[]) => {
+                            const rgbStr = `rgb(${rgb[0]}, ${rgb[1]}, ${rgb[2]})`;
+                            return (
+                              <div
+                                style={{
+                                  backgroundColor: rgbStr,
+                                }}
+                                className={styles.colorswatch}
+                                title={rgbStr}
+                              ></div>
+                            );
+                          }
+                        )}
+                      </div>
+                    ),
+                    valid: Boolean(props.block._build.tags?.colors),
+                  },
                 ]}
               />
 
               <div className={styles.viewOriginal}>
-                <a href={`#${props.block.id}`}>Permalink</a>&nbsp;&middot;&nbsp;
-                View{" "}
+                <a href={`#${props.block.id ?? props.block.data.src}`}>
+                  Permalink
+                </a>
+                &nbsp;&middot;&nbsp; View{" "}
                 <a href={props.block.data.src} target="_blank" rel="noreferrer">
                   original
                 </a>

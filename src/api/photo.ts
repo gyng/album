@@ -5,7 +5,7 @@ import exifr, { Exifr } from "exifr";
 import sizeOf from "image-size";
 import sharp from "sharp";
 
-export const OPTIMISED_SIZES = [4896, 2400, 1200, 800];
+export const OPTIMISED_SIZES = [4896, 2400, 1200, 800, 400, 200];
 export const RESIZED_IMAGE_DIR = ".resized_images";
 
 export const getPhotoSize = async (
