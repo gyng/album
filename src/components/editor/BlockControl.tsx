@@ -1,6 +1,6 @@
 import { v4 } from "uuid";
-import { serializeTextBlock } from "../../api/serialize";
-import { OnEditFn, TextBlock } from "../../api/types";
+import { serializeTextBlock } from "../../services/serialize";
+import { OnEditFn, TextBlock } from "../../services/types";
 
 import editStyles from "../EditContainer.module.css";
 

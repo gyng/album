@@ -1,4 +1,4 @@
-import { Block, OnEditFn } from "../../api/types";
+import { Block, OnEditFn } from "../../services/types";
 
 export const InputFieldControl: React.FC<{
   name: string;

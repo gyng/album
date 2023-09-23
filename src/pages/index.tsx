@@ -2,8 +2,8 @@ import type { GetStaticProps, NextPage } from "next";
 import Head from "next/head";
 import { Albums } from "../components/Albums";
 import styles from "./Index.module.css";
-import { getAlbums, getImageTimestampRange } from "../api/album";
-import { Content } from "../api/types";
+import { getAlbums, getImageTimestampRange } from "../services/album";
+import { Content } from "../services/types";
 import DynamicSearch from "../components/search/DynamicSearch";
 
 type PageProps = {

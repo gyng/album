@@ -1,7 +1,7 @@
 import Fraction from "fraction.js";
 import styles from "./Photo.module.css";
 import editStyles from "./EditContainer.module.css";
-import { OnDeleteFn, OnEditFn, PhotoBlock } from "../api/types";
+import { OnDeleteFn, OnEditFn, PhotoBlock } from "../services/types";
 import { MapDeferred } from "./MapDeferred";
 import React from "react";
 import { MoveControl } from "./editor/MoveBlock";

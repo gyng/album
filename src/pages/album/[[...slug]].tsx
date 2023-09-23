@@ -3,9 +3,9 @@
 import { GetStaticPaths, GetStaticProps, NextPage } from "next";
 import Head from "next/head";
 import React from "react";
-import { getAlbumFromName, getAlbumNames } from "../../api/album";
-import { serializeContentBlock } from "../../api/serialize";
-import { Block, Content, PhotoBlock } from "../../api/types";
+import { getAlbumFromName, getAlbumNames } from "../../services/album";
+import { serializeContentBlock } from "../../services/serialize";
+import { Block, Content, PhotoBlock } from "../../services/types";
 import { BlockControlOptions } from "../../components/editor/BlockControl";
 import { Nav } from "../../components/Nav";
 import { EditPhotoBlockOptions } from "../../components/Photo";

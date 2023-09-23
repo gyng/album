@@ -1,5 +1,5 @@
 import { render, screen } from "@testing-library/react";
-import { PhotoBlock } from "../api/types";
+import { PhotoBlock } from "../services/types";
 import { PhotoBlockEl } from "./Photo";
 
 describe("PhotoBlockEl", () => {
