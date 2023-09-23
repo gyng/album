@@ -1,6 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  reactStrictMode: true,
+  // reactStrictMode: true,
   swcMinify: true,
   staticPageGenerationTimeout: 300,
   i18n: {
@@ -9,19 +9,21 @@ const nextConfig = {
   },
   async headers() {
     return [
-      {
-        source: "/_next/:path*",
-        headers: [
-          {
-            key: "Cross-Origin-Embedder-Policy",
-            value: "require-corp",
-          },
-          {
-            key: "Cross-Origin-Opener-Policy",
-            value: "same-origin",
-          },
-        ],
-      },
+      // This doesn't work: on Vercel
+      // I think it's because Vercel does its own stuff
+      // {
+      //   source: "/_next/:path*",
+      //   headers: [
+      //     {
+      //       key: "Cross-Origin-Embedder-Policy",
+      //       value: "require-corp",
+      //     },
+      //     {
+      //       key: "Cross-Origin-Opener-Policy",
+      //       value: "same-origin",
+      //     },
+      //   ],
+      // },
       {
         source: "/",
         headers: [
@@ -35,6 +37,7 @@ const nextConfig = {
           },
         ],
       },
+      // Needed for OSM map tiles
       {
         source: "/album/:path",
         headers: [

@@ -74,6 +74,7 @@ class Sqlite3Client:
         cur.execute(
             "CREATE VIRTUAL TABLE IF NOT EXISTS images USING fts5(path, album_relative_path, filename, geocode, exif, tags, colors, tokenize='porter trigram')"
         )
+        # Optimise loads from the browser https://github.com/phiresky/sql.js-httpvfs#readme
         cur.execute("PRAGMA journal_mode = delete;")
         cur.execute("PRAGMA page_size = 1024;")
         cur.execute("INSERT INTO images(images) VALUES ('optimize');")

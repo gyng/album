@@ -498,6 +498,7 @@ export const PhotoBlockEl: React.FC<{
                             const rgbStr = `rgb(${rgb[0]}, ${rgb[1]}, ${rgb[2]})`;
                             return (
                               <div
+                                key={rgbStr}
                                 style={{
                                   backgroundColor: rgbStr,
                                 }}

@@ -3,6 +3,7 @@ import { createSQLiteThread, createHttpBackend } from "sqlite-wasm-http";
 import { useDebounce } from "use-debounce";
 import styles from "./Search.module.css";
 import Link from "next/link";
+import Script from "next/script";
 
 declare global {
   interface Window {
@@ -58,6 +59,10 @@ export const Search: React.FC<{}> = () => {
   const doSearch = async (query: string, tries = 3) => {
     let firstEventHandled = false;
 
+    if (!query) {
+      return;
+    }
+
     if (window.db && query) {
       const exec = await window.db("exec", {
         sql: `SELECT *, snippet(images, -1, '<i class="snippet">', '</i>', '…', 20) AS snippet, bm25(images) AS bm25 FROM images WHERE images MATCH ? ORDER BY rank LIMIT 24`,
@@ -90,7 +95,7 @@ export const Search: React.FC<{}> = () => {
       setLatestExecId(() => exec.messageId);
     } else {
       if (!window.db) {
-        console.log("window.db not initialised, retrying");
+        console.log(`window.db not initialised, retrying "${query}"`);
         setTimeout(() => {
           if (tries > 0) {
             return doSearch(query, tries - 1);
@@ -122,6 +127,7 @@ export const Search: React.FC<{}> = () => {
       album_relative_path: string;
       snippet: string;
       bm25: number;
+      tags: string;
     };
   }) => {
     const { result } = props;
@@ -143,6 +149,7 @@ export const Search: React.FC<{}> = () => {
             className={styles.resultPicture}
             data-testid="result-picture"
             src={resized}
+            alt={result.tags}
           ></img>
           <div className={styles.details}>
             <div>
@@ -161,8 +168,6 @@ export const Search: React.FC<{}> = () => {
   const doneSearching = execStatus[latestExecId] === "done";
   const latestResults = results.filter((r) => r.type.startsWith(latestExecId));
 
-  console.log(searchQuery, results, latestResults);
-
   return (
     <div className={styles.search}>
       <input
@@ -177,13 +182,19 @@ export const Search: React.FC<{}> = () => {
       {searchQuery.length > 0 && results.length > 0 ? (
         <div>
           <ul className={styles.results}>
-            {latestResults.map((r) => {
-              return (
-                <li key={r.path}>
-                  <SearchResult result={r} />
-                </li>
-              );
-            })}
+            {searchQuery.length < 3 && latestResults.length === 0 ? (
+              <div className={styles.searchHint}>
+                Type a minimum of 3 characters
+              </div>
+            ) : (
+              latestResults.map((r) => {
+                return (
+                  <li key={r.path} className={styles.resultLi}>
+                    <SearchResult result={r} />
+                  </li>
+                );
+              })
+            )}
           </ul>
         </div>
       ) : searchQuery.length > 0 &&

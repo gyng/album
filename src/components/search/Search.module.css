@@ -21,6 +21,17 @@
   font-size: var(--fs-s);
 }
 
+.resultLi {
+  animation-name: fadein;
+  animation-duration: 0.25s;
+  animation-timing-function: ease-out;
+}
+
+.searchHint {
+  animation-name: popin;
+  animation-delay: 1s;
+}
+
 .link {
   text-decoration: none !important;
 }
@@ -51,7 +62,6 @@
 .transitionHack {
   animation-name: popin;
   animation-delay: 1s;
-  animation-iteration-count: 1;
 }
 
 @keyframes popin {
@@ -60,5 +70,14 @@
   }
   to {
     visibility: visible;
+  }
+}
+
+@keyframes fadein {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
   }
 }
