@@ -55,10 +55,6 @@
   margin-bottom: var(--m-xl);
 }
 
-.score {
-  margin-left: var(--m-s);
-}
-
 .transitionHack {
   animation-name: popin;
   animation-delay: 1s;

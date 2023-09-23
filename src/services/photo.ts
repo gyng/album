@@ -65,7 +65,7 @@ export const optimiseImages = async (
       };
 
       if (fs.existsSync(newFile)) {
-        console.log(`Already optimised ${newFile}, using cached version`);
+        // console.log(`Already optimised ${newFile}, using cached version`);
 
         // Check if file is valid
         const stat = fs.statSync(newFile);

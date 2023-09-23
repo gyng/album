@@ -3,16 +3,12 @@ const nextConfig = {
   // reactStrictMode: true,
   swcMinify: true,
   staticPageGenerationTimeout: 300,
-  i18n: {
-    locales: ["en"],
-    defaultLocale: "en",
-  },
   async headers() {
     return [
-      // This doesn't work: on Vercel
-      // I think it's because Vercel does its own stuff
+      // // This doesn't work: on Vercel
+      // // I think it's because Vercel does its own stuff for _next/static/chunks
       // {
-      //   source: "/_next/:path*",
+      //   source: "/_next/static/chunks/:path*",
       //   headers: [
       //     {
       //       key: "Cross-Origin-Embedder-Policy",

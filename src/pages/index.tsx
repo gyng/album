@@ -4,7 +4,7 @@ import { Albums } from "../components/Albums";
 import styles from "./Index.module.css";
 import { getAlbums, getImageTimestampRange } from "../services/album";
 import { Content } from "../services/types";
-import DynamicSearch from "../components/search/DynamicSearch";
+import DynamicSearchWithCoi from "../components/search/DynamicSearchWithCoi";
 
 type PageProps = {
   albums: Content[];
@@ -22,7 +22,7 @@ const Home: NextPage<PageProps> = (context) => {
 
       <main className={styles.main}>
         <h1>Snapshots</h1>
-        <DynamicSearch />
+        <DynamicSearchWithCoi />
         <Albums albums={context.albums} />
       </main>
 

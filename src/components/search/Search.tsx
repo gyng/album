@@ -3,7 +3,7 @@ import { createSQLiteThread, createHttpBackend } from "sqlite-wasm-http";
 import { useDebounce } from "use-debounce";
 import styles from "./Search.module.css";
 import Link from "next/link";
-import Script from "next/script";
+import { Backend } from "sqlite-wasm-http/dist/vfs-http-types";
 
 declare global {
   interface Window {
@@ -11,24 +11,46 @@ declare global {
   }
 }
 
-export const Search: React.FC<{}> = () => {
+export const initBackend = () => {
+  const httpBackend = createHttpBackend({
+    maxPageSize: 4096, // this is the current default SQLite page size
+    timeout: 10000, // 10s
+    cacheSize: 4096, // 4 MB
+  });
+  return httpBackend;
+};
+
+export const initDb = async (backend: Backend) => {
+  return createSQLiteThread({ http: backend }).then((d) => {
+    if (!window.db) {
+      // Using setState crashes
+      // setDb(d);
+      window.db = d;
+      const remoteURL = "/search.sqlite";
+      window.db("open", {
+        filename: remoteURL,
+        vfs: "http",
+      });
+    } else {
+      console.warn("search DB thread already set", window.db);
+    }
+  });
+};
+
+export const Search: React.FC<{ disabled?: boolean }> = (props) => {
   const [backend, setBackend] = useState<ReturnType<
     typeof createHttpBackend
   > | null>(null);
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [debouncedSearchQuery] = useDebounce(searchQuery, 600);
 
-  const [results, setResults] = useState<any[]>([]);
-
   const [latestExecId, setLatestExecId] = useState<string>("");
   const [execStatus, setExecStatus] = useState<Record<string, string>>({});
 
+  const [results, setResults] = useState<any[]>([]);
+
   useEffect(() => {
-    const httpBackend = createHttpBackend({
-      maxPageSize: 4096, // this is the current default SQLite page size
-      timeout: 10000, // 10s
-      cacheSize: 4096, // 4 MB
-    });
+    const httpBackend = initBackend();
     setBackend(httpBackend);
   }, []);
 
@@ -37,23 +59,7 @@ export const Search: React.FC<{}> = () => {
     if (!backend || !backend.worker) {
       return;
     }
-
-    createSQLiteThread({ http: backend })
-      .then((d) => {
-        if (!window.db) {
-          // Using setState crashes
-          // setDb(d);
-          window.db = d;
-          const remoteURL = "/search.sqlite";
-          window.db("open", {
-            filename: remoteURL,
-            vfs: "http",
-          });
-        } else {
-          console.warn("search DB already set", window.db);
-        }
-      })
-      .catch(console.error);
+    initDb(backend).catch(console.error);
   }, [backend, backend?.worker]);
 
   const doSearch = async (query: string, tries = 3) => {
@@ -65,7 +71,7 @@ export const Search: React.FC<{}> = () => {
 
     if (window.db && query) {
       const exec = await window.db("exec", {
-        sql: `SELECT *, snippet(images, -1, '<i class="snippet">', '</i>', '…', 20) AS snippet, bm25(images) AS bm25 FROM images WHERE images MATCH ? ORDER BY rank LIMIT 24`,
+        sql: `SELECT *, snippet(images, -1, '<i class="snippet">', '</i>', '…', 24) AS snippet, bm25(images) AS bm25 FROM images WHERE images MATCH ? ORDER BY rank LIMIT 24`,
         bind: [`- {path album_relative_path} : ${query}`],
         callback: (msg: any) => {
           if (msg.row) {
@@ -118,6 +124,7 @@ export const Search: React.FC<{}> = () => {
       return { ...cur, [predictedExecId]: "done" };
     });
 
+    setResults([]);
     doSearch(searchQuery);
   }, [debouncedSearchQuery]);
 
@@ -153,10 +160,11 @@ export const Search: React.FC<{}> = () => {
           ></img>
           <div className={styles.details}>
             <div>
-              <span dangerouslySetInnerHTML={{ __html: result.snippet }} />
-              <span className={styles.score}>
-                {(result.bm25 * -1).toFixed(1)}
-              </span>
+              <div
+                className={styles.snippet}
+                dangerouslySetInnerHTML={{ __html: result.snippet }}
+                title={(result.bm25 * -1).toFixed(1)}
+              />
               <div>{albumName}</div>
             </div>
           </div>
@@ -174,10 +182,11 @@ export const Search: React.FC<{}> = () => {
         type="text"
         value={searchQuery}
         placeholder="Search (try burger, japan, x100)"
+        spellCheck={false}
         onChange={(ev) => {
           setSearchQuery(ev.target.value);
         }}
-        disabled={!backend}
+        disabled={props.disabled === true || !backend}
       />
       {searchQuery.length > 0 && results.length > 0 ? (
         <div>
