@@ -493,7 +493,7 @@ export const PhotoBlockEl: React.FC<{
                     k: "Colours",
                     v: (
                       <div className={styles.colorswatches}>
-                        {props.block._build?.tags?.colors.map(
+                        {props.block._build?.tags?.colors?.map(
                           (rgb: number[]) => {
                             const rgbStr = `rgb(${rgb[0]}, ${rgb[1]}, ${rgb[2]})`;
                             return (

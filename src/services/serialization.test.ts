@@ -61,8 +61,8 @@ describe("serialization", () => {
         _build: {
           srcset: [
             {
-              src: "/fixtures/.resized_images/monkey.jpg@800.webp",
-              width: 800,
+              src: "/fixtures/.resized_images/monkey.jpg@400.webp",
+              width: 400,
             },
             {
               src: "/fixtures/.resized_images/monkey.jpg@1200.webp",
@@ -78,7 +78,7 @@ describe("serialization", () => {
             },
           ],
           exif: {},
-          tags: {},
+          tags: null,
           width: 34,
           height: 50,
         },
