@@ -44,15 +44,21 @@ if (typeof window === "undefined") {
           }
 
           const newHeaders = new Headers(response.headers);
-          newHeaders.set(
-            "Cross-Origin-Embedder-Policy",
-            coepCredentialless ? "require-corp" : "require-corp"
-          );
+          // Needed for OSM
+          if (!response.url.includes("/album/")) {
+            newHeaders.set(
+              "Cross-Origin-Embedder-Policy",
+              coepCredentialless ? "require-corp" : "require-corp"
+            );
+          }
+
           if (!coepCredentialless) {
             newHeaders.set("Cross-Origin-Resource-Policy", "cross-origin");
           }
           newHeaders.set("Cross-Origin-Opener-Policy", "same-origin");
           newHeaders.set("X-Album-Service-Worker", 1);
+          // Needed for OSM map tiles
+          newHeaders.set("Cross-Origin-Resource-Policy", "cross-site");
 
           return new Response(response.body, {
             status: response.status,

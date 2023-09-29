@@ -12,13 +12,13 @@
   max-width: 1400px;
 }
 
-.name {
-  text-decoration: none;
-}
-
 .name h2 {
   margin: var(--m-s) 0 var(--m);
   font-size: var(--fs-m);
+}
+
+.name a {
+  text-decoration: none;
 }
 
 .date {
@@ -39,4 +39,8 @@
   object-fit: cover;
   height: 100%;
   width: 100%;
+}
+
+.itemLink:focus-visible {
+  outline: solid 2px var(--c-bg-contrast-light);
 }

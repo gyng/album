@@ -49,6 +49,22 @@
 .search input {
   margin-bottom: var(--m-l);
   width: 250px;
+  padding: var(--m-m);
+  color: var(--c-contrast);
+  background-color: var(--c-bg);
+  border: solid 2px var(--c-bg-contrast-light);
+  border-radius: var(--m-s);
+}
+
+.search input:focus-visible,
+.link:focus-visible {
+  outline: solid 2px var(--c-bg-contrast-light);
+}
+
+.searchHint {
+  font-style: italic;
+  color: var(--c-bg-contrast-light);
+  user-select: none;
 }
 
 .search {

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { createSQLiteThread, createHttpBackend } from "sqlite-wasm-http";
 import { useDebounce } from "use-debounce";
 import styles from "./Search.module.css";
@@ -43,6 +43,8 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
   > | null>(null);
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [debouncedSearchQuery] = useDebounce(searchQuery, 600);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [isInputFocused, setIsInputFocused] = useState<boolean>(false);
 
   const [latestExecId, setLatestExecId] = useState<string>("");
   const [execStatus, setExecStatus] = useState<Record<string, string>>({});
@@ -150,8 +152,8 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
     const albumName = result.path.split("/").at(-2);
 
     return (
-      <div className={styles.result}>
-        <Link href={result.album_relative_path} className={styles.link}>
+      <Link href={result.album_relative_path} className={styles.link}>
+        <div className={styles.result}>
           <img
             className={styles.resultPicture}
             data-testid="result-picture"
@@ -168,10 +170,54 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
               <div>{albumName}</div>
             </div>
           </div>
-        </Link>
-      </div>
+        </div>
+      </Link>
     );
   };
+
+  // Read query from URL on load
+  useEffect(() => {
+    const url = new URL(window.location.toString());
+    const query = url.searchParams.get("q");
+    if (query) {
+      setSearchQuery(query);
+    }
+  }, []);
+
+  // Set window URL query on change
+  useEffect(() => {
+    const searchParams = new URLSearchParams(window.location.search);
+    searchParams.delete("q");
+    if (debouncedSearchQuery) {
+      searchParams.set("q", debouncedSearchQuery);
+    }
+    const url = new URL(window.location.toString());
+    url.search = searchParams.toString();
+    window.history.replaceState({}, "", url);
+  }, [debouncedSearchQuery]);
+
+  // Register '/' to focus search
+  useEffect(() => {
+    function handler(ev: KeyboardEvent) {
+      if (ev.key === "/") {
+        inputRef.current?.focus();
+        ev.preventDefault();
+      }
+
+      if (ev.key === "Escape") {
+        inputRef.current?.blur();
+      }
+
+      if (ev.key === "Tab") {
+        return true;
+      }
+    }
+    window.addEventListener("keydown", handler);
+
+    return () => {
+      window.removeEventListener("keydown", handler);
+    };
+  }, []);
 
   const doneSearching = execStatus[latestExecId] === "done";
   const latestResults = results.filter((r) => r.type.startsWith(latestExecId));
@@ -181,13 +227,23 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
       <input
         type="text"
         value={searchQuery}
-        placeholder="Search (try burger, japan, x100)"
+        placeholder="Type / to search"
         spellCheck={false}
         onChange={(ev) => {
           setSearchQuery(ev.target.value);
         }}
+        onFocus={() => {
+          setIsInputFocused(true);
+        }}
+        onBlur={() => {
+          // Breaks tabindex
+          // setIsInputFocused(false);
+        }}
         disabled={props.disabled === true || !backend}
+        ref={inputRef}
+        tabIndex={0}
       />
+
       {searchQuery.length > 0 && results.length > 0 ? (
         <div>
           <ul className={styles.results}>
@@ -214,6 +270,8 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
         </div>
       ) : searchQuery.length > 0 && latestExecId ? (
         <div>Searching&hellip;</div>
+      ) : isInputFocused ? (
+        <div className={styles.searchHint}>try burger, japan, x100</div>
       ) : (
         <div style={{ userSelect: "none" }}>&nbsp;</div>
       )}

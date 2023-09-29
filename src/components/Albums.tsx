@@ -33,14 +33,18 @@ export const Albums: React.FC<{ albums: Content[] }> = (props) => {
               ) : null}
             </Link>
 
-            <div>
-              <Link
-                href={`/album/${album._build.slug}`}
-                className={styles.name}
-                aria-label={`View photo album: ${album._build.slug}`}
-              >
-                <h2>{album.title ?? album.name}</h2>
-              </Link>
+            <div className={styles.name}>
+              <h2>
+                <span>
+                  <Link
+                    href={`/album/${album._build.slug}`}
+                    aria-label={`View photo album: ${album._build.slug}`}
+                    tabIndex={-1}
+                  >
+                    {album.title ?? album.name}
+                  </Link>
+                </span>
+              </h2>
 
               {timeRange[0] && timeRange[1] && timeRange[0] !== timeRange[1] ? (
                 <small className={styles.date}>{timeRange.join("–")}</small>

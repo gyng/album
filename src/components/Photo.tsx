@@ -348,7 +348,6 @@ export const PhotoBlockEl: React.FC<{
       className={`${styles.block} ${
         props.block.formatting?.immersive ? styles.immersive : ""
       }`}
-      id={props.block.id ?? props.block.data.src}
       ref={anchorRef}
       data-testid="photoblockel"
     >
@@ -368,7 +367,10 @@ export const PhotoBlockEl: React.FC<{
         ) : null}
       </div>
 
-      <div className={styles.details}>
+      <div
+        id={props.block.id ?? props.block.data.src}
+        className={styles.details}
+      >
         <details>
           <summary
             title="More details&hellip;"
