@@ -38,6 +38,7 @@ export const initDb = async (backend: Backend) => {
 };
 
 export const Search: React.FC<{ disabled?: boolean }> = (props) => {
+  const PAGE_SIZE = 23;
   const router = useRouter();
 
   const [backend, setBackend] = useState<ReturnType<
@@ -46,6 +47,7 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [debouncedSearchQuery] = useDebounce(searchQuery, 600);
   const inputRef = useRef<HTMLInputElement>(null);
+  const [page, setPage] = useState(0);
 
   const [results, setResults] = useState<
     Record<
@@ -70,7 +72,7 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
     initDb(backend).catch(console.error);
   }, [backend, backend?.worker]);
 
-  const doSearch = async (query: string) => {
+  const doSearch = async (query: string, _page = 0, _pageSize = 23) => {
     if (!query) {
       return;
     }
@@ -88,13 +90,16 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
       return;
     }
 
-    setResults((cur) => ({
-      ...cur,
-      [query]: {
-        results: [],
-        status: "searching",
-      },
-    }));
+    // When clicking "more", don't remove old results
+    if (_page === 0) {
+      setResults((cur) => ({
+        ...cur,
+        [query]: {
+          results: [],
+          status: "searching",
+        },
+      }));
+    }
 
     // Potential duplicates when two queries
     // with the same same search term are in-flight
@@ -106,10 +111,15 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
     //
     // We store all return results until it's complete
     // and at that point we "commit" it all to `results` using `setResults`
-    const resultsBuffer: Record<string, string>[] = [];
+    const resultsBuffer: Record<string, string>[] =
+      results[query]?.results ?? [];
     const exec = await window.db("exec", {
-      sql: `SELECT *, snippet(images, -1, '<i class="snippet">', '</i>', '…', 24) AS snippet, bm25(images) AS bm25 FROM images WHERE images MATCH ? ORDER BY rank LIMIT 24`,
-      bind: [`- {path album_relative_path} : ${query}`],
+      sql: `SELECT *, snippet(images, -1, '<i class="snippet">', '</i>', '…', 24) AS snippet, bm25(images) AS bm25 FROM images WHERE images MATCH ? ORDER BY rank LIMIT ? OFFSET ?`,
+      bind: [
+        `- {path album_relative_path} : ${query}`,
+        _pageSize,
+        _page * _pageSize,
+      ],
       callback: (msg: any) => {
         if (msg.row) {
           const record: Record<string, string> = {};
@@ -135,8 +145,13 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
   };
 
   useEffect(() => {
-    doSearch(searchQuery);
+    setPage(0);
+    doSearch(debouncedSearchQuery, 0);
   }, [debouncedSearchQuery]);
+
+  useEffect(() => {
+    doSearch(debouncedSearchQuery, page);
+  }, [page]);
 
   const SearchResult = (props: {
     result: {
@@ -266,13 +281,28 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
                 No results for <i>{debouncedSearchQuery}</i>
               </div>
             ) : (
-              queryResults?.results.map((r) => {
-                return (
-                  <li key={r.path} className={styles.resultLi}>
-                    <SearchResult result={r} />
-                  </li>
-                );
-              })
+              <>
+                {queryResults?.results.map((r) => {
+                  return (
+                    <li key={r.path} className={styles.resultLi}>
+                      <SearchResult result={r} />
+                    </li>
+                  );
+                })}
+                {/* This logic is flawed as result sets with exactly PAGE_SIZE
+                results will show this button, but we don't want to fire off an additional COUNT query*/}
+                {queryResults?.results?.length % PAGE_SIZE === 0 &&
+                queryResults?.results?.length > 0 ? (
+                  <button
+                    className={styles.moreButton}
+                    onClick={() => {
+                      setPage(page + 1);
+                    }}
+                  >
+                    More&hellip;
+                  </button>
+                ) : null}
+              </>
             )
           ) : (
             <div style={{ userSelect: "none" }}>&nbsp;</div>

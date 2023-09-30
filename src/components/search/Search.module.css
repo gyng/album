@@ -1,9 +1,28 @@
 .resultPicture {
   width: 150px;
   height: 150px;
-  background-color: var(--c-bg-contrast-light);
+  background-color: var(--c-bg-contrast-dark);
   object-fit: cover;
   object-position: center;
+  display: block;
+}
+
+.moreButton {
+  width: 150px;
+  height: 150px;
+  color: var(--c-bg-contrast-light);
+  background-color: transparent;
+  border-radius: var(--m-m);
+  border-style: solid;
+  cursor: pointer;
+}
+
+.moreButton:hover {
+  background-color: var(--c-bg-contrast-dark);
+}
+
+.moreButton:active {
+  background-color: var(--c-bg);
 }
 
 .results {
@@ -56,7 +75,8 @@
 }
 
 .searchWidget input:focus-visible,
-.link:focus-visible {
+.link:focus-visible,
+.moreButton:focus-visible {
   outline: solid 2px var(--c-bg-contrast-light);
 }
 
