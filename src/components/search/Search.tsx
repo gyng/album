@@ -24,8 +24,7 @@ export const initBackend = () => {
 export const initDb = async (backend: Backend) => {
   return createSQLiteThread({ http: backend }).then((d) => {
     if (!window.db) {
-      // Using setState crashes
-      // setDb(d);
+      // Using setState crashes the library
       window.db = d;
       const remoteURL = "/search.sqlite";
       window.db("open", {
@@ -47,12 +46,16 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [debouncedSearchQuery] = useDebounce(searchQuery, 600);
   const inputRef = useRef<HTMLInputElement>(null);
-  const [isInputFocused, setIsInputFocused] = useState<boolean>(false);
 
-  const [latestExecId, setLatestExecId] = useState<string>("");
-  const [execStatus, setExecStatus] = useState<Record<string, string>>({});
-
-  const [results, setResults] = useState<any[]>([]);
+  const [results, setResults] = useState<
+    Record<
+      string,
+      {
+        results: any[];
+        status: "done" | "searching" | "new";
+      }
+    >
+  >({});
 
   useEffect(() => {
     const httpBackend = initBackend();
@@ -67,69 +70,71 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
     initDb(backend).catch(console.error);
   }, [backend, backend?.worker]);
 
-  const doSearch = async (query: string, tries = 3) => {
-    let firstEventHandled = false;
-
+  const doSearch = async (query: string) => {
     if (!query) {
       return;
     }
 
-    if (window.db && query) {
-      const exec = await window.db("exec", {
-        sql: `SELECT *, snippet(images, -1, '<i class="snippet">', '</i>', '…', 24) AS snippet, bm25(images) AS bm25 FROM images WHERE images MATCH ? ORDER BY rank LIMIT 24`,
-        bind: [`- {path album_relative_path} : ${query}`],
-        callback: (msg: any) => {
-          if (msg.row) {
-            const record: Record<string, string> = {};
-            (msg.columnNames as Array<string>).forEach((cn, i) => {
-              record[cn] = msg.row[i];
-            });
-            record.type = msg.type;
-
-            if (!firstEventHandled) {
-              firstEventHandled = true;
-              setResults(() => [record]);
-            } else {
-              setResults((cur) => {
-                return [...cur, record].filter(
-                  (thing, i, arr) =>
-                    arr.findIndex((t) => t.path === thing.path) === i
-                );
-              });
-            }
-          } else {
-            const sourceExecId = msg.type.split(":")[0];
-            setExecStatus((cur) => ({ ...cur, [sourceExecId]: "done" }));
-          }
-        },
-      });
-      setLatestExecId(() => exec.messageId);
-    } else {
-      if (!window.db) {
-        console.log(`window.db not initialised, retrying "${query}"`);
-        setTimeout(() => {
-          if (tries > 0) {
-            return doSearch(query, tries - 1);
-          }
-        }, 2000);
-      }
+    if (!window.db) {
+      console.log(`window.db not initialised, retrying "${query}"`);
+      setTimeout(() => {
+        window.location.reload();
+      }, 2000);
+      return;
     }
+
+    if (results[query]?.status === "searching") {
+      // prevent duplicate active queries
+      return;
+    }
+
+    setResults((cur) => ({
+      ...cur,
+      [query]: {
+        results: [],
+        status: "searching",
+      },
+    }));
+
+    // Potential duplicates when two queries
+    // with the same same search term are in-flight
+    // Eg, entering the following
+    // `dog` > query (dog1) executes
+    // `dogs` > query (dogs) executes
+    // `dog` > backspace, query (dog2) executes
+    // dog1 and dog2 are both returning results
+    //
+    // We store all return results until it's complete
+    // and at that point we "commit" it all to `results` using `setResults`
+    const resultsBuffer: Record<string, string>[] = [];
+    const exec = await window.db("exec", {
+      sql: `SELECT *, snippet(images, -1, '<i class="snippet">', '</i>', '…', 24) AS snippet, bm25(images) AS bm25 FROM images WHERE images MATCH ? ORDER BY rank LIMIT 24`,
+      bind: [`- {path album_relative_path} : ${query}`],
+      callback: (msg: any) => {
+        if (msg.row) {
+          const record: Record<string, string> = {};
+          (msg.columnNames as Array<string>).forEach((cn, i) => {
+            record[cn] = msg.row[i];
+          });
+          record.type = msg.type;
+          resultsBuffer.push(record);
+        } else {
+          setResults((cur) => {
+            return {
+              ...cur,
+              [query]: {
+                ...cur.query,
+                results: resultsBuffer,
+                status: "done",
+              },
+            };
+          });
+        }
+      },
+    });
   };
 
   useEffect(() => {
-    const predictedIdNumber = latestExecId
-      ? Number.parseInt(latestExecId.split("#").at(-1) ?? "-1") + 1
-      : latestExecId;
-    const predictedExecId = `exec#${predictedIdNumber}`;
-    setExecStatus((cur) => {
-      // Already completed before React got here
-      if (cur[predictedExecId] === "done") {
-        return cur;
-      }
-      return { ...cur, [predictedExecId]: "done" };
-    });
-
-    setResults([]);
     doSearch(searchQuery);
   }, [debouncedSearchQuery]);
 
@@ -157,12 +162,14 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
     return (
       <Link href={result.album_relative_path} className={styles.link}>
         <div className={styles.result}>
-          <img
-            className={styles.resultPicture}
-            data-testid="result-picture"
-            src={resized}
-            alt={result.tags}
-          ></img>
+          <picture>
+            <img
+              className={styles.resultPicture}
+              data-testid="result-picture"
+              src={resized}
+              alt={result.tags}
+            ></img>
+          </picture>
           <div className={styles.details}>
             <div>
               <div
@@ -222,62 +229,56 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
     };
   }, []);
 
-  const doneSearching = execStatus[latestExecId] === "done";
-  const latestResults = results.filter((r) => r.type.startsWith(latestExecId));
+  const queryResults = results[debouncedSearchQuery];
 
   return (
-    <div className={styles.search}>
-      <input
-        type="text"
-        value={searchQuery}
-        placeholder="Type / to search"
-        spellCheck={false}
-        onChange={(ev) => {
-          setSearchQuery(ev.target.value);
-        }}
-        onFocus={() => {
-          setIsInputFocused(true);
-        }}
-        onBlur={() => {
-          // Breaks tabindex
-          // setIsInputFocused(false);
-        }}
-        disabled={props.disabled === true || !backend}
-        ref={inputRef}
-        tabIndex={0}
-      />
+    <div className={styles.searchWidget}>
+      <div className={styles.searchInputRow}>
+        <input
+          type="text"
+          value={searchQuery}
+          placeholder="Type / to search (burger, japan, x10)"
+          spellCheck={false}
+          onChange={(ev) => {
+            setSearchQuery(ev.target.value);
+          }}
+          disabled={props.disabled === true || !backend}
+          ref={inputRef}
+          tabIndex={0}
+        />
+      </div>
 
-      {searchQuery.length > 0 && results.length > 0 ? (
-        <div>
-          <ul className={styles.results}>
-            {searchQuery.length < 3 && latestResults.length === 0 ? (
-              <div className={styles.searchHint}>
-                Type a minimum of 3 characters
+      <div>
+        <ul className={styles.results}>
+          {queryResults?.status === "done" &&
+          debouncedSearchQuery.length < 3 ? (
+            <div className={styles.searchHint}>
+              Type a minimum of 3 characters
+            </div>
+          ) : null}
+
+          {queryResults?.status === "searching" ? (
+            <div className={styles.searchHint}>Searching&hellip;</div>
+          ) : queryResults?.status === "done" ? (
+            queryResults?.results.length === 0 &&
+            debouncedSearchQuery.length >= 3 ? (
+              <div key={debouncedSearchQuery}>
+                No results for <i>{debouncedSearchQuery}</i>
               </div>
             ) : (
-              latestResults.map((r) => {
+              queryResults?.results.map((r) => {
                 return (
                   <li key={r.path} className={styles.resultLi}>
                     <SearchResult result={r} />
                   </li>
                 );
               })
-            )}
-          </ul>
-        </div>
-      ) : searchQuery.length > 0 &&
-        debouncedSearchQuery.length > 0 &&
-        doneSearching ? (
-        <div className={styles.transitionHack} key={debouncedSearchQuery}>
-          No results for <i>{debouncedSearchQuery}</i>
-        </div>
-      ) : searchQuery.length > 0 && latestExecId ? (
-        <div>Searching&hellip;</div>
-      ) : isInputFocused ? (
-        <div className={styles.searchHint}>try burger, japan, x100</div>
-      ) : (
-        <div style={{ userSelect: "none" }}>&nbsp;</div>
-      )}
+            )
+          ) : (
+            <div style={{ userSelect: "none" }}>&nbsp;</div>
+          )}
+        </ul>
+      </div>
     </div>
   );
 };

@@ -1,6 +1,7 @@
 .resultPicture {
   width: 150px;
   height: 150px;
+  background-color: var(--c-bg-contrast-light);
   object-fit: cover;
   object-position: center;
 }
@@ -23,13 +24,8 @@
 
 .resultLi {
   animation-name: fadein;
-  animation-duration: 0.25s;
+  animation-duration: 0.2s;
   animation-timing-function: ease-out;
-}
-
-.searchHint {
-  animation-name: popin;
-  animation-delay: 1s;
 }
 
 .link {
@@ -46,8 +42,11 @@
   text-overflow: ellipsis;
 }
 
-.search input {
-  margin-bottom: var(--m-l);
+.searchWidget {
+  margin-bottom: var(--m-xl);
+}
+
+.searchWidget input {
   width: 250px;
   padding: var(--m-m);
   color: var(--c-contrast);
@@ -56,7 +55,7 @@
   border-radius: var(--m-s);
 }
 
-.search input:focus-visible,
+.searchWidget input:focus-visible,
 .link:focus-visible {
   outline: solid 2px var(--c-bg-contrast-light);
 }
@@ -64,25 +63,14 @@
 .searchHint {
   font-style: italic;
   color: var(--c-bg-contrast-light);
-  user-select: none;
 }
 
-.search {
-  margin-bottom: var(--m-xl);
-}
-
-.transitionHack {
-  animation-name: popin;
-  animation-delay: 1s;
-}
-
-@keyframes popin {
-  from {
-    visibility: hidden;
-  }
-  to {
-    visibility: visible;
-  }
+.searchInputRow {
+  display: flex;
+  flex-direction: row;
+  gap: var(--m-m);
+  flex-wrap: wrap;
+  margin-bottom: var(--m-l);
 }
 
 @keyframes fadein {
