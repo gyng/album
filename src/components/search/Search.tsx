@@ -4,6 +4,7 @@ import { useDebounce } from "use-debounce";
 import styles from "./Search.module.css";
 import Link from "next/link";
 import { Backend } from "sqlite-wasm-http/dist/vfs-http-types";
+import { useRouter } from "next/router";
 
 declare global {
   interface Window {
@@ -38,6 +39,8 @@ export const initDb = async (backend: Backend) => {
 };
 
 export const Search: React.FC<{ disabled?: boolean }> = (props) => {
+  const router = useRouter();
+
   const [backend, setBackend] = useState<ReturnType<
     typeof createHttpBackend
   > | null>(null);
@@ -193,7 +196,7 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
     }
     const url = new URL(window.location.toString());
     url.search = searchParams.toString();
-    window.history.replaceState({}, "", url);
+    router.replace(url, undefined, { shallow: true });
   }, [debouncedSearchQuery]);
 
   // Register '/' to focus search
