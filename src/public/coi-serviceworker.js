@@ -44,13 +44,10 @@ if (typeof window === "undefined") {
           }
 
           const newHeaders = new Headers(response.headers);
-          // Needed for OSM
-          if (!response.url.includes("/album/")) {
-            newHeaders.set(
-              "Cross-Origin-Embedder-Policy",
-              coepCredentialless ? "require-corp" : "require-corp"
-            );
-          }
+          newHeaders.set(
+            "Cross-Origin-Embedder-Policy",
+            coepCredentialless ? "require-corp" : "require-corp"
+          );
 
           if (!coepCredentialless) {
             newHeaders.set("Cross-Origin-Resource-Policy", "cross-origin");

@@ -1,10 +1,12 @@
 .resultPicture {
   width: 150px;
   height: 150px;
+  margin-bottom: var(--m);
   background-color: var(--c-bg-contrast-dark);
   object-fit: cover;
   object-position: center;
-  display: block;
+  display: grid;
+  place-content: center;
 }
 
 .moreButton {
@@ -66,7 +68,7 @@
 }
 
 .searchWidget input {
-  width: 250px;
+  width: 300px;
   padding: var(--m-m);
   color: var(--c-contrast);
   background-color: var(--c-bg);

@@ -116,7 +116,7 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
     const exec = await window.db("exec", {
       sql: `SELECT *, snippet(images, -1, '<i class="snippet">', '</i>', '…', 24) AS snippet, bm25(images) AS bm25 FROM images WHERE images MATCH ? ORDER BY rank LIMIT ? OFFSET ?`,
       bind: [
-        `- {path album_relative_path} : ${query}`,
+        `- {path album_relative_path} : "${query.replaceAll(/["]/g, "'")}"`,
         _pageSize,
         _page * _pageSize,
       ],
@@ -160,9 +160,24 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
       snippet: string;
       bm25: number;
       tags: string;
+      colors: string;
     };
   }) => {
     const { result } = props;
+
+    // [(92, 124, 161), (213, 200, 192), (9, 9, 11), (152, 187, 215)]
+    let colour = "rgba(255, 255, 255, 0.2)";
+    try {
+      if (result.colors) {
+        const colourRgb = JSON.parse(
+          result.colors.replaceAll("(", "[").replaceAll(")", "]")
+        )[0];
+        colour = `rgba(${colourRgb[0]}, ${colourRgb[1]}, ${colourRgb[2]}, 1)`;
+      }
+    } catch (err) {
+      // noop
+    }
+
     // hack, assumed path
     // http://localhost:3000/data/albums/kuching/.resized_images/DSCF4490.JPG@2400.webp
     const imageSrc = result.path.replace("../src/public", "");
@@ -183,6 +198,7 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
               data-testid="result-picture"
               src={resized}
               alt={result.tags}
+              style={{ backgroundColor: colour }}
             ></img>
           </picture>
           <div className={styles.details}>
@@ -252,7 +268,7 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
         <input
           type="text"
           value={searchQuery}
-          placeholder="Type / to search (burger, japan, x10)"
+          placeholder="Type / to search (try burger, japan, x100)"
           spellCheck={false}
           onChange={(ev) => {
             setSearchQuery(ev.target.value);

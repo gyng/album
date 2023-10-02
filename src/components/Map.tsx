@@ -53,9 +53,10 @@ export const MMap: React.FC<MapProps> = (props) => {
         scrollWheelZoom={false}
         style={props.style ?? { flex: 1 }}
       >
+        {/* Use Next.js rewrites to hit OSM maps. This is needed because of COEP headers installed for WASM/search blocks maps loaded from OSM. */}
         <TileLayer
           attribution='&copy; <a href="https://osm.org/copyright">OpenStreetMap</a> contributors'
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          url="/osm/{s}/{z}/{x}/{y}"
         />
         <Marker
           position={props.coordinates}
