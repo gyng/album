@@ -31,11 +31,13 @@ def classify(fh: IO[any]):
     None
 
 
-def convert_to_degress(value: exifread.utils.Ratio) -> float:
+def convert_to_degress(value: exifread.utils.Ratio, lat_or_lng_ref: str) -> float:
+    is_s_or_w = str(lat_or_lng_ref) == "W" or str(lat_or_lng_ref) == "S"
+    sign = -1 if is_s_or_w else 1
     d = float(value.values[0].num) / float(value.values[0].den)
     m = float(value.values[1].num) / float(value.values[1].den)
     s = float(value.values[2].num) / float(value.values[2].den)
-    return d + (m / 60.0) + (s / 3600.0)
+    return sign * (d + (m / 60.0) + (s / 3600.0))
 
 
 def get_image_geocode(lat_deg: float, lng_deg: float) -> Mapping:
@@ -74,6 +76,12 @@ class Sqlite3Client:
         cur.execute(
             "CREATE VIRTUAL TABLE IF NOT EXISTS images USING fts5(path, album_relative_path, filename, geocode, exif, tags, colors, tokenize='porter trigram')"
         )
+        cur.execute(
+            "CREATE TABLE IF NOT EXISTS tags (tag VARCHAR PRIMARY KEY, count INTEGER DEFAULT 0)"
+        )
+        cur.execute(
+            "CREATE TABLE IF NOT EXISTS metadata (path VARCHAR PRIMARY KEY, lat_deg REAL, lng_deg REAL, iso8601 TEXT)"
+        )
         # Optimise loads from the browser https://github.com/phiresky/sql.js-httpvfs#readme
         cur.execute("PRAGMA journal_mode = delete;")
         cur.execute("PRAGMA page_size = 1024;")
@@ -85,8 +93,9 @@ class Sqlite3Client:
         cur = self.con.cursor()
         result = cur.execute(
             "SELECT COUNT(*) FROM images WHERE path = ?", (path,)
-        ).fetchall()
-        return len(result) > 0
+        ).fetchone()
+        # Result is a Tuple
+        return len(result) > 0 and result[0] > 0
 
     def insert_geocode(self, path: str, geocode: str):
         self.insert_field(path, value=geocode, field="geocode")
@@ -121,6 +130,24 @@ class Sqlite3Client:
         resolved = res.fetchall()
         return resolved
 
+    def search_tags(self, query: str, limit: Optional[int] = None):
+        cur = self.con.cursor()
+        res = cur.execute(
+            "SELECT * FROM tags t WHERE t.tag LIKE ? ORDER BY t.count DESC;",
+            (f"%{query}%",),
+        )
+        resolved = res.fetchall()
+        return resolved
+
+    def search_metadata(self, query: str, limit: Optional[int] = None):
+        cur = self.con.cursor()
+        res = cur.execute(
+            "SELECT * FROM metadata m WHERE m.path LIKE ?;",
+            (f"%{query}%",),
+        )
+        resolved = res.fetchall()
+        return resolved
+
     def insert_field(self, path: str, field: str, value: str):
         cur = self.con.cursor()
         # Upsert is not implemented for virtual tables
@@ -137,6 +164,44 @@ class Sqlite3Client:
                 f"INSERT INTO images (path, {field}) VALUES (?, ?);",
                 (path, value),
             )
+        cur.execute("COMMIT")
+
+    def insert_tag(self, tag: str):
+        cur = self.con.cursor()
+        cur.execute("BEGIN")
+        cur.execute(
+            "INSERT OR IGNORE INTO tags (tag, count) VALUES (?, 1);",
+            (tag,),
+        )
+        cur.execute(
+            "UPDATE tags SET count = count + 1 WHERE tag = ?",
+            (tag,),
+        )
+        cur.execute("COMMIT")
+
+    def insert_metadata(
+        self, path: str, lat_lng_deg: Tuple[float, float], iso8601: str
+    ):
+        cur = self.con.cursor()
+        cur.execute("BEGIN")
+        cur.execute(
+            "INSERT OR IGNORE INTO metadata (path, lat_deg, lng_deg, iso8601) VALUES (?, ?, ?, ?);",
+            (
+                path,
+                lat_lng_deg[0],
+                lat_lng_deg[1],
+                iso8601,
+            ),
+        )
+        cur.execute(
+            "UPDATE metadata SET lat_deg = ?, lng_deg = ?, iso8601 = ? WHERE path = ?",
+            (
+                lat_lng_deg[0],
+                lat_lng_deg[1],
+                iso8601,
+                path,
+            ),
+        )
         cur.execute("COMMIT")
 
 
@@ -161,19 +226,20 @@ def index(glob: str, dbpath: str, dry_run: bool):
     pprint.pprint(files)
     print(f"Found {len(files)} files for the the glob pattern {glob}")
 
-    pprint.pprint(valid_files)
     print(
-        f"Indexing {len(valid_files)} unindexed files (skipping {len(files) - len(valid_files)} already-indexed)"
+        f"Indexing {len(valid_files)} unindexed files (skipping {len(files) - len(valid_files)} already-indexed). Valid files:"
     )
+    pprint.pprint(valid_files)
 
     if not dry_run:
         classifier = Classifier()
         classifier.init_model()
 
-        for path in valid_files:
+        for idx, path in enumerate(valid_files):
             with open(path, "rb") as fh:
-                print(f"Indexing {path}...")
-                analysed = analyze_image(fh, classifier=classifier, path=path)
+                print(f"[{idx}/{len(valid_files)}] Indexing {path}...")
+                analysed = analyse_image(fh, classifier=classifier, path=path)
+                pprint.pprint(analysed)
                 db.insert_field(path, field="filename", value=get_filename(path))
                 db.insert_field(
                     path,
@@ -186,9 +252,26 @@ def index(glob: str, dbpath: str, dry_run: bool):
                 db.insert_field(
                     path, field="colors", value=format_mapping(analysed.get("colors"))
                 )
-                db.insert_geocode(path, format_mapping(analysed.get("geocode")))
+
+                geocode = analysed.get("geocode")
+                if geocode:
+                    db.insert_geocode(path, format_mapping_values(geocode))
+                    db.insert_tag(geocode["country"])
+                    db.insert_tag(geocode["city"])
+                    db.insert_tag(geocode["country_code"])
                 db.insert_field(
                     path, field="tags", value=", ".join(analysed.get("tags"))
+                )
+                for tag in analysed.get("tags"):
+                    db.insert_tag(tag)
+
+                db.insert_metadata(
+                    path,
+                    lat_lng_deg=(
+                        analysed.get("lat_deg"),
+                        analysed.get("lng_deg"),
+                    ),
+                    iso8601=analysed.get("iso8601"),
                 )
 
 
@@ -203,6 +286,28 @@ def search(dbpath: str, query: str, limit: Optional[int]):
     pprint.pprint(results)
 
 
+@cli.command("search-tags")
+@click.option("--dbpath", default="testdb.sqlite", help="sqlite database path to use.")
+@click.option("--query", default="", help="Search query.")
+@click.option("--limit", default=None, help="Search query limit.")
+def search(dbpath: str, query: str, limit: Optional[int]):
+    db = Sqlite3Client(dbpath)
+    db.setup_tables()
+    results = db.search_tags(query, limit)
+    pprint.pprint(results)
+
+
+@cli.command("search-metadata")
+@click.option("--dbpath", default="testdb.sqlite", help="sqlite database path to use.")
+@click.option("--query", default="", help="Search query.")
+@click.option("--limit", default=None, help="Search query limit.")
+def search(dbpath: str, query: str, limit: Optional[int]):
+    db = Sqlite3Client(dbpath)
+    db.setup_tables()
+    results = db.search_metadata(query, limit)
+    pprint.pprint(results)
+
+
 @cli.command("dump")
 @click.option("--dbpath", default="testdb.sqlite", help="sqlite database path to use.")
 def dump(dbpath: str):
@@ -212,18 +317,22 @@ def dump(dbpath: str):
     pprint.pprint(results)
 
 
-def analyze_image(fh: IO[bytes], classifier: Classifier, path: str) -> Mapping:
+def analyse_image(fh: IO[bytes], classifier: Classifier, path: str) -> Mapping:
     exif_full = get_exif(fh)
     exif = {k: v for k, v in exif_full.items() if not isinstance(v, bytes)}
 
-    lat = exif.get("GPS GPSLatitude", exif.get("GPS GPSLatitudeRef", None))
-    lng = exif.get("GPS GPSLongitude", exif.get("GPS GPSLongitudeRef", None))
+    lat = exif.get("GPS GPSLatitude", None)
+    lng = exif.get("GPS GPSLongitude", None)
+    lat_ref = exif.get("GPS GPSLatitudeRef", None)
+    lng_ref = exif.get("GPS GPSLongitudeRef", None)
 
-    if lat and lng:
-        lat_deg = convert_to_degress(lat)
-        lng_deg = convert_to_degress(lng)
+    if lat and lng and lat_ref and lng_ref:
+        lat_deg = convert_to_degress(lat, lat_ref)
+        lng_deg = convert_to_degress(lng, lng_ref)
         geo = get_image_geocode(lat_deg, lng_deg)
     else:
+        lat_deg = None
+        lng_deg = None
         geo = {}
 
     color_thief = ColorThief(fh)
@@ -231,13 +340,35 @@ def analyze_image(fh: IO[bytes], classifier: Classifier, path: str) -> Mapping:
 
     tags = classifier.predict(path=path)
 
-    return {"exif": exif, "geocode": geo, "colors": colors, "tags": tags}
+    # 2000:01:01 12:34:56 > 2000-01-01T12:34:56
+    datetime = (
+        str(exif_full.get("EXIF DateTimeOriginal", ""))
+        .replace(":", "-", 2)
+        .replace(" ", "T", 1)
+    )
+
+    return {
+        # assume TZ = Z
+        "datetime": f"{datetime}Z" if datetime else None,
+        "exif": exif,
+        "geocode": geo,
+        "lat_deg": lat_deg,
+        "lng_deg": lng_deg,
+        "colors": colors,
+        "tags": tags,
+    }
 
 
 def format_mapping(mapping: Optional[Mapping[str, str]]) -> str:
     if not mapping or not hasattr(mapping, "items"):
         return str(mapping)
-    return "\n".join([f"{k}: {v}" for k, v in mapping.items()])
+    return "\n".join([f"{k}:{v}" for k, v in mapping.items()])
+
+
+def format_mapping_values(mapping: Optional[Mapping[str, str]]) -> str:
+    if not mapping or not hasattr(mapping, "items"):
+        return str(mapping)
+    return "\n".join([str(v) for v in mapping.values()])
 
 
 if __name__ == "__main__":

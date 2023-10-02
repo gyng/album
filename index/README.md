@@ -2,23 +2,41 @@
 
 Indexes images for search with the following fields
 
-|           |                                                          |
-| --------- | -------------------------------------------------------- |
-| EXIF      | excluding binary data                                    |
-| Geography | taken from EXIF and roughly geocoded to country and city |
-| Tags      | classified using YOLOv8/ImageNet                         |
-| Colours   | RGB values                                               |
-| Filename  |                                                          |
+| Table        | Column              | Frontend     | Notes                             |
+| ------------ | ------------------- | ------------ | --------------------------------- |
+| fts5(images) | path                |              |                                   |
+| fts5(images) | album_relative_path |              |                                   |
+| fts5(images) | filename            |              |                                   |
+| fts5(images) | EXIF                | searched     | excluding binary data             |
+| fts5(images) | geocode             | searched     | geocoded to country and city      |
+| fts5(images) | tags                | searched     | classified using YOLOv8/ImageNet  |
+| fts5(images) | colors              |              | median cut (top 5); `[r, g, b][]` |
+| tags         | tag                 |              | primary key                       |
+| tags         | count               | autocomplete | tags count                        |
+| metadata     | path                |              | primary key                       |
+| metadata     | lat_deg             |              |                                   |
+| metadata     | lng_deg             |              |                                   |
+| metadata     | iso8601             |              | assumed UTC                       |
+
+The [FTS5 SQLite extension](https://www.sqlite.org/fts5.html) requires sqlite3 >= 3.34.0 and creates a virtual table.
+
+Full indexing of ~1000 images takes around 10+ minutes. The bottleneck is currently in the colour palette extraction step.
 
 ## Usage
 
-```
+```sh
 $ poetry run python index.py --help
 $ poetry run python index.py index --glob "../src/public/data/albums/test-simple/*.jpg"
 $ poetry run python index.py index --glob "../src/public/data/albums/**/*.jpg" --dbpath "search.sqlite" --dry-run
 $ poetry run python index.py search --query "singapore"
+
 $ poetry run python index.py inspect
+$ poetry run python index.py search-tags --query "dam"
+$ poetry run python index.py search-metadata --query "D"
+
 $ cp search.sqlite ../src/public/search.sqlite
+
+# Perform a full index and copy it to /public in the Next.js app
 $ ./full-index.sh
 ```
 
