@@ -61,8 +61,8 @@ describe("serialization", () => {
         _build: {
           srcset: [
             {
-              src: "/fixtures/.resized_images/monkey.jpg@400.webp",
-              width: 400,
+              src: "/fixtures/.resized_images/monkey.jpg@600.webp",
+              width: 600,
             },
             {
               src: "/fixtures/.resized_images/monkey.jpg@1200.webp",

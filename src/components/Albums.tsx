@@ -29,6 +29,7 @@ export const Albums: React.FC<{ albums: Content[] }> = (props) => {
                   thumb
                   lazy={i > 6}
                   label={`Album cover for ${album._build.slug}`}
+                  useColourPlaceholder
                 />
               ) : null}
             </Link>

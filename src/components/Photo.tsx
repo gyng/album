@@ -299,20 +299,42 @@ export const Picture: React.FC<{
   thumb?: boolean;
   lazy?: boolean;
   label?: string;
+  useColourPlaceholder?: boolean;
 }> = (props) => {
+  const colour = props.block._build?.tags?.colors?.[0];
+  const placeholderColour = colour
+    ? `rgb(${colour[0]}, ${colour[1]}, ${colour[2]})`
+    : "rgb(51, 51, 51)"; // var(--c-contrast-dark)
+  // We do this instead of simply setting background-color to `placeholderColor`
+  // as using background-color instead fills the entire picture element which can't
+  // be sized to be precisely the image size
+  // (wide viewports = wide picture element = oversized placeholder overflow)
+  const placeholderSvg = `
+<svg viewBox="0 0 ${props.block._build.width} ${props.block._build.height}" xmlns="http://www.w3.org/2000/svg">
+  <rect width="${props.block._build.width}" height="${props.block._build.height}" fill="${placeholderColour}" />
+</svg>`;
+  const b64Placeholder = btoa(placeholderSvg);
+  const aspectRatio = props.block._build.width / props.block._build.height;
+
   return (
     <picture className={styles.imageWrapper} data-testid="picture">
-      {props.block._build.srcset.map((srcset) => (
-        <source
-          key={srcset.src}
-          srcSet={srcset.src}
-          media={`(max-width: ${srcset.width * (props.thumb ? 2 : 1.1)}px) ${
-            srcset.width <= 400 ? "1x" : ""
-          }`}
-          width={props.block._build.width}
-          height={props.block._build.height}
-        />
-      ))}
+      {props.block._build.srcset.map((srcset, i) => {
+        const higherResSrcset2x = props.block._build.srcset[i + 1] ?? srcset;
+        const higherResSrcset3x =
+          props.block._build.srcset[i + 2] ?? higherResSrcset2x;
+
+        return (
+          <source
+            key={`${srcset.src}-${i}`}
+            srcSet={`${srcset.src}, ${higherResSrcset2x.src} 2x, ${higherResSrcset3x.src} 3x`}
+            media={`(max-height: ${
+              props.thumb ? srcset.width * 4 : srcset.width * 2
+            }px)`}
+            width={props.block._build.width}
+            height={props.block._build.height}
+          />
+        );
+      })}
 
       <img
         className={styles.image}
@@ -320,6 +342,12 @@ export const Picture: React.FC<{
         loading={props.lazy === false ? "eager" : "lazy"}
         style={{
           aspectRatio: `${props.block._build.width} / ${props.block._build.height}`,
+          backgroundImage: props.useColourPlaceholder
+            ? `url(data:image/svg+xml;base64,${b64Placeholder})`
+            : undefined,
+          backgroundRepeat: "no-repeat",
+          backgroundPosition: "center",
+          backgroundSize: props.thumb ? "cover" : "contain",
         }}
         // placeholder image sizes
         width={props.block._build.width}
@@ -351,7 +379,11 @@ export const PhotoBlockEl: React.FC<{
       ref={anchorRef}
       data-testid="photoblockel"
     >
-      <Picture block={props.block} lazy={props.currentIndex > 2} />
+      <Picture
+        block={props.block}
+        lazy={props.currentIndex > 2}
+        useColourPlaceholder
+      />
 
       <div className={styles.overlayHeader}>
         {props.block.data.title ? (

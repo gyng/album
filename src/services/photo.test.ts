@@ -39,8 +39,8 @@ describe("photo utilities", () => {
       const actual = await optimiseImages("test/fixtures/monkey.jpg");
       expect(actual).toEqual([
         {
-          src: "/fixtures/.resized_images/monkey.jpg@400.webp",
-          width: 400,
+          src: "/fixtures/.resized_images/monkey.jpg@600.webp",
+          width: 600,
         },
         {
           src: "/fixtures/.resized_images/monkey.jpg@1200.webp",
@@ -67,8 +67,8 @@ describe("photo utilities", () => {
       );
       expect(actual).toEqual([
         {
-          src: "/fixtures/.resized_images/monkey-for-unoptimised.jpg@400.webp",
-          width: 400,
+          src: "/fixtures/.resized_images/monkey-for-unoptimised.jpg@600.webp",
+          width: 600,
         },
         {
           src: "/fixtures/.resized_images/monkey-for-unoptimised.jpg@1200.webp",

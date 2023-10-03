@@ -186,7 +186,7 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
         ...imageSrc.split("/").slice(0, -1),
         ".resized_images",
         ...imageSrc.split("/").slice(-1),
-      ].join("/") + "@400.webp";
+      ].join("/") + "@600.webp";
     const albumName = result.path.split("/").at(-2);
 
     return (
@@ -268,7 +268,7 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
         <input
           type="text"
           value={searchQuery}
-          placeholder="Type / to search (try burger, japan, x100)"
+          placeholder="Type / to search (try burger, japan, 2020)"
           spellCheck={false}
           onChange={(ev) => {
             setSearchQuery(ev.target.value);
