@@ -304,7 +304,7 @@ export const Picture: React.FC<{
   const colour = props.block._build?.tags?.colors?.[0];
   const placeholderColour = colour
     ? `rgb(${colour[0]}, ${colour[1]}, ${colour[2]})`
-    : "rgb(51, 51, 51)"; // var(--c-contrast-dark)
+    : "transparent";
   // We do this instead of simply setting background-color to `placeholderColor`
   // as using background-color instead fills the entire picture element which can't
   // be sized to be precisely the image size
