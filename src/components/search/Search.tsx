@@ -145,8 +145,19 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
   };
 
   useEffect(() => {
-    setPage(0);
-    doSearch(debouncedSearchQuery, 0);
+    if ((results[debouncedSearchQuery]?.results.length ?? 0) === 0) {
+      setPage(0);
+      doSearch(debouncedSearchQuery, 0);
+    } else {
+      // Resume from previous search
+      const currentPage = Math.floor(
+        results[debouncedSearchQuery]?.results.length / PAGE_SIZE
+      );
+      // This has the unfortunate side effect of doing a search
+      // The proper fix is to store pages in `results` and do page caching
+      // transparently of the request
+      setPage(currentPage);
+    }
   }, [debouncedSearchQuery]);
 
   useEffect(() => {
