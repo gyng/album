@@ -71,8 +71,13 @@ export const deserializePhotoBlock = async (
   const { width, height } = await getPhotoSize(localFilepath);
   const exif = await getNextJsSafeExif(localFilepath);
   const srcset = await optimiseImages(localFilepath);
-  const tags =
-    (await getPhotoDetailsFromSearchIndex(localFilepath))?.[0] ?? null;
+  // Tags are optional
+  let tags;
+  try {
+    tags = (await getPhotoDetailsFromSearchIndex(localFilepath))?.[0] ?? null;
+  } catch (err) {
+    console.info("Failed to get details from index, skipping", err);
+  }
 
   const copy: PhotoBlock = {
     ...block,
