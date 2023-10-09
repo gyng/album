@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Screenshot for docs</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        height: 100vh;
+      }
+      body {
+        box-sizing: border-box;
+        background-color: rgb(51, 51, 51);
+        display: flex;
+        gap: 2%;
+        padding: 2%;
+      }
+      iframe {
+        box-sizing: border-box;
+        flex: 1;
+        border: none;
+        overflow: hidden;
+      }
+    </style>
+  </head>
+  <body>
+    <iframe scrolling="no" src="http://localhost:3000"></iframe>
+    <iframe
+      scrolling="no"
+      src="http://localhost:3000/album/kanto#DSCF3280.JPG"
+    ></iframe>
+    <iframe scrolling="no" src="http://localhost:3000/?q=japan"></iframe>
+  </body>
+</html>
