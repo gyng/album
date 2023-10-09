@@ -2,11 +2,10 @@ import React, { useEffect, useRef, useState } from "react";
 import { createSQLiteThread, createHttpBackend } from "sqlite-wasm-http";
 import { useDebounce } from "use-debounce";
 import styles from "./Search.module.css";
-import Link from "next/link";
 import { Backend } from "sqlite-wasm-http/dist/vfs-http-types";
 import { useRouter } from "next/router";
 import { useInfiniteQuery } from "@tanstack/react-query";
-import { SearchResult, fetchResults, PaginatedSearchResult } from "./api";
+import { fetchResults, PaginatedSearchResult } from "./api";
 import { SearchResultTile } from "./SearchResultTile";
 
 declare global {
