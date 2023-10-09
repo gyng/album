@@ -4,9 +4,18 @@ import Search from "./Search";
 
 export const SearchWithCoi = () => {
   const [coiLoaded, setCoiLoaded] = useState(false);
+  const [hasServiceWorker, setHasServiceWorker] = useState(true);
+
+  useEffect(() => {
+    setHasServiceWorker(!!navigator.serviceWorker);
+  }, []);
 
   const checkLoop = useCallback(async () => {
     const isCoiActive = async () => {
+      if (!navigator.serviceWorker) {
+        return false;
+      }
+
       const registrations = await navigator.serviceWorker.getRegistrations();
       return registrations.find(
         (r) =>
@@ -34,7 +43,7 @@ export const SearchWithCoi = () => {
       <Head>
         <script src="/coi-serviceworker.js"></script>
       </Head>
-      <Search />
+      <Search disabled={!hasServiceWorker && !coiLoaded} />
     </>
   );
 };

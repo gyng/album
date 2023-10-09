@@ -69,11 +69,20 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
         lastPage.next ?? undefined,
     }
   );
-  const { data, fetchNextPage, hasNextPage, isSuccess, isFetching } =
-    reactQuery;
+  const {
+    data,
+    fetchNextPage,
+    hasNextPage,
+    isSuccess,
+    isFetching,
+    isPreviousData,
+  } = reactQuery;
 
   useEffect(() => {
     if (!debouncedSearchQuery) {
+      // Bug: The react-query cache is not updated
+      // and leads to stale results being present when the input is focused on again
+      // Calling remove() on react-query doesn't seem to help
       return;
     }
 
@@ -81,11 +90,17 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
       console.log(
         `window.db not initialised, retrying "${debouncedSearchQuery}"`
       );
-      // Assume COOP/COEP service worker isn't up
-      // Give some time for service worker to init
-      setTimeout(() => {
-        window.location.reload();
-      }, 1000);
+
+      // FF in private browsing doesn't allow access to navigator.serviceWorker
+      if (navigator?.serviceWorker) {
+        // Assume COOP/COEP service worker isn't up
+        // Give some time for service worker to init
+        setTimeout(() => {
+          window.location.reload();
+        }, 1000);
+      } else {
+        console.log("navigator.serviceWorker not supported");
+      }
       return;
     } else {
       fetchNextPage();
@@ -155,6 +170,7 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
     <div className={styles.searchWidget}>
       <div className={styles.searchInputRow}>
         <input
+          suppressHydrationWarning
           type="text"
           value={searchQuery}
           placeholder="Type / to search (try burger, japan, datetime:2023)"
@@ -165,6 +181,11 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
           disabled={props.disabled === true || !backend}
           ref={inputRef}
           tabIndex={0}
+          title={
+            props.disabled || !backend
+              ? "Disabled: the SQLite WASM failed to load, your browser does not support service workers, or the server is missing the proper COEP/COOP headers"
+              : undefined
+          }
         />
       </div>
 
@@ -192,7 +213,13 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
 
               {queryResults?.map((r) => {
                 return (
-                  <li key={r.path} className={styles.resultLi}>
+                  <li
+                    key={r.path}
+                    className={styles.resultLi}
+                    style={{
+                      filter: isPreviousData ? "saturate(0.5)" : "saturate(1)",
+                    }}
+                  >
                     <SearchResultTile result={r} />
                   </li>
                 );

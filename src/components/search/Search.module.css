@@ -48,6 +48,12 @@
   background-color: var(--c-bg);
   border: solid 2px var(--c-bg-contrast-light);
   border-radius: var(--m-s);
+  transition: 0.5s ease-in opacity;
+}
+
+.searchWidget input:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
 }
 
 .searchWidget input:focus-visible,

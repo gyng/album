@@ -22,6 +22,11 @@
   display: grid;
 }
 
+/* Hide alt text while loading to reduce flicker */
+.resultPicture:-moz-loading {
+  color: transparent;
+}
+
 .details {
   width: 100%;
   overflow: hidden;
