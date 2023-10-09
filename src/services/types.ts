@@ -68,6 +68,7 @@ export type Content = {
   kicker?: string;
   blocks: Block[];
   order?: number;
+  cover?: { src: string };
   formatting: {
     overlay?: boolean;
     sort?: "newest-first" | "oldest-first";

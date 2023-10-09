@@ -3,7 +3,7 @@ import Head from "next/head";
 import { Albums } from "../components/Albums";
 import styles from "./Index.module.css";
 import { getAlbums, getImageTimestampRange } from "../services/album";
-import { Content } from "../services/types";
+import { Block, Content } from "../services/types";
 import DynamicSearchWithCoi from "../components/search/DynamicSearchWithCoi";
 
 type PageProps = {
@@ -54,7 +54,10 @@ export const getStaticProps: GetStaticProps<PageProps> = async (context) => {
       albums: albums.map((a) => ({
         ...a,
         // Reduce page data size by only providing a partial list
-        blocks: [...a.blocks.slice(0, 3)],
+        blocks: [
+          ...a.blocks.filter((b) => b.kind === "photo" && b.formatting?.cover),
+          a.blocks.find((b) => b.kind === "photo"),
+        ].filter(Boolean) as Block[],
         _build: { ...a._build, timeRange: getImageTimestampRange(a) }, // FIXME: Unoptimal
       })),
     },
