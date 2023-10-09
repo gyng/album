@@ -72,7 +72,8 @@ export const deserializePhotoBlock = async (
   const exif = await getNextJsSafeExif(localFilepath);
   const srcset = await optimiseImages(localFilepath);
   // Tags are optional
-  let tags;
+  // Needs to be null for same de/serialization result
+  let tags = null;
   try {
     tags = (await getPhotoDetailsFromSearchIndex(localFilepath))?.[0] ?? null;
   } catch (err) {

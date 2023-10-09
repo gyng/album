@@ -78,7 +78,7 @@ describe("serialization", () => {
             },
           ],
           exif: {},
-          tags: undefined,
+          tags: null,
           width: 34,
           height: 50,
         },
