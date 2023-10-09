@@ -5,6 +5,9 @@ import styles from "./Search.module.css";
 import Link from "next/link";
 import { Backend } from "sqlite-wasm-http/dist/vfs-http-types";
 import { useRouter } from "next/router";
+import { useInfiniteQuery } from "@tanstack/react-query";
+import { SearchResult, fetchResults, PaginatedSearchResult } from "./api";
+import { SearchResultTile } from "./SearchResultTile";
 
 declare global {
   interface Window {
@@ -44,20 +47,51 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
   const [backend, setBackend] = useState<ReturnType<
     typeof createHttpBackend
   > | null>(null);
+
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [debouncedSearchQuery] = useDebounce(searchQuery, 600);
   const inputRef = useRef<HTMLInputElement>(null);
-  const [page, setPage] = useState(0);
 
-  const [results, setResults] = useState<
-    Record<
-      string,
-      {
-        results: any[];
-        status: "done" | "searching" | "new";
-      }
-    >
-  >({});
+  const reactQuery = useInfiniteQuery(
+    ["results", { debouncedSearchQuery }],
+    async ({ pageParam = 0 }) =>
+      await fetchResults({
+        query: debouncedSearchQuery,
+        pageSize: PAGE_SIZE,
+        page: pageParam,
+      }),
+    {
+      // Don't fetch on mount
+      enabled: false,
+      keepPreviousData: true,
+      getPreviousPageParam: (firstPage: PaginatedSearchResult) =>
+        firstPage.prev ?? undefined,
+      getNextPageParam: (lastPage: PaginatedSearchResult) =>
+        lastPage.next ?? undefined,
+    }
+  );
+  const { data, fetchNextPage, hasNextPage, isSuccess, isFetching } =
+    reactQuery;
+
+  useEffect(() => {
+    if (!debouncedSearchQuery) {
+      return;
+    }
+
+    if (!window.db) {
+      console.log(
+        `window.db not initialised, retrying "${debouncedSearchQuery}"`
+      );
+      // Assume COOP/COEP service worker isn't up
+      // Give some time for service worker to init
+      setTimeout(() => {
+        window.location.reload();
+      }, 1000);
+      return;
+    } else {
+      fetchNextPage();
+    }
+  }, [debouncedSearchQuery]);
 
   useEffect(() => {
     const httpBackend = initBackend();
@@ -66,166 +100,11 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
 
   // Need to split initialisation out as the library doesn't guarantee that the backend worker is ready
   useEffect(() => {
-    if (!backend || !backend.worker) {
+    if (!backend || !backend.worker || window.db) {
       return;
     }
     initDb(backend).catch(console.error);
   }, [backend, backend?.worker]);
-
-  const doSearch = async (query: string, _page = 0, _pageSize = 23) => {
-    if (!query) {
-      return;
-    }
-
-    if (!window.db) {
-      console.log(`window.db not initialised, retrying "${query}"`);
-      setTimeout(() => {
-        window.location.reload();
-      }, 2000);
-      return;
-    }
-
-    if (results[query]?.status === "searching") {
-      // prevent duplicate active queries
-      return;
-    }
-
-    // When clicking "more", don't remove old results
-    if (_page === 0) {
-      setResults((cur) => ({
-        ...cur,
-        [query]: {
-          results: [],
-          status: "searching",
-        },
-      }));
-    }
-
-    // Potential duplicates when two queries
-    // with the same same search term are in-flight
-    // Eg, entering the following
-    // `dog` > query (dog1) executes
-    // `dogs` > query (dogs) executes
-    // `dog` > backspace, query (dog2) executes
-    // dog1 and dog2 are both returning results
-    //
-    // We store all return results until it's complete
-    // and at that point we "commit" it all to `results` using `setResults`
-    const resultsBuffer: Record<string, string>[] =
-      results[query]?.results ?? [];
-    const exec = await window.db("exec", {
-      sql: `SELECT *, snippet(images, -1, '<i class="snippet">', '</i>', '…', 24) AS snippet, bm25(images) AS bm25 FROM images WHERE images MATCH ? ORDER BY rank LIMIT ? OFFSET ?`,
-      bind: [
-        `- {path album_relative_path} : "${query.replaceAll(/["]/g, "'")}"`,
-        _pageSize,
-        _page * _pageSize,
-      ],
-      callback: (msg: any) => {
-        if (msg.row) {
-          const record: Record<string, string> = {};
-          (msg.columnNames as Array<string>).forEach((cn, i) => {
-            record[cn] = msg.row[i];
-          });
-          record.type = msg.type;
-          resultsBuffer.push(record);
-        } else {
-          setResults((cur) => {
-            return {
-              ...cur,
-              [query]: {
-                ...cur.query,
-                results: resultsBuffer,
-                status: "done",
-              },
-            };
-          });
-        }
-      },
-    });
-  };
-
-  useEffect(() => {
-    if ((results[debouncedSearchQuery]?.results.length ?? 0) === 0) {
-      setPage(0);
-      doSearch(debouncedSearchQuery, 0);
-    } else {
-      // Resume from previous search
-      const currentPage = Math.floor(
-        results[debouncedSearchQuery]?.results.length / PAGE_SIZE
-      );
-      // This has the unfortunate side effect of doing a search
-      // The proper fix is to store pages in `results` and do page caching
-      // transparently of the request
-      setPage(currentPage);
-    }
-  }, [debouncedSearchQuery]);
-
-  useEffect(() => {
-    doSearch(debouncedSearchQuery, page);
-  }, [page]);
-
-  const SearchResult = (props: {
-    result: {
-      path: string;
-      album_relative_path: string;
-      snippet: string;
-      bm25: number;
-      tags: string;
-      colors: string;
-    };
-  }) => {
-    const { result } = props;
-
-    // [(92, 124, 161), (213, 200, 192), (9, 9, 11), (152, 187, 215)]
-    let colour = "rgba(255, 255, 255, 0.2)";
-    try {
-      if (result.colors) {
-        const colourRgb = JSON.parse(
-          result.colors.replaceAll("(", "[").replaceAll(")", "]")
-        )[0];
-        colour = `rgba(${colourRgb[0]}, ${colourRgb[1]}, ${colourRgb[2]}, 1)`;
-      }
-    } catch (err) {
-      // noop
-    }
-
-    // hack, assumed path
-    // http://localhost:3000/data/albums/kuching/.resized_images/DSCF4490.JPG@2400.webp
-    const imageSrc = result.path.replace("../src/public", "");
-    const resized =
-      [
-        ...imageSrc.split("/").slice(0, -1),
-        ".resized_images",
-        ...imageSrc.split("/").slice(-1),
-      ].join("/") + "@600.webp";
-    const albumName = result.path.split("/").at(-2);
-
-    return (
-      <Link href={result.album_relative_path} className={styles.link}>
-        <div className={styles.result}>
-          <picture>
-            <img
-              className={styles.resultPicture}
-              data-testid="result-picture"
-              src={resized}
-              alt={result.tags}
-              style={{ backgroundColor: colour }}
-            ></img>
-          </picture>
-          <div className={styles.details}>
-            <div>
-              <div
-                className={styles.snippet}
-                dangerouslySetInnerHTML={{ __html: result.snippet }}
-                title={(result.bm25 * -1).toFixed(1)}
-              />
-              <div>{albumName}</div>
-            </div>
-          </div>
-        </div>
-      </Link>
-    );
-  };
 
   // Read query from URL on load
   useEffect(() => {
@@ -271,7 +150,7 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
     };
   }, []);
 
-  const queryResults = results[debouncedSearchQuery];
+  const queryResults = data?.pages.flatMap((page) => page.data);
 
   return (
     <div className={styles.searchWidget}>
@@ -279,7 +158,7 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
         <input
           type="text"
           value={searchQuery}
-          placeholder="Type / to search (try burger, japan, 2020)"
+          placeholder="Type / to search (try burger, japan, datetime:2023)"
           spellCheck={false}
           onChange={(ev) => {
             setSearchQuery(ev.target.value);
@@ -292,48 +171,50 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
 
       <div>
         <ul className={styles.results}>
-          {queryResults?.status === "done" &&
-          debouncedSearchQuery.length < 3 ? (
-            <div className={styles.searchHint}>
-              Type a minimum of 3 characters
-            </div>
-          ) : null}
+          {searchQuery ? (
+            <>
+              {isSuccess &&
+              !isFetching &&
+              queryResults?.length === 0 &&
+              debouncedSearchQuery.length >= 3 ? (
+                <div>
+                  No results for <i>{debouncedSearchQuery}</i>
+                </div>
+              ) : null}
 
-          {queryResults?.status === "searching" ? (
-            <div className={styles.searchHint}>Searching&hellip;</div>
-          ) : queryResults?.status === "done" ? (
-            queryResults?.results.length === 0 &&
-            debouncedSearchQuery.length >= 3 ? (
-              <div key={debouncedSearchQuery}>
-                No results for <i>{debouncedSearchQuery}</i>
-              </div>
-            ) : (
-              <>
-                {queryResults?.results.map((r) => {
-                  return (
-                    <li key={r.path} className={styles.resultLi}>
-                      <SearchResult result={r} />
-                    </li>
-                  );
-                })}
-                {/* This logic is flawed as result sets with exactly PAGE_SIZE
-                results will show this button, but we don't want to fire off an additional COUNT query*/}
-                {queryResults?.results?.length % PAGE_SIZE === 0 &&
-                queryResults?.results?.length > 0 ? (
-                  <button
-                    className={styles.moreButton}
-                    onClick={() => {
-                      setPage(page + 1);
-                    }}
-                  >
-                    More&hellip;
-                  </button>
-                ) : null}
-              </>
-            )
-          ) : (
-            <div style={{ userSelect: "none" }}>&nbsp;</div>
-          )}
+              {isSuccess &&
+              !isFetching &&
+              debouncedSearchQuery.length < 3 &&
+              queryResults?.length === 0 ? (
+                <div className={styles.searchHint}>
+                  Type a minimum of 3 characters
+                </div>
+              ) : null}
+
+              {queryResults?.map((r) => {
+                return (
+                  <li key={r.path} className={styles.resultLi}>
+                    <SearchResultTile result={r} />
+                  </li>
+                );
+              })}
+
+              {hasNextPage && isSuccess ? (
+                <button
+                  className={styles.moreButton}
+                  onClick={() => {
+                    fetchNextPage();
+                  }}
+                  disabled={isFetching}
+                >
+                  {isFetching ? <>Loading&hellip;</> : <>More&hellip;</>}
+                </button>
+              ) : null}
+
+              {/* First fetch */}
+              {isFetching && !isSuccess ? <div>Searching&hellip;</div> : null}
+            </>
+          ) : null}
         </ul>
       </div>
     </div>

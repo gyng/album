@@ -34,7 +34,7 @@ export const SearchWithCoi = () => {
       <Head>
         <script src="/coi-serviceworker.js"></script>
       </Head>
-      <Search disabled={!coiLoaded} />
+      <Search />
     </>
   );
 };

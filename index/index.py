@@ -106,26 +106,27 @@ class Sqlite3Client:
         resolved = res.fetchall()
         return resolved
 
-    def search(self, query: str, limit: Optional[int] = None):
+    def search(
+        self, query: str, limit: Optional[int] = 999999, offset: Optional[int] = 999999
+    ):
         cur = self.con.cursor()
-        # SELECT *, snippet(images, -1, '<i class="snippet">', '</i>', '…', 12) FROM images WHERE images MATCH ? ORDER BY rank
         statement = f"""
-          SELECT *, snippet(images, -1, '<i class="snippet">', '</i>', '…', 12) FROM images WHERE images MATCH ? ORDER BY rank {"LIMIT ?" if limit else ""}
+        SELECT *, snippet(images, -1, '<i class="snippet">', '</i>', '…', 24) AS snippet, bm25(images) AS bm25
+        FROM images
+        WHERE images MATCH ?
+        ORDER BY rank
+        LIMIT ?
+        OFFSET ?
         """
+
+        limit = limit or 99999
+        offset = offset or 99999
+
         excluded_columns = "path album_relative_path"
-        if limit:
-            res = cur.execute(
-                statement,
-                (
-                    f"- {{{excluded_columns}}} : {query}",
-                    limit,
-                ),
-            )
-        else:
-            res = cur.execute(
-                statement,
-                (f"- {{{excluded_columns}}} : {query}",),
-            )
+        res = cur.execute(
+            statement,
+            (f"- {{{excluded_columns}}} : {query}", limit, offset),
+        )
 
         resolved = res.fetchall()
         return resolved
@@ -290,6 +291,7 @@ def search(dbpath: str, query: str, limit: Optional[int]):
 @click.option("--dbpath", default="testdb.sqlite", help="sqlite database path to use.")
 @click.option("--query", default="", help="Search query.")
 @click.option("--limit", default=None, help="Search query limit.")
+@click.option("--offset", default=0, help="Search query offset.")
 def search(dbpath: str, query: str, limit: Optional[int]):
     db = Sqlite3Client(dbpath)
     db.setup_tables()

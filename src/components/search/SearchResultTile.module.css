@@ -1,0 +1,29 @@
+.link {
+  text-decoration: none !important;
+}
+
+.result {
+  width: 150px;
+  overflow: hidden;
+  font-size: var(--fs-s);
+}
+
+.snippet i {
+  background-color: rgba(255, 255, 255, 0.2);
+}
+
+.resultPicture {
+  width: 150px;
+  height: 150px;
+  margin-bottom: var(--m);
+  background-color: var(--c-bg-contrast-dark);
+  object-fit: cover;
+  object-position: center;
+  display: grid;
+}
+
+.details {
+  width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
