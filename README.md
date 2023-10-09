@@ -2,11 +2,9 @@
 
 [Demo](https://album-gyng.vercel.app/)
 
-| Index                                                                                                         | Album                                                                                                         | Search                                                                                     |
-| ------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
-| ![Index](https://user-images.githubusercontent.com/370496/209406151-e13ef6fc-eb25-41a0-a7d3-293bc69d9c09.png) | ![Album](https://user-images.githubusercontent.com/370496/209406166-e47e6a0e-abda-4b47-8856-862424fd3966.png) | ![image](https://github.com/gyng/album/assets/370496/2071165e-db34-4c58-b520-e9114f12e3b9) |
+<img width="1920" alt="Screenshot 2023-10-10 04 44 48" src="https://github.com/gyng/album/assets/370496/af81b5d8-65ca-4d81-b949-7b3f031f09e5">
 
-A zero-config static album generator
+A zero-config, static, file-based album generator
 
 - Dump your photos in a directory and run one command to deploy
 - Index and search images using YOLOv8/ImageNet classifications
@@ -133,3 +131,5 @@ Sqlite in the browser then loads this database and runs a trigram full-text sear
 Vercel is unable to serve the library's JS files from Next.js's `_next/` build directory with these headers, even with configuration set up in next.config.js and vercel.json. Middleware and API functions cannot redirect or add headers to these files either.
 
 A service worker modified from [coi-serviceworker](https://github.com/gzuidhof/coi-serviceworker) is used to add headers instead. This works, but has an unfortunate downside of requiring a page reload after initial install.
+
+To take screenshots, visit http://localhost:3000/screenshot.html
