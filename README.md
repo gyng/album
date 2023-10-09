@@ -4,9 +4,7 @@
 
 | Index                                                                                                         | Album                                                                                                         | Search                                                                                     |
 | ------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
-| ![Index](https://user-images.githubusercontent.com/370496/209406151-e13ef6fc-eb25-41a0-a7d3-293bc69d9c09.png) | ![Album](https://user-images.githubusercontent.com/370496/209406166-e47e6a0e-abda-4b47-8856-862424fd3966.png) | ![image](https://github.com/gyng/album/assets/370496/16d85522-ae14-400b-a4d9-b8d9c7bf1e9e) |
- |
- |
+| ![Index](https://user-images.githubusercontent.com/370496/209406151-e13ef6fc-eb25-41a0-a7d3-293bc69d9c09.png) | ![Album](https://user-images.githubusercontent.com/370496/209406166-e47e6a0e-abda-4b47-8856-862424fd3966.png) | ![image](https://github.com/gyng/album/assets/370496/2071165e-db34-4c58-b520-e9114f12e3b9) |
 
 A zero-config static album generator
 
