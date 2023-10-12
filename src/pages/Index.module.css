@@ -17,3 +17,25 @@
 .footer a {
   text-decoration: none;
 }
+
+.toolbar {
+  display: flex;
+  align-items: baseline;
+}
+
+.toolbarLink {
+  margin-bottom: var(--m-l);
+  text-decoration: none;
+  border: solid 2px var(--c-bg-contrast-light);
+  border-radius: var(--m-s);
+  padding: var(--m-m);
+  font-size: var(--fs-sm);
+}
+
+.toolbarLink:hover {
+  background-color: var(--c-bg-contrast-light);
+}
+
+.toolbarLink:focus-visible {
+  outline: solid 2px var(--c-bg-contrast-light);
+}

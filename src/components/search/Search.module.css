@@ -29,6 +29,7 @@
   padding: 0;
   gap: var(--m-m);
   min-height: 24px;
+  font-size: var(--fs-sm);
 }
 
 .resultLi {
@@ -49,6 +50,7 @@
   border: solid 2px var(--c-bg-contrast-light);
   border-radius: var(--m-s);
   transition: 0.08s ease-out opacity;
+  font-size: var(--fs-sm);
 }
 
 .searchWidget input:disabled {

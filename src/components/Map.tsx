@@ -61,8 +61,8 @@ export const MMap: React.FC<MapProps> = (props) => {
         <Marker
           position={props.coordinates}
           icon={Leaflet.divIcon({
-            iconSize: [32, 32],
-            iconAnchor: [32, 32],
+            iconSize: [16, 20],
+            iconAnchor: [10, 16],
             className: styles.marker,
             html: pinSvg,
           })}

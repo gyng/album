@@ -8,6 +8,7 @@ import { MoveControl } from "./editor/MoveBlock";
 import { InputFieldControl } from "./editor/InputFieldControl";
 import { DeleteBlock } from "./editor/DeleteBlock";
 import { License } from "../License";
+import { convertDMSToDegree, getDegLatLngFromExif } from "../util/dms2deg";
 
 type ExifCoordinatesRowProps = {
   kind: "coordinates";
@@ -161,24 +162,12 @@ const ExifCoordinatesRow: React.FC<{ row: ExifCoordinatesRowProps }> = (
     .filter(Boolean)
     .join(" ");
 
-  const convertDMSToDegree = (
-    coords: number[],
-    isSOrW: boolean
-  ): number | null => {
-    if (!coords || coords.length !== 3) {
-      return null;
-    }
-    return (isSOrW ? -1 : 1) * (coords[0] + coords[1] / 60 + coords[2] / 3600);
-  };
-
-  const decLng = convertDMSToDegree(
-    props.row.data.GPSLongitude,
-    props.row.data.GPSLongitudeRef === "W"
-  );
-  const decLat = convertDMSToDegree(
-    props.row.data.GPSLatitude,
-    props.row.data.GPSLatitudeRef === "S"
-  );
+  const { decLat, decLng } = getDegLatLngFromExif({
+    GPSLongitude: props.row.data.GPSLongitude,
+    GPSLatitude: props.row.data.GPSLatitude,
+    GPSLongitudeRef: props.row.data.GPSLongitudeRef,
+    GPSLatitudeRef: props.row.data.GPSLatitudeRef,
+  });
 
   return (
     <>

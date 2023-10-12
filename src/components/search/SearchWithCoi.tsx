@@ -1,8 +1,8 @@
 import Head from "next/head";
-import { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import Search from "./Search";
 
-export const SearchWithCoi = () => {
+function useCoi() {
   const [coiLoaded, setCoiLoaded] = useState(false);
   const [hasServiceWorker, setHasServiceWorker] = useState(true);
 
@@ -38,11 +38,23 @@ export const SearchWithCoi = () => {
     setTimeout(checkLoop);
   }, [checkLoop]);
 
-  return (
-    <>
+  return {
+    script: (
       <Head>
         <script src="/coi-serviceworker.js"></script>
       </Head>
+    ),
+    coiLoaded,
+    hasServiceWorker,
+  };
+}
+
+export const SearchWithCoi: React.FC<{}> = (props) => {
+  const { script, coiLoaded, hasServiceWorker } = useCoi();
+
+  return (
+    <>
+      {script}
       <Search disabled={!hasServiceWorker && !coiLoaded} />
     </>
   );
