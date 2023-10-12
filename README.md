@@ -1,8 +1,8 @@
 # album
 
-[Demo](https://album-gyng.vercel.app/)
+<img width="1920" alt="Screenshot 2023-10-13 01 42 01" src="https://github.com/gyng/album/assets/370496/ceac9451-4765-4efc-a7d6-c3b135942b13">
 
-<img width="1920" alt="Screenshot 2023-10-10 04 44 48" src="https://github.com/gyng/album/assets/370496/af81b5d8-65ca-4d81-b949-7b3f031f09e5">
+[Demo](https://album-gyng.vercel.app/)
 
 A zero-config, static, file-based album generator
 
