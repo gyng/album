@@ -24,3 +24,7 @@
   display: inline-block;
   margin: 0;
 }
+
+.titleBar a {
+  text-decoration: none !important;
+}

@@ -4,27 +4,22 @@
   object-fit: cover;
 }
 
-.marker {
-  fill: var(--c-bg);
-  stroke: white;
-  stroke-width: 1px;
-  transition: all 0.1s ease-in;
-  opacity: 0.8;
-}
-
-.marker:hover {
-  filter: brightness(2);
-  opacity: 1;
-}
-
-.marker svg {
-  transform-origin: 50% 50%;
-}
-
-.marker:hover svg {
-  transform: scale(1.2);
+.pin {
+  font-size: 18px;
+  text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.4), -1px -1px 0 rgba(0, 0, 0, 0.4),
+    1px -1px 0 rgba(0, 0, 0, 0.4), -1px 1px 0 rgba(0, 0, 0, 0.4),
+    1px 1px 0 rgba(0, 0, 0, 0.4);
+  opacity: 0.9;
 }
 
 .link {
   text-decoration: none;
+}
+
+.popup *:focus-visible {
+  outline: none;
+}
+
+.popup a:hover img {
+  outline: solid 2px var(--c-bg-contrast-light);
 }

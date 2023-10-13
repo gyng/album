@@ -21,7 +21,7 @@ const WorldMap: NextPage<PageProps> = (props) => {
       </Head>
       <div className={styles.titleBar}>
         <h1 className={styles.title}>🌏</h1>
-        <Link href="/">Home</Link>
+        <Link href="/">← Back</Link>
       </div>
       <MapWorldDeferred photos={props.photos} className={styles.map} />
     </div>

@@ -1,0 +1,29 @@
+.maplibregl-popup-content {
+  background-color: var(--c-bg) !important;
+}
+
+.maplibregl-popup-tip {
+  border-top-color: var(--c-bg) !important;
+}
+
+.maplibregl-marker {
+  cursor: pointer;
+}
+
+.maplibregl-marker:hover {
+  filter: brightness(1.5);
+}
+
+.maplibregl-ctrl-attrib a {
+  color: var(--c-bg-contrast-dark) !important;
+  text-decoration: none !important;
+}
+
+.maplibregl-ctrl-attrib a:hover {
+  color: var(--c-bg-contrast-dark) !important;
+  text-decoration: none !important;
+}
+
+.maplibregl-popup-close-button {
+  display: none;
+}
