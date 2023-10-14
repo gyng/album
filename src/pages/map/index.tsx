@@ -66,14 +66,22 @@ export const getStaticProps: GetStaticProps<PageProps> = async (context) => {
 
       const filename = photo.data.src.split("/").at(-1);
 
-      return {
+      const color = photo._build?.tags?.colors?.[0];
+
+      const entry: MapWorldEntry = {
         album: album._build.slug,
         src,
         decLng,
         decLat,
         date: DateTimeOriginal,
         href: `/album/${album._build.slug}#${filename}`,
+        placeholderColor: color
+          ? `rgba(${color[0]}, ${color[1]}, ${color[2]}, 1)`
+          : "transparent",
+        placeholderHeight: photo._build?.height,
+        placeholderWidth: photo._build?.width,
       };
+      return entry;
     });
   });
 

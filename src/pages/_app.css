@@ -4,6 +4,7 @@
 
 .maplibregl-popup-tip {
   border-top-color: var(--c-bg) !important;
+  border-bottom-color: var(--c-bg) !important;
 }
 
 .maplibregl-marker {
@@ -11,6 +12,7 @@
 }
 
 .maplibregl-marker:hover {
+  z-index: 5000;
   filter: brightness(1.5);
 }
 

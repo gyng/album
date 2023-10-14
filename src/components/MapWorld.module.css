@@ -6,14 +6,21 @@
 
 .pin {
   font-size: 18px;
-  text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.4), -1px -1px 0 rgba(0, 0, 0, 0.4),
-    1px -1px 0 rgba(0, 0, 0, 0.4), -1px 1px 0 rgba(0, 0, 0, 0.4),
-    1px 1px 0 rgba(0, 0, 0, 0.4);
+  text-shadow: 1.4px 1.4px 0 rgba(255, 255, 255, 0.8),
+    -1.4px -1.4px 0 rgba(255, 255, 255, 0.8),
+    1.4px -1.4px 0 rgba(255, 255, 255, 0.8),
+    -1.4px 1.4px 0 rgba(255, 255, 255, 0.8),
+    1.4px 1.4px 0 rgba(255, 255, 255, 0.8);
   opacity: 0.9;
 }
 
 .link {
   text-decoration: none;
+}
+
+.popup {
+  pointer-events: none;
+  z-index: 5001;
 }
 
 .popup *:focus-visible {
@@ -22,4 +29,34 @@
 
 .popup a:hover img {
   outline: solid 2px var(--c-bg-contrast-light);
+}
+
+.photoMarkerImage {
+  width: 80px;
+  height: 80px;
+  object-fit: cover;
+  animation: fadein;
+  animation-duration: 0.5s;
+  animation-delay: 0;
+  object-position: bottom;
+  border-radius: var(--m-s);
+
+  position: absolute;
+  top: -90px;
+  right: calc(-50% - 15px);
+  isolation: isolate;
+  border: solid 1px rgba(255, 255, 255, 0.5);
+}
+
+.hover * {
+  pointer-events: none;
+}
+
+@keyframes fadein {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }

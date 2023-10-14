@@ -1,10 +1,12 @@
-import React from "react";
+import React, { useEffect, useRef } from "react";
 import styles from "./MapWorld.module.css";
 import { OptimisedPhoto } from "../services/types";
 import Link from "next/link";
 import { getRelativeTimeString } from "../util/time";
 import Map, { Marker, Popup } from "react-map-gl/maplibre";
 import "maplibre-gl/dist/maplibre-gl.css";
+import { useIntersectionObserver } from "usehooks-ts";
+import { useRouter } from "next/router";
 
 export type MapWorldEntry = {
   album: string;
@@ -13,6 +15,9 @@ export type MapWorldEntry = {
   decLng: number | null;
   date: string;
   href: string;
+  placeholderColor?: string;
+  placeholderWidth?: number;
+  placeholderHeight?: number;
 };
 
 export type MapWorldProps = {
@@ -20,29 +25,35 @@ export type MapWorldProps = {
   className: string;
 };
 
-const resizeMap = (mapRef: React.RefObject<typeof MMap>) => {
-  // @ts-expect-error
-  mapRef.current?.invalidateSize();
-  const timer = window.setInterval(() => {
-    // @ts-expect-error
-    if (mapRef.current?.invalidateSize) {
-      // @ts-expect-error
-      mapRef.current?.invalidateSize();
-    }
-  }, 100);
-  return timer;
+const LazyImage = (props: { photo: MapWorldEntry }) => {
+  const ref = useRef<HTMLDivElement | null>(null);
+  const entry = useIntersectionObserver(ref, {
+    rootMargin: "100px",
+  });
+  const isVisible = !!entry?.isIntersecting;
+
+  return (
+    <div ref={ref}>
+      {isVisible && (
+        <img
+          src={props.photo.src.src}
+          className={styles.photoMarkerImage}
+          width={props.photo.placeholderWidth}
+          height={props.photo.placeholderHeight}
+          style={{
+            backgroundColor: `${props.photo.placeholderColor}`,
+          }}
+          loading="lazy"
+          alt=""
+        />
+      )}
+    </div>
+  );
 };
 
 export const MMap: React.FC<MapWorldProps> = (props) => {
-  const mapRef = React.useRef(null);
-
-  // react-leaflet doesn't show the map correctly. Force it to keep invalidating size to load tiles.
-  React.useEffect(() => {
-    const timer = resizeMap(mapRef);
-    return () => {
-      window.clearInterval(timer);
-    };
-  }, [mapRef]);
+  const [zoom, setZoom] = React.useState<number | null>(null);
+  const router = useRouter();
 
   const sortedByDate = props.photos
     .filter((p) => p.date)
@@ -57,11 +68,36 @@ export const MMap: React.FC<MapWorldProps> = (props) => {
   const [hoverInfo, setHoverInfo] = React.useState<MapWorldEntry | null>(null);
   const popupInfo = clickInfo ?? hoverInfo;
 
+  const url = new URL(window.location.toString());
+  const initialLon = url.searchParams.get("lon");
+  const initialLat = url.searchParams.get("lat");
+  const initialZoom = url.searchParams.get("zoom");
+
   return (
     <div className={props.className}>
       <Map
         style={{ width: "100vw", height: "100vh" }}
-        mapStyle="https://api.maptiler.com/maps/streets/style.json?key=rIHHWldVP0SFPxQ7N0Ua"
+        mapStyle="https://api.maptiler.com/maps/ffd8bd10-cd97-40a5-b1d6-d15f98fb3644/style.json?key=iilC4hPY1594noPX9OQ2"
+        initialViewState={{
+          longitude: initialLon ? Number.parseFloat(initialLon) : undefined,
+          latitude: initialLat ? Number.parseFloat(initialLat) : undefined,
+          zoom: initialZoom ? Number.parseFloat(initialZoom) : undefined,
+        }}
+        onZoom={(e) => {
+          setZoom(e.viewState.zoom);
+        }}
+        onZoomEnd={(e) => {
+          const zoom = e.viewState.zoom;
+          const lat = e.viewState.latitude;
+          const lng = e.viewState.longitude;
+          const url = new URL(window.location.toString());
+          const searchParams = new URLSearchParams(window.location.search);
+          searchParams.set("lat", lat.toPrecision(6).toString());
+          searchParams.set("lon", lng.toPrecision(6).toString());
+          searchParams.set("zoom", zoom.toPrecision(4).toString());
+          url.search = searchParams.toString();
+          router.replace(url, undefined, { shallow: true });
+        }}
       >
         {popupInfo && popupInfo.decLat && popupInfo.decLng ? (
           <Popup
@@ -70,13 +106,21 @@ export const MMap: React.FC<MapWorldProps> = (props) => {
             onClose={() => {
               setClickInfo(null);
             }}
-            className={styles.popup}
+            className={`${styles.popup} ${
+              clickInfo ? styles.click : styles.hover
+            }`}
             offset={15}
-            style={{ pointerEvents: clickInfo ? "unset" : "none" }}
+            closeButton={false}
           >
             <>
               <Link href={popupInfo.href ?? ""} className={styles.link}>
-                <img src={popupInfo.src.src} className={styles.image} />
+                <img
+                  src={popupInfo.src.src}
+                  className={styles.image}
+                  width={popupInfo.placeholderWidth}
+                  height={popupInfo.placeholderHeight}
+                  style={{ backgroundColor: popupInfo.placeholderColor }}
+                />
                 <div className={styles.details}>
                   {popupInfo.album}
                   <br />
@@ -129,17 +173,20 @@ export const MMap: React.FC<MapWorldProps> = (props) => {
                 }}
                 color={`hsl(${relative * 220}, 100%, ${50 - relative * 30}%)`}
               >
-                <div
-                  style={{ filter: `hue-rotate(${relative * 255}deg)` }}
-                  className={styles.pin}
-                  onMouseOver={() => {
-                    setHoverInfo(photo);
-                  }}
-                  onMouseOut={() => {
-                    setHoverInfo(null);
-                  }}
-                >
-                  🔴
+                <div>
+                  {zoom && zoom > 8.5 ? <LazyImage photo={photo} /> : null}
+                  <span
+                    style={{ filter: `hue-rotate(${relative * 255}deg)` }}
+                    className={styles.pin}
+                    onMouseOver={() => {
+                      setHoverInfo(photo);
+                    }}
+                    onMouseLeave={() => {
+                      setHoverInfo(null);
+                    }}
+                  >
+                    🔴
+                  </span>
                 </div>
               </Marker>
             </React.Fragment>
