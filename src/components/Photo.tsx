@@ -8,7 +8,7 @@ import { MoveControl } from "./editor/MoveBlock";
 import { InputFieldControl } from "./editor/InputFieldControl";
 import { DeleteBlock } from "./editor/DeleteBlock";
 import { License } from "../License";
-import { convertDMSToDegree, getDegLatLngFromExif } from "../util/dms2deg";
+import { getDegLatLngFromExif } from "../util/dms2deg";
 
 type ExifCoordinatesRowProps = {
   kind: "coordinates";
@@ -360,6 +360,8 @@ export const PhotoBlockEl: React.FC<{
   const FRACTION_SLASH = "⁄";
   const anchorRef = React.useRef<HTMLDivElement>(null);
 
+  const [isDetailsOpen, setIsDetailsOpen] = React.useState(false);
+
   return (
     <div
       className={`${styles.block} ${
@@ -392,195 +394,209 @@ export const PhotoBlockEl: React.FC<{
         id={props.block.id ?? props.block.data.src}
         className={styles.details}
       >
-        <details>
+        <details
+          onToggle={(ev) => {
+            setIsDetailsOpen(ev.currentTarget.open);
+          }}
+        >
           <summary
             title="More details&hellip;"
             className={styles.detailsSummary}
           >
             <span>ⓘ</span>
           </summary>
-          <div className={styles.detailsContent}>
-            <div className={styles.exif}>
-              <ExifTable
-                rows={[
-                  {
-                    kind: "coordinates",
-                    k: "Location",
-                    v: {
-                      GPSLatitudeRef: props.block._build.exif.GPSLatitudeRef,
-                      GPSLatitude: props.block._build.exif.GPSLatitude,
-                      GPSLongitudeRef: props.block._build.exif.GPSLongitudeRef,
-                      GPSLongitude: props.block._build.exif.GPSLongitude,
-                    },
-                    options: {
-                      showMap: true,
-                    },
-                    valid: Boolean(
-                      props.block._build.exif.GPSLatitudeRef &&
-                        props.block._build.exif.GPSLatitude &&
-                        props.block._build.exif.GPSLongitudeRef &&
-                        props.block._build.exif.GPSLongitude
-                    ),
-                  },
-                  {
-                    kind: "kv",
-                    k: "Shutter speed",
-                    v:
-                      props.block._build.exif.ExposureTime < 1
-                        ? `${new Fraction(props.block._build.exif.ExposureTime)
-                            .toFraction()
-                            .replace("/", FRACTION_SLASH)}; ${
-                            props.block._build.exif.ExposureTime
-                          }s` // FRACTION_SLASH gives us nice ligatured fractions (eg, 1⁄10)
-                        : `${props.block._build.exif.ExposureTime}s`,
-                    valid: Boolean(props.block._build.exif.ExposureTime),
-                  },
-                  {
-                    kind: "kv",
-                    k: "ISO",
-                    v: props.block._build.exif.ISO,
-                  },
-                  {
-                    kind: "kv",
-                    k: "𝑓",
-                    v: `𝑓/${props.block._build.exif.FNumber}`,
-                    valid: Boolean(props.block._build.exif.FNumber),
-                  },
-                  {
-                    kind: "kv",
-                    k: "Exposure compensation",
-                    v: props.block._build.exif.ExposureCompensation,
-                  },
-                  //   { kind: "kv", k: "Flash", v: props.block._build.exif.Flash },
-                  {
-                    kind: "kv",
-                    k: "Focal length",
-                    v: `${props.block._build.exif.FocalLength}mm (actual)${
-                      props.block._build.exif.FocalLengthIn35mmFormat
-                        ? `; ${props.block._build.exif.FocalLengthIn35mmFormat}mm (35mm equivalent)`
-                        : ""
-                    }`,
-                    valid: Boolean(props.block._build.exif.FocalLength),
-                  },
-                  {
-                    kind: "kv",
-                    k: "Lens info",
-                    v: props.block._build.exif.LensInfo,
-                  },
-                  {
-                    kind: "kv",
-                    k: "Camera datetime",
-                    v: props.block._build.exif.DateTimeOriginal?.replace(
-                      /Z$/,
-                      ""
-                    ), // TODO: shift TZ option
-                  },
-                  {
-                    kind: "kv",
-                    k: "Camera",
-                    v: [
-                      props.block._build.exif.Make,
-                      props.block._build.exif.Model,
-                    ].join(" "),
-                    valid: Boolean(
-                      props.block._build.exif.Make ||
-                        props.block._build.exif.Model
-                    ),
-                  },
-                  {
-                    kind: "kv",
-                    k: "Description",
-                    v: props.block._build.exif.ImageDescription,
-                  },
-                  {
-                    kind: "kv",
-                    k: "Lens",
-                    v: `${props.block._build.exif.LensMake} ${props.block._build.exif.LensModel}`,
-                    valid: Boolean(
-                      props.block._build.exif.LensMake ||
-                        props.block._build.exif.LensModel
-                    ),
-                  },
-                  //   { kind: "kv", k: "Software", v: [props.block._build.exif.Software].join(" ") },
-                  {
-                    kind: "kv",
-                    k: "Original size",
-                    v: `${props.block._build.width}px × ${props.block._build.height}px`,
-                  },
-                  {
-                    kind: "kv",
-                    k: "Tags",
-                    v: props.block._build?.tags?.tags,
-                    valid: Boolean(props.block._build.tags),
-                  },
-                  {
-                    kind: "kv",
-                    k: "Colours",
-                    v: (
-                      <div className={styles.colorswatches}>
-                        {props.block._build?.tags?.colors?.map(
-                          (rgb: number[]) => {
-                            const rgbStr = `rgb(${rgb[0]}, ${rgb[1]}, ${rgb[2]})`;
-                            return (
-                              <div
-                                key={rgbStr}
-                                style={{
-                                  backgroundColor: rgbStr,
-                                }}
-                                className={styles.colorswatch}
-                                title={rgbStr}
-                              ></div>
-                            );
-                          }
-                        )}
-                      </div>
-                    ),
-                    valid: Boolean(props.block._build.tags?.colors),
-                  },
-                ]}
-              />
 
-              <div className={styles.viewOriginal}>
-                <a href={`#${props.block.id ?? props.block.data.src}`}>
-                  Permalink
-                </a>
-                &nbsp;&middot;&nbsp; View{" "}
-                <a href={props.block.data.src} target="_blank" rel="noreferrer">
-                  original
-                </a>
-                {props.block._build.srcset.length > 0 ? (
-                  <>
-                    &nbsp;&middot;&nbsp;
-                    {props.block._build.srcset.map((s, i) => (
-                      <React.Fragment key={s.src}>
-                        <a
-                          key={s.src}
-                          target="_blank"
-                          href={s.src}
-                          rel="noreferrer"
-                        >
-                          {s.width}px
-                        </a>
-                        {i < props.block._build.srcset.length - 1 ? (
-                          <>&nbsp;&middot;&nbsp;</>
-                        ) : null}
-                      </React.Fragment>
-                    ))}
-                  </>
-                ) : null}
+          {isDetailsOpen ? (
+            <div className={styles.detailsContent}>
+              <div className={styles.exif}>
+                <ExifTable
+                  rows={[
+                    {
+                      kind: "coordinates",
+                      k: "Location",
+                      v: {
+                        GPSLatitudeRef: props.block._build.exif.GPSLatitudeRef,
+                        GPSLatitude: props.block._build.exif.GPSLatitude,
+                        GPSLongitudeRef:
+                          props.block._build.exif.GPSLongitudeRef,
+                        GPSLongitude: props.block._build.exif.GPSLongitude,
+                      },
+                      options: {
+                        showMap: true,
+                      },
+                      valid: Boolean(
+                        props.block._build.exif.GPSLatitudeRef &&
+                          props.block._build.exif.GPSLatitude &&
+                          props.block._build.exif.GPSLongitudeRef &&
+                          props.block._build.exif.GPSLongitude
+                      ),
+                    },
+                    {
+                      kind: "kv",
+                      k: "Shutter speed",
+                      v:
+                        props.block._build.exif.ExposureTime < 1
+                          ? `${new Fraction(
+                              props.block._build.exif.ExposureTime
+                            )
+                              .toFraction()
+                              .replace("/", FRACTION_SLASH)}; ${
+                              props.block._build.exif.ExposureTime
+                            }s` // FRACTION_SLASH gives us nice ligatured fractions (eg, 1⁄10)
+                          : `${props.block._build.exif.ExposureTime}s`,
+                      valid: Boolean(props.block._build.exif.ExposureTime),
+                    },
+                    {
+                      kind: "kv",
+                      k: "ISO",
+                      v: props.block._build.exif.ISO,
+                    },
+                    {
+                      kind: "kv",
+                      k: "𝑓",
+                      v: `𝑓/${props.block._build.exif.FNumber}`,
+                      valid: Boolean(props.block._build.exif.FNumber),
+                    },
+                    {
+                      kind: "kv",
+                      k: "Exposure compensation",
+                      v: props.block._build.exif.ExposureCompensation,
+                    },
+                    //   { kind: "kv", k: "Flash", v: props.block._build.exif.Flash },
+                    {
+                      kind: "kv",
+                      k: "Focal length",
+                      v: `${props.block._build.exif.FocalLength}mm (actual)${
+                        props.block._build.exif.FocalLengthIn35mmFormat
+                          ? `; ${props.block._build.exif.FocalLengthIn35mmFormat}mm (35mm equivalent)`
+                          : ""
+                      }`,
+                      valid: Boolean(props.block._build.exif.FocalLength),
+                    },
+                    {
+                      kind: "kv",
+                      k: "Lens info",
+                      v: props.block._build.exif.LensInfo,
+                    },
+                    {
+                      kind: "kv",
+                      k: "Camera datetime",
+                      v: props.block._build.exif.DateTimeOriginal?.replace(
+                        /Z$/,
+                        ""
+                      ), // TODO: shift TZ option
+                    },
+                    {
+                      kind: "kv",
+                      k: "Camera",
+                      v: [
+                        props.block._build.exif.Make,
+                        props.block._build.exif.Model,
+                      ].join(" "),
+                      valid: Boolean(
+                        props.block._build.exif.Make ||
+                          props.block._build.exif.Model
+                      ),
+                    },
+                    {
+                      kind: "kv",
+                      k: "Description",
+                      v: props.block._build.exif.ImageDescription,
+                    },
+                    {
+                      kind: "kv",
+                      k: "Lens",
+                      v: `${props.block._build.exif.LensMake} ${props.block._build.exif.LensModel}`,
+                      valid: Boolean(
+                        props.block._build.exif.LensMake ||
+                          props.block._build.exif.LensModel
+                      ),
+                    },
+                    //   { kind: "kv", k: "Software", v: [props.block._build.exif.Software].join(" ") },
+                    {
+                      kind: "kv",
+                      k: "Original size",
+                      v: `${props.block._build.width}px × ${props.block._build.height}px`,
+                    },
+                    {
+                      kind: "kv",
+                      k: "Tags",
+                      v: props.block._build?.tags?.tags,
+                      valid: Boolean(props.block._build.tags),
+                    },
+                    {
+                      kind: "kv",
+                      k: "Colours",
+                      v: (
+                        <div className={styles.colorswatches}>
+                          {props.block._build?.tags?.colors?.map(
+                            (rgb: number[]) => {
+                              const rgbStr = `rgb(${rgb[0]}, ${rgb[1]}, ${rgb[2]})`;
+                              return (
+                                <div
+                                  key={rgbStr}
+                                  style={{
+                                    backgroundColor: rgbStr,
+                                  }}
+                                  className={styles.colorswatch}
+                                  title={rgbStr}
+                                ></div>
+                              );
+                            }
+                          )}
+                        </div>
+                      ),
+                      valid: Boolean(props.block._build.tags?.colors),
+                    },
+                  ]}
+                />
+
+                <div className={styles.viewOriginal}>
+                  <a href={`#${props.block.id ?? props.block.data.src}`}>
+                    Permalink
+                  </a>
+                  &nbsp;&middot;&nbsp; View{" "}
+                  <a
+                    href={props.block.data.src}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    original
+                  </a>
+                  {props.block._build.srcset.length > 0 ? (
+                    <>
+                      &nbsp;&middot;&nbsp;
+                      {props.block._build.srcset.map((s, i) => (
+                        <React.Fragment key={s.src}>
+                          <a
+                            key={s.src}
+                            target="_blank"
+                            href={s.src}
+                            rel="noreferrer"
+                          >
+                            {s.width}px
+                          </a>
+                          {i < props.block._build.srcset.length - 1 ? (
+                            <>&nbsp;&middot;&nbsp;</>
+                          ) : null}
+                        </React.Fragment>
+                      ))}
+                    </>
+                  ) : null}
+                </div>
+
+                <details className={styles.rawDetails}>
+                  <summary>Raw EXIF</summary>
+                  <pre>{JSON.stringify(props.block._build.exif, null, 2)}</pre>
+                </details>
+
+                <details>
+                  <summary>License</summary>
+                  <License />
+                </details>
               </div>
-
-              <details className={styles.rawDetails}>
-                <summary>Raw EXIF</summary>
-                <pre>{JSON.stringify(props.block._build.exif, null, 2)}</pre>
-              </details>
-
-              <details>
-                <summary>License</summary>
-                <License />
-              </details>
             </div>
-          </div>
+          ) : null}
         </details>
       </div>
 
