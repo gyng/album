@@ -338,6 +338,9 @@ export const Picture: React.FC<{
           backgroundPosition: "center",
           backgroundSize: props.thumb ? "cover" : "contain",
         }}
+        onLoad={(evt) => {
+          evt.currentTarget.style.backgroundImage = "unset";
+        }}
         // placeholder image sizes
         width={props.block._build.width}
         height={props.block._build.height}
