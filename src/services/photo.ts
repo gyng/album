@@ -55,7 +55,7 @@ export const optimiseImages = async (
       const newFile = path.join(
         dirname,
         RESIZED_IMAGE_DIR,
-        `${filename}@${size}.webp`
+        `${filename}@${size}.avif`
       );
       fs.mkdirSync(path.join(dirname, RESIZED_IMAGE_DIR), { recursive: true });
 
@@ -82,7 +82,8 @@ export const optimiseImages = async (
           .rotate()
           .resize(size)
           // .withMetadata() // larger filesize than .rotate(), but preserves more metadata (eg, width/height)
-          .webp({ quality: 90, smartSubsample: true })
+          // .webp({ quality: 90, smartSubsample: true })
+          .avif({ quality: 75 })
           .toFile(newFile)
           .then(() => {
             return optimised;

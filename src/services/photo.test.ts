@@ -39,19 +39,19 @@ describe("photo utilities", () => {
       const actual = await optimiseImages("test/fixtures/monkey.jpg");
       expect(actual).toEqual([
         {
-          src: "/fixtures/.resized_images/monkey.jpg@600.webp",
+          src: "/fixtures/.resized_images/monkey.jpg@600.avif",
           width: 600,
         },
         {
-          src: "/fixtures/.resized_images/monkey.jpg@1200.webp",
+          src: "/fixtures/.resized_images/monkey.jpg@1200.avif",
           width: 1200,
         },
         {
-          src: "/fixtures/.resized_images/monkey.jpg@2400.webp",
+          src: "/fixtures/.resized_images/monkey.jpg@2400.avif",
           width: 2400,
         },
         {
-          src: "/fixtures/.resized_images/monkey.jpg@4896.webp",
+          src: "/fixtures/.resized_images/monkey.jpg@4896.avif",
           width: 4896,
         },
       ]);
@@ -67,23 +67,23 @@ describe("photo utilities", () => {
       );
       expect(actual).toEqual([
         {
-          src: "/fixtures/.resized_images/monkey-for-unoptimised.jpg@600.webp",
+          src: "/fixtures/.resized_images/monkey-for-unoptimised.jpg@600.avif",
           width: 600,
         },
         {
-          src: "/fixtures/.resized_images/monkey-for-unoptimised.jpg@1200.webp",
+          src: "/fixtures/.resized_images/monkey-for-unoptimised.jpg@1200.avif",
           width: 1200,
         },
         {
-          src: "/fixtures/.resized_images/monkey-for-unoptimised.jpg@2400.webp",
+          src: "/fixtures/.resized_images/monkey-for-unoptimised.jpg@2400.avif",
           width: 2400,
         },
         {
-          src: "/fixtures/.resized_images/monkey-for-unoptimised.jpg@4896.webp",
+          src: "/fixtures/.resized_images/monkey-for-unoptimised.jpg@4896.avif",
           width: 4896,
         },
       ]);
-    }, 30000);
+    }, 120000);
   });
 
   describe("stripPublicFromPath", () => {

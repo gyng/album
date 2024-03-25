@@ -194,8 +194,11 @@ export const getStaticProps: GetStaticProps<
 };
 
 export const getStaticPaths: GetStaticPaths = async () => {
+  // TODO: move into routes
+  const paths = (await getAlbumNames()).map((n) => `/album/${n}`);
+  console.log("Paths", paths);
   return {
-    paths: (await getAlbumNames()).map((n) => `/album/${n}`), // TODO: move into routes
+    paths,
     fallback: true,
   };
 };

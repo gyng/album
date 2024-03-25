@@ -61,19 +61,19 @@ describe("serialization", () => {
         _build: {
           srcset: [
             {
-              src: "/fixtures/.resized_images/monkey.jpg@600.webp",
+              src: "/fixtures/.resized_images/monkey.jpg@600.avif",
               width: 600,
             },
             {
-              src: "/fixtures/.resized_images/monkey.jpg@1200.webp",
+              src: "/fixtures/.resized_images/monkey.jpg@1200.avif",
               width: 1200,
             },
             {
-              src: "/fixtures/.resized_images/monkey.jpg@2400.webp",
+              src: "/fixtures/.resized_images/monkey.jpg@2400.avif",
               width: 2400,
             },
             {
-              src: "/fixtures/.resized_images/monkey.jpg@4896.webp",
+              src: "/fixtures/.resized_images/monkey.jpg@4896.avif",
               width: 4896,
             },
           ],
@@ -105,7 +105,7 @@ describe("serialization", () => {
 
     const expected: Content = fullyDeserializedContent;
     expect(actual).toEqual(expected);
-    // First run will optimise images: webp optimisation takes a while
+    // First run will optimise images: avif optimisation takes a while
     // We keep optimised images in .resized_iamges
-  }, 10000);
+  }, 60000);
 });
