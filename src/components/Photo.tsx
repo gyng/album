@@ -290,6 +290,17 @@ export const Picture: React.FC<{
   label?: string;
   useColourPlaceholder?: boolean;
 }> = (props) => {
+  // Dimensions have to be flipped if image is rotated using EXIF
+  const isExifPortrait =
+    props.block?._build?.exif?.Orientation?.includes("270") ||
+    props.block?._build?.exif?.Orientation?.includes("90");
+  const actualWidth = isExifPortrait
+    ? props.block._build.height
+    : props.block._build.width;
+  const actualHeight = isExifPortrait
+    ? props.block._build.width
+    : props.block._build.height;
+
   const colour = props.block._build?.tags?.colors?.[0];
   const placeholderColour = colour
     ? `rgb(${colour[0]}, ${colour[1]}, ${colour[2]})`
@@ -299,11 +310,10 @@ export const Picture: React.FC<{
   // be sized to be precisely the image size
   // (wide viewports = wide picture element = oversized placeholder overflow)
   const placeholderSvg = `
-<svg viewBox="0 0 ${props.block._build.width} ${props.block._build.height}" xmlns="http://www.w3.org/2000/svg">
-  <rect width="${props.block._build.width}" height="${props.block._build.height}" fill="${placeholderColour}" />
+<svg viewBox="0 0 ${actualWidth} ${actualHeight}" xmlns="http://www.w3.org/2000/svg">
+  <rect width="${actualWidth}" height="${actualHeight}" fill="${placeholderColour}" />
 </svg>`;
   const b64Placeholder = btoa(placeholderSvg);
-  const aspectRatio = props.block._build.width / props.block._build.height;
 
   return (
     <picture className={styles.imageWrapper} data-testid="picture">
@@ -319,8 +329,8 @@ export const Picture: React.FC<{
             media={`(max-height: ${
               props.thumb ? srcset.width * 4 : srcset.width * 2
             }px)`}
-            width={props.block._build.width}
-            height={props.block._build.height}
+            width={actualWidth}
+            height={actualHeight}
           />
         );
       })}
@@ -330,7 +340,7 @@ export const Picture: React.FC<{
         src={props.block.data.src}
         loading={props.lazy === false ? "eager" : "lazy"}
         style={{
-          aspectRatio: `${props.block._build.width} / ${props.block._build.height}`,
+          aspectRatio: `${actualWidth} / ${actualHeight}`,
           backgroundImage: props.useColourPlaceholder
             ? `url(data:image/svg+xml;base64,${b64Placeholder})`
             : undefined,
@@ -342,8 +352,8 @@ export const Picture: React.FC<{
           evt.currentTarget.style.backgroundImage = "unset";
         }}
         // placeholder image sizes
-        width={props.block._build.width}
-        height={props.block._build.height}
+        width={actualWidth}
+        height={actualHeight}
         alt={
           props.block.data.title ??
           props.block.data.kicker ??
