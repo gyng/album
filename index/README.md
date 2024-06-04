@@ -34,6 +34,8 @@ $ poetry run python index.py inspect
 $ poetry run python index.py search-tags --query "dam"
 $ poetry run python index.py search-metadata --query "D"
 
+$ poetry run python index.py prune --glob "../src/public/data/albums/**/*.jpg" --dbpath "search.sqlite" --dry-run
+
 $ cp search.sqlite ../src/public/search.sqlite
 
 # Perform a full index and copy it to /public in the Next.js app

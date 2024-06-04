@@ -73,7 +73,7 @@ export const getStaticProps: GetStaticProps<PageProps> = async (context) => {
         src,
         decLng,
         decLat,
-        date: DateTimeOriginal,
+        date: DateTimeOriginal ?? null,
         href: `/album/${album._build.slug}#${filename}`,
         placeholderColor: color
           ? `rgba(${color[0]}, ${color[1]}, ${color[2]}, 1)`

@@ -2,7 +2,7 @@ import click
 import glob as _glob
 from pathlib import Path
 import pprint
-from colorthief import ColorThief
+import fast_colorthief
 import exifread
 import reverse_geocode
 import sqlite3
@@ -10,6 +10,8 @@ from ultralytics import YOLO
 import typing
 from typing import IO, TYPE_CHECKING, Mapping, Optional, Tuple
 import os
+import re
+import fnmatch
 
 
 class Classifier:
@@ -64,6 +66,7 @@ def get_filename(path: str) -> str:
     return str(os.path.basename(Path(path)))
 
 
+# Repository for our search + metadata table
 class Sqlite3Client:
     def __init__(self, db_path: typing.Union[str, bytes, os.PathLike]):
         self.con = sqlite3.connect(db_path)
@@ -105,6 +108,50 @@ class Sqlite3Client:
         res = cur.execute("SELECT * FROM images")
         resolved = res.fetchall()
         return resolved
+
+    def list_paths(self):
+        cur = self.con.cursor()
+
+        statement_images = f"""
+        SELECT path
+        FROM images
+        """
+        res = cur.execute(statement_images)
+        resolved_image_paths = res.fetchall()
+
+        statement_metadata = f"""
+        SELECT path
+        FROM metadata
+        """
+        res = cur.execute(statement_metadata)
+        resolved_metadata_paths = res.fetchall()
+
+        resolved_paths = {
+            p[0] for l in [resolved_image_paths, resolved_metadata_paths] for p in l
+        }
+        return resolved_paths
+
+    def delete_path(self, path: str):
+        cur = self.con.cursor()
+
+        statement_images = """
+        DELETE FROM images WHERE path = ?
+        """
+        res_images = cur.execute(
+            statement_images,
+            (path,),
+        )
+
+        statement_metadata = """
+        DELETE FROM metadata WHERE path = ?
+        """
+        res_metadata = cur.execute(
+            statement_metadata,
+            (path,),
+        )
+        cur.execute("COMMIT")
+
+        return (res_images, res_metadata)
 
     def search(
         self, query: str, limit: Optional[int] = 999999, offset: Optional[int] = 999999
@@ -221,7 +268,7 @@ def index(glob: str, dbpath: str, dry_run: bool):
     db.setup_tables()
     print(db.info())
 
-    files = _glob.glob(glob)
+    files = find_files(".", glob)
     valid_files = [f for f in files if not db.already_exists(f)]
 
     pprint.pprint(files)
@@ -274,6 +321,24 @@ def index(glob: str, dbpath: str, dry_run: bool):
                     ),
                     iso8601=analysed.get("iso8601"),
                 )
+
+
+@cli.command("prune")
+@click.option("--glob", help="glob to recursively index.")
+@click.option("--dbpath", default="testdb.sqlite", help="sqlite database path to use.")
+@click.option("--dry-run", is_flag=True, default=False, help="Dry run.")
+def prune(glob: str, dbpath: str, dry_run: bool):
+    db = Sqlite3Client(dbpath)
+    files = find_files(".", glob)
+    paths = db.list_paths()
+    to_delete = [p for p in paths if p not in files]
+
+    if dry_run:
+        pprint.pprint(to_delete)
+    else:
+        for p in to_delete:
+            res = db.delete_path(p)
+            pprint.pprint(f"deleted from db {res}")
 
 
 @cli.command("search")
@@ -337,8 +402,7 @@ def analyse_image(fh: IO[bytes], classifier: Classifier, path: str) -> Mapping:
         lng_deg = None
         geo = {}
 
-    color_thief = ColorThief(fh)
-    colors = color_thief.get_palette(color_count=3)
+    colors = fast_colorthief.get_palette(path)
 
     tags = classifier.predict(path=path)
 
@@ -371,6 +435,33 @@ def format_mapping_values(mapping: Optional[Mapping[str, str]]) -> str:
     if not mapping or not hasattr(mapping, "items"):
         return str(mapping)
     return "\n".join([str(v) for v in mapping.values()])
+
+
+def find_files(directory, pat):
+    """
+    Find files in a case sensitive way on Windows.
+
+    Parameters
+    ----------
+    directory: str
+        The directory where you want to find files, can be relative or
+        absolute path.
+    pat: str
+        The pattern of file names you want find, for example,`*.jpg` or
+        `*.JPG`.
+
+    Returns
+    -------
+    A list of file paths matching the given pattern. Empty if no files under
+        the directory matches the pattern.
+    """
+    path_pattern = os.path.join(directory, pat)
+    pths = _glob.glob(path_pattern)
+
+    match = re.compile(fnmatch.translate(path_pattern), re.IGNORECASE).match
+    valid_pths = [pth for pth in pths if match(pth)]
+
+    return valid_pths
 
 
 if __name__ == "__main__":

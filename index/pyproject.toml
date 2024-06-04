@@ -10,11 +10,11 @@ python = "^3.8"
 reverse-geocode = "^1.4.1"
 exifread = "^3.0.0"
 click = "^8.1.7"
-colorthief = "^0.2.1"
 ultralytics = "^8.0.184"
 # Bug with PyTorch not handling libcublas
 # https://stackoverflow.com/a/76647180
 torch = ">=2.0.0, !=2.0.1"
+fast-colorthief = "^0.0.5"
 
 [build-system]
 requires = ["poetry-core"]
