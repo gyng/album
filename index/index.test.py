@@ -10,6 +10,7 @@ from index import (
 import os
 import unittest
 from click.testing import CliRunner
+import torch
 
 
 class TestMain(unittest.TestCase):
@@ -28,19 +29,29 @@ class TestMain(unittest.TestCase):
         self.assertEqual(actual, expected)
 
     def test_analyse_image_worker(self):
-        classifier = Classifier()
-        classifier.init_model()
-        idx = 0
-        path = "../src/test/fixtures/monkey.jpg"
-        input = (idx, path, classifier)
+        if torch.cuda.is_available():
+            classifier = Classifier()
+            classifier.init_model()
+            idx = 0
+            path = "../src/test/fixtures/monkey.jpg"
+            input = (idx, path, classifier)
 
-        actual = analyse_image_worker(input)
+            actual = analyse_image_worker(input)
 
-        self.assertEqual(
-            actual.get("analysed").get("tags"),
-            ["Madagascar_cat", "worm_fence", "siamang", "milk_can", "spider_monkey"],
-        )
-        self.assertEqual(len(actual.get("analysed").get("colors")), 9)
+            self.assertEqual(
+                actual.get("analysed").get("tags"),
+                [
+                    "Madagascar_cat",
+                    "worm_fence",
+                    "siamang",
+                    "milk_can",
+                    "spider_monkey",
+                ],
+            )
+            self.assertEqual(len(actual.get("analysed").get("colors")), 9)
+        else:
+            print("Skipping test_analyse_image_worker as CUDA is not available")
+            pass
 
 
 class TestCli(unittest.TestCase):
