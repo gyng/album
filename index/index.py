@@ -1,6 +1,5 @@
 import click
-import glob as _glob
-from pathlib import Path
+from pathlib import Path, PosixPath
 import pprint
 import fast_colorthief
 import exifread
@@ -10,14 +9,14 @@ from ultralytics import YOLO
 import typing
 from typing import IO, TYPE_CHECKING, Mapping, Optional, Tuple
 import os
-import re
-import fnmatch
+from p_tqdm import p_uimap
 
 
 class Classifier:
     def init_model(self) -> None:
         print("Loading YOLOv8...")
-        self.model = YOLO("yolov8n-cls.pt")
+        self.model = YOLO("yolov8n-cls")
+        print("Loaded YOLOv8.")
 
     def predict(self, path: str):
         results = self.model(path, conf=0.7)
@@ -27,10 +26,6 @@ class Classifier:
             top5_mapped = [f"{classes[x]}" for x in top5]
             return top5_mapped
         return {}
-
-
-def classify(fh: IO[any]):
-    None
 
 
 def convert_to_degress(value: exifread.utils.Ratio, lat_or_lng_ref: str) -> float:
@@ -70,9 +65,17 @@ def get_filename(path: str) -> str:
 class Sqlite3Client:
     def __init__(self, db_path: typing.Union[str, bytes, os.PathLike]):
         self.con = sqlite3.connect(db_path)
+        # allows for concurrent writes...? Not sure if it has any impact
+        self.con.execute("PRAGMA journal_mode=WAL;")
 
     def info(self):
-        print(f"""sqlite:\t{sqlite3.sqlite_version}""")
+        version = sqlite3.sqlite_version
+        entries = 0
+        try:
+            entries = len(self.inspect())
+        except:
+            pass
+        return { "version": version, "entries": entries}
 
     def setup_tables(self):
         cur = self.con.cursor()
@@ -266,61 +269,32 @@ def cli(ctx):
 def index(glob: str, dbpath: str, dry_run: bool):
     db = Sqlite3Client(dbpath)
     db.setup_tables()
-    print(db.info())
+    pprint.pprint(db.info())
 
     files = find_files(".", glob)
     valid_files = [f for f in files if not db.already_exists(f)]
 
-    pprint.pprint(files)
     print(f"Found {len(files)} files for the the glob pattern {glob}")
-
     print(
-        f"Indexing {len(valid_files)} unindexed files (skipping {len(files) - len(valid_files)} already-indexed). Valid files:"
+        f"Analysing {len(valid_files)} unindexed files (skipping {len(files) - len(valid_files)} already-indexed)."
     )
-    pprint.pprint(valid_files)
 
     if not dry_run:
         classifier = Classifier()
         classifier.init_model()
 
-        for idx, path in enumerate(valid_files):
-            with open(path, "rb") as fh:
-                print(f"[{idx}/{len(valid_files)}] Indexing {path}...")
-                analysed = analyse_image(fh, classifier=classifier, path=path)
-                pprint.pprint(analysed)
-                db.insert_field(path, field="filename", value=get_filename(path))
-                db.insert_field(
-                    path,
-                    field="album_relative_path",
-                    value=get_album_relative_path(path),
-                )
-                db.insert_field(
-                    path, field="exif", value=format_mapping(analysed.get("exif"))
-                )
-                db.insert_field(
-                    path, field="colors", value=format_mapping(analysed.get("colors"))
-                )
+        enumerated = [
+            (index, item, classifier) for index, item in enumerate(valid_files)
+        ]
+        # 4 as GPU can run out of memory
+        # 4 also seems to be fastest on a 3080 vs 2 or 8
+        results_iter = p_uimap(analyse_image_worker, enumerated, num_cpus=4)
 
-                geocode = analysed.get("geocode")
-                if geocode:
-                    db.insert_geocode(path, format_mapping_values(geocode))
-                    db.insert_tag(geocode["country"])
-                    db.insert_tag(geocode["city"])
-                    db.insert_tag(geocode["country_code"])
-                db.insert_field(
-                    path, field="tags", value=", ".join(analysed.get("tags"))
-                )
-                for tag in analysed.get("tags"):
-                    db.insert_tag(tag)
-
-                db.insert_metadata(
-                    path,
-                    lat_lng_deg=(
-                        analysed.get("lat_deg"),
-                        analysed.get("lng_deg"),
-                    ),
-                    iso8601=analysed.get("iso8601"),
-                )
+        for result in results_iter:
+            pprint.pprint(f"Inserting analysed image {result.get("path")}")
+            insert_analysed_image(
+                db=db, analysed=result.get("analysed"), path=result.get("path")
+            )
 
 
 @cli.command("prune")
@@ -338,7 +312,7 @@ def prune(glob: str, dbpath: str, dry_run: bool):
     else:
         for p in to_delete:
             res = db.delete_path(p)
-            pprint.pprint(f"deleted from db {res}")
+            pprint.pprint(f"deleted from db {p}")
 
 
 @cli.command("search")
@@ -384,6 +358,29 @@ def dump(dbpath: str):
     pprint.pprint(results)
 
 
+def format_mapping(mapping: Optional[Mapping[str, str]]) -> str:
+    """Formats a mapping for insertion into sqlite via a paramaterised query"""
+    if not mapping or not hasattr(mapping, "items"):
+        return str(mapping)
+    return "\n".join([f"{k}:{v}" for k, v in mapping.items()])
+
+
+def format_mapping_values(mapping: Optional[Mapping[str, str]]) -> str:
+    """Formats a mapping for insertion of values into sqlite via a paramaterised query"""
+    if not mapping or not hasattr(mapping, "items"):
+        return str(mapping)
+    return "\n".join([str(v) for v in mapping.values()])
+
+
+def find_files(directory: str, pattern: str) -> list[str]:
+    """Find files from a glob pattern in a directory, ignoring case"""
+    path_pattern = os.path.join(directory, pattern)
+    paths: list[PosixPath] = list(
+        Path(directory).glob(path_pattern, case_sensitive=False)
+    )
+    return [str(p) for p in paths]
+
+
 def analyse_image(fh: IO[bytes], classifier: Classifier, path: str) -> Mapping:
     exif_full = get_exif(fh)
     exif = {k: v for k, v in exif_full.items() if not isinstance(v, bytes)}
@@ -402,6 +399,7 @@ def analyse_image(fh: IO[bytes], classifier: Classifier, path: str) -> Mapping:
         lng_deg = None
         geo = {}
 
+    # We could maybe speed this up by scaling images down?
     colors = fast_colorthief.get_palette(path)
 
     tags = classifier.predict(path=path)
@@ -425,43 +423,59 @@ def analyse_image(fh: IO[bytes], classifier: Classifier, path: str) -> Mapping:
     }
 
 
-def format_mapping(mapping: Optional[Mapping[str, str]]) -> str:
-    if not mapping or not hasattr(mapping, "items"):
-        return str(mapping)
-    return "\n".join([f"{k}:{v}" for k, v in mapping.items()])
+def analyse_image_worker(
+    input: list[Tuple[int, str, Classifier]]
+) -> Mapping[str, typing.Any]:
+    try:
+        """Multiprocessable worker"""
+        idx = input[0]
+        path = input[1]
+        classifier = input[2]
+
+        print(f"[{idx}] Analysing {path}...")
+        with open(path, "rb") as fh:
+            analysed = analyse_image(fh, classifier=classifier, path=path)
+            return {
+                "path": path,
+                "analysed": analysed,
+            }
+    except (KeyboardInterrupt, SystemExit):
+        print("Exiting...")
+        return (index, False)
 
 
-def format_mapping_values(mapping: Optional[Mapping[str, str]]) -> str:
-    if not mapping or not hasattr(mapping, "items"):
-        return str(mapping)
-    return "\n".join([str(v) for v in mapping.values()])
+def insert_analysed_image(db, analysed: Mapping, path):
+    db.insert_field(path, field="filename", value=get_filename(path))
+    db.insert_field(
+        path,
+        field="album_relative_path",
+        value=get_album_relative_path(path),
+    )
+    db.insert_field(path, field="exif", value=format_mapping(analysed.get("exif")))
+    db.insert_field(
+        path,
+        field="colors",
+        value=format_mapping(analysed.get("colors")),
+    )
 
+    geocode = analysed.get("geocode")
+    if geocode:
+        db.insert_geocode(path, format_mapping_values(geocode))
+        db.insert_tag(geocode["country"])
+        db.insert_tag(geocode["city"])
+        db.insert_tag(geocode["country_code"])
+    db.insert_field(path, field="tags", value=", ".join(analysed.get("tags")))
+    for tag in analysed.get("tags"):
+        db.insert_tag(tag)
 
-def find_files(directory, pat):
-    """
-    Find files in a case sensitive way on Windows.
-
-    Parameters
-    ----------
-    directory: str
-        The directory where you want to find files, can be relative or
-        absolute path.
-    pat: str
-        The pattern of file names you want find, for example,`*.jpg` or
-        `*.JPG`.
-
-    Returns
-    -------
-    A list of file paths matching the given pattern. Empty if no files under
-        the directory matches the pattern.
-    """
-    path_pattern = os.path.join(directory, pat)
-    pths = _glob.glob(path_pattern)
-
-    match = re.compile(fnmatch.translate(path_pattern), re.IGNORECASE).match
-    valid_pths = [pth for pth in pths if match(pth)]
-
-    return valid_pths
+    db.insert_metadata(
+        path,
+        lat_lng_deg=(
+            analysed.get("lat_deg"),
+            analysed.get("lng_deg"),
+        ),
+        iso8601=analysed.get("iso8601"),
+    )
 
 
 if __name__ == "__main__":

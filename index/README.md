@@ -20,7 +20,7 @@ Indexes images for search with the following fields
 
 The [FTS5 SQLite extension](https://www.sqlite.org/fts5.html) requires sqlite3 >= 3.34.0 and creates a virtual table.
 
-Full indexing of ~1000 images takes around 10+ minutes. The bottleneck is currently in the colour palette extraction step.
+Full indexing of ~1000 images takes around 3+ minutes.
 
 ## Usage
 
@@ -38,14 +38,19 @@ $ poetry run python index.py prune --glob "../src/public/data/albums/**/*.jpg" -
 
 $ cp search.sqlite ../src/public/search.sqlite
 
+# Test
+$ ./create-test-db.sh
+$ ./do-test-index.sh
+$ ./do-test-fts.sh
+
 # Perform a full index and copy it to /public in the Next.js app
-$ ./full-index.sh
+$ ./do-full-index.sh
 ```
 
 ## Prerequisites
 
 - CUDA/GPU access ([WSL2 instructions](https://developer.nvidia.com/cuda-downloads?target_os=Linux&target_arch=x86_64&Distribution=WSL-Ubuntu&target_version=2.0&target_type=deb_local))
-- Python 3.11
+- Python 3.12
 - sqlite3 >= 3.34.0
 
 ## WSL2

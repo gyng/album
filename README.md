@@ -78,20 +78,29 @@ You will need Node installed. The following steps are for deployment on Vercel, 
    $ npx vercel@latest login
    $ npx vercel@latest build --prod
    $ npx vercel@latest deploy --prebuilt --prod
+
    # If you hit the file limit
    $ npx vercel@latest deploy --prebuilt --prod --archive=tgz
+
+   # Everything together for convenience
+   $ npm run index:update && npx vercel@latest build --prod && npx vercel@latest deploy --prebuilt --prod
    ```
 
    If the build fails, try removing `.vercel` and reinitialising the project. Somehow this seems to happen a lot.
 
-3. Index images by running the script at `/index/index.py` amd copying the result to `/src/public`. You need CUDA installed: see [index/README.md](index/README.md)
+3. Index images by running the script at `/index/index.py` amd copying the result to `/src/public`. You need CUDA installed: see [index/README.md](index/README.md). Indexing is incremental, to reset delete `search.sqlite` (or whatever file the DB is in)
 
    ```sh
    $ cd index
    $ poetry install
    $ poetry run python index.py index --glob "../src/public/data/albums/**/*.jpg" --dbpath "search.sqlite"
    $ cp search.sqlite ../src/public/search.sqlite
+
+   # or
+   $ ./do-full-index.sh
    ```
+
+   This can be done from Next.js app for convenience as well `npm run index:update`
 
 4. To use the manifest creator, run `npm run dev` or `yarn dev` and visit your album's page. Click the `Edit` link at the top.
 

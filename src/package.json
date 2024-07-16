@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "index:update": "(cd ../index; bash ./do-full-index.sh)",
     "deploy:vercel": "npx vercel build --prod && npx vercel deploy --prebuilt --prod",
     "dev": "next dev",
     "build": "next build",
