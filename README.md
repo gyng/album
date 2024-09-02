@@ -57,7 +57,9 @@ You will need Node installed. The following steps are for deployment on Vercel, 
    ```ts
    {
       // Defaults to oldest-first
-      sort?: "newest-first" | "oldest-first"
+      sort?: "newest-first" | "oldest-first",
+      // Does a partial match
+      cover?: "filename.jpg"
    }
    ```
 

@@ -10,12 +10,12 @@ Indexes images for search with the following fields
 | fts5(images) | EXIF                | searched     | excluding binary data             |
 | fts5(images) | geocode             | searched     | geocoded to country and city      |
 | fts5(images) | tags                | searched     | classified using YOLOv8/ImageNet  |
-| fts5(images) | colors              |              | median cut (top 5); `[r, g, b][]` |
-| tags         | tag                 |              | primary key                       |
+| fts5(images) | colors              | placeholder  | median cut (top 5); `[r, g, b][]` |
+| tags         | tag                 |              | primary key, yolov8/imagenet      |
 | tags         | count               | autocomplete | tags count                        |
 | metadata     | path                |              | primary key                       |
-| metadata     | lat_deg             |              |                                   |
-| metadata     | lng_deg             |              |                                   |
+| metadata     | lat_deg             | map          |                                   |
+| metadata     | lng_deg             | map          |                                   |
 | metadata     | iso8601             |              | assumed UTC                       |
 
 The [FTS5 SQLite extension](https://www.sqlite.org/fts5.html) requires sqlite3 >= 3.34.0 and creates a virtual table.

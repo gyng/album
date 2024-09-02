@@ -190,6 +190,17 @@ export const getAlbum = async (
           }`;
         }
       }
+
+      if (v2Manifest.cover) {
+        manifest.cover = { src: v2Manifest.cover };
+        const toSet = manifest.blocks.find(
+          // @ts-expect-error ?. checks well enough
+          (b) => b.data?.src?.includes(v2Manifest.cover)
+        );
+        if (toSet) {
+          toSet.formatting = { ...toSet?.formatting, cover: true };
+        }
+      }
     }
 
     return manifest;

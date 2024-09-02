@@ -94,7 +94,7 @@ export interface SerializedContent {
 
 export interface V2AlbumMetadata {
   sort?: "newest-first" | "oldest-first";
-  // cover?: string;
+  cover?: string;
   // TODO: use EXIF for title/notes
 }
 
