@@ -326,8 +326,10 @@ export const Picture: React.FC<{
           <source
             key={`${srcset.src}-${i}`}
             srcSet={`${srcset.src}, ${higherResSrcset2x.src} 2x, ${higherResSrcset3x.src} 3x`}
-            media={`(max-height: ${
-              props.thumb ? srcset.width * 4 : srcset.width * 2
+            media={`(max-width: ${
+              props.thumb ? srcset.width * 4 : srcset.width * 1.5
+            }px), (max-height: ${
+              props.thumb ? srcset.height * 4 : srcset.height * 1.5
             }px)`}
             width={actualWidth}
             height={actualHeight}

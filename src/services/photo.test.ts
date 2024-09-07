@@ -41,18 +41,22 @@ describe("photo utilities", () => {
         {
           src: "/fixtures/.resized_images/monkey.jpg@600.avif",
           width: 600,
+          height: 882,
         },
         {
           src: "/fixtures/.resized_images/monkey.jpg@1200.avif",
           width: 1200,
+          height: 1765,
         },
         {
           src: "/fixtures/.resized_images/monkey.jpg@2400.avif",
           width: 2400,
+          height: 3529,
         },
         {
           src: "/fixtures/.resized_images/monkey.jpg@4896.avif",
           width: 4896,
+          height: 7200,
         },
       ]);
     });
@@ -69,18 +73,22 @@ describe("photo utilities", () => {
         {
           src: "/fixtures/.resized_images/monkey-for-unoptimised.jpg@600.avif",
           width: 600,
+          height: 882,
         },
         {
           src: "/fixtures/.resized_images/monkey-for-unoptimised.jpg@1200.avif",
           width: 1200,
+          height: 1765,
         },
         {
           src: "/fixtures/.resized_images/monkey-for-unoptimised.jpg@2400.avif",
           width: 2400,
+          height: 3529,
         },
         {
           src: "/fixtures/.resized_images/monkey-for-unoptimised.jpg@4896.avif",
           width: 4896,
+          height: 7200,
         },
       ]);
     }, 120000);

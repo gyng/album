@@ -59,18 +59,25 @@ export const optimiseImages = async (
       );
       fs.mkdirSync(path.join(dirname, RESIZED_IMAGE_DIR), { recursive: true });
 
-      const optimised: OptimisedPhoto = {
-        src: stripPublicFromPath(newFile),
-        width: size,
-      };
-
       if (fs.existsSync(newFile)) {
         // console.log(`Already optimised ${newFile}, using cached version`);
 
         // Check if file is valid
         const stat = fs.statSync(newFile);
         if (stat.size > 0) {
-          return optimised;
+          const metadata = await sharp(newFile).metadata();
+
+          if (!metadata.width || !metadata.height) {
+            console.log(`Optimised file is bad? Metadata: ${metadata}`);
+          } else {
+            const optimised: OptimisedPhoto = {
+              src: stripPublicFromPath(newFile),
+              width: metadata.width,
+              height: metadata.height,
+            };
+
+            return optimised;
+          }
         } else {
           console.log(`Optimised file is bad? size 0: ${newFile}`);
         }
@@ -85,7 +92,12 @@ export const optimiseImages = async (
           // .webp({ quality: 90, smartSubsample: true })
           .avif({ quality: 75 })
           .toFile(newFile)
-          .then(() => {
+          .then((p) => {
+            const optimised: OptimisedPhoto = {
+              src: stripPublicFromPath(newFile),
+              width: p.width,
+              height: p.height,
+            };
             return optimised;
           })
           .catch((err) => {

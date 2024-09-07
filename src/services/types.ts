@@ -3,6 +3,7 @@ export type SerializedTextBlock = TextBlock;
 export interface OptimisedPhoto {
   src: string;
   width: number;
+  height: number;
 }
 
 export interface TextBlock extends IBlock {
