@@ -3,29 +3,14 @@ from pathlib import Path, PosixPath
 import pprint
 import fast_colorthief
 import exifread
+from index.classifiers import YoloClassifier
 import reverse_geocode
 import sqlite3
-from ultralytics import YOLO
+
 import typing
 from typing import IO, TYPE_CHECKING, Mapping, Optional, Tuple
 import os
 from p_tqdm import p_uimap
-
-
-class Classifier:
-    def init_model(self) -> None:
-        print("Loading YOLOv8...")
-        self.model = YOLO("yolov8n-cls")
-        print("Loaded YOLOv8.")
-
-    def predict(self, path: str):
-        results = self.model(path, conf=0.7)
-        if len(results) > 0:
-            classes = results[0].names
-            top5 = results[0].probs.top5
-            top5_mapped = [f"{classes[x]}" for x in top5]
-            return top5_mapped
-        return {}
 
 
 def convert_to_degress(value: exifread.utils.Ratio, lat_or_lng_ref: str) -> float:
@@ -75,7 +60,7 @@ class Sqlite3Client:
             entries = len(self.inspect())
         except:
             pass
-        return { "version": version, "entries": entries}
+        return {"version": version, "entries": entries}
 
     def setup_tables(self):
         cur = self.con.cursor()
@@ -280,7 +265,7 @@ def index(glob: str, dbpath: str, dry_run: bool):
     )
 
     if not dry_run:
-        classifier = Classifier()
+        classifier = YoloClassifier()
         classifier.init_model()
 
         enumerated = [
@@ -291,10 +276,9 @@ def index(glob: str, dbpath: str, dry_run: bool):
         results_iter = p_uimap(analyse_image_worker, enumerated, num_cpus=4)
 
         for result in results_iter:
-            pprint.pprint(f"Inserting analysed image {result.get("path")}")
-            insert_analysed_image(
-                db=db, analysed=result.get("analysed"), path=result.get("path")
-            )
+            path = result.get("path")
+            pprint.pprint(f"Inserting analysed image {path}")
+            insert_analysed_image(db=db, analysed=result.get("analysed"), path=path)
 
 
 @cli.command("prune")
@@ -381,7 +365,7 @@ def find_files(directory: str, pattern: str) -> list[str]:
     return [str(p) for p in paths]
 
 
-def analyse_image(fh: IO[bytes], classifier: Classifier, path: str) -> Mapping:
+def analyse_image(fh: IO[bytes], classifier: YoloClassifier, path: str) -> Mapping:
     exif_full = get_exif(fh)
     exif = {k: v for k, v in exif_full.items() if not isinstance(v, bytes)}
 
@@ -402,7 +386,7 @@ def analyse_image(fh: IO[bytes], classifier: Classifier, path: str) -> Mapping:
     # We could maybe speed this up by scaling images down?
     colors = fast_colorthief.get_palette(path)
 
-    tags = classifier.predict(path=path)
+    tags = classifier.predict_file(path=path)
 
     # 2000:01:01 12:34:56 > 2000-01-01T12:34:56
     datetime = (
@@ -424,7 +408,7 @@ def analyse_image(fh: IO[bytes], classifier: Classifier, path: str) -> Mapping:
 
 
 def analyse_image_worker(
-    input: list[Tuple[int, str, Classifier]]
+    input: list[Tuple[int, str, YoloClassifier]]
 ) -> Mapping[str, typing.Any]:
     try:
         """Multiprocessable worker"""
