@@ -109,7 +109,7 @@ const EditPhotoBlock: React.FC<{
                     immersive: ev.target.checked,
                   },
                 },
-                props.currentIndex,
+                props.currentIndex
               );
             }}
           />
@@ -132,7 +132,7 @@ const EditPhotoBlock: React.FC<{
                     cover: ev.target.checked,
                   },
                 },
-                props.currentIndex,
+                props.currentIndex
               );
             }}
           />
@@ -144,7 +144,7 @@ const EditPhotoBlock: React.FC<{
 };
 
 const ExifCoordinatesRow: React.FC<{ row: ExifCoordinatesRowProps }> = (
-  props,
+  props
 ) => {
   const formatted = [
     `${props.row.data.GPSLatitude?.[0]}°`,
@@ -277,7 +277,7 @@ export const ExifTable: React.FC<{
 };
 
 export const ExifRow: React.FC<{ k: string; v: string; valid?: boolean }> = (
-  props,
+  props
 ) => {
   if (props.valid === false) {
     return null;
@@ -328,29 +328,19 @@ export const Picture: React.FC<{
   const b64Placeholder = btoa(placeholderSvg);
 
   return (
-    <picture className={styles.imageWrapper} data-testid="picture">
-      {props.block._build.srcset.map((srcset, i) => {
-        const higherResSrcset2x = props.block._build.srcset[i + 1] ?? srcset;
-        const higherResSrcset3x =
-          props.block._build.srcset[i + 2] ?? higherResSrcset2x;
-
-        return (
-          <source
-            key={`${srcset.src}-${i}`}
-            srcSet={`${srcset.src}, ${higherResSrcset2x.src} 2x, ${higherResSrcset3x.src} 3x`}
-            media={`(max-width: ${
-              props.thumb ? srcset.width * 4 : srcset.width * 1.5
-            }px), (max-height: ${
-              props.thumb ? srcset.height * 4 : srcset.height * 1.5
-            }px)`}
-            width={actualWidth}
-            height={actualHeight}
-          />
-        );
-      })}
-
+    // picture is needed for index page, aspect ratio goes all wonky without
+    <picture className={styles.imageWrapper}>
       <img
+        data-testid="picture"
         className={styles.image}
+        srcSet={
+          props.thumb
+            ? // HACK: pick 1200px as 800 is blurry
+              `${props.block._build.srcset[1].src} ${props.block._build.srcset[1].width}w`
+            : props.block._build.srcset
+                .map((s) => `${s.src} ${s.width}w`)
+                .join(", ")
+        }
         src={props.block.data.src}
         loading={props.lazy === false ? "eager" : "lazy"}
         style={{
@@ -456,7 +446,7 @@ export const PhotoBlockEl: React.FC<{
                         props.block._build.exif.GPSLatitudeRef &&
                           props.block._build.exif.GPSLatitude &&
                           props.block._build.exif.GPSLongitudeRef &&
-                          props.block._build.exif.GPSLongitude,
+                          props.block._build.exif.GPSLongitude
                       ),
                     },
                     {
@@ -465,7 +455,7 @@ export const PhotoBlockEl: React.FC<{
                       v:
                         props.block._build.exif.ExposureTime < 1
                           ? `${new Fraction(
-                              props.block._build.exif.ExposureTime,
+                              props.block._build.exif.ExposureTime
                             )
                               .toFraction()
                               .replace("/", FRACTION_SLASH)}; ${
@@ -518,7 +508,7 @@ export const PhotoBlockEl: React.FC<{
                       valid: Boolean(
                         props.block._build.exif.LensMake ||
                           props.block._build.exif.LensModel ||
-                          props.block._build.exif.LensInfo,
+                          props.block._build.exif.LensInfo
                       ),
                     },
                     {
@@ -530,7 +520,7 @@ export const PhotoBlockEl: React.FC<{
                       ].join(" "),
                       valid: Boolean(
                         props.block._build.exif.Make ||
-                          props.block._build.exif.Model,
+                          props.block._build.exif.Model
                       ),
                     },
                     {
@@ -546,7 +536,7 @@ export const PhotoBlockEl: React.FC<{
                           ? `${props.block._build.exif.DateTimeOriginal} (local @ ${props.block._build.exif.OffsetTime})`
                           : props.block._build.exif.DateTimeOriginal?.replace(
                               /Z$/,
-                              "",
+                              ""
                             ),
                       ]
                         .filter(Boolean)
@@ -587,7 +577,7 @@ export const PhotoBlockEl: React.FC<{
                                   title={rgbStr}
                                 ></div>
                               );
-                            },
+                            }
                           )}
                         </div>
                       ),

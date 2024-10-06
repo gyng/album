@@ -42,23 +42,23 @@ describe("photo utilities", () => {
     it("skips cached/already-optimised images", async () => {
       const actual = await optimiseImages(
         "test/fixtures/monkey.jpg",
-        "fixtures",
+        "fixtures"
       );
       expect(actual).toEqual([
         {
-          src: "/fixtures/.resized_images/monkey.jpg@600.avif",
-          width: 600,
-          height: 882,
+          src: "/fixtures/.resized_images/monkey.jpg@800.avif",
+          width: 800,
+          height: 1176,
         },
         {
-          src: "/fixtures/.resized_images/monkey.jpg@1200.avif",
-          width: 1200,
-          height: 1765,
+          src: "/fixtures/.resized_images/monkey.jpg@1600.avif",
+          width: 1600,
+          height: 2353,
         },
         {
-          src: "/fixtures/.resized_images/monkey.jpg@2400.avif",
-          width: 2400,
-          height: 3529,
+          src: "/fixtures/.resized_images/monkey.jpg@3200.avif",
+          width: 3200,
+          height: 4706,
         },
       ]);
     });
@@ -70,23 +70,23 @@ describe("photo utilities", () => {
     it("optimised unoptimised images", async () => {
       const actual = await optimiseImages(
         "test/fixtures/monkey-for-unoptimised.jpg",
-        "fixtures",
+        "fixtures"
       );
       expect(actual).toEqual([
         {
-          src: "/fixtures/.resized_images/monkey-for-unoptimised.jpg@600.avif",
-          width: 600,
-          height: 882,
+          src: "/fixtures/.resized_images/monkey-for-unoptimised.jpg@800.avif",
+          width: 800,
+          height: 1176,
         },
         {
-          src: "/fixtures/.resized_images/monkey-for-unoptimised.jpg@1200.avif",
-          width: 1200,
-          height: 1765,
+          src: "/fixtures/.resized_images/monkey-for-unoptimised.jpg@1600.avif",
+          width: 1600,
+          height: 2353,
         },
         {
-          src: "/fixtures/.resized_images/monkey-for-unoptimised.jpg@2400.avif",
-          width: 2400,
-          height: 3529,
+          src: "/fixtures/.resized_images/monkey-for-unoptimised.jpg@3200.avif",
+          width: 3200,
+          height: 4706,
         },
       ]);
     }, 120000);
