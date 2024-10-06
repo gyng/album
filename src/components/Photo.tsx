@@ -20,6 +20,7 @@ type ExifCoordinatesRowProps = {
     GPSLatitude: [number, number, number];
     GPSLongitudeRef: string;
     GPSLongitude: [number, number, number];
+    geocode?: string;
   };
   options: {
     showMap: boolean;
@@ -173,7 +174,17 @@ const ExifCoordinatesRow: React.FC<{ row: ExifCoordinatesRowProps }> = (
     <>
       <tr>
         <td>{props.row.k}</td>
-        <td>{formatted}</td>
+        <td>
+          {formatted}
+          {props.row.data.geocode ? (
+            <div>
+              {props.row.data.geocode
+                .split("\n")
+                .filter((v, i) => i === 1 || i > 4)
+                .join(", ")}
+            </div>
+          ) : null}
+        </td>
       </tr>
       {props.row.options.showMap && decLng && decLat ? (
         <tr>
@@ -207,6 +218,7 @@ type ExifRow =
         GPSLatitude: [number, number, number];
         GPSLongitudeRef: string;
         GPSLongitude: [number, number, number];
+        geocode?: string;
       };
       options: {
         showMap: boolean;
@@ -435,6 +447,7 @@ export const PhotoBlockEl: React.FC<{
                         GPSLongitudeRef:
                           props.block._build.exif.GPSLongitudeRef,
                         GPSLongitude: props.block._build.exif.GPSLongitude,
+                        geocode: props.block._build?.tags?.geocode,
                       },
                       options: {
                         showMap: true,
@@ -468,7 +481,7 @@ export const PhotoBlockEl: React.FC<{
                     },
                     {
                       kind: "kv",
-                      k: "𝑓",
+                      k: "Aperture",
                       v: `𝑓/${props.block._build.exif.FNumber}`,
                       valid: Boolean(props.block._build.exif.FNumber),
                     },
@@ -490,16 +503,23 @@ export const PhotoBlockEl: React.FC<{
                     },
                     {
                       kind: "kv",
-                      k: "Lens info",
-                      v: props.block._build.exif.LensInfo,
-                    },
-                    {
-                      kind: "kv",
-                      k: "Camera datetime",
-                      v: props.block._build.exif.DateTimeOriginal?.replace(
-                        /Z$/,
-                        ""
-                      ), // TODO: shift TZ option
+                      k: "Lens",
+                      v: [
+                        props.block._build.exif.LensMake,
+                        props.block._build.exif.LensModel,
+                        // Don't show LensInfo if LensMake or LensModel is present
+                        props.block._build.exif.LensModel ||
+                        props.block._build.exif.LensModel
+                          ? null
+                          : props.block._build.exif.LensInfo,
+                      ]
+                        .filter(Boolean)
+                        .join(" "),
+                      valid: Boolean(
+                        props.block._build.exif.LensMake ||
+                          props.block._build.exif.LensModel ||
+                          props.block._build.exif.LensInfo
+                      ),
                     },
                     {
                       kind: "kv",
@@ -520,18 +540,28 @@ export const PhotoBlockEl: React.FC<{
                     },
                     {
                       kind: "kv",
-                      k: "Lens",
-                      v: `${props.block._build.exif.LensMake} ${props.block._build.exif.LensModel}`,
-                      valid: Boolean(
-                        props.block._build.exif.LensMake ||
-                          props.block._build.exif.LensModel
-                      ),
+                      k: "Camera datetime",
+                      v: [
+                        props.block._build.exif.OffsetTime
+                          ? `${props.block._build.exif.DateTimeOriginal} (local @ ${props.block._build.exif.OffsetTime})`
+                          : props.block._build.exif.DateTimeOriginal?.replace(
+                              /Z$/,
+                              ""
+                            ),
+                      ]
+                        .filter(Boolean)
+                        .join(" "), // TODO: shift TZ option
                     },
                     //   { kind: "kv", k: "Software", v: [props.block._build.exif.Software].join(" ") },
                     {
                       kind: "kv",
                       k: "Original size",
-                      v: `${props.block._build.width}px × ${props.block._build.height}px`,
+                      v: `${props.block._build.width}px × ${
+                        props.block._build.height
+                      }px (${(
+                        (props.block._build.width * props.block._build.height) /
+                        1_000_000
+                      ).toPrecision(2)} MP) `,
                     },
                     {
                       kind: "kv",
