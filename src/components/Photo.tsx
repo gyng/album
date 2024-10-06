@@ -341,7 +341,8 @@ export const Picture: React.FC<{
                 .map((s) => `${s.src} ${s.width}w`)
                 .join(", ")
         }
-        src={props.block.data.src}
+        // Original image is not uploaded
+        src={props.block._build.srcset[0].src}
         loading={props.lazy === false ? "eager" : "lazy"}
         style={{
           aspectRatio: `${actualWidth} / ${actualHeight}`,
