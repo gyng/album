@@ -32,10 +32,18 @@
   margin-top: var(--m-s);
   background-color: var(--c-overlay);
   backdrop-filter: blur(8px);
+  border-radius: var(--m);
 }
 
-.details details {
+.details > details {
   display: flex;
+  height: 1.4em;
+  transition: height 0.1s ease-in-out;
+}
+
+.details > details[open] {
+  height: auto;
+  overflow: clip; /* Clip off contents while animating */
 }
 
 .details summary {

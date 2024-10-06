@@ -1,7 +1,7 @@
 .main {
   max-width: 1400px;
-  margin: var(--m-xl) auto;
-  padding: 0 var(--m-xl);
+  margin: 0 auto;
+  padding: var(--m-xl);
 }
 
 .main h1 {
@@ -20,7 +20,8 @@
 
 .toolbar {
   display: flex;
-  align-items: baseline;
+  align-items: flex-start;
+  gap: var(--m-s);
 }
 
 .toolbarLink {
@@ -30,6 +31,7 @@
   border-radius: var(--m-s);
   padding: var(--m-m);
   font-size: var(--fs-sm);
+  user-select: none;
 }
 
 .toolbarLink:hover {

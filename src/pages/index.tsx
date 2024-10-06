@@ -6,6 +6,7 @@ import { getAlbums, getImageTimestampRange } from "../services/album";
 import { Block, Content } from "../services/types";
 import DynamicSearchWithCoi from "../components/search/DynamicSearchWithCoi";
 import Link from "next/link";
+import { ThemeToggle } from "../components/ThemeToggle";
 
 type PageProps = {
   albums: Content[];
@@ -27,6 +28,7 @@ const Home: NextPage<PageProps> = (context) => {
           <Link className={styles.toolbarLink} href="/map">
             Map
           </Link>
+          <ThemeToggle />
         </div>
         <DynamicSearchWithCoi />
         <Albums albums={context.albums} />

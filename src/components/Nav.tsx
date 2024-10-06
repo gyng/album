@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { useRouter } from "next/router";
 import styles from "./Nav.module.css";
+import { ThemeToggle } from "./ThemeToggle";
 
 export const Nav: React.FC<{ isEditing: boolean; editable: boolean }> = (
   props
@@ -15,7 +16,12 @@ export const Nav: React.FC<{ isEditing: boolean; editable: boolean }> = (
             ← Albums
           </Link>
         </li>
+        <li>
+          <ThemeToggle />
+        </li>
 
+        {/* Deprecate edit mode */}
+        {/* 
         {props.editable && !props.isEditing ? (
           <li>
             <Link href={router.asPath + "/edit"}>Edit</Link>
@@ -28,7 +34,7 @@ export const Nav: React.FC<{ isEditing: boolean; editable: boolean }> = (
               Exit edit mode
             </Link>
           </li>
-        ) : null}
+        ) : null} */}
       </ul>
     </nav>
   );

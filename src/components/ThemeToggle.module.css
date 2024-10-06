@@ -1,0 +1,22 @@
+.themeToggle {
+  display: inline-block;
+  border: solid 2px var(--c-bg-contrast-light);
+  border-radius: var(--m-s);
+  /* optically align text */
+  line-height: 0;
+  overflow: clip;
+}
+
+.themeToggle button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: var(--m-m);
+  user-select: none;
+  height: 100%;
+}
+
+.themeToggle button:hover {
+  background-color: var(--c-bg-contrast-light);
+  outline: 3px solid var(--c-bg-contrast-light);
+}

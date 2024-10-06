@@ -20,8 +20,10 @@ const WorldMap: NextPage<PageProps> = (props) => {
         <title>Map</title>
       </Head>
       <div className={styles.titleBar}>
-        <h1 className={styles.title}>🌏</h1>
-        <Link href="/">← Back</Link>
+        <Link href="/">
+          <h1 className={styles.title}>🌏</h1>
+          <div>← Back</div>
+        </Link>
       </div>
       <MapWorldDeferred photos={props.photos} className={styles.map} />
     </div>

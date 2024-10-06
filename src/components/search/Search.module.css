@@ -58,6 +58,10 @@
   cursor: not-allowed;
 }
 
+.searchWidget input::placeholder {
+  user-select: none;
+}
+
 .searchWidget input:focus-visible,
 .link:focus-visible,
 .moreButton:focus-visible {

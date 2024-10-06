@@ -21,7 +21,7 @@ type PageProps = {
 
 const Album: NextPage<PageProps> = ({ album, edit, editable }) => {
   if (!album) {
-    return <div></div>;
+    return <div>This seems to be missing.</div>;
   }
 
   // Have a stateful album so we can edit
