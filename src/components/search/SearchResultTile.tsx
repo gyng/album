@@ -26,7 +26,7 @@ export const SearchResultTile = (props: { result: SearchResult }) => {
       ...imageSrc.split("/").slice(0, -1),
       ".resized_images",
       ...imageSrc.split("/").slice(-1),
-    ].join("/") + `@600.avif`;
+    ].join("/") + `@800.avif`;
   const albumName = result.path.split("/").at(-2);
 
   return (
