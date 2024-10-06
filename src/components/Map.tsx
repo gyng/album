@@ -21,7 +21,6 @@ export const MMap: React.FC<MapProps> = (props) => {
           latitude: props.coordinates[0],
           zoom: 12,
         }}
-        // @ts-expect-error false is accepted https://visgl.github.io/react-map-gl/docs/api-reference/map
         RTLTextPlugin={false}
       >
         <Marker

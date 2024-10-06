@@ -24,7 +24,7 @@
     "next": "13.4.8",
     "react": "18.2.0",
     "react-dom": "18.2.0",
-    "react-map-gl": "^7.1.6",
+    "react-map-gl": "^7.1.7",
     "sharp": "^0.32.6",
     "sqlite-wasm-http": "^1.1.1",
     "sqlite3": "^5.1.6",
