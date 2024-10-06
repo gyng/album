@@ -1,3 +1,7 @@
+/**
+ * @jest-environment node
+ */
+
 import { monkeyExif } from "../test/fixtures/monkey_exif";
 import {
   getNextJsSafeExif,

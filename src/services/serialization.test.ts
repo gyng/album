@@ -1,3 +1,7 @@
+/**
+ * @jest-environment node
+ */
+
 import { deserializeContentBlock } from "./deserialize";
 import { serializeContentBlock } from "./serialize";
 import { Content, SerializedContent } from "./types";
