@@ -1,6 +1,6 @@
 # album
 
-<img width="1920" alt="Screenshot 2023-10-13 01 42 01" src="https://github.com/gyng/album/assets/370496/ceac9451-4765-4efc-a7d6-c3b135942b13">
+<img width="1920" alt="sshot" src="https://github.com/user-attachments/assets/76a9b78c-df92-47da-ab67-02710bc010f6">
 
 [Demo](https://album-gyng.vercel.app/)
 
@@ -8,11 +8,13 @@ A zero-config, static, file-based album generator
 
 - Dump your photos in a directory and run one command to deploy
 - Index and search images using YOLOv8/ImageNet classifications
+- Map mode
 - EXIF support
 - Next.JS static build, deployed on Vercel
 - Custom image optimisation, resizing
+- Light and dark modes
 
-Constraints
+Goals
 
 - Minimal friction between camera and publishing on web
 - No running infrastructure
