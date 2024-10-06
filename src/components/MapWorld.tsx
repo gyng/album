@@ -120,6 +120,7 @@ export const MMap: React.FC<MapWorldProps> = (props) => {
                   width={popupInfo.placeholderWidth}
                   height={popupInfo.placeholderHeight}
                   style={{ backgroundColor: popupInfo.placeholderColor }}
+                  alt=""
                 />
                 <div className={styles.details}>
                   {popupInfo.album}

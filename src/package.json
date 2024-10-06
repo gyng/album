@@ -14,7 +14,7 @@
     "test:ci": "jest && npm run lint"
   },
   "dependencies": {
-    "@tanstack/react-query": "^4.36.1",
+    "@tanstack/react-query": "^5.59.0",
     "@vercel/analytics": "^1.0.1",
     "coi-serviceworker": "^0.1.7",
     "exifr": "^7.1.3",

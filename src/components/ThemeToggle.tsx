@@ -20,7 +20,6 @@ export const ThemeToggle: React.FC = () => {
 
   useEffect(() => {
     const stored = JSON.parse(localStorage.getItem("darkMode") ?? "null");
-    console.log("stored", stored);
     if (stored === true || stored === false) {
       setDarkMode(JSON.parse(stored));
     } else {

@@ -4,7 +4,7 @@ import { useDebounce } from "use-debounce";
 import styles from "./Search.module.css";
 import { Backend } from "sqlite-wasm-http/dist/vfs-http-types";
 import { useRouter } from "next/router";
-import { useInfiniteQuery } from "@tanstack/react-query";
+import { useInfiniteQuery, keepPreviousData } from "@tanstack/react-query";
 import { fetchResults, PaginatedSearchResult } from "./api";
 import { SearchResultTile } from "./SearchResultTile";
 
@@ -40,7 +40,7 @@ export const initDb = async (backend: Backend) => {
 };
 
 export const Search: React.FC<{ disabled?: boolean }> = (props) => {
-  const PAGE_SIZE = 23;
+  const PAGE_SIZE = 24;
   const router = useRouter();
 
   const [backend, setBackend] = useState<ReturnType<
@@ -51,34 +51,47 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
   const [debouncedSearchQuery] = useDebounce(searchQuery, 600);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const reactQuery = useInfiniteQuery(
-    ["results", { debouncedSearchQuery }],
-    async ({ pageParam = 0 }) =>
+  const reactQuery = useInfiniteQuery({
+    queryKey: ["results", { debouncedSearchQuery }],
+    queryFn: async ({ pageParam }: { pageParam: number }) =>
       await fetchResults({
         query: debouncedSearchQuery,
         pageSize: PAGE_SIZE,
         page: pageParam,
       }),
-    {
-      // Don't fetch on mount
-      enabled: false,
-      keepPreviousData: true,
-      getPreviousPageParam: (firstPage: PaginatedSearchResult) =>
-        firstPage.prev ?? undefined,
-      getNextPageParam: (lastPage: PaginatedSearchResult) =>
-        lastPage.next ?? undefined,
-    }
-  );
+    initialPageParam: 0,
+    enabled: false,
+    placeholderData: keepPreviousData,
+    getPreviousPageParam: (firstPage: PaginatedSearchResult) => {
+      return firstPage.prev ?? undefined;
+    },
+    getNextPageParam: (
+      lastPage: PaginatedSearchResult,
+      allPages,
+      lastPageParam
+    ) => {
+      // Hack to show next page: not 100% correct as sometimes results can only have 1 page
+      return lastPage.data.length === PAGE_SIZE ? lastPageParam + 1 : undefined;
+      // TODO: Update SQLITE to return cursor or next page if it exists
+      // return lastPage.next ?? undefined;
+    },
+  });
+
   const {
     data,
     fetchNextPage,
     hasNextPage,
     isSuccess,
     isFetching,
-    isPreviousData,
+    isPlaceholderData,
   } = reactQuery;
 
   useEffect(() => {
+    if (!fetchNextPage) {
+      // Not initialised yet
+      return;
+    }
+
     if (!debouncedSearchQuery) {
       // Bug: The react-query cache is not updated
       // and leads to stale results being present when the input is focused on again
@@ -138,8 +151,10 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
     }
     const url = new URL(window.location.toString());
     url.search = searchParams.toString();
-    router.replace(url, undefined, { shallow: true });
-  }, [debouncedSearchQuery, router]);
+    if (router) {
+      router.replace(url, undefined, { shallow: true });
+    }
+  }, [debouncedSearchQuery]);
 
   // Register '/' to focus search
   useEffect(() => {
@@ -217,7 +232,9 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
                     key={r.path}
                     className={styles.resultLi}
                     style={{
-                      filter: isPreviousData ? "saturate(0.5)" : "saturate(1)",
+                      filter: isPlaceholderData
+                        ? "saturate(0.5)"
+                        : "saturate(1)",
                     }}
                   >
                     <SearchResultTile result={r} />
