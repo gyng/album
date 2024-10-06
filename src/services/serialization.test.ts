@@ -64,24 +64,19 @@ describe("serialization", () => {
         _build: {
           srcset: [
             {
-              src: "/fixtures/.resized_images/monkey.jpg@600.avif",
+              src: "/data/albums/fixtures/.resized_images/monkey.jpg@600.avif",
               width: 600,
               height: 882,
             },
             {
-              src: "/fixtures/.resized_images/monkey.jpg@1200.avif",
+              src: "/data/albums/fixtures/.resized_images/monkey.jpg@1200.avif",
               width: 1200,
               height: 1765,
             },
             {
-              src: "/fixtures/.resized_images/monkey.jpg@2400.avif",
+              src: "/data/albums/fixtures/.resized_images/monkey.jpg@2400.avif",
               width: 2400,
               height: 3529,
-            },
-            {
-              src: "/fixtures/.resized_images/monkey.jpg@4896.avif",
-              width: 4896,
-              height: 7200,
             },
           ],
           exif: {},

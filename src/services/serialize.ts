@@ -10,7 +10,7 @@ import {
 } from "./types";
 
 export const serializePhotoBlock = (
-  block: PhotoBlock
+  block: PhotoBlock,
 ): SerializedPhotoBlock => {
   const copy = { ...block };
 

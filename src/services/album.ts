@@ -12,16 +12,12 @@ import {
   V2AlbumMetadata,
 } from "./types";
 
-export const ALBUMS_DIR = "public/data/albums";
+export const ALBUMS_DIR = "../albums";
 export const MANIFEST_NAME = "manifest.json";
 export const MANIFEST_V2_NAME = "album.json";
 
-export const stripDirectoryCommands = (input: string): string => {
-  return input.replaceAll(".newest-first", "");
-};
-
 export const getImageTimestampRange = (
-  album: Content
+  album: Content,
 ): [number | null, number | null] => {
   // FIXME: dedup
   const earliest = album.blocks.reduce((acc: number, val: Block) => {
@@ -47,19 +43,21 @@ export const getImageTimestampRange = (
 };
 
 export const getAlbumNames = async (
-  albumsPath = ALBUMS_DIR
+  albumsPath = ALBUMS_DIR,
 ): Promise<string[]> => {
   return (await getAlbums(albumsPath)).map(
-    (al) => al._build.srcdir.split(path.sep).pop() ?? "" // potential error
+    (al) => al._build.srcdir.split(path.sep).pop() ?? "", // potential error
   );
 };
 
 export const getAlbums = (albumsPath = ALBUMS_DIR): Promise<Content[]> => {
-  const albumNames = fs.readdirSync(albumsPath);
+  const albumNames = fs.readdirSync(albumsPath).filter((it) => {
+    return fs.lstatSync(path.join(albumsPath, it)).isDirectory();
+  });
   const albums = Promise.all(
     albumNames.map((an) => {
       return getAlbum(path.join(albumsPath, an));
-    })
+    }),
   );
   return albums;
 };
@@ -69,7 +67,7 @@ export const getAlbumFromName = (albumName: string): Promise<Content> => {
 };
 
 export const getAlbumWithoutManifest = async (
-  albumPath: string
+  albumPath: string,
 ): Promise<Content> => {
   const photos = fs
     .readdirSync(albumPath)
@@ -112,11 +110,11 @@ export const getAlbumWithoutManifest = async (
 
 export const getAlbumWithManifest = async (
   /** Directory, eg, `public/data/albums/foobar` */
-  rootRelativePath: string
+  rootRelativePath: string,
 ): Promise<Content> => {
   const txt = fs.readFileSync(
     path.join(rootRelativePath, MANIFEST_NAME),
-    "utf-8"
+    "utf-8",
   );
   const manifest = JSON.parse(txt);
   return deserializeContentBlock(manifest, rootRelativePath);
@@ -125,7 +123,7 @@ export const getAlbumWithManifest = async (
 // TODO: Add option to not optimise images until build time
 export const getAlbum = async (
   /** Directory, eg, public/data/albums/simple */
-  albumPath: string
+  albumPath: string,
 ): Promise<Content> => {
   // v1 manifest: legacy support from LoL, internal serialisation format
   const isManifest = fs.existsSync(path.join(albumPath, MANIFEST_NAME));
@@ -150,7 +148,7 @@ export const getAlbum = async (
     const title = manifest.blocks.at(0);
     if (title?.kind === "text") {
       const range = getImageTimestampRange(manifest).map((ts) =>
-        new Date(ts!).getFullYear()
+        new Date(ts!).getFullYear(),
       ) ?? [0, 0];
       title.data.kicker = `${range[0]}${
         range[1] === range[0] ? "" : `–${range[1]}`
@@ -162,7 +160,7 @@ export const getAlbum = async (
     if (isV2Manifest) {
       const v2Config = fs.readFileSync(
         path.join(albumPath, MANIFEST_V2_NAME),
-        "utf-8"
+        "utf-8",
       );
       const v2Manifest = JSON.parse(v2Config) as V2AlbumMetadata;
       if (v2Manifest.sort === "newest-first") {
@@ -170,11 +168,11 @@ export const getAlbum = async (
           return (
             Date.parse(
               (b as PhotoBlock)._build?.exif?.DateTimeOriginal ??
-                Number.MAX_VALUE
+                Number.MAX_VALUE,
             ) -
             Date.parse(
               (a as PhotoBlock)._build?.exif?.DateTimeOriginal ??
-                Number.MAX_VALUE
+                Number.MAX_VALUE,
             )
           );
         });
@@ -183,7 +181,7 @@ export const getAlbum = async (
         const title = manifest.blocks.at(0);
         if (title?.kind === "text") {
           const range = getImageTimestampRange(manifest).map((ts) =>
-            new Date(ts!).getFullYear()
+            new Date(ts!).getFullYear(),
           ) ?? [0, 0];
           title.data.kicker = `${range[1]}${
             range[1] === range[0] ? "" : `–${range[0]}`
@@ -195,7 +193,7 @@ export const getAlbum = async (
         manifest.cover = { src: v2Manifest.cover };
         const toSet = manifest.blocks.find(
           // @ts-expect-error ?. checks well enough
-          (b) => b.data?.src?.includes(v2Manifest.cover)
+          (b) => b.data?.src?.includes(v2Manifest.cover),
         );
         if (toSet) {
           toSet.formatting = { ...toSet?.formatting, cover: true };

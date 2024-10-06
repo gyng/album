@@ -10,7 +10,7 @@ export const SearchResultTile = (props: { result: SearchResult }) => {
   try {
     if (result.colors) {
       const colourRgb = JSON.parse(
-        result.colors.replaceAll("(", "[").replaceAll(")", "]")
+        result.colors.replaceAll("(", "[").replaceAll(")", "]"),
       )[0];
       colour = `rgba(${colourRgb[0]}, ${colourRgb[1]}, ${colourRgb[2]}, 1)`;
     }
@@ -20,13 +20,13 @@ export const SearchResultTile = (props: { result: SearchResult }) => {
 
   // hack, assumed path
   // http://localhost:3000/data/albums/kuching/.resized_images/DSCF4490.JPG@2400.avif
-  const imageSrc = result.path.replace("../src/public", "");
+  const imageSrc = result.path.replace("..", "data");
   const resized =
     [
       ...imageSrc.split("/").slice(0, -1),
       ".resized_images",
       ...imageSrc.split("/").slice(-1),
-    ].join("/") + "@600.avif";
+    ].join("/") + `@600.avif`;
   const albumName = result.path.split("/").at(-2);
 
   return (

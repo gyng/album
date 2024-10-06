@@ -21,7 +21,7 @@ const exec = (
     page: number;
     pageSize: number;
     query: string;
-  }
+  },
 ): Promise<PaginatedSearchResult> => {
   return new Promise(async (resolve, reject) => {
     const accumulator: any[] = [];
@@ -83,7 +83,7 @@ export const fetchResults = async (opts: {
         page,
         pageSize,
         query,
-      }
+      },
     );
   } catch (err) {
     console.error(`Bad query ${query} ${page}`, err);

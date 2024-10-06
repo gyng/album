@@ -24,9 +24,18 @@ export const ThemeToggle: React.FC = () => {
       setDarkMode(JSON.parse(stored));
     } else {
       const browserDark = window.matchMedia(
-        "(prefers-color-scheme: dark)"
+        "(prefers-color-scheme: dark)",
       ).matches;
       setBrowserDarkMode(browserDark);
+    }
+
+    // Override initial theme, used for screenshots
+    const url = new URL(window.location.toString());
+    const theme = url.searchParams.get("theme");
+    const requestedMode =
+      theme === "dark" ? true : theme === "light" ? false : null;
+    if (requestedMode != null) {
+      setDarkMode(requestedMode);
     }
   }, []);
 
@@ -43,7 +52,7 @@ export const ThemeToggle: React.FC = () => {
       >
         {darkMode == null && browserDarkMode == null ? (
           <span style={{ opacity: 0 }}>☀️</span>
-        ) : darkMode ?? browserDarkMode ? (
+        ) : (darkMode ?? browserDarkMode) ? (
           "☀️"
         ) : (
           "🌙"

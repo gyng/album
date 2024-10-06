@@ -40,7 +40,10 @@ describe("photo utilities", () => {
 
   describe("optimiseImages", () => {
     it("skips cached/already-optimised images", async () => {
-      const actual = await optimiseImages("test/fixtures/monkey.jpg");
+      const actual = await optimiseImages(
+        "test/fixtures/monkey.jpg",
+        "fixtures",
+      );
       expect(actual).toEqual([
         {
           src: "/fixtures/.resized_images/monkey.jpg@600.avif",
@@ -57,11 +60,6 @@ describe("photo utilities", () => {
           width: 2400,
           height: 3529,
         },
-        {
-          src: "/fixtures/.resized_images/monkey.jpg@4896.avif",
-          width: 4896,
-          height: 7200,
-        },
       ]);
     });
 
@@ -71,7 +69,8 @@ describe("photo utilities", () => {
     // as images will have been cached. It will fail on CI.
     it("optimised unoptimised images", async () => {
       const actual = await optimiseImages(
-        "test/fixtures/monkey-for-unoptimised.jpg"
+        "test/fixtures/monkey-for-unoptimised.jpg",
+        "fixtures",
       );
       expect(actual).toEqual([
         {
@@ -88,11 +87,6 @@ describe("photo utilities", () => {
           src: "/fixtures/.resized_images/monkey-for-unoptimised.jpg@2400.avif",
           width: 2400,
           height: 3529,
-        },
-        {
-          src: "/fixtures/.resized_images/monkey-for-unoptimised.jpg@4896.avif",
-          width: 4896,
-          height: 7200,
         },
       ]);
     }, 120000);

@@ -1,3 +1,6 @@
-data/albums/*
+/albums/*
+!/albums/test-*
 .DS_File
 Thumbs.db
+*.Zone.Identifier
+.swc

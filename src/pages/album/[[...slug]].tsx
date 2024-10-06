@@ -100,12 +100,12 @@ const Album: NextPage<PageProps> = ({ album, edit, editable }) => {
     statefulAlbum.title ?? statefulAlbum.name ?? statefulAlbum._build.slug;
 
   const imageCount = statefulAlbum.blocks.filter(
-    (b) => b.kind === "photo"
+    (b) => b.kind === "photo",
   ).length;
 
   const cover =
     statefulAlbum.blocks.find(
-      (b) => b.kind === "photo" && b.formatting?.cover
+      (b) => b.kind === "photo" && b.formatting?.cover,
     ) ?? statefulAlbum.blocks.find((b) => b.kind === "photo");
 
   return (

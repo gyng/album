@@ -3,6 +3,7 @@ import {
   getNextJsSafeExif,
   getPhotoSize,
   optimiseImages,
+  removeUnneededImageSizes,
   stripPublicFromPath,
 } from "./photo";
 import {
@@ -18,7 +19,7 @@ import {
 const sqlite3 = require("sqlite3").verbose();
 
 export const deserializeTextBlock = async (
-  serialized: SerializedTextBlock
+  serialized: SerializedTextBlock,
 ): Promise<TextBlock> => {
   const copy = { ...serialized };
   return new Promise((resolve) => {
@@ -28,7 +29,7 @@ export const deserializeTextBlock = async (
 
 const getPhotoDetailsFromSearchIndex = async (
   path: string,
-  dbPath = "public/search.sqlite"
+  dbPath = "public/search.sqlite",
 ): Promise<any[]> => {
   const promise = new Promise<any[]>((resolve, reject) => {
     // This is really unoptimal
@@ -36,9 +37,8 @@ const getPhotoDetailsFromSearchIndex = async (
     const sql = "SELECT * FROM images WHERE path = ? LIMIT 1;";
     // In index
     // ../src/public/data/albums/kanto/DSCF3871_2.jpg
-    const filepathInDatabase = `../src/${path}`;
     const result: any[] = [];
-    db.get(sql, [filepathInDatabase], (err: Error, row: any) => {
+    db.get(sql, [path], (err: Error, row: any) => {
       if (err) {
         reject(err);
       }
@@ -63,14 +63,16 @@ export const deserializePhotoBlock = async (
   block: SerializedPhotoBlock,
   options: {
     dirname: string;
-  }
+  },
 ): Promise<PhotoBlock> => {
   const photoFilename = block.data.src;
   const localFilepath = path.join(options.dirname, photoFilename);
 
   const { width, height } = await getPhotoSize(localFilepath);
   const exif = await getNextJsSafeExif(localFilepath);
-  const srcset = await optimiseImages(localFilepath);
+  const srcset = await optimiseImages(localFilepath, "public/data/albums");
+  removeUnneededImageSizes(localFilepath);
+
   // Tags are optional
   // Needs to be null for same de/serialization result
   let tags = null;
@@ -104,7 +106,7 @@ export const deserializePhotoBlock = async (
 
 export const deserializeBlock = async (
   b: SerializedBlock,
-  dirname?: string
+  dirname?: string,
 ): Promise<Block> => {
   switch (b.kind) {
     case "photo":
@@ -123,12 +125,12 @@ export const deserializeBlock = async (
 export const deserializeContentBlock = async (
   serialized: SerializedContent,
   /** Relative to Next.js root, eg, `public/data/albums/foobar` */
-  dirname: string
+  dirname: string,
 ): Promise<Content> => {
   return {
     ...serialized,
     blocks: await Promise.all(
-      serialized.blocks.map(async (b) => deserializeBlock(b, dirname))
+      serialized.blocks.map(async (b) => deserializeBlock(b, dirname)),
     ),
     _build: {
       slug: serialized.name,

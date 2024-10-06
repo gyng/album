@@ -21,7 +21,7 @@ function useCoi() {
         (r) =>
           r.active &&
           r.active.scriptURL.endsWith("coi-serviceworker.js") &&
-          r.active.state === "activated"
+          r.active.state === "activated",
       );
     };
 

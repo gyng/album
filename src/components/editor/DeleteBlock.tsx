@@ -15,7 +15,7 @@ export const DeleteBlock: React.FC<{
       <button
         onClick={async () => {
           const confirm = window.confirm(
-            "Are you sure you want to delete this block?"
+            "Are you sure you want to delete this block?",
           );
           if (confirm) {
             props.edit.onDelete(props.currentIndex);

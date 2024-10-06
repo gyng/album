@@ -1,4 +1,3 @@
 .resized_images
 data/albums/*
-!data/albums/test-*
 search.sqlite

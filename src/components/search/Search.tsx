@@ -68,7 +68,7 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
     getNextPageParam: (
       lastPage: PaginatedSearchResult,
       allPages,
-      lastPageParam
+      lastPageParam,
     ) => {
       // Hack to show next page: not 100% correct as sometimes results can only have 1 page
       return lastPage.data.length === PAGE_SIZE ? lastPageParam + 1 : undefined;
@@ -101,7 +101,7 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
 
     if (!window.db) {
       console.log(
-        `window.db not initialised, retrying "${debouncedSearchQuery}"`
+        `window.db not initialised, retrying "${debouncedSearchQuery}"`,
       );
 
       // FF in private browsing doesn't allow access to navigator.serviceWorker

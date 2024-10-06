@@ -4,7 +4,7 @@ import styles from "./Nav.module.css";
 import { ThemeToggle } from "./ThemeToggle";
 
 export const Nav: React.FC<{ isEditing: boolean; editable: boolean }> = (
-  props
+  props,
 ) => {
   const router = useRouter();
 

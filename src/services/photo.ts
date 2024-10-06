@@ -5,11 +5,12 @@ import exifr from "exifr";
 import sizeOf from "image-size";
 import sharp from "sharp";
 
-export const OPTIMISED_SIZES = [4896, 2400, 1200, 600];
+export const OPTIMISED_SIZES = [2400, 1200, 600];
 export const RESIZED_IMAGE_DIR = ".resized_images";
+export const PUBLIC_ALBUMS_DIR = "public/data/albums";
 
 export const getPhotoSize = async (
-  filepath: string
+  filepath: string,
 ): Promise<{ width: number; height: number }> => {
   let width = 100;
   let height = 100;
@@ -43,21 +44,85 @@ export const getNextJsSafeExif = async (filepath: string): Promise<any> => {
     });
 };
 
+// export const removeStaleImages = async (photoPath: string) => {
+//   // TJODO: check source image
+//   const dirname = path.dirname(photoPath);
+//   const resizedDir = path.join(dirname, RESIZED_IMAGE_DIR);
+
+//   if (!fs.existsSync(resizedDir)) {
+//     return;
+//   }
+
+//   const currentFiles = fs.readdirSync(dirname);
+//   const cachedFiles = fs.readdirSync(resizedDir);
+
+//   const getOriginalFileFromCachedFilename = (cachedFilename: string) => {
+//     return cachedFilename.split("@")[0];
+//   };
+
+//   return Promise.all([
+//     ...cachedFiles.map(async (file) => {
+//       const cachedFile = path.join(resizedDir, file);
+
+//       if (
+//         !currentFiles.includes(getOriginalFileFromCachedFilename(cachedFile))
+//       ) {
+//         console.log(`Removing optimised image (missing source): ${cachedFile}`);
+//         fs.unlinkSync(cachedFile);
+//       }
+//     }),
+//   ]);
+// };
+
+export const removeUnneededImageSizes = async (photoPath: string) => {
+  const dirname = path.dirname(photoPath);
+
+  const resizedDir = path.join(PUBLIC_ALBUMS_DIR, dirname, RESIZED_IMAGE_DIR);
+
+  if (!fs.existsSync(resizedDir)) {
+    return;
+  }
+
+  const cachedFiles = fs.readdirSync(resizedDir);
+
+  const getSizeFromFilename = (cachedFilename: string) => {
+    return cachedFilename.split("@")[1].split(".")[0];
+  };
+
+  return Promise.all([
+    ...cachedFiles.map(async (file) => {
+      const cachedFile = path.join(resizedDir, file);
+      const size = getSizeFromFilename(file);
+
+      if (!OPTIMISED_SIZES.includes(parseInt(size))) {
+        console.log(`Removing optimised image (unused size): ${cachedFile}`);
+        fs.unlinkSync(cachedFile);
+      }
+    }),
+  ]);
+};
+
 // TODO: Handle RAW camera
 export const optimiseImages = async (
-  photoPath: string
+  photoPath: string,
+  outputDirectory: string,
 ): Promise<OptimisedPhoto[]> => {
   const filename = path.basename(photoPath);
   const dirname = path.dirname(photoPath);
+  const albumName = path.basename(dirname);
+
+  const publicAlbumDirectory = path.join(outputDirectory, albumName);
 
   return Promise.all([
     ...OPTIMISED_SIZES.sort((a, b) => a - b).map(async (size) => {
       const newFile = path.join(
-        dirname,
+        publicAlbumDirectory,
         RESIZED_IMAGE_DIR,
-        `${filename}@${size}.avif`
+        `${filename}@${size}.avif`,
       );
-      fs.mkdirSync(path.join(dirname, RESIZED_IMAGE_DIR), { recursive: true });
+      fs.mkdirSync(path.join(publicAlbumDirectory, RESIZED_IMAGE_DIR), {
+        recursive: true,
+      });
 
       if (fs.existsSync(newFile)) {
         // console.log(`Already optimised ${newFile}, using cached version`);

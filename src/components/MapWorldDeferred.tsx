@@ -9,7 +9,7 @@ export const MapWorldDeferred: React.FC<MapWorldProps> = (props) => {
         loading: () => <p></p>,
         ssr: false,
       }),
-    []
+    [],
   );
   return <Map {...props} />;
 };

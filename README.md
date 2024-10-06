@@ -36,21 +36,19 @@ You will need Node installed. The following steps are for deployment on Vercel, 
 1. Add your photos in a directory! Each album is a directory in `src/public/data/albums`.
 
    ```diff
-   /src
-   └─public
-     └─data
-       └─albums
-   +     ├─my-album
-   +     │ ├─pic1.jpg
-   +     │ └─cover.pic2.jpg
-         └─my-album-with-manifest
-           ├─album.json
-           └─pic.jpg
+     ├ /albums
+   + │ ├─my-album
+   + │ │ ├─pic1.jpg
+   + │ │ └─cover.pic2.jpg
+     │ └─my-album-with-manifest
+     │   ├─album.json
+     │   └─pic.jpg
+     ├ /src
+       └─public
+         └─data
+           └─albums
+             └─my-album (optimised images cached here)
    ```
-
-   Include `cover` in the filename to set it as the album cover on the index page. The first photo is otherwise used by default.
-
-   ### Album configuration
 
    Optionally, add an `album.json` to the album directory to do album-level configuration.
 
@@ -59,18 +57,18 @@ You will need Node installed. The following steps are for deployment on Vercel, 
       // Defaults to oldest-first
       sort?: "newest-first" | "oldest-first",
       // Does a partial match
-      cover?: "filename.jpg"
+      cover?: "pic1.jpg"
    }
    ```
 
-   <details>
-   <summary>v1 manifest (deprecated)</summary>
-   V1 manifest is overly difficult to use and will be removed.
+   Example
 
-   Optionally, add a `manifest.json` in this directory to add annotations, basic layout, and other text. If there is no `manifest.json`, a default one is automatically used.
-
-   Manifest creation mode is only enabled in local (`npm run dev`). Copy the manifest output from this mode into the album's directory as `manifest.json`. See [/src/public/data/albums](/src/public/data/albums) for examples.
-   </details>
+   ```json
+   {
+     "sort": "newest-first",
+     "cover": "pic1.jpg"
+   }
+   ```
 
 2. Deploy on Vercel (or elsewhere).
 

@@ -17,7 +17,7 @@ export const InputFieldControl: React.FC<{
               ...props.block,
               data: { ...props.block.data, [props.name]: ev.target.value },
             },
-            props.currentIndex
+            props.currentIndex,
           );
         }}
         // @ts-expect-error

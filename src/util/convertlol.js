@@ -55,7 +55,7 @@ toConvert.forEach((s) => {
       blocks,
     },
     null,
-    2
+    2,
   );
 
   fs.writeFileSync(target, output, "utf8");
