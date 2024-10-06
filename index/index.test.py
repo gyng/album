@@ -15,7 +15,7 @@ import torch
 
 class TestMain(unittest.TestCase):
     def test_find_files(self):
-        res = find_files(".", "../src/public/data/albums/test-simple/*.jpg")
+        res = find_files(".", "../albums/test-simple/*.jpg")
         self.assertEqual(len(res), 5)
 
     def test_format_mapping(self):
