@@ -12,15 +12,7 @@ export type MapProps = {
 
 export const MMap: React.FC<MapProps> = (props) => {
   return (
-    <div
-      style={{
-        height: 300,
-        maxWidth: 300,
-        width: "auto",
-        display: "flex",
-        flexDirection: "column",
-      }}
-    >
+    <div className={styles.map}>
       <Map
         style={{ width: "100%", height: "100%" }}
         mapStyle="https://api.maptiler.com/maps/streets/style.json?key=rIHHWldVP0SFPxQ7N0Ua"
@@ -29,7 +21,8 @@ export const MMap: React.FC<MapProps> = (props) => {
           latitude: props.coordinates[0],
           zoom: 12,
         }}
-        RTLTextPlugin="/mapbox-gl-rtl-text.js"
+        // @ts-expect-error false is accepted https://visgl.github.io/react-map-gl/docs/api-reference/map
+        RTLTextPlugin={false}
       >
         <Marker
           longitude={props.coordinates[1]}

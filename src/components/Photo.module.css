@@ -38,7 +38,7 @@
 .details > details {
   display: flex;
   height: 1.4em;
-  transition: height 0.1s ease-in-out;
+  transition: height 0.1s ease;
 }
 
 .details > details[open] {

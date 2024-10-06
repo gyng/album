@@ -7,3 +7,22 @@
 .viewOn {
   margin: var(--m) 0 0;
 }
+
+.map {
+  height: 300px;
+  max-width: 300px;
+  width: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+/* round map corners */
+.map canvas {
+  border-radius: var(--m);
+  overflow: clip;
+}
+
+/* Reduce attribution size */
+.map details {
+  font-size: 60%;
+}
