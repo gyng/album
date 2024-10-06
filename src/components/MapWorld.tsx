@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from "react";
+import React, { useRef } from "react";
 import styles from "./MapWorld.module.css";
 import { OptimisedPhoto } from "../services/types";
 import Link from "next/link";
@@ -26,10 +26,7 @@ export type MapWorldProps = {
 };
 
 const LazyImage = (props: { photo: MapWorldEntry }) => {
-  const ref = useRef<HTMLDivElement | null>(null);
-  const entry = useIntersectionObserver(ref, {
-    rootMargin: "100px",
-  });
+  const { entry, ref } = useIntersectionObserver({ rootMargin: "100px" });
   const isVisible = !!entry?.isIntersecting;
 
   return (
