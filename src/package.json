@@ -26,8 +26,8 @@
     "react-dom": "18.2.0",
     "react-map-gl": "^7.1.7",
     "sharp": "^0.32.6",
-    "sqlite-wasm-http": "^1.1.1",
-    "sqlite3": "^5.1.6",
+    "sqlite-wasm-http": "^1.2.0",
+    "sqlite3": "^5.1.7",
     "use-debounce": "^9.0.4",
     "usehooks-ts": "^3.1.0",
     "uuid": "^9.0.0"
