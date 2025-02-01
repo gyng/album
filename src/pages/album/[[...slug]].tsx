@@ -12,6 +12,7 @@ import { EditPhotoBlockOptions } from "../../components/Photo";
 import { PhotoAlbum } from "../../components/PhotoAlbum";
 import { EditTextBlockOptions } from "../../components/TextBlock";
 import styles from "./album.module.css";
+import { removeStaleImages } from "../../services/photo";
 
 type PageProps = {
   album?: Content;
@@ -184,9 +185,14 @@ export const getStaticProps: GetStaticProps<
     };
   }
 
+  const album = await getAlbumFromName(context.params?.slug?.[0]);
+
+  // Use getStaticProps as a hack to cleanup on build
+  await removeStaleImages(album._build.srcdir);
+
   return {
     props: {
-      album: await getAlbumFromName(context.params?.slug?.[0]),
+      album,
       edit: false,
       editable: process.env.NODE_ENV !== "production",
     },

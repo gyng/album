@@ -44,35 +44,39 @@ export const getNextJsSafeExif = async (filepath: string): Promise<any> => {
     });
 };
 
-// export const removeStaleImages = async (photoPath: string) => {
-//   // TJODO: check source image
-//   const dirname = path.dirname(photoPath);
-//   const resizedDir = path.join(dirname, RESIZED_IMAGE_DIR);
+export const removeStaleImages = async (dirname: string) => {
+  const resizedDir = path.join(dirname, RESIZED_IMAGE_DIR);
 
-//   if (!fs.existsSync(resizedDir)) {
-//     return;
-//   }
+  if (!fs.existsSync(resizedDir)) {
+    console.log(
+      "missing album resized directory, skipping cleanup.",
+      resizedDir,
+    );
+    return;
+  }
 
-//   const currentFiles = fs.readdirSync(dirname);
-//   const cachedFiles = fs.readdirSync(resizedDir);
+  const cachedFiles = fs.readdirSync(resizedDir);
 
-//   const getOriginalFileFromCachedFilename = (cachedFilename: string) => {
-//     return cachedFilename.split("@")[0];
-//   };
+  const getOriginalFileFromCachedFilename = (cachedFilename: string) => {
+    const expectedFilename = path.parse(cachedFilename).name.split("@")[0];
+    const expectedOriginalFile = path.join(dirname, expectedFilename);
+    return expectedOriginalFile;
+  };
 
-//   return Promise.all([
-//     ...cachedFiles.map(async (file) => {
-//       const cachedFile = path.join(resizedDir, file);
+  return Promise.all([
+    ...cachedFiles.map(async (file) => {
+      const cachedFile = path.join(resizedDir, file);
+      const originalFile = getOriginalFileFromCachedFilename(cachedFile);
 
-//       if (
-//         !currentFiles.includes(getOriginalFileFromCachedFilename(cachedFile))
-//       ) {
-//         console.log(`Removing optimised image (missing source): ${cachedFile}`);
-//         fs.unlinkSync(cachedFile);
-//       }
-//     }),
-//   ]);
-// };
+      if (!fs.existsSync(originalFile)) {
+        console.log(
+          `Removing cached optimised image "${cachedFile}". Expected source "${originalFile}" to exist.`,
+        );
+        fs.unlinkSync(cachedFile);
+      }
+    }),
+  ]);
+};
 
 export const removeUnneededImageSizes = async (photoPath: string) => {
   const dirname = path.dirname(photoPath);
