@@ -153,43 +153,48 @@ export const MMap: React.FC<MapWorldProps> = (props) => {
           </Popup>
         ) : null}
 
-        {props.photos.map((photo) => {
-          const relative =
-            (new Date(photo.date ?? oldest?.date).valueOf() -
-              new Date(oldest?.date ?? 0).valueOf()) /
-            range;
+        {props.photos
+          .sort((a, b) => {
+            // sort so newer markers are on top
+            return new Date(a.date).valueOf() - new Date(b.date).valueOf();
+          })
+          .map((photo) => {
+            const relative =
+              (new Date(photo.date ?? oldest?.date).valueOf() -
+                new Date(oldest?.date ?? 0).valueOf()) /
+              range;
 
-          return photo.decLat && photo.decLng ? (
-            <React.Fragment key={photo?.src?.src ?? ""}>
-              <Marker
-                longitude={photo.decLng}
-                latitude={photo.decLat}
-                anchor="bottom"
-                onClick={(e) => {
-                  e.originalEvent.stopPropagation();
-                  setClickInfo(photo);
-                }}
-                color={`hsl(${relative * 220}, 100%, ${50 - relative * 30}%)`}
-              >
-                <div>
-                  {zoom && zoom > 8.5 ? <LazyImage photo={photo} /> : null}
-                  <span
-                    style={{ filter: `hue-rotate(${relative * 255}deg)` }}
-                    className={styles.pin}
-                    onMouseOver={() => {
-                      setHoverInfo(photo);
-                    }}
-                    onMouseLeave={() => {
-                      setHoverInfo(null);
-                    }}
-                  >
-                    🔴
-                  </span>
-                </div>
-              </Marker>
-            </React.Fragment>
-          ) : null;
-        })}
+            return photo.decLat && photo.decLng ? (
+              <React.Fragment key={photo?.src?.src ?? ""}>
+                <Marker
+                  longitude={photo.decLng}
+                  latitude={photo.decLat}
+                  anchor="bottom"
+                  onClick={(e) => {
+                    e.originalEvent.stopPropagation();
+                    setClickInfo(photo);
+                  }}
+                  color={`hsl(${relative * 220}, 100%, ${50 - relative * 30}%)`}
+                >
+                  <div>
+                    {zoom && zoom > 8.5 ? <LazyImage photo={photo} /> : null}
+                    <span
+                      style={{ filter: `hue-rotate(${relative * 255}deg)` }}
+                      className={styles.pin}
+                      onMouseOver={() => {
+                        setHoverInfo(photo);
+                      }}
+                      onMouseLeave={() => {
+                        setHoverInfo(null);
+                      }}
+                    >
+                      🔴
+                    </span>
+                  </div>
+                </Marker>
+              </React.Fragment>
+            ) : null;
+          })}
       </Map>
     </div>
   );

@@ -9,6 +9,7 @@ import { InputFieldControl } from "./editor/InputFieldControl";
 import { DeleteBlock } from "./editor/DeleteBlock";
 import { License } from "../License";
 import { getDegLatLngFromExif } from "../util/dms2deg";
+import { getRelativeTimeString } from "../util/time";
 
 type ExifCoordinatesRowProps = {
   kind: "coordinates";
@@ -109,7 +110,7 @@ const EditPhotoBlock: React.FC<{
                     immersive: ev.target.checked,
                   },
                 },
-                props.currentIndex,
+                props.currentIndex
               );
             }}
           />
@@ -132,7 +133,7 @@ const EditPhotoBlock: React.FC<{
                     cover: ev.target.checked,
                   },
                 },
-                props.currentIndex,
+                props.currentIndex
               );
             }}
           />
@@ -144,7 +145,7 @@ const EditPhotoBlock: React.FC<{
 };
 
 const ExifCoordinatesRow: React.FC<{ row: ExifCoordinatesRowProps }> = (
-  props,
+  props
 ) => {
   const formatted = [
     `${props.row.data.GPSLatitude?.[0]}°`,
@@ -204,9 +205,10 @@ type ExifRow =
       /** Display key */
       k: string;
       /** Display value */
-      v: string;
+      v: string | JSX.Element;
       options?: any;
       valid?: boolean;
+      style?: any;
     }
   | {
       kind: "coordinates";
@@ -251,7 +253,7 @@ export const ExifTable: React.FC<{
             switch (row.kind) {
               case "kv":
                 return row.v ? (
-                  <ExifRow key={row.k} k={row.k} v={row.v} />
+                  <ExifRow key={row.k} k={row.k} v={row.v} style={row.style} />
                 ) : null;
               case "coordinates":
                 return (
@@ -276,9 +278,12 @@ export const ExifTable: React.FC<{
   );
 };
 
-export const ExifRow: React.FC<{ k: string; v: string; valid?: boolean }> = (
-  props,
-) => {
+export const ExifRow: React.FC<{
+  k: string;
+  v: string | JSX.Element;
+  valid?: boolean;
+  style?: any;
+}> = (props) => {
   if (props.valid === false) {
     return null;
   }
@@ -286,7 +291,7 @@ export const ExifRow: React.FC<{ k: string; v: string; valid?: boolean }> = (
   return (
     <tr>
       <td>{props.k}</td>
-      <td>{props.v}</td>
+      <td style={props.style}>{props.v}</td>
     </tr>
   );
 };
@@ -360,6 +365,7 @@ export const Picture: React.FC<{
         width={actualWidth}
         height={actualHeight}
         alt={
+          props.block._build?.tags?.alt_text ??
           props.block.data.title ??
           props.block.data.kicker ??
           props.block.data.description
@@ -447,7 +453,7 @@ export const PhotoBlockEl: React.FC<{
                         props.block._build.exif.GPSLatitudeRef &&
                           props.block._build.exif.GPSLatitude &&
                           props.block._build.exif.GPSLongitudeRef &&
-                          props.block._build.exif.GPSLongitude,
+                          props.block._build.exif.GPSLongitude
                       ),
                     },
                     {
@@ -456,7 +462,7 @@ export const PhotoBlockEl: React.FC<{
                       v:
                         props.block._build.exif.ExposureTime < 1
                           ? `${new Fraction(
-                              props.block._build.exif.ExposureTime,
+                              props.block._build.exif.ExposureTime
                             )
                               .toFraction()
                               .replace("/", FRACTION_SLASH)}; ${
@@ -509,7 +515,7 @@ export const PhotoBlockEl: React.FC<{
                       valid: Boolean(
                         props.block._build.exif.LensMake ||
                           props.block._build.exif.LensModel ||
-                          props.block._build.exif.LensInfo,
+                          props.block._build.exif.LensInfo
                       ),
                     },
                     {
@@ -521,7 +527,7 @@ export const PhotoBlockEl: React.FC<{
                       ].join(" "),
                       valid: Boolean(
                         props.block._build.exif.Make ||
-                          props.block._build.exif.Model,
+                          props.block._build.exif.Model
                       ),
                     },
                     {
@@ -537,11 +543,19 @@ export const PhotoBlockEl: React.FC<{
                           ? `${props.block._build.exif.DateTimeOriginal} (local @ ${props.block._build.exif.OffsetTime})`
                           : props.block._build.exif.DateTimeOriginal?.replace(
                               /Z$/,
-                              "",
+                              ""
                             ),
+                        getRelativeTimeString(
+                          new Date(props.block._build.exif.DateTimeOriginal)
+                        ),
                       ]
                         .filter(Boolean)
-                        .join(" "), // TODO: shift TZ option
+                        .map((it) => (
+                          <>
+                            {it}
+                            <br />
+                          </>
+                        )), // TODO: shift TZ option
                     },
                     //   { kind: "kv", k: "Software", v: [props.block._build.exif.Software].join(" ") },
                     {
@@ -559,6 +573,7 @@ export const PhotoBlockEl: React.FC<{
                       k: "Tags",
                       v: props.block._build?.tags?.tags,
                       valid: Boolean(props.block._build.tags),
+                      style: { width: "min-content" },
                     },
                     {
                       kind: "kv",
@@ -578,11 +593,35 @@ export const PhotoBlockEl: React.FC<{
                                   title={rgbStr}
                                 ></div>
                               );
-                            },
+                            }
                           )}
                         </div>
                       ),
                       valid: Boolean(props.block._build.tags?.colors),
+                    },
+                    {
+                      kind: "kv",
+                      k: "AI alt text",
+                      v: props.block._build?.tags?.alt_text,
+                      style: { width: "min-content" },
+                      valid: Boolean(props.block._build.tags?.alt_text),
+                    },
+                    {
+                      kind: "kv",
+                      k: "AI bootlick",
+                      v: (
+                        <>
+                          {props.block._build?.tags?.critique}
+                          <br />
+                          <br />
+                          {props.block._build?.tags?.composition_critique}
+                        </>
+                      ),
+                      style: { width: "min-content" },
+                      valid: Boolean(
+                        props.block._build?.tags?.critique ||
+                          props.block._build?.tags?.composition_critique
+                      ),
                     },
                   ]}
                 />

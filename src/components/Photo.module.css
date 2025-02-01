@@ -5,6 +5,7 @@
 
 .exif td {
   padding: 0 var(--m) var(--m) 0;
+  vertical-align: baseline;
 }
 
 .details {
@@ -73,6 +74,8 @@
   display: block;
   margin: 0 auto;
   object-fit: contain;
+  /* Hide alt text in FF */
+  color: transparent;
 }
 
 .th {
@@ -162,8 +165,8 @@
 }
 
 .colorswatch {
-  height: 1em;
-  width: 1em;
+  height: 1.5em;
+  width: 1.5em;
 }
 
 .colorswatches {
