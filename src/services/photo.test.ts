@@ -42,7 +42,7 @@ describe("photo utilities", () => {
     it("skips cached/already-optimised images", async () => {
       const actual = await optimiseImages(
         "test/fixtures/monkey.jpg",
-        "fixtures"
+        "fixtures",
       );
       expect(actual).toEqual([
         {
@@ -70,7 +70,7 @@ describe("photo utilities", () => {
     it("optimised unoptimised images", async () => {
       const actual = await optimiseImages(
         "test/fixtures/monkey-for-unoptimised.jpg",
-        "fixtures"
+        "fixtures",
       );
       expect(actual).toEqual([
         {

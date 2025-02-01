@@ -10,10 +10,9 @@ python = "^3.12"
 reverse-geocode = "^1.4.1"
 exifread = "^3.0.0"
 click = "^8.1.7"
-ultralytics = "^8.0.184"
 torch = "^2.1.1"
 fast-colorthief = "^0.0.5"
-p-tqdm = "^1.4.0"
+janus = {git = "ssh://git@github.com/deepseek-ai/Janus.git", rev = "main"}
 
 [build-system]
 requires = ["poetry-core"]

@@ -9,9 +9,9 @@ Indexes images for search with the following fields
 | fts5(images) | filename            |              |                                   |
 | fts5(images) | EXIF                | searched     | excluding binary data             |
 | fts5(images) | geocode             | searched     | geocoded to country and city      |
-| fts5(images) | tags                | searched     | classified using YOLOv8/ImageNet  |
+| fts5(images) | tags                | searched     | classified using Janus-Pro-1B     |
 | fts5(images) | colors              | placeholder  | median cut (top 5); `[r, g, b][]` |
-| tags         | tag                 |              | primary key, yolov8/imagenet      |
+| tags         | tag                 |              | primary key, Janus-Pro-1B         |
 | tags         | count               | autocomplete | tags count                        |
 | metadata     | path                |              | primary key                       |
 | metadata     | lat_deg             | map          |                                   |
@@ -20,7 +20,7 @@ Indexes images for search with the following fields
 
 The [FTS5 SQLite extension](https://www.sqlite.org/fts5.html) requires sqlite3 >= 3.34.0 and creates a virtual table.
 
-Full indexing of ~1000 images takes around 3+ minutes.
+Full indexing of ~1000 images takes around 3+ minutes. First run will download model weights which takes some time.
 
 ## Usage
 
@@ -30,7 +30,7 @@ $ poetry run python index.py index --glob "../src/public/data/albums/test-simple
 $ poetry run python index.py index --glob "../src/public/data/albums/**/*.jpg" --dbpath "search.sqlite" --dry-run
 $ poetry run python index.py search --query "singapore"
 
-$ poetry run python index.py inspect
+$ poetry run python index.py dump
 $ poetry run python index.py search-tags --query "dam"
 $ poetry run python index.py search-metadata --query "D"
 
@@ -41,7 +41,6 @@ $ cp search.sqlite ../src/public/search.sqlite
 # Test
 $ ./create-test-db.sh
 $ ./do-test-index.sh
-$ ./do-test-fts.sh
 
 # Perform a full index and copy it to /public in the Next.js app
 $ ./do-full-index.sh

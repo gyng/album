@@ -5,13 +5,14 @@
 }
 
 .pin {
+  --outline-color: rgba(255, 255, 255, 0.8);
   font-size: 18px;
   text-shadow:
-    1.4px 1.4px 0 rgba(255, 255, 255, 0.8),
-    -1.4px -1.4px 0 rgba(255, 255, 255, 0.8),
-    1.4px -1.4px 0 rgba(255, 255, 255, 0.8),
-    -1.4px 1.4px 0 rgba(255, 255, 255, 0.8),
-    1.4px 1.4px 0 rgba(255, 255, 255, 0.8);
+    1.4px 1.4px 0 var(--outline-color),
+    -1.4px -1.4px 0 var(--outline-color),
+    1.4px -1.4px 0 var(--outline-color),
+    -1.4px 1.4px 0 var(--outline-color),
+    1.4px 1.4px 0 var(--outline-color);
   opacity: 0.9;
 }
 

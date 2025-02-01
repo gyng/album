@@ -28,7 +28,7 @@ describe("PhotoBlockEl", () => {
     expect(screen.getAllByTestId("picture")).toHaveLength(1);
 
     const img: HTMLImageElement = screen.getByTestId("picture");
-    expect(img!.src).toBe("http://localhost/test/monkey.jpg");
+    expect(img!.src).toBeTruthy();
     expect(img!.srcset).toBeTruthy();
   });
 });

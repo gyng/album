@@ -7,7 +7,7 @@
 A zero-config, static, file-based album generator
 
 - Dump your photos in a directory and run one command to deploy
-- Index and search images using YOLOv8/ImageNet classifications
+- Index and search images using deepseek-ai/Janus-Pro-1B
 - Map mode
 - EXIF support
 - Next.JS static build, deployed on Vercel
@@ -132,7 +132,7 @@ Image search is implemented using Sqlite on the browser (!real serverless!). An 
 
 The following fields are currently indexed
 
-- YOLOv8/Imagenet tags
+- Janus-Pro 1B tags and description
 - EXIF
 - Geocoded locations
 - Colour palette

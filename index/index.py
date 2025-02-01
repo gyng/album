@@ -1,3 +1,4 @@
+import torch
 import click
 from pathlib import Path, PosixPath
 import pprint
@@ -5,27 +6,82 @@ import fast_colorthief
 import exifread
 import reverse_geocode
 import sqlite3
-from ultralytics import YOLO
 import typing
-from typing import IO, TYPE_CHECKING, Mapping, Optional, Tuple
+from typing import IO, Mapping, Optional, Tuple
 import os
-from p_tqdm import p_uimap
+import json
+import re
+import uuid
+
+from transformers import AutoModelForCausalLM
+from janus.models import MultiModalityCausalLM, VLChatProcessor
+from janus.utils.io import load_pil_images
+
+import concurrent.futures
+import time
 
 
-class Classifier:
+class JanusClassifier:
     def init_model(self) -> None:
-        print("Loading YOLOv8...")
-        self.model = YOLO("yolov8n-cls")
-        print("Loaded YOLOv8.")
+        print("Loading Janus-Pro-1B...")
+        # use 1B for speed/lower requirements
+        model_path = "deepseek-ai/Janus-Pro-1B"
+        self.vl_chat_processor: VLChatProcessor = VLChatProcessor.from_pretrained(
+            model_path
+        )
+        self.tokenizer = self.vl_chat_processor.tokenizer
 
-    def predict(self, path: str):
-        results = self.model(path, conf=0.7)
-        if len(results) > 0:
-            classes = results[0].names
-            top5 = results[0].probs.top5
-            top5_mapped = [f"{classes[x]}" for x in top5]
-            return top5_mapped
-        return {}
+        vl_gpt: MultiModalityCausalLM = AutoModelForCausalLM.from_pretrained(
+            model_path, trust_remote_code=True
+        )
+        self.vl_gpt = vl_gpt.to(torch.bfloat16).cuda().eval()
+        print("Loaded Janus-Pro-1B.")
+
+    @torch.inference_mode()
+    def predict(self, path: str, geocode: Optional[Mapping]) -> str:
+        schema = r"\{ \"identified_objects\": string[], \"themes\": string[], \"alt_text\": string, \"critique\": string, \"composition_critique\": string, \"suggested_title\": string, \"subject\": string }"
+
+        geocode_prompt = None
+        if geocode:
+            geocode_prompt = f"\nThis photo was taken near {geocode.get('city', '')}, {geocode.get('state')}, {geocode.get('country', '')}, {geocode.get('country', '')}."
+
+        prompt = f"<image_placeholder>{geocode_prompt}\nYou are the best photographer and brutally honest acclaimed photography critic and gallery curator. Your writing style is witty, sardonic, concise, and sarcastic like those of the best writers such as Hemingway and Roger Ebert. Classify and describe the following photo into JSON (MUST BE JSON!) with this schema:\n{schema}\n{uuid.uuid4()}. IT IS IMPORTANT THAT YOU ONLY RETURN VALID JSON ANOD NOTHING ELSE! Do not keep repeating yourself in your answer."
+
+        conversation = [
+            {
+                "role": "User",
+                "content": prompt,
+                "images": [path],
+            },
+            {"role": "Assistant", "content": ""},
+        ]
+
+        # load images and prepare for inputs
+        # Janus-Pro will resize images internally
+        pil_images = load_pil_images(conversation)
+
+        prepare_inputs = self.vl_chat_processor(
+            conversations=conversation, images=pil_images, force_batchify=True
+        ).to(self.vl_gpt.device)
+
+        # run image encoder to get the image embeddings
+        inputs_embeds = self.vl_gpt.prepare_inputs_embeds(**prepare_inputs)
+
+        outputs = self.vl_gpt.language_model.generate(
+            inputs_embeds=inputs_embeds,
+            attention_mask=prepare_inputs.attention_mask,
+            pad_token_id=self.tokenizer.eos_token_id,
+            bos_token_id=self.tokenizer.bos_token_id,
+            eos_token_id=self.tokenizer.eos_token_id,
+            max_new_tokens=512,
+            do_sample=False,
+            use_cache=True,
+        )
+
+        answer = self.tokenizer.decode(
+            outputs[0].cpu().tolist(), skip_special_tokens=True
+        )
+        return answer
 
 
 def convert_to_degress(value: exifread.utils.Ratio, lat_or_lng_ref: str) -> float:
@@ -54,7 +110,10 @@ def get_album_relative_path(path: str) -> str:
     # Specific hack for album project
     # album-relative is /myalbum/asdf.jpg
     p = Path(path)
-    return f"/album/{p.parts[-2]}#{p.parts[-1]}"
+    try:
+        return f"/album/{p.parts[-2]}#{p.parts[-1]}"
+    except:
+        return str(p)
 
 
 def get_filename(path: str) -> str:
@@ -75,12 +134,12 @@ class Sqlite3Client:
             entries = len(self.inspect())
         except:
             pass
-        return { "version": version, "entries": entries}
+        return {"version": version, "entries": entries}
 
     def setup_tables(self):
         cur = self.con.cursor()
         cur.execute(
-            "CREATE VIRTUAL TABLE IF NOT EXISTS images USING fts5(path, album_relative_path, filename, geocode, exif, tags, colors, tokenize='porter trigram')"
+            "CREATE VIRTUAL TABLE IF NOT EXISTS images USING fts5(path, album_relative_path, filename, geocode, exif, tags, colors, alt_text, critique, suggested_title, composition_critique, subject, tokenize='porter trigram')"
         )
         cur.execute(
             "CREATE TABLE IF NOT EXISTS tags (tag VARCHAR PRIMARY KEY, count INTEGER DEFAULT 0)"
@@ -157,8 +216,13 @@ class Sqlite3Client:
         return (res_images, res_metadata)
 
     def search(
-        self, query: str, limit: Optional[int] = 999999, offset: Optional[int] = 999999
+        self, query: str, limit: Optional[int] = 999999, offset: Optional[int] = 0
     ):
+
+        import pprint
+
+        pprint.pprint((query, limit, offset))
+
         cur = self.con.cursor()
         statement = f"""
         SELECT *, snippet(images, -1, '<i class="snippet">', '</i>', '…', 24) AS snippet, bm25(images) AS bm25
@@ -169,8 +233,8 @@ class Sqlite3Client:
         OFFSET ?
         """
 
-        limit = limit or 99999
-        offset = offset or 99999
+        limit = limit if limit is not None else 999999
+        offset = offset if offset is not None else 0
 
         excluded_columns = "path album_relative_path"
         res = cur.execute(
@@ -280,21 +344,29 @@ def index(glob: str, dbpath: str, dry_run: bool):
     )
 
     if not dry_run:
-        classifier = Classifier()
+        classifier = JanusClassifier()
         classifier.init_model()
 
         enumerated = [
             (index, item, classifier) for index, item in enumerate(valid_files)
         ]
-        # 4 as GPU can run out of memory
-        # 4 also seems to be fastest on a 3080 vs 2 or 8
-        results_iter = p_uimap(analyse_image_worker, enumerated, num_cpus=4)
 
-        for result in results_iter:
-            pprint.pprint(f"Inserting analysed image {result.get("path")}")
-            insert_analysed_image(
-                db=db, analysed=result.get("analysed"), path=result.get("path")
-            )
+        # Disable concurrency as it doesn't help performance on a RTX3080
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+            start_time = time.perf_counter()
+
+            for i, result in enumerate(executor.map(analyse_image_worker, enumerated)):
+                time_now = time.perf_counter()
+                time_per_image = (time_now - start_time) / (i + 1)
+                rate = 1 / time_per_image
+                percent = i / float(len(valid_files)) * 100
+                estimated_time_min = (len(valid_files) - i) * time_per_image / 60
+
+                pprint.pprint(result)
+                print(f"[{percent:.1f}% {i}/{len(valid_files)} {rate:.2f}it/s {estimated_time_min:.1f}min]\tAnalysed image {result["path"]}. Inserting image...")
+                insert_analysed_image(
+                    db=db, analysed=result.get("analysed"), path=result.get("path")
+                )
 
 
 @cli.command("prune")
@@ -330,8 +402,7 @@ def search(dbpath: str, query: str, limit: Optional[int]):
 @click.option("--dbpath", default="testdb.sqlite", help="sqlite database path to use.")
 @click.option("--query", default="", help="Search query.")
 @click.option("--limit", default=None, help="Search query limit.")
-@click.option("--offset", default=0, help="Search query offset.")
-def search(dbpath: str, query: str, limit: Optional[int]):
+def search_tags(dbpath: str, query: str, limit: Optional[int]):
     db = Sqlite3Client(dbpath)
     db.setup_tables()
     results = db.search_tags(query, limit)
@@ -342,7 +413,7 @@ def search(dbpath: str, query: str, limit: Optional[int]):
 @click.option("--dbpath", default="testdb.sqlite", help="sqlite database path to use.")
 @click.option("--query", default="", help="Search query.")
 @click.option("--limit", default=None, help="Search query limit.")
-def search(dbpath: str, query: str, limit: Optional[int]):
+def search_metadata(dbpath: str, query: str, limit: Optional[int]):
     db = Sqlite3Client(dbpath)
     db.setup_tables()
     results = db.search_metadata(query, limit)
@@ -381,7 +452,9 @@ def find_files(directory: str, pattern: str) -> list[str]:
     return [str(p) for p in paths]
 
 
-def analyse_image(fh: IO[bytes], classifier: Classifier, path: str) -> Mapping:
+def analyse_image(fh: IO[bytes], classifier: JanusClassifier, path: str) -> Mapping:
+    start_time = time.perf_counter()
+
     exif_full = get_exif(fh)
     exif = {k: v for k, v in exif_full.items() if not isinstance(v, bytes)}
 
@@ -400,9 +473,42 @@ def analyse_image(fh: IO[bytes], classifier: Classifier, path: str) -> Mapping:
         geo = {}
 
     # We could maybe speed this up by scaling images down?
+    # Resizing doesn't do much to improve speed?
     colors = fast_colorthief.get_palette(path)
 
-    tags = classifier.predict(path=path)
+    attempts = 0
+    max_attempts = 20
+    result = None
+    while attempts < max_attempts:
+        try:
+            result = classifier.predict(path=path, geocode=geo)
+
+            JSON_BLOCK_PATTERN = re.compile(r"\{.*?\}", re.DOTALL | re.MULTILINE)
+            blocks = JSON_BLOCK_PATTERN.findall(result)
+            block = blocks[0]
+            result = json.loads(block)
+
+            # Ensure we have the right keys as a poor man's schema check
+            assert isinstance(result, dict)
+            if isinstance(result["identified_objects"], str):
+                result["identified_objects"] = [result["identified_objects"]]
+            if isinstance(result["themes"], str):
+                result["themes"] = [result["themes"]]
+            result["alt_text"]
+            result["critique"]
+            result["suggested_title"]
+            result["composition_critique"]
+            result["subject"]
+            break
+        except Exception as e:
+            attempts += 1
+            print(f"Attempt {attempts}/{max_attempts} failed for {path}, got {result}")
+            if attempts >= max_attempts:
+                print(
+                    f"Failed to classify {path} after {max_attempts} attempts, skipping."
+                )
+                result = {}
+                break
 
     # 2000:01:01 12:34:56 > 2000-01-01T12:34:56
     datetime = (
@@ -410,6 +516,11 @@ def analyse_image(fh: IO[bytes], classifier: Classifier, path: str) -> Mapping:
         .replace(":", "-", 2)
         .replace(" ", "T", 1)
     )
+
+    tags = [] + result.get("identified_objects", []) + result.get("themes", [])
+    normalised_tags = [t.lower().replace(" ", "_") for t in list(set(tags))]
+
+    end_time = time.perf_counter()
 
     return {
         # assume TZ = Z
@@ -419,12 +530,18 @@ def analyse_image(fh: IO[bytes], classifier: Classifier, path: str) -> Mapping:
         "lat_deg": lat_deg,
         "lng_deg": lng_deg,
         "colors": colors,
-        "tags": tags,
+        "tags": normalised_tags,
+        "alt_text": result.get("alt_text"),
+        "critique": result.get("critique"),
+        "suggested_title": result.get("suggested_title"),
+        "composition_critique": result.get("composition_critique"),
+        "subject": result.get("subject"),
+        "_duration": end_time - start_time,
     }
 
 
 def analyse_image_worker(
-    input: list[Tuple[int, str, Classifier]]
+    input: list[Tuple[int, str, JanusClassifier]],
 ) -> Mapping[str, typing.Any]:
     try:
         """Multiprocessable worker"""
@@ -457,6 +574,15 @@ def insert_analysed_image(db, analysed: Mapping, path):
         field="colors",
         value=format_mapping(analysed.get("colors")),
     )
+    db.insert_field(path, field="alt_text", value=analysed.get("alt_text"))
+    db.insert_field(path, field="critique", value=analysed.get("critique"))
+    db.insert_field(
+        path, field="suggested_title", value=analysed.get("suggested_title")
+    )
+    db.insert_field(
+        path, field="composition_critique", value=analysed.get("composition_critique")
+    )
+    db.insert_field(path, field="subject", value=analysed.get("subject"))
 
     geocode = analysed.get("geocode")
     if geocode:

@@ -1,3 +1,4 @@
 .resized_images
 data/albums/*
 search.sqlite
+search.sqlite.bak
