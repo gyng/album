@@ -1,9 +1,16 @@
-import React, { useRef } from "react";
+import React from "react";
 import styles from "./MapWorld.module.css";
 import { OptimisedPhoto } from "../services/types";
 import Link from "next/link";
 import { getRelativeTimeString } from "../util/time";
-import Map, { Marker, Popup } from "react-map-gl/maplibre";
+import Map, {
+  Marker,
+  Popup,
+  ScaleControl,
+  NavigationControl,
+  GeolocateControl,
+  FullscreenControl,
+} from "react-map-gl/maplibre";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { useIntersectionObserver } from "usehooks-ts";
 import { useRouter } from "next/router";
@@ -55,7 +62,7 @@ export const MMap: React.FC<MapWorldProps> = (props) => {
   const initialZoom = url.searchParams.get("zoom");
 
   const [zoom, setZoom] = React.useState<number | null>(
-    initialZoom ? Number.parseFloat(initialZoom) : null
+    initialZoom ? Number.parseFloat(initialZoom) : null,
   );
   const router = useRouter();
 
@@ -76,9 +83,9 @@ export const MMap: React.FC<MapWorldProps> = (props) => {
     <div className={props.className}>
       <Map
         style={{ width: "100vw", height: "100vh" }}
-        // Use openfreemap instead, but swap to maptiler if it dies
-        mapStyle="https://tiles.openfreemap.org/styles/liberty"
-        // mapStyle="https://api.maptiler.com/maps/ffd8bd10-cd97-40a5-b1d6-d15f98fb3644/style.json?key=iilC4hPY1594noPX9OQ2"
+        // two options for map style
+        // mapStyle="https://tiles.openfreemap.org/styles/liberty"
+        mapStyle="https://api.maptiler.com/maps/ffd8bd10-cd97-40a5-b1d6-d15f98fb3644/style.json?key=iilC4hPY1594noPX9OQ2"
         initialViewState={{
           longitude: initialLon ? Number.parseFloat(initialLon) : undefined,
           latitude: initialLat ? Number.parseFloat(initialLat) : undefined,
@@ -199,6 +206,11 @@ export const MMap: React.FC<MapWorldProps> = (props) => {
               </React.Fragment>
             ) : null;
           })}
+
+        <NavigationControl />
+        <GeolocateControl />
+        <ScaleControl />
+        <FullscreenControl />
       </Map>
     </div>
   );

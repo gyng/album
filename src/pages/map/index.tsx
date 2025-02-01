@@ -8,12 +8,19 @@ import { MapWorldEntry } from "../../components/MapWorld";
 import styles from "./map.module.css";
 import Link from "next/link";
 import Head from "next/head";
+import { useSearchParams } from "next/navigation";
 
 type PageProps = {
   photos: MapWorldEntry[];
 };
 
 const WorldMap: NextPage<PageProps> = (props) => {
+  const searchParams = useSearchParams();
+  const filterAlbum = searchParams.get("filter_album");
+  const filteredPhotos = filterAlbum
+    ? props.photos.filter((p) => p.album === filterAlbum)
+    : props.photos;
+
   return (
     <div className={styles.container}>
       <Head>
@@ -22,12 +29,22 @@ const WorldMap: NextPage<PageProps> = (props) => {
         <meta name="theme-color" content="#2c2c2c" />
       </Head>
       <div className={styles.titleBar}>
-        <Link href="/">
-          <h1 className={styles.title}>🌏</h1>
-          <div>← Back</div>
-        </Link>
+        <div className={styles.backLink}>
+          <Link href="/">
+            <h1 className={styles.title}>🌏</h1>
+            <div>← Back</div>
+          </Link>
+        </div>
+
+        {filterAlbum ? (
+          <div className={styles.albumLink}>
+            Only showing photos from{" "}
+            <Link href={`/albums/${filterAlbum}`}>{filterAlbum}</Link>
+          </div>
+        ) : null}
       </div>
-      <MapWorldDeferred photos={props.photos} className={styles.map} />
+
+      <MapWorldDeferred photos={filteredPhotos} className={styles.map} />
     </div>
   );
 };
