@@ -112,7 +112,7 @@ const EditPhotoBlock: React.FC<{
                     immersive: ev.target.checked,
                   },
                 },
-                props.currentIndex
+                props.currentIndex,
               );
             }}
           />
@@ -135,7 +135,7 @@ const EditPhotoBlock: React.FC<{
                     cover: ev.target.checked,
                   },
                 },
-                props.currentIndex
+                props.currentIndex,
               );
             }}
           />
@@ -147,7 +147,7 @@ const EditPhotoBlock: React.FC<{
 };
 
 const ExifCoordinatesRow: React.FC<{ row: ExifCoordinatesRowProps }> = (
-  props
+  props,
 ) => {
   const formatted = [
     `${props.row.data.GPSLatitude?.[0]}°`,
@@ -455,7 +455,7 @@ export const PhotoBlockEl: React.FC<{
                         props.block._build.exif.GPSLatitudeRef &&
                           props.block._build.exif.GPSLatitude &&
                           props.block._build.exif.GPSLongitudeRef &&
-                          props.block._build.exif.GPSLongitude
+                          props.block._build.exif.GPSLongitude,
                       ),
                     },
                     {
@@ -464,7 +464,7 @@ export const PhotoBlockEl: React.FC<{
                       v:
                         props.block._build.exif.ExposureTime < 1
                           ? `${new Fraction(
-                              props.block._build.exif.ExposureTime
+                              props.block._build.exif.ExposureTime,
                             )
                               .toFraction()
                               .replace("/", FRACTION_SLASH)}; ${
@@ -517,7 +517,7 @@ export const PhotoBlockEl: React.FC<{
                       valid: Boolean(
                         props.block._build.exif.LensMake ||
                           props.block._build.exif.LensModel ||
-                          props.block._build.exif.LensInfo
+                          props.block._build.exif.LensInfo,
                       ),
                     },
                     {
@@ -529,7 +529,7 @@ export const PhotoBlockEl: React.FC<{
                       ].join(" "),
                       valid: Boolean(
                         props.block._build.exif.Make ||
-                          props.block._build.exif.Model
+                          props.block._build.exif.Model,
                       ),
                     },
                     {
@@ -545,10 +545,10 @@ export const PhotoBlockEl: React.FC<{
                           ? `${props.block._build.exif.DateTimeOriginal} (local @ ${props.block._build.exif.OffsetTime})`
                           : props.block._build.exif.DateTimeOriginal?.replace(
                               /Z$/,
-                              ""
+                              "",
                             ),
                         getRelativeTimeString(
-                          new Date(props.block._build.exif.DateTimeOriginal)
+                          new Date(props.block._build.exif.DateTimeOriginal),
                         ),
                       ]
                         .filter(Boolean)
@@ -595,7 +595,7 @@ export const PhotoBlockEl: React.FC<{
                                   title={rgbStr}
                                 ></div>
                               );
-                            }
+                            },
                           )}
                         </div>
                       ),
@@ -622,7 +622,7 @@ export const PhotoBlockEl: React.FC<{
                       style: { width: "min-content" },
                       valid: Boolean(
                         props.block._build?.tags?.critique ||
-                          props.block._build?.tags?.composition_critique
+                          props.block._build?.tags?.composition_critique,
                       ),
                     },
                   ]}

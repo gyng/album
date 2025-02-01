@@ -1,8 +1,7 @@
 import Link from "next/link";
 import styles from "./SearchResultTile.module.css";
-import { SearchResult } from "./api";
 
-export const SearchResultTile = (props: { result: SearchResult }) => {
+export const SearchResultTile = (props: { result: any }) => {
   const { result } = props;
 
   // [(92, 124, 161), (213, 200, 192), (9, 9, 11), (152, 187, 215)]

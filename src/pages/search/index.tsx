@@ -2,9 +2,7 @@ import { NextPage } from "next/types";
 import DynamicSearchWithCoi from "../../components/search/DynamicSearchWithCoi";
 import { Nav } from "../../components/Nav";
 import baseStyles from "../Index.module.css";
-import { useEffect } from "react";
 import React from "react";
-import { fetchTags } from "../../components/search/api";
 
 type PageProps = {};
 

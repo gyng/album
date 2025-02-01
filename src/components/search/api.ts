@@ -1,20 +1,14 @@
-export type SearchResult = {
-  path: string;
-  album_relative_path: string;
-  snippet: string;
-  bm25: number;
-  tags: string;
-  colors: string;
-};
+import { Database, Sqlite3Static } from "@sqlite.org/sqlite-wasm";
 
 export type PaginatedSearchResult = {
-  data: SearchResult[];
+  data: any[];
   next?: number;
   prev?: number;
   query?: string;
 };
 
 const exec = (
+  db: Database,
   sql: string,
   bind: (string | number)[],
   options?: {
@@ -27,47 +21,42 @@ const exec = (
     const accumulator: any[] = [];
 
     try {
-      await window.db("exec", {
+      db.exec({
         sql,
         bind,
-        callback: async (msg: any) => {
-          if (msg.row) {
-            const record: Record<string, string> = {};
-            (msg.columnNames as Array<string>).forEach((cn, i) => {
-              record[cn] = msg.row[i];
-            });
-            record.type = msg.type;
-            accumulator.push(record);
-          } else {
-            const prev =
-              !options?.page || options.page <= 0
-                ? undefined
-                : options.page - 1;
-            // This is not strictly correct, we need to do a SQL COUNT to be sure
-            const next =
-              options?.page && accumulator.length === options.pageSize
-                ? options.page + 1
-                : undefined;
-            resolve({ data: accumulator, next, prev, query: options?.query });
-          }
+        returnValue: "resultRows",
+        callback: (msg: any) => {
+          accumulator.push(msg);
         },
       });
     } catch (err) {
       console.error(`Bad query ${options?.query} ${options?.page}`, err);
       reject(err);
     }
+
+    const prev =
+      !options?.page || options.page <= 0 ? undefined : options.page - 1;
+    // This is not strictly correct, we need to do a SQL COUNT to be sure
+    const next =
+      options?.page && accumulator.length === options.pageSize
+        ? options.page + 1
+        : undefined;
+
+    resolve({ data: accumulator, next, prev, query: options?.query });
   });
 };
 
 export const fetchResults = async (opts: {
+  database: Database;
   query: string;
   pageSize: number;
   page: number;
 }): Promise<PaginatedSearchResult> => {
-  const { query, pageSize, page } = opts;
+  const { database, query, pageSize, page } = opts;
 
   try {
-    return await exec(
+    const result = await exec(
+      database,
       `SELECT *, snippet(images, -1, '<i class="snippet">', '</i>', '…', 24) AS snippet, bm25(images) AS bm25
         FROM images
         WHERE images MATCH ?
@@ -85,6 +74,32 @@ export const fetchResults = async (opts: {
         query,
       },
     );
+    const columns = [
+      "path",
+      "album_relative_path",
+      "filename",
+      "geocode",
+      "exif",
+      "tags",
+      "colors",
+      "alt_text",
+      "critique",
+      "suggested_title",
+      "composition_critique",
+      "subject",
+      "snippet",
+      "bm25",
+    ];
+
+    result.data = result.data.map((row) => {
+      const obj: any = {};
+      columns.forEach((col, idx) => {
+        obj[col] = row[idx];
+      });
+      return obj;
+    });
+
+    return result;
   } catch (err) {
     console.error(`Bad query ${query} ${page}`, err);
     throw err;
@@ -92,14 +107,16 @@ export const fetchResults = async (opts: {
 };
 
 export const fetchTags = async (opts: {
+  database: Database;
   pageSize: number;
   page: number;
   minCount?: number;
 }): Promise<{ data: { tag: string; count: number }[] }> => {
-  const { pageSize, page, minCount } = opts;
+  const { database, pageSize, page, minCount } = opts;
 
   try {
-    return (await exec(
+    const result = (await exec(
+      database,
       `SELECT *
         FROM tags
         WHERE count >= ?
@@ -107,7 +124,11 @@ export const fetchTags = async (opts: {
         LIMIT ?
         OFFSET ?`,
       [minCount ?? 0, pageSize, page * pageSize],
-    )) as unknown as { data: { tag: string; count: number }[] };
+    )) as unknown as { data: any[] };
+    result.data = result.data.map((row) => {
+      return { tag: row[0], count: row[1] };
+    });
+    return result;
   } catch (err) {
     console.error(`Failed to fetch tags, page: ${page} size: ${pageSize}`, err);
     throw err;

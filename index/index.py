@@ -343,7 +343,7 @@ def index(glob: str, dbpath: str, dry_run: bool):
         f"Analysing {len(valid_files)} unindexed files (skipping {len(files) - len(valid_files)} already-indexed)."
     )
 
-    if not dry_run and valid_files > 0:
+    if not dry_run and len(valid_files) > 0:
         classifier = JanusClassifier()
         classifier.init_model()
 

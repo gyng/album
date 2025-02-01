@@ -153,10 +153,18 @@ The following fields are currently indexed
 - Geocoded locations
 - Colour palette
 
-Sqlite in the browser then loads this database and runs a trigram full-text search. The library uses SharedArrayBuffers, which requires `Cross-Origin-Embedder-Policy` on the JS files and `Cross-Origin-Opener-Policy` on the page.
+Previously a HTTP Range VFS driver was used for Sqlite: however the fallback either didn't work right or a new package version with that feature wasn't released. To make things easier to maintain I switched it back to the official SQLite WASM library.
 
+Sqlite in the browser then loads this database and runs a trigram full-text search. I'm running SQLite on the main thread so it doesn't need access to shared array buffers. SABs need COOP/COEP headers setup. I ran things on the main thread to remove any need for COEP/COOP header hackery (on Vercel, very difficult to debug headers!). This does mean the full database (multi-megabyte) is loaded which can take some time.
+
+<details>
+<summary>Details on hack needed to get COOP/COEP headers working back when the range VFS was used:</summary>
 Vercel is unable to serve the library's JS files from Next.js's `_next/` build directory with these headers, even with configuration set up in next.config.js and vercel.json. Middleware and API functions cannot redirect or add headers to these files either.
 
 A service worker modified from [coi-serviceworker](https://github.com/gzuidhof/coi-serviceworker) is used to add headers instead. This works, but has an unfortunate downside of requiring a page reload after initial install.
+
+</details>
+
+---
 
 To take screenshots, visit http://localhost:3000/screenshot.html
