@@ -1,8 +1,8 @@
 # album
 
-<img width="1920" alt="sshot" src="https://github.com/user-attachments/assets/76a9b78c-df92-47da-ab67-02710bc010f6">
+![Screenshot 2025-02-02 at 06-49-43 Screenshot for docs](https://github.com/user-attachments/assets/92bd9ee8-af26-48af-b473-eb953e1d63c8)
 
-[Demo](https://album-gyng.vercel.app/)
+[Live site](https://album-gyng.vercel.app/)
 
 A zero-config, static, file-based album generator
 
@@ -131,7 +131,6 @@ Be sure to configure your license for _all_ images in `src/License.tsx`. By defa
 - Split data from app
 - Automatic external storage
 - Better content-based caching
-- More blocks (Map, video)
 - Links
 - Local manifest saving
 - Themes
