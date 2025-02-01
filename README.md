@@ -7,9 +7,11 @@
 A zero-config, static, file-based album generator
 
 - Dump your photos in a directory and run one command to deploy
-- Index and search images using deepseek-ai/Janus-Pro-1B
+- Index, search, explore images classified with deepseek-ai/Janus-Pro-1B
+- Colour palette analysis
 - Map mode
 - EXIF support
+- YouTube video support
 - Next.JS static build, deployed on Vercel
 - Custom image optimisation, resizing
 - Light and dark modes
@@ -59,7 +61,14 @@ You will need Node installed. The following steps are for deployment on Vercel, 
       // Defaults to oldest-first
       sort?: "newest-first" | "oldest-first",
       // Does a partial match
-      cover?: "pic1.jpg"
+      cover?: "pic1.jpg",
+      externals?: Array<
+         {
+            type: "youtube",
+            href: "https://www.youtube.com/embed/9bw3IL444Uo",
+            date?: "2025-11-25"
+         }
+      >
    }
    ```
 
@@ -68,7 +77,14 @@ You will need Node installed. The following steps are for deployment on Vercel, 
    ```json
    {
      "sort": "newest-first",
-     "cover": "pic1.jpg"
+     "cover": "pic1.jpg",
+     "externals": [
+       {
+         "type": "youtube",
+         "href": "https://www.youtube.com/embed/9bw3IL444Uo",
+         "date": "2019-11-07"
+       }
+     ]
    }
    ```
 

@@ -25,6 +25,11 @@ if (typeof window === "undefined") {
   });
 
   self.addEventListener("fetch", function (event) {
+    // passthrough for requests not coming from /search
+    if (!event.request.referrer.match("^.*(/search).*$")) {
+      return;
+    }
+
     const r = event.request;
     if (r.cache === "only-if-cached" && r.mode !== "same-origin") {
       return;

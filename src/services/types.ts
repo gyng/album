@@ -39,6 +39,16 @@ export interface PhotoBlock extends IBlock {
   };
 }
 
+export interface VideoBlock extends IBlock {
+  kind: "video";
+  id: string;
+  data: {
+    type: "youtube";
+    href: string;
+    date?: string;
+  };
+}
+
 export interface SerializedPhotoBlock extends Partial<PhotoBlock> {
   kind: "photo";
   id: string;
@@ -52,6 +62,16 @@ export interface SerializedPhotoBlock extends Partial<PhotoBlock> {
   };
 }
 
+export interface SerializedVideoBlock extends Partial<VideoBlock> {
+  kind: "video";
+  id: string;
+  data: {
+    type: "youtube";
+    href: string;
+    date?: string;
+  };
+}
+
 export interface IBlock {
   kind: unknown;
   data: unknown;
@@ -60,8 +80,11 @@ export interface IBlock {
   _build?: unknown;
 }
 
-export type Block = PhotoBlock | TextBlock;
-export type SerializedBlock = SerializedPhotoBlock | SerializedTextBlock;
+export type Block = PhotoBlock | TextBlock | VideoBlock;
+export type SerializedBlock =
+  | SerializedPhotoBlock
+  | SerializedTextBlock
+  | SerializedVideoBlock;
 
 export type Content = {
   name: string;
@@ -96,6 +119,7 @@ export interface SerializedContent {
 export interface V2AlbumMetadata {
   sort?: "newest-first" | "oldest-first";
   cover?: string;
+  externals?: Array<VideoBlock["data"]>;
   // TODO: use EXIF for title/notes
 }
 

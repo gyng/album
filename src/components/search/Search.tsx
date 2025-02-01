@@ -2,17 +2,24 @@ import React, { useEffect, useRef, useState } from "react";
 import { createSQLiteThread, createHttpBackend } from "sqlite-wasm-http";
 import { useDebounce } from "use-debounce";
 import styles from "./Search.module.css";
+// @ts-expect-error
 import { Backend } from "sqlite-wasm-http/dist/vfs-http-types";
 import { useRouter } from "next/router";
 import { useInfiniteQuery, keepPreviousData } from "@tanstack/react-query";
-import { fetchResults, PaginatedSearchResult } from "./api";
+import { fetchResults, fetchTags, PaginatedSearchResult } from "./api";
 import { SearchResultTile } from "./SearchResultTile";
+import { SearchTag } from "./SearchTag";
 
 declare global {
   interface Window {
     db: any;
   }
 }
+
+type Tag = {
+  name: string;
+  count: number;
+};
 
 export const initBackend = () => {
   const httpBackend = createHttpBackend({
@@ -46,6 +53,7 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
   const [backend, setBackend] = useState<ReturnType<
     typeof createHttpBackend
   > | null>(null);
+  const [backendInitialised, setBackendInitialised] = useState(false);
 
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [debouncedSearchQuery] = useDebounce(searchQuery, 600);
@@ -68,7 +76,7 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
     getNextPageParam: (
       lastPage: PaginatedSearchResult,
       allPages,
-      lastPageParam,
+      lastPageParam
     ) => {
       // Hack to show next page: not 100% correct as sometimes results can only have 1 page
       return lastPage.data.length === PAGE_SIZE ? lastPageParam + 1 : undefined;
@@ -101,7 +109,7 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
 
     if (!window.db) {
       console.log(
-        `window.db not initialised, retrying "${debouncedSearchQuery}"`,
+        `window.db not initialised, retrying "${debouncedSearchQuery}"`
       );
 
       // FF in private browsing doesn't allow access to navigator.serviceWorker
@@ -130,7 +138,11 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
     if (!backend || !backend.worker || window.db) {
       return;
     }
-    initDb(backend).catch(console.error);
+    initDb(backend)
+      .then(() => {
+        setBackendInitialised(true);
+      })
+      .catch(console.error);
   }, [backend, backend?.worker]);
 
   // Read query from URL on load
@@ -179,6 +191,23 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
     };
   }, []);
 
+  // Fetch tags as suggestions
+  const [tags, setTags] = React.useState<Tag[]>([]);
+  useEffect(() => {
+    if (!backend || !backendInitialised) {
+      return;
+    }
+
+    fetchTags({ page: 0, pageSize: 1000, minCount: 5 }).then((results) => {
+      console.log(results);
+      setTags(
+        results.data
+          .map((r) => ({ name: r.tag, count: r.count }))
+          .filter((t) => t.name.length >= 3)
+      );
+    });
+  }, [backendInitialised]);
+
   const queryResults = data?.pages.flatMap((page) => page.data);
 
   return (
@@ -204,6 +233,21 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
         />
       </div>
 
+      <div className={styles.tagsContainer}>
+        {tags.map((tag) => {
+          return (
+            <SearchTag
+              key={tag.name}
+              tag={tag.name}
+              count={tag.count}
+              onClick={() => {
+                setSearchQuery(tag.name);
+              }}
+            />
+          );
+        })}
+      </div>
+
       <div>
         <ul className={styles.results}>
           {searchQuery ? (
@@ -211,6 +255,7 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
               {isSuccess &&
               !isFetching &&
               queryResults?.length === 0 &&
+              // Needs to be 3 due to fts5?
               debouncedSearchQuery.length >= 3 ? (
                 <div>
                   No results for <i>{debouncedSearchQuery}</i>
@@ -219,6 +264,7 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
 
               {isSuccess &&
               !isFetching &&
+              // Needs to be 3 due to fts5?
               debouncedSearchQuery.length < 3 &&
               queryResults?.length === 0 ? (
                 <div className={styles.searchHint}>

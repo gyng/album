@@ -1,0 +1,19 @@
+.youtubeIframe {
+  height: 90vh;
+  height: 90svh;
+
+  aspect-ratio: 16 / 9;
+  width: auto;
+}
+
+.youtubeWrapper {
+  grid-column: 1;
+  grid-row: 1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+
+  max-height: 90vh !important;
+  max-height: 90svh !important;
+  height: auto;
+}

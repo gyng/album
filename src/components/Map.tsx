@@ -23,7 +23,6 @@ export const MMap: React.FC<MapProps> = (props) => {
           latitude: props.coordinates[0],
           zoom: 12,
         }}
-        RTLTextPlugin={false}
       >
         <Marker
           longitude={props.coordinates[1]}

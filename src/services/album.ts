@@ -132,9 +132,22 @@ export const getAlbum = async (
   const isV2Manifest = fs.existsSync(path.join(albumPath, MANIFEST_V2_NAME));
 
   if (isManifest && !isV2Manifest) {
+    // Warning: deprecated!
     return getAlbumWithManifest(albumPath);
   } else {
+    // This may be a v2 manifest
+    // Get deserialised
     let manifest = await getAlbumWithoutManifest(albumPath);
+
+    // Apply v2 manifest if it exists
+    let v2Manifest: V2AlbumMetadata | null = null;
+    if (isV2Manifest) {
+      const v2Config = fs.readFileSync(
+        path.join(albumPath, MANIFEST_V2_NAME),
+        "utf-8",
+      );
+      v2Manifest = JSON.parse(v2Config) as V2AlbumMetadata;
+    }
 
     // Sort by date
     manifest.blocks = manifest.blocks.sort((a, b) => {
@@ -144,7 +157,65 @@ export const getAlbum = async (
       );
     });
 
-    // Set defaults
+    // TODO: clean this up by splitting this up
+    // and default behaviour (no v1 manifest or v2 manifest)
+    if (isV2Manifest && v2Manifest) {
+      // Add in externals first; this is needed as we are sorting later
+      if (v2Manifest.externals) {
+        v2Manifest.externals.forEach((ext) => {
+          if (ext.type === "youtube") {
+            manifest.blocks.push({
+              kind: "video",
+              id: v4(),
+              data: {
+                type: "youtube",
+                href: ext.href,
+                date: ext.date,
+              },
+            });
+          }
+        });
+      }
+
+      if (v2Manifest.cover) {
+        manifest.cover = { src: v2Manifest.cover };
+        const toSet = manifest.blocks.find(
+          // @ts-expect-error ?. checks well enough
+          (b) => b.data?.src?.includes(v2Manifest.cover),
+        );
+        if (toSet && toSet.kind === "photo") {
+          toSet.formatting = { ...toSet?.formatting, cover: true };
+        }
+      }
+    }
+
+    manifest.blocks = manifest.blocks.sort((a, b) => {
+      const getBlockDate = (block: Block) => {
+        if (block.kind == "text") {
+          return 1;
+        } else if (block.kind === "photo") {
+          return (
+            Date.parse(block._build?.exif?.DateTimeOriginal ?? 0).valueOf() ?? 0
+          );
+        } else if (block.kind === "video") {
+          return block.data.date ? new Date(block.data.date).valueOf() : 0;
+        }
+        return 0;
+      };
+
+      if (v2Manifest?.sort === "newest-first") {
+        return getBlockDate(b) - getBlockDate(a);
+      } else {
+        return getBlockDate(a) - getBlockDate(b);
+      }
+    });
+
+    // Hack by moving text always to top
+    const textBlocks = manifest.blocks.filter((b) => b.kind === "text");
+    manifest.blocks = manifest.blocks.filter((b) => b.kind !== "text");
+    manifest.blocks = [...textBlocks, ...manifest.blocks];
+
+    // Set title defaults
     const title = manifest.blocks.at(0);
     if (title?.kind === "text") {
       const range = getImageTimestampRange(manifest).map((ts) =>
@@ -155,49 +226,16 @@ export const getAlbum = async (
       }`;
     }
 
-    // TODO: clean this up by splitting this up
-    // and default behaviour (no v1 manifest or v2 manifest)
-    if (isV2Manifest) {
-      const v2Config = fs.readFileSync(
-        path.join(albumPath, MANIFEST_V2_NAME),
-        "utf-8",
-      );
-      const v2Manifest = JSON.parse(v2Config) as V2AlbumMetadata;
-      if (v2Manifest.sort === "newest-first") {
-        manifest.blocks = manifest.blocks.sort((a, b) => {
-          return (
-            Date.parse(
-              (b as PhotoBlock)._build?.exif?.DateTimeOriginal ??
-                Number.MAX_VALUE,
-            ) -
-            Date.parse(
-              (a as PhotoBlock)._build?.exif?.DateTimeOriginal ??
-                Number.MAX_VALUE,
-            )
-          );
-        });
-
-        // TODO: DRY this out with above
-        const title = manifest.blocks.at(0);
-        if (title?.kind === "text") {
-          const range = getImageTimestampRange(manifest).map((ts) =>
-            new Date(ts!).getFullYear(),
-          ) ?? [0, 0];
-          title.data.kicker = `${range[1]}${
-            range[1] === range[0] ? "" : `–${range[0]}`
-          }`;
-        }
-      }
-
-      if (v2Manifest.cover) {
-        manifest.cover = { src: v2Manifest.cover };
-        const toSet = manifest.blocks.find(
-          // @ts-expect-error ?. checks well enough
-          (b) => b.data?.src?.includes(v2Manifest.cover),
-        );
-        if (toSet) {
-          toSet.formatting = { ...toSet?.formatting, cover: true };
-        }
+    if (v2Manifest?.sort === "newest-first") {
+      // TODO: DRY this out with above
+      const title = manifest.blocks.at(0);
+      if (title?.kind === "text") {
+        const range = getImageTimestampRange(manifest).map((ts) =>
+          new Date(ts!).getFullYear(),
+        ) ?? [0, 0];
+        title.data.kicker = `${range[1]}${
+          range[1] === range[0] ? "" : `–${range[0]}`
+        }`;
       }
     }
 

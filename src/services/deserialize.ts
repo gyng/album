@@ -13,14 +13,25 @@ import {
   SerializedBlock,
   SerializedContent,
   SerializedPhotoBlock,
+  SerializedVideoBlock,
   SerializedTextBlock,
   TextBlock,
+  VideoBlock,
 } from "./types";
 const sqlite3 = require("sqlite3").verbose();
 
 export const deserializeTextBlock = async (
   serialized: SerializedTextBlock,
 ): Promise<TextBlock> => {
+  const copy = { ...serialized };
+  return new Promise((resolve) => {
+    resolve(copy);
+  });
+};
+
+export const deserializeVideoBlock = async (
+  serialized: SerializedVideoBlock,
+): Promise<VideoBlock> => {
   const copy = { ...serialized };
   return new Promise((resolve) => {
     resolve(copy);
@@ -117,7 +128,6 @@ export const deserializeBlock = async (
     case "text":
       return deserializeTextBlock(b);
     default:
-      // @ts-expect-error
       throw new Error(`unsupported kind ${b.kind}`);
   }
 };

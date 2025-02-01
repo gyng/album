@@ -4,7 +4,7 @@ import { Albums } from "../components/Albums";
 import styles from "./Index.module.css";
 import { getAlbums, getImageTimestampRange } from "../services/album";
 import { Block, Content } from "../services/types";
-import DynamicSearchWithCoi from "../components/search/DynamicSearchWithCoi";
+// import DynamicSearchWithCoi from "../components/search/DynamicSearchWithCoi";
 import Link from "next/link";
 import { ThemeToggle } from "../components/ThemeToggle";
 
@@ -26,11 +26,13 @@ const Home: NextPage<PageProps> = (context) => {
         <h1>Snapshots</h1>
         <div className={styles.toolbar}>
           <Link className={styles.toolbarLink} href="/map">
-            Map
+            🌏 Map
+          </Link>
+          <Link className={styles.toolbarLink} href="/search">
+            🔍 Search & Explore
           </Link>
           <ThemeToggle />
         </div>
-        <DynamicSearchWithCoi />
         <Albums albums={context.albums} />
       </main>
 

@@ -90,3 +90,26 @@ export const fetchResults = async (opts: {
     throw err;
   }
 };
+
+export const fetchTags = async (opts: {
+  pageSize: number;
+  page: number;
+  minCount?: number;
+}): Promise<{ data: { tag: string; count: number }[] }> => {
+  const { pageSize, page, minCount } = opts;
+
+  try {
+    return (await exec(
+      `SELECT *
+        FROM tags
+        WHERE count >= ?
+        ORDER BY count DESC
+        LIMIT ?
+        OFFSET ?`,
+      [minCount ?? 0, pageSize, page * pageSize],
+    )) as unknown as { data: { tag: string; count: number }[] };
+  } catch (err) {
+    console.error(`Failed to fetch tags, page: ${page} size: ${pageSize}`, err);
+    throw err;
+  }
+};

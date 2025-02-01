@@ -6,7 +6,9 @@ import {
   SerializedContent,
   SerializedPhotoBlock,
   SerializedTextBlock,
+  SerializedVideoBlock,
   TextBlock,
+  VideoBlock,
 } from "./types";
 
 export const serializePhotoBlock = (
@@ -43,6 +45,13 @@ export const serializeTextBlock = (block: TextBlock): SerializedTextBlock => {
   return copy;
 };
 
+export const serializeVideoBlock = (
+  block: VideoBlock,
+): SerializedVideoBlock => {
+  const copy = { ...block };
+  return copy;
+};
+
 export const serializeBlock = (block: Block): SerializedBlock => {
   switch (block.kind) {
     case "photo":
@@ -50,7 +59,6 @@ export const serializeBlock = (block: Block): SerializedBlock => {
     case "text":
       return serializeTextBlock(block);
     default:
-      // @ts-expect-error
       throw new Error(`serializeBlock: Unsupported block ${block.kind}`);
   }
 };

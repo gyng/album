@@ -1,0 +1,11 @@
+.tag {
+  padding: var(--m);
+  font-size: var(--fs-s);
+  border-radius: var(--m-s);
+  border: solid 1px var(--c-bg-contrast-dark);
+  cursor: pointer;
+}
+
+.tag:hover {
+  background-color: var(--c-bg-contrast-light);
+}

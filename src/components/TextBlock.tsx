@@ -84,6 +84,7 @@ export const TextBlockEl: React.FC<{
           block={props.block}
           edit={props.edit}
           currentIndex={props.currentIndex}
+          // @ts-expect-error
           anchorRef={anchorRef}
         />
       ) : null}

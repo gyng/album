@@ -88,3 +88,12 @@
     opacity: 1;
   }
 }
+
+.tagsContainer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--m);
+  max-height: 30vh;
+  overflow-y: auto;
+  margin-bottom: var(--m-l);
+}

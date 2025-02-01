@@ -1,8 +1,15 @@
-import { Content, IBlock, PhotoBlock, TextBlock } from "../services/types";
+import {
+  Content,
+  IBlock,
+  PhotoBlock,
+  TextBlock,
+  VideoBlock,
+} from "../services/types";
 import { BlockControl, BlockControlOptions } from "./editor/BlockControl";
 import { EditPhotoBlockOptions, PhotoBlockEl } from "./Photo";
 import styles from "./PhotoAlbum.module.css";
 import { EditTextBlockOptions, TextBlockEl } from "./TextBlock";
+import { YoutubeBlockEl } from "./VideoBlock";
 
 export const Block: React.FC<{
   b: IBlock;
@@ -29,6 +36,14 @@ export const Block: React.FC<{
           edit={props.extraProps.editTextBlock}
         />
       );
+    case "video":
+      if ((props.b as VideoBlock).data.type === "youtube") {
+        return <YoutubeBlockEl src={(props.b as VideoBlock).data.href} />;
+      } else {
+        return (
+          <pre>Unsupported video type {JSON.stringify(props.b, null, 2)}</pre>
+        );
+      }
     default:
       return <pre>Unsupported block {JSON.stringify(props.b, null, 2)}</pre>;
   }
