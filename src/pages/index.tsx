@@ -44,6 +44,18 @@ const Home: NextPage<PageProps> = (context) => {
         >
           GitHub
         </a>
+        &nbsp;&middot;&nbsp;
+        <a href="https://mastodon.yshi.org/@f" target="_blank" rel="noreferrer">
+          Fediverse
+        </a>
+        &nbsp;&middot;&nbsp;
+        <a
+          href="https://bsky.app/profile/gyng.bsky.social"
+          target="_blank"
+          rel="noreferrer"
+        >
+          Bluesky
+        </a>
       </footer>
     </div>
   );
