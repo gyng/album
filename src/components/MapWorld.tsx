@@ -49,7 +49,14 @@ const LazyImage = (props: { photo: MapWorldEntry }) => {
 };
 
 export const MMap: React.FC<MapWorldProps> = (props) => {
-  const [zoom, setZoom] = React.useState<number | null>(null);
+  const url = new URL(window.location.toString());
+  const initialLon = url.searchParams.get("lon");
+  const initialLat = url.searchParams.get("lat");
+  const initialZoom = url.searchParams.get("zoom");
+
+  const [zoom, setZoom] = React.useState<number | null>(
+    initialZoom ? Number.parseFloat(initialZoom) : null
+  );
   const router = useRouter();
 
   const sortedByDate = props.photos
@@ -65,16 +72,13 @@ export const MMap: React.FC<MapWorldProps> = (props) => {
   const [hoverInfo, setHoverInfo] = React.useState<MapWorldEntry | null>(null);
   const popupInfo = clickInfo ?? hoverInfo;
 
-  const url = new URL(window.location.toString());
-  const initialLon = url.searchParams.get("lon");
-  const initialLat = url.searchParams.get("lat");
-  const initialZoom = url.searchParams.get("zoom");
-
   return (
     <div className={props.className}>
       <Map
         style={{ width: "100vw", height: "100vh" }}
-        mapStyle="https://api.maptiler.com/maps/ffd8bd10-cd97-40a5-b1d6-d15f98fb3644/style.json?key=iilC4hPY1594noPX9OQ2"
+        // Use openfreemap instead, but swap to maptiler if it dies
+        mapStyle="https://tiles.openfreemap.org/styles/liberty"
+        // mapStyle="https://api.maptiler.com/maps/ffd8bd10-cd97-40a5-b1d6-d15f98fb3644/style.json?key=iilC4hPY1594noPX9OQ2"
         initialViewState={{
           longitude: initialLon ? Number.parseFloat(initialLon) : undefined,
           latitude: initialLat ? Number.parseFloat(initialLat) : undefined,

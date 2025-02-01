@@ -4,6 +4,7 @@ import styles from "./Map.module.css";
 
 import Map, { Marker } from "react-map-gl/maplibre";
 import "maplibre-gl/dist/maplibre-gl.css";
+import Link from "next/link";
 
 export type MapProps = {
   coordinates: [number, number];
@@ -15,7 +16,8 @@ export const MMap: React.FC<MapProps> = (props) => {
     <div className={styles.map}>
       <Map
         style={{ width: "100%", height: "100%" }}
-        mapStyle="https://api.maptiler.com/maps/streets/style.json?key=rIHHWldVP0SFPxQ7N0Ua"
+        mapStyle="https://tiles.openfreemap.org/styles/liberty"
+        // mapStyle="https://api.maptiler.com/maps/streets/style.json?key=rIHHWldVP0SFPxQ7N0Ua"
         initialViewState={{
           longitude: props.coordinates[1],
           latitude: props.coordinates[0],
@@ -33,12 +35,18 @@ export const MMap: React.FC<MapProps> = (props) => {
 
       <div className={styles.viewOn}>
         View on{" "}
+        <Link
+          href={`http://localhost:3000/map?lat=${props.coordinates[0].toPrecision(6)}&lon=${props.coordinates[1].toPrecision(6)}&zoom=14`}
+        >
+          Album map
+        </Link>
+        &nbsp;&middot;&nbsp;
         <a
-          href={`https://www.openstreetmap.org/?mlat=${props.coordinates[0]}&mlon=${props.coordinates[1]}&zoom=13`}
+          href={`https://www.openstreetmap.org/?mlat=${props.coordinates[0]}&mlon=${props.coordinates[1]}&zoom=14`}
           target="_blank"
           rel="noreferrer"
         >
-          OpenStreetMaps
+          OpenStreetMap
         </a>
         &nbsp;&middot;&nbsp;
         <a
