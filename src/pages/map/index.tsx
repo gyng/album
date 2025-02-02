@@ -39,7 +39,7 @@ const WorldMap: NextPage<PageProps> = (props) => {
         {filterAlbum ? (
           <div className={styles.albumLink}>
             🔽 only showing photos from{" "}
-            <Link href={`/albums/${filterAlbum}`}>
+            <Link href={`/album/${filterAlbum}`}>
               <i>{filterAlbum}</i>
             </Link>
           </div>
