@@ -8,7 +8,7 @@ export const ProgressBar: React.FC<{
     <div style={{ display: "block" }}>
       <div className={styles.progressBar}>
         <div className={styles.progress} style={{ width: `${progress}%` }} />
-        <div>Loading tags&hellip;</div>
+        <div>Loading&hellip;</div>
       </div>
     </div>
   ) : null;

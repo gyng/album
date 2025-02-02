@@ -207,7 +207,7 @@ type ExifRow =
       /** Display key */
       k: string;
       /** Display value */
-      v: string | JSX.Element;
+      v: string | JSX.Element | JSX.Element[];
       options?: any;
       valid?: boolean;
       style?: any;
@@ -282,7 +282,7 @@ export const ExifTable: React.FC<{
 
 export const ExifRow: React.FC<{
   k: string;
-  v: string | JSX.Element;
+  v: string | JSX.Element | JSX.Element[];
   valid?: boolean;
   style?: any;
 }> = (props) => {
@@ -558,6 +558,7 @@ export const PhotoBlockEl: React.FC<{
                             <br />
                           </>
                         )), // TODO: shift TZ option
+                      valid: Boolean(props.block._build.exif.DateTimeOriginal),
                     },
                     //   { kind: "kv", k: "Software", v: [props.block._build.exif.Software].join(" ") },
                     {
@@ -603,27 +604,10 @@ export const PhotoBlockEl: React.FC<{
                     },
                     {
                       kind: "kv",
-                      k: "AI description",
+                      k: "Description (AI)",
                       v: props.block._build?.tags?.alt_text,
                       style: { width: "min-content" },
                       valid: Boolean(props.block._build.tags?.alt_text),
-                    },
-                    {
-                      kind: "kv",
-                      k: "AI bootlick",
-                      v: (
-                        <>
-                          {props.block._build?.tags?.critique}
-                          <br />
-                          <br />
-                          {props.block._build?.tags?.composition_critique}
-                        </>
-                      ),
-                      style: { width: "min-content" },
-                      valid: Boolean(
-                        props.block._build?.tags?.critique ||
-                          props.block._build?.tags?.composition_critique,
-                      ),
                     },
                   ]}
                 />

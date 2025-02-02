@@ -3,13 +3,14 @@
   height: 100%;
   object-fit: contain;
   cursor: pointer;
+  transition: all 0.2s ease-out;
 }
 
 .container {
   position: fixed;
   width: 100vw;
   height: 100vh;
-  background-color: var(--c-bg);
+  background-color: black;
 }
 
 .progressBarContainer {
@@ -28,7 +29,7 @@
   display: flex;
   padding: var(--m-m);
   background-color: var(--c-bg);
-  opacity: 0.01;
+  opacity: 0;
   animation: fade 3s forwards ease-out;
   transition: all 0.2s ease-out;
   background-color: transparent;
@@ -56,6 +57,11 @@
   background-color: var(--c-bg-contrast-light);
 }
 
+.toolbar > .back {
+  align-self: center;
+  font-size: var(--fs-sm);
+}
+
 .countdown {
   align-self: center;
   font-size: var(--fs-sm);
@@ -63,6 +69,8 @@
 
 .clock {
   position: fixed;
+  user-select: none;
+  pointer-events: none;
   bottom: 5vh;
   width: 100%;
   text-align: center;
@@ -70,6 +78,7 @@
     1px 2px 2px hsl(0 0% 0% / 0.333),
     2px 4px 4px hsl(0 0% 0% / 0.333),
     3px 6px 6px hsl(0 0% 0% / 0.333);
+  color: white;
 }
 
 .date {
@@ -92,4 +101,13 @@
 .filterLabel {
   font-size: var(--fs-sm);
   align-self: center;
+}
+
+.notLoaded {
+  opacity: 0.5;
+}
+
+.taken {
+  margin-top: var(--m-m);
+  font-size: var(--fs-s);
 }

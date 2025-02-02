@@ -9,6 +9,10 @@ export function getRelativeTimeString(
   date: Date | number,
   options?: { lang?: string; short?: boolean },
 ): string {
+  if (isNaN(date as number)) {
+    return "Invalid Date";
+  }
+
   const { lang = navigator.language, short = false } = options ?? {};
 
   // Allow dates or times to be passed
@@ -53,5 +57,6 @@ export function getRelativeTimeString(
     numeric: "auto",
     style: short ? "narrow" : "long",
   });
+
   return rtf.format(Math.floor(deltaSeconds / divisor), units[unitIndex]);
 }

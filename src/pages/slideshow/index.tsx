@@ -8,6 +8,9 @@ import styles from "./slideshow.module.css";
 import { ThemeToggle } from "../../components/ThemeToggle";
 import Link from "next/link";
 import Head from "next/head";
+import { useLocalStorage } from "usehooks-ts";
+import { getRelativeTimeString } from "../../util/time";
+import { extractDateFromExifString } from "../../util/extractExifFromDb";
 
 type PageProps = {};
 
@@ -15,18 +18,33 @@ const SlideshowPage: NextPage<PageProps> = (props) => {
   return <Slideshow />;
 };
 
+// TODO: consider doing getStaticProps here to fetch all photos and pass them to the slideshow
+// like in world map
 const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
   const [database, progress] = useDatabase();
 
-  const [currentPhotoPath, setCurrentPhotoPath] = React.useState<string | null>(
-    null,
+  const [currentPhotoPath, setCurrentPhotoPath] = React.useState<{
+    path: string;
+    exif: string;
+  } | null>(null);
+
+  const [timeDelay, setTimeDelay, removeTimeDelay] = useLocalStorage(
+    "slideshow-timedelay",
+    30000,
   );
-  const [timeDelay, setTimeDelay] = React.useState<number>(30000);
+  const [showClock, setShowClock, removeShowClock] = useLocalStorage(
+    "slideshow-showclock",
+    false,
+  );
+
   const [nextChangeAt, setNextChangeAt] = React.useState<Date>(new Date());
   const [secondsLeft, setSecondsLeft] = React.useState<number>(0);
-  const [showClock, setShowClock] = React.useState<boolean>(false);
   const [time, setTime] = React.useState<Date>(new Date());
-  const [swiping, setSwiping] = React.useState<boolean>(false);
+
+  const [imageLoaded, setImageLoaded] = React.useState<boolean>(false);
+
+  // Use this to force a clear
+  const [nextCounter, setNextCounter] = React.useState<number>(0);
 
   const [filter, setFilter] = React.useState<string | undefined>(undefined);
   useEffect(() => {
@@ -43,7 +61,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
     }
     fetchRandomPhoto({ database, filter })
       .then((p) => {
-        setCurrentPhotoPath(p[0].path);
+        setCurrentPhotoPath(p[0]);
         setNextChangeAt(new Date(Date.now() + timeDelay));
       })
       .catch(console.error);
@@ -53,7 +71,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
     goNext();
     const id = setInterval(goNext, timeDelay);
     return () => clearInterval(id);
-  }, [database, timeDelay]);
+  }, [database, timeDelay, nextCounter]);
 
   useEffect(() => {
     const id = setInterval(() => {
@@ -74,8 +92,8 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
     );
   }
 
-  const albumName = currentPhotoPath?.[0]?.split?.("/")?.[2] ?? "";
-  const photoName = currentPhotoPath?.[0]?.split?.("/")?.[3] ?? "";
+  const albumName = currentPhotoPath?.path?.split?.("/")?.[2] ?? "";
+  const photoName = currentPhotoPath?.path?.split?.("/")?.[3] ?? "";
   const photoBlock: PhotoBlock = {
     kind: "photo",
     id: "",
@@ -96,6 +114,12 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
     },
   };
 
+  const exifDate = currentPhotoPath.exif
+    ? extractDateFromExifString(currentPhotoPath.exif)
+    : null;
+
+  const relativeDate = exifDate ? getRelativeTimeString(exifDate) : null;
+
   return (
     <>
       <Head>
@@ -104,10 +128,14 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
 
       <div className={styles.container}>
         <div className={styles.toolbar}>
-          <ThemeToggle />
+          {/* <ThemeToggle /> */}
+
+          <Link className={`${styles.back}`} href="/">
+            ← Home
+          </Link>
 
           <button
-            className={`${styles.button} ${showClock ? styles.active : ""}`}
+            className={`${showClock ? styles.active : ""}`}
             onClick={() => setShowClock(!showClock)}
           >
             🕰️ Clock
@@ -128,28 +156,33 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
           <button
             className={styles.nextPhoto}
             onClick={() => {
-              goNext();
+              setImageLoaded(false);
+              setNextCounter(nextCounter + 1);
             }}
           >
             Next
           </button>
 
-          {[5000, 10000, 30000, 60000, 300000, 600000, 3600000, 86400000].map(
-            (delay) => {
-              const delayMin = delay / 1000 / 60;
-              const delaySec = delay / 1000;
+          {[
+            10000, 60000, 300000, 900000, 3600000, 10800000, 43200000, 86400000,
+          ].map((delay) => {
+            const delayMin = delay / 1000 / 60;
+            const delaySec = delay / 1000;
 
-              return (
-                <button
-                  key={delay}
-                  className={`${styles.timeDelayButton} ${delay === timeDelay ? styles.active : ""}`}
-                  onClick={() => setTimeDelay(delay)}
-                >
-                  {delayMin < 1 ? `${delaySec} sec` : `${delayMin} min`}
-                </button>
-              );
-            },
-          )}
+            return (
+              <button
+                key={delay}
+                className={`${styles.timeDelayButton} ${delay === timeDelay ? styles.active : ""}`}
+                onClick={() => setTimeDelay(delay)}
+              >
+                {delayMin >= 60
+                  ? `${delayMin / 60}h`
+                  : delayMin < 1
+                    ? `${delaySec}s`
+                    : `${delayMin}m`}
+              </button>
+            );
+          })}
 
           <div className={styles.countdown}>🔁 {secondsLeft.toFixed(0)}s</div>
 
@@ -162,7 +195,10 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
             </div>
           ) : null}
 
-          <Link href={`/album/${albumName}`} className={styles.filterLabel}>
+          <Link
+            href={`/album/${albumName}#${photoName}`}
+            className={styles.filterLabel}
+          >
             from album: {albumName}
           </Link>
         </div>
@@ -184,14 +220,30 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
                 day: "numeric",
               })}
             </div>
+
+            {relativeDate ? (
+              <div className={styles.taken}>
+                {relativeDate} &middot;{" "}
+                {exifDate?.toLocaleDateString(undefined, {
+                  year: "numeric",
+                  month: "long",
+                })}
+              </div>
+            ) : (
+              <div>&nbsp;</div>
+            )}
           </div>
         )}
 
         <img
-          className={styles.image}
+          className={`${styles.image} ${!imageLoaded ? styles.notLoaded : ""}`}
           src={photoBlock.data.src}
+          onLoad={() => {
+            setImageLoaded(true);
+          }}
           onClick={() => {
-            goNext();
+            setImageLoaded(false);
+            setNextCounter(nextCounter + 1);
           }}
         />
       </div>
