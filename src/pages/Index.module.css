@@ -21,11 +21,12 @@
 .toolbar {
   display: flex;
   align-items: flex-start;
+  flex-wrap: wrap;
   gap: var(--m-s);
+  margin-bottom: var(--m-xl);
 }
 
 .toolbarLink {
-  margin-bottom: var(--m-l);
   text-decoration: none;
   border: solid 2px var(--c-bg-contrast-light);
   border-radius: var(--m-s);
