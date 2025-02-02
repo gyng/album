@@ -6,65 +6,11 @@ import { useInfiniteQuery, keepPreviousData } from "@tanstack/react-query";
 import { fetchResults, fetchTags, PaginatedSearchResult } from "./api";
 import { SearchResultTile } from "./SearchResultTile";
 import { SearchTag } from "./SearchTag";
-
-import sqlite3InitModule, {
-  Database,
-  Sqlite3Static,
-} from "@sqlite.org/sqlite-wasm";
+import { useDatabase } from "../database/useDatabase";
 
 type Tag = {
   name: string;
   count: number;
-};
-
-const loadRemoteDatabase = async (sqlite3: Sqlite3Static) => {
-  console.log("Running SQLite3 version", sqlite3.version.libVersion);
-  return fetch("/search.sqlite")
-    .then((res) => res.arrayBuffer())
-    .then(function (arrayBuffer) {
-      const p = sqlite3.wasm.allocFromTypedArray(arrayBuffer);
-      const db = new sqlite3.oo1.DB();
-      if (db.pointer) {
-        const rc = sqlite3.capi.sqlite3_deserialize(
-          db.pointer,
-          "main",
-          p,
-          arrayBuffer.byteLength,
-          arrayBuffer.byteLength,
-          sqlite3.capi.SQLITE_DESERIALIZE_FREEONCLOSE,
-          // Optionally:
-          // | sqlite3.capi.SQLITE_DESERIALIZE_RESIZEABLE
-        );
-        db.checkRc(rc);
-        return db;
-      } else {
-        throw new Error("Database pointer is undefined");
-      }
-    });
-};
-
-const initializeSQLite = async (): Promise<Database> => {
-  let db;
-  try {
-    console.log("Loading and initializing SQLite3 module...");
-    const sqlite3 = await sqlite3InitModule({
-      print: console.log,
-      printErr: console.error,
-    });
-    db = loadRemoteDatabase(sqlite3);
-  } catch (err) {
-    if (err instanceof Error) {
-      console.error("Initialization error:", err.name, err.message);
-    } else {
-      console.error("Initialization error:", err);
-    }
-  }
-
-  if (!db) {
-    throw new Error("Failed to initialise SQLite");
-  }
-
-  return db;
 };
 
 export const Search: React.FC<{ disabled?: boolean }> = (props) => {
@@ -74,13 +20,7 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [debouncedSearchQuery] = useDebounce(searchQuery, 600);
   const inputRef = useRef<HTMLInputElement>(null);
-
-  const [database, setDatabase] = useState<Database | null>(null);
-  useEffect(() => {
-    initializeSQLite().then((db) => {
-      setDatabase(db);
-    });
-  }, []);
+  const [database, progress] = useDatabase();
 
   const reactQuery = useInfiniteQuery({
     queryKey: ["results", { debouncedSearchQuery }],
@@ -109,7 +49,7 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
     getNextPageParam: (
       lastPage: PaginatedSearchResult,
       allPages,
-      lastPageParam,
+      lastPageParam
     ) => {
       // Hack to show next page: not 100% correct as sometimes results can only have 1 page
       return lastPage.data.length === PAGE_SIZE ? lastPageParam + 1 : undefined;
@@ -142,28 +82,8 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
 
     if (!database) {
       console.log(
-        `window.db not initialised, retrying "${debouncedSearchQuery}"`,
+        `database not initialised, retrying "${debouncedSearchQuery}"`
       );
-
-      // FF in private browsing doesn't allow access to navigator.serviceWorker
-      if (navigator?.serviceWorker) {
-        // Assume COOP/COEP service worker isn't up
-        // Give some time for service worker to init
-        setTimeout(() => {
-          // set search params to count reloads
-          const url = new URL(window.location.toString());
-          const searchParams = new URLSearchParams(window.location.search);
-
-          if (!searchParams.has("reload")) {
-            searchParams.set("reload", "1");
-            url.search = searchParams.toString();
-            // window.location.reload();
-          }
-        }, 2000);
-      } else {
-        console.log("navigator.serviceWorker not supported");
-      }
-      return;
     } else {
       fetchNextPage();
     }
@@ -223,12 +143,12 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
       return;
     }
 
-    fetchTags({ database, page: 0, pageSize: 1000, minCount: 5 })
+    fetchTags({ database, page: 0, pageSize: 1000, minCount: 1 })
       .then((results) => {
         setTags(
           results.data
             .map((r) => ({ name: r.tag, count: r.count }))
-            .filter((t) => t.name.length >= 3),
+            .filter((t) => t.name.length >= 3)
         );
       })
       .catch(console.error);
@@ -243,8 +163,9 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
           suppressHydrationWarning
           type="text"
           value={searchQuery}
-          placeholder="Type / to search (try burger, japan, datetime:2023)"
+          placeholder="Type / to search (try bird, model:mavica, datetime:2023)"
           spellCheck={false}
+          autoFocus
           onChange={(ev) => {
             setSearchQuery(ev.target.value);
           }}
@@ -259,16 +180,44 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
         />
       </div>
 
+      {progress < 100 ? (
+        <div style={{ display: "block" }}>
+          <div className={styles.progressBar}>
+            <div
+              className={styles.progress}
+              style={{ width: `${progress}%` }}
+            />
+            <div>Loading tags&hellip;</div>
+          </div>
+        </div>
+      ) : null}
+
       <div className={styles.tagsContainer}>
-        {tags.length === 0 ? <div>Loading tags&hellip;</div> : null}
-        {tags.map((tag) => {
+        {Object.values(
+          // Combine tags with the same name but different casing
+          tags.reduce(
+            (acc, tag) => {
+              const key = tag.name.toLocaleLowerCase();
+              if (!acc[key]) {
+                acc[key] = { ...tag };
+              } else {
+                acc[key].count += tag.count;
+              }
+              return acc;
+            },
+            {} as Record<string, Tag>
+          )
+        ).map((tag) => {
           return (
             <SearchTag
               key={tag.name}
               tag={tag.name}
-              count={tag.count}
+              count={tag.count - 1}
+              isActive={
+                tag.name.toLocaleLowerCase() === searchQuery.toLocaleLowerCase()
+              }
               onClick={() => {
-                setSearchQuery(tag.name);
+                setSearchQuery(tag.name.toLocaleLowerCase());
               }}
             />
           );

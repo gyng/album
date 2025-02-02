@@ -1,5 +1,6 @@
 import Link from "next/link";
 import styles from "./SearchResultTile.module.css";
+import { getRelativeTimeString } from "../../util/time";
 
 export const SearchResultTile = (props: { result: any }) => {
   const { result } = props;
@@ -28,6 +29,39 @@ export const SearchResultTile = (props: { result: any }) => {
     ].join("/") + `@800.avif`;
   const albumName = result.path.split("/").at(-2);
 
+  let dateTimeOriginal;
+  try {
+    const exifData =
+      result.exif &&
+      Object.fromEntries(
+        result.exif.split("\n").map((line: string) => {
+          const [key, ...value] = line.split(":");
+          return [key, value.join(":").trim()];
+        }),
+      );
+
+    if (exifData["EXIF DateTimeOriginal"]) {
+      dateTimeOriginal = new Date(
+        exifData["EXIF DateTimeOriginal"].split(" ")[0].replace(/:/g, "-"),
+      );
+
+      if (exifData["EXIF OffsetTime"]) {
+        const [offsetHours, offsetMinutes] = exifData["EXIF OffsetTime"]
+          .split(":")
+          .map(Number);
+
+        dateTimeOriginal.setHours(dateTimeOriginal.getHours() + offsetHours);
+        dateTimeOriginal.setMinutes(
+          dateTimeOriginal.getMinutes() + offsetMinutes,
+        );
+      }
+    }
+    console.log(exifData, dateTimeOriginal);
+  } catch (err) {
+    console.error("Error parsing exif data", err);
+    // noop
+  }
+
   return (
     <Link href={result.album_relative_path} className={styles.link}>
       <div className={styles.result}>
@@ -47,7 +81,17 @@ export const SearchResultTile = (props: { result: any }) => {
               dangerouslySetInnerHTML={{ __html: result.snippet }}
               title={(result.bm25 * -1).toFixed(1)}
             />
-            <div>{albumName}</div>
+            <div className={styles.source}>
+              <span>{albumName}</span>
+              <span>
+                {dateTimeOriginal
+                  ? ", " +
+                    getRelativeTimeString(dateTimeOriginal, {
+                      short: true,
+                    }).replace(" ago", "")
+                  : null}
+              </span>
+            </div>
           </div>
         </div>
       </div>

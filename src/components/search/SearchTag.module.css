@@ -4,8 +4,15 @@
   border-radius: var(--m-s);
   border: solid 1px var(--c-bg-contrast-dark);
   cursor: pointer;
+  user-select: none;
 }
 
-.tag:hover {
+.tag:hover,
+.tag.active {
   background-color: var(--c-bg-contrast-light);
+  color: var(--c-bg-contrast-dark);
+}
+
+.count {
+  font-style: italic;
 }
