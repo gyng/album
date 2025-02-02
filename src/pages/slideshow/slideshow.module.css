@@ -32,6 +32,7 @@
   transition: all 0.2s ease-out;
   background-color: transparent;
   gap: var(--m-m);
+  flex-wrap: wrap;
 }
 
 .toolbar:hover {

@@ -103,7 +103,19 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
           className={styles.nextPhoto}
           onClick={() => setShowClock(!showClock)}
         >
-          🕰️
+          🕰️ Clock
+        </button>
+
+        <button
+          onClick={() => {
+            if (document.fullscreenElement) {
+              document.exitFullscreen();
+            } else {
+              document.documentElement.requestFullscreen();
+            }
+          }}
+        >
+          ⇱ Fullscreen
         </button>
 
         <button
