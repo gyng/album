@@ -26,6 +26,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
   const [secondsLeft, setSecondsLeft] = React.useState<number>(0);
   const [showClock, setShowClock] = React.useState<boolean>(false);
   const [time, setTime] = React.useState<Date>(new Date());
+  const [swiping, setSwiping] = React.useState<boolean>(false);
 
   const [filter, setFilter] = React.useState<string | undefined>(undefined);
   useEffect(() => {
@@ -160,6 +161,10 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
               </Link>
             </div>
           ) : null}
+
+          <Link href={`/album/${albumName}`} className={styles.filterLabel}>
+            from album: {albumName}
+          </Link>
         </div>
 
         {showClock && (
@@ -182,9 +187,13 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
           </div>
         )}
 
-        <Link href={`/album/${albumName}`} className={styles.link}>
-          <img className={styles.image} src={photoBlock.data.src} />
-        </Link>
+        <img
+          className={styles.image}
+          src={photoBlock.data.src}
+          onClick={() => {
+            goNext();
+          }}
+        />
       </div>
     </>
   );
