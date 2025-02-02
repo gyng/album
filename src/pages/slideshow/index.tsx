@@ -19,7 +19,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
   const [database, progress] = useDatabase();
 
   const [currentPhotoPath, setCurrentPhotoPath] = React.useState<string | null>(
-    null
+    null,
   );
   const [timeDelay, setTimeDelay] = React.useState<number>(30000);
   const [nextChangeAt, setNextChangeAt] = React.useState<Date>(new Date());
@@ -96,95 +96,97 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
   };
 
   return (
-    <div className={styles.container}>
+    <>
       <Head>
         <title>Slideshow</title>
       </Head>
 
-      <div className={styles.toolbar}>
-        <ThemeToggle />
+      <div className={styles.container}>
+        <div className={styles.toolbar}>
+          <ThemeToggle />
 
-        <button
-          className={styles.nextPhoto}
-          onClick={() => setShowClock(!showClock)}
-        >
-          🕰️ Clock
-        </button>
+          <button
+            className={`${styles.button} ${showClock ? styles.active : ""}`}
+            onClick={() => setShowClock(!showClock)}
+          >
+            🕰️ Clock
+          </button>
 
-        <button
-          onClick={() => {
-            if (document.fullscreenElement) {
-              document.exitFullscreen();
-            } else {
-              document.documentElement.requestFullscreen();
-            }
-          }}
-        >
-          ⇱ Fullscreen
-        </button>
+          <button
+            onClick={() => {
+              if (document.fullscreenElement) {
+                document.exitFullscreen();
+              } else {
+                document.documentElement.requestFullscreen();
+              }
+            }}
+          >
+            ⇱ Fullscreen
+          </button>
 
-        <button
-          className={styles.nextPhoto}
-          onClick={() => {
-            goNext();
-          }}
-        >
-          Next
-        </button>
+          <button
+            className={styles.nextPhoto}
+            onClick={() => {
+              goNext();
+            }}
+          >
+            Next
+          </button>
 
-        {[5000, 10000, 30000, 60000, 300000, 600000, 3600000, 86400000].map(
-          (delay) => {
-            const delayMin = delay / 1000 / 60;
-            const delaySec = delay / 1000;
+          {[5000, 10000, 30000, 60000, 300000, 600000, 3600000, 86400000].map(
+            (delay) => {
+              const delayMin = delay / 1000 / 60;
+              const delaySec = delay / 1000;
 
-            return (
-              <button
-                key={delay}
-                className={`${styles.timeDelayButton} ${delay === timeDelay ? styles.active : ""}`}
-                onClick={() => setTimeDelay(delay)}
-              >
-                {delayMin < 1 ? `${delaySec} sec` : `${delayMin} min`}
-              </button>
-            );
-          }
+              return (
+                <button
+                  key={delay}
+                  className={`${styles.timeDelayButton} ${delay === timeDelay ? styles.active : ""}`}
+                  onClick={() => setTimeDelay(delay)}
+                >
+                  {delayMin < 1 ? `${delaySec} sec` : `${delayMin} min`}
+                </button>
+              );
+            },
+          )}
+
+          <div className={styles.countdown}>🔁 {secondsLeft.toFixed(0)}s</div>
+
+          {filter ? (
+            <div className={styles.filterLabel}>
+              🔽 only showing photos from{" "}
+              <Link href={`/album/${filter}`}>
+                <i>{filter}</i>
+              </Link>
+            </div>
+          ) : null}
+        </div>
+
+        {showClock && (
+          <div className={styles.clock}>
+            <div className={styles.time}>
+              {time.toLocaleTimeString(undefined, {
+                hour: "numeric",
+                minute: "numeric",
+                hour12: false,
+              })}
+            </div>
+            <div className={styles.date}>
+              {time.toLocaleDateString(undefined, {
+                weekday: "long",
+                year: "numeric",
+                month: "long",
+                day: "numeric",
+              })}
+            </div>
+          </div>
         )}
 
-        <div className={styles.countdown}>🔁 {secondsLeft.toFixed(0)}s</div>
-
-        {filter ? (
-          <div className={styles.filterLabel}>
-            🔽 only showing photos from{" "}
-            <Link href={`/album/${filter}`}>
-              <i>{filter}</i>
-            </Link>
-          </div>
-        ) : null}
+        <Link href={`/album/${albumName}`} className={styles.link}>
+          <img className={styles.image} src={photoBlock.data.src} />
+        </Link>
       </div>
-
-      {showClock && (
-        <div className={styles.clock}>
-          <div className={styles.time}>
-            {time.toLocaleTimeString(undefined, {
-              hour: "numeric",
-              minute: "numeric",
-              hour12: false,
-            })}
-          </div>
-          <div className={styles.date}>
-            {time.toLocaleDateString(undefined, {
-              weekday: "long",
-              year: "numeric",
-              month: "long",
-              day: "numeric",
-            })}
-          </div>
-        </div>
-      )}
-
-      <Link href={`/album/${albumName}`} className={styles.link}>
-        <img className={styles.image} src={photoBlock.data.src} />
-      </Link>
-    </div>
+    </>
   );
 };
 
