@@ -10,6 +10,7 @@ A zero-config, static, file-based album generator
 - Index, search, explore images classified with deepseek-ai/Janus-Pro-1B
 - Colour palette analysis
 - Map mode
+- Slideshow, with clock
 - EXIF support
 - YouTube video support
 - Next.JS static build, deployed on Vercel

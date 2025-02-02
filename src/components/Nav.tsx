@@ -3,9 +3,11 @@ import { useRouter } from "next/router";
 import styles from "./Nav.module.css";
 import { ThemeToggle } from "./ThemeToggle";
 
-export const Nav: React.FC<{ isEditing: boolean; editable: boolean }> = (
-  props,
-) => {
+export const Nav: React.FC<{
+  isEditing: boolean;
+  editable: boolean;
+  albumName?: string;
+}> = (props) => {
   const router = useRouter();
 
   return (
@@ -19,6 +21,26 @@ export const Nav: React.FC<{ isEditing: boolean; editable: boolean }> = (
         <li>
           <ThemeToggle />
         </li>
+        {props.albumName ? (
+          <>
+            <li style={{ alignSelf: "flex-end" }}>
+              <Link
+                href={`/map?filter_album=${props.albumName}`}
+                style={{ textDecoration: "none" }}
+              >
+                Album map
+              </Link>
+            </li>
+            <li style={{ alignSelf: "flex-end" }}>
+              <Link
+                href={`/slideshow?filter=${props.albumName}`}
+                style={{ textDecoration: "none" }}
+              >
+                Album slideshow
+              </Link>
+            </li>
+          </>
+        ) : null}
 
         {/* Deprecate edit mode */}
         {/* 

@@ -31,6 +31,9 @@ const Home: NextPage<PageProps> = (context) => {
           <Link className={styles.toolbarLink} href="/search">
             🔍 Search & Explore
           </Link>
+          <Link className={styles.toolbarLink} href="/slideshow">
+            🖼️ Slideshow
+          </Link>
           <ThemeToggle />
         </div>
         <Albums albums={context.albums} />

@@ -1,0 +1,22 @@
+.progressBar {
+  width: 100%;
+  max-width: max(20vw, 200px);
+  background-color: var(--c-bg-contrast-dark);
+  border-radius: var(--m-xl);
+  overflow: hidden;
+  font-size: var(--fs-s);
+  display: grid;
+  user-select: none;
+}
+
+.progressBar > * {
+  grid-row: 1;
+  grid-column: 1;
+  padding: var(--m-s) var(--m-m);
+}
+
+.progress {
+  background-color: var(--c-bg-contrast-light);
+  height: 100%;
+  transition: all 0.1s ease-out;
+}

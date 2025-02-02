@@ -134,3 +134,26 @@ export const fetchTags = async (opts: {
     throw err;
   }
 };
+
+export const fetchRandomPhoto = async (opts: {
+  database: Database;
+  filter?: string;
+}): Promise<{ path: string }[]> => {
+  const { database, filter = "%" } = opts;
+
+  try {
+    const result = await exec(
+      database,
+      `SELECT path
+      FROM images
+      WHERE path LIKE ?
+      ORDER BY RANDOM()
+      LIMIT 1`,
+      [`../albums/${filter}/%`],
+    );
+    return [{ path: result.data[0] }];
+  } catch (err) {
+    console.error(`Failed to fetch random photo`, err);
+    throw err;
+  }
+};

@@ -7,7 +7,7 @@
  */
 export function getRelativeTimeString(
   date: Date | number,
-  options?: { lang?: string; short?: boolean }
+  options?: { lang?: string; short?: boolean },
 ): string {
   const { lang = navigator.language, short = false } = options ?? {};
 
@@ -41,7 +41,7 @@ export function getRelativeTimeString(
 
   // Grab the ideal cutoff unit
   const unitIndex = cutoffs.findIndex(
-    (cutoff) => cutoff > Math.abs(deltaSeconds)
+    (cutoff) => cutoff > Math.abs(deltaSeconds),
   );
 
   // Get the divisor to divide from the seconds. E.g. if our unit is "day" our divisor

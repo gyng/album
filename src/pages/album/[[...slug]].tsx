@@ -131,7 +131,11 @@ const Album: NextPage<PageProps> = ({ album, edit, editable }) => {
         ) : null}
       </Head>
 
-      <Nav isEditing={Boolean(edit)} editable={Boolean(editable)} />
+      <Nav
+        isEditing={Boolean(edit)}
+        editable={Boolean(editable)}
+        albumName={statefulAlbum._build.slug}
+      />
       {edit ? (
         <div className={styles.edit}>
           Edit mode

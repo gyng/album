@@ -10,8 +10,8 @@
 .nav ul {
   list-style: none;
   margin: 0;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
+  display: flex;
+  flex-wrap: wrap;
   flex-direction: row;
   padding: 0;
   gap: var(--m-m);

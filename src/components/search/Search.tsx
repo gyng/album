@@ -7,6 +7,7 @@ import { fetchResults, fetchTags, PaginatedSearchResult } from "./api";
 import { SearchResultTile } from "./SearchResultTile";
 import { SearchTag } from "./SearchTag";
 import { useDatabase } from "../database/useDatabase";
+import { ProgressBar } from "../ProgressBar";
 
 type Tag = {
   name: string;
@@ -49,7 +50,7 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
     getNextPageParam: (
       lastPage: PaginatedSearchResult,
       allPages,
-      lastPageParam
+      lastPageParam,
     ) => {
       // Hack to show next page: not 100% correct as sometimes results can only have 1 page
       return lastPage.data.length === PAGE_SIZE ? lastPageParam + 1 : undefined;
@@ -82,7 +83,7 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
 
     if (!database) {
       console.log(
-        `database not initialised, retrying "${debouncedSearchQuery}"`
+        `database not initialised, retrying "${debouncedSearchQuery}"`,
       );
     } else {
       fetchNextPage();
@@ -148,7 +149,7 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
         setTags(
           results.data
             .map((r) => ({ name: r.tag, count: r.count }))
-            .filter((t) => t.name.length >= 3)
+            .filter((t) => t.name.length >= 3),
         );
       })
       .catch(console.error);
@@ -180,17 +181,7 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
         />
       </div>
 
-      {progress < 100 ? (
-        <div style={{ display: "block" }}>
-          <div className={styles.progressBar}>
-            <div
-              className={styles.progress}
-              style={{ width: `${progress}%` }}
-            />
-            <div>Loading tags&hellip;</div>
-          </div>
-        </div>
-      ) : null}
+      <ProgressBar progress={progress} />
 
       <div className={styles.tagsContainer}>
         {Object.values(
@@ -205,8 +196,8 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
               }
               return acc;
             },
-            {} as Record<string, Tag>
-          )
+            {} as Record<string, Tag>,
+          ),
         ).map((tag) => {
           return (
             <SearchTag
