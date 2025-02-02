@@ -7,6 +7,7 @@ import { ProgressBar } from "../../components/ProgressBar";
 import styles from "./slideshow.module.css";
 import { ThemeToggle } from "../../components/ThemeToggle";
 import Link from "next/link";
+import Head from "next/head";
 
 type PageProps = {};
 
@@ -18,7 +19,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
   const [database, progress] = useDatabase();
 
   const [currentPhotoPath, setCurrentPhotoPath] = React.useState<string | null>(
-    null,
+    null
   );
   const [timeDelay, setTimeDelay] = React.useState<number>(30000);
   const [nextChangeAt, setNextChangeAt] = React.useState<Date>(new Date());
@@ -96,6 +97,10 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
 
   return (
     <div className={styles.container}>
+      <Head>
+        <title>Slideshow</title>
+      </Head>
+
       <div className={styles.toolbar}>
         <ThemeToggle />
 
@@ -141,7 +146,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
                 {delayMin < 1 ? `${delaySec} sec` : `${delayMin} min`}
               </button>
             );
-          },
+          }
         )}
 
         <div className={styles.countdown}>🔁 {secondsLeft.toFixed(0)}s</div>
