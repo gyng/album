@@ -30,6 +30,7 @@ export type MapProps = {
   attribution?: boolean;
   details?: boolean;
   mapStyle?: MapTilerMapStyle;
+  projection?: "vertical-perspective" | "mercator";
 };
 
 const ZOOM = 12;
@@ -53,6 +54,7 @@ const MapFlyer = (props: { coordinates: [number, number] }) => {
 
 export const MMap: React.FC<MapProps> = (props) => {
   const mapStyle: MapTilerMapStyle = props.mapStyle ?? "streets";
+  const projection = props.projection ?? "mercator";
 
   return (
     <div className={styles.map}>
@@ -65,7 +67,11 @@ export const MMap: React.FC<MapProps> = (props) => {
           latitude: props.coordinates[0],
           zoom: ZOOM,
         }}
-        {...(props.attribution === false ? { attributionControl: false } : {})}
+        // @ts-expect-error bad type
+        projection={projection}
+        {...(props.attribution === false
+          ? { attributionControl: false }
+          : { attributionControl: { compact: true } })}
       >
         <Marker
           longitude={props.coordinates[1]}
@@ -74,7 +80,6 @@ export const MMap: React.FC<MapProps> = (props) => {
           color="var(--c-accent)"
         />
         <MapFlyer coordinates={props.coordinates} />
-        {props.attribution !== false ? <AttributionControl compact /> : null}
       </Map>
 
       {props.details !== false ? (

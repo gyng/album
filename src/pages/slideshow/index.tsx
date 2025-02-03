@@ -290,6 +290,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
                     details={false}
                     style={{ width: "100%", height: "100%" }}
                     mapStyle="toner"
+                    projection="vertical-perspective"
                   />
                 ) : (
                   <div className={styles.mapContainer}>&nbsp;</div>
