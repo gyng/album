@@ -38,19 +38,19 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
 
   const [timeDelay, setTimeDelay, removeTimeDelay] = useLocalStorage(
     "slideshow-timedelay",
-    30000,
+    30000
   );
   const [showClock, setShowClock, removeShowClock] = useLocalStorage(
     "slideshow-showclock",
-    false,
+    false
   );
   const [showMap, setShowMap, removeShowMap] = useLocalStorage(
     "slideshow-showmap",
-    false,
+    false
   );
   const [showDetails, setShowDetails, removeShowDetails] = useLocalStorage(
     "slideshow-showdetails",
-    false,
+    false
   );
 
   const [nextChangeAt, setNextChangeAt] = React.useState<Date>(new Date());
@@ -237,7 +237,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
                       : `${delayMin}m`}
                 </button>
               );
-            },
+            }
           )}
 
           <div className={commonStyles.toast}>🔁 {secondsLeft.toFixed(0)}s</div>
@@ -327,6 +327,12 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
           src={photoBlock.data.src}
           onLoad={() => {
             setImageLoaded(true);
+          }}
+          onError={() => {
+            // Skip bad images to avoid showing broken image on displays
+            setTimeout(() => {
+              setNextCounter(nextCounter + 1);
+            }, 1000);
           }}
           onClick={() => {
             setImageLoaded(false);
