@@ -2,15 +2,17 @@ import { NextPage } from "next/types";
 import React, { useEffect } from "react";
 import { useDatabase } from "../../components/database/useDatabase";
 import { PhotoBlock } from "../../services/types";
-import { fetchRandomPhoto } from "../../components/search/api";
+import { fetchRandomPhoto, RandomPhotoRow } from "../../components/search/api";
 import { ProgressBar } from "../../components/ProgressBar";
 import styles from "./slideshow.module.css";
+import commonStyles from "../../styles/common.module.css";
 import { ThemeToggle } from "../../components/ThemeToggle";
 import Link from "next/link";
 import Head from "next/head";
 import { useLocalStorage } from "usehooks-ts";
 import { getRelativeTimeString } from "../../util/time";
 import { extractDateFromExifString } from "../../util/extractExifFromDb";
+import MMap from "../../components/Map";
 
 type PageProps = {};
 
@@ -23,10 +25,16 @@ const SlideshowPage: NextPage<PageProps> = (props) => {
 const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
   const [database, progress] = useDatabase();
 
-  const [currentPhotoPath, setCurrentPhotoPath] = React.useState<{
-    path: string;
-    exif: string;
-  } | null>(null);
+  // reload page every 1 day to force load of new code
+  useEffect(() => {
+    const id = setInterval(() => {
+      window.location.reload();
+    }, 86400000);
+    return () => clearInterval(id);
+  }, []);
+
+  const [currentPhotoPath, setCurrentPhotoPath] =
+    React.useState<RandomPhotoRow | null>(null);
 
   const [timeDelay, setTimeDelay, removeTimeDelay] = useLocalStorage(
     "slideshow-timedelay",
@@ -34,6 +42,14 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
   );
   const [showClock, setShowClock, removeShowClock] = useLocalStorage(
     "slideshow-showclock",
+    false,
+  );
+  const [showMap, setShowMap, removeShowMap] = useLocalStorage(
+    "slideshow-showmap",
+    false,
+  );
+  const [showDetails, setShowDetails, removeShowDetails] = useLocalStorage(
+    "slideshow-showdetails",
     false,
   );
 
@@ -117,8 +133,21 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
   const exifDate = currentPhotoPath.exif
     ? extractDateFromExifString(currentPhotoPath.exif)
     : null;
-
   const relativeDate = exifDate ? getRelativeTimeString(exifDate) : null;
+
+  const geocodeCountry = currentPhotoPath?.geocode
+    ? currentPhotoPath.geocode
+        .split("\n")
+        .slice(-3)
+        .filter((x) => Number.isNaN(parseFloat(x)))
+        .join(", ")
+    : null;
+  const coordinates = currentPhotoPath?.geocode
+    ? ([
+        parseFloat(currentPhotoPath?.geocode.split("\n").at(2) ?? ""),
+        parseFloat(currentPhotoPath?.geocode.split("\n").at(3) ?? ""),
+      ] as [number, number])
+    : null;
 
   return (
     <>
@@ -127,21 +156,45 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
       </Head>
 
       <div className={styles.container}>
-        <div className={styles.toolbar}>
+        <div className={[styles.toolbar, commonStyles.topBar].join(" ")}>
           {/* <ThemeToggle /> */}
 
-          <Link className={styles.back} href="/">
+          <Link className={commonStyles.button} href="/">
             ← Home
           </Link>
 
           <button
-            className={`${showClock ? styles.active : ""}`}
+            className={[
+              showClock ? commonStyles.active : "",
+              commonStyles.button,
+            ].join(" ")}
             onClick={() => setShowClock(!showClock)}
           >
-            🕰️ Clock
+            🕰️
           </button>
 
           <button
+            className={[
+              showDetails ? commonStyles.active : "",
+              commonStyles.button,
+            ].join(" ")}
+            onClick={() => setShowDetails(!showDetails)}
+          >
+            Details
+          </button>
+
+          <button
+            className={[
+              showMap ? commonStyles.active : "",
+              commonStyles.button,
+            ].join(" ")}
+            onClick={() => setShowMap(!showMap)}
+          >
+            Map
+          </button>
+
+          <button
+            className={commonStyles.button}
             onClick={() => {
               if (document.fullscreenElement) {
                 document.exitFullscreen();
@@ -154,7 +207,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
           </button>
 
           <button
-            className={styles.nextPhoto}
+            className={commonStyles.button}
             onClick={() => {
               setImageLoaded(false);
               setNextCounter(nextCounter + 1);
@@ -171,7 +224,10 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
               return (
                 <button
                   key={delay}
-                  className={`${styles.timeDelayButton} ${delay === timeDelay ? styles.active : ""}`}
+                  className={[
+                    commonStyles.button,
+                    delay === timeDelay ? commonStyles.active : "",
+                  ].join(" ")}
                   onClick={() => setTimeDelay(delay)}
                 >
                   {delayMin >= 60
@@ -184,10 +240,10 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
             },
           )}
 
-          <div className={styles.countdown}>🔁 {secondsLeft.toFixed(0)}s</div>
+          <div className={commonStyles.toast}>🔁 {secondsLeft.toFixed(0)}s</div>
 
           {filter ? (
-            <div className={styles.filterLabel}>
+            <div className={commonStyles.toast}>
               only showing photos from{" "}
               <Link href={`/album/${filter}`}>
                 <i>{filter}</i>
@@ -197,43 +253,72 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
 
           <Link
             href={`/album/${albumName}#${photoName}`}
-            className={styles.filterLabel}
+            className={commonStyles.toast}
           >
             view photo in <i>{albumName}</i>
           </Link>
         </div>
 
-        {showClock && (
-          <div className={styles.clock}>
-            <div className={styles.time}>
-              {time.toLocaleTimeString(undefined, {
-                hour: "numeric",
-                minute: "numeric",
-                hour12: false,
-              })}
-            </div>
-            <div className={styles.date}>
-              {time.toLocaleDateString(undefined, {
-                weekday: "long",
-                year: "numeric",
-                month: "long",
-                day: "numeric",
-              })}
-            </div>
-
-            {relativeDate ? (
-              <div className={styles.taken}>
-                {relativeDate} &middot;{" "}
-                {exifDate?.toLocaleDateString(undefined, {
-                  year: "numeric",
-                  month: "long",
-                })}
+        {showClock || showDetails || showMap ? (
+          <div className={styles.bottomBar}>
+            {showClock ? (
+              <div className={styles.clock}>
+                <div className={styles.time}>
+                  {time.toLocaleTimeString(undefined, {
+                    hour: "numeric",
+                    minute: "numeric",
+                    hour12: false,
+                  })}
+                </div>
+                <div className={styles.date}>
+                  {time.toLocaleDateString(undefined, {
+                    weekday: "long",
+                    year: "numeric",
+                    month: "long",
+                    day: "numeric",
+                  })}
+                </div>
               </div>
-            ) : (
-              <div>&nbsp;</div>
-            )}
+            ) : null}
+
+            {showMap ? (
+              <div className={styles.mapContainer}>
+                {coordinates ? (
+                  <MMap
+                    coordinates={coordinates}
+                    attribution={false}
+                    details={false}
+                    style={{ width: "100%", height: "100%" }}
+                  />
+                ) : (
+                  <div className={styles.mapContainer}>&nbsp;</div>
+                )}
+              </div>
+            ) : null}
+
+            {showDetails ? (
+              <div className={styles.details}>
+                {relativeDate ? (
+                  <div className={styles.detailsRow}>
+                    {relativeDate} &middot;{" "}
+                    {exifDate?.toLocaleDateString(undefined, {
+                      year: "numeric",
+                      month: "long",
+                    })}
+                  </div>
+                ) : (
+                  <div className={styles.detailsRow}>&nbsp;</div>
+                )}
+
+                {geocodeCountry ? (
+                  <div className={styles.detailsRow}>{geocodeCountry}</div>
+                ) : (
+                  <div className={styles.detailsRow}>&nbsp;</div>
+                )}
+              </div>
+            ) : null}
           </div>
-        )}
+        ) : null}
 
         <img
           className={`${styles.image} ${!imageLoaded ? styles.notLoaded : ""}`}

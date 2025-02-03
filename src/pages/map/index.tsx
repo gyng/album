@@ -6,6 +6,7 @@ import { Block, PhotoBlock } from "../../services/types";
 import { getDegLatLngFromExif } from "../../util/dms2deg";
 import { MapWorldEntry } from "../../components/MapWorld";
 import styles from "./map.module.css";
+import commonStyles from "../../styles/common.module.css";
 import Link from "next/link";
 import Head from "next/head";
 import { useSearchParams } from "next/navigation";
@@ -28,16 +29,16 @@ const WorldMap: NextPage<PageProps> = (props) => {
         <link rel="icon" href="/favicon.svg" />
         <meta name="theme-color" content="#2c2c2c" />
       </Head>
-      <div className={styles.titleBar}>
-        <Link href="/" className={styles.backLink}>
+      <div className={[styles.titleBar, commonStyles.topBar].join(" ")}>
+        <Link href="/" className={commonStyles.button}>
           ← Albums
         </Link>
 
         {filterAlbum ? (
-          <div className={styles.albumInfo}>
+          <div className={commonStyles.toast}>
             only showing photos from{" "}
             <Link href={`/album/${filterAlbum}`}>
-              <i className={styles.albumLink}>{filterAlbum}</i>
+              <i>{filterAlbum}</i>
             </Link>
           </div>
         ) : null}

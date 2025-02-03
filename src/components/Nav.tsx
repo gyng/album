@@ -1,6 +1,6 @@
 import Link from "next/link";
-import { useRouter } from "next/router";
 import styles from "./Nav.module.css";
+import commonStyles from "../styles/common.module.css";
 import { ThemeToggle } from "./ThemeToggle";
 
 export const Nav: React.FC<{
@@ -8,13 +8,11 @@ export const Nav: React.FC<{
   editable: boolean;
   albumName?: string;
 }> = (props) => {
-  const router = useRouter();
-
   return (
     <nav className={styles.nav}>
-      <ul>
+      <ul className={commonStyles.topBar}>
         <li>
-          <Link href="/" style={{ textDecoration: "none" }}>
+          <Link href="/" className={commonStyles.button}>
             ← Albums
           </Link>
         </li>
@@ -23,18 +21,18 @@ export const Nav: React.FC<{
         </li>
         {props.albumName ? (
           <>
-            <li style={{ alignSelf: "flex-end" }}>
+            <li>
               <Link
                 href={`/map?filter_album=${props.albumName}`}
-                style={{ textDecoration: "none" }}
+                className={commonStyles.button}
               >
                 Album map
               </Link>
             </li>
-            <li style={{ alignSelf: "flex-end" }}>
+            <li>
               <Link
                 href={`/slideshow?filter=${props.albumName}`}
-                style={{ textDecoration: "none" }}
+                className={commonStyles.button}
               >
                 Album slideshow
               </Link>

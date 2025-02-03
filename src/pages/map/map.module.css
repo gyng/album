@@ -8,47 +8,12 @@
 .titleBar {
   position: fixed;
   z-index: 9999;
-  top: 10px;
-  left: 20px;
+  top: calc(var(--m-l) + var(--m-m));
+  left: var(--m-l);
   margin: 0;
-  width: calc(100vw - 40px);
-  display: flex;
-  flex-direction: row;
-  align-items: flex-start;
-  user-select: none;
-  text-align: center;
-  gap: var(--m-m);
-  font-size: var(--fs-sm);
-}
-
-.titleBar > * {
-  background-color: var(--c-bg);
-  padding: var(--m-m) var(--m-l);
-  border-radius: var(--m-s);
-}
-
-.backLink {
-  border: solid 2px var(--c-bg-contrast-light);
-  padding: var(--m-m);
-}
-
-.backLink:hover {
-  background-color: var(--c-bg-contrast-light);
 }
 
 .title {
   display: inline-block;
   margin: 0;
-}
-
-.titleBar a {
-  text-decoration: none !important;
-}
-
-.albumInfo {
-  justify-self: center;
-}
-
-.albumLink {
-  text-decoration: underline !important;
 }

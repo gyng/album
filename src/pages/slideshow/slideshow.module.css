@@ -3,6 +3,7 @@
   height: 100%;
   object-fit: contain;
   cursor: pointer;
+  filter: grayscale(0) opacity(1);
   transition: all 0.2s ease-out;
 }
 
@@ -11,6 +12,8 @@
   width: 100vw;
   height: 100vh;
   background-color: black;
+  display: flex;
+  justify-content: center;
 }
 
 .progressBarContainer {
@@ -23,78 +26,35 @@
 
 .toolbar {
   position: fixed;
-  top: 0;
-  left: 0;
+  top: calc(var(--m-l) + var(--m-m));
+  left: var(--m-l);
+  padding: 0 15vh 15vw 0;
   width: 100%;
-  display: flex;
-  padding: var(--m-m) 33vw 10vh var(--m-xl);
-  background-color: var(--c-bg);
   opacity: 0;
   animation: fade 3s forwards ease-out;
   transition: all 0.2s ease-out;
   background-color: transparent;
-  gap: var(--m-s);
-  flex-wrap: wrap;
+  z-index: 10000;
 }
 
 .toolbar:hover {
   opacity: 1 !important;
 }
 
-.toolbar > button {
-  border: solid 2px var(--c-bg-contrast-light);
-  border-radius: var(--m-s);
-  padding: var(--m-m);
-  cursor: pointer;
-  background-color: var(--c-bg);
-}
-
-.toolbar > button:hover {
-  background-color: var(--c-bg-contrast-light);
-}
-
-.toolbar > button.active {
-  background-color: var(--c-bg-contrast-light);
-}
-
-.toolbar > .back {
-  border: solid 2px var(--c-bg-contrast-light);
-  border-radius: var(--m-s);
-  align-self: center;
-  font-size: var(--fs-sm);
-  background-color: var(--c-bg);
-  padding: var(--m-m);
-  cursor: pointer;
-  text-decoration: none;
-}
-
-.toolbar > .back:active,
-.toolbar > .back:hover {
-  background-color: var(--c-bg-contrast-light);
-}
-
-.countdown {
-  align-self: center;
-  font-size: var(--fs-sm);
-  color: white;
-  background-color: var(--c-bg);
-  padding: var(--m-m);
-  border-radius: var(--m-s);
-  user-select: none;
-}
-
-.clock {
+.bottomBar {
   position: fixed;
   user-select: none;
   pointer-events: none;
   bottom: 5vh;
-  width: 100%;
+  margin: 0 auto;
   text-align: center;
   text-shadow:
     1px 2px 2px hsl(0 0% 0% / 0.333),
     2px 4px 4px hsl(0 0% 0% / 0.333),
     3px 6px 6px hsl(0 0% 0% / 0.333);
   color: white;
+  z-index: 100;
+  min-width: 220px;
 }
 
 .date {
@@ -103,6 +63,15 @@
 
 .time {
   font-size: var(--fs-xl);
+}
+
+.details {
+  margin-top: var(--m-m);
+}
+
+.detailsRow {
+  margin: var(--m-s) 0;
+  font-size: var(--fs-s);
 }
 
 @keyframes fade {
@@ -114,20 +83,20 @@
   }
 }
 
-.filterLabel {
-  font-size: var(--fs-sm);
-  align-self: center;
-  background-color: var(--c-bg);
-  padding: var(--m-m) var(--m-l);
-  border-radius: var(--m-s);
-  user-select: none;
-}
-
 .notLoaded {
-  opacity: 0.5;
+  filter: grayscale(100%) opacity(0.5);
 }
 
-.taken {
-  margin-top: var(--m-m);
-  font-size: var(--fs-s);
+.mapContainer {
+  border-radius: 50%;
+  overflow: hidden;
+  margin: var(--m-l) 0;
+  aspect-ratio: 1 / 1;
+}
+
+.mapContainer > * {
+  box-shadow:
+    1px 2px 2px hsl(0 0% 0% / 0.333),
+    2px 4px 4px hsl(0 0% 0% / 0.333),
+    3px 6px 6px hsl(0 0% 0% / 0.333);
 }

@@ -1,0 +1,51 @@
+.button {
+  border: solid 2px var(--c-bg-contrast-light);
+  border-radius: var(--m-s);
+  padding: var(--m-m);
+  cursor: pointer;
+  background-color: var(--c-bg);
+
+  /* If not a <button>, needs more styling */
+  align-self: center;
+  font-size: var(--fs-sm);
+  padding: var(--m-m);
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.button:hover {
+  background-color: var(--c-bg-contrast-light);
+}
+
+.button:active,
+.button.active {
+  background-color: var(--c-bg-contrast-light);
+}
+
+.toast {
+  background-color: var(--c-bg);
+  padding: var(--m-m) var(--m-l);
+  border-radius: var(--m-s);
+  align-self: center;
+}
+
+.toast a {
+  text-decoration: underline;
+}
+
+.topBar {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  user-select: none;
+  text-align: center;
+  gap: var(--m-m);
+  font-size: var(--fs-sm);
+  margin-bottom: var(--m-m);
+  padding-left: var(--m-l);
+
+  /* if on ul/li */
+  list-style: none;
+  padding-left: unset;
+}
