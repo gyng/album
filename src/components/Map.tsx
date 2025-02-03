@@ -6,11 +6,30 @@ import Map, { AttributionControl, Marker, useMap } from "react-map-gl/maplibre";
 import "maplibre-gl/dist/maplibre-gl.css";
 import Link from "next/link";
 
+type OpenFreeMapStyle = "positron" | "bright" | "liberty";
+
+type MapTilerMapStyle =
+  | "aquarelle"
+  | "bright"
+  | "backdrop"
+  | "basic"
+  | "toner"
+  | "streets"
+  | "dataviz"
+  | "landscape"
+  | "ocean"
+  | "openstreetmap"
+  | "outdoor"
+  | "satellite"
+  | "topo"
+  | "winter";
+
 export type MapProps = {
   coordinates: [number, number];
   style?: CSSProperties;
   attribution?: boolean;
   details?: boolean;
+  mapStyle?: MapTilerMapStyle;
 };
 
 const ZOOM = 12;
@@ -25,6 +44,7 @@ const MapFlyer = (props: { coordinates: [number, number] }) => {
     map.flyTo({
       center: [props.coordinates[1], props.coordinates[0]],
       zoom: ZOOM,
+      speed: 2.4,
     });
   }, [props.coordinates]);
 
@@ -32,12 +52,14 @@ const MapFlyer = (props: { coordinates: [number, number] }) => {
 };
 
 export const MMap: React.FC<MapProps> = (props) => {
+  const mapStyle: MapTilerMapStyle = props.mapStyle ?? "streets";
+
   return (
     <div className={styles.map}>
       <Map
         style={{ width: "100%", height: "100%", ...(props.style ?? {}) }}
         // mapStyle="https://tiles.openfreemap.org/styles/liberty"
-        mapStyle="https://api.maptiler.com/maps/streets/style.json?key=rIHHWldVP0SFPxQ7N0Ua"
+        mapStyle={`https://api.maptiler.com/maps/${mapStyle}/style.json?key=rIHHWldVP0SFPxQ7N0Ua`}
         initialViewState={{
           longitude: props.coordinates[1],
           latitude: props.coordinates[0],

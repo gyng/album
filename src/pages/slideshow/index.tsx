@@ -289,6 +289,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
                     attribution={false}
                     details={false}
                     style={{ width: "100%", height: "100%" }}
+                    mapStyle="toner"
                   />
                 ) : (
                   <div className={styles.mapContainer}>&nbsp;</div>
