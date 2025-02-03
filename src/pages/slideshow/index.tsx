@@ -38,19 +38,19 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
 
   const [timeDelay, setTimeDelay, removeTimeDelay] = useLocalStorage(
     "slideshow-timedelay",
-    30000
+    30000,
   );
   const [showClock, setShowClock, removeShowClock] = useLocalStorage(
     "slideshow-showclock",
-    false
+    false,
   );
   const [showMap, setShowMap, removeShowMap] = useLocalStorage(
     "slideshow-showmap",
-    false
+    false,
   );
   const [showDetails, setShowDetails, removeShowDetails] = useLocalStorage(
     "slideshow-showdetails",
-    false
+    false,
   );
 
   const [nextChangeAt, setNextChangeAt] = React.useState<Date>(new Date());
@@ -149,6 +149,72 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
       ] as [number, number])
     : null;
 
+  const detailsElement = (isMapHack: boolean) => (
+    <>
+      {isMapHack && showMap ? (
+        <div className={styles.mapContainer}>
+          {coordinates ? (
+            <MMap
+              coordinates={coordinates}
+              attribution={false}
+              details={false}
+              style={{ width: "100%", height: "100%" }}
+              mapStyle="toner"
+              projection="vertical-perspective"
+              markerStyle={{ visibility: "hidden" }}
+            />
+          ) : (
+            <div className={styles.mapContainer}>&nbsp;</div>
+          )}
+        </div>
+      ) : null}
+
+      {showDetails ? (
+        <div
+          className={[styles.details, isMapHack ? styles.hide : ""].join(" ")}
+        >
+          {geocodeCountry ? (
+            <div className={styles.detailsRow}>{geocodeCountry}</div>
+          ) : (
+            <div className={styles.detailsRow}>&nbsp;</div>
+          )}
+
+          {relativeDate ? (
+            <div className={styles.detailsRow}>
+              {relativeDate} &middot;{" "}
+              {exifDate?.toLocaleDateString(undefined, {
+                year: "numeric",
+                month: "long",
+              })}
+            </div>
+          ) : (
+            <div className={styles.detailsRow}>&nbsp;</div>
+          )}
+        </div>
+      ) : null}
+
+      {showClock ? (
+        <div className={[styles.clock, isMapHack ? styles.hide : ""].join(" ")}>
+          <div className={styles.time}>
+            {time.toLocaleTimeString(undefined, {
+              hour: "numeric",
+              minute: "numeric",
+              hour12: false,
+            })}
+          </div>
+          <div className={styles.date}>
+            {time.toLocaleDateString(undefined, {
+              weekday: "long",
+              year: "numeric",
+              month: "long",
+              day: "numeric",
+            })}
+          </div>
+        </div>
+      ) : null}
+    </>
+  );
+
   return (
     <>
       <Head>
@@ -194,6 +260,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
           </button>
 
           <button
+            style={{ marginRight: "var(--m-m)" }}
             className={commonStyles.button}
             onClick={() => {
               if (document.fullscreenElement) {
@@ -237,10 +304,15 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
                       : `${delayMin}m`}
                 </button>
               );
-            }
+            },
           )}
 
-          <div className={commonStyles.toast}>🔁 {secondsLeft.toFixed(0)}s</div>
+          <div
+            className={commonStyles.toast}
+            style={{ marginRight: "var(--m-m)" }}
+          >
+            🔁 {secondsLeft.toFixed(0)}s
+          </div>
 
           {filter ? (
             <div className={commonStyles.toast}>
@@ -259,67 +331,22 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
           </Link>
         </div>
 
+        {/* Hack: render the elements twice so we can get a different context
+        to get mix-blend-mode working on ONLY the map and not on the text.
+        However we still want the positioning of the map to to be handled by the box model,
+        so we render details twice (but hide with visibility: hidden). We need a different
+        context because the drop shadows disappear when mix-blend-mode is applied.
+        */}
         {showClock || showDetails || showMap ? (
-          <div className={styles.bottomBar}>
-            {showClock ? (
-              <div className={styles.clock}>
-                <div className={styles.time}>
-                  {time.toLocaleTimeString(undefined, {
-                    hour: "numeric",
-                    minute: "numeric",
-                    hour12: false,
-                  })}
-                </div>
-                <div className={styles.date}>
-                  {time.toLocaleDateString(undefined, {
-                    weekday: "long",
-                    year: "numeric",
-                    month: "long",
-                    day: "numeric",
-                  })}
-                </div>
-              </div>
-            ) : null}
-
-            {showMap ? (
-              <div className={styles.mapContainer}>
-                {coordinates ? (
-                  <MMap
-                    coordinates={coordinates}
-                    attribution={false}
-                    details={false}
-                    style={{ width: "100%", height: "100%" }}
-                    mapStyle="toner"
-                    projection="vertical-perspective"
-                  />
-                ) : (
-                  <div className={styles.mapContainer}>&nbsp;</div>
-                )}
-              </div>
-            ) : null}
-
-            {showDetails ? (
-              <div className={styles.details}>
-                {relativeDate ? (
-                  <div className={styles.detailsRow}>
-                    {relativeDate} &middot;{" "}
-                    {exifDate?.toLocaleDateString(undefined, {
-                      year: "numeric",
-                      month: "long",
-                    })}
-                  </div>
-                ) : (
-                  <div className={styles.detailsRow}>&nbsp;</div>
-                )}
-
-                {geocodeCountry ? (
-                  <div className={styles.detailsRow}>{geocodeCountry}</div>
-                ) : (
-                  <div className={styles.detailsRow}>&nbsp;</div>
-                )}
-              </div>
-            ) : null}
-          </div>
+          <>
+            <div
+              className={styles.bottomBar}
+              style={{ mixBlendMode: "screen" }}
+            >
+              {detailsElement(true)}
+            </div>
+            <div className={styles.bottomBar}>{detailsElement(false)}</div>
+          </>
         ) : null}
 
         <img

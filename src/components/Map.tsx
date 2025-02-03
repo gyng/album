@@ -30,6 +30,7 @@ export type MapProps = {
   attribution?: boolean;
   details?: boolean;
   mapStyle?: MapTilerMapStyle;
+  markerStyle?: CSSProperties;
   projection?: "vertical-perspective" | "mercator";
 };
 
@@ -78,6 +79,7 @@ export const MMap: React.FC<MapProps> = (props) => {
           latitude={props.coordinates[0]}
           anchor="bottom"
           color="var(--c-accent)"
+          style={props.markerStyle ?? {}}
         />
         <MapFlyer coordinates={props.coordinates} />
       </Map>

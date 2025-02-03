@@ -5,6 +5,7 @@
   cursor: pointer;
   filter: grayscale(0) opacity(1);
   transition: all 0.2s ease-out;
+  z-index: 100;
 }
 
 .container {
@@ -26,9 +27,9 @@
 
 .toolbar {
   position: fixed;
-  top: calc(var(--m-l) + var(--m-m));
-  left: var(--m-l);
-  padding: 0 15vh 15vw 0;
+  top: 0;
+  left: 0;
+  padding: calc(var(--m-l) + var(--m-m)) 20vw 20vh var(--m-xl) !important;
   width: 100%;
   opacity: 0;
   animation: fade 3s forwards ease-out;
@@ -53,8 +54,16 @@
     2px 4px 4px hsl(0 0% 0% / 0.333),
     3px 6px 6px hsl(0 0% 0% / 0.333);
   color: white;
-  z-index: 100;
+  z-index: 200;
   min-width: 220px;
+}
+
+.hide {
+  visibility: hidden;
+}
+
+.clock {
+  isolation: isolate;
 }
 
 .date {
@@ -88,6 +97,8 @@
 }
 
 .mapContainer {
+  filter: invert(1);
+
   border-radius: 50%;
   overflow: hidden;
   margin: var(--m-l) 0;
