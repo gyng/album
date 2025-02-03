@@ -52,6 +52,10 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
     "slideshow-showdetails",
     false,
   );
+  const [showCover, setShowCover, removeShowCover] = useLocalStorage(
+    "slideshow-showcover",
+    false,
+  );
 
   const [nextChangeAt, setNextChangeAt] = React.useState<Date>(new Date());
   const [secondsLeft, setSecondsLeft] = React.useState<number>(0);
@@ -260,6 +264,16 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
           </button>
 
           <button
+            className={[
+              showCover ? commonStyles.active : "",
+              commonStyles.button,
+            ].join(" ")}
+            onClick={() => setShowCover(!showCover)}
+          >
+            {showCover ? "Cover" : "Contain"}
+          </button>
+
+          <button
             style={{ marginRight: "var(--m-m)" }}
             className={commonStyles.button}
             onClick={() => {
@@ -350,7 +364,11 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
         ) : null}
 
         <img
-          className={`${styles.image} ${!imageLoaded ? styles.notLoaded : ""}`}
+          className={[
+            styles.image,
+            !imageLoaded ? styles.notLoaded : "",
+            showCover ? styles.cover : "",
+          ].join(" ")}
           src={photoBlock.data.src}
           onLoad={() => {
             setImageLoaded(true);

@@ -8,6 +8,10 @@
   z-index: 100;
 }
 
+.image.cover {
+  object-fit: cover !important;
+}
+
 .container {
   position: fixed;
   width: 100vw;
