@@ -130,7 +130,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
         <div className={styles.toolbar}>
           {/* <ThemeToggle /> */}
 
-          <Link className={`${styles.back}`} href="/">
+          <Link className={styles.back} href="/">
             ← Home
           </Link>
 
@@ -163,32 +163,32 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
             Next
           </button>
 
-          {[
-            10000, 60000, 300000, 900000, 3600000, 10800000, 43200000, 86400000,
-          ].map((delay) => {
-            const delayMin = delay / 1000 / 60;
-            const delaySec = delay / 1000;
+          {[10000, 60000, 900000, 3600000, 10800000, 43200000, 86400000].map(
+            (delay) => {
+              const delayMin = delay / 1000 / 60;
+              const delaySec = delay / 1000;
 
-            return (
-              <button
-                key={delay}
-                className={`${styles.timeDelayButton} ${delay === timeDelay ? styles.active : ""}`}
-                onClick={() => setTimeDelay(delay)}
-              >
-                {delayMin >= 60
-                  ? `${delayMin / 60}h`
-                  : delayMin < 1
-                    ? `${delaySec}s`
-                    : `${delayMin}m`}
-              </button>
-            );
-          })}
+              return (
+                <button
+                  key={delay}
+                  className={`${styles.timeDelayButton} ${delay === timeDelay ? styles.active : ""}`}
+                  onClick={() => setTimeDelay(delay)}
+                >
+                  {delayMin >= 60
+                    ? `${delayMin / 60}h`
+                    : delayMin < 1
+                      ? `${delaySec}s`
+                      : `${delayMin}m`}
+                </button>
+              );
+            },
+          )}
 
           <div className={styles.countdown}>🔁 {secondsLeft.toFixed(0)}s</div>
 
           {filter ? (
             <div className={styles.filterLabel}>
-              🔽 only showing photos from{" "}
+              only showing photos from{" "}
               <Link href={`/album/${filter}`}>
                 <i>{filter}</i>
               </Link>
@@ -199,7 +199,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
             href={`/album/${albumName}#${photoName}`}
             className={styles.filterLabel}
           >
-            from album: {albumName}
+            view photo in <i>{albumName}</i>
           </Link>
         </div>
 

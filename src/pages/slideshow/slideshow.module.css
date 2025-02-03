@@ -27,13 +27,13 @@
   left: 0;
   width: 100%;
   display: flex;
-  padding: var(--m-m);
+  padding: var(--m-m) 33vw 10vh var(--m-xl);
   background-color: var(--c-bg);
   opacity: 0;
   animation: fade 3s forwards ease-out;
   transition: all 0.2s ease-out;
   background-color: transparent;
-  gap: var(--m-m);
+  gap: var(--m-s);
   flex-wrap: wrap;
 }
 
@@ -58,13 +58,29 @@
 }
 
 .toolbar > .back {
+  border: solid 2px var(--c-bg-contrast-light);
+  border-radius: var(--m-s);
   align-self: center;
   font-size: var(--fs-sm);
+  background-color: var(--c-bg);
+  padding: var(--m-m);
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.toolbar > .back:active,
+.toolbar > .back:hover {
+  background-color: var(--c-bg-contrast-light);
 }
 
 .countdown {
   align-self: center;
   font-size: var(--fs-sm);
+  color: white;
+  background-color: var(--c-bg);
+  padding: var(--m-m);
+  border-radius: var(--m-s);
+  user-select: none;
 }
 
 .clock {
@@ -101,6 +117,10 @@
 .filterLabel {
   font-size: var(--fs-sm);
   align-self: center;
+  background-color: var(--c-bg);
+  padding: var(--m-m) var(--m-l);
+  border-radius: var(--m-s);
+  user-select: none;
 }
 
 .notLoaded {

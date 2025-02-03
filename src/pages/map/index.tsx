@@ -29,18 +29,15 @@ const WorldMap: NextPage<PageProps> = (props) => {
         <meta name="theme-color" content="#2c2c2c" />
       </Head>
       <div className={styles.titleBar}>
-        <div className={styles.backLink}>
-          <Link href="/">
-            <h1 className={styles.title}>🌏</h1>
-            <div>← Back</div>
-          </Link>
-        </div>
+        <Link href="/" className={styles.backLink}>
+          ← Albums
+        </Link>
 
         {filterAlbum ? (
-          <div className={styles.albumLink}>
-            🔽 only showing photos from{" "}
+          <div className={styles.albumInfo}>
+            only showing photos from{" "}
             <Link href={`/album/${filterAlbum}`}>
-              <i>{filterAlbum}</i>
+              <i className={styles.albumLink}>{filterAlbum}</i>
             </Link>
           </div>
         ) : null}

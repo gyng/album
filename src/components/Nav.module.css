@@ -5,6 +5,7 @@
   z-index: 300;
   color: var(--c-bg-contrast-light);
   padding: var(--m);
+  font-size: var(--fs-sm);
 }
 
 .nav ul {
@@ -14,7 +15,7 @@
   flex-wrap: wrap;
   flex-direction: row;
   padding: 0;
-  gap: var(--m-m);
+  gap: var(--m-s);
   align-items: center;
 }
 
@@ -24,7 +25,7 @@
 
 .nav a {
   display: inline-block;
-  padding: var(--m-s) var(--m-m);
+  padding: var(--m-m) var(--m-m);
   border-radius: var(--m-s);
   border: solid 2px var(--c-bg-contrast-light);
   color: var(--c-font);
