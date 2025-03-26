@@ -42,10 +42,14 @@
   text-align: center;
   gap: var(--m-m);
   font-size: var(--fs-sm);
-  margin-bottom: var(--m-m);
   padding-left: var(--m-l);
+  margin: 0;
 
   /* if on ul/li */
   list-style: none;
   padding-left: unset;
+
+  & > li {
+    margin-bottom: var(--m-s);
+  }
 }

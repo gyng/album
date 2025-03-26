@@ -1,8 +1,5 @@
 .nav {
-  position: absolute;
-  top: var(--m-m);
-  left: var(--m-l);
-  z-index: 300;
+  padding: var(--m-m) var(--m-l);
 }
 
 .nav ul {
