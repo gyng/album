@@ -24,17 +24,24 @@ Full indexing of ~1000 images takes around 3+ minutes. First run will download m
 
 ## Usage
 
+This project uses [uv](https://docs.astral.sh/uv/) for dependency management.
+
 ```sh
-$ poetry run python index.py --help
-$ poetry run python index.py index --glob "../src/public/data/albums/test-simple/*.jpg"
-$ poetry run python index.py index --glob "../src/public/data/albums/**/*.jpg" --dbpath "search.sqlite" --dry-run
-$ poetry run python index.py search --query "singapore"
+$ uv sync
 
-$ poetry run python index.py dump
-$ poetry run python index.py search-tags --query "dam"
-$ poetry run python index.py search-metadata --query "D"
+$ uv run ruff --fix
+$ uv run black .
 
-$ poetry run python index.py prune --glob "../src/public/data/albums/**/*.jpg" --dbpath "search.sqlite" --dry-run
+$ uv run index.py --help
+$ uv run index.py index --glob "../src/public/data/albums/test-simple/*.jpg"
+$ uv run index.py index --glob "../src/public/data/albums/**/*.jpg" --dbpath "search.sqlite" --dry-run
+$ uv run index.py search --query "singapore"
+
+$ uv run index.py dump
+$ uv run index.py search-tags --query "dam"
+$ uv run index.py search-metadata --query "D"
+
+$ uv run index.py prune --glob "../src/public/data/albums/**/*.jpg" --dbpath "search.sqlite" --dry-run
 
 $ cp search.sqlite ../src/public/search.sqlite
 

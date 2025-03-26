@@ -21,24 +21,23 @@ jobs:
           node-version: "20"
       - run: npm ci
       - run: npm run test:ci
-  
-  # This does not run on CI because janus is too large a dependency to be installed on GHA
-  # 
-  # test-index:
-  #   runs-on: ubuntu-latest
-  #   defaults:
-  #     run:
-  #       working-directory: ./index
-  #   steps:
-  #     - uses: actions/checkout@v4
-  #     - name: Install poetry
-  #       run: pipx install poetry
-  #     - uses: actions/setup-python@v5
-  #       with:
-  #         python-version: "3.12"
-  #         cache: "poetry"
-  #     - run: poetry install
-  #     - run: |
-  #         chmod +x ./do-test-index.sh
-  #         ./do-test-index.sh
-  #       shell: bash
+# FIXME: Janus fails to be installed on GHA with "git@github.com: Permission denied (publickey)."
+# test-index:
+#   runs-on: ubuntu-latest
+#   defaults:
+#     run:
+#       working-directory: ./index
+#   steps:
+#     - uses: actions/checkout@v4
+#     - name: Install uv
+#       uses: astral-sh/setup-uv@v5
+#       with:
+#         enable-cache: true
+#     - name: Set up Python
+#       run: uv python install
+#     - name: Install the project
+#       run: uv sync --all-extras --dev
+#     - run: |
+#         chmod +x ./do-test-index.sh
+#         ./do-test-index.sh
+#       shell: bash

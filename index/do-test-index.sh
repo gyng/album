@@ -1,4 +1,4 @@
 #!/bin/bash
 set -euox pipefail
 
-poetry run python index.test.py
+uv run index.test.py

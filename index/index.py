@@ -112,7 +112,7 @@ def get_album_relative_path(path: str) -> str:
     p = Path(path)
     try:
         return f"/album/{p.parts[-2]}#{p.parts[-1]}"
-    except:
+    except Exception:
         return str(p)
 
 
@@ -132,7 +132,7 @@ class Sqlite3Client:
         entries = 0
         try:
             entries = len(self.inspect())
-        except:
+        except Exception:
             pass
         return {"version": version, "entries": entries}
 
@@ -174,14 +174,14 @@ class Sqlite3Client:
     def list_paths(self):
         cur = self.con.cursor()
 
-        statement_images = f"""
+        statement_images = """
         SELECT path
         FROM images
         """
         res = cur.execute(statement_images)
         resolved_image_paths = res.fetchall()
 
-        statement_metadata = f"""
+        statement_metadata = """
         SELECT path
         FROM metadata
         """
@@ -189,7 +189,9 @@ class Sqlite3Client:
         resolved_metadata_paths = res.fetchall()
 
         resolved_paths = {
-            p[0] for l in [resolved_image_paths, resolved_metadata_paths] for p in l
+            p[0]
+            for path_list in [resolved_image_paths, resolved_metadata_paths]
+            for p in path_list
         }
         return resolved_paths
 
@@ -224,7 +226,7 @@ class Sqlite3Client:
         pprint.pprint((query, limit, offset))
 
         cur = self.con.cursor()
-        statement = f"""
+        statement = """
         SELECT *, snippet(images, -1, '<i class="snippet">', '</i>', '…', 24) AS snippet, bm25(images) AS bm25
         FROM images
         WHERE images MATCH ?
@@ -363,7 +365,9 @@ def index(glob: str, dbpath: str, dry_run: bool):
                 estimated_time_min = (len(valid_files) - i) * time_per_image / 60
 
                 pprint.pprint(result)
-                print(f"[{percent:.1f}% {i}/{len(valid_files)} {rate:.2f}it/s {estimated_time_min:.1f}min]\tAnalysed image {result["path"]}. Inserting image...")
+                print(
+                    f"[{percent:.1f}% {i}/{len(valid_files)} {rate:.2f}it/s {estimated_time_min:.1f}min]\tAnalysed image {result["path"]}. Inserting image..."
+                )
                 insert_analysed_image(
                     db=db, analysed=result.get("analysed"), path=result.get("path")
                 )
@@ -383,7 +387,7 @@ def prune(glob: str, dbpath: str, dry_run: bool):
         pprint.pprint(to_delete)
     else:
         for p in to_delete:
-            res = db.delete_path(p)
+            _res = db.delete_path(p)
             pprint.pprint(f"deleted from db {p}")
 
 
@@ -500,7 +504,7 @@ def analyse_image(fh: IO[bytes], classifier: JanusClassifier, path: str) -> Mapp
             result["composition_critique"]
             result["subject"]
             break
-        except Exception as e:
+        except Exception:
             attempts += 1
             print(f"Attempt {attempts}/{max_attempts} failed for {path}, got {result}")
             if attempts >= max_attempts:
