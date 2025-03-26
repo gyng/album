@@ -7,9 +7,15 @@ export const Nav: React.FC<{
   isEditing: boolean;
   editable: boolean;
   albumName?: string;
+  hasPadding?: boolean;
 }> = (props) => {
   return (
-    <nav className={styles.nav}>
+    <nav
+      className={[
+        styles.nav,
+        props.hasPadding === false ? commonStyles.noNavPadding : "",
+      ].join(" ")}
+    >
       <ul className={commonStyles.topBar}>
         <li>
           <Link href="/" className={commonStyles.button}>

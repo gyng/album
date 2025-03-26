@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { use, useEffect, useRef, useState } from "react";
 import { useDebounce } from "use-debounce";
 import styles from "./Search.module.css";
 import { useRouter } from "next/router";
@@ -18,7 +18,7 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
   const PAGE_SIZE = 48;
   const router = useRouter();
 
-  const [searchQuery, setSearchQuery] = useState<string>("");
+  const [searchQuery, setSearchQuery] = useState<string[]>([]);
   const [debouncedSearchQuery] = useDebounce(searchQuery, 600);
   const inputRef = useRef<HTMLInputElement>(null);
   const [database, progress] = useDatabase();
@@ -34,9 +34,10 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
           next: undefined,
         };
       }
+
       return await fetchResults({
         database: database,
-        query: debouncedSearchQuery,
+        query: debouncedSearchQuery.join("|"),
         pageSize: PAGE_SIZE,
         page: pageParam,
       });
@@ -95,7 +96,7 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
     const url = new URL(window.location.toString());
     const query = url.searchParams.get("q");
     if (query) {
-      setSearchQuery(query);
+      setSearchQuery(query.split(","));
     }
   }, []);
 
@@ -103,8 +104,9 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
   useEffect(() => {
     const searchParams = new URLSearchParams(window.location.search);
     searchParams.delete("q");
-    if (debouncedSearchQuery) {
-      searchParams.set("q", debouncedSearchQuery);
+
+    if (debouncedSearchQuery.length > 0) {
+      searchParams.set("q", debouncedSearchQuery.join(","));
     }
     const url = new URL(window.location.toString());
     url.search = searchParams.toString();
@@ -163,12 +165,12 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
         <input
           suppressHydrationWarning
           type="text"
-          value={searchQuery}
+          value={searchQuery.join(",")}
           placeholder="Type / to search (try bird, model:mavica, datetime:2023)"
           spellCheck={false}
           autoFocus
           onChange={(ev) => {
-            setSearchQuery(ev.target.value);
+            setSearchQuery(ev.target.value.split(",").map((s) => s.trim()));
           }}
           // disabled={props.disabled === true || !backend}
           ref={inputRef}
@@ -199,16 +201,21 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
             {} as Record<string, Tag>,
           ),
         ).map((tag) => {
+          const isActive = searchQuery.includes(tag.name.toLocaleLowerCase());
           return (
             <SearchTag
               key={tag.name}
               tag={tag.name}
               count={tag.count - 1}
-              isActive={
-                tag.name.toLocaleLowerCase() === searchQuery.toLocaleLowerCase()
-              }
+              isActive={isActive}
               onClick={() => {
-                setSearchQuery(tag.name.toLocaleLowerCase());
+                setSearchQuery((prev) =>
+                  isActive
+                    ? prev.filter(
+                        (t) => t && t !== tag.name.toLocaleLowerCase(),
+                      )
+                    : [...prev.filter((t) => t), tag.name.toLocaleLowerCase()],
+                );
               }}
             />
           );
@@ -217,22 +224,22 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
 
       <div>
         <ul className={styles.results}>
-          {searchQuery ? (
+          {searchQuery.length > 0 ? (
             <>
               {isSuccess &&
               !isFetching &&
               queryResults?.length === 0 &&
               // Needs to be 3 due to fts5?
-              debouncedSearchQuery.length >= 3 ? (
+              debouncedSearchQuery.join(" ").length >= 3 ? (
                 <div>
-                  No results for <i>{debouncedSearchQuery}</i>
+                  No results for <i>{debouncedSearchQuery.join(" ")}</i>
                 </div>
               ) : null}
 
               {isSuccess &&
               !isFetching &&
               // Needs to be 3 due to fts5?
-              debouncedSearchQuery.length < 3 &&
+              debouncedSearchQuery.join(" ").length < 3 &&
               queryResults?.length === 0 ? (
                 <div className={styles.searchHint}>
                   Type a minimum of 3 characters

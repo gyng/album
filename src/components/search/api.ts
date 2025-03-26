@@ -53,18 +53,22 @@ export const fetchResults = async (opts: {
   page: number;
 }): Promise<PaginatedSearchResult> => {
   const { database, query, pageSize, page } = opts;
+  const queries = query.split("|");
 
   try {
     const result = await exec(
       database,
       `SELECT *, snippet(images, -1, '<i class="snippet">', '</i>', '…', 24) AS snippet, bm25(images) AS bm25
         FROM images
-        WHERE images MATCH ?
+        WHERE ${Array.from({ length: queries.length }, () => "images MATCH ?").join(" AND ")}
         ORDER BY rank
         LIMIT ?
         OFFSET ?`,
       [
-        `- {path album_relative_path} : "${query.replaceAll(/["]/g, "'")}"`,
+        ...queries.map(
+          (q) =>
+            `- {path album_relative_path} : "${q.replaceAll(/["]/g, "'")}"`,
+        ),
         pageSize,
         page * pageSize,
       ],

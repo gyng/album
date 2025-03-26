@@ -9,7 +9,7 @@ type PageProps = {};
 const SearchPage: NextPage<PageProps> = (props) => {
   return (
     <main className={baseStyles.main}>
-      <Nav isEditing={false} editable={false} />
+      <Nav isEditing={false} editable={false} hasPadding={false} />
 
       <h1>Search & Explore</h1>
       <DynamicSearchWithCoi />

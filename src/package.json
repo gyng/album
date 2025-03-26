@@ -5,7 +5,7 @@
   "scripts": {
     "index:update": "(cd ../index; bash ./do-full-index.sh)",
     "deploy:vercel": "npx vercel build --prod && npx vercel deploy --prebuilt --prod",
-    "dev": "next dev",
+    "dev": "next dev --turbopack",
     "build": "next build",
     "start": "next start",
     "lint": "next lint && prettier --check .",

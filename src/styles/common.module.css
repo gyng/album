@@ -53,3 +53,7 @@
     margin-bottom: var(--m-s);
   }
 }
+
+.noNavPadding {
+  padding-left: unset !important;
+}
