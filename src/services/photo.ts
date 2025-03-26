@@ -1,8 +1,8 @@
 import path from "path";
-import fs from "fs";
+import fs from "node:fs";
 import { OptimisedPhoto } from "./types";
 import exifr from "exifr";
-import sizeOf from "image-size";
+import { imageSizeFromFile } from "image-size/fromFile";
 import sharp from "sharp";
 
 export const OPTIMISED_SIZES = [3200, 1600, 800];
@@ -10,13 +10,13 @@ export const RESIZED_IMAGE_DIR = ".resized_images";
 export const PUBLIC_ALBUMS_DIR = "public/data/albums";
 
 export const getPhotoSize = async (
-  filepath: string,
+  filepath: string
 ): Promise<{ width: number; height: number }> => {
   let width = 100;
   let height = 100;
 
   try {
-    const dimensions = sizeOf(filepath);
+    const dimensions = await imageSizeFromFile(filepath);
     width = dimensions.width ?? 0;
     height = dimensions.height ?? 0;
   } catch (err) {
@@ -50,7 +50,7 @@ export const removeStaleImages = async (dirname: string) => {
   if (!fs.existsSync(resizedDir)) {
     console.log(
       "missing album resized directory, skipping cleanup.",
-      resizedDir,
+      resizedDir
     );
     return;
   }
@@ -70,7 +70,7 @@ export const removeStaleImages = async (dirname: string) => {
 
       if (!fs.existsSync(originalFile)) {
         console.log(
-          `Removing cached optimised image "${cachedFile}". Expected source "${originalFile}" to exist.`,
+          `Removing cached optimised image "${cachedFile}". Expected source "${originalFile}" to exist.`
         );
         fs.unlinkSync(cachedFile);
       }
@@ -109,7 +109,7 @@ export const removeUnneededImageSizes = async (photoPath: string) => {
 // TODO: Handle RAW camera
 export const optimiseImages = async (
   photoPath: string,
-  outputDirectory: string,
+  outputDirectory: string
 ): Promise<OptimisedPhoto[]> => {
   const filename = path.basename(photoPath);
   const dirname = path.dirname(photoPath);
@@ -122,7 +122,7 @@ export const optimiseImages = async (
       const newFile = path.join(
         publicAlbumDirectory,
         RESIZED_IMAGE_DIR,
-        `${filename}@${size}.avif`,
+        `${filename}@${size}.avif`
       );
       fs.mkdirSync(path.join(publicAlbumDirectory, RESIZED_IMAGE_DIR), {
         recursive: true,
