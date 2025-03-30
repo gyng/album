@@ -1,9 +1,12 @@
 .youtubeIframe {
-  height: 90vh;
-  height: 90svh;
+  max-height: 90vh;
+  height: auto;
 
   aspect-ratio: 16 / 9;
-  width: auto;
+
+  max-width: 100vw;
+  max-width: 100svw;
+  width: 90%;
 }
 
 .youtubeWrapper {
@@ -16,4 +19,11 @@
   max-height: 90vh !important;
   max-height: 90svh !important;
   height: auto;
+
+  max-width: 100vw !important;
+  max-width: 100svw !important;
+
+  aspect-ratio: 16 / 9;
+
+  width: auto;
 }
