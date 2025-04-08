@@ -39,7 +39,9 @@
 .details > details {
   display: flex;
   height: 1.4em;
-  transition: height 0.1s ease;
+  transition: height 0.2s ease-out;
+  /* Chrome and FF display this differently */
+  display: block;
 }
 
 .details > details[open] {
