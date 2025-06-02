@@ -10,10 +10,12 @@ import Map, {
   NavigationControl,
   GeolocateControl,
   FullscreenControl,
+  ViewStateChangeEvent,
 } from "react-map-gl/maplibre";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { useIntersectionObserver } from "usehooks-ts";
 import { useRouter } from "next/router";
+import { ThemeToggle } from "./ThemeToggle";
 
 export type MapWorldEntry = {
   album: string;
@@ -62,8 +64,9 @@ export const MMap: React.FC<MapWorldProps> = (props) => {
   const initialZoom = url.searchParams.get("zoom");
 
   const [zoom, setZoom] = React.useState<number | null>(
-    initialZoom ? Number.parseFloat(initialZoom) : null,
+    initialZoom ? Number.parseFloat(initialZoom) : null
   );
+
   const router = useRouter();
 
   const sortedByDate = props.photos
@@ -79,8 +82,32 @@ export const MMap: React.FC<MapWorldProps> = (props) => {
   const [hoverInfo, setHoverInfo] = React.useState<MapWorldEntry | null>(null);
   const popupInfo = clickInfo ?? hoverInfo;
 
+  const updateParams = (e: ViewStateChangeEvent) => {
+    const url = new URL(window.location.toString());
+    const searchParams = new URLSearchParams(window.location.search);
+
+    if (e.viewState.latitude !== 0) {
+      searchParams.set("lat", e.viewState.latitude.toFixed(3).toString());
+    }
+
+    if (e.viewState.longitude !== 0) {
+      searchParams.set("lon", e.viewState.longitude.toFixed(3).toString());
+    }
+
+    if (e.viewState.zoom !== 1) {
+      searchParams.set("zoom", e.viewState.zoom.toFixed(2).toString());
+    }
+
+    url.search = searchParams.toString();
+    router.replace(url, undefined, { shallow: true });
+  };
+
   return (
     <div className={props.className}>
+      {/* Use ThemeToggle to set theme on load if visiting map directly */}
+      <div style={{ position: "fixed", pointerEvents: "none", opacity: "0" }}>
+        <ThemeToggle />
+      </div>
       <Map
         style={{ width: "100vw", height: "100vh" }}
         // two options for map style
@@ -94,18 +121,8 @@ export const MMap: React.FC<MapWorldProps> = (props) => {
         onZoom={(e) => {
           setZoom(e.viewState.zoom);
         }}
-        onZoomEnd={(e) => {
-          const zoom = e.viewState.zoom;
-          const lat = e.viewState.latitude;
-          const lng = e.viewState.longitude;
-          const url = new URL(window.location.toString());
-          const searchParams = new URLSearchParams(window.location.search);
-          searchParams.set("lat", lat.toPrecision(6).toString());
-          searchParams.set("lon", lng.toPrecision(6).toString());
-          searchParams.set("zoom", zoom.toPrecision(4).toString());
-          url.search = searchParams.toString();
-          router.replace(url, undefined, { shallow: true });
-        }}
+        onZoomEnd={updateParams}
+        onMoveEnd={updateParams}
       >
         {popupInfo && popupInfo.decLat && popupInfo.decLng ? (
           <Popup
