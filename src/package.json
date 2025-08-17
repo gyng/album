@@ -11,7 +11,10 @@
     "lint": "next lint && prettier --check .",
     "lint:fix": "prettier --write .",
     "test": "jest --watch",
-    "test:ci": "jest && npm run lint"
+    "test:ci": "jest && npm run lint",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:headed": "playwright test --headed"
   },
   "dependencies": {
     "@sqlite.org/sqlite-wasm": "^3.49.1-build4",
@@ -38,6 +41,7 @@
     }
   },
   "devDependencies": {
+    "@playwright/test": "^1.54.2",
     "@testing-library/dom": "^10.4.0",
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.3.0",
