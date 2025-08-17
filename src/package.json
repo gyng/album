@@ -52,5 +52,8 @@
     "jest-environment-jsdom": "^29.7.0",
     "prettier": "^3.5.3",
     "typescript": "5.8.3"
+  },
+  "engines": {
+    "node": "^22.0.0"
   }
 }

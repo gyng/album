@@ -64,7 +64,7 @@ export const MMap: React.FC<MapWorldProps> = (props) => {
   const initialZoom = url.searchParams.get("zoom");
 
   const [zoom, setZoom] = React.useState<number | null>(
-    initialZoom ? Number.parseFloat(initialZoom) : null
+    initialZoom ? Number.parseFloat(initialZoom) : null,
   );
 
   const router = useRouter();
