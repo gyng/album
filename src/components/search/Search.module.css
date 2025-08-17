@@ -43,8 +43,8 @@
 
 .searchWidget input {
   width: 100%;
-  max-width: min(80vw, 420px);
   padding: var(--m-m);
+  padding-right: 40px; /* Make space for clear button */
   color: var(--c-contrast);
   background-color: var(--c-bg);
   border: solid 2px var(--c-bg-contrast-light);
@@ -79,6 +79,41 @@
   gap: var(--m-m);
   flex-wrap: wrap;
   margin-bottom: var(--m-l);
+}
+
+.searchInputContainer {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  max-width: min(80vw, 420px);
+}
+
+.clearButton {
+  position: absolute;
+  right: var(--m-m);
+  background: none;
+  border: none;
+  font-size: 20px;
+  color: var(--c-bg-contrast-light);
+  cursor: pointer;
+  padding: 0;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: all 0.2s ease;
+}
+
+.clearButton:hover {
+  background-color: var(--c-bg-contrast-light);
+  color: var(--c-bg);
+}
+
+.clearButton:focus-visible {
+  outline: solid 2px var(--c-bg-contrast-light);
 }
 
 @keyframes fadein {

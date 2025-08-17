@@ -162,25 +162,37 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
   return (
     <div className={styles.searchWidget}>
       <div className={styles.searchInputRow}>
-        <input
-          suppressHydrationWarning
-          type="text"
-          value={searchQuery.join(",")}
-          placeholder="Type / to search (try bird, model:mavica, datetime:2023)"
-          spellCheck={false}
-          autoFocus
-          onChange={(ev) => {
-            setSearchQuery(ev.target.value.split(",").map((s) => s.trim()));
-          }}
-          // disabled={props.disabled === true || !backend}
-          ref={inputRef}
-          tabIndex={0}
-          title={
-            props.disabled || !database
-              ? "Disabled: the SQLite WASM failed to load, your browser does not support service workers, or the server is missing the proper COEP/COOP headers"
-              : undefined
-          }
-        />
+        <div className={styles.searchInputContainer}>
+          <input
+            suppressHydrationWarning
+            type="text"
+            value={searchQuery.join(",")}
+            placeholder="Type / to search (try bird, model:mavica, datetime:2023)"
+            spellCheck={false}
+            autoFocus
+            onChange={(ev) => {
+              setSearchQuery(ev.target.value.split(",").map((s) => s.trim()));
+            }}
+            // disabled={props.disabled === true || !backend}
+            ref={inputRef}
+            tabIndex={0}
+            title={
+              props.disabled || !database
+                ? "Disabled: the SQLite WASM failed to load, your browser does not support service workers, or the server is missing the proper COEP/COOP headers"
+                : undefined
+            }
+          />
+          {searchQuery.length > 0 && searchQuery.join("").trim() !== "" && (
+            <button
+              className={styles.clearButton}
+              onClick={() => setSearchQuery([])}
+              title="Clear search"
+              type="button"
+            >
+              ×
+            </button>
+          )}
+        </div>
       </div>
 
       <ProgressBar progress={progress} />
