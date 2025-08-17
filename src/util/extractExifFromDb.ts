@@ -1,13 +1,15 @@
 import { getDegLatLngFromExif } from "./dms2deg";
 
-export const extractGPSFromExifString = (exifString: string): [number, number] | null => {
+export const extractGPSFromExifString = (
+  exifString: string,
+): [number, number] | null => {
   if (!exifString) return null;
 
   const exifData: any = Object.fromEntries(
     exifString.split("\n").map((line: string) => {
       const [key, ...value] = line.split(":");
       return [key, value.join(":").trim()];
-    })
+    }),
   );
 
   try {
@@ -27,7 +29,7 @@ export const extractGPSFromExifString = (exifString: string): [number, number] |
         if (coordStr.includes("[") && coordStr.includes("]")) {
           const arrayMatch = coordStr.match(/\[([^\]]+)\]/);
           if (arrayMatch) {
-            return arrayMatch[1].split(",").map(s => {
+            return arrayMatch[1].split(",").map((s) => {
               const trimmed = s.trim();
               // Handle fractions like "341/40"
               if (trimmed.includes("/")) {
@@ -38,10 +40,10 @@ export const extractGPSFromExifString = (exifString: string): [number, number] |
             });
           }
         }
-        
+
         // Handle comma-separated values with fractions
         if (coordStr.includes(",")) {
-          return coordStr.split(",").map(s => {
+          return coordStr.split(",").map((s) => {
             const trimmed = s.trim();
             // Handle fractions like "341/40"
             if (trimmed.includes("/")) {
@@ -51,17 +53,23 @@ export const extractGPSFromExifString = (exifString: string): [number, number] |
             return parseFloat(trimmed);
           });
         }
-        
+
         // Handle degree/minute/second format
-        const degMatch = coordStr.match(/(\d+(?:\.\d+)?)\s*deg\s*(\d+(?:\.\d+)?)'?\s*(\d+(?:\.\d+)?)/);
+        const degMatch = coordStr.match(
+          /(\d+(?:\.\d+)?)\s*deg\s*(\d+(?:\.\d+)?)'?\s*(\d+(?:\.\d+)?)/,
+        );
         if (degMatch) {
-          return [parseFloat(degMatch[1]), parseFloat(degMatch[2]), parseFloat(degMatch[3])];
+          return [
+            parseFloat(degMatch[1]),
+            parseFloat(degMatch[2]),
+            parseFloat(degMatch[3]),
+          ];
         }
-        
+
         // Handle simple space-separated format with fractions
         const spaceMatch = coordStr.trim().split(/\s+/);
         if (spaceMatch.length >= 3) {
-          return spaceMatch.slice(0, 3).map(s => {
+          return spaceMatch.slice(0, 3).map((s) => {
             // Handle fractions like "341/40"
             if (s.includes("/")) {
               const [num, den] = s.split("/");
@@ -70,7 +78,7 @@ export const extractGPSFromExifString = (exifString: string): [number, number] |
             return parseFloat(s);
           });
         }
-        
+
         return [];
       };
 

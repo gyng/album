@@ -1,5 +1,5 @@
 import { NextPage } from "next/types";
-import React, { useEffect } from "react";
+import React, { useEffect, useCallback } from "react";
 import { useDatabase } from "../../components/database/useDatabase";
 import { PhotoBlock } from "../../services/types";
 import { fetchRandomPhoto, RandomPhotoRow } from "../../components/search/api";
@@ -11,7 +11,10 @@ import Link from "next/link";
 import Head from "next/head";
 import { useLocalStorage } from "usehooks-ts";
 import { getRelativeTimeString } from "../../util/time";
-import { extractDateFromExifString, extractGPSFromExifString } from "../../util/extractExifFromDb";
+import {
+  extractDateFromExifString,
+  extractGPSFromExifString,
+} from "../../util/extractExifFromDb";
 import MMap from "../../components/Map";
 
 type PageProps = {};
@@ -79,7 +82,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
     }
   }, []);
 
-  const goNext = () => {
+  const goNext = useCallback(() => {
     if (!database) {
       return;
     }
@@ -89,12 +92,15 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
         setNextChangeAt(new Date(Date.now() + timeDelay));
       })
       .catch(console.error);
-  };
+  }, [database, filter, timeDelay]);
 
   const cycleAlignment = () => {
-    const next = 
-      detailsAlignment === "left" ? "center" : 
-      detailsAlignment === "center" ? "right" : "left";
+    const next =
+      detailsAlignment === "left"
+        ? "center"
+        : detailsAlignment === "center"
+          ? "right"
+          : "left";
     setDetailsAlignment(next);
   };
 
@@ -102,7 +108,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
     goNext();
     const id = setInterval(goNext, timeDelay);
     return () => clearInterval(id);
-  }, [database, timeDelay, nextCounter]);
+  }, [database, timeDelay, nextCounter, goNext]);
 
   useEffect(() => {
     const id = setInterval(() => {
@@ -151,7 +157,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
   const relativeDate = exifDate ? getRelativeTimeString(exifDate) : null;
 
   // Get coordinates from EXIF GPS data instead of geocoded location
-  const coordinates = currentPhotoPath?.exif 
+  const coordinates = currentPhotoPath?.exif
     ? extractGPSFromExifString(currentPhotoPath.exif)
     : null;
 
@@ -281,7 +287,9 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
             ].join(" ")}
             onClick={cycleAlignment}
           >
-            📍 {detailsAlignment.charAt(0).toUpperCase() + detailsAlignment.slice(1)}
+            📍{" "}
+            {detailsAlignment.charAt(0).toUpperCase() +
+              detailsAlignment.slice(1)}
           </button>
 
           <button
@@ -377,16 +385,20 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
             <div
               className={[
                 styles.bottomBar,
-                styles[`align${detailsAlignment.charAt(0).toUpperCase() + detailsAlignment.slice(1)}`]
+                styles[
+                  `align${detailsAlignment.charAt(0).toUpperCase() + detailsAlignment.slice(1)}`
+                ],
               ].join(" ")}
               style={{ mixBlendMode: "screen" }}
             >
               {detailsElement(true)}
             </div>
-            <div 
+            <div
               className={[
                 styles.bottomBar,
-                styles[`align${detailsAlignment.charAt(0).toUpperCase() + detailsAlignment.slice(1)}`]
+                styles[
+                  `align${detailsAlignment.charAt(0).toUpperCase() + detailsAlignment.slice(1)}`
+                ],
               ].join(" ")}
             >
               {detailsElement(false)}
@@ -401,6 +413,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
             showCover ? styles.cover : "",
           ].join(" ")}
           src={photoBlock.data.src}
+          alt={photoBlock.data.title || "Slideshow image"}
           onLoad={() => {
             setImageLoaded(true);
           }}

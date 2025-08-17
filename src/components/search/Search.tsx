@@ -89,7 +89,7 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
     } else {
       fetchNextPage();
     }
-  }, [debouncedSearchQuery, fetchNextPage]);
+  }, [debouncedSearchQuery, fetchNextPage, database]);
 
   // Read query from URL on load
   useEffect(() => {
@@ -113,7 +113,7 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
     if (router) {
       router.replace(url, undefined, { shallow: true });
     }
-  }, [debouncedSearchQuery]);
+  }, [debouncedSearchQuery, router]);
 
   // Register '/' to focus search
   useEffect(() => {

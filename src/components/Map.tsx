@@ -48,7 +48,7 @@ const MapFlyer = (props: { coordinates: [number, number] }) => {
       zoom: ZOOM,
       speed: 2.4,
     });
-  }, [props.coordinates]);
+  }, [props.coordinates, map]);
 
   return <></>;
 };
