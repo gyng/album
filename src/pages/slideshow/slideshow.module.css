@@ -51,8 +51,6 @@
   user-select: none;
   pointer-events: none;
   bottom: 5vh;
-  margin: 0 auto;
-  text-align: center;
   text-shadow:
     1px 2px 2px hsl(0 0% 0% / 0.333),
     2px 4px 4px hsl(0 0% 0% / 0.333),
@@ -60,6 +58,40 @@
   color: white;
   z-index: 200;
   min-width: 220px;
+  /* Default center alignment */
+  left: 50%;
+  transform: translateX(-50%);
+  text-align: center;
+}
+
+.alignLeft {
+  left: 5vw !important;
+  transform: none !important;
+  text-align: center; /* Keep text centered within the container */
+}
+
+.alignCenter {
+  left: 50% !important;
+  transform: translateX(-50%) !important;
+  text-align: center;
+}
+
+.alignRight {
+  right: 5vw !important;
+  left: auto !important;
+  transform: none !important;
+  text-align: center; /* Keep text centered within the container */
+}
+
+@media (max-width: 768px) {
+  .alignLeft {
+    left: 2vw !important;
+  }
+  
+  .alignRight {
+    right: 2vw !important;
+    left: auto !important;
+  }
 }
 
 .hide {

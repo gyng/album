@@ -56,6 +56,10 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
     "slideshow-showcover",
     false,
   );
+  const [detailsAlignment, setDetailsAlignment] = useLocalStorage(
+    "slideshow-details-alignment",
+    "center" as "left" | "center" | "right",
+  );
 
   const [nextChangeAt, setNextChangeAt] = React.useState<Date>(new Date());
   const [secondsLeft, setSecondsLeft] = React.useState<number>(0);
@@ -85,6 +89,13 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
         setNextChangeAt(new Date(Date.now() + timeDelay));
       })
       .catch(console.error);
+  };
+
+  const cycleAlignment = () => {
+    const next = 
+      detailsAlignment === "left" ? "center" : 
+      detailsAlignment === "center" ? "right" : "left";
+    setDetailsAlignment(next);
   };
 
   useEffect(() => {
@@ -265,6 +276,16 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
 
           <button
             className={[
+              detailsAlignment !== "center" ? commonStyles.active : "",
+              commonStyles.button,
+            ].join(" ")}
+            onClick={cycleAlignment}
+          >
+            📍 {detailsAlignment.charAt(0).toUpperCase() + detailsAlignment.slice(1)}
+          </button>
+
+          <button
+            className={[
               showCover ? commonStyles.active : "",
               commonStyles.button,
             ].join(" ")}
@@ -354,12 +375,22 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
         {showClock || showDetails || showMap ? (
           <>
             <div
-              className={styles.bottomBar}
+              className={[
+                styles.bottomBar,
+                styles[`align${detailsAlignment.charAt(0).toUpperCase() + detailsAlignment.slice(1)}`]
+              ].join(" ")}
               style={{ mixBlendMode: "screen" }}
             >
               {detailsElement(true)}
             </div>
-            <div className={styles.bottomBar}>{detailsElement(false)}</div>
+            <div 
+              className={[
+                styles.bottomBar,
+                styles[`align${detailsAlignment.charAt(0).toUpperCase() + detailsAlignment.slice(1)}`]
+              ].join(" ")}
+            >
+              {detailsElement(false)}
+            </div>
           </>
         ) : null}
 
