@@ -11,7 +11,7 @@ import Link from "next/link";
 import Head from "next/head";
 import { useLocalStorage } from "usehooks-ts";
 import { getRelativeTimeString } from "../../util/time";
-import { extractDateFromExifString } from "../../util/extractExifFromDb";
+import { extractDateFromExifString, extractGPSFromExifString } from "../../util/extractExifFromDb";
 import MMap from "../../components/Map";
 
 type PageProps = {};
@@ -139,18 +139,18 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
     : null;
   const relativeDate = exifDate ? getRelativeTimeString(exifDate) : null;
 
+  // Get coordinates from EXIF GPS data instead of geocoded location
+  const coordinates = currentPhotoPath?.exif 
+    ? extractGPSFromExifString(currentPhotoPath.exif)
+    : null;
+
+  // Keep geocoded location for display purposes (country/region name)
   const geocodeCountry = currentPhotoPath?.geocode
     ? currentPhotoPath.geocode
         .split("\n")
         .slice(-3)
         .filter((x) => Number.isNaN(parseFloat(x)))
         .join(", ")
-    : null;
-  const coordinates = currentPhotoPath?.geocode
-    ? ([
-        parseFloat(currentPhotoPath?.geocode.split("\n").at(2) ?? ""),
-        parseFloat(currentPhotoPath?.geocode.split("\n").at(3) ?? ""),
-      ] as [number, number])
     : null;
 
   const detailsElement = (isMapHack: boolean) => (
