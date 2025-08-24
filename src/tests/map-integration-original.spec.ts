@@ -65,7 +65,7 @@ test.describe("Map Integration Tests", () => {
     await expect(page).toHaveTitle("Map");
 
     // Check for filter indication
-    const filterIndicator = page.locator('text*="24japan", .toast');
+    const filterIndicator = page.locator('text="24japan", .toast');
     if ((await filterIndicator.count()) > 0) {
       await expect(filterIndicator.first()).toBeVisible({ timeout: 5000 });
       console.log("✓ Album filter indicator displayed");
@@ -190,7 +190,7 @@ test.describe("Map Integration Tests", () => {
       console.log("✓ Map canvas loaded for geotagged photo album");
 
       // Check for album filter indicator
-      const filterText = page.locator('text*="hokkaido"');
+      const filterText = page.locator('text="hokkaido"');
       if ((await filterText.count()) > 0) {
         console.log("✓ Album filter active for hokkaido");
       }

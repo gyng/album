@@ -4,97 +4,25 @@ import { GetStaticPaths, GetStaticProps, NextPage } from "next";
 import Head from "next/head";
 import React from "react";
 import { getAlbumFromName, getAlbumNames } from "../../services/album";
-import { serializeContentBlock } from "../../services/serialize";
-import { Block, Content, PhotoBlock } from "../../services/types";
-import { BlockControlOptions } from "../../components/editor/BlockControl";
+import { Content, PhotoBlock } from "../../services/types";
 import { Nav } from "../../components/Nav";
-import { EditPhotoBlockOptions } from "../../components/Photo";
 import { PhotoAlbum } from "../../components/PhotoAlbum";
-import { EditTextBlockOptions } from "../../components/TextBlock";
-import styles from "./album.module.css";
 import { removeStaleImages } from "../../services/photo";
 
 type PageProps = {
   album?: Content;
-  edit?: boolean;
-  editable?: boolean;
 };
 
-const Album: NextPage<PageProps> = ({ album, edit, editable }) => {
+const Album: NextPage<PageProps> = ({ album }) => {
   if (!album) {
     return <div>This seems to be missing.</div>;
   }
 
-  // Have a stateful album so we can edit
+  // Have a stateful album for potential future state management
   const [statefulAlbum, setStatefulAlbum] = React.useState(album);
   React.useEffect(() => {
     setStatefulAlbum(album);
   }, [album]);
-
-  const editPhotoBlockOptions: EditPhotoBlockOptions = {
-    onEdit: (newBlock, newIndex) => {
-      const newBlocks = [...statefulAlbum.blocks];
-      const oldIndex = newBlocks.findIndex((b) => b.id === newBlock.id);
-      newBlocks.splice(oldIndex, 1);
-      newBlocks.splice(newIndex ?? oldIndex, 0, newBlock as PhotoBlock);
-
-      setStatefulAlbum({
-        ...statefulAlbum,
-        blocks: newBlocks,
-      });
-    },
-    onDelete: (oldIndex) => {
-      const newBlocks = [...statefulAlbum.blocks];
-      if (oldIndex != null) {
-        newBlocks.splice(oldIndex, 1);
-      }
-      setStatefulAlbum({
-        ...statefulAlbum,
-        blocks: newBlocks,
-      });
-    },
-    isEditing: Boolean(edit),
-    maxIndex: statefulAlbum.blocks.length,
-  };
-
-  const editTextBlockOptions: EditTextBlockOptions = {
-    onEdit: (newBlock, newIndex) => {
-      const newBlocks = [...statefulAlbum.blocks];
-      const oldIndex = newBlocks.findIndex((b) => b.id === newBlock.id);
-      newBlocks.splice(oldIndex, 1);
-      newBlocks.splice(newIndex ?? oldIndex, 0, newBlock);
-
-      setStatefulAlbum({
-        ...statefulAlbum,
-        blocks: newBlocks,
-      });
-    },
-    onDelete: (oldIndex) => {
-      const newBlocks = [...statefulAlbum.blocks];
-      if (oldIndex != null) {
-        newBlocks.splice(oldIndex, 1);
-      }
-      setStatefulAlbum({
-        ...statefulAlbum,
-        blocks: newBlocks,
-      });
-    },
-    isEditing: Boolean(edit),
-    maxIndex: statefulAlbum.blocks.length,
-  };
-
-  const blockControlOptions: BlockControlOptions = {
-    isEditing: Boolean(edit),
-    onEdit: (newBlock, newIndex) => {
-      const newBlocks = [...statefulAlbum.blocks];
-      newBlocks.splice(newIndex ?? 0, 0, newBlock as Block);
-
-      setStatefulAlbum({
-        ...statefulAlbum,
-        blocks: newBlocks,
-      });
-    },
-  };
 
   // SEO/Meta tag generation
   const title =
@@ -131,36 +59,8 @@ const Album: NextPage<PageProps> = ({ album, edit, editable }) => {
         ) : null}
       </Head>
 
-      <Nav
-        isEditing={Boolean(edit)}
-        editable={Boolean(editable)}
-        albumName={statefulAlbum._build.slug}
-      />
-      {edit ? (
-        <div className={styles.edit}>
-          Edit mode
-          <details>
-            <summary>manifest.json</summary>
-            <div className={styles.editDetails}>
-              <pre>
-                {JSON.stringify(serializeContentBlock(statefulAlbum), null, 2)}
-              </pre>
-            </div>
-          </details>
-          <details>
-            <summary>Built manifest.json</summary>
-            <div className={styles.editDetails}>
-              <pre>{JSON.stringify(statefulAlbum, null, 2)}</pre>
-            </div>
-          </details>
-        </div>
-      ) : null}
-      <PhotoAlbum
-        album={statefulAlbum}
-        editPhotoBlock={editPhotoBlockOptions}
-        editTextBlock={editTextBlockOptions}
-        blockControl={blockControlOptions}
-      />
+      <Nav albumName={statefulAlbum._build.slug} />
+      <PhotoAlbum album={statefulAlbum} />
     </>
   );
 };
@@ -173,18 +73,6 @@ export const getStaticProps: GetStaticProps<
     return {
       props: {
         album: undefined,
-        // Can't edit on edge workers
-        editable: process.env.NODE_ENV !== "production",
-      },
-    };
-  }
-
-  if (context.params.slug[1] === "edit") {
-    return {
-      props: {
-        album: await getAlbumFromName(context.params?.slug?.[0]),
-        edit: true,
-        editable: process.env.NODE_ENV !== "production",
       },
     };
   }
@@ -197,8 +85,6 @@ export const getStaticProps: GetStaticProps<
   return {
     props: {
       album,
-      edit: false,
-      editable: process.env.NODE_ENV !== "production",
     },
   };
 };

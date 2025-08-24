@@ -6,15 +6,15 @@
     "index:update": "(cd ../index; bash ./do-full-index.sh)",
     "deploy:vercel": "npx vercel build --prod && npx vercel deploy --prebuilt --prod",
     "dev": "next dev --turbopack",
-    "build": "next build",
+    "build": "next build && echo 'build done'",
     "start": "next start",
     "lint": "next lint && prettier --check .",
     "lint:fix": "prettier --write .",
     "test": "jest --watch",
-    "test:ci": "jest && npm run lint",
-    "test:e2e": "playwright test",
-    "test:e2e:ui": "playwright test --ui",
-    "test:e2e:headed": "playwright test --headed"
+    "test:ci": "timeout 60s jest --forceExit --runInBand && npm run lint",
+    "test:e2e": "echo \"CI env: $CI\" && npm run build && playwright test",
+    "test:e2e:built": "playwright test",
+    "test:e2e:headed": "echo \"CI env: $CI\" && npm run build && playwright test --headed"
   },
   "dependencies": {
     "@sqlite.org/sqlite-wasm": "^3.49.1-build4",

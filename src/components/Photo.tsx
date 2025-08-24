@@ -1,12 +1,8 @@
 import Fraction from "fraction.js";
 import styles from "./Photo.module.css";
-import editStyles from "./EditContainer.module.css";
-import { OnDeleteFn, OnEditFn, PhotoBlock } from "../services/types";
+import { PhotoBlock } from "../services/types";
 import { MapDeferred } from "./MapDeferred";
 import React from "react";
-import { MoveControl } from "./editor/MoveBlock";
-import { InputFieldControl } from "./editor/InputFieldControl";
-import { DeleteBlock } from "./editor/DeleteBlock";
 import { License } from "../License";
 import { getDegLatLngFromExif } from "../util/dms2deg";
 import { getRelativeTimeString } from "../util/time";
@@ -28,122 +24,6 @@ type ExifCoordinatesRowProps = {
   options: {
     showMap: boolean;
   };
-};
-
-export type EditPhotoBlockOptions = {
-  onEdit: OnEditFn;
-  onDelete: OnDeleteFn;
-  isEditing: boolean;
-  maxIndex: number;
-};
-
-const EditPhotoBlock: React.FC<{
-  block: PhotoBlock;
-  currentIndex: number;
-  edit: EditPhotoBlockOptions;
-  anchorRef: React.RefObject<HTMLElement>;
-}> = (props) => {
-  const [initial, setInitial] = React.useState(true);
-  const [triggered, setTriggered] = React.useState(false);
-
-  React.useEffect(() => {
-    if (initial) {
-      setInitial(false);
-      return;
-    }
-
-    if (!triggered) {
-      return;
-    }
-
-    document
-      .getElementById(props.block.id)
-      ?.scrollIntoView({ behavior: "smooth" });
-    setTriggered(false);
-  }, [props.currentIndex, initial, props.block.id, triggered]);
-
-  return (
-    <div className={`${editStyles.editContainer} ${editStyles.gridRight}`}>
-      <InputFieldControl
-        block={props.block}
-        name="title"
-        label="Title"
-        currentIndex={props.currentIndex}
-        edit={props.edit}
-      />
-
-      <InputFieldControl
-        block={props.block}
-        name="kicker"
-        label="Kicker"
-        currentIndex={props.currentIndex}
-        edit={props.edit}
-      />
-
-      <InputFieldControl
-        block={props.block}
-        name="description"
-        label="Description"
-        currentIndex={props.currentIndex}
-        edit={props.edit}
-      />
-
-      <MoveControl
-        anchorRef={props.anchorRef}
-        block={props.block}
-        currentIndex={props.currentIndex}
-        edit={props.edit}
-      />
-
-      <DeleteBlock edit={props.edit} currentIndex={props.currentIndex} />
-
-      <label>
-        <div className={editStyles.checkboxRow}>
-          <input
-            type="checkbox"
-            checked={props.block.formatting?.immersive}
-            onChange={(ev) => {
-              props.edit.onEdit(
-                {
-                  ...props.block,
-                  data: { ...props.block.data },
-                  formatting: {
-                    ...props.block.formatting,
-                    immersive: ev.target.checked,
-                  },
-                },
-                props.currentIndex,
-              );
-            }}
-          />
-          <span>Full-width</span>
-        </div>
-      </label>
-
-      <label>
-        <div className={editStyles.checkboxRow}>
-          <input
-            type="checkbox"
-            checked={props.block.formatting?.immersive}
-            onChange={(ev) => {
-              props.edit.onEdit(
-                {
-                  ...props.block,
-                  data: { ...props.block.data },
-                  formatting: {
-                    ...props.block.formatting,
-                    cover: ev.target.checked,
-                  },
-                },
-                props.currentIndex,
-              );
-            }}
-          />
-          <span>Use as album cover</span>
-        </div>
-      </label>
-    </div>
-  );
 };
 
 const ExifCoordinatesRow: React.FC<{ row: ExifCoordinatesRowProps }> = (
@@ -381,7 +261,6 @@ export const Picture: React.FC<{
 export const PhotoBlockEl: React.FC<{
   block: PhotoBlock;
   currentIndex: number;
-  edit?: EditPhotoBlockOptions;
 }> = (props) => {
   const FRACTION_SLASH = "⁄";
   const anchorRef = React.useRef<HTMLDivElement>(null);
@@ -652,16 +531,6 @@ export const PhotoBlockEl: React.FC<{
           ) : null}
         </details>
       </div>
-
-      {props.edit?.isEditing ? (
-        <EditPhotoBlock
-          // @ts-expect-error
-          anchorRef={anchorRef}
-          block={props.block}
-          currentIndex={props.currentIndex}
-          edit={props.edit}
-        />
-      ) : null}
     </div>
   );
 };

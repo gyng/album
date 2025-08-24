@@ -4,8 +4,6 @@ import commonStyles from "../styles/common.module.css";
 import { ThemeToggle } from "./ThemeToggle";
 
 export const Nav: React.FC<{
-  isEditing: boolean;
-  editable: boolean;
   albumName?: string;
   hasPadding?: boolean;
 }> = (props) => {
@@ -45,22 +43,6 @@ export const Nav: React.FC<{
             </li>
           </>
         ) : null}
-
-        {/* Deprecate edit mode */}
-        {/* 
-        {props.editable && !props.isEditing ? (
-          <li>
-            <Link href={router.asPath + "/edit"}>Edit</Link>
-          </li>
-        ) : null}
-
-        {props.editable && props.isEditing ? (
-          <li>
-            <Link href={router.asPath.replace("/edit", "")}>
-              Exit edit mode
-            </Link>
-          </li>
-        ) : null} */}
       </ul>
     </nav>
   );

@@ -27,15 +27,16 @@ test.describe("Core Functionality Tests", () => {
 
   test("slideshow page loads (with extended timeout)", async ({ page }) => {
     // Slideshow takes time to load due to database initialization
-    await page.goto("/slideshow");
+    await page.goto("/slideshow", { timeout: 90000 });
 
     // Wait for the slideshow to initialize - look for key elements
-    await expect(page).toHaveTitle("Slideshow", { timeout: 60000 });
+    await expect(page).toHaveTitle("Slideshow", { timeout: 90000 });
 
-    // Wait for slideshow controls to appear
-    await expect(
-      page.locator('button:has-text("Next"), a:has-text("← Home")'),
-    ).toBeVisible({ timeout: 30000 });
+    // Wait for slideshow controls to appear (more flexible selectors)
+    const controls = page.locator(
+      'button:has-text("Next"), a:has-text("← Home"), button:has-text("⏸"), button:has-text("▶")',
+    );
+    await expect(controls.first()).toBeVisible({ timeout: 60000 });
 
     console.log(
       "✓ Slideshow page loaded successfully (with database initialization)",

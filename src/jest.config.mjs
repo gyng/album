@@ -12,6 +12,12 @@ const config = {
   // setupFilesAfterEnv: ['<rootDir>/jest.setup.js'],
 
   testEnvironment: "jest-environment-jsdom",
+  testTimeout: 30000,
+  forceExit: true,
+  testPathIgnorePatterns: [
+    "<rootDir>/node_modules/",
+    "<rootDir>/tests/", // Ignore Playwright tests
+  ],
 };
 
 // createJestConfig is exported this way to ensure that next/jest can load the Next.js config which is async

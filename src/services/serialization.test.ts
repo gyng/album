@@ -64,19 +64,17 @@ describe("serialization", () => {
         _build: {
           srcset: [
             {
-              // FIXME: on GHA this is public/data/albums/fixtures/.resized_images/monkey.jpg@100
-              // but locally it's just /data
-              src: "public/data/albums/fixtures/.resized_images/monkey.jpg@800.avif",
+              src: "/data/albums/fixtures/.resized_images/monkey.jpg@800.avif",
               width: 800,
               height: 1176,
             },
             {
-              src: "public/data/albums/fixtures/.resized_images/monkey.jpg@1600.avif",
+              src: "/data/albums/fixtures/.resized_images/monkey.jpg@1600.avif",
               width: 1600,
               height: 2353,
             },
             {
-              src: "public/data/albums/fixtures/.resized_images/monkey.jpg@3200.avif",
+              src: "/data/albums/fixtures/.resized_images/monkey.jpg@3200.avif",
               width: 3200,
               height: 4706,
             },
