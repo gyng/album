@@ -111,8 +111,9 @@ export const MMap: React.FC<MapWorldProps> = (props) => {
       <Map
         style={{ width: "100vw", height: "100vh" }}
         // two options for map style
-        mapStyle="https://tiles.openfreemap.org/styles/liberty"
-        // mapStyle="https://api.maptiler.com/maps/ffd8bd10-cd97-40a5-b1d6-d15f98fb3644/style.json?key=iilC4hPY1594noPX9OQ2"
+        // mapStyle="https://tiles.openfreemap.org/styles/liberty"
+        // mapStyle="https://vector.openstreetmap.org/shortbread_v1/tilejson.json"
+        mapStyle="https://api.maptiler.com/maps/ffd8bd10-cd97-40a5-b1d6-d15f98fb3644/style.json?key=iilC4hPY1594noPX9OQ2"
         initialViewState={{
           longitude: initialLon ? Number.parseFloat(initialLon) : undefined,
           latitude: initialLat ? Number.parseFloat(initialLat) : undefined,
