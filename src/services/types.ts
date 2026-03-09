@@ -42,10 +42,34 @@ export interface PhotoBlock extends IBlock {
 export interface VideoBlock extends IBlock {
   kind: "video";
   id: string;
-  data: {
-    type: "youtube";
-    href: string;
-    date?: string;
+  data:
+    | {
+        type: "youtube";
+        href: string;
+        date?: string;
+      }
+    | {
+        type: "local";
+        href: string;
+        date?: string;
+      };
+  _build?: {
+    src: string;
+    originalSrc?: string;
+    mimeType: string;
+    originalTechnicalData?: {
+      originalDate?: string;
+      codec?: string;
+      profile?: string;
+      fps?: number;
+      bitrateKbps?: number;
+      fileSizeBytes?: number;
+      durationSeconds?: number;
+      width?: number;
+      height?: number;
+      audioCodec?: string;
+      container?: string;
+    };
   };
 }
 
@@ -65,11 +89,17 @@ export interface SerializedPhotoBlock extends Partial<PhotoBlock> {
 export interface SerializedVideoBlock extends Partial<VideoBlock> {
   kind: "video";
   id: string;
-  data: {
-    type: "youtube";
-    href: string;
-    date?: string;
-  };
+  data:
+    | {
+        type: "youtube";
+        href: string;
+        date?: string;
+      }
+    | {
+        type: "local";
+        href: string;
+        date?: string;
+      };
 }
 
 export interface IBlock {

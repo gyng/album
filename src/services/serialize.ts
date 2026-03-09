@@ -58,6 +58,8 @@ export const serializeBlock = (block: Block): SerializedBlock => {
       return serializePhotoBlock(block);
     case "text":
       return serializeTextBlock(block);
+    case "video":
+      return serializeVideoBlock(block);
     default:
       throw new Error(`serializeBlock: Unsupported block ${block.kind}`);
   }

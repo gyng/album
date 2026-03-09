@@ -8,6 +8,7 @@ import { Content, PhotoBlock } from "../../services/types";
 import { Nav } from "../../components/Nav";
 import { PhotoAlbum } from "../../components/PhotoAlbum";
 import { removeStaleImages } from "../../services/photo";
+import { removeStaleVideos } from "../../services/video";
 
 type PageProps = {
   album?: Content;
@@ -81,6 +82,7 @@ export const getStaticProps: GetStaticProps<
 
   // Use getStaticProps as a hack to cleanup on build
   await removeStaleImages(album._build.srcdir);
+  await removeStaleVideos(album._build.srcdir);
 
   return {
     props: {

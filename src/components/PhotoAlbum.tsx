@@ -8,7 +8,7 @@ import {
 import { PhotoBlockEl } from "./Photo";
 import styles from "./PhotoAlbum.module.css";
 import { TextBlockEl } from "./TextBlock";
-import { YoutubeBlockEl } from "./VideoBlock";
+import { LocalVideoBlockEl, YoutubeBlockEl } from "./VideoBlock";
 
 export const Block: React.FC<{
   b: IBlock;
@@ -25,7 +25,26 @@ export const Block: React.FC<{
       );
     case "video":
       if ((props.b as VideoBlock).data.type === "youtube") {
-        return <YoutubeBlockEl src={(props.b as VideoBlock).data.href} />;
+        return (
+          <YoutubeBlockEl
+            id={(props.b as VideoBlock).id}
+            src={(props.b as VideoBlock).data.href}
+            date={(props.b as VideoBlock).data.date}
+          />
+        );
+      } else if ((props.b as VideoBlock).data.type === "local") {
+        return (
+          <LocalVideoBlockEl
+            id={(props.b as VideoBlock).id}
+            src={(props.b as VideoBlock).data.href}
+            originalSrc={(props.b as VideoBlock)._build?.originalSrc}
+            date={(props.b as VideoBlock).data.date}
+            mimeType={(props.b as VideoBlock)._build?.mimeType}
+            originalTechnicalData={
+              (props.b as VideoBlock)._build?.originalTechnicalData
+            }
+          />
+        );
       } else {
         return (
           <pre>Unsupported video type {JSON.stringify(props.b, null, 2)}</pre>

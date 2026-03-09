@@ -11,10 +11,15 @@ import {
   SerializedTextBlock,
   V2AlbumMetadata,
 } from "./types";
+import { isVideoFile } from "./video";
 
 export const ALBUMS_DIR = "../albums";
 export const MANIFEST_NAME = "manifest.json";
 export const MANIFEST_V2_NAME = "album.json";
+
+const isZoneIdentifierFile = (filename: string): boolean => {
+  return filename.toLowerCase().includes(":zone.identifier");
+};
 
 export const getImageTimestampRange = (
   album: Content,
@@ -69,10 +74,27 @@ export const getAlbumFromName = (albumName: string): Promise<Content> => {
 export const getAlbumWithoutManifest = async (
   albumPath: string,
 ): Promise<Content> => {
-  const photos = fs
+  const mediaFiles = fs
     .readdirSync(albumPath)
     .filter((it) => !fs.lstatSync(path.join(albumPath, it)).isDirectory())
-    .filter((it) => !it.match(/\.json$/));
+    .filter((it) => !it.match(/\.json$/))
+    .filter((it) => {
+      if (!isZoneIdentifierFile(it)) {
+        return true;
+      }
+
+      const sidecarPath = path.join(albumPath, it);
+      try {
+        fs.unlinkSync(sidecarPath);
+        console.log(`Deleted Zone.Identifier sidecar file: ${sidecarPath}`);
+      } catch (err) {
+        console.warn(`Failed to delete Zone.Identifier sidecar: ${sidecarPath}`, err);
+      }
+      return false;
+    });
+
+  const photos = mediaFiles.filter((it) => !isVideoFile(it));
+  const videos = mediaFiles.filter((it) => isVideoFile(it));
 
   const dirname = path.parse(albumPath).name;
 
@@ -92,6 +114,15 @@ export const getAlbumWithoutManifest = async (
     },
   }));
 
+  const videoBlocks = videos.map((v) => ({
+    kind: "video" as const,
+    id: v,
+    data: {
+      type: "local" as const,
+      href: v,
+    },
+  }));
+
   const coverBlock: SerializedPhotoBlock | null =
     photoBlocks.find((b) => b.data.src.includes("cover")) ?? null;
 
@@ -102,7 +133,7 @@ export const getAlbumWithoutManifest = async (
     formatting: {
       sort: dirname.includes(".newest-first") ? "newest-first" : "oldest-first",
     },
-    blocks: [titleBlock, ...photoBlocks],
+    blocks: [titleBlock, ...photoBlocks, ...videoBlocks],
   };
 
   return deserializeContentBlock(anonymousManifest, albumPath);
@@ -169,6 +200,29 @@ export const getAlbum = async (
               id: v4(),
               data: {
                 type: "youtube",
+                href: ext.href,
+                date: ext.date,
+              },
+            });
+          } else if (ext.type === "local") {
+            if (isZoneIdentifierFile(ext.href)) {
+              const sidecarPath = path.join(albumPath, ext.href);
+              try {
+                if (fs.existsSync(sidecarPath)) {
+                  fs.unlinkSync(sidecarPath);
+                  console.log(`Deleted Zone.Identifier sidecar file: ${sidecarPath}`);
+                }
+              } catch (err) {
+                console.warn(`Failed to delete Zone.Identifier sidecar: ${sidecarPath}`, err);
+              }
+              return;
+            }
+
+            manifest.blocks.push({
+              kind: "video",
+              id: v4(),
+              data: {
+                type: "local",
                 href: ext.href,
                 date: ext.date,
               },

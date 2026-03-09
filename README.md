@@ -13,6 +13,9 @@ A zero-config, static, file-based album generator
 - Slideshow, with clock
 - EXIF support
 - YouTube video support
+- Local video support (FFmpeg web-optimised transcode)
+- Video technical metadata details panel (codec/profile/fps/bitrate/filesize/date)
+- Viewport-based local video autoplay/pause
 - Next.JS static build, deployed on Vercel
 - Custom image optimisation, resizing
 - Light and dark modes
@@ -38,7 +41,7 @@ You will need Node installed. The following steps are for deployment on Vercel, 
    $ cd album/src/public/data/albums
    ```
 
-1. Add your photos in a directory! Each album is a directory in `src/public/data/albums`.
+1. Add your photos/videos in a directory! Each album is a directory in `src/public/data/albums`.
 
    ```diff
      ├ /albums
@@ -57,6 +60,8 @@ You will need Node installed. The following steps are for deployment on Vercel, 
 
    Optionally, add an `album.json` to the album directory to do album-level configuration.
 
+   Local video files in album directories are auto-detected (`.mp4`, `.mov`, `.m4v`, `.webm`, `.mkv`, `.avi`) and transcoded to web-optimised MP4 during build. On album pages, local videos are auto-played when in viewport and paused when out of viewport.
+
    ```ts
    {
       // Defaults to oldest-first
@@ -67,6 +72,10 @@ You will need Node installed. The following steps are for deployment on Vercel, 
          {
             type: "youtube",
             href: "https://www.youtube.com/embed/9bw3IL444Uo",
+            date?: "2025-11-25"
+         } | {
+            type: "local",
+            href: "clip.mov",
             date?: "2025-11-25"
          }
       >
@@ -89,9 +98,15 @@ You will need Node installed. The following steps are for deployment on Vercel, 
    }
    ```
 
+   Notes for local videos:
+
+   - `date` is optional. If omitted, original capture date is extracted from source metadata when available.
+   - The details panel for local videos shows original-file technical metadata (codec, profile, framerate, bitrate, duration, resolution, audio codec, container, filesize).
+   - Windows `:Zone.Identifier` sidecar files are deleted/skipped automatically during album scan.
+
 2. Deploy on Vercel (or elsewhere).
 
-   Due to the large size of `public/data/*` (and a long time taken to optimise images), deploys are done manually from your (my?) local machine. Image optimisations/resizes are cached locally on `next build` or `vercel build`, so clear out `.resized_images` first if you want to regenerate them. If Next.js times out during `vercel build`, it's probably image optimisation taking way too long. In that case, run `npm run build` to optimise images first.
+   Due to the large size of `public/data/*` (and a long time taken to optimise images/videos), deploys are done manually from your (my?) local machine. Image and video optimisations are cached locally on `next build` or `vercel build` (`.resized_images` / `.resized_videos`). Local videos are transcoded to web-optimised MP4 outputs via FFmpeg and only the optimised output path is used for playback. Outdated cached video sizes are pruned automatically.
 
    ```
    $ npx vercel@latest login

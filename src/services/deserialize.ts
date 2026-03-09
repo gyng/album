@@ -6,6 +6,7 @@ import {
   removeUnneededImageSizes,
   stripPublicFromPath,
 } from "./photo";
+import { getOriginalVideoTechnicalData, optimiseVideo } from "./video";
 import {
   Block,
   Content,
@@ -31,11 +32,36 @@ export const deserializeTextBlock = async (
 
 export const deserializeVideoBlock = async (
   serialized: SerializedVideoBlock,
+  options: {
+    dirname: string;
+  },
 ): Promise<VideoBlock> => {
-  const copy = { ...serialized };
-  return new Promise((resolve) => {
-    resolve(copy);
-  });
+  if (serialized.data.type === "youtube") {
+    return { ...serialized };
+  }
+
+  const localFilepath = path.join(options.dirname, serialized.data.href);
+  const optimised = await optimiseVideo(localFilepath, "public/data/albums");
+  const originalTechnicalData =
+    await getOriginalVideoTechnicalData(localFilepath);
+  const resolvedDate = serialized.data.date ?? originalTechnicalData.originalDate;
+
+  const copy: VideoBlock = {
+    ...serialized,
+    data: {
+      ...serialized.data,
+      href: optimised.src,
+      date: resolvedDate,
+    },
+    _build: {
+      src: optimised.src,
+      originalSrc: serialized.data.href,
+      mimeType: optimised.mimeType,
+      originalTechnicalData,
+    },
+  };
+
+  return copy;
 };
 
 const getPhotoDetailsFromSearchIndex = async (
@@ -127,8 +153,13 @@ export const deserializeBlock = async (
       throw new Error("Need dirname for photoblock deser");
     case "text":
       return deserializeTextBlock(b);
+    case "video":
+      if (dirname) {
+        return deserializeVideoBlock(b, { dirname });
+      }
+      throw new Error("Need dirname for videoblock deser");
     default:
-      throw new Error(`unsupported kind ${b.kind}`);
+      throw new Error("unsupported block kind");
   }
 };
 
