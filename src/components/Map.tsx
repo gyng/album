@@ -62,7 +62,7 @@ export const MMap: React.FC<MapProps> = (props) => {
       <Map
         style={{ width: "100%", height: "100%", ...(props.style ?? {}) }}
         // mapStyle="https://tiles.openfreemap.org/styles/liberty"
-        mapStyle="https://api.maptiler.com/maps/ffd8bd10-cd97-40a5-b1d6-d15f98fb3644/style.json?key=iilC4hPY1594noPX9OQ2"
+        mapStyle="https://api.maptiler.com/maps/toner-v2/style.json?key=mrjUpLh9Syjz9wcEY2Vb"
         initialViewState={{
           longitude: props.coordinates[1],
           latitude: props.coordinates[0],

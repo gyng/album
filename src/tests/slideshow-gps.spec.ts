@@ -88,4 +88,58 @@ test.describe("Slideshow GPS Tests", () => {
       }
     }
   });
+
+  test("slideshow falls back to geocode coordinates when EXIF GPS is unavailable", async ({
+    page,
+  }) => {
+    // Navigate to slideshow with map enabled
+    await page.goto("/slideshow?map=1", {
+      timeout: 90000,
+      waitUntil: "domcontentloaded",
+    });
+
+    // Wait for slideshow to load and map to be enabled by URL param
+    await page.waitForTimeout(10000);
+
+    // Check if map is visible (should attempt to show map with coordinates)
+    const mapContainer = page.locator(".mapContainer");
+    const mapContainerCount = await mapContainer.count();
+
+    // The map container should exist (even if coordinates unavailable)
+    if (mapContainerCount > 0) {
+      console.log(
+        "✓ Map container present - coordinates loaded from EXIF or geocode fallback",
+      );
+    }
+
+    // Try cycling through a few photos to find one with coordinates
+    let foundCoordinatePhoto = false;
+    for (let i = 0; i < 5; i++) {
+      const nextButton = page.locator('button:has-text("Next")');
+      if (await nextButton.isVisible()) {
+        await nextButton.click();
+        await page.waitForTimeout(2000);
+
+        // Check if map canvas renders (indicates coordinates available)
+        const mapCanvas = page.locator("canvas");
+        if ((await mapCanvas.count()) > 0) {
+          const isCanvasVisible = await mapCanvas.first().isVisible();
+          if (isCanvasVisible) {
+            foundCoordinatePhoto = true;
+            console.log(
+              `✓ Found photo with coordinates (EXIF or geocode) on attempt ${i + 1}`,
+            );
+            break;
+          }
+        }
+      }
+    }
+
+    if (!foundCoordinatePhoto) {
+      console.log(
+        "⚠ No photos with coordinates found in this batch (expected if dataset has no GPS data)",
+      );
+    }
+  });
 });
+

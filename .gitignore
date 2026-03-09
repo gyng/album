@@ -4,3 +4,5 @@
 Thumbs.db
 *.Zone.Identifier
 .swc
+.vercel
+.env*.local

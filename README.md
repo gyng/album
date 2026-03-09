@@ -102,7 +102,7 @@ You will need Node installed. The following steps are for deployment on Vercel, 
    $ npx vercel@latest deploy --prebuilt --prod --archive=tgz
 
    # Everything together for convenience
-   $ npm run index:update && npx vercel@latest build --prod && npx vercel@latest deploy --prebuilt --prod
+   $ npx vercel@latest pull && npm run index:update && npx vercel@latest build --prod && npx vercel@latest deploy --prebuilt --prod
    ```
 
    If the build fails, try removing `.vercel` and reinitialising the project. Somehow this seems to happen a lot.
