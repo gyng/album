@@ -9,15 +9,18 @@ import styles from "./map.module.css";
 import commonStyles from "../../styles/common.module.css";
 import Link from "next/link";
 import Head from "next/head";
-import { useSearchParams } from "next/navigation";
+import { useRouter } from "next/router";
 
 type PageProps = {
   photos: MapWorldEntry[];
 };
 
 const WorldMap: NextPage<PageProps> = (props) => {
-  const searchParams = useSearchParams();
-  const filterAlbum = searchParams.get("filter_album");
+  const router = useRouter();
+  const filterAlbum =
+    typeof router.query.filter_album === "string"
+      ? router.query.filter_album
+      : null;
   const filteredPhotos = filterAlbum
     ? props.photos.filter((p) => p.album === filterAlbum)
     : props.photos;
@@ -30,9 +33,9 @@ const WorldMap: NextPage<PageProps> = (props) => {
         <meta name="theme-color" content="#2c2c2c" />
       </Head>
       <div className={[styles.titleBar, commonStyles.topBar].join(" ")}>
-        <Link href="/" className={commonStyles.button}>
+        <a href="/" className={commonStyles.button}>
           ← Albums
-        </Link>
+        </a>
 
         {filterAlbum ? (
           <div className={commonStyles.toast}>
