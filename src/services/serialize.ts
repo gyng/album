@@ -61,6 +61,6 @@ export const serializeBlock = (block: Block): SerializedBlock => {
     case "video":
       return serializeVideoBlock(block);
     default:
-      throw new Error(`serializeBlock: Unsupported block ${block.kind}`);
+      throw new Error(`serializeBlock: Unsupported block ${(block as any).kind}`);
   }
 };

@@ -11,6 +11,7 @@ import Map, {
   GeolocateControl,
   FullscreenControl,
   ViewStateChangeEvent,
+  useMap,
 } from "react-map-gl/maplibre";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { useIntersectionObserver } from "usehooks-ts";
@@ -57,6 +58,54 @@ const LazyImage = (props: { photo: MapWorldEntry }) => {
   );
 };
 
+// Component to track map bounds for viewport culling
+const MapBoundsTracker = (props: {
+  onBoundsChange: (bounds: {
+    north: number;
+    south: number;
+    east: number;
+    west: number;
+  }) => void;
+}) => {
+  const { current: map } = useMap();
+
+  React.useEffect(() => {
+    if (!map) return;
+
+    const updateBounds = () => {
+      const bounds = map.getBounds();
+      if (bounds) {
+        props.onBoundsChange({
+          north: bounds.getNorth(),
+          south: bounds.getSouth(),
+          east: bounds.getEast(),
+          west: bounds.getWest(),
+        });
+      }
+    };
+
+    // Set initial bounds
+    updateBounds();
+
+    // Update bounds on move
+    map.on("moveend", updateBounds);
+    map.on("zoomend", updateBounds);
+
+    return () => {
+      map.off("moveend", updateBounds);
+      map.off("zoomend", updateBounds);
+    };
+  }, [map, props]);
+
+  return null;
+};
+
+type PhotoWithStyle = MapWorldEntry & {
+  relative: number;
+  markerColor: string;
+  hueRotate: string;
+};
+
 export const MMap: React.FC<MapWorldProps> = (props) => {
   const url = new URL(window.location.toString());
   const initialLon = url.searchParams.get("lon");
@@ -67,16 +116,68 @@ export const MMap: React.FC<MapWorldProps> = (props) => {
     initialZoom ? Number.parseFloat(initialZoom) : null,
   );
 
+  const [bounds, setBounds] = React.useState<{
+    north: number;
+    south: number;
+    east: number;
+    west: number;
+  } | null>(null);
+
   const router = useRouter();
 
-  const sortedByDate = props.photos
-    .filter((p) => p.date)
-    .sort((a, b) => new Date(b.date).valueOf() - new Date(a.date).valueOf());
-  const oldest = sortedByDate.at(0);
-  const newest = sortedByDate.at(-1);
-  const range =
-    new Date(newest?.date ?? 0).valueOf() -
-    new Date(oldest?.date ?? 0).valueOf();
+  // Memoize date range calculations (Optimization #1)
+  const dateStats = React.useMemo(() => {
+    const sortedByDate = props.photos
+      .filter((p) => p.date)
+      .sort((a, b) => new Date(b.date).valueOf() - new Date(a.date).valueOf());
+    const oldest = sortedByDate.at(0);
+    const newest = sortedByDate.at(-1);
+    const range =
+      new Date(newest?.date ?? 0).valueOf() -
+      new Date(oldest?.date ?? 0).valueOf();
+
+    return { oldest, newest, range };
+  }, [props.photos]);
+
+  // Memoize sorted photos with pre-calculated marker styles (Optimization #2)
+  const photosWithStyles = React.useMemo(() => {
+    return props.photos
+      .sort((a, b) => {
+        // sort so newer markers are on top
+        return new Date(a.date).valueOf() - new Date(b.date).valueOf();
+      })
+      .map((photo): PhotoWithStyle => {
+        const relative =
+          (new Date(photo.date ?? dateStats.oldest?.date).valueOf() -
+            new Date(dateStats.oldest?.date ?? 0).valueOf()) /
+          dateStats.range;
+
+        return {
+          ...photo,
+          relative,
+          markerColor: `hsl(${relative * 220}, 100%, ${50 - relative * 30}%)`,
+          hueRotate: `hue-rotate(${relative * 255}deg)`,
+        };
+      });
+  }, [props.photos, dateStats]);
+
+  // Filter photos by viewport bounds (Optimization #3)
+  const visiblePhotos = React.useMemo(() => {
+    if (!bounds) {
+      return photosWithStyles;
+    }
+
+    return photosWithStyles.filter((photo) => {
+      if (!photo.decLat || !photo.decLng) return false;
+
+      return (
+        photo.decLat >= bounds.south &&
+        photo.decLat <= bounds.north &&
+        photo.decLng >= bounds.west &&
+        photo.decLng <= bounds.east
+      );
+    });
+  }, [photosWithStyles, bounds]);
 
   const [clickInfo, setClickInfo] = React.useState<MapWorldEntry | null>(null);
   const [hoverInfo, setHoverInfo] = React.useState<MapWorldEntry | null>(null);
@@ -125,6 +226,8 @@ export const MMap: React.FC<MapWorldProps> = (props) => {
         onZoomEnd={updateParams}
         onMoveEnd={updateParams}
       >
+        <MapBoundsTracker onBoundsChange={setBounds} />
+
         {popupInfo && popupInfo.decLat && popupInfo.decLng ? (
           <Popup
             longitude={popupInfo.decLng}
@@ -182,48 +285,38 @@ export const MMap: React.FC<MapWorldProps> = (props) => {
           </Popup>
         ) : null}
 
-        {props.photos
-          .sort((a, b) => {
-            // sort so newer markers are on top
-            return new Date(a.date).valueOf() - new Date(b.date).valueOf();
-          })
-          .map((photo) => {
-            const relative =
-              (new Date(photo.date ?? oldest?.date).valueOf() -
-                new Date(oldest?.date ?? 0).valueOf()) /
-              range;
-
-            return photo.decLat && photo.decLng ? (
-              <React.Fragment key={photo?.src?.src ?? ""}>
-                <Marker
-                  longitude={photo.decLng}
-                  latitude={photo.decLat}
-                  anchor="bottom"
-                  onClick={(e) => {
-                    e.originalEvent.stopPropagation();
-                    setClickInfo(photo);
-                  }}
-                  color={`hsl(${relative * 220}, 100%, ${50 - relative * 30}%)`}
-                >
-                  <div>
-                    {zoom && zoom > 8.5 ? <LazyImage photo={photo} /> : null}
-                    <span
-                      style={{ filter: `hue-rotate(${relative * 255}deg)` }}
-                      className={styles.pin}
-                      onMouseOver={() => {
-                        setHoverInfo(photo);
-                      }}
-                      onMouseLeave={() => {
-                        setHoverInfo(null);
-                      }}
-                    >
-                      🔴
-                    </span>
-                  </div>
-                </Marker>
-              </React.Fragment>
-            ) : null;
-          })}
+        {visiblePhotos.map((photo) => {
+          return photo.decLat && photo.decLng ? (
+            <React.Fragment key={photo?.src?.src ?? ""}>
+              <Marker
+                longitude={photo.decLng}
+                latitude={photo.decLat}
+                anchor="bottom"
+                onClick={(e) => {
+                  e.originalEvent.stopPropagation();
+                  setClickInfo(photo);
+                }}
+                color={photo.markerColor}
+              >
+                <div>
+                  {zoom && zoom > 8.5 ? <LazyImage photo={photo} /> : null}
+                  <span
+                    style={{ filter: photo.hueRotate }}
+                    className={styles.pin}
+                    onMouseOver={() => {
+                      setHoverInfo(photo);
+                    }}
+                    onMouseLeave={() => {
+                      setHoverInfo(null);
+                    }}
+                  >
+                    🔴
+                  </span>
+                </div>
+              </Marker>
+            </React.Fragment>
+          ) : null;
+        })}
 
         <NavigationControl />
         <GeolocateControl />

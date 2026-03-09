@@ -170,9 +170,11 @@ const isValidCachedVideo = async (videoPath: string): Promise<boolean> => {
     return false;
   }
 
+  const ffmpegExecutable = ffmpegPath;
+
   return new Promise((resolve) => {
     const proc = spawn(
-      ffmpegPath,
+      ffmpegExecutable,
       [
         "-v",
         "error",
@@ -215,9 +217,11 @@ export const getOriginalVideoTechnicalData = async (
     return {};
   }
 
+  const ffprobeExecutable = ffprobePath.path;
+
   return new Promise((resolve) => {
     const proc = spawn(
-      ffprobePath.path,
+      ffprobeExecutable,
       [
         "-v",
         "error",

@@ -3,7 +3,6 @@ import styles from "./ThemeToggle.module.css";
 
 export const ThemeToggle: React.FC = () => {
   const [darkMode, setDarkMode] = useState<boolean | null>(null);
-  const [browserDarkMode, setBrowserDarkMode] = useState<boolean | null>(null);
 
   useEffect(() => {
     if (darkMode === true) {
@@ -19,16 +18,6 @@ export const ThemeToggle: React.FC = () => {
   }, [darkMode]);
 
   useEffect(() => {
-    const stored = JSON.parse(localStorage.getItem("darkMode") ?? "null");
-    if (stored === true || stored === false) {
-      setDarkMode(JSON.parse(stored));
-    } else {
-      const browserDark = window.matchMedia(
-        "(prefers-color-scheme: dark)",
-      ).matches;
-      setBrowserDarkMode(browserDark);
-    }
-
     // Override initial theme, used for screenshots
     const url = new URL(window.location.toString());
     const theme = url.searchParams.get("theme");
@@ -36,7 +25,16 @@ export const ThemeToggle: React.FC = () => {
       theme === "dark" ? true : theme === "light" ? false : null;
     if (requestedMode != null) {
       setDarkMode(requestedMode);
+      return;
     }
+
+    const stored = JSON.parse(localStorage.getItem("darkMode") ?? "null");
+    if (stored === true || stored === false) {
+      setDarkMode(stored);
+      return;
+    }
+
+    setDarkMode(true);
   }, []);
 
   return (
@@ -45,14 +43,14 @@ export const ThemeToggle: React.FC = () => {
         title="Toggle dark mode"
         className="dark-mode-toggle"
         onClick={() => {
-          const next = !!!(darkMode ?? browserDarkMode);
+          const next = !(darkMode ?? true);
           setDarkMode(next);
           localStorage.setItem("darkMode", JSON.stringify(next));
         }}
       >
-        {darkMode == null && browserDarkMode == null ? (
+        {darkMode == null ? (
           <span style={{ opacity: 0 }}>☀️</span>
-        ) : (darkMode ?? browserDarkMode) ? (
+        ) : darkMode ? (
           "☀️"
         ) : (
           "🌙"

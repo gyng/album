@@ -2,7 +2,8 @@ import { CSSProperties, useEffect } from "react";
 import React from "react";
 import styles from "./Map.module.css";
 
-import Map, { AttributionControl, Marker, useMap } from "react-map-gl/maplibre";
+import Map, { Marker, useMap } from "react-map-gl/maplibre";
+import type { ProjectionSpecification } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import Link from "next/link";
 
@@ -56,6 +57,10 @@ const MapFlyer = (props: { coordinates: [number, number] }) => {
 export const MMap: React.FC<MapProps> = (props) => {
   const mapStyle: MapTilerMapStyle = props.mapStyle ?? "streets";
   const projection = props.projection ?? "mercator";
+  const projectionSpec: "mercator" | "globe" | ProjectionSpecification =
+    projection === "vertical-perspective"
+      ? ({ name: "vertical-perspective" } as ProjectionSpecification)
+      : projection;
 
   return (
     <div className={styles.map}>
@@ -68,11 +73,10 @@ export const MMap: React.FC<MapProps> = (props) => {
           latitude: props.coordinates[0],
           zoom: ZOOM,
         }}
-        // @ts-expect-error bad type
-        projection={projection}
-        {...(props.attribution === false
-          ? { attributionControl: false }
-          : { attributionControl: { compact: true } })}
+        projection={projectionSpec}
+        attributionControl={
+          props.attribution === false ? false : { compact: true }
+        }
       >
         <Marker
           longitude={props.coordinates[1]}
