@@ -14,7 +14,7 @@ type MapTilerMapStyle =
   | "bright"
   | "backdrop"
   | "basic"
-  | "toner"
+  | "toner-v2"
   | "streets"
   | "dataviz"
   | "landscape"
@@ -67,7 +67,7 @@ export const MMap: React.FC<MapProps> = (props) => {
       <Map
         style={{ width: "100%", height: "100%", ...(props.style ?? {}) }}
         // mapStyle="https://tiles.openfreemap.org/styles/liberty"
-        mapStyle="https://api.maptiler.com/maps/toner-v2/style.json?key=mrjUpLh9Syjz9wcEY2Vb"
+        mapStyle={`https://api.maptiler.com/maps/${mapStyle}/style.json?key=mrjUpLh9Syjz9wcEY2Vb`}
         initialViewState={{
           longitude: props.coordinates[1],
           latitude: props.coordinates[0],

@@ -335,7 +335,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
               attribution={false}
               details={false}
               style={{ width: "100%", height: "100%" }}
-              mapStyle="toner"
+              mapStyle="toner-v2"
               projection="vertical-perspective"
               markerStyle={{ visibility: "hidden" }}
             />
