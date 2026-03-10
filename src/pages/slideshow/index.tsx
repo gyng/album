@@ -481,33 +481,6 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
             Next
           </button>
 
-          <div
-            style={{
-              display: "flex",
-              gap: "var(--m-xs)",
-              alignItems: "center",
-            }}
-          >
-            <span className={commonStyles.toast} style={{ margin: "0" }}>
-              Shuffle history:
-            </span>
-            {[5, 10, 20, 50, 100].map((size) => {
-              return (
-                <button
-                  key={size}
-                  className={[
-                    commonStyles.button,
-                    size === shuffleHistorySize ? commonStyles.active : "",
-                  ].join(" ")}
-                  onClick={() => setShuffleHistorySize(size)}
-                  title={`Skip photos seen in last ${size} shots`}
-                >
-                  {size}
-                </button>
-              );
-            })}
-          </div>
-
           {[10000, 60000, 900000, 3600000, 10800000, 43200000, 86400000].map(
             (delay) => {
               const delayMin = delay / 1000 / 60;
