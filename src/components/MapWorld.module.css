@@ -21,8 +21,12 @@
 }
 
 .popup {
-  pointer-events: none;
   z-index: 5001;
+}
+
+.click,
+.click * {
+  pointer-events: auto;
 }
 
 .popup *:focus-visible {
@@ -50,6 +54,7 @@
   border: solid 1px rgba(255, 255, 255, 0.5);
 }
 
+.hover,
 .hover * {
   pointer-events: none;
 }

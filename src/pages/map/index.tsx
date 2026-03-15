@@ -33,9 +33,9 @@ const WorldMap: NextPage<PageProps> = (props) => {
         <meta name="theme-color" content="#2c2c2c" />
       </Head>
       <div className={[styles.titleBar, commonStyles.topBar].join(" ")}>
-        <a href="/" className={commonStyles.button}>
+        <Link href="/" className={commonStyles.button}>
           ← Albums
-        </a>
+        </Link>
 
         {filterAlbum ? (
           <div className={commonStyles.toast}>

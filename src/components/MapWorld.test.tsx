@@ -1,0 +1,199 @@
+import { act, fireEvent, render, screen } from "@testing-library/react";
+import { MapWorldEntry } from "./MapWorld";
+
+const mapHandlers: {
+  onMoveEnd?: (event: {
+    viewState: { latitude: number; longitude: number; zoom: number };
+  }) => void;
+  onZoom?: (event: { viewState: { zoom: number } }) => void;
+} = {};
+
+const mapInstance = {
+  flyTo: jest.fn(),
+  on: jest.fn(),
+  off: jest.fn(),
+  getBounds: jest.fn(() => ({
+    getNorth: () => 90,
+    getSouth: () => -90,
+    getEast: () => 180,
+    getWest: () => -180,
+  })),
+};
+
+const mapRef = { current: mapInstance };
+const replace = jest.fn();
+
+jest.mock("next/router", () => ({
+  useRouter: () => ({
+    replace,
+  }),
+}));
+
+jest.mock("react-map-gl/maplibre", () => {
+  const React = require("react");
+
+  return {
+    __esModule: true,
+    default: ({
+      children,
+      onMoveEnd,
+      onZoom,
+    }: {
+      children?: React.ReactNode;
+      onMoveEnd?: (event: {
+        viewState: { latitude: number; longitude: number; zoom: number };
+      }) => void;
+      onZoom?: (event: { viewState: { zoom: number } }) => void;
+    }) => {
+      mapHandlers.onMoveEnd = onMoveEnd;
+      mapHandlers.onZoom = onZoom;
+      return <div data-testid="map">{children}</div>;
+    },
+    Marker: ({
+      children,
+      onClick,
+    }: {
+      children?: React.ReactNode;
+      onClick?: (event: { originalEvent: { stopPropagation: () => void } }) => void;
+    }) => (
+      <button
+        type="button"
+        data-testid="marker"
+        onClick={() => {
+          onClick?.({ originalEvent: { stopPropagation: jest.fn() } });
+        }}
+      >
+        {children}
+      </button>
+    ),
+    Popup: ({
+      children,
+      className,
+    }: {
+      children?: React.ReactNode;
+      className?: string;
+    }) => (
+      <div data-testid="popup" className={className}>
+        {children}
+      </div>
+    ),
+    ScaleControl: () => null,
+    NavigationControl: () => null,
+    GeolocateControl: () => null,
+    FullscreenControl: () => null,
+    useMap: () => mapRef,
+  };
+});
+
+jest.mock("next/link", () => ({
+  __esModule: true,
+  default: ({
+    href,
+    children,
+    className,
+  }: {
+    href: string;
+    children: React.ReactNode;
+    className?: string;
+  }) => (
+    <a href={href} className={className}>
+      {children}
+    </a>
+  ),
+}));
+
+jest.mock("usehooks-ts", () => ({
+  useIntersectionObserver: () => ({
+    entry: { isIntersecting: true },
+    ref: jest.fn(),
+  }),
+}));
+
+jest.mock("./ThemeToggle", () => ({
+  ThemeToggle: () => null,
+}));
+
+jest.mock("../util/time", () => ({
+  getRelativeTimeString: () => "just now",
+}));
+
+const { MMap } = require("./MapWorld");
+
+describe("MapWorld", () => {
+  const photo: MapWorldEntry = {
+    album: "kansai",
+    src: { src: "/photo.jpg", width: 100, height: 100 },
+    decLat: 35.6762,
+    decLng: 139.6503,
+    date: "2024-01-02T03:04:05.000Z",
+    href: "/album/kansai#photo.jpg",
+    placeholderColor: "transparent",
+    placeholderWidth: 100,
+    placeholderHeight: 100,
+  };
+
+  beforeEach(() => {
+    jest.useFakeTimers();
+    mapHandlers.onMoveEnd = undefined;
+    mapHandlers.onZoom = undefined;
+    mapInstance.flyTo.mockClear();
+    mapInstance.on.mockClear();
+    mapInstance.off.mockClear();
+    mapInstance.getBounds.mockClear();
+    replace.mockClear();
+  });
+
+  afterEach(() => {
+    jest.runOnlyPendingTimers();
+    jest.useRealTimers();
+  });
+
+  it("updates the URL with debounced next router replace", () => {
+    render(<MMap photos={[photo]} className="map" />);
+
+    act(() => {
+      mapHandlers.onMoveEnd?.({
+        viewState: { latitude: 35.6762, longitude: 139.6503, zoom: 14 },
+      });
+    });
+
+    expect(replace).not.toHaveBeenCalled();
+
+    act(() => {
+      jest.advanceTimersByTime(200);
+    });
+
+    expect(replace).toHaveBeenCalledWith("/?lat=35.676&lon=139.650&zoom=14.00", undefined, {
+      shallow: true,
+      scroll: false,
+    });
+  });
+
+  it("pauses router sync while popup links are being clicked", () => {
+    render(<MMap photos={[photo]} className="map" />);
+
+    act(() => {
+      mapHandlers.onZoom?.({ viewState: { zoom: 9 } });
+    });
+
+    fireEvent.click(screen.getByTestId("marker"));
+    fireEvent.mouseDown(screen.getByRole("link", { name: /kansai/i }));
+
+    act(() => {
+      mapHandlers.onMoveEnd?.({
+        viewState: { latitude: 35.6762, longitude: 139.6503, zoom: 14 },
+      });
+    });
+
+    act(() => {
+      jest.advanceTimersByTime(250);
+    });
+
+    expect(replace).not.toHaveBeenCalled();
+
+    expect(screen.getByRole("link", { name: /kansai/i }).getAttribute("href")).toBe(
+      "/album/kansai#photo.jpg",
+    );
+    expect(screen.getByTestId("popup").className).toContain("click");
+  });
+});

@@ -92,7 +92,7 @@ export const MMap: React.FC<MapProps> = (props) => {
         <div className={styles.viewOn}>
           View on{" "}
           <Link
-            href={`http://localhost:3000/map?lat=${props.coordinates[0].toPrecision(6)}&lon=${props.coordinates[1].toPrecision(6)}&zoom=14`}
+            href={`/map?lat=${props.coordinates[0].toPrecision(6)}&lon=${props.coordinates[1].toPrecision(6)}&zoom=14`}
           >
             Album map
           </Link>

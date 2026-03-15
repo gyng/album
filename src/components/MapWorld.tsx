@@ -95,7 +95,7 @@ const MapBoundsTracker = (props: {
       map.off("moveend", updateBounds);
       map.off("zoomend", updateBounds);
     };
-  }, [map, props]);
+  }, [map, props.onBoundsChange]);
 
   return null;
 };
@@ -106,7 +106,11 @@ type PhotoWithStyle = MapWorldEntry & {
   hueRotate: string;
 };
 
+const ROUTER_SYNC_DEBOUNCE_MS = 200;
+const ROUTER_SYNC_PAUSE_MS = 700;
+
 export const MMap: React.FC<MapWorldProps> = (props) => {
+  const router = useRouter();
   const url = new URL(window.location.toString());
   const initialLon = url.searchParams.get("lon");
   const initialLat = url.searchParams.get("lat");
@@ -122,9 +126,6 @@ export const MMap: React.FC<MapWorldProps> = (props) => {
     east: number;
     west: number;
   } | null>(null);
-
-  const router = useRouter();
-
   // Memoize date range calculations (Optimization #1)
   const dateStats = React.useMemo(() => {
     const sortedByDate = props.photos
@@ -181,7 +182,24 @@ export const MMap: React.FC<MapWorldProps> = (props) => {
 
   const [clickInfo, setClickInfo] = React.useState<MapWorldEntry | null>(null);
   const [hoverInfo, setHoverInfo] = React.useState<MapWorldEntry | null>(null);
+  const lastSyncedRouteRef = React.useRef<string>("");
+  const debounceTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
+  const pauseUntilRef = React.useRef<number>(0);
   const popupInfo = clickInfo ?? hoverInfo;
+
+  React.useEffect(() => {
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+    };
+  }, []);
+
+  const pauseRouterSync = React.useCallback(() => {
+    pauseUntilRef.current = Date.now() + ROUTER_SYNC_PAUSE_MS;
+  }, []);
 
   const updateParams = (e: ViewStateChangeEvent) => {
     const url = new URL(window.location.toString());
@@ -200,7 +218,23 @@ export const MMap: React.FC<MapWorldProps> = (props) => {
     }
 
     url.search = searchParams.toString();
-    router.replace(url, undefined, { shallow: true });
+    const nextRoute = `${url.pathname}${url.search}${url.hash}`;
+    if (nextRoute === lastSyncedRouteRef.current) {
+      return;
+    }
+
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+
+    debounceTimerRef.current = setTimeout(() => {
+      if (Date.now() < pauseUntilRef.current) {
+        return;
+      }
+
+      lastSyncedRouteRef.current = nextRoute;
+      router.replace(nextRoute, undefined, { shallow: true, scroll: false });
+    }, ROUTER_SYNC_DEBOUNCE_MS);
   };
 
   return (
@@ -241,7 +275,13 @@ export const MMap: React.FC<MapWorldProps> = (props) => {
             offset={15}
             closeButton={false}
           >
-            <>
+            <div
+              onMouseDownCapture={pauseRouterSync}
+              onTouchStartCapture={pauseRouterSync}
+              onClick={(event) => {
+                event.stopPropagation();
+              }}
+            >
               <Link href={popupInfo.href ?? ""} className={styles.link}>
                 <img
                   src={popupInfo.src.src}
@@ -281,7 +321,7 @@ export const MMap: React.FC<MapWorldProps> = (props) => {
                   </a>
                 </div>
               ) : null}
-            </>
+            </div>
           </Popup>
         ) : null}
 
