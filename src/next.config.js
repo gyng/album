@@ -9,6 +9,7 @@ const nextConfig = {
   outputFileTracingRoot: isVercelBuild ? __dirname : path.join(__dirname, ".."),
   serverExternalPackages: ["sharp", "ffmpeg-static", "ffprobe-static", "sqlite3"],
   experimental: {
+    useLightningcss: true,
     lightningCssFeatures: {
       exclude: ["light-dark"],
     },
