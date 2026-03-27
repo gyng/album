@@ -22,7 +22,25 @@ import {
 import MMap from "../../components/Map";
 
 type PageProps = {};
-type SlideshowMode = "random" | "similar";
+type SlideshowMode = "random" | "weighted" | "similar";
+
+const avoidBoundaryRepeat = (
+  photos: RandomPhotoRow[],
+  previousLastPath?: string,
+): RandomPhotoRow[] => {
+  if (
+    previousLastPath &&
+    photos.length > 1 &&
+    photos[0]?.path === previousLastPath
+  ) {
+    const swapIdx = photos.findIndex((photo) => photo.path !== previousLastPath);
+    if (swapIdx > 0) {
+      [photos[0], photos[swapIdx]] = [photos[swapIdx], photos[0]];
+    }
+  }
+
+  return photos;
+};
 
 const shufflePhotos = (
   photos: RandomPhotoRow[],
@@ -35,18 +53,41 @@ const shufflePhotos = (
     [shuffled[idx], shuffled[randomIdx]] = [shuffled[randomIdx], shuffled[idx]];
   }
 
-  if (
-    previousLastPath &&
-    shuffled.length > 1 &&
-    shuffled[0]?.path === previousLastPath
-  ) {
-    const swapIdx = shuffled.findIndex((photo) => photo.path !== previousLastPath);
-    if (swapIdx > 0) {
-      [shuffled[0], shuffled[swapIdx]] = [shuffled[swapIdx], shuffled[0]];
-    }
+  return avoidBoundaryRepeat(shuffled, previousLastPath);
+};
+
+const weightedShufflePhotos = (
+  photos: RandomPhotoRow[],
+  previousLastPath?: string,
+): RandomPhotoRow[] => {
+  const timestamps = photos
+    .map((photo) => extractDateFromExifString(photo.exif)?.getTime() ?? null)
+    .filter((timestamp): timestamp is number => timestamp !== null);
+
+  if (timestamps.length === 0) {
+    return shufflePhotos(photos, previousLastPath);
   }
 
-  return shuffled;
+  const minTimestamp = Math.min(...timestamps);
+  const maxTimestamp = Math.max(...timestamps);
+  const timestampRange = Math.max(1, maxTimestamp - minTimestamp);
+
+  const weighted = photos
+    .map((photo) => {
+      const timestamp = extractDateFromExifString(photo.exif)?.getTime() ?? null;
+      const normalized =
+        timestamp === null ? 0.15 : (timestamp - minTimestamp) / timestampRange;
+      const weight = 1 + normalized * 5;
+      const randomValue = Math.max(Math.random(), Number.EPSILON);
+      return {
+        photo,
+        key: -Math.log(randomValue) / weight,
+      };
+    })
+    .sort((left, right) => left.key - right.key)
+    .map((entry) => entry.photo);
+
+  return avoidBoundaryRepeat(weighted, previousLastPath);
 };
 
 const SlideshowPage: NextPage<PageProps> = (props) => {
@@ -58,6 +99,11 @@ const SlideshowPage: NextPage<PageProps> = (props) => {
 const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
   const [database, progress] = useDatabase();
   const buildIdRef = React.useRef<string | null>(null);
+  const initialPhotoPathRef = React.useRef<string | null>(null);
+  const similarSeedPathRef = React.useRef<string | null>(null);
+  const similarQueueRef = React.useRef<RandomPhotoRow[]>([]);
+  const similarQueueIndexRef = React.useRef<number>(-1);
+  const similarQueueLastPathRef = React.useRef<string | undefined>(undefined);
 
   // Check for a new build and reload when one is detected.
   useEffect(() => {
@@ -102,9 +148,15 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
   const randomQueueRef = React.useRef<RandomPhotoRow[]>([]);
   const randomQueueIndexRef = React.useRef<number>(-1);
   const randomQueueLastPathRef = React.useRef<string | undefined>(undefined);
+  const navigationHistoryRef = React.useRef<RandomPhotoRow[]>([]);
+  const historyIndexRef = React.useRef<number>(-1);
   const [slideshowError, setSlideshowError] = React.useState<string | null>(
     null,
   );
+  const [historyPosition, setHistoryPosition] = React.useState({
+    index: -1,
+    total: 0,
+  });
 
   const [timeDelay, setTimeDelay, removeTimeDelay] = useLocalStorage(
     "slideshow-timedelay",
@@ -148,6 +200,52 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
     "slideshow-mode",
     "random" as SlideshowMode,
   );
+  const [hasParsedInitialUrl, setHasParsedInitialUrl] = React.useState(false);
+
+  const updateSlideshowUrl = useCallback(
+    (
+      mode: SlideshowMode,
+      opts?: { photoPath?: string | null; clearPhoto?: boolean },
+    ) => {
+    const url = new URL(window.location.toString());
+    url.searchParams.set("mode", mode);
+
+      const hasExplicitPhotoPath = Object.prototype.hasOwnProperty.call(
+        opts ?? {},
+        "photoPath",
+      );
+      const nextPhotoPath = hasExplicitPhotoPath
+        ? opts?.photoPath ?? null
+        : currentPhotoPathRef.current?.path ?? null;
+
+      if (nextPhotoPath) {
+        url.searchParams.set("photo", nextPhotoPath);
+      } else if (opts?.clearPhoto) {
+        url.searchParams.delete("photo");
+      }
+
+      if (mode === "similar") {
+        if (nextPhotoPath) {
+          url.searchParams.set("seed", nextPhotoPath);
+        } else if (opts?.clearPhoto) {
+          url.searchParams.delete("seed");
+        }
+      } else {
+        url.searchParams.delete("seed");
+      }
+
+    window.history.replaceState(window.history.state, "", url.toString());
+    },
+    [],
+  );
+
+  const setSlideshowModeAndUrl = useCallback(
+    (mode: SlideshowMode) => {
+      setSlideshowMode(mode);
+      updateSlideshowUrl(mode);
+    },
+    [setSlideshowMode, updateSlideshowUrl],
+  );
 
   /**
    * URL Search Parameters for Slideshow Configuration
@@ -159,7 +257,9 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
    *   - cover=1        Use cover mode (vs contain)
    *
    * Other parameters:
-   *   - mode=random|similar     Slideshow playback mode
+  *   - mode=random|weighted|similar  Slideshow playback mode
+  *   - photo=<photo-path>      Start on a specific photo and keep the URL synced to the current image
+  *   - seed=<photo-path>       Similar mode only: backward-compatible alias for the starting photo
    *   - align=left|center|right  Set details alignment
    *   - delay=<seconds>          Set slide duration in seconds (e.g., 60 = 60 seconds)
   *   - shuffle=<number>         Similar mode only: avoid repeating the last N photos
@@ -170,6 +270,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
    *   /?clock=1&delay=30                              Just clock with 30-second intervals
    *   /?details=1&align=left                          Details aligned left (no clock)
   *   /?filter=japan&delay=45                         Japan album, 45-second slides in a shuffled pass
+  *   /?mode=weighted&filter=japan                    Recent-biased weighted shuffle for one album
   *   /?mode=similar&filter=japan&shuffle=50         Similar mode, avoid the last 50 photos
    */
   // Parse URL search params to configure slideshow
@@ -196,11 +297,19 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
     }
 
     const modeParam = url.searchParams.get("mode");
+    initialPhotoPathRef.current =
+      url.searchParams.get("photo") ?? url.searchParams.get("seed");
     const nextMode =
-      modeParam === "random" || modeParam === "similar"
+      modeParam === "random" ||
+      modeParam === "weighted" ||
+      modeParam === "similar"
         ? modeParam
         : slideshowMode;
-    if (modeParam === "random" || modeParam === "similar") {
+    if (
+      modeParam === "random" ||
+      modeParam === "weighted" ||
+      modeParam === "similar"
+    ) {
       setSlideshowMode(modeParam);
     }
 
@@ -248,6 +357,9 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
     if (nextMode === "similar" && historyParam !== null && historyParam > 0) {
       setShuffleHistorySize(historyParam);
     }
+
+    setHasParsedInitialUrl(true);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- slideshowMode is only read as a fallback on mount
   }, [
     setShowClock,
     setShowDetails,
@@ -257,7 +369,6 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
     setTimeDelay,
     setShuffleHistorySize,
     setSlideshowMode,
-    slideshowMode,
   ]);
 
   const commitNextPhoto = useCallback(
@@ -269,6 +380,18 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
         ].slice(0, shuffleHistorySize);
       }
 
+      const nextHistory = [
+        ...navigationHistoryRef.current.slice(0, historyIndexRef.current + 1),
+        candidatePhoto,
+      ];
+
+      navigationHistoryRef.current = nextHistory;
+      historyIndexRef.current = nextHistory.length - 1;
+      setHistoryPosition({
+        index: historyIndexRef.current,
+        total: nextHistory.length,
+      });
+
       currentPhotoPathRef.current = candidatePhoto;
       setCurrentPhotoPath(candidatePhoto);
       setSlideshowError(null);
@@ -277,15 +400,49 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
     [shuffleHistorySize, timeDelay],
   );
 
+  const showHistoryPhoto = useCallback(
+    (index: number): RandomPhotoRow | null => {
+      const candidatePhoto = navigationHistoryRef.current[index] ?? null;
+      if (!candidatePhoto) {
+        return null;
+      }
+
+      historyIndexRef.current = index;
+      setHistoryPosition({
+        index,
+        total: navigationHistoryRef.current.length,
+      });
+
+      currentPhotoPathRef.current = candidatePhoto;
+      setCurrentPhotoPath(candidatePhoto);
+      setSlideshowError(null);
+      setNextChangeAt(new Date(Date.now() + timeDelay));
+      return candidatePhoto;
+    },
+    [timeDelay],
+  );
+
   const refillRandomQueue = useCallback((): RandomPhotoRow[] => {
-    const nextQueue = shufflePhotos(
-      randomPhotoPoolRef.current,
-      randomQueueLastPathRef.current,
-    );
+    const nextQueue =
+      slideshowMode === "weighted"
+        ? weightedShufflePhotos(
+            randomPhotoPoolRef.current,
+            randomQueueLastPathRef.current,
+          )
+        : shufflePhotos(
+            randomPhotoPoolRef.current,
+            randomQueueLastPathRef.current,
+          );
 
     randomQueueRef.current = nextQueue;
     randomQueueIndexRef.current = -1;
     return nextQueue;
+  }, [slideshowMode]);
+
+  const resetSimilarQueue = useCallback(() => {
+    similarSeedPathRef.current = null;
+    similarQueueRef.current = [];
+    similarQueueIndexRef.current = -1;
   }, []);
 
   const advanceRandomPhoto = useCallback(
@@ -320,6 +477,14 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
   );
 
   useEffect(() => {
+    if (!hasParsedInitialUrl) {
+      return;
+    }
+
+    updateSlideshowUrl(slideshowMode);
+  }, [currentPhotoPath?.path, hasParsedInitialUrl, slideshowMode, updateSlideshowUrl]);
+
+  useEffect(() => {
     if (!database) {
       return;
     }
@@ -336,23 +501,48 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
         randomQueueRef.current = [];
         randomQueueIndexRef.current = -1;
         recentPhotoPathsRef.current = [];
+        navigationHistoryRef.current = [];
+        historyIndexRef.current = -1;
+        setHistoryPosition({ index: -1, total: 0 });
+        resetSimilarQueue();
 
         if (photos.length === 0) {
           setCurrentPhotoPath(null);
           currentPhotoPathRef.current = null;
+          updateSlideshowUrl(slideshowMode, { photoPath: null, clearPhoto: true });
           setSlideshowError("No photos available");
           return;
         }
 
         setSlideshowError(null);
 
-        if (slideshowMode === "random" || currentPhotoPathRef.current === null) {
+        if (initialPhotoPathRef.current) {
+          const seededPhoto =
+            photos.find((photo) => photo.path === initialPhotoPathRef.current) ??
+            null;
+
+          initialPhotoPathRef.current = null;
+
+          if (seededPhoto) {
+            commitNextPhoto(seededPhoto, {
+              trackRecent: slideshowMode === "similar",
+            });
+            return;
+          }
+        }
+
+        if (
+          slideshowMode === "random" ||
+          slideshowMode === "weighted" ||
+          currentPhotoPathRef.current === null
+        ) {
           advanceRandomPhoto({ trackRecent: slideshowMode === "similar" });
         }
       })
       .catch((err) => {
         console.error(err);
         if (!cancelled) {
+          updateSlideshowUrl(slideshowMode, { photoPath: null, clearPhoto: true });
           setSlideshowError("No photos available");
         }
       });
@@ -360,14 +550,96 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
     return () => {
       cancelled = true;
     };
-  }, [advanceRandomPhoto, database, filter, slideshowMode]);
+  }, [
+    advanceRandomPhoto,
+    commitNextPhoto,
+    database,
+    filter,
+    resetSimilarQueue,
+    slideshowMode,
+    updateSlideshowUrl,
+  ]);
+
+  const advanceSimilarPhoto = useCallback(async (): Promise<RandomPhotoRow | null> => {
+    if (!database) {
+      return null;
+    }
+
+    const activePhoto = currentPhotoPathRef.current;
+    if (!activePhoto?.path) {
+      return advanceRandomPhoto({ trackRecent: true });
+    }
+
+    const refillSimilarQueue = async (seedPath: string) => {
+      const result = await fetchSimilarResults({
+        database,
+        path: seedPath,
+        page: 0,
+        pageSize: Math.max(shuffleHistorySize, 100),
+      });
+      const filteredResults = result.data
+        .filter((candidate) => {
+          const matchesAlbumFilter = filter
+            ? candidate.path.startsWith(`../albums/${filter}/`)
+            : true;
+          const isRecent = recentPhotoPathsRef.current.includes(candidate.path);
+          return matchesAlbumFilter && !isRecent;
+        })
+        .map((candidate) => ({
+          path: candidate.path,
+          exif: candidate.exif,
+          geocode: candidate.geocode,
+        }));
+
+      const nextQueue = shufflePhotos(
+        filteredResults,
+        similarQueueLastPathRef.current,
+      );
+
+      similarSeedPathRef.current = seedPath;
+      similarQueueRef.current = nextQueue;
+      similarQueueIndexRef.current = -1;
+      return nextQueue;
+    };
+
+    let queue = similarQueueRef.current;
+    let nextIndex = similarQueueIndexRef.current + 1;
+
+    if (similarSeedPathRef.current !== activePhoto.path || nextIndex >= queue.length) {
+      queue = await refillSimilarQueue(activePhoto.path);
+      nextIndex = 0;
+    }
+
+    const nextPhoto = queue[nextIndex] ?? null;
+    if (!nextPhoto) {
+      resetSimilarQueue();
+      return advanceRandomPhoto({ trackRecent: true });
+    }
+
+    similarQueueIndexRef.current = nextIndex;
+    similarQueueLastPathRef.current = nextPhoto.path;
+    commitNextPhoto(nextPhoto, { trackRecent: true });
+    return nextPhoto;
+  }, [
+    advanceRandomPhoto,
+    commitNextPhoto,
+    database,
+    filter,
+    resetSimilarQueue,
+    shuffleHistorySize,
+  ]);
 
   const goNext = useCallback(() => {
     if (!database) {
       return;
     }
 
-    if (slideshowMode === "random") {
+    if (historyIndexRef.current < navigationHistoryRef.current.length - 1) {
+      showHistoryPhoto(historyIndexRef.current + 1);
+      return;
+    }
+
+    if (slideshowMode === "random" || slideshowMode === "weighted") {
       advanceRandomPhoto();
       return;
     }
@@ -375,51 +647,71 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
     const activePhoto = currentPhotoPathRef.current;
 
     if (slideshowMode === "similar" && activePhoto?.path) {
-      fetchSimilarResults({
-        database,
-        path: activePhoto.path,
-        page: 0,
-        pageSize: Math.max(shuffleHistorySize, 100),
-      })
-        .then((result) => {
-          const filteredResults = result.data.filter((candidate) => {
-            const matchesAlbumFilter = filter
-              ? candidate.path.startsWith(`../albums/${filter}/`)
-              : true;
-            const isRecent = recentPhotoPathsRef.current.includes(
-              candidate.path,
-            );
-            return matchesAlbumFilter && !isRecent;
-          });
-
-          const nextSimilar = filteredResults[0];
-          if (!nextSimilar) {
-            advanceRandomPhoto({ trackRecent: true });
-            return;
-          }
-
-          commitNextPhoto({
-            path: nextSimilar.path,
-            exif: nextSimilar.exif,
-            geocode: nextSimilar.geocode,
-          }, { trackRecent: true });
-        })
-        .catch((err) => {
-          console.error(err);
-          advanceRandomPhoto({ trackRecent: true });
-        });
+      advanceSimilarPhoto().catch((err) => {
+        console.error(err);
+        advanceRandomPhoto({ trackRecent: true });
+      });
       return;
     }
 
     advanceRandomPhoto({ trackRecent: true });
   }, [
     advanceRandomPhoto,
-    commitNextPhoto,
+    advanceSimilarPhoto,
     database,
-    filter,
-    shuffleHistorySize,
+    showHistoryPhoto,
     slideshowMode,
   ]);
+
+  const goPrevious = useCallback(() => {
+    if (historyIndexRef.current <= 0) {
+      return;
+    }
+
+    showHistoryPhoto(historyIndexRef.current - 1);
+  }, [showHistoryPhoto]);
+
+  const goRandom = useCallback(() => {
+    if (!database) {
+      return;
+    }
+
+    resetSimilarQueue();
+    setSlideshowModeAndUrl("random");
+    advanceRandomPhoto();
+  }, [advanceRandomPhoto, database, resetSimilarQueue, setSlideshowModeAndUrl]);
+
+  useEffect(() => {
+    if (slideshowMode === "similar") {
+      randomQueueRef.current = [];
+      randomQueueIndexRef.current = -1;
+
+      if (currentPhotoPathRef.current) {
+        navigationHistoryRef.current = [currentPhotoPathRef.current];
+        historyIndexRef.current = 0;
+        setHistoryPosition({ index: 0, total: 1 });
+      }
+      return;
+    }
+
+    resetSimilarQueue();
+    randomQueueRef.current = [];
+    randomQueueIndexRef.current = -1;
+  }, [resetSimilarQueue, slideshowMode]);
+
+  const canGoPrevious = historyPosition.index > 0;
+  const playbackSubtitle =
+    slideshowMode === "similar"
+      ? "🧭 Similar trail"
+      : slideshowMode === "weighted"
+        ? "🕒 Recent-weighted shuffle"
+        : "🔀 Shuffle pass";
+  const playbackContextLabel =
+    slideshowMode === "similar"
+      ? "🧭 similar trail"
+      : slideshowMode === "weighted"
+        ? "🕒 weighted shuffle"
+        : "🔀 shuffle pass";
 
   const cycleAlignment = () => {
     const next =
@@ -577,171 +869,280 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
         <div className={[styles.toolbar, commonStyles.topBar].join(" ")}>
           {/* <ThemeToggle /> */}
 
-          <Link className={commonStyles.button} href="/">
-            ← Home
+          <Link className={styles.brandLink} href="/">
+            <span className={styles.brandLogo} aria-hidden="true">
+              🖼️
+            </span>
+            <span className={styles.brandCopy}>
+              <span className={styles.brandTitle}>Snapshots</span>
+              <span className={styles.brandSubtitle}>Slideshow</span>
+            </span>
           </Link>
 
-          <button
-            className={[
-              showClock ? commonStyles.active : "",
-              commonStyles.button,
-            ].join(" ")}
-            aria-pressed={showClock}
-            onClick={() => setShowClock(!showClock)}
-          >
-            🕰️
-          </button>
+          <div className={styles.playbackGroup} role="group" aria-label="Playback mode">
+            <div className={styles.playbackHeader}>
+              <span className={styles.playbackLogo} aria-hidden="true">
+                ⟲
+              </span>
+              <span className={styles.playbackCopy}>
+                <span className={styles.playbackTitle}>Playback</span>
+                <span className={styles.playbackSubtitle}>{playbackSubtitle}</span>
+              </span>
+            </div>
 
-          <button
-            className={[
-              showDetails ? commonStyles.active : "",
-              commonStyles.button,
-            ].join(" ")}
-            aria-pressed={showDetails}
-            onClick={() => setShowDetails(!showDetails)}
-          >
-            Details
-          </button>
+            <div className={styles.playbackButtons}>
+              <button
+                className={[
+                  slideshowMode === "random" ? commonStyles.active : "",
+                  commonStyles.button,
+                ].join(" ")}
+                aria-pressed={slideshowMode === "random"}
+                onClick={() => {
+                  setSlideshowModeAndUrl("random");
+                }}
+              >
+                🔀 Shuffle
+              </button>
 
-          <button
-            className={[
-              showMap ? commonStyles.active : "",
-              commonStyles.button,
-            ].join(" ")}
-            aria-pressed={showMap}
-            onClick={() => setShowMap(!showMap)}
-          >
-            Map
-          </button>
+              <button
+                className={[
+                  slideshowMode === "weighted" ? commonStyles.active : "",
+                  commonStyles.button,
+                ].join(" ")}
+                aria-pressed={slideshowMode === "weighted"}
+                onClick={() => {
+                  setSlideshowModeAndUrl("weighted");
+                }}
+              >
+                🕒 Recent
+              </button>
 
-          <button
-            className={[
-              detailsAlignment !== "center" ? commonStyles.active : "",
-              commonStyles.button,
-            ].join(" ")}
-            onClick={cycleAlignment}
-          >
-            📍{" "}
-            {detailsAlignment.charAt(0).toUpperCase() +
-              detailsAlignment.slice(1)}
-          </button>
+              <button
+                className={[
+                  slideshowMode === "similar" ? commonStyles.active : "",
+                  commonStyles.button,
+                ].join(" ")}
+                aria-pressed={slideshowMode === "similar"}
+                onClick={() => {
+                  setSlideshowModeAndUrl("similar");
+                }}
+              >
+                🧭 Similar
+              </button>
 
-          <button
-            className={[
-              showCover ? commonStyles.active : "",
-              commonStyles.button,
-            ].join(" ")}
-            aria-pressed={showCover}
-            onClick={() => setShowCover(!showCover)}
-          >
-            {showCover ? "Cover" : "Contain"}
-          </button>
+              <span className={styles.playbackDivider} aria-hidden="true" />
 
-          <button
-            style={{ marginRight: "var(--m-m)" }}
-            className={commonStyles.button}
-            onClick={() => {
-              if (document.fullscreenElement) {
-                document.exitFullscreen();
-              } else {
-                document.documentElement.requestFullscreen();
-              }
-            }}
-          >
-            ⇱ Fullscreen
-          </button>
+              <button
+                className={commonStyles.button}
+                onClick={() => {
+                  setImageLoaded(false);
+                  goRandom();
+                }}
+              >
+                🎲 Random
+              </button>
 
-          <button
-            className={[
-              slideshowMode === "random" ? commonStyles.active : "",
-              commonStyles.button,
-            ].join(" ")}
-            aria-pressed={slideshowMode === "random"}
-            onClick={() => {
-              setSlideshowMode("random");
-            }}
-          >
-            Random
-          </button>
+              <button
+                className={commonStyles.button}
+                disabled={!canGoPrevious}
+                aria-disabled={!canGoPrevious}
+                onClick={() => {
+                  setImageLoaded(false);
+                  goPrevious();
+                }}
+              >
+                Previous
+              </button>
 
-          <button
-            className={[
-              slideshowMode === "similar" ? commonStyles.active : "",
-              commonStyles.button,
-            ].join(" ")}
-            aria-pressed={slideshowMode === "similar"}
-            onClick={() => {
-              setSlideshowMode("similar");
-            }}
-          >
-            Similar
-          </button>
-
-          <button
-            className={commonStyles.button}
-            onClick={() => {
-              setImageLoaded(false);
-              setNextCounter((prev) => prev + 1);
-            }}
-          >
-            Next
-          </button>
-
-          {[10000, 60000, 900000, 3600000, 10800000, 43200000, 86400000].map(
-            (delay) => {
-              const delayMin = delay / 1000 / 60;
-              const delaySec = delay / 1000;
-
-              return (
-                <button
-                  key={delay}
-                  className={[
-                    commonStyles.button,
-                    delay === timeDelay ? commonStyles.active : "",
-                  ].join(" ")}
-                  aria-pressed={delay === timeDelay}
-                  onClick={() => setTimeDelay(delay)}
-                >
-                  {delayMin >= 60
-                    ? `${delayMin / 60}h`
-                    : delayMin < 1
-                      ? `${delaySec}s`
-                      : `${delayMin}m`}
-                </button>
-              );
-            },
-          )}
-
-          <div
-            className={commonStyles.toast}
-            style={{ marginRight: "var(--m-m)" }}
-          >
-            🔁 {secondsLeft.toFixed(0)}s
+              <button
+                className={commonStyles.button}
+                onClick={() => {
+                  setImageLoaded(false);
+                  setNextCounter((prev) => prev + 1);
+                }}
+              >
+                Next
+              </button>
+            </div>
           </div>
 
-          {filter ? (
-            <div className={commonStyles.toast}>
-              only showing photos from{" "}
-              <Link href={`/album/${filter}`}>
-                <i>{filter}</i>
+          <div className={styles.controlGroup} role="group" aria-label="Display controls">
+            <div className={styles.controlHeader}>
+              <span className={styles.controlLogo} aria-hidden="true">
+                ✦
+              </span>
+              <span className={styles.controlCopy}>
+                <span className={styles.controlTitle}>Display</span>
+                <span className={styles.controlSubtitle}>Overlays and placement</span>
+              </span>
+            </div>
+
+            <div className={styles.controlButtons}>
+              <button
+                className={[
+                  showClock ? commonStyles.active : "",
+                  commonStyles.button,
+                ].join(" ")}
+                aria-pressed={showClock}
+                onClick={() => setShowClock(!showClock)}
+              >
+                🕰️
+              </button>
+
+              <button
+                className={[
+                  showDetails ? commonStyles.active : "",
+                  commonStyles.button,
+                ].join(" ")}
+                aria-pressed={showDetails}
+                onClick={() => setShowDetails(!showDetails)}
+              >
+                Details
+              </button>
+
+              <button
+                className={[
+                  showMap ? commonStyles.active : "",
+                  commonStyles.button,
+                ].join(" ")}
+                aria-pressed={showMap}
+                onClick={() => setShowMap(!showMap)}
+              >
+                Map
+              </button>
+
+              <button
+                className={[
+                  detailsAlignment !== "center" ? commonStyles.active : "",
+                  commonStyles.button,
+                ].join(" ")}
+                onClick={cycleAlignment}
+              >
+                📍{" "}
+                {detailsAlignment.charAt(0).toUpperCase() +
+                  detailsAlignment.slice(1)}
+              </button>
+            </div>
+          </div>
+
+          <div className={styles.controlGroup} role="group" aria-label="View controls">
+            <div className={styles.controlHeader}>
+              <span className={styles.controlLogo} aria-hidden="true">
+                ⛶
+              </span>
+              <span className={styles.controlCopy}>
+                <span className={styles.controlTitle}>View</span>
+                <span className={styles.controlSubtitle}>Frame and screen mode</span>
+              </span>
+            </div>
+
+            <div className={styles.controlButtons}>
+              <button
+                className={[
+                  showCover ? commonStyles.active : "",
+                  commonStyles.button,
+                ].join(" ")}
+                aria-pressed={showCover}
+                onClick={() => setShowCover(!showCover)}
+              >
+                {showCover ? "Cover" : "Contain"}
+              </button>
+
+              <button
+                className={commonStyles.button}
+                onClick={() => {
+                  if (document.fullscreenElement) {
+                    document.exitFullscreen();
+                  } else {
+                    document.documentElement.requestFullscreen();
+                  }
+                }}
+              >
+                ⇱ Fullscreen
+              </button>
+            </div>
+          </div>
+
+          <div className={styles.controlGroup} role="group" aria-label="Timing controls">
+            <div className={styles.controlHeader}>
+              <span className={styles.controlLogo} aria-hidden="true">
+                ⏱
+              </span>
+              <span className={styles.controlCopy}>
+                <span className={styles.controlTitle}>Timing</span>
+                <span className={styles.controlSubtitle}>Slide cadence</span>
+              </span>
+            </div>
+
+            <div className={styles.controlButtons}>
+              {[10000, 60000, 900000, 3600000, 10800000, 43200000, 86400000].map(
+                (delay) => {
+                  const delayMin = delay / 1000 / 60;
+                  const delaySec = delay / 1000;
+
+                  return (
+                    <button
+                      key={delay}
+                      className={[
+                        commonStyles.button,
+                        delay === timeDelay ? commonStyles.active : "",
+                      ].join(" ")}
+                      aria-pressed={delay === timeDelay}
+                      onClick={() => setTimeDelay(delay)}
+                    >
+                      {delayMin >= 60
+                        ? `${delayMin / 60}h`
+                        : delayMin < 1
+                          ? `${delaySec}s`
+                          : `${delayMin}m`}
+                    </button>
+                  );
+                },
+              )}
+            </div>
+
+            <div className={styles.controlMeta}>
+              <div className={commonStyles.toast}>🔁 {secondsLeft.toFixed(0)}s</div>
+            </div>
+          </div>
+
+          <div className={styles.controlGroup} role="group" aria-label="Current photo context">
+            <div className={styles.controlHeader}>
+              <span className={styles.controlLogo} aria-hidden="true">
+                📎
+              </span>
+              <span className={styles.controlCopy}>
+                <span className={styles.controlTitle}>Context</span>
+                <span className={styles.controlSubtitle}>Album and filter links</span>
+              </span>
+            </div>
+
+            <div className={styles.controlMeta}>
+              {filter ? (
+                <div className={commonStyles.toast}>
+                  only showing photos from{" "}
+                  <Link href={`/album/${filter}`}>
+                    <i>{filter}</i>
+                  </Link>
+                </div>
+              ) : null}
+
+              <Link
+                href={`/album/${albumName}#${photoName}`}
+                className={commonStyles.toast}
+              >
+                {playbackContextLabel} in{" "}
+                <i>{albumName}</i>
+              </Link>
+
+              <Link
+                href={`/album/${albumName}#${photoName}`}
+                className={commonStyles.toast}
+              >
+                view photo in <i>{albumName}</i>
               </Link>
             </div>
-          ) : null}
-
-          <Link
-            href={`/album/${albumName}#${photoName}`}
-            className={commonStyles.toast}
-          >
-            {slideshowMode === "similar" ? "similar" : "random"} in{" "}
-            <i>{albumName}</i>
-          </Link>
-
-          <Link
-            href={`/album/${albumName}#${photoName}`}
-            className={commonStyles.toast}
-          >
-            view photo in <i>{albumName}</i>
-          </Link>
+          </div>
         </div>
 
         {/* Hack: render the elements twice so we can get a different context

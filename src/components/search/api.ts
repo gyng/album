@@ -37,6 +37,12 @@ const IMAGE_COLUMNS = [
   "subject",
 ] as const;
 
+const IMAGE_COLUMN_SELECTS = IMAGE_COLUMNS.map((column) => `images.${column}`);
+
+const toFtsMatchTerm = (term: string): string => {
+  return `- {path album_relative_path} : "${term.replaceAll(/[\"]/g, "'")}"`;
+};
+
 const exec = (
   db: Database,
   sql: string,
@@ -70,6 +76,7 @@ const exec = (
         console.error(`Bad query ${options?.query} ${options?.page}`, err);
       }
       reject(err);
+      return;
     }
 
     const prev =
@@ -215,14 +222,7 @@ export const fetchResults = async (opts: {
         ORDER BY rank
         LIMIT ?
         OFFSET ?`,
-      [
-        ...queries.map(
-          (q) =>
-            `- {path album_relative_path} : "${q.replaceAll(/["]/g, "'")}"`,
-        ),
-        pageSize,
-        page * pageSize,
-      ],
+      [...queries.map((q) => toFtsMatchTerm(q)), pageSize, page * pageSize],
       {
         page,
         pageSize,
@@ -236,6 +236,63 @@ export const fetchResults = async (opts: {
     console.error(`Bad query ${query} ${page}`, err);
     throw err;
   }
+};
+
+export const fetchRefinementTagCounts = async (opts: {
+  database: Database;
+  activeTerms: string[];
+  candidateTags: string[];
+}): Promise<Record<string, number>> => {
+  const { database, activeTerms, candidateTags } = opts;
+  const normalizedActiveTerms = Array.from(
+    new Set(
+      activeTerms.map((term) => term.trim().toLowerCase()).filter(Boolean),
+    ),
+  );
+  const normalizedCandidateTags = Array.from(
+    new Set(
+      candidateTags.map((tag) => tag.trim().toLowerCase()).filter(Boolean),
+    ),
+  ).filter((tag) => !normalizedActiveTerms.includes(tag));
+
+  if (
+    normalizedActiveTerms.length === 0 ||
+    normalizedCandidateTags.length === 0
+  ) {
+    return {};
+  }
+
+  const counts: Record<string, number> = {};
+  const batchSize = 24;
+
+  for (let idx = 0; idx < normalizedCandidateTags.length; idx += batchSize) {
+    const batch = normalizedCandidateTags.slice(idx, idx + batchSize);
+    const sql = batch
+      .map(
+        () =>
+          `SELECT ? AS tag, COUNT(*) AS count
+            FROM images
+            WHERE ${Array.from({ length: normalizedActiveTerms.length + 1 }, () => "images MATCH ?").join(" AND ")}`,
+      )
+      .join(" UNION ALL ");
+
+    const bind: Array<string | number> = [];
+    for (const tag of batch) {
+      bind.push(tag);
+      for (const term of [...normalizedActiveTerms, tag]) {
+        bind.push(toFtsMatchTerm(term));
+      }
+    }
+
+    const result = await exec(database, sql, bind);
+    for (const [tag, count] of result.data as unknown as Array<
+      [string, number]
+    >) {
+      counts[String(tag)] = Number(count);
+    }
+  }
+
+  return counts;
 };
 
 export const fetchSimilarResults = async (opts: {
@@ -333,6 +390,93 @@ export const fetchTags = async (opts: {
   }
 };
 
+export const fetchRecentResults = async (opts: {
+  database: Database;
+  pageSize: number;
+}): Promise<SearchResultRow[]> => {
+  const { database, pageSize } = opts;
+
+  try {
+    const recentResults = await exec(
+      database,
+      `SELECT ${IMAGE_COLUMN_SELECTS.join(", ")}
+        FROM images
+        LEFT JOIN metadata m ON m.path = images.path
+        WHERE COALESCE(
+          NULLIF(m.iso8601, ''),
+          CASE
+            WHEN instr(images.exif, 'DateTimeOriginal:') > 0 THEN trim(
+              substr(
+                images.exif,
+                instr(images.exif, 'DateTimeOriginal:') + length('DateTimeOriginal:'),
+                19
+              )
+            )
+            ELSE ''
+          END
+        ) != ''
+        ORDER BY COALESCE(
+          NULLIF(m.iso8601, ''),
+          CASE
+            WHEN instr(images.exif, 'DateTimeOriginal:') > 0 THEN trim(
+              substr(
+                images.exif,
+                instr(images.exif, 'DateTimeOriginal:') + length('DateTimeOriginal:'),
+                19
+              )
+            )
+            ELSE ''
+          END
+        ) DESC
+        LIMIT ?`,
+      [pageSize],
+    );
+
+    const rows = mapImageRows(recentResults.data as unknown as any[][]);
+
+    return rows.map((row) => ({
+      ...row,
+      snippet: row.alt_text || row.subject || row.tags || row.filename,
+    }));
+  } catch (err) {
+    console.error(`Failed to fetch recent results`, err);
+    throw err;
+  }
+};
+
+export const fetchRandomResults = async (opts: {
+  database: Database;
+  pageSize: number;
+  excludePaths?: string[];
+}): Promise<SearchResultRow[]> => {
+  const { database, pageSize, excludePaths = [] } = opts;
+
+  try {
+    const placeholders = excludePaths.map(() => "?").join(", ");
+    const whereClause =
+      excludePaths.length > 0 ? `WHERE path NOT IN (${placeholders})` : "";
+    const randomResults = await exec(
+      database,
+      `SELECT ${IMAGE_COLUMN_SELECTS.join(", ")}
+        FROM images
+        ${whereClause}
+        ORDER BY RANDOM()
+        LIMIT ?`,
+      [...excludePaths, pageSize],
+    );
+
+    const rows = mapImageRows(randomResults.data as unknown as any[][]);
+
+    return rows.map((row) => ({
+      ...row,
+      snippet: row.alt_text || row.subject || row.tags || row.filename,
+    }));
+  } catch (err) {
+    console.error(`Failed to fetch random results`, err);
+    throw err;
+  }
+};
+
 export type RandomPhotoRow = { path: string; exif: string; geocode: string };
 
 export const fetchSlideshowPhotos = async (opts: {
@@ -378,10 +522,6 @@ export const fetchRandomPhoto = async (opts: {
       [`../albums/${filter}/%`],
     );
     const row = result.data[0] as unknown as string[];
-    if (!row) {
-      return [];
-    }
-
     return [
       {
         path: row[0],

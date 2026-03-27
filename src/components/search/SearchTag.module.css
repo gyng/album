@@ -1,10 +1,13 @@
 .tag {
+  appearance: none;
   padding: var(--m);
   font-size: var(--fs-s);
   border-radius: var(--m-s);
   border: solid 1px var(--c-bg-contrast-dark);
   cursor: pointer;
   user-select: none;
+  background: transparent;
+  color: inherit;
 }
 
 .tag:hover,
@@ -13,6 +16,26 @@
   color: var(--c-bg-contrast-dark);
 }
 
+.tag:focus-visible {
+  outline: solid 2px var(--c-bg-contrast-light);
+  outline-offset: 2px;
+}
+
+.tag.disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.tag.disabled:hover,
+.tag.disabled.active {
+  background-color: transparent;
+  color: inherit;
+}
+
 .count {
+  display: inline-block;
   font-style: italic;
+  font-variant-numeric: tabular-nums;
+  min-width: 3ch;
+  text-align: right;
 }

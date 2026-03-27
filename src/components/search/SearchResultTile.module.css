@@ -16,10 +16,6 @@
   position: relative;
 }
 
-.snippet i {
-  background-color: rgba(255, 255, 255, 0.2);
-}
-
 .resultPicture {
   width: 150px;
   height: 150px;
@@ -65,10 +61,10 @@
 }
 
 .similarButton {
-  border: 0;
+  border: solid 1px var(--c-bg-contrast-light);
   border-radius: 999px;
-  background-color: rgba(0, 0, 0, 0.72);
-  color: white;
+  background-color: var(--c-bg);
+  color: inherit;
   cursor: pointer;
   font-size: 11px;
   line-height: 1;
@@ -77,7 +73,12 @@
 }
 
 .similarButton:hover {
-  background-color: rgba(0, 0, 0, 0.88);
+  background-color: var(--c-bg-contrast-light);
+}
+
+.similarButtonIcon {
+  display: inline-block;
+  filter: grayscale(100%);
 }
 
 .similarButton:focus-visible {

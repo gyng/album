@@ -5,9 +5,20 @@ import { extractDateFromExifString } from "../../util/extractExifFromDb";
 import { SearchResultRow } from "./searchTypes";
 import { getResizedAlbumImageSrc } from "../../util/getResizedAlbumImageSrc";
 
+const stripHtml = (value?: string): string => {
+  if (!value) {
+    return "";
+  }
+
+  return value
+    .replace(/<[^>]+>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+};
+
 export const SearchResultTile = (props: {
   result: SearchResultRow;
-  onFindSimilar?: (path: string) => void;
+  onFindSimilar?: (path: string, similarity?: number) => void;
 }) => {
   const { result, onFindSimilar } = props;
 
@@ -26,8 +37,14 @@ export const SearchResultTile = (props: {
   const resized = getResizedAlbumImageSrc(result.path);
   const albumName = result.path.split("/").at(-2);
   const dateTimeOriginal = extractDateFromExifString(result.exif);
-  const snippet =
-    result.snippet || result.alt_text || result.subject || result.tags;
+  const snippet = stripHtml(
+    result.snippet || result.alt_text || result.subject || result.tags,
+  );
+  const imageAlt =
+    snippet ||
+    stripHtml(result.alt_text) ||
+    stripHtml(result.subject) ||
+    stripHtml(result.tags);
   const similarityLabel =
     typeof result.similarity === "number"
       ? `${Math.round(result.similarity * 100)}% match`
@@ -54,18 +71,13 @@ export const SearchResultTile = (props: {
                 className={styles.resultPicture}
                 data-testid="result-picture"
                 src={resized}
-                alt={result.tags}
+                alt={imageAlt}
                 style={{ backgroundColor: colour }}
               ></img>
             </picture>
           </div>
           <div className={styles.details}>
             <div>
-              <div
-                className={styles.snippet}
-                dangerouslySetInnerHTML={{ __html: snippet }}
-                title={scoreTitle}
-              />
               <div className={styles.source}>
                 <div className={styles.sourceText}>{albumName}</div>
                 <div className={styles.sourceText}>
@@ -84,10 +96,10 @@ export const SearchResultTile = (props: {
                     onClick={(event) => {
                       event.preventDefault();
                       event.stopPropagation();
-                      onFindSimilar(result.path);
+                      onFindSimilar(result.path, result.similarity);
                     }}
                   >
-                    🔍
+                    <span className={styles.similarButtonIcon}>🔍</span>
                   </button>
                 ) : null}
               </div>

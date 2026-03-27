@@ -18,7 +18,8 @@ test.describe("Slideshow Functionality Tests", () => {
     await expect(page).toHaveTitle("Slideshow", { timeout: 90000 });
 
     // Look for navigation controls separately to avoid strict mode violation
-    const homeLink = page.locator('a:has-text("← Home")');
+    const homeLink = page.locator('a:has-text("Snapshots")');
+    const previousButton = page.locator('button:has-text("Previous")');
     const nextButton = page.locator('button:has-text("Next")');
 
     // Wait for at least one to appear
@@ -26,8 +27,13 @@ test.describe("Slideshow Functionality Tests", () => {
       await expect(homeLink).toBeVisible({ timeout: 15000 });
       console.log("✓ Home link found");
     } catch {
-      await expect(nextButton).toBeVisible({ timeout: 15000 });
-      console.log("✓ Next button found");
+      try {
+        await expect(previousButton).toBeVisible({ timeout: 15000 });
+        console.log("✓ Previous button found");
+      } catch {
+        await expect(nextButton).toBeVisible({ timeout: 15000 });
+        console.log("✓ Next button found");
+      }
     }
 
     console.log("✓ Slideshow navigation controls loaded");
@@ -100,6 +106,46 @@ test.describe("Slideshow Functionality Tests", () => {
     console.log("✓ Next button functionality tested");
   });
 
+  test("slideshow previous button restores the prior image", async ({
+    page,
+  }) => {
+    await page.goto("/slideshow");
+
+    await expect(page).toHaveTitle("Slideshow", { timeout: 90000 });
+
+    const slideshowImage = page
+      .locator('img[src*=".jpg"], img[src*=".JPG"], img[src*=".avif"]')
+      .first();
+    await expect(slideshowImage).toBeVisible({ timeout: 45000 });
+
+    const previousButton = page.locator('button:has-text("Previous")');
+    const nextButton = page.locator('button:has-text("Next")');
+
+    await expect(previousButton).toBeDisabled();
+
+    const firstImageSrc = await slideshowImage.getAttribute("src");
+    expect(firstImageSrc).toBeTruthy();
+
+    await nextButton.click();
+    await page.waitForFunction(
+      ([selector, previousSrc]) => {
+        const image = document.querySelector(selector);
+        return image?.getAttribute("src") !== previousSrc;
+      },
+      ['img[alt="Slideshow image"]', String(firstImageSrc)],
+      { timeout: 10000 },
+    );
+
+    const secondImageSrc = await slideshowImage.getAttribute("src");
+    expect(secondImageSrc).toBeTruthy();
+    expect(secondImageSrc).not.toBe(firstImageSrc);
+
+    await expect(previousButton).toBeEnabled();
+    await previousButton.click();
+
+    await expect(slideshowImage).toHaveAttribute("src", String(firstImageSrc));
+  });
+
   test("slideshow toggle controls work", async ({ page }) => {
     await page.goto("/slideshow");
 
@@ -127,14 +173,28 @@ test.describe("Slideshow Functionality Tests", () => {
 
     await expect(page).toHaveTitle("Slideshow", { timeout: 90000 });
 
-    const randomButton = page.locator('button:has-text("Random")');
+    const shuffleButton = page.locator('button:has-text("Shuffle")');
+    const recentButton = page.locator('button:has-text("Recent")');
     const similarButton = page.locator('button:has-text("Similar")');
+    const playbackGroup = page.locator(
+      '[role="group"][aria-label="Playback mode"]',
+    );
 
-    await expect(randomButton).toBeVisible({ timeout: 15000 });
+    await expect(playbackGroup).toBeVisible({ timeout: 15000 });
+    await expect(shuffleButton).toBeVisible({ timeout: 15000 });
+    await expect(recentButton).toBeVisible({ timeout: 15000 });
     await expect(similarButton).toBeVisible({ timeout: 15000 });
 
-    await expect(randomButton).toHaveAttribute("aria-pressed", "true");
+    await expect(shuffleButton).toHaveAttribute("aria-pressed", "true");
+    await expect(recentButton).toHaveAttribute("aria-pressed", "false");
     await expect(similarButton).toHaveAttribute("aria-pressed", "false");
+    await expect(page).toHaveURL(/mode=random/);
+
+    await recentButton.click();
+    await page.waitForTimeout(250);
+
+    await expect(recentButton).toHaveAttribute("aria-pressed", "true");
+    await expect(page).toHaveURL(/mode=weighted/);
 
     await similarButton.evaluate((button: HTMLButtonElement) => {
       button.click();
@@ -142,7 +202,14 @@ test.describe("Slideshow Functionality Tests", () => {
     await page.waitForTimeout(500);
 
     await expect(similarButton).toHaveAttribute("aria-pressed", "true");
-    await expect(randomButton).toHaveAttribute("aria-pressed", "false");
+    await expect(shuffleButton).toHaveAttribute("aria-pressed", "false");
+    await expect(page).toHaveURL(/mode=similar/);
+
+    await shuffleButton.click();
+    await page.waitForTimeout(250);
+
+    await expect(shuffleButton).toHaveAttribute("aria-pressed", "true");
+    await expect(page).toHaveURL(/mode=random/);
   });
 
   test("slideshow fullscreen button exists", async ({ page }) => {

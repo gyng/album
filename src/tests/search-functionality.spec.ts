@@ -1,6 +1,81 @@
 import { test, expect } from "@playwright/test";
 
 test.describe("Search Functionality", () => {
+  test("browse mode exposes zero-query exploration", async ({ page }) => {
+    const pageErrors: string[] = [];
+    page.on("pageerror", (error) => {
+      pageErrors.push(error.message);
+    });
+
+    await page.goto("/search");
+
+    await expect(page.getByLabel("Explore browse mode")).toBeVisible({
+      timeout: 15000,
+    });
+    await expect(
+      page.getByRole("link", { name: "Explore the map" }),
+    ).toBeVisible({ timeout: 15000 });
+    await expect(
+      page.getByRole("link", { name: "Open slideshow" }),
+    ).toBeVisible({ timeout: 15000 });
+
+    await Promise.all([
+      page.waitForURL(/\/map$/, { timeout: 15000 }),
+      page.getByRole("link", { name: "Explore the map" }).click(),
+    ]);
+
+    await expect(page).toHaveTitle("Map");
+    expect(pageErrors).toEqual([]);
+  });
+
+  test("browse mode opens slideshow via explore action", async ({ page }) => {
+    const pageErrors: string[] = [];
+    page.on("pageerror", (error) => {
+      pageErrors.push(error.message);
+    });
+
+    await page.goto("/search");
+
+    await expect(page.getByLabel("Explore browse mode")).toBeVisible({
+      timeout: 15000,
+    });
+
+    await Promise.all([
+      page.waitForURL(/\/slideshow$/, { timeout: 15000 }),
+      page.getByRole("link", { name: "Open slideshow" }).click(),
+    ]);
+
+    await expect(page.getByRole("button", { name: /random/i })).toBeVisible({
+      timeout: 15000,
+    });
+    expect(pageErrors).toEqual([]);
+  });
+
+  test("browse mode starts a random similarity trail", async ({ page }) => {
+    const pageErrors: string[] = [];
+    page.on("pageerror", (error) => {
+      pageErrors.push(error.message);
+    });
+
+    await page.goto("/search");
+
+    const randomTrailButton = page.getByRole("button", {
+      name: "Random similarity trail",
+    });
+
+    await expect(randomTrailButton).toBeEnabled({ timeout: 15000 });
+
+    await Promise.all([
+      page.waitForURL(/\/slideshow\?mode=similar&seed=/, { timeout: 15000 }),
+      randomTrailButton.click(),
+    ]);
+
+    await expect(page.getByText("Similar mode")).toBeVisible({
+      timeout: 15000,
+    });
+    expect(pageErrors).toEqual([]);
+  });
+
   test("search page loads and accepts a query", async ({ page }) => {
     const pageErrors: string[] = [];
     page.on("pageerror", (error) => {

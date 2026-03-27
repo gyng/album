@@ -63,6 +63,81 @@ test.describe("Slideshow URL Parameters Tests", () => {
     await expect(similarButton).toBeVisible({ timeout: 15000 });
 
     await expect(similarButton).toHaveAttribute("aria-pressed", "true");
+    await expect(page).toHaveURL(/mode=similar/);
+  });
+
+  test("mode parameter works with ?mode=random", async ({ page }) => {
+    await page.goto("/slideshow?mode=random", {
+      timeout: 90000,
+      waitUntil: "domcontentloaded",
+    });
+
+    await expect(page).toHaveTitle("Slideshow", { timeout: 90000 });
+
+    const shuffleButton = page.locator('button:has-text("Shuffle")');
+    await expect(shuffleButton).toBeVisible({ timeout: 15000 });
+
+    await expect(shuffleButton).toHaveAttribute("aria-pressed", "true");
+    await expect(page).toHaveURL(/mode=random/);
+  });
+
+  test("mode parameter works with ?mode=weighted", async ({ page }) => {
+    await page.goto("/slideshow?mode=weighted", {
+      timeout: 90000,
+      waitUntil: "domcontentloaded",
+    });
+
+    await expect(page).toHaveTitle("Slideshow", { timeout: 90000 });
+
+    const recentButton = page.locator('button:has-text("Recent")');
+    await expect(recentButton).toBeVisible({ timeout: 15000 });
+
+    await expect(recentButton).toHaveAttribute("aria-pressed", "true");
+    await expect(page).toHaveURL(/mode=weighted/);
+  });
+
+  test("current slideshow image is reflected in the photo parameter", async ({
+    page,
+  }) => {
+    await page.goto("/slideshow?mode=random&filter=snapshots", {
+      timeout: 90000,
+      waitUntil: "domcontentloaded",
+    });
+
+    await expect(page).toHaveTitle("Slideshow", { timeout: 90000 });
+
+    const image = page.locator('img[alt="Slideshow image"]');
+    await expect(image).toBeVisible({ timeout: 45000 });
+
+    await page.waitForFunction(
+      () => new URL(window.location.href).searchParams.has("photo"),
+      { timeout: 10000 },
+    );
+
+    const firstPhotoParam = await page.evaluate(() =>
+      new URL(window.location.href).searchParams.get("photo"),
+    );
+
+    expect(firstPhotoParam).toContain("../albums/snapshots/");
+
+    const nextButton = page.locator('button:has-text("Next")');
+    await expect(nextButton).toBeVisible({ timeout: 15000 });
+    await nextButton.click();
+
+    await page.waitForFunction(
+      (previousPhotoParam) =>
+        new URL(window.location.href).searchParams.get("photo") !==
+        previousPhotoParam,
+      firstPhotoParam,
+      { timeout: 10000 },
+    );
+
+    const secondPhotoParam = await page.evaluate(() =>
+      new URL(window.location.href).searchParams.get("photo"),
+    );
+
+    expect(secondPhotoParam).toContain("../albums/snapshots/");
+    expect(secondPhotoParam).not.toBe(firstPhotoParam);
   });
 
   test("map parameter works with ?map=1", async ({ page }) => {
@@ -214,14 +289,16 @@ test.describe("Slideshow URL Parameters Tests", () => {
 
     await expect(page).toHaveTitle("Slideshow", { timeout: 90000 });
 
-    const randomButton = page.locator('button:has-text("Random")');
+    const shuffleButton = page.locator('button:has-text("Shuffle")');
     const image = page.locator('img[alt="Slideshow image"]');
 
-    await expect(randomButton).toBeVisible({ timeout: 15000 });
-    await expect(randomButton).toHaveAttribute("aria-pressed", "true");
+    await expect(shuffleButton).toBeVisible({ timeout: 15000 });
+    await expect(shuffleButton).toHaveAttribute("aria-pressed", "true");
     await expect(image).toBeVisible({ timeout: 30000 });
 
-    console.log("✓ Shuffle parameter ?shuffle=50 is ignored cleanly in random mode");
+    console.log(
+      "✓ Shuffle parameter ?shuffle=50 is ignored cleanly in random mode",
+    );
   });
 
   test("combined parameters work together", async ({ page }) => {
@@ -239,15 +316,15 @@ test.describe("Slideshow URL Parameters Tests", () => {
     const clockButton = page.locator('button:has-text("🕰️")');
     const detailsButton = page.locator('button:has-text("Details")');
     const alignmentButton = page.locator('button:has-text("📍")');
-    const randomButton = page.locator('button:has-text("Random")');
+    const shuffleButton = page.locator('button:has-text("Shuffle")');
 
     await expect(clockButton).toBeVisible({ timeout: 15000 });
     await expect(detailsButton).toBeVisible({ timeout: 15000 });
-    await expect(randomButton).toBeVisible({ timeout: 15000 });
+    await expect(shuffleButton).toBeVisible({ timeout: 15000 });
 
     await expect(clockButton).toHaveAttribute("aria-pressed", "true");
     await expect(detailsButton).toHaveAttribute("aria-pressed", "true");
-    await expect(randomButton).toHaveAttribute("aria-pressed", "true");
+    await expect(shuffleButton).toHaveAttribute("aria-pressed", "true");
 
     try {
       await expect(alignmentButton).toContainText("Left");
