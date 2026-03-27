@@ -22,6 +22,26 @@ type EmbeddingRow = {
   embedding_json: string;
 };
 
+type RankedVectorResult = {
+  path: string;
+  similarity: number;
+};
+
+type RankedKeywordResult = {
+  path: string;
+  bm25: number;
+};
+
+type RankedHybridResult = {
+  path: string;
+  similarity?: number;
+  bm25?: number;
+  rrfScore: number;
+};
+
+const DEFAULT_EMBEDDING_MODEL_ID = "google/siglip-base-patch16-224";
+const RECIPROCAL_RANK_FUSION_K = 60;
+
 const IMAGE_COLUMNS = [
   "path",
   "album_relative_path",
@@ -131,6 +151,95 @@ const cosineSimilarity = (left: number[], right: number[]): number => {
   }
 
   return dot / (Math.sqrt(leftNorm) * Math.sqrt(rightNorm));
+};
+
+const getResultSnippet = (row: SearchResultRow): string => {
+  return row.snippet || row.alt_text || row.subject || row.tags;
+};
+
+const rankEmbeddingsByVector = async (opts: {
+  database: Database;
+  queryVector: number[];
+  modelId: string;
+  excludePaths?: string[];
+}): Promise<RankedVectorResult[]> => {
+  const { database, queryVector, modelId, excludePaths = [] } = opts;
+  const excluded = new Set(excludePaths);
+  const candidates = await fetchEmbeddingsByModel(database, modelId);
+
+  return candidates
+    .filter((candidate) => !excluded.has(candidate.path))
+    .map((candidate) => ({
+      path: candidate.path,
+      similarity: cosineSimilarity(
+        queryVector,
+        JSON.parse(candidate.embedding_json) as number[],
+      ),
+    }))
+    .sort((left, right) => right.similarity - left.similarity);
+};
+
+const fetchKeywordRanking = async (opts: {
+  database: Database;
+  query: string;
+}): Promise<RankedKeywordResult[]> => {
+  const { database, query } = opts;
+  const queries = query.split("|").map((term) => term.trim()).filter(Boolean);
+
+  if (queries.length === 0) {
+    return [];
+  }
+
+  const result = await exec(
+    database,
+    `SELECT path, bm25(images) AS bm25
+      FROM images
+      WHERE ${Array.from({ length: queries.length }, () => "images MATCH ?").join(" AND ")}
+      ORDER BY rank`,
+    queries.map((term) => toFtsMatchTerm(term)),
+    { query },
+  );
+
+  return (result.data as unknown as any[][]).map((row) => ({
+    path: String(row[0]),
+    bm25: Number(row[1]),
+  }));
+};
+
+const fuseRankingsWithRrf = (rankings: {
+  keywordResults: RankedKeywordResult[];
+  vectorResults: RankedVectorResult[];
+}): RankedHybridResult[] => {
+  const { keywordResults, vectorResults } = rankings;
+  const fused = new Map<string, RankedHybridResult>();
+
+  keywordResults.forEach((result, index) => {
+    const current = fused.get(result.path) ?? {
+      path: result.path,
+      rrfScore: 0,
+    };
+    current.bm25 = result.bm25;
+    current.rrfScore += 1 / (RECIPROCAL_RANK_FUSION_K + index + 1);
+    fused.set(result.path, current);
+  });
+
+  vectorResults.forEach((result, index) => {
+    const current = fused.get(result.path) ?? {
+      path: result.path,
+      rrfScore: 0,
+    };
+    current.similarity = result.similarity;
+    current.rrfScore += 1 / (RECIPROCAL_RANK_FUSION_K + index + 1);
+    fused.set(result.path, current);
+  });
+
+  return Array.from(fused.values()).sort((left, right) => {
+    if (right.rrfScore !== left.rrfScore) {
+      return right.rrfScore - left.rrfScore;
+    }
+
+    return (right.similarity ?? 0) - (left.similarity ?? 0);
+  });
 };
 
 const fetchResultsByPaths = async (
@@ -310,20 +419,12 @@ export const fetchSimilarResults = async (opts: {
     }
 
     const queryVector = JSON.parse(queryEmbedding.embedding_json) as number[];
-    const candidates = await fetchEmbeddingsByModel(
+    const rankedPaths = await rankEmbeddingsByVector({
       database,
-      queryEmbedding.model_id,
-    );
-    const rankedPaths = candidates
-      .filter((candidate) => candidate.path !== path)
-      .map((candidate) => ({
-        path: candidate.path,
-        similarity: cosineSimilarity(
-          queryVector,
-          JSON.parse(candidate.embedding_json) as number[],
-        ),
-      }))
-      .sort((left, right) => right.similarity - left.similarity);
+      queryVector,
+      modelId: queryEmbedding.model_id,
+      excludePaths: [path],
+    });
 
     const pageSlice = rankedPaths.slice(page * pageSize, (page + 1) * pageSize);
     const details = await fetchResultsByPaths(
@@ -340,7 +441,7 @@ export const fetchSimilarResults = async (opts: {
       }
       resolvedRows.push({
         ...row,
-        snippet: row.snippet || row.alt_text || row.subject || row.tags,
+        snippet: getResultSnippet(row),
         similarity: candidate.similarity,
       });
     }
@@ -357,6 +458,137 @@ export const fetchSimilarResults = async (opts: {
     }
 
     console.error(`Failed to fetch similar results for ${path}`, err);
+    throw err;
+  }
+};
+
+export const fetchSemanticResults = async (opts: {
+  database: Database;
+  textQuery: string;
+  textVector: number[];
+  pageSize: number;
+  page: number;
+  modelId?: string;
+}): Promise<PaginatedSearchResult> => {
+  const {
+    database,
+    textQuery,
+    textVector,
+    page,
+    pageSize,
+    modelId = DEFAULT_EMBEDDING_MODEL_ID,
+  } = opts;
+
+  try {
+    const rankedPaths = await rankEmbeddingsByVector({
+      database,
+      queryVector: textVector,
+      modelId,
+    });
+    const pageSlice = rankedPaths.slice(page * pageSize, (page + 1) * pageSize);
+    const details = await fetchResultsByPaths(
+      database,
+      pageSlice.map((candidate) => candidate.path),
+    );
+    const detailMap = new Map(details.map((row) => [row.path, row]));
+
+    const resolvedRows: SearchResultRow[] = [];
+    for (const candidate of pageSlice) {
+      const row = detailMap.get(candidate.path);
+      if (!row) {
+        continue;
+      }
+
+      resolvedRows.push({
+        ...row,
+        snippet: getResultSnippet(row),
+        similarity: candidate.similarity,
+      });
+    }
+
+    return {
+      data: resolvedRows,
+      prev: page <= 0 ? undefined : page - 1,
+      next: rankedPaths.length > (page + 1) * pageSize ? page + 1 : undefined,
+      query: textQuery,
+    };
+  } catch (err) {
+    if (isMissingEmbeddingsTableError(err)) {
+      return { data: [], query: textQuery, prev: undefined, next: undefined };
+    }
+
+    console.error(`Failed to fetch semantic results for ${textQuery}`, err);
+    throw err;
+  }
+};
+
+export const fetchHybridResults = async (opts: {
+  database: Database;
+  textQuery: string;
+  textVector: number[];
+  pageSize: number;
+  page: number;
+  modelId?: string;
+  keywordQuery?: string;
+}): Promise<PaginatedSearchResult> => {
+  const {
+    database,
+    textQuery,
+    textVector,
+    page,
+    pageSize,
+    modelId = DEFAULT_EMBEDDING_MODEL_ID,
+    keywordQuery = textQuery,
+  } = opts;
+
+  try {
+    const [keywordResults, vectorResults] = await Promise.all([
+      fetchKeywordRanking({ database, query: keywordQuery }),
+      rankEmbeddingsByVector({
+        database,
+        queryVector: textVector,
+        modelId,
+      }),
+    ]);
+    const fusedResults = fuseRankingsWithRrf({
+      keywordResults,
+      vectorResults,
+    });
+    const pageSlice = fusedResults.slice(page * pageSize, (page + 1) * pageSize);
+    const details = await fetchResultsByPaths(
+      database,
+      pageSlice.map((candidate) => candidate.path),
+    );
+    const detailMap = new Map(details.map((row) => [row.path, row]));
+
+    const resolvedRows: SearchResultRow[] = [];
+    for (const candidate of pageSlice) {
+      const row = detailMap.get(candidate.path);
+      if (!row) {
+        continue;
+      }
+
+      resolvedRows.push({
+        ...row,
+        snippet: getResultSnippet(row),
+        bm25: candidate.bm25,
+        similarity: candidate.similarity,
+        rrfScore: candidate.rrfScore,
+      });
+    }
+
+    return {
+      data: resolvedRows,
+      prev: page <= 0 ? undefined : page - 1,
+      next: fusedResults.length > (page + 1) * pageSize ? page + 1 : undefined,
+      query: textQuery,
+    };
+  } catch (err) {
+    if (isMissingEmbeddingsTableError(err)) {
+      return { data: [], query: textQuery, prev: undefined, next: undefined };
+    }
+
+    console.error(`Failed to fetch hybrid results for ${textQuery}`, err);
     throw err;
   }
 };

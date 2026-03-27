@@ -21,6 +21,7 @@
     "test:e2e:headed": "echo \"CI env: $CI\" && npm run build && playwright test --headed"
   },
   "dependencies": {
+    "@huggingface/transformers": "^3.8.1",
     "@sqlite.org/sqlite-wasm": "^3.50.4-build1",
     "@tanstack/react-query": "^5.90.12",
     "@vercel/analytics": "^1.6.1",

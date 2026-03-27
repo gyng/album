@@ -14,4 +14,5 @@ export type SearchResultRow = {
   snippet?: string;
   bm25?: number;
   similarity?: number;
+  rrfScore?: number;
 };

@@ -12,10 +12,12 @@ import styles from "./Search.module.css";
 import { useInfiniteQuery, keepPreviousData } from "@tanstack/react-query";
 import {
   fetchRefinementTagCounts,
+  fetchHybridResults,
   fetchRecentResults,
   fetchRandomResults,
   fetchResults,
   fetchRandomPhoto,
+  fetchSemanticResults,
   fetchSimilarResults,
   fetchTags,
   PaginatedSearchResult,
@@ -26,15 +28,19 @@ import { useDatabase } from "../database/useDatabase";
 import { ProgressBar } from "../ProgressBar";
 import { getResizedAlbumImageSrc } from "../../util/getResizedAlbumImageSrc";
 import { SearchResultRow } from "./searchTypes";
+import { encodeSearchText, warmupTextEmbeddingModel } from "./textEmbeddings";
 
 type Tag = {
   name: string;
   count: number;
 };
 
+type SearchMode = "keyword" | "semantic" | "hybrid";
+
 type InitialSearchState = {
   searchQuery: string[];
   similarPath: string | null;
+  searchMode: SearchMode;
   hasHydratedFromUrl: boolean;
 };
 
@@ -80,11 +86,24 @@ const dedupeTags = (tags: Tag[]): Tag[] => {
   );
 };
 
+const parseSearchTerms = (value: string): string[] => {
+  if (value === "") {
+    return [];
+  }
+
+  return value.split(",");
+};
+
+const isSearchMode = (value: string | null): value is SearchMode => {
+  return value === "keyword" || value === "semantic" || value === "hybrid";
+};
+
 const getInitialSearchState = (): InitialSearchState => {
   if (typeof window === "undefined") {
     return {
       searchQuery: [],
       similarPath: null,
+      searchMode: "keyword",
       hasHydratedFromUrl: false,
     };
   }
@@ -95,6 +114,9 @@ const getInitialSearchState = (): InitialSearchState => {
   return {
     searchQuery: query ? query.split(",").map((value) => value.trim()) : [],
     similarPath: url.searchParams.get("similar"),
+    searchMode: isSearchMode(url.searchParams.get("mode"))
+      ? (url.searchParams.get("mode") as SearchMode)
+      : "keyword",
     hasHydratedFromUrl: true,
   };
 };
@@ -117,24 +139,48 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
   const RECENT_ROW_LOAD_MORE_SIZE = 16;
   const RANDOM_ROW_INITIAL_SIZE = 7;
   const RANDOM_ROW_LOAD_MORE_SIZE = 8;
-  const [searchQuery, setSearchQuery] = useState<string[]>([]);
+  const [searchInputValue, setSearchInputValue] = useState<string>("");
+  const [searchMode, setSearchMode] = useState<SearchMode>("keyword");
   const [similarPath, setSimilarPath] = useState<string | null>(null);
   const [similarTrail, setSimilarTrail] = useState<SimilarTrailItem[]>([]);
   const [hasHydratedFromUrl, setHasHydratedFromUrl] = useState<boolean>(false);
-  const [debouncedSearchQuery] = useDebounce(searchQuery, 600);
+  const [textVector, setTextVector] = useState<number[] | null>(null);
+  const [textVectorQuery, setTextVectorQuery] = useState<string | null>(null);
+  const [isTextVectorLoading, setIsTextVectorLoading] = useState<boolean>(false);
+  const [textModelProgress, setTextModelProgress] = useState<number>(100);
+  const [textModelStage, setTextModelStage] = useState<string>("Loading semantic search model...");
+  const [textModelProgressDetails, setTextModelProgressDetails] = useState<{
+    loaded: number;
+    total: number;
+    file?: string;
+  }>({ loaded: 0, total: 0 });
+  const [textVectorError, setTextVectorError] = useState<string | null>(null);
+  const [debouncedSearchInputValue] = useDebounce(searchInputValue, 600);
   const inputRef = useRef<HTMLInputElement>(null);
   const modeSourceRef = useRef<HTMLDivElement | null>(null);
   const randomLoadMoreButtonRef = useRef<HTMLButtonElement | null>(null);
   const breadcrumbRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const breadcrumbPositionsRef = useRef<Record<string, DOMRect>>({});
-  const [database, progress] = useDatabase();
+  const [database, progress, databaseProgressDetails] = useDatabase();
+  const searchQuery = useMemo(
+    () => parseSearchTerms(searchInputValue),
+    [searchInputValue],
+  );
+  const debouncedSearchQuery = useMemo(
+    () => parseSearchTerms(debouncedSearchInputValue),
+    [debouncedSearchInputValue],
+  );
   const isSimilarMode = Boolean(similarPath);
   const trimmedQuery = debouncedSearchQuery.join(" ").trim();
   const hasSearchQuery = trimmedQuery.length > 0;
+  const keywordQuery = debouncedSearchQuery.join("|");
+  const needsTextVector = !isSimilarMode && hasSearchQuery && searchMode !== "keyword";
+  const hasCurrentTextVector = Boolean(textVector) && textVectorQuery === trimmedQuery;
   const canRunQuery =
     hasHydratedFromUrl &&
     Boolean(database) &&
-    (Boolean(similarPath) || hasSearchQuery);
+    (Boolean(similarPath) ||
+      (hasSearchQuery && (searchMode === "keyword" || hasCurrentTextVector)));
   const similarFilename = similarPath?.split("/").at(-1) ?? null;
   const similarPreviewSrc = similarPath
     ? getResizedAlbumImageSrc(similarPath)
@@ -142,13 +188,98 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
 
   useEffect(() => {
     const initialSearchState = getInitialSearchState();
-    setSearchQuery(initialSearchState.searchQuery);
+    setSearchInputValue(initialSearchState.searchQuery.join(","));
     setSimilarPath(initialSearchState.similarPath);
+    setSearchMode(initialSearchState.searchMode);
     setHasHydratedFromUrl(initialSearchState.hasHydratedFromUrl);
   }, []);
 
+  useEffect(() => {
+    if (isSimilarMode || searchMode === "keyword") {
+      return;
+    }
+
+    setTextModelProgress(0);
+    setTextModelStage("Loading semantic search model...");
+    setTextModelProgressDetails({ loaded: 0, total: 0 });
+
+    void warmupTextEmbeddingModel((progress, stage, details) => {
+      setTextModelProgress(progress);
+      setTextModelStage(stage);
+      setTextModelProgressDetails(details ?? { loaded: 0, total: 0 });
+    })
+    .then(() => {
+      setTextModelProgress(100);
+      setTextModelStage("Search model ready");
+      setTextModelProgressDetails({ loaded: 0, total: 0 });
+    })
+    .catch((err) => {
+      console.warn("Failed to warm semantic search model", err);
+      setTextModelProgress(100);
+      setTextModelProgressDetails({ loaded: 0, total: 0 });
+    });
+  }, [isSimilarMode, searchMode]);
+
+  useEffect(() => {
+    if (!needsTextVector) {
+      setTextVector(null);
+      setTextVectorQuery(null);
+      setIsTextVectorLoading(false);
+      setTextVectorError(null);
+      setTextModelProgressDetails({ loaded: 0, total: 0 });
+      return;
+    }
+
+    let didCancel = false;
+    const queryText = trimmedQuery;
+    setTextVector(null);
+    setTextVectorQuery(null);
+    setIsTextVectorLoading(true);
+    setTextVectorError(null);
+
+    encodeSearchText(queryText, (progress, stage, details) => {
+      setTextModelProgress(progress);
+      setTextModelStage(stage);
+      setTextModelProgressDetails(details ?? { loaded: 0, total: 0 });
+    })
+      .then((vector) => {
+        if (!didCancel) {
+          setTextVector(vector);
+          setTextVectorQuery(queryText);
+          setTextModelProgress(100);
+          setTextModelStage("Search model ready");
+          setTextModelProgressDetails({ loaded: 0, total: 0 });
+        }
+      })
+      .catch((err) => {
+        if (!didCancel) {
+          console.error("Failed to encode semantic search text", err);
+          setTextVector(null);
+          setTextVectorError("Semantic search is unavailable right now.");
+          setTextModelProgressDetails({ loaded: 0, total: 0 });
+        }
+      })
+      .finally(() => {
+        if (!didCancel) {
+          setIsTextVectorLoading(false);
+        }
+      });
+
+    return () => {
+      didCancel = true;
+    };
+  }, [needsTextVector, trimmedQuery]);
+
   const reactQuery = useInfiniteQuery({
-    queryKey: ["results", { debouncedSearchQuery, similarPath }],
+    queryKey: [
+      "results",
+      {
+        debouncedSearchQuery,
+        similarPath,
+        searchMode,
+        hasTextVector: hasCurrentTextVector,
+      },
+    ],
     queryFn: async ({ pageParam }: { pageParam: number }) => {
       if (!database) {
         return {
@@ -167,6 +298,27 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
         });
       }
 
+      if (searchMode === "semantic" && textVector && hasCurrentTextVector) {
+        return await fetchSemanticResults({
+          database,
+          textQuery: trimmedQuery,
+          textVector,
+          pageSize: PAGE_SIZE,
+          page: pageParam,
+        });
+      }
+
+      if (searchMode === "hybrid" && textVector && hasCurrentTextVector) {
+        return await fetchHybridResults({
+          database,
+          textQuery: trimmedQuery,
+          keywordQuery,
+          textVector,
+          pageSize: PAGE_SIZE,
+          page: pageParam,
+        });
+      }
+
       if (!hasSearchQuery) {
         return {
           data: [],
@@ -177,7 +329,7 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
 
       return await fetchResults({
         database,
-        query: debouncedSearchQuery.join("|"),
+        query: keywordQuery,
         pageSize: PAGE_SIZE,
         page: pageParam,
       });
@@ -217,11 +369,16 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
     const searchParams = new URLSearchParams(window.location.search);
     searchParams.delete("q");
     searchParams.delete("similar");
+    searchParams.delete("mode");
 
     if (similarPath) {
       searchParams.set("similar", similarPath);
     } else if (debouncedSearchQuery.length > 0) {
       searchParams.set("q", debouncedSearchQuery.join(","));
+    }
+
+    if (searchMode !== "keyword") {
+      searchParams.set("mode", searchMode);
     }
 
     const url = new URL(window.location.toString());
@@ -237,7 +394,7 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
     } catch (err) {
       console.warn("Failed to sync search URL", err);
     }
-  }, [debouncedSearchQuery, hasHydratedFromUrl, similarPath]);
+  }, [debouncedSearchQuery, hasHydratedFromUrl, searchMode, similarPath]);
 
   useEffect(() => {
     function handler(ev: KeyboardEvent) {
@@ -408,6 +565,15 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
       searchQuery.map((term) => term.trim().toLowerCase()).filter(Boolean),
     [searchQuery],
   );
+  const normalizedDebouncedSearchTerms = useMemo(
+    () =>
+      debouncedSearchQuery
+        .map((term) => term.trim().toLowerCase())
+        .filter(Boolean),
+    [debouncedSearchQuery],
+  );
+  const normalizedDebouncedSearchTermsKey =
+    normalizedDebouncedSearchTerms.join("|");
   const normalizedSearchTermsKey = normalizedSearchTerms.join("|");
   const normalizedTagNames = useMemo(
     () => normalizedTags.map((tag) => tag.name),
@@ -427,9 +593,9 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
     ...similarTrail.map((item) => item.path),
     ...(similarPath ? [similarPath] : []),
   ]);
-  const isEmptyState = !isSimilarMode && searchQuery.join("").trim() === "";
+  const isEmptyState = !isSimilarMode && searchInputValue.trim() === "";
   const queryResults = data?.pages.flatMap((page) => page.data);
-  const canClear = isSimilarMode || searchQuery.join("").trim() !== "";
+  const canClear = isSimilarMode || searchInputValue.trim() !== "";
   const [refinementCounts, setRefinementCounts] = useState<
     Record<string, number>
   >({});
@@ -482,7 +648,11 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
   ]);
 
   useEffect(() => {
-    if (!database || isSimilarMode || normalizedSearchTerms.length === 0) {
+    if (
+      !database ||
+      isSimilarMode ||
+      normalizedDebouncedSearchTerms.length === 0
+    ) {
       setRefinementCounts({});
       return;
     }
@@ -491,7 +661,7 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
 
     fetchRefinementTagCounts({
       database,
-      activeTerms: normalizedSearchTerms,
+      activeTerms: normalizedDebouncedSearchTerms,
       candidateTags: normalizedTagNames,
     })
       .then((counts) => {
@@ -512,8 +682,8 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
   }, [
     database,
     isSimilarMode,
-    normalizedSearchTerms,
-    normalizedSearchTermsKey,
+    normalizedDebouncedSearchTerms,
+    normalizedDebouncedSearchTermsKey,
     normalizedTagNames,
     normalizedTagNamesKey,
   ]);
@@ -607,11 +777,11 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
     setSimilarPath(null);
     setSimilarTrail([]);
     setRandomExploreError(null);
-    setSearchQuery(terms);
+    setSearchInputValue(terms.join(","));
   };
 
   const clearSearchState = () => {
-    setSearchQuery([]);
+    setSearchInputValue("");
     setSimilarPath(null);
     setSimilarTrail([]);
   };
@@ -707,12 +877,12 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
           <input
             suppressHydrationWarning
             type="text"
-            value={searchQuery.join(",")}
-            placeholder="Type / to search (try bird, model:mavica, datetime:2023)"
+            value={searchInputValue}
+            placeholder="Type / to search (try 'cat at night', 'white', 'mavica')"
             spellCheck={false}
             autoFocus
             onChange={(ev) => {
-              applySearchTerms(ev.target.value.split(",").map((s) => s.trim()));
+              applySearchTerms(ev.target.value.split(","));
             }}
             ref={inputRef}
             tabIndex={0}
@@ -736,9 +906,34 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
           ) : null}
         </div>
 
+        {!isSimilarMode ? (
+          <label className={styles.searchModeSelectLabel}>
+            <select
+              className={styles.searchModeSelect}
+              aria-label="Search mode"
+              value={searchMode}
+              onChange={(event) => {
+                setSearchMode(event.target.value as SearchMode);
+              }}
+            >
+              <option value="keyword">Keyword search</option>
+              <option value="semantic">Semantic search</option>
+              <option value="hybrid">Hybrid search</option>
+            </select>
+            <span
+              className={styles.searchModeInfo}
+              aria-label="Search mode help"
+              title="Keyword search matches indexed terms. Semantic search matches visual meaning using embeddings. Hybrid search fuses both rankings."
+            >
+              ⓘ
+            </span>
+          </label>
+        ) : null}
+
         {isSuccess &&
         !isFetching &&
         !isSimilarMode &&
+        searchMode === "keyword" &&
         trimmedQuery.length < 3 &&
         queryResults?.length === 0 ? (
           <div className={styles.searchHintInline}>
@@ -747,6 +942,20 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
         ) : null}
       </div>
 
+      {!isSimilarMode && searchMode !== "keyword" && textModelProgress < 100 ? (
+        <div className={styles.searchModeStatus}>
+          <ProgressBar
+            progress={textModelProgress}
+            details={textModelProgressDetails}
+          />
+          <div>{textModelStage}</div>
+        </div>
+      ) : null}
+
+      {!isSimilarMode && textVectorError ? (
+        <div className={styles.inlineError}>{textVectorError}</div>
+      ) : null}
+
       {isEmptyState ? (
         <section className={styles.emptyState} aria-label="Explore browse mode">
           <div className={styles.emptySections}>
@@ -754,7 +963,10 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
               <div className={styles.emptyTagsCaption}>
                 <SharedTagsCaption />
               </div>
-              <ProgressBar progress={progress} />
+              <ProgressBar
+                progress={progress}
+                details={databaseProgressDetails}
+              />
               <div className={styles.tagsContainer}>
                 {normalizedTags.map((tag) => {
                   return (
@@ -897,7 +1109,7 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
               <SharedTagsCaption />
             </div>
           </div>
-          <ProgressBar progress={progress} />
+          <ProgressBar progress={progress} details={databaseProgressDetails} />
           <div className={styles.tagsContainer}>
             {normalizedTags.map((tag) => {
               const isActive = normalizedSearchTerms.includes(tag.name);
@@ -918,13 +1130,16 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
                     setSimilarPath(null);
                     setSimilarTrail([]);
                     setRandomExploreError(null);
-                    setSearchQuery((prev) =>
-                      isActive
-                        ? prev.filter(
-                            (t) => t && t.trim().toLowerCase() !== tag.name,
+                    setSearchInputValue((prev) => {
+                      const nextTerms = parseSearchTerms(prev);
+                      const updatedTerms = isActive
+                        ? nextTerms.filter(
+                            (term) =>
+                              term && term.trim().toLowerCase() !== tag.name,
                           )
-                        : [...prev.filter((t) => t), tag.name],
-                    );
+                        : [...nextTerms.filter((term) => term), tag.name];
+                      return updatedTerms.join(",");
+                    });
                   }}
                 />
               );
@@ -963,7 +1178,7 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
                   type="button"
                   className={styles.breadcrumbRemoveButton}
                   onClick={() => {
-                    clearSearchState();
+                    truncateSimilarStack(similarTrail.length);
                   }}
                   aria-label="Clear current similarity selection"
                   title="Clear similarity selection"
@@ -1045,7 +1260,7 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
 
       <div>
         <ul className={styles.results}>
-          {isSimilarMode || searchQuery.length > 0 ? (
+          {isSimilarMode || searchInputValue.trim().length > 0 ? (
             <>
               {isSuccess &&
               !isFetching &&
@@ -1090,7 +1305,7 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
                           return;
                         }
 
-                        setSearchQuery([]);
+                        setSearchInputValue("");
                         setSimilarTrail((prev) => {
                           if (!similarPath) {
                             return prev;

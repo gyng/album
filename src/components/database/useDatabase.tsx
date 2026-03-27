@@ -4,6 +4,11 @@ import sqlite3InitModule, {
 } from "@sqlite.org/sqlite-wasm";
 import { useState, useEffect } from "react";
 
+type ProgressDetails = {
+  loaded: number;
+  total: number;
+};
+
 let cachedDatabase: Database | null = null;
 let databasePromise: Promise<Database> | null = null;
 
@@ -95,7 +100,7 @@ const loadRemoteDatabase = async (
 };
 
 const initializeSQLite = async (
-  setProgress?: (percent: number) => void,
+  setProgress?: (percent: number, details: ProgressDetails) => void,
 ): Promise<Database> => {
   let db;
   try {
@@ -121,10 +126,10 @@ const initializeSQLite = async (
 };
 
 const getDatabase = (
-  setProgress?: (percent: number) => void,
+  setProgress?: (percent: number, details: ProgressDetails) => void,
 ): Promise<Database> => {
   if (cachedDatabase) {
-    setProgress?.(100);
+    setProgress?.(100, { loaded: 0, total: 0 });
     return Promise.resolve(cachedDatabase);
   }
 
@@ -143,14 +148,25 @@ const getDatabase = (
   return databasePromise;
 };
 
-export const useDatabase = (): [Database | null, number] => {
+export const useDatabase = (): [Database | null, number, ProgressDetails] => {
   const [database, setDatabase] = useState<Database | null>(null);
   const [progress, setProgress] = useState(0);
+  const [progressDetails, setProgressDetails] = useState<ProgressDetails>({
+    loaded: 0,
+    total: 0,
+  });
 
   useEffect(() => {
     let isCancelled = false;
 
-    getDatabase(setProgress)
+    getDatabase((percent, details) => {
+      if (isCancelled) {
+        return;
+      }
+
+      setProgress(percent);
+      setProgressDetails(details);
+    })
       .then((db) => {
         if (isCancelled) {
           return;
@@ -172,5 +188,5 @@ export const useDatabase = (): [Database | null, number] => {
     };
   }, []);
 
-  return [database, progress];
+  return [database, progress, progressDetails];
 };

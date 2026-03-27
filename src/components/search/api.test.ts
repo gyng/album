@@ -1,6 +1,8 @@
 import {
+  fetchHybridResults,
   fetchRecentResults,
   fetchRefinementTagCounts,
+  fetchSemanticResults,
   fetchSimilarResults,
 } from "./api";
 
@@ -17,7 +19,7 @@ const makeDatabase = () => {
         if (bind?.[0] === "../albums/test-simple/DSCF0506-2.jpg") {
           callback([
             "../albums/test-simple/DSCF0506-2.jpg",
-            "google/siglip2-base-patch16-224",
+            "google/siglip-base-patch16-224",
             3,
             JSON.stringify([1, 0, 0]),
           ]);
@@ -31,19 +33,19 @@ const makeDatabase = () => {
       ) {
         callback([
           "../albums/test-simple/DSCF0506-2.jpg",
-          "google/siglip2-base-patch16-224",
+          "google/siglip-base-patch16-224",
           3,
           JSON.stringify([1, 0, 0]),
         ]);
         callback([
           "../albums/test-simple/DSCF0593.jpg",
-          "google/siglip2-base-patch16-224",
+          "google/siglip-base-patch16-224",
           3,
           JSON.stringify([0.9, 0.1, 0]),
         ]);
         callback([
           "../albums/test-simple/DSCF2581-2_2.jpg",
-          "google/siglip2-base-patch16-224",
+          "google/siglip-base-patch16-224",
           3,
           JSON.stringify([0, 1, 0]),
         ]);
@@ -51,6 +53,20 @@ const makeDatabase = () => {
       }
 
       if (sql.includes("FROM images") && sql.includes("WHERE path IN")) {
+        callback([
+          "../albums/test-simple/DSCF0506-2.jpg",
+          "/album/test-simple#DSCF0506-2.jpg",
+          "DSCF0506-2.jpg",
+          "",
+          "",
+          "bridge, harbor",
+          "[(0,0,0)]",
+          "Bridge over harbor",
+          "",
+          "",
+          "",
+          "",
+        ]);
         callback([
           "../albums/test-simple/DSCF0593.jpg",
           "/album/test-simple#DSCF0593.jpg",
@@ -123,6 +139,168 @@ describe("fetchSimilarResults", () => {
 
     expect(results.data).toEqual([]);
     expect(results.query).toBe("../albums/test-simple/DSCF0506-2.jpg");
+  });
+});
+
+describe("fetchSemanticResults", () => {
+  it("returns similarity-ranked results for a text embedding", async () => {
+    const results = await fetchSemanticResults({
+      database: makeDatabase() as any,
+      textQuery: "harbor skyline",
+      textVector: [1, 0, 0],
+      page: 0,
+      pageSize: 2,
+      modelId: "google/siglip-base-patch16-224",
+    });
+
+    if ((results.data.length ?? 0) !== 2) {
+      throw new Error(`Expected 2 results, got ${results.data.length ?? 0}`);
+    }
+
+    expect(results.data[0]?.path).toBe("../albums/test-simple/DSCF0506-2.jpg");
+    expect(results.data[1]?.path).toBe("../albums/test-simple/DSCF0593.jpg");
+    expect(Number(results.data[0]?.similarity ?? 0)).toBeGreaterThan(
+      Number(results.data[1]?.similarity ?? 0),
+    );
+    expect(results.query).toBe("harbor skyline");
+  });
+
+  it("returns no results when embeddings are unavailable", async () => {
+    const database = {
+      exec: ({ sql }: ExecArgs) => {
+        if (sql.includes("FROM embeddings")) {
+          throw new Error("SQLITE_ERROR: no such table: embeddings");
+        }
+      },
+    };
+
+    const results = await fetchSemanticResults({
+      database: database as any,
+      textQuery: "harbor skyline",
+      textVector: [1, 0, 0],
+      page: 0,
+      pageSize: 2,
+      modelId: "google/siglip-base-patch16-224",
+    });
+
+    expect(results.data).toEqual([]);
+    expect(results.query).toBe("harbor skyline");
+  });
+});
+
+describe("fetchHybridResults", () => {
+  it("fuses keyword and vector rankings with reciprocal rank fusion", async () => {
+    const database = {
+      exec: ({ sql, bind, callback }: ExecArgs) => {
+        if (
+          sql.includes("FROM images") &&
+          sql.includes("images MATCH ?") &&
+          sql.includes("ORDER BY rank")
+        ) {
+          expect(bind).toEqual([`- {path album_relative_path} : "harbor"`]);
+          callback([
+            "../albums/test-simple/DSCF0593.jpg",
+            0.9,
+          ]);
+          callback([
+            "../albums/test-simple/DSCF2581-2_2.jpg",
+            0.5,
+          ]);
+          return;
+        }
+
+        if (
+          sql.includes("FROM embeddings") &&
+          sql.includes("WHERE model_id = ?")
+        ) {
+          callback([
+            "../albums/test-simple/DSCF0506-2.jpg",
+            "google/siglip-base-patch16-224",
+            3,
+            JSON.stringify([1, 0, 0]),
+          ]);
+          callback([
+            "../albums/test-simple/DSCF0593.jpg",
+            "google/siglip-base-patch16-224",
+            3,
+            JSON.stringify([0.9, 0.1, 0]),
+          ]);
+          callback([
+            "../albums/test-simple/DSCF2581-2_2.jpg",
+            "google/siglip-base-patch16-224",
+            3,
+            JSON.stringify([0, 1, 0]),
+          ]);
+          return;
+        }
+
+        if (sql.includes("FROM images") && sql.includes("WHERE path IN")) {
+          callback([
+            "../albums/test-simple/DSCF0593.jpg",
+            "/album/test-simple#DSCF0593.jpg",
+            "DSCF0593.jpg",
+            "",
+            "",
+            "harbor, skyline",
+            "[(0,0,0)]",
+            "Harbor skyline",
+            "",
+            "",
+            "",
+            "",
+          ]);
+          callback([
+            "../albums/test-simple/DSCF0506-2.jpg",
+            "/album/test-simple#DSCF0506-2.jpg",
+            "DSCF0506-2.jpg",
+            "",
+            "",
+            "bridge, harbor",
+            "[(0,0,0)]",
+            "Bridge over harbor",
+            "",
+            "",
+            "",
+            "",
+          ]);
+          callback([
+            "../albums/test-simple/DSCF2581-2_2.jpg",
+            "/album/test-simple#DSCF2581-2_2.jpg",
+            "DSCF2581-2_2.jpg",
+            "",
+            "",
+            "night, street",
+            "[(0,0,0)]",
+            "Night street",
+            "",
+            "",
+            "",
+            "",
+          ]);
+        }
+      },
+    };
+
+    const results = await fetchHybridResults({
+      database: database as any,
+      textQuery: "harbor",
+      textVector: [1, 0, 0],
+      page: 0,
+      pageSize: 3,
+      modelId: "google/siglip-base-patch16-224",
+    });
+
+    expect(results.data.map((row) => row.path)).toEqual([
+      "../albums/test-simple/DSCF0593.jpg",
+      "../albums/test-simple/DSCF2581-2_2.jpg",
+      "../albums/test-simple/DSCF0506-2.jpg",
+    ]);
+    expect(results.data[0]?.bm25).toBe(0.9);
+    expect(Number(results.data[0]?.similarity ?? 0)).toBeGreaterThan(0);
+    expect(results.data[1]?.bm25).toBe(0.5);
+    expect(Number(results.data[1]?.rrfScore ?? 0)).toBeGreaterThan(
+      Number(results.data[2]?.rrfScore ?? 0),
+    );
   });
 });
 

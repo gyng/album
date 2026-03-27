@@ -7,11 +7,13 @@
 A zero-config, static, file-based album generator
 
 - Dump your photos in a directory and run one command to deploy
-- Index, search, explore images classified with deepseek-ai/Janus-Pro-1B
+- Browser-side keyword, semantic, and hybrid search
+- Similar-photo search and slideshow trails powered by image embeddings
+- Janus-Pro-1B metadata extraction for tags, captions, and search text
 - Colour palette analysis
 - Map mode
 - Slideshow, with clock
-- Slideshow random/similar playback modes
+- Slideshow shuffle, recent-weighted, and similar playback modes
 - EXIF support
 - YouTube video support
 - Local video support (FFmpeg web-optimised transcode)
@@ -167,6 +169,33 @@ You will need Node installed. The following steps are for deployment on Vercel, 
 
 4. To use the manifest creator, run `npm run dev` or `yarn dev` and visit your album's page. Click the `Edit` link at the top.
 
+## Search Modes
+
+The search page now supports three browser-side ranking modes:
+
+- `Keyword search`: FTS5 matches against indexed tags, descriptions, EXIF-derived text, filenames, and geocoded location text.
+- `Semantic search`: the browser embeds your query text and ranks photos by cosine similarity against stored image embeddings.
+- `Hybrid search`: keyword and semantic rankings are fused with Reciprocal Rank Fusion so strong exact matches and visually related matches can both surface.
+
+The same embeddings table is also used for photo-to-photo similarity on the search page, album detail views, and slideshow similarity trails.
+
+When you switch into semantic or hybrid mode, the site warms the text-embedding model in a web worker and shows a small progress bar while the tokenizer and model load.
+
+When you are browsing a similarity trail on the search page, the source thumbnail also includes a slideshow shortcut that opens `/slideshow?mode=similar&seed=<path>` from the current seed photo.
+
+## How Search Works
+
+There is no search backend. The full search stack runs in the browser:
+
+1. The indexing step writes a SQLite database to `src/public/search.sqlite`.
+2. The app downloads that database and opens it with SQLite WASM in the client.
+3. Keyword search runs locally with SQLite FTS5 over Janus-generated metadata plus EXIF and geocoded text.
+4. Similarity search reads precomputed image embeddings from the `embeddings` table and scores them in the browser.
+5. Semantic text search embeds the query in a worker using a SigLIP text model that is compatible with the stored image-embedding space.
+6. Hybrid search fuses the keyword and semantic rankings instead of mixing raw BM25 and cosine scores directly.
+
+This keeps deployment simple: the app stays statically hosted, with no search server or vector database to run.
+
 Be sure to configure your license for _all_ images in `src/License.tsx`. By default all photos are licensed under CC BY-NC 4.0.
 
 ## Wishlist
@@ -188,26 +217,27 @@ Analytics is integrated into the app at `_app.tsx`. Remove the `<Analytics />` c
 
 ## Dev notes
 
-Image search is implemented using Sqlite on the browser (!real serverless!). An [analysis process](index/index.py) creates this database which is dumped into Next.js's `/public` directory.
+Image search is implemented using SQLite in the browser. An [analysis process](index/index.py) creates this database which is dumped into Next.js's `/public` directory.
 
 The following fields are currently indexed
 
 - Janus-Pro 1B tags and description
-- SigLIP image embeddings for similarity search and slideshow mode
+- SigLIP-compatible image embeddings for semantic, hybrid, and similarity search
 - EXIF
 - Geocoded locations
 - Colour palette
 
-The slideshow supports two playback modes:
+The slideshow supports three playback modes:
 
-- `Random`: default behaviour, chooses the next image at random.
+- `Random`: default shuffle playback across the available photos.
+- `Weighted`: a recent-biased shuffle that prefers newer photos based on EXIF timestamps.
 - `Similar`: uses the current image as the seed and advances through visually similar photos.
 
-You can enable similarity mode from the slideshow toolbar or by opening `/slideshow?mode=similar`.
+You can switch modes from the slideshow toolbar or open them directly with `/slideshow?mode=random`, `/slideshow?mode=weighted`, or `/slideshow?mode=similar`.
 
 Previously a HTTP Range VFS driver was used for Sqlite: however the fallback either didn't work right or a new package version with that feature wasn't released. To make things easier to maintain I switched it back to the official SQLite WASM library.
 
-Sqlite in the browser then loads this database and runs a trigram full-text search. I'm running SQLite on the main thread so it doesn't need access to shared array buffers. SABs need COOP/COEP headers setup. I ran things on the main thread to remove any need for COEP/COOP header hackery (on Vercel, very difficult to debug headers!). This does mean the full database (multi-megabyte) is loaded which can take some time.
+SQLite in the browser then loads this database and runs local FTS5 queries plus embedding-based ranking. The semantic text model is loaded separately in a worker so the UI can show loading progress without blocking interaction. I'm running SQLite on the main thread so it doesn't need access to shared array buffers. SABs need COOP/COEP headers setup. I ran things on the main thread to remove any need for COOP/COEP header hackery (on Vercel, very difficult to debug headers!). This does mean the full database (multi-megabyte) is loaded which can take some time.
 
 <details>
 <summary>Details on hack needed to get COOP/COEP headers working back when the range VFS was used:</summary>

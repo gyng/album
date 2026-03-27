@@ -50,11 +50,21 @@ export const SearchResultTile = (props: {
       ? `${Math.round(result.similarity * 100)}% match`
       : null;
   const scoreTitle =
-    typeof result.similarity === "number"
-      ? result.similarity.toFixed(3)
-      : typeof result.bm25 === "number"
-        ? (result.bm25 * -1).toFixed(1)
-        : undefined;
+    typeof result.rrfScore === "number"
+      ? `Hybrid search: semantic ${
+          typeof result.similarity === "number"
+            ? `${Math.round(result.similarity * 100)}%`
+            : "n/a"
+        }, keyword ${
+          typeof result.bm25 === "number"
+            ? (result.bm25 * -1).toFixed(1)
+            : "n/a"
+        }, fused ${result.rrfScore.toFixed(3)}`
+      : typeof result.similarity === "number"
+        ? result.similarity.toFixed(3)
+        : typeof result.bm25 === "number"
+          ? (result.bm25 * -1).toFixed(1)
+          : undefined;
 
   return (
     <div className={styles.card}>
@@ -62,6 +72,21 @@ export const SearchResultTile = (props: {
         <div className={styles.similarityBadge} title={scoreTitle}>
           {similarityLabel}
         </div>
+      ) : null}
+      {onFindSimilar ? (
+        <button
+          type="button"
+          className={styles.similarButton}
+          aria-label="Find similar photos"
+          title="Find similar photos"
+          onClick={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            onFindSimilar(result.path, result.similarity);
+          }}
+        >
+          <span className={styles.similarButtonIcon}>🔍</span>
+        </button>
       ) : null}
       <Link href={result.album_relative_path} className={styles.link}>
         <div className={styles.result}>
@@ -88,20 +113,6 @@ export const SearchResultTile = (props: {
                       }).replace(" ago", "")
                     : null}
                 </div>
-                {onFindSimilar ? (
-                  <button
-                    type="button"
-                    className={styles.similarButton}
-                    aria-label="Find similar photos"
-                    onClick={(event) => {
-                      event.preventDefault();
-                      event.stopPropagation();
-                      onFindSimilar(result.path, result.similarity);
-                    }}
-                  >
-                    <span className={styles.similarButtonIcon}>🔍</span>
-                  </button>
-                ) : null}
               </div>
             </div>
           </div>

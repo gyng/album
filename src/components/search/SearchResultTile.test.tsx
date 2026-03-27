@@ -77,4 +77,37 @@ describe("SearchResultTile", () => {
 
     expect(screen.getByText("71% match")).toBeTruthy();
   });
+
+  it("shows a hybrid tooltip breakdown when semantic and keyword scores are both present", () => {
+    render(
+      <SearchResultTile
+        result={makeResult({
+          snippet: "Harbor skyline",
+          similarity: 0.7128,
+          bm25: -3.5,
+          rrfScore: 0.0312,
+        })}
+      />,
+    );
+
+    expect(screen.getByText("71% match").getAttribute("title")).toBe(
+      "Hybrid search: semantic 71%, keyword 3.5, fused 0.031",
+    );
+  });
+
+  it("shows a hybrid title breakdown even when one fused source is missing", () => {
+    render(
+      <SearchResultTile
+        result={makeResult({
+          snippet: "Harbor skyline",
+          similarity: 0.7128,
+          rrfScore: 0.0312,
+        })}
+      />,
+    );
+
+    expect(screen.getByText("71% match").getAttribute("title")).toBe(
+      "Hybrid search: semantic 71%, keyword n/a, fused 0.031",
+    );
+  });
 });

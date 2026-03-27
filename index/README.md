@@ -69,6 +69,17 @@ $ ./do-embeddings-index.sh
 
 `do-full-index.sh` uses `hybrid`. `do-embeddings-index.sh` is useful when you want to preserve the current metadata-backed `search.sqlite` and only refresh the embeddings table.
 
+## Frontend Search Pipeline
+
+The generated SQLite database drives all search features in the Next.js app:
+
+- `Keyword search` reads the FTS tables locally in the browser.
+- `Similarity search` ranks rows from the `embeddings` table against another image embedding.
+- `Semantic search` embeds user text in the browser and compares it against the same stored image vectors.
+- `Hybrid search` fuses the keyword and semantic rankings with Reciprocal Rank Fusion.
+
+If you change the embedding model family, keep the frontend text encoder and the stored image embeddings in the same embedding space. Similar-photo search can still work with image embeddings alone, but semantic text-to-image and hybrid ranking depend on that compatibility.
+
 ## Prerequisites
 
 - CUDA/GPU access ([WSL2 instructions](https://developer.nvidia.com/cuda-downloads?target_os=Linux&target_arch=x86_64&Distribution=WSL-Ubuntu&target_version=2.0&target_type=deb_local))

@@ -61,19 +61,26 @@
 }
 
 .similarButton {
-  border: solid 1px var(--c-bg-contrast-light);
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  appearance: none;
+  border: solid 1px rgba(255, 255, 255, 0.28);
   border-radius: 999px;
-  background-color: var(--c-bg);
-  color: inherit;
+  background-color: rgba(0, 0, 0, 0.72);
+  color: white;
   cursor: pointer;
   font-size: 11px;
   line-height: 1;
-  margin-left: auto;
   padding: 6px 8px;
 }
 
 .similarButton:hover {
-  background-color: var(--c-bg-contrast-light);
+  background-color: rgba(0, 0, 0, 0.84);
 }
 
 .similarButtonIcon {

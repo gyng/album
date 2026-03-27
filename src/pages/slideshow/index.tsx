@@ -257,21 +257,21 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
    *   - cover=1        Use cover mode (vs contain)
    *
    * Other parameters:
-  *   - mode=random|weighted|similar  Slideshow playback mode
-  *   - photo=<photo-path>      Start on a specific photo and keep the URL synced to the current image
-  *   - seed=<photo-path>       Similar mode only: backward-compatible alias for the starting photo
+    *   - mode=random|weighted|similar Slideshow playback mode
+    *   - photo=<photo-path>          Start on a specific photo and keep the URL synced to the current image
+    *   - seed=<photo-path>           Similar mode only: backward-compatible alias for the starting photo
    *   - align=left|center|right  Set details alignment
    *   - delay=<seconds>          Set slide duration in seconds (e.g., 60 = 60 seconds)
-  *   - shuffle=<number>         Similar mode only: avoid repeating the last N photos
+    *   - shuffle=<number>         Similar mode only: avoid repeating the last N photos
    *   - filter=<album-name>      Filter to specific album
    *
    * Examples:
    *   /?clock=1&details=1&map=1&delay=60              All features with 60-second slides
    *   /?clock=1&delay=30                              Just clock with 30-second intervals
    *   /?details=1&align=left                          Details aligned left (no clock)
-  *   /?filter=japan&delay=45                         Japan album, 45-second slides in a shuffled pass
-  *   /?mode=weighted&filter=japan                    Recent-biased weighted shuffle for one album
-  *   /?mode=similar&filter=japan&shuffle=50         Similar mode, avoid the last 50 photos
+    *   /?filter=japan&delay=45                         Japan album, 45-second slides in a shuffled pass
+    *   /?mode=weighted&filter=japan                    Recent-biased weighted shuffle for one album
+    *   /?mode=similar&filter=japan&shuffle=50          Similar mode, avoid the last 50 photos
    */
   // Parse URL search params to configure slideshow
   useEffect(() => {

@@ -187,7 +187,65 @@
   flex-direction: row;
   gap: var(--m-m);
   flex-wrap: wrap;
+  align-items: center;
   margin-bottom: var(--m-l);
+}
+
+.searchModeSelectLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--m-s);
+  flex: 0 0 auto;
+}
+
+.searchModeSelect {
+  appearance: none;
+  border: solid 2px var(--c-bg-contrast-light);
+  border-radius: var(--m-s);
+  background: var(--c-bg);
+  color: inherit;
+  font-size: var(--fs-s);
+  padding: calc(var(--m-m) + 1px) calc(var(--m-xl) + 2px)
+    calc(var(--m-m) + 1px) calc(var(--m-m) + 1px);
+  cursor: pointer;
+  min-height: 45px;
+  min-width: 132px;
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease,
+    border-color 0.15s ease;
+  background-image:
+    linear-gradient(45deg, transparent 50%, currentColor 50%),
+    linear-gradient(135deg, currentColor 50%, transparent 50%);
+  background-position:
+    calc(100% - 18px) 50%,
+    calc(100% - 12px) 50%;
+  background-size: 6px 6px, 6px 6px;
+  background-repeat: no-repeat;
+}
+
+.searchModeSelect:hover,
+.searchModeSelect:focus-visible {
+  background: var(--c-bg-contrast-light);
+  color: var(--c-bg);
+  outline: none;
+}
+
+.searchModeInfo {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--c-bg-contrast-light);
+  font-size: var(--fs-m);
+  line-height: 1;
+  cursor: help;
+  user-select: none;
+}
+
+.searchModeStatus {
+  margin-bottom: var(--m);
+  color: var(--c-bg-contrast-light);
+  font-size: var(--fs-s);
 }
 
 .searchInputContainer {
