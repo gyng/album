@@ -214,24 +214,14 @@ test.describe("Slideshow URL Parameters Tests", () => {
 
     await expect(page).toHaveTitle("Slideshow", { timeout: 90000 });
 
-    // Should have a button showing "50" active for shuffle history
-    const shuffleButton = page.locator('button:has-text("50")');
+    const randomButton = page.locator('button:has-text("Random")');
+    const image = page.locator('img[alt="Slideshow image"]');
 
-    try {
-      await expect(shuffleButton).toBeVisible({ timeout: 30000 });
+    await expect(randomButton).toBeVisible({ timeout: 15000 });
+    await expect(randomButton).toHaveAttribute("aria-pressed", "true");
+    await expect(image).toBeVisible({ timeout: 30000 });
 
-      await expect(shuffleButton).toHaveAttribute("aria-pressed", "true");
-
-      console.log("✓ Shuffle parameter ?shuffle=50 works");
-    } catch {
-      const shuffleButtons = page.locator(
-        'button:has-text("5"), button:has-text("10"), button:has-text("20")',
-      );
-      const count = await shuffleButtons.count();
-      console.log(
-        `Shuffle param processed (${count > 0 ? "shuffle controls visible" : "still loading"})`,
-      );
-    }
+    console.log("✓ Shuffle parameter ?shuffle=50 is ignored cleanly in random mode");
   });
 
   test("combined parameters work together", async ({ page }) => {
@@ -249,25 +239,20 @@ test.describe("Slideshow URL Parameters Tests", () => {
     const clockButton = page.locator('button:has-text("🕰️")');
     const detailsButton = page.locator('button:has-text("Details")');
     const alignmentButton = page.locator('button:has-text("📍")');
-    const shuffleButton = page.locator('button:has-text("20")');
+    const randomButton = page.locator('button:has-text("Random")');
 
     await expect(clockButton).toBeVisible({ timeout: 15000 });
     await expect(detailsButton).toBeVisible({ timeout: 15000 });
+    await expect(randomButton).toBeVisible({ timeout: 15000 });
 
     await expect(clockButton).toHaveAttribute("aria-pressed", "true");
     await expect(detailsButton).toHaveAttribute("aria-pressed", "true");
+    await expect(randomButton).toHaveAttribute("aria-pressed", "true");
 
     try {
       await expect(alignmentButton).toContainText("Left");
     } catch {
       // noop: alignment text may render a moment later
-    }
-
-    try {
-      await expect(shuffleButton).toBeVisible({ timeout: 10000 });
-      await expect(shuffleButton).toHaveAttribute("aria-pressed", "true");
-    } catch {
-      // Shuffle buttons may take time to load
     }
 
     console.log("✓ Combined parameters work");

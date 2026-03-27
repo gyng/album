@@ -3,7 +3,7 @@ import React, { useEffect, useCallback } from "react";
 import { useDatabase } from "../../components/database/useDatabase";
 import { PhotoBlock } from "../../services/types";
 import {
-  fetchRandomPhoto,
+  fetchSlideshowPhotos,
   fetchSimilarResults,
   RandomPhotoRow,
 } from "../../components/search/api";
@@ -23,6 +23,31 @@ import MMap from "../../components/Map";
 
 type PageProps = {};
 type SlideshowMode = "random" | "similar";
+
+const shufflePhotos = (
+  photos: RandomPhotoRow[],
+  previousLastPath?: string,
+): RandomPhotoRow[] => {
+  const shuffled = [...photos];
+
+  for (let idx = shuffled.length - 1; idx > 0; idx -= 1) {
+    const randomIdx = Math.floor(Math.random() * (idx + 1));
+    [shuffled[idx], shuffled[randomIdx]] = [shuffled[randomIdx], shuffled[idx]];
+  }
+
+  if (
+    previousLastPath &&
+    shuffled.length > 1 &&
+    shuffled[0]?.path === previousLastPath
+  ) {
+    const swapIdx = shuffled.findIndex((photo) => photo.path !== previousLastPath);
+    if (swapIdx > 0) {
+      [shuffled[0], shuffled[swapIdx]] = [shuffled[swapIdx], shuffled[0]];
+    }
+  }
+
+  return shuffled;
+};
 
 const SlideshowPage: NextPage<PageProps> = (props) => {
   return <Slideshow />;
@@ -72,6 +97,14 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
 
   const [currentPhotoPath, setCurrentPhotoPath] =
     React.useState<RandomPhotoRow | null>(null);
+  const currentPhotoPathRef = React.useRef<RandomPhotoRow | null>(null);
+  const randomPhotoPoolRef = React.useRef<RandomPhotoRow[]>([]);
+  const randomQueueRef = React.useRef<RandomPhotoRow[]>([]);
+  const randomQueueIndexRef = React.useRef<number>(-1);
+  const randomQueueLastPathRef = React.useRef<string | undefined>(undefined);
+  const [slideshowError, setSlideshowError] = React.useState<string | null>(
+    null,
+  );
 
   const [timeDelay, setTimeDelay, removeTimeDelay] = useLocalStorage(
     "slideshow-timedelay",
@@ -129,14 +162,15 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
    *   - mode=random|similar     Slideshow playback mode
    *   - align=left|center|right  Set details alignment
    *   - delay=<seconds>          Set slide duration in seconds (e.g., 60 = 60 seconds)
-   *   - shuffle=<number>         Set shuffle history size (avoid repeating last N photos)
+  *   - shuffle=<number>         Similar mode only: avoid repeating the last N photos
    *   - filter=<album-name>      Filter to specific album
    *
    * Examples:
    *   /?clock=1&details=1&map=1&delay=60              All features with 60-second slides
    *   /?clock=1&delay=30                              Just clock with 30-second intervals
    *   /?details=1&align=left                          Details aligned left (no clock)
-   *   /?filter=japan&delay=45&shuffle=50              Japan album, 45-second slides, avoid last 50
+  *   /?filter=japan&delay=45                         Japan album, 45-second slides in a shuffled pass
+  *   /?mode=similar&filter=japan&shuffle=50         Similar mode, avoid the last 50 photos
    */
   // Parse URL search params to configure slideshow
   useEffect(() => {
@@ -162,6 +196,10 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
     }
 
     const modeParam = url.searchParams.get("mode");
+    const nextMode =
+      modeParam === "random" || modeParam === "similar"
+        ? modeParam
+        : slideshowMode;
     if (modeParam === "random" || modeParam === "similar") {
       setSlideshowMode(modeParam);
     }
@@ -207,7 +245,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
 
     // Parse shuffle history size
     const historyParam = parseNum(url.searchParams.get("shuffle"));
-    if (historyParam !== null && historyParam > 0) {
+    if (nextMode === "similar" && historyParam !== null && historyParam > 0) {
       setShuffleHistorySize(historyParam);
     }
   }, [
@@ -219,59 +257,127 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
     setTimeDelay,
     setShuffleHistorySize,
     setSlideshowMode,
+    slideshowMode,
   ]);
 
   const commitNextPhoto = useCallback(
-    (candidatePhoto: RandomPhotoRow) => {
-      recentPhotoPathsRef.current = [
-        candidatePhoto.path,
-        ...recentPhotoPathsRef.current,
-      ].slice(0, shuffleHistorySize);
+    (candidatePhoto: RandomPhotoRow, opts?: { trackRecent?: boolean }) => {
+      if (opts?.trackRecent) {
+        recentPhotoPathsRef.current = [
+          candidatePhoto.path,
+          ...recentPhotoPathsRef.current,
+        ].slice(0, shuffleHistorySize);
+      }
 
+      currentPhotoPathRef.current = candidatePhoto;
       setCurrentPhotoPath(candidatePhoto);
+      setSlideshowError(null);
       setNextChangeAt(new Date(Date.now() + timeDelay));
     },
     [shuffleHistorySize, timeDelay],
   );
+
+  const refillRandomQueue = useCallback((): RandomPhotoRow[] => {
+    const nextQueue = shufflePhotos(
+      randomPhotoPoolRef.current,
+      randomQueueLastPathRef.current,
+    );
+
+    randomQueueRef.current = nextQueue;
+    randomQueueIndexRef.current = -1;
+    return nextQueue;
+  }, []);
+
+  const advanceRandomPhoto = useCallback(
+    (opts?: { trackRecent?: boolean }): RandomPhotoRow | null => {
+      if (randomPhotoPoolRef.current.length === 0) {
+        setSlideshowError("No photos available");
+        return null;
+      }
+
+      if (randomQueueRef.current.length === 0) {
+        refillRandomQueue();
+      }
+
+      let nextIndex = randomQueueIndexRef.current + 1;
+      if (nextIndex >= randomQueueRef.current.length) {
+        refillRandomQueue();
+        nextIndex = 0;
+      }
+
+      const nextPhoto = randomQueueRef.current[nextIndex] ?? null;
+      if (!nextPhoto) {
+        setSlideshowError("No photos available");
+        return null;
+      }
+
+      randomQueueIndexRef.current = nextIndex;
+      randomQueueLastPathRef.current = nextPhoto.path;
+      commitNextPhoto(nextPhoto, opts);
+      return nextPhoto;
+    },
+    [commitNextPhoto, refillRandomQueue],
+  );
+
+  useEffect(() => {
+    if (!database) {
+      return;
+    }
+
+    let cancelled = false;
+
+    fetchSlideshowPhotos({ database, filter })
+      .then((photos) => {
+        if (cancelled) {
+          return;
+        }
+
+        randomPhotoPoolRef.current = photos;
+        randomQueueRef.current = [];
+        randomQueueIndexRef.current = -1;
+        recentPhotoPathsRef.current = [];
+
+        if (photos.length === 0) {
+          setCurrentPhotoPath(null);
+          currentPhotoPathRef.current = null;
+          setSlideshowError("No photos available");
+          return;
+        }
+
+        setSlideshowError(null);
+
+        if (slideshowMode === "random" || currentPhotoPathRef.current === null) {
+          advanceRandomPhoto({ trackRecent: slideshowMode === "similar" });
+        }
+      })
+      .catch((err) => {
+        console.error(err);
+        if (!cancelled) {
+          setSlideshowError("No photos available");
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [advanceRandomPhoto, database, filter, slideshowMode]);
 
   const goNext = useCallback(() => {
     if (!database) {
       return;
     }
 
-    let attempts = 0;
-    const maxAttempts = 5;
+    if (slideshowMode === "random") {
+      advanceRandomPhoto();
+      return;
+    }
 
-    const tryFetchRandom = () => {
-      fetchRandomPhoto({ database, filter })
-        .then((result) => {
-          if (result.length === 0) {
-            console.error("No photos available");
-            return;
-          }
+    const activePhoto = currentPhotoPathRef.current;
 
-          const candidatePhoto = result[0];
-
-          // Check if photo is in recent history
-          if (
-            recentPhotoPathsRef.current.includes(candidatePhoto.path) &&
-            attempts < maxAttempts
-          ) {
-            attempts++;
-            // Retry after a small delay instead of hot-looping
-            setTimeout(tryFetchRandom, 50);
-            return;
-          }
-
-          commitNextPhoto(candidatePhoto);
-        })
-        .catch(console.error);
-    };
-
-    if (slideshowMode === "similar" && currentPhotoPath?.path) {
+    if (slideshowMode === "similar" && activePhoto?.path) {
       fetchSimilarResults({
         database,
-        path: currentPhotoPath.path,
+        path: activePhoto.path,
         page: 0,
         pageSize: Math.max(shuffleHistorySize, 100),
       })
@@ -288,7 +394,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
 
           const nextSimilar = filteredResults[0];
           if (!nextSimilar) {
-            tryFetchRandom();
+            advanceRandomPhoto({ trackRecent: true });
             return;
           }
 
@@ -296,19 +402,19 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
             path: nextSimilar.path,
             exif: nextSimilar.exif,
             geocode: nextSimilar.geocode,
-          });
+          }, { trackRecent: true });
         })
         .catch((err) => {
           console.error(err);
-          tryFetchRandom();
+          advanceRandomPhoto({ trackRecent: true });
         });
       return;
     }
 
-    tryFetchRandom();
+    advanceRandomPhoto({ trackRecent: true });
   }, [
+    advanceRandomPhoto,
     commitNextPhoto,
-    currentPhotoPath?.path,
     database,
     filter,
     shuffleHistorySize,
@@ -345,7 +451,11 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
         <div style={{ display: "none" }}>
           <ThemeToggle />
         </div>
-        <ProgressBar progress={progress} />
+        {slideshowError ? (
+          <div className={commonStyles.toast}>{slideshowError}</div>
+        ) : (
+          <ProgressBar progress={progress} />
+        )}
       </div>
     );
   }

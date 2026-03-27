@@ -47,7 +47,11 @@ const getInitialDarkMode = (): boolean | null => {
 };
 
 export const ThemeToggle: React.FC = () => {
-  const [darkMode, setDarkMode] = useState<boolean | null>(getInitialDarkMode);
+  const [darkMode, setDarkMode] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    setDarkMode(getInitialDarkMode());
+  }, []);
 
   useEffect(() => {
     if (darkMode === true) {

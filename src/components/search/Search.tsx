@@ -58,20 +58,11 @@ const getAlbumAnchorHref = (path: string): string => {
 
 export const Search: React.FC<{ disabled?: boolean }> = (props) => {
   const PAGE_SIZE = 48;
-  const [initialSearchState] = useState<InitialSearchState>(
-    getInitialSearchState,
-  );
-
-  const [searchQuery, setSearchQuery] = useState<string[]>(
-    initialSearchState.searchQuery,
-  );
-  const [similarPath, setSimilarPath] = useState<string | null>(
-    initialSearchState.similarPath,
-  );
+  const [searchQuery, setSearchQuery] = useState<string[]>([]);
+  const [similarPath, setSimilarPath] = useState<string | null>(null);
   const [similarTrail, setSimilarTrail] = useState<string[]>([]);
-  const [hasHydratedFromUrl] = useState<boolean>(
-    initialSearchState.hasHydratedFromUrl,
-  );
+  const [hasHydratedFromUrl, setHasHydratedFromUrl] =
+    useState<boolean>(false);
   const [debouncedSearchQuery] = useDebounce(searchQuery, 600);
   const inputRef = useRef<HTMLInputElement>(null);
   const [database, progress] = useDatabase();
@@ -82,6 +73,13 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
   const similarPreviewSrc = similarPath
     ? getResizedAlbumImageSrc(similarPath)
     : null;
+
+  useEffect(() => {
+    const initialSearchState = getInitialSearchState();
+    setSearchQuery(initialSearchState.searchQuery);
+    setSimilarPath(initialSearchState.similarPath);
+    setHasHydratedFromUrl(initialSearchState.hasHydratedFromUrl);
+  }, []);
 
   const reactQuery = useInfiniteQuery({
     queryKey: ["results", { debouncedSearchQuery, similarPath }],

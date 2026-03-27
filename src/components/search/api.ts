@@ -335,6 +335,32 @@ export const fetchTags = async (opts: {
 
 export type RandomPhotoRow = { path: string; exif: string; geocode: string };
 
+export const fetchSlideshowPhotos = async (opts: {
+  database: Database;
+  filter?: string;
+}): Promise<RandomPhotoRow[]> => {
+  const { database, filter = "%" } = opts;
+
+  try {
+    const result = await exec(
+      database,
+      `SELECT path, exif, geocode
+      FROM images
+      WHERE path LIKE ?`,
+      [`../albums/${filter}/%`],
+    );
+
+    return (result.data as unknown as string[][]).map((row) => ({
+      path: row[0],
+      exif: row[1],
+      geocode: row[2],
+    }));
+  } catch (err) {
+    console.error(`Failed to fetch slideshow photos`, err);
+    throw err;
+  }
+};
+
 export const fetchRandomPhoto = async (opts: {
   database: Database;
   filter?: string;
