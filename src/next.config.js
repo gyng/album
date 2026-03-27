@@ -8,6 +8,11 @@ const nextConfig = {
   staticPageGenerationTimeout: 300,
   outputFileTracingRoot: isVercelBuild ? __dirname : path.join(__dirname, ".."),
   serverExternalPackages: ["sharp", "ffmpeg-static", "ffprobe-static", "sqlite3"],
+  experimental: {
+    lightningCssFeatures: {
+      exclude: ["light-dark"],
+    },
+  },
   outputFileTracingExcludes: {
     "**": [
       "node_modules/ffmpeg-static/**",
