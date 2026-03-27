@@ -15,11 +15,20 @@ const fetchWithProgress = async (
   ) => void,
 ) => {
   const res = await fetch(url);
-  if (!res.body)
-    throw new Error("ReadableStream not yet supported in this browser.");
+  if (!res.ok) {
+    throw new Error(`Failed to fetch ${url}: ${res.status} ${res.statusText}`);
+  }
+
+  if (!res.body) {
+    onProgress(0, { loaded: 0, total: 0 });
+    return res;
+  }
+
   const contentLength = res.headers.get("content-length");
-  if (!contentLength)
-    throw new Error("Content-Length response header unavailable");
+  if (!contentLength) {
+    onProgress(0, { loaded: 0, total: 0 });
+    return res;
+  }
 
   const total = parseInt(contentLength, 10);
   let loaded = 0;
@@ -44,6 +53,10 @@ const fetchWithProgress = async (
   });
 
   return new Response(stream);
+};
+
+export const databaseLoaderInternals = {
+  fetchWithProgress,
 };
 
 const loadRemoteDatabase = async (

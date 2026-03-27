@@ -5,9 +5,9 @@ from index import (
     analyse_image_worker,
     JanusClassifier,
     Sqlite3Client,
-    search_similar_path,
     index,
     search,
+    search_similar_path,
     search_tags,
 )
 import os
@@ -163,6 +163,23 @@ class TestDb(unittest.TestCase):
             self.assertTrue(near_path in result.output)
             self.assertTrue(far_path in result.output)
             self.assertLess(result.output.find(near_path), result.output.find(far_path))
+
+    def test_siglip2_dry_run_backfills_missing_embeddings_for_existing_rows(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            dbpath = os.path.join(tmpdir, "test-simple.sqlite")
+            db = Sqlite3Client(dbpath)
+            db.setup_tables()
+            existing_path = "../albums/test-simple/DSCF0506-2.jpg"
+            db.insert_field(existing_path, field="filename", value="DSCF0506-2.jpg")
+
+            runner = CliRunner()
+            result = runner.invoke(
+                index,
+                f"--glob {existing_path} --dbpath {dbpath} --dry-run --model-profile siglip2".split(),
+            )
+
+            self.assertEqual(0, result.exit_code)
+            self.assertTrue("Analysing 1 files needing work" in result.output)
 
 
 if __name__ == "__main__":

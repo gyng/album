@@ -15,7 +15,6 @@ import uuid
 import math
 
 from transformers import AutoModel, AutoModelForCausalLM, AutoProcessor
-from transformers.image_utils import load_image
 from janus.models import MultiModalityCausalLM, VLChatProcessor
 from janus.utils.io import load_pil_images
 
@@ -93,34 +92,17 @@ class JanusClassifier:
 
 class Siglip2Embedder:
     def init_model(self) -> None:
-        candidate_model_ids = [
-            "google/siglip2-base-patch16-224",
-            "google/siglip-base-patch16-224",
-        ]
-        load_error = None
-        self.model_id = candidate_model_ids[0]
-        for model_id in candidate_model_ids:
-            try:
-                print(f"Loading image embedder {model_id}...")
-                self.processor = AutoProcessor.from_pretrained(model_id)
-                self.model = AutoModel.from_pretrained(model_id)
-                self.model_id = model_id
-                break
-            except Exception as err:
-                load_error = err
-                print(f"Failed to load image embedder {model_id}: {err}")
-        else:
-            raise RuntimeError(
-                "Failed to load any configured image embedding model"
-            ) from load_error
-
+        self.model_id = "google/siglip2-base-patch16-224"
+        print(f"Loading image embedder {self.model_id}...")
+        self.processor = AutoProcessor.from_pretrained(self.model_id)
+        self.model = AutoModel.from_pretrained(self.model_id)
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         self.model = self.model.to(self.device).eval()
         print(f"Loaded image embedder {self.model_id} on {self.device}.")
 
     @torch.inference_mode()
     def predict_image_embedding(self, path: str) -> list[float]:
-        image = load_image(path)
+        image = self.processor.image_processor.fetch_images(path)[0]
         inputs = self.processor(images=[image], return_tensors="pt")
         inputs = {k: v.to(self.device) for k, v in inputs.items()}
         features = self.model.get_image_features(**inputs)
@@ -209,6 +191,9 @@ class Sqlite3Client:
         ).fetchone()
         # Result is a Tuple
         return len(result) > 0 and result[0] > 0
+
+    def has_embedding(self, path: str) -> bool:
+        return self.get_embedding(path) is not None
 
     def insert_geocode(self, path: str, geocode: str):
         self.insert_field(path, value=geocode, field="geocode")
@@ -455,28 +440,48 @@ def index(glob: str, dbpath: str, dry_run: bool, model_profile: str):
     pprint.pprint(db.info())
 
     files = find_files(".", glob)
-    valid_files = [f for f in files if not db.already_exists(f)]
+    work_items = []
+    for file_path in files:
+        has_image = db.already_exists(file_path)
+        has_embedding = db.has_embedding(file_path)
+        needs_classifier = model_profile in [MODEL_PROFILE_JANUS, MODEL_PROFILE_HYBRID] and not has_image
+        needs_embedding = model_profile in [MODEL_PROFILE_SIGLIP2, MODEL_PROFILE_HYBRID] and not has_embedding
+
+        if needs_classifier or needs_embedding:
+            work_items.append(
+                {
+                    "path": file_path,
+                    "needs_classifier": needs_classifier,
+                    "needs_embedding": needs_embedding,
+                }
+            )
 
     print(f"Found {len(files)} files for the the glob pattern {glob}")
     print(
-        f"Analysing {len(valid_files)} unindexed files (skipping {len(files) - len(valid_files)} already-indexed)."
+        f"Analysing {len(work_items)} files needing work (skipping {len(files) - len(work_items)} already-indexed)."
     )
     print(f"Using model profile: {model_profile}")
 
-    if not dry_run and len(valid_files) > 0:
+    if not dry_run and len(work_items) > 0:
         classifier = None
         embedder = None
 
-        if model_profile in [MODEL_PROFILE_JANUS, MODEL_PROFILE_HYBRID]:
+        if any(item["needs_classifier"] for item in work_items):
             classifier = JanusClassifier()
             classifier.init_model()
 
-        if model_profile in [MODEL_PROFILE_SIGLIP2, MODEL_PROFILE_HYBRID]:
+        if any(item["needs_embedding"] for item in work_items):
             embedder = Siglip2Embedder()
             embedder.init_model()
 
         enumerated = [
-            (index, item, classifier, embedder) for index, item in enumerate(valid_files)
+            (
+                index,
+                item["path"],
+                classifier if item["needs_classifier"] else None,
+                embedder if item["needs_embedding"] else None,
+            )
+            for index, item in enumerate(work_items)
         ]
 
         # Disable concurrency as it doesn't help performance on a RTX3080
@@ -487,15 +492,18 @@ def index(glob: str, dbpath: str, dry_run: bool, model_profile: str):
                 time_now = time.perf_counter()
                 time_per_image = (time_now - start_time) / (i + 1)
                 rate = 1 / time_per_image
-                percent = i / float(len(valid_files)) * 100
-                estimated_time_min = (len(valid_files) - i) * time_per_image / 60
+                percent = i / float(len(work_items)) * 100
+                estimated_time_min = (len(work_items) - i) * time_per_image / 60
 
                 pprint.pprint(result)
                 print(
-                    f"[{percent:.1f}% {i}/{len(valid_files)} {rate:.2f}it/s {estimated_time_min:.1f}min]\tAnalysed image {result["path"]}. Inserting image..."
+                    f"[{percent:.1f}% {i}/{len(work_items)} {rate:.2f}it/s {estimated_time_min:.1f}min]\tAnalysed image {result["path"]}. Inserting image..."
                 )
                 insert_analysed_image(
-                    db=db, analysed=result.get("analysed"), path=result.get("path")
+                    db=db,
+                    analysed=result.get("analysed"),
+                    path=result.get("path"),
+                    include_classifier_fields=result.get("used_classifier", False),
                 )
 
 
@@ -758,13 +766,14 @@ def analyse_image_worker(
             return {
                 "path": path,
                 "analysed": analysed,
+                "used_classifier": classifier is not None,
             }
     except (KeyboardInterrupt, SystemExit):
         print("Exiting...")
         return (index, False)
 
 
-def insert_analysed_image(db, analysed: Mapping, path):
+def insert_analysed_image(db, analysed: Mapping, path, include_classifier_fields: bool = True):
     db.insert_field(path, field="filename", value=get_filename(path))
     db.insert_field(
         path,
@@ -777,25 +786,31 @@ def insert_analysed_image(db, analysed: Mapping, path):
         field="colors",
         value=format_mapping(analysed.get("colors")),
     )
-    db.insert_field(path, field="alt_text", value=analysed.get("alt_text"))
-    db.insert_field(path, field="critique", value=analysed.get("critique"))
-    db.insert_field(
-        path, field="suggested_title", value=analysed.get("suggested_title")
-    )
-    db.insert_field(
-        path, field="composition_critique", value=analysed.get("composition_critique")
-    )
-    db.insert_field(path, field="subject", value=analysed.get("subject"))
 
     geocode = analysed.get("geocode")
     if geocode:
         db.insert_geocode(path, format_mapping_values(geocode))
+
+    if include_classifier_fields:
+        db.insert_field(path, field="alt_text", value=analysed.get("alt_text"))
+        db.insert_field(path, field="critique", value=analysed.get("critique"))
+        db.insert_field(
+            path, field="suggested_title", value=analysed.get("suggested_title")
+        )
+        db.insert_field(
+            path,
+            field="composition_critique",
+            value=analysed.get("composition_critique"),
+        )
+        db.insert_field(path, field="subject", value=analysed.get("subject"))
+
         db.insert_tag(geocode["country"])
         db.insert_tag(geocode["city"])
         db.insert_tag(geocode["country_code"])
-    db.insert_field(path, field="tags", value=", ".join(analysed.get("tags")))
-    for tag in analysed.get("tags"):
-        db.insert_tag(tag)
+
+        db.insert_field(path, field="tags", value=", ".join(analysed.get("tags")))
+        for tag in analysed.get("tags"):
+            db.insert_tag(tag)
 
     db.insert_metadata(
         path,
