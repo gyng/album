@@ -409,8 +409,9 @@ export const fetchSimilarResults = async (opts: {
   path: string;
   pageSize: number;
   page: number;
+  offset?: number;
 }): Promise<PaginatedSearchResult> => {
-  const { database, path, page, pageSize } = opts;
+  const { database, path, page, pageSize, offset } = opts;
 
   try {
     const queryEmbedding = await fetchEmbeddingByPath(database, path);
@@ -426,7 +427,9 @@ export const fetchSimilarResults = async (opts: {
       excludePaths: [path],
     });
 
-    const pageSlice = rankedPaths.slice(page * pageSize, (page + 1) * pageSize);
+    const start = typeof offset === "number" ? offset : page * pageSize;
+    const end = start + pageSize;
+    const pageSlice = rankedPaths.slice(start, end);
     const details = await fetchResultsByPaths(
       database,
       pageSlice.map((candidate) => candidate.path),
@@ -448,8 +451,20 @@ export const fetchSimilarResults = async (opts: {
 
     return {
       data: resolvedRows,
-      prev: page <= 0 ? undefined : page - 1,
-      next: rankedPaths.length > (page + 1) * pageSize ? page + 1 : undefined,
+      prev:
+        typeof offset === "number"
+          ? start <= 0
+            ? undefined
+            : Math.max(0, start - pageSize)
+          : page <= 0
+            ? undefined
+            : page - 1,
+      next:
+        rankedPaths.length > end
+          ? typeof offset === "number"
+            ? end
+            : page + 1
+          : undefined,
       query: path,
     };
   } catch (err) {

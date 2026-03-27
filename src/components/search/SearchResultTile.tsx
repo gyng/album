@@ -45,9 +45,15 @@ export const SearchResultTile = (props: {
     stripHtml(result.alt_text) ||
     stripHtml(result.subject) ||
     stripHtml(result.tags);
+  const visibleMatchScore =
+    typeof result.rrfScore === "number"
+      ? result.rrfScore
+      : typeof result.similarity === "number"
+        ? result.similarity
+        : null;
   const similarityLabel =
-    typeof result.similarity === "number"
-      ? `${Math.round(result.similarity * 100)}% match`
+    typeof visibleMatchScore === "number"
+      ? `${Math.round(visibleMatchScore * 100)}% match`
       : null;
   const scoreTitle =
     typeof result.rrfScore === "number"
@@ -59,7 +65,7 @@ export const SearchResultTile = (props: {
           typeof result.bm25 === "number"
             ? (result.bm25 * -1).toFixed(1)
             : "n/a"
-        }, fused ${result.rrfScore.toFixed(3)}`
+        }, fused ${Math.round(result.rrfScore * 100)}%`
       : typeof result.similarity === "number"
         ? result.similarity.toFixed(3)
         : typeof result.bm25 === "number"

@@ -2,11 +2,6 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { PhotoSimilarPhotos } from "./PhotoSimilarPhotos";
 import { useDatabase } from "./database/useDatabase";
 import { fetchSimilarResults } from "./search/api";
-import { getRelativeTimeString } from "../util/time";
-
-jest.mock("../util/time", () => ({
-  getRelativeTimeString: jest.fn(),
-}));
 
 jest.mock("next/link", () => ({
   __esModule: true,
@@ -28,7 +23,6 @@ jest.mock("./search/api", () => ({
 describe("PhotoSimilarPhotos", () => {
   beforeEach(() => {
     jest.resetAllMocks();
-    (getRelativeTimeString as jest.Mock).mockReturnValue("2y ago");
   });
 
   it("shows loading progress while the search index is still opening", () => {
@@ -65,7 +59,8 @@ describe("PhotoSimilarPhotos", () => {
         database,
         path: "../albums/test-simple/DSCF0506-2.jpg",
         page: 0,
-        pageSize: 9,
+        pageSize: 8,
+        offset: 0,
       });
     });
 
@@ -75,8 +70,6 @@ describe("PhotoSimilarPhotos", () => {
       screen.getByRole("img", { name: /Harbor skyline/i }).getAttribute("src"),
     ).toBe("/data/albums/test-simple/.resized_images/DSCF0593.jpg@800.avif");
     expect(screen.getByText("test-simple")).toBeTruthy();
-    expect(screen.getByText(", 2y")).toBeTruthy();
-    expect(screen.getByText("DSCF0593.jpg")).toBeTruthy();
     expect(screen.getByText("82% match")).toBeTruthy();
   });
 
@@ -85,7 +78,7 @@ describe("PhotoSimilarPhotos", () => {
     (useDatabase as jest.Mock).mockReturnValue([database, 100]);
     (fetchSimilarResults as jest.Mock)
       .mockResolvedValueOnce({
-        data: Array.from({ length: 9 }, (_value, idx) => ({
+        data: Array.from({ length: 8 }, (_value, idx) => ({
           path: `../albums/test-simple/first-${idx}.jpg`,
           album_relative_path: `/album/test-simple#first-${idx}.jpg`,
           filename: `first-${idx}.jpg`,
@@ -95,37 +88,38 @@ describe("PhotoSimilarPhotos", () => {
           tags: `First ${idx}`,
           similarity: 0.9,
         })),
-        next: 1,
+        next: 8,
       })
       .mockResolvedValueOnce({
-        data: [
-          {
-            path: "../albums/test-simple/second-page.jpg",
-            album_relative_path: "/album/test-simple#second-page.jpg",
-            filename: "second-page.jpg",
-            alt_text: "Second page",
-            exif: "EXIF DateTimeOriginal:2024:02:03 10:20:30",
-            subject: "Second page",
-            tags: "Second page",
-            similarity: 0.7,
-          },
-        ],
+        data: Array.from({ length: 9 }, (_value, idx) => ({
+          path: `../albums/test-simple/second-${idx}.jpg`,
+          album_relative_path: `/album/test-simple#second-${idx}.jpg`,
+          filename: `second-${idx}.jpg`,
+          alt_text: `Second ${idx}`,
+          exif: "EXIF DateTimeOriginal:2024:02:03 10:20:30",
+          subject: `Second ${idx}`,
+          tags: `Second ${idx}`,
+          similarity: 0.7,
+        })),
       });
 
     render(<PhotoSimilarPhotos path="../albums/test-simple/DSCF0506-2.jpg" />);
 
-    expect(await screen.findByText("first-0.jpg")).toBeTruthy();
+    expect(await screen.findByRole("img", { name: /First 0/i })).toBeTruthy();
+    expect(screen.getAllByRole("img")).toHaveLength(8);
     fireEvent.click(screen.getByRole("button", { name: /load more/i }));
 
     await waitFor(() => {
       expect(fetchSimilarResults).toHaveBeenNthCalledWith(2, {
         database,
         path: "../albums/test-simple/DSCF0506-2.jpg",
-        page: 1,
+        page: 0,
         pageSize: 9,
+        offset: 8,
       });
     });
 
-    expect(await screen.findByText("second-page.jpg")).toBeTruthy();
+    expect(await screen.findByRole("img", { name: /Second 8/i })).toBeTruthy();
+    expect(screen.getAllByRole("img")).toHaveLength(17);
   });
 });

@@ -1,31 +1,29 @@
-import Link from "next/link";
 import React from "react";
 import styles from "./Photo.module.css";
 import { useDatabase } from "./database/useDatabase";
 import { fetchSimilarResults } from "./search/api";
 import { SearchResultRow } from "./search/searchTypes";
-import { getResizedAlbumImageSrc } from "../util/getResizedAlbumImageSrc";
-import { extractDateFromExifString } from "../util/extractExifFromDb";
-import { getRelativeTimeString } from "../util/time";
+import { SearchResultTile } from "./search/SearchResultTile";
 
 export const PhotoSimilarPhotos: React.FC<{
   path?: string | null;
   pageSize?: number;
 }> = (props) => {
   const pageSize = props.pageSize ?? 9;
+  const initialVisibleCount = Math.max(pageSize - 1, 1);
   const [database, progress] = useDatabase();
   const [results, setResults] = React.useState<SearchResultRow[]>([]);
   const [error, setError] = React.useState<string | null>(null);
-  const [page, setPage] = React.useState(0);
+  const [offset, setOffset] = React.useState(0);
   const [hasNextPage, setHasNextPage] = React.useState(false);
   const [isLoadingResults, setIsLoadingResults] = React.useState(false);
 
   React.useEffect(() => {
     setResults([]);
     setError(null);
-    setPage(0);
+    setOffset(0);
     setHasNextPage(false);
-  }, [database, pageSize, props.path]);
+  }, [database, initialVisibleCount, props.path]);
 
   React.useEffect(() => {
     if (!database || !props.path) {
@@ -39,8 +37,9 @@ export const PhotoSimilarPhotos: React.FC<{
     fetchSimilarResults({
       database,
       path: props.path,
-      page,
-      pageSize,
+      page: 0,
+      pageSize: offset === 0 ? initialVisibleCount : pageSize,
+      offset,
     })
       .then((response) => {
         if (isCancelled) {
@@ -48,7 +47,7 @@ export const PhotoSimilarPhotos: React.FC<{
         }
 
         setResults((prev) =>
-          page === 0
+          offset === 0
             ? response.data
             : [
                 ...prev,
@@ -78,7 +77,7 @@ export const PhotoSimilarPhotos: React.FC<{
     return () => {
       isCancelled = true;
     };
-  }, [database, page, pageSize, props.path]);
+  }, [database, initialVisibleCount, offset, pageSize, props.path]);
 
   if (!props.path) {
     return null;
@@ -103,82 +102,30 @@ export const PhotoSimilarPhotos: React.FC<{
         </p>
       ) : (
         <div className={styles.similarPhotoGrid}>
-          {results.map((result) => {
-            const albumName = result.path.split("/").at(-2);
-            const dateTimeOriginal = extractDateFromExifString(result.exif);
-            const relativeAge = dateTimeOriginal
-              ? getRelativeTimeString(dateTimeOriginal, {
-                  short: true,
-                })
-              : null;
-            const similarityLabel =
-              typeof result.similarity === "number"
-                ? `${Math.round(result.similarity * 100)}% match`
-                : null;
-
-            return (
-              <Link
-                key={result.path}
-                href={result.album_relative_path}
-                className={styles.similarPhotoCard}
-                title={
-                  result.alt_text ||
-                  result.subject ||
-                  result.tags ||
-                  result.filename
-                }
-              >
-                {similarityLabel ? (
-                  <span className={styles.similarPhotoBadge}>
-                    {similarityLabel}
-                  </span>
-                ) : null}
-                <img
-                  src={getResizedAlbumImageSrc(result.path)}
-                  alt={
-                    result.alt_text ||
-                    result.subject ||
-                    result.tags ||
-                    result.filename
-                  }
-                  className={styles.similarPhotoImage}
-                  loading="lazy"
-                />
-                <span className={styles.similarPhotoMeta}>
-                  <span className={styles.similarPhotoSource}>
-                    <span className={styles.similarPhotoSourceText}>
-                      {albumName}
-                    </span>
-                    <span className={styles.similarPhotoSourceText}>
-                      {typeof relativeAge === "string"
-                        ? ", " + relativeAge.replace(" ago", "")
-                        : null}
-                    </span>
-                  </span>
-                  <span className={styles.similarPhotoFilename}>
-                    {result.filename}
-                  </span>
+          {results.map((result) => (
+            <SearchResultTile key={result.path} result={result} />
+          ))}
+          {hasNextPage ? (
+            <button
+              type="button"
+              className={styles.similarPhotosLoadMoreTile}
+              disabled={isLoadingResults}
+              onClick={() => {
+                setOffset(results.length);
+              }}
+            >
+              <span className={styles.similarPhotosLoadMoreTileBody}>
+                <span className={styles.similarPhotosLoadMoreLabel}>
+                  {isLoadingResults ? "Loading..." : "Load more"}
                 </span>
-              </Link>
-            );
-          })}
+                <span className={styles.similarPhotosLoadMoreHint}>
+                  {isLoadingResults ? "Fetching similar photos" : `Show ${pageSize} more`}
+                </span>
+              </span>
+            </button>
+          ) : null}
         </div>
       )}
-
-      {database && results.length > 0 && hasNextPage ? (
-        <div className={styles.similarPhotosActions}>
-          <button
-            type="button"
-            className={styles.similarPhotosLoadMore}
-            disabled={isLoadingResults}
-            onClick={() => {
-              setPage((prev) => prev + 1);
-            }}
-          >
-            {isLoadingResults ? "Loading…" : "Load more"}
-          </button>
-        </div>
-      ) : null}
     </section>
   );
 };

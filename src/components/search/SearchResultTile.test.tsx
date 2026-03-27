@@ -90,8 +90,8 @@ describe("SearchResultTile", () => {
       />,
     );
 
-    expect(screen.getByText("71% match").getAttribute("title")).toBe(
-      "Hybrid search: semantic 71%, keyword 3.5, fused 0.031",
+    expect(screen.getByText("3% match").getAttribute("title")).toBe(
+      "Hybrid search: semantic 71%, keyword 3.5, fused 3%",
     );
   });
 
@@ -106,8 +106,8 @@ describe("SearchResultTile", () => {
       />,
     );
 
-    expect(screen.getByText("71% match").getAttribute("title")).toBe(
-      "Hybrid search: semantic 71%, keyword n/a, fused 0.031",
+    expect(screen.getByText("3% match").getAttribute("title")).toBe(
+      "Hybrid search: semantic 71%, keyword n/a, fused 3%",
     );
   });
 });
