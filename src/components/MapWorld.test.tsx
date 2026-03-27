@@ -21,14 +21,6 @@ const mapInstance = {
 };
 
 const mapRef = { current: mapInstance };
-const replace = jest.fn();
-
-jest.mock("next/router", () => ({
-  useRouter: () => ({
-    replace,
-  }),
-}));
-
 jest.mock("react-map-gl/maplibre", () => {
   const React = require("react");
 
@@ -132,6 +124,8 @@ describe("MapWorld", () => {
     placeholderHeight: 100,
   };
 
+  let replaceStateSpy: jest.SpyInstance;
+
   beforeEach(() => {
     jest.useFakeTimers();
     mapHandlers.onMoveEnd = undefined;
@@ -140,12 +134,15 @@ describe("MapWorld", () => {
     mapInstance.on.mockClear();
     mapInstance.off.mockClear();
     mapInstance.getBounds.mockClear();
-    replace.mockClear();
+    replaceStateSpy = jest
+      .spyOn(window.history, "replaceState")
+      .mockImplementation(() => {});
   });
 
   afterEach(() => {
     jest.runOnlyPendingTimers();
     jest.useRealTimers();
+    replaceStateSpy.mockRestore();
   });
 
   it("updates the URL with debounced next router replace", () => {
@@ -157,16 +154,17 @@ describe("MapWorld", () => {
       });
     });
 
-    expect(replace).not.toHaveBeenCalled();
+    expect(replaceStateSpy).not.toHaveBeenCalled();
 
     act(() => {
       jest.advanceTimersByTime(200);
     });
 
-    expect(replace).toHaveBeenCalledWith("/?lat=35.676&lon=139.650&zoom=14.00", undefined, {
-      shallow: true,
-      scroll: false,
-    });
+    expect(replaceStateSpy).toHaveBeenCalledWith(
+      window.history.state,
+      "",
+      "/?lat=35.676&lon=139.650&zoom=14.00",
+    );
   });
 
   it("pauses router sync while popup links are being clicked", () => {
@@ -189,7 +187,7 @@ describe("MapWorld", () => {
       jest.advanceTimersByTime(250);
     });
 
-    expect(replace).not.toHaveBeenCalled();
+    expect(replaceStateSpy).not.toHaveBeenCalled();
 
     expect(screen.getByRole("link", { name: /kansai/i }).getAttribute("href")).toBe(
       "/album/kansai#photo.jpg",

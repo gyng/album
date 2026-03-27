@@ -31,7 +31,7 @@
     "fraction.js": "^5.3.4",
     "image-size": "^2.0.2",
     "maplibre-gl": "^5.14.0",
-    "next": "^15.0.0",
+    "next": "^16.0.0",
     "react": "^19.2.1",
     "react-dom": "^19.2.1",
     "react-map-gl": "^8.1.0",

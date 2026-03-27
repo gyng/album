@@ -15,7 +15,6 @@ import Map, {
 } from "react-map-gl/maplibre";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { useIntersectionObserver } from "usehooks-ts";
-import { useRouter } from "next/router";
 import { ThemeToggle } from "./ThemeToggle";
 
 export type MapWorldEntry = {
@@ -112,7 +111,6 @@ const ROUTER_SYNC_DEBOUNCE_MS = 200;
 const ROUTER_SYNC_PAUSE_MS = 700;
 
 export const MMap: React.FC<MapWorldProps> = ({ photos, className }) => {
-  const router = useRouter();
   const url = new URL(window.location.toString());
   const initialLon = url.searchParams.get("lon");
   const initialLat = url.searchParams.get("lat");
@@ -235,7 +233,7 @@ export const MMap: React.FC<MapWorldProps> = ({ photos, className }) => {
       }
 
       lastSyncedRouteRef.current = nextRoute;
-      router.replace(nextRoute, undefined, { shallow: true, scroll: false });
+      window.history.replaceState(window.history.state, "", nextRoute);
     }, ROUTER_SYNC_DEBOUNCE_MS);
   };
 

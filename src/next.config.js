@@ -7,8 +7,18 @@ const nextConfig = {
   reactStrictMode: true,
   staticPageGenerationTimeout: 300,
   outputFileTracingRoot: isVercelBuild ? __dirname : path.join(__dirname, ".."),
-  eslint: {
-    ignoreDuringBuilds: true,
+  serverExternalPackages: ["sharp", "ffmpeg-static", "ffprobe-static", "sqlite3"],
+  outputFileTracingExcludes: {
+    "**": [
+      "node_modules/ffmpeg-static/**",
+      "node_modules/ffprobe-static/**",
+      "node_modules/@img/**",
+      "node_modules/sharp/**",
+      "node_modules/sqlite3/build/**",
+      "node_modules/@sqlite.org/**",
+      "public/data/**",
+      "test/**",
+    ],
   },
 };
 
