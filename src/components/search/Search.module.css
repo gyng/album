@@ -340,9 +340,34 @@
 }
 
 .modeSourceItem:hover .breadcrumbRemoveButton,
-.modeSourceItem:focus-within .breadcrumbRemoveButton {
+.modeSourceItem:focus-within .breadcrumbRemoveButton,
+.modeSourceItem:hover .modeSourceSlideshowButton,
+.modeSourceItem:focus-within .modeSourceSlideshowButton {
   opacity: 1;
   pointer-events: auto;
+}
+
+.modeSourceSlideshowButton {
+  position: absolute;
+  bottom: 4px;
+  left: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.72);
+  font-size: 14px;
+  line-height: 1;
+  text-decoration: none;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease;
+}
+
+.modeSourceSlideshowButton:focus-visible {
+  outline: solid 2px var(--c-bg-contrast-light);
 }
 
 .breadcrumbRemoveButton:focus-visible {

@@ -945,6 +945,20 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
                     alt={`Source photo ${similarFilename ?? ""}`}
                   />
                 ) : null}
+                <a
+                  className={styles.modeSourceSlideshowButton}
+                  href={`/slideshow?mode=similar&seed=${encodeURIComponent(similarPath ?? "")}`}
+                  aria-label="Start similarity trail slideshow"
+                  title="Start similarity trail slideshow"
+                  onClick={(event) =>
+                    forceDocumentNavigation(
+                      event,
+                      `/slideshow?mode=similar&seed=${encodeURIComponent(similarPath ?? "")}`,
+                    )
+                  }
+                >
+                  🖼️
+                </a>
                 <button
                   type="button"
                   className={styles.breadcrumbRemoveButton}
