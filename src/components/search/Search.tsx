@@ -1,33 +1,109 @@
-import React, { use, useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useDebounce } from "use-debounce";
 import styles from "./Search.module.css";
-import { useRouter } from "next/router";
 import { useInfiniteQuery, keepPreviousData } from "@tanstack/react-query";
-import { fetchResults, fetchTags, PaginatedSearchResult } from "./api";
+import {
+  fetchResults,
+  fetchSimilarResults,
+  fetchTags,
+  PaginatedSearchResult,
+} from "./api";
 import { SearchResultTile } from "./SearchResultTile";
 import { SearchTag } from "./SearchTag";
 import { useDatabase } from "../database/useDatabase";
 import { ProgressBar } from "../ProgressBar";
+import { getResizedAlbumImageSrc } from "../../util/getResizedAlbumImageSrc";
 
 type Tag = {
   name: string;
   count: number;
 };
 
+type InitialSearchState = {
+  searchQuery: string[];
+  similarPath: string | null;
+  hasHydratedFromUrl: boolean;
+};
+
+const getInitialSearchState = (): InitialSearchState => {
+  if (typeof window === "undefined") {
+    return {
+      searchQuery: [],
+      similarPath: null,
+      hasHydratedFromUrl: false,
+    };
+  }
+
+  const url = new URL(window.location.toString());
+  const query = url.searchParams.get("q");
+
+  return {
+    searchQuery: query ? query.split(",").map((value) => value.trim()) : [],
+    similarPath: url.searchParams.get("similar"),
+    hasHydratedFromUrl: true,
+  };
+};
+
+const getAlbumAnchorHref = (path: string): string => {
+  const segments = path.split("/");
+  const albumName = segments.at(-2);
+  const filename = segments.at(-1);
+
+  if (!albumName || !filename) {
+    return "/search";
+  }
+
+  return `/album/${albumName}#${filename}`;
+};
+
 export const Search: React.FC<{ disabled?: boolean }> = (props) => {
   const PAGE_SIZE = 48;
-  const router = useRouter();
+  const [initialSearchState] = useState<InitialSearchState>(
+    getInitialSearchState,
+  );
 
-  const [searchQuery, setSearchQuery] = useState<string[]>([]);
+  const [searchQuery, setSearchQuery] = useState<string[]>(
+    initialSearchState.searchQuery,
+  );
+  const [similarPath, setSimilarPath] = useState<string | null>(
+    initialSearchState.similarPath,
+  );
+  const [similarTrail, setSimilarTrail] = useState<string[]>([]);
+  const [hasHydratedFromUrl] = useState<boolean>(
+    initialSearchState.hasHydratedFromUrl,
+  );
   const [debouncedSearchQuery] = useDebounce(searchQuery, 600);
   const inputRef = useRef<HTMLInputElement>(null);
   const [database, progress] = useDatabase();
+  const isSimilarMode = Boolean(similarPath);
+  const trimmedQuery = debouncedSearchQuery.join(" ").trim();
+  const hasSearchQuery = trimmedQuery.length > 0;
+  const similarFilename = similarPath?.split("/").at(-1) ?? null;
+  const similarPreviewSrc = similarPath
+    ? getResizedAlbumImageSrc(similarPath)
+    : null;
 
   const reactQuery = useInfiniteQuery({
-    queryKey: ["results", { debouncedSearchQuery }],
+    queryKey: ["results", { debouncedSearchQuery, similarPath }],
     queryFn: async ({ pageParam }: { pageParam: number }) => {
       if (!database) {
-        console.log("Database not initialised");
+        return {
+          data: [],
+          prev: undefined,
+          next: undefined,
+        };
+      }
+
+      if (similarPath) {
+        return await fetchSimilarResults({
+          database,
+          path: similarPath,
+          pageSize: PAGE_SIZE,
+          page: pageParam,
+        });
+      }
+
+      if (!hasSearchQuery) {
         return {
           data: [],
           prev: undefined,
@@ -36,7 +112,7 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
       }
 
       return await fetchResults({
-        database: database,
+        database,
         query: debouncedSearchQuery.join("|"),
         pageSize: PAGE_SIZE,
         page: pageParam,
@@ -50,13 +126,13 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
     },
     getNextPageParam: (
       lastPage: PaginatedSearchResult,
-      allPages,
+      _allPages,
       lastPageParam,
     ) => {
-      // Hack to show next page: not 100% correct as sometimes results can only have 1 page
-      return lastPage.data.length === PAGE_SIZE ? lastPageParam + 1 : undefined;
-      // TODO: Update SQLITE to return cursor or next page if it exists
-      // return lastPage.next ?? undefined;
+      return (
+        lastPage.next ??
+        (lastPage.data.length === PAGE_SIZE ? lastPageParam + 1 : undefined)
+      );
     },
   });
 
@@ -70,52 +146,53 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
   } = reactQuery;
 
   useEffect(() => {
-    if (!fetchNextPage) {
-      // Not initialised yet
+    if (!hasHydratedFromUrl || !fetchNextPage || !database) {
       return;
     }
 
-    if (!debouncedSearchQuery) {
-      // Bug: The react-query cache is not updated
-      // and leads to stale results being present when the input is focused on again
-      // Calling remove() on react-query doesn't seem to help
+    if (!similarPath && !hasSearchQuery) {
       return;
     }
 
-    if (!database) {
-      console.log(
-        `database not initialised, retrying "${debouncedSearchQuery}"`,
-      );
-    } else {
-      fetchNextPage();
-    }
-  }, [debouncedSearchQuery, fetchNextPage, database]);
+    fetchNextPage();
+  }, [
+    database,
+    fetchNextPage,
+    hasHydratedFromUrl,
+    hasSearchQuery,
+    similarPath,
+  ]);
 
-  // Read query from URL on load
   useEffect(() => {
-    const url = new URL(window.location.toString());
-    const query = url.searchParams.get("q");
-    if (query) {
-      setSearchQuery(query.split(","));
+    if (!hasHydratedFromUrl) {
+      return;
     }
-  }, []);
 
-  // Set window URL query on change
-  useEffect(() => {
     const searchParams = new URLSearchParams(window.location.search);
     searchParams.delete("q");
+    searchParams.delete("similar");
 
-    if (debouncedSearchQuery.length > 0) {
+    if (similarPath) {
+      searchParams.set("similar", similarPath);
+    } else if (debouncedSearchQuery.length > 0) {
       searchParams.set("q", debouncedSearchQuery.join(","));
     }
+
     const url = new URL(window.location.toString());
     url.search = searchParams.toString();
-    if (router) {
-      router.replace(url, undefined, { shallow: true });
+    const nextRoute = `${url.pathname}${url.search}${url.hash}`;
+    const currentRoute = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+    if (nextRoute === currentRoute) {
+      return;
     }
-  }, [debouncedSearchQuery, router]);
 
-  // Register '/' to focus search
+    try {
+      window.history.replaceState(window.history.state, "", nextRoute);
+    } catch (err) {
+      console.warn("Failed to sync search URL", err);
+    }
+  }, [debouncedSearchQuery, hasHydratedFromUrl, similarPath]);
+
   useEffect(() => {
     function handler(ev: KeyboardEvent) {
       if (ev.key === "/") {
@@ -138,11 +215,9 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
     };
   }, []);
 
-  // Fetch tags as suggestions
   const [tags, setTags] = React.useState<Tag[]>([]);
   useEffect(() => {
     if (!database) {
-      console.log("Database not initialised");
       return;
     }
 
@@ -158,6 +233,7 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
   }, [database]);
 
   const queryResults = data?.pages.flatMap((page) => page.data);
+  const canClear = isSimilarMode || searchQuery.join("").trim() !== "";
 
   return (
     <div className={styles.searchWidget}>
@@ -171,9 +247,10 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
             spellCheck={false}
             autoFocus
             onChange={(ev) => {
+              setSimilarPath(null);
+              setSimilarTrail([]);
               setSearchQuery(ev.target.value.split(",").map((s) => s.trim()));
             }}
-            // disabled={props.disabled === true || !backend}
             ref={inputRef}
             tabIndex={0}
             title={
@@ -182,24 +259,102 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
                 : undefined
             }
           />
-          {searchQuery.length > 0 && searchQuery.join("").trim() !== "" && (
+          {canClear ? (
             <button
               className={styles.clearButton}
-              onClick={() => setSearchQuery([])}
+              onClick={() => {
+                setSearchQuery([]);
+                setSimilarPath(null);
+                setSimilarTrail([]);
+              }}
               title="Clear search"
               type="button"
             >
               ×
             </button>
-          )}
+          ) : null}
         </div>
       </div>
 
       <ProgressBar progress={progress} />
 
+      {isSimilarMode ? (
+        <div className={styles.modeBar}>
+          <div className={styles.modeMetaLabel} style={{ width: "100%" }}>
+            Similar photos
+          </div>
+          <div className={styles.modeStack}>
+            {similarTrail.length > 0 ? (
+              <div
+                className={styles.breadcrumbs}
+                aria-label="Similarity breadcrumbs"
+              >
+                {similarTrail.map((path, idx) => {
+                  const label = path.split("/").at(-1) ?? path;
+                  const opacity =
+                    0.35 + (0.55 * (idx + 1)) / similarTrail.length;
+                  const isLatestBreadcrumb = idx === similarTrail.length - 1;
+                  const preview = (
+                    <img
+                      className={styles.breadcrumbPreview}
+                      src={getResizedAlbumImageSrc(path)}
+                      alt=""
+                    />
+                  );
+
+                  if (isLatestBreadcrumb) {
+                    return (
+                      <a
+                        key={`${path}-${idx}`}
+                        className={styles.breadcrumbButton}
+                        style={{ opacity }}
+                        href={getAlbumAnchorHref(path)}
+                        title={`Open ${label}`}
+                        aria-label={label}
+                      >
+                        {preview}
+                      </a>
+                    );
+                  }
+
+                  return (
+                    <button
+                      key={`${path}-${idx}`}
+                      type="button"
+                      className={styles.breadcrumbButton}
+                      style={{ opacity }}
+                      onClick={() => {
+                        setSimilarPath(path);
+                        setSimilarTrail((prev) => prev.slice(0, idx));
+                      }}
+                      title={label}
+                      aria-label={label}
+                    >
+                      {preview}
+                    </button>
+                  );
+                })}
+              </div>
+            ) : null}
+            <div className={styles.modeSource}>
+              {similarPreviewSrc ? (
+                <img
+                  className={styles.modeSourcePreview}
+                  src={similarPreviewSrc}
+                  alt={`Source photo ${similarFilename ?? ""}`}
+                />
+              ) : null}
+              <div className={styles.modeSourceMeta}>
+                <div className={styles.modeMetaLabel}>Comparing against</div>
+                <div className={styles.modeMeta}>{similarFilename}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       <div className={styles.tagsContainer}>
         {Object.values(
-          // Combine tags with the same name but different casing
           tags.reduce(
             (acc, tag) => {
               const key = tag.name.toLocaleLowerCase();
@@ -221,6 +376,8 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
               count={tag.count - 1}
               isActive={isActive}
               onClick={() => {
+                setSimilarPath(null);
+                setSimilarTrail([]);
                 setSearchQuery((prev) =>
                   isActive
                     ? prev.filter(
@@ -236,22 +393,31 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
 
       <div>
         <ul className={styles.results}>
-          {searchQuery.length > 0 ? (
+          {isSimilarMode || searchQuery.length > 0 ? (
             <>
               {isSuccess &&
               !isFetching &&
               queryResults?.length === 0 &&
-              // Needs to be 3 due to fts5?
-              debouncedSearchQuery.join(" ").length >= 3 ? (
+              isSimilarMode ? (
                 <div>
-                  No results for <i>{debouncedSearchQuery.join(" ")}</i>
+                  No similar results for <i>{similarPath?.split("/").at(-1)}</i>
                 </div>
               ) : null}
 
               {isSuccess &&
               !isFetching &&
-              // Needs to be 3 due to fts5?
-              debouncedSearchQuery.join(" ").length < 3 &&
+              queryResults?.length === 0 &&
+              !isSimilarMode &&
+              trimmedQuery.length >= 3 ? (
+                <div>
+                  No results for <i>{trimmedQuery}</i>
+                </div>
+              ) : null}
+
+              {isSuccess &&
+              !isFetching &&
+              !isSimilarMode &&
+              trimmedQuery.length < 3 &&
               queryResults?.length === 0 ? (
                 <div className={styles.searchHint}>
                   Type a minimum of 3 characters
@@ -269,7 +435,24 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
                         : "saturate(1)",
                     }}
                   >
-                    <SearchResultTile result={r} />
+                    <SearchResultTile
+                      result={r}
+                      onFindSimilar={(path) => {
+                        if (path === similarPath) {
+                          return;
+                        }
+
+                        setSearchQuery([]);
+                        setSimilarTrail((prev) => {
+                          if (!similarPath) {
+                            return prev;
+                          }
+
+                          return [...prev, similarPath];
+                        });
+                        setSimilarPath(path);
+                      }}
+                    />
                   </li>
                 );
               })}
@@ -286,7 +469,6 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
                 </button>
               ) : null}
 
-              {/* First fetch */}
               {isFetching && !isSuccess ? <div>Searching&hellip;</div> : null}
             </>
           ) : null}

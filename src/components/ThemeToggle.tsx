@@ -1,8 +1,53 @@
 import { useEffect, useState } from "react";
 import styles from "./ThemeToggle.module.css";
 
+const readStoredDarkMode = (): boolean | null => {
+  try {
+    const stored = JSON.parse(localStorage.getItem("darkMode") ?? "null");
+    return stored === true || stored === false ? stored : null;
+  } catch (err) {
+    console.warn("Failed to read dark mode preference", err);
+    return null;
+  }
+};
+
+const writeStoredDarkMode = (value: boolean | null): void => {
+  try {
+    if (value == null) {
+      localStorage.removeItem("darkMode");
+      return;
+    }
+
+    localStorage.setItem("darkMode", JSON.stringify(value));
+  } catch (err) {
+    console.warn("Failed to persist dark mode preference", err);
+  }
+};
+
+const getInitialDarkMode = (): boolean | null => {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  const url = new URL(window.location.toString());
+  const theme = url.searchParams.get("theme");
+  if (theme === "dark") {
+    return true;
+  }
+  if (theme === "light") {
+    return false;
+  }
+
+  const stored = readStoredDarkMode();
+  if (stored === true || stored === false) {
+    return stored;
+  }
+
+  return true;
+};
+
 export const ThemeToggle: React.FC = () => {
-  const [darkMode, setDarkMode] = useState<boolean | null>(null);
+  const [darkMode, setDarkMode] = useState<boolean | null>(getInitialDarkMode);
 
   useEffect(() => {
     if (darkMode === true) {
@@ -17,26 +62,6 @@ export const ThemeToggle: React.FC = () => {
     }
   }, [darkMode]);
 
-  useEffect(() => {
-    // Override initial theme, used for screenshots
-    const url = new URL(window.location.toString());
-    const theme = url.searchParams.get("theme");
-    const requestedMode =
-      theme === "dark" ? true : theme === "light" ? false : null;
-    if (requestedMode != null) {
-      setDarkMode(requestedMode);
-      return;
-    }
-
-    const stored = JSON.parse(localStorage.getItem("darkMode") ?? "null");
-    if (stored === true || stored === false) {
-      setDarkMode(stored);
-      return;
-    }
-
-    setDarkMode(true);
-  }, []);
-
   return (
     <div className={styles.themeToggle}>
       <button
@@ -45,7 +70,7 @@ export const ThemeToggle: React.FC = () => {
         onClick={() => {
           const next = !(darkMode ?? true);
           setDarkMode(next);
-          localStorage.setItem("darkMode", JSON.stringify(next));
+          writeStoredDarkMode(next);
         }}
       >
         {darkMode == null ? (
@@ -61,7 +86,7 @@ export const ThemeToggle: React.FC = () => {
           title="Reset to system default"
           onClick={() => {
             setDarkMode(null);
-            localStorage.removeItem("darkMode");
+            writeStoredDarkMode(null);
           }}
         >
           ⟳

@@ -2,6 +2,8 @@ import { render, screen } from "@testing-library/react";
 import { PhotoBlock } from "../services/types";
 import { PhotoBlockEl } from "./Photo";
 
+jest.mock("next/dynamic", () => () => () => null);
+
 describe("PhotoBlockEl", () => {
   it("renders a PhotoBlock with Pictures", () => {
     const block: PhotoBlock = {
@@ -26,6 +28,7 @@ describe("PhotoBlockEl", () => {
 
     expect(screen.getAllByTestId("photoblockel")).toHaveLength(1);
     expect(screen.getAllByTestId("picture")).toHaveLength(1);
+    expect(screen.queryByText("Similar photos")).toBeNull();
 
     const img: HTMLImageElement = screen.getByTestId("picture");
     expect(img!.src).toBeTruthy();

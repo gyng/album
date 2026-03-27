@@ -122,6 +122,29 @@ test.describe("Slideshow Functionality Tests", () => {
     }
   });
 
+  test("slideshow mode toggle works", async ({ page }) => {
+    await page.goto("/slideshow");
+
+    await expect(page).toHaveTitle("Slideshow", { timeout: 90000 });
+
+    const randomButton = page.locator('button:has-text("Random")');
+    const similarButton = page.locator('button:has-text("Similar")');
+
+    await expect(randomButton).toBeVisible({ timeout: 15000 });
+    await expect(similarButton).toBeVisible({ timeout: 15000 });
+
+    await expect(randomButton).toHaveAttribute("aria-pressed", "true");
+    await expect(similarButton).toHaveAttribute("aria-pressed", "false");
+
+    await similarButton.evaluate((button: HTMLButtonElement) => {
+      button.click();
+    });
+    await page.waitForTimeout(500);
+
+    await expect(similarButton).toHaveAttribute("aria-pressed", "true");
+    await expect(randomButton).toHaveAttribute("aria-pressed", "false");
+  });
+
   test("slideshow fullscreen button exists", async ({ page }) => {
     await page.goto("/slideshow");
 
@@ -171,14 +194,7 @@ test.describe("Slideshow Functionality Tests", () => {
       await tenSecondButton.click();
       await page.waitForTimeout(500);
 
-      // Check if button appears active/selected
-      const isActive = await tenSecondButton.evaluate(
-        (el) =>
-          el.classList.contains("active") ||
-          el.getAttribute("aria-pressed") === "true",
-      );
-
-      console.log(`10s timing button active state: ${isActive}`);
+      await expect(tenSecondButton).toHaveAttribute("aria-pressed", "true");
       console.log("✓ Timing adjustment controls functional");
     } else {
       console.log("Timing controls not visible - may still be loading");

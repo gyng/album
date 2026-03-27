@@ -1,3 +1,7 @@
+.card {
+  position: relative;
+}
+
 .link {
   text-decoration: none !important;
 }
@@ -6,6 +10,10 @@
   width: 150px;
   overflow: hidden;
   font-size: var(--fs-s);
+}
+
+.thumbnailWrap {
+  position: relative;
 }
 
 .snippet i {
@@ -22,7 +30,6 @@
   display: grid;
 }
 
-/* Hide alt text while loading to reduce flicker */
 .resultPicture:-moz-loading {
   color: transparent;
 }
@@ -35,4 +42,44 @@
 
 .source {
   display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.sourceText {
+  min-width: 0;
+}
+
+.similarityBadge {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 1;
+  border-radius: 999px;
+  background-color: rgba(0, 0, 0, 0.72);
+  color: white;
+  font-size: 11px;
+  line-height: 1;
+  padding: 6px 8px;
+}
+
+.similarButton {
+  border: 0;
+  border-radius: 999px;
+  background-color: rgba(0, 0, 0, 0.72);
+  color: white;
+  cursor: pointer;
+  font-size: 11px;
+  line-height: 1;
+  margin-left: auto;
+  padding: 6px 8px;
+}
+
+.similarButton:hover {
+  background-color: rgba(0, 0, 0, 0.88);
+}
+
+.similarButton:focus-visible {
+  outline: solid 2px var(--c-bg-contrast-light);
 }

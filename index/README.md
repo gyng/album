@@ -17,6 +17,10 @@ Indexes images for search with the following fields
 | metadata     | lat_deg             | map          |                                   |
 | metadata     | lng_deg             | map          |                                   |
 | metadata     | iso8601             |              | assumed UTC                       |
+| embeddings   | path                | similarity   | primary key                       |
+| embeddings   | model_id            | similarity   | embedding model identifier        |
+| embeddings   | embedding_dim       | similarity   | vector dimensionality             |
+| embeddings   | embedding_json      | similarity   | normalised image embedding vector |
 
 The [FTS5 SQLite extension](https://www.sqlite.org/fts5.html) requires sqlite3 >= 3.34.0 and creates a virtual table.
 
@@ -33,9 +37,10 @@ $ uv run ruff --fix
 $ uv run black .
 
 $ uv run index.py --help
-$ uv run index.py index --glob "../src/public/data/albums/test-simple/*.jpg"
-$ uv run index.py index --glob "../src/public/data/albums/**/*.jpg" --dbpath "search.sqlite" --dry-run
+$ uv run python index.py index --glob "../albums/test-simple/*.[jJ][pP][gG]"
+$ uv run python index.py index --glob "../albums/**/*.jpg" --dbpath "search.sqlite" --dry-run --model-profile hybrid
 $ uv run index.py search --query "singapore"
+$ uv run python index.py search-similar-path --dbpath "search.sqlite" --path "../albums/2511japan/DSCF6007-06.jpg"
 
 $ uv run index.py dump
 $ uv run index.py search-tags --query "dam"
@@ -51,7 +56,18 @@ $ ./do-test-index.sh
 
 # Perform a full index and copy it to /public in the Next.js app
 $ ./do-full-index.sh
+
+# Generate embeddings only and merge them into the active public database
+$ ./do-embeddings-index.sh
 ```
+
+## Model profiles
+
+- `janus`: generate tags, descriptions, and metadata only.
+- `siglip2`: generate image embeddings only.
+- `hybrid`: generate Janus metadata and SigLIP embeddings in one pass.
+
+`do-full-index.sh` uses `hybrid`. `do-embeddings-index.sh` is useful when you want to preserve the current metadata-backed `search.sqlite` and only refresh the embeddings table.
 
 ## Prerequisites
 

@@ -1,4 +1,6 @@
 #!/bin/bash
 set -euox pipefail
 
-uv run index.test.py
+cd "$(dirname "$0")"
+
+uv run python index.test.py

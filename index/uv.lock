@@ -150,8 +150,20 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/46/2b/9d4ae88af21fc22a87333632e9b26ec1ec711e0ed61ad48faeeff5068f76/fast-colorthief-0.0.5.tar.gz", hash = "sha256:c943b5be73add8d3f295d3e314c9f48db8555fccc770ab09d88155ba060165ae", size = 754871 }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/05/32/ecee7c929d1143f781c0cbf685f1473d535ac15634dd2e6077e9f31ccf5c/fast_colorthief-0.0.5-cp312-cp312-macosx_12_0_universal2.whl", hash = "sha256:a06f6bcae040b67d1682c64246e5e7065602bd1987585a207b2af1b93ba617eb", size = 59145 },
+    { url = "https://files.pythonhosted.org/packages/bf/1e/34d6c1faaefbd48993d9f71930d0b5a6b244d10d27429d885631b7487c7a/fast_colorthief-0.0.5-cp312-cp312-macosx_15_0_universal2.whl", hash = "sha256:6ddee5d82c699831176694c64be2050db05315de29f84ef64c45be1dd7ae831b", size = 70806 },
+    { url = "https://files.pythonhosted.org/packages/2d/5e/df9c9e10932bd08534439529cb02d0ec28fed38db2fbd4452fc3bbc9bb34/fast_colorthief-0.0.5-cp312-cp312-macosx_26_0_universal2.whl", hash = "sha256:ec23d8791b72937137aa4cea97393f105388e2d05dc6d1198e1fa6a0bc4ce88f", size = 71728 },
     { url = "https://files.pythonhosted.org/packages/3c/bd/b65923166334a78e9076832b6515548796a5dac45ca616b642be815f61a2/fast_colorthief-0.0.5-cp312-cp312-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:a4966e3bbb12d64af67b762327f65c01b2d742af75bb12e911970af176e30401", size = 67417 },
     { url = "https://files.pythonhosted.org/packages/f9/a7/a73105cca5320763657ae33a2ef1302a570e5a2baea02f7fa60a5e032ac8/fast_colorthief-0.0.5-cp312-cp312-win_amd64.whl", hash = "sha256:1c5d18968983334f7f3a6e715714915d78d646531a0c3e527288443dee902ef3", size = 61529 },
+    { url = "https://files.pythonhosted.org/packages/ae/46/b15b2f4cc7f478a20921b327d068e3ad5b303ab30048582d164fe2b93265/fast_colorthief-0.0.5-cp313-cp313-macosx_14_0_universal2.whl", hash = "sha256:6630fac4243fab7887e0a6d5c8b63ac869b4cfbf0841f97085b05b9dca995287", size = 72045 },
+    { url = "https://files.pythonhosted.org/packages/db/39/5602f13da6a53d57b42659f0d57e5587599bc97809fed7b43fb05b4928e3/fast_colorthief-0.0.5-cp313-cp313-macosx_15_0_universal2.whl", hash = "sha256:eb509e1f5f6f944098a5cfd99648d56e86322ae642a850cd106e50dffe815259", size = 70848 },
+    { url = "https://files.pythonhosted.org/packages/e0/99/172348e95a88db433e412d9476bb7575fed6669e949c6c22e631ea612963/fast_colorthief-0.0.5-cp313-cp313-macosx_26_0_universal2.whl", hash = "sha256:4651ba8f3ffeb31ccdf0b9e58c0d866208955adc3e87a64229e3d7d50a843528", size = 71783 },
+    { url = "https://files.pythonhosted.org/packages/d1/a6/ae70c5fd50baf465fc6e4f293942ae3adbea05e25657a3bdbc3794f53d1a/fast_colorthief-0.0.5-cp313-cp313-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:510ed3bc8b1a7ad1986503a383a1ab941c8ffef3ebd5fbd08efbbb04f5a5c68f", size = 88907 },
+    { url = "https://files.pythonhosted.org/packages/21/33/711e6ec674552d10bb8156c2c5387d57e582835a2f326604f5b35ced9641/fast_colorthief-0.0.5-cp313-cp313-win_amd64.whl", hash = "sha256:a0cad7e060b6d3c069ee98325f0e90ac9a293476a54c27b8e10b79b0c3af7df0", size = 77030 },
+    { url = "https://files.pythonhosted.org/packages/96/13/e59815d007d6861dc8c3be13d90ba380a0ea844e5e158eb7897bd46fe2b2/fast_colorthief-0.0.5-cp314-cp314-macosx_14_0_universal2.whl", hash = "sha256:8250e8b50547c9b50079af6f0987c744a8319ef02386659b790f20e9a6a882a1", size = 72204 },
+    { url = "https://files.pythonhosted.org/packages/a5/e4/9c0dbafaf52b5d437ad4dbabc2a17e9afb6c917a41afbf561c0d215f2e28/fast_colorthief-0.0.5-cp314-cp314-macosx_15_0_universal2.whl", hash = "sha256:28945aa50679ce2f60f24daebc0256f472afb1cc41c9d26c485add0405eef333", size = 70921 },
+    { url = "https://files.pythonhosted.org/packages/cf/15/f18cb61b784829bee04ead851fbba4cd30ab772ad57123d6870eff06e862/fast_colorthief-0.0.5-cp314-cp314-macosx_26_0_universal2.whl", hash = "sha256:6bc8fd0861b5721cbe0a3665ea5d69e2d3a64c912941e923862b607435e58ab8", size = 78350 },
+    { url = "https://files.pythonhosted.org/packages/1e/20/87858926cb0445bfa49431e9b5f273cc16ac5bc7e6c3be5e813fdd369ff6/fast_colorthief-0.0.5-cp314-cp314-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:00106f3e391e10edc16a48b7518c9e0a88f8f8a1ea1bcfcf112e5685edc5a595", size = 88908 },
+    { url = "https://files.pythonhosted.org/packages/33/fa/60a1b220cbdbcfc1de1e2f637b91306d35dc47335945370703d182f59acf/fast_colorthief-0.0.5-cp314-cp314-win_amd64.whl", hash = "sha256:18d91fbfcf788bad0646c9871e32f7feaed4b2666b6e3cabe0b6ecbee22b6016", size = 79029 },
 ]
 
 [[package]]
@@ -208,6 +220,7 @@ dependencies = [
     { name = "exifread" },
     { name = "fast-colorthief" },
     { name = "janus" },
+    { name = "protobuf" },
     { name = "reverse-geocode" },
     { name = "torch" },
 ]
@@ -224,6 +237,7 @@ requires-dist = [
     { name = "exifread", specifier = ">=3.0.0,<4" },
     { name = "fast-colorthief", specifier = ">=0.0.5,<0.0.6" },
     { name = "janus", git = "ssh://git@github.com/deepseek-ai/Janus.git?rev=main" },
+    { name = "protobuf", specifier = ">=7.34.1" },
     { name = "reverse-geocode", specifier = ">=1.4.1,<2" },
     { name = "torch", specifier = ">=2.1.1,<3" },
 ]
@@ -544,6 +558,21 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/b6/2d/7d512a3913d60623e7eb945c6d1b4f0bddf1d0b7ada5225274c87e5b53d1/platformdirs-4.3.7.tar.gz", hash = "sha256:eb437d586b6a0986388f0d6f74aa0cde27b48d0e3d66843640bfb6bdcdb6e351", size = 21291 }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/6d/45/59578566b3275b8fd9157885918fcd0c4d74162928a5310926887b856a51/platformdirs-4.3.7-py3-none-any.whl", hash = "sha256:a03875334331946f13c549dbd8f4bac7a13a50a895a0eb1e8c6a8ace80d40a94", size = 18499 },
+]
+
+[[package]]
+name = "protobuf"
+version = "7.34.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/6b/6b/a0e95cad1ad7cc3f2c6821fcab91671bd5b78bd42afb357bb4765f29bc41/protobuf-7.34.1.tar.gz", hash = "sha256:9ce42245e704cc5027be797c1db1eb93184d44d1cdd71811fb2d9b25ad541280", size = 454708 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/ec/11/3325d41e6ee15bf1125654301211247b042563bcc898784351252549a8ad/protobuf-7.34.1-cp310-abi3-macosx_10_9_universal2.whl", hash = "sha256:d8b2cc79c4d8f62b293ad9b11ec3aebce9af481fa73e64556969f7345ebf9fc7", size = 429247 },
+    { url = "https://files.pythonhosted.org/packages/eb/9d/aa69df2724ff63efa6f72307b483ce0827f4347cc6d6df24b59e26659fef/protobuf-7.34.1-cp310-abi3-manylinux2014_aarch64.whl", hash = "sha256:5185e0e948d07abe94bb76ec9b8416b604cfe5da6f871d67aad30cbf24c3110b", size = 325753 },
+    { url = "https://files.pythonhosted.org/packages/92/e8/d174c91fd48e50101943f042b09af9029064810b734e4160bbe282fa1caa/protobuf-7.34.1-cp310-abi3-manylinux2014_s390x.whl", hash = "sha256:403b093a6e28a960372b44e5eb081775c9b056e816a8029c61231743d63f881a", size = 340198 },
+    { url = "https://files.pythonhosted.org/packages/53/1b/3b431694a4dc6d37b9f653f0c64b0a0d9ec074ee810710c0c3da21d67ba7/protobuf-7.34.1-cp310-abi3-manylinux2014_x86_64.whl", hash = "sha256:8ff40ce8cd688f7265326b38d5a1bed9bfdf5e6723d49961432f83e21d5713e4", size = 324267 },
+    { url = "https://files.pythonhosted.org/packages/85/29/64de04a0ac142fb685fd09999bc3d337943fb386f3a0ec57f92fd8203f97/protobuf-7.34.1-cp310-abi3-win32.whl", hash = "sha256:34b84ce27680df7cca9f231043ada0daa55d0c44a2ddfaa58ec1d0d89d8bf60a", size = 426628 },
+    { url = "https://files.pythonhosted.org/packages/4d/87/cb5e585192a22b8bd457df5a2c16a75ea0db9674c3a0a39fc9347d84e075/protobuf-7.34.1-cp310-abi3-win_amd64.whl", hash = "sha256:e97b55646e6ce5cbb0954a8c28cd39a5869b59090dfaa7df4598a7fba869468c", size = 437901 },
+    { url = "https://files.pythonhosted.org/packages/88/95/608f665226bca68b736b79e457fded9a2a38c4f4379a4a7614303d9db3bc/protobuf-7.34.1-py3-none-any.whl", hash = "sha256:bb3812cd53aefea2b028ef42bd780f5b96407247f20c6ef7c679807e9d188f11", size = 170715 },
 ]
 
 [[package]]

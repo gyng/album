@@ -1,34 +1,45 @@
-This is a [Next.js](https://nextjs.org/) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
+This is the frontend for the album site: a statically exported Next.js app backed by a browser-loaded SQLite search index.
 
 ## Getting Started
 
-First, run the development server:
+First, install dependencies and run the development server:
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
-You can start editing the page by modifying `pages/index.tsx`. The page auto-updates as you edit the file.
+Useful routes:
 
-[API routes](https://nextjs.org/docs/api-routes/introduction) can be accessed on [http://localhost:3000/api/hello](http://localhost:3000/api/hello). This endpoint can be edited in `pages/api/hello.ts`.
+- `/` albums index
+- `/search` browser-side search and similarity exploration
+- `/slideshow` slideshow with random and similarity playback modes
+- `/map` world and album mapping views
 
-The `pages/api` directory is mapped to `/api/*`. Files in this directory are treated as [API routes](https://nextjs.org/docs/api-routes/introduction) instead of React pages.
+The frontend expects the generated SQLite index at `public/search.sqlite`. Rebuild it from [index/README.md](../index/README.md).
 
-## Learn More
+## Search Database
 
-To learn more about Next.js, take a look at the following resources:
+The search UI, album details similarity grid, and slideshow similarity mode all use the same browser-loaded SQLite database.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- Keyword search uses FTS5 against Janus-generated metadata.
+- Similarity uses the `embeddings` table generated from SigLIP image vectors.
+- Database loading is cached in the browser so similarity features do not repeatedly deserialize the same SQLite file.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js/) - your feedback and contributions are welcome!
+## Tests
 
-## Deploy on Vercel
+```bash
+npm test
+npx playwright test tests/search-functionality.spec.ts --project=chromium
+npx playwright test tests/slideshow-functionality.spec.ts --project=chromium
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Notes
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/deployment) for more details.
+- The app ships as static files; there is no search backend.
+- Large search DB downloads are expected on first load.
+- Some focused tests target Firefox because it surfaced browser-history and storage issues earlier than Chromium.
+
+See the root [README.md](../README.md) for album generation and deployment steps.

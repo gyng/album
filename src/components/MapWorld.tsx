@@ -35,7 +35,7 @@ export type MapWorldProps = {
   className: string;
 };
 
-const LazyImage = (props: { photo: MapWorldEntry }) => {
+const LazyImage = ({ photo }: { photo: MapWorldEntry }) => {
   const { entry, ref } = useIntersectionObserver({ rootMargin: "100px" });
   const isVisible = !!entry?.isIntersecting;
 
@@ -43,12 +43,12 @@ const LazyImage = (props: { photo: MapWorldEntry }) => {
     <div ref={ref}>
       {isVisible && (
         <img
-          src={props.photo.src.src}
+          src={photo.src.src}
           className={styles.photoMarkerImage}
-          width={props.photo.placeholderWidth}
-          height={props.photo.placeholderHeight}
+          width={photo.placeholderWidth}
+          height={photo.placeholderHeight}
           style={{
-            backgroundColor: `${props.photo.placeholderColor}`,
+            backgroundColor: `${photo.placeholderColor}`,
           }}
           loading="lazy"
           alt=""
@@ -59,7 +59,9 @@ const LazyImage = (props: { photo: MapWorldEntry }) => {
 };
 
 // Component to track map bounds for viewport culling
-const MapBoundsTracker = (props: {
+const MapBoundsTracker = ({
+  onBoundsChange,
+}: {
   onBoundsChange: (bounds: {
     north: number;
     south: number;
@@ -75,7 +77,7 @@ const MapBoundsTracker = (props: {
     const updateBounds = () => {
       const bounds = map.getBounds();
       if (bounds) {
-        props.onBoundsChange({
+        onBoundsChange({
           north: bounds.getNorth(),
           south: bounds.getSouth(),
           east: bounds.getEast(),
@@ -95,7 +97,7 @@ const MapBoundsTracker = (props: {
       map.off("moveend", updateBounds);
       map.off("zoomend", updateBounds);
     };
-  }, [map, props.onBoundsChange]);
+  }, [map, onBoundsChange]);
 
   return null;
 };
@@ -109,7 +111,7 @@ type PhotoWithStyle = MapWorldEntry & {
 const ROUTER_SYNC_DEBOUNCE_MS = 200;
 const ROUTER_SYNC_PAUSE_MS = 700;
 
-export const MMap: React.FC<MapWorldProps> = (props) => {
+export const MMap: React.FC<MapWorldProps> = ({ photos, className }) => {
   const router = useRouter();
   const url = new URL(window.location.toString());
   const initialLon = url.searchParams.get("lon");
@@ -128,7 +130,7 @@ export const MMap: React.FC<MapWorldProps> = (props) => {
   } | null>(null);
   // Memoize date range calculations (Optimization #1)
   const dateStats = React.useMemo(() => {
-    const sortedByDate = props.photos
+    const sortedByDate = photos
       .filter((p) => p.date)
       .sort((a, b) => new Date(b.date).valueOf() - new Date(a.date).valueOf());
     const oldest = sortedByDate.at(0);
@@ -138,11 +140,11 @@ export const MMap: React.FC<MapWorldProps> = (props) => {
       new Date(oldest?.date ?? 0).valueOf();
 
     return { oldest, newest, range };
-  }, [props.photos]);
+  }, [photos]);
 
   // Memoize sorted photos with pre-calculated marker styles (Optimization #2)
   const photosWithStyles = React.useMemo(() => {
-    return props.photos
+    return photos
       .sort((a, b) => {
         // sort so newer markers are on top
         return new Date(a.date).valueOf() - new Date(b.date).valueOf();
@@ -160,7 +162,7 @@ export const MMap: React.FC<MapWorldProps> = (props) => {
           hueRotate: `hue-rotate(${relative * 255}deg)`,
         };
       });
-  }, [props.photos, dateStats]);
+  }, [photos, dateStats]);
 
   // Filter photos by viewport bounds (Optimization #3)
   const visiblePhotos = React.useMemo(() => {
@@ -238,7 +240,7 @@ export const MMap: React.FC<MapWorldProps> = (props) => {
   };
 
   return (
-    <div className={props.className}>
+    <div className={className}>
       {/* Use ThemeToggle to set theme on load if visiting map directly */}
       <div style={{ position: "fixed", pointerEvents: "none", opacity: "0" }}>
         <ThemeToggle />

@@ -2,7 +2,11 @@ import { NextPage } from "next/types";
 import React, { useEffect, useCallback } from "react";
 import { useDatabase } from "../../components/database/useDatabase";
 import { PhotoBlock } from "../../services/types";
-import { fetchRandomPhoto, RandomPhotoRow } from "../../components/search/api";
+import {
+  fetchRandomPhoto,
+  fetchSimilarResults,
+  RandomPhotoRow,
+} from "../../components/search/api";
 import { ProgressBar } from "../../components/ProgressBar";
 import styles from "./slideshow.module.css";
 import commonStyles from "../../styles/common.module.css";
@@ -18,6 +22,7 @@ import {
 import MMap from "../../components/Map";
 
 type PageProps = {};
+type SlideshowMode = "random" | "similar";
 
 const SlideshowPage: NextPage<PageProps> = (props) => {
   return <Slideshow />;
@@ -106,6 +111,10 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
   const recentPhotoPathsRef = React.useRef<string[]>([]);
   const [shuffleHistorySize, setShuffleHistorySize, removeShuffleHistorySize] =
     useLocalStorage("slideshow-shuffle-history-size", 100);
+  const [slideshowMode, setSlideshowMode] = useLocalStorage(
+    "slideshow-mode",
+    "random" as SlideshowMode,
+  );
 
   /**
    * URL Search Parameters for Slideshow Configuration
@@ -117,6 +126,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
    *   - cover=1        Use cover mode (vs contain)
    *
    * Other parameters:
+   *   - mode=random|similar     Slideshow playback mode
    *   - align=left|center|right  Set details alignment
    *   - delay=<seconds>          Set slide duration in seconds (e.g., 60 = 60 seconds)
    *   - shuffle=<number>         Set shuffle history size (avoid repeating last N photos)
@@ -149,6 +159,11 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
     const searchFilter = url.searchParams.get("filter");
     if (searchFilter) {
       setFilter(searchFilter);
+    }
+
+    const modeParam = url.searchParams.get("mode");
+    if (modeParam === "random" || modeParam === "similar") {
+      setSlideshowMode(modeParam);
     }
 
     // Parse clock setting
@@ -203,7 +218,21 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
     setDetailsAlignment,
     setTimeDelay,
     setShuffleHistorySize,
+    setSlideshowMode,
   ]);
+
+  const commitNextPhoto = useCallback(
+    (candidatePhoto: RandomPhotoRow) => {
+      recentPhotoPathsRef.current = [
+        candidatePhoto.path,
+        ...recentPhotoPathsRef.current,
+      ].slice(0, shuffleHistorySize);
+
+      setCurrentPhotoPath(candidatePhoto);
+      setNextChangeAt(new Date(Date.now() + timeDelay));
+    },
+    [shuffleHistorySize, timeDelay],
+  );
 
   const goNext = useCallback(() => {
     if (!database) {
@@ -213,7 +242,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
     let attempts = 0;
     const maxAttempts = 5;
 
-    const tryFetch = () => {
+    const tryFetchRandom = () => {
       fetchRandomPhoto({ database, filter })
         .then((result) => {
           if (result.length === 0) {
@@ -230,24 +259,61 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
           ) {
             attempts++;
             // Retry after a small delay instead of hot-looping
-            setTimeout(tryFetch, 50);
+            setTimeout(tryFetchRandom, 50);
             return;
           }
 
-          // Update recent photos history
-          recentPhotoPathsRef.current = [
-            candidatePhoto.path,
-            ...recentPhotoPathsRef.current,
-          ].slice(0, shuffleHistorySize);
-
-          setCurrentPhotoPath(candidatePhoto);
-          setNextChangeAt(new Date(Date.now() + timeDelay));
+          commitNextPhoto(candidatePhoto);
         })
         .catch(console.error);
     };
 
-    tryFetch();
-  }, [database, filter, timeDelay, shuffleHistorySize]);
+    if (slideshowMode === "similar" && currentPhotoPath?.path) {
+      fetchSimilarResults({
+        database,
+        path: currentPhotoPath.path,
+        page: 0,
+        pageSize: Math.max(shuffleHistorySize, 100),
+      })
+        .then((result) => {
+          const filteredResults = result.data.filter((candidate) => {
+            const matchesAlbumFilter = filter
+              ? candidate.path.startsWith(`../albums/${filter}/`)
+              : true;
+            const isRecent = recentPhotoPathsRef.current.includes(
+              candidate.path,
+            );
+            return matchesAlbumFilter && !isRecent;
+          });
+
+          const nextSimilar = filteredResults[0];
+          if (!nextSimilar) {
+            tryFetchRandom();
+            return;
+          }
+
+          commitNextPhoto({
+            path: nextSimilar.path,
+            exif: nextSimilar.exif,
+            geocode: nextSimilar.geocode,
+          });
+        })
+        .catch((err) => {
+          console.error(err);
+          tryFetchRandom();
+        });
+      return;
+    }
+
+    tryFetchRandom();
+  }, [
+    commitNextPhoto,
+    currentPhotoPath?.path,
+    database,
+    filter,
+    shuffleHistorySize,
+    slideshowMode,
+  ]);
 
   const cycleAlignment = () => {
     const next =
@@ -410,6 +476,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
               showClock ? commonStyles.active : "",
               commonStyles.button,
             ].join(" ")}
+            aria-pressed={showClock}
             onClick={() => setShowClock(!showClock)}
           >
             🕰️
@@ -420,6 +487,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
               showDetails ? commonStyles.active : "",
               commonStyles.button,
             ].join(" ")}
+            aria-pressed={showDetails}
             onClick={() => setShowDetails(!showDetails)}
           >
             Details
@@ -430,6 +498,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
               showMap ? commonStyles.active : "",
               commonStyles.button,
             ].join(" ")}
+            aria-pressed={showMap}
             onClick={() => setShowMap(!showMap)}
           >
             Map
@@ -452,6 +521,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
               showCover ? commonStyles.active : "",
               commonStyles.button,
             ].join(" ")}
+            aria-pressed={showCover}
             onClick={() => setShowCover(!showCover)}
           >
             {showCover ? "Cover" : "Contain"}
@@ -472,10 +542,36 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
           </button>
 
           <button
+            className={[
+              slideshowMode === "random" ? commonStyles.active : "",
+              commonStyles.button,
+            ].join(" ")}
+            aria-pressed={slideshowMode === "random"}
+            onClick={() => {
+              setSlideshowMode("random");
+            }}
+          >
+            Random
+          </button>
+
+          <button
+            className={[
+              slideshowMode === "similar" ? commonStyles.active : "",
+              commonStyles.button,
+            ].join(" ")}
+            aria-pressed={slideshowMode === "similar"}
+            onClick={() => {
+              setSlideshowMode("similar");
+            }}
+          >
+            Similar
+          </button>
+
+          <button
             className={commonStyles.button}
             onClick={() => {
               setImageLoaded(false);
-              setNextCounter(nextCounter + 1);
+              setNextCounter((prev) => prev + 1);
             }}
           >
             Next
@@ -493,6 +589,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
                     commonStyles.button,
                     delay === timeDelay ? commonStyles.active : "",
                   ].join(" ")}
+                  aria-pressed={delay === timeDelay}
                   onClick={() => setTimeDelay(delay)}
                 >
                   {delayMin >= 60
@@ -520,6 +617,14 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
               </Link>
             </div>
           ) : null}
+
+          <Link
+            href={`/album/${albumName}#${photoName}`}
+            className={commonStyles.toast}
+          >
+            {slideshowMode === "similar" ? "similar" : "random"} in{" "}
+            <i>{albumName}</i>
+          </Link>
 
           <Link
             href={`/album/${albumName}#${photoName}`}
@@ -575,12 +680,12 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
           onError={() => {
             // Skip bad images to avoid showing broken image on displays
             setTimeout(() => {
-              setNextCounter(nextCounter + 1);
+              setNextCounter((prev) => prev + 1);
             }, 1000);
           }}
           onClick={() => {
             setImageLoaded(false);
-            setNextCounter(nextCounter + 1);
+            setNextCounter((prev) => prev + 1);
           }}
         />
       </div>

@@ -4,6 +4,9 @@ import sqlite3InitModule, {
 } from "@sqlite.org/sqlite-wasm";
 import { useState, useEffect } from "react";
 
+let cachedDatabase: Database | null = null;
+let databasePromise: Promise<Database> | null = null;
+
 const fetchWithProgress = async (
   url: string,
   onProgress: (
@@ -104,14 +107,56 @@ const initializeSQLite = async (
   return db;
 };
 
+const getDatabase = (
+  setProgress?: (percent: number) => void,
+): Promise<Database> => {
+  if (cachedDatabase) {
+    setProgress?.(100);
+    return Promise.resolve(cachedDatabase);
+  }
+
+  if (!databasePromise) {
+    databasePromise = initializeSQLite(setProgress)
+      .then((database) => {
+        cachedDatabase = database;
+        return database;
+      })
+      .catch((err) => {
+        databasePromise = null;
+        throw err;
+      });
+  }
+
+  return databasePromise;
+};
+
 export const useDatabase = (): [Database | null, number] => {
   const [database, setDatabase] = useState<Database | null>(null);
   const [progress, setProgress] = useState(0);
 
   useEffect(() => {
-    initializeSQLite(setProgress).then((db) => {
-      setDatabase(db);
-    });
+    let isCancelled = false;
+
+    getDatabase(setProgress)
+      .then((db) => {
+        if (isCancelled) {
+          return;
+        }
+
+        setProgress(100);
+        setDatabase(db);
+      })
+      .catch((err) => {
+        if (isCancelled) {
+          return;
+        }
+
+        console.error("Failed to load database", err);
+      });
+
+    return () => {
+      isCancelled = true;
+    };
   }, []);
 
   return [database, progress];

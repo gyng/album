@@ -5,11 +5,13 @@ from index import (
     analyse_image_worker,
     JanusClassifier,
     Sqlite3Client,
+    search_similar_path,
     index,
     search,
     search_tags,
 )
 import os
+import tempfile
 import unittest
 from click.testing import CliRunner
 import torch
@@ -36,9 +38,9 @@ class TestMain(unittest.TestCase):
             classifier.init_model()
             idx = 0
             path = "../src/test/fixtures/monkey.jpg"
-            input = (idx, path, classifier)
+            input_tuple = (idx, path, classifier)
 
-            actual = analyse_image_worker(input)
+            actual = analyse_image_worker(input_tuple)
             analysed = actual.get("analysed")
 
             self.assertGreater(len(analysed.get("tags")), 0)
@@ -55,10 +57,22 @@ class TestMain(unittest.TestCase):
             self.assertEqual(analysed.get("lng_deg"), 103.7822)
         else:
             print("Skipping test_analyse_image_worker as CUDA is not available")
-            pass
 
 
 class TestCli(unittest.TestCase):
+    def test_index_dry_run_siglip2_test_simple(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            runner = CliRunner()
+            glob = "../albums/test-simple/*.[jJ][pP][gG]"
+            dbpath = os.path.join(tmpdir, "test-simple.sqlite")
+            result = runner.invoke(
+                index,
+                f"--glob {glob} --dbpath {dbpath} --dry-run --model-profile siglip2".split(),
+            )
+            self.assertEqual(0, result.exit_code)
+            self.assertTrue("Using model profile: siglip2" in result.output)
+            self.assertTrue("Found 5 files" in result.output)
+
     def test_skip_index_already_exists(self):
         runner = CliRunner()
         glob = "../src/test/fixtures/*.jpg"
@@ -119,6 +133,36 @@ class TestDb(unittest.TestCase):
         self.assertEqual(
             db.already_exists("../src/test/fixtures/monkey.missing"), False
         )
+
+    def test_embeddings_insert_and_similarity(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            dbpath = os.path.join(tmpdir, "test-simple-vector.sqlite")
+            db = Sqlite3Client(dbpath)
+            db.setup_tables()
+
+            base_path = "../albums/test-simple/DSCF0506-2.jpg"
+            near_path = "../albums/test-simple/DSCF0593.jpg"
+            far_path = "../albums/test-simple/DSCF2581-2_2.jpg"
+
+            db.insert_embedding(base_path, "unit-test-model", [1.0, 0.0, 0.0])
+            db.insert_embedding(near_path, "unit-test-model", [0.9, 0.1, 0.0])
+            db.insert_embedding(far_path, "unit-test-model", [0.0, 1.0, 0.0])
+
+            embedding = db.get_embedding(base_path, model_id="unit-test-model")
+            self.assertIsNotNone(embedding)
+            self.assertEqual(embedding[1], "unit-test-model")
+            self.assertEqual(embedding[2], 3)
+
+            runner = CliRunner()
+            result = runner.invoke(
+                search_similar_path,
+                f"--dbpath {dbpath} --path {base_path} --limit 2".split(),
+            )
+
+            self.assertEqual(0, result.exit_code)
+            self.assertTrue(near_path in result.output)
+            self.assertTrue(far_path in result.output)
+            self.assertLess(result.output.find(near_path), result.output.find(far_path))
 
 
 if __name__ == "__main__":

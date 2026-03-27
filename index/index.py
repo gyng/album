@@ -12,13 +12,20 @@ import os
 import json
 import re
 import uuid
+import math
 
-from transformers import AutoModelForCausalLM
+from transformers import AutoModel, AutoModelForCausalLM, AutoProcessor
+from transformers.image_utils import load_image
 from janus.models import MultiModalityCausalLM, VLChatProcessor
 from janus.utils.io import load_pil_images
 
 import concurrent.futures
 import time
+
+
+MODEL_PROFILE_JANUS = "janus"
+MODEL_PROFILE_SIGLIP2 = "siglip2"
+MODEL_PROFILE_HYBRID = "hybrid"
 
 
 class JanusClassifier:
@@ -84,6 +91,44 @@ class JanusClassifier:
         return answer
 
 
+class Siglip2Embedder:
+    def init_model(self) -> None:
+        candidate_model_ids = [
+            "google/siglip2-base-patch16-224",
+            "google/siglip-base-patch16-224",
+        ]
+        load_error = None
+        self.model_id = candidate_model_ids[0]
+        for model_id in candidate_model_ids:
+            try:
+                print(f"Loading image embedder {model_id}...")
+                self.processor = AutoProcessor.from_pretrained(model_id)
+                self.model = AutoModel.from_pretrained(model_id)
+                self.model_id = model_id
+                break
+            except Exception as err:
+                load_error = err
+                print(f"Failed to load image embedder {model_id}: {err}")
+        else:
+            raise RuntimeError(
+                "Failed to load any configured image embedding model"
+            ) from load_error
+
+        self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        self.model = self.model.to(self.device).eval()
+        print(f"Loaded image embedder {self.model_id} on {self.device}.")
+
+    @torch.inference_mode()
+    def predict_image_embedding(self, path: str) -> list[float]:
+        image = load_image(path)
+        inputs = self.processor(images=[image], return_tensors="pt")
+        inputs = {k: v.to(self.device) for k, v in inputs.items()}
+        features = self.model.get_image_features(**inputs)
+        # Normalise for cosine similarity and keep as float list for sqlite JSON storage.
+        features = torch.nn.functional.normalize(features, p=2, dim=-1)
+        return features[0].detach().float().cpu().tolist()
+
+
 def convert_to_degress(value: exifread.utils.Ratio, lat_or_lng_ref: str) -> float:
     is_s_or_w = str(lat_or_lng_ref) == "W" or str(lat_or_lng_ref) == "S"
     sign = -1 if is_s_or_w else 1
@@ -147,6 +192,9 @@ class Sqlite3Client:
         cur.execute(
             "CREATE TABLE IF NOT EXISTS metadata (path VARCHAR PRIMARY KEY, lat_deg REAL, lng_deg REAL, iso8601 TEXT)"
         )
+        cur.execute(
+            "CREATE TABLE IF NOT EXISTS embeddings (path VARCHAR PRIMARY KEY, model_id TEXT, embedding_dim INTEGER, embedding_json TEXT)"
+        )
         # Optimise loads from the browser https://github.com/phiresky/sql.js-httpvfs#readme
         cur.execute("PRAGMA journal_mode = delete;")
         cur.execute("PRAGMA page_size = 1024;")
@@ -188,9 +236,20 @@ class Sqlite3Client:
         res = cur.execute(statement_metadata)
         resolved_metadata_paths = res.fetchall()
 
+        statement_embeddings = """
+        SELECT path
+        FROM embeddings
+        """
+        res = cur.execute(statement_embeddings)
+        resolved_embedding_paths = res.fetchall()
+
         resolved_paths = {
             p[0]
-            for path_list in [resolved_image_paths, resolved_metadata_paths]
+            for path_list in [
+                resolved_image_paths,
+                resolved_metadata_paths,
+                resolved_embedding_paths,
+            ]
             for p in path_list
         }
         return resolved_paths
@@ -213,9 +272,17 @@ class Sqlite3Client:
             statement_metadata,
             (path,),
         )
+
+        statement_embeddings = """
+        DELETE FROM embeddings WHERE path = ?
+        """
+        res_embeddings = cur.execute(
+            statement_embeddings,
+            (path,),
+        )
         cur.execute("COMMIT")
 
-        return (res_images, res_metadata)
+        return (res_images, res_metadata, res_embeddings)
 
     def search(
         self, query: str, limit: Optional[int] = 999999, offset: Optional[int] = 0
@@ -321,6 +388,47 @@ class Sqlite3Client:
         )
         cur.execute("COMMIT")
 
+    def insert_embedding(self, path: str, model_id: str, embedding: list[float]):
+        cur = self.con.cursor()
+        embedding_json = json.dumps(embedding)
+        cur.execute("BEGIN")
+        cur.execute(
+            "INSERT OR IGNORE INTO embeddings (path, model_id, embedding_dim, embedding_json) VALUES (?, ?, ?, ?);",
+            (path, model_id, len(embedding), embedding_json),
+        )
+        cur.execute(
+            "UPDATE embeddings SET model_id = ?, embedding_dim = ?, embedding_json = ? WHERE path = ?",
+            (model_id, len(embedding), embedding_json, path),
+        )
+        cur.execute("COMMIT")
+
+    def get_embedding(self, path: str, model_id: Optional[str] = None):
+        cur = self.con.cursor()
+        if model_id:
+            res = cur.execute(
+                "SELECT path, model_id, embedding_dim, embedding_json FROM embeddings WHERE path = ? AND model_id = ?",
+                (path, model_id),
+            )
+        else:
+            res = cur.execute(
+                "SELECT path, model_id, embedding_dim, embedding_json FROM embeddings WHERE path = ?",
+                (path,),
+            )
+        return res.fetchone()
+
+    def list_embeddings(self, model_id: Optional[str] = None):
+        cur = self.con.cursor()
+        if model_id:
+            res = cur.execute(
+                "SELECT path, model_id, embedding_dim, embedding_json FROM embeddings WHERE model_id = ?",
+                (model_id,),
+            )
+        else:
+            res = cur.execute(
+                "SELECT path, model_id, embedding_dim, embedding_json FROM embeddings"
+            )
+        return res.fetchall()
+
 
 @click.group()
 @click.pass_context
@@ -332,7 +440,16 @@ def cli(ctx):
 @click.option("--glob", help="glob to recursively index.")
 @click.option("--dbpath", default="testdb.sqlite", help="sqlite database path to use.")
 @click.option("--dry-run", is_flag=True, default=False, help="Dry run.")
-def index(glob: str, dbpath: str, dry_run: bool):
+@click.option(
+    "--model-profile",
+    type=click.Choice(
+        [MODEL_PROFILE_JANUS, MODEL_PROFILE_SIGLIP2, MODEL_PROFILE_HYBRID],
+        case_sensitive=False,
+    ),
+    default=MODEL_PROFILE_JANUS,
+    help="Indexing profile: janus (legacy tags), siglip2 (embeddings), hybrid (both).",
+)
+def index(glob: str, dbpath: str, dry_run: bool, model_profile: str):
     db = Sqlite3Client(dbpath)
     db.setup_tables()
     pprint.pprint(db.info())
@@ -344,13 +461,22 @@ def index(glob: str, dbpath: str, dry_run: bool):
     print(
         f"Analysing {len(valid_files)} unindexed files (skipping {len(files) - len(valid_files)} already-indexed)."
     )
+    print(f"Using model profile: {model_profile}")
 
     if not dry_run and len(valid_files) > 0:
-        classifier = JanusClassifier()
-        classifier.init_model()
+        classifier = None
+        embedder = None
+
+        if model_profile in [MODEL_PROFILE_JANUS, MODEL_PROFILE_HYBRID]:
+            classifier = JanusClassifier()
+            classifier.init_model()
+
+        if model_profile in [MODEL_PROFILE_SIGLIP2, MODEL_PROFILE_HYBRID]:
+            embedder = Siglip2Embedder()
+            embedder.init_model()
 
         enumerated = [
-            (index, item, classifier) for index, item in enumerate(valid_files)
+            (index, item, classifier, embedder) for index, item in enumerate(valid_files)
         ]
 
         # Disable concurrency as it doesn't help performance on a RTX3080
@@ -433,6 +559,53 @@ def dump(dbpath: str):
     pprint.pprint(results)
 
 
+def cosine_similarity(a: list[float], b: list[float]) -> float:
+    if len(a) == 0 or len(b) == 0 or len(a) != len(b):
+        return 0.0
+    dot = sum(x * y for x, y in zip(a, b))
+    norm_a = math.sqrt(sum(x * x for x in a))
+    norm_b = math.sqrt(sum(y * y for y in b))
+    if norm_a == 0.0 or norm_b == 0.0:
+        return 0.0
+    return dot / (norm_a * norm_b)
+
+
+@cli.command("search-similar-path")
+@click.option("--dbpath", default="testdb.sqlite", help="sqlite database path to use.")
+@click.option("--path", "query_path", required=True, help="Image path to query by.")
+@click.option("--limit", default=10, help="Number of similar results to return.")
+@click.option(
+    "--model-id",
+    default=None,
+    help="Optional model_id filter. Defaults to the query path's stored model_id.",
+)
+def search_similar_path(
+    dbpath: str, query_path: str, limit: int, model_id: Optional[str]
+):
+    db = Sqlite3Client(dbpath)
+    db.setup_tables()
+
+    base = db.get_embedding(path=query_path, model_id=model_id)
+    if not base:
+        pprint.pprint([])
+        return
+
+    resolved_model_id = base[1]
+    base_embedding = json.loads(base[3])
+
+    candidates = db.list_embeddings(model_id=resolved_model_id)
+    scored = []
+    for path, _model_id, _dim, embedding_json in candidates:
+        if path == query_path:
+            continue
+        candidate_embedding = json.loads(embedding_json)
+        score = cosine_similarity(base_embedding, candidate_embedding)
+        scored.append((path, score))
+
+    scored = sorted(scored, key=lambda x: x[1], reverse=True)[:limit]
+    pprint.pprint(scored)
+
+
 def format_mapping(mapping: Optional[Mapping[str, str]]) -> str:
     """Formats a mapping for insertion into sqlite via a paramaterised query"""
     if not mapping or not hasattr(mapping, "items"):
@@ -456,7 +629,12 @@ def find_files(directory: str, pattern: str) -> list[str]:
     return [str(p) for p in paths]
 
 
-def analyse_image(fh: IO[bytes], classifier: JanusClassifier, path: str) -> Mapping:
+def analyse_image(
+    fh: IO[bytes],
+    classifier: Optional[JanusClassifier],
+    path: str,
+    embedder: Optional[Siglip2Embedder] = None,
+) -> Mapping:
     start_time = time.perf_counter()
 
     exif_full = get_exif(fh)
@@ -480,39 +658,52 @@ def analyse_image(fh: IO[bytes], classifier: JanusClassifier, path: str) -> Mapp
     # Resizing doesn't do much to improve speed?
     colors = fast_colorthief.get_palette(path)
 
-    attempts = 0
-    max_attempts = 20
-    result = None
-    while attempts < max_attempts:
-        try:
-            result = classifier.predict(path=path, geocode=geo)
+    result: Mapping = {}
+    if classifier is not None:
+        attempts = 0
+        max_attempts = 20
+        raw_result = None
+        while attempts < max_attempts:
+            try:
+                raw_result = classifier.predict(path=path, geocode=geo)
 
-            JSON_BLOCK_PATTERN = re.compile(r"\{.*?\}", re.DOTALL | re.MULTILINE)
-            blocks = JSON_BLOCK_PATTERN.findall(result)
-            block = blocks[0]
-            result = json.loads(block)
+                JSON_BLOCK_PATTERN = re.compile(r"\{.*?\}", re.DOTALL | re.MULTILINE)
+                blocks = JSON_BLOCK_PATTERN.findall(raw_result)
+                block = blocks[0]
+                result = json.loads(block)
 
-            # Ensure we have the right keys as a poor man's schema check
-            assert isinstance(result, dict)
-            if isinstance(result["identified_objects"], str):
-                result["identified_objects"] = [result["identified_objects"]]
-            if isinstance(result["themes"], str):
-                result["themes"] = [result["themes"]]
-            result["alt_text"]
-            result["critique"]
-            result["suggested_title"]
-            result["composition_critique"]
-            result["subject"]
-            break
-        except Exception:
-            attempts += 1
-            print(f"Attempt {attempts}/{max_attempts} failed for {path}, got {result}")
-            if attempts >= max_attempts:
-                print(
-                    f"Failed to classify {path} after {max_attempts} attempts, skipping."
-                )
-                result = {}
+                # Ensure we have the right keys as a poor man's schema check
+                assert isinstance(result, dict)
+                if isinstance(result["identified_objects"], str):
+                    result["identified_objects"] = [result["identified_objects"]]
+                if isinstance(result["themes"], str):
+                    result["themes"] = [result["themes"]]
+                result["alt_text"]
+                result["critique"]
+                result["suggested_title"]
+                result["composition_critique"]
+                result["subject"]
                 break
+            except Exception:
+                attempts += 1
+                print(
+                    f"Attempt {attempts}/{max_attempts} failed for {path}, got {raw_result}"
+                )
+                if attempts >= max_attempts:
+                    print(
+                        f"Failed to classify {path} after {max_attempts} attempts, skipping."
+                    )
+                    result = {}
+                    break
+
+    embedding = None
+    embedding_model_id = None
+    if embedder is not None:
+        try:
+            embedding = embedder.predict_image_embedding(path)
+            embedding_model_id = embedder.model_id
+        except Exception as err:
+            print(f"Embedding failed for {path}: {err}")
 
     # 2000:01:01 12:34:56 > 2000-01-01T12:34:56
     datetime = (
@@ -540,22 +731,30 @@ def analyse_image(fh: IO[bytes], classifier: JanusClassifier, path: str) -> Mapp
         "suggested_title": result.get("suggested_title"),
         "composition_critique": result.get("composition_critique"),
         "subject": result.get("subject"),
+        "embedding": embedding,
+        "embedding_model_id": embedding_model_id,
         "_duration": end_time - start_time,
     }
 
 
 def analyse_image_worker(
-    input: list[Tuple[int, str, JanusClassifier]],
+    input: list[Tuple[int, str, Optional[JanusClassifier], Optional[Siglip2Embedder]]],
 ) -> Mapping[str, typing.Any]:
     try:
         """Multiprocessable worker"""
         idx = input[0]
         path = input[1]
         classifier = input[2]
+        embedder = input[3] if len(input) > 3 else None
 
         print(f"[{idx}] Analysing {path}...")
         with open(path, "rb") as fh:
-            analysed = analyse_image(fh, classifier=classifier, path=path)
+            analysed = analyse_image(
+                fh,
+                classifier=classifier,
+                path=path,
+                embedder=embedder,
+            )
             return {
                 "path": path,
                 "analysed": analysed,
@@ -606,6 +805,11 @@ def insert_analysed_image(db, analysed: Mapping, path):
         ),
         iso8601=analysed.get("iso8601"),
     )
+
+    embedding = analysed.get("embedding")
+    embedding_model_id = analysed.get("embedding_model_id")
+    if embedding and embedding_model_id:
+        db.insert_embedding(path=path, model_id=embedding_model_id, embedding=embedding)
 
 
 if __name__ == "__main__":

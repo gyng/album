@@ -14,15 +14,7 @@ test.describe("Slideshow URL Parameters Tests", () => {
     const clockButton = page.locator('button:has-text("🕰️")');
     await expect(clockButton).toBeVisible({ timeout: 15000 });
 
-    // Check if button has active state
-    const isActive = await clockButton.evaluate((el) =>
-      el.classList.contains("active"),
-    );
-    expect(isActive).toBe(true);
-
-    // Check if clock display is present
-    const clockDisplay = page.locator(".clock, .time");
-    expect((await clockDisplay.count()) > 0 || isActive).toBeTruthy();
+    await expect(clockButton).toHaveAttribute("aria-pressed", "true");
 
     console.log("✓ Clock parameter ?clock=1 works");
   });
@@ -38,10 +30,7 @@ test.describe("Slideshow URL Parameters Tests", () => {
     const clockButton = page.locator('button:has-text("🕰️")');
     await expect(clockButton).toBeVisible({ timeout: 15000 });
 
-    const isActive = await clockButton.evaluate((el) =>
-      el.classList.contains("active"),
-    );
-    expect(isActive).toBe(true);
+    await expect(clockButton).toHaveAttribute("aria-pressed", "true");
 
     console.log("✓ Clock parameter ?clock=true works");
   });
@@ -57,12 +46,23 @@ test.describe("Slideshow URL Parameters Tests", () => {
     const detailsButton = page.locator('button:has-text("Details")');
     await expect(detailsButton).toBeVisible({ timeout: 15000 });
 
-    const isActive = await detailsButton.evaluate((el) =>
-      el.classList.contains("active"),
-    );
-    expect(isActive).toBe(true);
+    await expect(detailsButton).toHaveAttribute("aria-pressed", "true");
 
     console.log("✓ Details parameter ?details=1 works");
+  });
+
+  test("mode parameter works with ?mode=similar", async ({ page }) => {
+    await page.goto("/slideshow?mode=similar", {
+      timeout: 90000,
+      waitUntil: "domcontentloaded",
+    });
+
+    await expect(page).toHaveTitle("Slideshow", { timeout: 90000 });
+
+    const similarButton = page.locator('button:has-text("Similar")');
+    await expect(similarButton).toBeVisible({ timeout: 15000 });
+
+    await expect(similarButton).toHaveAttribute("aria-pressed", "true");
   });
 
   test("map parameter works with ?map=1", async ({ page }) => {
@@ -76,10 +76,7 @@ test.describe("Slideshow URL Parameters Tests", () => {
     const mapButton = page.locator('button:has-text("Map")');
     await expect(mapButton).toBeVisible({ timeout: 15000 });
 
-    const isActive = await mapButton.evaluate((el) =>
-      el.classList.contains("active"),
-    );
-    expect(isActive).toBe(true);
+    await expect(mapButton).toHaveAttribute("aria-pressed", "true");
 
     console.log("✓ Map parameter ?map=1 works");
   });
@@ -95,10 +92,7 @@ test.describe("Slideshow URL Parameters Tests", () => {
     const coverButton = page.locator('button:has-text("Cover")');
     await expect(coverButton).toBeVisible({ timeout: 15000 });
 
-    const isActive = await coverButton.evaluate((el) =>
-      el.classList.contains("active"),
-    );
-    expect(isActive).toBe(true);
+    await expect(coverButton).toHaveAttribute("aria-pressed", "true");
 
     console.log("✓ Cover parameter ?cover=1 works");
   });
@@ -167,10 +161,7 @@ test.describe("Slideshow URL Parameters Tests", () => {
     try {
       await expect(tenSecondButton).toBeVisible({ timeout: 30000 });
 
-      const isActive = await tenSecondButton.evaluate((el) =>
-        el.classList.contains("active"),
-      );
-      expect(isActive).toBe(true);
+      await expect(tenSecondButton).toHaveAttribute("aria-pressed", "true");
 
       console.log("✓ Delay parameter ?delay=10 works (10 seconds)");
     } catch {
@@ -201,10 +192,7 @@ test.describe("Slideshow URL Parameters Tests", () => {
     try {
       await expect(oneMinuteButton).toBeVisible({ timeout: 30000 });
 
-      const isActive = await oneMinuteButton.evaluate((el) =>
-        el.classList.contains("active"),
-      );
-      expect(isActive).toBe(true);
+      await expect(oneMinuteButton).toHaveAttribute("aria-pressed", "true");
 
       console.log("✓ Delay parameter ?delay=60 works (60 seconds = 1 minute)");
     } catch {
@@ -232,10 +220,7 @@ test.describe("Slideshow URL Parameters Tests", () => {
     try {
       await expect(shuffleButton).toBeVisible({ timeout: 30000 });
 
-      const isActive = await shuffleButton.evaluate((el) =>
-        el.classList.contains("active"),
-      );
-      expect(isActive).toBe(true);
+      await expect(shuffleButton).toHaveAttribute("aria-pressed", "true");
 
       console.log("✓ Shuffle parameter ?shuffle=50 works");
     } catch {
@@ -269,40 +254,29 @@ test.describe("Slideshow URL Parameters Tests", () => {
     await expect(clockButton).toBeVisible({ timeout: 15000 });
     await expect(detailsButton).toBeVisible({ timeout: 15000 });
 
-    let allActive = true;
-    const clockActive = await clockButton.evaluate((el) =>
-      el.classList.contains("active"),
-    );
-    const detailsActive = await detailsButton.evaluate((el) =>
-      el.classList.contains("active"),
-    );
-
-    expect(clockActive).toBe(true);
-    expect(detailsActive).toBe(true);
+    await expect(clockButton).toHaveAttribute("aria-pressed", "true");
+    await expect(detailsButton).toHaveAttribute("aria-pressed", "true");
 
     try {
       await expect(alignmentButton).toContainText("Left");
     } catch {
-      allActive = false;
+      // noop: alignment text may render a moment later
     }
 
     try {
       await expect(shuffleButton).toBeVisible({ timeout: 10000 });
-      const shuffleActive = await shuffleButton.evaluate((el) =>
-        el.classList.contains("active"),
-      );
-      expect(shuffleActive).toBe(true);
+      await expect(shuffleButton).toHaveAttribute("aria-pressed", "true");
     } catch {
       // Shuffle buttons may take time to load
     }
 
-    console.log(
-      `✓ Combined parameters work (clock=${clockActive}, details=${detailsActive})`,
-    );
+    console.log("✓ Combined parameters work");
   });
 
-  test("filter parameter still works with ?filter=japan", async ({ page }) => {
-    await page.goto("/slideshow?filter=japan&clock=1", {
+  test("filter parameter still works with ?filter=2511japan", async ({
+    page,
+  }) => {
+    await page.goto("/slideshow?filter=2511japan&clock=1", {
       timeout: 90000,
       waitUntil: "domcontentloaded",
     });
@@ -310,11 +284,11 @@ test.describe("Slideshow URL Parameters Tests", () => {
     await expect(page).toHaveTitle("Slideshow", { timeout: 90000 });
 
     // Check if filter is indicated in the UI
-    const filterIndicator = page.locator(':has-text("japan")');
+    const filterIndicator = page.locator(':has-text("2511japan")');
     const filterCount = await filterIndicator.count();
 
     // URL should contain filter
-    expect(page.url()).toContain("filter=japan");
+    expect(page.url()).toContain("filter=2511japan");
     console.log(
       `✓ Filter parameter works (filter indicator visible: ${filterCount > 0 ? "yes" : "no"})`,
     );
@@ -370,10 +344,7 @@ test.describe("Slideshow URL Parameters Tests", () => {
     const clockButton = page.locator('button:has-text("🕰️")');
     await expect(clockButton).toBeVisible({ timeout: 15000 });
 
-    let isActive = await clockButton.evaluate((el) =>
-      el.classList.contains("active"),
-    );
-    expect(isActive).toBe(true);
+    await expect(clockButton).toHaveAttribute("aria-pressed", "true");
 
     console.log("✓ Clock parameter ?clock=yes works");
 
@@ -388,10 +359,7 @@ test.describe("Slideshow URL Parameters Tests", () => {
     const detailsButton = page.locator('button:has-text("Details")');
     await expect(detailsButton).toBeVisible({ timeout: 15000 });
 
-    isActive = await detailsButton.evaluate((el) =>
-      el.classList.contains("active"),
-    );
-    expect(isActive).toBe(true);
+    await expect(detailsButton).toHaveAttribute("aria-pressed", "true");
 
     console.log("✓ Details parameter ?details=on works");
   });

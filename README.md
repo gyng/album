@@ -11,6 +11,7 @@ A zero-config, static, file-based album generator
 - Colour palette analysis
 - Map mode
 - Slideshow, with clock
+- Slideshow random/similar playback modes
 - EXIF support
 - YouTube video support
 - Local video support (FFmpeg web-optimised transcode)
@@ -122,19 +123,22 @@ You will need Node installed. The following steps are for deployment on Vercel, 
 
    If the build fails, try removing `.vercel` and reinitialising the project. Somehow this seems to happen a lot.
 
-3. Index images by running the script at `/index/index.py` amd copying the result to `/src/public`. You need CUDA installed: see [index/README.md](index/README.md). Indexing is incremental, to reset delete `search.sqlite` (or whatever file the DB is in)
+3. Index images by running the script at `/index/index.py` and copying the result to `/src/public`. You need CUDA installed: see [index/README.md](index/README.md). Indexing is incremental, to reset delete `search.sqlite` (or whatever file the DB is in)
 
    ```sh
    $ cd index
-   $ poetry install
-   $ poetry run python index.py index --glob "../src/public/data/albums/**/*.jpg" --dbpath "search.sqlite"
+   $ uv sync
+   $ uv run python index.py index --glob "../albums/**/*.jpg" --dbpath "search.sqlite" --model-profile hybrid
    $ cp search.sqlite ../src/public/search.sqlite
 
    # or
    $ ./do-full-index.sh
+
+   # embeddings-only refresh merged into the active public DB
+   $ ./do-embeddings-index.sh
    ```
 
-   This can be done from Next.js app for convenience as well `npm run index:update`
+   This can be done from the Next.js app for convenience as well with `npm run index:update` or `npm run index:embeddings:update`
 
 4. To use the manifest creator, run `npm run dev` or `yarn dev` and visit your album's page. Click the `Edit` link at the top.
 
@@ -164,9 +168,17 @@ Image search is implemented using Sqlite on the browser (!real serverless!). An 
 The following fields are currently indexed
 
 - Janus-Pro 1B tags and description
+- SigLIP image embeddings for similarity search and slideshow mode
 - EXIF
 - Geocoded locations
 - Colour palette
+
+The slideshow supports two playback modes:
+
+- `Random`: default behaviour, chooses the next image at random.
+- `Similar`: uses the current image as the seed and advances through visually similar photos.
+
+You can enable similarity mode from the slideshow toolbar or by opening `/slideshow?mode=similar`.
 
 Previously a HTTP Range VFS driver was used for Sqlite: however the fallback either didn't work right or a new package version with that feature wasn't released. To make things easier to maintain I switched it back to the official SQLite WASM library.
 

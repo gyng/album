@@ -44,7 +44,7 @@
 .searchWidget input {
   width: 100%;
   padding: var(--m-m);
-  padding-right: 40px; /* Make space for clear button */
+  padding-right: 40px;
   color: var(--c-contrast);
   background-color: var(--c-bg);
   border: solid 2px var(--c-bg-contrast-light);
@@ -114,6 +114,104 @@
 
 .clearButton:focus-visible {
   outline: solid 2px var(--c-bg-contrast-light);
+}
+
+.modeBar {
+  display: flex;
+  gap: var(--m);
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: var(--m-l);
+}
+
+.modeStack {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: var(--m);
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.breadcrumbs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: nowrap;
+  flex: 1 1 auto;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 2px;
+  white-space: nowrap;
+}
+
+.breadcrumbButton {
+  display: inline-flex;
+  appearance: none;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  padding: 0;
+  flex: 0 0 auto;
+}
+
+.breadcrumbPreview {
+  width: 56px;
+  height: 56px;
+  border-radius: var(--m-s);
+  object-fit: cover;
+  object-position: center;
+  background: var(--c-bg-contrast-dark);
+  flex: 0 0 auto;
+}
+
+.breadcrumbButton:hover {
+  opacity: 1 !important;
+}
+
+.breadcrumbButton:focus-visible {
+  outline: solid 2px var(--c-bg-contrast-light);
+  border-radius: var(--m-s);
+}
+
+.modeSource {
+  display: flex;
+  gap: var(--m);
+  align-items: center;
+  min-width: 0;
+  flex: 0 0 auto;
+}
+
+.modeSourcePreview {
+  width: 56px;
+  height: 56px;
+  border-radius: var(--m-s);
+  object-fit: cover;
+  object-position: center;
+  background: var(--c-bg-contrast-dark);
+}
+
+.modeSourceMeta {
+  min-width: 0;
+}
+
+.modeMetaLabel {
+  color: var(--c-bg-contrast-light);
+  font-size: var(--fs-s);
+}
+
+.modePill {
+  border-radius: 999px;
+  padding: 6px 10px;
+  background: var(--c-bg-contrast-light);
+  color: var(--c-bg);
+  font-size: var(--fs-s);
+}
+
+.modeMeta {
+  color: var(--c-bg-contrast-light);
+  font-size: var(--fs-s);
+  word-break: break-word;
 }
 
 @keyframes fadein {

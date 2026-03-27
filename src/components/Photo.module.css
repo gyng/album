@@ -92,6 +92,115 @@
   margin-top: var(--m-m);
 }
 
+.similarPhotos {
+  margin-top: var(--m-l);
+  max-width: min(32rem, 100%);
+  width: fit-content;
+}
+
+.similarPhotosTitle {
+  margin: 0 0 var(--m);
+  font-size: var(--fs-m);
+}
+
+.similarPhotosStatus {
+  margin: 0;
+  color: var(--c-bg-contrast-light);
+}
+
+.similarPhotoGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(120px, 150px));
+  gap: var(--m);
+}
+
+.similarPhotoCard {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  text-decoration: none;
+  color: inherit;
+  min-width: 0;
+}
+
+.similarPhotoCard:hover .similarPhotoImage {
+  filter: saturate(1);
+}
+
+.similarPhotoImage {
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+  object-position: center;
+  margin-bottom: calc(var(--m) / 2);
+  border-radius: var(--m-s);
+  background-color: var(--c-bg-contrast-dark);
+  filter: saturate(0.95);
+}
+
+.similarPhotoMeta {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--m) / 4);
+  font-size: var(--fs-s);
+}
+
+.similarPhotoSource {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.similarPhotoSourceText {
+  min-width: 0;
+}
+
+.similarPhotoFilename {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--c-bg-contrast-light);
+}
+
+.similarPhotoBadge {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 1;
+  border-radius: 999px;
+  background-color: rgba(0, 0, 0, 0.72);
+  color: white;
+  font-size: 11px;
+  line-height: 1;
+  padding: 6px 8px;
+}
+
+.similarPhotosActions {
+  display: flex;
+  justify-content: center;
+  margin-top: var(--m);
+}
+
+.similarPhotosLoadMore {
+  border: solid 1px var(--c-bg-contrast-light);
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font-size: var(--fs-s);
+  padding: 8px 14px;
+}
+
+.similarPhotosLoadMore:hover:not(:disabled) {
+  background-color: rgba(255, 255, 255, 0.08);
+}
+
+.similarPhotosLoadMore:disabled {
+  cursor: wait;
+  opacity: 0.7;
+}
+
 .description {
   max-width: 900px;
   place-self: center;
