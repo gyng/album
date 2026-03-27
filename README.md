@@ -111,13 +111,27 @@ You will need Node installed. The following steps are for deployment on Vercel, 
 
    ```
    $ npx vercel@latest login
+
+   # Recommended guided workflow
+   $ ./publish-wizard
+
+   # Default mode: ask all decisions up front, then run unattended
+   $ ./publish-wizard --fast-track
+
+   # Optional old step-by-step prompts
+   $ ./publish-wizard --interactive
+
+   # Dry-run preflight only
+   $ ./publish-wizard --dry-run
+
+   # Legacy manual flow
    $ npx vercel@latest build --prod
    $ npx vercel@latest deploy --prebuilt --prod
 
    # If you hit the file limit
    $ npx vercel@latest deploy --prebuilt --prod --archive=tgz
 
-   # Everything together for convenience
+   # Everything together without prompts
    $ npx vercel@latest pull && npm run index:update && npx vercel@latest build --prod && npx vercel@latest deploy --prebuilt --prod
    ```
 
@@ -138,7 +152,18 @@ You will need Node installed. The following steps are for deployment on Vercel, 
    $ ./do-embeddings-index.sh
    ```
 
-   This can be done from the Next.js app for convenience as well with `npm run index:update` or `npm run index:embeddings:update`
+   This can be done from the Next.js app for convenience as well with `npm run index:update`, `npm run index:embeddings:update`, or the guided `npm run publish:wizard`
+
+   The wizard now uses fast-track mode by default: it asks the index/build/deploy questions before the long-running work starts, then continues without further prompts. Use `--interactive` if you want the older step-by-step prompting instead.
+
+   The publish wizard writes a report to `src/.publish-report.json` and currently checks:
+
+   - newly discovered photos versus the current `search.sqlite`
+   - missing GPS coordinates on new photos
+   - missing EXIF capture timestamps on new photos
+   - unreadable EXIF metadata on new photos
+   - invalid `album.json`
+   - whether all discovered photos are present in the index after indexing
 
 4. To use the manifest creator, run `npm run dev` or `yarn dev` and visit your album's page. Click the `Edit` link at the top.
 

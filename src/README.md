@@ -20,6 +20,19 @@ Useful routes:
 
 The frontend expects the generated SQLite index at `public/search.sqlite`. Rebuild it from [index/README.md](../index/README.md).
 
+To run the local guided publish flow for new photos:
+
+```bash
+npm run publish:wizard
+npm run publish:wizard -- --fast-track
+npm run publish:wizard -- --interactive
+npm run publish:wizard -- --dry-run
+```
+
+The wizard scans albums, reports GPS/EXIF/index health for new photos, runs indexing, verifies the resulting SQLite DB, and can then continue to build and deploy.
+
+Fast-track is now the default behavior, so `npm run publish:wizard` asks the index/build/deploy questions before indexing starts and then proceeds unattended. Use `--interactive` if you want the older step-by-step prompting.
+
 ## Search Database
 
 The search UI, album details similarity grid, and slideshow similarity mode all use the same browser-loaded SQLite database.

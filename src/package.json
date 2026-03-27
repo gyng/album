@@ -5,6 +5,7 @@
   "scripts": {
     "index:update": "(cd ../index; bash ./do-full-index.sh)",
     "index:embeddings:update": "(cd ../index; bash ./do-embeddings-index.sh)",
+    "publish:wizard": "node ./bin/publish-wizard.cjs",
     "deploy:vercel": "npx vercel build --prod && npx vercel deploy --prebuilt --prod",
     "dev": "next dev --turbopack",
     "build": "next build && echo 'build done'",
