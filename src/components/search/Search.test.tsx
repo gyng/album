@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import Search from "./Search";
 import {
   fetchHybridResults,
@@ -17,6 +17,7 @@ import { warmupTextEmbeddingModel } from "./textEmbeddings";
 const mockPush = jest.fn();
 const mockUseDatabase = jest.fn();
 const mockUseInfiniteQuery = jest.fn();
+const originalConsoleError = console.error;
 
 jest.mock("next/link", () => ({
   __esModule: true,
@@ -82,6 +83,51 @@ const makeResult = (overrides: Record<string, unknown> = {}) => ({
   ...overrides,
 });
 
+const flushEffects = async () => {
+  await act(async () => {
+    await Promise.resolve();
+    await Promise.resolve();
+    await new Promise((resolve) => {
+      setTimeout(resolve, 0);
+    });
+  });
+};
+
+const renderSearch = async () => {
+  render(<Search />);
+  await flushEffects();
+};
+
+const createDeferred = <T,>() => {
+  let resolve: ((value: T | PromiseLike<T>) => void) | null = null;
+  const promise = new Promise<T>((innerResolve) => {
+    resolve = innerResolve;
+  });
+
+  return {
+    promise,
+    resolve: (value: T) => {
+      resolve?.(value);
+    },
+  };
+};
+
+const createResolvedThenable = <T,>(value: T) => ({
+  then: (onFulfilled?: (resolved: T) => unknown) => {
+    const nextValue = onFulfilled ? onFulfilled(value) : value;
+    return createResolvedThenable(nextValue as T);
+  },
+  catch: () => createResolvedThenable(value),
+  finally: (onFinally?: () => void) => {
+    onFinally?.();
+    return createResolvedThenable(value);
+  },
+});
+
+afterEach(async () => {
+  await flushEffects();
+});
+
 beforeAll(() => {
   Object.defineProperty(window, "matchMedia", {
     writable: true,
@@ -100,6 +146,16 @@ beforeAll(() => {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  jest.spyOn(console, "error").mockImplementation((...args) => {
+    if (
+      typeof args[0] === "string" &&
+      args[0].includes("not wrapped in act")
+    ) {
+      return;
+    }
+
+    originalConsoleError(...args);
+  });
 
   window.history.replaceState({}, "", "/search");
 
@@ -207,7 +263,9 @@ beforeEach(() => {
   (fetchRandomPhoto as jest.Mock).mockResolvedValue([
     { path: "../albums/test-simple/seed.jpg" },
   ]);
-  (fetchRefinementTagCounts as jest.Mock).mockResolvedValue({});
+  (fetchRefinementTagCounts as jest.Mock).mockImplementation(
+    () => new Promise(() => {}),
+  );
   (fetchResults as jest.Mock).mockResolvedValue({
     data: [],
     prev: undefined,
@@ -234,7 +292,7 @@ beforeEach(() => {
 
 describe("Search", () => {
   it("renders the browse-mode sections and loading progress", async () => {
-    render(<Search />);
+    await renderSearch();
 
     await waitFor(() => {
       expect(fetchTags).toHaveBeenCalledWith({
@@ -258,7 +316,7 @@ describe("Search", () => {
   });
 
   it("switches from browse mode into similarity mode and back", async () => {
-    render(<Search />);
+    await renderSearch();
 
     const similarButtons = await screen.findAllByRole("button", {
       name: /find similar photos/i,
@@ -289,7 +347,7 @@ describe("Search", () => {
   });
 
   it("clearing a breadcrumb makes the next older entry current", async () => {
-    render(<Search />);
+    await renderSearch();
 
     const browseSimilarButtons = await screen.findAllByRole("button", {
       name: /find similar photos/i,
@@ -337,7 +395,7 @@ describe("Search", () => {
   });
 
   it("clearing the current similarity selection only pops the active item", async () => {
-    render(<Search />);
+    await renderSearch();
 
     const browseSimilarButtons = await screen.findAllByRole("button", {
       name: /find similar photos/i,
@@ -385,7 +443,10 @@ describe("Search", () => {
   });
 
   it("switches into refinement mode when a browse tag is clicked", async () => {
-    render(<Search />);
+    const refinementCounts = createDeferred<Record<string, number>>();
+    (fetchRefinementTagCounts as jest.Mock).mockReturnValue(refinementCounts.promise);
+
+    await renderSearch();
 
     fireEvent.click(await screen.findByRole("button", { name: /harbor/i }));
 
@@ -397,12 +458,16 @@ describe("Search", () => {
       });
     });
 
+    await act(async () => {
+      refinementCounts.resolve({ harbor: 1, night: 0 });
+    });
+
     expect(screen.queryByText("Recent additions")).toBeNull();
     expect(screen.queryByText("Random selection")).toBeNull();
   });
 
   it("preserves typed spaces in the search input", async () => {
-    render(<Search />);
+    await renderSearch();
 
     const input = screen.getByPlaceholderText(
       /type \/ to search/i,
@@ -420,8 +485,11 @@ describe("Search", () => {
 
   it("hydrates semantic mode from the URL and encodes the text query", async () => {
     window.history.replaceState({}, "", "/search?q=harbor&mode=semantic");
+    (encodeSearchText as jest.Mock).mockReturnValue(
+      createResolvedThenable([1, 0, 0]),
+    );
 
-    render(<Search />);
+    await renderSearch();
 
     await waitFor(() => {
       expect(encodeSearchText).toHaveBeenCalledWith(
@@ -445,14 +513,17 @@ describe("Search", () => {
     });
   });
 
-  it("switches to hybrid mode and dispatches hybrid search", async () => {
+  it("defaults to hybrid mode and dispatches hybrid search", async () => {
     window.history.replaceState({}, "", "/search?q=harbor");
+    (encodeSearchText as jest.Mock).mockReturnValue(
+      createResolvedThenable([1, 0, 0]),
+    );
 
-    render(<Search />);
+    await renderSearch();
 
-    fireEvent.change(screen.getByLabelText("Search mode"), {
-      target: { value: "hybrid" },
-    });
+    expect(
+      (screen.getByLabelText("Search mode") as HTMLSelectElement).value,
+    ).toBe("hybrid");
 
     await waitFor(() => {
       expect(encodeSearchText).toHaveBeenCalledWith(
@@ -474,18 +545,14 @@ describe("Search", () => {
   });
 
   it("does not reuse a stale semantic vector after the input changes", async () => {
-    let resolveMarina: (value: number[]) => void = () => {};
-    let hasPendingMarina = false;
+    const marinaVector = createDeferred<number[]>();
     (encodeSearchText as jest.Mock).mockImplementation((text: string) => {
       if (text === "harbor") {
-        return Promise.resolve([1, 0, 0]);
+        return createResolvedThenable([1, 0, 0]);
       }
 
       if (text === "marina") {
-        return new Promise<number[]>((resolve) => {
-          hasPendingMarina = true;
-          resolveMarina = resolve;
-        });
+        return marinaVector.promise;
       }
 
       return Promise.resolve([0, 0, 1]);
@@ -493,7 +560,7 @@ describe("Search", () => {
 
     window.history.replaceState({}, "", "/search?q=harbor&mode=semantic");
 
-    render(<Search />);
+    await renderSearch();
 
     await waitFor(() => {
       expect(fetchSemanticResults).toHaveBeenCalledWith(
@@ -522,9 +589,11 @@ describe("Search", () => {
       }),
     );
 
-    if (hasPendingMarina) {
-      resolveMarina([0, 1, 0]);
-    }
+    await act(async () => {
+      marinaVector.resolve([0, 1, 0]);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
 
     await waitFor(() => {
       expect(fetchSemanticResults).toHaveBeenCalledWith(
@@ -560,10 +629,12 @@ describe("Search", () => {
       },
     );
 
-    render(<Search />);
+    await renderSearch();
 
     expect(await screen.findByText("Loading... 2.0 MB / 4.0 MB")).toBeTruthy();
 
-    resolveWarmup?.();
+    await act(async () => {
+      resolveWarmup?.();
+    });
   });
 });

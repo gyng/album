@@ -98,12 +98,14 @@ const isSearchMode = (value: string | null): value is SearchMode => {
   return value === "keyword" || value === "semantic" || value === "hybrid";
 };
 
+const DEFAULT_SEARCH_MODE: SearchMode = "hybrid";
+
 const getInitialSearchState = (): InitialSearchState => {
   if (typeof window === "undefined") {
     return {
       searchQuery: [],
       similarPath: null,
-      searchMode: "keyword",
+      searchMode: DEFAULT_SEARCH_MODE,
       hasHydratedFromUrl: false,
     };
   }
@@ -116,7 +118,7 @@ const getInitialSearchState = (): InitialSearchState => {
     similarPath: url.searchParams.get("similar"),
     searchMode: isSearchMode(url.searchParams.get("mode"))
       ? (url.searchParams.get("mode") as SearchMode)
-      : "keyword",
+      : DEFAULT_SEARCH_MODE,
     hasHydratedFromUrl: true,
   };
 };
@@ -140,7 +142,7 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
   const RANDOM_ROW_INITIAL_SIZE = 7;
   const RANDOM_ROW_LOAD_MORE_SIZE = 8;
   const [searchInputValue, setSearchInputValue] = useState<string>("");
-  const [searchMode, setSearchMode] = useState<SearchMode>("keyword");
+  const [searchMode, setSearchMode] = useState<SearchMode>(DEFAULT_SEARCH_MODE);
   const [similarPath, setSimilarPath] = useState<string | null>(null);
   const [similarTrail, setSimilarTrail] = useState<SimilarTrailItem[]>([]);
   const [hasHydratedFromUrl, setHasHydratedFromUrl] = useState<boolean>(false);
@@ -377,7 +379,7 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
       searchParams.set("q", debouncedSearchQuery.join(","));
     }
 
-    if (searchMode !== "keyword") {
+    if (searchMode !== DEFAULT_SEARCH_MODE) {
       searchParams.set("mode", searchMode);
     }
 
