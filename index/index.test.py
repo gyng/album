@@ -4,6 +4,7 @@ from index import (
     format_mapping_values,
     analyse_image_worker,
     build_janus_prompt,
+    filter_exif_for_search,
     parse_janus_response,
     JanusClassifier,
     Sqlite3Client,
@@ -56,6 +57,33 @@ class TestMain(unittest.TestCase):
         self.assertTrue("serene" in actual["identified_objects"])
         self.assertTrue("bird" in actual["identified_objects"])
         self.assertEqual(actual["themes"], [])
+
+    def test_filter_exif_for_search_keeps_only_useful_fields(self):
+        actual = filter_exif_for_search(
+            {
+                "Image Make": "FUJIFILM",
+                "Image Model": "X-T5",
+                "EXIF LensModel": "XF16-80mmF4 R OIS WR",
+                "EXIF FocalLength": "80",
+                "EXIF DateTimeOriginal": "2024:11:02 09:00:00",
+                "GPS GPSLatitude": "[35, 0, 0]",
+                "MakerNote Tag 0x100B": "256",
+                "Thumbnail JPEGInterchangeFormat": "1002",
+                "Image Software": "Adobe Photoshop",
+            }
+        )
+
+        self.assertEqual(
+            actual,
+            {
+                "Image Make": "FUJIFILM",
+                "Image Model": "X-T5",
+                "EXIF LensModel": "XF16-80mmF4 R OIS WR",
+                "EXIF FocalLength": "80",
+                "EXIF DateTimeOriginal": "2024:11:02 09:00:00",
+                "GPS GPSLatitude": "[35, 0, 0]",
+            },
+        )
 
     def test_analyse_image_worker(self):
         if torch.cuda.is_available():

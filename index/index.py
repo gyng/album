@@ -35,6 +35,24 @@ JANUS_RESPONSE_FIELDS = (
     "subject",
 )
 JANUS_MAX_NEW_TOKENS = 192
+EXIF_SEARCH_FIELDS = (
+    "Image Make",
+    "Image Model",
+    "EXIF LensMake",
+    "EXIF LensModel",
+    "EXIF LensSpecification",
+    "EXIF FocalLength",
+    "EXIF FocalLengthIn35mmFilm",
+    "EXIF FNumber",
+    "EXIF ExposureTime",
+    "EXIF ISOSpeedRatings",
+    "EXIF DateTimeOriginal",
+    "EXIF OffsetTime",
+    "GPS GPSLatitude",
+    "GPS GPSLatitudeRef",
+    "GPS GPSLongitude",
+    "GPS GPSLongitudeRef",
+)
 JANUS_FALLBACK_STOPWORDS = {
     "a",
     "an",
@@ -136,6 +154,22 @@ def parse_janus_response(raw_result: str) -> Mapping[str, typing.Any]:
     for field in JANUS_RESPONSE_FIELDS:
         result[field]
     return result
+
+
+def filter_exif_for_search(exif: Optional[Mapping[str, typing.Any]]) -> Mapping[str, typing.Any]:
+    if not exif or not hasattr(exif, "get"):
+        return {}
+
+    filtered = {}
+    for field in EXIF_SEARCH_FIELDS:
+        value = exif.get(field)
+        if value is None:
+            continue
+        resolved = str(value).strip()
+        if resolved == "":
+            continue
+        filtered[field] = value
+    return filtered
 
 
 class JanusClassifier:
@@ -1051,7 +1085,9 @@ def analyse_image(
     start_time = time.perf_counter()
 
     exif_full = get_exif(fh)
-    exif = {k: v for k, v in exif_full.items() if not isinstance(v, bytes)}
+    exif = filter_exif_for_search(
+        {k: v for k, v in exif_full.items() if not isinstance(v, bytes)}
+    )
 
     lat = exif.get("GPS GPSLatitude", None)
     lng = exif.get("GPS GPSLongitude", None)
