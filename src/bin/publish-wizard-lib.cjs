@@ -2,7 +2,7 @@ const fs = require("fs");
 const path = require("path");
 const readline = require("readline/promises");
 const { stdin, stdout } = require("process");
-const { spawn } = require("child_process");
+const { spawn, execSync } = require("child_process");
 const exifr = require("exifr");
 const sqlite3 = require("sqlite3");
 
@@ -144,6 +144,13 @@ const buildPreflightInsights = (report) => {
     lines.push({
       level: "info",
       text: `${formatNumber(report.summary.newPhotos)} new photo(s) and ${formatNumber(report.summary.removedPhotos)} removed photo(s) need reconciliation.`,
+    });
+  }
+
+  if (report.db.staleEmbeddingCount > 0) {
+    lines.push({
+      level: "warn",
+      text: `Embedding model has changed to ${report.db.currentEmbeddingModelId}. ${formatNumber(report.db.staleEmbeddingCount)} photo(s) have stale embeddings and will be re-indexed — this run will take significantly longer than usual.`,
     });
   }
 
@@ -421,6 +428,9 @@ const loadDbState = async (dbPath) => {
     const embeddingsCountRow = hasEmbeddingsTable
       ? await dbGet(db, "SELECT COUNT(*) AS count FROM embeddings")
       : { count: 0 };
+    const embeddingModelRows = hasEmbeddingsTable
+      ? await dbAll(db, "SELECT model_id, COUNT(*) AS count FROM embeddings GROUP BY model_id")
+      : [];
 
     return {
       exists: true,
@@ -430,6 +440,7 @@ const loadDbState = async (dbPath) => {
       indexedPhotoPaths: new Set(imageRows.map((row) => row.path)),
       indexedEmbeddingPaths: new Set(embeddingRows.map((row) => row.path)),
       hasEmbeddingsTable,
+      embeddingModelCounts: embeddingModelRows.map((row) => ({ modelId: row.model_id, count: row.count })),
     };
   } finally {
     await dbClose(db);
@@ -673,7 +684,16 @@ const createAlbumReport = async ({ albumDir, albumName, dbState }) => {
   };
 };
 
-const createPreflightReport = async ({ albumsDir, dbPath }) => {
+const getIndexerModelInfo = (indexDir) => {
+  try {
+    const output = execSync("uv run index.py model-info", { cwd: indexDir, timeout: 10000 });
+    return JSON.parse(output.toString().trim());
+  } catch {
+    return null;
+  }
+};
+
+const createPreflightReport = async ({ albumsDir, dbPath, indexDir }) => {
   const dbState = await loadDbState(dbPath);
   const albumNames = fs
     .readdirSync(albumsDir, { withFileTypes: true })
@@ -687,6 +707,14 @@ const createPreflightReport = async ({ albumsDir, dbPath }) => {
     albums.push(await createAlbumReport({ albumDir, albumName, dbState }));
   }
 
+  const modelInfo = indexDir ? getIndexerModelInfo(indexDir) : null;
+  const currentEmbeddingModelId = modelInfo?.embeddingModelId ?? null;
+  const staleEmbeddingCount = currentEmbeddingModelId
+    ? dbState.embeddingModelCounts
+        .filter((m) => m.modelId !== currentEmbeddingModelId)
+        .reduce((sum, m) => sum + m.count, 0)
+    : 0;
+
   return {
     generatedAt: new Date().toISOString(),
     db: {
@@ -695,6 +723,8 @@ const createPreflightReport = async ({ albumsDir, dbPath }) => {
       imageCount: dbState.imageCount,
       embeddingsCount: dbState.embeddingsCount,
       hasEmbeddingsTable: dbState.hasEmbeddingsTable,
+      currentEmbeddingModelId,
+      staleEmbeddingCount,
     },
     albums,
     summary: buildSummary(albums),
@@ -926,6 +956,7 @@ const buildWizardContext = ({ srcDir }) => {
     srcDir,
     repoDir,
     albumsDir: path.join(repoDir, "albums"),
+    indexDir: path.join(repoDir, "index"),
     dbPath: path.join(srcDir, "public", "search.sqlite"),
     reportPath: path.join(srcDir, REPORT_FILENAME),
   };

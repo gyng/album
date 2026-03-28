@@ -23,6 +23,7 @@ const main = async () => {
   const report = await createPreflightReport({
     albumsDir: context.albumsDir,
     dbPath: context.dbPath,
+    indexDir: context.indexDir,
   });
   writeReport(context.reportPath, report);
   printPreflightReport(report);
@@ -46,7 +47,7 @@ const main = async () => {
   const executionPlan = await resolveExecutionPlan({ args, report });
   printExecutionPlan({ args, report, plan: executionPlan });
 
-  const hasIndexChanges = report.summary.newPhotos > 0 || report.summary.removedPhotos > 0;
+  const hasIndexChanges = report.summary.newPhotos > 0 || report.summary.removedPhotos > 0 || report.db.staleEmbeddingCount > 0;
   if (hasIndexChanges) {
     if (!executionPlan.runIndex) {
       console.log("Skipping indexing by user choice.");

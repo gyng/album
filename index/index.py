@@ -1060,6 +1060,12 @@ def search_similar_path(
     pprint.pprint(scored)
 
 
+@cli.command("model-info")
+def model_info():
+    """Print the current embedding model configuration as JSON."""
+    print(json.dumps({"embeddingModelId": Siglip2Embedder.MODEL_ID}))
+
+
 def format_mapping(mapping: Optional[Mapping[str, str]]) -> str:
     """Formats a mapping for insertion into sqlite via a paramaterised query"""
     if not mapping or not hasattr(mapping, "items"):
