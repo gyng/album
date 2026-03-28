@@ -32,6 +32,9 @@ const Home: NextPage<PageProps> = (context) => {
           <Link className={styles.toolbarLink} href="/search">
             🔍 Search & Explore
           </Link>
+          <Link className={styles.toolbarLink} href="/timeline">
+            📅 Timeline
+          </Link>
           <Link className={styles.toolbarLink} href="/slideshow">
             🖼️ Slideshow
           </Link>

@@ -867,6 +867,17 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
           >
             🖼️ Open slideshow
           </Link>
+          <Link
+            href="/timeline"
+            prefetch={false}
+            className={styles.secondaryAction}
+            aria-label="Browse timeline"
+            onClick={(event) => {
+              forceDocumentNavigation(event, "/timeline");
+            }}
+          >
+            📅 Browse timeline
+          </Link>
         </div>
 
         {randomExploreError ? (

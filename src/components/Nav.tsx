@@ -35,6 +35,14 @@ export const Nav: React.FC<{
             </li>
             <li>
               <Link
+                href={`/timeline?filter_album=${props.albumName}`}
+                className={commonStyles.button}
+              >
+                Album timeline
+              </Link>
+            </li>
+            <li>
+              <Link
                 href={`/slideshow?filter=${props.albumName}`}
                 className={commonStyles.button}
               >
