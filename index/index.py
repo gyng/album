@@ -229,8 +229,8 @@ class JanusClassifier:
         return answer
 
 
-class Siglip2Embedder:
-    MODEL_ID = "google/siglip2-base-patch16-224"
+class BaseImageEmbedder:
+    MODEL_ID: str
 
     def init_model(self) -> None:
         self.model_id = self.MODEL_ID
@@ -247,9 +247,17 @@ class Siglip2Embedder:
         inputs = self.processor(images=[image], return_tensors="pt")
         inputs = {k: v.to(self.device) for k, v in inputs.items()}
         features = self.model.get_image_features(**inputs)
-        # Normalise for cosine similarity and keep as float list for sqlite JSON storage.
+        # Normalise for cosine similarity; store as float list for SQLite JSON.
         features = torch.nn.functional.normalize(features, p=2, dim=-1)
         return features[0].detach().float().cpu().tolist()
+
+
+class SiglipEmbedder(BaseImageEmbedder):
+    MODEL_ID = "google/siglip-base-patch16-224"
+
+
+class Siglip2Embedder(BaseImageEmbedder):
+    MODEL_ID = "google/siglip2-base-patch16-224"
 
 
 def convert_to_degress(value: exifread.utils.Ratio, lat_or_lng_ref: str) -> float:
@@ -686,22 +694,28 @@ def index(
     files = find_files(".", glob)
     existing_image_paths = db.list_image_paths()
     uses_embeddings = model_profile in [MODEL_PROFILE_SIGLIP2, MODEL_PROFILE_HYBRID]
-    existing_embedding_paths = db.list_embedding_paths(
+    existing_embedding_paths_v2 = db.list_embedding_paths(
         model_id=Siglip2Embedder.MODEL_ID if uses_embeddings else None
+    )
+    existing_embedding_paths_v1 = db.list_embedding_paths(
+        model_id=SiglipEmbedder.MODEL_ID if uses_embeddings else None
     )
     work_items = []
     for file_path in files:
         has_image = file_path in existing_image_paths
-        has_embedding = file_path in existing_embedding_paths
+        has_embedding_v2 = file_path in existing_embedding_paths_v2
+        has_embedding_v1 = file_path in existing_embedding_paths_v1
         needs_classifier = model_profile in [MODEL_PROFILE_JANUS, MODEL_PROFILE_HYBRID] and not has_image
-        needs_embedding = uses_embeddings and not has_embedding
+        needs_embedding_v2 = uses_embeddings and not has_embedding_v2
+        needs_embedding_v1 = uses_embeddings and not has_embedding_v1
 
-        if needs_classifier or needs_embedding:
+        if needs_classifier or needs_embedding_v2 or needs_embedding_v1:
             work_items.append(
                 {
                     "path": file_path,
                     "needs_classifier": needs_classifier,
-                    "needs_embedding": needs_embedding,
+                    "needs_embedding_v2": needs_embedding_v2,
+                    "needs_embedding_v1": needs_embedding_v1,
                 }
             )
     planning_ms = (time.perf_counter() - planning_started_at) * 1000
@@ -718,9 +732,14 @@ def index(
             classifier = JanusClassifier()
             classifier.init_model()
 
-        if any(item["needs_embedding"] for item in work_items):
-            embedder = Siglip2Embedder()
-            embedder.init_model()
+        embedder_v2 = None
+        embedder_v1 = None
+        if any(item["needs_embedding_v2"] for item in work_items):
+            embedder_v2 = Siglip2Embedder()
+            embedder_v2.init_model()
+        if any(item["needs_embedding_v1"] for item in work_items):
+            embedder_v1 = SiglipEmbedder()
+            embedder_v1.init_model()
 
         model_init_ms = (time.perf_counter() - model_init_started_at) * 1000
 
@@ -729,7 +748,10 @@ def index(
                 item_index,
                 item["path"],
                 classifier if item["needs_classifier"] else None,
-                embedder if item["needs_embedding"] else None,
+                [e for e in [
+                    embedder_v2 if item["needs_embedding_v2"] else None,
+                    embedder_v1 if item["needs_embedding_v1"] else None,
+                ] if e is not None],
             )
             for item_index, item in enumerate(work_items)
         ]
@@ -1104,7 +1126,7 @@ def analyse_image(
     fh: IO[bytes],
     classifier: Optional[JanusClassifier],
     path: str,
-    embedder: Optional[Siglip2Embedder] = None,
+    embedders: Optional[list[BaseImageEmbedder]] = None,
 ) -> Mapping:
     start_time = time.perf_counter()
 
@@ -1154,14 +1176,12 @@ def analyse_image(
                     result = {}
                     break
 
-    embedding = None
-    embedding_model_id = None
-    if embedder is not None:
+    embeddings = []
+    for emb in (embedders or []):
         try:
-            embedding = embedder.predict_image_embedding(path)
-            embedding_model_id = embedder.model_id
+            embeddings.append({"model_id": emb.model_id, "embedding": emb.predict_image_embedding(path)})
         except Exception as err:
-            print(f"Embedding failed for {path}: {err}")
+            print(f"Embedding ({emb.model_id}) failed for {path}: {err}")
 
     # 2000:01:01 12:34:56 > 2000-01-01T12:34:56
     datetime = (
@@ -1186,21 +1206,20 @@ def analyse_image(
         "tags": normalised_tags,
         "alt_text": result.get("alt_text"),
         "subject": result.get("subject"),
-        "embedding": embedding,
-        "embedding_model_id": embedding_model_id,
+        "embeddings": embeddings,
         "_duration": end_time - start_time,
     }
 
 
 def analyse_image_worker(
-    input: list[Tuple[int, str, Optional[JanusClassifier], Optional[Siglip2Embedder]]],
+    input: list[Tuple[int, str, Optional[JanusClassifier], list[BaseImageEmbedder]]],
 ) -> Mapping[str, typing.Any]:
     try:
         """Multiprocessable worker"""
         idx = input[0]
         path = input[1]
         classifier = input[2]
-        embedder = input[3] if len(input) > 3 else None
+        embedders = input[3] if len(input) > 3 else []
 
         print(f"[{idx + 1}] {os.path.basename(path)}...")
         with open(path, "rb") as fh:
@@ -1208,7 +1227,7 @@ def analyse_image_worker(
                 fh,
                 classifier=classifier,
                 path=path,
-                embedder=embedder,
+                embedders=embedders,
             )
             return {
                 "path": path,
@@ -1262,13 +1281,11 @@ def insert_analysed_image(db, analysed: Mapping, path, include_classifier_fields
             cur=cur,
         )
 
-        embedding = analysed.get("embedding")
-        embedding_model_id = analysed.get("embedding_model_id")
-        if embedding and embedding_model_id:
+        for emb in analysed.get("embeddings") or []:
             db.insert_embedding(
                 path=path,
-                model_id=embedding_model_id,
-                embedding=embedding,
+                model_id=emb["model_id"],
+                embedding=emb["embedding"],
                 cur=cur,
             )
 

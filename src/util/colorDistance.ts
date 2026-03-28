@@ -66,6 +66,22 @@ export function deltaE(lab1: LAB, lab2: LAB): number {
  * @param colorString Color string from database
  * @returns Array of RGB tuples
  */
+export function rgbToString(rgb: RGB): string {
+  return `rgb(${rgb[0]}, ${rgb[1]}, ${rgb[2]})`;
+}
+
+export function rgbToHex(rgb: RGB): string {
+  return "#" + rgb.map((c) => c.toString(16).padStart(2, "0")).join("");
+}
+
+export function hexToRgb(hex: string): RGB | null {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  if (isNaN(r) || isNaN(g) || isNaN(b)) return null;
+  return [r, g, b];
+}
+
 export function parseColorPalette(colorString: string): RGB[] {
   try {
     // Convert Python tuple format to JSON array format

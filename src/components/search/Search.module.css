@@ -463,8 +463,8 @@
 }
 
 .modeColorSwatch {
-  width: 56px;
-  height: 56px;
+  width: 36px;
+  height: 36px;
   border-radius: var(--m-s);
   flex-shrink: 0;
 }
@@ -510,4 +510,137 @@
   .secondaryAction {
     width: 100%;
   }
+}
+
+.modeColorSwatchLabel {
+  cursor: pointer;
+  position: relative;
+  display: flex;
+  flex-shrink: 0;
+}
+
+.modeColorSwatchLabel:hover .modeColorSwatch {
+  outline: solid 2px var(--c-bg-contrast-light);
+  outline-offset: 2px;
+}
+
+.modeColorInput {
+  position: absolute;
+  width: 0;
+  height: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.modeColorHex {
+  font-family: monospace;
+  font-size: var(--fs-s);
+  color: var(--c-text);
+  letter-spacing: 0.04em;
+  flex-shrink: 0;
+}
+
+.modeColorDivider {
+  width: 1px;
+  align-self: stretch;
+  background: var(--c-bg-contrast-light);
+  opacity: 0.35;
+  flex-shrink: 0;
+  margin: var(--m-s) 0;
+}
+
+.modeColorToleranceLabel {
+  display: flex;
+  align-items: center;
+  gap: var(--m-s);
+  flex-shrink: 0;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.modeColorToleranceValue {
+  font-size: var(--fs-s);
+  color: var(--c-text-muted, var(--c-text));
+  white-space: nowrap;
+  min-width: 3.5em;
+  text-align: right;
+}
+
+.modeColorToleranceSlider {
+  flex: 1 1 auto;
+  min-width: 48px;
+  cursor: pointer;
+}
+
+.colorPickerInput {
+  position: absolute;
+  width: 0;
+  height: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.modeInputArea {
+  display: flex;
+  align-items: center;
+  gap: var(--m);
+  padding: var(--m-s) var(--m-m);
+  border: solid 2px var(--c-bg-contrast-light);
+  border-radius: var(--m-s);
+  background-color: var(--c-bg);
+  width: 100%;
+  max-width: min(80vw, 480px);
+  min-height: 45px;
+  transition:
+    transform 0.22s ease-out,
+    opacity 0.22s ease-out;
+}
+
+.modeLabel {
+  font-size: var(--fs-s);
+  color: var(--c-bg-contrast-light);
+  white-space: nowrap;
+  flex-shrink: 0;
+  user-select: none;
+}
+
+.modeSimilarFilename {
+  font-size: var(--fs-s);
+  color: var(--c-text);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1 1 auto;
+}
+
+.modeClearButton {
+  margin-left: auto;
+  background: none;
+  border: none;
+  font-size: 20px;
+  color: var(--c-bg-contrast-light);
+  cursor: pointer;
+  padding: 0;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  flex-shrink: 0;
+  transition: all 0.15s ease;
+}
+
+.modeClearButton:hover {
+  background-color: var(--c-bg-contrast-light);
+  color: var(--c-bg);
+}
+
+.modeClearButton:focus-visible {
+  outline: solid 2px var(--c-bg-contrast-light);
+}
+
+.breadcrumbsBar {
+  margin-bottom: var(--m-l);
 }

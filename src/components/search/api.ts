@@ -480,8 +480,9 @@ export const fetchColorSimilarResults = async (opts: {
   color: RGB;
   pageSize: number;
   page: number;
+  maxDistance?: number;
 }): Promise<PaginatedSearchResult> => {
-  const { database, color, page, pageSize } = opts;
+  const { database, color, page, pageSize, maxDistance = 100 } = opts;
 
   try {
     const lightRows = await exec(
@@ -491,23 +492,34 @@ export const fetchColorSimilarResults = async (opts: {
     );
 
     const queryLab = rgbToLab(...color);
-    const ranked: { path: string; distance: number }[] = [];
+    const ranked: { path: string; score: number; rawDist: number; matchingColor: [number, number, number] }[] = [];
 
-    for (const row of lightRows.data as { path: string; colors: string }[]) {
-      const palette = parseColorPalette(row.colors);
+    for (const row of lightRows.data as unknown as [string, string][]) {
+      const palette = parseColorPalette(row[1]);
       if (palette.length === 0) continue;
 
-      let minDist = Infinity;
-      for (const rgb of palette) {
-        const d = deltaE(queryLab, rgbToLab(...rgb));
-        if (d < minDist) minDist = d;
-      }
-      if (minDist === Infinity) continue;
+      let bestScore = Infinity;
+      let bestRawDist = Infinity;
+      let matchingColor: [number, number, number] = palette[0] as [number, number, number];
 
-      ranked.push({ path: row.path, distance: minDist });
+      for (let i = 0; i < palette.length; i++) {
+        const rgb = palette[i] as [number, number, number];
+        const rawDist = deltaE(queryLab, rgbToLab(...rgb));
+        // Mild dominance weight: palette[0] (most dominant) has no penalty;
+        // later entries get a small additive penalty so dominant-color matches rank higher.
+        const score = rawDist * (1 + i * 0.1);
+        if (score < bestScore) {
+          bestScore = score;
+          bestRawDist = rawDist;
+          matchingColor = rgb;
+        }
+      }
+
+      if (bestScore === Infinity || bestRawDist > maxDistance) continue;
+      ranked.push({ path: row[0], score: bestScore, rawDist: bestRawDist, matchingColor });
     }
 
-    ranked.sort((a, b) => a.distance - b.distance);
+    ranked.sort((a, b) => a.score - b.score);
 
     const start = page * pageSize;
     const end = start + pageSize;
@@ -525,8 +537,8 @@ export const fetchColorSimilarResults = async (opts: {
       resolvedRows.push({
         ...row,
         snippet: getResultSnippet(row),
-        // Delta E clamped to 0-100: < 2 is imperceptible, ~100 is maximally different
-        similarity: Math.max(0, Math.min(100, 100 - candidate.distance)),
+        similarity: Math.max(0, Math.min(100, 100 - candidate.rawDist)),
+        matchingColor: candidate.matchingColor,
       });
     }
 

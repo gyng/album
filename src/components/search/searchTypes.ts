@@ -12,4 +12,5 @@ export type SearchResultRow = {
   bm25?: number;
   similarity?: number;
   rrfScore?: number;
+  matchingColor?: [number, number, number];
 };

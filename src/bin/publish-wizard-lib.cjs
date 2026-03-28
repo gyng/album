@@ -147,7 +147,15 @@ const buildPreflightInsights = (report) => {
     });
   }
 
-  if (report.db.staleEmbeddingCount > 0) {
+  if (report.db.mixedEmbeddingModels?.length > 1) {
+    const breakdown = report.db.mixedEmbeddingModels
+      .map((m) => `${formatNumber(m.count)} under "${m.modelId}"`)
+      .join(", ");
+    lines.push({
+      level: "warn",
+      text: `Embeddings use ${report.db.mixedEmbeddingModels.length} different model IDs (${breakdown}). Similarity search is broken for photos under the minority model — re-index to fix.`,
+    });
+  } else if (report.db.staleEmbeddingCount > 0) {
     const oldModels = (report.db.staleEmbeddingModelIds ?? []).join(", ") || "unknown";
     const newModel = report.db.currentEmbeddingModelId ?? "unknown";
     lines.push({
@@ -312,7 +320,11 @@ const parseArgs = (argv) => {
 };
 
 const resolveExecutionPlan = async ({ args, report }) => {
-  const hasIndexChanges = report.summary.newPhotos > 0 || report.summary.removedPhotos > 0;
+  const hasIndexChanges =
+    report.summary.newPhotos > 0 ||
+    report.summary.removedPhotos > 0 ||
+    report.db.missingEmbeddingCount > 0 ||
+    report.db.mixedEmbeddingModels?.length > 1;
 
   const plan = {
     runIndex: false,
@@ -737,6 +749,12 @@ const createPreflightReport = async ({ albumsDir, dbPath, indexDir, lastIndexSta
   const missingEmbeddingCount = currentEmbeddingModelId
     ? Math.max(0, dbState.imageCount - currentModelEmbeddingCount)
     : 0;
+  // Detected without needing the Python subprocess: if the DB contains embeddings under
+  // more than one model ID, similarity search is broken for photos under the minority model.
+  const mixedEmbeddingModels =
+    dbState.hasEmbeddingsTable && dbState.embeddingModelCounts.length > 1
+      ? dbState.embeddingModelCounts
+      : [];
 
   return {
     generatedAt: new Date().toISOString(),
@@ -750,6 +768,7 @@ const createPreflightReport = async ({ albumsDir, dbPath, indexDir, lastIndexSta
       staleEmbeddingCount,
       staleEmbeddingModelIds,
       missingEmbeddingCount,
+      mixedEmbeddingModels,
     },
     lastIndexStats: readLastIndexStats(lastIndexStatsPath),
     albums,

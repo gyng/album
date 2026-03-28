@@ -3,6 +3,7 @@ import React from "react";
 import { getRelativeTimeString } from "../util/time";
 import styles from "./CalendarHeatmap.module.css";
 import { TimelineEntry } from "./timelineTypes";
+import { rgbToString } from "../util/colorDistance";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const MONTH_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -154,7 +155,7 @@ const getDominantColorForDay = (entries: TimelineEntry[], count: number): string
   // Convert back to RGB
   const [r, g, b] = hslToRgb(h, adjustedS, adjustedL);
 
-  return `rgb(${r}, ${g}, ${b})`;
+  return rgbToString([r, g, b]);
 };
 
 const POPUP_WIDTH = 220;

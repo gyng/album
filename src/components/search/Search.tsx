@@ -23,7 +23,7 @@ import {
   fetchTags,
   PaginatedSearchResult,
 } from "./api";
-import { RGB } from "../../util/colorDistance";
+import { RGB, rgbToHex, hexToRgb, rgbToString } from "../../util/colorDistance";
 import { SearchResultTile } from "./SearchResultTile";
 import { SearchTag } from "./SearchTag";
 import { useDatabase } from "../database/useDatabase";
@@ -110,6 +110,7 @@ const parseColorParam = (value: string | null): RGB | null => {
   return null;
 };
 
+
 const DEFAULT_SEARCH_MODE: SearchMode = "hybrid";
 
 const getInitialSearchState = (): InitialSearchState => {
@@ -158,6 +159,8 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
   const [searchMode, setSearchMode] = useState<SearchMode>(DEFAULT_SEARCH_MODE);
   const [similarPath, setSimilarPath] = useState<string | null>(null);
   const [colorSearch, setColorSearch] = useState<RGB | null>(null);
+  const [colorTolerance, setColorTolerance] = useState<number>(35);
+  const [debouncedColorTolerance] = useDebounce(colorTolerance, 400);
   const [similarTrail, setSimilarTrail] = useState<SimilarTrailItem[]>([]);
   const [hasHydratedFromUrl, setHasHydratedFromUrl] = useState<boolean>(false);
   const [textVector, setTextVector] = useState<number[] | null>(null);
@@ -188,6 +191,7 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
   );
   const isSimilarMode = Boolean(similarPath);
   const isColorMode = Boolean(colorSearch);
+  const colorHex = useMemo(() => colorSearch ? rgbToHex(colorSearch) : null, [colorSearch]);
   const trimmedQuery = debouncedSearchQuery.join(" ").trim();
   const hasSearchQuery = trimmedQuery.length > 0;
   const keywordQuery = debouncedSearchQuery.join("|");
@@ -297,6 +301,7 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
         debouncedSearchQuery,
         similarPath,
         colorSearch,
+        colorTolerance: debouncedColorTolerance,
         searchMode,
         hasTextVector: hasCurrentTextVector,
       },
@@ -325,6 +330,7 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
           color: colorSearch,
           pageSize: PAGE_SIZE,
           page: pageParam,
+          maxDistance: debouncedColorTolerance,
         });
       }
 
@@ -607,7 +613,6 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
   );
   const normalizedDebouncedSearchTermsKey =
     normalizedDebouncedSearchTerms.join("|");
-  const normalizedSearchTermsKey = normalizedSearchTerms.join("|");
   const normalizedTagNames = useMemo(
     () => normalizedTags.map((tag) => tag.name),
     [normalizedTags],
@@ -684,6 +689,7 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
     if (
       !database ||
       isSimilarMode ||
+      isColorMode ||
       normalizedDebouncedSearchTerms.length === 0
     ) {
       setRefinementCounts({});
@@ -715,6 +721,7 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
   }, [
     database,
     isSimilarMode,
+    isColorMode,
     normalizedDebouncedSearchTerms,
     normalizedDebouncedSearchTermsKey,
     normalizedTagNames,
@@ -722,7 +729,7 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
   ]);
 
   useSafeLayoutEffect(() => {
-    if (!similarPath) {
+    if (!similarPath && !colorSearch) {
       return;
     }
 
@@ -756,7 +763,7 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
       cancelAnimationFrame(frameA);
       cancelAnimationFrame(frameB);
     };
-  }, [similarPath]);
+  }, [similarPath, colorSearch]);
 
   useSafeLayoutEffect(() => {
     const nextPositions: Record<string, DOMRect> = {};
@@ -919,62 +926,158 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
       </div>
 
       <div className={styles.searchInputRow}>
-        <div className={styles.searchInputContainer}>
-          <input
-            suppressHydrationWarning
-            type="text"
-            value={searchInputValue}
-            placeholder="Type / to search (try 'cat at night', 'white', 'mavica')"
-            spellCheck={false}
-            autoFocus
-            onChange={(ev) => {
-              applySearchTerms(ev.target.value.split(","));
-            }}
-            ref={inputRef}
-            tabIndex={0}
-            title={
-              props.disabled || !database
-                ? "Disabled: the SQLite WASM failed to load, your browser does not support service workers, or the server is missing the proper COEP/COOP headers"
-                : undefined
-            }
-          />
-          {canClear ? (
+        {isColorMode && colorSearch ? (
+          <div className={styles.modeInputArea} ref={modeSourceRef}>
+            <label className={styles.modeColorSwatchLabel} title="Click to change color">
+              <div
+                className={styles.modeColorSwatch}
+                style={{ backgroundColor: rgbToString(colorSearch) }}
+              />
+              <input
+                type="color"
+                className={styles.modeColorInput}
+                value={colorHex ?? ""}
+                onChange={(e) => {
+                  const rgb = hexToRgb(e.target.value);
+                  if (rgb) setColorSearch(rgb);
+                }}
+              />
+            </label>
+            <span className={styles.modeColorHex}>{colorHex}</span>
+            <div className={styles.modeColorDivider} />
+            <label className={styles.modeColorToleranceLabel}>
+              <span className={styles.modeLabel}>Range</span>
+              <input
+                type="range"
+                className={styles.modeColorToleranceSlider}
+                min={5}
+                max={60}
+                value={colorTolerance}
+                onChange={(e) => setColorTolerance(Number(e.target.value))}
+                aria-label="Color distance tolerance"
+                title="How similar the color needs to be (lower = more exact, higher = more results)"
+              />
+              <span className={styles.modeColorToleranceValue}>±{colorTolerance}</span>
+            </label>
             <button
-              className={styles.clearButton}
-              onClick={() => {
-                clearSearchState();
-              }}
-              title="Clear search"
               type="button"
+              className={styles.modeClearButton}
+              onClick={clearSearchState}
+              aria-label="Exit color search"
+              title="Exit color search"
             >
               ×
             </button>
-          ) : null}
-        </div>
-
-        {!isSimilarMode ? (
-          <label className={styles.searchModeSelectLabel}>
-            <select
-              className={styles.searchModeSelect}
-              aria-label="Search mode"
-              value={searchMode}
-              onChange={(event) => {
-                setSearchMode(event.target.value as SearchMode);
-              }}
+          </div>
+        ) : isSimilarMode ? (
+          <div className={styles.modeInputArea} ref={modeSourceRef}>
+            <span className={styles.modeLabel}>Similar to</span>
+            {similarPreviewSrc ? (
+              <img
+                className={styles.modeSourcePreview}
+                src={similarPreviewSrc}
+                alt=""
+              />
+            ) : null}
+            <span className={styles.modeSimilarFilename}>{similarFilename}</span>
+            <a
+              className={styles.modeSourceSlideshowButton}
+              href={`/slideshow?mode=similar&seed=${encodeURIComponent(similarPath ?? "")}`}
+              aria-label="Start similarity trail slideshow"
+              title="Start similarity trail slideshow"
+              onClick={(event) =>
+                forceDocumentNavigation(
+                  event,
+                  `/slideshow?mode=similar&seed=${encodeURIComponent(similarPath ?? "")}`,
+                )
+              }
             >
-              <option value="keyword">Keyword search</option>
-              <option value="semantic">Semantic search</option>
-              <option value="hybrid">Hybrid search</option>
-            </select>
-            <span
-              className={styles.searchModeInfo}
-              aria-label="Search mode help"
-              title="Keyword search matches indexed terms. Semantic search matches visual meaning using embeddings. Hybrid search fuses both rankings."
+              🖼️
+            </a>
+            <button
+              type="button"
+              className={styles.modeClearButton}
+              onClick={clearSearchState}
+              aria-label="Exit similarity search"
+              title="Exit similarity search"
             >
-              ⓘ
-            </span>
-          </label>
-        ) : null}
+              ×
+            </button>
+          </div>
+        ) : (
+          <>
+            <div className={styles.searchInputContainer}>
+              <input
+                suppressHydrationWarning
+                type="text"
+                value={searchInputValue}
+                placeholder="Type / to search (try 'cat at night', 'white', 'mavica')"
+                spellCheck={false}
+                autoFocus
+                onChange={(ev) => {
+                  applySearchTerms(ev.target.value.split(","));
+                }}
+                ref={inputRef}
+                tabIndex={0}
+                title={
+                  props.disabled || !database
+                    ? "Disabled: the SQLite WASM failed to load, your browser does not support service workers, or the server is missing the proper COEP/COOP headers"
+                    : undefined
+                }
+              />
+              {canClear ? (
+                <button
+                  className={styles.clearButton}
+                  onClick={() => {
+                    clearSearchState();
+                  }}
+                  title="Clear search"
+                  type="button"
+                >
+                  ×
+                </button>
+              ) : null}
+            </div>
+            <label className={styles.searchModeSelectLabel}>
+              <select
+                className={styles.searchModeSelect}
+                aria-label="Search mode"
+                value={searchMode}
+                onChange={(event) => {
+                  setSearchMode(event.target.value as SearchMode);
+                }}
+              >
+                <option value="keyword">Keyword search</option>
+                <option value="semantic">Semantic search</option>
+                <option value="hybrid">Semantic + keyword</option>
+              </select>
+              <span
+                className={styles.searchModeInfo}
+                aria-label="Search mode help"
+                title="Keyword search matches indexed terms. Semantic search matches visual meaning using embeddings. Hybrid search fuses both rankings."
+              >
+                ⓘ
+              </span>
+            </label>
+            <label
+              className={styles.secondaryAction}
+              title="Pick a color to search by"
+            >
+              🎨 Color
+              <input
+                type="color"
+                className={styles.colorPickerInput}
+                onChange={(e) => {
+                  const rgb = hexToRgb(e.target.value);
+                  if (rgb) {
+                    clearSearchState();
+                    setColorSearch(rgb);
+                  }
+                }}
+              />
+            </label>
+          </>
+        )}
 
         {isSuccess &&
         !isFetching &&
@@ -1148,7 +1251,7 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
         </section>
       ) : null}
 
-      {!isEmptyState ? (
+      {!isEmptyState && !isColorMode && !isSimilarMode ? (
         <section>
           <div className={styles.sectionHeader}>
             <div className={styles.sectionCaption}>
@@ -1194,137 +1297,67 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
         </section>
       ) : null}
 
-      {isColorMode && colorSearch ? (
-        <div className={styles.modeBar}>
-          <div className={styles.modeStack}>
-            <div className={styles.modeSource} ref={modeSourceRef}>
-              <div className={styles.modeSourceItem}>
-                <div
-                  className={styles.modeColorSwatch}
-                  style={{ backgroundColor: `rgb(${colorSearch[0]}, ${colorSearch[1]}, ${colorSearch[2]})` }}
-                  aria-label={`Color search: rgb(${colorSearch[0]}, ${colorSearch[1]}, ${colorSearch[2]})`}
+      {isSimilarMode && similarTrail.length > 0 ? (
+        <div className={styles.breadcrumbsBar}>
+          <div
+            className={styles.breadcrumbs}
+            aria-label="Similarity breadcrumbs"
+          >
+            {[...breadcrumbEntries].reverse().map((entry) => {
+              const { path, idx, key, similarity } = entry;
+              const label = path.split("/").at(-1) ?? path;
+              const opacity =
+                0.35 + (0.55 * (idx + 1)) / similarTrail.length;
+              const similarityLabel =
+                typeof similarity === "number"
+                  ? `${Math.round(similarity * 100)}%`
+                  : null;
+              const preview = (
+                <img
+                  className={styles.breadcrumbPreview}
+                  src={getResizedAlbumImageSrc(path)}
+                  alt=""
                 />
-                <button
-                  type="button"
-                  className={styles.breadcrumbRemoveButton}
-                  onClick={clearSearchState}
-                  aria-label="Clear color search"
-                  title="Clear color search"
-                >
-                  ×
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      ) : null}
+              );
 
-      {isSimilarMode ? (
-        <div className={styles.modeBar}>
-          <div className={styles.modeStack}>
-            <div className={styles.modeSource} ref={modeSourceRef}>
-              <div className={styles.modeSourceItem}>
-                {similarPreviewSrc ? (
-                  <img
-                    className={styles.modeSourcePreview}
-                    src={similarPreviewSrc}
-                    alt={`Source photo ${similarFilename ?? ""}`}
-                  />
-                ) : null}
-                <a
-                  className={styles.modeSourceSlideshowButton}
-                  href={`/slideshow?mode=similar&seed=${encodeURIComponent(similarPath ?? "")}`}
-                  aria-label="Start similarity trail slideshow"
-                  title="Start similarity trail slideshow"
-                  onClick={(event) =>
-                    forceDocumentNavigation(
-                      event,
-                      `/slideshow?mode=similar&seed=${encodeURIComponent(similarPath ?? "")}`,
-                    )
-                  }
-                >
-                  🖼️
-                </a>
-                <button
-                  type="button"
-                  className={styles.breadcrumbRemoveButton}
-                  onClick={() => {
-                    truncateSimilarStack(similarTrail.length);
+              return (
+                <div
+                  key={key}
+                  className={styles.breadcrumbItem}
+                  style={{ opacity }}
+                  ref={(element) => {
+                    breadcrumbRefs.current[key] = element;
                   }}
-                  aria-label="Clear current similarity selection"
-                  title="Clear similarity selection"
                 >
-                  ×
-                </button>
-              </div>
-              {similarTrail.length > 0 ? (
-                <div className={styles.modeArrow} aria-hidden="true">
-                  →
+                  <a
+                    className={styles.breadcrumbButton}
+                    href={getAlbumAnchorHref(path)}
+                    title={`Open ${label}`}
+                    aria-label={label}
+                  >
+                    {preview}
+                    {similarityLabel ? (
+                      <span className={styles.breadcrumbSimilarity}>
+                        {similarityLabel}
+                      </span>
+                    ) : null}
+                  </a>
+                  <button
+                    type="button"
+                    className={styles.breadcrumbRemoveButton}
+                    onClick={(event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      truncateSimilarStack(idx);
+                    }}
+                    aria-label={`Remove ${label} from breadcrumbs`}
+                    title={`Remove ${label} and newer selections`}
+                  >
+                    ×
+                  </button>
                 </div>
-              ) : null}
-            </div>
-            {similarTrail.length > 0 ? (
-              <div
-                className={styles.breadcrumbs}
-                aria-label="Similarity breadcrumbs"
-              >
-                {[...breadcrumbEntries].reverse().map((entry) => {
-                  const { path, idx, key, similarity } = entry;
-                  const label = path.split("/").at(-1) ?? path;
-                  const opacity =
-                    0.35 + (0.55 * (idx + 1)) / similarTrail.length;
-                  const similarityLabel =
-                    typeof similarity === "number"
-                      ? `${Math.round(similarity * 100)}%`
-                      : null;
-                  const preview = (
-                    <img
-                      className={styles.breadcrumbPreview}
-                      src={getResizedAlbumImageSrc(path)}
-                      alt=""
-                    />
-                  );
-
-                  return (
-                    <div
-                      key={key}
-                      className={styles.breadcrumbItem}
-                      style={{ opacity }}
-                      ref={(element) => {
-                        breadcrumbRefs.current[key] = element;
-                      }}
-                    >
-                      <a
-                        className={styles.breadcrumbButton}
-                        href={getAlbumAnchorHref(path)}
-                        title={`Open ${label}`}
-                        aria-label={label}
-                      >
-                        {preview}
-                        {similarityLabel ? (
-                          <span className={styles.breadcrumbSimilarity}>
-                            {similarityLabel}
-                          </span>
-                        ) : null}
-                      </a>
-                      <button
-                        type="button"
-                        className={styles.breadcrumbRemoveButton}
-                        onClick={(event) => {
-                          event.preventDefault();
-                          event.stopPropagation();
-                          truncateSimilarStack(idx);
-                        }}
-                        aria-label={`Remove ${label} from breadcrumbs`}
-                        title={`Remove ${label} and newer selections`}
-                      >
-                        ×
-                      </button>
-                    </div>
-                  );
-                })}
-              </div>
-            ) : null}
+              );
+            })}
           </div>
         </div>
       ) : null}

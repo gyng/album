@@ -9,6 +9,7 @@ import { getDegLatLngFromExif } from "../util/dms2deg";
 import { getRelativeTimeString } from "../util/time";
 
 import type { JSX } from "react";
+import { rgbToString } from "../util/colorDistance";
 
 const PhotoSimilarPhotosDeferred = dynamic(
   () => import("./PhotoSimilarPhotos").then((mod) => mod.PhotoSimilarPhotos),
@@ -212,9 +213,7 @@ export const Picture: React.FC<{
     : props.block._build.height;
 
   const colour = props.block._build?.tags?.colors?.[0];
-  const placeholderColour = colour
-    ? `rgb(${colour[0]}, ${colour[1]}, ${colour[2]})`
-    : "transparent";
+  const placeholderColour = colour ? rgbToString(colour) : "transparent";
   // We do this instead of simply setting background-color to `placeholderColor`
   // as using background-color instead fills the entire picture element which can't
   // be sized to be precisely the image size
@@ -475,7 +474,7 @@ export const PhotoBlockEl: React.FC<{
                         <div className={styles.colorswatches}>
                           {props.block._build?.tags?.colors?.map(
                             (rgb: number[]) => {
-                              const rgbStr = `rgb(${rgb[0]}, ${rgb[1]}, ${rgb[2]})`;
+                              const rgbStr = rgbToString(rgb as [number, number, number]);
                               const colorParam = `${rgb[0]},${rgb[1]},${rgb[2]}`;
                               return (
                                 <a

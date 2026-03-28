@@ -48,7 +48,7 @@ const main = async () => {
   const executionPlan = await resolveExecutionPlan({ args, report });
   printExecutionPlan({ args, report, plan: executionPlan });
 
-  const hasIndexChanges = report.summary.newPhotos > 0 || report.summary.removedPhotos > 0 || report.db.missingEmbeddingCount > 0;
+  const hasIndexChanges = report.summary.newPhotos > 0 || report.summary.removedPhotos > 0 || report.db.missingEmbeddingCount > 0 || report.db.mixedEmbeddingModels?.length > 1;
   if (hasIndexChanges) {
     if (!executionPlan.runIndex) {
       console.log("Skipping indexing by user choice.");

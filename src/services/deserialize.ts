@@ -22,6 +22,7 @@ import {
   incrementBuildCounter,
   measureBuild,
 } from "./buildTiming";
+import { parseColorPalette } from "../util/colorDistance";
 const sqlite3 = require("sqlite3").verbose();
 
 let searchDb: any | null = null;
@@ -120,10 +121,7 @@ const getPhotoDetailsFromSearchIndex = async (
         result.push(row);
 
         if (row?.colors) {
-          const jsonified = row?.colors
-            ?.replaceAll("(", "[")
-            .replaceAll(")", "]");
-          row.colors = JSON.parse(jsonified);
+          row.colors = parseColorPalette(row.colors);
         }
 
         resolve(result);

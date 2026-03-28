@@ -91,3 +91,16 @@
 .similarButton:focus-visible {
   outline: solid 2px var(--c-bg-contrast-light);
 }
+
+.matchingColorDot {
+  position: absolute;
+  bottom: calc(var(--m) + var(--m-l));
+  left: 50%;
+  transform: translateX(-50%);
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: solid 2px rgba(255, 255, 255, 0.8);
+  z-index: 1;
+  pointer-events: none;
+}

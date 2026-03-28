@@ -3,6 +3,7 @@ import styles from "./SearchResultTile.module.css";
 import { getRelativeTimeString } from "../../util/time";
 import { extractDateFromExifString } from "../../util/extractExifFromDb";
 import { SearchResultRow } from "./searchTypes";
+import { rgbToString, parseColorPalette } from "../../util/colorDistance";
 import { getResizedAlbumImageSrc } from "../../util/getResizedAlbumImageSrc";
 
 const stripHtml = (value?: string): string => {
@@ -23,15 +24,9 @@ export const SearchResultTile = (props: {
   const { result, onFindSimilar } = props;
 
   let colour = "rgba(255, 255, 255, 0.2)";
-  try {
-    if (result.colors) {
-      const colourRgb = JSON.parse(
-        result.colors.replaceAll("(", "[").replaceAll(")", "]"),
-      )[0];
-      colour = `rgba(${colourRgb[0]}, ${colourRgb[1]}, ${colourRgb[2]}, 1)`;
-    }
-  } catch (_err) {
-    // noop
+  if (result.colors) {
+    const firstColor = parseColorPalette(result.colors)[0];
+    if (firstColor) colour = rgbToString(firstColor);
   }
 
   const resized = getResizedAlbumImageSrc(result.path);
@@ -55,6 +50,7 @@ export const SearchResultTile = (props: {
     typeof visibleMatchScore === "number"
       ? `${Math.round(visibleMatchScore * 100)}%`
       : null;
+  const matchingColorStyle = result.matchingColor ? rgbToString(result.matchingColor) : null;
   const scoreTitle =
     typeof result.rrfScore === "number"
       ? `Hybrid search: semantic ${
@@ -106,10 +102,16 @@ export const SearchResultTile = (props: {
                 style={{ backgroundColor: colour }}
               ></img>
             </picture>
+            {matchingColorStyle ? (
+              <div
+                className={styles.matchingColorDot}
+                style={{ backgroundColor: matchingColorStyle }}
+                title={`Matched palette color: ${matchingColorStyle}`}
+              />
+            ) : null}
           </div>
           <div className={styles.details}>
-            <div>
-              <div className={styles.source}>
+            <div className={styles.source}>
                 <div className={styles.sourceText}>{albumName}</div>
                 <div className={styles.sourceText}>
                   {dateTimeOriginal
@@ -120,7 +122,6 @@ export const SearchResultTile = (props: {
                     : null}
                 </div>
               </div>
-            </div>
           </div>
         </div>
       </Link>
