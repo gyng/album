@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
 
-test.describe("Search Functionality", () => {
+test.describe("Search Functionality @slow", () => {
   test("browse mode exposes zero-query exploration", async ({ page }) => {
     const pageErrors: string[] = [];
     page.on("pageerror", (error) => {

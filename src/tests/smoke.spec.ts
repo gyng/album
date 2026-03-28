@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
 
-test.describe("Smoke Tests", () => {
+test.describe("Smoke Tests @slow", () => {
   test("homepage loads and displays title", async ({ page }) => {
     await page.goto("/");
 
@@ -16,6 +16,7 @@ test.describe("Smoke Tests", () => {
 
     // Verify main navigation links are present
     await expect(page.getByText("🌏 Map")).toBeVisible();
+    await expect(page.getByText("📅 Timeline")).toBeVisible();
     await expect(page.getByText("🔍 Search & Explore")).toBeVisible();
     await expect(page.getByText("🖼️ Slideshow")).toBeVisible();
   });
@@ -78,6 +79,23 @@ test.describe("Smoke Tests", () => {
 
     // Verify we're on the slideshow page - just check URL since title might be slow
     expect(page.url()).toContain("/slideshow");
+  });
+
+  test("can navigate to timeline page", async ({ page }) => {
+    await page.goto("/");
+
+    await expect(page.locator("h1")).toContainText("Snapshots");
+
+    const timelineLink = page.locator('a[href="/timeline"]');
+    await expect(timelineLink).toBeVisible();
+
+    await Promise.all([
+      page.waitForURL("/timeline", { timeout: 30000 }),
+      timelineLink.click(),
+    ]);
+
+    expect(page.url()).toContain("/timeline");
+    await expect(page.locator("h1")).toContainText("Timeline");
   });
 
   test("theme toggle works", async ({ page }) => {

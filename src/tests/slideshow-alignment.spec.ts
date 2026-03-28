@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
 
-test.describe("Slideshow Details Alignment Tests", () => {
+test.describe("Slideshow Details Alignment Tests @slow", () => {
   test("alignment button cycles through left, center, right options", async ({
     page,
   }) => {

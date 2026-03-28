@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
 
-test.describe("Slideshow URL Parameters Tests", () => {
+test.describe("Slideshow URL Parameters Tests @slow", () => {
   test("clock parameter works with ?clock=1", async ({ page }) => {
     await page.goto("/slideshow?clock=1", {
       timeout: 90000,

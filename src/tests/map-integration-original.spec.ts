@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
 
-test.describe("Map Integration Tests", () => {
+test.describe("Map Integration Tests @slow", () => {
   test("map page loads correctly", async ({ page }) => {
     // Try to load map page with extended timeout and error handling
     try {

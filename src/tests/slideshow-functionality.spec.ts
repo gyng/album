@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
 
-test.describe("Slideshow Functionality Tests", () => {
+test.describe("Slideshow Functionality Tests @slow", () => {
   test("slideshow page loads with extended timeout", async ({ page }) => {
     // Slideshow takes time to load due to database initialization
     await page.goto("/slideshow");

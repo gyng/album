@@ -23,6 +23,8 @@ export default defineConfig({
   workers: process.env.CI ? 1 : undefined,
   /* Reporter to use. See https://playwright.dev/docs/test-reporters */
   reporter: [["list"], ["html", { open: "never" }]],
+  /* Skip slow tests locally by default */
+  grep: process.env.CI ? undefined : /^(?!.*@slow)/,
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
   use: {
     /* Base URL to use in actions like `await page.goto('/')`. */
@@ -37,9 +39,9 @@ export default defineConfig({
   },
 
   /* Increase timeout due to slow initial page load */
-  timeout: process.env.CI ? 90 * 1000 : 30 * 1000,
+  timeout: process.env.CI ? 90 * 1000 : 15 * 1000,
   expect: {
-    timeout: process.env.CI ? 45 * 1000 : 10 * 1000,
+    timeout: process.env.CI ? 45 * 1000 : 5 * 1000,
   },
 
   /* Configure projects for major browsers */

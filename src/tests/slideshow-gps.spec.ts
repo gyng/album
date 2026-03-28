@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
 
-test.describe("Slideshow GPS Tests", () => {
+test.describe("Slideshow GPS Tests @slow", () => {
   test("slideshow uses EXIF GPS coordinates for map display", async ({
     page,
   }) => {

@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
 
-test.describe("Photo Viewing Flow", () => {
+test.describe("Photo Viewing Flow @slow", () => {
   test("album displays photos correctly", async ({ page }) => {
     await page.goto("/album/snapshots");
 

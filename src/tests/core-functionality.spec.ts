@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
 
-test.describe("Core Functionality Tests", () => {
+test.describe("Core Functionality Tests @slow", () => {
   test("homepage loads successfully", async ({ page }) => {
     await page.goto("/");
     await expect(page).toHaveTitle("Snapshots");
