@@ -2,6 +2,8 @@
  * @jest-environment node
  */
 
+import fs from "fs";
+import path from "path";
 import { monkeyExif } from "../test/fixtures/monkey_exif";
 import {
   getNextJsSafeExif,
@@ -62,6 +64,27 @@ describe("photo utilities", () => {
         },
       ]);
     });
+
+    it("src paths start with / and omit the output directory on first encode (regression: encode path must use stripPublicFromPath)", async () => {
+      // Use a relative output dir matching production ("public/data/albums").
+      // Delete it first so there are no cached avifs and we always exercise the encode path.
+      const outputDir = "test-regression-output";
+      fs.rmSync(outputDir, { recursive: true, force: true });
+      try {
+        const actual = await optimiseImages("test/fixtures/monkey.jpg", outputDir);
+        expect(actual).toEqual([
+          expect.objectContaining({ src: "/fixtures/.resized_images/monkey.jpg@800.avif" }),
+          expect.objectContaining({ src: "/fixtures/.resized_images/monkey.jpg@1600.avif" }),
+          expect.objectContaining({ src: "/fixtures/.resized_images/monkey.jpg@3200.avif" }),
+        ]);
+        for (const result of actual) {
+          expect(result.src).toMatch(/^\//);
+          expect(result.src).not.toContain(outputDir);
+        }
+      } finally {
+        fs.rmSync(outputDir, { recursive: true, force: true });
+      }
+    }, 120000);
 
     // Note that this test is minimal/incomplete as an implementation shortcut
     // it assumes that file will exist if the promise resolves

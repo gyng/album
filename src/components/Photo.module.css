@@ -246,6 +246,19 @@
 .colorswatch {
   height: 1.5em;
   width: 1.5em;
+  cursor: pointer;
+  transition: transform 0.15s ease, opacity 0.15s ease;
+  display: block;
+}
+
+.colorswatch:hover {
+  transform: scale(1.2);
+  opacity: 0.8;
+}
+
+.colorswatch:focus-visible {
+  outline: solid 2px var(--c-bg-contrast-light);
+  outline-offset: 2px;
 }
 
 .colorswatches {

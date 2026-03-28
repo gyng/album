@@ -476,15 +476,18 @@ export const PhotoBlockEl: React.FC<{
                           {props.block._build?.tags?.colors?.map(
                             (rgb: number[]) => {
                               const rgbStr = `rgb(${rgb[0]}, ${rgb[1]}, ${rgb[2]})`;
+                              const colorParam = `${rgb[0]},${rgb[1]},${rgb[2]}`;
                               return (
-                                <div
+                                <a
                                   key={rgbStr}
+                                  href={`/search?color=${colorParam}`}
                                   style={{
                                     backgroundColor: rgbStr,
                                   }}
                                   className={styles.colorswatch}
-                                  title={rgbStr}
-                                ></div>
+                                  title={`Search photos with similar color: ${rgbStr}`}
+                                  aria-label={`Search photos with similar color ${rgbStr}`}
+                                ></a>
                               );
                             },
                           )}

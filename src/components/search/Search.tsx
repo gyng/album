@@ -19,9 +19,11 @@ import {
   fetchRandomPhoto,
   fetchSemanticResults,
   fetchSimilarResults,
+  fetchColorSimilarResults,
   fetchTags,
   PaginatedSearchResult,
 } from "./api";
+import { RGB } from "../../util/colorDistance";
 import { SearchResultTile } from "./SearchResultTile";
 import { SearchTag } from "./SearchTag";
 import { useDatabase } from "../database/useDatabase";
@@ -40,6 +42,7 @@ type SearchMode = "keyword" | "semantic" | "hybrid";
 type InitialSearchState = {
   searchQuery: string[];
   similarPath: string | null;
+  colorSearch: RGB | null;
   searchMode: SearchMode;
   hasHydratedFromUrl: boolean;
 };
@@ -98,6 +101,15 @@ const isSearchMode = (value: string | null): value is SearchMode => {
   return value === "keyword" || value === "semantic" || value === "hybrid";
 };
 
+const parseColorParam = (value: string | null): RGB | null => {
+  if (!value) return null;
+  const parts = value.split(",").map((v) => parseInt(v.trim(), 10));
+  if (parts.length === 3 && parts.every((v) => !isNaN(v) && v >= 0 && v <= 255)) {
+    return [parts[0], parts[1], parts[2]];
+  }
+  return null;
+};
+
 const DEFAULT_SEARCH_MODE: SearchMode = "hybrid";
 
 const getInitialSearchState = (): InitialSearchState => {
@@ -105,6 +117,7 @@ const getInitialSearchState = (): InitialSearchState => {
     return {
       searchQuery: [],
       similarPath: null,
+      colorSearch: null,
       searchMode: DEFAULT_SEARCH_MODE,
       hasHydratedFromUrl: false,
     };
@@ -112,10 +125,10 @@ const getInitialSearchState = (): InitialSearchState => {
 
   const url = new URL(window.location.toString());
   const query = url.searchParams.get("q");
-
   return {
     searchQuery: query ? query.split(",").map((value) => value.trim()) : [],
     similarPath: url.searchParams.get("similar"),
+    colorSearch: parseColorParam(url.searchParams.get("color")),
     searchMode: isSearchMode(url.searchParams.get("mode"))
       ? (url.searchParams.get("mode") as SearchMode)
       : DEFAULT_SEARCH_MODE,
@@ -144,6 +157,7 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
   const [searchInputValue, setSearchInputValue] = useState<string>("");
   const [searchMode, setSearchMode] = useState<SearchMode>(DEFAULT_SEARCH_MODE);
   const [similarPath, setSimilarPath] = useState<string | null>(null);
+  const [colorSearch, setColorSearch] = useState<RGB | null>(null);
   const [similarTrail, setSimilarTrail] = useState<SimilarTrailItem[]>([]);
   const [hasHydratedFromUrl, setHasHydratedFromUrl] = useState<boolean>(false);
   const [textVector, setTextVector] = useState<number[] | null>(null);
@@ -173,25 +187,29 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
     [debouncedSearchInputValue],
   );
   const isSimilarMode = Boolean(similarPath);
+  const isColorMode = Boolean(colorSearch);
   const trimmedQuery = debouncedSearchQuery.join(" ").trim();
   const hasSearchQuery = trimmedQuery.length > 0;
   const keywordQuery = debouncedSearchQuery.join("|");
-  const needsTextVector = !isSimilarMode && hasSearchQuery && searchMode !== "keyword";
+  const needsTextVector = !isSimilarMode && !isColorMode && hasSearchQuery && searchMode !== "keyword";
   const hasCurrentTextVector = Boolean(textVector) && textVectorQuery === trimmedQuery;
   const canRunQuery =
     hasHydratedFromUrl &&
     Boolean(database) &&
     (Boolean(similarPath) ||
+      isColorMode ||
       (hasSearchQuery && (searchMode === "keyword" || hasCurrentTextVector)));
   const similarFilename = similarPath?.split("/").at(-1) ?? null;
   const similarPreviewSrc = similarPath
     ? getResizedAlbumImageSrc(similarPath)
     : null;
 
+
   useEffect(() => {
     const initialSearchState = getInitialSearchState();
     setSearchInputValue(initialSearchState.searchQuery.join(","));
     setSimilarPath(initialSearchState.similarPath);
+    setColorSearch(initialSearchState.colorSearch);
     setSearchMode(initialSearchState.searchMode);
     setHasHydratedFromUrl(initialSearchState.hasHydratedFromUrl);
   }, []);
@@ -278,6 +296,7 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
       {
         debouncedSearchQuery,
         similarPath,
+        colorSearch,
         searchMode,
         hasTextVector: hasCurrentTextVector,
       },
@@ -295,6 +314,15 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
         return await fetchSimilarResults({
           database,
           path: similarPath,
+          pageSize: PAGE_SIZE,
+          page: pageParam,
+        });
+      }
+
+      if (colorSearch) {
+        return await fetchColorSimilarResults({
+          database,
+          color: colorSearch,
           pageSize: PAGE_SIZE,
           page: pageParam,
         });
@@ -371,10 +399,13 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
     const searchParams = new URLSearchParams(window.location.search);
     searchParams.delete("q");
     searchParams.delete("similar");
+    searchParams.delete("color");
     searchParams.delete("mode");
 
     if (similarPath) {
       searchParams.set("similar", similarPath);
+    } else if (colorSearch) {
+      searchParams.set("color", `${colorSearch[0]},${colorSearch[1]},${colorSearch[2]}`);
     } else if (debouncedSearchQuery.length > 0) {
       searchParams.set("q", debouncedSearchQuery.join(","));
     }
@@ -396,7 +427,7 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
     } catch (err) {
       console.warn("Failed to sync search URL", err);
     }
-  }, [debouncedSearchQuery, hasHydratedFromUrl, searchMode, similarPath]);
+  }, [colorSearch, debouncedSearchQuery, hasHydratedFromUrl, searchMode, similarPath]);
 
   useEffect(() => {
     function handler(ev: KeyboardEvent) {
@@ -595,9 +626,9 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
     ...similarTrail.map((item) => item.path),
     ...(similarPath ? [similarPath] : []),
   ]);
-  const isEmptyState = !isSimilarMode && searchInputValue.trim() === "";
+  const isEmptyState = !isSimilarMode && !isColorMode && searchInputValue.trim() === "";
   const queryResults = data?.pages.flatMap((page) => page.data);
-  const canClear = isSimilarMode || searchInputValue.trim() !== "";
+  const canClear = isSimilarMode || isColorMode || searchInputValue.trim() !== "";
   const [refinementCounts, setRefinementCounts] = useState<
     Record<string, number>
   >({});
@@ -778,6 +809,7 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
   const applySearchTerms = (terms: string[]) => {
     setSimilarPath(null);
     setSimilarTrail([]);
+    setColorSearch(null);
     setRandomExploreError(null);
     setSearchInputValue(terms.join(","));
   };
@@ -786,6 +818,7 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
     setSearchInputValue("");
     setSimilarPath(null);
     setSimilarTrail([]);
+    setColorSearch(null);
   };
 
   const truncateSimilarStack = (breadcrumbIndex: number) => {
@@ -1161,6 +1194,31 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
         </section>
       ) : null}
 
+      {isColorMode && colorSearch ? (
+        <div className={styles.modeBar}>
+          <div className={styles.modeStack}>
+            <div className={styles.modeSource} ref={modeSourceRef}>
+              <div className={styles.modeSourceItem}>
+                <div
+                  className={styles.modeColorSwatch}
+                  style={{ backgroundColor: `rgb(${colorSearch[0]}, ${colorSearch[1]}, ${colorSearch[2]})` }}
+                  aria-label={`Color search: rgb(${colorSearch[0]}, ${colorSearch[1]}, ${colorSearch[2]})`}
+                />
+                <button
+                  type="button"
+                  className={styles.breadcrumbRemoveButton}
+                  onClick={clearSearchState}
+                  aria-label="Clear color search"
+                  title="Clear color search"
+                >
+                  ×
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       {isSimilarMode ? (
         <div className={styles.modeBar}>
           <div className={styles.modeStack}>
@@ -1273,7 +1331,7 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
 
       <div>
         <ul className={styles.results}>
-          {isSimilarMode || searchInputValue.trim().length > 0 ? (
+          {isSimilarMode || isColorMode || searchInputValue.trim().length > 0 ? (
             <>
               {isSuccess &&
               !isFetching &&
@@ -1282,6 +1340,13 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
                 <div>
                   No similar results for <i>{similarPath?.split("/").at(-1)}</i>
                 </div>
+              ) : null}
+
+              {isSuccess &&
+              !isFetching &&
+              queryResults?.length === 0 &&
+              isColorMode ? (
+                <div>No photos with a similar color found.</div>
               ) : null}
 
               {isSuccess &&

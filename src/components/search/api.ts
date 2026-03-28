@@ -1,5 +1,6 @@
 import { Database, Sqlite3Static } from "@sqlite.org/sqlite-wasm";
 import { SearchResultRow } from "./searchTypes";
+import { RGB, deltaE, rgbToLab, parseColorPalette } from "../../util/colorDistance";
 
 export type PaginatedSearchResult = {
   data: SearchResultRow[];
@@ -470,6 +471,73 @@ export const fetchSimilarResults = async (opts: {
     }
 
     console.error(`Failed to fetch similar results for ${path}`, err);
+    throw err;
+  }
+};
+
+export const fetchColorSimilarResults = async (opts: {
+  database: Database;
+  color: RGB;
+  pageSize: number;
+  page: number;
+}): Promise<PaginatedSearchResult> => {
+  const { database, color, page, pageSize } = opts;
+
+  try {
+    const lightRows = await exec(
+      database,
+      `SELECT path, colors FROM images WHERE colors IS NOT NULL AND colors != ''`,
+      [],
+    );
+
+    const queryLab = rgbToLab(...color);
+    const ranked: { path: string; distance: number }[] = [];
+
+    for (const row of lightRows.data as { path: string; colors: string }[]) {
+      const palette = parseColorPalette(row.colors);
+      if (palette.length === 0) continue;
+
+      let minDist = Infinity;
+      for (const rgb of palette) {
+        const d = deltaE(queryLab, rgbToLab(...rgb));
+        if (d < minDist) minDist = d;
+      }
+      if (minDist === Infinity) continue;
+
+      ranked.push({ path: row.path, distance: minDist });
+    }
+
+    ranked.sort((a, b) => a.distance - b.distance);
+
+    const start = page * pageSize;
+    const end = start + pageSize;
+    const pageSlice = ranked.slice(start, end);
+    const details = await fetchResultsByPaths(
+      database,
+      pageSlice.map((candidate) => candidate.path),
+    );
+    const detailMap = new Map(details.map((row) => [row.path, row]));
+
+    const resolvedRows: SearchResultRow[] = [];
+    for (const candidate of pageSlice) {
+      const row = detailMap.get(candidate.path);
+      if (!row) continue;
+      resolvedRows.push({
+        ...row,
+        snippet: getResultSnippet(row),
+        // Delta E clamped to 0-100: < 2 is imperceptible, ~100 is maximally different
+        similarity: Math.max(0, Math.min(100, 100 - candidate.distance)),
+      });
+    }
+
+    return {
+      data: resolvedRows,
+      prev: page <= 0 ? undefined : page - 1,
+      next: ranked.length > end ? page + 1 : undefined,
+      query: `${color[0]},${color[1]},${color[2]}`,
+    };
+  } catch (err) {
+    console.error(`Failed to fetch color similar results for ${color}`, err);
     throw err;
   }
 };

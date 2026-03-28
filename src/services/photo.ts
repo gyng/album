@@ -125,7 +125,7 @@ export const optimiseImages = async (
             .toFile(newFile)
             .then((p) => {
               const optimised: OptimisedPhoto = {
-                src: newFile,
+                src: stripPublicFromPath(newFile),
                 width: p.width,
                 height: p.height,
               };

@@ -462,6 +462,13 @@
   background: var(--c-bg-contrast-dark);
 }
 
+.modeColorSwatch {
+  width: 56px;
+  height: 56px;
+  border-radius: var(--m-s);
+  flex-shrink: 0;
+}
+
 .modeArrow {
   color: var(--c-bg-contrast-light);
   font-size: 24px;
