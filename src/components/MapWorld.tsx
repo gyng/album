@@ -32,6 +32,57 @@ export type MapWorldEntry = {
 export type MapWorldProps = {
   photos: MapWorldEntry[];
   className: string;
+  style?: React.CSSProperties;
+  syncRoute?: boolean;
+  fitToPhotos?: boolean;
+  showThemeBootstrap?: boolean;
+};
+
+const MapAutoFit = ({
+  enabled,
+  photos,
+}: {
+  enabled: boolean;
+  photos: MapWorldEntry[];
+}) => {
+  const { current: map } = useMap();
+
+  React.useEffect(() => {
+    if (!enabled || !map) {
+      return;
+    }
+
+    const coordinates = photos
+      .filter((photo) => photo.decLat !== null && photo.decLng !== null)
+      .map((photo) => [photo.decLng as number, photo.decLat as number] as [number, number]);
+
+    if (coordinates.length === 0) {
+      return;
+    }
+
+    if (coordinates.length === 1) {
+      const [longitude, latitude] = coordinates[0];
+      map.flyTo({ center: [longitude, latitude], zoom: 10.5, speed: 2.2 });
+      return;
+    }
+
+    const longitudes = coordinates.map(([longitude]) => longitude);
+    const latitudes = coordinates.map(([, latitude]) => latitude);
+
+    map.fitBounds(
+      [
+        [Math.min(...longitudes), Math.min(...latitudes)],
+        [Math.max(...longitudes), Math.max(...latitudes)],
+      ],
+      {
+        padding: 36,
+        duration: 0,
+        maxZoom: 11,
+      },
+    );
+  }, [enabled, map, photos]);
+
+  return null;
 };
 
 const LazyImage = ({ photo }: { photo: MapWorldEntry }) => {
@@ -110,11 +161,18 @@ type PhotoWithStyle = MapWorldEntry & {
 const ROUTER_SYNC_DEBOUNCE_MS = 200;
 const ROUTER_SYNC_PAUSE_MS = 700;
 
-export const MMap: React.FC<MapWorldProps> = ({ photos, className }) => {
-  const url = new URL(window.location.toString());
-  const initialLon = url.searchParams.get("lon");
-  const initialLat = url.searchParams.get("lat");
-  const initialZoom = url.searchParams.get("zoom");
+export const MMap: React.FC<MapWorldProps> = ({
+  photos,
+  className,
+  style,
+  syncRoute = true,
+  fitToPhotos = false,
+  showThemeBootstrap = true,
+}) => {
+  const url = typeof window === "undefined" ? null : new URL(window.location.toString());
+  const initialLon = syncRoute ? url?.searchParams.get("lon") ?? null : null;
+  const initialLat = syncRoute ? url?.searchParams.get("lat") ?? null : null;
+  const initialZoom = syncRoute ? url?.searchParams.get("zoom") ?? null : null;
 
   const [zoom, setZoom] = React.useState<number | null>(
     initialZoom ? Number.parseFloat(initialZoom) : null,
@@ -198,10 +256,18 @@ export const MMap: React.FC<MapWorldProps> = ({ photos, className }) => {
   }, []);
 
   const pauseRouterSync = React.useCallback(() => {
+    if (!syncRoute) {
+      return;
+    }
+
     pauseUntilRef.current = Date.now() + ROUTER_SYNC_PAUSE_MS;
-  }, []);
+  }, [syncRoute]);
 
   const updateParams = (e: ViewStateChangeEvent) => {
+    if (!syncRoute) {
+      return;
+    }
+
     const url = new URL(window.location.toString());
     const searchParams = new URLSearchParams(window.location.search);
 
@@ -239,12 +305,13 @@ export const MMap: React.FC<MapWorldProps> = ({ photos, className }) => {
 
   return (
     <div className={className}>
-      {/* Use ThemeToggle to set theme on load if visiting map directly */}
-      <div style={{ position: "fixed", pointerEvents: "none", opacity: "0" }}>
-        <ThemeToggle />
-      </div>
+      {showThemeBootstrap ? (
+        <div style={{ position: "fixed", pointerEvents: "none", opacity: "0" }}>
+          <ThemeToggle />
+        </div>
+      ) : null}
       <Map
-        style={{ width: "100vw", height: "100vh" }}
+        style={{ width: "100%", height: "100%", ...style }}
         // two options for map style
         // mapStyle="https://tiles.openfreemap.org/styles/liberty"
         // mapStyle="https://vector.openstreetmap.org/shortbread_v1/tilejson.json"
@@ -260,6 +327,7 @@ export const MMap: React.FC<MapWorldProps> = ({ photos, className }) => {
         onZoomEnd={updateParams}
         onMoveEnd={updateParams}
       >
+        <MapAutoFit enabled={fitToPhotos} photos={photos} />
         <MapBoundsTracker onBoundsChange={setBounds} />
 
         {popupInfo && popupInfo.decLat && popupInfo.decLng ? (

@@ -4,7 +4,9 @@
 
 [Live site](https://album-gyng.vercel.app/)
 
-A zero-config, static, file-based album generator
+A zero-config, static, file-based album generator.
+
+Photos are dropped into directories, indexed via a Python pipeline (Janus-Pro-1B for AI tags + SigLIP2 for embeddings), and served with browser-side SQLite search.
 
 - Dump your photos in a directory and run one command to deploy
 - Browser-side keyword, semantic, and hybrid search
