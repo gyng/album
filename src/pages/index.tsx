@@ -4,6 +4,7 @@ import { Albums } from "../components/Albums";
 import styles from "./Index.module.css";
 import { getAlbums, getImageTimestampRange } from "../services/album";
 import { Block, Content } from "../services/types";
+import { measureBuild } from "../services/buildTiming";
 // import DynamicSearchWithCoi from "../components/search/DynamicSearchWithCoi";
 import Link from "next/link";
 import { ThemeToggle } from "../components/ThemeToggle";
@@ -65,28 +66,30 @@ const Home: NextPage<PageProps> = (context) => {
 };
 
 export const getStaticProps: GetStaticProps<PageProps> = async (context) => {
-  const albums = (await getAlbums())
-    .sort((a, b) => {
-      const bTime = getImageTimestampRange(b)[1] ?? 0;
-      const aTime = getImageTimestampRange(a)[1] ?? 0;
-      return bTime - aTime;
-    })
-    .sort((a, b) => (b.order ?? 0) - (a.order ?? 0))
-    .sort((a, b) => (b.name.startsWith("test") ? -1 : 0));
+  return measureBuild("page./.getStaticProps", async () => {
+    const albums = (await getAlbums())
+      .sort((a, b) => {
+        const bTime = getImageTimestampRange(b)[1] ?? 0;
+        const aTime = getImageTimestampRange(a)[1] ?? 0;
+        return bTime - aTime;
+      })
+      .sort((a, b) => (b.order ?? 0) - (a.order ?? 0))
+      .sort((a, b) => (b.name.startsWith("test") ? -1 : 0));
 
-  return {
-    props: {
-      albums: albums.map((a) => ({
-        ...a,
-        // Reduce page data size by only providing a partial list
-        blocks: [
-          ...a.blocks.filter((b) => b.kind === "photo" && b.formatting?.cover),
-          a.blocks.find((b) => b.kind === "photo"),
-        ].filter(Boolean) as Block[],
-        _build: { ...a._build, timeRange: getImageTimestampRange(a) }, // FIXME: Unoptimal
-      })),
-    },
-  };
+    return {
+      props: {
+        albums: albums.map((a) => ({
+          ...a,
+          // Reduce page data size by only providing a partial list
+          blocks: [
+            ...a.blocks.filter((b) => b.kind === "photo" && b.formatting?.cover),
+            a.blocks.find((b) => b.kind === "photo"),
+          ].filter(Boolean) as Block[],
+          _build: { ...a._build, timeRange: getImageTimestampRange(a) }, // FIXME: Unoptimal
+        })),
+      },
+    };
+  });
 };
 
 export default Home;

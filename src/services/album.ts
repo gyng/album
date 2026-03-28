@@ -12,6 +12,7 @@ import {
   V2AlbumMetadata,
 } from "./types";
 import { isVideoFile } from "./video";
+import { incrementBuildCounter, measureBuild } from "./buildTiming";
 
 export const ALBUMS_DIR = "../albums";
 export const MANIFEST_NAME = "manifest.json";
@@ -50,122 +51,156 @@ export const getImageTimestampRange = (
 export const getAlbumNames = async (
   albumsPath = ALBUMS_DIR,
 ): Promise<string[]> => {
-  return (await getAlbums(albumsPath)).map(
-    (al) => al._build.srcdir.split(path.sep).pop() ?? "", // potential error
-  );
+  return measureBuild("album.getAlbumNames", async () => {
+    return fs.readdirSync(albumsPath).filter((it) => {
+      return fs.lstatSync(path.join(albumsPath, it)).isDirectory();
+    });
+  });
 };
 
 export const getAlbums = (albumsPath = ALBUMS_DIR): Promise<Content[]> => {
-  const albumNames = fs.readdirSync(albumsPath).filter((it) => {
-    return fs.lstatSync(path.join(albumsPath, it)).isDirectory();
+  return measureBuild("album.getAlbums", async () => {
+    const albumNames = fs.readdirSync(albumsPath).filter((it) => {
+      return fs.lstatSync(path.join(albumsPath, it)).isDirectory();
+    });
+
+    incrementBuildCounter("album.getAlbums.calls");
+    incrementBuildCounter("album.getAlbums.albumCount", albumNames.length);
+
+    const albums = Promise.all(
+      albumNames.map((an) => {
+        return getAlbum(path.join(albumsPath, an));
+      }),
+    );
+    return albums;
   });
-  const albums = Promise.all(
-    albumNames.map((an) => {
-      return getAlbum(path.join(albumsPath, an));
-    }),
-  );
-  return albums;
 };
 
 export const getAlbumFromName = (albumName: string): Promise<Content> => {
-  return getAlbum(path.join(ALBUMS_DIR, albumName));
+  return measureBuild("album.getAlbumFromName", async () => {
+    return getAlbum(path.join(ALBUMS_DIR, albumName));
+  });
 };
 
 export const getAlbumWithoutManifest = async (
   albumPath: string,
 ): Promise<Content> => {
-  const mediaFiles = fs
-    .readdirSync(albumPath)
-    .filter((it) => !fs.lstatSync(path.join(albumPath, it)).isDirectory())
-    .filter((it) => !it.match(/\.json$/))
-    .filter((it) => {
-      if (!isZoneIdentifierFile(it)) {
-        return true;
-      }
+  return measureBuild("album.getAlbumWithoutManifest", async () => {
+    const mediaFiles = fs
+      .readdirSync(albumPath)
+      .filter((it) => !fs.lstatSync(path.join(albumPath, it)).isDirectory())
+      .filter((it) => !it.match(/\.json$/))
+      .filter((it) => {
+        if (!isZoneIdentifierFile(it)) {
+          return true;
+        }
 
-      const sidecarPath = path.join(albumPath, it);
-      try {
-        fs.unlinkSync(sidecarPath);
-        console.log(`Deleted Zone.Identifier sidecar file: ${sidecarPath}`);
-      } catch (err) {
-        console.warn(`Failed to delete Zone.Identifier sidecar: ${sidecarPath}`, err);
-      }
-      return false;
-    });
+        const sidecarPath = path.join(albumPath, it);
+        try {
+          fs.unlinkSync(sidecarPath);
+          console.log(`Deleted Zone.Identifier sidecar file: ${sidecarPath}`);
+        } catch (err) {
+          console.warn(
+            `Failed to delete Zone.Identifier sidecar: ${sidecarPath}`,
+            err,
+          );
+        }
+        return false;
+      });
 
-  const photos = mediaFiles.filter((it) => !isVideoFile(it));
-  const videos = mediaFiles.filter((it) => isVideoFile(it));
+    const photos = mediaFiles.filter((it) => !isVideoFile(it));
+    const videos = mediaFiles.filter((it) => isVideoFile(it));
 
-  const dirname = path.parse(albumPath).name;
+    incrementBuildCounter("album.getAlbumWithoutManifest.photoCount", photos.length);
+    incrementBuildCounter("album.getAlbumWithoutManifest.videoCount", videos.length);
 
-  const titleBlock: SerializedTextBlock = {
-    kind: "text",
-    id: v4(),
-    data: {
+    const dirname = path.parse(albumPath).name;
+
+    const titleBlock: SerializedTextBlock = {
+      kind: "text",
+      id: v4(),
+      data: {
+        title: dirname,
+      },
+    };
+
+    const photoBlocks: SerializedPhotoBlock[] = photos.map((p) => ({
+      kind: "photo",
+      id: p,
+      data: {
+        src: p,
+      },
+    }));
+
+    const videoBlocks = videos.map((v) => ({
+      kind: "video" as const,
+      id: v,
+      data: {
+        type: "local" as const,
+        href: v,
+      },
+    }));
+
+    const coverBlock: SerializedPhotoBlock | null =
+      photoBlocks.find((b) => b.data.src.includes("cover")) ?? null;
+
+    const anonymousManifest: SerializedContent = {
+      name: dirname,
       title: dirname,
-    },
-  };
+      ...(coverBlock ? { cover: coverBlock } : {}),
+      formatting: {
+        sort: dirname.includes(".newest-first")
+          ? "newest-first"
+          : "oldest-first",
+      },
+      blocks: [titleBlock, ...photoBlocks, ...videoBlocks],
+    };
 
-  const photoBlocks: SerializedPhotoBlock[] = photos.map((p) => ({
-    kind: "photo",
-    id: p,
-    data: {
-      src: p,
-    },
-  }));
-
-  const videoBlocks = videos.map((v) => ({
-    kind: "video" as const,
-    id: v,
-    data: {
-      type: "local" as const,
-      href: v,
-    },
-  }));
-
-  const coverBlock: SerializedPhotoBlock | null =
-    photoBlocks.find((b) => b.data.src.includes("cover")) ?? null;
-
-  const anonymousManifest: SerializedContent = {
-    name: dirname,
-    title: dirname,
-    ...(coverBlock ? { cover: coverBlock } : {}),
-    formatting: {
-      sort: dirname.includes(".newest-first") ? "newest-first" : "oldest-first",
-    },
-    blocks: [titleBlock, ...photoBlocks, ...videoBlocks],
-  };
-
-  return deserializeContentBlock(anonymousManifest, albumPath);
+    return deserializeContentBlock(anonymousManifest, albumPath);
+  });
 };
 
 export const getAlbumWithManifest = async (
   /** Directory, eg, `public/data/albums/foobar` */
   rootRelativePath: string,
 ): Promise<Content> => {
-  const txt = fs.readFileSync(
-    path.join(rootRelativePath, MANIFEST_NAME),
-    "utf-8",
-  );
-  const manifest = JSON.parse(txt);
-  return deserializeContentBlock(manifest, rootRelativePath);
+  return measureBuild("album.getAlbumWithManifest", async () => {
+    const txt = fs.readFileSync(
+      path.join(rootRelativePath, MANIFEST_NAME),
+      "utf-8",
+    );
+    const manifest = JSON.parse(txt);
+    return deserializeContentBlock(manifest, rootRelativePath);
+  });
 };
+
+const albumPromiseCache = new Map<string, Promise<Content>>();
 
 // TODO: Add option to not optimise images until build time
 export const getAlbum = async (
   /** Directory, eg, public/data/albums/simple */
   albumPath: string,
 ): Promise<Content> => {
-  // v1 manifest: legacy support from LoL, internal serialisation format
-  const isManifest = fs.existsSync(path.join(albumPath, MANIFEST_NAME));
+  const cached = albumPromiseCache.get(albumPath);
 
-  // V2 manifest exists: use it instead of v1 manifest
-  const isV2Manifest = fs.existsSync(path.join(albumPath, MANIFEST_V2_NAME));
+  if (cached) {
+    incrementBuildCounter("album.getAlbum.cacheHits");
+    return cached;
+  }
 
-  if (isManifest && !isV2Manifest) {
-    // Warning: deprecated!
-    return getAlbumWithManifest(albumPath);
-  } else {
+  incrementBuildCounter("album.getAlbum.cacheMisses");
+  const pending = measureBuild("album.getAlbum", async () => {
+    // v1 manifest: legacy support from LoL, internal serialisation format
+    const isManifest = fs.existsSync(path.join(albumPath, MANIFEST_NAME));
+
+    // V2 manifest exists: use it instead of v1 manifest
+    const isV2Manifest = fs.existsSync(path.join(albumPath, MANIFEST_V2_NAME));
+
+    if (isManifest && !isV2Manifest) {
+      // Warning: deprecated!
+      return getAlbumWithManifest(albumPath);
+    }
+
     // This may be a v2 manifest
     // Get deserialised
     let manifest = await getAlbumWithoutManifest(albumPath);
@@ -210,10 +245,15 @@ export const getAlbum = async (
               try {
                 if (fs.existsSync(sidecarPath)) {
                   fs.unlinkSync(sidecarPath);
-                  console.log(`Deleted Zone.Identifier sidecar file: ${sidecarPath}`);
+                  console.log(
+                    `Deleted Zone.Identifier sidecar file: ${sidecarPath}`,
+                  );
                 }
               } catch (err) {
-                console.warn(`Failed to delete Zone.Identifier sidecar: ${sidecarPath}`, err);
+                console.warn(
+                  `Failed to delete Zone.Identifier sidecar: ${sidecarPath}`,
+                  err,
+                );
               }
               return;
             }
@@ -294,5 +334,12 @@ export const getAlbum = async (
     }
 
     return manifest;
-  }
+  });
+
+  albumPromiseCache.set(albumPath, pending);
+  void pending.catch(() => {
+    albumPromiseCache.delete(albumPath);
+  });
+
+  return pending;
 };

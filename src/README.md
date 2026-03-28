@@ -7,6 +7,7 @@ First, install dependencies and run the development server:
 ```bash
 npm install
 npm run dev
+npm run benchmark:warm
 ```
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
@@ -56,6 +57,38 @@ The app stays fully static. There is no API route or search server involved.
 5. Hybrid mode runs both paths and merges the rankings with RRF so exact textual hits and semantically similar photos can both score well.
 
 The result is a static deployment with richer search behavior, at the cost of an up-front DB download and an on-demand text-model download the first time semantic or hybrid search is used.
+
+## Warm Build Benchmarking
+
+To profile warm builds under the current Next 16 + Turbopack pipeline:
+
+```bash
+npm run benchmark:warm
+```
+
+This keeps the existing resized asset caches in place, clears `.next` before each run, executes repeated production builds, and writes a benchmark artifact to `.warm-build-benchmark.json`.
+
+Cached resized-image and resized-video housekeeping still lives outside page generation, but `npm run build` and `npm run build:profile` now invoke it once before `next build`. That cleanup also drops cached outputs whose source file has been edited in place and is newer than the cached variant. You can still run it manually when image/video size settings change or after large media deletions:
+
+```bash
+npm run cleanup:media-cache
+```
+
+The benchmark runner also compares the median timings against `warm-build-budget.json` and prints warnings when a metric regresses beyond the configured absolute or percentage tolerance.
+
+To make budget regressions fail with a non-zero exit code instead of warning only:
+
+```bash
+npm run benchmark:warm:strict
+```
+
+For a single profiled build without the repeat runner:
+
+```bash
+npm run build:profile
+```
+
+That writes build-only timing metrics to `.next/album-build-profile.json` unless `ALBUM_BUILD_PROFILE_OUTPUT` is set.
 
 ## Tests
 

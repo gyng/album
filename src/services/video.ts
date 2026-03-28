@@ -62,77 +62,6 @@ export const isVideoFile = (filepath: string): boolean => {
   return VIDEO_EXTENSIONS.includes(path.extname(filepath).toLowerCase());
 };
 
-export const removeStaleVideos = async (dirname: string) => {
-  const resizedDir = path.join(dirname, RESIZED_VIDEO_DIR);
-
-  if (!fs.existsSync(resizedDir)) {
-    console.log(
-      "missing album resized video directory, skipping cleanup.",
-      resizedDir,
-    );
-    return;
-  }
-
-  const cachedFiles = fs.readdirSync(resizedDir);
-
-  const getOriginalFileFromCachedFilename = (cachedFilename: string) => {
-    const expectedFilename = path.parse(cachedFilename).name.split("@")[0];
-    const expectedOriginalFile = path.join(dirname, expectedFilename);
-    return expectedOriginalFile;
-  };
-
-  return Promise.all([
-    ...cachedFiles.map(async (file) => {
-      const cachedFile = path.join(resizedDir, file);
-      const originalFile = getOriginalFileFromCachedFilename(cachedFile);
-
-      if (!fs.existsSync(originalFile)) {
-        console.log(
-          `Detected unused cached video: "${cachedFile}" (missing source "${originalFile}")`,
-        );
-        console.log(
-          `Removing cached optimised video "${cachedFile}". Expected source "${originalFile}" to exist.`,
-        );
-        fs.unlinkSync(cachedFile);
-      }
-    }),
-  ]);
-};
-
-export const removeUnneededVideoSizes = async (videoPath: string) => {
-  const dirname = path.dirname(videoPath);
-  const filename = path.basename(videoPath);
-  const albumName = path.basename(dirname);
-  const resizedDir = path.join(
-    "public/data/albums",
-    albumName,
-    RESIZED_VIDEO_DIR,
-  );
-
-  if (!fs.existsSync(resizedDir)) {
-    return;
-  }
-
-  const cachedFiles = fs.readdirSync(resizedDir);
-
-  return Promise.all([
-    ...cachedFiles.map(async (file) => {
-      if (!file.startsWith(`${filename}@`) || !file.endsWith(".mp4")) {
-        return;
-      }
-
-      const sizeSegment = file.split("@")[1]?.split(".")[0];
-      const size = Number(sizeSegment);
-      if (size !== OPTIMISED_VIDEO_MAX_WIDTH) {
-        const cachedFile = path.join(resizedDir, file);
-        console.log(`Detected unused cached video size: ${cachedFile}`);
-        console.log(`Removing optimised video (unused size): ${cachedFile}`);
-        fs.unlinkSync(cachedFile);
-      }
-    }),
-  ]);
-};
-
 const runFfmpeg = async (args: string[]): Promise<void> => {
   if (!ffmpegPath) {
     throw new Error("ffmpeg binary is unavailable");
@@ -306,8 +235,6 @@ export const optimiseVideo = async (
   fs.mkdirSync(path.join(publicAlbumDirectory, RESIZED_VIDEO_DIR), {
     recursive: true,
   });
-
-  await removeUnneededVideoSizes(videoPath);
 
   if (fs.existsSync(outputFile) && fs.statSync(outputFile).size > 0) {
     const isValidCached = await isValidCachedVideo(outputFile);

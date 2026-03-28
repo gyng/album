@@ -1,0 +1,26 @@
+{
+  "description": "Warm-build performance budgets for the Next 16 + Turbopack production benchmark.",
+  "warnOnly": true,
+  "metrics": {
+    "medianWallTimeMs": {
+      "baselineMs": 17500,
+      "maxRegressionMs": 2000,
+      "maxRegressionPercent": 15
+    },
+    "medianNextBuildMs": {
+      "baselineMs": 17000,
+      "maxRegressionMs": 1800,
+      "maxRegressionPercent": 12
+    },
+    "medianStaticGenerationMs": {
+      "baselineMs": 9700,
+      "maxRegressionMs": 1200,
+      "maxRegressionPercent": 12
+    },
+    "medianStaticCheckMs": {
+      "baselineMs": 400,
+      "maxRegressionMs": 150,
+      "maxRegressionPercent": 35
+    }
+  }
+}

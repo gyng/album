@@ -7,8 +7,7 @@ import { getAlbumFromName, getAlbumNames } from "../../services/album";
 import { Content, PhotoBlock } from "../../services/types";
 import { Nav } from "../../components/Nav";
 import { PhotoAlbum } from "../../components/PhotoAlbum";
-import { removeStaleImages } from "../../services/photo";
-import { removeStaleVideos } from "../../services/video";
+import { measureBuild } from "../../services/buildTiming";
 
 type PageProps = {
   album?: Content;
@@ -70,35 +69,34 @@ export const getStaticProps: GetStaticProps<
   PageProps,
   { slug: string[] }
 > = async (context) => {
-  if (!context.params?.slug?.[0]) {
+  return measureBuild("page./album/[[...slug]].getStaticProps", async () => {
+    if (!context.params?.slug?.[0]) {
+      return {
+        props: {
+          album: undefined,
+        },
+      };
+    }
+
+    const album = await getAlbumFromName(context.params?.slug?.[0]);
+
     return {
       props: {
-        album: undefined,
+        album,
       },
     };
-  }
-
-  const album = await getAlbumFromName(context.params?.slug?.[0]);
-
-  // Use getStaticProps as a hack to cleanup on build
-  await removeStaleImages(album._build.srcdir);
-  await removeStaleVideos(album._build.srcdir);
-
-  return {
-    props: {
-      album,
-    },
-  };
+  });
 };
 
 export const getStaticPaths: GetStaticPaths = async () => {
-  // TODO: move into routes
-  const paths = (await getAlbumNames()).map((n) => `/album/${n}`);
-  console.log("Paths", paths);
-  return {
-    paths,
-    fallback: true,
-  };
+  return measureBuild("page./album/[[...slug]].getStaticPaths", async () => {
+    // TODO: move into routes
+    const paths = (await getAlbumNames()).map((n) => `/album/${n}`);
+    return {
+      paths,
+      fallback: true,
+    };
+  });
 };
 
 export default Album;
