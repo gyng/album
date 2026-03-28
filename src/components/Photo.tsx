@@ -442,11 +442,11 @@ export const PhotoBlockEl: React.FC<{
                         ),
                       ]
                         .filter(Boolean)
-                        .map((it) => (
-                          <>
+                        .map((it, idx) => (
+                          <React.Fragment key={`${props.block.id ?? props.block.data.src}-camera-datetime-${idx}`}>
                             {it}
                             <br />
-                          </>
+                          </React.Fragment>
                         )), // TODO: shift TZ option
                       valid: Boolean(props.block._build.exif.DateTimeOriginal),
                     },
