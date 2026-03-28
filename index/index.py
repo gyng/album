@@ -773,6 +773,17 @@ def index(
         analysis_durations_ms = []
         insert_durations_ms = []
 
+    if not dry_run and analysis_durations_ms:
+        stats = {
+            "completedAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+            "modelProfile": model_profile,
+            "workItemCount": len(work_items),
+            "medianAnalysisMs": round(statistics.median(analysis_durations_ms), 2),
+        }
+        stats_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".last-index-stats.json")
+        with open(stats_path, "w", encoding="utf-8") as fh:
+            json.dump(stats, fh, indent=2)
+
     if benchmark_output:
         benchmark = {
             "generatedAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),

@@ -148,9 +148,11 @@ const buildPreflightInsights = (report) => {
   }
 
   if (report.db.staleEmbeddingCount > 0) {
+    const oldModels = (report.db.staleEmbeddingModelIds ?? []).join(", ") || "unknown";
+    const newModel = report.db.currentEmbeddingModelId ?? "unknown";
     lines.push({
       level: "warn",
-      text: `Embedding model has changed to ${report.db.currentEmbeddingModelId}. ${formatNumber(report.db.staleEmbeddingCount)} photo(s) have stale embeddings and will be re-indexed — this run will take significantly longer than usual.`,
+      text: `Embedding model changed: ${oldModels} → ${newModel}. ${formatNumber(report.db.staleEmbeddingCount)} photo(s) will be re-embedded — this run will take significantly longer than usual.`,
     });
   }
 
@@ -693,7 +695,16 @@ const getIndexerModelInfo = (indexDir) => {
   }
 };
 
-const createPreflightReport = async ({ albumsDir, dbPath, indexDir }) => {
+const readLastIndexStats = (lastIndexStatsPath) => {
+  if (!lastIndexStatsPath || !fileExists(lastIndexStatsPath)) return null;
+  try {
+    return JSON.parse(fs.readFileSync(lastIndexStatsPath, "utf-8"));
+  } catch {
+    return null;
+  }
+};
+
+const createPreflightReport = async ({ albumsDir, dbPath, indexDir, lastIndexStatsPath }) => {
   const dbState = await loadDbState(dbPath);
   const albumNames = fs
     .readdirSync(albumsDir, { withFileTypes: true })
@@ -709,11 +720,11 @@ const createPreflightReport = async ({ albumsDir, dbPath, indexDir }) => {
 
   const modelInfo = indexDir ? getIndexerModelInfo(indexDir) : null;
   const currentEmbeddingModelId = modelInfo?.embeddingModelId ?? null;
-  const staleEmbeddingCount = currentEmbeddingModelId
-    ? dbState.embeddingModelCounts
-        .filter((m) => m.modelId !== currentEmbeddingModelId)
-        .reduce((sum, m) => sum + m.count, 0)
-    : 0;
+  const staleModels = currentEmbeddingModelId
+    ? dbState.embeddingModelCounts.filter((m) => m.modelId !== currentEmbeddingModelId)
+    : [];
+  const staleEmbeddingCount = staleModels.reduce((sum, m) => sum + m.count, 0);
+  const staleEmbeddingModelIds = staleModels.map((m) => m.modelId);
 
   return {
     generatedAt: new Date().toISOString(),
@@ -725,7 +736,9 @@ const createPreflightReport = async ({ albumsDir, dbPath, indexDir }) => {
       hasEmbeddingsTable: dbState.hasEmbeddingsTable,
       currentEmbeddingModelId,
       staleEmbeddingCount,
+      staleEmbeddingModelIds,
     },
+    lastIndexStats: readLastIndexStats(lastIndexStatsPath),
     albums,
     summary: buildSummary(albums),
   };
@@ -910,8 +923,27 @@ const printVerificationReport = (verification) => {
   }
 };
 
+const formatDuration = (seconds) => {
+  if (seconds < 90) return `~${Math.round(seconds)}s`;
+  if (seconds < 3600) return `~${Math.round(seconds / 60)}min`;
+  const h = Math.floor(seconds / 3600);
+  const m = Math.round((seconds % 3600) / 60);
+  return `~${h}h ${m}min`;
+};
+
 const printExecutionPlan = ({ args, report, plan }) => {
-  const hasIndexChanges = report.summary.newPhotos > 0 || report.summary.removedPhotos > 0;
+  const hasIndexChanges =
+    report.summary.newPhotos > 0 ||
+    report.summary.removedPhotos > 0 ||
+    report.db.staleEmbeddingCount > 0;
+
+  const stats = report.lastIndexStats;
+  const indexWorkItems =
+    (report.summary.newPhotos ?? 0) + (report.db.staleEmbeddingCount ?? 0);
+  const estimatedIndexSeconds =
+    stats?.medianAnalysisMs && indexWorkItems > 0
+      ? (indexWorkItems * stats.medianAnalysisMs) / 1000
+      : null;
 
   printSection("Execution Plan");
   printStatRows([
@@ -925,6 +957,15 @@ const printExecutionPlan = ({ args, report, plan }) => {
       value: hasIndexChanges ? (plan.runIndex ? "yes" : "no") : "not needed",
       level: hasIndexChanges ? (plan.runIndex ? "ok" : "warn") : "info",
     },
+    ...(estimatedIndexSeconds !== null && plan.runIndex
+      ? [
+          {
+            label: "Estimated index time",
+            value: `${formatDuration(estimatedIndexSeconds)} (${formatNumber(indexWorkItems)} photos × ${Math.round(stats.medianAnalysisMs)}ms/photo from last run)`,
+            level: "info",
+          },
+        ]
+      : []),
     {
       label: "Build",
       value: args.skipBuild
@@ -952,11 +993,13 @@ const printExecutionPlan = ({ args, report, plan }) => {
 
 const buildWizardContext = ({ srcDir }) => {
   const repoDir = path.resolve(srcDir, "..");
+  const indexDir = path.join(repoDir, "index");
   return {
     srcDir,
     repoDir,
     albumsDir: path.join(repoDir, "albums"),
-    indexDir: path.join(repoDir, "index"),
+    indexDir,
+    lastIndexStatsPath: path.join(indexDir, ".last-index-stats.json"),
     dbPath: path.join(srcDir, "public", "search.sqlite"),
     reportPath: path.join(srcDir, REPORT_FILENAME),
   };

@@ -24,6 +24,7 @@ const main = async () => {
     albumsDir: context.albumsDir,
     dbPath: context.dbPath,
     indexDir: context.indexDir,
+    lastIndexStatsPath: context.lastIndexStatsPath,
   });
   writeReport(context.reportPath, report);
   printPreflightReport(report);
