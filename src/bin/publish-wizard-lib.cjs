@@ -154,6 +154,11 @@ const buildPreflightInsights = (report) => {
       level: "warn",
       text: `Embedding model changed: ${oldModels} → ${newModel}. ${formatNumber(report.db.staleEmbeddingCount)} photo(s) will be re-embedded — this run will take significantly longer than usual.`,
     });
+  } else if (report.db.missingEmbeddingCount > 0) {
+    lines.push({
+      level: "warn",
+      text: `${formatNumber(report.db.missingEmbeddingCount)} indexed photo(s) have no embeddings yet and will be embedded on the next index run — this may take significantly longer than usual.`,
+    });
   }
 
   if (report.summary.photosWithoutGps > 0) {
@@ -725,6 +730,13 @@ const createPreflightReport = async ({ albumsDir, dbPath, indexDir, lastIndexSta
     : [];
   const staleEmbeddingCount = staleModels.reduce((sum, m) => sum + m.count, 0);
   const staleEmbeddingModelIds = staleModels.map((m) => m.modelId);
+  const currentModelEmbeddingCount = currentEmbeddingModelId
+    ? (dbState.embeddingModelCounts.find((m) => m.modelId === currentEmbeddingModelId)?.count ?? 0)
+    : 0;
+  // Photos in the DB that lack a current-model embedding (stale or never embedded).
+  const missingEmbeddingCount = currentEmbeddingModelId
+    ? Math.max(0, dbState.imageCount - currentModelEmbeddingCount)
+    : 0;
 
   return {
     generatedAt: new Date().toISOString(),
@@ -737,6 +749,7 @@ const createPreflightReport = async ({ albumsDir, dbPath, indexDir, lastIndexSta
       currentEmbeddingModelId,
       staleEmbeddingCount,
       staleEmbeddingModelIds,
+      missingEmbeddingCount,
     },
     lastIndexStats: readLastIndexStats(lastIndexStatsPath),
     albums,
@@ -935,11 +948,11 @@ const printExecutionPlan = ({ args, report, plan }) => {
   const hasIndexChanges =
     report.summary.newPhotos > 0 ||
     report.summary.removedPhotos > 0 ||
-    report.db.staleEmbeddingCount > 0;
+    report.db.missingEmbeddingCount > 0;
 
   const stats = report.lastIndexStats;
   const indexWorkItems =
-    (report.summary.newPhotos ?? 0) + (report.db.staleEmbeddingCount ?? 0);
+    (report.summary.newPhotos ?? 0) + (report.db.missingEmbeddingCount ?? 0);
   const estimatedIndexSeconds =
     stats?.medianAnalysisMs && indexWorkItems > 0
       ? (indexWorkItems * stats.medianAnalysisMs) / 1000
