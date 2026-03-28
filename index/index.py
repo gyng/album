@@ -230,8 +230,10 @@ class JanusClassifier:
 
 
 class Siglip2Embedder:
+    MODEL_ID = "google/siglip2-base-patch16-224"
+
     def init_model(self) -> None:
-        self.model_id = "google/siglip2-base-patch16-224"
+        self.model_id = self.MODEL_ID
         print(f"Loading image embedder {self.model_id}...")
         self.processor = AutoImageProcessor.from_pretrained(self.model_id)
         self.model = AutoModel.from_pretrained(self.model_id)
@@ -677,18 +679,22 @@ def index(
     setup_started_at = time.perf_counter()
     db.setup_tables()
     setup_ms = (time.perf_counter() - setup_started_at) * 1000
-    pprint.pprint(db.info())
+    db_info = db.info()
+    print(f"Database: {db_info['entries']} entries (SQLite {db_info['version']})")
 
     planning_started_at = time.perf_counter()
     files = find_files(".", glob)
     existing_image_paths = db.list_image_paths()
-    existing_embedding_paths = db.list_embedding_paths()
+    uses_embeddings = model_profile in [MODEL_PROFILE_SIGLIP2, MODEL_PROFILE_HYBRID]
+    existing_embedding_paths = db.list_embedding_paths(
+        model_id=Siglip2Embedder.MODEL_ID if uses_embeddings else None
+    )
     work_items = []
     for file_path in files:
         has_image = file_path in existing_image_paths
         has_embedding = file_path in existing_embedding_paths
         needs_classifier = model_profile in [MODEL_PROFILE_JANUS, MODEL_PROFILE_HYBRID] and not has_image
-        needs_embedding = model_profile in [MODEL_PROFILE_SIGLIP2, MODEL_PROFILE_HYBRID] and not has_embedding
+        needs_embedding = uses_embeddings and not has_embedding
 
         if needs_classifier or needs_embedding:
             work_items.append(
@@ -700,11 +706,8 @@ def index(
             )
     planning_ms = (time.perf_counter() - planning_started_at) * 1000
 
-    print(f"Found {len(files)} files for the the glob pattern {glob}")
-    print(
-        f"Analysing {len(work_items)} files needing work (skipping {len(files) - len(work_items)} already-indexed)."
-    )
-    print(f"Using model profile: {model_profile}")
+    skipped = len(files) - len(work_items)
+    print(f"Found {len(files)} files ({len(work_items)} to index, {skipped} already indexed) — profile: {model_profile}")
 
     if not dry_run and len(work_items) > 0:
         classifier = None
@@ -747,9 +750,13 @@ def index(
                 analysed = result.get("analysed")
                 analysis_durations_ms.append((analysed.get("_duration") or 0) * 1000)
 
-                pprint.pprint(result)
+                tags = (analysed.get("tags") or {}).get("labels") or []
+                tags_str = ", ".join(tags[:6]) if tags else "—"
+                alt = analysed.get("alt_text") or analysed.get("subject") or ""
+                alt_str = f" | {alt[:80]}" if alt else ""
+                filename = os.path.basename(result["path"])
                 print(
-                    f"[{percent:.1f}% {i}/{len(work_items)} {rate:.2f}it/s {estimated_time_min:.1f}min]\tAnalysed image {result['path']}. Inserting image..."
+                    f"[{i + 1}/{len(work_items)} {percent:.0f}% {rate:.2f}it/s ~{estimated_time_min:.1f}min] {filename}: {tags_str}{alt_str}"
                 )
                 insert_started_at = time.perf_counter()
                 insert_analysed_image(
@@ -1178,7 +1185,7 @@ def analyse_image_worker(
         classifier = input[2]
         embedder = input[3] if len(input) > 3 else None
 
-        print(f"[{idx}] Analysing {path}...")
+        print(f"[{idx + 1}] {os.path.basename(path)}...")
         with open(path, "rb") as fh:
             analysed = analyse_image(
                 fh,
