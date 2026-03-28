@@ -159,9 +159,11 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
   const [searchMode, setSearchMode] = useState<SearchMode>(DEFAULT_SEARCH_MODE);
   const [similarPath, setSimilarPath] = useState<string | null>(null);
   const [colorSearch, setColorSearch] = useState<RGB | null>(null);
+  const [debouncedColorSearch] = useDebounce(colorSearch, 300);
   const [colorTolerance, setColorTolerance] = useState<number>(35);
   const [debouncedColorTolerance] = useDebounce(colorTolerance, 400);
   const [similarTrail, setSimilarTrail] = useState<SimilarTrailItem[]>([]);
+  const [pendingRemoveIdx, setPendingRemoveIdx] = useState<number | null>(null);
   const [hasHydratedFromUrl, setHasHydratedFromUrl] = useState<boolean>(false);
   const [textVector, setTextVector] = useState<number[] | null>(null);
   const [textVectorQuery, setTextVectorQuery] = useState<string | null>(null);
@@ -300,7 +302,7 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
       {
         debouncedSearchQuery,
         similarPath,
-        colorSearch,
+        colorSearch: debouncedColorSearch,
         colorTolerance: debouncedColorTolerance,
         searchMode,
         hasTextVector: hasCurrentTextVector,
@@ -324,10 +326,10 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
         });
       }
 
-      if (colorSearch) {
+      if (debouncedColorSearch) {
         return await fetchColorSimilarResults({
           database,
-          color: colorSearch,
+          color: debouncedColorSearch,
           pageSize: PAGE_SIZE,
           page: pageParam,
           maxDistance: debouncedColorTolerance,
@@ -729,7 +731,7 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
   ]);
 
   useSafeLayoutEffect(() => {
-    if (!similarPath && !colorSearch) {
+    if (!similarPath && !isColorMode) {
       return;
     }
 
@@ -763,7 +765,7 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
       cancelAnimationFrame(frameA);
       cancelAnimationFrame(frameB);
     };
-  }, [similarPath, colorSearch]);
+  }, [similarPath, isColorMode]);
 
   useSafeLayoutEffect(() => {
     const nextPositions: Record<string, DOMRect> = {};
@@ -969,42 +971,7 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
               ×
             </button>
           </div>
-        ) : isSimilarMode ? (
-          <div className={styles.modeInputArea} ref={modeSourceRef}>
-            <span className={styles.modeLabel}>Similar to</span>
-            {similarPreviewSrc ? (
-              <img
-                className={styles.modeSourcePreview}
-                src={similarPreviewSrc}
-                alt=""
-              />
-            ) : null}
-            <span className={styles.modeSimilarFilename}>{similarFilename}</span>
-            <a
-              className={styles.modeSourceSlideshowButton}
-              href={`/slideshow?mode=similar&seed=${encodeURIComponent(similarPath ?? "")}`}
-              aria-label="Start similarity trail slideshow"
-              title="Start similarity trail slideshow"
-              onClick={(event) =>
-                forceDocumentNavigation(
-                  event,
-                  `/slideshow?mode=similar&seed=${encodeURIComponent(similarPath ?? "")}`,
-                )
-              }
-            >
-              🖼️
-            </a>
-            <button
-              type="button"
-              className={styles.modeClearButton}
-              onClick={clearSearchState}
-              aria-label="Exit similarity search"
-              title="Exit similarity search"
-            >
-              ×
-            </button>
-          </div>
-        ) : (
+        ) : isSimilarMode ? null : (
           <>
             <div className={styles.searchInputContainer}>
               <input
@@ -1038,44 +1005,48 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
                 </button>
               ) : null}
             </div>
-            <label className={styles.searchModeSelectLabel}>
-              <select
-                className={styles.searchModeSelect}
-                aria-label="Search mode"
-                value={searchMode}
-                onChange={(event) => {
-                  setSearchMode(event.target.value as SearchMode);
-                }}
+            {!isSimilarMode ? (
+              <label className={styles.searchModeSelectLabel}>
+                <select
+                  className={styles.searchModeSelect}
+                  aria-label="Search mode"
+                  value={searchMode}
+                  onChange={(event) => {
+                    setSearchMode(event.target.value as SearchMode);
+                  }}
+                >
+                  <option value="keyword">Keyword search</option>
+                  <option value="semantic">Semantic search</option>
+                  <option value="hybrid">Semantic + keyword</option>
+                </select>
+                <span
+                  className={styles.searchModeInfo}
+                  aria-label="Search mode help"
+                  title="Keyword search matches indexed terms. Semantic search matches visual meaning using embeddings. Hybrid search fuses both rankings."
+                >
+                  ⓘ
+                </span>
+              </label>
+            ) : null}
+            {!isSimilarMode ? (
+              <label
+                className={styles.secondaryAction}
+                title="Pick a color to search by"
               >
-                <option value="keyword">Keyword search</option>
-                <option value="semantic">Semantic search</option>
-                <option value="hybrid">Semantic + keyword</option>
-              </select>
-              <span
-                className={styles.searchModeInfo}
-                aria-label="Search mode help"
-                title="Keyword search matches indexed terms. Semantic search matches visual meaning using embeddings. Hybrid search fuses both rankings."
-              >
-                ⓘ
-              </span>
-            </label>
-            <label
-              className={styles.secondaryAction}
-              title="Pick a color to search by"
-            >
-              🎨 Color
-              <input
-                type="color"
-                className={styles.colorPickerInput}
-                onChange={(e) => {
-                  const rgb = hexToRgb(e.target.value);
-                  if (rgb) {
-                    clearSearchState();
-                    setColorSearch(rgb);
-                  }
-                }}
-              />
-            </label>
+                🎨 Color
+                <input
+                  type="color"
+                  className={styles.colorPickerInput}
+                  onChange={(e) => {
+                    const rgb = hexToRgb(e.target.value);
+                    if (rgb) {
+                      clearSearchState();
+                      setColorSearch(rgb);
+                    }
+                  }}
+                />
+              </label>
+            ) : null}
           </>
         )}
 
@@ -1135,7 +1106,7 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
 
             <section className={styles.sectionSurface}>
               <div className={styles.sectionHeader}>
-                <h3 className={styles.sectionTitle}>Recent additions</h3>
+                <h3 className={styles.sectionTitle}>Latest</h3>
               </div>
 
               {isRecentLoading ? (
@@ -1297,67 +1268,125 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
         </section>
       ) : null}
 
-      {isSimilarMode && similarTrail.length > 0 ? (
-        <div className={styles.breadcrumbsBar}>
-          <div
-            className={styles.breadcrumbs}
-            aria-label="Similarity breadcrumbs"
-          >
-            {[...breadcrumbEntries].reverse().map((entry) => {
-              const { path, idx, key, similarity } = entry;
-              const label = path.split("/").at(-1) ?? path;
-              const opacity =
-                0.35 + (0.55 * (idx + 1)) / similarTrail.length;
-              const similarityLabel =
-                typeof similarity === "number"
-                  ? `${Math.round(similarity * 100)}%`
-                  : null;
-              const preview = (
-                <img
-                  className={styles.breadcrumbPreview}
-                  src={getResizedAlbumImageSrc(path)}
-                  alt=""
-                />
-              );
-
-              return (
-                <div
-                  key={key}
-                  className={styles.breadcrumbItem}
-                  style={{ opacity }}
-                  ref={(element) => {
-                    breadcrumbRefs.current[key] = element;
-                  }}
+      {isSimilarMode ? (
+        <div className={styles.modeBar}>
+          <span className={styles.modeLabel}>Similar to</span>
+          <div className={styles.modeStack}>
+            <div className={styles.modeSource} ref={modeSourceRef}>
+              <div
+                className={styles.modeSourceItem}
+                style={{ opacity: pendingRemoveIdx !== null ? 0.15 : undefined, transition: "opacity 0.15s ease" }}
+              >
+                {similarPreviewSrc ? (
+                  <img
+                    className={styles.modeSourcePreview}
+                    src={similarPreviewSrc}
+                    alt={`Source photo ${similarFilename ?? ""}`}
+                  />
+                ) : null}
+                <a
+                  className={styles.modeSourceSlideshowButton}
+                  href={`/slideshow?mode=similar&seed=${encodeURIComponent(similarPath ?? "")}`}
+                  aria-label="Start similarity trail slideshow"
+                  title="Start similarity trail slideshow"
+                  onClick={(event) =>
+                    forceDocumentNavigation(
+                      event,
+                      `/slideshow?mode=similar&seed=${encodeURIComponent(similarPath ?? "")}`,
+                    )
+                  }
                 >
-                  <a
-                    className={styles.breadcrumbButton}
-                    href={getAlbumAnchorHref(path)}
-                    title={`Open ${label}`}
-                    aria-label={label}
-                  >
-                    {preview}
-                    {similarityLabel ? (
-                      <span className={styles.breadcrumbSimilarity}>
-                        {similarityLabel}
-                      </span>
-                    ) : null}
-                  </a>
-                  <button
-                    type="button"
-                    className={styles.breadcrumbRemoveButton}
-                    onClick={(event) => {
-                      event.preventDefault();
-                      event.stopPropagation();
-                      truncateSimilarStack(idx);
-                    }}
-                    aria-label={`Remove ${label} from breadcrumbs`}
-                    title={`Remove ${label} and newer selections`}
-                  >
-                    ×
-                  </button>
+                  🖼️
+                </a>
+                <button
+                  type="button"
+                  className={styles.breadcrumbRemoveButton}
+                  onClick={() => {
+                    setPendingRemoveIdx(null);
+                    truncateSimilarStack(similarTrail.length);
+                  }}
+                  onMouseEnter={() => setPendingRemoveIdx(0)}
+                  onMouseLeave={() => setPendingRemoveIdx(null)}
+                  aria-label="Clear current similarity selection"
+                  title="Clear similarity selection"
+                >
+                  ×
+                </button>
+              </div>
+              {similarTrail.length > 0 ? (
+                <div className={styles.modeArrow} aria-hidden="true">
+                  →
                 </div>
-              );
-            })}
+              ) : null}
+            </div>
+            {similarTrail.length > 0 ? (
+              <div
+                className={styles.breadcrumbs}
+                aria-label="Similarity breadcrumbs"
+              >
+                {[...breadcrumbEntries].reverse().map((entry) => {
+                  const { path, idx, key, similarity } = entry;
+                  const label = path.split("/").at(-1) ?? path;
+                  const opacity =
+                    0.35 + (0.55 * (idx + 1)) / similarTrail.length;
+                  const similarityLabel =
+                    typeof similarity === "number"
+                      ? `${Math.round(similarity * 100)}%`
+                      : null;
+                  const preview = (
+                    <img
+                      className={styles.breadcrumbPreview}
+                      src={getResizedAlbumImageSrc(path)}
+                      alt=""
+                    />
+                  );
+
+                  const wouldBeRemoved =
+                    pendingRemoveIdx !== null && idx >= pendingRemoveIdx;
+
+                  return (
+                    <div
+                      key={key}
+                      className={`${styles.breadcrumbItem}${wouldBeRemoved ? ` ${styles.breadcrumbItemWillRemove}` : ""}`}
+                      style={{ opacity: wouldBeRemoved ? undefined : opacity }}
+                      ref={(element) => {
+                        breadcrumbRefs.current[key] = element;
+                      }}
+                    >
+                      <a
+                        className={styles.breadcrumbButton}
+                        href={getAlbumAnchorHref(path)}
+                        title={`Open ${label}`}
+                        aria-label={label}
+                      >
+                        {preview}
+                        {similarityLabel ? (
+                          <span className={styles.breadcrumbSimilarity}>
+                            {similarityLabel}
+                          </span>
+                        ) : null}
+                      </a>
+                      <button
+                        type="button"
+                        className={styles.breadcrumbRemoveButton}
+                        onClick={(event) => {
+                          event.preventDefault();
+                          event.stopPropagation();
+                          setPendingRemoveIdx(null);
+                          truncateSimilarStack(idx);
+                        }}
+                        onMouseEnter={() => setPendingRemoveIdx(idx)}
+                        onMouseLeave={() => setPendingRemoveIdx(null)}
+                        aria-label={`Remove ${label} from breadcrumbs`}
+                        title={`Remove ${label} and newer selections`}
+                      >
+                        ×
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : null}
           </div>
         </div>
       ) : null}

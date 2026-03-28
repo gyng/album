@@ -9,7 +9,7 @@ export const PhotoSimilarPhotos: React.FC<{
   path?: string | null;
   pageSize?: number;
 }> = (props) => {
-  const pageSize = props.pageSize ?? 9;
+  const pageSize = props.pageSize ?? 8;
   const initialVisibleCount = Math.max(pageSize - 1, 1);
   const [database, progress] = useDatabase();
   const [results, setResults] = React.useState<SearchResultRow[]>([]);
@@ -105,6 +105,17 @@ export const PhotoSimilarPhotos: React.FC<{
           {results.map((result) => (
             <SearchResultTile key={result.path} result={result} />
           ))}
+          <a
+            href={`/search?similar=${encodeURIComponent(props.path)}`}
+            className={styles.similarPhotosLoadMoreTile}
+          >
+            <span className={styles.similarPhotosLoadMoreTileBody}>
+              <span className={styles.similarPhotosLoadMoreLabel}>Explore →</span>
+              <span className={styles.similarPhotosLoadMoreHint}>
+                Search similar in explore mode
+              </span>
+            </span>
+          </a>
           {hasNextPage ? (
             <button
               type="button"
@@ -124,17 +135,6 @@ export const PhotoSimilarPhotos: React.FC<{
               </span>
             </button>
           ) : null}
-          <a
-            href={`/search?similar=${encodeURIComponent(props.path)}`}
-            className={styles.similarPhotosLoadMoreTile}
-          >
-            <span className={styles.similarPhotosLoadMoreTileBody}>
-              <span className={styles.similarPhotosLoadMoreLabel}>Explore</span>
-              <span className={styles.similarPhotosLoadMoreHint}>
-                Search similar in explore mode
-              </span>
-            </span>
-          </a>
         </div>
       )}
     </section>

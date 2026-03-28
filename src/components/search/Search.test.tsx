@@ -300,7 +300,7 @@ describe("Search", () => {
       });
     });
 
-    expect(screen.getByText("Recent additions")).toBeTruthy();
+    expect(screen.getByText("Latest")).toBeTruthy();
     expect(screen.getByText("Random selection")).toBeTruthy();
     expect(
       screen.getByText(/keep stacking keywords to narrow results/i),
@@ -459,7 +459,7 @@ describe("Search", () => {
       refinementCounts.resolve({ harbor: 1, night: 0 });
     });
 
-    expect(screen.queryByText("Recent additions")).toBeNull();
+    expect(screen.queryByText("Latest")).toBeNull();
     expect(screen.queryByText("Random selection")).toBeNull();
   });
 
