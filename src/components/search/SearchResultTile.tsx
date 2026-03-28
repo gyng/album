@@ -53,7 +53,7 @@ export const SearchResultTile = (props: {
         : null;
   const similarityLabel =
     typeof visibleMatchScore === "number"
-      ? `${Math.round(visibleMatchScore * 100)}% match`
+      ? `${Math.round(visibleMatchScore * 100)}%`
       : null;
   const scoreTitle =
     typeof result.rrfScore === "number"

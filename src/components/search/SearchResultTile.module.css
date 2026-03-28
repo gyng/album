@@ -49,8 +49,8 @@
 
 .similarityBadge {
   position: absolute;
-  top: 8px;
-  left: 8px;
+  bottom: calc(var(--m) + var(--m-l));
+  left: var(--m);
   z-index: 1;
   border-radius: 999px;
   background-color: rgba(0, 0, 0, 0.72);
@@ -62,8 +62,8 @@
 
 .similarButton {
   position: absolute;
-  top: 8px;
-  right: 8px;
+  bottom: calc(var(--m) + var(--m-l));
+  right: var(--m);
   z-index: 1;
   display: inline-flex;
   align-items: center;
