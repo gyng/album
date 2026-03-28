@@ -51,9 +51,6 @@ const IMAGE_COLUMNS = [
   "tags",
   "colors",
   "alt_text",
-  "critique",
-  "suggested_title",
-  "composition_critique",
   "subject",
 ] as const;
 

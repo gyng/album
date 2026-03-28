@@ -19,9 +19,6 @@ const makeResult = (overrides: Record<string, unknown> = {}) => ({
   tags: "harbor, skyline",
   colors: "[(12, 34, 56)]",
   alt_text: "",
-  critique: "",
-  suggested_title: "",
-  composition_critique: "",
   subject: "",
   ...overrides,
 });

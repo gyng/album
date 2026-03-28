@@ -26,6 +26,8 @@ The [FTS5 SQLite extension](https://www.sqlite.org/fts5.html) requires sqlite3 >
 
 Full indexing of ~1000 images takes around 3+ minutes. First run will download model weights which takes some time.
 
+The SQLite write path can be benchmarked independently of model loading with the built-in synthetic benchmark command.
+
 ## Usage
 
 This project uses [uv](https://docs.astral.sh/uv/) for dependency management.
@@ -39,6 +41,7 @@ $ uv run black .
 $ uv run index.py --help
 $ uv run python index.py index --glob "../albums/test-simple/*.[jJ][pP][gG]"
 $ uv run python index.py index --glob "../albums/**/*.jpg" --dbpath "search.sqlite" --dry-run --model-profile hybrid
+$ uv run python index.py benchmark-index --rows 200 --repeat 3 --output ".index-benchmark.json"
 $ uv run index.py search --query "singapore"
 $ uv run python index.py search-similar-path --dbpath "search.sqlite" --path "../albums/2511japan/DSCF6007-06.jpg"
 
@@ -61,11 +64,29 @@ $ ./do-full-index.sh
 $ ./do-embeddings-index.sh
 ```
 
+## Benchmarking
+
+Use the synthetic benchmark to measure the SQLite-heavy portion of indexing without paying model download or inference costs:
+
+```sh
+$ uv run python index.py benchmark-index --rows 200 --repeat 3 --output ".index-benchmark.json"
+```
+
+The command reports median setup and insert timings and can write a JSON artifact for comparing future optimisations.
+
+To benchmark the Janus classifier path directly on a sample image:
+
+```sh
+$ uv run python index.py benchmark-janus --path "../src/test/fixtures/monkey.jpg" --repeat 3 --output ".janus-benchmark.json"
+```
+
 ## Model profiles
 
-- `janus`: generate tags, descriptions, and metadata only.
+- `janus`: generate tags, short alt text, subject text, and metadata only.
 - `siglip2`: generate image embeddings only.
 - `hybrid`: generate Janus metadata and SigLIP embeddings in one pass.
+
+The Janus prompt is intentionally limited to the fields currently used by the frontend search UX: `identified_objects`, `themes`, `alt_text`, and `subject`.
 
 `do-full-index.sh` uses `hybrid`. `do-embeddings-index.sh` is useful when you want to preserve the current metadata-backed `search.sqlite` and only refresh the embeddings table.
 

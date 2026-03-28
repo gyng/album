@@ -3,8 +3,11 @@ from index import (
     format_mapping,
     format_mapping_values,
     analyse_image_worker,
+    build_janus_prompt,
+    parse_janus_response,
     JanusClassifier,
     Sqlite3Client,
+    cli,
     index,
     search,
     search_similar_path,
@@ -15,6 +18,7 @@ import tempfile
 import unittest
 from click.testing import CliRunner
 import torch
+import json
 
 
 class TestMain(unittest.TestCase):
@@ -32,6 +36,27 @@ class TestMain(unittest.TestCase):
         expected = "bar\nbaz"
         self.assertEqual(actual, expected)
 
+    def test_build_janus_prompt_only_requests_used_fields(self):
+        actual = build_janus_prompt({"city": "Tokyo", "country": "Japan"})
+
+        self.assertTrue("identified_objects" in actual)
+        self.assertTrue("themes" in actual)
+        self.assertTrue("alt_text" in actual)
+        self.assertTrue("subject" in actual)
+        self.assertFalse("critique" in actual)
+        self.assertFalse("suggested_title" in actual)
+        self.assertFalse("composition_critique" in actual)
+
+    def test_parse_janus_response_falls_back_to_plain_text(self):
+        actual = parse_janus_response(
+            "The photo depicts a serene sky with a bird in flight and a flock of birds."
+        )
+
+        self.assertEqual(actual["alt_text"], "The photo depicts a serene sky with a bird in flight and a flock of birds.")
+        self.assertTrue("serene" in actual["identified_objects"])
+        self.assertTrue("bird" in actual["identified_objects"])
+        self.assertEqual(actual["themes"], [])
+
     def test_analyse_image_worker(self):
         if torch.cuda.is_available():
             classifier = JanusClassifier()
@@ -45,9 +70,6 @@ class TestMain(unittest.TestCase):
 
             self.assertGreater(len(analysed.get("tags")), 0)
             self.assertGreater(len(analysed.get("alt_text")), 0)
-            self.assertGreater(len(analysed.get("critique")), 0)
-            self.assertGreater(len(analysed.get("suggested_title")), 0)
-            self.assertGreater(len(analysed.get("composition_critique")), 0)
             self.assertGreater(len(analysed.get("subject")), 0)
             self.assertGreater(len(analysed.get("geocode").get("city")), 0)
             self.assertEqual(isinstance(analysed.get("exif"), dict), True)
@@ -180,6 +202,26 @@ class TestDb(unittest.TestCase):
 
             self.assertEqual(0, result.exit_code)
             self.assertTrue("Analysing 1 files needing work" in result.output)
+
+    def test_benchmark_index_outputs_summary_json(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            output_path = os.path.join(tmpdir, "benchmark.json")
+            runner = CliRunner()
+
+            result = runner.invoke(
+                cli,
+                f"benchmark-index --rows 5 --repeat 2 --output {output_path}".split(),
+                standalone_mode=False,
+            )
+
+            self.assertEqual(0, result.exit_code)
+            with open(output_path, "r", encoding="utf-8") as fh:
+                parsed = json.load(fh)
+
+            self.assertEqual(parsed["rows"], 5)
+            self.assertEqual(parsed["repeat"], 2)
+            self.assertEqual(len(parsed["runs"]), 2)
+            self.assertTrue(parsed["medianInsertTotalMs"] >= 0)
 
 
 if __name__ == "__main__":

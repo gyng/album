@@ -7,9 +7,6 @@ export type SearchResultRow = {
   tags: string;
   colors: string;
   alt_text: string;
-  critique: string;
-  suggested_title: string;
-  composition_critique: string;
   subject: string;
   snippet?: string;
   bm25?: number;

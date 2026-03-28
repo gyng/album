@@ -7,14 +7,17 @@ import exifread
 import reverse_geocode
 import sqlite3
 import typing
+from PIL import Image
 from typing import IO, Mapping, Optional, Tuple
 import os
 import json
 import re
-import uuid
 import math
+import tempfile
+import statistics
+from contextlib import contextmanager
 
-from transformers import AutoModel, AutoModelForCausalLM, AutoProcessor
+from transformers import AutoImageProcessor, AutoModel, AutoModelForCausalLM
 from janus.models import MultiModalityCausalLM, VLChatProcessor
 from janus.utils.io import load_pil_images
 
@@ -25,6 +28,114 @@ import time
 MODEL_PROFILE_JANUS = "janus"
 MODEL_PROFILE_SIGLIP2 = "siglip2"
 MODEL_PROFILE_HYBRID = "hybrid"
+JANUS_RESPONSE_FIELDS = (
+    "identified_objects",
+    "themes",
+    "alt_text",
+    "subject",
+)
+JANUS_MAX_NEW_TOKENS = 192
+JANUS_FALLBACK_STOPWORDS = {
+    "a",
+    "an",
+    "and",
+    "are",
+    "at",
+    "be",
+    "by",
+    "for",
+    "from",
+    "in",
+    "is",
+    "it",
+    "its",
+    "near",
+    "of",
+    "on",
+    "or",
+    "photo",
+    "shows",
+    "taken",
+    "that",
+    "the",
+    "their",
+    "there",
+    "this",
+    "to",
+    "was",
+    "with",
+}
+
+
+def build_janus_prompt(geocode: Optional[Mapping]) -> str:
+    schema = (
+        '{ "identified_objects": string[], "themes": string[], '
+        '"alt_text": string, "subject": string }'
+    )
+
+    location_hint = ""
+    if geocode:
+        city = geocode.get("city", "")
+        country = geocode.get("country", "")
+        place = ", ".join([part for part in [city, country] if part])
+        if place:
+            location_hint = (
+                f" The photo was taken near {place}. Use that only when it is visually relevant."
+            )
+
+    return (
+        "<image_placeholder>Return strict JSON only. "
+        "Describe the photo for search indexing using this schema: "
+        f"{schema}."
+        " Keep identified_objects and themes short and concrete."
+        " Keep alt_text and subject concise, factual, and literal."
+        " Do not return prose outside the JSON object."
+        f"{location_hint}"
+    )
+
+
+def keywordise_text(text: str, limit: int = 6) -> list[str]:
+    keywords = []
+    for word in re.findall(r"[A-Za-z][A-Za-z0-9_-]+", text.lower()):
+        if len(word) < 4 or word in JANUS_FALLBACK_STOPWORDS:
+            continue
+        normalised = word.replace("-", "_")
+        if normalised in keywords:
+            continue
+        keywords.append(normalised)
+        if len(keywords) >= limit:
+            break
+    return keywords
+
+
+def parse_janus_response(raw_result: str) -> Mapping[str, typing.Any]:
+    JSON_BLOCK_PATTERN = re.compile(r"\{.*?\}", re.DOTALL | re.MULTILINE)
+    blocks = JSON_BLOCK_PATTERN.findall(raw_result)
+
+    if len(blocks) > 0:
+        result = json.loads(blocks[0])
+    else:
+        cleaned = " ".join(raw_result.split()).strip()
+        if not cleaned:
+            raise ValueError("Empty Janus response")
+        keywords = keywordise_text(cleaned)
+        subject = cleaned.split(".")[0].strip() or cleaned[:160]
+        result = {
+            "identified_objects": keywords,
+            "themes": [],
+            "alt_text": cleaned,
+            "subject": subject,
+        }
+
+    if not isinstance(result, dict):
+        raise ValueError("Janus response was not an object")
+    if isinstance(result.get("identified_objects"), str):
+        result["identified_objects"] = [result["identified_objects"]]
+    if isinstance(result.get("themes"), str):
+        result["themes"] = [result["themes"]]
+    for field in JANUS_RESPONSE_FIELDS:
+        result[field]
+    return result
 
 
 class JanusClassifier:
@@ -45,13 +156,7 @@ class JanusClassifier:
 
     @torch.inference_mode()
     def predict(self, path: str, geocode: Optional[Mapping]) -> str:
-        schema = r"\{ \"identified_objects\": string[], \"themes\": string[], \"alt_text\": string, \"critique\": string, \"composition_critique\": string, \"suggested_title\": string, \"subject\": string }"
-
-        geocode_prompt = None
-        if geocode:
-            geocode_prompt = f"\nThis photo was taken near {geocode.get('city', '')}, {geocode.get('state')}, {geocode.get('country', '')}, {geocode.get('country', '')}."
-
-        prompt = f"<image_placeholder>{geocode_prompt}\nYou are the best photographer and brutally honest acclaimed photography critic and gallery curator. Your writing style is witty, sardonic, concise, and sarcastic like those of the best writers such as Hemingway and Roger Ebert. Classify and describe the following photo into JSON (MUST BE JSON!) with this schema:\n{schema}\n{uuid.uuid4()}. IT IS IMPORTANT THAT YOU ONLY RETURN VALID JSON ANOD NOTHING ELSE! Do not keep repeating yourself in your answer."
+        prompt = build_janus_prompt(geocode)
 
         conversation = [
             {
@@ -79,7 +184,7 @@ class JanusClassifier:
             pad_token_id=self.tokenizer.eos_token_id,
             bos_token_id=self.tokenizer.bos_token_id,
             eos_token_id=self.tokenizer.eos_token_id,
-            max_new_tokens=512,
+            max_new_tokens=JANUS_MAX_NEW_TOKENS,
             do_sample=False,
             use_cache=True,
         )
@@ -94,7 +199,7 @@ class Siglip2Embedder:
     def init_model(self) -> None:
         self.model_id = "google/siglip2-base-patch16-224"
         print(f"Loading image embedder {self.model_id}...")
-        self.processor = AutoProcessor.from_pretrained(self.model_id)
+        self.processor = AutoImageProcessor.from_pretrained(self.model_id)
         self.model = AutoModel.from_pretrained(self.model_id)
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         self.model = self.model.to(self.device).eval()
@@ -102,7 +207,7 @@ class Siglip2Embedder:
 
     @torch.inference_mode()
     def predict_image_embedding(self, path: str) -> list[float]:
-        image = self.processor.image_processor.fetch_images(path)[0]
+        image = Image.open(path).convert("RGB")
         inputs = self.processor(images=[image], return_tensors="pt")
         inputs = {k: v.to(self.device) for k, v in inputs.items()}
         features = self.model.get_image_features(**inputs)
@@ -154,6 +259,18 @@ class Sqlite3Client:
         # allows for concurrent writes...? Not sure if it has any impact
         self.con.execute("PRAGMA journal_mode=WAL;")
 
+    @contextmanager
+    def transaction(self):
+        cur = self.con.cursor()
+        cur.execute("BEGIN")
+        try:
+            yield cur
+        except Exception:
+            cur.execute("ROLLBACK")
+            raise
+        else:
+            cur.execute("COMMIT")
+
     def info(self):
         version = sqlite3.sqlite_version
         entries = 0
@@ -166,7 +283,7 @@ class Sqlite3Client:
     def setup_tables(self):
         cur = self.con.cursor()
         cur.execute(
-            "CREATE VIRTUAL TABLE IF NOT EXISTS images USING fts5(path, album_relative_path, filename, geocode, exif, tags, colors, alt_text, critique, suggested_title, composition_critique, subject, tokenize='porter trigram')"
+            "CREATE VIRTUAL TABLE IF NOT EXISTS images USING fts5(path, album_relative_path, filename, geocode, exif, tags, colors, alt_text, subject, tokenize='porter trigram')"
         )
         cur.execute(
             "CREATE TABLE IF NOT EXISTS tags (tag VARCHAR PRIMARY KEY, count INTEGER DEFAULT 0)"
@@ -180,20 +297,45 @@ class Sqlite3Client:
         # Optimise loads from the browser https://github.com/phiresky/sql.js-httpvfs#readme
         cur.execute("PRAGMA journal_mode = delete;")
         cur.execute("PRAGMA page_size = 1024;")
+        self.con.commit()
+
+    def optimize(self, vacuum: bool = False):
+        cur = self.con.cursor()
         cur.execute("INSERT INTO images(images) VALUES ('optimize');")
-        cur.execute("COMMIT")
-        cur.execute("VACUUM")
+        self.con.commit()
+        if vacuum:
+            cur.execute("VACUUM")
+            self.con.commit()
 
     def already_exists(self, path: str) -> bool:
         cur = self.con.cursor()
         result = cur.execute(
-            "SELECT COUNT(*) FROM images WHERE path = ?", (path,)
+            "SELECT 1 FROM images WHERE path = ? LIMIT 1", (path,)
         ).fetchone()
-        # Result is a Tuple
-        return len(result) > 0 and result[0] > 0
+        return result is not None
 
     def has_embedding(self, path: str) -> bool:
-        return self.get_embedding(path) is not None
+        cur = self.con.cursor()
+        result = cur.execute(
+            "SELECT 1 FROM embeddings WHERE path = ? LIMIT 1", (path,)
+        ).fetchone()
+        return result is not None
+
+    def list_image_paths(self):
+        cur = self.con.cursor()
+        res = cur.execute("SELECT path FROM images")
+        return {row[0] for row in res.fetchall()}
+
+    def list_embedding_paths(self, model_id: Optional[str] = None):
+        cur = self.con.cursor()
+        if model_id:
+            res = cur.execute(
+                "SELECT path FROM embeddings WHERE model_id = ?",
+                (model_id,),
+            )
+        else:
+            res = cur.execute("SELECT path FROM embeddings")
+        return {row[0] for row in res.fetchall()}
 
     def insert_geocode(self, path: str, geocode: str):
         self.insert_field(path, value=geocode, field="geocode")
@@ -317,42 +459,85 @@ class Sqlite3Client:
         resolved = res.fetchall()
         return resolved
 
-    def insert_field(self, path: str, field: str, value: str):
-        cur = self.con.cursor()
-        # Upsert is not implemented for virtual tables
-        cur.execute("BEGIN")
-        count = cur.execute(
-            "SELECT COUNT(*) FROM images WHERE path = ?;", (path,)
-        ).fetchall()
+    def upsert_image_fields(
+        self,
+        path: str,
+        fields: Mapping[str, typing.Any],
+        cur: Optional[sqlite3.Cursor] = None,
+    ):
+        if cur is None:
+            with self.transaction() as transactional_cur:
+                self.upsert_image_fields(path, fields, transactional_cur)
+                return
 
-        if len(count) > 0 and count[0][0] > 0:
-            cur.execute(f"UPDATE images SET {field} = ? WHERE path = ?;", (value, path))
-        else:
-            # No point INSERT OR IGNORE-ing: fts5 auto creates a random primary key
+        row_exists = cur.execute(
+            "SELECT 1 FROM images WHERE path = ? LIMIT 1;",
+            (path,),
+        ).fetchone()
+        resolved_fields = {field: value for field, value in fields.items()}
+
+        if row_exists:
+            assignments = ", ".join([f"{field} = ?" for field in resolved_fields])
             cur.execute(
-                f"INSERT INTO images (path, {field}) VALUES (?, ?);",
-                (path, value),
+                f"UPDATE images SET {assignments} WHERE path = ?;",
+                [*resolved_fields.values(), path],
             )
-        cur.execute("COMMIT")
+            return
 
-    def insert_tag(self, tag: str):
-        cur = self.con.cursor()
-        cur.execute("BEGIN")
+        columns = ", ".join(["path", *resolved_fields.keys()])
+        placeholders = ", ".join(["?" for _ in range(len(resolved_fields) + 1)])
         cur.execute(
+            f"INSERT INTO images ({columns}) VALUES ({placeholders});",
+            [path, *resolved_fields.values()],
+        )
+
+    def insert_field(
+        self,
+        path: str,
+        field: str,
+        value: str,
+        cur: Optional[sqlite3.Cursor] = None,
+    ):
+        self.upsert_image_fields(path, {field: value}, cur=cur)
+
+    def insert_tags(
+        self,
+        tags: list[str],
+        cur: Optional[sqlite3.Cursor] = None,
+    ):
+        resolved_tags = [tag for tag in tags if tag]
+        if len(resolved_tags) == 0:
+            return
+
+        if cur is None:
+            with self.transaction() as transactional_cur:
+                self.insert_tags(resolved_tags, transactional_cur)
+                return
+
+        cur.executemany(
             "INSERT OR IGNORE INTO tags (tag, count) VALUES (?, 1);",
-            (tag,),
+            [(tag,) for tag in resolved_tags],
         )
-        cur.execute(
+        cur.executemany(
             "UPDATE tags SET count = count + 1 WHERE tag = ?",
-            (tag,),
+            [(tag,) for tag in resolved_tags],
         )
-        cur.execute("COMMIT")
+
+    def insert_tag(self, tag: str, cur: Optional[sqlite3.Cursor] = None):
+        self.insert_tags([tag], cur=cur)
 
     def insert_metadata(
-        self, path: str, lat_lng_deg: Tuple[float, float], iso8601: str
+        self,
+        path: str,
+        lat_lng_deg: Tuple[float, float],
+        iso8601: str,
+        cur: Optional[sqlite3.Cursor] = None,
     ):
-        cur = self.con.cursor()
-        cur.execute("BEGIN")
+        if cur is None:
+            with self.transaction() as transactional_cur:
+                self.insert_metadata(path, lat_lng_deg, iso8601, transactional_cur)
+                return
+
         cur.execute(
             "INSERT OR IGNORE INTO metadata (path, lat_deg, lng_deg, iso8601) VALUES (?, ?, ?, ?);",
             (
@@ -371,12 +556,20 @@ class Sqlite3Client:
                 path,
             ),
         )
-        cur.execute("COMMIT")
 
-    def insert_embedding(self, path: str, model_id: str, embedding: list[float]):
-        cur = self.con.cursor()
+    def insert_embedding(
+        self,
+        path: str,
+        model_id: str,
+        embedding: list[float],
+        cur: Optional[sqlite3.Cursor] = None,
+    ):
+        if cur is None:
+            with self.transaction() as transactional_cur:
+                self.insert_embedding(path, model_id, embedding, transactional_cur)
+                return
+
         embedding_json = json.dumps(embedding)
-        cur.execute("BEGIN")
         cur.execute(
             "INSERT OR IGNORE INTO embeddings (path, model_id, embedding_dim, embedding_json) VALUES (?, ?, ?, ?);",
             (path, model_id, len(embedding), embedding_json),
@@ -385,7 +578,6 @@ class Sqlite3Client:
             "UPDATE embeddings SET model_id = ?, embedding_dim = ?, embedding_json = ? WHERE path = ?",
             (model_id, len(embedding), embedding_json, path),
         )
-        cur.execute("COMMIT")
 
     def get_embedding(self, path: str, model_id: Optional[str] = None):
         cur = self.con.cursor()
@@ -434,16 +626,33 @@ def cli(ctx):
     default=MODEL_PROFILE_JANUS,
     help="Indexing profile: janus (legacy tags), siglip2 (embeddings), hybrid (both).",
 )
-def index(glob: str, dbpath: str, dry_run: bool, model_profile: str):
+@click.option(
+    "--benchmark-output",
+    default=None,
+    help="Optional JSON file path for timing output.",
+)
+def index(
+    glob: str,
+    dbpath: str,
+    dry_run: bool,
+    model_profile: str,
+    benchmark_output: Optional[str],
+):
+    started_at = time.perf_counter()
     db = Sqlite3Client(dbpath)
+    setup_started_at = time.perf_counter()
     db.setup_tables()
+    setup_ms = (time.perf_counter() - setup_started_at) * 1000
     pprint.pprint(db.info())
 
+    planning_started_at = time.perf_counter()
     files = find_files(".", glob)
+    existing_image_paths = db.list_image_paths()
+    existing_embedding_paths = db.list_embedding_paths()
     work_items = []
     for file_path in files:
-        has_image = db.already_exists(file_path)
-        has_embedding = db.has_embedding(file_path)
+        has_image = file_path in existing_image_paths
+        has_embedding = file_path in existing_embedding_paths
         needs_classifier = model_profile in [MODEL_PROFILE_JANUS, MODEL_PROFILE_HYBRID] and not has_image
         needs_embedding = model_profile in [MODEL_PROFILE_SIGLIP2, MODEL_PROFILE_HYBRID] and not has_embedding
 
@@ -455,6 +664,7 @@ def index(glob: str, dbpath: str, dry_run: bool, model_profile: str):
                     "needs_embedding": needs_embedding,
                 }
             )
+    planning_ms = (time.perf_counter() - planning_started_at) * 1000
 
     print(f"Found {len(files)} files for the the glob pattern {glob}")
     print(
@@ -465,6 +675,7 @@ def index(glob: str, dbpath: str, dry_run: bool, model_profile: str):
     if not dry_run and len(work_items) > 0:
         classifier = None
         embedder = None
+        model_init_started_at = time.perf_counter()
 
         if any(item["needs_classifier"] for item in work_items):
             classifier = JanusClassifier()
@@ -474,19 +685,23 @@ def index(glob: str, dbpath: str, dry_run: bool, model_profile: str):
             embedder = Siglip2Embedder()
             embedder.init_model()
 
+        model_init_ms = (time.perf_counter() - model_init_started_at) * 1000
+
         enumerated = [
             (
-                index,
+                item_index,
                 item["path"],
                 classifier if item["needs_classifier"] else None,
                 embedder if item["needs_embedding"] else None,
             )
-            for index, item in enumerate(work_items)
+            for item_index, item in enumerate(work_items)
         ]
 
         # Disable concurrency as it doesn't help performance on a RTX3080
         with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
             start_time = time.perf_counter()
+            analysis_durations_ms = []
+            insert_durations_ms = []
 
             for i, result in enumerate(executor.map(analyse_image_worker, enumerated)):
                 time_now = time.perf_counter()
@@ -495,16 +710,206 @@ def index(glob: str, dbpath: str, dry_run: bool, model_profile: str):
                 percent = i / float(len(work_items)) * 100
                 estimated_time_min = (len(work_items) - i) * time_per_image / 60
 
+                analysed = result.get("analysed")
+                analysis_durations_ms.append((analysed.get("_duration") or 0) * 1000)
+
                 pprint.pprint(result)
                 print(
-                    f"[{percent:.1f}% {i}/{len(work_items)} {rate:.2f}it/s {estimated_time_min:.1f}min]\tAnalysed image {result["path"]}. Inserting image..."
+                    f"[{percent:.1f}% {i}/{len(work_items)} {rate:.2f}it/s {estimated_time_min:.1f}min]\tAnalysed image {result['path']}. Inserting image..."
                 )
+                insert_started_at = time.perf_counter()
                 insert_analysed_image(
                     db=db,
-                    analysed=result.get("analysed"),
+                    analysed=analysed,
                     path=result.get("path"),
                     include_classifier_fields=result.get("used_classifier", False),
                 )
+                insert_durations_ms.append((time.perf_counter() - insert_started_at) * 1000)
+
+        db.optimize()
+    else:
+        model_init_ms = 0.0
+        analysis_durations_ms = []
+        insert_durations_ms = []
+
+    if benchmark_output:
+        benchmark = {
+            "generatedAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+            "glob": glob,
+            "dbPath": dbpath,
+            "modelProfile": model_profile,
+            "dryRun": dry_run,
+            "fileCount": len(files),
+            "workItemCount": len(work_items),
+            "durationsMs": {
+                "total": round((time.perf_counter() - started_at) * 1000, 2),
+                "setupTables": round(setup_ms, 2),
+                "planning": round(planning_ms, 2),
+                "modelInit": round(model_init_ms, 2),
+                "analysisTotal": round(sum(analysis_durations_ms), 2),
+                "analysisMedian": round(statistics.median(analysis_durations_ms), 2)
+                if analysis_durations_ms
+                else 0.0,
+                "insertTotal": round(sum(insert_durations_ms), 2),
+                "insertMedian": round(statistics.median(insert_durations_ms), 2)
+                if insert_durations_ms
+                else 0.0,
+            },
+        }
+        with open(benchmark_output, "w", encoding="utf-8") as fh:
+            json.dump(benchmark, fh, indent=2)
+        print(f"Benchmark written to {benchmark_output}")
+
+
+def build_benchmark_sample(index_value: int) -> Mapping[str, typing.Any]:
+    return {
+        "exif": {"Make": "Fuji", "Model": "X100V", "Index": str(index_value)},
+        "geocode": {"country": "Japan", "city": "Tokyo", "country_code": "JP"},
+        "lat_deg": 35.0,
+        "lng_deg": 139.0,
+        "colors": [(1, 2, 3), (4, 5, 6), (7, 8, 9)],
+        "tags": ["street", "night", "tokyo"],
+        "alt_text": "Night street scene",
+        "subject": "street",
+        "embedding": [0.1, 0.2, 0.3, 0.4],
+        "embedding_model_id": "benchmark-model",
+        "iso8601": "2024-01-01T00:00:00Z",
+    }
+
+
+@cli.command("benchmark-index")
+@click.option("--rows", default=200, help="Synthetic analysed rows to insert per run.")
+@click.option("--repeat", default=3, help="How many benchmark runs to execute.")
+@click.option(
+    "--output",
+    default=None,
+    help="Optional JSON output file for the benchmark summary.",
+)
+def benchmark_index(rows: int, repeat: int, output: Optional[str]):
+    runs = []
+
+    for run_index in range(repeat):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            dbpath = os.path.join(tmpdir, f"benchmark-{run_index}.sqlite")
+            db = Sqlite3Client(dbpath)
+
+            setup_started_at = time.perf_counter()
+            db.setup_tables()
+            setup_ms = (time.perf_counter() - setup_started_at) * 1000
+
+            insert_started_at = time.perf_counter()
+            row_insert_durations_ms = []
+            for row_index in range(rows):
+                row_started_at = time.perf_counter()
+                insert_analysed_image(
+                    db,
+                    build_benchmark_sample(row_index),
+                    f"../albums/benchmark/photo-{row_index}.jpg",
+                )
+                row_insert_durations_ms.append(
+                    (time.perf_counter() - row_started_at) * 1000
+                )
+            insert_total_ms = (time.perf_counter() - insert_started_at) * 1000
+
+            db.optimize()
+            runs.append(
+                {
+                    "run": run_index + 1,
+                    "setupMs": round(setup_ms, 2),
+                    "insertTotalMs": round(insert_total_ms, 2),
+                    "insertMedianMs": round(statistics.median(row_insert_durations_ms), 2),
+                    "insertAverageMs": round(insert_total_ms / rows, 2),
+                }
+            )
+
+    summary = {
+        "generatedAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "rows": rows,
+        "repeat": repeat,
+        "runs": runs,
+        "medianSetupMs": round(statistics.median([run["setupMs"] for run in runs]), 2),
+        "medianInsertTotalMs": round(
+            statistics.median([run["insertTotalMs"] for run in runs]),
+            2,
+        ),
+        "medianInsertAverageMs": round(
+            statistics.median([run["insertAverageMs"] for run in runs]),
+            2,
+        ),
+        "medianInsertMedianMs": round(
+            statistics.median([run["insertMedianMs"] for run in runs]),
+            2,
+        ),
+    }
+
+    pprint.pprint(summary)
+
+    if output:
+        with open(output, "w", encoding="utf-8") as fh:
+            json.dump(summary, fh, indent=2)
+        print(f"Benchmark written to {output}")
+
+
+@cli.command("benchmark-janus")
+@click.option(
+    "--path",
+    "image_path",
+    default="../src/test/fixtures/monkey.jpg",
+    help="Image path to run through Janus.",
+)
+@click.option("--repeat", default=3, help="How many predict runs to measure.")
+@click.option(
+    "--output",
+    default=None,
+    help="Optional JSON output file for the benchmark summary.",
+)
+def benchmark_janus(image_path: str, repeat: int, output: Optional[str]):
+    classifier = JanusClassifier()
+
+    init_started_at = time.perf_counter()
+    classifier.init_model()
+    init_ms = (time.perf_counter() - init_started_at) * 1000
+
+    geocode = {
+        "city": "Singapore",
+        "country": "Singapore",
+    }
+    runs = []
+
+    for run_index in range(repeat):
+        started_at = time.perf_counter()
+        raw_output = classifier.predict(image_path, geocode)
+        duration_ms = (time.perf_counter() - started_at) * 1000
+        runs.append(
+            {
+                "run": run_index + 1,
+                "durationMs": round(duration_ms, 2),
+                "outputChars": len(raw_output),
+            }
+        )
+
+    summary = {
+        "generatedAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "path": image_path,
+        "repeat": repeat,
+        "initMs": round(init_ms, 2),
+        "medianPredictMs": round(
+            statistics.median([run["durationMs"] for run in runs]),
+            2,
+        ),
+        "medianOutputChars": round(
+            statistics.median([run["outputChars"] for run in runs]),
+            2,
+        ),
+        "runs": runs,
+    }
+
+    pprint.pprint(summary)
+
+    if output:
+        with open(output, "w", encoding="utf-8") as fh:
+            json.dump(summary, fh, indent=2)
+        print(f"Benchmark written to {output}")
 
 
 @cli.command("prune")
@@ -675,22 +1080,7 @@ def analyse_image(
             try:
                 raw_result = classifier.predict(path=path, geocode=geo)
 
-                JSON_BLOCK_PATTERN = re.compile(r"\{.*?\}", re.DOTALL | re.MULTILINE)
-                blocks = JSON_BLOCK_PATTERN.findall(raw_result)
-                block = blocks[0]
-                result = json.loads(block)
-
-                # Ensure we have the right keys as a poor man's schema check
-                assert isinstance(result, dict)
-                if isinstance(result["identified_objects"], str):
-                    result["identified_objects"] = [result["identified_objects"]]
-                if isinstance(result["themes"], str):
-                    result["themes"] = [result["themes"]]
-                result["alt_text"]
-                result["critique"]
-                result["suggested_title"]
-                result["composition_critique"]
-                result["subject"]
+                result = parse_janus_response(raw_result)
                 break
             except Exception:
                 attempts += 1
@@ -735,9 +1125,6 @@ def analyse_image(
         "colors": colors,
         "tags": normalised_tags,
         "alt_text": result.get("alt_text"),
-        "critique": result.get("critique"),
-        "suggested_title": result.get("suggested_title"),
-        "composition_critique": result.get("composition_critique"),
         "subject": result.get("subject"),
         "embedding": embedding,
         "embedding_model_id": embedding_model_id,
@@ -774,57 +1161,56 @@ def analyse_image_worker(
 
 
 def insert_analysed_image(db, analysed: Mapping, path, include_classifier_fields: bool = True):
-    db.insert_field(path, field="filename", value=get_filename(path))
-    db.insert_field(
-        path,
-        field="album_relative_path",
-        value=get_album_relative_path(path),
-    )
-    db.insert_field(path, field="exif", value=format_mapping(analysed.get("exif")))
-    db.insert_field(
-        path,
-        field="colors",
-        value=format_mapping(analysed.get("colors")),
-    )
-
     geocode = analysed.get("geocode")
+    image_fields = {
+        "filename": get_filename(path),
+        "album_relative_path": get_album_relative_path(path),
+        "exif": format_mapping(analysed.get("exif")),
+        "colors": format_mapping(analysed.get("colors")),
+    }
+
     if geocode:
-        db.insert_geocode(path, format_mapping_values(geocode))
+        image_fields["geocode"] = format_mapping_values(geocode)
 
     if include_classifier_fields:
-        db.insert_field(path, field="alt_text", value=analysed.get("alt_text"))
-        db.insert_field(path, field="critique", value=analysed.get("critique"))
-        db.insert_field(
-            path, field="suggested_title", value=analysed.get("suggested_title")
-        )
-        db.insert_field(
+        image_fields["alt_text"] = analysed.get("alt_text")
+        image_fields["subject"] = analysed.get("subject")
+        image_fields["tags"] = ", ".join(analysed.get("tags"))
+
+    with db.transaction() as cur:
+        db.upsert_image_fields(path, image_fields, cur=cur)
+
+        if include_classifier_fields:
+            tags_to_insert = list(analysed.get("tags") or [])
+            if geocode:
+                tags_to_insert.extend(
+                    [
+                        geocode.get("country"),
+                        geocode.get("city"),
+                        geocode.get("country_code"),
+                    ]
+                )
+            db.insert_tags(tags_to_insert, cur=cur)
+
+        db.insert_metadata(
             path,
-            field="composition_critique",
-            value=analysed.get("composition_critique"),
+            lat_lng_deg=(
+                analysed.get("lat_deg"),
+                analysed.get("lng_deg"),
+            ),
+            iso8601=analysed.get("iso8601"),
+            cur=cur,
         )
-        db.insert_field(path, field="subject", value=analysed.get("subject"))
 
-        db.insert_tag(geocode["country"])
-        db.insert_tag(geocode["city"])
-        db.insert_tag(geocode["country_code"])
-
-        db.insert_field(path, field="tags", value=", ".join(analysed.get("tags")))
-        for tag in analysed.get("tags"):
-            db.insert_tag(tag)
-
-    db.insert_metadata(
-        path,
-        lat_lng_deg=(
-            analysed.get("lat_deg"),
-            analysed.get("lng_deg"),
-        ),
-        iso8601=analysed.get("iso8601"),
-    )
-
-    embedding = analysed.get("embedding")
-    embedding_model_id = analysed.get("embedding_model_id")
-    if embedding and embedding_model_id:
-        db.insert_embedding(path=path, model_id=embedding_model_id, embedding=embedding)
+        embedding = analysed.get("embedding")
+        embedding_model_id = analysed.get("embedding_model_id")
+        if embedding and embedding_model_id:
+            db.insert_embedding(
+                path=path,
+                model_id=embedding_model_id,
+                embedding=embedding,
+                cur=cur,
+            )
 
 
 if __name__ == "__main__":
