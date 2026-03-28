@@ -36,10 +36,10 @@ export default defineConfig({
     video: "retain-on-failure",
   },
 
-  /* Increase timeout due to extremely slow application performance (40-70s load times observed) */
-  timeout: 90 * 1000, // 90 seconds
+  /* Increase timeout due to slow initial page load */
+  timeout: process.env.CI ? 90 * 1000 : 30 * 1000,
   expect: {
-    timeout: 45 * 1000, // 45 seconds for expect assertions
+    timeout: process.env.CI ? 45 * 1000 : 10 * 1000,
   },
 
   /* Configure projects for major browsers */
@@ -49,15 +49,19 @@ export default defineConfig({
       use: { ...devices["Desktop Chrome"] },
     },
 
-    {
-      name: "firefox",
-      use: { ...devices["Desktop Firefox"] },
-    },
-
-    {
-      name: "webkit",
-      use: { ...devices["Desktop Safari"] },
-    },
+    // Run all browsers in CI, but only chromium locally for faster dev loop
+    ...(process.env.CI
+      ? [
+          {
+            name: "firefox",
+            use: { ...devices["Desktop Firefox"] },
+          },
+          {
+            name: "webkit",
+            use: { ...devices["Desktop Safari"] },
+          },
+        ]
+      : []),
 
     /* Test against mobile viewports. */
     // {
