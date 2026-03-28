@@ -124,6 +124,17 @@ export const PhotoSimilarPhotos: React.FC<{
               </span>
             </button>
           ) : null}
+          <a
+            href={`/search?similar=${encodeURIComponent(props.path)}`}
+            className={styles.similarPhotosLoadMoreTile}
+          >
+            <span className={styles.similarPhotosLoadMoreTileBody}>
+              <span className={styles.similarPhotosLoadMoreLabel}>Explore</span>
+              <span className={styles.similarPhotosLoadMoreHint}>
+                Search similar in explore mode
+              </span>
+            </span>
+          </a>
         </div>
       )}
     </section>

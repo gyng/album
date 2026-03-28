@@ -117,12 +117,15 @@
 .similarPhotosLoadMoreTile {
   appearance: none;
   width: 150px;
+  height: 150px;
   border: 0;
   padding: 0;
   text-align: left;
   background: transparent;
   color: inherit;
   cursor: pointer;
+  text-decoration: none;
+  display: block;
 }
 
 .similarPhotosLoadMoreTileBody {
