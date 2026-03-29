@@ -31,6 +31,16 @@ import { handleSlideshowKeyboardShortcut } from "../../util/slideshowKeyboard";
 
 type PageProps = {};
 type SlideshowMode = "random" | "weighted" | "similar";
+const CONTROLS_AUTO_HIDE_MS = 3000;
+
+type FullscreenDocument = Document & {
+  webkitExitFullscreen?: () => Promise<void> | void;
+  webkitFullscreenElement?: Element | null;
+};
+
+type FullscreenElement = HTMLElement & {
+  webkitRequestFullscreen?: () => Promise<void> | void;
+};
 
 const avoidBoundaryRepeat = (
   photos: RandomPhotoRow[],
@@ -41,7 +51,9 @@ const avoidBoundaryRepeat = (
     photos.length > 1 &&
     photos[0]?.path === previousLastPath
   ) {
-    const swapIdx = photos.findIndex((photo) => photo.path !== previousLastPath);
+    const swapIdx = photos.findIndex(
+      (photo) => photo.path !== previousLastPath,
+    );
     if (swapIdx > 0) {
       [photos[0], photos[swapIdx]] = [photos[swapIdx], photos[0]];
     }
@@ -82,7 +94,8 @@ const weightedShufflePhotos = (
 
   const weighted = photos
     .map((photo) => {
-      const timestamp = extractDateFromExifString(photo.exif)?.getTime() ?? null;
+      const timestamp =
+        extractDateFromExifString(photo.exif)?.getTime() ?? null;
       const normalized =
         timestamp === null ? 0.15 : (timestamp - minTimestamp) / timestampRange;
       const weight = 1 + normalized * 5;
@@ -211,25 +224,41 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
   );
   const [hasParsedInitialUrl, setHasParsedInitialUrl] = React.useState(false);
   const [isPaused, setIsPaused] = React.useState(false);
+  const [controlsVisible, setControlsVisible] = React.useState(true);
+  const [controlsHideProgress, setControlsHideProgress] = React.useState(1);
+  const [isCoarsePointer, setIsCoarsePointer] = React.useState(false);
+  const [isPointerOverToolbar, setIsPointerOverToolbar] = React.useState(false);
+  const [isFullscreenSupported, setIsFullscreenSupported] =
+    React.useState(false);
+  const [isFullscreenActive, setIsFullscreenActive] = React.useState(false);
   const [embeddingsDatabase, embeddingsProgress] = useEmbeddingsDatabase(
     slideshowMode === "similar",
   );
+  const pointerGestureRef = React.useRef<{
+    pointerId: number;
+    pointerType: string;
+    startX: number;
+    startY: number;
+  } | null>(null);
+  const suppressImageClickRef = React.useRef(false);
+  const controlsHideDeadlineRef = React.useRef<number | null>(null);
+  const pausedRemainingMsRef = React.useRef<number | null>(null);
 
   const updateSlideshowUrl = useCallback(
     (
       mode: SlideshowMode,
       opts?: { photoPath?: string | null; clearPhoto?: boolean },
     ) => {
-    const url = new URL(window.location.toString());
-    url.searchParams.set("mode", mode);
+      const url = new URL(window.location.toString());
+      url.searchParams.set("mode", mode);
 
       const hasExplicitPhotoPath = Object.prototype.hasOwnProperty.call(
         opts ?? {},
         "photoPath",
       );
       const nextPhotoPath = hasExplicitPhotoPath
-        ? opts?.photoPath ?? null
-        : currentPhotoPathRef.current?.path ?? null;
+        ? (opts?.photoPath ?? null)
+        : (currentPhotoPathRef.current?.path ?? null);
 
       if (nextPhotoPath) {
         url.searchParams.set("photo", nextPhotoPath);
@@ -247,7 +276,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
         url.searchParams.delete("seed");
       }
 
-    window.history.replaceState(window.history.state, "", url.toString());
+      window.history.replaceState(window.history.state, "", url.toString());
     },
     [],
   );
@@ -270,21 +299,21 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
    *   - cover=1        Use cover mode (vs contain)
    *
    * Other parameters:
-    *   - mode=random|weighted|similar Slideshow playback mode
-    *   - photo=<photo-path>          Start on a specific photo and keep the URL synced to the current image
-    *   - seed=<photo-path>           Similar mode only: backward-compatible alias for the starting photo
+   *   - mode=random|weighted|similar Slideshow playback mode
+   *   - photo=<photo-path>          Start on a specific photo and keep the URL synced to the current image
+   *   - seed=<photo-path>           Similar mode only: backward-compatible alias for the starting photo
    *   - align=left|center|right  Set details alignment
    *   - delay=<seconds>          Set slide duration in seconds (e.g., 60 = 60 seconds)
-    *   - shuffle=<number>         Similar mode only: avoid repeating the last N photos
+   *   - shuffle=<number>         Similar mode only: avoid repeating the last N photos
    *   - filter=<album-name>      Filter to specific album
    *
    * Examples:
    *   /?clock=1&details=1&map=1&delay=60              All features with 60-second slides
    *   /?clock=1&delay=30                              Just clock with 30-second intervals
    *   /?details=1&align=left                          Details aligned left (no clock)
-    *   /?filter=japan&delay=45                         Japan album, 45-second slides in a shuffled pass
-    *   /?mode=weighted&filter=japan                    Recent-biased weighted shuffle for one album
-    *   /?mode=similar&filter=japan&shuffle=50          Similar mode, avoid the last 50 photos
+   *   /?filter=japan&delay=45                         Japan album, 45-second slides in a shuffled pass
+   *   /?mode=weighted&filter=japan                    Recent-biased weighted shuffle for one album
+   *   /?mode=similar&filter=japan&shuffle=50          Similar mode, avoid the last 50 photos
    */
   // Parse URL search params to configure slideshow
   useEffect(() => {
@@ -377,7 +406,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
     }
 
     setHasParsedInitialUrl(true);
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- slideshowMode is only read as a fallback on mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- slideshowMode is only read as a fallback on mount
   }, [
     setShowClock,
     setShowDetails,
@@ -500,7 +529,12 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
     }
 
     updateSlideshowUrl(slideshowMode);
-  }, [currentPhotoPath?.path, hasParsedInitialUrl, slideshowMode, updateSlideshowUrl]);
+  }, [
+    currentPhotoPath?.path,
+    hasParsedInitialUrl,
+    slideshowMode,
+    updateSlideshowUrl,
+  ]);
 
   useEffect(() => {
     if (!database) {
@@ -527,7 +561,10 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
         if (photos.length === 0) {
           setCurrentPhotoPath(null);
           currentPhotoPathRef.current = null;
-          updateSlideshowUrl(slideshowMode, { photoPath: null, clearPhoto: true });
+          updateSlideshowUrl(slideshowMode, {
+            photoPath: null,
+            clearPhoto: true,
+          });
           setSlideshowError("No photos available");
           return;
         }
@@ -554,8 +591,9 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
 
         if (initialPhotoPathRef.current) {
           const seededPhoto =
-            photos.find((photo) => photo.path === initialPhotoPathRef.current) ??
-            null;
+            photos.find(
+              (photo) => photo.path === initialPhotoPathRef.current,
+            ) ?? null;
 
           initialPhotoPathRef.current = null;
 
@@ -578,7 +616,10 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
       .catch((err) => {
         console.error(err);
         if (!cancelled) {
-          updateSlideshowUrl(slideshowMode, { photoPath: null, clearPhoto: true });
+          updateSlideshowUrl(slideshowMode, {
+            photoPath: null,
+            clearPhoto: true,
+          });
           setSlideshowError("No photos available");
         }
       });
@@ -596,76 +637,82 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
     updateSlideshowUrl,
   ]);
 
-  const advanceSimilarPhoto = useCallback(async (): Promise<RandomPhotoRow | null> => {
-    if (!database || !embeddingsDatabase) {
-      return null;
-    }
+  const advanceSimilarPhoto =
+    useCallback(async (): Promise<RandomPhotoRow | null> => {
+      if (!database || !embeddingsDatabase) {
+        return null;
+      }
 
-    const activePhoto = currentPhotoPathRef.current;
-    if (!activePhoto?.path) {
-      return advanceRandomPhoto({ trackRecent: true });
-    }
+      const activePhoto = currentPhotoPathRef.current;
+      if (!activePhoto?.path) {
+        return advanceRandomPhoto({ trackRecent: true });
+      }
 
-    const refillSimilarQueue = async (seedPath: string) => {
-      const result = await fetchSimilarResults({
-        database,
-        embeddingsDatabase,
-        path: seedPath,
-        page: 0,
-        pageSize: Math.max(shuffleHistorySize, 100),
-      });
-      const filteredResults = result.data
-        .filter((candidate) => {
-          const matchesAlbumFilter = filter
-            ? candidate.path.startsWith(`../albums/${filter}/`)
-            : true;
-          const isRecent = recentPhotoPathsRef.current.includes(candidate.path);
-          return matchesAlbumFilter && !isRecent;
-        })
-        .map((candidate) => ({
-          path: candidate.path,
-          exif: candidate.exif,
-          geocode: candidate.geocode,
-        }));
+      const refillSimilarQueue = async (seedPath: string) => {
+        const result = await fetchSimilarResults({
+          database,
+          embeddingsDatabase,
+          path: seedPath,
+          page: 0,
+          pageSize: Math.max(shuffleHistorySize, 100),
+        });
+        const filteredResults = result.data
+          .filter((candidate) => {
+            const matchesAlbumFilter = filter
+              ? candidate.path.startsWith(`../albums/${filter}/`)
+              : true;
+            const isRecent = recentPhotoPathsRef.current.includes(
+              candidate.path,
+            );
+            return matchesAlbumFilter && !isRecent;
+          })
+          .map((candidate) => ({
+            path: candidate.path,
+            exif: candidate.exif,
+            geocode: candidate.geocode,
+          }));
 
-      const nextQueue = shufflePhotos(
-        filteredResults,
-        similarQueueLastPathRef.current,
-      );
+        const nextQueue = shufflePhotos(
+          filteredResults,
+          similarQueueLastPathRef.current,
+        );
 
-      similarSeedPathRef.current = seedPath;
-      similarQueueRef.current = nextQueue;
-      similarQueueIndexRef.current = -1;
-      return nextQueue;
-    };
+        similarSeedPathRef.current = seedPath;
+        similarQueueRef.current = nextQueue;
+        similarQueueIndexRef.current = -1;
+        return nextQueue;
+      };
 
-    let queue = similarQueueRef.current;
-    let nextIndex = similarQueueIndexRef.current + 1;
+      let queue = similarQueueRef.current;
+      let nextIndex = similarQueueIndexRef.current + 1;
 
-    if (similarSeedPathRef.current !== activePhoto.path || nextIndex >= queue.length) {
-      queue = await refillSimilarQueue(activePhoto.path);
-      nextIndex = 0;
-    }
+      if (
+        similarSeedPathRef.current !== activePhoto.path ||
+        nextIndex >= queue.length
+      ) {
+        queue = await refillSimilarQueue(activePhoto.path);
+        nextIndex = 0;
+      }
 
-    const nextPhoto = queue[nextIndex] ?? null;
-    if (!nextPhoto) {
-      resetSimilarQueue();
-      return advanceRandomPhoto({ trackRecent: true });
-    }
+      const nextPhoto = queue[nextIndex] ?? null;
+      if (!nextPhoto) {
+        resetSimilarQueue();
+        return advanceRandomPhoto({ trackRecent: true });
+      }
 
-    similarQueueIndexRef.current = nextIndex;
-    similarQueueLastPathRef.current = nextPhoto.path;
-    commitNextPhoto(nextPhoto, { trackRecent: true });
-    return nextPhoto;
-  }, [
-    advanceRandomPhoto,
-    commitNextPhoto,
-    database,
-    embeddingsDatabase,
-    filter,
-    resetSimilarQueue,
-    shuffleHistorySize,
-  ]);
+      similarQueueIndexRef.current = nextIndex;
+      similarQueueLastPathRef.current = nextPhoto.path;
+      commitNextPhoto(nextPhoto, { trackRecent: true });
+      return nextPhoto;
+    }, [
+      advanceRandomPhoto,
+      commitNextPhoto,
+      database,
+      embeddingsDatabase,
+      filter,
+      resetSimilarQueue,
+      shuffleHistorySize,
+    ]);
 
   const goNext = useCallback(() => {
     if (!database || (slideshowMode === "similar" && !embeddingsDatabase)) {
@@ -762,12 +809,38 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
     setDetailsAlignment(next);
   };
 
+  const togglePaused = useCallback(() => {
+    setIsPaused((prev) => !prev);
+  }, []);
+
   useEffect(() => {
-    if (isPaused) return;
-    goNext();
-    const id = setInterval(goNext, timeDelay);
-    return () => clearInterval(id);
-  }, [database, timeDelay, nextCounter, goNext, isPaused]);
+    if (isPaused || !currentPhotoPathRef.current) {
+      return;
+    }
+
+    const delayUntilNext = Math.max(0, nextChangeAt.getTime() - Date.now());
+    const id = window.setTimeout(() => {
+      goNext();
+    }, delayUntilNext);
+
+    return () => window.clearTimeout(id);
+  }, [goNext, isPaused, nextChangeAt, nextCounter]);
+
+  useEffect(() => {
+    if (isPaused) {
+      const remaining = Math.max(0, nextChangeAt.getTime() - Date.now());
+      pausedRemainingMsRef.current = remaining;
+      setSecondsLeft(remaining / 1000);
+      return;
+    }
+
+    if (pausedRemainingMsRef.current !== null) {
+      const remaining = pausedRemainingMsRef.current;
+      pausedRemainingMsRef.current = null;
+      setNextChangeAt(new Date(Date.now() + remaining));
+      setSecondsLeft(remaining / 1000);
+    }
+  }, [isPaused, nextChangeAt]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -780,9 +853,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
           setImageLoaded(false);
           goPrevious();
         },
-        togglePaused: () => {
-          setIsPaused((prev) => !prev);
-        },
+        togglePaused,
         exit: () => {
           navigateTo("/");
         },
@@ -790,15 +861,235 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [goPrevious]);
+  }, [goPrevious, togglePaused]);
 
   useEffect(() => {
     const id = setInterval(() => {
-      setSecondsLeft((nextChangeAt.getTime() - Date.now()) / 1000);
+      const pausedRemaining = pausedRemainingMsRef.current;
+      setSecondsLeft(
+        pausedRemaining !== null
+          ? pausedRemaining / 1000
+          : (nextChangeAt.getTime() - Date.now()) / 1000,
+      );
       setTime(new Date());
     }, 1000);
     return () => clearInterval(id);
   }, [nextChangeAt]);
+
+  useEffect(() => {
+    const coarsePointerQuery = window.matchMedia(
+      "(hover: none), (pointer: coarse)",
+    );
+    const syncCoarsePointer = () => {
+      setIsCoarsePointer(coarsePointerQuery.matches);
+    };
+
+    syncCoarsePointer();
+    coarsePointerQuery.addEventListener("change", syncCoarsePointer);
+    return () => {
+      coarsePointerQuery.removeEventListener("change", syncCoarsePointer);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (isCoarsePointer) {
+      controlsHideDeadlineRef.current = null;
+      setControlsHideProgress(1);
+      return;
+    }
+
+    if (!controlsVisible) {
+      controlsHideDeadlineRef.current = null;
+      setControlsHideProgress(0);
+      return;
+    }
+
+    if (isPointerOverToolbar) {
+      controlsHideDeadlineRef.current = null;
+      setControlsHideProgress(1);
+      return;
+    }
+
+    const deadline = Date.now() + CONTROLS_AUTO_HIDE_MS;
+    controlsHideDeadlineRef.current = deadline;
+    setControlsHideProgress(1);
+
+    let frameId = 0;
+
+    const tick = () => {
+      const currentDeadline = controlsHideDeadlineRef.current;
+      if (!currentDeadline) {
+        setControlsHideProgress(0);
+        return;
+      }
+
+      const remaining = Math.max(0, currentDeadline - Date.now());
+      const progress = remaining / CONTROLS_AUTO_HIDE_MS;
+      setControlsHideProgress(progress);
+
+      if (remaining <= 0) {
+        controlsHideDeadlineRef.current = null;
+        setControlsVisible(false);
+        return;
+      }
+      frameId = window.requestAnimationFrame(tick);
+    };
+
+    frameId = window.requestAnimationFrame(tick);
+
+    return () => window.cancelAnimationFrame(frameId);
+  }, [controlsVisible, isCoarsePointer, isPointerOverToolbar]);
+
+  useEffect(() => {
+    const fullscreenDocument = document as FullscreenDocument;
+    const fullscreenRoot = document.documentElement as FullscreenElement;
+    setIsFullscreenSupported(
+      typeof fullscreenRoot.requestFullscreen === "function" ||
+        typeof fullscreenRoot.webkitRequestFullscreen === "function",
+    );
+
+    const syncFullscreenState = () => {
+      setIsFullscreenActive(
+        Boolean(
+          document.fullscreenElement ??
+          fullscreenDocument.webkitFullscreenElement,
+        ),
+      );
+    };
+
+    syncFullscreenState();
+    document.addEventListener("fullscreenchange", syncFullscreenState);
+    document.addEventListener("webkitfullscreenchange", syncFullscreenState);
+
+    return () => {
+      document.removeEventListener("fullscreenchange", syncFullscreenState);
+      document.removeEventListener(
+        "webkitfullscreenchange",
+        syncFullscreenState,
+      );
+    };
+  }, []);
+
+  const handleFullscreenToggle = useCallback(async () => {
+    const fullscreenDocument = document as FullscreenDocument;
+    const fullscreenRoot = document.documentElement as FullscreenElement;
+
+    try {
+      if (
+        document.fullscreenElement ||
+        fullscreenDocument.webkitFullscreenElement
+      ) {
+        if (typeof document.exitFullscreen === "function") {
+          await document.exitFullscreen();
+          return;
+        }
+        if (typeof fullscreenDocument.webkitExitFullscreen === "function") {
+          await fullscreenDocument.webkitExitFullscreen();
+          return;
+        }
+      }
+
+      if (typeof fullscreenRoot.requestFullscreen === "function") {
+        await fullscreenRoot.requestFullscreen();
+        return;
+      }
+
+      if (typeof fullscreenRoot.webkitRequestFullscreen === "function") {
+        await fullscreenRoot.webkitRequestFullscreen();
+        return;
+      }
+
+      setSlideshowError(
+        "Fullscreen is not available on this browser. Use the browser's own full-screen controls on iPad.",
+      );
+    } catch (error) {
+      console.error(error);
+      setSlideshowError(
+        "Couldn't enter fullscreen on this device. Safari on iPad can be limited here.",
+      );
+    }
+  }, []);
+
+  const handleImagePointerDown = useCallback(
+    (event: React.PointerEvent<HTMLImageElement>) => {
+      if (event.pointerType === "mouse" && event.button !== 0) {
+        return;
+      }
+
+      event.currentTarget.setPointerCapture(event.pointerId);
+      pointerGestureRef.current = {
+        pointerId: event.pointerId,
+        pointerType: event.pointerType,
+        startX: event.clientX,
+        startY: event.clientY,
+      };
+    },
+    [],
+  );
+
+  const clearImagePointerGesture = useCallback(
+    (event?: React.PointerEvent<HTMLImageElement>) => {
+      if (event && event.currentTarget.hasPointerCapture(event.pointerId)) {
+        event.currentTarget.releasePointerCapture(event.pointerId);
+      }
+
+      pointerGestureRef.current = null;
+    },
+    [],
+  );
+
+  const handleImagePointerUp = useCallback(
+    (event: React.PointerEvent<HTMLImageElement>) => {
+      const gesture = pointerGestureRef.current;
+      clearImagePointerGesture(event);
+
+      if (!gesture || gesture.pointerId !== event.pointerId) {
+        return;
+      }
+
+      const deltaX = event.clientX - gesture.startX;
+      const deltaY = event.clientY - gesture.startY;
+      const horizontalDistance = Math.abs(deltaX);
+      const verticalDistance = Math.abs(deltaY);
+
+      if (horizontalDistance >= 48 && horizontalDistance > verticalDistance) {
+        suppressImageClickRef.current = true;
+        setImageLoaded(false);
+
+        if (deltaX < 0) {
+          setNextCounter((prev) => prev + 1);
+          return;
+        }
+
+        goPrevious();
+        return;
+      }
+
+      if (verticalDistance >= 48 && verticalDistance > horizontalDistance) {
+        suppressImageClickRef.current = true;
+        setControlsVisible(deltaY > 0);
+        return;
+      }
+
+      if (
+        (gesture.pointerType === "touch" || gesture.pointerType === "pen") &&
+        horizontalDistance < 12 &&
+        verticalDistance < 12
+      ) {
+        suppressImageClickRef.current = true;
+        togglePaused();
+      }
+    },
+    [clearImagePointerGesture, goPrevious, togglePaused],
+  );
+
+  const showControlsForDesktop = useCallback(() => {
+    if (isCoarsePointer) {
+      return;
+    }
+
+    setControlsVisible(true);
+  }, [isCoarsePointer]);
 
   if (currentPhotoPath === null) {
     return (
@@ -942,8 +1233,39 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
         })}
       />
 
-      <div className={styles.container} data-paused={String(isPaused)}>
-        <div className={[styles.toolbar, commonStyles.topBar].join(" ")}>
+      <div
+        className={styles.container}
+        data-controls-visible={String(controlsVisible)}
+        data-paused={String(isPaused)}
+      >
+        {!isCoarsePointer ? (
+          <>
+            <div
+              className={styles.toolbarTrigger}
+              aria-hidden="true"
+              onMouseEnter={showControlsForDesktop}
+              onMouseMove={showControlsForDesktop}
+            />
+            {!controlsVisible ? (
+              <div className={styles.toolbarHint} aria-hidden="true">
+                Move cursor to top edge for controls
+              </div>
+            ) : null}
+          </>
+        ) : null}
+        <div
+          className={[styles.toolbar, commonStyles.topBar].join(" ")}
+          onFocusCapture={showControlsForDesktop}
+          onBlur={() => {
+            setIsPointerOverToolbar(false);
+          }}
+          onMouseEnter={() => {
+            setIsPointerOverToolbar(true);
+          }}
+          onMouseLeave={() => {
+            setIsPointerOverToolbar(false);
+          }}
+        >
           {/* <ThemeToggle /> */}
 
           <Link className={styles.brandLink} href="/">
@@ -956,14 +1278,20 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
             </span>
           </Link>
 
-          <div className={styles.playbackGroup} role="group" aria-label="Playback mode">
+          <div
+            className={styles.playbackGroup}
+            role="group"
+            aria-label="Playback mode"
+          >
             <div className={styles.playbackHeader}>
               <span className={styles.playbackLogo} aria-hidden="true">
                 ⟲
               </span>
               <span className={styles.playbackCopy}>
                 <span className={styles.playbackTitle}>Playback</span>
-                <span className={styles.playbackSubtitle}>{playbackSubtitle}</span>
+                <span className={styles.playbackSubtitle}>
+                  {playbackSubtitle}
+                </span>
               </span>
             </div>
 
@@ -1020,6 +1348,17 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
               </button>
 
               <button
+                className={[
+                  isPaused ? commonStyles.active : "",
+                  commonStyles.button,
+                ].join(" ")}
+                aria-pressed={isPaused}
+                onClick={togglePaused}
+              >
+                {isPaused ? "▶ Resume" : "⏸ Pause"}
+              </button>
+
+              <button
                 className={commonStyles.button}
                 disabled={!canGoPrevious}
                 aria-disabled={!canGoPrevious}
@@ -1040,17 +1379,50 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
               >
                 Next
               </button>
+
+              <button
+                className={commonStyles.button}
+                aria-label="Hide controls"
+                onClick={() => {
+                  controlsHideDeadlineRef.current = null;
+                  setControlsVisible(false);
+                }}
+              >
+                Hide
+              </button>
+
+              {!isCoarsePointer ? (
+                <div
+                  className={styles.hideProgress}
+                  aria-hidden="true"
+                  style={
+                    {
+                      "--hide-progress": String(
+                        Math.max(0, Math.min(1, controlsHideProgress)),
+                      ),
+                    } as React.CSSProperties
+                  }
+                >
+                  <div className={styles.hideProgressRing} />
+                </div>
+              ) : null}
             </div>
           </div>
 
-          <div className={styles.controlGroup} role="group" aria-label="Display controls">
+          <div
+            className={styles.controlGroup}
+            role="group"
+            aria-label="Display controls"
+          >
             <div className={styles.controlHeader}>
               <span className={styles.controlLogo} aria-hidden="true">
                 ✦
               </span>
               <span className={styles.controlCopy}>
                 <span className={styles.controlTitle}>Display</span>
-                <span className={styles.controlSubtitle}>Overlays and placement</span>
+                <span className={styles.controlSubtitle}>
+                  Overlays and placement
+                </span>
               </span>
             </div>
 
@@ -1102,14 +1474,20 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
             </div>
           </div>
 
-          <div className={styles.controlGroup} role="group" aria-label="View controls">
+          <div
+            className={styles.controlGroup}
+            role="group"
+            aria-label="View controls"
+          >
             <div className={styles.controlHeader}>
               <span className={styles.controlLogo} aria-hidden="true">
                 ⛶
               </span>
               <span className={styles.controlCopy}>
                 <span className={styles.controlTitle}>View</span>
-                <span className={styles.controlSubtitle}>Frame and screen mode</span>
+                <span className={styles.controlSubtitle}>
+                  Frame and screen mode
+                </span>
               </span>
             </div>
 
@@ -1127,20 +1505,22 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
 
               <button
                 className={commonStyles.button}
+                disabled={!isFullscreenSupported}
+                aria-disabled={!isFullscreenSupported}
                 onClick={() => {
-                  if (document.fullscreenElement) {
-                    document.exitFullscreen();
-                  } else {
-                    document.documentElement.requestFullscreen();
-                  }
+                  handleFullscreenToggle().catch(console.error);
                 }}
               >
-                ⇱ Fullscreen
+                {isFullscreenActive ? "⇲ Exit full" : "⇱ Fullscreen"}
               </button>
             </div>
           </div>
 
-          <div className={styles.controlGroup} role="group" aria-label="Timing controls">
+          <div
+            className={styles.controlGroup}
+            role="group"
+            aria-label="Timing controls"
+          >
             <div className={styles.controlHeader}>
               <span className={styles.controlLogo} aria-hidden="true">
                 ⏱
@@ -1152,45 +1532,53 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
             </div>
 
             <div className={styles.controlButtons}>
-              {[10000, 60000, 900000, 3600000, 10800000, 43200000, 86400000].map(
-                (delay) => {
-                  const delayMin = delay / 1000 / 60;
-                  const delaySec = delay / 1000;
+              {[
+                10000, 60000, 900000, 3600000, 10800000, 43200000, 86400000,
+              ].map((delay) => {
+                const delayMin = delay / 1000 / 60;
+                const delaySec = delay / 1000;
 
-                  return (
-                    <button
-                      key={delay}
-                      className={[
-                        commonStyles.button,
-                        delay === timeDelay ? commonStyles.active : "",
-                      ].join(" ")}
-                      aria-pressed={delay === timeDelay}
-                      onClick={() => setTimeDelay(delay)}
-                    >
-                      {delayMin >= 60
-                        ? `${delayMin / 60}h`
-                        : delayMin < 1
-                          ? `${delaySec}s`
-                          : `${delayMin}m`}
-                    </button>
-                  );
-                },
-              )}
+                return (
+                  <button
+                    key={delay}
+                    className={[
+                      commonStyles.button,
+                      delay === timeDelay ? commonStyles.active : "",
+                    ].join(" ")}
+                    aria-pressed={delay === timeDelay}
+                    onClick={() => setTimeDelay(delay)}
+                  >
+                    {delayMin >= 60
+                      ? `${delayMin / 60}h`
+                      : delayMin < 1
+                        ? `${delaySec}s`
+                        : `${delayMin}m`}
+                  </button>
+                );
+              })}
             </div>
 
             <div className={styles.controlMeta}>
-              <div className={commonStyles.toast}>🔁 {secondsLeft.toFixed(0)}s</div>
+              <div className={commonStyles.toast}>
+                🔁 {secondsLeft.toFixed(0)}s
+              </div>
             </div>
           </div>
 
-          <div className={styles.controlGroup} role="group" aria-label="Current photo context">
+          <div
+            className={styles.controlGroup}
+            role="group"
+            aria-label="Current photo context"
+          >
             <div className={styles.controlHeader}>
               <span className={styles.controlLogo} aria-hidden="true">
                 📎
               </span>
               <span className={styles.controlCopy}>
                 <span className={styles.controlTitle}>Context</span>
-                <span className={styles.controlSubtitle}>Album and filter links</span>
+                <span className={styles.controlSubtitle}>
+                  Album and filter links
+                </span>
               </span>
             </div>
 
@@ -1208,8 +1596,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
                 href={`/album/${albumName}#${photoName}`}
                 className={commonStyles.toast}
               >
-                {playbackContextLabel} in{" "}
-                <i>{albumName}</i>
+                {playbackContextLabel} in <i>{albumName}</i>
               </Link>
 
               <Link
@@ -1271,7 +1658,14 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
               setNextCounter((prev) => prev + 1);
             }, 1000);
           }}
+          onPointerDown={handleImagePointerDown}
+          onPointerCancel={clearImagePointerGesture}
+          onPointerUp={handleImagePointerUp}
           onClick={() => {
+            if (suppressImageClickRef.current) {
+              suppressImageClickRef.current = false;
+              return;
+            }
             setImageLoaded(false);
             setNextCounter((prev) => prev + 1);
           }}

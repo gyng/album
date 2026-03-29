@@ -6,6 +6,10 @@
   filter: grayscale(0) opacity(1);
   transition: all 0.2s ease-out;
   z-index: 100;
+  touch-action: manipulation;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
 }
 
 .image.cover {
@@ -14,16 +18,24 @@
 
 .container {
   position: fixed;
+  inset: 0;
   width: 100vw;
+  width: 100dvw;
   height: 100vh;
+  height: 100dvh;
+  min-height: 100svh;
   background-color: black;
   display: flex;
   justify-content: center;
+  overflow: clip;
 }
 
 .progressBarContainer {
   width: 100vw;
+  width: 100dvw;
   height: 100vh;
+  height: 100dvh;
+  min-height: 100svh;
   position: fixed;
   display: grid;
   place-items: center;
@@ -33,17 +45,69 @@
   position: fixed;
   top: 0;
   left: 0;
-  padding: calc(var(--m-l) + var(--m-m)) 20vw 20vh var(--m-xl) !important;
+  padding: calc(env(safe-area-inset-top, 0px) + var(--m-l))
+    clamp(var(--m-l), 4vw, var(--m-xl))
+    calc(env(safe-area-inset-bottom, 0px) + var(--m-l))
+    calc(env(safe-area-inset-left, 0px) + clamp(var(--m-l), 4vw, var(--m-xl))) !important;
   width: 100%;
+  max-height: 100dvh;
   opacity: 0;
-  animation: fade 3s forwards ease-out;
-  transition: all 0.2s ease-out;
+  transform: translateY(-1rem) scale(0.985);
+  transform-origin: top center;
+  transition:
+    opacity 0.28s ease-out,
+    transform 0.32s cubic-bezier(0.22, 1, 0.36, 1),
+    background-color 0.22s ease-out,
+    box-shadow 0.22s ease-out;
   background-color: transparent;
   z-index: 10000;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  will-change: opacity, transform;
 }
 
-.toolbar:hover {
-  opacity: 1 !important;
+.toolbarTrigger {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: clamp(5rem, 18vh, 10rem);
+  z-index: 9999;
+}
+
+.container[data-controls-visible="true"] .toolbarTrigger {
+  pointer-events: none;
+}
+
+.toolbarHint {
+  position: fixed;
+  top: calc(env(safe-area-inset-top, 0px) + var(--m-m));
+  left: 50%;
+  transform: translateX(-50%);
+  padding: calc(var(--m-s) * 0.75) var(--m-l);
+  border-radius: 999px;
+  background: hsl(0 0% 0% / 0.5);
+  color: hsl(0 0% 100% / 0.82);
+  font-size: var(--fs-s);
+  letter-spacing: 0.03em;
+  backdrop-filter: blur(10px);
+  box-shadow:
+    0 8px 22px hsl(0 0% 0% / 0.18),
+    inset 0 1px 0 hsl(0 0% 100% / 0.08);
+  pointer-events: none;
+  z-index: 9998;
+  animation: toolbarHintLifecycle 2.2s ease-out forwards;
+}
+
+.container[data-controls-visible="true"] .toolbar {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+.container[data-controls-visible="false"] .toolbar {
+  opacity: 0;
+  transform: translateY(-1.5rem) scale(0.975);
+  pointer-events: none;
 }
 
 .brandLink {
@@ -53,8 +117,11 @@
   padding: var(--m-m) var(--m-l);
   border-radius: calc(var(--m-s) * 1.5);
   text-decoration: none;
-  background:
-    linear-gradient(135deg, hsl(210 40% 14% / 0.9), hsl(26 65% 22% / 0.88));
+  background: linear-gradient(
+    135deg,
+    hsl(210 40% 14% / 0.9),
+    hsl(26 65% 22% / 0.88)
+  );
   color: white;
   box-shadow:
     0 12px 30px hsl(0 0% 0% / 0.25),
@@ -208,15 +275,85 @@
   gap: var(--m-s);
 }
 
-@media (max-width: 768px) {
+.playbackButtons :global(button),
+.controlButtons :global(button),
+.controlMeta :global(a),
+.controlMeta :global(div) {
+  min-height: 44px;
+}
+
+.hideProgress {
+  display: inline-grid;
+  place-items: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  margin-left: calc(var(--m-s) * 0.5);
+  opacity: 0.46;
+  transform: translateY(0.02rem);
+}
+
+.hideProgressRing {
+  width: 100%;
+  height: 100%;
+  border-radius: 999px;
+  background:
+    radial-gradient(
+      circle closest-side,
+      transparent 74%,
+      hsl(0 0% 100% / 0.1) 75% 100%
+    ),
+    conic-gradient(
+      hsl(0 0% 100% / 0.5) calc(var(--hide-progress, 1) * 1turn),
+      hsl(0 0% 100% / 0.08) 0
+    );
+  box-shadow:
+    inset 0 0 0 1px hsl(0 0% 100% / 0.05),
+    0 0 0 1px hsl(0 0% 0% / 0.08);
+  filter: saturate(0.8);
+}
+
+@media (hover: none), (pointer: coarse) {
+  .toolbarTrigger {
+    display: none;
+  }
+
+  .toolbarHint {
+    display: none;
+  }
+
   .toolbar {
-    padding: var(--m-l) var(--m-l) 20vh var(--m-l) !important;
+    pointer-events: auto;
+  }
+
+  .container[data-controls-visible="false"] .toolbar {
+    opacity: 0;
+    transform: translateY(-1.5rem) scale(0.975);
+    pointer-events: none;
+  }
+
+  .container[data-controls-visible="true"] .toolbar {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    background: linear-gradient(
+      180deg,
+      hsl(0 0% 0% / 0.68),
+      hsl(0 0% 0% / 0.34) 38%,
+      transparent 72%
+    );
+  }
+}
+
+@media (max-width: 1024px) {
+  .toolbar {
+    padding: calc(env(safe-area-inset-top, 0px) + var(--m-l)) var(--m-l)
+      calc(env(safe-area-inset-bottom, 0px) + var(--m-l))
+      calc(env(safe-area-inset-left, 0px) + var(--m-l)) !important;
   }
 
   .brandLink,
   .playbackGroup,
   .controlGroup {
-    width: min(100%, 28rem);
+    width: min(100%, 42rem);
   }
 
   .playbackGroup,
@@ -238,7 +375,7 @@
   position: fixed;
   user-select: none;
   pointer-events: none;
-  bottom: 5vh;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 5vh);
   text-shadow:
     1px 2px 2px hsl(0 0% 0% / 0.333),
     2px 4px 4px hsl(0 0% 0% / 0.333),
@@ -253,7 +390,7 @@
 }
 
 .alignLeft {
-  left: 5vw !important;
+  left: calc(env(safe-area-inset-left, 0px) + 5vw) !important;
   transform: none !important;
   text-align: center; /* Keep text centered within the container */
 }
@@ -265,19 +402,19 @@
 }
 
 .alignRight {
-  right: 5vw !important;
+  right: calc(env(safe-area-inset-right, 0px) + 5vw) !important;
   left: auto !important;
   transform: none !important;
   text-align: center; /* Keep text centered within the container */
 }
 
-@media (max-width: 768px) {
+@media (max-width: 1024px) {
   .alignLeft {
-    left: 2vw !important;
+    left: calc(env(safe-area-inset-left, 0px) + 2vw) !important;
   }
 
   .alignRight {
-    right: 2vw !important;
+    right: calc(env(safe-area-inset-right, 0px) + 2vw) !important;
     left: auto !important;
   }
 }
@@ -305,14 +442,25 @@
 .detailsRow {
   margin: var(--m-s) 0;
   font-size: var(--fs-s);
+  max-width: min(80vw, 28rem);
 }
 
-@keyframes fade {
+@keyframes toolbarHintLifecycle {
   0% {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-0.35rem);
+  }
+  14% {
     opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+  72% {
+    opacity: 0.92;
+    transform: translateX(-50%) translateY(0);
   }
   100% {
     opacity: 0;
+    transform: translateX(-50%) translateY(-0.2rem);
   }
 }
 
