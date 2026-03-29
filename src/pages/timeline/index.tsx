@@ -17,6 +17,7 @@ import {
   formatMemoryDateRange,
   getMemoryClusters,
 } from "../../util/clusterByDate";
+import heatmapStyles from "../../components/CalendarHeatmap.module.css";
 import styles from "./timeline.module.css";
 
 const MAX_TIMELINE_MEMORY_CLUSTERS = 2;
@@ -46,6 +47,43 @@ const getClusterAlbumLabel = (albums: string[]) => {
   return uniqueAlbums.length === 1 ? uniqueAlbums[0] : null;
 };
 
+const clamp = (value: number, min: number, max: number) => {
+  return Math.min(Math.max(value, min), max);
+};
+
+type ConnectorCurve = {
+  startX: number;
+  startY: number;
+  control1X: number;
+  control1Y: number;
+  control2X: number;
+  control2Y: number;
+  endX: number;
+  endY: number;
+};
+
+const toConnectorPath = (curve: ConnectorCurve) => {
+  return [
+    `M ${curve.startX} ${curve.startY}`,
+    `C ${curve.control1X} ${curve.control1Y} ${curve.control2X} ${curve.control2Y} ${curve.endX} ${curve.endY}`,
+  ].join(" ");
+};
+
+const interpolateCurve = (
+  from: ConnectorCurve,
+  to: ConnectorCurve,
+  progress: number,
+): ConnectorCurve => ({
+  startX: to.startX,
+  startY: to.startY,
+  control1X: from.control1X + (to.control1X - from.control1X) * progress,
+  control1Y: from.control1Y + (to.control1Y - from.control1Y) * progress,
+  control2X: from.control2X + (to.control2X - from.control2X) * progress,
+  control2Y: from.control2Y + (to.control2Y - from.control2Y) * progress,
+  endX: to.endX,
+  endY: to.endY,
+});
+
 const TimelinePage: NextPage<PageProps> = ({ entries }) => {
   const router = useRouter();
   const filterAlbum =
@@ -68,21 +106,25 @@ const TimelinePage: NextPage<PageProps> = ({ entries }) => {
   }, [filteredEntries]);
 
   // Default to latest date (first in sorted list), but allow URL param
-  const initialDateFromUrl = typeof router.query.date === "string" ? router.query.date : null;
+  const initialDateFromUrl =
+    typeof router.query.date === "string" ? router.query.date : null;
   const [selectedDate, setSelectedDate] = React.useState<string | null>(
     initialDateFromUrl && availableDates.includes(initialDateFromUrl)
       ? initialDateFromUrl
-      : availableDates[0] ?? null
+      : (availableDates[0] ?? null),
   );
   const [todayDate, setTodayDate] = React.useState<string | null>(null);
-  const [hoveredMemoryDates, setHoveredMemoryDates] = React.useState<string[]>(
-    [],
-  );
-  const [hoveredMemoryYears, setHoveredMemoryYears] = React.useState<number[]>(
-    [],
-  );
-  const [memoryScrollTargetDate, setMemoryScrollTargetDate] =
-    React.useState<string | null>(null);
+  const [memoryScrollTargetDate, setMemoryScrollTargetDate] = React.useState<
+    string | null
+  >(null);
+  const layoutRef = React.useRef<HTMLDivElement | null>(null);
+  const heatmapPanelRef = React.useRef<HTMLElement | null>(null);
+  const dayHeadingRef = React.useRef<HTMLHeadingElement | null>(null);
+  const selectedConnectorSvgRef = React.useRef<SVGSVGElement | null>(null);
+  const selectedConnectorPathRef = React.useRef<SVGPathElement | null>(null);
+  const selectedConnectorCurveRef = React.useRef<ConnectorCurve | null>(null);
+  const selectedConnectorAnimationRef = React.useRef<number | null>(null);
+  const highlightedHeatmapElementsRef = React.useRef<HTMLElement[]>([]);
 
   const selectableDates = React.useMemo(() => {
     return todayDate
@@ -112,15 +154,225 @@ const TimelinePage: NextPage<PageProps> = ({ entries }) => {
     return memories.slice(0, visibleMemoryClusterCount);
   }, [memories, visibleMemoryClusterCount]);
 
-  const applyMemoryHighlight = React.useCallback((cluster: (typeof memories)[number]) => {
-    setHoveredMemoryDates(Array.from(new Set(cluster.items.map((entry) => entry.date))));
-    setHoveredMemoryYears([cluster.year]);
-  }, []);
+  const applyMemoryHighlight = React.useCallback(
+    (cluster: (typeof memories)[number]) => {
+      const heatmapPanel = heatmapPanelRef.current;
+      if (!heatmapPanel) {
+        return;
+      }
+
+      highlightedHeatmapElementsRef.current.forEach((element) => {
+        element.classList.remove(heatmapStyles.memoryHighlighted);
+        element.classList.remove(heatmapStyles.highlightedYearHeading);
+      });
+
+      const nextElements: HTMLElement[] = [];
+      const uniqueDates = Array.from(
+        new Set(cluster.items.map((entry) => entry.date)),
+      );
+      uniqueDates.forEach((date) => {
+        const element = heatmapPanel.querySelector<HTMLElement>(
+          `[data-date="${date}"]`,
+        );
+        if (element) {
+          element.classList.add(heatmapStyles.memoryHighlighted);
+          nextElements.push(element);
+        }
+      });
+
+      const yearHeading = heatmapPanel.querySelector<HTMLElement>(
+        `[data-year-heading="${cluster.year}"]`,
+      );
+      if (yearHeading) {
+        yearHeading.classList.add(heatmapStyles.highlightedYearHeading);
+        nextElements.push(yearHeading);
+      }
+
+      highlightedHeatmapElementsRef.current = nextElements;
+    },
+    [],
+  );
 
   const clearMemoryHighlight = React.useCallback(() => {
-    setHoveredMemoryDates([]);
-    setHoveredMemoryYears([]);
+    highlightedHeatmapElementsRef.current.forEach((element) => {
+      element.classList.remove(heatmapStyles.memoryHighlighted);
+      element.classList.remove(heatmapStyles.highlightedYearHeading);
+    });
+    highlightedHeatmapElementsRef.current = [];
   }, []);
+
+  const clearSelectedConnectorPath = React.useCallback(() => {
+    selectedConnectorCurveRef.current = null;
+    if (selectedConnectorAnimationRef.current != null) {
+      cancelAnimationFrame(selectedConnectorAnimationRef.current);
+      selectedConnectorAnimationRef.current = null;
+    }
+    if (selectedConnectorPathRef.current) {
+      selectedConnectorPathRef.current.setAttribute("d", "");
+    }
+  }, []);
+
+  const updateSelectedConnectorPath = React.useCallback(
+    (shouldAnimate = true) => {
+      if (
+        !selectedDate ||
+        typeof window === "undefined" ||
+        window.innerWidth < 960
+      ) {
+        clearSelectedConnectorPath();
+        return;
+      }
+
+      const layout = layoutRef.current;
+      const heading = dayHeadingRef.current;
+      const connectorSvg = selectedConnectorSvgRef.current;
+      const connectorPath = selectedConnectorPathRef.current;
+      if (!layout || !heading || !connectorSvg || !connectorPath) {
+        return;
+      }
+
+      const target = layout.querySelector<HTMLElement>(
+        `[data-date="${selectedDate}"]`,
+      );
+      if (!target) {
+        clearSelectedConnectorPath();
+        return;
+      }
+
+      const layoutRect = layout.getBoundingClientRect();
+      const headingRect = heading.getBoundingClientRect();
+      const targetRect = target.getBoundingClientRect();
+
+      connectorSvg.setAttribute(
+        "viewBox",
+        `0 0 ${layout.clientWidth} ${layout.clientHeight}`,
+      );
+
+      const startX = headingRect.left - layoutRect.left - 16;
+      const startY = headingRect.top + headingRect.height / 2 - layoutRect.top;
+      const endX = clamp(
+        targetRect.left + targetRect.width / 2 - layoutRect.left,
+        10,
+        layoutRect.width - 10,
+      );
+      const endY = clamp(
+        targetRect.top + targetRect.height / 2 - layoutRect.top,
+        10,
+        layoutRect.height - 10,
+      );
+      const controlOffset = Math.max(48, Math.abs(startX - endX) * 0.18);
+      const nextCurve: ConnectorCurve = {
+        startX,
+        startY,
+        control1X: startX - controlOffset,
+        control1Y: startY,
+        control2X: endX + controlOffset,
+        control2Y: endY,
+        endX,
+        endY,
+      };
+
+      const previousCurve = selectedConnectorCurveRef.current;
+      if (!previousCurve) {
+        selectedConnectorCurveRef.current = nextCurve;
+        connectorPath.setAttribute("d", toConnectorPath(nextCurve));
+        return;
+      }
+
+      const nextPath = toConnectorPath(nextCurve);
+      if (toConnectorPath(previousCurve) === nextPath) {
+        return;
+      }
+
+      if (!shouldAnimate) {
+        if (selectedConnectorAnimationRef.current != null) {
+          cancelAnimationFrame(selectedConnectorAnimationRef.current);
+          selectedConnectorAnimationRef.current = null;
+        }
+        selectedConnectorCurveRef.current = nextCurve;
+        connectorPath.setAttribute("d", nextPath);
+        return;
+      }
+
+      if (selectedConnectorAnimationRef.current != null) {
+        cancelAnimationFrame(selectedConnectorAnimationRef.current);
+        selectedConnectorAnimationRef.current = null;
+      }
+
+      const animationStart = performance.now();
+      const animationDuration = 120;
+      const startCurve = previousCurve;
+
+      const animateFrame = (now: number) => {
+        const elapsed = now - animationStart;
+        const linear = Math.min(elapsed / animationDuration, 1);
+        const eased = 1 - Math.pow(1 - linear, 3);
+        const currentCurve = interpolateCurve(startCurve, nextCurve, eased);
+
+        selectedConnectorCurveRef.current = currentCurve;
+        connectorPath.setAttribute("d", toConnectorPath(currentCurve));
+
+        if (linear < 1) {
+          selectedConnectorAnimationRef.current =
+            requestAnimationFrame(animateFrame);
+        } else {
+          selectedConnectorAnimationRef.current = null;
+          selectedConnectorCurveRef.current = nextCurve;
+          connectorPath.setAttribute("d", nextPath);
+        }
+      };
+
+      selectedConnectorAnimationRef.current =
+        requestAnimationFrame(animateFrame);
+    },
+    [clearSelectedConnectorPath, selectedDate],
+  );
+
+  React.useEffect(() => {
+    updateSelectedConnectorPath(true);
+
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    let frameId: number | null = null;
+    const handleResize = () => {
+      if (frameId != null) {
+        window.cancelAnimationFrame(frameId);
+      }
+
+      frameId = window.requestAnimationFrame(() => {
+        frameId = null;
+        updateSelectedConnectorPath(false);
+      });
+    };
+
+    const handleScroll = () => {
+      if (frameId != null) {
+        window.cancelAnimationFrame(frameId);
+      }
+
+      frameId = window.requestAnimationFrame(() => {
+        frameId = null;
+        updateSelectedConnectorPath(false);
+      });
+    };
+
+    window.addEventListener("resize", handleResize);
+    window.addEventListener("scroll", handleScroll, true);
+
+    return () => {
+      if (frameId != null) {
+        window.cancelAnimationFrame(frameId);
+      }
+      if (selectedConnectorAnimationRef.current != null) {
+        window.cancelAnimationFrame(selectedConnectorAnimationRef.current);
+        selectedConnectorAnimationRef.current = null;
+      }
+      window.removeEventListener("resize", handleResize);
+      window.removeEventListener("scroll", handleScroll, true);
+    };
+  }, [updateSelectedConnectorPath, filteredEntries, todayDate]);
 
   // If availableDates changes and selectedDate is null, default to latest
   React.useEffect(() => {
@@ -141,7 +393,10 @@ const TimelinePage: NextPage<PageProps> = ({ entries }) => {
   // When selectedDate changes, update the URL param (shallow push)
   React.useEffect(() => {
     if (!selectedDate) return;
-    const url = { pathname: router.pathname, query: { ...router.query, date: selectedDate } };
+    const url = {
+      pathname: router.pathname,
+      query: { ...router.query, date: selectedDate },
+    };
     if (router.query.date !== selectedDate) {
       router.replace(url, undefined, { shallow: true });
     }
@@ -150,12 +405,12 @@ const TimelinePage: NextPage<PageProps> = ({ entries }) => {
   React.useEffect(() => {
     if (
       selectedDate &&
-      (!availableDates.includes(selectedDate) || (todayDate && selectedDate > todayDate))
+      (!availableDates.includes(selectedDate) ||
+        (todayDate && selectedDate > todayDate))
     ) {
       setSelectedDate(null);
     }
   }, [availableDates, selectedDate, todayDate]);
-
 
   const handleSelectRandomDate = React.useCallback(() => {
     if (selectableDates.length === 0) {
@@ -245,16 +500,30 @@ const TimelinePage: NextPage<PageProps> = ({ entries }) => {
           </div>
         ) : (
           <>
-            <div className={styles.layout}>
+            <div className={styles.layout} ref={layoutRef}>
+              <svg
+                ref={selectedConnectorSvgRef}
+                className={styles.selectedConnector}
+                aria-hidden="true"
+                preserveAspectRatio="none"
+              >
+                <path
+                  ref={selectedConnectorPathRef}
+                  className={styles.selectedConnectorPath}
+                  d=""
+                />
+              </svg>
               <div className={styles.leftColumn}>
-                <section className={styles.heatmapPanel} aria-label="Timeline heatmap panel">
+                <section
+                  ref={heatmapPanelRef}
+                  className={styles.heatmapPanel}
+                  aria-label="Timeline heatmap panel"
+                >
                   <CalendarHeatmap
                     entries={filteredEntries}
                     selectedDate={selectedDate}
                     onSelectDate={setSelectedDate}
                     todayDate={todayDate ?? undefined}
-                    highlightedDates={hoveredMemoryDates}
-                    highlightedYears={hoveredMemoryYears}
                     scrollToDate={memoryScrollTargetDate}
                   />
                 </section>
@@ -277,15 +546,17 @@ const TimelinePage: NextPage<PageProps> = ({ entries }) => {
                         );
                         const meta = [
                           albumLabel,
-                          formatMemoryDateRange(cluster.startDate, cluster.endDate),
+                          formatMemoryDateRange(
+                            cluster.startDate,
+                            cluster.endDate,
+                          ),
                         ].filter(Boolean);
                         const swatches = Array.from(
                           new Set(
                             previewItems
                               .map((entry) => entry.placeholderColor)
                               .filter(
-                                (color) =>
-                                  color && color !== "transparent",
+                                (color) => color && color !== "transparent",
                               ),
                           ),
                         ).slice(0, 4);
@@ -306,7 +577,11 @@ const TimelinePage: NextPage<PageProps> = ({ entries }) => {
                             onMouseLeave={clearMemoryHighlight}
                             onFocusCapture={() => applyMemoryHighlight(cluster)}
                             onBlurCapture={(event) => {
-                              if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+                              if (
+                                !event.currentTarget.contains(
+                                  event.relatedTarget as Node | null,
+                                )
+                              ) {
                                 clearMemoryHighlight();
                               }
                             }}
@@ -322,9 +597,13 @@ const TimelinePage: NextPage<PageProps> = ({ entries }) => {
                                 aria-label={label}
                                 id={clusterId}
                               >
-                                <span className={styles.memoryClusterAge}>{ageLabel}</span>
+                                <span className={styles.memoryClusterAge}>
+                                  {ageLabel}
+                                </span>
                                 {metaLabel ? (
-                                  <span className={styles.memoryClusterLabel}>{metaLabel}</span>
+                                  <span className={styles.memoryClusterLabel}>
+                                    {metaLabel}
+                                  </span>
                                 ) : null}
                                 {swatches.length > 0 ? (
                                   <span
@@ -345,7 +624,10 @@ const TimelinePage: NextPage<PageProps> = ({ entries }) => {
 
                             <ul className={styles.memoryStrip}>
                               {previewItems.map((entry) => (
-                                <li key={entry.href} className={styles.memoryItem}>
+                                <li
+                                  key={entry.href}
+                                  className={styles.memoryItem}
+                                >
                                   <button
                                     type="button"
                                     className={styles.memoryButton}
@@ -359,7 +641,9 @@ const TimelinePage: NextPage<PageProps> = ({ entries }) => {
                                       src={entry.src.src}
                                       width={entry.placeholderWidth}
                                       height={entry.placeholderHeight}
-                                      style={{ backgroundColor: entry.placeholderColor }}
+                                      style={{
+                                        backgroundColor: entry.placeholderColor,
+                                      }}
                                       className={styles.memoryImage}
                                       alt=""
                                     />
@@ -393,6 +677,7 @@ const TimelinePage: NextPage<PageProps> = ({ entries }) => {
               </div>
               <div className={styles.dayPanel}>
                 <TimelineDayGrid
+                  dateHeadingRef={dayHeadingRef}
                   date={selectedDate}
                   entries={selectedEntries}
                   onSelectRandomDate={handleSelectRandomDate}
@@ -432,12 +717,8 @@ export const getStaticProps: GetStaticProps<PageProps> = async () => {
           const filename = photo.data.src.split("/").at(-1) ?? photo.id;
           const primaryColor = photo._build?.tags?.colors?.[0];
           const geocode = photo._build?.tags?.geocode ?? null;
-          const {
-            GPSLongitude,
-            GPSLatitude,
-            GPSLongitudeRef,
-            GPSLatitudeRef,
-          } = photo._build?.exif ?? {};
+          const { GPSLongitude, GPSLatitude, GPSLongitudeRef, GPSLatitudeRef } =
+            photo._build?.exif ?? {};
           const { decLng, decLat } =
             GPSLongitude && GPSLatitude && GPSLongitudeRef && GPSLatitudeRef
               ? getDegLatLngFromExif({

@@ -70,7 +70,9 @@ const getGeocodeSummary = (geocode?: string | null): string | null => {
     cleaned.at(-1),
   ].filter(Boolean) as string[];
 
-  return summaryParts.filter((part, index) => summaryParts.indexOf(part) === index).join(", ");
+  return summaryParts
+    .filter((part, index) => summaryParts.indexOf(part) === index)
+    .join(", ");
 };
 
 const toSimilarSearchPath = (path: string) => {
@@ -89,6 +91,7 @@ export const TimelineDayGrid = ({
   onSelectNewerDate,
   canGoOlder,
   canGoNewer,
+  dateHeadingRef,
 }: {
   date: string | null;
   entries: TimelineEntry[];
@@ -97,25 +100,42 @@ export const TimelineDayGrid = ({
   onSelectNewerDate?: () => void;
   canGoOlder?: boolean;
   canGoNewer?: boolean;
+  dateHeadingRef?: React.Ref<HTMLHeadingElement>;
 }) => {
   if (!date) {
     return (
       <section className={styles.emptyState} aria-label="No day selected">
         <h2 className={styles.heading}>Pick a day</h2>
-        <p className={styles.emptyCopy}>Choose a day from the heatmap, or jump to a random one.</p>
+        <p className={styles.emptyCopy}>
+          Choose a day from the heatmap, or jump to a random one.
+        </p>
         <div className={styles.dayNavButtons}>
           {onSelectOlderDate ? (
-            <button type="button" className={commonStyles.button} onClick={onSelectOlderDate} disabled>
+            <button
+              type="button"
+              className={commonStyles.button}
+              onClick={onSelectOlderDate}
+              disabled
+            >
               ← Older
             </button>
           ) : null}
           {onSelectRandomDate ? (
-            <button type="button" className={commonStyles.button} onClick={onSelectRandomDate}>
+            <button
+              type="button"
+              className={commonStyles.button}
+              onClick={onSelectRandomDate}
+            >
               🎲 Random
             </button>
           ) : null}
           {onSelectNewerDate ? (
-            <button type="button" className={commonStyles.button} onClick={onSelectNewerDate} disabled>
+            <button
+              type="button"
+              className={commonStyles.button}
+              onClick={onSelectNewerDate}
+              disabled
+            >
               Newer →
             </button>
           ) : null}
@@ -126,7 +146,9 @@ export const TimelineDayGrid = ({
 
   const formattedDate = formatLongDate(date);
   const locationSummary = Array.from(
-    new Set(entries.map((entry) => getGeocodeSummary(entry.geocode)).filter(Boolean)),
+    new Set(
+      entries.map((entry) => getGeocodeSummary(entry.geocode)).filter(Boolean),
+    ),
   ).join(" · ");
   const mappableEntries = entries.filter(
     (entry): entry is TimelineEntry & { decLat: number; decLng: number } =>
@@ -148,10 +170,17 @@ export const TimelineDayGrid = ({
   }));
 
   return (
-    <section className={styles.section} aria-label={`Photos from ${formattedDate}`}>
+    <section
+      className={styles.section}
+      aria-label={`Photos from ${formattedDate}`}
+    >
       <div className={styles.header}>
-        <h2 className={styles.heading}>{formattedDate}</h2>
-        <div className={styles.count}>{entries.length} photo{entries.length === 1 ? "" : "s"}</div>
+        <h2 ref={dateHeadingRef} className={styles.heading}>
+          {formattedDate}
+        </h2>
+        <div className={styles.count}>
+          {entries.length} photo{entries.length === 1 ? "" : "s"}
+        </div>
       </div>
 
       <div className={styles.dayNavButtons}>
@@ -167,7 +196,11 @@ export const TimelineDayGrid = ({
           </button>
         ) : null}
         {onSelectRandomDate ? (
-          <button type="button" className={commonStyles.button} onClick={onSelectRandomDate}>
+          <button
+            type="button"
+            className={commonStyles.button}
+            onClick={onSelectRandomDate}
+          >
             🎲 Random
           </button>
         ) : null}
@@ -231,7 +264,9 @@ export const TimelineDayGrid = ({
                     <span
                       suppressHydrationWarning
                       className={styles.secondaryMeta}
-                      title={formatDateTimeTitle(entry.dateTimeOriginal) ?? undefined}
+                      title={
+                        formatDateTimeTitle(entry.dateTimeOriginal) ?? undefined
+                      }
                     >
                       {formatRelativeDateTime(entry.dateTimeOriginal)}
                     </span>
@@ -244,7 +279,10 @@ export const TimelineDayGrid = ({
       </ul>
 
       {mapPhotos.length > 0 ? (
-        <section className={styles.mapSection} aria-label={`Map of photos from ${formattedDate}`}>
+        <section
+          className={styles.mapSection}
+          aria-label={`Map of photos from ${formattedDate}`}
+        >
           <div className={styles.mapHeader}>
             <h3 className={styles.mapHeading}>Map</h3>
             <div className={styles.mapCount}>

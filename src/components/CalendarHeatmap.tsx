@@ -6,8 +6,24 @@ import { TimelineEntry } from "./timelineTypes";
 import { rgbToString } from "../util/colorDistance";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
-const MONTH_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const MONTH_LABELS = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
+];
 const WEEKDAY_LABELS = ["S", "M", "T", "W", "T", "F", "S"];
+const EMPTY_HIGHLIGHTED_DATES: string[] = [];
+const EMPTY_HIGHLIGHTED_YEARS: number[] = [];
+const EMPTY_DATE_SET = new Set<string>();
 
 const formatShortDate = (date: string) =>
   new Date(`${date}T00:00:00Z`).toLocaleDateString(undefined, {
@@ -64,7 +80,11 @@ const getLevelClassName = (count: number) => {
 };
 
 // Convert RGB to HSL
-const rgbToHsl = (r: number, g: number, b: number): [number, number, number] => {
+const rgbToHsl = (
+  r: number,
+  g: number,
+  b: number,
+): [number, number, number] => {
   r /= 255;
   g /= 255;
   b /= 255;
@@ -96,7 +116,11 @@ const rgbToHsl = (r: number, g: number, b: number): [number, number, number] => 
 };
 
 // Convert HSL to RGB
-const hslToRgb = (h: number, s: number, l: number): [number, number, number] => {
+const hslToRgb = (
+  h: number,
+  s: number,
+  l: number,
+): [number, number, number] => {
   h /= 360;
 
   const hue2rgb = (p: number, q: number, t: number) => {
@@ -122,16 +146,25 @@ const hslToRgb = (h: number, s: number, l: number): [number, number, number] => 
 };
 
 // Calculate dominant color for a day and adjust saturation/value based on count
-const getDominantColorForDay = (entries: TimelineEntry[], count: number): string | null => {
+const getDominantColorForDay = (
+  entries: TimelineEntry[],
+  count: number,
+): string | null => {
   if (count === 0) return null;
 
   // Collect all RGB colors from entries
   const colors: [number, number, number][] = [];
   for (const entry of entries) {
     if (entry.placeholderColor && entry.placeholderColor !== "transparent") {
-      const match = entry.placeholderColor.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+      const match = entry.placeholderColor.match(
+        /rgba?\((\d+),\s*(\d+),\s*(\d+)/,
+      );
       if (match) {
-        colors.push([parseInt(match[1]), parseInt(match[2]), parseInt(match[3])]);
+        colors.push([
+          parseInt(match[1]),
+          parseInt(match[2]),
+          parseInt(match[3]),
+        ]);
       }
     }
   }
@@ -139,9 +172,15 @@ const getDominantColorForDay = (entries: TimelineEntry[], count: number): string
   if (colors.length === 0) return null;
 
   // Calculate average RGB (simple dominant color)
-  const avgR = Math.round(colors.reduce((sum, [r]) => sum + r, 0) / colors.length);
-  const avgG = Math.round(colors.reduce((sum, [, g]) => sum + g, 0) / colors.length);
-  const avgB = Math.round(colors.reduce((sum, [, , b]) => sum + b, 0) / colors.length);
+  const avgR = Math.round(
+    colors.reduce((sum, [r]) => sum + r, 0) / colors.length,
+  );
+  const avgG = Math.round(
+    colors.reduce((sum, [, g]) => sum + g, 0) / colors.length,
+  );
+  const avgB = Math.round(
+    colors.reduce((sum, [, , b]) => sum + b, 0) / colors.length,
+  );
 
   // Convert to HSL
   const [h, s, l] = rgbToHsl(avgR, avgG, avgB);
@@ -181,7 +220,7 @@ const CalendarHeatmapYear = React.memo(
     entriesByDate,
     effectiveTodayDate,
     highlightedDates,
-    highlightedYears,
+    isHighlightedYear,
     onSelectDate,
     openPopup,
     closePopupSoon,
@@ -193,7 +232,7 @@ const CalendarHeatmapYear = React.memo(
     entriesByDate: Map<string, TimelineEntry[]>;
     effectiveTodayDate: string;
     highlightedDates: Set<string>;
-    highlightedYears: Set<number>;
+    isHighlightedYear: boolean;
     onSelectDate: (date: string) => void;
     openPopup: (date: string, target: EventTarget | null) => void;
     closePopupSoon: () => void;
@@ -205,9 +244,10 @@ const CalendarHeatmapYear = React.memo(
       <section className={styles.yearSection} aria-label={`${year} timeline`}>
         <div className={styles.yearHeaderRow}>
           <h2
+            data-year-heading={year}
             className={[
               styles.yearHeading,
-              highlightedYears.has(year) ? styles.highlightedYearHeading : "",
+              isHighlightedYear ? styles.highlightedYearHeading : "",
             ].join(" ")}
           >
             {year}
@@ -235,7 +275,10 @@ const CalendarHeatmapYear = React.memo(
           {showWeekdayLabels ? (
             <div className={styles.weekdays} aria-hidden="true">
               {WEEKDAY_LABELS.map((label, i) => (
-                <span key={`${year}-weekday-${i}`} className={styles.weekdayLabel}>
+                <span
+                  key={`${year}-weekday-${i}`}
+                  className={styles.weekdayLabel}
+                >
                   {label}
                 </span>
               ))}
@@ -260,7 +303,10 @@ const CalendarHeatmapYear = React.memo(
               // Gather up to 4 unique color swatches for the pips
               let colorSwatches: string[] = [];
               for (const entry of dateEntries) {
-                if (entry.placeholderColor && entry.placeholderColor !== "transparent") {
+                if (
+                  entry.placeholderColor &&
+                  entry.placeholderColor !== "transparent"
+                ) {
                   if (!colorSwatches.includes(entry.placeholderColor)) {
                     colorSwatches.push(entry.placeholderColor);
                   }
@@ -290,9 +336,15 @@ const CalendarHeatmapYear = React.memo(
                       isToday ? styles.today : "",
                       isSelected ? styles.selected : "",
                       isHighlighted ? styles.memoryHighlighted : "",
-                      !isInteractive ? styles.emptyCell : styles.interactiveCell,
+                      !isInteractive
+                        ? styles.emptyCell
+                        : styles.interactiveCell,
                     ].join(" ")}
-                    style={dominantColor && isInteractive ? { backgroundColor: dominantColor } : undefined}
+                    style={
+                      dominantColor && isInteractive
+                        ? { backgroundColor: dominantColor }
+                        : undefined
+                    }
                     aria-label={
                       isInteractive
                         ? `${formattedDate}: ${count} ${count === 1 ? "photo" : "photos"}`
@@ -301,8 +353,12 @@ const CalendarHeatmapYear = React.memo(
                     aria-current={isToday ? "date" : undefined}
                     aria-pressed={isSelected}
                     aria-disabled={!isInteractive}
-                    onClick={isInteractive ? () => onSelectDate(date) : undefined}
-                    onMouseEnter={(event) => openPopup(date, event.currentTarget)}
+                    onClick={
+                      isInteractive ? () => onSelectDate(date) : undefined
+                    }
+                    onMouseEnter={(event) =>
+                      openPopup(date, event.currentTarget)
+                    }
                     onMouseLeave={closePopupSoon}
                     onFocus={(event) => openPopup(date, event.currentTarget)}
                     onBlur={closePopupSoon}
@@ -339,8 +395,8 @@ export const CalendarHeatmap = ({
   selectedDate,
   onSelectDate,
   todayDate,
-  highlightedDates = [],
-  highlightedYears = [],
+  highlightedDates = EMPTY_HIGHLIGHTED_DATES,
+  highlightedYears = EMPTY_HIGHLIGHTED_YEARS,
   scrollToDate,
 }: {
   entries: TimelineEntry[];
@@ -368,7 +424,9 @@ export const CalendarHeatmap = ({
 
   const years = React.useMemo(() => {
     return Array.from(
-      new Set(entries.map((entry) => Number.parseInt(entry.date.slice(0, 4), 10))),
+      new Set(
+        entries.map((entry) => Number.parseInt(entry.date.slice(0, 4), 10)),
+      ),
     ).sort((left, right) => right - left);
   }, [entries]);
 
@@ -381,10 +439,21 @@ export const CalendarHeatmap = ({
     () => todayDate ?? getLocalDateKey(),
     [todayDate],
   );
-  const highlightedDateSet = React.useMemo(
-    () => new Set(highlightedDates),
-    [highlightedDates],
-  );
+  const highlightedDatesByYear = React.useMemo(() => {
+    const grouped = new Map<number, Set<string>>();
+
+    for (const date of highlightedDates) {
+      const year = Number.parseInt(date.slice(0, 4), 10);
+      const existing = grouped.get(year);
+      if (existing) {
+        existing.add(date);
+      } else {
+        grouped.set(year, new Set([date]));
+      }
+    }
+
+    return grouped;
+  }, [highlightedDates]);
   const highlightedYearSet = React.useMemo(
     () => new Set(highlightedYears),
     [highlightedYears],
@@ -394,7 +463,9 @@ export const CalendarHeatmap = ({
     date: string;
     rect: DOMRect;
   } | null>(null);
-  const popupCloseTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const popupCloseTimer = React.useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
 
   React.useEffect(() => {
     return () => {
@@ -444,7 +515,9 @@ export const CalendarHeatmap = ({
     [],
   );
 
-  const popupEntries = popupState ? entriesByDate.get(popupState.date) ?? [] : [];
+  const popupEntries = popupState
+    ? (entriesByDate.get(popupState.date) ?? [])
+    : [];
   const popupPreview = popupEntries[0] ?? null;
 
   return (
@@ -457,12 +530,16 @@ export const CalendarHeatmap = ({
             dates={group.dates}
             entriesByDate={entriesByDate}
             effectiveTodayDate={effectiveTodayDate}
-            highlightedDates={highlightedDateSet}
-            highlightedYears={highlightedYearSet}
+            highlightedDates={
+              highlightedDatesByYear.get(group.year) ?? EMPTY_DATE_SET
+            }
+            isHighlightedYear={highlightedYearSet.has(group.year)}
             onSelectDate={onSelectDate}
             openPopup={openPopup}
             closePopupSoon={closePopupSoon}
-            selectedDate={selectedDate}
+            selectedDate={
+              selectedDate?.startsWith(`${group.year}-`) ? selectedDate : null
+            }
             showWeekdayLabels={group.year === yearGroups[0]?.year}
           />
         ))}
@@ -502,7 +579,11 @@ export const CalendarHeatmap = ({
                   <br />
                   <span>{formatLongDate(popupState.date)}</span>
                   <br />
-                  <span>{getRelativeTimeString(new Date(`${popupState.date}T12:00:00`))}</span>
+                  <span>
+                    {getRelativeTimeString(
+                      new Date(`${popupState.date}T12:00:00`),
+                    )}
+                  </span>
                 </div>
               </Link>
 
@@ -527,7 +608,9 @@ export const CalendarHeatmap = ({
               <br />
               <span>{formatLongDate(popupState.date)}</span>
               <br />
-              <span>{getRelativeTimeString(new Date(`${popupState.date}T12:00:00`))}</span>
+              <span>
+                {getRelativeTimeString(new Date(`${popupState.date}T12:00:00`))}
+              </span>
             </div>
           ) : null}
         </div>
@@ -547,7 +630,9 @@ export const CalendarHeatmap = ({
             <br />
             <span>{formatLongDate(popupState.date)}</span>
             <br />
-            <span>{getRelativeTimeString(new Date(`${popupState.date}T12:00:00`))}</span>
+            <span>
+              {getRelativeTimeString(new Date(`${popupState.date}T12:00:00`))}
+            </span>
           </div>
         </div>
       ) : null}
