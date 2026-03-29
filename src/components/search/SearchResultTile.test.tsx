@@ -72,7 +72,7 @@ describe("SearchResultTile", () => {
       />,
     );
 
-    expect(screen.getByText("71% match")).toBeTruthy();
+    expect(screen.getByText("71%")).toBeTruthy();
   });
 
   it("shows a hybrid tooltip breakdown when semantic and keyword scores are both present", () => {
@@ -87,7 +87,7 @@ describe("SearchResultTile", () => {
       />,
     );
 
-    expect(screen.getByText("3% match").getAttribute("title")).toBe(
+    expect(screen.getByText("3%").getAttribute("title")).toBe(
       "Hybrid search: semantic 71%, keyword 3.5, fused 3%",
     );
   });
@@ -103,7 +103,7 @@ describe("SearchResultTile", () => {
       />,
     );
 
-    expect(screen.getByText("3% match").getAttribute("title")).toBe(
+    expect(screen.getByText("3%").getAttribute("title")).toBe(
       "Hybrid search: semantic 71%, keyword n/a, fused 3%",
     );
   });

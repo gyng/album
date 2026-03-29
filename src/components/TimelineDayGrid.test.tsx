@@ -44,6 +44,7 @@ describe("TimelineDayGrid", () => {
       geocode: "JP\nAkihabara\n35.6\n139.7\n77200\nTokyo\nChiyoda-ku\nJapan",
       src: { src: "/a.jpg", width: 200, height: 150 },
       href: "/album/kansai#a.jpg",
+      path: "/data/albums/kansai/a.jpg",
       placeholderColor: "rgb(1, 2, 3)",
       placeholderWidth: 200,
       placeholderHeight: 150,
@@ -57,6 +58,7 @@ describe("TimelineDayGrid", () => {
       geocode: "JP\nŌme\n35.7\n139.2\n131895\nTokyo\nJapan",
       src: { src: "/b.jpg", width: 200, height: 150 },
       href: "/album/tokyo#b.jpg",
+      path: "/data/albums/tokyo/b.jpg",
       placeholderColor: "rgb(4, 5, 6)",
       placeholderWidth: 200,
       placeholderHeight: 150,
@@ -71,18 +73,26 @@ describe("TimelineDayGrid", () => {
     expect(screen.getByLabelText("Location summary").textContent).toContain("Akihabara, Chiyoda-ku, Japan");
     expect(screen.getByText("yesterday")).toBeTruthy();
     expect(screen.getByText("20 hours ago")).toBeTruthy();
+    expect(screen.getByText("kansai")).toBeTruthy();
+    expect(screen.getByText("tokyo")).toBeTruthy();
     expect(screen.getByRole("heading", { name: "Map" })).toBeTruthy();
     expect(screen.getByText("1 mapped photo")).toBeTruthy();
     expect(screen.getByTestId("timeline-map")).toBeTruthy();
     expect(
-      screen.getByRole("link", {
-        name: /kansai yesterday/i,
-      }),
+      document.querySelector('a[href="/album/kansai#a.jpg"]'),
     ).toBeTruthy();
     expect(
-      screen.getByRole("link", {
-        name: /tokyo 20 hours ago/i,
-      }),
+      document.querySelector('a[href="/album/tokyo#b.jpg"]'),
+    ).toBeTruthy();
+    expect(
+      document.querySelector(
+        'a[href="/search?similar=..%2Falbums%2Fkansai%2Fa.jpg"]',
+      ),
+    ).toBeTruthy();
+    expect(
+      document.querySelector(
+        'a[href="/search?similar=..%2Falbums%2Ftokyo%2Fb.jpg"]',
+      ),
     ).toBeTruthy();
   });
 

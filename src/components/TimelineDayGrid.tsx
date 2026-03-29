@@ -73,6 +73,14 @@ const getGeocodeSummary = (geocode?: string | null): string | null => {
   return summaryParts.filter((part, index) => summaryParts.indexOf(part) === index).join(", ");
 };
 
+const toSimilarSearchPath = (path: string) => {
+  if (path.startsWith("/data/albums/")) {
+    return path.replace(/^\/data\/albums\//, "../albums/");
+  }
+
+  return path;
+};
+
 export const TimelineDayGrid = ({
   date,
   entries,
@@ -188,6 +196,7 @@ export const TimelineDayGrid = ({
             <div className={styles.card}>
               <div className={styles.thumbnailWrap}>
                 <Link
+                  suppressHydrationWarning
                   href={entry.href}
                   aria-label={`${entry.album} ${formattedDate} ${formatRelativeDateTime(entry.dateTimeOriginal) ?? ""}`.trim()}
                 >
@@ -201,7 +210,9 @@ export const TimelineDayGrid = ({
                   />
                 </Link>
                 <Link
-                  href={`/search?similar=..${entry.path}`}
+                  href={`/search?similar=${encodeURIComponent(
+                    toSimilarSearchPath(entry.path),
+                  )}`}
                   className={styles.similarButton}
                   aria-label="Find similar photos"
                   title="Find similar photos"
@@ -218,6 +229,7 @@ export const TimelineDayGrid = ({
                   <strong className={styles.sourceText}>{entry.album}</strong>
                   {formatRelativeDateTime(entry.dateTimeOriginal) ? (
                     <span
+                      suppressHydrationWarning
                       className={styles.secondaryMeta}
                       title={formatDateTimeTitle(entry.dateTimeOriginal) ?? undefined}
                     >

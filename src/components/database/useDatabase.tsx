@@ -2,11 +2,68 @@ import sqlite3InitModule, {
   Database,
   Sqlite3Static,
 } from "@sqlite.org/sqlite-wasm";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useReducer } from "react";
 
 type ProgressDetails = {
   loaded: number;
   total: number;
+};
+
+type UseDatabaseState = {
+  database: Database | null;
+  progress: number;
+  progressDetails: ProgressDetails;
+  error: Error | null;
+};
+
+type Action =
+  | { type: "load:start" }
+  | { type: "load:progress"; percent: number; details: ProgressDetails }
+  | { type: "load:success"; database: Database }
+  | { type: "load:error"; error: Error };
+
+const initialState: UseDatabaseState = {
+  database: null,
+  progress: 0,
+  progressDetails: {
+    loaded: 0,
+    total: 0,
+  },
+  error: null,
+};
+
+const reducer = (
+  state: UseDatabaseState,
+  action: Action,
+): UseDatabaseState => {
+  switch (action.type) {
+    case "load:start":
+      return {
+        ...state,
+        error: null,
+        progress: 0,
+        progressDetails: { loaded: 0, total: 0 },
+      };
+    case "load:progress":
+      return {
+        ...state,
+        progress: action.percent,
+        progressDetails: action.details,
+      };
+    case "load:success":
+      return {
+        ...state,
+        database: action.database,
+        progress: 100,
+      };
+    case "load:error":
+      return {
+        ...state,
+        error: action.error,
+      };
+    default:
+      return state;
+  }
 };
 
 let cachedDatabase: Database | null = null;
@@ -60,10 +117,6 @@ const fetchWithProgress = async (
   return new Response(stream);
 };
 
-export const databaseLoaderInternals = {
-  fetchWithProgress,
-};
-
 const loadRemoteDatabase = async (
   sqlite3: Sqlite3Static,
   setProgress?: (
@@ -109,7 +162,7 @@ const initializeSQLite = async (
       print: console.log,
       printErr: console.error,
     });
-    db = loadRemoteDatabase(sqlite3, setProgress);
+    db = await loadRemoteDatabase(sqlite3, setProgress);
   } catch (err) {
     if (err instanceof Error) {
       console.error("Initialization error:", err.name, err.message);
@@ -123,6 +176,15 @@ const initializeSQLite = async (
   }
 
   return db;
+};
+
+export const databaseLoaderInternals = {
+  fetchWithProgress,
+  initializeSQLite,
+  resetForTesting: () => {
+    cachedDatabase = null;
+    databasePromise = null;
+  },
 };
 
 const getDatabase = (
@@ -148,32 +210,34 @@ const getDatabase = (
   return databasePromise;
 };
 
-export const useDatabase = (): [Database | null, number, ProgressDetails] => {
-  const [database, setDatabase] = useState<Database | null>(null);
-  const [progress, setProgress] = useState(0);
-  const [progressDetails, setProgressDetails] = useState<ProgressDetails>({
-    loaded: 0,
-    total: 0,
-  });
+export const useDatabase = (): [
+  Database | null,
+  number,
+  ProgressDetails,
+  Error | null,
+  () => void,
+] => {
+  const [{ database, progress, progressDetails, error }, dispatch] =
+    useReducer(reducer, initialState);
+  const [retryCount, setRetryCount] = useState(0);
 
   useEffect(() => {
     let isCancelled = false;
+    dispatch({ type: "load:start" });
 
     getDatabase((percent, details) => {
       if (isCancelled) {
         return;
       }
 
-      setProgress(percent);
-      setProgressDetails(details);
+      dispatch({ type: "load:progress", percent, details });
     })
       .then((db) => {
         if (isCancelled) {
           return;
         }
 
-        setProgress(100);
-        setDatabase(db);
+        dispatch({ type: "load:success", database: db });
       })
       .catch((err) => {
         if (isCancelled) {
@@ -181,12 +245,20 @@ export const useDatabase = (): [Database | null, number, ProgressDetails] => {
         }
 
         console.error("Failed to load database", err);
+        dispatch({
+          type: "load:error",
+          error: err instanceof Error ? err : new Error(String(err)),
+        });
       });
 
     return () => {
       isCancelled = true;
     };
+  }, [retryCount]);
+
+  const retry = useCallback(() => {
+    setRetryCount((c) => c + 1);
   }, []);
 
-  return [database, progress, progressDetails];
+  return [database, progress, progressDetails, error, retry];
 };

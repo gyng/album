@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useReducer } from "react";
 import styles from "./ThemeToggle.module.css";
 
 const readStoredDarkMode = (): boolean | null => {
@@ -47,7 +47,10 @@ const getInitialDarkMode = (): boolean | null => {
 };
 
 export const ThemeToggle: React.FC = () => {
-  const [darkMode, setDarkMode] = useState<boolean | null>(null);
+  const [darkMode, setDarkMode] = useReducer(
+    (_state: boolean | null, next: boolean | null) => next,
+    null,
+  );
 
   useEffect(() => {
     setDarkMode(getInitialDarkMode());

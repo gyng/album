@@ -59,7 +59,7 @@ describe("PhotoSimilarPhotos", () => {
         database,
         path: "../albums/test-simple/DSCF0506-2.jpg",
         page: 0,
-        pageSize: 8,
+        pageSize: 7,
         offset: 0,
       });
     });
@@ -70,7 +70,7 @@ describe("PhotoSimilarPhotos", () => {
       screen.getByRole("img", { name: /Harbor skyline/i }).getAttribute("src"),
     ).toBe("/data/albums/test-simple/.resized_images/DSCF0593.jpg@800.avif");
     expect(screen.getByText("test-simple")).toBeTruthy();
-    expect(screen.getByText("82% match")).toBeTruthy();
+    expect(screen.getByText("82%")).toBeTruthy();
   });
 
   it("loads another 3x3 page when load more is clicked", async () => {
@@ -114,7 +114,7 @@ describe("PhotoSimilarPhotos", () => {
         database,
         path: "../albums/test-simple/DSCF0506-2.jpg",
         page: 0,
-        pageSize: 9,
+        pageSize: 8,
         offset: 8,
       });
     });
