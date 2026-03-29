@@ -25,6 +25,8 @@ import MMap from "../../components/Map";
 import { Seo } from "../../components/Seo";
 import { buildCollectionPageJsonLd } from "../../lib/seo";
 import { getPhotoAltText } from "../../lib/alt";
+import { navigateTo } from "../../util/navigate";
+import { handleSlideshowKeyboardShortcut } from "../../util/slideshowKeyboard";
 
 type PageProps = {};
 type SlideshowMode = "random" | "weighted" | "similar";
@@ -206,6 +208,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
     "random" as SlideshowMode,
   );
   const [hasParsedInitialUrl, setHasParsedInitialUrl] = React.useState(false);
+  const [isPaused, setIsPaused] = React.useState(false);
   const [embeddingsDatabase, embeddingsProgress] = useEmbeddingsDatabase(
     slideshowMode === "similar",
   );
@@ -735,10 +738,34 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
   };
 
   useEffect(() => {
+    if (isPaused) return;
     goNext();
     const id = setInterval(goNext, timeDelay);
     return () => clearInterval(id);
-  }, [database, timeDelay, nextCounter, goNext]);
+  }, [database, timeDelay, nextCounter, goNext, isPaused]);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      handleSlideshowKeyboardShortcut(e, {
+        goNext: () => {
+          setImageLoaded(false);
+          setNextCounter((prev) => prev + 1);
+        },
+        goPrevious: () => {
+          setImageLoaded(false);
+          goPrevious();
+        },
+        togglePaused: () => {
+          setIsPaused((prev) => !prev);
+        },
+        exit: () => {
+          navigateTo("/");
+        },
+      });
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [goPrevious]);
 
   useEffect(() => {
     const id = setInterval(() => {
@@ -890,7 +917,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
         })}
       />
 
-      <div className={styles.container}>
+      <div className={styles.container} data-paused={String(isPaused)}>
         <div className={[styles.toolbar, commonStyles.topBar].join(" ")}>
           {/* <ThemeToggle /> */}
 

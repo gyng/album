@@ -14,6 +14,7 @@
     "build": "npm run cleanup:media-cache && next build && echo 'build done'",
     "build:profile": "npm run cleanup:media-cache && ALBUM_BUILD_PROFILE=1 next build && echo 'build done'",
     "start": "next start",
+    "start:test": "node ./bin/start-test-server.cjs",
     "typecheck": "tsc --noEmit -p tsconfig.typecheck.json",
     "lint": "eslint . && npm run typecheck",
     "lint:fix": "eslint . --fix",
@@ -22,9 +23,10 @@
     "test": "jest",
     "test:seo": "jest --runInBand test/seo.test.tsx test/alt.test.ts test/feed.test.ts services/albumFeed.test.ts",
     "test:ci": "timeout 60s jest --maxWorkers=50% && npm run lint",
-    "test:e2e": "echo \"CI env: $CI\" && npm run build && playwright test",
-    "test:e2e:built": "playwright test",
-    "test:e2e:headed": "echo \"CI env: $CI\" && npm run build && playwright test --headed"
+    "test:e2e": "npm run build && PLAYWRIGHT_INCLUDE_SLOW=1 PLAYWRIGHT_SKIP_WEBSERVER=1 playwright test",
+    "test:e2e:built": "PLAYWRIGHT_INCLUDE_SLOW=1 PLAYWRIGHT_SKIP_WEBSERVER=1 playwright test",
+    "test:e2e:reuse": "PLAYWRIGHT_INCLUDE_SLOW=1 PLAYWRIGHT_SKIP_WEBSERVER=1 playwright test",
+    "test:e2e:headed": "npm run build && PLAYWRIGHT_INCLUDE_SLOW=1 PLAYWRIGHT_SKIP_WEBSERVER=1 playwright test --headed"
   },
   "dependencies": {
     "@huggingface/transformers": "^3.8.1",

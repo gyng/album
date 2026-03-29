@@ -6,10 +6,16 @@ import { render, screen } from "@testing-library/react";
 
 const mockUseDatabase = jest.fn();
 const mockUseEmbeddingsDatabase = jest.fn();
+const mockFetchSlideshowPhotos = jest.fn();
 
 jest.mock("../../../components/database/useDatabase", () => ({
   useDatabase: () => mockUseDatabase(),
   useEmbeddingsDatabase: () => mockUseEmbeddingsDatabase(),
+}));
+
+jest.mock("../../../components/search/api", () => ({
+  fetchSlideshowPhotos: (...args: unknown[]) => mockFetchSlideshowPhotos(...args),
+  fetchSimilarResults: jest.fn(),
 }));
 
 jest.mock("../../../components/ProgressBar", () => ({
@@ -26,7 +32,9 @@ jest.mock("../../../components/Map", () => () => null);
 
 jest.mock("next/link", () => ({
   __esModule: true,
-  default: ({ children, href }: any) => <a href={href}>{children}</a>,
+  default: ({ children, href }: { children: React.ReactNode; href: string }) => (
+    <a href={href}>{children}</a>
+  ),
 }));
 
 jest.mock("next/head", () => ({
@@ -50,6 +58,7 @@ describe("slideshow page", () => {
     jest.clearAllMocks();
     mockUseDatabase.mockReturnValue([null, 42]);
     mockUseEmbeddingsDatabase.mockReturnValue([null, 0]);
+    mockFetchSlideshowPhotos.mockResolvedValue([]);
     global.fetch = jest.fn().mockResolvedValue({
       ok: false,
       text: async () => "",

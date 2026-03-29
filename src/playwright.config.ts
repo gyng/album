@@ -1,5 +1,13 @@
 import { defineConfig, devices } from "@playwright/test";
 
+const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? "http://localhost:3000";
+// Keep "include @slow tests" separate from CI mode so local debug runs do not
+// accidentally change worker count, retries, or server reuse semantics.
+const includeSlowTests =
+  process.env.PLAYWRIGHT_INCLUDE_SLOW === "1" || !!process.env.CI;
+const reuseExistingServer = !process.env.CI;
+const skipWebServer = process.env.PLAYWRIGHT_SKIP_WEBSERVER === "1";
+
 /**
  * Read environment variables from file.
  * https://github.com/motdotla/dotenv
@@ -23,12 +31,12 @@ export default defineConfig({
   workers: process.env.CI ? 1 : undefined,
   /* Reporter to use. See https://playwright.dev/docs/test-reporters */
   reporter: [["list"], ["html", { open: "never" }]],
-  /* Skip slow tests locally by default */
-  grep: process.env.CI ? undefined : /^(?!.*@slow)/,
+  /* Skip slow tests locally unless explicitly requested. */
+  grep: includeSlowTests ? undefined : /^(?!.*@slow)/,
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
   use: {
     /* Base URL to use in actions like `await page.goto('/')`. */
-    baseURL: "http://localhost:3000",
+    baseURL,
 
     /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
     trace: "on-first-retry",
@@ -86,11 +94,17 @@ export default defineConfig({
     // },
   ],
 
-  /* Run your local production server before starting the tests */
-  webServer: {
-    command: "npm start",
-    url: "http://localhost:3000",
-    reuseExistingServer: !process.env.CI,
-    timeout: 120 * 1000,
-  },
+  /*
+   * Managed server path for normal e2e runs.
+   * Use PLAYWRIGHT_SKIP_WEBSERVER=1 only when you intentionally want to point
+   * Playwright at an already-running server that you know is serving fresh code.
+   */
+  webServer: skipWebServer
+    ? undefined
+    : {
+        command: "node ./bin/start-test-server.cjs",
+        url: baseURL,
+        reuseExistingServer,
+        timeout: 120 * 1000,
+      },
 });
