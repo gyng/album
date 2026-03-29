@@ -19,7 +19,12 @@ Useful routes:
 - `/slideshow` slideshow with shuffle, recent-weighted, and similarity playback modes
 - `/map` world and album mapping views
 
-The frontend expects the generated SQLite index at `public/search.sqlite`. Rebuild it from [index/README.md](../index/README.md).
+The frontend expects the generated search indexes at:
+
+- `public/search.sqlite` for keyword/browse metadata
+- `public/search-embeddings.sqlite` for semantic and similarity search
+
+Rebuild them from [index/README.md](../index/README.md).
 
 To run the local guided publish flow for new photos:
 
@@ -36,13 +41,15 @@ Fast-track is now the default behavior, so `npm run publish:wizard` asks the ind
 
 ## Search Database
 
-The search UI, album details similarity grid, and slideshow similarity mode all use the same browser-loaded SQLite database.
+The search UI, album details similarity grid, and slideshow similarity mode use browser-loaded SQLite databases.
 
+- `search.sqlite` holds FTS5 content, browse metadata, tags, and map/timeline fields.
+- `search-embeddings.sqlite` holds the image embeddings used by semantic and similarity features.
 - Keyword search uses FTS5 against Janus-generated metadata, EXIF text, filenames, and geocoded locations.
 - Semantic search embeds the query text in a web worker and compares it against stored image vectors.
 - Hybrid search fuses the keyword and semantic rankings with Reciprocal Rank Fusion.
-- Similarity uses the same `embeddings` table for image-to-image ranking.
-- Database loading is cached in the browser so similarity features do not repeatedly deserialize the same SQLite file.
+- Similarity uses the embeddings database for image-to-image ranking.
+- Database loading is cached in the browser so pages do not repeatedly deserialize the same SQLite files.
 
 When search is already in similarity mode, the source thumbnail can launch a similar-trail slideshow directly with `/slideshow?mode=similar&seed=<path>`.
 
@@ -50,13 +57,14 @@ When search is already in similarity mode, the source thumbnail can launch a sim
 
 The app stays fully static. There is no API route or search server involved.
 
-1. The Python indexer writes `public/search.sqlite` with FTS tables, metadata tables, and an `embeddings` table.
-2. The frontend opens that SQLite file with SQLite WASM directly in the browser.
-3. Keyword mode issues local FTS5 queries.
-4. Semantic mode warms a SigLIP text encoder in a worker, shows model-load progress in the search UI, embeds the query, and ranks image embeddings with cosine similarity.
-5. Hybrid mode runs both paths and merges the rankings with RRF so exact textual hits and semantically similar photos can both score well.
+1. The Python indexer writes a core browse DB plus an embeddings DB for the frontend.
+2. The frontend opens `search.sqlite` with SQLite WASM directly in the browser.
+3. Keyword mode and browse surfaces issue local FTS5 and metadata queries against the core DB.
+4. Semantic and similarity features lazily open `search-embeddings.sqlite` when needed.
+5. Semantic mode warms a SigLIP text encoder in a worker, shows model-load progress in the search UI, embeds the query, and ranks image embeddings with cosine similarity.
+6. Hybrid mode runs both paths and merges the rankings with RRF so exact textual hits and semantically similar photos can both score well.
 
-The result is a static deployment with richer search behavior, at the cost of an up-front DB download and an on-demand text-model download the first time semantic or hybrid search is used.
+The result is a static deployment with richer search behavior, while keeping the heavier embeddings download off the critical path for keyword and browse flows.
 
 ## Warm Build Benchmarking
 
@@ -101,7 +109,7 @@ npx playwright test tests/slideshow-functionality.spec.ts --project=chromium
 ## Notes
 
 - The app ships as static files; there is no search backend.
-- Large search DB downloads are expected on first load.
+- The core search DB loads on first search/browse use; the embeddings DB loads lazily for semantic and similar-photo features.
 - Some focused tests target Firefox because it surfaced browser-history and storage issues earlier than Chromium.
 
 See the root [README.md](../README.md) for album generation and deployment steps.

@@ -4,7 +4,10 @@
 
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { PhotoSimilarPhotos } from "./PhotoSimilarPhotos";
-import { useDatabase } from "./database/useDatabase";
+import {
+  useDatabase,
+  useEmbeddingsDatabase,
+} from "./database/useDatabase";
 import { fetchSimilarResults } from "./search/api";
 
 jest.mock("next/link", () => ({
@@ -18,6 +21,7 @@ jest.mock("next/link", () => ({
 
 jest.mock("./database/useDatabase", () => ({
   useDatabase: jest.fn(),
+  useEmbeddingsDatabase: jest.fn(),
 }));
 
 jest.mock("./search/api", () => ({
@@ -31,6 +35,7 @@ describe("PhotoSimilarPhotos", () => {
 
   it("shows loading progress while the search index is still opening", () => {
     (useDatabase as jest.Mock).mockReturnValue([null, 42]);
+    (useEmbeddingsDatabase as jest.Mock).mockReturnValue([null, 0]);
 
     render(<PhotoSimilarPhotos path="../albums/test-simple/DSCF0506-2.jpg" />);
 
@@ -40,7 +45,12 @@ describe("PhotoSimilarPhotos", () => {
 
   it("renders linked thumbnail results once similarity data is available", async () => {
     const database = { name: "db" };
+    const embeddingsDatabase = { name: "embeddings" };
     (useDatabase as jest.Mock).mockReturnValue([database, 100]);
+    (useEmbeddingsDatabase as jest.Mock).mockReturnValue([
+      embeddingsDatabase,
+      100,
+    ]);
     (fetchSimilarResults as jest.Mock).mockResolvedValue({
       data: [
         {
@@ -61,6 +71,7 @@ describe("PhotoSimilarPhotos", () => {
     await waitFor(() => {
       expect(fetchSimilarResults).toHaveBeenCalledWith({
         database,
+        embeddingsDatabase,
         path: "../albums/test-simple/DSCF0506-2.jpg",
         page: 0,
         pageSize: 7,
@@ -79,7 +90,12 @@ describe("PhotoSimilarPhotos", () => {
 
   it("loads another 3x3 page when load more is clicked", async () => {
     const database = { name: "db" };
+    const embeddingsDatabase = { name: "embeddings" };
     (useDatabase as jest.Mock).mockReturnValue([database, 100]);
+    (useEmbeddingsDatabase as jest.Mock).mockReturnValue([
+      embeddingsDatabase,
+      100,
+    ]);
     (fetchSimilarResults as jest.Mock)
       .mockResolvedValueOnce({
         data: Array.from({ length: 8 }, (_value, idx) => ({
@@ -116,6 +132,7 @@ describe("PhotoSimilarPhotos", () => {
     await waitFor(() => {
       expect(fetchSimilarResults).toHaveBeenNthCalledWith(2, {
         database,
+        embeddingsDatabase,
         path: "../albums/test-simple/DSCF0506-2.jpg",
         page: 0,
         pageSize: 8,

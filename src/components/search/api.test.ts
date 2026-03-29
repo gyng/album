@@ -123,6 +123,59 @@ describe("fetchSimilarResults", () => {
     expect(firstSimilarity > secondSimilarity).toBe(true);
   });
 
+  it("can read embeddings from a separate database", async () => {
+    const coreDatabase = {
+      exec: ({ sql, callback }: ExecArgs) => {
+        if (sql.includes("FROM images") && sql.includes("WHERE path IN")) {
+          callback([
+            "../albums/test-simple/DSCF0593.jpg",
+            "/album/test-simple#DSCF0593.jpg",
+            "DSCF0593.jpg",
+            "",
+            "",
+            "harbor, skyline",
+            "[(0,0,0)]",
+            "Harbor skyline",
+            "",
+          ]);
+        }
+      },
+    };
+    const embeddingsDatabase = {
+      exec: ({ sql, callback }: ExecArgs) => {
+        if (sql.includes("FROM embeddings") && sql.includes("WHERE path = ?")) {
+          callback([
+            "../albums/test-simple/DSCF0506-2.jpg",
+            "google/siglip-base-patch16-224",
+            3,
+            JSON.stringify([1, 0, 0]),
+          ]);
+          return;
+        }
+
+        if (sql.includes("FROM embeddings") && sql.includes("WHERE model_id = ?")) {
+          callback([
+            "../albums/test-simple/DSCF0593.jpg",
+            "google/siglip-base-patch16-224",
+            3,
+            JSON.stringify([0.9, 0.1, 0]),
+          ]);
+        }
+      },
+    };
+
+    const results = await fetchSimilarResults({
+      database: coreDatabase as any,
+      embeddingsDatabase: embeddingsDatabase as any,
+      path: "../albums/test-simple/DSCF0506-2.jpg",
+      page: 0,
+      pageSize: 2,
+    });
+
+    expect(results.data).toHaveLength(1);
+    expect(results.data[0]?.path).toBe("../albums/test-simple/DSCF0593.jpg");
+  });
+
   it("returns no results when the database has no embeddings table", async () => {
     const database = {
       exec: ({ sql }: ExecArgs) => {

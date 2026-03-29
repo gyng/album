@@ -239,7 +239,54 @@ describe("initializeSQLite", () => {
     }) as typeof fetch;
 
     await expect(
-      databaseLoaderInternals.initializeSQLite(),
+      databaseLoaderInternals.initializeSQLite("/search.sqlite"),
     ).rejects.toThrow("Failed to initialise SQLite");
+  });
+
+  it("falls back to the main database when the embeddings database is missing", async () => {
+    (sqlite3InitModule as jest.Mock).mockResolvedValue({
+      ...({
+        version: { libVersion: "mock" },
+      } as object),
+      version: { libVersion: "mock" },
+      wasm: { allocFromTypedArray: jest.fn().mockReturnValue(1) },
+      oo1: {
+        DB: jest.fn().mockImplementation(() => ({
+          pointer: 1,
+          checkRc: jest.fn(),
+        })),
+      },
+      capi: {
+        sqlite3_deserialize: jest.fn().mockReturnValue(0),
+        SQLITE_DESERIALIZE_FREEONCLOSE: 1,
+      },
+    });
+
+    global.fetch = jest
+      .fn()
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 404,
+        statusText: "Not Found",
+        body: null,
+        headers: { get: () => null },
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        body: null,
+        headers: { get: () => null },
+        arrayBuffer: jest.fn().mockResolvedValue(new ArrayBuffer(0)),
+      }) as typeof fetch;
+
+    await expect(
+      databaseLoaderInternals.initializeSQLite(
+        "/search-embeddings.sqlite",
+        "/search.sqlite",
+      ),
+    ).resolves.toBeTruthy();
+
+    expect(global.fetch).toHaveBeenNthCalledWith(1, "/search-embeddings.sqlite");
+    expect(global.fetch).toHaveBeenNthCalledWith(2, "/search.sqlite");
   });
 });

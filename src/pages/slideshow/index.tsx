@@ -1,6 +1,9 @@
 import { NextPage } from "next/types";
 import React, { useEffect, useCallback } from "react";
-import { useDatabase } from "../../components/database/useDatabase";
+import {
+  useDatabase,
+  useEmbeddingsDatabase,
+} from "../../components/database/useDatabase";
 import { PhotoBlock } from "../../services/types";
 import {
   fetchSlideshowPhotos,
@@ -203,6 +206,9 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
     "random" as SlideshowMode,
   );
   const [hasParsedInitialUrl, setHasParsedInitialUrl] = React.useState(false);
+  const [embeddingsDatabase, embeddingsProgress] = useEmbeddingsDatabase(
+    slideshowMode === "similar",
+  );
 
   const updateSlideshowUrl = useCallback(
     (
@@ -563,7 +569,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
   ]);
 
   const advanceSimilarPhoto = useCallback(async (): Promise<RandomPhotoRow | null> => {
-    if (!database) {
+    if (!database || !embeddingsDatabase) {
       return null;
     }
 
@@ -575,6 +581,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
     const refillSimilarQueue = async (seedPath: string) => {
       const result = await fetchSimilarResults({
         database,
+        embeddingsDatabase,
         path: seedPath,
         page: 0,
         pageSize: Math.max(shuffleHistorySize, 100),
@@ -626,13 +633,14 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
     advanceRandomPhoto,
     commitNextPhoto,
     database,
+    embeddingsDatabase,
     filter,
     resetSimilarQueue,
     shuffleHistorySize,
   ]);
 
   const goNext = useCallback(() => {
-    if (!database) {
+    if (!database || (slideshowMode === "similar" && !embeddingsDatabase)) {
       return;
     }
 
@@ -661,6 +669,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
     advanceRandomPhoto,
     advanceSimilarPhoto,
     database,
+    embeddingsDatabase,
     showHistoryPhoto,
     slideshowMode,
   ]);
@@ -748,7 +757,13 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
         {slideshowError ? (
           <div className={commonStyles.toast}>{slideshowError}</div>
         ) : (
-          <ProgressBar progress={progress} />
+          <ProgressBar
+            progress={
+              slideshowMode === "similar" && !embeddingsDatabase
+                ? embeddingsProgress
+                : progress
+            }
+          />
         )}
       </div>
     );

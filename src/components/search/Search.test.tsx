@@ -20,6 +20,7 @@ import { warmupTextEmbeddingModel } from "./textEmbeddings";
 
 const mockPush = jest.fn();
 const mockUseDatabase = jest.fn();
+const mockUseEmbeddingsDatabase = jest.fn();
 const mockUseInfiniteQuery = jest.fn();
 const originalConsoleError = console.error;
 
@@ -44,6 +45,7 @@ jest.mock("use-debounce", () => ({
 
 jest.mock("../database/useDatabase", () => ({
   useDatabase: () => mockUseDatabase(),
+  useEmbeddingsDatabase: () => mockUseEmbeddingsDatabase(),
 }));
 
 jest.mock("@tanstack/react-query", () => ({
@@ -164,6 +166,12 @@ beforeEach(() => {
     mockDatabase,
     42,
     { loaded: 2_000_000, total: 4_000_000 },
+  ]);
+  mockUseEmbeddingsDatabase.mockReturnValue([
+    mockDatabase,
+    100,
+    { loaded: 2_000_000, total: 2_000_000 },
+    null,
   ]);
   mockUseInfiniteQuery.mockImplementation((opts: any) => {
     const similarPath = opts?.queryKey?.[1]?.similarPath;

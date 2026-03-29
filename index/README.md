@@ -57,10 +57,10 @@ $ cp search.sqlite ../src/public/search.sqlite
 $ ./create-test-db.sh
 $ ./do-test-index.sh
 
-# Perform a full index and copy it to /public in the Next.js app
+# Perform a full index and copy split core + embeddings DBs to /public in the Next.js app
 $ ./do-full-index.sh
 
-# Generate embeddings only and merge them into the active public database
+# Generate the frontend embeddings DB only
 $ ./do-embeddings-index.sh
 ```
 
@@ -92,10 +92,12 @@ The Janus prompt is intentionally limited to the fields currently used by the fr
 
 ## Frontend Search Pipeline
 
-The generated SQLite database drives all search features in the Next.js app:
+The generated SQLite databases drive all search features in the Next.js app:
 
+- `search.sqlite` carries FTS, tags, and metadata for keyword and browse features.
+- `search-embeddings.sqlite` carries the embeddings table used by semantic and similarity search.
 - `Keyword search` reads the FTS tables locally in the browser.
-- `Similarity search` ranks rows from the `embeddings` table against another image embedding.
+- `Similarity search` ranks rows from the embeddings DB against another image embedding.
 - `Semantic search` embeds user text in the browser and compares it against the same stored image vectors.
 - `Hybrid search` fuses the keyword and semantic rankings with Reciprocal Rank Fusion.
 

@@ -5,9 +5,11 @@
 import { render, screen } from "@testing-library/react";
 
 const mockUseDatabase = jest.fn();
+const mockUseEmbeddingsDatabase = jest.fn();
 
 jest.mock("../../../components/database/useDatabase", () => ({
   useDatabase: () => mockUseDatabase(),
+  useEmbeddingsDatabase: () => mockUseEmbeddingsDatabase(),
 }));
 
 jest.mock("../../../components/ProgressBar", () => ({
@@ -47,6 +49,7 @@ describe("slideshow page", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockUseDatabase.mockReturnValue([null, 42]);
+    mockUseEmbeddingsDatabase.mockReturnValue([null, 0]);
     global.fetch = jest.fn().mockResolvedValue({
       ok: false,
       text: async () => "",

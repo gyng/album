@@ -9,6 +9,8 @@ export type PaginatedSearchResult = {
   query?: string;
 };
 
+type SearchDatabase = Database;
+
 const isMissingEmbeddingsTableError = (err: unknown): boolean => {
   return (
     err instanceof Error &&
@@ -155,7 +157,7 @@ const getResultSnippet = (row: SearchResultRow): string => {
 };
 
 const rankEmbeddingsByVector = async (opts: {
-  database: Database;
+  database: SearchDatabase;
   queryVector: number[];
   modelId: string;
   excludePaths?: string[];
@@ -276,7 +278,7 @@ const fetchResultsByPaths = async (
 };
 
 const fetchEmbeddingByPath = async (
-  database: Database,
+  database: SearchDatabase,
   path: string,
 ): Promise<EmbeddingRow | null> => {
   const result = await exec(
@@ -302,7 +304,7 @@ const fetchEmbeddingByPath = async (
 };
 
 const fetchEmbeddingsByModel = async (
-  database: Database,
+  database: SearchDatabase,
   modelId: string,
 ): Promise<EmbeddingRow[]> => {
   const result = await exec(
@@ -415,15 +417,17 @@ export const fetchRefinementTagCounts = async (opts: {
 
 export const fetchSimilarResults = async (opts: {
   database: Database;
+  embeddingsDatabase?: Database | null;
   path: string;
   pageSize: number;
   page: number;
   offset?: number;
 }): Promise<PaginatedSearchResult> => {
-  const { database, path, page, pageSize, offset } = opts;
+  const { database, embeddingsDatabase, path, page, pageSize, offset } = opts;
+  const vectorDatabase = embeddingsDatabase ?? database;
 
   try {
-    const queryEmbedding = await fetchEmbeddingByPath(database, path);
+    const queryEmbedding = await fetchEmbeddingByPath(vectorDatabase, path);
     if (!queryEmbedding) {
       return { data: [], query: path, prev: undefined, next: undefined };
     }
@@ -435,7 +439,7 @@ export const fetchSimilarResults = async (opts: {
       return { data: [], query: path, prev: undefined, next: undefined };
     }
     const rankedPaths = await rankEmbeddingsByVector({
-      database,
+      database: vectorDatabase,
       queryVector,
       modelId: queryEmbedding.model_id,
       excludePaths: [path],
@@ -575,6 +579,7 @@ export const fetchColorSimilarResults = async (opts: {
 
 export const fetchSemanticResults = async (opts: {
   database: Database;
+  embeddingsDatabase?: Database | null;
   textQuery: string;
   textVector: number[];
   pageSize: number;
@@ -583,16 +588,18 @@ export const fetchSemanticResults = async (opts: {
 }): Promise<PaginatedSearchResult> => {
   const {
     database,
+    embeddingsDatabase,
     textQuery,
     textVector,
     page,
     pageSize,
     modelId = DEFAULT_EMBEDDING_MODEL_ID,
   } = opts;
+  const vectorDatabase = embeddingsDatabase ?? database;
 
   try {
     const rankedPaths = await rankEmbeddingsByVector({
-      database,
+      database: vectorDatabase,
       queryVector: textVector,
       modelId,
     });
@@ -635,6 +642,7 @@ export const fetchSemanticResults = async (opts: {
 
 export const fetchHybridResults = async (opts: {
   database: Database;
+  embeddingsDatabase?: Database | null;
   textQuery: string;
   textVector: number[];
   pageSize: number;
@@ -644,6 +652,7 @@ export const fetchHybridResults = async (opts: {
 }): Promise<PaginatedSearchResult> => {
   const {
     database,
+    embeddingsDatabase,
     textQuery,
     textVector,
     page,
@@ -651,12 +660,13 @@ export const fetchHybridResults = async (opts: {
     modelId = DEFAULT_EMBEDDING_MODEL_ID,
     keywordQuery = textQuery,
   } = opts;
+  const vectorDatabase = embeddingsDatabase ?? database;
 
   try {
     const [keywordResults, vectorResults] = await Promise.all([
       fetchKeywordRanking({ database, query: keywordQuery }),
       rankEmbeddingsByVector({
-        database,
+        database: vectorDatabase,
         queryVector: textVector,
         modelId,
       }),

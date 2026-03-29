@@ -16,6 +16,7 @@ import { parseSearchTerms } from "./searchUtils";
 
 type Props = {
   database: unknown;
+  embeddingsDatabase: unknown;
   searchInputValue: string;
   similarPath: string | null;
   colorSearch: RGB | null;
@@ -27,6 +28,7 @@ type Props = {
 
 export const useSearchResultsState = ({
   database,
+  embeddingsDatabase,
   searchInputValue,
   similarPath,
   colorSearch,
@@ -77,9 +79,11 @@ export const useSearchResultsState = ({
   const canRunQuery =
     hasHydratedFromUrl &&
     Boolean(database) &&
-    (Boolean(similarPath) ||
+    ((Boolean(similarPath) && Boolean(embeddingsDatabase)) ||
       isColorMode ||
-      (hasSearchQuery && (searchMode === "keyword" || hasCurrentTextVector)));
+      (hasSearchQuery &&
+        (searchMode === "keyword" ||
+          (Boolean(embeddingsDatabase) && hasCurrentTextVector))));
 
   const similarFilename = similarPath?.split("/").at(-1) ?? null;
   const similarPreviewSrc = similarPath
@@ -91,6 +95,7 @@ export const useSearchResultsState = ({
       "results",
       {
         database: !!database,
+        embeddingsDatabase: !!embeddingsDatabase,
         debouncedSearchQuery,
         similarPath,
         colorSearch: debouncedColorSearch,
@@ -111,6 +116,7 @@ export const useSearchResultsState = ({
       if (similarPath) {
         return await fetchSimilarResults({
           database,
+          embeddingsDatabase: embeddingsDatabase as any,
           path: similarPath,
           pageSize,
           page: pageParam,
@@ -130,6 +136,7 @@ export const useSearchResultsState = ({
       if (searchMode === "semantic" && textVector && hasCurrentTextVector) {
         return await fetchSemanticResults({
           database,
+          embeddingsDatabase: embeddingsDatabase as any,
           textQuery: trimmedQuery,
           textVector,
           pageSize,
@@ -140,6 +147,7 @@ export const useSearchResultsState = ({
       if (searchMode === "hybrid" && textVector && hasCurrentTextVector) {
         return await fetchHybridResults({
           database,
+          embeddingsDatabase: embeddingsDatabase as any,
           textQuery: trimmedQuery,
           keywordQuery,
           textVector,

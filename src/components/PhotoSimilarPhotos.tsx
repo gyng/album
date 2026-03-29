@@ -1,6 +1,9 @@
 import React from "react";
 import styles from "./Photo.module.css";
-import { useDatabase } from "./database/useDatabase";
+import {
+  useDatabase,
+  useEmbeddingsDatabase,
+} from "./database/useDatabase";
 import { fetchSimilarResults } from "./search/api";
 import { SearchResultRow } from "./search/searchTypes";
 import { SearchResultTile } from "./search/SearchResultTile";
@@ -12,6 +15,9 @@ export const PhotoSimilarPhotos: React.FC<{
   const pageSize = props.pageSize ?? 8;
   const initialVisibleCount = Math.max(pageSize - 1, 1);
   const [database, progress] = useDatabase();
+  const [embeddingsDatabase, embeddingsProgress] = useEmbeddingsDatabase(
+    Boolean(props.path),
+  );
   const [results, setResults] = React.useState<SearchResultRow[]>([]);
   const [error, setError] = React.useState<string | null>(null);
   const [offset, setOffset] = React.useState(0);
@@ -26,7 +32,7 @@ export const PhotoSimilarPhotos: React.FC<{
   }, [database, initialVisibleCount, props.path]);
 
   React.useEffect(() => {
-    if (!database || !props.path) {
+    if (!database || !embeddingsDatabase || !props.path) {
       return;
     }
 
@@ -36,6 +42,7 @@ export const PhotoSimilarPhotos: React.FC<{
 
     fetchSimilarResults({
       database,
+      embeddingsDatabase,
       path: props.path,
       page: 0,
       pageSize: offset === 0 ? initialVisibleCount : pageSize,
@@ -77,7 +84,14 @@ export const PhotoSimilarPhotos: React.FC<{
     return () => {
       isCancelled = true;
     };
-  }, [database, initialVisibleCount, offset, pageSize, props.path]);
+  }, [
+    database,
+    embeddingsDatabase,
+    initialVisibleCount,
+    offset,
+    pageSize,
+    props.path,
+  ]);
 
   if (!props.path) {
     return null;
@@ -91,6 +105,12 @@ export const PhotoSimilarPhotos: React.FC<{
         <p className={styles.similarPhotosStatus}>
           Loading search index
           {progress > 0 ? ` (${Math.round(progress)}%)` : ""}…
+        </p>
+      ) : !embeddingsDatabase ? (
+        <p className={styles.similarPhotosStatus}>
+          Loading similarity index
+          {embeddingsProgress > 0 ? ` (${Math.round(embeddingsProgress)}%)` : ""}
+          …
         </p>
       ) : isLoadingResults && results.length === 0 ? (
         <p className={styles.similarPhotosStatus}>Finding similar photos…</p>

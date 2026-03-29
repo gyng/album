@@ -66,8 +66,8 @@ const reducer = (
   }
 };
 
-let cachedDatabase: Database | null = null;
-let databasePromise: Promise<Database> | null = null;
+const cachedDatabases = new Map<string, Database>();
+const databasePromises = new Map<string, Promise<Database>>();
 
 const fetchWithProgress = async (
   url: string,
@@ -119,6 +119,7 @@ const fetchWithProgress = async (
 
 const loadRemoteDatabase = async (
   sqlite3: Sqlite3Static,
+  url: string,
   setProgress?: (
     percent: number,
     details: { loaded: number; total: number },
@@ -126,10 +127,7 @@ const loadRemoteDatabase = async (
 ) => {
   console.log("Running SQLite3 version", sqlite3.version.libVersion);
 
-  const response = await fetchWithProgress(
-    "/search.sqlite",
-    setProgress || (() => {}),
-  );
+  const response = await fetchWithProgress(url, setProgress || (() => {}));
 
   const arrayBuffer = await response.arrayBuffer();
   const p = sqlite3.wasm.allocFromTypedArray(arrayBuffer);
@@ -153,16 +151,34 @@ const loadRemoteDatabase = async (
 };
 
 const initializeSQLite = async (
+  url: string,
+  fallbackUrl?: string,
   setProgress?: (percent: number, details: ProgressDetails) => void,
 ): Promise<Database> => {
-  let db;
+  let db: Database | undefined;
   try {
     console.log("Loading and initializing SQLite3 module...");
     const sqlite3 = await sqlite3InitModule({
       print: console.log,
       printErr: console.error,
     });
-    db = await loadRemoteDatabase(sqlite3, setProgress);
+    try {
+      db = await loadRemoteDatabase(sqlite3, url, setProgress);
+    } catch (err) {
+      const shouldFallback =
+        fallbackUrl &&
+        err instanceof Error &&
+        err.message.includes(`Failed to fetch ${url}: 404`);
+
+      if (!shouldFallback) {
+        throw err;
+      }
+
+      console.info(
+        `Database ${url} not found, falling back to ${fallbackUrl}`,
+      );
+      db = await loadRemoteDatabase(sqlite3, fallbackUrl, setProgress);
+    }
   } catch (err) {
     if (err instanceof Error) {
       console.error("Initialization error:", err.name, err.message);
@@ -182,50 +198,66 @@ export const databaseLoaderInternals = {
   fetchWithProgress,
   initializeSQLite,
   resetForTesting: () => {
-    cachedDatabase = null;
-    databasePromise = null;
+    cachedDatabases.clear();
+    databasePromises.clear();
   },
 };
 
 const getDatabase = (
+  url: string,
+  fallbackUrl?: string,
   setProgress?: (percent: number, details: ProgressDetails) => void,
 ): Promise<Database> => {
+  const cachedDatabase = cachedDatabases.get(url);
   if (cachedDatabase) {
     setProgress?.(100, { loaded: 0, total: 0 });
     return Promise.resolve(cachedDatabase);
   }
 
-  if (!databasePromise) {
-    databasePromise = initializeSQLite(setProgress)
-      .then((database) => {
-        cachedDatabase = database;
-        return database;
-      })
-      .catch((err) => {
-        databasePromise = null;
-        throw err;
-      });
+  const existingPromise = databasePromises.get(url);
+  if (existingPromise) {
+    return existingPromise;
   }
 
+  const databasePromise = initializeSQLite(url, fallbackUrl, setProgress)
+    .then((database) => {
+      cachedDatabases.set(url, database);
+      return database;
+    })
+    .catch((err) => {
+      databasePromises.delete(url);
+      throw err;
+    });
+
+  databasePromises.set(url, databasePromise);
   return databasePromise;
 };
 
-export const useDatabase = (): [
+const useSqliteDatabase = (
+  url: string,
+  options?: { enabled?: boolean; fallbackUrl?: string },
+): [
   Database | null,
   number,
   ProgressDetails,
   Error | null,
   () => void,
 ] => {
+  const enabled = options?.enabled ?? true;
+  const fallbackUrl = options?.fallbackUrl;
   const [{ database, progress, progressDetails, error }, dispatch] =
     useReducer(reducer, initialState);
   const [retryCount, setRetryCount] = useState(0);
 
   useEffect(() => {
+    if (!enabled) {
+      return;
+    }
+
     let isCancelled = false;
     dispatch({ type: "load:start" });
 
-    getDatabase((percent, details) => {
+    getDatabase(url, fallbackUrl, (percent, details) => {
       if (isCancelled) {
         return;
       }
@@ -254,11 +286,22 @@ export const useDatabase = (): [
     return () => {
       isCancelled = true;
     };
-  }, [retryCount]);
+  }, [enabled, fallbackUrl, retryCount, url]);
 
   const retry = useCallback(() => {
     setRetryCount((c) => c + 1);
   }, []);
 
   return [database, progress, progressDetails, error, retry];
+};
+
+export const useDatabase = () => {
+  return useSqliteDatabase("/search.sqlite");
+};
+
+export const useEmbeddingsDatabase = (enabled = true) => {
+  return useSqliteDatabase("/search-embeddings.sqlite", {
+    enabled,
+    fallbackUrl: "/search.sqlite",
+  });
 };

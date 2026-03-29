@@ -4,28 +4,24 @@ set -euox pipefail
 cd "$(dirname "$0")"
 
 EMBED_DB="${1:-all-embeddings.sqlite}"
-SOURCE_DB="${2:-../src/public/search.sqlite}"
-OUTPUT_DB="${3:-../src/public/search.sqlite}"
-BACKUP_DB="${OUTPUT_DB}.bak"
+OUTPUT_DB="${2:-../src/public/search-embeddings.sqlite}"
 
 uv run python index.py index \
   --glob "../albums/**/*.jpg" \
   --dbpath "$EMBED_DB" \
   --model-profile siglip2
 
-cp "$SOURCE_DB" "$BACKUP_DB"
-
-uv run python - <<'PY' "$SOURCE_DB" "$EMBED_DB" "$OUTPUT_DB"
+uv run python - <<'PY' "$EMBED_DB" "$OUTPUT_DB"
 import sqlite3
 import sys
 from pathlib import Path
 
-source_db = Path(sys.argv[1])
-embedding_db = Path(sys.argv[2])
-output_db = Path(sys.argv[3])
+embedding_db = Path(sys.argv[1])
+output_db = Path(sys.argv[2])
 
 tmp_db = output_db.with_suffix(output_db.suffix + ".tmp")
-tmp_db.write_bytes(source_db.read_bytes())
+if tmp_db.exists():
+    tmp_db.unlink()
 
 dest = sqlite3.connect(tmp_db)
 src = sqlite3.connect(embedding_db)
@@ -57,8 +53,7 @@ import sqlite3
 import sys
 
 db = sqlite3.connect(sys.argv[1])
-images = db.execute("SELECT count(*) FROM images").fetchone()[0]
 embeddings = db.execute("SELECT count(*) FROM embeddings").fetchone()[0]
-print({"images": images, "embeddings": embeddings})
+print({"embeddings": embeddings})
 db.close()
 PY

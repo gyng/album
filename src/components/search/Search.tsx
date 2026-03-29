@@ -9,7 +9,10 @@ import React, {
 import { fetchRandomPhoto, fetchRefinementTagCounts, fetchTags } from "./api";
 import { RGB } from "../../util/colorDistance";
 import styles from "./Search.module.css";
-import { useDatabase } from "../database/useDatabase";
+import {
+  useDatabase,
+  useEmbeddingsDatabase,
+} from "../database/useDatabase";
 import { ProgressBar } from "../ProgressBar";
 import { EmptyStateExplore } from "./EmptyStateExplore";
 import { SearchBrowseActions } from "./SearchBrowseActions";
@@ -50,6 +53,17 @@ export const Search: React.FC<{ disabled?: boolean }> = ({ disabled }) => {
   const inputRef = useRef<HTMLInputElement>(null);
   const modeSourceRef = useRef<HTMLDivElement | null>(null);
   const [database, progress, databaseProgressDetails] = useDatabase();
+  const needsEmbeddingsDatabase =
+    Boolean(similarPath) ||
+    (!colorSearch &&
+      searchInputValue.trim() !== "" &&
+      searchMode !== "keyword");
+  const [
+    embeddingsDatabase,
+    embeddingsProgress,
+    embeddingsProgressDetails,
+    embeddingsError,
+  ] = useEmbeddingsDatabase(needsEmbeddingsDatabase);
 
   const {
     canClear,
@@ -73,6 +87,7 @@ export const Search: React.FC<{ disabled?: boolean }> = ({ disabled }) => {
     trimmedQuery,
   } = useSearchResultsState({
     database,
+    embeddingsDatabase,
     searchInputValue,
     similarPath,
     colorSearch,
@@ -414,8 +429,24 @@ export const Search: React.FC<{ disabled?: boolean }> = ({ disabled }) => {
         </div>
       ) : null}
 
+      {needsEmbeddingsDatabase && !embeddingsDatabase ? (
+        <div className={styles.searchModeStatus}>
+          <ProgressBar
+            progress={embeddingsProgress}
+            details={embeddingsProgressDetails}
+          />
+          <div>Loading similarity index...</div>
+        </div>
+      ) : null}
+
       {!isSimilarMode && textVectorError ? (
         <div className={styles.inlineError}>{textVectorError}</div>
+      ) : null}
+
+      {needsEmbeddingsDatabase && embeddingsError ? (
+        <div className={styles.inlineError}>
+          Similarity search is unavailable right now.
+        </div>
       ) : null}
 
       {isEmptyState ? (
