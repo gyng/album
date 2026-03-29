@@ -6,210 +6,104 @@ import React, {
   useRef,
   useState,
 } from "react";
-import Link from "next/link";
-import { useDebounce } from "use-debounce";
+import { fetchRandomPhoto, fetchRefinementTagCounts, fetchTags } from "./api";
+import { RGB } from "../../util/colorDistance";
 import styles from "./Search.module.css";
-import { useInfiniteQuery, keepPreviousData } from "@tanstack/react-query";
-import {
-  fetchRefinementTagCounts,
-  fetchHybridResults,
-  fetchRecentResults,
-  fetchRandomResults,
-  fetchResults,
-  fetchRandomPhoto,
-  fetchSemanticResults,
-  fetchSimilarResults,
-  fetchColorSimilarResults,
-  fetchTags,
-  PaginatedSearchResult,
-} from "./api";
-import { RGB, rgbToHex, hexToRgb, rgbToString } from "../../util/colorDistance";
-import { SearchResultTile } from "./SearchResultTile";
-import { SearchTag } from "./SearchTag";
 import { useDatabase } from "../database/useDatabase";
 import { ProgressBar } from "../ProgressBar";
-import { getResizedAlbumImageSrc } from "../../util/getResizedAlbumImageSrc";
-import { SearchResultRow } from "./searchTypes";
-import { encodeSearchText, warmupTextEmbeddingModel } from "./textEmbeddings";
-
-type Tag = {
-  name: string;
-  count: number;
-};
-
-type SearchMode = "keyword" | "semantic" | "hybrid";
-
-type InitialSearchState = {
-  searchQuery: string[];
-  similarPath: string | null;
-  colorSearch: RGB | null;
-  searchMode: SearchMode;
-  hasHydratedFromUrl: boolean;
-};
-
-type SimilarTrailItem = {
-  path: string;
-  similarity?: number;
-};
-
-const similarSearchEmojiStyle = { filter: "grayscale(100%)" } as const;
+import { EmptyStateExplore } from "./EmptyStateExplore";
+import { SearchBrowseActions } from "./SearchBrowseActions";
+import { SearchInputBar } from "./SearchInputBar";
+import { SearchRefinementSection } from "./SearchRefinementSection";
+import { SearchResultsGrid } from "./SearchResultsGrid";
+import { SimilarTrailBar, SimilarTrailItem } from "./SimilarTrailBar";
+import {
+  DEFAULT_SEARCH_MODE,
+  dedupeTags,
+  getInitialSearchState,
+  parseSearchTerms,
+  Tag,
+} from "./searchUtils";
+import { SearchMode } from "./useTextVector";
+import { useSearchResultsState } from "./useSearchResultsState";
 
 const useSafeLayoutEffect =
   typeof window === "undefined" ? useEffect : useLayoutEffect;
 
-const SharedTagsCaption = () => (
-  <>
-    keep stacking keywords to narrow results, or click{" "}
-    <span style={similarSearchEmojiStyle}>🔍</span> to find similar photos
-  </>
-);
-
-const forceDocumentNavigation = (
-  event: React.MouseEvent<HTMLAnchorElement>,
-  href: string,
-) => {
-  event.preventDefault();
-  window.location.assign(href);
-};
-
-const dedupeTags = (tags: Tag[]): Tag[] => {
-  return Object.values(
-    tags.reduce(
-      (acc, tag) => {
-        const key = tag.name.toLocaleLowerCase();
-        if (!acc[key]) {
-          acc[key] = { ...tag, name: key };
-        } else {
-          acc[key].count += tag.count;
-        }
-        return acc;
-      },
-      {} as Record<string, Tag>,
-    ),
-  );
-};
-
-const parseSearchTerms = (value: string): string[] => {
-  if (value === "") {
-    return [];
-  }
-
-  return value.split(",");
-};
-
-const isSearchMode = (value: string | null): value is SearchMode => {
-  return value === "keyword" || value === "semantic" || value === "hybrid";
-};
-
-const parseColorParam = (value: string | null): RGB | null => {
-  if (!value) return null;
-  const parts = value.split(",").map((v) => parseInt(v.trim(), 10));
-  if (parts.length === 3 && parts.every((v) => !isNaN(v) && v >= 0 && v <= 255)) {
-    return [parts[0], parts[1], parts[2]];
-  }
-  return null;
-};
-
-
-const DEFAULT_SEARCH_MODE: SearchMode = "hybrid";
-
-const getInitialSearchState = (): InitialSearchState => {
-  if (typeof window === "undefined") {
-    return {
-      searchQuery: [],
-      similarPath: null,
-      colorSearch: null,
-      searchMode: DEFAULT_SEARCH_MODE,
-      hasHydratedFromUrl: false,
-    };
-  }
-
-  const url = new URL(window.location.toString());
-  const query = url.searchParams.get("q");
-  return {
-    searchQuery: query ? query.split(",").map((value) => value.trim()) : [],
-    similarPath: url.searchParams.get("similar"),
-    colorSearch: parseColorParam(url.searchParams.get("color")),
-    searchMode: isSearchMode(url.searchParams.get("mode"))
-      ? (url.searchParams.get("mode") as SearchMode)
-      : DEFAULT_SEARCH_MODE,
-    hasHydratedFromUrl: true,
-  };
-};
-
-const getAlbumAnchorHref = (path: string): string => {
-  const segments = path.split("/");
-  const albumName = segments.at(-2);
-  const filename = segments.at(-1);
-
-  if (!albumName || !filename) {
-    return "/search";
-  }
-
-  return `/album/${albumName}#${filename}`;
-};
-
-export const Search: React.FC<{ disabled?: boolean }> = (props) => {
-  const PAGE_SIZE = 48;
-  const RECENT_ROW_INITIAL_SIZE = 15;
-  const RECENT_ROW_LOAD_MORE_SIZE = 16;
-  const RANDOM_ROW_INITIAL_SIZE = 7;
-  const RANDOM_ROW_LOAD_MORE_SIZE = 8;
+export const Search: React.FC<{ disabled?: boolean }> = ({ disabled }) => {
   const [searchInputValue, setSearchInputValue] = useState<string>("");
   const [searchMode, setSearchMode] = useState<SearchMode>(DEFAULT_SEARCH_MODE);
   const [similarPath, setSimilarPath] = useState<string | null>(null);
   const [colorSearch, setColorSearch] = useState<RGB | null>(null);
-  const [debouncedColorSearch] = useDebounce(colorSearch, 300);
   const [colorTolerance, setColorTolerance] = useState<number>(35);
-  const [debouncedColorTolerance] = useDebounce(colorTolerance, 400);
   const [similarTrail, setSimilarTrail] = useState<SimilarTrailItem[]>([]);
-  const [pendingRemoveIdx, setPendingRemoveIdx] = useState<number | null>(null);
   const [hasHydratedFromUrl, setHasHydratedFromUrl] = useState<boolean>(false);
-  const [textVector, setTextVector] = useState<number[] | null>(null);
-  const [textVectorQuery, setTextVectorQuery] = useState<string | null>(null);
-  const [isTextVectorLoading, setIsTextVectorLoading] = useState<boolean>(false);
-  const [textModelProgress, setTextModelProgress] = useState<number>(100);
-  const [textModelStage, setTextModelStage] = useState<string>("Loading semantic search model...");
-  const [textModelProgressDetails, setTextModelProgressDetails] = useState<{
-    loaded: number;
-    total: number;
-    file?: string;
-  }>({ loaded: 0, total: 0 });
-  const [textVectorError, setTextVectorError] = useState<string | null>(null);
-  const [debouncedSearchInputValue] = useDebounce(searchInputValue, 600);
+  const [isRandomSimilarLoading, setIsRandomSimilarLoading] =
+    useState<boolean>(false);
+  const [randomExploreError, setRandomExploreError] = useState<string | null>(
+    null,
+  );
+  const [tags, setTags] = useState<Tag[]>([]);
+  const [refinementCounts, setRefinementCounts] = useState<
+    Record<string, number>
+  >({});
   const inputRef = useRef<HTMLInputElement>(null);
   const modeSourceRef = useRef<HTMLDivElement | null>(null);
-  const randomLoadMoreButtonRef = useRef<HTMLButtonElement | null>(null);
-  const breadcrumbRefs = useRef<Record<string, HTMLDivElement | null>>({});
-  const breadcrumbPositionsRef = useRef<Record<string, DOMRect>>({});
   const [database, progress, databaseProgressDetails] = useDatabase();
-  const searchQuery = useMemo(
-    () => parseSearchTerms(searchInputValue),
-    [searchInputValue],
-  );
-  const debouncedSearchQuery = useMemo(
-    () => parseSearchTerms(debouncedSearchInputValue),
-    [debouncedSearchInputValue],
-  );
-  const isSimilarMode = Boolean(similarPath);
-  const isColorMode = Boolean(colorSearch);
-  const colorHex = useMemo(() => colorSearch ? rgbToHex(colorSearch) : null, [colorSearch]);
-  const trimmedQuery = debouncedSearchQuery.join(" ").trim();
-  const hasSearchQuery = trimmedQuery.length > 0;
-  const keywordQuery = debouncedSearchQuery.join("|");
-  const needsTextVector = !isSimilarMode && !isColorMode && hasSearchQuery && searchMode !== "keyword";
-  const hasCurrentTextVector = Boolean(textVector) && textVectorQuery === trimmedQuery;
-  const canRunQuery =
-    hasHydratedFromUrl &&
-    Boolean(database) &&
-    (Boolean(similarPath) ||
-      isColorMode ||
-      (hasSearchQuery && (searchMode === "keyword" || hasCurrentTextVector)));
-  const similarFilename = similarPath?.split("/").at(-1) ?? null;
-  const similarPreviewSrc = similarPath
-    ? getResizedAlbumImageSrc(similarPath)
-    : null;
 
+  const {
+    canClear,
+    colorHex,
+    debouncedSearchQuery,
+    fetchNextPage,
+    hasNextPage,
+    isColorMode,
+    isFetching,
+    isPlaceholderData,
+    isSimilarMode,
+    isSuccess,
+    queryResults,
+    searchQuery,
+    similarFilename,
+    similarPreviewSrc,
+    textModelProgress,
+    textModelProgressDetails,
+    textModelStage,
+    textVectorError,
+    trimmedQuery,
+  } = useSearchResultsState({
+    database,
+    searchInputValue,
+    similarPath,
+    colorSearch,
+    colorTolerance,
+    searchMode,
+    hasHydratedFromUrl,
+  });
+
+  const normalizedTags = useMemo(() => dedupeTags(tags), [tags]);
+  const normalizedSearchTerms = useMemo(
+    () => searchQuery.map((term) => term.trim().toLowerCase()).filter(Boolean),
+    [searchQuery],
+  );
+  const normalizedDebouncedSearchTerms = useMemo(
+    () =>
+      debouncedSearchQuery
+        .map((term) => term.trim().toLowerCase())
+        .filter(Boolean),
+    [debouncedSearchQuery],
+  );
+  const normalizedTagNames = useMemo(
+    () => normalizedTags.map((tag) => tag.name),
+    [normalizedTags],
+  );
+
+  const similarClickstreamPaths = new Set([
+    ...similarTrail.map((item) => item.path),
+    ...(similarPath ? [similarPath] : []),
+  ]);
+  const isEmptyState =
+    !isSimilarMode && !isColorMode && searchInputValue.trim() === "";
 
   useEffect(() => {
     const initialSearchState = getInitialSearchState();
@@ -219,185 +113,6 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
     setSearchMode(initialSearchState.searchMode);
     setHasHydratedFromUrl(initialSearchState.hasHydratedFromUrl);
   }, []);
-
-  useEffect(() => {
-    if (isSimilarMode || searchMode === "keyword") {
-      return;
-    }
-
-    setTextModelProgress(0);
-    setTextModelStage("Loading semantic search model...");
-    setTextModelProgressDetails({ loaded: 0, total: 0 });
-
-    void warmupTextEmbeddingModel((progress, stage, details) => {
-      setTextModelProgress(progress);
-      setTextModelStage(stage);
-      setTextModelProgressDetails(details ?? { loaded: 0, total: 0 });
-    })
-    .then(() => {
-      setTextModelProgress(100);
-      setTextModelStage("Search model ready");
-      setTextModelProgressDetails({ loaded: 0, total: 0 });
-    })
-    .catch((err) => {
-      console.warn("Failed to warm semantic search model", err);
-      setTextModelProgress(100);
-      setTextModelProgressDetails({ loaded: 0, total: 0 });
-    });
-  }, [isSimilarMode, searchMode]);
-
-  useEffect(() => {
-    if (!needsTextVector) {
-      setTextVector(null);
-      setTextVectorQuery(null);
-      setIsTextVectorLoading(false);
-      setTextVectorError(null);
-      setTextModelProgressDetails({ loaded: 0, total: 0 });
-      return;
-    }
-
-    let didCancel = false;
-    const queryText = trimmedQuery;
-    setTextVector(null);
-    setTextVectorQuery(null);
-    setIsTextVectorLoading(true);
-    setTextVectorError(null);
-
-    encodeSearchText(queryText, (progress, stage, details) => {
-      setTextModelProgress(progress);
-      setTextModelStage(stage);
-      setTextModelProgressDetails(details ?? { loaded: 0, total: 0 });
-    })
-      .then((vector) => {
-        if (!didCancel) {
-          setTextVector(vector);
-          setTextVectorQuery(queryText);
-          setTextModelProgress(100);
-          setTextModelStage("Search model ready");
-          setTextModelProgressDetails({ loaded: 0, total: 0 });
-        }
-      })
-      .catch((err) => {
-        if (!didCancel) {
-          console.error("Failed to encode semantic search text", err);
-          setTextVector(null);
-          setTextVectorError("Semantic search is unavailable right now.");
-          setTextModelProgressDetails({ loaded: 0, total: 0 });
-        }
-      })
-      .finally(() => {
-        if (!didCancel) {
-          setIsTextVectorLoading(false);
-        }
-      });
-
-    return () => {
-      didCancel = true;
-    };
-  }, [needsTextVector, trimmedQuery]);
-
-  const reactQuery = useInfiniteQuery({
-    queryKey: [
-      "results",
-      {
-        debouncedSearchQuery,
-        similarPath,
-        colorSearch: debouncedColorSearch,
-        colorTolerance: debouncedColorTolerance,
-        searchMode,
-        hasTextVector: hasCurrentTextVector,
-      },
-    ],
-    queryFn: async ({ pageParam }: { pageParam: number }) => {
-      if (!database) {
-        return {
-          data: [],
-          prev: undefined,
-          next: undefined,
-        };
-      }
-
-      if (similarPath) {
-        return await fetchSimilarResults({
-          database,
-          path: similarPath,
-          pageSize: PAGE_SIZE,
-          page: pageParam,
-        });
-      }
-
-      if (debouncedColorSearch) {
-        return await fetchColorSimilarResults({
-          database,
-          color: debouncedColorSearch,
-          pageSize: PAGE_SIZE,
-          page: pageParam,
-          maxDistance: debouncedColorTolerance,
-        });
-      }
-
-      if (searchMode === "semantic" && textVector && hasCurrentTextVector) {
-        return await fetchSemanticResults({
-          database,
-          textQuery: trimmedQuery,
-          textVector,
-          pageSize: PAGE_SIZE,
-          page: pageParam,
-        });
-      }
-
-      if (searchMode === "hybrid" && textVector && hasCurrentTextVector) {
-        return await fetchHybridResults({
-          database,
-          textQuery: trimmedQuery,
-          keywordQuery,
-          textVector,
-          pageSize: PAGE_SIZE,
-          page: pageParam,
-        });
-      }
-
-      if (!hasSearchQuery) {
-        return {
-          data: [],
-          prev: undefined,
-          next: undefined,
-        };
-      }
-
-      return await fetchResults({
-        database,
-        query: keywordQuery,
-        pageSize: PAGE_SIZE,
-        page: pageParam,
-      });
-    },
-    initialPageParam: 0,
-    enabled: canRunQuery,
-    placeholderData: keepPreviousData,
-    getPreviousPageParam: (firstPage: PaginatedSearchResult) => {
-      return firstPage.prev ?? undefined;
-    },
-    getNextPageParam: (
-      lastPage: PaginatedSearchResult,
-      _allPages,
-      lastPageParam,
-    ) => {
-      return (
-        lastPage.next ??
-        (lastPage.data.length === PAGE_SIZE ? lastPageParam + 1 : undefined)
-      );
-    },
-  });
-
-  const {
-    data,
-    fetchNextPage,
-    hasNextPage,
-    isSuccess,
-    isFetching,
-    isPlaceholderData,
-  } = reactQuery;
 
   useEffect(() => {
     if (!hasHydratedFromUrl) {
@@ -413,7 +128,10 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
     if (similarPath) {
       searchParams.set("similar", similarPath);
     } else if (colorSearch) {
-      searchParams.set("color", `${colorSearch[0]},${colorSearch[1]},${colorSearch[2]}`);
+      searchParams.set(
+        "color",
+        `${colorSearch[0]},${colorSearch[1]},${colorSearch[2]}`,
+      );
     } else if (debouncedSearchQuery.length > 0) {
       searchParams.set("q", debouncedSearchQuery.join(","));
     }
@@ -435,7 +153,13 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
     } catch (err) {
       console.warn("Failed to sync search URL", err);
     }
-  }, [colorSearch, debouncedSearchQuery, hasHydratedFromUrl, searchMode, similarPath]);
+  }, [
+    colorSearch,
+    debouncedSearchQuery,
+    hasHydratedFromUrl,
+    searchMode,
+    similarPath,
+  ]);
 
   useEffect(() => {
     function handler(ev: KeyboardEvent) {
@@ -459,29 +183,6 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
     };
   }, []);
 
-  const [tags, setTags] = useState<Tag[]>([]);
-  const [recentVisibleCount, setRecentVisibleCount] = useState<number>(
-    RECENT_ROW_INITIAL_SIZE,
-  );
-  const [recentResults, setRecentResults] = useState<SearchResultRow[]>([]);
-  const [randomResults, setRandomResults] = useState<SearchResultRow[]>([]);
-  const [hasMoreRandomResults, setHasMoreRandomResults] =
-    useState<boolean>(true);
-  const [randomAutoLoadCount, setRandomAutoLoadCount] = useState<number>(0);
-  const [isRandomSimilarLoading, setIsRandomSimilarLoading] =
-    useState<boolean>(false);
-  const [isRecentLoading, setIsRecentLoading] = useState<boolean>(false);
-  const [isRandomResultsLoading, setIsRandomResultsLoading] =
-    useState<boolean>(false);
-  const [randomExploreError, setRandomExploreError] = useState<string | null>(
-    null,
-  );
-  const [randomResultsError, setRandomResultsError] = useState<string | null>(
-    null,
-  );
-  const [recentExploreError, setRecentExploreError] = useState<string | null>(
-    null,
-  );
   useEffect(() => {
     if (!database) {
       return;
@@ -497,195 +198,6 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
       })
       .catch(console.error);
   }, [database]);
-
-  useEffect(() => {
-    if (!database) {
-      setRecentResults([]);
-      setRecentExploreError(null);
-      return;
-    }
-
-    let didCancel = false;
-    setIsRecentLoading(true);
-    setRecentExploreError(null);
-
-    fetchRecentResults({ database, pageSize: recentVisibleCount })
-      .then((results) => {
-        if (!didCancel) {
-          setRecentResults(results);
-        }
-      })
-      .catch((err) => {
-        if (!didCancel) {
-          console.error(err);
-          setRecentExploreError("Couldn't load recent photos right now.");
-        }
-      })
-      .finally(() => {
-        if (!didCancel) {
-          setIsRecentLoading(false);
-        }
-      });
-
-    return () => {
-      didCancel = true;
-    };
-  }, [database, recentVisibleCount]);
-
-  useEffect(() => {
-    if (!database) {
-      setRandomResults([]);
-      setRandomResultsError(null);
-      return;
-    }
-
-    let didCancel = false;
-    setHasMoreRandomResults(true);
-    setRandomAutoLoadCount(0);
-    setIsRandomResultsLoading(true);
-    setRandomResultsError(null);
-
-    fetchRandomResults({ database, pageSize: RANDOM_ROW_INITIAL_SIZE })
-      .then((results) => {
-        if (!didCancel) {
-          setRandomResults(results);
-          setHasMoreRandomResults(results.length === RANDOM_ROW_INITIAL_SIZE);
-        }
-      })
-      .catch((err) => {
-        if (!didCancel) {
-          console.error(err);
-          setRandomResultsError("Couldn't load random photos right now.");
-        }
-      })
-      .finally(() => {
-        if (!didCancel) {
-          setIsRandomResultsLoading(false);
-        }
-      });
-
-    return () => {
-      didCancel = true;
-    };
-  }, [database]);
-
-  const loadMoreRandomResults = useCallback(
-    async (trigger: "manual" | "auto" = "manual") => {
-      if (!database || isRandomResultsLoading) {
-        return;
-      }
-
-      setIsRandomResultsLoading(true);
-      setRandomResultsError(null);
-
-      try {
-        const results = await fetchRandomResults({
-          database,
-          pageSize: RANDOM_ROW_LOAD_MORE_SIZE,
-          excludePaths: randomResults.map((result) => result.path),
-        });
-
-        setRandomResults((prev) => [...prev, ...results]);
-        setHasMoreRandomResults(results.length === RANDOM_ROW_LOAD_MORE_SIZE);
-        if (trigger === "auto") {
-          setRandomAutoLoadCount((prev) => prev + 1);
-        }
-      } catch (err) {
-        console.error(err);
-        setRandomResultsError("Couldn't load random photos right now.");
-      } finally {
-        setIsRandomResultsLoading(false);
-      }
-    },
-    [database, isRandomResultsLoading, randomResults],
-  );
-
-  const normalizedTags = useMemo(() => dedupeTags(tags), [tags]);
-  const normalizedSearchTerms = useMemo(
-    () =>
-      searchQuery.map((term) => term.trim().toLowerCase()).filter(Boolean),
-    [searchQuery],
-  );
-  const normalizedDebouncedSearchTerms = useMemo(
-    () =>
-      debouncedSearchQuery
-        .map((term) => term.trim().toLowerCase())
-        .filter(Boolean),
-    [debouncedSearchQuery],
-  );
-  const normalizedDebouncedSearchTermsKey =
-    normalizedDebouncedSearchTerms.join("|");
-  const normalizedTagNames = useMemo(
-    () => normalizedTags.map((tag) => tag.name),
-    [normalizedTags],
-  );
-  const normalizedTagNamesKey = normalizedTagNames.join("|");
-  const breadcrumbEntries = similarTrail.map((item, idx, trail) => ({
-    ...item,
-    path: item.path,
-    idx,
-    key: `${item.path}::${
-      trail.slice(0, idx).filter((candidate) => candidate.path === item.path)
-        .length
-    }`,
-  }));
-  const similarClickstreamPaths = new Set([
-    ...similarTrail.map((item) => item.path),
-    ...(similarPath ? [similarPath] : []),
-  ]);
-  const isEmptyState = !isSimilarMode && !isColorMode && searchInputValue.trim() === "";
-  const queryResults = data?.pages.flatMap((page) => page.data);
-  const canClear = isSimilarMode || isColorMode || searchInputValue.trim() !== "";
-  const [refinementCounts, setRefinementCounts] = useState<
-    Record<string, number>
-  >({});
-
-  useEffect(() => {
-    if (
-      !isEmptyState ||
-      !hasMoreRandomResults ||
-      isRandomResultsLoading ||
-      randomAutoLoadCount >= 50
-    ) {
-      return;
-    }
-
-    const button = randomLoadMoreButtonRef.current;
-
-    if (!button || typeof IntersectionObserver === "undefined") {
-      return;
-    }
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        const [entry] = entries;
-
-        if (!entry?.isIntersecting) {
-          return;
-        }
-
-        observer.disconnect();
-        void loadMoreRandomResults("auto");
-      },
-      {
-        rootMargin: "160px 0px",
-        threshold: 0.1,
-      },
-    );
-
-    observer.observe(button);
-
-    return () => {
-      observer.disconnect();
-    };
-  }, [
-    hasMoreRandomResults,
-    isEmptyState,
-    isRandomResultsLoading,
-    loadMoreRandomResults,
-    randomAutoLoadCount,
-    randomResults.length,
-  ]);
 
   useEffect(() => {
     if (
@@ -725,9 +237,7 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
     isSimilarMode,
     isColorMode,
     normalizedDebouncedSearchTerms,
-    normalizedDebouncedSearchTermsKey,
     normalizedTagNames,
-    normalizedTagNamesKey,
   ]);
 
   useSafeLayoutEffect(() => {
@@ -767,84 +277,39 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
     };
   }, [similarPath, isColorMode]);
 
-  useSafeLayoutEffect(() => {
-    const nextPositions: Record<string, DOMRect> = {};
-
-    const animateIntoPlace = (
-      element: HTMLDivElement,
-      startingTransform: string,
-    ) => {
-      element.style.transition = "none";
-      element.style.transform = startingTransform;
-      void element.getBoundingClientRect();
-
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          element.style.removeProperty("transition");
-          element.style.removeProperty("transform");
-        });
-      });
-    };
-
-    breadcrumbEntries.forEach((entry) => {
-      const element = breadcrumbRefs.current[entry.key];
-
-      if (!element) {
-        return;
-      }
-
-      const currentPosition = element.getBoundingClientRect();
-      const previousPosition = breadcrumbPositionsRef.current[entry.key];
-
-      nextPositions[entry.key] = currentPosition;
-
-      if (!previousPosition) {
-        animateIntoPlace(element, "translateX(-14px)");
-        return;
-      }
-
-      const deltaX = previousPosition.left - currentPosition.left;
-
-      if (Math.abs(deltaX) < 1) {
-        return;
-      }
-
-      animateIntoPlace(element, `translateX(${deltaX}px)`);
-    });
-
-    breadcrumbPositionsRef.current = nextPositions;
-  }, [breadcrumbEntries.map((entry) => entry.key).join("|")]);
-
-  const applySearchTerms = (terms: string[]) => {
+  const applySearchTerms = useCallback((terms: string[]) => {
     setSimilarPath(null);
     setSimilarTrail([]);
     setColorSearch(null);
     setRandomExploreError(null);
     setSearchInputValue(terms.join(","));
-  };
+  }, []);
 
-  const clearSearchState = () => {
+  const clearSearchState = useCallback(() => {
     setSearchInputValue("");
     setSimilarPath(null);
     setSimilarTrail([]);
     setColorSearch(null);
-  };
+  }, []);
 
-  const truncateSimilarStack = (breadcrumbIndex: number) => {
+  const truncateSimilarStack = useCallback((breadcrumbIndex: number) => {
     setSimilarTrail((prev) => {
       const nextCurrentPath =
         breadcrumbIndex > 0 ? (prev[breadcrumbIndex - 1]?.path ?? null) : null;
       setSimilarPath(nextCurrentPath);
       return breadcrumbIndex > 1 ? prev.slice(0, breadcrumbIndex - 1) : [];
     });
-  };
+  }, []);
 
-  const startSimilarSearch = (path: string) => {
-    clearSearchState();
-    setSimilarPath(path);
-  };
+  const startSimilarSearch = useCallback(
+    (path: string) => {
+      clearSearchState();
+      setSimilarPath(path);
+    },
+    [clearSearchState],
+  );
 
-  const loadRandomSimilarTrail = async () => {
+  const loadRandomSimilarTrail = useCallback(async () => {
     if (!database || isRandomSimilarLoading) {
       return;
     }
@@ -870,197 +335,74 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
     } finally {
       setIsRandomSimilarLoading(false);
     }
-  };
+  }, [database, isRandomSimilarLoading]);
+
+  const handleFindSimilar = useCallback(
+    (path: string, similarity?: number) => {
+      if (path === similarPath) {
+        return;
+      }
+
+      setSearchInputValue("");
+      setSimilarTrail((prev) => {
+        if (!similarPath) {
+          return prev;
+        }
+
+        return [...prev, { path: similarPath, similarity }];
+      });
+      setSimilarPath(path);
+    },
+    [similarPath],
+  );
+
+  const handleToggleTag = useCallback((tagName: string, isActive: boolean) => {
+    setSimilarPath(null);
+    setSimilarTrail([]);
+    setRandomExploreError(null);
+    setSearchInputValue((prev) => {
+      const nextTerms = parseSearchTerms(prev);
+      const updatedTerms = isActive
+        ? nextTerms.filter(
+            (term) => term && term.trim().toLowerCase() !== tagName,
+          )
+        : [...nextTerms.filter((term) => term), tagName];
+      return updatedTerms.join(",");
+    });
+  }, []);
 
   return (
     <div className={styles.searchWidget}>
-      <div className={styles.browseActionsBar}>
-        <div className={styles.exploreActions}>
-          <button
-            type="button"
-            className={styles.exploreAction}
-            aria-label="Random similarity trail"
-            onClick={loadRandomSimilarTrail}
-            disabled={!database || isRandomSimilarLoading}
-          >
-            {isRandomSimilarLoading
-              ? "Picking a random photo..."
-              : "🎲 Random similarity trail"}
-          </button>
-          <Link
-            href="/map"
-            prefetch={false}
-            className={styles.secondaryAction}
-            aria-label="Explore the map"
-            onClick={(event) => {
-              forceDocumentNavigation(event, "/map");
-            }}
-          >
-            🗺️ Explore the map
-          </Link>
-          <Link
-            href="/slideshow"
-            prefetch={false}
-            className={styles.secondaryAction}
-            aria-label="Open slideshow"
-            onClick={(event) => {
-              forceDocumentNavigation(event, "/slideshow");
-            }}
-          >
-            🖼️ Open slideshow
-          </Link>
-          <Link
-            href="/timeline"
-            prefetch={false}
-            className={styles.secondaryAction}
-            aria-label="Browse timeline"
-            onClick={(event) => {
-              forceDocumentNavigation(event, "/timeline");
-            }}
-          >
-            📅 Browse timeline
-          </Link>
-        </div>
+      <SearchBrowseActions
+        databaseReady={Boolean(database)}
+        isRandomSimilarLoading={isRandomSimilarLoading}
+        randomExploreError={randomExploreError}
+        onLoadRandomSimilarTrail={loadRandomSimilarTrail}
+      />
 
-        {randomExploreError ? (
-          <div className={styles.inlineError}>{randomExploreError}</div>
-        ) : null}
-      </div>
-
-      <div className={styles.searchInputRow}>
-        {isColorMode && colorSearch ? (
-          <div className={styles.modeInputArea} ref={modeSourceRef}>
-            <label className={styles.modeColorSwatchLabel} title="Click to change color">
-              <div
-                className={styles.modeColorSwatch}
-                style={{ backgroundColor: rgbToString(colorSearch) }}
-              />
-              <input
-                type="color"
-                className={styles.modeColorInput}
-                value={colorHex ?? ""}
-                onChange={(e) => {
-                  const rgb = hexToRgb(e.target.value);
-                  if (rgb) setColorSearch(rgb);
-                }}
-              />
-            </label>
-            <span className={styles.modeColorHex}>{colorHex}</span>
-            <div className={styles.modeColorDivider} />
-            <label className={styles.modeColorToleranceLabel}>
-              <span className={styles.modeLabel}>Range</span>
-              <input
-                type="range"
-                className={styles.modeColorToleranceSlider}
-                min={5}
-                max={60}
-                value={colorTolerance}
-                onChange={(e) => setColorTolerance(Number(e.target.value))}
-                aria-label="Color distance tolerance"
-                title="How similar the color needs to be (lower = more exact, higher = more results)"
-              />
-              <span className={styles.modeColorToleranceValue}>±{colorTolerance}</span>
-            </label>
-            <button
-              type="button"
-              className={styles.modeClearButton}
-              onClick={clearSearchState}
-              aria-label="Exit color search"
-              title="Exit color search"
-            >
-              ×
-            </button>
-          </div>
-        ) : isSimilarMode ? null : (
-          <>
-            <div className={styles.searchInputContainer}>
-              <input
-                suppressHydrationWarning
-                type="text"
-                value={searchInputValue}
-                placeholder="Type / to search (try 'cat at night', 'white', 'mavica')"
-                spellCheck={false}
-                autoFocus
-                onChange={(ev) => {
-                  applySearchTerms(ev.target.value.split(","));
-                }}
-                ref={inputRef}
-                tabIndex={0}
-                title={
-                  props.disabled || !database
-                    ? "Disabled: the SQLite WASM failed to load, your browser does not support service workers, or the server is missing the proper COEP/COOP headers"
-                    : undefined
-                }
-              />
-              {canClear ? (
-                <button
-                  className={styles.clearButton}
-                  onClick={() => {
-                    clearSearchState();
-                  }}
-                  title="Clear search"
-                  type="button"
-                >
-                  ×
-                </button>
-              ) : null}
-            </div>
-            {!isSimilarMode ? (
-              <label className={styles.searchModeSelectLabel}>
-                <select
-                  className={styles.searchModeSelect}
-                  aria-label="Search mode"
-                  value={searchMode}
-                  onChange={(event) => {
-                    setSearchMode(event.target.value as SearchMode);
-                  }}
-                >
-                  <option value="keyword">Keyword search</option>
-                  <option value="semantic">Semantic search</option>
-                  <option value="hybrid">Semantic + keyword</option>
-                </select>
-                <span
-                  className={styles.searchModeInfo}
-                  aria-label="Search mode help"
-                  title="Keyword search matches indexed terms. Semantic search matches visual meaning using embeddings. Hybrid search fuses both rankings."
-                >
-                  ⓘ
-                </span>
-              </label>
-            ) : null}
-            {!isSimilarMode ? (
-              <label
-                className={styles.secondaryAction}
-                title="Pick a color to search by"
-              >
-                🎨 Color
-                <input
-                  type="color"
-                  className={styles.colorPickerInput}
-                  onChange={(e) => {
-                    const rgb = hexToRgb(e.target.value);
-                    if (rgb) {
-                      clearSearchState();
-                      setColorSearch(rgb);
-                    }
-                  }}
-                />
-              </label>
-            ) : null}
-          </>
-        )}
-
-        {isSuccess &&
-        !isFetching &&
-        !isSimilarMode &&
-        searchMode === "keyword" &&
-        trimmedQuery.length < 3 &&
-        queryResults?.length === 0 ? (
-          <div className={styles.searchHintInline}>
-            Type a minimum of 3 characters
-          </div>
-        ) : null}
-      </div>
+      <SearchInputBar
+        canClear={canClear}
+        colorHex={colorHex}
+        colorSearch={colorSearch}
+        colorTolerance={colorTolerance}
+        databaseReady={Boolean(database)}
+        disabled={disabled}
+        inputRef={inputRef}
+        isColorMode={isColorMode}
+        isFetching={isFetching}
+        isSimilarMode={isSimilarMode}
+        isSuccess={isSuccess}
+        modeSourceRef={modeSourceRef}
+        queryResultsLength={queryResults?.length}
+        searchInputValue={searchInputValue}
+        searchMode={searchMode}
+        trimmedQuery={trimmedQuery}
+        onApplySearchTerms={applySearchTerms}
+        onClearSearchState={clearSearchState}
+        onSetColorSearch={setColorSearch}
+        onSetColorTolerance={setColorTolerance}
+        onSetSearchMode={setSearchMode}
+      />
 
       {!isSimilarMode && searchMode !== "keyword" && textModelProgress < 100 ? (
         <div className={styles.searchModeStatus}>
@@ -1077,405 +419,54 @@ export const Search: React.FC<{ disabled?: boolean }> = (props) => {
       ) : null}
 
       {isEmptyState ? (
-        <section className={styles.emptyState} aria-label="Explore browse mode">
-          <div className={styles.emptySections}>
-            <section className={styles.sectionSurface}>
-              <div className={styles.emptyTagsCaption}>
-                <SharedTagsCaption />
-              </div>
-              <ProgressBar
-                progress={progress}
-                details={databaseProgressDetails}
-              />
-              <div className={styles.tagsContainer}>
-                {normalizedTags.map((tag) => {
-                  return (
-                    <SearchTag
-                      key={tag.name}
-                      tag={tag.name}
-                      count={tag.count - 1}
-                      isActive={false}
-                      onClick={(tagName) => {
-                        applySearchTerms([tagName]);
-                      }}
-                    />
-                  );
-                })}
-              </div>
-            </section>
-
-            <section className={styles.sectionSurface}>
-              <div className={styles.sectionHeader}>
-                <h3 className={styles.sectionTitle}>Latest</h3>
-              </div>
-
-              {isRecentLoading ? (
-                <div className={styles.sectionStatus}>
-                  Loading recent photos...
-                </div>
-              ) : null}
-
-              {recentExploreError ? (
-                <div className={styles.inlineError}>{recentExploreError}</div>
-              ) : null}
-
-              {!isRecentLoading &&
-              !recentExploreError &&
-              recentResults.length === 0 ? (
-                <div className={styles.sectionStatus}>
-                  No dated photos available yet.
-                </div>
-              ) : null}
-
-              {recentResults.length > 0 ? (
-                <ul className={styles.results}>
-                  {recentResults.map((result) => {
-                    return (
-                      <li key={result.path} className={styles.resultLi}>
-                        <SearchResultTile
-                          result={result}
-                          onFindSimilar={(path) => {
-                            startSimilarSearch(path);
-                          }}
-                        />
-                      </li>
-                    );
-                  })}
-                  {recentResults.length >= recentVisibleCount ? (
-                    <button
-                      className={styles.moreButton}
-                      onClick={() => {
-                        setRecentVisibleCount(
-                          (prev) => prev + RECENT_ROW_LOAD_MORE_SIZE,
-                        );
-                      }}
-                      disabled={isRecentLoading}
-                    >
-                      {isRecentLoading ? (
-                        <>Loading&hellip;</>
-                      ) : (
-                        <>More&hellip;</>
-                      )}
-                    </button>
-                  ) : null}
-                </ul>
-              ) : null}
-            </section>
-
-            <section className={styles.sectionSurface}>
-              <div className={styles.sectionHeader}>
-                <h3 className={styles.sectionTitle}>Random selection</h3>
-              </div>
-
-              {isRandomResultsLoading ? (
-                <div className={styles.sectionStatus}>
-                  Loading random photos...
-                </div>
-              ) : null}
-
-              {randomResultsError ? (
-                <div className={styles.inlineError}>{randomResultsError}</div>
-              ) : null}
-
-              {!isRandomResultsLoading &&
-              !randomResultsError &&
-              randomResults.length === 0 ? (
-                <div className={styles.sectionStatus}>
-                  No random photos available yet.
-                </div>
-              ) : null}
-
-              {randomResults.length > 0 ? (
-                <ul className={styles.results}>
-                  {randomResults.map((result) => {
-                    return (
-                      <li key={result.path} className={styles.resultLi}>
-                        <SearchResultTile
-                          result={result}
-                          onFindSimilar={(path) => {
-                            startSimilarSearch(path);
-                          }}
-                        />
-                      </li>
-                    );
-                  })}
-                  {hasMoreRandomResults ? (
-                    <button
-                      ref={randomLoadMoreButtonRef}
-                      className={styles.moreButton}
-                      onClick={() => {
-                        void loadMoreRandomResults("manual");
-                      }}
-                      disabled={isRandomResultsLoading}
-                    >
-                      {isRandomResultsLoading ? (
-                        <>Loading&hellip;</>
-                      ) : (
-                        <>More&hellip;</>
-                      )}
-                    </button>
-                  ) : null}
-                </ul>
-              ) : null}
-            </section>
-          </div>
-        </section>
+        <EmptyStateExplore
+          database={database}
+          progress={progress}
+          databaseProgressDetails={databaseProgressDetails}
+          normalizedTags={normalizedTags}
+          onApplySearchTerms={applySearchTerms}
+          onStartSimilarSearch={startSimilarSearch}
+        />
       ) : null}
 
       {!isEmptyState && !isColorMode && !isSimilarMode ? (
-        <section>
-          <div className={styles.sectionHeader}>
-            <div className={styles.sectionCaption}>
-              <SharedTagsCaption />
-            </div>
-          </div>
-          <ProgressBar progress={progress} details={databaseProgressDetails} />
-          <div className={styles.tagsContainer}>
-            {normalizedTags.map((tag) => {
-              const isActive = normalizedSearchTerms.includes(tag.name);
-              const refinementCount = refinementCounts[tag.name];
-              const isDisabled = !isActive && refinementCount === 0;
-              const visibleCount =
-                !isActive && refinementCount !== undefined
-                  ? refinementCount
-                  : tag.count - 1;
-              return (
-                <SearchTag
-                  key={tag.name}
-                  tag={tag.name}
-                  count={visibleCount}
-                  isActive={isActive}
-                  disabled={isDisabled}
-                  onClick={() => {
-                    setSimilarPath(null);
-                    setSimilarTrail([]);
-                    setRandomExploreError(null);
-                    setSearchInputValue((prev) => {
-                      const nextTerms = parseSearchTerms(prev);
-                      const updatedTerms = isActive
-                        ? nextTerms.filter(
-                            (term) =>
-                              term && term.trim().toLowerCase() !== tag.name,
-                          )
-                        : [...nextTerms.filter((term) => term), tag.name];
-                      return updatedTerms.join(",");
-                    });
-                  }}
-                />
-              );
-            })}
-          </div>
-        </section>
+        <SearchRefinementSection
+          databaseProgressDetails={databaseProgressDetails}
+          normalizedSearchTerms={normalizedSearchTerms}
+          normalizedTags={normalizedTags}
+          progress={progress}
+          refinementCounts={refinementCounts}
+          onToggleTag={handleToggleTag}
+        />
       ) : null}
 
-      {isSimilarMode ? (
-        <div className={styles.modeBar}>
-          <span className={styles.modeLabel}>Similar to</span>
-          <div className={styles.modeStack}>
-            <div className={styles.modeSource} ref={modeSourceRef}>
-              <div
-                className={styles.modeSourceItem}
-                style={{ opacity: pendingRemoveIdx !== null ? 0.15 : undefined, transition: "opacity 0.15s ease" }}
-              >
-                {similarPreviewSrc ? (
-                  <img
-                    className={styles.modeSourcePreview}
-                    src={similarPreviewSrc}
-                    alt={`Source photo ${similarFilename ?? ""}`}
-                  />
-                ) : null}
-                <a
-                  className={styles.modeSourceSlideshowButton}
-                  href={`/slideshow?mode=similar&seed=${encodeURIComponent(similarPath ?? "")}`}
-                  aria-label="Start similarity trail slideshow"
-                  title="Start similarity trail slideshow"
-                  onClick={(event) =>
-                    forceDocumentNavigation(
-                      event,
-                      `/slideshow?mode=similar&seed=${encodeURIComponent(similarPath ?? "")}`,
-                    )
-                  }
-                >
-                  🖼️
-                </a>
-                <button
-                  type="button"
-                  className={styles.breadcrumbRemoveButton}
-                  onClick={() => {
-                    setPendingRemoveIdx(null);
-                    truncateSimilarStack(similarTrail.length);
-                  }}
-                  onMouseEnter={() => setPendingRemoveIdx(0)}
-                  onMouseLeave={() => setPendingRemoveIdx(null)}
-                  aria-label="Clear current similarity selection"
-                  title="Clear similarity selection"
-                >
-                  ×
-                </button>
-              </div>
-              {similarTrail.length > 0 ? (
-                <div className={styles.modeArrow} aria-hidden="true">
-                  →
-                </div>
-              ) : null}
-            </div>
-            {similarTrail.length > 0 ? (
-              <div
-                className={styles.breadcrumbs}
-                aria-label="Similarity breadcrumbs"
-              >
-                {[...breadcrumbEntries].reverse().map((entry) => {
-                  const { path, idx, key, similarity } = entry;
-                  const label = path.split("/").at(-1) ?? path;
-                  const opacity =
-                    0.35 + (0.55 * (idx + 1)) / similarTrail.length;
-                  const similarityLabel =
-                    typeof similarity === "number"
-                      ? `${Math.round(similarity * 100)}%`
-                      : null;
-                  const preview = (
-                    <img
-                      className={styles.breadcrumbPreview}
-                      src={getResizedAlbumImageSrc(path)}
-                      alt=""
-                    />
-                  );
-
-                  const wouldBeRemoved =
-                    pendingRemoveIdx !== null && idx >= pendingRemoveIdx;
-
-                  return (
-                    <div
-                      key={key}
-                      className={`${styles.breadcrumbItem}${wouldBeRemoved ? ` ${styles.breadcrumbItemWillRemove}` : ""}`}
-                      style={{ opacity: wouldBeRemoved ? undefined : opacity }}
-                      ref={(element) => {
-                        breadcrumbRefs.current[key] = element;
-                      }}
-                    >
-                      <a
-                        className={styles.breadcrumbButton}
-                        href={getAlbumAnchorHref(path)}
-                        title={`Open ${label}`}
-                        aria-label={label}
-                      >
-                        {preview}
-                        {similarityLabel ? (
-                          <span className={styles.breadcrumbSimilarity}>
-                            {similarityLabel}
-                          </span>
-                        ) : null}
-                      </a>
-                      <button
-                        type="button"
-                        className={styles.breadcrumbRemoveButton}
-                        onClick={(event) => {
-                          event.preventDefault();
-                          event.stopPropagation();
-                          setPendingRemoveIdx(null);
-                          truncateSimilarStack(idx);
-                        }}
-                        onMouseEnter={() => setPendingRemoveIdx(idx)}
-                        onMouseLeave={() => setPendingRemoveIdx(null)}
-                        aria-label={`Remove ${label} from breadcrumbs`}
-                        title={`Remove ${label} and newer selections`}
-                      >
-                        ×
-                      </button>
-                    </div>
-                  );
-                })}
-              </div>
-            ) : null}
-          </div>
-        </div>
+      {isSimilarMode && similarPath ? (
+        <SimilarTrailBar
+          similarPath={similarPath}
+          similarPreviewSrc={similarPreviewSrc}
+          similarFilename={similarFilename}
+          trail={similarTrail}
+          sourceRef={modeSourceRef}
+          onTruncate={truncateSimilarStack}
+        />
       ) : null}
 
       <div>
-        <ul className={styles.results}>
-          {isSimilarMode || isColorMode || searchInputValue.trim().length > 0 ? (
-            <>
-              {isSuccess &&
-              !isFetching &&
-              queryResults?.length === 0 &&
-              isSimilarMode ? (
-                <div>
-                  No similar results for <i>{similarPath?.split("/").at(-1)}</i>
-                </div>
-              ) : null}
-
-              {isSuccess &&
-              !isFetching &&
-              queryResults?.length === 0 &&
-              isColorMode ? (
-                <div>No photos with a similar color found.</div>
-              ) : null}
-
-              {isSuccess &&
-              !isFetching &&
-              queryResults?.length === 0 &&
-              !isSimilarMode &&
-              trimmedQuery.length >= 3 ? (
-                <div>
-                  No results for <i>{trimmedQuery}</i>
-                </div>
-              ) : null}
-
-              {queryResults?.map((r) => {
-                const isVisitedInSimilarTrail =
-                  isSimilarMode && similarClickstreamPaths.has(r.path);
-                return (
-                  <li
-                    key={r.path}
-                    className={styles.resultLi}
-                    style={{
-                      filter: [
-                        isPlaceholderData ? "saturate(0.5)" : "saturate(1)",
-                        isVisitedInSimilarTrail ? "grayscale(1)" : "",
-                      ]
-                        .filter(Boolean)
-                        .join(" "),
-                      opacity: isVisitedInSimilarTrail ? 0.55 : 1,
-                    }}
-                  >
-                    <SearchResultTile
-                      result={r}
-                      onFindSimilar={(path, similarity) => {
-                        if (path === similarPath) {
-                          return;
-                        }
-
-                        setSearchInputValue("");
-                        setSimilarTrail((prev) => {
-                          if (!similarPath) {
-                            return prev;
-                          }
-
-                          return [...prev, { path: similarPath, similarity }];
-                        });
-                        setSimilarPath(path);
-                      }}
-                    />
-                  </li>
-                );
-              })}
-
-              {hasNextPage && isSuccess ? (
-                <button
-                  className={styles.moreButton}
-                  onClick={() => {
-                    fetchNextPage();
-                  }}
-                  disabled={isFetching}
-                >
-                  {isFetching ? <>Loading&hellip;</> : <>More&hellip;</>}
-                </button>
-              ) : null}
-
-              {isFetching && !isSuccess ? <div>Searching&hellip;</div> : null}
-            </>
-          ) : null}
-        </ul>
+        <SearchResultsGrid
+          isSimilarMode={isSimilarMode}
+          isColorMode={isColorMode}
+          searchInputValue={searchInputValue}
+          trimmedQuery={trimmedQuery}
+          similarPath={similarPath}
+          results={queryResults}
+          isSuccess={isSuccess}
+          isFetching={isFetching}
+          isPlaceholderData={isPlaceholderData}
+          hasNextPage={hasNextPage}
+          similarClickstreamPaths={similarClickstreamPaths}
+          onFindSimilar={handleFindSimilar}
+          onFetchNextPage={fetchNextPage}
+        />
       </div>
     </div>
   );
