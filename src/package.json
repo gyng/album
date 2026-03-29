@@ -19,7 +19,7 @@
     "format:check": "prettier --check .",
     "format:write": "prettier --write .",
     "test": "jest",
-    "test:seo": "jest --runInBand test/seo.test.tsx test/alt.test.ts test/feed.test.ts",
+    "test:seo": "jest --runInBand test/seo.test.tsx test/alt.test.ts test/feed.test.ts services/albumFeed.test.ts",
     "test:ci": "timeout 60s jest --forceExit --runInBand && npm run lint",
     "test:e2e": "echo \"CI env: $CI\" && npm run build && playwright test",
     "test:e2e:built": "playwright test",

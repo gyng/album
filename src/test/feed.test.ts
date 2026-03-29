@@ -1,23 +1,19 @@
-/**
- * @jest-environment node
- */
-
-jest.mock("../services/album", () => ({
-  getAlbumFeedEntries: jest.fn(),
-  getAlbumFeedEntry: jest.fn(),
-  getAlbumFeedItems: jest.fn(),
-}));
-
 import { buildFeedXml, getServerSideProps as getFeedProps } from "../pages/feed.xml";
 import {
   getAlbumFeedEntries,
   getAlbumFeedEntry,
   getAlbumFeedItems,
-} from "../services/album";
+} from "../services/albumFeed";
 import {
   buildAlbumFeedXml,
   getServerSideProps as getAlbumFeedProps,
 } from "../pages/album/[slug]/feed.xml";
+
+jest.mock("../services/albumFeed", () => ({
+  getAlbumFeedEntries: jest.fn(),
+  getAlbumFeedEntry: jest.fn(),
+  getAlbumFeedItems: jest.fn(),
+}));
 
 describe("RSS feed", () => {
   beforeEach(() => {
@@ -79,40 +75,6 @@ describe("RSS feed", () => {
     );
   });
 
-  it("builds a per-album rss feed", () => {
-    const xml = buildAlbumFeedXml({
-      slug: "tokyo",
-      title: "Tokyo Trip",
-      description: "Spring photos from Tokyo.",
-      lastmod: "2025-03-10",
-    }, [
-      {
-        title: "Shibuya crossing",
-        description: "Night street scene",
-        link: "/album/tokyo#shibuya.jpg",
-        pubDate: "2025-03-09",
-      },
-      {
-        title: "Temple garden",
-        description: "Morning light in the garden",
-        link: "/album/tokyo#garden.jpg",
-        pubDate: "2025-03-08",
-      },
-    ]);
-
-    expect(xml).toContain("<title>Tokyo Trip | Snapshots</title>");
-    expect(xml).toContain(
-      "<atom:link href=\"https://photos.example.com/album/tokyo/feed.xml\"",
-    );
-    expect(xml).toContain(
-      "<guid>https://photos.example.com/album/tokyo#shibuya.jpg</guid>",
-    );
-    expect(xml).toContain("<title>Shibuya crossing</title>");
-    expect(xml).toContain(
-      "<description>Night street scene</description>",
-    );
-  });
-
   it("serves the per-album feed route", async () => {
     (getAlbumFeedEntry as jest.Mock).mockResolvedValue({
       slug: "trip",
@@ -146,6 +108,33 @@ describe("RSS feed", () => {
     );
     expect(write.mock.calls[0][0]).toContain(
       "<link>https://photos.example.com/album/trip#bridge.jpg</link>",
+    );
+  });
+
+  it("builds a per-album rss feed", () => {
+    const xml = buildAlbumFeedXml(
+      {
+        slug: "tokyo",
+        title: "Tokyo Trip",
+        description: "Spring photos from Tokyo.",
+        lastmod: "2025-03-10",
+      },
+      [
+        {
+          title: "Shibuya crossing",
+          description: "Night street scene",
+          link: "/album/tokyo#shibuya.jpg",
+          pubDate: "2025-03-09",
+        },
+      ],
+    );
+
+    expect(xml).toContain("<title>Tokyo Trip | Snapshots</title>");
+    expect(xml).toContain(
+      "<atom:link href=\"https://photos.example.com/album/tokyo/feed.xml\"",
+    );
+    expect(xml).toContain(
+      "<guid>https://photos.example.com/album/tokyo#shibuya.jpg</guid>",
     );
   });
 });

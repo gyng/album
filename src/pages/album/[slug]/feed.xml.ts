@@ -2,7 +2,7 @@ import type { GetServerSideProps } from "next";
 import {
   getAlbumFeedEntry,
   getAlbumFeedItems,
-} from "../../../services/album";
+} from "../../../services/albumFeed";
 import { getCanonicalUrl } from "../../../lib/seo";
 import { buildRssXml, toRssDate } from "../../../lib/rss";
 

@@ -1,5 +1,5 @@
 import type { GetServerSideProps } from "next";
-import { getAlbumFeedEntries } from "../services/album";
+import { getAlbumFeedEntries } from "../services/albumFeed";
 import { getCanonicalUrl, getDefaultSeo } from "../lib/seo";
 import { buildRssXml, toRssDate } from "../lib/rss";
 

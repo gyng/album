@@ -1,5 +1,5 @@
 import type { GetServerSideProps } from "next";
-import { getAlbumSitemapEntries } from "../services/album";
+import { getAlbumSitemapEntries } from "../services/albumFeed";
 import { getCanonicalUrl } from "../lib/seo";
 
 type SitemapEntry = {

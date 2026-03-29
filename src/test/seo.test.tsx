@@ -13,6 +13,9 @@ jest.mock("next/head", () => ({
 jest.mock("../services/album", () => ({
   getAlbumFromName: jest.fn(),
   getAlbumNames: jest.fn(),
+}));
+
+jest.mock("../services/albumFeed", () => ({
   getAlbumSitemapEntries: jest.fn(),
 }));
 
@@ -41,9 +44,8 @@ import {
 import { buildRobotsTxt } from "../pages/robots.txt";
 import { buildSitemapXml, getServerSideProps as getSitemapProps } from "../pages/sitemap.xml";
 import {
-  getAlbumNames,
   getAlbumSitemapEntries,
-} from "../services/album";
+} from "../services/albumFeed";
 
 const AlbumPage = require("../pages/album/[[...slug]]").default;
 const MapPage = require("../pages/map/index").default;
@@ -227,7 +229,6 @@ describe("SEO helpers", () => {
 describe("sitemap route", () => {
   beforeEach(() => {
     process.env.NEXT_PUBLIC_SITE_URL = "https://photos.example.com";
-    (getAlbumNames as jest.Mock).mockReset();
     (getAlbumSitemapEntries as jest.Mock).mockReset();
   });
 
