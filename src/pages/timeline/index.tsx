@@ -152,8 +152,6 @@ const TimelinePage: NextPage<PageProps> = ({ entries }) => {
     <div className={styles.page}>
       <Head>
         <title>Timeline</title>
-        <link rel="icon" href="/favicon.svg" />
-        <meta name="theme-color" content="#2c2c2c" />
       </Head>
 
       <main className={styles.main}>

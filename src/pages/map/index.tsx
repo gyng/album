@@ -30,8 +30,6 @@ const WorldMap: NextPage<PageProps> = (props) => {
     <div className={styles.container}>
       <Head>
         <title>Map</title>
-        <link rel="icon" href="/favicon.svg" />
-        <meta name="theme-color" content="#2c2c2c" />
       </Head>
       <div className={[styles.titleBar, commonStyles.topBar].join(" ")}>
         <Link href="/" className={commonStyles.button}>

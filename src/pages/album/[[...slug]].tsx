@@ -49,8 +49,6 @@ const Album: NextPage<PageProps> = ({ album }) => {
             content={`${title} photo album: ${imageCount} photos`}
           />
         )}
-        <link rel="icon" href="/favicon.svg" />
-        <meta name="theme-color" content="#2c2c2c" />
         {cover ? (
           <meta
             property="og:image"
