@@ -41,10 +41,26 @@ const WorldMap: NextPage<PageProps> = (props) => {
     [filteredPhotos],
   );
   const hasRoute = filterAlbum != null && routeEligiblePhotoCount >= 2;
+  const routableAlbumCount = React.useMemo(() => {
+    const byAlbum = new Map<string, number>();
+    for (const photo of props.photos) {
+      if (
+        typeof photo.decLat !== "number" ||
+        typeof photo.decLng !== "number"
+      ) {
+        continue;
+      }
+
+      byAlbum.set(photo.album, (byAlbum.get(photo.album) ?? 0) + 1);
+    }
+
+    return Array.from(byAlbum.values()).filter((count) => count >= 2).length;
+  }, [props.photos]);
   const defaultRouteMode = React.useMemo<RouteMode>(
     () => getDefaultRouteMode(filteredPhotos),
     [filteredPhotos],
   );
+  const [showAllRoutes, setShowAllRoutes] = React.useState(false);
 
   return (
     <div className={styles.container}>
@@ -79,14 +95,27 @@ const WorldMap: NextPage<PageProps> = (props) => {
             {routeEligiblePhotoCount === 1 ? "" : "s"}.
           </div>
         ) : null}
+        {!filterAlbum && routableAlbumCount > 0 ? (
+          <button
+            type="button"
+            className={commonStyles.button}
+            onClick={() => {
+              setShowAllRoutes((current) => !current);
+            }}
+          >
+            {showAllRoutes ? "Hide all journeys" : "Show all journeys"}
+          </button>
+        ) : null}
       </div>
 
       <MapWorldDeferred
         photos={filteredPhotos}
         className={styles.map}
-        showRoute={false}
-        routeMode={defaultRouteMode}
-        routeDisplayMode="active-only"
+        showRoute={!filterAlbum && showAllRoutes}
+        routeMode={filterAlbum ? defaultRouteMode : "simplified"}
+        routeDisplayMode={
+          !filterAlbum && showAllRoutes ? "always" : "active-only"
+        }
       />
     </div>
   );

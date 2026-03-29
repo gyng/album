@@ -15,7 +15,6 @@
     0 0 0 2px var(--outline-color),
     0 1px 2px rgb(0 0 0 / 0.18);
   opacity: 0.9;
-  transform: translateY(1px);
 }
 
 .link {

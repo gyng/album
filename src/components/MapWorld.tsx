@@ -23,6 +23,7 @@ import {
   buildContextRoutePoints,
   buildMapRoute,
   distanceMetersBetween,
+  RouteGeoJson,
   RouteMode,
   RoutePoint,
   toRouteGeoJson,
@@ -235,15 +236,37 @@ const withSaturation = (
 };
 
 const getDirectionalGradientStops = (fromColor: string, toColor: string) => {
-  const olderColor = withSaturation(fromColor, 100, 32);
-  const middleColor = withSaturation(toColor, 100, 48);
-  const newerColor = withSaturation(toColor, 100, 68);
+  const olderColor = withSaturation(fromColor, 100, 20);
+  const middleColor = withSaturation(toColor, 100, 50);
+  const newerColor = withSaturation(toColor, 100, 78);
 
   return [
     { offset: "0%", color: olderColor },
-    { offset: "42%", color: middleColor },
+    { offset: "38%", color: middleColor },
     { offset: "100%", color: newerColor },
   ];
+};
+
+const getDirectionalGradientColors = (fromColor: string, toColor: string) => {
+  const stops = getDirectionalGradientStops(fromColor, toColor);
+
+  return {
+    start: stops[0]?.color ?? fromColor,
+    middle: stops[1]?.color ?? toColor,
+    end: stops[2]?.color ?? toColor,
+  };
+};
+
+const getBackgroundJourneyGradientColors = (
+  fromColor: string,
+  toColor: string,
+) => {
+  return {
+    start: withSaturation(fromColor, 100, 10),
+    quarter: withSaturation(fromColor, 100, 24),
+    middle: withSaturation(toColor, 100, 56),
+    end: withSaturation(toColor, 100, 90),
+  };
 };
 
 const getRouteSpeedSeconds = (
@@ -340,19 +363,7 @@ const isTransferLeg = (
   return distanceKm >= 12 || hours >= 2;
 };
 
-const MapRouteOverlay = ({
-  routePoints,
-  routeMode,
-  getPointColor,
-  showSpeedLabels,
-  ghostRoutePoints,
-}: {
-  routePoints: RoutePoint[] | null;
-  routeMode: RouteMode;
-  getPointColor: (point: RoutePoint, index: number) => string;
-  showSpeedLabels: boolean;
-  ghostRoutePoints: RoutePoint[] | null;
-}) => {
+const useMapOverlayVersion = () => {
   const { current: map } = useMap();
   const [version, setVersion] = React.useState(0);
 
@@ -392,6 +403,24 @@ const MapRouteOverlay = ({
       map.off("resize", update);
     };
   }, [map]);
+
+  return { map, version };
+};
+
+const MapRouteOverlay = ({
+  routePoints,
+  routeMode,
+  getPointColor,
+  showSpeedLabels,
+  ghostRoutePoints,
+}: {
+  routePoints: RoutePoint[] | null;
+  routeMode: RouteMode;
+  getPointColor: (point: RoutePoint, index: number) => string;
+  showSpeedLabels: boolean;
+  ghostRoutePoints: RoutePoint[] | null;
+}) => {
+  const { map, version } = useMapOverlayVersion();
 
   const projectedSegments = React.useMemo(() => {
     if (!map || !routePoints || routePoints.length < 2) {
@@ -829,24 +858,90 @@ export const MMap: React.FC<MapWorldProps> = ({
     () => toRouteGeoJson(activeContextRoutePoints ?? []),
     [activeContextRoutePoints],
   );
+  const markerColorByHref = React.useMemo(
+    () =>
+      new globalThis.Map(
+        photosWithStyles.map(
+          (photo) => [photo.href, photo.markerColor] as const,
+        ),
+      ),
+    [photosWithStyles],
+  );
   const fullRoutePoints = React.useMemo(() => {
     if (!showRoute || routeDisplayMode !== "always") {
       return null;
     }
 
-    if (routeDataByAlbum.size !== 1) {
+    if (routeDataByAlbum.size === 1) {
+      const route = Array.from(routeDataByAlbum.values())[0];
+      return routeMode === "simplified"
+        ? (route?.simplifiedPoints ?? null)
+        : (route?.fullPoints ?? null);
+    }
+
+    return null;
+  }, [routeDataByAlbum, routeDisplayMode, routeMode, showRoute]);
+  const alwaysVisibleRouteGeoJson = React.useMemo(() => {
+    if (!showRoute || routeDisplayMode !== "always") {
       return null;
     }
 
-    const route = Array.from(routeDataByAlbum.values())[0];
-    return routeMode === "simplified"
-      ? (route?.simplifiedPoints ?? null)
-      : (route?.fullPoints ?? null);
-  }, [routeDataByAlbum, routeDisplayMode, routeMode, showRoute]);
-  const fullRouteGeoJson = React.useMemo(() => {
-    return toRouteGeoJson(fullRoutePoints ?? []);
-  }, [fullRoutePoints]);
-  const routeGeoJson = fullRouteGeoJson ?? activeContextRouteGeoJson;
+    if (fullRoutePoints) {
+      return toRouteGeoJson(fullRoutePoints);
+    }
+
+    const features = Array.from(routeDataByAlbum.entries()).flatMap(
+      ([album, route]) => {
+        const points =
+          routeMode === "simplified" ? route.simplifiedPoints : route.fullPoints;
+        const routeGeoJson = toRouteGeoJson(points);
+        const startPoint = points[0];
+        const endPoint = points.at(-1);
+        const gradientColors =
+          startPoint && endPoint
+            ? getBackgroundJourneyGradientColors(
+                markerColorByHref.get(startPoint.memberHrefs.at(-1) ?? startPoint.href) ??
+                  markerColorByHref.get(startPoint.href) ??
+                  "#12bcd4",
+                markerColorByHref.get(endPoint.memberHrefs.at(-1) ?? endPoint.href) ??
+                  markerColorByHref.get(endPoint.href) ??
+                  "#12bcd4",
+              )
+            : null;
+
+        return (
+          routeGeoJson?.features.map((feature) => ({
+            ...feature,
+            properties: {
+              ...feature.properties,
+              album,
+              routeColorStart: gradientColors?.start ?? "#0f4b6e",
+              routeColorQuarter: gradientColors?.quarter ?? "#145b83",
+              routeColorMiddle: gradientColors?.middle ?? "#12bcd4",
+              routeColorEnd: gradientColors?.end ?? "#b9fbff",
+            },
+          })) ?? []
+        );
+      },
+    );
+
+    if (features.length === 0) {
+      return null;
+    }
+
+    return {
+      type: "FeatureCollection",
+      features,
+    } satisfies RouteGeoJson;
+  }, [
+    fullRoutePoints,
+    markerColorByHref,
+    routeDataByAlbum,
+    routeDisplayMode,
+    routeMode,
+    showRoute,
+  ]);
+  const routeGeoJson = alwaysVisibleRouteGeoJson ?? activeContextRouteGeoJson;
   const overlayRoutePoints = activeContextRoutePoints ?? fullRoutePoints;
   const ghostRoutePoints =
     activeContextRoutePoints &&
@@ -864,15 +959,6 @@ export const MMap: React.FC<MapWorldProps> = ({
     [overlayRoutePoints],
   );
   const shouldEmphasizeRouteMarkers = clickInfo !== null;
-  const markerColorByHref = React.useMemo(
-    () =>
-      new globalThis.Map(
-        photosWithStyles.map(
-          (photo) => [photo.href, photo.markerColor] as const,
-        ),
-      ),
-    [photosWithStyles],
-  );
   const getRoutePointColor = React.useCallback(
     (point: RoutePoint, index: number) => {
       const memberHref = point.memberHrefs.at(-1) ?? point.href;
@@ -998,23 +1084,73 @@ export const MMap: React.FC<MapWorldProps> = ({
               id="journey-line-glow-layer"
               type="line"
               paint={{
-                "line-color": "#dbfbff",
-                "line-opacity": 0.35,
-                "line-width": routeLineWidth + 4,
+                "line-color":
+                  routeDataByAlbum.size > 1
+                    ? ["coalesce", ["get", "routeColorMiddle"], "#b7eef5"]
+                    : "#dbfbff",
+                "line-opacity": routeDataByAlbum.size > 1 ? 0.34 : 0.35,
+                "line-width":
+                  routeDataByAlbum.size > 1
+                    ? [
+                        "interpolate",
+                        ["linear"],
+                        ["line-progress"],
+                        0,
+                        2.4,
+                        0.32,
+                        6.2,
+                        1,
+                        10.2,
+                      ]
+                    : routeLineWidth + 4,
               }}
             />
             <Layer
               id="journey-line-layer"
               type="line"
               paint={{
-                "line-color": routeColorStops[1]?.color ?? "#12bcd4",
-                "line-opacity": fullRouteGeoJson
-                  ? routeMode === "simplified"
-                    ? 0.55
-                    : 0.78
+                "line-color":
+                  routeDataByAlbum.size > 1
+                    ? "#12bcd4"
+                    : (routeColorStops[1]?.color ?? "#12bcd4"),
+                "line-gradient":
+                  routeDataByAlbum.size > 1
+                    ? [
+                        "interpolate",
+                        ["linear"],
+                        ["line-progress"],
+                        0,
+                        ["coalesce", ["get", "routeColorStart"], "#0f4b6e"],
+                        0.24,
+                        ["coalesce", ["get", "routeColorQuarter"], "#145b83"],
+                        0.58,
+                        ["coalesce", ["get", "routeColorMiddle"], "#12bcd4"],
+                        1,
+                        ["coalesce", ["get", "routeColorEnd"], "#b9fbff"],
+                      ]
+                    : undefined,
+                "line-opacity": alwaysVisibleRouteGeoJson
+                  ? routeDataByAlbum.size > 1
+                    ? 1
+                    : routeMode === "simplified"
+                      ? 0.55
+                      : 0.78
                   : 0.24,
-                "line-width": routeLineWidth,
-                "line-dasharray": [2, 2],
+                "line-width":
+                  routeDataByAlbum.size > 1
+                    ? [
+                        "interpolate",
+                        ["linear"],
+                        ["line-progress"],
+                        0,
+                        1.1,
+                        0.32,
+                        4.8,
+                        1,
+                        8,
+                      ]
+                    : routeLineWidth,
+                "line-dasharray": routeDataByAlbum.size > 1 ? undefined : [2, 2],
               }}
             />
           </Source>
@@ -1098,7 +1234,7 @@ export const MMap: React.FC<MapWorldProps> = ({
               <Marker
                 longitude={photo.decLng}
                 latitude={photo.decLat}
-                anchor="bottom"
+                anchor="center"
                 onClick={(e) => {
                   e.originalEvent.stopPropagation();
                   setClickInfo(photo);

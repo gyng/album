@@ -2,7 +2,7 @@
  * @jest-environment jsdom
  */
 
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 
 const push = jest.fn();
 const replace = jest.fn();
@@ -107,6 +107,60 @@ describe("WorldMap route controls", () => {
         showRoute: false,
         routeMode: "full",
         routeDisplayMode: "active-only",
+      }),
+    );
+  });
+
+  it("can toggle all routes on for the world map", () => {
+    render(
+      <WorldMap
+        photos={[
+          {
+            album: "trip-a",
+            src: { src: "/1.jpg", width: 100, height: 100 },
+            decLat: 35,
+            decLng: 139,
+            date: "2024-01-01T00:00:00.000Z",
+            href: "/album/trip-a#1.jpg",
+          },
+          {
+            album: "trip-a",
+            src: { src: "/2.jpg", width: 100, height: 100 },
+            decLat: 35.1,
+            decLng: 139.1,
+            date: "2024-01-02T00:00:00.000Z",
+            href: "/album/trip-a#2.jpg",
+          },
+          {
+            album: "trip-b",
+            src: { src: "/3.jpg", width: 100, height: 100 },
+            decLat: 48.8,
+            decLng: 2.3,
+            date: "2024-02-01T00:00:00.000Z",
+            href: "/album/trip-b#1.jpg",
+          },
+          {
+            album: "trip-b",
+            src: { src: "/4.jpg", width: 100, height: 100 },
+            decLat: 49,
+            decLng: 2.5,
+            date: "2024-02-02T00:00:00.000Z",
+            href: "/album/trip-b#2.jpg",
+          },
+        ]}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Show all journeys" }));
+
+    expect(
+      screen.getByRole("button", { name: "Hide all journeys" }),
+    ).toBeTruthy();
+    expect(mapWorldDeferredMock).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        showRoute: true,
+        routeMode: "simplified",
+        routeDisplayMode: "always",
       }),
     );
   });
