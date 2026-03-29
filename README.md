@@ -6,12 +6,13 @@
 
 A zero-config, static, file-based album generator.
 
-Photos are dropped into directories, indexed via a Python pipeline (Janus-Pro-1B for AI tags + SigLIP2 for embeddings), and served with browser-side SQLite search.
+Photos are dropped into directories, indexed via a Python pipeline (Janus-Pro-1B for AI tags + SigLIP1+2 for embeddings), and served with browser-side SQLite search.
 
 - Dump your photos in a directory and run one command to deploy
 - Browser-side keyword, semantic, and hybrid search
-- Similar-photo search and slideshow trails powered by image embeddings
+- Similar-photo search and slideshow trails powered by SigLIP2 image embeddings
 - Janus-Pro-1B metadata extraction for tags, captions, and search text
+- Sqlite FTS for keyword search
 - Colour palette analysis
 - Map mode
 - Slideshow, with clock
@@ -32,8 +33,6 @@ Goals
 - EXIF and GPS data
 - Photos are size-optimised for mobile viewing
 - Free hosting!
-
-This is a weekend project! Very, very, rough Next.JS project.
 
 ## Usage
 
@@ -204,14 +203,8 @@ Be sure to configure your license for _all_ images in `src/License.tsx`. By defa
 
 - EXIF stripping via filename
 - Camera RAW
-- Split data from app
 - Automatic external storage
 - Better content-based caching
-- Links
-- Local manifest saving
-- Themes
-- Polish
-- Don't optimise all images until export/build-time
 
 ## Privacy notes
 
