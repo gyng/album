@@ -7,7 +7,7 @@ import ffprobePath from "ffprobe-static";
 import { stripPublicFromPath } from "./photo";
 
 export const OPTIMISED_VIDEO_MAX_WIDTH = 1920;
-export const OPTIMISED_VIDEO_PRESET = "slow";
+export const OPTIMISED_VIDEO_PRESET = "medium";
 export const OPTIMISED_VIDEO_CRF = 30;
 export const OPTIMISED_VIDEO_AUDIO_BITRATE = "96k";
 export const VIDEO_VALIDATION_SECONDS = "0.25";
