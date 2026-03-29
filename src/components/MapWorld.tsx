@@ -118,7 +118,8 @@ const LazyImage = ({ photo }: { photo: MapWorldEntry }) => {
             backgroundColor: `${photo.placeholderColor}`,
           }}
           loading="lazy"
-          alt={photo.album}
+          alt=""
+          aria-hidden="true"
         />
       )}
     </div>
