@@ -83,7 +83,7 @@ const TimelinePage: NextPage<PageProps> = ({ entries }) => {
     if (urlDate && availableDates.includes(urlDate) && urlDate !== selectedDate) {
       setSelectedDate(urlDate);
     }
-  }, [router.query.date, availableDates]);
+  }, [router.query.date, availableDates, selectedDate]);
 
   // When selectedDate changes, update the URL param (shallow push)
   React.useEffect(() => {
@@ -92,7 +92,7 @@ const TimelinePage: NextPage<PageProps> = ({ entries }) => {
     if (router.query.date !== selectedDate) {
       router.replace(url, undefined, { shallow: true });
     }
-  }, [selectedDate]);
+  }, [router, selectedDate]);
 
   React.useEffect(() => {
     if (

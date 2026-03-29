@@ -6,3 +6,5 @@ Thumbs.db
 .swc
 .vercel
 .env*.local
+.codex
+index/.last-index-stats.json
