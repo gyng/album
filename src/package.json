@@ -18,7 +18,7 @@
     "lint:fix": "eslint . --fix",
     "format:check": "prettier --check .",
     "format:write": "prettier --write .",
-    "test": "jest --watch",
+    "test": "jest",
     "test:ci": "timeout 60s jest --forceExit --runInBand && npm run lint",
     "test:e2e": "echo \"CI env: $CI\" && npm run build && playwright test",
     "test:e2e:built": "playwright test",

@@ -75,10 +75,12 @@ textarea {
   --c-font: light-dark(black, white);
 }
 
+html.light,
 body.light {
   color-scheme: light;
 }
 
+html.dark,
 body.dark {
   color-scheme: dark;
 }
