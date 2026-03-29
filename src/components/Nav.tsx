@@ -23,11 +23,6 @@ export const Nav: React.FC<{
         <li>
           <ThemeToggle />
         </li>
-        <li>
-          <Link href="/journeys" className={commonStyles.button}>
-            Journeys
-          </Link>
-        </li>
         {props.albumName ? (
           <>
             <li>

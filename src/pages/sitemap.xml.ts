@@ -38,7 +38,6 @@ export const getServerSideProps: GetServerSideProps = async ({ res }) => {
     { path: "/", lastmod: latestLastmod },
     { path: "/map", lastmod: latestLastmod },
     { path: "/timeline", lastmod: latestLastmod },
-    { path: "/journeys", lastmod: latestLastmod },
     ...albumEntries.map((entry) => ({
       path: `/album/${entry.slug}`,
       lastmod: entry.lastmod,
