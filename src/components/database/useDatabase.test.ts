@@ -1,3 +1,5 @@
+import sqlite3InitModule from "@sqlite.org/sqlite-wasm";
+
 jest.mock("@sqlite.org/sqlite-wasm", () => ({
   __esModule: true,
   default: jest.fn(),
@@ -212,5 +214,32 @@ describe("fetchWithProgress", () => {
       loaded: 7,
       total: 7,
     });
+  });
+});
+
+describe("initializeSQLite", () => {
+  const originalFetch = global.fetch;
+
+  afterEach(() => {
+    global.fetch = originalFetch;
+    jest.restoreAllMocks();
+  });
+
+  it("throws 'Failed to initialise SQLite' when loadRemoteDatabase rejects", async () => {
+    (sqlite3InitModule as jest.Mock).mockResolvedValue({
+      version: { libVersion: "mock" },
+    });
+
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: false,
+      status: 500,
+      statusText: "Internal Server Error",
+      body: null,
+      headers: { get: () => null },
+    }) as typeof fetch;
+
+    await expect(
+      databaseLoaderInternals.initializeSQLite(),
+    ).rejects.toThrow("Failed to initialise SQLite");
   });
 });

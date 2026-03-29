@@ -1,9 +1,11 @@
 import {
   fetchHybridResults,
+  fetchRandomPhoto,
   fetchRecentResults,
   fetchRefinementTagCounts,
   fetchSemanticResults,
   fetchSimilarResults,
+  searchInternals,
 } from "./api";
 
 type ExecArgs = {
@@ -139,6 +141,93 @@ describe("fetchSimilarResults", () => {
 
     expect(results.data).toEqual([]);
     expect(results.query).toBe("../albums/test-simple/DSCF0506-2.jpg");
+  });
+
+  it("returns empty results when the query embedding_json is malformed", async () => {
+    const database = {
+      exec: ({ sql, bind, callback }: ExecArgs) => {
+        if (sql.includes("FROM embeddings") && sql.includes("WHERE path = ?")) {
+          callback([
+            "../albums/test-simple/DSCF0506-2.jpg",
+            "google/siglip-base-patch16-224",
+            3,
+            "{{not valid json",
+          ]);
+        }
+      },
+    };
+
+    const results = await fetchSimilarResults({
+      database: database as any,
+      path: "../albums/test-simple/DSCF0506-2.jpg",
+      page: 0,
+      pageSize: 10,
+    });
+
+    expect(results.data).toEqual([]);
+    expect(results.query).toBe("../albums/test-simple/DSCF0506-2.jpg");
+  });
+
+  it("skips malformed candidate embeddings and returns the valid ones", async () => {
+    const database = {
+      exec: ({ sql, bind, callback }: ExecArgs) => {
+        if (sql.includes("FROM embeddings") && sql.includes("WHERE path = ?")) {
+          callback([
+            "../albums/test-simple/DSCF0506-2.jpg",
+            "google/siglip-base-patch16-224",
+            3,
+            JSON.stringify([1, 0, 0]),
+          ]);
+          return;
+        }
+
+        if (
+          sql.includes("FROM embeddings") &&
+          sql.includes("WHERE model_id = ?")
+        ) {
+          callback([
+            "../albums/test-simple/DSCF0593.jpg",
+            "google/siglip-base-patch16-224",
+            3,
+            JSON.stringify([0.9, 0.1, 0]),
+          ]);
+          callback([
+            "../albums/test-simple/DSCF2581-2_2.jpg",
+            "google/siglip-base-patch16-224",
+            3,
+            "{{not valid json",
+          ]);
+          return;
+        }
+
+        if (sql.includes("FROM images") && sql.includes("WHERE path IN")) {
+          callback([
+            "../albums/test-simple/DSCF0593.jpg",
+            "/album/test-simple#DSCF0593.jpg",
+            "DSCF0593.jpg",
+            "",
+            "",
+            "harbor, skyline",
+            "[(0,0,0)]",
+            "Harbor skyline",
+            "",
+            "",
+            "",
+            "",
+          ]);
+        }
+      },
+    };
+
+    const results = await fetchSimilarResults({
+      database: database as any,
+      path: "../albums/test-simple/DSCF0506-2.jpg",
+      page: 0,
+      pageSize: 10,
+    });
+
+    expect(results.data).toHaveLength(1);
+    expect(results.data[0]?.path).toBe("../albums/test-simple/DSCF0593.jpg");
   });
 });
 
@@ -385,5 +474,49 @@ describe("fetchRefinementTagCounts", () => {
     expect(results.harbor).toBe(4);
     expect(results.night).toBe(0);
     expect(results.bird).toBeUndefined();
+  });
+});
+
+describe("fetchRandomPhoto", () => {
+  it("returns an empty array when the database has no matching rows", async () => {
+    const database = {
+      exec: ({ callback }: ExecArgs) => {
+        // return no rows
+      },
+    };
+
+    const result = await fetchRandomPhoto({ database: database as any });
+
+    expect(result).toEqual([]);
+  });
+});
+
+describe("exec", () => {
+  it("resolves with rows collected from the callback", async () => {
+    const database = {
+      exec: ({ callback }: ExecArgs) => {
+        callback(["path/a.jpg", "/album/a#a.jpg", "a.jpg", "", "", "tag", "[(0,0,0)]", "Alt", "", "", "", ""]);
+        callback(["path/b.jpg", "/album/b#b.jpg", "b.jpg", "", "", "tag", "[(0,0,0)]", "Alt", "", "", "", ""]);
+      },
+    };
+
+    const result = await searchInternals.exec(database as any, "SELECT 1", []);
+
+    expect(result.data).toHaveLength(2);
+    expect((result.data[0] as unknown as string[])[0]).toBe("path/a.jpg");
+    expect((result.data[1] as unknown as string[])[0]).toBe("path/b.jpg");
+  });
+
+  it("rejects when db.exec throws", async () => {
+    const boom = new Error("SQLITE_ERROR: no such table: images");
+    const database = {
+      exec: () => {
+        throw boom;
+      },
+    };
+
+    await expect(
+      searchInternals.exec(database as any, "SELECT 1", []),
+    ).rejects.toThrow("no such table: images");
   });
 });

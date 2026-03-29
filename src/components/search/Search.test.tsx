@@ -634,4 +634,31 @@ describe("Search", () => {
       resolveWarmup?.();
     });
   });
+
+  it("includes database readiness in the query key so the key changes when the DB loads", async () => {
+    mockUseDatabase.mockReturnValue([null, 0, { loaded: 0, total: 0 }]);
+    window.history.replaceState({}, "", "/search?q=harbor&mode=keyword");
+
+    const { rerender } = render(<Search />);
+    await flushEffects();
+
+    const callsBeforeLoad = mockUseInfiniteQuery.mock.calls.length;
+    const keyBeforeLoad =
+      mockUseInfiniteQuery.mock.calls[callsBeforeLoad - 1][0].queryKey;
+
+    mockUseDatabase.mockReturnValue([
+      mockDatabase,
+      100,
+      { loaded: 0, total: 0 },
+    ]);
+    rerender(<Search />);
+    await flushEffects();
+
+    const keyAfterLoad =
+      mockUseInfiniteQuery.mock.calls[
+        mockUseInfiniteQuery.mock.calls.length - 1
+      ][0].queryKey;
+
+    expect(keyAfterLoad).not.toEqual(keyBeforeLoad);
+  });
 });

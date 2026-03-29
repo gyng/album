@@ -61,7 +61,7 @@ const toFtsMatchTerm = (term: string): string => {
   return `- {path album_relative_path} : "${term.replaceAll(/[\"]/g, "'")}"`;
 };
 
-const exec = (
+const exec = async (
   db: Database,
   sql: string,
   bind: (string | number)[],
@@ -72,46 +72,45 @@ const exec = (
     suppressMissingEmbeddingsTableError?: boolean;
   },
 ): Promise<PaginatedSearchResult> => {
-  return new Promise(async (resolve, reject) => {
-    const accumulator: any[] = [];
+  const accumulator: any[] = [];
 
-    try {
-      db.exec({
-        sql,
-        bind,
-        returnValue: "resultRows",
-        callback: (msg: any) => {
-          accumulator.push(msg);
-        },
-      });
-    } catch (err) {
-      if (
-        !(
-          options?.suppressMissingEmbeddingsTableError &&
-          isMissingEmbeddingsTableError(err)
-        )
-      ) {
-        console.error(`Bad query ${options?.query} ${options?.page}`, err);
-      }
-      reject(err);
-      return;
-    }
-
-    const prev =
-      !options?.page || options.page <= 0 ? undefined : options.page - 1;
-    const next =
-      options?.page && accumulator.length === options.pageSize
-        ? options.page + 1
-        : undefined;
-
-    resolve({
-      data: accumulator as SearchResultRow[],
-      next,
-      prev,
-      query: options?.query,
+  try {
+    db.exec({
+      sql,
+      bind,
+      returnValue: "resultRows",
+      callback: (msg: any) => {
+        accumulator.push(msg);
+      },
     });
-  });
+  } catch (err) {
+    if (
+      !(
+        options?.suppressMissingEmbeddingsTableError &&
+        isMissingEmbeddingsTableError(err)
+      )
+    ) {
+      console.error(`Bad query ${options?.query} ${options?.page}`, err);
+    }
+    throw err;
+  }
+
+  const prev =
+    !options?.page || options.page <= 0 ? undefined : options.page - 1;
+  const next =
+    options?.page && accumulator.length === options.pageSize
+      ? options.page + 1
+      : undefined;
+
+  return {
+    data: accumulator as SearchResultRow[],
+    next,
+    prev,
+    query: options?.query,
+  };
 };
+
+export const searchInternals = { exec };
 
 const mapImageRows = (rows: any[][]): SearchResultRow[] => {
   return rows.map((row) => {
@@ -163,17 +162,29 @@ const rankEmbeddingsByVector = async (opts: {
 }): Promise<RankedVectorResult[]> => {
   const { database, queryVector, modelId, excludePaths = [] } = opts;
   const excluded = new Set(excludePaths);
+  // All embeddings must be loaded — cosine similarity requires an exhaustive
+  // scan against every vector. There is no index structure that avoids this.
+  // excludePaths is a small set (typically just the query image itself).
   const candidates = await fetchEmbeddingsByModel(database, modelId);
 
   return candidates
     .filter((candidate) => !excluded.has(candidate.path))
-    .map((candidate) => ({
-      path: candidate.path,
-      similarity: cosineSimilarity(
-        queryVector,
-        JSON.parse(candidate.embedding_json) as number[],
-      ),
-    }))
+    .flatMap((candidate) => {
+      try {
+        return [
+          {
+            path: candidate.path,
+            similarity: cosineSimilarity(
+              queryVector,
+              JSON.parse(candidate.embedding_json) as number[],
+            ),
+          },
+        ];
+      } catch {
+        console.warn(`Skipping malformed embedding for ${candidate.path}`);
+        return [];
+      }
+    })
     .sort((left, right) => right.similarity - left.similarity);
 };
 
@@ -417,7 +428,12 @@ export const fetchSimilarResults = async (opts: {
       return { data: [], query: path, prev: undefined, next: undefined };
     }
 
-    const queryVector = JSON.parse(queryEmbedding.embedding_json) as number[];
+    let queryVector: number[];
+    try {
+      queryVector = JSON.parse(queryEmbedding.embedding_json) as number[];
+    } catch {
+      return { data: [], query: path, prev: undefined, next: undefined };
+    }
     const rankedPaths = await rankEmbeddingsByVector({
       database,
       queryVector,
@@ -485,6 +501,9 @@ export const fetchColorSimilarResults = async (opts: {
   const { database, color, page, pageSize, maxDistance = 100 } = opts;
 
   try {
+    // All images must be loaded and scored — deltaE operates in CIELAB space where
+    // perceptual distance doesn't map to RGB ranges. SQL pre-filtering by RGB would
+    // silently drop valid results (a color far in RGB can be close in LAB).
     const lightRows = await exec(
       database,
       `SELECT path, colors FROM images WHERE colors IS NOT NULL AND colors != ''`,
@@ -845,7 +864,10 @@ export const fetchRandomPhoto = async (opts: {
       LIMIT 1`,
       [`../albums/${filter}/%`],
     );
-    const row = result.data[0] as unknown as string[];
+    const row = result.data[0] as unknown as string[] | undefined;
+    if (!row) {
+      return [];
+    }
     return [
       {
         path: row[0],
