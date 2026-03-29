@@ -89,6 +89,9 @@ describe("SEO helpers", () => {
     expect(html).toContain(
       'rel="canonical" href="https://photos.example.com/search"',
     );
+    expect(html).toContain(
+      'rel="alternate" type="application/rss+xml" title="Snapshots RSS Feed" href="https://photos.example.com/feed.xml"',
+    );
     expect(html).toContain('property="og:url" content="https://photos.example.com/search"');
     expect(html).toContain('name="robots" content="noindex, nofollow"');
     expect(html).toContain('name="twitter:card" content="summary_large_image"');
@@ -187,6 +190,9 @@ describe("SEO helpers", () => {
     );
     expect(html).toContain("BreadcrumbList");
     expect(html).toContain("https://photos.example.com/album/trip");
+    expect(html).toContain(
+      'rel="alternate" type="application/rss+xml" title="Tokyo Trip RSS Feed" href="https://photos.example.com/album/trip/feed.xml"',
+    );
   });
 
   it("marks filtered map views as noindex while keeping the base canonical", () => {

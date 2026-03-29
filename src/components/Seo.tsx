@@ -14,6 +14,7 @@ type SeoProps = {
   noindex?: boolean;
   type?: "website" | "article";
   jsonLd?: JsonLd | JsonLd[];
+  extraFeeds?: Array<{ title: string; href: string }>;
 };
 
 export const Seo: React.FC<SeoProps> = ({
@@ -24,6 +25,7 @@ export const Seo: React.FC<SeoProps> = ({
   noindex = false,
   type = "website",
   jsonLd,
+  extraFeeds = [],
 }) => {
   const defaults = getDefaultSeo();
   const resolvedTitle = title ?? defaults.defaultTitle;
@@ -38,6 +40,22 @@ export const Seo: React.FC<SeoProps> = ({
       <meta name="description" content={resolvedDescription} key="description" />
       <link rel="canonical" href={canonicalUrl} key="canonical" />
       <link rel="icon" href="/favicon.svg" key="favicon" />
+      <link
+        rel="alternate"
+        type="application/rss+xml"
+        title={`${defaults.siteName} RSS Feed`}
+        href={getCanonicalUrl("/feed.xml")}
+        key="rss-feed"
+      />
+      {extraFeeds.map((feed, index) => (
+        <link
+          rel="alternate"
+          type="application/rss+xml"
+          title={feed.title}
+          href={feed.href}
+          key={`extra-rss-feed-${index}`}
+        />
+      ))}
       <meta name="theme-color" content={defaults.themeColor} key="theme-color" />
       <meta property="og:site_name" content={defaults.siteName} key="og:site_name" />
       <meta property="og:title" content={resolvedTitle} key="og:title" />

@@ -11,6 +11,7 @@ import { Seo } from "../../components/Seo";
 import {
   buildBreadcrumbJsonLd,
   buildCollectionPageJsonLd,
+  getCanonicalUrl,
 } from "../../lib/seo";
 
 type PageProps = {
@@ -51,6 +52,12 @@ const Album: NextPage<PageProps> = ({ album }) => {
         pathname={`/album/${statefulAlbum._build.slug}`}
         image={(cover as PhotoBlock | undefined)?._build.srcset?.[0].src}
         type="article"
+        extraFeeds={[
+          {
+            title: `${title} RSS Feed`,
+            href: getCanonicalUrl(`/album/${statefulAlbum._build.slug}/feed.xml`),
+          },
+        ]}
         jsonLd={[
           buildCollectionPageJsonLd({
             name: `${title} | Snapshots`,
