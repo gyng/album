@@ -1,6 +1,6 @@
 import path from "path";
 import fs from "node:fs";
-import { OptimisedPhoto } from "./types";
+import { Exif, OptimisedPhoto } from "./types";
 import exifr from "exifr";
 import { imageSizeFromFile } from "image-size/fromFile";
 import sharp from "sharp";
@@ -29,14 +29,11 @@ export const getPhotoSize = async (
       // noop
     }
 
-    return new Promise((resolve) => {
-      resolve({ width, height });
-    });
+    return { width, height };
   });
 };
 
-// TODO: typedef any
-export const getNextJsSafeExif = async (filepath: string): Promise<any> => {
+export const getNextJsSafeExif = async (filepath: string): Promise<Exif> => {
   // EXIF dates are resolved to relative datetime: this is wrong behaviour
   // but we are lazy and don't want to turn that off as we need to compare dates
   // https://github.com/MikeKovarik/exifr/issues/51

@@ -4,8 +4,9 @@ import { Analytics } from "@vercel/analytics/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import "./_app.css";
 
+const queryClient = new QueryClient();
+
 function MyApp({ Component, pageProps }: AppProps) {
-  const queryClient = new QueryClient();
   return (
     <QueryClientProvider client={queryClient}>
       <Analytics />

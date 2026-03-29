@@ -1,3 +1,33 @@
+export interface Exif {
+  DateTimeOriginal?: string;
+  OffsetTime?: string;
+  Orientation?: string;
+  GPSLatitudeRef?: string;
+  GPSLatitude?: [number, number, number];
+  GPSLongitudeRef?: string;
+  GPSLongitude?: [number, number, number];
+  ExposureTime?: number;
+  ISO?: number;
+  FNumber?: number;
+  ExposureCompensation?: number;
+  FocalLength?: number;
+  FocalLengthIn35mmFormat?: number;
+  LensMake?: string;
+  LensModel?: string;
+  LensInfo?: string;
+  Make?: string;
+  Model?: string;
+  ImageDescription?: string;
+}
+
+export interface Tags {
+  tags?: string[];
+  colors?: [number, number, number][];
+  alt_text?: string;
+  path?: string;
+  geocode?: string;
+}
+
 export type SerializedTextBlock = TextBlock;
 
 export interface OptimisedPhoto {
@@ -33,8 +63,8 @@ export interface PhotoBlock extends IBlock {
   _build: {
     height: number;
     width: number;
-    exif: any;
-    tags: any;
+    exif: Exif;
+    tags: Tags;
     srcset: OptimisedPhoto[];
   };
 }

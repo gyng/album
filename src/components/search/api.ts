@@ -178,7 +178,8 @@ const rankEmbeddingsByVector = async (opts: {
             path: candidate.path,
             similarity: cosineSimilarity(
               queryVector,
-              JSON.parse(candidate.embedding_json) as number[],
+              // JSON.parse is necessary here — embeddings must be deserialized to compute cosine similarity at query time
+            JSON.parse(candidate.embedding_json) as number[],
             ),
           },
         ];

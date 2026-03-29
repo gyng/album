@@ -785,8 +785,8 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
     _build: {
       height: 0,
       width: 0,
-      exif: undefined,
-      tags: undefined,
+      exif: {},
+      tags: {},
       srcset: [],
     },
   };

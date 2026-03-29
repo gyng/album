@@ -10,7 +10,7 @@ test.describe("Core Functionality", () => {
   test("main pages are accessible", async ({ page }) => {
     // Map
     await page.goto("/map");
-    await expect(page).toHaveTitle("Map");
+    await expect(page).toHaveTitle("Map | Snapshots");
 
     // Search
     await page.goto("/search");

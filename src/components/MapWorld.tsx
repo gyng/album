@@ -22,7 +22,7 @@ export type MapWorldEntry = {
   src: OptimisedPhoto;
   decLat: number | null;
   decLng: number | null;
-  date: string;
+  date: string | null;
   href: string;
   placeholderColor?: string;
   placeholderWidth?: number;
@@ -188,7 +188,7 @@ export const MMap: React.FC<MapWorldProps> = ({
   const dateStats = React.useMemo(() => {
     const sortedByDate = photos
       .filter((p) => p.date)
-      .sort((a, b) => new Date(b.date).valueOf() - new Date(a.date).valueOf());
+      .sort((a, b) => new Date(b.date ?? "").valueOf() - new Date(a.date ?? "").valueOf());
     const oldest = sortedByDate.at(0);
     const newest = sortedByDate.at(-1);
     const range =
@@ -203,11 +203,11 @@ export const MMap: React.FC<MapWorldProps> = ({
     return photos
       .sort((a, b) => {
         // sort so newer markers are on top
-        return new Date(a.date).valueOf() - new Date(b.date).valueOf();
+        return new Date(a.date ?? "").valueOf() - new Date(b.date ?? "").valueOf();
       })
       .map((photo): PhotoWithStyle => {
         const relative =
-          (new Date(photo.date ?? dateStats.oldest?.date).valueOf() -
+          (new Date(photo.date ?? dateStats.oldest?.date ?? "").valueOf() -
             new Date(dateStats.oldest?.date ?? 0).valueOf()) /
           dateStats.range;
 
@@ -364,9 +364,9 @@ export const MMap: React.FC<MapWorldProps> = ({
                   {popupInfo.album}
                   <br />
                   <span>
-                    {new Date(popupInfo.date).toLocaleString()}
+                    {new Date(popupInfo.date ?? "").toLocaleString()}
                     <br />
-                    {getRelativeTimeString(new Date(popupInfo.date))}
+                    {getRelativeTimeString(new Date(popupInfo.date ?? ""))}
                   </span>
                 </div>
               </Link>

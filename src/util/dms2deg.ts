@@ -1,5 +1,5 @@
 export const convertDMSToDegree = (
-  coords: number[],
+  coords: number[] | undefined,
   isSOrW: boolean,
 ): number | null => {
   if (!coords || coords.length !== 3) {
@@ -9,10 +9,10 @@ export const convertDMSToDegree = (
 };
 
 export const getDegLatLngFromExif = (args: {
-  GPSLongitude: number[];
-  GPSLatitude: number[];
-  GPSLongitudeRef: string;
-  GPSLatitudeRef: string;
+  GPSLongitude?: number[];
+  GPSLatitude?: number[];
+  GPSLongitudeRef?: string;
+  GPSLatitudeRef?: string;
 }) => {
   const decLng = convertDMSToDegree(
     args.GPSLongitude,

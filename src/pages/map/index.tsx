@@ -72,12 +72,12 @@ export const getStaticProps: GetStaticProps<PageProps> = async (context) => {
     const hasLatLng = (block: Block): boolean => {
       const { GPSLongitude, GPSLatitude, GPSLongitudeRef, GPSLatitudeRef } =
         (block as PhotoBlock)._build?.exif ?? {};
-      return (
+      return Boolean(
         block.kind === "photo" &&
         GPSLongitude &&
         GPSLatitude &&
         GPSLongitudeRef &&
-        GPSLatitudeRef
+        GPSLatitudeRef,
       );
     };
 

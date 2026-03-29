@@ -28,10 +28,10 @@ type ExifCoordinatesRowProps = {
   k: string;
   /** https://exiftool.org/TagNames/GPS.html */
   data: {
-    GPSLatitudeRef: string;
-    GPSLatitude: [number, number, number];
-    GPSLongitudeRef: string;
-    GPSLongitude: [number, number, number];
+    GPSLatitudeRef?: string;
+    GPSLatitude?: [number, number, number];
+    GPSLongitudeRef?: string;
+    GPSLongitude?: [number, number, number];
     geocode?: string;
   };
   options: {
@@ -100,7 +100,7 @@ type ExifRow =
       /** Display key */
       k: string;
       /** Display value */
-      v: string | JSX.Element | JSX.Element[];
+      v: string | string[] | number | JSX.Element | JSX.Element[] | undefined | null;
       options?: any;
       valid?: boolean;
       style?: any;
@@ -111,10 +111,10 @@ type ExifRow =
       k: string;
       /** https://exiftool.org/TagNames/GPS.html */
       v: {
-        GPSLatitudeRef: string;
-        GPSLatitude: [number, number, number];
-        GPSLongitudeRef: string;
-        GPSLongitude: [number, number, number];
+        GPSLatitudeRef?: string;
+        GPSLatitude?: [number, number, number];
+        GPSLongitudeRef?: string;
+        GPSLongitude?: [number, number, number];
         geocode?: string;
       };
       options: {
@@ -175,7 +175,7 @@ export const ExifTable: React.FC<{
 
 export const ExifRow: React.FC<{
   k: string;
-  v: string | JSX.Element | JSX.Element[];
+  v: string | string[] | number | JSX.Element | JSX.Element[] | undefined | null;
   valid?: boolean;
   style?: any;
 }> = (props) => {
@@ -346,16 +346,13 @@ export const PhotoBlockEl: React.FC<{
                     {
                       kind: "kv",
                       k: "Shutter speed",
-                      v:
-                        props.block._build.exif.ExposureTime < 1
-                          ? `${new Fraction(
-                              props.block._build.exif.ExposureTime,
-                            )
-                              .toFraction()
-                              .replace("/", FRACTION_SLASH)}; ${
-                              props.block._build.exif.ExposureTime
-                            }s` // FRACTION_SLASH gives us nice ligatured fractions (eg, 1⁄10)
-                          : `${props.block._build.exif.ExposureTime}s`,
+                      v: (() => {
+                        const t = props.block._build.exif.ExposureTime;
+                        if (!t) return undefined;
+                        return t < 1
+                          ? `${new Fraction(t).toFraction().replace("/", FRACTION_SLASH)}; ${t}s` // FRACTION_SLASH gives us nice ligatured fractions (eg, 1⁄10)
+                          : `${t}s`;
+                      })(),
                       valid: Boolean(props.block._build.exif.ExposureTime),
                     },
                     {
@@ -433,7 +430,7 @@ export const PhotoBlockEl: React.FC<{
                               "",
                             ),
                         getRelativeTimeString(
-                          new Date(props.block._build.exif.DateTimeOriginal),
+                          new Date(props.block._build.exif.DateTimeOriginal ?? ""),
                         ),
                       ]
                         .filter(Boolean)

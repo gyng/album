@@ -59,7 +59,8 @@ export const getBlockDate = (block: Block): number => {
     return 1;
   }
   if (block.kind === "photo") {
-    return Date.parse(block._build?.exif?.DateTimeOriginal ?? 0).valueOf() ?? 0;
+    const t = Date.parse(block._build?.exif?.DateTimeOriginal ?? "");
+    return isNaN(t) ? 0 : t;
   }
   if (block.kind === "video") {
     return block.data.date ? new Date(block.data.date).valueOf() : 0;
@@ -85,7 +86,7 @@ export const getImageTimestampRange = (
   let latest = 0;
   for (const block of album.blocks) {
     if (block.kind !== "photo") continue;
-    const dt = new Date(block._build?.exif?.DateTimeOriginal).getTime();
+    const dt = new Date(block._build?.exif?.DateTimeOriginal ?? "").getTime();
     if (dt < earliest) earliest = dt; // NaN comparisons are false → missing dates skipped
     if (dt > latest) latest = dt;
   }

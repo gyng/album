@@ -85,7 +85,8 @@ export const getStaticProps: GetStaticProps<PageProps> = async (context) => {
         return bTime - aTime;
       })
       .sort((a, b) => (b.order ?? 0) - (a.order ?? 0))
-      .sort((a, b) => (b.name.startsWith("test") ? -1 : 0));
+      // Push test albums to the end
+      .sort((a, b) => (a.name.startsWith("test") ? 1 : 0) - (b.name.startsWith("test") ? 1 : 0));
 
     return {
       props: {
