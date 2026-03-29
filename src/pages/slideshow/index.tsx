@@ -26,7 +26,7 @@ import MMap from "../../components/Map";
 import { Seo } from "../../components/Seo";
 import { buildCollectionPageJsonLd } from "../../lib/seo";
 import { getPhotoAltText } from "../../lib/alt";
-import { navigateTo } from "../../util/navigate";
+import { navigateTo, reloadCurrentPage } from "../../util/navigate";
 import { handleSlideshowKeyboardShortcut } from "../../util/slideshowKeyboard";
 import { BUILD_VERSION } from "../../lib/buildVersion";
 
@@ -166,7 +166,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
           latestBuildVersion &&
           latestBuildVersion !== buildVersionRef.current
         ) {
-          window.location.replace(window.location.href);
+          reloadCurrentPage();
         }
       } catch (error) {
         console.error(error);
@@ -200,7 +200,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
   // Fallback hard reload for long-running kiosk sessions.
   useEffect(() => {
     const id = setInterval(() => {
-      window.location.replace(window.location.href);
+      reloadCurrentPage();
     }, FALLBACK_RELOAD_MS);
     return () => clearInterval(id);
   }, []);
