@@ -4,4 +4,5 @@ set -euox pipefail
 uv run index.py index --glob "../albums/**/*.jpg" --dbpath "search.sqlite" --model-profile hybrid &&
     uv run index.py prune --glob "../albums/**/*.jpg" --dbpath "search.sqlite" &&
     uv run index.py search --query "burger" --dbpath "search.sqlite" &&
+    sqlite3 search.sqlite "VACUUM;" &&
     cp search.sqlite ../src/public/search.sqlite

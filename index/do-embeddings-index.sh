@@ -43,6 +43,8 @@ dest.executemany(
     rows,
 )
 dest.commit()
+dest.execute("VACUUM")
+dest.commit()
 
 src.close()
 dest.close()
