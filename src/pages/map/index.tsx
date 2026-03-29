@@ -12,6 +12,11 @@ import { useRouter } from "next/router";
 import { measureBuild } from "../../services/buildTiming";
 import { Seo } from "../../components/Seo";
 import { buildCollectionPageJsonLd } from "../../lib/seo";
+import {
+  getDefaultRouteMode,
+  ROUTE_SIMPLIFY_THRESHOLD,
+  RouteMode,
+} from "../../components/mapRoute";
 
 type PageProps = {
   photos: MapWorldEntry[];
@@ -31,6 +36,31 @@ const WorldMap: NextPage<PageProps> = (props) => {
   const filteredPhotos = filterAlbum
     ? props.photos.filter((p) => p.album === filterAlbum)
     : props.photos;
+  const routeEligiblePhotoCount = React.useMemo(
+    () =>
+      filteredPhotos.filter(
+        (photo) =>
+          typeof photo.decLat === "number" && typeof photo.decLng === "number",
+      ).length,
+    [filteredPhotos],
+  );
+  const hasRoute = filterAlbum != null && routeEligiblePhotoCount >= 2;
+  const defaultRouteMode = React.useMemo<RouteMode>(
+    () => getDefaultRouteMode(filteredPhotos),
+    [filteredPhotos],
+  );
+  const [showRoute, setShowRoute] = React.useState(
+    hasRoute && router.query.route === "1",
+  );
+  const [routeMode, setRouteMode] = React.useState<RouteMode>(defaultRouteMode);
+
+  React.useEffect(() => {
+    setShowRoute(hasRoute && router.query.route === "1");
+  }, [hasRoute, router.query.route]);
+
+  React.useEffect(() => {
+    setRouteMode(defaultRouteMode);
+  }, [defaultRouteMode]);
 
   return (
     <div className={styles.container}>
@@ -58,9 +88,52 @@ const WorldMap: NextPage<PageProps> = (props) => {
             </Link>
           </div>
         ) : null}
+        {hasRoute ? (
+          <>
+            <button
+              type="button"
+              className={commonStyles.button}
+              onClick={() => {
+                setShowRoute((current) => !current);
+              }}
+            >
+              {showRoute ? "Hide journey line" : "Show journey line"}
+            </button>
+            {routeEligiblePhotoCount > 20 ? (
+              <button
+                type="button"
+                className={commonStyles.button}
+                onClick={() => {
+                  setRouteMode((current) =>
+                    current === "full" ? "simplified" : "full",
+                  );
+                }}
+              >
+                {routeMode === "full"
+                  ? "Use simplified stops"
+                  : "Use every photo"}
+              </button>
+            ) : null}
+            <div className={commonStyles.toast}>
+              {routeEligiblePhotoCount} geotagged photo
+              {routeEligiblePhotoCount === 1 ? "" : "s"}
+              {routeEligiblePhotoCount > ROUTE_SIMPLIFY_THRESHOLD
+                ? " • simplified by default"
+                : ""}
+            </div>
+          </>
+        ) : null}
       </div>
 
-      <MapWorldDeferred photos={filteredPhotos} className={styles.map} />
+      <MapWorldDeferred
+        photos={filteredPhotos}
+        className={styles.map}
+        showRoute={showRoute}
+        routeMode={routeMode}
+        routeDisplayMode={
+          filterAlbum ? (showRoute ? "always" : "active-only") : "active-only"
+        }
+      />
     </div>
   );
 };

@@ -27,7 +27,7 @@ export const Nav: React.FC<{
           <>
             <li>
               <Link
-                href={`/map?filter_album=${props.albumName}`}
+                href={`/map?filter_album=${props.albumName}&route=1`}
                 className={commonStyles.button}
               >
                 Album map

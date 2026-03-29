@@ -11,6 +11,7 @@
     "dev": "next dev --turbopack",
     "benchmark:warm": "node ./bin/warm-build-benchmark.cjs",
     "benchmark:warm:strict": "ALBUM_BENCHMARK_FAIL_ON_BUDGET=1 node ./bin/warm-build-benchmark.cjs",
+    "benchmark:route": "node --experimental-strip-types ./bin/map-route-benchmark.ts",
     "build": "npm run cleanup:media-cache && next build && echo 'build done'",
     "build:profile": "npm run cleanup:media-cache && ALBUM_BUILD_PROFILE=1 next build && echo 'build done'",
     "start": "next start",

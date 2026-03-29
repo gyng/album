@@ -6,9 +6,11 @@ import { act, fireEvent, render, screen } from "@testing-library/react";
 import { MapWorldEntry } from "./MapWorld";
 
 const mapHandlers: {
+  onMoveStart?: () => void;
   onMoveEnd?: (event: {
     viewState: { latitude: number; longitude: number; zoom: number };
   }) => void;
+  onZoomStart?: () => void;
   onZoom?: (event: { viewState: { zoom: number } }) => void;
 } = {};
 
@@ -16,6 +18,10 @@ const mapInstance = {
   flyTo: jest.fn(),
   on: jest.fn(),
   off: jest.fn(),
+  project: jest.fn(([longitude, latitude]: [number, number]) => ({
+    x: longitude * 100,
+    y: latitude * 100,
+  })),
   getBounds: jest.fn(() => ({
     getNorth: () => 90,
     getSouth: () => -90,
@@ -32,16 +38,22 @@ jest.mock("react-map-gl/maplibre", () => {
     __esModule: true,
     default: ({
       children,
+      onMoveStart,
       onMoveEnd,
+      onZoomStart,
       onZoom,
     }: {
       children?: React.ReactNode;
+      onMoveStart?: () => void;
       onMoveEnd?: (event: {
         viewState: { latitude: number; longitude: number; zoom: number };
       }) => void;
+      onZoomStart?: () => void;
       onZoom?: (event: { viewState: { zoom: number } }) => void;
     }) => {
+      mapHandlers.onMoveStart = onMoveStart;
       mapHandlers.onMoveEnd = onMoveEnd;
+      mapHandlers.onZoomStart = onZoomStart;
       mapHandlers.onZoom = onZoom;
       return <div data-testid="map">{children}</div>;
     },
@@ -50,7 +62,9 @@ jest.mock("react-map-gl/maplibre", () => {
       onClick,
     }: {
       children?: React.ReactNode;
-      onClick?: (event: { originalEvent: { stopPropagation: () => void } }) => void;
+      onClick?: (event: {
+        originalEvent: { stopPropagation: () => void };
+      }) => void;
     }) => (
       <button
         type="button"
@@ -77,6 +91,20 @@ jest.mock("react-map-gl/maplibre", () => {
     NavigationControl: () => null,
     GeolocateControl: () => null,
     FullscreenControl: () => null,
+    Source: ({
+      children,
+      id,
+      data,
+    }: {
+      children?: React.ReactNode;
+      id?: string;
+      data?: unknown;
+    }) => (
+      <div data-testid={id ?? "source"} data-source={JSON.stringify(data)}>
+        {children}
+      </div>
+    ),
+    Layer: ({ id }: { id?: string }) => <div data-testid={id ?? "layer"} />,
     useMap: () => mapRef,
   };
 });
@@ -132,11 +160,14 @@ describe("MapWorld", () => {
 
   beforeEach(() => {
     jest.useFakeTimers();
+    mapHandlers.onMoveStart = undefined;
     mapHandlers.onMoveEnd = undefined;
+    mapHandlers.onZoomStart = undefined;
     mapHandlers.onZoom = undefined;
     mapInstance.flyTo.mockClear();
     mapInstance.on.mockClear();
     mapInstance.off.mockClear();
+    mapInstance.project.mockClear();
     mapInstance.getBounds.mockClear();
     replaceStateSpy = jest
       .spyOn(window.history, "replaceState")
@@ -193,9 +224,61 @@ describe("MapWorld", () => {
 
     expect(replaceStateSpy).not.toHaveBeenCalled();
 
-    expect(screen.getByRole("link", { name: /kansai/i }).getAttribute("href")).toBe(
-      "/album/kansai#photo.jpg",
-    );
+    expect(
+      screen.getByRole("link", { name: /kansai/i }).getAttribute("href"),
+    ).toBe("/album/kansai#photo.jpg");
     expect(screen.getByTestId("popup").className).toContain("click");
+  });
+
+  it("renders a journey line layer when enabled", () => {
+    render(
+      <MMap
+        photos={[
+          photo,
+          {
+            ...photo,
+            href: "/album/kansai#two.jpg",
+            src: { src: "/photo-2.jpg", width: 100, height: 100 },
+            decLat: 35.8,
+            decLng: 139.8,
+          },
+        ]}
+        className="map"
+        showRoute
+        routeDisplayMode="always"
+      />,
+    );
+
+    expect(screen.getByTestId("journey-line-source")).toBeTruthy();
+    expect(screen.getByTestId("journey-line-layer")).toBeTruthy();
+    expect(screen.getByTestId("journey-line-overlay")).toBeTruthy();
+  });
+
+  it("reveals a context path for the selected marker without always-on route mode", () => {
+    render(
+      <MMap
+        photos={[
+          photo,
+          {
+            ...photo,
+            href: "/album/kansai#two.jpg",
+            src: { src: "/photo-2.jpg", width: 100, height: 100 },
+            decLat: 36.8,
+            decLng: 140.8,
+            date: "2024-01-02T06:14:05.000Z",
+          },
+        ]}
+        className="map"
+      />,
+    );
+
+    expect(screen.queryByTestId("journey-line-source")).toBeNull();
+
+    fireEvent.click(screen.getAllByTestId("marker")[0]);
+
+    expect(screen.getByTestId("journey-line-source")).toBeTruthy();
+    expect(screen.getByTestId("journey-line-layer")).toBeTruthy();
+    expect(screen.getByTestId("journey-line-overlay")).toBeTruthy();
+    expect(screen.getByTestId("journey-line-speed-label")).toBeTruthy();
   });
 });
