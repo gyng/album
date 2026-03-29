@@ -22,6 +22,19 @@
   background-color: var(--c-bg-contrast-light);
 }
 
+.navCurrent {
+  border-color: color-mix(
+    in srgb,
+    var(--c-bg-contrast-light) 65%,
+    var(--c-bg)
+  );
+  background-color: color-mix(
+    in srgb,
+    var(--c-bg-contrast-light) 14%,
+    var(--c-bg)
+  );
+}
+
 .toast {
   background-color: var(--c-bg);
   padding: var(--m-m) var(--m-l);
@@ -55,5 +68,52 @@
 }
 
 .noNavPadding {
-  padding-left: unset !important;
+  padding-inline: 0 !important;
+}
+
+.splitButton {
+  display: inline-flex;
+  align-items: stretch;
+  border: solid 2px var(--c-bg-contrast-light);
+  border-radius: var(--m-s);
+  overflow: clip;
+  background-color: var(--c-bg);
+}
+
+.splitButtonMain,
+.splitButtonSub {
+  align-self: stretch;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font-size: var(--fs-sm);
+  text-decoration: none;
+}
+
+.splitButtonMain {
+  padding: var(--m-m);
+}
+
+.splitButtonSub {
+  padding: var(--m-m);
+  border-left: solid 2px var(--c-bg-contrast-light);
+  cursor: pointer;
+  line-height: 1;
+  min-width: calc(var(--m-xl) * 1.5);
+}
+
+.splitButtonMain:hover,
+.splitButtonSub:hover:not(:disabled) {
+  background-color: var(--c-bg-contrast-light);
+}
+
+.splitButtonSub:disabled {
+  opacity: 0.5;
+  cursor: wait;
+}
+
+.splitButtonMain:focus-visible,
+.splitButtonSub:focus-visible {
+  outline: solid 2px var(--c-bg-contrast-light);
+  outline-offset: -2px;
 }

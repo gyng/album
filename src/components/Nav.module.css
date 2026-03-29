@@ -9,3 +9,7 @@
 .nav li {
   height: 100%;
 }
+
+.themeToggleItem {
+  margin-left: auto;
+}

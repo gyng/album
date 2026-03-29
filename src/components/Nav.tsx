@@ -6,6 +6,8 @@ import { ThemeToggle } from "./ThemeToggle";
 export const Nav: React.FC<{
   albumName?: string;
   hasPadding?: boolean;
+  extraItems?: React.ReactNode;
+  isHome?: boolean;
 }> = (props) => {
   return (
     <nav
@@ -16,12 +18,15 @@ export const Nav: React.FC<{
     >
       <ul className={commonStyles.topBar}>
         <li>
-          <Link href="/" className={commonStyles.button}>
-            ← Albums
+          <Link
+            href="/"
+            className={[
+              commonStyles.button,
+              props.isHome ? commonStyles.navCurrent : "",
+            ].join(" ")}
+          >
+            Albums
           </Link>
-        </li>
-        <li>
-          <ThemeToggle />
         </li>
         {props.albumName ? (
           <>
@@ -51,6 +56,10 @@ export const Nav: React.FC<{
             </li>
           </>
         ) : null}
+        {props.extraItems}
+        <li className={styles.themeToggleItem}>
+          <ThemeToggle />
+        </li>
       </ul>
     </nav>
   );

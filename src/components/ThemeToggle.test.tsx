@@ -34,7 +34,7 @@ describe("ThemeToggle", () => {
     });
 
     expect(consoleError).not.toHaveBeenCalled();
-    expect(container?.textContent).toContain("🌙");
+    expect(container?.textContent).toContain("☀️");
     expect(container?.textContent).toContain("⟳");
     expect(document.body.classList.contains("light")).toBe(true);
 
@@ -76,5 +76,15 @@ describe("ThemeToggle", () => {
     setItemSpy.mockRestore();
     getItemSpy.mockRestore();
     warnSpy.mockRestore();
+  });
+
+  it("keeps showing a theme icon after reset", () => {
+    render(<ThemeToggle />);
+
+    fireEvent.click(screen.getByTitle(/reset to system default/i));
+
+    expect(screen.getByTitle(/toggle dark mode/i).textContent).toMatch(
+      /☀️|🌙/,
+    );
   });
 });

@@ -1,4 +1,4 @@
-import { useEffect, useReducer } from "react";
+import { useEffect, useReducer, useState } from "react";
 import styles from "./ThemeToggle.module.css";
 
 const readStoredDarkMode = (): boolean | null => {
@@ -46,14 +46,33 @@ const getInitialDarkMode = (): boolean | null => {
   return true;
 };
 
+const getFallbackDarkMode = (): boolean => {
+  if (typeof document !== "undefined") {
+    if (document.body.classList.contains("dark")) {
+      return true;
+    }
+    if (document.body.classList.contains("light")) {
+      return false;
+    }
+  }
+
+  if (typeof window !== "undefined" && typeof window.matchMedia === "function") {
+    return window.matchMedia("(prefers-color-scheme: dark)").matches;
+  }
+
+  return true;
+};
+
 export const ThemeToggle: React.FC = () => {
   const [darkMode, setDarkMode] = useReducer(
     (_state: boolean | null, next: boolean | null) => next,
     null,
   );
+  const [hasHydrated, setHasHydrated] = useState(false);
 
   useEffect(() => {
     setDarkMode(getInitialDarkMode());
+    setHasHydrated(true);
   }, []);
 
   useEffect(() => {
@@ -69,6 +88,9 @@ export const ThemeToggle: React.FC = () => {
     }
   }, [darkMode]);
 
+  const displayDarkMode =
+    darkMode == null ? (hasHydrated ? getFallbackDarkMode() : null) : darkMode;
+
   return (
     <div className={styles.themeToggle}>
       <button
@@ -80,12 +102,12 @@ export const ThemeToggle: React.FC = () => {
           writeStoredDarkMode(next);
         }}
       >
-        {darkMode == null ? (
+        {displayDarkMode == null ? (
           <span style={{ opacity: 0 }}>☀️</span>
-        ) : darkMode ? (
-          "☀️"
-        ) : (
+        ) : displayDarkMode ? (
           "🌙"
+        ) : (
+          "☀️"
         )}
       </button>
       {darkMode != null ? (

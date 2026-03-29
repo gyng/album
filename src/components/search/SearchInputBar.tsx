@@ -22,6 +22,7 @@ type Props = {
   trimmedQuery: string;
   onApplySearchTerms: (terms: string[]) => void;
   onClearSearchState: () => void;
+  onStartRandomSimilarSearch: () => void;
   onSetColorSearch: (rgb: RGB) => void;
   onSetColorTolerance: (value: number) => void;
   onSetSearchMode: (mode: SearchMode) => void;
@@ -46,6 +47,7 @@ export const SearchInputBar: React.FC<Props> = ({
   trimmedQuery,
   onApplySearchTerms,
   onClearSearchState,
+  onStartRandomSimilarSearch,
   onSetColorSearch,
   onSetColorTolerance,
   onSetSearchMode,
@@ -170,6 +172,15 @@ export const SearchInputBar: React.FC<Props> = ({
               }}
             />
           </label>
+          <button
+            type="button"
+            className={styles.secondaryAction}
+            onClick={onStartRandomSimilarSearch}
+            disabled={!databaseReady}
+            title="Start similarity search for a random image"
+          >
+            🎲 Similarity search
+          </button>
         </>
       )}
 

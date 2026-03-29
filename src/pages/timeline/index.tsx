@@ -432,7 +432,51 @@ const TimelinePage: NextPage<PageProps> = ({ entries }) => {
       />
 
       <main className={styles.main}>
-        <Nav hasPadding={false} />
+        <Nav
+          hasPadding={false}
+          extraItems={
+            <>
+              <li>
+                <Link href="/search" className={commonStyles.button}>
+                  Search & Explore
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href="/timeline"
+                  className={[
+                    commonStyles.button,
+                    commonStyles.navCurrent,
+                  ].join(
+                    " ",
+                  )}
+                >
+                  Timeline
+                </Link>
+              </li>
+              <li>
+                <Link href="/map" className={commonStyles.button}>
+                  Map
+                </Link>
+              </li>
+              <li>
+                <div className={commonStyles.splitButton}>
+                  <Link href="/slideshow" className={commonStyles.splitButtonMain}>
+                    Slideshow
+                  </Link>
+                  <Link
+                    href="/slideshow?mode=similar&random=1"
+                    className={commonStyles.splitButtonSub}
+                    aria-label="Start similarity slideshow for a random image"
+                    title="Start similarity slideshow for a random image"
+                  >
+                    🎲
+                  </Link>
+                </div>
+              </li>
+            </>
+          }
+        />
 
         <header className={styles.header}>
           <h1 className={styles.title}>Timeline</h1>
@@ -445,15 +489,6 @@ const TimelinePage: NextPage<PageProps> = ({ entries }) => {
             </div>
           ) : null}
         </header>
-
-        <div className={styles.browseActionsBar}>
-          <Link href="/search" className={styles.exploreLink}>
-            🔍 Explore photos
-          </Link>
-          <Link href="/map" className={styles.exploreLink}>
-            🗺️ Explore the map
-          </Link>
-        </div>
 
         {filteredEntries.length === 0 ? (
           <div className={styles.emptyState}>

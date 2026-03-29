@@ -7,6 +7,7 @@ import {
 import { PhotoBlock } from "../../services/types";
 import {
   fetchSlideshowPhotos,
+  fetchRandomPhoto,
   fetchSimilarResults,
   RandomPhotoRow,
 } from "../../components/search/api";
@@ -107,6 +108,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
   const [database, progress] = useDatabase();
   const buildIdRef = React.useRef<string | null>(null);
   const initialPhotoPathRef = React.useRef<string | null>(null);
+  const randomSimilarRequestedRef = React.useRef(false);
   const similarSeedPathRef = React.useRef<string | null>(null);
   const similarQueueRef = React.useRef<RandomPhotoRow[]>([]);
   const similarQueueIndexRef = React.useRef<number>(-1);
@@ -316,6 +318,11 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
       modeParam === "similar"
         ? modeParam
         : slideshowMode;
+    randomSimilarRequestedRef.current =
+      nextMode === "similar" &&
+      ["1", "true", "yes", "on"].includes(
+        (url.searchParams.get("random") ?? "").toLowerCase(),
+      );
     if (
       modeParam === "random" ||
       modeParam === "weighted" ||
@@ -503,7 +510,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
     let cancelled = false;
 
     fetchSlideshowPhotos({ database, filter })
-      .then((photos) => {
+      .then(async (photos) => {
         if (cancelled) {
           return;
         }
@@ -526,6 +533,24 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
         }
 
         setSlideshowError(null);
+
+        if (
+          slideshowMode === "similar" &&
+          randomSimilarRequestedRef.current &&
+          !initialPhotoPathRef.current
+        ) {
+          const [randomPhoto] = await fetchRandomPhoto({
+            database,
+            filter,
+          });
+
+          if (cancelled) {
+            return;
+          }
+
+          randomSimilarRequestedRef.current = false;
+          initialPhotoPathRef.current = randomPhoto?.path ?? null;
+        }
 
         if (initialPhotoPathRef.current) {
           const seededPhoto =

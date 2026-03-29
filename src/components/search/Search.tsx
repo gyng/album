@@ -15,7 +15,6 @@ import {
 } from "../database/useDatabase";
 import { ProgressBar } from "../ProgressBar";
 import { EmptyStateExplore } from "./EmptyStateExplore";
-import { SearchBrowseActions } from "./SearchBrowseActions";
 import { SearchInputBar } from "./SearchInputBar";
 import { SearchRefinementSection } from "./SearchRefinementSection";
 import { SearchResultsGrid } from "./SearchResultsGrid";
@@ -33,7 +32,17 @@ import { useSearchResultsState } from "./useSearchResultsState";
 const useSafeLayoutEffect =
   typeof window === "undefined" ? useEffect : useLayoutEffect;
 
-export const Search: React.FC<{ disabled?: boolean }> = ({ disabled }) => {
+export type SearchNavState = {
+  databaseReady: boolean;
+  isRandomSimilarLoading: boolean;
+  onStartRandomSimilarSlideshow: () => void;
+  randomExploreError: string | null;
+};
+
+export const Search: React.FC<{
+  disabled?: boolean;
+  onNavStateChange?: (state: SearchNavState) => void;
+}> = ({ disabled, onNavStateChange }) => {
   const [searchInputValue, setSearchInputValue] = useState<string>("");
   const [searchMode, setSearchMode] = useState<SearchMode>(DEFAULT_SEARCH_MODE);
   const [similarPath, setSimilarPath] = useState<string | null>(null);
@@ -352,6 +361,33 @@ export const Search: React.FC<{ disabled?: boolean }> = ({ disabled }) => {
     }
   }, [database, isRandomSimilarLoading]);
 
+  const startRandomSimilarSearch = useCallback(async () => {
+    if (!database || isRandomSimilarLoading) {
+      return;
+    }
+
+    setIsRandomSimilarLoading(true);
+    setRandomExploreError(null);
+
+    try {
+      const [randomPhoto] = await fetchRandomPhoto({ database });
+      if (!randomPhoto) {
+        setRandomExploreError(
+          "No photos are available for random explore yet.",
+        );
+        return;
+      }
+
+      clearSearchState();
+      setSimilarPath(randomPhoto.path);
+    } catch (err) {
+      console.error("Failed to load a random photo", err);
+      setRandomExploreError("Couldn't start random explore right now.");
+    } finally {
+      setIsRandomSimilarLoading(false);
+    }
+  }, [clearSearchState, database, isRandomSimilarLoading]);
+
   const handleFindSimilar = useCallback(
     (path: string, similarity?: number) => {
       if (path === similarPath) {
@@ -394,15 +430,23 @@ export const Search: React.FC<{ disabled?: boolean }> = ({ disabled }) => {
     setColorSearch(color);
   }, []);
 
+  useEffect(() => {
+    onNavStateChange?.({
+      databaseReady: Boolean(database),
+      isRandomSimilarLoading,
+      onStartRandomSimilarSlideshow: loadRandomSimilarTrail,
+      randomExploreError,
+    });
+  }, [
+    database,
+    isRandomSimilarLoading,
+    loadRandomSimilarTrail,
+    onNavStateChange,
+    randomExploreError,
+  ]);
+
   return (
     <div className={styles.searchWidget}>
-      <SearchBrowseActions
-        databaseReady={Boolean(database)}
-        isRandomSimilarLoading={isRandomSimilarLoading}
-        randomExploreError={randomExploreError}
-        onLoadRandomSimilarTrail={loadRandomSimilarTrail}
-      />
-
       <SearchInputBar
         canClear={canClear}
         colorHex={colorHex}
@@ -422,6 +466,7 @@ export const Search: React.FC<{ disabled?: boolean }> = ({ disabled }) => {
         trimmedQuery={trimmedQuery}
         onApplySearchTerms={applySearchTerms}
         onClearSearchState={clearSearchState}
+        onStartRandomSimilarSearch={startRandomSimilarSearch}
         onSetColorSearch={setColorSearch}
         onSetColorTolerance={setColorTolerance}
         onSetSearchMode={setSearchMode}

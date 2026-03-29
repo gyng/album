@@ -303,6 +303,65 @@ beforeEach(() => {
 });
 
 describe("Search", () => {
+  it("reports a random similarity slideshow action for the slideshow split button", async () => {
+    const onNavStateChange = jest.fn();
+    (fetchRandomPhoto as jest.Mock).mockResolvedValue([]);
+
+    render(<Search onNavStateChange={onNavStateChange} />);
+    await flushEffects();
+
+    await waitFor(() => {
+      expect(onNavStateChange).toHaveBeenCalled();
+    });
+
+    const latestState = onNavStateChange.mock.calls.at(-1)?.[0];
+
+    expect(latestState).toMatchObject({
+      databaseReady: true,
+      isRandomSimilarLoading: false,
+      randomExploreError: null,
+    });
+    expect(typeof latestState?.onStartRandomSimilarSlideshow).toBe("function");
+
+    await act(async () => {
+      await latestState.onStartRandomSimilarSlideshow();
+    });
+
+    expect(fetchRandomPhoto).toHaveBeenCalledWith({ database: mockDatabase });
+    expect(onNavStateChange).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        isRandomSimilarLoading: false,
+        randomExploreError: "No photos are available for random explore yet.",
+      }),
+    );
+  });
+
+  it("shows a local similarity-search button beside the color control", async () => {
+    (fetchRandomPhoto as jest.Mock).mockResolvedValue([
+      { path: "../albums/test-simple/seed.jpg" },
+    ]);
+
+    render(<Search />);
+    await flushEffects();
+
+    await act(async () => {
+      fireEvent.click(
+        screen.getByRole("button", {
+          name: "🎲 Similarity search",
+        }),
+      );
+    });
+
+    expect(fetchRandomPhoto).toHaveBeenCalledWith({ database: mockDatabase });
+    await waitFor(() => {
+      expect(
+        screen.queryByRole("button", {
+          name: "🎲 Similarity search",
+        }),
+      ).toBeNull();
+    });
+  });
+
   it("renders the browse-mode sections and loading progress", async () => {
     (fetchMemoryCandidates as jest.Mock).mockResolvedValue([
       {
