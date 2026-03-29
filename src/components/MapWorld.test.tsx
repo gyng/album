@@ -281,4 +281,41 @@ describe("MapWorld", () => {
     expect(screen.getByTestId("journey-line-overlay")).toBeTruthy();
     expect(screen.getByTestId("journey-line-speed-label")).toBeTruthy();
   });
+
+  it("keeps album routes interactive when the full journey line is enabled", () => {
+    render(
+      <MMap
+        photos={[
+          photo,
+          {
+            ...photo,
+            href: "/album/kansai#two.jpg",
+            src: { src: "/photo-2.jpg", width: 100, height: 100 },
+            decLat: 35.5,
+            decLng: 139.5,
+            date: "2024-01-02T06:14:05.000Z",
+          },
+          {
+            ...photo,
+            href: "/album/kansai#three.jpg",
+            src: { src: "/photo-3.jpg", width: 100, height: 100 },
+            decLat: 36.1,
+            decLng: 140.2,
+            date: "2024-02-11T06:14:05.000Z",
+          },
+        ]}
+        className="map"
+        showRoute
+        routeDisplayMode="always"
+      />,
+    );
+
+    fireEvent.mouseOver(
+      screen.getAllByTestId("marker")[0]!.querySelector("span")!,
+    );
+
+    expect(screen.getByTestId("journey-line-overlay")).toBeTruthy();
+    expect(screen.getByTestId("journey-line-ghost-route")).toBeTruthy();
+    expect(screen.getByTestId("journey-line-speed-label")).toBeTruthy();
+  });
 });

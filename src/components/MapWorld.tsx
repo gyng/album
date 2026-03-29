@@ -583,6 +583,7 @@ const MapRouteOverlay = ({
         <path
           d={projectedGhostPath}
           className={styles.routeOverlayGhost}
+          data-testid="journey-line-ghost-route"
           style={{
             strokeWidth: routeMode === "simplified" ? 3 : 2.5,
             strokeDasharray: "2 8",
@@ -845,7 +846,7 @@ export const MMap: React.FC<MapWorldProps> = ({
     return toRouteGeoJson(fullRoutePoints ?? []);
   }, [fullRoutePoints]);
   const routeGeoJson = fullRouteGeoJson ?? activeContextRouteGeoJson;
-  const routePoints = fullRoutePoints ?? activeContextRoutePoints;
+  const overlayRoutePoints = activeContextRoutePoints ?? fullRoutePoints;
   const ghostRoutePoints =
     activeContextRoutePoints &&
     fullRoutePoints &&
@@ -855,11 +856,11 @@ export const MMap: React.FC<MapWorldProps> = ({
   const activeRouteHrefSet = React.useMemo(
     () =>
       new Set(
-        routePoints?.flatMap((point) =>
+        overlayRoutePoints?.flatMap((point) =>
           point.memberHrefs.length > 0 ? point.memberHrefs : [point.href],
         ) ?? [],
       ),
-    [routePoints],
+    [overlayRoutePoints],
   );
   const shouldEmphasizeRouteMarkers = clickInfo !== null;
   const markerColorByHref = React.useMemo(
@@ -1019,7 +1020,7 @@ export const MMap: React.FC<MapWorldProps> = ({
         ) : null}
         {!isInteracting && routeGeoJson ? (
           <MapRouteOverlay
-            routePoints={routePoints}
+            routePoints={overlayRoutePoints}
             routeMode={routeMode}
             getPointColor={getRoutePointColor}
             showSpeedLabels={clickInfo !== null || hoverInfo !== null}
@@ -1106,7 +1107,7 @@ export const MMap: React.FC<MapWorldProps> = ({
                 <div>
                   {zoom && zoom > 8.5 ? <LazyImage photo={photo} /> : null}
                   <span
-                    style={{ filter: photo.hueRotate }}
+                    style={{ color: photo.markerColor }}
                     className={[
                       styles.pin,
                       shouldEmphasizeRouteMarkers && activeRouteHrefSet.size > 0
@@ -1121,9 +1122,7 @@ export const MMap: React.FC<MapWorldProps> = ({
                     onMouseLeave={() => {
                       setHoverInfo(null);
                     }}
-                  >
-                    🔴
-                  </span>
+                  />
                 </div>
               </Marker>
             </React.Fragment>
