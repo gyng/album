@@ -125,6 +125,22 @@ describe("fetchSimilarResults", () => {
     expect(firstSimilarity > secondSimilarity).toBe(true);
   });
 
+  it("can return least-similar results first", async () => {
+    const results = await fetchSimilarResults({
+      database: makeDatabase() as any,
+      path: "../albums/test-simple/DSCF0506-2.jpg",
+      similarityOrder: "least",
+      page: 0,
+      pageSize: 2,
+    });
+
+    expect(results.data[0]?.path).toBe("../albums/test-simple/DSCF2581-2_2.jpg");
+    expect(results.data[1]?.path).toBe("../albums/test-simple/DSCF0593.jpg");
+    expect(Number(results.data[0]?.similarity ?? 0)).toBeLessThan(
+      Number(results.data[1]?.similarity ?? 0),
+    );
+  });
+
   it("can read embeddings from a separate database", async () => {
     const coreDatabase = {
       exec: ({ sql, callback }: ExecArgs) => {

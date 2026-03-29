@@ -1,0 +1,34 @@
+.wrapper {
+  display: grid;
+  gap: var(--m-l);
+}
+
+.block {
+  display: grid;
+  gap: var(--m-m);
+  position: relative;
+  z-index: 1;
+}
+
+.header {
+  display: flex;
+  align-items: baseline;
+  gap: var(--m-s);
+  flex-wrap: wrap;
+}
+
+.title {
+  margin: 0;
+  font-size: var(--fs-m);
+}
+
+.coverage {
+  font-size: var(--fs-s);
+  color: var(--c-bg-contrast-light);
+}
+
+.noData {
+  margin: 0;
+  color: var(--c-bg-contrast-light);
+  font-size: var(--fs-sm);
+}

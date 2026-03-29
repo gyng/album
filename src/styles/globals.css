@@ -72,6 +72,7 @@ textarea {
   );
   --c-bg-contrast-dark: light-dark(black, rgb(51, 51, 51));
   --c-accent: rgb(230, 32, 101);
+  --c-stats-pink: rgb(230, 32, 101);
   --c-font: light-dark(black, white);
 }
 

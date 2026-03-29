@@ -33,17 +33,20 @@ describe("FOCAL_LENGTH_35MM_FACET", () => {
   });
 
   it("buckets correctly", () => {
-    expect(FOCAL_LENGTH_35MM_FACET.buckets.find((b) => b.match(23))?.label).toBe("<24mm");
-    expect(FOCAL_LENGTH_35MM_FACET.buckets.find((b) => b.match(24))?.label).toBe("24–35mm");
-    expect(FOCAL_LENGTH_35MM_FACET.buckets.find((b) => b.match(35))?.label).toBe("24–35mm");
-    expect(FOCAL_LENGTH_35MM_FACET.buckets.find((b) => b.match(50))?.label).toBe("35–50mm");
-    expect(FOCAL_LENGTH_35MM_FACET.buckets.find((b) => b.match(85))?.label).toBe("50–85mm");
-    expect(FOCAL_LENGTH_35MM_FACET.buckets.find((b) => b.match(135))?.label).toBe("85–135mm");
-    expect(FOCAL_LENGTH_35MM_FACET.buckets.find((b) => b.match(200))?.label).toBe("135mm+");
+    expect(FOCAL_LENGTH_35MM_FACET.buckets.find((b) => b.match(23))?.label).toBe("<24mm · ultra-wide");
+    expect(FOCAL_LENGTH_35MM_FACET.buckets.find((b) => b.match(24))?.label).toBe("24–34mm · wide");
+    expect(FOCAL_LENGTH_35MM_FACET.buckets.find((b) => b.match(34))?.label).toBe("24–34mm · wide");
+    expect(FOCAL_LENGTH_35MM_FACET.buckets.find((b) => b.match(35))?.label).toBe("35–49mm · normal");
+    expect(FOCAL_LENGTH_35MM_FACET.buckets.find((b) => b.match(49))?.label).toBe("35–49mm · normal");
+    expect(FOCAL_LENGTH_35MM_FACET.buckets.find((b) => b.match(50))?.label).toBe("50–84mm · short tele");
+    expect(FOCAL_LENGTH_35MM_FACET.buckets.find((b) => b.match(84))?.label).toBe("50–84mm · short tele");
+    expect(FOCAL_LENGTH_35MM_FACET.buckets.find((b) => b.match(85))?.label).toBe("85–134mm · tele");
+    expect(FOCAL_LENGTH_35MM_FACET.buckets.find((b) => b.match(134))?.label).toBe("85–134mm · tele");
+    expect(FOCAL_LENGTH_35MM_FACET.buckets.find((b) => b.match(200))?.label).toBe("135mm+ · long tele");
   });
 
   it("every value falls into exactly one bucket", () => {
-    for (const v of [10, 23, 24, 35, 36, 50, 51, 85, 86, 135, 136, 400]) {
+    for (const v of [10, 23, 24, 34, 35, 49, 50, 84, 85, 134, 135, 400]) {
       const matches = FOCAL_LENGTH_35MM_FACET.buckets.filter((b) => b.match(v));
       expect(matches).toHaveLength(1);
     }
@@ -66,17 +69,20 @@ describe("FOCAL_LENGTH_ACTUAL_FACET", () => {
   });
 
   it("buckets correctly", () => {
-    expect(FOCAL_LENGTH_ACTUAL_FACET.buckets.find((b) => b.match(10))?.label).toBe("<18mm");
-    expect(FOCAL_LENGTH_ACTUAL_FACET.buckets.find((b) => b.match(18))?.label).toBe("18–23mm");
-    expect(FOCAL_LENGTH_ACTUAL_FACET.buckets.find((b) => b.match(23))?.label).toBe("18–23mm");
-    expect(FOCAL_LENGTH_ACTUAL_FACET.buckets.find((b) => b.match(35))?.label).toBe("23–35mm");
-    expect(FOCAL_LENGTH_ACTUAL_FACET.buckets.find((b) => b.match(56))?.label).toBe("35–56mm");
-    expect(FOCAL_LENGTH_ACTUAL_FACET.buckets.find((b) => b.match(100))?.label).toBe("56–100mm");
-    expect(FOCAL_LENGTH_ACTUAL_FACET.buckets.find((b) => b.match(200))?.label).toBe("100mm+");
+    expect(FOCAL_LENGTH_ACTUAL_FACET.buckets.find((b) => b.match(10))?.label).toBe("<18mm · ultra-wide");
+    expect(FOCAL_LENGTH_ACTUAL_FACET.buckets.find((b) => b.match(18))?.label).toBe("18–22mm · wide");
+    expect(FOCAL_LENGTH_ACTUAL_FACET.buckets.find((b) => b.match(22))?.label).toBe("18–22mm · wide");
+    expect(FOCAL_LENGTH_ACTUAL_FACET.buckets.find((b) => b.match(23))?.label).toBe("23–34mm · normal");
+    expect(FOCAL_LENGTH_ACTUAL_FACET.buckets.find((b) => b.match(34))?.label).toBe("23–34mm · normal");
+    expect(FOCAL_LENGTH_ACTUAL_FACET.buckets.find((b) => b.match(35))?.label).toBe("35–55mm · short tele");
+    expect(FOCAL_LENGTH_ACTUAL_FACET.buckets.find((b) => b.match(55))?.label).toBe("35–55mm · short tele");
+    expect(FOCAL_LENGTH_ACTUAL_FACET.buckets.find((b) => b.match(56))?.label).toBe("56–99mm · tele");
+    expect(FOCAL_LENGTH_ACTUAL_FACET.buckets.find((b) => b.match(99))?.label).toBe("56–99mm · tele");
+    expect(FOCAL_LENGTH_ACTUAL_FACET.buckets.find((b) => b.match(200))?.label).toBe("100mm+ · long tele");
   });
 
   it("every value falls into exactly one bucket", () => {
-    for (const v of [1, 17, 18, 23, 24, 35, 36, 56, 57, 100, 101, 300]) {
+    for (const v of [1, 17, 18, 22, 23, 34, 35, 55, 56, 99, 100, 300]) {
       const matches = FOCAL_LENGTH_ACTUAL_FACET.buckets.filter((b) => b.match(v));
       expect(matches).toHaveLength(1);
     }
@@ -91,11 +97,12 @@ describe("APERTURE_FACET", () => {
   });
 
   it("buckets correctly", () => {
-    expect(APERTURE_FACET.buckets.find((b) => b.match(1.4))?.label).toBe("f/1.0–1.8");
-    expect(APERTURE_FACET.buckets.find((b) => b.match(1.8))?.label).toBe("f/1.0–1.8");
-    expect(APERTURE_FACET.buckets.find((b) => b.match(2.0))?.label).toBe("f/2–2.8");
-    expect(APERTURE_FACET.buckets.find((b) => b.match(2.8))?.label).toBe("f/2–2.8");
-    expect(APERTURE_FACET.buckets.find((b) => b.match(4))?.label).toBe("f/3.5–5.6");
+    expect(APERTURE_FACET.buckets.find((b) => b.match(1.4))?.label).toBe("f/1.8 and faster");
+    expect(APERTURE_FACET.buckets.find((b) => b.match(1.8))?.label).toBe("f/1.8 and faster");
+    expect(APERTURE_FACET.buckets.find((b) => b.match(2.0))?.label).toBe("around f/2");
+    expect(APERTURE_FACET.buckets.find((b) => b.match(2.8))?.label).toBe("around f/2.8");
+    expect(APERTURE_FACET.buckets.find((b) => b.match(4))?.label).toBe("around f/4");
+    expect(APERTURE_FACET.buckets.find((b) => b.match(5.6))?.label).toBe("around f/5.6");
     expect(APERTURE_FACET.buckets.find((b) => b.match(8))?.label).toBe("f/8–11");
     expect(APERTURE_FACET.buckets.find((b) => b.match(16))?.label).toBe("f/16+");
   });

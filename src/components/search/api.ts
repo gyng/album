@@ -2,6 +2,7 @@ import { Database, Sqlite3Static } from "@sqlite.org/sqlite-wasm";
 import { SearchResultRow } from "./searchTypes";
 import { RGB, deltaE, rgbToLab, parseColorPalette } from "../../util/colorDistance";
 import { SearchFacetSelection } from "../../util/searchFacets";
+import { SimilarityOrder } from "./searchUtils";
 import {
   APERTURE_FACET,
   CAMERA_FACET,
@@ -841,11 +842,20 @@ export const fetchSimilarResults = async (opts: {
   database: Database;
   embeddingsDatabase?: Database | null;
   path: string;
+  similarityOrder?: SimilarityOrder;
   pageSize: number;
   page: number;
   offset?: number;
 }): Promise<PaginatedSearchResult> => {
-  const { database, embeddingsDatabase, path, page, pageSize, offset } = opts;
+  const {
+    database,
+    embeddingsDatabase,
+    path,
+    similarityOrder = "most",
+    page,
+    pageSize,
+    offset,
+  } = opts;
   const vectorDatabase = embeddingsDatabase ?? database;
 
   try {
@@ -866,6 +876,9 @@ export const fetchSimilarResults = async (opts: {
       modelId: queryEmbedding.model_id,
       excludePaths: [path],
     });
+    if (similarityOrder === "least") {
+      rankedPaths.reverse();
+    }
 
     const start = typeof offset === "number" ? offset : page * pageSize;
     const end = start + pageSize;

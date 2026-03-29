@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import styles from "./Search.module.css";
 import { hexToRgb, RGB, rgbToString } from "../../util/colorDistance";
 import { SearchMode } from "./useTextVector";
@@ -52,6 +52,12 @@ export const SearchInputBar: React.FC<Props> = ({
   onSetColorTolerance,
   onSetSearchMode,
 }) => {
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
   return (
     <div className={styles.searchInputRow}>
       {isColorMode && colorSearch ? (
@@ -172,15 +178,17 @@ export const SearchInputBar: React.FC<Props> = ({
               }}
             />
           </label>
-          <button
-            type="button"
-            className={styles.secondaryAction}
-            onClick={onStartRandomSimilarSearch}
-            disabled={!databaseReady}
-            title="Start similarity search for a random image"
-          >
-            🎲 Similarity search
-          </button>
+          {isMounted ? (
+            <button
+              type="button"
+              className={styles.secondaryAction}
+              onClick={onStartRandomSimilarSearch}
+              disabled={!databaseReady}
+              title="Start similarity search for a random image"
+            >
+              🎲 Similarity search
+            </button>
+          ) : null}
         </>
       )}
 

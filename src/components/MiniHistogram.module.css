@@ -1,0 +1,91 @@
+.chart {
+  display: grid;
+  gap: var(--m-s);
+  align-content: start;
+}
+
+.title {
+  margin: 0;
+  font-size: var(--fs-m);
+  padding-bottom: 0.2rem;
+}
+
+.bars {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
+  gap: 1px;
+  align-items: end;
+}
+
+.column {
+  display: grid;
+  gap: 0.35rem;
+  align-items: end;
+  position: relative;
+}
+
+.tooltip {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  transform: translate(-50%, calc(-100% - var(--m-s)));
+  padding: 0.3rem 0.45rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--c-bg) 88%, var(--c-accent));
+  border: 1px solid color-mix(in srgb, var(--c-accent) 60%, var(--c-font));
+  color: color-mix(in srgb, white 92%, var(--c-font));
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.08s ease;
+  z-index: 2;
+}
+
+.column:hover .tooltip {
+  opacity: 1;
+}
+
+.track {
+  height: 112px;
+  position: relative;
+  display: flex;
+  align-items: end;
+  padding: 1.2rem 0.2rem 0.2rem;
+  background: color-mix(in srgb, var(--c-bg) 96%, var(--c-bg-contrast-dark));
+  border: 1px solid color-mix(in srgb, var(--c-bg-contrast-dark) 88%, transparent);
+}
+
+.count {
+  position: absolute;
+  left: 50%;
+  top: 0.2rem;
+  transform: translateX(-50%);
+  font-size: 10px;
+  color: var(--c-bg-contrast-light);
+  text-align: center;
+  line-height: 1;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+.bar {
+  width: 100%;
+  min-height: 2px;
+  background: var(--c-accent);
+  transition: height 0.25s ease;
+}
+
+.barEmpty {
+  background: color-mix(in srgb, var(--c-bg-contrast-dark) 80%, transparent);
+}
+
+.label {
+  min-height: 1lh;
+  font-size: 10px;
+  color: var(--c-bg-contrast-light);
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}

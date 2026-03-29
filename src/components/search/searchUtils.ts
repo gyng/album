@@ -13,6 +13,7 @@ export type Tag = {
 export type InitialSearchState = {
   searchQuery: string[];
   similarPath: string | null;
+  similarityOrder: SimilarityOrder;
   colorSearch: RGB | null;
   searchMode: SearchMode;
   selectedFacets: SearchFacetSelection[];
@@ -20,6 +21,8 @@ export type InitialSearchState = {
 };
 
 export const DEFAULT_SEARCH_MODE: SearchMode = "hybrid";
+export type SimilarityOrder = "most" | "least";
+export const DEFAULT_SIMILARITY_ORDER: SimilarityOrder = "most";
 
 export const similarSearchEmojiStyle = {
   filter: "grayscale(100%)",
@@ -62,6 +65,12 @@ export const isSearchMode = (value: string | null): value is SearchMode => {
   return value === "keyword" || value === "semantic" || value === "hybrid";
 };
 
+export const isSimilarityOrder = (
+  value: string | null,
+): value is SimilarityOrder => {
+  return value === "most" || value === "least";
+};
+
 export const parseColorParam = (value: string | null): RGB | null => {
   if (!value) return null;
   const parts = value.split(",").map((v) => parseInt(v.trim(), 10));
@@ -79,6 +88,7 @@ export const getInitialSearchState = (): InitialSearchState => {
     return {
       searchQuery: [],
       similarPath: null,
+      similarityOrder: DEFAULT_SIMILARITY_ORDER,
       colorSearch: null,
       searchMode: DEFAULT_SEARCH_MODE,
       selectedFacets: [],
@@ -91,6 +101,9 @@ export const getInitialSearchState = (): InitialSearchState => {
   return {
     searchQuery: query ? query.split(",").map((value) => value.trim()) : [],
     similarPath: url.searchParams.get("similar"),
+    similarityOrder: isSimilarityOrder(url.searchParams.get("similar_order"))
+      ? (url.searchParams.get("similar_order") as SimilarityOrder)
+      : DEFAULT_SIMILARITY_ORDER,
     colorSearch: parseColorParam(url.searchParams.get("color")),
     searchMode: isSearchMode(url.searchParams.get("mode"))
       ? (url.searchParams.get("mode") as SearchMode)

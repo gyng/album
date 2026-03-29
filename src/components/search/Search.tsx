@@ -29,9 +29,11 @@ import { SearchResultsGrid } from "./SearchResultsGrid";
 import { SimilarTrailBar, SimilarTrailItem } from "./SimilarTrailBar";
 import {
   DEFAULT_SEARCH_MODE,
+  DEFAULT_SIMILARITY_ORDER,
   dedupeTags,
   getInitialSearchState,
   parseSearchTerms,
+  SimilarityOrder,
   Tag,
 } from "./searchUtils";
 import { SearchMode } from "./useTextVector";
@@ -120,6 +122,8 @@ export const Search: React.FC<{
   const [searchInputValue, setSearchInputValue] = useState<string>("");
   const [searchMode, setSearchMode] = useState<SearchMode>(DEFAULT_SEARCH_MODE);
   const [similarPath, setSimilarPath] = useState<string | null>(null);
+  const [similarityOrder, setSimilarityOrder] =
+    useState<SimilarityOrder>(DEFAULT_SIMILARITY_ORDER);
   const [colorSearch, setColorSearch] = useState<RGB | null>(null);
   const [colorTolerance, setColorTolerance] = useState<number>(35);
   const [similarTrail, setSimilarTrail] = useState<SimilarTrailItem[]>([]);
@@ -185,6 +189,7 @@ export const Search: React.FC<{
     embeddingsDatabase,
     searchInputValue,
     similarPath,
+    similarityOrder,
     colorSearch,
     colorTolerance,
     searchMode,
@@ -232,6 +237,7 @@ export const Search: React.FC<{
     const initialSearchState = getInitialSearchState();
     setSearchInputValue(initialSearchState.searchQuery.join(","));
     setSimilarPath(initialSearchState.similarPath);
+    setSimilarityOrder(initialSearchState.similarityOrder);
     setColorSearch(initialSearchState.colorSearch);
     setSearchMode(initialSearchState.searchMode);
     setSelectedFacets(initialSearchState.selectedFacets);
@@ -252,12 +258,16 @@ export const Search: React.FC<{
     const searchParams = new URLSearchParams(window.location.search);
     searchParams.delete("q");
     searchParams.delete("similar");
+    searchParams.delete("similar_order");
     searchParams.delete("color");
     searchParams.delete("mode");
     writeSearchFacetSelections(searchParams, selectedFacets);
 
     if (similarPath) {
       searchParams.set("similar", similarPath);
+      if (similarityOrder !== DEFAULT_SIMILARITY_ORDER) {
+        searchParams.set("similar_order", similarityOrder);
+      }
     } else if (colorSearch) {
       searchParams.set(
         "color",
@@ -291,6 +301,7 @@ export const Search: React.FC<{
     searchMode,
     selectedFacets,
     similarPath,
+    similarityOrder,
   ]);
 
   useEffect(() => {
@@ -757,8 +768,10 @@ export const Search: React.FC<{
           similarPath={similarPath}
           similarPreviewSrc={similarPreviewSrc}
           similarFilename={similarFilename}
+          similarityOrder={similarityOrder}
           trail={similarTrail}
           sourceRef={modeSourceRef}
+          onSetSimilarityOrder={setSimilarityOrder}
           onTruncate={truncateSimilarStack}
         />
       ) : null}

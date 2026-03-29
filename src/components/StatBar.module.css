@@ -1,9 +1,13 @@
 .row {
   display: grid;
-  grid-template-columns: minmax(80px, 160px) 1fr auto auto;
+  grid-template-columns: minmax(96px, 180px) 1fr auto auto;
   align-items: center;
   gap: var(--m-s);
-  min-height: 22px;
+  min-height: 28px;
+}
+
+.rowInteractive {
+  border-radius: var(--m-s);
 }
 
 .label {
@@ -12,6 +16,10 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-width: 0;
 }
 
 .barTrack {
@@ -33,9 +41,35 @@
   font-size: var(--fs-sm);
   color: var(--c-bg-contrast-light);
   text-align: right;
-  min-width: 36px;
+  min-width: 44px;
+  font-variant-numeric: tabular-nums;
 }
 
 .action {
   justify-self: end;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  color: var(--c-bg-contrast-light);
+  text-decoration: none;
+  font-size: var(--fs-s);
+  white-space: nowrap;
+}
+
+.action:hover {
+  color: var(--c-font);
+}
+
+.actionText {
+  display: inline;
+}
+
+@media (max-width: 720px) {
+  .row {
+    grid-template-columns: minmax(84px, 132px) 1fr auto auto;
+  }
+
+  .actionText {
+    display: none;
+  }
 }

@@ -1,0 +1,67 @@
+.shell {
+  position: relative;
+  border-radius: calc(var(--m) + var(--m-s));
+  overflow: hidden;
+  background: color-mix(in srgb, var(--c-bg) 82%, black);
+}
+
+.shell::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background:
+    linear-gradient(
+      180deg,
+      rgb(255 255 255 / 0.08),
+      rgb(255 255 255 / 0.02) 18%,
+      transparent 32%
+    ),
+    radial-gradient(
+      circle at 18% 0%,
+      color-mix(in srgb, var(--c-stats-pink) 24%, transparent),
+      transparent 34%
+    ),
+    radial-gradient(
+      circle at 82% 100%,
+      color-mix(in srgb, var(--c-stats-pink) 12%, transparent),
+      transparent 36%
+    );
+  mix-blend-mode: screen;
+  z-index: 2;
+}
+
+.map {
+  height: 560px;
+  border: 1px solid var(--c-bg-contrast-dark);
+  border-radius: inherit;
+  background: color-mix(in srgb, var(--c-bg) 82%, black);
+}
+
+.map :global(.maplibregl-map),
+.map :global(canvas) {
+  border-radius: inherit;
+}
+
+.map :global(.maplibregl-map) {
+  mix-blend-mode: screen;
+}
+
+.map :global(.maplibregl-control-container) {
+  display: none;
+}
+
+.map :global(.maplibregl-canvas) {
+  opacity: 0.9;
+}
+
+@media (max-width: 720px) {
+  .shell {
+    border-radius: var(--m);
+  }
+
+  .map {
+    height: 420px;
+  }
+}

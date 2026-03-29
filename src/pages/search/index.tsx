@@ -15,8 +15,13 @@ const SearchPage: NextPage<PageProps> = (props) => {
   const [searchNavState, setSearchNavState] = useState<SearchNavState | null>(
     null,
   );
+  const [isMounted, setIsMounted] = useState(false);
   const handleNavStateChange = useCallback((state: SearchNavState) => {
     setSearchNavState(state);
+  }, []);
+
+  React.useEffect(() => {
+    setIsMounted(true);
   }, []);
 
   return (
@@ -39,6 +44,7 @@ const SearchPage: NextPage<PageProps> = (props) => {
           hasPadding={false}
           onMapClick={(event) => forceDocumentNavigation(event, "/map")}
           slideshowAction={
+            isMounted ? (
             <button
               type="button"
               className={commonStyles.splitButtonSub}
@@ -58,6 +64,7 @@ const SearchPage: NextPage<PageProps> = (props) => {
             >
               {searchNavState?.isRandomSimilarLoading ? "…" : "🎲"}
             </button>
+            ) : undefined
           }
         />
 

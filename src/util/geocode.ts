@@ -84,3 +84,34 @@ export function getGeocodeSubregion(
   const lines = getGeocodeParts(geocode);
   return lines[2] ?? null;
 }
+
+const TRAILING_PLACE_SUFFIXES = [
+  /\s*\([^)]*\)$/,
+  /\bCity$/,
+  /\bCounty$/,
+  /\bDistrict$/,
+  /\bPrefecture$/,
+  /\bProvince$/,
+  /\bState$/,
+  /\bShi$/,
+  /-shi$/,
+  /\bKu$/,
+  /-ku$/,
+  /\bGun$/,
+  /-gun$/,
+];
+
+export function formatPlaceDisplayLabel(
+  value: string | null | undefined,
+): string | null {
+  if (!value) return null;
+
+  let label = value.trim();
+  if (!label) return null;
+
+  TRAILING_PLACE_SUFFIXES.forEach((pattern) => {
+    label = label.replace(pattern, "").trim();
+  });
+
+  return label || value.trim();
+}

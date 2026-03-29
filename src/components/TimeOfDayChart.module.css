@@ -1,0 +1,132 @@
+.chart {
+  display: grid;
+  gap: var(--m);
+}
+
+.metaRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--m);
+  flex-wrap: wrap;
+}
+
+.summary {
+  margin: 0;
+  font-size: var(--fs-s);
+  color: var(--c-bg-contrast-light);
+}
+
+.dayparts {
+  display: grid;
+  grid-template-columns: repeat(24, minmax(0, 1fr));
+  gap: 1px;
+}
+
+.daypart {
+  padding: 0.35rem 0.5rem;
+  font-size: 11px;
+  color: var(--c-bg-contrast-light);
+  background: color-mix(in srgb, var(--c-bg) 94%, var(--c-bg-contrast-dark));
+  border: 1px solid color-mix(in srgb, var(--c-bg-contrast-dark) 88%, transparent);
+  text-align: center;
+}
+
+.bars {
+  display: grid;
+  grid-template-columns: repeat(24, minmax(0, 1fr));
+  gap: 1px;
+  align-items: end;
+}
+
+.column {
+  display: grid;
+  gap: 0.35rem;
+  align-items: end;
+  position: relative;
+}
+
+.columnActive .track {
+  border-color: color-mix(in srgb, var(--c-accent) 70%, var(--c-font));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--c-accent) 70%, var(--c-font)) inset;
+}
+
+.tooltip {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  transform: translate(-50%, calc(-100% - var(--m-s)));
+  padding: 0.3rem 0.45rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--c-bg) 88%, var(--c-accent));
+  border: 1px solid color-mix(in srgb, var(--c-accent) 60%, var(--c-font));
+  color: color-mix(in srgb, white 92%, var(--c-font));
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.08s ease;
+  z-index: 2;
+}
+
+.column:hover .tooltip {
+  opacity: 1;
+}
+
+.count {
+  position: absolute;
+  left: 50%;
+  top: 0.2rem;
+  transform: translateX(-50%);
+  font-size: 10px;
+  color: var(--c-bg-contrast-light);
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  pointer-events: none;
+}
+
+.track {
+  height: 180px;
+  position: relative;
+  display: flex;
+  align-items: end;
+  padding: 1.2rem 0.2rem 0.2rem;
+  background: color-mix(in srgb, var(--c-bg) 96%, var(--c-bg-contrast-dark));
+  border: 1px solid color-mix(in srgb, var(--c-bg-contrast-dark) 88%, transparent);
+}
+
+.bar {
+  width: 100%;
+  min-height: 2px;
+  background: var(--c-accent);
+  transition: height 0.25s ease;
+}
+
+.barEmpty {
+  background: color-mix(in srgb, var(--c-bg-contrast-dark) 80%, transparent);
+}
+
+.label {
+  min-height: 1lh;
+  font-size: 10px;
+  color: var(--c-bg-contrast-light);
+  text-align: center;
+}
+
+.labelMuted {
+  color: transparent;
+}
+
+@media (max-width: 900px) {
+  .track {
+    height: 132px;
+  }
+
+  .daypart {
+    font-size: 10px;
+    padding-inline: 0.2rem;
+  }
+}

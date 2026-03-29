@@ -1,0 +1,48 @@
+.wrapper {
+  display: grid;
+  gap: var(--m-s);
+  width: 100%;
+  min-width: 0;
+}
+
+.chartShell {
+  height: var(--sankey-height, 460px);
+  border: 1px solid var(--c-bg-contrast-dark);
+  border-radius: var(--m-s);
+  padding: var(--m);
+  background: color-mix(in srgb, var(--c-bg) 96%, var(--c-bg-contrast-dark));
+  overflow: hidden;
+}
+
+.svgLabel {
+  fill: var(--c-font);
+  font-size: 13px;
+  font-weight: 500;
+  transition: fill 0.15s ease, opacity 0.15s ease;
+}
+
+.svgLabelLink {
+  cursor: pointer;
+}
+
+.svgLabelLink:hover .svgLabel {
+  fill: color-mix(in srgb, var(--c-font) 78%, var(--c-accent));
+}
+
+.tooltip {
+  display: grid;
+  gap: 0.1rem;
+  line-height: 1.25;
+}
+
+.empty {
+  margin: 0;
+  color: var(--c-bg-contrast-light);
+  font-size: var(--fs-sm);
+}
+
+@media (max-width: 900px) {
+  .wrapper {
+    display: none;
+  }
+}

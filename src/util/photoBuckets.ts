@@ -30,12 +30,12 @@ export const FOCAL_LENGTH_35MM_FACET: PhotoFacet<number> = {
   displayName: "Focal length (35mm equiv.)",
   extract: (exif) => exif.FocalLengthIn35mmFormat ?? null,
   buckets: [
-    { label: "<24mm",    match: (v) => (v as number) < 24,                      range: [null, 23] },
-    { label: "24–35mm",  match: (v) => (v as number) >= 24 && (v as number) <= 35, range: [24, 35] },
-    { label: "35–50mm",  match: (v) => (v as number) > 35 && (v as number) <= 50,  range: [36, 50] },
-    { label: "50–85mm",  match: (v) => (v as number) > 50 && (v as number) <= 85,  range: [51, 85] },
-    { label: "85–135mm", match: (v) => (v as number) > 85 && (v as number) <= 135, range: [86, 135] },
-    { label: "135mm+",   match: (v) => (v as number) > 135,                     range: [136, null] },
+    { label: "<24mm · ultra-wide",          match: (v) => (v as number) < 24,                       range: [null, 23] },
+    { label: "24–34mm · wide",             match: (v) => (v as number) >= 24 && (v as number) <= 34, range: [24, 34] },
+    { label: "35–49mm · normal",           match: (v) => (v as number) >= 35 && (v as number) <= 49, range: [35, 49] },
+    { label: "50–84mm · short tele",       match: (v) => (v as number) >= 50 && (v as number) <= 84, range: [50, 84] },
+    { label: "85–134mm · tele",            match: (v) => (v as number) >= 85 && (v as number) <= 134, range: [85, 134] },
+    { label: "135mm+ · long tele",         match: (v) => (v as number) >= 135,                     range: [135, null] },
   ],
 };
 
@@ -48,12 +48,12 @@ export const FOCAL_LENGTH_ACTUAL_FACET: PhotoFacet<number> = {
   displayName: "Focal length (actual)",
   extract: (exif) => exif.FocalLength ?? null,
   buckets: [
-    { label: "<18mm",    match: (v) => (v as number) < 18,                      range: [null, 17] },
-    { label: "18–23mm",  match: (v) => (v as number) >= 18 && (v as number) <= 23, range: [18, 23] },
-    { label: "23–35mm",  match: (v) => (v as number) > 23 && (v as number) <= 35,  range: [24, 35] },
-    { label: "35–56mm",  match: (v) => (v as number) > 35 && (v as number) <= 56,  range: [36, 56] },
-    { label: "56–100mm", match: (v) => (v as number) > 56 && (v as number) <= 100, range: [57, 100] },
-    { label: "100mm+",   match: (v) => (v as number) > 100,                     range: [101, null] },
+    { label: "<18mm · ultra-wide",         match: (v) => (v as number) < 18,                       range: [null, 17] },
+    { label: "18–22mm · wide",             match: (v) => (v as number) >= 18 && (v as number) <= 22, range: [18, 22] },
+    { label: "23–34mm · normal",           match: (v) => (v as number) >= 23 && (v as number) <= 34, range: [23, 34] },
+    { label: "35–55mm · short tele",       match: (v) => (v as number) >= 35 && (v as number) <= 55, range: [35, 55] },
+    { label: "56–99mm · tele",             match: (v) => (v as number) >= 56 && (v as number) <= 99, range: [56, 99] },
+    { label: "100mm+ · long tele",         match: (v) => (v as number) >= 100,                     range: [100, null] },
   ],
 };
 
@@ -64,11 +64,13 @@ export const APERTURE_FACET: PhotoFacet<number> = {
   displayName: "Aperture",
   extract: (exif) => exif.FNumber ?? null,
   buckets: [
-    { label: "f/1.0–1.8", match: (v) => (v as number) <= 1.8,                                range: [null, 1] },
-    { label: "f/2–2.8",   match: (v) => (v as number) > 1.8 && (v as number) <= 2.8,          range: [2, 2] },
-    { label: "f/3.5–5.6", match: (v) => (v as number) > 2.8 && (v as number) <= 5.6,          range: [3, 5] },
-    { label: "f/8–11",    match: (v) => (v as number) > 5.6 && (v as number) <= 11,            range: [8, 11] },
-    { label: "f/16+",     match: (v) => (v as number) > 11,                                   range: [16, null] },
+    { label: "f/1.8 and faster", match: (v) => (v as number) <= 1.8,                       range: [null, 1] },
+    { label: "around f/2",       match: (v) => (v as number) > 1.8 && (v as number) <= 2.0, range: [2, 2] },
+    { label: "around f/2.8",     match: (v) => (v as number) > 2.0 && (v as number) <= 2.8, range: [3, 3] },
+    { label: "around f/4",       match: (v) => (v as number) > 2.8 && (v as number) <= 4.0, range: [4, 4] },
+    { label: "around f/5.6",     match: (v) => (v as number) > 4.0 && (v as number) <= 5.6, range: [5, 6] },
+    { label: "f/8–11",           match: (v) => (v as number) > 5.6 && (v as number) <= 11,  range: [8, 11] },
+    { label: "f/16+",            match: (v) => (v as number) > 11,                          range: [16, null] },
   ],
 };
 

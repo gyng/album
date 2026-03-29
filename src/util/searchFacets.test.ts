@@ -62,9 +62,9 @@ describe("searchFacets", () => {
     expect(
       getSearchFacetChipLabel({
         facetId: "focal-length-35mm",
-        value: "35–50mm",
+        value: "35–49mm · normal",
       }),
-    ).toBe("35mm eq.: 35–50mm");
+    ).toBe("35mm eq.: 35–49mm · normal");
     expect(
       getSearchFacetChipLabel({ facetId: "region", value: "Tokyo" }),
     ).toBe("Region: Tokyo");

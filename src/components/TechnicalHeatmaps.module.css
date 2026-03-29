@@ -1,0 +1,250 @@
+.wrapper {
+  display: grid;
+  gap: var(--m-l);
+  width: 100%;
+  position: relative;
+}
+
+.wrapperTwoUp {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: start;
+}
+
+.wrapperTwoUp .caption {
+  grid-column: 1 / -1;
+}
+
+.wrapperDiagonal {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-areas:
+    "panel-a spacer-a"
+    "spacer-b panel-b";
+  align-items: start;
+}
+
+.wrapperTriGrid {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-areas:
+    "panel-a panel-b"
+    "panel-c spacer-c";
+  align-items: start;
+}
+
+.panelTopLeft {
+  grid-area: panel-a;
+}
+
+.panelTopRight {
+  grid-area: panel-b;
+}
+
+.panelBottomLeft {
+  grid-area: panel-c;
+}
+
+.panelBottomRight {
+  grid-area: panel-b;
+}
+
+.diagonalSpacer {
+  min-height: 1px;
+}
+
+.diagonalSpacer:nth-of-type(1) {
+  grid-area: spacer-a;
+}
+
+.diagonalSpacer:nth-of-type(2) {
+  grid-area: spacer-b;
+}
+
+.triSpacer {
+  grid-area: spacer-c;
+  min-height: 1px;
+}
+
+.wrapperDiagonal .caption {
+  grid-column: 1 / -1;
+}
+
+.wrapperTriGrid .caption {
+  grid-column: 1 / -1;
+}
+
+.panel {
+  display: grid;
+  gap: var(--m-s);
+  position: relative;
+  z-index: 1;
+}
+
+.panelTitle {
+  margin: 0;
+  font-size: var(--fs-s);
+}
+
+.matrix {
+  display: grid;
+  gap: 1px;
+  align-items: stretch;
+}
+
+.corner {
+  min-height: 1px;
+}
+
+.columnLabel {
+  color: var(--c-bg-contrast-light);
+  font-size: 11px;
+  text-align: center;
+  padding-bottom: 0.35rem;
+  min-height: 1lh;
+}
+
+.columnLabelActive {
+  color: var(--c-font);
+  font-weight: 700;
+}
+
+.columnLabelMuted {
+  color: transparent;
+}
+
+.row {
+  display: contents;
+}
+
+.rowLabel {
+  color: var(--c-bg-contrast-light);
+  font-size: 11px;
+  display: flex;
+  align-items: center;
+  padding-right: var(--m-s);
+}
+
+.cell {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 0.35rem;
+  color: var(--c-font);
+  text-decoration: none;
+  background: color-mix(
+    in srgb,
+    var(--c-accent) calc(var(--intensity, 0) * 75%),
+    var(--c-bg) calc(100% - (var(--intensity, 0) * 75%))
+  );
+  border: 1px solid color-mix(in srgb, var(--c-bg-contrast-dark) 88%, transparent);
+  transition: transform 0.12s ease, border-color 0.12s ease;
+}
+
+.cell:hover {
+  transform: translateY(-1px);
+  border-color: var(--c-font);
+}
+
+.cellDimmed {
+  opacity: 0.32;
+}
+
+.cellActive {
+  border-color: var(--c-font);
+  box-shadow: 0 0 0 1px var(--c-font) inset;
+}
+
+.cellColumnActive {
+  border-color: color-mix(in srgb, var(--c-accent) 70%, var(--c-font));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--c-accent) 70%, var(--c-font)) inset;
+}
+
+.cellRelated {
+  border-color: color-mix(in srgb, var(--c-accent) 65%, var(--c-font));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--c-accent) 65%, var(--c-font)) inset;
+}
+
+.cellEmpty {
+  background: color-mix(in srgb, var(--c-bg) 96%, var(--c-bg-contrast-dark));
+}
+
+.cellCount {
+  font-size: 11px;
+  line-height: 1.1;
+}
+
+.caption {
+  margin: 0;
+  color: var(--c-bg-contrast-light);
+  font-size: var(--fs-s);
+}
+
+.overlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  overflow: visible;
+  z-index: 2;
+}
+
+.overlayLine {
+  fill: none;
+  stroke: color-mix(in srgb, var(--c-accent) 82%, white);
+  stroke-linecap: round;
+}
+
+.overlayLabel {
+  pointer-events: none;
+  filter: drop-shadow(0 1px 4px color-mix(in srgb, var(--c-bg) 70%, transparent));
+}
+
+.overlayLabelBg {
+  fill: color-mix(in srgb, var(--c-accent) 18%, var(--c-bg) 82%);
+  stroke: color-mix(in srgb, var(--c-accent) 55%, var(--c-font));
+  stroke-width: 1.25px;
+}
+
+.overlayLabel text {
+  fill: color-mix(in srgb, white 92%, var(--c-font));
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+@media (max-width: 900px) {
+  .wrapperTwoUp {
+    grid-template-columns: 1fr;
+  }
+
+  .wrapperDiagonal {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "panel-a"
+      "spacer-a"
+      "spacer-b"
+      "panel-b";
+  }
+
+  .wrapperTriGrid {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "panel-a"
+      "panel-b"
+      "panel-c";
+  }
+
+  .diagonalSpacer {
+    display: none;
+  }
+
+  .triSpacer {
+    display: none;
+  }
+
+  .matrix {
+    overflow-x: auto;
+  }
+}

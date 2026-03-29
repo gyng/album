@@ -538,6 +538,29 @@ describe("Search", () => {
     });
   });
 
+  it("lets similarity mode switch to least-similar ordering", async () => {
+    await renderSearch();
+
+    const similarButtons = await screen.findAllByRole("button", {
+      name: /find similar photos/i,
+    });
+    fireEvent.click(similarButtons[0]);
+
+    const leastSimilarTab = await screen.findByRole("tab", {
+      name: /least similar/i,
+    });
+    fireEvent.click(leastSimilarTab);
+
+    await waitFor(() => {
+      expect(fetchSimilarResults).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          path: "../albums/test-simple/recent.jpg",
+          similarityOrder: "least",
+        }),
+      );
+    });
+  });
+
   it("clearing a breadcrumb makes the next older entry current", async () => {
     await renderSearch();
 

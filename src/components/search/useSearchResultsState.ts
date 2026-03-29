@@ -13,7 +13,7 @@ import {
 import { getResizedAlbumImageSrc } from "../../util/getResizedAlbumImageSrc";
 import { RGB, rgbToHex } from "../../util/colorDistance";
 import { SearchMode, useTextVector } from "./useTextVector";
-import { parseSearchTerms } from "./searchUtils";
+import { parseSearchTerms, SimilarityOrder } from "./searchUtils";
 import { SearchFacetSelection } from "../../util/searchFacets";
 
 type Props = {
@@ -21,6 +21,7 @@ type Props = {
   embeddingsDatabase: Database | null;
   searchInputValue: string;
   similarPath: string | null;
+  similarityOrder: SimilarityOrder;
   colorSearch: RGB | null;
   colorTolerance: number;
   searchMode: SearchMode;
@@ -34,6 +35,7 @@ export const useSearchResultsState = ({
   embeddingsDatabase,
   searchInputValue,
   similarPath,
+  similarityOrder,
   colorSearch,
   colorTolerance,
   searchMode,
@@ -77,6 +79,7 @@ export const useSearchResultsState = ({
   });
 
   const { textVector, textVectorQuery } = textVectorState;
+  const hasVectorDatabase = Boolean(embeddingsDatabase || database);
 
   const hasCurrentTextVector =
     Boolean(textVector) && textVectorQuery === trimmedQuery;
@@ -84,11 +87,11 @@ export const useSearchResultsState = ({
   const canRunQuery =
     hasHydratedFromUrl &&
     Boolean(database) &&
-    ((Boolean(similarPath) && Boolean(embeddingsDatabase)) ||
+    ((Boolean(similarPath) && hasVectorDatabase) ||
       isColorMode ||
       (hasSearchQuery &&
         (searchMode === "keyword" ||
-          (Boolean(embeddingsDatabase) && hasCurrentTextVector))) ||
+          (hasVectorDatabase && hasCurrentTextVector))) ||
       (!isSimilarMode && !isColorMode && hasFacetFilters));
 
   const similarFilename = similarPath?.split("/").at(-1) ?? null;
@@ -104,6 +107,7 @@ export const useSearchResultsState = ({
         embeddingsDatabase: !!embeddingsDatabase,
         debouncedSearchQuery,
         similarPath,
+        similarityOrder,
         colorSearch: debouncedColorSearch,
         colorTolerance: debouncedColorTolerance,
         searchMode,
@@ -125,6 +129,7 @@ export const useSearchResultsState = ({
           database,
           embeddingsDatabase,
           path: similarPath,
+          similarityOrder,
           pageSize,
           page: pageParam,
         });
