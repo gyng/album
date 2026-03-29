@@ -28,10 +28,13 @@ import { buildCollectionPageJsonLd } from "../../lib/seo";
 import { getPhotoAltText } from "../../lib/alt";
 import { navigateTo } from "../../util/navigate";
 import { handleSlideshowKeyboardShortcut } from "../../util/slideshowKeyboard";
+import { BUILD_VERSION } from "../../lib/buildVersion";
 
 type PageProps = {};
 type SlideshowMode = "random" | "weighted" | "similar";
 const CONTROLS_AUTO_HIDE_MS = 3000;
+const VERSION_POLL_MS = 300000;
+const FALLBACK_RELOAD_MS = 86400000;
 
 type FullscreenDocument = Document & {
   webkitExitFullscreen?: () => Promise<void> | void;
@@ -40,6 +43,12 @@ type FullscreenDocument = Document & {
 
 type FullscreenElement = HTMLElement & {
   webkitRequestFullscreen?: () => Promise<void> | void;
+};
+
+type VersionManifest = {
+  buildVersion?: string;
+  builtAt?: string;
+  gitSha?: string | null;
 };
 
 const avoidBoundaryRepeat = (
@@ -133,7 +142,7 @@ const SlideshowPage: NextPage<PageProps> = (props) => {
 // like in world map
 const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
   const [database, progress] = useDatabase();
-  const buildIdRef = React.useRef<string | null>(null);
+  const buildVersionRef = React.useRef<string>(BUILD_VERSION);
   const initialPhotoPathRef = React.useRef<string | null>(null);
   const randomSimilarRequestedRef = React.useRef(false);
   const similarSeedPathRef = React.useRef<string | null>(null);
@@ -141,39 +150,58 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
   const similarQueueIndexRef = React.useRef<number>(-1);
   const similarQueueLastPathRef = React.useRef<string | undefined>(undefined);
 
-  // Check for a new build and reload when one is detected.
+  // Check for a new build manifest we control and reload when one is detected.
   useEffect(() => {
-    buildIdRef.current =
-      (window as { __NEXT_DATA__?: { buildId?: string } }).__NEXT_DATA__
-        ?.buildId ?? null;
-
     const checkForNewBuild = async () => {
       try {
-        const response = await fetch("/_next/static/BUILD_ID", {
+        const response = await fetch("/version.json", {
           cache: "no-store",
         });
         if (!response.ok) {
           return;
         }
-        const latestBuildId = (await response.text()).trim();
-        if (buildIdRef.current && latestBuildId !== buildIdRef.current) {
-          window.location.reload();
+        const manifest = (await response.json()) as VersionManifest;
+        const latestBuildVersion = manifest.buildVersion?.trim();
+        if (
+          latestBuildVersion &&
+          latestBuildVersion !== buildVersionRef.current
+        ) {
+          window.location.replace(window.location.href);
         }
       } catch (error) {
         console.error(error);
       }
     };
 
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        void checkForNewBuild();
+      }
+    };
+    const handleOnline = () => {
+      void checkForNewBuild();
+    };
+
     checkForNewBuild();
-    const id = setInterval(checkForNewBuild, 300000);
-    return () => clearInterval(id);
+    const id = setInterval(() => {
+      if (navigator.onLine) {
+        void checkForNewBuild();
+      }
+    }, VERSION_POLL_MS);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("online", handleOnline);
+    return () => {
+      clearInterval(id);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("online", handleOnline);
+    };
   }, []);
 
-  // reload page every 1 day to force load of new code regardless as fallback
+  // Fallback hard reload for long-running kiosk sessions.
   useEffect(() => {
     const id = setInterval(() => {
-      window.location.reload();
-    }, 86400000);
+      window.location.replace(window.location.href);
+    }, FALLBACK_RELOAD_MS);
     return () => clearInterval(id);
   }, []);
 
