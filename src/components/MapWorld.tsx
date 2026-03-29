@@ -101,7 +101,7 @@ const LazyImage = ({ photo }: { photo: MapWorldEntry }) => {
             backgroundColor: `${photo.placeholderColor}`,
           }}
           loading="lazy"
-          alt=""
+          alt={photo.album}
         />
       )}
     </div>
@@ -315,6 +315,7 @@ export const MMap: React.FC<MapWorldProps> = ({
         // two options for map style
         // mapStyle="https://tiles.openfreemap.org/styles/liberty"
         // mapStyle="https://vector.openstreetmap.org/shortbread_v1/tilejson.json"
+        // Public API key — domain-restricted on MapTiler side, not a secret.
         mapStyle="https://api.maptiler.com/maps/ffd8bd10-cd97-40a5-b1d6-d15f98fb3644/style.json?key=iilC4hPY1594noPX9OQ2"
         initialViewState={{
           longitude: initialLon ? Number.parseFloat(initialLon) : undefined,
@@ -357,7 +358,7 @@ export const MMap: React.FC<MapWorldProps> = ({
                   width={popupInfo.placeholderWidth}
                   height={popupInfo.placeholderHeight}
                   style={{ backgroundColor: popupInfo.placeholderColor }}
-                  alt=""
+                  alt={popupInfo.album}
                 />
                 <div className={styles.details}>
                   {popupInfo.album}
