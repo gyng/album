@@ -1,5 +1,7 @@
-import { useEffect, useReducer, useState } from "react";
+import { useEffect, useReducer, useSyncExternalStore } from "react";
 import styles from "./ThemeToggle.module.css";
+
+const subscribeToHydration = () => () => {};
 
 const readStoredDarkMode = (): boolean | null => {
   try {
@@ -64,16 +66,25 @@ const getFallbackDarkMode = (): boolean => {
 };
 
 export const ThemeToggle: React.FC = () => {
-  const [darkMode, setDarkMode] = useReducer(
-    (_state: boolean | null, next: boolean | null) => next,
-    null,
+  const hasHydrated = useSyncExternalStore(
+    subscribeToHydration,
+    () => true,
+    () => false,
   );
-  const [hasHydrated, setHasHydrated] = useState(false);
-
-  useEffect(() => {
-    setDarkMode(getInitialDarkMode());
-    setHasHydrated(true);
-  }, []);
+  const initialDarkMode = useSyncExternalStore(
+    subscribeToHydration,
+    getInitialDarkMode,
+    () => null,
+  );
+  const [darkModeOverride, setDarkModeOverride] = useReducer(
+    (
+      _state: boolean | null | undefined,
+      next: boolean | null | undefined,
+    ) => next,
+    undefined,
+  );
+  const darkMode =
+    darkModeOverride === undefined ? initialDarkMode : darkModeOverride;
 
   useEffect(() => {
     if (darkMode === true) {
@@ -98,7 +109,7 @@ export const ThemeToggle: React.FC = () => {
         className="dark-mode-toggle"
         onClick={() => {
           const next = !(darkMode ?? true);
-          setDarkMode(next);
+          setDarkModeOverride(next);
           writeStoredDarkMode(next);
         }}
       >
@@ -114,7 +125,7 @@ export const ThemeToggle: React.FC = () => {
         <button
           title="Reset to system default"
           onClick={() => {
-            setDarkMode(null);
+            setDarkModeOverride(null);
             writeStoredDarkMode(null);
           }}
         >

@@ -1,0 +1,37 @@
+.row {
+  display: grid;
+  grid-template-columns: minmax(80px, 160px) 1fr auto;
+  align-items: center;
+  gap: var(--m-s);
+  min-height: 22px;
+}
+
+.label {
+  font-size: var(--fs-sm);
+  color: var(--c-font);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.barTrack {
+  height: 8px;
+  background-color: var(--c-bg-contrast-dark);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.bar {
+  height: 100%;
+  background-color: var(--c-accent);
+  border-radius: 4px;
+  transition: width 0.3s ease;
+  min-width: 2px;
+}
+
+.count {
+  font-size: var(--fs-sm);
+  color: var(--c-bg-contrast-light);
+  text-align: right;
+  min-width: 36px;
+}

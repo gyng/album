@@ -423,6 +423,8 @@ const MapRouteOverlay = ({
   const { map, version } = useMapOverlayVersion();
 
   const projectedSegments = React.useMemo(() => {
+    void version;
+
     if (!map || !routePoints || routePoints.length < 2) {
       return [];
     }
@@ -511,6 +513,8 @@ const MapRouteOverlay = ({
   }, [getPointColor, projectedSegments, routePoints]);
 
   const projectedGhostPath = React.useMemo(() => {
+    void version;
+
     if (!map || !ghostRoutePoints || ghostRoutePoints.length < 2) {
       return null;
     }

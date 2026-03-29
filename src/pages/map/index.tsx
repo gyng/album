@@ -2,6 +2,7 @@ import { GetStaticProps, NextPage } from "next";
 import { getAlbums } from "../../services/album";
 import React from "react";
 import { MapWorldDeferred } from "../../components/MapWorldDeferred";
+import { GlobalNav } from "../../components/GlobalNav";
 import { Block, PhotoBlock } from "../../services/types";
 import { getDegLatLngFromExif } from "../../util/dms2deg";
 import { MapWorldEntry } from "../../components/MapWorld";
@@ -75,37 +76,47 @@ const WorldMap: NextPage<PageProps> = (props) => {
           pathname: "/map",
         })}
       />
-      <div className={[styles.titleBar, commonStyles.topBar].join(" ")}>
-        <Link href="/" className={commonStyles.button}>
-          ← Albums
-        </Link>
-
-        {filterAlbum ? (
-          <div className={commonStyles.toast}>
-            only showing photos from{" "}
-            <Link href={`/album/${filterAlbum}`}>
-              <i>{filterAlbum}</i>
-            </Link>
-          </div>
-        ) : null}
-        {hasRoute ? (
-          <div className={commonStyles.toast}>
-            Hover or select a photo to trace the journey across{" "}
-            {routeEligiblePhotoCount} geotagged photo
-            {routeEligiblePhotoCount === 1 ? "" : "s"}.
-          </div>
-        ) : null}
-        {!filterAlbum && routableAlbumCount > 0 ? (
-          <button
-            type="button"
-            className={commonStyles.button}
-            onClick={() => {
-              setShowAllRoutes((current) => !current);
-            }}
-          >
-            {showAllRoutes ? "Hide all journeys" : "Show all journeys"}
-          </button>
-        ) : null}
+      <div className={styles.titleBar}>
+        <GlobalNav
+          currentPage="map"
+          hasPadding={false}
+          extraItems={
+            <>
+              {filterAlbum ? (
+                <li>
+                  <div className={commonStyles.toast}>
+                    only showing photos from{" "}
+                    <Link href={`/album/${filterAlbum}`}>
+                      <i>{filterAlbum}</i>
+                    </Link>
+                  </div>
+                </li>
+              ) : null}
+              {hasRoute ? (
+                <li>
+                  <div className={commonStyles.toast}>
+                    Hover or select a photo to trace the journey across{" "}
+                    {routeEligiblePhotoCount} geotagged photo
+                    {routeEligiblePhotoCount === 1 ? "" : "s"}.
+                  </div>
+                </li>
+              ) : null}
+              {!filterAlbum && routableAlbumCount > 0 ? (
+                <li>
+                  <button
+                    type="button"
+                    className={commonStyles.button}
+                    onClick={() => {
+                      setShowAllRoutes((current) => !current);
+                    }}
+                  >
+                    {showAllRoutes ? "Hide all journeys" : "Show all journeys"}
+                  </button>
+                </li>
+              ) : null}
+            </>
+          }
+        />
       </div>
 
       <MapWorldDeferred

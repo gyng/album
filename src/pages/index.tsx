@@ -5,14 +5,12 @@ import { getAlbums, getImageTimestampRange } from "../services/album";
 import { Block, Content } from "../services/types";
 import { measureBuild } from "../services/buildTiming";
 // import DynamicSearchWithCoi from "../components/search/DynamicSearchWithCoi";
-import Link from "next/link";
 import { Seo } from "../components/Seo";
 import {
   buildCollectionPageJsonLd,
   buildWebSiteJsonLd,
 } from "../lib/seo";
-import { Nav } from "../components/Nav";
-import commonStyles from "../styles/common.module.css";
+import { GlobalNav } from "../components/GlobalNav";
 
 type PageProps = {
   albums: Content[];
@@ -33,44 +31,7 @@ const Home: NextPage<PageProps> = (context) => {
       />
 
       <main className={styles.main}>
-        <Nav
-          hasPadding={false}
-          isHome
-          extraItems={
-            <>
-              <li>
-                <Link href="/search" className={commonStyles.button}>
-                  Search & Explore
-                </Link>
-              </li>
-              <li>
-                <Link href="/timeline" className={commonStyles.button}>
-                  Timeline
-                </Link>
-              </li>
-              <li>
-                <Link href="/map" className={commonStyles.button}>
-                  Map
-                </Link>
-              </li>
-              <li>
-                <div className={commonStyles.splitButton}>
-                  <Link href="/slideshow" className={commonStyles.splitButtonMain}>
-                    Slideshow
-                  </Link>
-                  <Link
-                    href="/slideshow?mode=similar&random=1"
-                    className={commonStyles.splitButtonSub}
-                    aria-label="Start similarity slideshow for a random image"
-                    title="Start similarity slideshow for a random image"
-                  >
-                    🎲
-                  </Link>
-                </div>
-              </li>
-            </>
-          }
-        />
+        <GlobalNav currentPage="home" hasPadding={false} />
         <h1>Snapshots</h1>
         <Albums albums={context.albums} />
       </main>

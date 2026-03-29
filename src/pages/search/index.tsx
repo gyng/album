@@ -1,11 +1,10 @@
 import { NextPage } from "next/types";
 import DynamicSearchWithCoi from "../../components/search/DynamicSearchWithCoi";
-import { Nav } from "../../components/Nav";
+import { GlobalNav } from "../../components/GlobalNav";
 import baseStyles from "../Index.module.css";
 import React, { useCallback, useState } from "react";
 import { Seo } from "../../components/Seo";
 import { buildCollectionPageJsonLd } from "../../lib/seo";
-import Link from "next/link";
 import commonStyles from "../../styles/common.module.css";
 import { forceDocumentNavigation } from "../../components/search/searchUtils";
 import type { SearchNavState } from "../../components/search/Search";
@@ -35,64 +34,30 @@ const SearchPage: NextPage<PageProps> = (props) => {
         })}
       />
       <main className={baseStyles.main}>
-        <Nav
+        <GlobalNav
+          currentPage="search"
           hasPadding={false}
-          extraItems={
-            <>
-              <li>
-                <Link
-                  href="/search"
-                  className={[commonStyles.button, commonStyles.navCurrent].join(
-                    " ",
-                  )}
-                >
-                  Search & Explore
-                </Link>
-              </li>
-              <li>
-                <Link href="/timeline" className={commonStyles.button}>
-                  Timeline
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href="/map"
-                  prefetch={false}
-                  className={commonStyles.button}
-                  onClick={(event) => {
-                    forceDocumentNavigation(event, "/map");
-                  }}
-                >
-                  Map
-                </Link>
-              </li>
-              <li>
-                <div className={commonStyles.splitButton}>
-                  <Link href="/slideshow" className={commonStyles.splitButtonMain}>
-                    Slideshow
-                  </Link>
-                  <button
-                    type="button"
-                    className={commonStyles.splitButtonSub}
-                    onClick={() => {
-                      searchNavState?.onStartRandomSimilarSlideshow();
-                    }}
-                    disabled={
-                      !searchNavState?.databaseReady ||
-                      searchNavState.isRandomSimilarLoading
-                    }
-                    aria-label="Start similarity slideshow for a random image"
-                    title={
-                      searchNavState?.isRandomSimilarLoading
-                        ? "Starting similarity slideshow..."
-                        : "Start similarity slideshow for a random image"
-                    }
-                  >
-                    {searchNavState?.isRandomSimilarLoading ? "…" : "🎲"}
-                  </button>
-                </div>
-              </li>
-            </>
+          onMapClick={(event) => forceDocumentNavigation(event, "/map")}
+          slideshowAction={
+            <button
+              type="button"
+              className={commonStyles.splitButtonSub}
+              onClick={() => {
+                searchNavState?.onStartRandomSimilarSlideshow();
+              }}
+              disabled={
+                !searchNavState?.databaseReady ||
+                searchNavState.isRandomSimilarLoading
+              }
+              aria-label="Start similarity slideshow for a random image"
+              title={
+                searchNavState?.isRandomSimilarLoading
+                  ? "Starting similarity slideshow..."
+                  : "Start similarity slideshow for a random image"
+              }
+            >
+              {searchNavState?.isRandomSimilarLoading ? "…" : "🎲"}
+            </button>
           }
         />
 

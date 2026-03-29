@@ -3,7 +3,7 @@ import Link from "next/link";
 import { useRouter } from "next/router";
 import React from "react";
 import { CalendarHeatmap } from "../../components/CalendarHeatmap";
-import { Nav } from "../../components/Nav";
+import { GlobalNav } from "../../components/GlobalNav";
 import { TimelineDayGrid } from "../../components/TimelineDayGrid";
 import { TimelineEntry } from "../../components/timelineTypes";
 import { getAlbums } from "../../services/album";
@@ -122,6 +122,11 @@ const TimelinePage: NextPage<PageProps> = ({ entries }) => {
   const selectedConnectorSvgRef = React.useRef<SVGSVGElement | null>(null);
   const selectedConnectorPathRef = React.useRef<SVGPathElement | null>(null);
   const highlightedHeatmapElementsRef = React.useRef<HTMLElement[]>([]);
+  const routePathname = router.pathname;
+  const routeQuery = router.query;
+  const routeDateQuery =
+    typeof routeQuery.date === "string" ? routeQuery.date : null;
+  const replaceRoute = router.replace;
 
   const selectableDates = React.useMemo(() => {
     return todayDate
@@ -317,24 +322,24 @@ const TimelinePage: NextPage<PageProps> = ({ entries }) => {
 
   // On mount or when router.query.date changes, update selectedDate if needed
   React.useEffect(() => {
-    const urlDate =
-      typeof router.query.date === "string" ? router.query.date : null;
-    if (urlDate && availableDates.includes(urlDate)) {
-      setSelectedDate((current) => (current === urlDate ? current : urlDate));
+    if (routeDateQuery && availableDates.includes(routeDateQuery)) {
+      setSelectedDate((current) =>
+        current === routeDateQuery ? current : routeDateQuery,
+      );
     }
-  }, [router.query.date, availableDates]);
+  }, [availableDates, routeDateQuery]);
 
   // When selectedDate changes, update the URL param (shallow push)
   React.useEffect(() => {
     if (!selectedDate) return;
     const url = {
-      pathname: router.pathname,
-      query: { ...router.query, date: selectedDate },
+      pathname: routePathname,
+      query: { ...routeQuery, date: selectedDate },
     };
-    if (router.query.date !== selectedDate) {
-      router.replace(url, undefined, { shallow: true });
+    if (routeDateQuery !== selectedDate) {
+      replaceRoute(url, undefined, { shallow: true });
     }
-  }, [router.pathname, router.query, router.replace, selectedDate]);
+  }, [replaceRoute, routeDateQuery, routePathname, routeQuery, selectedDate]);
 
   React.useEffect(() => {
     if (
@@ -432,51 +437,7 @@ const TimelinePage: NextPage<PageProps> = ({ entries }) => {
       />
 
       <main className={styles.main}>
-        <Nav
-          hasPadding={false}
-          extraItems={
-            <>
-              <li>
-                <Link href="/search" className={commonStyles.button}>
-                  Search & Explore
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href="/timeline"
-                  className={[
-                    commonStyles.button,
-                    commonStyles.navCurrent,
-                  ].join(
-                    " ",
-                  )}
-                >
-                  Timeline
-                </Link>
-              </li>
-              <li>
-                <Link href="/map" className={commonStyles.button}>
-                  Map
-                </Link>
-              </li>
-              <li>
-                <div className={commonStyles.splitButton}>
-                  <Link href="/slideshow" className={commonStyles.splitButtonMain}>
-                    Slideshow
-                  </Link>
-                  <Link
-                    href="/slideshow?mode=similar&random=1"
-                    className={commonStyles.splitButtonSub}
-                    aria-label="Start similarity slideshow for a random image"
-                    title="Start similarity slideshow for a random image"
-                  >
-                    🎲
-                  </Link>
-                </div>
-              </li>
-            </>
-          }
-        />
+        <GlobalNav currentPage="timeline" hasPadding={false} />
 
         <header className={styles.header}>
           <h1 className={styles.title}>Timeline</h1>

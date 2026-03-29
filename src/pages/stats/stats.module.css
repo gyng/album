@@ -1,0 +1,86 @@
+.page {
+  min-height: 100vh;
+}
+
+.main {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: var(--m-xl);
+  display: grid;
+  gap: var(--m-xl);
+}
+
+.header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: var(--m-m);
+}
+
+.title {
+  margin: 0;
+}
+
+.kicker {
+  margin: 0;
+  color: var(--c-bg-contrast-light);
+  font-size: var(--fs-sm);
+}
+
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+  gap: var(--m-xl);
+  align-items: start;
+}
+
+/* Hour-of-day facet is wide — it has 24 narrow bars */
+.section:has(.bars > *:nth-child(12)) {
+  grid-column: 1 / -1;
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--m-m);
+}
+
+.sectionHeader {
+  display: flex;
+  align-items: baseline;
+  gap: var(--m-s);
+  flex-wrap: wrap;
+}
+
+.sectionTitle {
+  margin: 0;
+  font-size: var(--fs-m);
+}
+
+.coverage {
+  font-size: var(--fs-s);
+  color: var(--c-bg-contrast-light);
+}
+
+.bars {
+  display: flex;
+  flex-direction: column;
+  gap: var(--m-s);
+}
+
+.noData {
+  margin: 0;
+  color: var(--c-bg-contrast-light);
+  font-size: var(--fs-sm);
+}
+
+@media (max-width: 720px) {
+  .main {
+    padding: var(--m-l);
+  }
+
+  .grid {
+    grid-template-columns: 1fr;
+  }
+}

@@ -73,7 +73,7 @@ describe("WorldMap page", () => {
   it("uses client-side navigation for the albums link", () => {
     render(<WorldMap photos={[]} />);
 
-    fireEvent.click(screen.getByRole("link", { name: "← Albums" }));
+    fireEvent.click(screen.getByRole("link", { name: "Albums" }));
 
     expect(push).toHaveBeenCalledWith("/");
   });
