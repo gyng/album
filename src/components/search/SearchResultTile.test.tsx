@@ -91,8 +91,8 @@ describe("SearchResultTile", () => {
       />,
     );
 
-    expect(screen.getByText("3%").getAttribute("title")).toBe(
-      "Hybrid search: semantic 71%, keyword 3.5, fused 3%",
+    expect(screen.getByText("71%").getAttribute("title")).toBe(
+      "Hybrid search: semantic 71% (badge shown), keyword 3.5, fused score 0.031",
     );
   });
 
@@ -107,8 +107,8 @@ describe("SearchResultTile", () => {
       />,
     );
 
-    expect(screen.getByText("3%").getAttribute("title")).toBe(
-      "Hybrid search: semantic 71%, keyword n/a, fused 3%",
+    expect(screen.getByText("71%").getAttribute("title")).toBe(
+      "Hybrid search: semantic 71% (badge shown), keyword n/a, fused score 0.031",
     );
   });
 });

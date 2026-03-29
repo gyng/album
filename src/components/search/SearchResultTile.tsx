@@ -40,28 +40,25 @@ export const SearchResultTile = (props: {
     stripHtml(result.alt_text) ||
     stripHtml(result.subject) ||
     stripHtml(result.tags);
-  const visibleMatchScore =
-    typeof result.rrfScore === "number"
-      ? result.rrfScore
-      : typeof result.similarity === "number"
-        ? result.similarity
-        : null;
+  const isHybridResult = typeof result.rrfScore === "number";
   const similarityLabel =
-    typeof visibleMatchScore === "number"
-      ? `${Math.round(visibleMatchScore * 100)}%`
-      : null;
+    typeof result.similarity === "number"
+      ? `${Math.round(result.similarity * 100)}%`
+      : isHybridResult
+        ? "Hybrid"
+        : null;
   const matchingColorStyle = result.matchingColor ? rgbToString(result.matchingColor) : null;
   const scoreTitle =
-    typeof result.rrfScore === "number"
+    isHybridResult
       ? `Hybrid search: semantic ${
           typeof result.similarity === "number"
-            ? `${Math.round(result.similarity * 100)}%`
+            ? `${Math.round(result.similarity * 100)}% (badge shown)`
             : "n/a"
         }, keyword ${
           typeof result.bm25 === "number"
             ? (result.bm25 * -1).toFixed(1)
             : "n/a"
-        }, fused ${Math.round(result.rrfScore * 100)}%`
+        }, fused score ${result.rrfScore.toFixed(3)}`
       : typeof result.similarity === "number"
         ? result.similarity.toFixed(3)
         : typeof result.bm25 === "number"
