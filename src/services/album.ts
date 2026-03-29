@@ -17,8 +17,41 @@ export const ALBUMS_DIR = "../albums";
 export const MANIFEST_NAME = "manifest.json";
 export const MANIFEST_V2_NAME = "album.json";
 
+const listAlbumDirectories = (albumsPath: string): string[] => {
+  return fs.readdirSync(albumsPath).filter((it) => {
+    return fs.lstatSync(path.join(albumsPath, it)).isDirectory();
+  });
+};
+
 const isZoneIdentifierFile = (filename: string): boolean => {
   return filename.toLowerCase().includes(":zone.identifier");
+};
+
+const removeZoneIdentifierSidecar = (sidecarPath: string): boolean => {
+  try {
+    if (fs.existsSync(sidecarPath)) {
+      fs.unlinkSync(sidecarPath);
+      console.log(`Deleted Zone.Identifier sidecar file: ${sidecarPath}`);
+    }
+  } catch (err) {
+    console.warn(`Failed to delete Zone.Identifier sidecar: ${sidecarPath}`, err);
+  }
+
+  return false;
+};
+
+const listAlbumMediaFiles = (albumPath: string): string[] => {
+  return fs
+    .readdirSync(albumPath)
+    .filter((it) => !fs.lstatSync(path.join(albumPath, it)).isDirectory())
+    .filter((it) => !it.match(/\.json$/))
+    .filter((it) => {
+      if (!isZoneIdentifierFile(it)) {
+        return true;
+      }
+
+      return removeZoneIdentifierSidecar(path.join(albumPath, it));
+    });
 };
 
 export const getBlockDate = (block: Block): number => {
@@ -66,17 +99,13 @@ export const getAlbumNames = async (
   albumsPath = ALBUMS_DIR,
 ): Promise<string[]> => {
   return measureBuild("album.getAlbumNames", async () => {
-    return fs.readdirSync(albumsPath).filter((it) => {
-      return fs.lstatSync(path.join(albumsPath, it)).isDirectory();
-    });
+    return listAlbumDirectories(albumsPath);
   });
 };
 
 export const getAlbums = (albumsPath = ALBUMS_DIR): Promise<Content[]> => {
   return measureBuild("album.getAlbums", async () => {
-    const albumNames = fs.readdirSync(albumsPath).filter((it) => {
-      return fs.lstatSync(path.join(albumsPath, it)).isDirectory();
-    });
+    const albumNames = listAlbumDirectories(albumsPath);
 
     incrementBuildCounter("album.getAlbums.calls");
     incrementBuildCounter("album.getAlbums.albumCount", albumNames.length);
@@ -100,27 +129,7 @@ export const getAlbumWithoutManifest = async (
   albumPath: string,
 ): Promise<Content> => {
   return measureBuild("album.getAlbumWithoutManifest", async () => {
-    const mediaFiles = fs
-      .readdirSync(albumPath)
-      .filter((it) => !fs.lstatSync(path.join(albumPath, it)).isDirectory())
-      .filter((it) => !it.match(/\.json$/))
-      .filter((it) => {
-        if (!isZoneIdentifierFile(it)) {
-          return true;
-        }
-
-        const sidecarPath = path.join(albumPath, it);
-        try {
-          fs.unlinkSync(sidecarPath);
-          console.log(`Deleted Zone.Identifier sidecar file: ${sidecarPath}`);
-        } catch (err) {
-          console.warn(
-            `Failed to delete Zone.Identifier sidecar: ${sidecarPath}`,
-            err,
-          );
-        }
-        return false;
-      });
+    const mediaFiles = listAlbumMediaFiles(albumPath);
 
     const photos = mediaFiles.filter((it) => !isVideoFile(it));
     const videos = mediaFiles.filter((it) => isVideoFile(it));
@@ -188,6 +197,104 @@ export const getAlbumWithManifest = async (
   });
 };
 
+const loadV2Manifest = (albumPath: string): V2AlbumMetadata | null => {
+  const v2Path = path.join(albumPath, MANIFEST_V2_NAME);
+  if (!fs.existsSync(v2Path)) {
+    return null;
+  }
+
+  const v2Config = fs.readFileSync(v2Path, "utf-8");
+  return JSON.parse(v2Config) as V2AlbumMetadata;
+};
+
+const appendExternalBlocks = (
+  manifest: Content,
+  albumPath: string,
+  externals?: V2AlbumMetadata["externals"],
+): void => {
+  externals?.forEach((ext) => {
+    if (ext.type === "youtube") {
+      manifest.blocks.push({
+        kind: "video",
+        id: v4(),
+        data: {
+          type: "youtube",
+          href: ext.href,
+          date: ext.date,
+        },
+      });
+      return;
+    }
+
+    if (isZoneIdentifierFile(ext.href)) {
+      removeZoneIdentifierSidecar(path.join(albumPath, ext.href));
+      return;
+    }
+
+    manifest.blocks.push({
+      kind: "video",
+      id: v4(),
+      data: {
+        type: "local",
+        href: ext.href,
+        date: ext.date,
+      },
+    });
+  });
+};
+
+const isPhotoBlockWithSrc = (
+  block: Block,
+  src: string,
+): block is import("./types").PhotoBlock => {
+  return block.kind === "photo" && block.data.src.includes(src);
+};
+
+const applyCoverSelection = (
+  manifest: Content,
+  cover?: string,
+): void => {
+  if (!cover) {
+    return;
+  }
+
+  manifest.cover = { src: cover };
+  const coverBlock = manifest.blocks.find((block) =>
+    isPhotoBlockWithSrc(block, cover),
+  );
+
+  if (coverBlock) {
+    coverBlock.formatting = { ...coverBlock.formatting, cover: true };
+  }
+};
+
+const moveTextBlocksToTop = (blocks: Block[]): Block[] => {
+  const textBlocks = blocks.filter((b) => b.kind === "text");
+  const otherBlocks = blocks.filter((b) => b.kind !== "text");
+  return [...textBlocks, ...otherBlocks];
+};
+
+const applyTitleKickerDefaults = (
+  manifest: Content,
+  sortOrder: "newest-first" | "oldest-first",
+): void => {
+  const title = manifest.blocks.at(0);
+  if (title?.kind !== "text") {
+    return;
+  }
+
+  const [earliest, latest] = getImageTimestampRange(manifest);
+  if (earliest == null || latest == null) {
+    return;
+  }
+
+  const [from, to] =
+    sortOrder === "newest-first"
+      ? [new Date(latest).getFullYear(), new Date(earliest).getFullYear()]
+      : [new Date(earliest).getFullYear(), new Date(latest).getFullYear()];
+  title.data.kicker = `${from}${to === from ? "" : `–${to}`}`;
+};
+
 const albumPromiseCache = new Map<string, Promise<Content>>();
 
 // TODO: Add option to not optimise images until build time
@@ -208,9 +315,9 @@ export const getAlbum = async (
     const isManifest = fs.existsSync(path.join(albumPath, MANIFEST_NAME));
 
     // V2 manifest exists: use it instead of v1 manifest
-    const isV2Manifest = fs.existsSync(path.join(albumPath, MANIFEST_V2_NAME));
+    const v2Manifest = loadV2Manifest(albumPath);
 
-    if (isManifest && !isV2Manifest) {
+    if (isManifest && !v2Manifest) {
       // Warning: deprecated!
       return getAlbumWithManifest(albumPath);
     }
@@ -219,101 +326,20 @@ export const getAlbum = async (
     // Get deserialised
     let manifest = await getAlbumWithoutManifest(albumPath);
 
-    // Apply v2 manifest if it exists
-    let v2Manifest: V2AlbumMetadata | null = null;
-    if (isV2Manifest) {
-      const v2Config = fs.readFileSync(
-        path.join(albumPath, MANIFEST_V2_NAME),
-        "utf-8",
-      );
-      v2Manifest = JSON.parse(v2Config) as V2AlbumMetadata;
-    }
-
     // Sort by date
     manifest.blocks = sortBlocksByDate(manifest.blocks);
 
-    // TODO: clean this up by splitting this up
-    // and default behaviour (no v1 manifest or v2 manifest)
-    if (isV2Manifest && v2Manifest) {
-      // Add in externals first; this is needed as we are sorting later
-      if (v2Manifest.externals) {
-        v2Manifest.externals.forEach((ext) => {
-          if (ext.type === "youtube") {
-            manifest.blocks.push({
-              kind: "video",
-              id: v4(),
-              data: {
-                type: "youtube",
-                href: ext.href,
-                date: ext.date,
-              },
-            });
-          } else if (ext.type === "local") {
-            if (isZoneIdentifierFile(ext.href)) {
-              const sidecarPath = path.join(albumPath, ext.href);
-              try {
-                if (fs.existsSync(sidecarPath)) {
-                  fs.unlinkSync(sidecarPath);
-                  console.log(
-                    `Deleted Zone.Identifier sidecar file: ${sidecarPath}`,
-                  );
-                }
-              } catch (err) {
-                console.warn(
-                  `Failed to delete Zone.Identifier sidecar: ${sidecarPath}`,
-                  err,
-                );
-              }
-              return;
-            }
-
-            manifest.blocks.push({
-              kind: "video",
-              id: v4(),
-              data: {
-                type: "local",
-                href: ext.href,
-                date: ext.date,
-              },
-            });
-          }
-        });
-      }
-
-      if (v2Manifest.cover) {
-        manifest.cover = { src: v2Manifest.cover };
-        const toSet = manifest.blocks.find(
-          // @ts-expect-error ?. checks well enough
-          (b) => b.data?.src?.includes(v2Manifest.cover),
-        );
-        if (toSet && toSet.kind === "photo") {
-          toSet.formatting = { ...toSet?.formatting, cover: true };
-        }
-      }
+    if (v2Manifest) {
+      appendExternalBlocks(manifest, albumPath, v2Manifest.externals);
+      applyCoverSelection(manifest, v2Manifest.cover);
     }
 
     manifest.blocks = sortBlocksByDate(
       manifest.blocks,
       v2Manifest?.sort ?? "oldest-first",
     );
-
-    // Hack by moving text always to top
-    const textBlocks = manifest.blocks.filter((b) => b.kind === "text");
-    manifest.blocks = manifest.blocks.filter((b) => b.kind !== "text");
-    manifest.blocks = [...textBlocks, ...manifest.blocks];
-
-    // Set title defaults
-    const title = manifest.blocks.at(0);
-    if (title?.kind === "text") {
-      const range = getImageTimestampRange(manifest).map((ts) =>
-        new Date(ts!).getFullYear(),
-      ) ?? [0, 0];
-      const [from, to] =
-        v2Manifest?.sort === "newest-first"
-          ? [range[1], range[0]]
-          : [range[0], range[1]];
-      title.data.kicker = `${from}${to === from ? "" : `–${to}`}`;
-    }
+    manifest.blocks = moveTextBlocksToTop(manifest.blocks);
+    applyTitleKickerDefaults(manifest, v2Manifest?.sort ?? "oldest-first");
 
     return manifest;
   });

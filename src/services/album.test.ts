@@ -205,4 +205,23 @@ describe("getAlbum", () => {
       fs.rmSync(root, { recursive: true, force: true });
     }
   });
+
+  it("does not set a 1970-style kicker when no dated photos exist", async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "album-kicker-test-"));
+    const albumDir = path.join(root, "trip");
+    fs.mkdirSync(albumDir, { recursive: true });
+    fs.writeFileSync(path.join(albumDir, "photo.jpg"), "x");
+
+    try {
+      const album = await getAlbum(albumDir);
+      const titleBlock = album.blocks[0];
+
+      expect(titleBlock?.kind).toBe("text");
+      if (titleBlock?.kind === "text") {
+        expect(titleBlock.data.kicker).toBeUndefined();
+      }
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
 });
