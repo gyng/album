@@ -3,7 +3,11 @@ import styles from "./SearchResultTile.module.css";
 import { getRelativeTimeString } from "../../util/time";
 import { extractDateFromExifString } from "../../util/extractExifFromDb";
 import { SearchResultRow } from "./searchTypes";
-import { rgbToString, parseColorPalette } from "../../util/colorDistance";
+import {
+  RGB,
+  rgbToString,
+  parseColorPalette,
+} from "../../util/colorDistance";
 import { getResizedAlbumImageSrc } from "../../util/getResizedAlbumImageSrc";
 
 const stripHtml = (value?: string): string => {
@@ -20,8 +24,9 @@ const stripHtml = (value?: string): string => {
 export const SearchResultTile = (props: {
   result: SearchResultRow;
   onFindSimilar?: (path: string, similarity?: number) => void;
+  onSearchByColor?: (color: RGB) => void;
 }) => {
-  const { result, onFindSimilar } = props;
+  const { result, onFindSimilar, onSearchByColor } = props;
 
   let colour = "rgba(255, 255, 255, 0.2)";
   if (result.colors) {
@@ -41,24 +46,34 @@ export const SearchResultTile = (props: {
     stripHtml(result.subject) ||
     stripHtml(result.tags);
   const isHybridResult = typeof result.rrfScore === "number";
-  const similarityLabel =
-    typeof result.similarity === "number"
+  const isColorMatchResult =
+    Array.isArray(result.matchingColor) && typeof result.similarity === "number";
+  const hybridScore = isHybridResult ? result.rrfScore : null;
+  const hybridScoreLabel =
+    typeof hybridScore === "number"
+      ? `${Math.round(hybridScore * 1000)}`
+      : null;
+  const similarityLabel = isHybridResult
+    ? hybridScoreLabel
+    : isColorMatchResult
+      ? `${Math.round(result.similarity)}%`
+      : typeof result.similarity === "number"
       ? `${Math.round(result.similarity * 100)}%`
-      : isHybridResult
-        ? "Hybrid"
-        : null;
+      : null;
   const matchingColorStyle = result.matchingColor ? rgbToString(result.matchingColor) : null;
   const scoreTitle =
     isHybridResult
       ? `Hybrid search: semantic ${
           typeof result.similarity === "number"
-            ? `${Math.round(result.similarity * 100)}% (badge shown)`
+            ? `${Math.round(result.similarity * 100)}%`
             : "n/a"
         }, keyword ${
           typeof result.bm25 === "number"
             ? (result.bm25 * -1).toFixed(1)
             : "n/a"
-        }, fused score ${result.rrfScore.toFixed(3)}`
+        }, fused score ${hybridScore?.toFixed(3)} (${hybridScoreLabel})`
+      : isColorMatchResult
+        ? `Color match score ${Math.round(result.similarity)}%`
       : typeof result.similarity === "number"
         ? result.similarity.toFixed(3)
         : typeof result.bm25 === "number"
@@ -72,20 +87,42 @@ export const SearchResultTile = (props: {
           {similarityLabel}
         </div>
       ) : null}
-      {onFindSimilar ? (
-        <button
-          type="button"
-          className={styles.similarButton}
-          aria-label="Find similar photos"
-          title="Find similar photos"
-          onClick={(event) => {
-            event.preventDefault();
-            event.stopPropagation();
-            onFindSimilar(result.path, result.similarity);
-          }}
-        >
-          <span className={styles.similarButtonIcon}>🔍</span>
-        </button>
+      {onFindSimilar || (matchingColorStyle && onSearchByColor) ? (
+        <div className={styles.actionButtons}>
+          {matchingColorStyle && onSearchByColor && result.matchingColor ? (
+            <button
+              type="button"
+              className={styles.actionButton}
+              aria-label="Search by matched color"
+              title={`Search by matched color: ${matchingColorStyle}`}
+              onClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                onSearchByColor(result.matchingColor as RGB);
+              }}
+            >
+              <span
+                className={styles.actionColorSwatch}
+                style={{ backgroundColor: matchingColorStyle }}
+              />
+            </button>
+          ) : null}
+          {onFindSimilar ? (
+            <button
+              type="button"
+              className={styles.actionButton}
+              aria-label="Find similar photos"
+              title="Find similar photos"
+              onClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                onFindSimilar(result.path, result.similarity);
+              }}
+            >
+              <span className={styles.similarButtonIcon}>🔍</span>
+            </button>
+          ) : null}
+        </div>
       ) : null}
       <Link href={result.album_relative_path} className={styles.link}>
         <div className={styles.result}>
@@ -99,13 +136,6 @@ export const SearchResultTile = (props: {
                 style={{ backgroundColor: colour }}
               ></img>
             </picture>
-            {matchingColorStyle ? (
-              <div
-                className={styles.matchingColorDot}
-                style={{ backgroundColor: matchingColorStyle }}
-                title={`Matched palette color: ${matchingColorStyle}`}
-              />
-            ) : null}
           </div>
           <div className={styles.details}>
             <div className={styles.source}>

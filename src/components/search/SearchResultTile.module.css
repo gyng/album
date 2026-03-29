@@ -60,11 +60,17 @@
   padding: 6px 8px;
 }
 
-.similarButton {
+.actionButtons {
   position: absolute;
   bottom: calc(var(--m) + var(--m-l));
   right: var(--m);
   z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.actionButton {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -79,7 +85,7 @@
   padding: 6px 8px;
 }
 
-.similarButton:hover {
+.actionButton:hover {
   background-color: rgba(0, 0, 0, 0.84);
 }
 
@@ -88,19 +94,13 @@
   filter: grayscale(100%);
 }
 
-.similarButton:focus-visible {
+.actionButton:focus-visible {
   outline: solid 2px var(--c-bg-contrast-light);
 }
 
-.matchingColorDot {
-  position: absolute;
-  bottom: calc(var(--m) + var(--m-l));
-  left: 50%;
-  transform: translateX(-50%);
+.actionColorSwatch {
   width: 14px;
   height: 14px;
   border-radius: 50%;
   border: solid 2px rgba(255, 255, 255, 0.8);
-  z-index: 1;
-  pointer-events: none;
 }

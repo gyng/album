@@ -66,6 +66,26 @@ describe("SearchResultTile", () => {
     );
   });
 
+  it("calls onSearchByColor when the matched color button is clicked", () => {
+    const onSearchByColor = jest.fn();
+
+    render(
+      <SearchResultTile
+        result={makeResult({
+          snippet: "Harbor skyline",
+          matchingColor: [12, 34, 56],
+        })}
+        onSearchByColor={onSearchByColor}
+      />,
+    );
+
+    fireEvent.click(
+      screen.getByRole("button", { name: /search by matched color/i }),
+    );
+
+    expect(onSearchByColor).toHaveBeenCalledWith([12, 34, 56]);
+  });
+
   it("shows a visible percentage match when similarity is present", () => {
     render(
       <SearchResultTile
@@ -77,6 +97,22 @@ describe("SearchResultTile", () => {
     );
 
     expect(screen.getByText("71%")).toBeTruthy();
+  });
+
+  it("shows a color match percentage without multiplying it again", () => {
+    render(
+      <SearchResultTile
+        result={makeResult({
+          snippet: "Harbor skyline",
+          similarity: 86.25,
+          matchingColor: [12, 34, 56],
+        })}
+      />,
+    );
+
+    expect(screen.getByText("86%").getAttribute("title")).toBe(
+      "Color match score 86%",
+    );
   });
 
   it("shows a hybrid tooltip breakdown when semantic and keyword scores are both present", () => {
@@ -91,8 +127,8 @@ describe("SearchResultTile", () => {
       />,
     );
 
-    expect(screen.getByText("71%").getAttribute("title")).toBe(
-      "Hybrid search: semantic 71% (badge shown), keyword 3.5, fused score 0.031",
+    expect(screen.getByText("31").getAttribute("title")).toBe(
+      "Hybrid search: semantic 71%, keyword 3.5, fused score 0.031 (31)",
     );
   });
 
@@ -107,8 +143,8 @@ describe("SearchResultTile", () => {
       />,
     );
 
-    expect(screen.getByText("71%").getAttribute("title")).toBe(
-      "Hybrid search: semantic 71% (badge shown), keyword n/a, fused score 0.031",
+    expect(screen.getByText("31").getAttribute("title")).toBe(
+      "Hybrid search: semantic 71%, keyword n/a, fused score 0.031 (31)",
     );
   });
 });

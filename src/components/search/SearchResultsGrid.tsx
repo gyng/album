@@ -2,6 +2,7 @@ import React from "react";
 import styles from "./Search.module.css";
 import { SearchResultTile } from "./SearchResultTile";
 import { SearchResultRow } from "./searchTypes";
+import { RGB } from "../../util/colorDistance";
 
 type Props = {
   isSimilarMode: boolean;
@@ -16,6 +17,7 @@ type Props = {
   hasNextPage: boolean;
   similarClickstreamPaths: Set<string>;
   onFindSimilar: (path: string, similarity?: number) => void;
+  onSearchByColor: (color: RGB) => void;
   onFetchNextPage: () => void;
 };
 
@@ -32,6 +34,7 @@ export const SearchResultsGrid: React.FC<Props> = ({
   hasNextPage,
   similarClickstreamPaths,
   onFindSimilar,
+  onSearchByColor,
   onFetchNextPage,
 }) => {
   const showResults =
@@ -85,6 +88,7 @@ export const SearchResultsGrid: React.FC<Props> = ({
               onFindSimilar={(path, similarity) => {
                 onFindSimilar(path, similarity);
               }}
+              onSearchByColor={onSearchByColor}
             />
           </li>
         );

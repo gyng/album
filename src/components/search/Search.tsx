@@ -386,6 +386,14 @@ export const Search: React.FC<{ disabled?: boolean }> = ({ disabled }) => {
     });
   }, []);
 
+  const handleSearchByColor = useCallback((color: RGB) => {
+    setSearchInputValue("");
+    setSimilarPath(null);
+    setSimilarTrail([]);
+    setRandomExploreError(null);
+    setColorSearch(color);
+  }, []);
+
   return (
     <div className={styles.searchWidget}>
       <SearchBrowseActions
@@ -496,6 +504,7 @@ export const Search: React.FC<{ disabled?: boolean }> = ({ disabled }) => {
           hasNextPage={hasNextPage}
           similarClickstreamPaths={similarClickstreamPaths}
           onFindSimilar={handleFindSimilar}
+          onSearchByColor={handleSearchByColor}
           onFetchNextPage={fetchNextPage}
         />
       </div>
