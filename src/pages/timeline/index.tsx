@@ -39,6 +39,8 @@ const TimelinePage: NextPage<PageProps> = ({ entries }) => {
     typeof router.query.filter_album === "string"
       ? router.query.filter_album
       : null;
+  const hasRouteState =
+    filterAlbum != null || typeof router.query.date === "string";
 
   const filteredEntries = React.useMemo(() => {
     return filterAlbum
@@ -155,6 +157,7 @@ const TimelinePage: NextPage<PageProps> = ({ entries }) => {
         title="Timeline | Snapshots"
         description="Explore dated photos across the archive timeline."
         pathname="/timeline"
+        noindex={hasRouteState}
         jsonLd={buildCollectionPageJsonLd({
           name: "Timeline | Snapshots",
           description: "Explore dated photos across the archive timeline.",

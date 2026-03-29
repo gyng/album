@@ -23,6 +23,11 @@ const WorldMap: NextPage<PageProps> = (props) => {
     typeof router.query.filter_album === "string"
       ? router.query.filter_album
       : null;
+  const hasRouteState =
+    filterAlbum != null ||
+    typeof router.query.lat === "string" ||
+    typeof router.query.lon === "string" ||
+    typeof router.query.zoom === "string";
   const filteredPhotos = filterAlbum
     ? props.photos.filter((p) => p.album === filterAlbum)
     : props.photos;
@@ -33,6 +38,7 @@ const WorldMap: NextPage<PageProps> = (props) => {
         title="Map | Snapshots"
         description="Browse photo locations across the world map."
         pathname="/map"
+        noindex={hasRouteState}
         jsonLd={buildCollectionPageJsonLd({
           name: "Map | Snapshots",
           description: "Browse photo locations across the world map.",

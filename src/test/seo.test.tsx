@@ -16,6 +16,12 @@ jest.mock("../services/album", () => ({
   getAlbumSitemapEntries: jest.fn(),
 }));
 
+const useRouter = jest.fn();
+
+jest.mock("next/router", () => ({
+  useRouter: () => useRouter(),
+}));
+
 jest.mock("../components/Nav", () => ({
   Nav: () => null,
 }));
@@ -40,6 +46,8 @@ import {
 } from "../services/album";
 
 const AlbumPage = require("../pages/album/[[...slug]]").default;
+const MapPage = require("../pages/map/index").default;
+const TimelinePage = require("../pages/timeline/index").default;
 
 describe("SEO helpers", () => {
   const originalEnv = process.env;
@@ -47,6 +55,11 @@ describe("SEO helpers", () => {
   beforeEach(() => {
     jest.resetModules();
     process.env = { ...originalEnv, NEXT_PUBLIC_SITE_URL: "https://photos.example.com" };
+    useRouter.mockReturnValue({
+      pathname: "/",
+      query: {},
+      replace: jest.fn(),
+    });
   });
 
   afterAll(() => {
@@ -174,6 +187,34 @@ describe("SEO helpers", () => {
     );
     expect(html).toContain("BreadcrumbList");
     expect(html).toContain("https://photos.example.com/album/trip");
+  });
+
+  it("marks filtered map views as noindex while keeping the base canonical", () => {
+    useRouter.mockReturnValue({
+      pathname: "/map",
+      query: { filter_album: "trip" },
+      replace: jest.fn(),
+    });
+
+    const html = renderToStaticMarkup(<MapPage photos={[]} />);
+
+    expect(html).toContain('rel="canonical" href="https://photos.example.com/map"');
+    expect(html).toContain('name="robots" content="noindex, nofollow"');
+  });
+
+  it("marks dated timeline views as noindex while keeping the base canonical", () => {
+    useRouter.mockReturnValue({
+      pathname: "/timeline",
+      query: { date: "2024-04-07" },
+      replace: jest.fn(),
+    });
+
+    const html = renderToStaticMarkup(<TimelinePage entries={[]} />);
+
+    expect(html).toContain(
+      'rel="canonical" href="https://photos.example.com/timeline"',
+    );
+    expect(html).toContain('name="robots" content="noindex, nofollow"');
   });
 });
 
