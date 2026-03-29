@@ -81,7 +81,7 @@ describe("handleSlideshowKeyboardShortcut", () => {
       await setup();
 
     const handled = handleSlideshowKeyboardShortcut(
-      { key: "ArrowRight", preventDefault, target: { tagName: "input" } as EventTarget },
+      { key: "ArrowRight", preventDefault, target: { tagName: "input" } as unknown as EventTarget },
       handlers,
     );
 
@@ -94,7 +94,7 @@ describe("handleSlideshowKeyboardShortcut", () => {
       await setup();
 
     const handled = handleSlideshowKeyboardShortcut(
-      { key: "Escape", preventDefault, target: { tagName: "textarea" } as EventTarget },
+      { key: "Escape", preventDefault, target: { tagName: "textarea" } as unknown as EventTarget },
       handlers,
     );
 
@@ -107,7 +107,7 @@ describe("handleSlideshowKeyboardShortcut", () => {
       await setup();
 
     const handled = handleSlideshowKeyboardShortcut(
-      { key: " ", preventDefault, target: { tagName: "select" } as EventTarget },
+      { key: " ", preventDefault, target: { tagName: "select" } as unknown as EventTarget },
       handlers,
     );
 
@@ -124,7 +124,7 @@ describe("handleSlideshowKeyboardShortcut", () => {
       {
         key: "ArrowLeft",
         preventDefault,
-        target: { isContentEditable: true } as EventTarget,
+        target: { isContentEditable: true } as unknown as EventTarget,
       },
       handlers,
     );

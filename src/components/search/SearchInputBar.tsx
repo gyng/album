@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useSyncExternalStore } from "react";
 import styles from "./Search.module.css";
 import { hexToRgb, RGB, rgbToString } from "../../util/colorDistance";
 import { SearchMode } from "./useTextVector";
@@ -52,11 +52,11 @@ export const SearchInputBar: React.FC<Props> = ({
   onSetColorTolerance,
   onSetSearchMode,
 }) => {
-  const [isMounted, setIsMounted] = useState(false);
-
-  useEffect(() => {
-    setIsMounted(true);
-  }, []);
+  const isMounted = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false,
+  );
 
   return (
     <div className={styles.searchInputRow}>

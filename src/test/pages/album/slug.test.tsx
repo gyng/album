@@ -2,6 +2,8 @@
  * @jest-environment node
  */
 
+export {};
+
 const getAlbumFromName = jest.fn();
 const getAlbumNames = jest.fn();
 const removeStaleImages = jest.fn();
@@ -33,7 +35,10 @@ jest.mock("../../../components/PhotoAlbum", () => ({
   PhotoAlbum: () => null,
 }));
 
-const { getStaticProps, getStaticPaths } = require("../../../pages/album/[[...slug]]");
+const {
+  getStaticProps: getAlbumPageStaticProps,
+  getStaticPaths,
+} = require("../../../pages/album/[[...slug]]");
 
 describe("album page data fetching", () => {
   beforeEach(() => {
@@ -53,7 +58,7 @@ describe("album page data fetching", () => {
     };
     getAlbumFromName.mockResolvedValue(album);
 
-    const actual = await getStaticProps({ params: { slug: ["trip"] } });
+    const actual = await getAlbumPageStaticProps({ params: { slug: ["trip"] } });
 
     expect(actual).toEqual({ props: { album } });
     expect(removeStaleImages).not.toHaveBeenCalled();

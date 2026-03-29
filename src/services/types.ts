@@ -1,4 +1,6 @@
 export interface Exif {
+  CreateDate?: string;
+  ModifyDate?: string;
   DateTimeOriginal?: string;
   OffsetTime?: string;
   Orientation?: string;

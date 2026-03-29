@@ -43,6 +43,8 @@ import {
 } from "../lib/seo";
 import { buildRobotsTxt } from "../pages/robots.txt";
 import { buildSitemapXml, getServerSideProps as getSitemapProps } from "../pages/sitemap.xml";
+import type { ServerResponse, IncomingMessage } from "http";
+import type { GetServerSidePropsContext } from "next";
 import {
   getAlbumSitemapEntries,
 } from "../services/albumFeed";
@@ -243,8 +245,11 @@ describe("sitemap route", () => {
     const setHeader = jest.fn();
 
     await getSitemapProps({
-      res: { write, end, setHeader },
-    });
+      req: { cookies: {} } as IncomingMessage & { cookies: Record<string, string> },
+      query: {},
+      resolvedUrl: "/sitemap.xml",
+      res: { write, end, setHeader } as unknown as ServerResponse<IncomingMessage>,
+    } as GetServerSidePropsContext);
 
     expect(getAlbumSitemapEntries).toHaveBeenCalled();
     expect(setHeader).toHaveBeenCalledWith(

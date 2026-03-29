@@ -1,10 +1,8 @@
-import { test, expect } from "@playwright/test";
+import { test, expect, type Page } from "@playwright/test";
 
 const slideshowTitle = /Slideshow \| Snapshots/;
 
-const revealSlideshowControls = async (
-  page: Parameters<typeof test>[0]["page"],
-) => {
+const revealSlideshowControls = async (page: Page) => {
   await page.mouse.move(200, 10);
   await page.waitForTimeout(150);
 };

@@ -29,14 +29,14 @@ jest.mock("../../../components/CalendarHeatmap", () => ({
   CalendarHeatmap: (props: any) => {
     mockCalendarHeatmap(props);
     const years = Array.from(
-      new Set(
+      new Set<number>(
         (props.entries ?? []).map((entry: TimelineEntry) =>
           Number.parseInt(entry.date.slice(0, 4), 10),
         ),
       ),
     ).sort((left, right) => right - left);
     const dates = Array.from(
-      new Set((props.entries ?? []).map((entry: TimelineEntry) => entry.date)),
+      new Set<string>((props.entries ?? []).map((entry: TimelineEntry) => entry.date)),
     );
 
     return (

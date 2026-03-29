@@ -311,11 +311,18 @@ export const TechnicalHeatmaps: React.FC<Props> = ({
 
   useEffect(() => {
     if (!activeSelection || !wrapperRef.current) {
-      setOverlayLines((current) => (current.length === 0 ? current : []));
-      return;
+      const frame = requestAnimationFrame(() => {
+        setOverlayLines((current) => (current.length === 0 ? current : []));
+      });
+      return () => {
+        cancelAnimationFrame(frame);
+      };
     }
 
+    let frame = 0;
+
     const updateLines = () => {
+      frame = 0;
       const sourceNode = cellRefs.current.get(
         `${activeSelection.heatmapKey}::${activeSelection.cellKey}`,
       );
@@ -361,10 +368,20 @@ export const TechnicalHeatmaps: React.FC<Props> = ({
       );
     };
 
-    updateLines();
-    window.addEventListener("resize", updateLines);
+    const scheduleUpdate = () => {
+      if (frame !== 0) {
+        cancelAnimationFrame(frame);
+      }
+      frame = requestAnimationFrame(updateLines);
+    };
+
+    scheduleUpdate();
+    window.addEventListener("resize", scheduleUpdate);
     return () => {
-      window.removeEventListener("resize", updateLines);
+      if (frame !== 0) {
+        cancelAnimationFrame(frame);
+      }
+      window.removeEventListener("resize", scheduleUpdate);
     };
   }, [activeSelection, relatedMap]);
 

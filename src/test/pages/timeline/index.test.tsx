@@ -2,6 +2,8 @@
  * @jest-environment node
  */
 
+export {};
+
 const getAlbums = jest.fn();
 
 jest.mock("../../../services/album", () => ({
@@ -21,7 +23,7 @@ jest.mock("../../../components/TimelineDayGrid", () => ({
   TimelineDayGrid: () => null,
 }));
 
-const { getStaticProps } = require("../../../pages/timeline/index");
+const { getStaticProps: getTimelinePageStaticProps } = require("../../../pages/timeline/index");
 
 describe("timeline page data fetching", () => {
   beforeEach(() => {
@@ -90,7 +92,7 @@ describe("timeline page data fetching", () => {
       },
     ]);
 
-    const actual = await getStaticProps({});
+    const actual = await getTimelinePageStaticProps({});
 
     expect(actual).toEqual({
       props: {

@@ -1,4 +1,3 @@
-import { useEffect, useState } from "react";
 import { ResponsiveSankey } from "@nivo/sankey";
 import { SankeyFlow } from "../util/computeStats";
 import styles from "./SankeyChart.module.css";
@@ -262,11 +261,7 @@ export const SankeyChart: React.FC<Props> = ({
   minHeight = 460,
   minLabelHeight = 14,
 }) => {
-  const [spacing, setSpacing] = useState(FALLBACK_SPACING);
-
-  useEffect(() => {
-    setSpacing(readCssSpacing("--m-s", FALLBACK_SPACING));
-  }, []);
+  const spacing = readCssSpacing("--m-s", FALLBACK_SPACING);
 
   if (flow.nodes.length === 0 || flow.links.length === 0) {
     return <p className={styles.empty}>{emptyMessage}</p>;

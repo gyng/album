@@ -8,6 +8,8 @@ import {
   buildAlbumFeedXml,
   getServerSideProps as getAlbumFeedProps,
 } from "../pages/album/[slug]/feed.xml";
+import type { ServerResponse, IncomingMessage } from "http";
+import type { GetServerSidePropsContext } from "next";
 
 jest.mock("../services/albumFeed", () => ({
   getAlbumFeedEntries: jest.fn(),
@@ -62,8 +64,11 @@ describe("RSS feed", () => {
     const setHeader = jest.fn();
 
     await getFeedProps({
-      res: { write, end, setHeader },
-    });
+      req: { cookies: {} } as IncomingMessage & { cookies: Record<string, string> },
+      query: {},
+      resolvedUrl: "/feed.xml",
+      res: { write, end, setHeader } as unknown as ServerResponse<IncomingMessage>,
+    } as GetServerSidePropsContext);
 
     expect(getAlbumFeedEntries).toHaveBeenCalled();
     expect(setHeader).toHaveBeenCalledWith(
@@ -96,9 +101,12 @@ describe("RSS feed", () => {
     const setHeader = jest.fn();
 
     await getAlbumFeedProps({
+      req: { cookies: {} } as IncomingMessage & { cookies: Record<string, string> },
       params: { slug: "trip" },
-      res: { write, end, setHeader },
-    });
+      query: {},
+      resolvedUrl: "/album/trip/feed.xml",
+      res: { write, end, setHeader } as unknown as ServerResponse<IncomingMessage>,
+    } as GetServerSidePropsContext);
 
     expect(getAlbumFeedEntry).toHaveBeenCalledWith("trip");
     expect(getAlbumFeedItems).toHaveBeenCalledWith("trip");

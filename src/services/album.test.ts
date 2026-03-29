@@ -37,7 +37,7 @@ const makePhoto = (dateStr?: string): PhotoBlock => ({
     height: 100,
     width: 100,
     exif: { DateTimeOriginal: dateStr },
-    tags: [],
+    tags: {},
     srcset: [],
   },
 });
