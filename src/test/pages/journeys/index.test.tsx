@@ -74,7 +74,6 @@ describe("Journeys page", () => {
             id: "japan",
             albumSlug: "japan",
             albumTitle: "Japan Winter Loop",
-            albumCount: 1,
             title: "Japan Winter Loop",
             summary: "2 stops • 410 km • 3 days • Tokyo to Osaka",
             tags: ["winter", "city"],
@@ -93,11 +92,6 @@ describe("Journeys page", () => {
             albumHref: "/album/japan",
             mapHref: "/map?filter_album=japan",
             timelineHref: "/timeline?filter_album=japan",
-            memberHrefs: [
-              "/album/japan#a.jpg",
-              "/album/japan#b.jpg",
-              "/album/japan#c.jpg",
-            ],
             stops: [
               {
                 id: "japan:0",
@@ -150,12 +144,9 @@ describe("Journeys page", () => {
     expect(screen.getByText("Japan Winter Loop")).toBeTruthy();
     expect(screen.getByText("Tokyo Arrival")).toBeTruthy();
     expect(screen.getByText("Osaka Nights")).toBeTruthy();
-    expect(screen.queryByText("Primary album")).toBeNull();
-    expect(screen.getByAltText("Tokyo Arrival")).toBeTruthy();
-    expect(screen.getByAltText("Osaka Nights")).toBeTruthy();
-    expect(screen.getByRole("link", { name: /^Album$/i })).toBeTruthy();
+    expect(screen.getByRole("link", { name: /Open album/i })).toBeTruthy();
 
-    fireEvent.click(screen.getByRole("link", { name: /^Map$/i }));
+    fireEvent.click(screen.getByRole("link", { name: /Open map/i }));
     expect(push).toHaveBeenCalledWith("/map?filter_album=japan");
   });
 });

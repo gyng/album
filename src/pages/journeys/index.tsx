@@ -6,18 +6,11 @@ import { buildCollectionPageJsonLd } from "../../lib/seo";
 import { getAlbums } from "../../services/album";
 import { measureBuild } from "../../services/buildTiming";
 import { getJourneys, Journey } from "../../services/journeys";
+import commonStyles from "../../styles/common.module.css";
 import styles from "./journeys.module.css";
 
 type PageProps = {
   journeys: Journey[];
-};
-
-const toSerializableJourneys = (journeys: Journey[]): Journey[] => {
-  return JSON.parse(
-    JSON.stringify(journeys, (_key, value) =>
-      value === undefined ? null : value,
-    ),
-  ) as Journey[];
 };
 
 const JourneysPage: NextPage<PageProps> = ({ journeys }) => {
@@ -54,59 +47,57 @@ const JourneysPage: NextPage<PageProps> = ({ journeys }) => {
           <div className={styles.grid}>
             {journeys.map((journey) => (
               <article key={journey.id} className={styles.card}>
-                <div className={styles.cardHead}>
-                  <Link href={journey.albumHref} className={styles.coverLink}>
-                    <img
-                      src={journey.cover.src}
-                      alt={journey.title}
-                      className={styles.coverImage}
-                      width={journey.cover.width ?? undefined}
-                      height={journey.cover.height ?? undefined}
-                      style={{
-                        backgroundColor:
-                          journey.cover.placeholderColor ?? undefined,
-                      }}
-                    />
-                  </Link>
+                <Link href={journey.albumHref} className={styles.coverLink}>
+                  <img
+                    src={journey.cover.src}
+                    alt={journey.title}
+                    className={styles.coverImage}
+                    width={journey.cover.width}
+                    height={journey.cover.height}
+                    style={{
+                      backgroundColor: journey.cover.placeholderColor,
+                    }}
+                  />
+                </Link>
 
-                  <div className={styles.cardIntro}>
-                    <div className={styles.meta}>
-                      {journey.albumCount > 1 ? (
-                        <span>{journey.albumCount} albums</span>
-                      ) : null}
-                      <span>{journey.stopCount} stops</span>
-                      <span>{journey.geotaggedPhotoCount} route photos</span>
-                      {journey.durationDays ? (
-                        <span>{journey.durationDays} days</span>
-                      ) : null}
-                    </div>
-
-                    <div>
-                      <h2>{journey.title}</h2>
-                      <p className={styles.summary}>{journey.summary}</p>
-                    </div>
-
-                    {journey.tags.length > 0 ? (
-                      <div className={styles.tags}>
-                        {journey.tags.map((tag) => (
-                          <span key={tag} className={styles.tag}>
-                            {tag}
-                          </span>
-                        ))}
-                      </div>
-                    ) : null}
-                  </div>
+                <div className={styles.meta}>
+                  <span>{journey.stopCount} stops</span>
+                  <span>{journey.geotaggedPhotoCount} route photos</span>
+                  {journey.durationDays ? (
+                    <span>{journey.durationDays} days</span>
+                  ) : null}
                 </div>
 
+                <div>
+                  <h2>{journey.title}</h2>
+                  <p className={styles.summary}>{journey.summary}</p>
+                </div>
+
+                {journey.tags.length > 0 ? (
+                  <div className={styles.tags}>
+                    {journey.tags.map((tag) => (
+                      <span key={tag} className={styles.tag}>
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
+                ) : null}
+
                 <div className={styles.actions}>
-                  <Link href={journey.albumHref} className={styles.actionLink}>
-                    {journey.albumCount > 1 ? "Primary album" : "Album"}
+                  <Link
+                    href={journey.albumHref}
+                    className={commonStyles.button}
+                  >
+                    Open album
                   </Link>
-                  <Link href={journey.mapHref} className={styles.actionLink}>
-                    Map
+                  <Link href={journey.mapHref} className={commonStyles.button}>
+                    Open map
                   </Link>
-                  <Link href={journey.timelineHref} className={styles.actionLink}>
-                    Timeline
+                  <Link
+                    href={journey.timelineHref}
+                    className={commonStyles.button}
+                  >
+                    Open timeline
                   </Link>
                 </div>
 
@@ -116,27 +107,11 @@ const JourneysPage: NextPage<PageProps> = ({ journeys }) => {
                 >
                   <strong>Stops</strong>
                   <ol className={styles.stopList}>
-                    {journey.stops.slice(0, 3).map((stop) => (
+                    {journey.stops.slice(0, 4).map((stop) => (
                       <li key={stop.id} className={styles.stopItem}>
                         <span className={styles.stopIndex}>
                           {stop.sequenceIndex + 1}
                         </span>
-                        <Link
-                          href={stop.coverHref}
-                          className={styles.stopPreviewLink}
-                        >
-                          <img
-                            src={stop.cover.src}
-                            alt={stop.title}
-                            className={styles.stopPreview}
-                            width={stop.cover.width ?? undefined}
-                            height={stop.cover.height ?? undefined}
-                            style={{
-                              backgroundColor:
-                                stop.cover.placeholderColor ?? undefined,
-                            }}
-                          />
-                        </Link>
                         <div className={styles.stopText}>
                           <span className={styles.stopTitle}>{stop.title}</span>
                           <span className={styles.stopSummary}>
@@ -163,7 +138,7 @@ export const getStaticProps: GetStaticProps<PageProps> = async () => {
 
     return {
       props: {
-        journeys: toSerializableJourneys(journeys),
+        journeys,
       },
     };
   });

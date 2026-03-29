@@ -31,8 +31,6 @@ import {
 
 export type MapWorldEntry = {
   album: string;
-  tripId?: string | null;
-  tripTitle?: string | null;
   src: OptimisedPhoto;
   decLat: number | null;
   decLng: number | null;
@@ -826,14 +824,13 @@ export const MMap: React.FC<MapWorldProps> = ({
   const routeDataByAlbum = React.useMemo(() => {
     const albums = new globalThis.Map<string, MapWorldEntry[]>();
     photos.forEach((photo) => {
-      const routeGroupKey = photo.tripId ?? photo.album;
-      const existing = albums.get(routeGroupKey);
+      const existing = albums.get(photo.album);
       if (existing) {
         existing.push(photo);
         return;
       }
 
-      albums.set(routeGroupKey, [photo]);
+      albums.set(photo.album, [photo]);
     });
 
     return new globalThis.Map(

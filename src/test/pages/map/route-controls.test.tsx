@@ -164,35 +164,4 @@ describe("WorldMap route controls", () => {
       }),
     );
   });
-
-  it("counts detected trips rather than only albums for world map journeys", () => {
-    render(
-      <WorldMap
-        photos={[
-          {
-            album: "trip-a",
-            tripId: "journey-1",
-            src: { src: "/1.jpg", width: 100, height: 100 },
-            decLat: 35,
-            decLng: 139,
-            date: "2024-01-01T00:00:00.000Z",
-            href: "/album/trip-a#1.jpg",
-          },
-          {
-            album: "trip-b",
-            tripId: "journey-1",
-            src: { src: "/2.jpg", width: 100, height: 100 },
-            decLat: 35.1,
-            decLng: 139.1,
-            date: "2024-01-02T00:00:00.000Z",
-            href: "/album/trip-b#2.jpg",
-          },
-        ]}
-      />,
-    );
-
-    expect(
-      screen.getByRole("button", { name: "Show all journeys" }),
-    ).toBeTruthy();
-  });
 });
