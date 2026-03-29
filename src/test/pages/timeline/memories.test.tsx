@@ -28,7 +28,31 @@ const mockCalendarHeatmap = jest.fn();
 jest.mock("../../../components/CalendarHeatmap", () => ({
   CalendarHeatmap: (props: any) => {
     mockCalendarHeatmap(props);
-    return <div>heatmap</div>;
+    const years = Array.from(
+      new Set(
+        (props.entries ?? []).map((entry: TimelineEntry) =>
+          Number.parseInt(entry.date.slice(0, 4), 10),
+        ),
+      ),
+    ).sort((left, right) => right - left);
+    const dates = Array.from(
+      new Set((props.entries ?? []).map((entry: TimelineEntry) => entry.date)),
+    );
+
+    return (
+      <div>
+        {years.map((year) => (
+          <h2 key={year} data-year-heading={year}>
+            {year}
+          </h2>
+        ))}
+        {dates.map((date) => (
+          <button key={date} type="button" data-date={date}>
+            {date}
+          </button>
+        ))}
+      </div>
+    );
   },
 }));
 
@@ -128,7 +152,9 @@ describe("Timeline memories", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByTestId("selected-date").textContent).toBe("2025-03-15");
+      expect(screen.getByTestId("selected-date").textContent).toBe(
+        "2025-03-15",
+      );
     });
   });
 
@@ -156,7 +182,9 @@ describe("Timeline memories", () => {
     fireEvent.click(screen.getByRole("button", { name: "older" }));
 
     await waitFor(() => {
-      expect(screen.getByTestId("selected-date").textContent).toBe("2025-03-14");
+      expect(screen.getByTestId("selected-date").textContent).toBe(
+        "2025-03-14",
+      );
     });
 
     expect(mockReplace).toHaveBeenLastCalledWith(
@@ -230,19 +258,26 @@ describe("Timeline memories", () => {
       await screen.findByTestId("memory-cluster-2025-2025-03-15-2025-03-16"),
     );
 
-    const lastCall =
-      mockCalendarHeatmap.mock.calls[mockCalendarHeatmap.mock.calls.length - 1]?.[0];
-    expect(lastCall.highlightedDates).toEqual(["2025-03-15", "2025-03-16"]);
-    expect(lastCall.highlightedYears).toEqual([2025]);
+    expect(
+      screen.getByRole("button", { name: "2025-03-15" }).className,
+    ).toMatch(/memoryHighlighted/);
+    expect(
+      screen.getByRole("button", { name: "2025-03-16" }).className,
+    ).toMatch(/memoryHighlighted/);
+    expect(screen.getByRole("heading", { name: "2025" }).className).toMatch(
+      /highlightedYearHeading/,
+    );
 
     fireEvent.mouseLeave(
       screen.getByTestId("memory-cluster-2025-2025-03-15-2025-03-16"),
     );
 
-    const clearedCall =
-      mockCalendarHeatmap.mock.calls[mockCalendarHeatmap.mock.calls.length - 1]?.[0];
-    expect(clearedCall.highlightedDates).toEqual([]);
-    expect(clearedCall.highlightedYears).toEqual([]);
+    expect(
+      screen.getByRole("button", { name: "2025-03-15" }).className,
+    ).not.toMatch(/memoryHighlighted/);
+    expect(screen.getByRole("heading", { name: "2025" }).className).not.toMatch(
+      /highlightedYearHeading/,
+    );
   });
 
   it("clicking a memory label targets the matching calendar date", async () => {
@@ -271,7 +306,9 @@ describe("Timeline memories", () => {
     );
 
     const lastCall =
-      mockCalendarHeatmap.mock.calls[mockCalendarHeatmap.mock.calls.length - 1]?.[0];
+      mockCalendarHeatmap.mock.calls[
+        mockCalendarHeatmap.mock.calls.length - 1
+      ]?.[0];
     expect(lastCall.scrollToDate).toBe("2025-03-15");
     expect(screen.getByTestId("selected-date").textContent).toBe("2025-03-15");
   });
@@ -301,9 +338,81 @@ describe("Timeline memories", () => {
 
     fireEvent.focus(memoryButton);
 
-    const focusedCall =
-      mockCalendarHeatmap.mock.calls[mockCalendarHeatmap.mock.calls.length - 1]?.[0];
-    expect(focusedCall.highlightedDates).toEqual(["2025-03-15", "2025-03-16"]);
-    expect(focusedCall.highlightedYears).toEqual([2025]);
+    expect(
+      screen.getByRole("button", { name: "2025-03-15" }).className,
+    ).toMatch(/memoryHighlighted/);
+    expect(screen.getByRole("heading", { name: "2025" }).className).toMatch(
+      /highlightedYearHeading/,
+    );
+  });
+
+  it("supports slideshow-style keyboard navigation with arrow keys", async () => {
+    render(
+      <TimelinePage
+        entries={[
+          makeEntry({
+            date: "2025-03-15",
+            href: "/album/kansai#newer.jpg",
+            path: "../albums/kansai/newer.jpg",
+          }),
+          makeEntry({
+            date: "2025-03-14",
+            href: "/album/kansai#older.jpg",
+            path: "../albums/kansai/older.jpg",
+            dateTimeOriginal: "2025-03-14T09:00:00.000Z",
+          }),
+        ]}
+      />,
+    );
+
+    fireEvent.keyDown(window, { key: "ArrowLeft" });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("selected-date").textContent).toBe(
+        "2025-03-14",
+      );
+    });
+
+    fireEvent.keyDown(window, { key: "ArrowRight" });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("selected-date").textContent).toBe(
+        "2025-03-15",
+      );
+    });
+  });
+
+  it("ignores arrow navigation while typing in an input", async () => {
+    render(
+      <>
+        <input aria-label="scratch input" />
+        <TimelinePage
+          entries={[
+            makeEntry({
+              date: "2025-03-15",
+              href: "/album/kansai#newer.jpg",
+              path: "../albums/kansai/newer.jpg",
+            }),
+            makeEntry({
+              date: "2025-03-14",
+              href: "/album/kansai#older.jpg",
+              path: "../albums/kansai/older.jpg",
+              dateTimeOriginal: "2025-03-14T09:00:00.000Z",
+            }),
+          ]}
+        />
+      </>,
+    );
+
+    const input = screen.getByRole("textbox", { name: "scratch input" });
+    input.focus();
+
+    fireEvent.keyDown(input, { key: "ArrowLeft" });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("selected-date").textContent).toBe(
+        "2025-03-15",
+      );
+    });
   });
 });

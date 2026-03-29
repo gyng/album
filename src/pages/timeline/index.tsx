@@ -47,6 +47,20 @@ const getClusterAlbumLabel = (albums: string[]) => {
   return uniqueAlbums.length === 1 ? uniqueAlbums[0] : null;
 };
 
+const isEditableTarget = (target: EventTarget | null) => {
+  if (!(target instanceof HTMLElement)) {
+    return false;
+  }
+
+  const tagName = target.tagName.toLowerCase();
+  return (
+    target.isContentEditable ||
+    tagName === "input" ||
+    tagName === "textarea" ||
+    tagName === "select"
+  );
+};
+
 const clamp = (value: number, min: number, max: number) => {
   return Math.min(Math.max(value, min), max);
 };
@@ -68,21 +82,6 @@ const toConnectorPath = (curve: ConnectorCurve) => {
     `C ${curve.control1X} ${curve.control1Y} ${curve.control2X} ${curve.control2Y} ${curve.endX} ${curve.endY}`,
   ].join(" ");
 };
-
-const interpolateCurve = (
-  from: ConnectorCurve,
-  to: ConnectorCurve,
-  progress: number,
-): ConnectorCurve => ({
-  startX: to.startX,
-  startY: to.startY,
-  control1X: from.control1X + (to.control1X - from.control1X) * progress,
-  control1Y: from.control1Y + (to.control1Y - from.control1Y) * progress,
-  control2X: from.control2X + (to.control2X - from.control2X) * progress,
-  control2Y: from.control2Y + (to.control2Y - from.control2Y) * progress,
-  endX: to.endX,
-  endY: to.endY,
-});
 
 const TimelinePage: NextPage<PageProps> = ({ entries }) => {
   const router = useRouter();
@@ -122,8 +121,6 @@ const TimelinePage: NextPage<PageProps> = ({ entries }) => {
   const dayHeadingRef = React.useRef<HTMLHeadingElement | null>(null);
   const selectedConnectorSvgRef = React.useRef<SVGSVGElement | null>(null);
   const selectedConnectorPathRef = React.useRef<SVGPathElement | null>(null);
-  const selectedConnectorCurveRef = React.useRef<ConnectorCurve | null>(null);
-  const selectedConnectorAnimationRef = React.useRef<number | null>(null);
   const highlightedHeatmapElementsRef = React.useRef<HTMLElement[]>([]);
 
   const selectableDates = React.useMemo(() => {
@@ -202,134 +199,75 @@ const TimelinePage: NextPage<PageProps> = ({ entries }) => {
   }, []);
 
   const clearSelectedConnectorPath = React.useCallback(() => {
-    selectedConnectorCurveRef.current = null;
-    if (selectedConnectorAnimationRef.current != null) {
-      cancelAnimationFrame(selectedConnectorAnimationRef.current);
-      selectedConnectorAnimationRef.current = null;
-    }
     if (selectedConnectorPathRef.current) {
       selectedConnectorPathRef.current.setAttribute("d", "");
     }
   }, []);
 
-  const updateSelectedConnectorPath = React.useCallback(
-    (shouldAnimate = true) => {
-      if (
-        !selectedDate ||
-        typeof window === "undefined" ||
-        window.innerWidth < 960
-      ) {
-        clearSelectedConnectorPath();
-        return;
-      }
+  const updateSelectedConnectorPath = React.useCallback(() => {
+    if (
+      !selectedDate ||
+      typeof window === "undefined" ||
+      window.innerWidth < 960
+    ) {
+      clearSelectedConnectorPath();
+      return;
+    }
 
-      const layout = layoutRef.current;
-      const heading = dayHeadingRef.current;
-      const connectorSvg = selectedConnectorSvgRef.current;
-      const connectorPath = selectedConnectorPathRef.current;
-      if (!layout || !heading || !connectorSvg || !connectorPath) {
-        return;
-      }
+    const layout = layoutRef.current;
+    const heading = dayHeadingRef.current;
+    const connectorSvg = selectedConnectorSvgRef.current;
+    const connectorPath = selectedConnectorPathRef.current;
+    if (!layout || !heading || !connectorSvg || !connectorPath) {
+      return;
+    }
 
-      const target = layout.querySelector<HTMLElement>(
-        `[data-date="${selectedDate}"]`,
-      );
-      if (!target) {
-        clearSelectedConnectorPath();
-        return;
-      }
+    const target = layout.querySelector<HTMLElement>(
+      `[data-date="${selectedDate}"]`,
+    );
+    if (!target) {
+      clearSelectedConnectorPath();
+      return;
+    }
 
-      const layoutRect = layout.getBoundingClientRect();
-      const headingRect = heading.getBoundingClientRect();
-      const targetRect = target.getBoundingClientRect();
+    const layoutRect = layout.getBoundingClientRect();
+    const headingRect = heading.getBoundingClientRect();
+    const targetRect = target.getBoundingClientRect();
 
-      connectorSvg.setAttribute(
-        "viewBox",
-        `0 0 ${layout.clientWidth} ${layout.clientHeight}`,
-      );
+    connectorSvg.setAttribute(
+      "viewBox",
+      `0 0 ${layout.clientWidth} ${layout.clientHeight}`,
+    );
 
-      const startX = headingRect.left - layoutRect.left - 16;
-      const startY = headingRect.top + headingRect.height / 2 - layoutRect.top;
-      const endX = clamp(
-        targetRect.left + targetRect.width / 2 - layoutRect.left,
-        10,
-        layoutRect.width - 10,
-      );
-      const endY = clamp(
-        targetRect.top + targetRect.height / 2 - layoutRect.top,
-        10,
-        layoutRect.height - 10,
-      );
-      const controlOffset = Math.max(48, Math.abs(startX - endX) * 0.18);
-      const nextCurve: ConnectorCurve = {
-        startX,
-        startY,
-        control1X: startX - controlOffset,
-        control1Y: startY,
-        control2X: endX + controlOffset,
-        control2Y: endY,
-        endX,
-        endY,
-      };
+    const startX = headingRect.left - layoutRect.left - 16;
+    const startY = headingRect.top + headingRect.height / 2 - layoutRect.top;
+    const endX = clamp(
+      targetRect.left + targetRect.width / 2 - layoutRect.left,
+      10,
+      layoutRect.width - 10,
+    );
+    const endY = clamp(
+      targetRect.top + targetRect.height / 2 - layoutRect.top,
+      10,
+      layoutRect.height - 10,
+    );
+    const controlOffset = Math.max(48, Math.abs(startX - endX) * 0.18);
+    const nextCurve: ConnectorCurve = {
+      startX,
+      startY,
+      control1X: startX - controlOffset,
+      control1Y: startY,
+      control2X: endX + controlOffset,
+      control2Y: endY,
+      endX,
+      endY,
+    };
 
-      const previousCurve = selectedConnectorCurveRef.current;
-      if (!previousCurve) {
-        selectedConnectorCurveRef.current = nextCurve;
-        connectorPath.setAttribute("d", toConnectorPath(nextCurve));
-        return;
-      }
-
-      const nextPath = toConnectorPath(nextCurve);
-      if (toConnectorPath(previousCurve) === nextPath) {
-        return;
-      }
-
-      if (!shouldAnimate) {
-        if (selectedConnectorAnimationRef.current != null) {
-          cancelAnimationFrame(selectedConnectorAnimationRef.current);
-          selectedConnectorAnimationRef.current = null;
-        }
-        selectedConnectorCurveRef.current = nextCurve;
-        connectorPath.setAttribute("d", nextPath);
-        return;
-      }
-
-      if (selectedConnectorAnimationRef.current != null) {
-        cancelAnimationFrame(selectedConnectorAnimationRef.current);
-        selectedConnectorAnimationRef.current = null;
-      }
-
-      const animationStart = performance.now();
-      const animationDuration = 120;
-      const startCurve = previousCurve;
-
-      const animateFrame = (now: number) => {
-        const elapsed = now - animationStart;
-        const linear = Math.min(elapsed / animationDuration, 1);
-        const eased = 1 - Math.pow(1 - linear, 3);
-        const currentCurve = interpolateCurve(startCurve, nextCurve, eased);
-
-        selectedConnectorCurveRef.current = currentCurve;
-        connectorPath.setAttribute("d", toConnectorPath(currentCurve));
-
-        if (linear < 1) {
-          selectedConnectorAnimationRef.current =
-            requestAnimationFrame(animateFrame);
-        } else {
-          selectedConnectorAnimationRef.current = null;
-          selectedConnectorCurveRef.current = nextCurve;
-          connectorPath.setAttribute("d", nextPath);
-        }
-      };
-
-      selectedConnectorAnimationRef.current =
-        requestAnimationFrame(animateFrame);
-    },
-    [clearSelectedConnectorPath, selectedDate],
-  );
+    connectorPath.setAttribute("d", toConnectorPath(nextCurve));
+  }, [clearSelectedConnectorPath, selectedDate]);
 
   React.useEffect(() => {
-    updateSelectedConnectorPath(true);
+    updateSelectedConnectorPath();
 
     if (typeof window === "undefined") {
       return;
@@ -343,7 +281,7 @@ const TimelinePage: NextPage<PageProps> = ({ entries }) => {
 
       frameId = window.requestAnimationFrame(() => {
         frameId = null;
-        updateSelectedConnectorPath(false);
+        updateSelectedConnectorPath();
       });
     };
 
@@ -354,7 +292,7 @@ const TimelinePage: NextPage<PageProps> = ({ entries }) => {
 
       frameId = window.requestAnimationFrame(() => {
         frameId = null;
-        updateSelectedConnectorPath(false);
+        updateSelectedConnectorPath();
       });
     };
 
@@ -364,10 +302,6 @@ const TimelinePage: NextPage<PageProps> = ({ entries }) => {
     return () => {
       if (frameId != null) {
         window.cancelAnimationFrame(frameId);
-      }
-      if (selectedConnectorAnimationRef.current != null) {
-        window.cancelAnimationFrame(selectedConnectorAnimationRef.current);
-        selectedConnectorAnimationRef.current = null;
       }
       window.removeEventListener("resize", handleResize);
       window.removeEventListener("scroll", handleScroll, true);
@@ -437,6 +371,33 @@ const TimelinePage: NextPage<PageProps> = ({ entries }) => {
       setSelectedDate(selectableDates[idx - 1]);
     }
   }, [selectableDates, selectedDate]);
+
+  React.useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (
+        event.defaultPrevented ||
+        event.metaKey ||
+        event.ctrlKey ||
+        event.altKey ||
+        isEditableTarget(event.target)
+      ) {
+        return;
+      }
+
+      if (event.key === "ArrowLeft") {
+        event.preventDefault();
+        handleSelectOlderDate();
+      }
+
+      if (event.key === "ArrowRight") {
+        event.preventDefault();
+        handleSelectNewerDate();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [handleSelectNewerDate, handleSelectOlderDate]);
 
   const selectedEntries = React.useMemo(() => {
     return selectedDate
