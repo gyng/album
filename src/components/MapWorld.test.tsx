@@ -1,3 +1,7 @@
+/**
+ * @jest-environment jsdom
+ */
+
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { MapWorldEntry } from "./MapWorld";
 

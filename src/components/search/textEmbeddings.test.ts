@@ -1,3 +1,7 @@
+/**
+ * @jest-environment jsdom
+ */
+
 describe("textEmbeddings", () => {
   const originalWorker = global.Worker;
 

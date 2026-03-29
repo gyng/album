@@ -1,3 +1,7 @@
+/**
+ * @jest-environment jsdom
+ */
+
 import { fireEvent, render, screen } from "@testing-library/react";
 import { CalendarHeatmap } from "./CalendarHeatmap";
 import { TimelineEntry } from "./timelineTypes";

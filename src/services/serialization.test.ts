@@ -2,7 +2,7 @@
  * @jest-environment node
  */
 
-import { deserializeContentBlock } from "./deserialize";
+import { deserializeContentBlock, deserializeInternals } from "./deserialize";
 import { serializeContentBlock } from "./serialize";
 import { Content, SerializedContent } from "./types";
 
@@ -27,6 +27,10 @@ jest.mock("./video", () => ({
 }));
 
 describe("serialization", () => {
+  afterEach(async () => {
+    await deserializeInternals.resetForTesting();
+  });
+
   const content: Content = {
     name: "foo",
     title: "bar",

@@ -11,10 +11,10 @@ const config = {
   // Add more setup options before each test is run
   // setupFilesAfterEnv: ['<rootDir>/jest.setup.js'],
 
-  testEnvironment: "jest-environment-jsdom",
+  testEnvironment: "node",
   testTimeout: 30000,
-  forceExit: true,
   testPathIgnorePatterns: [
+    "<rootDir>/.next/",
     "<rootDir>/node_modules/",
     "<rootDir>/tests/", // Ignore Playwright tests
   ],

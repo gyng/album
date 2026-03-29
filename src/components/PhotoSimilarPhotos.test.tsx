@@ -1,3 +1,7 @@
+/**
+ * @jest-environment jsdom
+ */
+
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { PhotoSimilarPhotos } from "./PhotoSimilarPhotos";
 import { useDatabase } from "./database/useDatabase";

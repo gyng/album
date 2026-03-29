@@ -28,6 +28,21 @@ const sqlite3 = require("sqlite3").verbose();
 let searchDb: any | null = null;
 const photoSearchIndexCache = new Map<string, Promise<any[]>>();
 
+const closeSearchDb = async (): Promise<void> => {
+  if (!searchDb) {
+    return;
+  }
+
+  const dbToClose = searchDb;
+  searchDb = null;
+
+  await new Promise<void>((resolve) => {
+    dbToClose.close(() => {
+      resolve();
+    });
+  });
+};
+
 const getSearchDb = (dbPath: string) => {
   if (searchDb) {
     incrementBuildCounter("deserialize.searchIndexLookup.dbCacheHits");
@@ -38,13 +53,6 @@ const getSearchDb = (dbPath: string) => {
   searchDb = new sqlite3.Database(dbPath);
   return searchDb;
 };
-
-process.once("exit", () => {
-  if (searchDb) {
-    searchDb.close();
-    searchDb = null;
-  }
-});
 
 export const deserializeTextBlock = async (
   serialized: SerializedTextBlock,
@@ -232,4 +240,11 @@ export const deserializeContentBlock = async (
       },
     };
   });
+};
+
+export const deserializeInternals = {
+  resetForTesting: async () => {
+    photoSearchIndexCache.clear();
+    await closeSearchDb();
+  },
 };

@@ -1,3 +1,7 @@
+/**
+ * @jest-environment jsdom
+ */
+
 import sqlite3InitModule from "@sqlite.org/sqlite-wasm";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { databaseLoaderInternals, useDatabase } from "./useDatabase";

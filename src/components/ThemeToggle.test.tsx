@@ -1,3 +1,7 @@
+/**
+ * @jest-environment jsdom
+ */
+
 import React, { act } from "react";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { hydrateRoot } from "react-dom/client";
