@@ -48,6 +48,16 @@ export const GlobalNav: React.FC<Props> = ({
         <>
           <li>
             <Link
+              href="/map"
+              prefetch={onMapClick ? false : undefined}
+              className={cx(commonStyles.button, current("map"))}
+              onClick={onMapClick}
+            >
+              Map
+            </Link>
+          </li>
+          <li>
+            <Link
               href="/search"
               className={cx(commonStyles.button, current("search"))}
             >
@@ -60,16 +70,6 @@ export const GlobalNav: React.FC<Props> = ({
               className={cx(commonStyles.button, current("timeline"))}
             >
               Timeline
-            </Link>
-          </li>
-          <li>
-            <Link
-              href="/map"
-              prefetch={onMapClick ? false : undefined}
-              className={cx(commonStyles.button, current("map"))}
-              onClick={onMapClick}
-            >
-              Map
             </Link>
           </li>
           <li>
