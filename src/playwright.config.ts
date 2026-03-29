@@ -102,7 +102,7 @@ export default defineConfig({
   webServer: skipWebServer
     ? undefined
     : {
-        command: "node ./bin/start-test-server.cjs",
+        command: "npm start",
         url: baseURL,
         reuseExistingServer,
         timeout: 120 * 1000,

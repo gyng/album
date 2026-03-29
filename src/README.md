@@ -107,7 +107,7 @@ npm run test:e2e -- ./tests/slideshow-keyboard.spec.ts --project=chromium
 npm run test:e2e:reuse -- ./tests/slideshow-keyboard.spec.ts --project=chromium
 ```
 
-Use `npm run test:e2e` when you want Playwright to run against a fresh build of the current code.
+Use `npm run test:e2e` when you want Playwright to build the app and manage its own local server.
 
 Use `npm run test:e2e:reuse` only when you already have a server running locally and you explicitly want Playwright to reuse it.
 
