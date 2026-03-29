@@ -1,4 +1,5 @@
 import { keepPreviousData, useInfiniteQuery } from "@tanstack/react-query";
+import { Database } from "@sqlite.org/sqlite-wasm";
 import { useDebounce } from "use-debounce";
 import { useMemo } from "react";
 import {
@@ -15,8 +16,8 @@ import { SearchMode, useTextVector } from "./useTextVector";
 import { parseSearchTerms } from "./searchUtils";
 
 type Props = {
-  database: unknown;
-  embeddingsDatabase: unknown;
+  database: Database | null;
+  embeddingsDatabase: Database | null;
   searchInputValue: string;
   similarPath: string | null;
   colorSearch: RGB | null;
@@ -116,7 +117,7 @@ export const useSearchResultsState = ({
       if (similarPath) {
         return await fetchSimilarResults({
           database,
-          embeddingsDatabase: embeddingsDatabase as any,
+          embeddingsDatabase,
           path: similarPath,
           pageSize,
           page: pageParam,
@@ -136,7 +137,7 @@ export const useSearchResultsState = ({
       if (searchMode === "semantic" && textVector && hasCurrentTextVector) {
         return await fetchSemanticResults({
           database,
-          embeddingsDatabase: embeddingsDatabase as any,
+          embeddingsDatabase,
           textQuery: trimmedQuery,
           textVector,
           pageSize,
@@ -147,7 +148,7 @@ export const useSearchResultsState = ({
       if (searchMode === "hybrid" && textVector && hasCurrentTextVector) {
         return await fetchHybridResults({
           database,
-          embeddingsDatabase: embeddingsDatabase as any,
+          embeddingsDatabase,
           textQuery: trimmedQuery,
           keywordQuery,
           textVector,

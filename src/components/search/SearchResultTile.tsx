@@ -48,6 +48,7 @@ export const SearchResultTile = (props: {
   const isHybridResult = typeof result.rrfScore === "number";
   const isColorMatchResult =
     Array.isArray(result.matchingColor) && typeof result.similarity === "number";
+  const colorMatchScore = isColorMatchResult ? result.similarity : null;
   const hybridScore = isHybridResult ? result.rrfScore : null;
   const hybridScoreLabel =
     typeof hybridScore === "number"
@@ -55,8 +56,8 @@ export const SearchResultTile = (props: {
       : null;
   const similarityLabel = isHybridResult
     ? hybridScoreLabel
-    : isColorMatchResult
-      ? `${Math.round(result.similarity)}%`
+    : typeof colorMatchScore === "number"
+      ? `${Math.round(colorMatchScore)}%`
       : typeof result.similarity === "number"
       ? `${Math.round(result.similarity * 100)}%`
       : null;
@@ -72,8 +73,8 @@ export const SearchResultTile = (props: {
             ? (result.bm25 * -1).toFixed(1)
             : "n/a"
         }, fused score ${hybridScore?.toFixed(3)} (${hybridScoreLabel})`
-      : isColorMatchResult
-        ? `Color match score ${Math.round(result.similarity)}%`
+      : typeof colorMatchScore === "number"
+        ? `Color match score ${Math.round(colorMatchScore)}%`
       : typeof result.similarity === "number"
         ? result.similarity.toFixed(3)
         : typeof result.bm25 === "number"
