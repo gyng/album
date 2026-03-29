@@ -9,9 +9,9 @@ import { Content, PhotoBlock } from "./types";
 type JourneyCover = {
   href: string;
   src: string;
-  width?: number;
-  height?: number;
-  placeholderColor?: string;
+  width: number | null;
+  height: number | null;
+  placeholderColor: string | null;
 };
 
 export type JourneyStop = {
@@ -36,7 +36,8 @@ export type JourneyStop = {
 export type Journey = {
   id: string;
   albumSlug: string;
-  albumTitle: string;
+  albumTitle: string | null;
+  albumCount: number;
   title: string;
   summary: string;
   tags: string[];
@@ -52,6 +53,7 @@ export type Journey = {
   mapHref: string;
   timelineHref: string;
   albumHref: string;
+  memberHrefs: string[];
   stops: JourneyStop[];
 };
 
@@ -78,12 +80,15 @@ type BuildJourneysOptions = {
 
 type JourneySourceEntry = MapWorldEntry & {
   geocode: string | null;
+  albumTitle: string | null;
 };
 
 type CoordinateEntry = {
   decLat: number;
   decLng: number;
 };
+
+const TRIP_GAP_BREAK_MS = 5 * 24 * 60 * 60 * 1000;
 
 const isPhotoBlockWithGps = (block: PhotoBlock): boolean => {
   const exif = block._build?.exif ?? {};
@@ -108,6 +113,37 @@ const toPlaceholderColor = (color?: [number, number, number]): string => {
   return `rgba(${color[0]}, ${color[1]}, ${color[2]}, 1)`;
 };
 
+const isNumericGeocodeToken = (token: string): boolean => {
+  return /^-?\d+(?:\.\d+)?$/.test(token);
+};
+
+const cleanGeocodeFragment = (fragment: string): string | null => {
+  const cleanedTokens = fragment
+    .replace(/[()[\]]/g, " ")
+    .split(/\s+/)
+    .map((token) => token.trim())
+    .filter(Boolean)
+    .filter((token) => !isNumericGeocodeToken(token))
+    .filter((token) => !/^\d{4,}$/.test(token))
+    .filter((token) => !/^[A-Z]{2,3}$/.test(token));
+
+  const dedupedTokens = cleanedTokens.filter((token, index) => {
+    return cleanedTokens.findIndex(
+      (candidate) => candidate.toLowerCase() === token.toLowerCase(),
+    ) === index;
+  });
+
+  if (dedupedTokens.length === 0) {
+    return null;
+  }
+
+  if (dedupedTokens.length === 1) {
+    return dedupedTokens[0] ?? null;
+  }
+
+  return dedupedTokens.slice(0, 2).join(" ");
+};
+
 const getPlaceLabel = (geocode: string | null): string | null => {
   if (!geocode) {
     return null;
@@ -115,7 +151,7 @@ const getPlaceLabel = (geocode: string | null): string | null => {
 
   const parts = geocode
     .split(",")
-    .map((part) => part.trim())
+    .map((part) => cleanGeocodeFragment(part))
     .filter(Boolean);
 
   if (parts.length === 0) {
@@ -200,6 +236,7 @@ const buildJourneyEntries = (album: Content): JourneySourceEntry[] => {
 
       return {
         album: album._build.slug,
+        albumTitle: album.title ?? null,
         src: src ?? { src: block.data.src, width: 0, height: 0 },
         decLat,
         decLng,
@@ -215,6 +252,10 @@ const buildJourneyEntries = (album: Content): JourneySourceEntry[] => {
       (entry) =>
         typeof entry.decLat === "number" && typeof entry.decLng === "number",
     ) as JourneySourceEntry[];
+};
+
+const flattenJourneyEntries = (albums: Content[]): JourneySourceEntry[] => {
+  return albums.flatMap((album) => buildJourneyEntries(album));
 };
 
 const buildStopSummary = (stop: JourneyStop): string => {
@@ -278,19 +319,23 @@ const getStopPlaceLabel = (
 };
 
 const buildDefaultJourneyTitle = (
-  album: Content,
   startPlace: string | null,
   endPlace: string | null,
+  fallbackLabel: string,
 ): string => {
-  if (album.title && album.title.trim()) {
-    return album.title.trim();
-  }
-
   if (startPlace && endPlace && startPlace !== endPlace) {
     return `${startPlace} to ${endPlace}`;
   }
 
-  return album._build.slug;
+  if (startPlace) {
+    return startPlace;
+  }
+
+  if (endPlace) {
+    return endPlace;
+  }
+
+  return fallbackLabel;
 };
 
 const findEntryForHref = (
@@ -324,19 +369,128 @@ export const loadJourneyEnrichmentOverrides = (
   ) as JourneyEnrichmentOverrides;
 };
 
+const sortEntriesChronologically = (
+  entries: JourneySourceEntry[],
+): JourneySourceEntry[] => {
+  return [...entries].sort((left, right) => {
+    const leftTimestamp = left.date ? new Date(left.date).valueOf() : NaN;
+    const rightTimestamp = right.date ? new Date(right.date).valueOf() : NaN;
+
+    if (Number.isNaN(leftTimestamp) && Number.isNaN(rightTimestamp)) {
+      return left.href.localeCompare(right.href);
+    }
+
+    if (Number.isNaN(leftTimestamp)) {
+      return 1;
+    }
+
+    if (Number.isNaN(rightTimestamp)) {
+      return -1;
+    }
+
+    if (leftTimestamp !== rightTimestamp) {
+      return leftTimestamp - rightTimestamp;
+    }
+
+    return left.href.localeCompare(right.href);
+  });
+};
+
+const splitEntriesIntoTrips = (
+  entries: JourneySourceEntry[],
+): JourneySourceEntry[][] => {
+  const orderedEntries = sortEntriesChronologically(entries);
+  const trips: JourneySourceEntry[][] = [];
+  let currentTrip: JourneySourceEntry[] = [];
+
+  for (const entry of orderedEntries) {
+    const previous = currentTrip.at(-1);
+    if (!previous) {
+      currentTrip.push(entry);
+      continue;
+    }
+
+    const previousTimestamp = previous.date
+      ? new Date(previous.date).valueOf()
+      : NaN;
+    const currentTimestamp = entry.date ? new Date(entry.date).valueOf() : NaN;
+
+    const gapMs =
+      Number.isNaN(previousTimestamp) || Number.isNaN(currentTimestamp)
+        ? 0
+        : currentTimestamp - previousTimestamp;
+
+    if (gapMs > TRIP_GAP_BREAK_MS) {
+      if (currentTrip.length >= 2) {
+        trips.push(currentTrip);
+      }
+      currentTrip = [entry];
+      continue;
+    }
+
+    currentTrip.push(entry);
+  }
+
+  if (currentTrip.length >= 2) {
+    trips.push(currentTrip);
+  }
+
+  return trips;
+};
+
+const getPrimaryAlbumSlug = (entries: JourneySourceEntry[]): string => {
+  const counts = new Map<string, number>();
+  for (const entry of entries) {
+    counts.set(entry.album, (counts.get(entry.album) ?? 0) + 1);
+  }
+
+  return Array.from(counts.entries()).sort((left, right) => {
+    if (left[1] !== right[1]) {
+      return right[1] - left[1];
+    }
+
+    return left[0].localeCompare(right[0]);
+  })[0]?.[0] as string;
+};
+
+const getJourneyFallbackLabel = (
+  entries: JourneySourceEntry[],
+  primaryAlbumTitle: string | null,
+): string => {
+  const startDate = entries[0]?.date ? new Date(entries[0].date) : null;
+
+  if (startDate && !Number.isNaN(startDate.valueOf())) {
+    return startDate.toLocaleDateString("en-US", {
+      month: "short",
+      year: "numeric",
+    });
+  }
+
+  return primaryAlbumTitle?.trim() || entries[0]?.album || "Trip";
+};
+
+const getTripId = (entries: JourneySourceEntry[]): string => {
+  const first = entries[0];
+  const startDate = first?.date ? first.date.slice(0, 10) : "undated";
+  const hrefSlug =
+    first?.href
+      .split("#")
+      .at(-1)
+      ?.replace(/[^a-zA-Z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "") || "trip";
+
+  return `${startDate}:${first?.album ?? "archive"}:${hrefSlug}`;
+};
+
 export const buildJourneys = (
   albums: Content[],
   options?: BuildJourneysOptions,
 ): Journey[] => {
   const enrichmentOverrides = options?.enrichmentOverrides ?? null;
+  const tripEntries = splitEntriesIntoTrips(flattenJourneyEntries(albums));
 
-  return albums
-    .map((album) => {
-      const entries = buildJourneyEntries(album);
-      if (entries.length < 2) {
-        return null;
-      }
-
+  return tripEntries
+    .map((entries) => {
       const entriesByHref = new Map(
         entries.map((entry) => [entry.href, entry] as const),
       );
@@ -351,6 +505,14 @@ export const buildJourneys = (
         ? getStopPlaceLabel(route.simplifiedPoints.at(-1)!, entriesByHref)
         : null;
       const coverEntry = entries[0] ?? null;
+      const primaryAlbumSlug = getPrimaryAlbumSlug(entries);
+      const primaryAlbumTitle =
+        entries.find((entry) => entry.album === primaryAlbumSlug)?.albumTitle ??
+        null;
+      const sourceAlbumSlugs = Array.from(
+        new Set(entries.map((entry) => entry.album)),
+      );
+      const journeyId = getTripId(entries);
 
       const stops = route.simplifiedPoints.map(
         (stopPoint, index): JourneyStop => {
@@ -359,14 +521,15 @@ export const buildJourneys = (
             coverEntry;
           const stopTitle =
             getStopPlaceLabel(stopPoint, entriesByHref) ?? `Stop ${index + 1}`;
-          const stopId = `${album._build.slug}:${index}`;
+          const stopAlbumSlug = coverEntryForStop?.album ?? primaryAlbumSlug;
+          const stopId = `${journeyId}:${index}`;
           const enrichedStop = enrichmentOverrides?.stops?.[stopId];
 
           const stop: JourneyStop = {
             id: stopId,
-            journeyId: album._build.slug,
+            journeyId,
             sequenceIndex: index,
-            albumSlug: album._build.slug,
+            albumSlug: stopAlbumSlug,
             title: enrichedStop?.title ?? stopTitle,
             summary: enrichedStop?.summary ?? "",
             tags: enrichedStop?.tags ?? [],
@@ -382,13 +545,16 @@ export const buildJourneys = (
               src: coverEntryForStop?.src.src ?? stopPoint.src.src,
               width:
                 coverEntryForStop?.placeholderWidth ??
-                stopPoint.placeholderWidth,
+                stopPoint.placeholderWidth ??
+                null,
               height:
                 coverEntryForStop?.placeholderHeight ??
-                stopPoint.placeholderHeight,
+                stopPoint.placeholderHeight ??
+                null,
               placeholderColor:
                 coverEntryForStop?.placeholderColor ??
-                stopPoint.placeholderColor,
+                stopPoint.placeholderColor ??
+                null,
             },
             memberHrefs:
               stopPoint.memberHrefs.length > 0
@@ -404,10 +570,15 @@ export const buildJourneys = (
       );
 
       const baseJourney: Journey = {
-        id: album._build.slug,
-        albumSlug: album._build.slug,
-        albumTitle: album.title,
-        title: buildDefaultJourneyTitle(album, startPlace, endPlace),
+        id: journeyId,
+        albumSlug: primaryAlbumSlug,
+        albumTitle: primaryAlbumTitle,
+        albumCount: sourceAlbumSlugs.length,
+        title: buildDefaultJourneyTitle(
+          startPlace,
+          endPlace,
+          getJourneyFallbackLabel(entries, primaryAlbumTitle),
+        ),
         summary: "",
         tags: [],
         startDate,
@@ -429,15 +600,22 @@ export const buildJourneys = (
           href:
             coverEntry?.href ??
             stops[0]?.coverHref ??
-            `/album/${album._build.slug}`,
+            `/album/${primaryAlbumSlug}`,
           src: coverEntry?.src.src ?? stops[0]?.cover.src ?? "",
-          width: coverEntry?.placeholderWidth,
-          height: coverEntry?.placeholderHeight,
-          placeholderColor: coverEntry?.placeholderColor,
+          width: coverEntry?.placeholderWidth ?? null,
+          height: coverEntry?.placeholderHeight ?? null,
+          placeholderColor: coverEntry?.placeholderColor ?? null,
         },
-        mapHref: `/map?filter_album=${album._build.slug}`,
-        timelineHref: `/timeline?filter_album=${album._build.slug}`,
-        albumHref: `/album/${album._build.slug}`,
+        mapHref:
+          sourceAlbumSlugs.length === 1
+            ? `/map?filter_album=${primaryAlbumSlug}`
+            : "/map",
+        timelineHref:
+          sourceAlbumSlugs.length === 1
+            ? `/timeline?filter_album=${primaryAlbumSlug}`
+            : "/timeline",
+        albumHref: `/album/${primaryAlbumSlug}`,
+        memberHrefs: route.fullPoints.map((point) => point.href),
         stops,
       };
 
@@ -454,7 +632,6 @@ export const buildJourneys = (
         summary: journey.summary || buildJourneySummary(journey),
       };
     })
-    .filter((journey): journey is Journey => journey !== null)
     .sort((left, right) => {
       const leftDate = left.endDate ? new Date(left.endDate).valueOf() : 0;
       const rightDate = right.endDate ? new Date(right.endDate).valueOf() : 0;

@@ -172,6 +172,54 @@ describe("mapRoute", () => {
     });
   });
 
+  it("keeps a detected trip linked across album boundaries", () => {
+    const photos = [
+      makePhoto({
+        href: "/album/trip-a#a.jpg",
+        album: "trip-a",
+        tripId: "trip-1",
+        date: "2024-01-01T00:00:00.000Z",
+        decLat: 35.0,
+        decLng: 139.0,
+      }),
+      makePhoto({
+        href: "/album/trip-b#b.jpg",
+        album: "trip-b",
+        tripId: "trip-1",
+        date: "2024-01-02T00:00:00.000Z",
+        decLat: 35.5,
+        decLng: 139.5,
+      }),
+      makePhoto({
+        href: "/album/trip-c#c.jpg",
+        album: "trip-c",
+        tripId: "trip-2",
+        date: "2024-02-01T00:00:00.000Z",
+        decLat: 48.8,
+        decLng: 2.3,
+      }),
+    ];
+
+    expect(buildContextRouteGeoJson(photos, "/album/trip-b#b.jpg")).toEqual({
+      type: "FeatureCollection",
+      features: [
+        {
+          type: "Feature",
+          properties: {
+            pointCount: 2,
+          },
+          geometry: {
+            type: "LineString",
+            coordinates: [
+              [139, 35],
+              [139.5, 35.5],
+            ],
+          },
+        },
+      ],
+    });
+  });
+
   it("limits the context route to the contiguous trip segment", () => {
     const photos = [
       makePhoto({

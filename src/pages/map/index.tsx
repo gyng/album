@@ -13,6 +13,7 @@ import { measureBuild } from "../../services/buildTiming";
 import { Seo } from "../../components/Seo";
 import { buildCollectionPageJsonLd } from "../../lib/seo";
 import { getDefaultRouteMode, RouteMode } from "../../components/mapRoute";
+import { getJourneys } from "../../services/journeys";
 
 type PageProps = {
   photos: MapWorldEntry[];
@@ -51,7 +52,8 @@ const WorldMap: NextPage<PageProps> = (props) => {
         continue;
       }
 
-      byAlbum.set(photo.album, (byAlbum.get(photo.album) ?? 0) + 1);
+      const routeGroupKey = photo.tripId ?? photo.album;
+      byAlbum.set(routeGroupKey, (byAlbum.get(routeGroupKey) ?? 0) + 1);
     }
 
     return Array.from(byAlbum.values()).filter((count) => count >= 2).length;
@@ -124,6 +126,21 @@ const WorldMap: NextPage<PageProps> = (props) => {
 export const getStaticProps: GetStaticProps<PageProps> = async (context) => {
   return measureBuild("page./map.getStaticProps", async () => {
     const albums = await getAlbums();
+    const journeys = await getJourneys(albums);
+    const journeyByHref = new Map<
+      string,
+      { tripId: string; tripTitle: string; primaryAlbumSlug: string }
+    >();
+
+    journeys.forEach((journey) => {
+      journey.memberHrefs.forEach((href) => {
+        journeyByHref.set(href, {
+          tripId: journey.id,
+          tripTitle: journey.title,
+          primaryAlbumSlug: journey.albumSlug,
+        });
+      });
+    });
 
     const hasLatLng = (block: Block): boolean => {
       const { GPSLongitude, GPSLatitude, GPSLongitudeRef, GPSLatitudeRef } =
@@ -161,6 +178,8 @@ export const getStaticProps: GetStaticProps<PageProps> = async (context) => {
         const filename = photo.data.src.split("/").at(-1);
 
         const color = photo._build?.tags?.colors?.[0];
+        const href = `/album/${album._build.slug}#${filename}`;
+        const journey = journeyByHref.get(href);
 
         const entry: MapWorldEntry = {
           album: album._build.slug,
@@ -168,7 +187,9 @@ export const getStaticProps: GetStaticProps<PageProps> = async (context) => {
           decLng,
           decLat,
           date: DateTimeOriginal ?? null,
-          href: `/album/${album._build.slug}#${filename}`,
+          href,
+          tripId: journey?.tripId ?? null,
+          tripTitle: journey?.tripTitle ?? null,
           placeholderColor: color
             ? `rgba(${color[0]}, ${color[1]}, ${color[2]}, 1)`
             : "transparent",

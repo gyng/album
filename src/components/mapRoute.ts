@@ -45,6 +45,10 @@ const parseTimestamp = (value: string | null | undefined): number | null => {
   return Number.isNaN(timestamp) ? null : timestamp;
 };
 
+const getRouteGroupKey = (photo: Pick<MapWorldEntry, "album" | "tripId">) => {
+  return photo.tripId ?? photo.album;
+};
+
 export const distanceMetersBetween = (
   left: { decLat: number; decLng: number },
   right: { decLat: number; decLng: number },
@@ -288,7 +292,7 @@ export const buildContextRoutePoints = (
   }
 
   const route = buildMapRoute(
-    photos.filter((photo) => photo.album === target.album),
+    photos.filter((photo) => getRouteGroupKey(photo) === getRouteGroupKey(target)),
   );
   const points =
     routeMode === "simplified" ? route.simplifiedPoints : route.fullPoints;
