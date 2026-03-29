@@ -312,19 +312,6 @@ export const EmptyStateExplore: React.FC<Props> = ({
 
         <section className={styles.sectionSurface}>
           <div className={styles.sectionHeader}>
-            <h3 className={styles.sectionTitle}>Visual sameness</h3>
-          </div>
-          <p className={styles.sectionCaption}>
-            See repeated motifs and the frames that stand apart across the archive.
-          </p>
-          <Link href="/stats#visual-sameness" className={styles.secondaryAction}>
-            <span>Open visual sameness</span>
-            <span aria-hidden="true">↗</span>
-          </Link>
-        </section>
-
-        <section className={styles.sectionSurface}>
-          <div className={styles.sectionHeader}>
             <h3 className={styles.sectionTitle}>Latest</h3>
           </div>
 

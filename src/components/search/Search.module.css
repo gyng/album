@@ -487,7 +487,23 @@
 .modeBarHeader {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: var(--m);
+  flex-wrap: wrap;
+  width: 100%;
+}
+
+.modeHeading {
+  display: flex;
+  align-items: baseline;
+  gap: var(--m-s);
+  min-width: 0;
+}
+
+.modeHeaderActions {
+  display: flex;
+  align-items: center;
+  gap: var(--m-s);
   flex-wrap: wrap;
 }
 
@@ -516,6 +532,28 @@
 }
 
 .similarityOrderButton:focus-visible {
+  outline: solid 2px var(--c-bg-contrast-light);
+}
+
+.similarityStatsLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.35rem 0.65rem;
+  border: 1px solid var(--c-bg-contrast-dark);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--c-bg) 94%, var(--c-bg-contrast-dark));
+  color: var(--c-bg-contrast-light);
+  text-decoration: none;
+  font-size: var(--fs-s);
+}
+
+.similarityStatsLink:hover {
+  color: var(--c-font);
+  border-color: var(--c-bg-contrast-light);
+}
+
+.similarityStatsLink:focus-visible {
   outline: solid 2px var(--c-bg-contrast-light);
 }
 
@@ -834,6 +872,8 @@
   white-space: nowrap;
   flex-shrink: 0;
   user-select: none;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
 }
 
 .modeSimilarFilename {

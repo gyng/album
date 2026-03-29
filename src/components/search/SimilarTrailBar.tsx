@@ -118,34 +118,45 @@ export const SimilarTrailBar: React.FC<Props> = ({
   return (
     <div className={styles.modeBar}>
       <div className={styles.modeBarHeader}>
-        <span className={styles.modeLabel}>Similar to</span>
-        <div
-          className={styles.similarityOrderToggle}
-          role="tablist"
-          aria-label="Similarity order"
-        >
-          <button
-            type="button"
-            role="tab"
-            aria-selected={similarityOrder === "most"}
-            className={`${styles.similarityOrderButton}${similarityOrder === "most" ? ` ${styles.similarityOrderButtonActive}` : ""}`}
-            onClick={() => {
-              onSetSimilarityOrder("most");
-            }}
+        <div className={styles.modeHeading}>
+          <span className={styles.modeLabel}>Similar to</span>
+          {similarFilename ? (
+            <span className={styles.modeSimilarFilename}>{similarFilename}</span>
+          ) : null}
+        </div>
+        <div className={styles.modeHeaderActions}>
+          <a href="/stats#visual-sameness" className={styles.similarityStatsLink}>
+            <span>Visual sameness</span>
+            <span aria-hidden="true">↗</span>
+          </a>
+          <div
+            className={styles.similarityOrderToggle}
+            role="tablist"
+            aria-label="Similarity order"
           >
-            Most similar
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={similarityOrder === "least"}
-            className={`${styles.similarityOrderButton}${similarityOrder === "least" ? ` ${styles.similarityOrderButtonActive}` : ""}`}
-            onClick={() => {
-              onSetSimilarityOrder("least");
-            }}
-          >
-            Least similar
-          </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={similarityOrder === "most"}
+              className={`${styles.similarityOrderButton}${similarityOrder === "most" ? ` ${styles.similarityOrderButtonActive}` : ""}`}
+              onClick={() => {
+                onSetSimilarityOrder("most");
+              }}
+            >
+              Most similar
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={similarityOrder === "least"}
+              className={`${styles.similarityOrderButton}${similarityOrder === "least" ? ` ${styles.similarityOrderButtonActive}` : ""}`}
+              onClick={() => {
+                onSetSimilarityOrder("least");
+              }}
+            >
+              Least similar
+            </button>
+          </div>
         </div>
       </div>
       <div className={styles.modeStack}>
