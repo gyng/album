@@ -8,9 +8,23 @@ import { License } from "../License";
 import { getDegLatLngFromExif } from "../util/dms2deg";
 import { getRelativeTimeString } from "../util/time";
 import { getPhotoAltText } from "../lib/alt";
+import { FacetLinkIcon } from "./FacetLinkIcon";
 
 import type { JSX } from "react";
 import { rgbToString } from "../util/colorDistance";
+import {
+  buildSearchFacetHref,
+  getBucketFacetSelection,
+  getCameraFacetSelection,
+  getLensFacetSelection,
+  getLocationFacetSelection,
+} from "../util/searchFacets";
+import {
+  APERTURE_FACET,
+  FOCAL_LENGTH_35MM_FACET,
+  FOCAL_LENGTH_ACTUAL_FACET,
+  ISO_FACET,
+} from "../util/photoBuckets";
 
 const PhotoSimilarPhotosDeferred = dynamic(
   () => import("./PhotoSimilarPhotos").then((mod) => mod.PhotoSimilarPhotos),
@@ -42,6 +56,12 @@ type ExifCoordinatesRowProps = {
 const ExifCoordinatesRow: React.FC<{ row: ExifCoordinatesRowProps }> = (
   props,
 ) => {
+  const locationSelection = getLocationFacetSelection({
+    geocode: props.row.data.geocode,
+  });
+  const locationHref = locationSelection
+    ? buildSearchFacetHref(locationSelection)
+    : null;
   const formatted = [
     `${props.row.data.GPSLatitude?.[0]}°`,
     `${props.row.data.GPSLatitude?.[1]}′`,
@@ -71,7 +91,15 @@ const ExifCoordinatesRow: React.FC<{ row: ExifCoordinatesRowProps }> = (
       <tr>
         <td>{props.row.k}</td>
         <td>
-          {formatted}
+          <span className={styles.detailValueWithAction}>
+            <span>{formatted}</span>
+            {locationHref ? (
+              <FacetLinkIcon
+                href={locationHref}
+                label="Find photos from this place"
+              />
+            ) : null}
+          </span>
           {props.row.data.geocode ? (
             <div>
               {props.row.data.geocode
@@ -100,7 +128,7 @@ type ExifRow =
       /** Display key */
       k: string;
       /** Display value */
-      v: string | string[] | number | JSX.Element | JSX.Element[] | undefined | null;
+      v: ExifCellValue;
       options?: any;
       valid?: boolean;
       style?: any;
@@ -122,6 +150,15 @@ type ExifRow =
       };
       valid?: boolean;
     };
+
+type ExifCellValue =
+  | string
+  | string[]
+  | number
+  | JSX.Element
+  | JSX.Element[]
+  | undefined
+  | null;
 
 export const PhotoDescription: React.FC<{ description: string }> = (props) => {
   return <div>{props.description}</div>;
@@ -175,7 +212,7 @@ export const ExifTable: React.FC<{
 
 export const ExifRow: React.FC<{
   k: string;
-  v: string | string[] | number | JSX.Element | JSX.Element[] | undefined | null;
+  v: ExifCellValue;
   valid?: boolean;
   style?: any;
 }> = (props) => {
@@ -193,6 +230,23 @@ export const ExifRow: React.FC<{
 
 export type PhotoBlockEditDetails = {
   description: string;
+};
+
+const withFacetAction = (
+  value: ExifCellValue,
+  href: string | null,
+  label: string,
+): ExifCellValue => {
+  if (!href) {
+    return value;
+  }
+
+  return (
+    <span className={styles.detailValueWithAction}>
+      <span>{value}</span>
+      <FacetLinkIcon href={href} label={label} />
+    </span>
+  );
 };
 
 export const Picture: React.FC<{
@@ -270,8 +324,22 @@ export const PhotoBlockEl: React.FC<{
 }> = (props) => {
   const FRACTION_SLASH = "⁄";
   const anchorRef = React.useRef<HTMLDivElement>(null);
+  const { exif } = props.block._build;
 
   const [isDetailsOpen, setIsDetailsOpen] = React.useState(false);
+  const cameraSelection = getCameraFacetSelection(exif);
+  const lensSelection = getLensFacetSelection(exif);
+  const isoSelection = getBucketFacetSelection(ISO_FACET.id, exif.ISO);
+  const apertureSelection = getBucketFacetSelection(
+    APERTURE_FACET.id,
+    exif.FNumber,
+  );
+  const focalLengthSelection =
+    getBucketFacetSelection(
+      FOCAL_LENGTH_35MM_FACET.id,
+      exif.FocalLengthIn35mmFormat,
+    ) ??
+    getBucketFacetSelection(FOCAL_LENGTH_ACTUAL_FACET.id, exif.FocalLength);
 
   return (
     <div
@@ -358,13 +426,23 @@ export const PhotoBlockEl: React.FC<{
                     {
                       kind: "kv",
                       k: "ISO",
-                      v: props.block._build.exif.ISO,
+                      v: withFacetAction(
+                        exif.ISO,
+                        isoSelection ? buildSearchFacetHref(isoSelection) : null,
+                        "Find photos at this ISO",
+                      ),
                     },
                     {
                       kind: "kv",
                       k: "Aperture",
-                      v: `𝑓/${props.block._build.exif.FNumber}`,
-                      valid: Boolean(props.block._build.exif.FNumber),
+                      v: withFacetAction(
+                        `𝑓/${exif.FNumber}`,
+                        apertureSelection
+                          ? buildSearchFacetHref(apertureSelection)
+                          : null,
+                        "Find photos at this aperture",
+                      ),
+                      valid: Boolean(exif.FNumber),
                     },
                     {
                       kind: "kv",
@@ -375,43 +453,49 @@ export const PhotoBlockEl: React.FC<{
                     {
                       kind: "kv",
                       k: "Focal length",
-                      v: `${props.block._build.exif.FocalLength}mm (actual)${
-                        props.block._build.exif.FocalLengthIn35mmFormat
-                          ? `; ${props.block._build.exif.FocalLengthIn35mmFormat}mm (35mm equivalent)`
+                      v: withFacetAction(
+                        `${exif.FocalLength}mm (actual)${
+                        exif.FocalLengthIn35mmFormat
+                          ? `; ${exif.FocalLengthIn35mmFormat}mm (35mm equivalent)`
                           : ""
-                      }`,
-                      valid: Boolean(props.block._build.exif.FocalLength),
+                        }`,
+                        focalLengthSelection
+                          ? buildSearchFacetHref(focalLengthSelection)
+                          : null,
+                        "Find photos with this focal length",
+                      ),
+                      valid: Boolean(exif.FocalLength),
                     },
                     {
                       kind: "kv",
                       k: "Lens",
-                      v: [
-                        props.block._build.exif.LensMake,
-                        props.block._build.exif.LensModel,
-                        // Don't show LensInfo if LensMake or LensModel is present
-                        props.block._build.exif.LensModel ||
-                        props.block._build.exif.LensModel
-                          ? null
-                          : props.block._build.exif.LensInfo,
-                      ]
-                        .filter(Boolean)
-                        .join(" "),
+                      v: withFacetAction(
+                        [
+                          exif.LensMake,
+                          exif.LensModel,
+                          exif.LensMake || exif.LensModel ? null : exif.LensInfo,
+                        ]
+                          .filter(Boolean)
+                          .join(" "),
+                        lensSelection ? buildSearchFacetHref(lensSelection) : null,
+                        "Find photos with this lens",
+                      ),
                       valid: Boolean(
-                        props.block._build.exif.LensMake ||
-                        props.block._build.exif.LensModel ||
-                        props.block._build.exif.LensInfo,
+                        exif.LensMake || exif.LensModel || exif.LensInfo,
                       ),
                     },
                     {
                       kind: "kv",
                       k: "Camera",
-                      v: [
-                        props.block._build.exif.Make,
-                        props.block._build.exif.Model,
-                      ].join(" "),
+                      v: withFacetAction(
+                        [exif.Make, exif.Model].filter(Boolean).join(" "),
+                        cameraSelection
+                          ? buildSearchFacetHref(cameraSelection)
+                          : null,
+                        "Find photos with this camera",
+                      ),
                       valid: Boolean(
-                        props.block._build.exif.Make ||
-                        props.block._build.exif.Model,
+                        exif.Make || exif.Model,
                       ),
                     },
                     {

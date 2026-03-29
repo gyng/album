@@ -6,6 +6,10 @@ import { getAlbums } from "../../services/album";
 import { computePhotoStats, PhotoStats } from "../../util/computeStats";
 import { measureBuild } from "../../services/buildTiming";
 import styles from "./stats.module.css";
+import {
+  buildSearchFacetHref,
+  isSearchableFacetId,
+} from "../../util/searchFacets";
 
 type PageProps = {
   stats: PhotoStats;
@@ -80,6 +84,15 @@ const StatsPage: NextPage<PageProps> = ({ stats }) => {
                     count={bucket.count}
                     maxCount={max}
                     totalPhotos={stats.totalPhotos}
+                    actionHref={
+                      isSearchableFacetId(facet.facetId)
+                        ? buildSearchFacetHref({
+                            facetId: facet.facetId,
+                            value: bucket.label,
+                          })
+                        : null
+                    }
+                    actionLabel={`Find photos with ${facet.displayName.toLowerCase()} ${bucket.label}`}
                   />
                 ))}
               </StatSection>
@@ -103,6 +116,15 @@ const StatsPage: NextPage<PageProps> = ({ stats }) => {
                     count={bucket.count}
                     maxCount={max}
                     totalPhotos={stats.totalPhotos}
+                    actionHref={
+                      isSearchableFacetId(facet.facetId)
+                        ? buildSearchFacetHref({
+                            facetId: facet.facetId,
+                            value: bucket.label,
+                          })
+                        : null
+                    }
+                    actionLabel={`Find photos with ${facet.displayName.toLowerCase()} ${bucket.label}`}
                   />
                 ))}
               </StatSection>

@@ -1,5 +1,9 @@
 import { RGB } from "../../util/colorDistance";
 import { SearchMode } from "./useTextVector";
+import {
+  readSearchFacetSelections,
+  SearchFacetSelection,
+} from "../../util/searchFacets";
 
 export type Tag = {
   name: string;
@@ -11,6 +15,7 @@ export type InitialSearchState = {
   similarPath: string | null;
   colorSearch: RGB | null;
   searchMode: SearchMode;
+  selectedFacets: SearchFacetSelection[];
   hasHydratedFromUrl: boolean;
 };
 
@@ -76,6 +81,7 @@ export const getInitialSearchState = (): InitialSearchState => {
       similarPath: null,
       colorSearch: null,
       searchMode: DEFAULT_SEARCH_MODE,
+      selectedFacets: [],
       hasHydratedFromUrl: false,
     };
   }
@@ -89,6 +95,7 @@ export const getInitialSearchState = (): InitialSearchState => {
     searchMode: isSearchMode(url.searchParams.get("mode"))
       ? (url.searchParams.get("mode") as SearchMode)
       : DEFAULT_SEARCH_MODE,
+    selectedFacets: readSearchFacetSelections(url.searchParams),
     hasHydratedFromUrl: true,
   };
 };

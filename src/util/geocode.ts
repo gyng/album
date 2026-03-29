@@ -15,6 +15,13 @@ const cleanLines = (geocode: string): string[] =>
     .filter((line) => !isCoordinate(line))
     .filter((line) => !isCountryCode(line));
 
+const getGeocodeParts = (
+  geocode: string | null | undefined,
+): string[] => {
+  if (!geocode) return [];
+  return cleanLines(geocode);
+};
+
 /**
  * Returns a short human-readable location label from a stored geocode string.
  * Returns null when the string is empty or contains only coordinates/codes.
@@ -50,8 +57,7 @@ export function getGeocodeLabel(
 export function getGeocodeCountry(
   geocode: string | null | undefined,
 ): string | null {
-  if (!geocode) return null;
-  const lines = cleanLines(geocode);
+  const lines = getGeocodeParts(geocode);
   return lines.at(-1) ?? null;
 }
 
@@ -61,7 +67,20 @@ export function getGeocodeCountry(
 export function getGeocodeCity(
   geocode: string | null | undefined,
 ): string | null {
-  if (!geocode) return null;
-  const lines = cleanLines(geocode);
+  const lines = getGeocodeParts(geocode);
   return lines[0] ?? null;
+}
+
+export function getGeocodeRegion(
+  geocode: string | null | undefined,
+): string | null {
+  const lines = getGeocodeParts(geocode);
+  return lines[1] ?? null;
+}
+
+export function getGeocodeSubregion(
+  geocode: string | null | undefined,
+): string | null {
+  const lines = getGeocodeParts(geocode);
+  return lines[2] ?? null;
 }

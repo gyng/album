@@ -1,6 +1,11 @@
 import { Exif, Tags } from "../services/types";
 import { parseExifLocalDateTime } from "./exifTime";
-import { getGeocodeCountry } from "./geocode";
+import {
+  getGeocodeCity,
+  getGeocodeCountry,
+  getGeocodeRegion,
+  getGeocodeSubregion,
+} from "./geocode";
 
 export type PhotoBucket = {
   label: string;
@@ -158,8 +163,29 @@ export const LENS_FACET: PhotoFacet<string> = {
 
 export const LOCATION_FACET: PhotoFacet<string> = {
   id: "location",
-  displayName: "Location",
+  displayName: "Country",
   extract: (_exif, tags) => getGeocodeCountry(tags?.geocode) ?? null,
+  buckets: [], // string facet: buckets are built dynamically from data
+};
+
+export const REGION_FACET: PhotoFacet<string> = {
+  id: "region",
+  displayName: "Region",
+  extract: (_exif, tags) => getGeocodeRegion(tags?.geocode) ?? null,
+  buckets: [], // string facet: buckets are built dynamically from data
+};
+
+export const SUBREGION_FACET: PhotoFacet<string> = {
+  id: "subregion",
+  displayName: "Subregion",
+  extract: (_exif, tags) => getGeocodeSubregion(tags?.geocode) ?? null,
+  buckets: [], // string facet: buckets are built dynamically from data
+};
+
+export const CITY_FACET: PhotoFacet<string> = {
+  id: "city",
+  displayName: "City",
+  extract: (_exif, tags) => getGeocodeCity(tags?.geocode) ?? null,
   buckets: [], // string facet: buckets are built dynamically from data
 };
 
@@ -179,6 +205,9 @@ export const STRING_FACETS: PhotoFacet<string>[] = [
   CAMERA_FACET,
   LENS_FACET,
   LOCATION_FACET,
+  REGION_FACET,
+  SUBREGION_FACET,
+  CITY_FACET,
 ];
 
 export const ALL_FACETS: PhotoFacet<number | string>[] = [

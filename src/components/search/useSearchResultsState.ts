@@ -14,6 +14,7 @@ import { getResizedAlbumImageSrc } from "../../util/getResizedAlbumImageSrc";
 import { RGB, rgbToHex } from "../../util/colorDistance";
 import { SearchMode, useTextVector } from "./useTextVector";
 import { parseSearchTerms } from "./searchUtils";
+import { SearchFacetSelection } from "../../util/searchFacets";
 
 type Props = {
   database: Database | null;
@@ -23,6 +24,7 @@ type Props = {
   colorSearch: RGB | null;
   colorTolerance: number;
   searchMode: SearchMode;
+  selectedFacets: SearchFacetSelection[];
   hasHydratedFromUrl: boolean;
   pageSize?: number;
 };
@@ -35,6 +37,7 @@ export const useSearchResultsState = ({
   colorSearch,
   colorTolerance,
   searchMode,
+  selectedFacets,
   hasHydratedFromUrl,
   pageSize = 48,
 }: Props) => {
@@ -58,6 +61,7 @@ export const useSearchResultsState = ({
   );
   const trimmedQuery = debouncedSearchQuery.join(" ").trim();
   const hasSearchQuery = trimmedQuery.length > 0;
+  const hasFacetFilters = selectedFacets.length > 0;
   const keywordQuery = debouncedSearchQuery.join("|");
   const needsTextVector =
     !isSimilarMode &&
@@ -84,7 +88,8 @@ export const useSearchResultsState = ({
       isColorMode ||
       (hasSearchQuery &&
         (searchMode === "keyword" ||
-          (Boolean(embeddingsDatabase) && hasCurrentTextVector))));
+          (Boolean(embeddingsDatabase) && hasCurrentTextVector))) ||
+      (!isSimilarMode && !isColorMode && hasFacetFilters));
 
   const similarFilename = similarPath?.split("/").at(-1) ?? null;
   const similarPreviewSrc = similarPath
@@ -102,6 +107,7 @@ export const useSearchResultsState = ({
         colorSearch: debouncedColorSearch,
         colorTolerance: debouncedColorTolerance,
         searchMode,
+        selectedFacets,
         hasTextVector: hasCurrentTextVector,
       },
     ],
@@ -142,6 +148,7 @@ export const useSearchResultsState = ({
           textVector,
           pageSize,
           page: pageParam,
+          selectedFacets,
         });
       }
 
@@ -154,10 +161,11 @@ export const useSearchResultsState = ({
           textVector,
           pageSize,
           page: pageParam,
+          selectedFacets,
         });
       }
 
-      if (!hasSearchQuery) {
+      if (!hasSearchQuery && !hasFacetFilters) {
         return {
           data: [],
           prev: undefined,
@@ -170,6 +178,7 @@ export const useSearchResultsState = ({
         query: keywordQuery,
         pageSize,
         page: pageParam,
+        selectedFacets,
       });
     },
     initialPageParam: 0,
@@ -200,6 +209,7 @@ export const useSearchResultsState = ({
     colorHex,
     debouncedSearchQuery,
     hasSearchQuery,
+    hasFacetFilters,
     isColorMode,
     isSimilarMode,
     queryResults,

@@ -48,6 +48,145 @@
   margin-bottom: var(--m-xl);
 }
 
+.activeFacetSection {
+  display: grid;
+  gap: 0.35rem;
+  margin-top: var(--m-s);
+  margin-bottom: var(--m-xl);
+}
+
+.activeFacetLabel {
+  font-size: 12px;
+  font-weight: 400;
+  letter-spacing: 0.02em;
+  color: var(--c-bg-contrast-light);
+}
+
+.activeFacetChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--m-s);
+}
+
+.activeFacetChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: var(--m);
+  border: solid 1px var(--c-bg-contrast-dark);
+  border-radius: var(--m-s);
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font-size: var(--fs-s);
+  user-select: none;
+}
+
+.activeFacetChip:hover {
+  background-color: var(--c-bg-contrast-light);
+  color: var(--c-bg-contrast-dark);
+}
+
+.activeFacetChip:focus-visible {
+  outline: solid 2px var(--c-bg-contrast-light);
+  outline-offset: 2px;
+}
+
+.facetPanel {
+  display: grid;
+  grid-template-columns: 170px minmax(0, 1fr);
+  gap: var(--m-l);
+  height: clamp(10.5rem, 23.5vh, 13.5rem);
+  margin-bottom: var(--m-l);
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.facetCategoryRail {
+  display: grid;
+  align-content: start;
+  gap: var(--m-s);
+}
+
+.facetCategoryTab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 0.38rem 0.55rem;
+  border: solid 1px color-mix(in srgb, var(--c-bg-contrast-light) 25%, transparent);
+  border-radius: var(--m-s);
+  background: transparent;
+  color: var(--c-bg-contrast-light);
+  cursor: pointer;
+  text-align: left;
+  font-size: var(--fs-s);
+}
+
+.facetCategoryTab:hover {
+  background: color-mix(in srgb, var(--c-bg-contrast-light) 12%, transparent);
+  color: var(--c-font);
+}
+
+.facetCategoryTab:focus-visible {
+  outline: solid 2px var(--c-bg-contrast-light);
+  outline-offset: 2px;
+}
+
+.facetCategoryTabActive {
+  background: color-mix(in srgb, var(--c-bg-contrast-light) 18%, transparent);
+  color: var(--c-font);
+  border-color: var(--c-font);
+}
+
+.facetCategoryContent {
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  display: grid;
+  align-content: start;
+  gap: var(--m-s);
+}
+
+.facetSection {
+  display: flex;
+  flex-direction: column;
+  gap: var(--m-s);
+}
+
+.facetSectionTitle {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 400;
+  letter-spacing: 0.02em;
+  color: var(--c-bg-contrast-light);
+
+}
+
+.facetCategoryContent .tagsContainer {
+  gap: var(--m);
+  margin-bottom: 0;
+}
+
+.facetOptionList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--m-s);
+}
+
+@media (max-width: 900px) {
+  .facetPanel {
+    grid-template-columns: 1fr;
+    height: auto;
+  }
+
+  .facetCategoryRail {
+    display: flex;
+    flex-wrap: wrap;
+  }
+}
+
 .emptyState {
   display: grid;
   gap: var(--m-l);
@@ -108,6 +247,7 @@
 
 .memoryClusterHeader {
   min-width: 0;
+  margin-bottom: var(--m);
 }
 
 .memoryClusterLabel {
@@ -123,6 +263,7 @@
   gap: var(--m-m);
   list-style: none;
   margin: 0;
+  margin-bottom: var(--m);
   padding: 0;
   overflow-x: auto;
   font-size: var(--fs-sm);
@@ -551,6 +692,7 @@
 .tagsContainer {
   display: flex;
   flex-wrap: wrap;
+  align-items: flex-start;
   gap: var(--m);
   max-height: 20vh;
   overflow-y: auto;

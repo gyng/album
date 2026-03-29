@@ -1,0 +1,25 @@
+.link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.25rem;
+  height: 1.25rem;
+  color: var(--c-bg-contrast-light);
+  text-decoration: none;
+  border-radius: 999px;
+  font-size: 0.95em;
+  line-height: 1;
+  transition:
+    color 0.15s ease,
+    background-color 0.15s ease;
+}
+
+.link:hover {
+  color: var(--c-font);
+  background-color: color-mix(in srgb, var(--c-bg-contrast-light) 18%, transparent);
+}
+
+.link:focus-visible {
+  outline: solid 2px var(--c-bg-contrast-light);
+  outline-offset: 2px;
+}

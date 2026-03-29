@@ -1,5 +1,6 @@
 import {
   fetchMemoryCandidates,
+  fetchSearchFacetSections,
   fetchHybridResults,
   fetchRandomPhoto,
   fetchRecentResults,
@@ -329,6 +330,70 @@ describe("fetchSemanticResults", () => {
     expect(results.data).toEqual([]);
     expect(results.query).toBe("harbor skyline");
   });
+
+  it("filters semantic results by selected facets", async () => {
+    const database = {
+      exec: ({ sql, bind, callback }: ExecArgs) => {
+        if (
+          sql.includes("SELECT images.path") &&
+          sql.includes("images.geocode LIKE ? OR images.geocode LIKE ?")
+        ) {
+          expect(bind).toEqual(["%\nJapan\n%", "%\nJapan"]);
+          callback(["../albums/test-simple/DSCF0593.jpg"]);
+          return;
+        }
+
+        if (
+          sql.includes("FROM embeddings") &&
+          sql.includes("WHERE model_id = ?")
+        ) {
+          callback([
+            "../albums/test-simple/DSCF0506-2.jpg",
+            "google/siglip-base-patch16-224",
+            3,
+            JSON.stringify([1, 0, 0]),
+          ]);
+          callback([
+            "../albums/test-simple/DSCF0593.jpg",
+            "google/siglip-base-patch16-224",
+            3,
+            JSON.stringify([0.9, 0.1, 0]),
+          ]);
+          return;
+        }
+
+        if (sql.includes("FROM images") && sql.includes("WHERE path IN")) {
+          callback([
+            "../albums/test-simple/DSCF0593.jpg",
+            "/album/test-simple#DSCF0593.jpg",
+            "DSCF0593.jpg",
+            "35.6895\n139.6917\nShinjuku-ku\nTokyo\nTokyo\nJP\nJapan",
+            "",
+            "harbor, skyline",
+            "[(0,0,0)]",
+            "Harbor skyline",
+            "",
+            "",
+            "",
+            "",
+          ]);
+        }
+      },
+    };
+
+    const results = await fetchSemanticResults({
+      database: database as any,
+      textQuery: "harbor skyline",
+      textVector: [1, 0, 0],
+      page: 0,
+      pageSize: 10,
+      modelId: "google/siglip-base-patch16-224",
+      selectedFacets: [{ facetId: "location", value: "Japan" }],
+    });
+
+    expect(results.data).toHaveLength(1);
+    expect(results.data[0]?.path).toBe("../albums/test-simple/DSCF0593.jpg");
+  });
 });
 
 describe("fetchHybridResults", () => {
@@ -444,6 +509,81 @@ describe("fetchHybridResults", () => {
     expect(Number(results.data[1]?.rrfScore ?? 0)).toBeGreaterThan(
       Number(results.data[2]?.rrfScore ?? 0),
     );
+  });
+
+  it("filters hybrid results by selected facets", async () => {
+    const database = {
+      exec: ({ sql, bind, callback }: ExecArgs) => {
+        if (
+          sql.includes("SELECT images.path") &&
+          sql.includes("images.geocode LIKE ? OR images.geocode LIKE ?")
+        ) {
+          expect(bind).toEqual(["%\nJapan\n%", "%\nJapan"]);
+          callback(["../albums/test-simple/DSCF0593.jpg"]);
+          return;
+        }
+
+        if (
+          sql.includes("FROM images") &&
+          sql.includes("images MATCH ?") &&
+          sql.includes("ORDER BY rank")
+        ) {
+          callback(["../albums/test-simple/DSCF0593.jpg", 0.9]);
+          callback(["../albums/test-simple/DSCF2581-2_2.jpg", 0.5]);
+          return;
+        }
+
+        if (
+          sql.includes("FROM embeddings") &&
+          sql.includes("WHERE model_id = ?")
+        ) {
+          callback([
+            "../albums/test-simple/DSCF0506-2.jpg",
+            "google/siglip-base-patch16-224",
+            3,
+            JSON.stringify([1, 0, 0]),
+          ]);
+          callback([
+            "../albums/test-simple/DSCF0593.jpg",
+            "google/siglip-base-patch16-224",
+            3,
+            JSON.stringify([0.9, 0.1, 0]),
+          ]);
+          return;
+        }
+
+        if (sql.includes("FROM images") && sql.includes("WHERE path IN")) {
+          callback([
+            "../albums/test-simple/DSCF0593.jpg",
+            "/album/test-simple#DSCF0593.jpg",
+            "DSCF0593.jpg",
+            "35.6895\n139.6917\nShinjuku-ku\nTokyo\nTokyo\nJP\nJapan",
+            "",
+            "harbor, skyline",
+            "[(0,0,0)]",
+            "Harbor skyline",
+            "",
+            "",
+            "",
+            "",
+          ]);
+        }
+      },
+    };
+
+    const results = await fetchHybridResults({
+      database: database as any,
+      textQuery: "harbor",
+      keywordQuery: "harbor",
+      textVector: [1, 0, 0],
+      page: 0,
+      pageSize: 10,
+      modelId: "google/siglip-base-patch16-224",
+      selectedFacets: [{ facetId: "location", value: "Japan" }],
+    });
+
+    expect(results.data).toHaveLength(1);
+    expect(results.data[0]?.path).toBe("../albums/test-simple/DSCF0593.jpg");
   });
 });
 
@@ -575,6 +715,88 @@ describe("fetchRefinementTagCounts", () => {
     expect(results.harbor).toBe(4);
     expect(results.night).toBe(0);
     expect(results.bird).toBeUndefined();
+  });
+
+  it("applies active facet filters while recalculating tag counts", async () => {
+    const database = {
+      exec: ({ sql, bind, callback }: ExecArgs) => {
+        if (sql.includes("COUNT(*) AS count") && sql.includes("images.geocode")) {
+          expect(sql).toContain("LEFT JOIN metadata m ON m.path = images.path");
+          expect(bind).toEqual([
+            "harbor",
+            `- {path album_relative_path} : "harbor"`,
+            "%\nJapan\n%",
+            "%\nJapan",
+          ]);
+          callback(["harbor", 2]);
+        }
+      },
+    };
+
+    const results = await fetchRefinementTagCounts({
+      database: database as any,
+      activeTerms: [],
+      candidateTags: ["harbor"],
+      selectedFacets: [{ facetId: "location", value: "Japan" }],
+    });
+
+    expect(results.harbor).toBe(2);
+  });
+});
+
+describe("fetchSearchFacetSections", () => {
+  it("recalculates each section against keywords and the other selected facets", async () => {
+    const calls: Array<{ sql: string; bind?: Array<string | number> }> = [];
+    const database = {
+      exec: ({ sql, bind, callback }: ExecArgs) => {
+        calls.push({ sql, bind });
+        callback([
+          "Image Make: FUJIFILM\nImage Model: X-T5\nEXIF LensModel: XF35mmF1.4 R\nEXIF ISOSpeedRatings: 400",
+          "35.6895\n139.6917\nShinjuku-ku\nTokyo\nTokyo\nJP\nJapan",
+        ]);
+      },
+    };
+
+    const sections = await fetchSearchFacetSections({
+      database: database as any,
+      activeTerms: ["harbor"],
+      selectedFacets: [
+        { facetId: "camera", value: "FUJIFILM X-T5" },
+        { facetId: "location", value: "Japan" },
+      ],
+    });
+
+    expect(
+      sections.find((section) => section.facetId === "camera")?.options,
+    ).toEqual([{ value: "FUJIFILM X-T5", count: 1 }]);
+    expect(
+      sections.find((section) => section.facetId === "region")?.options,
+    ).toEqual([{ value: "Tokyo", count: 1 }]);
+    expect(
+      sections.find((section) => section.facetId === "subregion")?.options,
+    ).toEqual([{ value: "Tokyo", count: 1 }]);
+    expect(
+      sections.find((section) => section.facetId === "city")?.options,
+    ).toEqual([{ value: "Shinjuku-ku", count: 1 }]);
+    expect(
+      calls.some(({ bind }) =>
+        bind?.includes(`- {path album_relative_path} : "harbor"`),
+      ),
+    ).toBe(true);
+    expect(
+      calls.some(
+        ({ sql, bind }) =>
+          sql.includes("images.geocode LIKE ? OR images.geocode LIKE ?") &&
+          bind?.includes("%\nJapan"),
+      ),
+    ).toBe(true);
+    expect(
+      calls.some(
+        ({ bind }) =>
+          bind?.includes("%Image Model:FUJIFILM X-T5%") &&
+          bind?.includes("%Image Make:FUJIFILM%"),
+      ),
+    ).toBe(true);
   });
 });
 

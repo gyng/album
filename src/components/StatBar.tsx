@@ -1,4 +1,5 @@
 import styles from "./StatBar.module.css";
+import { FacetLinkIcon } from "./FacetLinkIcon";
 
 type Props = {
   label: string;
@@ -6,9 +7,18 @@ type Props = {
   maxCount: number;
   /** Optional: show as percentage of total photos, not just relative width */
   totalPhotos?: number;
+  actionHref?: string | null;
+  actionLabel?: string;
 };
 
-export const StatBar: React.FC<Props> = ({ label, count, maxCount, totalPhotos }) => {
+export const StatBar: React.FC<Props> = ({
+  label,
+  count,
+  maxCount,
+  totalPhotos,
+  actionHref,
+  actionLabel,
+}) => {
   const pct = maxCount > 0 ? (count / maxCount) * 100 : 0;
   const coveragePct =
     totalPhotos != null && totalPhotos > 0
@@ -24,6 +34,13 @@ export const StatBar: React.FC<Props> = ({ label, count, maxCount, totalPhotos }
       <span className={styles.count}>
         {coveragePct != null ? `${coveragePct}%` : count}
       </span>
+      {actionHref && actionLabel ? (
+        <FacetLinkIcon
+          href={actionHref}
+          label={actionLabel}
+          className={styles.action}
+        />
+      ) : null}
     </div>
   );
 };

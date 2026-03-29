@@ -1,6 +1,6 @@
 .row {
   display: grid;
-  grid-template-columns: minmax(80px, 160px) 1fr auto;
+  grid-template-columns: minmax(80px, 160px) 1fr auto auto;
   align-items: center;
   gap: var(--m-s);
   min-height: 22px;
@@ -34,4 +34,8 @@
   color: var(--c-bg-contrast-light);
   text-align: right;
   min-width: 36px;
+}
+
+.action {
+  justify-self: end;
 }

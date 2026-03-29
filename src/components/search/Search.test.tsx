@@ -6,6 +6,7 @@ import { act, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import Search from "./Search";
 import {
   fetchMemoryCandidates,
+  fetchSearchFacetSections,
   fetchHybridResults,
   fetchRandomPhoto,
   fetchRandomResults,
@@ -56,6 +57,7 @@ jest.mock("@tanstack/react-query", () => ({
 
 jest.mock("./api", () => ({
   fetchMemoryCandidates: jest.fn(),
+  fetchSearchFacetSections: jest.fn(),
   fetchHybridResults: jest.fn(),
   fetchRandomPhoto: jest.fn(),
   fetchRandomResults: jest.fn(),
@@ -278,6 +280,38 @@ beforeEach(() => {
   (fetchRefinementTagCounts as jest.Mock).mockImplementation(
     () => new Promise(() => {}),
   );
+  (fetchSearchFacetSections as jest.Mock).mockResolvedValue([
+    {
+      facetId: "location",
+      displayName: "Country",
+      options: [{ value: "Japan", count: 2 }],
+    },
+    {
+      facetId: "region",
+      displayName: "Region",
+      options: [{ value: "Tokyo", count: 1 }],
+    },
+    {
+      facetId: "subregion",
+      displayName: "Subregion",
+      options: [{ value: "Tokyo", count: 1 }],
+    },
+    {
+      facetId: "city",
+      displayName: "City",
+      options: [{ value: "Shinjuku-ku", count: 1 }],
+    },
+    {
+      facetId: "camera",
+      displayName: "Camera",
+      options: [{ value: "FUJIFILM X-T5", count: 2 }],
+    },
+    {
+      facetId: "iso",
+      displayName: "ISO",
+      options: [{ value: "400", count: 1 }],
+    },
+  ]);
   (fetchResults as jest.Mock).mockResolvedValue({
     data: [],
     prev: undefined,
@@ -414,20 +448,10 @@ describe("Search", () => {
     });
 
     expect(screen.getByText("Latest")).toBeTruthy();
-    expect(screen.getByText("Memories")).toBeTruthy();
     expect(screen.getByText("Random selection")).toBeTruthy();
-    expect(
-      screen.getByText(/keep stacking keywords to narrow results/i),
-    ).toBeTruthy();
     expect(screen.getByText(/Loading/)).toBeTruthy();
     expect(screen.getByText("Loading... 1.9 MB / 3.8 MB")).toBeTruthy();
     expect(screen.getByRole("button", { name: /harbor/i })).toBeTruthy();
-    expect(await screen.findByAltText("Memory shot A")).toBeTruthy();
-    expect(
-      screen
-        .getAllByRole("link", { name: /open timeline/i })[0]
-        ?.getAttribute("href"),
-    ).toContain("/timeline?");
     expect(await screen.findByAltText("Recent shot")).toBeTruthy();
     expect(await screen.findByAltText("Random shot")).toBeTruthy();
   });
@@ -616,6 +640,10 @@ describe("Search", () => {
 
     await renderSearch();
 
+    fireEvent.change(screen.getByLabelText("Search mode"), {
+      target: { value: "keyword" },
+    });
+
     fireEvent.click(await screen.findByRole("button", { name: /harbor/i }));
 
     await waitFor(() => {
@@ -623,6 +651,7 @@ describe("Search", () => {
         database: mockDatabase,
         activeTerms: ["harbor"],
         candidateTags: ["harbor", "night"],
+        selectedFacets: [],
       });
     });
 
@@ -632,6 +661,60 @@ describe("Search", () => {
 
     expect(screen.queryByText("Latest")).toBeNull();
     expect(screen.queryByText("Random selection")).toBeNull();
+  });
+
+  it("recalculates non-tag facet sections from the active search context", async () => {
+    await renderSearch();
+
+    fireEvent.click(screen.getByRole("tab", { name: /gear/i }));
+    fireEvent.click(screen.getByRole("button", { name: /fujifilm x-t5/i }));
+
+    await waitFor(() => {
+      expect(fetchSearchFacetSections).toHaveBeenLastCalledWith({
+        database: mockDatabase,
+        activeTerms: [],
+        selectedFacets: [{ facetId: "camera", value: "FUJIFILM X-T5" }],
+      });
+    });
+  });
+
+  it("keeps zero-count place options visible and clickable", async () => {
+    (fetchSearchFacetSections as jest.Mock)
+      .mockResolvedValueOnce([
+        {
+          facetId: "location",
+          displayName: "Location",
+          options: [
+            { value: "Japan", count: 2 },
+            { value: "Singapore", count: 1 },
+          ],
+        },
+      ])
+      .mockResolvedValueOnce([
+        {
+          facetId: "location",
+          displayName: "Location",
+          options: [{ value: "Japan", count: 2 }],
+        },
+      ])
+      .mockResolvedValueOnce([
+        {
+          facetId: "location",
+          displayName: "Location",
+          options: [{ value: "Japan", count: 2 }],
+        },
+      ]);
+
+    await renderSearch();
+
+    fireEvent.click(screen.getByRole("tab", { name: /place/i }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /singapore/i })).toBeTruthy();
+    });
+
+    const singaporePill = screen.getByRole("button", { name: /singapore/i });
+    expect((singaporePill as HTMLButtonElement).disabled).toBe(false);
   });
 
   it("preserves typed spaces in the search input", async () => {
@@ -676,9 +759,57 @@ describe("Search", () => {
           database: mockDatabase,
           textQuery: "harbor",
           textVector: [1, 0, 0],
+          selectedFacets: [],
         }),
       );
     });
+  });
+
+  it("passes selected facets into semantic search", async () => {
+    window.history.replaceState(
+      {},
+      "",
+      "/search?q=harbor&mode=semantic&facet=location:Japan",
+    );
+    (encodeSearchText as jest.Mock).mockReturnValue(
+      createResolvedThenable([1, 0, 0]),
+    );
+
+    await renderSearch();
+
+    await waitFor(() => {
+      expect(fetchSemanticResults).toHaveBeenCalledWith(
+        expect.objectContaining({
+          database: mockDatabase,
+          textQuery: "harbor",
+          textVector: [1, 0, 0],
+          selectedFacets: [{ facetId: "location", value: "Japan" }],
+        }),
+      );
+    });
+  });
+
+  it("keeps filter pills enabled in semantic mode while ignoring keyword-only refinement counts", async () => {
+    window.history.replaceState({}, "", "/search?q=harbor&mode=semantic");
+    (encodeSearchText as jest.Mock).mockReturnValue(
+      createResolvedThenable([1, 0, 0]),
+    );
+
+    await renderSearch();
+
+    await waitFor(() => {
+      expect(fetchSearchFacetSections).toHaveBeenLastCalledWith({
+        database: mockDatabase,
+        activeTerms: [],
+        selectedFacets: [],
+      });
+    });
+
+    expect(fetchRefinementTagCounts).not.toHaveBeenCalled();
+    expect(
+      (screen.getByRole("button", { name: /night/i }) as HTMLButtonElement)
+        .disabled,
+    ).toBe(false);
   });
 
   it("defaults to hybrid mode and dispatches hybrid search", async () => {
@@ -707,9 +838,54 @@ describe("Search", () => {
           textQuery: "harbor",
           keywordQuery: "harbor",
           textVector: [1, 0, 0],
+          selectedFacets: [],
         }),
       );
     });
+  });
+
+  it("passes selected facets into hybrid search", async () => {
+    window.history.replaceState({}, "", "/search?q=harbor&facet=location:Japan");
+    (encodeSearchText as jest.Mock).mockReturnValue(
+      createResolvedThenable([1, 0, 0]),
+    );
+
+    await renderSearch();
+
+    await waitFor(() => {
+      expect(fetchHybridResults).toHaveBeenCalledWith(
+        expect.objectContaining({
+          database: mockDatabase,
+          textQuery: "harbor",
+          keywordQuery: "harbor",
+          textVector: [1, 0, 0],
+          selectedFacets: [{ facetId: "location", value: "Japan" }],
+        }),
+      );
+    });
+  });
+
+  it("keeps filter pills enabled in hybrid mode while ignoring keyword-only refinement counts", async () => {
+    window.history.replaceState({}, "", "/search?q=harbor");
+    (encodeSearchText as jest.Mock).mockReturnValue(
+      createResolvedThenable([1, 0, 0]),
+    );
+
+    await renderSearch();
+
+    await waitFor(() => {
+      expect(fetchSearchFacetSections).toHaveBeenLastCalledWith({
+        database: mockDatabase,
+        activeTerms: [],
+        selectedFacets: [],
+      });
+    });
+
+    expect(fetchRefinementTagCounts).not.toHaveBeenCalled();
+    expect(
+      (screen.getByRole("button", { name: /night/i }) as HTMLButtonElement)
+        .disabled,
+    ).toBe(false);
   });
 
   it("does not reuse a stale semantic vector after the input changes", async () => {

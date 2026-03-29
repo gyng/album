@@ -6,7 +6,6 @@ import commonStyles from "../../styles/common.module.css";
 import { fetchMemoryCandidates, fetchRecentResults, fetchRandomResults } from "./api";
 import { SearchResultRow } from "./searchTypes";
 import { SearchResultTile } from "./SearchResultTile";
-import { SearchTag } from "./SearchTag";
 import { ProgressBar } from "../ProgressBar";
 import {
   formatMemoryDateRange,
@@ -32,11 +31,6 @@ const buildTimelineMemoryHref = (date: string, album?: string | null) => {
   return `/timeline?${params.toString()}`;
 };
 
-type Tag = {
-  name: string;
-  count: number;
-};
-
 type ProgressDetails = {
   loaded: number;
   total: number;
@@ -51,8 +45,6 @@ type Props = {
   database: Database | null;
   progress: number;
   databaseProgressDetails: ProgressDetails;
-  normalizedTags: Tag[];
-  onApplySearchTerms: (terms: string[]) => void;
   onStartSimilarSearch: (path: string) => void;
 };
 
@@ -60,8 +52,6 @@ export const EmptyStateExplore: React.FC<Props> = ({
   database,
   progress,
   databaseProgressDetails,
-  normalizedTags,
-  onApplySearchTerms,
   onStartSimilarSearch,
 }) => {
   const [recentVisibleCount, setRecentVisibleCount] = useState<number>(
@@ -317,27 +307,7 @@ export const EmptyStateExplore: React.FC<Props> = ({
     <section className={styles.emptyState} aria-label="Explore browse mode">
       <div className={styles.emptySections}>
         <section className={styles.sectionSurface}>
-          <div className={styles.emptyTagsCaption}>
-            keep stacking keywords to narrow results, or click{" "}
-            <span style={{ filter: "grayscale(100%)" }}>🔍</span> to find
-            similar photos
-          </div>
           <ProgressBar progress={progress} details={databaseProgressDetails} />
-          <div className={styles.tagsContainer}>
-            {normalizedTags.map((tag) => {
-              return (
-                <SearchTag
-                  key={tag.name}
-                  tag={tag.name}
-                  count={tag.count - 1}
-                  isActive={false}
-                  onClick={(tagName) => {
-                    onApplySearchTerms([tagName]);
-                  }}
-                />
-              );
-            })}
-          </div>
         </section>
 
         <section className={styles.sectionSurface}>
@@ -397,7 +367,7 @@ export const EmptyStateExplore: React.FC<Props> = ({
         {visibleMemoryClusters.length > 0 ? (
           <section className={styles.sectionSurface}>
             <div className={styles.sectionHeader}>
-              <h3 className={styles.sectionTitle}>Memories</h3>
+              <h3 className={styles.sectionTitle}>On this day</h3>
             </div>
 
             <div className={styles.memoryClusters}>

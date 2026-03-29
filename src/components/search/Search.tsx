@@ -6,7 +6,12 @@ import React, {
   useRef,
   useState,
 } from "react";
-import { fetchRandomPhoto, fetchRefinementTagCounts, fetchTags } from "./api";
+import {
+  fetchRandomPhoto,
+  fetchRefinementTagCounts,
+  fetchSearchFacetSections,
+  fetchTags,
+} from "./api";
 import { RGB } from "../../util/colorDistance";
 import styles from "./Search.module.css";
 import {
@@ -16,7 +21,10 @@ import {
 import { ProgressBar } from "../ProgressBar";
 import { EmptyStateExplore } from "./EmptyStateExplore";
 import { SearchInputBar } from "./SearchInputBar";
-import { SearchRefinementSection } from "./SearchRefinementSection";
+import {
+  SearchFacetPanel,
+  SearchFacetSection,
+} from "./SearchFacetPanel";
 import { SearchResultsGrid } from "./SearchResultsGrid";
 import { SimilarTrailBar, SimilarTrailItem } from "./SimilarTrailBar";
 import {
@@ -28,6 +36,12 @@ import {
 } from "./searchUtils";
 import { SearchMode } from "./useTextVector";
 import { useSearchResultsState } from "./useSearchResultsState";
+import {
+  getSearchFacetChipLabel,
+  SearchFacetSelection,
+  serializeSearchFacetSelection,
+  writeSearchFacetSelections,
+} from "../../util/searchFacets";
 
 const useSafeLayoutEffect =
   typeof window === "undefined" ? useEffect : useLayoutEffect;
@@ -37,6 +51,66 @@ export type SearchNavState = {
   isRandomSimilarLoading: boolean;
   onStartRandomSimilarSlideshow: () => void;
   randomExploreError: string | null;
+};
+
+const mergeFacetSections = (
+  catalogSections: SearchFacetSection[],
+  liveSections: SearchFacetSection[],
+  selectedFacets: SearchFacetSelection[],
+): SearchFacetSection[] => {
+  const liveSectionMap = new Map(
+    liveSections.map((section) => [section.facetId, section]),
+  );
+  const selectedValuesByFacet = new Map<string, Set<string>>();
+  selectedFacets.forEach((selection) => {
+    const values = selectedValuesByFacet.get(selection.facetId) ?? new Set<string>();
+    values.add(selection.value);
+    selectedValuesByFacet.set(selection.facetId, values);
+  });
+
+  const mergeSection = (section: SearchFacetSection): SearchFacetSection => {
+    const liveSection = liveSectionMap.get(section.facetId);
+    const liveOptionMap = new Map(
+      (liveSection?.options ?? []).map((option) => [option.value, option.count]),
+    );
+    const orderedOptions = [...section.options];
+
+    (liveSection?.options ?? []).forEach((option) => {
+      if (!orderedOptions.some((candidate) => candidate.value === option.value)) {
+        orderedOptions.push(option);
+      }
+    });
+
+    Array.from(selectedValuesByFacet.get(section.facetId) ?? []).forEach((value) => {
+      if (!orderedOptions.some((candidate) => candidate.value === value)) {
+        orderedOptions.push({ value, count: 0 });
+      }
+    });
+
+    return {
+      ...section,
+      options: orderedOptions.map((option) => ({
+        value: option.value,
+        count: liveOptionMap.get(option.value) ?? 0,
+      })),
+    };
+  };
+
+  const merged = catalogSections.map(mergeSection);
+
+  liveSections.forEach((section) => {
+    if (!catalogSections.some((candidate) => candidate.facetId === section.facetId)) {
+      merged.push(
+        mergeSection({
+          facetId: section.facetId,
+          displayName: section.displayName,
+          options: section.options,
+        }),
+      );
+    }
+  });
+
+  return merged;
 };
 
 export const Search: React.FC<{
@@ -50,6 +124,18 @@ export const Search: React.FC<{
   const [colorTolerance, setColorTolerance] = useState<number>(35);
   const [similarTrail, setSimilarTrail] = useState<SimilarTrailItem[]>([]);
   const [hasHydratedFromUrl, setHasHydratedFromUrl] = useState<boolean>(false);
+  const [selectedFacets, setSelectedFacets] = useState<SearchFacetSelection[]>(
+    [],
+  );
+  const [facetCatalogSections, setFacetCatalogSections] = useState<
+    SearchFacetSection[]
+  >([]);
+  const [facetSections, setFacetSections] = useState<SearchFacetSection[]>([]);
+  const [isFacetSectionsLoading, setIsFacetSectionsLoading] =
+    useState<boolean>(false);
+  const [selectedFilterCategory, setSelectedFilterCategory] = useState<
+    "tags" | "place" | "gear" | "settings"
+  >("tags");
   const [isRandomSimilarLoading, setIsRandomSimilarLoading] =
     useState<boolean>(false);
   const [randomExploreError, setRandomExploreError] = useState<string | null>(
@@ -102,6 +188,7 @@ export const Search: React.FC<{
     colorSearch,
     colorTolerance,
     searchMode,
+    selectedFacets,
     hasHydratedFromUrl,
   });
 
@@ -121,13 +208,25 @@ export const Search: React.FC<{
     () => normalizedTags.map((tag) => tag.name),
     [normalizedTags],
   );
+  const liveFacetQueryTerms = useMemo(
+    () =>
+      searchMode === "keyword" ? normalizedDebouncedSearchTerms : [],
+    [searchMode, normalizedDebouncedSearchTerms],
+  );
+  const visibleFacetSections = useMemo(
+    () => mergeFacetSections(facetCatalogSections, facetSections, selectedFacets),
+    [facetCatalogSections, facetSections, selectedFacets],
+  );
 
   const similarClickstreamPaths = new Set([
     ...similarTrail.map((item) => item.path),
     ...(similarPath ? [similarPath] : []),
   ]);
   const isEmptyState =
-    !isSimilarMode && !isColorMode && searchInputValue.trim() === "";
+    !isSimilarMode &&
+    !isColorMode &&
+    searchInputValue.trim() === "" &&
+    selectedFacets.length === 0;
 
   useEffect(() => {
     const initialSearchState = getInitialSearchState();
@@ -135,8 +234,15 @@ export const Search: React.FC<{
     setSimilarPath(initialSearchState.similarPath);
     setColorSearch(initialSearchState.colorSearch);
     setSearchMode(initialSearchState.searchMode);
+    setSelectedFacets(initialSearchState.selectedFacets);
     setHasHydratedFromUrl(initialSearchState.hasHydratedFromUrl);
   }, []);
+
+  useEffect(() => {
+    if (normalizedSearchTerms.length > 0) {
+      setSelectedFilterCategory("tags");
+    }
+  }, [normalizedSearchTerms.length]);
 
   useEffect(() => {
     if (!hasHydratedFromUrl) {
@@ -148,6 +254,7 @@ export const Search: React.FC<{
     searchParams.delete("similar");
     searchParams.delete("color");
     searchParams.delete("mode");
+    writeSearchFacetSelections(searchParams, selectedFacets);
 
     if (similarPath) {
       searchParams.set("similar", similarPath);
@@ -182,6 +289,7 @@ export const Search: React.FC<{
     debouncedSearchQuery,
     hasHydratedFromUrl,
     searchMode,
+    selectedFacets,
     similarPath,
   ]);
 
@@ -224,11 +332,89 @@ export const Search: React.FC<{
   }, [database]);
 
   useEffect(() => {
+    if (!database) {
+      setFacetCatalogSections([]);
+      return;
+    }
+
+    let didCancel = false;
+
+    fetchSearchFacetSections({ database })
+      .then((sections) => {
+        if (!didCancel) {
+          setFacetCatalogSections(sections);
+        }
+      })
+      .catch((err) => {
+        if (!didCancel) {
+          console.error("Failed to fetch search facet catalog", err);
+          setFacetCatalogSections([]);
+        }
+      });
+
+    return () => {
+      didCancel = true;
+    };
+  }, [database]);
+
+  useEffect(() => {
+    if (!database) {
+      setFacetSections([]);
+      setIsFacetSectionsLoading(false);
+      return;
+    }
+
+    if (isSimilarMode || isColorMode) {
+      setFacetSections([]);
+      setIsFacetSectionsLoading(false);
+      return;
+    }
+
+    let didCancel = false;
+    setIsFacetSectionsLoading(true);
+
+    fetchSearchFacetSections({
+      database,
+      activeTerms: liveFacetQueryTerms,
+      selectedFacets,
+    })
+      .then((sections) => {
+        if (!didCancel) {
+          setFacetSections(sections);
+        }
+      })
+      .catch((err) => {
+        if (!didCancel) {
+          console.error("Failed to fetch search facets", err);
+          setFacetSections([]);
+        }
+      })
+      .finally(() => {
+        if (!didCancel) {
+          setIsFacetSectionsLoading(false);
+        }
+      });
+
+    return () => {
+      didCancel = true;
+    };
+  }, [
+    database,
+    isColorMode,
+    isSimilarMode,
+    liveFacetQueryTerms,
+    searchMode,
+    selectedFacets,
+  ]);
+
+  useEffect(() => {
     if (
       !database ||
+      searchMode !== "keyword" ||
       isSimilarMode ||
       isColorMode ||
-      normalizedDebouncedSearchTerms.length === 0
+      (normalizedDebouncedSearchTerms.length === 0 &&
+        selectedFacets.length === 0)
     ) {
       setRefinementCounts({});
       return;
@@ -240,6 +426,7 @@ export const Search: React.FC<{
       database,
       activeTerms: normalizedDebouncedSearchTerms,
       candidateTags: normalizedTagNames,
+      selectedFacets,
     })
       .then((counts) => {
         if (!didCancel) {
@@ -260,8 +447,10 @@ export const Search: React.FC<{
     database,
     isSimilarMode,
     isColorMode,
+    searchMode,
     normalizedDebouncedSearchTerms,
     normalizedTagNames,
+    selectedFacets,
   ]);
 
   useSafeLayoutEffect(() => {
@@ -314,6 +503,7 @@ export const Search: React.FC<{
     setSimilarPath(null);
     setSimilarTrail([]);
     setColorSearch(null);
+    setSelectedFacets([]);
   }, []);
 
   const truncateSimilarStack = useCallback((breadcrumbIndex: number) => {
@@ -395,6 +585,7 @@ export const Search: React.FC<{
       }
 
       setSearchInputValue("");
+      setSelectedFacets([]);
       setSimilarTrail((prev) => {
         if (!similarPath) {
           return prev;
@@ -427,7 +618,42 @@ export const Search: React.FC<{
     setSimilarPath(null);
     setSimilarTrail([]);
     setRandomExploreError(null);
+    setSelectedFacets([]);
     setColorSearch(color);
+  }, []);
+
+  const handleRemoveFacet = useCallback((selection: SearchFacetSelection) => {
+    const key = serializeSearchFacetSelection(selection);
+    setSelectedFacets((prev) =>
+      prev.filter((facet) => serializeSearchFacetSelection(facet) !== key),
+    );
+  }, []);
+
+  const handleToggleFacet = useCallback((selection: SearchFacetSelection) => {
+    const key = serializeSearchFacetSelection(selection);
+    setSimilarPath(null);
+    setSimilarTrail([]);
+    setRandomExploreError(null);
+    setColorSearch(null);
+    setSelectedFacets((prev) => {
+      const alreadySelected = prev.some(
+        (facet) => serializeSearchFacetSelection(facet) === key,
+      );
+      if (alreadySelected) {
+        return prev.filter(
+          (facet) => serializeSearchFacetSelection(facet) !== key,
+        );
+      }
+      return [...prev, selection];
+    });
+  }, []);
+
+  const handleRemoveSearchTerm = useCallback((termToRemove: string) => {
+    setSearchInputValue((prev) =>
+      parseSearchTerms(prev)
+        .filter((term) => term.trim().toLowerCase() !== termToRemove)
+        .join(","),
+    );
   }, []);
 
   useEffect(() => {
@@ -472,6 +698,21 @@ export const Search: React.FC<{
         onSetSearchMode={setSearchMode}
       />
 
+      {!isSimilarMode && !isColorMode ? (
+        <SearchFacetPanel
+          sections={visibleFacetSections}
+          selectedCategory={selectedFilterCategory}
+          selectedFacets={selectedFacets}
+          normalizedSearchTerms={normalizedSearchTerms}
+          normalizedTags={normalizedTags}
+          refinementCounts={refinementCounts}
+          isLoading={isFacetSectionsLoading}
+          onSelectCategory={setSelectedFilterCategory}
+          onToggleFacet={handleToggleFacet}
+          onToggleTag={handleToggleTag}
+        />
+      ) : null}
+
       {!isSimilarMode && searchMode !== "keyword" && textModelProgress < 100 ? (
         <div className={styles.searchModeStatus}>
           <ProgressBar
@@ -507,20 +748,7 @@ export const Search: React.FC<{
           database={database}
           progress={progress}
           databaseProgressDetails={databaseProgressDetails}
-          normalizedTags={normalizedTags}
-          onApplySearchTerms={applySearchTerms}
           onStartSimilarSearch={startSimilarSearch}
-        />
-      ) : null}
-
-      {!isEmptyState && !isColorMode && !isSimilarMode ? (
-        <SearchRefinementSection
-          databaseProgressDetails={databaseProgressDetails}
-          normalizedSearchTerms={normalizedSearchTerms}
-          normalizedTags={normalizedTags}
-          progress={progress}
-          refinementCounts={refinementCounts}
-          onToggleTag={handleToggleTag}
         />
       ) : null}
 
@@ -535,10 +763,53 @@ export const Search: React.FC<{
         />
       ) : null}
 
+      {selectedFacets.length > 0 || normalizedSearchTerms.length > 0 ? (
+        <div className={styles.activeFacetSection}>
+          <div className={styles.activeFacetLabel}>Active filters</div>
+          <div className={styles.activeFacetChips}>
+            {normalizedSearchTerms.map((term) => (
+              <button
+                key={`term-${term}`}
+                type="button"
+                className={styles.activeFacetChip}
+                onClick={() => {
+                  handleRemoveSearchTerm(term);
+                }}
+                title={`Remove filter ${term}`}
+                aria-label={`Remove filter ${term}`}
+              >
+                <span>{term}</span>
+                <span aria-hidden="true">×</span>
+              </button>
+            ))}
+            {selectedFacets.map((selection) => {
+              const key = serializeSearchFacetSelection(selection);
+              const chipLabel = getSearchFacetChipLabel(selection);
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  className={styles.activeFacetChip}
+                  onClick={() => {
+                    handleRemoveFacet(selection);
+                  }}
+                  title={`Remove filter ${chipLabel}`}
+                  aria-label={`Remove filter ${chipLabel}`}
+                >
+                  <span>{chipLabel}</span>
+                  <span aria-hidden="true">×</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      ) : null}
+
       <div>
         <SearchResultsGrid
           isSimilarMode={isSimilarMode}
           isColorMode={isColorMode}
+          hasFacetFilters={selectedFacets.length > 0}
           searchInputValue={searchInputValue}
           trimmedQuery={trimmedQuery}
           similarPath={similarPath}

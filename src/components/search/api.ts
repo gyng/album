@@ -1,6 +1,26 @@
 import { Database, Sqlite3Static } from "@sqlite.org/sqlite-wasm";
 import { SearchResultRow } from "./searchTypes";
 import { RGB, deltaE, rgbToLab, parseColorPalette } from "../../util/colorDistance";
+import { SearchFacetSelection } from "../../util/searchFacets";
+import {
+  APERTURE_FACET,
+  CAMERA_FACET,
+  CITY_FACET,
+  FOCAL_LENGTH_35MM_FACET,
+  FOCAL_LENGTH_ACTUAL_FACET,
+  ISO_FACET,
+  LENS_FACET,
+  LOCATION_FACET,
+  REGION_FACET,
+  SUBREGION_FACET,
+} from "../../util/photoBuckets";
+import type { Exif } from "../../services/types";
+import {
+  getGeocodeCity,
+  getGeocodeCountry,
+  getGeocodeRegion,
+  getGeocodeSubregion,
+} from "../../util/geocode";
 
 export type PaginatedSearchResult = {
   data: SearchResultRow[];
@@ -81,6 +101,223 @@ const NORMALIZED_IMAGE_DATE_SQL = `COALESCE(
   NULLIF(substr(NULLIF(m.iso8601, ''), 1, 10), ''),
   ${EXIF_DATE_SQL}
 )`;
+
+const buildExifFieldSql = (fieldName: string): string => {
+  const start = `instr(images.exif, '${fieldName}:') + length('${fieldName}:')`;
+  const tail = `substr(images.exif, ${start})`;
+  const newlineIndex = `instr(${tail}, char(10))`;
+  return `CASE
+    WHEN instr(images.exif, '${fieldName}:') > 0 THEN trim(
+      substr(
+        ${tail},
+        1,
+        CASE
+          WHEN ${newlineIndex} > 0 THEN ${newlineIndex} - 1
+          ELSE length(${tail})
+        END
+      )
+    )
+    ELSE ''
+  END`;
+};
+
+const FACET_FIELD_SQL_BY_ID: Record<string, string> = {
+  [FOCAL_LENGTH_35MM_FACET.id]: buildExifFieldSql("EXIF FocalLengthIn35mmFilm"),
+  [FOCAL_LENGTH_ACTUAL_FACET.id]: buildExifFieldSql("EXIF FocalLength"),
+  [APERTURE_FACET.id]: buildExifFieldSql("EXIF FNumber"),
+  [ISO_FACET.id]: buildExifFieldSql("EXIF ISOSpeedRatings"),
+};
+
+const SEARCHABLE_NUMERIC_FACETS = [
+  FOCAL_LENGTH_35MM_FACET,
+  FOCAL_LENGTH_ACTUAL_FACET,
+  APERTURE_FACET,
+  ISO_FACET,
+] as const;
+
+const SEARCHABLE_STRING_FACETS = [
+  CAMERA_FACET,
+  LENS_FACET,
+  LOCATION_FACET,
+  REGION_FACET,
+  SUBREGION_FACET,
+  CITY_FACET,
+] as const;
+
+export type SearchFacetSectionData = {
+  facetId: string;
+  displayName: string;
+  options: Array<{ value: string; count: number }>;
+};
+
+const buildGeocodeLineClause = (value: string) => ({
+  sql: `(images.geocode LIKE ? OR images.geocode LIKE ?)`,
+  bind: [`%\n${value}\n%`, `%\n${value}`],
+});
+
+const parseDbExifString = (raw: string): Exif => {
+  if (!raw) {
+    return {};
+  }
+
+  const values = Object.fromEntries(
+    raw.split("\n").flatMap((line) => {
+      const [key, ...rest] = line.split(":");
+      const value = rest.join(":").trim();
+      return key ? [[key.trim(), value]] : [];
+    }),
+  ) as Record<string, string>;
+
+  const parseNumber = (value: string | undefined): number | undefined => {
+    if (!value) {
+      return undefined;
+    }
+    const numeric = Number.parseFloat(value);
+    return Number.isFinite(numeric) ? numeric : undefined;
+  };
+
+  return {
+    Make: values["Image Make"],
+    Model: values["Image Model"],
+    LensMake: values["EXIF LensMake"],
+    LensModel: values["EXIF LensModel"],
+    LensInfo: values["EXIF LensSpecification"],
+    FocalLength: parseNumber(values["EXIF FocalLength"]),
+    FocalLengthIn35mmFormat: parseNumber(values["EXIF FocalLengthIn35mmFilm"]),
+    FNumber: parseNumber(values["EXIF FNumber"]),
+    ExposureTime: parseNumber(values["EXIF ExposureTime"]),
+    ISO: parseNumber(values["EXIF ISOSpeedRatings"]),
+    DateTimeOriginal: values["EXIF DateTimeOriginal"],
+    OffsetTime: values["EXIF OffsetTime"],
+  };
+};
+
+const buildSingleFacetClause = (
+  selection: SearchFacetSelection,
+): { sql: string; bind: (string | number)[] } | null => {
+  const numericFacet = SEARCHABLE_NUMERIC_FACETS.find(
+    (facet) => facet.id === selection.facetId,
+  );
+  if (numericFacet) {
+    const bucket = numericFacet.buckets.find(
+      (candidate) => candidate.label === selection.value,
+    );
+    const fieldSql = FACET_FIELD_SQL_BY_ID[selection.facetId];
+    if (!bucket?.range || !fieldSql) {
+      return null;
+    }
+
+    const numericSql = `CAST(NULLIF(${fieldSql}, '') AS REAL)`;
+    const [min, max] = bucket.range;
+    if (min == null && max == null) {
+      return null;
+    }
+    if (min == null) {
+      return { sql: `${numericSql} <= ?`, bind: [max as number] };
+    }
+    if (max == null) {
+      return { sql: `${numericSql} >= ?`, bind: [min] };
+    }
+    return { sql: `${numericSql} >= ? AND ${numericSql} <= ?`, bind: [min, max] };
+  }
+
+  if (selection.facetId === LOCATION_FACET.id) {
+    return buildGeocodeLineClause(selection.value);
+  }
+
+  if (selection.facetId === REGION_FACET.id) {
+    return buildGeocodeLineClause(selection.value);
+  }
+
+  if (selection.facetId === SUBREGION_FACET.id) {
+    return buildGeocodeLineClause(selection.value);
+  }
+
+  if (selection.facetId === CITY_FACET.id) {
+    return buildGeocodeLineClause(selection.value);
+  }
+
+  if (selection.facetId === LENS_FACET.id) {
+    return {
+      sql: `images.exif LIKE ?`,
+      bind: [`%EXIF LensModel:${selection.value}%`],
+    };
+  }
+
+  if (selection.facetId === CAMERA_FACET.id) {
+    const parts = selection.value.split(" ").filter(Boolean);
+    const make = parts[0] ?? selection.value;
+    const model = parts.slice(1).join(" ");
+    const bind: (string | number)[] = [
+      `%Image Model:${selection.value}%`,
+      `%Image Make:${selection.value}%`,
+    ];
+    const clauses = ["images.exif LIKE ?", "images.exif LIKE ?"];
+    if (model) {
+      clauses.push("(images.exif LIKE ? AND images.exif LIKE ?)");
+      bind.push(`%Image Make:${make}%`, `%Image Model:${model}%`);
+    }
+    return { sql: `(${clauses.join(" OR ")})`, bind };
+  }
+
+  const stringFacet = SEARCHABLE_STRING_FACETS.find(
+    (facet) => facet.id === selection.facetId,
+  );
+  if (stringFacet) {
+    return { sql: `images.exif LIKE ?`, bind: [`%${selection.value}%`] };
+  }
+
+  return null;
+};
+
+const buildFacetWhereClause = (selectedFacets: SearchFacetSelection[]) => {
+  if (selectedFacets.length === 0) {
+    return { sql: "", bind: [] as (string | number)[] };
+  }
+
+  const grouped = new Map<string, SearchFacetSelection[]>();
+  selectedFacets.forEach((selection) => {
+    const current = grouped.get(selection.facetId) ?? [];
+    current.push(selection);
+    grouped.set(selection.facetId, current);
+  });
+
+  const bind: (string | number)[] = [];
+  const groups = Array.from(grouped.values())
+    .map((group) => {
+      const resolved = group
+        .map((selection) => buildSingleFacetClause(selection))
+        .filter((value): value is { sql: string; bind: (string | number)[] } =>
+          Boolean(value),
+        );
+      if (resolved.length === 0) {
+        return null;
+      }
+      resolved.forEach((value) => {
+        bind.push(...value.bind);
+      });
+      return `(${resolved.map((value) => `(${value.sql})`).join(" OR ")})`;
+    })
+    .filter(Boolean);
+
+  return {
+    sql: groups.length > 0 ? groups.join(" AND ") : "",
+    bind,
+  };
+};
+
+const buildKeywordWhereClause = (activeTerms: string[]) => {
+  const normalizedActiveTerms = Array.from(
+    new Set(
+      activeTerms.map((term) => term.trim().toLowerCase()).filter(Boolean),
+    ),
+  );
+
+  return {
+    sql: normalizedActiveTerms.map(() => "images MATCH ?").join(" AND "),
+    bind: normalizedActiveTerms.map((term) => toFtsMatchTerm(term)),
+  };
+};
 
 const toFtsMatchTerm = (term: string): string => {
   return `- {path album_relative_path} : "${term.replaceAll(/[\"]/g, "'")}"`;
@@ -301,6 +538,130 @@ const fetchResultsByPaths = async (
     .filter((row): row is SearchResultRow => Boolean(row));
 };
 
+const fetchFacetMatchedPaths = async (
+  database: Database,
+  selectedFacets: SearchFacetSelection[],
+): Promise<Set<string>> => {
+  const facetWhere = buildFacetWhereClause(selectedFacets);
+  if (!facetWhere.sql) {
+    return new Set();
+  }
+
+  const result = await exec(
+    database,
+    `SELECT images.path
+      FROM images
+      LEFT JOIN metadata m ON m.path = images.path
+      WHERE ${facetWhere.sql}`,
+    facetWhere.bind,
+  );
+
+  return new Set(
+    (result.data as unknown as any[][]).map((row) => String(row[0])),
+  );
+};
+
+export const fetchSearchFacetSections = async (opts: {
+  database: Database;
+  activeTerms?: string[];
+  selectedFacets?: SearchFacetSelection[];
+}): Promise<SearchFacetSectionData[]> => {
+  const { database, activeTerms = [], selectedFacets = [] } = opts;
+  const keywordWhere = buildKeywordWhereClause(activeTerms);
+
+  const fetchFacetItems = async (facetId: string) => {
+    const facetWhere = buildFacetWhereClause(
+      selectedFacets.filter((selection) => selection.facetId !== facetId),
+    );
+    const whereClause = [keywordWhere.sql, facetWhere.sql].filter(Boolean);
+    const result = await exec(
+      database,
+      `SELECT images.exif, images.geocode
+        FROM images
+        LEFT JOIN metadata m ON m.path = images.path
+        ${whereClause.length > 0 ? `WHERE ${whereClause.join(" AND ")}` : ""}`,
+      [...keywordWhere.bind, ...facetWhere.bind],
+    );
+
+    const rows = result.data as unknown as Array<[string, string]>;
+    return rows.map(([exif, geocode]) => ({
+      exif: parseDbExifString(exif),
+      geocode,
+    }));
+  };
+
+  const numericSections = await Promise.all(SEARCHABLE_NUMERIC_FACETS.map(async (facet) => {
+    const items = await fetchFacetItems(facet.id);
+    const counts = new Map(facet.buckets.map((bucket) => [bucket.label, 0]));
+
+    items.forEach((item) => {
+      const value = facet.extract(item.exif) ?? null;
+      if (value == null) {
+        return;
+      }
+
+      const bucket = facet.buckets.find((candidate) => candidate.match(value));
+      if (!bucket) {
+        return;
+      }
+
+      counts.set(bucket.label, (counts.get(bucket.label) ?? 0) + 1);
+    });
+
+    return {
+      facetId: facet.id,
+      displayName: facet.displayName,
+      options: facet.buckets
+        .map((bucket) => ({
+          value: bucket.label,
+          count: counts.get(bucket.label) ?? 0,
+        }))
+        .filter((option) => option.count > 0),
+    };
+  }));
+
+  const stringSections = await Promise.all(SEARCHABLE_STRING_FACETS.map(async (facet) => {
+    const items = await fetchFacetItems(facet.id);
+    const counts = new Map<string, number>();
+
+    items.forEach((item) => {
+      const value =
+        facet.id === LOCATION_FACET.id
+          ? getGeocodeCountry(item.geocode) ?? null
+          : facet.id === REGION_FACET.id
+            ? getGeocodeRegion(item.geocode) ?? null
+            : facet.id === SUBREGION_FACET.id
+              ? getGeocodeSubregion(item.geocode) ?? null
+          : facet.id === CITY_FACET.id
+            ? getGeocodeCity(item.geocode) ?? null
+            : facet.extract(item.exif) ?? null;
+      if (!value) {
+        return;
+      }
+
+      counts.set(value, (counts.get(value) ?? 0) + 1);
+    });
+
+    return {
+      facetId: facet.id,
+      displayName: facet.displayName,
+      options: Array.from(counts.entries())
+        .map(([value, count]) => ({ value, count }))
+        .sort((left, right) => {
+          if (right.count !== left.count) {
+            return right.count - left.count;
+          }
+          return left.value.localeCompare(right.value);
+        })
+        .slice(0, 12),
+    };
+  }));
+
+  return [...numericSections, ...stringSections].filter(
+    (section) => section.options.length > 0,
+  );
+};
+
 const fetchEmbeddingByPath = async (
   database: SearchDatabase,
   path: string,
@@ -353,20 +714,40 @@ export const fetchResults = async (opts: {
   query: string;
   pageSize: number;
   page: number;
+  selectedFacets?: SearchFacetSelection[];
 }): Promise<PaginatedSearchResult> => {
-  const { database, query, pageSize, page } = opts;
-  const queries = query.split("|");
+  const { database, query, pageSize, page, selectedFacets = [] } = opts;
+  const queries = query ? query.split("|").filter(Boolean) : [];
+  const facetWhere = buildFacetWhereClause(selectedFacets);
+  const whereParts = [
+    ...Array.from({ length: queries.length }, () => "images MATCH ?"),
+    ...(facetWhere.sql ? [facetWhere.sql] : []),
+  ];
 
   try {
     const result = await exec(
       database,
-      `SELECT *, snippet(images, -1, '<i class="snippet">', '</i>', '…', 24) AS snippet, bm25(images) AS bm25
-        FROM images
-        WHERE ${Array.from({ length: queries.length }, () => "images MATCH ?").join(" AND ")}
-        ORDER BY rank
-        LIMIT ?
-        OFFSET ?`,
-      [...queries.map((q) => toFtsMatchTerm(q)), pageSize, page * pageSize],
+      queries.length > 0
+        ? `SELECT ${IMAGE_COLUMN_SELECTS.join(", ")}, snippet(images, -1, '<i class="snippet">', '</i>', '…', 24) AS snippet, bm25(images) AS bm25
+            FROM images
+            LEFT JOIN metadata m ON m.path = images.path
+            ${whereParts.length > 0 ? `WHERE ${whereParts.join(" AND ")}` : ""}
+            ORDER BY rank
+            LIMIT ?
+            OFFSET ?`
+        : `SELECT ${IMAGE_COLUMN_SELECTS.join(", ")}
+            FROM images
+            LEFT JOIN metadata m ON m.path = images.path
+            ${whereParts.length > 0 ? `WHERE ${whereParts.join(" AND ")}` : ""}
+            ORDER BY ${NORMALIZED_IMAGE_DATE_SQL} DESC, images.path DESC
+            LIMIT ?
+            OFFSET ?`,
+      [
+        ...queries.map((q) => toFtsMatchTerm(q)),
+        ...facetWhere.bind,
+        pageSize,
+        page * pageSize,
+      ],
       {
         page,
         pageSize,
@@ -386,8 +767,14 @@ export const fetchRefinementTagCounts = async (opts: {
   database: Database;
   activeTerms: string[];
   candidateTags: string[];
+  selectedFacets?: SearchFacetSelection[];
 }): Promise<Record<string, number>> => {
-  const { database, activeTerms, candidateTags } = opts;
+  const {
+    database,
+    activeTerms,
+    candidateTags,
+    selectedFacets = [],
+  } = opts;
   const normalizedActiveTerms = Array.from(
     new Set(
       activeTerms.map((term) => term.trim().toLowerCase()).filter(Boolean),
@@ -398,11 +785,13 @@ export const fetchRefinementTagCounts = async (opts: {
       candidateTags.map((tag) => tag.trim().toLowerCase()).filter(Boolean),
     ),
   ).filter((tag) => !normalizedActiveTerms.includes(tag));
+  const facetWhere = buildFacetWhereClause(selectedFacets);
 
-  if (
-    normalizedActiveTerms.length === 0 ||
-    normalizedCandidateTags.length === 0
-  ) {
+  if (normalizedCandidateTags.length === 0) {
+    return {};
+  }
+
+  if (normalizedActiveTerms.length === 0 && !facetWhere.sql) {
     return {};
   }
 
@@ -411,12 +800,20 @@ export const fetchRefinementTagCounts = async (opts: {
 
   for (let idx = 0; idx < normalizedCandidateTags.length; idx += batchSize) {
     const batch = normalizedCandidateTags.slice(idx, idx + batchSize);
+    const whereClause = [
+      ...Array.from(
+        { length: normalizedActiveTerms.length + 1 },
+        () => "images MATCH ?",
+      ),
+      ...(facetWhere.sql ? [facetWhere.sql] : []),
+    ].join(" AND ");
     const sql = batch
       .map(
         () =>
           `SELECT ? AS tag, COUNT(*) AS count
             FROM images
-            WHERE ${Array.from({ length: normalizedActiveTerms.length + 1 }, () => "images MATCH ?").join(" AND ")}`,
+            LEFT JOIN metadata m ON m.path = images.path
+            WHERE ${whereClause}`,
       )
       .join(" UNION ALL ");
 
@@ -426,6 +823,7 @@ export const fetchRefinementTagCounts = async (opts: {
       for (const term of [...normalizedActiveTerms, tag]) {
         bind.push(toFtsMatchTerm(term));
       }
+      bind.push(...facetWhere.bind);
     }
 
     const result = await exec(database, sql, bind);
@@ -609,6 +1007,7 @@ export const fetchSemanticResults = async (opts: {
   pageSize: number;
   page: number;
   modelId?: string;
+  selectedFacets?: SearchFacetSelection[];
 }): Promise<PaginatedSearchResult> => {
   const {
     database,
@@ -618,16 +1017,27 @@ export const fetchSemanticResults = async (opts: {
     page,
     pageSize,
     modelId = DEFAULT_EMBEDDING_MODEL_ID,
+    selectedFacets = [],
   } = opts;
   const vectorDatabase = embeddingsDatabase ?? database;
 
   try {
+    const allowedPaths =
+      selectedFacets.length > 0
+        ? await fetchFacetMatchedPaths(database, selectedFacets)
+        : null;
     const rankedPaths = await rankEmbeddingsByVector({
       database: vectorDatabase,
       queryVector: textVector,
       modelId,
     });
-    const pageSlice = rankedPaths.slice(page * pageSize, (page + 1) * pageSize);
+    const filteredRankedPaths = allowedPaths
+      ? rankedPaths.filter((candidate) => allowedPaths.has(candidate.path))
+      : rankedPaths;
+    const pageSlice = filteredRankedPaths.slice(
+      page * pageSize,
+      (page + 1) * pageSize,
+    );
     const details = await fetchResultsByPaths(
       database,
       pageSlice.map((candidate) => candidate.path),
@@ -651,7 +1061,10 @@ export const fetchSemanticResults = async (opts: {
     return {
       data: resolvedRows,
       prev: page <= 0 ? undefined : page - 1,
-      next: rankedPaths.length > (page + 1) * pageSize ? page + 1 : undefined,
+      next:
+        filteredRankedPaths.length > (page + 1) * pageSize
+          ? page + 1
+          : undefined,
       query: textQuery,
     };
   } catch (err) {
@@ -673,6 +1086,7 @@ export const fetchHybridResults = async (opts: {
   page: number;
   modelId?: string;
   keywordQuery?: string;
+  selectedFacets?: SearchFacetSelection[];
 }): Promise<PaginatedSearchResult> => {
   const {
     database,
@@ -683,10 +1097,15 @@ export const fetchHybridResults = async (opts: {
     pageSize,
     modelId = DEFAULT_EMBEDDING_MODEL_ID,
     keywordQuery = textQuery,
+    selectedFacets = [],
   } = opts;
   const vectorDatabase = embeddingsDatabase ?? database;
 
   try {
+    const allowedPaths =
+      selectedFacets.length > 0
+        ? await fetchFacetMatchedPaths(database, selectedFacets)
+        : null;
     const [keywordResults, vectorResults] = await Promise.all([
       fetchKeywordRanking({ database, query: keywordQuery }),
       rankEmbeddingsByVector({
@@ -699,7 +1118,10 @@ export const fetchHybridResults = async (opts: {
       keywordResults,
       vectorResults,
     });
-    const pageSlice = fusedResults.slice(page * pageSize, (page + 1) * pageSize);
+    const filteredResults = allowedPaths
+      ? fusedResults.filter((candidate) => allowedPaths.has(candidate.path))
+      : fusedResults;
+    const pageSlice = filteredResults.slice(page * pageSize, (page + 1) * pageSize);
     const details = await fetchResultsByPaths(
       database,
       pageSlice.map((candidate) => candidate.path),
@@ -725,7 +1147,10 @@ export const fetchHybridResults = async (opts: {
     return {
       data: resolvedRows,
       prev: page <= 0 ? undefined : page - 1,
-      next: fusedResults.length > (page + 1) * pageSize ? page + 1 : undefined,
+      next:
+        filteredResults.length > (page + 1) * pageSize
+          ? page + 1
+          : undefined,
       query: textQuery,
     };
   } catch (err) {

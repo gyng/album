@@ -7,6 +7,7 @@ import { RGB } from "../../util/colorDistance";
 type Props = {
   isSimilarMode: boolean;
   isColorMode: boolean;
+  hasFacetFilters: boolean;
   searchInputValue: string;
   trimmedQuery: string;
   similarPath: string | null;
@@ -24,6 +25,7 @@ type Props = {
 export const SearchResultsGrid: React.FC<Props> = ({
   isSimilarMode,
   isColorMode,
+  hasFacetFilters,
   searchInputValue,
   trimmedQuery,
   similarPath,
@@ -38,7 +40,10 @@ export const SearchResultsGrid: React.FC<Props> = ({
   onFetchNextPage,
 }) => {
   const showResults =
-    isSimilarMode || isColorMode || searchInputValue.trim().length > 0;
+    isSimilarMode ||
+    isColorMode ||
+    hasFacetFilters ||
+    searchInputValue.trim().length > 0;
 
   if (!showResults) {
     return <ul className={styles.results} />;
@@ -60,9 +65,15 @@ export const SearchResultsGrid: React.FC<Props> = ({
       !isFetching &&
       results?.length === 0 &&
       !isSimilarMode &&
-      trimmedQuery.length >= 3 ? (
+      (trimmedQuery.length >= 3 || hasFacetFilters) ? (
         <div>
-          No results for <i>{trimmedQuery}</i>
+          {trimmedQuery.length >= 3 ? (
+            <>
+              No results for <i>{trimmedQuery}</i>
+            </>
+          ) : (
+            <>No results for the selected filters.</>
+          )}
         </div>
       ) : null}
 

@@ -1,5 +1,7 @@
-.tag {
+.pill {
   appearance: none;
+  display: inline-flex;
+  align-items: center;
   padding: var(--m);
   font-size: var(--fs-s);
   border-radius: var(--m-s);
@@ -8,32 +10,34 @@
   user-select: none;
   background: transparent;
   color: inherit;
+  white-space: nowrap;
 }
 
-.tag:hover,
-.tag.active {
+.pill:hover,
+.pill.active {
   background-color: var(--c-bg-contrast-light);
   color: var(--c-bg-contrast-dark);
 }
 
-.tag:focus-visible {
+.pill:focus-visible {
   outline: solid 2px var(--c-bg-contrast-light);
   outline-offset: 2px;
 }
 
-.tag.disabled {
+.pill.disabled {
   opacity: 0.45;
   cursor: not-allowed;
 }
 
-.tag.disabled:hover,
-.tag.disabled.active {
+.pill.disabled:hover,
+.pill.disabled.active {
   background-color: transparent;
   color: inherit;
 }
 
 .count {
   display: inline-block;
+  margin-left: 0.55rem;
   font-style: italic;
   font-variant-numeric: tabular-nums;
   min-width: 3ch;

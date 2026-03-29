@@ -1,5 +1,5 @@
 import React from "react";
-import styles from "./SearchTag.module.css";
+import { SearchFilterPill } from "./SearchFilterPill";
 
 interface SearchTagProps {
   tag: string;
@@ -18,18 +18,12 @@ export const SearchTag: React.FC<SearchTagProps> = ({
 }) => {
   const tagName = tag.toLocaleLowerCase();
   return (
-    <button
-      type="button"
-      className={[
-        styles.tag,
-        isActive ? styles.active : "",
-        disabled ? styles.disabled : "",
-      ].join(" ")}
+    <SearchFilterPill
+      label={tagName}
+      count={count}
+      isActive={isActive}
       disabled={disabled}
-      aria-pressed={isActive}
       onClick={() => onClick(tagName)}
-    >
-      {tagName} <span className={styles.count}>{count}</span>
-    </button>
+    />
   );
 };
