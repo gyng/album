@@ -1,0 +1,144 @@
+.page {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: var(--m-xl);
+}
+
+.header {
+  display: grid;
+  gap: var(--m-l);
+  margin: var(--m-xl) 0;
+}
+
+.eyebrow {
+  margin: 0;
+  color: var(--c-bg-contrast-light);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: var(--fs-sm);
+}
+
+.title {
+  margin: 0;
+}
+
+.lede {
+  max-width: 70ch;
+  margin: 0;
+  line-height: 1.6;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: var(--m-l);
+}
+
+.card {
+  display: grid;
+  gap: var(--m-m);
+  border: solid 1px var(--c-bg-contrast-light);
+  border-radius: var(--m-l);
+  padding: var(--m-l);
+  background:
+    linear-gradient(160deg, rgb(255 255 255 / 0.05), rgb(255 255 255 / 0.01)),
+    var(--c-bg);
+}
+
+.coverLink {
+  text-decoration: none;
+  color: inherit;
+}
+
+.coverImage {
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  object-fit: cover;
+  border-radius: var(--m-m);
+  border: solid 1px rgb(255 255 255 / 0.12);
+}
+
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--m-s);
+  color: var(--c-bg-contrast-light);
+  font-size: var(--fs-sm);
+}
+
+.summary {
+  margin: 0;
+  line-height: 1.55;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--m-s);
+}
+
+.stops {
+  display: grid;
+  gap: var(--m-s);
+}
+
+.stopList {
+  display: grid;
+  gap: var(--m-s);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.stopItem {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--m-s);
+  align-items: start;
+}
+
+.stopIndex {
+  display: inline-grid;
+  place-items: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 999px;
+  border: solid 1px var(--c-bg-contrast-light);
+  font-size: var(--fs-sm);
+  color: var(--c-bg-contrast-light);
+}
+
+.stopText {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.stopTitle {
+  font-weight: 600;
+}
+
+.stopSummary {
+  color: var(--c-bg-contrast-light);
+  font-size: var(--fs-sm);
+}
+
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.tag {
+  border: solid 1px rgb(255 255 255 / 0.16);
+  border-radius: 999px;
+  padding: 0.18rem 0.5rem;
+  font-size: 0.75rem;
+  color: var(--c-bg-contrast-light);
+}
+
+.empty {
+  border: dashed 1px var(--c-bg-contrast-light);
+  border-radius: var(--m-l);
+  padding: var(--m-xl);
+  color: var(--c-bg-contrast-light);
+}

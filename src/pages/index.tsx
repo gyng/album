@@ -8,10 +8,7 @@ import { measureBuild } from "../services/buildTiming";
 import Link from "next/link";
 import { ThemeToggle } from "../components/ThemeToggle";
 import { Seo } from "../components/Seo";
-import {
-  buildCollectionPageJsonLd,
-  buildWebSiteJsonLd,
-} from "../lib/seo";
+import { buildCollectionPageJsonLd, buildWebSiteJsonLd } from "../lib/seo";
 
 type PageProps = {
   albums: Content[];
@@ -42,6 +39,9 @@ const Home: NextPage<PageProps> = (context) => {
           </Link>
           <Link className={styles.toolbarLink} href="/timeline">
             📅 Timeline
+          </Link>
+          <Link className={styles.toolbarLink} href="/journeys">
+            🧭 Journeys
           </Link>
           <Link className={styles.toolbarLink} href="/slideshow">
             🖼️ Slideshow
@@ -86,7 +86,11 @@ export const getStaticProps: GetStaticProps<PageProps> = async (context) => {
       })
       .sort((a, b) => (b.order ?? 0) - (a.order ?? 0))
       // Push test albums to the end
-      .sort((a, b) => (a.name.startsWith("test") ? 1 : 0) - (b.name.startsWith("test") ? 1 : 0));
+      .sort(
+        (a, b) =>
+          (a.name.startsWith("test") ? 1 : 0) -
+          (b.name.startsWith("test") ? 1 : 0),
+      );
 
     return {
       props: {
@@ -94,7 +98,9 @@ export const getStaticProps: GetStaticProps<PageProps> = async (context) => {
           ...a,
           // Reduce page data size by only providing a partial list
           blocks: [
-            ...a.blocks.filter((b) => b.kind === "photo" && b.formatting?.cover),
+            ...a.blocks.filter(
+              (b) => b.kind === "photo" && b.formatting?.cover,
+            ),
             a.blocks.find((b) => b.kind === "photo"),
           ].filter(Boolean) as Block[],
           _build: { ...a._build, timeRange: getImageTimestampRange(a) }, // FIXME: Unoptimal
