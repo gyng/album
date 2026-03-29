@@ -66,7 +66,7 @@ describe("Journeys page", () => {
     push.mockClear();
   });
 
-  it("renders a journey feed with trip and stop posts", () => {
+  it("renders journey cards with story structure and links", () => {
     render(
       <JourneysPage
         journeys={[
@@ -147,17 +147,15 @@ describe("Journeys page", () => {
       />,
     );
 
-    expect(screen.getByText("Journey Feed")).toBeTruthy();
-    expect(screen.getAllByText("Japan Winter Loop").length).toBeGreaterThan(0);
+    expect(screen.getByText("Japan Winter Loop")).toBeTruthy();
     expect(screen.getByText("Tokyo Arrival")).toBeTruthy();
     expect(screen.getByText("Osaka Nights")).toBeTruthy();
-    expect(screen.getAllByText(/^Stop$/i).length).toBeGreaterThan(0);
-    expect(screen.getByText(/^Trip$/i)).toBeTruthy();
+    expect(screen.queryByText("Primary album")).toBeNull();
     expect(screen.getByAltText("Tokyo Arrival")).toBeTruthy();
     expect(screen.getByAltText("Osaka Nights")).toBeTruthy();
-    expect(screen.getByRole("link", { name: /Open album/i })).toBeTruthy();
+    expect(screen.getByRole("link", { name: /^Album$/i })).toBeTruthy();
 
-    fireEvent.click(screen.getAllByRole("link", { name: /Trace route/i })[0]!);
+    fireEvent.click(screen.getByRole("link", { name: /^Map$/i }));
     expect(push).toHaveBeenCalledWith("/map?filter_album=japan");
   });
 });
