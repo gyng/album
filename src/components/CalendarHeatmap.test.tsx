@@ -128,4 +128,42 @@ describe("CalendarHeatmap", () => {
       ),
     ).toBe("true");
   });
+
+  it("highlights specified memory dates", () => {
+    render(
+      <CalendarHeatmap
+        entries={entries}
+        selectedDate="2024-01-02"
+        onSelectDate={() => {}}
+        highlightedDates={["2024-03-05"]}
+      />,
+    );
+
+    expect(
+      screen.getByRole("button", { name: /mar 5, 2024/i }).className,
+    ).toMatch(/memoryHighlighted/);
+  });
+
+  it("highlights specified years and can receive a scroll target", () => {
+    const scrollIntoView = jest.fn();
+    const original = HTMLElement.prototype.scrollIntoView;
+    HTMLElement.prototype.scrollIntoView = scrollIntoView;
+
+    render(
+      <CalendarHeatmap
+        entries={entries}
+        selectedDate="2024-01-02"
+        onSelectDate={() => {}}
+        highlightedYears={[2024]}
+        scrollToDate="2024-03-05"
+      />,
+    );
+
+    expect(screen.getByRole("heading", { name: "2024" }).className).toMatch(
+      /highlightedYearHeading/,
+    );
+    expect(scrollIntoView).toHaveBeenCalled();
+
+    HTMLElement.prototype.scrollIntoView = original;
+  });
 });

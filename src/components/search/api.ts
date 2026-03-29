@@ -59,6 +59,29 @@ const IMAGE_COLUMNS = [
 
 const IMAGE_COLUMN_SELECTS = IMAGE_COLUMNS.map((column) => `images.${column}`);
 
+const EXIF_DATE_SQL = `CASE
+  WHEN instr(images.exif, 'DateTimeOriginal:') > 0 THEN replace(
+    substr(
+      trim(
+        substr(
+          images.exif,
+          instr(images.exif, 'DateTimeOriginal:') + length('DateTimeOriginal:')
+        )
+      ),
+      1,
+      10
+    ),
+    ':',
+    '-'
+  )
+  ELSE ''
+END`;
+
+const NORMALIZED_IMAGE_DATE_SQL = `COALESCE(
+  NULLIF(substr(NULLIF(m.iso8601, ''), 1, 10), ''),
+  ${EXIF_DATE_SQL}
+)`;
+
 const toFtsMatchTerm = (term: string): string => {
   return `- {path album_relative_path} : "${term.replaceAll(/[\"]/g, "'")}"`;
 };
@@ -756,32 +779,8 @@ export const fetchRecentResults = async (opts: {
       `SELECT ${IMAGE_COLUMN_SELECTS.join(", ")}
         FROM images
         LEFT JOIN metadata m ON m.path = images.path
-        WHERE COALESCE(
-          NULLIF(m.iso8601, ''),
-          CASE
-            WHEN instr(images.exif, 'DateTimeOriginal:') > 0 THEN trim(
-              substr(
-                images.exif,
-                instr(images.exif, 'DateTimeOriginal:') + length('DateTimeOriginal:'),
-                19
-              )
-            )
-            ELSE ''
-          END
-        ) != ''
-        ORDER BY COALESCE(
-          NULLIF(m.iso8601, ''),
-          CASE
-            WHEN instr(images.exif, 'DateTimeOriginal:') > 0 THEN trim(
-              substr(
-                images.exif,
-                instr(images.exif, 'DateTimeOriginal:') + length('DateTimeOriginal:'),
-                19
-              )
-            )
-            ELSE ''
-          END
-        ) DESC
+        WHERE ${NORMALIZED_IMAGE_DATE_SQL} != ''
+        ORDER BY ${NORMALIZED_IMAGE_DATE_SQL} DESC
         LIMIT ?`,
       [pageSize],
     );
@@ -794,6 +793,49 @@ export const fetchRecentResults = async (opts: {
     }));
   } catch (err) {
     console.error(`Failed to fetch recent results`, err);
+    throw err;
+  }
+};
+
+export const fetchMemoryCandidates = async (opts: {
+  database: Database;
+  todayDate: string;
+}): Promise<Array<SearchResultRow & { isoDate: string }>> => {
+  const { database, todayDate } = opts;
+  const excludeYear = todayDate.slice(0, 4);
+
+  try {
+    const result = await exec(
+      database,
+      `SELECT ${IMAGE_COLUMN_SELECTS.join(", ")}, ${NORMALIZED_IMAGE_DATE_SQL} AS isoDate
+        FROM images
+        LEFT JOIN metadata m ON m.path = images.path
+        WHERE ${NORMALIZED_IMAGE_DATE_SQL} != ''
+          AND substr(${NORMALIZED_IMAGE_DATE_SQL}, 1, 4) != ?
+        ORDER BY isoDate DESC`,
+      [excludeYear],
+    );
+
+    return (result.data as unknown as any[][]).map((row) => {
+      const imageValues = row.slice(0, IMAGE_COLUMNS.length);
+      const resolved: Record<string, any> = {};
+      IMAGE_COLUMNS.forEach((column, index) => {
+        resolved[column] = imageValues[index];
+      });
+
+      const isoDate = String(row[IMAGE_COLUMNS.length] ?? "");
+      return {
+        ...(resolved as SearchResultRow),
+        isoDate,
+        snippet:
+          resolved.alt_text ||
+          resolved.subject ||
+          resolved.tags ||
+          resolved.filename,
+      };
+    });
+  } catch (err) {
+    console.error("Failed to fetch memory candidates", err);
     throw err;
   }
 };

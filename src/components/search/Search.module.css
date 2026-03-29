@@ -1,10 +1,17 @@
 .moreButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   width: 150px;
   height: 150px;
   background-color: transparent;
   border-radius: var(--m-m);
   border-style: solid;
+  border-color: var(--c-bg-contrast-light);
   cursor: pointer;
+  color: inherit;
+  text-decoration: none;
+  font-size: inherit;
 }
 
 .moreButton:disabled {
@@ -43,7 +50,7 @@
 
 .emptyState {
   display: grid;
-  gap: var(--m-xl);
+  gap: var(--m-l);
   margin-bottom: var(--m-xl);
 }
 
@@ -103,6 +110,67 @@
 .emptySections {
   display: grid;
   gap: var(--m-xl);
+}
+
+.memoryClusters {
+  display: grid;
+  gap: var(--m-l);
+}
+
+.memoryClusterCard {
+  display: grid;
+  gap: var(--m);
+}
+
+.memoryClusterHeader {
+  min-width: 0;
+}
+
+.memoryClusterLabel {
+  margin: 0;
+  color: var(--c-bg-contrast-light);
+  font-size: var(--fs-s);
+  line-height: 1.4;
+  font-weight: 400;
+}
+
+.memoryClusterStrip {
+  display: flex;
+  gap: var(--m-m);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  overflow-x: auto;
+  font-size: var(--fs-sm);
+}
+
+.memoryClusterItem {
+  flex: 0 0 auto;
+}
+
+.memoryThumbLink {
+  display: block;
+}
+
+.memoryThumbImage {
+  display: block;
+  width: 150px;
+  height: 150px;
+  object-fit: cover;
+  background-color: var(--c-bg-contrast-dark);
+}
+
+.memoryLoadMoreButton {
+  margin-top: var(--m-l);
+}
+
+.memoryTimelineTile {
+  color: inherit;
+  text-decoration: none;
+}
+
+.memoryTimelineTile:visited {
+  color: inherit;
 }
 
 .sectionSurface {

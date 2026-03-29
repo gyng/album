@@ -180,6 +180,8 @@ const CalendarHeatmapYear = React.memo(
     dates,
     entriesByDate,
     effectiveTodayDate,
+    highlightedDates,
+    highlightedYears,
     onSelectDate,
     openPopup,
     closePopupSoon,
@@ -190,6 +192,8 @@ const CalendarHeatmapYear = React.memo(
     dates: string[];
     entriesByDate: Map<string, TimelineEntry[]>;
     effectiveTodayDate: string;
+    highlightedDates: Set<string>;
+    highlightedYears: Set<number>;
     onSelectDate: (date: string) => void;
     openPopup: (date: string, target: EventTarget | null) => void;
     closePopupSoon: () => void;
@@ -200,7 +204,14 @@ const CalendarHeatmapYear = React.memo(
     return (
       <section className={styles.yearSection} aria-label={`${year} timeline`}>
         <div className={styles.yearHeaderRow}>
-          <h2 className={styles.yearHeading}>{year}</h2>
+          <h2
+            className={[
+              styles.yearHeading,
+              highlightedYears.has(year) ? styles.highlightedYearHeading : "",
+            ].join(" ")}
+          >
+            {year}
+          </h2>
         </div>
 
         <div className={styles.yearTrack}>
@@ -237,6 +248,7 @@ const CalendarHeatmapYear = React.memo(
               const count = dateEntries.length;
               const formattedDate = formatShortDate(date);
               const isSelected = selectedDate === date;
+              const isHighlighted = highlightedDates.has(date);
               const isToday = date === effectiveTodayDate;
               const isFuture = date > effectiveTodayDate;
               const cellDate = new Date(`${date}T00:00:00Z`);
@@ -267,6 +279,7 @@ const CalendarHeatmapYear = React.memo(
                 >
                   <button
                     type="button"
+                    data-date={date}
                     className={[
                       styles.cell,
                       isInteractive
@@ -276,6 +289,7 @@ const CalendarHeatmapYear = React.memo(
                           : styles.level0,
                       isToday ? styles.today : "",
                       isSelected ? styles.selected : "",
+                      isHighlighted ? styles.memoryHighlighted : "",
                       !isInteractive ? styles.emptyCell : styles.interactiveCell,
                     ].join(" ")}
                     style={dominantColor && isInteractive ? { backgroundColor: dominantColor } : undefined}
@@ -298,7 +312,10 @@ const CalendarHeatmapYear = React.memo(
                         {colorSwatches.map((color, i) => (
                           <span
                             key={color + i}
-                            className={styles.subpip}
+                            className={[
+                              styles.subpip,
+                              isHighlighted ? styles.highlightedSubpip : "",
+                            ].join(" ")}
                             style={{ backgroundColor: color }}
                           />
                         ))}
@@ -322,11 +339,17 @@ export const CalendarHeatmap = ({
   selectedDate,
   onSelectDate,
   todayDate,
+  highlightedDates = [],
+  highlightedYears = [],
+  scrollToDate,
 }: {
   entries: TimelineEntry[];
   selectedDate: string | null;
   onSelectDate: (date: string) => void;
   todayDate?: string;
+  highlightedDates?: string[];
+  highlightedYears?: number[];
+  scrollToDate?: string | null;
 }) => {
   const entriesByDate = React.useMemo(() => {
     const grouped = new Map<string, TimelineEntry[]>();
@@ -358,6 +381,14 @@ export const CalendarHeatmap = ({
     () => todayDate ?? getLocalDateKey(),
     [todayDate],
   );
+  const highlightedDateSet = React.useMemo(
+    () => new Set(highlightedDates),
+    [highlightedDates],
+  );
+  const highlightedYearSet = React.useMemo(
+    () => new Set(highlightedYears),
+    [highlightedYears],
+  );
 
   const [popupState, setPopupState] = React.useState<{
     date: string;
@@ -372,6 +403,21 @@ export const CalendarHeatmap = ({
       }
     };
   }, []);
+
+  React.useEffect(() => {
+    if (!scrollToDate || typeof document === "undefined") {
+      return;
+    }
+
+    const target = document.querySelector<HTMLElement>(
+      `[data-date="${scrollToDate}"]`,
+    );
+    target?.scrollIntoView({
+      behavior: "smooth",
+      block: "nearest",
+      inline: "nearest",
+    });
+  }, [scrollToDate]);
 
   const closePopupSoon = React.useCallback(() => {
     if (popupCloseTimer.current) {
@@ -411,6 +457,8 @@ export const CalendarHeatmap = ({
             dates={group.dates}
             entriesByDate={entriesByDate}
             effectiveTodayDate={effectiveTodayDate}
+            highlightedDates={highlightedDateSet}
+            highlightedYears={highlightedYearSet}
             onSelectDate={onSelectDate}
             openPopup={openPopup}
             closePopupSoon={closePopupSoon}

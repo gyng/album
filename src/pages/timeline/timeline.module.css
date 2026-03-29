@@ -67,6 +67,139 @@
   align-items: start;
 }
 
+.leftColumn {
+  display: grid;
+  gap: var(--m-l);
+  min-width: 0;
+}
+
+.memories {
+  display: grid;
+  gap: var(--m);
+  padding-top: var(--m);
+  border-top: solid 1px color-mix(in srgb, var(--c-bg-contrast-light) 35%, transparent);
+}
+
+.memoriesHeader {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--m-s);
+}
+
+.memoriesTitle {
+  margin: 0;
+  font-size: var(--fs-m);
+}
+
+.memoriesCaption {
+  margin: 0;
+  color: var(--c-bg-contrast-light);
+  font-size: var(--fs-s);
+}
+
+.memoryClusters {
+  display: grid;
+  gap: var(--m-l);
+}
+
+.memoryCluster {
+  display: grid;
+  gap: var(--m-s);
+  min-width: 0;
+}
+
+.memoryClusterHeader {
+  min-width: 0;
+}
+
+.memoryClusterLabelButton {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--m-s);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.memoryClusterAge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 6px;
+  border: solid 1px color-mix(in srgb, var(--c-bg-contrast-light) 35%, transparent);
+  color: inherit;
+  font-size: 11px;
+  line-height: 1.2;
+}
+
+.memoryClusterLabel {
+  margin: 0;
+  color: var(--c-bg-contrast-light);
+  font-size: var(--fs-s);
+  line-height: 1.4;
+  font-weight: 400;
+}
+
+.memoryClusterSwatches {
+  display: inline-flex;
+  gap: 4px;
+}
+
+.memoryClusterSwatch {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--c-bg) 60%, transparent);
+}
+
+.memoryStrip {
+  display: flex;
+  gap: var(--m-s);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  overflow-x: auto;
+}
+
+.memoryItem {
+  flex: 0 0 auto;
+}
+
+.memoryButton {
+  display: block;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.memoryImage {
+  display: block;
+  width: 150px;
+  height: 150px;
+  object-fit: cover;
+}
+
+.memoryButton:focus-visible {
+  outline: solid 2px var(--c-bg-contrast-light);
+  outline-offset: 3px;
+}
+
+.memoryClusterLabelButton:focus-visible {
+  outline: solid 2px var(--c-bg-contrast-light);
+  outline-offset: 3px;
+}
+
+.memoryLoadMoreButton {
+  justify-self: start;
+  align-self: start;
+  margin-top: var(--m-s);
+}
+
 .heatmapPanel,
 .dayPanel {
   min-width: 0;

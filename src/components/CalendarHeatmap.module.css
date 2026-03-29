@@ -18,6 +18,11 @@
   box-shadow: 0 0 0.5px rgba(0,0,0,0.25);
   flex-shrink: 0;
 }
+
+.highlightedSubpip {
+  box-shadow: 0 0 0 1px color-mix(in srgb, white 70%, transparent);
+  filter: brightness(1.2) saturate(1.2);
+}
 .heatmap {
   --heatmap-cell-size: 8px;
   --heatmap-gap: 2px;
@@ -60,6 +65,10 @@
   font-size: var(--fs-sm);
   line-height: 1;
   text-align: left;
+}
+
+.highlightedYearHeading {
+  color: var(--c-link);
 }
 
 .weekdaySpacer {
@@ -153,6 +162,11 @@
   transform: none;
   border-radius: 3px;
   box-shadow: 0 0 0 2px var(--c-bg), 0 0 0 4px var(--c-link);
+}
+
+.memoryHighlighted {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--c-bg-contrast-light) 60%, transparent);
+  transform: scale(1.06);
 }
 
 .today {

@@ -5,6 +5,7 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import Search from "./Search";
 import {
+  fetchMemoryCandidates,
   fetchHybridResults,
   fetchRandomPhoto,
   fetchRandomResults,
@@ -54,6 +55,7 @@ jest.mock("@tanstack/react-query", () => ({
 }));
 
 jest.mock("./api", () => ({
+  fetchMemoryCandidates: jest.fn(),
   fetchHybridResults: jest.fn(),
   fetchRandomPhoto: jest.fn(),
   fetchRandomResults: jest.fn(),
@@ -261,6 +263,7 @@ beforeEach(() => {
       snippet: "Recent shot",
     }),
   ]);
+  (fetchMemoryCandidates as jest.Mock).mockResolvedValue([]);
   (fetchRandomResults as jest.Mock).mockResolvedValue([
     makeResult({
       path: "../albums/test-simple/random.jpg",
@@ -301,6 +304,45 @@ beforeEach(() => {
 
 describe("Search", () => {
   it("renders the browse-mode sections and loading progress", async () => {
+    (fetchMemoryCandidates as jest.Mock).mockResolvedValue([
+      {
+        ...makeResult({
+          path: "../albums/test-simple/memory-a.jpg",
+          album_relative_path: "/album/test-simple#memory-a.jpg",
+          filename: "memory-a.jpg",
+          snippet: "Memory shot A",
+        }),
+        isoDate: "2025-03-13",
+      },
+      {
+        ...makeResult({
+          path: "../albums/test-simple/memory-b.jpg",
+          album_relative_path: "/album/test-simple#memory-b.jpg",
+          filename: "memory-b.jpg",
+          snippet: "Memory shot B",
+        }),
+        isoDate: "2025-03-15",
+      },
+      {
+        ...makeResult({
+          path: "../albums/test-simple/memory-c.jpg",
+          album_relative_path: "/album/test-simple#memory-c.jpg",
+          filename: "memory-c.jpg",
+          snippet: "Memory shot C",
+        }),
+        isoDate: "2024-03-12",
+      },
+      {
+        ...makeResult({
+          path: "../albums/test-simple/memory-d.jpg",
+          album_relative_path: "/album/test-simple#memory-d.jpg",
+          filename: "memory-d.jpg",
+          snippet: "Memory shot D",
+        }),
+        isoDate: "2023-03-11",
+      },
+    ]);
+
     await renderSearch();
 
     await waitFor(() => {
@@ -313,6 +355,7 @@ describe("Search", () => {
     });
 
     expect(screen.getByText("Latest")).toBeTruthy();
+    expect(screen.getByText("Memories")).toBeTruthy();
     expect(screen.getByText("Random selection")).toBeTruthy();
     expect(
       screen.getByText(/keep stacking keywords to narrow results/i),
@@ -320,8 +363,65 @@ describe("Search", () => {
     expect(screen.getByText(/Loading/)).toBeTruthy();
     expect(screen.getByText("Loading... 1.9 MB / 3.8 MB")).toBeTruthy();
     expect(screen.getByRole("button", { name: /harbor/i })).toBeTruthy();
+    expect(await screen.findByAltText("Memory shot A")).toBeTruthy();
+    expect(
+      screen
+        .getAllByRole("link", { name: /open timeline/i })[0]
+        ?.getAttribute("href"),
+    ).toContain("/timeline?");
     expect(await screen.findByAltText("Recent shot")).toBeTruthy();
     expect(await screen.findByAltText("Random shot")).toBeTruthy();
+  });
+
+  it("reveals additional memory clusters on demand", async () => {
+    (fetchMemoryCandidates as jest.Mock).mockResolvedValue([
+      {
+        ...makeResult({
+          path: "../albums/test-simple/memory-a.jpg",
+          album_relative_path: "/album/test-simple#memory-a.jpg",
+          filename: "memory-a.jpg",
+          snippet: "Memory shot A",
+        }),
+        isoDate: "2025-03-20",
+      },
+      {
+        ...makeResult({
+          path: "../albums/test-simple/memory-b.jpg",
+          album_relative_path: "/album/test-simple#memory-b.jpg",
+          filename: "memory-b.jpg",
+          snippet: "Memory shot B",
+        }),
+        isoDate: "2025-03-22",
+      },
+      {
+        ...makeResult({
+          path: "../albums/test-simple/memory-c.jpg",
+          album_relative_path: "/album/test-simple#memory-c.jpg",
+          filename: "memory-c.jpg",
+          snippet: "Memory shot C",
+        }),
+        isoDate: "2024-03-18",
+      },
+      {
+        ...makeResult({
+          path: "../albums/test-simple/memory-d.jpg",
+          album_relative_path: "/album/test-simple#memory-d.jpg",
+          filename: "memory-d.jpg",
+          snippet: "Memory shot D",
+        }),
+        isoDate: "2023-03-17",
+      },
+    ]);
+
+    await renderSearch();
+
+    expect(screen.queryByAltText("Memory shot D")).toBeNull();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: /more memories/i }),
+    );
+
+    expect(await screen.findByAltText("Memory shot D")).toBeTruthy();
   });
 
   it("switches from browse mode into similarity mode and back", async () => {

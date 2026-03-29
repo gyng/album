@@ -1,4 +1,5 @@
 import {
+  fetchMemoryCandidates,
   fetchHybridResults,
   fetchRandomPhoto,
   fetchRecentResults,
@@ -496,6 +497,53 @@ describe("fetchRecentResults", () => {
     expect(results[0].snippet).toBe("City at dawn");
     expect(results[1].path).toBe("../albums/test-simple/older.jpg");
     expect(results[1].snippet).toBe("night, street");
+  });
+});
+
+describe("fetchMemoryCandidates", () => {
+  it("returns prior-year dated images with normalized isoDate values", async () => {
+    const database = {
+      exec: ({ sql, bind, callback }: ExecArgs) => {
+        if (sql.includes("LEFT JOIN metadata m ON m.path = images.path")) {
+          expect(bind).toEqual(["2026"]);
+          callback([
+            "../albums/test-simple/march.jpg",
+            "/album/test-simple#march.jpg",
+            "march.jpg",
+            "",
+            "EXIF DateTimeOriginal: 2025:03:18 09:00:00",
+            "city, dawn",
+            "[(0,0,0)]",
+            "City at dawn",
+            "",
+            "2025-03-18",
+          ]);
+          callback([
+            "../albums/test-simple/fallback.jpg",
+            "/album/test-simple#fallback.jpg",
+            "fallback.jpg",
+            "",
+            "EXIF DateTimeOriginal: 2024:12:30 18:30:00",
+            "night, street",
+            "[(0,0,0)]",
+            "",
+            "Lantern alley",
+            "2024-12-30",
+          ]);
+        }
+      },
+    };
+
+    const results = await fetchMemoryCandidates({
+      database: database as any,
+      todayDate: "2026-03-15",
+    });
+
+    expect(results).toHaveLength(2);
+    expect(results[0]?.isoDate).toBe("2025-03-18");
+    expect(results[0]?.snippet).toBe("City at dawn");
+    expect(results[1]?.isoDate).toBe("2024-12-30");
+    expect(results[1]?.snippet).toBe("Lantern alley");
   });
 });
 

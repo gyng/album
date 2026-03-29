@@ -13,7 +13,15 @@ import { getDegLatLngFromExif } from "../../util/dms2deg";
 import commonStyles from "../../styles/common.module.css";
 import { Seo } from "../../components/Seo";
 import { buildCollectionPageJsonLd } from "../../lib/seo";
+import {
+  formatMemoryDateRange,
+  getMemoryClusters,
+} from "../../util/clusterByDate";
 import styles from "./timeline.module.css";
+
+const MAX_TIMELINE_MEMORY_CLUSTERS = 2;
+const MAX_TIMELINE_MEMORY_ITEMS = 4;
+const TIMELINE_MEMORY_LOAD_MORE_SIZE = 2;
 
 type PageProps = {
   entries: TimelineEntry[];
@@ -31,6 +39,11 @@ const getLocalDateKey = (date = new Date()) => {
   const month = `${date.getMonth() + 1}`.padStart(2, "0");
   const day = `${date.getDate()}`.padStart(2, "0");
   return `${year}-${month}-${day}`;
+};
+
+const getClusterAlbumLabel = (albums: string[]) => {
+  const uniqueAlbums = Array.from(new Set(albums.filter(Boolean)));
+  return uniqueAlbums.length === 1 ? uniqueAlbums[0] : null;
 };
 
 const TimelinePage: NextPage<PageProps> = ({ entries }) => {
@@ -62,6 +75,14 @@ const TimelinePage: NextPage<PageProps> = ({ entries }) => {
       : availableDates[0] ?? null
   );
   const [todayDate, setTodayDate] = React.useState<string | null>(null);
+  const [hoveredMemoryDates, setHoveredMemoryDates] = React.useState<string[]>(
+    [],
+  );
+  const [hoveredMemoryYears, setHoveredMemoryYears] = React.useState<number[]>(
+    [],
+  );
+  const [memoryScrollTargetDate, setMemoryScrollTargetDate] =
+    React.useState<string | null>(null);
 
   const selectableDates = React.useMemo(() => {
     return todayDate
@@ -73,6 +94,34 @@ const TimelinePage: NextPage<PageProps> = ({ entries }) => {
     setTodayDate(getLocalDateKey());
   }, []);
 
+  const memories = React.useMemo(() => {
+    if (!todayDate) {
+      return [];
+    }
+
+    return getMemoryClusters(filteredEntries, todayDate);
+  }, [filteredEntries, todayDate]);
+  const [visibleMemoryClusterCount, setVisibleMemoryClusterCount] =
+    React.useState(MAX_TIMELINE_MEMORY_CLUSTERS);
+
+  React.useEffect(() => {
+    setVisibleMemoryClusterCount(MAX_TIMELINE_MEMORY_CLUSTERS);
+  }, [filteredEntries, todayDate]);
+
+  const visibleMemories = React.useMemo(() => {
+    return memories.slice(0, visibleMemoryClusterCount);
+  }, [memories, visibleMemoryClusterCount]);
+
+  const applyMemoryHighlight = React.useCallback((cluster: (typeof memories)[number]) => {
+    setHoveredMemoryDates(Array.from(new Set(cluster.items.map((entry) => entry.date))));
+    setHoveredMemoryYears([cluster.year]);
+  }, []);
+
+  const clearMemoryHighlight = React.useCallback(() => {
+    setHoveredMemoryDates([]);
+    setHoveredMemoryYears([]);
+  }, []);
+
   // If availableDates changes and selectedDate is null, default to latest
   React.useEffect(() => {
     if (!selectedDate && availableDates.length > 0) {
@@ -82,11 +131,12 @@ const TimelinePage: NextPage<PageProps> = ({ entries }) => {
 
   // On mount or when router.query.date changes, update selectedDate if needed
   React.useEffect(() => {
-    const urlDate = typeof router.query.date === "string" ? router.query.date : null;
-    if (urlDate && availableDates.includes(urlDate) && urlDate !== selectedDate) {
-      setSelectedDate(urlDate);
+    const urlDate =
+      typeof router.query.date === "string" ? router.query.date : null;
+    if (urlDate && availableDates.includes(urlDate)) {
+      setSelectedDate((current) => (current === urlDate ? current : urlDate));
     }
-  }, [router.query.date, availableDates, selectedDate]);
+  }, [router.query.date, availableDates]);
 
   // When selectedDate changes, update the URL param (shallow push)
   React.useEffect(() => {
@@ -95,7 +145,7 @@ const TimelinePage: NextPage<PageProps> = ({ entries }) => {
     if (router.query.date !== selectedDate) {
       router.replace(url, undefined, { shallow: true });
     }
-  }, [router, selectedDate]);
+  }, [router.pathname, router.query, router.replace, selectedDate]);
 
   React.useEffect(() => {
     if (
@@ -194,27 +244,166 @@ const TimelinePage: NextPage<PageProps> = ({ entries }) => {
             No dated photos are available for this view yet.
           </div>
         ) : (
-          <div className={styles.layout}>
-            <section className={styles.heatmapPanel} aria-label="Timeline heatmap panel">
-              <CalendarHeatmap
-                entries={filteredEntries}
-                selectedDate={selectedDate}
-                onSelectDate={setSelectedDate}
-                todayDate={todayDate ?? undefined}
-              />
-            </section>
-            <div className={styles.dayPanel}>
-              <TimelineDayGrid
-                date={selectedDate}
-                entries={selectedEntries}
-                onSelectRandomDate={handleSelectRandomDate}
-                onSelectOlderDate={handleSelectOlderDate}
-                onSelectNewerDate={handleSelectNewerDate}
-                canGoOlder={canGoOlder}
-                canGoNewer={canGoNewer}
-              />
+          <>
+            <div className={styles.layout}>
+              <div className={styles.leftColumn}>
+                <section className={styles.heatmapPanel} aria-label="Timeline heatmap panel">
+                  <CalendarHeatmap
+                    entries={filteredEntries}
+                    selectedDate={selectedDate}
+                    onSelectDate={setSelectedDate}
+                    todayDate={todayDate ?? undefined}
+                    highlightedDates={hoveredMemoryDates}
+                    highlightedYears={hoveredMemoryYears}
+                    scrollToDate={memoryScrollTargetDate}
+                  />
+                </section>
+
+                {visibleMemories.length > 0 ? (
+                  <section className={styles.memories} aria-label="Memories">
+                    <div className={styles.memoriesHeader}>
+                      <h2 className={styles.memoriesTitle}>Memories</h2>
+                      <p className={styles.memoriesCaption}>Around this time</p>
+                    </div>
+
+                    <div className={styles.memoryClusters}>
+                      {visibleMemories.map((cluster) => {
+                        const albumLabel = getClusterAlbumLabel(
+                          cluster.items.map((entry) => entry.album),
+                        );
+                        const previewItems = cluster.items.slice(
+                          0,
+                          MAX_TIMELINE_MEMORY_ITEMS,
+                        );
+                        const meta = [
+                          albumLabel,
+                          formatMemoryDateRange(cluster.startDate, cluster.endDate),
+                        ].filter(Boolean);
+                        const swatches = Array.from(
+                          new Set(
+                            previewItems
+                              .map((entry) => entry.placeholderColor)
+                              .filter(
+                                (color) =>
+                                  color && color !== "transparent",
+                              ),
+                          ),
+                        ).slice(0, 4);
+                        const label = [
+                          `${cluster.yearsAgo} year${cluster.yearsAgo === 1 ? "" : "s"} ago`,
+                          ...meta,
+                        ].join(" · ");
+                        const ageLabel = `${cluster.yearsAgo} year${cluster.yearsAgo === 1 ? "" : "s"} ago`;
+                        const metaLabel = meta.join(" · ");
+                        const clusterId = `memory-cluster-${cluster.year}-${cluster.startDate}-${cluster.endDate}`;
+
+                        return (
+                          <section
+                            key={`${cluster.year}-${cluster.startDate}-${cluster.endDate}`}
+                            className={styles.memoryCluster}
+                            data-testid={clusterId}
+                            onMouseEnter={() => applyMemoryHighlight(cluster)}
+                            onMouseLeave={clearMemoryHighlight}
+                            onFocusCapture={() => applyMemoryHighlight(cluster)}
+                            onBlurCapture={(event) => {
+                              if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+                                clearMemoryHighlight();
+                              }
+                            }}
+                          >
+                            <div className={styles.memoryClusterHeader}>
+                              <button
+                                type="button"
+                                className={styles.memoryClusterLabelButton}
+                                onClick={() => {
+                                  setSelectedDate(cluster.startDate);
+                                  setMemoryScrollTargetDate(cluster.startDate);
+                                }}
+                                aria-label={label}
+                                id={clusterId}
+                              >
+                                <span className={styles.memoryClusterAge}>{ageLabel}</span>
+                                {metaLabel ? (
+                                  <span className={styles.memoryClusterLabel}>{metaLabel}</span>
+                                ) : null}
+                                {swatches.length > 0 ? (
+                                  <span
+                                    className={styles.memoryClusterSwatches}
+                                    aria-hidden="true"
+                                  >
+                                    {swatches.map((color) => (
+                                      <span
+                                        key={color}
+                                        className={styles.memoryClusterSwatch}
+                                        style={{ backgroundColor: color }}
+                                      />
+                                    ))}
+                                  </span>
+                                ) : null}
+                              </button>
+                            </div>
+
+                            <ul className={styles.memoryStrip}>
+                              {previewItems.map((entry) => (
+                                <li key={entry.href} className={styles.memoryItem}>
+                                  <button
+                                    type="button"
+                                    className={styles.memoryButton}
+                                    onClick={() => {
+                                      setSelectedDate(entry.date);
+                                    }}
+                                    aria-label={`Jump to ${entry.album} on ${entry.date}`}
+                                    title={`Jump to ${entry.date}`}
+                                  >
+                                    <img
+                                      src={entry.src.src}
+                                      width={entry.placeholderWidth}
+                                      height={entry.placeholderHeight}
+                                      style={{ backgroundColor: entry.placeholderColor }}
+                                      className={styles.memoryImage}
+                                      alt=""
+                                    />
+                                  </button>
+                                </li>
+                              ))}
+                            </ul>
+                          </section>
+                        );
+                      })}
+                    </div>
+
+                    {memories.length > visibleMemoryClusterCount ? (
+                      <button
+                        type="button"
+                        className={`${commonStyles.button} ${styles.memoryLoadMoreButton}`}
+                        onClick={() => {
+                          setVisibleMemoryClusterCount((current) =>
+                            Math.min(
+                              current + TIMELINE_MEMORY_LOAD_MORE_SIZE,
+                              memories.length,
+                            ),
+                          );
+                        }}
+                      >
+                        More memories…
+                      </button>
+                    ) : null}
+                  </section>
+                ) : null}
+              </div>
+              <div className={styles.dayPanel}>
+                <TimelineDayGrid
+                  date={selectedDate}
+                  entries={selectedEntries}
+                  onSelectRandomDate={handleSelectRandomDate}
+                  onSelectOlderDate={handleSelectOlderDate}
+                  onSelectNewerDate={handleSelectNewerDate}
+                  canGoOlder={canGoOlder}
+                  canGoNewer={canGoNewer}
+                />
+              </div>
             </div>
-          </div>
+          </>
         )}
       </main>
     </div>
