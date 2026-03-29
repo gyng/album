@@ -5,7 +5,6 @@ import { deserializeContentBlock } from "./deserialize";
 import {
   Block,
   Content,
-  PhotoBlock,
   SerializedContent,
   SerializedPhotoBlock,
   SerializedTextBlock,
@@ -22,26 +21,41 @@ const isZoneIdentifierFile = (filename: string): boolean => {
   return filename.toLowerCase().includes(":zone.identifier");
 };
 
+export const getBlockDate = (block: Block): number => {
+  if (block.kind === "text") {
+    return 1;
+  }
+  if (block.kind === "photo") {
+    return Date.parse(block._build?.exif?.DateTimeOriginal ?? 0).valueOf() ?? 0;
+  }
+  if (block.kind === "video") {
+    return block.data.date ? new Date(block.data.date).valueOf() : 0;
+  }
+  return 0;
+};
+
+const sortBlocksByDate = (
+  blocks: Block[],
+  sortOrder: "newest-first" | "oldest-first" = "oldest-first",
+): Block[] => {
+  return blocks.sort((a, b) =>
+    sortOrder === "newest-first"
+      ? getBlockDate(b) - getBlockDate(a)
+      : getBlockDate(a) - getBlockDate(b),
+  );
+};
+
 export const getImageTimestampRange = (
   album: Content,
 ): [number | null, number | null] => {
-  // FIXME: dedup
-  const earliest = album.blocks.reduce((acc: number, val: Block) => {
-    if (val.kind === "photo") {
-      const dt = new Date(val._build?.exif.DateTimeOriginal).getTime();
-      return dt < acc ? dt : acc;
-    }
-    return acc;
-  }, Number.MAX_VALUE);
-
-  const latest = album.blocks.reduce((acc: number, val: Block) => {
-    if (val.kind === "photo") {
-      const dt = new Date(val._build?.exif.DateTimeOriginal).getTime();
-      return dt > acc ? dt : acc;
-    }
-    return acc;
-  }, 0);
-
+  let earliest = Number.MAX_VALUE;
+  let latest = 0;
+  for (const block of album.blocks) {
+    if (block.kind !== "photo") continue;
+    const dt = new Date(block._build?.exif?.DateTimeOriginal).getTime();
+    if (dt < earliest) earliest = dt; // NaN comparisons are false → missing dates skipped
+    if (dt > latest) latest = dt;
+  }
   return [
     earliest !== Number.MAX_VALUE ? earliest : null,
     latest !== 0 ? latest : null,
@@ -216,12 +230,7 @@ export const getAlbum = async (
     }
 
     // Sort by date
-    manifest.blocks = manifest.blocks.sort((a, b) => {
-      return (
-        Date.parse((a as PhotoBlock)._build?.exif?.DateTimeOriginal ?? 0) -
-        Date.parse((b as PhotoBlock)._build?.exif?.DateTimeOriginal ?? 0)
-      );
-    });
+    manifest.blocks = sortBlocksByDate(manifest.blocks);
 
     // TODO: clean this up by splitting this up
     // and default behaviour (no v1 manifest or v2 manifest)
@@ -283,26 +292,10 @@ export const getAlbum = async (
       }
     }
 
-    manifest.blocks = manifest.blocks.sort((a, b) => {
-      const getBlockDate = (block: Block) => {
-        if (block.kind == "text") {
-          return 1;
-        } else if (block.kind === "photo") {
-          return (
-            Date.parse(block._build?.exif?.DateTimeOriginal ?? 0).valueOf() ?? 0
-          );
-        } else if (block.kind === "video") {
-          return block.data.date ? new Date(block.data.date).valueOf() : 0;
-        }
-        return 0;
-      };
-
-      if (v2Manifest?.sort === "newest-first") {
-        return getBlockDate(b) - getBlockDate(a);
-      } else {
-        return getBlockDate(a) - getBlockDate(b);
-      }
-    });
+    manifest.blocks = sortBlocksByDate(
+      manifest.blocks,
+      v2Manifest?.sort ?? "oldest-first",
+    );
 
     // Hack by moving text always to top
     const textBlocks = manifest.blocks.filter((b) => b.kind === "text");
@@ -315,22 +308,11 @@ export const getAlbum = async (
       const range = getImageTimestampRange(manifest).map((ts) =>
         new Date(ts!).getFullYear(),
       ) ?? [0, 0];
-      title.data.kicker = `${range[0]}${
-        range[1] === range[0] ? "" : `–${range[1]}`
-      }`;
-    }
-
-    if (v2Manifest?.sort === "newest-first") {
-      // TODO: DRY this out with above
-      const title = manifest.blocks.at(0);
-      if (title?.kind === "text") {
-        const range = getImageTimestampRange(manifest).map((ts) =>
-          new Date(ts!).getFullYear(),
-        ) ?? [0, 0];
-        title.data.kicker = `${range[1]}${
-          range[1] === range[0] ? "" : `–${range[0]}`
-        }`;
-      }
+      const [from, to] =
+        v2Manifest?.sort === "newest-first"
+          ? [range[1], range[0]]
+          : [range[0], range[1]];
+      title.data.kicker = `${from}${to === from ? "" : `–${to}`}`;
     }
 
     return manifest;
