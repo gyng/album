@@ -89,7 +89,7 @@ test.describe("Slideshow GPS Tests @slow", () => {
     }
   });
 
-  test("slideshow falls back to geocode coordinates when EXIF GPS is unavailable", async ({
+  test("slideshow only renders the map when EXIF GPS coordinates are available", async ({
     page,
   }) => {
     // Navigate to slideshow with map enabled
@@ -101,18 +101,18 @@ test.describe("Slideshow GPS Tests @slow", () => {
     // Wait for slideshow to load and map to be enabled by URL param
     await page.waitForTimeout(10000);
 
-    // Check if map is visible (should attempt to show map with coordinates)
+    // The slideshow only uses EXIF GPS coordinates for map rendering.
     const mapContainer = page.locator(".mapContainer");
     const mapContainerCount = await mapContainer.count();
 
-    // The map container should exist (even if coordinates unavailable)
+    // The container may exist even when the current photo has no EXIF GPS fix.
     if (mapContainerCount > 0) {
       console.log(
-        "✓ Map container present - coordinates loaded from EXIF or geocode fallback",
+        "✓ Map container present - slideshow will render a map when EXIF GPS is available",
       );
     }
 
-    // Try cycling through a few photos to find one with coordinates
+    // Try cycling through a few photos to find one with EXIF GPS coordinates
     let foundCoordinatePhoto = false;
     for (let i = 0; i < 5; i++) {
       const nextButton = page.locator('button:has-text("Next")');
@@ -127,7 +127,7 @@ test.describe("Slideshow GPS Tests @slow", () => {
           if (isCanvasVisible) {
             foundCoordinatePhoto = true;
             console.log(
-              `✓ Found photo with coordinates (EXIF or geocode) on attempt ${i + 1}`,
+              `✓ Found photo with EXIF GPS coordinates on attempt ${i + 1}`,
             );
             break;
           }
@@ -137,9 +137,8 @@ test.describe("Slideshow GPS Tests @slow", () => {
 
     if (!foundCoordinatePhoto) {
       console.log(
-        "⚠ No photos with coordinates found in this batch (expected if dataset has no GPS data)",
+        "⚠ No photos with EXIF GPS coordinates found in this batch",
       );
     }
   });
 });
-

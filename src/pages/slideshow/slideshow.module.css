@@ -16,6 +16,16 @@
   object-fit: cover !important;
 }
 
+.preloadBuffer {
+  position: fixed;
+  width: 1px;
+  height: 1px;
+  inset: auto auto -10px -10px;
+  opacity: 0.001;
+  pointer-events: none;
+  user-select: none;
+}
+
 .container {
   position: fixed;
   inset: 0;

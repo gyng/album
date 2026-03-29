@@ -106,12 +106,19 @@ test.describe("Slideshow Functionality Tests @slow", () => {
     await revealSlideshowControls(page);
     await nextButton.click();
 
-    // Wait a moment for image to potentially change
-    await page.waitForTimeout(2000);
+    await page.waitForFunction(
+      ([selector, previousSrc]) => {
+        const img = document.querySelector(selector);
+        return img?.getAttribute("src") !== previousSrc;
+      },
+      ['img[src*=".jpg"], img[src*=".JPG"], img[src*=".avif"]', String(firstImageSrc)],
+      { timeout: 10000 },
+    );
 
-    // Check if image changed (may or may not depending on available photos)
     const secondImageSrc = await slideshowImage.getAttribute("src");
     console.log(`Image changed from ${firstImageSrc} to ${secondImageSrc}`);
+    expect(secondImageSrc).toBeTruthy();
+    expect(secondImageSrc).not.toBe(firstImageSrc);
 
     console.log("✓ Next button functionality tested");
   });
@@ -132,15 +139,18 @@ test.describe("Slideshow Functionality Tests @slow", () => {
     expect(firstImageSrc).toBeTruthy();
 
     await page.keyboard.press("ArrowRight");
-    await page.waitForTimeout(500);
+    await page.waitForFunction(
+      ([selector, previousSrc]) => {
+        const img = document.querySelector(selector);
+        return img?.getAttribute("src") !== previousSrc;
+      },
+      ['img[src*=".jpg"], img[src*=".JPG"], img[src*=".avif"]', String(firstImageSrc)],
+      { timeout: 10000 },
+    );
 
     const secondImageSrc = await slideshowImage.getAttribute("src");
     expect(secondImageSrc).toBeTruthy();
-
-    test.skip(
-      secondImageSrc === firstImageSrc,
-      "Slideshow did not advance to a distinct image in this run",
-    );
+    expect(secondImageSrc).not.toBe(firstImageSrc);
 
     await page.keyboard.press("ArrowLeft");
 

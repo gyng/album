@@ -50,6 +50,7 @@ The search UI, album details similarity grid, and slideshow similarity mode use 
 - Hybrid search fuses the keyword and semantic rankings with Reciprocal Rank Fusion.
 - Similarity uses the embeddings database for image-to-image ranking.
 - Database loading is cached in the browser so pages do not repeatedly deserialize the same SQLite files.
+- In the slideshow, map coordinates come from EXIF GPS data only. Geocoded location text can still be shown in details overlays, but it is not converted into fallback map coordinates.
 
 When search is already in similarity mode, the source thumbnail can launch a similar-trail slideshow directly with `/slideshow?mode=similar&seed=<path>`.
 

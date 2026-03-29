@@ -111,6 +111,20 @@ const weightedShufflePhotos = (
   return avoidBoundaryRepeat(weighted, previousLastPath);
 };
 
+const getSlideshowPhotoSrc = (photo: RandomPhotoRow | null): string | null => {
+  if (!photo?.path) {
+    return null;
+  }
+
+  const albumName = photo.path.split("/")?.[2] ?? "";
+  const photoName = photo.path.split("/")?.[3] ?? "";
+  if (!albumName || !photoName) {
+    return null;
+  }
+
+  return `/data/albums/${albumName}/.resized_images/${photoName}@3200.avif`;
+};
+
 const SlideshowPage: NextPage<PageProps> = (props) => {
   return <Slideshow />;
 };
@@ -211,9 +225,6 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
 
   const [imageLoaded, setImageLoaded] = React.useState<boolean>(false);
 
-  // Use this to force a clear
-  const [nextCounter, setNextCounter] = React.useState<number>(0);
-
   const [filter, setFilter] = React.useState<string | undefined>(undefined);
   const recentPhotoPathsRef = React.useRef<string[]>([]);
   const [shuffleHistorySize, setShuffleHistorySize, removeShuffleHistorySize] =
@@ -243,6 +254,9 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
   const suppressImageClickRef = React.useRef(false);
   const controlsHideDeadlineRef = React.useRef<number | null>(null);
   const pausedRemainingMsRef = React.useRef<number | null>(null);
+  const [bufferedPhotoSrc, setBufferedPhotoSrc] = React.useState<string | null>(
+    null,
+  );
 
   const updateSlideshowUrl = useCallback(
     (
@@ -295,7 +309,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
    * Boolean parameters (accept: 1, true, yes, on):
    *   - clock=1        Show clock display
    *   - details=1      Show photo details (location, date)
-   *   - map=1          Show map with GPS coordinates
+   *   - map=1          Show map when EXIF GPS coordinates are available
    *   - cover=1        Use cover mode (vs contain)
    *
    * Other parameters:
@@ -767,6 +781,47 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
     advanceRandomPhoto();
   }, [advanceRandomPhoto, database, resetSimilarQueue, setSlideshowModeAndUrl]);
 
+  const getUpcomingPhoto = useCallback((): RandomPhotoRow | null => {
+    if (historyIndexRef.current < navigationHistoryRef.current.length - 1) {
+      return navigationHistoryRef.current[historyIndexRef.current + 1] ?? null;
+    }
+
+    if (slideshowMode === "random" || slideshowMode === "weighted") {
+      let queue = randomQueueRef.current;
+      let nextIndex = randomQueueIndexRef.current + 1;
+
+      if (queue.length === 0 || nextIndex >= queue.length) {
+        if (randomPhotoPoolRef.current.length === 0) {
+          return null;
+        }
+
+        queue =
+          slideshowMode === "weighted"
+            ? weightedShufflePhotos(
+                randomPhotoPoolRef.current,
+                randomQueueLastPathRef.current,
+              )
+            : shufflePhotos(
+                randomPhotoPoolRef.current,
+                randomQueueLastPathRef.current,
+              );
+        nextIndex = 0;
+      }
+
+      return queue[nextIndex] ?? null;
+    }
+
+    if (
+      slideshowMode === "similar" &&
+      similarSeedPathRef.current === currentPhotoPathRef.current?.path
+    ) {
+      const nextIndex = similarQueueIndexRef.current + 1;
+      return similarQueueRef.current[nextIndex] ?? null;
+    }
+
+    return null;
+  }, [slideshowMode]);
+
   useEffect(() => {
     if (slideshowMode === "similar") {
       randomQueueRef.current = [];
@@ -813,6 +868,16 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
     setIsPaused((prev) => !prev);
   }, []);
 
+  const advanceToNextPhoto = useCallback(() => {
+    setImageLoaded(false);
+    goNext();
+  }, [goNext]);
+
+  useEffect(() => {
+    const nextSrc = getSlideshowPhotoSrc(getUpcomingPhoto());
+    setBufferedPhotoSrc(nextSrc);
+  }, [currentPhotoPath?.path, getUpcomingPhoto, historyPosition.index, historyPosition.total]);
+
   useEffect(() => {
     if (isPaused || !currentPhotoPathRef.current) {
       return;
@@ -824,7 +889,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
     }, delayUntilNext);
 
     return () => window.clearTimeout(id);
-  }, [goNext, isPaused, nextChangeAt, nextCounter]);
+  }, [goNext, isPaused, nextChangeAt]);
 
   useEffect(() => {
     if (isPaused) {
@@ -845,10 +910,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       handleSlideshowKeyboardShortcut(e, {
-        goNext: () => {
-          setImageLoaded(false);
-          setNextCounter((prev) => prev + 1);
-        },
+        goNext: advanceToNextPhoto,
         goPrevious: () => {
           setImageLoaded(false);
           goPrevious();
@@ -861,7 +923,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [goPrevious, togglePaused]);
+  }, [advanceToNextPhoto, goPrevious, togglePaused]);
 
   useEffect(() => {
     const id = setInterval(() => {
@@ -1054,10 +1116,9 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
 
       if (horizontalDistance >= 48 && horizontalDistance > verticalDistance) {
         suppressImageClickRef.current = true;
-        setImageLoaded(false);
 
         if (deltaX < 0) {
-          setNextCounter((prev) => prev + 1);
+          advanceToNextPhoto();
           return;
         }
 
@@ -1080,7 +1141,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
         togglePaused();
       }
     },
-    [clearImagePointerGesture, goPrevious, togglePaused],
+    [advanceToNextPhoto, clearImagePointerGesture, goPrevious, togglePaused],
   );
 
   const showControlsForDesktop = useCallback(() => {
@@ -1118,9 +1179,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
     kind: "photo",
     id: "",
     data: {
-      src: currentPhotoPath
-        ? `/data/albums/${albumName}/.resized_images/${photoName}@3200.avif`
-        : "",
+      src: getSlideshowPhotoSrc(currentPhotoPath) ?? "",
       title: undefined,
       kicker: undefined,
       description: undefined,
@@ -1340,7 +1399,6 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
               <button
                 className={commonStyles.button}
                 onClick={() => {
-                  setImageLoaded(false);
                   goRandom();
                 }}
               >
@@ -1373,8 +1431,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
               <button
                 className={commonStyles.button}
                 onClick={() => {
-                  setImageLoaded(false);
-                  setNextCounter((prev) => prev + 1);
+                  advanceToNextPhoto();
                 }}
               >
                 Next
@@ -1655,7 +1712,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
           onError={() => {
             // Skip bad images to avoid showing broken image on displays
             setTimeout(() => {
-              setNextCounter((prev) => prev + 1);
+              advanceToNextPhoto();
             }, 1000);
           }}
           onPointerDown={handleImagePointerDown}
@@ -1666,10 +1723,19 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
               suppressImageClickRef.current = false;
               return;
             }
-            setImageLoaded(false);
-            setNextCounter((prev) => prev + 1);
+            advanceToNextPhoto();
           }}
         />
+
+        {bufferedPhotoSrc && bufferedPhotoSrc !== photoBlock.data.src ? (
+          <img
+            className={styles.preloadBuffer}
+            src={bufferedPhotoSrc}
+            alt=""
+            aria-hidden="true"
+            decoding="async"
+          />
+        ) : null}
       </div>
     </>
   );

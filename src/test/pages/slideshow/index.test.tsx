@@ -59,6 +59,19 @@ describe("slideshow page", () => {
     mockUseDatabase.mockReturnValue([null, 42]);
     mockUseEmbeddingsDatabase.mockReturnValue([null, 0]);
     mockFetchSlideshowPhotos.mockResolvedValue([]);
+    Object.defineProperty(window, "matchMedia", {
+      writable: true,
+      value: jest.fn().mockImplementation(() => ({
+        matches: false,
+        media: "",
+        onchange: null,
+        addListener: jest.fn(),
+        removeListener: jest.fn(),
+        addEventListener: jest.fn(),
+        removeEventListener: jest.fn(),
+        dispatchEvent: jest.fn(),
+      })),
+    });
     global.fetch = jest.fn().mockResolvedValue({
       ok: false,
       text: async () => "",

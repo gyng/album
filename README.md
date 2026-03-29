@@ -230,6 +230,8 @@ The slideshow supports three playback modes:
 
 You can switch modes from the slideshow toolbar or open them directly with `/slideshow?mode=random`, `/slideshow?mode=weighted`, or `/slideshow?mode=similar`.
 
+In slideshow overlays, the map only renders when the current photo has EXIF GPS coordinates. Geocoded location text is still used for display labels, but it is not used as a coordinate fallback for the slideshow map.
+
 Previously a HTTP Range VFS driver was used for Sqlite: however the fallback either didn't work right or a new package version with that feature wasn't released. To make things easier to maintain I switched it back to the official SQLite WASM library.
 
 SQLite in the browser then loads this database and runs local FTS5 queries plus embedding-based ranking. The semantic text model is loaded separately in a worker so the UI can show loading progress without blocking interaction. I'm running SQLite on the main thread so it doesn't need access to shared array buffers. SABs need COOP/COEP headers setup. I ran things on the main thread to remove any need for COOP/COEP header hackery (on Vercel, very difficult to debug headers!). This does mean the full database (multi-megabyte) is loaded which can take some time.
