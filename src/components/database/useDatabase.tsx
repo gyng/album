@@ -158,10 +158,7 @@ const initializeSQLite = async (
   let db: Database | undefined;
   try {
     console.log("Loading and initializing SQLite3 module...");
-    const sqlite3 = await sqlite3InitModule({
-      print: console.log,
-      printErr: console.error,
-    });
+    const sqlite3 = await sqlite3InitModule();
     try {
       db = await loadRemoteDatabase(sqlite3, url, setProgress);
     } catch (err) {

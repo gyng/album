@@ -12,12 +12,13 @@ jest.mock("next/link", () => ({
     href,
     children,
     className,
+    ...rest
   }: {
     href: string;
     children: React.ReactNode;
     className?: string;
   }) => (
-    <a href={href} className={className}>
+    <a href={href} className={className} {...rest}>
       {children}
     </a>
   ),
@@ -88,16 +89,13 @@ describe("TimelineDayGrid", () => {
     expect(
       document.querySelector('a[href="/album/tokyo#b.jpg"]'),
     ).toBeTruthy();
-    expect(
-      document.querySelector(
-        'a[href="/search?similar=..%2Falbums%2Fkansai%2Fa.jpg"]',
-      ),
-    ).toBeTruthy();
-    expect(
-      document.querySelector(
-        'a[href="/search?similar=..%2Falbums%2Ftokyo%2Fb.jpg"]',
-      ),
-    ).toBeTruthy();
+    const similarLinks = screen.getAllByRole("link", {
+      name: /find similar photos/i,
+    });
+    expect(similarLinks.map((link) => link.getAttribute("href"))).toEqual([
+      "/search?similar=..%2Falbums%2Fkansai%2Fa.jpg",
+      "/search?similar=..%2Falbums%2Ftokyo%2Fb.jpg",
+    ]);
   });
 
   it("renders an empty state when no date is selected", () => {
