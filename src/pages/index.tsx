@@ -1,5 +1,4 @@
 import type { GetStaticProps, NextPage } from "next";
-import Head from "next/head";
 import { Albums } from "../components/Albums";
 import styles from "./Index.module.css";
 import { getAlbums, getImageTimestampRange } from "../services/album";
@@ -8,6 +7,11 @@ import { measureBuild } from "../services/buildTiming";
 // import DynamicSearchWithCoi from "../components/search/DynamicSearchWithCoi";
 import Link from "next/link";
 import { ThemeToggle } from "../components/ThemeToggle";
+import { Seo } from "../components/Seo";
+import {
+  buildCollectionPageJsonLd,
+  buildWebSiteJsonLd,
+} from "../lib/seo";
 
 type PageProps = {
   albums: Content[];
@@ -16,10 +20,16 @@ type PageProps = {
 const Home: NextPage<PageProps> = (context) => {
   return (
     <div className={styles.container}>
-      <Head>
-        <title>Snapshots</title>
-        <meta name="description" content="Snapshots from a better era" />
-      </Head>
+      <Seo
+        jsonLd={[
+          buildWebSiteJsonLd(),
+          buildCollectionPageJsonLd({
+            name: "Snapshots",
+            description: "Snapshots from a better era",
+            pathname: "/",
+          }),
+        ]}
+      />
 
       <main className={styles.main}>
         <h1>Snapshots</h1>

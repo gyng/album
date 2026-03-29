@@ -7,6 +7,7 @@ import React from "react";
 import { License } from "../License";
 import { getDegLatLngFromExif } from "../util/dms2deg";
 import { getRelativeTimeString } from "../util/time";
+import { getPhotoAltText } from "../lib/alt";
 
 import type { JSX } from "react";
 import { rgbToString } from "../util/colorDistance";
@@ -256,12 +257,7 @@ export const Picture: React.FC<{
         // placeholder image sizes
         width={actualWidth}
         height={actualHeight}
-        alt={
-          props.block._build?.tags?.alt_text ??
-          props.block.data.title ??
-          props.block.data.kicker ??
-          props.block.data.description
-        }
+        alt={getPhotoAltText(props.block)}
         aria-label={props.label}
       />
     </picture>

@@ -1,5 +1,4 @@
 import { GetStaticProps, NextPage } from "next";
-import Head from "next/head";
 import Link from "next/link";
 import { useRouter } from "next/router";
 import React from "react";
@@ -12,6 +11,8 @@ import { Block, PhotoBlock } from "../../services/types";
 import { measureBuild } from "../../services/buildTiming";
 import { getDegLatLngFromExif } from "../../util/dms2deg";
 import commonStyles from "../../styles/common.module.css";
+import { Seo } from "../../components/Seo";
+import { buildCollectionPageJsonLd } from "../../lib/seo";
 import styles from "./timeline.module.css";
 
 type PageProps = {
@@ -150,9 +151,16 @@ const TimelinePage: NextPage<PageProps> = ({ entries }) => {
 
   return (
     <div className={styles.page}>
-      <Head>
-        <title>Timeline</title>
-      </Head>
+      <Seo
+        title="Timeline | Snapshots"
+        description="Explore dated photos across the archive timeline."
+        pathname="/timeline"
+        jsonLd={buildCollectionPageJsonLd({
+          name: "Timeline | Snapshots",
+          description: "Explore dated photos across the archive timeline.",
+          pathname: "/timeline",
+        })}
+      />
 
       <main className={styles.main}>
         <Nav hasPadding={false} />

@@ -12,7 +12,6 @@ import styles from "./slideshow.module.css";
 import commonStyles from "../../styles/common.module.css";
 import { ThemeToggle } from "../../components/ThemeToggle";
 import Link from "next/link";
-import Head from "next/head";
 import { useLocalStorage } from "usehooks-ts";
 import { getRelativeTimeString } from "../../util/time";
 import {
@@ -20,6 +19,9 @@ import {
   extractGPSFromExifString,
 } from "../../util/extractExifFromDb";
 import MMap from "../../components/Map";
+import { Seo } from "../../components/Seo";
+import { buildCollectionPageJsonLd } from "../../lib/seo";
+import { getPhotoAltText } from "../../lib/alt";
 
 type PageProps = {};
 type SlideshowMode = "random" | "weighted" | "similar";
@@ -861,9 +863,17 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
 
   return (
     <>
-      <Head>
-        <title>Slideshow</title>
-      </Head>
+      <Seo
+        title="Slideshow | Snapshots"
+        description="Play a fullscreen slideshow from the photo archive."
+        pathname="/slideshow"
+        noindex
+        jsonLd={buildCollectionPageJsonLd({
+          name: "Slideshow | Snapshots",
+          description: "Play a fullscreen slideshow from the photo archive.",
+          pathname: "/slideshow",
+        })}
+      />
 
       <div className={styles.container}>
         <div className={[styles.toolbar, commonStyles.topBar].join(" ")}>
@@ -1184,7 +1194,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
             showCover ? styles.cover : "",
           ].join(" ")}
           src={photoBlock.data.src}
-          alt={photoBlock.data.title || "Slideshow image"}
+          alt={getPhotoAltText(photoBlock, "Slideshow photo")}
           onLoad={() => {
             setImageLoaded(true);
           }}

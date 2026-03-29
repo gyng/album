@@ -1,13 +1,17 @@
 /* eslint react-hooks/rules-of-hooks: 0 */
 
 import { GetStaticPaths, GetStaticProps, NextPage } from "next";
-import Head from "next/head";
 import React from "react";
 import { getAlbumFromName, getAlbumNames } from "../../services/album";
 import { Content, PhotoBlock } from "../../services/types";
 import { Nav } from "../../components/Nav";
 import { PhotoAlbum } from "../../components/PhotoAlbum";
 import { measureBuild } from "../../services/buildTiming";
+import { Seo } from "../../components/Seo";
+import {
+  buildBreadcrumbJsonLd,
+  buildCollectionPageJsonLd,
+} from "../../lib/seo";
 
 type PageProps = {
   album?: Content;
@@ -39,23 +43,31 @@ const Album: NextPage<PageProps> = ({ album }) => {
 
   return (
     <>
-      <Head>
-        <title>{title}</title>
-        {album.kicker ? (
-          <meta name="description" content={album.kicker} />
-        ) : (
-          <meta
-            name="description"
-            content={`${title} photo album: ${imageCount} photos`}
-          />
-        )}
-        {cover ? (
-          <meta
-            property="og:image"
-            content={(cover as PhotoBlock)._build.srcset?.[0].src}
-          />
-        ) : null}
-      </Head>
+      <Seo
+        title={`${title} | Snapshots`}
+        description={
+          album.kicker ?? `${title} photo album: ${imageCount} photos`
+        }
+        pathname={`/album/${statefulAlbum._build.slug}`}
+        image={(cover as PhotoBlock | undefined)?._build.srcset?.[0].src}
+        type="article"
+        jsonLd={[
+          buildCollectionPageJsonLd({
+            name: `${title} | Snapshots`,
+            description:
+              album.kicker ?? `${title} photo album: ${imageCount} photos`,
+            pathname: `/album/${statefulAlbum._build.slug}`,
+            image: (cover as PhotoBlock | undefined)?._build.srcset?.[0].src,
+          }),
+          buildBreadcrumbJsonLd([
+            { name: "Snapshots", pathname: "/" },
+            {
+              name: title,
+              pathname: `/album/${statefulAlbum._build.slug}`,
+            },
+          ]),
+        ]}
+      />
 
       <Nav albumName={statefulAlbum._build.slug} />
       <PhotoAlbum album={statefulAlbum} />

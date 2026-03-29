@@ -72,6 +72,39 @@ export const getAlbumNames = async (
   });
 };
 
+const formatSitemapDate = (timestampMs: number): string =>
+  new Date(timestampMs).toISOString().slice(0, 10);
+
+export const getAlbumSitemapEntries = async (
+  albumsPath = ALBUMS_DIR,
+): Promise<Array<{ slug: string; lastmod: string }>> => {
+  return measureBuild("album.getAlbumSitemapEntries", async () => {
+    const albumNames = fs.readdirSync(albumsPath).filter((it) => {
+      return fs.lstatSync(path.join(albumsPath, it)).isDirectory();
+    });
+
+    return albumNames.map((slug) => {
+      const albumPath = path.join(albumsPath, slug);
+      const manifestPaths = [
+        path.join(albumPath, MANIFEST_NAME),
+        path.join(albumPath, MANIFEST_V2_NAME),
+      ];
+
+      const lastModifiedMs = Math.max(
+        fs.statSync(albumPath).mtimeMs,
+        ...manifestPaths
+          .filter((manifestPath) => fs.existsSync(manifestPath))
+          .map((manifestPath) => fs.statSync(manifestPath).mtimeMs),
+      );
+
+      return {
+        slug,
+        lastmod: formatSitemapDate(lastModifiedMs),
+      };
+    });
+  });
+};
+
 export const getAlbums = (albumsPath = ALBUMS_DIR): Promise<Content[]> => {
   return measureBuild("album.getAlbums", async () => {
     const albumNames = fs.readdirSync(albumsPath).filter((it) => {

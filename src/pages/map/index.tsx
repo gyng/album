@@ -8,9 +8,10 @@ import { MapWorldEntry } from "../../components/MapWorld";
 import styles from "./map.module.css";
 import commonStyles from "../../styles/common.module.css";
 import Link from "next/link";
-import Head from "next/head";
 import { useRouter } from "next/router";
 import { measureBuild } from "../../services/buildTiming";
+import { Seo } from "../../components/Seo";
+import { buildCollectionPageJsonLd } from "../../lib/seo";
 
 type PageProps = {
   photos: MapWorldEntry[];
@@ -28,9 +29,16 @@ const WorldMap: NextPage<PageProps> = (props) => {
 
   return (
     <div className={styles.container}>
-      <Head>
-        <title>Map</title>
-      </Head>
+      <Seo
+        title="Map | Snapshots"
+        description="Browse photo locations across the world map."
+        pathname="/map"
+        jsonLd={buildCollectionPageJsonLd({
+          name: "Map | Snapshots",
+          description: "Browse photo locations across the world map.",
+          pathname: "/map",
+        })}
+      />
       <div className={[styles.titleBar, commonStyles.topBar].join(" ")}>
         <Link href="/" className={commonStyles.button}>
           ← Albums
