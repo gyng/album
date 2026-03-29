@@ -49,8 +49,9 @@
   border-radius: var(--m-s);
 
   position: absolute;
-  top: -90px;
-  right: calc(-50% - 15px);
+  left: 50%;
+  bottom: calc(100% + 12px);
+  transform: translateX(-50%);
   isolation: isolate;
   border: solid 1px rgba(255, 255, 255, 0.5);
 }
