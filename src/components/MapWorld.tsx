@@ -269,21 +269,13 @@ const getBackgroundJourneyGradientColors = (
   };
 };
 
-const getRouteSpeedSeconds = (
-  fromDate: string | null,
-  toDate: string | null,
-): number => {
-  const from = fromDate ? new Date(fromDate).valueOf() : NaN;
-  const to = toDate ? new Date(toDate).valueOf() : NaN;
-
-  if (Number.isNaN(from) || Number.isNaN(to)) {
-    return 1.4;
-  }
-
-  const gapMinutes = Math.max(1, Math.abs(to - from) / (60 * 1000));
-  const normalized = Math.min(1, gapMinutes / (12 * 60));
-
-  return Number((0.9 + normalized * 1.6).toFixed(2));
+// Slow real-world speed → slow animation, fast → fast.
+// Uses log10 so the huge range (walk 3km/h → flight 900km/h) maps smoothly.
+// log10(1)=0 → 2.5s, log10(10)=1 → 1.83s, log10(100)=2 → 1.16s, log10(900)≈3 → 0.5s
+const getAnimationSecondsFromSpeed = (speedKmh: number | null): number => {
+  if (speedKmh === null || speedKmh <= 0) return 1.8;
+  const log = Math.log10(Math.min(1000, Math.max(1, speedKmh)));
+  return Number((2.5 - log * 0.67).toFixed(2));
 };
 
 const getApproxSpeedKmh = (
@@ -461,8 +453,12 @@ const MapRouteOverlay = ({
           id: `${point.href}-${nextPoint.href}`,
           d: `M ${start.x.toFixed(2)} ${start.y.toFixed(2)} L ${end.x.toFixed(2)} ${end.y.toFixed(2)}`,
           color: getPointColor(nextPoint, index + 1),
-          durationSeconds: getRouteSpeedSeconds(point.date, nextPoint.date),
           approxSpeedKmh: getApproxSpeedKmh(point, nextPoint),
+          durationSeconds: (() => {
+            const t0 = point.date ? new Date(point.date).valueOf() : NaN;
+            const t1 = nextPoint.date ? new Date(nextPoint.date).valueOf() : NaN;
+            return Number.isNaN(t0) || Number.isNaN(t1) ? 0 : Math.abs(t1 - t0) / 1000;
+          })(),
           distanceKm: getDistanceKm(point, nextPoint),
           midX: Number(((start.x + end.x) / 2 + normalX * 10).toFixed(2)),
           midY: Number(((start.y + end.y) / 2 + normalY * 10).toFixed(2)),
@@ -668,7 +664,7 @@ const MapRouteOverlay = ({
                           ? 0.9
                           : 0.72,
                     strokeDasharray: transferLeg ? "18 10" : "8 8",
-                    ["--route-speed" as string]: `${segment.durationSeconds}s`,
+                    ["--route-speed" as string]: `${getAnimationSecondsFromSpeed(segment.approxSpeedKmh)}s`,
                     ["--route-dash-cycle" as string]: dashCycle,
                   }}
                 />
@@ -822,14 +818,15 @@ export const MMap: React.FC<MapWorldProps> = ({
     }
 
     return photosWithStyles.filter((photo) => {
-      if (!photo.decLat || !photo.decLng) return false;
+      if (photo.decLat == null || photo.decLng == null) return false;
 
-      return (
-        photo.decLat >= bounds.south &&
-        photo.decLat <= bounds.north &&
-        photo.decLng >= bounds.west &&
-        photo.decLng <= bounds.east
-      );
+      const inLat = photo.decLat >= bounds.south && photo.decLat <= bounds.north;
+      // Handle antimeridian wrap: west > east when viewport straddles 180°
+      const inLng =
+        bounds.west <= bounds.east
+          ? photo.decLng >= bounds.west && photo.decLng <= bounds.east
+          : photo.decLng >= bounds.west || photo.decLng <= bounds.east;
+      return inLat && inLng;
     });
   }, [photosWithStyles, bounds]);
 
