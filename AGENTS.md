@@ -129,6 +129,19 @@ cd index
 - FTS5 uses `porter trigram` tokeniser — supports both stemmed keyword and substring search
 - Page size set to 1024 bytes and journal mode to `delete` for efficient HTTP range reads via sql.js-httpvfs in the browser
 
+## CI (`.github/workflows/ci.yml`)
+Runs on PRs to `main`, pushes to `main` and `release/*`, and manual dispatch.
+
+**Jobs:**
+- `test` — `npm ci` + `npm run test:ci` from `src/` (Node 20, ubuntu-latest)
+- `playwright` — full Playwright suite (all browsers) with artifact upload (`playwright-report/`, 30-day retention)
+- `test-index` — **currently disabled** (commented out); Janus git dependency fails on GHA due to SSH auth
+
+**Notes:**
+- Both JS jobs set `working-directory: ./src`
+- Playwright installs browsers via `npx playwright install --with-deps` (not cached)
+- No deploy/build job — CI is test-only
+
 ## Do not modify
 - `src/util/lol2album.js`, `src/util/convertlol.js` — one-off migration scripts
 - `src/services/buildTiming.ts` — build instrumentation only, no logic
