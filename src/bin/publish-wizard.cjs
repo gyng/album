@@ -23,6 +23,7 @@ const main = async () => {
   const report = await createPreflightReport({
     albumsDir: context.albumsDir,
     dbPath: context.dbPath,
+    embeddingsDbPath: context.embeddingsDbPath,
     indexDir: context.indexDir,
     lastIndexStatsPath: context.lastIndexStatsPath,
   });
@@ -62,7 +63,7 @@ const main = async () => {
 
   const discoveredPhotoPaths = report.albums.flatMap((album) => album.photoPaths);
   const newPhotoPaths = report.albums.flatMap((album) => album.newPhotos.map((photo) => photo.path));
-  const refreshedDbState = await loadDbState(context.dbPath);
+  const refreshedDbState = await loadDbState(context.dbPath, context.embeddingsDbPath);
   const verification = buildIndexVerification({
     discoveredPhotoPaths,
     newPhotoPaths,

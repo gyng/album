@@ -1,9 +1,11 @@
+const path = require("path");
 const {
   buildAttentionAlbums,
   buildIndexVerification,
   buildPreflightInsights,
   buildSummary,
   buildVerificationInsights,
+  loadDbState,
   parseArgs,
   resolveExecutionPlan,
 } = require("./publish-wizard-lib.cjs");
@@ -328,5 +330,24 @@ describe("publish-wizard-lib", () => {
     });
     expect(insights.map((item) => item.text).join(" ")).toContain("New-photo index coverage: 0%");
     expect(insights.map((item) => item.text).join(" ")).toContain("embedding coverage");
+  });
+
+  describe("loadDbState", () => {
+    const publicDir = path.resolve(__dirname, "../public");
+    const mainDbPath = path.join(publicDir, "search.sqlite");
+    const embeddingsDbPath = path.join(publicDir, "search-embeddings.sqlite");
+
+    it("reports hasEmbeddingsTable false when only main DB provided and it has no embeddings table", async () => {
+      const state = await loadDbState(mainDbPath);
+      expect(state.hasEmbeddingsTable).toBe(false);
+      expect(state.embeddingsCount).toBe(0);
+    });
+
+    it("reads embeddings from a separate embeddings DB when main DB has no embeddings table", async () => {
+      const state = await loadDbState(mainDbPath, embeddingsDbPath);
+      expect(state.hasEmbeddingsTable).toBe(true);
+      expect(state.embeddingsCount).toBeGreaterThan(0);
+      expect(state.embeddingsCount).toBe(state.imageCount);
+    });
   });
 });

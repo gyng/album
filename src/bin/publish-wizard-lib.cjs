@@ -419,7 +419,27 @@ const dbClose = (db) => {
   });
 };
 
-const loadDbState = async (dbPath) => {
+const loadEmbeddingsFromDb = async (embeddingsDbPath) => {
+  const db = await openDatabase(embeddingsDbPath);
+  try {
+    const embeddingRows = await dbAll(db, "SELECT path FROM embeddings");
+    const embeddingsCountRow = await dbGet(db, "SELECT COUNT(*) AS count FROM embeddings");
+    const embeddingModelRows = await dbAll(
+      db,
+      "SELECT model_id, COUNT(*) AS count FROM embeddings GROUP BY model_id",
+    );
+    return {
+      hasEmbeddingsTable: true,
+      embeddingsCount: embeddingsCountRow?.count ?? 0,
+      indexedEmbeddingPaths: new Set(embeddingRows.map((row) => row.path)),
+      embeddingModelCounts: embeddingModelRows.map((row) => ({ modelId: row.model_id, count: row.count })),
+    };
+  } finally {
+    await dbClose(db);
+  }
+};
+
+const loadDbState = async (dbPath, embeddingsDbPath = null) => {
   if (!fileExists(dbPath)) {
     return {
       exists: false,
@@ -451,7 +471,7 @@ const loadDbState = async (dbPath) => {
       ? await dbAll(db, "SELECT model_id, COUNT(*) AS count FROM embeddings GROUP BY model_id")
       : [];
 
-    return {
+    const baseState = {
       exists: true,
       dbPath,
       imageCount: imageCountRow?.count ?? 0,
@@ -461,6 +481,13 @@ const loadDbState = async (dbPath) => {
       hasEmbeddingsTable,
       embeddingModelCounts: embeddingModelRows.map((row) => ({ modelId: row.model_id, count: row.count })),
     };
+
+    if (!hasEmbeddingsTable && embeddingsDbPath && fileExists(embeddingsDbPath)) {
+      const embeddingsState = await loadEmbeddingsFromDb(embeddingsDbPath);
+      return { ...baseState, ...embeddingsState };
+    }
+
+    return baseState;
   } finally {
     await dbClose(db);
   }
@@ -721,8 +748,8 @@ const readLastIndexStats = (lastIndexStatsPath) => {
   }
 };
 
-const createPreflightReport = async ({ albumsDir, dbPath, indexDir, lastIndexStatsPath }) => {
-  const dbState = await loadDbState(dbPath);
+const createPreflightReport = async ({ albumsDir, dbPath, embeddingsDbPath, indexDir, lastIndexStatsPath }) => {
+  const dbState = await loadDbState(dbPath, embeddingsDbPath);
   const albumNames = fs
     .readdirSync(albumsDir, { withFileTypes: true })
     .filter((entry) => entry.isDirectory())
@@ -1033,6 +1060,7 @@ const buildWizardContext = ({ srcDir }) => {
     indexDir,
     lastIndexStatsPath: path.join(indexDir, ".last-index-stats.json"),
     dbPath: path.join(srcDir, "public", "search.sqlite"),
+    embeddingsDbPath: path.join(srcDir, "public", "search-embeddings.sqlite"),
     reportPath: path.join(srcDir, REPORT_FILENAME),
   };
 };
