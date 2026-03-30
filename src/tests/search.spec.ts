@@ -1,4 +1,10 @@
 import { test, expect } from "@playwright/test";
+import { existsSync } from "fs";
+import { join } from "path";
+
+const hasSearchDb = existsSync(
+  join(__dirname, "..", "public", "search.sqlite"),
+);
 
 test.describe("Search", () => {
   test("search page loads with explore section", async ({ page }) => {
@@ -26,6 +32,53 @@ test.describe("Search", () => {
 
     await input.fill("tokyo");
     await expect(page).toHaveURL(/q=tokyo/);
+
+    expect(pageErrors).toEqual([]);
+  });
+
+  test("keyword search returns results", async ({ page }) => {
+    test.skip(!hasSearchDb, "Requires search.sqlite");
+
+    const pageErrors: string[] = [];
+    page.on("pageerror", (error) => pageErrors.push(error.message));
+
+    await page.goto("/search");
+
+    // Use keyword mode to avoid WebGPU dependency
+    await page
+      .getByLabel("Search mode", { exact: true })
+      .selectOption("keyword");
+
+    const input = page.locator('input[placeholder*="Type / to search"]');
+    await input.fill("japan");
+    await expect(page).toHaveURL(/q=japan/);
+
+    // Result tile images appear
+    const results = page.locator("img");
+    await expect(results.first()).toBeVisible();
+    expect(await results.count()).toBeGreaterThan(0);
+
+    expect(pageErrors).toEqual([]);
+  });
+
+  test("tag facet filters results", async ({ page }) => {
+    test.skip(!hasSearchDb, "Requires search.sqlite");
+
+    const pageErrors: string[] = [];
+    page.on("pageerror", (error) => pageErrors.push(error.message));
+
+    await page.goto("/search");
+
+    // Wait for tag cloud to load
+    const tagButton = page.locator("button[aria-pressed]").first();
+    await expect(tagButton).toBeVisible();
+
+    // Click a tag
+    await tagButton.click();
+
+    // URL updates with the tag and button becomes active
+    await expect(tagButton).toHaveAttribute("aria-pressed", "true");
+    await expect(page).toHaveURL(/q=/);
 
     expect(pageErrors).toEqual([]);
   });
