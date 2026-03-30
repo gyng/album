@@ -6,12 +6,14 @@ import {
   CITY_FACET,
   FOCAL_LENGTH_35MM_FACET,
   FOCAL_LENGTH_ACTUAL_FACET,
+  HOUR_FACET,
   ISO_FACET,
   LENS_FACET,
   LOCATION_FACET,
   PhotoFacet,
   REGION_FACET,
   SUBREGION_FACET,
+  YEAR_FACET,
 } from "./photoBuckets";
 
 export type SearchFacetSelection = {
@@ -26,8 +28,10 @@ const SEARCHABLE_FACET_IDS = new Set([
   FOCAL_LENGTH_ACTUAL_FACET.id,
   APERTURE_FACET.id,
   ISO_FACET.id,
+  HOUR_FACET.id,
   CAMERA_FACET.id,
   LENS_FACET.id,
+  YEAR_FACET.id,
   LOCATION_FACET.id,
   REGION_FACET.id,
   SUBREGION_FACET.id,
@@ -135,6 +139,14 @@ export const buildSearchHref = (opts?: {
   return queryString ? `/search?${queryString}` : "/search";
 };
 
+export const buildSimilaritySearchHref = (
+  similarPath: string,
+): string => {
+  const params = new URLSearchParams();
+  params.set("similar", similarPath);
+  return `/search?${params.toString()}`;
+};
+
 export const buildSearchFacetHref = (
   selection: SearchFacetSelection,
 ): string | null => {
@@ -152,6 +164,8 @@ export const getSearchFacetChipLabel = (
   switch (selection.facetId) {
     case ISO_FACET.id:
       return `ISO: ${selection.value}`;
+    case HOUR_FACET.id:
+      return `Time: ${selection.value}`;
     case APERTURE_FACET.id:
       return `Aperture: ${selection.value}`;
     case FOCAL_LENGTH_35MM_FACET.id:
@@ -162,6 +176,8 @@ export const getSearchFacetChipLabel = (
       return `Camera: ${selection.value}`;
     case LENS_FACET.id:
       return `Lens: ${selection.value}`;
+    case YEAR_FACET.id:
+      return `Year: ${selection.value}`;
     case LOCATION_FACET.id:
       return `Country: ${selection.value}`;
     case REGION_FACET.id:

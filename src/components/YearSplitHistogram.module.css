@@ -1,0 +1,131 @@
+.chart {
+  display: grid;
+  gap: var(--m-s);
+  align-content: start;
+}
+
+.title {
+  margin: 0;
+  font-size: var(--fs-m);
+  padding-bottom: 0.2rem;
+}
+
+.matrix {
+  display: grid;
+  gap: 1px;
+  align-items: stretch;
+}
+
+.corner {
+  min-height: 1px;
+}
+
+.monthLabel {
+  font-size: 10px;
+  color: var(--c-bg-contrast-light);
+  text-align: center;
+}
+
+.yearLabel {
+  display: flex;
+  align-items: center;
+  font-size: var(--fs-s);
+  color: var(--c-bg-contrast-light);
+  font-variant-numeric: tabular-nums;
+}
+
+.yearLabelLink {
+  text-decoration: none;
+}
+
+.yearLabelLink:hover {
+  color: var(--c-font);
+}
+
+.cell {
+  position: relative;
+  min-height: 2.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.2rem;
+  background: color-mix(
+    in srgb,
+    var(--c-accent) calc(12% + (var(--intensity) * 78%)),
+    var(--c-bg)
+  );
+  border: 1px solid color-mix(
+    in srgb,
+    var(--c-bg-contrast-dark) calc(80% - (var(--intensity) * 45%)),
+    transparent
+  );
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    transform 0.15s ease;
+}
+
+.cellLink {
+  text-decoration: none;
+}
+
+.cell:hover {
+  transform: translateY(-1px);
+  border-color: color-mix(in srgb, var(--c-accent) 45%, var(--c-font));
+}
+
+.cellEmpty {
+  background: color-mix(in srgb, var(--c-bg) 97%, var(--c-bg-contrast-dark));
+  border-color: color-mix(in srgb, var(--c-bg-contrast-dark) 88%, transparent);
+}
+
+.count {
+  font-size: 10px;
+  font-weight: 600;
+  color: color-mix(in srgb, white 85%, var(--c-font));
+  line-height: 1;
+}
+
+.tooltip {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  transform: translate(-50%, calc(-100% - var(--m-s)));
+  padding: 0.3rem 0.45rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--c-bg) 88%, var(--c-accent));
+  border: 1px solid color-mix(in srgb, var(--c-accent) 60%, var(--c-font));
+  color: color-mix(in srgb, white 92%, var(--c-font));
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.08s ease;
+  z-index: 2;
+}
+
+.cell:hover .tooltip {
+  opacity: 1;
+}
+
+@media (max-width: 720px) {
+  .matrix {
+    grid-template-columns: 3rem repeat(12, minmax(0, 1fr)) !important;
+  }
+
+  .monthLabel,
+  .count {
+    font-size: 9px;
+  }
+
+  .yearLabel {
+    font-size: 9px;
+  }
+
+  .cell {
+    min-height: 2.2rem;
+    padding: 0.15rem;
+  }
+}

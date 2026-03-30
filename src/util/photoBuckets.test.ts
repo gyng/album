@@ -7,6 +7,7 @@ import {
   CAMERA_FACET,
   LENS_FACET,
   LOCATION_FACET,
+  YEAR_FACET,
 } from "./photoBuckets";
 import { Exif, Tags } from "../services/types";
 
@@ -226,5 +227,17 @@ describe("LOCATION_FACET", () => {
   it("returns null when no geocode", () => {
     expect(LOCATION_FACET.extract(exif(), tags())).toBeNull();
     expect(LOCATION_FACET.extract(exif())).toBeNull();
+  });
+});
+
+describe("YEAR_FACET", () => {
+  it("extracts year from DateTimeOriginal", () => {
+    expect(YEAR_FACET.extract(exif({ DateTimeOriginal: "2024:03:22 18:30:00" }))).toBe(
+      "2024",
+    );
+  });
+
+  it("returns null when date is absent", () => {
+    expect(YEAR_FACET.extract(exif({ DateTimeOriginal: undefined }))).toBeNull();
   });
 });

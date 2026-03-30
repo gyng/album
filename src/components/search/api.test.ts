@@ -767,8 +767,9 @@ describe("fetchSearchFacetSections", () => {
       exec: ({ sql, bind, callback }: ExecArgs) => {
         calls.push({ sql, bind });
         callback([
-          "Image Make: FUJIFILM\nImage Model: X-T5\nEXIF LensModel: XF35mmF1.4 R\nEXIF ISOSpeedRatings: 400",
+          "Image Make: FUJIFILM\nImage Model: X-T5\nEXIF LensModel: XF35mmF1.4 R\nEXIF ISOSpeedRatings: 400\nEXIF DateTimeOriginal: 2024:03:22 17:45:00\nEXIF OffsetTime: +09:00",
           "35.6895\n139.6917\nShinjuku-ku\nTokyo\nTokyo\nJP\nJapan",
+          "2024-03-22",
         ]);
       },
     };
@@ -794,6 +795,12 @@ describe("fetchSearchFacetSections", () => {
     expect(
       sections.find((section) => section.facetId === "city")?.options,
     ).toEqual([{ value: "Shinjuku-ku", count: 1 }]);
+    expect(
+      sections.find((section) => section.facetId === "year")?.options,
+    ).toEqual([{ value: "2024", count: 1 }]);
+    expect(
+      sections.find((section) => section.facetId === "hour")?.options,
+    ).toEqual([{ value: "17:00", count: 1 }]);
     expect(
       calls.some(({ bind }) =>
         bind?.includes(`- {path album_relative_path} : "harbor"`),

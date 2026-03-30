@@ -213,6 +213,74 @@ describe("computePhotoStats", () => {
     });
   });
 
+  it("precomputes technical relationship filters for camera and lens", () => {
+    const stats = computePhotoStats([makeAlbum([
+      makePhoto({
+        exif: {
+          DateTimeOriginal: "2024:03:22 17:45:00",
+          OffsetTime: "+09:00",
+          FocalLengthIn35mmFormat: 35,
+          FNumber: 2,
+          ISO: 400,
+          Make: "FUJIFILM",
+          Model: "X-T5",
+          LensModel: "XF35mmF1.4 R",
+        },
+      }),
+      makePhoto({
+        exif: {
+          DateTimeOriginal: "2024:03:22 18:45:00",
+          OffsetTime: "+09:00",
+          FocalLengthIn35mmFormat: 35,
+          FNumber: 2,
+          ISO: 800,
+          Make: "FUJIFILM",
+          Model: "X-T5",
+          LensModel: "XF35mmF1.4 R",
+        },
+      }),
+      makePhoto({
+        exif: {
+          DateTimeOriginal: "2024:03:23 09:00:00",
+          OffsetTime: "+09:00",
+          FocalLengthIn35mmFormat: 85,
+          FNumber: 4,
+          ISO: 400,
+          Make: "SONY",
+          Model: "A7IV",
+          LensModel: "FE 85mm F1.8",
+        },
+      }),
+    ])]);
+
+    expect(stats.technicalRelationshipFilters.cameras).toEqual([
+      "FUJIFILM X-T5",
+      "SONY A7IV",
+    ]);
+    expect(stats.technicalRelationshipFilters.lensesByCamera["FUJIFILM X-T5"]).toEqual([
+      "XF35mmF1.4 R",
+    ]);
+    expect(
+      stats.technicalRelationshipFilters.byCamera["FUJIFILM X-T5"]?.technicalRelationships?.total,
+    ).toBe(2);
+    expect(
+      stats.technicalRelationshipFilters.byLens["FE 85mm F1.8"]?.technicalRelationships?.total,
+    ).toBe(1);
+    expect(
+      stats.technicalRelationshipFilters.byCamera["FUJIFILM X-T5"]?.timeRelationships?.total,
+    ).toBe(2);
+    expect(
+      stats.technicalRelationshipFilters.byCamera["FUJIFILM X-T5"]?.weekdayStats.find(
+        (bucket) => bucket.label === "Fri",
+      )?.count,
+    ).toBe(2);
+    expect(
+      stats.technicalRelationshipFilters.byCameraLens["FUJIFILM X-T5"]?.[
+        "XF35mmF1.4 R"
+      ]?.technicalRelationships?.total,
+    ).toBe(2);
+  });
+
   it("computes hour-of-day coverage (only counts photos with OffsetTime)", () => {
     const stats = computePhotoStats([makeAlbum([
       makePhoto({ exif: { DateTimeOriginal: "2024:03:22 17:45:00", OffsetTime: "+09:00" } }),
@@ -257,12 +325,56 @@ describe("computePhotoStats", () => {
     expect(stats.recentMonthStats.at(-1)).toEqual({ label: "Dec '24", count: 1 });
     expect(stats.recentMonthStats.find((bucket) => bucket.label === "Mar '24")?.count).toBe(2);
     expect(stats.recentYearStats).toEqual([
-      { label: "2020", count: 0 },
-      { label: "2021", count: 0 },
-      { label: "2022", count: 0 },
-      { label: "2023", count: 1 },
-      { label: "2024", count: 3 },
+      {
+        label: "2020",
+        data: expect.arrayContaining([{ label: "Jan", count: 0 }]),
+      },
+      {
+        label: "2021",
+        data: expect.arrayContaining([{ label: "Jan", count: 0 }]),
+      },
+      {
+        label: "2022",
+        data: expect.arrayContaining([{ label: "Jan", count: 0 }]),
+      },
+      {
+        label: "2023",
+        data: expect.arrayContaining([
+          { label: "Dec", count: 1 },
+          { label: "Mar", count: 0 },
+        ]),
+      },
+      {
+        label: "2024",
+        data: expect.arrayContaining([
+          { label: "Mar", count: 2 },
+          { label: "Dec", count: 1 },
+        ]),
+      },
     ]);
+  });
+
+  it("computes a revisited place across multiple years", () => {
+    const stats = computePhotoStats([makeAlbum([
+      makePhoto({
+        exif: { DateTimeOriginal: "2020:03:22 17:45:00" },
+        tags: { geocode: "36.3286\n138.8951\nAnnaka\nGunma\nAnnaka Shi\nJP\nJapan" } as any,
+      }),
+      makePhoto({
+        exif: { DateTimeOriginal: "2024:03:22 17:45:00" },
+        tags: { geocode: "36.3286\n138.8951\nAnnaka\nGunma\nAnnaka Shi\nJP\nJapan" } as any,
+      }),
+    ])]);
+
+    expect(stats.revisitedPlace).toEqual(
+      expect.objectContaining({
+        label: "Annaka",
+        facetId: "city",
+        firstYear: 2020,
+        lastYear: 2024,
+        spanYears: 4,
+      }),
+    );
   });
 
   it("extracts lightweight map points from geotagged photos", () => {

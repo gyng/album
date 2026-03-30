@@ -27,12 +27,12 @@ const SearchPage: NextPage<PageProps> = (props) => {
   return (
     <>
       <Seo
-        title="Search & Explore | Snapshots"
+        title="Search | Snapshots"
         description="Search the photo archive by text, tags, and visual similarity."
         pathname="/search"
         noindex
         jsonLd={buildCollectionPageJsonLd({
-          name: "Search & Explore | Snapshots",
+          name: "Search | Snapshots",
           description:
             "Search the photo archive by text, tags, and visual similarity.",
           pathname: "/search",
@@ -68,7 +68,7 @@ const SearchPage: NextPage<PageProps> = (props) => {
           }
         />
 
-        <h1>Search & Explore</h1>
+        <h1>Search</h1>
         {searchNavState?.randomExploreError ? (
           <p style={{ color: "var(--c-accent)", margin: 0 }}>
             {searchNavState.randomExploreError}

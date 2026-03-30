@@ -9,11 +9,13 @@ import {
   CITY_FACET,
   FOCAL_LENGTH_35MM_FACET,
   FOCAL_LENGTH_ACTUAL_FACET,
+  HOUR_FACET,
   ISO_FACET,
   LENS_FACET,
   LOCATION_FACET,
   REGION_FACET,
   SUBREGION_FACET,
+  YEAR_FACET,
 } from "../../util/photoBuckets";
 import type { Exif } from "../../services/types";
 import {
@@ -129,16 +131,44 @@ const FACET_FIELD_SQL_BY_ID: Record<string, string> = {
   [ISO_FACET.id]: buildExifFieldSql("EXIF ISOSpeedRatings"),
 };
 
+const EXIF_DATETIME_SQL = buildExifFieldSql("EXIF DateTimeOriginal");
+const EXIF_OFFSET_SQL = buildExifFieldSql("EXIF OffsetTime");
+const LOCAL_HOUR_SQL = `CASE
+  WHEN NULLIF(${EXIF_OFFSET_SQL}, '') = '' OR NULLIF(${EXIF_DATETIME_SQL}, '') = '' THEN NULL
+  WHEN instr(${EXIF_DATETIME_SQL}, 'T') > 0 OR substr(${EXIF_DATETIME_SQL}, -1, 1) = 'Z' THEN CAST(
+    (
+      (
+        (
+          CAST(substr(${EXIF_DATETIME_SQL}, 12, 2) AS INTEGER) * 60 +
+          CAST(substr(${EXIF_DATETIME_SQL}, 15, 2) AS INTEGER)
+        ) +
+        (
+          CASE substr(${EXIF_OFFSET_SQL}, 1, 1)
+            WHEN '-' THEN -1
+            ELSE 1
+          END
+        ) * (
+          CAST(substr(${EXIF_OFFSET_SQL}, 2, 2) AS INTEGER) * 60 +
+          CAST(substr(${EXIF_OFFSET_SQL}, 5, 2) AS INTEGER)
+        )
+      ) % 1440 + 1440
+    ) % 1440 / 60 AS INTEGER
+  )
+  ELSE CAST(substr(${EXIF_DATETIME_SQL}, 12, 2) AS INTEGER)
+END`;
+
 const SEARCHABLE_NUMERIC_FACETS = [
   FOCAL_LENGTH_35MM_FACET,
   FOCAL_LENGTH_ACTUAL_FACET,
   APERTURE_FACET,
   ISO_FACET,
+  HOUR_FACET,
 ] as const;
 
 const SEARCHABLE_STRING_FACETS = [
   CAMERA_FACET,
   LENS_FACET,
+  YEAR_FACET,
   LOCATION_FACET,
   REGION_FACET,
   SUBREGION_FACET,
@@ -196,6 +226,21 @@ const parseDbExifString = (raw: string): Exif => {
 const buildSingleFacetClause = (
   selection: SearchFacetSelection,
 ): { sql: string; bind: (string | number)[] } | null => {
+  if (selection.facetId === HOUR_FACET.id) {
+    const bucket = HOUR_FACET.buckets.find(
+      (candidate) => candidate.label === selection.value,
+    );
+    const [min, max] = bucket?.range ?? [];
+    if (min == null || max == null) {
+      return null;
+    }
+
+    return {
+      sql: `${LOCAL_HOUR_SQL} >= ? AND ${LOCAL_HOUR_SQL} <= ?`,
+      bind: [min, max],
+    };
+  }
+
   const numericFacet = SEARCHABLE_NUMERIC_FACETS.find(
     (facet) => facet.id === selection.facetId,
   );
@@ -236,6 +281,13 @@ const buildSingleFacetClause = (
 
   if (selection.facetId === CITY_FACET.id) {
     return buildGeocodeLineClause(selection.value);
+  }
+
+  if (selection.facetId === YEAR_FACET.id) {
+    return {
+      sql: `substr(${NORMALIZED_IMAGE_DATE_SQL}, 1, 4) = ?`,
+      bind: [selection.value],
+    };
   }
 
   if (selection.facetId === LENS_FACET.id) {
@@ -577,17 +629,18 @@ export const fetchSearchFacetSections = async (opts: {
     const whereClause = [keywordWhere.sql, facetWhere.sql].filter(Boolean);
     const result = await exec(
       database,
-      `SELECT images.exif, images.geocode
+      `SELECT images.exif, images.geocode, ${NORMALIZED_IMAGE_DATE_SQL}
         FROM images
         LEFT JOIN metadata m ON m.path = images.path
         ${whereClause.length > 0 ? `WHERE ${whereClause.join(" AND ")}` : ""}`,
       [...keywordWhere.bind, ...facetWhere.bind],
     );
 
-    const rows = result.data as unknown as Array<[string, string]>;
-    return rows.map(([exif, geocode]) => ({
+    const rows = result.data as unknown as Array<[string, string, string]>;
+    return rows.map(([exif, geocode, normalizedDate]) => ({
       exif: parseDbExifString(exif),
       geocode,
+      normalizedDate,
     }));
   };
 
@@ -627,7 +680,9 @@ export const fetchSearchFacetSections = async (opts: {
 
     items.forEach((item) => {
       const value =
-        facet.id === LOCATION_FACET.id
+        facet.id === YEAR_FACET.id
+          ? item.normalizedDate?.slice(0, 4) ?? null
+          : facet.id === LOCATION_FACET.id
           ? getGeocodeCountry(item.geocode) ?? null
           : facet.id === REGION_FACET.id
             ? getGeocodeRegion(item.geocode) ?? null
@@ -649,12 +704,16 @@ export const fetchSearchFacetSections = async (opts: {
       options: Array.from(counts.entries())
         .map(([value, count]) => ({ value, count }))
         .sort((left, right) => {
+          if (facet.id === YEAR_FACET.id) {
+            return Number(right.value) - Number(left.value);
+          }
+
           if (right.count !== left.count) {
             return right.count - left.count;
           }
           return left.value.localeCompare(right.value);
         })
-        .slice(0, 12),
+        .slice(0, facet.id === YEAR_FACET.id ? 20 : 12),
     };
   }));
 

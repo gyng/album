@@ -23,7 +23,7 @@ type Tag = {
   count: number;
 };
 
-type FilterCategoryId = "tags" | "place" | "gear" | "settings";
+type FilterCategoryId = "tags" | "time" | "place" | "gear" | "settings";
 
 type FilterCategory = {
   id: FilterCategoryId;
@@ -32,12 +32,14 @@ type FilterCategory = {
 
 const FILTER_CATEGORIES: FilterCategory[] = [
   { id: "tags", label: "Tags" },
+  { id: "time", label: "Time" },
   { id: "place", label: "Place" },
   { id: "gear", label: "Gear" },
   { id: "settings", label: "Settings" },
 ];
 
 const CATEGORY_FACET_IDS: Record<Exclude<FilterCategoryId, "tags">, string[]> = {
+  time: ["year", "hour"],
   place: ["location", "region", "subregion", "city"],
   gear: ["camera", "lens"],
   settings: ["focal-length-35mm", "focal-length-actual", "aperture", "iso"],

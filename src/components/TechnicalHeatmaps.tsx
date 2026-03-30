@@ -47,6 +47,22 @@ type OverlayLine = {
   labelY: number;
 };
 
+const cubicBezierPoint = (
+  p0: number,
+  p1: number,
+  p2: number,
+  p3: number,
+  t: number,
+): number => {
+  const mt = 1 - t;
+  return (
+    mt * mt * mt * p0 +
+    3 * mt * mt * t * p1 +
+    3 * mt * t * t * p2 +
+    t * t * t * p3
+  );
+};
+
 const DEFAULT_PAIRS: Array<[number, number]> = [
   [0, 1],
   [0, 2],
@@ -353,6 +369,21 @@ export const TechnicalHeatmaps: React.FC<Props> = ({
             y: targetRect.top + targetRect.height / 2 - wrapperRect.top,
           };
           const midX = source.x + (target.x - source.x) * 0.45;
+          const labelT = 0.56;
+          const labelX = cubicBezierPoint(
+            source.x,
+            midX,
+            midX,
+            target.x,
+            labelT,
+          );
+          const labelY = cubicBezierPoint(
+            source.y,
+            source.y,
+            target.y,
+            target.y,
+            labelT,
+          );
           return [
             {
               key: `${activeSelection.heatmapKey}-${targetKey}`,
@@ -360,8 +391,8 @@ export const TechnicalHeatmaps: React.FC<Props> = ({
               width: 1.5 + (count / maxCount) * 5,
               opacity: 0.18 + (count / maxCount) * 0.55,
               label: count.toLocaleString(),
-              labelX: source.x + (target.x - source.x) * 0.52,
-              labelY: source.y + (target.y - source.y) * 0.52,
+              labelX,
+              labelY,
             },
           ];
         }),

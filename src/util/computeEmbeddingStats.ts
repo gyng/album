@@ -12,6 +12,7 @@ const IDENTICAL_SIMILARITY_THRESHOLD = 0.9999;
 const MAX_VISUAL_EXAMPLES = 24;
 const MAX_AVERAGE_EXAMPLES = 12;
 const MAX_OUTLIER_EXAMPLES = 12;
+const MAX_VISUAL_ERAS = 6;
 const DEFAULT_EMBEDDINGS_DB_PATH = path.join(
   process.cwd(),
   "public",
@@ -48,6 +49,22 @@ export type VisualSamenessStats = {
     photo: VisualSamenessPhoto;
     nearestSimilarityPercent: number;
   }>;
+  visualEras: Array<{
+    label: string;
+    photo: VisualSamenessPhoto;
+    sharePercent: number;
+    count: number;
+  }>;
+  lookTimeline: Array<{
+    year: number;
+    photo: VisualSamenessPhoto;
+    count: number;
+  }>;
+  lookDrift: {
+    similarityPercent: number;
+    firstYear: number;
+    lastYear: number;
+  } | null;
 };
 
 export type VisualSamenessPhoto = {
@@ -63,6 +80,7 @@ type EmbeddingRow = {
 };
 
 type PhotoLookup = Map<string, VisualSamenessPhoto>;
+type PhotoDateLookup = Map<string, Date>;
 
 const normalizeVector = (vector: number[]): number[] => {
   let norm = 0;
@@ -134,6 +152,9 @@ export const computeVisualSamenessFromVectors = (
     lowSimilarityThreshold: LOW_SIMILARITY_THRESHOLD,
     repeatedExamples: [],
     distinctExamples: [],
+    visualEras: [],
+    lookTimeline: [],
+    lookDrift: null,
   };
 };
 
@@ -163,6 +184,37 @@ const buildPhotoLookup = (albums: Content[]): PhotoLookup => {
         href: `/album/${album._build.slug}#${photo.id ?? photo.data.src}`,
         label: photo.data.title ?? path.basename(photo.data.src),
       });
+    });
+  });
+
+  return lookup;
+};
+
+const buildPhotoDateLookup = (albums: Content[]): PhotoDateLookup => {
+  const lookup: PhotoDateLookup = new Map();
+
+  albums.forEach((album) => {
+    if (isTestAlbum(album)) {
+      return;
+    }
+
+    album.blocks.forEach((block) => {
+      if (block.kind !== "photo") {
+        return;
+      }
+
+      const photo = block as PhotoBlock;
+      const indexedPath = photo._build?.tags?.path;
+      const raw = photo._build?.exif?.DateTimeOriginal;
+      if (!indexedPath || !raw) {
+        return;
+      }
+
+      const normalized = raw.replace(/^(\d{4}):(\d{2}):(\d{2})/, "$1-$2-$3");
+      const date = new Date(normalized);
+      if (!Number.isNaN(date.getTime())) {
+        lookup.set(indexedPath, date);
+      }
     });
   });
 
@@ -218,6 +270,7 @@ export const computeVisualSamenessStats = async (
     }
 
     const photoLookup = buildPhotoLookup(albums);
+    const photoDateLookup = buildPhotoDateLookup(albums);
     const candidatePaths = albums
       .filter((album) => !isTestAlbum(album))
       .flatMap((album) => album.blocks)
@@ -370,6 +423,9 @@ export const computeVisualSamenessStats = async (
       const centroidCandidates = parsedRows.filter((row) => photoLookup.has(row.path));
       let averageExamples: VisualSamenessStats["averageExamples"] = [];
       let outlierExamples: VisualSamenessStats["outlierExamples"] = [];
+      let visualEras: VisualSamenessStats["visualEras"] = [];
+      let lookTimeline: VisualSamenessStats["lookTimeline"] = [];
+      let lookDrift: VisualSamenessStats["lookDrift"] = null;
       if (centroidCandidates.length > 0) {
         const dimension = centroidCandidates[0]?.vector.length ?? 0;
         const centroid = new Array<number>(dimension).fill(0);
@@ -418,6 +474,191 @@ export const computeVisualSamenessStats = async (
             ];
           })
           .slice(0, MAX_OUTLIER_EXAMPLES);
+
+        if (centroidCandidates.length >= 48) {
+          const visualEraCount = Math.min(
+            MAX_VISUAL_ERAS,
+            Math.max(4, Math.floor(centroidCandidates.length / 250)),
+          );
+          const seeds = [centroidCandidates[0]];
+          while (seeds.length < Math.min(visualEraCount, centroidCandidates.length)) {
+            let bestCandidate = centroidCandidates[0];
+            let bestDistance = -1;
+            centroidCandidates.forEach((candidate) => {
+              const nearestSeed = Math.max(
+                ...seeds.map((seed) => dotProduct(candidate.vector, seed.vector)),
+              );
+              const distance = 1 - nearestSeed;
+              if (distance > bestDistance) {
+                bestDistance = distance;
+                bestCandidate = candidate;
+              }
+            });
+            seeds.push(bestCandidate);
+          }
+
+          let centroids = seeds.map((seed) => seed.vector);
+          for (let iteration = 0; iteration < 3; iteration += 1) {
+            const nextGroups = centroids.map(() => [] as typeof centroidCandidates);
+            centroidCandidates.forEach((candidate) => {
+              let bestIndex = 0;
+              let bestScore = -Infinity;
+              centroids.forEach((clusterCentroid, index) => {
+                const score = dotProduct(candidate.vector, clusterCentroid);
+                if (score > bestScore) {
+                  bestScore = score;
+                  bestIndex = index;
+                }
+              });
+              nextGroups[bestIndex].push(candidate);
+            });
+
+            centroids = nextGroups.map((group, index) => {
+              if (group.length === 0) {
+                return centroids[index];
+              }
+
+              const nextCentroid = new Array<number>(dimension).fill(0);
+              group.forEach((candidate) => {
+                for (let valueIndex = 0; valueIndex < dimension; valueIndex += 1) {
+                  nextCentroid[valueIndex] += candidate.vector[valueIndex];
+                }
+              });
+              return normalizeVector(nextCentroid);
+            });
+          }
+
+          const finalGroups = centroids.map(() => [] as typeof centroidCandidates);
+          centroidCandidates.forEach((candidate) => {
+            let bestIndex = 0;
+            let bestScore = -Infinity;
+            centroids.forEach((clusterCentroid, index) => {
+              const score = dotProduct(candidate.vector, clusterCentroid);
+              if (score > bestScore) {
+                bestScore = score;
+                bestIndex = index;
+              }
+            });
+            finalGroups[bestIndex].push(candidate);
+          });
+
+          visualEras = finalGroups
+            .map((group, index) => {
+              const clusterCentroid = centroids[index];
+              const representativeMatch = group
+                .map((candidate) => ({
+                  candidate,
+                  score: dotProduct(candidate.vector, clusterCentroid),
+                }))
+                .sort((left, right) => right.score - left.score)[0];
+              if (!representativeMatch) {
+                return null;
+              }
+
+              const photo = photoLookup.get(representativeMatch.candidate.path);
+              if (!photo) {
+                return null;
+              }
+
+              return {
+                label: `Era ${index + 1}`,
+                photo,
+                count: group.length,
+                sharePercent: Math.round((group.length / centroidCandidates.length) * 100),
+              };
+            })
+            .filter((value): value is NonNullable<typeof value> => value !== null)
+            .sort((left, right) => right.count - left.count)
+            .slice(0, MAX_VISUAL_ERAS);
+        }
+
+        const datedCandidates = centroidCandidates
+          .map((candidate) => ({
+            ...candidate,
+            date: photoDateLookup.get(candidate.path) ?? null,
+          }))
+          .filter((candidate): candidate is typeof candidate & { date: Date } => candidate.date !== null)
+          .sort((left, right) => left.date.getTime() - right.date.getTime());
+
+        if (datedCandidates.length >= 24) {
+          const byYear = new Map<number, typeof datedCandidates>();
+          datedCandidates.forEach((candidate) => {
+            const year = candidate.date.getFullYear();
+            const current = byYear.get(year) ?? [];
+            current.push(candidate);
+            byYear.set(year, current);
+          });
+
+          lookTimeline = Array.from(byYear.entries())
+            .sort((left, right) => left[0] - right[0])
+            .flatMap(([year, group]) => {
+              const yearCentroid = new Array<number>(dimension).fill(0);
+              group.forEach((candidate) => {
+                for (let index = 0; index < dimension; index += 1) {
+                  yearCentroid[index] += candidate.vector[index];
+                }
+              });
+              const normalizedYearCentroid = normalizeVector(yearCentroid);
+              const representative = group
+                .map((candidate) => ({
+                  candidate,
+                  score: dotProduct(candidate.vector, normalizedYearCentroid),
+                }))
+                .sort((left, right) => right.score - left.score)[0];
+              if (!representative) {
+                return [];
+              }
+
+              const photo = photoLookup.get(representative.candidate.path);
+              if (!photo) {
+                return [];
+              }
+
+              return [
+                {
+                  year,
+                  photo,
+                  count: group.length,
+                },
+              ];
+            });
+
+          const bucketSize = Math.max(12, Math.floor(datedCandidates.length * 0.2));
+          const early = datedCandidates.slice(0, bucketSize);
+          const recent = datedCandidates.slice(-bucketSize);
+          const buildCentroid = (group: typeof datedCandidates) => {
+            const nextCentroid = new Array<number>(dimension).fill(0);
+            group.forEach((candidate) => {
+              for (let index = 0; index < dimension; index += 1) {
+                nextCentroid[index] += candidate.vector[index];
+              }
+            });
+            return normalizeVector(nextCentroid);
+          };
+          const earlyCentroid = buildCentroid(early);
+          const recentCentroid = buildCentroid(recent);
+          const earlyBest = early
+            .map((candidate) => ({
+              candidate,
+              score: dotProduct(candidate.vector, earlyCentroid),
+            }))
+            .sort((left, right) => right.score - left.score)[0];
+          const recentBest = recent
+            .map((candidate) => ({
+              candidate,
+              score: dotProduct(candidate.vector, recentCentroid),
+            }))
+            .sort((left, right) => right.score - left.score)[0];
+          if (earlyBest && recentBest) {
+            lookDrift = {
+              similarityPercent: Math.round(dotProduct(earlyCentroid, recentCentroid) * 100),
+              firstYear: early[0]?.date.getFullYear() ?? recent[0]?.date.getFullYear(),
+              lastYear:
+                recent[recent.length - 1]?.date.getFullYear() ??
+                early[early.length - 1]?.date.getFullYear(),
+            };
+          }
+        }
       }
 
       return {
@@ -432,6 +673,9 @@ export const computeVisualSamenessStats = async (
         lowSimilarityThreshold: LOW_SIMILARITY_THRESHOLD,
         repeatedExamples,
         distinctExamples,
+        visualEras,
+        lookTimeline,
+        lookDrift,
       };
     } finally {
       await closeDatabase(db);

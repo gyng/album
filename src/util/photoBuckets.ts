@@ -191,6 +191,16 @@ export const CITY_FACET: PhotoFacet<string> = {
   buckets: [], // string facet: buckets are built dynamically from data
 };
 
+export const YEAR_FACET: PhotoFacet<string> = {
+  id: "year",
+  displayName: "Year",
+  extract: (exif) => {
+    const dateTime = parseExifLocalDateTime(exif.DateTimeOriginal);
+    return dateTime ? String(dateTime.year) : null;
+  },
+  buckets: [], // string facet: buckets are built dynamically from data
+};
+
 // ─── All numeric facets (bucketed) ─────────────────────────────────────────
 
 export const NUMERIC_FACETS: PhotoFacet<number>[] = [
@@ -206,6 +216,7 @@ export const NUMERIC_FACETS: PhotoFacet<number>[] = [
 export const STRING_FACETS: PhotoFacet<string>[] = [
   CAMERA_FACET,
   LENS_FACET,
+  YEAR_FACET,
   LOCATION_FACET,
   REGION_FACET,
   SUBREGION_FACET,

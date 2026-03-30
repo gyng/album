@@ -17,7 +17,8 @@ test.describe("Smoke Tests @slow", () => {
     // Verify main navigation links are present
     await expect(page.getByText("🌏 Map")).toBeVisible();
     await expect(page.getByText("📅 Timeline")).toBeVisible();
-    await expect(page.getByText("🔍 Search & Explore")).toBeVisible();
+    await expect(page.getByText("🔍 Search")).toBeVisible();
+    await expect(page.getByText("🧭 Explore")).toBeVisible();
     await expect(page.getByText("🖼️ Slideshow")).toBeVisible();
   });
 

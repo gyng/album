@@ -138,7 +138,7 @@ export const Search: React.FC<{
   const [isFacetSectionsLoading, setIsFacetSectionsLoading] =
     useState<boolean>(false);
   const [selectedFilterCategory, setSelectedFilterCategory] = useState<
-    "tags" | "place" | "gear" | "settings"
+    "tags" | "time" | "place" | "gear" | "settings"
   >("tags");
   const [isRandomSimilarLoading, setIsRandomSimilarLoading] =
     useState<boolean>(false);

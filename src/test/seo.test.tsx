@@ -73,20 +73,20 @@ describe("SEO helpers", () => {
   it("renders canonical, social tags, and robots directives", () => {
     const html = renderToStaticMarkup(
       <Seo
-        title="Search & Explore | Snapshots"
+        title="Search | Snapshots"
         description="Search the photo archive."
         pathname="/search"
         noindex
         image="https://photos.example.com/cover.jpg"
         jsonLd={buildCollectionPageJsonLd({
-          name: "Search & Explore | Snapshots",
+          name: "Search | Snapshots",
           description: "Search the photo archive.",
           pathname: "/search",
         })}
       />,
     );
 
-    expect(html).toContain("<title>Search &amp; Explore | Snapshots</title>");
+    expect(html).toContain("<title>Search | Snapshots</title>");
     expect(html).toContain(
       'name="description" content="Search the photo archive."',
     );

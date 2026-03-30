@@ -4,6 +4,7 @@ import React, {
   useRef,
   useState,
 } from "react";
+import Link from "next/link";
 import styles from "./Search.module.css";
 import { getResizedAlbumImageSrc } from "../../util/getResizedAlbumImageSrc";
 import { SimilarityOrder } from "./searchUtils";
@@ -125,10 +126,10 @@ export const SimilarTrailBar: React.FC<Props> = ({
           ) : null}
         </div>
         <div className={styles.modeHeaderActions}>
-          <a href="/stats#visual-sameness" className={styles.similarityStatsLink}>
+          <Link href="/stats#visual-sameness" className={styles.similarityStatsLink}>
             <span>Visual sameness</span>
             <span aria-hidden="true">↗</span>
-          </a>
+          </Link>
           <div
             className={styles.similarityOrderToggle}
             role="tablist"

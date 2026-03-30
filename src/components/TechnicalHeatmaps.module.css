@@ -3,6 +3,7 @@
   gap: var(--m-l);
   width: 100%;
   position: relative;
+  isolation: isolate;
 }
 
 .wrapperTwoUp {
@@ -75,7 +76,6 @@
   display: grid;
   gap: var(--m-s);
   position: relative;
-  z-index: 1;
 }
 
 .panelTitle {
@@ -123,6 +123,8 @@
 }
 
 .cell {
+  position: relative;
+  z-index: 0;
   min-height: 44px;
   display: flex;
   align-items: center;
@@ -150,16 +152,19 @@
 }
 
 .cellActive {
+  z-index: 2;
   border-color: var(--c-font);
   box-shadow: 0 0 0 1px var(--c-font) inset;
 }
 
 .cellColumnActive {
+  z-index: 2;
   border-color: color-mix(in srgb, var(--c-accent) 70%, var(--c-font));
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--c-accent) 70%, var(--c-font)) inset;
 }
 
 .cellRelated {
+  z-index: 2;
   border-color: color-mix(in srgb, var(--c-accent) 65%, var(--c-font));
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--c-accent) 65%, var(--c-font)) inset;
 }
@@ -186,7 +191,7 @@
   height: 100%;
   pointer-events: none;
   overflow: visible;
-  z-index: 2;
+  z-index: 1;
 }
 
 .overlayLine {

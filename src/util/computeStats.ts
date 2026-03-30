@@ -22,6 +22,11 @@ export type BucketedStat = {
   count: number;
 };
 
+export type BucketedStatGroup = {
+  label: string;
+  data: BucketedStat[];
+};
+
 export type NumericFacetStat = {
   facetId: string;
   displayName: string;
@@ -48,12 +53,13 @@ export type PhotoStats = {
   gearFlow: SankeyFlow;
   locationFlow: SankeyFlow;
   technicalRelationships: ParallelRelationshipData | null;
+  technicalRelationshipFilters: TechnicalRelationshipFilters;
   timeRelationships: ParallelRelationshipData | null;
   weekdayStats: BucketedStat[];
   monthStats: BucketedStat[];
   calendarCoverage: number;
   recentMonthStats: BucketedStat[];
-  recentYearStats: BucketedStat[];
+  recentYearStats: BucketedStatGroup[];
   mapPoints: Array<{ lat: number; lng: number }>;
   colorStats: BucketedStat[];
   colorCoverage: number;
@@ -63,6 +69,15 @@ export type PhotoStats = {
     zoom: number;
     unknown: number;
   };
+  revisitedPlace: {
+    label: string;
+    facetId: "location" | "region" | "subregion" | "city";
+    facetValue: string;
+    firstYear: number;
+    lastYear: number;
+    spanYears: number;
+    photoCount: number;
+  } | null;
 };
 
 const TOP_N_STRING = 20;
@@ -132,6 +147,24 @@ export type ParallelRelationshipData = {
   axes: ParallelRelationshipAxis[];
   paths: ParallelRelationshipPath[];
   total: number;
+};
+
+export type ShootingScopeStats = {
+  numericFacets: NumericFacetStat[];
+  technicalRelationships: ParallelRelationshipData | null;
+  timeRelationships: ParallelRelationshipData | null;
+  weekdayStats: BucketedStat[];
+  monthStats: BucketedStat[];
+  calendarCoverage: number;
+};
+
+export type TechnicalRelationshipFilters = {
+  cameras: string[];
+  lenses: string[];
+  lensesByCamera: Record<string, string[]>;
+  byCamera: Record<string, ShootingScopeStats>;
+  byLens: Record<string, ShootingScopeStats>;
+  byCameraLens: Record<string, Record<string, ShootingScopeStats>>;
 };
 
 function computeNumericFacet(
@@ -494,6 +527,127 @@ function computeTechnicalRelationships(
   return computeRelationships(photos, facets);
 }
 
+function computeShootingScopeStats(photos: PhotoBlock[]): ShootingScopeStats {
+  const scopedNumericFacetIds = new Set([
+    "hour",
+    "focal-length-35mm",
+    "focal-length-actual",
+    "aperture",
+    "iso",
+  ]);
+  const numericFacets = NUMERIC_FACETS.filter((facet) =>
+    scopedNumericFacetIds.has(facet.id),
+  ).map((facet) => computeNumericFacet(photos, facet as PhotoFacet<number>));
+  const hourFacet = computeNumericFacet(photos, HOUR_FACET);
+  const calendarStats = computeCalendarStats(photos);
+
+  return {
+    numericFacets: [hourFacet, ...numericFacets],
+    technicalRelationships: computeTechnicalRelationships(photos),
+    timeRelationships: computeTimeRelationships(photos),
+    weekdayStats: calendarStats.weekdayStats,
+    monthStats: calendarStats.monthStats,
+    calendarCoverage: calendarStats.coverage,
+  };
+}
+
+function computeTechnicalRelationshipFilters(
+  photos: PhotoBlock[],
+): TechnicalRelationshipFilters {
+  const photosByCamera = new Map<string, PhotoBlock[]>();
+  const photosByLens = new Map<string, PhotoBlock[]>();
+  const photosByCameraLens = new Map<string, Map<string, PhotoBlock[]>>();
+
+  for (const photo of photos) {
+    const tags = photo._build.tags ?? undefined;
+    const camera = CAMERA_FACET.extract(photo._build.exif, tags);
+    const lens = LENS_FACET.extract(photo._build.exif, tags);
+
+    if (camera) {
+      const cameraPhotos = photosByCamera.get(camera) ?? [];
+      cameraPhotos.push(photo);
+      photosByCamera.set(camera, cameraPhotos);
+    }
+
+    if (lens) {
+      const lensPhotos = photosByLens.get(lens) ?? [];
+      lensPhotos.push(photo);
+      photosByLens.set(lens, lensPhotos);
+    }
+
+    if (camera && lens) {
+      const cameraLensMap =
+        photosByCameraLens.get(camera) ?? new Map<string, PhotoBlock[]>();
+      const cameraLensPhotos = cameraLensMap.get(lens) ?? [];
+      cameraLensPhotos.push(photo);
+      cameraLensMap.set(lens, cameraLensPhotos);
+      photosByCameraLens.set(camera, cameraLensMap);
+    }
+  }
+
+  const cameras = sortCounts(
+    new Map(
+      Array.from(photosByCamera.entries()).map(([camera, cameraPhotos]) => [
+        camera,
+        cameraPhotos.length,
+      ]),
+    ),
+  ).map(([camera]) => camera);
+
+  const lenses = sortCounts(
+    new Map(
+      Array.from(photosByLens.entries()).map(([lens, lensPhotos]) => [
+        lens,
+        lensPhotos.length,
+      ]),
+    ),
+  ).map(([lens]) => lens);
+
+  const byCamera: Record<string, ShootingScopeStats> = {};
+  cameras.forEach((camera) => {
+    byCamera[camera] = computeShootingScopeStats(photosByCamera.get(camera) ?? []);
+  });
+
+  const byLens: Record<string, ShootingScopeStats> = {};
+  lenses.forEach((lens) => {
+    byLens[lens] = computeShootingScopeStats(photosByLens.get(lens) ?? []);
+  });
+
+  const lensesByCamera: Record<string, string[]> = {};
+  const byCameraLens: Record<string, Record<string, ShootingScopeStats>> = {};
+
+  cameras.forEach((camera) => {
+    const lensMap = photosByCameraLens.get(camera);
+    if (!lensMap) {
+      return;
+    }
+
+    const sortedLenses = sortCounts(
+      new Map(
+        Array.from(lensMap.entries()).map(([lens, lensPhotos]) => [
+          lens,
+          lensPhotos.length,
+        ]),
+      ),
+    ).map(([lens]) => lens);
+    lensesByCamera[camera] = sortedLenses;
+
+    sortedLenses.forEach((lens) => {
+      byCameraLens[camera] = byCameraLens[camera] ?? {};
+      byCameraLens[camera][lens] = computeShootingScopeStats(lensMap.get(lens) ?? []);
+    });
+  });
+
+  return {
+    cameras,
+    lenses,
+    lensesByCamera,
+    byCamera,
+    byLens,
+    byCameraLens,
+  };
+}
+
 function computeTimeRelationships(
   photos: PhotoBlock[],
 ): ParallelRelationshipData | null {
@@ -554,7 +708,7 @@ function computeCalendarStats(photos: PhotoBlock[]): {
 
 function computeRecentTrendStats(photos: PhotoBlock[]): {
   recentMonthStats: BucketedStat[];
-  recentYearStats: BucketedStat[];
+  recentYearStats: BucketedStatGroup[];
 } {
   const dated = photos
     .map((photo) => parseExifLocalDateTime(photo._build?.exif?.DateTimeOriginal))
@@ -584,8 +738,11 @@ function computeRecentTrendStats(photos: PhotoBlock[]): {
   );
 
   const yearKeys = Array.from({ length: 5 }, (_, index) => latest.year - (4 - index));
-  const yearCounts = new Map<string, number>(
-    yearKeys.map((year) => [String(year), 0]),
+  const yearMonthCounts = new Map<string, Map<string, number>>(
+    yearKeys.map((year) => [
+      String(year),
+      new Map<string, number>(MONTH_LABELS.map((month) => [month, 0])),
+    ]),
   );
 
   for (const value of dated) {
@@ -595,8 +752,10 @@ function computeRecentTrendStats(photos: PhotoBlock[]): {
     }
 
     const yearKey = String(value.year);
-    if (yearCounts.has(yearKey)) {
-      yearCounts.set(yearKey, (yearCounts.get(yearKey) ?? 0) + 1);
+    const yearData = yearMonthCounts.get(yearKey);
+    if (yearData) {
+      const monthLabel = MONTH_LABELS[value.month - 1];
+      yearData.set(monthLabel, (yearData.get(monthLabel) ?? 0) + 1);
     }
   }
 
@@ -607,7 +766,10 @@ function computeRecentTrendStats(photos: PhotoBlock[]): {
     })),
     recentYearStats: yearKeys.map((year) => ({
       label: String(year),
-      count: yearCounts.get(String(year)) ?? 0,
+      data: MONTH_LABELS.map((month) => ({
+        label: month,
+        count: yearMonthCounts.get(String(year))?.get(month) ?? 0,
+      })),
     })),
   };
 }
@@ -740,6 +902,87 @@ function computeLensTypeStats(photos: PhotoBlock[]): PhotoStats["lensTypeStats"]
   return counts;
 }
 
+function computeRevisitedPlace(
+  photos: PhotoBlock[],
+): PhotoStats["revisitedPlace"] {
+  const placeYears = new Map<
+    string,
+    {
+      label: string;
+      facetId: "location" | "region" | "subregion" | "city";
+      facetValue: string;
+      years: Set<number>;
+      photoCount: number;
+    }
+  >();
+
+  for (const photo of photos) {
+    const parsed = parseExifLocalDateTime(photo._build?.exif?.DateTimeOriginal);
+    if (!parsed) {
+      continue;
+    }
+
+    const geocode = photo._build.tags?.geocode;
+    const placeCandidates = [
+      { facetId: "city" as const, value: getGeocodeCity(geocode) },
+      { facetId: "subregion" as const, value: getGeocodeSubregion(geocode) },
+      { facetId: "region" as const, value: getGeocodeRegion(geocode) },
+      { facetId: "location" as const, value: getGeocodeCountry(geocode) },
+    ];
+    const place = placeCandidates.find((candidate) => candidate.value);
+    if (!place?.value) {
+      continue;
+    }
+
+    const key = `${place.facetId}:${place.value}`;
+    const existing = placeYears.get(key) ?? {
+      label: formatPlaceDisplayLabel(place.value) ?? place.value,
+      facetId: place.facetId,
+      facetValue: place.value,
+      years: new Set<number>(),
+      photoCount: 0,
+    };
+    existing.years.add(parsed.year);
+    existing.photoCount += 1;
+    placeYears.set(key, existing);
+  }
+
+  const best = Array.from(placeYears.values())
+    .map((place) => {
+      const years = Array.from(place.years).sort((left, right) => left - right);
+      return {
+        ...place,
+        firstYear: years[0],
+        lastYear: years[years.length - 1],
+        spanYears: years.length > 1 ? years[years.length - 1] - years[0] : 0,
+      };
+    })
+    .filter((place) => place.years.size > 1 && place.spanYears > 0)
+    .sort((left, right) => {
+      if (right.spanYears !== left.spanYears) {
+        return right.spanYears - left.spanYears;
+      }
+      if (right.photoCount !== left.photoCount) {
+        return right.photoCount - left.photoCount;
+      }
+      return left.label.localeCompare(right.label);
+    })[0];
+
+  if (!best) {
+    return null;
+  }
+
+  return {
+    label: best.label,
+    facetId: best.facetId,
+    facetValue: best.facetValue,
+    firstYear: best.firstYear,
+    lastYear: best.lastYear,
+    spanYears: best.spanYears,
+    photoCount: best.photoCount,
+  };
+}
+
 export function computePhotoStats(albums: Content[]): PhotoStats {
   const photos = albums.flatMap((album) =>
     album.blocks.filter((b): b is PhotoBlock => b.kind === "photo"),
@@ -764,6 +1007,8 @@ export function computePhotoStats(albums: Content[]): PhotoStats {
   const recentTrendStats = computeRecentTrendStats(photos);
   const colorStats = computeColorStats(photos);
   const lensTypeStats = computeLensTypeStats(photos);
+  const technicalRelationshipFilters = computeTechnicalRelationshipFilters(photos);
+  const revisitedPlace = computeRevisitedPlace(photos);
   const mapPoints = photos.flatMap((photo) => {
     const exif = photo._build?.exif ?? {};
     const { decLat, decLng } = getDegLatLngFromExif(exif);
@@ -785,6 +1030,7 @@ export function computePhotoStats(albums: Content[]): PhotoStats {
     gearFlow: computeGearFlow(photos),
     locationFlow: computeLocationFlow(photos),
     technicalRelationships: computeTechnicalRelationships(photos),
+    technicalRelationshipFilters,
     timeRelationships: computeTimeRelationships(photos),
     weekdayStats: calendarStats.weekdayStats,
     monthStats: calendarStats.monthStats,
@@ -796,5 +1042,6 @@ export function computePhotoStats(albums: Content[]): PhotoStats {
     colorCoverage: colorStats.colorCoverage,
     paletteSizeStats: colorStats.paletteSizeStats,
     lensTypeStats,
+    revisitedPlace,
   };
 }

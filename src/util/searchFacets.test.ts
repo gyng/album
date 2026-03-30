@@ -52,10 +52,16 @@ describe("searchFacets", () => {
   });
 
   it("rejects unsearchable facets", () => {
-    expect(parseSearchFacetSelection("hour:17:00")).toBeNull();
+    expect(parseSearchFacetSelection("shutter:1/250")).toBeNull();
   });
 
   it("formats active facet chip labels with short prefixes", () => {
+    expect(
+      getSearchFacetChipLabel({ facetId: "hour", value: "17:00" }),
+    ).toBe("Time: 17:00");
+    expect(
+      getSearchFacetChipLabel({ facetId: "year", value: "2024" }),
+    ).toBe("Year: 2024");
     expect(
       getSearchFacetChipLabel({ facetId: "iso", value: "400" }),
     ).toBe("ISO: 400");

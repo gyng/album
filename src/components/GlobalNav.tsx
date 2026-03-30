@@ -48,20 +48,28 @@ export const GlobalNav: React.FC<Props> = ({
         <>
           <li>
             <Link
+              href="/search"
+              className={cx(commonStyles.button, current("search"))}
+            >
+              Search
+            </Link>
+          </li>
+          <li>
+            <Link
+              href="/stats"
+              className={cx(commonStyles.button, current("stats"))}
+            >
+              Explore
+            </Link>
+          </li>
+          <li>
+            <Link
               href="/map"
               prefetch={onMapClick ? false : undefined}
               className={cx(commonStyles.button, current("map"))}
               onClick={onMapClick}
             >
               Map
-            </Link>
-          </li>
-          <li>
-            <Link
-              href="/search"
-              className={cx(commonStyles.button, current("search"))}
-            >
-              Search & Explore
             </Link>
           </li>
           <li>
@@ -94,14 +102,6 @@ export const GlobalNav: React.FC<Props> = ({
                 </Link>
               )}
             </div>
-          </li>
-          <li>
-            <Link
-              href="/stats"
-              className={cx(commonStyles.button, current("stats"))}
-            >
-              Stats
-            </Link>
           </li>
           {extraItems}
         </>
