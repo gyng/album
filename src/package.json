@@ -27,7 +27,7 @@
     "test:e2e": "npm run build && playwright test",
     "test:e2e:reuse": "PLAYWRIGHT_SKIP_WEBSERVER=1 playwright test",
     "test:e2e:headed": "npm run build && playwright test --headed",
-    "screenshot": "npm run build && playwright test --config=playwright.screenshot.config.ts"
+    "screenshot": "playwright test --config=playwright.screenshot.config.ts"
   },
   "dependencies": {
     "@huggingface/transformers": "^3.8.1",

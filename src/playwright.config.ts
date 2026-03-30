@@ -19,8 +19,9 @@ export default defineConfig({
   testDir: "./tests",
   testIgnore: ["**/screenshot.spec.ts"],
 
-  /* Run tests in files in parallel */
-  fullyParallel: true,
+  /* Tests within a file run in parallel; files run sequentially to avoid
+   * CPU contention from heavy pages (slideshow WASM, map canvas). */
+  fullyParallel: false,
   /* Fail the build on CI if you accidentally left test.only in the source code. */
   forbidOnly: !!process.env.CI,
   /* Retry on CI only */

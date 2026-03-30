@@ -1,6 +1,6 @@
 # album
 
-![Screenshot](screenshot.png)
+![Screenshot](screenshot.jpg)
 
 [Live site](https://album-gyng.vercel.app/)
 
@@ -253,4 +253,4 @@ cd src
 npm run screenshot
 ```
 
-This builds the site, captures `screenshot.html` at a fixed 1600×900 viewport, and writes `screenshot.png` to the repo root.
+This captures `screenshot.html` at a fixed 3840×2160 viewport (iframes load from production) and writes `screenshot.jpg` to the repo root.

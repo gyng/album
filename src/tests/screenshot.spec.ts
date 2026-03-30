@@ -2,16 +2,18 @@ import { test } from "@playwright/test";
 import path from "path";
 
 /**
- * Captures a README screenshot from the screenshot.html fixture.
+ * Captures a README screenshot from the screenshot.html fixture,
+ * loading iframes from the production site.
  *
- * Fully automated:  npm run screenshot    (from src/)
- * With dev server:  PLAYWRIGHT_SKIP_WEBSERVER=1 npx playwright test ./tests/screenshot.spec.ts --project=chromium
+ * Automated:  npm run screenshot    (from src/)
  *
  * Output: ../screenshot.png (repo root)
  */
 test("capture README screenshot", async ({ page }) => {
   // Fixed viewport so the screenshot dimensions stay consistent
-  await page.setViewportSize({ width: 1600, height: 900 });
+  await page.setViewportSize({ width: 3840, height: 2160 });
+
+  // screenshot.html is a local static file; iframes point at production
   await page.goto("/screenshot.html", { waitUntil: "domcontentloaded" });
 
   // Wait for all four iframes to finish loading
@@ -23,11 +25,18 @@ test("capture README screenshot", async ({ page }) => {
     await contentFrame.locator("body").waitFor({ state: "visible" });
   }
 
-  // Give content (map tiles, images) a moment to render
+  // Open the details pane for DSCF8612.JPG in the album iframe (top-right, index 1)
+  const albumFrame = iframes.nth(1).contentFrame();
+  const photoAnchor = albumFrame.locator("#DSCF8612\\.JPG");
+  await photoAnchor.waitFor({ state: "attached", timeout: 15000 });
+  await photoAnchor.locator("details summary").click();
+  await photoAnchor.scrollIntoViewIfNeeded();
+
+  // Give content (map tiles, images, details map) a moment to render
   await page.waitForTimeout(5000);
 
-  const out = path.resolve(__dirname, "../../screenshot.png");
-  await page.screenshot({ path: out, type: "png" });
+  const out = path.resolve(__dirname, "../../screenshot.jpg");
+  await page.screenshot({ path: out, type: "jpeg", quality: 85 });
   // eslint-disable-next-line no-console
   console.log(`Screenshot saved to ${out}`);
 });

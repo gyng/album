@@ -1,11 +1,13 @@
 import { defineConfig, devices } from "@playwright/test";
 
-const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? "http://localhost:3000";
-const reuseExistingServer = !process.env.CI;
-const skipWebServer = process.env.PLAYWRIGHT_SKIP_WEBSERVER === "1";
+const port = 3001;
+const baseURL = `http://localhost:${port}`;
 
 /**
  * Playwright config for the README screenshot capture only.
+ * Serves the public/ directory with a simple static server —
+ * no Next.js build needed since iframes point at production.
+ *
  * Used by: npm run screenshot
  */
 export default defineConfig({
@@ -22,12 +24,10 @@ export default defineConfig({
     },
   ],
   reporter: [["list"]],
-  webServer: skipWebServer
-    ? undefined
-    : {
-        command: "npm start",
-        url: baseURL,
-        reuseExistingServer,
-        timeout: 120 * 1000,
-      },
+  webServer: {
+    command: `npx serve public -l ${port}`,
+    url: baseURL,
+    reuseExistingServer: true,
+    timeout: 15 * 1000,
+  },
 });
