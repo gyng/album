@@ -5,6 +5,9 @@ Personal photo gallery — Next.js 14, TypeScript, CSS Modules, MapLibre GL. Pho
 > Claude Code also loads `.claude/rules/` for additional scoped detail — other agents use this file only.
 
 ## Commands
+
+> A root `Makefile` exists for human convenience — agents should use the direct commands below.
+
 - **Tests:** `npx jest` from `src/` (not the repo root)
 - Subset: `npx jest --testPathPatterns="MapWorld"` (plural flag)
 - **Dev:** `npm run dev` from `src/`
