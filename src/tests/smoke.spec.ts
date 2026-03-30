@@ -1,6 +1,17 @@
 import { test, expect } from "@playwright/test";
 
 test.describe("Smoke Tests", () => {
+  let pageErrors: string[] = [];
+
+  test.beforeEach(({ page }) => {
+    pageErrors = [];
+    page.on("pageerror", (error) => pageErrors.push(error.message));
+  });
+
+  test.afterEach(() => {
+    expect(pageErrors).toEqual([]);
+  });
+
   test("homepage loads with albums and navigation", async ({ page }) => {
     await page.goto("/");
 
@@ -29,9 +40,10 @@ test.describe("Smoke Tests", () => {
     expect(await photos.count()).toBeGreaterThan(0);
   });
 
-  test("map page loads", async ({ page }) => {
+  test("map page loads with canvas", async ({ page }) => {
     await page.goto("/map");
     await expect(page).toHaveTitle("Map | Snapshots");
+    await expect(page.locator("canvas").first()).toBeVisible();
   });
 
   test("search page loads", async ({ page }) => {
@@ -39,14 +51,14 @@ test.describe("Smoke Tests", () => {
     await expect(page.getByRole("heading", { name: /search/i })).toBeVisible();
   });
 
+  test("explore page loads", async ({ page }) => {
+    await page.goto("/explore");
+    await expect(page).toHaveTitle(/Explore/);
+  });
+
   test("timeline page loads", async ({ page }) => {
     await page.goto("/timeline");
     await expect(page.getByRole("heading", { name: "Timeline" })).toBeVisible();
-  });
-
-  test("slideshow page loads", async ({ page }) => {
-    await page.goto("/slideshow");
-    await expect(page).toHaveTitle("Slideshow | Snapshots");
   });
 
   test("album navigation flow works", async ({ page }) => {
