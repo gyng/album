@@ -9,7 +9,7 @@
     "cleanup:media-cache": "node ./bin/cleanup-optimised-media.cjs",
     "prepare:build-manifest": "node ./bin/write-build-manifest.cjs",
     "deploy:vercel": "npx vercel build --prod && npx vercel deploy --prebuilt --prod",
-    "dev": "npm run prepare:build-manifest && next dev --turbopack",
+    "dev": "npm run prepare:build-manifest && npm run prepare:feeds && next dev --turbopack",
     "benchmark:warm": "node ./bin/warm-build-benchmark.cjs",
     "benchmark:warm:strict": "ALBUM_BENCHMARK_FAIL_ON_BUDGET=1 node ./bin/warm-build-benchmark.cjs",
     "benchmark:route": "node --experimental-strip-types ./bin/map-route-benchmark.ts",
