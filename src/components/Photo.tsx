@@ -561,8 +561,8 @@ export const PhotoBlockEl: React.FC<{
                                     backgroundColor: rgbStr,
                                   }}
                                   className={styles.colorswatch}
-                                  title={`Search photos with similar color: ${rgbStr}`}
-                                  aria-label={`Search photos with similar color ${rgbStr}`}
+                                  title={`Search photos with similar colour: ${rgbStr}`}
+                                  aria-label={`Search photos with similar colour ${rgbStr}`}
                                 ></a>
                               );
                             },

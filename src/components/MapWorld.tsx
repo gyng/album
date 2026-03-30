@@ -1117,22 +1117,23 @@ export const MMap: React.FC<MapWorldProps> = ({
                   routeDataByAlbum.size > 1
                     ? "#12bcd4"
                     : (routeColorStops[1]?.color ?? "#12bcd4"),
-                "line-gradient":
-                  routeDataByAlbum.size > 1
-                    ? [
+                ...(routeDataByAlbum.size > 1
+                  ? {
+                      "line-gradient": [
                         "interpolate",
                         ["linear"],
                         ["line-progress"],
                         0,
-                        ["coalesce", ["get", "routeColorStart"], "#0f4b6e"],
+                        "#0f4b6e",
                         0.24,
-                        ["coalesce", ["get", "routeColorQuarter"], "#145b83"],
+                        "#145b83",
                         0.58,
-                        ["coalesce", ["get", "routeColorMiddle"], "#12bcd4"],
+                        "#12bcd4",
                         1,
-                        ["coalesce", ["get", "routeColorEnd"], "#b9fbff"],
-                      ]
-                    : undefined,
+                        "#b9fbff",
+                      ],
+                    }
+                  : {}),
                 "line-opacity": alwaysVisibleRouteGeoJson
                   ? routeDataByAlbum.size > 1
                     ? 1
@@ -1154,7 +1155,7 @@ export const MMap: React.FC<MapWorldProps> = ({
                         8,
                       ]
                     : routeLineWidth,
-                "line-dasharray": routeDataByAlbum.size > 1 ? undefined : [2, 2],
+                ...(routeDataByAlbum.size > 1 ? {} : { "line-dasharray": [2, 2] }),
               }}
             />
           </Source>

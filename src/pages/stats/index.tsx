@@ -579,7 +579,7 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
           },
     topColorMood
       ? {
-          label: "Color mood",
+          label: "Colour mood",
           value: topColorMood.label,
           detail: `${topColorMood.count.toLocaleString("en")} photos lean most strongly into this family.`,
           actionHref: COLOR_SEARCH_PARAMS[topColorMood.label]
@@ -587,7 +587,7 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
             : null,
         }
       : {
-          label: "Color mood",
+          label: "Colour mood",
           value: "Not enough palette data",
           detail: "Needs extracted color swatches to show a dominant mood.",
         },

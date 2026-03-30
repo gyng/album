@@ -25,6 +25,10 @@
   z-index: 5001;
 }
 
+.click {
+  z-index: 5003;
+}
+
 .click,
 .click * {
   pointer-events: auto;
