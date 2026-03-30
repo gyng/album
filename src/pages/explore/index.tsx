@@ -1317,19 +1317,16 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
             >
               <StatsWorldMap points={stats.mapPoints} />
             </div>
-            <div
-              className={[
-                styles.desktopOnly,
-                locationView === "sankey" ? "" : styles.hidden,
-              ].join(" ")}
-            >
-              <SankeyChart
-                flow={stats.locationFlow}
-                emptyMessage="Not enough linked location data yet."
-                labelMaxLength={16}
-                minHeight={1400}
-              />
-            </div>
+            {locationView === "sankey" && (
+              <div className={styles.desktopOnly}>
+                <SankeyChart
+                  flow={stats.locationFlow}
+                  emptyMessage="Not enough linked location data yet."
+                  labelMaxLength={16}
+                  minHeight={1400}
+                />
+              </div>
+            )}
             <div
               className={[
                 styles.desktopBarView,
@@ -1387,14 +1384,11 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
               </div>
             }
           >
-            <div
-              className={[
-                styles.desktopOnly,
-                gearView === "sankey" ? "" : styles.hidden,
-              ].join(" ")}
-            >
-              <SankeyChart flow={stats.gearFlow} />
-            </div>
+            {gearView === "sankey" && (
+              <div className={styles.desktopOnly}>
+                <SankeyChart flow={stats.gearFlow} />
+              </div>
+            )}
             <div
               className={[
                 styles.desktopBarView,
