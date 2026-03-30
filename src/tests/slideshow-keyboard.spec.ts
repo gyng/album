@@ -16,7 +16,7 @@ const dispatchShortcut = async (
   await page.keyboard.press(key);
 };
 
-test.describe("Slideshow Keyboard Navigation @slow", () => {
+test.describe("Slideshow Keyboard Navigation", () => {
   test("right arrow key advances to next photo", async ({ page }) => {
     await page.goto("/slideshow");
     await expect(page).toHaveTitle(/Slideshow/, { timeout: 90000 });

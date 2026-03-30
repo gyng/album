@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
 
-test.describe("Map Integration Tests @slow", () => {
+test.describe("Map Integration Tests", () => {
   test("map page loads correctly", async ({ page }) => {
     // Try to load map page with extended timeout and error handling
     try {
@@ -19,7 +19,7 @@ test.describe("Map Integration Tests @slow", () => {
       }
 
       try {
-        await expect(page.locator('a:has-text("← Albums")')).toBeVisible({
+        await expect(page.locator('a:has-text("Albums")')).toBeVisible({
           timeout: 15000,
         });
         console.log("✓ Map navigation loaded");
@@ -42,7 +42,7 @@ test.describe("Map Integration Tests @slow", () => {
     await page.goto("/map");
 
     // Wait for navigation
-    await expect(page.locator('a:has-text("← Albums")')).toBeVisible({
+    await expect(page.locator('a:has-text("Albums")')).toBeVisible({
       timeout: 10000,
     });
 
@@ -62,7 +62,7 @@ test.describe("Map Integration Tests @slow", () => {
     await page.goto("/map?filter_album=test-simple");
 
     // Verify page loads
-    await expect(page).toHaveTitle("Map");
+    await expect(page).toHaveTitle("Map | Snapshots");
 
     // Check for filter indication
     const filterIndicator = page.locator('text="test-simple", .toast');
@@ -81,7 +81,7 @@ test.describe("Map Integration Tests @slow", () => {
     await page.goto("/album/test-simple");
 
     // Wait for album to load
-    await expect(page.locator('a:has-text("← Albums")')).toBeVisible({
+    await expect(page.locator('a:has-text("Albums")')).toBeVisible({
       timeout: 10000,
     });
 
@@ -92,7 +92,7 @@ test.describe("Map Integration Tests @slow", () => {
 
     // Should navigate to map with filter
     await page.waitForURL(/\/map\?filter_album=test-simple/);
-    await expect(page).toHaveTitle("Map");
+    await expect(page).toHaveTitle("Map | Snapshots");
 
     console.log("✓ Album to map navigation successful");
   });
@@ -101,7 +101,7 @@ test.describe("Map Integration Tests @slow", () => {
     await page.goto("/map");
 
     // Wait for page to load
-    await expect(page.locator('a:has-text("← Albums")')).toBeVisible({
+    await expect(page.locator('a:has-text("Albums")')).toBeVisible({
       timeout: 10000,
     });
 
@@ -139,7 +139,7 @@ test.describe("Map Integration Tests @slow", () => {
     await page.waitForURL("/map");
 
     // Use back navigation
-    await page.locator('a:has-text("← Albums")').click();
+    await page.locator('a:has-text("Albums")').click();
     await page.waitForURL("/");
 
     // Should be back on homepage
@@ -151,7 +151,7 @@ test.describe("Map Integration Tests @slow", () => {
     await page.goto("/map");
 
     // Wait for page to load
-    await expect(page.locator('a:has-text("← Albums")')).toBeVisible({
+    await expect(page.locator('a:has-text("Albums")')).toBeVisible({
       timeout: 10000,
     });
 
@@ -178,7 +178,7 @@ test.describe("Map Integration Tests @slow", () => {
     await page.goto("/map?filter_album=test-simple");
 
     // Wait for page and potential markers
-    await expect(page.locator('a:has-text("← Albums")')).toBeVisible({
+    await expect(page.locator('a:has-text("Albums")')).toBeVisible({
       timeout: 10000,
     });
     await page.waitForTimeout(3000);

@@ -41,8 +41,8 @@ npm run test:e2e -- ./tests/smoke.spec.ts --project=chromium   # single file
 npm run test:e2e:reuse -- ./tests/smoke.spec.ts                # reuse already-running dev server
 ```
 - Config: `src/playwright.config.ts`; tests live in `src/tests/*.spec.ts`
-- Locally: Chromium only, slow tests (`@slow`) skipped, reuses existing server if running
-- CI: all browsers (Chromium, Firefox, WebKit), slow tests included, fresh server always
+- Locally: Chromium only, reuses existing server if running
+- CI: all browsers (Chromium, Firefox, WebKit), fresh server always
 - Use `test:e2e:reuse` only when a server is already running — do not use it to skip the build
 - **CI album data:** only `albums/test-*` directories are checked into git (real albums are gitignored). Playwright tests must use `test-simple`, `test-manifest`, or `test-manifest-v2` — never hardcode real album names like `snapshots` or `24japan`
 
@@ -134,7 +134,7 @@ cd index
 Runs on PRs to `main`, pushes to `main` and `release/*`, and manual dispatch.
 
 **Jobs:**
-- `test` — `npm ci` + `npm run test:ci` from `src/` (Node 20, ubuntu-latest)
+- `test` — `npm ci` + `npm run test:ci` from `src/` (Node 24, ubuntu-latest)
 - `playwright` — full Playwright suite (all browsers) with artifact upload (`playwright-report/`, 30-day retention)
 - `test-index` — **currently disabled** (commented out); Janus git dependency fails on GHA due to SSH auth
 

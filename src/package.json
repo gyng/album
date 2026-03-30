@@ -24,9 +24,9 @@
     "test": "jest",
     "test:seo": "jest --runInBand test/seo.test.tsx test/alt.test.ts test/feed.test.ts services/albumFeed.test.ts",
     "test:ci": "timeout 60s jest --maxWorkers=50% && npm run lint",
-    "test:e2e": "npm run build && PLAYWRIGHT_INCLUDE_SLOW=1 playwright test",
-    "test:e2e:reuse": "PLAYWRIGHT_INCLUDE_SLOW=1 PLAYWRIGHT_SKIP_WEBSERVER=1 playwright test",
-    "test:e2e:headed": "npm run build && PLAYWRIGHT_INCLUDE_SLOW=1 playwright test --headed"
+    "test:e2e": "npm run build && playwright test",
+    "test:e2e:reuse": "PLAYWRIGHT_SKIP_WEBSERVER=1 playwright test",
+    "test:e2e:headed": "npm run build && playwright test --headed"
   },
   "dependencies": {
     "@huggingface/transformers": "^3.8.1",

@@ -1,10 +1,6 @@
 import { defineConfig, devices } from "@playwright/test";
 
 const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? "http://localhost:3000";
-// Keep "include @slow tests" separate from CI mode so local debug runs do not
-// accidentally change worker count, retries, or server reuse semantics.
-const includeSlowTests =
-  process.env.PLAYWRIGHT_INCLUDE_SLOW === "1" || !!process.env.CI;
 const reuseExistingServer = !process.env.CI;
 const skipWebServer = process.env.PLAYWRIGHT_SKIP_WEBSERVER === "1";
 
@@ -31,8 +27,6 @@ export default defineConfig({
   workers: process.env.CI ? 1 : undefined,
   /* Reporter to use. See https://playwright.dev/docs/test-reporters */
   reporter: [["list"], ["html", { open: "never" }]],
-  /* Skip slow tests locally unless explicitly requested. */
-  grep: includeSlowTests ? undefined : /^(?!.*@slow)/,
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
   use: {
     /* Base URL to use in actions like `await page.goto('/')`. */

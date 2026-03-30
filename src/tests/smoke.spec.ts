@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
 
-test.describe("Smoke Tests @slow", () => {
+test.describe("Smoke Tests", () => {
   test("homepage loads and displays title", async ({ page }) => {
     await page.goto("/");
 
@@ -15,11 +15,11 @@ test.describe("Smoke Tests @slow", () => {
     await page.goto("/");
 
     // Verify main navigation links are present
-    await expect(page.getByText("🌏 Map")).toBeVisible();
-    await expect(page.getByText("📅 Timeline")).toBeVisible();
-    await expect(page.getByText("🔍 Search")).toBeVisible();
-    await expect(page.getByText("🧭 Explore")).toBeVisible();
-    await expect(page.getByText("🖼️ Slideshow")).toBeVisible();
+    await expect(page.locator('a[href="/map"]')).toBeVisible();
+    await expect(page.locator('a[href="/timeline"]')).toBeVisible();
+    await expect(page.locator('a[href="/search"]')).toBeVisible();
+    await expect(page.locator('a[href="/explore"]')).toBeVisible();
+    await expect(page.locator('a[href="/slideshow"]')).toBeVisible();
   });
 
   test("homepage loads albums", async ({ page }) => {

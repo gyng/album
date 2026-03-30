@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
 
-test.describe("Album Browsing Flow @slow", () => {
+test.describe("Album Browsing Flow", () => {
   test("homepage displays album grid", async ({ page }) => {
     await page.goto("/");
 
@@ -30,7 +30,7 @@ test.describe("Album Browsing Flow @slow", () => {
 
     // Verify we're on the album page
     // Look for album navigation elements
-    await expect(page.locator('a:has-text("← Albums")')).toBeVisible({
+    await expect(page.locator('a:has-text("Albums")')).toBeVisible({
       timeout: 10000,
     });
     await expect(page.locator('a:has-text("Album map")')).toBeVisible({
@@ -47,7 +47,7 @@ test.describe("Album Browsing Flow @slow", () => {
     await page.goto("/album/test-simple");
 
     // Wait for navigation to load
-    await expect(page.locator('a:has-text("← Albums")')).toBeVisible({
+    await expect(page.locator('a:has-text("Albums")')).toBeVisible({
       timeout: 10000,
     });
 
@@ -90,7 +90,7 @@ test.describe("Album Browsing Flow @slow", () => {
     await page.goto("/album/test-simple");
 
     // Wait for album to load
-    await expect(page.locator('a:has-text("← Albums")')).toBeVisible({
+    await expect(page.locator('a:has-text("Albums")')).toBeVisible({
       timeout: 10000,
     });
 
@@ -102,7 +102,7 @@ test.describe("Album Browsing Flow @slow", () => {
 
     // Should go to map with filter
     await page.waitForURL(/\/map\?filter_album=test-simple/);
-    await expect(page).toHaveTitle("Map");
+    await expect(page).toHaveTitle("Map | Snapshots");
 
     console.log("✓ Album map navigation works");
   });
@@ -111,7 +111,7 @@ test.describe("Album Browsing Flow @slow", () => {
     await page.goto("/album/test-manifest-v2");
 
     // Wait for album to load
-    await expect(page.locator('a:has-text("← Albums")')).toBeVisible({
+    await expect(page.locator('a:has-text("Albums")')).toBeVisible({
       timeout: 10000,
     });
 

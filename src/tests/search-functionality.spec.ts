@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
 
-test.describe("Search Functionality @slow", () => {
+test.describe("Search Functionality", () => {
   test("browse mode exposes zero-query exploration", async ({ page }) => {
     const pageErrors: string[] = [];
     page.on("pageerror", (error) => {
@@ -24,7 +24,7 @@ test.describe("Search Functionality @slow", () => {
       page.getByRole("link", { name: "Explore the map" }).click(),
     ]);
 
-    await expect(page).toHaveTitle("Map");
+    await expect(page).toHaveTitle("Map | Snapshots");
     expect(pageErrors).toEqual([]);
   });
 
@@ -106,7 +106,7 @@ test.describe("Search Functionality @slow", () => {
       pageErrors.push(error.message);
     });
 
-    await page.goto("/search?similar=../albums/2511japan/DSCF6007-06.jpg");
+    await page.goto("/search?similar=../albums/test-simple/DSCF0506-2.jpg");
 
     await expect(page).toHaveURL(/similar=/, { timeout: 10000 });
     await expect(page.getByText("Similar photos")).toBeVisible({
@@ -115,7 +115,7 @@ test.describe("Search Functionality @slow", () => {
     await expect(page.getByText("Comparing against")).toBeVisible({
       timeout: 10000,
     });
-    await expect(page.getByText("DSCF6007-06.jpg")).toBeVisible({
+    await expect(page.getByText("DSCF0506-2.jpg")).toBeVisible({
       timeout: 10000,
     });
     await expect(page.getByRole("img", { name: /source photo/i })).toBeVisible({
@@ -139,7 +139,7 @@ test.describe("Search Functionality @slow", () => {
     ).toBeVisible({ timeout: 10000 });
     await expect(
       page.locator('[aria-label="Similarity breadcrumbs"] a').last(),
-    ).toHaveAttribute("href", /\/album\/2511japan#DSCF6007-06\.jpg$/);
+    ).toHaveAttribute("href", /\/album\/test-simple#DSCF0506-2\.jpg$/);
     expect(pageErrors).toEqual([]);
   });
 });

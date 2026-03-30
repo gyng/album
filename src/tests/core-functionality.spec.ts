@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
 
-test.describe("Core Functionality Tests @slow", () => {
+test.describe("Core Functionality Tests", () => {
   test("homepage loads successfully", async ({ page }) => {
     await page.goto("/");
     await expect(page).toHaveTitle("Snapshots");
@@ -15,10 +15,10 @@ test.describe("Core Functionality Tests @slow", () => {
 
   test("map page loads and displays correctly", async ({ page }) => {
     await page.goto("/map");
-    await expect(page).toHaveTitle("Map");
+    await expect(page).toHaveTitle("Map | Snapshots");
 
     // Wait for back link to be visible (indicates page structure loaded)
-    await expect(page.locator('a:has-text("← Albums")')).toBeVisible({
+    await expect(page.locator('a:has-text("Albums")')).toBeVisible({
       timeout: 15000,
     });
 
@@ -30,7 +30,7 @@ test.describe("Core Functionality Tests @slow", () => {
     await page.goto("/slideshow", { timeout: 90000 });
 
     // Wait for the slideshow to initialize - look for key elements
-    await expect(page).toHaveTitle("Slideshow", { timeout: 90000 });
+    await expect(page).toHaveTitle("Slideshow | Snapshots", { timeout: 90000 });
 
     // Wait for slideshow controls to appear (more flexible selectors)
     const controls = page.locator(

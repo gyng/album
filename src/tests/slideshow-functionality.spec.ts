@@ -7,7 +7,7 @@ const revealSlideshowControls = async (page: Page) => {
   await page.waitForTimeout(150);
 };
 
-test.describe("Slideshow Functionality Tests @slow", () => {
+test.describe("Slideshow Functionality Tests", () => {
   test("slideshow page loads with extended timeout", async ({ page }) => {
     // Slideshow takes time to load due to database initialization
     await page.goto("/slideshow");

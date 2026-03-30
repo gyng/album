@@ -1,11 +1,11 @@
 import { test, expect } from "@playwright/test";
 
-test.describe("Photo Viewing Flow @slow", () => {
+test.describe("Photo Viewing Flow", () => {
   test("album displays photos correctly", async ({ page }) => {
     await page.goto("/album/test-simple");
 
     // Wait for album navigation to load
-    await expect(page.locator('a:has-text("← Albums")')).toBeVisible({
+    await expect(page.locator('a:has-text("Albums")')).toBeVisible({
       timeout: 10000,
     });
 
@@ -24,7 +24,7 @@ test.describe("Photo Viewing Flow @slow", () => {
     await page.goto("/album/test-simple");
 
     // Wait for photos to load
-    await expect(page.locator('a:has-text("← Albums")')).toBeVisible({
+    await expect(page.locator('a:has-text("Albums")')).toBeVisible({
       timeout: 10000,
     });
 
@@ -46,7 +46,7 @@ test.describe("Photo Viewing Flow @slow", () => {
     await page.goto("/album/test-simple");
 
     // Wait for album to load
-    await expect(page.locator('a:has-text("← Albums")')).toBeVisible({
+    await expect(page.locator('a:has-text("Albums")')).toBeVisible({
       timeout: 10000,
     });
 
@@ -70,7 +70,7 @@ test.describe("Photo Viewing Flow @slow", () => {
     await page.goto("/album/test-simple#DSCF2768.JPG");
 
     // Wait for album to load
-    await expect(page.locator('a:has-text("← Albums")')).toBeVisible({
+    await expect(page.locator('a:has-text("Albums")')).toBeVisible({
       timeout: 10000,
     });
 
@@ -83,7 +83,7 @@ test.describe("Photo Viewing Flow @slow", () => {
     await page.goto("/album/test-simple");
 
     // Wait for album to load
-    await expect(page.locator('a:has-text("← Albums")')).toBeVisible({
+    await expect(page.locator('a:has-text("Albums")')).toBeVisible({
       timeout: 10000,
     });
 
@@ -113,7 +113,7 @@ test.describe("Photo Viewing Flow @slow", () => {
     await page.goto("/album/test-simple");
 
     // Wait for album to load
-    await expect(page.locator('a:has-text("← Albums")')).toBeVisible({
+    await expect(page.locator('a:has-text("Albums")')).toBeVisible({
       timeout: 10000,
     });
 
@@ -143,7 +143,7 @@ test.describe("Photo Viewing Flow @slow", () => {
     await page.goto("/album/test-simple");
 
     // Wait for album to load
-    await expect(page.locator('a:has-text("← Albums")')).toBeVisible({
+    await expect(page.locator('a:has-text("Albums")')).toBeVisible({
       timeout: 10000,
     });
 
