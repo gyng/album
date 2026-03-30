@@ -25,12 +25,15 @@ export const SearchResultTile = (props: {
   result: SearchResultRow;
   onFindSimilar?: (path: string, similarity?: number) => void;
   onSearchByColor?: (color: RGB) => void;
+  persistColorAction?: boolean;
 }) => {
-  const { result, onFindSimilar, onSearchByColor } = props;
+  const { result, onFindSimilar, onSearchByColor, persistColorAction = false } =
+    props;
 
   let colour = "rgba(255, 255, 255, 0.2)";
+  const palette = result.colors ? parseColorPalette(result.colors) : [];
   if (result.colors) {
-    const firstColor = parseColorPalette(result.colors)[0];
+    const firstColor = palette[0];
     if (firstColor) colour = rgbToString(firstColor);
   }
 
@@ -61,7 +64,8 @@ export const SearchResultTile = (props: {
       : typeof result.similarity === "number"
       ? `${Math.round(result.similarity * 100)}%`
       : null;
-  const matchingColorStyle = result.matchingColor ? rgbToString(result.matchingColor) : null;
+  const actionColor = result.matchingColor ?? (palette[0] as RGB | undefined) ?? null;
+  const matchingColorStyle = actionColor ? rgbToString(actionColor) : null;
   const scoreTitle =
     isHybridResult
       ? `Hybrid search: semantic ${
@@ -74,7 +78,7 @@ export const SearchResultTile = (props: {
             : "n/a"
         }, fused score ${hybridScore?.toFixed(3)} (${hybridScoreLabel})`
       : typeof colorMatchScore === "number"
-        ? `Color match score ${Math.round(colorMatchScore)}%`
+        ? `Colour match score ${Math.round(colorMatchScore)}%`
       : typeof result.similarity === "number"
         ? result.similarity.toFixed(3)
         : typeof result.bm25 === "number"
@@ -90,16 +94,19 @@ export const SearchResultTile = (props: {
       ) : null}
       {onFindSimilar || (matchingColorStyle && onSearchByColor) ? (
         <div className={styles.actionButtons}>
-          {matchingColorStyle && onSearchByColor && result.matchingColor ? (
+          {matchingColorStyle && onSearchByColor && actionColor ? (
             <button
               type="button"
-              className={styles.actionButton}
-              aria-label="Search by matched color"
-              title={`Search by matched color: ${matchingColorStyle}`}
+              className={[
+                styles.actionButton,
+                persistColorAction ? styles.actionButtonPersistent : "",
+              ].filter(Boolean).join(" ")}
+              aria-label="Use this photo's colour"
+              title={`Use this photo's colour: ${matchingColorStyle}`}
               onClick={(event) => {
                 event.preventDefault();
                 event.stopPropagation();
-                onSearchByColor(result.matchingColor as RGB);
+                onSearchByColor(actionColor);
               }}
             >
               <span

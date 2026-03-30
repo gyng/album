@@ -2,9 +2,10 @@
  * @jest-environment jsdom
  */
 
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import Search from "./Search";
 import {
+  fetchColorSimilarResults,
   fetchMemoryCandidates,
   fetchSearchFacetSections,
   fetchHybridResults,
@@ -56,6 +57,7 @@ jest.mock("@tanstack/react-query", () => ({
 }));
 
 jest.mock("./api", () => ({
+  fetchColorSimilarResults: jest.fn(),
   fetchMemoryCandidates: jest.fn(),
   fetchSearchFacetSections: jest.fn(),
   fetchHybridResults: jest.fn(),
@@ -257,6 +259,12 @@ beforeEach(() => {
       { tag: "Night", count: 2 },
     ],
   });
+  (fetchColorSimilarResults as jest.Mock).mockResolvedValue({
+    data: [],
+    prev: undefined,
+    next: undefined,
+    query: "255,0,0",
+  });
   (fetchRecentResults as jest.Mock).mockResolvedValue([
     makeResult({
       path: "../albums/test-simple/recent.jpg",
@@ -370,7 +378,7 @@ describe("Search", () => {
     );
   });
 
-  it("shows a local similarity-search button beside the color control", async () => {
+  it("keeps the local similarity-search button in the search bar while color filtering lives in the facet panel", async () => {
     (fetchRandomPhoto as jest.Mock).mockResolvedValue([
       { path: "../albums/test-simple/seed.jpg" },
     ]);
@@ -378,22 +386,21 @@ describe("Search", () => {
     render(<Search />);
     await flushEffects();
 
+    expect(
+      screen.getByRole("button", {
+        name: "🎲 Random starting photo",
+      }),
+    ).toBeTruthy();
+
     await act(async () => {
       fireEvent.click(
         screen.getByRole("button", {
-          name: "🎲 Similarity search",
+          name: "🎲 Random starting photo",
         }),
       );
     });
 
     expect(fetchRandomPhoto).toHaveBeenCalledWith({ database: mockDatabase });
-    await waitFor(() => {
-      expect(
-        screen.queryByRole("button", {
-          name: "🎲 Similarity search",
-        }),
-      ).toBeNull();
-    });
   });
 
   it("renders the browse-mode sections and loading progress", async () => {
@@ -740,6 +747,58 @@ describe("Search", () => {
     expect((singaporePill as HTMLButtonElement).disabled).toBe(false);
   });
 
+  it("treats color as a composable filter with facets", async () => {
+    await renderSearch();
+
+    fireEvent.click(screen.getByRole("tab", { name: /colour/i }));
+    fireEvent.change(screen.getByLabelText("Colour filter hex value"), {
+      target: { value: "#ff0000" },
+    });
+
+    await waitFor(() => {
+      expect(screen.getByRole("tab", { name: /place/i })).toBeTruthy();
+    });
+    expect(screen.getByLabelText("Search mode")).toBeTruthy();
+    expect(
+      screen.getByPlaceholderText(/type \/ to search/i),
+    ).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("tab", { name: /place/i }));
+    fireEvent.click(
+      within(screen.getByRole("heading", { name: "Region" }).parentElement!)
+        .getByRole("button", { name: /tokyo/i }),
+    );
+
+    await waitFor(() => {
+      expect(fetchColorSimilarResults).toHaveBeenLastCalledWith({
+        database: mockDatabase,
+        color: [255, 0, 0],
+        pageSize: 48,
+        page: 0,
+        maxDistance: 35,
+        selectedFacets: [{ facetId: "region", value: "Tokyo" }],
+      });
+    });
+
+    expect(screen.getByRole("button", { name: /remove filter colour: #ff0000/i })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /remove filter region: tokyo/i })).toBeTruthy();
+  });
+
+  it("only shows the photo color action while the color facet is active or selected", async () => {
+    window.history.replaceState({}, "", "/search?q=harbor");
+    await renderSearch();
+
+    expect(
+      screen.queryByRole("button", { name: /use this photo's colour/i }),
+    ).toBeNull();
+
+    fireEvent.click(screen.getByRole("tab", { name: /colour/i }));
+
+    expect(
+      screen.getAllByRole("button", { name: /use this photo's colour/i }).length,
+    ).toBeGreaterThan(0);
+  });
+
   it("preserves typed spaces in the search input", async () => {
     await renderSearch();
 
@@ -810,6 +869,35 @@ describe("Search", () => {
         }),
       );
     });
+  });
+
+  it("passes selected color into semantic search instead of falling back to color-only mode", async () => {
+    window.history.replaceState(
+      {},
+      "",
+      "/search?q=harbor&mode=semantic&color=255,0,0",
+    );
+    (encodeSearchText as jest.Mock).mockReturnValue(
+      createResolvedThenable([1, 0, 0]),
+    );
+
+    await renderSearch();
+
+    await waitFor(() => {
+      expect(fetchSemanticResults).toHaveBeenCalledWith(
+        expect.objectContaining({
+          database: mockDatabase,
+          textQuery: "harbor",
+          textVector: [1, 0, 0],
+          colorSearch: [255, 0, 0],
+          colorTolerance: 35,
+          selectedFacets: [],
+        }),
+      );
+    });
+
+    expect(fetchColorSimilarResults).not.toHaveBeenCalled();
+    expect(screen.getByLabelText("Search mode")).toBeTruthy();
   });
 
   it("keeps filter pills enabled in semantic mode while ignoring keyword-only refinement counts", async () => {

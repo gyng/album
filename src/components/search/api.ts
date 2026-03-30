@@ -65,6 +65,13 @@ type RankedHybridResult = {
   rrfScore: number;
 };
 
+type RankedColorResult = {
+  path: string;
+  score: number;
+  rawDist: number;
+  matchingColor: [number, number, number];
+};
+
 const DEFAULT_EMBEDDING_MODEL_ID = "google/siglip-base-patch16-224";
 const RECIPROCAL_RANK_FUSION_K = 60;
 
@@ -614,6 +621,62 @@ const fetchFacetMatchedPaths = async (
   );
 };
 
+const fetchColorMatchedResults = async (opts: {
+  database: Database;
+  color: RGB;
+  maxDistance?: number;
+  selectedFacets?: SearchFacetSelection[];
+}): Promise<RankedColorResult[]> => {
+  const {
+    database,
+    color,
+    maxDistance = 100,
+    selectedFacets = [],
+  } = opts;
+  const facetWhere = buildFacetWhereClause(selectedFacets);
+  const lightRows = await exec(
+    database,
+    `SELECT images.path, images.colors FROM images
+      LEFT JOIN metadata m ON m.path = images.path
+      WHERE images.colors IS NOT NULL AND images.colors != ''
+      ${facetWhere.sql ? `AND ${facetWhere.sql}` : ""}`,
+    facetWhere.bind,
+  );
+
+  const queryLab = rgbToLab(...color);
+  const ranked: RankedColorResult[] = [];
+
+  for (const row of lightRows.data as unknown as [string, string][]) {
+    const palette = parseColorPalette(row[1]);
+    if (palette.length === 0) continue;
+
+    let bestScore = Infinity;
+    let bestRawDist = Infinity;
+    let matchingColor: [number, number, number] = palette[0] as [
+      number,
+      number,
+      number,
+    ];
+
+    for (let i = 0; i < palette.length; i++) {
+      const rgb = palette[i] as [number, number, number];
+      const rawDist = deltaE(queryLab, rgbToLab(...rgb));
+      const score = rawDist * (1 + i * 0.1);
+      if (score < bestScore) {
+        bestScore = score;
+        bestRawDist = rawDist;
+        matchingColor = rgb;
+      }
+    }
+
+    if (bestScore === Infinity || bestRawDist > maxDistance) continue;
+    ranked.push({ path: row[0], score: bestScore, rawDist: bestRawDist, matchingColor });
+  }
+
+  ranked.sort((a, b) => a.score - b.score);
+  return ranked;
+};
+
 export const fetchSearchFacetSections = async (opts: {
   database: Database;
   activeTerms?: string[];
@@ -775,13 +838,46 @@ export const fetchResults = async (opts: {
   pageSize: number;
   page: number;
   selectedFacets?: SearchFacetSelection[];
+  colorSearch?: RGB | null;
+  colorTolerance?: number;
 }): Promise<PaginatedSearchResult> => {
-  const { database, query, pageSize, page, selectedFacets = [] } = opts;
+  const {
+    database,
+    query,
+    pageSize,
+    page,
+    selectedFacets = [],
+    colorSearch = null,
+    colorTolerance = 100,
+  } = opts;
   const queries = query ? query.split("|").filter(Boolean) : [];
-  const facetWhere = buildFacetWhereClause(selectedFacets);
+  const colorMatchedPaths = colorSearch
+    ? (
+        await fetchColorMatchedResults({
+          database,
+          color: colorSearch,
+          maxDistance: colorTolerance,
+          selectedFacets,
+        })
+      ).slice(0, 900)
+    : null;
+  const allowedPaths = colorMatchedPaths
+    ? new Set(colorMatchedPaths.map((candidate) => candidate.path))
+    : null;
+  const colorMap = colorMatchedPaths
+    ? new Map(colorMatchedPaths.map((candidate) => [candidate.path, candidate]))
+    : null;
+  const facetWhere = colorSearch
+    ? { sql: "", bind: [] as (string | number)[] }
+    : buildFacetWhereClause(selectedFacets);
   const whereParts = [
     ...Array.from({ length: queries.length }, () => "images MATCH ?"),
     ...(facetWhere.sql ? [facetWhere.sql] : []),
+    ...(allowedPaths && allowedPaths.size > 0
+      ? [`images.path IN (${Array.from({ length: allowedPaths.size }, () => "?").join(", ")})`]
+      : allowedPaths
+        ? ["1 = 0"]
+        : []),
   ];
 
   try {
@@ -805,6 +901,7 @@ export const fetchResults = async (opts: {
       [
         ...queries.map((q) => toFtsMatchTerm(q)),
         ...facetWhere.bind,
+        ...(allowedPaths ? Array.from(allowedPaths) : []),
         pageSize,
         page * pageSize,
       ],
@@ -815,7 +912,16 @@ export const fetchResults = async (opts: {
       },
     );
 
-    result.data = mapImageRows(result.data as unknown as any[][]);
+    result.data = mapImageRows(result.data as unknown as any[][]).map((row) => {
+      const colorData = colorMap?.get(row.path);
+      return {
+        ...row,
+        matchingColor: colorData?.matchingColor,
+        similarity: colorData
+          ? Math.max(0, Math.min(100, 100 - colorData.rawDist))
+          : row.similarity,
+      };
+    });
     return result;
   } catch (err) {
     console.error(`Bad query ${query} ${page}`, err);
@@ -995,48 +1101,23 @@ export const fetchColorSimilarResults = async (opts: {
   pageSize: number;
   page: number;
   maxDistance?: number;
+  selectedFacets?: SearchFacetSelection[];
 }): Promise<PaginatedSearchResult> => {
-  const { database, color, page, pageSize, maxDistance = 100 } = opts;
-
+  const {
+    database,
+    color,
+    page,
+    pageSize,
+    maxDistance = 100,
+    selectedFacets = [],
+  } = opts;
   try {
-    // All images must be loaded and scored — deltaE operates in CIELAB space where
-    // perceptual distance doesn't map to RGB ranges. SQL pre-filtering by RGB would
-    // silently drop valid results (a color far in RGB can be close in LAB).
-    const lightRows = await exec(
+    const ranked = await fetchColorMatchedResults({
       database,
-      `SELECT path, colors FROM images WHERE colors IS NOT NULL AND colors != ''`,
-      [],
-    );
-
-    const queryLab = rgbToLab(...color);
-    const ranked: { path: string; score: number; rawDist: number; matchingColor: [number, number, number] }[] = [];
-
-    for (const row of lightRows.data as unknown as [string, string][]) {
-      const palette = parseColorPalette(row[1]);
-      if (palette.length === 0) continue;
-
-      let bestScore = Infinity;
-      let bestRawDist = Infinity;
-      let matchingColor: [number, number, number] = palette[0] as [number, number, number];
-
-      for (let i = 0; i < palette.length; i++) {
-        const rgb = palette[i] as [number, number, number];
-        const rawDist = deltaE(queryLab, rgbToLab(...rgb));
-        // Mild dominance weight: palette[0] (most dominant) has no penalty;
-        // later entries get a small additive penalty so dominant-color matches rank higher.
-        const score = rawDist * (1 + i * 0.1);
-        if (score < bestScore) {
-          bestScore = score;
-          bestRawDist = rawDist;
-          matchingColor = rgb;
-        }
-      }
-
-      if (bestScore === Infinity || bestRawDist > maxDistance) continue;
-      ranked.push({ path: row[0], score: bestScore, rawDist: bestRawDist, matchingColor });
-    }
-
-    ranked.sort((a, b) => a.score - b.score);
+      color,
+      maxDistance,
+      selectedFacets,
+    });
 
     const start = page * pageSize;
     const end = start + pageSize;
@@ -1080,6 +1161,8 @@ export const fetchSemanticResults = async (opts: {
   page: number;
   modelId?: string;
   selectedFacets?: SearchFacetSelection[];
+  colorSearch?: RGB | null;
+  colorTolerance?: number;
 }): Promise<PaginatedSearchResult> => {
   const {
     database,
@@ -1090,14 +1173,39 @@ export const fetchSemanticResults = async (opts: {
     pageSize,
     modelId = DEFAULT_EMBEDDING_MODEL_ID,
     selectedFacets = [],
+    colorSearch = null,
+    colorTolerance = 100,
   } = opts;
   const vectorDatabase = embeddingsDatabase ?? database;
 
   try {
+    const [facetAllowedPaths, colorMatches] = await Promise.all([
+      selectedFacets.length > 0 && !colorSearch
+        ? fetchFacetMatchedPaths(database, selectedFacets)
+        : Promise.resolve<Set<string> | null>(null),
+      colorSearch
+        ? fetchColorMatchedResults({
+            database,
+            color: colorSearch,
+            maxDistance: colorTolerance,
+            selectedFacets,
+          })
+        : Promise.resolve<RankedColorResult[] | null>(null),
+    ]);
+    const colorAllowedPaths = colorMatches
+      ? new Set(colorMatches.map((candidate) => candidate.path))
+      : null;
+    const colorMap = colorMatches
+      ? new Map(colorMatches.map((candidate) => [candidate.path, candidate]))
+      : null;
     const allowedPaths =
-      selectedFacets.length > 0
-        ? await fetchFacetMatchedPaths(database, selectedFacets)
-        : null;
+      facetAllowedPaths && colorAllowedPaths
+        ? new Set(
+            Array.from(facetAllowedPaths).filter((path) =>
+              colorAllowedPaths.has(path),
+            ),
+          )
+        : facetAllowedPaths ?? colorAllowedPaths;
     const rankedPaths = await rankEmbeddingsByVector({
       database: vectorDatabase,
       queryVector: textVector,
@@ -1127,6 +1235,7 @@ export const fetchSemanticResults = async (opts: {
         ...row,
         snippet: getResultSnippet(row),
         similarity: candidate.similarity,
+        matchingColor: colorMap?.get(candidate.path)?.matchingColor,
       });
     }
 
@@ -1159,6 +1268,8 @@ export const fetchHybridResults = async (opts: {
   modelId?: string;
   keywordQuery?: string;
   selectedFacets?: SearchFacetSelection[];
+  colorSearch?: RGB | null;
+  colorTolerance?: number;
 }): Promise<PaginatedSearchResult> => {
   const {
     database,
@@ -1170,14 +1281,39 @@ export const fetchHybridResults = async (opts: {
     modelId = DEFAULT_EMBEDDING_MODEL_ID,
     keywordQuery = textQuery,
     selectedFacets = [],
+    colorSearch = null,
+    colorTolerance = 100,
   } = opts;
   const vectorDatabase = embeddingsDatabase ?? database;
 
   try {
+    const [facetAllowedPaths, colorMatches] = await Promise.all([
+      selectedFacets.length > 0 && !colorSearch
+        ? fetchFacetMatchedPaths(database, selectedFacets)
+        : Promise.resolve<Set<string> | null>(null),
+      colorSearch
+        ? fetchColorMatchedResults({
+            database,
+            color: colorSearch,
+            maxDistance: colorTolerance,
+            selectedFacets,
+          })
+        : Promise.resolve<RankedColorResult[] | null>(null),
+    ]);
+    const colorAllowedPaths = colorMatches
+      ? new Set(colorMatches.map((candidate) => candidate.path))
+      : null;
+    const colorMap = colorMatches
+      ? new Map(colorMatches.map((candidate) => [candidate.path, candidate]))
+      : null;
     const allowedPaths =
-      selectedFacets.length > 0
-        ? await fetchFacetMatchedPaths(database, selectedFacets)
-        : null;
+      facetAllowedPaths && colorAllowedPaths
+        ? new Set(
+            Array.from(facetAllowedPaths).filter((path) =>
+              colorAllowedPaths.has(path),
+            ),
+          )
+        : facetAllowedPaths ?? colorAllowedPaths;
     const [keywordResults, vectorResults] = await Promise.all([
       fetchKeywordRanking({ database, query: keywordQuery }),
       rankEmbeddingsByVector({
@@ -1213,6 +1349,7 @@ export const fetchHybridResults = async (opts: {
         bm25: candidate.bm25,
         similarity: candidate.similarity,
         rrfScore: candidate.rrfScore,
+        matchingColor: colorMap?.get(candidate.path)?.matchingColor,
       });
     }
 

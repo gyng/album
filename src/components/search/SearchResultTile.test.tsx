@@ -66,7 +66,7 @@ describe("SearchResultTile", () => {
     );
   });
 
-  it("calls onSearchByColor when the matched color button is clicked", () => {
+  it("calls onSearchByColor when the photo color button is clicked", () => {
     const onSearchByColor = jest.fn();
 
     render(
@@ -80,10 +80,27 @@ describe("SearchResultTile", () => {
     );
 
     fireEvent.click(
-      screen.getByRole("button", { name: /search by matched color/i }),
+      screen.getByRole("button", { name: /use this photo's colour/i }),
     );
 
     expect(onSearchByColor).toHaveBeenCalledWith([12, 34, 56]);
+  });
+
+  it("keeps the color action visibly marked when requested", () => {
+    render(
+      <SearchResultTile
+        result={makeResult({
+          snippet: "Harbor skyline",
+          matchingColor: [12, 34, 56],
+        })}
+        onSearchByColor={jest.fn()}
+        persistColorAction
+      />,
+    );
+
+    expect(
+      screen.getByRole("button", { name: /use this photo's colour/i }).className,
+    ).toContain("actionButtonPersistent");
   });
 
   it("shows a visible percentage match when similarity is present", () => {
@@ -99,7 +116,7 @@ describe("SearchResultTile", () => {
     expect(screen.getByText("71%")).toBeTruthy();
   });
 
-  it("shows a color match percentage without multiplying it again", () => {
+  it("shows a colour match percentage without multiplying it again", () => {
     render(
       <SearchResultTile
         result={makeResult({
@@ -111,7 +128,7 @@ describe("SearchResultTile", () => {
     );
 
     expect(screen.getByText("86%").getAttribute("title")).toBe(
-      "Color match score 86%",
+      "Colour match score 86%",
     );
   });
 

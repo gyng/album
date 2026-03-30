@@ -44,6 +44,7 @@ import {
   serializeSearchFacetSelection,
   writeSearchFacetSelections,
 } from "../../util/searchFacets";
+import { rgbToHex, rgbToString } from "../../util/colorDistance";
 
 const useSafeLayoutEffect =
   typeof window === "undefined" ? useEffect : useLayoutEffect;
@@ -138,7 +139,7 @@ export const Search: React.FC<{
   const [isFacetSectionsLoading, setIsFacetSectionsLoading] =
     useState<boolean>(false);
   const [selectedFilterCategory, setSelectedFilterCategory] = useState<
-    "tags" | "time" | "place" | "gear" | "settings"
+    "tags" | "color" | "time" | "place" | "gear" | "settings"
   >("tags");
   const [isRandomSimilarLoading, setIsRandomSimilarLoading] =
     useState<boolean>(false);
@@ -166,7 +167,6 @@ export const Search: React.FC<{
 
   const {
     canClear,
-    colorHex,
     debouncedSearchQuery,
     fetchNextPage,
     hasNextPage,
@@ -268,12 +268,16 @@ export const Search: React.FC<{
       if (similarityOrder !== DEFAULT_SIMILARITY_ORDER) {
         searchParams.set("similar_order", similarityOrder);
       }
-    } else if (colorSearch) {
+    }
+
+    if (colorSearch) {
       searchParams.set(
         "color",
         `${colorSearch[0]},${colorSearch[1]},${colorSearch[2]}`,
       );
-    } else if (debouncedSearchQuery.length > 0) {
+    }
+
+    if (debouncedSearchQuery.length > 0) {
       searchParams.set("q", debouncedSearchQuery.join(","));
     }
 
@@ -375,7 +379,7 @@ export const Search: React.FC<{
       return;
     }
 
-    if (isSimilarMode || isColorMode) {
+    if (isSimilarMode) {
       setFacetSections([]);
       setIsFacetSectionsLoading(false);
       return;
@@ -629,8 +633,12 @@ export const Search: React.FC<{
     setSimilarPath(null);
     setSimilarTrail([]);
     setRandomExploreError(null);
-    setSelectedFacets([]);
     setColorSearch(color);
+    setSelectedFilterCategory("color");
+  }, []);
+
+  const handleClearColorSearch = useCallback(() => {
+    setColorSearch(null);
   }, []);
 
   const handleRemoveFacet = useCallback((selection: SearchFacetSelection) => {
@@ -645,7 +653,6 @@ export const Search: React.FC<{
     setSimilarPath(null);
     setSimilarTrail([]);
     setRandomExploreError(null);
-    setColorSearch(null);
     setSelectedFacets((prev) => {
       const alreadySelected = prev.some(
         (facet) => serializeSearchFacetSelection(facet) === key,
@@ -686,17 +693,12 @@ export const Search: React.FC<{
     <div className={styles.searchWidget}>
       <SearchInputBar
         canClear={canClear}
-        colorHex={colorHex}
-        colorSearch={colorSearch}
-        colorTolerance={colorTolerance}
         databaseReady={Boolean(database)}
         disabled={disabled}
         inputRef={inputRef}
-        isColorMode={isColorMode}
         isFetching={isFetching}
         isSimilarMode={isSimilarMode}
         isSuccess={isSuccess}
-        modeSourceRef={modeSourceRef}
         queryResultsLength={queryResults?.length}
         searchInputValue={searchInputValue}
         searchMode={searchMode}
@@ -704,21 +706,24 @@ export const Search: React.FC<{
         onApplySearchTerms={applySearchTerms}
         onClearSearchState={clearSearchState}
         onStartRandomSimilarSearch={startRandomSimilarSearch}
-        onSetColorSearch={setColorSearch}
-        onSetColorTolerance={setColorTolerance}
         onSetSearchMode={setSearchMode}
       />
 
-      {!isSimilarMode && !isColorMode ? (
+      {!isSimilarMode ? (
         <SearchFacetPanel
           sections={visibleFacetSections}
           selectedCategory={selectedFilterCategory}
+          colorSearch={colorSearch}
+          colorTolerance={colorTolerance}
           selectedFacets={selectedFacets}
           normalizedSearchTerms={normalizedSearchTerms}
           normalizedTags={normalizedTags}
           refinementCounts={refinementCounts}
           isLoading={isFacetSectionsLoading}
           onSelectCategory={setSelectedFilterCategory}
+          onClearColorSearch={handleClearColorSearch}
+          onSetColorSearch={handleSearchByColor}
+          onSetColorTolerance={setColorTolerance}
           onToggleFacet={handleToggleFacet}
           onToggleTag={handleToggleTag}
         />
@@ -776,10 +781,30 @@ export const Search: React.FC<{
         />
       ) : null}
 
-      {selectedFacets.length > 0 || normalizedSearchTerms.length > 0 ? (
+      {selectedFacets.length > 0 ||
+      normalizedSearchTerms.length > 0 ||
+      colorSearch ? (
         <div className={styles.activeFacetSection}>
           <div className={styles.activeFacetLabel}>Active filters</div>
           <div className={styles.activeFacetChips}>
+            {colorSearch ? (
+              <button
+                key="color-filter"
+                type="button"
+                className={styles.activeFacetChip}
+                onClick={handleClearColorSearch}
+                title={`Remove filter Colour: ${rgbToHex(colorSearch)}`}
+                aria-label={`Remove filter Colour: ${rgbToHex(colorSearch)}`}
+              >
+                <span
+                  className={styles.activeFacetColorSwatch}
+                  style={{ backgroundColor: rgbToString(colorSearch) }}
+                  aria-hidden="true"
+                />
+                <span>{`Colour: ${rgbToHex(colorSearch)}`}</span>
+                <span aria-hidden="true">×</span>
+              </button>
+            ) : null}
             {normalizedSearchTerms.map((term) => (
               <button
                 key={`term-${term}`}
@@ -822,6 +847,7 @@ export const Search: React.FC<{
         <SearchResultsGrid
           isSimilarMode={isSimilarMode}
           isColorMode={isColorMode}
+          isColorCategoryActive={selectedFilterCategory === "color"}
           hasFacetFilters={selectedFacets.length > 0}
           searchInputValue={searchInputValue}
           trimmedQuery={trimmedQuery}
@@ -833,7 +859,11 @@ export const Search: React.FC<{
           hasNextPage={hasNextPage}
           similarClickstreamPaths={similarClickstreamPaths}
           onFindSimilar={handleFindSimilar}
-          onSearchByColor={handleSearchByColor}
+          onSearchByColor={
+            selectedFilterCategory === "color" || colorSearch
+              ? handleSearchByColor
+              : undefined
+          }
           onFetchNextPage={fetchNextPage}
         />
       </div>

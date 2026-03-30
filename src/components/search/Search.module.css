@@ -92,6 +92,14 @@
   outline-offset: 2px;
 }
 
+.activeFacetColorSwatch {
+  width: 0.85rem;
+  height: 0.85rem;
+  border: solid 1px color-mix(in srgb, var(--c-bg) 55%, transparent);
+  border-radius: 999px;
+  flex: 0 0 auto;
+}
+
 .facetPanel {
   display: grid;
   grid-template-columns: 170px minmax(0, 1fr);
@@ -102,6 +110,10 @@
   border: 0;
   border-radius: 0;
   background: transparent;
+}
+
+.facetPanelColorMode {
+  min-height: 0;
 }
 
 .facetCategoryRail {
@@ -164,6 +176,166 @@
 
 }
 
+.colorFacetSection {
+  min-height: 0;
+  align-items: flex-start;
+}
+
+.colorFacetControl {
+  display: grid;
+  grid-template-columns: 196px minmax(220px, 260px);
+  gap: var(--m-m);
+  align-items: start;
+  justify-content: start;
+  max-width: 100%;
+}
+
+.colorFacetPicker {
+  width: 196px !important;
+  height: 160px !important;
+}
+
+.colorFacetPicker :global(.react-colorful__saturation) {
+  border-radius: var(--m-s) var(--m-s) 0 0;
+  border-bottom: 0;
+}
+
+.colorFacetPicker :global(.react-colorful__hue) {
+  height: 16px;
+  border-radius: 0 0 var(--m-s) var(--m-s);
+}
+
+.colorFacetPicker :global(.react-colorful__pointer) {
+  width: 16px;
+  height: 16px;
+}
+
+.colorFacetMeta {
+  display: grid;
+  gap: var(--m-m);
+  min-width: 0;
+  width: min(260px, 100%);
+  align-content: start;
+}
+
+.colorFacetHexLabel,
+.colorFacetRangeGroup {
+  display: grid;
+  gap: var(--m-s);
+}
+
+.colorFacetRangeLabel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--m-s);
+}
+
+.colorFacetHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--m);
+  margin-bottom: 0;
+}
+
+.colorFacetCurrent {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--m-s);
+  min-width: 0;
+}
+
+.colorFacetCurrentSwatchButton {
+  position: relative;
+  display: inline-flex;
+  cursor: pointer;
+}
+
+.colorFacetCurrentSwatch {
+  width: 1rem;
+  height: 1rem;
+  border-radius: 999px;
+  border: solid 1px color-mix(in srgb, var(--c-bg) 55%, transparent);
+  flex: 0 0 auto;
+}
+
+.colorFacetNativeInput {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.colorFacetCurrentHex {
+  font-family: monospace;
+  font-size: var(--fs-s);
+  color: var(--c-font);
+  letter-spacing: 0.04em;
+}
+
+.colorFacetHexInput {
+  width: 100%;
+  min-height: 34px;
+  padding: 0 0 var(--m);
+  border: 0;
+  border-bottom: solid 1px color-mix(in srgb, var(--c-bg-contrast-light) 35%, transparent);
+  border-radius: 0;
+  background: transparent;
+  color: inherit;
+  font-size: var(--fs-s);
+  font-family: monospace;
+}
+
+.colorFacetHexInput:focus-visible {
+  outline: none;
+  border-bottom-color: var(--c-font);
+}
+
+.colorFacetToleranceSlider {
+  width: 100%;
+  margin: 0;
+}
+
+.colorFacetToleranceValue {
+  font-size: var(--fs-s);
+  color: var(--c-bg-contrast-light);
+  justify-self: start;
+  line-height: 1.2;
+  min-width: 0;
+  padding: 0;
+  white-space: nowrap;
+}
+
+.colorFacetClearButton {
+  flex: 0 0 auto;
+  min-height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--c-bg-contrast-light);
+  font-size: var(--fs-s);
+  cursor: pointer;
+}
+
+.colorFacetClearButton:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.colorFacetClearButton:not(:disabled):hover {
+  color: var(--c-font);
+}
+
+.colorFacetClearButton:focus-visible {
+  outline: solid 2px var(--c-bg-contrast-light);
+  outline-offset: 2px;
+}
+
 .facetCategoryContent .tagsContainer {
   gap: var(--m);
   margin-bottom: 0;
@@ -181,9 +353,26 @@
     height: auto;
   }
 
+  .facetPanelColorMode {
+    height: auto;
+  }
+
   .facetCategoryRail {
     display: flex;
     flex-wrap: wrap;
+  }
+
+  .colorFacetControl {
+    grid-template-columns: 1fr;
+    gap: var(--m);
+  }
+
+  .colorFacetMeta {
+    width: 100%;
+  }
+
+  .colorFacetHeader {
+    gap: var(--m-s);
   }
 }
 

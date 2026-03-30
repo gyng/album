@@ -1,4 +1,5 @@
 import {
+  fetchColorSimilarResults,
   fetchMemoryCandidates,
   fetchSearchFacetSections,
   fetchHybridResults,
@@ -295,6 +296,55 @@ describe("fetchSimilarResults", () => {
       path: "../albums/test-simple/DSCF0506-2.jpg",
       page: 0,
       pageSize: 10,
+    });
+
+    expect(results.data).toHaveLength(1);
+    expect(results.data[0]?.path).toBe("../albums/test-simple/DSCF0593.jpg");
+  });
+});
+
+describe("fetchColorSimilarResults", () => {
+  it("filters color results by selected facets", async () => {
+    const database = {
+      exec: ({ sql, bind, callback }: ExecArgs) => {
+        if (
+          sql.includes("SELECT images.path, images.colors FROM images") &&
+          sql.includes("images.geocode LIKE ? OR images.geocode LIKE ?")
+        ) {
+          expect(bind).toEqual(["%\nTokyo\n%", "%\nTokyo"]);
+          callback([
+            "../albums/test-simple/DSCF0593.jpg",
+            "[(255,0,0), (0,0,0)]",
+          ]);
+          return;
+        }
+
+        if (sql.includes("FROM images") && sql.includes("WHERE path IN")) {
+          callback([
+            "../albums/test-simple/DSCF0593.jpg",
+            "/album/test-simple#DSCF0593.jpg",
+            "DSCF0593.jpg",
+            "35.6895\n139.6917\nShinjuku-ku\nTokyo\nTokyo\nJP\nJapan",
+            "",
+            "harbor, skyline",
+            "[(255,0,0), (0,0,0)]",
+            "Harbor skyline",
+            "",
+            "",
+            "",
+            "",
+          ]);
+        }
+      },
+    };
+
+    const results = await fetchColorSimilarResults({
+      database: database as any,
+      color: [255, 0, 0],
+      page: 0,
+      pageSize: 10,
+      maxDistance: 60,
+      selectedFacets: [{ facetId: "region", value: "Tokyo" }],
     });
 
     expect(results.data).toHaveLength(1);

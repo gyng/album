@@ -306,9 +306,11 @@ export const EmptyStateExplore: React.FC<Props> = ({
   return (
     <section className={styles.emptyState} aria-label="Explore browse mode">
       <div className={styles.emptySections}>
-        <section className={styles.sectionSurface}>
-          <ProgressBar progress={progress} details={databaseProgressDetails} />
-        </section>
+        {progress < 100 && (
+          <section className={styles.sectionSurface}>
+            <ProgressBar progress={progress} details={databaseProgressDetails} />
+          </section>
+        )}
 
         <section className={styles.sectionSurface}>
           <div className={styles.sectionHeader}>

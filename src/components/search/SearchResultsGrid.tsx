@@ -7,6 +7,7 @@ import { RGB } from "../../util/colorDistance";
 type Props = {
   isSimilarMode: boolean;
   isColorMode: boolean;
+  isColorCategoryActive: boolean;
   hasFacetFilters: boolean;
   searchInputValue: string;
   trimmedQuery: string;
@@ -18,13 +19,14 @@ type Props = {
   hasNextPage: boolean;
   similarClickstreamPaths: Set<string>;
   onFindSimilar: (path: string, similarity?: number) => void;
-  onSearchByColor: (color: RGB) => void;
+  onSearchByColor?: (color: RGB) => void;
   onFetchNextPage: () => void;
 };
 
 export const SearchResultsGrid: React.FC<Props> = ({
   isSimilarMode,
   isColorMode,
+  isColorCategoryActive,
   hasFacetFilters,
   searchInputValue,
   trimmedQuery,
@@ -44,6 +46,8 @@ export const SearchResultsGrid: React.FC<Props> = ({
     isColorMode ||
     hasFacetFilters ||
     searchInputValue.trim().length > 0;
+  const hasTextQuery = trimmedQuery.length >= 3;
+  const isPureColorSearch = isColorMode && !hasTextQuery && !hasFacetFilters;
 
   if (!showResults) {
     return <ul className={styles.results} />;
@@ -57,17 +61,17 @@ export const SearchResultsGrid: React.FC<Props> = ({
         </div>
       ) : null}
 
-      {isSuccess && !isFetching && results?.length === 0 && isColorMode ? (
-        <div>No photos with a similar color found.</div>
+      {isSuccess && !isFetching && results?.length === 0 && isPureColorSearch ? (
+        <div>No photos with a similar colour found.</div>
       ) : null}
 
       {isSuccess &&
       !isFetching &&
       results?.length === 0 &&
       !isSimilarMode &&
-      (trimmedQuery.length >= 3 || hasFacetFilters) ? (
+      (hasTextQuery || hasFacetFilters || isColorMode) ? (
         <div>
-          {trimmedQuery.length >= 3 ? (
+          {hasTextQuery ? (
             <>
               No results for <i>{trimmedQuery}</i>
             </>
@@ -96,6 +100,7 @@ export const SearchResultsGrid: React.FC<Props> = ({
           >
             <SearchResultTile
               result={r}
+              persistColorAction={isColorCategoryActive}
               onFindSimilar={(path, similarity) => {
                 onFindSimilar(path, similarity);
               }}

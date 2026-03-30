@@ -67,7 +67,6 @@ export const useSearchResultsState = ({
   const keywordQuery = debouncedSearchQuery.join("|");
   const needsTextVector =
     !isSimilarMode &&
-    !isColorMode &&
     hasSearchQuery &&
     searchMode !== "keyword";
 
@@ -88,11 +87,11 @@ export const useSearchResultsState = ({
     hasHydratedFromUrl &&
     Boolean(database) &&
     ((Boolean(similarPath) && hasVectorDatabase) ||
-      isColorMode ||
+      (isColorMode && !hasSearchQuery) ||
       (hasSearchQuery &&
         (searchMode === "keyword" ||
           (hasVectorDatabase && hasCurrentTextVector))) ||
-      (!isSimilarMode && !isColorMode && hasFacetFilters));
+      (!isSimilarMode && (hasFacetFilters || isColorMode)));
 
   const similarFilename = similarPath?.split("/").at(-1) ?? null;
   const similarPreviewSrc = similarPath
@@ -135,13 +134,14 @@ export const useSearchResultsState = ({
         });
       }
 
-      if (debouncedColorSearch) {
+      if (debouncedColorSearch && !hasSearchQuery) {
         return await fetchColorSimilarResults({
           database,
           color: debouncedColorSearch,
           pageSize,
           page: pageParam,
           maxDistance: debouncedColorTolerance,
+          selectedFacets,
         });
       }
 
@@ -154,6 +154,8 @@ export const useSearchResultsState = ({
           pageSize,
           page: pageParam,
           selectedFacets,
+          colorSearch: debouncedColorSearch,
+          colorTolerance: debouncedColorTolerance,
         });
       }
 
@@ -167,6 +169,8 @@ export const useSearchResultsState = ({
           pageSize,
           page: pageParam,
           selectedFacets,
+          colorSearch: debouncedColorSearch,
+          colorTolerance: debouncedColorTolerance,
         });
       }
 
@@ -184,6 +188,8 @@ export const useSearchResultsState = ({
         pageSize,
         page: pageParam,
         selectedFacets,
+        colorSearch: debouncedColorSearch,
+        colorTolerance: debouncedColorTolerance,
       });
     },
     initialPageParam: 0,
@@ -206,7 +212,10 @@ export const useSearchResultsState = ({
 
   const queryResults = reactQuery.data?.pages.flatMap((page) => page.data);
   const canClear =
-    isSimilarMode || isColorMode || searchInputValue.trim() !== "";
+    isSimilarMode ||
+    isColorMode ||
+    searchInputValue.trim() !== "" ||
+    hasFacetFilters;
 
   return {
     ...textVectorState,

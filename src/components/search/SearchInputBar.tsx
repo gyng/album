@@ -1,21 +1,15 @@
 import React, { useSyncExternalStore } from "react";
 import styles from "./Search.module.css";
-import { hexToRgb, RGB, rgbToString } from "../../util/colorDistance";
 import { SearchMode } from "./useTextVector";
 
 type Props = {
   canClear: boolean;
-  colorHex: string | null;
-  colorSearch: RGB | null;
-  colorTolerance: number;
   databaseReady: boolean;
   disabled?: boolean;
   inputRef: React.RefObject<HTMLInputElement | null>;
-  isColorMode: boolean;
   isFetching: boolean;
   isSimilarMode: boolean;
   isSuccess: boolean;
-  modeSourceRef: React.RefObject<HTMLDivElement | null>;
   queryResultsLength?: number;
   searchInputValue: string;
   searchMode: SearchMode;
@@ -23,24 +17,17 @@ type Props = {
   onApplySearchTerms: (terms: string[]) => void;
   onClearSearchState: () => void;
   onStartRandomSimilarSearch: () => void;
-  onSetColorSearch: (rgb: RGB) => void;
-  onSetColorTolerance: (value: number) => void;
   onSetSearchMode: (mode: SearchMode) => void;
 };
 
 export const SearchInputBar: React.FC<Props> = ({
   canClear,
-  colorHex,
-  colorSearch,
-  colorTolerance,
   databaseReady,
   disabled,
   inputRef,
-  isColorMode,
   isFetching,
   isSimilarMode,
   isSuccess,
-  modeSourceRef,
   queryResultsLength,
   searchInputValue,
   searchMode,
@@ -48,8 +35,6 @@ export const SearchInputBar: React.FC<Props> = ({
   onApplySearchTerms,
   onClearSearchState,
   onStartRandomSimilarSearch,
-  onSetColorSearch,
-  onSetColorTolerance,
   onSetSearchMode,
 }) => {
   const isMounted = useSyncExternalStore(
@@ -60,55 +45,7 @@ export const SearchInputBar: React.FC<Props> = ({
 
   return (
     <div className={styles.searchInputRow}>
-      {isColorMode && colorSearch ? (
-        <div className={styles.modeInputArea} ref={modeSourceRef}>
-          <label
-            className={styles.modeColorSwatchLabel}
-            title="Click to change color"
-          >
-            <div
-              className={styles.modeColorSwatch}
-              style={{ backgroundColor: rgbToString(colorSearch) }}
-            />
-            <input
-              type="color"
-              className={styles.modeColorInput}
-              value={colorHex ?? ""}
-              onChange={(e) => {
-                const rgb = hexToRgb(e.target.value);
-                if (rgb) onSetColorSearch(rgb);
-              }}
-            />
-          </label>
-          <span className={styles.modeColorHex}>{colorHex}</span>
-          <div className={styles.modeColorDivider} />
-          <label className={styles.modeColorToleranceLabel}>
-            <span className={styles.modeLabel}>Range</span>
-            <input
-              type="range"
-              className={styles.modeColorToleranceSlider}
-              min={5}
-              max={60}
-              value={colorTolerance}
-              onChange={(e) => onSetColorTolerance(Number(e.target.value))}
-              aria-label="Color distance tolerance"
-              title="How similar the color needs to be (lower = more exact, higher = more results)"
-            />
-            <span className={styles.modeColorToleranceValue}>
-              ±{colorTolerance}
-            </span>
-          </label>
-          <button
-            type="button"
-            className={styles.modeClearButton}
-            onClick={onClearSearchState}
-            aria-label="Exit color search"
-            title="Exit color search"
-          >
-            ×
-          </button>
-        </div>
-      ) : isSimilarMode ? null : (
+      {isSimilarMode ? null : (
         <>
           <div className={styles.searchInputContainer}>
             <input
@@ -161,32 +98,15 @@ export const SearchInputBar: React.FC<Props> = ({
               ⓘ
             </span>
           </label>
-          <label
-            className={styles.secondaryAction}
-            title="Pick a color to search by"
-          >
-            🎨 Color
-            <input
-              type="color"
-              className={styles.colorPickerInput}
-              onChange={(e) => {
-                const rgb = hexToRgb(e.target.value);
-                if (rgb) {
-                  onClearSearchState();
-                  onSetColorSearch(rgb);
-                }
-              }}
-            />
-          </label>
           {isMounted ? (
             <button
               type="button"
               className={styles.secondaryAction}
               onClick={onStartRandomSimilarSearch}
               disabled={!databaseReady}
-              title="Start similarity search for a random image"
+              title="Start with a random photo"
             >
-              🎲 Similarity search
+              🎲 Random starting photo
             </button>
           ) : null}
         </>
