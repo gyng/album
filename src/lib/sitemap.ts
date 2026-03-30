@@ -10,7 +10,7 @@ export const buildSitemapXml = (entries: SitemapEntry[]): string => {
     .map(({ path, lastmod }) => {
       return [
         "  <url>",
-        `    <loc>${getCanonicalUrl(path)}</loc>`,
+        `    <loc>${encodeURI(getCanonicalUrl(path))}</loc>`,
         ...(lastmod ? [`    <lastmod>${lastmod}</lastmod>`] : []),
         "  </url>",
       ].join("\n");

@@ -26,8 +26,10 @@ const getSiteOrigin = () => {
 
 const getCanonicalUrl = (pathname = "/") => {
   const normalised = pathname.startsWith("/") ? pathname : `/${pathname}`;
-  return `${getSiteOrigin()}${normalised}`;
+  return `${getSiteOrigin()}${encodeURI(normalised)}`;
 };
+
+const isTestAlbum = (slug) => slug.startsWith("test-");
 
 const escapeXml = (value) =>
   value
@@ -128,6 +130,7 @@ const buildRssXml = (channel) => {
     `    <title>${escapeXml(channel.title)}</title>`,
     `    <link>${escapeXml(channel.link)}</link>`,
     `    <description>${escapeXml(channel.description)}</description>`,
+    "    <language>en</language>",
     `    <atom:link href="${escapeXml(channel.selfUrl)}" rel="self" type="application/rss+xml" />`,
     ...(channel.lastBuildDate
       ? [
@@ -325,6 +328,7 @@ const generateSitemap = (albumEntries) => {
     { url: getCanonicalUrl("/"), lastmod: latestLastmod },
     { url: getCanonicalUrl("/map"), lastmod: latestLastmod },
     { url: getCanonicalUrl("/timeline"), lastmod: latestLastmod },
+    { url: getCanonicalUrl("/explore"), lastmod: latestLastmod },
     ...albumEntries.map((e) => ({
       url: getCanonicalUrl(`/album/${e.slug}`),
       lastmod: e.lastmod,
@@ -351,7 +355,9 @@ const run = () => {
     return;
   }
 
-  const feedEntries = albumEntries
+  const realAlbumEntries = albumEntries.filter((e) => !isTestAlbum(e.slug));
+
+  const feedEntries = realAlbumEntries
     .map(({ slug, albumPath, lastmod }) => {
       const metadata = readAlbumFeedMetadata(albumPath, slug);
       return { slug, albumPath, title: metadata.title, description: metadata.description, lastmod };
@@ -365,7 +371,7 @@ const run = () => {
   );
 
   // Sitemap
-  writeFile(path.join(publicDir, "sitemap.xml"), generateSitemap(albumEntries));
+  writeFile(path.join(publicDir, "sitemap.xml"), generateSitemap(realAlbumEntries));
 
   // Per-album feeds
   for (const entry of feedEntries) {
