@@ -214,11 +214,11 @@
   gap: var(--m-s);
   width: 220px;
   padding: var(--m-s);
-  border: solid 1px color-mix(in srgb, var(--c-bg-contrast-light) 45%, transparent);
-  border-radius: var(--m-s);
+  border: var(--popup-border);
+  border-radius: var(--popup-radius);
   background-color: var(--c-overlay);
   backdrop-filter: blur(8px);
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.18);
+  box-shadow: var(--popup-shadow);
 }
 
 .popup::after {
@@ -229,8 +229,8 @@
   width: 12px;
   height: 12px;
   background-color: var(--c-overlay);
-  border-right: solid 1px color-mix(in srgb, var(--c-bg-contrast-light) 45%, transparent);
-  border-bottom: solid 1px color-mix(in srgb, var(--c-bg-contrast-light) 45%, transparent);
+  border-right: var(--popup-border);
+  border-bottom: var(--popup-border);
   transform: translateX(-50%) rotate(45deg);
 }
 

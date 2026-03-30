@@ -42,7 +42,7 @@ export const StatBar: React.FC<Props> = ({
           }}
         />
       </div>
-      <span className={styles.count}>{count.toLocaleString()}</span>
+      <span className={styles.count}>{count.toLocaleString("en")}</span>
       {actionHref && actionLabel ? (
         <Link
           href={actionHref}

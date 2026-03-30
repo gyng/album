@@ -51,13 +51,13 @@ export type VisualSamenessStats = {
   }>;
   visualEras: Array<{
     label: string;
-    photo: VisualSamenessPhoto;
+    photos: VisualSamenessPhoto[];
     sharePercent: number;
     count: number;
   }>;
   lookTimeline: Array<{
     year: number;
-    photo: VisualSamenessPhoto;
+    photos: VisualSamenessPhoto[];
     count: number;
   }>;
   lookDrift: {
@@ -545,24 +545,24 @@ export const computeVisualSamenessStats = async (
           visualEras = finalGroups
             .map((group, index) => {
               const clusterCentroid = centroids[index];
-              const representativeMatch = group
+              const photos = group
                 .map((candidate) => ({
                   candidate,
                   score: dotProduct(candidate.vector, clusterCentroid),
                 }))
-                .sort((left, right) => right.score - left.score)[0];
-              if (!representativeMatch) {
-                return null;
-              }
-
-              const photo = photoLookup.get(representativeMatch.candidate.path);
-              if (!photo) {
+                .sort((left, right) => right.score - left.score)
+                .flatMap((match) => {
+                  const photo = photoLookup.get(match.candidate.path);
+                  return photo ? [photo] : [];
+                })
+                .slice(0, 5);
+              if (photos.length === 0) {
                 return null;
               }
 
               return {
                 label: `Era ${index + 1}`,
-                photo,
+                photos,
                 count: group.length,
                 sharePercent: Math.round((group.length / centroidCandidates.length) * 100),
               };
@@ -599,25 +599,25 @@ export const computeVisualSamenessStats = async (
                 }
               });
               const normalizedYearCentroid = normalizeVector(yearCentroid);
-              const representative = group
+              const photos = group
                 .map((candidate) => ({
                   candidate,
                   score: dotProduct(candidate.vector, normalizedYearCentroid),
                 }))
-                .sort((left, right) => right.score - left.score)[0];
-              if (!representative) {
-                return [];
-              }
-
-              const photo = photoLookup.get(representative.candidate.path);
-              if (!photo) {
+                .sort((left, right) => right.score - left.score)
+                .flatMap((match) => {
+                  const photo = photoLookup.get(match.candidate.path);
+                  return photo ? [photo] : [];
+                })
+                .slice(0, 3);
+              if (photos.length === 0) {
                 return [];
               }
 
               return [
                 {
                   year,
-                  photo,
+                  photos,
                   count: group.length,
                 },
               ];

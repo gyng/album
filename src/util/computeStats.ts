@@ -64,12 +64,48 @@ export type PhotoStats = {
   colorStats: BucketedStat[];
   colorCoverage: number;
   paletteSizeStats: BucketedStat[];
+  colorFamilyExamples: Array<{
+    label: string;
+    count: number;
+    sharePercent: number;
+    photos: Array<{
+      src: string;
+      href: string;
+      label: string;
+    }>;
+  }>;
+  colorYearStats: BucketedStatGroup[];
+  colorYearRibbons: Array<{
+    label: string;
+    total: number;
+    dominantFamily: string | null;
+    slices: Array<{
+      rgb: string;
+      family: string;
+      count: number;
+      position: number;
+      dateLabel: string;
+      thumbSrc: string;
+      photoLabel: string;
+    }>;
+  }>;
+  colorDrift: {
+    earlyLabel: string;
+    recentLabel: string;
+    buckets: Array<{
+      label: string;
+      earlyCount: number;
+      recentCount: number;
+      earlySharePercent: number;
+      recentSharePercent: number;
+    }>;
+  } | null;
   lensTypeStats: {
     prime: number;
     zoom: number;
     unknown: number;
   };
-  revisitedPlace: {
+  revisitedPlaces: Array<{
     label: string;
     facetId: "location" | "region" | "subregion" | "city";
     facetValue: string;
@@ -77,12 +113,25 @@ export type PhotoStats = {
     lastYear: number;
     spanYears: number;
     photoCount: number;
-  } | null;
+    timeline: Array<{
+      year: number;
+      count: number;
+      photos: Array<{
+        src: string;
+        label: string;
+      }>;
+    }>;
+    examples: Array<{
+      year: number;
+      src: string;
+      label: string;
+    }>;
+  }>;
 };
 
 const TOP_N_STRING = 20;
-const TOP_N_CAMERAS = 8;
-const TOP_N_LENSES_PER_CAMERA = 6;
+const GEAR_FALLBACK_LENS_LABEL = "Unknown / built-in lens";
+const MAX_REVISITED_PLACES = 4;
 const WEEKDAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const MONTH_LABELS = [
   "Jan",
@@ -214,7 +263,12 @@ function computeStringFacet(
   const sorted: BucketedStat[] = Array.from(counts.entries())
     .map(([label, count]) => ({ label, count }))
     .sort((a, b) => b.count - a.count)
-    .slice(0, TOP_N_STRING);
+    .slice(
+      0,
+      facet.id === CAMERA_FACET.id || facet.id === LENS_FACET.id
+        ? counts.size
+        : TOP_N_STRING,
+    );
 
   return {
     facetId: facet.id,
@@ -231,8 +285,9 @@ function computeGearFlow(photos: PhotoBlock[]): SankeyFlow {
   for (const photo of photos) {
     const exif = photo._build.exif;
     const camera = CAMERA_FACET.extract(exif, photo._build.tags ?? undefined);
-    const lens = LENS_FACET.extract(exif, photo._build.tags ?? undefined);
-    if (!camera || !lens) {
+    const lens =
+      LENS_FACET.extract(exif, photo._build.tags ?? undefined) ?? GEAR_FALLBACK_LENS_LABEL;
+    if (!camera) {
       continue;
     }
 
@@ -248,8 +303,7 @@ function computeGearFlow(photos: PhotoBlock[]): SankeyFlow {
         return right[1] - left[1];
       }
       return left[0].localeCompare(right[0]);
-    })
-    .slice(0, TOP_N_CAMERAS);
+    });
 
   const nodes: SankeyNode[] = [];
   const links: SankeyLink[] = [];
@@ -273,8 +327,7 @@ function computeGearFlow(photos: PhotoBlock[]): SankeyFlow {
           return right[1] - left[1];
         }
         return left[0].localeCompare(right[0]);
-      })
-      .slice(0, TOP_N_LENSES_PER_CAMERA);
+      });
 
     topLenses.forEach(([lens, lensCount]) => {
       const lensId = `lens:${lens}`;
@@ -830,6 +883,10 @@ function computeColorStats(photos: PhotoBlock[]): {
   colorStats: BucketedStat[];
   colorCoverage: number;
   paletteSizeStats: BucketedStat[];
+  colorFamilyExamples: PhotoStats["colorFamilyExamples"];
+  colorYearStats: BucketedStatGroup[];
+  colorYearRibbons: PhotoStats["colorYearRibbons"];
+  colorDrift: PhotoStats["colorDrift"];
 } {
   const colorCounts = new Map<string, number>(
     COLOR_FAMILY_LABELS.map((label) => [label, 0]),
@@ -865,6 +922,232 @@ function computeColorStats(photos: PhotoBlock[]): {
       label,
       count: paletteCounts.get(label) ?? 0,
     })),
+    colorFamilyExamples: [],
+    colorYearStats: [],
+    colorYearRibbons: [],
+    colorDrift: null,
+  };
+}
+
+function computeRichColorStats(albums: Content[]): {
+  colorStats: BucketedStat[];
+  colorCoverage: number;
+  paletteSizeStats: BucketedStat[];
+  colorFamilyExamples: PhotoStats["colorFamilyExamples"];
+  colorYearStats: BucketedStatGroup[];
+  colorYearRibbons: PhotoStats["colorYearRibbons"];
+  colorDrift: PhotoStats["colorDrift"];
+} {
+  const photoEntries = albums.flatMap((album) =>
+    album.blocks.flatMap((block) => {
+      if (block.kind !== "photo") {
+        return [];
+      }
+
+      const photo = block as PhotoBlock;
+      return [{ album, photo }];
+    }),
+  );
+  const photos = photoEntries.map(({ photo }) => photo);
+  const base = computeColorStats(photos);
+  const exampleBuckets = new Map<
+    string,
+    Array<{ src: string; href: string; label: string }>
+  >(COLOR_FAMILY_LABELS.map((label) => [label, []]));
+  const yearCounts = new Map<string, Map<string, number>>();
+  const yearPhotoColors = new Map<
+    string,
+    Array<{
+      sortKey: number;
+      rgb: [number, number, number];
+      family: string;
+      position: number;
+      dateLabel: string;
+      thumbSrc: string;
+      photoLabel: string;
+    }>
+  >();
+  const datedColorEntries: Array<{ year: number; family: string }> = [];
+
+  for (const { album, photo } of photoEntries) {
+    const palette = photo._build?.tags?.colors;
+    if (!palette || palette.length === 0) {
+      continue;
+    }
+
+    const dominant = palette[0] as [number, number, number];
+    const family = getColorFamilyLabel(dominant);
+    const examples = exampleBuckets.get(family);
+    const src = photo._build?.srcset?.[0]?.src ?? photo.data.src;
+    if (examples && src && examples.length < 6) {
+      examples.push({
+        src,
+        href: `/album/${album._build.slug}#${photo.id ?? photo.data.src}`,
+        label: photo.data.title ?? photo.data.src.split("/").at(-1) ?? family,
+      });
+    }
+
+    const parsed = parseExifLocalDateTime(photo._build?.exif?.DateTimeOriginal);
+    if (!parsed) {
+      continue;
+    }
+
+    const yearKey = String(parsed.year);
+    const yearBucket =
+      yearCounts.get(yearKey) ??
+      new Map<string, number>(COLOR_FAMILY_LABELS.map((label) => [label, 0]));
+    yearBucket.set(family, (yearBucket.get(family) ?? 0) + 1);
+    yearCounts.set(yearKey, yearBucket);
+    const sortKey =
+      parsed.year * 100000000 +
+      parsed.month * 1000000 +
+      parsed.day * 10000 +
+      parsed.hour * 100 +
+      parsed.minute;
+    const yearPhotos = yearPhotoColors.get(yearKey) ?? [];
+    const yearStart = Date.UTC(parsed.year, 0, 1, 0, 0, 0, 0);
+    const nextYearStart = Date.UTC(parsed.year + 1, 0, 1, 0, 0, 0, 0);
+    const currentTime = Date.UTC(
+      parsed.year,
+      parsed.month - 1,
+      parsed.day,
+      parsed.hour,
+      parsed.minute,
+      0,
+      0,
+    );
+    const position =
+      nextYearStart > yearStart
+        ? (currentTime - yearStart) / (nextYearStart - yearStart)
+        : 0;
+    yearPhotos.push({
+      sortKey,
+      rgb: dominant,
+      family,
+      position: Math.max(0, Math.min(1, position)),
+      dateLabel: `${MONTH_LABELS[parsed.month - 1]} ${parsed.day}`,
+      thumbSrc: src,
+      photoLabel: photo.data.title ?? photo.data.src.split("/").at(-1) ?? family,
+    });
+    yearPhotoColors.set(yearKey, yearPhotos);
+    datedColorEntries.push({ year: parsed.year, family });
+  }
+
+  const colorFamilyExamples = COLOR_FAMILY_LABELS.map((label) => {
+    const count = base.colorStats.find((bucket) => bucket.label === label)?.count ?? 0;
+    return {
+      label,
+      count,
+      sharePercent:
+        base.colorCoverage > 0 && photos.length > 0
+          ? Math.round((count / Math.max(1, Math.round(base.colorCoverage * photos.length))) * 100)
+          : 0,
+      photos: exampleBuckets.get(label) ?? [],
+    };
+  }).filter((bucket) => bucket.count > 0 && bucket.photos.length > 0)
+    .sort((left, right) => right.count - left.count || left.label.localeCompare(right.label));
+
+  const sortedYears = Array.from(yearCounts.keys())
+    .map((year) => Number(year))
+    .sort((left, right) => right - left)
+    .slice(0, 5);
+
+  const colorYearStats = sortedYears.map((year) => ({
+    label: String(year),
+    data: COLOR_FAMILY_LABELS.map((label) => ({
+      label,
+      count: yearCounts.get(String(year))?.get(label) ?? 0,
+    })),
+  }));
+  const colorYearRibbons = sortedYears.map((year) => {
+    const yearKey = String(year);
+    const entries = (yearPhotoColors.get(yearKey) ?? [])
+      .slice()
+      .sort((left, right) => left.sortKey - right.sortKey);
+    const total = entries.length;
+    const slices = entries.map((entry) => ({
+      rgb: `rgb(${entry.rgb[0]}, ${entry.rgb[1]}, ${entry.rgb[2]})`,
+      family: entry.family,
+      count: 1,
+      position: entry.position,
+      dateLabel: entry.dateLabel,
+      thumbSrc: entry.thumbSrc,
+      photoLabel: entry.photoLabel,
+    }));
+
+    const dominantFamily =
+      colorYearStats
+        .find((group) => group.label === yearKey)
+        ?.data.slice()
+        .sort((left, right) => right.count - left.count || left.label.localeCompare(right.label))[0]
+        ?.label ?? null;
+
+    return {
+      label: yearKey,
+      total,
+      dominantFamily,
+      slices,
+    };
+  });
+
+  let colorDrift: PhotoStats["colorDrift"] = null;
+  if (datedColorEntries.length > 0) {
+    const years = Array.from(new Set(datedColorEntries.map((entry) => entry.year))).sort(
+      (left, right) => left - right,
+    );
+    const windowSize =
+      years.length <= 2 ? 1 : Math.min(3, Math.max(1, Math.floor(years.length / 2)));
+    const earlyYears = years.slice(0, windowSize);
+    const recentYears = years.slice(-windowSize);
+    const earlyCounts = new Map<string, number>(COLOR_FAMILY_LABELS.map((label) => [label, 0]));
+    const recentCounts = new Map<string, number>(COLOR_FAMILY_LABELS.map((label) => [label, 0]));
+
+    datedColorEntries.forEach((entry) => {
+      if (earlyYears.includes(entry.year)) {
+        earlyCounts.set(entry.family, (earlyCounts.get(entry.family) ?? 0) + 1);
+      }
+      if (recentYears.includes(entry.year)) {
+        recentCounts.set(entry.family, (recentCounts.get(entry.family) ?? 0) + 1);
+      }
+    });
+
+    const earlyTotal = Array.from(earlyCounts.values()).reduce((sum, value) => sum + value, 0);
+    const recentTotal = Array.from(recentCounts.values()).reduce((sum, value) => sum + value, 0);
+    colorDrift = {
+      earlyLabel:
+        earlyYears.length === 1
+          ? String(earlyYears[0])
+          : `${earlyYears[0]}–${earlyYears[earlyYears.length - 1]}`,
+      recentLabel:
+        recentYears.length === 1
+          ? String(recentYears[0])
+          : `${recentYears[0]}–${recentYears[recentYears.length - 1]}`,
+      buckets: COLOR_FAMILY_LABELS.map((label) => ({
+        label,
+        earlyCount: earlyCounts.get(label) ?? 0,
+        recentCount: recentCounts.get(label) ?? 0,
+        earlySharePercent:
+          earlyTotal > 0 ? Math.round(((earlyCounts.get(label) ?? 0) / earlyTotal) * 100) : 0,
+        recentSharePercent:
+          recentTotal > 0 ? Math.round(((recentCounts.get(label) ?? 0) / recentTotal) * 100) : 0,
+      }))
+        .filter((bucket) => bucket.earlyCount > 0 || bucket.recentCount > 0)
+        .sort(
+          (left, right) =>
+            right.recentSharePercent +
+            right.earlySharePercent -
+            (left.recentSharePercent + left.earlySharePercent) ||
+            left.label.localeCompare(right.label),
+        ),
+    };
+  }
+
+  return {
+    ...base,
+    colorFamilyExamples,
+    colorYearStats,
+    colorYearRibbons,
+    colorDrift,
   };
 }
 
@@ -904,7 +1187,7 @@ function computeLensTypeStats(photos: PhotoBlock[]): PhotoStats["lensTypeStats"]
 
 function computeRevisitedPlace(
   photos: PhotoBlock[],
-): PhotoStats["revisitedPlace"] {
+): PhotoStats["revisitedPlaces"] {
   const placeYears = new Map<
     string,
     {
@@ -913,6 +1196,11 @@ function computeRevisitedPlace(
       facetValue: string;
       years: Set<number>;
       photoCount: number;
+      photos: Array<{
+        year: number;
+        src: string;
+        label: string;
+      }>;
     }
   >();
 
@@ -935,19 +1223,28 @@ function computeRevisitedPlace(
     }
 
     const key = `${place.facetId}:${place.value}`;
+    const thumbSrc = photo._build.srcset?.[0]?.src ?? photo.data.src;
     const existing = placeYears.get(key) ?? {
       label: formatPlaceDisplayLabel(place.value) ?? place.value,
       facetId: place.facetId,
       facetValue: place.value,
       years: new Set<number>(),
       photoCount: 0,
+      photos: [],
     };
     existing.years.add(parsed.year);
     existing.photoCount += 1;
+    if (thumbSrc) {
+      existing.photos.push({
+        year: parsed.year,
+        src: thumbSrc,
+        label: photo.data.title ?? place.value,
+      });
+    }
     placeYears.set(key, existing);
   }
 
-  const best = Array.from(placeYears.values())
+  return Array.from(placeYears.values())
     .map((place) => {
       const years = Array.from(place.years).sort((left, right) => left - right);
       return {
@@ -966,21 +1263,40 @@ function computeRevisitedPlace(
         return right.photoCount - left.photoCount;
       }
       return left.label.localeCompare(right.label);
-    })[0];
-
-  if (!best) {
-    return null;
-  }
-
-  return {
-    label: best.label,
-    facetId: best.facetId,
-    facetValue: best.facetValue,
-    firstYear: best.firstYear,
-    lastYear: best.lastYear,
-    spanYears: best.spanYears,
-    photoCount: best.photoCount,
-  };
+    })
+    .slice(0, MAX_REVISITED_PLACES)
+    .map((place) => ({
+      label: place.label,
+      facetId: place.facetId,
+      facetValue: place.facetValue,
+      firstYear: place.firstYear,
+      lastYear: place.lastYear,
+      spanYears: place.spanYears,
+      photoCount: place.photoCount,
+      timeline: Array.from(
+        place.photos.reduce((groups, photo) => {
+          const current = groups.get(photo.year) ?? [];
+          current.push(photo);
+          groups.set(photo.year, current);
+          return groups;
+        }, new Map<number, typeof place.photos>()).entries(),
+      )
+        .sort((left, right) => left[0] - right[0])
+        .map(([year, photos]) => ({
+          year,
+          count: photos.length,
+          photos: photos.slice(0, 3).map((photo) => ({
+            src: photo.src,
+            label: photo.label,
+          })),
+        })),
+      examples: place.photos
+        .sort((left, right) => left.year - right.year)
+        .filter((photo, index, all) =>
+          index === all.findIndex((candidate) => candidate.year === photo.year),
+        )
+        .slice(0, 3),
+    }));
 }
 
 export function computePhotoStats(albums: Content[]): PhotoStats {
@@ -1005,10 +1321,10 @@ export function computePhotoStats(albums: Content[]): PhotoStats {
     minYear !== Infinity ? [minYear, maxYear] : null;
   const calendarStats = computeCalendarStats(photos);
   const recentTrendStats = computeRecentTrendStats(photos);
-  const colorStats = computeColorStats(photos);
+  const colorStats = computeRichColorStats(albums);
   const lensTypeStats = computeLensTypeStats(photos);
   const technicalRelationshipFilters = computeTechnicalRelationshipFilters(photos);
-  const revisitedPlace = computeRevisitedPlace(photos);
+  const revisitedPlaces = computeRevisitedPlace(photos);
   const mapPoints = photos.flatMap((photo) => {
     const exif = photo._build?.exif ?? {};
     const { decLat, decLng } = getDegLatLngFromExif(exif);
@@ -1041,7 +1357,11 @@ export function computePhotoStats(albums: Content[]): PhotoStats {
     colorStats: colorStats.colorStats,
     colorCoverage: colorStats.colorCoverage,
     paletteSizeStats: colorStats.paletteSizeStats,
+    colorFamilyExamples: colorStats.colorFamilyExamples,
+    colorYearStats: colorStats.colorYearStats,
+    colorYearRibbons: colorStats.colorYearRibbons,
+    colorDrift: colorStats.colorDrift,
     lensTypeStats,
-    revisitedPlace,
+    revisitedPlaces,
   };
 }

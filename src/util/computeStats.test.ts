@@ -155,6 +155,14 @@ describe("computePhotoStats", () => {
           facetId: "lens",
           facetValue: "XF35mmF1.4 R",
         }),
+        expect.objectContaining({
+          id: "lens:Unknown / built-in lens",
+          label: "Unknown / built-in lens",
+          count: 1,
+          depth: 1,
+          facetId: "lens",
+          facetValue: "Unknown / built-in lens",
+        }),
       ]),
     );
 
@@ -173,6 +181,11 @@ describe("computePhotoStats", () => {
         {
           source: "camera:SONY A7IV",
           target: "lens:FE 55mm F1.8 ZA",
+          count: 1,
+        },
+        {
+          source: "camera:SONY A7IV",
+          target: "lens:Unknown / built-in lens",
           count: 1,
         },
       ]),
@@ -366,13 +379,25 @@ describe("computePhotoStats", () => {
       }),
     ])]);
 
-    expect(stats.revisitedPlace).toEqual(
+    expect(stats.revisitedPlaces[0]).toEqual(
       expect.objectContaining({
         label: "Annaka",
         facetId: "city",
         firstYear: 2020,
         lastYear: 2024,
         spanYears: 4,
+        timeline: [
+          expect.objectContaining({
+            year: 2020,
+            count: 1,
+            photos: [expect.objectContaining({ src: "/test.jpg" })],
+          }),
+          expect.objectContaining({
+            year: 2024,
+            count: 1,
+            photos: [expect.objectContaining({ src: "/test.jpg" })],
+          }),
+        ],
       }),
     );
   });
@@ -399,17 +424,22 @@ describe("computePhotoStats", () => {
     );
   });
 
-  it("computes dominant color families and palette richness", () => {
+  it("computes dominant color families, examples, and color drift", () => {
     const stats = computePhotoStats([makeAlbum([
       makePhoto({
+        id: "red-early.jpg",
         tags: {
           colors: [
             [210, 70, 80],
             [240, 220, 220],
           ],
         } as any,
+        exif: {
+          DateTimeOriginal: "2021:04:02 12:00:00",
+        },
       }),
       makePhoto({
+        id: "blue-recent.jpg",
         tags: {
           colors: [
             [80, 120, 220],
@@ -417,11 +447,18 @@ describe("computePhotoStats", () => {
             [50, 60, 80],
           ],
         } as any,
+        exif: {
+          DateTimeOriginal: "2024:05:03 12:00:00",
+        },
       }),
       makePhoto({
+        id: "neutral-recent.jpg",
         tags: {
           colors: [[140, 140, 140]],
         } as any,
+        exif: {
+          DateTimeOriginal: "2024:06:04 12:00:00",
+        },
       }),
       makePhoto({ tags: null as any }),
     ])]);
@@ -437,6 +474,42 @@ describe("computePhotoStats", () => {
       { label: "4", count: 0 },
       { label: "5+", count: 0 },
     ]);
+    expect(stats.colorFamilyExamples.find((bucket) => bucket.label === "Red")?.photos[0]).toEqual(
+      expect.objectContaining({
+        href: "/album/test-album#test.jpg",
+      }),
+    );
+    expect(stats.colorYearStats).toEqual([
+      expect.objectContaining({
+        label: "2024",
+      }),
+      expect.objectContaining({
+        label: "2021",
+      }),
+    ]);
+    expect(stats.colorYearRibbons).toEqual([
+      expect.objectContaining({
+        label: "2024",
+        total: 2,
+        slices: expect.arrayContaining([
+          expect.objectContaining({
+            rgb: expect.stringMatching(/^rgb\(/),
+            family: expect.any(String),
+            count: expect.any(Number),
+          }),
+        ]),
+      }),
+      expect.objectContaining({
+        label: "2021",
+        total: 1,
+      }),
+    ]);
+    expect(stats.colorDrift).toEqual(
+      expect.objectContaining({
+        earlyLabel: "2021",
+        recentLabel: "2024",
+      }),
+    );
   });
 
   it("computes time-of-day relationships from local hour, aperture, and ISO", () => {

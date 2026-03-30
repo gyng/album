@@ -66,7 +66,7 @@
 
 @media (max-width: 720px) {
   .row {
-    grid-template-columns: minmax(84px, 132px) 1fr auto auto;
+    grid-template-columns: minmax(64px, 96px) 1fr auto auto;
   }
 
   .actionText {

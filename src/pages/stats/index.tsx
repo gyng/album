@@ -58,7 +58,7 @@ const getTopLabel = (
   facet?.data[0]?.label ?? "—";
 
 const getOverviewValue = (value: number | string | null): string =>
-  typeof value === "number" ? value.toLocaleString() : value ?? "—";
+  typeof value === "number" ? value.toLocaleString("en") : value ?? "—";
 
 const getPeakBucketLabel = (data: BucketedStat[]): string => {
   const top = data.reduce<BucketedStat | null>((current, bucket) => {
@@ -87,6 +87,12 @@ type FunStatCard = {
   value: string;
   detail: string;
   actionHref?: string | null;
+  examples?: Array<{
+    year: number;
+    src: string;
+    label: string;
+    href: string;
+  }>;
 };
 
 type OverviewCard = {
@@ -98,6 +104,21 @@ const buildYearSearchHref = (year: string): string =>
   buildSearchHref({
     facets: [{ facetId: "year", value: year }],
   });
+
+const buildColorSearchHref = (colorLabel: string, year?: string): string | null => {
+  const color = COLOR_SEARCH_PARAMS[colorLabel];
+  if (!color) {
+    return null;
+  }
+
+  const params = new URLSearchParams();
+  params.set("color", color);
+  if (year) {
+    params.append("facet", `year:${year}`);
+  }
+  const query = params.toString();
+  return query ? `/search?${query}` : "/search";
+};
 
 const isAggregateLocationBucket = (label: string): boolean =>
   label.startsWith("Other ");
@@ -126,14 +147,28 @@ const COLOR_SEARCH_PARAMS: Record<string, string> = {
   Pink: "216,107,167",
 };
 
+const COLOR_FAMILY_ORDER = [
+  "Neutral",
+  "Red",
+  "Orange",
+  "Yellow",
+  "Green",
+  "Cyan",
+  "Blue",
+  "Purple",
+  "Pink",
+] as const;
+
 const INITIAL_AVERAGE_EXAMPLES = 4;
 const INITIAL_REPEATED_EXAMPLES = 2;
 const INITIAL_DISTINCT_EXAMPLES = 4;
 const INITIAL_RECURRING_LOOKS = 4;
+const INITIAL_LOOK_TIMELINE = 4;
 const LOAD_MORE_AVERAGE_EXAMPLES = 4;
 const LOAD_MORE_REPEATED_EXAMPLES = 2;
 const LOAD_MORE_DISTINCT_EXAMPLES = 4;
 const LOAD_MORE_RECURRING_LOOKS = 2;
+const LOAD_MORE_LOOK_TIMELINE = 4;
 
 const StatSection: React.FC<{
   facetId: string;
@@ -162,7 +197,7 @@ const StatSection: React.FC<{
 const StatGroup: React.FC<{
   id?: string;
   title: string;
-  description: string;
+  description?: string;
   actions?: React.ReactNode;
   children: React.ReactNode;
 }> = ({ id, title, description, actions, children }) => (
@@ -183,10 +218,41 @@ const StatGroup: React.FC<{
         </h2>
         {actions ? <div className={styles.groupActions}>{actions}</div> : null}
       </div>
-      <p className={styles.groupDescription}>{description}</p>
+      {description ? <p className={styles.groupDescription}>{description}</p> : null}
     </div>
     <div className={styles.groupGrid}>{children}</div>
   </section>
+);
+
+const VisualSimilarityThumb: React.FC<{
+  photo: {
+    path: string;
+    src: string;
+    href: string;
+    label: string;
+  };
+  className?: string;
+  imageClassName?: string;
+}> = ({ photo, className, imageClassName }) => (
+  <div className={`${styles.visualThumbWrap} ${className ?? ""}`.trim()}>
+    <Link href={photo.href} className={styles.visualThumbLink}>
+      <img
+        src={photo.src}
+        alt={photo.label}
+        className={`${styles.visualThumb} ${imageClassName ?? ""}`.trim()}
+      />
+    </Link>
+    <Link
+      href={buildSimilaritySearchHref(photo.path)}
+      className={styles.visualThumbSearchLink}
+      aria-label={`Find photos visually similar to ${photo.label}`}
+      title="Open similarity search"
+    >
+      <span aria-hidden="true">🔍</span>
+      <span>Similar</span>
+      <span aria-hidden="true">↗</span>
+    </Link>
+  </div>
 );
 
 const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
@@ -205,6 +271,9 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
   );
   const [visibleRecurringLooks, setVisibleRecurringLooks] = useState(
     INITIAL_RECURRING_LOOKS,
+  );
+  const [visibleLookTimeline, setVisibleLookTimeline] = useState(
+    INITIAL_LOOK_TIMELINE,
   );
   const timeFacet = findNumericFacet(stats, "hour");
   const technicalFacets = [
@@ -274,7 +343,6 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
   const renderScopeFilterControls = () => (
     <div className={styles.sectionFilters}>
       <label className={styles.sectionFilter}>
-        <span className={styles.sectionFilterLabel}>Camera</span>
         <select
           className={styles.sectionSelect}
           value={selectedTechnicalCamera}
@@ -291,7 +359,6 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
         </select>
       </label>
       <label className={styles.sectionFilter}>
-        <span className={styles.sectionFilterLabel}>Lens</span>
         <select
           className={styles.sectionSelect}
           value={activeTechnicalLens}
@@ -392,6 +459,10 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
     0,
     visibleRecurringLooks,
   ) ?? [];
+  const lookTimeline = visualSameness?.lookTimeline.toReversed().slice(
+    0,
+    visibleLookTimeline,
+  ) ?? [];
   const overviewCards: OverviewCard[] = [
     {
       label: "Photos",
@@ -469,13 +540,13 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
           : {
               label: "Prime vs zoom",
               value: "Balanced bag",
-              detail: `${stats.lensTypeStats.prime.toLocaleString()} prime vs ${stats.lensTypeStats.zoom.toLocaleString()} zoom shots.`,
+              detail: `${stats.lensTypeStats.prime.toLocaleString("en")} prime vs ${stats.lensTypeStats.zoom.toLocaleString("en")} zoom shots.`,
             },
     topComfortPath
       ? {
           label: "Comfort settings",
           value: topComfortPath.values.join(" · "),
-          detail: `${topComfortPath.count.toLocaleString()} photos use this combo most often.`,
+          detail: `${topComfortPath.count.toLocaleString("en")} photos use this combo most often.`,
           actionHref: buildSearchHref({
             facets: [
               { facetId: "focal-length-35mm", value: topComfortPath.values[0] },
@@ -510,7 +581,7 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
       ? {
           label: "Color mood",
           value: topColorMood.label,
-          detail: `${topColorMood.count.toLocaleString()} photos lean most strongly into this family.`,
+          detail: `${topColorMood.count.toLocaleString("en")} photos lean most strongly into this family.`,
           actionHref: COLOR_SEARCH_PARAMS[topColorMood.label]
             ? `/search?color=${COLOR_SEARCH_PARAMS[topColorMood.label]}`
             : null,
@@ -520,21 +591,17 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
           value: "Not enough palette data",
           detail: "Needs extracted color swatches to show a dominant mood.",
         },
-    stats.revisitedPlace
-      ? {
-          label: "Revisited after years",
-          value: stats.revisitedPlace.label,
-          detail: `Seen from ${stats.revisitedPlace.firstYear} to ${stats.revisitedPlace.lastYear} across ${stats.revisitedPlace.photoCount.toLocaleString()} photos.`,
-          actionHref: buildSearchFacetHref({
-            facetId: stats.revisitedPlace.facetId,
-            value: stats.revisitedPlace.facetValue,
-          }),
-        }
-      : {
-          label: "Revisited after years",
-          value: "No long-return place yet",
-          detail: "Needs dated photos from the same place across multiple years.",
-        },
+  ];
+  const sectionLinks = [
+    { href: "#visual-sameness", label: "Visual sameness" },
+    { href: "#fun-stats", label: "Fun stats" },
+    { href: "#recent-trends", label: "Recent trends" },
+    { href: "#revisited-places", label: "Revisited places" },
+    { href: "#when-you-shoot", label: "When" },
+    { href: "#how-you-shoot", label: "How" },
+    { href: "#where-you-shoot", label: "Where" },
+    { href: "#what-you-shoot-with", label: "What" },
+    { href: "#colour", label: "Colour" },
   ];
   const renderNumericFacet = (facet: NumericFacetStat) => {
     const max = Math.max(...facet.data.map((b) => b.count), 1);
@@ -629,18 +696,6 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
         <header className={styles.header}>
           <div className={styles.headerBody}>
             <h1 className={styles.title}>Explore</h1>
-            {stats.dateRange ? (
-              <p className={styles.kicker}>
-                A read on how this archive has evolved across time, place, gear, and visual rhythm.
-                {` `}
-                {stats.totalPhotos.toLocaleString()} photos across {stats.totalAlbums} albums,{" "}
-                {stats.dateRange[0]}–{stats.dateRange[1]}.
-              </p>
-            ) : (
-              <p className={styles.kicker}>
-                A read on how this archive has evolved across time, place, gear, and visual rhythm.
-              </p>
-            )}
           </div>
         </header>
 
@@ -653,12 +708,22 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
           ))}
         </section>
 
+        <nav className={styles.jumpNav} aria-label="Jump to section">
+          <span className={styles.jumpNavLabel}>Jump to</span>
+          <div className={styles.jumpNavLinks}>
+            {sectionLinks.map((link) => (
+              <a key={link.href} href={link.href} className={styles.jumpNavLink}>
+                {link.label}
+              </a>
+            ))}
+          </div>
+        </nav>
+
         <div className={styles.groups}>
           {visualSameness ? (
             <StatGroup
               id="visual-sameness"
               title="Visual sameness"
-              description="A lightweight embeddings-based read on how visually repetitive the archive feels."
             >
               <section className={`${styles.section} ${styles.sectionWide}`}>
                 <div className={styles.visualSummaryGrid}>
@@ -668,7 +733,7 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
                       {visualSameness.samenessPercent}%
                     </div>
                     <div className={styles.funStatDetail}>
-                      Average nearest-neighbor similarity across {visualSameness.sampleSize.toLocaleString()} embedded photos in the archive.
+                      Average nearest-neighbor similarity across {visualSameness.sampleSize.toLocaleString("en")} embedded photos in the archive.
                     </div>
                   </article>
                   <article className={styles.visualSummaryCard}>
@@ -734,16 +799,7 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
                               key={example.photo.path}
                               className={styles.visualSingleCard}
                             >
-                              <Link
-                                href={buildSimilaritySearchHref(example.photo.path)}
-                                className={styles.visualThumbLink}
-                              >
-                                <img
-                                  src={example.photo.src}
-                                  alt={example.photo.label}
-                                  className={styles.visualThumb}
-                                />
-                              </Link>
+                              <VisualSimilarityThumb photo={example.photo} />
                               <div className={styles.visualExampleMeta}>
                                 <span>
                                   {example.centroidSimilarityPercent}% to archive center
@@ -781,16 +837,7 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
                         <div className={styles.visualSingles}>
                           {distinctExamples.map((example) => (
                             <div key={example.photo.path} className={styles.visualSingleCard}>
-                              <Link
-                                href={buildSimilaritySearchHref(example.photo.path)}
-                                className={styles.visualThumbLink}
-                              >
-                                <img
-                                  src={example.photo.src}
-                                  alt={example.photo.label}
-                                  className={styles.visualThumb}
-                                />
-                              </Link>
+                              <VisualSimilarityThumb photo={example.photo} />
                               <div className={styles.visualExampleMeta}>
                                 <span>{example.nearestSimilarityPercent}% nearest match</span>
                               </div>
@@ -832,26 +879,8 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
                               className={styles.visualPairCard}
                             >
                               <div className={styles.visualPairImages}>
-                                <Link
-                                  href={buildSimilaritySearchHref(example.left.path)}
-                                  className={styles.visualThumbLink}
-                                >
-                                  <img
-                                    src={example.left.src}
-                                    alt={example.left.label}
-                                    className={styles.visualThumb}
-                                  />
-                                </Link>
-                                <Link
-                                  href={buildSimilaritySearchHref(example.right.path)}
-                                  className={styles.visualThumbLink}
-                                >
-                                  <img
-                                    src={example.right.src}
-                                    alt={example.right.label}
-                                    className={styles.visualThumb}
-                                  />
-                                </Link>
+                                <VisualSimilarityThumb photo={example.left} />
+                                <VisualSimilarityThumb photo={example.right} />
                               </div>
                               <div className={styles.visualExampleMeta}>
                                 <span>{example.similarityPercent}% match</span>
@@ -887,24 +916,24 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
                             Recurring visual modes in the archive
                           </span>
                         </div>
-                        <div className={styles.visualSingles}>
+                        <div className={styles.visualEraGrid}>
                           {recurringLooks.map((era) => (
-                            <div key={era.label} className={styles.visualSingleCard}>
-                              <Link
-                                href={buildSimilaritySearchHref(era.photo.path)}
-                                className={styles.visualThumbLink}
-                              >
-                                <img
-                                  src={era.photo.src}
-                                  alt={era.photo.label}
-                                  className={styles.visualThumb}
-                                />
-                              </Link>
+                            <div key={era.label} className={styles.visualEraCard}>
+                              <div className={styles.visualEraThumbs}>
+                                {era.photos.map((photo) => (
+                                  <VisualSimilarityThumb
+                                    key={photo.path}
+                                    photo={photo}
+                                    className={styles.visualEraThumbWrap}
+                                    imageClassName={styles.visualEraThumb}
+                                  />
+                                ))}
+                              </div>
                               <div className={styles.visualExampleMeta}>
                                 <span>{era.label}</span>
                                 <br />
                                 <span>
-                                  {era.sharePercent}% of archive · {era.count.toLocaleString()} photos
+                                  {era.sharePercent}% of archive · {era.count.toLocaleString("en")} photos
                                 </span>
                               </div>
                             </div>
@@ -930,35 +959,62 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
                     ) : null}
                     {visualSameness.lookTimeline.length > 0 ? (
                       <section
-                        className={`${styles.visualExampleSection} ${styles.visualFullRowSection}`}
+                        className={`${styles.visualExampleSection} ${styles.visualFullRowSection} ${styles.timelineSectionAligned}`}
                       >
                         <div className={styles.sectionHeader}>
                           <h3 className={styles.sectionTitle}>Changed look over time</h3>
                           <span className={styles.coverage}>
-                            Yearly representative frames
+                            Yearly representative sets
                           </span>
                         </div>
-                        <div className={styles.visualSingles}>
-                          {visualSameness.lookTimeline.map((entry) => (
-                            <div key={entry.year} className={styles.visualSingleCard}>
-                              <Link
-                                href={buildSimilaritySearchHref(entry.photo.path)}
-                                className={styles.visualThumbLink}
-                              >
-                                <img
-                                  src={entry.photo.src}
-                                  alt={entry.photo.label}
-                                  className={styles.visualThumb}
-                                />
-                              </Link>
-                              <div className={styles.visualExampleMeta}>
-                                <span>{entry.year}</span>
-                                <br />
-                                <span>{entry.count.toLocaleString()} photos</span>
+                        <div className={styles.visualTimeline}>
+                          {lookTimeline.map((entry, index) => (
+                            <div
+                              key={entry.year}
+                              className={`${styles.visualTimelineRow} ${
+                                index === lookTimeline.length - 1
+                                  ? visualSameness.lookTimeline.length > lookTimeline.length
+                                    ? styles.visualTimelineRowContinues
+                                    : styles.visualTimelineRowLast
+                                  : ""
+                              }`}
+                            >
+                              <div className={styles.visualTimelineMeta}>
+                                <span className={styles.visualTimelineYear}>{entry.year}</span>
+                                <span>{entry.count.toLocaleString("en")} photos</span>
+                              </div>
+                              <div className={styles.visualTimelineRail} aria-hidden="true">
+                                <span className={styles.visualTimelineDot} />
+                              </div>
+                              <div className={styles.visualTimelineThumbs}>
+                                {entry.photos.map((photo) => (
+                                  <VisualSimilarityThumb
+                                    key={photo.path}
+                                    photo={photo}
+                                    className={styles.visualTimelineThumbWrap}
+                                    imageClassName={`${styles.visualEraThumb} ${styles.visualTimelineThumb}`}
+                                  />
+                                ))}
                               </div>
                             </div>
                           ))}
                         </div>
+                        {visualSameness.lookTimeline.length > lookTimeline.length ? (
+                          <button
+                            type="button"
+                            className={styles.loadMoreButton}
+                            onClick={() => {
+                              setVisibleLookTimeline((count) =>
+                                Math.min(
+                                  count + LOAD_MORE_LOOK_TIMELINE,
+                                  visualSameness.lookTimeline.length,
+                                ),
+                              );
+                            }}
+                          >
+                            <span>Load more years</span>
+                          </button>
+                        ) : null}
                       </section>
                     ) : null}
                   </div>
@@ -970,7 +1026,6 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
           <StatGroup
             id="fun-stats"
             title="Fun stats"
-            description="A few quick personality reads pulled from the archive."
           >
             <section className={`${styles.section} ${styles.sectionWide}`}>
               <div className={styles.funStatsGrid}>
@@ -979,6 +1034,24 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
                     <div className={styles.funStatLabel}>{stat.label}</div>
                     <div className={styles.funStatValue}>{stat.value}</div>
                     <div className={styles.funStatDetail}>{stat.detail}</div>
+                    {stat.examples && stat.examples.length > 0 ? (
+                      <div className={styles.funStatThumbs}>
+                        {stat.examples.map((example) => (
+                          <Link
+                            key={`${stat.label}-${example.year}-${example.src}`}
+                            href={example.href}
+                            className={styles.funStatThumbLink}
+                          >
+                            <img
+                              src={example.src}
+                              alt={`${example.label} (${example.year})`}
+                              className={styles.funStatThumb}
+                            />
+                            <span className={styles.funStatThumbYear}>{example.year}</span>
+                          </Link>
+                        ))}
+                      </div>
+                    ) : null}
                     {stat.actionHref ? (
                       <Link href={stat.actionHref} className={styles.funStatLink}>
                         <span>Open in Search</span>
@@ -991,11 +1064,10 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
             </section>
           </StatGroup>
 
-          {(stats.recentMonthStats.length > 0 || stats.recentYearStats.length > 0) ? (
+          {stats.recentYearStats.length > 0 ? (
             <StatGroup
               id="recent-trends"
               title="Recent trends"
-              description="A smaller look at how the archive has been moving lately."
               actions={
                 <Link href="/timeline" className={styles.inlineLink}>
                   <span>Open Timeline</span>
@@ -1005,19 +1077,99 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
             >
               <section className={`${styles.section} ${styles.sectionWide}`}>
                 <div className={styles.recentTrendsGrid}>
-                  {stats.recentMonthStats.length > 0 ? (
-                    <MiniHistogram
-                      title="Last 12 months"
-                      data={stats.recentMonthStats}
-                    />
-                  ) : null}
-                  {stats.recentYearStats.length > 0 ? (
-                    <YearSplitHistogram
-                      title="Last 5 years"
-                      data={stats.recentYearStats}
-                      getHref={buildYearSearchHref}
-                    />
-                  ) : null}
+                  <YearSplitHistogram
+                    title="Last 5 years"
+                    data={stats.recentYearStats}
+                    getHref={buildYearSearchHref}
+                  />
+                </div>
+              </section>
+            </StatGroup>
+          ) : null}
+
+          {stats.revisitedPlaces.length > 0 ? (
+            <StatGroup
+              id="revisited-places"
+              title="Revisited places"
+            >
+              <section className={`${styles.section} ${styles.sectionWide}`}>
+                <div className={styles.revisitedPlacesGrid}>
+                  {stats.revisitedPlaces.map((place) => (
+                    <section
+                      key={`${place.facetId}:${place.facetValue}`}
+                      className={`${styles.revisitedPlaceCard} ${styles.timelineSectionAligned}`}
+                    >
+                      <div className={styles.sectionHeader}>
+                        <h3 className={styles.sectionTitle}>{place.label}</h3>
+                        <span className={styles.coverage}>
+                          Seen from {place.firstYear} to {place.lastYear}
+                          {` `}across {place.photoCount.toLocaleString("en")} photos
+                        </span>
+                        <Link
+                          href={buildSearchHref({
+                            facets: [
+                              {
+                                facetId: place.facetId,
+                                value: place.facetValue,
+                              },
+                            ],
+                          })}
+                          className={styles.inlineLink}
+                        >
+                          <span>Open in Search</span>
+                          <span aria-hidden="true">↗</span>
+                        </Link>
+                      </div>
+                      <div className={styles.visualTimeline}>
+                        {place.timeline.toReversed().map((entry, index, entries) => {
+                          const nextEntry = entries[index + 1];
+                          return (
+                            <div
+                              key={entry.year}
+                              className={`${styles.visualTimelineRow} ${!nextEntry ? styles.visualTimelineRowLast : ""}`}
+                            >
+                              <div className={styles.visualTimelineMeta}>
+                                <span className={styles.visualTimelineYear}>{entry.year}</span>
+                                <span>{entry.count.toLocaleString("en")} photos</span>
+                              </div>
+                              <div className={`${styles.visualTimelineRail} ${styles.revisitTimelineRail}`} aria-hidden="true">
+                                <span className={styles.visualTimelineDot} />
+                                {nextEntry ? (
+                                  <span className={styles.revisitGapLabelInline}>
+                                    {entry.year - nextEntry.year}{" "}
+                                    {entry.year - nextEntry.year === 1 ? "year" : "years"}
+                                  </span>
+                                ) : null}
+                              </div>
+                              <div className={styles.revisitThumbs}>
+                                {entry.photos.map((photo, photoIndex) => (
+                                  <Link
+                                    key={`${entry.year}-${photo.src}-${photoIndex}`}
+                                    href={buildSearchHref({
+                                      facets: [
+                                        {
+                                          facetId: place.facetId,
+                                          value: place.facetValue,
+                                        },
+                                        { facetId: "year", value: String(entry.year) },
+                                      ],
+                                    })}
+                                    className={`${styles.visualThumbLink} ${styles.visualEraThumbLink}`}
+                                  >
+                                    <img
+                                      src={photo.src}
+                                      alt={`${photo.label} (${entry.year})`}
+                                      className={`${styles.visualThumb} ${styles.visualEraThumb} ${styles.revisitThumb}`}
+                                    />
+                                  </Link>
+                                ))}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </section>
+                  ))}
                 </div>
               </section>
             </StatGroup>
@@ -1026,7 +1178,6 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
           <StatGroup
             id="when-you-shoot"
             title="When You Shoot"
-            description="Time-based patterns across the archive."
             actions={renderScopeFilterControls()}
           >
             {activeTimeFacet && activeTimeRelationships ? (
@@ -1067,7 +1218,6 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
           <StatGroup
             id="how-you-shoot"
             title="How You Shoot"
-            description="Focal length, aperture, and ISO usage."
             actions={renderScopeFilterControls()}
           >
             {activeTechnicalFacets.map(renderNumericFacet)}
@@ -1077,7 +1227,7 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
                   <h2 className={styles.sectionTitle}>Settings relationships</h2>
                   <span className={styles.coverage}>
                     {filteredTechnicalRelationships
-                      ? `Based on ${filteredTechnicalRelationships.total.toLocaleString()} photos with focal length, aperture, and ISO`
+                      ? `Based on ${filteredTechnicalRelationships.total.toLocaleString("en")} photos with focal length, aperture, and ISO`
                       : "No matching photos with focal length, aperture, and ISO for this combination"}
                   </span>
                 </div>
@@ -1096,7 +1246,6 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
           <StatGroup
             id="where-you-shoot"
             title="Where You Shoot"
-            description="Places from reverse-geocoded photos."
             actions={
               <div className={styles.groupActionsStack}>
                 <Link href="/map" className={styles.inlineLink}>
@@ -1201,7 +1350,6 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
           <StatGroup
             id="what-you-shoot-with"
             title="What You Shoot With"
-            description="How lenses distribute across camera bodies."
             actions={
               <div
                 className={styles.viewToggle}
@@ -1267,38 +1415,170 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
           <StatGroup
             id="colour"
             title="Colour"
-            description="Dominant tones across the archive."
           >
-            <section className={styles.section}>
-              <div className={styles.sectionHeader}>
-                <h2 className={styles.sectionTitle}>Dominant colour families</h2>
-                <span className={styles.coverage}>
-                  {formatCoverage(stats.colorCoverage)}
-                </span>
-              </div>
-              <div className={styles.bars}>
-                {stats.colorStats.map((bucket) => (
-                  <StatBar
-                    key={bucket.label}
-                    label={bucket.label}
-                    count={bucket.count}
-                    maxCount={Math.max(...stats.colorStats.map((item) => item.count), 1)}
-                    barColor={COLOR_SWATCHES[bucket.label] ?? undefined}
-                    actionHref={
-                      COLOR_SEARCH_PARAMS[bucket.label]
-                        ? `/search?color=${COLOR_SEARCH_PARAMS[bucket.label]}`
-                        : null
-                    }
-                    actionLabel={`Find photos with similar ${bucket.label.toLowerCase()} tones`}
-                    labelPrefix={
-                      <span
-                        className={styles.colorSwatch}
-                        style={{ backgroundColor: COLOR_SWATCHES[bucket.label] ?? "#999" }}
-                        aria-hidden="true"
+            <section className={`${styles.section} ${styles.sectionWide}`}>
+              <div className={styles.colourSectionGrid}>
+                <section className={styles.colourPanel}>
+                  <div className={styles.sectionHeader}>
+                    <h2 className={styles.sectionTitle}>Dominant colour families</h2>
+                    <span className={styles.coverage}>
+                      {formatCoverage(stats.colorCoverage)}
+                    </span>
+                  </div>
+                  <div className={styles.bars}>
+                    {stats.colorStats.map((bucket) => (
+                      <StatBar
+                        key={bucket.label}
+                        label={bucket.label}
+                        count={bucket.count}
+                        maxCount={Math.max(...stats.colorStats.map((item) => item.count), 1)}
+                        barColor={COLOR_SWATCHES[bucket.label] ?? undefined}
+                        actionHref={buildColorSearchHref(bucket.label)}
+                        actionLabel={`Find photos with similar ${bucket.label.toLowerCase()} tones`}
+                        labelPrefix={
+                          <span
+                            className={styles.colorSwatch}
+                            style={{ backgroundColor: COLOR_SWATCHES[bucket.label] ?? "#999" }}
+                            aria-hidden="true"
+                          />
+                        }
                       />
-                    }
-                  />
-                ))}
+                    ))}
+                  </div>
+                </section>
+
+                {stats.colorFamilyExamples.length > 0 ? (
+                  <section className={`${styles.colourPanel} ${styles.colourFamilyPanel}`}>
+                    <div className={styles.sectionHeader}>
+                      <h2 className={styles.sectionTitle}>Representative colour looks</h2>
+                    </div>
+                    <div className={styles.colorFamilyRows}>
+                      {stats.colorFamilyExamples.map((family) => (
+                        <div key={family.label} className={styles.colorFamilyRow}>
+                          <div className={styles.colorFamilyMeta}>
+                            <div className={styles.colorFamilyHeading}>
+                              <span
+                                className={styles.colorSwatch}
+                                style={{ backgroundColor: COLOR_SWATCHES[family.label] ?? "#999" }}
+                                aria-hidden="true"
+                              />
+                              <span>{family.label}</span>
+                            </div>
+                            <div className={styles.colorFamilyStat}>
+                              {family.sharePercent}% of colour-tagged photos
+                            </div>
+                            {buildColorSearchHref(family.label) ? (
+                              <Link
+                                href={buildColorSearchHref(family.label) ?? "/search"}
+                                className={styles.inlineLink}
+                              >
+                                <span>Search</span>
+                                <span aria-hidden="true">↗</span>
+                              </Link>
+                            ) : null}
+                          </div>
+                          <div className={styles.colorFamilyThumbs}>
+                            {family.photos.slice(0, 4).map((photo) => (
+                              <Link
+                                key={`${family.label}-${photo.href}-${photo.src}`}
+                                href={photo.href}
+                                className={styles.colorFamilyThumbLink}
+                              >
+                                <img
+                                  src={photo.src}
+                                  alt={photo.label}
+                                  className={styles.colorFamilyThumb}
+                                />
+                              </Link>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </section>
+                ) : null}
+
+                {stats.colorYearRibbons.length > 0 ? (
+                  <section className={`${styles.colourPanel} ${styles.colourFullRowPanel}`}>
+                    <div className={styles.sectionHeader}>
+                      <h2 className={styles.sectionTitle}>Colour over time</h2>
+                    </div>
+                    <div className={styles.colorTimeLegend}>
+                      {COLOR_FAMILY_ORDER.map((label) => (
+                        <div key={`legend-${label}`} className={styles.colorTimeLegendItem}>
+                          <span
+                            className={styles.colorSwatch}
+                            style={{ backgroundColor: COLOR_SWATCHES[label] ?? "#999" }}
+                            aria-hidden="true"
+                          />
+                          <span>{label}</span>
+                        </div>
+                      ))}
+                    </div>
+                    <div className={styles.colorTimeSeries}>
+                      {stats.colorYearRibbons.map((year) => {
+                        return (
+                          <div key={year.label} className={styles.colorTimeRow}>
+                            <div className={styles.colorTimeMeta}>
+                              <span className={styles.colorTimeYear}>{year.label}</span>
+                              <span className={styles.colorTimeDetail}>{year.total.toLocaleString("en")}</span>
+                            </div>
+                            <div className={styles.colorTimeBar}>
+                              {year.slices.map((slice, index) => {
+                                const share = year.total > 0 ? (slice.count / year.total) * 100 : 0;
+                                return (
+                                  <Link
+                                    key={`${year.label}-${slice.family}-${index}`}
+                                    href={buildColorSearchHref(slice.family, year.label) ?? "/search"}
+                                    className={styles.colorTimeSegment}
+                                    title={`${slice.family} around ${year.label}: ${slice.count} photos (${Math.round(share)}%)`}
+                                    style={{
+                                      left: `${slice.position * 100}%`,
+                                      width: `max(3px, ${100 / Math.max(year.total, 1)}%)`,
+                                      backgroundColor: slice.rgb,
+                                    }}
+                                  >
+                                    <span className={styles.colorTimeTooltip} aria-hidden="true">
+                                      <img
+                                        src={slice.thumbSrc}
+                                        alt={slice.photoLabel}
+                                        className={styles.colorTimeTooltipImage}
+                                      />
+                                      <span className={styles.colorTimeTooltipBody}>
+                                        <span
+                                          className={styles.colorTimeTooltipSwatch}
+                                          style={{ backgroundColor: slice.rgb }}
+                                        />
+                                        <span className={styles.colorTimeTooltipText}>
+                                          <span>{slice.family}</span>
+                                          <span>{slice.dateLabel}</span>
+                                        </span>
+                                      </span>
+                                    </span>
+                                  </Link>
+                                );
+                              })}
+                            </div>
+                            <div className={styles.colorTimeSummary}>
+                              {year.dominantFamily ? (
+                                <>
+                                  <span
+                                    className={styles.colorSwatch}
+                                    style={{ backgroundColor: COLOR_SWATCHES[year.dominantFamily] ?? "#999" }}
+                                    aria-hidden="true"
+                                  />
+                                  <span>{year.dominantFamily}</span>
+                                </>
+                              ) : (
+                                <span>—</span>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </section>
+                ) : null}
               </div>
             </section>
           </StatGroup>

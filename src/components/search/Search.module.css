@@ -564,6 +564,7 @@
   gap: var(--m);
   min-width: 0;
   flex: 1 1 auto;
+  width: 100%;
 }
 
 .breadcrumbs {
@@ -769,6 +770,7 @@
   gap: var(--m);
   max-height: 20vh;
   overflow-y: auto;
+  overflow-x: hidden;
   margin-bottom: var(--m-l);
 }
 

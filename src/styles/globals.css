@@ -74,6 +74,9 @@ textarea {
   --c-accent: rgb(230, 32, 101);
   --c-stats-pink: rgb(230, 32, 101);
   --c-font: light-dark(black, white);
+  --popup-border: solid 1px color-mix(in srgb, var(--c-bg-contrast-light) 45%, transparent);
+  --popup-radius: var(--m-s);
+  --popup-shadow: 0 10px 30px rgba(0, 0, 0, 0.18);
 }
 
 html.light,

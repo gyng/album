@@ -18,8 +18,9 @@ const getMaxCount = (groups: BucketedStatGroup[]): number =>
   );
 
 export const YearSplitHistogram: React.FC<Props> = ({ title, data, getHref }) => {
-  const max = getMaxCount(data);
-  const months = data[0]?.data.map((bucket) => bucket.label) ?? [];
+  const orderedData = data.toReversed();
+  const max = getMaxCount(orderedData);
+  const months = orderedData[0]?.data.map((bucket) => bucket.label) ?? [];
 
   return (
     <section className={styles.chart}>
@@ -37,7 +38,7 @@ export const YearSplitHistogram: React.FC<Props> = ({ title, data, getHref }) =>
           </div>
         ))}
 
-        {data.map((group) => (
+        {orderedData.map((group) => (
           <React.Fragment key={group.label}>
             {getHref?.(group.label) ? (
               <Link
