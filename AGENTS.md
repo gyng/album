@@ -9,11 +9,15 @@ Personal photo gallery — Next.js 14, TypeScript, CSS Modules, MapLibre GL. Pho
 - **Lint/typecheck:** `npm run lint` from `src/`
 
 ## Structure
-- `src/components/` — React components, each with co-located `.module.css` and `.test.tsx`
-- `src/pages/` — Next.js pages (`/map`, `/search`, `/stats`, `/timeline`, `/slideshow`)
+- `src/components/` — React components with co-located `.module.css`; complex components have `.test.tsx`, not all
+- `src/pages/` — Next.js pages (`/map`, `/search`, `/explore`, `/timeline`, `/slideshow`)
 - `src/util/` — pure utility functions (no React)
+- `src/services/` — build-time data: album/photo loading, serialisation, EXIF extraction (Node only, never imported client-side)
+- `../albums/` — album source directories (sibling to `src/`); each album is a folder of images with an optional `album.json` (v2 manifest)
 - `src/components/search/` — search page, SQLite API layer, facet panel, result tiles
 - `src/components/mapRoute.ts` — all route/journey logic
+
+All pages use `getStaticProps` — data is computed at build time, no runtime API. Client state is UI-only (filters, view toggles).
 
 ## Conventions
 - **British English** in all user-facing copy and comments: colour, centre, favourite, licence
@@ -33,7 +37,67 @@ Personal photo gallery — Next.js 14, TypeScript, CSS Modules, MapLibre GL. Pho
 - `useMap()` only works inside children of `<MapLibreMap>` — use small child components for imperative map calls
 - Route overlay is SVG (screen-space), projected via `map.project()`
 
+## Design tokens (src/styles/globals.css)
+Always use tokens — never raw px values or colours.
+- Spacing: `--m` 4 / `--m-s` 8 / `--m-m` 12 / `--m-l` 20 / `--m-xl` 40 (px)
+- Font sizes: `--fs-s` 11 / `--fs-sm` 14 / `--fs-m` 18 / `--fs-l` 24 / `--fs-xl` 64 (px)
+- Colours: `--c-bg`, `--c-font`, `--c-bg-contrast-light`, `--c-bg-contrast-dark`, `--c-accent`
+
 ## Search
 - SQLite runs in-browser via sql.js (WASM)
+- Two-phase: JS colour pre-filter → SQL text/facet filter — never do colour filtering in SQL
 - Colour-matched paths capped at 900 before building SQL `IN` clause (SQLite bind-parameter limit)
 - Colour filter composes with text search and facets — not a separate mode
+- Semantic search runs `Xenova/siglip-base-patch16-224` (SigLIP **v1**, ONNX, q4) in a web worker; v1 is used because the v2 model is too large to ship to the browser — do not upgrade without a viable ONNX-quantised v2 alternative
+- **Image embeddings in the DB must be SigLIP v1** (`google/siglip-base-patch16-224`) for semantic search; v2 embeddings are in a different embedding space and only work for image-to-image similarity
+- COI headers required for SharedArrayBuffer; search page is wrapped in `WithCoi`
+
+## Indexing pipeline (index/index.py)
+The search database (`src/public/search.sqlite`) is built offline by a Python CLI before `npm run build`.
+
+**Run** (use the shell scripts, which handle the DB split and copy):
+```
+cd index
+./do-full-index.sh          # full hybrid index → produces both DBs
+./do-embeddings-index.sh    # refresh embeddings only, keep existing search.sqlite
+```
+
+Or directly:
+```
+uv run python index.py index --glob "../albums/**/*.jpg" --dbpath search.sqlite --model-profile hybrid
+```
+
+**Output databases** (both copied to `src/public/` after indexing):
+- `search.sqlite` — FTS5 content, tags, metadata, colours; loaded on first search use
+- `search-embeddings.sqlite` — embeddings table only; loaded lazily for semantic/similarity search; falls back to `search.sqlite` if absent
+
+**What it does per image:**
+1. Reads EXIF (via `exifread`) — camera make/model, lens, focal length, GPS, timestamp
+2. Reverse-geocodes GPS coords to city/country (in-process k-d tree, no API)
+3. Runs **Janus-Pro-1B** (VLM, GPU) — produces `identified_objects`, `themes`, `alt_text`, `subject` as JSON
+4. Runs **SigLIP v1** (`google/siglip-base-patch16-224`, GPU) — embeddings compatible with the browser text encoder; required for semantic search
+5. Optionally runs **SigLIP v2** (`google/siglip2-base-patch16-224`, GPU) — higher-quality embeddings for image-to-image similarity only (incompatible with the browser text encoder)
+6. Extracts dominant colour palette via `fast_colorthief` (Rust, runs concurrently with GPU work)
+7. Writes everything into `search.sqlite` in a single batch transaction; `do-full-index.sh` then splits out the embeddings table into `search-embeddings.sqlite`
+
+**Model profiles:**
+- `janus` — tags/text only (Janus VLM, no embeddings)
+- `siglip2` — embeddings only (no VLM tags)
+- `hybrid` — both (default for production)
+
+**Database schema** (FTS5 + plain tables):
+- `images` — FTS5 virtual table: `path`, `geocode`, `exif`, `tags`, `colors`, `alt_text`, `subject`
+- `metadata` — `path`, `lat_deg`, `lng_deg`, `iso8601`
+- `embeddings` — `path`, `model_id`, `embedding_dim`, `embedding_json`
+- `tags` — denormalised tag frequency counts
+
+**Key behaviours:**
+- Incremental: already-indexed paths are skipped (one bulk `SELECT` into a set, then O(1) checks)
+- `colors` stored as serialised RGB tuples; `parseColorPalette` in `src/util/colorDistance.ts` deserialises them at build time
+- FTS5 uses `porter trigram` tokeniser — supports both stemmed keyword and substring search
+- Page size set to 1024 bytes and journal mode to `delete` for efficient HTTP range reads via sql.js-httpvfs in the browser
+
+## Do not modify
+- `src/util/lol2album.js`, `src/util/convertlol.js` — one-off migration scripts
+- `src/services/buildTiming.ts` — build instrumentation only, no logic
+- v1 album manifest (`manifest.json`) — deprecated, handled in `getAlbum` for legacy support only; new album config uses `album.json` (v2)

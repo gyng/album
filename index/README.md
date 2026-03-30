@@ -101,7 +101,7 @@ The generated SQLite databases drive all search features in the Next.js app:
 - `Semantic search` embeds user text in the browser and compares it against the same stored image vectors.
 - `Hybrid search` fuses the keyword and semantic rankings with Reciprocal Rank Fusion.
 
-If you change the embedding model family, keep the frontend text encoder and the stored image embeddings in the same embedding space. Similar-photo search can still work with image embeddings alone, but semantic text-to-image and hybrid ranking depend on that compatibility.
+The browser text encoder uses SigLIP v1 (`Xenova/siglip-base-patch16-224`, ONNX, q4) because the v2 model is too large to ship to the browser — do not upgrade without a viable ONNX-quantised v2 alternative. If you change the embedding model, update the browser text encoder to match: semantic and hybrid search require both to share the same embedding space. Similar-photo search works with image embeddings alone and is not affected by the model family constraint.
 
 ## Prerequisites
 
