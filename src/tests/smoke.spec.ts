@@ -51,9 +51,15 @@ test.describe("Smoke Tests", () => {
     await expect(page.getByRole("heading", { name: /search/i })).toBeVisible();
   });
 
-  test("explore page loads", async ({ page }) => {
+  test("explore page loads with sections", async ({ page }) => {
     await page.goto("/explore");
     await expect(page).toHaveTitle(/Explore/);
+    await expect(page.getByRole("heading", { name: "Explore" })).toBeVisible();
+
+    // Jump nav and at least one data section render
+    await expect(
+      page.locator('nav[aria-label="Jump to section"]'),
+    ).toBeVisible();
   });
 
   test("timeline page loads", async ({ page }) => {
@@ -86,6 +92,15 @@ test.describe("Smoke Tests", () => {
     // Filter indicator toast appears with album name
     await expect(page.locator("i", { hasText: "test-simple" })).toBeVisible();
     expect(page.url()).toContain("filter_album=test-simple");
+  });
+
+  test("photo deep-link scrolls to photo", async ({ page }) => {
+    await page.goto("/album/test-simple#DSCF0506-2.jpg");
+
+    // The photo element with matching ID should be in the viewport
+    const photo = page.locator('[id="DSCF0506-2.jpg"]');
+    await expect(photo).toBeVisible();
+    await expect(photo).toBeInViewport();
   });
 
   test("theme toggle changes theme", async ({ page }) => {

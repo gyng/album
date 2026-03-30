@@ -1,10 +1,18 @@
 import { test, expect } from "@playwright/test";
 
 test.describe("Timeline", () => {
-  test("heatmap preview and day selection work", async ({ page }) => {
-    const pageErrors: string[] = [];
-    page.on("pageerror", (error) => pageErrors.push(error.message));
+  let pageErrors: string[] = [];
 
+  test.beforeEach(({ page }) => {
+    pageErrors = [];
+    page.on("pageerror", (error) => pageErrors.push(error.message));
+  });
+
+  test.afterEach(() => {
+    expect(pageErrors).toEqual([]);
+  });
+
+  test("heatmap preview and day selection work", async ({ page }) => {
     await page.goto("/timeline");
     await expect(page.getByRole("heading", { name: "Timeline" })).toBeVisible();
 
@@ -29,8 +37,6 @@ test.describe("Timeline", () => {
     await expect(
       selectedSection.locator('a[href*="/album/"]').first(),
     ).toBeVisible();
-
-    expect(pageErrors).toEqual([]);
   });
 
   test("mobile layout works", async ({ page }) => {

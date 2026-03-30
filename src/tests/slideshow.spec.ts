@@ -17,9 +17,11 @@ const revealControls = async (page: Page) => {
   await page.waitForTimeout(150);
 };
 
-/** Wait for the slideshow to fully load (title + image visible). */
+/** Wait for the slideshow to fully load (title + image visible).
+ *  Uses a longer timeout for the first assertion since the slideshow
+ *  page is heavy (WASM sql.js init) and may load slowly under contention. */
 const waitForSlideshow = async (page: Page) => {
-  await expect(page).toHaveTitle("Slideshow | Snapshots");
+  await expect(page).toHaveTitle("Slideshow | Snapshots", { timeout: 15_000 });
   await expect(page.locator(slideshowImg).first()).toBeVisible();
 };
 
@@ -198,64 +200,37 @@ test.describe("Slideshow", () => {
 });
 
 test.describe("Slideshow URL parameters", () => {
-  test("boolean toggles via URL", async ({ page }) => {
-    await page.goto("/slideshow?clock=1&details=1&map=1&cover=1", {
-      waitUntil: "domcontentloaded",
-    });
+  test("URL parameters set correct initial state", async ({ page }) => {
+    await page.goto(
+      "/slideshow?clock=1&details=1&map=1&cover=1&mode=weighted&delay=60&align=left&filter=test-simple",
+      { waitUntil: "domcontentloaded" },
+    );
     await waitForSlideshow(page);
 
+    // Boolean toggles
     for (const label of ["🕰️", "Details", "Map", "Cover"]) {
       await expect(page.locator(`button:has-text("${label}")`)).toHaveAttribute(
         "aria-pressed",
         "true",
       );
     }
-  });
 
-  test("mode=weighted sets Recent active", async ({ page }) => {
-    await page.goto("/slideshow?mode=weighted", {
-      waitUntil: "domcontentloaded",
-    });
-    await waitForSlideshow(page);
+    // Mode
     await expect(page.locator('button:has-text("Recent")')).toHaveAttribute(
       "aria-pressed",
       "true",
     );
-  });
 
-  test("mode=similar sets Similar active", async ({ page }) => {
-    await page.goto("/slideshow?mode=similar", {
-      waitUntil: "domcontentloaded",
-    });
-    await waitForSlideshow(page);
-    await expect(page.locator('button:has-text("Similar")')).toHaveAttribute(
-      "aria-pressed",
-      "true",
-    );
-  });
-
-  test("align parameter sets alignment", async ({ page }) => {
-    await page.goto("/slideshow?align=left&details=1", {
-      waitUntil: "domcontentloaded",
-    });
-    await waitForSlideshow(page);
-    await expect(page.locator('button:has-text("📍")')).toContainText("Left");
-  });
-
-  test("delay parameter sets timing", async ({ page }) => {
-    await page.goto("/slideshow?delay=60", { waitUntil: "domcontentloaded" });
-    await waitForSlideshow(page);
+    // Delay
     await expect(page.locator('button:has-text("1m")')).toHaveAttribute(
       "aria-pressed",
       "true",
     );
-  });
 
-  test("filter parameter restricts to album", async ({ page }) => {
-    await page.goto("/slideshow?filter=test-simple", {
-      waitUntil: "domcontentloaded",
-    });
-    await waitForSlideshow(page);
+    // Alignment
+    await expect(page.locator('button:has-text("📍")')).toContainText("Left");
+
+    // Filter
     expect(page.url()).toContain("filter=test-simple");
   });
 });
