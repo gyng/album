@@ -697,22 +697,24 @@ const MapRouteOverlay = ({
         <>
           <g
             data-testid="journey-line-start"
+            className={styles.routeEndpointGroup}
             transform={`translate(${projectedSegments[0]?.startX ?? 0}, ${projectedSegments[0]?.startY ?? 0})`}
           >
-            <line x1="0" y1="0" x2="0" y2="-16" className={styles.routeEndpointPole} />
-            <polygon points="0,-16 9,-11 0,-6" className={styles.routeEndpointStartFlag} />
-            <circle cx="0" cy="0" r="2.5" className={styles.routeEndpointBase} />
+            <line x1="0" y1="0" x2="0" y2="-24" className={styles.routeEndpointPole} />
+            <polygon points="0,-24 14,-17 0,-10" className={styles.routeEndpointStartFlag} />
+            <circle cx="0" cy="0" r="3.5" className={styles.routeEndpointBase} />
           </g>
           <g
             data-testid="journey-line-end"
+            className={styles.routeEndpointGroup}
             transform={`translate(${projectedSegments.at(-1)?.endX ?? 0}, ${projectedSegments.at(-1)?.endY ?? 0})`}
           >
-            <line x1="0" y1="0" x2="0" y2="-16" className={styles.routeEndpointPole} />
-            <rect x="0" y="-16" width="4.5" height="4.5" className={styles.routeEndpointCheckDark} />
-            <rect x="4.5" y="-16" width="4.5" height="4.5" className={styles.routeEndpointCheckLight} />
-            <rect x="0" y="-11.5" width="4.5" height="4.5" className={styles.routeEndpointCheckLight} />
-            <rect x="4.5" y="-11.5" width="4.5" height="4.5" className={styles.routeEndpointCheckDark} />
-            <circle cx="0" cy="0" r="2.5" className={styles.routeEndpointBase} />
+            <line x1="0" y1="0" x2="0" y2="-24" className={styles.routeEndpointPole} />
+            <rect x="0" y="-24" width="6" height="6" className={styles.routeEndpointCheckDark} />
+            <rect x="6" y="-24" width="6" height="6" className={styles.routeEndpointCheckLight} />
+            <rect x="0" y="-18" width="6" height="6" className={styles.routeEndpointCheckLight} />
+            <rect x="6" y="-18" width="6" height="6" className={styles.routeEndpointCheckDark} />
+            <circle cx="0" cy="0" r="3.5" className={styles.routeEndpointBase} />
           </g>
         </>
       ) : null}
