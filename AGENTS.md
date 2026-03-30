@@ -1,6 +1,8 @@
 # AGENTS.md
 
-Personal photo gallery — Next.js 14, TypeScript, CSS Modules, MapLibre GL. Photos are static-site-generated from album directories.
+Personal photo gallery — Next.js 14, TypeScript, CSS Modules, MapLibre GL. Photos are static-site-generated from album directories. Python + various models for embeddings/metadata generation.
+
+> Claude Code also loads `.claude/rules/` for additional scoped detail — other agents use this file only.
 
 ## Commands
 - **Tests:** `npx jest` from `src/` (not the repo root)
@@ -16,6 +18,7 @@ Personal photo gallery — Next.js 14, TypeScript, CSS Modules, MapLibre GL. Pho
 - `../albums/` — album source directories (sibling to `src/`); each album is a folder of images with an optional `album.json` (v2 manifest)
 - `src/components/search/` — search page, SQLite API layer, facet panel, result tiles
 - `src/components/mapRoute.ts` — all route/journey logic
+- `index/` — Python indexing pipeline (Janus, SigLIP, EXIF, geocoding → SQLite)
 
 All pages use `getStaticProps` — data is computed at build time, no runtime API. Client state is UI-only (filters, view toggles).
 
@@ -28,10 +31,6 @@ All pages use `getStaticProps` — data is computed at build time, no runtime AP
 ## Testing
 
 **Jest** — unit/integration tests, run from `src/`:
-```
-npx jest                                        # all tests
-npx jest --testPathPatterns="MapWorld"          # subset by name
-```
 - Config: `src/jest.config.mjs`; test environment is `node`
 - Playwright tests in `src/tests/` are excluded from Jest automatically
 
@@ -55,7 +54,7 @@ npm run test:e2e:reuse -- ./tests/smoke.spec.ts                # reuse already-r
 - `create-test-db.sh` must be run first if fixture DBs (`testexists.sqlite`, `test-simple.sqlite`) are missing
 
 **General:**
-- Run Jest after every refactor before committing
+- Run tests after every refactor before committing
 - Red-green TDD — write the failing test first
 - Prefer unit > integration > e2e
 - No perf changes without profiling evidence first
@@ -100,11 +99,6 @@ cd index
 ./do-embeddings-index.sh    # refresh embeddings only, keep existing search.sqlite
 ```
 
-Or directly:
-```
-uv run python index.py index --glob "../albums/**/*.jpg" --dbpath search.sqlite --model-profile hybrid
-```
-
 **Output databases** (both copied to `src/public/` after indexing):
 - `search.sqlite` — FTS5 content, tags, metadata, colours; loaded on first search use
 - `search-embeddings.sqlite` — embeddings table only; loaded lazily for semantic/similarity search; falls back to `search.sqlite` if absent
@@ -120,7 +114,7 @@ uv run python index.py index --glob "../albums/**/*.jpg" --dbpath search.sqlite 
 
 **Model profiles:**
 - `janus` — tags/text only (Janus VLM, no embeddings)
-- `siglip2` — embeddings only (no VLM tags)
+- `siglip2` — both SigLIP v1 + v2 embeddings, no VLM tags
 - `hybrid` — both (default for production)
 
 **Database schema** (FTS5 + plain tables):
