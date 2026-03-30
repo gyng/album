@@ -20,12 +20,12 @@
     ),
     radial-gradient(
       circle at 18% 0%,
-      color-mix(in srgb, var(--c-stats-pink) 24%, transparent),
+      color-mix(in srgb, var(--c-accent) 24%, transparent),
       transparent 34%
     ),
     radial-gradient(
       circle at 82% 100%,
-      color-mix(in srgb, var(--c-stats-pink) 12%, transparent),
+      color-mix(in srgb, var(--c-accent) 12%, transparent),
       transparent 36%
     );
   mix-blend-mode: screen;

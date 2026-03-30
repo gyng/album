@@ -468,10 +468,6 @@
 
 .memoryThumbImage {
   display: block;
-  width: 150px;
-  height: 150px;
-  object-fit: cover;
-  background-color: var(--c-bg-contrast-dark);
 }
 
 .memoryLoadMoreButton {
@@ -529,7 +525,7 @@
   width: 100%;
   padding: var(--m-m);
   padding-right: 40px;
-  color: var(--c-contrast);
+  color: var(--c-font);
   background-color: var(--c-bg);
   border: solid 2px var(--c-bg-contrast-light);
   border-radius: var(--m-s);
@@ -816,9 +812,9 @@
   left: 4px;
   bottom: 4px;
   border-radius: 999px;
-  background: rgba(0, 0, 0, 0.58);
+  background: color-mix(in srgb, var(--c-overlay-dark) 80%, transparent);
   color: white;
-  font-size: 10px;
+  font-size: var(--fs-xs);
   line-height: 1;
   padding: 3px 5px;
   pointer-events: none;
@@ -835,7 +831,7 @@
   height: 18px;
   border: 0;
   border-radius: 999px;
-  background: rgba(0, 0, 0, 0.72);
+  background: var(--c-overlay-dark);
   color: white;
   cursor: pointer;
   font-size: 14px;
@@ -875,7 +871,7 @@
   width: 26px;
   height: 26px;
   border-radius: 999px;
-  background: rgba(0, 0, 0, 0.72);
+  background: var(--c-overlay-dark);
   font-size: 14px;
   line-height: 1;
   text-decoration: none;
@@ -996,7 +992,7 @@
 .modeColorHex {
   font-family: monospace;
   font-size: var(--fs-s);
-  color: var(--c-text);
+  color: var(--c-font);
   letter-spacing: 0.04em;
   flex-shrink: 0;
 }
@@ -1021,7 +1017,7 @@
 
 .modeColorToleranceValue {
   font-size: var(--fs-s);
-  color: var(--c-text-muted, var(--c-text));
+  color: var(--c-bg-contrast-light);
   white-space: nowrap;
   min-width: 3.5em;
   text-align: right;
@@ -1069,7 +1065,7 @@
 
 .modeSimilarFilename {
   font-size: var(--fs-s);
-  color: var(--c-text);
+  color: var(--c-font);
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;

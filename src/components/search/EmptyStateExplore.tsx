@@ -3,6 +3,7 @@ import { Database } from "@sqlite.org/sqlite-wasm";
 import Link from "next/link";
 import styles from "./Search.module.css";
 import commonStyles from "../../styles/common.module.css";
+import { Thumb } from "../Thumb";
 import { fetchMemoryCandidates, fetchRecentResults, fetchRandomResults } from "./api";
 import { SearchResultRow } from "./searchTypes";
 import { SearchResultTile } from "./SearchResultTile";
@@ -407,7 +408,7 @@ export const EmptyStateExplore: React.FC<Props> = ({
                             className={styles.memoryThumbLink}
                             aria-label={result.snippet || result.filename}
                           >
-                            <img
+                            <Thumb
                               className={styles.memoryThumbImage}
                               src={getResizedAlbumImageSrc(result.path)}
                               alt={result.snippet || result.filename}

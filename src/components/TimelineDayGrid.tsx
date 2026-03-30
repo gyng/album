@@ -2,6 +2,7 @@ import Link from "next/link";
 import { MapWorldDeferred } from "./MapWorldDeferred";
 import { MapWorldEntry } from "./MapWorld";
 import { getRelativeTimeString } from "../util/time";
+import { Thumb } from "./Thumb";
 import commonStyles from "../styles/common.module.css";
 import styles from "./TimelineDayGrid.module.css";
 import { TimelineEntry } from "./timelineTypes";
@@ -233,7 +234,7 @@ export const TimelineDayGrid = ({
                   href={entry.href}
                   aria-label={`${entry.album} ${formattedDate} ${formatRelativeDateTime(entry.dateTimeOriginal) ?? ""}`.trim()}
                 >
-                  <img
+                  <Thumb
                     src={entry.src.src}
                     width={entry.placeholderWidth}
                     height={entry.placeholderHeight}

@@ -61,7 +61,7 @@
   background: color-mix(in srgb, var(--c-bg) 88%, var(--c-accent));
   border: 1px solid color-mix(in srgb, var(--c-accent) 60%, var(--c-font));
   color: color-mix(in srgb, white 92%, var(--c-font));
-  font-size: 10px;
+  font-size: var(--fs-xs);
   font-weight: 700;
   line-height: 1;
   white-space: nowrap;
@@ -80,7 +80,7 @@
   left: 50%;
   top: 0.2rem;
   transform: translateX(-50%);
-  font-size: 10px;
+  font-size: var(--fs-xs);
   color: var(--c-bg-contrast-light);
   text-align: center;
   font-variant-numeric: tabular-nums;
@@ -111,7 +111,7 @@
 
 .label {
   min-height: 1lh;
-  font-size: 10px;
+  font-size: var(--fs-xs);
   color: var(--c-bg-contrast-light);
   text-align: center;
 }
@@ -126,7 +126,7 @@
   }
 
   .daypart {
-    font-size: 10px;
+    font-size: var(--fs-xs);
     padding-inline: 0.2rem;
   }
 }

@@ -17,11 +17,7 @@
 }
 
 .resultPicture {
-  width: 150px;
-  height: 150px;
   margin-bottom: var(--m);
-  background-color: var(--c-bg-contrast-dark);
-  object-fit: cover;
   object-position: center;
   display: grid;
 }
@@ -53,7 +49,7 @@
   left: var(--m);
   z-index: 1;
   border-radius: 999px;
-  background-color: rgba(0, 0, 0, 0.72);
+  background-color: var(--c-overlay-dark);
   color: white;
   font-size: 11px;
   line-height: 1;
@@ -75,9 +71,9 @@
   align-items: center;
   justify-content: center;
   appearance: none;
-  border: solid 1px rgba(255, 255, 255, 0.28);
+  border: solid 1px var(--c-border-on-dark);
   border-radius: 999px;
-  background-color: rgba(0, 0, 0, 0.72);
+  background-color: var(--c-overlay-dark);
   color: white;
   cursor: pointer;
   font-size: 11px;

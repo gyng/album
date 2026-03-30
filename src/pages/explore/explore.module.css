@@ -12,7 +12,7 @@
 
 .header {
   display: grid;
-  gap: var(--m);
+  gap: var(--m-s);
 }
 
 .headerBody {
@@ -42,7 +42,7 @@
   display: grid;
   gap: var(--m);
   min-height: 6.25rem;
-  padding: var(--m-m) var(--m);
+  padding: var(--m-m) var(--m-m);
   border: 1px solid var(--c-bg-contrast-dark);
   border-radius: var(--m-s);
   background: color-mix(in srgb, var(--c-bg) 97%, var(--c-bg-contrast-dark));
@@ -106,7 +106,7 @@
 
 .group {
   display: grid;
-  gap: var(--m);
+  gap: var(--m-s);
   scroll-margin-top: 5.5rem;
 }
 
@@ -328,8 +328,7 @@
   width: 100%;
   aspect-ratio: 1;
   object-fit: cover;
-  border-radius: calc(var(--m-s) * 0.9);
-  background: color-mix(in srgb, var(--c-bg) 90%, var(--c-bg-contrast-dark));
+  background-color: var(--c-bg-contrast-dark);
 }
 
 .funStatThumbYear {
@@ -342,7 +341,7 @@
   border-radius: 999px;
   background: color-mix(in srgb, var(--c-bg) 76%, transparent);
   color: var(--c-font);
-  font-size: 10px;
+  font-size: var(--fs-xs);
   line-height: 1;
 }
 
@@ -364,15 +363,6 @@
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: var(--m-s);
-}
-
-.visualSummaryCard {
-  display: grid;
-  gap: var(--m-s);
-  padding: var(--m);
-  border: 1px solid var(--c-bg-contrast-dark);
-  border-radius: var(--m-s);
-  background: color-mix(in srgb, var(--c-bg) 96%, var(--c-stats-pink) 4%);
 }
 
 .visualSummaryValue {
@@ -519,7 +509,7 @@
   border: 1px solid color-mix(in srgb, var(--c-bg-contrast-light) 32%, transparent);
   color: var(--c-font);
   text-decoration: none;
-  font-size: 10px;
+  font-size: var(--fs-xs);
   line-height: 1;
   box-shadow: 0 6px 18px color-mix(in srgb, black 20%, transparent);
 }
@@ -536,10 +526,6 @@
 .visualThumb {
   width: var(--visual-thumb-size);
   height: var(--visual-thumb-size);
-  aspect-ratio: 1;
-  object-fit: cover;
-  border-radius: var(--m-s);
-  background: color-mix(in srgb, var(--c-bg) 90%, var(--c-bg-contrast-dark));
 }
 
 .visualEraThumb {
@@ -591,7 +577,7 @@
     (var(--visual-timeline-rail-width) / 2)
   );
   width: 1px;
-  background: color-mix(in srgb, var(--c-stats-pink) 42%, var(--c-bg-contrast-dark));
+  background: color-mix(in srgb, var(--c-accent) 42%, var(--c-bg-contrast-dark));
 }
 
 .visualTimelineRowLast::after {
@@ -601,8 +587,8 @@
 .visualTimelineRowContinues::after {
   background: linear-gradient(
     to bottom,
-    color-mix(in srgb, var(--c-stats-pink) 42%, var(--c-bg-contrast-dark)) 0%,
-    color-mix(in srgb, var(--c-stats-pink) 42%, var(--c-bg-contrast-dark)) 45%,
+    color-mix(in srgb, var(--c-accent) 42%, var(--c-bg-contrast-dark)) 0%,
+    color-mix(in srgb, var(--c-accent) 42%, var(--c-bg-contrast-dark)) 45%,
     transparent 100%
   );
 }
@@ -640,8 +626,8 @@
   height: 0.75rem;
   border-radius: 999px;
   border: 2px solid var(--c-bg);
-  background: var(--c-stats-pink);
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--c-stats-pink) 50%, transparent);
+  background: var(--c-accent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--c-accent) 50%, transparent);
 }
 
 .visualTimelineThumbs {
@@ -758,7 +744,7 @@
   border-radius: 999px;
   background: color-mix(in srgb, var(--c-bg) 94%, var(--c-bg-contrast-dark));
   color: var(--c-bg-contrast-light);
-  font-size: 10px;
+  font-size: var(--fs-xs);
   line-height: 1;
   white-space: nowrap;
 }
@@ -772,7 +758,7 @@
   border-radius: 999px;
   background: color-mix(in srgb, var(--c-bg) 94%, var(--c-bg-contrast-dark));
   color: var(--c-bg-contrast-light);
-  font-size: 10px;
+  font-size: var(--fs-xs);
   line-height: 1;
   white-space: nowrap;
   text-align: right;
@@ -839,7 +825,7 @@
 }
 
 .sectionFilterLabel {
-  font-size: 10px;
+  font-size: var(--fs-xs);
   color: var(--c-bg-contrast-light);
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -944,14 +930,6 @@
 .colorFamilyThumbLink {
   display: block;
   text-decoration: none;
-}
-
-.colorFamilyThumb {
-  width: 112px;
-  height: 112px;
-  object-fit: cover;
-  border-radius: var(--m-s);
-  background: color-mix(in srgb, var(--c-bg) 90%, var(--c-bg-contrast-dark));
 }
 
 .colorTimeLegend {

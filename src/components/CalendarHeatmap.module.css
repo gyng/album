@@ -68,7 +68,7 @@
 }
 
 .highlightedYearHeading {
-  color: var(--c-link);
+  color: var(--c-accent);
 }
 
 .weekdaySpacer {
@@ -84,7 +84,7 @@
   grid-template-columns: repeat(var(--heatmap-weeks), minmax(0, 1fr));
   column-gap: var(--heatmap-gap);
   color: var(--c-bg-contrast-light);
-  font-size: 10px;
+  font-size: var(--fs-xs);
   line-height: 1;
   width: 100%;
 }
@@ -161,7 +161,7 @@
   z-index: 2;
   transform: none;
   border-radius: 3px;
-  box-shadow: 0 0 0 2px var(--c-bg), 0 0 0 4px var(--c-link);
+  box-shadow: 0 0 0 2px var(--c-bg), 0 0 0 4px var(--c-accent);
 }
 
 .memoryHighlighted {
@@ -262,7 +262,7 @@
   border-radius: 999px;
   padding: 0;
   background: transparent;
-  color: var(--c-link);
+  color: var(--c-accent);
   cursor: pointer;
   font-size: var(--fs-s);
 }

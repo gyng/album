@@ -4,12 +4,8 @@
   padding: var(--m-m);
   cursor: pointer;
   background-color: var(--c-bg);
-
-  /* If not a <button>, needs more styling */
   align-self: center;
   font-size: var(--fs-sm);
-  padding: var(--m-m);
-  cursor: pointer;
   text-decoration: none;
 }
 
@@ -116,4 +112,18 @@
 .splitButtonSub:focus-visible {
   outline: solid 2px var(--c-bg-contrast-light);
   outline-offset: -2px;
+}
+
+.thumb {
+  width: 150px;
+  height: 150px;
+  object-fit: cover;
+  background-color: var(--c-bg-contrast-dark);
+}
+
+.thumbSmall {
+  width: 112px;
+  height: 112px;
+  object-fit: cover;
+  background-color: var(--c-bg-contrast-dark);
 }

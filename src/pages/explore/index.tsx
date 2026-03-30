@@ -24,6 +24,7 @@ import {
   StringFacetStat,
 } from "../../util/computeStats";
 import { measureBuild } from "../../services/buildTiming";
+import { Thumb } from "../../components/Thumb";
 import styles from "./explore.module.css";
 import {
   buildSearchHref,
@@ -236,7 +237,7 @@ const VisualSimilarityThumb: React.FC<{
 }> = ({ photo, className, imageClassName }) => (
   <div className={`${styles.visualThumbWrap} ${className ?? ""}`.trim()}>
     <Link href={photo.href} className={styles.visualThumbLink}>
-      <img
+      <Thumb
         src={photo.src}
         alt={photo.label}
         className={`${styles.visualThumb} ${imageClassName ?? ""}`.trim()}
@@ -727,7 +728,7 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
             >
               <section className={`${styles.section} ${styles.sectionWide}`}>
                 <div className={styles.visualSummaryGrid}>
-                  <article className={styles.visualSummaryCard}>
+                  <article className={styles.overviewCard}>
                     <div className={styles.funStatLabel}>Sameness</div>
                     <div className={styles.visualSummaryValue}>
                       {visualSameness.samenessPercent}%
@@ -736,7 +737,7 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
                       Average nearest-neighbor similarity across {visualSameness.sampleSize.toLocaleString("en")} embedded photos in the archive.
                     </div>
                   </article>
-                  <article className={styles.visualSummaryCard}>
+                  <article className={styles.overviewCard}>
                     <div className={styles.funStatLabel}>Repeated motifs</div>
                     <div className={styles.visualSummaryValue}>
                       {visualSameness.repeatedMotifPercent}%
@@ -745,7 +746,7 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
                       Photos with a very close visual neighbor at or above {Math.round(visualSameness.highSimilarityThreshold * 100)}% similarity.
                     </div>
                   </article>
-                  <article className={styles.visualSummaryCard}>
+                  <article className={styles.overviewCard}>
                     <div className={styles.funStatLabel}>Distinct frames</div>
                     <div className={styles.visualSummaryValue}>
                       {visualSameness.distinctPercent}%
@@ -755,7 +756,7 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
                     </div>
                   </article>
                   {visualSameness.lookDrift ? (
-                    <article className={styles.visualSummaryCard}>
+                    <article className={styles.overviewCard}>
                       <div className={styles.funStatLabel}>Changed look over time</div>
                       <div className={styles.visualSummaryValue}>
                         {visualSameness.lookDrift.similarityPercent}%
@@ -766,7 +767,7 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
                     </article>
                   ) : null}
                   {visualSameness.visualEras.length > 0 ? (
-                    <article className={styles.visualSummaryCard}>
+                    <article className={styles.overviewCard}>
                       <div className={styles.funStatLabel}>Recurring looks</div>
                       <div className={styles.visualSummaryValue}>
                         {visualSameness.visualEras.length}
@@ -1156,7 +1157,7 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
                                     })}
                                     className={`${styles.visualThumbLink} ${styles.visualEraThumbLink}`}
                                   >
-                                    <img
+                                    <Thumb
                                       src={photo.src}
                                       alt={`${photo.label} (${entry.year})`}
                                       className={`${styles.visualThumb} ${styles.visualEraThumb} ${styles.revisitThumb}`}
@@ -1478,10 +1479,10 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
                                 href={photo.href}
                                 className={styles.colorFamilyThumbLink}
                               >
-                                <img
+                                <Thumb
                                   src={photo.src}
                                   alt={photo.label}
-                                  className={styles.colorFamilyThumb}
+                                  size="small"
                                 />
                               </Link>
                             ))}

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Thumb } from "../Thumb";
 import styles from "./SearchResultTile.module.css";
 import { getRelativeTimeString } from "../../util/time";
 import { extractDateFromExifString } from "../../util/extractExifFromDb";
@@ -136,13 +137,13 @@ export const SearchResultTile = (props: {
         <div className={styles.result}>
           <div className={styles.thumbnailWrap}>
             <picture>
-              <img
+              <Thumb
                 className={styles.resultPicture}
                 data-testid="result-picture"
                 src={resized}
                 alt={imageAlt}
                 style={{ backgroundColor: colour }}
-              ></img>
+              />
             </picture>
           </div>
           <div className={styles.details}>

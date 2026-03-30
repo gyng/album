@@ -55,6 +55,7 @@ textarea {
   --m-m: 12px;
   --m-l: 20px;
   --m-xl: 40px;
+  --fs-xs: 10px;
   --fs-s: 11px;
   --fs-sm: 14px;
   --fs-m: 18px;
@@ -72,8 +73,9 @@ textarea {
   );
   --c-bg-contrast-dark: light-dark(black, rgb(51, 51, 51));
   --c-accent: rgb(230, 32, 101);
-  --c-stats-pink: rgb(230, 32, 101);
   --c-font: light-dark(black, white);
+  --c-overlay-dark: rgba(0, 0, 0, 0.72);
+  --c-border-on-dark: rgba(255, 255, 255, 0.28);
   --popup-border: solid 1px color-mix(in srgb, var(--c-bg-contrast-light) 45%, transparent);
   --popup-radius: var(--m-s);
   --popup-shadow: 0 10px 30px rgba(0, 0, 0, 0.18);
