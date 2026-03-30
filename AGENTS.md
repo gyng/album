@@ -28,7 +28,7 @@ Personal photo gallery — Next.js 14, TypeScript, CSS Modules, MapLibre GL. Pho
 - No perf changes without profiling evidence first
 
 ## Map
-- MapLibre via `@vis.gl/react-maplibre`; `MMap` is the main component
+- MapLibre via `react-map-gl/maplibre`; `MMap` is the main component
 - Omit MapLibre paint properties entirely (spread `{}`) instead of passing `undefined` — MapLibre throws on undefined values
 - `useMap()` only works inside children of `<MapLibreMap>` — use small child components for imperative map calls
 - Route overlay is SVG (screen-space), projected via `map.project()`
