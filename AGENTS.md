@@ -84,6 +84,15 @@ Always use tokens — never raw px values or colours.
 ## Indexing pipeline (index/index.py)
 The search database (`src/public/search.sqlite`) is built offline by a Python CLI before `npm run build`.
 
+**Setup** (Python 3.12, managed by [uv](https://docs.astral.sh/uv/)):
+```
+cd index
+uv sync                 # install dependencies (including Janus from git)
+uv run ruff --fix       # lint
+uv run black .          # format
+```
+Note: `janus` is installed from the `deepseek-ai/Janus` git repo, not PyPI — first `uv sync` will clone it.
+
 **Run** (use the shell scripts, which handle the DB split and copy):
 ```
 cd index
