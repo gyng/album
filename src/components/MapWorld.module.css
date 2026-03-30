@@ -115,13 +115,7 @@
   }
 }
 
-.routeEndpointPingStart {
-  fill: #16a34a;
-  animation: routeEndpointPing 2.2s ease-out infinite;
-}
-
-.routeEndpointPingEnd {
-  fill: #12bcd4;
+.routeEndpointPing {
   animation: routeEndpointPing 2.2s ease-out infinite;
 }
 
@@ -160,8 +154,7 @@
 
 @media (prefers-reduced-motion: reduce) {
   .routeOverlayPath,
-  .routeEndpointPingStart,
-  .routeEndpointPingEnd {
+  .routeEndpointPing {
     animation: none;
   }
 }
