@@ -242,7 +242,7 @@ const getTripSpanDays = (points: RoutePoint[]): number | null => {
   return Math.floor((last - first) / dayMs) + 1;
 };
 
-export const splitIntoRouteSegments = (points: RoutePoint[]): RoutePoint[][] => {
+const splitIntoRouteSegments = (points: RoutePoint[]): RoutePoint[][] => {
   if (points.length === 0) {
     return [];
   }
@@ -276,6 +276,8 @@ export const splitIntoRouteSegments = (points: RoutePoint[]): RoutePoint[][] => 
 
   return segments;
 };
+
+export const splitRouteByDay = splitIntoRouteSegments;
 
 export const buildContextRoutePoints = (
   photos: MapWorldEntry[],

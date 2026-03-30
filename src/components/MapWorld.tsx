@@ -22,11 +22,11 @@ import {
   buildContextRouteGeoJson,
   buildContextRoutePoints,
   buildMapRoute,
-  splitIntoRouteSegments,
   distanceMetersBetween,
   RouteGeoJson,
   RouteMode,
   RoutePoint,
+  splitRouteByDay,
   toRouteGeoJson,
 } from "./mapRoute";
 
@@ -915,7 +915,7 @@ export const MMap: React.FC<MapWorldProps> = ({
       ([album, route]) => {
         const points =
           routeMode === "simplified" ? route.simplifiedPoints : route.fullPoints;
-        const segments = splitIntoRouteSegments(points);
+        const segments = splitRouteByDay(points);
 
         return segments.flatMap((segment) => {
           const routeGeoJson = toRouteGeoJson(segment);
