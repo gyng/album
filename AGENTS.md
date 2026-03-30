@@ -44,6 +44,7 @@ npm run test:e2e:reuse -- ./tests/smoke.spec.ts                # reuse already-r
 - Locally: Chromium only, slow tests (`@slow`) skipped, reuses existing server if running
 - CI: all browsers (Chromium, Firefox, WebKit), slow tests included, fresh server always
 - Use `test:e2e:reuse` only when a server is already running — do not use it to skip the build
+- **CI album data:** only `albums/test-*` directories are checked into git (real albums are gitignored). Playwright tests must use `test-simple`, `test-manifest`, or `test-manifest-v2` — never hardcode real album names like `snapshots` or `24japan`
 
 **Python (indexer)** — unittest, run from `index/`:
 ```

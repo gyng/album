@@ -22,11 +22,11 @@ test.describe("Album Browsing Flow @slow", () => {
     await page.goto("/");
 
     // Click on a specific album we know exists - use first() to handle multiple links
-    const albumLink = page.locator('a[href="/album/24japan"]').first();
+    const albumLink = page.locator('a[href="/album/test-simple"]').first();
     await expect(albumLink).toBeVisible({ timeout: 10000 });
 
     await albumLink.click();
-    await page.waitForURL("/album/24japan");
+    await page.waitForURL("/album/test-simple");
 
     // Verify we're on the album page
     // Look for album navigation elements
@@ -40,11 +40,11 @@ test.describe("Album Browsing Flow @slow", () => {
       timeout: 5000,
     });
 
-    console.log("✓ Successfully navigated to 24japan album");
+    console.log("✓ Successfully navigated to test-simple album");
   });
 
   test("album page displays photos", async ({ page }) => {
-    await page.goto("/album/snapshots");
+    await page.goto("/album/test-simple");
 
     // Wait for navigation to load
     await expect(page.locator('a:has-text("← Albums")')).toBeVisible({
@@ -56,7 +56,7 @@ test.describe("Album Browsing Flow @slow", () => {
     await expect(photos.first()).toBeVisible({ timeout: 15000 });
 
     const photoCount = await photos.count();
-    console.log(`Found ${photoCount} photos in snapshots album`);
+    console.log(`Found ${photoCount} photos in test-simple album`);
     expect(photoCount).toBeGreaterThan(0);
   });
 
@@ -87,7 +87,7 @@ test.describe("Album Browsing Flow @slow", () => {
   });
 
   test("album map link works", async ({ page }) => {
-    await page.goto("/album/24japan");
+    await page.goto("/album/test-simple");
 
     // Wait for album to load
     await expect(page.locator('a:has-text("← Albums")')).toBeVisible({
@@ -101,14 +101,14 @@ test.describe("Album Browsing Flow @slow", () => {
     await mapLink.click();
 
     // Should go to map with filter
-    await page.waitForURL(/\/map\?filter_album=24japan/);
+    await page.waitForURL(/\/map\?filter_album=test-simple/);
     await expect(page).toHaveTitle("Map");
 
     console.log("✓ Album map navigation works");
   });
 
   test("album slideshow link works", async ({ page }) => {
-    await page.goto("/album/kansai");
+    await page.goto("/album/test-manifest-v2");
 
     // Wait for album to load
     await expect(page.locator('a:has-text("← Albums")')).toBeVisible({
@@ -122,7 +122,7 @@ test.describe("Album Browsing Flow @slow", () => {
     await slideshowLink.click();
 
     // Should go to slideshow with filter
-    await page.waitForURL(/\/slideshow\?filter=kansai/);
+    await page.waitForURL(/\/slideshow\?filter=test-manifest-v2/);
 
     // Slideshow may take time to load, just verify URL change
     console.log("✓ Album slideshow navigation works (URL redirect successful)");

@@ -2,7 +2,7 @@ import { test, expect } from "@playwright/test";
 
 test.describe("Photo Viewing Flow @slow", () => {
   test("album displays photos correctly", async ({ page }) => {
-    await page.goto("/album/snapshots");
+    await page.goto("/album/test-simple");
 
     // Wait for album navigation to load
     await expect(page.locator('a:has-text("← Albums")')).toBeVisible({
@@ -21,7 +21,7 @@ test.describe("Photo Viewing Flow @slow", () => {
   });
 
   test("photos load with proper attributes", async ({ page }) => {
-    await page.goto("/album/24japan");
+    await page.goto("/album/test-simple");
 
     // Wait for photos to load
     await expect(page.locator('a:has-text("← Albums")')).toBeVisible({
@@ -43,7 +43,7 @@ test.describe("Photo Viewing Flow @slow", () => {
   });
 
   test("can click on photo elements", async ({ page }) => {
-    await page.goto("/album/kansai");
+    await page.goto("/album/test-simple");
 
     // Wait for album to load
     await expect(page.locator('a:has-text("← Albums")')).toBeVisible({
@@ -67,7 +67,7 @@ test.describe("Photo Viewing Flow @slow", () => {
 
   test("photo deep linking works", async ({ page }) => {
     // Test deep linking to a specific photo using fragment identifier
-    await page.goto("/album/hokkaido#DSCF1389.JPG");
+    await page.goto("/album/test-simple#DSCF2768.JPG");
 
     // Wait for album to load
     await expect(page.locator('a:has-text("← Albums")')).toBeVisible({
@@ -75,12 +75,12 @@ test.describe("Photo Viewing Flow @slow", () => {
     });
 
     // Check if the URL fragment is preserved
-    expect(page.url()).toContain("#DSCF1389.JPG");
+    expect(page.url()).toContain("#DSCF2768.JPG");
     console.log("✓ Photo deep linking URL structure preserved");
   });
 
   test("photo metadata displays when available", async ({ page }) => {
-    await page.goto("/album/eastcoast");
+    await page.goto("/album/test-simple");
 
     // Wait for album to load
     await expect(page.locator('a:has-text("← Albums")')).toBeVisible({
@@ -110,7 +110,7 @@ test.describe("Photo Viewing Flow @slow", () => {
   });
 
   test("album navigation between photos works", async ({ page }) => {
-    await page.goto("/album/melbourne");
+    await page.goto("/album/test-simple");
 
     // Wait for album to load
     await expect(page.locator('a:has-text("← Albums")')).toBeVisible({
@@ -140,7 +140,7 @@ test.describe("Photo Viewing Flow @slow", () => {
   });
 
   test("photos display responsive layout", async ({ page }) => {
-    await page.goto("/album/nagano");
+    await page.goto("/album/test-simple");
 
     // Wait for album to load
     await expect(page.locator('a:has-text("← Albums")')).toBeVisible({

@@ -263,19 +263,19 @@ test.describe("Slideshow Functionality Tests @slow", () => {
 
   test("slideshow with album filter works", async ({ page }) => {
     // Test filtered slideshow
-    await page.goto("/slideshow?filter=snapshots");
+    await page.goto("/slideshow?filter=test-simple");
 
     // Wait for slideshow to load
     await expect(page).toHaveTitle(slideshowTitle, { timeout: 90000 });
 
     // Check if filter is indicated using proper selector
-    const filterIndicator = page.locator(':has-text("snapshots")');
+    const filterIndicator = page.locator(':has-text("test-simple")');
     if ((await filterIndicator.count()) > 0) {
       console.log("✓ Album filter applied to slideshow");
     }
 
     // Verify URL contains filter
-    expect(page.url()).toContain("filter=snapshots");
+    expect(page.url()).toContain("filter=test-simple");
     console.log("✓ Slideshow filtering by album works");
   });
 

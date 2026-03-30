@@ -59,26 +59,26 @@ test.describe("Map Integration Tests @slow", () => {
   });
 
   test("filtered map works with album parameter", async ({ page }) => {
-    await page.goto("/map?filter_album=24japan");
+    await page.goto("/map?filter_album=test-simple");
 
     // Verify page loads
     await expect(page).toHaveTitle("Map");
 
     // Check for filter indication
-    const filterIndicator = page.locator('text="24japan", .toast');
+    const filterIndicator = page.locator('text="test-simple", .toast');
     if ((await filterIndicator.count()) > 0) {
       await expect(filterIndicator.first()).toBeVisible({ timeout: 5000 });
       console.log("✓ Album filter indicator displayed");
     }
 
     // Verify URL contains filter
-    expect(page.url()).toContain("filter_album=24japan");
+    expect(page.url()).toContain("filter_album=test-simple");
     console.log("✓ Map filtering by album works");
   });
 
   test("map navigation from album works", async ({ page }) => {
     // Start from an album
-    await page.goto("/album/kansai");
+    await page.goto("/album/test-simple");
 
     // Wait for album to load
     await expect(page.locator('a:has-text("← Albums")')).toBeVisible({
@@ -91,7 +91,7 @@ test.describe("Map Integration Tests @slow", () => {
     await mapLink.click();
 
     // Should navigate to map with filter
-    await page.waitForURL(/\/map\?filter_album=kansai/);
+    await page.waitForURL(/\/map\?filter_album=test-simple/);
     await expect(page).toHaveTitle("Map");
 
     console.log("✓ Album to map navigation successful");
@@ -174,8 +174,8 @@ test.describe("Map Integration Tests @slow", () => {
   });
 
   test("map with geotagged photos", async ({ page }) => {
-    // Go to an album that likely has geotagged photos (Japan albums probably do)
-    await page.goto("/map?filter_album=hokkaido");
+    // test-simple photos have GPS data
+    await page.goto("/map?filter_album=test-simple");
 
     // Wait for page and potential markers
     await expect(page.locator('a:has-text("← Albums")')).toBeVisible({
@@ -190,9 +190,9 @@ test.describe("Map Integration Tests @slow", () => {
       console.log("✓ Map canvas loaded for geotagged photo album");
 
       // Check for album filter indicator
-      const filterText = page.locator('text="hokkaido"');
+      const filterText = page.locator('text="test-simple"');
       if ((await filterText.count()) > 0) {
-        console.log("✓ Album filter active for hokkaido");
+        console.log("✓ Album filter active for test-simple");
       }
     }
   });

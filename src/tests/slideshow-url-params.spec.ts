@@ -99,7 +99,7 @@ test.describe("Slideshow URL Parameters Tests @slow", () => {
   test("current slideshow image is reflected in the photo parameter", async ({
     page,
   }) => {
-    await page.goto("/slideshow?mode=random&filter=snapshots", {
+    await page.goto("/slideshow?mode=random&filter=test-simple", {
       timeout: 90000,
       waitUntil: "domcontentloaded",
     });
@@ -118,7 +118,7 @@ test.describe("Slideshow URL Parameters Tests @slow", () => {
       new URL(window.location.href).searchParams.get("photo"),
     );
 
-    expect(firstPhotoParam).toContain("../albums/snapshots/");
+    expect(firstPhotoParam).toContain("../albums/test-simple/");
 
     const nextButton = page.locator('button:has-text("Next")');
     await expect(nextButton).toBeVisible({ timeout: 15000 });
@@ -136,7 +136,7 @@ test.describe("Slideshow URL Parameters Tests @slow", () => {
       new URL(window.location.href).searchParams.get("photo"),
     );
 
-    expect(secondPhotoParam).toContain("../albums/snapshots/");
+    expect(secondPhotoParam).toContain("../albums/test-simple/");
     expect(secondPhotoParam).not.toBe(firstPhotoParam);
   });
 
