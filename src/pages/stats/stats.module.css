@@ -87,6 +87,27 @@
   font-size: var(--fs-l);
 }
 
+.groupAnchorLink {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.35rem;
+  color: inherit;
+  text-decoration: none;
+}
+
+.groupAnchorMark {
+  color: var(--c-bg-contrast-light);
+  font-size: var(--fs-sm);
+  opacity: 0;
+  transform: translateY(-1px);
+  transition: opacity 0.12s ease;
+}
+
+.groupAnchorLink:hover .groupAnchorMark,
+.groupAnchorLink:focus-visible .groupAnchorMark {
+  opacity: 1;
+}
+
 .groupActions {
   display: flex;
   align-items: center;
@@ -311,13 +332,6 @@
   min-width: 0;
 }
 
-.visualExtrasGrid {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: var(--m-l);
-  align-items: start;
-}
-
 .visualPairs {
   display: grid;
   grid-template-columns: repeat(
@@ -492,10 +506,6 @@
   }
 
   .visualSummaryGrid {
-    grid-template-columns: 1fr;
-  }
-
-  .visualExtrasGrid {
     grid-template-columns: 1fr;
   }
 

@@ -169,7 +169,18 @@ const StatGroup: React.FC<{
   <section id={id} className={styles.group}>
     <div className={styles.groupHeader}>
       <div className={styles.groupTitleRow}>
-        <h2 className={styles.groupTitle}>{title}</h2>
+        <h2 className={styles.groupTitle}>
+          {id ? (
+            <a href={`#${id}`} className={styles.groupAnchorLink}>
+              <span>{title}</span>
+              <span className={styles.groupAnchorMark} aria-hidden="true">
+                #
+              </span>
+            </a>
+          ) : (
+            title
+          )}
+        </h2>
         {actions ? <div className={styles.groupActions}>{actions}</div> : null}
       </div>
       <p className={styles.groupDescription}>{description}</p>
@@ -332,7 +343,6 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
   const topLens = getTopLabel(findStringFacet(stats, "lens"));
   const topCountry = getTopLabel(findStringFacet(stats, "location"));
   const topHour = getPeakBucketLabel(findNumericFacet(stats, "hour")?.data ?? []);
-  const topMonth = getPeakBucketLabel(stats.monthStats);
   const weekdayTotal = stats.weekdayStats.reduce((sum, bucket) => sum + bucket.count, 0);
   const weekendCount = sumBuckets(stats.weekdayStats, ["Sat", "Sun"]);
   const weekendShare = weekdayTotal > 0 ? weekendCount / weekdayTotal : 0;
@@ -412,10 +422,6 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
     {
       label: "Peak hour",
       value: topHour,
-    },
-    {
-      label: "Biggest month",
-      value: topMonth,
     },
   ];
   const funStats: FunStatCard[] = [
@@ -871,91 +877,87 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
                         ) : null}
                       </section>
                     ) : null}
-                    {visualSameness.visualEras.length > 0 || visualSameness.lookTimeline.length > 0 ? (
+                    {visualSameness.visualEras.length > 0 ? (
                       <section
                         className={`${styles.visualExampleSection} ${styles.visualFullRowSection}`}
                       >
-                        <div className={styles.visualExtrasGrid}>
-                          {visualSameness.visualEras.length > 0 ? (
-                            <section className={styles.visualExampleSection}>
-                              <div className={styles.sectionHeader}>
-                                <h3 className={styles.sectionTitle}>Recurring looks</h3>
-                                <span className={styles.coverage}>
-                                  Recurring visual modes in the archive
+                        <div className={styles.sectionHeader}>
+                          <h3 className={styles.sectionTitle}>Recurring looks</h3>
+                          <span className={styles.coverage}>
+                            Recurring visual modes in the archive
+                          </span>
+                        </div>
+                        <div className={styles.visualSingles}>
+                          {recurringLooks.map((era) => (
+                            <div key={era.label} className={styles.visualSingleCard}>
+                              <Link
+                                href={buildSimilaritySearchHref(era.photo.path)}
+                                className={styles.visualThumbLink}
+                              >
+                                <img
+                                  src={era.photo.src}
+                                  alt={era.photo.label}
+                                  className={styles.visualThumb}
+                                />
+                              </Link>
+                              <div className={styles.visualExampleMeta}>
+                                <span>{era.label}</span>
+                                <br />
+                                <span>
+                                  {era.sharePercent}% of archive · {era.count.toLocaleString()} photos
                                 </span>
                               </div>
-                              <div className={styles.visualSingles}>
-                                {recurringLooks.map((era) => (
-                                  <div key={era.label} className={styles.visualSingleCard}>
-                                    <Link
-                                      href={buildSimilaritySearchHref(era.photo.path)}
-                                      className={styles.visualThumbLink}
-                                    >
-                                      <img
-                                        src={era.photo.src}
-                                        alt={era.photo.label}
-                                        className={styles.visualThumb}
-                                      />
-                                    </Link>
-                                    <div className={styles.visualExampleMeta}>
-                                      <span>{era.label}</span>
-                                      <br />
-                                      <span>
-                                        {era.sharePercent}% of archive · {era.count.toLocaleString()} photos
-                                      </span>
-                                    </div>
-                                  </div>
-                                ))}
+                            </div>
+                          ))}
+                        </div>
+                        {visualSameness.visualEras.length > recurringLooks.length ? (
+                          <button
+                            type="button"
+                            className={styles.loadMoreButton}
+                            onClick={() => {
+                              setVisibleRecurringLooks((count) =>
+                                Math.min(
+                                  count + LOAD_MORE_RECURRING_LOOKS,
+                                  visualSameness.visualEras.length,
+                                ),
+                              );
+                            }}
+                          >
+                            <span>Load more recurring looks</span>
+                          </button>
+                        ) : null}
+                      </section>
+                    ) : null}
+                    {visualSameness.lookTimeline.length > 0 ? (
+                      <section
+                        className={`${styles.visualExampleSection} ${styles.visualFullRowSection}`}
+                      >
+                        <div className={styles.sectionHeader}>
+                          <h3 className={styles.sectionTitle}>Changed look over time</h3>
+                          <span className={styles.coverage}>
+                            Yearly representative frames
+                          </span>
+                        </div>
+                        <div className={styles.visualSingles}>
+                          {visualSameness.lookTimeline.map((entry) => (
+                            <div key={entry.year} className={styles.visualSingleCard}>
+                              <Link
+                                href={buildSimilaritySearchHref(entry.photo.path)}
+                                className={styles.visualThumbLink}
+                              >
+                                <img
+                                  src={entry.photo.src}
+                                  alt={entry.photo.label}
+                                  className={styles.visualThumb}
+                                />
+                              </Link>
+                              <div className={styles.visualExampleMeta}>
+                                <span>{entry.year}</span>
+                                <br />
+                                <span>{entry.count.toLocaleString()} photos</span>
                               </div>
-                              {visualSameness.visualEras.length > recurringLooks.length ? (
-                                <button
-                                  type="button"
-                                  className={styles.loadMoreButton}
-                                  onClick={() => {
-                                    setVisibleRecurringLooks((count) =>
-                                      Math.min(
-                                        count + LOAD_MORE_RECURRING_LOOKS,
-                                        visualSameness.visualEras.length,
-                                      ),
-                                    );
-                                  }}
-                                >
-                                  <span>Load more recurring looks</span>
-                                </button>
-                              ) : null}
-                            </section>
-                          ) : null}
-                          {visualSameness.lookTimeline.length > 0 ? (
-                            <section className={styles.visualExampleSection}>
-                              <div className={styles.sectionHeader}>
-                                <h3 className={styles.sectionTitle}>Changed look over time</h3>
-                                <span className={styles.coverage}>
-                                  Yearly representative frames
-                                </span>
-                              </div>
-                              <div className={styles.visualSingles}>
-                                {visualSameness.lookTimeline.map((entry) => (
-                                  <div key={entry.year} className={styles.visualSingleCard}>
-                                    <Link
-                                      href={buildSimilaritySearchHref(entry.photo.path)}
-                                      className={styles.visualThumbLink}
-                                    >
-                                      <img
-                                        src={entry.photo.src}
-                                        alt={entry.photo.label}
-                                        className={styles.visualThumb}
-                                      />
-                                    </Link>
-                                    <div className={styles.visualExampleMeta}>
-                                      <span>{entry.year}</span>
-                                      <br />
-                                      <span>{entry.count.toLocaleString()} photos</span>
-                                    </div>
-                                  </div>
-                                ))}
-                              </div>
-                            </section>
-                          ) : null}
+                            </div>
+                          ))}
                         </div>
                       </section>
                     ) : null}
@@ -966,6 +968,7 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
           ) : null}
 
           <StatGroup
+            id="fun-stats"
             title="Fun stats"
             description="A few quick personality reads pulled from the archive."
           >
@@ -990,6 +993,7 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
 
           {(stats.recentMonthStats.length > 0 || stats.recentYearStats.length > 0) ? (
             <StatGroup
+              id="recent-trends"
               title="Recent trends"
               description="A smaller look at how the archive has been moving lately."
               actions={
@@ -1020,6 +1024,7 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
           ) : null}
 
           <StatGroup
+            id="when-you-shoot"
             title="When You Shoot"
             description="Time-based patterns across the archive."
             actions={renderScopeFilterControls()}
@@ -1060,6 +1065,7 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
           </StatGroup>
 
           <StatGroup
+            id="how-you-shoot"
             title="How You Shoot"
             description="Focal length, aperture, and ISO usage."
             actions={renderScopeFilterControls()}
@@ -1088,6 +1094,7 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
           </StatGroup>
 
           <StatGroup
+            id="where-you-shoot"
             title="Where You Shoot"
             description="Places from reverse-geocoded photos."
             actions={
@@ -1192,6 +1199,7 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
           </StatGroup>
 
           <StatGroup
+            id="what-you-shoot-with"
             title="What You Shoot With"
             description="How lenses distribute across camera bodies."
             actions={
@@ -1257,6 +1265,7 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
           </StatGroup>
 
           <StatGroup
+            id="colour"
             title="Colour"
             description="Dominant tones across the archive."
           >
