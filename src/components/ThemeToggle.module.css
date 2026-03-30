@@ -1,5 +1,6 @@
 .themeToggle {
   display: inline-block;
+  background: var(--c-bg);
   border: solid 2px var(--c-bg-contrast-light);
   border-radius: var(--m-s);
   /* optically align text */
