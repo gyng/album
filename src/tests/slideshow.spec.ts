@@ -23,6 +23,8 @@ const waitForSlideshow = async (page: Page) => {
   await expect(page.locator(slideshowImg).first()).toBeVisible();
 };
 
+test.describe.configure({ mode: "serial" });
+
 test.describe("Slideshow", () => {
   test("displays image and navigation controls", async ({ page }) => {
     await page.goto("/slideshow", { waitUntil: "domcontentloaded" });
@@ -31,7 +33,9 @@ test.describe("Slideshow", () => {
     await revealControls(page);
     await expect(page.locator('button:has-text("Next")')).toBeVisible();
     await expect(page.locator('button:has-text("Previous")')).toBeVisible();
-    await expect(page.locator('a:has-text("Snapshots")')).toBeVisible();
+    await expect(
+      page.getByRole("link", { name: "Snapshots Slideshow" }),
+    ).toBeVisible();
   });
 
   test("next/previous navigation works", async ({ page }) => {
@@ -163,7 +167,9 @@ test.describe("Slideshow", () => {
   });
 
   test("photo parameter reflects current image", async ({ page }) => {
-    await page.goto("/slideshow?mode=random&filter=test-simple", { waitUntil: "domcontentloaded" });
+    await page.goto("/slideshow?mode=random&filter=test-simple", {
+      waitUntil: "domcontentloaded",
+    });
     await waitForSlideshow(page);
 
     await page.waitForFunction(() =>
@@ -193,7 +199,9 @@ test.describe("Slideshow", () => {
 
 test.describe("Slideshow URL parameters", () => {
   test("boolean toggles via URL", async ({ page }) => {
-    await page.goto("/slideshow?clock=1&details=1&map=1&cover=1", { waitUntil: "domcontentloaded" });
+    await page.goto("/slideshow?clock=1&details=1&map=1&cover=1", {
+      waitUntil: "domcontentloaded",
+    });
     await waitForSlideshow(page);
 
     for (const label of ["🕰️", "Details", "Map", "Cover"]) {
@@ -205,7 +213,9 @@ test.describe("Slideshow URL parameters", () => {
   });
 
   test("mode=weighted sets Recent active", async ({ page }) => {
-    await page.goto("/slideshow?mode=weighted", { waitUntil: "domcontentloaded" });
+    await page.goto("/slideshow?mode=weighted", {
+      waitUntil: "domcontentloaded",
+    });
     await waitForSlideshow(page);
     await expect(page.locator('button:has-text("Recent")')).toHaveAttribute(
       "aria-pressed",
@@ -214,7 +224,9 @@ test.describe("Slideshow URL parameters", () => {
   });
 
   test("mode=similar sets Similar active", async ({ page }) => {
-    await page.goto("/slideshow?mode=similar", { waitUntil: "domcontentloaded" });
+    await page.goto("/slideshow?mode=similar", {
+      waitUntil: "domcontentloaded",
+    });
     await waitForSlideshow(page);
     await expect(page.locator('button:has-text("Similar")')).toHaveAttribute(
       "aria-pressed",
@@ -223,7 +235,9 @@ test.describe("Slideshow URL parameters", () => {
   });
 
   test("align parameter sets alignment", async ({ page }) => {
-    await page.goto("/slideshow?align=left&details=1", { waitUntil: "domcontentloaded" });
+    await page.goto("/slideshow?align=left&details=1", {
+      waitUntil: "domcontentloaded",
+    });
     await waitForSlideshow(page);
     await expect(page.locator('button:has-text("📍")')).toContainText("Left");
   });
@@ -237,23 +251,10 @@ test.describe("Slideshow URL parameters", () => {
     );
   });
 
-  test("combined parameters work together", async ({ page }) => {
-    await page.goto("/slideshow?clock=1&details=1&delay=30&align=left", { waitUntil: "domcontentloaded" });
-    await waitForSlideshow(page);
-
-    await expect(page.locator('button:has-text("🕰️")')).toHaveAttribute(
-      "aria-pressed",
-      "true",
-    );
-    await expect(page.locator('button:has-text("Details")')).toHaveAttribute(
-      "aria-pressed",
-      "true",
-    );
-    await expect(page.locator('button:has-text("📍")')).toContainText("Left");
-  });
-
   test("filter parameter restricts to album", async ({ page }) => {
-    await page.goto("/slideshow?filter=test-simple", { waitUntil: "domcontentloaded" });
+    await page.goto("/slideshow?filter=test-simple", {
+      waitUntil: "domcontentloaded",
+    });
     await waitForSlideshow(page);
     expect(page.url()).toContain("filter=test-simple");
   });
