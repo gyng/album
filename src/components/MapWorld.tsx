@@ -695,27 +695,24 @@ const MapRouteOverlay = ({
       ))}
       {routePoints && routePoints.length >= 2 ? (
         <>
-          <g data-testid="journey-line-start">
-            <circle
-              className={styles.routeEndpointStart}
-              cx={projectedSegments[0]?.startX}
-              cy={projectedSegments[0]?.startY}
-              r={4.75}
-            />
+          <g
+            data-testid="journey-line-start"
+            transform={`translate(${projectedSegments[0]?.startX ?? 0}, ${projectedSegments[0]?.startY ?? 0})`}
+          >
+            <line x1="0" y1="0" x2="0" y2="-16" className={styles.routeEndpointPole} />
+            <polygon points="0,-16 9,-11 0,-6" className={styles.routeEndpointStartFlag} />
+            <circle cx="0" cy="0" r="2.5" className={styles.routeEndpointBase} />
           </g>
-          <g data-testid="journey-line-end">
-            <circle
-              className={styles.routeEndpointEnd}
-              cx={projectedSegments.at(-1)?.endX}
-              cy={projectedSegments.at(-1)?.endY}
-              r={5.25}
-            />
-            <circle
-              className={styles.routeEndpointInner}
-              cx={projectedSegments.at(-1)?.endX}
-              cy={projectedSegments.at(-1)?.endY}
-              r={1.6}
-            />
+          <g
+            data-testid="journey-line-end"
+            transform={`translate(${projectedSegments.at(-1)?.endX ?? 0}, ${projectedSegments.at(-1)?.endY ?? 0})`}
+          >
+            <line x1="0" y1="0" x2="0" y2="-16" className={styles.routeEndpointPole} />
+            <rect x="0" y="-16" width="4.5" height="4.5" className={styles.routeEndpointCheckDark} />
+            <rect x="4.5" y="-16" width="4.5" height="4.5" className={styles.routeEndpointCheckLight} />
+            <rect x="0" y="-11.5" width="4.5" height="4.5" className={styles.routeEndpointCheckLight} />
+            <rect x="4.5" y="-11.5" width="4.5" height="4.5" className={styles.routeEndpointCheckDark} />
+            <circle cx="0" cy="0" r="2.5" className={styles.routeEndpointBase} />
           </g>
         </>
       ) : null}

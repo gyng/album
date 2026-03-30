@@ -104,20 +104,30 @@
   stroke-linejoin: round;
 }
 
-.routeEndpointStart {
-  fill: none;
-  stroke: rgb(28 40 44 / 0.72);
-  stroke-width: 1.75px;
+.routeEndpointPole {
+  stroke: rgb(255 255 255 / 0.92);
+  stroke-width: 1.5px;
+  filter: drop-shadow(0 0 1px rgb(0 0 0 / 0.55));
 }
 
-.routeEndpointEnd {
-  fill: rgb(28 40 44 / 0.92);
-  stroke: rgb(255 255 255 / 0.96);
-  stroke-width: 1.75px;
+.routeEndpointBase {
+  fill: rgb(255 255 255 / 0.92);
+  stroke: rgb(28 40 44 / 0.65);
+  stroke-width: 1px;
 }
 
-.routeEndpointInner {
-  fill: rgb(255 255 255 / 0.96);
+.routeEndpointStartFlag {
+  fill: #22c55e;
+  stroke: rgb(255 255 255 / 0.7);
+  stroke-width: 0.75px;
+}
+
+.routeEndpointCheckDark {
+  fill: rgb(20 20 20 / 0.88);
+}
+
+.routeEndpointCheckLight {
+  fill: rgb(255 255 255 / 0.92);
 }
 
 @media (prefers-reduced-motion: reduce) {
