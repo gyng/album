@@ -275,7 +275,7 @@ export const SankeyChart: React.FC<Props> = ({
     nodesByDepth.set(node.depth, (nodesByDepth.get(node.depth) ?? 0) + 1);
   }
   let maxNodesPerColumn = 0;
-  for (const count of nodesByDepth.values()) {
+  for (const count of Array.from(nodesByDepth.values())) {
     if (count > maxNodesPerColumn) maxNodesPerColumn = count;
   }
   const safeHeight = Math.max(minHeight, maxNodesPerColumn * NODE_THICKNESS);
