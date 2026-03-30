@@ -22,6 +22,7 @@ import {
   buildContextRouteGeoJson,
   buildContextRoutePoints,
   buildMapRoute,
+  splitIntoRouteSegments,
   distanceMetersBetween,
   RouteGeoJson,
   RouteMode,
@@ -914,34 +915,38 @@ export const MMap: React.FC<MapWorldProps> = ({
       ([album, route]) => {
         const points =
           routeMode === "simplified" ? route.simplifiedPoints : route.fullPoints;
-        const routeGeoJson = toRouteGeoJson(points);
-        const startPoint = points[0];
-        const endPoint = points.at(-1);
-        const gradientColors =
-          startPoint && endPoint
-            ? getBackgroundJourneyGradientColors(
-                markerColorByHref.get(startPoint.memberHrefs.at(-1) ?? startPoint.href) ??
-                  markerColorByHref.get(startPoint.href) ??
-                  "#12bcd4",
-                markerColorByHref.get(endPoint.memberHrefs.at(-1) ?? endPoint.href) ??
-                  markerColorByHref.get(endPoint.href) ??
-                  "#12bcd4",
-              )
-            : null;
+        const segments = splitIntoRouteSegments(points);
 
-        return (
-          routeGeoJson?.features.map((feature) => ({
-            ...feature,
-            properties: {
-              ...feature.properties,
-              album,
-              routeColorStart: gradientColors?.start ?? "#0f4b6e",
-              routeColorQuarter: gradientColors?.quarter ?? "#145b83",
-              routeColorMiddle: gradientColors?.middle ?? "#12bcd4",
-              routeColorEnd: gradientColors?.end ?? "#b9fbff",
-            },
-          })) ?? []
-        );
+        return segments.flatMap((segment) => {
+          const routeGeoJson = toRouteGeoJson(segment);
+          const startPoint = segment[0];
+          const endPoint = segment.at(-1);
+          const gradientColors =
+            startPoint && endPoint
+              ? getBackgroundJourneyGradientColors(
+                  markerColorByHref.get(startPoint.memberHrefs.at(-1) ?? startPoint.href) ??
+                    markerColorByHref.get(startPoint.href) ??
+                    "#12bcd4",
+                  markerColorByHref.get(endPoint.memberHrefs.at(-1) ?? endPoint.href) ??
+                    markerColorByHref.get(endPoint.href) ??
+                    "#12bcd4",
+                )
+              : null;
+
+          return (
+            routeGeoJson?.features.map((feature) => ({
+              ...feature,
+              properties: {
+                ...feature.properties,
+                album,
+                routeColorStart: gradientColors?.start ?? "#0f4b6e",
+                routeColorQuarter: gradientColors?.quarter ?? "#145b83",
+                routeColorMiddle: gradientColors?.middle ?? "#12bcd4",
+                routeColorEnd: gradientColors?.end ?? "#b9fbff",
+              },
+            })) ?? []
+          );
+        });
       },
     );
 
