@@ -1,6 +1,6 @@
 # album
 
-![Screenshot 2025-02-02 at 06-49-43 Screenshot for docs](https://github.com/user-attachments/assets/92bd9ee8-af26-48af-b473-eb953e1d63c8)
+![Screenshot](screenshot.png)
 
 [Live site](https://album-gyng.vercel.app/)
 
@@ -246,4 +246,11 @@ A service worker modified from [coi-serviceworker](https://github.com/gzuidhof/c
 
 ---
 
-To take screenshots, visit http://localhost:3000/screenshot.html
+To update the README screenshot:
+
+```sh
+cd src
+npm run screenshot
+```
+
+This builds the site, captures `screenshot.html` at a fixed 1600×900 viewport, and writes `screenshot.png` to the repo root.

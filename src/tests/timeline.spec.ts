@@ -1,31 +1,29 @@
 import { test, expect } from "@playwright/test";
 
-test.describe("Timeline Functionality", () => {
+test.describe("Timeline", () => {
   test("heatmap preview and day selection work", async ({ page }) => {
     const pageErrors: string[] = [];
-    page.on("pageerror", (error) => {
-      pageErrors.push(error.message);
-    });
+    page.on("pageerror", (error) => pageErrors.push(error.message));
 
     await page.goto("/timeline");
-
-    // Wait for page to be ready
     await expect(page.getByRole("heading", { name: "Timeline" })).toBeVisible();
 
+    // Click a populated cell
     const populatedCells = page.locator('button[aria-disabled="false"]');
     await expect(populatedCells.first()).toBeVisible();
 
     const firstCell = populatedCells.first();
     await firstCell.hover();
 
+    // Preview appears on hover
     const previewLink = page
       .locator('a[aria-label^="View "][aria-label$=" preview"]')
       .first();
     await expect(previewLink).toBeVisible();
     await expect(previewLink.locator("img")).toBeVisible();
 
+    // Clicking selects the day
     await firstCell.click();
-
     const selectedSection = page.locator('section[aria-label^="Photos from "]');
     await expect(selectedSection).toBeVisible();
     await expect(

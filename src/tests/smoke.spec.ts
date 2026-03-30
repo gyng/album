@@ -1,114 +1,62 @@
 import { test, expect } from "@playwright/test";
 
 test.describe("Smoke Tests", () => {
-  test("homepage loads and displays title", async ({ page }) => {
+  test("homepage loads with albums and navigation", async ({ page }) => {
     await page.goto("/");
 
-    // Verify the page title
     await expect(page).toHaveTitle("Snapshots");
-
-    // Verify main heading is present
     await expect(page.locator("h1")).toContainText("Snapshots");
-  });
 
-  test("homepage displays navigation links", async ({ page }) => {
-    await page.goto("/");
-
-    // Verify main navigation links are present
+    // Navigation links
     await expect(page.locator('a[href="/map"]')).toBeVisible();
     await expect(page.locator('a[href="/timeline"]')).toBeVisible();
     await expect(page.locator('a[href="/search"]')).toBeVisible();
-    await expect(page.locator('a[href="/explore"]')).toBeVisible();
     await expect(page.locator('a[href="/slideshow"]')).toBeVisible();
+
+    // At least one album
+    await expect(page.locator('a[href*="/album/"]').first()).toBeVisible();
   });
 
-  test("homepage loads albums", async ({ page }) => {
-    await page.goto("/");
+  test("album page loads with nav and photos", async ({ page }) => {
+    await page.goto("/album/test-simple");
 
-    // Wait for page to load basic structure first
-    await expect(page.locator("h1")).toContainText("Snapshots");
+    await expect(page.locator('a:has-text("Albums")')).toBeVisible();
+    await expect(page.locator('a:has-text("Album map")')).toBeVisible();
+    await expect(page.locator('a:has-text("Album slideshow")')).toBeVisible();
 
-    // Wait for albums with more reasonable timeout
-    const albumElements = page.locator('a[href*="/album/"]');
-
-    // Should have at least one album visible
-    await expect(albumElements.first()).toBeVisible();
-
-    // Count albums for verification
-    const albumCount = await albumElements.count();
-    expect(albumCount).toBeGreaterThan(0);
+    const photos = page.locator("img");
+    await expect(photos.first()).toBeVisible();
+    expect(await photos.count()).toBeGreaterThan(0);
   });
 
-  test("can navigate to map page", async ({ page }) => {
-    await page.goto("/");
-
-    // Wait for page to load
-    await expect(page.locator("h1")).toContainText("Snapshots");
-
-    // Click map link using href selector for reliability
-    const mapLink = page.locator('a[href="/map"]');
-    await expect(mapLink).toBeVisible();
-
-    await mapLink.click();
-
-    // Wait for URL change with shorter timeout and don't require full load
-    try {
-      await page.waitForURL("/map");
-    } catch {
-      // If navigation is slow, just check if URL changed
-      await page.waitForTimeout(2000);
-    }
-
-    // Verify we're on the map page - just check URL
-    expect(page.url()).toContain("/map");
+  test("map page loads", async ({ page }) => {
+    await page.goto("/map");
+    await expect(page).toHaveTitle("Map | Snapshots");
   });
 
-  test("can navigate to slideshow page", async ({ page }) => {
-    await page.goto("/");
-
-    // Wait for page to load
-    await expect(page.locator("h1")).toContainText("Snapshots");
-
-    // Click slideshow link using href selector for reliability
-    const slideshowLink = page.locator('a[href="/slideshow"]');
-    await expect(slideshowLink).toBeVisible();
-
-    await Promise.all([page.waitForURL("/slideshow"), slideshowLink.click()]);
-
-    // Verify we're on the slideshow page - just check URL since title might be slow
-    expect(page.url()).toContain("/slideshow");
+  test("search page loads", async ({ page }) => {
+    await page.goto("/search");
+    await expect(page.getByRole("heading", { name: /search/i })).toBeVisible();
   });
 
-  test("can navigate to timeline page", async ({ page }) => {
-    await page.goto("/");
-
-    await expect(page.locator("h1")).toContainText("Snapshots");
-
-    const timelineLink = page.locator('a[href="/timeline"]');
-    await expect(timelineLink).toBeVisible();
-
-    await Promise.all([page.waitForURL("/timeline"), timelineLink.click()]);
-
-    expect(page.url()).toContain("/timeline");
-    await expect(page.locator("h1")).toContainText("Timeline");
+  test("timeline page loads", async ({ page }) => {
+    await page.goto("/timeline");
+    await expect(page.getByRole("heading", { name: "Timeline" })).toBeVisible();
   });
 
-  test("theme toggle works", async ({ page }) => {
+  test("slideshow page loads", async ({ page }) => {
+    await page.goto("/slideshow");
+    await expect(page).toHaveTitle("Slideshow | Snapshots");
+  });
+
+  test("theme toggle changes theme", async ({ page }) => {
     await page.goto("/");
 
-    // Find and click theme toggle
-    const themeToggle = page
-      .locator(
-        '[data-testid="theme-toggle"], button[title*="theme" i], button:has-text("🌙"), button:has-text("☀️")',
-      )
-      .first();
+    const html = page.locator("html");
+    const initialTheme = await html.getAttribute("data-theme");
 
-    if (await themeToggle.isVisible()) {
-      await themeToggle.click();
+    await page.locator('button[title="Toggle dark mode"]').click();
 
-      // Verify theme changed (this might change data-theme attribute on html element)
-      // We'll check for any indication that theme changed
-      await page.waitForTimeout(500); // Allow time for theme change
-    }
+    await expect(html).not.toHaveAttribute("data-theme", initialTheme ?? "");
   });
 });

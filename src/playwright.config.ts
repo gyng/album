@@ -17,6 +17,8 @@ const skipWebServer = process.env.PLAYWRIGHT_SKIP_WEBSERVER === "1";
  */
 export default defineConfig({
   testDir: "./tests",
+  testIgnore: ["**/screenshot.spec.ts"],
+
   /* Run tests in files in parallel */
   fullyParallel: true,
   /* Fail the build on CI if you accidentally left test.only in the source code. */
