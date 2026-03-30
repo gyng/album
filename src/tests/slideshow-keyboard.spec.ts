@@ -19,10 +19,10 @@ const dispatchShortcut = async (
 test.describe("Slideshow Keyboard Navigation", () => {
   test("right arrow key advances to next photo", async ({ page }) => {
     await page.goto("/slideshow");
-    await expect(page).toHaveTitle(/Slideshow/, { timeout: 90000 });
+    await expect(page).toHaveTitle(/Slideshow/);
 
     const image = waitForImage(page);
-    await expect(image).toBeVisible({ timeout: 45000 });
+    await expect(image).toBeVisible();
     const firstSrc = await image.getAttribute("src");
 
     await dispatchShortcut(page, "ArrowRight");
@@ -33,7 +33,6 @@ test.describe("Slideshow Keyboard Navigation", () => {
         return img?.getAttribute("src") !== previousSrc;
       },
       ['img[src*=".jpg"], img[src*=".JPG"], img[src*=".avif"]', String(firstSrc)],
-      { timeout: 10000 },
     );
 
     const secondSrc = await image.getAttribute("src");
@@ -42,10 +41,10 @@ test.describe("Slideshow Keyboard Navigation", () => {
 
   test("left arrow key returns to previous photo", async ({ page }) => {
     await page.goto("/slideshow");
-    await expect(page).toHaveTitle(/Slideshow/, { timeout: 90000 });
+    await expect(page).toHaveTitle(/Slideshow/);
 
     const image = waitForImage(page);
-    await expect(image).toBeVisible({ timeout: 45000 });
+    await expect(image).toBeVisible();
     const firstSrc = await image.getAttribute("src");
 
     // Advance to second photo
@@ -56,48 +55,39 @@ test.describe("Slideshow Keyboard Navigation", () => {
         return img?.getAttribute("src") !== previousSrc;
       },
       ['img[src*=".jpg"], img[src*=".JPG"], img[src*=".avif"]', String(firstSrc)],
-      { timeout: 10000 },
     );
 
     // Go back with left arrow
     await dispatchShortcut(page, "ArrowLeft");
-    await expect(image).toHaveAttribute("src", String(firstSrc), {
-      timeout: 5000,
-    });
+    await expect(image).toHaveAttribute("src", String(firstSrc));
   });
 
   test("space key toggles pause state", async ({ page }) => {
     await page.goto("/slideshow");
-    await expect(page).toHaveTitle(/Slideshow/, { timeout: 90000 });
+    await expect(page).toHaveTitle(/Slideshow/);
 
     const image = waitForImage(page);
-    await expect(image).toBeVisible({ timeout: 45000 });
+    await expect(image).toBeVisible();
 
     const container = page.locator("[data-paused]");
-    await expect(container).toHaveAttribute("data-paused", "false", {
-      timeout: 5000,
-    });
+    await expect(container).toHaveAttribute("data-paused", "false");
 
     await dispatchShortcut(page, " ");
-    await expect(container).toHaveAttribute("data-paused", "true", {
-      timeout: 2000,
-    });
+    await expect(container).toHaveAttribute("data-paused", "true");
 
     await dispatchShortcut(page, " ");
-    await expect(container).toHaveAttribute("data-paused", "false", {
-      timeout: 2000,
-    });
+    await expect(container).toHaveAttribute("data-paused", "false");
   });
 
   test("escape key navigates to home", async ({ page }) => {
     await page.goto("/slideshow");
-    await expect(page).toHaveTitle(/Slideshow/, { timeout: 90000 });
+    await expect(page).toHaveTitle(/Slideshow/);
 
     await expect(
       page.locator('img[src*=".jpg"], img[src*=".JPG"], img[src*=".avif"]').first(),
-    ).toBeVisible({ timeout: 45000 });
+    ).toBeVisible();
 
     await dispatchShortcut(page, "Escape");
-    await expect(page).toHaveURL(/\/$/, { timeout: 5000 });
+    await expect(page).toHaveURL(/\/$/);
   });
 });

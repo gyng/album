@@ -4,7 +4,7 @@ test.describe("Map Integration Tests", () => {
   test("map page loads correctly", async ({ page }) => {
     // Try to load map page with extended timeout and error handling
     try {
-      await page.goto("/map", { timeout: 60000 });
+      await page.goto("/map");
 
       // Check if we can at least reach the page (might have loading issues)
       const currentUrl = page.url();
@@ -12,16 +12,14 @@ test.describe("Map Integration Tests", () => {
 
       // Try to verify page structure if possible
       try {
-        await expect(page).toHaveTitle("Map", { timeout: 30000 });
+        await expect(page).toHaveTitle("Map");
         console.log("✓ Map page title loaded");
       } catch {
         console.log("Map page reached but title may not be set yet");
       }
 
       try {
-        await expect(page.locator('a:has-text("Albums")')).toBeVisible({
-          timeout: 15000,
-        });
+        await expect(page.locator('a:has-text("Albums")')).toBeVisible();
         console.log("✓ Map navigation loaded");
       } catch {
         console.log("Map navigation may not be visible yet");
@@ -42,9 +40,7 @@ test.describe("Map Integration Tests", () => {
     await page.goto("/map");
 
     // Wait for navigation
-    await expect(page.locator('a:has-text("Albums")')).toBeVisible({
-      timeout: 10000,
-    });
+    await expect(page.locator('a:has-text("Albums")')).toBeVisible();
 
     // Look for map container elements
     const mapElements = page.locator(
@@ -52,7 +48,7 @@ test.describe("Map Integration Tests", () => {
     );
 
     // MapLibre/Mapbox maps typically create canvas elements
-    await expect(mapElements.first()).toBeVisible({ timeout: 20000 });
+    await expect(mapElements.first()).toBeVisible();
 
     const mapCount = await mapElements.count();
     console.log(`Found ${mapCount} map-related elements`);
@@ -67,7 +63,7 @@ test.describe("Map Integration Tests", () => {
     // Check for filter indication
     const filterIndicator = page.locator('text="test-simple", .toast');
     if ((await filterIndicator.count()) > 0) {
-      await expect(filterIndicator.first()).toBeVisible({ timeout: 5000 });
+      await expect(filterIndicator.first()).toBeVisible();
       console.log("✓ Album filter indicator displayed");
     }
 
@@ -81,9 +77,7 @@ test.describe("Map Integration Tests", () => {
     await page.goto("/album/test-simple");
 
     // Wait for album to load
-    await expect(page.locator('a:has-text("Albums")')).toBeVisible({
-      timeout: 10000,
-    });
+    await expect(page.locator('a:has-text("Albums")')).toBeVisible();
 
     // Click album map link
     const mapLink = page.locator('a:has-text("Album map")');
@@ -101,9 +95,7 @@ test.describe("Map Integration Tests", () => {
     await page.goto("/map");
 
     // Wait for page to load
-    await expect(page.locator('a:has-text("Albums")')).toBeVisible({
-      timeout: 10000,
-    });
+    await expect(page.locator('a:has-text("Albums")')).toBeVisible();
 
     // Wait for map to potentially load markers
     await page.waitForTimeout(5000);
@@ -119,7 +111,7 @@ test.describe("Map Integration Tests", () => {
 
       // Try clicking first marker
       try {
-        await potentialMarkers.first().click({ timeout: 3000 });
+        await potentialMarkers.first().click();
         console.log("✓ Map marker is clickable");
       } catch (error) {
         console.log("Marker not clickable or not found");
@@ -151,9 +143,7 @@ test.describe("Map Integration Tests", () => {
     await page.goto("/map");
 
     // Wait for page to load
-    await expect(page.locator('a:has-text("Albums")')).toBeVisible({
-      timeout: 10000,
-    });
+    await expect(page.locator('a:has-text("Albums")')).toBeVisible();
 
     // Test desktop view
     await page.setViewportSize({ width: 1200, height: 800 });
@@ -161,14 +151,14 @@ test.describe("Map Integration Tests", () => {
 
     // Check if map is still visible
     const mapElements = page.locator("canvas, .maplibregl-map, .map-container");
-    await expect(mapElements.first()).toBeVisible({ timeout: 10000 });
+    await expect(mapElements.first()).toBeVisible();
 
     // Test mobile view
     await page.setViewportSize({ width: 375, height: 667 });
     await page.waitForTimeout(1000);
 
     // Map should still be visible
-    await expect(mapElements.first()).toBeVisible({ timeout: 5000 });
+    await expect(mapElements.first()).toBeVisible();
 
     console.log("✓ Map responsive design works");
   });
@@ -178,9 +168,7 @@ test.describe("Map Integration Tests", () => {
     await page.goto("/map?filter_album=test-simple");
 
     // Wait for page and potential markers
-    await expect(page.locator('a:has-text("Albums")')).toBeVisible({
-      timeout: 10000,
-    });
+    await expect(page.locator('a:has-text("Albums")')).toBeVisible();
     await page.waitForTimeout(3000);
 
     // Check if there are any indicators of photos on the map

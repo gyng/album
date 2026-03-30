@@ -13,7 +13,7 @@ test.describe("Slideshow Functionality Tests", () => {
     await page.goto("/slideshow");
 
     // Wait for the title to be set (indicates basic loading)
-    await expect(page).toHaveTitle(slideshowTitle, { timeout: 90000 });
+    await expect(page).toHaveTitle(slideshowTitle);
 
     console.log("✓ Slideshow page title loaded");
   });
@@ -22,7 +22,7 @@ test.describe("Slideshow Functionality Tests", () => {
     await page.goto("/slideshow");
 
     // Wait for title first
-    await expect(page).toHaveTitle(slideshowTitle, { timeout: 90000 });
+    await expect(page).toHaveTitle(slideshowTitle);
 
     // Look for navigation controls separately to avoid strict mode violation
     const homeLink = page.locator('a:has-text("Snapshots")');
@@ -31,14 +31,14 @@ test.describe("Slideshow Functionality Tests", () => {
 
     // Wait for at least one to appear
     try {
-      await expect(homeLink).toBeVisible({ timeout: 15000 });
+      await expect(homeLink).toBeVisible();
       console.log("✓ Home link found");
     } catch {
       try {
-        await expect(previousButton).toBeVisible({ timeout: 15000 });
+        await expect(previousButton).toBeVisible();
         console.log("✓ Previous button found");
       } catch {
-        await expect(nextButton).toBeVisible({ timeout: 15000 });
+        await expect(nextButton).toBeVisible();
         console.log("✓ Next button found");
       }
     }
@@ -50,7 +50,7 @@ test.describe("Slideshow Functionality Tests", () => {
     await page.goto("/slideshow");
 
     // Wait for title and basic load
-    await expect(page).toHaveTitle(slideshowTitle, { timeout: 90000 });
+    await expect(page).toHaveTitle(slideshowTitle);
 
     // Look for timing control buttons (from the code we know these exist)
     const timingButtons = page.locator(
@@ -58,7 +58,7 @@ test.describe("Slideshow Functionality Tests", () => {
     );
 
     // Should find at least one timing button
-    await expect(timingButtons.first()).toBeVisible({ timeout: 30000 });
+    await expect(timingButtons.first()).toBeVisible();
 
     const buttonCount = await timingButtons.count();
     console.log(`Found ${buttonCount} timing control buttons`);
@@ -68,14 +68,14 @@ test.describe("Slideshow Functionality Tests", () => {
     await page.goto("/slideshow");
 
     // Wait for basic load
-    await expect(page).toHaveTitle(slideshowTitle, { timeout: 90000 });
+    await expect(page).toHaveTitle(slideshowTitle);
 
     // Wait for an image to appear in the slideshow
     const slideshowImage = page
       .locator('img[src*=".jpg"], img[src*=".JPG"], img[src*=".avif"]')
       .first();
 
-    await expect(slideshowImage).toBeVisible({ timeout: 45000 });
+    await expect(slideshowImage).toBeVisible();
 
     // Get image source to verify it loaded
     const imageSrc = await slideshowImage.getAttribute("src");
@@ -87,20 +87,20 @@ test.describe("Slideshow Functionality Tests", () => {
     await page.goto("/slideshow");
 
     // Wait for slideshow to load
-    await expect(page).toHaveTitle(slideshowTitle, { timeout: 90000 });
+    await expect(page).toHaveTitle(slideshowTitle);
 
     // Wait for image to load
     const slideshowImage = page
       .locator('img[src*=".jpg"], img[src*=".JPG"], img[src*=".avif"]')
       .first();
-    await expect(slideshowImage).toBeVisible({ timeout: 45000 });
+    await expect(slideshowImage).toBeVisible();
 
     // Get current image source
     const firstImageSrc = await slideshowImage.getAttribute("src");
 
     // Click next button
     const nextButton = page.locator('button:has-text("Next")');
-    await expect(nextButton).toBeVisible({ timeout: 10000 });
+    await expect(nextButton).toBeVisible();
     await revealSlideshowControls(page);
     await nextButton.click();
 
@@ -110,7 +110,6 @@ test.describe("Slideshow Functionality Tests", () => {
         return img?.getAttribute("src") !== previousSrc;
       },
       ['img[src*=".jpg"], img[src*=".JPG"], img[src*=".avif"]', String(firstImageSrc)],
-      { timeout: 10000 },
     );
 
     const secondImageSrc = await slideshowImage.getAttribute("src");
@@ -126,12 +125,12 @@ test.describe("Slideshow Functionality Tests", () => {
   }) => {
     await page.goto("/slideshow");
 
-    await expect(page).toHaveTitle(slideshowTitle, { timeout: 90000 });
+    await expect(page).toHaveTitle(slideshowTitle);
 
     const slideshowImage = page
       .locator('img[src*=".jpg"], img[src*=".JPG"], img[src*=".avif"]')
       .first();
-    await expect(slideshowImage).toBeVisible({ timeout: 45000 });
+    await expect(slideshowImage).toBeVisible();
 
     const firstImageSrc = await slideshowImage.getAttribute("src");
     expect(firstImageSrc).toBeTruthy();
@@ -143,7 +142,6 @@ test.describe("Slideshow Functionality Tests", () => {
         return img?.getAttribute("src") !== previousSrc;
       },
       ['img[src*=".jpg"], img[src*=".JPG"], img[src*=".avif"]', String(firstImageSrc)],
-      { timeout: 10000 },
     );
 
     const secondImageSrc = await slideshowImage.getAttribute("src");
@@ -159,7 +157,7 @@ test.describe("Slideshow Functionality Tests", () => {
     await page.goto("/slideshow");
 
     // Wait for slideshow to load
-    await expect(page).toHaveTitle(slideshowTitle, { timeout: 90000 });
+    await expect(page).toHaveTitle(slideshowTitle);
 
     // Look for toggle controls (from code we know these exist)
     const toggleButtons = page.locator(
@@ -181,7 +179,7 @@ test.describe("Slideshow Functionality Tests", () => {
   test("slideshow mode toggle works", async ({ page }) => {
     await page.goto("/slideshow");
 
-    await expect(page).toHaveTitle(slideshowTitle, { timeout: 90000 });
+    await expect(page).toHaveTitle(slideshowTitle);
 
     const shuffleButton = page.locator('button:has-text("Shuffle")');
     const recentButton = page.locator('button:has-text("Recent")');
@@ -190,10 +188,10 @@ test.describe("Slideshow Functionality Tests", () => {
       '[role="group"][aria-label="Playback mode"]',
     );
 
-    await expect(playbackGroup).toBeVisible({ timeout: 15000 });
-    await expect(shuffleButton).toBeVisible({ timeout: 15000 });
-    await expect(recentButton).toBeVisible({ timeout: 15000 });
-    await expect(similarButton).toBeVisible({ timeout: 15000 });
+    await expect(playbackGroup).toBeVisible();
+    await expect(shuffleButton).toBeVisible();
+    await expect(recentButton).toBeVisible();
+    await expect(similarButton).toBeVisible();
 
     await expect(shuffleButton).toHaveAttribute("aria-pressed", "true");
     await expect(recentButton).toHaveAttribute("aria-pressed", "false");
@@ -227,10 +225,10 @@ test.describe("Slideshow Functionality Tests", () => {
   test("slideshow pause control toggles playback state", async ({ page }) => {
     await page.goto("/slideshow");
 
-    await expect(page).toHaveTitle(slideshowTitle, { timeout: 90000 });
+    await expect(page).toHaveTitle(slideshowTitle);
 
     const pauseButton = page.locator('button:has-text("Pause")');
-    await expect(pauseButton).toBeVisible({ timeout: 15000 });
+    await expect(pauseButton).toBeVisible();
     await expect(pauseButton).toHaveAttribute("aria-pressed", "false");
 
     await revealSlideshowControls(page);
@@ -246,7 +244,7 @@ test.describe("Slideshow Functionality Tests", () => {
     await page.goto("/slideshow");
 
     // Wait for slideshow to load
-    await expect(page).toHaveTitle(slideshowTitle, { timeout: 90000 });
+    await expect(page).toHaveTitle(slideshowTitle);
 
     // Look for fullscreen button
     const fullscreenButton = page.locator(
@@ -254,7 +252,7 @@ test.describe("Slideshow Functionality Tests", () => {
     );
 
     if ((await fullscreenButton.count()) > 0) {
-      await expect(fullscreenButton.first()).toBeVisible({ timeout: 10000 });
+      await expect(fullscreenButton.first()).toBeVisible();
       console.log("✓ Fullscreen button available");
     } else {
       console.log("Fullscreen button not found - may be rendered differently");
@@ -266,7 +264,7 @@ test.describe("Slideshow Functionality Tests", () => {
     await page.goto("/slideshow?filter=test-simple");
 
     // Wait for slideshow to load
-    await expect(page).toHaveTitle(slideshowTitle, { timeout: 90000 });
+    await expect(page).toHaveTitle(slideshowTitle);
 
     // Check if filter is indicated using proper selector
     const filterIndicator = page.locator(':has-text("test-simple")');
@@ -283,11 +281,11 @@ test.describe("Slideshow Functionality Tests", () => {
     await page.goto("/slideshow");
 
     // Wait for slideshow to load
-    await expect(page).toHaveTitle(slideshowTitle, { timeout: 90000 });
+    await expect(page).toHaveTitle(slideshowTitle);
 
     // Find timing buttons and click one
     const tenSecondButton = page.locator('button:has-text("10s")');
-    if (await tenSecondButton.isVisible({ timeout: 30000 })) {
+    if (await tenSecondButton.isVisible()) {
       await revealSlideshowControls(page);
       await tenSecondButton.click();
       await page.waitForTimeout(500);

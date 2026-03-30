@@ -32,7 +32,7 @@ test.describe("Smoke Tests", () => {
     const albumElements = page.locator('a[href*="/album/"]');
 
     // Should have at least one album visible
-    await expect(albumElements.first()).toBeVisible({ timeout: 15000 });
+    await expect(albumElements.first()).toBeVisible();
 
     // Count albums for verification
     const albumCount = await albumElements.count();
@@ -53,7 +53,7 @@ test.describe("Smoke Tests", () => {
 
     // Wait for URL change with shorter timeout and don't require full load
     try {
-      await page.waitForURL("/map", { timeout: 10000 });
+      await page.waitForURL("/map");
     } catch {
       // If navigation is slow, just check if URL changed
       await page.waitForTimeout(2000);
@@ -74,7 +74,7 @@ test.describe("Smoke Tests", () => {
     await expect(slideshowLink).toBeVisible();
 
     await Promise.all([
-      page.waitForURL("/slideshow", { timeout: 30000 }),
+      page.waitForURL("/slideshow"),
       slideshowLink.click(),
     ]);
 
@@ -91,7 +91,7 @@ test.describe("Smoke Tests", () => {
     await expect(timelineLink).toBeVisible();
 
     await Promise.all([
-      page.waitForURL("/timeline", { timeout: 30000 }),
+      page.waitForURL("/timeline"),
       timelineLink.click(),
     ]);
 

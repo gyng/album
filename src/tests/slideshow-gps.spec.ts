@@ -5,9 +5,7 @@ test.describe("Slideshow GPS Tests", () => {
     page,
   }) => {
     // Navigate to slideshow
-    await page.goto("/slideshow", {
-      timeout: 90000,
-      waitUntil: "domcontentloaded",
+    await page.goto("/slideshow", { waitUntil: "domcontentloaded",
     });
 
     // Wait for slideshow to load
@@ -42,9 +40,7 @@ test.describe("Slideshow GPS Tests", () => {
   test("slideshow displays photos with potential GPS data", async ({
     page,
   }) => {
-    await page.goto("/slideshow", {
-      timeout: 90000,
-      waitUntil: "domcontentloaded",
+    await page.goto("/slideshow", { waitUntil: "domcontentloaded",
     });
 
     // Wait for slideshow to load
@@ -93,9 +89,7 @@ test.describe("Slideshow GPS Tests", () => {
     page,
   }) => {
     // Navigate to slideshow with map enabled
-    await page.goto("/slideshow?map=1", {
-      timeout: 90000,
-      waitUntil: "domcontentloaded",
+    await page.goto("/slideshow?map=1", { waitUntil: "domcontentloaded",
     });
 
     // Wait for slideshow to load and map to be enabled by URL param

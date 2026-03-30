@@ -9,18 +9,16 @@ test.describe("Search Functionality", () => {
 
     await page.goto("/search");
 
-    await expect(page.getByLabel("Explore browse mode")).toBeVisible({
-      timeout: 15000,
-    });
+    await expect(page.getByLabel("Explore browse mode")).toBeVisible();
     await expect(
       page.getByRole("link", { name: "Explore the map" }),
-    ).toBeVisible({ timeout: 15000 });
+    ).toBeVisible();
     await expect(
       page.getByRole("link", { name: "Open slideshow" }),
-    ).toBeVisible({ timeout: 15000 });
+    ).toBeVisible();
 
     await Promise.all([
-      page.waitForURL(/\/map$/, { timeout: 15000 }),
+      page.waitForURL(/\/map$/),
       page.getByRole("link", { name: "Explore the map" }).click(),
     ]);
 
@@ -36,18 +34,14 @@ test.describe("Search Functionality", () => {
 
     await page.goto("/search");
 
-    await expect(page.getByLabel("Explore browse mode")).toBeVisible({
-      timeout: 15000,
-    });
+    await expect(page.getByLabel("Explore browse mode")).toBeVisible();
 
     await Promise.all([
-      page.waitForURL(/\/slideshow$/, { timeout: 15000 }),
+      page.waitForURL(/\/slideshow$/),
       page.getByRole("link", { name: "Open slideshow" }).click(),
     ]);
 
-    await expect(page.getByRole("button", { name: /random/i })).toBeVisible({
-      timeout: 15000,
-    });
+    await expect(page.getByRole("button", { name: /random/i })).toBeVisible();
     expect(pageErrors).toEqual([]);
   });
 
@@ -63,16 +57,14 @@ test.describe("Search Functionality", () => {
       name: "Random similarity trail",
     });
 
-    await expect(randomTrailButton).toBeEnabled({ timeout: 15000 });
+    await expect(randomTrailButton).toBeEnabled();
 
     await Promise.all([
-      page.waitForURL(/\/slideshow\?mode=similar&seed=/, { timeout: 15000 }),
+      page.waitForURL(/\/slideshow\?mode=similar&seed=/),
       randomTrailButton.click(),
     ]);
 
-    await expect(page.getByText("Similar mode")).toBeVisible({
-      timeout: 15000,
-    });
+    await expect(page.getByText("Similar mode")).toBeVisible();
     expect(pageErrors).toEqual([]);
   });
 
@@ -86,15 +78,13 @@ test.describe("Search Functionality", () => {
 
     await expect(
       page.getByRole("heading", { name: /search & explore/i }),
-    ).toBeVisible({
-      timeout: 15000,
-    });
+    ).toBeVisible();
 
     const input = page.locator('input[placeholder*="Type / to search"]');
-    await expect(input).toBeVisible({ timeout: 15000 });
+    await expect(input).toBeVisible();
 
     await input.fill("tokyo");
-    await expect(page).toHaveURL(/q=tokyo/, { timeout: 10000 });
+    await expect(page).toHaveURL(/q=tokyo/);
     expect(pageErrors).toEqual([]);
   });
 
@@ -108,35 +98,23 @@ test.describe("Search Functionality", () => {
 
     await page.goto("/search?similar=../albums/test-simple/DSCF0506-2.jpg");
 
-    await expect(page).toHaveURL(/similar=/, { timeout: 10000 });
-    await expect(page.getByText("Similar photos")).toBeVisible({
-      timeout: 10000,
-    });
-    await expect(page.getByText("Comparing against")).toBeVisible({
-      timeout: 10000,
-    });
-    await expect(page.getByText("DSCF0506-2.jpg")).toBeVisible({
-      timeout: 10000,
-    });
-    await expect(page.getByRole("img", { name: /source photo/i })).toBeVisible({
-      timeout: 10000,
-    });
-    await expect(page.locator("text=/% match$/").first()).toBeVisible({
-      timeout: 20000,
-    });
+    await expect(page).toHaveURL(/similar=/);
+    await expect(page.getByText("Similar photos")).toBeVisible();
+    await expect(page.getByText("Comparing against")).toBeVisible();
+    await expect(page.getByText("DSCF0506-2.jpg")).toBeVisible();
+    await expect(page.getByRole("img", { name: /source photo/i })).toBeVisible();
+    await expect(page.locator("text=/% match$/").first()).toBeVisible();
 
     const similarButton = page.getByRole("button", {
       name: /find similar photos/i,
     });
-    await expect(similarButton.first()).toBeVisible({ timeout: 20000 });
+    await expect(similarButton.first()).toBeVisible();
     await similarButton.first().click();
 
-    await expect(page.getByLabel("Similarity breadcrumbs")).toBeVisible({
-      timeout: 10000,
-    });
+    await expect(page.getByLabel("Similarity breadcrumbs")).toBeVisible();
     await expect(
       page.locator('[aria-label="Similarity breadcrumbs"] img').first(),
-    ).toBeVisible({ timeout: 10000 });
+    ).toBeVisible();
     await expect(
       page.locator('[aria-label="Similarity breadcrumbs"] a').last(),
     ).toHaveAttribute("href", /\/album\/test-simple#DSCF0506-2\.jpg$/);

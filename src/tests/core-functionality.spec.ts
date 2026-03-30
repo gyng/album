@@ -18,25 +18,23 @@ test.describe("Core Functionality Tests", () => {
     await expect(page).toHaveTitle("Map | Snapshots");
 
     // Wait for back link to be visible (indicates page structure loaded)
-    await expect(page.locator('a:has-text("Albums")')).toBeVisible({
-      timeout: 15000,
-    });
+    await expect(page.locator('a:has-text("Albums")')).toBeVisible();
 
     console.log("✓ Map page loaded successfully");
   });
 
   test("slideshow page loads (with extended timeout)", async ({ page }) => {
     // Slideshow takes time to load due to database initialization
-    await page.goto("/slideshow", { timeout: 90000 });
+    await page.goto("/slideshow");
 
     // Wait for the slideshow to initialize - look for key elements
-    await expect(page).toHaveTitle("Slideshow | Snapshots", { timeout: 90000 });
+    await expect(page).toHaveTitle("Slideshow | Snapshots");
 
     // Wait for slideshow controls to appear (more flexible selectors)
     const controls = page.locator(
       'button:has-text("Next"), a:has-text("← Home"), button:has-text("⏸"), button:has-text("▶")',
     );
-    await expect(controls.first()).toBeVisible({ timeout: 60000 });
+    await expect(controls.first()).toBeVisible();
 
     console.log(
       "✓ Slideshow page loaded successfully (with database initialization)",
@@ -51,7 +49,7 @@ test.describe("Core Functionality Tests", () => {
 
     // Find any album link and click it
     const albumLink = page.locator('a[href*="/album/"]').first();
-    await expect(albumLink).toBeVisible({ timeout: 15000 });
+    await expect(albumLink).toBeVisible();
 
     const albumHref = await albumLink.getAttribute("href");
     console.log("Clicking album:", albumHref);
@@ -74,7 +72,7 @@ test.describe("Core Functionality Tests", () => {
       )
       .first();
 
-    if (await themeToggle.isVisible({ timeout: 5000 })) {
+    if (await themeToggle.isVisible()) {
       // Get initial state
       const htmlElement = page.locator("html");
       const initialTheme = await htmlElement.getAttribute("data-theme");

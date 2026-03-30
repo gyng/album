@@ -5,9 +5,7 @@ test.describe("Slideshow Details Alignment Tests", () => {
     page,
   }) => {
     // Navigate to slideshow
-    await page.goto("/slideshow", {
-      timeout: 90000,
-      waitUntil: "domcontentloaded",
+    await page.goto("/slideshow", { waitUntil: "domcontentloaded",
     });
 
     // Wait for slideshow to load
@@ -46,9 +44,7 @@ test.describe("Slideshow Details Alignment Tests", () => {
   });
 
   test("details pane position changes with alignment", async ({ page }) => {
-    await page.goto("/slideshow", {
-      timeout: 90000,
-      waitUntil: "domcontentloaded",
+    await page.goto("/slideshow", { waitUntil: "domcontentloaded",
     });
 
     await page.waitForTimeout(10000);
@@ -106,9 +102,7 @@ test.describe("Slideshow Details Alignment Tests", () => {
   test("alignment preference persists across page reloads", async ({
     page,
   }) => {
-    await page.goto("/slideshow", {
-      timeout: 90000,
-      waitUntil: "domcontentloaded",
+    await page.goto("/slideshow", { waitUntil: "domcontentloaded",
     });
 
     await page.waitForTimeout(10000);
@@ -134,9 +128,7 @@ test.describe("Slideshow Details Alignment Tests", () => {
   });
 
   test("alignment works with map and clock enabled", async ({ page }) => {
-    await page.goto("/slideshow", {
-      timeout: 90000,
-      waitUntil: "domcontentloaded",
+    await page.goto("/slideshow", { waitUntil: "domcontentloaded",
     });
 
     await page.waitForTimeout(10000);

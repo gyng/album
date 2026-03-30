@@ -10,7 +10,7 @@ test.describe("Album Browsing Flow", () => {
 
     // Check that we have album links (we know from debug output they exist)
     const albumLinks = page.locator('a[href*="/album/"]');
-    await expect(albumLinks.first()).toBeVisible({ timeout: 10000 });
+    await expect(albumLinks.first()).toBeVisible();
 
     // Count how many albums are visible
     const albumCount = await albumLinks.count();
@@ -23,22 +23,16 @@ test.describe("Album Browsing Flow", () => {
 
     // Click on a specific album we know exists - use first() to handle multiple links
     const albumLink = page.locator('a[href="/album/test-simple"]').first();
-    await expect(albumLink).toBeVisible({ timeout: 10000 });
+    await expect(albumLink).toBeVisible();
 
     await albumLink.click();
     await page.waitForURL("/album/test-simple");
 
     // Verify we're on the album page
     // Look for album navigation elements
-    await expect(page.locator('a:has-text("Albums")')).toBeVisible({
-      timeout: 10000,
-    });
-    await expect(page.locator('a:has-text("Album map")')).toBeVisible({
-      timeout: 5000,
-    });
-    await expect(page.locator('a:has-text("Album slideshow")')).toBeVisible({
-      timeout: 5000,
-    });
+    await expect(page.locator('a:has-text("Albums")')).toBeVisible();
+    await expect(page.locator('a:has-text("Album map")')).toBeVisible();
+    await expect(page.locator('a:has-text("Album slideshow")')).toBeVisible();
 
     console.log("✓ Successfully navigated to test-simple album");
   });
@@ -47,13 +41,11 @@ test.describe("Album Browsing Flow", () => {
     await page.goto("/album/test-simple");
 
     // Wait for navigation to load
-    await expect(page.locator('a:has-text("Albums")')).toBeVisible({
-      timeout: 10000,
-    });
+    await expect(page.locator('a:has-text("Albums")')).toBeVisible();
 
     // Look for photo elements - they might be images or figure elements
     const photos = page.locator('img, figure, [data-testid*="photo"]');
-    await expect(photos.first()).toBeVisible({ timeout: 15000 });
+    await expect(photos.first()).toBeVisible();
 
     const photoCount = await photos.count();
     console.log(`Found ${photoCount} photos in test-simple album`);
@@ -67,11 +59,11 @@ test.describe("Album Browsing Flow", () => {
 
     // Go to an album - wait for albums to load first, then use first link
     const albumLinks = page.locator('a[href*="/album/"]');
-    await expect(albumLinks.first()).toBeVisible({ timeout: 15000 });
+    await expect(albumLinks.first()).toBeVisible();
 
     // Click the first available album link
     await Promise.all([
-      page.waitForURL(/\/album\//, { timeout: 30000 }),
+      page.waitForURL(/\/album\//),
       albumLinks.first().click(),
     ]);
 
@@ -80,7 +72,7 @@ test.describe("Album Browsing Flow", () => {
 
     // Use browser back button
     await page.goBack();
-    await page.waitForURL("/", { timeout: 10000 });
+    await page.waitForURL("/");
     await expect(page.locator("h1")).toContainText("Snapshots");
 
     console.log("✓ Back navigation works correctly");
@@ -90,9 +82,7 @@ test.describe("Album Browsing Flow", () => {
     await page.goto("/album/test-simple");
 
     // Wait for album to load
-    await expect(page.locator('a:has-text("Albums")')).toBeVisible({
-      timeout: 10000,
-    });
+    await expect(page.locator('a:has-text("Albums")')).toBeVisible();
 
     // Click album map link
     const mapLink = page.locator('a:has-text("Album map")');
@@ -111,9 +101,7 @@ test.describe("Album Browsing Flow", () => {
     await page.goto("/album/test-manifest-v2");
 
     // Wait for album to load
-    await expect(page.locator('a:has-text("Albums")')).toBeVisible({
-      timeout: 10000,
-    });
+    await expect(page.locator('a:has-text("Albums")')).toBeVisible();
 
     // Click album slideshow link
     const slideshowLink = page.locator('a:has-text("Album slideshow")');

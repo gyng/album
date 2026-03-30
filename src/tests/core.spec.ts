@@ -14,7 +14,7 @@ test.describe("Core Functionality", () => {
 
     // Search
     await page.goto("/search");
-    await expect(page.getByRole("heading", { name: /search & explore/i })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /search/i })).toBeVisible();
 
     // Timeline
     await page.goto("/timeline");

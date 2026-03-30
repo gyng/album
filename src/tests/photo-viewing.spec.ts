@@ -5,15 +5,13 @@ test.describe("Photo Viewing Flow", () => {
     await page.goto("/album/test-simple");
 
     // Wait for album navigation to load
-    await expect(page.locator('a:has-text("Albums")')).toBeVisible({
-      timeout: 10000,
-    });
+    await expect(page.locator('a:has-text("Albums")')).toBeVisible();
 
     // Find photo elements
     const photos = page.locator(
       'img[src*=".jpg"], img[src*=".JPG"], img[src*=".avif"]',
     );
-    await expect(photos.first()).toBeVisible({ timeout: 15000 });
+    await expect(photos.first()).toBeVisible();
 
     const photoCount = await photos.count();
     console.log(`Album contains ${photoCount} photo elements`);
@@ -24,14 +22,12 @@ test.describe("Photo Viewing Flow", () => {
     await page.goto("/album/test-simple");
 
     // Wait for photos to load
-    await expect(page.locator('a:has-text("Albums")')).toBeVisible({
-      timeout: 10000,
-    });
+    await expect(page.locator('a:has-text("Albums")')).toBeVisible();
 
     const firstPhoto = page
       .locator('img[src*=".jpg"], img[src*=".JPG"], img[src*=".avif"]')
       .first();
-    await expect(firstPhoto).toBeVisible({ timeout: 15000 });
+    await expect(firstPhoto).toBeVisible();
 
     // Check photo has required attributes
     const src = await firstPhoto.getAttribute("src");
@@ -46,15 +42,13 @@ test.describe("Photo Viewing Flow", () => {
     await page.goto("/album/test-simple");
 
     // Wait for album to load
-    await expect(page.locator('a:has-text("Albums")')).toBeVisible({
-      timeout: 10000,
-    });
+    await expect(page.locator('a:has-text("Albums")')).toBeVisible();
 
     // Find a clickable photo element
     const photoElement = page
       .locator('img, figure, [data-testid*="photo"], [class*="photo"]')
       .first();
-    await expect(photoElement).toBeVisible({ timeout: 15000 });
+    await expect(photoElement).toBeVisible();
 
     // Try to click the photo
     await photoElement.click();
@@ -70,9 +64,7 @@ test.describe("Photo Viewing Flow", () => {
     await page.goto("/album/test-simple#DSCF2768.JPG");
 
     // Wait for album to load
-    await expect(page.locator('a:has-text("Albums")')).toBeVisible({
-      timeout: 10000,
-    });
+    await expect(page.locator('a:has-text("Albums")')).toBeVisible();
 
     // Check if the URL fragment is preserved
     expect(page.url()).toContain("#DSCF2768.JPG");
@@ -83,9 +75,7 @@ test.describe("Photo Viewing Flow", () => {
     await page.goto("/album/test-simple");
 
     // Wait for album to load
-    await expect(page.locator('a:has-text("Albums")')).toBeVisible({
-      timeout: 10000,
-    });
+    await expect(page.locator('a:has-text("Albums")')).toBeVisible();
 
     // Look for any metadata elements (dates, descriptions, titles)
     const metadataElements = page.locator(
@@ -113,9 +103,7 @@ test.describe("Photo Viewing Flow", () => {
     await page.goto("/album/test-simple");
 
     // Wait for album to load
-    await expect(page.locator('a:has-text("Albums")')).toBeVisible({
-      timeout: 10000,
-    });
+    await expect(page.locator('a:has-text("Albums")')).toBeVisible();
 
     // Get initial photo count
     const photos = page.locator(
@@ -143,15 +131,13 @@ test.describe("Photo Viewing Flow", () => {
     await page.goto("/album/test-simple");
 
     // Wait for album to load
-    await expect(page.locator('a:has-text("Albums")')).toBeVisible({
-      timeout: 10000,
-    });
+    await expect(page.locator('a:has-text("Albums")')).toBeVisible();
 
     // Check layout at different viewport sizes
     const photos = page.locator(
       'img[src*=".jpg"], img[src*=".JPG"], img[src*=".avif"]',
     );
-    await expect(photos.first()).toBeVisible({ timeout: 15000 });
+    await expect(photos.first()).toBeVisible();
 
     // Test desktop view
     await page.setViewportSize({ width: 1200, height: 800 });

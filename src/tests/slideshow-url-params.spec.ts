@@ -2,17 +2,15 @@ import { test, expect } from "@playwright/test";
 
 test.describe("Slideshow URL Parameters Tests", () => {
   test("clock parameter works with ?clock=1", async ({ page }) => {
-    await page.goto("/slideshow?clock=1", {
-      timeout: 90000,
-      waitUntil: "domcontentloaded",
+    await page.goto("/slideshow?clock=1", { waitUntil: "domcontentloaded",
     });
 
     // Wait for slideshow to load
-    await expect(page).toHaveTitle("Slideshow | Snapshots", { timeout: 90000 });
+    await expect(page).toHaveTitle("Slideshow | Snapshots");
 
     // Clock button should be visible and active
     const clockButton = page.locator('button:has-text("🕰️")');
-    await expect(clockButton).toBeVisible({ timeout: 15000 });
+    await expect(clockButton).toBeVisible();
 
     await expect(clockButton).toHaveAttribute("aria-pressed", "true");
 
@@ -20,15 +18,13 @@ test.describe("Slideshow URL Parameters Tests", () => {
   });
 
   test("clock parameter works with ?clock=true", async ({ page }) => {
-    await page.goto("/slideshow?clock=true", {
-      timeout: 90000,
-      waitUntil: "domcontentloaded",
+    await page.goto("/slideshow?clock=true", { waitUntil: "domcontentloaded",
     });
 
-    await expect(page).toHaveTitle("Slideshow | Snapshots", { timeout: 90000 });
+    await expect(page).toHaveTitle("Slideshow | Snapshots");
 
     const clockButton = page.locator('button:has-text("🕰️")');
-    await expect(clockButton).toBeVisible({ timeout: 15000 });
+    await expect(clockButton).toBeVisible();
 
     await expect(clockButton).toHaveAttribute("aria-pressed", "true");
 
@@ -36,15 +32,13 @@ test.describe("Slideshow URL Parameters Tests", () => {
   });
 
   test("details parameter works with ?details=1", async ({ page }) => {
-    await page.goto("/slideshow?details=1", {
-      timeout: 90000,
-      waitUntil: "domcontentloaded",
+    await page.goto("/slideshow?details=1", { waitUntil: "domcontentloaded",
     });
 
-    await expect(page).toHaveTitle("Slideshow | Snapshots", { timeout: 90000 });
+    await expect(page).toHaveTitle("Slideshow | Snapshots");
 
     const detailsButton = page.locator('button:has-text("Details")');
-    await expect(detailsButton).toBeVisible({ timeout: 15000 });
+    await expect(detailsButton).toBeVisible();
 
     await expect(detailsButton).toHaveAttribute("aria-pressed", "true");
 
@@ -52,45 +46,39 @@ test.describe("Slideshow URL Parameters Tests", () => {
   });
 
   test("mode parameter works with ?mode=similar", async ({ page }) => {
-    await page.goto("/slideshow?mode=similar", {
-      timeout: 90000,
-      waitUntil: "domcontentloaded",
+    await page.goto("/slideshow?mode=similar", { waitUntil: "domcontentloaded",
     });
 
-    await expect(page).toHaveTitle("Slideshow | Snapshots", { timeout: 90000 });
+    await expect(page).toHaveTitle("Slideshow | Snapshots");
 
     const similarButton = page.locator('button:has-text("Similar")');
-    await expect(similarButton).toBeVisible({ timeout: 15000 });
+    await expect(similarButton).toBeVisible();
 
     await expect(similarButton).toHaveAttribute("aria-pressed", "true");
     await expect(page).toHaveURL(/mode=similar/);
   });
 
   test("mode parameter works with ?mode=random", async ({ page }) => {
-    await page.goto("/slideshow?mode=random", {
-      timeout: 90000,
-      waitUntil: "domcontentloaded",
+    await page.goto("/slideshow?mode=random", { waitUntil: "domcontentloaded",
     });
 
-    await expect(page).toHaveTitle("Slideshow | Snapshots", { timeout: 90000 });
+    await expect(page).toHaveTitle("Slideshow | Snapshots");
 
     const shuffleButton = page.locator('button:has-text("Shuffle")');
-    await expect(shuffleButton).toBeVisible({ timeout: 15000 });
+    await expect(shuffleButton).toBeVisible();
 
     await expect(shuffleButton).toHaveAttribute("aria-pressed", "true");
     await expect(page).toHaveURL(/mode=random/);
   });
 
   test("mode parameter works with ?mode=weighted", async ({ page }) => {
-    await page.goto("/slideshow?mode=weighted", {
-      timeout: 90000,
-      waitUntil: "domcontentloaded",
+    await page.goto("/slideshow?mode=weighted", { waitUntil: "domcontentloaded",
     });
 
-    await expect(page).toHaveTitle("Slideshow | Snapshots", { timeout: 90000 });
+    await expect(page).toHaveTitle("Slideshow | Snapshots");
 
     const recentButton = page.locator('button:has-text("Recent")');
-    await expect(recentButton).toBeVisible({ timeout: 15000 });
+    await expect(recentButton).toBeVisible();
 
     await expect(recentButton).toHaveAttribute("aria-pressed", "true");
     await expect(page).toHaveURL(/mode=weighted/);
@@ -99,19 +87,16 @@ test.describe("Slideshow URL Parameters Tests", () => {
   test("current slideshow image is reflected in the photo parameter", async ({
     page,
   }) => {
-    await page.goto("/slideshow?mode=random&filter=test-simple", {
-      timeout: 90000,
-      waitUntil: "domcontentloaded",
+    await page.goto("/slideshow?mode=random&filter=test-simple", { waitUntil: "domcontentloaded",
     });
 
-    await expect(page).toHaveTitle("Slideshow | Snapshots", { timeout: 90000 });
+    await expect(page).toHaveTitle("Slideshow | Snapshots");
 
     const image = page.locator('img[alt="Slideshow image"]');
-    await expect(image).toBeVisible({ timeout: 45000 });
+    await expect(image).toBeVisible();
 
     await page.waitForFunction(
       () => new URL(window.location.href).searchParams.has("photo"),
-      { timeout: 10000 },
     );
 
     const firstPhotoParam = await page.evaluate(() =>
@@ -121,7 +106,7 @@ test.describe("Slideshow URL Parameters Tests", () => {
     expect(firstPhotoParam).toContain("../albums/test-simple/");
 
     const nextButton = page.locator('button:has-text("Next")');
-    await expect(nextButton).toBeVisible({ timeout: 15000 });
+    await expect(nextButton).toBeVisible();
     await nextButton.click();
 
     await page.waitForFunction(
@@ -129,7 +114,6 @@ test.describe("Slideshow URL Parameters Tests", () => {
         new URL(window.location.href).searchParams.get("photo") !==
         previousPhotoParam,
       firstPhotoParam,
-      { timeout: 10000 },
     );
 
     const secondPhotoParam = await page.evaluate(() =>
@@ -141,15 +125,13 @@ test.describe("Slideshow URL Parameters Tests", () => {
   });
 
   test("map parameter works with ?map=1", async ({ page }) => {
-    await page.goto("/slideshow?map=1", {
-      timeout: 90000,
-      waitUntil: "domcontentloaded",
+    await page.goto("/slideshow?map=1", { waitUntil: "domcontentloaded",
     });
 
-    await expect(page).toHaveTitle("Slideshow | Snapshots", { timeout: 90000 });
+    await expect(page).toHaveTitle("Slideshow | Snapshots");
 
     const mapButton = page.locator('button:has-text("Map")');
-    await expect(mapButton).toBeVisible({ timeout: 15000 });
+    await expect(mapButton).toBeVisible();
 
     await expect(mapButton).toHaveAttribute("aria-pressed", "true");
 
@@ -157,15 +139,13 @@ test.describe("Slideshow URL Parameters Tests", () => {
   });
 
   test("cover parameter works with ?cover=1", async ({ page }) => {
-    await page.goto("/slideshow?cover=1", {
-      timeout: 90000,
-      waitUntil: "domcontentloaded",
+    await page.goto("/slideshow?cover=1", { waitUntil: "domcontentloaded",
     });
 
-    await expect(page).toHaveTitle("Slideshow | Snapshots", { timeout: 90000 });
+    await expect(page).toHaveTitle("Slideshow | Snapshots");
 
     const coverButton = page.locator('button:has-text("Cover")');
-    await expect(coverButton).toBeVisible({ timeout: 15000 });
+    await expect(coverButton).toBeVisible();
 
     await expect(coverButton).toHaveAttribute("aria-pressed", "true");
 
@@ -173,15 +153,13 @@ test.describe("Slideshow URL Parameters Tests", () => {
   });
 
   test("align parameter works with ?align=left", async ({ page }) => {
-    await page.goto("/slideshow?align=left", {
-      timeout: 90000,
-      waitUntil: "domcontentloaded",
+    await page.goto("/slideshow?align=left", { waitUntil: "domcontentloaded",
     });
 
-    await expect(page).toHaveTitle("Slideshow | Snapshots", { timeout: 90000 });
+    await expect(page).toHaveTitle("Slideshow | Snapshots");
 
     const alignmentButton = page.locator('button:has-text("📍")');
-    await expect(alignmentButton).toBeVisible({ timeout: 15000 });
+    await expect(alignmentButton).toBeVisible();
 
     // Check if button shows "Left"
     await expect(alignmentButton).toContainText("Left");
@@ -190,15 +168,13 @@ test.describe("Slideshow URL Parameters Tests", () => {
   });
 
   test("align parameter works with ?align=right", async ({ page }) => {
-    await page.goto("/slideshow?align=right", {
-      timeout: 90000,
-      waitUntil: "domcontentloaded",
+    await page.goto("/slideshow?align=right", { waitUntil: "domcontentloaded",
     });
 
-    await expect(page).toHaveTitle("Slideshow | Snapshots", { timeout: 90000 });
+    await expect(page).toHaveTitle("Slideshow | Snapshots");
 
     const alignmentButton = page.locator('button:has-text("📍")');
-    await expect(alignmentButton).toBeVisible({ timeout: 15000 });
+    await expect(alignmentButton).toBeVisible();
 
     await expect(alignmentButton).toContainText("Right");
 
@@ -206,15 +182,13 @@ test.describe("Slideshow URL Parameters Tests", () => {
   });
 
   test("align parameter works with ?align=center", async ({ page }) => {
-    await page.goto("/slideshow?align=center", {
-      timeout: 90000,
-      waitUntil: "domcontentloaded",
+    await page.goto("/slideshow?align=center", { waitUntil: "domcontentloaded",
     });
 
-    await expect(page).toHaveTitle("Slideshow | Snapshots", { timeout: 90000 });
+    await expect(page).toHaveTitle("Slideshow | Snapshots");
 
     const alignmentButton = page.locator('button:has-text("📍")');
-    await expect(alignmentButton).toBeVisible({ timeout: 15000 });
+    await expect(alignmentButton).toBeVisible();
 
     await expect(alignmentButton).toContainText("Center");
 
@@ -222,19 +196,17 @@ test.describe("Slideshow URL Parameters Tests", () => {
   });
 
   test("delay parameter works with seconds (?delay=10)", async ({ page }) => {
-    await page.goto("/slideshow?delay=10", {
-      timeout: 90000,
-      waitUntil: "domcontentloaded",
+    await page.goto("/slideshow?delay=10", { waitUntil: "domcontentloaded",
     });
 
-    await expect(page).toHaveTitle("Slideshow | Snapshots", { timeout: 90000 });
+    await expect(page).toHaveTitle("Slideshow | Snapshots");
 
     // Should have a button showing "10s" active
     const tenSecondButton = page.locator('button:has-text("10s")');
 
     // Wait for timing controls to appear
     try {
-      await expect(tenSecondButton).toBeVisible({ timeout: 30000 });
+      await expect(tenSecondButton).toBeVisible();
 
       await expect(tenSecondButton).toHaveAttribute("aria-pressed", "true");
 
@@ -254,18 +226,16 @@ test.describe("Slideshow URL Parameters Tests", () => {
   test("delay parameter works with ?delay=60 for 60 seconds", async ({
     page,
   }) => {
-    await page.goto("/slideshow?delay=60", {
-      timeout: 90000,
-      waitUntil: "domcontentloaded",
+    await page.goto("/slideshow?delay=60", { waitUntil: "domcontentloaded",
     });
 
-    await expect(page).toHaveTitle("Slideshow | Snapshots", { timeout: 90000 });
+    await expect(page).toHaveTitle("Slideshow | Snapshots");
 
     // Should have a button showing "1m" active (60s = 1m)
     const oneMinuteButton = page.locator('button:has-text("1m")');
 
     try {
-      await expect(oneMinuteButton).toBeVisible({ timeout: 30000 });
+      await expect(oneMinuteButton).toBeVisible();
 
       await expect(oneMinuteButton).toHaveAttribute("aria-pressed", "true");
 
@@ -282,19 +252,17 @@ test.describe("Slideshow URL Parameters Tests", () => {
   });
 
   test("shuffle parameter works with ?shuffle=50", async ({ page }) => {
-    await page.goto("/slideshow?shuffle=50", {
-      timeout: 90000,
-      waitUntil: "domcontentloaded",
+    await page.goto("/slideshow?shuffle=50", { waitUntil: "domcontentloaded",
     });
 
-    await expect(page).toHaveTitle("Slideshow | Snapshots", { timeout: 90000 });
+    await expect(page).toHaveTitle("Slideshow | Snapshots");
 
     const shuffleButton = page.locator('button:has-text("Shuffle")');
     const image = page.locator('img[alt="Slideshow image"]');
 
-    await expect(shuffleButton).toBeVisible({ timeout: 15000 });
+    await expect(shuffleButton).toBeVisible();
     await expect(shuffleButton).toHaveAttribute("aria-pressed", "true");
-    await expect(image).toBeVisible({ timeout: 30000 });
+    await expect(image).toBeVisible();
 
     console.log(
       "✓ Shuffle parameter ?shuffle=50 is ignored cleanly in random mode",
@@ -304,13 +272,11 @@ test.describe("Slideshow URL Parameters Tests", () => {
   test("combined parameters work together", async ({ page }) => {
     await page.goto(
       "/slideshow?clock=1&details=1&delay=30&align=left&shuffle=20",
-      {
-        timeout: 90000,
-        waitUntil: "domcontentloaded",
+      { waitUntil: "domcontentloaded",
       },
     );
 
-    await expect(page).toHaveTitle("Slideshow | Snapshots", { timeout: 90000 });
+    await expect(page).toHaveTitle("Slideshow | Snapshots");
 
     // Check each parameter
     const clockButton = page.locator('button:has-text("🕰️")');
@@ -318,9 +284,9 @@ test.describe("Slideshow URL Parameters Tests", () => {
     const alignmentButton = page.locator('button:has-text("📍")');
     const shuffleButton = page.locator('button:has-text("Shuffle")');
 
-    await expect(clockButton).toBeVisible({ timeout: 15000 });
-    await expect(detailsButton).toBeVisible({ timeout: 15000 });
-    await expect(shuffleButton).toBeVisible({ timeout: 15000 });
+    await expect(clockButton).toBeVisible();
+    await expect(detailsButton).toBeVisible();
+    await expect(shuffleButton).toBeVisible();
 
     await expect(clockButton).toHaveAttribute("aria-pressed", "true");
     await expect(detailsButton).toHaveAttribute("aria-pressed", "true");
@@ -338,12 +304,10 @@ test.describe("Slideshow URL Parameters Tests", () => {
   test("filter parameter still works with ?filter=test-simple", async ({
     page,
   }) => {
-    await page.goto("/slideshow?filter=test-simple&clock=1", {
-      timeout: 90000,
-      waitUntil: "domcontentloaded",
+    await page.goto("/slideshow?filter=test-simple&clock=1", { waitUntil: "domcontentloaded",
     });
 
-    await expect(page).toHaveTitle("Slideshow | Snapshots", { timeout: 90000 });
+    await expect(page).toHaveTitle("Slideshow | Snapshots");
 
     // Check if filter is indicated in the UI
     const filterIndicator = page.locator(':has-text("test-simple")');
@@ -358,15 +322,13 @@ test.describe("Slideshow URL Parameters Tests", () => {
 
   test("invalid align values are ignored gracefully", async ({ page }) => {
     // Invalid align value should not crash, just be ignored
-    await page.goto("/slideshow?align=invalid", {
-      timeout: 90000,
-      waitUntil: "domcontentloaded",
+    await page.goto("/slideshow?align=invalid", { waitUntil: "domcontentloaded",
     });
 
-    await expect(page).toHaveTitle("Slideshow | Snapshots", { timeout: 90000 });
+    await expect(page).toHaveTitle("Slideshow | Snapshots");
 
     const alignmentButton = page.locator('button:has-text("📍")');
-    await expect(alignmentButton).toBeVisible({ timeout: 15000 });
+    await expect(alignmentButton).toBeVisible();
 
     // Should default to Center
     await expect(alignmentButton).toContainText("Center");
@@ -375,12 +337,10 @@ test.describe("Slideshow URL Parameters Tests", () => {
   });
 
   test("zero or negative delay values are ignored", async ({ page }) => {
-    await page.goto("/slideshow?delay=0", {
-      timeout: 90000,
-      waitUntil: "domcontentloaded",
+    await page.goto("/slideshow?delay=0", { waitUntil: "domcontentloaded",
     });
 
-    await expect(page).toHaveTitle("Slideshow | Snapshots", { timeout: 90000 });
+    await expect(page).toHaveTitle("Slideshow | Snapshots");
 
     // Should use default timing, not crash
     const timingButtons = page.locator(
@@ -396,30 +356,26 @@ test.describe("Slideshow URL Parameters Tests", () => {
     page,
   }) => {
     // Test with "yes" format
-    await page.goto("/slideshow?clock=yes", {
-      timeout: 90000,
-      waitUntil: "domcontentloaded",
+    await page.goto("/slideshow?clock=yes", { waitUntil: "domcontentloaded",
     });
 
-    await expect(page).toHaveTitle("Slideshow | Snapshots", { timeout: 90000 });
+    await expect(page).toHaveTitle("Slideshow | Snapshots");
 
     const clockButton = page.locator('button:has-text("🕰️")');
-    await expect(clockButton).toBeVisible({ timeout: 15000 });
+    await expect(clockButton).toBeVisible();
 
     await expect(clockButton).toHaveAttribute("aria-pressed", "true");
 
     console.log("✓ Clock parameter ?clock=yes works");
 
     // Test with "on" format
-    await page.goto("/slideshow?details=on", {
-      timeout: 90000,
-      waitUntil: "domcontentloaded",
+    await page.goto("/slideshow?details=on", { waitUntil: "domcontentloaded",
     });
 
-    await expect(page).toHaveTitle("Slideshow | Snapshots", { timeout: 90000 });
+    await expect(page).toHaveTitle("Slideshow | Snapshots");
 
     const detailsButton = page.locator('button:has-text("Details")');
-    await expect(detailsButton).toBeVisible({ timeout: 15000 });
+    await expect(detailsButton).toBeVisible();
 
     await expect(detailsButton).toHaveAttribute("aria-pressed", "true");
 
