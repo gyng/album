@@ -107,6 +107,7 @@
 .group {
   display: grid;
   gap: var(--m);
+  scroll-margin-top: 5.5rem;
 }
 
 .groupHeader {
