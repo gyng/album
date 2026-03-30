@@ -104,6 +104,31 @@
   stroke-linejoin: round;
 }
 
+@keyframes routeEndpointPing {
+  0% {
+    transform: scale(1);
+    opacity: 0.65;
+  }
+  100% {
+    transform: scale(6);
+    opacity: 0;
+  }
+}
+
+.routeEndpointPingStart {
+  fill: #16a34a;
+  animation: routeEndpointPing 2.2s ease-out infinite;
+}
+
+.routeEndpointPingEnd {
+  fill: #12bcd4;
+  animation: routeEndpointPing 2.2s ease-out infinite;
+}
+
+.routeEndpointPingDelay {
+  animation-delay: 1.1s;
+}
+
 .routeEndpointGroup {
   filter: drop-shadow(0 2px 5px rgb(0 0 0 / 0.75));
 }
@@ -134,7 +159,9 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .routeOverlayPath {
+  .routeOverlayPath,
+  .routeEndpointPingStart,
+  .routeEndpointPingEnd {
     animation: none;
   }
 }

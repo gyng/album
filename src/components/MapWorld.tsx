@@ -695,6 +695,15 @@ const MapRouteOverlay = ({
       ))}
       {routePoints && routePoints.length >= 2 ? (
         <>
+          {/* ping rings rendered beneath the flag groups so they don't inherit the drop-shadow */}
+          <g transform={`translate(${projectedSegments[0]?.startX ?? 0}, ${projectedSegments[0]?.startY ?? 0})`}>
+            <circle cx="0" cy="0" r="3.5" className={styles.routeEndpointPingStart} />
+            <circle cx="0" cy="0" r="3.5" className={`${styles.routeEndpointPingStart} ${styles.routeEndpointPingDelay}`} />
+          </g>
+          <g transform={`translate(${projectedSegments.at(-1)?.endX ?? 0}, ${projectedSegments.at(-1)?.endY ?? 0})`}>
+            <circle cx="0" cy="0" r="3.5" className={styles.routeEndpointPingEnd} />
+            <circle cx="0" cy="0" r="3.5" className={`${styles.routeEndpointPingEnd} ${styles.routeEndpointPingDelay}`} />
+          </g>
           <g
             data-testid="journey-line-start"
             className={styles.routeEndpointGroup}
