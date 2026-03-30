@@ -15,9 +15,6 @@ jest.mock("../services/album", () => ({
   getAlbumNames: jest.fn(),
 }));
 
-jest.mock("../services/albumFeed", () => ({
-  getAlbumSitemapEntries: jest.fn(),
-}));
 
 const useRouter = jest.fn();
 
@@ -42,12 +39,7 @@ import {
   getDefaultSocialImageUrl,
 } from "../lib/seo";
 import { buildRobotsTxt } from "../pages/robots.txt";
-import { buildSitemapXml, getServerSideProps as getSitemapProps } from "../pages/sitemap.xml";
-import type { ServerResponse, IncomingMessage } from "http";
-import type { GetServerSidePropsContext } from "next";
-import {
-  getAlbumSitemapEntries,
-} from "../services/albumFeed";
+import { buildSitemapXml } from "../lib/sitemap";
 
 const AlbumPage = require("../pages/album/[[...slug]]").default;
 const MapPage = require("../pages/map/index").default;
@@ -228,37 +220,3 @@ describe("SEO helpers", () => {
   });
 });
 
-describe("sitemap route", () => {
-  beforeEach(() => {
-    process.env.NEXT_PUBLIC_SITE_URL = "https://photos.example.com";
-    (getAlbumSitemapEntries as jest.Mock).mockReset();
-  });
-
-  it("requests album sitemap entries for sitemap generation", async () => {
-    (getAlbumSitemapEntries as jest.Mock).mockResolvedValue([
-      { slug: "trip", lastmod: "2025-02-01" },
-      { slug: "tokyo", lastmod: "2025-03-10" },
-    ]);
-
-    const write = jest.fn();
-    const end = jest.fn();
-    const setHeader = jest.fn();
-
-    await getSitemapProps({
-      req: { cookies: {} } as IncomingMessage & { cookies: Record<string, string> },
-      query: {},
-      resolvedUrl: "/sitemap.xml",
-      res: { write, end, setHeader } as unknown as ServerResponse<IncomingMessage>,
-    } as GetServerSidePropsContext);
-
-    expect(getAlbumSitemapEntries).toHaveBeenCalled();
-    expect(setHeader).toHaveBeenCalledWith(
-      "Content-Type",
-      "application/xml; charset=utf-8",
-    );
-    expect(write.mock.calls[0][0]).toContain("<lastmod>2025-03-10</lastmod>");
-    expect(write.mock.calls[0][0]).toContain(
-      "<loc>https://photos.example.com/album/tokyo</loc>",
-    );
-  });
-});

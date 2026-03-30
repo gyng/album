@@ -8,6 +8,26 @@ const nextConfig = {
   staticPageGenerationTimeout: 300,
   outputFileTracingRoot: isVercelBuild ? __dirname : path.join(__dirname, ".."),
   serverExternalPackages: ["sharp", "ffmpeg-static", "ffprobe-static", "sqlite3"],
+  headers: async () => [
+    {
+      source: "/feed.xml",
+      headers: [
+        { key: "Content-Type", value: "application/rss+xml; charset=utf-8" },
+      ],
+    },
+    {
+      source: "/album/:slug/feed.xml",
+      headers: [
+        { key: "Content-Type", value: "application/rss+xml; charset=utf-8" },
+      ],
+    },
+    {
+      source: "/sitemap.xml",
+      headers: [
+        { key: "Content-Type", value: "application/xml; charset=utf-8" },
+      ],
+    },
+  ],
   experimental: {
     useLightningcss: true,
     lightningCssFeatures: {

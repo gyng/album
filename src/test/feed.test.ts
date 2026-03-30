@@ -1,26 +1,72 @@
-import { buildFeedXml, getServerSideProps as getFeedProps } from "../pages/feed.xml";
-import {
-  getAlbumFeedEntries,
-  getAlbumFeedEntry,
-  getAlbumFeedItems,
-} from "../services/albumFeed";
-import {
-  buildAlbumFeedXml,
-  getServerSideProps as getAlbumFeedProps,
-} from "../pages/album/[slug]/feed.xml";
-import type { ServerResponse, IncomingMessage } from "http";
-import type { GetServerSidePropsContext } from "next";
+import { buildRssXml, escapeXml, toRssDate } from "../lib/rss";
+import { getCanonicalUrl, getDefaultSeo } from "../lib/seo";
 
-jest.mock("../services/albumFeed", () => ({
-  getAlbumFeedEntries: jest.fn(),
-  getAlbumFeedEntry: jest.fn(),
-  getAlbumFeedItems: jest.fn(),
-}));
+/** Mirrors the main feed builder from bin/generate-feeds.cjs for unit testing. */
+const buildFeedXml = (
+  entries: Array<{
+    slug: string;
+    title: string;
+    description: string;
+    lastmod: string;
+  }>,
+): string => {
+  const defaults = getDefaultSeo();
+  const siteUrl = getCanonicalUrl("/");
+  const feedUrl = getCanonicalUrl("/feed.xml");
+
+  return buildRssXml({
+    title: defaults.siteName,
+    link: siteUrl,
+    description: defaults.defaultDescription,
+    selfUrl: feedUrl,
+    lastBuildDate: entries[0]?.lastmod ? toRssDate(entries[0].lastmod) : undefined,
+    items: entries.map((entry) => ({
+      title: entry.title,
+      link: getCanonicalUrl(`/album/${entry.slug}`),
+      guid: getCanonicalUrl(`/album/${entry.slug}`),
+      description: entry.description,
+      pubDate: toRssDate(entry.lastmod),
+    })),
+  });
+};
+
+/** Mirrors the per-album feed builder from bin/generate-feeds.cjs for unit testing. */
+const buildAlbumFeedXml = (
+  entry: {
+    slug: string;
+    title: string;
+    description: string;
+    lastmod: string;
+  },
+  items: Array<{
+    title: string;
+    description: string;
+    link: string;
+    pubDate: string;
+  }>,
+): string => {
+  const albumUrl = getCanonicalUrl(`/album/${entry.slug}`);
+  const feedUrl = getCanonicalUrl(`/album/${entry.slug}/feed.xml`);
+
+  return buildRssXml({
+    title: `${entry.title} | Snapshots`,
+    link: albumUrl,
+    description: entry.description,
+    selfUrl: feedUrl,
+    lastBuildDate: toRssDate(entry.lastmod),
+    items: items.map((item) => ({
+      title: item.title,
+      link: getCanonicalUrl(item.link),
+      guid: getCanonicalUrl(item.link),
+      description: item.description,
+      pubDate: toRssDate(item.pubDate),
+    })),
+  });
+};
 
 describe("RSS feed", () => {
   beforeEach(() => {
     process.env.NEXT_PUBLIC_SITE_URL = "https://photos.example.com";
-    (getAlbumFeedEntries as jest.Mock).mockReset();
   });
 
   it("builds RSS xml for album updates", () => {
@@ -49,76 +95,6 @@ describe("RSS feed", () => {
     expect(xml).toContain("<lastBuildDate>Mon, 10 Mar 2025 00:00:00 GMT</lastBuildDate>");
   });
 
-  it("serves feed xml from the route", async () => {
-    (getAlbumFeedEntries as jest.Mock).mockResolvedValue([
-      {
-        slug: "trip",
-        title: "Trip",
-        description: "Trip photo album",
-        lastmod: "2025-02-01",
-      },
-    ]);
-
-    const write = jest.fn();
-    const end = jest.fn();
-    const setHeader = jest.fn();
-
-    await getFeedProps({
-      req: { cookies: {} } as IncomingMessage & { cookies: Record<string, string> },
-      query: {},
-      resolvedUrl: "/feed.xml",
-      res: { write, end, setHeader } as unknown as ServerResponse<IncomingMessage>,
-    } as GetServerSidePropsContext);
-
-    expect(getAlbumFeedEntries).toHaveBeenCalled();
-    expect(setHeader).toHaveBeenCalledWith(
-      "Content-Type",
-      "application/rss+xml; charset=utf-8",
-    );
-    expect(write.mock.calls[0][0]).toContain(
-      "<link>https://photos.example.com/album/trip</link>",
-    );
-  });
-
-  it("serves the per-album feed route", async () => {
-    (getAlbumFeedEntry as jest.Mock).mockResolvedValue({
-      slug: "trip",
-      title: "Trip",
-      description: "Trip photo album",
-      lastmod: "2025-02-01",
-    });
-    (getAlbumFeedItems as jest.Mock).mockResolvedValue([
-      {
-        title: "Bridge at dusk",
-        description: "Bridge at dusk from trip",
-        link: "/album/trip#bridge.jpg",
-        pubDate: "2025-01-30",
-      },
-    ]);
-
-    const write = jest.fn();
-    const end = jest.fn();
-    const setHeader = jest.fn();
-
-    await getAlbumFeedProps({
-      req: { cookies: {} } as IncomingMessage & { cookies: Record<string, string> },
-      params: { slug: "trip" },
-      query: {},
-      resolvedUrl: "/album/trip/feed.xml",
-      res: { write, end, setHeader } as unknown as ServerResponse<IncomingMessage>,
-    } as GetServerSidePropsContext);
-
-    expect(getAlbumFeedEntry).toHaveBeenCalledWith("trip");
-    expect(getAlbumFeedItems).toHaveBeenCalledWith("trip");
-    expect(setHeader).toHaveBeenCalledWith(
-      "Content-Type",
-      "application/rss+xml; charset=utf-8",
-    );
-    expect(write.mock.calls[0][0]).toContain(
-      "<link>https://photos.example.com/album/trip#bridge.jpg</link>",
-    );
-  });
-
   it("builds a per-album rss feed", () => {
     const xml = buildAlbumFeedXml(
       {
@@ -144,5 +120,13 @@ describe("RSS feed", () => {
     expect(xml).toContain(
       "<guid>https://photos.example.com/album/tokyo#shibuya.jpg</guid>",
     );
+  });
+
+  it("escapes XML special characters", () => {
+    expect(escapeXml("Tom & Jerry <3>")).toBe("Tom &amp; Jerry &lt;3&gt;");
+  });
+
+  it("converts dates to RSS format", () => {
+    expect(toRssDate("2025-03-10")).toBe("Mon, 10 Mar 2025 00:00:00 GMT");
   });
 });

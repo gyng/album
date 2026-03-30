@@ -42,3 +42,8 @@ node_modules/
 /playwright-report/
 /blob-report/
 /playwright/.cache/
+
+# Generated at build time by bin/generate-feeds.cjs
+/public/feed.xml
+/public/sitemap.xml
+/public/album/*/feed.xml
