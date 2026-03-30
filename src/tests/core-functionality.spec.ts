@@ -87,9 +87,7 @@ test.describe("Core Functionality Tests", () => {
       console.log(`Theme changed from "${initialTheme}" to "${newTheme}"`);
       console.log("✓ Theme toggle functionality working");
     } else {
-      console.log(
-        "⚠ Theme toggle not found - may not be visible on this page",
-      );
+      console.log("⚠ Theme toggle not found - may not be visible on this page");
     }
   });
 });

@@ -1,9 +1,7 @@
 import { test, expect } from "@playwright/test";
 
 const waitForImage = (page: import("@playwright/test").Page) =>
-  page
-    .locator('img[src*=".jpg"], img[src*=".JPG"], img[src*=".avif"]')
-    .first();
+  page.locator('img[src*=".jpg"], img[src*=".JPG"], img[src*=".avif"]').first();
 
 const dispatchShortcut = async (
   page: import("@playwright/test").Page,
@@ -32,7 +30,10 @@ test.describe("Slideshow Keyboard Navigation", () => {
         const img = document.querySelector(selector);
         return img?.getAttribute("src") !== previousSrc;
       },
-      ['img[src*=".jpg"], img[src*=".JPG"], img[src*=".avif"]', String(firstSrc)],
+      [
+        'img[src*=".jpg"], img[src*=".JPG"], img[src*=".avif"]',
+        String(firstSrc),
+      ],
     );
 
     const secondSrc = await image.getAttribute("src");
@@ -54,7 +55,10 @@ test.describe("Slideshow Keyboard Navigation", () => {
         const img = document.querySelector(selector);
         return img?.getAttribute("src") !== previousSrc;
       },
-      ['img[src*=".jpg"], img[src*=".JPG"], img[src*=".avif"]', String(firstSrc)],
+      [
+        'img[src*=".jpg"], img[src*=".JPG"], img[src*=".avif"]',
+        String(firstSrc),
+      ],
     );
 
     // Go back with left arrow
@@ -84,7 +88,9 @@ test.describe("Slideshow Keyboard Navigation", () => {
     await expect(page).toHaveTitle(/Slideshow/);
 
     await expect(
-      page.locator('img[src*=".jpg"], img[src*=".JPG"], img[src*=".avif"]').first(),
+      page
+        .locator('img[src*=".jpg"], img[src*=".JPG"], img[src*=".avif"]')
+        .first(),
     ).toBeVisible();
 
     await dispatchShortcut(page, "Escape");

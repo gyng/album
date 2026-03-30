@@ -73,10 +73,7 @@ test.describe("Smoke Tests", () => {
     const slideshowLink = page.locator('a[href="/slideshow"]');
     await expect(slideshowLink).toBeVisible();
 
-    await Promise.all([
-      page.waitForURL("/slideshow"),
-      slideshowLink.click(),
-    ]);
+    await Promise.all([page.waitForURL("/slideshow"), slideshowLink.click()]);
 
     // Verify we're on the slideshow page - just check URL since title might be slow
     expect(page.url()).toContain("/slideshow");
@@ -90,10 +87,7 @@ test.describe("Smoke Tests", () => {
     const timelineLink = page.locator('a[href="/timeline"]');
     await expect(timelineLink).toBeVisible();
 
-    await Promise.all([
-      page.waitForURL("/timeline"),
-      timelineLink.click(),
-    ]);
+    await Promise.all([page.waitForURL("/timeline"), timelineLink.click()]);
 
     expect(page.url()).toContain("/timeline");
     await expect(page.locator("h1")).toContainText("Timeline");

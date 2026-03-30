@@ -109,7 +109,10 @@ test.describe("Slideshow Functionality Tests", () => {
         const img = document.querySelector(selector);
         return img?.getAttribute("src") !== previousSrc;
       },
-      ['img[src*=".jpg"], img[src*=".JPG"], img[src*=".avif"]', String(firstImageSrc)],
+      [
+        'img[src*=".jpg"], img[src*=".JPG"], img[src*=".avif"]',
+        String(firstImageSrc),
+      ],
     );
 
     const secondImageSrc = await slideshowImage.getAttribute("src");
@@ -141,7 +144,10 @@ test.describe("Slideshow Functionality Tests", () => {
         const img = document.querySelector(selector);
         return img?.getAttribute("src") !== previousSrc;
       },
-      ['img[src*=".jpg"], img[src*=".JPG"], img[src*=".avif"]', String(firstImageSrc)],
+      [
+        'img[src*=".jpg"], img[src*=".JPG"], img[src*=".avif"]',
+        String(firstImageSrc),
+      ],
     );
 
     const secondImageSrc = await slideshowImage.getAttribute("src");

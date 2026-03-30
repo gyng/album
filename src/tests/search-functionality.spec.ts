@@ -102,7 +102,9 @@ test.describe("Search Functionality", () => {
     await expect(page.getByText("Similar photos")).toBeVisible();
     await expect(page.getByText("Comparing against")).toBeVisible();
     await expect(page.getByText("DSCF0506-2.jpg")).toBeVisible();
-    await expect(page.getByRole("img", { name: /source photo/i })).toBeVisible();
+    await expect(
+      page.getByRole("img", { name: /source photo/i }),
+    ).toBeVisible();
     await expect(page.locator("text=/% match$/").first()).toBeVisible();
 
     const similarButton = page.getByRole("button", {

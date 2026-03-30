@@ -5,8 +5,7 @@ test.describe("Slideshow GPS Tests", () => {
     page,
   }) => {
     // Navigate to slideshow
-    await page.goto("/slideshow", { waitUntil: "domcontentloaded",
-    });
+    await page.goto("/slideshow", { waitUntil: "domcontentloaded" });
 
     // Wait for slideshow to load
     await page.waitForTimeout(10000);
@@ -40,8 +39,7 @@ test.describe("Slideshow GPS Tests", () => {
   test("slideshow displays photos with potential GPS data", async ({
     page,
   }) => {
-    await page.goto("/slideshow", { waitUntil: "domcontentloaded",
-    });
+    await page.goto("/slideshow", { waitUntil: "domcontentloaded" });
 
     // Wait for slideshow to load
     await page.waitForTimeout(5000);
@@ -89,8 +87,7 @@ test.describe("Slideshow GPS Tests", () => {
     page,
   }) => {
     // Navigate to slideshow with map enabled
-    await page.goto("/slideshow?map=1", { waitUntil: "domcontentloaded",
-    });
+    await page.goto("/slideshow?map=1", { waitUntil: "domcontentloaded" });
 
     // Wait for slideshow to load and map to be enabled by URL param
     await page.waitForTimeout(10000);
@@ -130,9 +127,7 @@ test.describe("Slideshow GPS Tests", () => {
     }
 
     if (!foundCoordinatePhoto) {
-      console.log(
-        "⚠ No photos with EXIF GPS coordinates found in this batch",
-      );
+      console.log("⚠ No photos with EXIF GPS coordinates found in this batch");
     }
   });
 });

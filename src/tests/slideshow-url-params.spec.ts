@@ -2,8 +2,7 @@ import { test, expect } from "@playwright/test";
 
 test.describe("Slideshow URL Parameters Tests", () => {
   test("clock parameter works with ?clock=1", async ({ page }) => {
-    await page.goto("/slideshow?clock=1", { waitUntil: "domcontentloaded",
-    });
+    await page.goto("/slideshow?clock=1", { waitUntil: "domcontentloaded" });
 
     // Wait for slideshow to load
     await expect(page).toHaveTitle("Slideshow | Snapshots");
@@ -18,8 +17,7 @@ test.describe("Slideshow URL Parameters Tests", () => {
   });
 
   test("clock parameter works with ?clock=true", async ({ page }) => {
-    await page.goto("/slideshow?clock=true", { waitUntil: "domcontentloaded",
-    });
+    await page.goto("/slideshow?clock=true", { waitUntil: "domcontentloaded" });
 
     await expect(page).toHaveTitle("Slideshow | Snapshots");
 
@@ -32,8 +30,7 @@ test.describe("Slideshow URL Parameters Tests", () => {
   });
 
   test("details parameter works with ?details=1", async ({ page }) => {
-    await page.goto("/slideshow?details=1", { waitUntil: "domcontentloaded",
-    });
+    await page.goto("/slideshow?details=1", { waitUntil: "domcontentloaded" });
 
     await expect(page).toHaveTitle("Slideshow | Snapshots");
 
@@ -46,7 +43,8 @@ test.describe("Slideshow URL Parameters Tests", () => {
   });
 
   test("mode parameter works with ?mode=similar", async ({ page }) => {
-    await page.goto("/slideshow?mode=similar", { waitUntil: "domcontentloaded",
+    await page.goto("/slideshow?mode=similar", {
+      waitUntil: "domcontentloaded",
     });
 
     await expect(page).toHaveTitle("Slideshow | Snapshots");
@@ -59,7 +57,8 @@ test.describe("Slideshow URL Parameters Tests", () => {
   });
 
   test("mode parameter works with ?mode=random", async ({ page }) => {
-    await page.goto("/slideshow?mode=random", { waitUntil: "domcontentloaded",
+    await page.goto("/slideshow?mode=random", {
+      waitUntil: "domcontentloaded",
     });
 
     await expect(page).toHaveTitle("Slideshow | Snapshots");
@@ -72,7 +71,8 @@ test.describe("Slideshow URL Parameters Tests", () => {
   });
 
   test("mode parameter works with ?mode=weighted", async ({ page }) => {
-    await page.goto("/slideshow?mode=weighted", { waitUntil: "domcontentloaded",
+    await page.goto("/slideshow?mode=weighted", {
+      waitUntil: "domcontentloaded",
     });
 
     await expect(page).toHaveTitle("Slideshow | Snapshots");
@@ -87,7 +87,8 @@ test.describe("Slideshow URL Parameters Tests", () => {
   test("current slideshow image is reflected in the photo parameter", async ({
     page,
   }) => {
-    await page.goto("/slideshow?mode=random&filter=test-simple", { waitUntil: "domcontentloaded",
+    await page.goto("/slideshow?mode=random&filter=test-simple", {
+      waitUntil: "domcontentloaded",
     });
 
     await expect(page).toHaveTitle("Slideshow | Snapshots");
@@ -95,8 +96,8 @@ test.describe("Slideshow URL Parameters Tests", () => {
     const image = page.locator('img[alt="Slideshow image"]');
     await expect(image).toBeVisible();
 
-    await page.waitForFunction(
-      () => new URL(window.location.href).searchParams.has("photo"),
+    await page.waitForFunction(() =>
+      new URL(window.location.href).searchParams.has("photo"),
     );
 
     const firstPhotoParam = await page.evaluate(() =>
@@ -125,8 +126,7 @@ test.describe("Slideshow URL Parameters Tests", () => {
   });
 
   test("map parameter works with ?map=1", async ({ page }) => {
-    await page.goto("/slideshow?map=1", { waitUntil: "domcontentloaded",
-    });
+    await page.goto("/slideshow?map=1", { waitUntil: "domcontentloaded" });
 
     await expect(page).toHaveTitle("Slideshow | Snapshots");
 
@@ -139,8 +139,7 @@ test.describe("Slideshow URL Parameters Tests", () => {
   });
 
   test("cover parameter works with ?cover=1", async ({ page }) => {
-    await page.goto("/slideshow?cover=1", { waitUntil: "domcontentloaded",
-    });
+    await page.goto("/slideshow?cover=1", { waitUntil: "domcontentloaded" });
 
     await expect(page).toHaveTitle("Slideshow | Snapshots");
 
@@ -153,8 +152,7 @@ test.describe("Slideshow URL Parameters Tests", () => {
   });
 
   test("align parameter works with ?align=left", async ({ page }) => {
-    await page.goto("/slideshow?align=left", { waitUntil: "domcontentloaded",
-    });
+    await page.goto("/slideshow?align=left", { waitUntil: "domcontentloaded" });
 
     await expect(page).toHaveTitle("Slideshow | Snapshots");
 
@@ -168,7 +166,8 @@ test.describe("Slideshow URL Parameters Tests", () => {
   });
 
   test("align parameter works with ?align=right", async ({ page }) => {
-    await page.goto("/slideshow?align=right", { waitUntil: "domcontentloaded",
+    await page.goto("/slideshow?align=right", {
+      waitUntil: "domcontentloaded",
     });
 
     await expect(page).toHaveTitle("Slideshow | Snapshots");
@@ -182,7 +181,8 @@ test.describe("Slideshow URL Parameters Tests", () => {
   });
 
   test("align parameter works with ?align=center", async ({ page }) => {
-    await page.goto("/slideshow?align=center", { waitUntil: "domcontentloaded",
+    await page.goto("/slideshow?align=center", {
+      waitUntil: "domcontentloaded",
     });
 
     await expect(page).toHaveTitle("Slideshow | Snapshots");
@@ -196,8 +196,7 @@ test.describe("Slideshow URL Parameters Tests", () => {
   });
 
   test("delay parameter works with seconds (?delay=10)", async ({ page }) => {
-    await page.goto("/slideshow?delay=10", { waitUntil: "domcontentloaded",
-    });
+    await page.goto("/slideshow?delay=10", { waitUntil: "domcontentloaded" });
 
     await expect(page).toHaveTitle("Slideshow | Snapshots");
 
@@ -226,8 +225,7 @@ test.describe("Slideshow URL Parameters Tests", () => {
   test("delay parameter works with ?delay=60 for 60 seconds", async ({
     page,
   }) => {
-    await page.goto("/slideshow?delay=60", { waitUntil: "domcontentloaded",
-    });
+    await page.goto("/slideshow?delay=60", { waitUntil: "domcontentloaded" });
 
     await expect(page).toHaveTitle("Slideshow | Snapshots");
 
@@ -252,8 +250,7 @@ test.describe("Slideshow URL Parameters Tests", () => {
   });
 
   test("shuffle parameter works with ?shuffle=50", async ({ page }) => {
-    await page.goto("/slideshow?shuffle=50", { waitUntil: "domcontentloaded",
-    });
+    await page.goto("/slideshow?shuffle=50", { waitUntil: "domcontentloaded" });
 
     await expect(page).toHaveTitle("Slideshow | Snapshots");
 
@@ -272,8 +269,7 @@ test.describe("Slideshow URL Parameters Tests", () => {
   test("combined parameters work together", async ({ page }) => {
     await page.goto(
       "/slideshow?clock=1&details=1&delay=30&align=left&shuffle=20",
-      { waitUntil: "domcontentloaded",
-      },
+      { waitUntil: "domcontentloaded" },
     );
 
     await expect(page).toHaveTitle("Slideshow | Snapshots");
@@ -304,7 +300,8 @@ test.describe("Slideshow URL Parameters Tests", () => {
   test("filter parameter still works with ?filter=test-simple", async ({
     page,
   }) => {
-    await page.goto("/slideshow?filter=test-simple&clock=1", { waitUntil: "domcontentloaded",
+    await page.goto("/slideshow?filter=test-simple&clock=1", {
+      waitUntil: "domcontentloaded",
     });
 
     await expect(page).toHaveTitle("Slideshow | Snapshots");
@@ -322,7 +319,8 @@ test.describe("Slideshow URL Parameters Tests", () => {
 
   test("invalid align values are ignored gracefully", async ({ page }) => {
     // Invalid align value should not crash, just be ignored
-    await page.goto("/slideshow?align=invalid", { waitUntil: "domcontentloaded",
+    await page.goto("/slideshow?align=invalid", {
+      waitUntil: "domcontentloaded",
     });
 
     await expect(page).toHaveTitle("Slideshow | Snapshots");
@@ -337,8 +335,7 @@ test.describe("Slideshow URL Parameters Tests", () => {
   });
 
   test("zero or negative delay values are ignored", async ({ page }) => {
-    await page.goto("/slideshow?delay=0", { waitUntil: "domcontentloaded",
-    });
+    await page.goto("/slideshow?delay=0", { waitUntil: "domcontentloaded" });
 
     await expect(page).toHaveTitle("Slideshow | Snapshots");
 
@@ -356,8 +353,7 @@ test.describe("Slideshow URL Parameters Tests", () => {
     page,
   }) => {
     // Test with "yes" format
-    await page.goto("/slideshow?clock=yes", { waitUntil: "domcontentloaded",
-    });
+    await page.goto("/slideshow?clock=yes", { waitUntil: "domcontentloaded" });
 
     await expect(page).toHaveTitle("Slideshow | Snapshots");
 
@@ -369,8 +365,7 @@ test.describe("Slideshow URL Parameters Tests", () => {
     console.log("✓ Clock parameter ?clock=yes works");
 
     // Test with "on" format
-    await page.goto("/slideshow?details=on", { waitUntil: "domcontentloaded",
-    });
+    await page.goto("/slideshow?details=on", { waitUntil: "domcontentloaded" });
 
     await expect(page).toHaveTitle("Slideshow | Snapshots");
 
