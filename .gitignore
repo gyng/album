@@ -8,3 +8,7 @@ Thumbs.db
 .env*.local
 .codex
 index/.last-index-stats.json
+
+# generated on every dev/build run via prepare:build-manifest
+src/lib/buildVersion.ts
+src/public/version.json

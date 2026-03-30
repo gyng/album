@@ -126,7 +126,7 @@ export const SimilarTrailBar: React.FC<Props> = ({
           ) : null}
         </div>
         <div className={styles.modeHeaderActions}>
-          <Link href="/stats#visual-sameness" className={styles.similarityStatsLink}>
+          <Link href="/explore#visual-sameness" className={styles.similarityStatsLink}>
             <span>Visual sameness</span>
             <span aria-hidden="true">↗</span>
           </Link>

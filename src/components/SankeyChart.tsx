@@ -126,6 +126,7 @@ const chartTheme = {
 };
 
 const FALLBACK_SPACING = 12;
+const NODE_THICKNESS = 18;
 const SANKEY_PALETTE = [
   "#e62065",
   "#ef4c8a",
@@ -269,11 +270,21 @@ export const SankeyChart: React.FC<Props> = ({
 
   const chartData = withFlowColors(flow);
 
+  const nodesByDepth = new Map<number, number>();
+  for (const node of flow.nodes) {
+    nodesByDepth.set(node.depth, (nodesByDepth.get(node.depth) ?? 0) + 1);
+  }
+  let maxNodesPerColumn = 0;
+  for (const count of nodesByDepth.values()) {
+    if (count > maxNodesPerColumn) maxNodesPerColumn = count;
+  }
+  const safeHeight = Math.max(minHeight, maxNodesPerColumn * NODE_THICKNESS);
+
   return (
     <div className={styles.wrapper}>
       <div
         className={styles.chartShell}
-        style={{ ["--sankey-height" as string]: `${minHeight}px` }}
+        style={{ ["--sankey-height" as string]: `${safeHeight}px` }}
       >
         <ResponsiveSankey<SankeyChartNode, SankeyChartLink>
           data={chartData}
@@ -291,7 +302,7 @@ export const SankeyChart: React.FC<Props> = ({
             SANKEY_PALETTE[0]
           }
           nodeOpacity={0.9}
-          nodeThickness={18}
+          nodeThickness={NODE_THICKNESS}
           nodeSpacing={0}
           nodeBorderWidth={0}
           linkOpacity={0.28}

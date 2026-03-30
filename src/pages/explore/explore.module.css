@@ -60,8 +60,13 @@
 }
 
 .jumpNav {
+  position: sticky;
+  top: 0;
+  z-index: 10;
   display: grid;
   gap: var(--m-s);
+  padding: var(--m-s) 0;
+  background: var(--c-bg);
 }
 
 .jumpNavLabel {

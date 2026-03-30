@@ -24,7 +24,7 @@ import {
   StringFacetStat,
 } from "../../util/computeStats";
 import { measureBuild } from "../../services/buildTiming";
-import styles from "./stats.module.css";
+import styles from "./explore.module.css";
 import {
   buildSearchHref,
   buildSearchFacetHref,
@@ -686,12 +686,23 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
       <Seo
         title="Explore | Snapshots"
         description="Explore the archive through time, place, gear, colour, and visual similarity."
-        pathname="/stats"
+        pathname="/explore"
         jsonLd={[]}
       />
 
       <main className={styles.main}>
-        <GlobalNav currentPage="stats" hasPadding={false} />
+        <GlobalNav currentPage="explore" hasPadding={false} />
+
+        <nav className={styles.jumpNav} aria-label="Jump to section">
+          <span className={styles.jumpNavLabel}>Jump to</span>
+          <div className={styles.jumpNavLinks}>
+            {sectionLinks.map((link) => (
+              <a key={link.href} href={link.href} className={styles.jumpNavLink}>
+                {link.label}
+              </a>
+            ))}
+          </div>
+        </nav>
 
         <header className={styles.header}>
           <div className={styles.headerBody}>
@@ -707,17 +718,6 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
             </div>
           ))}
         </section>
-
-        <nav className={styles.jumpNav} aria-label="Jump to section">
-          <span className={styles.jumpNavLabel}>Jump to</span>
-          <div className={styles.jumpNavLinks}>
-            {sectionLinks.map((link) => (
-              <a key={link.href} href={link.href} className={styles.jumpNavLink}>
-                {link.label}
-              </a>
-            ))}
-          </div>
-        </nav>
 
         <div className={styles.groups}>
           {visualSameness ? (
@@ -1590,7 +1590,7 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
 };
 
 export const getStaticProps: GetStaticProps<PageProps> = async () => {
-  return measureBuild("page./stats.getStaticProps", async () => {
+  return measureBuild("page./explore.getStaticProps", async () => {
     const albums = await getAlbums();
     const stats = computePhotoStats(albums);
     const visualSameness = await computeVisualSamenessStats(albums);
