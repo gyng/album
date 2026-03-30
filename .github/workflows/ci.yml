@@ -20,6 +20,7 @@ jobs:
         with:
           node-version: "20"
       - run: npm ci
+      - run: npm run prepare:build-manifest
       - run: npm run test:ci
   playwright:
     timeout-minutes: 60
@@ -36,6 +37,8 @@ jobs:
         run: npm ci
       - name: Install Playwright Browsers
         run: npx playwright install --with-deps
+      - name: Build
+        run: npm run build
       - name: Run Playwright tests
         run: npx playwright test
       - uses: actions/upload-artifact@v4
