@@ -1,4 +1,5 @@
 import { BucketedStat } from "../util/computeStats";
+import { ChartTooltip } from "./ChartTooltip";
 import styles from "./MiniHistogram.module.css";
 
 type Props = {
@@ -22,9 +23,9 @@ export const MiniHistogram: React.FC<Props> = ({ title, data }) => {
               className={styles.column}
               aria-label={`${bucket.label} · ${bucket.count.toLocaleString()} photos`}
             >
-              <div className={styles.tooltip} aria-hidden="true">
+              <ChartTooltip>
                 {bucket.label} · {bucket.count.toLocaleString()}
-              </div>
+              </ChartTooltip>
               <div className={styles.track}>
                 <div className={styles.count}>{bucket.label}</div>
                 <div

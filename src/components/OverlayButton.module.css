@@ -1,0 +1,35 @@
+.base {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  appearance: none;
+  border: solid 1px var(--c-border-on-dark);
+  border-radius: 999px;
+  background-color: var(--c-overlay-dark);
+  color: white;
+  cursor: pointer;
+  font-size: 11px;
+  line-height: 1;
+  padding: 6px 8px;
+  text-decoration: none;
+  min-width: 44px;
+  min-height: 44px;
+}
+
+.base:hover {
+  background-color: rgba(0, 0, 0, 0.84);
+}
+
+.base:focus-visible {
+  outline: solid 2px var(--c-bg-contrast-light);
+}
+
+.small {
+  width: 18px;
+  height: 18px;
+  min-width: 18px;
+  min-height: 18px;
+  padding: 0;
+  border: 0;
+  font-size: 14px;
+}

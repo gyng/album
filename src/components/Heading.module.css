@@ -1,0 +1,27 @@
+.heading {
+  margin: 0;
+}
+
+.level1 {
+  font-size: var(--fs-l);
+}
+
+.level2 {
+  font-size: var(--fs-m);
+}
+
+.level3 {
+  font-size: var(--fs-sm);
+}
+
+@media (max-width: 720px) {
+  .level1 {
+    font-size: var(--fs-m);
+  }
+}
+
+.caption {
+  color: var(--c-bg-contrast-light);
+  font-size: var(--fs-s);
+  margin: 0;
+}

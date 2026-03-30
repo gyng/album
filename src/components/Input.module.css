@@ -1,0 +1,23 @@
+.input {
+  width: 100%;
+  padding: var(--m-m);
+  color: var(--c-font);
+  background-color: var(--c-bg);
+  border: solid 2px var(--c-bg-contrast-light);
+  border-radius: var(--m-s);
+  font-size: var(--fs-sm);
+  transition: 0.08s ease-out opacity;
+}
+
+.input:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.input::placeholder {
+  user-select: none;
+}
+
+.input:focus-visible {
+  outline: solid 2px var(--c-bg-contrast-light);
+}

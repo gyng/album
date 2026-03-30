@@ -1,4 +1,5 @@
 import { BucketedStat } from "../util/computeStats";
+import { ChartTooltip } from "./ChartTooltip";
 import styles from "./TimeOfDayChart.module.css";
 
 type Props = {
@@ -93,9 +94,9 @@ export const TimeOfDayChart: React.FC<Props> = ({
                 onDeactivate?.();
               }}
             >
-              <div className={styles.tooltip} aria-hidden="true">
+              <ChartTooltip>
                 {bucket.label} · {bucket.count.toLocaleString()}
-              </div>
+              </ChartTooltip>
               <div className={styles.track}>
                 <div className={styles.count}>{bucket.label}</div>
                 <div

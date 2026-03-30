@@ -3,6 +3,7 @@ import Link from "next/link";
 import {
   BucketedStatGroup,
 } from "../util/computeStats";
+import { ChartTooltip } from "./ChartTooltip";
 import styles from "./YearSplitHistogram.module.css";
 
 type Props = {
@@ -59,9 +60,9 @@ export const YearSplitHistogram: React.FC<Props> = ({ title, data, getHref }) =>
 
               const cell = (
                 <>
-                  <div className={styles.tooltip} aria-hidden="true">
+                  <ChartTooltip>
                     {group.label} {bucket.label} · {bucket.count.toLocaleString()}
-                  </div>
+                  </ChartTooltip>
                   {bucket.count > 0 ? (
                     <span className={styles.count}>{bucket.count.toLocaleString()}</span>
                   ) : null}

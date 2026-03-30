@@ -1,0 +1,34 @@
+.base {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--m);
+  padding: var(--m) var(--m-m);
+  border: 1px solid var(--c-bg-contrast-dark);
+  border-radius: 999px;
+  color: var(--c-bg-contrast-light);
+  text-decoration: none;
+  font-size: var(--fs-s);
+  cursor: pointer;
+}
+
+.base:hover {
+  color: var(--c-font);
+  border-color: var(--c-bg-contrast-light);
+}
+
+.base:focus-visible {
+  outline: solid 2px var(--c-bg-contrast-light);
+  outline-offset: 2px;
+}
+
+.surface {
+  background: color-mix(in srgb, var(--c-bg) 97%, var(--c-bg-contrast-dark));
+}
+
+.ghost {
+  background: transparent;
+}
+
+.ghost:hover {
+  background: color-mix(in srgb, var(--c-bg) 97%, var(--c-bg-contrast-dark));
+}

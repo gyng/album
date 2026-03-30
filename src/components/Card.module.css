@@ -1,0 +1,8 @@
+.card {
+  display: grid;
+  gap: var(--m);
+  padding: var(--m-m);
+  border: 1px solid var(--c-bg-contrast-dark);
+  border-radius: var(--m-s);
+  background: color-mix(in srgb, var(--c-bg) 97%, var(--c-bg-contrast-dark));
+}

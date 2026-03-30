@@ -1,0 +1,17 @@
+.footer {
+  display: flex;
+  justify-content: center;
+  gap: var(--m-m);
+  padding: var(--m-xl) var(--m-l);
+  font-size: var(--fs-s);
+  color: var(--c-bg-contrast-light);
+}
+
+.link {
+  color: inherit;
+  text-decoration: none;
+}
+
+.link:hover {
+  color: var(--c-font);
+}

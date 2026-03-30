@@ -1,0 +1,198 @@
+.page {
+  min-height: 100vh;
+}
+
+.main {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: var(--m-xl);
+  display: grid;
+  gap: var(--m-2xl);
+}
+
+.intro {
+  margin: 0;
+  color: var(--c-bg-contrast-light);
+  font-size: var(--fs-sm);
+  max-width: 42rem;
+  line-height: 1.55;
+}
+
+.section {
+  display: grid;
+  gap: var(--m-l);
+}
+
+.sectionHeader {
+  display: grid;
+  gap: var(--m-s);
+  padding-bottom: var(--m-s);
+  border-bottom: 1px solid var(--c-bg-contrast-dark);
+}
+
+.sectionTitle {
+  margin: 0;
+  font-size: var(--fs-l);
+}
+
+.sectionDescription {
+  margin: 0;
+  color: var(--c-bg-contrast-light);
+  font-size: var(--fs-s);
+  line-height: 1.5;
+}
+
+.subsection {
+  display: grid;
+  gap: var(--m-s);
+}
+
+.subsectionLabel {
+  margin: 0;
+  font-size: var(--fs-s);
+  color: var(--c-bg-contrast-light);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--m-m);
+}
+
+.rowStart {
+  align-items: flex-start;
+}
+
+/* Token swatches */
+
+.spacingScale {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--m-s);
+}
+
+.spacingSwatch {
+  display: grid;
+  gap: var(--m);
+  justify-items: center;
+}
+
+.spacingBox {
+  background: color-mix(in srgb, var(--c-accent) 24%, var(--c-bg));
+  border: 1px solid color-mix(in srgb, var(--c-accent) 45%, transparent);
+  border-radius: 2px;
+}
+
+.spacingLabel {
+  font-size: var(--fs-xs);
+  color: var(--c-bg-contrast-light);
+  font-family: monospace;
+  white-space: nowrap;
+}
+
+.fontScale {
+  display: grid;
+  gap: var(--m-m);
+}
+
+.fontSample {
+  display: flex;
+  align-items: baseline;
+  gap: var(--m-m);
+}
+
+.fontLabel {
+  font-size: var(--fs-xs);
+  color: var(--c-bg-contrast-light);
+  font-family: monospace;
+  min-width: 7rem;
+  flex-shrink: 0;
+}
+
+.colourGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: var(--m-s);
+}
+
+.colourSwatch {
+  display: grid;
+  gap: var(--m);
+}
+
+.colourBox {
+  height: 48px;
+  border-radius: var(--m);
+  border: 1px solid color-mix(in srgb, var(--c-bg-contrast-light) 25%, transparent);
+}
+
+.colourLabel {
+  font-size: var(--fs-xs);
+  color: var(--c-bg-contrast-light);
+  font-family: monospace;
+}
+
+/* Component preview areas */
+
+.darkPreview {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--m-m);
+  padding: var(--m-l);
+  border-radius: var(--m-s);
+  background: var(--c-bg-contrast-dark);
+  position: relative;
+}
+
+.tooltipDemo {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  gap: 1px;
+  height: 80px;
+  padding-top: var(--m-xl);
+}
+
+.tooltipBar {
+  width: 32px;
+  background: var(--c-accent);
+  border-radius: 2px 2px 0 0;
+  position: relative;
+}
+
+.tooltipBar [data-tooltip] {
+  opacity: 1;
+}
+
+.cardGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--m-s);
+}
+
+.inputGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: var(--m-m);
+  align-items: start;
+}
+
+.inputField {
+  display: grid;
+  gap: var(--m);
+}
+
+@media (max-width: 720px) {
+  .main {
+    padding: var(--m-l);
+  }
+
+  .fontSample {
+    flex-direction: column;
+    gap: var(--m);
+  }
+}

@@ -1,0 +1,27 @@
+.toggle {
+  display: inline-flex;
+  padding: 2px;
+  border: 1px solid var(--c-bg-contrast-dark);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--c-bg) 98%, var(--c-bg-contrast-dark));
+}
+
+.button {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--c-bg-contrast-light);
+  font-size: var(--fs-s);
+  padding: 0.35rem 0.65rem;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.buttonActive {
+  background: var(--c-font);
+  color: var(--c-bg);
+}
+
+.button:focus-visible {
+  outline: solid 2px var(--c-bg-contrast-light);
+}

@@ -127,3 +127,23 @@
   object-fit: cover;
   background-color: var(--c-bg-contrast-dark);
 }
+
+.stack {
+  display: grid;
+  gap: var(--m-s);
+}
+
+.stackL {
+  display: grid;
+  gap: var(--m-l);
+}
+
+.stackXl {
+  display: grid;
+  gap: var(--m-xl);
+}
+
+.stackPage {
+  display: grid;
+  gap: var(--m-2xl);
+}
