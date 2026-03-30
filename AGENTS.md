@@ -26,7 +26,36 @@ All pages use `getStaticProps` — data is computed at build time, no runtime AP
 - Omit optional attributes/props rather than setting them to `undefined`
 
 ## Testing
-- Run tests after every refactor before committing
+
+**Jest** — unit/integration tests, run from `src/`:
+```
+npx jest                                        # all tests
+npx jest --testPathPatterns="MapWorld"          # subset by name
+```
+- Config: `src/jest.config.mjs`; test environment is `node`
+- Playwright tests in `src/tests/` are excluded from Jest automatically
+
+**Playwright** — e2e tests, run from `src/`:
+```
+npm run test:e2e                                # build + start server + run all tests (Chromium only locally)
+npm run test:e2e -- ./tests/smoke.spec.ts --project=chromium   # single file
+npm run test:e2e:reuse -- ./tests/smoke.spec.ts                # reuse already-running dev server
+```
+- Config: `src/playwright.config.ts`; tests live in `src/tests/*.spec.ts`
+- Locally: Chromium only, slow tests (`@slow`) skipped, reuses existing server if running
+- CI: all browsers (Chromium, Firefox, WebKit), slow tests included, fresh server always
+- Use `test:e2e:reuse` only when a server is already running — do not use it to skip the build
+
+**Python (indexer)** — unittest, run from `index/`:
+```
+./do-test-index.sh          # runs index.test.py via uv
+./create-test-db.sh         # builds fixture SQLite DBs needed by some tests
+```
+- Tests live in `index/index.test.py`; uses `unittest` + Click's `CliRunner`
+- `create-test-db.sh` must be run first if fixture DBs (`testexists.sqlite`, `test-simple.sqlite`) are missing
+
+**General:**
+- Run Jest after every refactor before committing
 - Red-green TDD — write the failing test first
 - Prefer unit > integration > e2e
 - No perf changes without profiling evidence first
