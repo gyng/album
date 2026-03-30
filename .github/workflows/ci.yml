@@ -19,6 +19,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
+          cache: "npm"
+          cache-dependency-path: src/package-lock.json
       - run: npm ci
       - run: npm run prepare:build-manifest
       - run: npm run test:ci
@@ -33,10 +35,29 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: lts/*
+          cache: "npm"
+          cache-dependency-path: src/package-lock.json
       - name: Install dependencies
         run: npm ci
+      - name: Cache Playwright browsers
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('src/package-lock.json') }}
       - name: Install Playwright Browsers
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
         run: npx playwright install --with-deps
+      - name: Install Playwright system deps
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
+        run: npx playwright install-deps
+      - name: Cache Next.js build
+        uses: actions/cache@v4
+        with:
+          path: src/.next/cache
+          key: nextjs-${{ runner.os }}-${{ hashFiles('src/package-lock.json') }}-${{ hashFiles('src/**/*.ts', 'src/**/*.tsx', 'src/**/*.css', 'src/**/*.js') }}
+          restore-keys: |
+            nextjs-${{ runner.os }}-${{ hashFiles('src/package-lock.json') }}-
       - name: Build
         run: npm run build
       - name: Run Playwright tests
