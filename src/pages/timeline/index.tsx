@@ -4,7 +4,7 @@ import { useRouter } from "next/router";
 import React from "react";
 import { CalendarHeatmap } from "../../components/CalendarHeatmap";
 import { GlobalNav } from "../../components/GlobalNav";
-import { Footer, Heading } from "../../components/ui";
+import { Caption, Footer, Heading } from "../../components/ui";
 import { TimelineDayGrid } from "../../components/TimelineDayGrid";
 import { TimelineEntry } from "../../components/timelineTypes";
 import { getAlbums } from "../../services/album";
@@ -490,7 +490,7 @@ const TimelinePage: NextPage<PageProps> = ({ entries }) => {
                   <section className={styles.memories} aria-label="Memories">
                     <div className={styles.memoriesHeader}>
                       <Heading level={2} as="h2">Memories</Heading>
-                      <p className={styles.memoriesCaption}>Around this time</p>
+                      <Caption>Around this time</Caption>
                     </div>
 
                     <div className={styles.memoryClusters}>

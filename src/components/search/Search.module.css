@@ -56,7 +56,7 @@
 }
 
 .activeFacetLabel {
-  font-size: 12px;
+  font-size: var(--fs-s);
   font-weight: 400;
   letter-spacing: 0.02em;
   color: var(--c-bg-contrast-light);
@@ -169,7 +169,7 @@
 
 .facetSectionTitle {
   margin: 0;
-  font-size: 11px;
+  font-size: var(--fs-s);
   font-weight: 400;
   letter-spacing: 0.02em;
   color: var(--c-bg-contrast-light);
@@ -762,7 +762,7 @@
   background: var(--c-overlay-dark);
   color: white;
   cursor: pointer;
-  font-size: 14px;
+  font-size: var(--fs-sm);
   line-height: 1;
   opacity: 0;
   pointer-events: none;
@@ -800,7 +800,7 @@
   height: 26px;
   border-radius: 999px;
   background: var(--c-overlay-dark);
-  font-size: 14px;
+  font-size: var(--fs-sm);
   line-height: 1;
   text-decoration: none;
   opacity: 0;
@@ -855,7 +855,7 @@
 
 .modeArrow {
   color: var(--c-bg-contrast-light);
-  font-size: 24px;
+  font-size: var(--fs-l);
   line-height: 1;
 }
 

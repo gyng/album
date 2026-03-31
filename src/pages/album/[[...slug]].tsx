@@ -6,6 +6,7 @@ import { getAlbumFromName, getAlbumNames } from "../../services/album";
 import { Content, PhotoBlock } from "../../services/types";
 import { Nav } from "../../components/Nav";
 import { PhotoAlbum } from "../../components/PhotoAlbum";
+import { Footer } from "../../components/ui";
 import { measureBuild } from "../../services/buildTiming";
 import { Seo } from "../../components/Seo";
 import {
@@ -78,6 +79,7 @@ const Album: NextPage<PageProps> = ({ album }) => {
 
       <Nav albumName={statefulAlbum._build.slug} />
       <PhotoAlbum album={statefulAlbum} />
+      <Footer />
     </>
   );
 };

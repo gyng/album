@@ -25,7 +25,7 @@
 
 .daypart {
   padding: 0.35rem 0.5rem;
-  font-size: 11px;
+  font-size: var(--fs-s);
   color: var(--c-bg-contrast-light);
   background: color-mix(in srgb, var(--c-bg) 94%, var(--c-bg-contrast-dark));
   border: 1px solid color-mix(in srgb, var(--c-bg-contrast-dark) 88%, transparent);

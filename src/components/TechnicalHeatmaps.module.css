@@ -95,7 +95,7 @@
 
 .columnLabel {
   color: var(--c-bg-contrast-light);
-  font-size: 11px;
+  font-size: var(--fs-s);
   text-align: center;
   padding-bottom: 0.35rem;
   min-height: 1lh;
@@ -116,7 +116,7 @@
 
 .rowLabel {
   color: var(--c-bg-contrast-light);
-  font-size: 11px;
+  font-size: var(--fs-s);
   display: flex;
   align-items: center;
   padding-right: var(--m-s);
@@ -174,7 +174,7 @@
 }
 
 .cellCount {
-  font-size: 11px;
+  font-size: var(--fs-s);
   line-height: 1.1;
 }
 

@@ -8,7 +8,7 @@
   background-color: var(--c-overlay-dark);
   color: white;
   cursor: pointer;
-  font-size: 11px;
+  font-size: var(--fs-s);
   line-height: 1;
   padding: 6px 8px;
   text-decoration: none;
@@ -31,5 +31,5 @@
   min-height: 18px;
   padding: 0;
   border: 0;
-  font-size: 14px;
+  font-size: var(--fs-sm);
 }

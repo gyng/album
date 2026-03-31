@@ -75,11 +75,7 @@
   gap: var(--m-s);
 }
 
-.memoriesCaption {
-  margin: 0;
-  color: var(--c-bg-contrast-light);
-  font-size: var(--fs-s);
-}
+
 
 .memoryClusters {
   display: grid;
@@ -113,7 +109,7 @@
   display: inline-flex;
   align-items: center;
   color: var(--c-bg-contrast-light);
-  font-size: 11px;
+  font-size: var(--fs-s);
   line-height: 1.2;
 }
 
