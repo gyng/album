@@ -1,4 +1,4 @@
-import common from "../styles/common.module.css";
+import common from "../../styles/common.module.css";
 
 export const Thumb = (
   props: {

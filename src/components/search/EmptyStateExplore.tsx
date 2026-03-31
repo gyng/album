@@ -3,7 +3,7 @@ import { Database } from "@sqlite.org/sqlite-wasm";
 import Link from "next/link";
 import styles from "./Search.module.css";
 import commonStyles from "../../styles/common.module.css";
-import { Thumb } from "../Thumb";
+import { Thumb } from "../ui";
 import { fetchMemoryCandidates, fetchRecentResults, fetchRandomResults } from "./api";
 import { SearchResultRow } from "./searchTypes";
 import { SearchResultTile } from "./SearchResultTile";

@@ -2,17 +2,12 @@ import { useState } from "react";
 import type { GetStaticProps, NextPage } from "next";
 import { GlobalNav } from "../../components/GlobalNav";
 import { Seo } from "../../components/Seo";
-import { Footer } from "../../components/Footer";
 import { ThemeToggle } from "../../components/ThemeToggle";
-import { Heading, Caption } from "../../components/Heading";
-import { Card } from "../../components/Card";
-import { Thumb } from "../../components/Thumb";
-import { ChartTooltip } from "../../components/ChartTooltip";
-import { SegmentedToggle } from "../../components/SegmentedToggle";
-import { Pill, PillButton } from "../../components/Pill";
-import { OverlayButton, OverlayButtonLink } from "../../components/OverlayButton";
-import { Input } from "../../components/Input";
-import { Select } from "../../components/Select";
+import {
+  Card, ChartTooltip, Footer, Heading, Caption, Input,
+  OverlayButton, OverlayButtonLink, Pill, PillButton,
+  SegmentedToggle, Select, Thumb,
+} from "../../components/ui";
 import commonStyles from "../../styles/common.module.css";
 import styles from "./design.module.css";
 

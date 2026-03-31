@@ -5,7 +5,7 @@ import React, {
   useState,
 } from "react";
 import Link from "next/link";
-import { SegmentedToggle } from "../SegmentedToggle";
+import { SegmentedToggle } from "../ui";
 import styles from "./Search.module.css";
 import { getResizedAlbumImageSrc } from "../../util/getResizedAlbumImageSrc";
 import { SimilarityOrder } from "./searchUtils";

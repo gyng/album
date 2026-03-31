@@ -1,5 +1,5 @@
 import { BucketedStat } from "../util/computeStats";
-import { ChartTooltip } from "./ChartTooltip";
+import { ChartTooltip } from "./ui";
 import styles from "./MiniHistogram.module.css";
 
 type Props = {

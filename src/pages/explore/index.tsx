@@ -24,10 +24,7 @@ import {
   StringFacetStat,
 } from "../../util/computeStats";
 import { measureBuild } from "../../services/buildTiming";
-import { Thumb } from "../../components/Thumb";
-import { Footer } from "../../components/Footer";
-import { SegmentedToggle } from "../../components/SegmentedToggle";
-import { Card } from "../../components/Card";
+import { Thumb, Footer, SegmentedToggle, Card } from "../../components/ui";
 import styles from "./explore.module.css";
 import {
   buildSearchHref,

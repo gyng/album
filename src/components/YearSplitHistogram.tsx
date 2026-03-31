@@ -3,7 +3,7 @@ import Link from "next/link";
 import {
   BucketedStatGroup,
 } from "../util/computeStats";
-import { ChartTooltip } from "./ChartTooltip";
+import { ChartTooltip } from "./ui";
 import styles from "./YearSplitHistogram.module.css";
 
 type Props = {

@@ -4,7 +4,7 @@ import { useRouter } from "next/router";
 import React from "react";
 import { CalendarHeatmap } from "../../components/CalendarHeatmap";
 import { GlobalNav } from "../../components/GlobalNav";
-import { Footer } from "../../components/Footer";
+import { Footer } from "../../components/ui";
 import { TimelineDayGrid } from "../../components/TimelineDayGrid";
 import { TimelineEntry } from "../../components/timelineTypes";
 import { getAlbums } from "../../services/album";

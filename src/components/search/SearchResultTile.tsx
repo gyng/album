@@ -1,6 +1,5 @@
 import Link from "next/link";
-import { Thumb } from "../Thumb";
-import { OverlayButton } from "../OverlayButton";
+import { Thumb, OverlayButton } from "../ui";
 import styles from "./SearchResultTile.module.css";
 import { getRelativeTimeString } from "../../util/time";
 import { extractDateFromExifString } from "../../util/extractExifFromDb";
