@@ -109,7 +109,7 @@
 
 .similarPhotoGrid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(120px, 150px));
+  grid-template-columns: repeat(auto-fill, minmax(120px, 150px));
   gap: var(--m);
 }
 
