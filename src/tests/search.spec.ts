@@ -1,10 +1,10 @@
 import { test, expect } from "@playwright/test";
-import { existsSync } from "fs";
+import { existsSync, statSync } from "fs";
 import { join } from "path";
 
-const hasSearchDb = existsSync(
-  join(__dirname, "..", "public", "search.sqlite"),
-);
+const searchDbPath = join(__dirname, "..", "public", "search.sqlite");
+const hasSearchDb =
+  existsSync(searchDbPath) && statSync(searchDbPath).size > 0;
 
 test.describe("Search", () => {
   let pageErrors: string[] = [];

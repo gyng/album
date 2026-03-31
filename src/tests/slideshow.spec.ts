@@ -1,4 +1,10 @@
 import { test, expect, type Page } from "@playwright/test";
+import { existsSync, statSync } from "fs";
+import { join } from "path";
+
+const searchDbPath = join(__dirname, "..", "public", "search.sqlite");
+const hasSearchDb =
+  existsSync(searchDbPath) && statSync(searchDbPath).size > 0;
 
 /** Slideshow image — the only non-hidden img on the page. */
 const slideshowImg = 'img[alt]:not([aria-hidden="true"])';
@@ -28,6 +34,8 @@ const waitForSlideshow = async (page: Page) => {
 test.describe.configure({ mode: "serial" });
 
 test.describe("Slideshow", () => {
+  test.skip(!hasSearchDb, "Requires search.sqlite with data");
+
   test("displays image and navigation controls", async ({ page }) => {
     await page.goto("/slideshow", { waitUntil: "domcontentloaded" });
     await waitForSlideshow(page);
@@ -200,6 +208,8 @@ test.describe("Slideshow", () => {
 });
 
 test.describe("Slideshow URL parameters", () => {
+  test.skip(!hasSearchDb, "Requires search.sqlite with data");
+
   test("URL parameters set correct initial state", async ({ page }) => {
     await page.goto(
       "/slideshow?clock=1&details=1&map=1&cover=1&mode=weighted&delay=60&align=left&filter=test-simple",

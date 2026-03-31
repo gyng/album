@@ -1,3 +1,4 @@
+import fs from "fs";
 import path from "path";
 import {
   getNextJsSafeExif,
@@ -47,6 +48,10 @@ const getSearchDb = (dbPath: string) => {
   if (searchDb) {
     incrementBuildCounter("deserialize.searchIndexLookup.dbCacheHits");
     return searchDb;
+  }
+
+  if (!fs.existsSync(dbPath)) {
+    return null;
   }
 
   incrementBuildCounter("deserialize.searchIndexLookup.dbCacheMisses");
@@ -117,6 +122,10 @@ const getPhotoDetailsFromSearchIndex = async (
     incrementBuildCounter("deserialize.searchIndexLookup.calls");
     const promise = new Promise<any[]>((resolve, reject) => {
       const db = getSearchDb(dbPath);
+      if (!db) {
+        resolve([]);
+        return;
+      }
       const sql = "SELECT * FROM images WHERE path = ? LIMIT 1;";
       // In index
       // ../src/public/data/albums/kanto/DSCF3871_2.jpg
