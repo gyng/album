@@ -466,10 +466,6 @@
   display: block;
 }
 
-.memoryThumbImage {
-  display: block;
-}
-
 .memoryLoadMoreButton {
   margin-top: var(--m-l);
 }

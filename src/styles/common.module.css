@@ -115,6 +115,7 @@
 }
 
 .thumb {
+  display: block;
   width: 150px;
   height: 150px;
   object-fit: cover;
@@ -122,6 +123,7 @@
 }
 
 .thumbSmall {
+  display: block;
   width: 112px;
   height: 112px;
   object-fit: cover;

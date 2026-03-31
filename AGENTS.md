@@ -15,7 +15,7 @@ Personal photo gallery — Next.js 14, TypeScript, CSS Modules, MapLibre GL. Pho
 
 ## Structure
 - `src/components/` — React components with co-located `.module.css`; complex components have `.test.tsx`, not all
-- `src/pages/` — Next.js pages (`/map`, `/search`, `/explore`, `/timeline`, `/slideshow`)
+- `src/pages/` — Next.js pages (`/map`, `/search`, `/explore`, `/timeline`, `/slideshow`, `/design`)
 - `src/util/` — pure utility functions (no React)
 - `src/services/` — build-time data: album/photo loading, serialisation, EXIF extraction (Node only, never imported client-side)
 - `../albums/` — album source directories (sibling to `src/`); each album is a folder of images with an optional `album.json` (v2 manifest)
@@ -71,9 +71,22 @@ npm run test:e2e:reuse -- ./tests/smoke.spec.ts                # reuse already-r
 
 ## Design tokens (src/styles/globals.css)
 Always use tokens — never raw px values or colours.
-- Spacing: `--m` 4 / `--m-s` 8 / `--m-m` 12 / `--m-l` 20 / `--m-xl` 40 (px)
-- Font sizes: `--fs-s` 11 / `--fs-sm` 14 / `--fs-m` 18 / `--fs-l` 24 / `--fs-xl` 64 (px)
-- Colours: `--c-bg`, `--c-font`, `--c-bg-contrast-light`, `--c-bg-contrast-dark`, `--c-accent`
+- Spacing: `--m` 4 / `--m-s` 8 / `--m-m` 12 / `--m-l` 20 / `--m-xl` 40 / `--m-2xl` 64 (px)
+- Font sizes: `--fs-xs` 10 / `--fs-s` 11 / `--fs-sm` 14 / `--fs-m` 18 / `--fs-l` 24 / `--fs-xl` 64 (px)
+- Colours: `--c-bg`, `--c-font`, `--c-bg-contrast-light`, `--c-bg-contrast-dark`, `--c-accent`, `--c-overlay-dark`, `--c-border-on-dark`
+
+## Shared components (src/components/)
+Prefer shared components over ad-hoc CSS for common UI patterns. The `/design` page is the living catalogue.
+- `Thumb` / `Thumb size="small"` — image thumbnail (150px / 112px), sharp corners
+- `Heading level={1|2|3}` + `Caption` — consistent heading hierarchy and muted secondary text
+- `Card` — bordered surface container, theme-adaptive via color-mix
+- `Input` / `Select` — form controls with consistent border, radius, and focus ring
+- `ChartTooltip` — accent-tinted hover tooltip for charts; consumer provides the hover trigger via `[data-tooltip]`
+- `SegmentedToggle` — pill-shaped option switcher (generic over value type)
+- `Pill` / `PillButton` — rounded nav link / action button; `variant="surface"` (default) or `"ghost"`
+- `OverlayButton` / `OverlayButtonLink` — dark glass button for media overlays; `size="small"` for icon-only
+- `Footer` — site footer with /design link
+- Stack utilities in `common.module.css`: `.stack` (8px) / `.stackL` (20px) / `.stackXl` (40px) / `.stackPage` (64px)
 
 ## Search
 - SQLite runs in-browser via sql.js (WASM)

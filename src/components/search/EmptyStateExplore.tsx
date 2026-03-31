@@ -409,7 +409,6 @@ export const EmptyStateExplore: React.FC<Props> = ({
                             aria-label={result.snippet || result.filename}
                           >
                             <Thumb
-                              className={styles.memoryThumbImage}
                               src={getResizedAlbumImageSrc(result.path)}
                               alt={result.snippet || result.filename}
                               style={{
