@@ -512,28 +512,14 @@
   font-size: var(--fs-s);
 }
 
-.searchWidget input {
-  width: 100%;
-  padding: var(--m-m);
+.searchInput {
   padding-right: 40px;
-  color: var(--c-font);
-  background-color: var(--c-bg);
-  border: solid 2px var(--c-bg-contrast-light);
-  border-radius: var(--m-s);
-  transition: 0.08s ease-out opacity;
-  font-size: var(--fs-sm);
 }
 
-.searchWidget input:disabled {
-  opacity: 0.3;
-  cursor: not-allowed;
-}
-
-.searchWidget input::placeholder {
+.searchInput::placeholder {
   user-select: none;
 }
 
-.searchWidget input:focus-visible,
 .link:focus-visible,
 .moreButton:focus-visible {
   outline: solid 2px var(--c-bg-contrast-light);

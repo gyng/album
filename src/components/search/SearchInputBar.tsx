@@ -1,4 +1,5 @@
 import React, { useSyncExternalStore } from "react";
+import { Input } from "../ui";
 import styles from "./Search.module.css";
 import { SearchMode } from "./useTextVector";
 
@@ -48,7 +49,8 @@ export const SearchInputBar: React.FC<Props> = ({
       {isSimilarMode ? null : (
         <>
           <div className={styles.searchInputContainer}>
-            <input
+            <Input
+              className={styles.searchInput}
               suppressHydrationWarning
               type="text"
               value={searchInputValue}
