@@ -722,22 +722,8 @@
 }
 
 .sectionFilter {
-  position: relative;
   display: grid;
   gap: var(--m);
-}
-
-.sectionFilter::after {
-  content: "";
-  position: absolute;
-  right: 0.85rem;
-  top: 50%;
-  width: 0.45rem;
-  height: 0.45rem;
-  border-right: 1.5px solid var(--c-bg-contrast-light);
-  border-bottom: 1.5px solid var(--c-bg-contrast-light);
-  transform: translateY(-60%) rotate(45deg);
-  pointer-events: none;
 }
 
 .sectionFilterLabel {
@@ -745,23 +731,6 @@
   color: var(--c-bg-contrast-light);
   text-transform: uppercase;
   letter-spacing: 0.04em;
-}
-
-.sectionSelect {
-  appearance: none;
-  min-width: 10rem;
-  padding: 0.4rem 2rem 0.4rem 0.65rem;
-  border: 1px solid var(--c-bg-contrast-light);
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--c-bg) 98%, var(--c-bg-contrast-dark));
-  color: var(--c-font);
-  font-size: var(--fs-s);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--c-bg-contrast-dark) 55%, transparent);
-}
-
-.sectionSelect:focus {
-  outline: none;
-  border-color: var(--c-accent);
 }
 
 
@@ -1134,8 +1103,4 @@
     min-width: 0;
   }
 
-  .sectionSelect {
-    min-width: 0;
-    width: 100%;
-  }
 }

@@ -24,7 +24,7 @@ import {
   StringFacetStat,
 } from "../../util/computeStats";
 import { measureBuild } from "../../services/buildTiming";
-import { Thumb, Footer, SegmentedToggle, Card, Heading, Pill, PillButton, pillStyles } from "../../components/ui";
+import { Thumb, Footer, SegmentedToggle, Card, Heading, Pill, PillButton, pillStyles, Select } from "../../components/ui";
 import styles from "./explore.module.css";
 import {
   buildSearchHref,
@@ -344,8 +344,8 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
   const renderScopeFilterControls = () => (
     <div className={styles.sectionFilters}>
       <label className={styles.sectionFilter}>
-        <select
-          className={styles.sectionSelect}
+        <Select
+          variant="compact"
           value={selectedTechnicalCamera}
           onChange={(event) => {
             setSelectedTechnicalCamera(event.target.value);
@@ -357,11 +357,11 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
               {camera}
             </option>
           ))}
-        </select>
+        </Select>
       </label>
       <label className={styles.sectionFilter}>
-        <select
-          className={styles.sectionSelect}
+        <Select
+          variant="compact"
           value={activeTechnicalLens}
           onChange={(event) => {
             setSelectedTechnicalLens(event.target.value);
@@ -373,7 +373,7 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
               {lens}
             </option>
           ))}
-        </select>
+        </Select>
       </label>
     </div>
   );

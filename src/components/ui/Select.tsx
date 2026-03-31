@@ -1,12 +1,17 @@
 import styles from "./Select.module.css";
 
 export const Select = (
-  props: React.SelectHTMLAttributes<HTMLSelectElement>,
+  props: {
+    variant?: "compact";
+  } & React.SelectHTMLAttributes<HTMLSelectElement>,
 ) => {
-  const { className, children, ...rest } = props;
+  const { variant, className, children, ...rest } = props;
+  const variantClass = variant === "compact" ? styles.compact : styles.select;
   return (
     <select
-      className={[styles.select, className].filter(Boolean).join(" ")}
+      className={[styles.base, variantClass, className]
+        .filter(Boolean)
+        .join(" ")}
       {...rest}
     >
       {children}

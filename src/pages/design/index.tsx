@@ -235,11 +235,19 @@ const DesignPage: NextPage<PageProps> = () => {
               <Input placeholder="Disabled" disabled />
             </div>
             <div className={styles.inputField}>
-              <span className={styles.subsectionLabel}>Select</span>
+              <span className={styles.subsectionLabel}>Select (default)</span>
               <Select defaultValue="keyword">
                 <option value="keyword">Keyword</option>
                 <option value="semantic">Semantic</option>
                 <option value="hybrid">Hybrid</option>
+              </Select>
+            </div>
+            <div className={styles.inputField}>
+              <span className={styles.subsectionLabel}>Select (compact)</span>
+              <Select variant="compact" defaultValue="all">
+                <option value="all">All cameras</option>
+                <option value="fuji">Fujifilm</option>
+                <option value="sony">Sony</option>
               </Select>
             </div>
           </div>
@@ -258,7 +266,7 @@ const DesignPage: NextPage<PageProps> = () => {
             </div>
           </div>
           <Code>{'<Input placeholder="..." />'}</Code>
-          <Code>{'<Select>...</Select>'}</Code>
+          <Code>{'<Select variant="compact">...</Select>'}</Code>
           <Code>{'<SegmentedToggle options={[...]} value={v} onChange={set} ariaLabel="..." />'}</Code>
         </section>
 
