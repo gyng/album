@@ -39,13 +39,7 @@
 }
 
 .overviewCard {
-  display: grid;
-  gap: var(--m);
   min-height: 6.25rem;
-  padding: var(--m-m) var(--m-m);
-  border: 1px solid var(--c-bg-contrast-dark);
-  border-radius: var(--m-s);
-  background: color-mix(in srgb, var(--c-bg) 97%, var(--c-bg-contrast-dark));
 }
 
 .overviewLabel {
@@ -246,29 +240,7 @@
   display: none !important;
 }
 
-.viewToggle {
-  display: inline-flex;
-  padding: 2px;
-  border: 1px solid var(--c-bg-contrast-dark);
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--c-bg) 98%, var(--c-bg-contrast-dark));
-}
 
-.viewToggleButton {
-  appearance: none;
-  border: 0;
-  background: transparent;
-  color: var(--c-bg-contrast-light);
-  font-size: var(--fs-s);
-  padding: 0.35rem 0.65rem;
-  border-radius: 999px;
-  cursor: pointer;
-}
-
-.viewToggleButtonActive {
-  background: var(--c-font);
-  color: var(--c-bg);
-}
 
 .sectionWide {
   grid-column: 1 / -1;
@@ -286,14 +258,7 @@
   gap: var(--m-s);
 }
 
-.funStatCard {
-  display: grid;
-  gap: var(--m);
-  padding: var(--m-m) var(--m);
-  border: 1px solid var(--c-bg-contrast-dark);
-  border-radius: var(--m-s);
-  background: color-mix(in srgb, var(--c-bg) 98%, var(--c-bg-contrast-dark));
-}
+
 
 .funStatLabel {
   font-size: var(--fs-s);

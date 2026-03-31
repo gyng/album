@@ -3,6 +3,7 @@ import { MapWorldDeferred } from "./MapWorldDeferred";
 import { MapWorldEntry } from "./MapWorld";
 import { getRelativeTimeString } from "../util/time";
 import { Thumb } from "./Thumb";
+import { overlayButtonStyles } from "./OverlayButton";
 import commonStyles from "../styles/common.module.css";
 import styles from "./TimelineDayGrid.module.css";
 import { TimelineEntry } from "./timelineTypes";
@@ -247,7 +248,7 @@ export const TimelineDayGrid = ({
                   href={`/search?similar=${encodeURIComponent(
                     toSimilarSearchPath(entry.path),
                   )}`}
-                  className={styles.similarButton}
+                  className={`${overlayButtonStyles.base} ${styles.similarButton}`}
                   aria-label="Find similar photos"
                   title="Find similar photos"
                   onClick={(event) => {

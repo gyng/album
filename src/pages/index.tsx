@@ -1,4 +1,5 @@
 import type { GetStaticProps, NextPage } from "next";
+import Link from "next/link";
 import { Albums } from "../components/Albums";
 import styles from "./Index.module.css";
 import { getAlbums, getImageTimestampRange } from "../services/album";
@@ -56,6 +57,8 @@ const Home: NextPage<PageProps> = (context) => {
         >
           Bluesky
         </a>
+        &nbsp;&middot;&nbsp;
+        <Link href="/design">Design</Link>
       </footer>
     </div>
   );

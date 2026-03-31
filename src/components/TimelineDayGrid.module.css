@@ -88,32 +88,12 @@
   bottom: calc(var(--m) + var(--m-s));
   right: var(--m-s);
   z-index: 1;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  appearance: none;
-  border: solid 1px var(--c-border-on-dark);
-  border-radius: 999px;
-  background-color: var(--c-overlay-dark);
-  color: white;
-  cursor: pointer;
-  font-size: 11px;
-  line-height: 1;
-  padding: 6px 8px;
   text-decoration: none;
-}
-
-.similarButton:hover {
-  background-color: rgba(0, 0, 0, 0.84);
 }
 
 .similarButtonIcon {
   display: inline-block;
   filter: grayscale(100%);
-}
-
-.similarButton:focus-visible {
-  outline: solid 2px var(--c-bg-contrast-light);
 }
 
 .emptyState {

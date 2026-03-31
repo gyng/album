@@ -5,6 +5,7 @@ import React, {
   useState,
 } from "react";
 import Link from "next/link";
+import { SegmentedToggle } from "../SegmentedToggle";
 import styles from "./Search.module.css";
 import { getResizedAlbumImageSrc } from "../../util/getResizedAlbumImageSrc";
 import { SimilarityOrder } from "./searchUtils";
@@ -130,34 +131,15 @@ export const SimilarTrailBar: React.FC<Props> = ({
             <span>Visual sameness</span>
             <span aria-hidden="true">↗</span>
           </Link>
-          <div
-            className={styles.similarityOrderToggle}
-            role="tablist"
-            aria-label="Similarity order"
-          >
-            <button
-              type="button"
-              role="tab"
-              aria-selected={similarityOrder === "most"}
-              className={`${styles.similarityOrderButton}${similarityOrder === "most" ? ` ${styles.similarityOrderButtonActive}` : ""}`}
-              onClick={() => {
-                onSetSimilarityOrder("most");
-              }}
-            >
-              Most similar
-            </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={similarityOrder === "least"}
-              className={`${styles.similarityOrderButton}${similarityOrder === "least" ? ` ${styles.similarityOrderButtonActive}` : ""}`}
-              onClick={() => {
-                onSetSimilarityOrder("least");
-              }}
-            >
-              Least similar
-            </button>
-          </div>
+          <SegmentedToggle
+            options={[
+              { value: "most" as const, label: "Most similar" },
+              { value: "least" as const, label: "Least similar" },
+            ]}
+            value={similarityOrder}
+            onChange={onSetSimilarityOrder}
+            ariaLabel="Similarity order"
+          />
         </div>
       </div>
       <div className={styles.modeStack}>

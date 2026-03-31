@@ -688,33 +688,6 @@
   flex-wrap: wrap;
 }
 
-.similarityOrderToggle {
-  display: inline-flex;
-  padding: 2px;
-  border: 1px solid var(--c-bg-contrast-dark);
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--c-bg) 94%, var(--c-bg-contrast-dark));
-}
-
-.similarityOrderButton {
-  appearance: none;
-  border: 0;
-  background: transparent;
-  color: var(--c-bg-contrast-light);
-  font-size: var(--fs-s);
-  padding: 0.35rem 0.65rem;
-  border-radius: 999px;
-  cursor: pointer;
-}
-
-.similarityOrderButtonActive {
-  background: var(--c-font);
-  color: var(--c-bg);
-}
-
-.similarityOrderButton:focus-visible {
-  outline: solid 2px var(--c-bg-contrast-light);
-}
 
 .similarityStatsLink {
   display: inline-flex;

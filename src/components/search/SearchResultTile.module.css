@@ -66,36 +66,13 @@
   gap: 6px;
 }
 
-.actionButton {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  appearance: none;
-  border: solid 1px var(--c-border-on-dark);
-  border-radius: 999px;
-  background-color: var(--c-overlay-dark);
-  color: white;
-  cursor: pointer;
-  font-size: 11px;
-  line-height: 1;
-  padding: 6px 8px;
-}
-
 .actionButtonPersistent {
   box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.12);
-}
-
-.actionButton:hover {
-  background-color: rgba(0, 0, 0, 0.84);
 }
 
 .similarButtonIcon {
   display: inline-block;
   filter: grayscale(100%);
-}
-
-.actionButton:focus-visible {
-  outline: solid 2px var(--c-bg-contrast-light);
 }
 
 .actionColorSwatch {

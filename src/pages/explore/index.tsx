@@ -25,6 +25,9 @@ import {
 } from "../../util/computeStats";
 import { measureBuild } from "../../services/buildTiming";
 import { Thumb } from "../../components/Thumb";
+import { Footer } from "../../components/Footer";
+import { SegmentedToggle } from "../../components/SegmentedToggle";
+import { Card } from "../../components/Card";
 import styles from "./explore.module.css";
 import {
   buildSearchHref,
@@ -713,10 +716,10 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
 
         <section className={styles.overview}>
           {overviewCards.map((card) => (
-            <div key={card.label} className={styles.overviewCard}>
+            <Card key={card.label} className={styles.overviewCard}>
               <div className={styles.overviewLabel}>{card.label}</div>
               <div className={styles.overviewValue}>{card.value}</div>
-            </div>
+            </Card>
           ))}
         </section>
 
@@ -728,7 +731,7 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
             >
               <section className={`${styles.section} ${styles.sectionWide}`}>
                 <div className={styles.visualSummaryGrid}>
-                  <article className={styles.overviewCard}>
+                  <Card as="article" className={styles.overviewCard}>
                     <div className={styles.funStatLabel}>Sameness</div>
                     <div className={styles.visualSummaryValue}>
                       {visualSameness.samenessPercent}%
@@ -736,8 +739,8 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
                     <div className={styles.funStatDetail}>
                       Average nearest-neighbor similarity across {visualSameness.sampleSize.toLocaleString("en")} embedded photos in the archive.
                     </div>
-                  </article>
-                  <article className={styles.overviewCard}>
+                  </Card>
+                  <Card as="article" className={styles.overviewCard}>
                     <div className={styles.funStatLabel}>Repeated motifs</div>
                     <div className={styles.visualSummaryValue}>
                       {visualSameness.repeatedMotifPercent}%
@@ -745,8 +748,8 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
                     <div className={styles.funStatDetail}>
                       Photos with a very close visual neighbor at or above {Math.round(visualSameness.highSimilarityThreshold * 100)}% similarity.
                     </div>
-                  </article>
-                  <article className={styles.overviewCard}>
+                  </Card>
+                  <Card as="article" className={styles.overviewCard}>
                     <div className={styles.funStatLabel}>Distinct frames</div>
                     <div className={styles.visualSummaryValue}>
                       {visualSameness.distinctPercent}%
@@ -754,9 +757,9 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
                     <div className={styles.funStatDetail}>
                       Photos whose nearest visual neighbor stays below {Math.round(visualSameness.lowSimilarityThreshold * 100)}% similarity.
                     </div>
-                  </article>
+                  </Card>
                   {visualSameness.lookDrift ? (
-                    <article className={styles.overviewCard}>
+                    <Card as="article" className={styles.overviewCard}>
                       <div className={styles.funStatLabel}>Changed look over time</div>
                       <div className={styles.visualSummaryValue}>
                         {visualSameness.lookDrift.similarityPercent}%
@@ -764,10 +767,10 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
                       <div className={styles.funStatDetail}>
                         The archive’s early and recent look stays {visualSameness.lookDrift.similarityPercent}% aligned from {visualSameness.lookDrift.firstYear} to {visualSameness.lookDrift.lastYear}.
                       </div>
-                    </article>
+                    </Card>
                   ) : null}
                   {visualSameness.visualEras.length > 0 ? (
-                    <article className={styles.overviewCard}>
+                    <Card as="article" className={styles.overviewCard}>
                       <div className={styles.funStatLabel}>Recurring looks</div>
                       <div className={styles.visualSummaryValue}>
                         {visualSameness.visualEras.length}
@@ -775,7 +778,7 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
                       <div className={styles.funStatDetail}>
                         The biggest era covers {visualSameness.visualEras[0]?.sharePercent ?? 0}% of embedded photos.
                       </div>
-                    </article>
+                    </Card>
                   ) : null}
                 </div>
                 {(visualSameness.averageExamples.length > 0 ||
@@ -1031,7 +1034,7 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
             <section className={`${styles.section} ${styles.sectionWide}`}>
               <div className={styles.funStatsGrid}>
                 {funStats.map((stat) => (
-                  <article key={stat.label} className={styles.funStatCard}>
+                  <Card as="article" key={stat.label}>
                     <div className={styles.funStatLabel}>{stat.label}</div>
                     <div className={styles.funStatValue}>{stat.value}</div>
                     <div className={styles.funStatDetail}>{stat.detail}</div>
@@ -1059,7 +1062,7 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
                         <span aria-hidden="true">↗</span>
                       </Link>
                     ) : null}
-                  </article>
+                  </Card>
                 ))}
               </div>
             </section>
@@ -1253,60 +1256,16 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
                   <span>Open Map</span>
                   <span aria-hidden="true">↗</span>
                 </Link>
-                <div
-                  className={styles.viewToggle}
-                  role="tablist"
-                  aria-label="Location chart view"
-                >
-                  <button
-                    type="button"
-                    role="tab"
-                    aria-selected={locationView === "map"}
-                    className={[
-                      styles.viewToggleButton,
-                      locationView === "map"
-                        ? styles.viewToggleButtonActive
-                        : "",
-                    ].join(" ")}
-                    onClick={() => {
-                      setLocationView("map");
-                    }}
-                  >
-                    Map
-                  </button>
-                  <button
-                    type="button"
-                    role="tab"
-                    aria-selected={locationView === "sankey"}
-                    className={[
-                      styles.viewToggleButton,
-                      locationView === "sankey"
-                        ? styles.viewToggleButtonActive
-                        : "",
-                    ].join(" ")}
-                    onClick={() => {
-                      setLocationView("sankey");
-                    }}
-                  >
-                    Sankey
-                  </button>
-                  <button
-                    type="button"
-                    role="tab"
-                    aria-selected={locationView === "bars"}
-                    className={[
-                      styles.viewToggleButton,
-                      locationView === "bars"
-                        ? styles.viewToggleButtonActive
-                        : "",
-                    ].join(" ")}
-                    onClick={() => {
-                      setLocationView("bars");
-                    }}
-                  >
-                    Bars
-                  </button>
-                </div>
+                <SegmentedToggle
+                  options={[
+                    { value: "map" as const, label: "Map" },
+                    { value: "sankey" as const, label: "Sankey" },
+                    { value: "bars" as const, label: "Bars" },
+                  ]}
+                  value={locationView}
+                  onChange={setLocationView}
+                  ariaLabel="Location chart view"
+                />
               </div>
             }
           >
@@ -1349,40 +1308,15 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
             id="what-you-shoot-with"
             title="What You Shoot With"
             actions={
-              <div
-                className={styles.viewToggle}
-                role="tablist"
-                aria-label="Gear chart view"
-              >
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={gearView === "sankey"}
-                  className={[
-                    styles.viewToggleButton,
-                    gearView === "sankey" ? styles.viewToggleButtonActive : "",
-                  ].join(" ")}
-                  onClick={() => {
-                    setGearView("sankey");
-                  }}
-                >
-                  Sankey
-                </button>
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={gearView === "bars"}
-                  className={[
-                    styles.viewToggleButton,
-                    gearView === "bars" ? styles.viewToggleButtonActive : "",
-                  ].join(" ")}
-                  onClick={() => {
-                    setGearView("bars");
-                  }}
-                >
-                  Bars
-                </button>
-              </div>
+              <SegmentedToggle
+                options={[
+                  { value: "sankey" as const, label: "Sankey" },
+                  { value: "bars" as const, label: "Bars" },
+                ]}
+                value={gearView}
+                onChange={setGearView}
+                ariaLabel="Gear chart view"
+              />
             }
           >
             {gearView === "sankey" && (
@@ -1580,6 +1514,7 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
 
         </div>
       </main>
+      <Footer />
     </div>
   );
 };

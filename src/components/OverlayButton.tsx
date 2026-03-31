@@ -1,5 +1,7 @@
 import styles from "./OverlayButton.module.css";
 
+export { default as overlayButtonStyles } from "./OverlayButton.module.css";
+
 const getClassName = (
   size: "small" | undefined,
   className: string | undefined,

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Thumb } from "../Thumb";
+import { OverlayButton } from "../OverlayButton";
 import styles from "./SearchResultTile.module.css";
 import { getRelativeTimeString } from "../../util/time";
 import { extractDateFromExifString } from "../../util/extractExifFromDb";
@@ -96,12 +97,8 @@ export const SearchResultTile = (props: {
       {onFindSimilar || (matchingColorStyle && onSearchByColor) ? (
         <div className={styles.actionButtons}>
           {matchingColorStyle && onSearchByColor && actionColor ? (
-            <button
-              type="button"
-              className={[
-                styles.actionButton,
-                persistColorAction ? styles.actionButtonPersistent : "",
-              ].filter(Boolean).join(" ")}
+            <OverlayButton
+              className={persistColorAction ? styles.actionButtonPersistent : undefined}
               aria-label="Use this photo's colour"
               title={`Use this photo's colour: ${matchingColorStyle}`}
               onClick={(event) => {
@@ -114,12 +111,10 @@ export const SearchResultTile = (props: {
                 className={styles.actionColorSwatch}
                 style={{ backgroundColor: matchingColorStyle }}
               />
-            </button>
+            </OverlayButton>
           ) : null}
           {onFindSimilar ? (
-            <button
-              type="button"
-              className={styles.actionButton}
+            <OverlayButton
               aria-label="Find similar photos"
               title="Find similar photos"
               onClick={(event) => {
@@ -129,7 +124,7 @@ export const SearchResultTile = (props: {
               }}
             >
               <span className={styles.similarButtonIcon}>🔍</span>
-            </button>
+            </OverlayButton>
           ) : null}
         </div>
       ) : null}
