@@ -24,7 +24,7 @@ import {
   StringFacetStat,
 } from "../../util/computeStats";
 import { measureBuild } from "../../services/buildTiming";
-import { Thumb, Footer, SegmentedToggle, Card, Heading } from "../../components/ui";
+import { Thumb, Footer, SegmentedToggle, Card, Heading, Pill, PillButton, pillStyles } from "../../components/ui";
 import styles from "./explore.module.css";
 import {
   buildSearchHref,
@@ -698,9 +698,9 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
           <span className={styles.jumpNavLabel}>Jump to</span>
           <div className={styles.jumpNavLinks}>
             {sectionLinks.map((link) => (
-              <a key={link.href} href={link.href} className={styles.jumpNavLink}>
+              <Pill key={link.href} href={link.href} className={styles.jumpNavLink}>
                 {link.label}
-              </a>
+              </Pill>
             ))}
           </div>
         </nav>
@@ -810,8 +810,7 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
                           ))}
                         </div>
                         {visualSameness.averageExamples.length > averageExamples.length ? (
-                          <button
-                            type="button"
+                          <PillButton
                             className={styles.loadMoreButton}
                             onClick={() => {
                               setVisibleAverageExamples((count) =>
@@ -823,7 +822,7 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
                             }}
                           >
                             <span>Load more average photos</span>
-                          </button>
+                          </PillButton>
                         ) : null}
                       </section>
                     ) : null}
@@ -846,8 +845,7 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
                           ))}
                         </div>
                         {visualSameness.distinctExamples.length > distinctExamples.length ? (
-                          <button
-                            type="button"
+                          <PillButton
                             className={styles.loadMoreButton}
                             onClick={() => {
                               setVisibleDistinctExamples((count) =>
@@ -859,7 +857,7 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
                             }}
                           >
                             <span>Load more distinct frames</span>
-                          </button>
+                          </PillButton>
                         ) : null}
                       </section>
                     ) : null}
@@ -890,8 +888,7 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
                           ))}
                         </div>
                         {visualSameness.repeatedExamples.length > repeatedExamples.length ? (
-                          <button
-                            type="button"
+                          <PillButton
                             className={styles.loadMoreButton}
                             onClick={() => {
                               setVisibleRepeatedExamples((count) =>
@@ -903,7 +900,7 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
                             }}
                           >
                             <span>Load more repeated motifs</span>
-                          </button>
+                          </PillButton>
                         ) : null}
                       </section>
                     ) : null}
@@ -941,8 +938,7 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
                           ))}
                         </div>
                         {visualSameness.visualEras.length > recurringLooks.length ? (
-                          <button
-                            type="button"
+                          <PillButton
                             className={styles.loadMoreButton}
                             onClick={() => {
                               setVisibleRecurringLooks((count) =>
@@ -954,7 +950,7 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
                             }}
                           >
                             <span>Load more recurring looks</span>
-                          </button>
+                          </PillButton>
                         ) : null}
                       </section>
                     ) : null}
@@ -1001,8 +997,7 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
                           ))}
                         </div>
                         {visualSameness.lookTimeline.length > lookTimeline.length ? (
-                          <button
-                            type="button"
+                          <PillButton
                             className={styles.loadMoreButton}
                             onClick={() => {
                               setVisibleLookTimeline((count) =>
@@ -1014,7 +1009,7 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
                             }}
                           >
                             <span>Load more years</span>
-                          </button>
+                          </PillButton>
                         ) : null}
                       </section>
                     ) : null}
@@ -1070,7 +1065,7 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
               id="recent-trends"
               title="Recent trends"
               actions={
-                <Link href="/timeline" className={styles.inlineLink}>
+                <Link href="/timeline" className={`${pillStyles.base} ${pillStyles.ghost}`}>
                   <span>Open Timeline</span>
                   <span aria-hidden="true">↗</span>
                 </Link>
@@ -1115,7 +1110,7 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
                               },
                             ],
                           })}
-                          className={styles.inlineLink}
+                          className={`${pillStyles.base} ${pillStyles.ghost}`}
                         >
                           <span>Open in Search</span>
                           <span aria-hidden="true">↗</span>
@@ -1197,7 +1192,7 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
                   <span className={styles.coverage}>
                     {formatCoverage(activeCalendarCoverage)}
                   </span>
-                  <Link href="/timeline" className={styles.inlineLink}>
+                  <Link href="/timeline" className={`${pillStyles.base} ${pillStyles.ghost}`}>
                     <span>Open Timeline</span>
                     <span aria-hidden="true">↗</span>
                   </Link>
@@ -1249,7 +1244,7 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
             title="Where You Shoot"
             actions={
               <div className={styles.groupActionsStack}>
-                <Link href="/map" className={styles.inlineLink}>
+                <Link href="/map" className={`${pillStyles.base} ${pillStyles.ghost}`}>
                   <span>Open Map</span>
                   <span aria-hidden="true">↗</span>
                 </Link>
@@ -1396,7 +1391,7 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
                             {buildColorSearchHref(family.label) ? (
                               <Link
                                 href={buildColorSearchHref(family.label) ?? "/search"}
-                                className={styles.inlineLink}
+                                className={`${pillStyles.base} ${pillStyles.ghost}`}
                               >
                                 <span>Search</span>
                                 <span aria-hidden="true">↗</span>

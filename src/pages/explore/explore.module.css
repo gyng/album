@@ -75,22 +75,8 @@
 }
 
 .jumpNavLink {
-  display: inline-flex;
-  align-items: center;
   min-height: 2rem;
-  padding: var(--m) var(--m-m);
-  border: 1px solid var(--c-bg-contrast-dark);
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--c-bg) 97%, var(--c-bg-contrast-dark));
-  color: var(--c-bg-contrast-light);
-  text-decoration: none;
-  font-size: var(--fs-s);
   white-space: nowrap;
-}
-
-.jumpNavLink:hover {
-  color: var(--c-font);
-  border-color: var(--c-bg-contrast-light);
 }
 
 .groups {
@@ -150,25 +136,6 @@
   align-items: center;
   gap: var(--m-s);
   flex-wrap: wrap;
-}
-
-.inlineLink {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--m);
-  padding: var(--m) calc(var(--m) + var(--m-s));
-  border: 1px solid var(--c-bg-contrast-dark);
-  border-radius: 999px;
-  background: transparent;
-  color: var(--c-bg-contrast-light);
-  text-decoration: none;
-  font-size: var(--fs-s);
-}
-
-.inlineLink:hover {
-  color: var(--c-font);
-  border-color: var(--c-bg-contrast-light);
-  background: color-mix(in srgb, var(--c-bg) 97%, var(--c-bg-contrast-dark));
 }
 
 .groupDescription {
@@ -735,20 +702,8 @@
 }
 
 .loadMoreButton {
-  appearance: none;
   width: fit-content;
-  border: 1px solid var(--c-bg-contrast-dark);
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--c-bg) 94%, var(--c-bg-contrast-dark));
-  color: var(--c-bg-contrast-light);
-  cursor: pointer;
-  font-size: var(--fs-s);
   padding: var(--m-s) var(--m-m);
-}
-
-.loadMoreButton:hover {
-  color: var(--c-font);
-  border-color: var(--c-bg-contrast-light);
 }
 
 .sectionHeader {
