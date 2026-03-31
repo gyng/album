@@ -3,7 +3,7 @@ import { Database } from "@sqlite.org/sqlite-wasm";
 import Link from "next/link";
 import styles from "./Search.module.css";
 import commonStyles from "../../styles/common.module.css";
-import { Heading, Thumb } from "../ui";
+import { Heading } from "../ui";
 import { fetchMemoryCandidates, fetchRecentResults, fetchRandomResults } from "./api";
 import { SearchResultRow } from "./searchTypes";
 import { SearchResultTile } from "./SearchResultTile";
@@ -13,8 +13,7 @@ import {
   getMemoryClusters,
   ResolvedMemoryCluster,
 } from "../../util/clusterByDate";
-import { getResizedAlbumImageSrc } from "../../util/getResizedAlbumImageSrc";
-import { parseColorPalette, rgbToString } from "../../util/colorDistance";
+import { RGB } from "../../util/colorDistance";
 
 const RECENT_ROW_INITIAL_SIZE = 15;
 const RECENT_ROW_LOAD_MORE_SIZE = 16;
@@ -47,6 +46,8 @@ type Props = {
   progress: number;
   databaseProgressDetails: ProgressDetails;
   onStartSimilarSearch: (path: string) => void;
+  onSearchByColor?: (color: RGB) => void;
+  isColorCategoryActive?: boolean;
 };
 
 export const EmptyStateExplore: React.FC<Props> = ({
@@ -54,6 +55,8 @@ export const EmptyStateExplore: React.FC<Props> = ({
   progress,
   databaseProgressDetails,
   onStartSimilarSearch,
+  onSearchByColor,
+  isColorCategoryActive = false,
 }) => {
   const [recentVisibleCount, setRecentVisibleCount] = useState<number>(
     RECENT_ROW_INITIAL_SIZE,
@@ -295,10 +298,6 @@ export const EmptyStateExplore: React.FC<Props> = ({
     return albums.length === 1 ? albums[0] : null;
   }, []);
 
-  const getMemoryThumbnailColor = useCallback((result: MemoryResult) => {
-    const firstColor = parseColorPalette(result.colors)[0];
-    return firstColor ? rgbToString(firstColor) : "rgba(255, 255, 255, 0.2)";
-  }, []);
   const visibleMemoryClusters = memoryClusters.slice(
     0,
     visibleMemoryClusterCount,
@@ -346,6 +345,8 @@ export const EmptyStateExplore: React.FC<Props> = ({
                       onFindSimilar={(path) => {
                         onStartSimilarSearch(path);
                       }}
+                      onSearchByColor={onSearchByColor}
+                      persistColorAction={isColorCategoryActive}
                     />
                   </li>
                 );
@@ -403,19 +404,14 @@ export const EmptyStateExplore: React.FC<Props> = ({
                     <ul className={styles.memoryClusterStrip}>
                       {previewItems.map((result) => (
                         <li key={result.path} className={styles.memoryClusterItem}>
-                          <Link
-                            href={result.album_relative_path}
-                            className={styles.memoryThumbLink}
-                            aria-label={result.snippet || result.filename}
-                          >
-                            <Thumb
-                              src={getResizedAlbumImageSrc(result.path)}
-                              alt={result.snippet || result.filename}
-                              style={{
-                                backgroundColor: getMemoryThumbnailColor(result),
-                              }}
-                            />
-                          </Link>
+                          <SearchResultTile
+                            result={result}
+                            onFindSimilar={(path) => {
+                              onStartSimilarSearch(path);
+                            }}
+                            onSearchByColor={onSearchByColor}
+                            persistColorAction={isColorCategoryActive}
+                          />
                         </li>
                       ))}
                       <li className={styles.memoryClusterItem}>
@@ -487,6 +483,8 @@ export const EmptyStateExplore: React.FC<Props> = ({
                       onFindSimilar={(path) => {
                         onStartSimilarSearch(path);
                       }}
+                      onSearchByColor={onSearchByColor}
+                      persistColorAction={isColorCategoryActive}
                     />
                   </li>
                 );

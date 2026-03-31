@@ -64,10 +64,14 @@
   display: flex;
   align-items: center;
   gap: 6px;
+  opacity: 0;
+  transition: opacity 0.15s ease;
 }
 
-.actionButtonPersistent {
-  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.12);
+.card:hover .actionButtons,
+.card:focus-within .actionButtons,
+.actionButtonsPersistent {
+  opacity: 1;
 }
 
 .similarButtonIcon {

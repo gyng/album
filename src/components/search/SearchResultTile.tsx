@@ -94,10 +94,15 @@ export const SearchResultTile = (props: {
         </div>
       ) : null}
       {onFindSimilar || (matchingColorStyle && onSearchByColor) ? (
-        <div className={styles.actionButtons}>
+        <div
+          className={
+            [styles.actionButtons, persistColorAction ? styles.actionButtonsPersistent : ""]
+              .filter(Boolean)
+              .join(" ")
+          }
+        >
           {matchingColorStyle && onSearchByColor && actionColor ? (
             <OverlayButton
-              className={persistColorAction ? styles.actionButtonPersistent : undefined}
               aria-label="Use this photo's colour"
               title={`Use this photo's colour: ${matchingColorStyle}`}
               onClick={(event) => {

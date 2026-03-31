@@ -765,6 +765,12 @@ export const Search: React.FC<{
           progress={progress}
           databaseProgressDetails={databaseProgressDetails}
           onStartSimilarSearch={startSimilarSearch}
+          onSearchByColor={
+            selectedFilterCategory === "color"
+              ? handleSearchByColor
+              : undefined
+          }
+          isColorCategoryActive={selectedFilterCategory === "color"}
         />
       ) : null}
 

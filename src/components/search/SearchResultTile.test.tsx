@@ -99,8 +99,9 @@ describe("SearchResultTile", () => {
     );
 
     expect(
-      screen.getByRole("button", { name: /use this photo's colour/i }).className,
-    ).toContain("actionButtonPersistent");
+      screen.getByRole("button", { name: /use this photo's colour/i })
+        .parentElement!.className,
+    ).toContain("actionButtonsPersistent");
   });
 
   it("shows a visible percentage match when similarity is present", () => {

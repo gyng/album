@@ -427,7 +427,6 @@ describe("computePhotoStats", () => {
   it("computes dominant color families, examples, and color drift", () => {
     const stats = computePhotoStats([makeAlbum([
       makePhoto({
-        id: "red-early.jpg",
         tags: {
           colors: [
             [210, 70, 80],
@@ -439,7 +438,6 @@ describe("computePhotoStats", () => {
         },
       }),
       makePhoto({
-        id: "blue-recent.jpg",
         tags: {
           colors: [
             [80, 120, 220],
@@ -452,7 +450,6 @@ describe("computePhotoStats", () => {
         },
       }),
       makePhoto({
-        id: "neutral-recent.jpg",
         tags: {
           colors: [[140, 140, 140]],
         } as any,
