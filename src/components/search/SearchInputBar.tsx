@@ -1,5 +1,5 @@
 import React, { useSyncExternalStore } from "react";
-import { Input } from "../ui";
+import { Input, Select } from "../ui";
 import styles from "./Search.module.css";
 import { SearchMode } from "./useTextVector";
 
@@ -80,7 +80,7 @@ export const SearchInputBar: React.FC<Props> = ({
             ) : null}
           </div>
           <label className={styles.searchModeSelectLabel}>
-            <select
+            <Select
               className={styles.searchModeSelect}
               aria-label="Search mode"
               value={searchMode}
@@ -91,7 +91,7 @@ export const SearchInputBar: React.FC<Props> = ({
               <option value="keyword">Keyword search</option>
               <option value="semantic">Semantic search</option>
               <option value="hybrid">Semantic + keyword</option>
-            </select>
+            </Select>
             <span
               className={styles.searchModeInfo}
               aria-label="Search mode help"
