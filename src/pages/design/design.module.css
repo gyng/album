@@ -30,17 +30,6 @@
   border-bottom: 1px solid var(--c-bg-contrast-dark);
 }
 
-.sectionTitle {
-  margin: 0;
-  font-size: var(--fs-l);
-}
-
-.sectionDescription {
-  margin: 0;
-  color: var(--c-bg-contrast-light);
-  font-size: var(--fs-s);
-  line-height: 1.5;
-}
 
 .subsection {
   display: grid;
@@ -184,6 +173,23 @@
 .inputField {
   display: grid;
   gap: var(--m);
+}
+
+.codeHint {
+  font-family: monospace;
+  font-size: var(--fs-xs);
+  color: var(--c-bg-contrast-light);
+  padding: var(--m) var(--m-s);
+  border-radius: var(--m);
+  background: color-mix(in srgb, var(--c-bg) 94%, var(--c-bg-contrast-dark));
+  border: 1px solid color-mix(in srgb, var(--c-bg-contrast-dark) 60%, transparent);
+  width: fit-content;
+}
+
+.jumpNav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--m-s);
 }
 
 @media (max-width: 720px) {

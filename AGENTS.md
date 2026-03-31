@@ -75,17 +75,17 @@ Always use tokens — never raw px values or colours.
 - Font sizes: `--fs-xs` 10 / `--fs-s` 11 / `--fs-sm` 14 / `--fs-m` 18 / `--fs-l` 24 / `--fs-xl` 64 (px)
 - Colours: `--c-bg`, `--c-font`, `--c-bg-contrast-light`, `--c-bg-contrast-dark`, `--c-accent`, `--c-overlay-dark`, `--c-border-on-dark`
 
-## Shared components (src/components/)
-Prefer shared components over ad-hoc CSS for common UI patterns. The `/design` page is the living catalogue.
+## Shared components (src/components/ui/)
+Design system primitives live in `src/components/ui/` with a barrel export. Import via `import { Heading, Card } from "../ui"` (from components) or `"../../components/ui"` (from pages). The `/design` page is the living catalogue.
 - `Thumb` / `Thumb size="small"` — image thumbnail (150px / 112px), sharp corners
 - `Heading level={1|2|3}` + `Caption` — consistent heading hierarchy and muted secondary text
 - `Card` — bordered surface container, theme-adaptive via color-mix
-- `Input` / `Select` — form controls with consistent border, radius, and focus ring
+- `Input` / `Select` — form controls with consistent border, radius, and focus ring; Input supports forwardRef
 - `ChartTooltip` — accent-tinted hover tooltip for charts; consumer provides the hover trigger via `[data-tooltip]`
 - `SegmentedToggle` — pill-shaped option switcher (generic over value type)
-- `Pill` / `PillButton` — rounded nav link / action button; `variant="surface"` (default) or `"ghost"`
-- `OverlayButton` / `OverlayButtonLink` — dark glass button for media overlays; `size="small"` for icon-only
-- `Footer` — site footer with /design link
+- `Pill` / `PillButton` / `pillStyles` — rounded nav link / action button; `variant="surface"` (default) or `"ghost"`; use `pillStyles` for composing with Next.js `<Link>`
+- `OverlayButton` / `OverlayButtonLink` / `overlayButtonStyles` — dark glass button for media overlays; `size="small"` for icon-only
+- `Footer` — site footer with standard links (GitHub, Fediverse, Bluesky, Design)
 - Stack utilities in `common.module.css`: `.stack` (8px) / `.stackL` (20px) / `.stackXl` (40px) / `.stackPage` (64px)
 
 ## Search
