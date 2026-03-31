@@ -2,7 +2,6 @@ import { useState } from "react";
 import type { GetStaticProps, NextPage } from "next";
 import { GlobalNav } from "../../components/GlobalNav";
 import { Seo } from "../../components/Seo";
-import { ThemeToggle } from "../../components/ThemeToggle";
 import {
   Card, ChartTooltip, Footer, Heading, Caption, Input,
   OverlayButton, OverlayButtonLink, Pill, PillButton,
@@ -60,7 +59,6 @@ const DesignPage: NextPage<PageProps> = () => {
               A living reference for iterating on the visual language.
             </p>
           </div>
-          <ThemeToggle />
         </header>
 
         {/* Tokens: Spacing */}

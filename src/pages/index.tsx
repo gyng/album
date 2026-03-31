@@ -1,6 +1,6 @@
 import type { GetStaticProps, NextPage } from "next";
-import Link from "next/link";
 import { Albums } from "../components/Albums";
+import { Footer } from "../components/ui";
 import styles from "./Index.module.css";
 import { getAlbums, getImageTimestampRange } from "../services/album";
 import { Block, Content } from "../services/types";
@@ -37,29 +37,7 @@ const Home: NextPage<PageProps> = (context) => {
         <Albums albums={context.albums} />
       </main>
 
-      <footer className={styles.footer}>
-        <a
-          href="https://www.github.com/gyng/album"
-          target="_blank"
-          rel="noreferrer"
-        >
-          GitHub
-        </a>
-        &nbsp;&middot;&nbsp;
-        <a href="https://mastodon.yshi.org/@f" target="_blank" rel="noreferrer">
-          Fediverse
-        </a>
-        &nbsp;&middot;&nbsp;
-        <a
-          href="https://bsky.app/profile/gyng.bsky.social"
-          target="_blank"
-          rel="noreferrer"
-        >
-          Bluesky
-        </a>
-        &nbsp;&middot;&nbsp;
-        <Link href="/design">Design</Link>
-      </footer>
+      <Footer />
     </div>
   );
 };
