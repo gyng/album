@@ -15,16 +15,6 @@
   gap: var(--m-s);
 }
 
-.count {
-  color: var(--c-bg-contrast-light);
-  font-size: var(--fs-sm);
-}
-
-.locationSummary {
-  color: var(--c-bg-contrast-light);
-  font-size: var(--fs-sm);
-}
-
 .grid {
   display: flex;
   flex-wrap: wrap;
@@ -98,12 +88,6 @@
   gap: var(--m-m);
 }
 
-.emptyCopy {
-  margin: 0;
-  color: var(--c-bg-contrast-light);
-  font-size: var(--fs-sm);
-}
-
 .mapSection {
   display: grid;
   gap: var(--m-s);
@@ -120,11 +104,6 @@
 .mapHeading {
   margin: 0;
   font-size: var(--fs-sm);
-}
-
-.mapCount {
-  color: var(--c-bg-contrast-light);
-  font-size: var(--fs-s);
 }
 
 .mapWrap {

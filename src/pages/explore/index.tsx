@@ -24,7 +24,7 @@ import {
   StringFacetStat,
 } from "../../util/computeStats";
 import { measureBuild } from "../../services/buildTiming";
-import { Thumb, Footer, SegmentedToggle, Card, Heading, Pill, PillButton, pillStyles, Select } from "../../components/ui";
+import { Thumb, Footer, SegmentedToggle, Card, Heading, Caption, Pill, PillButton, pillStyles, Select } from "../../components/ui";
 import styles from "./explore.module.css";
 import {
   buildSearchHref,
@@ -185,10 +185,10 @@ const StatSection: React.FC<{
   >
     <div className={styles.sectionHeader}>
       <Heading level={2} as="h2">{title}</Heading>
-      <span className={styles.coverage}>{formatCoverage(coverage)}</span>
+      <Caption as="span">{formatCoverage(coverage)}</Caption>
     </div>
     {coverage === 0 ? (
-      <p className={styles.noData}>No data available.</p>
+      <Caption size="sm">No data available.</Caption>
     ) : (
       <div className={styles.bars}>{children}</div>
     )}
@@ -695,7 +695,7 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
         <GlobalNav currentPage="explore" hasPadding={false} />
 
         <nav className={styles.jumpNav} aria-label="Jump to section">
-          <span className={styles.jumpNavLabel}>Jump to</span>
+          <Caption as="span">Jump to</Caption>
           <div className={styles.jumpNavLinks}>
             {sectionLinks.map((link) => (
               <Pill key={link.href} href={link.href} className={styles.jumpNavLink}>
@@ -714,7 +714,7 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
         <section className={styles.overview}>
           {overviewCards.map((card) => (
             <Card key={card.label} className={styles.overviewCard}>
-              <div className={styles.overviewLabel}>{card.label}</div>
+              <Caption as="div">{card.label}</Caption>
               <div className={styles.overviewValue}>{card.value}</div>
             </Card>
           ))}
@@ -729,7 +729,7 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
               <section className={`${styles.section} ${styles.sectionWide}`}>
                 <div className={styles.visualSummaryGrid}>
                   <Card as="article" className={styles.overviewCard}>
-                    <div className={styles.funStatLabel}>Sameness</div>
+                    <Caption as="div">Sameness</Caption>
                     <div className={styles.visualSummaryValue}>
                       {visualSameness.samenessPercent}%
                     </div>
@@ -738,7 +738,7 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
                     </div>
                   </Card>
                   <Card as="article" className={styles.overviewCard}>
-                    <div className={styles.funStatLabel}>Repeated motifs</div>
+                    <Caption as="div">Repeated motifs</Caption>
                     <div className={styles.visualSummaryValue}>
                       {visualSameness.repeatedMotifPercent}%
                     </div>
@@ -747,7 +747,7 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
                     </div>
                   </Card>
                   <Card as="article" className={styles.overviewCard}>
-                    <div className={styles.funStatLabel}>Distinct frames</div>
+                    <Caption as="div">Distinct frames</Caption>
                     <div className={styles.visualSummaryValue}>
                       {visualSameness.distinctPercent}%
                     </div>
@@ -757,7 +757,7 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
                   </Card>
                   {visualSameness.lookDrift ? (
                     <Card as="article" className={styles.overviewCard}>
-                      <div className={styles.funStatLabel}>Changed look over time</div>
+                      <Caption as="div">Changed look over time</Caption>
                       <div className={styles.visualSummaryValue}>
                         {visualSameness.lookDrift.similarityPercent}%
                       </div>
@@ -768,7 +768,7 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
                   ) : null}
                   {visualSameness.visualEras.length > 0 ? (
                     <Card as="article" className={styles.overviewCard}>
-                      <div className={styles.funStatLabel}>Recurring looks</div>
+                      <Caption as="div">Recurring looks</Caption>
                       <div className={styles.visualSummaryValue}>
                         {visualSameness.visualEras.length}
                       </div>
@@ -790,9 +790,9 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
                       >
                         <div className={styles.sectionHeader}>
                           <Heading level={2}>Most average photos</Heading>
-                          <span className={styles.coverage}>
+                          <Caption as="span">
                             Closest to the archive center
-                          </span>
+                          </Caption>
                         </div>
                         <div className={styles.visualSingles}>
                           {averageExamples.map((example) => (
@@ -830,9 +830,9 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
                       <section className={styles.visualExampleSection}>
                         <div className={styles.sectionHeader}>
                           <Heading level={2}>Distinct frames</Heading>
-                          <span className={styles.coverage}>
+                          <Caption as="span">
                             Weakest nearest-neighbor matches
-                          </span>
+                          </Caption>
                         </div>
                         <div className={styles.visualSingles}>
                           {distinctExamples.map((example) => (
@@ -867,9 +867,9 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
                       >
                         <div className={styles.sectionHeader}>
                           <Heading level={2}>Repeated motifs</Heading>
-                          <span className={styles.coverage}>
+                          <Caption as="span">
                             Closest recurring visual matches
-                          </span>
+                          </Caption>
                         </div>
                         <div className={styles.visualPairs}>
                           {repeatedExamples.map((example) => (
@@ -910,9 +910,9 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
                       >
                         <div className={styles.sectionHeader}>
                           <Heading level={2}>Recurring looks</Heading>
-                          <span className={styles.coverage}>
+                          <Caption as="span">
                             Recurring visual modes in the archive
-                          </span>
+                          </Caption>
                         </div>
                         <div className={styles.visualEraGrid}>
                           {recurringLooks.map((era) => (
@@ -960,9 +960,9 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
                       >
                         <div className={styles.sectionHeader}>
                           <Heading level={2}>Changed look over time</Heading>
-                          <span className={styles.coverage}>
+                          <Caption as="span">
                             Yearly representative sets
-                          </span>
+                          </Caption>
                         </div>
                         <div className={styles.visualTimeline}>
                           {lookTimeline.map((entry, index) => (
@@ -1027,7 +1027,7 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
               <div className={styles.funStatsGrid}>
                 {funStats.map((stat) => (
                   <Card as="article" key={stat.label}>
-                    <div className={styles.funStatLabel}>{stat.label}</div>
+                    <Caption as="div">{stat.label}</Caption>
                     <div className={styles.funStatValue}>{stat.value}</div>
                     <div className={styles.funStatDetail}>{stat.detail}</div>
                     {stat.examples && stat.examples.length > 0 ? (
@@ -1097,10 +1097,10 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
                     >
                       <div className={styles.sectionHeader}>
                         <Heading level={2}>{place.label}</Heading>
-                        <span className={styles.coverage}>
+                        <Caption as="span">
                           Seen from {place.firstYear} to {place.lastYear}
                           {` `}across {place.photoCount.toLocaleString("en")} photos
-                        </span>
+                        </Caption>
                         <Link
                           href={buildSearchHref({
                             facets: [
@@ -1189,9 +1189,9 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
               <section className={`${styles.section} ${styles.sectionWide}`}>
                 <div className={styles.sectionHeader}>
                   <Heading level={2} as="h2">Archive cadence</Heading>
-                  <span className={styles.coverage}>
+                  <Caption as="span">
                     {formatCoverage(activeCalendarCoverage)}
-                  </span>
+                  </Caption>
                   <Link href="/timeline" className={`${pillStyles.base} ${pillStyles.ghost}`}>
                     <span>Open Timeline</span>
                     <span aria-hidden="true">↗</span>
@@ -1221,11 +1221,11 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
               <section className={`${styles.section} ${styles.sectionWide}`}>
                 <div className={styles.sectionHeader}>
                   <Heading level={2} as="h2">Settings relationships</Heading>
-                  <span className={styles.coverage}>
+                  <Caption as="span">
                     {filteredTechnicalRelationships
                       ? `Based on ${filteredTechnicalRelationships.total.toLocaleString("en")} photos with focal length, aperture, and ISO`
                       : "No matching photos with focal length, aperture, and ISO for this combination"}
-                  </span>
+                  </Caption>
                 </div>
                 {filteredTechnicalRelationships ? (
                   <TechnicalHeatmaps
@@ -1233,7 +1233,7 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
                     layout="tri-grid"
                   />
                 ) : (
-                  <p className={styles.noData}>No data available.</p>
+                  <Caption size="sm">No data available.</Caption>
                 )}
               </section>
             ) : null}
@@ -1342,9 +1342,9 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
                 <section className={styles.colourPanel}>
                   <div className={styles.sectionHeader}>
                     <Heading level={2} as="h2">Dominant colour families</Heading>
-                    <span className={styles.coverage}>
+                    <Caption as="span">
                       {formatCoverage(stats.colorCoverage)}
-                    </span>
+                    </Caption>
                   </div>
                   <div className={styles.bars}>
                     {stats.colorStats.map((bucket) => (

@@ -42,10 +42,6 @@
   min-height: 6.25rem;
 }
 
-.overviewLabel {
-  font-size: var(--fs-s);
-  color: var(--c-bg-contrast-light);
-}
 
 .overviewValue {
   font-size: var(--fs-m);
@@ -63,10 +59,6 @@
   background: var(--c-bg);
 }
 
-.jumpNavLabel {
-  font-size: var(--fs-s);
-  color: var(--c-bg-contrast-light);
-}
 
 .jumpNavLinks {
   display: flex;
@@ -223,10 +215,6 @@
 
 
 
-.funStatLabel {
-  font-size: var(--fs-s);
-  color: var(--c-bg-contrast-light);
-}
 
 .funStatValue {
   font-size: calc(var(--fs-m) - 0.05rem);
@@ -734,10 +722,6 @@
 }
 
 
-.coverage {
-  font-size: var(--fs-s);
-  color: var(--c-bg-contrast-light);
-}
 
 .colorSwatch {
   width: 0.7rem;
@@ -976,11 +960,6 @@
   gap: var(--m-s);
 }
 
-.noData {
-  margin: 0;
-  color: var(--c-bg-contrast-light);
-  font-size: var(--fs-sm);
-}
 
 @media (max-width: 720px) {
   .main {

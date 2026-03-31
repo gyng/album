@@ -2,7 +2,7 @@ import Link from "next/link";
 import { MapWorldDeferred } from "./MapWorldDeferred";
 import { MapWorldEntry } from "./MapWorld";
 import { getRelativeTimeString } from "../util/time";
-import { Heading, Thumb, overlayButtonStyles } from "./ui";
+import { Caption, Heading, Thumb, overlayButtonStyles } from "./ui";
 import commonStyles from "../styles/common.module.css";
 import styles from "./TimelineDayGrid.module.css";
 import { TimelineEntry } from "./timelineTypes";
@@ -107,9 +107,9 @@ export const TimelineDayGrid = ({
     return (
       <section className={styles.emptyState} aria-label="No day selected">
         <Heading level={1} as="h2">Pick a day</Heading>
-        <p className={styles.emptyCopy}>
+        <Caption size="sm">
           Choose a day from the heatmap, or jump to a random one.
-        </p>
+        </Caption>
         <div className={styles.dayNavButtons}>
           {onSelectOlderDate ? (
             <button
@@ -181,9 +181,9 @@ export const TimelineDayGrid = ({
             {formattedDate}
           </Heading>
         </div>
-        <div className={styles.count}>
+        <Caption as="div" size="sm">
           {entries.length} photo{entries.length === 1 ? "" : "s"}
-        </div>
+        </Caption>
       </div>
 
       <div className={styles.dayNavButtons}>
@@ -221,8 +221,10 @@ export const TimelineDayGrid = ({
       </div>
 
       {locationSummary ? (
-        <div className={styles.locationSummary} aria-label="Location summary">
-          {locationSummary}
+        <div aria-label="Location summary">
+          <Caption as="div" size="sm">
+            {locationSummary}
+          </Caption>
         </div>
       ) : null}
 
@@ -288,9 +290,9 @@ export const TimelineDayGrid = ({
         >
           <div className={styles.mapHeader}>
             <h3 className={styles.mapHeading}>Map</h3>
-            <div className={styles.mapCount}>
+            <Caption as="div">
               {mapPhotos.length} mapped photo{mapPhotos.length === 1 ? "" : "s"}
-            </div>
+            </Caption>
           </div>
 
           <div className={styles.mapWrap}>

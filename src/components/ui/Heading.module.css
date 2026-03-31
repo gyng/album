@@ -19,9 +19,3 @@
     font-size: var(--fs-m);
   }
 }
-
-.caption {
-  color: var(--c-bg-contrast-light);
-  font-size: var(--fs-s);
-  margin: 0;
-}

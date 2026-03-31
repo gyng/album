@@ -149,3 +149,15 @@
   display: grid;
   gap: var(--m-2xl);
 }
+
+.caption {
+  color: var(--c-bg-contrast-light);
+  font-size: var(--fs-s);
+  margin: 0;
+}
+
+.captionSm {
+  color: var(--c-bg-contrast-light);
+  font-size: var(--fs-sm);
+  margin: 0;
+}

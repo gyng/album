@@ -179,9 +179,7 @@
 }
 
 .caption {
-  margin: 0;
-  color: var(--c-bg-contrast-light);
-  font-size: var(--fs-s);
+  /* Layout-only hook — visual styles come from Caption component */
 }
 
 .overlay {

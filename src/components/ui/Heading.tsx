@@ -1,3 +1,4 @@
+import common from "../../styles/common.module.css";
 import styles from "./Heading.module.css";
 
 const defaultElements = { 1: "h2", 2: "h3", 3: "h4" } as const;
@@ -24,12 +25,14 @@ export const Heading = (props: {
 
 export const Caption = (props: {
   as?: "p" | "span" | "div";
+  size?: "sm";
   className?: string;
   children: React.ReactNode;
 }) => {
-  const { as: Tag = "p", className, children } = props;
+  const { as: Tag = "p", size, className, children } = props;
+  const base = size === "sm" ? common.captionSm : common.caption;
   return (
-    <Tag className={[styles.caption, className].filter(Boolean).join(" ")}>
+    <Tag className={[base, className].filter(Boolean).join(" ")}>
       {children}
     </Tag>
   );

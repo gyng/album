@@ -22,13 +22,3 @@
   font-size: var(--fs-m);
 }
 
-.coverage {
-  font-size: var(--fs-s);
-  color: var(--c-bg-contrast-light);
-}
-
-.noData {
-  margin: 0;
-  color: var(--c-bg-contrast-light);
-  font-size: var(--fs-sm);
-}

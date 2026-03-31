@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ParallelRelationshipData } from "../util/computeStats";
 import { buildSearchHref } from "../util/searchFacets";
+import { Caption } from "./ui";
 import styles from "./TechnicalHeatmaps.module.css";
 
 type Props = {
@@ -597,9 +598,9 @@ export const TechnicalHeatmaps: React.FC<Props> = ({
           />
         ))
       )}
-      <p className={styles.caption}>
+      <Caption className={styles.caption}>
         {caption}
-      </p>
+      </Caption>
     </div>
   );
 };

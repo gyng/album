@@ -5,6 +5,7 @@ import {
 } from "../util/computeStats";
 import { TechnicalHeatmaps } from "./TechnicalHeatmaps";
 import { TimeOfDayChart } from "./TimeOfDayChart";
+import { Caption } from "./ui";
 import styles from "./TimeRelationshipExplorer.module.css";
 
 type Props = {
@@ -25,12 +26,12 @@ export const TimeRelationshipExplorer: React.FC<Props> = ({
       <section className={styles.block}>
         <div className={styles.header}>
           <h2 className={styles.title}>{hourFacet.displayName}</h2>
-          <span className={styles.coverage}>
+          <Caption as="span">
             {formatCoverage(hourFacet.coverage)}
-          </span>
+          </Caption>
         </div>
         {hourFacet.coverage === 0 ? (
-          <p className={styles.noData}>No data available.</p>
+          <Caption size="sm">No data available.</Caption>
         ) : (
           <TimeOfDayChart
             data={hourFacet.data}
@@ -46,10 +47,10 @@ export const TimeRelationshipExplorer: React.FC<Props> = ({
       <section className={styles.block}>
         <div className={styles.header}>
           <h2 className={styles.title}>Time relationships</h2>
-          <span className={styles.coverage}>
+          <Caption as="span">
             Based on {relationships.total.toLocaleString()} photos with local
             time, aperture, and ISO
-          </span>
+          </Caption>
         </div>
         <TechnicalHeatmaps
           data={relationships}
