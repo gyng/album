@@ -1,5 +1,5 @@
 import { BucketedStat } from "../util/computeStats";
-import { ChartTooltip } from "./ui";
+import { ChartTooltip, Heading } from "./ui";
 import styles from "./MiniHistogram.module.css";
 
 type Props = {
@@ -12,7 +12,7 @@ export const MiniHistogram: React.FC<Props> = ({ title, data }) => {
 
   return (
     <section className={styles.chart}>
-      <h3 className={styles.title}>{title}</h3>
+      <Heading level={2} className={styles.title}>{title}</Heading>
       <div className={styles.bars}>
         {data.map((bucket) => {
           const heightPct = max > 0 ? (bucket.count / max) * 100 : 0;

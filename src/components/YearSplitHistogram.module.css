@@ -4,11 +4,6 @@
   align-content: start;
 }
 
-.title {
-  margin: 0;
-  font-size: var(--fs-m);
-  padding-bottom: 0.2rem;
-}
 
 .matrix {
   display: grid;

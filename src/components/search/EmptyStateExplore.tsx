@@ -3,7 +3,7 @@ import { Database } from "@sqlite.org/sqlite-wasm";
 import Link from "next/link";
 import styles from "./Search.module.css";
 import commonStyles from "../../styles/common.module.css";
-import { Thumb } from "../ui";
+import { Heading, Thumb } from "../ui";
 import { fetchMemoryCandidates, fetchRecentResults, fetchRandomResults } from "./api";
 import { SearchResultRow } from "./searchTypes";
 import { SearchResultTile } from "./SearchResultTile";
@@ -315,7 +315,7 @@ export const EmptyStateExplore: React.FC<Props> = ({
 
         <section className={styles.sectionSurface}>
           <div className={styles.sectionHeader}>
-            <h3 className={styles.sectionTitle}>Latest</h3>
+            <Heading level={2} as="h3">Latest</Heading>
           </div>
 
           {isRecentLoading || isMemoriesLoading ? (
@@ -370,7 +370,7 @@ export const EmptyStateExplore: React.FC<Props> = ({
         {visibleMemoryClusters.length > 0 ? (
           <section className={styles.sectionSurface}>
             <div className={styles.sectionHeader}>
-              <h3 className={styles.sectionTitle}>On this day</h3>
+              <Heading level={2} as="h3">On this day</Heading>
             </div>
 
             <div className={styles.memoryClusters}>
@@ -456,7 +456,7 @@ export const EmptyStateExplore: React.FC<Props> = ({
 
         <section className={styles.sectionSurface}>
           <div className={styles.sectionHeader}>
-            <h3 className={styles.sectionTitle}>Random selection</h3>
+            <Heading level={2} as="h3">Random selection</Heading>
           </div>
 
           {isRandomResultsLoading ? (

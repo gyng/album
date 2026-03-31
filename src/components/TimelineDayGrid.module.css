@@ -15,10 +15,6 @@
   gap: var(--m-s);
 }
 
-.heading {
-  margin: 0;
-}
-
 .count {
   color: var(--c-bg-contrast-light);
   font-size: var(--fs-sm);

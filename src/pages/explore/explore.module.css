@@ -117,10 +117,6 @@
   flex-wrap: wrap;
 }
 
-.groupTitle {
-  margin: 0;
-  font-size: var(--fs-l);
-}
 
 .groupAnchorLink {
   display: inline-flex;
@@ -813,10 +809,6 @@
   border-color: var(--c-accent);
 }
 
-.sectionTitle {
-  margin: 0;
-  font-size: var(--fs-m);
-}
 
 .coverage {
   font-size: var(--fs-s);

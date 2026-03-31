@@ -24,7 +24,7 @@ import {
   StringFacetStat,
 } from "../../util/computeStats";
 import { measureBuild } from "../../services/buildTiming";
-import { Thumb, Footer, SegmentedToggle, Card } from "../../components/ui";
+import { Thumb, Footer, SegmentedToggle, Card, Heading } from "../../components/ui";
 import styles from "./explore.module.css";
 import {
   buildSearchHref,
@@ -184,7 +184,7 @@ const StatSection: React.FC<{
     ].join(" ")}
   >
     <div className={styles.sectionHeader}>
-      <h2 className={styles.sectionTitle}>{title}</h2>
+      <Heading level={2} as="h2">{title}</Heading>
       <span className={styles.coverage}>{formatCoverage(coverage)}</span>
     </div>
     {coverage === 0 ? (
@@ -205,7 +205,7 @@ const StatGroup: React.FC<{
   <section id={id} className={styles.group}>
     <div className={styles.groupHeader}>
       <div className={styles.groupTitleRow}>
-        <h2 className={styles.groupTitle}>
+        <Heading level={1}>
           {id ? (
             <a href={`#${id}`} className={styles.groupAnchorLink}>
               <span>{title}</span>
@@ -216,7 +216,7 @@ const StatGroup: React.FC<{
           ) : (
             title
           )}
-        </h2>
+        </Heading>
         {actions ? <div className={styles.groupActions}>{actions}</div> : null}
       </div>
       {description ? <p className={styles.groupDescription}>{description}</p> : null}
@@ -789,7 +789,7 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
                         className={`${styles.visualExampleSection} ${styles.visualAverageSection}`}
                       >
                         <div className={styles.sectionHeader}>
-                          <h3 className={styles.sectionTitle}>Most average photos</h3>
+                          <Heading level={2}>Most average photos</Heading>
                           <span className={styles.coverage}>
                             Closest to the archive center
                           </span>
@@ -830,7 +830,7 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
                     {visualSameness.distinctExamples.length > 0 ? (
                       <section className={styles.visualExampleSection}>
                         <div className={styles.sectionHeader}>
-                          <h3 className={styles.sectionTitle}>Distinct frames</h3>
+                          <Heading level={2}>Distinct frames</Heading>
                           <span className={styles.coverage}>
                             Weakest nearest-neighbor matches
                           </span>
@@ -868,7 +868,7 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
                         className={`${styles.visualExampleSection} ${styles.visualFullRowSection}`}
                       >
                         <div className={styles.sectionHeader}>
-                          <h3 className={styles.sectionTitle}>Repeated motifs</h3>
+                          <Heading level={2}>Repeated motifs</Heading>
                           <span className={styles.coverage}>
                             Closest recurring visual matches
                           </span>
@@ -912,7 +912,7 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
                         className={`${styles.visualExampleSection} ${styles.visualFullRowSection}`}
                       >
                         <div className={styles.sectionHeader}>
-                          <h3 className={styles.sectionTitle}>Recurring looks</h3>
+                          <Heading level={2}>Recurring looks</Heading>
                           <span className={styles.coverage}>
                             Recurring visual modes in the archive
                           </span>
@@ -963,7 +963,7 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
                         className={`${styles.visualExampleSection} ${styles.visualFullRowSection} ${styles.timelineSectionAligned}`}
                       >
                         <div className={styles.sectionHeader}>
-                          <h3 className={styles.sectionTitle}>Changed look over time</h3>
+                          <Heading level={2}>Changed look over time</Heading>
                           <span className={styles.coverage}>
                             Yearly representative sets
                           </span>
@@ -1101,7 +1101,7 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
                       className={`${styles.revisitedPlaceCard} ${styles.timelineSectionAligned}`}
                     >
                       <div className={styles.sectionHeader}>
-                        <h3 className={styles.sectionTitle}>{place.label}</h3>
+                        <Heading level={2}>{place.label}</Heading>
                         <span className={styles.coverage}>
                           Seen from {place.firstYear} to {place.lastYear}
                           {` `}across {place.photoCount.toLocaleString("en")} photos
@@ -1193,7 +1193,7 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
             {activeCalendarCoverage > 0 ? (
               <section className={`${styles.section} ${styles.sectionWide}`}>
                 <div className={styles.sectionHeader}>
-                  <h2 className={styles.sectionTitle}>Archive cadence</h2>
+                  <Heading level={2} as="h2">Archive cadence</Heading>
                   <span className={styles.coverage}>
                     {formatCoverage(activeCalendarCoverage)}
                   </span>
@@ -1225,7 +1225,7 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
             {stats.technicalRelationships ? (
               <section className={`${styles.section} ${styles.sectionWide}`}>
                 <div className={styles.sectionHeader}>
-                  <h2 className={styles.sectionTitle}>Settings relationships</h2>
+                  <Heading level={2} as="h2">Settings relationships</Heading>
                   <span className={styles.coverage}>
                     {filteredTechnicalRelationships
                       ? `Based on ${filteredTechnicalRelationships.total.toLocaleString("en")} photos with focal length, aperture, and ISO`
@@ -1346,7 +1346,7 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
               <div className={styles.colourSectionGrid}>
                 <section className={styles.colourPanel}>
                   <div className={styles.sectionHeader}>
-                    <h2 className={styles.sectionTitle}>Dominant colour families</h2>
+                    <Heading level={2} as="h2">Dominant colour families</Heading>
                     <span className={styles.coverage}>
                       {formatCoverage(stats.colorCoverage)}
                     </span>
@@ -1376,7 +1376,7 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
                 {stats.colorFamilyExamples.length > 0 ? (
                   <section className={`${styles.colourPanel} ${styles.colourFamilyPanel}`}>
                     <div className={styles.sectionHeader}>
-                      <h2 className={styles.sectionTitle}>Representative colour looks</h2>
+                      <Heading level={2} as="h2">Representative colour looks</Heading>
                     </div>
                     <div className={styles.colorFamilyRows}>
                       {stats.colorFamilyExamples.map((family) => (
@@ -1427,7 +1427,7 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
                 {stats.colorYearRibbons.length > 0 ? (
                   <section className={`${styles.colourPanel} ${styles.colourFullRowPanel}`}>
                     <div className={styles.sectionHeader}>
-                      <h2 className={styles.sectionTitle}>Colour over time</h2>
+                      <Heading level={2} as="h2">Colour over time</Heading>
                     </div>
                     <div className={styles.colorTimeLegend}>
                       {COLOR_FAMILY_ORDER.map((label) => (

@@ -75,11 +75,6 @@
   gap: var(--m-s);
 }
 
-.memoriesTitle {
-  margin: 0;
-  font-size: var(--fs-m);
-}
-
 .memoriesCaption {
   margin: 0;
   color: var(--c-bg-contrast-light);

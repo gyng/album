@@ -494,11 +494,6 @@
   margin-bottom: var(--m);
 }
 
-.sectionTitle {
-  margin: 0;
-  font-size: var(--fs-m);
-}
-
 .sectionCaption,
 .sectionStatus {
   color: var(--c-bg-contrast-light);

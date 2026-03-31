@@ -3,7 +3,7 @@ import Link from "next/link";
 import {
   BucketedStatGroup,
 } from "../util/computeStats";
-import { ChartTooltip } from "./ui";
+import { ChartTooltip, Heading } from "./ui";
 import styles from "./YearSplitHistogram.module.css";
 
 type Props = {
@@ -25,7 +25,7 @@ export const YearSplitHistogram: React.FC<Props> = ({ title, data, getHref }) =>
 
   return (
     <section className={styles.chart}>
-      <h3 className={styles.title}>{title}</h3>
+      <Heading level={2}>{title}</Heading>
       <div
         className={styles.matrix}
         style={{

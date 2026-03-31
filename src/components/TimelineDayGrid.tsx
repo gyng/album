@@ -2,7 +2,7 @@ import Link from "next/link";
 import { MapWorldDeferred } from "./MapWorldDeferred";
 import { MapWorldEntry } from "./MapWorld";
 import { getRelativeTimeString } from "../util/time";
-import { Thumb, overlayButtonStyles } from "./ui";
+import { Heading, Thumb, overlayButtonStyles } from "./ui";
 import commonStyles from "../styles/common.module.css";
 import styles from "./TimelineDayGrid.module.css";
 import { TimelineEntry } from "./timelineTypes";
@@ -101,12 +101,12 @@ export const TimelineDayGrid = ({
   onSelectNewerDate?: () => void;
   canGoOlder?: boolean;
   canGoNewer?: boolean;
-  dateHeadingRef?: React.Ref<HTMLHeadingElement>;
+  dateHeadingRef?: React.Ref<HTMLDivElement>;
 }) => {
   if (!date) {
     return (
       <section className={styles.emptyState} aria-label="No day selected">
-        <h2 className={styles.heading}>Pick a day</h2>
+        <Heading level={1} as="h2">Pick a day</Heading>
         <p className={styles.emptyCopy}>
           Choose a day from the heatmap, or jump to a random one.
         </p>
@@ -176,9 +176,11 @@ export const TimelineDayGrid = ({
       aria-label={`Photos from ${formattedDate}`}
     >
       <div className={styles.header}>
-        <h2 ref={dateHeadingRef} className={styles.heading}>
-          {formattedDate}
-        </h2>
+        <div ref={dateHeadingRef}>
+          <Heading level={1} as="h2">
+            {formattedDate}
+          </Heading>
+        </div>
         <div className={styles.count}>
           {entries.length} photo{entries.length === 1 ? "" : "s"}
         </div>

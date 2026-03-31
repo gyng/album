@@ -4,7 +4,7 @@ import { useRouter } from "next/router";
 import React from "react";
 import { CalendarHeatmap } from "../../components/CalendarHeatmap";
 import { GlobalNav } from "../../components/GlobalNav";
-import { Footer } from "../../components/ui";
+import { Footer, Heading } from "../../components/ui";
 import { TimelineDayGrid } from "../../components/TimelineDayGrid";
 import { TimelineEntry } from "../../components/timelineTypes";
 import { getAlbums } from "../../services/album";
@@ -119,7 +119,7 @@ const TimelinePage: NextPage<PageProps> = ({ entries }) => {
   >(null);
   const layoutRef = React.useRef<HTMLDivElement | null>(null);
   const heatmapPanelRef = React.useRef<HTMLElement | null>(null);
-  const dayHeadingRef = React.useRef<HTMLHeadingElement | null>(null);
+  const dayHeadingRef = React.useRef<HTMLDivElement | null>(null);
   const selectedConnectorSvgRef = React.useRef<SVGSVGElement | null>(null);
   const selectedConnectorPathRef = React.useRef<SVGPathElement | null>(null);
   const highlightedHeatmapElementsRef = React.useRef<HTMLElement[]>([]);
@@ -489,7 +489,7 @@ const TimelinePage: NextPage<PageProps> = ({ entries }) => {
                 {visibleMemories.length > 0 ? (
                   <section className={styles.memories} aria-label="Memories">
                     <div className={styles.memoriesHeader}>
-                      <h2 className={styles.memoriesTitle}>Memories</h2>
+                      <Heading level={2} as="h2">Memories</Heading>
                       <p className={styles.memoriesCaption}>Around this time</p>
                     </div>
 

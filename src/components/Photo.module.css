@@ -99,8 +99,7 @@
 }
 
 .similarPhotosTitle {
-  margin: 0 0 var(--m);
-  font-size: var(--fs-m);
+  margin-bottom: var(--m);
 }
 
 .similarPhotosStatus {

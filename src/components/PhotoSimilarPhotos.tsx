@@ -7,6 +7,7 @@ import {
 import { fetchSimilarResults } from "./search/api";
 import { SearchResultRow } from "./search/searchTypes";
 import { SearchResultTile } from "./search/SearchResultTile";
+import { Heading } from "./ui";
 
 export const PhotoSimilarPhotos: React.FC<{
   path?: string | null;
@@ -99,7 +100,7 @@ export const PhotoSimilarPhotos: React.FC<{
 
   return (
     <section className={styles.similarPhotos} aria-live="polite">
-      <h3 className={styles.similarPhotosTitle}>Similar photos</h3>
+      <Heading level={2} as="h3" className={styles.similarPhotosTitle}>Similar photos</Heading>
 
       {!database ? (
         <p className={styles.similarPhotosStatus}>
