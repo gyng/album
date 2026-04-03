@@ -3,10 +3,17 @@ from index import (
     format_mapping,
     format_mapping_values,
     analyse_image_worker,
+    build_classifier_prompt,
     build_janus_prompt,
+    compare_caption_payloads,
+    create_classifier,
     filter_exif_for_search,
-    parse_janus_response,
+    Gemma4Classifier,
+    Gemma4GgufClassifier,
     JanusClassifier,
+    parse_classifier_response,
+    parse_janus_response,
+    sample_balanced_paths,
     Sqlite3Client,
     cli,
     index,
@@ -20,6 +27,7 @@ import unittest
 from click.testing import CliRunner
 import torch
 import json
+from unittest import mock
 
 
 class TestMain(unittest.TestCase):
@@ -48,15 +56,43 @@ class TestMain(unittest.TestCase):
         self.assertFalse("suggested_title" in actual)
         self.assertFalse("composition_critique" in actual)
 
+    def test_build_classifier_prompt_matches_janus_prompt_contract(self):
+        actual = build_classifier_prompt({"city": "Tokyo", "country": "Japan"})
+        janus = build_janus_prompt({"city": "Tokyo", "country": "Japan"})
+
+        self.assertEqual(janus, f"<image_placeholder>{actual}")
+        self.assertTrue("strict JSON only" in actual)
+
     def test_parse_janus_response_falls_back_to_plain_text(self):
         actual = parse_janus_response(
             "The photo depicts a serene sky with a bird in flight and a flock of birds."
         )
 
-        self.assertEqual(actual["alt_text"], "The photo depicts a serene sky with a bird in flight and a flock of birds.")
+        self.assertEqual(
+            actual["alt_text"],
+            "The photo depicts a serene sky with a bird in flight and a flock of birds.",
+        )
         self.assertTrue("serene" in actual["identified_objects"])
         self.assertTrue("bird" in actual["identified_objects"])
         self.assertEqual(actual["themes"], [])
+
+    def test_parse_classifier_response_accepts_embedded_json(self):
+        actual = parse_classifier_response(
+            'Sure, here it is: {"identified_objects":["tram"],"themes":["commute"],"alt_text":"Red tram at a stop.","subject":"tram"}'
+        )
+
+        self.assertEqual(actual["identified_objects"], ["tram"])
+        self.assertEqual(actual["themes"], ["commute"])
+        self.assertEqual(actual["subject"], "tram")
+
+    def test_parse_classifier_response_prefers_last_valid_json_block(self):
+        actual = parse_classifier_response(
+            '<|channel>thought {"identified_objects":["wrong"],"themes":[],"alt_text":"Wrong.","subject":"wrong"} <channel|> {"identified_objects":["tram"],"themes":["commute"],"alt_text":"Red tram at a stop.","subject":"tram"}'
+        )
+
+        self.assertEqual(actual["identified_objects"], ["tram"])
+        self.assertEqual(actual["themes"], ["commute"])
+        self.assertEqual(actual["subject"], "tram")
 
     def test_filter_exif_for_search_keeps_only_useful_fields(self):
         actual = filter_exif_for_search(
@@ -85,10 +121,72 @@ class TestMain(unittest.TestCase):
             },
         )
 
+    def test_create_classifier_supports_janus_gemma_and_gguf(self):
+        janus = create_classifier("janus")
+        gemma = create_classifier(
+            "gemma4",
+            model_id="google/gemma-4-E2B-it",
+            quantization=None,
+            batch_size=1,
+            gpu_headroom_gb=3.0,
+            low_impact=True,
+        )
+        gemma_gguf = create_classifier(
+            "gemma4-gguf",
+            model_id="unsloth/gemma-4-E4B-it-GGUF:Q8_0",
+        )
+
+        self.assertEqual(type(janus), JanusClassifier)
+        self.assertEqual(type(gemma), Gemma4Classifier)
+        self.assertEqual(type(gemma_gguf), Gemma4GgufClassifier)
+        self.assertEqual(gemma.model_id, "google/gemma-4-E2B-it")
+        self.assertEqual(gemma.quantization, None)
+        self.assertEqual(gemma.gpu_headroom_gb, 3.0)
+        self.assertEqual(gemma.low_impact, True)
+        self.assertEqual(gemma_gguf.model_id, "unsloth/gemma-4-E4B-it-GGUF:Q8_0")
+
+    def test_sample_balanced_paths_spreads_across_groups(self):
+        paths = [
+            "albums/a/1.jpg",
+            "albums/a/2.jpg",
+            "albums/b/1.jpg",
+            "albums/b/2.jpg",
+            "albums/c/1.jpg",
+        ]
+
+        actual = sample_balanced_paths(paths, sample_size=3, seed=1)
+        parents = {os.path.dirname(path) for path in actual}
+
+        self.assertEqual(len(actual), 3)
+        self.assertEqual(len(parents), 3)
+
+    def test_compare_caption_payloads_flags_candidate_specificity(self):
+        actual = compare_caption_payloads(
+            {
+                "tags": "tram, stop",
+                "alt_text": "Tram",
+                "subject": "tram",
+            },
+            {
+                "identified_objects": ["tram", "platform", "wires"],
+                "themes": ["commute"],
+                "alt_text": "A red tram waiting at a city platform under overhead wires.",
+                "subject": "red tram",
+            },
+        )
+
+        self.assertEqual(actual["verdict"], "candidate_better")
+        self.assertTrue("candidate_adds_tags" in actual["reasons"])
+
     def test_analyse_image_worker(self):
         if torch.cuda.is_available():
             classifier = JanusClassifier()
-            classifier.init_model()
+            try:
+                classifier.init_model()
+            except Exception as err:
+                self.skipTest(
+                    f"Skipping Janus CUDA integration test because Janus is not compatible with the current transformers runtime: {err}"
+                )
             idx = 0
             path = "../src/test/fixtures/monkey.jpg"
             input_tuple = (idx, path, classifier)
@@ -122,6 +220,44 @@ class TestCli(unittest.TestCase):
             self.assertEqual(0, result.exit_code)
             self.assertTrue("Using model profile: siglip2" in result.output)
             self.assertTrue("Found 5 files" in result.output)
+
+    def test_index_dry_run_accepts_gemma_classifier_flags(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            runner = CliRunner()
+            glob = "../albums/test-simple/*.[jJ][pP][gG]"
+            dbpath = os.path.join(tmpdir, "test-simple.sqlite")
+            result = runner.invoke(
+                index,
+                (
+                    f"--glob {glob} --dbpath {dbpath} --dry-run "
+                    "--model-profile janus "
+                    "--classifier-backend gemma4 "
+                    "--classifier-model-id google/gemma-4-E2B-it "
+                    "--classifier-gpu-headroom-gb 3 "
+                    "--classifier-low-impact "
+                    "--classifier-batch-size 1"
+                ).split(),
+            )
+            self.assertEqual(0, result.exit_code)
+            self.assertTrue("Classifier backend: gemma4" in result.output)
+
+    def test_index_dry_run_accepts_gemma_gguf_classifier_flags(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            runner = CliRunner()
+            glob = "../albums/test-simple/*.[jJ][pP][gG]"
+            dbpath = os.path.join(tmpdir, "test-simple.sqlite")
+            result = runner.invoke(
+                index,
+                (
+                    f"--glob {glob} --dbpath {dbpath} --dry-run "
+                    "--model-profile janus "
+                    "--classifier-backend gemma4-gguf "
+                    "--classifier-model-id unsloth/gemma-4-E4B-it-GGUF:Q8_0 "
+                    "--classifier-batch-size 1"
+                ).split(),
+            )
+            self.assertEqual(0, result.exit_code)
+            self.assertTrue("Classifier backend: gemma4-gguf" in result.output)
 
     def test_skip_index_already_exists(self):
         runner = CliRunner()
@@ -250,6 +386,73 @@ class TestDb(unittest.TestCase):
             self.assertEqual(parsed["repeat"], 2)
             self.assertEqual(len(parsed["runs"]), 2)
             self.assertTrue(parsed["medianInsertTotalMs"] >= 0)
+
+    def test_compare_captioners_writes_report_from_existing_db_baseline(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            dbpath = os.path.join(tmpdir, "baseline.sqlite")
+            output_json = os.path.join(tmpdir, "compare.json")
+            output_md = os.path.join(tmpdir, "compare.md")
+
+            db = Sqlite3Client(dbpath)
+            db.setup_tables()
+            path = "../albums/test-simple/DSCF0506-2.jpg"
+            db.upsert_image_fields(
+                path,
+                {
+                    "filename": "DSCF0506-2.jpg",
+                    "album_relative_path": "/album/test-simple#DSCF0506-2.jpg",
+                    "tags": "monkey, branch",
+                    "alt_text": "Monkey on a branch",
+                    "subject": "monkey",
+                },
+            )
+
+            runner = CliRunner()
+
+            class StubClassifier:
+                backend = "gemma4"
+                model_id = "stub/gemma4"
+                quantization = "bnb-4bit"
+
+                def init_model(self):
+                    return None
+
+                def predict(self, _path, _geocode):
+                    return json.dumps(
+                        {
+                            "identified_objects": ["monkey", "branch", "leaves"],
+                            "themes": ["wildlife"],
+                            "alt_text": "Monkey sitting on a branch among leaves.",
+                            "subject": "monkey on branch",
+                        }
+                    )
+
+            with mock.patch("index.create_classifier", return_value=StubClassifier()):
+                result = runner.invoke(
+                    cli,
+                    [
+                        "compare-captioners",
+                        "--glob",
+                        path,
+                        "--baseline-dbpath",
+                        dbpath,
+                        "--sample-size",
+                        "1",
+                        "--output-json",
+                        output_json,
+                        "--output-md",
+                        output_md,
+                    ],
+                    standalone_mode=False,
+                )
+
+            self.assertEqual(0, result.exit_code)
+            self.assertTrue(os.path.exists(output_json))
+            self.assertTrue(os.path.exists(output_md))
+            with open(output_json, "r", encoding="utf-8") as fh:
+                payload = json.load(fh)
+            self.assertEqual(payload["summary"]["sampleSize"], 1)
+            self.assertEqual(payload["summary"]["verdictCounts"]["candidate_better"], 1)
 
 
 if __name__ == "__main__":

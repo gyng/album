@@ -5,3 +5,10 @@ __pycache__
 *.bak
 .venv
 .ruff_cache
+.janus-bench-packages
+.janus-benchmark-*.json
+.gemma-benchmark.json
+.google-gemma-benchmark*.json
+.fixture-caption-comparison.json
+.fixture-caption-comparison.md
+.test-simple-gemma-sample.json

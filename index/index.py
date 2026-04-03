@@ -15,11 +15,17 @@ import re
 import math
 import tempfile
 import statistics
+import random
+import subprocess
+import shutil
 from contextlib import contextmanager
 
-from transformers import AutoImageProcessor, AutoModel, AutoModelForCausalLM
-from janus.models import MultiModalityCausalLM, VLChatProcessor
-from janus.utils.io import load_pil_images
+from transformers import (
+    AutoImageProcessor,
+    AutoModel,
+    AutoModelForCausalLM,
+    AutoProcessor,
+)
 
 import concurrent.futures
 import time
@@ -28,6 +34,21 @@ import time
 MODEL_PROFILE_JANUS = "janus"
 MODEL_PROFILE_SIGLIP2 = "siglip2"
 MODEL_PROFILE_HYBRID = "hybrid"
+CLASSIFIER_BACKEND_JANUS = "janus"
+CLASSIFIER_BACKEND_GEMMA4 = "gemma4"
+CLASSIFIER_BACKEND_GEMMA4_GGUF = "gemma4-gguf"
+DEFAULT_GEMMA4_MODEL_ID = "google/gemma-4-E2B-it"
+DEFAULT_GEMMA4_QUANTIZATION = None
+DEFAULT_GEMMA4_BATCH_SIZE = 1
+DEFAULT_GEMMA4_LOW_IMPACT_HEADROOM_GB = 3.0
+DEFAULT_GEMMA4_CPU_MAX_MEMORY = "24GiB"
+DEFAULT_GEMMA4_GGUF_MODEL_ID = "unsloth/gemma-4-E4B-it-GGUF:Q8_0"
+DEFAULT_GEMMA4_GGUF_BATCH_SIZE = 1
+DEFAULT_GEMMA4_GGUF_MAX_NEW_TOKENS = 256
+DEFAULT_GEMMA4_GGUF_IMAGE_MIN_TOKENS = 70
+DEFAULT_GEMMA4_GGUF_IMAGE_MAX_TOKENS = 140
+DEFAULT_GEMMA4_GGUF_THREADS = 8
+DEFAULT_GEMMA4_GGUF_CTX_SIZE = 32768
 JANUS_RESPONSE_FIELDS = (
     "identified_objects",
     "themes",
@@ -36,6 +57,7 @@ JANUS_RESPONSE_FIELDS = (
 )
 JANUS_MAX_NEW_TOKENS = 192
 JANUS_BATCH_SIZE = 4
+GEMMA4_MAX_NEW_TOKENS = 192
 EMBEDDER_BATCH_SIZE = 16
 COLORTHIEF_WORKERS = 4
 EXIF_SEARCH_FIELDS = (
@@ -88,7 +110,7 @@ JANUS_FALLBACK_STOPWORDS = {
 }
 
 
-def build_janus_prompt(geocode: Optional[Mapping]) -> str:
+def build_classifier_prompt(geocode: Optional[Mapping]) -> str:
     schema = (
         '{ "identified_objects": string[], "themes": string[], '
         '"alt_text": string, "subject": string }'
@@ -100,12 +122,10 @@ def build_janus_prompt(geocode: Optional[Mapping]) -> str:
         country = geocode.get("country", "")
         place = ", ".join([part for part in [city, country] if part])
         if place:
-            location_hint = (
-                f" The photo was taken near {place}. Use that only when it is visually relevant."
-            )
+            location_hint = f" The photo was taken near {place}. Use that only when it is visually relevant."
 
     return (
-        "<image_placeholder>Return strict JSON only. "
+        "Return strict JSON only. "
         "Describe the photo for search indexing using this schema: "
         f"{schema}."
         " Keep identified_objects and themes short and concrete."
@@ -113,6 +133,10 @@ def build_janus_prompt(geocode: Optional[Mapping]) -> str:
         " Do not return prose outside the JSON object."
         f"{location_hint}"
     )
+
+
+def build_janus_prompt(geocode: Optional[Mapping]) -> str:
+    return f"<image_placeholder>{build_classifier_prompt(geocode)}"
 
 
 def keywordise_text(text: str, limit: int = 6) -> list[str]:
@@ -129,12 +153,21 @@ def keywordise_text(text: str, limit: int = 6) -> list[str]:
     return keywords
 
 
-def parse_janus_response(raw_result: str) -> Mapping[str, typing.Any]:
+def parse_classifier_response(raw_result: str) -> Mapping[str, typing.Any]:
     JSON_BLOCK_PATTERN = re.compile(r"\{.*?\}", re.DOTALL | re.MULTILINE)
     blocks = JSON_BLOCK_PATTERN.findall(raw_result)
 
     if len(blocks) > 0:
-        result = json.loads(blocks[0])
+        result = None
+        last_error = None
+        for block in reversed(blocks):
+            try:
+                result = json.loads(block)
+                break
+            except json.JSONDecodeError as err:
+                last_error = err
+        if result is None:
+            raise last_error or ValueError("No valid JSON block found")
     else:
         cleaned = " ".join(raw_result.split()).strip()
         if not cleaned:
@@ -159,7 +192,13 @@ def parse_janus_response(raw_result: str) -> Mapping[str, typing.Any]:
     return result
 
 
-def filter_exif_for_search(exif: Optional[Mapping[str, typing.Any]]) -> Mapping[str, typing.Any]:
+def parse_janus_response(raw_result: str) -> Mapping[str, typing.Any]:
+    return parse_classifier_response(raw_result)
+
+
+def filter_exif_for_search(
+    exif: Optional[Mapping[str, typing.Any]],
+) -> Mapping[str, typing.Any]:
     if not exif or not hasattr(exif, "get"):
         return {}
 
@@ -175,17 +214,56 @@ def filter_exif_for_search(exif: Optional[Mapping[str, typing.Any]]) -> Mapping[
     return filtered
 
 
-class JanusClassifier:
+class BaseCaptionClassifier:
+    backend = "base"
+    batch_size = 1
+
+    def init_model(self) -> None:
+        raise NotImplementedError
+
+    def predict(self, path: str, geocode: Optional[Mapping]) -> str:
+        raise NotImplementedError
+
+    def predict_batch(self, items: list[tuple[str, Optional[Mapping]]]) -> list[str]:
+        return [self.predict(path, geocode) for path, geocode in items]
+
+
+class JanusClassifier(BaseCaptionClassifier):
+    backend = CLASSIFIER_BACKEND_JANUS
+    batch_size = JANUS_BATCH_SIZE
+
+    def _import_janus_modules(self):
+        # Janus currently expects pre-Transformers-5 PretrainedConfig subclass behaviour.
+        # The temporary shim keeps Janus importable while the rest of the process uses the
+        # newer Gemma-capable transformers build.
+        from transformers import PretrainedConfig
+
+        original_init_subclass = PretrainedConfig.__init_subclass__
+
+        def compat_init_subclass(cls, **kwargs):
+            return super(PretrainedConfig, cls).__init_subclass__(**kwargs)
+
+        PretrainedConfig.__init_subclass__ = classmethod(compat_init_subclass)
+        try:
+            from janus.models import MultiModalityCausalLM, VLChatProcessor
+            from janus.utils.io import load_pil_images
+        finally:
+            PretrainedConfig.__init_subclass__ = original_init_subclass
+
+        return MultiModalityCausalLM, VLChatProcessor, load_pil_images
+
     def init_model(self) -> None:
         print("Loading Janus-Pro-1B...")
         # use 1B for speed/lower requirements
         model_path = "deepseek-ai/Janus-Pro-1B"
-        self.vl_chat_processor: VLChatProcessor = VLChatProcessor.from_pretrained(
-            model_path
+        MultiModalityCausalLM, VLChatProcessor, load_pil_images = (
+            self._import_janus_modules()
         )
+        self._load_pil_images = load_pil_images
+        self.vl_chat_processor = VLChatProcessor.from_pretrained(model_path)
         self.tokenizer = self.vl_chat_processor.tokenizer
 
-        vl_gpt: MultiModalityCausalLM = AutoModelForCausalLM.from_pretrained(
+        vl_gpt = AutoModelForCausalLM.from_pretrained(
             model_path, trust_remote_code=True
         )
         self.vl_gpt = vl_gpt.to(torch.bfloat16).cuda().eval()
@@ -206,7 +284,7 @@ class JanusClassifier:
 
         # load images and prepare for inputs
         # Janus-Pro will resize images internally
-        pil_images = load_pil_images(conversation)
+        pil_images = self._load_pil_images(conversation)
 
         prepare_inputs = self.vl_chat_processor(
             conversations=conversation, images=pil_images, force_batchify=True
@@ -248,7 +326,7 @@ class JanusClassifier:
                 {"role": "User", "content": prompt, "images": [path]},
                 {"role": "Assistant", "content": ""},
             ]
-            pil_images = load_pil_images(conversation)
+            pil_images = self._load_pil_images(conversation)
             prepare_inputs = self.vl_chat_processor(
                 conversations=conversation, images=pil_images, force_batchify=True
             ).to(self.vl_gpt.device)
@@ -294,6 +372,325 @@ class JanusClassifier:
         ]
 
 
+class Gemma4Classifier(BaseCaptionClassifier):
+    backend = CLASSIFIER_BACKEND_GEMMA4
+
+    def __init__(
+        self,
+        model_id: str = DEFAULT_GEMMA4_MODEL_ID,
+        quantization: Optional[str] = DEFAULT_GEMMA4_QUANTIZATION,
+        batch_size: int = DEFAULT_GEMMA4_BATCH_SIZE,
+        max_new_tokens: int = GEMMA4_MAX_NEW_TOKENS,
+        gpu_headroom_gb: Optional[float] = None,
+        low_impact: bool = False,
+    ):
+        self.model_id = model_id
+        self.quantization = quantization
+        self.batch_size = batch_size
+        self.max_new_tokens = max_new_tokens
+        self.gpu_headroom_gb = gpu_headroom_gb
+        self.low_impact = low_impact
+        self.device = "cuda" if torch.cuda.is_available() else "cpu"
+
+    def _build_max_memory(self) -> Optional[dict[typing.Any, str]]:
+        if not torch.cuda.is_available():
+            return None
+
+        requested_headroom = self.gpu_headroom_gb
+        if requested_headroom is None and self.low_impact:
+            requested_headroom = DEFAULT_GEMMA4_LOW_IMPACT_HEADROOM_GB
+        if requested_headroom is None:
+            return None
+
+        total_gb = torch.cuda.get_device_properties(0).total_memory / (1024**3)
+        usable_gb = max(4.0, total_gb - requested_headroom)
+        usable_mib = max(4096, int(usable_gb * 1024))
+        reserved_gb = round(total_gb - (usable_mib / 1024), 2)
+        print(
+            "Gemma 4 headroom mode: "
+            f"reserving about {reserved_gb} GiB of GPU memory for interactive work."
+        )
+        return {
+            0: f"{usable_mib}MiB",
+            "cpu": DEFAULT_GEMMA4_CPU_MAX_MEMORY,
+        }
+
+    def init_model(self) -> None:
+        try:
+            from transformers import AutoModelForMultimodalLM
+        except ImportError as err:
+            raise RuntimeError(
+                "Gemma 4 full-precision support requires a newer transformers build with AutoModelForMultimodalLM. Keep Janus as the default in this environment, or install the experimental Gemma runtime separately."
+            ) from err
+        print(
+            f"Loading Gemma 4 classifier ({self.model_id}, quantization={self.quantization or 'none'})..."
+        )
+        if self.quantization == "bnb-4bit":
+            print(
+                "Warning: local testing found Gemma 4 vision captions can become placeholder-like under bitsandbytes 4-bit quantisation. Prefer full precision for quality checks."
+            )
+        self.processor = AutoProcessor.from_pretrained(self.model_id)
+
+        model_kwargs: dict[str, typing.Any] = {}
+        max_memory = self._build_max_memory()
+        if self.quantization == "bnb-4bit":
+            try:
+                from transformers import BitsAndBytesConfig
+            except ImportError as err:
+                raise RuntimeError(
+                    "Gemma 4 4-bit loading requires bitsandbytes-compatible transformers support."
+                ) from err
+
+            compute_dtype = (
+                torch.bfloat16 if torch.cuda.is_available() else torch.float32
+            )
+            model_kwargs["quantization_config"] = BitsAndBytesConfig(
+                load_in_4bit=True,
+                bnb_4bit_quant_type="nf4",
+                bnb_4bit_use_double_quant=True,
+                bnb_4bit_compute_dtype=compute_dtype,
+            )
+            model_kwargs["device_map"] = "auto"
+            if max_memory is not None:
+                model_kwargs["max_memory"] = max_memory
+        else:
+            model_kwargs["dtype"] = (
+                torch.bfloat16 if torch.cuda.is_available() else torch.float32
+            )
+            if max_memory is not None:
+                model_kwargs["device_map"] = "auto"
+                model_kwargs["max_memory"] = max_memory
+
+        self.model = AutoModelForMultimodalLM.from_pretrained(
+            self.model_id,
+            **model_kwargs,
+        )
+        if "device_map" not in model_kwargs:
+            self.model = self.model.to(self.device)
+        self.model = self.model.eval()
+        print(f"Loaded Gemma 4 classifier {self.model_id}.")
+
+    def _build_prompt(self, geocode: Optional[Mapping]) -> str:
+        return build_classifier_prompt(geocode)
+
+    def _build_inputs(
+        self, path: str, geocode: Optional[Mapping]
+    ) -> dict[str, torch.Tensor]:
+        prompt = self._build_prompt(geocode)
+        with Image.open(path) as raw_image:
+            image = raw_image.convert("RGB")
+
+        messages = [
+            {
+                "role": "user",
+                "content": [
+                    {"type": "image", "image": image},
+                    {"type": "text", "text": prompt},
+                ],
+            }
+        ]
+        inputs = self.processor.apply_chat_template(
+            messages,
+            tokenize=True,
+            return_dict=True,
+            return_tensors="pt",
+            add_generation_prompt=True,
+        )
+
+        resolved_device = getattr(self.model, "device", None)
+        if resolved_device is None or str(resolved_device) == "meta":
+            resolved_device = self.device
+        return {k: v.to(resolved_device) for k, v in inputs.items()}
+
+    @torch.inference_mode()
+    def predict(self, path: str, geocode: Optional[Mapping]) -> str:
+        inputs = self._build_inputs(path, geocode)
+        input_ids = inputs.get("input_ids")
+        generated = self.model.generate(
+            **inputs,
+            max_new_tokens=self.max_new_tokens,
+            do_sample=False,
+            use_cache=True,
+        )
+
+        if input_ids is not None:
+            prompt_len = input_ids.shape[-1]
+            generated_tokens = generated[:, prompt_len:]
+        else:
+            generated_tokens = generated
+
+        return self.processor.batch_decode(
+            generated_tokens,
+            skip_special_tokens=True,
+            clean_up_tokenization_spaces=True,
+        )[0]
+
+
+class Gemma4GgufClassifier(BaseCaptionClassifier):
+    backend = CLASSIFIER_BACKEND_GEMMA4_GGUF
+
+    def __init__(
+        self,
+        model_id: str = DEFAULT_GEMMA4_GGUF_MODEL_ID,
+        quantization: Optional[str] = None,
+        batch_size: int = DEFAULT_GEMMA4_GGUF_BATCH_SIZE,
+        max_new_tokens: int = DEFAULT_GEMMA4_GGUF_MAX_NEW_TOKENS,
+        gpu_headroom_gb: Optional[float] = None,
+        low_impact: bool = False,
+    ):
+        self.model_id = model_id
+        self.quantization = quantization
+        self.batch_size = batch_size
+        self.max_new_tokens = max_new_tokens
+        self.gpu_headroom_gb = gpu_headroom_gb
+        self.low_impact = low_impact
+        self.command = None
+        self._json_schema_path = None
+
+    def init_model(self) -> None:
+        command = shutil.which("llama-mtmd-cli")
+        if command is None:
+            candidate = "/tmp/llama.cpp/build/bin/llama-mtmd-cli"
+            if os.path.exists(candidate):
+                command = candidate
+        if command is None:
+            raise RuntimeError(
+                "Could not find llama-mtmd-cli. Install llama.cpp or add it to PATH."
+            )
+        self.command = command
+        schema = {
+            "type": "object",
+            "properties": {
+                "identified_objects": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                },
+                "themes": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                },
+                "alt_text": {"type": "string"},
+                "subject": {"type": "string"},
+            },
+            "required": list(JANUS_RESPONSE_FIELDS),
+            "additionalProperties": False,
+        }
+        schema_file = tempfile.NamedTemporaryFile(
+            mode="w",
+            suffix=".json",
+            prefix="gemma4-gguf-schema-",
+            delete=False,
+            encoding="utf-8",
+        )
+        json.dump(schema, schema_file)
+        schema_file.flush()
+        schema_file.close()
+        self._json_schema_path = schema_file.name
+        print(
+            f"Using llama.cpp Gemma 4 GGUF classifier ({self.model_id}) via {self.command}."
+        )
+
+    def _build_prompt(self, geocode: Optional[Mapping]) -> str:
+        schema = (
+            '{ "identified_objects": string[], "themes": string[], '
+            '"alt_text": string, "subject": string }'
+        )
+        location_hint = ""
+        if geocode:
+            city = geocode.get("city", "")
+            country = geocode.get("country", "")
+            place = ", ".join([part for part in [city, country] if part])
+            if place:
+                location_hint = f" The photo was taken near {place}. Use that only when it is visually relevant."
+
+        return (
+            "Reply with strict JSON only using this schema: "
+            f"{schema}."
+            " Keep identified_objects and themes short and concrete."
+            " Keep alt_text and subject concise, factual, and literal."
+            " Do not include any reasoning, channel markers, code fences, or prose outside the JSON object."
+            f"{location_hint}"
+        )
+
+    def _extract_answer_text(self, raw_output: str) -> str:
+        answer = raw_output.strip()
+        if "<|channel>final" in answer:
+            answer = answer.split("<|channel>final", 1)[1]
+        elif "<|channel>analysis" in answer:
+            answer = answer.split("<|channel>analysis", 1)[-1]
+        elif "<|channel>thought" in answer and "{ " in answer:
+            answer = answer[answer.find("{ ") :]
+
+        if "<|channel>" in answer:
+            answer = answer.split("<|channel>", 1)[-1]
+        if "<channel|>" in answer:
+            answer = answer.split("<channel|>")[-1]
+        answer = answer.replace("```json", "").replace("```", "").strip()
+        return answer
+
+    @torch.inference_mode()
+    def predict(self, path: str, geocode: Optional[Mapping]) -> str:
+        if self.command is None:
+            raise RuntimeError(
+                "Gemma4GgufClassifier.init_model() must be called first."
+            )
+
+        prompt = self._build_prompt(geocode)
+        command = [
+            self.command,
+            "--image",
+            path,
+            "--image-min-tokens",
+            str(DEFAULT_GEMMA4_GGUF_IMAGE_MIN_TOKENS),
+            "--image-max-tokens",
+            str(DEFAULT_GEMMA4_GGUF_IMAGE_MAX_TOKENS),
+            "--ctx-size",
+            str(DEFAULT_GEMMA4_GGUF_CTX_SIZE),
+            "--threads",
+            str(DEFAULT_GEMMA4_GGUF_THREADS),
+            "--gpu-layers",
+            "auto",
+            "--predict",
+            str(self.max_new_tokens),
+            "--jinja",
+            "--json-schema-file",
+            self._json_schema_path,
+            "--no-warmup",
+            "-p",
+            prompt,
+        ]
+        if self.model_id.endswith(".gguf") and os.path.exists(self.model_id):
+            mmproj_path = self.quantization
+            if mmproj_path is None:
+                sibling = os.path.join(
+                    os.path.dirname(self.model_id), "mmproj-BF16.gguf"
+                )
+                if os.path.exists(sibling):
+                    mmproj_path = sibling
+            if mmproj_path is None:
+                raise RuntimeError(
+                    "Local GGUF model path requires an mmproj file path via quantization or a sibling mmproj-BF16.gguf."
+                )
+            command[1:1] = ["--model", self.model_id, "--mmproj", mmproj_path]
+        else:
+            command[1:1] = ["--hf-repo", self.model_id]
+
+        completed = subprocess.run(
+            command,
+            capture_output=True,
+            text=True,
+            check=True,
+            env=os.environ.copy(),
+        )
+        output = completed.stdout.strip()
+        if not output:
+            stderr = completed.stderr.strip()
+            output = self._extract_answer_text(stderr)
+        if not output:
+            raise RuntimeError("llama.cpp returned no parseable output.")
+        return self._extract_answer_text(output)
+
+
 class BaseImageEmbedder:
     MODEL_ID: str
 
@@ -329,6 +726,45 @@ class SiglipEmbedder(BaseImageEmbedder):
 
 class Siglip2Embedder(BaseImageEmbedder):
     MODEL_ID = "google/siglip2-base-patch16-224"
+
+
+def create_classifier(
+    backend: str,
+    model_id: Optional[str] = None,
+    quantization: Optional[str] = None,
+    batch_size: Optional[int] = None,
+    max_new_tokens: Optional[int] = None,
+    gpu_headroom_gb: Optional[float] = None,
+    low_impact: bool = False,
+) -> BaseCaptionClassifier:
+    if backend == CLASSIFIER_BACKEND_JANUS:
+        return JanusClassifier()
+
+    if backend == CLASSIFIER_BACKEND_GEMMA4:
+        return Gemma4Classifier(
+            model_id=model_id or DEFAULT_GEMMA4_MODEL_ID,
+            quantization=(
+                quantization
+                if quantization is not None
+                else DEFAULT_GEMMA4_QUANTIZATION
+            ),
+            batch_size=batch_size or DEFAULT_GEMMA4_BATCH_SIZE,
+            max_new_tokens=max_new_tokens or GEMMA4_MAX_NEW_TOKENS,
+            gpu_headroom_gb=gpu_headroom_gb,
+            low_impact=low_impact,
+        )
+
+    if backend == CLASSIFIER_BACKEND_GEMMA4_GGUF:
+        return Gemma4GgufClassifier(
+            model_id=model_id or DEFAULT_GEMMA4_GGUF_MODEL_ID,
+            quantization=quantization,
+            batch_size=batch_size or DEFAULT_GEMMA4_GGUF_BATCH_SIZE,
+            max_new_tokens=max_new_tokens or DEFAULT_GEMMA4_GGUF_MAX_NEW_TOKENS,
+            gpu_headroom_gb=gpu_headroom_gb,
+            low_impact=low_impact,
+        )
+
+    raise ValueError(f"Unsupported classifier backend: {backend}")
 
 
 def convert_to_degress(value: exifread.utils.Ratio, lat_or_lng_ref: str) -> float:
@@ -376,6 +812,7 @@ class Sqlite3Client:
         self.con = sqlite3.connect(db_path)
         # allows for concurrent writes...? Not sure if it has any impact
         self.con.execute("PRAGMA journal_mode=WAL;")
+        self._images_columns = None
 
     @contextmanager
     def transaction(self):
@@ -463,6 +900,52 @@ class Sqlite3Client:
         res = cur.execute("SELECT * FROM images")
         resolved = res.fetchall()
         return resolved
+
+    def get_image_row(self, path: str):
+        cur = self.con.cursor()
+        if self._images_columns is None:
+            self._images_columns = {
+                row[1] for row in cur.execute("PRAGMA table_info(images)").fetchall()
+            }
+
+        ordered_fields = [
+            "path",
+            "album_relative_path",
+            "filename",
+            "geocode",
+            "exif",
+            "tags",
+            "colors",
+            "alt_text",
+            "subject",
+        ]
+        select_fields = []
+        for field in ordered_fields:
+            if field in self._images_columns:
+                select_fields.append(field)
+            else:
+                select_fields.append(f"NULL as {field}")
+        statement = f"""
+            SELECT {", ".join(select_fields)}
+            FROM images
+            WHERE path = ?
+            LIMIT 1
+        """
+        res = cur.execute(statement, (path,))
+        row = res.fetchone()
+        if row is None:
+            return None
+        return {
+            "path": row[0],
+            "album_relative_path": row[1],
+            "filename": row[2],
+            "geocode": row[3],
+            "exif": row[4],
+            "tags": row[5],
+            "colors": row[6],
+            "alt_text": row[7],
+            "subject": row[8],
+        }
 
     def list_paths(self):
         cur = self.con.cursor()
@@ -749,12 +1232,59 @@ def cli(ctx):
     default=None,
     help="Optional JSON file path for timing output.",
 )
+@click.option(
+    "--classifier-backend",
+    type=click.Choice(
+        [
+            CLASSIFIER_BACKEND_JANUS,
+            CLASSIFIER_BACKEND_GEMMA4,
+            CLASSIFIER_BACKEND_GEMMA4_GGUF,
+        ],
+        case_sensitive=False,
+    ),
+    default=CLASSIFIER_BACKEND_JANUS,
+    help="Caption classifier backend to use when the profile includes classifier fields.",
+)
+@click.option(
+    "--classifier-model-id",
+    default=None,
+    help="Optional model id for the selected classifier backend. Full Gemma defaults to google/gemma-4-E2B-it and GGUF defaults to unsloth/gemma-4-E4B-it-GGUF:Q8_0.",
+)
+@click.option(
+    "--classifier-quantization",
+    default=None,
+    help="Optional quantisation mode for the classifier backend. The Transformers bnb-4bit path is not recommended for Gemma 4 vision.",
+)
+@click.option(
+    "--classifier-batch-size",
+    default=None,
+    type=int,
+    help="Optional caption batch size override. Janus defaults to 4; Gemma defaults to 1.",
+)
+@click.option(
+    "--classifier-gpu-headroom-gb",
+    default=None,
+    type=float,
+    help="Optional GPU memory headroom to keep free for Gemma 4 by offloading part of the model to CPU.",
+)
+@click.option(
+    "--classifier-low-impact",
+    is_flag=True,
+    default=False,
+    help="Low-impact Gemma mode: keep some GPU memory free and prefer CPU offload for background runs.",
+)
 def index(
     glob: str,
     dbpath: str,
     dry_run: bool,
     model_profile: str,
     benchmark_output: Optional[str],
+    classifier_backend: str,
+    classifier_model_id: Optional[str],
+    classifier_quantization: Optional[str],
+    classifier_batch_size: Optional[int],
+    classifier_gpu_headroom_gb: Optional[float],
+    classifier_low_impact: bool,
 ):
     started_at = time.perf_counter()
     db = Sqlite3Client(dbpath)
@@ -763,6 +1293,7 @@ def index(
     setup_ms = (time.perf_counter() - setup_started_at) * 1000
     db_info = db.info()
     print(f"Database: {db_info['entries']} entries (SQLite {db_info['version']})")
+    print(f"Using model profile: {model_profile}")
 
     planning_started_at = time.perf_counter()
     files = find_files(".", glob)
@@ -781,7 +1312,10 @@ def index(
         has_image = file_path in existing_image_paths
         has_embedding_v2 = file_path in existing_embedding_paths_v2
         has_embedding_v1 = file_path in existing_embedding_paths_v1
-        needs_classifier = model_profile in [MODEL_PROFILE_JANUS, MODEL_PROFILE_HYBRID] and not has_image
+        needs_classifier = (
+            model_profile in [MODEL_PROFILE_JANUS, MODEL_PROFILE_HYBRID]
+            and not has_image
+        )
         needs_embedding_v2 = uses_embeddings and not has_embedding_v2
         needs_embedding_v1 = uses_embeddings and not has_embedding_v1
 
@@ -797,7 +1331,13 @@ def index(
     planning_ms = (time.perf_counter() - planning_started_at) * 1000
 
     skipped = len(files) - len(work_items)
-    print(f"Found {len(files)} files ({len(work_items)} to index, {skipped} already indexed) — profile: {model_profile}")
+    print(
+        f"Found {len(files)} files ({len(work_items)} to index, {skipped} already indexed) — profile: {model_profile}"
+    )
+    print(f"(skipping {skipped} already-indexed)")
+    print(f"Analysing {len(work_items)} files needing work")
+    if model_profile in [MODEL_PROFILE_JANUS, MODEL_PROFILE_HYBRID]:
+        print(f"Classifier backend: {classifier_backend}")
 
     if not dry_run and len(work_items) > 0:
         classifier = None
@@ -805,7 +1345,14 @@ def index(
         model_init_started_at = time.perf_counter()
 
         if any(item["needs_classifier"] for item in work_items):
-            classifier = JanusClassifier()
+            classifier = create_classifier(
+                backend=classifier_backend,
+                model_id=classifier_model_id,
+                quantization=classifier_quantization,
+                batch_size=classifier_batch_size,
+                gpu_headroom_gb=classifier_gpu_headroom_gb,
+                low_impact=classifier_low_impact,
+            )
             classifier.init_model()
 
         embedder_v2 = None
@@ -823,35 +1370,44 @@ def index(
         # fast_colorthief (Rust) releases the GIL, so it runs truly in parallel with
         # CUDA kernels on the GPU — ~2.7 min of CPU work becomes effectively free.
         all_paths = [item["path"] for item in work_items]
-        colors_executor = concurrent.futures.ThreadPoolExecutor(max_workers=COLORTHIEF_WORKERS)
+        colors_executor = concurrent.futures.ThreadPoolExecutor(
+            max_workers=COLORTHIEF_WORKERS
+        )
         colors_started_at = time.perf_counter()
         color_futures = {
             path: colors_executor.submit(fast_colorthief.get_palette, path)
             for path in all_paths
         }
-        print(f"Color extraction started in background ({len(all_paths)} images, {COLORTHIEF_WORKERS} threads)")
+        print(
+            f"Color extraction started in background ({len(all_paths)} images, {COLORTHIEF_WORKERS} threads)"
+        )
 
         # Pre-compute Janus results in batches (GPU).
         # Batching amortises KV-cache and kernel launch overhead — ~3.8x vs single-image.
-        precomputed_janus: dict[str, str] = {}
+        precomputed_captions: dict[str, str] = {}
         if classifier is not None:
-            janus_paths = [
+            classifier_paths = [
                 item["path"] for item in work_items if item["needs_classifier"]
             ]
-            print(f"Running Janus in batches of {JANUS_BATCH_SIZE} ({len(janus_paths)} images)...")
+            resolved_batch_size = max(1, classifier_batch_size or classifier.batch_size)
+            print(
+                f"Running {classifier.backend} captions in batches of {resolved_batch_size} ({len(classifier_paths)} images)..."
+            )
             batch_started_at = time.perf_counter()
-            for batch_start in range(0, len(janus_paths), JANUS_BATCH_SIZE):
-                batch_paths = janus_paths[batch_start : batch_start + JANUS_BATCH_SIZE]
+            for batch_start in range(0, len(classifier_paths), resolved_batch_size):
+                batch_paths = classifier_paths[
+                    batch_start : batch_start + resolved_batch_size
+                ]
                 batch_geocodes = [extract_geocode_from_path(p) for p in batch_paths]
                 batch_results = classifier.predict_batch(
                     list(zip(batch_paths, batch_geocodes))
                 )
                 for path, raw in zip(batch_paths, batch_results):
-                    precomputed_janus[path] = raw
-                done = min(batch_start + JANUS_BATCH_SIZE, len(janus_paths))
-                print(f"  Janus batch: {done}/{len(janus_paths)}")
+                    precomputed_captions[path] = raw
+                done = min(batch_start + resolved_batch_size, len(classifier_paths))
+                print(f"  {classifier.backend} batch: {done}/{len(classifier_paths)}")
             batch_ms = (time.perf_counter() - batch_started_at) * 1000
-            print(f"Janus batch inference complete in {batch_ms:.0f}ms")
+            print(f"{classifier.backend} batch inference complete in {batch_ms:.0f}ms")
 
         # Pre-compute embeddings in batches (GPU, ~2x vs sequential).
         # keyed as precomputed_embeddings[path][model_id] = embedding
@@ -863,13 +1419,17 @@ def index(
             if embedder is None:
                 continue
             emb_paths = [item["path"] for item in work_items if item[needs_key]]
-            print(f"Running {embedder.model_id} embeddings in batches of {EMBEDDER_BATCH_SIZE} ({len(emb_paths)} images)...")
+            print(
+                f"Running {embedder.model_id} embeddings in batches of {EMBEDDER_BATCH_SIZE} ({len(emb_paths)} images)..."
+            )
             emb_started_at = time.perf_counter()
             for batch_start in range(0, len(emb_paths), EMBEDDER_BATCH_SIZE):
                 batch_paths = emb_paths[batch_start : batch_start + EMBEDDER_BATCH_SIZE]
                 batch_embeddings = embedder.predict_image_embeddings_batch(batch_paths)
                 for path, embedding in zip(batch_paths, batch_embeddings):
-                    precomputed_embeddings.setdefault(path, {})[embedder.model_id] = embedding
+                    precomputed_embeddings.setdefault(path, {})[
+                        embedder.model_id
+                    ] = embedding
             emb_ms = (time.perf_counter() - emb_started_at) * 1000
             print(f"{embedder.model_id} embeddings complete in {emb_ms:.0f}ms")
 
@@ -879,18 +1439,24 @@ def index(
         for path, fut in color_futures.items():
             precomputed_colors[path] = fut.result()
         colors_ms = (time.perf_counter() - colors_started_at) * 1000
-        print(f"Color extraction complete in {colors_ms:.0f}ms (ran concurrently with GPU)")
+        print(
+            f"Color extraction complete in {colors_ms:.0f}ms (ran concurrently with GPU)"
+        )
 
         enumerated = [
             (
                 item_index,
                 item["path"],
                 classifier if item["needs_classifier"] else None,
-                [e for e in [
-                    embedder_v2 if item["needs_embedding_v2"] else None,
-                    embedder_v1 if item["needs_embedding_v1"] else None,
-                ] if e is not None],
-                precomputed_janus.get(item["path"]),
+                [
+                    e
+                    for e in [
+                        embedder_v2 if item["needs_embedding_v2"] else None,
+                        embedder_v1 if item["needs_embedding_v1"] else None,
+                    ]
+                    if e is not None
+                ],
+                precomputed_captions.get(item["path"]),
                 precomputed_embeddings.get(item["path"]),
                 precomputed_colors.get(item["path"]),
             )
@@ -927,7 +1493,9 @@ def index(
         insert_started_at = time.perf_counter()
         insert_analysed_images_batch(db, worker_results)
         insert_durations_ms = [(time.perf_counter() - insert_started_at) * 1000]
-        print(f"Inserted {len(worker_results)} images in {insert_durations_ms[0]:.0f}ms")
+        print(
+            f"Inserted {len(worker_results)} images in {insert_durations_ms[0]:.0f}ms"
+        )
 
         db.optimize()
     else:
@@ -942,7 +1510,9 @@ def index(
             "workItemCount": len(work_items),
             "medianAnalysisMs": round(statistics.median(analysis_durations_ms), 2),
         }
-        stats_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".last-index-stats.json")
+        stats_path = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)), ".last-index-stats.json"
+        )
         with open(stats_path, "w", encoding="utf-8") as fh:
             json.dump(stats, fh, indent=2)
 
@@ -961,13 +1531,17 @@ def index(
                 "planning": round(planning_ms, 2),
                 "modelInit": round(model_init_ms, 2),
                 "analysisTotal": round(sum(analysis_durations_ms), 2),
-                "analysisMedian": round(statistics.median(analysis_durations_ms), 2)
-                if analysis_durations_ms
-                else 0.0,
+                "analysisMedian": (
+                    round(statistics.median(analysis_durations_ms), 2)
+                    if analysis_durations_ms
+                    else 0.0
+                ),
                 "insertTotal": round(sum(insert_durations_ms), 2),
-                "insertMedian": round(statistics.median(insert_durations_ms), 2)
-                if insert_durations_ms
-                else 0.0,
+                "insertMedian": (
+                    round(statistics.median(insert_durations_ms), 2)
+                    if insert_durations_ms
+                    else 0.0
+                ),
             },
         }
         with open(benchmark_output, "w", encoding="utf-8") as fh:
@@ -1031,7 +1605,9 @@ def benchmark_index(rows: int, repeat: int, output: Optional[str]):
                     "run": run_index + 1,
                     "setupMs": round(setup_ms, 2),
                     "insertTotalMs": round(insert_total_ms, 2),
-                    "insertMedianMs": round(statistics.median(row_insert_durations_ms), 2),
+                    "insertMedianMs": round(
+                        statistics.median(row_insert_durations_ms), 2
+                    ),
                     "insertAverageMs": round(insert_total_ms / rows, 2),
                 }
             )
@@ -1144,7 +1720,9 @@ def benchmark_janus(image_path: str, repeat: int, output: Optional[str]):
     default=None,
     help="Optional JSON output file for the benchmark summary.",
 )
-def benchmark_janus_batch(image_path: str, batch_sizes: str, repeat: int, output: Optional[str]):
+def benchmark_janus_batch(
+    image_path: str, batch_sizes: str, repeat: int, output: Optional[str]
+):
     """Compare single-image vs batched Janus inference throughput."""
     classifier = JanusClassifier()
 
@@ -1164,13 +1742,15 @@ def benchmark_janus_batch(image_path: str, batch_sizes: str, repeat: int, output
             outputs = classifier.predict_batch(items)
             duration_ms = (time.perf_counter() - started_at) * 1000
             ms_per_image = duration_ms / batch_size
-            runs.append({
-                "run": run_index + 1,
-                "batchSize": batch_size,
-                "totalMs": round(duration_ms, 2),
-                "msPerImage": round(ms_per_image, 2),
-                "outputChars": sum(len(o) for o in outputs),
-            })
+            runs.append(
+                {
+                    "run": run_index + 1,
+                    "batchSize": batch_size,
+                    "totalMs": round(duration_ms, 2),
+                    "msPerImage": round(ms_per_image, 2),
+                    "outputChars": sum(len(o) for o in outputs),
+                }
+            )
         median_ms_per_image = statistics.median(r["msPerImage"] for r in runs)
         results_by_size[batch_size] = {
             "runs": runs,
@@ -1178,7 +1758,9 @@ def benchmark_janus_batch(image_path: str, batch_sizes: str, repeat: int, output
         }
         print(f"batch={batch_size}: median {median_ms_per_image:.0f}ms/image")
 
-    single_median = results_by_size[1]["medianMsPerImage"] if 1 in results_by_size else None
+    single_median = (
+        results_by_size[1]["medianMsPerImage"] if 1 in results_by_size else None
+    )
     speedups = {}
     if single_median:
         for size, data in results_by_size.items():
@@ -1201,6 +1783,279 @@ def benchmark_janus_batch(image_path: str, batch_sizes: str, repeat: int, output
         print(f"Benchmark written to {output}")
 
 
+@cli.command("benchmark-classifier")
+@click.option(
+    "--path",
+    "image_path",
+    default="../src/test/fixtures/monkey.jpg",
+    help="Image path to run through the classifier.",
+)
+@click.option(
+    "--backend",
+    type=click.Choice(
+        [
+            CLASSIFIER_BACKEND_JANUS,
+            CLASSIFIER_BACKEND_GEMMA4,
+            CLASSIFIER_BACKEND_GEMMA4_GGUF,
+        ],
+        case_sensitive=False,
+    ),
+    default=CLASSIFIER_BACKEND_JANUS,
+    help="Caption classifier backend to benchmark.",
+)
+@click.option(
+    "--model-id",
+    default=None,
+    help="Optional model id override for the selected backend.",
+)
+@click.option(
+    "--quantization",
+    default=None,
+    help="Optional quantisation mode, for example bnb-4bit for Gemma 4.",
+)
+@click.option(
+    "--gpu-headroom-gb",
+    default=None,
+    type=float,
+    help="Optional GPU memory headroom to keep free for Gemma 4 by offloading part of the model to CPU.",
+)
+@click.option(
+    "--low-impact",
+    is_flag=True,
+    default=False,
+    help="Low-impact Gemma mode: keep some GPU memory free and prefer CPU offload for background runs.",
+)
+@click.option("--repeat", default=3, help="How many predict runs to measure.")
+@click.option(
+    "--output",
+    default=None,
+    help="Optional JSON output file for the benchmark summary.",
+)
+def benchmark_classifier(
+    image_path: str,
+    backend: str,
+    model_id: Optional[str],
+    quantization: Optional[str],
+    gpu_headroom_gb: Optional[float],
+    low_impact: bool,
+    repeat: int,
+    output: Optional[str],
+):
+    classifier = create_classifier(
+        backend=backend,
+        model_id=model_id,
+        quantization=quantization,
+        gpu_headroom_gb=gpu_headroom_gb,
+        low_impact=low_impact,
+    )
+
+    init_started_at = time.perf_counter()
+    classifier.init_model()
+    init_ms = (time.perf_counter() - init_started_at) * 1000
+
+    geocode = {"city": "Singapore", "country": "Singapore"}
+    runs = []
+    for run_index in range(repeat):
+        started_at = time.perf_counter()
+        raw_output = classifier.predict(image_path, geocode)
+        duration_ms = (time.perf_counter() - started_at) * 1000
+        parsed = parse_classifier_response(raw_output)
+        runs.append(
+            {
+                "run": run_index + 1,
+                "durationMs": round(duration_ms, 2),
+                "outputChars": len(raw_output),
+                "tagCount": len(parsed.get("identified_objects", []))
+                + len(parsed.get("themes", [])),
+                "altTextLength": len(parsed.get("alt_text") or ""),
+            }
+        )
+
+    summary = {
+        "generatedAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "backend": backend,
+        "modelId": getattr(classifier, "model_id", None),
+        "quantization": getattr(classifier, "quantization", None),
+        "path": image_path,
+        "repeat": repeat,
+        "initMs": round(init_ms, 2),
+        "medianPredictMs": round(
+            statistics.median([run["durationMs"] for run in runs]),
+            2,
+        ),
+        "runs": runs,
+    }
+    pprint.pprint(summary)
+    if output:
+        with open(output, "w", encoding="utf-8") as fh:
+            json.dump(summary, fh, indent=2)
+        print(f"Benchmark written to {output}")
+
+
+@cli.command("compare-captioners")
+@click.option("--glob", required=True, help="Glob of images to sample for comparison.")
+@click.option(
+    "--baseline-dbpath",
+    default=None,
+    help="Existing DB path to use as the baseline caption source.",
+)
+@click.option(
+    "--sample-size",
+    default=24,
+    type=int,
+    help="How many images to include in the comparison sample.",
+)
+@click.option(
+    "--seed",
+    default=7,
+    type=int,
+    help="Random seed for balanced album sampling.",
+)
+@click.option(
+    "--candidate-backend",
+    type=click.Choice(
+        [
+            CLASSIFIER_BACKEND_JANUS,
+            CLASSIFIER_BACKEND_GEMMA4,
+            CLASSIFIER_BACKEND_GEMMA4_GGUF,
+        ],
+        case_sensitive=False,
+    ),
+    default=CLASSIFIER_BACKEND_GEMMA4,
+    help="Candidate classifier backend to compare against the current baseline DB captions.",
+)
+@click.option(
+    "--candidate-model-id",
+    default=None,
+    help="Optional candidate model id override.",
+)
+@click.option(
+    "--candidate-quantization",
+    default=None,
+    help="Optional candidate quantisation mode.",
+)
+@click.option(
+    "--candidate-gpu-headroom-gb",
+    default=None,
+    type=float,
+    help="Optional GPU memory headroom to keep free for Gemma 4 by offloading part of the model to CPU.",
+)
+@click.option(
+    "--candidate-low-impact",
+    is_flag=True,
+    default=False,
+    help="Low-impact Gemma mode: keep some GPU memory free and prefer CPU offload for background runs.",
+)
+@click.option(
+    "--output-json",
+    default=".caption-comparison.json",
+    help="JSON artifact path for the side-by-side comparison output.",
+)
+@click.option(
+    "--output-md",
+    default=".caption-comparison.md",
+    help="Markdown report path for the side-by-side review summary.",
+)
+def compare_captioners(
+    glob: str,
+    baseline_dbpath: Optional[str],
+    sample_size: int,
+    seed: int,
+    candidate_backend: str,
+    candidate_model_id: Optional[str],
+    candidate_quantization: Optional[str],
+    candidate_gpu_headroom_gb: Optional[float],
+    candidate_low_impact: bool,
+    output_json: str,
+    output_md: str,
+):
+    files = find_files(".", glob)
+    sampled_paths = sample_balanced_paths(files, sample_size=sample_size, seed=seed)
+    baseline_db = Sqlite3Client(baseline_dbpath) if baseline_dbpath else None
+
+    candidate = create_classifier(
+        backend=candidate_backend,
+        model_id=candidate_model_id,
+        quantization=candidate_quantization,
+        gpu_headroom_gb=candidate_gpu_headroom_gb,
+        low_impact=candidate_low_impact,
+    )
+    candidate.init_model()
+
+    rows = []
+    verdict_counts = {"candidate_better": 0, "neutral": 0, "baseline_better": 0}
+    parse_success = 0
+
+    for index_value, path in enumerate(sampled_paths, start=1):
+        print(
+            f"[{index_value}/{len(sampled_paths)}] comparing {os.path.basename(path)}"
+        )
+        baseline = baseline_db.get_image_row(path) if baseline_db else None
+        geocode = extract_geocode_from_path(path)
+        started_at = time.perf_counter()
+        candidate_raw = candidate.predict(path, geocode)
+        duration_ms = (time.perf_counter() - started_at) * 1000
+        try:
+            candidate_parsed = parse_classifier_response(candidate_raw)
+            parse_success += 1
+            parse_error = None
+        except Exception as err:
+            candidate_parsed = {
+                "identified_objects": [],
+                "themes": [],
+                "alt_text": "",
+                "subject": "",
+            }
+            parse_error = str(err)
+        comparison = compare_caption_payloads(baseline, candidate_parsed)
+        verdict_counts[comparison["verdict"]] += 1
+        rows.append(
+            {
+                "path": path,
+                "baseline": baseline,
+                "candidate": {
+                    "backend": candidate_backend,
+                    "modelId": getattr(candidate, "model_id", None),
+                    "quantization": getattr(candidate, "quantization", None),
+                    "raw": candidate_raw,
+                    "parsed": candidate_parsed,
+                    "parseError": parse_error,
+                    "durationMs": round(duration_ms, 2),
+                },
+                "comparison": comparison,
+            }
+        )
+
+    candidate_durations = [row["candidate"]["durationMs"] for row in rows]
+    summary = {
+        "generatedAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "sampleSize": len(rows),
+        "candidateBackend": candidate_backend,
+        "candidateModelId": getattr(candidate, "model_id", None),
+        "candidateQuantization": getattr(candidate, "quantization", None),
+        "candidateMedianMs": (
+            round(statistics.median(candidate_durations), 2)
+            if candidate_durations
+            else None
+        ),
+        "candidateParseSuccess": parse_success,
+        "verdictCounts": verdict_counts,
+    }
+
+    report = {
+        "summary": summary,
+        "rows": rows,
+    }
+    with open(output_json, "w", encoding="utf-8") as fh:
+        json.dump(report, fh, indent=2)
+    with open(output_md, "w", encoding="utf-8") as fh:
+        fh.write(build_ab_report_markdown(summary, rows))
+
+    pprint.pprint(summary)
+    print(f"Comparison artifact written to {output_json}")
+    print(f"Comparison report written to {output_md}")
+
+
 @cli.command("benchmark-embedder-batch")
 @click.option(
     "--path",
@@ -1221,7 +2076,9 @@ def benchmark_janus_batch(image_path: str, batch_sizes: str, repeat: int, output
 )
 @click.option("--repeat", default=3, help="Runs per batch size.")
 @click.option("--output", default=None, help="Optional JSON output file.")
-def benchmark_embedder_batch(image_path: str, model: str, batch_sizes: str, repeat: int, output: Optional[str]):
+def benchmark_embedder_batch(
+    image_path: str, model: str, batch_sizes: str, repeat: int, output: Optional[str]
+):
     """Compare single-image vs batched SigLIP embedding throughput."""
     embedder = Siglip2Embedder() if model == "siglip2" else SiglipEmbedder()
 
@@ -1261,7 +2118,9 @@ def benchmark_embedder_batch(image_path: str, model: str, batch_sizes: str, repe
             "batchedMsPerImage": round(batch_median, 2),
             "speedup": speedup,
         }
-        print(f"batch={batch_size:2d}: seq {seq_median:.1f}ms  batched {batch_median:.1f}ms  speedup {speedup}x")
+        print(
+            f"batch={batch_size:2d}: seq {seq_median:.1f}ms  batched {batch_median:.1f}ms  speedup {speedup}x"
+        )
 
     summary = {
         "generatedAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
@@ -1411,7 +2270,182 @@ def find_files(directory: str, pattern: str) -> list[str]:
     paths: list[PosixPath] = list(
         Path(directory).glob(path_pattern, case_sensitive=False)
     )
+    if len(paths) == 0 and Path(pattern).exists():
+        return [str(Path(pattern))]
     return [str(p) for p in paths]
+
+
+def sample_balanced_paths(
+    paths: list[str], sample_size: int, seed: int = 7
+) -> list[str]:
+    if sample_size <= 0 or len(paths) <= sample_size:
+        return list(paths)
+
+    rng = random.Random(seed)
+    grouped: dict[str, list[str]] = {}
+    for path in paths:
+        group = str(Path(path).parent)
+        grouped.setdefault(group, []).append(path)
+
+    groups = list(grouped.keys())
+    rng.shuffle(groups)
+    for group in groups:
+        rng.shuffle(grouped[group])
+
+    sampled = []
+    while len(sampled) < sample_size:
+        progressed = False
+        for group in groups:
+            if len(sampled) >= sample_size:
+                break
+            if grouped[group]:
+                sampled.append(grouped[group].pop())
+                progressed = True
+        if not progressed:
+            break
+    return sampled
+
+
+def split_tag_text(tags: Optional[str]) -> list[str]:
+    if not tags:
+        return []
+    return [tag.strip() for tag in tags.split(",") if tag.strip()]
+
+
+def compare_caption_payloads(
+    baseline: Optional[Mapping[str, typing.Any]],
+    candidate: Mapping[str, typing.Any],
+) -> dict[str, typing.Any]:
+    baseline_tags = split_tag_text((baseline or {}).get("tags"))
+    candidate_tags = list(candidate.get("identified_objects") or []) + list(
+        candidate.get("themes") or []
+    )
+
+    baseline_alt = (baseline or {}).get("alt_text") or ""
+    candidate_alt = candidate.get("alt_text") or ""
+    baseline_subject = (baseline or {}).get("subject") or ""
+    candidate_subject = candidate.get("subject") or ""
+
+    shared_tags = sorted(set(baseline_tags).intersection(candidate_tags))
+    added_tags = sorted(set(candidate_tags) - set(baseline_tags))
+    removed_tags = sorted(set(baseline_tags) - set(candidate_tags))
+    verdict = "neutral"
+    reasons = []
+
+    if len(candidate_alt.strip()) > len(baseline_alt.strip()) + 15:
+        reasons.append("candidate_alt_more_specific")
+    if len(candidate_alt.strip()) + 15 < len(baseline_alt.strip()):
+        reasons.append("candidate_alt_shorter")
+    if len(shared_tags) >= max(1, min(len(baseline_tags), len(candidate_tags)) // 2):
+        reasons.append("good_tag_overlap")
+    if len(shared_tags) == 0 and baseline_tags and candidate_tags:
+        reasons.append("no_tag_overlap")
+    if len(added_tags) >= 2:
+        reasons.append("candidate_adds_tags")
+    if len(removed_tags) >= max(3, len(baseline_tags) // 2):
+        reasons.append("candidate_drops_many_tags")
+    if candidate_subject and candidate_subject != baseline_subject:
+        reasons.append("subject_changed")
+
+    positive_signals = {
+        "candidate_alt_more_specific",
+        "good_tag_overlap",
+        "candidate_adds_tags",
+    }
+    negative_signals = {
+        "candidate_alt_shorter",
+        "candidate_drops_many_tags",
+        "no_tag_overlap",
+    }
+    if {
+        "candidate_drops_many_tags",
+        "no_tag_overlap",
+    }.issubset(set(reasons)):
+        verdict = "baseline_better"
+    elif {
+        "candidate_alt_more_specific",
+        "good_tag_overlap",
+    }.issubset(set(reasons)):
+        verdict = "candidate_better"
+    if any(reason in positive_signals for reason in reasons) and not any(
+        reason in negative_signals for reason in reasons
+    ):
+        verdict = "candidate_better"
+    elif any(reason in negative_signals for reason in reasons) and not any(
+        reason in positive_signals for reason in reasons
+    ):
+        verdict = "baseline_better"
+
+    return {
+        "baselineTags": baseline_tags,
+        "candidateTags": candidate_tags,
+        "sharedTags": shared_tags,
+        "addedTags": added_tags,
+        "removedTags": removed_tags,
+        "baselineAltLength": len(baseline_alt),
+        "candidateAltLength": len(candidate_alt),
+        "baselineSubject": baseline_subject,
+        "candidateSubject": candidate_subject,
+        "verdict": verdict,
+        "reasons": reasons,
+    }
+
+
+def build_ab_report_markdown(
+    summary: Mapping[str, typing.Any], rows: list[Mapping[str, typing.Any]]
+) -> str:
+    lines = [
+        "# Caption Comparison Report",
+        "",
+        f"- Generated: {summary['generatedAt']}",
+        f"- Sample size: {summary['sampleSize']}",
+        f"- Candidate backend: {summary['candidateBackend']}",
+        f"- Candidate model: {summary['candidateModelId']}",
+        f"- Candidate quantisation: {summary['candidateQuantization'] or 'none'}",
+        f"- Parse success: {summary['candidateParseSuccess']}/{summary['sampleSize']}",
+        f"- Median candidate runtime: {summary['candidateMedianMs']}ms",
+        "",
+        "## Aggregate verdict",
+        "",
+        f"- Candidate better: {summary['verdictCounts'].get('candidate_better', 0)}",
+        f"- Neutral: {summary['verdictCounts'].get('neutral', 0)}",
+        f"- Baseline better: {summary['verdictCounts'].get('baseline_better', 0)}",
+        "",
+        "## Notes",
+        "",
+        "- Treat this as a first-pass review artifact. It highlights structure, overlap, and specificity differences, but final promotion should still be based on side-by-side inspection.",
+        "- Baseline rows come from the existing DB when available, so the comparison reflects current indexed captions rather than a re-run with potentially different Janus weights.",
+        "",
+        "## Sample rows",
+        "",
+    ]
+
+    for row in rows:
+        comparison = row["comparison"]
+        lines.extend(
+            [
+                f"### {row['path']}",
+                "",
+                f"- Verdict: {comparison['verdict']}",
+                f"- Reasons: {', '.join(comparison['reasons']) if comparison['reasons'] else 'none'}",
+                f"- Candidate runtime: {row['candidate']['durationMs']}ms",
+                "",
+                "**Baseline**",
+                "",
+                f"- Subject: {(row.get('baseline') or {}).get('subject') or ''}",
+                f"- Alt text: {(row.get('baseline') or {}).get('alt_text') or ''}",
+                f"- Tags: {', '.join(comparison['baselineTags'])}",
+                "",
+                "**Candidate**",
+                "",
+                f"- Subject: {row['candidate']['parsed'].get('subject') or ''}",
+                f"- Alt text: {row['candidate']['parsed'].get('alt_text') or ''}",
+                f"- Tags: {', '.join(comparison['candidateTags'])}",
+                "",
+            ]
+        )
+
+    return "\n".join(lines)
 
 
 def extract_geocode_from_path(path: str) -> Mapping:
@@ -1437,10 +2471,10 @@ def extract_geocode_from_path(path: str) -> Mapping:
 
 def analyse_image(
     fh: IO[bytes],
-    classifier: Optional[JanusClassifier],
+    classifier: Optional[BaseCaptionClassifier],
     path: str,
     embedders: Optional[list[BaseImageEmbedder]] = None,
-    precomputed_janus: Optional[str] = None,
+    precomputed_caption: Optional[str] = None,
     precomputed_embeddings: Optional[dict[str, list[float]]] = None,
     precomputed_colors: Optional[list] = None,
 ) -> Mapping:
@@ -1465,7 +2499,11 @@ def analyse_image(
         lng_deg = None
         geo = {}
 
-    colors = precomputed_colors if precomputed_colors is not None else fast_colorthief.get_palette(path)
+    colors = (
+        precomputed_colors
+        if precomputed_colors is not None
+        else fast_colorthief.get_palette(path)
+    )
 
     result: Mapping = {}
     if classifier is not None:
@@ -1474,16 +2512,16 @@ def analyse_image(
         raw_result = None
         while attempts < max_attempts:
             try:
-                if precomputed_janus is not None and attempts == 0:
-                    raw_result = precomputed_janus
+                if precomputed_caption is not None and attempts == 0:
+                    raw_result = precomputed_caption
                 else:
                     raw_result = classifier.predict(path=path, geocode=geo)
 
-                result = parse_janus_response(raw_result)
+                result = parse_classifier_response(raw_result)
                 break
             except Exception:
                 attempts += 1
-                precomputed_janus = None  # fall back to fresh per-image predictions
+                precomputed_caption = None  # fall back to fresh per-image predictions
                 print(
                     f"Attempt {attempts}/{max_attempts} failed for {path}, got {raw_result}"
                 )
@@ -1495,10 +2533,14 @@ def analyse_image(
                     break
 
     embeddings = []
-    for emb in (embedders or []):
+    for emb in embedders or []:
         try:
             precomputed = (precomputed_embeddings or {}).get(emb.model_id)
-            embedding = precomputed if precomputed is not None else emb.predict_image_embedding(path)
+            embedding = (
+                precomputed
+                if precomputed is not None
+                else emb.predict_image_embedding(path)
+            )
             embeddings.append({"model_id": emb.model_id, "embedding": embedding})
         except Exception as err:
             print(f"Embedding ({emb.model_id}) failed for {path}: {err}")
@@ -1532,7 +2574,17 @@ def analyse_image(
 
 
 def analyse_image_worker(
-    input: list[Tuple[int, str, Optional[JanusClassifier], list[BaseImageEmbedder], Optional[str], Optional[dict], Optional[list]]],
+    input: list[
+        Tuple[
+            int,
+            str,
+            Optional[BaseCaptionClassifier],
+            list[BaseImageEmbedder],
+            Optional[str],
+            Optional[dict],
+            Optional[list],
+        ]
+    ],
 ) -> Mapping[str, typing.Any]:
     try:
         """Multiprocessable worker"""
@@ -1540,7 +2592,7 @@ def analyse_image_worker(
         path = input[1]
         classifier = input[2]
         embedders = input[3] if len(input) > 3 else []
-        precomputed_janus = input[4] if len(input) > 4 else None
+        precomputed_caption = input[4] if len(input) > 4 else None
         precomputed_embeddings = input[5] if len(input) > 5 else None
         precomputed_colors = input[6] if len(input) > 6 else None
 
@@ -1551,7 +2603,7 @@ def analyse_image_worker(
                 classifier=classifier,
                 path=path,
                 embedders=embedders,
-                precomputed_janus=precomputed_janus,
+                precomputed_caption=precomputed_caption,
                 precomputed_embeddings=precomputed_embeddings,
                 precomputed_colors=precomputed_colors,
             )
@@ -1565,7 +2617,9 @@ def analyse_image_worker(
         return (index, False)
 
 
-def insert_analysed_image(db, analysed: Mapping, path, include_classifier_fields: bool = True):
+def insert_analysed_image(
+    db, analysed: Mapping, path, include_classifier_fields: bool = True
+):
     geocode = analysed.get("geocode")
     image_fields = {
         "filename": get_filename(path),
@@ -1647,11 +2701,13 @@ def insert_analysed_images_batch(db, results: list[Mapping]):
             if include_classifier_fields:
                 tags_to_insert = list(analysed.get("tags") or [])
                 if geocode:
-                    tags_to_insert.extend([
-                        geocode.get("country"),
-                        geocode.get("city"),
-                        geocode.get("country_code"),
-                    ])
+                    tags_to_insert.extend(
+                        [
+                            geocode.get("country"),
+                            geocode.get("city"),
+                            geocode.get("country_code"),
+                        ]
+                    )
                 db.insert_tags(tags_to_insert, cur=cur)
 
             db.insert_metadata(

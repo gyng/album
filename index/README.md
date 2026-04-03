@@ -9,9 +9,9 @@ Indexes images for search with the following fields
 | fts5(images) | filename            |              |                                   |
 | fts5(images) | EXIF                | searched     | excluding binary data             |
 | fts5(images) | geocode             | searched     | geocoded to country and city      |
-| fts5(images) | tags                | searched     | classified using Janus-Pro-1B     |
+| fts5(images) | tags                | searched     | classified using the selected caption backend |
 | fts5(images) | colors              | placeholder  | median cut (top 5); `[r, g, b][]` |
-| tags         | tag                 |              | primary key, Janus-Pro-1B         |
+| tags         | tag                 |              | primary key, from caption backend |
 | tags         | count               | autocomplete | tags count                        |
 | metadata     | path                |              | primary key                       |
 | metadata     | lat_deg             | map          |                                   |
@@ -42,6 +42,8 @@ $ uv run index.py --help
 $ uv run python index.py index --glob "../albums/test-simple/*.[jJ][pP][gG]"
 $ uv run python index.py index --glob "../albums/**/*.jpg" --dbpath "search.sqlite" --dry-run --model-profile hybrid
 $ uv run python index.py benchmark-index --rows 200 --repeat 3 --output ".index-benchmark.json"
+$ uv run python index.py benchmark-classifier --backend gemma4-gguf --model-id "/tmp/gemma4-e4b-gguf/gemma-4-E4B-it-Q8_0.gguf" --quantization "/tmp/gemma4-e4b-gguf/mmproj-BF16.gguf" --path "../albums/test-simple/DSCF0506-2.jpg" --repeat 1 --output ".gemma4-gguf-benchmark.json"
+$ uv run python index.py compare-captioners --glob "../albums/test-simple/*.[jJ][pP][gG]" --baseline-dbpath "./test-simple.sqlite" --sample-size 5 --candidate-backend gemma4-gguf --candidate-model-id "/tmp/gemma4-e4b-gguf/gemma-4-E4B-it-Q8_0.gguf" --candidate-quantization "/tmp/gemma4-e4b-gguf/mmproj-BF16.gguf" --output-json ".caption-comparison.json" --output-md ".caption-comparison.md"
 $ uv run index.py search --query "singapore"
 $ uv run python index.py search-similar-path --dbpath "search.sqlite" --path "../albums/2511japan/DSCF6007-06.jpg"
 
@@ -80,13 +82,46 @@ To benchmark the Janus classifier path directly on a sample image:
 $ uv run python index.py benchmark-janus --path "../src/test/fixtures/monkey.jpg" --repeat 3 --output ".janus-benchmark.json"
 ```
 
+To benchmark the working `llama.cpp` GGUF path locally:
+
+```sh
+$ uv run python index.py benchmark-classifier --backend gemma4-gguf --model-id "/tmp/gemma4-e4b-gguf/gemma-4-E4B-it-Q8_0.gguf" --quantization "/tmp/gemma4-e4b-gguf/mmproj-BF16.gguf" --path "../albums/test-simple/DSCF0506-2.jpg" --repeat 1 --output ".gemma4-gguf-benchmark.json"
+```
+
+To compare the current DB captions against Gemma on a balanced sample and generate a review artifact:
+
+```sh
+$ uv run python index.py compare-captioners --glob "../albums/test-simple/*.[jJ][pP][gG]" --baseline-dbpath "./test-simple.sqlite" --sample-size 5 --candidate-backend gemma4-gguf --candidate-model-id "/tmp/gemma4-e4b-gguf/gemma-4-E4B-it-Q8_0.gguf" --candidate-quantization "/tmp/gemma4-e4b-gguf/mmproj-BF16.gguf" --output-json ".caption-comparison.json" --output-md ".caption-comparison.md"
+```
+
+The JSON artifact stores the side-by-side rows. The Markdown report is the first-pass human review summary for deciding whether the quality gain is worth any speed regression.
+
 ## Model profiles
 
 - `janus`: generate tags, short alt text, subject text, and metadata only.
 - `siglip2`: generate image embeddings only.
-- `hybrid`: generate Janus metadata and SigLIP embeddings in one pass.
+- `hybrid`: generate caption metadata and SigLIP embeddings in one pass.
 
-The Janus prompt is intentionally limited to the fields currently used by the frontend search UX: `identified_objects`, `themes`, `alt_text`, and `subject`.
+The caption prompt is intentionally limited to the fields currently used by the frontend search UX: `identified_objects`, `themes`, `alt_text`, and `subject`.
+
+## Caption backends
+
+- `janus`: current default and rollback path.
+- `gemma4`: retained experimental backend for future work. In practice, this needs a newer `transformers` runtime than the default Janus environment.
+- `gemma4-gguf`: `llama.cpp` backend for local GGUF Gemma 4 runs. The best local quantised result so far is `unsloth/gemma-4-E4B-it-GGUF:Q8_0` with `mmproj-BF16`.
+
+Current compatibility note:
+Janus-Pro-1B is the default production path in this repo. The GGUF Gemma path is kept as experimental groundwork for future image and video work. The full-precision `transformers` Gemma path is also retained in code, but it is not the normal runtime and should be treated as separate experimental work.
+
+Current local-debugging note:
+In local testing, the `transformers` `bnb-4bit` Gemma path repeatedly hallucinated placeholder-like "gray image" descriptions for normal photos. Keep the GGUF path as the preferred quantised experiment instead.
+
+Recommended local rollout:
+
+1. Keep Janus-Pro-1B as the default captioner.
+2. Use the GGUF Gemma path for focused evaluation and future roadmap work.
+3. Compare outputs on a balanced sample before changing any production DB build.
+4. If video work starts, build it first as sampled-frame processing on top of the retained Gemma groundwork.
 
 `do-full-index.sh` uses `hybrid`. `do-embeddings-index.sh` is useful when you want to preserve the current metadata-backed `search.sqlite` and only refresh the embeddings table.
 
