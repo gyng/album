@@ -6,6 +6,8 @@
     "index:update": "(cd ../index; bash ./do-full-index.sh)",
     "index:embeddings:update": "(cd ../index; bash ./do-embeddings-index.sh)",
     "publish:wizard": "node ./bin/publish-wizard.cjs",
+    "backup:publish": "node ./bin/backup-publish-assets.cjs",
+    "backup:publish:with-albums": "node ./bin/backup-publish-assets.cjs --with-albums",
     "cleanup:media-cache": "node ./bin/cleanup-optimised-media.cjs",
     "prepare:build-manifest": "node ./bin/write-build-manifest.cjs",
     "deploy:vercel": "npx vercel build --prod && npx vercel deploy --prebuilt --prod",

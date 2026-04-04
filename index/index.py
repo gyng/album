@@ -60,6 +60,7 @@ JANUS_BATCH_SIZE = 4
 GEMMA4_MAX_NEW_TOKENS = 192
 EMBEDDER_BATCH_SIZE = 16
 COLORTHIEF_WORKERS = 4
+INSERT_CHUNK_SIZE = 64
 EXIF_SEARCH_FIELDS = (
     "Image Make",
     "Image Model",
@@ -847,8 +848,26 @@ class Sqlite3Client:
             "CREATE TABLE IF NOT EXISTS metadata (path VARCHAR PRIMARY KEY, lat_deg REAL, lng_deg REAL, iso8601 TEXT)"
         )
         cur.execute(
-            "CREATE TABLE IF NOT EXISTS embeddings (path VARCHAR PRIMARY KEY, model_id TEXT, embedding_dim INTEGER, embedding_json TEXT)"
+            "CREATE TABLE IF NOT EXISTS embeddings (path VARCHAR NOT NULL, model_id TEXT NOT NULL, embedding_dim INTEGER, embedding_json TEXT, PRIMARY KEY(path, model_id))"
         )
+        # Migrate legacy schema (PRIMARY KEY(path)) so v1 + v2 embeddings can coexist.
+        embedding_columns = cur.execute("PRAGMA table_info(embeddings)").fetchall()
+        pk_columns = [
+            row[1]
+            for row in sorted(embedding_columns, key=lambda row: row[5])
+            if row[5] > 0
+        ]
+        if pk_columns == ["path"]:
+            cur.execute("ALTER TABLE embeddings RENAME TO embeddings_legacy")
+            cur.execute(
+                "CREATE TABLE embeddings (path VARCHAR NOT NULL, model_id TEXT NOT NULL, embedding_dim INTEGER, embedding_json TEXT, PRIMARY KEY(path, model_id))"
+            )
+            cur.execute(
+                "INSERT INTO embeddings (path, model_id, embedding_dim, embedding_json) "
+                "SELECT path, COALESCE(model_id, ''), embedding_dim, embedding_json FROM embeddings_legacy"
+            )
+            cur.execute("DROP TABLE embeddings_legacy")
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_embeddings_path ON embeddings(path)")
         # Optimise loads from the browser https://github.com/phiresky/sql.js-httpvfs#readme
         cur.execute("PRAGMA journal_mode = delete;")
         cur.execute("PRAGMA page_size = 1024;")
@@ -1172,12 +1191,9 @@ class Sqlite3Client:
 
         embedding_json = json.dumps(embedding)
         cur.execute(
-            "INSERT OR IGNORE INTO embeddings (path, model_id, embedding_dim, embedding_json) VALUES (?, ?, ?, ?);",
+            "INSERT INTO embeddings (path, model_id, embedding_dim, embedding_json) VALUES (?, ?, ?, ?) "
+            "ON CONFLICT(path, model_id) DO UPDATE SET embedding_dim = excluded.embedding_dim, embedding_json = excluded.embedding_json",
             (path, model_id, len(embedding), embedding_json),
-        )
-        cur.execute(
-            "UPDATE embeddings SET model_id = ?, embedding_dim = ?, embedding_json = ? WHERE path = ?",
-            (model_id, len(embedding), embedding_json, path),
         )
 
     def get_embedding(self, path: str, model_id: Optional[str] = None):
@@ -1189,8 +1205,14 @@ class Sqlite3Client:
             )
         else:
             res = cur.execute(
-                "SELECT path, model_id, embedding_dim, embedding_json FROM embeddings WHERE path = ?",
-                (path,),
+                "SELECT path, model_id, embedding_dim, embedding_json FROM embeddings "
+                "WHERE path = ? "
+                "ORDER BY CASE "
+                "WHEN model_id = ? THEN 0 "
+                "WHEN model_id = ? THEN 1 "
+                "ELSE 2 END "
+                "LIMIT 1",
+                (path, Siglip2Embedder.MODEL_ID, SiglipEmbedder.MODEL_ID),
             )
         return res.fetchone()
 
@@ -1434,10 +1456,10 @@ def index(
             print(f"{embedder.model_id} embeddings complete in {emb_ms:.0f}ms")
 
         # Collect color results (GPU work is done; colors are likely already finished).
-        precomputed_colors: dict[str, list] = {}
+        precomputed_colors_by_path: dict[str, list] = {}
         colors_executor.shutdown(wait=True)
         for path, fut in color_futures.items():
-            precomputed_colors[path] = fut.result()
+            precomputed_colors_by_path[path] = fut.result()
         colors_ms = (time.perf_counter() - colors_started_at) * 1000
         print(
             f"Color extraction complete in {colors_ms:.0f}ms (ran concurrently with GPU)"
@@ -1458,43 +1480,60 @@ def index(
                 ],
                 precomputed_captions.get(item["path"]),
                 precomputed_embeddings.get(item["path"]),
-                precomputed_colors.get(item["path"]),
+                precomputed_colors_by_path.get(item["path"]),
             )
             for item_index, item in enumerate(work_items)
         ]
 
         # Disable concurrency as it doesn't help performance on a RTX3080
+        insert_durations_ms = []
         with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
             start_time = time.perf_counter()
             analysis_durations_ms = []
-            worker_results = []
+            pending_results = []
+            persisted_results = 0
+            total_work_items = len(work_items)
+
+            def flush_pending_results() -> None:
+                nonlocal pending_results, persisted_results
+                if len(pending_results) == 0:
+                    return
+                insert_started_at = time.perf_counter()
+                insert_analysed_images_batch(db, pending_results)
+                insert_durations_ms.append((time.perf_counter() - insert_started_at) * 1000)
+                persisted_results += len(pending_results)
+                print(
+                    f"Committed {persisted_results}/{total_work_items} analysed image(s) to SQLite"
+                )
+                pending_results = []
 
             for i, result in enumerate(executor.map(analyse_image_worker, enumerated)):
                 time_now = time.perf_counter()
                 time_per_image = (time_now - start_time) / (i + 1)
                 rate = 1 / time_per_image
-                percent = i / float(len(work_items)) * 100
-                estimated_time_min = (len(work_items) - i) * time_per_image / 60
+                percent = i / float(total_work_items) * 100
+                estimated_time_min = (total_work_items - i) * time_per_image / 60
 
                 analysed = result.get("analysed")
                 analysis_durations_ms.append((analysed.get("_duration") or 0) * 1000)
 
-                tags = (analysed.get("tags") or {}).get("labels") or []
+                tags = analysed.get("tags") or []
                 tags_str = ", ".join(tags[:6]) if tags else "—"
                 alt = analysed.get("alt_text") or analysed.get("subject") or ""
                 alt_str = f" | {alt[:80]}" if alt else ""
                 filename = os.path.basename(result["path"])
                 print(
-                    f"[{i + 1}/{len(work_items)} {percent:.0f}% {rate:.2f}it/s ~{estimated_time_min:.1f}min] {filename}: {tags_str}{alt_str}"
+                    f"[{i + 1}/{total_work_items} {percent:.0f}% {rate:.2f}it/s ~{estimated_time_min:.1f}min] {filename}: {tags_str}{alt_str}"
                 )
-                worker_results.append(result)
+                pending_results.append(result)
+                if len(pending_results) >= INSERT_CHUNK_SIZE:
+                    flush_pending_results()
 
-        # Single-transaction batch insert: FTS5 flushes once instead of per-image (~63x faster).
-        insert_started_at = time.perf_counter()
-        insert_analysed_images_batch(db, worker_results)
-        insert_durations_ms = [(time.perf_counter() - insert_started_at) * 1000]
+            # Persist tail work so reruns continue from the latest committed chunk.
+            flush_pending_results()
+
         print(
-            f"Inserted {len(worker_results)} images in {insert_durations_ms[0]:.0f}ms"
+            f"Inserted {persisted_results} images in {sum(insert_durations_ms):.0f}ms across {len(insert_durations_ms)} transaction(s)"
         )
 
         db.optimize()

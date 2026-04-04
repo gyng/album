@@ -350,7 +350,7 @@ describe("publish-wizard-lib", () => {
       const state = await loadDbState(mainDbPath, embeddingsDbPath);
       expect(state.hasEmbeddingsTable).toBe(true);
       expect(state.embeddingsCount).toBeGreaterThan(0);
-      expect(state.embeddingsCount).toBe(state.imageCount);
+      expect(state.embeddingsCount).toBeGreaterThanOrEqual(state.imageCount);
     });
   });
 });
