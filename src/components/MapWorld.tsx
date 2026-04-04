@@ -3,6 +3,7 @@ import styles from "./MapWorld.module.css";
 import { OptimisedPhoto } from "../services/types";
 import Link from "next/link";
 import { getRelativeTimeString } from "../util/time";
+import { parseTimestampSafe } from "../util/timeRange";
 import MapLibreMap, {
   Marker,
   Popup,
@@ -41,6 +42,17 @@ export type MapWorldEntry = {
   placeholderHeight?: number;
 };
 
+export type TimeRange = { fromMs: number; toMs: number };
+
+const isPhotoInTimeRange = (
+  photo: { date: string | null },
+  range: TimeRange,
+): boolean => {
+  const ms = parseTimestampSafe(photo.date);
+  if (ms === null) return false;
+  return ms >= range.fromMs && ms <= range.toMs;
+};
+
 export type MapWorldProps = {
   photos: MapWorldEntry[];
   className: string;
@@ -51,6 +63,8 @@ export type MapWorldProps = {
   showRoute?: boolean;
   routeMode?: RouteMode;
   routeDisplayMode?: "always" | "active-only";
+  /** Live time range for opacity-based filtering during drag. */
+  timeRange?: TimeRange | null;
 };
 
 const MapAutoFit = ({
@@ -748,6 +762,7 @@ export const MMap: React.FC<MapWorldProps> = ({
   showRoute = false,
   routeMode = "full",
   routeDisplayMode = "active-only",
+  timeRange,
 }) => {
   const url =
     typeof window === "undefined" ? null : new URL(window.location.toString());
@@ -768,6 +783,11 @@ export const MMap: React.FC<MapWorldProps> = ({
     east: number;
     west: number;
   } | null>(null);
+  const timeFilteredPhotos = React.useMemo(
+    () =>
+      timeRange ? photos.filter((photo) => isPhotoInTimeRange(photo, timeRange)) : photos,
+    [photos, timeRange],
+  );
   // Memoize date range calculations (Optimization #1)
   const dateStats = React.useMemo(() => {
     const sortedByDate = photos
@@ -788,7 +808,7 @@ export const MMap: React.FC<MapWorldProps> = ({
 
   // Memoize sorted photos with pre-calculated marker styles (Optimization #2)
   const photosWithStyles = React.useMemo(() => {
-    return photos
+    return timeFilteredPhotos
       .slice()
       .sort((a, b) => {
         // sort so newer markers are on top
@@ -809,7 +829,7 @@ export const MMap: React.FC<MapWorldProps> = ({
           hueRotate: `hue-rotate(${relative * 255}deg)`,
         };
       });
-  }, [photos, dateStats]);
+  }, [dateStats, timeFilteredPhotos]);
 
   // Filter photos by viewport bounds (Optimization #3)
   const visiblePhotos = React.useMemo(() => {
@@ -840,7 +860,7 @@ export const MMap: React.FC<MapWorldProps> = ({
   const popupInfo = clickInfo ?? hoverInfo;
   const routeDataByAlbum = React.useMemo(() => {
     const albums = new globalThis.Map<string, MapWorldEntry[]>();
-    photos.forEach((photo) => {
+    timeFilteredPhotos.forEach((photo) => {
       const existing = albums.get(photo.album);
       if (existing) {
         existing.push(photo);
@@ -856,7 +876,7 @@ export const MMap: React.FC<MapWorldProps> = ({
         buildMapRoute(albumPhotos),
       ]),
     );
-  }, [photos]);
+  }, [timeFilteredPhotos]);
   const activeRouteTarget = clickInfo?.href ?? hoverInfo?.href ?? null;
   const activeRoutePhoto = React.useMemo(
     () =>
@@ -869,8 +889,8 @@ export const MMap: React.FC<MapWorldProps> = ({
       return null;
     }
 
-    return buildContextRoutePoints(photos, activeRouteTarget, routeMode);
-  }, [activeRouteTarget, photos, routeMode]);
+    return buildContextRoutePoints(timeFilteredPhotos, activeRouteTarget, routeMode);
+  }, [activeRouteTarget, routeMode, timeFilteredPhotos]);
   const activeContextRouteGeoJson = React.useMemo(
     () => toRouteGeoJson(activeContextRoutePoints ?? []),
     [activeContextRoutePoints],
@@ -898,6 +918,15 @@ export const MMap: React.FC<MapWorldProps> = ({
 
     return null;
   }, [routeDataByAlbum, routeDisplayMode, routeMode, showRoute]);
+
+  React.useEffect(() => {
+    if (clickInfo && !timeFilteredPhotos.some((photo) => photo.href === clickInfo.href)) {
+      setClickInfo(null);
+    }
+    if (hoverInfo && !timeFilteredPhotos.some((photo) => photo.href === hoverInfo.href)) {
+      setHoverInfo(null);
+    }
+  }, [clickInfo, hoverInfo, timeFilteredPhotos]);
   const alwaysVisibleRouteGeoJson = React.useMemo(() => {
     if (!showRoute || routeDisplayMode !== "always") {
       return null;
@@ -1270,7 +1299,7 @@ export const MMap: React.FC<MapWorldProps> = ({
                           ? styles.pinActive
                           : styles.pinMuted
                         : "",
-                    ].join(" ")}
+                    ].filter(Boolean).join(" ")}
                     onMouseOver={() => {
                       setHoverInfo(photo);
                     }}

@@ -676,6 +676,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
     filter,
     resetSimilarQueue,
     slideshowMode,
+    timeDelay,
     updateSlideshowUrl,
   ]);
 

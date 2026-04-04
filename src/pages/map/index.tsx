@@ -5,7 +5,7 @@ import { MapWorldDeferred } from "../../components/MapWorldDeferred";
 import { GlobalNav } from "../../components/GlobalNav";
 import { Block, PhotoBlock } from "../../services/types";
 import { getDegLatLngFromExif } from "../../util/dms2deg";
-import { MapWorldEntry } from "../../components/MapWorld";
+import { MapWorldEntry, type TimeRange } from "../../components/MapWorld";
 import styles from "./map.module.css";
 import commonStyles from "../../styles/common.module.css";
 import Link from "next/link";
@@ -14,10 +14,14 @@ import { measureBuild } from "../../services/buildTiming";
 import { Seo } from "../../components/Seo";
 import { buildCollectionPageJsonLd } from "../../lib/seo";
 import { getDefaultRouteMode, RouteMode } from "../../components/mapRoute";
+import { TimeRangeSlider } from "../../components/TimeRangeSlider";
+import { parseRangeParam, formatRangeDate } from "../../util/timeRange";
 
 type PageProps = {
   photos: MapWorldEntry[];
 };
+
+const DEBOUNCE_URL_MS = 300;
 
 const WorldMap: NextPage<PageProps> = (props) => {
   const router = useRouter();
@@ -29,10 +33,79 @@ const WorldMap: NextPage<PageProps> = (props) => {
     filterAlbum != null ||
     typeof router.query.lat === "string" ||
     typeof router.query.lon === "string" ||
-    typeof router.query.zoom === "string";
-  const filteredPhotos = filterAlbum
-    ? props.photos.filter((p) => p.album === filterAlbum)
-    : props.photos;
+    typeof router.query.zoom === "string" ||
+    typeof router.query.from === "string" ||
+    typeof router.query.to === "string";
+
+  // Album filtering (existing)
+  const albumFilteredPhotos = React.useMemo(
+    () =>
+      filterAlbum
+        ? props.photos.filter((p) => p.album === filterAlbum)
+        : props.photos,
+    [props.photos, filterAlbum],
+  );
+
+  // Time range state — live during drag, committed on pointer up
+  const urlFrom = parseRangeParam(
+    typeof router.query.from === "string" ? router.query.from : null,
+  );
+  const urlTo = parseRangeParam(
+    typeof router.query.to === "string" ? router.query.to : null,
+    { endOfDay: true },
+  );
+  const [timeRange, setTimeRange] = React.useState<TimeRange | null>(
+    urlFrom !== null && urlTo !== null ? { fromMs: urlFrom, toMs: urlTo } : null,
+  );
+  const [showTimeRangeSlider, setShowTimeRangeSlider] = React.useState(
+    urlFrom !== null && urlTo !== null,
+  );
+  const urlSyncTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Sync from URL on navigation (back/forward)
+  React.useEffect(() => {
+    if (urlFrom !== null && urlTo !== null) {
+      setTimeRange({ fromMs: urlFrom, toMs: urlTo });
+      setShowTimeRangeSlider(true);
+    } else {
+      setTimeRange(null);
+    }
+  }, [urlFrom, urlTo]);
+
+  const handleTimeRangeDrag = React.useCallback(
+    (fromMs: number, toMs: number) => {
+      setTimeRange({ fromMs, toMs });
+    },
+    [],
+  );
+
+  const handleTimeRangeCommit = React.useCallback(
+    (fromMs: number | null, toMs: number | null) => {
+      if (fromMs !== null && toMs !== null) {
+        setTimeRange({ fromMs, toMs });
+      } else {
+        setTimeRange(null);
+      }
+
+      // Debounced URL update
+      if (urlSyncTimer.current) clearTimeout(urlSyncTimer.current);
+      urlSyncTimer.current = setTimeout(() => {
+        const query = { ...router.query };
+        if (fromMs !== null && toMs !== null) {
+          query.from = formatRangeDate(fromMs);
+          query.to = formatRangeDate(toMs);
+        } else {
+          delete query.from;
+          delete query.to;
+        }
+        router.replace({ query }, undefined, { shallow: true });
+      }, DEBOUNCE_URL_MS);
+    },
+    [router],
+  );
+
+  // Use album-filtered photos for the map (time filtering is done via opacity)
+  const filteredPhotos = albumFilteredPhotos;
   const routeEligiblePhotoCount = React.useMemo(
     () =>
       filteredPhotos.filter(
@@ -103,14 +176,47 @@ const WorldMap: NextPage<PageProps> = (props) => {
               ) : null}
               {!filterAlbum && routableAlbumCount > 0 ? (
                 <li>
+                  <div className={styles.mapControls}>
+                    <button
+                      type="button"
+                      className={commonStyles.button}
+                      onClick={() => {
+                        setShowAllRoutes((current) => !current);
+                      }}
+                    >
+                      {showAllRoutes ? "Hide all journeys" : "Show all journeys"}
+                    </button>
+
+                    <button
+                      type="button"
+                      className={[
+                        commonStyles.button,
+                        showTimeRangeSlider ? commonStyles.active : "",
+                      ].filter(Boolean).join(" ")}
+                      aria-pressed={showTimeRangeSlider}
+                      onClick={() => {
+                        setShowTimeRangeSlider((current) => !current);
+                      }}
+                    >
+                      {showTimeRangeSlider ? "Hide date range" : "Show date range"}
+                    </button>
+                  </div>
+                </li>
+              ) : null}
+              {(filterAlbum || routableAlbumCount === 0) ? (
+                <li>
                   <button
                     type="button"
-                    className={commonStyles.button}
+                    className={[
+                      commonStyles.button,
+                      showTimeRangeSlider ? commonStyles.active : "",
+                    ].filter(Boolean).join(" ")}
+                    aria-pressed={showTimeRangeSlider}
                     onClick={() => {
-                      setShowAllRoutes((current) => !current);
+                      setShowTimeRangeSlider((current) => !current);
                     }}
                   >
-                    {showAllRoutes ? "Hide all journeys" : "Show all journeys"}
+                    {showTimeRangeSlider ? "Hide date range" : "Show date range"}
                   </button>
                 </li>
               ) : null}
@@ -127,7 +233,18 @@ const WorldMap: NextPage<PageProps> = (props) => {
         routeDisplayMode={
           !filterAlbum && showAllRoutes ? "always" : "active-only"
         }
+        timeRange={timeRange}
       />
+
+      {showTimeRangeSlider ? (
+        <TimeRangeSlider
+          photos={albumFilteredPhotos}
+          fromMs={timeRange?.fromMs ?? null}
+          toMs={timeRange?.toMs ?? null}
+          onDrag={handleTimeRangeDrag}
+          onCommit={handleTimeRangeCommit}
+        />
+      ) : null}
     </div>
   );
 };

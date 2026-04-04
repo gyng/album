@@ -37,6 +37,5 @@ test("capture README screenshot", async ({ page }) => {
 
   const out = path.resolve(__dirname, "../../screenshot.jpg");
   await page.screenshot({ path: out, type: "jpeg", quality: 85 });
-  // eslint-disable-next-line no-console
   console.log(`Screenshot saved to ${out}`);
 });

@@ -1,0 +1,159 @@
+.container {
+  position: absolute;
+  bottom: var(--m-l);
+  left: var(--m-xl);
+  right: var(--m-xl);
+  z-index: 9998;
+  pointer-events: auto;
+  background: var(--c-overlay-dark);
+  border: solid 1px var(--c-border-on-dark);
+  border-radius: var(--m-s);
+  padding: var(--m-s) var(--m-l) var(--m-s);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+/* --- Sparkline --- */
+
+.sparkline {
+  display: block;
+  width: 100%;
+  height: 28px;
+}
+
+.sparklineBar {
+  fill: rgba(255, 255, 255, 0.18);
+}
+
+.sparklineBarActive {
+  fill: var(--c-accent);
+  opacity: 0.85;
+}
+
+/* --- Track --- */
+
+.trackArea {
+  position: relative;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  touch-action: none;
+}
+
+.track {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 2px;
+}
+
+.trackFill {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: var(--c-accent);
+  border-radius: 2px;
+  opacity: 0.6;
+}
+
+/* --- Thumbs --- */
+
+.thumb {
+  position: absolute;
+  top: 50%;
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  background: white;
+  border: solid 2px var(--c-accent);
+  transform: translate(-50%, -50%);
+  cursor: grab;
+  touch-action: none;
+  z-index: 1;
+  transition: opacity 0.15s, transform 0.1s;
+}
+
+.thumb:active {
+  cursor: grabbing;
+  transform: translate(-50%, -50%) scale(1.2);
+}
+
+.thumb:focus-visible {
+  outline: 2px solid var(--c-accent);
+  outline-offset: 2px;
+}
+
+/* Inactive state: hide thumbs until hover */
+.thumbHidden {
+  opacity: 0;
+}
+
+.container:hover .thumbHidden,
+.container:focus-within .thumbHidden {
+  opacity: 1;
+}
+
+/* --- Labels --- */
+
+.labels {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: var(--fs-xs);
+  color: rgba(255, 255, 255, 0.5);
+  margin-top: 2px;
+  line-height: 1;
+}
+
+.labelsActive {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.label {
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.resetButton {
+  appearance: none;
+  border: none;
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.6);
+  font-size: var(--fs-xs);
+  cursor: pointer;
+  padding: 2px var(--m-s);
+  border-radius: 999px;
+  line-height: 1;
+}
+
+.resetButton:hover {
+  background: rgba(255, 255, 255, 0.18);
+  color: white;
+}
+
+/* --- Responsive --- */
+
+@media (max-width: 600px) {
+  .container {
+    left: var(--m-s);
+    right: var(--m-s);
+    padding: var(--m-s) var(--m-m);
+  }
+
+  .thumb,
+  .thumbHidden {
+    width: 22px;
+    height: 22px;
+    /* Always visible on touch — no hover discovery */
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .thumb {
+    transition: none;
+  }
+}
