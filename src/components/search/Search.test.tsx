@@ -464,6 +464,13 @@ describe("Search", () => {
   });
 
   it("reveals additional memory clusters on demand", async () => {
+    // Pin the date to March 20 so the test memory dates (March 17-22)
+    // fall within the 14-day seed window used by getMemoryClusters.
+    // Only fake Date, not timers — async rendering needs real setTimeout.
+    jest.useFakeTimers({
+      now: new Date("2026-03-20T12:00:00Z"),
+      doNotFake: ["setTimeout", "clearTimeout", "setInterval", "clearInterval", "setImmediate", "clearImmediate", "queueMicrotask"],
+    });
     (fetchMemoryCandidates as jest.Mock).mockResolvedValue([
       {
         ...makeResult({
@@ -512,6 +519,8 @@ describe("Search", () => {
     );
 
     expect(await screen.findByAltText("Memory shot D")).toBeTruthy();
+
+    jest.useRealTimers();
   });
 
   it("switches from browse mode into similarity mode and back", async () => {

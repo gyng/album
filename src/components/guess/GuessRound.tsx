@@ -4,45 +4,18 @@ import { Caption } from "../ui";
 import styles from "./GuessRound.module.css";
 import { GuessPhoto } from "./guessTypes";
 import { fireConfetti } from "./confetti";
+import {
+  MAX_SCORE,
+  computeScore,
+  computeTimeBonus,
+  formatDistance,
+  scoreRatio,
+  scoreTierColour,
+} from "./guessScoring";
 
 const MIN_ZOOM = 1;
 const MAX_ZOOM = 6;
 const ZOOM_STEP = 1.15;
-
-const MAX_SCORE = 5000;
-/** Distance in km at which score reaches 0. */
-const ZERO_DISTANCE = 500;
-const LOG_DIVISOR = Math.log(1 + ZERO_DISTANCE);
-
-const computeScore = (distanceKm: number): number =>
-  Math.round(MAX_SCORE * Math.max(0, 1 - Math.log(1 + distanceKm) / LOG_DIVISOR));
-
-const formatDistance = (meters: number): string => {
-  if (meters < 1000) return `${Math.round(meters)} m`;
-  if (meters < 100_000) return `${(meters / 1000).toFixed(1)} km`;
-  return `${Math.round(meters / 1000).toLocaleString()} km`;
-};
-
-const MAX_TIME_BONUS = 1000;
-
-/** 0–1 ratio for the score bar width (distance portion only). */
-const scoreRatio = (score: number): number => score / MAX_SCORE;
-
-const computeTimeBonus = (
-  timeLimit: number | null,
-  timeRemaining: number | null,
-): number => {
-  if (!timeLimit || timeRemaining === null) return 0;
-  return Math.round(MAX_TIME_BONUS * (timeRemaining / timeLimit));
-};
-
-/** Returns a CSS colour based on score tier — green for close, amber mid, accent for far. */
-const scoreTierColour = (score: number): string => {
-  const ratio = score / MAX_SCORE;
-  if (ratio >= 0.7) return "#22c55e";
-  if (ratio >= 0.35) return "#eab308";
-  return "var(--c-accent)";
-};
 
 export type RoundResult = {
   photo: GuessPhoto;

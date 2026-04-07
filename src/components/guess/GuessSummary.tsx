@@ -3,6 +3,12 @@ import Link from "next/link";
 import { Heading, Caption } from "../ui";
 import { RoundResult } from "./GuessRound";
 import { GameSettings } from "./guessTypes";
+import {
+  MAX_SCORE,
+  MAX_TIME_BONUS,
+  formatDistance,
+  scoreTierColour,
+} from "./guessScoring";
 import styles from "./GuessSummary.module.css";
 
 type GuessSummaryProps = {
@@ -13,15 +19,12 @@ type GuessSummaryProps = {
   onChangeSettings: () => void;
 };
 
-const MAX_DISTANCE_SCORE = 5000;
-const MAX_TIME_BONUS = 1000;
-
 const getRating = (
   score: number,
   totalRounds: number,
   hasTimer: boolean,
 ): string => {
-  const maxPerRound = MAX_DISTANCE_SCORE + (hasTimer ? MAX_TIME_BONUS : 0);
+  const maxPerRound = MAX_SCORE + (hasTimer ? MAX_TIME_BONUS : 0);
   const ratio = score / (totalRounds * maxPerRound);
   if (ratio >= 0.9) return "Local expert";
   if (ratio >= 0.7) return "Seasoned traveller";
@@ -29,13 +32,6 @@ const getRating = (
   if (ratio >= 0.3) return "Getting there";
   if (ratio >= 0.1) return "Tourist with a broken compass";
   return "Lost in space";
-};
-
-const formatDistance = (meters: number): string => {
-  if (!Number.isFinite(meters)) return "—";
-  if (meters < 1000) return `${Math.round(meters)} m`;
-  if (meters < 100_000) return `${(meters / 1000).toFixed(1)} km`;
-  return `${Math.round(meters / 1000).toLocaleString()} km`;
 };
 
 const getGeocodeLabel = (geocode: string): string | null => {
@@ -47,13 +43,6 @@ const getGeocodeLabel = (geocode: string): string | null => {
   if (parts.length === 0) return null;
   if (parts.length >= 2) return `${parts[0]}, ${parts[parts.length - 1]}`;
   return parts[0];
-};
-
-const scoreTierColour = (score: number): string => {
-  const ratio = score / MAX_DISTANCE_SCORE;
-  if (ratio >= 0.7) return "#22c55e";
-  if (ratio >= 0.35) return "#eab308";
-  return "var(--c-accent)";
 };
 
 /** Imperatively animates a DOM element's textContent from 0 to target. */
@@ -105,7 +94,7 @@ export const GuessSummary: React.FC<GuessSummaryProps> = ({
   onChangeSettings,
 }) => {
   const hasTimer = Boolean(settings.timeLimit);
-  const maxPerRound = MAX_DISTANCE_SCORE + (hasTimer ? MAX_TIME_BONUS : 0);
+  const maxPerRound = MAX_SCORE + (hasTimer ? MAX_TIME_BONUS : 0);
   const totalScore = results.reduce((sum, r) => sum + r.score, 0);
   const maxScore = results.length * maxPerRound;
   const rating = getRating(totalScore, results.length, hasTimer);

@@ -1685,7 +1685,7 @@ const hashSeed = (str: string): number => {
 };
 
 /** Fisher-Yates shuffle with a seeded PRNG. Returns a new array. */
-const seededShuffle = <T>(arr: T[], seed: string): T[] => {
+export const seededShuffle = <T>(arr: T[], seed: string): T[] => {
   const result = [...arr];
   const rng = mulberry32(hashSeed(seed));
   for (let i = result.length - 1; i > 0; i--) {
