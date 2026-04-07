@@ -1,4 +1,5 @@
 import React, { useCallback, useRef } from "react";
+import Link from "next/link";
 import { Heading } from "../ui";
 import { RoundResult } from "./GuessRound";
 import styles from "./GuessSummary.module.css";
@@ -111,12 +112,14 @@ export const GuessSummary: React.FC<GuessSummaryProps> = ({
               className={styles.roundRow}
               style={{ animationDelay: `${idx * 0.08}s` }}
             >
-              <img
-                src={thumbSrc}
-                alt=""
-                className={styles.thumb}
-                draggable={false}
-              />
+              <Link href={`/album/${result.photo.albumName}#${result.photo.photoName}`}>
+                <img
+                  src={thumbSrc}
+                  alt=""
+                  className={styles.thumb}
+                  draggable={false}
+                />
+              </Link>
               <div className={styles.roundDetail}>
                 <div className={styles.roundMeta}>
                   {label ? (

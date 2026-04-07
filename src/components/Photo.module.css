@@ -95,7 +95,6 @@
 .similarPhotos {
   margin-top: var(--m-l);
   max-width: min(32rem, 100%);
-  width: fit-content;
 }
 
 .similarPhotosTitle {
