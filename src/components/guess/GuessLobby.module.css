@@ -1,0 +1,146 @@
+.lobby {
+  display: grid;
+  gap: var(--m-xl);
+  max-width: 420px;
+  margin: var(--m-xl) auto 0;
+  padding: var(--m-xl) var(--m-l);
+}
+
+/* Header — drops in first */
+.header {
+  display: grid;
+  gap: var(--m-s);
+  text-align: center;
+  animation: dropIn 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes dropIn {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Options — each row cascades in */
+.options {
+  display: grid;
+  gap: var(--m-l);
+}
+
+.optionRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--m-m);
+  padding: var(--m-s) var(--m-m);
+  border-radius: var(--m-s);
+  animation: slideIn 0.3s ease-out both;
+  transition: background-color 0.15s;
+}
+
+.optionRow:hover {
+  background-color: color-mix(in srgb, var(--c-bg-contrast-light) 8%, transparent);
+}
+
+@keyframes slideIn {
+  from { opacity: 0; transform: translateX(-8px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+.optionLabel {
+  font-size: var(--fs-sm);
+  flex-shrink: 0;
+}
+
+.regionSelect {
+  max-width: 220px;
+}
+
+/* Photo count — subtle context */
+.photoCount {
+  text-align: center;
+  animation: fadeIn 0.4s 0.2s ease-out both;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Play button — prominent, accent-bordered, enters last */
+.playButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--m-s);
+  border: solid 2px var(--c-accent);
+  border-radius: var(--m-s);
+  padding: var(--m-m) var(--m-2xl);
+  cursor: pointer;
+  background-color: var(--c-bg);
+  font-size: var(--fs-m);
+  font-weight: 600;
+  color: var(--c-font);
+  justify-self: center;
+  position: relative;
+  overflow: hidden;
+  transition: background-color 0.15s, transform 0.12s, box-shadow 0.2s;
+  animation: buttonEnter 0.4s 0.25s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes buttonEnter {
+  from { opacity: 0; transform: scale(0.9); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.playButton:hover {
+  background-color: color-mix(in srgb, var(--c-accent) 10%, var(--c-bg));
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--c-accent) 15%, transparent);
+  transform: scale(1.03);
+}
+
+.playButton:active {
+  transform: scale(0.97);
+  box-shadow: none;
+}
+
+/* Shimmer sweep across the play button */
+.playButton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(
+    105deg,
+    transparent 40%,
+    color-mix(in srgb, var(--c-accent) 12%, transparent) 50%,
+    transparent 60%
+  );
+  animation: shimmer 3s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes shimmer {
+  0%, 100% { transform: translateX(-120%); }
+  50% { transform: translateX(120%); }
+}
+
+.kbd {
+  font-family: inherit;
+  font-size: var(--fs-xs);
+  color: var(--c-bg-contrast-light);
+  border: 1px solid color-mix(in srgb, var(--c-bg-contrast-light) 40%, transparent);
+  border-radius: 3px;
+  padding: 1px 4px;
+  line-height: 1;
+}
+
+@media (max-width: 480px) {
+  .lobby {
+    margin-top: var(--m-l);
+    padding: var(--m-l) var(--m-s);
+    gap: var(--m-l);
+  }
+
+  .kbd {
+    display: none;
+  }
+}

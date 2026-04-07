@@ -1,5 +1,4 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import dynamic from "next/dynamic";
 import { distanceMetersBetween } from "../mapRoute";
 import { Caption } from "../ui";
 import styles from "./GuessRound.module.css";
@@ -10,16 +9,13 @@ const MIN_ZOOM = 1;
 const MAX_ZOOM = 6;
 const ZOOM_STEP = 1.15;
 
-const GuessMap = dynamic(() => import("./GuessMapExport"), {
-  loading: () => <div className={styles.mapPlaceholder} />,
-  ssr: false,
-});
-
 const MAX_SCORE = 5000;
-const DECAY_FACTOR = 250;
+/** Distance in km at which score reaches 0. */
+const ZERO_DISTANCE = 500;
+const LOG_DIVISOR = Math.log(1 + ZERO_DISTANCE);
 
 const computeScore = (distanceKm: number): number =>
-  Math.round(MAX_SCORE * Math.exp(-distanceKm / DECAY_FACTOR));
+  Math.round(MAX_SCORE * Math.max(0, 1 - Math.log(1 + distanceKm) / LOG_DIVISOR));
 
 const formatDistance = (meters: number): string => {
   if (meters < 1000) return `${Math.round(meters)} m`;
@@ -27,8 +23,18 @@ const formatDistance = (meters: number): string => {
   return `${Math.round(meters / 1000).toLocaleString()} km`;
 };
 
-/** 0–1 ratio for the score bar width. */
+const MAX_TIME_BONUS = 1000;
+
+/** 0–1 ratio for the score bar width (distance portion only). */
 const scoreRatio = (score: number): number => score / MAX_SCORE;
+
+const computeTimeBonus = (
+  timeLimit: number | null,
+  timeRemaining: number | null,
+): number => {
+  if (!timeLimit || timeRemaining === null) return 0;
+  return Math.round(MAX_TIME_BONUS * (timeRemaining / timeLimit));
+};
 
 /** Returns a CSS colour based on score tier — green for close, amber mid, accent for far. */
 const scoreTierColour = (score: number): string => {
@@ -41,6 +47,11 @@ const scoreTierColour = (score: number): string => {
 export type RoundResult = {
   photo: GuessPhoto;
   distanceMeters: number;
+  /** Distance-based score (max 5,000). */
+  distanceScore: number;
+  /** Time bonus (max 1,000, 0 when timer is off). */
+  timeBonus: number;
+  /** Total: distanceScore + timeBonus. */
   score: number;
   skipped: boolean;
 };
@@ -50,8 +61,14 @@ type GuessRoundProps = {
   roundNumber: number;
   totalRounds: number;
   cumulativeScore: number;
-  difficulty: "easy" | "medium" | "hard";
+  timeLimit: number | null;
+  /** Externally managed guess from the persistent map. */
+  guess: { lat: number; lng: number } | null;
   onComplete: (result: RoundResult) => void;
+  onReveal: () => void;
+  onAbort: () => void;
+  /** Persistent map element rendered by the parent to avoid remounts. */
+  mapSlot: React.ReactNode;
 };
 
 const getGeocodeLabel = (geocode: string): string | null => {
@@ -109,16 +126,30 @@ export const GuessRound: React.FC<GuessRoundProps> = ({
   roundNumber,
   totalRounds,
   cumulativeScore,
-  difficulty,
+  timeLimit,
+  guess,
   onComplete,
+  onReveal,
+  onAbort,
+  mapSlot,
 }) => {
-  const [guess, setGuess] = useState<{ lat: number; lng: number } | null>(null);
   const [revealed, setRevealed] = useState(false);
   const [result, setResult] = useState<RoundResult | null>(null);
-
-  // Photo zoom/pan state
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
+
+  // Reset round-local state when the photo changes.
+  // setState during render is the React-approved pattern for syncing state
+  // with props — React re-renders immediately before painting.
+  // See: https://react.dev/reference/react/useState#storing-information-from-previous-renders
+  const [prevPath, setPrevPath] = useState(photo.path);
+  if (prevPath !== photo.path) {
+    setPrevPath(photo.path);
+    setRevealed(false);
+    setResult(null);
+    setZoom(1);
+    setPan({ x: 0, y: 0 });
+  }
   const panRef = useRef({ x: 0, y: 0 });
   const dragging = useRef(false);
   const dragStart = useRef({ x: 0, y: 0 });
@@ -130,11 +161,11 @@ export const GuessRound: React.FC<GuessRoundProps> = ({
     revealed ? cumulativeScore + (result?.score ?? 0) : cumulativeScore,
   );
 
-  const photoSrc = `/data/albums/${photo.albumName}/.resized_images/${photo.photoName}@1600.avif`;
+  // Timer state — must be declared before handlers that read it
+  const [timeRemaining, setTimeRemaining] = useState(timeLimit);
+  const timerCallbackRef = useRef<() => void>(() => {});
 
-  const handleGuess = useCallback((lat: number, lng: number) => {
-    setGuess({ lat, lng });
-  }, []);
+  const photoSrc = `/data/albums/${photo.albumName}/.resized_images/${photo.photoName}@1600.avif`;
 
   const handleConfirm = useCallback(() => {
     if (!guess) return;
@@ -143,32 +174,40 @@ export const GuessRound: React.FC<GuessRoundProps> = ({
       { decLat: guess.lat, decLng: guess.lng },
       { decLat: photo.lat, decLng: photo.lng },
     );
-    const score = computeScore(distanceMeters / 1000);
+    const distanceScore = computeScore(distanceMeters / 1000);
+    const timeBonus = computeTimeBonus(timeLimit, timeRemaining);
+    const score = distanceScore + timeBonus;
     const roundResult: RoundResult = {
       photo,
       distanceMeters,
+      distanceScore,
+      timeBonus,
       score,
       skipped: false,
     };
 
     setResult(roundResult);
     setRevealed(true);
+    onReveal();
 
-    if (score / MAX_SCORE >= 0.7) {
+    if (distanceScore / MAX_SCORE >= 0.7) {
       fireConfetti();
     }
-  }, [guess, photo]);
+  }, [guess, photo, timeLimit, timeRemaining, onReveal]);
 
   const handleSkip = useCallback(() => {
     const roundResult: RoundResult = {
       photo,
       distanceMeters: Infinity,
+      distanceScore: 0,
+      timeBonus: 0,
       score: 0,
       skipped: true,
     };
     setResult(roundResult);
     setRevealed(true);
-  }, [photo]);
+    onReveal();
+  }, [photo, onReveal]);
 
   const handleNext = useCallback(() => {
     if (result) onComplete(result);
@@ -226,7 +265,7 @@ export const GuessRound: React.FC<GuessRoundProps> = ({
   // Keyboard shortcuts: Enter = confirm, Space/ArrowRight = next
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
-      if (event.key === "Enter" && !revealed && guess) {
+      if ((event.key === "Enter" || event.key === " ") && !revealed && guess) {
         event.preventDefault();
         handleConfirm();
       } else if (
@@ -243,14 +282,42 @@ export const GuessRound: React.FC<GuessRoundProps> = ({
     return () => window.removeEventListener("keydown", handler);
   }, [revealed, guess, handleConfirm, handleNext]);
 
-  const countryHint =
-    difficulty === "easy" && photo.geocode
-      ? photo.geocode.split("\n").pop()?.trim()
-      : null;
+  // Timer: countdown per round, auto-confirm/skip on expiry.
+  useEffect(() => {
+    timerCallbackRef.current = () => {
+      if (guess) {
+        handleConfirm();
+      } else {
+        handleSkip();
+      }
+    };
+  }, [guess, handleConfirm, handleSkip]);
+
+  useEffect(() => {
+    if (!timeLimit || revealed) return;
+    let remaining = timeLimit;
+
+    const interval = setInterval(() => {
+      remaining -= 1;
+      if (remaining <= 0) {
+        clearInterval(interval);
+        setTimeRemaining(0);
+        timerCallbackRef.current();
+        return;
+      }
+      setTimeRemaining(remaining);
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [timeLimit, revealed]);
 
   const geocodeLabel = revealed ? getGeocodeLabel(photo.geocode) : null;
   const tierColour =
-    result && !result.skipped ? scoreTierColour(result.score) : undefined;
+    result && !result.skipped
+      ? scoreTierColour(result.distanceScore)
+      : undefined;
+  const isBadGuess =
+    result && !result.skipped && result.distanceScore / MAX_SCORE < 0.1;
 
   return (
     <div className={styles.round}>
@@ -280,6 +347,13 @@ export const GuessRound: React.FC<GuessRoundProps> = ({
         >
           <span ref={cumulativeCounterRef}>{cumulativeScore.toLocaleString()}</span> pts
         </span>
+        <button
+          className={styles.abortButton}
+          onClick={onAbort}
+          title="Quit to menu"
+        >
+          &times;
+        </button>
       </div>
 
       <div className={styles.gameArea}>
@@ -305,8 +379,26 @@ export const GuessRound: React.FC<GuessRoundProps> = ({
               transform: `scale(${zoom}) translate(${pan.x / zoom}px, ${pan.y / zoom}px)`,
             }}
           />
-          {countryHint ? (
-            <div className={styles.countryHint}>{countryHint}</div>
+          {timeLimit && !revealed ? (
+            <div
+              className={styles.timerBar}
+              style={{
+                width: `${((timeRemaining ?? timeLimit) / timeLimit) * 100}%`,
+                transitionDuration: "1s",
+              }}
+              data-urgent={
+                timeRemaining !== null && timeRemaining <= timeLimit * 0.25
+                  ? ""
+                  : undefined
+              }
+              data-warning={
+                timeRemaining !== null &&
+                timeRemaining <= timeLimit * 0.5 &&
+                timeRemaining > timeLimit * 0.25
+                  ? ""
+                  : undefined
+              }
+            />
           ) : null}
           {!isZoomed ? (
             <div className={styles.zoomHint}>Scroll to zoom</div>
@@ -315,12 +407,7 @@ export const GuessRound: React.FC<GuessRoundProps> = ({
 
         {/* Map panel */}
         <div className={styles.mapPanel}>
-          <GuessMap
-            reveal={
-              revealed ? { lat: photo.lat, lng: photo.lng } : undefined
-            }
-            onGuess={handleGuess}
-          />
+          {mapSlot}
 
           <div className={styles.controls}>
             {!revealed ? (
@@ -349,21 +436,38 @@ export const GuessRound: React.FC<GuessRoundProps> = ({
                 ) : (
                   <div className={styles.scoreReveal}>
                     <div className={styles.scoreLine}>
-                      <span className={styles.distance}>
+                      <span
+                        className={[
+                          styles.distance,
+                          isBadGuess ? styles.distanceBad : "",
+                        ]
+                          .filter(Boolean)
+                          .join(" ")}
+                      >
                         {formatDistance(result?.distanceMeters ?? 0)}
                       </span>
                       <span
-                        className={styles.scoreValue}
+                        className={[
+                          styles.scoreValue,
+                          tierColour ? styles.scoreValueGlow : "",
+                        ]
+                          .filter(Boolean)
+                          .join(" ")}
                         style={tierColour ? { color: tierColour } : undefined}
                       >
                         +<span ref={scoreCounterRef}>0</span>
                       </span>
+                      {result && result.timeBonus > 0 ? (
+                        <span className={styles.timeBonusInline}>
+                          +{result.timeBonus.toLocaleString()}
+                        </span>
+                      ) : null}
                     </div>
                     <div className={styles.scoreBarTrack}>
                       <div
                         className={styles.scoreBarFill}
                         style={{
-                          width: `${scoreRatio(result?.score ?? 0) * 100}%`,
+                          width: `${scoreRatio(result?.distanceScore ?? 0) * 100}%`,
                           backgroundColor: tierColour,
                         }}
                       />

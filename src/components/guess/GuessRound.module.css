@@ -1,10 +1,10 @@
 /* Full round layout */
 .round {
   display: grid;
-  grid-template-rows: auto 1fr;
+  grid-template-rows: auto minmax(0, 1fr);
   gap: var(--m-s);
-  height: calc(100vh - 120px);
-  min-height: 480px;
+  height: calc(100dvh - 120px);
+  overflow: hidden;
   animation: roundEnter 0.35s ease-out;
 }
 
@@ -68,6 +68,24 @@
   100% { transform: scale(1); }
 }
 
+.abortButton {
+  appearance: none;
+  border: none;
+  background: none;
+  color: var(--c-bg-contrast-light);
+  font-size: var(--fs-sm);
+  cursor: pointer;
+  padding: var(--m) var(--m-s);
+  line-height: 1;
+  border-radius: var(--m);
+  transition: color 0.12s, background-color 0.12s;
+}
+
+.abortButton:hover {
+  color: var(--c-font);
+  background-color: color-mix(in srgb, var(--c-bg-contrast-light) 15%, transparent);
+}
+
 /* Photo + Map side by side */
 .gameArea {
   display: grid;
@@ -78,17 +96,23 @@
 
 @media (max-width: 768px) {
   .round {
-    height: auto;
-    min-height: unset;
+    height: calc(100dvh - 70px);
   }
 
   .gameArea {
     grid-template-columns: 1fr;
-    grid-template-rows: 1fr auto;
+    grid-template-rows: 2fr minmax(0, 3fr);
+    min-height: 0;
   }
 }
 
-/* Photo panel — zoomable */
+@media (max-width: 480px) {
+  .gameArea {
+    gap: var(--m-s);
+  }
+}
+
+/* Photo panel — zoomable, crossfade on new round */
 .photoPanel {
   position: relative;
   overflow: hidden;
@@ -118,6 +142,12 @@
   transform-origin: center center;
   will-change: transform;
   transition: transform 0.1s ease-out;
+  animation: photoCrossfade 0.4s ease-out;
+}
+
+@keyframes photoCrossfade {
+  from { opacity: 0; filter: blur(6px); }
+  to { opacity: 1; filter: blur(0); }
 }
 
 .zoomHint {
@@ -133,17 +163,33 @@
   opacity: 0.6;
 }
 
-.countryHint {
+/* Timer bar with pulsing glow at urgent */
+.timerBar {
   position: absolute;
-  bottom: var(--m-m);
-  left: 50%;
-  transform: translateX(-50%);
-  background-color: var(--c-overlay-dark);
-  color: #fff;
-  padding: var(--m-s) var(--m-m);
-  border-radius: var(--m-s);
-  font-size: var(--fs-s);
-  white-space: nowrap;
+  top: 0;
+  left: 0;
+  height: 3px;
+  background-color: #22c55e;
+  transition-property: width, background-color;
+  transition-timing-function: linear, ease;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.timerBar[data-warning] {
+  background-color: #eab308;
+}
+
+.timerBar[data-urgent] {
+  background-color: #ef4444;
+  height: 4px;
+  box-shadow: 0 0 8px 1px rgba(239, 68, 68, 0.5);
+  animation: timerPulse 0.5s ease-in-out infinite;
+}
+
+@keyframes timerPulse {
+  0%, 100% { box-shadow: 0 0 8px 1px rgba(239, 68, 68, 0.5); }
+  50% { box-shadow: 0 0 14px 3px rgba(239, 68, 68, 0.7); }
 }
 
 /* Map panel */
@@ -152,18 +198,13 @@
   flex-direction: column;
   gap: var(--m-s);
   min-height: 0;
-}
-
-@media (max-width: 768px) {
-  .mapPanel {
-    min-height: 300px;
-  }
+  overflow: hidden;
 }
 
 .mapPlaceholder {
   width: 100%;
   flex: 1;
-  min-height: 200px;
+  min-height: 0;
   background-color: var(--c-bg-contrast-dark);
   border-radius: var(--m-s);
 }
@@ -189,12 +230,17 @@
   background-color: var(--c-bg);
   font-size: var(--fs-sm);
   color: var(--c-font);
-  transition: background-color 0.12s, border-color 0.2s, box-shadow 0.2s;
+  transition: background-color 0.12s, border-color 0.2s, box-shadow 0.2s, transform 0.1s;
 }
 
 .confirmButton:hover:not(:disabled),
 .nextButton:hover {
   background-color: var(--c-bg-contrast-light);
+}
+
+.confirmButton:active:not(:disabled),
+.nextButton:active {
+  transform: scale(0.96);
 }
 
 .confirmButton:disabled {
@@ -227,6 +273,12 @@
   line-height: 1;
 }
 
+@media (max-width: 480px) {
+  .kbd {
+    display: none;
+  }
+}
+
 .skipButton {
   border: none;
   background: none;
@@ -252,6 +304,13 @@
   animation: slideUp 0.3s ease-out;
 }
 
+@media (max-width: 480px) {
+  .revealPanel {
+    gap: var(--m-s);
+    flex-wrap: wrap;
+  }
+}
+
 @keyframes slideUp {
   from { opacity: 0; transform: translateY(6px); }
   to { opacity: 1; transform: translateY(0); }
@@ -260,7 +319,13 @@
 .scoreReveal {
   display: grid;
   gap: 4px;
-  min-width: 120px;
+  min-width: 100px;
+}
+
+@media (max-width: 480px) {
+  .scoreReveal {
+    min-width: 80px;
+  }
 }
 
 .scoreLine {
@@ -275,6 +340,19 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* Distance shakes on bad guess */
+.distanceBad {
+  animation: shake 0.4s ease-out;
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-3px); }
+  40% { transform: translateX(3px); }
+  60% { transform: translateX(-2px); }
+  80% { transform: translateX(2px); }
+}
+
 .scoreValue {
   font-size: var(--fs-m);
   font-weight: 700;
@@ -282,10 +360,28 @@
   animation: scorePop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
+/* Glow behind score in tier colour */
+.scoreValueGlow {
+  text-shadow: 0 0 12px currentColor;
+}
+
 @keyframes scorePop {
   0% { transform: scale(0.5); opacity: 0; }
   60% { transform: scale(1.15); }
   100% { transform: scale(1); opacity: 1; }
+}
+
+/* Time bonus appears after main score */
+.timeBonusInline {
+  font-size: var(--fs-s);
+  color: var(--c-bg-contrast-light);
+  font-variant-numeric: tabular-nums;
+  animation: bonusSlide 0.35s 0.3s ease-out both;
+}
+
+@keyframes bonusSlide {
+  from { opacity: 0; transform: translateX(-6px); }
+  to { opacity: 1; transform: translateX(0); }
 }
 
 .scoreBarTrack {

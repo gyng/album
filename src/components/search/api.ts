@@ -1568,31 +1568,129 @@ export const fetchRandomPhoto = async (opts: {
   }
 };
 
+export type GuessRegionOption = { country: string; count: number };
+
+/** Fetches distinct countries with GPS-tagged photo counts, sorted by count. */
+export const fetchGuessRegions = async (opts: {
+  database: Database;
+}): Promise<GuessRegionOption[]> => {
+  try {
+    const result = await exec(
+      opts.database,
+      `SELECT geocode FROM images WHERE exif LIKE '%GPSLatitude%'`,
+      [],
+    );
+    const counts = new Map<string, number>();
+    for (const row of result.data as unknown as string[][]) {
+      const country = getGeocodeCountry(row[0]);
+      if (!country) continue;
+      counts.set(country, (counts.get(country) ?? 0) + 1);
+    }
+    return Array.from(counts.entries())
+      .filter(([, count]) => count >= 3)
+      .map(([country, count]) => ({ country, count }))
+      .sort((a, b) => b.count - a.count);
+  } catch (err) {
+    console.error("Failed to fetch guess regions", err);
+    return [];
+  }
+};
+
 export const fetchGuessPhotos = async (opts: {
   database: Database;
   count: number;
   filter?: string;
+  region?: string;
+  seed?: string;
 }): Promise<RandomPhotoRow[]> => {
-  const { database, count, filter = "%" } = opts;
+  const { database, count, filter = "%", region, seed } = opts;
+
+  const baseWhere = `path LIKE ? AND exif LIKE '%GPSLatitude%'`;
+  const regionClause = region
+    ? ` AND (geocode LIKE '%\n' || ? OR geocode LIKE '%\n' || ? || '\n%')`
+    : "";
+  const baseParams: (string | number)[] = [`../albums/${filter}/%`];
+  if (region) {
+    baseParams.push(region, region);
+  }
 
   try {
+    if (!seed) {
+      const result = await exec(
+        database,
+        `SELECT path, exif, geocode FROM images
+         WHERE ${baseWhere}${regionClause}
+         ORDER BY RANDOM() LIMIT ?`,
+        [...baseParams, count],
+      );
+      return (result.data as unknown as string[][]).map((row) => ({
+        path: row[0],
+        exif: row[1],
+        geocode: row[2],
+      }));
+    }
+
+    // Seeded: fetch all matching paths, shuffle deterministically, then
+    // fetch full rows for the selected subset.
+    const allResult = await exec(
+      database,
+      `SELECT path FROM images WHERE ${baseWhere}${regionClause}`,
+      baseParams,
+    );
+    const allPaths = (allResult.data as unknown as string[][]).map((r) => r[0]);
+    const selected = seededShuffle(allPaths, seed).slice(0, count);
+
+    if (selected.length === 0) return [];
+
+    const placeholders = selected.map(() => "?").join(",");
     const result = await exec(
       database,
-      `SELECT path, exif, geocode
-      FROM images
-      WHERE path LIKE ?
-        AND exif LIKE '%GPSLatitude%'
-      ORDER BY RANDOM()
-      LIMIT ?`,
-      [`../albums/${filter}/%`, count],
+      `SELECT path, exif, geocode FROM images WHERE path IN (${placeholders})`,
+      selected,
     );
-    return (result.data as unknown as string[][]).map((row) => ({
-      path: row[0],
-      exif: row[1],
-      geocode: row[2],
-    }));
+    const rowMap = new Map(
+      (result.data as unknown as string[][]).map((row) => [
+        row[0],
+        { path: row[0], exif: row[1], geocode: row[2] },
+      ]),
+    );
+    return selected.flatMap((p) => {
+      const row = rowMap.get(p);
+      return row ? [row] : [];
+    });
   } catch (err) {
     console.error(`Failed to fetch guess photos`, err);
     throw err;
   }
+};
+
+/** Simple seeded PRNG (mulberry32). */
+const mulberry32 = (seed: number) => {
+  return () => {
+    seed |= 0;
+    seed = (seed + 0x6d2b79f5) | 0;
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+};
+
+/** Hash a string to a 32-bit integer for use as a PRNG seed. */
+const hashSeed = (str: string): number => {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = (Math.imul(31, hash) + str.charCodeAt(i)) | 0;
+  }
+  return hash;
+};
+
+/** Fisher-Yates shuffle with a seeded PRNG. Returns a new array. */
+const seededShuffle = <T>(arr: T[], seed: string): T[] => {
+  const result = [...arr];
+  const rng = mulberry32(hashSeed(seed));
+  for (let i = result.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [result[i], result[j]] = [result[j], result[i]];
+  }
+  return result;
 };

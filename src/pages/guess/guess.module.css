@@ -1,7 +1,11 @@
 .page {
-  max-width: 1400px;
-  margin: 0 auto;
   padding: 0 var(--m-l) var(--m-l);
+}
+
+@media (max-width: 480px) {
+  .page {
+    padding: 0 var(--m-s) var(--m-s);
+  }
 }
 
 .title {

@@ -1,42 +1,18 @@
-import React, { useCallback, useState } from "react";
-import Map, { Marker, Source, Layer, useMap } from "react-map-gl/maplibre";
-import type { MapLayerMouseEvent, LngLatBoundsLike } from "maplibre-gl";
+import React, { useCallback } from "react";
+import Map, { Marker, Source, Layer } from "react-map-gl/maplibre";
+import type { MapLayerMouseEvent } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import styles from "./GuessMap.module.css";
 
 export type GuessMapProps = {
+  /** Current guess position, managed by the parent. */
+  guess: { lat: number; lng: number } | null;
   /** When set, shows the actual location and a connecting line from the guess. */
   reveal?: { lat: number; lng: number };
   onGuess: (lat: number, lng: number) => void;
 };
 
 const MAP_STYLE = "https://tiles.openfreemap.org/styles/liberty";
-
-const RevealFitter: React.FC<{
-  guess: { lat: number; lng: number };
-  actual: { lat: number; lng: number };
-}> = ({ guess, actual }) => {
-  const { current: map } = useMap();
-
-  React.useEffect(() => {
-    if (!map) return;
-
-    const bounds: LngLatBoundsLike = [
-      [
-        Math.min(guess.lng, actual.lng) - 2,
-        Math.min(guess.lat, actual.lat) - 2,
-      ],
-      [
-        Math.max(guess.lng, actual.lng) + 2,
-        Math.max(guess.lat, actual.lat) + 2,
-      ],
-    ];
-
-    map.fitBounds(bounds, { padding: 60, duration: 1200 });
-  }, [map, guess, actual]);
-
-  return null;
-};
 
 const lineGeoJson = (
   from: { lat: number; lng: number },
@@ -58,14 +34,15 @@ const lineGeoJson = (
   ],
 });
 
-export const GuessMap: React.FC<GuessMapProps> = ({ reveal, onGuess }) => {
-  const [guess, setGuess] = useState<{ lat: number; lng: number } | null>(null);
-
+export const GuessMap: React.FC<GuessMapProps> = ({
+  guess,
+  reveal,
+  onGuess,
+}) => {
   const handleClick = useCallback(
     (event: MapLayerMouseEvent) => {
       if (reveal) return;
       const { lat, lng } = event.lngLat;
-      setGuess({ lat, lng });
       onGuess(lat, lng);
     },
     [reveal, onGuess],
@@ -129,7 +106,6 @@ export const GuessMap: React.FC<GuessMapProps> = ({ reveal, onGuess }) => {
                     }}
                   />
                 </Source>
-                <RevealFitter guess={guess} actual={reveal} />
               </>
             ) : null}
           </>

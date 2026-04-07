@@ -1,19 +1,28 @@
-import React, { useCallback, useRef } from "react";
+import React, { useCallback, useRef, useState } from "react";
 import Link from "next/link";
-import { Heading } from "../ui";
+import { Heading, Caption } from "../ui";
 import { RoundResult } from "./GuessRound";
+import { GameSettings } from "./guessTypes";
 import styles from "./GuessSummary.module.css";
 
 type GuessSummaryProps = {
   results: RoundResult[];
+  seed: string;
+  settings: GameSettings;
   onPlayAgain: () => void;
+  onChangeSettings: () => void;
 };
 
-const MAX_SCORE_PER_ROUND = 5000;
+const MAX_DISTANCE_SCORE = 5000;
+const MAX_TIME_BONUS = 1000;
 
-const getRating = (score: number, totalRounds: number): string => {
-  const maxScore = totalRounds * MAX_SCORE_PER_ROUND;
-  const ratio = score / maxScore;
+const getRating = (
+  score: number,
+  totalRounds: number,
+  hasTimer: boolean,
+): string => {
+  const maxPerRound = MAX_DISTANCE_SCORE + (hasTimer ? MAX_TIME_BONUS : 0);
+  const ratio = score / (totalRounds * maxPerRound);
   if (ratio >= 0.9) return "Local expert";
   if (ratio >= 0.7) return "Seasoned traveller";
   if (ratio >= 0.5) return "Decent navigator";
@@ -41,7 +50,7 @@ const getGeocodeLabel = (geocode: string): string | null => {
 };
 
 const scoreTierColour = (score: number): string => {
-  const ratio = score / MAX_SCORE_PER_ROUND;
+  const ratio = score / MAX_DISTANCE_SCORE;
   if (ratio >= 0.7) return "#22c55e";
   if (ratio >= 0.35) return "#eab308";
   return "var(--c-accent)";
@@ -78,20 +87,55 @@ const useAnimatedCounter = (
   );
 };
 
+const buildShareUrl = (seed: string, settings: GameSettings): string => {
+  const params = new URLSearchParams();
+  params.set("seed", seed);
+  if (settings.rounds !== 5) params.set("rounds", String(settings.rounds));
+  if (settings.region) params.set("region", settings.region);
+  if (settings.timeLimit) params.set("timer", String(settings.timeLimit));
+  return `/guess?${params.toString()}`;
+};
+
 export const GuessSummary: React.FC<GuessSummaryProps> = ({
   results,
+  seed,
+  settings,
   onPlayAgain,
+  onChangeSettings,
 }) => {
+  const hasTimer = Boolean(settings.timeLimit);
+  const maxPerRound = MAX_DISTANCE_SCORE + (hasTimer ? MAX_TIME_BONUS : 0);
   const totalScore = results.reduce((sum, r) => sum + r.score, 0);
-  const maxScore = results.length * MAX_SCORE_PER_ROUND;
-  const rating = getRating(totalScore, results.length);
+  const maxScore = results.length * maxPerRound;
+  const rating = getRating(totalScore, results.length, hasTimer);
   const totalCounterRef = useAnimatedCounter(totalScore);
+  const [copied, setCopied] = useState(false);
+  const bestScore = Math.max(...results.map((r) => r.score));
+  const totalTierColour = scoreTierColour(
+    results.length > 0
+      ? totalScore / results.length
+      : 0,
+  );
+
+  const shareUrl = buildShareUrl(seed, settings);
+
+  const handleCopyLink = useCallback(() => {
+    const fullUrl = `${window.location.origin}${shareUrl}`;
+    navigator.clipboard.writeText(fullUrl).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  }, [shareUrl]);
 
   return (
     <div className={styles.summary}>
       <div className={styles.header}>
         <Heading level={1}>
-          <span className={styles.totalScore} ref={totalCounterRef}>
+          <span
+            className={styles.totalScore}
+            ref={totalCounterRef}
+            style={{ textShadow: `0 0 16px ${totalTierColour}` }}
+          >
             0
           </span>{" "}
           <span className={styles.maxScore}>/ {maxScore.toLocaleString()}</span>
@@ -103,13 +147,20 @@ export const GuessSummary: React.FC<GuessSummaryProps> = ({
         {results.map((result, idx) => {
           const thumbSrc = `/data/albums/${result.photo.albumName}/.resized_images/${result.photo.photoName}@800.avif`;
           const label = getGeocodeLabel(result.photo.geocode);
-          const barWidth = (result.score / MAX_SCORE_PER_ROUND) * 100;
-          const colour = scoreTierColour(result.score);
+          const barWidth = (result.score / maxPerRound) * 100;
+          const colour = scoreTierColour(result.distanceScore);
 
           return (
             <li
               key={idx}
-              className={styles.roundRow}
+              className={[
+                styles.roundRow,
+                result.score === bestScore && result.score > 0
+                  ? styles.bestRound
+                  : "",
+              ]
+                .filter(Boolean)
+                .join(" ")}
               style={{ animationDelay: `${idx * 0.08}s` }}
             >
               <Link href={`/album/${result.photo.albumName}#${result.photo.photoName}`}>
@@ -144,20 +195,44 @@ export const GuessSummary: React.FC<GuessSummaryProps> = ({
                   />
                 </div>
               </div>
-              <span
-                className={styles.roundScore}
-                style={{ color: colour }}
-              >
-                {result.score.toLocaleString()}
+              <span className={styles.roundScoreCol}>
+                <span
+                  className={styles.roundScore}
+                  style={{ color: colour }}
+                >
+                  {result.score.toLocaleString()}
+                </span>
+                {result.timeBonus > 0 ? (
+                  <span className={styles.timeBonus}>
+                    +{result.timeBonus.toLocaleString()}
+                  </span>
+                ) : null}
               </span>
             </li>
           );
         })}
       </ol>
 
-      <button className={styles.playAgain} onClick={onPlayAgain}>
-        Play again
-      </button>
+      <div className={styles.actions}>
+        <button className={styles.playAgain} onClick={onPlayAgain}>
+          Play again
+        </button>
+        <button className={styles.shareButton} onClick={handleCopyLink}>
+          {copied ? "Copied!" : "Copy challenge link"}
+        </button>
+      </div>
+
+      <div className={styles.footer}>
+        <Caption as="p" size="sm" className={styles.shareHint}>
+          Challenge a friend to the same {results.length} photos
+        </Caption>
+        <button
+          className={styles.changeSettings}
+          onClick={onChangeSettings}
+        >
+          Change settings
+        </button>
+      </div>
     </div>
   );
 };

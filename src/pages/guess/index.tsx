@@ -1,42 +1,64 @@
 import { NextPage } from "next/types";
+import { useCallback } from "react";
 import { useRouter } from "next/router";
 import { useDatabase } from "../../components/database/useDatabase";
 import { ProgressBar } from "../../components/ProgressBar";
 import { GlobalNav } from "../../components/GlobalNav";
 import { GuessGame } from "../../components/guess/GuessGame";
+import { GameSettings } from "../../components/guess/guessTypes";
 import { Seo } from "../../components/Seo";
 import styles from "./guess.module.css";
 
 type PageProps = {};
 
-const DEFAULT_ROUNDS = 5;
-
-const parseDifficulty = (
-  value: string | string[] | undefined,
-): "easy" | "medium" | "hard" => {
-  if (value === "easy" || value === "hard") return value;
-  return "medium";
+const parseTimer = (value: string | string[] | undefined): number | null => {
+  if (value === "15" || value === "30") return Number(value);
+  return null;
 };
 
 const GuessPage: NextPage<PageProps> = () => {
   const router = useRouter();
   const [database, progress] = useDatabase();
 
-  const rounds = Math.min(
-    20,
-    Math.max(1, Number(router.query.rounds) || DEFAULT_ROUNDS),
+  const seedFromUrl =
+    typeof router.query.seed === "string" ? router.query.seed : undefined;
+  const regionFromUrl =
+    typeof router.query.region === "string" ? router.query.region : undefined;
+
+  // When a seed is in the URL, build settings from params and skip the lobby.
+  const initialSettings: GameSettings | undefined = seedFromUrl
+    ? {
+        rounds: Math.min(
+          20,
+          Math.max(1, Number(router.query.rounds) || 5),
+        ),
+        timeLimit: parseTimer(router.query.timer),
+        region: regionFromUrl,
+      }
+    : undefined;
+
+  const handleSeedGenerated = useCallback(
+    (seed: string) => {
+      if (!seedFromUrl) {
+        const params = new URLSearchParams(window.location.search);
+        params.set("seed", seed);
+        window.history.replaceState(null, "", `?${params.toString()}`);
+      }
+    },
+    [seedFromUrl],
   );
-  const filter =
-    typeof router.query.filter === "string" ? router.query.filter : undefined;
-  const difficulty = parseDifficulty(router.query.difficulty);
+
+  const isChallenge = Boolean(seedFromUrl);
+  const description = isChallenge
+    ? "Can you beat this score? Guess where each photo was taken."
+    : "Test your geography — guess where each photo was taken on the map.";
 
   return (
     <>
       <Seo
         title="Guess Where | Snapshots"
-        description="A GeoGuessr-style game using your own photos."
-        pathname="/guess"
-        noindex
+        description={description}
+        pathname={`/guess${seedFromUrl ? `?seed=${seedFromUrl}` : ""}`}
       />
       <main className={styles.page}>
         <GlobalNav currentPage="guess" />
@@ -50,9 +72,9 @@ const GuessPage: NextPage<PageProps> = () => {
         ) : (
           <GuessGame
             database={database}
-            rounds={rounds}
-            filter={filter}
-            difficulty={difficulty}
+            initialSettings={initialSettings}
+            seed={seedFromUrl}
+            onSeedGenerated={handleSeedGenerated}
           />
         )}
       </main>

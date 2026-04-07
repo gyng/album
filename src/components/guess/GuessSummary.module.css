@@ -6,6 +6,13 @@
   padding: var(--m-xl) var(--m-l);
 }
 
+@media (max-width: 480px) {
+  .summary {
+    padding: var(--m-l) var(--m-s);
+    gap: var(--m-l);
+  }
+}
+
 /* Header: total score counts up, rating fades in after */
 .header {
   text-align: center;
@@ -64,6 +71,19 @@
   animation: rowSlide 0.35s ease-out both;
 }
 
+@media (max-width: 400px) {
+  .roundRow {
+    grid-template-columns: 40px 1fr auto;
+    gap: var(--m-s);
+    padding: var(--m-s) var(--m);
+  }
+}
+
+.bestRound {
+  border: 1px solid color-mix(in srgb, #22c55e 35%, transparent);
+  background-color: color-mix(in srgb, #22c55e 6%, var(--c-bg));
+}
+
 @keyframes rowSlide {
   from { opacity: 0; transform: translateX(-12px); }
   to { opacity: 1; transform: translateX(0); }
@@ -75,6 +95,14 @@
   object-fit: cover;
   border-radius: var(--m);
   background-color: var(--c-bg-contrast-dark);
+  display: block;
+}
+
+@media (max-width: 400px) {
+  .thumb {
+    width: 40px;
+    height: 40px;
+  }
 }
 
 .roundDetail {
@@ -126,16 +154,46 @@
   to { transform: scaleX(1); }
 }
 
+.roundScoreCol {
+  display: grid;
+  gap: 1px;
+  text-align: right;
+  min-width: 40px;
+}
+
 .roundScore {
   font-size: var(--fs-sm);
   font-weight: 600;
   font-variant-numeric: tabular-nums;
-  text-align: right;
-  min-width: 48px;
 }
 
-/* Play again button */
-.playAgain {
+.timeBonus {
+  font-size: var(--fs-xs);
+  color: var(--c-bg-contrast-light);
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 400px) {
+  .roundScoreCol {
+    min-width: 32px;
+  }
+
+  .roundScore {
+    font-size: var(--fs-s);
+  }
+}
+
+/* Actions row */
+.actions {
+  display: flex;
+  gap: var(--m-m);
+  justify-content: center;
+  flex-wrap: wrap;
+  animation: ratingFade 0.4s 0.8s ease-out both;
+}
+
+.playAgain,
+.shareButton {
   border: solid 2px var(--c-bg-contrast-light);
   border-radius: var(--m-s);
   padding: var(--m-m) var(--m-l);
@@ -143,16 +201,42 @@
   background-color: var(--c-bg);
   font-size: var(--fs-sm);
   color: var(--c-font);
-  justify-self: center;
   transition: background-color 0.12s, transform 0.12s;
-  animation: ratingFade 0.4s 0.8s ease-out both;
 }
 
-.playAgain:hover {
+.playAgain:hover,
+.shareButton:hover {
   background-color: var(--c-bg-contrast-light);
   transform: scale(1.03);
 }
 
-.playAgain:active {
+.playAgain:active,
+.shareButton:active {
   transform: scale(0.97);
+}
+
+.footer {
+  display: grid;
+  gap: var(--m-s);
+  justify-items: center;
+  animation: ratingFade 0.4s 1s ease-out both;
+}
+
+.shareHint {
+  text-align: center;
+}
+
+.changeSettings {
+  border: none;
+  background: none;
+  color: var(--c-bg-contrast-light);
+  font-size: var(--fs-s);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  padding: var(--m);
+}
+
+.changeSettings:hover {
+  color: var(--c-font);
 }

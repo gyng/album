@@ -6,3 +6,9 @@ export type GuessPhoto = {
   albumName: string;
   photoName: string;
 };
+
+export type GameSettings = {
+  rounds: number;
+  timeLimit: number | null;
+  region?: string;
+};
