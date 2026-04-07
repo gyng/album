@@ -26,6 +26,13 @@
   to { opacity: 1; transform: translateY(0); }
 }
 
+.dailyLabel {
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--c-accent);
+  font-weight: 600;
+}
+
 .totalScore {
   font-variant-numeric: tabular-nums;
 }

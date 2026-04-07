@@ -23,6 +23,14 @@ type GuessGameProps = {
 
 const generateSeed = (): string => Math.random().toString(36).slice(2, 8);
 
+const getDailySeed = (): string => {
+  const now = new Date();
+  const yyyy = now.getFullYear();
+  const mm = String(now.getMonth() + 1).padStart(2, "0");
+  const dd = String(now.getDate()).padStart(2, "0");
+  return `daily-${yyyy}-${mm}-${dd}`;
+};
+
 const DEFAULT_SETTINGS: GameSettings = {
   rounds: 5,
   timeLimit: null,
@@ -157,7 +165,7 @@ export const GuessGame: React.FC<GuessGameProps> = ({
     let cancelled = false;
 
     const load = async () => {
-      const seed = seedProp || generateSeed();
+      const seed = seedProp || (state.settings.daily ? getDailySeed() : generateSeed());
       try {
         const rows = await fetchGuessPhotos({
           database,

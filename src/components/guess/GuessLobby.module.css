@@ -65,7 +65,40 @@
   to { opacity: 1; }
 }
 
-/* Play button — prominent, accent-bordered, enters last */
+/* Button row — daily + play side by side */
+.buttonRow {
+  display: flex;
+  gap: var(--m-m);
+  justify-content: center;
+  align-items: center;
+  animation: buttonEnter 0.4s 0.25s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* Daily button — secondary, understated */
+.dailyButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: solid 2px var(--c-bg-contrast-light);
+  border-radius: var(--m-s);
+  padding: var(--m-m) var(--m-l);
+  cursor: pointer;
+  background-color: var(--c-bg);
+  font-size: var(--fs-sm);
+  color: var(--c-font);
+  transition: background-color 0.15s, transform 0.12s;
+}
+
+.dailyButton:hover {
+  background-color: var(--c-bg-contrast-light);
+  transform: scale(1.03);
+}
+
+.dailyButton:active {
+  transform: scale(0.97);
+}
+
+/* Play button — prominent, accent-bordered */
 .playButton {
   display: inline-flex;
   align-items: center;
@@ -79,11 +112,9 @@
   font-size: var(--fs-m);
   font-weight: 600;
   color: var(--c-font);
-  justify-self: center;
   position: relative;
   overflow: hidden;
   transition: background-color 0.15s, transform 0.12s, box-shadow 0.2s;
-  animation: buttonEnter 0.4s 0.25s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 @keyframes buttonEnter {

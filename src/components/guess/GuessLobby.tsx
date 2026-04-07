@@ -71,6 +71,14 @@ export const GuessLobby: React.FC<GuessLobbyProps> = ({
     });
   }, [onStart, rounds, timer, region]);
 
+  const handleDaily = useCallback(() => {
+    onStart({
+      rounds: 5,
+      timeLimit: null,
+      daily: true,
+    });
+  }, [onStart]);
+
   // Enter/Space to start
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
@@ -138,10 +146,15 @@ export const GuessLobby: React.FC<GuessLobbyProps> = ({
         </Caption>
       ) : null}
 
-      <button className={styles.playButton} onClick={handleStart}>
-        Play
-        <kbd className={styles.kbd}>Enter</kbd>
-      </button>
+      <div className={styles.buttonRow}>
+        <button className={styles.dailyButton} onClick={handleDaily}>
+          Daily challenge
+        </button>
+        <button className={styles.playButton} onClick={handleStart}>
+          Play
+          <kbd className={styles.kbd}>Enter</kbd>
+        </button>
+      </div>
     </div>
   );
 };

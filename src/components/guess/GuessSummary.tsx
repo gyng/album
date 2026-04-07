@@ -88,6 +88,7 @@ const useAnimatedCounter = (
 };
 
 const buildShareUrl = (seed: string, settings: GameSettings): string => {
+  if (settings.daily) return "/guess?daily";
   const params = new URLSearchParams();
   params.set("seed", seed);
   if (settings.rounds !== 5) params.set("rounds", String(settings.rounds));
@@ -130,6 +131,9 @@ export const GuessSummary: React.FC<GuessSummaryProps> = ({
   return (
     <div className={styles.summary}>
       <div className={styles.header}>
+        {settings.daily ? (
+          <Caption as="p" className={styles.dailyLabel}>Daily challenge</Caption>
+        ) : null}
         <Heading level={1}>
           <span
             className={styles.totalScore}
@@ -223,9 +227,6 @@ export const GuessSummary: React.FC<GuessSummaryProps> = ({
       </div>
 
       <div className={styles.footer}>
-        <Caption as="p" size="sm" className={styles.shareHint}>
-          Challenge a friend to the same {results.length} photos
-        </Caption>
         <button
           className={styles.changeSettings}
           onClick={onChangeSettings}

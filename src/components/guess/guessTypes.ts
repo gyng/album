@@ -11,4 +11,5 @@ export type GameSettings = {
   rounds: number;
   timeLimit: number | null;
   region?: string;
+  daily?: boolean;
 };

@@ -24,18 +24,21 @@ const GuessPage: NextPage<PageProps> = () => {
     typeof router.query.seed === "string" ? router.query.seed : undefined;
   const regionFromUrl =
     typeof router.query.region === "string" ? router.query.region : undefined;
+  const isDaily = router.query.daily !== undefined;
 
-  // When a seed is in the URL, build settings from params and skip the lobby.
-  const initialSettings: GameSettings | undefined = seedFromUrl
-    ? {
-        rounds: Math.min(
-          20,
-          Math.max(1, Number(router.query.rounds) || 5),
-        ),
-        timeLimit: parseTimer(router.query.timer),
-        region: regionFromUrl,
-      }
-    : undefined;
+  // When a seed or daily flag is in the URL, skip the lobby.
+  const initialSettings: GameSettings | undefined = isDaily
+    ? { rounds: 5, timeLimit: null, daily: true }
+    : seedFromUrl
+      ? {
+          rounds: Math.min(
+            20,
+            Math.max(1, Number(router.query.rounds) || 5),
+          ),
+          timeLimit: parseTimer(router.query.timer),
+          region: regionFromUrl,
+        }
+      : undefined;
 
   const handleSeedGenerated = useCallback(
     (seed: string) => {
@@ -48,10 +51,12 @@ const GuessPage: NextPage<PageProps> = () => {
     [seedFromUrl],
   );
 
-  const isChallenge = Boolean(seedFromUrl);
-  const description = isChallenge
-    ? "Can you beat this score? Guess where each photo was taken."
-    : "Test your geography — guess where each photo was taken on the map.";
+  const isChallenge = Boolean(seedFromUrl) || isDaily;
+  const description = isDaily
+    ? "Today's daily challenge — guess where each photo was taken."
+    : isChallenge
+      ? "Can you beat this score? Guess where each photo was taken."
+      : "Test your geography — guess where each photo was taken on the map.";
 
   return (
     <>
