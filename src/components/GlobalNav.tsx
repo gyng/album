@@ -8,7 +8,8 @@ export type GlobalNavPage =
   | "timeline"
   | "map"
   | "slideshow"
-  | "explore";
+  | "explore"
+  | "guess";
 
 type Props = {
   currentPage?: GlobalNavPage;
@@ -102,6 +103,14 @@ export const GlobalNav: React.FC<Props> = ({
                 </Link>
               )}
             </div>
+          </li>
+          <li>
+            <Link
+              href="/guess"
+              className={cx(commonStyles.button, current("guess"))}
+            >
+              Guess
+            </Link>
           </li>
           {extraItems}
         </>

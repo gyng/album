@@ -1,0 +1,6 @@
+.status {
+  text-align: center;
+  padding: var(--m-2xl);
+  color: var(--c-bg-contrast-light);
+  font-size: var(--fs-sm);
+}

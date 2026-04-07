@@ -1,0 +1,20 @@
+.page {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 0 var(--m-l) var(--m-l);
+}
+
+.title {
+  margin: 0;
+  font-size: var(--fs-l);
+}
+
+.loading {
+  display: grid;
+  gap: var(--m-m);
+  max-width: 360px;
+  margin: var(--m-2xl) auto;
+  text-align: center;
+  color: var(--c-bg-contrast-light);
+  font-size: var(--fs-sm);
+}

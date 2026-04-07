@@ -1,0 +1,309 @@
+/* Full round layout */
+.round {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  gap: var(--m-s);
+  height: calc(100vh - 120px);
+  min-height: 480px;
+  animation: roundEnter 0.35s ease-out;
+}
+
+@keyframes roundEnter {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Top bar: progress dots + running score */
+.topBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--m) 0;
+}
+
+.progressDots {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: color-mix(in srgb, var(--c-bg-contrast-light) 30%, transparent);
+  transition: background-color 0.3s, transform 0.3s;
+}
+
+.dotDone {
+  background-color: var(--c-accent);
+}
+
+.dotCurrent {
+  background-color: var(--c-font);
+  transform: scale(1.3);
+  animation: dotPulse 1.8s ease-in-out infinite;
+}
+
+@keyframes dotPulse {
+  0%, 100% { transform: scale(1.3); opacity: 1; }
+  50% { transform: scale(1.0); opacity: 0.6; }
+}
+
+/* Cumulative score — bumps on reveal */
+.cumulativeScore {
+  font-size: var(--fs-s);
+  color: var(--c-bg-contrast-light);
+  font-variant-numeric: tabular-nums;
+  transition: transform 0.2s;
+}
+
+.cumulativeScoreBump {
+  animation: scoreBump 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes scoreBump {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.25); }
+  100% { transform: scale(1); }
+}
+
+/* Photo + Map side by side */
+.gameArea {
+  display: grid;
+  grid-template-columns: 3fr 2fr;
+  gap: var(--m-m);
+  min-height: 0;
+}
+
+@media (max-width: 768px) {
+  .round {
+    height: auto;
+    min-height: unset;
+  }
+
+  .gameArea {
+    grid-template-columns: 1fr;
+    grid-template-rows: 1fr auto;
+  }
+}
+
+/* Photo panel — zoomable */
+.photoPanel {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--m-s);
+  background-color: var(--c-bg-contrast-dark);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 0;
+  cursor: zoom-in;
+  touch-action: none;
+}
+
+.photoZoomed {
+  cursor: grab;
+}
+
+.photoZoomed:active {
+  cursor: grabbing;
+}
+
+.photo {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  user-select: none;
+  transform-origin: center center;
+  will-change: transform;
+  transition: transform 0.1s ease-out;
+}
+
+.zoomHint {
+  position: absolute;
+  top: var(--m-m);
+  right: var(--m-m);
+  background-color: var(--c-overlay-dark);
+  color: #fff;
+  padding: 2px var(--m-s);
+  border-radius: var(--m);
+  font-size: var(--fs-xs);
+  pointer-events: none;
+  opacity: 0.6;
+}
+
+.countryHint {
+  position: absolute;
+  bottom: var(--m-m);
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: var(--c-overlay-dark);
+  color: #fff;
+  padding: var(--m-s) var(--m-m);
+  border-radius: var(--m-s);
+  font-size: var(--fs-s);
+  white-space: nowrap;
+}
+
+/* Map panel */
+.mapPanel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--m-s);
+  min-height: 0;
+}
+
+@media (max-width: 768px) {
+  .mapPanel {
+    min-height: 300px;
+  }
+}
+
+.mapPlaceholder {
+  width: 100%;
+  flex: 1;
+  min-height: 200px;
+  background-color: var(--c-bg-contrast-dark);
+  border-radius: var(--m-s);
+}
+
+/* Controls bar */
+.controls {
+  display: flex;
+  gap: var(--m-s);
+  align-items: center;
+  flex-shrink: 0;
+  min-height: 44px;
+}
+
+.confirmButton,
+.nextButton {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--m-s);
+  border: solid 2px var(--c-bg-contrast-light);
+  border-radius: var(--m-s);
+  padding: var(--m-s) var(--m-l);
+  cursor: pointer;
+  background-color: var(--c-bg);
+  font-size: var(--fs-sm);
+  color: var(--c-font);
+  transition: background-color 0.12s, border-color 0.2s, box-shadow 0.2s;
+}
+
+.confirmButton:hover:not(:disabled),
+.nextButton:hover {
+  background-color: var(--c-bg-contrast-light);
+}
+
+.confirmButton:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+/* Pulse glow when a guess is placed and confirm is ready */
+.confirmReady {
+  border-color: var(--c-accent);
+  animation: confirmPulse 1.5s ease-in-out infinite;
+}
+
+@keyframes confirmPulse {
+  0%, 100% { box-shadow: 0 0 0 0 transparent; }
+  50% { box-shadow: 0 0 0 4px color-mix(in srgb, var(--c-accent) 25%, transparent); }
+}
+
+.nextButton {
+  animation: slideUp 0.25s ease-out;
+}
+
+.kbd {
+  font-family: inherit;
+  font-size: var(--fs-xs);
+  color: var(--c-bg-contrast-light);
+  border: 1px solid color-mix(in srgb, var(--c-bg-contrast-light) 40%, transparent);
+  border-radius: 3px;
+  padding: 1px 4px;
+  line-height: 1;
+}
+
+.skipButton {
+  border: none;
+  background: none;
+  color: var(--c-bg-contrast-light);
+  font-size: var(--fs-s);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  padding: var(--m-s);
+  transition: color 0.12s;
+}
+
+.skipButton:hover {
+  color: var(--c-font);
+}
+
+/* Reveal state */
+.revealPanel {
+  display: flex;
+  align-items: center;
+  gap: var(--m-l);
+  width: 100%;
+  animation: slideUp 0.3s ease-out;
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.scoreReveal {
+  display: grid;
+  gap: 4px;
+  min-width: 120px;
+}
+
+.scoreLine {
+  display: flex;
+  align-items: baseline;
+  gap: var(--m-s);
+}
+
+.distance {
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.scoreValue {
+  font-size: var(--fs-m);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  animation: scorePop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes scorePop {
+  0% { transform: scale(0.5); opacity: 0; }
+  60% { transform: scale(1.15); }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.scoreBarTrack {
+  height: 4px;
+  border-radius: 2px;
+  background-color: color-mix(in srgb, var(--c-bg-contrast-light) 20%, transparent);
+  overflow: hidden;
+}
+
+.scoreBarFill {
+  height: 100%;
+  border-radius: 2px;
+  background-color: var(--c-accent);
+  animation: growBar 0.6s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  transform-origin: left;
+}
+
+@keyframes growBar {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}

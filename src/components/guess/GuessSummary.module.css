@@ -1,0 +1,158 @@
+.summary {
+  display: grid;
+  gap: var(--m-xl);
+  max-width: 560px;
+  margin: 0 auto;
+  padding: var(--m-xl) var(--m-l);
+}
+
+/* Header: total score counts up, rating fades in after */
+.header {
+  text-align: center;
+  display: grid;
+  gap: var(--m-s);
+  animation: headerDrop 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes headerDrop {
+  from { opacity: 0; transform: translateY(-12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.totalScore {
+  font-variant-numeric: tabular-nums;
+}
+
+.maxScore {
+  color: var(--c-bg-contrast-light);
+  font-weight: 400;
+}
+
+.rating {
+  font-size: var(--fs-sm);
+  color: var(--c-bg-contrast-light);
+  margin: 0;
+  animation: ratingFade 0.6s 0.5s ease-out both;
+}
+
+@keyframes ratingFade {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Round list — each row cascades in */
+.roundList {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: var(--m-s);
+}
+
+.roundRow {
+  display: grid;
+  grid-template-columns: 48px 1fr auto;
+  gap: var(--m-m);
+  align-items: center;
+  padding: var(--m-s);
+  border-radius: var(--m-s);
+  background-color: color-mix(
+    in srgb,
+    var(--c-bg-contrast-dark) 30%,
+    var(--c-bg)
+  );
+  animation: rowSlide 0.35s ease-out both;
+}
+
+@keyframes rowSlide {
+  from { opacity: 0; transform: translateX(-12px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+.thumb {
+  width: 48px;
+  height: 48px;
+  object-fit: cover;
+  border-radius: var(--m);
+  background-color: var(--c-bg-contrast-dark);
+}
+
+.roundDetail {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.roundMeta {
+  display: flex;
+  align-items: baseline;
+  gap: var(--m-s);
+  min-width: 0;
+}
+
+.location {
+  font-size: var(--fs-s);
+  color: var(--c-bg-contrast-light);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.roundDistance {
+  font-size: var(--fs-s);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  margin-left: auto;
+}
+
+.scoreBarTrack {
+  height: 3px;
+  border-radius: 2px;
+  background-color: color-mix(in srgb, var(--c-bg-contrast-light) 15%, transparent);
+  overflow: hidden;
+}
+
+.scoreBarFill {
+  height: 100%;
+  border-radius: 2px;
+  background-color: var(--c-accent);
+  animation: growBar 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+  transform-origin: left;
+}
+
+@keyframes growBar {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+
+.roundScore {
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  min-width: 48px;
+}
+
+/* Play again button */
+.playAgain {
+  border: solid 2px var(--c-bg-contrast-light);
+  border-radius: var(--m-s);
+  padding: var(--m-m) var(--m-l);
+  cursor: pointer;
+  background-color: var(--c-bg);
+  font-size: var(--fs-sm);
+  color: var(--c-font);
+  justify-self: center;
+  transition: background-color 0.12s, transform 0.12s;
+  animation: ratingFade 0.4s 0.8s ease-out both;
+}
+
+.playAgain:hover {
+  background-color: var(--c-bg-contrast-light);
+  transform: scale(1.03);
+}
+
+.playAgain:active {
+  transform: scale(0.97);
+}

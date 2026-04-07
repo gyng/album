@@ -1567,3 +1567,32 @@ export const fetchRandomPhoto = async (opts: {
     throw err;
   }
 };
+
+export const fetchGuessPhotos = async (opts: {
+  database: Database;
+  count: number;
+  filter?: string;
+}): Promise<RandomPhotoRow[]> => {
+  const { database, count, filter = "%" } = opts;
+
+  try {
+    const result = await exec(
+      database,
+      `SELECT path, exif, geocode
+      FROM images
+      WHERE path LIKE ?
+        AND exif LIKE '%GPSLatitude%'
+      ORDER BY RANDOM()
+      LIMIT ?`,
+      [`../albums/${filter}/%`, count],
+    );
+    return (result.data as unknown as string[][]).map((row) => ({
+      path: row[0],
+      exif: row[1],
+      geocode: row[2],
+    }));
+  } catch (err) {
+    console.error(`Failed to fetch guess photos`, err);
+    throw err;
+  }
+};
