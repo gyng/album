@@ -55,6 +55,7 @@ export const GuessMap: React.FC<GuessMapProps> = ({
         mapStyle={MAP_STYLE}
         initialViewState={{ longitude: 0, latitude: 20, zoom: 1.5 }}
         scrollZoom
+        dragPan
         cooperativeGestures={false}
         onClick={handleClick}
         cursor={reveal ? "default" : "crosshair"}
