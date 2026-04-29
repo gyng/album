@@ -285,14 +285,10 @@ export const Picture: React.FC<{
       <img
         data-testid="picture"
         className={styles.image}
-        srcSet={
-          props.thumb
-            ? // HACK: pick 1200px as 800 is blurry
-              `${props.block._build.srcset[1].src} ${props.block._build.srcset[1].width}w`
-            : props.block._build.srcset
-                .map((s) => `${s.src} ${s.width}w`)
-                .join(", ")
-        }
+        srcSet={props.block._build.srcset
+          .map((s) => `${s.src} ${s.width}w`)
+          .join(", ")}
+        sizes={props.thumb ? "auto, 800px" : "auto, 100vw"}
         // Original image is not uploaded
         src={props.block._build.srcset[0].src}
         loading={props.lazy === false ? "eager" : "lazy"}
