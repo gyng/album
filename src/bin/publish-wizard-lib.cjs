@@ -147,20 +147,14 @@ const buildPreflightInsights = (report) => {
     });
   }
 
-  if (report.db.mixedEmbeddingModels?.length > 1) {
-    const breakdown = report.db.mixedEmbeddingModels
-      .map((m) => `${formatNumber(m.count)} under "${m.modelId}"`)
-      .join(", ");
-    lines.push({
-      level: "warn",
-      text: `Embeddings use ${report.db.mixedEmbeddingModels.length} different model IDs (${breakdown}). Similarity search is broken for photos under the minority model — re-index to fix.`,
-    });
-  } else if (report.db.staleEmbeddingCount > 0) {
+  if (report.db.staleEmbeddingCount > 0) {
     const oldModels = (report.db.staleEmbeddingModelIds ?? []).join(", ") || "unknown";
-    const newModel = report.db.currentEmbeddingModelId ?? "unknown";
+    const newModels = (report.db.expectedEmbeddingModelIds ?? []).join(", ")
+      || report.db.currentEmbeddingModelId
+      || "unknown";
     lines.push({
       level: "warn",
-      text: `Embedding model changed: ${oldModels} → ${newModel}. ${formatNumber(report.db.staleEmbeddingCount)} photo(s) will be re-embedded — this run will take significantly longer than usual.`,
+      text: `Embedding model changed: ${oldModels} → ${newModels}. ${formatNumber(report.db.staleEmbeddingCount)} photo(s) will be re-embedded — this run will take significantly longer than usual.`,
     });
   } else if (report.db.missingEmbeddingCount > 0) {
     lines.push({
@@ -324,7 +318,7 @@ const resolveExecutionPlan = async ({ args, report }) => {
     report.summary.newPhotos > 0 ||
     report.summary.removedPhotos > 0 ||
     report.db.missingEmbeddingCount > 0 ||
-    report.db.mixedEmbeddingModels?.length > 1;
+    report.db.staleEmbeddingCount > 0;
 
   const plan = {
     runIndex: false,
@@ -763,25 +757,33 @@ const createPreflightReport = async ({ albumsDir, dbPath, embeddingsDbPath, inde
   }
 
   const modelInfo = indexDir ? getIndexerModelInfo(indexDir) : null;
+  const expectedEmbeddingModelIds =
+    modelInfo?.embeddingModelIds
+    ?? (modelInfo?.embeddingModelId ? [modelInfo.embeddingModelId] : []);
   const currentEmbeddingModelId = modelInfo?.embeddingModelId ?? null;
-  const staleModels = currentEmbeddingModelId
-    ? dbState.embeddingModelCounts.filter((m) => m.modelId !== currentEmbeddingModelId)
+  // Stale = rows under model IDs the indexer no longer produces. These won't be
+  // re-embedded automatically (the indexer skips paths that already have a row
+  // under any of its current IDs), so they linger until the DB is rebuilt.
+  const staleModels = expectedEmbeddingModelIds.length > 0
+    ? dbState.embeddingModelCounts.filter((m) => !expectedEmbeddingModelIds.includes(m.modelId))
     : [];
   const staleEmbeddingCount = staleModels.reduce((sum, m) => sum + m.count, 0);
   const staleEmbeddingModelIds = staleModels.map((m) => m.modelId);
-  const currentModelEmbeddingCount = currentEmbeddingModelId
-    ? (dbState.embeddingModelCounts.find((m) => m.modelId === currentEmbeddingModelId)?.count ?? 0)
+  // Missing = photos that don't have full coverage across every expected model.
+  // Take the min count across the expected set — if any expected model is
+  // absent from the DB its count is 0, so missing == imageCount.
+  const missingEmbeddingCount = expectedEmbeddingModelIds.length > 0
+    ? Math.max(
+        0,
+        dbState.imageCount
+          - Math.min(
+              ...expectedEmbeddingModelIds.map(
+                (id) => dbState.embeddingModelCounts.find((m) => m.modelId === id)?.count ?? 0,
+              ),
+            ),
+      )
     : 0;
-  // Photos in the DB that lack a current-model embedding (stale or never embedded).
-  const missingEmbeddingCount = currentEmbeddingModelId
-    ? Math.max(0, dbState.imageCount - currentModelEmbeddingCount)
-    : 0;
-  // Detected without needing the Python subprocess: if the DB contains embeddings under
-  // more than one model ID, similarity search is broken for photos under the minority model.
-  const mixedEmbeddingModels =
-    dbState.hasEmbeddingsTable && dbState.embeddingModelCounts.length > 1
-      ? dbState.embeddingModelCounts
-      : [];
+  const unexpectedEmbeddingModels = staleModels;
 
   return {
     generatedAt: new Date().toISOString(),
@@ -791,11 +793,12 @@ const createPreflightReport = async ({ albumsDir, dbPath, embeddingsDbPath, inde
       imageCount: dbState.imageCount,
       embeddingsCount: dbState.embeddingsCount,
       hasEmbeddingsTable: dbState.hasEmbeddingsTable,
+      expectedEmbeddingModelIds,
       currentEmbeddingModelId,
       staleEmbeddingCount,
       staleEmbeddingModelIds,
       missingEmbeddingCount,
-      mixedEmbeddingModels,
+      unexpectedEmbeddingModels,
     },
     lastIndexStats: readLastIndexStats(lastIndexStatsPath),
     albums,

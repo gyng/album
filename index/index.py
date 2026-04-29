@@ -2285,8 +2285,23 @@ def search_similar_path(
 
 @cli.command("model-info")
 def model_info():
-    """Print the current embedding model configuration as JSON."""
-    print(json.dumps({"embeddingModelId": Siglip2Embedder.MODEL_ID}))
+    """Print the current embedding model configuration as JSON.
+
+    The hybrid profile (production default) writes one row per photo under
+    *each* listed model ID. `embeddingModelId` is retained for callers that
+    only understand a single ID — it names the richer v2 model.
+    """
+    print(
+        json.dumps(
+            {
+                "embeddingModelIds": [
+                    SiglipEmbedder.MODEL_ID,
+                    Siglip2Embedder.MODEL_ID,
+                ],
+                "embeddingModelId": Siglip2Embedder.MODEL_ID,
+            }
+        )
+    )
 
 
 def format_mapping(mapping: Optional[Mapping[str, str]]) -> str:

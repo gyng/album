@@ -332,6 +332,97 @@ describe("publish-wizard-lib", () => {
     expect(insights.map((item) => item.text).join(" ")).toContain("embedding coverage");
   });
 
+  describe("embedding model health insights", () => {
+    const baseReport = {
+      db: {
+        exists: true,
+        imageCount: 1486,
+        hasEmbeddingsTable: true,
+      },
+      summary: {
+        newPhotos: 0,
+        removedPhotos: 0,
+        photosWithoutGps: 0,
+        photosMissingExifDate: 0,
+        unreadablePhotos: 0,
+        invalidAlbums: 0,
+      },
+      albums: [],
+    };
+
+    it("does not warn when the DB matches the expected hybrid model set", () => {
+      // Healthy hybrid index: two intentional model IDs with full, equal
+      // coverage. The old code flagged this as broken via mixedEmbeddingModels;
+      // the new code looks at unexpectedEmbeddingModels relative to the
+      // indexer's expected set.
+      const insights = buildPreflightInsights({
+        ...baseReport,
+        db: {
+          ...baseReport.db,
+          embeddingsCount: 2972,
+          expectedEmbeddingModelIds: [
+            "google/siglip-base-patch16-224",
+            "google/siglip2-base-patch16-224",
+          ],
+          mixedEmbeddingModels: [
+            { modelId: "google/siglip-base-patch16-224", count: 1486 },
+            { modelId: "google/siglip2-base-patch16-224", count: 1486 },
+          ],
+          unexpectedEmbeddingModels: [],
+          staleEmbeddingCount: 0,
+          missingEmbeddingCount: 0,
+        },
+      });
+
+      const texts = insights.map((i) => i.text).join(" ");
+      expect(texts).not.toContain("different model IDs");
+      expect(texts).not.toContain("Similarity search is broken");
+      expect(texts).not.toContain("re-embedded");
+    });
+
+    it("warns about stale model IDs not in the expected set", () => {
+      const insights = buildPreflightInsights({
+        ...baseReport,
+        db: {
+          ...baseReport.db,
+          embeddingsCount: 1486,
+          expectedEmbeddingModelIds: ["google/siglip2-base-patch16-224"],
+          unexpectedEmbeddingModels: [
+            { modelId: "google/siglip-base-patch16-224", count: 1486 },
+          ],
+          currentEmbeddingModelId: "google/siglip2-base-patch16-224",
+          staleEmbeddingCount: 1486,
+          staleEmbeddingModelIds: ["google/siglip-base-patch16-224"],
+          missingEmbeddingCount: 0,
+        },
+      });
+
+      const texts = insights.map((i) => i.text).join(" ");
+      expect(texts).toContain("google/siglip-base-patch16-224");
+      expect(texts).not.toContain("Similarity search is broken");
+    });
+
+    it("warns when an expected model is fully missing", () => {
+      const insights = buildPreflightInsights({
+        ...baseReport,
+        db: {
+          ...baseReport.db,
+          embeddingsCount: 1486,
+          expectedEmbeddingModelIds: [
+            "google/siglip-base-patch16-224",
+            "google/siglip2-base-patch16-224",
+          ],
+          unexpectedEmbeddingModels: [],
+          staleEmbeddingCount: 0,
+          missingEmbeddingCount: 1486,
+        },
+      });
+
+      const texts = insights.map((i) => i.text).join(" ");
+      expect(texts).toMatch(/missing|no embeddings|re-embedded|indexed on the next index run/i);
+    });
+  });
+
   describe("loadDbState", () => {
     const publicDir = path.resolve(__dirname, "../public");
     const mainDbPath = path.join(publicDir, "search.sqlite");
