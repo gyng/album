@@ -127,6 +127,10 @@ export const GuessRound: React.FC<GuessRoundProps> = ({
   const dragging = useRef(false);
   const dragStart = useRef({ x: 0, y: 0 });
   const photoPanelRef = useRef<HTMLDivElement>(null);
+  // Pinch-to-zoom: track every active pointer; when two are down we treat it
+  // as a pinch and scale relative to the initial finger distance.
+  const pointersRef = useRef<Map<number, { x: number; y: number }>>(new Map());
+  const pinchStartRef = useRef<{ distance: number; zoom: number } | null>(null);
 
   // Animated score counters — ref callbacks that imperatively update textContent
   const scoreCounterRef = useAnimatedCounter(result?.score ?? 0);
@@ -200,32 +204,86 @@ export const GuessRound: React.FC<GuessRoundProps> = ({
     });
   }, []);
 
+  const pointerDistance = (): number => {
+    const pts = Array.from(pointersRef.current.values());
+    if (pts.length < 2) return 0;
+    return Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+  };
+
   const handlePointerDown = useCallback(
     (event: React.PointerEvent) => {
-      if (zoom <= MIN_ZOOM) return;
-      dragging.current = true;
-      dragStart.current = {
-        x: event.clientX - panRef.current.x,
-        y: event.clientY - panRef.current.y,
-      };
+      pointersRef.current.set(event.pointerId, {
+        x: event.clientX,
+        y: event.clientY,
+      });
       (event.target as HTMLElement).setPointerCapture(event.pointerId);
+
+      if (pointersRef.current.size === 2) {
+        pinchStartRef.current = { distance: pointerDistance(), zoom };
+        dragging.current = false;
+      } else if (pointersRef.current.size === 1 && zoom > MIN_ZOOM) {
+        dragging.current = true;
+        dragStart.current = {
+          x: event.clientX - panRef.current.x,
+          y: event.clientY - panRef.current.y,
+        };
+      }
     },
     [zoom],
   );
 
   const handlePointerMove = useCallback((event: React.PointerEvent) => {
-    if (!dragging.current) return;
-    const next = {
-      x: event.clientX - dragStart.current.x,
-      y: event.clientY - dragStart.current.y,
-    };
-    panRef.current = next;
-    setPan(next);
+    if (!pointersRef.current.has(event.pointerId)) return;
+    pointersRef.current.set(event.pointerId, {
+      x: event.clientX,
+      y: event.clientY,
+    });
+
+    if (pointersRef.current.size >= 2 && pinchStartRef.current) {
+      const dist = pointerDistance();
+      if (dist === 0) return;
+      const next =
+        pinchStartRef.current.zoom * (dist / pinchStartRef.current.distance);
+      const clamped = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, next));
+      setZoom(clamped);
+      if (clamped === MIN_ZOOM) {
+        panRef.current = { x: 0, y: 0 };
+        setPan({ x: 0, y: 0 });
+      }
+    } else if (pointersRef.current.size === 1 && dragging.current) {
+      const next = {
+        x: event.clientX - dragStart.current.x,
+        y: event.clientY - dragStart.current.y,
+      };
+      panRef.current = next;
+      setPan(next);
+    }
   }, []);
 
-  const handlePointerUp = useCallback(() => {
-    dragging.current = false;
-  }, []);
+  const handlePointerUp = useCallback(
+    (event: React.PointerEvent) => {
+      pointersRef.current.delete(event.pointerId);
+
+      if (pointersRef.current.size < 2) {
+        pinchStartRef.current = null;
+      }
+
+      if (pointersRef.current.size === 0) {
+        dragging.current = false;
+      } else if (pointersRef.current.size === 1 && zoom > MIN_ZOOM) {
+        // Pinch released to a single finger — resume drag-pan from there
+        const remaining = pointersRef.current.values().next().value;
+        if (remaining) {
+          dragging.current = true;
+          dragStart.current = {
+            x: remaining.x - panRef.current.x,
+            y: remaining.y - panRef.current.y,
+          };
+        }
+      }
+    },
+    [zoom],
+  );
 
   const handleDoubleClick = useCallback(() => {
     setZoom(MIN_ZOOM);
@@ -374,7 +432,7 @@ export const GuessRound: React.FC<GuessRoundProps> = ({
             />
           ) : null}
           {!isZoomed ? (
-            <div className={styles.zoomHint}>Scroll to zoom</div>
+            <div className={styles.zoomHint}>Scroll or pinch to zoom</div>
           ) : null}
         </div>
 
@@ -385,6 +443,9 @@ export const GuessRound: React.FC<GuessRoundProps> = ({
           <div className={styles.controls}>
             {!revealed ? (
               <>
+                <button className={styles.skipButton} onClick={handleSkip}>
+                  I have no idea
+                </button>
                 <button
                   className={[
                     styles.confirmButton,
@@ -397,9 +458,6 @@ export const GuessRound: React.FC<GuessRoundProps> = ({
                 >
                   Confirm
                   <kbd className={styles.kbd}>Enter</kbd>
-                </button>
-                <button className={styles.skipButton} onClick={handleSkip}>
-                  I have no idea
                 </button>
               </>
             ) : (

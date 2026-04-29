@@ -1,9 +1,12 @@
-/* Full round layout */
+/* Full round layout — fills remaining space inside the flex-column page wrapper.
+   Using flex: 1 instead of `100dvh - <fixed nav>` so the layout stays correct
+   when the nav wraps onto multiple lines on narrow screens. */
 .round {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
   gap: var(--m-s);
-  height: calc(100dvh - 120px);
+  flex: 1;
+  min-height: 0;
   overflow: hidden;
   animation: roundEnter 0.35s ease-out;
 }
@@ -95,10 +98,6 @@
 }
 
 @media (max-width: 768px) {
-  .round {
-    height: calc(100dvh - 70px);
-  }
-
   .gameArea {
     grid-template-columns: 1fr;
     grid-template-rows: 2fr minmax(0, 3fr);
@@ -231,6 +230,11 @@
   font-size: var(--fs-sm);
   color: var(--c-font);
   transition: background-color 0.12s, border-color 0.2s, box-shadow 0.2s, transform 0.1s;
+}
+
+/* Confirm pinned to the right of the controls row; skip stays at flex-start. */
+.confirmButton {
+  margin-left: auto;
 }
 
 .confirmButton:hover:not(:disabled),
