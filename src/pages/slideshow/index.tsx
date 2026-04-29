@@ -1342,7 +1342,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
           </>
         ) : null}
         <div
-          className={[styles.toolbar, commonStyles.topBar].join(" ")}
+          className={styles.toolbar}
           onFocusCapture={showControlsForDesktop}
           onBlur={() => {
             setIsPointerOverToolbar(false);

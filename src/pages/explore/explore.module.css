@@ -439,6 +439,14 @@
   inline-size: auto;
 }
 
+/* Era thumbs sit in a 3-per-row grid; each cell is ~80–110px wide, narrower
+   than the "🔍 Similar ↗" pill. Hiding the pill here prevents it bleeding out
+   of the cell into the gap between adjacent era cards. The thumb itself
+   remains clickable to navigate to the photo. */
+.visualEraThumbWrap .visualThumbSearchLink {
+  display: none;
+}
+
 .visualThumb {
   width: var(--visual-thumb-size);
   height: var(--visual-thumb-size);

@@ -14,6 +14,11 @@
   z-index: 9999;
   top: calc(var(--m-l) + var(--m-m));
   left: var(--m-l);
+  /* Reserve clearance on the right for MapLibre's stacked controls
+     (NavigationControl, GeolocateControl, FullscreenControl all anchor
+     top-right). Without this the nav's bounding box overlaps them on mobile,
+     blocking taps even when the mask-image has faded the visible content. */
+  right: calc(var(--m-l) + var(--m-2xl));
   margin: 0;
 }
 

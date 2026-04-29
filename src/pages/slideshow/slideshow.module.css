@@ -61,6 +61,16 @@
     calc(env(safe-area-inset-left, 0px) + clamp(var(--m-l), 4vw, var(--m-xl))) !important;
   width: 100%;
   max-height: 100dvh;
+  /* The slideshow toolbar is a multi-section overlay that needs to wrap onto
+     multiple rows — it does NOT share the always-single-line scroll behavior
+     of the global .topBar. Layout is defined inline here rather than borrowing
+     .topBar from common.module.css. */
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--m-m);
+  font-size: var(--fs-sm);
   opacity: 0;
   transform: translateY(-1rem) scale(0.985);
   transform-origin: top center;

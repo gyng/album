@@ -42,25 +42,55 @@
   text-decoration: underline;
 }
 
+/* The nav always lays out as a single horizontally-scrollable row, regardless
+   of viewport width — wrapping caused the theme toggle to orphan onto its own
+   line at intermediate widths. Items are pinned at their natural size; if they
+   overflow the container the row scrolls.
+
+   The mask-image fades the left/right edges of the visible area; widths come
+   from --nav-fade-left/--nav-fade-right which Nav.module.css toggles via
+   modifier classes set by the JS scroll listener. mask-image applies to the
+   element's painted (visible) output, so the fades stay pinned to the scroll
+   viewport rather than scrolling with content — no sticky positioning needed,
+   so this works identically across Chrome, Firefox, and Safari. */
 .topBar {
   display: flex;
   flex-direction: row;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
   align-items: center;
   user-select: none;
   text-align: center;
   gap: var(--m-m);
   font-size: var(--fs-sm);
-  padding-left: var(--m-l);
   margin: 0;
-
-  /* if on ul/li */
   list-style: none;
-  padding-left: unset;
+  padding-left: 0;
+  mask-image: linear-gradient(
+    to right,
+    transparent 0,
+    black var(--nav-fade-left, 0px),
+    black calc(100% - var(--nav-fade-right, 0px)),
+    transparent 100%
+  );
+  -webkit-mask-image: linear-gradient(
+    to right,
+    transparent 0,
+    black var(--nav-fade-left, 0px),
+    black calc(100% - var(--nav-fade-right, 0px)),
+    transparent 100%
+  );
+}
 
-  & > li {
-    margin-bottom: var(--m-s);
-  }
+.topBar::-webkit-scrollbar {
+  display: none;
+}
+
+.topBar > li {
+  flex-shrink: 0;
 }
 
 .noNavPadding {

@@ -1,5 +1,10 @@
 .nav {
   padding: var(--m-m) var(--m-l);
+  /* Width of each edge fade. Set to 0 by default; the .scrollable* modifiers
+     below switch them on. The .topBar mask-image (in common.module.css) reads
+     these via inheritance — no descendant selectors needed across modules. */
+  --nav-fade-left: 0px;
+  --nav-fade-right: 0px;
 }
 
 .nav ul {
@@ -12,4 +17,12 @@
 
 .themeToggleItem {
   margin-left: auto;
+}
+
+.scrollableLeft {
+  --nav-fade-left: var(--m-xl);
+}
+
+.scrollableRight {
+  --nav-fade-right: var(--m-xl);
 }
