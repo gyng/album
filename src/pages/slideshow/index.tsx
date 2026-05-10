@@ -306,10 +306,6 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
       : 0;
   const touchToolbarHidePreviewProgress =
     controlsVisible && touchGestureHint === "overlays" ? touchPullProgress : 0;
-  const touchHorizontalPreviewDirection =
-    touchGestureHint === "next" ? -1 : touchGestureHint === "previous" ? 1 : 0;
-  const touchHorizontalPreviewProgress =
-    touchHorizontalPreviewDirection !== 0 ? touchPullProgress : 0;
   const [keepAwake, setKeepAwake] = useLocalStorage(
     "slideshow-keepawake",
     true,
@@ -1278,6 +1274,20 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
     showMap,
   ]);
 
+  const nextOverlayPreset = getNextSlideshowOverlayPreset({
+    showDetails,
+    showMap,
+    showClock,
+  });
+
+  const nextOverlayLabel = nextOverlayPreset.showDetails
+    ? nextOverlayPreset.showMap
+      ? nextOverlayPreset.showClock
+        ? "Enable details, map and clock"
+        : "Enable details and map"
+      : "Enable details"
+    : "Disable display settings";
+
   const handleImagePointerDown = useCallback(
     (event: React.PointerEvent<HTMLImageElement>) => {
       if (event.pointerType === "mouse" && event.button !== 0) {
@@ -1361,9 +1371,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
 
       if (horizontalDistance >= 24 && horizontalDistance > verticalDistance) {
         setTouchGestureHint(deltaX < 0 ? "next" : "previous");
-        setTouchPullProgress(
-          Math.min(1, horizontalDistance / TOUCH_SWIPE_THRESHOLD_PX),
-        );
+        setTouchPullProgress(0);
         return;
       }
 
@@ -1747,6 +1755,9 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
               </span>
             </div>
             <div className={styles.touchBottomAffordance}>
+              <span className={styles.touchAffordanceLabel}>
+                {controlsVisible ? "Close settings" : nextOverlayLabel}
+              </span>
               <span className={styles.touchPullChevron}>
                 <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
                   <path d="M5 12l5-5 5 5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
@@ -2210,10 +2221,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
           ].join(" ")}
           src={photoBlock.data.src}
           alt={photoAltText}
-          style={{
-            touchAction: controlsVisible ? "auto" : "manipulation",
-            transform: `translateX(${touchHorizontalPreviewDirection * touchHorizontalPreviewProgress * 18}vw)`,
-          }}
+          style={{ touchAction: controlsVisible ? "auto" : "manipulation" }}
           onLoad={() => {
             setImageLoaded(true);
             window.setTimeout(() => {

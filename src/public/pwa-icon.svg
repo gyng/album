@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Snapshots app icon">
+  <rect width="512" height="512" rx="112" fill="#000"/>
+  <circle cx="256" cy="256" r="150" fill="#fff" fill-opacity="0.08"/>
+  <rect x="138" y="178" width="236" height="156" rx="24" fill="#fff" fill-opacity="0.92"/>
+  <rect x="168" y="150" width="72" height="40" rx="14" fill="#fff" fill-opacity="0.92"/>
+  <circle cx="256" cy="256" r="54" fill="#000" fill-opacity="0.92"/>
+  <circle cx="256" cy="256" r="28" fill="#fff" fill-opacity="0.92"/>
+</svg>

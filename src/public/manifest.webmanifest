@@ -1,0 +1,19 @@
+{
+  "name": "Snapshots",
+  "short_name": "Snapshots",
+  "description": "Fullscreen photo frame for the photo archive.",
+  "start_url": "/slideshow",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": ["standalone", "fullscreen"],
+  "theme_color": "#000000",
+  "background_color": "#000000",
+  "icons": [
+    {
+      "src": "/pwa-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
