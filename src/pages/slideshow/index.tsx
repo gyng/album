@@ -1145,6 +1145,11 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
   }, []);
 
   useEffect(() => {
+    // Slideshow is primarily used as a photo frame, so default to awake.
+    setKeepAwake(true);
+  }, [setKeepAwake]);
+
+  useEffect(() => {
     let cancelled = false;
 
     const releaseWakeLock = async () => {
