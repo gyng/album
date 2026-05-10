@@ -38,6 +38,7 @@ import { BUILD_VERSION } from "../../lib/buildVersion";
 type PageProps = {};
 type SlideshowMode = "random" | "weighted" | "similar";
 const CONTROLS_AUTO_HIDE_MS = 3000;
+const TOUCH_CONTROLS_AUTO_HIDE_MS = 30000;
 const VERSION_POLL_MS = 300000;
 const FALLBACK_RELOAD_MS = 86400000;
 const TOUCH_SWIPE_THRESHOLD_PX = 48;
@@ -244,6 +245,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
     "slideshow-timedelay",
     30000,
   );
+  const timeDelayRef = React.useRef(timeDelay);
   const [showClock, setShowClock, removeShowClock] = useLocalStorage(
     "slideshow-showclock",
     false,
@@ -270,6 +272,9 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
   const [time, setTime] = React.useState<Date>(new Date());
 
   const [imageLoaded, setImageLoaded] = React.useState<boolean>(false);
+  const [previousPhotoSrc, setPreviousPhotoSrc] = React.useState<string | null>(
+    null,
+  );
 
   const [filter, setFilter] = React.useState<string | undefined>(undefined);
   const recentPhotoPathsRef = React.useRef<string[]>([]);
@@ -291,9 +296,20 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
   const [isWakeLockSupported, setIsWakeLockSupported] = React.useState(false);
   const [isWakeLockActive, setIsWakeLockActive] = React.useState(false);
   const [touchGestureHint, setTouchGestureHint] = React.useState<
-    "next" | "previous" | "controls" | "reload" | null
+    "next" | "previous" | "controls" | "reload" | "overlays" | null
   >(null);
   const [touchPullProgress, setTouchPullProgress] = React.useState(0);
+  const touchToolbarShowPreviewProgress =
+    !controlsVisible &&
+    (touchGestureHint === "controls" || touchGestureHint === "reload")
+      ? touchPullProgress
+      : 0;
+  const touchToolbarHidePreviewProgress =
+    controlsVisible && touchGestureHint === "overlays" ? touchPullProgress : 0;
+  const touchHorizontalPreviewDirection =
+    touchGestureHint === "next" ? -1 : touchGestureHint === "previous" ? 1 : 0;
+  const touchHorizontalPreviewProgress =
+    touchHorizontalPreviewDirection !== 0 ? touchPullProgress : 0;
   const [keepAwake, setKeepAwake] = useLocalStorage(
     "slideshow-keepawake",
     true,
@@ -311,15 +327,37 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
   } | null>(null);
   const suppressImageClickRef = React.useRef(false);
   const controlsHideDeadlineRef = React.useRef<number | null>(null);
+  const touchControlsHideTimeoutRef = React.useRef<number | null>(null);
   const pausedRemainingMsRef = React.useRef<number | null>(null);
+  const activePhotoSrcRef = React.useRef<string | null>(null);
   const [bufferedPhotoSrc, setBufferedPhotoSrc] = React.useState<string | null>(
     null,
   );
 
+  const clearTouchControlsHideTimeout = useCallback(() => {
+    if (touchControlsHideTimeoutRef.current !== null) {
+      window.clearTimeout(touchControlsHideTimeoutRef.current);
+      touchControlsHideTimeoutRef.current = null;
+    }
+  }, []);
+
+  const resetTouchControlsHideTimeout = useCallback(() => {
+    if (!isCoarsePointer || !controlsVisible) {
+      return;
+    }
+
+    clearTouchControlsHideTimeout();
+    touchControlsHideTimeoutRef.current = window.setTimeout(() => {
+      setControlsVisible(false);
+      touchControlsHideTimeoutRef.current = null;
+    }, TOUCH_CONTROLS_AUTO_HIDE_MS);
+  }, [clearTouchControlsHideTimeout, controlsVisible, isCoarsePointer]);
+
   const updateSlideshowUrl = useCallback(
-    (mode: SlideshowMode) => {
+    (mode: SlideshowMode, delayMs = timeDelayRef.current) => {
       const url = new URL(window.location.toString());
       url.searchParams.set("mode", mode);
+      url.searchParams.set("delay", String(delayMs / 1000));
       url.searchParams.delete("photo");
       url.searchParams.delete("seed");
 
@@ -335,6 +373,19 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
     },
     [setSlideshowMode, updateSlideshowUrl],
   );
+
+  const setTimeDelayAndUrl = useCallback(
+    (delay: number) => {
+      timeDelayRef.current = delay;
+      setTimeDelay(delay);
+      updateSlideshowUrl(slideshowMode, delay);
+    },
+    [setTimeDelay, slideshowMode, updateSlideshowUrl],
+  );
+
+  useEffect(() => {
+    timeDelayRef.current = timeDelay;
+  }, [timeDelay]);
 
   /**
    * URL Search Parameters for Slideshow Configuration
@@ -443,7 +494,9 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
     // Parse time delay in seconds and convert to milliseconds
     const delayParam = parseNum(url.searchParams.get("delay"));
     if (delayParam !== null && delayParam > 0) {
-      setTimeDelay(delayParam * 1000);
+      const delayMs = delayParam * 1000;
+      timeDelayRef.current = delayMs;
+      setTimeDelay(delayMs);
     }
 
     // Parse shuffle history size
@@ -1046,6 +1099,21 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
   }, [controlsVisible, isCoarsePointer, isPointerOverToolbar]);
 
   useEffect(() => {
+    if (!isCoarsePointer || !controlsVisible) {
+      clearTouchControlsHideTimeout();
+      return;
+    }
+
+    resetTouchControlsHideTimeout();
+    return clearTouchControlsHideTimeout;
+  }, [
+    clearTouchControlsHideTimeout,
+    controlsVisible,
+    isCoarsePointer,
+    resetTouchControlsHideTimeout,
+  ]);
+
+  useEffect(() => {
     const fullscreenDocument = document as FullscreenDocument;
     const fullscreenRoot = document.documentElement as FullscreenElement;
     setIsFullscreenSupported(
@@ -1234,8 +1302,14 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
 
   const clearImagePointerGesture = useCallback(
     (event?: React.PointerEvent<HTMLImageElement>) => {
-      if (event && event.currentTarget.hasPointerCapture(event.pointerId)) {
-        event.currentTarget.releasePointerCapture(event.pointerId);
+      if (event) {
+        try {
+          if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+            event.currentTarget.releasePointerCapture(event.pointerId);
+          }
+        } catch (error) {
+          console.debug("Ignoring stale slideshow pointer capture", error);
+        }
       }
 
       pointerGestureRef.current = null;
@@ -1263,6 +1337,12 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
 
       if (verticalDistance >= 24 && verticalDistance > horizontalDistance) {
         if (deltaY > 0) {
+          if (gesture.controlsWereVisible) {
+            setTouchGestureHint(null);
+            setTouchPullProgress(0);
+            return;
+          }
+
           setTouchGestureHint(
             gesture.controlsWereVisible ? "reload" : "controls",
           );
@@ -1272,14 +1352,18 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
           return;
         }
 
-        setTouchGestureHint(null);
-        setTouchPullProgress(0);
+        setTouchGestureHint("overlays");
+        setTouchPullProgress(
+          Math.min(1, verticalDistance / TOUCH_PULL_THRESHOLD_PX),
+        );
         return;
       }
 
       if (horizontalDistance >= 24 && horizontalDistance > verticalDistance) {
         setTouchGestureHint(deltaX < 0 ? "next" : "previous");
-        setTouchPullProgress(0);
+        setTouchPullProgress(
+          Math.min(1, horizontalDistance / TOUCH_SWIPE_THRESHOLD_PX),
+        );
         return;
       }
 
@@ -1331,6 +1415,11 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
         }
 
         suppressImageClickRef.current = true;
+        if (gesture.controlsWereVisible) {
+          controlsHideDeadlineRef.current = null;
+          setControlsVisible(false);
+          return;
+        }
         cycleTouchOverlays();
         return;
       }
@@ -1416,6 +1505,25 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
     }
   }, [getCurrentPhotoLink]);
 
+  const activePhotoSrc = getSlideshowPhotoSrc(currentPhotoPath);
+
+  useEffect(() => {
+    if (!activePhotoSrc) {
+      activePhotoSrcRef.current = null;
+      setPreviousPhotoSrc(null);
+      return;
+    }
+
+    const previousPhotoSrc = activePhotoSrcRef.current;
+
+    if (previousPhotoSrc && previousPhotoSrc !== activePhotoSrc) {
+      setPreviousPhotoSrc(previousPhotoSrc);
+      setImageLoaded(false);
+    }
+
+    activePhotoSrcRef.current = activePhotoSrc;
+  }, [activePhotoSrc]);
+
   if (currentPhotoPath === null) {
     return (
       <div className={styles.progressBarContainer}>
@@ -1443,7 +1551,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
     kind: "photo",
     id: "",
     data: {
-      src: getSlideshowPhotoSrc(currentPhotoPath) ?? "",
+      src: activePhotoSrc ?? "",
       title: undefined,
       kicker: undefined,
       description: undefined,
@@ -1466,6 +1574,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
   const coordinates = currentPhotoPath?.exif
     ? extractGPSFromExifString(currentPhotoPath.exif)
     : null;
+  const photoAltText = getPhotoAltText(photoBlock, "Slideshow photo");
 
   // Keep geocoded location for display purposes (country/region name)
   const geocodeCountry = currentPhotoPath?.geocode
@@ -1478,8 +1587,14 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
 
   const detailsElement = (isMapHack: boolean) => (
     <>
-      {isMapHack && showMap ? (
-        <div className={styles.mapContainer}>
+      {isMapHack ? (
+        <div
+          className={[
+            styles.mapContainer,
+            styles.displaySetting,
+            showMap ? styles.displaySettingActive : "",
+          ].join(" ")}
+        >
           {coordinates ? (
             <MMap
               coordinates={coordinates}
@@ -1496,49 +1611,57 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
         </div>
       ) : null}
 
-      {showDetails ? (
-        <div
-          className={[styles.details, isMapHack ? styles.hide : ""].join(" ")}
-        >
-          {geocodeCountry ? (
-            <div className={styles.detailsRow}>{geocodeCountry}</div>
-          ) : (
-            <div className={styles.detailsRow}>&nbsp;</div>
-          )}
+      <div
+        className={[
+          styles.details,
+          styles.displaySetting,
+          showDetails ? styles.displaySettingActive : "",
+          isMapHack ? styles.hide : "",
+        ].join(" ")}
+      >
+        {geocodeCountry ? (
+          <div className={styles.detailsRow}>{geocodeCountry}</div>
+        ) : (
+          <div className={styles.detailsRow}>&nbsp;</div>
+        )}
 
-          {relativeDate ? (
-            <div className={styles.detailsRow}>
-              {relativeDate} &middot;{" "}
-              {exifDate?.toLocaleDateString(undefined, {
-                year: "numeric",
-                month: "long",
-              })}
-            </div>
-          ) : (
-            <div className={styles.detailsRow}>&nbsp;</div>
-          )}
-        </div>
-      ) : null}
-
-      {showClock ? (
-        <div className={[styles.clock, isMapHack ? styles.hide : ""].join(" ")}>
-          <div className={styles.time}>
-            {time.toLocaleTimeString(undefined, {
-              hour: "numeric",
-              minute: "numeric",
-              hour12: false,
-            })}
-          </div>
-          <div className={styles.date}>
-            {time.toLocaleDateString(undefined, {
-              weekday: "long",
+        {relativeDate ? (
+          <div className={styles.detailsRow}>
+            {relativeDate} &middot;{" "}
+            {exifDate?.toLocaleDateString(undefined, {
               year: "numeric",
               month: "long",
-              day: "numeric",
             })}
           </div>
+        ) : (
+          <div className={styles.detailsRow}>&nbsp;</div>
+        )}
+      </div>
+
+      <div
+        className={[
+          styles.clock,
+          styles.displaySetting,
+          showClock ? styles.displaySettingActive : "",
+          isMapHack ? styles.hide : "",
+        ].join(" ")}
+      >
+        <div className={styles.time}>
+          {time.toLocaleTimeString(undefined, {
+            hour: "numeric",
+            minute: "numeric",
+            hour12: false,
+          })}
         </div>
-      ) : null}
+        <div className={styles.date}>
+          {time.toLocaleDateString(undefined, {
+            weekday: "long",
+            year: "numeric",
+            month: "long",
+            day: "numeric",
+          })}
+        </div>
+      </div>
     </>
   );
 
@@ -1561,6 +1684,18 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
         data-controls-visible={String(controlsVisible)}
         data-fullscreen-active={String(isFullscreenActive)}
         data-paused={String(isPaused)}
+        onPointerDownCapture={resetTouchControlsHideTimeout}
+        onPointerMoveCapture={resetTouchControlsHideTimeout}
+        style={
+          {
+            "--touch-toolbar-show-preview-progress": String(
+              touchToolbarShowPreviewProgress,
+            ),
+            "--touch-toolbar-hide-preview-progress": String(
+              touchToolbarHidePreviewProgress,
+            ),
+          } as React.CSSProperties
+        }
       >
         {isFullscreenActive ? (
           <button
@@ -1605,10 +1740,30 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
           >
             <div className={styles.touchTopAffordance}>
               <span className={styles.touchPullHandle} />
-              <span className={styles.touchPullChevron}>⌄</span>
+              <span className={styles.touchPullChevron}>
+                <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                  <path d="M5 8l5 5 5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </span>
             </div>
-            <div className={styles.touchSideAffordanceLeft}>‹</div>
-            <div className={styles.touchSideAffordanceRight}>›</div>
+            <div className={styles.touchBottomAffordance}>
+              <span className={styles.touchPullChevron}>
+                <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                  <path d="M5 12l5-5 5 5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </span>
+              <span className={styles.touchPullHandle} />
+            </div>
+            <div className={styles.touchSideAffordanceLeft}>
+              <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                <path d="M12 5l-5 5 5 5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </div>
+            <div className={styles.touchSideAffordanceRight}>
+              <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                <path d="M8 5l5 5-5 5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </div>
           </div>
         ) : null}
         <div
@@ -1909,7 +2064,8 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
 
             <div className={styles.controlButtons}>
               {[
-                10000, 60000, 900000, 3600000, 10800000, 43200000, 86400000,
+                10000, 30000, 60000, 900000, 3600000, 10800000, 43200000,
+                86400000,
               ].map((delay) => {
                 const delayMin = delay / 1000 / 60;
                 const delaySec = delay / 1000;
@@ -1922,7 +2078,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
                       delay === timeDelay ? commonStyles.active : "",
                     ].join(" ")}
                     aria-pressed={delay === timeDelay}
-                    onClick={() => setTimeDelay(delay)}
+                    onClick={() => setTimeDelayAndUrl(delay)}
                   >
                     {delayMin >= 60
                       ? `${delayMin / 60}h`
@@ -2008,30 +2164,42 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
         so we render details twice (but hide with visibility: hidden). We need a different
         context because the drop shadows disappear when mix-blend-mode is applied.
         */}
-        {showClock || showDetails || showMap ? (
-          <>
-            <div
-              className={[
-                styles.bottomBar,
-                styles[
-                  `align${detailsAlignment.charAt(0).toUpperCase() + detailsAlignment.slice(1)}`
-                ],
-              ].join(" ")}
-              style={{ mixBlendMode: "screen" }}
-            >
-              {detailsElement(true)}
-            </div>
-            <div
-              className={[
-                styles.bottomBar,
-                styles[
-                  `align${detailsAlignment.charAt(0).toUpperCase() + detailsAlignment.slice(1)}`
-                ],
-              ].join(" ")}
-            >
-              {detailsElement(false)}
-            </div>
-          </>
+        <>
+          <div
+            className={[
+              styles.bottomBar,
+              styles[
+                `align${detailsAlignment.charAt(0).toUpperCase() + detailsAlignment.slice(1)}`
+              ],
+            ].join(" ")}
+            style={{ mixBlendMode: "screen" }}
+          >
+            {detailsElement(true)}
+          </div>
+          <div
+            className={[
+              styles.bottomBar,
+              styles[
+                `align${detailsAlignment.charAt(0).toUpperCase() + detailsAlignment.slice(1)}`
+              ],
+            ].join(" ")}
+          >
+            {detailsElement(false)}
+          </div>
+        </>
+
+        {previousPhotoSrc ? (
+          <img
+            className={[
+              styles.image,
+              styles.previousImage,
+              imageLoaded ? styles.previousImageHidden : "",
+              showCover ? styles.cover : "",
+            ].join(" ")}
+            src={previousPhotoSrc}
+            alt=""
+            aria-hidden="true"
+          />
         ) : null}
 
         <img
@@ -2041,9 +2209,16 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
             showCover ? styles.cover : "",
           ].join(" ")}
           src={photoBlock.data.src}
-          alt={getPhotoAltText(photoBlock, "Slideshow photo")}
+          alt={photoAltText}
+          style={{
+            touchAction: controlsVisible ? "auto" : "manipulation",
+            transform: `translateX(${touchHorizontalPreviewDirection * touchHorizontalPreviewProgress * 18}vw)`,
+          }}
           onLoad={() => {
             setImageLoaded(true);
+            window.setTimeout(() => {
+              setPreviousPhotoSrc(null);
+            }, 260);
           }}
           onError={() => {
             // Skip bad images to avoid showing broken image on displays

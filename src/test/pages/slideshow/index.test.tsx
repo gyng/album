@@ -220,7 +220,7 @@ describe("slideshow page", () => {
     window.history.replaceState(
       window.history.state,
       "",
-      `/slideshow?mode=random&filter=test-simple&photo=${encodeURIComponent(
+      `/slideshow?mode=random&filter=test-simple&delay=60&photo=${encodeURIComponent(
         samplePhoto.path,
       )}`,
     );
@@ -239,8 +239,27 @@ describe("slideshow page", () => {
     const url = new URL(window.location.href);
     expect(url.searchParams.get("mode")).toBe("random");
     expect(url.searchParams.get("filter")).toBe("test-simple");
+    expect(url.searchParams.get("delay")).toBe("60");
     expect(url.searchParams.has("photo")).toBe(false);
     expect(url.searchParams.has("seed")).toBe(false);
+  });
+
+  it("writes timing changes into the URL", async () => {
+    mockUseDatabase.mockReturnValue([{ db: true }, 100]);
+    mockFetchSlideshowPhotos.mockResolvedValue([samplePhoto]);
+
+    render(<SlideshowPage />);
+
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    screen.getByRole("button", { name: "1m" }).click();
+
+    const url = new URL(window.location.href);
+    expect(url.searchParams.get("mode")).toBe("random");
+    expect(url.searchParams.get("delay")).toBe("60");
   });
 
   it("copies a current-photo slideshow link from the context section", async () => {

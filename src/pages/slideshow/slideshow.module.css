@@ -1,10 +1,15 @@
 .image {
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
   object-fit: contain;
   cursor: pointer;
-  filter: grayscale(0) opacity(1);
-  transition: all 0.2s ease-out;
+  opacity: 1;
+  filter: grayscale(0);
+  transition:
+    opacity 0.24s ease-out,
+    filter 0.2s ease-out;
   z-index: 100;
   touch-action: manipulation;
   -webkit-user-select: none;
@@ -14,6 +19,15 @@
 
 .image.cover {
   object-fit: cover !important;
+}
+
+.previousImage {
+  z-index: 90;
+  pointer-events: none;
+}
+
+.previousImageHidden {
+  opacity: 0;
 }
 
 .preloadBuffer {
@@ -27,6 +41,8 @@
 }
 
 .container {
+  --touch-toolbar-show-preview-progress: 0;
+  --touch-toolbar-hide-preview-progress: 0;
   position: fixed;
   inset: 0;
   width: 100vw;
@@ -120,13 +136,19 @@
 }
 
 .container[data-controls-visible="true"] .toolbar {
-  opacity: 1;
-  transform: translateY(0) scale(1);
+  opacity: calc(1 - var(--touch-toolbar-hide-preview-progress));
+  transform: translateY(
+      calc(-1.5rem * var(--touch-toolbar-hide-preview-progress))
+    )
+    scale(calc(1 - (0.025 * var(--touch-toolbar-hide-preview-progress))));
 }
 
 .container[data-controls-visible="false"] .toolbar {
-  opacity: 0;
-  transform: translateY(-1.5rem) scale(0.975);
+  opacity: var(--touch-toolbar-show-preview-progress);
+  transform: translateY(
+      calc(-1.5rem * (1 - var(--touch-toolbar-show-preview-progress)))
+    )
+    scale(calc(0.975 + (0.025 * var(--touch-toolbar-show-preview-progress))));
   pointer-events: none;
 }
 
@@ -171,9 +193,9 @@
   color: hsl(0 0% 100% / 0.72);
 }
 
-.touchTopAffordance {
+.touchTopAffordance,
+.touchBottomAffordance {
   position: fixed;
-  top: calc(env(safe-area-inset-top, 0px) + var(--m-m));
   left: 50%;
   display: grid;
   place-items: center;
@@ -184,6 +206,16 @@
   transition:
     opacity 0.18s ease-out,
     transform 0.18s ease-out;
+}
+
+.touchTopAffordance {
+  top: calc(env(safe-area-inset-top, 0px) + var(--m-m));
+}
+
+.touchBottomAffordance {
+  bottom: calc(env(safe-area-inset-bottom, 0px) + var(--m-m));
+  transform: translateX(-50%)
+    translateY(calc(var(--touch-pull-progress) * var(--m-l) * -1));
 }
 
 .touchPullHandle {
@@ -204,9 +236,13 @@
   border-radius: 999px;
   background: hsl(0 0% 0% / 0.38);
   color: hsl(0 0% 100% / 0.86);
-  font-size: var(--fs-l);
-  line-height: 1;
   backdrop-filter: blur(10px);
+}
+
+.touchPullChevron svg,
+.touchSideAffordanceLeft svg,
+.touchSideAffordanceRight svg {
+  display: block;
 }
 
 .touchSideAffordanceLeft,
@@ -215,14 +251,12 @@
   top: 50%;
   display: grid;
   place-items: center;
-  width: var(--m-xl);
-  height: calc(var(--m-2xl) * 1.25);
+  width: var(--m-2xl);
+  height: var(--m-2xl);
   border-radius: 999px;
   background: hsl(0 0% 0% / 0.28);
   color: hsl(0 0% 100% / 0.58);
-  font-size: var(--fs-xl);
-  line-height: 1;
-  opacity: 0.26;
+  opacity: 0;
   transform: translateY(-50%);
   transition:
     opacity 0.18s ease-out,
@@ -243,7 +277,7 @@
   .touchSideAffordanceLeft,
 .touchAffordances[data-controls-visible="true"]
   .touchSideAffordanceRight {
-  opacity: 0.12;
+  opacity: 0;
 }
 
 .touchAffordances[data-touch-hint="previous"] .touchSideAffordanceLeft,
@@ -264,6 +298,25 @@
 .touchAffordances[data-touch-hint="controls"] .touchTopAffordance,
 .touchAffordances[data-touch-hint="reload"] .touchTopAffordance {
   opacity: calc(0.7 + (var(--touch-pull-progress) * 0.3));
+}
+
+.touchAffordances[data-touch-hint="idle"] .touchTopAffordance,
+.touchAffordances[data-touch-hint="overlays"] .touchTopAffordance,
+.touchAffordances[data-touch-hint="next"] .touchTopAffordance,
+.touchAffordances[data-touch-hint="previous"] .touchTopAffordance {
+  opacity: 0;
+}
+
+.touchAffordances[data-touch-hint="overlays"] .touchBottomAffordance {
+  opacity: calc(0.7 + (var(--touch-pull-progress) * 0.3));
+}
+
+.touchAffordances[data-touch-hint="idle"] .touchBottomAffordance,
+.touchAffordances[data-touch-hint="controls"] .touchBottomAffordance,
+.touchAffordances[data-touch-hint="reload"] .touchBottomAffordance,
+.touchAffordances[data-touch-hint="next"] .touchBottomAffordance,
+.touchAffordances[data-touch-hint="previous"] .touchBottomAffordance {
+  opacity: 0;
 }
 
 .brandLink {
@@ -483,14 +536,20 @@
   }
 
   .container[data-controls-visible="false"] .toolbar {
-    opacity: 0;
-    transform: translateY(-1.5rem) scale(0.975);
+    opacity: var(--touch-toolbar-show-preview-progress);
+    transform: translateY(
+        calc(-1.5rem * (1 - var(--touch-toolbar-show-preview-progress)))
+      )
+      scale(calc(0.975 + (0.025 * var(--touch-toolbar-show-preview-progress))));
     pointer-events: none;
   }
 
   .container[data-controls-visible="true"] .toolbar {
-    opacity: 1;
-    transform: translateY(0) scale(1);
+    opacity: calc(1 - var(--touch-toolbar-hide-preview-progress));
+    transform: translateY(
+        calc(-1.5rem * var(--touch-toolbar-hide-preview-progress))
+      )
+      scale(calc(1 - (0.025 * var(--touch-toolbar-hide-preview-progress))));
     background: linear-gradient(
       180deg,
       hsl(0 0% 0% / 0.68),
@@ -580,6 +639,21 @@
   visibility: hidden;
 }
 
+.displaySetting {
+  opacity: 0;
+  transform: translateY(var(--m-s));
+  transition:
+    opacity 0.28s ease-out,
+    transform 0.28s ease-out;
+  will-change: opacity, transform;
+  pointer-events: none;
+}
+
+.displaySettingActive {
+  opacity: 1;
+  transform: translateY(0);
+}
+
 .clock {
   isolation: isolate;
 }
@@ -622,7 +696,8 @@
 }
 
 .notLoaded {
-  filter: grayscale(100%) opacity(0.5);
+  opacity: 0;
+  filter: grayscale(100%);
 }
 
 .mapContainer {

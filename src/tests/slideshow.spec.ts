@@ -176,34 +176,25 @@ test.describe("Slideshow", () => {
     await expect(page.locator('button:has-text("📍")')).toContainText("Right");
   });
 
-  test("photo parameter reflects current image", async ({ page }) => {
+  test("current image does not get written into the URL", async ({ page }) => {
     await page.goto("/slideshow?mode=random&filter=test-simple", {
       waitUntil: "domcontentloaded",
     });
     await waitForSlideshow(page);
 
-    await page.waitForFunction(() =>
-      new URL(window.location.href).searchParams.has("photo"),
-    );
-
-    const firstPhoto = await page.evaluate(() =>
-      new URL(window.location.href).searchParams.get("photo"),
-    );
-    expect(firstPhoto).toContain("../albums/test-simple/");
+    await expect(page).toHaveURL(/mode=random/);
+    expect(new URL(page.url()).searchParams.has("photo")).toBe(false);
+    expect(new URL(page.url()).searchParams.has("seed")).toBe(false);
 
     await revealControls(page);
     await page.locator('button:has-text("Next")').click();
-    await page.waitForFunction(
-      (prev) =>
-        new URL(window.location.href).searchParams.get("photo") !== prev,
-      firstPhoto,
-    );
+    await page.waitForTimeout(150);
 
-    const secondPhoto = await page.evaluate(() =>
-      new URL(window.location.href).searchParams.get("photo"),
-    );
-    expect(secondPhoto).toContain("../albums/test-simple/");
-    expect(secondPhoto).not.toBe(firstPhoto);
+    const url = new URL(page.url());
+    expect(url.searchParams.get("mode")).toBe("random");
+    expect(url.searchParams.get("filter")).toBe("test-simple");
+    expect(url.searchParams.has("photo")).toBe(false);
+    expect(url.searchParams.has("seed")).toBe(false);
   });
 });
 
