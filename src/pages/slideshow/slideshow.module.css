@@ -130,6 +130,142 @@
   pointer-events: none;
 }
 
+.container[data-fullscreen-active="true"] .toolbar {
+  padding-right: calc(
+    env(safe-area-inset-right, 0px) + var(--m-2xl) + var(--m-l)
+  ) !important;
+}
+
+.fullscreenExitButton {
+  position: fixed;
+  top: calc(env(safe-area-inset-top, 0px) + var(--m-m));
+  right: calc(env(safe-area-inset-right, 0px) + var(--m-m));
+  z-index: 10001;
+  min-height: calc(var(--m-xl) + var(--m));
+  padding: 0 var(--m-l);
+  border: 1px solid hsl(0 0% 100% / 0.18);
+  border-radius: 999px;
+  background: hsl(0 0% 0% / 0.58);
+  color: hsl(0 0% 100% / 0.92);
+  font-size: var(--fs-s);
+  font-weight: 600;
+  line-height: 1;
+  box-shadow:
+    0 var(--m-s) var(--m-l) hsl(0 0% 0% / 0.32),
+    inset 0 1px 0 hsl(0 0% 100% / 0.1);
+  backdrop-filter: blur(12px);
+}
+
+.fullscreenExitButton:hover,
+.fullscreenExitButton:focus-visible {
+  background: hsl(0 0% 0% / 0.74);
+  color: white;
+}
+
+.touchAffordances {
+  --touch-pull-progress: 0;
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  pointer-events: none;
+  color: hsl(0 0% 100% / 0.72);
+}
+
+.touchTopAffordance {
+  position: fixed;
+  top: calc(env(safe-area-inset-top, 0px) + var(--m-m));
+  left: 50%;
+  display: grid;
+  place-items: center;
+  gap: calc(var(--m-s) * 0.5);
+  opacity: calc(0.34 + (var(--touch-pull-progress) * 0.5));
+  transform: translateX(-50%)
+    translateY(calc(var(--touch-pull-progress) * var(--m-l)));
+  transition:
+    opacity 0.18s ease-out,
+    transform 0.18s ease-out;
+}
+
+.touchPullHandle {
+  width: 4rem;
+  height: calc(var(--m) * 0.75);
+  border-radius: 999px;
+  background: hsl(0 0% 100% / 0.5);
+  box-shadow:
+    0 0 0 1px hsl(0 0% 0% / 0.24),
+    0 var(--m-s) var(--m-l) hsl(0 0% 0% / 0.34);
+}
+
+.touchPullChevron {
+  display: grid;
+  place-items: center;
+  width: var(--m-xl);
+  height: var(--m-xl);
+  border-radius: 999px;
+  background: hsl(0 0% 0% / 0.38);
+  color: hsl(0 0% 100% / 0.86);
+  font-size: var(--fs-l);
+  line-height: 1;
+  backdrop-filter: blur(10px);
+}
+
+.touchSideAffordanceLeft,
+.touchSideAffordanceRight {
+  position: fixed;
+  top: 50%;
+  display: grid;
+  place-items: center;
+  width: var(--m-xl);
+  height: calc(var(--m-2xl) * 1.25);
+  border-radius: 999px;
+  background: hsl(0 0% 0% / 0.28);
+  color: hsl(0 0% 100% / 0.58);
+  font-size: var(--fs-xl);
+  line-height: 1;
+  opacity: 0.26;
+  transform: translateY(-50%);
+  transition:
+    opacity 0.18s ease-out,
+    transform 0.18s ease-out,
+    background-color 0.18s ease-out;
+  backdrop-filter: blur(10px);
+}
+
+.touchSideAffordanceLeft {
+  left: calc(env(safe-area-inset-left, 0px) + var(--m-m));
+}
+
+.touchSideAffordanceRight {
+  right: calc(env(safe-area-inset-right, 0px) + var(--m-m));
+}
+
+.touchAffordances[data-controls-visible="true"]
+  .touchSideAffordanceLeft,
+.touchAffordances[data-controls-visible="true"]
+  .touchSideAffordanceRight {
+  opacity: 0.12;
+}
+
+.touchAffordances[data-touch-hint="previous"] .touchSideAffordanceLeft,
+.touchAffordances[data-touch-hint="next"] .touchSideAffordanceRight {
+  opacity: 0.88;
+  background: hsl(0 0% 0% / 0.52);
+  color: hsl(0 0% 100% / 0.94);
+}
+
+.touchAffordances[data-touch-hint="previous"] .touchSideAffordanceLeft {
+  transform: translateY(-50%) translateX(var(--m-s));
+}
+
+.touchAffordances[data-touch-hint="next"] .touchSideAffordanceRight {
+  transform: translateY(-50%) translateX(calc(var(--m-s) * -1));
+}
+
+.touchAffordances[data-touch-hint="controls"] .touchTopAffordance,
+.touchAffordances[data-touch-hint="reload"] .touchTopAffordance {
+  opacity: calc(0.7 + (var(--touch-pull-progress) * 0.3));
+}
+
 .brandLink {
   display: inline-flex;
   align-items: center;
@@ -298,6 +434,7 @@
 .playbackButtons :global(button),
 .controlButtons :global(button),
 .controlMeta :global(a),
+.controlMeta :global(button),
 .controlMeta :global(div) {
   min-height: 44px;
 }

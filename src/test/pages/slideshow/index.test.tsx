@@ -10,6 +10,12 @@ const mockUseEmbeddingsDatabase = jest.fn();
 const mockFetchSlideshowPhotos = jest.fn();
 const mockReloadCurrentPage = jest.fn();
 const mockBuildVersion = "test-build-version";
+const mockClipboardWriteText = jest.fn();
+const samplePhoto = {
+  path: "../albums/test-simple/DSCF0506.jpg",
+  exif: "",
+  geocode: "",
+};
 
 jest.mock("../../../components/database/useDatabase", () => ({
   useDatabase: () => mockUseDatabase(),
@@ -91,12 +97,19 @@ describe("slideshow page", () => {
       configurable: true,
       value: {
         onLine: true,
+        clipboard: {
+          writeText: mockClipboardWriteText,
+        },
       },
     });
+    window.history.replaceState(window.history.state, "", "/slideshow");
     global.fetch = jest.fn().mockResolvedValue({
       ok: false,
       text: async () => "",
     }) as jest.Mock;
+    Element.prototype.setPointerCapture = jest.fn();
+    Element.prototype.releasePointerCapture = jest.fn();
+    Element.prototype.hasPointerCapture = jest.fn(() => true);
   });
 
   afterEach(() => {
@@ -109,6 +122,34 @@ describe("slideshow page", () => {
     render(<SlideshowPage />);
 
     expect(screen.getByText("Loading... 42%")).toBeTruthy();
+  });
+
+  it("requests a screen wake lock while the slideshow is mounted", async () => {
+    const wakeLockSentinel = Object.assign(new EventTarget(), {
+      release: jest.fn().mockResolvedValue(undefined),
+    });
+    const requestWakeLock = jest.fn().mockResolvedValue(wakeLockSentinel);
+    Object.defineProperty(window, "navigator", {
+      configurable: true,
+      value: {
+        onLine: true,
+        wakeLock: {
+          request: requestWakeLock,
+        },
+      },
+    });
+
+    const { unmount } = render(<SlideshowPage />);
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(requestWakeLock).toHaveBeenCalledWith("screen");
+
+    unmount();
+
+    expect(wakeLockSentinel.release).toHaveBeenCalledTimes(1);
   });
 
   it("polls the owned version manifest and reloads when the build version changes", async () => {
@@ -172,4 +213,58 @@ describe("slideshow page", () => {
     expect(global.fetch).toHaveBeenCalledTimes(2);
     expect(mockReloadCurrentPage).not.toHaveBeenCalled();
   });
+
+  it("resolves an initial photo parameter without keeping it in the URL", async () => {
+    mockUseDatabase.mockReturnValue([{ db: true }, 100]);
+    mockFetchSlideshowPhotos.mockResolvedValue([samplePhoto]);
+    window.history.replaceState(
+      window.history.state,
+      "",
+      `/slideshow?mode=random&filter=test-simple&photo=${encodeURIComponent(
+        samplePhoto.path,
+      )}`,
+    );
+
+    render(<SlideshowPage />);
+
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(screen.getByRole("img", { name: /DSCF0506/ }).getAttribute("src")).toBe(
+      "/data/albums/test-simple/.resized_images/DSCF0506.jpg@3200.avif",
+    );
+
+    const url = new URL(window.location.href);
+    expect(url.searchParams.get("mode")).toBe("random");
+    expect(url.searchParams.get("filter")).toBe("test-simple");
+    expect(url.searchParams.has("photo")).toBe(false);
+    expect(url.searchParams.has("seed")).toBe(false);
+  });
+
+  it("copies a current-photo slideshow link from the context section", async () => {
+    mockUseDatabase.mockReturnValue([{ db: true }, 100]);
+    mockFetchSlideshowPhotos.mockResolvedValue([samplePhoto]);
+
+    render(<SlideshowPage />);
+
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    screen.getByRole("button", { name: "copy photo link" }).click();
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(mockClipboardWriteText).toHaveBeenCalledTimes(1);
+    const copiedUrl = new URL(mockClipboardWriteText.mock.calls[0][0]);
+    expect(copiedUrl.pathname).toBe("/slideshow");
+    expect(copiedUrl.searchParams.get("mode")).toBe("random");
+    expect(copiedUrl.searchParams.get("photo")).toBe(samplePhoto.path);
+  });
+
 });

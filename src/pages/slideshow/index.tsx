@@ -28,6 +28,11 @@ import { buildCollectionPageJsonLd } from "../../lib/seo";
 import { getPhotoAltText } from "../../lib/alt";
 import { navigateTo, reloadCurrentPage } from "../../util/navigate";
 import { handleSlideshowKeyboardShortcut } from "../../util/slideshowKeyboard";
+import {
+  getNextSlideshowOverlayPreset,
+  getSlideshowTouchTapAction,
+} from "../../util/slideshowTouch";
+import { getNextAlignedSlideshowChange } from "../../util/slideshowTiming";
 import { BUILD_VERSION } from "../../lib/buildVersion";
 
 type PageProps = {};
@@ -35,6 +40,8 @@ type SlideshowMode = "random" | "weighted" | "similar";
 const CONTROLS_AUTO_HIDE_MS = 3000;
 const VERSION_POLL_MS = 300000;
 const FALLBACK_RELOAD_MS = 86400000;
+const TOUCH_SWIPE_THRESHOLD_PX = 48;
+const TOUCH_PULL_THRESHOLD_PX = 72;
 
 type FullscreenDocument = Document & {
   webkitExitFullscreen?: () => Promise<void> | void;
@@ -43,6 +50,16 @@ type FullscreenDocument = Document & {
 
 type FullscreenElement = HTMLElement & {
   webkitRequestFullscreen?: () => Promise<void> | void;
+};
+
+type WakeLockSentinel = EventTarget & {
+  release: () => Promise<void>;
+};
+
+type WakeLockNavigator = Navigator & {
+  wakeLock?: {
+    request: (type: "screen") => Promise<WakeLockSentinel>;
+  };
 };
 
 type VersionManifest = {
@@ -217,6 +234,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
   const [slideshowError, setSlideshowError] = React.useState<string | null>(
     null,
   );
+  const [copiedPhotoLink, setCopiedPhotoLink] = React.useState(false);
   const [historyPosition, setHistoryPosition] = React.useState({
     index: -1,
     total: 0,
@@ -270,14 +288,26 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
   const [isFullscreenSupported, setIsFullscreenSupported] =
     React.useState(false);
   const [isFullscreenActive, setIsFullscreenActive] = React.useState(false);
+  const [isWakeLockSupported, setIsWakeLockSupported] = React.useState(false);
+  const [isWakeLockActive, setIsWakeLockActive] = React.useState(false);
+  const [touchGestureHint, setTouchGestureHint] = React.useState<
+    "next" | "previous" | "controls" | "reload" | null
+  >(null);
+  const [touchPullProgress, setTouchPullProgress] = React.useState(0);
+  const [keepAwake, setKeepAwake] = useLocalStorage(
+    "slideshow-keepawake",
+    true,
+  );
   const [embeddingsDatabase, embeddingsProgress] = useEmbeddingsDatabase(
     slideshowMode === "similar",
   );
+  const wakeLockRef = React.useRef<WakeLockSentinel | null>(null);
   const pointerGestureRef = React.useRef<{
     pointerId: number;
     pointerType: string;
     startX: number;
     startY: number;
+    controlsWereVisible: boolean;
   } | null>(null);
   const suppressImageClickRef = React.useRef(false);
   const controlsHideDeadlineRef = React.useRef<number | null>(null);
@@ -287,36 +317,11 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
   );
 
   const updateSlideshowUrl = useCallback(
-    (
-      mode: SlideshowMode,
-      opts?: { photoPath?: string | null; clearPhoto?: boolean },
-    ) => {
+    (mode: SlideshowMode) => {
       const url = new URL(window.location.toString());
       url.searchParams.set("mode", mode);
-
-      const hasExplicitPhotoPath = Object.prototype.hasOwnProperty.call(
-        opts ?? {},
-        "photoPath",
-      );
-      const nextPhotoPath = hasExplicitPhotoPath
-        ? (opts?.photoPath ?? null)
-        : (currentPhotoPathRef.current?.path ?? null);
-
-      if (nextPhotoPath) {
-        url.searchParams.set("photo", nextPhotoPath);
-      } else if (opts?.clearPhoto) {
-        url.searchParams.delete("photo");
-      }
-
-      if (mode === "similar") {
-        if (nextPhotoPath) {
-          url.searchParams.set("seed", nextPhotoPath);
-        } else if (opts?.clearPhoto) {
-          url.searchParams.delete("seed");
-        }
-      } else {
-        url.searchParams.delete("seed");
-      }
+      url.searchParams.delete("photo");
+      url.searchParams.delete("seed");
 
       window.history.replaceState(window.history.state, "", url.toString());
     },
@@ -342,7 +347,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
    *
    * Other parameters:
    *   - mode=random|weighted|similar Slideshow playback mode
-   *   - photo=<photo-path>          Start on a specific photo and keep the URL synced to the current image
+   *   - photo=<photo-path>          Start on a specific photo; the live URL drops this after load
    *   - seed=<photo-path>           Similar mode only: backward-compatible alias for the starting photo
    *   - align=left|center|right  Set details alignment
    *   - delay=<seconds>          Set slide duration in seconds (e.g., 60 = 60 seconds)
@@ -603,10 +608,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
         if (photos.length === 0) {
           setCurrentPhotoPath(null);
           currentPhotoPathRef.current = null;
-          updateSlideshowUrl(slideshowMode, {
-            photoPath: null,
-            clearPhoto: true,
-          });
+          updateSlideshowUrl(slideshowMode);
           setSlideshowError("No photos available");
           return;
         }
@@ -658,10 +660,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
       .catch((err) => {
         console.error(err);
         if (!cancelled) {
-          updateSlideshowUrl(slideshowMode, {
-            photoPath: null,
-            clearPhoto: true,
-          });
+          updateSlideshowUrl(slideshowMode);
           setSlideshowError("No photos available");
         }
       });
@@ -897,6 +896,21 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
     setIsPaused((prev) => !prev);
   }, []);
 
+  const alignNextChangeToCadence = useCallback(() => {
+    const alignedNextChange = getNextAlignedSlideshowChange({
+      now: new Date(),
+      delayMs: timeDelay,
+    });
+    const remainingMs = Math.max(0, alignedNextChange.getTime() - Date.now());
+
+    setNextChangeAt(alignedNextChange);
+    setSecondsLeft(remainingMs / 1000);
+
+    if (isPaused) {
+      pausedRemainingMsRef.current = remainingMs;
+    }
+  }, [isPaused, timeDelay]);
+
   const advanceToNextPhoto = useCallback(() => {
     setImageLoaded(false);
     goNext();
@@ -1061,6 +1075,82 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
     };
   }, []);
 
+  useEffect(() => {
+    const wakeLock = (navigator as WakeLockNavigator).wakeLock;
+    setIsWakeLockSupported(typeof wakeLock?.request === "function");
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const releaseWakeLock = async () => {
+      const sentinel = wakeLockRef.current;
+      wakeLockRef.current = null;
+      setIsWakeLockActive(false);
+
+      if (!sentinel) {
+        return;
+      }
+
+      try {
+        await sentinel.release();
+      } catch (error) {
+        console.error(error);
+      }
+    };
+
+    const requestWakeLock = async () => {
+      const wakeLock = (navigator as WakeLockNavigator).wakeLock;
+      if (
+        props.disabled ||
+        !keepAwake ||
+        document.visibilityState !== "visible" ||
+        typeof wakeLock?.request !== "function"
+      ) {
+        await releaseWakeLock();
+        return;
+      }
+
+      if (wakeLockRef.current) {
+        setIsWakeLockActive(true);
+        return;
+      }
+
+      try {
+        const sentinel = await wakeLock.request("screen");
+        if (cancelled) {
+          await sentinel.release();
+          return;
+        }
+
+        wakeLockRef.current = sentinel;
+        setIsWakeLockActive(true);
+        sentinel.addEventListener("release", () => {
+          if (wakeLockRef.current === sentinel) {
+            wakeLockRef.current = null;
+          }
+          setIsWakeLockActive(false);
+        });
+      } catch (error) {
+        console.error(error);
+        wakeLockRef.current = null;
+        setIsWakeLockActive(false);
+      }
+    };
+
+    requestWakeLock().catch(console.error);
+    document.addEventListener("visibilitychange", requestWakeLock);
+
+    return () => {
+      cancelled = true;
+      document.removeEventListener("visibilitychange", requestWakeLock);
+      const sentinel = wakeLockRef.current;
+      wakeLockRef.current = null;
+      setIsWakeLockActive(false);
+      sentinel?.release().catch(console.error);
+    };
+  }, [keepAwake, props.disabled]);
+
   const handleFullscreenToggle = useCallback(async () => {
     const fullscreenDocument = document as FullscreenDocument;
     const fullscreenRoot = document.documentElement as FullscreenElement;
@@ -1101,21 +1191,45 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
     }
   }, []);
 
+  const cycleTouchOverlays = useCallback(() => {
+    const nextPreset = getNextSlideshowOverlayPreset({
+      showDetails,
+      showMap,
+      showClock,
+    });
+
+    setShowDetails(nextPreset.showDetails);
+    setShowMap(nextPreset.showMap);
+    setShowClock(nextPreset.showClock);
+  }, [
+    setShowClock,
+    setShowDetails,
+    setShowMap,
+    showClock,
+    showDetails,
+    showMap,
+  ]);
+
   const handleImagePointerDown = useCallback(
     (event: React.PointerEvent<HTMLImageElement>) => {
       if (event.pointerType === "mouse" && event.button !== 0) {
         return;
       }
 
-      event.currentTarget.setPointerCapture(event.pointerId);
+      if (event.pointerType === "mouse") {
+        event.currentTarget.setPointerCapture(event.pointerId);
+      }
       pointerGestureRef.current = {
         pointerId: event.pointerId,
         pointerType: event.pointerType,
         startX: event.clientX,
         startY: event.clientY,
+        controlsWereVisible: controlsVisible,
       };
+      setTouchGestureHint(null);
+      setTouchPullProgress(0);
     },
-    [],
+    [controlsVisible],
   );
 
   const clearImagePointerGesture = useCallback(
@@ -1125,6 +1239,52 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
       }
 
       pointerGestureRef.current = null;
+      setTouchGestureHint(null);
+      setTouchPullProgress(0);
+    },
+    [],
+  );
+
+  const handleImagePointerMove = useCallback(
+    (event: React.PointerEvent<HTMLImageElement>) => {
+      const gesture = pointerGestureRef.current;
+      if (
+        !gesture ||
+        gesture.pointerId !== event.pointerId ||
+        (gesture.pointerType !== "touch" && gesture.pointerType !== "pen")
+      ) {
+        return;
+      }
+
+      const deltaX = event.clientX - gesture.startX;
+      const deltaY = event.clientY - gesture.startY;
+      const horizontalDistance = Math.abs(deltaX);
+      const verticalDistance = Math.abs(deltaY);
+
+      if (verticalDistance >= 24 && verticalDistance > horizontalDistance) {
+        if (deltaY > 0) {
+          setTouchGestureHint(
+            gesture.controlsWereVisible ? "reload" : "controls",
+          );
+          setTouchPullProgress(
+            Math.min(1, verticalDistance / TOUCH_PULL_THRESHOLD_PX),
+          );
+          return;
+        }
+
+        setTouchGestureHint(null);
+        setTouchPullProgress(0);
+        return;
+      }
+
+      if (horizontalDistance >= 24 && horizontalDistance > verticalDistance) {
+        setTouchGestureHint(deltaX < 0 ? "next" : "previous");
+        setTouchPullProgress(0);
+        return;
+      }
+
+      setTouchGestureHint(null);
+      setTouchPullProgress(0);
     },
     [],
   );
@@ -1143,7 +1303,10 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
       const horizontalDistance = Math.abs(deltaX);
       const verticalDistance = Math.abs(deltaY);
 
-      if (horizontalDistance >= 48 && horizontalDistance > verticalDistance) {
+      if (
+        horizontalDistance >= TOUCH_SWIPE_THRESHOLD_PX &&
+        horizontalDistance > verticalDistance
+      ) {
         suppressImageClickRef.current = true;
 
         if (deltaX < 0) {
@@ -1155,9 +1318,20 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
         return;
       }
 
-      if (verticalDistance >= 48 && verticalDistance > horizontalDistance) {
+      if (
+        verticalDistance >= TOUCH_SWIPE_THRESHOLD_PX &&
+        verticalDistance > horizontalDistance
+      ) {
+        if (deltaY > 0) {
+          if (!gesture.controlsWereVisible) {
+            suppressImageClickRef.current = true;
+            setControlsVisible(true);
+          }
+          return;
+        }
+
         suppressImageClickRef.current = true;
-        setControlsVisible(deltaY > 0);
+        cycleTouchOverlays();
         return;
       }
 
@@ -1166,11 +1340,29 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
         horizontalDistance < 12 &&
         verticalDistance < 12
       ) {
+        const imageBounds = event.currentTarget.getBoundingClientRect();
+        const tapAction = getSlideshowTouchTapAction({
+          clientX: event.clientX,
+          bounds: imageBounds,
+          canGoPrevious,
+        });
+
         suppressImageClickRef.current = true;
-        togglePaused();
+        if (tapAction === "previous") {
+          goPrevious();
+          return;
+        }
+
+        advanceToNextPhoto();
       }
     },
-    [advanceToNextPhoto, clearImagePointerGesture, goPrevious, togglePaused],
+    [
+      advanceToNextPhoto,
+      canGoPrevious,
+      clearImagePointerGesture,
+      cycleTouchOverlays,
+      goPrevious,
+    ],
   );
 
   const showControlsForDesktop = useCallback(() => {
@@ -1180,6 +1372,49 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
 
     setControlsVisible(true);
   }, [isCoarsePointer]);
+
+  const getCurrentPhotoLink = useCallback((): string | null => {
+    const photoPath = currentPhotoPathRef.current?.path;
+    if (!photoPath) {
+      return null;
+    }
+
+    const url = new URL("/slideshow", window.location.origin);
+    url.searchParams.set("mode", slideshowMode);
+    if (filter) {
+      url.searchParams.set("filter", filter);
+    }
+    url.searchParams.set("photo", photoPath);
+    return url.toString();
+  }, [filter, slideshowMode]);
+
+  const copyCurrentPhotoLink = useCallback(async () => {
+    const photoLink = getCurrentPhotoLink();
+    if (!photoLink) {
+      return;
+    }
+
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(photoLink);
+      } else {
+        const textArea = document.createElement("textarea");
+        textArea.value = photoLink;
+        textArea.setAttribute("readonly", "");
+        textArea.style.position = "fixed";
+        textArea.style.inset = "0 auto auto -9999px";
+        document.body.appendChild(textArea);
+        textArea.select();
+        document.execCommand("copy");
+        document.body.removeChild(textArea);
+      }
+      setCopiedPhotoLink(true);
+      window.setTimeout(() => setCopiedPhotoLink(false), 1800);
+    } catch (err) {
+      console.error("Failed to copy slideshow photo link", err);
+      setSlideshowError("Could not copy photo link");
+    }
+  }, [getCurrentPhotoLink]);
 
   if (currentPhotoPath === null) {
     return (
@@ -1324,8 +1559,23 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
       <div
         className={styles.container}
         data-controls-visible={String(controlsVisible)}
+        data-fullscreen-active={String(isFullscreenActive)}
         data-paused={String(isPaused)}
       >
+        {isFullscreenActive ? (
+          <button
+            className={styles.fullscreenExitButton}
+            type="button"
+            aria-label="Exit fullscreen"
+            title="Exit fullscreen"
+            onClick={() => {
+              handleFullscreenToggle().catch(console.error);
+            }}
+          >
+            Exit full
+          </button>
+        ) : null}
+
         {!isCoarsePointer ? (
           <>
             <div
@@ -1340,6 +1590,26 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
               </div>
             ) : null}
           </>
+        ) : null}
+        {isCoarsePointer ? (
+          <div
+            className={styles.touchAffordances}
+            data-touch-hint={touchGestureHint ?? "idle"}
+            data-controls-visible={String(controlsVisible)}
+            aria-hidden="true"
+            style={
+              {
+                "--touch-pull-progress": String(touchPullProgress),
+              } as React.CSSProperties
+            }
+          >
+            <div className={styles.touchTopAffordance}>
+              <span className={styles.touchPullHandle} />
+              <span className={styles.touchPullChevron}>⌄</span>
+            </div>
+            <div className={styles.touchSideAffordanceLeft}>‹</div>
+            <div className={styles.touchSideAffordanceRight}>›</div>
+          </div>
         ) : null}
         <div
           className={styles.toolbar}
@@ -1589,15 +1859,35 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
                 {showCover ? "Cover" : "Contain"}
               </button>
 
+              {!isFullscreenActive ? (
+                <button
+                  className={commonStyles.button}
+                  disabled={!isFullscreenSupported}
+                  aria-disabled={!isFullscreenSupported}
+                  onClick={() => {
+                    handleFullscreenToggle().catch(console.error);
+                  }}
+                >
+                  ⇱ Fullscreen
+                </button>
+              ) : null}
+
               <button
-                className={commonStyles.button}
-                disabled={!isFullscreenSupported}
-                aria-disabled={!isFullscreenSupported}
-                onClick={() => {
-                  handleFullscreenToggle().catch(console.error);
-                }}
+                className={[
+                  keepAwake && isWakeLockActive ? commonStyles.active : "",
+                  commonStyles.button,
+                ].join(" ")}
+                disabled={!isWakeLockSupported}
+                aria-disabled={!isWakeLockSupported}
+                aria-pressed={keepAwake && isWakeLockActive}
+                title={
+                  isWakeLockSupported
+                    ? "Keep the screen awake while the slideshow is open"
+                    : "Screen wake lock is not available in this browser"
+                }
+                onClick={() => setKeepAwake(!keepAwake)}
               >
-                {isFullscreenActive ? "⇲ Exit full" : "⇱ Fullscreen"}
+                {keepAwake ? "Awake" : "Sleep ok"}
               </button>
             </div>
           </div>
@@ -1648,6 +1938,13 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
               <div className={commonStyles.toast}>
                 🔁 {secondsLeft.toFixed(0)}s
               </div>
+              <button
+                className={commonStyles.button}
+                type="button"
+                onClick={alignNextChangeToCadence}
+              >
+                Align
+              </button>
             </div>
           </div>
 
@@ -1691,6 +1988,16 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
               >
                 view photo in <i>{albumName}</i>
               </Link>
+
+              <button
+                className={commonStyles.button}
+                type="button"
+                onClick={() => {
+                  void copyCurrentPhotoLink();
+                }}
+              >
+                {copiedPhotoLink ? "copied photo link" : "copy photo link"}
+              </button>
             </div>
           </div>
         </div>
@@ -1745,6 +2052,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
             }, 1000);
           }}
           onPointerDown={handleImagePointerDown}
+          onPointerMove={handleImagePointerMove}
           onPointerCancel={clearImagePointerGesture}
           onPointerUp={handleImagePointerUp}
           onClick={() => {
