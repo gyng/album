@@ -297,17 +297,25 @@
 
 .touchAffordances[data-touch-hint="previous"] .touchSideAffordanceLeft,
 .touchAffordances[data-touch-hint="next"] .touchSideAffordanceRight {
-  opacity: 0.88;
-  background: hsl(0 0% 0% / 0.52);
-  color: hsl(0 0% 100% / 0.94);
+  opacity: calc(0.88 + (var(--touch-swipe-progress, 0) * 0.12));
+  background: hsl(
+    0 0% calc(0% + (var(--touch-swipe-progress, 0) * 10%))
+    / calc(0.52 + (var(--touch-swipe-progress, 0) * 0.24))
+  );
+  color: hsl(0 0% 100% / calc(0.94 + (var(--touch-swipe-progress, 0) * 0.06)));
+  box-shadow: 0 0 0 calc(var(--touch-swipe-progress, 0) * 2px) hsl(0 0% 100% / 0.55);
 }
 
 .touchAffordances[data-touch-hint="previous"] .touchSideAffordanceLeft {
-  transform: translateY(-50%) translateX(var(--m-s));
+  transform: translateY(-50%)
+    translateX(var(--m-s))
+    scale(calc(1 + var(--touch-swipe-progress, 0) * 0.18));
 }
 
 .touchAffordances[data-touch-hint="next"] .touchSideAffordanceRight {
-  transform: translateY(-50%) translateX(calc(var(--m-s) * -1));
+  transform: translateY(-50%)
+    translateX(calc(var(--m-s) * -1))
+    scale(calc(1 + var(--touch-swipe-progress, 0) * 0.18));
 }
 
 .touchAffordances[data-touch-hint="controls"] .touchTopAffordance,

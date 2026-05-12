@@ -42,7 +42,9 @@ const TOUCH_CONTROLS_AUTO_HIDE_MS = 30000;
 const VERSION_POLL_MS = 300000;
 const FALLBACK_RELOAD_MS = 86400000;
 const TOUCH_SWIPE_THRESHOLD_PX = 48;
+const TOUCH_SWIPE_HINT_THRESHOLD_PX = TOUCH_SWIPE_THRESHOLD_PX / 2; // start showing hint at half the commit distance
 const TOUCH_PULL_THRESHOLD_PX = 72;
+const TOUCH_PULL_HINT_THRESHOLD_PX = TOUCH_PULL_THRESHOLD_PX / 3; // start showing pull hint at 1/3 of the commit distance
 
 type FullscreenDocument = Document & {
   webkitExitFullscreen?: () => Promise<void> | void;
@@ -299,6 +301,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
     "next" | "previous" | "controls" | "reload" | "overlays" | null
   >(null);
   const [touchPullProgress, setTouchPullProgress] = React.useState(0);
+  const [touchSwipeProgress, setTouchSwipeProgress] = React.useState(0);
   const touchToolbarShowPreviewProgress =
     !controlsVisible &&
     (touchGestureHint === "controls" || touchGestureHint === "reload")
@@ -316,6 +319,9 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
     startX: number;
     startY: number;
     controlsWereVisible: boolean;
+    // Set on the first move event that crosses the horizontal hint threshold;
+    // held for the lifetime of the gesture so dragging back does not flip the action.
+    committedHorizontalDirection?: "next" | "previous";
   } | null>(null);
   const suppressImageClickRef = React.useRef(false);
   const controlsHideDeadlineRef = React.useRef<number | null>(null);
@@ -1375,6 +1381,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
       pointerGestureRef.current = null;
       setTouchGestureHint(null);
       setTouchPullProgress(0);
+      setTouchSwipeProgress(0);
     },
     [],
   );
@@ -1395,7 +1402,8 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
       const horizontalDistance = Math.abs(deltaX);
       const verticalDistance = Math.abs(deltaY);
 
-      if (verticalDistance >= 24 && verticalDistance > horizontalDistance) {
+      if (verticalDistance >= TOUCH_PULL_HINT_THRESHOLD_PX && verticalDistance > horizontalDistance) {
+        setTouchSwipeProgress(0);
         if (deltaY > 0) {
           if (gesture.controlsWereVisible) {
             setTouchGestureHint(null);
@@ -1419,14 +1427,27 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
         return;
       }
 
-      if (horizontalDistance >= 24 && horizontalDistance > verticalDistance) {
-        setTouchGestureHint(deltaX < 0 ? "next" : "previous");
+      if (horizontalDistance >= TOUCH_SWIPE_HINT_THRESHOLD_PX && horizontalDistance > verticalDistance) {
+        // Lock the direction on the first crossing — dragging back must not flip the hint.
+        if (!gesture.committedHorizontalDirection) {
+          gesture.committedHorizontalDirection = deltaX < 0 ? "next" : "previous";
+        }
+        setTouchGestureHint(gesture.committedHorizontalDirection);
         setTouchPullProgress(0);
+        // Progress from 0 (hint threshold) to 1 (commit threshold) — drives the committed visual.
+        setTouchSwipeProgress(
+          Math.min(
+            1,
+            (horizontalDistance - TOUCH_SWIPE_HINT_THRESHOLD_PX) /
+              (TOUCH_SWIPE_THRESHOLD_PX - TOUCH_SWIPE_HINT_THRESHOLD_PX),
+          ),
+        );
         return;
       }
 
       setTouchGestureHint(null);
       setTouchPullProgress(0);
+      setTouchSwipeProgress(0);
     },
     [],
   );
@@ -1449,9 +1470,19 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
         horizontalDistance >= TOUCH_SWIPE_THRESHOLD_PX &&
         horizontalDistance > verticalDistance
       ) {
+        const committed = gesture.committedHorizontalDirection;
+        const finalDirection = deltaX < 0 ? "next" : "previous";
+        const effectiveDirection = committed ?? finalDirection;
+
+        // If the user dragged back past the start in the opposite direction,
+        // treat it as a cancelled gesture — do not trigger the opposite action.
+        if (committed && finalDirection !== committed) {
+          return;
+        }
+
         suppressImageClickRef.current = true;
 
-        if (deltaX < 0) {
+        if (effectiveDirection === "next") {
           advanceToNextPhoto();
           return;
         }
@@ -1794,6 +1825,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
             style={
               {
                 "--touch-pull-progress": String(touchPullProgress),
+                "--touch-swipe-progress": String(touchSwipeProgress),
               } as React.CSSProperties
             }
           >
