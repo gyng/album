@@ -1403,6 +1403,11 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
       const verticalDistance = Math.abs(deltaY);
 
       if (verticalDistance >= TOUCH_PULL_HINT_THRESHOLD_PX && verticalDistance > horizontalDistance) {
+        // If a horizontal swipe is already in progress, don't let a diagonal drift trigger vertical pull.
+        if (gesture.committedHorizontalDirection) {
+          return;
+        }
+
         setTouchSwipeProgress(0);
         if (deltaY > 0) {
           if (gesture.controlsWereVisible) {

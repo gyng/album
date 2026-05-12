@@ -219,13 +219,14 @@
 }
 
 .touchPullHandle {
-  width: 4rem;
+  width: calc(4rem + var(--touch-pull-progress, 0) * 2rem);
   height: calc(var(--m) * 0.75);
   border-radius: 999px;
   background: hsl(0 0% 100% / 0.5);
   box-shadow:
     0 0 0 1px hsl(0 0% 0% / 0.24),
-    0 var(--m-s) var(--m-l) hsl(0 0% 0% / 0.34);
+    0 var(--m-s) var(--m-l) hsl(0 0% 0% / 0.34),
+    0 0 calc(var(--touch-pull-progress, 0) * 18px) calc(var(--touch-pull-progress, 0) * 3px) hsl(0 0% 100% / 0.22);
 }
 
 .touchPullChevron {
@@ -234,24 +235,27 @@
   width: var(--m-xl);
   height: var(--m-xl);
   border-radius: 999px;
-  background: hsl(0 0% 0% / 0.38);
+  background: hsl(0 0% 0% / calc(0.38 + var(--touch-pull-progress, 0) * 0.22));
   color: hsl(0 0% 100% / 0.86);
   backdrop-filter: blur(10px);
+  scale: calc(1 + var(--touch-pull-progress, 0) * 0.24);
+  box-shadow: 0 0 0 calc(var(--touch-pull-progress, 0) * 2.5px) hsl(0 0% 100% / 0.48);
 }
 
 .touchAffordanceLabel {
   padding: calc(var(--m-s) * 0.65) var(--m-l);
   border-radius: 999px;
-  border: 1px solid var(--c-bg-contrast-dark);
+  border: 1px solid hsl(0 0% calc(40% + var(--touch-pull-progress, 0) * 40%) / calc(0.3 + var(--touch-pull-progress, 0) * 0.45));
   background: color-mix(in srgb, var(--c-bg) 97%, var(--c-bg-contrast-dark));
   color: var(--c-bg-contrast-light);
   font-size: var(--fs-s);
   letter-spacing: 0.02em;
   white-space: nowrap;
   box-shadow:
-    0 8px 20px hsl(0 0% 0% / 0.22),
-    inset 0 1px 0 hsl(0 0% 100% / 0.08);
+    0 8px 20px hsl(0 0% 0% / calc(0.22 + var(--touch-pull-progress, 0) * 0.14)),
+    inset 0 1px 0 hsl(0 0% 100% / calc(0.08 + var(--touch-pull-progress, 0) * 0.16));
   backdrop-filter: blur(10px);
+  scale: calc(1 + var(--touch-pull-progress, 0) * 0.06);
 }
 
 .touchPullChevron svg,
@@ -275,8 +279,9 @@
   transform: translateY(-50%);
   transition:
     opacity 0.18s ease-out,
-    transform 0.18s ease-out,
-    background-color 0.18s ease-out;
+    transform 0.24s cubic-bezier(0.34, 1.56, 0.64, 1),
+    background-color 0.18s ease-out,
+    box-shadow 0.18s ease-out;
   backdrop-filter: blur(10px);
 }
 
@@ -299,23 +304,25 @@
 .touchAffordances[data-touch-hint="next"] .touchSideAffordanceRight {
   opacity: calc(0.88 + (var(--touch-swipe-progress, 0) * 0.12));
   background: hsl(
-    0 0% calc(0% + (var(--touch-swipe-progress, 0) * 10%))
+    0 0% calc(0% + (var(--touch-swipe-progress, 0) * 12%))
     / calc(0.52 + (var(--touch-swipe-progress, 0) * 0.24))
   );
   color: hsl(0 0% 100% / calc(0.94 + (var(--touch-swipe-progress, 0) * 0.06)));
-  box-shadow: 0 0 0 calc(var(--touch-swipe-progress, 0) * 2px) hsl(0 0% 100% / 0.55);
+  box-shadow:
+    0 0 0 calc(var(--touch-swipe-progress, 0) * 2.5px) hsl(0 0% 100% / 0.6),
+    0 0 calc(var(--touch-swipe-progress, 0) * 22px) calc(var(--touch-swipe-progress, 0) * 4px) hsl(0 0% 100% / 0.18);
 }
 
 .touchAffordances[data-touch-hint="previous"] .touchSideAffordanceLeft {
   transform: translateY(-50%)
     translateX(var(--m-s))
-    scale(calc(1 + var(--touch-swipe-progress, 0) * 0.18));
+    scale(calc(1 + var(--touch-swipe-progress, 0) * 0.26));
 }
 
 .touchAffordances[data-touch-hint="next"] .touchSideAffordanceRight {
   transform: translateY(-50%)
     translateX(calc(var(--m-s) * -1))
-    scale(calc(1 + var(--touch-swipe-progress, 0) * 0.18));
+    scale(calc(1 + var(--touch-swipe-progress, 0) * 0.26));
 }
 
 .touchAffordances[data-touch-hint="controls"] .touchTopAffordance,
