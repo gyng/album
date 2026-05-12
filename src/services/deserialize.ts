@@ -59,6 +59,26 @@ const getSearchDb = (dbPath: string) => {
   return searchDb;
 };
 
+const isMissingLocalMediaError = (err: unknown): boolean => {
+  if (!(err instanceof Error)) {
+    return false;
+  }
+
+  const maybeNodeError = err as NodeJS.ErrnoException;
+  return (
+    maybeNodeError.code === "ENOENT" ||
+    err.message.includes("Input file is missing")
+  );
+};
+
+const makeMissingFileError = (filepath: string): NodeJS.ErrnoException => {
+  const error = new Error(
+    `Input file is missing: ${filepath}`,
+  ) as NodeJS.ErrnoException;
+  error.code = "ENOENT";
+  return error;
+};
+
 export const deserializeTextBlock = async (
   serialized: SerializedTextBlock,
 ): Promise<TextBlock> => {
@@ -166,6 +186,10 @@ export const deserializePhotoBlock = async (
     const photoFilename = block.data.src;
     const localFilepath = path.join(options.dirname, photoFilename);
 
+    if (!fs.existsSync(localFilepath)) {
+      throw makeMissingFileError(localFilepath);
+    }
+
     const { width, height } = await getPhotoSize(localFilepath);
     const exif = await getNextJsSafeExif(localFilepath);
     const srcset = await optimiseImages(localFilepath, "public/data/albums");
@@ -238,11 +262,37 @@ export const deserializeContentBlock = async (
       serialized.blocks.length,
     );
 
+    const deserializedBlocks = await Promise.all(
+      serialized.blocks.map(async (b) => {
+        try {
+          return await deserializeBlock(b, dirname);
+        } catch (err) {
+          const isMissingLocalPhoto =
+            b.kind === "photo" && isMissingLocalMediaError(err);
+          const isMissingLocalVideo =
+            b.kind === "video" &&
+            b.data.type === "local" &&
+            isMissingLocalMediaError(err);
+
+          if (!isMissingLocalPhoto && !isMissingLocalVideo) {
+            throw err;
+          }
+
+          const missingPath =
+            b.kind === "photo"
+              ? path.join(dirname, b.data.src)
+              : path.join(dirname, b.data.href);
+
+          incrementBuildCounter("deserialize.contentBlock.skippedMissingMedia");
+          console.warn(`Skipping missing media file: ${missingPath}`);
+          return null;
+        }
+      }),
+    );
+
     return {
       ...serialized,
-      blocks: await Promise.all(
-        serialized.blocks.map(async (b) => deserializeBlock(b, dirname)),
-      ),
+      blocks: deserializedBlocks.filter((b): b is Block => b !== null),
       _build: {
         slug: serialized.name,
         srcdir: dirname,

@@ -229,4 +229,34 @@ describe("serialization", () => {
     expect(localVideo.kind).toBe("video");
     expect((localVideo as any).data.date).toBe("2023-11-20T10:11:12.000Z");
   });
+
+  it("skips missing local photo blocks instead of throwing", async () => {
+    const consoleWarnSpy = jest
+      .spyOn(console, "warn")
+      .mockImplementation(() => undefined);
+
+    const input: SerializedContent = {
+      ...serializedContent,
+      blocks: [
+        {
+          kind: "photo",
+          id: "missing-photo",
+          data: {
+            src: "test/fixtures/does-not-exist.jpg",
+          },
+        },
+        serializedContent.blocks[0],
+      ],
+    };
+
+    const actual = await deserializeContentBlock(input, ".");
+
+    expect(actual.blocks).toHaveLength(1);
+    expect(actual.blocks[0]?.kind).toBe("photo");
+    expect(consoleWarnSpy).toHaveBeenCalledWith(
+      "Skipping missing media file: test/fixtures/does-not-exist.jpg",
+    );
+
+    consoleWarnSpy.mockRestore();
+  });
 });
