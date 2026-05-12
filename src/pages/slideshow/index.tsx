@@ -1237,9 +1237,20 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
       }
     };
 
+    // pageshow fires in Safari PWAs when the page is restored from the back/forward cache
+    // or resumed from background — more reliable than visibilitychange alone in that context.
+    const handlePageShow = (e: PageTransitionEvent) => {
+      if (!e.persisted) {
+        return;
+      }
+      syncWakeLockState();
+    };
+
     document.addEventListener("visibilitychange", syncWakeLockState);
+    window.addEventListener("pageshow", handlePageShow);
     return () => {
       document.removeEventListener("visibilitychange", syncWakeLockState);
+      window.removeEventListener("pageshow", handlePageShow);
     };
   }, [props.disabled, tryAcquireWakeLock]);
 
@@ -1329,6 +1340,13 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
       }
 
       event.currentTarget.setPointerCapture(event.pointerId);
+
+      // Use the gesture to silently acquire a wake lock if not already held.
+      // This is the most reliable path in Safari PWAs which block gesturer-free acquisition.
+      if (!wakeLockRef.current && !props.disabled) {
+        tryAcquireWakeLock().catch(console.error);
+      }
+
       pointerGestureRef.current = {
         pointerId: event.pointerId,
         pointerType: event.pointerType,
@@ -1339,7 +1357,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
       setTouchGestureHint(null);
       setTouchPullProgress(0);
     },
-    [controlsVisible],
+    [controlsVisible, props.disabled, tryAcquireWakeLock],
   );
 
   const clearImagePointerGesture = useCallback(
@@ -1810,6 +1828,12 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
             </div>
           </div>
         ) : null}
+        {isCoarsePointer && isWakeLockSupported && !isWakeLockActive && !controlsVisible ? (
+          <div className={styles.wakeLockNudge} aria-hidden="true">
+            Tap anywhere to keep the screen awake
+          </div>
+        ) : null}
+
         <div
           className={styles.toolbar}
           onFocusCapture={showControlsForDesktop}
@@ -2146,7 +2170,11 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
 
             <div className={styles.controlMeta}>
               <div className={commonStyles.toast}>
-                🔁 {secondsLeft.toFixed(0)}s
+                🔁 {secondsLeft >= 3600
+                  ? `${Math.floor(secondsLeft / 3600)}h ${Math.floor((secondsLeft % 3600) / 60)}m`
+                  : secondsLeft >= 60
+                    ? `${Math.floor(secondsLeft / 60)}m ${Math.floor(secondsLeft % 60)}s`
+                    : `${Math.floor(secondsLeft)}s`}
               </div>
               <button
                 className={commonStyles.button}
