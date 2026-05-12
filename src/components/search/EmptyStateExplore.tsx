@@ -92,6 +92,7 @@ export const EmptyStateExplore: React.FC<Props> = ({
 
   useEffect(() => {
     if (!database) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setMemoryClusters([]);
       setVisibleMemoryClusterCount(MEMORY_CLUSTER_INITIAL_SIZE);
       return;
@@ -136,6 +137,7 @@ export const EmptyStateExplore: React.FC<Props> = ({
 
   useEffect(() => {
     if (!database) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setRecentResults([]);
       setRecentExploreError(null);
       return;
@@ -170,6 +172,7 @@ export const EmptyStateExplore: React.FC<Props> = ({
 
   useEffect(() => {
     if (!database) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setRandomResults([]);
       setRandomResultsError(null);
       return;

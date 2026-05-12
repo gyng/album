@@ -21,6 +21,7 @@ const SearchPage: NextPage<PageProps> = (props) => {
   }, []);
 
   React.useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setIsMounted(true);
   }, []);
 

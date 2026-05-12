@@ -235,6 +235,7 @@ export const Search: React.FC<{
 
   useEffect(() => {
     const initialSearchState = getInitialSearchState();
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setSearchInputValue(initialSearchState.searchQuery.join(","));
     setSimilarPath(initialSearchState.similarPath);
     setSimilarityOrder(initialSearchState.similarityOrder);
@@ -246,6 +247,7 @@ export const Search: React.FC<{
 
   useEffect(() => {
     if (normalizedSearchTerms.length > 0) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setSelectedFilterCategory("tags");
     }
   }, [normalizedSearchTerms.length]);
@@ -348,6 +350,7 @@ export const Search: React.FC<{
 
   useEffect(() => {
     if (!database) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setFacetCatalogSections([]);
       return;
     }
@@ -374,6 +377,7 @@ export const Search: React.FC<{
 
   useEffect(() => {
     if (!database) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setFacetSections([]);
       setIsFacetSectionsLoading(false);
       return;
@@ -431,6 +435,7 @@ export const Search: React.FC<{
       (normalizedDebouncedSearchTerms.length === 0 &&
         selectedFacets.length === 0)
     ) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setRefinementCounts({});
       return;
     }

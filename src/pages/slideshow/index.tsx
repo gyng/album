@@ -243,7 +243,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
 
   const [timeDelay, setTimeDelay, removeTimeDelay] = useLocalStorage(
     "slideshow-timedelay",
-    30000,
+    900000,
   );
   const timeDelayRef = React.useRef(timeDelay);
   const [showClock, setShowClock, removeShowClock] = useLocalStorage(
@@ -306,10 +306,6 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
       : 0;
   const touchToolbarHidePreviewProgress =
     controlsVisible && touchGestureHint === "overlays" ? touchPullProgress : 0;
-  const [keepAwake, setKeepAwake] = useLocalStorage(
-    "slideshow-keepawake",
-    true,
-  );
   const [embeddingsDatabase, embeddingsProgress] = useEmbeddingsDatabase(
     slideshowMode === "similar",
   );
@@ -429,6 +425,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
     // Parse filter (already supported)
     const searchFilter = url.searchParams.get("filter");
     if (searchFilter) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setFilter(searchFilter);
     }
 
@@ -965,8 +962,19 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
     goNext();
   }, [goNext]);
 
+  // Auto-align to cadence boundary on first photo load
+  const hasAutoAlignedRef = React.useRef(false);
+  useEffect(() => {
+    if (!currentPhotoPath || hasAutoAlignedRef.current) {
+      return;
+    }
+    hasAutoAlignedRef.current = true;
+    alignNextChangeToCadence();
+  }, [alignNextChangeToCadence, currentPhotoPath]);
+
   useEffect(() => {
     const nextSrc = getSlideshowPhotoSrc(getUpcomingPhoto());
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setBufferedPhotoSrc(nextSrc);
   }, [currentPhotoPath?.path, getUpcomingPhoto, historyPosition.index, historyPosition.total]);
 
@@ -987,6 +995,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
     if (isPaused) {
       const remaining = Math.max(0, nextChangeAt.getTime() - Date.now());
       pausedRemainingMsRef.current = remaining;
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setSecondsLeft(remaining / 1000);
       return;
     }
@@ -1048,6 +1057,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
   useEffect(() => {
     if (isCoarsePointer) {
       controlsHideDeadlineRef.current = null;
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setControlsHideProgress(1);
       return;
     }
@@ -1112,6 +1122,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
   useEffect(() => {
     const fullscreenDocument = document as FullscreenDocument;
     const fullscreenRoot = document.documentElement as FullscreenElement;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setIsFullscreenSupported(
       typeof fullscreenRoot.requestFullscreen === "function" ||
         typeof fullscreenRoot.webkitRequestFullscreen === "function",
@@ -1141,84 +1152,102 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
 
   useEffect(() => {
     const wakeLock = (navigator as WakeLockNavigator).wakeLock;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setIsWakeLockSupported(typeof wakeLock?.request === "function");
   }, []);
 
-  useEffect(() => {
-    // Slideshow is primarily used as a photo frame, so default to awake.
-    setKeepAwake(true);
-  }, [setKeepAwake]);
+  const releaseWakeLock = useCallback(async () => {
+    const sentinel = wakeLockRef.current;
+    wakeLockRef.current = null;
+    setIsWakeLockActive(false);
 
-  useEffect(() => {
-    let cancelled = false;
+    if (!sentinel) {
+      return;
+    }
 
-    const releaseWakeLock = async () => {
-      const sentinel = wakeLockRef.current;
-      wakeLockRef.current = null;
-      setIsWakeLockActive(false);
+    try {
+      await sentinel.release();
+    } catch (error) {
+      console.error(error);
+    }
+  }, []);
 
-      if (!sentinel) {
-        return;
-      }
+  const tryAcquireWakeLock = useCallback(async () => {
+    const wakeLock = (navigator as WakeLockNavigator).wakeLock;
+    if (
+      props.disabled ||
+      document.visibilityState !== "visible" ||
+      typeof wakeLock?.request !== "function"
+    ) {
+      await releaseWakeLock();
+      return;
+    }
 
-      try {
-        await sentinel.release();
-      } catch (error) {
-        console.error(error);
-      }
-    };
+    if (wakeLockRef.current) {
+      setIsWakeLockActive(true);
+      return;
+    }
 
-    const requestWakeLock = async () => {
-      const wakeLock = (navigator as WakeLockNavigator).wakeLock;
-      if (
-        props.disabled ||
-        !keepAwake ||
-        document.visibilityState !== "visible" ||
-        typeof wakeLock?.request !== "function"
-      ) {
-        await releaseWakeLock();
-        return;
-      }
-
-      if (wakeLockRef.current) {
-        setIsWakeLockActive(true);
-        return;
-      }
-
-      try {
-        const sentinel = await wakeLock.request("screen");
-        if (cancelled) {
-          await sentinel.release();
-          return;
+    try {
+      const sentinel = await wakeLock.request("screen");
+      wakeLockRef.current = sentinel;
+      setIsWakeLockActive(true);
+      sentinel.addEventListener("release", () => {
+        if (wakeLockRef.current === sentinel) {
+          wakeLockRef.current = null;
         }
-
-        wakeLockRef.current = sentinel;
-        setIsWakeLockActive(true);
-        sentinel.addEventListener("release", () => {
-          if (wakeLockRef.current === sentinel) {
-            wakeLockRef.current = null;
-          }
-          setIsWakeLockActive(false);
-        });
-      } catch (error) {
-        console.error(error);
-        wakeLockRef.current = null;
         setIsWakeLockActive(false);
+      });
+    } catch (error) {
+      console.error(error);
+      wakeLockRef.current = null;
+      setIsWakeLockActive(false);
+    }
+  }, [props.disabled, releaseWakeLock]);
+
+  useEffect(() => {
+    if (!props.disabled) {
+      return;
+    }
+
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    releaseWakeLock().catch(console.error);
+  }, [props.disabled, releaseWakeLock]);
+
+  useEffect(() => {
+    if (props.disabled) {
+      return;
+    }
+
+    // Try once on load so kiosk/photo-frame sessions wake-lock automatically
+    // where browsers permit non-gesture acquisition.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    tryAcquireWakeLock().catch(console.error);
+  }, [props.disabled, tryAcquireWakeLock]);
+
+  useEffect(() => {
+    const syncWakeLockState = () => {
+      if (document.visibilityState !== "visible") {
+        setIsWakeLockActive(false);
+        return;
+      }
+
+      if (!props.disabled) {
+        tryAcquireWakeLock().catch(console.error);
       }
     };
 
-    requestWakeLock().catch(console.error);
-    document.addEventListener("visibilitychange", requestWakeLock);
-
+    document.addEventListener("visibilitychange", syncWakeLockState);
     return () => {
-      cancelled = true;
-      document.removeEventListener("visibilitychange", requestWakeLock);
-      const sentinel = wakeLockRef.current;
-      wakeLockRef.current = null;
-      setIsWakeLockActive(false);
-      sentinel?.release().catch(console.error);
+      document.removeEventListener("visibilitychange", syncWakeLockState);
     };
-  }, [keepAwake, props.disabled]);
+  }, [props.disabled, tryAcquireWakeLock]);
+
+  useEffect(() => {
+    return () => {
+      releaseWakeLock().catch(console.error);
+    };
+  }, [releaseWakeLock]);
 
   const handleFullscreenToggle = useCallback(async () => {
     const fullscreenDocument = document as FullscreenDocument;
@@ -1299,9 +1328,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
         return;
       }
 
-      if (event.pointerType === "mouse") {
-        event.currentTarget.setPointerCapture(event.pointerId);
-      }
+      event.currentTarget.setPointerCapture(event.pointerId);
       pointerGestureRef.current = {
         pointerId: event.pointerId,
         pointerType: event.pointerType,
@@ -1523,6 +1550,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
   useEffect(() => {
     if (!activePhotoSrc) {
       activePhotoSrcRef.current = null;
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setPreviousPhotoSrc(null);
       return;
     }
@@ -2043,22 +2071,32 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
                 </button>
               ) : null}
 
+              <div className={commonStyles.toast} role="status" aria-live="polite">
+                {isWakeLockSupported
+                  ? isWakeLockActive
+                    ? "Wake lock on"
+                    : "Wake lock off"
+                  : "Wake lock unsupported"}
+              </div>
+
               <button
                 className={[
-                  keepAwake && isWakeLockActive ? commonStyles.active : "",
+                  isWakeLockActive ? commonStyles.active : "",
                   commonStyles.button,
                 ].join(" ")}
                 disabled={!isWakeLockSupported}
                 aria-disabled={!isWakeLockSupported}
-                aria-pressed={keepAwake && isWakeLockActive}
+                aria-pressed={isWakeLockActive}
                 title={
                   isWakeLockSupported
-                    ? "Keep the screen awake while the slideshow is open"
+                    ? "Try to acquire a wake lock for this slideshow session"
                     : "Screen wake lock is not available in this browser"
                 }
-                onClick={() => setKeepAwake(!keepAwake)}
+                onClick={() => {
+                  tryAcquireWakeLock().catch(console.error);
+                }}
               >
-                {keepAwake ? "Awake" : "Sleep ok"}
+                {isWakeLockActive ? "Wake lock active" : "Try awake lock"}
               </button>
             </div>
           </div>
@@ -2226,7 +2264,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
           ].join(" ")}
           src={photoBlock.data.src}
           alt={photoAltText}
-          style={{ touchAction: controlsVisible ? "auto" : "manipulation" }}
+          style={{ touchAction: "none" }}
           onLoad={() => {
             setImageLoaded(true);
             window.setTimeout(() => {

@@ -26,6 +26,7 @@ export const PhotoSimilarPhotos: React.FC<{
   const [isLoadingResults, setIsLoadingResults] = React.useState(false);
 
   React.useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setResults([]);
     setError(null);
     setOffset(0);
@@ -38,6 +39,7 @@ export const PhotoSimilarPhotos: React.FC<{
     }
 
     let isCancelled = false;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setIsLoadingResults(true);
     setError(null);
 

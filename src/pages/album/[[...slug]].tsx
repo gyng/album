@@ -27,6 +27,7 @@ const Album: NextPage<PageProps> = ({ album }) => {
   // Have a stateful album for potential future state management
   const [statefulAlbum, setStatefulAlbum] = React.useState(album);
   React.useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setStatefulAlbum(album);
   }, [album]);
 

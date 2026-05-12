@@ -65,6 +65,7 @@ const WorldMap: NextPage<PageProps> = (props) => {
   // Sync from URL on navigation (back/forward)
   React.useEffect(() => {
     if (urlFrom !== null && urlTo !== null) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setTimeRange({ fromMs: urlFrom, toMs: urlTo });
       setShowTimeRangeSlider(true);
     } else {
