@@ -2137,14 +2137,8 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
     },
   };
 
-  const exifDate = currentPhotoPath.exif
-    ? extractDateFromExifString(currentPhotoPath.exif)
-    : null;
-  const relativeDate = exifDate ? getRelativeTimeString(exifDate) : null;
-
   const photoAltText = getPhotoAltText(photoBlock, "Slideshow photo");
 
-  // Keep geocoded location for display purposes (country/region name)
   const extractGeocodeLabel = (geocode: string): string | null =>
     geocode
       ? geocode
@@ -2153,11 +2147,10 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
           .filter((x) => Number.isNaN(parseFloat(x)))
           .join(", ") || null
       : null;
-  const geocodeCountry = extractGeocodeLabel(currentPhotoPath?.geocode ?? "");
 
   // Per-photo metadata for the whole slide (seed + any remix companions).
-  // Used to render aggregate captions and to plot every photo on the map
-  // overlay when a remix is active.
+  // Each photo gets its own description block rendered in the slide-bottom
+  // row, so the same component scales from 1 to N cells without aggregation.
   const slidePhotos = [currentPhotoPath, ...remixCompanions];
   const slidePhotoMeta = slidePhotos.map((photo) => ({
     path: photo.path,
@@ -2166,92 +2159,33 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
     coords: extractGPSFromExifString(photo.exif),
   }));
 
-  // Aggregate geocode labels across the slide. If everyone is in the same
-  // place, just show it once; otherwise comma-separate (capped) so the row
-  // stays readable.
-  const aggregateGeocode = (() => {
-    const labels = slidePhotoMeta
-      .map((m) => m.geocode)
-      .filter((g): g is string => !!g);
-    const unique = Array.from(new Set(labels));
-    if (unique.length === 0) return null;
-    if (unique.length === 1) return unique[0];
-    // Remix is capped at 3-up, so listing every unique location stays
-    // readable. Truncation only kicks in if we ever pair more than 3.
-    if (unique.length <= 3) return unique.join(" + ");
-    return `${unique.slice(0, 2).join(" + ")} +${unique.length - 2} more`;
-  })();
+  // Single description block for one photo (map + geocode/date rows + clock).
+  // Used identically in single-image mode (rendered once, centred) and in
+  // remix mode (rendered once per photo, each centred in its column) so the
+  // visual rhythm is the same regardless of cell count.
+  const detailsElement = (
+    isMapHack: boolean,
+    _photo: RandomPhotoRow,
+    meta: (typeof slidePhotoMeta)[number],
+  ) => {
+    const photoDate = meta.date;
+    const photoGeocode = meta.geocode;
+    const photoCoords = meta.coords;
+    const photoRelative = photoDate ? getRelativeTimeString(photoDate) : null;
 
-  // For anniversary remixes the years are the interesting axis — show them
-  // explicitly. For other strategies just show the seed's date in long form
-  // (or for same-year remixes, show all years if they vary by year).
-  const aggregateDateRow = (() => {
-    if (!exifDate) return null;
-
-    const dates = slidePhotoMeta
-      .map((m) => m.date)
-      .filter((d): d is Date => !!d);
-    if (dates.length === 0) return null;
-
-    const formatLong = (d: Date) =>
-      d.toLocaleDateString(undefined, { year: "numeric", month: "long" });
-    const uniqueLongDates = Array.from(new Set(dates.map(formatLong)));
-
-    // Anniversary remix: emphasise the calendar day shared by all photos
-    // and list the years.
-    if (remixStrategy === "anniversary") {
-      const years = Array.from(
-        new Set(dates.map((d) => d.getFullYear())),
-      ).sort();
-      if (years.length > 1) {
-        const calendarDay = exifDate.toLocaleDateString(undefined, {
-          month: "long",
-          day: "numeric",
-        });
-        return `${calendarDay} · ${years.join(", ")}`;
-      }
-    }
-
-    // Single unique date — include "3 years ago" prefix.
-    if (uniqueLongDates.length === 1) {
-      return `${relativeDate ?? ""}${relativeDate ? " · " : ""}${uniqueLongDates[0]}`;
-    }
-
-    // 2-up or 3-up with differing dates: list them all rather than truncate.
-    // Remix is capped at 3-up so this is at most three dates.
-    if (uniqueLongDates.length <= 3) {
-      return uniqueLongDates.join(" + ");
-    }
-
-    // Safety net if we ever raise the remix cap.
-    return `${uniqueLongDates.slice(0, 2).join(" + ")} +${uniqueLongDates.length - 2} more`;
-  })();
-
-  const isRemix = remixCompanions.length > 0;
-
-  const detailsElement = (isMapHack: boolean) => (
-    <>
-      {isMapHack ? (
-        <div
-          className={[
-            styles.mapContainer,
-            styles.displaySetting,
-            showMap ? styles.displaySettingActive : "",
-          ].join(" ")}
-        >
-          {(() => {
-            // Collect every photo's coords for the slide (seed + companions).
-            // The map auto-fits to all of them when there's more than one,
-            // so a remix that spans regions still tells the visual truth.
-            const allCoords = slidePhotoMeta
-              .map((m) => m.coords)
-              .filter((c): c is [number, number] => !!c);
-            if (allCoords.length === 0) {
-              return <div className={styles.mapContainer}>&nbsp;</div>;
-            }
-            return (
+    return (
+      <>
+        {isMapHack ? (
+          <div
+            className={[
+              styles.mapContainer,
+              styles.displaySetting,
+              showMap ? styles.displaySettingActive : "",
+            ].join(" ")}
+          >
+            {photoCoords ? (
               <MMap
-                coordinates={allCoords.length === 1 ? allCoords[0] : allCoords}
+                coordinates={photoCoords}
                 attribution={false}
                 details={false}
                 style={{ width: "100%", height: "100%" }}
@@ -2259,102 +2193,75 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
                 projection="vertical-perspective"
                 markerStyle={{ visibility: "hidden" }}
               />
-            );
-          })()}
-        </div>
-      ) : null}
-
-      <div
-        className={[
-          styles.details,
-          styles.displaySetting,
-          showDetails ? styles.displaySettingActive : "",
-          isMapHack ? styles.hide : "",
-        ].join(" ")}
-      >
-        {/* On remix slides the per-cell captions inside the grid carry each
-            photo's location + date, so the centred aggregate rows would be
-            doubly-rendered information. Hide them and let the per-cell
-            captions do the work. The remix strategy badge row below still
-            renders — it's slide-level context that has no per-cell home. */}
-        {!isRemix && (aggregateGeocode ?? geocodeCountry) ? (
-          <div className={styles.detailsRow}>
-            {aggregateGeocode ?? geocodeCountry}
-          </div>
-        ) : !isRemix ? (
-          <div className={styles.detailsRow}>&nbsp;</div>
-        ) : null}
-
-        {!isRemix && aggregateDateRow ? (
-          <div className={styles.detailsRow}>{aggregateDateRow}</div>
-        ) : !isRemix ? (
-          <div className={styles.detailsRow}>&nbsp;</div>
-        ) : null}
-
-        {/* Time-affinity is per-photo; for a remix slide the strategy label
-            already explains the grouping, so we hide the seed-only score
-            to avoid implying it applies to the whole layout. */}
-        {timeAware && exifDate && !isRemix ? (
-          <div className={[styles.detailsRow, styles.detailsAffinity].join(" ")}>
-            🌅 {Math.round(getTimeAffinityScore(exifDate) * 100)}% match to
-            this hour & season
+            ) : (
+              <div className={styles.mapContainer}>&nbsp;</div>
+            )}
           </div>
         ) : null}
 
-        {remixCompanions.length > 0 ? (() => {
-          const totalPhotos = remixCompanions.length + 1;
-          const source: Record<RemixStrategy, string> = {
-            "same-album": "from this album",
-            "same-year": "from the same year",
-            "same-decade": "from the same decade",
-            "same-region": "from the same place",
-            "same-time-of-day": "shot around the same hour",
-            anniversary: "from this week, other years",
-            proximity: "shot nearby",
-            "golden-hour": "shot at golden hour",
-            juxtapose: "deliberately juxtaposed",
-            similar: "visually similar",
-            random: "picked at random",
-          };
-          const label = remixStrategy
-            ? source[remixStrategy]
-            : "picked at random";
-          return (
+        <div
+          className={[
+            styles.details,
+            styles.displaySetting,
+            showDetails ? styles.displaySettingActive : "",
+            isMapHack ? styles.hide : "",
+          ].join(" ")}
+        >
+          {photoGeocode ? (
+            <div className={styles.detailsRow}>{photoGeocode}</div>
+          ) : (
+            <div className={styles.detailsRow}>&nbsp;</div>
+          )}
+
+          {photoDate ? (
+            <div className={styles.detailsRow}>
+              {photoRelative ? `${photoRelative} · ` : ""}
+              {photoDate.toLocaleDateString(undefined, {
+                year: "numeric",
+                month: "long",
+              })}
+            </div>
+          ) : (
+            <div className={styles.detailsRow}>&nbsp;</div>
+          )}
+
+          {timeAware && photoDate ? (
             <div
               className={[styles.detailsRow, styles.detailsAffinity].join(" ")}
             >
-              ◫ Remix · {totalPhotos} photos {label}
+              🌅 {Math.round(getTimeAffinityScore(photoDate) * 100)}% match to
+              this hour & season
             </div>
-          );
-        })() : null}
-      </div>
+          ) : null}
+        </div>
 
-      <div
-        className={[
-          styles.clock,
-          styles.displaySetting,
-          showClock ? styles.displaySettingActive : "",
-          isMapHack ? styles.hide : "",
-        ].join(" ")}
-      >
-        <div className={styles.time}>
-          {time.toLocaleTimeString(undefined, {
-            hour: "numeric",
-            minute: "numeric",
-            hour12: false,
-          })}
+        <div
+          className={[
+            styles.clock,
+            styles.displaySetting,
+            showClock ? styles.displaySettingActive : "",
+            isMapHack ? styles.hide : "",
+          ].join(" ")}
+        >
+          <div className={styles.time}>
+            {time.toLocaleTimeString(undefined, {
+              hour: "numeric",
+              minute: "numeric",
+              hour12: false,
+            })}
+          </div>
+          <div className={styles.date}>
+            {time.toLocaleDateString(undefined, {
+              weekday: "long",
+              year: "numeric",
+              month: "long",
+              day: "numeric",
+            })}
+          </div>
         </div>
-        <div className={styles.date}>
-          {time.toLocaleDateString(undefined, {
-            weekday: "long",
-            year: "numeric",
-            month: "long",
-            day: "numeric",
-          })}
-        </div>
-      </div>
-    </>
-  );
+      </>
+    );
+  };
 
   return (
     <>
@@ -2957,27 +2864,47 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
         context because the drop shadows disappear when mix-blend-mode is applied.
         */}
         <>
-          <div
-            className={[
-              styles.bottomBar,
-              styles[
-                `align${detailsAlignment.charAt(0).toUpperCase() + detailsAlignment.slice(1)}`
-              ],
-            ].join(" ")}
-            style={{ mixBlendMode: "screen" }}
-          >
-            {detailsElement(true)}
-          </div>
-          <div
-            className={[
-              styles.bottomBar,
-              styles[
-                `align${detailsAlignment.charAt(0).toUpperCase() + detailsAlignment.slice(1)}`
-              ],
-            ].join(" ")}
-          >
-            {detailsElement(false)}
-          </div>
+          {slidePhotos.map((photo, idx) => {
+            const meta = slidePhotoMeta[idx];
+            const total = slidePhotos.length;
+            // Single image stays in its existing alignLeft/Center/Right slot
+            // controlled by the user's detailsAlignment toggle. Multi-photo
+            // (remix) splits the screen into N equal columns and centres each
+            // description block in its own column, so the rhythm matches the
+            // photo grid above it.
+            const useColumnLayout = total > 1;
+            const alignClass = useColumnLayout
+              ? styles.alignCenter
+              : styles[
+                  `align${detailsAlignment.charAt(0).toUpperCase() + detailsAlignment.slice(1)}`
+                ];
+            const columnLeft = useColumnLayout
+              ? `${((idx + 0.5) / total) * 100}%`
+              : undefined;
+            const columnStyle: React.CSSProperties = useColumnLayout
+              ? { left: columnLeft, transform: "translateX(-50%)" }
+              : {};
+
+            return (
+              <React.Fragment key={`${photo.path}-${idx}`}>
+                {/* Double-render keeps the map's drop shadows from being
+                    swallowed by mix-blend-mode while still allowing the
+                    map below to "screen" against the photo. */}
+                <div
+                  className={[styles.bottomBar, alignClass].join(" ")}
+                  style={{ ...columnStyle, mixBlendMode: "screen" }}
+                >
+                  {detailsElement(true, photo, meta)}
+                </div>
+                <div
+                  className={[styles.bottomBar, alignClass].join(" ")}
+                  style={columnStyle}
+                >
+                  {detailsElement(false, photo, meta)}
+                </div>
+              </React.Fragment>
+            );
+          })}
         </>
 
         {previousPhotoSrc ? (
@@ -3011,20 +2938,13 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
               advanceToNextPhoto();
             }}
           >
-            {slidePhotoMeta.map((meta, idx) => {
+            {slidePhotoMeta.map((_meta, idx) => {
               const photo = slidePhotos[idx];
               const isSeed = idx === 0;
               const src = isSeed
                 ? photoBlock.data.src
                 : getSlideshowPhotoSrc(photo);
               if (!src) return null;
-
-              const dateLabel = meta.date
-                ? meta.date.toLocaleDateString(undefined, {
-                    year: "numeric",
-                    month: "short",
-                  })
-                : null;
 
               return (
                 <div key={photo.path} className={styles.remixCell}>
@@ -3058,20 +2978,9 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
                         : undefined
                     }
                   />
-                  {showDetails && (meta.geocode || dateLabel) ? (
-                    <div className={styles.remixCellCaption}>
-                      {meta.geocode ? (
-                        <div className={styles.detailsRow}>{meta.geocode}</div>
-                      ) : (
-                        <div className={styles.detailsRow}>&nbsp;</div>
-                      )}
-                      {dateLabel ? (
-                        <div className={styles.detailsRow}>{dateLabel}</div>
-                      ) : (
-                        <div className={styles.detailsRow}>&nbsp;</div>
-                      )}
-                    </div>
-                  ) : null}
+                  {/* per-cell description is now rendered as a bottomBar
+                      column further down — same component as the single-
+                      image case, just one per cell. */}
                 </div>
               );
             })}
