@@ -1211,16 +1211,6 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
     showHistoryPhoto(historyIndexRef.current - 1);
   }, [showHistoryPhoto]);
 
-  const goRandom = useCallback(() => {
-    if (!database) {
-      return;
-    }
-
-    resetSimilarQueue();
-    setSlideshowModeAndUrl("random");
-    advanceRandomPhoto();
-  }, [advanceRandomPhoto, database, resetSimilarQueue, setSlideshowModeAndUrl]);
-
   const getUpcomingPhoto = useCallback((): RandomPhotoRow | null => {
     if (historyIndexRef.current < navigationHistoryRef.current.length - 1) {
       return (
@@ -2527,16 +2517,6 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
               </button>
 
               <span className={styles.playbackDivider} aria-hidden="true" />
-
-              <button
-                className={commonStyles.button}
-                onClick={() => {
-                  goRandom();
-                }}
-                title="Pick a fresh random photo, regardless of mode"
-              >
-                🎲 Surprise
-              </button>
 
               <button
                 className={commonStyles.button}

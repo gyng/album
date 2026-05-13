@@ -684,7 +684,7 @@
 .controlGroup {
   display: inline-flex;
   align-items: center;
-  gap: var(--m-m);
+  gap: var(--m-s);
   padding: var(--m-s);
   border-radius: calc(var(--m-s) * 1.5);
   background: hsl(0 0% 8% / 0.72);
@@ -698,8 +698,9 @@
   display: inline-flex;
   align-items: center;
   gap: var(--m-s);
-  min-width: 10rem;
-  padding: 0 var(--m-s);
+  /* min-width removed — header used to reserve 10rem regardless of label
+     width, which left a large gap between the title and the first button. */
+  padding: 0 calc(var(--m-s) * 0.5);
 }
 
 .controlLogo {
