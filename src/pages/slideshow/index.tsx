@@ -2867,22 +2867,27 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
           {slidePhotos.map((photo, idx) => {
             const meta = slidePhotoMeta[idx];
             const total = slidePhotos.length;
-            // Single image stays in its existing alignLeft/Center/Right slot
-            // controlled by the user's detailsAlignment toggle. Multi-photo
-            // (remix) splits the screen into N equal columns and centres each
-            // description block in its own column, so the rhythm matches the
-            // photo grid above it.
+            // Single image (N=1) uses the existing alignLeft/Center/Right
+            // class controlled by the user's detailsAlignment toggle.
+            // Multi-photo (remix) splits the screen into N equal columns and
+            // pins each description to its column's centre via the bottomBarColumn
+            // class — that class deliberately AVOIDS the !important rules on
+            // .alignCenter / .alignLeft / .alignRight, so inline `left` and
+            // `transform` can position each instance per column.
             const useColumnLayout = total > 1;
             const alignClass = useColumnLayout
-              ? styles.alignCenter
+              ? styles.bottomBarColumn
               : styles[
                   `align${detailsAlignment.charAt(0).toUpperCase() + detailsAlignment.slice(1)}`
                 ];
-            const columnLeft = useColumnLayout
-              ? `${((idx + 0.5) / total) * 100}%`
-              : undefined;
             const columnStyle: React.CSSProperties = useColumnLayout
-              ? { left: columnLeft, transform: "translateX(-50%)" }
+              ? {
+                  left: `${((idx + 0.5) / total) * 100}%`,
+                  right: "auto",
+                  transform: "translateX(-50%)",
+                  width: `${100 / total}%`,
+                  maxWidth: `${100 / total}vw`,
+                }
               : {};
 
             return (

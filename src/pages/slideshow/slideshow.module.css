@@ -66,9 +66,15 @@
   min-height: 0;
 }
 
-/* Per-cell description is now rendered as a column-positioned .bottomBar
-   instance — same component as the single-image case, just one per cell.
-   The .remixCellCaption class is no longer used. */
+/* Column-positioned bottomBar variant used when the slide has more than
+   one photo. Deliberately omits the `!important` left/right/transform
+   declarations that .alignLeft/.alignCenter/.alignRight carry, so inline
+   `left` and `transform` can place each instance over its photo column. */
+.bottomBarColumn {
+  /* Empty placeholder — presence of the class signals "do not apply the
+     align* overrides". Actual position is set via inline style by the
+     slideshow renderer. */
+}
 
 .previousImageHidden {
   opacity: 0;
