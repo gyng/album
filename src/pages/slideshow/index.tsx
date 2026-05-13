@@ -2864,52 +2864,66 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
         context because the drop shadows disappear when mix-blend-mode is applied.
         */}
         <>
-          {slidePhotos.map((photo, idx) => {
-            const meta = slidePhotoMeta[idx];
-            const total = slidePhotos.length;
-            // Single image (N=1) uses the existing alignLeft/Center/Right
-            // class controlled by the user's detailsAlignment toggle.
-            // Multi-photo (remix) splits the screen into N equal columns and
-            // pins each description to its column's centre via the bottomBarColumn
-            // class — that class deliberately AVOIDS the !important rules on
-            // .alignCenter / .alignLeft / .alignRight, so inline `left` and
-            // `transform` can position each instance per column.
-            const useColumnLayout = total > 1;
-            const alignClass = useColumnLayout
-              ? styles.bottomBarColumn
-              : styles[
-                  `align${detailsAlignment.charAt(0).toUpperCase() + detailsAlignment.slice(1)}`
-                ];
-            const columnStyle: React.CSSProperties = useColumnLayout
-              ? {
-                  left: `${((idx + 0.5) / total) * 100}%`,
-                  right: "auto",
-                  transform: "translateX(-50%)",
-                  width: `${100 / total}%`,
-                  maxWidth: `${100 / total}vw`,
-                }
-              : {};
-
-            return (
-              <React.Fragment key={`${photo.path}-${idx}`}>
-                {/* Double-render keeps the map's drop shadows from being
-                    swallowed by mix-blend-mode while still allowing the
-                    map below to "screen" against the photo. */}
-                <div
-                  className={[styles.bottomBar, alignClass].join(" ")}
-                  style={{ ...columnStyle, mixBlendMode: "screen" }}
-                >
-                  {detailsElement(true, photo, meta)}
-                </div>
-                <div
-                  className={[styles.bottomBar, alignClass].join(" ")}
-                  style={columnStyle}
-                >
-                  {detailsElement(false, photo, meta)}
-                </div>
-              </React.Fragment>
-            );
-          })}
+          {slidePhotos.length === 1 ? (
+            // Single image: existing fixed-position bottomBar with the
+            // user's detailsAlignment (left / center / right) applied.
+            <>
+              <div
+                className={[
+                  styles.bottomBar,
+                  styles[
+                    `align${detailsAlignment.charAt(0).toUpperCase() + detailsAlignment.slice(1)}`
+                  ],
+                ].join(" ")}
+                style={{ mixBlendMode: "screen" }}
+              >
+                {detailsElement(true, currentPhotoPath, slidePhotoMeta[0])}
+              </div>
+              <div
+                className={[
+                  styles.bottomBar,
+                  styles[
+                    `align${detailsAlignment.charAt(0).toUpperCase() + detailsAlignment.slice(1)}`
+                  ],
+                ].join(" ")}
+              >
+                {detailsElement(false, currentPhotoPath, slidePhotoMeta[0])}
+              </div>
+            </>
+          ) : (
+            // Remix: a fixed-position grid row at the bottom of the viewport
+            // with N equal columns. Each cell places its two dual-render
+            // bottomBars in the same grid-area so they overlay (for the
+            // mix-blend-mode hack) while sitting bottom-aligned and
+            // horizontally centred inside their column. No transforms — the
+            // browser's grid alignment does the centering.
+            <div
+              className={styles.bottomBarRow}
+              data-count={slidePhotos.length}
+            >
+              {slidePhotos.map((photo, idx) => {
+                const meta = slidePhotoMeta[idx];
+                return (
+                  <div
+                    key={`${photo.path}-${idx}`}
+                    className={styles.bottomBarCell}
+                  >
+                    <div
+                      className={[styles.bottomBar, styles.bottomBarColumn].join(" ")}
+                      style={{ mixBlendMode: "screen" }}
+                    >
+                      {detailsElement(true, photo, meta)}
+                    </div>
+                    <div
+                      className={[styles.bottomBar, styles.bottomBarColumn].join(" ")}
+                    >
+                      {detailsElement(false, photo, meta)}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </>
 
         {previousPhotoSrc ? (

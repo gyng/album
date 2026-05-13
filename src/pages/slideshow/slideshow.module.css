@@ -66,14 +66,57 @@
   min-height: 0;
 }
 
-/* Column-positioned bottomBar variant used when the slide has more than
-   one photo. Deliberately omits the `!important` left/right/transform
-   declarations that .alignLeft/.alignCenter/.alignRight carry, so inline
-   `left` and `transform` can place each instance over its photo column. */
+/* Multi-photo description row. Sits at the same vertical position as the
+   single-image .bottomBar and lays out N equal columns across the viewport
+   width using CSS grid. Each cell uses place-items: end center so its
+   bottombar sits at the cell bottom, horizontally centred — no transforms
+   needed. */
+.bottomBarRow {
+  position: fixed;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 5vh);
+  left: 0;
+  right: 0;
+  z-index: 200;
+  display: grid;
+  align-items: end;
+  pointer-events: none;
+}
+
+.bottomBarRow[data-count="2"] {
+  grid-template-columns: 1fr 1fr;
+}
+
+.bottomBarRow[data-count="3"] {
+  grid-template-columns: 1fr 1fr 1fr;
+}
+
+/* Each cell is itself a grid with a single named area so the two dual-
+   render bottombars (one with mix-blend-mode for the map, one without
+   for the text) overlay rather than stack vertically. */
+.bottomBarCell {
+  display: grid;
+  grid-template-areas: "stack";
+  justify-items: center;
+  align-items: end;
+  min-width: 0;
+}
+
+.bottomBarCell > .bottomBarColumn {
+  grid-area: stack;
+}
+
+/* Column variant of .bottomBar: drops the fixed positioning and the
+   default centre transform so the parent grid cell controls layout.
+   Keeps the visual styling (text-shadow, colour, etc.) inherited from
+   .bottomBar. */
 .bottomBarColumn {
-  /* Empty placeholder — presence of the class signals "do not apply the
-     align* overrides". Actual position is set via inline style by the
-     slideshow renderer. */
+  position: static;
+  left: auto;
+  right: auto;
+  bottom: auto;
+  transform: none;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .previousImageHidden {
