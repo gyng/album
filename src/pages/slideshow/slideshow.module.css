@@ -116,8 +116,34 @@
   right: auto;
   bottom: auto;
   transform: none;
+  /* Fill the grid cell horizontally so each column's content has a
+     predictable width and can't bleed into a neighbouring column. */
   min-width: 0;
+  width: 100%;
   max-width: 100%;
+  box-sizing: border-box;
+  padding: 0 var(--m-s);
+}
+
+/* Scale the clock down in column mode — the fs-xl 64px clock that works
+   for one viewport-wide bar is overkill when there are 2-3 side by side
+   and would visually crowd the cells. */
+.bottomBarColumn .time {
+  font-size: var(--fs-l);
+}
+
+.bottomBarColumn .date {
+  font-size: var(--fs-sm);
+}
+
+/* The map's aspect-ratio 1/1 derives width from its container. In column
+   mode constrain it to a fixed compact size so it doesn't grow to fill the
+   full cell width (which on a wide viewport would be a huge map). */
+.bottomBarColumn .mapContainer {
+  width: 6rem;
+  max-width: 100%;
+  margin-left: auto;
+  margin-right: auto;
 }
 
 .previousImageHidden {
