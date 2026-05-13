@@ -2159,88 +2159,116 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
     coords: extractGPSFromExifString(photo.exif),
   }));
 
-  // Single description block for one photo (map + geocode/date rows + clock).
-  // Used identically in single-image mode (rendered once, centred) and in
-  // remix mode (rendered once per photo, each centred in its column) so the
-  // visual rhythm is the same regardless of cell count.
-  const detailsElement = (
-    isMapHack: boolean,
-    _photo: RandomPhotoRow,
+  // Per-photo description: just the geocode + date + (optionally) the
+  // time-affinity row. No chrome (map / clock / strategy badge) — those
+  // are slide-level and rendered once below.
+  const renderPhotoDescription = (
     meta: (typeof slidePhotoMeta)[number],
   ) => {
     const photoDate = meta.date;
     const photoGeocode = meta.geocode;
-    const photoCoords = meta.coords;
     const photoRelative = photoDate ? getRelativeTimeString(photoDate) : null;
 
     return (
+      <div
+        className={[
+          styles.details,
+          styles.displaySetting,
+          showDetails ? styles.displaySettingActive : "",
+        ].join(" ")}
+      >
+        {photoGeocode ? (
+          <div className={styles.detailsRow}>{photoGeocode}</div>
+        ) : (
+          <div className={styles.detailsRow}>&nbsp;</div>
+        )}
+
+        {photoDate ? (
+          <div className={styles.detailsRow}>
+            {photoRelative ? `${photoRelative} · ` : ""}
+            {photoDate.toLocaleDateString(undefined, {
+              year: "numeric",
+              month: "long",
+            })}
+          </div>
+        ) : (
+          <div className={styles.detailsRow}>&nbsp;</div>
+        )}
+
+        {timeAware && photoDate ? (
+          <div
+            className={[styles.detailsRow, styles.detailsAffinity].join(" ")}
+          >
+            🌅 {Math.round(getTimeAffinityScore(photoDate) * 100)}% match
+          </div>
+        ) : null}
+      </div>
+    );
+  };
+
+  // Slide-level chrome: ONE map (showing every slide photo as a marker),
+  // ONE clock, ONE remix strategy badge. Rendered once regardless of the
+  // remix cell count — that's what keeps the clock from layout-shifting
+  // when going from single to remix. mix-blend-mode is applied only to
+  // the map wrapper here, so the clock and badge text-shadows are never
+  // affected (no dual-render hack needed).
+  const renderSlideChrome = () => {
+    const allCoords = slidePhotoMeta
+      .map((m) => m.coords)
+      .filter((c): c is [number, number] => !!c);
+
+    const remixStrategyLabel: Record<RemixStrategy, string> = {
+      "same-album": "from this album",
+      "same-year": "from the same year",
+      "same-decade": "from the same decade",
+      "same-region": "from the same place",
+      "same-time-of-day": "shot around the same hour",
+      anniversary: "from this week, other years",
+      proximity: "shot nearby",
+      "golden-hour": "shot at golden hour",
+      juxtapose: "deliberately juxtaposed",
+      similar: "visually similar",
+      random: "picked at random",
+    };
+    const isRemix = remixCompanions.length > 0;
+
+    return (
       <>
-        {isMapHack ? (
+        {allCoords.length > 0 ? (
           <div
             className={[
               styles.mapContainer,
               styles.displaySetting,
               showMap ? styles.displaySettingActive : "",
             ].join(" ")}
+            style={{ mixBlendMode: "screen" }}
           >
-            {photoCoords ? (
-              <MMap
-                coordinates={photoCoords}
-                attribution={false}
-                details={false}
-                style={{ width: "100%", height: "100%" }}
-                mapStyle="toner-v2"
-                projection="vertical-perspective"
-                markerStyle={{ visibility: "hidden" }}
-              />
-            ) : (
-              <div className={styles.mapContainer}>&nbsp;</div>
-            )}
+            <MMap
+              coordinates={allCoords.length === 1 ? allCoords[0] : allCoords}
+              attribution={false}
+              details={false}
+              style={{ width: "100%", height: "100%" }}
+              mapStyle="toner-v2"
+              projection="vertical-perspective"
+              markerStyle={{ visibility: "hidden" }}
+            />
           </div>
         ) : null}
 
-        <div
-          className={[
-            styles.details,
-            styles.displaySetting,
-            showDetails ? styles.displaySettingActive : "",
-            isMapHack ? styles.hide : "",
-          ].join(" ")}
-        >
-          {photoGeocode ? (
-            <div className={styles.detailsRow}>{photoGeocode}</div>
-          ) : (
-            <div className={styles.detailsRow}>&nbsp;</div>
-          )}
-
-          {photoDate ? (
-            <div className={styles.detailsRow}>
-              {photoRelative ? `${photoRelative} · ` : ""}
-              {photoDate.toLocaleDateString(undefined, {
-                year: "numeric",
-                month: "long",
-              })}
-            </div>
-          ) : (
-            <div className={styles.detailsRow}>&nbsp;</div>
-          )}
-
-          {timeAware && photoDate ? (
-            <div
-              className={[styles.detailsRow, styles.detailsAffinity].join(" ")}
-            >
-              🌅 {Math.round(getTimeAffinityScore(photoDate) * 100)}% match to
-              this hour & season
-            </div>
-          ) : null}
-        </div>
+        {isRemix && remixStrategy ? (
+          <div
+            className={[styles.detailsRow, styles.detailsAffinity].join(" ")}
+          >
+            ◫ Remix · {slidePhotos.length} photos{" "}
+            {remixStrategyLabel[remixStrategy]}
+          </div>
+        ) : null}
 
         <div
           className={[
             styles.clock,
             styles.displaySetting,
             showClock ? styles.displaySettingActive : "",
-            isMapHack ? styles.hide : "",
           ].join(" ")}
         >
           <div className={styles.time}>
@@ -2863,68 +2891,35 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
         so we render details twice (but hide with visibility: hidden). We need a different
         context because the drop shadows disappear when mix-blend-mode is applied.
         */}
-        <>
-          {slidePhotos.length === 1 ? (
-            // Single image: existing fixed-position bottomBar with the
-            // user's detailsAlignment (left / center / right) applied.
-            <>
+        {/*
+          New layout: one fixed bottom-anchored flex stack.
+          • Per-photo descriptions row on top (1 cell for single, N for remix).
+          • Slide-level chrome (map + clock + remix badge) below.
+          The chrome is rendered once regardless of cell count, so the clock
+          and map don't shift position when going from single to remix.
+          The chrome render is doubled for the mix-blend-mode hack that
+          preserves drop-shadows on the text below.
+        */}
+        <div
+          className={styles.bottomBarStack}
+          data-align={detailsAlignment}
+        >
+          <div
+            className={styles.descriptionRow}
+            data-count={slidePhotos.length}
+          >
+            {slidePhotos.map((photo, idx) => (
               <div
-                className={[
-                  styles.bottomBar,
-                  styles[
-                    `align${detailsAlignment.charAt(0).toUpperCase() + detailsAlignment.slice(1)}`
-                  ],
-                ].join(" ")}
-                style={{ mixBlendMode: "screen" }}
+                key={`${photo.path}-${idx}`}
+                className={styles.descriptionCell}
               >
-                {detailsElement(true, currentPhotoPath, slidePhotoMeta[0])}
+                {renderPhotoDescription(slidePhotoMeta[idx])}
               </div>
-              <div
-                className={[
-                  styles.bottomBar,
-                  styles[
-                    `align${detailsAlignment.charAt(0).toUpperCase() + detailsAlignment.slice(1)}`
-                  ],
-                ].join(" ")}
-              >
-                {detailsElement(false, currentPhotoPath, slidePhotoMeta[0])}
-              </div>
-            </>
-          ) : (
-            // Remix: a fixed-position grid row at the bottom of the viewport
-            // with N equal columns. Each cell places its two dual-render
-            // bottomBars in the same grid-area so they overlay (for the
-            // mix-blend-mode hack) while sitting bottom-aligned and
-            // horizontally centred inside their column. No transforms — the
-            // browser's grid alignment does the centering.
-            <div
-              className={styles.bottomBarRow}
-              data-count={slidePhotos.length}
-            >
-              {slidePhotos.map((photo, idx) => {
-                const meta = slidePhotoMeta[idx];
-                return (
-                  <div
-                    key={`${photo.path}-${idx}`}
-                    className={styles.bottomBarCell}
-                  >
-                    <div
-                      className={[styles.bottomBar, styles.bottomBarColumn].join(" ")}
-                      style={{ mixBlendMode: "screen" }}
-                    >
-                      {detailsElement(true, photo, meta)}
-                    </div>
-                    <div
-                      className={[styles.bottomBar, styles.bottomBarColumn].join(" ")}
-                    >
-                      {detailsElement(false, photo, meta)}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </>
+            ))}
+          </div>
+
+          <div className={styles.slideChrome}>{renderSlideChrome()}</div>
+        </div>
 
         {previousPhotoSrc ? (
           <img

@@ -66,84 +66,77 @@
   min-height: 0;
 }
 
-/* Multi-photo description row. Sits at the same vertical position as the
-   single-image .bottomBar and lays out N equal columns across the viewport
-   width using CSS grid. Each cell uses place-items: end center so its
-   bottombar sits at the cell bottom, horizontally centred — no transforms
-   needed. */
-.bottomBarRow {
+/* Fixed bottom-anchored stack that holds the per-photo descriptions row
+   on top and the slide-level chrome (map / clock / remix badge) at the
+   bottom. The chrome's vertical position never depends on cell count, so
+   transitioning from single → remix or back doesn't shift the clock. */
+.bottomBarStack {
   position: fixed;
   bottom: calc(env(safe-area-inset-bottom, 0px) + 5vh);
   left: 0;
   right: 0;
   z-index: 200;
-  display: grid;
-  align-items: end;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   pointer-events: none;
+  text-shadow:
+    1px 2px 2px hsl(0 0% 0% / 0.333),
+    2px 4px 4px hsl(0 0% 0% / 0.333),
+    3px 6px 6px hsl(0 0% 0% / 0.333);
+  color: white;
 }
 
-.bottomBarRow[data-count="2"] {
+.descriptionRow {
+  display: grid;
+  width: 100%;
+  align-items: end;
+  justify-items: center;
+}
+
+.descriptionRow[data-count="1"] {
+  grid-template-columns: 1fr;
+}
+
+.descriptionRow[data-count="2"] {
   grid-template-columns: 1fr 1fr;
 }
 
-.bottomBarRow[data-count="3"] {
+.descriptionRow[data-count="3"] {
   grid-template-columns: 1fr 1fr 1fr;
 }
 
-/* Each cell is itself a grid with a single named area so the two dual-
-   render bottombars (one with mix-blend-mode for the map, one without
-   for the text) overlay rather than stack vertically. */
-.bottomBarCell {
-  display: grid;
-  grid-template-areas: "stack";
-  justify-items: center;
-  align-items: end;
-  min-width: 0;
+/* Single-image alignment toggle (left / center / right) maps onto how
+   the lone description cell sits inside its 1fr row. Ignored when N > 1
+   because each column already centres its own content. */
+.bottomBarStack[data-align="left"] .descriptionRow[data-count="1"] {
+  justify-items: start;
 }
 
-.bottomBarCell > .bottomBarColumn {
-  grid-area: stack;
+.bottomBarStack[data-align="right"] .descriptionRow[data-count="1"] {
+  justify-items: end;
 }
 
-/* Column variant of .bottomBar: drops the fixed positioning and the
-   default centre transform so the parent grid cell controls layout.
-   Compound selector (.bottomBar.bottomBarColumn) is needed because the
-   base .bottomBar rule appears later in the stylesheet — without the
-   compound the base would win on source order. */
-.bottomBar.bottomBarColumn {
-  position: static;
-  left: auto;
-  right: auto;
-  bottom: auto;
-  transform: none;
-  /* Fill the grid cell horizontally so each column's content has a
-     predictable width and can't bleed into a neighbouring column. */
+.descriptionCell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   min-width: 0;
-  width: 100%;
   max-width: 100%;
-  box-sizing: border-box;
   padding: 0 var(--m-s);
+  box-sizing: border-box;
 }
 
-/* Scale the clock down in column mode — the fs-xl 64px clock that works
-   for one viewport-wide bar is overkill when there are 2-3 side by side
-   and would visually crowd the cells. */
-.bottomBarColumn .time {
-  font-size: var(--fs-l);
-}
-
-.bottomBarColumn .date {
-  font-size: var(--fs-sm);
-}
-
-/* The map's aspect-ratio 1/1 derives width from its container. In column
-   mode constrain it to a fixed compact size so it doesn't grow to fill the
-   full cell width (which on a wide viewport would be a huge map). */
-.bottomBarColumn .mapContainer {
-  width: 6rem;
-  max-width: 100%;
-  margin-left: auto;
-  margin-right: auto;
+/* Slide-level chrome (map + clock + remix badge). Two copies stack in
+   the column so the mix-blend-mode hack keeps text-shadow alive: one
+   instance has mix-blend-mode on the wrapper which makes the map
+   "screen" against the photo, with details/clock hidden via .hide; the
+   other instance shows clock+badge normally with no blending. */
+.slideChrome {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  pointer-events: none;
 }
 
 .previousImageHidden {
@@ -902,9 +895,13 @@
 }
 
 .detailsRow {
-  margin: var(--m-s) 0;
+  /* Auto left/right margins horizontally centre the row inside its parent
+     even when the parent is wider than max-width (which happens in remix
+     column mode — each column can be wider than the 28rem cap). */
+  margin: var(--m-s) auto;
   font-size: var(--fs-s);
   max-width: min(80vw, 28rem);
+  text-align: center;
 }
 
 /* Subtle annotation row — used for "this photo matched because…" style
