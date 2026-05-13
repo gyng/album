@@ -752,8 +752,9 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
       let companions: RandomPhotoRow[] = [];
       let strategy: RemixStrategy | null = null;
       if (opts?.allowRemix && (forceRemixRef.current || remixEnabled)) {
+        const wasForced = forceRemixRef.current;
         let count: 0 | 1 | 2 = 0;
-        if (forceRemixRef.current) {
+        if (wasForced) {
           // User pressed "Remix now"; bypass the dice and pick a layout.
           forceRemixRef.current = false;
           count = Math.random() < 0.7 ? 1 : 2;
@@ -761,11 +762,12 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
           count = decideRemixCompanionCount(REMIX_PROBABILITY);
         }
         if (count > 0) {
-          // 40% of remixes try a vector strategy (SigLIP similar / anti-similar)
-          // when the embeddings DB is loaded — these are the most "artful" pairs.
-          // If the DB isn't loaded yet, kick off a load and fall back to a
-          // sync strategy this round.
-          const wantsVector = Math.random() < 0.4;
+          // 40% of *ambient* remixes try a vector strategy (SigLIP similar /
+          // anti-similar) when the embeddings DB is loaded. User-forced
+          // remixes always take the sync path so the layout appears
+          // immediately — otherwise a "Remix now" press would briefly show
+          // the seed alone while the async vector fetch is in flight.
+          const wantsVector = !wasForced && Math.random() < 0.4;
           const vectorReady = !!(database && embeddingsDatabase);
 
           if (wantsVector && !vectorReady && !enableRemixEmbeddings) {
@@ -2905,27 +2907,56 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
             spans the full width. Single source of truth means the clock
             never moves between single/remix and there's no parallel
             "centered" description block taking layout space. */}
-        <div
-          className={styles.bottomBarStack}
-          data-count={slidePhotos.length}
-          data-align={detailsAlignment}
-        >
-          <div className={styles.slideMap} style={{ gridArea: "map" }}>
-            {renderSlideMap()}
-          </div>
-          {slidePhotos.map((photo, idx) => (
+        {/* Dual-rendered stack. Both copies share the same fixed position
+            and identical layout (every grid-area present) so they overlay
+            pixel-for-pixel. Layer 1 has `mix-blend-mode: screen` on the
+            stack itself — this blend reaches the photo because the stack
+            is a direct child of the slideshow container. Layer 1 shows
+            only the map; other cells have visibility: hidden but still
+            occupy layout so positioning stays in lockstep with Layer 2.
+            Layer 2 has no blending; map cell is visibility:hidden, the
+            text cells are visible. Net result: map blends with the photo,
+            text/clock render with their full text-shadow intact. */}
+        {[true, false].map((isMapLayer) => (
+          <div
+            key={isMapLayer ? "map" : "text"}
+            className={styles.bottomBarStack}
+            data-count={slidePhotos.length}
+            data-align={detailsAlignment}
+            style={isMapLayer ? { mixBlendMode: "screen" } : undefined}
+          >
             <div
-              key={`${photo.path}-${idx}`}
-              className={styles.descriptionCell}
-              style={{ gridArea: `desc${idx}` }}
+              className={styles.slideMap}
+              style={{
+                gridArea: "map",
+                visibility: isMapLayer ? "visible" : "hidden",
+              }}
             >
-              {renderPhotoDescription(slidePhotoMeta[idx])}
+              {renderSlideMap()}
             </div>
-          ))}
-          <div className={styles.slideClock} style={{ gridArea: "clock" }}>
-            {renderSlideClock()}
+            {slidePhotos.map((photo, idx) => (
+              <div
+                key={`${photo.path}-${idx}`}
+                className={styles.descriptionCell}
+                style={{
+                  gridArea: `desc${idx}`,
+                  visibility: isMapLayer ? "hidden" : "visible",
+                }}
+              >
+                {renderPhotoDescription(slidePhotoMeta[idx])}
+              </div>
+            ))}
+            <div
+              className={styles.slideClock}
+              style={{
+                gridArea: "clock",
+                visibility: isMapLayer ? "hidden" : "visible",
+              }}
+            >
+              {renderSlideClock()}
+            </div>
           </div>
-        </div>
+        ))}
 
         {previousPhotoSrc ? (
           <img

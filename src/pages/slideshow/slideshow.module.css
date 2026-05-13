@@ -164,7 +164,7 @@
 }
 
 .slideMap .mapContainer {
-  width: 8rem;
+  width: 11rem;
   max-width: 80vw;
   margin-left: auto;
   margin-right: auto;
@@ -173,6 +173,15 @@
 .slideClock {
   pointer-events: none;
   width: 100%;
+}
+
+/* The remix strategy badge inside .slideClock sits directly below the
+   description row above it; the default .detailsRow vertical margin
+   (var(--m-s) top + bottom) opens a gap that breaks the visual line-
+   height rhythm with the description rows. Tighten the top margin so
+   the badge feels like a continuation of the description block. */
+.slideClock .detailsAffinity {
+  margin-top: 0;
 }
 
 .previousImageHidden {
