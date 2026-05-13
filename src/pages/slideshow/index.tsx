@@ -47,7 +47,15 @@ type SlideshowMode = "random" | "weighted" | "similar";
 const CONTROLS_AUTO_HIDE_MS = 3000;
 const TOUCH_CONTROLS_AUTO_HIDE_MS = 30000;
 const VERSION_POLL_MS = 300000;
-const FALLBACK_RELOAD_MS = 86400000;
+// Backstop hard-reload interval. Was 24h, which was killing the wake lock
+// daily on iPad PWA installs (Safari requires a user gesture to re-acquire).
+// 7 days is the "something is definitely broken if we got here" failsafe.
+// The version-manifest poll handles real build updates without a reload.
+const FALLBACK_RELOAD_MS = 7 * 86400000;
+// How often to HEAD-check the search DB for changes. Cheap (a few hundred
+// bytes per request), so 10 minutes is plenty responsive for a sideboard
+// without being chatty.
+const DB_POLL_MS = 600000;
 const TOUCH_SWIPE_THRESHOLD_PX = 48;
 const TOUCH_SWIPE_HINT_THRESHOLD_PX = TOUCH_SWIPE_THRESHOLD_PX / 2; // start showing hint at half the commit distance
 const TOUCH_PULL_THRESHOLD_PX = 72;
@@ -175,6 +183,15 @@ const SlideshowPage: NextPage<PageProps> = (props) => {
 const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
   const [database, progress] = useDatabase();
   const buildVersionRef = React.useRef<string>(BUILD_VERSION);
+  // Tracks the search DB's Last-Modified / ETag so we can detect a
+  // re-indexed DB without a full page reload. Initialised to null and seeded
+  // by the first successful HEAD response so the *first* poll never triggers
+  // a refresh (otherwise we'd reload on every cold start).
+  const lastDbVersionRef = React.useRef<string | null>(null);
+  // Mirror of the `filter` state used by the DB-update poll, which is
+  // declared *above* the `filter` state — using a ref sidesteps the hoist
+  // ordering without forcing a structural re-shuffle.
+  const filterRef = React.useRef<string | undefined>(undefined);
   const initialPhotoPathRef = React.useRef<string | null>(null);
   const randomSimilarRequestedRef = React.useRef(false);
   const similarSeedPathRef = React.useRef<string | null>(null);
@@ -229,13 +246,106 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
     };
   }, []);
 
-  // Fallback hard reload for long-running kiosk sessions.
+  // Fallback hard reload for long-running kiosk sessions. Guarded by wake
+  // lock state: if the screen is actively kept awake we DON'T reload,
+  // because tearing down the document releases the wake lock and Safari
+  // PWAs require a fresh user gesture to re-acquire — which means a dark
+  // sideboard until someone touches the screen. The version-manifest poll
+  // above handles real build updates; this interval is purely a "something
+  // is broken if we got here" safety net.
   useEffect(() => {
     const id = setInterval(() => {
+      if (wakeLockRef.current) {
+        return;
+      }
       reloadCurrentPage();
     }, FALLBACK_RELOAD_MS);
     return () => clearInterval(id);
   }, []);
+
+  // Periodically HEAD-poll the search DB to notice when it has been
+  // re-indexed without a full page rebuild (e.g. the user updates the photo
+  // pool between deploys). On change, refresh the photo pool in place if
+  // the wake lock is held; otherwise reload while it's cheap to do so.
+  useEffect(() => {
+    if (!database) {
+      return;
+    }
+
+    const checkForDbUpdates = async () => {
+      try {
+        const response = await fetch("/search.sqlite", {
+          method: "HEAD",
+          cache: "no-store",
+        });
+        if (!response.ok) {
+          return;
+        }
+        const version =
+          response.headers.get("etag") ??
+          response.headers.get("last-modified");
+        if (!version) {
+          return;
+        }
+
+        // Seed on the first observation so a fresh page load doesn't
+        // immediately mistake "I've never seen this header before" for an update.
+        if (lastDbVersionRef.current === null) {
+          lastDbVersionRef.current = version;
+          return;
+        }
+
+        if (version === lastDbVersionRef.current) {
+          return;
+        }
+
+        // The DB on disk has changed.
+        lastDbVersionRef.current = version;
+
+        if (wakeLockRef.current) {
+          // Active kiosk session — refresh the photo pool in place so we
+          // never tear down the document and lose the wake lock. The next
+          // queue refill will pick up the new pool.
+          const photos = await fetchSlideshowPhotos({
+            database,
+            filter: filterRef.current,
+          });
+          if (photos.length > 0) {
+            randomPhotoPoolRef.current = photos;
+            randomQueueRef.current = [];
+            randomQueueIndexRef.current = -1;
+            recentPhotoPathsRef.current = [];
+          }
+        } else {
+          // Wake lock isn't held — reload is cheap and gives us a fully
+          // clean re-init of sql.js-httpvfs cached pages too.
+          reloadCurrentPage();
+        }
+      } catch (error) {
+        console.error("DB update check failed", error);
+      }
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        void checkForDbUpdates();
+      }
+    };
+
+    void checkForDbUpdates();
+    const id = setInterval(() => {
+      if (navigator.onLine) {
+        void checkForDbUpdates();
+      }
+    }, DB_POLL_MS);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => {
+      clearInterval(id);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+    // filter is read via filterRef so it doesn't need to be a dep — that
+    // also keeps this effect from re-running on every filter change.
+  }, [database]);
 
   const [currentPhotoPath, setCurrentPhotoPath] =
     React.useState<RandomPhotoRow | null>(null);
@@ -328,6 +438,11 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
   );
 
   const [filter, setFilter] = React.useState<string | undefined>(undefined);
+  // Mirror the filter state into the ref consumed by the DB-update poll
+  // (declared earlier in the component than `filter` is).
+  useEffect(() => {
+    filterRef.current = filter;
+  }, [filter]);
   const recentPhotoPathsRef = React.useRef<string[]>([]);
   const [shuffleHistorySize, setShuffleHistorySize, removeShuffleHistorySize] =
     useLocalStorage("slideshow-shuffle-history-size", 100);
