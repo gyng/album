@@ -107,9 +107,10 @@
 
 /* Column variant of .bottomBar: drops the fixed positioning and the
    default centre transform so the parent grid cell controls layout.
-   Keeps the visual styling (text-shadow, colour, etc.) inherited from
-   .bottomBar. */
-.bottomBarColumn {
+   Compound selector (.bottomBar.bottomBarColumn) is needed because the
+   base .bottomBar rule appears later in the stylesheet — without the
+   compound the base would win on source order. */
+.bottomBar.bottomBarColumn {
   position: static;
   left: auto;
   right: auto;
