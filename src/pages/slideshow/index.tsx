@@ -2272,19 +2272,24 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
           isMapHack ? styles.hide : "",
         ].join(" ")}
       >
-        {aggregateGeocode ?? geocodeCountry ? (
+        {/* On remix slides the per-cell captions inside the grid carry each
+            photo's location + date, so the centred aggregate rows would be
+            doubly-rendered information. Hide them and let the per-cell
+            captions do the work. The remix strategy badge row below still
+            renders — it's slide-level context that has no per-cell home. */}
+        {!isRemix && (aggregateGeocode ?? geocodeCountry) ? (
           <div className={styles.detailsRow}>
             {aggregateGeocode ?? geocodeCountry}
           </div>
-        ) : (
+        ) : !isRemix ? (
           <div className={styles.detailsRow}>&nbsp;</div>
-        )}
+        ) : null}
 
-        {aggregateDateRow ? (
+        {!isRemix && aggregateDateRow ? (
           <div className={styles.detailsRow}>{aggregateDateRow}</div>
-        ) : (
+        ) : !isRemix ? (
           <div className={styles.detailsRow}>&nbsp;</div>
-        )}
+        ) : null}
 
         {/* Time-affinity is per-photo; for a remix slide the strategy label
             already explains the grouping, so we hide the seed-only score
@@ -3006,35 +3011,68 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
               advanceToNextPhoto();
             }}
           >
-            <img
-              className={[styles.remixImage, !imageLoaded ? styles.notLoaded : ""]
-                .filter(Boolean)
-                .join(" ")}
-              src={photoBlock.data.src}
-              alt={photoAltText}
-              onLoad={() => {
-                setImageLoaded(true);
-                window.setTimeout(() => {
-                  setPreviousPhotoSrc(null);
-                }, 260);
-              }}
-              onError={() => {
-                setTimeout(() => {
-                  advanceToNextPhoto();
-                }, 1000);
-              }}
-            />
-            {remixCompanions.map((companion) => {
-              const src = getSlideshowPhotoSrc(companion);
+            {slidePhotoMeta.map((meta, idx) => {
+              const photo = slidePhotos[idx];
+              const isSeed = idx === 0;
+              const src = isSeed
+                ? photoBlock.data.src
+                : getSlideshowPhotoSrc(photo);
               if (!src) return null;
+
+              const dateLabel = meta.date
+                ? meta.date.toLocaleDateString(undefined, {
+                    year: "numeric",
+                    month: "short",
+                  })
+                : null;
+
               return (
-                <img
-                  key={companion.path}
-                  className={styles.remixImage}
-                  src={src}
-                  alt=""
-                  aria-hidden="true"
-                />
+                <div key={photo.path} className={styles.remixCell}>
+                  <img
+                    className={[
+                      styles.remixImage,
+                      isSeed && !imageLoaded ? styles.notLoaded : "",
+                    ]
+                      .filter(Boolean)
+                      .join(" ")}
+                    src={src}
+                    alt={isSeed ? photoAltText : ""}
+                    aria-hidden={isSeed ? undefined : true}
+                    onLoad={
+                      isSeed
+                        ? () => {
+                            setImageLoaded(true);
+                            window.setTimeout(() => {
+                              setPreviousPhotoSrc(null);
+                            }, 260);
+                          }
+                        : undefined
+                    }
+                    onError={
+                      isSeed
+                        ? () => {
+                            setTimeout(() => {
+                              advanceToNextPhoto();
+                            }, 1000);
+                          }
+                        : undefined
+                    }
+                  />
+                  {showDetails && (meta.geocode || dateLabel) ? (
+                    <div className={styles.remixCellCaption}>
+                      {meta.geocode ? (
+                        <div className={styles.detailsRow}>{meta.geocode}</div>
+                      ) : (
+                        <div className={styles.detailsRow}>&nbsp;</div>
+                      )}
+                      {dateLabel ? (
+                        <div className={styles.detailsRow}>{dateLabel}</div>
+                      ) : (
+                        <div className={styles.detailsRow}>&nbsp;</div>
+                      )}
+                    </div>
+                  ) : null}
+                </div>
               );
             })}
           </div>

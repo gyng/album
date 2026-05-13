@@ -47,6 +47,16 @@
   grid-template-columns: 1fr 1fr 1fr;
 }
 
+/* Each cell is a positioning context so the per-photo caption can pin to
+   the bottom of its own image, not the whole grid. min-width:0 prevents
+   the image's intrinsic size from stretching the grid track. */
+.remixCell {
+  position: relative;
+  overflow: hidden;
+  min-width: 0;
+  min-height: 0;
+}
+
 .remixImage {
   width: 100%;
   height: 100%;
@@ -54,6 +64,29 @@
   display: block;
   min-width: 0;
   min-height: 0;
+}
+
+/* Per-cell mini-caption — location + date for one photo in the remix
+   layout. Sits at the same vertical position as the slide-level bottomBar
+   (5vh + safe-area inset from the bottom edge) and is centred horizontally
+   inside its own cell. Uses the same .detailsRow margins/typography as
+   the single-image description so the visual rhythm matches. No background
+   gradient — drop-shadow on the text keeps it legible on any photo without
+   painting an opaque band that would visually crop the image. */
+.remixCellCaption {
+  position: absolute;
+  left: 50%;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 5vh);
+  transform: translateX(-50%);
+  min-width: 220px;
+  max-width: 90%;
+  color: white;
+  text-align: center;
+  pointer-events: none;
+  text-shadow:
+    1px 2px 2px hsl(0 0% 0% / 0.333),
+    2px 4px 4px hsl(0 0% 0% / 0.333),
+    3px 6px 6px hsl(0 0% 0% / 0.333);
 }
 
 .previousImageHidden {
