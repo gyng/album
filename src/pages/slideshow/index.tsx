@@ -71,6 +71,11 @@ type VersionManifest = {
   gitSha?: string | null;
 };
 
+// Touch and pen pointers behave the same for this page's gesture model:
+// progress visuals, tap zones, click suppression. Mouse is handled separately.
+const isTouchOrPen = (pointerType: string): boolean =>
+  pointerType === "touch" || pointerType === "pen";
+
 const avoidBoundaryRepeat = (
   photos: RandomPhotoRow[],
   previousLastPath?: string,
@@ -302,13 +307,21 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
   >(null);
   const [touchPullProgress, setTouchPullProgress] = React.useState(0);
   const [touchSwipeProgress, setTouchSwipeProgress] = React.useState(0);
+  const [touchPointerActive, setTouchPointerActive] = React.useState(false);
+  const [touchArmed, setTouchArmed] = React.useState(false);
+  // The chevron handle leads the pull; the toolbar/edge peek only enters in the last 35%
+  // so the two indicators don't compete. Below 0.65 only the chevron is visible.
+  const remapPeek = (progress: number) =>
+    Math.max(0, (progress - 0.65) / 0.35);
   const touchToolbarShowPreviewProgress =
     !controlsVisible &&
     (touchGestureHint === "controls" || touchGestureHint === "reload")
-      ? touchPullProgress
+      ? remapPeek(touchPullProgress)
       : 0;
   const touchToolbarHidePreviewProgress =
-    controlsVisible && touchGestureHint === "overlays" ? touchPullProgress : 0;
+    controlsVisible && touchGestureHint === "overlays"
+      ? remapPeek(touchPullProgress)
+      : 0;
   const [embeddingsDatabase, embeddingsProgress] = useEmbeddingsDatabase(
     slideshowMode === "similar",
   );
@@ -319,9 +332,13 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
     startX: number;
     startY: number;
     controlsWereVisible: boolean;
-    // Set on the first move event that crosses the horizontal hint threshold;
+    // Set on the first move event that crosses the relevant hint threshold;
     // held for the lifetime of the gesture so dragging back does not flip the action.
     committedHorizontalDirection?: "next" | "previous";
+    committedVerticalDirection?: "down" | "up";
+    // True once the gesture has crossed the commit threshold on its primary axis,
+    // so we can fire the haptic exactly once per gesture.
+    hapticFired?: boolean;
   } | null>(null);
   const suppressImageClickRef = React.useRef(false);
   const controlsHideDeadlineRef = React.useRef<number | null>(null);
@@ -1334,10 +1351,10 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
   const nextOverlayLabel = nextOverlayPreset.showDetails
     ? nextOverlayPreset.showMap
       ? nextOverlayPreset.showClock
-        ? "Enable details, map and clock"
-        : "Enable details and map"
-      : "Enable details"
-    : "Disable display settings";
+        ? "Show everything"
+        : "Show details + map"
+      : "Show details"
+    : "Hide overlays";
 
   const handleImagePointerDown = useCallback(
     (event: React.PointerEvent<HTMLImageElement>) => {
@@ -1360,8 +1377,19 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
         startY: event.clientY,
         controlsWereVisible: controlsVisible,
       };
+      // Defensive reset: under normal flow the prior gesture's synthetic click
+      // consumes (and self-clears) the suppress flag, but if that click never
+      // reached this element (e.g. focus shift, navigation, browser quirk) the
+      // flag could linger and eat the next legitimate click. Clear it on every
+      // new gesture so a fresh tap always lands.
+      suppressImageClickRef.current = false;
       setTouchGestureHint(null);
       setTouchPullProgress(0);
+      setTouchSwipeProgress(0);
+      setTouchArmed(false);
+      if (isTouchOrPen(event.pointerType)) {
+        setTouchPointerActive(true);
+      }
     },
     [controlsVisible, props.disabled, tryAcquireWakeLock],
   );
@@ -1379,9 +1407,17 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
       }
 
       pointerGestureRef.current = null;
+      // On pointercancel the gesture ends without a follow-up click, so any
+      // suppress flag from a prior pointerup-set commit branch must be cleared
+      // — otherwise the next legitimate click could be swallowed. On pointerup
+      // this resets to false too, but the up handler immediately re-sets it
+      // for touch/pen so suppression still works there.
+      suppressImageClickRef.current = false;
       setTouchGestureHint(null);
       setTouchPullProgress(0);
       setTouchSwipeProgress(0);
+      setTouchPointerActive(false);
+      setTouchArmed(false);
     },
     [],
   );
@@ -1392,7 +1428,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
       if (
         !gesture ||
         gesture.pointerId !== event.pointerId ||
-        (gesture.pointerType !== "touch" && gesture.pointerType !== "pen")
+        !isTouchOrPen(gesture.pointerType)
       ) {
         return;
       }
@@ -1402,57 +1438,109 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
       const horizontalDistance = Math.abs(deltaX);
       const verticalDistance = Math.abs(deltaY);
 
-      if (verticalDistance >= TOUCH_PULL_HINT_THRESHOLD_PX && verticalDistance > horizontalDistance) {
-        // If a horizontal swipe is already in progress, don't let a diagonal drift trigger vertical pull.
+      // Map raw distance to a 0..1 progress that *starts* at the hint threshold,
+      // so the indicator fades in from 0 rather than popping in mid-bright.
+      const progressFromDistance = (
+        distance: number,
+        hintPx: number,
+        commitPx: number,
+      ): number =>
+        Math.max(
+          0,
+          Math.min(1, (distance - hintPx) / (commitPx - hintPx)),
+        );
+
+      const armIfThreshold = (committed: boolean) => {
+        if (!committed) {
+          setTouchArmed(false);
+          return;
+        }
+        setTouchArmed(true);
+        if (!gesture.hapticFired) {
+          gesture.hapticFired = true;
+          if (typeof navigator !== "undefined" && navigator.vibrate) {
+            navigator.vibrate(8);
+          }
+        }
+      };
+
+      const isVertical =
+        verticalDistance >= TOUCH_PULL_HINT_THRESHOLD_PX &&
+        verticalDistance > horizontalDistance;
+      const isHorizontal =
+        horizontalDistance >= TOUCH_SWIPE_HINT_THRESHOLD_PX &&
+        horizontalDistance > verticalDistance;
+
+      // When the user reverses past the committed direction the gesture is
+      // effectively cancelled — visuals must drop back to idle, otherwise the
+      // chevron stays armed at progress=1.0 even though pointer-up will bail.
+      const resetVisual = () => {
+        setTouchGestureHint(null);
+        setTouchPullProgress(0);
+        setTouchSwipeProgress(0);
+        armIfThreshold(false);
+      };
+
+      if (isVertical) {
+        // Once horizontal is committed, ignore vertical drift; symmetric below.
         if (gesture.committedHorizontalDirection) {
           return;
         }
 
-        setTouchSwipeProgress(0);
-        if (deltaY > 0) {
-          if (gesture.controlsWereVisible) {
-            setTouchGestureHint(null);
-            setTouchPullProgress(0);
-            return;
-          }
+        const direction: "down" | "up" = deltaY > 0 ? "down" : "up";
 
-          setTouchGestureHint(
-            gesture.controlsWereVisible ? "reload" : "controls",
-          );
-          setTouchPullProgress(
-            Math.min(1, verticalDistance / TOUCH_PULL_THRESHOLD_PX),
-          );
+        // Downward pull from a controls-visible state has no action — bail early.
+        if (direction === "down" && gesture.controlsWereVisible) {
+          resetVisual();
           return;
         }
 
-        setTouchGestureHint("overlays");
-        setTouchPullProgress(
-          Math.min(1, verticalDistance / TOUCH_PULL_THRESHOLD_PX),
+        if (!gesture.committedVerticalDirection) {
+          gesture.committedVerticalDirection = direction;
+        } else if (gesture.committedVerticalDirection !== direction) {
+          // Reversed past start — drop back to idle so the visual matches what
+          // pointer-up will actually do (nothing).
+          resetVisual();
+          return;
+        }
+
+        setTouchSwipeProgress(0);
+        setTouchGestureHint(direction === "down" ? "controls" : "overlays");
+        const progress = progressFromDistance(
+          verticalDistance,
+          TOUCH_PULL_HINT_THRESHOLD_PX,
+          TOUCH_PULL_THRESHOLD_PX,
         );
+        setTouchPullProgress(progress);
+        armIfThreshold(progress >= 1);
         return;
       }
 
-      if (horizontalDistance >= TOUCH_SWIPE_HINT_THRESHOLD_PX && horizontalDistance > verticalDistance) {
-        // Lock the direction on the first crossing — dragging back must not flip the hint.
+      if (isHorizontal) {
+        if (gesture.committedVerticalDirection) {
+          return;
+        }
+        const direction: "next" | "previous" = deltaX < 0 ? "next" : "previous";
         if (!gesture.committedHorizontalDirection) {
-          gesture.committedHorizontalDirection = deltaX < 0 ? "next" : "previous";
+          gesture.committedHorizontalDirection = direction;
+        } else if (gesture.committedHorizontalDirection !== direction) {
+          // Reversed past start — drop back to idle.
+          resetVisual();
+          return;
         }
         setTouchGestureHint(gesture.committedHorizontalDirection);
         setTouchPullProgress(0);
-        // Progress from 0 (hint threshold) to 1 (commit threshold) — drives the committed visual.
-        setTouchSwipeProgress(
-          Math.min(
-            1,
-            (horizontalDistance - TOUCH_SWIPE_HINT_THRESHOLD_PX) /
-              (TOUCH_SWIPE_THRESHOLD_PX - TOUCH_SWIPE_HINT_THRESHOLD_PX),
-          ),
+        const progress = progressFromDistance(
+          horizontalDistance,
+          TOUCH_SWIPE_HINT_THRESHOLD_PX,
+          TOUCH_SWIPE_THRESHOLD_PX,
         );
+        setTouchSwipeProgress(progress);
+        armIfThreshold(progress >= 1);
         return;
       }
 
-      setTouchGestureHint(null);
-      setTouchPullProgress(0);
-      setTouchSwipeProgress(0);
+      resetVisual();
     },
     [],
   );
@@ -1471,10 +1559,35 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
       const horizontalDistance = Math.abs(deltaX);
       const verticalDistance = Math.abs(deltaY);
 
-      if (
-        horizontalDistance >= TOUCH_SWIPE_THRESHOLD_PX &&
-        horizontalDistance > verticalDistance
-      ) {
+      // Honour the axis the visual already committed to. The move handler shows
+      // the user a directional hint as soon as the hint threshold is crossed;
+      // letting drift on the other axis flip the action at release would mean
+      // the visual lied to them.
+      const isTouchLike = isTouchOrPen(gesture.pointerType);
+      const horizontalCommitted = !!gesture.committedHorizontalDirection;
+      const verticalCommitted = !!gesture.committedVerticalDirection;
+      // Horizontal commits stay un-gated for pointer type: a mouse drag past
+      // the threshold should still navigate (advance / previous) for power
+      // users who prefer drag-as-prev over the toolbar buttons. The lack of
+      // mid-drag visual feedback for mouse is acceptable — the action only
+      // fires at release.
+      const treatAsHorizontal = horizontalCommitted
+        ? horizontalDistance >= TOUCH_SWIPE_THRESHOLD_PX
+        : !verticalCommitted &&
+          horizontalDistance >= TOUCH_SWIPE_THRESHOLD_PX &&
+          horizontalDistance > verticalDistance;
+      // Vertical commits (toggle controls, cycle overlays) are touch-first UX
+      // and have no progress visual for mouse — gating on touch/pen avoids a
+      // mouse drag-up silently hiding the toolbar.
+      const treatAsVertical =
+        isTouchLike &&
+        (verticalCommitted
+          ? verticalDistance >= TOUCH_SWIPE_THRESHOLD_PX
+          : !horizontalCommitted &&
+            verticalDistance >= TOUCH_SWIPE_THRESHOLD_PX &&
+            verticalDistance > horizontalDistance);
+
+      if (treatAsHorizontal) {
         const committed = gesture.committedHorizontalDirection;
         const finalDirection = deltaX < 0 ? "next" : "previous";
         const effectiveDirection = committed ?? finalDirection;
@@ -1496,11 +1609,18 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
         return;
       }
 
-      if (
-        verticalDistance >= TOUCH_SWIPE_THRESHOLD_PX &&
-        verticalDistance > horizontalDistance
-      ) {
-        if (deltaY > 0) {
+      if (treatAsVertical) {
+        const committed = gesture.committedVerticalDirection;
+        const finalDirection: "down" | "up" = deltaY > 0 ? "down" : "up";
+        // Drag-back cancel: if the user reversed direction past the start,
+        // do not trigger the opposite action.
+        if (committed && finalDirection !== committed) {
+          return;
+        }
+
+        const effectiveDirection = committed ?? finalDirection;
+
+        if (effectiveDirection === "down") {
           if (!gesture.controlsWereVisible) {
             suppressImageClickRef.current = true;
             setControlsVisible(true);
@@ -1518,25 +1638,31 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
         return;
       }
 
-      if (
-        (gesture.pointerType === "touch" || gesture.pointerType === "pen") &&
-        horizontalDistance < 12 &&
-        verticalDistance < 12
-      ) {
-        const imageBounds = event.currentTarget.getBoundingClientRect();
-        const tapAction = getSlideshowTouchTapAction({
-          clientX: event.clientX,
-          bounds: imageBounds,
-          canGoPrevious,
-        });
-
+      if (isTouchLike) {
+        // The browser synthesises a click after every touch pointerup. Without
+        // this suppression a mid-distance jitter (12-48px) or a reversed-cancel
+        // gesture would fall through every action branch above and then
+        // silently advance the photo via the image's onClick — making the
+        // cancellation visual a lie. Set the suppress ref unconditionally for
+        // touch/pen so the synthetic click swallows itself. The commit branches
+        // already set it; setting it again is idempotent.
         suppressImageClickRef.current = true;
-        if (tapAction === "previous") {
-          goPrevious();
-          return;
-        }
 
-        advanceToNextPhoto();
+        if (horizontalDistance < 12 && verticalDistance < 12) {
+          const imageBounds = event.currentTarget.getBoundingClientRect();
+          const tapAction = getSlideshowTouchTapAction({
+            clientX: event.clientX,
+            bounds: imageBounds,
+            canGoPrevious,
+          });
+
+          if (tapAction === "previous") {
+            goPrevious();
+            return;
+          }
+
+          advanceToNextPhoto();
+        }
       }
     },
     [
@@ -1779,6 +1905,8 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
         data-controls-visible={String(controlsVisible)}
         data-fullscreen-active={String(isFullscreenActive)}
         data-paused={String(isPaused)}
+        data-touch-active={String(touchPointerActive)}
+        data-touch-armed={String(touchArmed)}
         onPointerDownCapture={resetTouchControlsHideTimeout}
         onPointerMoveCapture={resetTouchControlsHideTimeout}
         style={
@@ -1826,6 +1954,8 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
             className={styles.touchAffordances}
             data-touch-hint={touchGestureHint ?? "idle"}
             data-controls-visible={String(controlsVisible)}
+            data-touch-active={String(touchPointerActive)}
+            data-touch-armed={String(touchArmed)}
             aria-hidden="true"
             style={
               {
@@ -1865,7 +1995,11 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
             </div>
           </div>
         ) : null}
-        {isCoarsePointer && isWakeLockSupported && !isWakeLockActive && !controlsVisible ? (
+        {isCoarsePointer &&
+        isWakeLockSupported &&
+        !isWakeLockActive &&
+        !controlsVisible &&
+        !touchPointerActive ? (
           <div className={styles.wakeLockNudge} aria-hidden="true">
             Tap anywhere to keep the screen awake
           </div>

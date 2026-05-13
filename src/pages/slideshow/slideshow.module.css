@@ -186,6 +186,10 @@
 
 .touchAffordances {
   --touch-pull-progress: 0;
+  --touch-swipe-progress: 0;
+  /* Decelerating ease: progress visuals "land" near the commit threshold
+     rather than gliding past it, so the user can feel where 1.0 lives. */
+  --touch-juice-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
   position: fixed;
   inset: 0;
   z-index: 300;
@@ -200,12 +204,12 @@
   display: grid;
   place-items: center;
   gap: calc(var(--m-s) * 0.5);
-  opacity: calc(0.34 + (var(--touch-pull-progress) * 0.5));
+  opacity: 0;
   transform: translateX(-50%)
     translateY(calc(var(--touch-pull-progress) * var(--m-l)));
   transition:
-    opacity 0.18s ease-out,
-    transform 0.18s ease-out;
+    opacity 0.18s var(--touch-juice-ease),
+    transform 0.18s var(--touch-juice-ease);
 }
 
 .touchTopAffordance {
@@ -225,8 +229,7 @@
   background: hsl(0 0% 100% / 0.5);
   box-shadow:
     0 0 0 1px hsl(0 0% 0% / 0.24),
-    0 var(--m-s) var(--m-l) hsl(0 0% 0% / 0.34),
-    0 0 calc(var(--touch-pull-progress, 0) * 18px) calc(var(--touch-pull-progress, 0) * 3px) hsl(0 0% 100% / 0.22);
+    0 var(--m-s) var(--m-l) hsl(0 0% 0% / 0.34);
 }
 
 .touchPullChevron {
@@ -235,27 +238,30 @@
   width: var(--m-xl);
   height: var(--m-xl);
   border-radius: 999px;
-  background: hsl(0 0% 0% / calc(0.38 + var(--touch-pull-progress, 0) * 0.22));
-  color: hsl(0 0% 100% / 0.86);
+  background: hsl(0 0% 0% / 0.42);
+  color: hsl(0 0% 100% / 0.92);
   backdrop-filter: blur(10px);
-  scale: calc(1 + var(--touch-pull-progress, 0) * 0.24);
-  box-shadow: 0 0 0 calc(var(--touch-pull-progress, 0) * 2.5px) hsl(0 0% 100% / 0.48);
+  scale: calc(1 + var(--touch-pull-progress, 0) * 0.18);
+  box-shadow: 0 0 0 calc(var(--touch-pull-progress, 0) * 1.5px)
+    hsl(0 0% 100% / 0.5);
+  transition:
+    background-color 0.16s var(--touch-juice-ease),
+    color 0.16s var(--touch-juice-ease);
 }
 
 .touchAffordanceLabel {
   padding: calc(var(--m-s) * 0.65) var(--m-l);
   border-radius: 999px;
-  border: 1px solid hsl(0 0% calc(40% + var(--touch-pull-progress, 0) * 40%) / calc(0.3 + var(--touch-pull-progress, 0) * 0.45));
+  border: 1px solid hsl(0 0% 60% / 0.35);
   background: color-mix(in srgb, var(--c-bg) 97%, var(--c-bg-contrast-dark));
   color: var(--c-bg-contrast-light);
   font-size: var(--fs-s);
   letter-spacing: 0.02em;
   white-space: nowrap;
   box-shadow:
-    0 8px 20px hsl(0 0% 0% / calc(0.22 + var(--touch-pull-progress, 0) * 0.14)),
-    inset 0 1px 0 hsl(0 0% 100% / calc(0.08 + var(--touch-pull-progress, 0) * 0.16));
+    0 8px 20px hsl(0 0% 0% / 0.22),
+    inset 0 1px 0 hsl(0 0% 100% / 0.08);
   backdrop-filter: blur(10px);
-  scale: calc(1 + var(--touch-pull-progress, 0) * 0.06);
 }
 
 .touchPullChevron svg,
@@ -278,10 +284,10 @@
   opacity: 0;
   transform: translateY(-50%);
   transition:
-    opacity 0.18s ease-out,
-    transform 0.24s cubic-bezier(0.34, 1.56, 0.64, 1),
-    background-color 0.18s ease-out,
-    box-shadow 0.18s ease-out;
+    opacity 0.18s var(--touch-juice-ease),
+    transform 0.24s var(--touch-juice-ease),
+    background-color 0.18s var(--touch-juice-ease),
+    box-shadow 0.18s var(--touch-juice-ease);
   backdrop-filter: blur(10px);
 }
 
@@ -293,6 +299,20 @@
   right: calc(env(safe-area-inset-right, 0px) + var(--m-m));
 }
 
+/* While a touch is active but no direction is committed yet, the side
+   chevrons peek in at low opacity so the tap zones are discoverable. They
+   stay completely hidden in idle (no pointer down) and when controls are open.
+   The data-controls-visible="false" qualifier is load-bearing: without it,
+   the peek selector outranks the controls-visible hide rule below and the
+   chevrons would flash whenever the user touched the image with the toolbar
+   open. */
+.touchAffordances[data-touch-active="true"][data-touch-hint="idle"][data-controls-visible="false"]
+  .touchSideAffordanceLeft,
+.touchAffordances[data-touch-active="true"][data-touch-hint="idle"][data-controls-visible="false"]
+  .touchSideAffordanceRight {
+  opacity: 0.32;
+}
+
 .touchAffordances[data-controls-visible="true"]
   .touchSideAffordanceLeft,
 .touchAffordances[data-controls-visible="true"]
@@ -300,53 +320,79 @@
   opacity: 0;
 }
 
+/* Committed swipe direction — single signal carries the progress: scale + ring.
+   Background/colour shifts are dropped to avoid the "everything inflates" feel. */
 .touchAffordances[data-touch-hint="previous"] .touchSideAffordanceLeft,
 .touchAffordances[data-touch-hint="next"] .touchSideAffordanceRight {
-  opacity: calc(0.88 + (var(--touch-swipe-progress, 0) * 0.12));
-  background: hsl(
-    0 0% calc(0% + (var(--touch-swipe-progress, 0) * 12%))
-    / calc(0.52 + (var(--touch-swipe-progress, 0) * 0.24))
-  );
-  color: hsl(0 0% 100% / calc(0.94 + (var(--touch-swipe-progress, 0) * 0.06)));
+  opacity: calc(0.82 + (var(--touch-swipe-progress, 0) * 0.18));
+  background: hsl(0 0% 0% / 0.5);
+  color: hsl(0 0% 100% / 0.95);
   box-shadow:
-    0 0 0 calc(var(--touch-swipe-progress, 0) * 2.5px) hsl(0 0% 100% / 0.6),
-    0 0 calc(var(--touch-swipe-progress, 0) * 22px) calc(var(--touch-swipe-progress, 0) * 4px) hsl(0 0% 100% / 0.18);
+    0 0 0 calc(var(--touch-swipe-progress, 0) * 1.5px) hsl(0 0% 100% / 0.55);
 }
 
 .touchAffordances[data-touch-hint="previous"] .touchSideAffordanceLeft {
   transform: translateY(-50%)
     translateX(var(--m-s))
-    scale(calc(1 + var(--touch-swipe-progress, 0) * 0.26));
+    scale(calc(1 + var(--touch-swipe-progress, 0) * 0.18));
 }
 
 .touchAffordances[data-touch-hint="next"] .touchSideAffordanceRight {
   transform: translateY(-50%)
     translateX(calc(var(--m-s) * -1))
-    scale(calc(1 + var(--touch-swipe-progress, 0) * 0.26));
+    scale(calc(1 + var(--touch-swipe-progress, 0) * 0.18));
 }
 
 .touchAffordances[data-touch-hint="controls"] .touchTopAffordance,
 .touchAffordances[data-touch-hint="reload"] .touchTopAffordance {
-  opacity: calc(0.7 + (var(--touch-pull-progress) * 0.3));
-}
-
-.touchAffordances[data-touch-hint="idle"] .touchTopAffordance,
-.touchAffordances[data-touch-hint="overlays"] .touchTopAffordance,
-.touchAffordances[data-touch-hint="next"] .touchTopAffordance,
-.touchAffordances[data-touch-hint="previous"] .touchTopAffordance {
-  opacity: 0;
+  opacity: calc(0.62 + (var(--touch-pull-progress) * 0.38));
 }
 
 .touchAffordances[data-touch-hint="overlays"] .touchBottomAffordance {
-  opacity: calc(0.7 + (var(--touch-pull-progress) * 0.3));
+  opacity: calc(0.62 + (var(--touch-pull-progress) * 0.38));
 }
 
-.touchAffordances[data-touch-hint="idle"] .touchBottomAffordance,
-.touchAffordances[data-touch-hint="controls"] .touchBottomAffordance,
-.touchAffordances[data-touch-hint="reload"] .touchBottomAffordance,
-.touchAffordances[data-touch-hint="next"] .touchBottomAffordance,
-.touchAffordances[data-touch-hint="previous"] .touchBottomAffordance {
-  opacity: 0;
+/* Armed state: progress has crossed the commit threshold. Snap to a high-contrast
+   variant — solid white background, dark glyph, expanded ring — so the user can
+   feel "I'm past commit" rather than reading it off a continuous curve. */
+.touchAffordances[data-touch-armed="true"][data-touch-hint="previous"]
+  .touchSideAffordanceLeft,
+.touchAffordances[data-touch-armed="true"][data-touch-hint="next"]
+  .touchSideAffordanceRight {
+  background: hsl(0 0% 100% / 0.96);
+  color: hsl(0 0% 6%);
+  box-shadow:
+    0 0 0 3px hsl(0 0% 100% / 0.75),
+    0 0 0 5px hsl(0 0% 0% / 0.35);
+}
+
+.touchAffordances[data-touch-armed="true"][data-touch-hint="controls"]
+  .touchPullChevron,
+.touchAffordances[data-touch-armed="true"][data-touch-hint="overlays"]
+  .touchPullChevron {
+  background: hsl(0 0% 100% / 0.96);
+  color: hsl(0 0% 6%);
+  box-shadow:
+    0 0 0 3px hsl(0 0% 100% / 0.75),
+    0 0 0 5px hsl(0 0% 0% / 0.35);
+}
+
+.touchAffordances[data-touch-armed="true"][data-touch-hint="controls"]
+  .touchPullHandle,
+.touchAffordances[data-touch-armed="true"][data-touch-hint="overlays"]
+  .touchPullHandle {
+  background: hsl(0 0% 100% / 0.95);
+  box-shadow:
+    0 0 0 1px hsl(0 0% 0% / 0.24),
+    0 var(--m-s) var(--m-l) hsl(0 0% 0% / 0.34);
+}
+
+.touchAffordances[data-touch-armed="true"][data-touch-hint="overlays"]
+  .touchAffordanceLabel {
+  border-color: hsl(0 0% 100% / 0.95);
+  box-shadow:
+    0 8px 20px hsl(0 0% 0% / 0.3),
+    0 0 0 2px hsl(0 0% 100% / 0.45);
 }
 
 .brandLink {
@@ -633,6 +679,13 @@
   left: 50%;
   transform: translateX(-50%);
   text-align: center;
+  transition: opacity 0.18s ease-out;
+}
+
+/* Fade the clock/details panel during an active touch gesture so it doesn't
+   visually clash with the centred touch affordances. */
+.container[data-touch-active="true"] .bottomBar {
+  opacity: 0.25;
 }
 
 .alignLeft {

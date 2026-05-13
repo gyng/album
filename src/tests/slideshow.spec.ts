@@ -198,6 +198,436 @@ test.describe("Slideshow", () => {
   });
 });
 
+test.describe("Slideshow touch mode", () => {
+  test.describe.configure({ mode: "serial" });
+  test.skip(!hasSearchDb, "Requires search.sqlite with data");
+  test.skip(
+    ({ browserName }) => browserName !== "chromium",
+    "Synthetic pointer-event dispatch is reliable only on Chromium",
+  );
+
+  // Force coarse-pointer detection and stub pointer capture so synthetic
+  // PointerEvents can drive the slideshow gesture handlers without throwing.
+  test.beforeEach(async ({ page }) => {
+    await page.addInitScript(() => {
+      const orig = window.matchMedia.bind(window);
+      window.matchMedia = (query: string): MediaQueryList => {
+        if (
+          query.includes("hover: none") ||
+          query.includes("pointer: coarse")
+        ) {
+          return {
+            matches: true,
+            media: query,
+            onchange: null,
+            addEventListener: () => {},
+            removeEventListener: () => {},
+            addListener: () => {},
+            removeListener: () => {},
+            dispatchEvent: () => false,
+          } as MediaQueryList;
+        }
+        return orig(query);
+      };
+      Element.prototype.setPointerCapture = function () {};
+      Element.prototype.releasePointerCapture = function () {};
+      Element.prototype.hasPointerCapture = function () {
+        return false;
+      };
+    });
+  });
+
+  const dispatchPointer = async (
+    page: Page,
+    type: "down" | "move" | "up",
+    x: number,
+    y: number,
+  ) => {
+    await page.evaluate(
+      ({ type, x, y, selector }) => {
+        const el = document.querySelector(selector) as HTMLElement | null;
+        if (!el) throw new Error(`element ${selector} not found`);
+        const ev = new PointerEvent(`pointer${type}`, {
+          pointerId: 1,
+          pointerType: "touch",
+          clientX: x,
+          clientY: y,
+          bubbles: true,
+          cancelable: true,
+          isPrimary: true,
+          button: 0,
+          buttons: type === "up" ? 0 : 1,
+        });
+        el.dispatchEvent(ev);
+      },
+      { type, x, y, selector: slideshowImg },
+    );
+  };
+
+  const imageCentre = async (page: Page) => {
+    const box = await page.locator(slideshowImg).first().boundingBox();
+    if (!box) throw new Error("Slideshow image has no bounding box");
+    return { x: box.x + box.width / 2, y: box.y + box.height / 2, box };
+  };
+
+  const swipe = async (
+    page: Page,
+    dx: number,
+    dy: number,
+    steps = 6,
+  ): Promise<void> => {
+    const { x, y } = await imageCentre(page);
+    await dispatchPointer(page, "down", x, y);
+    for (let i = 1; i <= steps; i += 1) {
+      const t = i / steps;
+      await dispatchPointer(page, "move", x + dx * t, y + dy * t);
+    }
+    await dispatchPointer(page, "up", x + dx, y + dy);
+  };
+
+  test("horizontal swipe past commit advances to next photo", async ({
+    page,
+  }) => {
+    await page.goto("/slideshow?mode=random&filter=test-simple", {
+      waitUntil: "domcontentloaded",
+    });
+    await waitForSlideshow(page);
+
+    const image = page.locator(slideshowImg).first();
+    const firstSrc = await image.getAttribute("src");
+
+    // Swipe left past the 48px commit threshold → next photo.
+    await swipe(page, -90, 0);
+    await waitForImageChange(page, String(firstSrc));
+    expect(await image.getAttribute("src")).not.toBe(firstSrc);
+  });
+
+  test("horizontal swipe below commit threshold does not change photo", async ({
+    page,
+  }) => {
+    await page.goto("/slideshow?mode=random&filter=test-simple", {
+      waitUntil: "domcontentloaded",
+    });
+    await waitForSlideshow(page);
+
+    const image = page.locator(slideshowImg).first();
+    const firstSrc = await image.getAttribute("src");
+
+    // 20px is below the 48px commit threshold.
+    await swipe(page, -20, 0);
+    await page.waitForTimeout(200);
+    expect(await image.getAttribute("src")).toBe(firstSrc);
+  });
+
+  test("right swipe goes to previous photo after advancing", async ({
+    page,
+  }) => {
+    await page.goto("/slideshow?mode=random&filter=test-simple", {
+      waitUntil: "domcontentloaded",
+    });
+    await waitForSlideshow(page);
+
+    const image = page.locator(slideshowImg).first();
+    const firstSrc = await image.getAttribute("src");
+
+    // Build up history with a keyboard advance so a previous photo exists.
+    await page.keyboard.press("ArrowRight");
+    await waitForImageChange(page, String(firstSrc));
+    const secondSrc = await image.getAttribute("src");
+    expect(secondSrc).not.toBe(firstSrc);
+
+    // Swipe right past commit → previous.
+    await swipe(page, 90, 0);
+    await expect(image).toHaveAttribute("src", String(firstSrc));
+  });
+
+  test("pull up past commit hides visible controls", async ({ page }) => {
+    await page.goto("/slideshow?mode=random&filter=test-simple", {
+      waitUntil: "domcontentloaded",
+    });
+    await waitForSlideshow(page);
+
+    const container = page.locator("[data-paused]");
+    await expect(container).toHaveAttribute("data-controls-visible", "true");
+
+    await swipe(page, 0, -100, 10);
+    await expect(container).toHaveAttribute("data-controls-visible", "false");
+  });
+
+  test("pull down past commit shows hidden controls", async ({ page }) => {
+    await page.goto("/slideshow?mode=random&filter=test-simple", {
+      waitUntil: "domcontentloaded",
+    });
+    await waitForSlideshow(page);
+
+    const container = page.locator("[data-paused]");
+
+    // Hide controls first via a pull-up gesture.
+    await swipe(page, 0, -100, 10);
+    await expect(container).toHaveAttribute("data-controls-visible", "false");
+
+    // Then pull down → controls return.
+    await swipe(page, 0, 100, 10);
+    await expect(container).toHaveAttribute("data-controls-visible", "true");
+  });
+
+  test("pull up with controls hidden cycles overlay preset", async ({
+    page,
+  }) => {
+    await page.goto("/slideshow?mode=random&filter=test-simple", {
+      waitUntil: "domcontentloaded",
+    });
+    await waitForSlideshow(page);
+
+    const container = page.locator("[data-paused]");
+
+    // First pull-up hides the (initially visible) controls.
+    await swipe(page, 0, -100, 10);
+    await expect(container).toHaveAttribute("data-controls-visible", "false");
+
+    // Second pull-up with controls hidden → cycleTouchOverlays advances the preset.
+    // The default preset has no overlays; first cycle enables details.
+    await swipe(page, 0, -100, 10);
+    await expect
+      .poll(async () =>
+        page.evaluate(() => localStorage.getItem("slideshow-showdetails")),
+      )
+      .toBe("true");
+  });
+
+  test("data-touch-active toggles around the gesture lifecycle", async ({
+    page,
+  }) => {
+    await page.goto("/slideshow?mode=random&filter=test-simple", {
+      waitUntil: "domcontentloaded",
+    });
+    await waitForSlideshow(page);
+
+    const container = page.locator("[data-paused]");
+    await expect(container).toHaveAttribute("data-touch-active", "false");
+
+    const { x, y } = await imageCentre(page);
+    await dispatchPointer(page, "down", x, y);
+    await expect(container).toHaveAttribute("data-touch-active", "true");
+
+    await dispatchPointer(page, "up", x, y);
+    await expect(container).toHaveAttribute("data-touch-active", "false");
+  });
+
+  test("data-touch-armed flips when the gesture crosses the commit threshold", async ({
+    page,
+  }) => {
+    await page.goto("/slideshow?mode=random&filter=test-simple", {
+      waitUntil: "domcontentloaded",
+    });
+    await waitForSlideshow(page);
+
+    const affordances = page.locator("[data-touch-armed][data-touch-hint]");
+    await expect(affordances).toHaveAttribute("data-touch-armed", "false");
+
+    const { x, y } = await imageCentre(page);
+    await dispatchPointer(page, "down", x, y);
+    // Move below commit (hint zone only).
+    await dispatchPointer(page, "move", x - 30, y);
+    await expect(affordances).toHaveAttribute("data-touch-armed", "false");
+    // Cross the 48px commit threshold.
+    await dispatchPointer(page, "move", x - 80, y);
+    await expect(affordances).toHaveAttribute("data-touch-armed", "true");
+    // Release without firing the action — drag back inside the hint zone.
+    await dispatchPointer(page, "move", x - 10, y);
+    await dispatchPointer(page, "up", x - 10, y);
+    await expect(affordances).toHaveAttribute("data-touch-armed", "false");
+  });
+
+  test("reversing past the start cancels the armed visual", async ({
+    page,
+  }) => {
+    await page.goto("/slideshow?mode=random&filter=test-simple", {
+      waitUntil: "domcontentloaded",
+    });
+    await waitForSlideshow(page);
+
+    const affordances = page.locator("[data-touch-armed][data-touch-hint]");
+    const image = page.locator(slideshowImg).first();
+    const firstSrc = await image.getAttribute("src");
+
+    const { x, y } = await imageCentre(page);
+    await dispatchPointer(page, "down", x, y);
+    // Commit "next" (left swipe) past the threshold.
+    await dispatchPointer(page, "move", x - 80, y);
+    await expect(affordances).toHaveAttribute("data-touch-armed", "true");
+    // Reverse past the start to +30 — still inside the hint zone but the
+    // direction is now "previous", contradicting the committed "next" hint.
+    // The visual must drop back to idle so it doesn't promise an action that
+    // won't fire.
+    await dispatchPointer(page, "move", x + 30, y);
+    await expect(affordances).toHaveAttribute("data-touch-armed", "false");
+    await expect(affordances).toHaveAttribute("data-touch-hint", "idle");
+    await dispatchPointer(page, "up", x + 30, y);
+    // No photo change should have occurred.
+    await page.waitForTimeout(150);
+    expect(await image.getAttribute("src")).toBe(firstSrc);
+  });
+
+  // Real iPad Safari fires a click event after every touch pointerup. The
+  // chromium PointerEvent dispatch in our tests does NOT, so we have to
+  // synthesise it explicitly to validate the suppression logic.
+  const dispatchClick = async (page: Page, x: number, y: number) => {
+    await page.evaluate(
+      ({ x, y, selector }) => {
+        const el = document.querySelector(selector) as HTMLElement | null;
+        if (!el) throw new Error(`element ${selector} not found`);
+        el.dispatchEvent(
+          new MouseEvent("click", {
+            clientX: x,
+            clientY: y,
+            bubbles: true,
+            cancelable: true,
+            button: 0,
+          }),
+        );
+      },
+      { x, y, selector: slideshowImg },
+    );
+  };
+
+  test("synthetic click after a mid-distance touch gesture does not advance the photo", async ({
+    page,
+  }) => {
+    await page.goto("/slideshow?mode=random&filter=test-simple", {
+      waitUntil: "domcontentloaded",
+    });
+    await waitForSlideshow(page);
+
+    const image = page.locator(slideshowImg).first();
+    const firstSrc = await image.getAttribute("src");
+
+    const { x, y } = await imageCentre(page);
+    await dispatchPointer(page, "down", x, y);
+    // 30px: above the 12px tap threshold, below the 48px swipe commit
+    // threshold — the cancelled-gesture fall-through.
+    await dispatchPointer(page, "move", x - 30, y);
+    await dispatchPointer(page, "up", x - 30, y);
+    await dispatchClick(page, x - 30, y);
+
+    await page.waitForTimeout(150);
+    expect(await image.getAttribute("src")).toBe(firstSrc);
+  });
+
+  test("synthetic click after a vertical mid-distance gesture does not advance the photo", async ({
+    page,
+  }) => {
+    await page.goto("/slideshow?mode=random&filter=test-simple", {
+      waitUntil: "domcontentloaded",
+    });
+    await waitForSlideshow(page);
+
+    const image = page.locator(slideshowImg).first();
+    const firstSrc = await image.getAttribute("src");
+
+    const { x, y } = await imageCentre(page);
+    await dispatchPointer(page, "down", x, y);
+    // 30px vertical: above the 12px tap zone, below the 48px swipe threshold
+    // AND the 72px pull threshold — falls through all action branches.
+    await dispatchPointer(page, "move", x, y - 30);
+    await dispatchPointer(page, "up", x, y - 30);
+    await dispatchClick(page, x, y - 30);
+
+    await page.waitForTimeout(150);
+    expect(await image.getAttribute("src")).toBe(firstSrc);
+  });
+
+  test("synthetic click after a reversed-cancel does not advance the photo", async ({
+    page,
+  }) => {
+    await page.goto("/slideshow?mode=random&filter=test-simple", {
+      waitUntil: "domcontentloaded",
+    });
+    await waitForSlideshow(page);
+
+    const image = page.locator(slideshowImg).first();
+    const firstSrc = await image.getAttribute("src");
+
+    const { x, y } = await imageCentre(page);
+    await dispatchPointer(page, "down", x, y);
+    await dispatchPointer(page, "move", x - 80, y); // commits "next"
+    await dispatchPointer(page, "move", x + 30, y); // reverses past start
+    await dispatchPointer(page, "up", x + 30, y);
+    await dispatchClick(page, x + 30, y);
+
+    await page.waitForTimeout(150);
+    expect(await image.getAttribute("src")).toBe(firstSrc);
+  });
+
+  test("side affordances stay hidden during touch when controls are visible", async ({
+    page,
+  }) => {
+    await page.goto("/slideshow?mode=random&filter=test-simple", {
+      waitUntil: "domcontentloaded",
+    });
+    await waitForSlideshow(page);
+
+    const container = page.locator("[data-paused]");
+    await expect(container).toHaveAttribute("data-controls-visible", "true");
+
+    const { x, y } = await imageCentre(page);
+    await dispatchPointer(page, "down", x, y);
+
+    // The idle-peek opacity (0.32) outranks the controls-visible hide rule on
+    // raw specificity grounds. Without the data-controls-visible="false"
+    // qualifier on the peek selector, the side chevrons flash whenever the
+    // user touches the image with the toolbar open. Verify they stay hidden.
+    const opacities = await page.evaluate(() => {
+      const pick = (sel: string) => {
+        const el = document.querySelector(sel);
+        return el ? Number(getComputedStyle(el).opacity) : null;
+      };
+      return {
+        left: pick('[class*="touchSideAffordanceLeft"]'),
+        right: pick('[class*="touchSideAffordanceRight"]'),
+      };
+    });
+    // Guard against a silent pass if CSS Modules ever changes its hash format
+    // and the substring selector misses — `null < 0.05` would otherwise be
+    // truthy because null coerces to 0.
+    expect(opacities.left).not.toBeNull();
+    expect(opacities.right).not.toBeNull();
+    expect(opacities.left).toBeLessThan(0.05);
+    expect(opacities.right).toBeLessThan(0.05);
+
+    await dispatchPointer(page, "up", x, y);
+  });
+
+  test("horizontal commit ignores vertical drift", async ({ page }) => {
+    await page.goto("/slideshow?mode=random&filter=test-simple", {
+      waitUntil: "domcontentloaded",
+    });
+    await waitForSlideshow(page);
+
+    const image = page.locator(slideshowImg).first();
+    const firstSrc = await image.getAttribute("src");
+    const container = page.locator("[data-paused]");
+    const initialControlsVisible =
+      await container.getAttribute("data-controls-visible");
+
+    const { x, y } = await imageCentre(page);
+    await dispatchPointer(page, "down", x, y);
+    // Cross horizontal commit first.
+    await dispatchPointer(page, "move", x - 60, y);
+    // Then drift downward by a lot — must not trigger the controls pull.
+    await dispatchPointer(page, "move", x - 70, y + 120);
+    await dispatchPointer(page, "up", x - 70, y + 120);
+
+    // Image should have advanced (horizontal action committed).
+    await waitForImageChange(page, String(firstSrc));
+    // Controls visibility should not have flipped from the drift.
+    await expect(container).toHaveAttribute(
+      "data-controls-visible",
+      String(initialControlsVisible),
+    );
+  });
+});
+
 test.describe("Slideshow URL parameters", () => {
   test.skip(!hasSearchDb, "Requires search.sqlite with data");
 
