@@ -66,20 +66,22 @@
   min-height: 0;
 }
 
-/* Single fixed-position grid for the whole slide overlay. Holds the
-   per-photo description cells in the top row (1, 2 or 3 columns,
-   driven by data-count) and the slide-level chrome (map / clock /
-   remix badge) in the row below, spanning the full width. Because
-   chrome lives in the same element as the descriptions, the clock's
-   y-position never shifts when going from single → remix. */
+/* Fixed-position grid for the whole slide overlay. Three rows:
+     map     (full width, can carry mix-blend-mode in its own context)
+     descN   (1, 2 or 3 columns per data-count)
+     clock   (full width, contains badge + time/date)
+   data-count drives both the column template and the named areas. */
 .bottomBarStack {
   position: fixed;
   bottom: calc(env(safe-area-inset-bottom, 0px) + 5vh);
-  left: 0;
-  right: 0;
   z-index: 200;
   display: grid;
   justify-items: center;
+  /* align-items: end pins every grid item to the bottom of its row so
+     description cells with shorter content don't float up to the top of
+     a stretched cell (which made the centre cell look higher than its
+     neighbours when the row had to stretch to the tallest sibling). */
+  align-items: end;
   pointer-events: none;
   text-align: center;
   text-shadow:
@@ -92,48 +94,83 @@
 .bottomBarStack[data-count="1"] {
   grid-template-columns: 1fr;
   grid-template-areas:
+    "map"
     "desc0"
-    "chrome";
+    "clock";
 }
 
 .bottomBarStack[data-count="2"] {
   grid-template-columns: 1fr 1fr;
   grid-template-areas:
+    "map   map"
     "desc0 desc1"
-    "chrome chrome";
+    "clock clock";
 }
 
 .bottomBarStack[data-count="3"] {
   grid-template-columns: 1fr 1fr 1fr;
   grid-template-areas:
+    "map   map   map"
     "desc0 desc1 desc2"
-    "chrome chrome chrome";
+    "clock clock clock";
 }
 
-/* Single-image alignment toggle (left / center / right) shifts the
-   lone description cell within the 1fr row. Ignored when N > 1.    */
-.bottomBarStack[data-count="1"][data-align="left"] .descriptionCell {
-  justify-self: start;
+/* Width / horizontal placement:
+   - single image (N=1) sizes to content and slides left/center/right by
+     the user's detailsAlignment toggle.
+   - remix (N>1) always spans the full viewport so each column gets 1fr. */
+.bottomBarStack[data-count="1"] {
+  width: auto;
+  max-width: 90vw;
+  left: 50%;
+  transform: translateX(-50%);
 }
 
-.bottomBarStack[data-count="1"][data-align="right"] .descriptionCell {
-  justify-self: end;
+.bottomBarStack[data-count="1"][data-align="left"] {
+  left: calc(env(safe-area-inset-left, 0px) + 5vw);
+  transform: none;
 }
 
+.bottomBarStack[data-count="1"][data-align="right"] {
+  right: calc(env(safe-area-inset-right, 0px) + 5vw);
+  left: auto;
+  transform: none;
+}
+
+.bottomBarStack[data-count="2"],
+.bottomBarStack[data-count="3"] {
+  left: 0;
+  right: 0;
+}
+
+/* No inner flex layout here — the grid cell already fixes width, and a
+   plain block context lets `.detailsRow { margin: ... auto }` and
+   `text-align: center` (inherited) do the horizontal centring. */
 .descriptionCell {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
   min-width: 0;
   max-width: 100%;
   padding: 0 var(--m-s);
   box-sizing: border-box;
+  width: 100%;
 }
 
-.slideChrome {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
+/* mix-blend-mode requires its own stacking context to blend with the
+   layers below — without `isolation: isolate` the blend either has no
+   effect or bleeds beyond the intended subject. */
+.slideMap {
+  isolation: isolate;
+  pointer-events: none;
+  width: 100%;
+}
+
+.slideMap .mapContainer {
+  width: 8rem;
+  max-width: 80vw;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.slideClock {
   pointer-events: none;
   width: 100%;
 }

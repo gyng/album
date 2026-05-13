@@ -2206,17 +2206,38 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
     );
   };
 
-  // Slide-level chrome: ONE map (showing every slide photo as a marker),
-  // ONE clock, ONE remix strategy badge. Rendered once regardless of the
-  // remix cell count — that's what keeps the clock from layout-shifting
-  // when going from single to remix. mix-blend-mode is applied only to
-  // the map wrapper here, so the clock and badge text-shadows are never
-  // affected (no dual-render hack needed).
-  const renderSlideChrome = () => {
+  // Map zone (placed above descriptions in the grid). mix-blend-mode lives
+  // on the map wrapper so the clock and badge below keep their text-shadows.
+  const renderSlideMap = () => {
     const allCoords = slidePhotoMeta
       .map((m) => m.coords)
       .filter((c): c is [number, number] => !!c);
+    if (allCoords.length === 0) return null;
+    return (
+      <div
+        className={[
+          styles.mapContainer,
+          styles.displaySetting,
+          showMap ? styles.displaySettingActive : "",
+        ].join(" ")}
+        style={{ mixBlendMode: "screen" }}
+      >
+        <MMap
+          coordinates={allCoords.length === 1 ? allCoords[0] : allCoords}
+          attribution={false}
+          details={false}
+          style={{ width: "100%", height: "100%" }}
+          mapStyle="toner-v2"
+          projection="vertical-perspective"
+          markerStyle={{ visibility: "hidden" }}
+        />
+      </div>
+    );
+  };
 
+  // Clock zone (placed below descriptions). Optionally includes the
+  // remix strategy badge above the time/date.
+  const renderSlideClock = () => {
     const remixStrategyLabel: Record<RemixStrategy, string> = {
       "same-album": "from this album",
       "same-year": "from the same year",
@@ -2231,30 +2252,8 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
       random: "picked at random",
     };
     const isRemix = remixCompanions.length > 0;
-
     return (
       <>
-        {allCoords.length > 0 ? (
-          <div
-            className={[
-              styles.mapContainer,
-              styles.displaySetting,
-              showMap ? styles.displaySettingActive : "",
-            ].join(" ")}
-            style={{ mixBlendMode: "screen" }}
-          >
-            <MMap
-              coordinates={allCoords.length === 1 ? allCoords[0] : allCoords}
-              attribution={false}
-              details={false}
-              style={{ width: "100%", height: "100%" }}
-              mapStyle="toner-v2"
-              projection="vertical-perspective"
-              markerStyle={{ visibility: "hidden" }}
-            />
-          </div>
-        ) : null}
-
         {isRemix && remixStrategy ? (
           <div
             className={[styles.detailsRow, styles.detailsAffinity].join(" ")}
@@ -2911,6 +2910,9 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
           data-count={slidePhotos.length}
           data-align={detailsAlignment}
         >
+          <div className={styles.slideMap} style={{ gridArea: "map" }}>
+            {renderSlideMap()}
+          </div>
           {slidePhotos.map((photo, idx) => (
             <div
               key={`${photo.path}-${idx}`}
@@ -2920,8 +2922,8 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
               {renderPhotoDescription(slidePhotoMeta[idx])}
             </div>
           ))}
-          <div className={styles.slideChrome} style={{ gridArea: "chrome" }}>
-            {renderSlideChrome()}
+          <div className={styles.slideClock} style={{ gridArea: "clock" }}>
+            {renderSlideClock()}
           </div>
         </div>
 
