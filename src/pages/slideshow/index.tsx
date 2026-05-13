@@ -2900,25 +2900,29 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
           The chrome render is doubled for the mix-blend-mode hack that
           preserves drop-shadows on the text below.
         */}
+        {/* One fixed-position grid that owns the descriptions + chrome.
+            data-count drives the grid-template-areas so the description
+            cells split into 1, 2, or 3 columns and the chrome row below
+            spans the full width. Single source of truth means the clock
+            never moves between single/remix and there's no parallel
+            "centered" description block taking layout space. */}
         <div
           className={styles.bottomBarStack}
+          data-count={slidePhotos.length}
           data-align={detailsAlignment}
         >
-          <div
-            className={styles.descriptionRow}
-            data-count={slidePhotos.length}
-          >
-            {slidePhotos.map((photo, idx) => (
-              <div
-                key={`${photo.path}-${idx}`}
-                className={styles.descriptionCell}
-              >
-                {renderPhotoDescription(slidePhotoMeta[idx])}
-              </div>
-            ))}
+          {slidePhotos.map((photo, idx) => (
+            <div
+              key={`${photo.path}-${idx}`}
+              className={styles.descriptionCell}
+              style={{ gridArea: `desc${idx}` }}
+            >
+              {renderPhotoDescription(slidePhotoMeta[idx])}
+            </div>
+          ))}
+          <div className={styles.slideChrome} style={{ gridArea: "chrome" }}>
+            {renderSlideChrome()}
           </div>
-
-          <div className={styles.slideChrome}>{renderSlideChrome()}</div>
         </div>
 
         {previousPhotoSrc ? (

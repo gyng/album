@@ -66,20 +66,22 @@
   min-height: 0;
 }
 
-/* Fixed bottom-anchored stack that holds the per-photo descriptions row
-   on top and the slide-level chrome (map / clock / remix badge) at the
-   bottom. The chrome's vertical position never depends on cell count, so
-   transitioning from single → remix or back doesn't shift the clock. */
+/* Single fixed-position grid for the whole slide overlay. Holds the
+   per-photo description cells in the top row (1, 2 or 3 columns,
+   driven by data-count) and the slide-level chrome (map / clock /
+   remix badge) in the row below, spanning the full width. Because
+   chrome lives in the same element as the descriptions, the clock's
+   y-position never shifts when going from single → remix. */
 .bottomBarStack {
   position: fixed;
   bottom: calc(env(safe-area-inset-bottom, 0px) + 5vh);
   left: 0;
   right: 0;
   z-index: 200;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
+  display: grid;
+  justify-items: center;
   pointer-events: none;
+  text-align: center;
   text-shadow:
     1px 2px 2px hsl(0 0% 0% / 0.333),
     2px 4px 4px hsl(0 0% 0% / 0.333),
@@ -87,34 +89,35 @@
   color: white;
 }
 
-.descriptionRow {
-  display: grid;
-  width: 100%;
-  align-items: end;
-  justify-items: center;
-}
-
-.descriptionRow[data-count="1"] {
+.bottomBarStack[data-count="1"] {
   grid-template-columns: 1fr;
+  grid-template-areas:
+    "desc0"
+    "chrome";
 }
 
-.descriptionRow[data-count="2"] {
+.bottomBarStack[data-count="2"] {
   grid-template-columns: 1fr 1fr;
+  grid-template-areas:
+    "desc0 desc1"
+    "chrome chrome";
 }
 
-.descriptionRow[data-count="3"] {
+.bottomBarStack[data-count="3"] {
   grid-template-columns: 1fr 1fr 1fr;
+  grid-template-areas:
+    "desc0 desc1 desc2"
+    "chrome chrome chrome";
 }
 
-/* Single-image alignment toggle (left / center / right) maps onto how
-   the lone description cell sits inside its 1fr row. Ignored when N > 1
-   because each column already centres its own content. */
-.bottomBarStack[data-align="left"] .descriptionRow[data-count="1"] {
-  justify-items: start;
+/* Single-image alignment toggle (left / center / right) shifts the
+   lone description cell within the 1fr row. Ignored when N > 1.    */
+.bottomBarStack[data-count="1"][data-align="left"] .descriptionCell {
+  justify-self: start;
 }
 
-.bottomBarStack[data-align="right"] .descriptionRow[data-count="1"] {
-  justify-items: end;
+.bottomBarStack[data-count="1"][data-align="right"] .descriptionCell {
+  justify-self: end;
 }
 
 .descriptionCell {
@@ -127,16 +130,12 @@
   box-sizing: border-box;
 }
 
-/* Slide-level chrome (map + clock + remix badge). Two copies stack in
-   the column so the mix-blend-mode hack keeps text-shadow alive: one
-   instance has mix-blend-mode on the wrapper which makes the map
-   "screen" against the photo, with details/clock hidden via .hide; the
-   other instance shows clock+badge normally with no blending. */
 .slideChrome {
   display: flex;
   flex-direction: column;
   align-items: center;
   pointer-events: none;
+  width: 100%;
 }
 
 .previousImageHidden {
