@@ -2142,20 +2142,92 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
     : null;
   const relativeDate = exifDate ? getRelativeTimeString(exifDate) : null;
 
-  // Get coordinates from EXIF GPS data instead of geocoded location
-  const coordinates = currentPhotoPath?.exif
-    ? extractGPSFromExifString(currentPhotoPath.exif)
-    : null;
   const photoAltText = getPhotoAltText(photoBlock, "Slideshow photo");
 
   // Keep geocoded location for display purposes (country/region name)
-  const geocodeCountry = currentPhotoPath?.geocode
-    ? currentPhotoPath.geocode
-        .split("\n")
-        .slice(-3)
-        .filter((x) => Number.isNaN(parseFloat(x)))
-        .join(", ")
-    : null;
+  const extractGeocodeLabel = (geocode: string): string | null =>
+    geocode
+      ? geocode
+          .split("\n")
+          .slice(-3)
+          .filter((x) => Number.isNaN(parseFloat(x)))
+          .join(", ") || null
+      : null;
+  const geocodeCountry = extractGeocodeLabel(currentPhotoPath?.geocode ?? "");
+
+  // Per-photo metadata for the whole slide (seed + any remix companions).
+  // Used to render aggregate captions and to plot every photo on the map
+  // overlay when a remix is active.
+  const slidePhotos = [currentPhotoPath, ...remixCompanions];
+  const slidePhotoMeta = slidePhotos.map((photo) => ({
+    path: photo.path,
+    date: extractDateFromExifString(photo.exif),
+    geocode: extractGeocodeLabel(photo.geocode),
+    coords: extractGPSFromExifString(photo.exif),
+  }));
+
+  // Aggregate geocode labels across the slide. If everyone is in the same
+  // place, just show it once; otherwise comma-separate (capped) so the row
+  // stays readable.
+  const aggregateGeocode = (() => {
+    const labels = slidePhotoMeta
+      .map((m) => m.geocode)
+      .filter((g): g is string => !!g);
+    const unique = Array.from(new Set(labels));
+    if (unique.length === 0) return null;
+    if (unique.length === 1) return unique[0];
+    // Remix is capped at 3-up, so listing every unique location stays
+    // readable. Truncation only kicks in if we ever pair more than 3.
+    if (unique.length <= 3) return unique.join(" + ");
+    return `${unique.slice(0, 2).join(" + ")} +${unique.length - 2} more`;
+  })();
+
+  // For anniversary remixes the years are the interesting axis — show them
+  // explicitly. For other strategies just show the seed's date in long form
+  // (or for same-year remixes, show all years if they vary by year).
+  const aggregateDateRow = (() => {
+    if (!exifDate) return null;
+
+    const dates = slidePhotoMeta
+      .map((m) => m.date)
+      .filter((d): d is Date => !!d);
+    if (dates.length === 0) return null;
+
+    const formatLong = (d: Date) =>
+      d.toLocaleDateString(undefined, { year: "numeric", month: "long" });
+    const uniqueLongDates = Array.from(new Set(dates.map(formatLong)));
+
+    // Anniversary remix: emphasise the calendar day shared by all photos
+    // and list the years.
+    if (remixStrategy === "anniversary") {
+      const years = Array.from(
+        new Set(dates.map((d) => d.getFullYear())),
+      ).sort();
+      if (years.length > 1) {
+        const calendarDay = exifDate.toLocaleDateString(undefined, {
+          month: "long",
+          day: "numeric",
+        });
+        return `${calendarDay} · ${years.join(", ")}`;
+      }
+    }
+
+    // Single unique date — include "3 years ago" prefix.
+    if (uniqueLongDates.length === 1) {
+      return `${relativeDate ?? ""}${relativeDate ? " · " : ""}${uniqueLongDates[0]}`;
+    }
+
+    // 2-up or 3-up with differing dates: list them all rather than truncate.
+    // Remix is capped at 3-up so this is at most three dates.
+    if (uniqueLongDates.length <= 3) {
+      return uniqueLongDates.join(" + ");
+    }
+
+    // Safety net if we ever raise the remix cap.
+    return `${uniqueLongDates.slice(0, 2).join(" + ")} +${uniqueLongDates.length - 2} more`;
+  })();
+
+  const isRemix = remixCompanions.length > 0;
 
   const detailsElement = (isMapHack: boolean) => (
     <>
@@ -2167,19 +2239,28 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
             showMap ? styles.displaySettingActive : "",
           ].join(" ")}
         >
-          {coordinates ? (
-            <MMap
-              coordinates={coordinates}
-              attribution={false}
-              details={false}
-              style={{ width: "100%", height: "100%" }}
-              mapStyle="toner-v2"
-              projection="vertical-perspective"
-              markerStyle={{ visibility: "hidden" }}
-            />
-          ) : (
-            <div className={styles.mapContainer}>&nbsp;</div>
-          )}
+          {(() => {
+            // Collect every photo's coords for the slide (seed + companions).
+            // The map auto-fits to all of them when there's more than one,
+            // so a remix that spans regions still tells the visual truth.
+            const allCoords = slidePhotoMeta
+              .map((m) => m.coords)
+              .filter((c): c is [number, number] => !!c);
+            if (allCoords.length === 0) {
+              return <div className={styles.mapContainer}>&nbsp;</div>;
+            }
+            return (
+              <MMap
+                coordinates={allCoords.length === 1 ? allCoords[0] : allCoords}
+                attribution={false}
+                details={false}
+                style={{ width: "100%", height: "100%" }}
+                mapStyle="toner-v2"
+                projection="vertical-perspective"
+                markerStyle={{ visibility: "hidden" }}
+              />
+            );
+          })()}
         </div>
       ) : null}
 
@@ -2191,25 +2272,24 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
           isMapHack ? styles.hide : "",
         ].join(" ")}
       >
-        {geocodeCountry ? (
-          <div className={styles.detailsRow}>{geocodeCountry}</div>
-        ) : (
-          <div className={styles.detailsRow}>&nbsp;</div>
-        )}
-
-        {relativeDate ? (
+        {aggregateGeocode ?? geocodeCountry ? (
           <div className={styles.detailsRow}>
-            {relativeDate} &middot;{" "}
-            {exifDate?.toLocaleDateString(undefined, {
-              year: "numeric",
-              month: "long",
-            })}
+            {aggregateGeocode ?? geocodeCountry}
           </div>
         ) : (
           <div className={styles.detailsRow}>&nbsp;</div>
         )}
 
-        {timeAware && exifDate ? (
+        {aggregateDateRow ? (
+          <div className={styles.detailsRow}>{aggregateDateRow}</div>
+        ) : (
+          <div className={styles.detailsRow}>&nbsp;</div>
+        )}
+
+        {/* Time-affinity is per-photo; for a remix slide the strategy label
+            already explains the grouping, so we hide the seed-only score
+            to avoid implying it applies to the whole layout. */}
+        {timeAware && exifDate && !isRemix ? (
           <div className={[styles.detailsRow, styles.detailsAffinity].join(" ")}>
             🌅 {Math.round(getTimeAffinityScore(exifDate) * 100)}% match to
             this hour & season
