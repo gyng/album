@@ -59,7 +59,7 @@ export const MMap: React.FC<MapProps> = (props) => {
   const projection = props.projection ?? "mercator";
   const projectionSpec: "mercator" | "globe" | ProjectionSpecification =
     projection === "vertical-perspective"
-      ? ({ name: "vertical-perspective" } as ProjectionSpecification)
+      ? { type: "vertical-perspective" }
       : projection;
 
   return (
