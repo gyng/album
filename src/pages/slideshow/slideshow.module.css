@@ -233,7 +233,10 @@
   left: 50%;
   display: grid;
   place-items: center;
-  gap: calc(var(--m-s) * 0.5);
+  /* Was m-s*0.5 — too tight: the chevron scales to 1.18× near commit and
+     the label gains a 2px outline ring in the armed state, and at that
+     point a 4px gap let them visually crash into each other. */
+  gap: var(--m-m);
   opacity: 0;
   transform: translateX(-50%)
     translateY(calc(var(--touch-pull-progress) * var(--m-l)));
@@ -271,7 +274,7 @@
   background: hsl(0 0% 0% / 0.42);
   color: hsl(0 0% 100% / 0.92);
   backdrop-filter: blur(10px);
-  scale: calc(1 + var(--touch-pull-progress, 0) * 0.18);
+  scale: calc(1 + var(--touch-pull-progress, 0) * 0.1);
   box-shadow: 0 0 0 calc(var(--touch-pull-progress, 0) * 1.5px)
     hsl(0 0% 100% / 0.5);
   transition:
