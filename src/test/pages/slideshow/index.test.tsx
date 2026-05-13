@@ -237,7 +237,7 @@ describe("slideshow page", () => {
     );
 
     const url = new URL(window.location.href);
-    expect(url.searchParams.get("mode")).toBe("random");
+    expect(url.searchParams.get("mode")).toBe("weighted");
     expect(url.searchParams.get("filter")).toBe("test-simple");
     expect(url.searchParams.get("delay")).toBe("60");
     expect(url.searchParams.has("photo")).toBe(false);
@@ -258,7 +258,7 @@ describe("slideshow page", () => {
     screen.getByRole("button", { name: "1m" }).click();
 
     const url = new URL(window.location.href);
-    expect(url.searchParams.get("mode")).toBe("random");
+    expect(url.searchParams.get("mode")).toBe("weighted");
     expect(url.searchParams.get("delay")).toBe("60");
   });
 
@@ -282,7 +282,7 @@ describe("slideshow page", () => {
     expect(mockClipboardWriteText).toHaveBeenCalledTimes(1);
     const copiedUrl = new URL(mockClipboardWriteText.mock.calls[0][0]);
     expect(copiedUrl.pathname).toBe("/slideshow");
-    expect(copiedUrl.searchParams.get("mode")).toBe("random");
+    expect(copiedUrl.searchParams.get("mode")).toBe("weighted");
     expect(copiedUrl.searchParams.get("photo")).toBe(samplePhoto.path);
   });
 

@@ -33,6 +33,20 @@ const waitForSlideshow = async (page: Page) => {
 
 test.describe.configure({ mode: "serial" });
 
+// Disable wall-clock cadence alignment in every slideshow test so the auto-
+// advance timer can't fire mid-test when a quarter-hour boundary happens to
+// land within the test's runtime. Production defaults to alignment on; tests
+// need a fresh "now + delay" timer per advance for deterministic behaviour.
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => {
+    try {
+      localStorage.setItem("slideshow-align-cadence", "false");
+    } catch {
+      // localStorage may be unavailable in some sandboxed contexts; ignore.
+    }
+  });
+});
+
 test.describe("Slideshow", () => {
   test.skip(!hasSearchDb, "Requires search.sqlite with data");
 
@@ -104,15 +118,15 @@ test.describe("Slideshow", () => {
       page.locator('[role="group"][aria-label="Playback mode"]'),
     ).toBeVisible();
 
-    // Default is shuffle/random
-    await expect(shuffleButton).toHaveAttribute("aria-pressed", "true");
-    await expect(page).toHaveURL(/mode=random/);
-
-    // Switch to recent
-    await revealControls(page);
-    await recentButton.click();
+    // Default is recent/weighted
     await expect(recentButton).toHaveAttribute("aria-pressed", "true");
     await expect(page).toHaveURL(/mode=weighted/);
+
+    // Switch to shuffle
+    await revealControls(page);
+    await shuffleButton.click();
+    await expect(shuffleButton).toHaveAttribute("aria-pressed", "true");
+    await expect(page).toHaveURL(/mode=random/);
 
     // Switch to similar
     await similarButton.evaluate((b: HTMLButtonElement) => b.click());
@@ -639,7 +653,7 @@ test.describe("Slideshow URL parameters", () => {
     await waitForSlideshow(page);
 
     // Boolean toggles
-    for (const label of ["🕰️", "Details", "Map", "Cover"]) {
+    for (const label of ["🕰️", "Details", "Map", "Fill screen"]) {
       await expect(page.locator(`button:has-text("${label}")`)).toHaveAttribute(
         "aria-pressed",
         "true",

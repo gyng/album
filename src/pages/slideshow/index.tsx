@@ -33,6 +33,13 @@ import {
   getSlideshowTouchTapAction,
 } from "../../util/slideshowTouch";
 import { getNextAlignedSlideshowChange } from "../../util/slideshowTiming";
+import {
+  decideRemixCompanionCount,
+  getTimeAffinityScore,
+  pickRemixCompanions,
+  RemixStrategy,
+  timeAwareShufflePhotos,
+} from "../../util/slideshowAmbient";
 import { BUILD_VERSION } from "../../lib/buildVersion";
 
 type PageProps = {};
@@ -237,7 +244,16 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
   const randomQueueRef = React.useRef<RandomPhotoRow[]>([]);
   const randomQueueIndexRef = React.useRef<number>(-1);
   const randomQueueLastPathRef = React.useRef<string | undefined>(undefined);
-  const navigationHistoryRef = React.useRef<RandomPhotoRow[]>([]);
+  // Each navigation history entry captures the seed photo *plus* any remix
+  // companions and the strategy that produced them, so pressing Previous /
+  // Next replays the full side-by-side layout instead of collapsing the
+  // remix back to a single photo.
+  type NavigationEntry = {
+    seed: RandomPhotoRow;
+    companions: RandomPhotoRow[];
+    strategy: RemixStrategy | null;
+  };
+  const navigationHistoryRef = React.useRef<NavigationEntry[]>([]);
   const historyIndexRef = React.useRef<number>(-1);
   const [slideshowError, setSlideshowError] = React.useState<string | null>(
     null,
@@ -273,6 +289,34 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
     "slideshow-details-alignment",
     "center" as "left" | "center" | "right",
   );
+  const [timeAware, setTimeAware] = useLocalStorage(
+    "slideshow-time-aware",
+    false,
+  );
+  const [remixEnabled, setRemixEnabled] = useLocalStorage(
+    "slideshow-remix",
+    true,
+  );
+  const [remixCompanions, setRemixCompanions] = React.useState<
+    RandomPhotoRow[]
+  >([]);
+  const [remixStrategy, setRemixStrategy] =
+    React.useState<RemixStrategy | null>(null);
+  // When set, the next forward-advance ignores the dice roll and forces a
+  // remix. Used by the dedicated "Remix now" action button so users can
+  // trigger a remix on demand instead of waiting for the 3% dice.
+  const forceRemixRef = React.useRef(false);
+  // Kiosk-extreme timing cadences (3h, 12h, 24h) are kept available but hidden
+  // by default behind a "More" disclosure. Persisted so power users don't have
+  // to re-expand them every session.
+  const [showLongTimings, setShowLongTimings] = useLocalStorage(
+    "slideshow-show-long-timings",
+    false,
+  );
+  // 5% per slide ≈ one remix every 20 photos. At a 15-minute cadence that's
+  // a remix every ~5 hours — visible enough to register as a feature, rare
+  // enough that it still feels like a surprise rather than a pattern.
+  const REMIX_PROBABILITY = 0.05;
 
   const [nextChangeAt, setNextChangeAt] = React.useState<Date>(new Date());
   const [secondsLeft, setSecondsLeft] = React.useState<number>(0);
@@ -289,7 +333,14 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
     useLocalStorage("slideshow-shuffle-history-size", 100);
   const [slideshowMode, setSlideshowMode] = useLocalStorage(
     "slideshow-mode",
-    "random" as SlideshowMode,
+    "weighted" as SlideshowMode,
+  );
+  // When true, every new "next change at" snaps to the next aligned wall-clock
+  // boundary (e.g. every :00/:15/:30/:45 for a 15-minute cadence), so the
+  // slideshow stays in sync with the clock across days. Default on.
+  const [alignCadence, setAlignCadence] = useLocalStorage(
+    "slideshow-align-cadence",
+    true,
   );
   const [hasParsedInitialUrl, setHasParsedInitialUrl] = React.useState(false);
   const [isPaused, setIsPaused] = React.useState(false);
@@ -322,8 +373,15 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
     controlsVisible && touchGestureHint === "overlays"
       ? remapPeek(touchPullProgress)
       : 0;
+  // Loaded for Similar mode and *also* once the user expresses interest in
+  // vector-based remix strategies (set lazily by the remix code path the
+  // first time it rolls a vector strategy, so cold start doesn't pay for
+  // the embeddings DB unless someone uses them).
+  const [enableRemixEmbeddings, setEnableRemixEmbeddings] = React.useState(
+    false,
+  );
   const [embeddingsDatabase, embeddingsProgress] = useEmbeddingsDatabase(
-    slideshowMode === "similar",
+    slideshowMode === "similar" || enableRemixEmbeddings,
   );
   const wakeLockRef = React.useRef<WakeLockSentinel | null>(null);
   const pointerGestureRef = React.useRef<{
@@ -342,31 +400,22 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
   } | null>(null);
   const suppressImageClickRef = React.useRef(false);
   const controlsHideDeadlineRef = React.useRef<number | null>(null);
-  const touchControlsHideTimeoutRef = React.useRef<number | null>(null);
   const pausedRemainingMsRef = React.useRef<number | null>(null);
   const activePhotoSrcRef = React.useRef<string | null>(null);
   const [bufferedPhotoSrc, setBufferedPhotoSrc] = React.useState<string | null>(
     null,
   );
 
-  const clearTouchControlsHideTimeout = useCallback(() => {
-    if (touchControlsHideTimeoutRef.current !== null) {
-      window.clearTimeout(touchControlsHideTimeoutRef.current);
-      touchControlsHideTimeoutRef.current = null;
-    }
-  }, []);
-
-  const resetTouchControlsHideTimeout = useCallback(() => {
+  // Bump the auto-hide deadline forward on each container-level pointer
+  // event so touch interactions keep the toolbar awake (desktop gets this
+  // via the mouse-over-toolbar branch in the auto-hide effect).
+  const extendControlsHideDeadline = useCallback(() => {
     if (!isCoarsePointer || !controlsVisible) {
       return;
     }
-
-    clearTouchControlsHideTimeout();
-    touchControlsHideTimeoutRef.current = window.setTimeout(() => {
-      setControlsVisible(false);
-      touchControlsHideTimeoutRef.current = null;
-    }, TOUCH_CONTROLS_AUTO_HIDE_MS);
-  }, [clearTouchControlsHideTimeout, controlsVisible, isCoarsePointer]);
+    controlsHideDeadlineRef.current = Date.now() + TOUCH_CONTROLS_AUTO_HIDE_MS;
+    setControlsHideProgress(1);
+  }, [controlsVisible, isCoarsePointer]);
 
   const updateSlideshowUrl = useCallback(
     (mode: SlideshowMode, delayMs = timeDelayRef.current) => {
@@ -498,6 +547,25 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
       setShowCover(coverParam);
     }
 
+    // Time-of-day & season-aware bias toggle.
+    const timeParam = parseBool(url.searchParams.get("time"));
+    if (timeParam !== null) {
+      setTimeAware(timeParam);
+    }
+
+    // Occasional 2-/3-up "remix" slides.
+    const remixParam = parseBool(url.searchParams.get("remix"));
+    if (remixParam !== null) {
+      setRemixEnabled(remixParam);
+    }
+
+    // Snap each advance to wall-clock boundaries (default on). Tests and
+    // anyone wanting a strict "now + delay" cadence can pass align_cadence=0.
+    const alignCadenceParam = parseBool(url.searchParams.get("align_cadence"));
+    if (alignCadenceParam !== null) {
+      setAlignCadence(alignCadenceParam);
+    }
+
     // Parse details alignment setting
     const alignmentParam = url.searchParams.get("align");
     if (
@@ -532,10 +600,30 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
     setTimeDelay,
     setShuffleHistorySize,
     setSlideshowMode,
+    setTimeAware,
+    setRemixEnabled,
+    setAlignCadence,
   ]);
 
+  // Single source of truth for "when does the next slide change?". Honours
+  // the alignCadence toggle so every advance, history nav and pause/resume
+  // either snaps to the next wall-clock boundary (e.g. :00 / :15 / :30 / :45
+  // for a 15-minute cadence) or just adds the delay raw.
+  const computeNextChangeAt = useCallback(
+    (now: Date = new Date()): Date => {
+      if (alignCadence) {
+        return getNextAlignedSlideshowChange({ now, delayMs: timeDelay });
+      }
+      return new Date(now.getTime() + timeDelay);
+    },
+    [alignCadence, timeDelay],
+  );
+
   const commitNextPhoto = useCallback(
-    (candidatePhoto: RandomPhotoRow, opts?: { trackRecent?: boolean }) => {
+    (
+      candidatePhoto: RandomPhotoRow,
+      opts?: { trackRecent?: boolean; allowRemix?: boolean },
+    ) => {
       if (opts?.trackRecent) {
         recentPhotoPathsRef.current = [
           candidatePhoto.path,
@@ -543,9 +631,98 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
         ].slice(0, shuffleHistorySize);
       }
 
+      // Remix decision: only on forward advance (allowRemix), never on history
+      // navigation or initial seed. Compute companions+strategy BEFORE pushing
+      // the history entry so Previous/Next can replay the full layout.
+      let companions: RandomPhotoRow[] = [];
+      let strategy: RemixStrategy | null = null;
+      if (opts?.allowRemix && (forceRemixRef.current || remixEnabled)) {
+        let count: 0 | 1 | 2 = 0;
+        if (forceRemixRef.current) {
+          // User pressed "Remix now"; bypass the dice and pick a layout.
+          forceRemixRef.current = false;
+          count = Math.random() < 0.7 ? 1 : 2;
+        } else {
+          count = decideRemixCompanionCount(REMIX_PROBABILITY);
+        }
+        if (count > 0) {
+          // 40% of remixes try a vector strategy (SigLIP similar / anti-similar)
+          // when the embeddings DB is loaded — these are the most "artful" pairs.
+          // If the DB isn't loaded yet, kick off a load and fall back to a
+          // sync strategy this round.
+          const wantsVector = Math.random() < 0.4;
+          const vectorReady = !!(database && embeddingsDatabase);
+
+          if (wantsVector && !vectorReady && !enableRemixEmbeddings) {
+            // Trigger DB load so future vector rolls can succeed.
+            setEnableRemixEmbeddings(true);
+          }
+
+          if (wantsVector && vectorReady) {
+            // Async vector path. The history entry starts with no companions
+            // and the chosen strategy; the fetch resolves later and patches
+            // both the live state and the recorded history entry.
+            const useAntiSimilar = Math.random() < 0.45;
+            const vectorStrategy: RemixStrategy = useAntiSimilar
+              ? "juxtapose"
+              : "similar";
+            strategy = vectorStrategy;
+            const seedPath = candidatePhoto.path;
+            const desiredCount = count;
+
+            void (async () => {
+              try {
+                const result = await fetchSimilarResults({
+                  database,
+                  embeddingsDatabase,
+                  path: seedPath,
+                  similarityOrder: useAntiSimilar ? "least" : "most",
+                  page: 1,
+                  pageSize: desiredCount * 4,
+                });
+                // Stale guard: if the user has advanced past this slide while
+                // we were fetching, drop the result on the floor.
+                if (currentPhotoPathRef.current?.path !== seedPath) return;
+
+                const pool = randomPhotoPoolRef.current;
+                const fetched: RandomPhotoRow[] = [];
+                for (const item of result.data) {
+                  if (fetched.length >= desiredCount) break;
+                  const match = pool.find((p) => p.path === item.path);
+                  if (match) fetched.push(match);
+                }
+                if (fetched.length === 0) return;
+
+                setRemixCompanions(fetched);
+                // Patch the recorded history entry so Previous/Next replays
+                // with the same companions after the async resolve.
+                const entry = navigationHistoryRef.current.find(
+                  (e) => e.seed.path === seedPath,
+                );
+                if (entry) {
+                  entry.companions = fetched;
+                }
+              } catch (err) {
+                console.error("Vector remix fetch failed", err);
+              }
+            })();
+          } else {
+            const pick = pickRemixCompanions(
+              candidatePhoto,
+              randomPhotoPoolRef.current,
+              count,
+            );
+            if (pick.companions.length > 0) {
+              companions = pick.companions;
+              strategy = pick.strategy;
+            }
+          }
+        }
+      }
+
       const nextHistory = [
         ...navigationHistoryRef.current.slice(0, historyIndexRef.current + 1),
-        candidatePhoto,
+        { seed: candidatePhoto, companions, strategy },
       ];
 
       navigationHistoryRef.current = nextHistory;
@@ -557,16 +734,25 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
 
       currentPhotoPathRef.current = candidatePhoto;
       setCurrentPhotoPath(candidatePhoto);
+      setRemixCompanions(companions);
+      setRemixStrategy(strategy);
       setSlideshowError(null);
-      setNextChangeAt(new Date(Date.now() + timeDelay));
+      setNextChangeAt(computeNextChangeAt());
     },
-    [shuffleHistorySize, timeDelay],
+    [
+      computeNextChangeAt,
+      database,
+      embeddingsDatabase,
+      enableRemixEmbeddings,
+      remixEnabled,
+      shuffleHistorySize,
+    ],
   );
 
   const showHistoryPhoto = useCallback(
     (index: number): RandomPhotoRow | null => {
-      const candidatePhoto = navigationHistoryRef.current[index] ?? null;
-      if (!candidatePhoto) {
+      const entry = navigationHistoryRef.current[index] ?? null;
+      if (!entry) {
         return null;
       }
 
@@ -576,31 +762,71 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
         total: navigationHistoryRef.current.length,
       });
 
-      currentPhotoPathRef.current = candidatePhoto;
-      setCurrentPhotoPath(candidatePhoto);
+      currentPhotoPathRef.current = entry.seed;
+      setCurrentPhotoPath(entry.seed);
+      // Restore the original remix layout (if any) — companions and strategy
+      // are persisted in the history entry, so Previous/Next replays the
+      // side-by-side faithfully.
+      setRemixCompanions(entry.companions);
+      setRemixStrategy(entry.strategy);
       setSlideshowError(null);
-      setNextChangeAt(new Date(Date.now() + timeDelay));
-      return candidatePhoto;
+      setNextChangeAt(computeNextChangeAt());
+      return entry.seed;
     },
-    [timeDelay],
+    [computeNextChangeAt],
   );
 
+  // When remix is toggled off, drop any active companion layout immediately
+  // so the current slide collapses to a single photo. Otherwise the layout
+  // would persist until the next advance, which is jarring.
+  useEffect(() => {
+    if (!remixEnabled) {
+      setRemixCompanions([]);
+      setRemixStrategy(null);
+    }
+  }, [remixEnabled]);
+
+  // When time-aware is toggled, force a queue refill on the next advance so
+  // the new bias takes effect immediately rather than after the current
+  // pre-shuffled queue drains.
+  useEffect(() => {
+    randomQueueRef.current = [];
+    randomQueueIndexRef.current = -1;
+  }, [timeAware]);
+
   const refillRandomQueue = useCallback((): RandomPhotoRow[] => {
-    const nextQueue =
-      slideshowMode === "weighted"
-        ? weightedShufflePhotos(
-            randomPhotoPoolRef.current,
-            randomQueueLastPathRef.current,
-          )
-        : shufflePhotos(
-            randomPhotoPoolRef.current,
-            randomQueueLastPathRef.current,
-          );
+    let nextQueue: RandomPhotoRow[];
+    if (timeAware) {
+      // Time-aware bias overrides the per-mode bias: photos taken near the
+      // current hour-of-day and month-of-year are weighted higher.
+      nextQueue = timeAwareShufflePhotos(randomPhotoPoolRef.current);
+      // avoidBoundaryRepeat: prevent immediate repeat at queue boundaries
+      const lastPath = randomQueueLastPathRef.current;
+      if (lastPath && nextQueue.length > 1 && nextQueue[0]?.path === lastPath) {
+        const swapIdx = nextQueue.findIndex((p) => p.path !== lastPath);
+        if (swapIdx > 0) {
+          [nextQueue[0], nextQueue[swapIdx]] = [
+            nextQueue[swapIdx],
+            nextQueue[0],
+          ];
+        }
+      }
+    } else if (slideshowMode === "weighted") {
+      nextQueue = weightedShufflePhotos(
+        randomPhotoPoolRef.current,
+        randomQueueLastPathRef.current,
+      );
+    } else {
+      nextQueue = shufflePhotos(
+        randomPhotoPoolRef.current,
+        randomQueueLastPathRef.current,
+      );
+    }
 
     randomQueueRef.current = nextQueue;
     randomQueueIndexRef.current = -1;
     return nextQueue;
-  }, [slideshowMode]);
+  }, [slideshowMode, timeAware]);
 
   const resetSimilarQueue = useCallback(() => {
     similarSeedPathRef.current = null;
@@ -633,7 +859,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
 
       randomQueueIndexRef.current = nextIndex;
       randomQueueLastPathRef.current = nextPhoto.path;
-      commitNextPhoto(nextPhoto, opts);
+      commitNextPhoto(nextPhoto, { ...opts, allowRemix: true });
       return nextPhoto;
     },
     [commitNextPhoto, refillRandomQueue],
@@ -813,7 +1039,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
 
       similarQueueIndexRef.current = nextIndex;
       similarQueueLastPathRef.current = nextPhoto.path;
-      commitNextPhoto(nextPhoto, { trackRecent: true });
+      commitNextPhoto(nextPhoto, { trackRecent: true, allowRemix: true });
       return nextPhoto;
     }, [
       advanceRandomPhoto,
@@ -880,7 +1106,9 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
 
   const getUpcomingPhoto = useCallback((): RandomPhotoRow | null => {
     if (historyIndexRef.current < navigationHistoryRef.current.length - 1) {
-      return navigationHistoryRef.current[historyIndexRef.current + 1] ?? null;
+      return (
+        navigationHistoryRef.current[historyIndexRef.current + 1]?.seed ?? null
+      );
     }
 
     if (slideshowMode === "random" || slideshowMode === "weighted") {
@@ -925,7 +1153,16 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
       randomQueueIndexRef.current = -1;
 
       if (currentPhotoPathRef.current) {
-        navigationHistoryRef.current = [currentPhotoPathRef.current];
+        // Switching into similar mode resets history to just the current seed
+        // — discard any remix layout that was active so the new mode starts
+        // from a clean single photo.
+        navigationHistoryRef.current = [
+          {
+            seed: currentPhotoPathRef.current,
+            companions: [],
+            strategy: null,
+          },
+        ];
         historyIndexRef.current = 0;
         setHistoryPosition({ index: 0, total: 1 });
       }
@@ -1078,13 +1315,6 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
   }, []);
 
   useEffect(() => {
-    if (isCoarsePointer) {
-      controlsHideDeadlineRef.current = null;
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setControlsHideProgress(1);
-      return;
-    }
-
     if (!controlsVisible) {
       controlsHideDeadlineRef.current = null;
       setControlsHideProgress(0);
@@ -1097,7 +1327,13 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
       return;
     }
 
-    const deadline = Date.now() + CONTROLS_AUTO_HIDE_MS;
+    // Touch/coarse-pointer gets a much longer dwell since the user can't
+    // mouse-out to dismiss. The ring still renders to make the impending
+    // auto-hide discoverable.
+    const autoHideMs = isCoarsePointer
+      ? TOUCH_CONTROLS_AUTO_HIDE_MS
+      : CONTROLS_AUTO_HIDE_MS;
+    const deadline = Date.now() + autoHideMs;
     controlsHideDeadlineRef.current = deadline;
     setControlsHideProgress(1);
 
@@ -1111,7 +1347,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
       }
 
       const remaining = Math.max(0, currentDeadline - Date.now());
-      const progress = remaining / CONTROLS_AUTO_HIDE_MS;
+      const progress = remaining / autoHideMs;
       setControlsHideProgress(progress);
 
       if (remaining <= 0) {
@@ -1126,21 +1362,6 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
 
     return () => window.cancelAnimationFrame(frameId);
   }, [controlsVisible, isCoarsePointer, isPointerOverToolbar]);
-
-  useEffect(() => {
-    if (!isCoarsePointer || !controlsVisible) {
-      clearTouchControlsHideTimeout();
-      return;
-    }
-
-    resetTouchControlsHideTimeout();
-    return clearTouchControlsHideTimeout;
-  }, [
-    clearTouchControlsHideTimeout,
-    controlsVisible,
-    isCoarsePointer,
-    resetTouchControlsHideTimeout,
-  ]);
 
   useEffect(() => {
     const fullscreenDocument = document as FullscreenDocument;
@@ -1357,7 +1578,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
     : "Hide overlays";
 
   const handleImagePointerDown = useCallback(
-    (event: React.PointerEvent<HTMLImageElement>) => {
+    (event: React.PointerEvent<HTMLElement>) => {
       if (event.pointerType === "mouse" && event.button !== 0) {
         return;
       }
@@ -1395,7 +1616,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
   );
 
   const clearImagePointerGesture = useCallback(
-    (event?: React.PointerEvent<HTMLImageElement>) => {
+    (event?: React.PointerEvent<HTMLElement>) => {
       if (event) {
         try {
           if (event.currentTarget.hasPointerCapture(event.pointerId)) {
@@ -1423,7 +1644,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
   );
 
   const handleImagePointerMove = useCallback(
-    (event: React.PointerEvent<HTMLImageElement>) => {
+    (event: React.PointerEvent<HTMLElement>) => {
       const gesture = pointerGestureRef.current;
       if (
         !gesture ||
@@ -1546,7 +1767,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
   );
 
   const handleImagePointerUp = useCallback(
-    (event: React.PointerEvent<HTMLImageElement>) => {
+    (event: React.PointerEvent<HTMLElement>) => {
       const gesture = pointerGestureRef.current;
       clearImagePointerGesture(event);
 
@@ -1674,13 +1895,28 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
     ],
   );
 
+  // After the user explicitly presses Hide, their cursor is almost always
+  // still over the top-edge trigger zone — without this cooldown the next
+  // mouseenter/mousemove on that zone immediately re-opens the toolbar.
+  // The suppression lasts long enough for the user to move the cursor down
+  // off the trigger area.
+  const suppressDesktopShowUntilRef = React.useRef(0);
+
   const showControlsForDesktop = useCallback(() => {
     if (isCoarsePointer) {
       return;
     }
-
+    if (Date.now() < suppressDesktopShowUntilRef.current) {
+      return;
+    }
     setControlsVisible(true);
   }, [isCoarsePointer]);
+
+  const hideDesktopControls = useCallback(() => {
+    controlsHideDeadlineRef.current = null;
+    suppressDesktopShowUntilRef.current = Date.now() + 700;
+    setControlsVisible(false);
+  }, []);
 
   const getCurrentPhotoLink = useCallback((): string | null => {
     const photoPath = currentPhotoPathRef.current?.path;
@@ -1857,6 +2093,40 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
         ) : (
           <div className={styles.detailsRow}>&nbsp;</div>
         )}
+
+        {timeAware && exifDate ? (
+          <div className={[styles.detailsRow, styles.detailsAffinity].join(" ")}>
+            🌅 {Math.round(getTimeAffinityScore(exifDate) * 100)}% match to
+            this hour & season
+          </div>
+        ) : null}
+
+        {remixCompanions.length > 0 ? (() => {
+          const totalPhotos = remixCompanions.length + 1;
+          const source: Record<RemixStrategy, string> = {
+            "same-album": "from this album",
+            "same-year": "from the same year",
+            "same-decade": "from the same decade",
+            "same-region": "from the same place",
+            "same-time-of-day": "shot around the same hour",
+            anniversary: "from this week, other years",
+            proximity: "shot nearby",
+            "golden-hour": "shot at golden hour",
+            juxtapose: "deliberately juxtaposed",
+            similar: "visually similar",
+            random: "picked at random",
+          };
+          const label = remixStrategy
+            ? source[remixStrategy]
+            : "picked at random";
+          return (
+            <div
+              className={[styles.detailsRow, styles.detailsAffinity].join(" ")}
+            >
+              ◫ Remix · {totalPhotos} photos {label}
+            </div>
+          );
+        })() : null}
       </div>
 
       <div
@@ -1907,8 +2177,8 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
         data-paused={String(isPaused)}
         data-touch-active={String(touchPointerActive)}
         data-touch-armed={String(touchArmed)}
-        onPointerDownCapture={resetTouchControlsHideTimeout}
-        onPointerMoveCapture={resetTouchControlsHideTimeout}
+        onPointerDownCapture={extendControlsHideDeadline}
+        onPointerMoveCapture={extendControlsHideDeadline}
         style={
           {
             "--touch-toolbar-show-preview-progress": String(
@@ -2020,15 +2290,20 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
         >
           {/* <ThemeToggle /> */}
 
-          <Link className={styles.brandLink} href="/">
-            <span className={styles.brandLogo} aria-hidden="true">
-              🖼️
-            </span>
-            <span className={styles.brandCopy}>
-              <span className={styles.brandTitle}>Snapshots</span>
-              <span className={styles.brandSubtitle}>Slideshow</span>
-            </span>
-          </Link>
+          {/* On a coarse-pointer / kiosk install this link is an easy escape
+              hatch out of the slideshow; hiding it removes that footgun while
+              keeping it for desktop where it acts as an obvious nav element. */}
+          {!isCoarsePointer ? (
+            <Link className={styles.brandLink} href="/">
+              <span className={styles.brandLogo} aria-hidden="true">
+                🖼️
+              </span>
+              <span className={styles.brandCopy}>
+                <span className={styles.brandTitle}>Snapshots</span>
+                <span className={styles.brandSubtitle}>Slideshow</span>
+              </span>
+            </Link>
+          ) : null}
 
           <div
             className={styles.playbackGroup}
@@ -2090,12 +2365,52 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
               <span className={styles.playbackDivider} aria-hidden="true" />
 
               <button
+                className={[
+                  timeAware ? commonStyles.active : "",
+                  styles.playbackModifier,
+                  commonStyles.button,
+                ].join(" ")}
+                aria-pressed={timeAware}
+                title="Bias the shuffle toward photos taken near the current hour and month"
+                onClick={() => setTimeAware(!timeAware)}
+              >
+                🌅 Time-of-day
+              </button>
+
+              <button
+                className={[
+                  remixEnabled ? commonStyles.active : "",
+                  styles.playbackModifier,
+                  commonStyles.button,
+                ].join(" ")}
+                aria-pressed={remixEnabled}
+                title="Occasionally show two or three photos side by side at random"
+                onClick={() => setRemixEnabled(!remixEnabled)}
+              >
+                ◫ Remix
+              </button>
+
+              <span className={styles.playbackDivider} aria-hidden="true" />
+
+              <button
                 className={commonStyles.button}
                 onClick={() => {
                   goRandom();
                 }}
+                title="Pick a fresh random photo, regardless of mode"
               >
-                🎲 Random
+                🎲 Surprise
+              </button>
+
+              <button
+                className={commonStyles.button}
+                title="Force the next advance to be a remix slide (ignores the 3% dice)"
+                onClick={() => {
+                  forceRemixRef.current = true;
+                  advanceToNextPhoto();
+                }}
+              >
+                ◫ Remix now
               </button>
 
               <button
@@ -2130,18 +2445,14 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
                 Next
               </button>
 
-              <button
-                className={commonStyles.button}
-                aria-label="Hide controls"
-                onClick={() => {
-                  controlsHideDeadlineRef.current = null;
-                  setControlsVisible(false);
-                }}
-              >
-                Hide
-              </button>
+              <span className={styles.playbackHideGroup}>
+                <button
+                  className={commonStyles.button}
+                  onClick={hideDesktopControls}
+                >
+                  Hide
+                </button>
 
-              {!isCoarsePointer ? (
                 <div
                   className={styles.hideProgress}
                   aria-hidden="true"
@@ -2155,7 +2466,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
                 >
                   <div className={styles.hideProgressRing} />
                 </div>
-              ) : null}
+              </span>
             </div>
           </div>
 
@@ -2170,9 +2481,6 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
               </span>
               <span className={styles.controlCopy}>
                 <span className={styles.controlTitle}>Display</span>
-                <span className={styles.controlSubtitle}>
-                  Overlays and placement
-                </span>
               </span>
             </div>
 
@@ -2235,9 +2543,6 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
               </span>
               <span className={styles.controlCopy}>
                 <span className={styles.controlTitle}>View</span>
-                <span className={styles.controlSubtitle}>
-                  Frame and screen mode
-                </span>
               </span>
             </div>
 
@@ -2248,9 +2553,14 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
                   commonStyles.button,
                 ].join(" ")}
                 aria-pressed={showCover}
+                title={
+                  showCover
+                    ? "Photos fill the screen (cropping). Tap to switch to fit."
+                    : "Photos fit the screen (letterboxed). Tap to switch to fill."
+                }
                 onClick={() => setShowCover(!showCover)}
               >
-                {showCover ? "Cover" : "Contain"}
+                ⛶ Fill screen
               </button>
 
               {!isFullscreenActive ? (
@@ -2265,14 +2575,6 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
                   ⇱ Fullscreen
                 </button>
               ) : null}
-
-              <div className={commonStyles.toast} role="status" aria-live="polite">
-                {isWakeLockSupported
-                  ? isWakeLockActive
-                    ? "Wake lock on"
-                    : "Wake lock off"
-                  : "Wake lock unsupported"}
-              </div>
 
               <button
                 className={[
@@ -2307,36 +2609,72 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
               </span>
               <span className={styles.controlCopy}>
                 <span className={styles.controlTitle}>Timing</span>
-                <span className={styles.controlSubtitle}>Slide cadence</span>
               </span>
             </div>
 
             <div className={styles.controlButtons}>
-              {[
-                10000, 30000, 60000, 900000, 3600000, 10800000, 43200000,
-                86400000,
-              ].map((delay) => {
-                const delayMin = delay / 1000 / 60;
-                const delaySec = delay / 1000;
+              {(() => {
+                const shortTimings = [10000, 30000, 60000, 900000, 3600000];
+                const longTimings = [10800000, 43200000, 86400000];
+                // Kiosk-extreme cadences (3h+, 12h, 24h) are kept available but
+                // hidden by default behind a "More" disclosure. They're auto-
+                // revealed when the active delay is one of them so the user
+                // can always see what's selected.
+                const activeIsLong = longTimings.includes(timeDelay);
+                const visible = showLongTimings || activeIsLong
+                  ? [...shortTimings, ...longTimings]
+                  : shortTimings;
+
+                const buttons = visible.map((delay) => {
+                  const delayMin = delay / 1000 / 60;
+                  const delaySec = delay / 1000;
+                  return (
+                    <button
+                      key={delay}
+                      className={[
+                        commonStyles.button,
+                        delay === timeDelay ? commonStyles.active : "",
+                      ].join(" ")}
+                      aria-pressed={delay === timeDelay}
+                      onClick={() => setTimeDelayAndUrl(delay)}
+                    >
+                      {delayMin >= 60
+                        ? `${delayMin / 60}h`
+                        : delayMin < 1
+                          ? `${delaySec}s`
+                          : `${delayMin}m`}
+                    </button>
+                  );
+                });
 
                 return (
-                  <button
-                    key={delay}
-                    className={[
-                      commonStyles.button,
-                      delay === timeDelay ? commonStyles.active : "",
-                    ].join(" ")}
-                    aria-pressed={delay === timeDelay}
-                    onClick={() => setTimeDelayAndUrl(delay)}
-                  >
-                    {delayMin >= 60
-                      ? `${delayMin / 60}h`
-                      : delayMin < 1
-                        ? `${delaySec}s`
-                        : `${delayMin}m`}
-                  </button>
+                  <>
+                    {buttons}
+                    {!activeIsLong ? (
+                      <button
+                        className={[
+                          commonStyles.button,
+                          showLongTimings ? commonStyles.active : "",
+                        ].join(" ")}
+                        aria-pressed={showLongTimings}
+                        aria-label={
+                          showLongTimings
+                            ? "Hide longer cadences"
+                            : "Show longer cadences (3h, 12h, 24h)"
+                        }
+                        title={
+                          showLongTimings
+                            ? "Hide longer cadences"
+                            : "Show longer cadences (3h, 12h, 24h)"
+                        }
+                        onClick={() => setShowLongTimings(!showLongTimings)}
+                      >
+                        {showLongTimings ? "Less" : "More…"}
+                      </button>
+                    ) : null}
+                  </>
                 );
-              })}
+              })()}
             </div>
 
             <div className={styles.controlMeta}>
@@ -2348,11 +2686,22 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
                     : `${Math.floor(secondsLeft)}s`}
               </div>
               <button
-                className={commonStyles.button}
+                className={[
+                  alignCadence ? commonStyles.active : "",
+                  commonStyles.button,
+                ].join(" ")}
                 type="button"
-                onClick={alignNextChangeToCadence}
+                aria-pressed={alignCadence}
+                title="When on, advances snap to wall-clock boundaries (e.g. :00 / :15 / :30 / :45 for a 15-minute cadence) instead of drifting from the moment you opened the app"
+                onClick={() => {
+                  const next = !alignCadence;
+                  setAlignCadence(next);
+                  if (next) {
+                    alignNextChangeToCadence();
+                  }
+                }}
               >
-                Align
+                {alignCadence ? "Aligned" : "Align"}
               </button>
             </div>
           </div>
@@ -2368,9 +2717,6 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
               </span>
               <span className={styles.controlCopy}>
                 <span className={styles.controlTitle}>Context</span>
-                <span className={styles.controlSubtitle}>
-                  Album and filter links
-                </span>
               </span>
             </div>
 
@@ -2389,13 +2735,6 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
                 className={commonStyles.toast}
               >
                 {playbackContextLabel} in <i>{albumName}</i>
-              </Link>
-
-              <Link
-                href={`/album/${albumName}#${photoName}`}
-                className={commonStyles.toast}
-              >
-                view photo in <i>{albumName}</i>
               </Link>
 
               <button
@@ -2455,39 +2794,90 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
           />
         ) : null}
 
-        <img
-          className={[
-            styles.image,
-            !imageLoaded ? styles.notLoaded : "",
-            showCover ? styles.cover : "",
-          ].join(" ")}
-          src={photoBlock.data.src}
-          alt={photoAltText}
-          style={{ touchAction: "none" }}
-          onLoad={() => {
-            setImageLoaded(true);
-            window.setTimeout(() => {
-              setPreviousPhotoSrc(null);
-            }, 260);
-          }}
-          onError={() => {
-            // Skip bad images to avoid showing broken image on displays
-            setTimeout(() => {
+        {remixCompanions.length > 0 ? (
+          <div
+            className={styles.remixGrid}
+            data-count={remixCompanions.length + 1}
+            style={{ touchAction: "none" }}
+            onPointerDown={handleImagePointerDown}
+            onPointerMove={handleImagePointerMove}
+            onPointerCancel={clearImagePointerGesture}
+            onPointerUp={handleImagePointerUp}
+            onClick={() => {
+              if (suppressImageClickRef.current) {
+                suppressImageClickRef.current = false;
+                return;
+              }
               advanceToNextPhoto();
-            }, 1000);
-          }}
-          onPointerDown={handleImagePointerDown}
-          onPointerMove={handleImagePointerMove}
-          onPointerCancel={clearImagePointerGesture}
-          onPointerUp={handleImagePointerUp}
-          onClick={() => {
-            if (suppressImageClickRef.current) {
-              suppressImageClickRef.current = false;
-              return;
-            }
-            advanceToNextPhoto();
-          }}
-        />
+            }}
+          >
+            <img
+              className={[styles.remixImage, !imageLoaded ? styles.notLoaded : ""]
+                .filter(Boolean)
+                .join(" ")}
+              src={photoBlock.data.src}
+              alt={photoAltText}
+              onLoad={() => {
+                setImageLoaded(true);
+                window.setTimeout(() => {
+                  setPreviousPhotoSrc(null);
+                }, 260);
+              }}
+              onError={() => {
+                setTimeout(() => {
+                  advanceToNextPhoto();
+                }, 1000);
+              }}
+            />
+            {remixCompanions.map((companion) => {
+              const src = getSlideshowPhotoSrc(companion);
+              if (!src) return null;
+              return (
+                <img
+                  key={companion.path}
+                  className={styles.remixImage}
+                  src={src}
+                  alt=""
+                  aria-hidden="true"
+                />
+              );
+            })}
+          </div>
+        ) : (
+          <img
+            className={[
+              styles.image,
+              !imageLoaded ? styles.notLoaded : "",
+              showCover ? styles.cover : "",
+            ].join(" ")}
+            src={photoBlock.data.src}
+            alt={photoAltText}
+            style={{ touchAction: "none" }}
+            onLoad={() => {
+              setImageLoaded(true);
+              window.setTimeout(() => {
+                setPreviousPhotoSrc(null);
+              }, 260);
+            }}
+            onError={() => {
+              // Skip bad images to avoid showing broken image on displays
+              setTimeout(() => {
+                advanceToNextPhoto();
+              }, 1000);
+            }}
+            onPointerDown={handleImagePointerDown}
+            onPointerMove={handleImagePointerMove}
+            onPointerCancel={clearImagePointerGesture}
+            onPointerUp={handleImagePointerUp}
+            onClick={() => {
+              if (suppressImageClickRef.current) {
+                suppressImageClickRef.current = false;
+                return;
+              }
+              advanceToNextPhoto();
+            }}
+          />
+        )}
 
         {bufferedPhotoSrc && bufferedPhotoSrc !== photoBlock.data.src ? (
           <img
