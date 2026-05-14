@@ -921,7 +921,7 @@ export const MMap: React.FC<MapWorldProps> = ({
 
   React.useEffect(() => {
     if (clickInfo && !timeFilteredPhotos.some((photo) => photo.href === clickInfo.href)) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
+       
       setClickInfo(null);
     }
     if (hoverInfo && !timeFilteredPhotos.some((photo) => photo.href === hoverInfo.href)) {

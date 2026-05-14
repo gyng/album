@@ -136,7 +136,7 @@ const TimelinePage: NextPage<PageProps> = ({ entries }) => {
   }, [availableDates, todayDate]);
 
   React.useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
+     
     setTodayDate(getLocalDateKey());
   }, []);
 
@@ -151,7 +151,7 @@ const TimelinePage: NextPage<PageProps> = ({ entries }) => {
     React.useState(MAX_TIMELINE_MEMORY_CLUSTERS);
 
   React.useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
+     
     setVisibleMemoryClusterCount(MAX_TIMELINE_MEMORY_CLUSTERS);
   }, [filteredEntries, todayDate]);
 
@@ -319,7 +319,7 @@ const TimelinePage: NextPage<PageProps> = ({ entries }) => {
   // If availableDates changes and selectedDate is null, default to latest
   React.useEffect(() => {
     if (!selectedDate && availableDates.length > 0) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
+       
       setSelectedDate(availableDates[0]);
     }
   }, [availableDates, selectedDate]);
@@ -327,7 +327,7 @@ const TimelinePage: NextPage<PageProps> = ({ entries }) => {
   // On mount or when router.query.date changes, update selectedDate if needed
   React.useEffect(() => {
     if (routeDateQuery && availableDates.includes(routeDateQuery)) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
+       
       setSelectedDate((current) =>
         current === routeDateQuery ? current : routeDateQuery,
       );
@@ -352,7 +352,7 @@ const TimelinePage: NextPage<PageProps> = ({ entries }) => {
       (!availableDates.includes(selectedDate) ||
         (todayDate && selectedDate > todayDate))
     ) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
+       
       setSelectedDate(null);
     }
   }, [availableDates, selectedDate, todayDate]);

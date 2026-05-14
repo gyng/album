@@ -612,7 +612,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
     // Parse filter (already supported)
     const searchFilter = url.searchParams.get("filter");
     if (searchFilter) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
+       
       setFilter(searchFilter);
     }
 
@@ -1341,7 +1341,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
 
   useEffect(() => {
     const nextSrc = getSlideshowPhotoSrc(getUpcomingPhoto());
-    // eslint-disable-next-line react-hooks/set-state-in-effect
+     
     setBufferedPhotoSrc(nextSrc);
   }, [currentPhotoPath?.path, getUpcomingPhoto, historyPosition.index, historyPosition.total]);
 
@@ -1362,7 +1362,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
     if (isPaused) {
       const remaining = Math.max(0, nextChangeAt.getTime() - Date.now());
       pausedRemainingMsRef.current = remaining;
-      // eslint-disable-next-line react-hooks/set-state-in-effect
+       
       setSecondsLeft(remaining / 1000);
       return;
     }
@@ -1473,7 +1473,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
   useEffect(() => {
     const fullscreenDocument = document as FullscreenDocument;
     const fullscreenRoot = document.documentElement as FullscreenElement;
-    // eslint-disable-next-line react-hooks/set-state-in-effect
+     
     setIsFullscreenSupported(
       typeof fullscreenRoot.requestFullscreen === "function" ||
         typeof fullscreenRoot.webkitRequestFullscreen === "function",
@@ -1503,7 +1503,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
 
   useEffect(() => {
     const wakeLock = (navigator as WakeLockNavigator).wakeLock;
-    // eslint-disable-next-line react-hooks/set-state-in-effect
+     
     setIsWakeLockSupported(typeof wakeLock?.request === "function");
   }, []);
 
@@ -1561,7 +1561,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
       return;
     }
 
-    // eslint-disable-next-line react-hooks/set-state-in-effect
+     
     releaseWakeLock().catch(console.error);
   }, [props.disabled, releaseWakeLock]);
 
@@ -1572,7 +1572,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
 
     // Try once on load so kiosk/photo-frame sessions wake-lock automatically
     // where browsers permit non-gesture acquisition.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
+     
     tryAcquireWakeLock().catch(console.error);
   }, [props.disabled, tryAcquireWakeLock]);
 
@@ -2073,7 +2073,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
   useEffect(() => {
     if (!activePhotoSrc) {
       activePhotoSrcRef.current = null;
-      // eslint-disable-next-line react-hooks/set-state-in-effect
+       
       setPreviousPhotoSrc(null);
       return;
     }
