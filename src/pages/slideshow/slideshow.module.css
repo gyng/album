@@ -66,16 +66,22 @@
   min-height: 0;
 }
 
-/* Fixed-position grid for the whole slide overlay. Three rows:
-     map     (full width, can carry mix-blend-mode in its own context)
+/* Fixed-position grid spanning the full viewport width. Three rows:
+     map     (with mix-blend-mode in its own context)
      descN   (1, 2 or 3 columns per data-count)
-     clock   (full width, contains badge + time/date)
-   data-count drives both the column template and the named areas. */
+     clock   (contains badge + time/date)
+   data-count drives both the column template and the named areas.
+
+   All horizontal placement (centre / left / right) is done with grid
+   alignment (justify-items, justify-self) — no transforms, no manual
+   left/right, no hardcoded centring offsets. */
 .bottomBarStack {
   position: fixed;
-  bottom: calc(env(safe-area-inset-bottom, 0px) + 5vh);
+  inset: auto 0 calc(env(safe-area-inset-bottom, 0px) + 5vh) 0;
   z-index: 200;
   display: grid;
+  /* Every grid item is horizontally centred in its track by default;
+     justify-self on a specific item can override per data-align below. */
   justify-items: center;
   /* align-items: end pins every grid item to the bottom of its row so
      description cells with shorter content don't float up to the top of
@@ -115,32 +121,17 @@
     "clock clock clock";
 }
 
-/* Width / horizontal placement:
-   - single image (N=1) sizes to content and slides left/center/right by
-     the user's detailsAlignment toggle.
-   - remix (N>1) always spans the full viewport so each column gets 1fr. */
-.bottomBarStack[data-count="1"] {
-  width: auto;
-  max-width: 90vw;
-  left: 50%;
-  transform: translateX(-50%);
-}
-
+/* Single-image detailsAlignment toggle — slides every grid item to the
+   start or end of its (single) column. No transforms involved: pure
+   grid alignment via justify-items on the container. Multi-photo remix
+   ignores data-align because per-column centring already gives each
+   description its own column. */
 .bottomBarStack[data-count="1"][data-align="left"] {
-  left: calc(env(safe-area-inset-left, 0px) + 5vw);
-  transform: none;
+  justify-items: start;
 }
 
 .bottomBarStack[data-count="1"][data-align="right"] {
-  right: calc(env(safe-area-inset-right, 0px) + 5vw);
-  left: auto;
-  transform: none;
-}
-
-.bottomBarStack[data-count="2"],
-.bottomBarStack[data-count="3"] {
-  left: 0;
-  right: 0;
+  justify-items: end;
 }
 
 /* No inner flex layout here — the grid cell already fixes width, and a
@@ -850,59 +841,11 @@
   }
 }
 
-.bottomBar {
-  position: fixed;
-  user-select: none;
-  pointer-events: none;
-  bottom: calc(env(safe-area-inset-bottom, 0px) + 5vh);
-  text-shadow:
-    1px 2px 2px hsl(0 0% 0% / 0.333),
-    2px 4px 4px hsl(0 0% 0% / 0.333),
-    3px 6px 6px hsl(0 0% 0% / 0.333);
-  color: white;
-  z-index: 200;
-  min-width: 220px;
-  /* Default center alignment */
-  left: 50%;
-  transform: translateX(-50%);
-  text-align: center;
-  transition: opacity 0.18s ease-out;
-}
-
-/* Fade the clock/details panel during an active touch gesture so it doesn't
-   visually clash with the centred touch affordances. */
-.container[data-touch-active="true"] .bottomBar {
+/* Fade the clock/details panel during an active touch gesture so it
+   doesn't visually clash with the centred touch affordances. */
+.container[data-touch-active="true"] .bottomBarStack {
   opacity: 0.25;
-}
-
-.alignLeft {
-  left: calc(env(safe-area-inset-left, 0px) + 5vw) !important;
-  transform: none !important;
-  text-align: center; /* Keep text centered within the container */
-}
-
-.alignCenter {
-  left: 50% !important;
-  transform: translateX(-50%) !important;
-  text-align: center;
-}
-
-.alignRight {
-  right: calc(env(safe-area-inset-right, 0px) + 5vw) !important;
-  left: auto !important;
-  transform: none !important;
-  text-align: center; /* Keep text centered within the container */
-}
-
-@media (max-width: 1024px) {
-  .alignLeft {
-    left: calc(env(safe-area-inset-left, 0px) + 2vw) !important;
-  }
-
-  .alignRight {
-    right: calc(env(safe-area-inset-right, 0px) + 2vw) !important;
-    left: auto !important;
-  }
+  transition: opacity 0.18s ease-out;
 }
 
 .hide {
