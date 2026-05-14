@@ -2198,9 +2198,12 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
     );
   };
 
-  // Map zone (placed above descriptions in the grid). mix-blend-mode lives
-  // on the map wrapper so the clock and badge below keep their text-shadows.
-  const renderSlideMap = () => {
+  // Map zone (placed above descriptions in the grid). The actual MMap
+  // (which is a heavy WebGL context) is only mounted when `mountMap` is
+  // true — the text layer of the dual-render passes false so it just
+  // gets the empty wrapper for layout parity. That cuts the per-slide
+  // WebGL context lifecycles in half on a long-running sideboard session.
+  const renderSlideMap = (mountMap: boolean) => {
     const allCoords = slidePhotoMeta
       .map((m) => m.coords)
       .filter((c): c is [number, number] => !!c);
@@ -2214,15 +2217,17 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
         ].join(" ")}
         style={{ mixBlendMode: "screen" }}
       >
-        <MMap
-          coordinates={allCoords.length === 1 ? allCoords[0] : allCoords}
-          attribution={false}
-          details={false}
-          style={{ width: "100%", height: "100%" }}
-          mapStyle="toner-v2"
-          projection="vertical-perspective"
-          markerStyle={{ visibility: "hidden" }}
-        />
+        {mountMap ? (
+          <MMap
+            coordinates={allCoords.length === 1 ? allCoords[0] : allCoords}
+            attribution={false}
+            details={false}
+            style={{ width: "100%", height: "100%" }}
+            mapStyle="toner-v2"
+            projection="vertical-perspective"
+            markerStyle={{ visibility: "hidden" }}
+          />
+        ) : null}
       </div>
     );
   };
@@ -2912,7 +2917,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
                 visibility: isMapLayer ? "visible" : "hidden",
               }}
             >
-              {renderSlideMap()}
+              {renderSlideMap(isMapLayer)}
             </div>
             {slidePhotos.map((photo, idx) => (
               <div
