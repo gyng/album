@@ -2068,6 +2068,66 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
     }
   }, [getCurrentPhotoLink]);
 
+  // Hand off the current photo to the iOS / Android system share sheet. Falls
+  // back to clipboard copy when Web Share isn't available (desktop Safari,
+  // most desktop browsers other than Chrome on macOS).
+  const shareCurrentPhoto = useCallback(async () => {
+    const photoLink = getCurrentPhotoLink();
+    if (!photoLink) return;
+    const albumName = currentPhotoPathRef.current?.path.split("/")?.[2] ?? "";
+    const photoName = currentPhotoPathRef.current?.path.split("/")?.[3] ?? "";
+    if (typeof navigator.share === "function") {
+      try {
+        await navigator.share({
+          title: photoName || "Photo",
+          text: albumName ? `From ${albumName}` : undefined,
+          url: photoLink,
+        });
+        return;
+      } catch (err) {
+        // User cancelled, or the platform rejected the share — fall through
+        // to clipboard so something still happens.
+        console.debug("Web Share cancelled or unavailable", err);
+      }
+    }
+    await copyCurrentPhotoLink();
+  }, [copyCurrentPhotoLink, getCurrentPhotoLink]);
+
+  // Long-press the Context icon to dump info about the currently-displayed
+  // image — URL, decoded dimensions, byte size. Mostly a debug affordance
+  // for verifying the resized-image variant being served on real devices
+  // (e.g. confirming whether the iPad PWA is loading @3200 vs @1600).
+  const inspectCurrentImage = useCallback(async () => {
+    const img = document.querySelector(
+      'img[alt]:not([aria-hidden="true"])',
+    ) as HTMLImageElement | null;
+    if (!img) return;
+    const src = img.currentSrc || img.src;
+    const decoded = `${img.naturalWidth}×${img.naturalHeight}`;
+    const displayed = `${Math.round(img.getBoundingClientRect().width)}×${Math.round(img.getBoundingClientRect().height)}`;
+    let sizeKb: string | null = null;
+    try {
+      const head = await fetch(src, { method: "HEAD", cache: "no-store" });
+      const bytes = head.headers.get("content-length");
+      if (bytes) {
+        sizeKb = `${(parseInt(bytes, 10) / 1024).toFixed(0)} KB`;
+      }
+    } catch {
+      // ignore — HEAD might fail on some hosts; still show what we have.
+    }
+    const dpr = window.devicePixelRatio;
+    const lines = [
+      src,
+      `decoded ${decoded}`,
+      `displayed ${displayed} @ ${dpr.toFixed(2)}× DPR`,
+      sizeKb ? `bytes ${sizeKb}` : null,
+    ].filter(Boolean);
+    alert(lines.join("\n"));
+  }, []);
+
+  const contextLongPressTimerRef = React.useRef<number | null>(null);
+  const contextLongPressFiredRef = React.useRef(false);
+
   const activePhotoSrc = getSlideshowPhotoSrc(currentPhotoPath);
 
   useEffect(() => {
@@ -2833,7 +2893,38 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
             aria-label="Current photo context"
           >
             <div className={styles.controlHeader}>
-              <span className={styles.controlLogo} aria-hidden="true">
+              <span
+                className={styles.controlLogo}
+                role="button"
+                aria-label="Long-press to inspect the current image"
+                title="Long-press to inspect the current image"
+                style={{ cursor: "pointer", pointerEvents: "auto" }}
+                onPointerDown={(event) => {
+                  if (event.pointerType === "mouse" && event.button !== 0)
+                    return;
+                  contextLongPressFiredRef.current = false;
+                  if (contextLongPressTimerRef.current !== null) {
+                    window.clearTimeout(contextLongPressTimerRef.current);
+                  }
+                  contextLongPressTimerRef.current = window.setTimeout(() => {
+                    contextLongPressFiredRef.current = true;
+                    contextLongPressTimerRef.current = null;
+                    void inspectCurrentImage();
+                  }, 500);
+                }}
+                onPointerUp={() => {
+                  if (contextLongPressTimerRef.current !== null) {
+                    window.clearTimeout(contextLongPressTimerRef.current);
+                    contextLongPressTimerRef.current = null;
+                  }
+                }}
+                onPointerCancel={() => {
+                  if (contextLongPressTimerRef.current !== null) {
+                    window.clearTimeout(contextLongPressTimerRef.current);
+                    contextLongPressTimerRef.current = null;
+                  }
+                }}
+              >
                 📎
               </span>
               <span className={styles.controlCopy}>
@@ -2866,6 +2957,17 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
                 }}
               >
                 {copiedPhotoLink ? "copied photo link" : "copy photo link"}
+              </button>
+
+              <button
+                className={commonStyles.button}
+                type="button"
+                title="Send the current photo to a system app via the share sheet"
+                onClick={() => {
+                  void shareCurrentPhoto();
+                }}
+              >
+                ⤴ Share
               </button>
             </div>
           </div>
