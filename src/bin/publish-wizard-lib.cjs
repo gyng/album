@@ -828,10 +828,20 @@ const askYesNo = async ({ prompt, defaultValue, yes }) => {
   }
 };
 
+const wallClockStamp = () => {
+  const d = new Date();
+  const pad = (n) => String(n).padStart(2, "0");
+  const off = -d.getTimezoneOffset();
+  const sign = off >= 0 ? "+" : "-";
+  const oh = pad(Math.floor(Math.abs(off) / 60));
+  const om = pad(Math.abs(off) % 60);
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}${sign}${oh}:${om}`;
+};
+
 const runShellCommand = ({ command, cwd }) => {
   return new Promise((resolve, reject) => {
     const startedAt = Date.now();
-    console.log(`\n${statusLabel("run")} ${command}`);
+    console.log(`\n[${wallClockStamp()}] ${statusLabel("run")} ${command}`);
     const child = spawn(command, {
       cwd,
       stdio: "inherit",
@@ -842,7 +852,9 @@ const runShellCommand = ({ command, cwd }) => {
     child.on("exit", (code) => {
       if (code === 0) {
         const elapsedSeconds = ((Date.now() - startedAt) / 1000).toFixed(1);
-        console.log(`${statusLabel("ok")} Finished in ${elapsedSeconds}s`);
+        console.log(
+          `[${wallClockStamp()}] ${statusLabel("ok")} Finished in ${elapsedSeconds}s`
+        );
         resolve();
         return;
       }
