@@ -2,7 +2,10 @@ import { test, expect } from "@playwright/test";
 
 test.describe("Map time range slider", () => {
   test("slider renders with two thumbs and sparkline", async ({ page }) => {
-    await page.goto("/map");
+    // URL params are the documented way to reveal the slider — the toggle
+    // button is only shown when an album is filtered or there are no routable
+    // albums, neither of which holds for the test data on /map.
+    await page.goto("/map?from=2020-01-01&to=2025-01-01");
 
     // Two slider thumbs (from + to)
     const sliders = page.locator('[role="slider"]');
@@ -47,16 +50,18 @@ test.describe("Map time range slider", () => {
   });
 
   test("keyboard navigation moves thumbs", async ({ page }) => {
-    await page.goto("/map");
+    // Range pre-applied via URL so the slider is mounted; keyboard then nudges
+    // the start thumb and we verify the reset stays visible after the move.
+    await page.goto("/map?from=2020-01-01&to=2025-01-01");
 
     const fromThumb = page.locator('[role="slider"][aria-label="Range start"]');
     await expect(fromThumb).toBeVisible({ timeout: 10_000 });
 
-    // Focus and press right arrow to activate range
+    // Focus and press right arrow to nudge the from thumb
     await fromThumb.focus();
     await page.keyboard.press("ArrowRight");
 
-    // Should now have a reset button (range is active)
+    // Reset button stays visible (range is still active)
     const resetButton = page.locator('button:has-text("Reset")');
     await expect(resetButton).toBeVisible({ timeout: 5_000 });
   });
