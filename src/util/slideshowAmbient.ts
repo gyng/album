@@ -115,8 +115,12 @@ export type RemixStrategy =
   | "anniversary"
   | "proximity"
   | "golden-hour"
-  | "juxtapose"
+  | "shared-camera"
+  // Vector-only: produced by the SigLIP path in the slideshow component, not
+  // by the sync weighted roll. Their entries in `strategyFilters` are no-ops
+  // so they can never surface from the sync path even if rolled.
   | "similar"
+  | "juxtapose"
   | "random";
 
 export type RemixPick = {
@@ -159,6 +163,24 @@ const lastNonNumericLine = (geocode: string): string => {
     }
   }
   return "";
+};
+
+// Camera identity from EXIF — "Make Model" lowercased. Matches the line-based
+// "Key: value" format the rest of this module already parses.
+const extractCameraId = (exifString: string): string => {
+  if (!exifString) return "";
+  let make = "";
+  let model = "";
+  for (const line of exifString.split("\n")) {
+    const colonIdx = line.indexOf(":");
+    if (colonIdx === -1) continue;
+    const key = line.slice(0, colonIdx).trim();
+    const value = line.slice(colonIdx + 1).trim();
+    if (key === "Image Make") make = value;
+    else if (key === "Image Model") model = value;
+  }
+  if (!make && !model) return "";
+  return `${make} ${model}`.trim().toLowerCase();
 };
 
 const shuffleInPlace = (
@@ -297,54 +319,44 @@ const strategyFilters: Record<
       return inGoldenHour(d.getHours());
     });
   },
-  // Deliberate anti-cohesion: photos from a *different* album AND different
-  // region than the seed. Maximises the chance of a surprising visual
-  // pairing — a city night next to a desert dawn.
-  juxtapose: (seed, pool) => {
-    const seedAlbum = albumOfPath(seed.path);
-    const seedRegion = lastNonNumericLine(seed.geocode);
+  // Same camera body (Make + Model) — pairings share era and colour science
+  // even when the subject changes. A "shot through the same eye" remix.
+  "shared-camera": (seed, pool) => {
+    const seedCamera = extractCameraId(seed.exif);
+    if (!seedCamera) return [];
     return pool.filter((p) => {
       if (p.path === seed.path) return false;
-      const album = albumOfPath(p.path);
-      if (album === seedAlbum) return false;
-      // If we don't know the seed's region, the album diff alone is enough.
-      if (!seedRegion) return true;
-      const region = lastNonNumericLine(p.geocode);
-      return region !== seedRegion;
+      return extractCameraId(p.exif) === seedCamera;
     });
   },
-  // SigLIP-backed semantic similarity. Real similarity requires an async
-  // embeddings DB query (see fetchSimilarResults in components/search/api),
-  // which doesn't fit the sync filter signature here. Returns [] so the
-  // strategy roll falls through to the next candidate. The slideshow
-  // component can wire in an async post-commit hook to populate this case
-  // when embeddings are available; left intentionally unimplemented in the
-  // sync util to keep this module side-effect-free and unit-testable.
+  // Vector strategies — implemented in the slideshow component against the
+  // SigLIP embeddings DB. `similar` is nearest-neighbour; `juxtapose` is the
+  // farthest-neighbour (anti-similar). Their sync filters return [] so the
+  // weighted roll always falls through; the slideshow's vector path is the
+  // only producer of these labels.
   similar: () => [],
+  juxtapose: () => [],
 };
 
-// Probability weights when rolling for the next strategy. Same-album leads
-// because trip-cohesion is the most obviously meaningful pairing; juxtapose
-// is kept low because over-frequent anti-cohesion feels chaotic; random is
-// the universal fallback. Weights need not sum to 1 — `pickWeightedStrategy`
-// normalises by the total.
-// Note: the slideshow component additionally runs its own 40% coin flip to
-// reach for the vector-based (SigLIP) strategies before falling back to this
-// weighted roll. So these weights only apply for the ~60% of remixes that
-// don't use the embeddings DB. The list intentionally over-represents
-// juxtapose so the sync-only sideboard still gets a healthy dose of
-// contrast pairings.
+// Probability weights for one unified roll across every strategy, including
+// `similar` and `juxtapose` (SigLIP / anti-SigLIP). Vector strategies have to
+// be resolved asynchronously by the slideshow component; the sync entry
+// `pickRemixCompanions` treats them as no-ops and falls through, so the
+// slideshow is responsible for handling the async path when those names are
+// rolled (see `rollRemixStrategy`).
 const STRATEGY_WEIGHTS: Array<[RemixStrategy, number]> = [
-  ["same-album", 0.2],
-  ["same-year", 0.1],
-  ["same-region", 0.12],
-  ["same-time-of-day", 0.08],
-  ["anniversary", 0.08],
-  ["proximity", 0.08],
-  ["golden-hour", 0.06],
-  ["same-decade", 0.06],
-  ["juxtapose", 0.16],
-  ["random", 0.06],
+  ["similar", 0.2],
+  ["same-album", 0.13],
+  ["proximity", 0.12],
+  ["juxtapose", 0.1],
+  ["anniversary", 0.1],
+  ["golden-hour", 0.09],
+  ["same-year", 0.06],
+  ["shared-camera", 0.06],
+  ["same-time-of-day", 0.05],
+  ["same-region", 0.04],
+  ["same-decade", 0.03],
+  ["random", 0.02],
 ];
 
 const pickWeightedStrategy = (random: () => number): RemixStrategy => {
@@ -356,6 +368,21 @@ const pickWeightedStrategy = (random: () => number): RemixStrategy => {
   }
   return "random";
 };
+
+/**
+ * Public weighted roll for callers that need to dispatch on the chosen
+ * strategy before resolving companions (e.g. the slideshow component takes
+ * the async SigLIP path when the roll picks `similar` or `juxtapose`).
+ */
+export const rollRemixStrategy = (
+  random: () => number = Math.random,
+): RemixStrategy => pickWeightedStrategy(random);
+
+/** Vector-resolved strategies — the sync filter chain can't produce them. */
+export const VECTOR_REMIX_STRATEGIES = new Set<RemixStrategy>([
+  "similar",
+  "juxtapose",
+]);
 
 /**
  * Pick `count` companion photos for a remix slide. Rolls a weighted die to

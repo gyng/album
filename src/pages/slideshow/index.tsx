@@ -38,7 +38,9 @@ import {
   getTimeAffinityScore,
   pickRemixCompanions,
   RemixStrategy,
+  rollRemixStrategy,
   timeAwareShufflePhotos,
+  VECTOR_REMIX_STRATEGIES,
 } from "../../util/slideshowAmbient";
 import { BUILD_VERSION } from "../../lib/buildVersion";
 
@@ -762,28 +764,38 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
           count = decideRemixCompanionCount(REMIX_PROBABILITY);
         }
         if (count > 0) {
-          // 40% of *ambient* remixes try a vector strategy (SigLIP similar /
-          // anti-similar) when the embeddings DB is loaded. User-forced
-          // remixes always take the sync path so the layout appears
-          // immediately — otherwise a "Remix now" press would briefly show
-          // the seed alone while the async vector fetch is in flight.
-          const wantsVector = !wasForced && Math.random() < 0.4;
+          // One weighted roll decides everything. If the result is a
+          // SigLIP-backed strategy (`similar` / `juxtapose`), resolve it via
+          // the async embeddings fetch; otherwise hand the rolled strategy to
+          // the sync filter chain. User-forced remixes skip vector even when
+          // rolled because a "Remix now" press should show the layout
+          // immediately — re-rolling until we land on a sync strategy keeps
+          // the response instant.
+          let rolled = rollRemixStrategy();
+          if (wasForced) {
+            let guard = 0;
+            while (VECTOR_REMIX_STRATEGIES.has(rolled) && guard < 8) {
+              rolled = rollRemixStrategy();
+              guard += 1;
+            }
+          }
           const vectorReady = !!(database && embeddingsDatabase);
 
-          if (wantsVector && !vectorReady && !enableRemixEmbeddings) {
+          if (
+            VECTOR_REMIX_STRATEGIES.has(rolled) &&
+            !vectorReady &&
+            !enableRemixEmbeddings
+          ) {
             // Trigger DB load so future vector rolls can succeed.
             setEnableRemixEmbeddings(true);
           }
 
-          if (wantsVector && vectorReady) {
+          if (VECTOR_REMIX_STRATEGIES.has(rolled) && vectorReady) {
             // Async vector path. The history entry starts with no companions
             // and the chosen strategy; the fetch resolves later and patches
             // both the live state and the recorded history entry.
-            const useAntiSimilar = Math.random() < 0.45;
-            const vectorStrategy: RemixStrategy = useAntiSimilar
-              ? "juxtapose"
-              : "similar";
-            strategy = vectorStrategy;
+            const isAntiSimilar = rolled === "juxtapose";
+            strategy = rolled;
             const seedPath = candidatePhoto.path;
             const desiredCount = count;
 
@@ -793,7 +805,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
                   database,
                   embeddingsDatabase,
                   path: seedPath,
-                  similarityOrder: useAntiSimilar ? "least" : "most",
+                  similarityOrder: isAntiSimilar ? "least" : "most",
                   page: 1,
                   pageSize: desiredCount * 4,
                 });
@@ -824,6 +836,10 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
               }
             })();
           } else {
+            // Sync path. If a vector strategy was rolled but embeddings
+            // aren't ready, pickRemixCompanions ignores it (vector filters
+            // return []) and the fallback walk picks the best available
+            // sync strategy instead, so the slide never stalls.
             const pick = pickRemixCompanions(
               candidatePhoto,
               randomPhotoPoolRef.current,
@@ -2305,6 +2321,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
       proximity: "shot nearby",
       "golden-hour": "shot at golden hour",
       juxtapose: "deliberately juxtaposed",
+      "shared-camera": "shot through the same lens",
       similar: "visually similar",
       random: "picked at random",
     };

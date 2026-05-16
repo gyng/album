@@ -234,12 +234,11 @@ describe("pickRemixCompanions", () => {
   });
 
   test("falls through to a later strategy when the rolled one has too few candidates", () => {
-    // Rig strategy roll to land on `same-year` (0.28 + something). With our
-    // photos lacking EXIF dates, `same-year` returns [], so we fall through
-    // to the next strategy in priority order.
+    // Land the roll in the proximity band [0.33, 0.45). Photos lack GPS, so
+    // proximity returns []; fallback walks down to same-album.
     const random = jest
       .fn()
-      .mockReturnValueOnce(0.4) // lands in same-year band (after same-album=0.28)
+      .mockReturnValueOnce(0.4)
       .mockReturnValue(0.5);
     const pick = pickRemixCompanions(
       seed,
@@ -247,10 +246,8 @@ describe("pickRemixCompanions", () => {
       2,
       random,
     );
-    // None of our photos have EXIF, so same-year/same-time-of-day/same-region
-    // all return empty. Falls through to same-album (or another that hits).
     expect(pick.companions).toHaveLength(2);
-    expect(pick.strategy).not.toBe("same-year");
+    expect(pick.strategy).not.toBe("proximity");
   });
 
   test("returns no duplicates", () => {
@@ -261,33 +258,6 @@ describe("pickRemixCompanions", () => {
     );
     expect(new Set(pick.companions.map((p) => p.path)).size).toBe(
       pick.companions.length,
-    );
-  });
-
-  test("juxtapose strategy only picks from different albums and regions", () => {
-    const tokyo = makePhoto("data/albums/japan/seed.jpg");
-    tokyo.geocode = "Shibuya\nTokyo\nJapan";
-    const japanCompanion = makePhoto("data/albums/japan/2.jpg");
-    japanCompanion.geocode = "Kyoto\nKyoto\nJapan";
-    const icelandCompanion = makePhoto("data/albums/iceland/x.jpg");
-    icelandCompanion.geocode = "Reykjavik\nReykjavik\nIceland";
-
-    // Force juxtapose by rigging the roll into the juxtapose band.
-    // Cumulative through prior strategies: 0.22+0.12+0.14+0.10+0.08+0.08+
-    // 0.06+0.06 = 0.86; juxtapose adds 0.08 → [0.86, 0.94].
-    const random = jest
-      .fn()
-      .mockReturnValueOnce(0.88) // juxtapose band
-      .mockReturnValue(0.5);
-    const pick = pickRemixCompanions(
-      tokyo,
-      [japanCompanion, icelandCompanion, icelandCompanion],
-      1,
-      random,
-    );
-    expect(pick.strategy).toBe("juxtapose");
-    expect(pick.companions[0]?.path.startsWith("data/albums/iceland/")).toBe(
-      true,
     );
   });
 
@@ -311,10 +281,11 @@ describe("pickRemixCompanions", () => {
       candidates.push(makeGpsPhoto(`data/albums/x/${i}.jpg`, i * 36));
     }
 
-    // Force proximity by landing the weighted roll in [0.58, 0.66).
+    // Force proximity by landing the weighted roll in [0.32, 0.44) under the
+    // current weights (similar 0.18 + same-album 0.14 = 0.32; proximity 0.12).
     const random = jest
       .fn()
-      .mockReturnValueOnce(0.6)
+      .mockReturnValueOnce(0.35)
       .mockReturnValue(0.5);
     const pick = pickRemixCompanions(gpsSeed, candidates, 2, random);
     expect(pick.strategy).toBe("proximity");
@@ -329,11 +300,56 @@ describe("pickRemixCompanions", () => {
     }
   });
 
+  test("shared-camera strategy matches on Make + Model", () => {
+    const withCamera = (
+      path: string,
+      make: string,
+      model: string,
+    ): RandomPhotoRow => ({
+      path,
+      exif: `Image Make: ${make}\nImage Model: ${model}`,
+      geocode: "",
+    });
+    const seedX100 = withCamera(
+      "data/albums/a/seed.jpg",
+      "FUJIFILM",
+      "X100V",
+    );
+    const sameBody = withCamera("data/albums/b/1.jpg", "FUJIFILM", "X100V");
+    const differentBody = withCamera(
+      "data/albums/c/2.jpg",
+      "FUJIFILM",
+      "X-T20",
+    );
+    const differentMake = withCamera("data/albums/d/3.jpg", "Sony", "A7IV");
+    const noCamera: RandomPhotoRow = {
+      path: "data/albums/e/4.jpg",
+      exif: "",
+      geocode: "",
+    };
+
+    // Cumulative through prior strategies under current weights:
+    // similar 0.20 + same-album 0.13 + proximity 0.12 + juxtapose 0.10 +
+    // anniversary 0.10 + golden-hour 0.09 + same-year 0.06 = 0.80.
+    // shared-camera adds 0.06 → [0.80, 0.86).
+    const random = jest
+      .fn()
+      .mockReturnValueOnce(0.83)
+      .mockReturnValue(0.5);
+    const pick = pickRemixCompanions(
+      seedX100,
+      [sameBody, differentBody, differentMake, noCamera],
+      1,
+      random,
+    );
+    expect(pick.strategy).toBe("shared-camera");
+    expect(pick.companions[0]?.path).toBe("data/albums/b/1.jpg");
+  });
+
   test("similar strategy is a placeholder that falls through to other strategies", () => {
-    // Cumulative weights: same-album 0.28, same-year 0.46, same-region 0.64,
-    // same-time-of-day 0.78, juxtapose 0.9, random 1.0. There's no `similar`
-    // band, so it can only be reached via the iteration order — and since
-    // its filter returns [], it should never be the *chosen* strategy.
+    // There's no `similar` band in STRATEGY_WEIGHTS, so it can only be
+    // reached via the fallback iteration order — and since its filter
+    // returns [], it should never be the *chosen* strategy.
     for (let i = 0; i < 50; i += 1) {
       const pick = pickRemixCompanions(
         seed,
@@ -341,6 +357,7 @@ describe("pickRemixCompanions", () => {
         1,
       );
       expect(pick.strategy).not.toBe("similar");
+      expect(pick.strategy).not.toBe("juxtapose");
     }
   });
 });
