@@ -255,20 +255,31 @@ const strategyFilters: Record<
       return Math.floor(d.getFullYear() / 10) === seedDecade;
     });
   },
-  // GPS proximity via Haversine — within ~50km of the seed. Tighter than
-  // same-region (which matches whole countries) but doesn't require the
-  // geocode strings to agree. Useful when you have many photos of one city.
+  // GPS proximity via Haversine — within ~50km of the seed, but biased
+  // toward the seed's nearest neighbours so a 3-up grid stays a tight cluster
+  // instead of fanning across the full 50km radius. The outer cap keeps the
+  // pool sane on big cities; the inner top-N keeps the picks visually local.
   proximity: (seed, pool) => {
     const seedCoords = extractGPSFromExifString(seed.exif);
     if (!seedCoords) return [];
     const [seedLat, seedLng] = seedCoords;
     const PROXIMITY_KM = 50;
-    return pool.filter((p) => {
-      if (p.path === seed.path) return false;
-      const coords = extractGPSFromExifString(p.exif);
-      if (!coords) return false;
-      return haversineKm(seedLat, seedLng, coords[0], coords[1]) <= PROXIMITY_KM;
-    });
+    const NEAREST_POOL_SIZE = 8;
+
+    const withDistance: Array<{ photo: RandomPhotoRow; distance: number }> = [];
+    for (const candidate of pool) {
+      if (candidate.path === seed.path) continue;
+      const coords = extractGPSFromExifString(candidate.exif);
+      if (!coords) continue;
+      const distance = haversineKm(seedLat, seedLng, coords[0], coords[1]);
+      if (distance > PROXIMITY_KM) continue;
+      withDistance.push({ photo: candidate, distance });
+    }
+
+    withDistance.sort((a, b) => a.distance - b.distance);
+    return withDistance
+      .slice(0, NEAREST_POOL_SIZE)
+      .map((entry) => entry.photo);
   },
   // Photos shot at golden hour — roughly the hour around sunrise (5-7am)
   // or sunset (5-7pm). Both seed and candidate must be in the band, so a

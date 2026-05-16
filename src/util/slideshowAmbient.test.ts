@@ -291,6 +291,44 @@ describe("pickRemixCompanions", () => {
     );
   });
 
+  test("proximity strategy picks from the seed's nearest neighbours", () => {
+    // EXIF parser treats coords as DMS-summed (deg + min/60 + sec/3600), so
+    // [0, 0, i*36] = i*0.01° ≈ i*1.11km along longitude.
+    const makeGpsPhoto = (path: string, lngSec: number): RandomPhotoRow => ({
+      path,
+      exif: [
+        "GPS GPSLatitude: 0,0,0",
+        "GPS GPSLatitudeRef: N",
+        `GPS GPSLongitude: 0,0,${lngSec}`,
+        "GPS GPSLongitudeRef: E",
+      ].join("\n"),
+      geocode: "",
+    });
+    const gpsSeed = makeGpsPhoto("data/albums/x/seed.jpg", 0);
+    // 30 candidates fanning east of the seed; the 8 closest are i=1..8.
+    const candidates: RandomPhotoRow[] = [];
+    for (let i = 1; i <= 30; i += 1) {
+      candidates.push(makeGpsPhoto(`data/albums/x/${i}.jpg`, i * 36));
+    }
+
+    // Force proximity by landing the weighted roll in [0.58, 0.66).
+    const random = jest
+      .fn()
+      .mockReturnValueOnce(0.6)
+      .mockReturnValue(0.5);
+    const pick = pickRemixCompanions(gpsSeed, candidates, 2, random);
+    expect(pick.strategy).toBe("proximity");
+
+    for (const photo of pick.companions) {
+      const match = photo.path.match(/\/(\d+)\.jpg$/);
+      expect(match).not.toBeNull();
+      const index = Number(match![1]);
+      // Within the 8 nearest — earlier code would pick from up to 27 within
+      // the 50km cap, letting distant pairs through.
+      expect(index).toBeLessThanOrEqual(8);
+    }
+  });
+
   test("similar strategy is a placeholder that falls through to other strategies", () => {
     // Cumulative weights: same-album 0.28, same-year 0.46, same-region 0.64,
     // same-time-of-day 0.78, juxtapose 0.9, random 1.0. There's no `similar`
