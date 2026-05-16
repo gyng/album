@@ -4,19 +4,6 @@
   object-fit: cover;
 }
 
-.pin {
-  --outline-color: rgba(255, 255, 255, 0.84);
-  display: block;
-  width: 14px;
-  height: 14px;
-  border-radius: 999px;
-  background: currentColor;
-  box-shadow:
-    0 0 0 2px var(--outline-color),
-    0 1px 2px rgb(0 0 0 / 0.18);
-  opacity: 0.9;
-}
-
 .link {
   text-decoration: none;
 }

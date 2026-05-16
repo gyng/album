@@ -1,6 +1,7 @@
 import { CSSProperties, useEffect } from "react";
 import React from "react";
 import styles from "./Map.module.css";
+import pinStyles from "./mapPin.module.css";
 
 import Map, { Marker, useMap } from "react-map-gl/maplibre";
 import type { ProjectionSpecification } from "maplibre-gl";
@@ -127,10 +128,14 @@ export const MMap: React.FC<MapProps> = (props) => {
             key={`${lat}-${lng}-${idx}`}
             longitude={lng}
             latitude={lat}
-            anchor="bottom"
-            color="var(--c-accent)"
+            anchor="center"
             style={props.markerStyle ?? {}}
-          />
+          >
+            <span
+              className={pinStyles.pin}
+              style={{ color: "var(--c-accent)" }}
+            />
+          </Marker>
         ))}
         <MapFlyer coordinates={coords} />
       </Map>

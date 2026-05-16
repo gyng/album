@@ -1,0 +1,16 @@
+/* Shared marker pin shape used by both the world map (MapWorld) and the
+   per-photo details map (Map). Apply to a div/span child of <Marker> and
+   colour via inline `style={{ color: ... }}` — the background reads from
+   currentColor. */
+.pin {
+  --outline-color: rgba(255, 255, 255, 0.84);
+  display: block;
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  background: currentColor;
+  box-shadow:
+    0 0 0 2px var(--outline-color),
+    0 1px 2px rgb(0 0 0 / 0.18);
+  opacity: 0.9;
+}

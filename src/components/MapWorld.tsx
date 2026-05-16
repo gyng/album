@@ -1,5 +1,6 @@
 import React from "react";
 import styles from "./MapWorld.module.css";
+import pinStyles from "./mapPin.module.css";
 import { OptimisedPhoto } from "../services/types";
 import Link from "next/link";
 import { getRelativeTimeString } from "../util/time";
@@ -1294,7 +1295,7 @@ export const MMap: React.FC<MapWorldProps> = ({
                   <span
                     style={{ color: photo.markerColor }}
                     className={[
-                      styles.pin,
+                      pinStyles.pin,
                       shouldEmphasizeRouteMarkers && activeRouteHrefSet.size > 0
                         ? activeRouteHrefSet.has(photo.href)
                           ? styles.pinActive
