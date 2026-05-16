@@ -346,42 +346,21 @@
   color: hsl(0 0% 100% / 0.72);
 }
 
-.touchTopAffordance,
 .touchBottomAffordance {
   position: fixed;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + var(--m-m));
   left: 50%;
   display: grid;
+  /* Chevron sits above the label pill (JSX order: chevron, label).
+     gap controls the breathing room between the two. */
   place-items: center;
-  /* Was m-s*0.5 — too tight: the chevron scales to 1.18× near commit and
-     the label gains a 2px outline ring in the armed state, and at that
-     point a 4px gap let them visually crash into each other. */
-  gap: var(--m-m);
+  gap: calc(var(--m-s) * 0.75);
   opacity: 0;
   transform: translateX(-50%)
-    translateY(calc(var(--touch-pull-progress) * var(--m-l)));
+    translateY(calc(var(--touch-pull-progress) * var(--m-l) * -1));
   transition:
     opacity 0.18s var(--touch-juice-ease),
     transform 0.18s var(--touch-juice-ease);
-}
-
-.touchTopAffordance {
-  top: calc(env(safe-area-inset-top, 0px) + var(--m-m));
-}
-
-.touchBottomAffordance {
-  bottom: calc(env(safe-area-inset-bottom, 0px) + var(--m-m));
-  transform: translateX(-50%)
-    translateY(calc(var(--touch-pull-progress) * var(--m-l) * -1));
-}
-
-.touchPullHandle {
-  width: calc(4rem + var(--touch-pull-progress, 0) * 2rem);
-  height: calc(var(--m) * 0.75);
-  border-radius: 999px;
-  background: hsl(0 0% 100% / 0.5);
-  box-shadow:
-    0 0 0 1px hsl(0 0% 0% / 0.24),
-    0 var(--m-s) var(--m-l) hsl(0 0% 0% / 0.34);
 }
 
 .touchPullChevron {
@@ -495,11 +474,6 @@
     scale(calc(1 + var(--touch-swipe-progress, 0) * 0.18));
 }
 
-.touchAffordances[data-touch-hint="controls"] .touchTopAffordance,
-.touchAffordances[data-touch-hint="reload"] .touchTopAffordance {
-  opacity: calc(0.62 + (var(--touch-pull-progress) * 0.38));
-}
-
 .touchAffordances[data-touch-hint="overlays"] .touchBottomAffordance {
   opacity: calc(0.62 + (var(--touch-pull-progress) * 0.38));
 }
@@ -518,8 +492,6 @@
     0 0 0 5px hsl(0 0% 0% / 0.35);
 }
 
-.touchAffordances[data-touch-armed="true"][data-touch-hint="controls"]
-  .touchPullChevron,
 .touchAffordances[data-touch-armed="true"][data-touch-hint="overlays"]
   .touchPullChevron {
   background: hsl(0 0% 100% / 0.96);
@@ -527,16 +499,6 @@
   box-shadow:
     0 0 0 3px hsl(0 0% 100% / 0.75),
     0 0 0 5px hsl(0 0% 0% / 0.35);
-}
-
-.touchAffordances[data-touch-armed="true"][data-touch-hint="controls"]
-  .touchPullHandle,
-.touchAffordances[data-touch-armed="true"][data-touch-hint="overlays"]
-  .touchPullHandle {
-  background: hsl(0 0% 100% / 0.95);
-  box-shadow:
-    0 0 0 1px hsl(0 0% 0% / 0.24),
-    0 var(--m-s) var(--m-l) hsl(0 0% 0% / 0.34);
 }
 
 .touchAffordances[data-touch-armed="true"][data-touch-hint="overlays"]

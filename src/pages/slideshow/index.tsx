@@ -2425,24 +2425,17 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
               } as React.CSSProperties
             }
           >
-            <div className={styles.touchTopAffordance}>
-              <span className={styles.touchPullHandle} />
-              <span className={styles.touchPullChevron}>
-                <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
-                  <path d="M5 8l5 5 5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              </span>
-            </div>
+            {/* Top affordance removed — the toolbar slides down over the
+                same area when the user pulls, so the hint is redundant. */}
             <div className={styles.touchBottomAffordance}>
-              <span className={styles.touchAffordanceLabel}>
-                {controlsVisible ? "Close settings" : nextOverlayLabel}
-              </span>
               <span className={styles.touchPullChevron}>
                 <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
                   <path d="M5 12l5-5 5 5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
               </span>
-              <span className={styles.touchPullHandle} />
+              <span className={styles.touchAffordanceLabel}>
+                {controlsVisible ? "Close settings" : nextOverlayLabel}
+              </span>
             </div>
             <div className={styles.touchSideAffordanceLeft}>
               <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
