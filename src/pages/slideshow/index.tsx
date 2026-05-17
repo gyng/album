@@ -162,6 +162,28 @@ const weightedShufflePhotos = (
   return avoidBoundaryRepeat(weighted, previousLastPath);
 };
 
+type PoolStats = { count: number; newestDate: Date | null };
+
+const EMPTY_POOL_STATS: PoolStats = { count: 0, newestDate: null };
+
+const computePoolStats = (photos: RandomPhotoRow[]): PoolStats => {
+  let newest: Date | null = null;
+  for (const photo of photos) {
+    const date = extractDateFromExifString(photo.exif);
+    if (date && (newest === null || date.getTime() > newest.getTime())) {
+      newest = date;
+    }
+  }
+  return { count: photos.length, newestDate: newest };
+};
+
+const formatNewestPhotoDate = (date: Date): string =>
+  date.toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+
 const getSlideshowPhotoSrc = (photo: RandomPhotoRow | null): string | null => {
   if (!photo?.path) {
     return null;
@@ -317,6 +339,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
             randomQueueRef.current = [];
             randomQueueIndexRef.current = -1;
             recentPhotoPathsRef.current = [];
+            setPoolStats(computePoolStats(photos));
           }
         } else {
           // Wake lock isn't held — reload is cheap and gives us a fully
@@ -412,6 +435,8 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
   const [remixCompanions, setRemixCompanions] = React.useState<
     RandomPhotoRow[]
   >([]);
+  const [poolStats, setPoolStats] =
+    React.useState<PoolStats>(EMPTY_POOL_STATS);
   const [remixStrategy, setRemixStrategy] =
     React.useState<RemixStrategy | null>(null);
   // When set, the next forward-advance ignores the dice roll and forces a
@@ -1031,6 +1056,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
         navigationHistoryRef.current = [];
         historyIndexRef.current = -1;
         setHistoryPosition({ index: -1, total: 0 });
+        setPoolStats(computePoolStats(photos));
         resetSimilarQueue();
 
         if (photos.length === 0) {
@@ -2504,6 +2530,22 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
                 <span className={styles.brandSubtitle}>Slideshow</span>
               </span>
             </Link>
+          ) : null}
+
+          {poolStats.count > 0 ? (
+            <div
+              className={styles.poolStats}
+              title="Photo pool — use this to confirm a PWA reload has picked up the latest DB"
+            >
+              <span className={styles.poolStatsCount}>
+                {poolStats.count.toLocaleString("en-GB")} photos
+              </span>
+              {poolStats.newestDate ? (
+                <span className={styles.poolStatsNewest}>
+                  newest {formatNewestPhotoDate(poolStats.newestDate)}
+                </span>
+              ) : null}
+            </div>
           ) : null}
 
           <div
