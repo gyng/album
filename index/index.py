@@ -29,6 +29,13 @@ from transformers import (
 
 import concurrent.futures
 import time
+from datetime import datetime
+
+
+def log(message: str) -> None:
+    """Print an indexing progress line prefixed with an ISO 8601 local-tz timestamp."""
+    stamp = datetime.now().astimezone().isoformat(timespec="seconds")
+    print(f"[{stamp}] {message}", flush=True)
 
 
 MODEL_PROFILE_JANUS = "janus"
@@ -254,7 +261,7 @@ class JanusClassifier(BaseCaptionClassifier):
         return MultiModalityCausalLM, VLChatProcessor, load_pil_images
 
     def init_model(self) -> None:
-        print("Loading Janus-Pro-1B...")
+        log("Loading Janus-Pro-1B...")
         # use 1B for speed/lower requirements
         model_path = "deepseek-ai/Janus-Pro-1B"
         MultiModalityCausalLM, VLChatProcessor, load_pil_images = (
@@ -268,7 +275,7 @@ class JanusClassifier(BaseCaptionClassifier):
             model_path, trust_remote_code=True
         )
         self.vl_gpt = vl_gpt.to(torch.bfloat16).cuda().eval()
-        print("Loaded Janus-Pro-1B.")
+        log("Loaded Janus-Pro-1B.")
 
     @torch.inference_mode()
     def predict(self, path: str, geocode: Optional[Mapping]) -> str:
@@ -407,7 +414,7 @@ class Gemma4Classifier(BaseCaptionClassifier):
         usable_gb = max(4.0, total_gb - requested_headroom)
         usable_mib = max(4096, int(usable_gb * 1024))
         reserved_gb = round(total_gb - (usable_mib / 1024), 2)
-        print(
+        log(
             "Gemma 4 headroom mode: "
             f"reserving about {reserved_gb} GiB of GPU memory for interactive work."
         )
@@ -423,11 +430,11 @@ class Gemma4Classifier(BaseCaptionClassifier):
             raise RuntimeError(
                 "Gemma 4 full-precision support requires a newer transformers build with AutoModelForMultimodalLM. Keep Janus as the default in this environment, or install the experimental Gemma runtime separately."
             ) from err
-        print(
+        log(
             f"Loading Gemma 4 classifier ({self.model_id}, quantization={self.quantization or 'none'})..."
         )
         if self.quantization == "bnb-4bit":
-            print(
+            log(
                 "Warning: local testing found Gemma 4 vision captions can become placeholder-like under bitsandbytes 4-bit quantisation. Prefer full precision for quality checks."
             )
         self.processor = AutoProcessor.from_pretrained(self.model_id)
@@ -469,7 +476,7 @@ class Gemma4Classifier(BaseCaptionClassifier):
         if "device_map" not in model_kwargs:
             self.model = self.model.to(self.device)
         self.model = self.model.eval()
-        print(f"Loaded Gemma 4 classifier {self.model_id}.")
+        log(f"Loaded Gemma 4 classifier {self.model_id}.")
 
     def _build_prompt(self, geocode: Optional[Mapping]) -> str:
         return build_classifier_prompt(geocode)
@@ -587,7 +594,7 @@ class Gemma4GgufClassifier(BaseCaptionClassifier):
         schema_file.flush()
         schema_file.close()
         self._json_schema_path = schema_file.name
-        print(
+        log(
             f"Using llama.cpp Gemma 4 GGUF classifier ({self.model_id}) via {self.command}."
         )
 
@@ -697,12 +704,12 @@ class BaseImageEmbedder:
 
     def init_model(self) -> None:
         self.model_id = self.MODEL_ID
-        print(f"Loading image embedder {self.model_id}...")
+        log(f"Loading image embedder {self.model_id}...")
         self.processor = AutoImageProcessor.from_pretrained(self.model_id)
         self.model = AutoModel.from_pretrained(self.model_id)
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         self.model = self.model.to(self.device).eval()
-        print(f"Loaded image embedder {self.model_id} on {self.device}.")
+        log(f"Loaded image embedder {self.model_id} on {self.device}.")
 
     @torch.inference_mode()
     def predict_image_embedding(self, path: str) -> list[float]:
@@ -1314,8 +1321,8 @@ def index(
     db.setup_tables()
     setup_ms = (time.perf_counter() - setup_started_at) * 1000
     db_info = db.info()
-    print(f"Database: {db_info['entries']} entries (SQLite {db_info['version']})")
-    print(f"Using model profile: {model_profile}")
+    log(f"Database: {db_info['entries']} entries (SQLite {db_info['version']})")
+    log(f"Using model profile: {model_profile}")
 
     planning_started_at = time.perf_counter()
     files = find_files(".", glob)
@@ -1353,13 +1360,13 @@ def index(
     planning_ms = (time.perf_counter() - planning_started_at) * 1000
 
     skipped = len(files) - len(work_items)
-    print(
+    log(
         f"Found {len(files)} files ({len(work_items)} to index, {skipped} already indexed) — profile: {model_profile}"
     )
-    print(f"(skipping {skipped} already-indexed)")
-    print(f"Analysing {len(work_items)} files needing work")
+    log(f"(skipping {skipped} already-indexed)")
+    log(f"Analysing {len(work_items)} files needing work")
     if model_profile in [MODEL_PROFILE_JANUS, MODEL_PROFILE_HYBRID]:
-        print(f"Classifier backend: {classifier_backend}")
+        log(f"Classifier backend: {classifier_backend}")
 
     if not dry_run and len(work_items) > 0:
         classifier = None
@@ -1400,7 +1407,7 @@ def index(
             path: colors_executor.submit(fast_colorthief.get_palette, path)
             for path in all_paths
         }
-        print(
+        log(
             f"Color extraction started in background ({len(all_paths)} images, {COLORTHIEF_WORKERS} threads)"
         )
 
@@ -1412,14 +1419,21 @@ def index(
                 item["path"] for item in work_items if item["needs_classifier"]
             ]
             resolved_batch_size = max(1, classifier_batch_size or classifier.batch_size)
-            print(
-                f"Running {classifier.backend} captions in batches of {resolved_batch_size} ({len(classifier_paths)} images)..."
+            total_batches = math.ceil(len(classifier_paths) / resolved_batch_size)
+            log(
+                f"Running {classifier.backend} captions in batches of {resolved_batch_size} ({len(classifier_paths)} images, {total_batches} batch(es))..."
             )
             batch_started_at = time.perf_counter()
-            for batch_start in range(0, len(classifier_paths), resolved_batch_size):
+            for batch_index, batch_start in enumerate(
+                range(0, len(classifier_paths), resolved_batch_size), start=1
+            ):
                 batch_paths = classifier_paths[
                     batch_start : batch_start + resolved_batch_size
                 ]
+                log(
+                    f"  {classifier.backend} batch {batch_index}/{total_batches} starting ({len(batch_paths)} images)..."
+                )
+                single_started_at = time.perf_counter()
                 batch_geocodes = [extract_geocode_from_path(p) for p in batch_paths]
                 batch_results = classifier.predict_batch(
                     list(zip(batch_paths, batch_geocodes))
@@ -1427,9 +1441,12 @@ def index(
                 for path, raw in zip(batch_paths, batch_results):
                     precomputed_captions[path] = raw
                 done = min(batch_start + resolved_batch_size, len(classifier_paths))
-                print(f"  {classifier.backend} batch: {done}/{len(classifier_paths)}")
+                single_ms = (time.perf_counter() - single_started_at) * 1000
+                log(
+                    f"  {classifier.backend} batch {batch_index}/{total_batches} done in {single_ms:.0f}ms ({done}/{len(classifier_paths)} images)"
+                )
             batch_ms = (time.perf_counter() - batch_started_at) * 1000
-            print(f"{classifier.backend} batch inference complete in {batch_ms:.0f}ms")
+            log(f"{classifier.backend} batch inference complete in {batch_ms:.0f}ms")
 
         # Pre-compute embeddings in batches (GPU, ~2x vs sequential).
         # keyed as precomputed_embeddings[path][model_id] = embedding
@@ -1441,19 +1458,31 @@ def index(
             if embedder is None:
                 continue
             emb_paths = [item["path"] for item in work_items if item[needs_key]]
-            print(
-                f"Running {embedder.model_id} embeddings in batches of {EMBEDDER_BATCH_SIZE} ({len(emb_paths)} images)..."
+            total_emb_batches = math.ceil(len(emb_paths) / EMBEDDER_BATCH_SIZE)
+            log(
+                f"Running {embedder.model_id} embeddings in batches of {EMBEDDER_BATCH_SIZE} ({len(emb_paths)} images, {total_emb_batches} batch(es))..."
             )
             emb_started_at = time.perf_counter()
-            for batch_start in range(0, len(emb_paths), EMBEDDER_BATCH_SIZE):
+            for emb_batch_index, batch_start in enumerate(
+                range(0, len(emb_paths), EMBEDDER_BATCH_SIZE), start=1
+            ):
                 batch_paths = emb_paths[batch_start : batch_start + EMBEDDER_BATCH_SIZE]
+                log(
+                    f"  {embedder.model_id} batch {emb_batch_index}/{total_emb_batches} starting ({len(batch_paths)} images)..."
+                )
+                single_started_at = time.perf_counter()
                 batch_embeddings = embedder.predict_image_embeddings_batch(batch_paths)
                 for path, embedding in zip(batch_paths, batch_embeddings):
                     precomputed_embeddings.setdefault(path, {})[
                         embedder.model_id
                     ] = embedding
+                single_ms = (time.perf_counter() - single_started_at) * 1000
+                done = min(batch_start + EMBEDDER_BATCH_SIZE, len(emb_paths))
+                log(
+                    f"  {embedder.model_id} batch {emb_batch_index}/{total_emb_batches} done in {single_ms:.0f}ms ({done}/{len(emb_paths)} images)"
+                )
             emb_ms = (time.perf_counter() - emb_started_at) * 1000
-            print(f"{embedder.model_id} embeddings complete in {emb_ms:.0f}ms")
+            log(f"{embedder.model_id} embeddings complete in {emb_ms:.0f}ms")
 
         # Collect color results (GPU work is done; colors are likely already finished).
         precomputed_colors_by_path: dict[str, list] = {}
@@ -1461,7 +1490,7 @@ def index(
         for path, fut in color_futures.items():
             precomputed_colors_by_path[path] = fut.result()
         colors_ms = (time.perf_counter() - colors_started_at) * 1000
-        print(
+        log(
             f"Color extraction complete in {colors_ms:.0f}ms (ran concurrently with GPU)"
         )
 
@@ -1502,7 +1531,7 @@ def index(
                 insert_analysed_images_batch(db, pending_results)
                 insert_durations_ms.append((time.perf_counter() - insert_started_at) * 1000)
                 persisted_results += len(pending_results)
-                print(
+                log(
                     f"Committed {persisted_results}/{total_work_items} analysed image(s) to SQLite"
                 )
                 pending_results = []
@@ -1522,7 +1551,7 @@ def index(
                 alt = analysed.get("alt_text") or analysed.get("subject") or ""
                 alt_str = f" | {alt[:80]}" if alt else ""
                 filename = os.path.basename(result["path"])
-                print(
+                log(
                     f"[{i + 1}/{total_work_items} {percent:.0f}% {rate:.2f}it/s ~{estimated_time_min:.1f}min] {filename}: {tags_str}{alt_str}"
                 )
                 pending_results.append(result)
@@ -1532,7 +1561,7 @@ def index(
             # Persist tail work so reruns continue from the latest committed chunk.
             flush_pending_results()
 
-        print(
+        log(
             f"Inserted {persisted_results} images in {sum(insert_durations_ms):.0f}ms across {len(insert_durations_ms)} transaction(s)"
         )
 
@@ -2576,11 +2605,11 @@ def analyse_image(
             except Exception:
                 attempts += 1
                 precomputed_caption = None  # fall back to fresh per-image predictions
-                print(
+                log(
                     f"Attempt {attempts}/{max_attempts} failed for {path}, got {raw_result}"
                 )
                 if attempts >= max_attempts:
-                    print(
+                    log(
                         f"Failed to classify {path} after {max_attempts} attempts, skipping."
                     )
                     result = {}
@@ -2597,7 +2626,7 @@ def analyse_image(
             )
             embeddings.append({"model_id": emb.model_id, "embedding": embedding})
         except Exception as err:
-            print(f"Embedding ({emb.model_id}) failed for {path}: {err}")
+            log(f"Embedding ({emb.model_id}) failed for {path}: {err}")
 
     # 2000:01:01 12:34:56 > 2000-01-01T12:34:56
     datetime = (
