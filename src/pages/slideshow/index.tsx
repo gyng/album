@@ -1726,6 +1726,17 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
       : "Show details"
     : "Hide overlays";
 
+  // Any touch interaction anywhere in the slideshow is a fresh user gesture —
+  // use it to (re)acquire the screen wake lock, which Safari PWAs require to
+  // happen inside a gesture handler. Capture-phase so taps on buttons or
+  // overlays that stop propagation still trigger it.
+  const handleAnyTouchStartCapture = useCallback(() => {
+    if (props.disabled || wakeLockRef.current) {
+      return;
+    }
+    tryAcquireWakeLock().catch(console.error);
+  }, [props.disabled, tryAcquireWakeLock]);
+
   const handleImagePointerDown = useCallback(
     (event: React.PointerEvent<HTMLElement>) => {
       if (event.pointerType === "mouse" && event.button !== 0) {
@@ -2342,7 +2353,9 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
       "same-year": "from the same year",
       "same-decade": "from the same decade",
       "same-region": "from the same place",
-      "same-time-of-day": "shot around the same hour",
+      "same-city": "from the same city",
+      "same-day-of-year": "from this exact date, other years",
+      "dominant-colour": "sharing this colour",
       anniversary: "from this week, other years",
       proximity: "shot nearby",
       "golden-hour": "shot at golden hour",
@@ -2413,6 +2426,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
         data-touch-armed={String(touchArmed)}
         onPointerDownCapture={extendControlsHideDeadline}
         onPointerMoveCapture={extendControlsHideDeadline}
+        onTouchStartCapture={handleAnyTouchStartCapture}
         style={
           {
             "--touch-toolbar-show-preview-progress": String(

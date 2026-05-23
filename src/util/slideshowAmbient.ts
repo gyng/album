@@ -3,6 +3,7 @@ import {
   extractDateFromExifString,
   extractGPSFromExifString,
 } from "./extractExifFromDb";
+import { deltaE, parseColorPalette, rgbToLab } from "./colorDistance";
 
 /**
  * Cyclic distance on a wraparound axis (e.g. hour-of-day on 24, month on 12).
@@ -32,16 +33,20 @@ export const getTimeAffinityScore = (
     now.getHours() + now.getMinutes() / 60,
     24,
   );
-  // sigma ≈ 2.5h: photos within ~2.5 hours of now score >0.6 on this axis.
-  const hourScore = Math.exp(-(hourDistance ** 2) / (2 * 2.5 * 2.5));
+  // sigma ≈ 1.5h: photos within ~1.5h of now score >0.6 on this axis; a
+  // 3h-off photo is already down to ~0.14, so the "live time" mode really
+  // tracks the current hour rather than just the half-day.
+  const hourScore = Math.exp(-(hourDistance ** 2) / (2 * 1.5 * 1.5));
 
   const monthDistance = cyclicDistance(
     photoDate.getMonth(),
     now.getMonth(),
     12,
   );
-  // sigma ≈ 1.25mo: same-season photos score >0.6 on this axis.
-  const monthScore = Math.exp(-(monthDistance ** 2) / (2 * 1.25 * 1.25));
+  // sigma ≈ 0.8mo: adjacent months still score >0.5, but two-months-off
+  // already drops below 0.05 — keeps the season feel without spilling into
+  // photos from the opposite half of the year.
+  const monthScore = Math.exp(-(monthDistance ** 2) / (2 * 0.8 * 0.8));
 
   // Joint affinity: BOTH axes must match for a high score. A photo that's
   // the right hour but wrong season (or vice versa) lands around 0.3, not 0.5.
@@ -55,13 +60,13 @@ export const getTimeAffinityScore = (
 // already differ by ~50× (floor 0.02 to perfect 1.0), but with thousands of
 // low-affinity photos in the pool their cumulative weight still dominates a
 // handful of high-affinity ones — so the rotation feels linear and 2% photos
-// keep surfacing. Cubing the weight (3rd power) sharpens the curve:
-//   score 0.5  → effective 0.125 (8× less likely than perfect)
-//   score 0.2  → effective 0.008 (125× less likely)
-//   score 0.05 → effective 0.000125 (8000× less likely)
+// keep surfacing. Raising the weight to the 4th power sharpens the curve:
+//   score 0.5  → effective 0.0625 (16× less likely than perfect)
+//   score 0.2  → effective 0.0016 (625× less likely)
+//   score 0.05 → effective 6.25e-6 (160000× less likely)
 // — so the top of the refilled queue is dominated by genuinely on-target
 // photos, while the floor still lets the occasional off-band photo appear.
-const TIME_AWARE_WEIGHT_EXPONENT = 3;
+const TIME_AWARE_WEIGHT_EXPONENT = 4;
 
 /**
  * Weighted Fisher-Yates equivalent: assigns each photo a key derived from
@@ -110,8 +115,10 @@ export type RemixStrategy =
   | "same-album"
   | "same-year"
   | "same-decade"
-  | "same-time-of-day"
   | "same-region"
+  | "same-city"
+  | "same-day-of-year"
+  | "dominant-colour"
   | "anniversary"
   | "proximity"
   | "golden-hour"
@@ -165,6 +172,42 @@ const lastNonNumericLine = (geocode: string): string => {
   return "";
 };
 
+// Geocode line 0 is the ISO country code (e.g. "JP", "SG") and line 1 is the
+// city name (per reverse_geocode's output). Pull line 1 if it's present and
+// non-numeric; otherwise fall back to the first non-numeric line so we never
+// accidentally match cities on a coordinate value.
+const extractCity = (geocode: string): string => {
+  if (!geocode) return "";
+  const lines = geocode.split("\n").map((l) => l.trim()).filter(Boolean);
+  if (lines.length >= 2 && Number.isNaN(parseFloat(lines[1]))) {
+    return lines[1];
+  }
+  for (const line of lines.slice(1)) {
+    if (Number.isNaN(parseFloat(line))) {
+      return line;
+    }
+  }
+  return "";
+};
+
+// Dominant colour — the first entry in the palette serialised into `colors`.
+// Returns null when the palette is missing or unparseable so the matching
+// filter can bail without inventing a colour.
+const extractDominantLab = (
+  colors: string | undefined,
+): [number, number, number] | null => {
+  if (!colors) return null;
+  const palette = parseColorPalette(colors);
+  if (palette.length === 0) return null;
+  return rgbToLab(...palette[0]);
+};
+
+// Delta-E threshold for the dominant-colour remix. ~18 lands in the "clearly
+// related" band of perceptual colour distance: tighter than 25 (where colours
+// are still recognisably "in the same family") and looser than 10 (where the
+// match would feel sterile and the pool would often be empty).
+const DOMINANT_COLOUR_DELTAE = 18;
+
 // Camera identity from EXIF — "Make Model" lowercased. Matches the line-based
 // "Key: value" format the rest of this module already parses.
 const extractCameraId = (exifString: string): string => {
@@ -217,21 +260,6 @@ const strategyFilters: Record<
       return d?.getFullYear() === seedYear;
     });
   },
-  "same-time-of-day": (seed, pool) => {
-    const seedDate = extractDateFromExifString(seed.exif);
-    if (!seedDate) return [];
-    const seedHour = seedDate.getHours();
-    return pool.filter((p) => {
-      if (p.path === seed.path) return false;
-      const d = extractDateFromExifString(p.exif);
-      if (!d) return false;
-      const hour = d.getHours();
-      // ±2h, wrapping at midnight
-      const diff = Math.abs(hour - seedHour);
-      const wrappedDiff = Math.min(diff, 24 - diff);
-      return wrappedDiff <= 2;
-    });
-  },
   "same-region": (seed, pool) => {
     const seedRegion = lastNonNumericLine(seed.geocode);
     if (!seedRegion) return [];
@@ -240,6 +268,47 @@ const strategyFilters: Record<
         p.path !== seed.path &&
         lastNonNumericLine(p.geocode) === seedRegion,
     );
+  },
+  "same-city": (seed, pool) => {
+    const seedCity = extractCity(seed.geocode);
+    if (!seedCity) return [];
+    return pool.filter(
+      (p) => p.path !== seed.path && extractCity(p.geocode) === seedCity,
+    );
+  },
+  // Same calendar day (month + day-of-month) in a different year. Stricter
+  // than `anniversary` (which is ±3 days): this is the exact same date you
+  // were standing somewhere, years apart.
+  "same-day-of-year": (seed, pool) => {
+    const seedDate = extractDateFromExifString(seed.exif);
+    if (!seedDate) return [];
+    const seedMonth = seedDate.getMonth();
+    const seedDay = seedDate.getDate();
+    const seedYear = seedDate.getFullYear();
+    return pool.filter((p) => {
+      if (p.path === seed.path) return false;
+      const d = extractDateFromExifString(p.exif);
+      if (!d) return false;
+      if (d.getFullYear() === seedYear) return false;
+      return d.getMonth() === seedMonth && d.getDate() === seedDay;
+    });
+  },
+  // Photos whose dominant palette colour is within ~deltaE 18 (LAB) of the
+  // seed's dominant colour. Pulls visually coherent pairings — sunsets pair
+  // with sunsets, blue hour with blue hour — without needing tag overlap.
+  "dominant-colour": (seed, pool) => {
+    const seedLab = extractDominantLab(seed.colors);
+    if (!seedLab) return [];
+    const matches: RandomPhotoRow[] = [];
+    for (const candidate of pool) {
+      if (candidate.path === seed.path) continue;
+      const candidateLab = extractDominantLab(candidate.colors);
+      if (!candidateLab) continue;
+      if (deltaE(seedLab, candidateLab) <= DOMINANT_COLOUR_DELTAE) {
+        matches.push(candidate);
+      }
+    }
+    return matches;
   },
   // "This week, in past years" — same calendar day-of-year ±3, any year.
   // Evocative for slideshows on a sideboard: a memory from this exact week
@@ -345,18 +414,20 @@ const strategyFilters: Record<
 // slideshow is responsible for handling the async path when those names are
 // rolled (see `rollRemixStrategy`).
 const STRATEGY_WEIGHTS: Array<[RemixStrategy, number]> = [
-  ["similar", 0.2],
-  ["same-album", 0.13],
-  ["proximity", 0.12],
-  ["juxtapose", 0.1],
-  ["anniversary", 0.1],
-  ["golden-hour", 0.09],
-  ["same-year", 0.06],
-  ["shared-camera", 0.06],
-  ["same-time-of-day", 0.05],
-  ["same-region", 0.04],
-  ["same-decade", 0.03],
-  ["random", 0.02],
+  ["similar", 0.18],
+  ["same-album", 0.12],
+  ["proximity", 0.1],
+  ["dominant-colour", 0.1],
+  ["juxtapose", 0.08],
+  ["anniversary", 0.08],
+  ["golden-hour", 0.07],
+  ["same-city", 0.07],
+  ["same-year", 0.05],
+  ["shared-camera", 0.05],
+  ["same-day-of-year", 0.04],
+  ["same-region", 0.03],
+  ["same-decade", 0.02],
+  ["random", 0.01],
 ];
 
 const pickWeightedStrategy = (random: () => number): RemixStrategy => {
@@ -386,8 +457,8 @@ export const VECTOR_REMIX_STRATEGIES = new Set<RemixStrategy>([
 
 /**
  * Pick `count` companion photos for a remix slide. Rolls a weighted die to
- * choose a *strategy* (same-album / same-year / same-region / same-time-of-day
- * / random) and returns companions plus the strategy used so the UI can
+ * choose a *strategy* (same-album / same-year / same-region / random) and
+ * returns companions plus the strategy used so the UI can
  * describe why these photos were grouped.
  *
  * If the rolled strategy yields too few candidates, falls back through the

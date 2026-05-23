@@ -1507,7 +1507,12 @@ export const fetchRandomResults = async (opts: {
   }
 };
 
-export type RandomPhotoRow = { path: string; exif: string; geocode: string };
+export type RandomPhotoRow = {
+  path: string;
+  exif: string;
+  geocode: string;
+  colors?: string;
+};
 
 export const fetchSlideshowPhotos = async (opts: {
   database: Database;
@@ -1518,7 +1523,7 @@ export const fetchSlideshowPhotos = async (opts: {
   try {
     const result = await exec(
       database,
-      `SELECT path, exif, geocode
+      `SELECT path, exif, geocode, colors
       FROM images
       WHERE path LIKE ?`,
       [`../albums/${filter}/%`],
@@ -1528,6 +1533,7 @@ export const fetchSlideshowPhotos = async (opts: {
       path: row[0],
       exif: row[1],
       geocode: row[2],
+      colors: row[3],
     }));
   } catch (err) {
     console.error(`Failed to fetch slideshow photos`, err);

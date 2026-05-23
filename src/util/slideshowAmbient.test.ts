@@ -23,6 +23,18 @@ const makePhoto = (path: string, exifDate?: Date): RandomPhotoRow => ({
   geocode: "",
 });
 
+// reverse_geocode's format: country code, city, lat, lng, population, region,
+// sub-region, country name — one per line.
+const makeGeocode = (
+  countryCode: string,
+  city: string,
+  country: string,
+): string => [countryCode, city, "0.0", "0.0", "0", country, "", country].join("\n");
+
+// `colors` is the Python-tuple serialisation produced by the indexer.
+const formatColors = (rgbs: Array<[number, number, number]>): string =>
+  `[${rgbs.map(([r, g, b]) => `(${r}, ${g}, ${b})`).join(", ")}]`;
+
 describe("getTimeAffinityScore", () => {
   test("hour-of-day match scores higher than mismatch", () => {
     const now = new Date(2026, 4, 15, 14, 30); // 14:30 mid-May
@@ -343,6 +355,124 @@ describe("pickRemixCompanions", () => {
       random,
     );
     expect(pick.strategy).toBe("shared-camera");
+    expect(pick.companions[0]?.path).toBe("data/albums/b/1.jpg");
+  });
+
+  test("same-city strategy matches the city line of the geocode", () => {
+    const seedTokyo: RandomPhotoRow = {
+      path: "data/albums/japan/seed.jpg",
+      exif: "",
+      geocode: makeGeocode("JP", "Tokyo", "Japan"),
+    };
+    const sameCity: RandomPhotoRow = {
+      path: "data/albums/japan/a.jpg",
+      exif: "",
+      geocode: makeGeocode("JP", "Tokyo", "Japan"),
+    };
+    const sameCountry: RandomPhotoRow = {
+      path: "data/albums/japan/b.jpg",
+      exif: "",
+      geocode: makeGeocode("JP", "Osaka", "Japan"),
+    };
+    const elsewhere: RandomPhotoRow = {
+      path: "data/albums/london/c.jpg",
+      exif: "",
+      geocode: makeGeocode("GB", "London", "United Kingdom"),
+    };
+
+    // Cumulative under current weights:
+    // similar 0.18 + same-album 0.12 + proximity 0.10 + dominant-colour 0.10 +
+    // juxtapose 0.08 + anniversary 0.08 + golden-hour 0.07 = 0.73.
+    // same-city adds 0.07 → [0.73, 0.80). 0.76 lands in same-city.
+    const random = jest
+      .fn()
+      .mockReturnValueOnce(0.76)
+      .mockReturnValue(0.5);
+    const pick = pickRemixCompanions(
+      seedTokyo,
+      [sameCity, sameCountry, elsewhere],
+      1,
+      random,
+    );
+    expect(pick.strategy).toBe("same-city");
+    expect(pick.companions[0]?.path).toBe("data/albums/japan/a.jpg");
+  });
+
+  test("same-day-of-year strategy matches month+day across different years", () => {
+    const seedDate = makePhoto(
+      "data/albums/a/seed.jpg",
+      new Date(2024, 4, 24, 10, 0),
+    );
+    const sameDayDifferentYear = makePhoto(
+      "data/albums/b/1.jpg",
+      new Date(2022, 4, 24, 18, 0),
+    );
+    const sameDaySameYear = makePhoto(
+      "data/albums/c/2.jpg",
+      new Date(2024, 4, 24, 14, 0),
+    );
+    const sameMonthDifferentDay = makePhoto(
+      "data/albums/d/3.jpg",
+      new Date(2022, 4, 25, 10, 0),
+    );
+
+    // same-day-of-year cumulative band: 0.90..0.94 — 0.92 lands inside.
+    const random = jest
+      .fn()
+      .mockReturnValueOnce(0.92)
+      .mockReturnValue(0.5);
+    const pick = pickRemixCompanions(
+      seedDate,
+      [sameDayDifferentYear, sameDaySameYear, sameMonthDifferentDay],
+      1,
+      random,
+    );
+    expect(pick.strategy).toBe("same-day-of-year");
+    expect(pick.companions[0]?.path).toBe("data/albums/b/1.jpg");
+  });
+
+  test("dominant-colour strategy matches photos whose dominant colour is within deltaE 18", () => {
+    const seedRed: RandomPhotoRow = {
+      path: "data/albums/a/seed.jpg",
+      exif: "",
+      geocode: "",
+      // Dominant colour first: vivid red.
+      colors: formatColors([
+        [220, 30, 30],
+        [80, 80, 80],
+      ]),
+    };
+    const nearRed: RandomPhotoRow = {
+      path: "data/albums/b/1.jpg",
+      exif: "",
+      geocode: "",
+      colors: formatColors([
+        [210, 40, 35],
+        [40, 40, 40],
+      ]),
+    };
+    const blue: RandomPhotoRow = {
+      path: "data/albums/c/2.jpg",
+      exif: "",
+      geocode: "",
+      colors: formatColors([
+        [20, 60, 200],
+        [200, 200, 200],
+      ]),
+    };
+    const noColours: RandomPhotoRow = {
+      path: "data/albums/d/3.jpg",
+      exif: "",
+      geocode: "",
+    };
+
+    // dominant-colour cumulative band: 0.40..0.50 — 0.45 lands inside.
+    const random = jest
+      .fn()
+      .mockReturnValueOnce(0.45)
+      .mockReturnValue(0.5);
+    const pick = pickRemixCompanions(seedRed, [nearRed, blue, noColours], 1, random);
+    expect(pick.strategy).toBe("dominant-colour");
     expect(pick.companions[0]?.path).toBe("data/albums/b/1.jpg");
   });
 
