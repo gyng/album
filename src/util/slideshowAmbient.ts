@@ -96,19 +96,24 @@ export const timeAwareShufflePhotos = (
  * Decide whether the next slide should be a remix and, if so, how many
  * companion photos it should pair with the seed.
  *
- * Returns 0 (no remix), 1 (2-up) or 2 (3-up). 2-up is intentionally more
- * common than 3-up — three-photo grids are visually busier.
+ * Returns 0 (no remix), 1 (2-up), 2 (3-up) or 3 (4-up). 2-up is the
+ * common case (~70% of remixes); 3-up appears less often (~25%) and
+ * the 4-up grid is rare (~5%) because four photos at once is visually
+ * busy and harder to digest at a glance.
  *
  * `random` is injectable for tests.
  */
 export const decideRemixCompanionCount = (
   remixProbability: number,
   random: () => number = Math.random,
-): 0 | 1 | 2 => {
+): 0 | 1 | 2 | 3 => {
   if (random() >= remixProbability) {
     return 0;
   }
-  return random() < 0.7 ? 1 : 2;
+  const layoutRoll = random();
+  if (layoutRoll < 0.7) return 1; // 2-up
+  if (layoutRoll < 0.95) return 2; // 3-up
+  return 3; // 4-up
 };
 
 export type RemixStrategy =
@@ -116,6 +121,7 @@ export type RemixStrategy =
   | "same-year"
   | "same-decade"
   | "same-region"
+  | "same-country"
   | "same-city"
   | "same-day-of-year"
   | "dominant-colour"
@@ -168,6 +174,30 @@ const lastNonNumericLine = (geocode: string): string => {
     if (Number.isNaN(parseFloat(line))) {
       return line;
     }
+  }
+  return "";
+};
+
+// Geocode admin1 / region (e.g. "Hokkaido", "England"). reverse_geocode's
+// output places non-numeric lines in this order: country code, city, [admin1,
+// admin2], country. Pull the first interior line that isn't the city or the
+// country itself. Returns "" for city-states or geocodes that lack a distinct
+// admin1 level — so the strategy cleanly falls through to same-country.
+const extractAdmin1 = (geocode: string): string => {
+  if (!geocode) return "";
+  const nonNumeric = geocode
+    .split("\n")
+    .map((l) => l.trim())
+    .filter(Boolean)
+    .filter((line) => Number.isNaN(parseFloat(line)));
+  // Country code + city + admin1 + country = 4. Anything shorter doesn't
+  // confidently expose an admin1 level.
+  if (nonNumeric.length < 4) return "";
+  const city = nonNumeric[1];
+  const country = nonNumeric[nonNumeric.length - 1];
+  for (let i = 2; i < nonNumeric.length - 1; i += 1) {
+    const line = nonNumeric[i];
+    if (line && line !== country && line !== city) return line;
   }
   return "";
 };
@@ -260,13 +290,26 @@ const strategyFilters: Record<
       return d?.getFullYear() === seedYear;
     });
   },
+  // Matches at admin1 / region level (e.g. "Hokkaido", "England") — strictly
+  // narrower than same-country. The strategy returns [] when the seed lacks
+  // a distinct admin1 line, so it cleanly falls through to same-country.
   "same-region": (seed, pool) => {
-    const seedRegion = lastNonNumericLine(seed.geocode);
+    const seedRegion = extractAdmin1(seed.geocode);
     if (!seedRegion) return [];
+    return pool.filter(
+      (p) => p.path !== seed.path && extractAdmin1(p.geocode) === seedRegion,
+    );
+  },
+  // Matches at the country line — broadest of the geo strategies. Distinct
+  // from same-region so the badge can honestly say "from the same country"
+  // rather than the vague "from the same place".
+  "same-country": (seed, pool) => {
+    const seedCountry = lastNonNumericLine(seed.geocode);
+    if (!seedCountry) return [];
     return pool.filter(
       (p) =>
         p.path !== seed.path &&
-        lastNonNumericLine(p.geocode) === seedRegion,
+        lastNonNumericLine(p.geocode) === seedCountry,
     );
   },
   "same-city": (seed, pool) => {
@@ -514,8 +557,13 @@ export const describeRemix = (
     }
     case "same-region": {
       const seed = photos[0];
-      const region = seed ? lastNonNumericLine(seed.geocode) : "";
+      const region = seed ? extractAdmin1(seed.geocode) : "";
       return region || null;
+    }
+    case "same-country": {
+      const seed = photos[0];
+      const country = seed ? lastNonNumericLine(seed.geocode) : "";
+      return country || null;
     }
     case "same-year": {
       const dates = collectDates(photos);
@@ -585,19 +633,20 @@ export const getRemixSwatchRgb = (
 // slideshow is responsible for handling the async path when those names are
 // rolled (see `rollRemixStrategy`).
 const STRATEGY_WEIGHTS: Array<[RemixStrategy, number]> = [
-  ["similar", 0.18],
-  ["same-album", 0.12],
-  ["proximity", 0.1],
-  ["dominant-colour", 0.1],
-  ["juxtapose", 0.08],
-  ["anniversary", 0.08],
-  ["golden-hour", 0.07],
-  ["same-city", 0.07],
-  ["same-year", 0.05],
-  ["shared-camera", 0.05],
-  ["same-day-of-year", 0.04],
-  ["same-region", 0.03],
-  ["same-decade", 0.02],
+  ["similar", 0.3],
+  ["same-album", 0.1],
+  ["proximity", 0.08],
+  ["dominant-colour", 0.08],
+  ["juxtapose", 0.07],
+  ["anniversary", 0.06],
+  ["golden-hour", 0.05],
+  ["same-city", 0.06],
+  ["same-region", 0.05],
+  ["same-year", 0.04],
+  ["shared-camera", 0.04],
+  ["same-day-of-year", 0.03],
+  ["same-country", 0.02],
+  ["same-decade", 0.01],
   ["random", 0.01],
 ];
 

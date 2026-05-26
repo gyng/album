@@ -790,11 +790,13 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
       let strategy: RemixStrategy | null = null;
       if (opts?.allowRemix && (forceRemixRef.current || remixEnabled)) {
         const wasForced = forceRemixRef.current;
-        let count: 0 | 1 | 2 = 0;
+        let count: 0 | 1 | 2 | 3 = 0;
         if (wasForced) {
-          // User pressed "Remix now"; bypass the dice and pick a layout.
+          // User pressed "Remix now"; bypass the dice and pick a layout
+          // (favouring 2-up to keep forced remixes light).
           forceRemixRef.current = false;
-          count = Math.random() < 0.7 ? 1 : 2;
+          const layoutRoll = Math.random();
+          count = layoutRoll < 0.7 ? 1 : layoutRoll < 0.95 ? 2 : 3;
         } else {
           count = decideRemixCompanionCount(REMIX_PROBABILITY);
         }
@@ -2175,8 +2177,8 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
   // Tracks whether the *previously displayed* slide was a remix. Read by the
   // crossfade effect below so it can skip the fade when leaving a remix —
   // otherwise the previousPhotoSrc is the lone seed src and renders full-bleed
-  // behind the new image while it loads, which looks like an extra slide
-  // flashing past between the remix and the next photo.
+  // behind the new grid while its cells load, which reads as a misleading
+  // single-image flash between the two remixes.
   const previousSlideWasRemixRef = React.useRef(false);
 
   useEffect(() => {
@@ -2191,19 +2193,48 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
     const previousPhotoSrc = activePhotoSrcRef.current;
 
     if (previousPhotoSrc && previousPhotoSrc !== activePhotoSrc) {
-      const leavingRemixIntoSingle =
-        previousSlideWasRemixRef.current && remixCompanions.length === 0;
-      // Leaving a remix into a single photo: the cached previous src is the
-      // remix seed alone, which would show full-bleed behind the loading
-      // image and read as a stray extra slide. Skip the fade in that case —
-      // the next image is usually preloaded so it appears within a frame.
-      setPreviousPhotoSrc(leavingRemixIntoSingle ? null : previousPhotoSrc);
+      // Leaving any remix layout: the cached previous src is just the seed,
+      // which would show full-bleed behind the new content while it loads
+      // and read as a stray extra slide. Skip the fade in that case — the
+      // new image / grid handles its own reveal once ready.
+      setPreviousPhotoSrc(
+        previousSlideWasRemixRef.current ? null : previousPhotoSrc,
+      );
       setImageLoaded(false);
     }
 
     activePhotoSrcRef.current = activePhotoSrc;
     previousSlideWasRemixRef.current = remixCompanions.length > 0;
   }, [activePhotoSrc, remixCompanions]);
+
+  // Track which cells in the current remix have finished loading. The grid
+  // stays opacity-0 until every cell has fired its onLoad, so the user sees
+  // the whole arrangement appear at once rather than watching cells pop in
+  // one at a time. Using a path-keyed Set guards against React double-firing
+  // the load handler from inflating the count.
+  const remixLoadedPathsRef = React.useRef<Set<string>>(new Set());
+  const [remixLoadedCount, setRemixLoadedCount] = React.useState(0);
+  const remixLayoutKey = [
+    currentPhotoPath?.path ?? "",
+    ...remixCompanions.map((c) => c.path),
+  ].join("|");
+
+  useEffect(() => {
+    // Layout changed — clear the loaded set so the new grid waits for all
+    // of its own cells before revealing.
+    remixLoadedPathsRef.current = new Set();
+    setRemixLoadedCount(0);
+  }, [remixLayoutKey]);
+
+  const markRemixCellLoaded = useCallback((path: string) => {
+    if (remixLoadedPathsRef.current.has(path)) return;
+    remixLoadedPathsRef.current.add(path);
+    setRemixLoadedCount(remixLoadedPathsRef.current.size);
+  }, []);
+
+  const totalRemixCells = remixCompanions.length + 1;
+  const isRemixGridReady =
+    remixCompanions.length === 0 || remixLoadedCount >= totalRemixCells;
 
   if (currentPhotoPath === null) {
     return (
@@ -2356,7 +2387,8 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
       "same-album": "from this album",
       "same-year": "from the same year",
       "same-decade": "from the same decade",
-      "same-region": "from the same place",
+      "same-region": "from the same region",
+      "same-country": "from the same country",
       "same-city": "from the same city",
       "same-day-of-year": "from this exact date, other years",
       "dominant-colour": "sharing this colour",
@@ -3166,7 +3198,12 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
 
         {remixCompanions.length > 0 ? (
           <div
-            className={styles.remixGrid}
+            className={[
+              styles.remixGrid,
+              isRemixGridReady ? "" : styles.remixGridNotReady,
+            ]
+              .filter(Boolean)
+              .join(" ")}
             data-count={remixCompanions.length + 1}
             style={{ touchAction: "none" }}
             onPointerDown={handleImagePointerDown}
@@ -3201,16 +3238,15 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
                     src={src}
                     alt={isSeed ? photoAltText : ""}
                     aria-hidden={isSeed ? undefined : true}
-                    onLoad={
-                      isSeed
-                        ? () => {
-                            setImageLoaded(true);
-                            window.setTimeout(() => {
-                              setPreviousPhotoSrc(null);
-                            }, 260);
-                          }
-                        : undefined
-                    }
+                    onLoad={() => {
+                      markRemixCellLoaded(photo.path);
+                      if (isSeed) {
+                        setImageLoaded(true);
+                        window.setTimeout(() => {
+                          setPreviousPhotoSrc(null);
+                        }, 260);
+                      }
+                    }}
                     onError={
                       isSeed
                         ? () => {

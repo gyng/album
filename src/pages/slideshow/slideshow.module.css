@@ -34,9 +34,18 @@
   background: black;
   z-index: 100;
   cursor: pointer;
+  opacity: 1;
+  transition: opacity 0.28s ease-out;
   -webkit-user-select: none;
   user-select: none;
   -webkit-touch-callout: none;
+}
+
+/* Held until every cell's <img> has fired onLoad, so the user sees the
+   whole arrangement appear together rather than watching cells pop in
+   one at a time as their images arrive over the network. */
+.remixGridNotReady {
+  opacity: 0;
 }
 
 .remixGrid[data-count="2"] {
@@ -45,6 +54,14 @@
 
 .remixGrid[data-count="3"] {
   grid-template-columns: 1fr 1fr 1fr;
+}
+
+/* 4-up is a 2×2 grid rather than a 1×4 row so each cell keeps a usable
+   aspect ratio. The auto-flow places photo0/photo1 on top, photo2/photo3
+   on bottom. */
+.remixGrid[data-count="4"] {
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
 }
 
 /* Each cell is a positioning context so the per-photo caption can pin to
@@ -119,6 +136,14 @@
     "map   map   map"
     "desc0 desc1 desc2"
     "clock clock clock";
+}
+
+.bottomBarStack[data-count="4"] {
+  grid-template-columns: 1fr 1fr 1fr 1fr;
+  grid-template-areas:
+    "map   map   map   map  "
+    "desc0 desc1 desc2 desc3"
+    "clock clock clock clock";
 }
 
 /* Single-image detailsAlignment toggle — slides every grid item to the

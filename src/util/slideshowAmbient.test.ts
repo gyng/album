@@ -25,13 +25,16 @@ const makePhoto = (path: string, exifDate?: Date): RandomPhotoRow => ({
   geocode: "",
 });
 
-// reverse_geocode's format: country code, city, lat, lng, population, region,
-// sub-region, country name — one per line.
+// reverse_geocode's format: country code, city, lat, lng, population, admin1,
+// admin2, country name — one per line. When admin1 is omitted the slot is
+// filled with the country, which extractAdmin1 treats as "no distinct region"
+// so same-region falls cleanly through to same-country.
 const makeGeocode = (
   countryCode: string,
   city: string,
   country: string,
-): string => [countryCode, city, "0.0", "0.0", "0", country, "", country].join("\n");
+  admin1: string = country,
+): string => [countryCode, city, "0.0", "0.0", "0", admin1, "", country].join("\n");
 
 // `colors` is the Python-tuple serialisation produced by the indexer.
 const formatColors = (rgbs: Array<[number, number, number]>): string =>
@@ -167,20 +170,28 @@ describe("decideRemixCompanionCount", () => {
     expect(decideRemixCompanionCount(0.03, () => 0.03)).toBe(0);
   });
 
-  test("returns 1 (2-up) when below probability and second draw < 0.7", () => {
+  test("returns 1 (2-up) when below probability and layout roll < 0.7", () => {
     const random = jest
       .fn()
       .mockReturnValueOnce(0.01) // pass remix probability
-      .mockReturnValueOnce(0.5); // 2-up branch
+      .mockReturnValueOnce(0.5); // 2-up band
     expect(decideRemixCompanionCount(0.03, random)).toBe(1);
   });
 
-  test("returns 2 (3-up) when below probability and second draw >= 0.7", () => {
+  test("returns 2 (3-up) when layout roll lands in [0.7, 0.95)", () => {
     const random = jest
       .fn()
       .mockReturnValueOnce(0.01)
       .mockReturnValueOnce(0.85);
     expect(decideRemixCompanionCount(0.03, random)).toBe(2);
+  });
+
+  test("returns 3 (4-up) when layout roll >= 0.95", () => {
+    const random = jest
+      .fn()
+      .mockReturnValueOnce(0.01)
+      .mockReturnValueOnce(0.97);
+    expect(decideRemixCompanionCount(0.03, random)).toBe(3);
   });
 
   test("rate roughly matches probability over many trials", () => {
@@ -247,11 +258,11 @@ describe("pickRemixCompanions", () => {
   });
 
   test("falls through to a later strategy when the rolled one has too few candidates", () => {
-    // Land the roll in the proximity band [0.33, 0.45). Photos lack GPS, so
+    // Land the roll in the proximity band [0.40, 0.48). Photos lack GPS, so
     // proximity returns []; fallback walks down to same-album.
     const random = jest
       .fn()
-      .mockReturnValueOnce(0.4)
+      .mockReturnValueOnce(0.44)
       .mockReturnValue(0.5);
     const pick = pickRemixCompanions(
       seed,
@@ -294,11 +305,11 @@ describe("pickRemixCompanions", () => {
       candidates.push(makeGpsPhoto(`data/albums/x/${i}.jpg`, i * 36));
     }
 
-    // Force proximity by landing the weighted roll in [0.32, 0.44) under the
-    // current weights (similar 0.18 + same-album 0.14 = 0.32; proximity 0.12).
+    // Force proximity by landing the weighted roll in [0.40, 0.48) under
+    // current weights (similar 0.30 + same-album 0.10 = 0.40; proximity 0.08).
     const random = jest
       .fn()
-      .mockReturnValueOnce(0.35)
+      .mockReturnValueOnce(0.44)
       .mockReturnValue(0.5);
     const pick = pickRemixCompanions(gpsSeed, candidates, 2, random);
     expect(pick.strategy).toBe("proximity");
@@ -342,12 +353,13 @@ describe("pickRemixCompanions", () => {
     };
 
     // Cumulative through prior strategies under current weights:
-    // similar 0.20 + same-album 0.13 + proximity 0.12 + juxtapose 0.10 +
-    // anniversary 0.10 + golden-hour 0.09 + same-year 0.06 = 0.80.
-    // shared-camera adds 0.06 → [0.80, 0.86).
+    // similar 0.30 + same-album 0.10 + proximity 0.08 + dominant-colour 0.08 +
+    // juxtapose 0.07 + anniversary 0.06 + golden-hour 0.05 + same-city 0.06 +
+    // same-region 0.05 + same-year 0.04 = 0.89. shared-camera adds 0.04
+    // → [0.89, 0.93). 0.91 lands inside.
     const random = jest
       .fn()
-      .mockReturnValueOnce(0.83)
+      .mockReturnValueOnce(0.91)
       .mockReturnValue(0.5);
     const pick = pickRemixCompanions(
       seedX100,
@@ -382,9 +394,9 @@ describe("pickRemixCompanions", () => {
     };
 
     // Cumulative under current weights:
-    // similar 0.18 + same-album 0.12 + proximity 0.10 + dominant-colour 0.10 +
-    // juxtapose 0.08 + anniversary 0.08 + golden-hour 0.07 = 0.73.
-    // same-city adds 0.07 → [0.73, 0.80). 0.76 lands in same-city.
+    // similar 0.30 + same-album 0.10 + proximity 0.08 + dominant-colour 0.08 +
+    // juxtapose 0.07 + anniversary 0.06 + golden-hour 0.05 = 0.74.
+    // same-city adds 0.06 → [0.74, 0.80). 0.76 lands in same-city.
     const random = jest
       .fn()
       .mockReturnValueOnce(0.76)
@@ -417,10 +429,10 @@ describe("pickRemixCompanions", () => {
       new Date(2022, 4, 25, 10, 0),
     );
 
-    // same-day-of-year cumulative band: 0.90..0.94 — 0.92 lands inside.
+    // same-day-of-year cumulative band: [0.93, 0.96) — 0.94 lands inside.
     const random = jest
       .fn()
-      .mockReturnValueOnce(0.92)
+      .mockReturnValueOnce(0.94)
       .mockReturnValue(0.5);
     const pick = pickRemixCompanions(
       seedDate,
@@ -467,10 +479,10 @@ describe("pickRemixCompanions", () => {
       geocode: "",
     };
 
-    // dominant-colour cumulative band: 0.40..0.50 — 0.45 lands inside.
+    // dominant-colour cumulative band: [0.48, 0.56) — 0.52 lands inside.
     const random = jest
       .fn()
-      .mockReturnValueOnce(0.45)
+      .mockReturnValueOnce(0.52)
       .mockReturnValue(0.5);
     const pick = pickRemixCompanions(seedRed, [nearRed, blue, noColours], 1, random);
     expect(pick.strategy).toBe("dominant-colour");
@@ -532,13 +544,32 @@ describe("describeRemix", () => {
     expect(describeRemix("same-city", [seed])).toBe("Sapporo");
   });
 
-  test("same-region returns the country line (last non-numeric)", () => {
+  test("same-country returns the country line (last non-numeric)", () => {
     const seed: RandomPhotoRow = {
       path: "a/1.jpg",
       exif: "",
       geocode: makeGeocode("JP", "Sapporo", "Japan"),
     };
-    expect(describeRemix("same-region", [seed])).toBe("Japan");
+    expect(describeRemix("same-country", [seed])).toBe("Japan");
+  });
+
+  test("same-region returns the admin1 region (narrower than country)", () => {
+    const seed: RandomPhotoRow = {
+      path: "a/1.jpg",
+      exif: "",
+      geocode: makeGeocode("JP", "Sapporo", "Japan", "Hokkaido"),
+    };
+    expect(describeRemix("same-region", [seed])).toBe("Hokkaido");
+  });
+
+  test("same-region returns null when the geocode has no distinct admin1", () => {
+    const seed: RandomPhotoRow = {
+      path: "a/1.jpg",
+      exif: "",
+      // City-state-style geocode: no admin1 between city and country.
+      geocode: makeGeocode("SG", "Outram Park", "Singapore"),
+    };
+    expect(describeRemix("same-region", [seed])).toBeNull();
   });
 
   test("same-year returns the seed's year", () => {
