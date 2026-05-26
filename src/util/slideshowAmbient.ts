@@ -647,13 +647,13 @@ export const getRemixSwatchRgb = (
 // slideshow is responsible for handling the async path when those names are
 // rolled (see `rollRemixStrategy`).
 const STRATEGY_WEIGHTS: Array<[RemixStrategy, number]> = [
-  ["similar", 0.3],
-  ["same-album", 0.1],
-  ["proximity", 0.08],
-  ["dominant-colour", 0.08],
-  ["juxtapose", 0.07],
-  ["anniversary", 0.06],
-  ["golden-hour", 0.05],
+  ["similar", 0.2],
+  ["same-album", 0.12],
+  ["proximity", 0.1],
+  ["dominant-colour", 0.1],
+  ["juxtapose", 0.08],
+  ["anniversary", 0.08],
+  ["golden-hour", 0.06],
   ["same-city", 0.06],
   ["same-region", 0.05],
   ["same-year", 0.04],

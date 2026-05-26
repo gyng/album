@@ -323,11 +323,11 @@ describe("pickRemixCompanions", () => {
       candidates.push(makeGpsPhoto(`data/albums/x/${i}.jpg`, i * 36));
     }
 
-    // Force proximity by landing the weighted roll in [0.40, 0.48) under
-    // current weights (similar 0.30 + same-album 0.10 = 0.40; proximity 0.08).
+    // Force proximity by landing the weighted roll in [0.32, 0.42) under
+    // current weights (similar 0.20 + same-album 0.12 = 0.32; proximity 0.10).
     const random = jest
       .fn()
-      .mockReturnValueOnce(0.44)
+      .mockReturnValueOnce(0.4)
       .mockReturnValue(0.5);
     const pick = pickRemixCompanions(gpsSeed, candidates, 2, random);
     expect(pick.strategy).toBe("proximity");
