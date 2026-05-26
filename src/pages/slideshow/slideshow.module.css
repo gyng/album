@@ -474,7 +474,7 @@
     scale(calc(1 + var(--touch-swipe-progress, 0) * 0.18));
 }
 
-.touchAffordances[data-touch-hint="overlays"] .touchBottomAffordance {
+.touchAffordances[data-touch-hint="remix"] .touchBottomAffordance {
   opacity: calc(0.62 + (var(--touch-pull-progress) * 0.38));
 }
 
@@ -492,7 +492,7 @@
     0 0 0 5px hsl(0 0% 0% / 0.35);
 }
 
-.touchAffordances[data-touch-armed="true"][data-touch-hint="overlays"]
+.touchAffordances[data-touch-armed="true"][data-touch-hint="remix"]
   .touchPullChevron {
   background: hsl(0 0% 100% / 0.96);
   color: hsl(0 0% 6%);
@@ -501,7 +501,7 @@
     0 0 0 5px hsl(0 0% 0% / 0.35);
 }
 
-.touchAffordances[data-touch-armed="true"][data-touch-hint="overlays"]
+.touchAffordances[data-touch-armed="true"][data-touch-hint="remix"]
   .touchAffordanceLabel {
   border-color: hsl(0 0% 100% / 0.95);
   box-shadow:

@@ -1944,9 +1944,9 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
         : !verticalCommitted &&
           horizontalDistance >= TOUCH_SWIPE_THRESHOLD_PX &&
           horizontalDistance > verticalDistance;
-      // Vertical commits (toggle controls, cycle overlays) are touch-first UX
+      // Vertical commits (toggle controls, trigger remix) are touch-first UX
       // and have no progress visual for mouse — gating on touch/pen avoids a
-      // mouse drag-up silently hiding the toolbar.
+      // mouse drag-up silently triggering a remix.
       const treatAsVertical =
         isTouchLike &&
         (verticalCommitted
