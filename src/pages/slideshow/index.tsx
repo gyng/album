@@ -526,15 +526,13 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
     controlsVisible && touchGestureHint === "remix"
       ? remapPeek(touchPullProgress)
       : 0;
-  // Loaded for Similar mode and *also* once the user expresses interest in
-  // vector-based remix strategies (set lazily by the remix code path the
-  // first time it rolls a vector strategy, so cold start doesn't pay for
-  // the embeddings DB unless someone uses them).
-  const [enableRemixEmbeddings, setEnableRemixEmbeddings] = React.useState(
-    false,
-  );
+  // Loaded for Similar mode and also whenever remixes are on, so vector
+  // strategies (similar / juxtapose) can fire on the first roll. Loading
+  // lazily after the first vector roll meant the first ~37% of remixes
+  // silently fell through to the next-priority sync strategy (same-album),
+  // which dominated the badge in practice.
   const [embeddingsDatabase, embeddingsProgress] = useEmbeddingsDatabase(
-    slideshowMode === "similar" || enableRemixEmbeddings,
+    slideshowMode === "similar" || remixEnabled,
   );
   const wakeLockRef = React.useRef<WakeLockSentinel | null>(null);
   const pointerGestureRef = React.useRef<{
@@ -819,15 +817,6 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
           }
           const vectorReady = !!(database && embeddingsDatabase);
 
-          if (
-            VECTOR_REMIX_STRATEGIES.has(rolled) &&
-            !vectorReady &&
-            !enableRemixEmbeddings
-          ) {
-            // Trigger DB load so future vector rolls can succeed.
-            setEnableRemixEmbeddings(true);
-          }
-
           if (VECTOR_REMIX_STRATEGIES.has(rolled) && vectorReady) {
             // Async vector path. The history entry starts with no companions
             // and the chosen strategy; the fetch resolves later and patches
@@ -922,7 +911,6 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
       computeNextChangeAt,
       database,
       embeddingsDatabase,
-      enableRemixEmbeddings,
       remixEnabled,
       shuffleHistorySize,
     ],
