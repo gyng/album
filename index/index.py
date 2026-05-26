@@ -328,7 +328,8 @@ class JanusClassifier(BaseCaptionClassifier):
         all_embeds = []
         all_masks = []
 
-        for path, geocode in items:
+        for idx, (path, geocode) in enumerate(items, start=1):
+            prep_started_at = time.perf_counter()
             prompt = build_janus_prompt(geocode)
             conversation = [
                 {"role": "User", "content": prompt, "images": [path]},
@@ -341,6 +342,11 @@ class JanusClassifier(BaseCaptionClassifier):
             embeds = self.vl_gpt.prepare_inputs_embeds(**prepare_inputs)
             all_embeds.append(embeds)
             all_masks.append(prepare_inputs.attention_mask)
+            prep_ms = (time.perf_counter() - prep_started_at) * 1000
+            log(f"    prepped {idx}/{len(items)} in {prep_ms:.0f}ms ({os.path.basename(path)})")
+
+        log(f"    generating {len(items)} caption(s)...")
+        generate_started_at = time.perf_counter()
 
         # Left-pad to the longest sequence (standard for decoder-only batch generation)
         max_len = max(e.shape[1] for e in all_embeds)
@@ -373,6 +379,8 @@ class JanusClassifier(BaseCaptionClassifier):
             do_sample=False,
             use_cache=True,
         )
+        generate_ms = (time.perf_counter() - generate_started_at) * 1000
+        log(f"    generated {len(items)} caption(s) in {generate_ms:.0f}ms")
 
         return [
             self.tokenizer.decode(output.cpu().tolist(), skip_special_tokens=True)
