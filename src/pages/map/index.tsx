@@ -250,7 +250,7 @@ const WorldMap: NextPage<PageProps> = (props) => {
   );
 };
 
-export const getStaticProps: GetStaticProps<PageProps> = async (context) => {
+export const getStaticProps: GetStaticProps<PageProps> = async () => {
   return measureBuild("page./map.getStaticProps", async () => {
     const albums = await getAlbums();
 
@@ -308,7 +308,7 @@ export const getStaticProps: GetStaticProps<PageProps> = async (context) => {
       });
     });
 
-    return { props: { photos: stripped, test: albums } };
+    return { props: { photos: stripped } };
   });
 };
 
