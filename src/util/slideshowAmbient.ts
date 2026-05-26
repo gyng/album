@@ -139,7 +139,7 @@ const albumOfPath = (path: string): string => path.split("/")?.[2] ?? "";
 
 // Great-circle distance between two GPS points, in kilometres.
 // Used by the "proximity" remix strategy to find photos shot near a seed.
-const haversineKm = (
+export const haversineKm = (
   lat1: number,
   lon1: number,
   lat2: number,
@@ -405,6 +405,177 @@ const strategyFilters: Record<
   // only producer of these labels.
   similar: () => [],
   juxtapose: () => [],
+};
+
+// Extract the raw "Make Model" string from EXIF, preserving original casing
+// (unlike extractCameraId which lowercases for matching). Returns "" when the
+// camera identity isn't recoverable.
+const extractCameraDisplayName = (exifString: string): string => {
+  if (!exifString) return "";
+  let make = "";
+  let model = "";
+  for (const line of exifString.split("\n")) {
+    const colonIdx = line.indexOf(":");
+    if (colonIdx === -1) continue;
+    const key = line.slice(0, colonIdx).trim();
+    const value = line.slice(colonIdx + 1).trim();
+    if (key === "Image Make") make = value;
+    else if (key === "Image Model") model = value;
+  }
+  // Skip the manufacturer prefix when the model already redundantly includes
+  // it (e.g. "FUJIFILM" + "FUJIFILM X100V" → "FUJIFILM X100V").
+  if (make && model && model.toLowerCase().startsWith(make.toLowerCase())) {
+    return model;
+  }
+  return [make, model].filter(Boolean).join(" ");
+};
+
+const formatHourMinute = (date: Date): string => {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${pad(date.getHours())}:${pad(date.getMinutes())}`;
+};
+
+const formatDayMonth = (date: Date): string =>
+  date.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+
+// Max pairwise haversine distance (km) across a slide's photos. The slide is
+// a circle and this is its enclosing diameter — the radius the user can see.
+// Returns null if fewer than two photos have parseable GPS.
+const computeMaxPairwiseKm = (
+  photos: ReadonlyArray<RandomPhotoRow | null>,
+): number | null => {
+  const coords: Array<[number, number]> = [];
+  for (const photo of photos) {
+    if (!photo) continue;
+    const gps = extractGPSFromExifString(photo.exif);
+    if (gps) coords.push(gps);
+  }
+  if (coords.length < 2) return null;
+  let max = 0;
+  for (let i = 0; i < coords.length; i += 1) {
+    for (let j = i + 1; j < coords.length; j += 1) {
+      const d = haversineKm(
+        coords[i][0],
+        coords[i][1],
+        coords[j][0],
+        coords[j][1],
+      );
+      if (d > max) max = d;
+    }
+  }
+  return max;
+};
+
+const formatSpreadKm = (km: number): string => {
+  if (km < 1) return `within ${Math.round(km * 1000)} m`;
+  if (km < 10) return `within ${km.toFixed(1)} km`;
+  return `within ${Math.round(km)} km`;
+};
+
+const collectDates = (
+  photos: ReadonlyArray<RandomPhotoRow | null>,
+): Date[] => {
+  const dates: Date[] = [];
+  for (const photo of photos) {
+    if (!photo) continue;
+    const d = extractDateFromExifString(photo.exif);
+    if (d) dates.push(d);
+  }
+  return dates;
+};
+
+/**
+ * Describe a remix slide with a short, descriptive suffix appended to the
+ * strategy label (e.g. "shot nearby · within 740 m"). Returns null when the
+ * strategy has no descriptor or the photos lack the needed metadata.
+ *
+ * The vector strategies (`similar`, `juxtapose`) and the visual
+ * `dominant-colour` swatch are deliberately not handled here — they need
+ * extra state / non-text rendering that lives in the slideshow component.
+ */
+export const describeRemix = (
+  strategy: RemixStrategy,
+  photos: ReadonlyArray<RandomPhotoRow | null>,
+): string | null => {
+  switch (strategy) {
+    case "proximity": {
+      const spread = computeMaxPairwiseKm(photos);
+      return spread === null ? null : formatSpreadKm(spread);
+    }
+    case "same-album": {
+      const seed = photos[0];
+      const album = seed ? albumOfPath(seed.path) : "";
+      return album || null;
+    }
+    case "same-city": {
+      const seed = photos[0];
+      const city = seed ? extractCity(seed.geocode) : "";
+      return city || null;
+    }
+    case "same-region": {
+      const seed = photos[0];
+      const region = seed ? lastNonNumericLine(seed.geocode) : "";
+      return region || null;
+    }
+    case "same-year": {
+      const dates = collectDates(photos);
+      if (dates.length === 0) return null;
+      return String(dates[0].getFullYear());
+    }
+    case "same-decade": {
+      const dates = collectDates(photos);
+      if (dates.length === 0) return null;
+      const years = dates.map((d) => d.getFullYear()).sort((a, b) => a - b);
+      if (years[0] === years[years.length - 1]) return String(years[0]);
+      return `${years[0]}–${years[years.length - 1]}`;
+    }
+    case "same-day-of-year": {
+      const dates = collectDates(photos);
+      if (dates.length === 0) return null;
+      const day = formatDayMonth(dates[0]);
+      const years = Array.from(
+        new Set(dates.map((d) => d.getFullYear())),
+      ).sort((a, b) => a - b);
+      return `${day} · ${years.join(", ")}`;
+    }
+    case "anniversary": {
+      const dates = collectDates(photos);
+      if (dates.length === 0) return null;
+      const years = Array.from(
+        new Set(dates.map((d) => d.getFullYear())),
+      ).sort((a, b) => a - b);
+      return years.join(", ");
+    }
+    case "golden-hour": {
+      const dates = collectDates(photos);
+      if (dates.length === 0) return null;
+      return dates.map(formatHourMinute).join(" · ");
+    }
+    case "shared-camera": {
+      const seed = photos[0];
+      const name = seed ? extractCameraDisplayName(seed.exif) : "";
+      return name || null;
+    }
+    default:
+      return null;
+  }
+};
+
+/**
+ * For the `dominant-colour` strategy: extract the seed photo's dominant
+ * palette colour for rendering as a swatch alongside the remix label.
+ * Returns null when the strategy isn't dominant-colour or the seed has no
+ * parseable palette.
+ */
+export const getRemixSwatchRgb = (
+  strategy: RemixStrategy,
+  photos: ReadonlyArray<RandomPhotoRow | null>,
+): [number, number, number] | null => {
+  if (strategy !== "dominant-colour") return null;
+  const seed = photos[0];
+  if (!seed?.colors) return null;
+  const palette = parseColorPalette(seed.colors);
+  return palette.length > 0 ? palette[0] : null;
 };
 
 // Probability weights for one unified roll across every strategy, including

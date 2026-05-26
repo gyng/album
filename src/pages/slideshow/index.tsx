@@ -28,13 +28,12 @@ import { buildCollectionPageJsonLd } from "../../lib/seo";
 import { getPhotoAltText } from "../../lib/alt";
 import { navigateTo, reloadCurrentPage } from "../../util/navigate";
 import { handleSlideshowKeyboardShortcut } from "../../util/slideshowKeyboard";
-import {
-  getNextSlideshowOverlayPreset,
-  getSlideshowTouchTapAction,
-} from "../../util/slideshowTouch";
+import { getSlideshowTouchTapAction } from "../../util/slideshowTouch";
 import { getNextAlignedSlideshowChange } from "../../util/slideshowTiming";
 import {
   decideRemixCompanionCount,
+  describeRemix,
+  getRemixSwatchRgb,
   getTimeAffinityScore,
   pickRemixCompanions,
   RemixStrategy,
@@ -387,6 +386,9 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
     seed: RandomPhotoRow;
     companions: RandomPhotoRow[];
     strategy: RemixStrategy | null;
+    // Captured from the async vector fetch on this entry's first reveal so
+    // replaying Previous/Next shows the same "94% match" badge.
+    vectorScore?: number | null;
   };
   const navigationHistoryRef = React.useRef<NavigationEntry[]>([]);
   const historyIndexRef = React.useRef<number>(-1);
@@ -399,24 +401,24 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
     total: 0,
   });
 
-  const [timeDelay, setTimeDelay, removeTimeDelay] = useLocalStorage(
+  const [timeDelay, setTimeDelay] = useLocalStorage(
     "slideshow-timedelay",
     900000,
   );
   const timeDelayRef = React.useRef(timeDelay);
-  const [showClock, setShowClock, removeShowClock] = useLocalStorage(
+  const [showClock, setShowClock] = useLocalStorage(
     "slideshow-showclock",
     false,
   );
-  const [showMap, setShowMap, removeShowMap] = useLocalStorage(
+  const [showMap, setShowMap] = useLocalStorage(
     "slideshow-showmap",
     false,
   );
-  const [showDetails, setShowDetails, removeShowDetails] = useLocalStorage(
+  const [showDetails, setShowDetails] = useLocalStorage(
     "slideshow-showdetails",
     false,
   );
-  const [showCover, setShowCover, removeShowCover] = useLocalStorage(
+  const [showCover, setShowCover] = useLocalStorage(
     "slideshow-showcover",
     false,
   );
@@ -439,6 +441,12 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
     React.useState<PoolStats>(EMPTY_POOL_STATS);
   const [remixStrategy, setRemixStrategy] =
     React.useState<RemixStrategy | null>(null);
+  // Vector strategies (similar / juxtapose) resolve asynchronously and the
+  // similarity score isn't derivable from the photos themselves — capture it
+  // when the fetch resolves so the remix badge can show "94% match".
+  const [remixVectorScore, setRemixVectorScore] = React.useState<number | null>(
+    null,
+  );
   // When set, the next forward-advance ignores the dice roll and forces a
   // remix. Used by the dedicated "Remix now" action button so users can
   // trigger a remix on demand instead of waiting for the 3% dice.
@@ -471,8 +479,10 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
     filterRef.current = filter;
   }, [filter]);
   const recentPhotoPathsRef = React.useRef<string[]>([]);
-  const [shuffleHistorySize, setShuffleHistorySize, removeShuffleHistorySize] =
-    useLocalStorage("slideshow-shuffle-history-size", 100);
+  const [shuffleHistorySize, setShuffleHistorySize] = useLocalStorage(
+    "slideshow-shuffle-history-size",
+    100,
+  );
   const [slideshowMode, setSlideshowMode] = useLocalStorage(
     "slideshow-mode",
     "weighted" as SlideshowMode,
@@ -496,7 +506,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
   const [isWakeLockSupported, setIsWakeLockSupported] = React.useState(false);
   const [isWakeLockActive, setIsWakeLockActive] = React.useState(false);
   const [touchGestureHint, setTouchGestureHint] = React.useState<
-    "next" | "previous" | "controls" | "reload" | "overlays" | null
+    "next" | "previous" | "controls" | "reload" | "remix" | null
   >(null);
   const [touchPullProgress, setTouchPullProgress] = React.useState(0);
   const [touchSwipeProgress, setTouchSwipeProgress] = React.useState(0);
@@ -512,7 +522,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
       ? remapPeek(touchPullProgress)
       : 0;
   const touchToolbarHidePreviewProgress =
-    controlsVisible && touchGestureHint === "overlays"
+    controlsVisible && touchGestureHint === "remix"
       ? remapPeek(touchPullProgress)
       : 0;
   // Loaded for Similar mode and *also* once the user expresses interest in
@@ -847,14 +857,20 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
                 }
                 if (fetched.length === 0) return;
 
+                // Capture the top candidate's similarity score for the
+                // remix badge — it's the only descriptor for vector strategies.
+                const topSimilarity = result.data[0]?.similarity ?? null;
+
                 setRemixCompanions(fetched);
+                setRemixVectorScore(topSimilarity);
                 // Patch the recorded history entry so Previous/Next replays
-                // with the same companions after the async resolve.
+                // with the same companions and score after the async resolve.
                 const entry = navigationHistoryRef.current.find(
                   (e) => e.seed.path === seedPath,
                 );
                 if (entry) {
                   entry.companions = fetched;
+                  entry.vectorScore = topSimilarity;
                 }
               } catch (err) {
                 console.error("Vector remix fetch failed", err);
@@ -894,6 +910,8 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
       setCurrentPhotoPath(candidatePhoto);
       setRemixCompanions(companions);
       setRemixStrategy(strategy);
+      // Sync vector path resolves later; non-vector strategies clear here.
+      setRemixVectorScore(null);
       setSlideshowError(null);
       setNextChangeAt(computeNextChangeAt());
     },
@@ -927,6 +945,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
       // side-by-side faithfully.
       setRemixCompanions(entry.companions);
       setRemixStrategy(entry.strategy);
+      setRemixVectorScore(entry.vectorScore ?? null);
       setSlideshowError(null);
       setNextChangeAt(computeNextChangeAt());
       return entry.seed;
@@ -941,6 +960,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
     if (!remixEnabled) {
       setRemixCompanions([]);
       setRemixStrategy(null);
+      setRemixVectorScore(null);
     }
   }, [remixEnabled]);
 
@@ -1693,39 +1713,6 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
     }
   }, []);
 
-  const cycleTouchOverlays = useCallback(() => {
-    const nextPreset = getNextSlideshowOverlayPreset({
-      showDetails,
-      showMap,
-      showClock,
-    });
-
-    setShowDetails(nextPreset.showDetails);
-    setShowMap(nextPreset.showMap);
-    setShowClock(nextPreset.showClock);
-  }, [
-    setShowClock,
-    setShowDetails,
-    setShowMap,
-    showClock,
-    showDetails,
-    showMap,
-  ]);
-
-  const nextOverlayPreset = getNextSlideshowOverlayPreset({
-    showDetails,
-    showMap,
-    showClock,
-  });
-
-  const nextOverlayLabel = nextOverlayPreset.showDetails
-    ? nextOverlayPreset.showMap
-      ? nextOverlayPreset.showClock
-        ? "Show everything"
-        : "Show details + map"
-      : "Show details"
-    : "Hide overlays";
-
   // Any touch interaction anywhere in the slideshow is a fresh user gesture —
   // use it to (re)acquire the screen wake lock, which Safari PWAs require to
   // happen inside a gesture handler. Capture-phase so taps on buttons or
@@ -1886,7 +1873,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
         }
 
         setTouchSwipeProgress(0);
-        setTouchGestureHint(direction === "down" ? "controls" : "overlays");
+        setTouchGestureHint(direction === "down" ? "controls" : "remix");
         const progress = progressFromDistance(
           verticalDistance,
           TOUCH_PULL_HINT_THRESHOLD_PX,
@@ -2015,7 +2002,11 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
           setControlsVisible(false);
           return;
         }
-        cycleTouchOverlays();
+        // Drag-up from the slide forces the next advance to be a remix
+        // (mirrors the "Remix now" toolbar button). The forceRemix flag is
+        // honoured by advanceToNextPhoto's roll, bypassing the 3% dice.
+        forceRemixRef.current = true;
+        advanceToNextPhoto();
         return;
       }
 
@@ -2050,7 +2041,6 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
       advanceToNextPhoto,
       canGoPrevious,
       clearImagePointerGesture,
-      cycleTouchOverlays,
       goPrevious,
     ],
   );
@@ -2365,6 +2355,22 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
       random: "picked at random",
     };
     const isRemix = remixCompanions.length > 0;
+    const remixDescriptor =
+      isRemix && remixStrategy ? describeRemix(remixStrategy, slidePhotos) : null;
+    const remixSwatch =
+      isRemix && remixStrategy
+        ? getRemixSwatchRgb(remixStrategy, slidePhotos)
+        : null;
+    const vectorScoreLabel =
+      isRemix &&
+      (remixStrategy === "similar" || remixStrategy === "juxtapose") &&
+      remixVectorScore !== null
+        ? remixStrategy === "similar"
+          ? `${Math.round(remixVectorScore * 100)}% match`
+          : // For juxtapose the cosine is low; surface it as a "distance"
+            // reading so the framing matches the strategy intent.
+            `${Math.round((1 - remixVectorScore) * 100)}% distance`
+        : null;
     return (
       <>
         {isRemix && remixStrategy ? (
@@ -2373,6 +2379,20 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
           >
             ◫ Remix · {slidePhotos.length} photos{" "}
             {remixStrategyLabel[remixStrategy]}
+            {remixSwatch ? (
+              <>
+                {" "}
+                <span
+                  className={styles.remixSwatch}
+                  aria-hidden="true"
+                  style={{
+                    backgroundColor: `rgb(${remixSwatch[0]}, ${remixSwatch[1]}, ${remixSwatch[2]})`,
+                  }}
+                />
+              </>
+            ) : null}
+            {remixDescriptor ? ` · ${remixDescriptor}` : ""}
+            {vectorScoreLabel ? ` · ${vectorScoreLabel}` : ""}
           </div>
         ) : null}
 
@@ -2491,7 +2511,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
                 </svg>
               </span>
               <span className={styles.touchAffordanceLabel}>
-                {controlsVisible ? "Close settings" : nextOverlayLabel}
+                {controlsVisible ? "Close settings" : "◫ Remix now"}
               </span>
             </div>
             <div className={styles.touchSideAffordanceLeft}>

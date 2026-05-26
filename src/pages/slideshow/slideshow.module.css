@@ -891,6 +891,20 @@
   letter-spacing: 0.02em;
 }
 
+/* Inline colour swatch shown next to the "sharing this colour" remix label,
+   so the matched dominant colour is visible at a glance rather than
+   buried in the photos themselves. Width matches the line height of the
+   adjacent text so it sits cleanly inline. */
+.remixSwatch {
+  display: inline-block;
+  width: 0.85em;
+  height: 0.85em;
+  vertical-align: -0.1em;
+  border-radius: 50%;
+  border: 1px solid hsl(0 0% 100% / 0.5);
+  box-shadow: 0 0 0 1px hsl(0 0% 0% / 0.4);
+}
+
 /* Persistent bottom nudge shown on coarse-pointer devices until a wake lock is acquired */
 .wakeLockNudge {
   position: fixed;

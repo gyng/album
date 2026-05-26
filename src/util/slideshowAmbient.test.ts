@@ -1,6 +1,8 @@
 import { RandomPhotoRow } from "../components/search/api";
 import {
   decideRemixCompanionCount,
+  describeRemix,
+  getRemixSwatchRgb,
   getTimeAffinityScore,
   pickRemixCompanions,
   timeAwareShufflePhotos,
@@ -82,7 +84,6 @@ describe("getTimeAffinityScore", () => {
 
   test("wraparound: 23:30 and 00:30 score close (cyclic hour distance)", () => {
     const lateNight = new Date(2024, 5, 10, 23, 30);
-    const earlyMorning = new Date(2026, 5, 10, 0, 30); // 1h cyclic away
     const noon = new Date(2024, 5, 10, 12, 0); // 11.5h cyclic away
     const refNow = new Date(2026, 5, 10, 0, 30);
     expect(getTimeAffinityScore(lateNight, refNow)).toBeGreaterThan(
@@ -489,5 +490,159 @@ describe("pickRemixCompanions", () => {
       expect(pick.strategy).not.toBe("similar");
       expect(pick.strategy).not.toBe("juxtapose");
     }
+  });
+});
+
+describe("describeRemix", () => {
+  test("proximity returns a metric distance string from GPS metadata", () => {
+    // 0.01° latitude ≈ 1.11 km. Two photos 0.01° apart should land in the km bucket.
+    const photos: RandomPhotoRow[] = [
+      {
+        path: "data/albums/a/1.jpg",
+        exif: ["GPS GPSLatitude: 0,0,0", "GPS GPSLatitudeRef: N", "GPS GPSLongitude: 0,0,0", "GPS GPSLongitudeRef: E"].join("\n"),
+        geocode: "",
+      },
+      {
+        path: "data/albums/a/2.jpg",
+        exif: ["GPS GPSLatitude: 0,0,36", "GPS GPSLatitudeRef: N", "GPS GPSLongitude: 0,0,0", "GPS GPSLongitudeRef: E"].join("\n"),
+        geocode: "",
+      },
+    ];
+    const desc = describeRemix("proximity", photos);
+    expect(desc).not.toBeNull();
+    expect(desc).toMatch(/^within /);
+  });
+
+  test("proximity returns null when fewer than two photos have GPS", () => {
+    expect(describeRemix("proximity", [makePhoto("a/1.jpg")])).toBeNull();
+  });
+
+  test("same-album returns the album folder name from the seed path", () => {
+    expect(
+      describeRemix("same-album", [makePhoto("data/albums/hokkaido/1.jpg")]),
+    ).toBe("hokkaido");
+  });
+
+  test("same-city returns the city from the geocode line 2", () => {
+    const seed: RandomPhotoRow = {
+      path: "a/1.jpg",
+      exif: "",
+      geocode: makeGeocode("JP", "Sapporo", "Japan"),
+    };
+    expect(describeRemix("same-city", [seed])).toBe("Sapporo");
+  });
+
+  test("same-region returns the country line (last non-numeric)", () => {
+    const seed: RandomPhotoRow = {
+      path: "a/1.jpg",
+      exif: "",
+      geocode: makeGeocode("JP", "Sapporo", "Japan"),
+    };
+    expect(describeRemix("same-region", [seed])).toBe("Japan");
+  });
+
+  test("same-year returns the seed's year", () => {
+    expect(
+      describeRemix("same-year", [
+        makePhoto("a/1.jpg", new Date(2024, 5, 1)),
+        makePhoto("a/2.jpg", new Date(2024, 8, 1)),
+      ]),
+    ).toBe("2024");
+  });
+
+  test("same-decade returns the year range across the slide", () => {
+    expect(
+      describeRemix("same-decade", [
+        makePhoto("a/1.jpg", new Date(2021, 0, 1)),
+        makePhoto("a/2.jpg", new Date(2024, 0, 1)),
+      ]),
+    ).toBe("2021–2024");
+  });
+
+  test("same-day-of-year returns the day plus distinct years", () => {
+    const desc = describeRemix("same-day-of-year", [
+      makePhoto("a/1.jpg", new Date(2024, 4, 27, 10, 0)),
+      makePhoto("a/2.jpg", new Date(2021, 4, 27, 14, 0)),
+      makePhoto("a/3.jpg", new Date(2018, 4, 27, 18, 0)),
+    ]);
+    expect(desc).toMatch(/27 May · 2018, 2021, 2024/);
+  });
+
+  test("anniversary returns just the distinct years", () => {
+    expect(
+      describeRemix("anniversary", [
+        makePhoto("a/1.jpg", new Date(2024, 4, 27)),
+        makePhoto("a/2.jpg", new Date(2021, 4, 25)),
+      ]),
+    ).toBe("2021, 2024");
+  });
+
+  test("golden-hour returns the local hours of each photo", () => {
+    expect(
+      describeRemix("golden-hour", [
+        makePhoto("a/1.jpg", new Date(2024, 5, 1, 6, 42)),
+        makePhoto("a/2.jpg", new Date(2024, 5, 1, 17, 58)),
+      ]),
+    ).toBe("06:42 · 17:58");
+  });
+
+  test("shared-camera returns the make+model from EXIF", () => {
+    const seed: RandomPhotoRow = {
+      path: "a/1.jpg",
+      exif: "Image Make: FUJIFILM\nImage Model: X100V",
+      geocode: "",
+    };
+    expect(describeRemix("shared-camera", [seed])).toBe("FUJIFILM X100V");
+  });
+
+  test("shared-camera strips redundant manufacturer prefixes", () => {
+    // Some bodies report "Image Model: NIKON Z 7" with "Image Make: NIKON CORPORATION".
+    // The display should not become "NIKON CORPORATION NIKON Z 7".
+    const seed: RandomPhotoRow = {
+      path: "a/1.jpg",
+      exif: "Image Make: NIKON\nImage Model: NIKON Z 7",
+      geocode: "",
+    };
+    expect(describeRemix("shared-camera", [seed])).toBe("NIKON Z 7");
+  });
+
+  test("returns null for strategies without a text descriptor", () => {
+    const seed = makePhoto("a/1.jpg", new Date(2024, 0, 1));
+    expect(describeRemix("dominant-colour", [seed])).toBeNull();
+    expect(describeRemix("similar", [seed])).toBeNull();
+    expect(describeRemix("juxtapose", [seed])).toBeNull();
+    expect(describeRemix("random", [seed])).toBeNull();
+  });
+});
+
+describe("getRemixSwatchRgb", () => {
+  test("returns the seed's dominant palette colour for dominant-colour", () => {
+    const seed: RandomPhotoRow = {
+      path: "a/1.jpg",
+      exif: "",
+      geocode: "",
+      colors: formatColors([
+        [220, 30, 30],
+        [40, 40, 40],
+      ]),
+    };
+    expect(getRemixSwatchRgb("dominant-colour", [seed])).toEqual([220, 30, 30]);
+  });
+
+  test("returns null for any non-dominant-colour strategy", () => {
+    const seed: RandomPhotoRow = {
+      path: "a/1.jpg",
+      exif: "",
+      geocode: "",
+      colors: formatColors([[220, 30, 30]]),
+    };
+    expect(getRemixSwatchRgb("same-album", [seed])).toBeNull();
+    expect(getRemixSwatchRgb("proximity", [seed])).toBeNull();
+  });
+
+  test("returns null when the seed has no colours", () => {
+    expect(
+      getRemixSwatchRgb("dominant-colour", [makePhoto("a/1.jpg")]),
+    ).toBeNull();
   });
 });
