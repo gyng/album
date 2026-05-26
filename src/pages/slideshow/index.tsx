@@ -2361,15 +2361,20 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
       isRemix && remixStrategy
         ? getRemixSwatchRgb(remixStrategy, slidePhotos)
         : null;
+    // Cosine similarity from SigLIP is almost always in [0, 1] for normalised
+    // image embeddings, but the contract isn't strictly bounded — clamp before
+    // percent-rounding so a stray negative score can't render as "105% distance".
+    const clampPercent = (value: number): number =>
+      Math.max(0, Math.min(100, Math.round(value * 100)));
     const vectorScoreLabel =
       isRemix &&
       (remixStrategy === "similar" || remixStrategy === "juxtapose") &&
       remixVectorScore !== null
         ? remixStrategy === "similar"
-          ? `${Math.round(remixVectorScore * 100)}% match`
+          ? `${clampPercent(remixVectorScore)}% match`
           : // For juxtapose the cosine is low; surface it as a "distance"
             // reading so the framing matches the strategy intent.
-            `${Math.round((1 - remixVectorScore) * 100)}% distance`
+            `${clampPercent(1 - remixVectorScore)}% distance`
         : null;
     return (
       <>
