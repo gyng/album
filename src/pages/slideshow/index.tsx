@@ -2172,24 +2172,38 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
   const contextLongPressFiredRef = React.useRef(false);
 
   const activePhotoSrc = getSlideshowPhotoSrc(currentPhotoPath);
+  // Tracks whether the *previously displayed* slide was a remix. Read by the
+  // crossfade effect below so it can skip the fade when leaving a remix —
+  // otherwise the previousPhotoSrc is the lone seed src and renders full-bleed
+  // behind the new image while it loads, which looks like an extra slide
+  // flashing past between the remix and the next photo.
+  const previousSlideWasRemixRef = React.useRef(false);
 
   useEffect(() => {
     if (!activePhotoSrc) {
       activePhotoSrcRef.current = null;
-       
+
       setPreviousPhotoSrc(null);
+      previousSlideWasRemixRef.current = false;
       return;
     }
 
     const previousPhotoSrc = activePhotoSrcRef.current;
 
     if (previousPhotoSrc && previousPhotoSrc !== activePhotoSrc) {
-      setPreviousPhotoSrc(previousPhotoSrc);
+      const leavingRemixIntoSingle =
+        previousSlideWasRemixRef.current && remixCompanions.length === 0;
+      // Leaving a remix into a single photo: the cached previous src is the
+      // remix seed alone, which would show full-bleed behind the loading
+      // image and read as a stray extra slide. Skip the fade in that case —
+      // the next image is usually preloaded so it appears within a frame.
+      setPreviousPhotoSrc(leavingRemixIntoSingle ? null : previousPhotoSrc);
       setImageLoaded(false);
     }
 
     activePhotoSrcRef.current = activePhotoSrc;
-  }, [activePhotoSrc]);
+    previousSlideWasRemixRef.current = remixCompanions.length > 0;
+  }, [activePhotoSrc, remixCompanions]);
 
   if (currentPhotoPath === null) {
     return (
