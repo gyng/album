@@ -110,10 +110,24 @@ export const decideRemixCompanionCount = (
   if (random() >= remixProbability) {
     return 0;
   }
-  const layoutRoll = random();
-  if (layoutRoll < 0.7) return 1; // 2-up
-  if (layoutRoll < 0.95) return 2; // 3-up
-  return 3; // 4-up
+  return rollRemixLayoutCount(random);
+};
+
+/**
+ * Pick a layout size (1 = 2-up, 2 = 3-up, 3 = 4-up) under the same band
+ * split that `decideRemixCompanionCount` uses for organic dice rolls. Used
+ * by the slideshow's "Remix now" button and drag-up gesture so user-forced
+ * remixes share the same 70/25/5 distribution as the natural ones.
+ *
+ * `random` is injectable for tests.
+ */
+export const rollRemixLayoutCount = (
+  random: () => number = Math.random,
+): 1 | 2 | 3 => {
+  const r = random();
+  if (r < 0.7) return 1;
+  if (r < 0.95) return 2;
+  return 3;
 };
 
 export type RemixStrategy =

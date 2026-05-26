@@ -5,6 +5,7 @@ import {
   getRemixSwatchRgb,
   getTimeAffinityScore,
   pickRemixCompanions,
+  rollRemixLayoutCount,
   timeAwareShufflePhotos,
 } from "./slideshowAmbient";
 
@@ -161,6 +162,23 @@ describe("timeAwareShufflePhotos", () => {
     // the sharpened bias they should average above 3 (most of them, most
     // of the time).
     expect(avgTopTenOnBand).toBeGreaterThan(3);
+  });
+});
+
+describe("rollRemixLayoutCount", () => {
+  test("returns 1 (2-up) when roll < 0.7", () => {
+    expect(rollRemixLayoutCount(() => 0.0)).toBe(1);
+    expect(rollRemixLayoutCount(() => 0.69)).toBe(1);
+  });
+
+  test("returns 2 (3-up) when roll in [0.7, 0.95)", () => {
+    expect(rollRemixLayoutCount(() => 0.7)).toBe(2);
+    expect(rollRemixLayoutCount(() => 0.94)).toBe(2);
+  });
+
+  test("returns 3 (4-up) when roll >= 0.95", () => {
+    expect(rollRemixLayoutCount(() => 0.95)).toBe(3);
+    expect(rollRemixLayoutCount(() => 0.99)).toBe(3);
   });
 });
 

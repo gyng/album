@@ -138,12 +138,17 @@
     "clock clock clock";
 }
 
+/* 4-up: the photo grid above is 2 columns × 2 rows, so the description
+   strip mirrors that — two rows of descriptions, each spanning the same
+   half-width column as the photo it labels. Wider columns than a flat
+   1×4 split would have given, with descN positioned under photoN. */
 .bottomBarStack[data-count="4"] {
-  grid-template-columns: 1fr 1fr 1fr 1fr;
+  grid-template-columns: 1fr 1fr;
   grid-template-areas:
-    "map   map   map   map  "
-    "desc0 desc1 desc2 desc3"
-    "clock clock clock clock";
+    "map   map  "
+    "desc0 desc1"
+    "desc2 desc3"
+    "clock clock";
 }
 
 /* Single-image detailsAlignment toggle — slides every grid item to the
@@ -377,9 +382,11 @@
   left: 50%;
   display: grid;
   /* Chevron sits above the label pill (JSX order: chevron, label).
-     gap controls the breathing room between the two. */
+     gap controls the breathing room between the two — kept generous so
+     the circular chevron reads as separate from the pill rather than
+     sitting on top of it. */
   place-items: center;
-  gap: calc(var(--m-s) * 0.75);
+  gap: var(--m-m);
   opacity: 0;
   transform: translateX(-50%)
     translateY(calc(var(--touch-pull-progress) * var(--m-l) * -1));

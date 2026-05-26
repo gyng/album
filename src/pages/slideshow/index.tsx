@@ -37,6 +37,7 @@ import {
   getTimeAffinityScore,
   pickRemixCompanions,
   RemixStrategy,
+  rollRemixLayoutCount,
   rollRemixStrategy,
   timeAwareShufflePhotos,
   VECTOR_REMIX_STRATEGIES,
@@ -792,11 +793,11 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
         const wasForced = forceRemixRef.current;
         let count: 0 | 1 | 2 | 3 = 0;
         if (wasForced) {
-          // User pressed "Remix now"; bypass the dice and pick a layout
-          // (favouring 2-up to keep forced remixes light).
+          // User pressed "Remix now" or dragged up: bypass the remix-vs-no-
+          // remix dice but share the same 70/25/5 layout distribution as
+          // organic remixes via rollRemixLayoutCount (single source of truth).
           forceRemixRef.current = false;
-          const layoutRoll = Math.random();
-          count = layoutRoll < 0.7 ? 1 : layoutRoll < 0.95 ? 2 : 3;
+          count = rollRemixLayoutCount();
         } else {
           count = decideRemixCompanionCount(REMIX_PROBABILITY);
         }
@@ -2236,6 +2237,33 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
   const isRemixGridReady =
     remixCompanions.length === 0 || remixLoadedCount >= totalRemixCells;
 
+  // Safety net: if a cell never fires onLoad (broken file, dropped network,
+  // CORS), the grid would stay at opacity 0 indefinitely. After 3s reveal
+  // whatever is there — better to show a partial grid than a black screen.
+  // Populates the ref directly so any late-arriving load handlers no-op.
+  useEffect(() => {
+    if (remixCompanions.length === 0) return;
+    const seedPath = currentPhotoPath?.path;
+    if (!seedPath) return;
+    const t = window.setTimeout(() => {
+      if (remixLoadedPathsRef.current.size >= totalRemixCells) return;
+      const all = new Set<string>([seedPath, ...remixCompanions.map((c) => c.path)]);
+      remixLoadedPathsRef.current = all;
+      setRemixLoadedCount(all.size);
+    }, 3000);
+    return () => window.clearTimeout(t);
+  }, [remixLayoutKey, currentPhotoPath, remixCompanions, totalRemixCells]);
+
+  // Clear the fade-out backdrop only once the *whole* new grid is ready, so
+  // the user never sees a window where the previous slide is gone and the
+  // new grid hasn't yet revealed. The 260ms delay matches the grid's own
+  // opacity transition, so the backdrop persists through the fade-in.
+  useEffect(() => {
+    if (!isRemixGridReady || remixCompanions.length === 0) return;
+    const t = window.setTimeout(() => setPreviousPhotoSrc(null), 260);
+    return () => window.clearTimeout(t);
+  }, [isRemixGridReady, remixCompanions.length]);
+
   if (currentPhotoPath === null) {
     return (
       <div className={styles.progressBarContainer}>
@@ -3242,20 +3270,20 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
                       markRemixCellLoaded(photo.path);
                       if (isSeed) {
                         setImageLoaded(true);
-                        window.setTimeout(() => {
-                          setPreviousPhotoSrc(null);
-                        }, 260);
                       }
                     }}
-                    onError={
-                      isSeed
-                        ? () => {
-                            setTimeout(() => {
-                              advanceToNextPhoto();
-                            }, 1000);
-                          }
-                        : undefined
-                    }
+                    onError={() => {
+                      // Always mark the cell "loaded" on error so a single
+                      // broken companion can't pin the grid at opacity 0.
+                      // For the seed, keep the auto-advance on broken images
+                      // so kiosk displays don't get stuck on a 404.
+                      markRemixCellLoaded(photo.path);
+                      if (isSeed) {
+                        setTimeout(() => {
+                          advanceToNextPhoto();
+                        }, 1000);
+                      }
+                    }}
                   />
                   {/* per-cell description is now rendered as a bottomBar
                       column further down — same component as the single-
