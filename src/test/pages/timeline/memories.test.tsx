@@ -2,7 +2,6 @@
  * @jest-environment jsdom
  */
 
-import React from "react";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import TimelinePage from "../../../pages/timeline/index";
 import { TimelineEntry } from "../../../components/timelineTypes";

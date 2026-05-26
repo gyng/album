@@ -3,17 +3,16 @@
  */
 
 import { render, screen } from "@testing-library/react";
+import type { ReactNode } from "react";
 import { MMap } from "./Map";
 
 jest.mock("react-map-gl/maplibre", () => {
-  const React = require("react");
-
   return {
     __esModule: true,
-    default: ({ children }: { children?: React.ReactNode }) => (
+    default: ({ children }: { children?: ReactNode }) => (
       <div data-testid="map">{children}</div>
     ),
-    Marker: ({ children }: { children?: React.ReactNode }) => (
+    Marker: ({ children }: { children?: ReactNode }) => (
       <div data-testid="marker">{children}</div>
     ),
     useMap: () => ({

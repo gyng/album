@@ -3,6 +3,7 @@
  */
 
 import { act, fireEvent, render, screen } from "@testing-library/react";
+import type { ReactNode } from "react";
 import { MapWorldEntry } from "./MapWorld";
 
 const mapHandlers: {
@@ -32,8 +33,6 @@ const mapInstance = {
 
 const mapRef = { current: mapInstance };
 jest.mock("react-map-gl/maplibre", () => {
-  const React = require("react");
-
   return {
     __esModule: true,
     default: ({
@@ -43,7 +42,7 @@ jest.mock("react-map-gl/maplibre", () => {
       onZoomStart,
       onZoom,
     }: {
-      children?: React.ReactNode;
+      children?: ReactNode;
       onMoveStart?: () => void;
       onMoveEnd?: (event: {
         viewState: { latitude: number; longitude: number; zoom: number };
@@ -61,7 +60,7 @@ jest.mock("react-map-gl/maplibre", () => {
       children,
       onClick,
     }: {
-      children?: React.ReactNode;
+      children?: ReactNode;
       onClick?: (event: {
         originalEvent: { stopPropagation: () => void };
       }) => void;
@@ -80,7 +79,7 @@ jest.mock("react-map-gl/maplibre", () => {
       children,
       className,
     }: {
-      children?: React.ReactNode;
+      children?: ReactNode;
       className?: string;
     }) => (
       <div data-testid="popup" className={className}>
@@ -96,7 +95,7 @@ jest.mock("react-map-gl/maplibre", () => {
       id,
       data,
     }: {
-      children?: React.ReactNode;
+      children?: ReactNode;
       id?: string;
       data?: unknown;
     }) => (
@@ -117,7 +116,7 @@ jest.mock("next/link", () => ({
     className,
   }: {
     href: string;
-    children: React.ReactNode;
+    children: ReactNode;
     className?: string;
   }) => (
     <a href={href} className={className}>

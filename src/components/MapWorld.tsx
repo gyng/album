@@ -21,7 +21,6 @@ import "maplibre-gl/dist/maplibre-gl.css";
 import { useIntersectionObserver } from "usehooks-ts";
 import { ThemeToggle } from "./ThemeToggle";
 import {
-  buildContextRouteGeoJson,
   buildContextRoutePoints,
   buildMapRoute,
   distanceMetersBetween,
@@ -260,16 +259,6 @@ const getDirectionalGradientStops = (fromColor: string, toColor: string) => {
     { offset: "38%", color: middleColor },
     { offset: "100%", color: newerColor },
   ];
-};
-
-const getDirectionalGradientColors = (fromColor: string, toColor: string) => {
-  const stops = getDirectionalGradientStops(fromColor, toColor);
-
-  return {
-    start: stops[0]?.color ?? fromColor,
-    middle: stops[1]?.color ?? toColor,
-    end: stops[2]?.color ?? toColor,
-  };
 };
 
 const getBackgroundJourneyGradientColors = (

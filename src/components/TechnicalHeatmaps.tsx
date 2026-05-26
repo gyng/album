@@ -27,12 +27,6 @@ type HeatmapConfig = {
   cells: HeatmapCell[];
 };
 
-type RelatedCell = {
-  heatmapKey: string;
-  cellKey: string;
-  count: number;
-};
-
 type ActiveSelection = {
   heatmapKey: string;
   cellKey: string;

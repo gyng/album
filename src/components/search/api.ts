@@ -1,4 +1,4 @@
-import { Database, Sqlite3Static } from "@sqlite.org/sqlite-wasm";
+import { Database } from "@sqlite.org/sqlite-wasm";
 import { SearchResultRow } from "./searchTypes";
 import { RGB, deltaE, rgbToLab, parseColorPalette } from "../../util/colorDistance";
 import { SearchFacetSelection } from "../../util/searchFacets";

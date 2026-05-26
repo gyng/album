@@ -8,8 +8,6 @@ import type { ProjectionSpecification } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import Link from "next/link";
 
-type OpenFreeMapStyle = "positron" | "bright" | "liberty";
-
 type MapTilerMapStyle =
   | "aquarelle"
   | "bright"
