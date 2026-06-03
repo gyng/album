@@ -62,6 +62,27 @@ test.describe("Slideshow", () => {
     ).toBeVisible();
   });
 
+  test("desktop controls auto-hide on idle and reveal on mouse-to-top", async ({
+    page,
+  }) => {
+    await page.goto("/slideshow", { waitUntil: "domcontentloaded" });
+    await waitForSlideshow(page);
+
+    const container = page.locator("[data-paused]");
+
+    // Controls start visible; with no pointer interaction the desktop
+    // auto-hide deadline (CONTROLS_AUTO_HIDE_MS = 3s) runs to completion.
+    // (It may already have elapsed during a slow WASM load — either way the
+    // end state is hidden.)
+    await expect(container).toHaveAttribute("data-controls-visible", "false", {
+      timeout: 8000,
+    });
+
+    // Moving the cursor to the top edge reveals them again.
+    await revealControls(page);
+    await expect(container).toHaveAttribute("data-controls-visible", "true");
+  });
+
   test("next/previous navigation works", async ({ page }) => {
     await page.goto("/slideshow", { waitUntil: "domcontentloaded" });
     await waitForSlideshow(page);

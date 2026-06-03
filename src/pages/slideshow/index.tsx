@@ -46,6 +46,7 @@ import {
 } from "../../util/slideshowAmbient";
 import { BUILD_VERSION } from "../../lib/buildVersion";
 import { useWakeLock } from "../../components/useWakeLock";
+import { useControlsAutoHide } from "../../components/useControlsAutoHide";
 import { SlideshowToolbar } from "../../components/slideshow/SlideshowToolbar";
 import { SlideshowBottomBar } from "../../components/slideshow/SlideshowBottomBar";
 import { decideBuildUpdate, decideDbUpdateAction } from "../../util/kioskRefresh";
@@ -65,8 +66,6 @@ import {
 } from "../../util/slideshowUrl";
 
 type PageProps = {};
-const CONTROLS_AUTO_HIDE_MS = 3000;
-const TOUCH_CONTROLS_AUTO_HIDE_MS = 30000;
 const VERSION_POLL_MS = 300000;
 // Backstop hard-reload interval. Was 24h, which was killing the wake lock
 // daily on iPad PWA installs (Safari requires a user gesture to re-acquire).
@@ -410,10 +409,20 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
   );
   const [hasParsedInitialUrl, setHasParsedInitialUrl] = React.useState(false);
   const [isPaused, setIsPaused] = React.useState(false);
-  const [controlsVisible, setControlsVisible] = React.useState(true);
-  const [controlsHideProgress, setControlsHideProgress] = React.useState(1);
-  const [isCoarsePointer, setIsCoarsePointer] = React.useState(false);
-  const [isPointerOverToolbar, setIsPointerOverToolbar] = React.useState(false);
+  // Controls visibility lifecycle (coarse-pointer detection, rAF auto-hide
+  // countdown, desktop show/hide + post-Hide suppression) lives in a hook;
+  // destructured to the same local names the rest of this component uses.
+  const {
+    controlsVisible,
+    setControlsVisible,
+    controlsHideProgress,
+    isCoarsePointer,
+    setIsPointerOverToolbar,
+    extendControlsHideDeadline,
+    showControlsForDesktop,
+    hideDesktopControls,
+    dismissControls,
+  } = useControlsAutoHide();
   const [isFullscreenSupported, setIsFullscreenSupported] =
     React.useState(false);
   const [isFullscreenActive, setIsFullscreenActive] = React.useState(false);
@@ -471,23 +480,11 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
     hapticFired?: boolean;
   } | null>(null);
   const suppressImageClickRef = React.useRef(false);
-  const controlsHideDeadlineRef = React.useRef<number | null>(null);
   const pausedRemainingMsRef = React.useRef<number | null>(null);
   const activePhotoSrcRef = React.useRef<string | null>(null);
   const [bufferedPhotoSrc, setBufferedPhotoSrc] = React.useState<string | null>(
     null,
   );
-
-  // Bump the auto-hide deadline forward on each container-level pointer
-  // event so touch interactions keep the toolbar awake (desktop gets this
-  // via the mouse-over-toolbar branch in the auto-hide effect).
-  const extendControlsHideDeadline = useCallback(() => {
-    if (!isCoarsePointer || !controlsVisible) {
-      return;
-    }
-    controlsHideDeadlineRef.current = Date.now() + TOUCH_CONTROLS_AUTO_HIDE_MS;
-    setControlsHideProgress(1);
-  }, [controlsVisible, isCoarsePointer]);
 
   const updateSlideshowUrl = useCallback(
     (mode: SlideshowMode, delayMs = timeDelayRef.current) => {
@@ -1297,69 +1294,6 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
     return () => clearInterval(id);
   }, [controlsVisible, nextChangeAt, showClock]);
 
-  useEffect(() => {
-    const coarsePointerQuery = window.matchMedia(
-      "(hover: none), (pointer: coarse)",
-    );
-    const syncCoarsePointer = () => {
-      setIsCoarsePointer(coarsePointerQuery.matches);
-    };
-
-    syncCoarsePointer();
-    coarsePointerQuery.addEventListener("change", syncCoarsePointer);
-    return () => {
-      coarsePointerQuery.removeEventListener("change", syncCoarsePointer);
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!controlsVisible) {
-      controlsHideDeadlineRef.current = null;
-      setControlsHideProgress(0);
-      return;
-    }
-
-    if (isPointerOverToolbar) {
-      controlsHideDeadlineRef.current = null;
-      setControlsHideProgress(1);
-      return;
-    }
-
-    // Touch/coarse-pointer gets a much longer dwell since the user can't
-    // mouse-out to dismiss. The ring still renders to make the impending
-    // auto-hide discoverable.
-    const autoHideMs = isCoarsePointer
-      ? TOUCH_CONTROLS_AUTO_HIDE_MS
-      : CONTROLS_AUTO_HIDE_MS;
-    const deadline = Date.now() + autoHideMs;
-    controlsHideDeadlineRef.current = deadline;
-    setControlsHideProgress(1);
-
-    let frameId = 0;
-
-    const tick = () => {
-      const currentDeadline = controlsHideDeadlineRef.current;
-      if (!currentDeadline) {
-        setControlsHideProgress(0);
-        return;
-      }
-
-      const remaining = Math.max(0, currentDeadline - Date.now());
-      const progress = remaining / autoHideMs;
-      setControlsHideProgress(progress);
-
-      if (remaining <= 0) {
-        controlsHideDeadlineRef.current = null;
-        setControlsVisible(false);
-        return;
-      }
-      frameId = window.requestAnimationFrame(tick);
-    };
-
-    frameId = window.requestAnimationFrame(tick);
-
-    return () => window.cancelAnimationFrame(frameId);
-  }, [controlsVisible, isCoarsePointer, isPointerOverToolbar]);
 
   useEffect(() => {
     const fullscreenDocument = document as FullscreenDocument;
@@ -1608,8 +1542,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
           setControlsVisible(true);
           break;
         case "hide-controls":
-          controlsHideDeadlineRef.current = null;
-          setControlsVisible(false);
+          dismissControls();
           break;
         case "remix":
           // Drag-up forces the next advance to be a remix (mirrors the
@@ -1625,32 +1558,11 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
       advanceToNextPhoto,
       canGoPrevious,
       clearImagePointerGesture,
+      dismissControls,
       goPrevious,
+      setControlsVisible,
     ],
   );
-
-  // After the user explicitly presses Hide, their cursor is almost always
-  // still over the top-edge trigger zone — without this cooldown the next
-  // mouseenter/mousemove on that zone immediately re-opens the toolbar.
-  // The suppression lasts long enough for the user to move the cursor down
-  // off the trigger area.
-  const suppressDesktopShowUntilRef = React.useRef(0);
-
-  const showControlsForDesktop = useCallback(() => {
-    if (isCoarsePointer) {
-      return;
-    }
-    if (Date.now() < suppressDesktopShowUntilRef.current) {
-      return;
-    }
-    setControlsVisible(true);
-  }, [isCoarsePointer]);
-
-  const hideDesktopControls = useCallback(() => {
-    controlsHideDeadlineRef.current = null;
-    suppressDesktopShowUntilRef.current = Date.now() + 700;
-    setControlsVisible(false);
-  }, []);
 
   const getCurrentPhotoLink = useCallback((): string | null => {
     const photoPath = currentPhotoPathRef.current?.path;
