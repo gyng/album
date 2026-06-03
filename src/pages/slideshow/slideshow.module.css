@@ -138,17 +138,40 @@
     "clock clock clock";
 }
 
-/* 4-up: the photo grid above is 2 columns × 2 rows, so the description
-   strip mirrors that — two rows of descriptions, each spanning the same
-   half-width column as the photo it labels. Wider columns than a flat
-   1×4 split would have given, with descN positioned under photoN. */
+/* 4-up: the photo grid above is 2 columns × 2 rows (each photo fills a
+   viewport quadrant). Unlike 1/2/3-up — where the photos are a single row and
+   a bottom strip naturally sits under every column — here the top two photos
+   occupy the top half, so a bottom strip would pile all four labels at the
+   bottom (top-pane captions ending up in the bottom pane). Span the FULL
+   height instead and pin each description row to the bottom of its photo row:
+   desc0/desc1 to the bottom of the top photos, desc2/desc3 to the bottom of
+   the bottom photos. The two 1fr rows mirror the 50/50 photo split; map +
+   clock chrome sit in auto rows at the very bottom. align-items:end (set on
+   the container) pins each cell to the bottom of its row. */
 .bottomBarStack[data-count="4"] {
+  inset: 0 0 calc(env(safe-area-inset-bottom, 0px) + 5vh) 0;
   grid-template-columns: 1fr 1fr;
+  /* Two equal rows mirror the 2×2 photo split; align-items:end (on the
+     container) pins desc0/desc1 to the bottom of the top photo row and
+     desc2/desc3 to the bottom of the bottom photo row. */
+  grid-template-rows: 1fr 1fr;
   grid-template-areas:
-    "map   map  "
     "desc0 desc1"
-    "desc2 desc3"
-    "clock clock";
+    "desc2 desc3";
+}
+
+/* The slide chrome (map + clock + remix badge) is slide-level, not per-pane.
+   In the single-row layouts it stacks above/below the descriptions, but for
+   4-up it would otherwise claim grid rows (the map reserves height even when
+   toggled off), pulling the bottom captions up off the bottom photo row. Lift
+   it out of the grid flow and pin it to the bottom centre instead — the
+   per-column descriptions (offset to each half) clear the centred badge. */
+.bottomBarStack[data-count="4"] .slideMap,
+.bottomBarStack[data-count="4"] .slideClock {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
 }
 
 /* Single-image detailsAlignment toggle — slides every grid item to the

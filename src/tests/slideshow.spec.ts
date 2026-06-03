@@ -153,6 +153,45 @@ test.describe("Slideshow", () => {
     expect(await image.getAttribute("src")).toBe(originalSrc);
   });
 
+  test("4-up remix positions each caption in its own pane", async ({ page }) => {
+    // Force the remix layout roll to 3 companions (a 2×2 grid): rollRemix-
+    // LayoutCount uses Math.random and returns 3 when r >= 0.95.
+    await page.addInitScript(() => {
+      Math.random = () => 0.99;
+    });
+    await page.goto(
+      "/slideshow?mode=random&filter=test-simple&details=1&remix=1&delay=86400",
+      { waitUntil: "domcontentloaded" },
+    );
+    await waitForSlideshow(page);
+
+    await revealControls(page);
+    await page.locator('button:has-text("Remix now")').click();
+
+    const grid = page.locator('[data-count="4"]').first();
+    await expect(grid).toBeVisible({ timeout: 8000 });
+    await page.waitForTimeout(500); // let the grid settle / cells load
+
+    const geo = await page.evaluate(() => {
+      const vh = window.innerHeight;
+      const cells = Array.from(
+        document.querySelectorAll('div[class*="descriptionCell"]'),
+      ).slice(0, 4);
+      const r = (i: number) => {
+        const box = cells[i].getBoundingClientRect();
+        return { top: box.top, bottom: box.bottom };
+      };
+      return { vh, d0: r(0), d1: r(1), d2: r(2), d3: r(3) };
+    });
+
+    // The bug: all four captions piled up at the bottom. The fix pins the top
+    // two captions to the top photo row and the bottom two to the bottom row.
+    expect(geo.d0.bottom).toBeLessThan(geo.vh / 2);
+    expect(geo.d1.bottom).toBeLessThan(geo.vh / 2);
+    expect(geo.d2.top).toBeGreaterThan(geo.vh / 2);
+    expect(geo.d3.top).toBeGreaterThan(geo.vh / 2);
+  });
+
   test("playback mode toggles work", async ({ page }) => {
     await page.goto("/slideshow", { waitUntil: "domcontentloaded" });
     await waitForSlideshow(page);
