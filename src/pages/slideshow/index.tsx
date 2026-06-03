@@ -803,18 +803,11 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
           // One weighted roll decides everything. If the result is a
           // SigLIP-backed strategy (`similar` / `juxtapose`), resolve it via
           // the async embeddings fetch; otherwise hand the rolled strategy to
-          // the sync filter chain. User-forced remixes skip vector even when
-          // rolled because a "Remix now" press should show the layout
-          // immediately — re-rolling until we land on a sync strategy keeps
-          // the response instant.
-          let rolled = rollRemixStrategy();
-          if (wasForced) {
-            let guard = 0;
-            while (VECTOR_REMIX_STRATEGIES.has(rolled) && guard < 8) {
-              rolled = rollRemixStrategy();
-              guard += 1;
-            }
-          }
+          // the sync filter chain. Forced remixes use the same weights as
+          // organic ones — the embeddings DB is eagerly loaded when remix is
+          // on (so the vector fetch is a fast local query), and the async path
+          // shows the seed immediately and patches companions in when ready.
+          const rolled = rollRemixStrategy();
           const vectorReady = !!(database && embeddingsDatabase);
 
           if (VECTOR_REMIX_STRATEGIES.has(rolled) && vectorReady) {
@@ -877,6 +870,8 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
               candidatePhoto,
               randomPhotoPoolRef.current,
               count,
+              Math.random,
+              rolled,
             );
             if (pick.companions.length > 0) {
               companions = pick.companions;

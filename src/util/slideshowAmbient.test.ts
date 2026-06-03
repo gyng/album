@@ -275,6 +275,24 @@ describe("pickRemixCompanions", () => {
     }
   });
 
+  test("uses a caller-supplied strategy instead of rolling its own", () => {
+    // The slideshow rolls the strategy once (to choose between the async vector
+    // path and this sync path) and passes it down; pickRemixCompanions must
+    // honour it rather than re-rolling and funnelling failed rolls into
+    // same-album. Here a fresh internal roll would land on same-album, so the
+    // preset is the only thing that can produce same-year.
+    const y2020 = new Date(2020, 5, 1, 12, 0);
+    const seedDated = makePhoto("data/albums/japan/seed.jpg", y2020);
+    const pool = [
+      makePhoto("data/albums/japan/a.jpg", y2020),
+      makePhoto("data/albums/japan/b.jpg", y2020),
+      makePhoto("data/albums/iceland/x.jpg", y2020),
+    ];
+    const random = jest.fn().mockReturnValue(0); // would roll the first band
+    const pick = pickRemixCompanions(seedDated, pool, 2, random, "same-year");
+    expect(pick.strategy).toBe("same-year");
+  });
+
   test("falls through to a later strategy when the rolled one has too few candidates", () => {
     // Land the roll in the proximity band [0.40, 0.48). Photos lack GPS, so
     // proximity returns []; fallback walks down to same-album.

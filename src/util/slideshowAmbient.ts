@@ -707,12 +707,17 @@ export const pickRemixCompanions = (
   pool: RandomPhotoRow[],
   count: number,
   random: () => number = Math.random,
+  presetStrategy?: RemixStrategy,
 ): RemixPick => {
   if (count <= 0 || pool.length < count + 1) {
     return { companions: [], strategy: "random" };
   }
 
-  const rolled = pickWeightedStrategy(random);
+  // Honour a strategy the caller already rolled (the slideshow rolls once to
+  // decide between the async vector path and this sync path). Without this we
+  // re-roll from scratch — and any roll that lands on a vector strategy
+  // (no-op here) funnels straight into same-album as the first dense fallback.
+  const rolled = presetStrategy ?? pickWeightedStrategy(random);
   // Try rolled strategy first, then the others (preserving STRATEGY_WEIGHTS
   // order minus the rolled one), with pure-random as the universal fallback.
   const order: RemixStrategy[] = [
