@@ -267,10 +267,10 @@ export const getAlbumFeedItems = async (
             ),
             link:
               block.kind === "photo"
-                ? `/album/${slug}#${source.split("/").at(-1)}`
+                ? `/album/${slug}#${source.split("/").at(-1) ?? ""}`
                 : block.data?.type === "youtube"
                   ? `/album/${slug}`
-                  : `/album/${slug}#${source.split("/").at(-1)}`,
+                  : `/album/${slug}#${source.split("/").at(-1) ?? ""}`,
             pubDate: sortDate,
             sortDate,
           });

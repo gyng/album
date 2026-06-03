@@ -31,6 +31,21 @@ import { handleSlideshowKeyboardShortcut } from "../../util/slideshowKeyboard";
 import { getSlideshowTouchTapAction } from "../../util/slideshowTouch";
 import { getNextAlignedSlideshowChange } from "../../util/slideshowTiming";
 import {
+  advanceQueued,
+  avoidBoundaryRepeat,
+  computePoolStats,
+  createRandomQueueState,
+  EMPTY_POOL_STATS,
+  formatNewestPhotoDate,
+  getSlideshowPhotoSrc,
+  peekNextQueued,
+  PoolStats,
+  RandomQueueState,
+  resetRandomQueue,
+  shufflePhotos,
+  weightedShufflePhotos,
+} from "../../util/slideshowQueue";
+import {
   decideRemixCompanionCount,
   describeRemix,
   getRemixSwatchRgb,
@@ -43,6 +58,7 @@ import {
   VECTOR_REMIX_STRATEGIES,
 } from "../../util/slideshowAmbient";
 import { BUILD_VERSION } from "../../lib/buildVersion";
+import { useWakeLock } from "../../components/useWakeLock";
 
 type PageProps = {};
 type SlideshowMode = "random" | "weighted" | "similar";
@@ -72,16 +88,6 @@ type FullscreenElement = HTMLElement & {
   webkitRequestFullscreen?: () => Promise<void> | void;
 };
 
-type WakeLockSentinel = EventTarget & {
-  release: () => Promise<void>;
-};
-
-type WakeLockNavigator = Navigator & {
-  wakeLock?: {
-    request: (type: "screen") => Promise<WakeLockSentinel>;
-  };
-};
-
 type VersionManifest = {
   buildVersion?: string;
   builtAt?: string;
@@ -93,110 +99,10 @@ type VersionManifest = {
 const isTouchOrPen = (pointerType: string): boolean =>
   pointerType === "touch" || pointerType === "pen";
 
-const avoidBoundaryRepeat = (
-  photos: RandomPhotoRow[],
-  previousLastPath?: string,
-): RandomPhotoRow[] => {
-  if (
-    previousLastPath &&
-    photos.length > 1 &&
-    photos[0]?.path === previousLastPath
-  ) {
-    const swapIdx = photos.findIndex(
-      (photo) => photo.path !== previousLastPath,
-    );
-    if (swapIdx > 0) {
-      [photos[0], photos[swapIdx]] = [photos[swapIdx], photos[0]];
-    }
-  }
-
-  return photos;
-};
-
-const shufflePhotos = (
-  photos: RandomPhotoRow[],
-  previousLastPath?: string,
-): RandomPhotoRow[] => {
-  const shuffled = [...photos];
-
-  for (let idx = shuffled.length - 1; idx > 0; idx -= 1) {
-    const randomIdx = Math.floor(Math.random() * (idx + 1));
-    [shuffled[idx], shuffled[randomIdx]] = [shuffled[randomIdx], shuffled[idx]];
-  }
-
-  return avoidBoundaryRepeat(shuffled, previousLastPath);
-};
-
-const weightedShufflePhotos = (
-  photos: RandomPhotoRow[],
-  previousLastPath?: string,
-): RandomPhotoRow[] => {
-  const timestamps = photos
-    .map((photo) => extractDateFromExifString(photo.exif)?.getTime() ?? null)
-    .filter((timestamp): timestamp is number => timestamp !== null);
-
-  if (timestamps.length === 0) {
-    return shufflePhotos(photos, previousLastPath);
-  }
-
-  const minTimestamp = Math.min(...timestamps);
-  const maxTimestamp = Math.max(...timestamps);
-  const timestampRange = Math.max(1, maxTimestamp - minTimestamp);
-
-  const weighted = photos
-    .map((photo) => {
-      const timestamp =
-        extractDateFromExifString(photo.exif)?.getTime() ?? null;
-      const normalized =
-        timestamp === null ? 0.15 : (timestamp - minTimestamp) / timestampRange;
-      const weight = 1 + normalized * 5;
-      const randomValue = Math.max(Math.random(), Number.EPSILON);
-      return {
-        photo,
-        key: -Math.log(randomValue) / weight,
-      };
-    })
-    .sort((left, right) => left.key - right.key)
-    .map((entry) => entry.photo);
-
-  return avoidBoundaryRepeat(weighted, previousLastPath);
-};
-
-type PoolStats = { count: number; newestDate: Date | null };
-
-const EMPTY_POOL_STATS: PoolStats = { count: 0, newestDate: null };
-
-const computePoolStats = (photos: RandomPhotoRow[]): PoolStats => {
-  let newest: Date | null = null;
-  for (const photo of photos) {
-    const date = extractDateFromExifString(photo.exif);
-    if (date && (newest === null || date.getTime() > newest.getTime())) {
-      newest = date;
-    }
-  }
-  return { count: photos.length, newestDate: newest };
-};
-
-const formatNewestPhotoDate = (date: Date): string =>
-  date.toLocaleDateString("en-GB", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
-
-const getSlideshowPhotoSrc = (photo: RandomPhotoRow | null): string | null => {
-  if (!photo?.path) {
-    return null;
-  }
-
-  const albumName = photo.path.split("/")?.[2] ?? "";
-  const photoName = photo.path.split("/")?.[3] ?? "";
-  if (!albumName || !photoName) {
-    return null;
-  }
-
-  return `/data/albums/${albumName}/.resized_images/${photoName}@3200.avif`;
-};
+// Stable references for the slide map's style props so the memoised MMap can
+// skip re-rendering when only the coordinates are unchanged.
+const SLIDE_MAP_STYLE = { width: "100%", height: "100%" } as const;
+const SLIDE_MARKER_STYLE = { visibility: "hidden" } as const;
 
 const SlideshowPage: NextPage<PageProps> = (props) => {
   return <Slideshow />;
@@ -285,6 +191,9 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
       reloadCurrentPage();
     }, FALLBACK_RELOAD_MS);
     return () => clearInterval(id);
+    // wakeLockRef (from useWakeLock, declared below) is a stable ref read
+    // lazily inside the interval — not a reactive dependency.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Periodically HEAD-poll the search DB to notice when it has been
@@ -336,8 +245,11 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
           });
           if (photos.length > 0) {
             randomPhotoPoolRef.current = photos;
-            randomQueueRef.current = [];
-            randomQueueIndexRef.current = -1;
+            // In-place refresh of a near-identical pool during a live kiosk
+            // session: reset the queue but PRESERVE lastPath so the next
+            // refill still avoids repeating the currently-displayed photo
+            // (a full pool swap — see the main fetch — uses a fresh state).
+            resetRandomQueue(randomQueueStateRef.current);
             recentPhotoPathsRef.current = [];
             setPoolStats(computePoolStats(photos));
           }
@@ -370,15 +282,21 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
     };
     // filter is read via filterRef so it doesn't need to be a dep — that
     // also keeps this effect from re-running on every filter change.
+    // wakeLockRef (from useWakeLock, declared below) is a stable ref read
+    // lazily inside the poll, not a reactive dependency.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [database]);
 
   const [currentPhotoPath, setCurrentPhotoPath] =
     React.useState<RandomPhotoRow | null>(null);
   const currentPhotoPathRef = React.useRef<RandomPhotoRow | null>(null);
   const randomPhotoPoolRef = React.useRef<RandomPhotoRow[]>([]);
-  const randomQueueRef = React.useRef<RandomPhotoRow[]>([]);
-  const randomQueueIndexRef = React.useRef<number>(-1);
-  const randomQueueLastPathRef = React.useRef<string | undefined>(undefined);
+  // Single shared queue state for random/weighted modes. Both the forward
+  // advance and the preload peek consult it, so the buffered photo always
+  // matches the one the next advance shows (see util/slideshowQueue).
+  const randomQueueStateRef = React.useRef<RandomQueueState>(
+    createRandomQueueState(),
+  );
   // Each navigation history entry captures the seed photo *plus* any remix
   // companions and the strategy that produced them, so pressing Previous /
   // Next replays the full side-by-side layout instead of collapsing the
@@ -504,8 +422,17 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
   const [isFullscreenSupported, setIsFullscreenSupported] =
     React.useState(false);
   const [isFullscreenActive, setIsFullscreenActive] = React.useState(false);
-  const [isWakeLockSupported, setIsWakeLockSupported] = React.useState(false);
-  const [isWakeLockActive, setIsWakeLockActive] = React.useState(false);
+  // Screen wake-lock lifecycle (acquire on load/resume, release on
+  // unmount/disable) lives in a dedicated hook. Destructured to the same local
+  // names the rest of this component already used, so consumers — the kiosk
+  // DB-update poll, the fallback reload, the touch handlers and the toolbar
+  // button — are unchanged.
+  const {
+    ref: wakeLockRef,
+    isSupported: isWakeLockSupported,
+    isActive: isWakeLockActive,
+    acquire: tryAcquireWakeLock,
+  } = useWakeLock(!!props.disabled);
   const [touchGestureHint, setTouchGestureHint] = React.useState<
     "next" | "previous" | "controls" | "reload" | "remix" | null
   >(null);
@@ -534,7 +461,6 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
   const [embeddingsDatabase, embeddingsProgress] = useEmbeddingsDatabase(
     slideshowMode === "similar" || remixEnabled,
   );
-  const wakeLockRef = React.useRef<WakeLockSentinel | null>(null);
   const pointerGestureRef = React.useRef<{
     pointerId: number;
     pointerType: string;
@@ -952,45 +878,29 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
 
   // When time-aware is toggled, force a queue refill on the next advance so
   // the new bias takes effect immediately rather than after the current
-  // pre-shuffled queue drains.
+  // pre-shuffled queue drains. lastPath is preserved so the rebuilt queue
+  // still avoids an immediate repeat.
   useEffect(() => {
-    randomQueueRef.current = [];
-    randomQueueIndexRef.current = -1;
+    resetRandomQueue(randomQueueStateRef.current);
   }, [timeAware]);
 
-  const refillRandomQueue = useCallback((): RandomPhotoRow[] => {
-    let nextQueue: RandomPhotoRow[];
-    if (timeAware) {
-      // Time-aware bias overrides the per-mode bias: photos taken near the
-      // current hour-of-day and month-of-year are weighted higher.
-      nextQueue = timeAwareShufflePhotos(randomPhotoPoolRef.current);
-      // avoidBoundaryRepeat: prevent immediate repeat at queue boundaries
-      const lastPath = randomQueueLastPathRef.current;
-      if (lastPath && nextQueue.length > 1 && nextQueue[0]?.path === lastPath) {
-        const swapIdx = nextQueue.findIndex((p) => p.path !== lastPath);
-        if (swapIdx > 0) {
-          [nextQueue[0], nextQueue[swapIdx]] = [
-            nextQueue[swapIdx],
-            nextQueue[0],
-          ];
-        }
+  // Pure builder for the next random/weighted queue. No ref mutation — the
+  // queue state machine (peekNextQueued / advanceQueued) owns storage, so the
+  // preload peek and the forward advance share the same built queue.
+  const buildRandomQueue = useCallback(
+    (pool: RandomPhotoRow[], lastPath?: string): RandomPhotoRow[] => {
+      if (timeAware) {
+        // Time-aware bias overrides the per-mode bias: photos taken near the
+        // current hour-of-day and month-of-year are weighted higher.
+        return avoidBoundaryRepeat(timeAwareShufflePhotos(pool), lastPath);
       }
-    } else if (slideshowMode === "weighted") {
-      nextQueue = weightedShufflePhotos(
-        randomPhotoPoolRef.current,
-        randomQueueLastPathRef.current,
-      );
-    } else {
-      nextQueue = shufflePhotos(
-        randomPhotoPoolRef.current,
-        randomQueueLastPathRef.current,
-      );
-    }
-
-    randomQueueRef.current = nextQueue;
-    randomQueueIndexRef.current = -1;
-    return nextQueue;
-  }, [slideshowMode, timeAware]);
+      if (slideshowMode === "weighted") {
+        return weightedShufflePhotos(pool, lastPath);
+      }
+      return shufflePhotos(pool, lastPath);
+    },
+    [slideshowMode, timeAware],
+  );
 
   const resetSimilarQueue = useCallback(() => {
     similarSeedPathRef.current = null;
@@ -1005,28 +915,20 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
         return null;
       }
 
-      if (randomQueueRef.current.length === 0) {
-        refillRandomQueue();
-      }
-
-      let nextIndex = randomQueueIndexRef.current + 1;
-      if (nextIndex >= randomQueueRef.current.length) {
-        refillRandomQueue();
-        nextIndex = 0;
-      }
-
-      const nextPhoto = randomQueueRef.current[nextIndex] ?? null;
+      const nextPhoto = advanceQueued(
+        randomQueueStateRef.current,
+        randomPhotoPoolRef.current,
+        buildRandomQueue,
+      );
       if (!nextPhoto) {
         setSlideshowError("No photos available");
         return null;
       }
 
-      randomQueueIndexRef.current = nextIndex;
-      randomQueueLastPathRef.current = nextPhoto.path;
       commitNextPhoto(nextPhoto, { ...opts, allowRemix: true });
       return nextPhoto;
     },
-    [commitNextPhoto, refillRandomQueue],
+    [buildRandomQueue, commitNextPhoto],
   );
 
   useEffect(() => {
@@ -1056,8 +958,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
         }
 
         randomPhotoPoolRef.current = photos;
-        randomQueueRef.current = [];
-        randomQueueIndexRef.current = -1;
+        randomQueueStateRef.current = createRandomQueueState();
         recentPhotoPathsRef.current = [];
         navigationHistoryRef.current = [];
         historyIndexRef.current = -1;
@@ -1128,6 +1029,9 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
     return () => {
       cancelled = true;
     };
+    // NB: timeDelay is deliberately NOT a dependency. It isn't read in this
+    // effect, and including it made changing the slide duration refetch the
+    // whole pool, wipe navigation history, and jump to a fresh random photo.
   }, [
     advanceRandomPhoto,
     commitNextPhoto,
@@ -1135,14 +1039,20 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
     filter,
     resetSimilarQueue,
     slideshowMode,
-    timeDelay,
     updateSlideshowUrl,
   ]);
 
   const advanceSimilarPhoto =
     useCallback(async (): Promise<RandomPhotoRow | null> => {
-      if (!database || !embeddingsDatabase) {
+      if (!database) {
         return null;
+      }
+
+      // Embeddings not ready yet (still loading, or failed to load): keep the
+      // slideshow moving with a random advance rather than freezing on a
+      // no-op. The next advance retries the similar trail once they arrive.
+      if (!embeddingsDatabase) {
+        return advanceRandomPhoto({ trackRecent: true });
       }
 
       const activePhoto = currentPhotoPathRef.current;
@@ -1217,11 +1127,20 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
     ]);
 
   const goNext = useCallback(() => {
-    if (!database || (slideshowMode === "similar" && !embeddingsDatabase)) {
+    if (!database) {
       return;
     }
 
-    if (historyIndexRef.current < navigationHistoryRef.current.length - 1) {
+    // A pending forced remix ("Remix now" / drag-up) must produce a brand-new
+    // remixed slide. Skip replaying recorded forward history in that case and
+    // fall through to a real advance, which truncates forward history and
+    // honours the forceRemix flag. Without this, pressing "Remix now" while
+    // back in history silently stepped forward with no remix and left the
+    // flag armed to fire on a later, unexpected advance.
+    if (
+      !forceRemixRef.current &&
+      historyIndexRef.current < navigationHistoryRef.current.length - 1
+    ) {
       showHistoryPhoto(historyIndexRef.current + 1);
       return;
     }
@@ -1233,6 +1152,8 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
 
     const activePhoto = currentPhotoPathRef.current;
 
+    // Similar mode: advanceSimilarPhoto falls back to a random advance when the
+    // embeddings DB isn't ready, so the show never freezes waiting on it.
     if (slideshowMode === "similar" && activePhoto?.path) {
       advanceSimilarPhoto().catch((err) => {
         console.error(err);
@@ -1246,7 +1167,6 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
     advanceRandomPhoto,
     advanceSimilarPhoto,
     database,
-    embeddingsDatabase,
     showHistoryPhoto,
     slideshowMode,
   ]);
@@ -1267,28 +1187,14 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
     }
 
     if (slideshowMode === "random" || slideshowMode === "weighted") {
-      let queue = randomQueueRef.current;
-      let nextIndex = randomQueueIndexRef.current + 1;
-
-      if (queue.length === 0 || nextIndex >= queue.length) {
-        if (randomPhotoPoolRef.current.length === 0) {
-          return null;
-        }
-
-        queue =
-          slideshowMode === "weighted"
-            ? weightedShufflePhotos(
-                randomPhotoPoolRef.current,
-                randomQueueLastPathRef.current,
-              )
-            : shufflePhotos(
-                randomPhotoPoolRef.current,
-                randomQueueLastPathRef.current,
-              );
-        nextIndex = 0;
-      }
-
-      return queue[nextIndex] ?? null;
+      // Peek through the SAME queue state the advance will consume — building
+      // and storing the next queue here if we're at a boundary — so the
+      // preloaded photo is exactly the one the next advance shows.
+      return peekNextQueued(
+        randomQueueStateRef.current,
+        randomPhotoPoolRef.current,
+        buildRandomQueue,
+      );
     }
 
     if (
@@ -1300,12 +1206,11 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
     }
 
     return null;
-  }, [slideshowMode]);
+  }, [buildRandomQueue, slideshowMode]);
 
   useEffect(() => {
     if (slideshowMode === "similar") {
-      randomQueueRef.current = [];
-      randomQueueIndexRef.current = -1;
+      resetRandomQueue(randomQueueStateRef.current);
 
       if (currentPhotoPathRef.current) {
         // Switching into similar mode resets history to just the current seed
@@ -1325,8 +1230,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
     }
 
     resetSimilarQueue();
-    randomQueueRef.current = [];
-    randomQueueIndexRef.current = -1;
+    resetRandomQueue(randomQueueStateRef.current);
   }, [resetSimilarQueue, slideshowMode]);
 
   const canGoPrevious = historyPosition.index > 0;
@@ -1442,7 +1346,17 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
   }, [advanceToNextPhoto, goPrevious, togglePaused]);
 
   useEffect(() => {
-    const id = setInterval(() => {
+    // The per-second tick only drives on-screen UI: the countdown in the
+    // toolbar and the optional clock. When neither is visible there is nothing
+    // to update, so skip the interval entirely — otherwise a long-running
+    // kiosk session re-renders the whole (large) tree once a second for
+    // nothing. Slide advancement is driven by the separate nextChangeAt
+    // timer, not this display tick.
+    if (!controlsVisible && !showClock) {
+      return;
+    }
+
+    const tick = () => {
       const pausedRemaining = pausedRemainingMsRef.current;
       setSecondsLeft(
         pausedRemaining !== null
@@ -1450,9 +1364,12 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
           : (nextChangeAt.getTime() - Date.now()) / 1000,
       );
       setTime(new Date());
-    }, 1000);
+    };
+    // Update immediately so values are fresh the moment they become visible.
+    tick();
+    const id = setInterval(tick, 1000);
     return () => clearInterval(id);
-  }, [nextChangeAt]);
+  }, [controlsVisible, nextChangeAt, showClock]);
 
   useEffect(() => {
     const coarsePointerQuery = window.matchMedia(
@@ -1549,116 +1466,6 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
     };
   }, []);
 
-  useEffect(() => {
-    const wakeLock = (navigator as WakeLockNavigator).wakeLock;
-     
-    setIsWakeLockSupported(typeof wakeLock?.request === "function");
-  }, []);
-
-  const releaseWakeLock = useCallback(async () => {
-    const sentinel = wakeLockRef.current;
-    wakeLockRef.current = null;
-    setIsWakeLockActive(false);
-
-    if (!sentinel) {
-      return;
-    }
-
-    try {
-      await sentinel.release();
-    } catch (error) {
-      console.error(error);
-    }
-  }, []);
-
-  const tryAcquireWakeLock = useCallback(async () => {
-    const wakeLock = (navigator as WakeLockNavigator).wakeLock;
-    if (
-      props.disabled ||
-      document.visibilityState !== "visible" ||
-      typeof wakeLock?.request !== "function"
-    ) {
-      await releaseWakeLock();
-      return;
-    }
-
-    if (wakeLockRef.current) {
-      setIsWakeLockActive(true);
-      return;
-    }
-
-    try {
-      const sentinel = await wakeLock.request("screen");
-      wakeLockRef.current = sentinel;
-      setIsWakeLockActive(true);
-      sentinel.addEventListener("release", () => {
-        if (wakeLockRef.current === sentinel) {
-          wakeLockRef.current = null;
-        }
-        setIsWakeLockActive(false);
-      });
-    } catch (error) {
-      console.error(error);
-      wakeLockRef.current = null;
-      setIsWakeLockActive(false);
-    }
-  }, [props.disabled, releaseWakeLock]);
-
-  useEffect(() => {
-    if (!props.disabled) {
-      return;
-    }
-
-     
-    releaseWakeLock().catch(console.error);
-  }, [props.disabled, releaseWakeLock]);
-
-  useEffect(() => {
-    if (props.disabled) {
-      return;
-    }
-
-    // Try once on load so kiosk/photo-frame sessions wake-lock automatically
-    // where browsers permit non-gesture acquisition.
-     
-    tryAcquireWakeLock().catch(console.error);
-  }, [props.disabled, tryAcquireWakeLock]);
-
-  useEffect(() => {
-    const syncWakeLockState = () => {
-      if (document.visibilityState !== "visible") {
-        setIsWakeLockActive(false);
-        return;
-      }
-
-      if (!props.disabled) {
-        tryAcquireWakeLock().catch(console.error);
-      }
-    };
-
-    // pageshow fires in Safari PWAs when the page is restored from the back/forward cache
-    // or resumed from background — more reliable than visibilitychange alone in that context.
-    const handlePageShow = (e: PageTransitionEvent) => {
-      if (!e.persisted) {
-        return;
-      }
-      syncWakeLockState();
-    };
-
-    document.addEventListener("visibilitychange", syncWakeLockState);
-    window.addEventListener("pageshow", handlePageShow);
-    return () => {
-      document.removeEventListener("visibilitychange", syncWakeLockState);
-      window.removeEventListener("pageshow", handlePageShow);
-    };
-  }, [props.disabled, tryAcquireWakeLock]);
-
-  useEffect(() => {
-    return () => {
-      releaseWakeLock().catch(console.error);
-    };
-  }, [releaseWakeLock]);
-
   const handleFullscreenToggle = useCallback(async () => {
     const fullscreenDocument = document as FullscreenDocument;
     const fullscreenRoot = document.documentElement as FullscreenElement;
@@ -1708,7 +1515,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
       return;
     }
     tryAcquireWakeLock().catch(console.error);
-  }, [props.disabled, tryAcquireWakeLock]);
+  }, [props.disabled, tryAcquireWakeLock, wakeLockRef]);
 
   const handleImagePointerDown = useCallback(
     (event: React.PointerEvent<HTMLElement>) => {
@@ -1745,7 +1552,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
         setTouchPointerActive(true);
       }
     },
-    [controlsVisible, props.disabled, tryAcquireWakeLock],
+    [controlsVisible, props.disabled, tryAcquireWakeLock, wakeLockRef],
   );
 
   const clearImagePointerGesture = useCallback(
@@ -2381,10 +2188,10 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
             coordinates={allCoords.length === 1 ? allCoords[0] : allCoords}
             attribution={false}
             details={false}
-            style={{ width: "100%", height: "100%" }}
+            style={SLIDE_MAP_STYLE}
             mapStyle="toner-v2"
             projection="vertical-perspective"
-            markerStyle={{ visibility: "hidden" }}
+            markerStyle={SLIDE_MARKER_STYLE}
           />
         ) : null}
       </div>

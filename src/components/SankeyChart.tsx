@@ -27,6 +27,33 @@ type SankeyChartLink = {
   value: number;
 };
 
+// The node objects @nivo/sankey hands to custom layers and tooltips carry the
+// laid-out geometry (x0/x1/y0/y1, value) plus the original datum nested under
+// `data`. Older/other shapes hang the fields directly off the node, so every
+// accessor checks both. This structural type captures just what we read.
+type SankeyComputedNode = {
+  id?: string;
+  label?: string;
+  displayLabel?: string;
+  depth?: number;
+  facetId?: string;
+  facetValue?: string;
+  count?: number;
+  value?: number;
+  x0: number;
+  x1: number;
+  y0: number;
+  y1: number;
+  data?: {
+    label?: string;
+    displayLabel?: string;
+    depth?: number;
+    facetId?: string;
+    facetValue?: string;
+    count?: number;
+  };
+};
+
 const truncateLabel = (label: string, max = 28) =>
   label.length > max ? `${label.slice(0, max - 1)}…` : label;
 
@@ -35,29 +62,36 @@ const buildFacetHref = (facetId?: string, facetValue?: string) =>
     ? `/search?facet=${encodeURIComponent(`${facetId}:${facetValue}`)}`
     : null;
 
-const getNodeLabel = (node: any): string =>
+const getNodeLabel = (node: SankeyComputedNode): string =>
   node.data?.displayLabel ??
   node.data?.label ??
   node.displayLabel ??
   node.label ??
-  node.id;
-const getNodeDepth = (node: any): number => node.data?.depth ?? node.depth ?? 0;
-const getNodeFacetId = (node: any): string | undefined => node.data?.facetId ?? node.facetId;
-const getNodeFacetValue = (node: any): string | undefined =>
+  node.id ??
+  "";
+const getNodeDepth = (node: SankeyComputedNode): number =>
+  node.data?.depth ?? node.depth ?? 0;
+const getNodeFacetId = (node: SankeyComputedNode): string | undefined =>
+  node.data?.facetId ?? node.facetId;
+const getNodeFacetValue = (node: SankeyComputedNode): string | undefined =>
   node.data?.facetValue ?? node.facetValue;
-const getNodeCount = (node: any): number =>
+const getNodeCount = (node: SankeyComputedNode): number =>
   Number(node.value ?? node.data?.count ?? node.count ?? 0);
 
 const ClickableLabelLayer = ({
   nodes,
   labelMaxLength,
   minLabelHeight,
-}: any) => {
-  const maxDepth = Math.max(...nodes.map((node: any) => getNodeDepth(node)), 0);
+}: {
+  nodes: readonly SankeyComputedNode[];
+  labelMaxLength: number;
+  minLabelHeight: number;
+}) => {
+  const maxDepth = Math.max(...nodes.map((node) => getNodeDepth(node)), 0);
 
   return (
     <g>
-      {nodes.map((node: any) => {
+      {nodes.map((node) => {
         const height = node.y1 - node.y0;
         if (height < minLabelHeight) {
           return null;

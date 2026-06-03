@@ -129,9 +129,8 @@ type ExifRow =
       k: string;
       /** Display value */
       v: ExifCellValue;
-      options?: any;
       valid?: boolean;
-      style?: any;
+      style?: React.CSSProperties;
     }
   | {
       kind: "coordinates";
@@ -214,7 +213,7 @@ export const ExifRow: React.FC<{
   k: string;
   v: ExifCellValue;
   valid?: boolean;
-  style?: any;
+  style?: React.CSSProperties;
 }> = (props) => {
   if (props.valid === false) {
     return null;

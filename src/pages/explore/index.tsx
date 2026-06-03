@@ -1515,7 +1515,15 @@ export const getStaticProps: GetStaticProps<PageProps> = async () => {
   return measureBuild("page./explore.getStaticProps", async () => {
     const albums = await getAlbums();
     const stats = computePhotoStats(albums);
-    const visualSameness = await computeVisualSamenessStats(albums);
+    // Degrade gracefully: a corrupt or missing embeddings DB should drop the
+    // visual-sameness section, not fail the whole build. The page already
+    // treats visualSameness === null as "section unavailable".
+    let visualSameness: VisualSamenessStats | null = null;
+    try {
+      visualSameness = await computeVisualSamenessStats(albums);
+    } catch (err) {
+      console.error("Failed to compute visual sameness stats", err);
+    }
     return { props: { stats, visualSameness } };
   });
 };

@@ -3,6 +3,7 @@ import type { AppProps } from "next/app";
 import { Analytics } from "@vercel/analytics/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import React from "react";
+import { ErrorBoundary } from "../components/ErrorBoundary";
 import "./_app.css";
 
 const queryClient = new QueryClient();
@@ -17,10 +18,12 @@ function MyApp({ Component, pageProps }: AppProps) {
   }, []);
 
   return (
-    <QueryClientProvider client={queryClient}>
-      <Analytics />
-      <Component {...pageProps} />
-    </QueryClientProvider>
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <Analytics />
+        <Component {...pageProps} />
+      </QueryClientProvider>
+    </ErrorBoundary>
   );
 }
 

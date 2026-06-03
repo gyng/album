@@ -287,7 +287,7 @@ export const getStaticProps: GetStaticProps<PageProps> = async () => {
           GPSLatitudeRef,
         });
 
-        const filename = photo.data.src.split("/").at(-1);
+        const filename = photo.data.src.split("/").at(-1) ?? "";
 
         const color = photo._build?.tags?.colors?.[0];
 

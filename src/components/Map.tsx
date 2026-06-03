@@ -91,7 +91,7 @@ const MapFlyer = (props: { coordinates: [number, number][] }) => {
   return <></>;
 };
 
-export const MMap: React.FC<MapProps> = (props) => {
+const MMapComponent: React.FC<MapProps> = (props) => {
   const mapStyle: MapTilerMapStyle = props.mapStyle ?? "streets";
   const projection = props.projection ?? "mercator";
   const projectionSpec: "mercator" | "globe" | ProjectionSpecification =
@@ -167,5 +167,10 @@ export const MMap: React.FC<MapProps> = (props) => {
     </div>
   );
 };
+
+// Memoised so parents that re-render with referentially-stable props (e.g. the
+// slideshow's per-second clock tick) don't re-run the WebGL map needlessly.
+// With changed props it renders as normal.
+export const MMap = React.memo(MMapComponent);
 
 export default MMap;
