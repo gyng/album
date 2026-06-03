@@ -15,7 +15,6 @@ import { ProgressBar } from "../../components/ProgressBar";
 import styles from "./slideshow.module.css";
 import commonStyles from "../../styles/common.module.css";
 import { ThemeToggle } from "../../components/ThemeToggle";
-import Link from "next/link";
 import { useLocalStorage } from "usehooks-ts";
 import { getRelativeTimeString } from "../../util/time";
 import {
@@ -35,7 +34,6 @@ import {
   computePoolStats,
   createRandomQueueState,
   EMPTY_POOL_STATS,
-  formatNewestPhotoDate,
   getSlideshowPhotoSrc,
   peekNextQueued,
   PoolStats,
@@ -57,6 +55,7 @@ import {
 } from "../../util/slideshowAmbient";
 import { BUILD_VERSION } from "../../lib/buildVersion";
 import { useWakeLock } from "../../components/useWakeLock";
+import { SlideshowToolbar } from "../../components/slideshow/SlideshowToolbar";
 import { decideBuildUpdate, decideDbUpdateAction } from "../../util/kioskRefresh";
 import {
   decideRemixPlan,
@@ -1765,9 +1764,6 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
     alert(lines.join("\n"));
   }, []);
 
-  const contextLongPressTimerRef = React.useRef<number | null>(null);
-  const contextLongPressFiredRef = React.useRef(false);
-
   const activePhotoSrc = getSlideshowPhotoSrc(currentPhotoPath);
   // Tracks whether the *previously displayed* slide was a remix. Read by the
   // crossfade effect below so it can skip the fade when leaving a remix —
@@ -2209,528 +2205,80 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
           </div>
         ) : null}
 
-        <div
-          className={styles.toolbar}
+        <SlideshowToolbar
+          isCoarsePointer={isCoarsePointer}
           onFocusCapture={showControlsForDesktop}
-          onBlur={() => {
-            setIsPointerOverToolbar(false);
+          onPointerOverToolbar={setIsPointerOverToolbar}
+          poolStats={poolStats}
+          {...(filter ? { filter } : {})}
+          albumName={albumName}
+          photoName={photoName}
+          playbackSubtitle={playbackSubtitle}
+          playbackContextLabel={playbackContextLabel}
+          slideshowMode={slideshowMode}
+          onSelectMode={setSlideshowModeAndUrl}
+          timeAware={timeAware}
+          onToggleTimeAware={() => setTimeAware(!timeAware)}
+          remixEnabled={remixEnabled}
+          onToggleRemix={() => setRemixEnabled(!remixEnabled)}
+          onRemixNow={() => {
+            forceRemixRef.current = true;
+            advanceToNextPhoto();
           }}
-          onMouseEnter={() => {
-            setIsPointerOverToolbar(true);
+          isPaused={isPaused}
+          onTogglePaused={togglePaused}
+          canGoPrevious={canGoPrevious}
+          onPrevious={() => {
+            setImageLoaded(false);
+            goPrevious();
           }}
-          onMouseLeave={() => {
-            setIsPointerOverToolbar(false);
+          onNext={advanceToNextPhoto}
+          onHide={hideDesktopControls}
+          controlsHideProgress={controlsHideProgress}
+          showClock={showClock}
+          onToggleClock={() => setShowClock(!showClock)}
+          showDetails={showDetails}
+          onToggleDetails={() => setShowDetails(!showDetails)}
+          showMap={showMap}
+          onToggleMap={() => setShowMap(!showMap)}
+          detailsAlignment={detailsAlignment}
+          onCycleAlignment={cycleAlignment}
+          showCover={showCover}
+          onToggleCover={() => setShowCover(!showCover)}
+          isFullscreenActive={isFullscreenActive}
+          isFullscreenSupported={isFullscreenSupported}
+          onToggleFullscreen={() => {
+            handleFullscreenToggle().catch(console.error);
           }}
-        >
-          {/* <ThemeToggle /> */}
-
-          {/* On a coarse-pointer / kiosk install this link is an easy escape
-              hatch out of the slideshow; hiding it removes that footgun while
-              keeping it for desktop where it acts as an obvious nav element. */}
-          {!isCoarsePointer ? (
-            <Link className={styles.brandLink} href="/">
-              <span className={styles.brandLogo} aria-hidden="true">
-                🖼️
-              </span>
-              <span className={styles.brandCopy}>
-                <span className={styles.brandTitle}>Snapshots</span>
-                <span className={styles.brandSubtitle}>Slideshow</span>
-              </span>
-            </Link>
-          ) : null}
-
-          {poolStats.count > 0 ? (
-            <div
-              className={styles.poolStats}
-              title="Photo pool — use this to confirm a PWA reload has picked up the latest DB"
-            >
-              <span className={styles.poolStatsCount}>
-                {poolStats.count.toLocaleString("en-GB")} photos
-              </span>
-              {poolStats.newestDate ? (
-                <span className={styles.poolStatsNewest}>
-                  newest {formatNewestPhotoDate(poolStats.newestDate)}
-                </span>
-              ) : null}
-            </div>
-          ) : null}
-
-          <div
-            className={styles.playbackGroup}
-            role="group"
-            aria-label="Playback mode"
-          >
-            <div className={styles.playbackHeader}>
-              <span className={styles.playbackLogo} aria-hidden="true">
-                ⟲
-              </span>
-              <span className={styles.playbackCopy}>
-                <span className={styles.playbackTitle}>Playback</span>
-                <span className={styles.playbackSubtitle}>
-                  {playbackSubtitle}
-                </span>
-              </span>
-            </div>
-
-            <div className={styles.playbackButtons}>
-              <button
-                className={[
-                  slideshowMode === "random" ? commonStyles.active : "",
-                  commonStyles.button,
-                ].join(" ")}
-                aria-pressed={slideshowMode === "random"}
-                onClick={() => {
-                  setSlideshowModeAndUrl("random");
-                }}
-              >
-                🔀 Shuffle
-              </button>
-
-              <button
-                className={[
-                  slideshowMode === "weighted" ? commonStyles.active : "",
-                  commonStyles.button,
-                ].join(" ")}
-                aria-pressed={slideshowMode === "weighted"}
-                onClick={() => {
-                  setSlideshowModeAndUrl("weighted");
-                }}
-              >
-                🕒 Recent
-              </button>
-
-              <button
-                className={[
-                  slideshowMode === "similar" ? commonStyles.active : "",
-                  commonStyles.button,
-                ].join(" ")}
-                aria-pressed={slideshowMode === "similar"}
-                onClick={() => {
-                  setSlideshowModeAndUrl("similar");
-                }}
-              >
-                🧭 Similar
-              </button>
-
-              <span className={styles.playbackDivider} aria-hidden="true" />
-
-              <button
-                className={[
-                  timeAware ? commonStyles.active : "",
-                  styles.playbackModifier,
-                  commonStyles.button,
-                ].join(" ")}
-                aria-pressed={timeAware}
-                title="Bias the shuffle toward photos taken near the current hour and month"
-                onClick={() => setTimeAware(!timeAware)}
-              >
-                🌅 Time-of-day
-              </button>
-
-              <button
-                className={[
-                  remixEnabled ? commonStyles.active : "",
-                  styles.playbackModifier,
-                  commonStyles.button,
-                ].join(" ")}
-                aria-pressed={remixEnabled}
-                title="Occasionally show two or three photos side by side at random"
-                onClick={() => setRemixEnabled(!remixEnabled)}
-              >
-                ◫ Remix
-              </button>
-
-              <span className={styles.playbackDivider} aria-hidden="true" />
-
-              <button
-                className={commonStyles.button}
-                title="Force the next advance to be a remix slide (ignores the 3% dice)"
-                onClick={() => {
-                  forceRemixRef.current = true;
-                  advanceToNextPhoto();
-                }}
-              >
-                ◫ Remix now
-              </button>
-
-              <button
-                className={[
-                  isPaused ? commonStyles.active : "",
-                  commonStyles.button,
-                ].join(" ")}
-                aria-pressed={isPaused}
-                onClick={togglePaused}
-              >
-                {isPaused ? "▶ Resume" : "⏸ Pause"}
-              </button>
-
-              <button
-                className={commonStyles.button}
-                disabled={!canGoPrevious}
-                aria-disabled={!canGoPrevious}
-                onClick={() => {
-                  setImageLoaded(false);
-                  goPrevious();
-                }}
-              >
-                Previous
-              </button>
-
-              <button
-                className={commonStyles.button}
-                onClick={() => {
-                  advanceToNextPhoto();
-                }}
-              >
-                Next
-              </button>
-
-              <span className={styles.playbackHideGroup}>
-                <button
-                  className={commonStyles.button}
-                  onClick={hideDesktopControls}
-                >
-                  Hide
-                </button>
-
-                <div
-                  className={styles.hideProgress}
-                  aria-hidden="true"
-                  style={
-                    {
-                      "--hide-progress": String(
-                        Math.max(0, Math.min(1, controlsHideProgress)),
-                      ),
-                    } as React.CSSProperties
-                  }
-                >
-                  <div className={styles.hideProgressRing} />
-                </div>
-              </span>
-            </div>
-          </div>
-
-          <div
-            className={styles.controlGroup}
-            role="group"
-            aria-label="Display controls"
-          >
-            <div className={styles.controlHeader}>
-              <span className={styles.controlLogo} aria-hidden="true">
-                ✦
-              </span>
-              <span className={styles.controlCopy}>
-                <span className={styles.controlTitle}>Display</span>
-              </span>
-            </div>
-
-            <div className={styles.controlButtons}>
-              <button
-                className={[
-                  showClock ? commonStyles.active : "",
-                  commonStyles.button,
-                ].join(" ")}
-                aria-pressed={showClock}
-                onClick={() => setShowClock(!showClock)}
-              >
-                🕰️
-              </button>
-
-              <button
-                className={[
-                  showDetails ? commonStyles.active : "",
-                  commonStyles.button,
-                ].join(" ")}
-                aria-pressed={showDetails}
-                onClick={() => setShowDetails(!showDetails)}
-              >
-                Details
-              </button>
-
-              <button
-                className={[
-                  showMap ? commonStyles.active : "",
-                  commonStyles.button,
-                ].join(" ")}
-                aria-pressed={showMap}
-                onClick={() => setShowMap(!showMap)}
-              >
-                Map
-              </button>
-
-              <button
-                className={[
-                  detailsAlignment !== "center" ? commonStyles.active : "",
-                  commonStyles.button,
-                ].join(" ")}
-                onClick={cycleAlignment}
-              >
-                📍{" "}
-                {detailsAlignment.charAt(0).toUpperCase() +
-                  detailsAlignment.slice(1)}
-              </button>
-            </div>
-          </div>
-
-          <div
-            className={styles.controlGroup}
-            role="group"
-            aria-label="View controls"
-          >
-            <div className={styles.controlHeader}>
-              <span className={styles.controlLogo} aria-hidden="true">
-                ⛶
-              </span>
-              <span className={styles.controlCopy}>
-                <span className={styles.controlTitle}>View</span>
-              </span>
-            </div>
-
-            <div className={styles.controlButtons}>
-              <button
-                className={[
-                  showCover ? commonStyles.active : "",
-                  commonStyles.button,
-                ].join(" ")}
-                aria-pressed={showCover}
-                title={
-                  showCover
-                    ? "Photos fill the screen (cropping). Tap to switch to fit."
-                    : "Photos fit the screen (letterboxed). Tap to switch to fill."
-                }
-                onClick={() => setShowCover(!showCover)}
-              >
-                ⛶ Fill screen
-              </button>
-
-              {!isFullscreenActive ? (
-                <button
-                  className={commonStyles.button}
-                  disabled={!isFullscreenSupported}
-                  aria-disabled={!isFullscreenSupported}
-                  onClick={() => {
-                    handleFullscreenToggle().catch(console.error);
-                  }}
-                >
-                  ⇱ Fullscreen
-                </button>
-              ) : null}
-
-              <button
-                className={[
-                  isWakeLockActive ? commonStyles.active : "",
-                  commonStyles.button,
-                ].join(" ")}
-                disabled={!isWakeLockSupported}
-                aria-disabled={!isWakeLockSupported}
-                aria-pressed={isWakeLockActive}
-                title={
-                  isWakeLockSupported
-                    ? "Try to acquire a wake lock for this slideshow session"
-                    : "Screen wake lock is not available in this browser"
-                }
-                onClick={() => {
-                  tryAcquireWakeLock().catch(console.error);
-                }}
-              >
-                {isWakeLockActive ? "Wake lock active" : "Try awake lock"}
-              </button>
-            </div>
-          </div>
-
-          <div
-            className={styles.controlGroup}
-            role="group"
-            aria-label="Timing controls"
-          >
-            <div className={styles.controlHeader}>
-              <span className={styles.controlLogo} aria-hidden="true">
-                ⏱
-              </span>
-              <span className={styles.controlCopy}>
-                <span className={styles.controlTitle}>Timing</span>
-              </span>
-            </div>
-
-            <div className={styles.controlButtons}>
-              {(() => {
-                const shortTimings = [10000, 30000, 60000, 900000, 3600000];
-                const longTimings = [10800000, 43200000, 86400000];
-                // Kiosk-extreme cadences (3h+, 12h, 24h) are kept available but
-                // hidden by default behind a "More" disclosure. They're auto-
-                // revealed when the active delay is one of them so the user
-                // can always see what's selected.
-                const activeIsLong = longTimings.includes(timeDelay);
-                const visible = showLongTimings || activeIsLong
-                  ? [...shortTimings, ...longTimings]
-                  : shortTimings;
-
-                const buttons = visible.map((delay) => {
-                  const delayMin = delay / 1000 / 60;
-                  const delaySec = delay / 1000;
-                  return (
-                    <button
-                      key={delay}
-                      className={[
-                        commonStyles.button,
-                        delay === timeDelay ? commonStyles.active : "",
-                      ].join(" ")}
-                      aria-pressed={delay === timeDelay}
-                      onClick={() => setTimeDelayAndUrl(delay)}
-                    >
-                      {delayMin >= 60
-                        ? `${delayMin / 60}h`
-                        : delayMin < 1
-                          ? `${delaySec}s`
-                          : `${delayMin}m`}
-                    </button>
-                  );
-                });
-
-                return (
-                  <>
-                    {buttons}
-                    {!activeIsLong ? (
-                      <button
-                        className={[
-                          commonStyles.button,
-                          showLongTimings ? commonStyles.active : "",
-                        ].join(" ")}
-                        aria-pressed={showLongTimings}
-                        aria-label={
-                          showLongTimings
-                            ? "Hide longer cadences"
-                            : "Show longer cadences (3h, 12h, 24h)"
-                        }
-                        title={
-                          showLongTimings
-                            ? "Hide longer cadences"
-                            : "Show longer cadences (3h, 12h, 24h)"
-                        }
-                        onClick={() => setShowLongTimings(!showLongTimings)}
-                      >
-                        {showLongTimings ? "Less" : "More…"}
-                      </button>
-                    ) : null}
-                  </>
-                );
-              })()}
-            </div>
-
-            <div className={styles.controlMeta}>
-              <div className={commonStyles.toast}>
-                🔁 {secondsLeft >= 3600
-                  ? `${Math.floor(secondsLeft / 3600)}h ${Math.floor((secondsLeft % 3600) / 60)}m`
-                  : secondsLeft >= 60
-                    ? `${Math.floor(secondsLeft / 60)}m ${Math.floor(secondsLeft % 60)}s`
-                    : `${Math.floor(secondsLeft)}s`}
-              </div>
-              <button
-                className={[
-                  alignCadence ? commonStyles.active : "",
-                  commonStyles.button,
-                ].join(" ")}
-                type="button"
-                aria-pressed={alignCadence}
-                title="When on, advances snap to wall-clock boundaries (e.g. :00 / :15 / :30 / :45 for a 15-minute cadence) instead of drifting from the moment you opened the app"
-                onClick={() => {
-                  const next = !alignCadence;
-                  setAlignCadence(next);
-                  if (next) {
-                    alignNextChangeToCadence();
-                  }
-                }}
-              >
-                {alignCadence ? "Aligned" : "Align"}
-              </button>
-            </div>
-          </div>
-
-          <div
-            className={styles.controlGroup}
-            role="group"
-            aria-label="Current photo context"
-          >
-            <div className={styles.controlHeader}>
-              <span
-                className={styles.controlLogo}
-                role="button"
-                aria-label="Long-press to inspect the current image"
-                title="Long-press to inspect the current image"
-                style={{ cursor: "pointer", pointerEvents: "auto" }}
-                onPointerDown={(event) => {
-                  if (event.pointerType === "mouse" && event.button !== 0)
-                    return;
-                  contextLongPressFiredRef.current = false;
-                  if (contextLongPressTimerRef.current !== null) {
-                    window.clearTimeout(contextLongPressTimerRef.current);
-                  }
-                  contextLongPressTimerRef.current = window.setTimeout(() => {
-                    contextLongPressFiredRef.current = true;
-                    contextLongPressTimerRef.current = null;
-                    void inspectCurrentImage();
-                  }, 500);
-                }}
-                onPointerUp={() => {
-                  if (contextLongPressTimerRef.current !== null) {
-                    window.clearTimeout(contextLongPressTimerRef.current);
-                    contextLongPressTimerRef.current = null;
-                  }
-                }}
-                onPointerCancel={() => {
-                  if (contextLongPressTimerRef.current !== null) {
-                    window.clearTimeout(contextLongPressTimerRef.current);
-                    contextLongPressTimerRef.current = null;
-                  }
-                }}
-              >
-                📎
-              </span>
-              <span className={styles.controlCopy}>
-                <span className={styles.controlTitle}>Context</span>
-              </span>
-            </div>
-
-            <div className={styles.controlMeta}>
-              {filter ? (
-                <div className={commonStyles.toast}>
-                  only showing photos from{" "}
-                  <Link href={`/album/${filter}`}>
-                    <i>{filter}</i>
-                  </Link>
-                </div>
-              ) : null}
-
-              <Link
-                href={`/album/${albumName}#${photoName}`}
-                className={commonStyles.toast}
-              >
-                {playbackContextLabel} in <i>{albumName}</i>
-              </Link>
-
-              <button
-                className={commonStyles.button}
-                type="button"
-                onClick={() => {
-                  void copyCurrentPhotoLink();
-                }}
-              >
-                {copiedPhotoLink ? "copied photo link" : "copy photo link"}
-              </button>
-
-              <button
-                className={commonStyles.button}
-                type="button"
-                title="Send the current photo to a system app via the share sheet"
-                onClick={() => {
-                  void shareCurrentPhoto();
-                }}
-              >
-                ⤴ Share
-              </button>
-            </div>
-          </div>
-        </div>
+          isWakeLockActive={isWakeLockActive}
+          isWakeLockSupported={isWakeLockSupported}
+          onTryWakeLock={() => {
+            tryAcquireWakeLock().catch(console.error);
+          }}
+          timeDelay={timeDelay}
+          onSelectDelay={setTimeDelayAndUrl}
+          showLongTimings={showLongTimings}
+          onToggleLongTimings={() => setShowLongTimings(!showLongTimings)}
+          secondsLeft={secondsLeft}
+          alignCadence={alignCadence}
+          onToggleAlign={() => {
+            const next = !alignCadence;
+            setAlignCadence(next);
+            if (next) {
+              alignNextChangeToCadence();
+            }
+          }}
+          onInspectImage={() => {
+            void inspectCurrentImage();
+          }}
+          onCopyLink={() => {
+            void copyCurrentPhotoLink();
+          }}
+          copiedPhotoLink={copiedPhotoLink}
+          onShare={() => {
+            void shareCurrentPhoto();
+          }}
+        />
 
         {/* Hack: render the elements twice so we can get a different context
         to get mix-blend-mode working on ONLY the map and not on the text.
