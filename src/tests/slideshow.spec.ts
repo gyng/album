@@ -127,6 +127,32 @@ test.describe("Slideshow", () => {
     await expect(page).toHaveURL(/\/$/);
   });
 
+  test("switching playback mode keeps a photo on screen", async ({ page }) => {
+    await page.goto("/slideshow?mode=random&filter=test-simple", {
+      waitUntil: "domcontentloaded",
+    });
+    await waitForSlideshow(page);
+
+    const image = page.locator(slideshowImg).first();
+    await expect(image).toHaveAttribute("src", /\.avif$/);
+    const originalSrc = await image.getAttribute("src");
+
+    // Switching mode must carry the CURRENT photo into the new mode's history,
+    // not blank the slide or swap to a fresh random photo. Assert the SAME src
+    // persists, and give any (regressed) pool refetch time to settle first.
+    await revealControls(page);
+    await page.locator('button:has-text("Similar")').click();
+    await page.waitForTimeout(400);
+    await expect(image).toBeVisible();
+    expect(await image.getAttribute("src")).toBe(originalSrc);
+
+    await revealControls(page);
+    await page.locator('button:has-text("Recent")').click();
+    await page.waitForTimeout(400);
+    await expect(image).toBeVisible();
+    expect(await image.getAttribute("src")).toBe(originalSrc);
+  });
+
   test("playback mode toggles work", async ({ page }) => {
     await page.goto("/slideshow", { waitUntil: "domcontentloaded" });
     await waitForSlideshow(page);

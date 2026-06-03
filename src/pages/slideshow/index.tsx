@@ -48,6 +48,14 @@ import { useWakeLock } from "../../components/useWakeLock";
 import { useControlsAutoHide } from "../../components/useControlsAutoHide";
 import { useSlideshowCadence } from "../../components/useSlideshowCadence";
 import { useRemixGridReveal } from "../../components/useRemixGridReveal";
+import {
+  advanceHistory,
+  canGoBack,
+  currentEntry,
+  hasForwardEntry,
+  initialHistoryState,
+  upcomingSeed,
+} from "../../util/slideshowHistory";
 import { SlideshowToolbar } from "../../components/slideshow/SlideshowToolbar";
 import { SlideshowBottomBar } from "../../components/slideshow/SlideshowBottomBar";
 import { decideBuildUpdate, decideDbUpdateAction } from "../../util/kioskRefresh";
@@ -67,6 +75,9 @@ import {
 } from "../../util/slideshowUrl";
 
 type PageProps = {};
+// Stable empty companions array so the derived current-slide companions keep a
+// constant identity across renders for a non-remix slide (memo/dep stability).
+const EMPTY_COMPANIONS: RandomPhotoRow[] = [];
 const VERSION_POLL_MS = 300000;
 // Backstop hard-reload interval. Was 24h, which was killing the wake lock
 // daily on iPad PWA installs (Safari requires a user gesture to re-acquire).
@@ -282,9 +293,32 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [database]);
 
-  const [currentPhotoPath, setCurrentPhotoPath] =
-    React.useState<RandomPhotoRow | null>(null);
-  const currentPhotoPathRef = React.useRef<RandomPhotoRow | null>(null);
+  // Navigation history is the single source of truth for what's on screen.
+  // The current slide is history[index]; currentPhotoPath and the remix
+  // companions/strategy/score are DERIVED from it below, so there is no
+  // parallel current-slide state to keep in sync (see util/slideshowHistory).
+  const [historyState, dispatchHistory] = React.useReducer(
+    advanceHistory,
+    undefined,
+    initialHistoryState,
+  );
+  // A mirror of historyState for synchronous reads inside callbacks/async
+  // closures (kept current each render). Dispatches drive re-render; reads use
+  // the ref so the imperative advance logic always sees the latest state.
+  const historyStateRef = React.useRef(historyState);
+  historyStateRef.current = historyState;
+
+  const currentSlide = currentEntry(historyState);
+  const currentPhotoPath = currentSlide?.seed ?? null;
+  const remixCompanions = currentSlide?.companions ?? EMPTY_COMPANIONS;
+  const remixStrategy = currentSlide?.strategy ?? null;
+  const remixVectorScore = currentSlide?.vectorScore ?? null;
+  const canGoPrevious = canGoBack(historyState);
+  const historyPosition = {
+    index: historyState.index,
+    total: historyState.history.length,
+  };
+
   const randomPhotoPoolRef = React.useRef<RandomPhotoRow[]>([]);
   // Single shared queue state for random/weighted modes. Both the forward
   // advance and the preload peek consult it, so the buffered photo always
@@ -292,28 +326,10 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
   const randomQueueStateRef = React.useRef<RandomQueueState>(
     createRandomQueueState(),
   );
-  // Each navigation history entry captures the seed photo *plus* any remix
-  // companions and the strategy that produced them, so pressing Previous /
-  // Next replays the full side-by-side layout instead of collapsing the
-  // remix back to a single photo.
-  type NavigationEntry = {
-    seed: RandomPhotoRow;
-    companions: RandomPhotoRow[];
-    strategy: RemixStrategy | null;
-    // Captured from the async vector fetch on this entry's first reveal so
-    // replaying Previous/Next shows the same "94% match" badge.
-    vectorScore?: number | null;
-  };
-  const navigationHistoryRef = React.useRef<NavigationEntry[]>([]);
-  const historyIndexRef = React.useRef<number>(-1);
   const [slideshowError, setSlideshowError] = React.useState<string | null>(
     null,
   );
   const [copiedPhotoLink, setCopiedPhotoLink] = React.useState(false);
-  const [historyPosition, setHistoryPosition] = React.useState({
-    index: -1,
-    total: 0,
-  });
 
   const [timeDelay, setTimeDelay] = useLocalStorage(
     "slideshow-timedelay",
@@ -348,19 +364,8 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
     "slideshow-remix",
     true,
   );
-  const [remixCompanions, setRemixCompanions] = React.useState<
-    RandomPhotoRow[]
-  >([]);
   const [poolStats, setPoolStats] =
     React.useState<PoolStats>(EMPTY_POOL_STATS);
-  const [remixStrategy, setRemixStrategy] =
-    React.useState<RemixStrategy | null>(null);
-  // Vector strategies (similar / juxtapose) resolve asynchronously and the
-  // similarity score isn't derivable from the photos themselves — capture it
-  // when the fetch resolves so the remix badge can show "94% match".
-  const [remixVectorScore, setRemixVectorScore] = React.useState<number | null>(
-    null,
-  );
   // When set, the next forward-advance ignores the dice roll and forces a
   // remix. Used by the dedicated "Remix now" action button so users can
   // trigger a remix on demand instead of waiting for the 3% dice.
@@ -693,7 +698,8 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
             });
             // Stale guard: if the user has advanced past this slide while we
             // were fetching, drop the result on the floor.
-            if (currentPhotoPathRef.current?.path !== seedPath) return;
+            if (currentEntry(historyStateRef.current)?.seed.path !== seedPath)
+              return;
 
             const mapped = mapVectorRemixResult({
               resultData: result.data,
@@ -702,17 +708,15 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
             });
             if (mapped.companions.length === 0) return;
 
-            setRemixCompanions(mapped.companions);
-            setRemixVectorScore(mapped.topSimilarity);
-            // Patch the recorded history entry so Previous/Next replays with
-            // the same companions and score after the async resolve.
-            const entry = navigationHistoryRef.current.find(
-              (e) => e.seed.path === seedPath,
-            );
-            if (entry) {
-              entry.companions = mapped.companions;
-              entry.vectorScore = mapped.topSimilarity;
-            }
+            // Patch the matching history entry; the live current slide
+            // re-derives from it, so Previous/Next replays the same companions
+            // and score with no separate live state to keep in sync.
+            dispatchHistory({
+              type: "patchEntry",
+              seedPath,
+              companions: mapped.companions,
+              vectorScore: mapped.topSimilarity,
+            });
           } catch (err) {
             console.error("Vector remix fetch failed", err);
           }
@@ -734,24 +738,13 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
         }
       }
 
-      const nextHistory = [
-        ...navigationHistoryRef.current.slice(0, historyIndexRef.current + 1),
-        { seed: candidatePhoto, companions, strategy },
-      ];
-
-      navigationHistoryRef.current = nextHistory;
-      historyIndexRef.current = nextHistory.length - 1;
-      setHistoryPosition({
-        index: historyIndexRef.current,
-        total: nextHistory.length,
+      // The reducer truncates forward history, appends the new slide, and
+      // points the cursor at it. The current slide (seed + companions +
+      // strategy + score) is derived from this entry — no parallel state.
+      dispatchHistory({
+        type: "commit",
+        entry: { seed: candidatePhoto, companions, strategy },
       });
-
-      currentPhotoPathRef.current = candidatePhoto;
-      setCurrentPhotoPath(candidatePhoto);
-      setRemixCompanions(companions);
-      setRemixStrategy(strategy);
-      // Sync vector path resolves later; non-vector strategies clear here.
-      setRemixVectorScore(null);
       setSlideshowError(null);
       scheduleNextChange();
     },
@@ -766,25 +759,15 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
 
   const showHistoryPhoto = useCallback(
     (index: number): RandomPhotoRow | null => {
-      const entry = navigationHistoryRef.current[index] ?? null;
+      const entry = historyStateRef.current.history[index] ?? null;
       if (!entry) {
         return null;
       }
 
-      historyIndexRef.current = index;
-      setHistoryPosition({
-        index,
-        total: navigationHistoryRef.current.length,
-      });
-
-      currentPhotoPathRef.current = entry.seed;
-      setCurrentPhotoPath(entry.seed);
-      // Restore the original remix layout (if any) — companions and strategy
-      // are persisted in the history entry, so Previous/Next replays the
-      // side-by-side faithfully.
-      setRemixCompanions(entry.companions);
-      setRemixStrategy(entry.strategy);
-      setRemixVectorScore(entry.vectorScore ?? null);
+      // Just move the cursor — the current slide (seed + the original remix
+      // layout) re-derives from history[index], so Previous/Next replays
+      // the side-by-side faithfully.
+      dispatchHistory({ type: "goTo", index });
       setSlideshowError(null);
       scheduleNextChange();
       return entry.seed;
@@ -792,14 +775,10 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
     [scheduleNextChange],
   );
 
-  // When remix is toggled off, drop any active companion layout immediately
-  // so the current slide collapses to a single photo. Otherwise the layout
-  // would persist until the next advance, which is jarring.
+  // When remix is toggled off, collapse the current slide to a single photo.
   useEffect(() => {
     if (!remixEnabled) {
-      setRemixCompanions([]);
-      setRemixStrategy(null);
-      setRemixVectorScore(null);
+      dispatchHistory({ type: "clearCurrentRemix" });
     }
   }, [remixEnabled]);
 
@@ -884,18 +863,19 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
           return;
         }
 
+        // Whether a slide was on screen before this (re)load — used below to
+        // decide whether to advance to a first photo (mirrors the original
+        // currentPhotoPathRef !== null check, captured before the reset).
+        const hadCurrentPhoto = currentEntry(historyStateRef.current) !== null;
+
         randomPhotoPoolRef.current = photos;
         randomQueueStateRef.current = createRandomQueueState();
         recentPhotoPathsRef.current = [];
-        navigationHistoryRef.current = [];
-        historyIndexRef.current = -1;
-        setHistoryPosition({ index: -1, total: 0 });
+        dispatchHistory({ type: "reset" });
         setPoolStats(computePoolStats(photos));
         resetSimilarQueue();
 
         if (photos.length === 0) {
-          setCurrentPhotoPath(null);
-          currentPhotoPathRef.current = null;
           updateSlideshowUrl(slideshowMode);
           setSlideshowError("No photos available");
           return;
@@ -940,7 +920,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
         if (
           slideshowMode === "random" ||
           slideshowMode === "weighted" ||
-          currentPhotoPathRef.current === null
+          !hadCurrentPhoto
         ) {
           advanceRandomPhoto({ trackRecent: slideshowMode === "similar" });
         }
@@ -956,18 +936,16 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
     return () => {
       cancelled = true;
     };
-    // NB: timeDelay is deliberately NOT a dependency. It isn't read in this
-    // effect, and including it made changing the slide duration refetch the
-    // whole pool, wipe navigation history, and jump to a fresh random photo.
-  }, [
-    advanceRandomPhoto,
-    commitNextPhoto,
-    database,
-    filter,
-    resetSimilarQueue,
-    slideshowMode,
-    updateSlideshowUrl,
-  ]);
+    // This effect must fire ONLY when the photo pool can change: on the
+    // database becoming ready and on a filter change. It is deliberately NOT
+    // keyed on slideshowMode / timeDelay / the advance callbacks — the pool is
+    // mode-independent, and re-running on a mode toggle reset history and (via
+    // the derived current slide) blanked the photo. A mode change is handled by
+    // the mode-switch effect below. The callbacks it invokes are current at
+    // fire time because the effect only fires on mount/database/filter, where
+    // they reflect the latest render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [database, filter]);
 
   const advanceSimilarPhoto =
     useCallback(async (): Promise<RandomPhotoRow | null> => {
@@ -982,7 +960,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
         return advanceRandomPhoto({ trackRecent: true });
       }
 
-      const activePhoto = currentPhotoPathRef.current;
+      const activePhoto = currentEntry(historyStateRef.current)?.seed ?? null;
       if (!activePhoto?.path) {
         return advanceRandomPhoto({ trackRecent: true });
       }
@@ -1066,9 +1044,9 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
     // flag armed to fire on a later, unexpected advance.
     if (
       !forceRemixRef.current &&
-      historyIndexRef.current < navigationHistoryRef.current.length - 1
+      hasForwardEntry(historyStateRef.current)
     ) {
-      showHistoryPhoto(historyIndexRef.current + 1);
+      showHistoryPhoto(historyStateRef.current.index + 1);
       return;
     }
 
@@ -1077,7 +1055,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
       return;
     }
 
-    const activePhoto = currentPhotoPathRef.current;
+    const activePhoto = currentEntry(historyStateRef.current)?.seed ?? null;
 
     // Similar mode: advanceSimilarPhoto falls back to a random advance when the
     // embeddings DB isn't ready, so the show never freezes waiting on it.
@@ -1099,18 +1077,16 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
   ]);
 
   const goPrevious = useCallback(() => {
-    if (historyIndexRef.current <= 0) {
+    if (!canGoBack(historyStateRef.current)) {
       return;
     }
 
-    showHistoryPhoto(historyIndexRef.current - 1);
+    showHistoryPhoto(historyStateRef.current.index - 1);
   }, [showHistoryPhoto]);
 
   const getUpcomingPhoto = useCallback((): RandomPhotoRow | null => {
-    if (historyIndexRef.current < navigationHistoryRef.current.length - 1) {
-      return (
-        navigationHistoryRef.current[historyIndexRef.current + 1]?.seed ?? null
-      );
+    if (hasForwardEntry(historyStateRef.current)) {
+      return upcomingSeed(historyStateRef.current);
     }
 
     if (slideshowMode === "random" || slideshowMode === "weighted") {
@@ -1126,7 +1102,8 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
 
     if (
       slideshowMode === "similar" &&
-      similarSeedPathRef.current === currentPhotoPathRef.current?.path
+      similarSeedPathRef.current ===
+        currentEntry(historyStateRef.current)?.seed.path
     ) {
       const nextIndex = similarQueueIndexRef.current + 1;
       return similarQueueRef.current[nextIndex] ?? null;
@@ -1139,19 +1116,12 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
     if (slideshowMode === "similar") {
       resetRandomQueue(randomQueueStateRef.current);
 
-      if (currentPhotoPathRef.current) {
-        // Switching into similar mode resets history to just the current seed
-        // — discard any remix layout that was active so the new mode starts
-        // from a clean single photo.
-        navigationHistoryRef.current = [
-          {
-            seed: currentPhotoPathRef.current,
-            companions: [],
-            strategy: null,
-          },
-        ];
-        historyIndexRef.current = 0;
-        setHistoryPosition({ index: 0, total: 1 });
+      // Switching into similar mode resets history to just the current seed —
+      // discard any remix layout so the new mode starts from a clean single
+      // photo.
+      const seed = currentEntry(historyStateRef.current)?.seed;
+      if (seed) {
+        dispatchHistory({ type: "replaceSingle", seed });
       }
       return;
     }
@@ -1160,7 +1130,6 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
     resetRandomQueue(randomQueueStateRef.current);
   }, [resetSimilarQueue, slideshowMode]);
 
-  const canGoPrevious = historyPosition.index > 0;
   const playbackSubtitle =
     slideshowMode === "similar"
       ? "🧭 Similar trail"
@@ -1487,7 +1456,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
   );
 
   const getCurrentPhotoLink = useCallback((): string | null => {
-    const photoPath = currentPhotoPathRef.current?.path;
+    const photoPath = currentEntry(historyStateRef.current)?.seed.path;
     if (!photoPath) {
       return null;
     }
@@ -1534,8 +1503,9 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
   const shareCurrentPhoto = useCallback(async () => {
     const photoLink = getCurrentPhotoLink();
     if (!photoLink) return;
-    const albumName = currentPhotoPathRef.current?.path.split("/")?.[2] ?? "";
-    const photoName = currentPhotoPathRef.current?.path.split("/")?.[3] ?? "";
+    const sharePath = currentEntry(historyStateRef.current)?.seed.path;
+    const albumName = sharePath?.split("/")?.[2] ?? "";
+    const photoName = sharePath?.split("/")?.[3] ?? "";
     if (typeof navigator.share === "function") {
       try {
         await navigator.share({
