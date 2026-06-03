@@ -34,7 +34,7 @@ const REMIX_STRATEGY_LABEL: Record<RemixStrategy, string> = {
   "golden-hour": "shot at golden hour",
   juxtapose: "deliberately juxtaposed",
   "shared-camera": "shot through the same lens",
-  similar: "visually similar",
+  similar: "semantically similar",
   random: "picked at random",
 };
 

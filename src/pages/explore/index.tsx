@@ -246,7 +246,7 @@ const VisualSimilarityThumb: React.FC<{
     <Link
       href={buildSimilaritySearchHref(photo.path)}
       className={styles.visualThumbSearchLink}
-      aria-label={`Find photos visually similar to ${photo.label}`}
+      aria-label={`Find photos semantically similar to ${photo.label}`}
       title="Open similarity search"
     >
       <span aria-hidden="true">🔍</span>
