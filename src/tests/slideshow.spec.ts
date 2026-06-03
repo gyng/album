@@ -385,7 +385,7 @@ test.describe("Slideshow touch mode", () => {
     await expect(container).toHaveAttribute("data-controls-visible", "true");
   });
 
-  test("pull up with controls hidden cycles overlay preset", async ({
+  test("pull up with controls hidden forces a remix advance", async ({
     page,
   }) => {
     await page.goto("/slideshow?mode=random&filter=test-simple", {
@@ -394,19 +394,18 @@ test.describe("Slideshow touch mode", () => {
     await waitForSlideshow(page);
 
     const container = page.locator("[data-paused]");
+    const image = page.locator(slideshowImg).first();
 
     // First pull-up hides the (initially visible) controls.
     await swipe(page, 0, -100, 10);
     await expect(container).toHaveAttribute("data-controls-visible", "false");
 
-    // Second pull-up with controls hidden → cycleTouchOverlays advances the preset.
-    // The default preset has no overlays; first cycle enables details.
+    // Second pull-up with controls hidden forces the next advance to be a
+    // remix (mirrors the "Remix now" button), which moves to a new seed photo.
+    const beforeSrc = await image.getAttribute("src");
     await swipe(page, 0, -100, 10);
-    await expect
-      .poll(async () =>
-        page.evaluate(() => localStorage.getItem("slideshow-showdetails")),
-      )
-      .toBe("true");
+    await waitForImageChange(page, String(beforeSrc));
+    expect(await image.getAttribute("src")).not.toBe(beforeSrc);
   });
 
   test("data-touch-active toggles around the gesture lifecycle", async ({

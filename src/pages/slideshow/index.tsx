@@ -28,7 +28,6 @@ import { buildCollectionPageJsonLd } from "../../lib/seo";
 import { getPhotoAltText } from "../../lib/alt";
 import { navigateTo, reloadCurrentPage } from "../../util/navigate";
 import { handleSlideshowKeyboardShortcut } from "../../util/slideshowKeyboard";
-import { getSlideshowTouchTapAction } from "../../util/slideshowTouch";
 import { getNextAlignedSlideshowChange } from "../../util/slideshowTiming";
 import {
   advanceQueued,
@@ -64,6 +63,10 @@ import {
   mapVectorRemixResult,
 } from "../../util/slideshowRemix";
 import {
+  resolvePointerMove,
+  resolvePointerUpAction,
+} from "../../util/slideshowGesture";
+import {
   applySlideshowUrlState,
   buildSlideshowPermalink,
   parseSlideshowSearchParams,
@@ -83,10 +86,6 @@ const FALLBACK_RELOAD_MS = 7 * 86400000;
 // bytes per request), so 10 minutes is plenty responsive for a sideboard
 // without being chatty.
 const DB_POLL_MS = 600000;
-const TOUCH_SWIPE_THRESHOLD_PX = 48;
-const TOUCH_SWIPE_HINT_THRESHOLD_PX = TOUCH_SWIPE_THRESHOLD_PX / 2; // start showing hint at half the commit distance
-const TOUCH_PULL_THRESHOLD_PX = 72;
-const TOUCH_PULL_HINT_THRESHOLD_PX = TOUCH_PULL_THRESHOLD_PX / 3; // start showing pull hint at 1/3 of the commit distance
 
 type FullscreenDocument = Document & {
   webkitExitFullscreen?: () => Promise<void> | void;
@@ -1535,114 +1534,43 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
         return;
       }
 
-      const deltaX = event.clientX - gesture.startX;
-      const deltaY = event.clientY - gesture.startY;
-      const horizontalDistance = Math.abs(deltaX);
-      const verticalDistance = Math.abs(deltaY);
+      const result = resolvePointerMove({
+        deltaX: event.clientX - gesture.startX,
+        deltaY: event.clientY - gesture.startY,
+        committedHorizontal: gesture.committedHorizontalDirection,
+        committedVertical: gesture.committedVerticalDirection,
+        controlsWereVisible: gesture.controlsWereVisible,
+      });
 
-      // Map raw distance to a 0..1 progress that *starts* at the hint threshold,
-      // so the indicator fades in from 0 rather than popping in mid-bright.
-      const progressFromDistance = (
-        distance: number,
-        hintPx: number,
-        commitPx: number,
-      ): number =>
-        Math.max(
-          0,
-          Math.min(1, (distance - hintPx) / (commitPx - hintPx)),
-        );
+      // The other axis is already committed — leave visuals untouched.
+      if (result.kind === "ignore") {
+        return;
+      }
 
-      const armIfThreshold = (committed: boolean) => {
-        if (!committed) {
-          setTouchArmed(false);
-          return;
-        }
+      // Persist any newly-committed axis direction for the rest of the gesture.
+      if (result.committedHorizontal) {
+        gesture.committedHorizontalDirection = result.committedHorizontal;
+      }
+      if (result.committedVertical) {
+        gesture.committedVerticalDirection = result.committedVertical;
+      }
+
+      setTouchGestureHint(result.hint);
+      setTouchPullProgress(result.pullProgress);
+      setTouchSwipeProgress(result.swipeProgress);
+
+      if (result.armed) {
         setTouchArmed(true);
+        // Fire the commit haptic exactly once per gesture.
         if (!gesture.hapticFired) {
           gesture.hapticFired = true;
           if (typeof navigator !== "undefined" && navigator.vibrate) {
             navigator.vibrate(8);
           }
         }
-      };
-
-      const isVertical =
-        verticalDistance >= TOUCH_PULL_HINT_THRESHOLD_PX &&
-        verticalDistance > horizontalDistance;
-      const isHorizontal =
-        horizontalDistance >= TOUCH_SWIPE_HINT_THRESHOLD_PX &&
-        horizontalDistance > verticalDistance;
-
-      // When the user reverses past the committed direction the gesture is
-      // effectively cancelled — visuals must drop back to idle, otherwise the
-      // chevron stays armed at progress=1.0 even though pointer-up will bail.
-      const resetVisual = () => {
-        setTouchGestureHint(null);
-        setTouchPullProgress(0);
-        setTouchSwipeProgress(0);
-        armIfThreshold(false);
-      };
-
-      if (isVertical) {
-        // Once horizontal is committed, ignore vertical drift; symmetric below.
-        if (gesture.committedHorizontalDirection) {
-          return;
-        }
-
-        const direction: "down" | "up" = deltaY > 0 ? "down" : "up";
-
-        // Downward pull from a controls-visible state has no action — bail early.
-        if (direction === "down" && gesture.controlsWereVisible) {
-          resetVisual();
-          return;
-        }
-
-        if (!gesture.committedVerticalDirection) {
-          gesture.committedVerticalDirection = direction;
-        } else if (gesture.committedVerticalDirection !== direction) {
-          // Reversed past start — drop back to idle so the visual matches what
-          // pointer-up will actually do (nothing).
-          resetVisual();
-          return;
-        }
-
-        setTouchSwipeProgress(0);
-        setTouchGestureHint(direction === "down" ? "controls" : "remix");
-        const progress = progressFromDistance(
-          verticalDistance,
-          TOUCH_PULL_HINT_THRESHOLD_PX,
-          TOUCH_PULL_THRESHOLD_PX,
-        );
-        setTouchPullProgress(progress);
-        armIfThreshold(progress >= 1);
-        return;
+      } else {
+        setTouchArmed(false);
       }
-
-      if (isHorizontal) {
-        if (gesture.committedVerticalDirection) {
-          return;
-        }
-        const direction: "next" | "previous" = deltaX < 0 ? "next" : "previous";
-        if (!gesture.committedHorizontalDirection) {
-          gesture.committedHorizontalDirection = direction;
-        } else if (gesture.committedHorizontalDirection !== direction) {
-          // Reversed past start — drop back to idle.
-          resetVisual();
-          return;
-        }
-        setTouchGestureHint(gesture.committedHorizontalDirection);
-        setTouchPullProgress(0);
-        const progress = progressFromDistance(
-          horizontalDistance,
-          TOUCH_SWIPE_HINT_THRESHOLD_PX,
-          TOUCH_SWIPE_THRESHOLD_PX,
-        );
-        setTouchSwipeProgress(progress);
-        armIfThreshold(progress >= 1);
-        return;
-      }
-
-      resetVisual();
     },
     [],
   );
@@ -1656,119 +1584,55 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
         return;
       }
 
-      const deltaX = event.clientX - gesture.startX;
-      const deltaY = event.clientY - gesture.startY;
-      const horizontalDistance = Math.abs(deltaX);
-      const verticalDistance = Math.abs(deltaY);
+      const currentTarget = event.currentTarget;
+      const { action, suppressClick } = resolvePointerUpAction({
+        deltaX: event.clientX - gesture.startX,
+        deltaY: event.clientY - gesture.startY,
+        isTouchLike: isTouchOrPen(gesture.pointerType),
+        committedHorizontal: gesture.committedHorizontalDirection,
+        committedVertical: gesture.committedVerticalDirection,
+        controlsWereVisible: gesture.controlsWereVisible,
+        tap: {
+          clientX: event.clientX,
+          // Deferred: only the sub-12px tap path reads layout, so a swipe or
+          // pull no longer forces a reflow on release.
+          getBounds: () => {
+            const b = currentTarget.getBoundingClientRect();
+            return { left: b.left, width: b.width };
+          },
+          canGoPrevious,
+        },
+      });
 
-      // Honour the axis the visual already committed to. The move handler shows
-      // the user a directional hint as soon as the hint threshold is crossed;
-      // letting drift on the other axis flip the action at release would mean
-      // the visual lied to them.
-      const isTouchLike = isTouchOrPen(gesture.pointerType);
-      const horizontalCommitted = !!gesture.committedHorizontalDirection;
-      const verticalCommitted = !!gesture.committedVerticalDirection;
-      // Horizontal commits stay un-gated for pointer type: a mouse drag past
-      // the threshold should still navigate (advance / previous) for power
-      // users who prefer drag-as-prev over the toolbar buttons. The lack of
-      // mid-drag visual feedback for mouse is acceptable — the action only
-      // fires at release.
-      const treatAsHorizontal = horizontalCommitted
-        ? horizontalDistance >= TOUCH_SWIPE_THRESHOLD_PX
-        : !verticalCommitted &&
-          horizontalDistance >= TOUCH_SWIPE_THRESHOLD_PX &&
-          horizontalDistance > verticalDistance;
-      // Vertical commits (toggle controls, trigger remix) are touch-first UX
-      // and have no progress visual for mouse — gating on touch/pen avoids a
-      // mouse drag-up silently triggering a remix.
-      const treatAsVertical =
-        isTouchLike &&
-        (verticalCommitted
-          ? verticalDistance >= TOUCH_SWIPE_THRESHOLD_PX
-          : !horizontalCommitted &&
-            verticalDistance >= TOUCH_SWIPE_THRESHOLD_PX &&
-            verticalDistance > horizontalDistance);
-
-      if (treatAsHorizontal) {
-        const committed = gesture.committedHorizontalDirection;
-        const finalDirection = deltaX < 0 ? "next" : "previous";
-        const effectiveDirection = committed ?? finalDirection;
-
-        // If the user dragged back past the start in the opposite direction,
-        // treat it as a cancelled gesture — do not trigger the opposite action.
-        if (committed && finalDirection !== committed) {
-          return;
-        }
-
+      // The browser synthesises a click after a touch pointerup; the resolver
+      // tells us when to swallow it so a jitter or cancelled gesture can't
+      // fall through to the image's onClick and silently advance.
+      if (suppressClick) {
         suppressImageClickRef.current = true;
-
-        if (effectiveDirection === "next") {
-          advanceToNextPhoto();
-          return;
-        }
-
-        goPrevious();
-        return;
       }
 
-      if (treatAsVertical) {
-        const committed = gesture.committedVerticalDirection;
-        const finalDirection: "down" | "up" = deltaY > 0 ? "down" : "up";
-        // Drag-back cancel: if the user reversed direction past the start,
-        // do not trigger the opposite action.
-        if (committed && finalDirection !== committed) {
-          return;
-        }
-
-        const effectiveDirection = committed ?? finalDirection;
-
-        if (effectiveDirection === "down") {
-          if (!gesture.controlsWereVisible) {
-            suppressImageClickRef.current = true;
-            setControlsVisible(true);
-          }
-          return;
-        }
-
-        suppressImageClickRef.current = true;
-        if (gesture.controlsWereVisible) {
+      switch (action) {
+        case "next":
+          advanceToNextPhoto();
+          break;
+        case "previous":
+          goPrevious();
+          break;
+        case "show-controls":
+          setControlsVisible(true);
+          break;
+        case "hide-controls":
           controlsHideDeadlineRef.current = null;
           setControlsVisible(false);
-          return;
-        }
-        // Drag-up from the slide forces the next advance to be a remix
-        // (mirrors the "Remix now" toolbar button). The forceRemix flag is
-        // honoured by advanceToNextPhoto's roll, bypassing the 3% dice.
-        forceRemixRef.current = true;
-        advanceToNextPhoto();
-        return;
-      }
-
-      if (isTouchLike) {
-        // The browser synthesises a click after every touch pointerup. Without
-        // this suppression a mid-distance jitter (12-48px) or a reversed-cancel
-        // gesture would fall through every action branch above and then
-        // silently advance the photo via the image's onClick — making the
-        // cancellation visual a lie. Set the suppress ref unconditionally for
-        // touch/pen so the synthetic click swallows itself. The commit branches
-        // already set it; setting it again is idempotent.
-        suppressImageClickRef.current = true;
-
-        if (horizontalDistance < 12 && verticalDistance < 12) {
-          const imageBounds = event.currentTarget.getBoundingClientRect();
-          const tapAction = getSlideshowTouchTapAction({
-            clientX: event.clientX,
-            bounds: imageBounds,
-            canGoPrevious,
-          });
-
-          if (tapAction === "previous") {
-            goPrevious();
-            return;
-          }
-
+          break;
+        case "remix":
+          // Drag-up forces the next advance to be a remix (mirrors the
+          // "Remix now" button); advanceToNextPhoto honours forceRemix.
+          forceRemixRef.current = true;
           advanceToNextPhoto();
-        }
+          break;
+        case "none":
+          break;
       }
     },
     [
