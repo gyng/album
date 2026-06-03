@@ -47,6 +47,7 @@ import { BUILD_VERSION } from "../../lib/buildVersion";
 import { useWakeLock } from "../../components/useWakeLock";
 import { useControlsAutoHide } from "../../components/useControlsAutoHide";
 import { useSlideshowCadence } from "../../components/useSlideshowCadence";
+import { useRemixGridReveal } from "../../components/useRemixGridReveal";
 import { SlideshowToolbar } from "../../components/slideshow/SlideshowToolbar";
 import { SlideshowBottomBar } from "../../components/slideshow/SlideshowBottomBar";
 import { decideBuildUpdate, decideDbUpdateAction } from "../../util/kioskRefresh";
@@ -1618,51 +1619,17 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
     previousSlideWasRemixRef.current = remixCompanions.length > 0;
   }, [activePhotoSrc, remixCompanions]);
 
-  // Track which cells in the current remix have finished loading. The grid
-  // stays opacity-0 until every cell has fired its onLoad, so the user sees
-  // the whole arrangement appear at once rather than watching cells pop in
-  // one at a time. Using a path-keyed Set guards against React double-firing
-  // the load handler from inflating the count.
-  const remixLoadedPathsRef = React.useRef<Set<string>>(new Set());
-  const [remixLoadedCount, setRemixLoadedCount] = React.useState(0);
-  const remixLayoutKey = [
-    currentPhotoPath?.path ?? "",
-    ...remixCompanions.map((c) => c.path),
-  ].join("|");
-
-  useEffect(() => {
-    // Layout changed — clear the loaded set so the new grid waits for all
-    // of its own cells before revealing.
-    remixLoadedPathsRef.current = new Set();
-    setRemixLoadedCount(0);
-  }, [remixLayoutKey]);
-
-  const markRemixCellLoaded = useCallback((path: string) => {
-    if (remixLoadedPathsRef.current.has(path)) return;
-    remixLoadedPathsRef.current.add(path);
-    setRemixLoadedCount(remixLoadedPathsRef.current.size);
-  }, []);
-
-  const totalRemixCells = remixCompanions.length + 1;
-  const isRemixGridReady =
-    remixCompanions.length === 0 || remixLoadedCount >= totalRemixCells;
-
-  // Safety net: if a cell never fires onLoad (broken file, dropped network,
-  // CORS), the grid would stay at opacity 0 indefinitely. After 3s reveal
-  // whatever is there — better to show a partial grid than a black screen.
-  // Populates the ref directly so any late-arriving load handlers no-op.
-  useEffect(() => {
-    if (remixCompanions.length === 0) return;
-    const seedPath = currentPhotoPath?.path;
-    if (!seedPath) return;
-    const t = window.setTimeout(() => {
-      if (remixLoadedPathsRef.current.size >= totalRemixCells) return;
-      const all = new Set<string>([seedPath, ...remixCompanions.map((c) => c.path)]);
-      remixLoadedPathsRef.current = all;
-      setRemixLoadedCount(all.size);
-    }, 3000);
-    return () => window.clearTimeout(t);
-  }, [remixLayoutKey, currentPhotoPath, remixCompanions, totalRemixCells]);
+  // Track which cells in the current remix have finished loading so the grid
+  // reveals all at once (see util hook). Memoise the companion paths so the
+  // hook's safety-net effect stays stable across renders within a layout.
+  const remixCompanionPaths = React.useMemo(
+    () => remixCompanions.map((c) => c.path),
+    [remixCompanions],
+  );
+  const { markRemixCellLoaded, isRemixGridReady } = useRemixGridReveal({
+    seedPath: currentPhotoPath?.path,
+    companionPaths: remixCompanionPaths,
+  });
 
   // Clear the fade-out backdrop only once the *whole* new grid is ready, so
   // the user never sees a window where the previous slide is gone and the
