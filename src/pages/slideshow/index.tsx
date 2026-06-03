@@ -21,7 +21,6 @@ import { buildCollectionPageJsonLd } from "../../lib/seo";
 import { getPhotoAltText } from "../../lib/alt";
 import { navigateTo, reloadCurrentPage } from "../../util/navigate";
 import { handleSlideshowKeyboardShortcut } from "../../util/slideshowKeyboard";
-import { getNextAlignedSlideshowChange } from "../../util/slideshowTiming";
 import {
   advanceQueued,
   avoidBoundaryRepeat,
@@ -47,6 +46,7 @@ import {
 import { BUILD_VERSION } from "../../lib/buildVersion";
 import { useWakeLock } from "../../components/useWakeLock";
 import { useControlsAutoHide } from "../../components/useControlsAutoHide";
+import { useSlideshowCadence } from "../../components/useSlideshowCadence";
 import { SlideshowToolbar } from "../../components/slideshow/SlideshowToolbar";
 import { SlideshowBottomBar } from "../../components/slideshow/SlideshowBottomBar";
 import { decideBuildUpdate, decideDbUpdateAction } from "../../util/kioskRefresh";
@@ -376,9 +376,6 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
   // enough that it still feels like a surprise rather than a pattern.
   const REMIX_PROBABILITY = 0.05;
 
-  const [nextChangeAt, setNextChangeAt] = React.useState<Date>(new Date());
-  const [secondsLeft, setSecondsLeft] = React.useState<number>(0);
-  const [time, setTime] = React.useState<Date>(new Date());
 
   const [imageLoaded, setImageLoaded] = React.useState<boolean>(false);
   const [previousPhotoSrc, setPreviousPhotoSrc] = React.useState<string | null>(
@@ -408,7 +405,6 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
     true,
   );
   const [hasParsedInitialUrl, setHasParsedInitialUrl] = React.useState(false);
-  const [isPaused, setIsPaused] = React.useState(false);
   // Controls visibility lifecycle (coarse-pointer detection, rAF auto-hide
   // countdown, desktop show/hide + post-Hide suppression) lives in a hook;
   // destructured to the same local names the rest of this component uses.
@@ -480,7 +476,6 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
     hapticFired?: boolean;
   } | null>(null);
   const suppressImageClickRef = React.useRef(false);
-  const pausedRemainingMsRef = React.useRef<number | null>(null);
   const activePhotoSrcRef = React.useRef<string | null>(null);
   const [bufferedPhotoSrc, setBufferedPhotoSrc] = React.useState<string | null>(
     null,
@@ -611,19 +606,27 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
     setAlignCadence,
   ]);
 
-  // Single source of truth for "when does the next slide change?". Honours
-  // the alignCadence toggle so every advance, history nav and pause/resume
-  // either snaps to the next wall-clock boundary (e.g. :00 / :15 / :30 / :45
-  // for a 15-minute cadence) or just adds the delay raw.
-  const computeNextChangeAt = useCallback(
-    (now: Date = new Date()): Date => {
-      if (alignCadence) {
-        return getNextAlignedSlideshowChange({ now, delayMs: timeDelay });
-      }
-      return new Date(now.getTime() + timeDelay);
-    },
-    [alignCadence, timeDelay],
-  );
+  // The advance cadence (nextChangeAt timer, pause/resume, countdown + clock
+  // tick, alignment) lives in a hook. The timer fires goNext, which is defined
+  // below and changes identity — so the hook receives a STABLE wrapper over a
+  // ref to the latest goNext (assigned right after goNext is created).
+  const goNextRef = React.useRef<() => void>(() => {});
+  const advanceFromCadence = useCallback(() => goNextRef.current(), []);
+  const {
+    secondsLeft,
+    time,
+    isPaused,
+    togglePaused,
+    scheduleNextChange,
+    alignNextChangeToCadence,
+  } = useSlideshowCadence({
+    timeDelay,
+    alignCadence,
+    controlsVisible,
+    showClock,
+    hasCurrentPhoto: currentPhotoPath !== null,
+    onAdvance: advanceFromCadence,
+  });
 
   const commitNextPhoto = useCallback(
     (
@@ -749,13 +752,13 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
       // Sync vector path resolves later; non-vector strategies clear here.
       setRemixVectorScore(null);
       setSlideshowError(null);
-      setNextChangeAt(computeNextChangeAt());
+      scheduleNextChange();
     },
     [
-      computeNextChangeAt,
       database,
       embeddingsDatabase,
       remixEnabled,
+      scheduleNextChange,
       shuffleHistorySize,
     ],
   );
@@ -782,10 +785,10 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
       setRemixStrategy(entry.strategy);
       setRemixVectorScore(entry.vectorScore ?? null);
       setSlideshowError(null);
-      setNextChangeAt(computeNextChangeAt());
+      scheduleNextChange();
       return entry.seed;
     },
-    [computeNextChangeAt],
+    [scheduleNextChange],
   );
 
   // When remix is toggled off, drop any active companion layout immediately
@@ -1180,75 +1183,20 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
     setDetailsAlignment(next);
   };
 
-  const togglePaused = useCallback(() => {
-    setIsPaused((prev) => !prev);
-  }, []);
-
-  const alignNextChangeToCadence = useCallback(() => {
-    const alignedNextChange = getNextAlignedSlideshowChange({
-      now: new Date(),
-      delayMs: timeDelay,
-    });
-    const remainingMs = Math.max(0, alignedNextChange.getTime() - Date.now());
-
-    setNextChangeAt(alignedNextChange);
-    setSecondsLeft(remainingMs / 1000);
-
-    if (isPaused) {
-      pausedRemainingMsRef.current = remainingMs;
-    }
-  }, [isPaused, timeDelay]);
+  // Keep the cadence timer's advance pointing at the latest goNext (the hook
+  // calls it through advanceFromCadence -> goNextRef.current).
+  goNextRef.current = goNext;
 
   const advanceToNextPhoto = useCallback(() => {
     setImageLoaded(false);
     goNext();
   }, [goNext]);
 
-  // Auto-align to cadence boundary on first photo load
-  const hasAutoAlignedRef = React.useRef(false);
-  useEffect(() => {
-    if (!currentPhotoPath || hasAutoAlignedRef.current) {
-      return;
-    }
-    hasAutoAlignedRef.current = true;
-    alignNextChangeToCadence();
-  }, [alignNextChangeToCadence, currentPhotoPath]);
-
   useEffect(() => {
     const nextSrc = getSlideshowPhotoSrc(getUpcomingPhoto());
-     
+
     setBufferedPhotoSrc(nextSrc);
   }, [currentPhotoPath?.path, getUpcomingPhoto, historyPosition.index, historyPosition.total]);
-
-  useEffect(() => {
-    if (isPaused || !currentPhotoPathRef.current) {
-      return;
-    }
-
-    const delayUntilNext = Math.max(0, nextChangeAt.getTime() - Date.now());
-    const id = window.setTimeout(() => {
-      goNext();
-    }, delayUntilNext);
-
-    return () => window.clearTimeout(id);
-  }, [goNext, isPaused, nextChangeAt]);
-
-  useEffect(() => {
-    if (isPaused) {
-      const remaining = Math.max(0, nextChangeAt.getTime() - Date.now());
-      pausedRemainingMsRef.current = remaining;
-       
-      setSecondsLeft(remaining / 1000);
-      return;
-    }
-
-    if (pausedRemainingMsRef.current !== null) {
-      const remaining = pausedRemainingMsRef.current;
-      pausedRemainingMsRef.current = null;
-      setNextChangeAt(new Date(Date.now() + remaining));
-      setSecondsLeft(remaining / 1000);
-    }
-  }, [isPaused, nextChangeAt]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -1267,33 +1215,6 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [advanceToNextPhoto, goPrevious, togglePaused]);
-
-  useEffect(() => {
-    // The per-second tick only drives on-screen UI: the countdown in the
-    // toolbar and the optional clock. When neither is visible there is nothing
-    // to update, so skip the interval entirely — otherwise a long-running
-    // kiosk session re-renders the whole (large) tree once a second for
-    // nothing. Slide advancement is driven by the separate nextChangeAt
-    // timer, not this display tick.
-    if (!controlsVisible && !showClock) {
-      return;
-    }
-
-    const tick = () => {
-      const pausedRemaining = pausedRemainingMsRef.current;
-      setSecondsLeft(
-        pausedRemaining !== null
-          ? pausedRemaining / 1000
-          : (nextChangeAt.getTime() - Date.now()) / 1000,
-      );
-      setTime(new Date());
-    };
-    // Update immediately so values are fresh the moment they become visible.
-    tick();
-    const id = setInterval(tick, 1000);
-    return () => clearInterval(id);
-  }, [controlsVisible, nextChangeAt, showClock]);
-
 
   useEffect(() => {
     const fullscreenDocument = document as FullscreenDocument;

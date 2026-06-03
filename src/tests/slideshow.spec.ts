@@ -170,6 +170,43 @@ test.describe("Slideshow", () => {
     await expect(resumeButton).toHaveAttribute("aria-pressed", "true");
   });
 
+  test("auto-advances to the next photo after the configured delay", async ({
+    page,
+  }) => {
+    // delay=1 → a 1-second cadence; align-cadence is off (beforeEach) so the
+    // advance timer is a plain now+delay.
+    await page.goto("/slideshow?mode=random&filter=test-simple&delay=1", {
+      waitUntil: "domcontentloaded",
+    });
+    await waitForSlideshow(page);
+
+    const image = page.locator(slideshowImg).first();
+    const firstSrc = await image.getAttribute("src");
+
+    // The cadence timer should advance with no user interaction.
+    await waitForImageChange(page, String(firstSrc));
+    expect(await image.getAttribute("src")).not.toBe(firstSrc);
+  });
+
+  test("pausing stops the auto-advance", async ({ page }) => {
+    await page.goto("/slideshow?mode=random&filter=test-simple&delay=1", {
+      waitUntil: "domcontentloaded",
+    });
+    await waitForSlideshow(page);
+
+    const image = page.locator(slideshowImg).first();
+
+    await revealControls(page);
+    await page.locator('button:has-text("Pause")').click();
+    // Confirm pause took effect (timer torn down) before sampling the src.
+    await expect(page.locator('button:has-text("Resume")')).toBeVisible();
+
+    const pausedSrc = await image.getAttribute("src");
+    // Well past the 1s cadence: a running timer would have advanced by now.
+    await page.waitForTimeout(2500);
+    expect(await image.getAttribute("src")).toBe(pausedSrc);
+  });
+
   test("timing controls work", async ({ page }) => {
     await page.goto("/slideshow", { waitUntil: "domcontentloaded" });
     await waitForSlideshow(page);
