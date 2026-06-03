@@ -55,13 +55,22 @@ import {
   rollRemixLayoutCount,
   rollRemixStrategy,
   timeAwareShufflePhotos,
-  VECTOR_REMIX_STRATEGIES,
 } from "../../util/slideshowAmbient";
 import { BUILD_VERSION } from "../../lib/buildVersion";
 import { useWakeLock } from "../../components/useWakeLock";
+import { decideBuildUpdate, decideDbUpdateAction } from "../../util/kioskRefresh";
+import {
+  decideRemixPlan,
+  mapVectorRemixResult,
+} from "../../util/slideshowRemix";
+import {
+  applySlideshowUrlState,
+  buildSlideshowPermalink,
+  parseSlideshowSearchParams,
+  SlideshowMode,
+} from "../../util/slideshowUrl";
 
 type PageProps = {};
-type SlideshowMode = "random" | "weighted" | "similar";
 const CONTROLS_AUTO_HIDE_MS = 3000;
 const TOUCH_CONTROLS_AUTO_HIDE_MS = 30000;
 const VERSION_POLL_MS = 300000;
@@ -140,11 +149,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
           return;
         }
         const manifest = (await response.json()) as VersionManifest;
-        const latestBuildVersion = manifest.buildVersion?.trim();
-        if (
-          latestBuildVersion &&
-          latestBuildVersion !== buildVersionRef.current
-        ) {
+        if (decideBuildUpdate(manifest.buildVersion, buildVersionRef.current)) {
           reloadCurrentPage();
         }
       } catch (error) {
@@ -221,21 +226,25 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
           return;
         }
 
-        // Seed on the first observation so a fresh page load doesn't
-        // immediately mistake "I've never seen this header before" for an update.
-        if (lastDbVersionRef.current === null) {
-          lastDbVersionRef.current = version;
+        const action = decideDbUpdateAction({
+          observedVersion: version,
+          lastVersion: lastDbVersionRef.current,
+          wakeLockHeld: !!wakeLockRef.current,
+        });
+
+        if (action === "none") {
           return;
         }
 
-        if (version === lastDbVersionRef.current) {
-          return;
-        }
-
-        // The DB on disk has changed.
+        // Record the observed version for seed/refresh/reload alike. The
+        // "seed" case (first observation) stops here so a fresh page load
+        // doesn't mistake "never seen this header before" for an update.
         lastDbVersionRef.current = version;
+        if (action === "seed") {
+          return;
+        }
 
-        if (wakeLockRef.current) {
+        if (action === "refresh-in-place") {
           // Active kiosk session — refresh the photo pool in place so we
           // never tear down the document and lose the wake lock. The next
           // queue refill will pick up the new pool.
@@ -253,11 +262,12 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
             recentPhotoPathsRef.current = [];
             setPoolStats(computePoolStats(photos));
           }
-        } else {
-          // Wake lock isn't held — reload is cheap and gives us a fully
-          // clean re-init of sql.js-httpvfs cached pages too.
-          reloadCurrentPage();
+          return;
         }
+
+        // action === "reload": no wake lock held — a full reload is cheap and
+        // gives us a clean re-init of sql.js-httpvfs cached pages too.
+        reloadCurrentPage();
       } catch (error) {
         console.error("DB update check failed", error);
       }
@@ -496,13 +506,11 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
 
   const updateSlideshowUrl = useCallback(
     (mode: SlideshowMode, delayMs = timeDelayRef.current) => {
-      const url = new URL(window.location.toString());
-      url.searchParams.set("mode", mode);
-      url.searchParams.set("delay", String(delayMs / 1000));
-      url.searchParams.delete("photo");
-      url.searchParams.delete("seed");
-
-      window.history.replaceState(window.history.state, "", url.toString());
+      window.history.replaceState(
+        window.history.state,
+        "",
+        applySlideshowUrlState(window.location.toString(), { mode, delayMs }),
+      );
     },
     [],
   );
@@ -554,116 +562,55 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
    *   /?mode=weighted&filter=japan                    Recent-biased weighted shuffle for one album
    *   /?mode=similar&filter=japan&shuffle=50          Similar mode, avoid the last 50 photos
    */
-  // Parse URL search params to configure slideshow
+  // Parse URL search params to configure slideshow. The pure parser lives in
+  // util/slideshowUrl; this effect just fans the parsed values out to the
+  // React setters/refs (applying each only when present — null means absent).
   useEffect(() => {
-    const url = new URL(window.location.toString());
+    const parsed = parseSlideshowSearchParams(
+      window.location.search,
+      slideshowMode,
+    );
 
-    // Helper to parse boolean-like values from URL params
-    const parseBool = (value: string | null): boolean | null => {
-      if (value === null) return null;
-      return ["1", "true", "yes", "on"].includes(value.toLowerCase());
-    };
-
-    // Helper to parse numeric values
-    const parseNum = (value: string | null): number | null => {
-      if (value === null) return null;
-      const num = parseInt(value, 10);
-      return isNaN(num) ? null : num;
-    };
-
-    // Parse filter (already supported)
-    const searchFilter = url.searchParams.get("filter");
-    if (searchFilter) {
-       
-      setFilter(searchFilter);
+    if (parsed.filter) {
+      setFilter(parsed.filter);
     }
 
-    const modeParam = url.searchParams.get("mode");
-    initialPhotoPathRef.current =
-      url.searchParams.get("photo") ?? url.searchParams.get("seed");
-    const nextMode =
-      modeParam === "random" ||
-      modeParam === "weighted" ||
-      modeParam === "similar"
-        ? modeParam
-        : slideshowMode;
-    randomSimilarRequestedRef.current =
-      nextMode === "similar" &&
-      ["1", "true", "yes", "on"].includes(
-        (url.searchParams.get("random") ?? "").toLowerCase(),
-      );
-    if (
-      modeParam === "random" ||
-      modeParam === "weighted" ||
-      modeParam === "similar"
-    ) {
-      setSlideshowMode(modeParam);
+    initialPhotoPathRef.current = parsed.initialPhotoPath;
+    randomSimilarRequestedRef.current = parsed.randomSimilar;
+    if (parsed.mode) {
+      setSlideshowMode(parsed.mode);
     }
 
-    // Parse clock setting
-    const clockParam = parseBool(url.searchParams.get("clock"));
-    if (clockParam !== null) {
-      setShowClock(clockParam);
+    if (parsed.clock !== null) {
+      setShowClock(parsed.clock);
     }
-
-    // Parse details setting
-    const detailsParam = parseBool(url.searchParams.get("details"));
-    if (detailsParam !== null) {
-      setShowDetails(detailsParam);
+    if (parsed.details !== null) {
+      setShowDetails(parsed.details);
     }
-
-    // Parse map setting
-    const mapParam = parseBool(url.searchParams.get("map"));
-    if (mapParam !== null) {
-      setShowMap(mapParam);
+    if (parsed.map !== null) {
+      setShowMap(parsed.map);
     }
-
-    // Parse cover setting (cover or contain mode)
-    const coverParam = parseBool(url.searchParams.get("cover"));
-    if (coverParam !== null) {
-      setShowCover(coverParam);
+    if (parsed.cover !== null) {
+      setShowCover(parsed.cover);
     }
-
-    // Time-of-day & season-aware bias toggle.
-    const timeParam = parseBool(url.searchParams.get("time"));
-    if (timeParam !== null) {
-      setTimeAware(timeParam);
+    if (parsed.timeAware !== null) {
+      setTimeAware(parsed.timeAware);
     }
-
-    // Occasional 2-/3-up "remix" slides.
-    const remixParam = parseBool(url.searchParams.get("remix"));
-    if (remixParam !== null) {
-      setRemixEnabled(remixParam);
+    if (parsed.remix !== null) {
+      setRemixEnabled(parsed.remix);
     }
-
-    // Snap each advance to wall-clock boundaries (default on). Tests and
-    // anyone wanting a strict "now + delay" cadence can pass align_cadence=0.
-    const alignCadenceParam = parseBool(url.searchParams.get("align_cadence"));
-    if (alignCadenceParam !== null) {
-      setAlignCadence(alignCadenceParam);
+    if (parsed.alignCadence !== null) {
+      setAlignCadence(parsed.alignCadence);
     }
-
-    // Parse details alignment setting
-    const alignmentParam = url.searchParams.get("align");
-    if (
-      alignmentParam &&
-      ["left", "center", "right"].includes(alignmentParam)
-    ) {
-      setDetailsAlignment(alignmentParam as "left" | "center" | "right");
+    if (parsed.alignment) {
+      setDetailsAlignment(parsed.alignment);
     }
-
-    // Parse time delay in seconds and convert to milliseconds
-    const delayParam = parseNum(url.searchParams.get("delay"));
-    if (delayParam !== null && delayParam > 0) {
-      const delayMs = delayParam * 1000;
-      timeDelayRef.current = delayMs;
-      setTimeDelay(delayMs);
+    if (parsed.delayMs !== null) {
+      timeDelayRef.current = parsed.delayMs;
+      setTimeDelay(parsed.delayMs);
     }
-
-    // Parse shuffle history size
-    const historyParam = parseNum(url.searchParams.get("shuffle"));
-    if (nextMode === "similar" && historyParam !== null && historyParam > 0) {
-      setShuffleHistorySize(historyParam);
+    if (parsed.shuffleHistory !== null) {
+      setShuffleHistorySize(parsed.shuffleHistory);
     }
 
     setHasParsedInitialUrl(true);
@@ -710,100 +657,94 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
 
       // Remix decision: only on forward advance (allowRemix), never on history
       // navigation or initial seed. Compute companions+strategy BEFORE pushing
-      // the history entry so Previous/Next can replay the full layout.
+      // the history entry so Previous/Next can replay the full layout. The pure
+      // decision lives in util/slideshowRemix; this shell owns the one-shot
+      // forced flag, the async vector fetch and all setState/history patching.
       let companions: RandomPhotoRow[] = [];
       let strategy: RemixStrategy | null = null;
-      if (opts?.allowRemix && (forceRemixRef.current || remixEnabled)) {
-        const wasForced = forceRemixRef.current;
-        let count: 0 | 1 | 2 | 3 = 0;
-        if (wasForced) {
-          // User pressed "Remix now" or dragged up: bypass the remix-vs-no-
-          // remix dice but share the same 70/25/5 layout distribution as
-          // organic remixes via rollRemixLayoutCount (single source of truth).
-          forceRemixRef.current = false;
-          count = rollRemixLayoutCount();
-        } else {
-          count = decideRemixCompanionCount(REMIX_PROBABILITY);
-        }
-        if (count > 0) {
-          // One weighted roll decides everything. If the result is a
-          // SigLIP-backed strategy (`similar` / `juxtapose`), resolve it via
-          // the async embeddings fetch; otherwise hand the rolled strategy to
-          // the sync filter chain. Forced remixes use the same weights as
-          // organic ones — the embeddings DB is eagerly loaded when remix is
-          // on (so the vector fetch is a fast local query), and the async path
-          // shows the seed immediately and patches companions in when ready.
-          const rolled = rollRemixStrategy();
-          const vectorReady = !!(database && embeddingsDatabase);
 
-          if (VECTOR_REMIX_STRATEGIES.has(rolled) && vectorReady) {
-            // Async vector path. The history entry starts with no companions
-            // and the chosen strategy; the fetch resolves later and patches
-            // both the live state and the recorded history entry.
-            const isAntiSimilar = rolled === "juxtapose";
-            strategy = rolled;
-            const seedPath = candidatePhoto.path;
-            const desiredCount = count;
+      // Consume the one-shot forced flag here (decideRemixPlan stays pure and
+      // takes `forced` as a value) — same condition/timing as before: a
+      // forward advance that will consider a remix.
+      const forced = forceRemixRef.current;
+      if (opts?.allowRemix && forced) {
+        forceRemixRef.current = false;
+      }
 
-            void (async () => {
-              try {
-                const result = await fetchSimilarResults({
-                  database,
-                  embeddingsDatabase,
-                  path: seedPath,
-                  similarityOrder: isAntiSimilar ? "least" : "most",
-                  page: 1,
-                  pageSize: desiredCount * 4,
-                });
-                // Stale guard: if the user has advanced past this slide while
-                // we were fetching, drop the result on the floor.
-                if (currentPhotoPathRef.current?.path !== seedPath) return;
+      const plan = decideRemixPlan({
+        allowRemix: !!opts?.allowRemix,
+        forced,
+        remixEnabled,
+        vectorReady: !!(database && embeddingsDatabase),
+        probability: REMIX_PROBABILITY,
+        rollLayoutCount: rollRemixLayoutCount,
+        decideCount: decideRemixCompanionCount,
+        rollStrategy: rollRemixStrategy,
+      });
 
-                const pool = randomPhotoPoolRef.current;
-                const fetched: RandomPhotoRow[] = [];
-                for (const item of result.data) {
-                  if (fetched.length >= desiredCount) break;
-                  const match = pool.find((p) => p.path === item.path);
-                  if (match) fetched.push(match);
-                }
-                if (fetched.length === 0) return;
+      if (plan.kind === "vector") {
+        // Async vector path. The history entry starts with no companions and
+        // the chosen strategy; the fetch resolves later and patches both the
+        // live state and the recorded history entry.
+        strategy = plan.strategy;
+        const seedPath = candidatePhoto.path;
+        const desiredCount = plan.count;
+        const isAntiSimilar = plan.isAntiSimilar;
 
-                // Capture the top candidate's similarity score for the
-                // remix badge — it's the only descriptor for vector strategies.
-                const topSimilarity = result.data[0]?.similarity ?? null;
+        void (async () => {
+          // plan.kind === "vector" already implies both DBs are present
+          // (decideRemixPlan only returns vector when vectorReady); this guard
+          // also narrows the captured consts to non-null for TS.
+          if (!database || !embeddingsDatabase) return;
+          try {
+            const result = await fetchSimilarResults({
+              database,
+              embeddingsDatabase,
+              path: seedPath,
+              similarityOrder: isAntiSimilar ? "least" : "most",
+              page: 1,
+              pageSize: desiredCount * 4,
+            });
+            // Stale guard: if the user has advanced past this slide while we
+            // were fetching, drop the result on the floor.
+            if (currentPhotoPathRef.current?.path !== seedPath) return;
 
-                setRemixCompanions(fetched);
-                setRemixVectorScore(topSimilarity);
-                // Patch the recorded history entry so Previous/Next replays
-                // with the same companions and score after the async resolve.
-                const entry = navigationHistoryRef.current.find(
-                  (e) => e.seed.path === seedPath,
-                );
-                if (entry) {
-                  entry.companions = fetched;
-                  entry.vectorScore = topSimilarity;
-                }
-              } catch (err) {
-                console.error("Vector remix fetch failed", err);
-              }
-            })();
-          } else {
-            // Sync path. If a vector strategy was rolled but embeddings
-            // aren't ready, pickRemixCompanions ignores it (vector filters
-            // return []) and the fallback walk picks the best available
-            // sync strategy instead, so the slide never stalls.
-            const pick = pickRemixCompanions(
-              candidatePhoto,
-              randomPhotoPoolRef.current,
-              count,
-              Math.random,
-              rolled,
+            const mapped = mapVectorRemixResult({
+              resultData: result.data,
+              pool: randomPhotoPoolRef.current,
+              desiredCount,
+            });
+            if (mapped.companions.length === 0) return;
+
+            setRemixCompanions(mapped.companions);
+            setRemixVectorScore(mapped.topSimilarity);
+            // Patch the recorded history entry so Previous/Next replays with
+            // the same companions and score after the async resolve.
+            const entry = navigationHistoryRef.current.find(
+              (e) => e.seed.path === seedPath,
             );
-            if (pick.companions.length > 0) {
-              companions = pick.companions;
-              strategy = pick.strategy;
+            if (entry) {
+              entry.companions = mapped.companions;
+              entry.vectorScore = mapped.topSimilarity;
             }
+          } catch (err) {
+            console.error("Vector remix fetch failed", err);
           }
+        })();
+      } else if (plan.kind === "sync") {
+        // Sync path. If a vector strategy was rolled but embeddings aren't
+        // ready, decideRemixPlan already routed here; pickRemixCompanions
+        // walks to the best available sync strategy so the slide never stalls.
+        const pick = pickRemixCompanions(
+          candidatePhoto,
+          randomPhotoPoolRef.current,
+          plan.count,
+          Math.random,
+          plan.strategy,
+        );
+        if (pick.companions.length > 0) {
+          companions = pick.companions;
+          strategy = pick.strategy;
         }
       }
 
@@ -1867,13 +1808,12 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
       return null;
     }
 
-    const url = new URL("/slideshow", window.location.origin);
-    url.searchParams.set("mode", slideshowMode);
-    if (filter) {
-      url.searchParams.set("filter", filter);
-    }
-    url.searchParams.set("photo", photoPath);
-    return url.toString();
+    return buildSlideshowPermalink({
+      origin: window.location.origin,
+      mode: slideshowMode,
+      photoPath,
+      ...(filter ? { filter } : {}),
+    });
   }, [filter, slideshowMode]);
 
   const copyCurrentPhotoLink = useCallback(async () => {
