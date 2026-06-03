@@ -16,12 +16,6 @@ import styles from "./slideshow.module.css";
 import commonStyles from "../../styles/common.module.css";
 import { ThemeToggle } from "../../components/ThemeToggle";
 import { useLocalStorage } from "usehooks-ts";
-import { getRelativeTimeString } from "../../util/time";
-import {
-  extractDateFromExifString,
-  extractGPSFromExifString,
-} from "../../util/extractExifFromDb";
-import MMap from "../../components/Map";
 import { Seo } from "../../components/Seo";
 import { buildCollectionPageJsonLd } from "../../lib/seo";
 import { getPhotoAltText } from "../../lib/alt";
@@ -44,9 +38,6 @@ import {
 } from "../../util/slideshowQueue";
 import {
   decideRemixCompanionCount,
-  describeRemix,
-  getRemixSwatchRgb,
-  getTimeAffinityScore,
   pickRemixCompanions,
   RemixStrategy,
   rollRemixLayoutCount,
@@ -56,6 +47,7 @@ import {
 import { BUILD_VERSION } from "../../lib/buildVersion";
 import { useWakeLock } from "../../components/useWakeLock";
 import { SlideshowToolbar } from "../../components/slideshow/SlideshowToolbar";
+import { SlideshowBottomBar } from "../../components/slideshow/SlideshowBottomBar";
 import { decideBuildUpdate, decideDbUpdateAction } from "../../util/kioskRefresh";
 import {
   decideRemixPlan,
@@ -105,11 +97,6 @@ type VersionManifest = {
 // progress visuals, tap zones, click suppression. Mouse is handled separately.
 const isTouchOrPen = (pointerType: string): boolean =>
   pointerType === "touch" || pointerType === "pen";
-
-// Stable references for the slide map's style props so the memoised MMap can
-// skip re-rendering when only the coordinates are unchanged.
-const SLIDE_MAP_STYLE = { width: "100%", height: "100%" } as const;
-const SLIDE_MARKER_STYLE = { visibility: "hidden" } as const;
 
 const SlideshowPage: NextPage<PageProps> = (props) => {
   return <Slideshow />;
@@ -1897,200 +1884,9 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
 
   const photoAltText = getPhotoAltText(photoBlock, "Slideshow photo");
 
-  const extractGeocodeLabel = (geocode: string): string | null =>
-    geocode
-      ? geocode
-          .split("\n")
-          .slice(-3)
-          .filter((x) => Number.isNaN(parseFloat(x)))
-          .join(", ") || null
-      : null;
-
-  // Per-photo metadata for the whole slide (seed + any remix companions).
-  // Each photo gets its own description block rendered in the slide-bottom
-  // row, so the same component scales from 1 to N cells without aggregation.
+  // Seed photo plus any remix companions, in render order. Consumed by
+  // both the bottom-bar overlay and the image layer below.
   const slidePhotos = [currentPhotoPath, ...remixCompanions];
-  const slidePhotoMeta = slidePhotos.map((photo) => ({
-    path: photo.path,
-    date: extractDateFromExifString(photo.exif),
-    geocode: extractGeocodeLabel(photo.geocode),
-    coords: extractGPSFromExifString(photo.exif),
-  }));
-
-  // Per-photo description: just the geocode + date + (optionally) the
-  // time-affinity row. No chrome (map / clock / strategy badge) — those
-  // are slide-level and rendered once below.
-  const renderPhotoDescription = (
-    meta: (typeof slidePhotoMeta)[number],
-  ) => {
-    const photoDate = meta.date;
-    const photoGeocode = meta.geocode;
-    const photoRelative = photoDate ? getRelativeTimeString(photoDate) : null;
-
-    return (
-      <div
-        className={[
-          styles.details,
-          styles.displaySetting,
-          showDetails ? styles.displaySettingActive : "",
-        ].join(" ")}
-      >
-        {photoGeocode ? (
-          <div className={styles.detailsRow}>{photoGeocode}</div>
-        ) : (
-          <div className={styles.detailsRow}>&nbsp;</div>
-        )}
-
-        {photoDate ? (
-          <div className={styles.detailsRow}>
-            {photoRelative ? `${photoRelative} · ` : ""}
-            {photoDate.toLocaleDateString(undefined, {
-              year: "numeric",
-              month: "long",
-            })}
-          </div>
-        ) : (
-          <div className={styles.detailsRow}>&nbsp;</div>
-        )}
-
-        {timeAware && photoDate ? (
-          <div
-            className={[styles.detailsRow, styles.detailsAffinity].join(" ")}
-          >
-            🌅 {Math.round(getTimeAffinityScore(photoDate) * 100)}% match
-          </div>
-        ) : null}
-      </div>
-    );
-  };
-
-  // Map zone (placed above descriptions in the grid). The actual MMap
-  // (which is a heavy WebGL context) is only mounted when `mountMap` is
-  // true — the text layer of the dual-render passes false so it just
-  // gets the empty wrapper for layout parity. That cuts the per-slide
-  // WebGL context lifecycles in half on a long-running sideboard session.
-  const renderSlideMap = (mountMap: boolean) => {
-    const allCoords = slidePhotoMeta
-      .map((m) => m.coords)
-      .filter((c): c is [number, number] => !!c);
-    if (allCoords.length === 0) return null;
-    return (
-      <div
-        className={[
-          styles.mapContainer,
-          styles.displaySetting,
-          showMap ? styles.displaySettingActive : "",
-        ].join(" ")}
-        style={{ mixBlendMode: "screen" }}
-      >
-        {mountMap ? (
-          <MMap
-            coordinates={allCoords.length === 1 ? allCoords[0] : allCoords}
-            attribution={false}
-            details={false}
-            style={SLIDE_MAP_STYLE}
-            mapStyle="toner-v2"
-            projection="vertical-perspective"
-            markerStyle={SLIDE_MARKER_STYLE}
-          />
-        ) : null}
-      </div>
-    );
-  };
-
-  // Clock zone (placed below descriptions). Optionally includes the
-  // remix strategy badge above the time/date.
-  const renderSlideClock = () => {
-    const remixStrategyLabel: Record<RemixStrategy, string> = {
-      "same-album": "from this album",
-      "same-year": "from the same year",
-      "same-decade": "from the same decade",
-      "same-region": "from the same region",
-      "same-country": "from the same country",
-      "same-city": "from the same city",
-      "same-day-of-year": "from this exact date, other years",
-      "dominant-colour": "sharing this colour",
-      anniversary: "from this week, other years",
-      proximity: "shot nearby",
-      "golden-hour": "shot at golden hour",
-      juxtapose: "deliberately juxtaposed",
-      "shared-camera": "shot through the same lens",
-      similar: "visually similar",
-      random: "picked at random",
-    };
-    const isRemix = remixCompanions.length > 0;
-    const remixDescriptor =
-      isRemix && remixStrategy ? describeRemix(remixStrategy, slidePhotos) : null;
-    const remixSwatch =
-      isRemix && remixStrategy
-        ? getRemixSwatchRgb(remixStrategy, slidePhotos)
-        : null;
-    // Cosine similarity from SigLIP is almost always in [0, 1] for normalised
-    // image embeddings, but the contract isn't strictly bounded — clamp before
-    // percent-rounding so a stray negative score can't render as "105% distance".
-    const clampPercent = (value: number): number =>
-      Math.max(0, Math.min(100, Math.round(value * 100)));
-    const vectorScoreLabel =
-      isRemix &&
-      (remixStrategy === "similar" || remixStrategy === "juxtapose") &&
-      remixVectorScore !== null
-        ? remixStrategy === "similar"
-          ? `${clampPercent(remixVectorScore)}% match`
-          : // For juxtapose the cosine is low; surface it as a "distance"
-            // reading so the framing matches the strategy intent.
-            `${clampPercent(1 - remixVectorScore)}% distance`
-        : null;
-    return (
-      <>
-        {isRemix && remixStrategy ? (
-          <div
-            className={[styles.detailsRow, styles.detailsAffinity].join(" ")}
-          >
-            ◫ Remix · {slidePhotos.length} photos{" "}
-            {remixStrategyLabel[remixStrategy]}
-            {remixSwatch ? (
-              <>
-                {" "}
-                <span
-                  className={styles.remixSwatch}
-                  aria-hidden="true"
-                  style={{
-                    backgroundColor: `rgb(${remixSwatch[0]}, ${remixSwatch[1]}, ${remixSwatch[2]})`,
-                  }}
-                />
-              </>
-            ) : null}
-            {remixDescriptor ? ` · ${remixDescriptor}` : ""}
-            {vectorScoreLabel ? ` · ${vectorScoreLabel}` : ""}
-          </div>
-        ) : null}
-
-        <div
-          className={[
-            styles.clock,
-            styles.displaySetting,
-            showClock ? styles.displaySettingActive : "",
-          ].join(" ")}
-        >
-          <div className={styles.time}>
-            {time.toLocaleTimeString(undefined, {
-              hour: "numeric",
-              minute: "numeric",
-              hour12: false,
-            })}
-          </div>
-          <div className={styles.date}>
-            {time.toLocaleDateString(undefined, {
-              weekday: "long",
-              year: "numeric",
-              month: "long",
-              day: "numeric",
-            })}
-          </div>
-        </div>
-      </>
-    );
-  };
 
   return (
     <>
@@ -2311,46 +2107,17 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
             Layer 2 has no blending; map cell is visibility:hidden, the
             text cells are visible. Net result: map blends with the photo,
             text/clock render with their full text-shadow intact. */}
-        {[true, false].map((isMapLayer) => (
-          <div
-            key={isMapLayer ? "map" : "text"}
-            className={styles.bottomBarStack}
-            data-count={slidePhotos.length}
-            data-align={detailsAlignment}
-            style={isMapLayer ? { mixBlendMode: "screen" } : undefined}
-          >
-            <div
-              className={styles.slideMap}
-              style={{
-                gridArea: "map",
-                visibility: isMapLayer ? "visible" : "hidden",
-              }}
-            >
-              {renderSlideMap(isMapLayer)}
-            </div>
-            {slidePhotos.map((photo, idx) => (
-              <div
-                key={`${photo.path}-${idx}`}
-                className={styles.descriptionCell}
-                style={{
-                  gridArea: `desc${idx}`,
-                  visibility: isMapLayer ? "hidden" : "visible",
-                }}
-              >
-                {renderPhotoDescription(slidePhotoMeta[idx])}
-              </div>
-            ))}
-            <div
-              className={styles.slideClock}
-              style={{
-                gridArea: "clock",
-                visibility: isMapLayer ? "hidden" : "visible",
-              }}
-            >
-              {renderSlideClock()}
-            </div>
-          </div>
-        ))}
+        <SlideshowBottomBar
+          slidePhotos={slidePhotos}
+          showDetails={showDetails}
+          showMap={showMap}
+          showClock={showClock}
+          timeAware={timeAware}
+          detailsAlignment={detailsAlignment}
+          remixStrategy={remixStrategy}
+          remixVectorScore={remixVectorScore}
+          time={time}
+        />
 
         {previousPhotoSrc ? (
           <img
@@ -2388,8 +2155,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
               advanceToNextPhoto();
             }}
           >
-            {slidePhotoMeta.map((_meta, idx) => {
-              const photo = slidePhotos[idx];
+            {slidePhotos.map((photo, idx) => {
               const isSeed = idx === 0;
               const src = isSeed
                 ? photoBlock.data.src
