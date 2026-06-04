@@ -1,7 +1,12 @@
 .page {
   display: flex;
   flex-direction: column;
-  min-height: 100dvh;
+  /* Definite height (not min-height) so the playing round's height:100% / fr
+     chain resolves — otherwise a portrait photo's `height: 100%` falls back to
+     its intrinsic aspect ratio and overflows the viewport vertically. Lobby and
+     summary, which can exceed the viewport, overflow this box and scroll the
+     document as usual. */
+  height: 100dvh;
   padding: var(--m-s) var(--m-l) var(--m-l);
 }
 
