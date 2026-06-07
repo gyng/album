@@ -3,7 +3,13 @@ set -euox pipefail
 
 uv run index.py index --glob "../albums/**/*.jpg" --dbpath "search.sqlite" --model-profile hybrid
 uv run index.py prune --glob "../albums/**/*.jpg" --dbpath "search.sqlite"
-uv run index.py search --query "burger" --dbpath "search.sqlite"
+# Smoke test: search must return results for the most common indexed tag
+# (whatever it currently is — guaranteed present), so a structurally broken FTS
+# index fails the build instead of silently publishing. A fixed query like
+# "burger" matched nothing here, and a 0-result query can't tell a working
+# search apart from a broken one.
+smoke_term=$(sqlite3 search.sqlite "SELECT tag FROM tags ORDER BY count DESC LIMIT 1;")
+uv run index.py search --query "$smoke_term" --dbpath "search.sqlite" --min-results 1
 sqlite3 search.sqlite "VACUUM;"
 uv run python - <<'PY'
 import shutil

@@ -2466,11 +2466,24 @@ def prune(glob: str, dbpath: str, dry_run: bool):
 @click.option("--dbpath", default="testdb.sqlite", help="sqlite database path to use.")
 @click.option("--query", default="", help="Search query.")
 @click.option("--limit", default=None, help="Search query limit.")
-def search(dbpath: str, query: str, limit: Optional[int]):
+@click.option(
+    "--min-results",
+    type=int,
+    default=0,
+    help="Exit non-zero if fewer than this many results are returned. Use as a "
+    "post-build smoke test so a structurally broken FTS index fails loudly "
+    "instead of silently returning nothing.",
+)
+def search(dbpath: str, query: str, limit: Optional[int], min_results: int):
     db = Sqlite3Client(dbpath)
     db.setup_tables()
     results = db.search(query, limit)
     pprint.pprint(results)
+    if len(results) < min_results:
+        raise click.ClickException(
+            f"search for {query!r} returned {len(results)} result(s), "
+            f"expected at least {min_results}"
+        )
 
 
 @cli.command("search-tags")

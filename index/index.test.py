@@ -486,6 +486,26 @@ class TestCli(unittest.TestCase):
         self.assertEqual(0, result.exit_code)
         self.assertTrue("[]" in result.output)
 
+    def test_search_min_results_pass(self):
+        runner = CliRunner()
+        dbpath = "./testexists.sqlite"
+
+        result = runner.invoke(
+            search, f"--query plant --dbpath {dbpath} --min-results 1".split()
+        )
+
+        self.assertEqual(0, result.exit_code)
+
+    def test_search_min_results_fail(self):
+        runner = CliRunner()
+        dbpath = "./testexists.sqlite"
+
+        result = runner.invoke(
+            search, f"--query randomstring --dbpath {dbpath} --min-results 1".split()
+        )
+
+        self.assertNotEqual(0, result.exit_code)
+
     def test_search_tags(self):
         runner = CliRunner()
         dbpath = "./testexists.sqlite"
