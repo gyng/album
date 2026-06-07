@@ -10,6 +10,8 @@ import typing
 from PIL import Image
 from typing import IO, Mapping, Optional, Tuple
 import os
+import fcntl
+import gc
 import json
 import re
 import math
@@ -18,6 +20,7 @@ import statistics
 import random
 import subprocess
 import shutil
+import threading
 from contextlib import contextmanager
 
 from transformers import (
@@ -36,6 +39,116 @@ def log(message: str) -> None:
     """Print an indexing progress line prefixed with an ISO 8601 local-tz timestamp."""
     stamp = datetime.now().astimezone().isoformat(timespec="seconds")
     print(f"[{stamp}] {message}", flush=True)
+
+
+def acquire_single_instance_lock(dbpath: str) -> int:
+    """Take an advisory lock so two index runs can't share one GPU / DB file.
+
+    Two concurrent runs against the same database would contend for GPU VRAM
+    (deadlocking mid-batch once the card fills up) and write the same SQLite
+    file at once. The lock is keyed to the database path and held for the
+    lifetime of the process; the OS releases it automatically on exit —
+    including crash or ``kill -9`` — so there is no stale lock to clean up the
+    way a PID file would leave behind.
+
+    Returns the held file descriptor (kept open intentionally). Raises
+    ``click.ClickException`` if another run already holds the lock.
+    """
+    lock_path = f"{dbpath}.lock"
+    fd = os.open(lock_path, os.O_RDWR | os.O_CREAT, 0o644)
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        try:
+            holder = os.pread(fd, 64, 0).decode(errors="replace").strip()
+        except OSError:
+            holder = ""
+        os.close(fd)
+        raise click.ClickException(
+            f"Another index run is already using {dbpath} (PID {holder or 'unknown'}). "
+            "Two runs would contend for the GPU and write the same SQLite file. "
+            "Wait for it to finish or kill it, then retry."
+        )
+    os.ftruncate(fd, 0)
+    os.write(fd, str(os.getpid()).encode())
+    return fd
+
+
+def log_gpu_status() -> None:
+    """Log GPU name and free/total VRAM, warning if too little is free.
+
+    A run that is about to OOM or stall on a full card looks identical to a
+    healthy one until it hangs — surfacing free VRAM up front makes the cause
+    visible (e.g. another process, or a leaked CUDA context, holding memory)."""
+    if not torch.cuda.is_available():
+        log("CUDA not available — running on CPU")
+        return
+    free, total = torch.cuda.mem_get_info()
+    log(
+        f"GPU: {torch.cuda.get_device_name(0)} — "
+        f"{(total - free) / 1e9:.1f}/{total / 1e9:.1f} GB used, {free / 1e9:.1f} GB free"
+    )
+    if free < 2e9:
+        log(
+            "WARNING: under 2 GB GPU free — model loading may OOM or stall. "
+            "Check for another process holding VRAM (nvidia-smi)."
+        )
+
+
+def log_vram(label: str) -> None:
+    """Log GPU memory after a step: what this run holds vs how full the card is.
+
+    ``allocated`` is live tensors, ``reserved`` is the caching allocator's total
+    hold; ``used/total card-wide`` is the figure that decides whether we tip over
+    into slow shared system memory on WSL2 (the driver spills instead of OOMing).
+    Use after each model load and inference phase to see where VRAM actually goes."""
+    if not torch.cuda.is_available():
+        return
+    allocated = torch.cuda.memory_allocated() / 1e9
+    reserved = torch.cuda.memory_reserved() / 1e9
+    free, total = torch.cuda.mem_get_info()
+    log(
+        f"  VRAM after {label}: {allocated:.2f} GB tensors / {reserved:.2f} GB reserved "
+        f"(this run) · {(total - free) / 1e9:.2f}/{total / 1e9:.2f} GB used card-wide, "
+        f"{free / 1e9:.2f} GB free"
+    )
+
+
+def log_vram_peak() -> None:
+    """Report the high-water mark of this run's GPU allocation across all phases.
+
+    The peak is what determines spill, not the steady-state — a batch's transient
+    activations can briefly dwarf the resident model weights."""
+    if not torch.cuda.is_available():
+        return
+    log(
+        f"Peak VRAM this run: {torch.cuda.max_memory_allocated() / 1e9:.2f} GB tensors / "
+        f"{torch.cuda.max_memory_reserved() / 1e9:.2f} GB reserved"
+    )
+
+
+@contextmanager
+def heartbeat(label: str, interval_s: float = 15.0):
+    """Emit a periodic "still running" line while a long, silent call runs.
+
+    A single GPU ``generate()`` can run for many seconds with no output, which
+    is indistinguishable from a hang to someone watching the terminal. A moving
+    elapsed counter means it's alive; a frozen one means investigate."""
+    stop = threading.Event()
+    started = time.perf_counter()
+
+    def _beat() -> None:
+        while not stop.wait(interval_s):
+            elapsed = time.perf_counter() - started
+            log(f"  {label} still running… {elapsed:.0f}s elapsed")
+
+    thread = threading.Thread(target=_beat, daemon=True)
+    thread.start()
+    try:
+        yield
+    finally:
+        stop.set()
+        thread.join(timeout=1.0)
 
 
 MODEL_PROFILE_JANUS = "janus"
@@ -204,6 +317,38 @@ def parse_janus_response(raw_result: str) -> Mapping[str, typing.Any]:
     return parse_classifier_response(raw_result)
 
 
+def parse_caption_with_retry(
+    classifier: "BaseCaptionClassifier",
+    path: str,
+    geocode: Optional[Mapping],
+    raw_caption: str,
+    max_attempts: int = 20,
+) -> Mapping[str, typing.Any]:
+    """Parse a batched Janus caption, re-running the live model on parse failure.
+
+    Janus occasionally emits malformed JSON; a fresh sampled prediction usually
+    parses. This retry must run while the classifier is still loaded — the
+    one-model-per-pass design releases it before per-image assembly — so it lives
+    here in the Janus pass rather than in analyse_image. The first attempt uses
+    the batched ``raw_caption``; subsequent attempts call ``classifier.predict``.
+    Returns the parsed result dict, or ``{}`` once attempts are exhausted."""
+    raw_result = raw_caption
+    for attempt in range(max_attempts):
+        try:
+            return parse_classifier_response(raw_result)
+        except Exception:
+            log(
+                f"Caption parse attempt {attempt + 1}/{max_attempts} failed for {path}, got {raw_result}"
+            )
+            if attempt + 1 >= max_attempts:
+                log(
+                    f"Failed to classify {path} after {max_attempts} attempts, skipping."
+                )
+                return {}
+            raw_result = classifier.predict(path=path, geocode=geocode)
+    return {}
+
+
 def filter_exif_for_search(
     exif: Optional[Mapping[str, typing.Any]],
 ) -> Mapping[str, typing.Any]:
@@ -234,6 +379,26 @@ class BaseCaptionClassifier:
 
     def predict_batch(self, items: list[tuple[str, Optional[Mapping]]]) -> list[str]:
         return [self.predict(path, geocode) for path, geocode in items]
+
+    def release(self) -> None:
+        """Free GPU memory held by this model so the next pass can load alone.
+
+        Drops every attribute a subclass might have put weights in, then forces a
+        GC pass (nn.Module graphs are reference cycles) and empties the CUDA cache.
+        Idempotent and safe on a never-initialised or CPU-only (GGUF) instance."""
+        for attr in (
+            "vl_gpt",
+            "model",
+            "vl_chat_processor",
+            "processor",
+            "tokenizer",
+            "_load_pil_images",
+        ):
+            if hasattr(self, attr):
+                setattr(self, attr, None)
+        gc.collect()
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
 
 
 class JanusClassifier(BaseCaptionClassifier):
@@ -343,7 +508,9 @@ class JanusClassifier(BaseCaptionClassifier):
             all_embeds.append(embeds)
             all_masks.append(prepare_inputs.attention_mask)
             prep_ms = (time.perf_counter() - prep_started_at) * 1000
-            log(f"    prepped {idx}/{len(items)} in {prep_ms:.0f}ms ({os.path.basename(path)})")
+            log(
+                f"    prepped {idx}/{len(items)} in {prep_ms:.0f}ms ({os.path.basename(path)})"
+            )
 
         log(f"    generating {len(items)} caption(s)...")
         generate_started_at = time.perf_counter()
@@ -735,6 +902,14 @@ class BaseImageEmbedder:
         features = torch.nn.functional.normalize(features, p=2, dim=-1)
         return features.detach().float().cpu().tolist()
 
+    def release(self) -> None:
+        """Free the embedder's GPU weights so the next pass loads into a clear card."""
+        self.model = None
+        self.processor = None
+        gc.collect()
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+
 
 class SiglipEmbedder(BaseImageEmbedder):
     MODEL_ID = "google/siglip-base-patch16-224"
@@ -882,7 +1057,9 @@ class Sqlite3Client:
                 "SELECT path, COALESCE(model_id, ''), embedding_dim, embedding_json FROM embeddings_legacy"
             )
             cur.execute("DROP TABLE embeddings_legacy")
-        cur.execute("CREATE INDEX IF NOT EXISTS idx_embeddings_path ON embeddings(path)")
+        cur.execute(
+            "CREATE INDEX IF NOT EXISTS idx_embeddings_path ON embeddings(path)"
+        )
         # Optimise loads from the browser https://github.com/phiresky/sql.js-httpvfs#readme
         cur.execute("PRAGMA journal_mode = delete;")
         cur.execute("PRAGMA page_size = 1024;")
@@ -1251,6 +1428,52 @@ def cli(ctx):
     ctx.ensure_object(dict)
 
 
+def run_embedding_pass(
+    embedder: BaseImageEmbedder,
+    paths: list[str],
+    precomputed_embeddings: dict[str, dict[str, list[float]]],
+) -> float:
+    """Load one embedder, embed all ``paths`` in batches, store results, release it.
+
+    Holds only this single embedder in VRAM — the caller releases the previous
+    model first — so peak stays at one model. Mutates ``precomputed_embeddings``
+    in place (path → {model_id: vector}) and returns the model-load time in ms."""
+    load_started_at = time.perf_counter()
+    embedder.init_model()
+    load_ms = (time.perf_counter() - load_started_at) * 1000
+    log_vram(f"{embedder.model_id} load")
+
+    total_emb_batches = math.ceil(len(paths) / EMBEDDER_BATCH_SIZE)
+    log(
+        f"Running {embedder.model_id} embeddings in batches of {EMBEDDER_BATCH_SIZE} ({len(paths)} images, {total_emb_batches} batch(es))..."
+    )
+    emb_started_at = time.perf_counter()
+    for emb_batch_index, batch_start in enumerate(
+        range(0, len(paths), EMBEDDER_BATCH_SIZE), start=1
+    ):
+        batch_paths = paths[batch_start : batch_start + EMBEDDER_BATCH_SIZE]
+        log(
+            f"  {embedder.model_id} batch {emb_batch_index}/{total_emb_batches} starting ({len(batch_paths)} images)..."
+        )
+        single_started_at = time.perf_counter()
+        with heartbeat(
+            f"{embedder.model_id} batch {emb_batch_index}/{total_emb_batches}"
+        ):
+            batch_embeddings = embedder.predict_image_embeddings_batch(batch_paths)
+        for path, embedding in zip(batch_paths, batch_embeddings):
+            precomputed_embeddings.setdefault(path, {})[embedder.model_id] = embedding
+        single_ms = (time.perf_counter() - single_started_at) * 1000
+        done = min(batch_start + EMBEDDER_BATCH_SIZE, len(paths))
+        log(
+            f"  {embedder.model_id} batch {emb_batch_index}/{total_emb_batches} done in {single_ms:.0f}ms ({done}/{len(paths)} images)"
+        )
+    emb_ms = (time.perf_counter() - emb_started_at) * 1000
+    log(f"{embedder.model_id} embeddings complete in {emb_ms:.0f}ms")
+    log_vram(f"{embedder.model_id} inference")
+    embedder.release()
+    return load_ms
+
+
 @cli.command("index")
 @click.option("--glob", help="glob to recursively index.")
 @click.option("--dbpath", default="testdb.sqlite", help="sqlite database path to use.")
@@ -1324,6 +1547,9 @@ def index(
     classifier_low_impact: bool,
 ):
     started_at = time.perf_counter()
+    # Held for the lifetime of the process (OS releases it on exit) so a second
+    # run can't deadlock this one over GPU VRAM or co-write the same DB file.
+    acquire_single_instance_lock(dbpath)
     db = Sqlite3Client(dbpath)
     setup_started_at = time.perf_counter()
     db.setup_tables()
@@ -1377,10 +1603,54 @@ def index(
         log(f"Classifier backend: {classifier_backend}")
 
     if not dry_run and len(work_items) > 0:
+        log_gpu_status()
+        if torch.cuda.is_available():
+            torch.cuda.reset_peak_memory_stats()
+        # GPU work runs ONE model at a time: each pass loads its model, runs all its
+        # batches, then releases the weights before the next pass loads. On a 10GB
+        # card this keeps peak VRAM at ~one model instead of all three (which spills
+        # to slow shared system memory under WSL2). Order: Janus → SigLIP v1 → v2.
         classifier = None
-        embedder = None
-        model_init_started_at = time.perf_counter()
+        model_init_ms = 0.0
 
+        # Kick off color extraction in a background thread pool before GPU work starts.
+        # fast_colorthief (Rust) releases the GIL, so it runs truly in parallel with
+        # CUDA kernels on the GPU — ~2.7 min of CPU work becomes effectively free.
+        #
+        # The first palette is computed synchronously on THIS (main) thread to warm
+        # fast_colorthief's first-call lazy imports — PIL's JPEG plugin, numpy's
+        # C-API, and the Rust backend extension. Done inside a worker thread, those
+        # imports race against the main thread's own runtime imports (the Janus
+        # modules and the trust_remote_code modeling code loaded by init_model) and
+        # deadlock CPython's per-module import locks: every thread parks in
+        # futex_wait forever, looking like a frozen "Loading…" with an idle GPU.
+        # Warming them single-threaded means worker threads only hit the import
+        # fast-path and never block. (This is an import-lock hang, not GPU/VRAM.)
+        all_paths = [item["path"] for item in work_items]
+        colors_executor = concurrent.futures.ThreadPoolExecutor(
+            max_workers=COLORTHIEF_WORKERS
+        )
+        colors_started_at = time.perf_counter()
+        color_futures: dict[str, concurrent.futures.Future] = {}
+        for color_index, path in enumerate(all_paths):
+            if color_index == 0:
+                warm_future: concurrent.futures.Future = concurrent.futures.Future()
+                warm_future.set_result(fast_colorthief.get_palette(path))
+                color_futures[path] = warm_future
+            else:
+                color_futures[path] = colors_executor.submit(
+                    fast_colorthief.get_palette, path
+                )
+        log(
+            f"Color extraction started in background ({len(all_paths)} images, {COLORTHIEF_WORKERS} threads)"
+        )
+
+        # ---- Pass 1: Janus captions ----
+        # precomputed_captions stores PARSED result dicts: parsing (and retry on
+        # malformed JSON) runs here while the model is resident, because the model is
+        # released before per-image assembly. Batching amortises KV-cache/kernel
+        # launch overhead — ~3.8x vs single-image.
+        precomputed_captions: dict[str, Mapping] = {}
         if any(item["needs_classifier"] for item in work_items):
             classifier = create_classifier(
                 backend=classifier_backend,
@@ -1390,39 +1660,10 @@ def index(
                 gpu_headroom_gb=classifier_gpu_headroom_gb,
                 low_impact=classifier_low_impact,
             )
+            load_started_at = time.perf_counter()
             classifier.init_model()
-
-        embedder_v2 = None
-        embedder_v1 = None
-        if any(item["needs_embedding_v2"] for item in work_items):
-            embedder_v2 = Siglip2Embedder()
-            embedder_v2.init_model()
-        if any(item["needs_embedding_v1"] for item in work_items):
-            embedder_v1 = SiglipEmbedder()
-            embedder_v1.init_model()
-
-        model_init_ms = (time.perf_counter() - model_init_started_at) * 1000
-
-        # Kick off color extraction in a background thread pool before GPU work starts.
-        # fast_colorthief (Rust) releases the GIL, so it runs truly in parallel with
-        # CUDA kernels on the GPU — ~2.7 min of CPU work becomes effectively free.
-        all_paths = [item["path"] for item in work_items]
-        colors_executor = concurrent.futures.ThreadPoolExecutor(
-            max_workers=COLORTHIEF_WORKERS
-        )
-        colors_started_at = time.perf_counter()
-        color_futures = {
-            path: colors_executor.submit(fast_colorthief.get_palette, path)
-            for path in all_paths
-        }
-        log(
-            f"Color extraction started in background ({len(all_paths)} images, {COLORTHIEF_WORKERS} threads)"
-        )
-
-        # Pre-compute Janus results in batches (GPU).
-        # Batching amortises KV-cache and kernel launch overhead — ~3.8x vs single-image.
-        precomputed_captions: dict[str, str] = {}
-        if classifier is not None:
+            model_init_ms += (time.perf_counter() - load_started_at) * 1000
+            log_vram(f"{classifier.backend} load")
             classifier_paths = [
                 item["path"] for item in work_items if item["needs_classifier"]
             ]
@@ -1443,11 +1684,17 @@ def index(
                 )
                 single_started_at = time.perf_counter()
                 batch_geocodes = [extract_geocode_from_path(p) for p in batch_paths]
-                batch_results = classifier.predict_batch(
-                    list(zip(batch_paths, batch_geocodes))
-                )
-                for path, raw in zip(batch_paths, batch_results):
-                    precomputed_captions[path] = raw
+                with heartbeat(
+                    f"{classifier.backend} batch {batch_index}/{total_batches}"
+                ):
+                    batch_results = classifier.predict_batch(
+                        list(zip(batch_paths, batch_geocodes))
+                    )
+                # Parse (and retry malformed JSON) now, while the model is resident.
+                for path, raw, geo in zip(batch_paths, batch_results, batch_geocodes):
+                    precomputed_captions[path] = parse_caption_with_retry(
+                        classifier, path, geo, raw
+                    )
                 done = min(batch_start + resolved_batch_size, len(classifier_paths))
                 single_ms = (time.perf_counter() - single_started_at) * 1000
                 log(
@@ -1455,42 +1702,28 @@ def index(
                 )
             batch_ms = (time.perf_counter() - batch_started_at) * 1000
             log(f"{classifier.backend} batch inference complete in {batch_ms:.0f}ms")
+            log_vram(f"{classifier.backend} inference")
+            classifier.release()
+            classifier = None  # free VRAM before the embedding passes load
 
-        # Pre-compute embeddings in batches (GPU, ~2x vs sequential).
-        # keyed as precomputed_embeddings[path][model_id] = embedding
+        # ---- Embedding passes: one model resident at a time ----
+        # keyed as precomputed_embeddings[path][model_id] = embedding. Order per the
+        # one-model-per-pass requirement: SigLIP v1 (browser-compatible) then v2.
         precomputed_embeddings: dict[str, dict[str, list[float]]] = {}
-        for embedder, needs_key in [
-            (embedder_v2, "needs_embedding_v2"),
-            (embedder_v1, "needs_embedding_v1"),
-        ]:
-            if embedder is None:
-                continue
-            emb_paths = [item["path"] for item in work_items if item[needs_key]]
-            total_emb_batches = math.ceil(len(emb_paths) / EMBEDDER_BATCH_SIZE)
-            log(
-                f"Running {embedder.model_id} embeddings in batches of {EMBEDDER_BATCH_SIZE} ({len(emb_paths)} images, {total_emb_batches} batch(es))..."
+        if any(item["needs_embedding_v1"] for item in work_items):
+            v1_paths = [
+                item["path"] for item in work_items if item["needs_embedding_v1"]
+            ]
+            model_init_ms += run_embedding_pass(
+                SiglipEmbedder(), v1_paths, precomputed_embeddings
             )
-            emb_started_at = time.perf_counter()
-            for emb_batch_index, batch_start in enumerate(
-                range(0, len(emb_paths), EMBEDDER_BATCH_SIZE), start=1
-            ):
-                batch_paths = emb_paths[batch_start : batch_start + EMBEDDER_BATCH_SIZE]
-                log(
-                    f"  {embedder.model_id} batch {emb_batch_index}/{total_emb_batches} starting ({len(batch_paths)} images)..."
-                )
-                single_started_at = time.perf_counter()
-                batch_embeddings = embedder.predict_image_embeddings_batch(batch_paths)
-                for path, embedding in zip(batch_paths, batch_embeddings):
-                    precomputed_embeddings.setdefault(path, {})[
-                        embedder.model_id
-                    ] = embedding
-                single_ms = (time.perf_counter() - single_started_at) * 1000
-                done = min(batch_start + EMBEDDER_BATCH_SIZE, len(emb_paths))
-                log(
-                    f"  {embedder.model_id} batch {emb_batch_index}/{total_emb_batches} done in {single_ms:.0f}ms ({done}/{len(emb_paths)} images)"
-                )
-            emb_ms = (time.perf_counter() - emb_started_at) * 1000
-            log(f"{embedder.model_id} embeddings complete in {emb_ms:.0f}ms")
+        if any(item["needs_embedding_v2"] for item in work_items):
+            v2_paths = [
+                item["path"] for item in work_items if item["needs_embedding_v2"]
+            ]
+            model_init_ms += run_embedding_pass(
+                Siglip2Embedder(), v2_paths, precomputed_embeddings
+            )
 
         # Collect color results (GPU work is done; colors are likely already finished).
         precomputed_colors_by_path: dict[str, list] = {}
@@ -1502,19 +1735,14 @@ def index(
             f"Color extraction complete in {colors_ms:.0f}ms (ran concurrently with GPU)"
         )
 
+        # Assembly carries NO live model objects (all released) — only the per-image
+        # needs_classifier flag and the precomputed pass outputs. Keeping a model in
+        # this tuple would pin its VRAM and defeat the release()/empty_cache above.
         enumerated = [
             (
                 item_index,
                 item["path"],
-                classifier if item["needs_classifier"] else None,
-                [
-                    e
-                    for e in [
-                        embedder_v2 if item["needs_embedding_v2"] else None,
-                        embedder_v1 if item["needs_embedding_v1"] else None,
-                    ]
-                    if e is not None
-                ],
+                item["needs_classifier"],
                 precomputed_captions.get(item["path"]),
                 precomputed_embeddings.get(item["path"]),
                 precomputed_colors_by_path.get(item["path"]),
@@ -1537,7 +1765,9 @@ def index(
                     return
                 insert_started_at = time.perf_counter()
                 insert_analysed_images_batch(db, pending_results)
-                insert_durations_ms.append((time.perf_counter() - insert_started_at) * 1000)
+                insert_durations_ms.append(
+                    (time.perf_counter() - insert_started_at) * 1000
+                )
                 persisted_results += len(pending_results)
                 log(
                     f"Committed {persisted_results}/{total_work_items} analysed image(s) to SQLite"
@@ -1572,6 +1802,7 @@ def index(
         log(
             f"Inserted {persisted_results} images in {sum(insert_durations_ms):.0f}ms across {len(insert_durations_ms)} transaction(s)"
         )
+        log_vram_peak()
 
         db.optimize()
     else:
@@ -2562,10 +2793,9 @@ def extract_geocode_from_path(path: str) -> Mapping:
 
 def analyse_image(
     fh: IO[bytes],
-    classifier: Optional[BaseCaptionClassifier],
     path: str,
-    embedders: Optional[list[BaseImageEmbedder]] = None,
-    precomputed_caption: Optional[str] = None,
+    needs_classifier: bool = False,
+    precomputed_caption: Optional[Mapping] = None,
     precomputed_embeddings: Optional[dict[str, list[float]]] = None,
     precomputed_colors: Optional[list] = None,
 ) -> Mapping:
@@ -2596,45 +2826,24 @@ def analyse_image(
         else fast_colorthief.get_palette(path)
     )
 
-    result: Mapping = {}
-    if classifier is not None:
-        attempts = 0
-        max_attempts = 20
-        raw_result = None
-        while attempts < max_attempts:
-            try:
-                if precomputed_caption is not None and attempts == 0:
-                    raw_result = precomputed_caption
-                else:
-                    raw_result = classifier.predict(path=path, geocode=geo)
+    # Captions are parsed (with model retry) during the Janus pass while the model
+    # is still resident; here we only consume the precomputed parsed result. The
+    # per-image needs_classifier flag — not the presence of a live model — gates
+    # whether classifier fields are written, so embeddings-only re-indexes of
+    # already-captioned rows don't clobber their alt_text/subject/tags.
+    result: Mapping = (
+        precomputed_caption
+        if (needs_classifier and precomputed_caption is not None)
+        else {}
+    )
 
-                result = parse_classifier_response(raw_result)
-                break
-            except Exception:
-                attempts += 1
-                precomputed_caption = None  # fall back to fresh per-image predictions
-                log(
-                    f"Attempt {attempts}/{max_attempts} failed for {path}, got {raw_result}"
-                )
-                if attempts >= max_attempts:
-                    log(
-                        f"Failed to classify {path} after {max_attempts} attempts, skipping."
-                    )
-                    result = {}
-                    break
-
-    embeddings = []
-    for emb in embedders or []:
-        try:
-            precomputed = (precomputed_embeddings or {}).get(emb.model_id)
-            embedding = (
-                precomputed
-                if precomputed is not None
-                else emb.predict_image_embedding(path)
-            )
-            embeddings.append({"model_id": emb.model_id, "embedding": embedding})
-        except Exception as err:
-            log(f"Embedding ({emb.model_id}) failed for {path}: {err}")
+    # Embeddings are emitted from the precomputed {model_id: vector} dict — the GPU
+    # models are released before assembly, so there is no live per-image fallback.
+    # Emission is driven by the dict's keys: whatever was precomputed gets written.
+    embeddings = [
+        {"model_id": model_id, "embedding": embedding}
+        for model_id, embedding in (precomputed_embeddings or {}).items()
+    ]
 
     # 2000:01:01 12:34:56 > 2000-01-01T12:34:56
     datetime = (
@@ -2665,35 +2874,33 @@ def analyse_image(
 
 
 def analyse_image_worker(
-    input: list[
-        Tuple[
-            int,
-            str,
-            Optional[BaseCaptionClassifier],
-            list[BaseImageEmbedder],
-            Optional[str],
-            Optional[dict],
-            Optional[list],
-        ]
+    input: Tuple[
+        int,
+        str,
+        bool,
+        Optional[Mapping],
+        Optional[dict],
+        Optional[list],
     ],
 ) -> Mapping[str, typing.Any]:
+    """Assemble one image's record from precomputed pass outputs (no live models).
+
+    By the time this runs, every GPU model has been loaded, used, and released in
+    its own pass — so it consumes only precomputed captions/embeddings/colours."""
     try:
-        """Multiprocessable worker"""
         idx = input[0]
         path = input[1]
-        classifier = input[2]
-        embedders = input[3] if len(input) > 3 else []
-        precomputed_caption = input[4] if len(input) > 4 else None
-        precomputed_embeddings = input[5] if len(input) > 5 else None
-        precomputed_colors = input[6] if len(input) > 6 else None
+        needs_classifier = input[2]
+        precomputed_caption = input[3] if len(input) > 3 else None
+        precomputed_embeddings = input[4] if len(input) > 4 else None
+        precomputed_colors = input[5] if len(input) > 5 else None
 
         print(f"[{idx + 1}] {os.path.basename(path)}...")
         with open(path, "rb") as fh:
             analysed = analyse_image(
                 fh,
-                classifier=classifier,
                 path=path,
-                embedders=embedders,
+                needs_classifier=needs_classifier,
                 precomputed_caption=precomputed_caption,
                 precomputed_embeddings=precomputed_embeddings,
                 precomputed_colors=precomputed_colors,
@@ -2701,11 +2908,13 @@ def analyse_image_worker(
             return {
                 "path": path,
                 "analysed": analysed,
-                "used_classifier": classifier is not None,
+                "used_classifier": needs_classifier,
             }
     except (KeyboardInterrupt, SystemExit):
-        print("Exiting...")
-        return (index, False)
+        # Re-raise so Ctrl-C / SIGINT actually terminates the run. The old code
+        # swallowed it and returned a malformed tuple, which both masked the
+        # interrupt and crashed the downstream consumer.
+        raise
 
 
 def insert_analysed_image(

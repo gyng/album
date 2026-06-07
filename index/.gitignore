@@ -1,5 +1,6 @@
 *.sqlite
 !testexists.sqlite
+*.sqlite.lock
 *.pt
 __pycache__
 *.bak
