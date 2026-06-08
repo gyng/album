@@ -11,7 +11,6 @@ import { PoolStats, formatNewestPhotoDate } from "../../util/slideshowQueue";
 // focused on orchestration.
 export type SlideshowToolbarProps = {
   // Container interaction
-  isCoarsePointer: boolean;
   onFocusCapture: () => void;
   onPointerOverToolbar: (over: boolean) => void;
 
@@ -108,20 +107,19 @@ export const SlideshowToolbar: React.FC<SlideshowToolbarProps> = (props) => {
       onMouseEnter={() => props.onPointerOverToolbar(true)}
       onMouseLeave={() => props.onPointerOverToolbar(false)}
     >
-      {/* On a coarse-pointer / kiosk install this link is an easy escape
-          hatch out of the slideshow; hiding it removes that footgun while
-          keeping it for desktop where it acts as an obvious nav element. */}
-      {!props.isCoarsePointer ? (
-        <Link className={styles.brandLink} href="/">
-          <span className={styles.brandLogo} aria-hidden="true">
-            🖼️
-          </span>
-          <span className={styles.brandCopy}>
-            <span className={styles.brandTitle}>Snapshots</span>
-            <span className={styles.brandSubtitle}>Slideshow</span>
-          </span>
-        </Link>
-      ) : null}
+      {/* Home link / escape hatch back to the gallery. On desktop it's the
+          top-left nav element; on touch it lives inside this toolbar, which
+          only appears after a deliberate pull gesture — so an iPad still has a
+          way home without it being a one-tap accident on a kiosk. */}
+      <Link className={styles.brandLink} href="/">
+        <span className={styles.brandLogo} aria-hidden="true">
+          🖼️
+        </span>
+        <span className={styles.brandCopy}>
+          <span className={styles.brandTitle}>Snapshots</span>
+          <span className={styles.brandSubtitle}>Slideshow</span>
+        </span>
+      </Link>
 
       {props.poolStats.count > 0 ? (
         <div

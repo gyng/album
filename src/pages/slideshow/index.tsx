@@ -1772,7 +1772,6 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
         ) : null}
 
         <SlideshowToolbar
-          isCoarsePointer={isCoarsePointer}
           onFocusCapture={showControlsForDesktop}
           onPointerOverToolbar={setIsPointerOverToolbar}
           poolStats={poolStats}
