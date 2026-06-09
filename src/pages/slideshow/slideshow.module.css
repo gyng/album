@@ -26,6 +26,24 @@
   pointer-events: none;
 }
 
+/* Cross-fade layer state. Every layer (.image or .remixGrid) defaults to
+   opacity 1 with an opacity transition; .layerHidden drives the fade — a new
+   top layer starts hidden and fades in once decoded, older layers fade out.
+   Layers stack by DOM order (same z-index), newest last = on top.
+   The two-class selectors out-specify both .image and .remixGrid (which each
+   set opacity:1) regardless of source order — otherwise a remix grid would
+   never reach opacity 0 and the outgoing grid's cells would never clear. */
+.image.layerHidden,
+.remixGrid.layerHidden {
+  opacity: 0;
+}
+
+/* Non-top (outgoing) layers never take pointer input — only the live top slide
+   handles taps/swipes. */
+.backdropLayer {
+  pointer-events: none;
+}
+
 .remixGrid {
   position: absolute;
   inset: 0;

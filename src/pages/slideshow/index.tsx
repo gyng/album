@@ -49,6 +49,15 @@ import { useControlsAutoHide } from "../../components/useControlsAutoHide";
 import { useSlideshowCadence } from "../../components/useSlideshowCadence";
 import { useRemixGridReveal } from "../../components/useRemixGridReveal";
 import {
+  buildSlideSnapshot,
+  CrossfadeLayer,
+  isIncomingReady,
+  pushLayer,
+  removeLayer,
+  revealLayers,
+  slideKeyOf,
+} from "../../util/slideshowCrossfade";
+import {
   advanceHistory,
   canGoBack,
   currentEntry,
@@ -384,9 +393,10 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
 
 
   const [imageLoaded, setImageLoaded] = React.useState<boolean>(false);
-  const [previousPhotoSrc, setPreviousPhotoSrc] = React.useState<string | null>(
-    null,
-  );
+  // The cross-fade is a keyed STACK of slide layers (see util/slideshowCrossfade):
+  // the newest layer fades in once decoded while older layers fade out, each a
+  // stable keyed element so advancing mid-fade reverses smoothly (no flash).
+  const [layers, setLayers] = React.useState<CrossfadeLayer[]>([]);
 
   const [filter, setFilter] = React.useState<string | undefined>(undefined);
   // Mirror the filter state into the ref consumed by the DB-update poll
@@ -482,7 +492,6 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
     hapticFired?: boolean;
   } | null>(null);
   const suppressImageClickRef = React.useRef(false);
-  const activePhotoSrcRef = React.useRef<string | null>(null);
   const [bufferedPhotoSrc, setBufferedPhotoSrc] = React.useState<string | null>(
     null,
   );
@@ -1556,38 +1565,45 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
   }, []);
 
   const activePhotoSrc = getSlideshowPhotoSrc(currentPhotoPath);
-  // Tracks whether the *previously displayed* slide was a remix. Read by the
-  // crossfade effect below so it can skip the fade when leaving a remix —
-  // otherwise the previousPhotoSrc is the lone seed src and renders full-bleed
-  // behind the new grid while its cells load, which reads as a misleading
-  // single-image flash between the two remixes.
-  const previousSlideWasRemixRef = React.useRef(false);
+  const isRemix = remixCompanions.length > 0;
 
+  // The cells of the slide on screen: seed first, then remix companions.
+  // `path` keys the remix-grid reveal hook; `src` is what each <img> loads.
+  const currentCells = React.useMemo(() => {
+    if (!currentPhotoPath || !activePhotoSrc) return [];
+    return [
+      { path: currentPhotoPath.path, src: activePhotoSrc },
+      ...remixCompanions.map((companion) => ({
+        path: companion.path,
+        src: getSlideshowPhotoSrc(companion) ?? "",
+      })),
+    ];
+  }, [currentPhotoPath, activePhotoSrc, remixCompanions]);
+
+  const currentSnapshot = React.useMemo(
+    () => buildSlideSnapshot(currentCells),
+    [currentCells],
+  );
+  // Identity of the slide on screen. Changes on a normal advance AND when a
+  // single photo gains async remix companions — both push a fresh layer.
+  const slideKey = slideKeyOf(currentSnapshot);
+
+  // Push the current slide as a new top layer whenever its identity changes;
+  // same key just refreshes its snapshot. Resetting imageLoaded re-gates the
+  // new top's single-image decode.
+  const topKeyRef = React.useRef<string | null>(null);
   useEffect(() => {
-    if (!activePhotoSrc) {
-      activePhotoSrcRef.current = null;
-
-      setPreviousPhotoSrc(null);
-      previousSlideWasRemixRef.current = false;
+    if (!slideKey || !currentSnapshot) {
+      topKeyRef.current = null;
+      setLayers([]);
       return;
     }
-
-    const previousPhotoSrc = activePhotoSrcRef.current;
-
-    if (previousPhotoSrc && previousPhotoSrc !== activePhotoSrc) {
-      // Leaving any remix layout: the cached previous src is just the seed,
-      // which would show full-bleed behind the new content while it loads
-      // and read as a stray extra slide. Skip the fade in that case — the
-      // new image / grid handles its own reveal once ready.
-      setPreviousPhotoSrc(
-        previousSlideWasRemixRef.current ? null : previousPhotoSrc,
-      );
+    if (topKeyRef.current !== slideKey) {
+      topKeyRef.current = slideKey;
       setImageLoaded(false);
     }
-
-    activePhotoSrcRef.current = activePhotoSrc;
-    previousSlideWasRemixRef.current = remixCompanions.length > 0;
-  }, [activePhotoSrc, remixCompanions]);
+    setLayers((prev) => pushLayer(prev, slideKey, currentSnapshot));
+  }, [slideKey, currentSnapshot]);
 
   // Track which cells in the current remix have finished loading so the grid
   // reveals all at once (see util hook). Memoise the companion paths so the
@@ -1601,15 +1617,49 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
     companionPaths: remixCompanionPaths,
   });
 
-  // Clear the fade-out backdrop only once the *whole* new grid is ready, so
-  // the user never sees a window where the previous slide is gone and the
-  // new grid hasn't yet revealed. The 260ms delay matches the grid's own
-  // opacity transition, so the backdrop persists through the fade-in.
+  // The incoming (top) slide is "ready" once it has fully decoded — a single
+  // image, or EVERY cell of a remix grid (so the grid never pops in cell by
+  // cell).
+  const incomingReady = isIncomingReady({
+    isRemix,
+    imageLoaded,
+    remixGridReady: isRemixGridReady,
+  });
+
+  // Reveal the top layer once decoded: it fades in while every other layer
+  // fades out — the cross-fade. The double rAF guarantees the layer's opacity:0
+  // start state is painted first, so an already-decoded (preloaded) photo fades
+  // in instead of hard-cutting.
   useEffect(() => {
-    if (!isRemixGridReady || remixCompanions.length === 0) return;
-    const t = window.setTimeout(() => setPreviousPhotoSrc(null), 260);
+    if (!incomingReady || !slideKey) return;
+    let inner = 0;
+    const outer = requestAnimationFrame(() => {
+      inner = requestAnimationFrame(() =>
+        setLayers((prev) => revealLayers(prev, slideKey)),
+      );
+    });
+    return () => {
+      cancelAnimationFrame(outer);
+      cancelAnimationFrame(inner);
+    };
+  }, [incomingReady, slideKey]);
+
+  // Safety net: if the top never signals ready (a load event that never fires,
+  // a hung request), reveal it anyway after a few seconds so a held backdrop
+  // can't pin the show. Mirrors useRemixGridReveal's per-cell net, which single
+  // images otherwise lack.
+  const layersRef = React.useRef(layers);
+  layersRef.current = layers;
+  useEffect(() => {
+    if (!slideKey) return;
+    const top = layersRef.current[layersRef.current.length - 1];
+    if (top?.key === slideKey && top.loaded) return;
+    const t = window.setTimeout(
+      () => setLayers((prev) => revealLayers(prev, slideKey)),
+      6000,
+    );
     return () => window.clearTimeout(t);
-  }, [isRemixGridReady, remixCompanions.length]);
+  }, [slideKey, layers]);
 
   if (currentPhotoPath === null) {
     return (
@@ -1888,122 +1938,107 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
           time={time}
         />
 
-        {previousPhotoSrc ? (
-          <img
-            className={[
-              styles.image,
-              styles.previousImage,
-              imageLoaded ? styles.previousImageHidden : "",
-              showCover ? styles.cover : "",
-            ].join(" ")}
-            src={previousPhotoSrc}
-            alt=""
-            aria-hidden="true"
-          />
-        ) : null}
-
-        {remixCompanions.length > 0 ? (
-          <div
-            className={[
-              styles.remixGrid,
-              isRemixGridReady ? "" : styles.remixGridNotReady,
-            ]
-              .filter(Boolean)
-              .join(" ")}
-            data-count={remixCompanions.length + 1}
-            style={{ touchAction: "none" }}
-            onPointerDown={handleImagePointerDown}
-            onPointerMove={handleImagePointerMove}
-            onPointerCancel={clearImagePointerGesture}
-            onPointerUp={handleImagePointerUp}
-            onClick={() => {
+        {/* Cross-fade layer stack: the newest (last) layer is the interactive
+            current slide; it fades in once decoded while older layers fade out.
+            Each layer is keyed by its slideKey so advancing mid-fade reverses
+            that element's opacity smoothly instead of re-mounting and flashing.
+            A faded-out layer removes itself on its opacity transitionend. */}
+        {layers.map((layer, layerIdx) => {
+          const isTop = layerIdx === layers.length - 1;
+          const hidden = layer.loaded ? "" : styles.layerHidden;
+          const onFadeEnd = (e: React.TransitionEvent) => {
+            if (e.propertyName === "opacity" && !layer.loaded) {
+              setLayers((prev) => removeLayer(prev, layer.key));
+            }
+          };
+          const topImageHandlers = {
+            style: { touchAction: "none" as const },
+            onPointerDown: handleImagePointerDown,
+            onPointerMove: handleImagePointerMove,
+            onPointerCancel: clearImagePointerGesture,
+            onPointerUp: handleImagePointerUp,
+            onClick: () => {
               if (suppressImageClickRef.current) {
                 suppressImageClickRef.current = false;
                 return;
               }
               advanceToNextPhoto();
-            }}
-          >
-            {slidePhotos.map((photo, idx) => {
-              const isSeed = idx === 0;
-              const src = isSeed
-                ? photoBlock.data.src
-                : getSlideshowPhotoSrc(photo);
-              if (!src) return null;
+            },
+          };
 
-              return (
-                <div key={photo.path} className={styles.remixCell}>
-                  <img
-                    className={[
-                      styles.remixImage,
-                      isSeed && !imageLoaded ? styles.notLoaded : "",
-                    ]
-                      .filter(Boolean)
-                      .join(" ")}
-                    src={src}
-                    alt={isSeed ? photoAltText : ""}
-                    aria-hidden={isSeed ? undefined : true}
-                    onLoad={() => {
-                      markRemixCellLoaded(photo.path);
-                      if (isSeed) {
-                        setImageLoaded(true);
-                      }
-                    }}
-                    onError={() => {
-                      // Always mark the cell "loaded" on error so a single
-                      // broken companion can't pin the grid at opacity 0.
-                      // For the seed, keep the auto-advance on broken images
-                      // so kiosk displays don't get stuck on a 404.
-                      markRemixCellLoaded(photo.path);
-                      if (isSeed) {
-                        setTimeout(() => {
-                          advanceToNextPhoto();
-                        }, 1000);
-                      }
-                    }}
-                  />
-                  {/* per-cell description is now rendered as a bottomBar
-                      column further down — same component as the single-
-                      image case, just one per cell. */}
-                </div>
-              );
-            })}
-          </div>
-        ) : (
-          <img
-            className={[
-              styles.image,
-              !imageLoaded ? styles.notLoaded : "",
-              showCover ? styles.cover : "",
-            ].join(" ")}
-            src={photoBlock.data.src}
-            alt={photoAltText}
-            style={{ touchAction: "none" }}
-            onLoad={() => {
-              setImageLoaded(true);
-              window.setTimeout(() => {
-                setPreviousPhotoSrc(null);
-              }, 260);
-            }}
-            onError={() => {
-              // Skip bad images to avoid showing broken image on displays
-              setTimeout(() => {
-                advanceToNextPhoto();
-              }, 1000);
-            }}
-            onPointerDown={handleImagePointerDown}
-            onPointerMove={handleImagePointerMove}
-            onPointerCancel={clearImagePointerGesture}
-            onPointerUp={handleImagePointerUp}
-            onClick={() => {
-              if (suppressImageClickRef.current) {
-                suppressImageClickRef.current = false;
-                return;
-              }
-              advanceToNextPhoto();
-            }}
-          />
-        )}
+          if (layer.slide.remix) {
+            return (
+              <div
+                key={layer.key}
+                className={[
+                  styles.remixGrid,
+                  hidden,
+                  isTop ? "" : styles.backdropLayer,
+                ]
+                  .filter(Boolean)
+                  .join(" ")}
+                data-count={layer.slide.cells.length}
+                onTransitionEnd={onFadeEnd}
+                {...(isTop ? topImageHandlers : { "aria-hidden": true })}
+              >
+                {layer.slide.cells.map((cell, cellIdx) => {
+                  const isSeed = cellIdx === 0;
+                  return (
+                    <div key={cell.path} className={styles.remixCell}>
+                      <img
+                        className={styles.remixImage}
+                        src={cell.src}
+                        alt={isTop && isSeed ? photoAltText : ""}
+                        aria-hidden={isTop && isSeed ? undefined : true}
+                        {...(isTop
+                          ? {
+                              onLoad: () => {
+                                markRemixCellLoaded(cell.path);
+                                if (isSeed) setImageLoaded(true);
+                              },
+                              onError: () => {
+                                // Mark loaded on error so one broken companion
+                                // can't pin the grid hidden; the seed keeps the
+                                // auto-advance so kiosks don't stick on a 404.
+                                markRemixCellLoaded(cell.path);
+                                if (isSeed) {
+                                  setTimeout(() => advanceToNextPhoto(), 1000);
+                                }
+                              },
+                            }
+                          : {})}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          }
+
+          return (
+            <img
+              key={layer.key}
+              className={[
+                styles.image,
+                hidden,
+                showCover ? styles.cover : "",
+                isTop ? "" : styles.backdropLayer,
+              ]
+                .filter(Boolean)
+                .join(" ")}
+              src={layer.slide.cells[0].src}
+              alt={isTop ? photoAltText : ""}
+              onTransitionEnd={onFadeEnd}
+              {...(isTop
+                ? {
+                    ...topImageHandlers,
+                    onLoad: () => setImageLoaded(true),
+                    onError: () => setTimeout(() => advanceToNextPhoto(), 1000),
+                  }
+                : { "aria-hidden": true })}
+            />
+          );
+        })}
 
         {bufferedPhotoSrc && bufferedPhotoSrc !== photoBlock.data.src ? (
           <img
