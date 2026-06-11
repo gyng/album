@@ -31,7 +31,9 @@ export const getDefaultSeo = () => ({
   siteName: "Snapshots",
   defaultTitle: "Snapshots",
   defaultDescription: "Snapshots from a better era",
-  themeColor: "#2c2c2c",
+  // Black to match the manifest/_document theme-color and the always-dark
+  // slideshow chrome; a grey value tinted the iPad PWA status bar grey.
+  themeColor: "#000000",
 });
 
 export const buildWebSiteJsonLd = (): JsonLd => ({
