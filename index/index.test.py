@@ -30,6 +30,7 @@ from index import (
     search_tags,
 )
 import os
+import shutil
 import tempfile
 import time
 import unittest
@@ -402,7 +403,30 @@ class TestMain(unittest.TestCase):
                 )
 
 
-class TestCli(unittest.TestCase):
+class UsesTestexistsFixture:
+    """Runs against a throwaway copy of the committed ``testexists.sqlite``.
+
+    The fixture is WAL-mode, so merely opening it read-only checkpoints on
+    close and bumps the SQLite change counter in the file header — which
+    otherwise shows up as a spurious 2-byte diff every test run. Copying it to
+    a temp dir keeps the committed fixture pristine.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self._fixture_dir = tempfile.TemporaryDirectory()
+        self.testexists_db = os.path.join(self._fixture_dir.name, "testexists.sqlite")
+        shutil.copy(
+            os.path.join(os.path.dirname(os.path.abspath(__file__)), "testexists.sqlite"),
+            self.testexists_db,
+        )
+
+    def tearDown(self):
+        self._fixture_dir.cleanup()
+        super().tearDown()
+
+
+class TestCli(UsesTestexistsFixture, unittest.TestCase):
     def test_index_dry_run_siglip2_test_simple(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             runner = CliRunner()
@@ -457,7 +481,7 @@ class TestCli(unittest.TestCase):
     def test_skip_index_already_exists(self):
         runner = CliRunner()
         glob = "../src/test/fixtures/*.jpg"
-        dbpath = "./testexists.sqlite"
+        dbpath = self.testexists_db
         result = runner.invoke(
             index, f"--glob {glob} --dbpath {dbpath} --dry-run".split()
         )
@@ -467,7 +491,7 @@ class TestCli(unittest.TestCase):
 
     def test_search(self):
         runner = CliRunner()
-        dbpath = "./testexists.sqlite"
+        dbpath = self.testexists_db
 
         result = runner.invoke(search, f"--query plant --dbpath {dbpath}".split())
 
@@ -477,7 +501,7 @@ class TestCli(unittest.TestCase):
 
     def test_search_negative(self):
         runner = CliRunner()
-        dbpath = "./testexists.sqlite"
+        dbpath = self.testexists_db
 
         result = runner.invoke(
             search, f"--query randomstring --dbpath {dbpath}".split()
@@ -488,7 +512,7 @@ class TestCli(unittest.TestCase):
 
     def test_search_min_results_pass(self):
         runner = CliRunner()
-        dbpath = "./testexists.sqlite"
+        dbpath = self.testexists_db
 
         result = runner.invoke(
             search, f"--query plant --dbpath {dbpath} --min-results 1".split()
@@ -498,7 +522,7 @@ class TestCli(unittest.TestCase):
 
     def test_search_min_results_fail(self):
         runner = CliRunner()
-        dbpath = "./testexists.sqlite"
+        dbpath = self.testexists_db
 
         result = runner.invoke(
             search, f"--query randomstring --dbpath {dbpath} --min-results 1".split()
@@ -508,7 +532,7 @@ class TestCli(unittest.TestCase):
 
     def test_search_tags(self):
         runner = CliRunner()
-        dbpath = "./testexists.sqlite"
+        dbpath = self.testexists_db
 
         result = runner.invoke(search_tags, f"--query plant --dbpath {dbpath}".split())
 
@@ -517,7 +541,7 @@ class TestCli(unittest.TestCase):
 
     def test_search_tags_negative(self):
         runner = CliRunner()
-        dbpath = "./testexists.sqlite"
+        dbpath = self.testexists_db
 
         result = runner.invoke(
             search_tags, f"--query randomstring --dbpath {dbpath}".split()
@@ -527,9 +551,9 @@ class TestCli(unittest.TestCase):
         self.assertTrue("[]" in result.output)
 
 
-class TestDb(unittest.TestCase):
+class TestDb(UsesTestexistsFixture, unittest.TestCase):
     def test_already_exists(self):
-        db = Sqlite3Client("./testexists.sqlite")
+        db = Sqlite3Client(self.testexists_db)
         self.assertEqual(db.already_exists("../src/test/fixtures/monkey.jpg"), True)
         self.assertEqual(
             db.already_exists("../src/test/fixtures/monkey.missing"), False
