@@ -7,7 +7,6 @@ import { Heading } from "../ui";
 import { fetchMemoryCandidates, fetchRecentResults, fetchRandomResults } from "./api";
 import { SearchResultRow } from "./searchTypes";
 import { SearchResultTile } from "./SearchResultTile";
-import { ProgressBar } from "../ProgressBar";
 import {
   formatMemoryDateRange,
   getMemoryClusters,
@@ -31,11 +30,6 @@ const buildTimelineMemoryHref = (date: string, album?: string | null) => {
   return `/timeline?${params.toString()}`;
 };
 
-type ProgressDetails = {
-  loaded: number;
-  total: number;
-};
-
 type MemoryResult = SearchResultRow & {
   date: string;
   isoDate: string;
@@ -43,8 +37,6 @@ type MemoryResult = SearchResultRow & {
 
 type Props = {
   database: Database | null;
-  progress: number;
-  databaseProgressDetails: ProgressDetails;
   onStartSimilarSearch: (path: string) => void;
   onSearchByColor?: (color: RGB) => void;
   isColorCategoryActive?: boolean;
@@ -52,8 +44,6 @@ type Props = {
 
 export const EmptyStateExplore: React.FC<Props> = ({
   database,
-  progress,
-  databaseProgressDetails,
   onStartSimilarSearch,
   onSearchByColor,
   isColorCategoryActive = false,
@@ -309,12 +299,6 @@ export const EmptyStateExplore: React.FC<Props> = ({
   return (
     <section className={styles.emptyState} aria-label="Explore browse mode">
       <div className={styles.emptySections}>
-        {progress < 100 && (
-          <section className={styles.sectionSurface}>
-            <ProgressBar progress={progress} details={databaseProgressDetails} />
-          </section>
-        )}
-
         <section className={styles.sectionSurface}>
           <div className={styles.sectionHeader}>
             <Heading level={2} as="h3">Latest</Heading>

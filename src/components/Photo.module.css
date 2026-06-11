@@ -57,14 +57,8 @@
 }
 
 /* The top-level photo-details toggle shows a custom ⓘ glyph, so hide the
-   native disclosure triangle (the nested Raw EXIF / License disclosures keep
-   theirs). Enlarge the touch target towards 44px for the sole mobile
-   affordance to photo metadata. */
-.detailsSummary {
-  list-style: none;
-  padding: var(--m-s);
-}
-
+   native WebKit disclosure marker (the nested Raw EXIF / License disclosures
+   keep theirs). */
 .detailsSummary::-webkit-details-marker {
   display: none;
 }

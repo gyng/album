@@ -333,17 +333,20 @@
   text-align: center;
 }
 
-.bootStatus {
-  color: var(--c-bg-contrast-light);
-  font-size: var(--fs-sm);
-  letter-spacing: 0.02em;
-}
 
+/* A passive escape hatch, not an alarm — muted at rest, accent on interaction
+   so it doesn't read as a red error against the loading screen. */
 .bootHomeLink {
-  color: var(--c-accent);
+  color: var(--c-bg-contrast-light);
   font-size: var(--fs-s);
   text-decoration: underline;
   text-underline-offset: 2px;
+  transition: color var(--t-fast) var(--ease-out);
+}
+
+.bootHomeLink:hover,
+.bootHomeLink:focus-visible {
+  color: var(--c-accent);
 }
 
 .toolbar {

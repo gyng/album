@@ -20,13 +20,6 @@
   display: flex;
 }
 
-/* Dark mode keeps the bright MapTiler basemap, so dim and slightly cool the
-   canvas to sit closer to the rest of the dark UI without swapping styles. */
-:global(body.dark) .map canvas {
-  filter: brightness(0.78) saturate(0.9);
-  transition: filter var(--t-theme);
-}
-
 .titleBar {
   position: fixed;
   z-index: 9999;

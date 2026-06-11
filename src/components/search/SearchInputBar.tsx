@@ -105,7 +105,6 @@ export const SearchInputBar: React.FC<Props> = ({
                 aria-label="Search mode help"
                 aria-expanded={isModeHelpOpen}
                 aria-describedby={modeHelpId}
-                title={SEARCH_MODE_HELP}
                 onClick={() => setIsModeHelpOpen((open) => !open)}
                 onBlur={() => setIsModeHelpOpen(false)}
               >

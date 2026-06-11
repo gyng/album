@@ -1686,11 +1686,17 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
           </div>
         ) : (
           <div className={styles.bootScreen}>
-            {bootProgress < 100 ? (
-              <ProgressBar progress={bootProgress} />
-            ) : (
-              <p className={styles.bootStatus}>Preparing slideshow…</p>
-            )}
+            {/* One persistent bar: while downloading it shows progress, then it
+                stays full and its label becomes "Preparing slideshow…". Keeping
+                it a single element means nothing swaps, so "Exit to home" never
+                shifts. */}
+            <ProgressBar
+              progress={bootProgress}
+              hideIfComplete={false}
+              label={
+                bootProgress >= 100 ? "Preparing slideshow…" : undefined
+              }
+            />
             <Link href="/" className={styles.bootHomeLink}>
               Exit to home
             </Link>

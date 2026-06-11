@@ -46,11 +46,6 @@
   width: 100%;
 }
 
-.itemLink:hover img {
-  outline: solid 2px var(--c-bg-contrast-light);
-  outline-offset: -2px;
-}
-
 .itemLink:focus-visible {
   outline: solid 2px var(--c-bg-contrast-light);
 }

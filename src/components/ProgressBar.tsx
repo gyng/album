@@ -35,12 +35,15 @@ export const ProgressBar: React.FC<{
   progress: number;
   hideIfComplete?: boolean;
   details?: ProgressDetails;
-}> = ({ progress, hideIfComplete = true, details }) => {
+  /** Overrides the derived "Loading…" label — e.g. a status the bar should
+      show once it's full but work continues. */
+  label?: string;
+}> = ({ progress, hideIfComplete = true, details, label }) => {
   return !hideIfComplete || progress < 100 ? (
     <div className={styles.wrapper}>
       <div className={styles.progressBar}>
         <div className={styles.progress} style={{ width: `${progress}%` }} />
-        <div>{getLabel(details)}</div>
+        <div>{label ?? getLabel(details)}</div>
       </div>
     </div>
   ) : null;

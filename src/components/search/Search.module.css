@@ -174,6 +174,35 @@
   gap: var(--m-s);
 }
 
+/* A single fade for the whole panel, on whichever edge still has off-screen
+   pills (see SearchFacetPanel's scroll handler). Each edge's fade size is a
+   variable, defaulting to 0 so only the scrolled-past edges actually fade. The
+   mask is painted over the scrollport, so it stays put as the list scrolls. */
+.facetCategoryContentFade {
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    #000 var(--facet-fade-top, 0px),
+    #000 calc(100% - var(--facet-fade-bottom, 0px)),
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    #000 var(--facet-fade-top, 0px),
+    #000 calc(100% - var(--facet-fade-bottom, 0px)),
+    transparent 100%
+  );
+}
+
+.facetFadeAbove {
+  --facet-fade-top: var(--m-l);
+}
+
+.facetFadeBelow {
+  --facet-fade-bottom: var(--m-l);
+}
+
 .facetSection {
   display: flex;
   flex-direction: column;
@@ -633,6 +662,7 @@
   opacity: 1;
 }
 
+/* Muted status line used by the facet panel ("Loading filters…"). */
 .searchModeStatus {
   margin-bottom: var(--m);
   color: var(--c-bg-contrast-light);
@@ -935,9 +965,6 @@
   flex-wrap: wrap;
   align-items: flex-start;
   gap: var(--m);
-  max-height: 20vh;
-  overflow-y: auto;
-  overflow-x: hidden;
   margin-bottom: var(--m-l);
 }
 

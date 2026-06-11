@@ -133,6 +133,39 @@ export const SearchFacetPanel: React.FC<Props> = ({
           CATEGORY_FACET_IDS[selectedCategory].includes(section.facetId),
         );
   const showSectionLabels = visibleSections.length > 1;
+
+  // A single bottom fade on the scroll container (not per section) that only
+  // shows while there's more to scroll, as an affordance for the long pill
+  // lists. The whole panel scrolls as one, so the fade lives here.
+  const contentRef = React.useRef<HTMLDivElement | null>(null);
+  const [hasScrollAbove, setHasScrollAbove] = React.useState(false);
+  const [hasScrollBelow, setHasScrollBelow] = React.useState(false);
+
+  const updateScrollFade = React.useCallback(() => {
+    const el = contentRef.current;
+    if (!el) {
+      return;
+    }
+    setHasScrollAbove(el.scrollTop > 4);
+    setHasScrollBelow(el.scrollHeight - el.scrollTop - el.clientHeight > 4);
+  }, []);
+
+  // Recompute when the visible content changes (category switch, filters
+  // loading in, facet counts updating).
+  React.useEffect(() => {
+    updateScrollFade();
+  }, [updateScrollFade, selectedCategory, isLoading, sections, normalizedTags]);
+
+  // …and when the panel resizes (its height is viewport-relative).
+  React.useEffect(() => {
+    const el = contentRef.current;
+    if (!el) {
+      return;
+    }
+    const observer = new ResizeObserver(updateScrollFade);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [updateScrollFade]);
   const pickerHex = colorSearch ? rgbToHex(colorSearch) : "#ff6b6b";
   const handleHexChange = (value: string) => {
     const rgb = hexToRgb(value);
@@ -184,7 +217,18 @@ export const SearchFacetPanel: React.FC<Props> = ({
         id="search-filters-content"
         role="tabpanel"
         aria-labelledby={`search-filter-tab-${selectedCategory}`}
-        className={styles.facetCategoryContent}
+        ref={contentRef}
+        onScroll={updateScrollFade}
+        className={[
+          styles.facetCategoryContent,
+          hasScrollAbove || hasScrollBelow
+            ? styles.facetCategoryContentFade
+            : "",
+          hasScrollAbove ? styles.facetFadeAbove : "",
+          hasScrollBelow ? styles.facetFadeBelow : "",
+        ]
+          .filter(Boolean)
+          .join(" ")}
       >
         {isLoading ? (
           <div className={styles.searchModeStatus}>Loading filters…</div>

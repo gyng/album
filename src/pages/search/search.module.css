@@ -4,6 +4,15 @@
   flex-direction: column;
 }
 
+/* Title row: the database-download progress bar sits to the right of the
+   "Search" heading so it never occupies vertical space in the results flow. */
+.searchHeadingRow {
+  display: flex;
+  align-items: center;
+  gap: var(--m-m);
+  flex-wrap: wrap;
+}
+
 /* Matches Search.module.css .inlineError (the shared error treatment). */
 .inlineError {
   margin: 0;

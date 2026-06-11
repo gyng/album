@@ -18,7 +18,6 @@ import {
   useDatabase,
   useEmbeddingsDatabase,
 } from "../database/useDatabase";
-import { ProgressBar } from "../ProgressBar";
 import { EmptyStateExplore } from "./EmptyStateExplore";
 import { SearchInputBar } from "./SearchInputBar";
 import {
@@ -77,6 +76,13 @@ const isEditableTarget = (target: EventTarget | null): boolean => {
 
 export type SearchNavState = {
   databaseReady: boolean;
+  /** Whichever resource is currently loading (database, similarity index, or
+      text model), surfaced once so the page can show a single progress bar by
+      the heading instead of in-flow bars that shift content. Null when idle. */
+  loading: {
+    progress: number;
+    details?: { loaded: number; total: number };
+  } | null;
   isRandomSimilarLoading: boolean;
   onStartRandomSimilarSlideshow: () => void;
   randomExploreError: string | null;
@@ -208,7 +214,6 @@ export const Search: React.FC<{
     similarPreviewSrc,
     textModelProgress,
     textModelProgressDetails,
-    textModelStage,
     textVectorError,
     trimmedQuery,
   } = useSearchResultsState({
@@ -720,14 +725,36 @@ export const Search: React.FC<{
   }, []);
 
   useEffect(() => {
+    const loading =
+      progress < 100
+        ? { progress, details: databaseProgressDetails }
+        : needsEmbeddingsDatabase && !embeddingsDatabase
+          ? { progress: embeddingsProgress, details: embeddingsProgressDetails }
+          : !isSimilarMode &&
+              searchMode !== "keyword" &&
+              textModelProgress < 100
+            ? { progress: textModelProgress, details: textModelProgressDetails }
+            : null;
+
     onNavStateChange?.({
       databaseReady: Boolean(database),
+      loading,
       isRandomSimilarLoading,
       onStartRandomSimilarSlideshow: loadRandomSimilarTrail,
       randomExploreError,
     });
   }, [
     database,
+    progress,
+    databaseProgressDetails,
+    needsEmbeddingsDatabase,
+    embeddingsDatabase,
+    embeddingsProgress,
+    embeddingsProgressDetails,
+    isSimilarMode,
+    searchMode,
+    textModelProgress,
+    textModelProgressDetails,
     isRandomSimilarLoading,
     loadRandomSimilarTrail,
     onNavStateChange,
@@ -774,25 +801,9 @@ export const Search: React.FC<{
         />
       ) : null}
 
-      {!isSimilarMode && searchMode !== "keyword" && textModelProgress < 100 ? (
-        <div className={styles.searchModeStatus}>
-          <ProgressBar
-            progress={textModelProgress}
-            details={textModelProgressDetails}
-          />
-          <div>{textModelStage}</div>
-        </div>
-      ) : null}
-
-      {needsEmbeddingsDatabase && !embeddingsDatabase ? (
-        <div className={styles.searchModeStatus}>
-          <ProgressBar
-            progress={embeddingsProgress}
-            details={embeddingsProgressDetails}
-          />
-          <div>Loading similarity index…</div>
-        </div>
-      ) : null}
+      {/* DB / similarity-index / text-model download progress is shown once,
+          beside the page heading (see pages/search), so it never adds an
+          in-flow bar that shifts the results below. */}
 
       {!isSimilarMode && textVectorError ? (
         <div className={styles.inlineError}>{textVectorError}</div>
@@ -807,8 +818,6 @@ export const Search: React.FC<{
       {isEmptyState ? (
         <EmptyStateExplore
           database={database}
-          progress={progress}
-          databaseProgressDetails={databaseProgressDetails}
           onStartSimilarSearch={startSimilarSearch}
           onSearchByColor={
             selectedFilterCategory === "color"

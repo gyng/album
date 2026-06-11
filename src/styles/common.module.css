@@ -130,6 +130,12 @@
 .splitButtonMain,
 .splitButtonSub {
   align-self: stretch;
+  /* Centre the glyph deterministically so it sits identically whether this is
+     an <a> (default) or a <button> (the search page's similarity action) —
+     the two element types baseline-align their text differently otherwise. */
+  display: flex;
+  align-items: center;
+  justify-content: center;
   border: 0;
   background: transparent;
   color: inherit;

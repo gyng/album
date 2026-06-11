@@ -443,7 +443,9 @@ describe("Search", () => {
       },
     ]);
 
-    await renderSearch();
+    const onNavStateChange = jest.fn();
+    render(<Search onNavStateChange={onNavStateChange} />);
+    await flushEffects();
 
     await waitFor(() => {
       expect(fetchTags).toHaveBeenCalledWith({
@@ -456,8 +458,12 @@ describe("Search", () => {
 
     expect(screen.getByText("Latest")).toBeTruthy();
     expect(screen.getByText("Random selection")).toBeTruthy();
-    expect(screen.getByText(/Loading/)).toBeTruthy();
-    expect(screen.getByText("Loading… 1.9 MB / 3.8 MB")).toBeTruthy();
+    // DB-download progress is reported to the page (shown beside the heading),
+    // not rendered as an in-flow bar inside the Search widget.
+    expect(onNavStateChange.mock.calls.at(-1)?.[0].loading).toMatchObject({
+      progress: 42,
+      details: { loaded: 2_000_000, total: 4_000_000 },
+    });
     expect(screen.getByRole("button", { name: /harbor/i })).toBeTruthy();
     expect(await screen.findByAltText("Recent shot")).toBeTruthy();
     expect(await screen.findByAltText("Random shot")).toBeTruthy();
@@ -1099,6 +1105,14 @@ describe("Search", () => {
 
   it("shows model download sizes while warming semantic search", async () => {
     window.history.replaceState({}, "", "/search?mode=semantic");
+    // DB already loaded so the model-warmup progress is the active loader the
+    // page surfaces (the bar now lives beside the heading, reported via
+    // onNavStateChange rather than rendered inside the widget).
+    mockUseDatabase.mockReturnValue([
+      mockDatabase,
+      100,
+      { loaded: 0, total: 0 },
+    ]);
 
     let resolveWarmup: (() => void) | null = null;
     (warmupTextEmbeddingModel as jest.Mock).mockImplementation(
@@ -1121,9 +1135,16 @@ describe("Search", () => {
       },
     );
 
-    await renderSearch();
+    const onNavStateChange = jest.fn();
+    render(<Search onNavStateChange={onNavStateChange} />);
+    await flushEffects();
 
-    expect(await screen.findByText("Loading… 2.0 MB / 4.0 MB")).toBeTruthy();
+    await waitFor(() => {
+      expect(onNavStateChange.mock.calls.at(-1)?.[0].loading).toMatchObject({
+        progress: 50,
+        details: { loaded: 2 * 1024 * 1024, total: 4 * 1024 * 1024 },
+      });
+    });
 
     await act(async () => {
       resolveWarmup?.();
