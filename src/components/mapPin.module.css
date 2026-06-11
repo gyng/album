@@ -4,6 +4,7 @@
    currentColor. */
 .pin {
   --outline-color: rgba(255, 255, 255, 0.84);
+  position: relative;
   display: block;
   width: 14px;
   height: 14px;
@@ -13,4 +14,16 @@
     0 0 0 2px var(--outline-color),
     0 1px 2px rgb(0 0 0 / 0.18);
   opacity: 0.9;
+}
+
+/* On touch devices the 14px dot is far below a comfortable tap target, so
+   extend an invisible padded hit area to roughly 38px without changing the
+   visible pin size. */
+@media (pointer: coarse) {
+  .pin::after {
+    content: "";
+    position: absolute;
+    inset: -12px;
+    border-radius: 999px;
+  }
 }

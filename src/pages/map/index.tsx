@@ -29,11 +29,13 @@ const WorldMap: NextPage<PageProps> = (props) => {
     typeof router.query.filter_album === "string"
       ? router.query.filter_album
       : null;
-  const hasRouteState =
-    filterAlbum != null ||
+  const hasCameraParams =
     typeof router.query.lat === "string" ||
     typeof router.query.lon === "string" ||
-    typeof router.query.zoom === "string" ||
+    typeof router.query.zoom === "string";
+  const hasRouteState =
+    filterAlbum != null ||
+    hasCameraParams ||
     typeof router.query.from === "string" ||
     typeof router.query.to === "string";
 
@@ -138,7 +140,14 @@ const WorldMap: NextPage<PageProps> = (props) => {
   const [showAllRoutes, setShowAllRoutes] = React.useState(false);
 
   return (
-    <div className={styles.container}>
+    <div
+      className={[
+        styles.container,
+        showTimeRangeSlider ? styles.containerWithSlider : "",
+      ]
+        .filter(Boolean)
+        .join(" ")}
+    >
       <Seo
         title="Map | Snapshots"
         description="Browse photo locations across the world map."
@@ -229,6 +238,7 @@ const WorldMap: NextPage<PageProps> = (props) => {
       <MapWorldDeferred
         photos={filteredPhotos}
         className={styles.map}
+        fitToPhotos={!hasCameraParams}
         showRoute={!filterAlbum && showAllRoutes}
         routeMode={filterAlbum ? defaultRouteMode : "simplified"}
         routeDisplayMode={

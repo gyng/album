@@ -5,12 +5,19 @@
   padding: var(--m);
   font-size: var(--fs-s);
   border-radius: var(--m-s);
-  border: solid 1px var(--c-bg-contrast-dark);
+  border: solid 1px var(--c-border-on-dark);
   cursor: pointer;
   user-select: none;
   background: transparent;
   color: inherit;
   white-space: nowrap;
+}
+
+@media (hover: none), (pointer: coarse) {
+  .pill {
+    min-height: var(--m-xl);
+    padding: var(--m) var(--m-s);
+  }
 }
 
 .pill:hover,

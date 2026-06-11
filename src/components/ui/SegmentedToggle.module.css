@@ -4,6 +4,10 @@
   border: 1px solid var(--c-bg-contrast-dark);
   border-radius: 999px;
   background: color-mix(in srgb, var(--c-bg) 98%, var(--c-bg-contrast-dark));
+  transition:
+    background-color var(--t-theme),
+    color var(--t-theme),
+    border-color var(--t-theme);
 }
 
 .button {
@@ -12,9 +16,17 @@
   background: transparent;
   color: var(--c-bg-contrast-light);
   font-size: var(--fs-s);
-  padding: 0.35rem 0.65rem;
+  padding: var(--m-xs) var(--m-m);
   border-radius: 999px;
   cursor: pointer;
+  transition:
+    background-color var(--t-fast),
+    color var(--t-fast);
+}
+
+.button:not(.buttonActive):hover {
+  color: var(--c-font);
+  background: color-mix(in srgb, var(--c-bg-contrast-light) 12%, transparent);
 }
 
 .buttonActive {

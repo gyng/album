@@ -20,8 +20,8 @@ body {
   scrollbar-gutter: stable;
 
   transition:
-    background-color 0.15s,
-    color 0.15s;
+    background-color var(--t-theme),
+    color var(--t-theme);
 }
 
 html {
@@ -51,17 +51,27 @@ textarea {
   interpolate-size: allow-keywords;
 
   --m: 4px;
+  --m-xs: 6px;
   --m-s: 8px;
   --m-m: 12px;
   --m-l: 20px;
   --m-xl: 40px;
   --m-2xl: 64px;
+  --fs-2xs: 9px;
   --fs-xs: 10px;
   --fs-s: 11px;
   --fs-sm: 14px;
   --fs-m: 18px;
   --fs-l: 24px;
   --fs-xl: 64px;
+
+  /* Motion tokens — durations, easings, and the theme cross-fade. */
+  --t-fast: 0.12s;
+  --t-base: 0.2s;
+  --t-slow: 0.35s;
+  --t-theme: 0.15s;
+  --ease-out: ease-out;
+  --ease-spring: cubic-bezier(0.22, 1, 0.36, 1);
 
   color-scheme: light dark;
 
@@ -77,6 +87,13 @@ textarea {
   --c-font: light-dark(black, white);
   --c-overlay-dark: rgba(0, 0, 0, 0.72);
   --c-border-on-dark: rgba(255, 255, 255, 0.28);
+
+  /* Semantic status palette (guess game tiers, heatmap "today"). Darker in
+     light theme for contrast on white, brighter in dark theme. */
+  --c-success: light-dark(#16a34a, #22c55e);
+  --c-warning: light-dark(#ca8a04, #eab308);
+  --c-danger: light-dark(#dc2626, #ef4444);
+  --c-today: #2276ff;
   --popup-border: solid 1px color-mix(in srgb, var(--c-bg-contrast-light) 45%, transparent);
   --popup-radius: var(--m-s);
   --popup-shadow: 0 10px 30px rgba(0, 0, 0, 0.18);
@@ -90,4 +107,18 @@ body.light {
 html.dark,
 body.dark {
   color-scheme: dark;
+}
+
+/* Global reduced-motion safety net: neutralise CSS animations/transitions and
+   smooth scrolling for users who ask for less motion. JS-driven motion
+   (confetti, rAF count-ups, scrollIntoView) is guarded separately in code. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

@@ -4,3 +4,15 @@
   color: var(--c-bg-contrast-light);
   font-size: var(--fs-sm);
 }
+
+/* Placeholder while the MapLibre chunk loads, so the map slot reserves its
+   space and the round visibly assembles instead of starting blank. */
+.mapLoading {
+  width: 100%;
+  height: 100%;
+  flex: 1;
+  min-height: 0;
+  border-radius: var(--m-s);
+  background-color: var(--c-bg-contrast-dark);
+  border: 1px solid color-mix(in srgb, var(--c-bg-contrast-light) 30%, transparent);
+}

@@ -150,7 +150,7 @@ export const PhotoSimilarPhotos: React.FC<{
             >
               <span className={styles.similarPhotosLoadMoreTileBody}>
                 <span className={styles.similarPhotosLoadMoreLabel}>
-                  {isLoadingResults ? "Loading..." : "Load more"}
+                  {isLoadingResults ? "Loading…" : "Load more"}
                 </span>
                 <span className={styles.similarPhotosLoadMoreHint}>
                   {isLoadingResults ? "Fetching similar photos" : `Show ${pageSize} more`}

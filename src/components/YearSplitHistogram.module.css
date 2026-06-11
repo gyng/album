@@ -55,16 +55,17 @@
     transparent
   );
   transition:
-    background 0.15s ease,
-    border-color 0.15s ease,
-    transform 0.15s ease;
+    background var(--t-fast) ease,
+    border-color var(--t-fast) ease,
+    transform var(--t-fast) ease;
 }
 
 .cellLink {
   text-decoration: none;
 }
 
-.cell:hover {
+.cell:hover,
+.cell:focus-visible {
   transform: translateY(-1px);
   border-color: color-mix(in srgb, var(--c-accent) 45%, var(--c-font));
 }
@@ -77,11 +78,19 @@
 .count {
   font-size: var(--fs-xs);
   font-weight: 600;
-  color: color-mix(in srgb, white 85%, var(--c-font));
+  /* Track cell intensity: dark cells (high intensity) want light text, pale
+     cells (low intensity) want the theme font colour so the count stays legible
+     instead of being near-white on a pale fill. */
+  color: color-mix(
+    in srgb,
+    white calc(var(--intensity, 0) * 100%),
+    var(--c-font)
+  );
   line-height: 1;
 }
 
-.cell:hover [data-tooltip] {
+.cell:hover [data-tooltip],
+.cell:focus-visible [data-tooltip] {
   opacity: 1;
 }
 
@@ -92,11 +101,11 @@
 
   .monthLabel,
   .count {
-    font-size: 9px;
+    font-size: var(--fs-2xs);
   }
 
   .yearLabel {
-    font-size: 9px;
+    font-size: var(--fs-2xs);
   }
 
   .cell {

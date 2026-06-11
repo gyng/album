@@ -1,17 +1,32 @@
+.page {
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
 .error {
-  width: 100vw;
-  height: 100vh;
+  /* Fill the viewport below the nav strip and centre the grouped content as a
+     single unit (no large dead band between the glyph and the link). */
+  min-height: 70vh;
+  min-height: 70dvh;
   margin: 0;
-  padding: 0;
   display: grid;
-  place-items: center;
-  grid-template-rows: 60% 1fr;
+  place-content: center;
+  justify-items: center;
+  gap: var(--m-l);
+  text-align: center;
+  padding: var(--m-xl);
 }
 
-.error h1 {
-  font-size: 1000%;
+.glyph {
+  font-size: var(--fs-xl);
+  line-height: 1;
 }
 
-.error a {
+.heading {
+  margin: 0;
   font-size: var(--fs-l);
+}
+
+.homeLink {
+  font-size: var(--fs-m);
 }

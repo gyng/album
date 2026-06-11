@@ -26,7 +26,7 @@ const EMPTY_HIGHLIGHTED_YEARS: number[] = [];
 const EMPTY_DATE_SET = new Set<string>();
 
 const formatShortDate = (date: string) =>
-  new Date(`${date}T00:00:00Z`).toLocaleDateString(undefined, {
+  new Date(`${date}T00:00:00Z`).toLocaleDateString("en-GB", {
     year: "numeric",
     month: "short",
     day: "numeric",
@@ -34,14 +34,14 @@ const formatShortDate = (date: string) =>
   });
 
 const formatLongDate = (date: string) =>
-  new Date(`${date}T12:00:00`).toLocaleDateString(undefined, {
+  new Date(`${date}T12:00:00`).toLocaleDateString("en-GB", {
     year: "numeric",
     month: "long",
     day: "numeric",
   });
 
 const formatWeekday = (date: string) =>
-  new Date(`${date}T12:00:00`).toLocaleDateString(undefined, {
+  new Date(`${date}T12:00:00`).toLocaleDateString("en-GB", {
     weekday: "long",
   });
 
@@ -341,7 +341,7 @@ const CalendarHeatmapYear = React.memo(
                         : styles.interactiveCell,
                     ].join(" ")}
                     style={
-                      dominantColor && isInteractive
+                      dominantColor && isInteractive && !isToday
                         ? { backgroundColor: dominantColor }
                         : undefined
                     }
@@ -353,6 +353,7 @@ const CalendarHeatmapYear = React.memo(
                     aria-current={isToday ? "date" : undefined}
                     aria-pressed={isSelected}
                     aria-disabled={!isInteractive}
+                    tabIndex={isInteractive ? undefined : -1}
                     onClick={
                       isInteractive ? () => onSelectDate(date) : undefined
                     }
@@ -483,8 +484,11 @@ export const CalendarHeatmap = ({
     const target = document.querySelector<HTMLElement>(
       `[data-date="${scrollToDate}"]`,
     );
+    const prefersReducedMotion =
+      typeof window !== "undefined" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     target?.scrollIntoView({
-      behavior: "smooth",
+      behavior: prefersReducedMotion ? "auto" : "smooth",
       block: "nearest",
       inline: "nearest",
     });

@@ -9,6 +9,10 @@
   text-decoration: none;
   font-size: var(--fs-s);
   cursor: pointer;
+  transition:
+    background-color var(--t-fast),
+    color var(--t-fast),
+    border-color var(--t-fast);
 }
 
 .base:hover {

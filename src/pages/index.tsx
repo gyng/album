@@ -1,6 +1,6 @@
 import type { GetStaticProps, NextPage } from "next";
 import { Albums } from "../components/Albums";
-import { Footer } from "../components/ui";
+import { Footer, Heading } from "../components/ui";
 import styles from "./Index.module.css";
 import { getAlbums, getImageTimestampRange } from "../services/album";
 import { Block, Content } from "../services/types";
@@ -33,7 +33,9 @@ const Home: NextPage<PageProps> = (context) => {
 
       <main className={styles.main}>
         <GlobalNav currentPage="home" hasPadding={false} />
-        <h1>Snapshots</h1>
+        <Heading level={1} as="h1">
+          Snapshots
+        </Heading>
         <Albums albums={context.albums} />
       </main>
 

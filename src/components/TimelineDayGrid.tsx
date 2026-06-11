@@ -8,7 +8,7 @@ import styles from "./TimelineDayGrid.module.css";
 import { TimelineEntry } from "./timelineTypes";
 
 const formatLongDate = (date: string) =>
-  new Date(`${date}T00:00:00Z`).toLocaleDateString(undefined, {
+  new Date(`${date}T00:00:00Z`).toLocaleDateString("en-GB", {
     year: "numeric",
     month: "long",
     day: "numeric",
@@ -21,7 +21,7 @@ const formatDateTimeTitle = (dateTimeOriginal: string) => {
     return null;
   }
 
-  return parsed.toLocaleString(undefined, {
+  return parsed.toLocaleString("en-GB", {
     year: "numeric",
     month: "long",
     day: "numeric",

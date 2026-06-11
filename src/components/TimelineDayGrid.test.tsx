@@ -73,7 +73,7 @@ describe("TimelineDayGrid", () => {
   it("renders a wrapping day grid with photo links for the selected date", () => {
     render(<TimelineDayGrid date="2024-01-02" entries={entries} />);
 
-    expect(screen.getByRole("heading", { name: /january 2, 2024/i })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: /2 january 2024/i })).toBeTruthy();
     expect(screen.getByText("2 photos")).toBeTruthy();
     expect(screen.getByLabelText("Location summary").textContent).toContain("Akihabara, Chiyoda-ku, Japan");
     expect(screen.getByText("yesterday")).toBeTruthy();

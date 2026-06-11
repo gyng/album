@@ -25,10 +25,10 @@ const formatBytes = (value: number): string => {
 
 const getLabel = (details?: ProgressDetails): string => {
   if (!details || details.total <= 0) {
-    return "Loading...";
+    return "Loading…";
   }
 
-  return `Loading... ${formatBytes(details.loaded)} / ${formatBytes(details.total)}`;
+  return `Loading… ${formatBytes(details.loaded)} / ${formatBytes(details.total)}`;
 };
 
 export const ProgressBar: React.FC<{
@@ -36,8 +36,8 @@ export const ProgressBar: React.FC<{
   hideIfComplete?: boolean;
   details?: ProgressDetails;
 }> = ({ progress, hideIfComplete = true, details }) => {
-  return hideIfComplete && progress < 100 ? (
-    <div style={{ display: "block" }}>
+  return !hideIfComplete || progress < 100 ? (
+    <div className={styles.wrapper}>
       <div className={styles.progressBar}>
         <div className={styles.progress} style={{ width: `${progress}%` }} />
         <div>{getLabel(details)}</div>

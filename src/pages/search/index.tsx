@@ -1,7 +1,9 @@
 import { NextPage } from "next/types";
 import DynamicSearchWithCoi from "../../components/search/DynamicSearchWithCoi";
 import { GlobalNav } from "../../components/GlobalNav";
+import { Footer, Heading } from "../../components/ui";
 import baseStyles from "../Index.module.css";
+import styles from "./search.module.css";
 import React, { useCallback, useState } from "react";
 import { Seo } from "../../components/Seo";
 import { buildCollectionPageJsonLd } from "../../lib/seo";
@@ -59,7 +61,7 @@ const SearchPage: NextPage<PageProps> = (props) => {
               aria-label="Start similarity slideshow for a random image"
               title={
                 searchNavState?.isRandomSimilarLoading
-                  ? "Starting similarity slideshow..."
+                  ? "Starting similarity slideshow…"
                   : "Start similarity slideshow for a random image"
               }
             >
@@ -69,14 +71,15 @@ const SearchPage: NextPage<PageProps> = (props) => {
           }
         />
 
-        <h1>Search</h1>
+        <Heading level={1} as="h1">Search</Heading>
         {searchNavState?.randomExploreError ? (
-          <p style={{ color: "var(--c-accent)", margin: 0 }}>
+          <p className={styles.inlineError}>
             {searchNavState.randomExploreError}
           </p>
         ) : null}
         <DynamicSearchWithCoi onNavStateChange={handleNavStateChange} />
       </main>
+      <Footer />
     </>
   );
 };

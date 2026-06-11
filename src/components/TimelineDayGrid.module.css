@@ -53,7 +53,7 @@
 .source {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--m);
   flex-wrap: wrap;
   font-size: var(--fs-s);
 }

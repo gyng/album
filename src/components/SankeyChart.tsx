@@ -1,3 +1,4 @@
+import React from "react";
 import { ResponsiveSankey } from "@nivo/sankey";
 import { SankeyFlow } from "../util/computeStats";
 import styles from "./SankeyChart.module.css";
@@ -297,6 +298,24 @@ export const SankeyChart: React.FC<Props> = ({
   minLabelHeight = 14,
 }) => {
   const spacing = readCssSpacing("--m-s", FALLBACK_SPACING);
+  const shellRef = React.useRef<HTMLDivElement | null>(null);
+  const [shellWidth, setShellWidth] = React.useState(0);
+
+  React.useEffect(() => {
+    const node = shellRef.current;
+    if (!node || typeof ResizeObserver === "undefined") {
+      return;
+    }
+
+    const observer = new ResizeObserver((entries) => {
+      const width = entries[0]?.contentRect.width ?? node.clientWidth;
+      setShellWidth(width);
+    });
+    observer.observe(node);
+    setShellWidth(node.clientWidth);
+
+    return () => observer.disconnect();
+  }, []);
 
   if (flow.nodes.length === 0 || flow.links.length === 0) {
     return <p className={styles.empty}>{emptyMessage}</p>;
@@ -314,9 +333,20 @@ export const SankeyChart: React.FC<Props> = ({
   }
   const safeHeight = Math.max(minHeight, maxNodesPerColumn * NODE_THICKNESS);
 
+  // The label margins (spacing * 7 each side) can exceed a narrow container,
+  // which makes nivo compute a negative inner SVG width/height and emit console
+  // errors. Clamp the combined horizontal margin to at most 60% of the measured
+  // width so the chart always keeps a positive drawing area.
+  const desiredHorizontalMargin = spacing * 7;
+  const horizontalMargin =
+    shellWidth > 0
+      ? Math.max(0, Math.min(desiredHorizontalMargin, (shellWidth * 0.6) / 2))
+      : desiredHorizontalMargin;
+
   return (
     <div className={styles.wrapper}>
       <div
+        ref={shellRef}
         className={styles.chartShell}
         style={{ ["--sankey-height" as string]: `${safeHeight}px` }}
       >
@@ -324,9 +354,9 @@ export const SankeyChart: React.FC<Props> = ({
           data={chartData}
           margin={{
             top: spacing,
-            right: spacing * 7,
+            right: horizontalMargin,
             bottom: spacing,
-            left: spacing * 7,
+            left: horizontalMargin,
           }}
           align="justify"
           sort="descending"

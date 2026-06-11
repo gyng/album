@@ -1,11 +1,21 @@
-.marker {
-  fill: red;
-  stroke: var(--c-bg-contrast-light);
-  stroke-width: 1px;
-}
-
 .viewOn {
   margin: var(--m) 0 0;
+}
+
+/* Loading placeholder shown while the MapLibre bundle downloads — fills the
+   mini-map container so the layout is reserved and there is visible feedback.
+   Mirrors the world-map loader treatment. */
+.loadingPlaceholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 300px;
+  max-width: 300px;
+  margin: 0;
+  border-radius: var(--m);
+  background: var(--c-bg-contrast-dark);
+  color: var(--c-bg-contrast-light);
+  font-size: var(--fs-sm);
 }
 
 .map {

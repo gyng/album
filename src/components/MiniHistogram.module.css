@@ -22,7 +22,8 @@
   position: relative;
 }
 
-.column:hover [data-tooltip] {
+.column:hover [data-tooltip],
+.column:focus-visible [data-tooltip] {
   opacity: 1;
 }
 

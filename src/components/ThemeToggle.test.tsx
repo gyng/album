@@ -51,7 +51,7 @@ describe("ThemeToggle", () => {
 
     render(<ThemeToggle />);
 
-    expect(screen.getByTitle(/toggle dark mode/i)).toBeTruthy();
+    expect(screen.getByLabelText(/switch to (light|dark) theme/i)).toBeTruthy();
 
     getItemSpy.mockRestore();
     warnSpy.mockRestore();
@@ -69,7 +69,7 @@ describe("ThemeToggle", () => {
       });
 
     render(<ThemeToggle />);
-    fireEvent.click(screen.getByTitle(/toggle dark mode/i));
+    fireEvent.click(screen.getByLabelText(/switch to (light|dark) theme/i));
 
     expect(setItemSpy).toHaveBeenCalled();
 
@@ -81,10 +81,10 @@ describe("ThemeToggle", () => {
   it("keeps showing a theme icon after reset", () => {
     render(<ThemeToggle />);
 
-    fireEvent.click(screen.getByTitle(/reset to system default/i));
+    fireEvent.click(screen.getByLabelText(/reset theme to system default/i));
 
-    expect(screen.getByTitle(/toggle dark mode/i).textContent).toMatch(
-      /☀️|🌙/,
-    );
+    expect(
+      screen.getByLabelText(/switch to (light|dark) theme/i).textContent,
+    ).toMatch(/☀️|🌙/);
   });
 });

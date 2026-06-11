@@ -7,6 +7,7 @@
   margin: 0 auto;
   padding: var(--m-xl);
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: calc(var(--m-xl) * 1.15);
 }
 
@@ -73,13 +74,16 @@
 
 .groups {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: calc(var(--m-xl) * 1.35);
 }
 
 .group {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--m-s);
   scroll-margin-top: 5.5rem;
+  min-width: 0;
 }
 
 .groupHeader {
@@ -99,7 +103,7 @@
 .groupAnchorLink {
   display: inline-flex;
   align-items: baseline;
-  gap: 0.35rem;
+  gap: var(--m-xs);
   color: inherit;
   text-decoration: none;
 }
@@ -109,7 +113,7 @@
   font-size: var(--fs-sm);
   opacity: 0;
   transform: translateY(-1px);
-  transition: opacity 0.12s ease;
+  transition: opacity var(--t-fast) ease;
 }
 
 .groupAnchorLink:hover .groupAnchorMark,
@@ -261,20 +265,6 @@
   line-height: 1;
 }
 
-.funStatLink {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--m);
-  width: fit-content;
-  color: var(--c-bg-contrast-light);
-  text-decoration: none;
-  font-size: var(--fs-s);
-}
-
-.funStatLink:hover {
-  color: var(--c-font);
-}
-
 .visualSummaryGrid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
@@ -412,22 +402,13 @@
   text-decoration: none;
 }
 
-.visualThumbSearchLink {
+/* Positioning hook only — the dark-glass treatment comes from the shared
+   OverlayButton primitive so this matches the search tiles and timeline grid. */
+.visualThumbSearchButton {
   position: absolute;
   right: var(--m-s);
   bottom: var(--m-s);
-  display: inline-flex;
-  align-items: center;
   gap: var(--m);
-  padding: var(--m) var(--m-s);
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--c-bg) 82%, transparent);
-  border: 1px solid color-mix(in srgb, var(--c-bg-contrast-light) 32%, transparent);
-  color: var(--c-font);
-  text-decoration: none;
-  font-size: var(--fs-xs);
-  line-height: 1;
-  box-shadow: 0 6px 18px color-mix(in srgb, black 20%, transparent);
 }
 
 .visualEraThumbLink {
@@ -443,7 +424,7 @@
    than the "🔍 Similar ↗" pill. Hiding the pill here prevents it bleeding out
    of the cell into the gap between adjacent era cards. The thumb itself
    remains clickable to navigate to the photo. */
-.visualEraThumbWrap .visualThumbSearchLink {
+.visualEraThumbWrap .visualThumbSearchButton {
   display: none;
 }
 
@@ -573,28 +554,23 @@
 }
 
 @media (hover: hover) and (pointer: fine) {
-  .visualThumbSearchLink {
+  .visualThumbSearchButton {
     opacity: 0;
     transform: translateY(0.2rem);
     pointer-events: none;
     transition:
-      opacity 160ms ease,
-      transform 160ms ease,
-      border-color 160ms ease,
-      color 160ms ease,
-      background-color 160ms ease;
+      opacity var(--t-fast) ease,
+      transform var(--t-fast) ease,
+      border-color var(--t-fast),
+      color var(--t-fast),
+      background-color var(--t-fast);
   }
 
-  .visualThumbWrap:hover .visualThumbSearchLink,
-  .visualThumbWrap:focus-within .visualThumbSearchLink {
+  .visualThumbWrap:hover .visualThumbSearchButton,
+  .visualThumbWrap:focus-within .visualThumbSearchButton {
     opacity: 1;
     transform: translateY(0);
     pointer-events: auto;
-  }
-
-  .visualThumbSearchLink:hover {
-    background: color-mix(in srgb, var(--c-bg) 72%, transparent);
-    border-color: color-mix(in srgb, var(--c-bg-contrast-light) 54%, transparent);
   }
 }
 
@@ -697,6 +673,14 @@
   justify-content: flex-start;
 }
 
+/* The gap pill hangs to the left of the rail (right: 100% + gap). The rail is
+   the left-most column in the aligned layout, so without a reserved gutter the
+   pill is clipped off the viewport edge for left-column cards. Reserve its width
+   as left padding on the timeline so the pill stays inside the card. */
+.revisitedPlaceCard .visualTimeline {
+  padding-left: calc(3.5rem + var(--m-s));
+}
+
 .loadMoreButton {
   width: fit-content;
   padding: var(--m-s) var(--m-m);
@@ -736,7 +720,7 @@
   height: 0.7rem;
   border-radius: 999px;
   flex: 0 0 auto;
-  border: 1px solid color-mix(in srgb, white 72%, transparent);
+  border: 1px solid color-mix(in srgb, var(--c-bg) 55%, transparent);
 }
 
 .colourSectionGrid {
@@ -763,6 +747,10 @@
 .colorFamilyRows {
   display: grid;
   gap: var(--m);
+  /* The label column plus up to six representative thumbnails fill ~64rem; cap
+     the rows there so the right-hand whitespace reads as intentional rather
+     than the rows stranding half-way across a wide section. */
+  max-width: min(100%, 64rem);
 }
 
 .colorFamilyRow {
@@ -871,7 +859,8 @@
   min-width: 3px;
 }
 
-.colorTimeSegment:hover {
+.colorTimeSegment:hover,
+.colorTimeSegment:focus-visible {
   filter: brightness(1.08);
   z-index: 2;
 }
@@ -929,7 +918,7 @@
   width: 0.65rem;
   height: 0.65rem;
   border-radius: 999px;
-  border: 1px solid color-mix(in srgb, white 68%, transparent);
+  border: 1px solid color-mix(in srgb, var(--c-bg) 55%, transparent);
   flex: 0 0 auto;
 }
 
@@ -947,7 +936,8 @@
   color: var(--c-bg-contrast-light);
 }
 
-.colorTimeSegment:hover .colorTimeTooltip {
+.colorTimeSegment:hover .colorTimeTooltip,
+.colorTimeSegment:focus-visible .colorTimeTooltip {
   opacity: 1;
 }
 
@@ -1030,7 +1020,7 @@
       "meta"
       "bar"
       "summary";
-    gap: 0.45rem;
+    gap: var(--m-s);
   }
 
   .colorTimeMeta {

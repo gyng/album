@@ -96,6 +96,36 @@ export const SearchFacetPanel: React.FC<Props> = ({
     selectedFacets.map((selection) => serializeSearchFacetSelection(selection)),
   );
 
+  const categoryTabRefs = React.useRef<
+    Record<FilterCategoryId, HTMLButtonElement | null>
+  >({} as Record<FilterCategoryId, HTMLButtonElement | null>);
+
+  const handleCategoryKeyDown = (
+    event: React.KeyboardEvent<HTMLButtonElement>,
+  ) => {
+    const isForward = event.key === "ArrowRight" || event.key === "ArrowDown";
+    const isBackward = event.key === "ArrowLeft" || event.key === "ArrowUp";
+    if (!isForward && !isBackward) {
+      return;
+    }
+
+    event.preventDefault();
+    const currentIndex = FILTER_CATEGORIES.findIndex(
+      (category) => category.id === selectedCategory,
+    );
+    const delta = isForward ? 1 : -1;
+    const nextIndex =
+      (currentIndex + delta + FILTER_CATEGORIES.length) %
+      FILTER_CATEGORIES.length;
+    const nextCategory = FILTER_CATEGORIES[nextIndex];
+    if (!nextCategory) {
+      return;
+    }
+
+    onSelectCategory(nextCategory.id);
+    categoryTabRefs.current[nextCategory.id]?.focus();
+  };
+
   const visibleSections =
     selectedCategory === "tags" || selectedCategory === "color"
       ? []
@@ -128,7 +158,13 @@ export const SearchFacetPanel: React.FC<Props> = ({
               key={category.id}
               type="button"
               role="tab"
+              id={`search-filter-tab-${category.id}`}
               aria-selected={isActive}
+              aria-controls="search-filters-content"
+              tabIndex={isActive ? 0 : -1}
+              ref={(element) => {
+                categoryTabRefs.current[category.id] = element;
+              }}
               className={[
                 styles.facetCategoryTab,
                 isActive ? styles.facetCategoryTabActive : "",
@@ -136,6 +172,7 @@ export const SearchFacetPanel: React.FC<Props> = ({
               onClick={() => {
                 onSelectCategory(category.id);
               }}
+              onKeyDown={handleCategoryKeyDown}
             >
               {category.label}
             </button>
@@ -143,7 +180,12 @@ export const SearchFacetPanel: React.FC<Props> = ({
         })}
       </div>
 
-      <div className={styles.facetCategoryContent}>
+      <div
+        id="search-filters-content"
+        role="tabpanel"
+        aria-labelledby={`search-filter-tab-${selectedCategory}`}
+        className={styles.facetCategoryContent}
+      >
         {isLoading ? (
           <div className={styles.searchModeStatus}>Loading filters…</div>
         ) : null}

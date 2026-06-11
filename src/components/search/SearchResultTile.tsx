@@ -31,7 +31,7 @@ export const SearchResultTile = (props: {
   const { result, onFindSimilar, onSearchByColor, persistColorAction = false } =
     props;
 
-  let colour = "rgba(255, 255, 255, 0.2)";
+  let colour = "var(--c-border-on-dark)";
   const palette = result.colors ? parseColorPalette(result.colors) : [];
   if (result.colors) {
     const firstColor = palette[0];
@@ -89,7 +89,10 @@ export const SearchResultTile = (props: {
   return (
     <div className={styles.card}>
       {similarityLabel ? (
-        <div className={styles.similarityBadge} title={scoreTitle}>
+        <div
+          className={`${styles.overlayBadge} ${styles.similarityBadge}`}
+          title={scoreTitle}
+        >
           {similarityLabel}
         </div>
       ) : null}
@@ -147,16 +150,18 @@ export const SearchResultTile = (props: {
           </div>
           <div className={styles.details}>
             <div className={styles.source}>
-                <div className={styles.sourceText}>{albumName}</div>
-                <div className={styles.sourceText}>
-                  {dateTimeOriginal
-                    ? ", " +
-                      getRelativeTimeString(dateTimeOriginal, {
-                        short: true,
-                      }).replace(" ago", "")
-                    : null}
-                </div>
+              <div className={styles.sourceText}>
+                {albumName}
+                {dateTimeOriginal ? "," : null}
               </div>
+              {dateTimeOriginal ? (
+                <div className={styles.sourceText}>
+                  {getRelativeTimeString(dateTimeOriginal, {
+                    short: true,
+                  }).replace(" ago", "")}
+                </div>
+              ) : null}
+            </div>
           </div>
         </div>
       </Link>

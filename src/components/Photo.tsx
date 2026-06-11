@@ -130,7 +130,7 @@ type ExifRow =
       /** Display value */
       v: ExifCellValue;
       valid?: boolean;
-      style?: React.CSSProperties;
+      className?: string;
     }
   | {
       kind: "coordinates";
@@ -184,7 +184,12 @@ export const ExifTable: React.FC<{
             switch (row.kind) {
               case "kv":
                 return row.v ? (
-                  <ExifRow key={row.k} k={row.k} v={row.v} style={row.style} />
+                  <ExifRow
+                    key={row.k}
+                    k={row.k}
+                    v={row.v}
+                    className={row.className}
+                  />
                 ) : null;
               case "coordinates":
                 return (
@@ -213,7 +218,7 @@ export const ExifRow: React.FC<{
   k: string;
   v: ExifCellValue;
   valid?: boolean;
-  style?: React.CSSProperties;
+  className?: string;
 }> = (props) => {
   if (props.valid === false) {
     return null;
@@ -222,7 +227,7 @@ export const ExifRow: React.FC<{
   return (
     <tr>
       <td>{props.k}</td>
-      <td style={props.style}>{props.v}</td>
+      <td className={props.className}>{props.v}</td>
     </tr>
   );
 };
@@ -412,8 +417,11 @@ export const PhotoBlockEl: React.FC<{
                       v: (() => {
                         const t = props.block._build.exif.ExposureTime;
                         if (!t) return undefined;
+                        // FRACTION_SLASH gives us nice ligatured fractions (eg,
+                        // 1⁄10). The fraction already communicates the value, so
+                        // drop the raw float to avoid 19 digits of noise.
                         return t < 1
-                          ? `${new Fraction(t).toFraction().replace("/", FRACTION_SLASH)}; ${t}s` // FRACTION_SLASH gives us nice ligatured fractions (eg, 1⁄10)
+                          ? `${new Fraction(t).toFraction().replace("/", FRACTION_SLASH)}s`
                           : `${t}s`;
                       })(),
                       valid: Boolean(props.block._build.exif.ExposureTime),
@@ -502,12 +510,18 @@ export const PhotoBlockEl: React.FC<{
                       kind: "kv",
                       k: "Camera datetime",
                       v: [
-                        props.block._build.exif.OffsetTime
-                          ? `${props.block._build.exif.DateTimeOriginal} (local @ ${props.block._build.exif.OffsetTime})`
-                          : props.block._build.exif.DateTimeOriginal?.replace(
-                              /Z$/,
-                              "",
-                            ),
+                        // Strip the millisecond/UTC "Z" suffix before labelling
+                        // the value as local — a Z-suffixed string asserts UTC,
+                        // which contradicts the "(local @ …)" note.
+                        (() => {
+                          const local = props.block._build.exif.DateTimeOriginal?.replace(
+                            /(\.\d+)?Z$/,
+                            "",
+                          );
+                          return props.block._build.exif.OffsetTime
+                            ? `${local} (local @ ${props.block._build.exif.OffsetTime})`
+                            : local;
+                        })(),
                         getRelativeTimeString(
                           new Date(props.block._build.exif.DateTimeOriginal ?? ""),
                         ),
@@ -537,7 +551,7 @@ export const PhotoBlockEl: React.FC<{
                       k: "Tags",
                       v: props.block._build?.tags?.tags,
                       valid: Boolean(props.block._build.tags),
-                      style: { width: "min-content" },
+                      className: styles.narrowCell,
                     },
                     {
                       kind: "kv",
@@ -570,13 +584,13 @@ export const PhotoBlockEl: React.FC<{
                       kind: "kv",
                       k: "Description (AI)",
                       v: props.block._build?.tags?.alt_text,
-                      style: { width: "min-content" },
+                      className: styles.narrowCell,
                       valid: Boolean(props.block._build.tags?.alt_text),
                     },
                   ]}
                 />
 
-                <div style={{ margin: "0 0 var(--m-l)" }}>
+                <div className={styles.similarPhotosWrap}>
                   <PhotoSimilarPhotosDeferred
                     path={props.block._build?.tags?.path}
                   />

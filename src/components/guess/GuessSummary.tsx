@@ -1,4 +1,4 @@
-import React, { useCallback, useRef, useState } from "react";
+import React, { useCallback, useState } from "react";
 import Link from "next/link";
 import { Heading, Caption } from "../ui";
 import { RoundResult } from "./GuessRound";
@@ -9,6 +9,7 @@ import {
   formatDistance,
   scoreTierColour,
 } from "./guessScoring";
+import { useAnimatedCounter } from "./useAnimatedCounter";
 import styles from "./GuessSummary.module.css";
 
 type GuessSummaryProps = {
@@ -36,44 +37,19 @@ const getRating = (
 
 const getGeocodeLabel = (geocode: string): string | null => {
   if (!geocode) return null;
-  const parts = geocode
+  let parts = geocode
     .split("\n")
     .map((s) => s.trim())
     .filter(Boolean);
   if (parts.length === 0) return null;
+  // Drop a leading 2-letter country code when a fuller place name follows,
+  // so "JP\nJapan" reads as "Japan" rather than the redundant "JP, Japan".
+  if (parts.length >= 2 && /^[A-Z]{2}$/.test(parts[0])) {
+    parts = parts.slice(1);
+  }
+  if (parts.length === 0) return null;
   if (parts.length >= 2) return `${parts[0]}, ${parts[parts.length - 1]}`;
   return parts[0];
-};
-
-/** Imperatively animates a DOM element's textContent from 0 to target. */
-const useAnimatedCounter = (
-  target: number,
-  durationMs = 800,
-): React.RefCallback<HTMLElement> => {
-  const rafRef = useRef<number>(0);
-
-  return useCallback(
-    (node: HTMLElement | null) => {
-      cancelAnimationFrame(rafRef.current);
-      if (!node) return;
-      if (target === 0) {
-        node.textContent = "0";
-        return;
-      }
-      const start = performance.now();
-      const animate = (now: number) => {
-        const elapsed = now - start;
-        const progress = Math.min(elapsed / durationMs, 1);
-        const eased = 1 - Math.pow(1 - progress, 3);
-        node.textContent = Math.round(eased * target).toLocaleString();
-        if (progress < 1) {
-          rafRef.current = requestAnimationFrame(animate);
-        }
-      };
-      rafRef.current = requestAnimationFrame(animate);
-    },
-    [target, durationMs],
-  );
 };
 
 const buildShareUrl = (seed: string, settings: GameSettings): string => {

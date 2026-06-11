@@ -8,8 +8,8 @@
   opacity: 1;
   filter: grayscale(0);
   transition:
-    opacity 0.24s ease-out,
-    filter 0.2s ease-out;
+    opacity var(--fade-duration) ease-out,
+    filter var(--t-base) ease-out;
   z-index: 100;
   touch-action: manipulation;
   -webkit-user-select: none;
@@ -19,11 +19,6 @@
 
 .image.cover {
   object-fit: cover !important;
-}
-
-.previousImage {
-  z-index: 90;
-  pointer-events: none;
 }
 
 /* Cross-fade layer state. Every layer (.image or .remixGrid) defaults to
@@ -53,7 +48,7 @@
   z-index: 100;
   cursor: pointer;
   opacity: 1;
-  transition: opacity 0.28s ease-out;
+  transition: opacity var(--fade-duration) ease-out;
   -webkit-user-select: none;
   user-select: none;
   -webkit-touch-callout: none;
@@ -126,10 +121,32 @@
   pointer-events: none;
   text-align: center;
   text-shadow:
-    1px 2px 2px hsl(0 0% 0% / 0.333),
+    0 1px 3px hsl(0 0% 0% / 0.55),
+    1px 2px 2px hsl(0 0% 0% / 0.45),
     2px 4px 4px hsl(0 0% 0% / 0.333),
     3px 6px 6px hsl(0 0% 0% / 0.333);
   color: white;
+}
+
+/* Subtle bottom scrim so white captions stay legible over predominantly
+   bright photos (e.g. a near-white bokeh frame). Pinned to the viewport
+   bottom rather than the stack's own box, since the stack's height varies
+   with content (and is full-height in 4-up). Sits within the stack's
+   stacking context (z-index 200), so it darkens the photo beneath the
+   captions without ever covering them. */
+.bottomBarStack::before {
+  content: "";
+  position: fixed;
+  inset: auto 0 0 0;
+  height: 28vh;
+  z-index: -1;
+  pointer-events: none;
+  background: linear-gradient(
+    to top,
+    hsl(0 0% 0% / 0.42),
+    hsl(0 0% 0% / 0.18) 45%,
+    transparent
+  );
 }
 
 .bottomBarStack[data-count="1"] {
@@ -246,10 +263,6 @@
   margin-top: 0;
 }
 
-.previousImageHidden {
-  opacity: 0;
-}
-
 .preloadBuffer {
   position: fixed;
   width: 1px;
@@ -261,6 +274,21 @@
 }
 
 .container {
+  /* Local dark-glass palette — one source of truth for the always-dark
+     slideshow chrome, seeded from the shared overlay tokens (the same glass
+     OverlayButton uses on media). --glass-bg is the panel surface; the soft
+     and strong variants are deliberately lighter/darker, derived from the
+     token via color-mix so they stay in lockstep rather than drifting as
+     hand-rolled hsl() literals. --glass-border matches the on-dark border. */
+  --glass-bg: var(--c-overlay-dark);
+  --glass-bg-soft: color-mix(in srgb, var(--c-overlay-dark) 69%, transparent);
+  --glass-bg-strong: color-mix(in srgb, var(--c-overlay-dark) 80%, black 20%);
+  --glass-border: var(--c-border-on-dark);
+  /* One shared cross-fade duration for every layer in the stack (.image and
+     .remixGrid) so an image↔grid advance fades at a single constant rate
+     rather than two slightly different speeds (was 0.24s for images, 0.28s
+     for grids — this midpoint keeps the established feel). */
+  --fade-duration: 0.26s;
   --touch-toolbar-show-preview-progress: 0;
   --touch-toolbar-hide-preview-progress: 0;
   position: fixed;
@@ -285,6 +313,37 @@
   position: fixed;
   display: grid;
   place-items: center;
+}
+
+/* The slideshow renders a ThemeToggle purely so its layout effect seeds the
+   document theme classes; it must never be visible. Moved off an inline
+   display:none into the module per the CSS-Modules-only convention. */
+.hiddenThemeToggle {
+  display: none;
+}
+
+/* Boot/error screen: keeps feedback on the canvas between the database
+   download finishing and the first slide committing. Theme-aware (the page
+   honours the user's light/dark choice before the always-dark slideshow
+   chrome mounts), so it uses tokens rather than fixed white. */
+.bootScreen {
+  display: grid;
+  justify-items: center;
+  gap: var(--m-l);
+  text-align: center;
+}
+
+.bootStatus {
+  color: var(--c-bg-contrast-light);
+  font-size: var(--fs-sm);
+  letter-spacing: 0.02em;
+}
+
+.bootHomeLink {
+  color: var(--c-accent);
+  font-size: var(--fs-s);
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 
 .toolbar {
@@ -342,7 +401,7 @@
   transform: translateX(-50%);
   padding: calc(var(--m-s) * 0.75) var(--m-l);
   border-radius: 999px;
-  background: hsl(0 0% 0% / 0.5);
+  background: var(--glass-bg-soft);
   color: hsl(0 0% 100% / 0.82);
   font-size: var(--fs-s);
   letter-spacing: 0.03em;
@@ -385,9 +444,9 @@
   z-index: 10001;
   min-height: calc(var(--m-xl) + var(--m));
   padding: 0 var(--m-l);
-  border: 1px solid hsl(0 0% 100% / 0.18);
+  border: 1px solid var(--glass-border);
   border-radius: 999px;
-  background: hsl(0 0% 0% / 0.58);
+  background: var(--glass-bg-soft);
   color: hsl(0 0% 100% / 0.92);
   font-size: var(--fs-s);
   font-weight: 600;
@@ -400,7 +459,7 @@
 
 .fullscreenExitButton:hover,
 .fullscreenExitButton:focus-visible {
-  background: hsl(0 0% 0% / 0.74);
+  background: var(--glass-bg-strong);
   color: white;
 }
 
@@ -442,7 +501,7 @@
   width: var(--m-xl);
   height: var(--m-xl);
   border-radius: 999px;
-  background: hsl(0 0% 0% / 0.42);
+  background: color-mix(in srgb, var(--c-overlay-dark) 58%, transparent);
   color: hsl(0 0% 100% / 0.92);
   backdrop-filter: blur(10px);
   scale: calc(1 + var(--touch-pull-progress, 0) * 0.1);
@@ -483,7 +542,7 @@
   width: var(--m-2xl);
   height: var(--m-2xl);
   border-radius: 999px;
-  background: hsl(0 0% 0% / 0.28);
+  background: color-mix(in srgb, var(--c-overlay-dark) 39%, transparent);
   color: hsl(0 0% 100% / 0.58);
   opacity: 0;
   transform: translateY(-50%);
@@ -529,7 +588,7 @@
 .touchAffordances[data-touch-hint="previous"] .touchSideAffordanceLeft,
 .touchAffordances[data-touch-hint="next"] .touchSideAffordanceRight {
   opacity: calc(0.82 + (var(--touch-swipe-progress, 0) * 0.18));
-  background: hsl(0 0% 0% / 0.5);
+  background: var(--glass-bg-soft);
   color: hsl(0 0% 100% / 0.95);
   box-shadow:
     0 0 0 calc(var(--touch-swipe-progress, 0) * 1.5px) hsl(0 0% 100% / 0.55);
@@ -635,7 +694,7 @@
   gap: 2px;
   padding: calc(var(--m-s) * 0.75) var(--m-m);
   border-radius: calc(var(--m-s) * 1.5);
-  background: hsl(0 0% 8% / 0.72);
+  background: var(--glass-bg);
   color: hsl(0 0% 100% / 0.78);
   font-variant-numeric: tabular-nums;
   line-height: 1.15;
@@ -662,7 +721,7 @@
   gap: var(--m-m);
   padding: var(--m-s);
   border-radius: calc(var(--m-s) * 1.5);
-  background: hsl(0 0% 8% / 0.72);
+  background: var(--glass-bg);
   box-shadow:
     0 18px 40px hsl(0 0% 0% / 0.25),
     inset 0 1px 0 hsl(0 0% 100% / 0.08);
@@ -717,7 +776,7 @@
   height: 1.5rem;
   flex: 0 0 1px;
   margin: 0 calc(var(--m-s) * 0.75);
-  background: hsl(0 0% 100% / 0.18);
+  background: var(--glass-border);
   border-radius: 1px;
 }
 
@@ -741,7 +800,7 @@
   gap: var(--m-s);
   padding: var(--m-s);
   border-radius: calc(var(--m-s) * 1.5);
-  background: hsl(0 0% 8% / 0.72);
+  background: var(--glass-bg);
   box-shadow:
     0 18px 40px hsl(0 0% 0% / 0.25),
     inset 0 1px 0 hsl(0 0% 100% / 0.08);
@@ -876,6 +935,12 @@
   }
 }
 
+/* Deliberate one-off breakpoint (not part of the standard 720/900/480/400
+   set): the toolbar is a wide multi-section overlay — brand + playback +
+   control groups laid out in a row — that needs to stack into a single column
+   well before the 720px mobile breakpoint, otherwise the groups overflow on
+   tablets and small laptops. 1024px is where the three groups stop fitting
+   side by side. */
 @media (max-width: 1024px) {
   .toolbar {
     padding: calc(env(safe-area-inset-top, 0px) + var(--m-l)) var(--m-l)
@@ -986,7 +1051,7 @@
   transform: translateX(-50%);
   padding: calc(var(--m-s) * 0.75) var(--m-l);
   border-radius: 999px;
-  background: hsl(0 0% 0% / 0.5);
+  background: var(--glass-bg-soft);
   color: hsl(0 0% 100% / 0.82);
   font-size: var(--fs-s);
   letter-spacing: 0.03em;

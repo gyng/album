@@ -3,12 +3,15 @@ import { Database } from "@sqlite.org/sqlite-wasm";
 import { Heading, Caption, Select, SegmentedToggle } from "../ui";
 import { fetchGuessRegions, GuessRegionOption } from "../search/api";
 import { GameSettings } from "./guessTypes";
+import { isInteractiveTarget } from "./guessKeyboard";
 import styles from "./GuessLobby.module.css";
 
 type GuessLobbyProps = {
   database: Database;
   defaults: GameSettings;
   onStart: (settings: GameSettings) => void;
+  /** Shown as an inline error above the start buttons (e.g. after a failed load). */
+  error?: string | null;
 };
 
 type TimerValue = "off" | "30" | "15";
@@ -38,6 +41,7 @@ export const GuessLobby: React.FC<GuessLobbyProps> = ({
   database,
   defaults,
   onStart,
+  error,
 }) => {
   const [regions, setRegions] = useState<GuessRegionOption[]>([]);
   const [totalPhotos, setTotalPhotos] = useState(0);
@@ -79,12 +83,13 @@ export const GuessLobby: React.FC<GuessLobbyProps> = ({
     });
   }, [onStart]);
 
-  // Enter/Space to start
+  // Enter/Space to start — but only when focus is not on an interactive
+  // control, so tabbing to the Daily/Timer/Rounds buttons keeps their native
+  // activation instead of always starting the game.
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
       if (event.key === "Enter" || event.key === " ") {
-        // Don't fire if user is interacting with a select
-        if ((event.target as HTMLElement)?.tagName === "SELECT") return;
+        if (isInteractiveTarget(event.target)) return;
         event.preventDefault();
         handleStart();
       }
@@ -103,7 +108,7 @@ export const GuessLobby: React.FC<GuessLobbyProps> = ({
       </div>
 
       <div className={styles.options}>
-        <label className={styles.optionRow} style={{ animationDelay: "0.05s" }}>
+        <label className={styles.optionRow}>
           <span className={styles.optionLabel}>Region</span>
           <Select
             value={region}
@@ -119,7 +124,7 @@ export const GuessLobby: React.FC<GuessLobbyProps> = ({
           </Select>
         </label>
 
-        <div className={styles.optionRow} style={{ animationDelay: "0.1s" }}>
+        <div className={styles.optionRow}>
           <span className={styles.optionLabel}>Timer</span>
           <SegmentedToggle
             options={TIMER_OPTIONS}
@@ -129,7 +134,7 @@ export const GuessLobby: React.FC<GuessLobbyProps> = ({
           />
         </div>
 
-        <div className={styles.optionRow} style={{ animationDelay: "0.15s" }}>
+        <div className={styles.optionRow}>
           <span className={styles.optionLabel}>Rounds</span>
           <SegmentedToggle
             options={ROUND_OPTIONS}
@@ -144,6 +149,12 @@ export const GuessLobby: React.FC<GuessLobbyProps> = ({
         <Caption as="p" className={styles.photoCount}>
           {selectedCount.toLocaleString()} photos available
         </Caption>
+      ) : null}
+
+      {error ? (
+        <p className={styles.error} role="alert">
+          {error}
+        </p>
       ) : null}
 
       <div className={styles.buttonRow}>

@@ -87,8 +87,8 @@
 }
 
 .bestRound {
-  border: 1px solid color-mix(in srgb, #22c55e 35%, transparent);
-  background-color: color-mix(in srgb, #22c55e 6%, var(--c-bg));
+  border: 1px solid color-mix(in srgb, var(--c-success) 35%, transparent);
+  background-color: color-mix(in srgb, var(--c-success) 6%, var(--c-bg));
 }
 
 @keyframes rowSlide {
@@ -220,6 +220,13 @@
 .playAgain:active,
 .shareButton:active {
   transform: scale(0.97);
+}
+
+.playAgain:focus-visible,
+.shareButton:focus-visible,
+.changeSettings:focus-visible {
+  outline: solid 2px var(--c-bg-contrast-light);
+  outline-offset: 2px;
 }
 
 .footer {

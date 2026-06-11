@@ -1,4 +1,5 @@
 .nav {
+  position: relative;
   padding: var(--m-m) var(--m-l);
   /* Width of each edge fade. Set to 0 by default; the .scrollable* modifiers
      below switch them on. The .topBar mask-image (in common.module.css) reads
@@ -25,4 +26,31 @@
 
 .scrollableRight {
   --nav-fade-right: var(--m-xl);
+}
+
+/* Visually hidden until focused, then surfaces as a standard pill at the top
+   of the nav so keyboard users can jump past the repeated links. */
+.skipLink {
+  position: absolute;
+  left: var(--m-s);
+  top: var(--m-s);
+  z-index: 10;
+  padding: var(--m-s) var(--m-m);
+  border-radius: var(--m-s);
+  background-color: var(--c-bg);
+  border: solid 2px var(--c-bg-contrast-light);
+  color: var(--c-font);
+  font-size: var(--fs-sm);
+  text-decoration: none;
+  transform: translateY(calc(-100% - var(--m-l)));
+  opacity: 0;
+  pointer-events: none;
+}
+
+.skipLink:focus-visible {
+  transform: translateY(0);
+  opacity: 1;
+  pointer-events: auto;
+  outline: solid 2px var(--c-bg-contrast-light);
+  outline-offset: 2px;
 }

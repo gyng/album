@@ -22,7 +22,7 @@
   max-width: calc(100vw - var(--m-m));
   scrollbar-gutter: stable;
   z-index: 300;
-  margin-top: -40px;
+  margin-top: calc(-1 * var(--m-xl));
 }
 
 .detailsContent {
@@ -54,6 +54,19 @@
   user-select: none;
   cursor: pointer;
   color: var(--c-bg-contrast-light);
+}
+
+/* The top-level photo-details toggle shows a custom ⓘ glyph, so hide the
+   native disclosure triangle (the nested Raw EXIF / License disclosures keep
+   theirs). Enlarge the touch target towards 44px for the sole mobile
+   affordance to photo metadata. */
+.detailsSummary {
+  list-style: none;
+  padding: var(--m-s);
+}
+
+.detailsSummary::-webkit-details-marker {
+  display: none;
 }
 
 .block {
@@ -132,7 +145,7 @@
   justify-content: flex-end;
   width: 100%;
   height: 100%;
-  padding: 12px;
+  padding: var(--m-m);
   border-radius: var(--m-s);
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(0, 0, 0, 0.16)),
@@ -165,7 +178,7 @@
 }
 
 .similarPhotosLoadMoreHint {
-  margin-top: 4px;
+  margin-top: var(--m);
   color: var(--c-bg-contrast-light);
   font-size: var(--fs-s);
 }
@@ -204,11 +217,30 @@
 }
 
 .immersive .overlayHeader {
+  position: relative;
   grid-row: 1;
   grid-column: 1;
   z-index: 200;
   pointer-events: none;
-  text-shadow: 0 0 8px rgba(0, 0, 0, 0.5);
+  /* Force a photo-safe colour: the text sits directly over an arbitrary
+     image, so it must stay light-on-dark regardless of the active theme. */
+  color: white;
+  text-shadow: 0 1px 12px rgba(0, 0, 0, 0.6);
+}
+
+/* Subtle bottom gradient scrim so the caption stays legible over busy or
+   bright photos. */
+.immersive .overlayHeader::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 40vh;
+  height: 40svh;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.55), transparent);
+  pointer-events: none;
+  z-index: -1;
 }
 
 .immersive .title {
@@ -220,7 +252,7 @@
 .immersive .description {
   margin-bottom: 15vh;
   margin-bottom: 15svh;
-  text-shadow: black;
+  text-shadow: 0 1px 12px rgba(0, 0, 0, 0.8);
   font-size: var(--fs-l);
   margin-top: auto;
   pointer-events: auto;
@@ -237,6 +269,13 @@
 
 .title {
   font-size: var(--fs-xl);
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 720px) {
+  .title {
+    font-size: clamp(var(--fs-l), 10vw, var(--fs-xl));
+  }
 }
 
 .kicker {
@@ -267,8 +306,16 @@
   flex-direction: row;
 }
 
+.similarPhotosWrap {
+  margin: 0 0 var(--m-l);
+}
+
+.narrowCell {
+  width: min-content;
+}
+
 .detailValueWithAction {
   display: inline-flex;
   align-items: baseline;
-  gap: 0.35rem;
+  gap: var(--m-xs);
 }

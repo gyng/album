@@ -1,4 +1,5 @@
 import { NextPage } from "next/types";
+import Link from "next/link";
 import React, { useEffect, useCallback } from "react";
 import {
   useDatabase,
@@ -1662,21 +1663,38 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
   }, [slideKey, layers]);
 
   if (currentPhotoPath === null) {
+    // Effective download progress for whichever database the current mode is
+    // waiting on. The ProgressBar hides itself at 100%, so once the download
+    // finishes we keep a "Preparing slideshow…" status visible until the first
+    // slide commits (currentPhotoPath stops being null) rather than dropping to
+    // a featureless black screen while fetchSlideshowPhotos resolves.
+    const bootProgress =
+      slideshowMode === "similar" && !embeddingsDatabase
+        ? embeddingsProgress
+        : progress;
     return (
       <div className={styles.progressBarContainer}>
-        <div style={{ display: "none" }}>
+        <div className={styles.hiddenThemeToggle}>
           <ThemeToggle />
         </div>
         {slideshowError ? (
-          <div className={commonStyles.toast}>{slideshowError}</div>
+          <div className={commonStyles.toast}>
+            {slideshowError}{" "}
+            <Link href="/" className={styles.bootHomeLink}>
+              Back to home
+            </Link>
+          </div>
         ) : (
-          <ProgressBar
-            progress={
-              slideshowMode === "similar" && !embeddingsDatabase
-                ? embeddingsProgress
-                : progress
-            }
-          />
+          <div className={styles.bootScreen}>
+            {bootProgress < 100 ? (
+              <ProgressBar progress={bootProgress} />
+            ) : (
+              <p className={styles.bootStatus}>Preparing slideshow…</p>
+            )}
+            <Link href="/" className={styles.bootHomeLink}>
+              Exit to home
+            </Link>
+          </div>
         )}
       </div>
     );

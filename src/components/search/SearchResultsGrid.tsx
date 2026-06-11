@@ -14,6 +14,7 @@ type Props = {
   similarPath: string | null;
   results: SearchResultRow[] | undefined;
   isSuccess: boolean;
+  isError: boolean;
   isFetching: boolean;
   isPlaceholderData: boolean;
   hasNextPage: boolean;
@@ -33,6 +34,7 @@ export const SearchResultsGrid: React.FC<Props> = ({
   similarPath,
   results,
   isSuccess,
+  isError,
   isFetching,
   isPlaceholderData,
   hasNextPage,
@@ -55,14 +57,23 @@ export const SearchResultsGrid: React.FC<Props> = ({
 
   return (
     <ul className={styles.results}>
+      {isError && !isFetching ? (
+        <li className={styles.inlineError}>
+          Something went wrong running this search. Try again or adjust your
+          query.
+        </li>
+      ) : null}
+
       {isSuccess && !isFetching && results?.length === 0 && isSimilarMode ? (
-        <div>
+        <li className={styles.sectionStatus}>
           No similar results for <i>{similarPath?.split("/").at(-1)}</i>
-        </div>
+        </li>
       ) : null}
 
       {isSuccess && !isFetching && results?.length === 0 && isPureColorSearch ? (
-        <div>No photos with a similar colour found.</div>
+        <li className={styles.sectionStatus}>
+          No photos with a similar colour found.
+        </li>
       ) : null}
 
       {isSuccess &&
@@ -70,7 +81,7 @@ export const SearchResultsGrid: React.FC<Props> = ({
       results?.length === 0 &&
       !isSimilarMode &&
       (hasTextQuery || hasFacetFilters || isColorMode) ? (
-        <div>
+        <li className={styles.sectionStatus}>
           {hasTextQuery ? (
             <>
               No results for <i>{trimmedQuery}</i>
@@ -78,7 +89,7 @@ export const SearchResultsGrid: React.FC<Props> = ({
           ) : (
             <>No results for the selected filters.</>
           )}
-        </div>
+        </li>
       ) : null}
 
       {results?.map((r) => {
@@ -111,16 +122,20 @@ export const SearchResultsGrid: React.FC<Props> = ({
       })}
 
       {hasNextPage && isSuccess ? (
-        <button
-          className={styles.moreButton}
-          onClick={onFetchNextPage}
-          disabled={isFetching}
-        >
-          {isFetching ? <>Loading&hellip;</> : <>More&hellip;</>}
-        </button>
+        <li>
+          <button
+            className={styles.moreButton}
+            onClick={onFetchNextPage}
+            disabled={isFetching}
+          >
+            {isFetching ? <>Loading&hellip;</> : <>More&hellip;</>}
+          </button>
+        </li>
       ) : null}
 
-      {isFetching && !isSuccess ? <div>Searching&hellip;</div> : null}
+      {isFetching && !isSuccess ? (
+        <li className={styles.sectionStatus}>Searching&hellip;</li>
+      ) : null}
     </ul>
   );
 };

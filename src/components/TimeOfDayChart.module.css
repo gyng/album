@@ -51,7 +51,8 @@
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--c-accent) 70%, var(--c-font)) inset;
 }
 
-.column:hover [data-tooltip] {
+.column:hover [data-tooltip],
+.column:focus-visible [data-tooltip] {
   opacity: 1;
 }
 

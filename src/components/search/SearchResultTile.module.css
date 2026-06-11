@@ -35,7 +35,7 @@
 .source {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--m);
   flex-wrap: wrap;
 }
 
@@ -43,17 +43,23 @@
   min-width: 0;
 }
 
-.similarityBadge {
-  position: absolute;
-  bottom: calc(var(--m) + var(--m-l));
-  left: var(--m);
-  z-index: 1;
+/* Shared dark-glass pill used for the similarity/colour-match score badge.
+   The breadcrumb similarity badge (Search.module.css .breadcrumbSimilarity)
+   uses the same recipe at a smaller size. */
+.overlayBadge {
   border-radius: 999px;
   background-color: var(--c-overlay-dark);
   color: white;
   font-size: var(--fs-s);
   line-height: 1;
-  padding: 6px 8px;
+  padding: var(--m-xs) var(--m-s);
+}
+
+.similarityBadge {
+  position: absolute;
+  bottom: calc(var(--m) + var(--m-l));
+  left: var(--m);
+  z-index: 1;
 }
 
 .actionButtons {
@@ -63,15 +69,26 @@
   z-index: 1;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--m-xs);
   opacity: 0;
-  transition: opacity 0.15s ease;
+  pointer-events: none;
+  transition: opacity var(--t-fast) ease;
 }
 
 .card:hover .actionButtons,
 .card:focus-within .actionButtons,
 .actionButtonsPersistent {
   opacity: 1;
+  pointer-events: auto;
+}
+
+/* Touch / coarse-pointer devices have no hover and tapping a tile follows its
+   link, so the overlay actions are never reachable — show them persistently. */
+@media (hover: none), (pointer: coarse) {
+  .actionButtons {
+    opacity: 1;
+    pointer-events: auto;
+  }
 }
 
 .similarButtonIcon {
@@ -83,5 +100,5 @@
   width: 14px;
   height: 14px;
   border-radius: 50%;
-  border: solid 2px rgba(255, 255, 255, 0.8);
+  border: solid 2px var(--c-border-on-dark);
 }

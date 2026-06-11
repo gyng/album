@@ -87,15 +87,27 @@ export const ThemeToggle: React.FC = () => {
     darkModeOverride === undefined ? initialDarkMode : darkModeOverride;
 
   useEffect(() => {
+    // Mirror the pre-paint init script in _document.tsx, which toggles the
+    // theme class on both the root element and the body. Updating only the
+    // body would leave html in the stale theme — its color-scheme drives the
+    // viewport scrollbar and overscroll glow.
+    const root = document.documentElement;
+    const { body } = document;
     if (darkMode === true) {
-      document.body.classList.add("dark");
-      document.body.classList.remove("light");
+      root.classList.add("dark");
+      root.classList.remove("light");
+      body.classList.add("dark");
+      body.classList.remove("light");
     } else if (darkMode === false) {
-      document.body.classList.add("light");
-      document.body.classList.remove("dark");
+      root.classList.add("light");
+      root.classList.remove("dark");
+      body.classList.add("light");
+      body.classList.remove("dark");
     } else {
-      document.body.classList.remove("light");
-      document.body.classList.remove("dark");
+      root.classList.remove("light");
+      root.classList.remove("dark");
+      body.classList.remove("light");
+      body.classList.remove("dark");
     }
   }, [darkMode]);
 
@@ -105,7 +117,8 @@ export const ThemeToggle: React.FC = () => {
   return (
     <div className={styles.themeToggle}>
       <button
-        title="Toggle dark mode"
+        type="button"
+        aria-label={`Switch to ${displayDarkMode ? "light" : "dark"} theme`}
         className="dark-mode-toggle"
         onClick={() => {
           const next = !(darkMode ?? true);
@@ -114,22 +127,23 @@ export const ThemeToggle: React.FC = () => {
         }}
       >
         {displayDarkMode == null ? (
-          <span style={{ opacity: 0 }}>☀️</span>
-        ) : displayDarkMode ? (
-          "🌙"
+          <span aria-hidden="true" style={{ opacity: 0 }}>
+            ☀️
+          </span>
         ) : (
-          "☀️"
+          <span aria-hidden="true">{displayDarkMode ? "🌙" : "☀️"}</span>
         )}
       </button>
       {darkMode != null ? (
         <button
-          title="Reset to system default"
+          type="button"
+          aria-label="Reset theme to system default"
           onClick={() => {
             setDarkModeOverride(null);
             writeStoredDarkMode(null);
           }}
         >
-          ⟳
+          <span aria-hidden="true">⟳</span>
         </button>
       ) : null}
     </div>

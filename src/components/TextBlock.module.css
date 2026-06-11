@@ -6,7 +6,15 @@
   max-width: 100vw;
   overflow: hidden;
   word-wrap: break-word;
-  word-break: break-all;
+  /* Break only when a word genuinely cannot fit, rather than at arbitrary
+     letters (which split words like "Singapore" mid-character). */
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 720px) {
+  .title {
+    font-size: clamp(var(--fs-l), 10vw, var(--fs-xl));
+  }
 }
 
 .kicker {

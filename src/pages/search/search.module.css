@@ -3,3 +3,10 @@
   align-items: center;
   flex-direction: column;
 }
+
+/* Matches Search.module.css .inlineError (the shared error treatment). */
+.inlineError {
+  margin: 0;
+  color: var(--c-accent);
+  font-size: var(--fs-s);
+}

@@ -4,6 +4,21 @@
   object-fit: cover;
 }
 
+/* Loading placeholder shown while the MapLibre bundle downloads — fills the
+   viewport so the layout is reserved and there is visible feedback. */
+.loadingPlaceholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100vh;
+  height: 100dvh;
+  margin: 0;
+  background: var(--c-bg-contrast-dark);
+  color: var(--c-bg-contrast-light);
+  font-size: var(--fs-sm);
+}
+
 .link {
   text-decoration: none;
 }
@@ -21,12 +36,16 @@
   pointer-events: auto;
 }
 
-.popup *:focus-visible {
-  outline: none;
+.popup a:hover img,
+.popup a:focus-visible img {
+  outline: solid 2px var(--c-bg-contrast-light);
 }
 
-.popup a:hover img {
+/* Keyboard focus parity for the popup's text links (OpenStreetMap / Google
+   Maps). The default ring is replaced with an explicit visible one. */
+.popup a:focus-visible {
   outline: solid 2px var(--c-bg-contrast-light);
+  outline-offset: 2px;
 }
 
 .photoMarkerImage {
@@ -41,7 +60,7 @@
 
   position: absolute;
   left: 50%;
-  bottom: calc(100% + 12px);
+  bottom: calc(100% + var(--m-m));
   transform: translateX(-50%);
   isolation: isolate;
   border: solid 1px rgba(255, 255, 255, 0.5);
@@ -126,7 +145,7 @@
 }
 
 .routeEndpointStartFlag {
-  fill: #16a34a;
+  fill: var(--c-success);
   stroke: rgb(255 255 255 / 0.85);
   stroke-width: 1px;
 }

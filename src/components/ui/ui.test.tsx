@@ -185,7 +185,7 @@ describe("SegmentedToggle", () => {
     expect(onChange).toHaveBeenCalledWith("b");
   });
 
-  it("marks the active option with aria-selected", () => {
+  it("marks the active option with aria-checked", () => {
     render(
       <SegmentedToggle
         options={[
@@ -197,8 +197,26 @@ describe("SegmentedToggle", () => {
         ariaLabel="Test"
       />,
     );
-    expect(screen.getByText("Y").getAttribute("aria-selected")).toBe("true");
-    expect(screen.getByText("X").getAttribute("aria-selected")).toBe("false");
+    expect(screen.getByText("Y").getAttribute("role")).toBe("radio");
+    expect(screen.getByText("Y").getAttribute("aria-checked")).toBe("true");
+    expect(screen.getByText("X").getAttribute("aria-checked")).toBe("false");
+  });
+
+  it("moves selection with arrow keys", () => {
+    const onChange = jest.fn();
+    render(
+      <SegmentedToggle
+        options={[
+          { value: "x", label: "X" },
+          { value: "y", label: "Y" },
+        ]}
+        value="x"
+        onChange={onChange}
+        ariaLabel="Test"
+      />,
+    );
+    fireEvent.keyDown(screen.getByRole("radiogroup"), { key: "ArrowRight" });
+    expect(onChange).toHaveBeenCalledWith("y");
   });
 });
 

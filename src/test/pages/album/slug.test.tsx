@@ -56,6 +56,7 @@ describe("album page data fetching", () => {
       formatting: {},
       _build: { slug: "trip", srcdir: "../albums/trip" },
     };
+    getAlbumNames.mockResolvedValue(["trip"]);
     getAlbumFromName.mockResolvedValue(album);
 
     const actual = await getAlbumPageStaticProps({ params: { slug: ["trip"] } });

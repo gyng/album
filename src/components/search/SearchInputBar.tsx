@@ -1,7 +1,10 @@
-import React, { useSyncExternalStore } from "react";
+import React, { useId, useState, useSyncExternalStore } from "react";
 import { Input, Select } from "../ui";
 import styles from "./Search.module.css";
 import { SearchMode } from "./useTextVector";
+
+const SEARCH_MODE_HELP =
+  "Keyword search matches indexed terms. Semantic search matches visual meaning using embeddings. Hybrid search fuses both rankings.";
 
 type Props = {
   canClear: boolean;
@@ -43,6 +46,8 @@ export const SearchInputBar: React.FC<Props> = ({
     () => true,
     () => false,
   );
+  const [isModeHelpOpen, setIsModeHelpOpen] = useState(false);
+  const modeHelpId = useId();
 
   return (
     <div className={styles.searchInputRow}>
@@ -72,14 +77,15 @@ export const SearchInputBar: React.FC<Props> = ({
               <button
                 className={styles.clearButton}
                 onClick={onClearSearchState}
+                aria-label="Clear search"
                 title="Clear search"
                 type="button"
               >
-                ×
+                <span aria-hidden="true">×</span>
               </button>
             ) : null}
           </div>
-          <label className={styles.searchModeSelectLabel}>
+          <div className={styles.searchModeSelectLabel}>
             <Select
               className={styles.searchModeSelect}
               aria-label="Search mode"
@@ -92,14 +98,33 @@ export const SearchInputBar: React.FC<Props> = ({
               <option value="semantic">Semantic search</option>
               <option value="hybrid">Semantic + keyword</option>
             </Select>
-            <span
-              className={styles.searchModeInfo}
-              aria-label="Search mode help"
-              title="Keyword search matches indexed terms. Semantic search matches visual meaning using embeddings. Hybrid search fuses both rankings."
-            >
-              ⓘ
+            <span className={styles.searchModeInfoWrap}>
+              <button
+                type="button"
+                className={styles.searchModeInfo}
+                aria-label="Search mode help"
+                aria-expanded={isModeHelpOpen}
+                aria-describedby={modeHelpId}
+                title={SEARCH_MODE_HELP}
+                onClick={() => setIsModeHelpOpen((open) => !open)}
+                onBlur={() => setIsModeHelpOpen(false)}
+              >
+                <span aria-hidden="true">ⓘ</span>
+              </button>
+              <span
+                id={modeHelpId}
+                role="tooltip"
+                className={[
+                  styles.searchModeInfoTooltip,
+                  isModeHelpOpen ? styles.searchModeInfoTooltipOpen : "",
+                ]
+                  .filter(Boolean)
+                  .join(" ")}
+              >
+                {SEARCH_MODE_HELP}
+              </span>
             </span>
-          </label>
+          </div>
           {isMounted ? (
             <button
               type="button"

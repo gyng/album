@@ -275,10 +275,7 @@ const moveTextBlocksToTop = (blocks: Block[]): Block[] => {
   return [...textBlocks, ...otherBlocks];
 };
 
-const applyTitleKickerDefaults = (
-  manifest: Content,
-  sortOrder: "newest-first" | "oldest-first",
-): void => {
+const applyTitleKickerDefaults = (manifest: Content): void => {
   const title = manifest.blocks.at(0);
   if (title?.kind !== "text") {
     return;
@@ -289,10 +286,11 @@ const applyTitleKickerDefaults = (
     return;
   }
 
-  const [from, to] =
-    sortOrder === "newest-first"
-      ? [new Date(latest).getFullYear(), new Date(earliest).getFullYear()]
-      : [new Date(earliest).getFullYear(), new Date(latest).getFullYear()];
+  // Always render the year range ascending (earliest–latest), regardless of the
+  // album's photo sort order, so the kicker matches the home page album list
+  // (Albums.tsx) rather than reading as a reversed "2026–2025".
+  const from = new Date(earliest).getFullYear();
+  const to = new Date(latest).getFullYear();
   title.data.kicker = `${from}${to === from ? "" : `–${to}`}`;
 };
 
@@ -340,7 +338,7 @@ export const getAlbum = async (
       v2Manifest?.sort ?? "oldest-first",
     );
     manifest.blocks = moveTextBlocksToTop(manifest.blocks);
-    applyTitleKickerDefaults(manifest, v2Manifest?.sort ?? "oldest-first");
+    applyTitleKickerDefaults(manifest);
 
     return manifest;
   });

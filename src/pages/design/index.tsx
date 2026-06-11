@@ -57,12 +57,14 @@ const DesignPage: NextPage<PageProps> = () => {
   return (
     <div className={styles.page}>
       <Seo title="Design" pathname="/design" noindex />
-      <GlobalNav />
       <main className={styles.main}>
+        <GlobalNav hasPadding={false} />
         {/* Header */}
         <header className={styles.section}>
           <div>
-            <h1 style={{ margin: 0 }}>Design</h1>
+            <Heading level={1} as="h1">
+              Design
+            </Heading>
             <p className={styles.intro}>
               Shared components and design tokens. Import from{" "}
               <code className={styles.codeHint}>components/ui</code>.
@@ -132,10 +134,12 @@ const DesignPage: NextPage<PageProps> = () => {
           <div className={styles.colourGrid}>
             {colourTokens.map((t) => (
               <div key={t.name} className={styles.colourSwatch}>
-                <div
-                  className={styles.colourBox}
-                  style={{ backgroundColor: `var(${t.name})` }}
-                />
+                <div className={styles.colourBoxBacking}>
+                  <div
+                    className={styles.colourBox}
+                    style={{ backgroundColor: `var(${t.name})` }}
+                  />
+                </div>
                 <span className={styles.colourLabel}>{t.label}</span>
                 <span className={styles.colourLabel}>{t.name}</span>
               </div>
@@ -195,7 +199,7 @@ const DesignPage: NextPage<PageProps> = () => {
             <Heading level={1}>Thumb</Heading>
             <Caption>Image thumbnail with sharp corners. Default (150px) and small (112px) variants.</Caption>
           </div>
-          <div className={styles.row}>
+          <div className={`${styles.row} ${styles.rowStart}`}>
             <div className={styles.subsection}>
               <span className={styles.subsectionLabel}>Default (150px)</span>
               <Thumb
@@ -390,33 +394,9 @@ const DesignPage: NextPage<PageProps> = () => {
                   .{cls} ({gap})
                 </span>
                 <div className={commonStyles[cls]}>
-                  <div
-                    style={{
-                      height: 8,
-                      background: "color-mix(in srgb, var(--c-accent) 24%, var(--c-bg))",
-                      border: "1px solid color-mix(in srgb, var(--c-accent) 45%, transparent)",
-                      borderRadius: 2,
-                      width: 80,
-                    }}
-                  />
-                  <div
-                    style={{
-                      height: 8,
-                      background: "color-mix(in srgb, var(--c-accent) 24%, var(--c-bg))",
-                      border: "1px solid color-mix(in srgb, var(--c-accent) 45%, transparent)",
-                      borderRadius: 2,
-                      width: 80,
-                    }}
-                  />
-                  <div
-                    style={{
-                      height: 8,
-                      background: "color-mix(in srgb, var(--c-accent) 24%, var(--c-bg))",
-                      border: "1px solid color-mix(in srgb, var(--c-accent) 45%, transparent)",
-                      borderRadius: 2,
-                      width: 80,
-                    }}
-                  />
+                  <div className={styles.stackDemoBar} />
+                  <div className={styles.stackDemoBar} />
+                  <div className={styles.stackDemoBar} />
                 </div>
               </div>
             ))}

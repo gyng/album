@@ -4,7 +4,7 @@ import { useRouter } from "next/router";
 import React from "react";
 import { CalendarHeatmap } from "../../components/CalendarHeatmap";
 import { GlobalNav } from "../../components/GlobalNav";
-import { Caption, Footer, Heading } from "../../components/ui";
+import { Caption, Footer, Heading, PillButton } from "../../components/ui";
 import { TimelineDayGrid } from "../../components/TimelineDayGrid";
 import { TimelineEntry } from "../../components/timelineTypes";
 import { getAlbums } from "../../services/album";
@@ -446,7 +446,9 @@ const TimelinePage: NextPage<PageProps> = ({ entries }) => {
         <GlobalNav currentPage="timeline" hasPadding={false} />
 
         <header className={styles.header}>
-          <h1 className={styles.title}>Timeline</h1>
+          <Heading level={1} as="h1" className={styles.title}>
+            Timeline
+          </Heading>
           {filterAlbum ? (
             <div className={commonStyles.toast}>
               only showing photos from{" "}
@@ -620,9 +622,8 @@ const TimelinePage: NextPage<PageProps> = ({ entries }) => {
                     </div>
 
                     {memories.length > visibleMemoryClusterCount ? (
-                      <button
-                        type="button"
-                        className={`${commonStyles.button} ${styles.memoryLoadMoreButton}`}
+                      <PillButton
+                        className={styles.memoryLoadMoreButton}
                         onClick={() => {
                           setVisibleMemoryClusterCount((current) =>
                             Math.min(
@@ -632,8 +633,8 @@ const TimelinePage: NextPage<PageProps> = ({ entries }) => {
                           );
                         }}
                       >
-                        More memories…
-                      </button>
+                        Load more memories
+                      </PillButton>
                     ) : null}
                   </section>
                 ) : null}

@@ -19,6 +19,11 @@
 
 .name a {
   text-decoration: none;
+  transition: color var(--t-fast) var(--ease-out);
+}
+
+.name a:hover {
+  color: var(--c-accent);
 }
 
 .date {
@@ -39,6 +44,11 @@
   object-fit: cover;
   height: 100%;
   width: 100%;
+}
+
+.itemLink:hover img {
+  outline: solid 2px var(--c-bg-contrast-light);
+  outline-offset: -2px;
 }
 
 .itemLink:focus-visible {

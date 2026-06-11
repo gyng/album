@@ -5,4 +5,8 @@
   border: 1px solid var(--c-bg-contrast-dark);
   border-radius: var(--m-s);
   background: color-mix(in srgb, var(--c-bg) 97%, var(--c-bg-contrast-dark));
+  transition:
+    background-color var(--t-theme),
+    color var(--t-theme),
+    border-color var(--t-theme);
 }

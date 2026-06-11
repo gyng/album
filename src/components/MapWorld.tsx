@@ -848,6 +848,34 @@ export const MMap: React.FC<MapWorldProps> = ({
   );
   const pauseUntilRef = React.useRef<number>(0);
   const popupInfo = clickInfo ?? hoverInfo;
+  // Without clustering, many photos can share the same pixel and only the
+  // topmost marker intercepts a tap. As a minimal mitigation, repeated clicks
+  // on a stacked location cycle through every co-located photo so occluded
+  // ones are still reachable. Uses the functional updater so it reads the
+  // current selection without capturing it.
+  const selectMarker = (photo: MapWorldEntry) => {
+    setClickInfo((current) => {
+      const coLocated = visiblePhotos.filter(
+        (candidate) =>
+          candidate.decLat === photo.decLat &&
+          candidate.decLng === photo.decLng,
+      );
+
+      if (coLocated.length <= 1 || !current) {
+        return photo;
+      }
+
+      const currentIndex = coLocated.findIndex(
+        (candidate) => candidate.href === current.href,
+      );
+
+      if (currentIndex === -1) {
+        return photo;
+      }
+
+      return coLocated[(currentIndex + 1) % coLocated.length] ?? photo;
+    });
+  };
   const routeDataByAlbum = React.useMemo(() => {
     const albums = new globalThis.Map<string, MapWorldEntry[]>();
     timeFilteredPhotos.forEach((photo) => {
@@ -1236,7 +1264,13 @@ export const MMap: React.FC<MapWorldProps> = ({
                   {popupInfo.album}
                   <br />
                   <span>
-                    {new Date(popupInfo.date ?? "").toLocaleString()}
+                    {new Date(popupInfo.date ?? "").toLocaleString("en-GB", {
+                      day: "numeric",
+                      month: "short",
+                      year: "numeric",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
                     <br />
                     {getRelativeTimeString(new Date(popupInfo.date ?? ""))}
                   </span>
@@ -1250,7 +1284,7 @@ export const MMap: React.FC<MapWorldProps> = ({
                     target="_blank"
                     rel="noreferrer"
                   >
-                    OpenStreetMaps
+                    OpenStreetMap
                   </a>
                   &nbsp;&middot;&nbsp;
                   <a
@@ -1275,7 +1309,7 @@ export const MMap: React.FC<MapWorldProps> = ({
                 anchor="center"
                 onClick={(e) => {
                   e.originalEvent.stopPropagation();
-                  setClickInfo(photo);
+                  selectMarker(photo);
                 }}
                 color={photo.markerColor}
               >
@@ -1291,11 +1325,31 @@ export const MMap: React.FC<MapWorldProps> = ({
                           : styles.pinMuted
                         : "",
                     ].filter(Boolean).join(" ")}
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`Photo from ${photo.album}${
+                      photo.date
+                        ? ` on ${new Date(photo.date).toLocaleDateString(
+                            "en-GB",
+                            { day: "numeric", month: "short", year: "numeric" },
+                          )}`
+                        : ""
+                    }`}
                     onMouseOver={() => {
                       setHoverInfo(photo);
                     }}
                     onMouseLeave={() => {
                       setHoverInfo(null);
+                    }}
+                    onFocus={() => {
+                      setHoverInfo(photo);
+                    }}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        selectMarker(photo);
+                      }
                     }}
                   />
                 </div>

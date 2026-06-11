@@ -26,7 +26,7 @@
 
 .progressDots {
   display: flex;
-  gap: 6px;
+  gap: var(--m-xs);
   align-items: center;
 }
 
@@ -58,7 +58,7 @@
   font-size: var(--fs-s);
   color: var(--c-bg-contrast-light);
   font-variant-numeric: tabular-nums;
-  transition: transform 0.2s;
+  transition: transform var(--t-base);
 }
 
 .cumulativeScoreBump {
@@ -81,7 +81,7 @@
   padding: var(--m) var(--m-s);
   line-height: 1;
   border-radius: var(--m);
-  transition: color 0.12s, background-color 0.12s;
+  transition: color var(--t-fast), background-color var(--t-fast);
 }
 
 .abortButton:hover {
@@ -125,12 +125,36 @@
   touch-action: none;
 }
 
+.photoPanel:focus-visible {
+  outline: solid 2px var(--c-bg-contrast-light);
+  outline-offset: 2px;
+}
+
 .photoZoomed {
   cursor: grab;
 }
 
 .photoZoomed:active {
   cursor: grabbing;
+}
+
+/* Loading placeholder shown until the photo decodes (the timer waits for it). */
+.photoLoading {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    100deg,
+    var(--c-bg-contrast-dark) 30%,
+    color-mix(in srgb, var(--c-bg-contrast-light) 12%, var(--c-bg-contrast-dark)) 50%,
+    var(--c-bg-contrast-dark) 70%
+  );
+  background-size: 200% 100%;
+  animation: photoLoadingShimmer 1.2s ease-in-out infinite;
+}
+
+@keyframes photoLoadingShimmer {
+  from { background-position: 200% 0; }
+  to { background-position: -200% 0; }
 }
 
 .photo {
@@ -162,25 +186,31 @@
   opacity: 0.6;
 }
 
-/* Timer bar with pulsing glow at urgent */
+/* Timer bar with pulsing glow at urgent. Driven by transform: scaleX so we
+   animate the compositor-friendly transform instead of the layout `width`
+   (matches the score bars' growBar). transform-origin: left so it drains
+   from the right edge. */
 .timerBar {
   position: absolute;
   top: 0;
   left: 0;
+  width: 100%;
   height: 3px;
-  background-color: #22c55e;
-  transition-property: width, background-color;
+  background-color: var(--c-success);
+  transform-origin: left;
+  transition-property: transform, background-color;
+  transition-duration: 1s, var(--t-base);
   transition-timing-function: linear, ease;
   pointer-events: none;
   z-index: 1;
 }
 
 .timerBar[data-warning] {
-  background-color: #eab308;
+  background-color: var(--c-warning);
 }
 
 .timerBar[data-urgent] {
-  background-color: #ef4444;
+  background-color: var(--c-danger);
   height: 4px;
   box-shadow: 0 0 8px 1px rgba(239, 68, 68, 0.5);
   animation: timerPulse 0.5s ease-in-out infinite;
@@ -229,7 +259,7 @@
   background-color: var(--c-bg);
   font-size: var(--fs-sm);
   color: var(--c-font);
-  transition: background-color 0.12s, border-color 0.2s, box-shadow 0.2s, transform 0.1s;
+  transition: background-color var(--t-fast), border-color var(--t-base), box-shadow var(--t-base), transform 0.1s;
 }
 
 /* Confirm pinned to the right of the controls row; skip stays at flex-start. */
@@ -247,9 +277,17 @@
   transform: scale(0.96);
 }
 
+.confirmButton:focus-visible,
+.nextButton:focus-visible,
+.skipButton:focus-visible,
+.abortButton:focus-visible {
+  outline: solid 2px var(--c-bg-contrast-light);
+  outline-offset: 2px;
+}
+
 .confirmButton:disabled {
   opacity: 0.35;
-  cursor: default;
+  cursor: not-allowed;
 }
 
 /* Pulse glow when a guess is placed and confirm is ready */
@@ -292,11 +330,26 @@
   text-decoration: underline;
   text-underline-offset: 2px;
   padding: var(--m-s);
-  transition: color 0.12s;
+  transition: color var(--t-fast);
 }
 
 .skipButton:hover {
   color: var(--c-font);
+}
+
+/* Coarse pointers (touch): grow the two primary round actions to a ~44px
+   effective hit area so they aren't easy to miss-tap on a phone. */
+@media (pointer: coarse) {
+  .confirmButton,
+  .nextButton {
+    padding-top: var(--m-m);
+    padding-bottom: var(--m-m);
+  }
+
+  .skipButton {
+    padding-top: var(--m-m);
+    padding-bottom: var(--m-m);
+  }
 }
 
 /* Reveal state */

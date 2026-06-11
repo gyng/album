@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Content, PhotoBlock } from "../services/types";
 import { Picture } from "./Photo";
+import { Caption } from "./ui";
 import styles from "./Album.module.css";
 
 export const Albums: React.FC<{ albums: Content[] }> = (props) => {
@@ -21,7 +22,7 @@ export const Albums: React.FC<{ albums: Content[] }> = (props) => {
             <Link
               href={`/album/${album._build.slug}`}
               className={styles.itemLink}
-              aria-label={`View photo album: ${album._build.slug}`}
+              aria-label={`View photo album: ${album.title ?? album.name}`}
             >
               {cover ? (
                 <Picture
@@ -37,22 +38,24 @@ export const Albums: React.FC<{ albums: Content[] }> = (props) => {
             <div className={styles.name}>
               <h2>
                 <span>
-                  <Link
-                    href={`/album/${album._build.slug}`}
-                    aria-label={`View photo album: ${album._build.slug}`}
-                    tabIndex={-1}
-                  >
+                  <Link href={`/album/${album._build.slug}`} tabIndex={-1}>
                     {album.title ?? album.name}
                   </Link>
                 </span>
               </h2>
 
               {timeRange[0] && timeRange[1] && timeRange[0] !== timeRange[1] ? (
-                <small className={styles.date}>{timeRange.join("–")}</small>
+                <Caption as="span" size="sm" className={styles.date}>
+                  {timeRange.join("–")}
+                </Caption>
               ) : timeRange[0] ? (
-                <small className={styles.date}>{timeRange[0]}</small>
+                <Caption as="span" size="sm" className={styles.date}>
+                  {timeRange[0]}
+                </Caption>
               ) : (
-                <small className={styles.date}>&nbsp;</small>
+                <Caption as="span" size="sm" className={styles.date}>
+                  &nbsp;
+                </Caption>
               )}
             </div>
           </li>

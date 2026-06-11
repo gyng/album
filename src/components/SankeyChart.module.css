@@ -16,9 +16,9 @@
 
 .svgLabel {
   fill: var(--c-font);
-  font-size: 13px;
+  font-size: var(--fs-sm);
   font-weight: 500;
-  transition: fill 0.15s ease, opacity 0.15s ease;
+  transition: fill var(--t-fast), opacity var(--t-fast);
 }
 
 .svgLabelLink {
@@ -41,7 +41,11 @@
   font-size: var(--fs-sm);
 }
 
-@media (max-width: 900px) {
+/* Aligns with the explore page's desktop/mobile switch (720px): the Sankey is
+   wrapped in .desktopOnly there, which hides at 720px and reveals the bar
+   fallback. Hiding the chart at the same width avoids an empty StatGroup in the
+   721-900px range where the wrapper was visible but the chart was not. */
+@media (max-width: 720px) {
   .wrapper {
     display: none;
   }

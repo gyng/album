@@ -86,11 +86,18 @@ export const TimeOfDayChart: React.FC<Props> = ({
                 styles.column,
                 activeLabel === bucket.label ? styles.columnActive : "",
               ].join(" ")}
+              tabIndex={0}
               aria-label={`${bucket.label} · ${bucket.count.toLocaleString()} photos`}
               onMouseEnter={() => {
                 onActivate?.(bucket.label);
               }}
               onMouseLeave={() => {
+                onDeactivate?.();
+              }}
+              onFocus={() => {
+                onActivate?.(bucket.label);
+              }}
+              onBlur={() => {
                 onDeactivate?.();
               }}
             >

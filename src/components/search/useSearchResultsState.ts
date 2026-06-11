@@ -77,11 +77,16 @@ export const useSearchResultsState = ({
     trimmedQuery,
   });
 
-  const { textVector, textVectorQuery } = textVectorState;
+  const { textVector, textVectorError, textVectorQuery } = textVectorState;
   const hasVectorDatabase = Boolean(embeddingsDatabase || database);
 
   const hasCurrentTextVector =
     Boolean(textVector) && textVectorQuery === trimmedQuery;
+
+  // When the embedding model fails, hybrid degrades to a keyword search and
+  // pure semantic surfaces the error via a completed (empty) query, rather than
+  // leaving the query disabled forever with a blank results area (HIGH-7).
+  const textVectorFailed = Boolean(textVectorError);
 
   const canRunQuery =
     hasHydratedFromUrl &&
@@ -90,6 +95,7 @@ export const useSearchResultsState = ({
       (isColorMode && !hasSearchQuery) ||
       (hasSearchQuery &&
         (searchMode === "keyword" ||
+          textVectorFailed ||
           (hasVectorDatabase && hasCurrentTextVector))) ||
       (!isSimilarMode && (hasFacetFilters || isColorMode)));
 
@@ -112,10 +118,28 @@ export const useSearchResultsState = ({
         searchMode,
         selectedFacets,
         hasTextVector: hasCurrentTextVector,
+        textVectorFailed,
       },
     ],
     queryFn: async ({ pageParam }: { pageParam: number }) => {
       if (!database) {
+        return {
+          data: [],
+          prev: undefined,
+          next: undefined,
+        };
+      }
+
+      // Pure semantic search with a failed embedding model: complete the query
+      // empty so the grid can surface the unavailable-error empty state rather
+      // than fall back to unrelated keyword matches (HIGH-7).
+      if (
+        searchMode === "semantic" &&
+        textVectorFailed &&
+        !hasCurrentTextVector &&
+        !similarPath &&
+        !(debouncedColorSearch && !hasSearchQuery)
+      ) {
         return {
           data: [],
           prev: undefined,

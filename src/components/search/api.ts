@@ -379,8 +379,13 @@ const buildKeywordWhereClause = (activeTerms: string[]) => {
   };
 };
 
+// Constrain keyword matching to the human-meaningful content columns. The raw
+// `exif` blob is excluded so a query like "cat" no longer matches inside
+// "LensSpecification" (and the FTS snippet — used as image alt text — no longer
+// surfaces raw EXIF fragments). `path`/`album_relative_path` are file paths, not
+// content.
 const toFtsMatchTerm = (term: string): string => {
-  return `- {path album_relative_path} : "${term.replaceAll(/[\"]/g, "'")}"`;
+  return `- {path album_relative_path exif} : "${term.replaceAll(/[\"]/g, "'")}"`;
 };
 
 const exec = async (

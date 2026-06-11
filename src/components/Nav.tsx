@@ -36,6 +36,34 @@ export const Nav: React.FC<{
     };
   }, []);
 
+  // On narrow viewports the nav is a horizontal scroller; the active pill can
+  // start off-screen (e.g. "Map" on /map). Bring it into view on mount so the
+  // current page is visible without scrolling. Honour reduced-motion for the
+  // JS-driven smooth scroll.
+  useEffect(() => {
+    const ul = ulRef.current;
+    if (!ul) return;
+    const active = ul.querySelector<HTMLElement>('[aria-current="page"]');
+    if (!active) return;
+    const prefersReducedMotion = window.matchMedia(
+      "(prefers-reduced-motion: reduce)",
+    ).matches;
+    active.scrollIntoView({
+      inline: "nearest",
+      block: "nearest",
+      behavior: prefersReducedMotion ? "auto" : "smooth",
+    });
+  }, []);
+
+  const skipToContent: React.MouseEventHandler<HTMLAnchorElement> = (event) => {
+    const main = document.querySelector("main");
+    if (!main) return;
+    event.preventDefault();
+    main.setAttribute("tabindex", "-1");
+    main.focus();
+    main.scrollIntoView();
+  };
+
   return (
     <nav
       className={[
@@ -47,6 +75,13 @@ export const Nav: React.FC<{
         .filter(Boolean)
         .join(" ")}
     >
+      <a
+        href="#main-content"
+        className={styles.skipLink}
+        onClick={skipToContent}
+      >
+        Skip to content
+      </a>
       <ul ref={ulRef} className={commonStyles.topBar}>
         <li>
           <Link
@@ -55,6 +90,7 @@ export const Nav: React.FC<{
               commonStyles.button,
               props.isHome ? commonStyles.navCurrent : "",
             ].join(" ")}
+            aria-current={props.isHome ? "page" : undefined}
           >
             Albums
           </Link>

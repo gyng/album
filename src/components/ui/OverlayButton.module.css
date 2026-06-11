@@ -10,8 +10,12 @@
   cursor: pointer;
   font-size: var(--fs-s);
   line-height: 1;
-  padding: 6px 8px;
+  padding: var(--m-xs) var(--m-s);
   text-decoration: none;
+  transition:
+    background-color var(--t-fast),
+    color var(--t-fast),
+    border-color var(--t-fast);
 }
 
 .base:hover {

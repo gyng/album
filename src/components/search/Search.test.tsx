@@ -457,7 +457,7 @@ describe("Search", () => {
     expect(screen.getByText("Latest")).toBeTruthy();
     expect(screen.getByText("Random selection")).toBeTruthy();
     expect(screen.getByText(/Loading/)).toBeTruthy();
-    expect(screen.getByText("Loading... 1.9 MB / 3.8 MB")).toBeTruthy();
+    expect(screen.getByText("Loading… 1.9 MB / 3.8 MB")).toBeTruthy();
     expect(screen.getByRole("button", { name: /harbor/i })).toBeTruthy();
     expect(await screen.findByAltText("Recent shot")).toBeTruthy();
     expect(await screen.findByAltText("Random shot")).toBeTruthy();
@@ -562,7 +562,7 @@ describe("Search", () => {
     });
     fireEvent.click(similarButtons[0]);
 
-    const leastSimilarTab = await screen.findByRole("tab", {
+    const leastSimilarTab = await screen.findByRole("radio", {
       name: /least similar/i,
     });
     fireEvent.click(leastSimilarTab);
@@ -791,6 +791,34 @@ describe("Search", () => {
 
     expect(screen.getByRole("button", { name: /remove filter colour: #ff0000/i })).toBeTruthy();
     expect(screen.getByRole("button", { name: /remove filter region: tokyo/i })).toBeTruthy();
+  });
+
+  it("keeps the colour filter when the user then types a text query", async () => {
+    await renderSearch();
+
+    fireEvent.click(screen.getByRole("tab", { name: /colour/i }));
+    fireEvent.change(screen.getByLabelText("Colour filter hex value"), {
+      target: { value: "#ff0000" },
+    });
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("button", { name: /remove filter colour: #ff0000/i }),
+      ).toBeTruthy();
+    });
+
+    fireEvent.change(screen.getByPlaceholderText(/type \/ to search/i), {
+      target: { value: "harbor" },
+    });
+
+    // Typing must not silently erase the active colour filter — both compose.
+    expect(
+      (screen.getByPlaceholderText(/type \/ to search/i) as HTMLInputElement)
+        .value,
+    ).toBe("harbor");
+    expect(
+      screen.getByRole("button", { name: /remove filter colour: #ff0000/i }),
+    ).toBeTruthy();
   });
 
   it("only shows the photo color action while the color facet is active or selected", async () => {
@@ -1095,7 +1123,7 @@ describe("Search", () => {
 
     await renderSearch();
 
-    expect(await screen.findByText("Loading... 2.0 MB / 4.0 MB")).toBeTruthy();
+    expect(await screen.findByText("Loading… 2.0 MB / 4.0 MB")).toBeTruthy();
 
     await act(async () => {
       resolveWarmup?.();

@@ -21,6 +21,7 @@ export const MiniHistogram: React.FC<Props> = ({ title, data }) => {
             <div
               key={bucket.label}
               className={styles.column}
+              tabIndex={0}
               aria-label={`${bucket.label} · ${bucket.count.toLocaleString()} photos`}
             >
               <ChartTooltip>

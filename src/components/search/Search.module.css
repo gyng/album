@@ -71,15 +71,22 @@
 .activeFacetChip {
   display: inline-flex;
   align-items: center;
-  gap: 0.4rem;
+  gap: var(--m);
   padding: var(--m);
-  border: solid 1px var(--c-bg-contrast-dark);
+  border: solid 1px var(--c-border-on-dark);
   border-radius: var(--m-s);
   background: transparent;
   color: inherit;
   cursor: pointer;
   font-size: var(--fs-s);
   user-select: none;
+}
+
+@media (hover: none), (pointer: coarse) {
+  .activeFacetChip {
+    min-height: var(--m-xl);
+    padding: var(--m) var(--m-s);
+  }
 }
 
 .activeFacetChip:hover {
@@ -144,6 +151,12 @@
 .facetCategoryTab:focus-visible {
   outline: solid 2px var(--c-bg-contrast-light);
   outline-offset: 2px;
+}
+
+@media (hover: none), (pointer: coarse) {
+  .facetCategoryTab {
+    min-height: var(--m-xl);
+  }
 }
 
 .facetCategoryTabActive {
@@ -260,6 +273,13 @@
   flex: 0 0 auto;
 }
 
+/* The native colour input is opacity:0, so surface its keyboard focus on the
+   visible swatch. */
+.colorFacetCurrentSwatchButton:focus-within .colorFacetCurrentSwatch {
+  outline: solid 2px var(--c-bg-contrast-light);
+  outline-offset: 2px;
+}
+
 .colorFacetNativeInput {
   position: absolute;
   inset: 0;
@@ -298,6 +318,7 @@
 .colorFacetToleranceSlider {
   width: 100%;
   margin: 0;
+  accent-color: var(--c-accent);
 }
 
 .colorFacetToleranceValue {
@@ -513,7 +534,7 @@
 }
 
 .searchInput {
-  padding-right: 40px;
+  padding-right: var(--m-xl);
 }
 
 .searchInput::placeholder {
@@ -557,15 +578,59 @@
   min-width: 132px;
 }
 
+.searchModeInfoWrap {
+  position: relative;
+  display: inline-flex;
+}
+
 .searchModeInfo {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  appearance: none;
+  border: 0;
+  padding: 0;
+  background: transparent;
   color: var(--c-bg-contrast-light);
   font-size: var(--fs-m);
   line-height: 1;
   cursor: help;
   user-select: none;
+}
+
+.searchModeInfo:hover {
+  color: var(--c-font);
+}
+
+.searchModeInfo:focus-visible {
+  outline: solid 2px var(--c-bg-contrast-light);
+  outline-offset: 2px;
+  border-radius: 999px;
+}
+
+.searchModeInfoTooltip {
+  position: absolute;
+  top: calc(100% + var(--m-s));
+  left: 0;
+  z-index: 2;
+  width: max-content;
+  max-width: min(80vw, 280px);
+  padding: var(--m-s) var(--m-m);
+  border-radius: var(--m-s);
+  background: color-mix(in srgb, var(--c-bg) 88%, var(--c-accent));
+  border: solid 1px color-mix(in srgb, var(--c-accent) 60%, var(--c-font));
+  color: var(--c-font);
+  font-size: var(--fs-s);
+  line-height: 1.4;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--t-fast) ease;
+}
+
+.searchModeInfoWrap:hover .searchModeInfoTooltip,
+.searchModeInfoWrap:focus-within .searchModeInfoTooltip,
+.searchModeInfoTooltipOpen {
+  opacity: 1;
 }
 
 .searchModeStatus {
@@ -587,7 +652,7 @@
   right: var(--m-m);
   background: none;
   border: none;
-  font-size: 20px;
+  font-size: var(--fs-m);
   color: var(--c-bg-contrast-light);
   cursor: pointer;
   padding: var(--m-s);
@@ -597,7 +662,9 @@
   align-items: center;
   justify-content: center;
   border-radius: 50%;
-  transition: all 0.2s ease;
+  transition:
+    background-color var(--t-base) ease,
+    color var(--t-base) ease;
 }
 
 .clearButton:hover {
@@ -654,7 +721,7 @@
 .breadcrumbs {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--m-xs);
   flex-wrap: nowrap;
   flex: 1 1 auto;
   overflow-x: auto;
@@ -706,23 +773,25 @@
   border-radius: var(--m-s);
 }
 
+/* Smaller-size variant of the shared overlay badge
+   (SearchResultTile.module.css .overlayBadge). */
 .breadcrumbSimilarity {
   position: absolute;
-  left: 4px;
-  bottom: 4px;
+  left: var(--m);
+  bottom: var(--m);
   border-radius: 999px;
-  background: color-mix(in srgb, var(--c-overlay-dark) 80%, transparent);
+  background-color: var(--c-overlay-dark);
   color: white;
   font-size: var(--fs-xs);
   line-height: 1;
-  padding: 3px 5px;
+  padding: var(--m) var(--m-xs);
   pointer-events: none;
 }
 
 .breadcrumbRemoveButton {
   position: absolute;
-  top: 4px;
-  right: 4px;
+  top: var(--m);
+  right: var(--m);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -737,13 +806,27 @@
   line-height: 1;
   opacity: 0;
   pointer-events: none;
-  transition: opacity 0.15s ease;
+  transition: opacity var(--t-fast) ease;
 }
 
 .breadcrumbItem:hover .breadcrumbRemoveButton,
 .breadcrumbItem:focus-within .breadcrumbRemoveButton {
   opacity: 1;
   pointer-events: auto;
+}
+
+/* On touch the breadcrumb anchor navigates on tap, so its hover-only
+   remove/slideshow controls are unreachable — show them persistently and
+   enlarge them to a comfortable touch target. */
+@media (hover: none), (pointer: coarse) {
+  .breadcrumbRemoveButton,
+  .modeSourceItem .breadcrumbRemoveButton,
+  .modeSourceSlideshowButton {
+    opacity: 1;
+    pointer-events: auto;
+    width: var(--m-xl);
+    height: var(--m-xl);
+  }
 }
 
 .modeSourceItem {
@@ -762,8 +845,8 @@
 
 .modeSourceSlideshowButton {
   position: absolute;
-  bottom: 4px;
-  left: 4px;
+  bottom: var(--m);
+  left: var(--m);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -776,7 +859,7 @@
   text-decoration: none;
   opacity: 0;
   pointer-events: none;
-  transition: opacity 0.15s ease;
+  transition: opacity var(--t-fast) ease;
 }
 
 .modeSourceSlideshowButton:focus-visible {
@@ -976,7 +1059,7 @@
   margin-left: auto;
   background: none;
   border: none;
-  font-size: 20px;
+  font-size: var(--fs-m);
   color: var(--c-bg-contrast-light);
   cursor: pointer;
   padding: var(--m-s);
@@ -987,7 +1070,9 @@
   justify-content: center;
   border-radius: 50%;
   flex-shrink: 0;
-  transition: all 0.15s ease;
+  transition:
+    background-color var(--t-fast) ease,
+    color var(--t-fast) ease;
 }
 
 .modeClearButton:hover {

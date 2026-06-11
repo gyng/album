@@ -320,9 +320,9 @@ export const EmptyStateExplore: React.FC<Props> = ({
             <Heading level={2} as="h3">Latest</Heading>
           </div>
 
-          {isRecentLoading || isMemoriesLoading ? (
+          {!database || isRecentLoading || isMemoriesLoading ? (
             <div className={styles.sectionStatus}>
-              Loading recent photos...
+              Loading recent photos…
             </div>
           ) : null}
 
@@ -330,7 +330,8 @@ export const EmptyStateExplore: React.FC<Props> = ({
             <div className={styles.inlineError}>{recentExploreError}</div>
           ) : null}
 
-          {!isRecentLoading &&
+          {database &&
+          !isRecentLoading &&
           !recentExploreError &&
           recentResults.length === 0 ? (
             <div className={styles.sectionStatus}>
@@ -355,17 +356,19 @@ export const EmptyStateExplore: React.FC<Props> = ({
                 );
               })}
               {recentResults.length >= recentVisibleCount ? (
-                <button
-                  className={styles.moreButton}
-                  onClick={() => {
-                    setRecentVisibleCount(
-                      (prev) => prev + RECENT_ROW_LOAD_MORE_SIZE,
-                    );
-                  }}
-                  disabled={isRecentLoading}
-                >
-                  {isRecentLoading ? <>Loading&hellip;</> : <>More&hellip;</>}
-                </button>
+                <li>
+                  <button
+                    className={styles.moreButton}
+                    onClick={() => {
+                      setRecentVisibleCount(
+                        (prev) => prev + RECENT_ROW_LOAD_MORE_SIZE,
+                      );
+                    }}
+                    disabled={isRecentLoading}
+                  >
+                    {isRecentLoading ? <>Loading&hellip;</> : <>More&hellip;</>}
+                  </button>
+                </li>
               ) : null}
             </ul>
           ) : null}
@@ -458,9 +461,9 @@ export const EmptyStateExplore: React.FC<Props> = ({
             <Heading level={2} as="h3">Random selection</Heading>
           </div>
 
-          {isRandomResultsLoading ? (
+          {!database || isRandomResultsLoading ? (
             <div className={styles.sectionStatus}>
-              Loading random photos...
+              Loading random photos…
             </div>
           ) : null}
 
@@ -468,7 +471,8 @@ export const EmptyStateExplore: React.FC<Props> = ({
             <div className={styles.inlineError}>{randomResultsError}</div>
           ) : null}
 
-          {!isRandomResultsLoading &&
+          {database &&
+          !isRandomResultsLoading &&
           !randomResultsError &&
           randomResults.length === 0 ? (
             <div className={styles.sectionStatus}>
@@ -493,20 +497,22 @@ export const EmptyStateExplore: React.FC<Props> = ({
                 );
               })}
               {hasMoreRandomResults ? (
-                <button
-                  ref={randomLoadMoreButtonRef}
-                  className={styles.moreButton}
-                  onClick={() => {
-                    void loadMoreRandomResults("manual");
-                  }}
-                  disabled={isRandomResultsLoading}
-                >
-                  {isRandomResultsLoading ? (
-                    <>Loading&hellip;</>
-                  ) : (
-                    <>More&hellip;</>
-                  )}
-                </button>
+                <li>
+                  <button
+                    ref={randomLoadMoreButtonRef}
+                    className={styles.moreButton}
+                    onClick={() => {
+                      void loadMoreRandomResults("manual");
+                    }}
+                    disabled={isRandomResultsLoading}
+                  >
+                    {isRandomResultsLoading ? (
+                      <>Loading&hellip;</>
+                    ) : (
+                      <>More&hellip;</>
+                    )}
+                  </button>
+                </li>
               ) : null}
             </ul>
           ) : null}

@@ -49,6 +49,32 @@ import { rgbToHex, rgbToString } from "../../util/colorDistance";
 const useSafeLayoutEffect =
   typeof window === "undefined" ? useEffect : useLayoutEffect;
 
+// Mirrors isEditableTarget in src/util/slideshowKeyboard.ts so the "/" focus
+// shortcut never swallows characters typed into the search box or hex input.
+const isEditableTarget = (target: EventTarget | null): boolean => {
+  if (!target || typeof target !== "object") {
+    return false;
+  }
+
+  const maybeElement = target as {
+    tagName?: string;
+    nodeName?: string;
+    isContentEditable?: boolean;
+  };
+  const tagName = (
+    maybeElement.tagName ??
+    maybeElement.nodeName ??
+    ""
+  ).toUpperCase();
+
+  return (
+    tagName === "INPUT" ||
+    tagName === "TEXTAREA" ||
+    tagName === "SELECT" ||
+    maybeElement.isContentEditable === true
+  );
+};
+
 export type SearchNavState = {
   databaseReady: boolean;
   isRandomSimilarLoading: boolean;
@@ -171,6 +197,7 @@ export const Search: React.FC<{
     fetchNextPage,
     hasNextPage,
     isColorMode,
+    isError,
     isFetching,
     isPlaceholderData,
     isSimilarMode,
@@ -312,7 +339,7 @@ export const Search: React.FC<{
 
   useEffect(() => {
     function handler(ev: KeyboardEvent) {
-      if (ev.key === "/") {
+      if (ev.key === "/" && !isEditableTarget(ev.target)) {
         inputRef.current?.focus();
         ev.preventDefault();
       }
@@ -513,8 +540,10 @@ export const Search: React.FC<{
   const applySearchTerms = useCallback((terms: string[]) => {
     setSimilarPath(null);
     setSimilarTrail([]);
-    setColorSearch(null);
     setRandomExploreError(null);
+    // Keep any active colour filter — colour composes with the text query, so
+    // typing must not silently clear it (the facet panel adds colour the same
+    // composable way).
     setSearchInputValue(terms.join(","));
   }, []);
 
@@ -633,6 +662,8 @@ export const Search: React.FC<{
     });
   }, []);
 
+  // Per-tile "use this photo's colour" action: starts a fresh colour search,
+  // clearing any text query and similarity trail.
   const handleSearchByColor = useCallback((color: RGB) => {
     setSearchInputValue("");
     setSimilarPath(null);
@@ -640,6 +671,15 @@ export const Search: React.FC<{
     setRandomExploreError(null);
     setColorSearch(color);
     setSelectedFilterCategory("color");
+  }, []);
+
+  // Facet-panel colour picker: composes with the current text query/facets, so
+  // it must not clear the search input the way the per-tile action does.
+  const handleFacetColorSearch = useCallback((color: RGB) => {
+    setSimilarPath(null);
+    setSimilarTrail([]);
+    setRandomExploreError(null);
+    setColorSearch(color);
   }, []);
 
   const handleClearColorSearch = useCallback(() => {
@@ -727,7 +767,7 @@ export const Search: React.FC<{
           isLoading={isFacetSectionsLoading}
           onSelectCategory={setSelectedFilterCategory}
           onClearColorSearch={handleClearColorSearch}
-          onSetColorSearch={handleSearchByColor}
+          onSetColorSearch={handleFacetColorSearch}
           onSetColorTolerance={setColorTolerance}
           onToggleFacet={handleToggleFacet}
           onToggleTag={handleToggleTag}
@@ -750,7 +790,7 @@ export const Search: React.FC<{
             progress={embeddingsProgress}
             details={embeddingsProgressDetails}
           />
-          <div>Loading similarity index...</div>
+          <div>Loading similarity index…</div>
         </div>
       ) : null}
 
@@ -865,6 +905,7 @@ export const Search: React.FC<{
           similarPath={similarPath}
           results={queryResults}
           isSuccess={isSuccess}
+          isError={isError}
           isFetching={isFetching}
           isPlaceholderData={isPlaceholderData}
           hasNextPage={hasNextPage}

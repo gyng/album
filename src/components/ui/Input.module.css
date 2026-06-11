@@ -21,3 +21,10 @@
 .input:focus-visible {
   outline: solid 2px var(--c-bg-contrast-light);
 }
+
+/* 16px on touch devices stops iOS Safari zooming the page on focus */
+@media (hover: none), (pointer: coarse) {
+  .input {
+    font-size: 16px;
+  }
+}

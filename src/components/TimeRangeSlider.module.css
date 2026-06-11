@@ -136,18 +136,22 @@
 
 /* --- Responsive --- */
 
-@media (max-width: 600px) {
+@media (max-width: 720px) {
   .container {
     left: var(--m-s);
     right: var(--m-s);
     padding: var(--m-s) var(--m-m);
   }
+}
 
+/* On touch devices the hover-reveal never fires, so keep the thumbs visible
+   and enlarge them to a comfortable tap target — regardless of viewport width
+   (iPads and landscape phones are wider than 720px but still touch). */
+@media (hover: none), (pointer: coarse) {
   .thumb,
   .thumbHidden {
     width: 22px;
     height: 22px;
-    /* Always visible on touch — no hover discovery */
     opacity: 1;
   }
 }

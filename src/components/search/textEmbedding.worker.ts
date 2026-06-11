@@ -40,12 +40,28 @@ let runtimePromise: Promise<{
   model: Awaited<ReturnType<typeof SiglipTextModel.from_pretrained>>;
 }> | null = null;
 
-const getDevice = (): "webgpu" | "wasm" => {
-  const scope = self as typeof self & {
-    navigator?: Navigator & { gpu?: unknown };
-  };
+type WebGpuNavigator = Navigator & {
+  gpu?: { requestAdapter?: () => Promise<unknown | null> };
+};
 
-  return scope.navigator?.gpu ? "webgpu" : "wasm";
+// Prefer WebGPU when a usable adapter is actually available; some environments
+// (Linux Chrome without GPU flags, VMs, blocklisted GPUs) expose navigator.gpu
+// but fail to hand out an adapter, which would otherwise crash the model load
+// with "Failed to get GPU adapter" and no fallback.
+const getDevice = async (): Promise<"webgpu" | "wasm"> => {
+  const scope = self as typeof self & { navigator?: WebGpuNavigator };
+  const gpu = scope.navigator?.gpu;
+
+  if (!gpu?.requestAdapter) {
+    return "wasm";
+  }
+
+  try {
+    const adapter = await gpu.requestAdapter();
+    return adapter ? "webgpu" : "wasm";
+  } catch {
+    return "wasm";
+  }
 };
 
 const normalizeVector = (values: Float32Array | number[]): number[] => {
@@ -113,13 +129,34 @@ const loadRuntime = async (requestId?: number) => {
         },
       });
       postLoadProgress(35, "Tokenizer ready");
-      const model = await SiglipTextModel.from_pretrained(MODEL_ID, {
-        device: getDevice(),
-        dtype: "q4",
-        progress_callback: (info: TransformersProgressInfo) => {
-          reportProgress(35, 60, "Loading text model", info);
-        },
-      });
+
+      const loadModel = (device: "webgpu" | "wasm") =>
+        SiglipTextModel.from_pretrained(MODEL_ID, {
+          device,
+          dtype: "q4",
+          progress_callback: (info: TransformersProgressInfo) => {
+            reportProgress(35, 60, "Loading text model", info);
+          },
+        });
+
+      const device = await getDevice();
+      let model: Awaited<ReturnType<typeof loadModel>>;
+      try {
+        model = await loadModel(device);
+      } catch (error) {
+        // A WebGPU adapter can still vanish between probe and model init — fall
+        // back to the WASM backend rather than killing semantic search.
+        if (device === "webgpu") {
+          console.warn(
+            "WebGPU text model load failed, retrying on WASM backend",
+            error,
+          );
+          model = await loadModel("wasm");
+        } else {
+          throw error;
+        }
+      }
+
       postLoadProgress(95, "Search model ready");
       return { tokenizer, model };
     })();
@@ -129,6 +166,11 @@ const loadRuntime = async (requestId?: number) => {
     const runtime = await runtimePromise;
     postLoadProgress(100, "Search model ready");
     return runtime;
+  } catch (error) {
+    // Reset so a later attempt can retry — otherwise a single transient
+    // download/init failure permanently kills semantic search for the session.
+    runtimePromise = null;
+    throw error;
   } finally {
     if (typeof requestId === "number") {
       loadingRequestIds.delete(requestId);

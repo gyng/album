@@ -4,6 +4,8 @@ import { Caption } from "../ui";
 import styles from "./GuessRound.module.css";
 import { GuessPhoto } from "./guessTypes";
 import { fireConfetti } from "./confetti";
+import { isInteractiveTarget } from "./guessKeyboard";
+import { useAnimatedCounter } from "./useAnimatedCounter";
 import {
   MAX_SCORE,
   computeScore,
@@ -46,52 +48,19 @@ type GuessRoundProps = {
 
 const getGeocodeLabel = (geocode: string): string | null => {
   if (!geocode) return null;
-  const parts = geocode
+  let parts = geocode
     .split("\n")
     .map((s) => s.trim())
     .filter(Boolean);
   if (parts.length === 0) return null;
+  // Drop a leading 2-letter country code when a fuller place name follows,
+  // so "JP\nJapan" reads as "Japan" rather than the redundant "JP, Japan".
+  if (parts.length >= 2 && /^[A-Z]{2}$/.test(parts[0])) {
+    parts = parts.slice(1);
+  }
+  if (parts.length === 0) return null;
   if (parts.length >= 2) return `${parts[0]}, ${parts[parts.length - 1]}`;
   return parts[0];
-};
-
-/**
- * Imperatively animates a DOM element's textContent from 0 to the target value.
- * Avoids React state entirely so no re-renders are triggered during the count.
- */
-const useAnimatedCounter = (
-  target: number,
-  durationMs = 600,
-): React.RefCallback<HTMLElement> => {
-  const rafRef = useRef<number>(0);
-  const prevTarget = useRef<number | null>(null);
-
-  return useCallback(
-    (node: HTMLElement | null) => {
-      cancelAnimationFrame(rafRef.current);
-      if (!node) return;
-
-      if (target === 0 || target === prevTarget.current) {
-        node.textContent = target.toLocaleString();
-        prevTarget.current = target;
-        return;
-      }
-      prevTarget.current = target;
-
-      const start = performance.now();
-      const animate = (now: number) => {
-        const elapsed = now - start;
-        const progress = Math.min(elapsed / durationMs, 1);
-        const eased = 1 - Math.pow(1 - progress, 3);
-        node.textContent = Math.round(eased * target).toLocaleString();
-        if (progress < 1) {
-          rafRef.current = requestAnimationFrame(animate);
-        }
-      };
-      rafRef.current = requestAnimationFrame(animate);
-    },
-    [target, durationMs],
-  );
 };
 
 export const GuessRound: React.FC<GuessRoundProps> = ({
@@ -110,6 +79,11 @@ export const GuessRound: React.FC<GuessRoundProps> = ({
   const [result, setResult] = useState<RoundResult | null>(null);
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
+  // Gate the round timer until the photo has loaded, so a slow connection
+  // doesn't burn the round (and the time bonus) on a blank panel.
+  const [photoLoaded, setPhotoLoaded] = useState(false);
+  // Timer state — declared here so the photo-change reset below can re-seed it.
+  const [timeRemaining, setTimeRemaining] = useState(timeLimit);
 
   // Reset round-local state when the photo changes.
   // setState during render is the React-approved pattern for syncing state
@@ -122,6 +96,8 @@ export const GuessRound: React.FC<GuessRoundProps> = ({
     setResult(null);
     setZoom(1);
     setPan({ x: 0, y: 0 });
+    setPhotoLoaded(false);
+    setTimeRemaining(timeLimit);
   }
   const panRef = useRef({ x: 0, y: 0 });
   const dragging = useRef(false);
@@ -138,8 +114,6 @@ export const GuessRound: React.FC<GuessRoundProps> = ({
     revealed ? cumulativeScore + (result?.score ?? 0) : cumulativeScore,
   );
 
-  // Timer state — must be declared before handlers that read it
-  const [timeRemaining, setTimeRemaining] = useState(timeLimit);
   const timerCallbackRef = useRef<() => void>(() => {});
 
   const photoSrc = `/data/albums/${photo.albumName}/.resized_images/${photo.photoName}@1600.avif`;
@@ -291,11 +265,61 @@ export const GuessRound: React.FC<GuessRoundProps> = ({
     setPan({ x: 0, y: 0 });
   }, []);
 
+  // Keyboard zoom/pan for the focused photo panel: +/- zoom, arrows pan, 0 resets.
+  const handlePhotoKeyDown = useCallback((event: React.KeyboardEvent) => {
+    const PAN_STEP = 40;
+    if (event.key === "+" || event.key === "=") {
+      event.preventDefault();
+      setZoom((prev) => Math.min(MAX_ZOOM, prev * ZOOM_STEP));
+    } else if (event.key === "-" || event.key === "_") {
+      event.preventDefault();
+      setZoom((prev) => {
+        const next = Math.max(MIN_ZOOM, prev / ZOOM_STEP);
+        if (next === MIN_ZOOM) {
+          panRef.current = { x: 0, y: 0 };
+          setPan({ x: 0, y: 0 });
+        }
+        return next;
+      });
+    } else if (event.key === "0") {
+      event.preventDefault();
+      setZoom(MIN_ZOOM);
+      panRef.current = { x: 0, y: 0 };
+      setPan({ x: 0, y: 0 });
+    } else if (
+      event.key === "ArrowUp" ||
+      event.key === "ArrowDown" ||
+      event.key === "ArrowLeft" ||
+      event.key === "ArrowRight"
+    ) {
+      if (zoom <= MIN_ZOOM) return;
+      event.preventDefault();
+      const dx =
+        (event.key === "ArrowLeft" ? PAN_STEP : 0) -
+        (event.key === "ArrowRight" ? PAN_STEP : 0);
+      const dy =
+        (event.key === "ArrowUp" ? PAN_STEP : 0) -
+        (event.key === "ArrowDown" ? PAN_STEP : 0);
+      const next = {
+        x: panRef.current.x + dx,
+        y: panRef.current.y + dy,
+      };
+      panRef.current = next;
+      setPan(next);
+    }
+  }, [zoom]);
+
   const isZoomed = zoom > MIN_ZOOM;
 
-  // Keyboard shortcuts: Enter = confirm, Space/ArrowRight = next
+  // Keyboard shortcuts: Enter = confirm, Space/ArrowRight = next.
+  // Skip when focus is on an interactive control (e.g. "I have no idea" or the
+  // abort button) so it keeps its native Enter/Space activation.
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
+      if (isInteractiveTarget(event.target)) return;
+      // The photo panel has its own +/-/arrow zoom-pan handler; don't also fire
+      // the confirm/next shortcuts when it is the focused target.
+      if (event.target === photoPanelRef.current) return;
       if ((event.key === "Enter" || event.key === " ") && !revealed && guess) {
         event.preventDefault();
         handleConfirm();
@@ -325,7 +349,11 @@ export const GuessRound: React.FC<GuessRoundProps> = ({
   }, [guess, handleConfirm, handleSkip]);
 
   useEffect(() => {
-    if (!timeLimit || revealed) return;
+    // Hold the countdown until the photo is visible so the round doesn't start
+    // ticking against a blank panel.
+    if (!timeLimit || revealed || !photoLoaded) return;
+    // timeRemaining is re-seeded to timeLimit by the photo-change reset above,
+    // so the countdown always starts from full once the photo is visible.
     let remaining = timeLimit;
 
     const interval = setInterval(() => {
@@ -340,7 +368,7 @@ export const GuessRound: React.FC<GuessRoundProps> = ({
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [timeLimit, revealed]);
+  }, [timeLimit, revealed, photoLoaded]);
 
   const geocodeLabel = revealed ? getGeocodeLabel(photo.geocode) : null;
   const tierColour =
@@ -388,34 +416,39 @@ export const GuessRound: React.FC<GuessRoundProps> = ({
       </div>
 
       <div className={styles.gameArea}>
-        {/* Photo panel — scroll to zoom, drag to pan, double-click to reset */}
+        {/* Photo panel — scroll/+/- to zoom, drag/arrows to pan, double-click resets */}
         <div
           ref={photoPanelRef}
           className={[styles.photoPanel, isZoomed ? styles.photoZoomed : ""]
             .filter(Boolean)
             .join(" ")}
+          tabIndex={0}
+          role="img"
+          aria-label="Mystery photo. Use plus and minus to zoom, arrow keys to pan."
           onWheel={handleWheel}
           onPointerDown={handlePointerDown}
           onPointerMove={handlePointerMove}
           onPointerUp={handlePointerUp}
           onPointerCancel={handlePointerUp}
           onDoubleClick={handleDoubleClick}
+          onKeyDown={handlePhotoKeyDown}
         >
+          {!photoLoaded ? <div className={styles.photoLoading} /> : null}
           <img
             src={photoSrc}
             alt=""
             className={styles.photo}
             draggable={false}
+            onLoad={() => setPhotoLoaded(true)}
             style={{
               transform: `scale(${zoom}) translate(${pan.x / zoom}px, ${pan.y / zoom}px)`,
             }}
           />
-          {timeLimit && !revealed ? (
+          {timeLimit && !revealed && photoLoaded ? (
             <div
               className={styles.timerBar}
               style={{
-                width: `${((timeRemaining ?? timeLimit) / timeLimit) * 100}%`,
-                transitionDuration: "1s",
+                transform: `scaleX(${(timeRemaining ?? timeLimit) / timeLimit})`,
               }}
               data-urgent={
                 timeRemaining !== null && timeRemaining <= timeLimit * 0.25

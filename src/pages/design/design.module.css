@@ -112,10 +112,30 @@
   gap: var(--m);
 }
 
-.colourBox {
-  height: 48px;
+/* Checkerboard backing so translucent/near-background tokens read as
+   transparent rather than as a flat box. The token colour is layered on top
+   via .colourBox; transparency in the token lets the checkerboard show
+   through, while opaque tokens cover it entirely. */
+.colourBoxBacking {
   border-radius: var(--m);
   border: 1px solid color-mix(in srgb, var(--c-bg-contrast-light) 25%, transparent);
+  overflow: clip;
+  background-color: var(--c-bg);
+  background-image:
+    linear-gradient(45deg, var(--c-bg-contrast-dark) 25%, transparent 25%),
+    linear-gradient(-45deg, var(--c-bg-contrast-dark) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, var(--c-bg-contrast-dark) 75%),
+    linear-gradient(-45deg, transparent 75%, var(--c-bg-contrast-dark) 75%);
+  background-size: var(--m-m) var(--m-m);
+  background-position:
+    0 0,
+    0 calc(var(--m-m) / 2),
+    calc(var(--m-m) / 2) calc(var(--m-m) / -2),
+    calc(var(--m-m) / -2) 0;
+}
+
+.colourBox {
+  height: 48px;
 }
 
 .colourLabel {
@@ -190,6 +210,14 @@
   display: flex;
   flex-wrap: wrap;
   gap: var(--m-s);
+}
+
+.stackDemoBar {
+  height: var(--m-s);
+  width: 80px;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--c-accent) 24%, var(--c-bg));
+  border: 1px solid color-mix(in srgb, var(--c-accent) 45%, transparent);
 }
 
 @media (max-width: 720px) {

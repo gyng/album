@@ -41,7 +41,7 @@ const initialState: TextVectorState = {
   isTextVectorLoading: false,
   textVectorError: null,
   textModelProgress: 100,
-  textModelStage: "Loading semantic search model...",
+  textModelStage: "Loading semantic search model…",
   textModelProgressDetails: { loaded: 0, total: 0 },
 };
 
@@ -51,7 +51,7 @@ const reducer = (state: TextVectorState, action: Action): TextVectorState => {
       return {
         ...state,
         textModelProgress: 0,
-        textModelStage: "Loading semantic search model...",
+        textModelStage: "Loading semantic search model…",
         textModelProgressDetails: { loaded: 0, total: 0 },
       };
     case "progress":

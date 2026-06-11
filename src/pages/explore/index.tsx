@@ -24,7 +24,7 @@ import {
   StringFacetStat,
 } from "../../util/computeStats";
 import { measureBuild } from "../../services/buildTiming";
-import { Thumb, Footer, SegmentedToggle, Card, Heading, Caption, Pill, PillButton, pillStyles, Select } from "../../components/ui";
+import { Thumb, Footer, SegmentedToggle, Card, Heading, Caption, Pill, PillButton, pillStyles, Select, OverlayButtonLink } from "../../components/ui";
 import styles from "./explore.module.css";
 import {
   buildSearchHref,
@@ -243,16 +243,16 @@ const VisualSimilarityThumb: React.FC<{
         className={`${styles.visualThumb} ${imageClassName ?? ""}`.trim()}
       />
     </Link>
-    <Link
+    <OverlayButtonLink
       href={buildSimilaritySearchHref(photo.path)}
-      className={styles.visualThumbSearchLink}
+      className={styles.visualThumbSearchButton}
       aria-label={`Find photos semantically similar to ${photo.label}`}
       title="Open similarity search"
     >
       <span aria-hidden="true">🔍</span>
       <span>Similar</span>
       <span aria-hidden="true">↗</span>
-    </Link>
+    </OverlayButtonLink>
   </div>
 );
 
@@ -524,19 +524,19 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
       ? {
           label: "Prime vs zoom",
           value: "Lens mix unclear",
-          detail: "Not enough recognizable lens names yet.",
+          detail: "Not enough recognisable lens names yet.",
         }
       : primeShare >= 0.6
         ? {
             label: "Prime vs zoom",
             value: "Prime person",
-            detail: `${Math.round(primeShare * 100)}% of recognized lens shots were on primes.`,
+            detail: `${Math.round(primeShare * 100)}% of recognised lens shots were on primes.`,
           }
         : primeShare <= 0.4
           ? {
               label: "Prime vs zoom",
               value: "Zoom leaning",
-              detail: `${Math.round((1 - primeShare) * 100)}% of recognized lens shots were on zooms.`,
+              detail: `${Math.round((1 - primeShare) * 100)}% of recognised lens shots were on zooms.`,
             }
           : {
               label: "Prime vs zoom",
@@ -590,7 +590,7 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
       : {
           label: "Colour mood",
           value: "Not enough palette data",
-          detail: "Needs extracted color swatches to show a dominant mood.",
+          detail: "Needs extracted colour swatches to show a dominant mood.",
         },
   ];
   const sectionLinks = [
@@ -707,7 +707,9 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
 
         <header className={styles.header}>
           <div className={styles.headerBody}>
-            <h1 className={styles.title}>Explore</h1>
+            <Heading level={1} as="h1" className={styles.title}>
+              Explore
+            </Heading>
           </div>
         </header>
 
@@ -734,7 +736,7 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
                       {visualSameness.samenessPercent}%
                     </div>
                     <div className={styles.funStatDetail}>
-                      Average nearest-neighbor similarity across {visualSameness.sampleSize.toLocaleString("en")} embedded photos in the archive.
+                      Average nearest-neighbour similarity across {visualSameness.sampleSize.toLocaleString("en")} embedded photos in the archive.
                     </div>
                   </Card>
                   <Card as="article" className={styles.overviewCard}>
@@ -743,7 +745,7 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
                       {visualSameness.repeatedMotifPercent}%
                     </div>
                     <div className={styles.funStatDetail}>
-                      Photos with a very close visual neighbor at or above {Math.round(visualSameness.highSimilarityThreshold * 100)}% similarity.
+                      Photos with a very close visual neighbour at or above {Math.round(visualSameness.highSimilarityThreshold * 100)}% similarity.
                     </div>
                   </Card>
                   <Card as="article" className={styles.overviewCard}>
@@ -752,7 +754,7 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
                       {visualSameness.distinctPercent}%
                     </div>
                     <div className={styles.funStatDetail}>
-                      Photos whose nearest visual neighbor stays below {Math.round(visualSameness.lowSimilarityThreshold * 100)}% similarity.
+                      Photos whose nearest visual neighbour stays below {Math.round(visualSameness.lowSimilarityThreshold * 100)}% similarity.
                     </div>
                   </Card>
                   {visualSameness.lookDrift ? (
@@ -791,7 +793,7 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
                         <div className={styles.sectionHeader}>
                           <Heading level={2}>Most average photos</Heading>
                           <Caption as="span">
-                            Closest to the archive center
+                            Closest to the archive centre
                           </Caption>
                         </div>
                         <div className={styles.visualSingles}>
@@ -803,7 +805,7 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
                               <VisualSimilarityThumb photo={example.photo} />
                               <div className={styles.visualExampleMeta}>
                                 <span>
-                                  {example.centroidSimilarityPercent}% to archive center
+                                  {example.centroidSimilarityPercent}% to archive centre
                                 </span>
                               </div>
                             </div>
@@ -831,7 +833,7 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
                         <div className={styles.sectionHeader}>
                           <Heading level={2}>Distinct frames</Heading>
                           <Caption as="span">
-                            Weakest nearest-neighbor matches
+                            Weakest nearest-neighbour matches
                           </Caption>
                         </div>
                         <div className={styles.visualSingles}>
@@ -1049,7 +1051,10 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
                       </div>
                     ) : null}
                     {stat.actionHref ? (
-                      <Link href={stat.actionHref} className={styles.funStatLink}>
+                      <Link
+                        href={stat.actionHref}
+                        className={`${pillStyles.base} ${pillStyles.ghost}`}
+                      >
                         <span>Open in Search</span>
                         <span aria-hidden="true">↗</span>
                       </Link>
@@ -1173,7 +1178,7 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
 
           <StatGroup
             id="when-you-shoot"
-            title="When You Shoot"
+            title="When you shoot"
             actions={renderScopeFilterControls()}
           >
             {activeTimeFacet && activeTimeRelationships ? (
@@ -1213,7 +1218,7 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
 
           <StatGroup
             id="how-you-shoot"
-            title="How You Shoot"
+            title="How you shoot"
             actions={renderScopeFilterControls()}
           >
             {activeTechnicalFacets.map(renderNumericFacet)}
@@ -1241,7 +1246,7 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
 
           <StatGroup
             id="where-you-shoot"
-            title="Where You Shoot"
+            title="Where you shoot"
             actions={
               <div className={styles.groupActionsStack}>
                 <Link href="/map" className={`${pillStyles.base} ${pillStyles.ghost}`}>
@@ -1298,7 +1303,7 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
 
           <StatGroup
             id="what-you-shoot-with"
-            title="What You Shoot With"
+            title="What you shoot with"
             actions={
               <SegmentedToggle
                 options={[
@@ -1399,7 +1404,7 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
                             ) : null}
                           </div>
                           <div className={styles.colorFamilyThumbs}>
-                            {family.photos.slice(0, 4).map((photo) => (
+                            {family.photos.slice(0, 6).map((photo) => (
                               <Link
                                 key={`${family.label}-${photo.href}-${photo.src}`}
                                 href={photo.href}

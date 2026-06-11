@@ -15,8 +15,12 @@
   padding: var(--m-s) var(--m-m);
 }
 
+.wrapper {
+  display: block;
+}
+
 .progress {
   background-color: var(--c-bg-contrast-light);
   height: 100%;
-  transition: all 0.1s ease-out;
+  transition: width 0.1s ease-out;
 }

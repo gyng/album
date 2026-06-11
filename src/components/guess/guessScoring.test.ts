@@ -99,12 +99,12 @@ describe("scoreRatio", () => {
 });
 
 describe("scoreTierColour", () => {
-  it("returns green for high scores", () => {
-    expect(scoreTierColour(MAX_SCORE * 0.8)).toBe("#22c55e");
+  it("returns the success token for high scores", () => {
+    expect(scoreTierColour(MAX_SCORE * 0.8)).toBe("var(--c-success)");
   });
 
-  it("returns amber for medium scores", () => {
-    expect(scoreTierColour(MAX_SCORE * 0.4)).toBe("#eab308");
+  it("returns the warning token for medium scores", () => {
+    expect(scoreTierColour(MAX_SCORE * 0.4)).toBe("var(--c-warning)");
   });
 
   it("returns accent for low scores", () => {

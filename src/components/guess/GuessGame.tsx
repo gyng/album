@@ -10,7 +10,7 @@ import { GameSettings, GuessPhoto } from "./guessTypes";
 import styles from "./GuessGame.module.css";
 
 const GuessMap = dynamic(() => import("./GuessMapExport"), {
-  loading: () => null,
+  loading: () => <div className={styles.mapLoading} />,
   ssr: false,
 });
 
@@ -240,16 +240,13 @@ export const GuessGame: React.FC<GuessGameProps> = ({
         database={database}
         defaults={state.settings}
         onStart={handleStart}
+        error={state.error}
       />
     );
   }
 
   if (state.phase === "loading") {
     return <p className={styles.status}>Loading photos&hellip;</p>;
-  }
-
-  if (state.error) {
-    return <p className={styles.status}>{state.error}</p>;
   }
 
   if (state.phase === "summary") {

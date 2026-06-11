@@ -20,7 +20,7 @@
 }
 
 .highlightedSubpip {
-  box-shadow: 0 0 0 1px color-mix(in srgb, white 70%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--c-bg) 55%, transparent);
   filter: brightness(1.2) saturate(1.2);
 }
 .heatmap {
@@ -96,7 +96,7 @@
   gap: var(--heatmap-gap);
   width: 16px;
   color: var(--c-bg-contrast-light);
-  font-size: 8px;
+  font-size: var(--fs-2xs);
   line-height: 1;
 }
 
@@ -140,19 +140,23 @@
   padding: 0;
   cursor: pointer;
   transition:
-    transform 120ms ease,
-    box-shadow 120ms ease,
-    background-color 120ms ease;
+    transform var(--t-fast) ease,
+    box-shadow var(--t-fast) ease,
+    background-color var(--t-fast) ease;
 }
 
 .interactiveCell {
   cursor: pointer;
 }
 
-.cell:hover,
-.cell:focus-visible {
+.cell:hover {
   transform: scale(1.12);
   box-shadow: 0 0 0 2px var(--c-bg);
+}
+
+.cell:focus-visible {
+  transform: scale(1.12);
+  box-shadow: 0 0 0 2px var(--c-bg), 0 0 0 4px var(--c-accent);
   outline: none;
 }
 
@@ -169,14 +173,15 @@
   transform: scale(1.06);
 }
 
-.today {
-  background-color: #2276ff !important;
+.cell.today {
+  background-color: var(--c-today);
   box-shadow: none;
 }
 
-.today.selected {
-  background-color: #2276ff !important;
-  box-shadow: 0 0 0 2px var(--c-bg), 0 0 0 4px color-mix(in srgb, #2276ff 70%, white 30%);
+.cell.today.selected {
+  background-color: var(--c-today);
+  box-shadow: 0 0 0 2px var(--c-bg),
+    0 0 0 4px color-mix(in srgb, var(--c-today) 70%, white 30%);
 }
 
 .level0 {
@@ -279,6 +284,32 @@
   }
 
   .monthLabel {
-    font-size: 9px;
+    font-size: var(--fs-2xs);
+  }
+
+  /* On phones the fluid 54-column grid shrinks day cells to ~4-10px, making
+     them untappable. Keep a minimum cell size and let each year scroll
+     horizontally inside its own container instead (mirrors TechnicalHeatmaps). */
+  .yearSection {
+    overflow-x: auto;
+  }
+
+  .yearTrack {
+    grid-template-columns: 16px max-content;
+  }
+
+  .heatmap {
+    --heatmap-cell-size: 14px;
+  }
+
+  .months {
+    grid-template-columns: repeat(var(--heatmap-weeks), var(--heatmap-cell-size));
+    width: auto;
+  }
+
+  .grid {
+    grid-template-columns: repeat(var(--heatmap-weeks), var(--heatmap-cell-size));
+    width: auto;
+    aspect-ratio: auto;
   }
 }

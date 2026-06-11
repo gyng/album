@@ -50,7 +50,7 @@ class MyDocument extends Document {
 
   render() {
     return (
-      <Html>
+      <Html lang="en-GB">
         <Head>
           <link rel="manifest" href="/manifest.webmanifest" />
           <meta name="theme-color" content="#000000" />

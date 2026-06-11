@@ -46,7 +46,7 @@
   max-width: calc(100vw - var(--m-m));
   scrollbar-gutter: stable;
   z-index: 300;
-  margin-top: -40px;
+  margin-top: calc(-1 * var(--m-xl));
 }
 
 .details > details {

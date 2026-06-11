@@ -10,6 +10,13 @@
   gap: var(--m-xl);
 }
 
+/* Grid items default to min-width: auto, so the horizontally-scrolling nav's
+   intrinsic width can blow out the whole page on mobile. Let every direct
+   child shrink below its content width and scroll inside its own container. */
+.main > * {
+  min-width: 0;
+}
+
 .header {
   display: flex;
   flex-wrap: wrap;
@@ -123,7 +130,7 @@
 
 .memoryClusterSwatches {
   display: inline-flex;
-  gap: 4px;
+  gap: var(--m);
 }
 
 .memoryClusterSwatch {
@@ -161,6 +168,11 @@
   height: 150px;
   object-fit: cover;
   cursor: inherit;
+}
+
+.memoryButton:hover .memoryImage {
+  outline: solid 2px var(--c-bg-contrast-light);
+  outline-offset: 3px;
 }
 
 .memoryButton:focus-visible {

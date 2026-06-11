@@ -40,6 +40,8 @@ export const GlobalNav: React.FC<Props> = ({
 }) => {
   const current = (page: GlobalNavPage) =>
     currentPage === page ? commonStyles.navCurrent : undefined;
+  const ariaCurrent = (page: GlobalNavPage) =>
+    currentPage === page ? "page" : undefined;
 
   return (
     <Nav
@@ -51,6 +53,7 @@ export const GlobalNav: React.FC<Props> = ({
             <Link
               href="/search"
               className={cx(commonStyles.button, current("search"))}
+              aria-current={ariaCurrent("search")}
             >
               Search
             </Link>
@@ -59,6 +62,7 @@ export const GlobalNav: React.FC<Props> = ({
             <Link
               href="/explore"
               className={cx(commonStyles.button, current("explore"))}
+              aria-current={ariaCurrent("explore")}
             >
               Explore
             </Link>
@@ -69,6 +73,7 @@ export const GlobalNav: React.FC<Props> = ({
               prefetch={onMapClick ? false : undefined}
               className={cx(commonStyles.button, current("map"))}
               onClick={onMapClick}
+              aria-current={ariaCurrent("map")}
             >
               Map
             </Link>
@@ -77,6 +82,7 @@ export const GlobalNav: React.FC<Props> = ({
             <Link
               href="/timeline"
               className={cx(commonStyles.button, current("timeline"))}
+              aria-current={ariaCurrent("timeline")}
             >
               Timeline
             </Link>
@@ -89,6 +95,7 @@ export const GlobalNav: React.FC<Props> = ({
                   commonStyles.splitButtonMain,
                   currentPage === "slideshow" ? commonStyles.navCurrent : undefined,
                 )}
+                aria-current={ariaCurrent("slideshow")}
               >
                 Slideshow
               </Link>
@@ -108,6 +115,7 @@ export const GlobalNav: React.FC<Props> = ({
             <Link
               href="/guess"
               className={cx(commonStyles.button, current("guess"))}
+              aria-current={ariaCurrent("guess")}
             >
               Guess
             </Link>

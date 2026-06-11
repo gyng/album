@@ -1,5 +1,16 @@
+import { TIER_SUCCESS, TIER_WARNING, TIER_DANGER } from "./guessScoring";
+
 /** Lightweight canvas confetti burst. Self-cleans after the animation. */
 export const fireConfetti = (opts?: { x?: number; y?: number }) => {
+  // Respect reduced-motion: a full-screen particle burst is the most
+  // motion-heavy effect on the site, so skip it entirely.
+  if (
+    typeof window !== "undefined" &&
+    window.matchMedia("(prefers-reduced-motion: reduce)").matches
+  ) {
+    return;
+  }
+
   const canvas = document.createElement("canvas");
   canvas.style.cssText =
     "position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:9999";
@@ -20,9 +31,9 @@ export const fireConfetti = (opts?: { x?: number; y?: number }) => {
   const PARTICLE_COUNT = 60;
   const GRAVITY = 0.12;
   const COLOURS = [
-    "#22c55e",
-    "#eab308",
-    "#ef4444",
+    TIER_SUCCESS,
+    TIER_WARNING,
+    TIER_DANGER,
     "#3b82f6",
     "#a855f7",
     "#ec4899",

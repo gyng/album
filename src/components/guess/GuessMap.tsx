@@ -1,7 +1,8 @@
-import React, { useCallback } from "react";
-import Map, { Marker, Source, Layer } from "react-map-gl/maplibre";
+import React, { useCallback, useEffect } from "react";
+import Map, { Marker, Source, Layer, useMap } from "react-map-gl/maplibre";
 import type { MapLayerMouseEvent } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
+import { TIER_DANGER } from "./guessScoring";
 import styles from "./GuessMap.module.css";
 
 export type GuessMapProps = {
@@ -33,6 +34,45 @@ const lineGeoJson = (
     },
   ],
 });
+
+/**
+ * Re-frames the map on reveal so both the guess pin and the true location are
+ * visible — otherwise the connecting line runs off-screen and the answer marker
+ * is never seen. Rendered as a child of <Map> so it can use the map imperatively
+ * (useMap() only works inside MapLibreMap children — see the map rules).
+ */
+const RevealFit: React.FC<{
+  guess: { lat: number; lng: number } | null;
+  reveal: { lat: number; lng: number };
+}> = ({ guess, reveal }) => {
+  const { current: map } = useMap();
+  // Depend on primitive coordinates rather than the object identities: the
+  // parent recreates the `reveal`/`guess` objects each render, which would
+  // otherwise re-fire fitBounds on every re-render of the revealed round.
+  const revealLat = reveal.lat;
+  const revealLng = reveal.lng;
+  const guessLat = guess?.lat ?? null;
+  const guessLng = guess?.lng ?? null;
+
+  useEffect(() => {
+    if (!map) return;
+    // Frame both the guess and the true location (or just the answer when the
+    // round was skipped). Uses the corner-array form of fitBounds to match the
+    // map's MapAutoFit pattern.
+    const hasGuess = guessLat !== null && guessLng !== null;
+    const lngs = [revealLng, ...(hasGuess ? [guessLng] : [])];
+    const lats = [revealLat, ...(hasGuess ? [guessLat] : [])];
+    map.fitBounds(
+      [
+        [Math.min(...lngs), Math.min(...lats)],
+        [Math.max(...lngs), Math.max(...lats)],
+      ],
+      { padding: 60, maxZoom: 6, duration: 800 },
+    );
+  }, [map, revealLat, revealLng, guessLat, guessLng]);
+
+  return null;
+};
 
 export const GuessMap: React.FC<GuessMapProps> = ({
   guess,
@@ -73,6 +113,7 @@ export const GuessMap: React.FC<GuessMapProps> = ({
 
         {reveal ? (
           <>
+            <RevealFit guess={guess} reveal={reveal} />
             <Marker
               longitude={reveal.lng}
               latitude={reveal.lat}
@@ -91,7 +132,7 @@ export const GuessMap: React.FC<GuessMapProps> = ({
                     id="guess-line-glow"
                     type="line"
                     paint={{
-                      "line-color": "#ef4444",
+                      "line-color": TIER_DANGER,
                       "line-width": 6,
                       "line-opacity": 0.2,
                       "line-blur": 4,
@@ -101,7 +142,7 @@ export const GuessMap: React.FC<GuessMapProps> = ({
                     id="guess-line-layer"
                     type="line"
                     paint={{
-                      "line-color": "#ef4444",
+                      "line-color": TIER_DANGER,
                       "line-width": 2,
                       "line-dasharray": [4, 3],
                     }}

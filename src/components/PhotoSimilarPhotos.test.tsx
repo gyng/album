@@ -84,7 +84,7 @@ describe("PhotoSimilarPhotos", () => {
     expect(
       screen.getByRole("img", { name: /Harbor skyline/i }).getAttribute("src"),
     ).toBe("/data/albums/test-simple/.resized_images/DSCF0593.jpg@800.avif");
-    expect(screen.getByText("test-simple")).toBeTruthy();
+    expect(screen.getByText(/test-simple/)).toBeTruthy();
     expect(screen.getByText("82%")).toBeTruthy();
   });
 

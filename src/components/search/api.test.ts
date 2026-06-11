@@ -471,7 +471,7 @@ describe("fetchHybridResults", () => {
           sql.includes("images MATCH ?") &&
           sql.includes("ORDER BY rank")
         ) {
-          expect(bind).toEqual([`- {path album_relative_path} : "harbor"`]);
+          expect(bind).toEqual([`- {path album_relative_path exif} : "harbor"`]);
           callback([
             "../albums/test-simple/DSCF0593.jpg",
             0.9,
@@ -760,11 +760,11 @@ describe("fetchRefinementTagCounts", () => {
         if (sql.includes("COUNT(*) AS count") && sql.includes("UNION ALL")) {
           expect(bind).toEqual([
             "harbor",
-            `- {path album_relative_path} : "bird"`,
-            `- {path album_relative_path} : "harbor"`,
+            `- {path album_relative_path exif} : "bird"`,
+            `- {path album_relative_path exif} : "harbor"`,
             "night",
-            `- {path album_relative_path} : "bird"`,
-            `- {path album_relative_path} : "night"`,
+            `- {path album_relative_path exif} : "bird"`,
+            `- {path album_relative_path exif} : "night"`,
           ]);
           callback(["harbor", 4]);
           callback(["night", 0]);
@@ -790,7 +790,7 @@ describe("fetchRefinementTagCounts", () => {
           expect(sql).toContain("LEFT JOIN metadata m ON m.path = images.path");
           expect(bind).toEqual([
             "harbor",
-            `- {path album_relative_path} : "harbor"`,
+            `- {path album_relative_path exif} : "harbor"`,
             "%\nJapan\n%",
             "%\nJapan",
           ]);
@@ -853,7 +853,7 @@ describe("fetchSearchFacetSections", () => {
     ).toEqual([{ value: "17:00", count: 1 }]);
     expect(
       calls.some(({ bind }) =>
-        bind?.includes(`- {path album_relative_path} : "harbor"`),
+        bind?.includes(`- {path album_relative_path exif} : "harbor"`),
       ),
     ).toBe(true);
     expect(

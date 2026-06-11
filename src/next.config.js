@@ -29,6 +29,7 @@ const nextConfig = {
     },
   ],
   experimental: {
+    scrollRestoration: true,
     useLightningcss: true,
     lightningCssFeatures: {
       exclude: ["light-dark"],

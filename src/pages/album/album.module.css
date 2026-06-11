@@ -23,3 +23,16 @@
   cursor: pointer;
   user-select: none;
 }
+
+.fallbackPlaceholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--m-m);
+  min-height: 60vh;
+  min-height: 60svh;
+  padding: var(--m-xl);
+  text-align: center;
+  color: var(--c-bg-contrast-light);
+}

@@ -68,12 +68,12 @@ describe("CalendarHeatmap", () => {
     expect(screen.getByRole("heading", { name: "2024" })).toBeTruthy();
     expect(screen.getAllByText("S")).toHaveLength(2); // S for Sunday and Saturday
     expect(
-      screen.getByRole("button", { name: /jan 2, 2024/i }).getAttribute(
+      screen.getByRole("button", { name: /^2 Jan 2024:/i }).getAttribute(
         "aria-pressed",
       ),
     ).toBe("true");
 
-    fireEvent.click(screen.getByRole("button", { name: /jan 2, 2024/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^2 Jan 2024:/i }));
 
     expect(onSelectDate).toHaveBeenCalledWith("2024-01-02");
   });
@@ -87,9 +87,9 @@ describe("CalendarHeatmap", () => {
       />,
     );
 
-    fireEvent.mouseEnter(screen.getByRole("button", { name: /jan 2, 2024/i }));
+    fireEvent.mouseEnter(screen.getByRole("button", { name: /^2 Jan 2024:/i }));
 
-    expect(screen.getByRole("link", { name: /view jan 2, 2024 preview/i })).toBeTruthy();
+    expect(screen.getByRole("link", { name: /view 2 jan 2024 preview/i })).toBeTruthy();
     expect(screen.getByText("+1 more")).toBeTruthy();
   });
 
@@ -104,11 +104,11 @@ describe("CalendarHeatmap", () => {
     );
 
     fireEvent.mouseEnter(
-      screen.getByRole("button", { name: /jan 1, 2024: no photos/i }),
+      screen.getByRole("button", { name: /^1 Jan 2024: no photos/i }),
     );
 
     expect(screen.getByText("Monday")).toBeTruthy();
-    expect(screen.getByText("January 1, 2024")).toBeTruthy();
+    expect(screen.getByText("1 January 2024")).toBeTruthy();
   });
 
   it("highlights today and suppresses populated pips for future dates", () => {
@@ -122,12 +122,12 @@ describe("CalendarHeatmap", () => {
     );
 
     expect(
-      screen.getByRole("button", { name: /jan 2, 2024/i }).getAttribute(
+      screen.getByRole("button", { name: /^2 Jan 2024:/i }).getAttribute(
         "aria-current",
       ),
     ).toBe("date");
     expect(
-      screen.getByRole("button", { name: /mar 5, 2024: future date/i }).getAttribute(
+      screen.getByRole("button", { name: /^5 Mar 2024: future date/i }).getAttribute(
         "aria-disabled",
       ),
     ).toBe("true");
@@ -144,7 +144,7 @@ describe("CalendarHeatmap", () => {
     );
 
     expect(
-      screen.getByRole("button", { name: /mar 5, 2024/i }).className,
+      screen.getByRole("button", { name: /^5 Mar 2024:/i }).className,
     ).toMatch(/memoryHighlighted/);
   });
 
