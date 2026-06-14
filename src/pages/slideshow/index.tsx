@@ -2014,11 +2014,24 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
                         src={cell.src}
                         alt={isTop && isSeed ? photoAltText : ""}
                         aria-hidden={isTop && isSeed ? undefined : true}
+                        decoding="async"
                         {...(isTop
                           ? {
-                              onLoad: () => {
-                                markRemixCellLoaded(cell.path);
-                                if (isSeed) setImageLoaded(true);
+                              onLoad: (
+                                e: React.SyntheticEvent<HTMLImageElement>,
+                              ) => {
+                                // Mark the cell ready only once decoded, so the
+                                // grid reveals fully rendered rather than cell by
+                                // cell. Resolve on decode failure too, so one bad
+                                // cell can't pin the whole grid hidden.
+                                const img = e.currentTarget;
+                                img
+                                  .decode()
+                                  .catch(() => {})
+                                  .finally(() => {
+                                    markRemixCellLoaded(cell.path);
+                                    if (isSeed) setImageLoaded(true);
+                                  });
                               },
                               onError: () => {
                                 // Mark loaded on error so one broken companion
@@ -2052,11 +2065,23 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
                 .join(" ")}
               src={layer.slide.cells[0].src}
               alt={isTop ? photoAltText : ""}
+              decoding="async"
               onTransitionEnd={onFadeEnd}
               {...(isTop
                 ? {
                     ...topImageHandlers,
-                    onLoad: () => setImageLoaded(true),
+                    onLoad: (e: React.SyntheticEvent<HTMLImageElement>) => {
+                      // Reveal only once the bitmap has actually decoded, so a
+                      // main-thread decode can't stutter the cross-fade. Resolve
+                      // on decode failure too — the load succeeded, so a broken
+                      // decode mustn't pin the layer hidden (the 6s safety net
+                      // would otherwise be the only escape).
+                      const img = e.currentTarget;
+                      img
+                        .decode()
+                        .catch(() => {})
+                        .finally(() => setImageLoaded(true));
+                    },
                     onError: () => setTimeout(() => advanceToNextPhoto(), 1000),
                   }
                 : { "aria-hidden": true })}
