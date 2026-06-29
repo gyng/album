@@ -6,14 +6,12 @@ describe("decideDbUpdateAction", () => {
       decideDbUpdateAction({
         observedVersion: "v1",
         lastVersion: null,
-        wakeLockHeld: false,
       }),
     ).toBe("seed");
     expect(
       decideDbUpdateAction({
         observedVersion: "v1",
         lastVersion: null,
-        wakeLockHeld: true,
       }),
     ).toBe("seed");
   });
@@ -23,29 +21,17 @@ describe("decideDbUpdateAction", () => {
       decideDbUpdateAction({
         observedVersion: "v1",
         lastVersion: "v1",
-        wakeLockHeld: true,
       }),
     ).toBe("none");
   });
 
-  it("refreshes the pool in place on change while the wake lock is held", () => {
+  it("refreshes the pool in place on change", () => {
     expect(
       decideDbUpdateAction({
         observedVersion: "v2",
         lastVersion: "v1",
-        wakeLockHeld: true,
       }),
     ).toBe("refresh-in-place");
-  });
-
-  it("reloads on change when no wake lock is held", () => {
-    expect(
-      decideDbUpdateAction({
-        observedVersion: "v2",
-        lastVersion: "v1",
-        wakeLockHeld: false,
-      }),
-    ).toBe("reload");
   });
 });
 

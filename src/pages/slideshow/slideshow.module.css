@@ -695,16 +695,25 @@
   flex-direction: column;
   align-items: flex-start;
   gap: 2px;
+  border: 0;
   padding: calc(var(--m-s) * 0.75) var(--m-m);
   border-radius: calc(var(--m-s) * 1.5);
   background: var(--glass-bg);
   color: hsl(0 0% 100% / 0.78);
+  font: inherit;
   font-variant-numeric: tabular-nums;
   line-height: 1.15;
+  cursor: pointer;
   box-shadow:
     0 18px 40px hsl(0 0% 0% / 0.25),
     inset 0 1px 0 hsl(0 0% 100% / 0.08);
   backdrop-filter: blur(14px);
+}
+
+.poolStats:hover,
+.poolStats:focus-visible {
+  background: hsl(0 0% 100% / 0.18);
+  outline: 1px solid hsl(0 0% 100% / 0.3);
 }
 
 .poolStatsCount {

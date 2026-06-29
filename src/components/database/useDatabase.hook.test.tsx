@@ -91,4 +91,31 @@ describe("useDatabase", () => {
 
     expect(result.current[3]).toBeNull();
   });
+
+  it("force refreshes the database with a no-store request", async () => {
+    const fetchMock = jest
+      .fn()
+      .mockResolvedValueOnce(okFetchResponse())
+      .mockResolvedValueOnce(okFetchResponse());
+    global.fetch = fetchMock as typeof fetch;
+
+    const { result } = renderHook(() => useDatabase());
+
+    await waitFor(() => {
+      expect(result.current[0]).not.toBeNull();
+    });
+
+    act(() => {
+      result.current[4](true);
+    });
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+    });
+
+    expect(fetchMock).toHaveBeenNthCalledWith(1, "/search.sqlite");
+    expect(fetchMock).toHaveBeenNthCalledWith(2, "/search.sqlite", {
+      cache: "no-store",
+    });
+  });
 });

@@ -12,6 +12,16 @@ const {
 } = require("./write-build-manifest.cjs");
 
 describe("build manifest generation", () => {
+  const originalEnv = process.env;
+
+  beforeEach(() => {
+    process.env = { ...originalEnv };
+  });
+
+  afterEach(() => {
+    process.env = originalEnv;
+  });
+
   it("creates a manifest with an explicit build version", () => {
     const manifest = createBuildManifest({
       buildVersion: "build-123",
@@ -24,6 +34,32 @@ describe("build manifest generation", () => {
       builtAt: "2026-03-29T00:00:00.000Z",
       gitSha: "abcdef1234567890",
     });
+  });
+
+  it("uses the git SHA as the default reload version across timestamp-only rebuilds", () => {
+    const first = createBuildManifest({
+      builtAt: "2026-03-29T00:00:00.000Z",
+      gitSha: "abcdef1234567890",
+    });
+    const second = createBuildManifest({
+      builtAt: "2026-03-30T00:00:00.000Z",
+      gitSha: "abcdef1234567890",
+    });
+
+    expect(first.buildVersion).toBe("abcdef1234567890");
+    expect(second.buildVersion).toBe(first.buildVersion);
+    expect(second.builtAt).not.toBe(first.builtAt);
+  });
+
+  it("ignores blank environment build versions", () => {
+    process.env.NEXT_PUBLIC_BUILD_VERSION = "";
+
+    const manifest = createBuildManifest({
+      builtAt: "2026-03-29T00:00:00.000Z",
+      gitSha: "abcdef1234567890",
+    });
+
+    expect(manifest.buildVersion).toBe("abcdef1234567890");
   });
 
   it("writes version.json and buildVersion.ts to the target app root", () => {

@@ -16,6 +16,10 @@ export type SlideshowToolbarProps = {
 
   // Pool / context
   poolStats: PoolStats;
+  dataVersionLabel: string | null;
+  dataVersionTitle: string | null;
+  isCheckingDataVersion: boolean;
+  onCheckDataVersion: () => void;
   filter?: string;
   albumName: string;
   photoName: string;
@@ -122,9 +126,14 @@ export const SlideshowToolbar: React.FC<SlideshowToolbarProps> = (props) => {
       </Link>
 
       {props.poolStats.count > 0 ? (
-        <div
+        <button
+          type="button"
           className={styles.poolStats}
-          title="Photo pool — use this to confirm a PWA reload has picked up the latest DB"
+          title={
+            props.dataVersionTitle ??
+            "Photo pool - tap to check for the latest data"
+          }
+          onClick={props.onCheckDataVersion}
         >
           <span className={styles.poolStatsCount}>
             {props.poolStats.count.toLocaleString("en-GB")} photos
@@ -134,7 +143,12 @@ export const SlideshowToolbar: React.FC<SlideshowToolbarProps> = (props) => {
               newest {formatNewestPhotoDate(props.poolStats.newestDate)}
             </span>
           ) : null}
-        </div>
+          <span className={styles.poolStatsNewest}>
+            {props.isCheckingDataVersion
+              ? "checking data"
+              : (props.dataVersionLabel ?? "data unknown")}
+          </span>
+        </button>
       ) : null}
 
       <div className={styles.playbackGroup} role="group" aria-label="Playback mode">

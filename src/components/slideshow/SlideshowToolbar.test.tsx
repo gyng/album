@@ -2,7 +2,7 @@
  * @jest-environment jsdom
  */
 
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { SlideshowToolbar, SlideshowToolbarProps } from "./SlideshowToolbar";
 import { EMPTY_POOL_STATS } from "../../util/slideshowQueue";
 
@@ -23,6 +23,10 @@ const makeProps = (
   onFocusCapture: noop,
   onPointerOverToolbar: noop,
   poolStats: EMPTY_POOL_STATS,
+  dataVersionLabel: null,
+  dataVersionTitle: null,
+  isCheckingDataVersion: false,
+  onCheckDataVersion: noop,
   albumName: "Album",
   photoName: "Photo",
   playbackSubtitle: "Sub",
@@ -77,5 +81,30 @@ describe("SlideshowToolbar", () => {
 
     const home = screen.getByRole("link", { name: /snapshots/i });
     expect(home.getAttribute("href")).toBe("/");
+  });
+
+  it("shows the data version badge and checks for updates on click", () => {
+    const onCheckDataVersion = jest.fn();
+
+    render(
+      <SlideshowToolbar
+        {...makeProps({
+          poolStats: {
+            count: 1234,
+            newestDate: new Date("2026-06-29T12:00:00Z"),
+          },
+          dataVersionLabel: "data 29 Jun 20:00",
+          dataVersionTitle: "Photo database last modified 29/06/2026, 20:00:00.",
+          onCheckDataVersion,
+        })}
+      />,
+    );
+
+    const badge = screen.getByRole("button", { name: /1,234 photos/i });
+    expect(badge.textContent).toContain("data 29 Jun 20:00");
+
+    fireEvent.click(badge);
+
+    expect(onCheckDataVersion).toHaveBeenCalledTimes(1);
   });
 });

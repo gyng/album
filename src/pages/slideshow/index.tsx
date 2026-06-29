@@ -114,6 +114,46 @@ type VersionManifest = {
   gitSha?: string | null;
 };
 
+type SearchDbVersion = {
+  raw: string;
+  label: string;
+  title: string;
+};
+
+const formatSearchDbVersion = (response: Response): SearchDbVersion | null => {
+  const etag = response.headers.get("etag");
+  const lastModified = response.headers.get("last-modified");
+  if (lastModified) {
+    const date = new Date(lastModified);
+    if (!Number.isNaN(date.getTime())) {
+      return {
+        raw: etag ?? lastModified,
+        label: `data ${date.toLocaleDateString("en-GB", {
+          day: "numeric",
+          month: "short",
+        })} ${date.toLocaleTimeString("en-GB", {
+          hour: "2-digit",
+          minute: "2-digit",
+        })}`,
+        title: `Photo database last modified ${date.toLocaleString("en-GB")}. Tap to check again.`,
+      };
+    }
+  }
+
+  if (!etag) {
+    return null;
+  }
+
+  const cleaned = etag.replace(/^W\//, "").replace(/^"|"$/g, "");
+  const shortVersion =
+    cleaned.length > 12 ? `${cleaned.slice(0, 12)}...` : cleaned;
+  return {
+    raw: etag,
+    label: `data ${shortVersion}`,
+    title: `Photo database version ${cleaned}. Tap to check again.`,
+  };
+};
+
 // Touch and pen pointers behave the same for this page's gesture model:
 // progress visuals, tap zones, click suppression. Mouse is handled separately.
 const isTouchOrPen = (pointerType: string): boolean =>
@@ -126,13 +166,16 @@ const SlideshowPage: NextPage<PageProps> = (props) => {
 // TODO: consider doing getStaticProps here to fetch all photos and pass them to the slideshow
 // like in world map
 const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
-  const [database, progress] = useDatabase();
+  const databaseState = useDatabase();
+  const [database, progress] = databaseState;
+  const refreshDatabase = databaseState[4];
   const buildVersionRef = React.useRef<string>(BUILD_VERSION);
   // Tracks the search DB's Last-Modified / ETag so we can detect a
   // re-indexed DB without a full page reload. Initialised to null and seeded
   // by the first successful HEAD response so the *first* poll never triggers
   // a refresh (otherwise we'd reload on every cold start).
   const lastDbVersionRef = React.useRef<string | null>(null);
+  const isFullscreenActiveRef = React.useRef(false);
   // Mirror of the `filter` state used by the DB-update poll, which is
   // declared *above* the `filter` state — using a ref sidesteps the hoist
   // ordering without forcing a structural re-shuffle.
@@ -187,97 +230,85 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
     };
   }, []);
 
-  // Fallback hard reload for long-running kiosk sessions. Guarded by wake
-  // lock state: if the screen is actively kept awake we DON'T reload,
-  // because tearing down the document releases the wake lock and Safari
-  // PWAs require a fresh user gesture to re-acquire — which means a dark
-  // sideboard until someone touches the screen. The version-manifest poll
-  // above handles real build updates; this interval is purely a "something
-  // is broken if we got here" safety net.
+  // Fallback hard reload for long-running kiosk sessions. Guarded by wake lock
+  // and fullscreen state: if the page is actively acting as a kiosk, DON'T
+  // reload, because tearing down the document releases those browser-granted
+  // session states and Safari PWAs require a fresh user gesture to re-acquire.
+  // The version-manifest poll above handles real build updates; this interval
+  // is purely a "something is broken if we got here" safety net.
   useEffect(() => {
     const id = setInterval(() => {
-      if (wakeLockRef.current) {
+      if (wakeLockRef.current || isFullscreenActiveRef.current) {
         return;
       }
       reloadCurrentPage();
     }, FALLBACK_RELOAD_MS);
     return () => clearInterval(id);
-    // wakeLockRef (from useWakeLock, declared below) is a stable ref read
-    // lazily inside the interval — not a reactive dependency.
+    // wakeLockRef (from useWakeLock, declared below) and
+    // isFullscreenActiveRef are stable refs read lazily inside the interval —
+    // not reactive dependencies.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Periodically HEAD-poll the search DB to notice when it has been
-  // re-indexed without a full page rebuild (e.g. the user updates the photo
-  // pool between deploys). On change, refresh the photo pool in place if
-  // the wake lock is held; otherwise reload while it's cheap to do so.
-  useEffect(() => {
+  const checkForDbUpdates = useCallback(async () => {
     if (!database) {
       return;
     }
 
-    const checkForDbUpdates = async () => {
-      try {
-        const response = await fetch("/search.sqlite", {
-          method: "HEAD",
-          cache: "no-store",
-        });
-        if (!response.ok) {
-          return;
-        }
-        const version =
-          response.headers.get("etag") ??
-          response.headers.get("last-modified");
-        if (!version) {
-          return;
-        }
-
-        const action = decideDbUpdateAction({
-          observedVersion: version,
-          lastVersion: lastDbVersionRef.current,
-          wakeLockHeld: !!wakeLockRef.current,
-        });
-
-        if (action === "none") {
-          return;
-        }
-
-        // Record the observed version for seed/refresh/reload alike. The
-        // "seed" case (first observation) stops here so a fresh page load
-        // doesn't mistake "never seen this header before" for an update.
-        lastDbVersionRef.current = version;
-        if (action === "seed") {
-          return;
-        }
-
-        if (action === "refresh-in-place") {
-          // Active kiosk session — refresh the photo pool in place so we
-          // never tear down the document and lose the wake lock. The next
-          // queue refill will pick up the new pool.
-          const photos = await fetchSlideshowPhotos({
-            database,
-            filter: filterRef.current,
-          });
-          if (photos.length > 0) {
-            randomPhotoPoolRef.current = photos;
-            // In-place refresh of a near-identical pool during a live kiosk
-            // session: reset the queue but PRESERVE lastPath so the next
-            // refill still avoids repeating the currently-displayed photo
-            // (a full pool swap — see the main fetch — uses a fresh state).
-            resetRandomQueue(randomQueueStateRef.current);
-            recentPhotoPathsRef.current = [];
-            setPoolStats(computePoolStats(photos));
-          }
-          return;
-        }
-
-        // action === "reload": no wake lock held — a full reload is cheap and
-        // gives us a clean re-init of sql.js-httpvfs cached pages too.
-        reloadCurrentPage();
-      } catch (error) {
-        console.error("DB update check failed", error);
+    setIsCheckingSearchDbVersion(true);
+    try {
+      const response = await fetch("/search.sqlite", {
+        method: "HEAD",
+        cache: "no-store",
+      });
+      if (!response.ok) {
+        return;
       }
-    };
+
+      const version = formatSearchDbVersion(response);
+      if (!version) {
+        return;
+      }
+
+      setSearchDbVersion(version);
+      const action = decideDbUpdateAction({
+        observedVersion: version.raw,
+        lastVersion: lastDbVersionRef.current,
+      });
+
+      if (action === "none") {
+        return;
+      }
+
+      // Record the observed version for seed/refresh alike. The "seed" case
+      // stops here so a fresh page load doesn't mistake "never seen this
+      // header before" for an update.
+      lastDbVersionRef.current = version.raw;
+      if (action === "seed") {
+        return;
+      }
+
+      if (action === "refresh-in-place") {
+        // Data-only update - fetch a fresh database without tearing down the
+        // document. The main pool-loading effect runs again once the database
+        // object changes.
+        refreshDatabase(true);
+      }
+    } catch (error) {
+      console.error("DB update check failed", error);
+    } finally {
+      setIsCheckingSearchDbVersion(false);
+    }
+  }, [database, refreshDatabase]);
+
+  // Periodically HEAD-poll the search DB to notice when it has been
+  // re-indexed without a full page rebuild (e.g. the user updates the photo
+  // pool between deploys). On change, reload the SQLite database and photo
+  // pool in place so fullscreen/wake-lock sessions survive data-only updates.
+  useEffect(() => {
+    if (!database) {
+      return;
+    }
 
     const handleVisibilityChange = () => {
       if (document.visibilityState === "visible") {
@@ -296,12 +327,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
       clearInterval(id);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
-    // filter is read via filterRef so it doesn't need to be a dep — that
-    // also keeps this effect from re-running on every filter change.
-    // wakeLockRef (from useWakeLock, declared below) is a stable ref read
-    // lazily inside the poll, not a reactive dependency.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [database]);
+  }, [checkForDbUpdates, database]);
 
   // Navigation history is the single source of truth for what's on screen.
   // The current slide is history[index]; currentPhotoPath and the remix
@@ -376,6 +402,10 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
   );
   const [poolStats, setPoolStats] =
     React.useState<PoolStats>(EMPTY_POOL_STATS);
+  const [searchDbVersion, setSearchDbVersion] =
+    React.useState<SearchDbVersion | null>(null);
+  const [isCheckingSearchDbVersion, setIsCheckingSearchDbVersion] =
+    React.useState(false);
   // When set, the next forward-advance ignores the dice roll and forces a
   // remix. Used by the dedicated "Remix now" action button so users can
   // trigger a remix on demand instead of waiting for the 3% dice.
@@ -1199,19 +1229,19 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
   useEffect(() => {
     const fullscreenDocument = document as FullscreenDocument;
     const fullscreenRoot = document.documentElement as FullscreenElement;
-     
+
     setIsFullscreenSupported(
       typeof fullscreenRoot.requestFullscreen === "function" ||
         typeof fullscreenRoot.webkitRequestFullscreen === "function",
     );
 
     const syncFullscreenState = () => {
-      setIsFullscreenActive(
-        Boolean(
-          document.fullscreenElement ??
+      const isActive = Boolean(
+        document.fullscreenElement ??
           fullscreenDocument.webkitFullscreenElement,
-        ),
       );
+      isFullscreenActiveRef.current = isActive;
+      setIsFullscreenActive(isActive);
     };
 
     syncFullscreenState();
@@ -1849,6 +1879,12 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
           onFocusCapture={showControlsForDesktop}
           onPointerOverToolbar={setIsPointerOverToolbar}
           poolStats={poolStats}
+          dataVersionLabel={searchDbVersion?.label ?? null}
+          dataVersionTitle={searchDbVersion?.title ?? null}
+          isCheckingDataVersion={isCheckingSearchDbVersion}
+          onCheckDataVersion={() => {
+            void checkForDbUpdates();
+          }}
           {...(filter ? { filter } : {})}
           albumName={albumName}
           photoName={photoName}

@@ -21,18 +21,23 @@ const getGitSha = (cwd = path.resolve(appRoot, "..")) => {
   }
 };
 
+const nonEmpty = (value) => {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : null;
+};
+
 const createBuildManifest = (options = {}) => {
   const builtAt = options.builtAt ?? new Date().toISOString();
   const gitSha =
     options.gitSha ??
     process.env.VERCEL_GIT_COMMIT_SHA ??
     getGitSha(options.gitCwd);
-  const commitShortSha = gitSha ? gitSha.slice(0, 12) : null;
   const buildVersion =
     options.buildVersion ??
-    process.env.NEXT_PUBLIC_BUILD_VERSION ??
-    process.env.VERCEL_GIT_COMMIT_SHA ??
-    `${builtAt}${commitShortSha ? `-${commitShortSha}` : ""}`;
+    nonEmpty(process.env.NEXT_PUBLIC_BUILD_VERSION) ??
+    nonEmpty(process.env.VERCEL_GIT_COMMIT_SHA) ??
+    gitSha ??
+    builtAt;
 
   return {
     buildVersion,

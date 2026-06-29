@@ -2,12 +2,13 @@
  * @jest-environment jsdom
  */
 
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { act } from "react";
 
 const mockUseDatabase = jest.fn();
 const mockUseEmbeddingsDatabase = jest.fn();
 const mockFetchSlideshowPhotos = jest.fn();
+const mockRefreshDatabase = jest.fn();
 const mockReloadCurrentPage = jest.fn();
 const mockBuildVersion = "test-build-version";
 const mockClipboardWriteText = jest.fn();
@@ -77,7 +78,7 @@ describe("slideshow page", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     jest.useFakeTimers();
-    mockUseDatabase.mockReturnValue([null, 42]);
+    mockUseDatabase.mockReturnValue([null, 42, null, null, mockRefreshDatabase]);
     mockUseEmbeddingsDatabase.mockReturnValue([null, 0]);
     mockFetchSlideshowPhotos.mockResolvedValue([]);
     Object.defineProperty(window, "matchMedia", {
@@ -172,6 +173,65 @@ describe("slideshow page", () => {
     expect(mockReloadCurrentPage).toHaveBeenCalledTimes(1);
   });
 
+  it("refreshes the database in place when the search DB changes", async () => {
+    let dbVersion = "db-v1";
+    let dbLastModified = "Mon, 29 Jun 2026 12:00:00 GMT";
+    (global.fetch as jest.Mock).mockImplementation((url: string) => {
+      if (url === "/search.sqlite") {
+        return Promise.resolve({
+          ok: true,
+          headers: {
+            get: (name: string) => {
+              if (name.toLowerCase() === "etag") {
+                return dbVersion;
+              }
+              if (name.toLowerCase() === "last-modified") {
+                return dbLastModified;
+              }
+              return null;
+            },
+          },
+        });
+      }
+
+      return Promise.resolve({
+        ok: false,
+        json: async () => ({}),
+      });
+    });
+    mockUseDatabase.mockReturnValue([
+      { db: true },
+      100,
+      null,
+      null,
+      mockRefreshDatabase,
+    ]);
+    mockFetchSlideshowPhotos.mockResolvedValue([samplePhoto]);
+
+    render(<SlideshowPage />);
+
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    const badge = screen.getByRole("button", { name: /1 photos/i });
+    expect(badge.textContent).toContain("data 29 Jun");
+    expect(mockRefreshDatabase).not.toHaveBeenCalled();
+
+    dbVersion = "db-v2";
+    dbLastModified = "Mon, 29 Jun 2026 12:10:00 GMT";
+
+    await act(async () => {
+      fireEvent.click(badge);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(mockRefreshDatabase).toHaveBeenCalledWith(true);
+    expect(mockReloadCurrentPage).not.toHaveBeenCalled();
+  });
+
   it("does not reload when the manifest build version matches the current build", async () => {
     (global.fetch as jest.Mock).mockResolvedValue({
       ok: true,
@@ -215,7 +275,13 @@ describe("slideshow page", () => {
   });
 
   it("resolves an initial photo parameter without keeping it in the URL", async () => {
-    mockUseDatabase.mockReturnValue([{ db: true }, 100]);
+    mockUseDatabase.mockReturnValue([
+      { db: true },
+      100,
+      null,
+      null,
+      mockRefreshDatabase,
+    ]);
     mockFetchSlideshowPhotos.mockResolvedValue([samplePhoto]);
     window.history.replaceState(
       window.history.state,
@@ -245,7 +311,13 @@ describe("slideshow page", () => {
   });
 
   it("writes timing changes into the URL", async () => {
-    mockUseDatabase.mockReturnValue([{ db: true }, 100]);
+    mockUseDatabase.mockReturnValue([
+      { db: true },
+      100,
+      null,
+      null,
+      mockRefreshDatabase,
+    ]);
     mockFetchSlideshowPhotos.mockResolvedValue([samplePhoto]);
 
     render(<SlideshowPage />);
@@ -263,7 +335,13 @@ describe("slideshow page", () => {
   });
 
   it("copies a current-photo slideshow link from the context section", async () => {
-    mockUseDatabase.mockReturnValue([{ db: true }, 100]);
+    mockUseDatabase.mockReturnValue([
+      { db: true },
+      100,
+      null,
+      null,
+      mockRefreshDatabase,
+    ]);
     mockFetchSlideshowPhotos.mockResolvedValue([samplePhoto]);
 
     render(<SlideshowPage />);
