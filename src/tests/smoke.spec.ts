@@ -127,10 +127,12 @@ test.describe("Smoke Tests", () => {
     await page.goto("/");
 
     const html = page.locator("html");
-    const initialTheme = await html.getAttribute("data-theme");
+    const initialClass = await html.getAttribute("class");
 
-    await page.locator('button[title="Toggle dark mode"]').click();
+    await page
+      .getByRole("button", { name: /switch to (light|dark) theme/i })
+      .click();
 
-    await expect(html).not.toHaveAttribute("data-theme", initialTheme ?? "");
+    await expect(html).not.toHaveAttribute("class", initialClass ?? "");
   });
 });
