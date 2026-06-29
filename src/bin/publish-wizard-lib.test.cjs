@@ -5,6 +5,7 @@ const {
   buildPreflightInsights,
   buildSummary,
   buildVerificationInsights,
+  getVercelPreflightCommand,
   loadDbState,
   parseArgs,
   resolveExecutionPlan,
@@ -257,6 +258,42 @@ describe("publish-wizard-lib", () => {
     } finally {
       require("readline/promises").createInterface = originalCreateInterface;
     }
+  });
+
+  it("checks Vercel up front when build or deploy is planned", () => {
+    const args = {
+      indexOnly: false,
+    };
+
+    expect(
+      getVercelPreflightCommand({
+        args,
+        plan: { runIndex: true, runBuild: true, runDeploy: false },
+      }),
+    ).toBe("npx --yes vercel@latest whoami");
+
+    expect(
+      getVercelPreflightCommand({
+        args,
+        plan: { runIndex: false, runBuild: false, runDeploy: true },
+      }),
+    ).toBe("npx --yes vercel@latest whoami");
+  });
+
+  it("skips the Vercel upfront check for index-only or local-only plans", () => {
+    expect(
+      getVercelPreflightCommand({
+        args: { indexOnly: true },
+        plan: { runIndex: true, runBuild: false, runDeploy: false },
+      }),
+    ).toBeNull();
+
+    expect(
+      getVercelPreflightCommand({
+        args: { indexOnly: false },
+        plan: { runIndex: true, runBuild: false, runDeploy: false },
+      }),
+    ).toBeNull();
   });
 
   it("builds richer preflight insights and attention ordering", () => {

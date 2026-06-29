@@ -17,6 +17,7 @@ const VIDEO_EXTENSIONS = new Set([
 ]);
 const ALBUM_CONFIG_FILENAME = "album.json";
 const REPORT_FILENAME = ".publish-report.json";
+const VERCEL_CLI = "npx --yes vercel@latest";
 
 const NUMBER_FORMAT = new Intl.NumberFormat("en-US");
 const ANSI = {
@@ -363,6 +364,13 @@ const resolveExecutionPlan = async ({ args, report }) => {
   }
 
   return plan;
+};
+
+const getVercelPreflightCommand = ({ args, plan }) => {
+  if (args.indexOnly || (!plan.runBuild && !plan.runDeploy)) {
+    return null;
+  }
+  return `${VERCEL_CLI} whoami`;
 };
 
 const openDatabase = (dbPath) => {
@@ -1089,6 +1097,7 @@ module.exports = {
   createPreflightReport,
   buildAttentionAlbums,
   buildPreflightInsights,
+  getVercelPreflightCommand,
   loadDbState,
   parseArgs,
   printExecutionPlan,

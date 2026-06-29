@@ -6,6 +6,7 @@ const {
   buildIndexVerification,
   buildWizardContext,
   createPreflightReport,
+  getVercelPreflightCommand,
   loadDbState,
   parseArgs,
   printExecutionPlan,
@@ -48,6 +49,17 @@ const main = async () => {
 
   const executionPlan = await resolveExecutionPlan({ args, report });
   printExecutionPlan({ args, report, plan: executionPlan });
+
+  const vercelPreflightCommand = getVercelPreflightCommand({
+    args,
+    plan: executionPlan,
+  });
+  if (vercelPreflightCommand) {
+    await runShellCommand({
+      command: vercelPreflightCommand,
+      cwd: context.srcDir,
+    });
+  }
 
   const hasIndexChanges = report.summary.newPhotos > 0 || report.summary.removedPhotos > 0 || report.db.missingEmbeddingCount > 0 || report.db.mixedEmbeddingModels?.length > 1;
   if (hasIndexChanges) {
@@ -108,9 +120,9 @@ const main = async () => {
     }
 
     if (!args.skipPull) {
-      await runShellCommand({ command: "npx vercel@latest pull", cwd: context.srcDir });
+      await runShellCommand({ command: "npx --yes vercel@latest pull", cwd: context.srcDir });
     }
-    await runShellCommand({ command: "npx vercel@latest build --prod", cwd: context.srcDir });
+    await runShellCommand({ command: "npx --yes vercel@latest build --prod", cwd: context.srcDir });
   }
 
   if (!args.fastTrack && !args.deploy && !args.skipBuild) {
@@ -127,7 +139,7 @@ const main = async () => {
   }
 
   await runShellCommand({
-    command: "npx vercel@latest deploy --prebuilt --prod",
+    command: "npx --yes vercel@latest deploy --prebuilt --prod",
     cwd: context.srcDir,
   });
 
