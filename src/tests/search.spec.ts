@@ -51,9 +51,10 @@ test.describe("Search", () => {
     await input.fill("japan");
     await expect(page).toHaveURL(/q=japan/);
 
-    // Result tile images appear
-    const results = page.locator("img");
-    await expect(results.first()).toBeVisible();
+    // Result tile images appear — needs the WASM DB to load and query first,
+    // which can exceed the default expect timeout under a parallel suite run
+    const results = page.locator('a[href*="/album/"] img');
+    await expect(results.first()).toBeVisible({ timeout: 15_000 });
     expect(await results.count()).toBeGreaterThan(0);
   });
 
