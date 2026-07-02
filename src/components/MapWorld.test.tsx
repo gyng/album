@@ -281,6 +281,64 @@ describe("MapWorld", () => {
     expect(screen.getByTestId("journey-line-speed-label")).toBeTruthy();
   });
 
+  it("draws a Pacific-crossing route leg the short way across the antimeridian", () => {
+    // project() is mocked as x = lng * 100, so an unwrapped end longitude of
+    // 190 (the short way from 170 to -170) projects to x = 19000, whereas the
+    // naive -170 would project to x = -17000 (the long way round).
+    render(
+      <MMap
+        photos={[
+          {
+            ...photo,
+            href: "/album/pacific#a.jpg",
+            decLat: 10,
+            decLng: 170,
+            date: "2024-01-01T00:00:00.000Z",
+          },
+          {
+            ...photo,
+            href: "/album/pacific#b.jpg",
+            src: { src: "/photo-2.jpg", width: 100, height: 100 },
+            decLat: 20,
+            decLng: -170,
+            date: "2024-01-02T00:00:00.000Z",
+          },
+        ]}
+        className="map"
+        showRoute
+        routeDisplayMode="always"
+      />,
+    );
+
+    const segment = screen.getAllByTestId("journey-line-segment")[0]!;
+    const d = segment.getAttribute("d") ?? "";
+    // End x is the unwrapped 190 -> 19000, positive and just east of the start.
+    expect(d).toContain("19000.00");
+    expect(d).not.toContain("-17000");
+  });
+
+  it("colours markers without NaN for an all-same-timestamp burst", () => {
+    const { container } = render(
+      <MMap
+        photos={[
+          { ...photo, href: "/album/kansai#a.jpg", date: "2024-01-02T03:04:05.000Z" },
+          {
+            ...photo,
+            href: "/album/kansai#b.jpg",
+            src: { src: "/photo-2.jpg", width: 100, height: 100 },
+            decLat: 35.7,
+            decLng: 139.7,
+            date: "2024-01-02T03:04:05.000Z",
+          },
+        ]}
+        className="map"
+      />,
+    );
+
+    // range === 0 previously produced hsl(NaN,…) / hue-rotate(NaNdeg).
+    expect(container.innerHTML).not.toContain("NaN");
+  });
+
   it("keeps album routes interactive when the full journey line is enabled", () => {
     render(
       <MMap

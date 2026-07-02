@@ -3,6 +3,7 @@ import Map, { Marker, Source, Layer, useMap } from "react-map-gl/maplibre";
 import type { MapLayerMouseEvent } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { TIER_DANGER } from "./guessScoring";
+import { computeWrapAwareBounds } from "../../util/mapBounds";
 import styles from "./GuessMap.module.css";
 
 export type GuessMapProps = {
@@ -60,15 +61,15 @@ const RevealFit: React.FC<{
     // round was skipped). Uses the corner-array form of fitBounds to match the
     // map's MapAutoFit pattern.
     const hasGuess = guessLat !== null && guessLng !== null;
-    const lngs = [revealLng, ...(hasGuess ? [guessLng] : [])];
-    const lats = [revealLat, ...(hasGuess ? [guessLat] : [])];
-    map.fitBounds(
-      [
-        [Math.min(...lngs), Math.min(...lats)],
-        [Math.max(...lngs), Math.max(...lats)],
-      ],
-      { padding: 60, maxZoom: 6, duration: 800 },
-    );
+    const points: [number, number][] = [
+      [revealLng, revealLat],
+      ...(hasGuess ? [[guessLng, guessLat] as [number, number]] : []),
+    ];
+    // Antimeridian-aware so a guess and answer on opposite sides of ±180° frame
+    // the short hop rather than the whole globe.
+    const bounds = computeWrapAwareBounds(points);
+    if (!bounds) return;
+    map.fitBounds(bounds, { padding: 60, maxZoom: 6, duration: 800 });
   }, [map, revealLat, revealLng, guessLat, guessLng]);
 
   return null;

@@ -72,13 +72,35 @@ export type SlideshowBottomBarProps = {
 export const SlideshowBottomBar: React.FC<SlideshowBottomBarProps> = (props) => {
   const { slidePhotos, remixStrategy } = props;
 
+  // The parent rebuilds `slidePhotos` (a fresh array) on every 1 Hz clock tick,
+  // so memoising on its identity would never hit. Key on the stable per-slide
+  // path list instead so the derived metadata — and the map's coordinates —
+  // keep stable references across ticks. Otherwise MMap's React.memo misses and
+  // MapFlyer re-fires flyTo/fitBounds every second, yanking user pans back.
+  const slideKey = slidePhotos.map((photo) => photo.path).join("\u0000");
+
   // Per-photo metadata for the whole slide (seed + any remix companions).
-  const slidePhotoMeta = slidePhotos.map((photo) => ({
-    path: photo.path,
-    date: extractDateFromExifString(photo.exif),
-    geocode: extractGeocodeLabel(photo.geocode),
-    coords: extractGPSFromExifString(photo.exif),
-  }));
+  const slidePhotoMeta = React.useMemo(
+    () =>
+      slidePhotos.map((photo) => ({
+        path: photo.path,
+        date: extractDateFromExifString(photo.exif),
+        geocode: extractGeocodeLabel(photo.geocode),
+        coords: extractGPSFromExifString(photo.exif),
+      })),
+    // slidePhotos is a fresh array each tick; slideKey captures its content.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [slideKey],
+  );
+
+  // Stable coordinate reference for the slide map (see slideKey note above).
+  const allCoords = React.useMemo(
+    () =>
+      slidePhotoMeta
+        .map((m) => m.coords)
+        .filter((c): c is [number, number] => !!c),
+    [slidePhotoMeta],
+  );
 
   // Per-photo description: geocode + date + (optionally) the time-affinity row.
   // No chrome (map / clock / strategy badge) — those are slide-level, below.
@@ -125,9 +147,6 @@ export const SlideshowBottomBar: React.FC<SlideshowBottomBarProps> = (props) => 
   // Map zone. The heavy WebGL MMap is only mounted on the blend layer
   // (mountMap), halving per-slide WebGL context lifecycles on a long session.
   const renderSlideMap = (mountMap: boolean) => {
-    const allCoords = slidePhotoMeta
-      .map((m) => m.coords)
-      .filter((c): c is [number, number] => !!c);
     if (allCoords.length === 0) return null;
     return (
       <div

@@ -90,22 +90,35 @@ const WorldMap: NextPage<PageProps> = (props) => {
         setTimeRange(null);
       }
 
-      // Debounced URL update
+      // Debounced URL update. Derive the base query from the live
+      // window.location.search rather than router.query: MMap writes the
+      // camera params (lat/lon/zoom) straight to history via replaceState,
+      // which the Next router never sees, so router.query is stale and would
+      // drop them on commit.
       if (urlSyncTimer.current) clearTimeout(urlSyncTimer.current);
       urlSyncTimer.current = setTimeout(() => {
-        const query = { ...router.query };
+        const params = new URLSearchParams(window.location.search);
         if (fromMs !== null && toMs !== null) {
-          query.from = formatRangeDate(fromMs);
-          query.to = formatRangeDate(toMs);
+          params.set("from", formatRangeDate(fromMs));
+          params.set("to", formatRangeDate(toMs));
         } else {
-          delete query.from;
-          delete query.to;
+          params.delete("from");
+          params.delete("to");
         }
+        const query = Object.fromEntries(params.entries());
         router.replace({ query }, undefined, { shallow: true });
       }, DEBOUNCE_URL_MS);
     },
     [router],
   );
+
+  // Clear any pending debounced URL write on unmount so it can't fire against
+  // the next page's router after a fast navigation.
+  React.useEffect(() => {
+    return () => {
+      if (urlSyncTimer.current) clearTimeout(urlSyncTimer.current);
+    };
+  }, []);
 
   // Use album-filtered photos for the map (time filtering is done via opacity)
   const filteredPhotos = albumFilteredPhotos;
@@ -307,7 +320,7 @@ export const getStaticProps: GetStaticProps<PageProps> = async () => {
           decLng,
           decLat,
           date: DateTimeOriginal ?? null,
-          href: `/album/${album._build.slug}#${filename}`,
+          href: `/album/${album._build.slug}#${encodeURIComponent(filename)}`,
           placeholderColor: color
             ? `rgba(${color[0]}, ${color[1]}, ${color[2]}, 1)`
             : "transparent",

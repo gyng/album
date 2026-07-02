@@ -5,6 +5,7 @@ import { OptimisedPhoto } from "../services/types";
 import Link from "next/link";
 import { getRelativeTimeString } from "../util/time";
 import { parseTimestampSafe } from "../util/timeRange";
+import { computeWrapAwareBounds, unwrapLongitudes } from "../util/mapBounds";
 import MapLibreMap, {
   Marker,
   Popup,
@@ -98,20 +99,16 @@ const MapAutoFit = ({
       return;
     }
 
-    const longitudes = coordinates.map(([longitude]) => longitude);
-    const latitudes = coordinates.map(([, latitude]) => latitude);
+    const bounds = computeWrapAwareBounds(coordinates);
+    if (!bounds) {
+      return;
+    }
 
-    map.fitBounds(
-      [
-        [Math.min(...longitudes), Math.min(...latitudes)],
-        [Math.max(...longitudes), Math.max(...latitudes)],
-      ],
-      {
-        padding: 36,
-        duration: 0,
-        maxZoom: 11,
-      },
-    );
+    map.fitBounds(bounds, {
+      padding: 36,
+      duration: 0,
+      maxZoom: 11,
+    });
   }, [enabled, map, photos]);
 
   return null;
@@ -425,17 +422,24 @@ const MapRouteOverlay = ({
       return [];
     }
 
+    // Project each point onto the world copy nearest its predecessor so a leg
+    // crossing the Pacific (e.g. Tokyo → Honolulu) draws the short way across
+    // the antimeridian instead of sweeping the long way back across the map.
+    const unwrappedLngs = unwrapLongitudes(
+      routePoints.map((point) => point.decLng as number),
+    );
+
     return routePoints.slice(0, -1).flatMap((point, index) => {
       const nextPoint = routePoints[index + 1];
       if (!nextPoint) {
         return [];
       }
       const start = map.project([
-        point.decLng as number,
+        unwrappedLngs[index] as number,
         point.decLat as number,
       ]);
       const end = map.project([
-        nextPoint.decLng as number,
+        unwrappedLngs[index + 1] as number,
         nextPoint.decLat as number,
       ]);
       if (
@@ -519,9 +523,14 @@ const MapRouteOverlay = ({
       return null;
     }
 
+    // Same antimeridian-aware projection as the main route (see above).
+    const ghostUnwrappedLngs = unwrapLongitudes(
+      ghostRoutePoints.map((point) => point.decLng as number),
+    );
+
     const points = ghostRoutePoints
-      .map((point) =>
-        map.project([point.decLng as number, point.decLat as number]),
+      .map((point, index) =>
+        map.project([ghostUnwrappedLngs[index] as number, point.decLat as number]),
       )
       .filter(
         (point) => typeof point?.x === "number" && typeof point?.y === "number",
@@ -785,8 +794,9 @@ export const MMap: React.FC<MapWorldProps> = ({
       .filter((p) => p.date)
       .sort(
         (a, b) =>
-          new Date(b.date ?? "").valueOf() - new Date(a.date ?? "").valueOf(),
+          new Date(a.date ?? "").valueOf() - new Date(b.date ?? "").valueOf(),
       );
+    // Ascending sort: earliest first, latest last.
     const oldest = sortedByDate.at(0);
     const newest = sortedByDate.at(-1);
     const range =
@@ -807,10 +817,18 @@ export const MMap: React.FC<MapWorldProps> = ({
         );
       })
       .map((photo): PhotoWithStyle => {
-        const relative =
-          (new Date(photo.date ?? dateStats.oldest?.date ?? "").valueOf() -
-            new Date(dateStats.oldest?.date ?? 0).valueOf()) /
-          dateStats.range;
+        // Undated photos resolve to the oldest end. Guard range === 0 (single
+        // photo or an all-same-timestamp burst) so relative is 0, never NaN —
+        // otherwise the colours below become hsl(NaN)/hue-rotate(NaNdeg).
+        const rawRelative =
+          dateStats.range > 0
+            ? (new Date(photo.date ?? dateStats.oldest?.date ?? "").valueOf() -
+                new Date(dateStats.oldest?.date ?? 0).valueOf()) /
+              dateStats.range
+            : 0;
+        const relative = Number.isFinite(rawRelative)
+          ? Math.min(1, Math.max(0, rawRelative))
+          : 0;
 
         return {
           ...photo,
@@ -1067,17 +1085,11 @@ export const MMap: React.FC<MapWorldProps> = ({
     const url = new URL(window.location.toString());
     const searchParams = new URLSearchParams(window.location.search);
 
-    if (e.viewState.latitude !== 0) {
-      searchParams.set("lat", e.viewState.latitude.toFixed(3).toString());
-    }
-
-    if (e.viewState.longitude !== 0) {
-      searchParams.set("lon", e.viewState.longitude.toFixed(3).toString());
-    }
-
-    if (e.viewState.zoom !== 1) {
-      searchParams.set("zoom", e.viewState.zoom.toFixed(2).toString());
-    }
+    // Always write every camera param — skipping at sentinel values (lat 0 /
+    // lon 0 / zoom 1) would leave a stale earlier value in the URL.
+    searchParams.set("lat", e.viewState.latitude.toFixed(3).toString());
+    searchParams.set("lon", e.viewState.longitude.toFixed(3).toString());
+    searchParams.set("zoom", e.viewState.zoom.toFixed(2).toString());
 
     url.search = searchParams.toString();
     const nextRoute = `${url.pathname}${url.search}${url.hash}`;
@@ -1231,7 +1243,7 @@ export const MMap: React.FC<MapWorldProps> = ({
           />
         ) : null}
 
-        {popupInfo && popupInfo.decLat && popupInfo.decLng ? (
+        {popupInfo && popupInfo.decLat != null && popupInfo.decLng != null ? (
           <Popup
             longitude={popupInfo.decLng}
             latitude={popupInfo.decLat}
@@ -1262,18 +1274,41 @@ export const MMap: React.FC<MapWorldProps> = ({
                 />
                 <div className={styles.details}>
                   {popupInfo.album}
-                  <br />
-                  <span>
-                    {new Date(popupInfo.date ?? "").toLocaleString("en-GB", {
-                      day: "numeric",
-                      month: "short",
-                      year: "numeric",
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
-                    <br />
-                    {getRelativeTimeString(new Date(popupInfo.date ?? ""))}
-                  </span>
+                  {(() => {
+                    const parsedDate = popupInfo.date
+                      ? new Date(popupInfo.date)
+                      : null;
+                    if (!parsedDate || Number.isNaN(parsedDate.valueOf())) {
+                      // Missing/invalid date — render nothing rather than the
+                      // literal "Invalid Date".
+                      return null;
+                    }
+
+                    // getRelativeTimeString may return a string (current) or
+                    // null (once the util guards invalid input) — tolerate both.
+                    const relative = getRelativeTimeString(parsedDate);
+
+                    return (
+                      <>
+                        <br />
+                        <span>
+                          {parsedDate.toLocaleString("en-GB", {
+                            day: "numeric",
+                            month: "short",
+                            year: "numeric",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                          {relative ? (
+                            <>
+                              <br />
+                              {relative}
+                            </>
+                          ) : null}
+                        </span>
+                      </>
+                    );
+                  })()}
                 </div>
               </Link>
 
@@ -1301,7 +1336,7 @@ export const MMap: React.FC<MapWorldProps> = ({
         ) : null}
 
         {visiblePhotos.map((photo) => {
-          return photo.decLat && photo.decLng ? (
+          return photo.decLat != null && photo.decLng != null ? (
             <React.Fragment key={photo.href ?? photo?.src?.src ?? ""}>
               <Marker
                 longitude={photo.decLng}

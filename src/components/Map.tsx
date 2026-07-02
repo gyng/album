@@ -7,6 +7,7 @@ import Map, { Marker, useMap } from "react-map-gl/maplibre";
 import type { ProjectionSpecification } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import Link from "next/link";
+import { computeWrapAwareBounds } from "../util/mapBounds";
 
 type MapTilerMapStyle =
   | "aquarelle"
@@ -72,20 +73,21 @@ const MapFlyer = (props: { coordinates: [number, number][] }) => {
     }
 
     // Multiple points — fit bounds with padding so all markers are framed
-    // with a small margin around them.
-    const lngs = props.coordinates.map(([, lng]) => lng);
-    const lats = props.coordinates.map(([lat]) => lat);
-    const minLng = Math.min(...lngs);
-    const maxLng = Math.max(...lngs);
-    const minLat = Math.min(...lats);
-    const maxLat = Math.max(...lats);
-    map.fitBounds(
-      [
-        [minLng, minLat],
-        [maxLng, maxLat],
-      ],
-      { padding: FIT_BOUNDS_PADDING_PX, maxZoom: FIT_BOUNDS_MAX_ZOOM, duration: 800 },
+    // with a small margin around them. coordinates are [lat, lng]; the bounds
+    // helper wants [lng, lat] and returns antimeridian-aware corners so a
+    // layout spanning ±180° doesn't frame the whole globe.
+    const bounds = computeWrapAwareBounds(
+      props.coordinates.map(([lat, lng]) => [lng, lat] as [number, number]),
     );
+    if (!bounds) {
+      return;
+    }
+
+    map.fitBounds(bounds, {
+      padding: FIT_BOUNDS_PADDING_PX,
+      maxZoom: FIT_BOUNDS_MAX_ZOOM,
+      duration: 800,
+    });
   }, [props.coordinates, map]);
 
   return <></>;
