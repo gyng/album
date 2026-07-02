@@ -349,6 +349,52 @@
   color: var(--c-accent);
 }
 
+/* Transient error surfaced while a slide is on screen (fullscreen/clipboard/
+   pool failures). Dark glass so it reads over any photo; above the toolbar and
+   fullscreen-exit chrome. Self-dismisses after a few seconds; also dismissible.
+   The slideshow chrome is always dark, so on-dark text is intentional here. */
+.errorToast {
+  position: fixed;
+  top: calc(env(safe-area-inset-top, 0px) + var(--m-l));
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10002;
+  display: flex;
+  align-items: center;
+  gap: var(--m-s);
+  max-width: min(90vw, 30rem);
+  padding: var(--m-s) var(--m-m);
+  border-radius: var(--m-s);
+  background-color: var(--c-overlay-dark);
+  border: 1px solid var(--c-border-on-dark);
+  color: white;
+  font-size: var(--fs-sm);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 8px 22px hsl(0 0% 0% / 0.28);
+}
+
+.errorToastMessage {
+  flex: 1 1 auto;
+}
+
+.errorToastDismiss {
+  flex: 0 0 auto;
+  padding: 0 var(--m);
+  background: none;
+  border: none;
+  color: inherit;
+  font-size: var(--fs-sm);
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0.8;
+  transition: opacity var(--t-fast) var(--ease-out);
+}
+
+.errorToastDismiss:hover,
+.errorToastDismiss:focus-visible {
+  opacity: 1;
+}
+
 .toolbar {
   position: fixed;
   top: 0;

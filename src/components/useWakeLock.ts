@@ -28,17 +28,27 @@ export const useWakeLock = (disabled: boolean): UseWakeLock => {
   const [isSupported, setIsSupported] = React.useState(false);
   const [isActive, setIsActive] = React.useState(false);
   const wakeLockRef = React.useRef<WakeLockSentinel | null>(null);
+  // Guards overlapping acquires: request() is async, so two callers could each
+  // pass the "not currently held" check and each obtain a sentinel — leaking
+  // the first (the screen would stay awake with an untracked lock).
+  const isAcquiringRef = React.useRef(false);
+  // Bumped on every release so an acquire that is still awaiting request() can
+  // tell it was superseded (released / navigated away / disabled) and let go of
+  // the late-arriving sentinel instead of storing it.
+  const releaseGenerationRef = React.useRef(0);
 
   useEffect(() => {
     const wakeLock = (navigator as WakeLockNavigator).wakeLock;
 
     // Capability detection must run in an effect (client-only): `navigator` is
     // undefined during SSR, so a lazy useState initialiser would throw.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
+     
     setIsSupported(typeof wakeLock?.request === "function");
   }, []);
 
   const release = useCallback(async () => {
+    // Invalidate any in-flight acquire so its late sentinel is let go, not kept.
+    releaseGenerationRef.current += 1;
     const sentinel = wakeLockRef.current;
     wakeLockRef.current = null;
     setIsActive(false);
@@ -70,20 +80,46 @@ export const useWakeLock = (disabled: boolean): UseWakeLock => {
       return;
     }
 
+    // Collapse concurrent acquires into a single platform request.
+    if (isAcquiringRef.current) {
+      return;
+    }
+    isAcquiringRef.current = true;
+    const generation = releaseGenerationRef.current;
+
     try {
       const sentinel = await wakeLock.request("screen");
+
+      // Superseded while awaiting — a release/unmount/disable happened, or a
+      // parallel acquire already installed a lock. Let this sentinel go rather
+      // than leak it (this is the Escape-nav "screen stays awake" case).
+      if (releaseGenerationRef.current !== generation || wakeLockRef.current) {
+        try {
+          await sentinel.release();
+        } catch (error) {
+          console.error(error);
+        }
+        return;
+      }
+
       wakeLockRef.current = sentinel;
       setIsActive(true);
       sentinel.addEventListener("release", () => {
+        // Only the currently-held sentinel may flip state off; a superseded
+        // one firing its release event must not clear a newer lock.
         if (wakeLockRef.current === sentinel) {
           wakeLockRef.current = null;
+          setIsActive(false);
         }
-        setIsActive(false);
       });
     } catch (error) {
       console.error(error);
-      wakeLockRef.current = null;
-      setIsActive(false);
+      // Don't clobber a lock another acquire may have installed meanwhile.
+      if (!wakeLockRef.current) {
+        setIsActive(false);
+      }
+    } finally {
+      isAcquiringRef.current = false;
     }
   }, [disabled, release]);
 
@@ -95,7 +131,7 @@ export const useWakeLock = (disabled: boolean): UseWakeLock => {
     // Releasing the platform wake lock is an external-system sync; the state
     // update merely reflects its result, which is the legitimate use of an
     // effect here (not a derived-state cascade).
-    // eslint-disable-next-line react-hooks/set-state-in-effect
+     
     release().catch(console.error);
   }, [disabled, release]);
 
@@ -107,7 +143,7 @@ export const useWakeLock = (disabled: boolean): UseWakeLock => {
     // Try once on load so kiosk/photo-frame sessions wake-lock automatically
     // where browsers permit non-gesture acquisition. External-system sync —
     // the state update reflects the acquired lock.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
+     
     acquire().catch(console.error);
   }, [disabled, acquire]);
 

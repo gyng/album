@@ -79,15 +79,23 @@ export const useSlideshowCadence = (input: {
     }
   }, [isPaused, timeDelay]);
 
-  // Auto-align to the cadence boundary on first photo load.
+  // Schedule the first slide's cadence on photo load. Honours the alignCadence
+  // toggle exactly like computeNextChangeAt: snap to the wall-clock boundary
+  // when on, otherwise schedule the raw delay from now. Aligning unconditionally
+  // made the first slide end at the next boundary even with alignment off (e.g.
+  // opening at 10:29:58 with a 15-minute delay gave a 2-second first slide).
   const hasAutoAlignedRef = React.useRef(false);
   useEffect(() => {
     if (!hasCurrentPhoto || hasAutoAlignedRef.current) {
       return;
     }
     hasAutoAlignedRef.current = true;
-    alignNextChangeToCadence();
-  }, [alignNextChangeToCadence, hasCurrentPhoto]);
+    if (alignCadence) {
+      alignNextChangeToCadence();
+    } else {
+      scheduleNextChange();
+    }
+  }, [alignCadence, alignNextChangeToCadence, hasCurrentPhoto, scheduleNextChange]);
 
   // The advance timer: fire onAdvance when the slide's time is up.
   useEffect(() => {

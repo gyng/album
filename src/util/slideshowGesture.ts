@@ -107,7 +107,11 @@ export const resolvePointerMove = (
       hint: direction === "down" ? "controls" : "remix",
       pullProgress,
       swipeProgress: 0,
-      armed: pullProgress >= 1,
+      // A vertical release commits at swipeCommitPx (see resolvePointerUpAction),
+      // so the armed cue/haptic must fire at that same distance — not at the
+      // larger pullCommitPx the pull visual fills to, which left 48–72px pulls
+      // committing while the indicator still read "un-armed".
+      armed: verticalDistance >= thresholds.swipeCommitPx,
     };
   }
 

@@ -77,6 +77,7 @@ import {
   resolvePointerMove,
   resolvePointerUpAction,
 } from "../../util/slideshowGesture";
+import { decidePoolReloadAction } from "../../util/slideshowPoolReload";
 import {
   applySlideshowUrlState,
   buildSlideshowPermalink,
@@ -175,6 +176,10 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
   // by the first successful HEAD response so the *first* poll never triggers
   // a refresh (otherwise we'd reload on every cold start).
   const lastDbVersionRef = React.useRef<string | null>(null);
+  // The version an in-place refresh is trying to reach. Held here (not written
+  // straight to lastDbVersionRef) until the reload actually lands, so a failed
+  // refresh is retried on the next poll rather than recorded as already handled.
+  const pendingDbVersionRef = React.useRef<string | null>(null);
   const isFullscreenActiveRef = React.useRef(false);
   // Mirror of the `filter` state used by the DB-update poll, which is
   // declared *above* the `filter` state — using a ref sidesteps the hoist
@@ -280,18 +285,24 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
         return;
       }
 
-      // Record the observed version for seed/refresh alike. The "seed" case
-      // stops here so a fresh page load doesn't mistake "never seen this
-      // header before" for an update.
-      lastDbVersionRef.current = version.raw;
       if (action === "seed") {
+        // First observation — record immediately so a fresh page load doesn't
+        // mistake "never seen this header before" for an update.
+        lastDbVersionRef.current = version.raw;
         return;
       }
 
       if (action === "refresh-in-place") {
-        // Data-only update - fetch a fresh database without tearing down the
-        // document. The main pool-loading effect runs again once the database
-        // object changes.
+        // Data-only update — fetch a fresh database without tearing down the
+        // document. Record the target version as PENDING and only promote it to
+        // lastDbVersionRef once the reload actually lands (the database object
+        // identity changes — see the promote effect below). If the refresh
+        // fails (e.g. a Wi-Fi blip during the re-fetch), the version stays
+        // unrecorded so the next poll re-detects and retries instead of pinning
+        // the kiosk to stale data. refreshDatabase (useDatabase's `retry`)
+        // returns void — it just bumps a retry count — so there is no promise to
+        // await; the database-identity change is the success signal.
+        pendingDbVersionRef.current = version.raw;
         refreshDatabase(true);
       }
     } catch (error) {
@@ -328,6 +339,18 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   }, [checkForDbUpdates, database]);
+
+  // Promote a pending in-place-refresh version once the reloaded database has
+  // actually landed (its object identity changes). Tying the "seen this
+  // version" bookkeeping to refresh SUCCESS — rather than recording it up front
+  // — is what lets a failed refresh be retried on the next poll.
+  useEffect(() => {
+    if (!database || pendingDbVersionRef.current === null) {
+      return;
+    }
+    lastDbVersionRef.current = pendingDbVersionRef.current;
+    pendingDbVersionRef.current = null;
+  }, [database]);
 
   // Navigation history is the single source of truth for what's on screen.
   // The current slide is history[index]; currentPhotoPath and the remix
@@ -733,7 +756,10 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
               embeddingsDatabase,
               path: seedPath,
               similarityOrder: isAntiSimilar ? "least" : "most",
-              page: 1,
+              // Paging is 0-based (api.ts): page 1 skipped the top desiredCount*4
+              // ranked matches, so the "% match" badge reported a mid-ranked
+              // photo as the best. The trail path below already uses page 0.
+              page: 0,
               pageSize: desiredCount * 4,
             });
             // Stale guard: if the user has advanced past this slide while we
@@ -903,10 +929,12 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
           return;
         }
 
-        // Whether a slide was on screen before this (re)load — used below to
-        // decide whether to advance to a first photo (mirrors the original
-        // currentPhotoPathRef !== null check, captured before the reset).
-        const hadCurrentPhoto = currentEntry(historyStateRef.current) !== null;
+        // The slide (if any) on screen before this (re)load, captured BEFORE the
+        // history reset — used below to keep the show alive across a data-only
+        // refresh (see decidePoolReloadAction).
+        const previousEntry = currentEntry(historyStateRef.current);
+        const hadCurrentPhoto = previousEntry !== null;
+        const previousSeedPath = previousEntry?.seed.path ?? null;
 
         randomPhotoPoolRef.current = photos;
         randomQueueStateRef.current = createRandomQueueState();
@@ -957,11 +985,19 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
           }
         }
 
-        if (
-          slideshowMode === "random" ||
-          slideshowMode === "weighted" ||
-          !hadCurrentPhoto
-        ) {
+        // Keep the slideshow running across the (re)load in every mode: advance
+        // into the new pool, or — for a similar-mode refresh with a slide still
+        // showing — re-commit the current photo so the trail continues instead
+        // of the page freezing on the boot screen (H1 regression from 76e81d2).
+        const reloadAction = decidePoolReloadAction({
+          mode: slideshowMode,
+          hadCurrentPhoto,
+          previousSeedPath,
+          pool: photos,
+        });
+        if (reloadAction.kind === "recommit") {
+          commitNextPhoto(reloadAction.photo, { trackRecent: true });
+        } else {
           advanceRandomPhoto({ trackRecent: slideshowMode === "similar" });
         }
       })
@@ -1027,6 +1063,10 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
             path: candidate.path,
             exif: candidate.exif,
             geocode: candidate.geocode,
+            // Carry colours through: the next slide's remix uses the dominant
+            // colour of its seed, so dropping this silently disabled the
+            // dominant-colour remix strategy in similar mode.
+            colors: candidate.colors,
           }));
 
         const nextQueue = shufflePhotos(
@@ -1197,10 +1237,46 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
   // calls it through advanceFromCadence -> goNextRef.current).
   goNextRef.current = goNext;
 
+  // A broken image schedules a one-second retry-advance so a kiosk never sticks
+  // on a 404. Track its timer so a slide change, unmount, or manual navigation
+  // can cancel it — otherwise it fires late and double-advances past a photo the
+  // user just navigated to.
+  const imageErrorRetryTimerRef = React.useRef<number | null>(null);
+  const clearImageErrorRetry = useCallback(() => {
+    if (imageErrorRetryTimerRef.current !== null) {
+      window.clearTimeout(imageErrorRetryTimerRef.current);
+      imageErrorRetryTimerRef.current = null;
+    }
+  }, []);
+
   const advanceToNextPhoto = useCallback(() => {
+    clearImageErrorRetry();
     setImageLoaded(false);
     goNext();
-  }, [goNext]);
+  }, [clearImageErrorRetry, goNext]);
+
+  const scheduleImageErrorRetry = useCallback(() => {
+    clearImageErrorRetry();
+    imageErrorRetryTimerRef.current = window.setTimeout(() => {
+      imageErrorRetryTimerRef.current = null;
+      advanceToNextPhoto();
+    }, 1000);
+  }, [advanceToNextPhoto, clearImageErrorRetry]);
+
+  // Cancel any pending image-error retry on unmount.
+  useEffect(() => clearImageErrorRetry, [clearImageErrorRetry]);
+
+  // Auto-dismiss a transient error surfaced while a slide is on screen so its
+  // toast doesn't pin over the photo forever. Only while a photo is showing —
+  // on the boot screen the error IS the content (see the boot branch) and must
+  // persist until the user acts.
+  useEffect(() => {
+    if (!slideshowError || currentPhotoPath === null) {
+      return;
+    }
+    const id = window.setTimeout(() => setSlideshowError(null), 6000);
+    return () => window.clearTimeout(id);
+  }, [slideshowError, currentPhotoPath]);
 
   useEffect(() => {
     const nextSrc = getSlideshowPhotoSrc(getUpcomingPhoto());
@@ -1632,9 +1708,12 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
     if (topKeyRef.current !== slideKey) {
       topKeyRef.current = slideKey;
       setImageLoaded(false);
+      // A new slide is on screen — drop any retry armed by the previous slide's
+      // failed image so it can't fire late and skip this one.
+      clearImageErrorRetry();
     }
     setLayers((prev) => pushLayer(prev, slideKey, currentSnapshot));
-  }, [slideKey, currentSnapshot]);
+  }, [slideKey, currentSnapshot, clearImageErrorRetry]);
 
   // Track which cells in the current remix have finished loading so the grid
   // reveals all at once (see util hook). Memoise the companion paths so the
@@ -1809,6 +1888,20 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
           >
             Exit full
           </button>
+        ) : null}
+
+        {slideshowError ? (
+          <div className={styles.errorToast} role="status">
+            <span className={styles.errorToastMessage}>{slideshowError}</span>
+            <button
+              className={styles.errorToastDismiss}
+              type="button"
+              aria-label="Dismiss"
+              onClick={() => setSlideshowError(null)}
+            >
+              ✕
+            </button>
+          </div>
         ) : null}
 
         {!isCoarsePointer ? (
@@ -2075,7 +2168,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
                                 // auto-advance so kiosks don't stick on a 404.
                                 markRemixCellLoaded(cell.path);
                                 if (isSeed) {
-                                  setTimeout(() => advanceToNextPhoto(), 1000);
+                                  scheduleImageErrorRetry();
                                 }
                               },
                             }
@@ -2118,7 +2211,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
                         .catch(() => {})
                         .finally(() => setImageLoaded(true));
                     },
-                    onError: () => setTimeout(() => advanceToNextPhoto(), 1000),
+                    onError: () => scheduleImageErrorRetry(),
                   }
                 : { "aria-hidden": true })}
             />

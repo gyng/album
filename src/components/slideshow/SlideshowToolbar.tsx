@@ -97,6 +97,16 @@ export const SlideshowToolbar: React.FC<SlideshowToolbarProps> = (props) => {
   const contextLongPressTimerRef = React.useRef<number | null>(null);
   const contextLongPressFiredRef = React.useRef(false);
 
+  // Clear a pending long-press timer on unmount so its inspect `alert` can't
+  // fire after the toolbar (or the whole slideshow) has gone.
+  React.useEffect(() => {
+    return () => {
+      if (contextLongPressTimerRef.current !== null) {
+        window.clearTimeout(contextLongPressTimerRef.current);
+      }
+    };
+  }, []);
+
   const activeIsLong = LONG_TIMINGS.includes(props.timeDelay);
   const visibleTimings =
     props.showLongTimings || activeIsLong

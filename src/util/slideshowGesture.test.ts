@@ -108,6 +108,22 @@ describe("resolvePointerMove", () => {
     expect(r).toMatchObject({ committedVertical: "up", armed: true });
     expect(r.kind === "update" && r.pullProgress).toBe(1);
   });
+
+  it("arms a vertical pull at the release-commit distance (swipeCommitPx), not pullCommitPx", () => {
+    // A vertical release commits at swipeCommitPx (48), so the armed cue/haptic
+    // must fire there too — even though the pull visual only fills at
+    // pullCommitPx (72). Previously 48–72px pulls committed while reading
+    // "un-armed".
+    const r = move({ deltaY: -T.swipeCommitPx });
+    expect(r).toMatchObject({ committedVertical: "up", armed: true });
+    // Still short of the pull visual's full extent.
+    expect(r.kind === "update" && r.pullProgress).toBeLessThan(1);
+  });
+
+  it("is not armed for a vertical pull below the release-commit distance", () => {
+    const r = move({ deltaY: -(T.swipeCommitPx - 1) });
+    expect(r).toMatchObject({ committedVertical: "up", armed: false });
+  });
 });
 
 describe("resolvePointerUpAction", () => {

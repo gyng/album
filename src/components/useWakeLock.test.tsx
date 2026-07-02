@@ -141,4 +141,55 @@ describe("useWakeLock", () => {
     unmount();
     expect(sentinel.release).toHaveBeenCalled();
   });
+
+  it("releases a sentinel that resolves after the lock was released (no leak on nav away)", async () => {
+    // Make the platform grant the lock on a deferred so the mount acquire is
+    // still in-flight when we release.
+    let resolveRequest!: (s: FakeSentinel) => void;
+    request.mockReturnValueOnce(
+      new Promise<FakeSentinel>((res) => {
+        resolveRequest = res;
+      }),
+    );
+
+    const { result } = renderHook(() => useWakeLock(false));
+
+    // Release (e.g. Escape-nav / unmount) before the request resolves.
+    await act(async () => {
+      await result.current.release();
+    });
+
+    // The lock is granted late — it must be let go, not stored, or the screen
+    // stays awake with an untracked sentinel.
+    await act(async () => {
+      resolveRequest(sentinel);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(sentinel.release).toHaveBeenCalled();
+    expect(result.current.ref.current).toBeNull();
+    expect(result.current.isActive).toBe(false);
+  });
+
+  it("ignores a release event from a superseded sentinel", async () => {
+    const { result } = renderHook(() => useWakeLock(false));
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(result.current.isActive).toBe(true);
+
+    const supersededSentinel = sentinel;
+    const newerSentinel = makeSentinel();
+    // A newer lock is now the tracked one.
+    result.current.ref.current = newerSentinel;
+
+    act(() => {
+      supersededSentinel.dispatchEvent(new Event("release"));
+    });
+
+    // The old sentinel's release must not clear the newer lock or flip state.
+    expect(result.current.ref.current).toBe(newerSentinel);
+    expect(result.current.isActive).toBe(true);
+  });
 });

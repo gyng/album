@@ -76,4 +76,47 @@ describe("useSlideshowCadence", () => {
     act(() => result.current.togglePaused());
     expect(result.current.isPaused).toBe(false);
   });
+
+  it("does not snap the first slide to a wall-clock boundary when alignCadence is off", () => {
+    // 10:29:58 local with a 15-minute cadence: a boundary-snapped first slide
+    // would end at 10:30:00 — a 2-second first slide. With alignment off it must
+    // instead run the full raw delay.
+    jest.setSystemTime(new Date(2026, 6, 3, 10, 29, 58));
+    const onAdvance = jest.fn();
+    renderHook(() =>
+      useSlideshowCadence({
+        ...baseInput,
+        timeDelay: 900000,
+        alignCadence: false,
+        hasCurrentPhoto: true,
+        onAdvance,
+      }),
+    );
+
+    // 3s in — a boundary-snapped first slide would already have advanced.
+    act(() => jest.advanceTimersByTime(3000));
+    expect(onAdvance).not.toHaveBeenCalled();
+
+    // The full raw 15-minute delay is honoured instead.
+    act(() => jest.advanceTimersByTime(900000));
+    expect(onAdvance).toHaveBeenCalled();
+  });
+
+  it("snaps the first slide to the wall-clock boundary when alignCadence is on", () => {
+    jest.setSystemTime(new Date(2026, 6, 3, 10, 29, 58));
+    const onAdvance = jest.fn();
+    renderHook(() =>
+      useSlideshowCadence({
+        ...baseInput,
+        timeDelay: 900000,
+        alignCadence: true,
+        hasCurrentPhoto: true,
+        onAdvance,
+      }),
+    );
+
+    // The first slide ends at the next boundary (~2s away), not 15 minutes on.
+    act(() => jest.advanceTimersByTime(3000));
+    expect(onAdvance).toHaveBeenCalled();
+  });
 });
