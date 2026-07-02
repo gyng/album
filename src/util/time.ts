@@ -8,12 +8,17 @@
 export function getRelativeTimeString(
   date: Date | number,
   options?: { lang?: string; short?: boolean },
-): string {
+): string | null {
   if (isNaN(date as number)) {
-    return "Invalid Date";
+    return null;
   }
 
-  const { lang = navigator.language, short = false } = options ?? {};
+  // `navigator` is absent during SSG/Node builds; fall back to the runtime
+  // default locale (undefined) so Intl.RelativeTimeFormat still works.
+  const {
+    lang = typeof navigator !== "undefined" ? navigator.language : undefined,
+    short = false,
+  } = options ?? {};
 
   // Allow dates or times to be passed
   const timeMs = typeof date === "number" ? date : date.getTime();

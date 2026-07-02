@@ -127,6 +127,50 @@ describe("SEO helpers", () => {
     expect(xml).toContain("<loc>https://photos.example.com/album/trip</loc>");
   });
 
+  it("XML-escapes ampersands and percent-encodes spaces in <loc>", () => {
+    const xml = buildSitemapXml([{ path: "/album/food & drink" }]);
+
+    expect(xml).toContain(
+      "<loc>https://photos.example.com/album/food%20&amp;%20drink</loc>",
+    );
+    expect(xml).not.toContain("food & drink");
+  });
+
+  it("percent-encodes non-ASCII album slugs in canonical URLs", () => {
+    // Canonical and sitemap must agree byte-for-byte for e.g. "türkiye".
+    expect(getCanonicalUrl("/album/türkiye")).toBe(
+      "https://photos.example.com/album/t%C3%BCrkiye",
+    );
+  });
+
+  it("resolves a relative page image to absolute og:image/twitter:image", () => {
+    const html = renderToStaticMarkup(
+      <Seo image="/data/albums/trip/cover.avif" pathname="/album/trip" />,
+    );
+
+    expect(html).toContain(
+      'property="og:image" content="https://photos.example.com/data/albums/trip/cover.avif"',
+    );
+    expect(html).toContain(
+      'name="twitter:image" content="https://photos.example.com/data/albums/trip/cover.avif"',
+    );
+  });
+
+  it("escapes < in JSON-LD to prevent </script> injection", () => {
+    const html = renderToStaticMarkup(
+      <Seo
+        jsonLd={{
+          "@context": "https://schema.org",
+          "@type": "Thing",
+          name: "</script><script>alert(1)</script>",
+        }}
+      />,
+    );
+
+    expect(html).not.toContain("<script>alert(1)</script>");
+    expect(html).toContain("\\u003c");
+  });
+
   it("builds reusable JSON-LD payloads", () => {
     const website = buildWebSiteJsonLd();
     const collection = buildCollectionPageJsonLd({

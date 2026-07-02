@@ -3,6 +3,7 @@ import {
   getCanonicalUrl,
   getDefaultSeo,
   getDefaultSocialImageUrl,
+  resolveAbsoluteUrl,
   type JsonLd,
 } from "../lib/seo";
 
@@ -31,7 +32,9 @@ export const Seo: React.FC<SeoProps> = ({
   const resolvedTitle = title ?? defaults.defaultTitle;
   const resolvedDescription = description ?? defaults.defaultDescription;
   const canonicalUrl = getCanonicalUrl(pathname);
-  const resolvedImage = image ?? getDefaultSocialImageUrl();
+  // OG/Twitter scrapers require absolute image URLs; a page-relative srcset
+  // path (e.g. "/data/albums/…") is resolved against the site origin here.
+  const resolvedImage = resolveAbsoluteUrl(image) ?? getDefaultSocialImageUrl();
   const jsonLdItems = jsonLd == null ? [] : Array.isArray(jsonLd) ? jsonLd : [jsonLd];
 
   return (
@@ -82,7 +85,11 @@ export const Seo: React.FC<SeoProps> = ({
         <script
           key={`jsonld-${index}`}
           type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(item) }}
+          // Escape "<" so a "</script>" inside album metadata cannot break out
+          // of the script element (JSON-LD injection).
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify(item).replace(/</g, "\\u003c"),
+          }}
         />
       ))}
     </Head>

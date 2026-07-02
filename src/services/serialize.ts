@@ -14,16 +14,22 @@ import {
 export const serializePhotoBlock = (
   block: PhotoBlock,
 ): SerializedPhotoBlock => {
-  const copy = { ...block };
+  // Work on a shallow copy of `formatting` so the source Content is never
+  // mutated (the previous `delete` operated on the shared reference).
+  const formatting = block.formatting ? { ...block.formatting } : undefined;
 
-  if (!block.formatting?.immersive) {
-    delete block.formatting?.immersive;
+  if (formatting && !formatting.immersive) {
+    delete formatting.immersive;
   }
-  if (block.formatting && Object.keys(block.formatting).length === 0) {
-    delete block.formatting;
-  }
-  // @ts-expect-error
-  delete copy._build;
+
+  const hasFormatting = formatting && Object.keys(formatting).length > 0;
+
+  const copy: SerializedPhotoBlock = {
+    kind: block.kind,
+    id: block.id,
+    data: block.data,
+    ...(hasFormatting ? { formatting } : {}),
+  };
 
   return copy;
 };

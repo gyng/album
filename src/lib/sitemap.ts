@@ -1,4 +1,5 @@
 import { getCanonicalUrl } from "./seo";
+import { escapeXml } from "./rss";
 
 type SitemapEntry = {
   path: string;
@@ -8,10 +9,13 @@ type SitemapEntry = {
 export const buildSitemapXml = (entries: SitemapEntry[]): string => {
   const urls = entries
     .map(({ path, lastmod }) => {
+      // getCanonicalUrl already percent-encodes the path; escapeXml then
+      // handles XML metacharacters (&, <, >) so an album named "food & drink"
+      // cannot invalidate the whole sitemap.
       return [
         "  <url>",
-        `    <loc>${encodeURI(getCanonicalUrl(path))}</loc>`,
-        ...(lastmod ? [`    <lastmod>${lastmod}</lastmod>`] : []),
+        `    <loc>${escapeXml(getCanonicalUrl(path))}</loc>`,
+        ...(lastmod ? [`    <lastmod>${escapeXml(lastmod)}</lastmod>`] : []),
         "  </url>",
       ].join("\n");
     })

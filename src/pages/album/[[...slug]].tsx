@@ -17,6 +17,7 @@ import {
   buildBreadcrumbJsonLd,
   buildCollectionPageJsonLd,
   getCanonicalUrl,
+  resolveAbsoluteUrl,
 } from "../../lib/seo";
 
 type PageProps = {
@@ -38,7 +39,15 @@ const Album: NextPage<PageProps> = ({ album }) => {
       // Defer to the next frame so the freshly-navigated album's photo
       // elements are in the DOM before we look the anchor up.
       requestAnimationFrame(() => {
-        const target = document.getElementById(decodeURIComponent(hash));
+        // A malformed percent-sequence (e.g. a bare "%") throws URIError; fall
+        // back to the raw hash rather than crashing the navigation handler.
+        let id = hash;
+        try {
+          id = decodeURIComponent(hash);
+        } catch {
+          id = hash;
+        }
+        const target = document.getElementById(id);
         target?.scrollIntoView();
       });
     };
@@ -48,12 +57,6 @@ const Album: NextPage<PageProps> = ({ album }) => {
       router.events.off("routeChangeComplete", scrollToHash);
     };
   }, [router.events]);
-
-  if (router.isFallback) {
-    return (
-      <div className={styles.fallbackPlaceholder}>Loading album&hellip;</div>
-    );
-  }
 
   if (!album) {
     return (
@@ -108,7 +111,9 @@ const Album: NextPage<PageProps> = ({ album }) => {
             description:
               album.kicker ?? `${title} photo album: ${imageCount} photos`,
             pathname: `/album/${statefulAlbum._build.slug}`,
-            image: (cover as PhotoBlock | undefined)?._build.srcset?.[0].src,
+            image: resolveAbsoluteUrl(
+              (cover as PhotoBlock | undefined)?._build.srcset?.[0]?.src,
+            ),
           }),
           buildBreadcrumbJsonLd([
             { name: "Snapshots", pathname: "/" },
@@ -150,7 +155,7 @@ const Album: NextPage<PageProps> = ({ album }) => {
           </>
         }
       />
-      <main>
+      <main id="main-content">
         <PhotoAlbum album={statefulAlbum} />
       </main>
       <Footer />
@@ -168,15 +173,9 @@ export const getStaticProps: GetStaticProps<
       return { notFound: true };
     }
 
-    // Reject slugs that do not correspond to a real album directory so the
-    // styled 404 renders instead of an undesigned "missing" placeholder. With
-    // fallback: true a request can arrive for any path, and getAlbumFromName
-    // throws on a non-existent directory.
-    const albumNames = await getAlbumNames();
-    if (!albumNames.includes(slug)) {
-      return { notFound: true };
-    }
-
+    // With fallback: false only slugs returned by getStaticPaths are ever
+    // rendered, and always at build time where the ../albums source exists, so
+    // getAlbumFromName is guaranteed to resolve a real directory here.
     const album = await getAlbumFromName(slug);
 
     return {
@@ -190,10 +189,13 @@ export const getStaticProps: GetStaticProps<
 export const getStaticPaths: GetStaticPaths = async () => {
   return measureBuild("page./album/[[...slug]].getStaticPaths", async () => {
     // TODO: move into routes
+    // Every album is known at build time and ../albums is not deployed to the
+    // Vercel lambda, so fallback: false gives the styled 404 for unknown slugs
+    // instead of a 500 (getAlbumNames would throw reading a missing directory).
     const paths = (await getAlbumNames()).map((n) => `/album/${n}`);
     return {
       paths,
-      fallback: true,
+      fallback: false,
     };
   });
 };

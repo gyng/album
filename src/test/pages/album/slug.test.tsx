@@ -73,7 +73,7 @@ describe("album page data fetching", () => {
 
     expect(actual).toEqual({
       paths: ["/album/trip", "/album/holiday"],
-      fallback: true,
+      fallback: false,
     });
   });
 });

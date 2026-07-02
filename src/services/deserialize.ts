@@ -111,9 +111,11 @@ export const deserializeVideoBlock = async (
     const copy: VideoBlock = {
       ...serialized,
       data: {
-        ...serialized.data,
+        type: "local",
         href: optimised.src,
-        date: resolvedDate,
+        // Omit `date` entirely when unknown — an explicit `undefined` here
+        // aborts the static build via Next's isSerializableProps check.
+        ...(resolvedDate !== undefined ? { date: resolvedDate } : {}),
       },
       _build: {
         src: optimised.src,
@@ -206,7 +208,10 @@ export const deserializePhotoBlock = async (
     const copy: PhotoBlock = {
       ...block,
       formatting: {
-        cover: block.data.src.includes("cover"),
+        // Implicit cover convention: a file literally named `cover.*`
+        // (basename without extension === "cover"), not merely containing
+        // the substring "cover" (which matched e.g. "album-cover-shot.jpg").
+        cover: path.parse(block.data.src).name === "cover",
         ...block.formatting,
       },
       data: {

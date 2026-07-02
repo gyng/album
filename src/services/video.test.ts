@@ -8,6 +8,7 @@ import path from "node:path";
 import {
   OPTIMISED_VIDEO_MAX_WIDTH,
   RESIZED_VIDEO_DIR,
+  buildOriginalVideoTechnicalData,
   isVideoFile,
   optimiseVideo,
 } from "./video";
@@ -47,4 +48,45 @@ describe("video utilities", () => {
     });
   });
 
+  it("omits fields absent from ffprobe metadata (no undefined in SSG props)", () => {
+    // A WhatsApp / screen-recording export: no creation_time, no bit_rate,
+    // no duration, no profile — exactly what broke `next build` (H5).
+    const parsed = {
+      streams: [
+        {
+          codec_type: "video",
+          codec_name: "h264",
+          width: 1280,
+          height: 720,
+          avg_frame_rate: "30/1",
+        },
+      ],
+      format: {
+        format_name: "mov,mp4,m4a",
+      },
+    };
+
+    const data = buildOriginalVideoTechnicalData(parsed);
+
+    // Absent fields are omitted, not set to `undefined`.
+    expect("originalDate" in data).toBe(false);
+    expect("bitrateKbps" in data).toBe(false);
+    expect("durationSeconds" in data).toBe(false);
+    expect("profile" in data).toBe(false);
+    expect("fileSizeBytes" in data).toBe(false);
+
+    // Present fields survive.
+    expect(data).toMatchObject({
+      codec: "h264",
+      width: 1280,
+      height: 720,
+      fps: 30,
+      container: "mov,mp4,m4a",
+    });
+
+    // No value is `undefined`, and a JSON round-trip is lossless (Next's
+    // isSerializableProps rejects any explicit `undefined`).
+    expect(Object.values(data).some((v) => v === undefined)).toBe(false);
+    expect(JSON.parse(JSON.stringify(data))).toEqual(data);
+  });
 });

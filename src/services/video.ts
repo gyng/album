@@ -62,6 +62,60 @@ export const isVideoFile = (filepath: string): boolean => {
   return VIDEO_EXTENSIONS.includes(path.extname(filepath).toLowerCase());
 };
 
+// Drop keys whose value is `undefined`. Next's isSerializableProps aborts the
+// static build on any explicit `undefined` in page props, and this object is
+// serialised into album-page props, so we omit absent fields rather than
+// setting them to `undefined` (matching the "omit optional props" convention).
+const omitUndefined = <T extends Record<string, unknown>>(obj: T): T => {
+  const result = {} as T;
+  (Object.keys(obj) as Array<keyof T>).forEach((key) => {
+    if (obj[key] !== undefined) {
+      result[key] = obj[key];
+    }
+  });
+  return result;
+};
+
+type FfprobeResult = {
+  streams?: Array<any>;
+  format?: any;
+};
+
+// Pure mapper from a parsed ffprobe payload to serialisable technical data.
+// Exported for unit testing with fabricated metadata (e.g. missing
+// creation_time / bit_rate) without spawning ffprobe.
+export const buildOriginalVideoTechnicalData = (
+  parsed: FfprobeResult,
+  fileSizeBytes?: number,
+): OriginalVideoTechnicalData => {
+  const streams = parsed.streams ?? [];
+  const videoStream = streams.find((s) => s.codec_type === "video") ?? {};
+  const audioStream = streams.find((s) => s.codec_type === "audio") ?? {};
+  const format = parsed.format ?? {};
+
+  const originalDate = parseOriginalDate(
+    videoStream?.tags?.creation_time ?? format?.tags?.creation_time,
+  );
+  const bitrateRaw = videoStream.bit_rate ?? format.bit_rate;
+  const durationRaw = videoStream.duration ?? format.duration;
+
+  return omitUndefined({
+    originalDate,
+    codec: videoStream.codec_name,
+    profile: videoStream.profile,
+    fps: parseFps(videoStream.avg_frame_rate ?? videoStream.r_frame_rate),
+    bitrateKbps: bitrateRaw ? Math.round(Number(bitrateRaw) / 1000) : undefined,
+    fileSizeBytes,
+    durationSeconds: durationRaw
+      ? Number(Number(durationRaw).toFixed(3))
+      : undefined,
+    width: videoStream.width ? Number(videoStream.width) : undefined,
+    height: videoStream.height ? Number(videoStream.height) : undefined,
+    audioCodec: audioStream.codec_name,
+    container: format.format_name,
+  });
+};
+
 const runFfmpeg = async (args: string[]): Promise<void> => {
   if (!ffmpegPath) {
     throw new Error("ffmpeg binary is unavailable");
@@ -179,37 +233,9 @@ export const getOriginalVideoTechnicalData = async (
       }
 
       try {
-        const parsed = JSON.parse(stdout) as {
-          streams?: Array<any>;
-          format?: any;
-        };
-        const streams = parsed.streams ?? [];
-        const videoStream = streams.find((s) => s.codec_type === "video") ?? {};
-        const audioStream = streams.find((s) => s.codec_type === "audio") ?? {};
-        const format = parsed.format ?? {};
-        const originalDate = parseOriginalDate(
-          videoStream?.tags?.creation_time ?? format?.tags?.creation_time,
-        );
-
+        const parsed = JSON.parse(stdout) as FfprobeResult;
         const stat = fs.existsSync(videoPath) ? fs.statSync(videoPath) : null;
-        const bitrateRaw = videoStream.bit_rate ?? format.bit_rate;
-        const durationRaw = videoStream.duration ?? format.duration;
-
-        resolve({
-          originalDate,
-          codec: videoStream.codec_name,
-          profile: videoStream.profile,
-          fps: parseFps(videoStream.avg_frame_rate ?? videoStream.r_frame_rate),
-          bitrateKbps: bitrateRaw ? Math.round(Number(bitrateRaw) / 1000) : undefined,
-          fileSizeBytes: stat?.size,
-          durationSeconds: durationRaw
-            ? Number(Number(durationRaw).toFixed(3))
-            : undefined,
-          width: videoStream.width ? Number(videoStream.width) : undefined,
-          height: videoStream.height ? Number(videoStream.height) : undefined,
-          audioCodec: audioStream.codec_name,
-          container: format.format_name,
-        });
+        resolve(buildOriginalVideoTechnicalData(parsed, stat?.size));
       } catch {
         resolve({});
       }

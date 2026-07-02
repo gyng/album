@@ -21,7 +21,24 @@ export const getSiteOrigin = (): string => {
 
 export const getCanonicalUrl = (pathname = "/"): string => {
   const normalizedPathname = pathname.startsWith("/") ? pathname : `/${pathname}`;
-  return `${getSiteOrigin()}${normalizedPathname}`;
+  // Percent-encode non-ASCII path characters so canonical/OG/feed URLs agree
+  // byte-for-byte with the sitemap (which also runs encodeURI); e.g. an album
+  // named "türkiye" must serialise identically everywhere. encodeURI is a
+  // no-op for plain ASCII paths and preserves URL delimiters (:/?#&).
+  return encodeURI(`${getSiteOrigin()}${normalizedPathname}`);
+};
+
+// Resolve a possibly-relative asset path (e.g. a photo srcset entry) to an
+// absolute URL for OG/Twitter/JSON-LD consumers, which require absolute URLs.
+// Already-absolute URLs (http(s)://, protocol-relative, data:) pass through.
+export const resolveAbsoluteUrl = (url?: string): string | undefined => {
+  if (!url) {
+    return undefined;
+  }
+  if (/^(https?:)?\/\//i.test(url) || url.startsWith("data:")) {
+    return url;
+  }
+  return getCanonicalUrl(url);
 };
 
 export const getDefaultSocialImageUrl = (): string =>

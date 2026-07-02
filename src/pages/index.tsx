@@ -31,7 +31,7 @@ const Home: NextPage<PageProps> = (context) => {
         ]}
       />
 
-      <main className={styles.main}>
+      <main id="main-content" className={styles.main}>
         <GlobalNav currentPage="home" hasPadding={false} />
         <Heading level={1} as="h1">
           Snapshots
@@ -58,15 +58,25 @@ export const getStaticProps: GetStaticProps<PageProps> = async (context) => {
 
     return {
       props: {
-        albums: albums.map((a) => ({
-          ...a,
-          // Reduce page data size by only providing a partial list
-          blocks: [
-            ...a.blocks.filter((b) => b.kind === "photo" && b.formatting?.cover),
-            a.blocks.find((b) => b.kind === "photo"),
-          ].filter(Boolean) as Block[],
-          _build: { ...a._build, timeRange: getImageTimestampRange(a) }, // FIXME: Unoptimal
-        })),
+        albums: albums.map((a) => {
+          // Reduce page data size by only providing a partial list: the
+          // cover(s) plus the first photo. Dedupe when the cover *is* the first
+          // photo, otherwise the same block ships twice (duplicate React keys).
+          const coverBlocks = a.blocks.filter(
+            (b) => b.kind === "photo" && b.formatting?.cover,
+          );
+          const firstPhoto = a.blocks.find((b) => b.kind === "photo");
+          const previewBlocks: Block[] =
+            firstPhoto && !coverBlocks.some((b) => b.id === firstPhoto.id)
+              ? [...coverBlocks, firstPhoto]
+              : coverBlocks;
+
+          return {
+            ...a,
+            blocks: previewBlocks,
+            _build: { ...a._build, timeRange: getImageTimestampRange(a) }, // FIXME: Unoptimal
+          };
+        }),
       },
     };
   });

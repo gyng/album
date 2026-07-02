@@ -63,7 +63,8 @@ export const getBlockDate = (block: Block): number => {
     return isNaN(t) ? 0 : t;
   }
   if (block.kind === "video") {
-    return block.data.date ? new Date(block.data.date).valueOf() : 0;
+    const t = block.data.date ? new Date(block.data.date).valueOf() : 0;
+    return isNaN(t) ? 0 : t;
   }
   return 0;
 };
@@ -82,18 +83,18 @@ const sortBlocksByDate = (
 export const getImageTimestampRange = (
   album: Content,
 ): [number | null, number | null] => {
-  let earliest = Number.MAX_VALUE;
-  let latest = 0;
+  // Nullable accumulators rather than 0 / MAX_VALUE sentinels, so pre-1970
+  // (negative-epoch, e.g. scanned film) dates are not mistaken for "missing".
+  let earliest: number | null = null;
+  let latest: number | null = null;
   for (const block of album.blocks) {
     if (block.kind !== "photo") continue;
     const dt = new Date(block._build?.exif?.DateTimeOriginal ?? "").getTime();
-    if (dt < earliest) earliest = dt; // NaN comparisons are false → missing dates skipped
-    if (dt > latest) latest = dt;
+    if (Number.isNaN(dt)) continue; // missing / unparseable dates skipped
+    if (earliest === null || dt < earliest) earliest = dt;
+    if (latest === null || dt > latest) latest = dt;
   }
-  return [
-    earliest !== Number.MAX_VALUE ? earliest : null,
-    latest !== 0 ? latest : null,
-  ];
+  return [earliest, latest];
 };
 
 export const getAlbumNames = async (
@@ -166,7 +167,9 @@ export const getAlbumWithoutManifest = async (
     }));
 
     const coverBlock: SerializedPhotoBlock | null =
-      photoBlocks.find((b) => b.data.src.includes("cover")) ?? null;
+      photoBlocks.find(
+        (b) => path.parse(b.data.src).name === "cover",
+      ) ?? null;
 
     const anonymousManifest: SerializedContent = {
       name: dirname,
@@ -214,6 +217,8 @@ const appendExternalBlocks = (
   externals?: V2AlbumMetadata["externals"],
 ): void => {
   externals?.forEach((ext) => {
+    // Omit `date` when absent — an explicit `undefined` in a block's data
+    // aborts the static build via Next's isSerializableProps check.
     if (ext.type === "youtube") {
       manifest.blocks.push({
         kind: "video",
@@ -221,7 +226,7 @@ const appendExternalBlocks = (
         data: {
           type: "youtube",
           href: ext.href,
-          date: ext.date,
+          ...(ext.date !== undefined ? { date: ext.date } : {}),
         },
       });
       return;
@@ -238,7 +243,7 @@ const appendExternalBlocks = (
       data: {
         type: "local",
         href: ext.href,
-        date: ext.date,
+        ...(ext.date !== undefined ? { date: ext.date } : {}),
       },
     });
   });
@@ -248,7 +253,13 @@ const isPhotoBlockWithSrc = (
   block: Block,
   src: string,
 ): block is import("./types").PhotoBlock => {
-  return block.kind === "photo" && block.data.src.includes(src);
+  // Match the exact file (basename equality), not a substring — otherwise a
+  // cover of "1.jpg" would also match "11.jpg". The block's src is a stripped
+  // public path by this point; the manifest cover is a bare filename.
+  return (
+    block.kind === "photo" &&
+    path.basename(block.data.src) === path.basename(src)
+  );
 };
 
 const applyCoverSelection = (

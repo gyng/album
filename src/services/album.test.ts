@@ -79,6 +79,11 @@ describe("getBlockDate", () => {
   it("returns 0 for a video block with no date", () => {
     expect(getBlockDate(makeVideo(undefined))).toBe(0);
   });
+
+  it("returns 0 (not NaN) for a video block with an unparseable date", () => {
+    // Without the isNaN guard, a malformed manifest date scrambles block order.
+    expect(getBlockDate(makeVideo("not-a-date"))).toBe(0);
+  });
 });
 
 describe("getImageTimestampRange", () => {
@@ -126,6 +131,18 @@ describe("getImageTimestampRange", () => {
     expect(
       getImageTimestampRange(makeContent([makePhoto(), makePhoto()])),
     ).toEqual([null, null]);
+  });
+
+  it("keeps pre-1970 (negative-epoch) dates instead of treating them as missing", () => {
+    // Scanned film: a valid but negative timestamp must not hit the old 0 / -1
+    // "missing" sentinels.
+    const film = "1965-06-15T00:00:00Z";
+    const ts = new Date(film).getTime();
+    expect(ts).toBeLessThan(0);
+    expect(getImageTimestampRange(makeContent([makePhoto(film)]))).toEqual([
+      ts,
+      ts,
+    ]);
   });
 });
 
