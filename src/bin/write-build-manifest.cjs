@@ -27,13 +27,18 @@ const nonEmpty = (value) => {
 };
 
 const createBuildManifest = (options = {}) => {
-  const builtAt = options.builtAt ?? new Date().toISOString();
+  // nonEmpty() guards each step: Vercel writes VERCEL_GIT_COMMIT_SHA="" into
+  // .vercel/.env.production.local, and a bare `??` lets that empty string
+  // through — which previously shipped {"buildVersion": ""}, disabling the
+  // kiosk's build-update detection. builtAt is always a non-empty timestamp,
+  // so buildVersion can never resolve to "".
+  const builtAt = nonEmpty(options.builtAt) ?? new Date().toISOString();
   const gitSha =
-    options.gitSha ??
-    process.env.VERCEL_GIT_COMMIT_SHA ??
-    getGitSha(options.gitCwd);
+    nonEmpty(options.gitSha) ??
+    nonEmpty(process.env.VERCEL_GIT_COMMIT_SHA) ??
+    nonEmpty(getGitSha(options.gitCwd));
   const buildVersion =
-    options.buildVersion ??
+    nonEmpty(options.buildVersion) ??
     nonEmpty(process.env.NEXT_PUBLIC_BUILD_VERSION) ??
     nonEmpty(process.env.VERCEL_GIT_COMMIT_SHA) ??
     gitSha ??

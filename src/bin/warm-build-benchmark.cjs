@@ -59,7 +59,17 @@ const readBudget = () => {
     return null;
   }
 
-  return JSON.parse(fs.readFileSync(budgetPath, "utf8"));
+  // A malformed budget file must not throw away a completed (multi-run,
+  // ~30-minute) benchmark: warn and continue without budget checks so the
+  // results are still written.
+  try {
+    return JSON.parse(fs.readFileSync(budgetPath, "utf8"));
+  } catch (err) {
+    console.warn(
+      `Warning: could not parse warm build budget at ${budgetPath} (${err instanceof Error ? err.message : String(err)}). Continuing without budget checks.`,
+    );
+    return null;
+  }
 };
 
 const formatMs = (value) => `${Number(value).toFixed(2)}ms`;

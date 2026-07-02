@@ -1,11 +1,13 @@
 const path = require("path");
 const {
   buildAttentionAlbums,
+  buildDeletedAlbumReports,
   buildIndexVerification,
   buildPreflightInsights,
   buildSummary,
   buildVerificationInsights,
   getVercelPreflightCommand,
+  hasIndexChanges,
   loadDbState,
   parseArgs,
   resolveExecutionPlan,
@@ -260,9 +262,10 @@ describe("publish-wizard-lib", () => {
     }
   });
 
-  it("checks Vercel up front when build or deploy is planned", () => {
+  it("checks Vercel up front when a fast-track plan builds or deploys", () => {
     const args = {
       indexOnly: false,
+      fastTrack: true,
     };
 
     expect(
@@ -280,6 +283,18 @@ describe("publish-wizard-lib", () => {
     ).toBe("npx --yes vercel@latest whoami");
   });
 
+  it("checks Vercel up front in interactive mode before the index step", () => {
+    // Interactive mode decides build/deploy *after* the (possibly multi-hour)
+    // index, so the plan still shows them as false here. The auth check must
+    // still run up front so a logged-out user fails fast, not at `vercel pull`.
+    expect(
+      getVercelPreflightCommand({
+        args: { indexOnly: false, fastTrack: false, skipBuild: false, deploy: false },
+        plan: { runIndex: true, runBuild: false, runDeploy: false },
+      }),
+    ).toBe("npx --yes vercel@latest whoami");
+  });
+
   it("skips the Vercel upfront check for index-only or local-only plans", () => {
     expect(
       getVercelPreflightCommand({
@@ -288,9 +303,18 @@ describe("publish-wizard-lib", () => {
       }),
     ).toBeNull();
 
+    // Fast-track plan that has already decided against building and deploying.
     expect(
       getVercelPreflightCommand({
-        args: { indexOnly: false },
+        args: { indexOnly: false, fastTrack: true },
+        plan: { runIndex: true, runBuild: false, runDeploy: false },
+      }),
+    ).toBeNull();
+
+    // Interactive mode with the build explicitly skipped and no forced deploy.
+    expect(
+      getVercelPreflightCommand({
+        args: { indexOnly: false, fastTrack: false, skipBuild: true, deploy: false },
         plan: { runIndex: true, runBuild: false, runDeploy: false },
       }),
     ).toBeNull();
@@ -367,6 +391,83 @@ describe("publish-wizard-lib", () => {
     });
     expect(insights.map((item) => item.text).join(" ")).toContain("New-photo index coverage: 0%");
     expect(insights.map((item) => item.text).join(" ")).toContain("embedding coverage");
+  });
+
+  describe("hasIndexChanges", () => {
+    const base = {
+      summary: { newPhotos: 0, removedPhotos: 0 },
+      db: { missingEmbeddingCount: 0, staleEmbeddingCount: 0 },
+    };
+
+    it("is false when nothing needs (re)indexing", () => {
+      expect(hasIndexChanges(base)).toBe(false);
+    });
+
+    it("is true for new photos", () => {
+      expect(hasIndexChanges({ ...base, summary: { newPhotos: 1, removedPhotos: 0 } })).toBe(true);
+    });
+
+    it("is true for removed photos", () => {
+      expect(hasIndexChanges({ ...base, summary: { newPhotos: 0, removedPhotos: 3 } })).toBe(true);
+    });
+
+    it("is true for missing embeddings", () => {
+      expect(
+        hasIndexChanges({ ...base, db: { missingEmbeddingCount: 5, staleEmbeddingCount: 0 } }),
+      ).toBe(true);
+    });
+
+    it("is true after a model switch leaves stale embeddings", () => {
+      // The regression: the wizard entry point ignored staleEmbeddingCount and
+      // printed "Skipping index update" even though the plan re-indexed.
+      expect(
+        hasIndexChanges({ ...base, db: { missingEmbeddingCount: 0, staleEmbeddingCount: 1486 } }),
+      ).toBe(true);
+    });
+  });
+
+  describe("buildDeletedAlbumReports", () => {
+    it("surfaces indexed photos whose album directory is gone as removed", () => {
+      const reports = buildDeletedAlbumReports({
+        indexedPhotoPaths: new Set([
+          "../albums/kept/a.jpg",
+          "../albums/deleted/x.jpg",
+          "../albums/deleted/y.jpg",
+        ]),
+        onDiskAlbumNames: ["kept"],
+      });
+
+      expect(reports).toHaveLength(1);
+      expect(reports[0].albumName).toBe("deleted");
+      expect(reports[0].removedPhotos).toEqual([
+        "../albums/deleted/x.jpg",
+        "../albums/deleted/y.jpg",
+      ]);
+      expect(reports[0].newPhotos).toEqual([]);
+      expect(reports[0].photoPaths).toEqual([]);
+      expect(reports[0].warnings[0]).toContain("no longer exists on disk");
+      expect(reports[0].blockers).toEqual([]);
+    });
+
+    it("returns nothing when every indexed album still exists", () => {
+      expect(
+        buildDeletedAlbumReports({
+          indexedPhotoPaths: new Set(["../albums/kept/a.jpg"]),
+          onDiskAlbumNames: ["kept"],
+        }),
+      ).toEqual([]);
+    });
+
+    it("counts a deleted album's photos into the summary so indexing triggers", () => {
+      const reports = buildDeletedAlbumReports({
+        indexedPhotoPaths: new Set(["../albums/gone/a.jpg", "../albums/gone/b.jpg"]),
+        onDiskAlbumNames: [],
+      });
+      const summary = buildSummary(reports);
+
+      expect(summary.removedPhotos).toBe(2);
+      expect(hasIndexChanges({ summary, db: {} })).toBe(true);
+    });
   });
 
   describe("embedding model health insights", () => {

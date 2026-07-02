@@ -314,12 +314,18 @@ const parseArgs = (argv) => {
   return args;
 };
 
+// Single source of truth for "does anything need (re)indexing?". Kept in sync
+// across resolveExecutionPlan, printExecutionPlan and the wizard entry point so
+// the plan the user consents to matches what actually runs. Covers new/removed
+// photos as well as missing and stale (post-model-switch) embeddings.
+const hasIndexChanges = (report) =>
+  report.summary.newPhotos > 0 ||
+  report.summary.removedPhotos > 0 ||
+  (report.db?.missingEmbeddingCount ?? 0) > 0 ||
+  (report.db?.staleEmbeddingCount ?? 0) > 0;
+
 const resolveExecutionPlan = async ({ args, report }) => {
-  const hasIndexChanges =
-    report.summary.newPhotos > 0 ||
-    report.summary.removedPhotos > 0 ||
-    report.db.missingEmbeddingCount > 0 ||
-    report.db.staleEmbeddingCount > 0;
+  const indexChanges = hasIndexChanges(report);
 
   const plan = {
     runIndex: false,
@@ -327,7 +333,7 @@ const resolveExecutionPlan = async ({ args, report }) => {
     runDeploy: false,
   };
 
-  if (hasIndexChanges) {
+  if (indexChanges) {
     plan.runIndex = await askYesNo({
       prompt: "Run indexing now?",
       defaultValue: true,
@@ -343,7 +349,7 @@ const resolveExecutionPlan = async ({ args, report }) => {
     plan.runBuild = false;
   } else if (args.fastTrack) {
     plan.runBuild = await askYesNo({
-      prompt: hasIndexChanges
+      prompt: indexChanges
         ? "If indexing succeeds, build the site afterwards?"
         : "Build the site now?",
       defaultValue: true,
@@ -367,10 +373,20 @@ const resolveExecutionPlan = async ({ args, report }) => {
 };
 
 const getVercelPreflightCommand = ({ args, plan }) => {
-  if (args.indexOnly || (!plan.runBuild && !plan.runDeploy)) {
+  if (args.indexOnly) {
     return null;
   }
-  return `${VERCEL_CLI} whoami`;
+  // A build or deploy needs a logged-in Vercel CLI. In fast-track mode the plan
+  // already knows whether either will run, so we can gate precisely. In
+  // interactive mode those choices are made *after* the (possibly multi-hour)
+  // index step, so gating on the plan would skip the auth check entirely and
+  // only fail at `vercel pull` hours later. Run the check up front whenever a
+  // build or deploy could still follow (i.e. the build isn't explicitly
+  // skipped, or a deploy was forced with --deploy).
+  const buildOrDeployCouldFollow = args.fastTrack
+    ? Boolean(plan.runBuild || plan.runDeploy)
+    : !args.skipBuild || Boolean(args.deploy);
+  return buildOrDeployCouldFollow ? `${VERCEL_CLI} whoami` : null;
 };
 
 const openDatabase = (dbPath) => {
@@ -528,6 +544,15 @@ const readAlbumFiles = (albumDir) => {
     .map((entry) => entry.name);
 };
 
+// A malformed EXIF date must degrade to the benign "missing date" warning, not
+// blow up .toISOString() (which throws on an Invalid Date) and get caught below
+// as an "unreadable photo" hard blocker.
+const toIsoStringOrNull = (value) => {
+  if (value == null) return null;
+  const date = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date.toISOString();
+};
+
 const extractPhotoMetadata = async (filePath) => {
   try {
     const parsed = await exifr.parse(filePath, {
@@ -547,12 +572,7 @@ const extractPhotoMetadata = async (filePath) => {
       hasGps: Number.isFinite(latitude) && Number.isFinite(longitude),
       latitude: Number.isFinite(latitude) ? latitude : null,
       longitude: Number.isFinite(longitude) ? longitude : null,
-      capturedAt:
-        capturedAt instanceof Date
-          ? capturedAt.toISOString()
-          : capturedAt
-            ? new Date(capturedAt).toISOString()
-            : null,
+      capturedAt: toIsoStringOrNull(capturedAt),
       warnings: [],
     };
   } catch (err) {
@@ -732,11 +752,55 @@ const createAlbumReport = async ({ albumDir, albumName, dbState }) => {
   };
 };
 
+// createAlbumReport only runs for directories that still exist on disk, so a
+// whole-album deletion is otherwise invisible: its rows stay in the search DB
+// forever (searchable, with broken links) because prune never runs. Surface
+// each vanished album as a synthetic report whose indexed photos are all
+// "removed", which feeds removedPhotos and triggers the index/prune step.
+const buildDeletedAlbumReports = ({ indexedPhotoPaths, onDiskAlbumNames }) => {
+  const onDisk = new Set(onDiskAlbumNames);
+  const removedByAlbum = new Map();
+
+  for (const indexedPath of indexedPhotoPaths) {
+    const match = /^\.\.\/albums\/([^/]+)\//.exec(indexedPath);
+    if (!match) continue;
+    const albumName = match[1];
+    if (onDisk.has(albumName)) continue;
+    if (!removedByAlbum.has(albumName)) {
+      removedByAlbum.set(albumName, []);
+    }
+    removedByAlbum.get(albumName).push(indexedPath);
+  }
+
+  return Array.from(removedByAlbum, ([albumName, removedPhotos]) => ({
+    albumName,
+    albumDir: null,
+    manifest: { exists: false, valid: null, errors: [] },
+    zoneSidecars: [],
+    photos: [],
+    photoPaths: [],
+    videos: [],
+    newPhotos: [],
+    removedPhotos,
+    warnings: [
+      `album directory no longer exists on disk (${removedPhotos.length} indexed photo(s) will be pruned)`,
+    ],
+    blockers: [],
+  }));
+};
+
 const getIndexerModelInfo = (indexDir) => {
   try {
     const output = execSync("uv run index.py model-info", { cwd: indexDir, timeout: 10000 });
     return JSON.parse(output.toString().trim());
-  } catch {
+  } catch (err) {
+    const reason = err instanceof Error ? err.message : String(err);
+    console.warn(
+      styleText(
+        `Warning: could not query the indexer's embedding models (${reason}). Embedding coverage and model-change checks will be skipped for this run.`,
+        ANSI.yellow,
+      ),
+    );
     return null;
   }
 };
@@ -763,6 +827,12 @@ const createPreflightReport = async ({ albumsDir, dbPath, embeddingsDbPath, inde
     const albumDir = path.join(albumsDir, albumName);
     albums.push(await createAlbumReport({ albumDir, albumName, dbState }));
   }
+  albums.push(
+    ...buildDeletedAlbumReports({
+      indexedPhotoPaths: dbState.indexedPhotoPaths,
+      onDiskAlbumNames: albumNames,
+    }),
+  );
 
   const modelInfo = indexDir ? getIndexerModelInfo(indexDir) : null;
   const expectedEmbeddingModelIds =
@@ -1014,10 +1084,7 @@ const formatDuration = (seconds) => {
 };
 
 const printExecutionPlan = ({ args, report, plan }) => {
-  const hasIndexChanges =
-    report.summary.newPhotos > 0 ||
-    report.summary.removedPhotos > 0 ||
-    report.db.missingEmbeddingCount > 0;
+  const indexChanges = hasIndexChanges(report);
 
   const stats = report.lastIndexStats;
   const indexWorkItems =
@@ -1036,8 +1103,8 @@ const printExecutionPlan = ({ args, report, plan }) => {
     },
     {
       label: "Index update",
-      value: hasIndexChanges ? (plan.runIndex ? "yes" : "no") : "not needed",
-      level: hasIndexChanges ? (plan.runIndex ? "ok" : "warn") : "info",
+      value: indexChanges ? (plan.runIndex ? "yes" : "no") : "not needed",
+      level: indexChanges ? (plan.runIndex ? "ok" : "warn") : "info",
     },
     ...(estimatedIndexSeconds !== null && plan.runIndex
       ? [
@@ -1091,6 +1158,7 @@ const buildWizardContext = ({ srcDir }) => {
 module.exports = {
   ALBUM_CONFIG_FILENAME,
   REPORT_FILENAME,
+  buildDeletedAlbumReports,
   buildIndexVerification,
   buildSummary,
   buildWizardContext,
@@ -1098,6 +1166,7 @@ module.exports = {
   buildAttentionAlbums,
   buildPreflightInsights,
   getVercelPreflightCommand,
+  hasIndexChanges,
   loadDbState,
   parseArgs,
   printExecutionPlan,

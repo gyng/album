@@ -7,6 +7,7 @@ const {
   buildWizardContext,
   createPreflightReport,
   getVercelPreflightCommand,
+  hasIndexChanges,
   loadDbState,
   parseArgs,
   printExecutionPlan,
@@ -61,8 +62,7 @@ const main = async () => {
     });
   }
 
-  const hasIndexChanges = report.summary.newPhotos > 0 || report.summary.removedPhotos > 0 || report.db.missingEmbeddingCount > 0 || report.db.mixedEmbeddingModels?.length > 1;
-  if (hasIndexChanges) {
+  if (hasIndexChanges(report)) {
     if (!executionPlan.runIndex) {
       console.log("Skipping indexing by user choice.");
       return;

@@ -115,7 +115,7 @@ const buildRssXml = (channel) => {
           "    <item>",
           `      <title>${escapeXml(item.title)}</title>`,
           `      <link>${escapeXml(item.link)}</link>`,
-          `      <guid>${escapeXml(item.guid)}</guid>`,
+          `      <guid${item.guidIsPermaLink === false ? ' isPermaLink="false"' : ""}>${escapeXml(item.guid)}</guid>`,
           `      <description>${escapeXml(item.description)}</description>`,
           `      <pubDate>${escapeXml(item.pubDate)}</pubDate>`,
           "    </item>",
@@ -149,7 +149,7 @@ const buildSitemapXml = (entries) => {
     .map(({ url, lastmod }) =>
       [
         "  <url>",
-        `    <loc>${url}</loc>`,
+        `    <loc>${escapeXml(url)}</loc>`,
         ...(lastmod ? [`    <lastmod>${lastmod}</lastmod>`] : []),
         "  </url>",
       ].join("\n"),
@@ -202,7 +202,13 @@ const generateAlbumFeed = (entry, items) => {
     items: items.map((item) => ({
       title: item.title,
       link: getCanonicalUrl(item.link),
-      guid: getCanonicalUrl(item.link),
+      // Photo/file items carry a unique #fragment in their link, so the
+      // canonical URL is a fine permalink guid. YouTube/external items all share
+      // the bare /album/<slug> link, so they supply an explicit non-permalink
+      // guid to stop readers deduping them down to a single entry.
+      ...(item.guid
+        ? { guid: item.guid, guidIsPermaLink: false }
+        : { guid: getCanonicalUrl(item.link) }),
       description: item.description,
       pubDate: toRssDate(item.pubDate),
     })),
@@ -238,6 +244,8 @@ const getAlbumFeedItems = (slug, albumPath, albumMetadata, albumLastmod) => {
           block.data?.kicker?.trim() ||
           humanizeAlbumFeedName(source);
 
+        const isYoutube = block.kind === "video" && block.data?.type === "youtube";
+
         items.push({
           title: label,
           description: joinFeedDescriptionParts(
@@ -245,12 +253,12 @@ const getAlbumFeedItems = (slug, albumPath, albumMetadata, albumLastmod) => {
             block.data?.description,
             `From ${albumMetadata.title}`,
           ),
-          link:
-            block.kind === "photo"
-              ? `/album/${slug}#${source.split("/").at(-1)}`
-              : block.data?.type === "youtube"
-                ? `/album/${slug}`
-                : `/album/${slug}#${source.split("/").at(-1)}`,
+          link: isYoutube
+            ? `/album/${slug}`
+            : `/album/${slug}#${source.split("/").at(-1)}`,
+          // YouTube items all share the bare /album/<slug> link, so give them a
+          // unique guid from the video href to stop readers deduping them.
+          ...(isYoutube ? { guid: source } : {}),
           pubDate: sortDate,
           sortDate,
         });
@@ -287,7 +295,7 @@ const getAlbumFeedItems = (slug, albumPath, albumMetadata, albumLastmod) => {
   if (fs.existsSync(albumJsonPath)) {
     try {
       const albumJson = JSON.parse(fs.readFileSync(albumJsonPath, "utf-8"));
-      for (const external of albumJson.externals ?? []) {
+      for (const [externalIndex, external] of (albumJson.externals ?? []).entries()) {
         const sortDate =
           external.date?.slice(0, 10) ??
           formatSitemapDate(fs.statSync(albumJsonPath).mtimeMs);
@@ -298,6 +306,9 @@ const getAlbumFeedItems = (slug, albumPath, albumMetadata, albumLastmod) => {
             albumMetadata.description,
           ),
           link: `/album/${slug}`,
+          // External items also share the bare album link — key their guid off
+          // the (unique) external href, falling back to a positional id.
+          guid: external.href ?? `external-${slug}-${externalIndex}`,
           pubDate: sortDate,
           sortDate,
         });
@@ -310,11 +321,12 @@ const getAlbumFeedItems = (slug, albumPath, albumMetadata, albumLastmod) => {
   return items
     .sort((a, b) => b.sortDate.localeCompare(a.sortDate))
     .slice(0, 20)
-    .map(({ title, description, link, pubDate }) => ({
+    .map(({ title, description, link, pubDate, guid }) => ({
       title,
       description,
       link,
       pubDate,
+      ...(guid ? { guid } : {}),
     }));
 };
 
@@ -345,6 +357,37 @@ const ensureDir = (dirPath) => fs.mkdirSync(dirPath, { recursive: true });
 const writeFile = (filePath, content) => {
   ensureDir(path.dirname(filePath));
   fs.writeFileSync(filePath, content);
+};
+
+// Remove per-album feeds for slugs that are no longer albums (renamed/deleted),
+// otherwise their public/album/<slug>/feed.xml ships frozen forever. Deliberately
+// conservative: only ever deletes feed.xml, and only removes the containing
+// directory if it is then empty — never a recursive delete.
+const cleanupStaleAlbumFeeds = (validSlugs) => {
+  const albumOutputDir = path.join(publicDir, "album");
+  if (!fs.existsSync(albumOutputDir)) return 0;
+
+  let removed = 0;
+  for (const entry of fs.readdirSync(albumOutputDir, { withFileTypes: true })) {
+    if (!entry.isDirectory() || validSlugs.has(entry.name)) continue;
+
+    const slugDir = path.join(albumOutputDir, entry.name);
+    const feedPath = path.join(slugDir, "feed.xml");
+    if (fs.existsSync(feedPath)) {
+      fs.rmSync(feedPath);
+      removed += 1;
+    }
+
+    try {
+      if (fs.readdirSync(slugDir).length === 0) {
+        fs.rmdirSync(slugDir);
+      }
+    } catch {
+      // Non-empty or already gone — leave any other generated assets untouched.
+    }
+  }
+
+  return removed;
 };
 
 const run = () => {
@@ -387,8 +430,13 @@ const run = () => {
     );
   }
 
+  const removedFeeds = cleanupStaleAlbumFeeds(
+    new Set(feedEntries.map((entry) => entry.slug)),
+  );
+
   console.log(
-    `Generated feeds: feed.xml, sitemap.xml, ${feedEntries.length} album feeds`,
+    `Generated feeds: feed.xml, sitemap.xml, ${feedEntries.length} album feeds` +
+      (removedFeeds > 0 ? `, removed ${removedFeeds} stale album feed(s)` : ""),
   );
 };
 

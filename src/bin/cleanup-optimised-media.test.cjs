@@ -92,4 +92,66 @@ describe("cleanupOptimisedMedia", () => {
     expect(fs.existsSync(cachedImage)).toBe(false);
     expect(fs.existsSync(cachedVideo)).toBe(false);
   });
+
+  it("keeps cache files whose original name contains '@'", async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "album-media-at-"));
+    const albumsDir = path.join(root, "albums");
+    const publicAlbumsDir = path.join(root, "public", "data", "albums");
+    const albumDir = path.join(albumsDir, "trip");
+    const imageCacheDir = path.join(publicAlbumsDir, "trip", ".resized_images");
+
+    fs.mkdirSync(albumDir, { recursive: true });
+    fs.mkdirSync(imageCacheDir, { recursive: true });
+
+    const source = path.join(albumDir, "me@beach.jpg");
+    const keptCache = path.join(imageCacheDir, "me@beach.jpg@800.avif");
+    const unneededCache = path.join(imageCacheDir, "me@beach.jpg@999.avif");
+    fs.writeFileSync(source, "image");
+    fs.writeFileSync(keptCache, "cached");
+    fs.writeFileSync(unneededCache, "cached");
+
+    const older = new Date("2020-01-01T00:00:00.000Z");
+    const newer = new Date("2020-01-02T00:00:00.000Z");
+    fs.utimesSync(source, older, older);
+    fs.utimesSync(keptCache, newer, newer);
+    fs.utimesSync(unneededCache, newer, newer);
+
+    const summary = await cleanupOptimisedMedia({ albumsDir, publicAlbumsDir });
+
+    // Original name resolves correctly, so the valid 800px variant survives and
+    // is never flagged as stale; only the genuinely unneeded 999px size goes.
+    expect(fs.existsSync(keptCache)).toBe(true);
+    expect(fs.existsSync(unneededCache)).toBe(false);
+    expect(summary.removedStaleImages).toBe(0);
+    expect(summary.removedUnneededImageSizes).toBe(1);
+  });
+
+  it("does not invalidate the cache when only the source ctime changes", async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "album-media-ctime-"));
+    const albumsDir = path.join(root, "albums");
+    const publicAlbumsDir = path.join(root, "public", "data", "albums");
+    const albumDir = path.join(albumsDir, "trip");
+    const imageCacheDir = path.join(publicAlbumsDir, "trip", ".resized_images");
+
+    fs.mkdirSync(albumDir, { recursive: true });
+    fs.mkdirSync(imageCacheDir, { recursive: true });
+
+    const source = path.join(albumDir, "kept.jpg");
+    const cached = path.join(imageCacheDir, "kept.jpg@800.avif");
+    fs.writeFileSync(source, "image");
+    fs.writeFileSync(cached, "cached");
+
+    const stamp = new Date("2020-01-01T00:00:00.000Z");
+    fs.utimesSync(source, stamp, stamp);
+    fs.utimesSync(cached, stamp, stamp);
+
+    // A chmod bumps ctime to now but leaves mtime untouched (as chmod/chown or
+    // an rsync over albums/ would). Content is unchanged, so the cache stays.
+    fs.chmodSync(source, 0o644);
+
+    const summary = await cleanupOptimisedMedia({ albumsDir, publicAlbumsDir });
+
+    expect(summary.removedChangedImages).toBe(0);
+    expect(fs.existsSync(cached)).toBe(true);
+  });
 });

@@ -62,6 +62,52 @@ describe("build manifest generation", () => {
     expect(manifest.buildVersion).toBe("abcdef1234567890");
   });
 
+  it("falls back past a blank VERCEL_GIT_COMMIT_SHA to the git SHA", () => {
+    // Vercel's `vercel pull` writes VERCEL_GIT_COMMIT_SHA="" — the empty string
+    // must not short-circuit the fallback chain.
+    process.env.VERCEL_GIT_COMMIT_SHA = "";
+    delete process.env.NEXT_PUBLIC_BUILD_VERSION;
+
+    const manifest = createBuildManifest({
+      builtAt: "2026-03-29T00:00:00.000Z",
+      gitSha: "abcdef1234567890",
+    });
+
+    expect(manifest.buildVersion).toBe("abcdef1234567890");
+    expect(manifest.gitSha).toBe("abcdef1234567890");
+  });
+
+  it("never ships an empty buildVersion when the SHA is blank and git is unavailable", () => {
+    // Reproduces the live production bug: VERCEL_GIT_COMMIT_SHA="" with no
+    // NEXT_PUBLIC_BUILD_VERSION and no reachable git repo. buildVersion must
+    // fall through to builtAt, never "".
+    process.env.VERCEL_GIT_COMMIT_SHA = "";
+    delete process.env.NEXT_PUBLIC_BUILD_VERSION;
+
+    const manifest = createBuildManifest({
+      builtAt: "2026-03-29T00:00:00.000Z",
+      gitCwd: path.join(os.tmpdir(), "album-build-manifest-not-a-git-repo"),
+    });
+
+    expect(manifest.buildVersion).not.toBe("");
+    expect(manifest.buildVersion).toBe("2026-03-29T00:00:00.000Z");
+    expect(manifest.gitSha).toBeNull();
+  });
+
+  it("treats an explicitly blank gitSha option as absent", () => {
+    delete process.env.VERCEL_GIT_COMMIT_SHA;
+    delete process.env.NEXT_PUBLIC_BUILD_VERSION;
+
+    const manifest = createBuildManifest({
+      builtAt: "2026-03-29T00:00:00.000Z",
+      gitSha: "",
+      gitCwd: path.join(os.tmpdir(), "album-build-manifest-not-a-git-repo"),
+    });
+
+    expect(manifest.buildVersion).toBe("2026-03-29T00:00:00.000Z");
+    expect(manifest.gitSha).toBeNull();
+  });
+
   it("writes version.json and buildVersion.ts to the target app root", () => {
     const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "album-build-manifest-"));
 

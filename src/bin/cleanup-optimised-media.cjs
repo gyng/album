@@ -22,20 +22,43 @@ const listDirectories = (root) => {
 };
 
 const removeFileIfExists = (targetPath) => {
-  if (!fs.existsSync(targetPath)) {
-    return false;
+  // Tolerate ENOENT rather than pre-checking with existsSync: under concurrent
+  // builds the file can vanish between the check and the unlink (TOCTOU).
+  try {
+    fs.unlinkSync(targetPath);
+    return true;
+  } catch (err) {
+    if (err.code === "ENOENT") {
+      return false;
+    }
+    throw err;
+  }
+};
+
+// Cache files are named "<originalName>@<size>.<ext>", but the original name can
+// itself contain "@" (e.g. "me@beach.jpg@800.avif"). Split on the LAST "@" so
+// the original name and size segment survive intact.
+const parseCacheFileName = (file) => {
+  const nameWithoutExt = path.parse(file).name;
+  const lastAt = nameWithoutExt.lastIndexOf("@");
+  if (lastAt === -1) {
+    return { originalName: nameWithoutExt, size: Number.NaN };
   }
 
-  fs.unlinkSync(targetPath);
-  return true;
+  return {
+    originalName: nameWithoutExt.slice(0, lastAt),
+    size: Number(nameWithoutExt.slice(lastAt + 1)),
+  };
 };
 
 const hasSourceChangedSinceCache = (sourcePath, cachedPath) => {
+  // Compare mtime only. ctime moves on any metadata change (chmod/chown, and an
+  // rsync/restore over albums/), which would needlessly invalidate the entire
+  // media cache and trigger hours of re-encoding despite unchanged content.
   const sourceStat = fs.statSync(sourcePath);
   const cachedStat = fs.statSync(cachedPath);
-  const sourceUpdatedAt = Math.max(sourceStat.mtimeMs, sourceStat.ctimeMs);
 
-  return sourceUpdatedAt > cachedStat.mtimeMs;
+  return sourceStat.mtimeMs > cachedStat.mtimeMs;
 };
 
 const cleanupImageCache = ({ albumDir, publicAlbumDir }) => {
@@ -51,10 +74,8 @@ const cleanupImageCache = ({ albumDir, publicAlbumDir }) => {
 
   for (const file of fs.readdirSync(resizedDir)) {
     const cachedFile = path.join(resizedDir, file);
-    const originalName = path.parse(file).name.split("@")[0];
+    const { originalName, size } = parseCacheFileName(file);
     const originalFile = path.join(albumDir, originalName);
-    const sizeSegment = file.split("@")[1]?.split(".")[0];
-    const size = Number(sizeSegment);
 
     if (!fs.existsSync(originalFile)) {
       removedStale += removeFileIfExists(cachedFile) ? 1 : 0;
@@ -87,10 +108,8 @@ const cleanupVideoCache = ({ albumDir, publicAlbumDir }) => {
 
   for (const file of fs.readdirSync(resizedDir)) {
     const cachedFile = path.join(resizedDir, file);
-    const originalName = path.parse(file).name.split("@")[0];
+    const { originalName, size } = parseCacheFileName(file);
     const originalFile = path.join(albumDir, originalName);
-    const sizeSegment = file.split("@")[1]?.split(".")[0];
-    const size = Number(sizeSegment);
 
     if (!fs.existsSync(originalFile)) {
       removedStale += removeFileIfExists(cachedFile) ? 1 : 0;
