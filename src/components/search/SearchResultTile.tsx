@@ -50,9 +50,10 @@ export const SearchResultTile = (props: {
     stripHtml(result.subject) ||
     stripHtml(result.tags);
   const isHybridResult = typeof result.rrfScore === "number";
-  const isColorMatchResult =
-    Array.isArray(result.matchingColor) && typeof result.similarity === "number";
-  const colorMatchScore = isColorMatchResult ? result.similarity : null;
+  // Colour match uses its own 0–100 field, so a semantic cosine (0–1) that
+  // coexists with a colour swatch is never mistaken for a colour percentage.
+  const colorMatchScore =
+    typeof result.colorMatchScore === "number" ? result.colorMatchScore : null;
   const hybridScore = isHybridResult ? result.rrfScore : null;
   const hybridScoreLabel =
     typeof hybridScore === "number"
@@ -158,7 +159,7 @@ export const SearchResultTile = (props: {
                 <div className={styles.sourceText}>
                   {getRelativeTimeString(dateTimeOriginal, {
                     short: true,
-                  }).replace(" ago", "")}
+                  })?.replace(" ago", "")}
                 </div>
               ) : null}
             </div>

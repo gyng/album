@@ -16,6 +16,9 @@ type Props = {
   isSuccess: boolean;
   isError: boolean;
   isFetching: boolean;
+  /** True while a vector query is deferred because the embeddings DB is still
+   *  downloading — show a pending state instead of a definitive empty one. */
+  isAwaitingResults?: boolean;
   isPlaceholderData: boolean;
   hasNextPage: boolean;
   similarClickstreamPaths: Set<string>;
@@ -36,6 +39,7 @@ export const SearchResultsGrid: React.FC<Props> = ({
   isSuccess,
   isError,
   isFetching,
+  isAwaitingResults = false,
   isPlaceholderData,
   hasNextPage,
   similarClickstreamPaths,
@@ -133,7 +137,7 @@ export const SearchResultsGrid: React.FC<Props> = ({
         </li>
       ) : null}
 
-      {isFetching && !isSuccess ? (
+      {(isFetching && !isSuccess) || isAwaitingResults ? (
         <li className={styles.sectionStatus}>Searching&hellip;</li>
       ) : null}
     </ul>

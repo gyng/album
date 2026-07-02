@@ -78,7 +78,12 @@ export const useSearchResultsState = ({
   });
 
   const { textVector, textVectorError, textVectorQuery } = textVectorState;
-  const hasVectorDatabase = Boolean(embeddingsDatabase || database);
+  // Only the embeddings DB (or its search.sqlite fallback, once loaded) can
+  // answer vector queries. The main DB is NOT a stand-in: in a split build it
+  // has no `embeddings` table, so treating it as "ready" made cold-cache visitors
+  // see a definitive "No results" while the 52 MB embeddings DB downloaded
+  // (HIGH-8). Until it resolves, vector queries stay pending instead.
+  const hasVectorDatabase = Boolean(embeddingsDatabase);
 
   const hasCurrentTextVector =
     Boolean(textVector) && textVectorQuery === trimmedQuery;
@@ -96,7 +101,13 @@ export const useSearchResultsState = ({
       (hasSearchQuery &&
         (searchMode === "keyword" ||
           textVectorFailed ||
-          (hasVectorDatabase && hasCurrentTextVector))) ||
+          // Hybrid may run before the embeddings DB finishes downloading: it
+          // degrades to keyword-only ranking and re-fuses once vectors arrive.
+          (searchMode === "hybrid" && hasCurrentTextVector) ||
+          // Pure semantic needs the vector DB — otherwise it stays pending.
+          (searchMode === "semantic" &&
+            hasVectorDatabase &&
+            hasCurrentTextVector))) ||
       (!isSimilarMode && (hasFacetFilters || isColorMode)));
 
   const similarFilename = similarPath?.split("/").at(-1) ?? null;
@@ -222,15 +233,12 @@ export const useSearchResultsState = ({
     getPreviousPageParam: (firstPage: PaginatedSearchResult) => {
       return firstPage.prev ?? undefined;
     },
-    getNextPageParam: (
-      lastPage: PaginatedSearchResult,
-      _allPages,
-      lastPageParam,
-    ) => {
-      return (
-        lastPage.next ??
-        (lastPage.data.length === pageSize ? lastPageParam + 1 : undefined)
-      );
+    getNextPageParam: (lastPage: PaginatedSearchResult) => {
+      // Trust the `next` each fetcher computes. The vector/colour paths know the
+      // full result count and correctly return `undefined` at an exact-multiple
+      // boundary; the old fallback fabricated a phantom "More…" page whenever the
+      // last page happened to be full (L3). exec now sets `next` from page 0 too.
+      return lastPage.next ?? undefined;
     },
   });
 

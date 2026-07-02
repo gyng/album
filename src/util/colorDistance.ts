@@ -75,10 +75,19 @@ export function rgbToHex(rgb: RGB): string {
 }
 
 export function hexToRgb(hex: string): RGB | null {
-  const r = parseInt(hex.slice(1, 3), 16);
-  const g = parseInt(hex.slice(3, 5), 16);
-  const b = parseInt(hex.slice(5, 7), 16);
-  if (isNaN(r) || isNaN(g) || isNaN(b)) return null;
+  const value = hex.startsWith("#") ? hex.slice(1) : hex;
+  // Expand 3-digit shorthand (e.g. "#abc" → "aabbcc") — HexColorInput emits it.
+  const expanded =
+    value.length === 3
+      ? value
+          .split("")
+          .map((char) => char + char)
+          .join("")
+      : value;
+  if (!/^[0-9a-fA-F]{6}$/.test(expanded)) return null;
+  const r = parseInt(expanded.slice(0, 2), 16);
+  const g = parseInt(expanded.slice(2, 4), 16);
+  const b = parseInt(expanded.slice(4, 6), 16);
   return [r, g, b];
 }
 

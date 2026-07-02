@@ -100,16 +100,26 @@ const fetchWithProgress = async (
   const stream = new ReadableStream({
     start(controller) {
       function push() {
-        reader.read().then(({ done, value }) => {
-          if (done) {
-            controller.close();
-            return;
-          }
-          loaded += value.byteLength;
-          onProgress((loaded / total) * 100, { loaded, total });
-          controller.enqueue(value);
-          push();
-        });
+        reader
+          .read()
+          .then(({ done, value }) => {
+            if (done) {
+              controller.close();
+              return;
+            }
+            loaded += value.byteLength;
+            onProgress((loaded / total) * 100, { loaded, total });
+            controller.enqueue(value);
+            push();
+          })
+          .catch((err) => {
+            // A mid-download network error must surface: error the stream so the
+            // downstream `response.arrayBuffer()` rejects instead of hanging
+            // forever (which also leaves a stuck promise cached in
+            // databasePromises). getDatabase's catch then evicts it so a retry
+            // actually refetches.
+            controller.error(err);
+          });
       }
       push();
     },

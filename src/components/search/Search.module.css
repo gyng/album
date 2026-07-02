@@ -562,6 +562,21 @@
   font-size: var(--fs-s);
 }
 
+.retryButton {
+  margin-left: var(--m-s);
+  padding: var(--m) var(--m-s);
+  background-color: transparent;
+  border: solid 1px var(--c-accent);
+  border-radius: var(--m);
+  color: var(--c-accent);
+  font-size: inherit;
+  cursor: pointer;
+}
+
+.retryButton:hover {
+  background-color: color-mix(in srgb, var(--c-accent) 12%, transparent);
+}
+
 .searchInput {
   padding-right: var(--m-xl);
 }

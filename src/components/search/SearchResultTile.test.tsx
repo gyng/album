@@ -122,7 +122,7 @@ describe("SearchResultTile", () => {
       <SearchResultTile
         result={makeResult({
           snippet: "Harbor skyline",
-          similarity: 86.25,
+          colorMatchScore: 86.25,
           matchingColor: [12, 34, 56],
         })}
       />,
@@ -131,6 +131,22 @@ describe("SearchResultTile", () => {
     expect(screen.getByText("86%").getAttribute("title")).toBe(
       "Colour match score 86%",
     );
+  });
+
+  it("shows the semantic percentage (not a colour percentage) when both a cosine score and a colour swatch are present", () => {
+    render(
+      <SearchResultTile
+        result={makeResult({
+          snippet: "Harbor skyline",
+          similarity: 0.31,
+          matchingColor: [12, 34, 56],
+        })}
+      />,
+    );
+
+    // Semantic+colour: the badge must show 31% (0.31 cosine), never "0%".
+    expect(screen.getByText("31%")).toBeTruthy();
+    expect(screen.queryByText("0%")).toBeNull();
   });
 
   it("shows a hybrid tooltip breakdown when semantic and keyword scores are both present", () => {

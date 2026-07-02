@@ -6,6 +6,7 @@ import {
   fetchRandomPhoto,
   fetchRecentResults,
   fetchRefinementTagCounts,
+  fetchResults,
   fetchSemanticResults,
   fetchSimilarResults,
   searchInternals,
@@ -471,7 +472,7 @@ describe("fetchHybridResults", () => {
           sql.includes("images MATCH ?") &&
           sql.includes("ORDER BY rank")
         ) {
-          expect(bind).toEqual([`- {path album_relative_path exif} : "harbor"`]);
+          expect(bind).toEqual([`- {path album_relative_path exif colors} : "harbor"`]);
           callback([
             "../albums/test-simple/DSCF0593.jpg",
             0.9,
@@ -760,11 +761,11 @@ describe("fetchRefinementTagCounts", () => {
         if (sql.includes("COUNT(*) AS count") && sql.includes("UNION ALL")) {
           expect(bind).toEqual([
             "harbor",
-            `- {path album_relative_path exif} : "bird"`,
-            `- {path album_relative_path exif} : "harbor"`,
+            `- {path album_relative_path exif colors} : "bird"`,
+            `- {path album_relative_path exif colors} : "harbor"`,
             "night",
-            `- {path album_relative_path exif} : "bird"`,
-            `- {path album_relative_path exif} : "night"`,
+            `- {path album_relative_path exif colors} : "bird"`,
+            `- {path album_relative_path exif colors} : "night"`,
           ]);
           callback(["harbor", 4]);
           callback(["night", 0]);
@@ -790,7 +791,7 @@ describe("fetchRefinementTagCounts", () => {
           expect(sql).toContain("LEFT JOIN metadata m ON m.path = images.path");
           expect(bind).toEqual([
             "harbor",
-            `- {path album_relative_path exif} : "harbor"`,
+            `- {path album_relative_path exif colors} : "harbor"`,
             "%\nJapan\n%",
             "%\nJapan",
           ]);
@@ -853,7 +854,7 @@ describe("fetchSearchFacetSections", () => {
     ).toEqual([{ value: "17:00", count: 1 }]);
     expect(
       calls.some(({ bind }) =>
-        bind?.includes(`- {path album_relative_path exif} : "harbor"`),
+        bind?.includes(`- {path album_relative_path exif colors} : "harbor"`),
       ),
     ).toBe(true);
     expect(
@@ -884,6 +885,131 @@ describe("fetchRandomPhoto", () => {
     const result = await fetchRandomPhoto({ database: database as any });
 
     expect(result).toEqual([]);
+  });
+});
+
+const imageRow = (path: string, colors = "[(0,0,0)]") => [
+  path,
+  `/album/test-simple#${path.split("/").at(-1)}`,
+  path.split("/").at(-1),
+  "",
+  "",
+  "tag",
+  colors,
+  "Alt",
+  "",
+  "",
+  "",
+  "",
+];
+
+describe("fetchHybridResults keyword degradation", () => {
+  it("degrades to keyword-only ranking when the embeddings table is missing", async () => {
+    const database = {
+      exec: ({ sql, callback }: ExecArgs) => {
+        if (sql.includes("FROM embeddings")) {
+          throw new Error("SQLITE_ERROR: no such table: embeddings");
+        }
+        if (
+          sql.includes("FROM images") &&
+          sql.includes("images MATCH ?") &&
+          sql.includes("ORDER BY rank")
+        ) {
+          callback(["../albums/test-simple/DSCF0593.jpg", 0.9]);
+          callback(["../albums/test-simple/DSCF2581-2_2.jpg", 0.5]);
+          return;
+        }
+        if (sql.includes("FROM images") && sql.includes("WHERE path IN")) {
+          callback(imageRow("../albums/test-simple/DSCF0593.jpg"));
+          callback(imageRow("../albums/test-simple/DSCF2581-2_2.jpg"));
+        }
+      },
+    };
+
+    const results = await fetchHybridResults({
+      database: database as any,
+      textQuery: "harbor",
+      textVector: [1, 0, 0],
+      page: 0,
+      pageSize: 10,
+      modelId: "google/siglip-base-patch16-224",
+    });
+
+    // Keyword ranking survives instead of the whole result collapsing to empty.
+    expect(results.data.map((row) => row.path)).toEqual([
+      "../albums/test-simple/DSCF0593.jpg",
+      "../albums/test-simple/DSCF2581-2_2.jpg",
+    ]);
+    expect(results.data[0]?.bm25).toBe(0.9);
+  });
+});
+
+describe("fetchResults pagination", () => {
+  it("advertises a next page from page 0 when the page fills", async () => {
+    const database = {
+      exec: ({ sql, callback }: ExecArgs) => {
+        if (sql.includes("FROM images") && sql.includes("ORDER BY rank")) {
+          callback(imageRow("../albums/test-simple/a.jpg"));
+          callback(imageRow("../albums/test-simple/b.jpg"));
+        }
+      },
+    };
+
+    const results = await fetchResults({
+      database: database as any,
+      query: "harbor",
+      page: 0,
+      pageSize: 2,
+    });
+
+    expect(results.next).toBe(1);
+    expect(results.prev).toBeUndefined();
+  });
+
+  it("does not advertise a next page when page 0 is not full", async () => {
+    const database = {
+      exec: ({ sql, callback }: ExecArgs) => {
+        if (sql.includes("FROM images") && sql.includes("ORDER BY rank")) {
+          callback(imageRow("../albums/test-simple/a.jpg"));
+        }
+      },
+    };
+
+    const results = await fetchResults({
+      database: database as any,
+      query: "harbor",
+      page: 0,
+      pageSize: 2,
+    });
+
+    expect(results.next).toBeUndefined();
+  });
+});
+
+describe("fetchColorSimilarResults scoring", () => {
+  it("reports the colour match in colorMatchScore, not similarity", async () => {
+    const database = {
+      exec: ({ sql, callback }: ExecArgs) => {
+        if (sql.includes("SELECT images.path, images.colors FROM images")) {
+          callback(["../albums/test-simple/red.jpg", "[(255,0,0)]"]);
+          return;
+        }
+        if (sql.includes("FROM images") && sql.includes("WHERE path IN")) {
+          callback(imageRow("../albums/test-simple/red.jpg", "[(255,0,0)]"));
+        }
+      },
+    };
+
+    const results = await fetchColorSimilarResults({
+      database: database as any,
+      color: [255, 0, 0],
+      page: 0,
+      pageSize: 10,
+    });
+
+    expect(results.data).toHaveLength(1);
+    expect(typeof results.data[0]?.colorMatchScore).toBe("number");
+    expect(results.data[0]?.similarity).toBeUndefined();
   });
 });
 

@@ -7,6 +7,7 @@ describe("textEmbeddings", () => {
 
   class MockWorker {
     postMessage = jest.fn();
+    terminate = jest.fn();
     addEventListener = jest.fn(
       (type: string, listener: (event: { data?: unknown; error?: unknown }) => void) => {
         const current = this.listeners.get(type) ?? [];
@@ -124,6 +125,29 @@ describe("textEmbeddings", () => {
     worker.emitError(new Error("worker exploded"));
 
     await expect(resultPromise).rejects.toThrow("worker exploded");
+  });
+
+  it("terminates the dead worker and creates a fresh one for the next request", async () => {
+    const firstWorker = new MockWorker();
+    const secondWorker = new MockWorker();
+    const workerConstructor = jest
+      .fn()
+      .mockImplementationOnce(() => firstWorker as unknown as Worker)
+      .mockImplementationOnce(() => secondWorker as unknown as Worker);
+    global.Worker = workerConstructor as unknown as typeof Worker;
+
+    const { encodeSearchText } = await import("./textEmbeddings");
+
+    const failed = encodeSearchText("harbor");
+    firstWorker.emitError(new Error("chunk 404"));
+    await expect(failed).rejects.toThrow("chunk 404");
+    expect(firstWorker.terminate).toHaveBeenCalledTimes(1);
+
+    // The module-level worker was reset, so the next request builds a new one.
+    const retried = encodeSearchText("night");
+    expect(workerConstructor).toHaveBeenCalledTimes(2);
+    secondWorker.emitMessage({ id: 1, ok: true, vector: [0, 1, 0] });
+    await expect(retried).resolves.toEqual([0, 1, 0]);
   });
 
   it("throws when the worker returns no embedding for an encode request", async () => {

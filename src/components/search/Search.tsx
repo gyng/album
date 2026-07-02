@@ -184,7 +184,13 @@ export const Search: React.FC<{
   >({});
   const inputRef = useRef<HTMLInputElement>(null);
   const modeSourceRef = useRef<HTMLDivElement | null>(null);
-  const [database, progress, databaseProgressDetails] = useDatabase();
+  const [
+    database,
+    progress,
+    databaseProgressDetails,
+    databaseError,
+    retryDatabase,
+  ] = useDatabase();
   const needsEmbeddingsDatabase =
     Boolean(similarPath) ||
     (!colorSearch &&
@@ -264,6 +270,16 @@ export const Search: React.FC<{
     !isColorMode &&
     searchInputValue.trim() === "" &&
     selectedFacets.length === 0;
+
+  // While the embeddings DB is still downloading, similar / pure-semantic
+  // queries can't run yet — present the grid as pending (loading) instead of a
+  // definitive empty state (HIGH-8). Hybrid is deliberately excluded: it
+  // degrades to keyword-only ranking meanwhile rather than waiting.
+  const isAwaitingVectorDatabase =
+    needsEmbeddingsDatabase &&
+    !embeddingsDatabase &&
+    !embeddingsError &&
+    (isSimilarMode || searchMode === "semantic");
 
   useEffect(() => {
     const initialSearchState = getInitialSearchState();
@@ -725,10 +741,11 @@ export const Search: React.FC<{
   }, []);
 
   useEffect(() => {
-    const loading =
-      progress < 100
+    const loading = databaseError
+      ? null
+      : progress < 100
         ? { progress, details: databaseProgressDetails }
-        : needsEmbeddingsDatabase && !embeddingsDatabase
+        : needsEmbeddingsDatabase && !embeddingsDatabase && !embeddingsError
           ? { progress: embeddingsProgress, details: embeddingsProgressDetails }
           : !isSimilarMode &&
               searchMode !== "keyword" &&
@@ -745,10 +762,12 @@ export const Search: React.FC<{
     });
   }, [
     database,
+    databaseError,
     progress,
     databaseProgressDetails,
     needsEmbeddingsDatabase,
     embeddingsDatabase,
+    embeddingsError,
     embeddingsProgress,
     embeddingsProgressDetails,
     isSimilarMode,
@@ -804,6 +823,19 @@ export const Search: React.FC<{
       {/* DB / similarity-index / text-model download progress is shown once,
           beside the page heading (see pages/search), so it never adds an
           in-flow bar that shifts the results below. */}
+
+      {databaseError ? (
+        <div className={styles.inlineError}>
+          Couldn&apos;t load the search index.{" "}
+          <button
+            type="button"
+            className={styles.retryButton}
+            onClick={() => retryDatabase()}
+          >
+            Try again
+          </button>
+        </div>
+      ) : null}
 
       {!isSimilarMode && textVectorError ? (
         <div className={styles.inlineError}>{textVectorError}</div>
@@ -916,6 +948,7 @@ export const Search: React.FC<{
           isSuccess={isSuccess}
           isError={isError}
           isFetching={isFetching}
+          isAwaitingResults={isAwaitingVectorDatabase}
           isPlaceholderData={isPlaceholderData}
           hasNextPage={hasNextPage}
           similarClickstreamPaths={similarClickstreamPaths}

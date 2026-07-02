@@ -73,6 +73,9 @@ type RankedColorResult = {
 };
 
 const DEFAULT_EMBEDDING_MODEL_ID = "google/siglip-base-patch16-224";
+// v2 gives higher-quality image-to-image similarity; prefer it when the DB holds
+// both spaces so seed lookups and ranking use a deterministic embedding space.
+const PREFERRED_EMBEDDING_MODEL_ID = "google/siglip2-base-patch16-224";
 const RECIPROCAL_RANK_FUSION_K = 60;
 
 const IMAGE_COLUMNS = [
@@ -140,27 +143,14 @@ const FACET_FIELD_SQL_BY_ID: Record<string, string> = {
 
 const EXIF_DATETIME_SQL = buildExifFieldSql("EXIF DateTimeOriginal");
 const EXIF_OFFSET_SQL = buildExifFieldSql("EXIF OffsetTime");
+// DateTimeOriginal is camera-local wall time, so the local hour is read straight
+// from the string ("YYYY:MM:DD HH:MM:SS" → substr positions 12-13). No offset
+// arithmetic. Mirrors the JS HOUR_FACET: the hour is only returned when BOTH
+// DateTimeOriginal and OffsetTime are present (older bodies without OffsetTime
+// store unreliable times), otherwise NULL — so undated photos are excluded
+// rather than matching the 00:00 bucket.
 const LOCAL_HOUR_SQL = `CASE
-  WHEN NULLIF(${EXIF_OFFSET_SQL}, '') = '' OR NULLIF(${EXIF_DATETIME_SQL}, '') = '' THEN NULL
-  WHEN instr(${EXIF_DATETIME_SQL}, 'T') > 0 OR substr(${EXIF_DATETIME_SQL}, -1, 1) = 'Z' THEN CAST(
-    (
-      (
-        (
-          CAST(substr(${EXIF_DATETIME_SQL}, 12, 2) AS INTEGER) * 60 +
-          CAST(substr(${EXIF_DATETIME_SQL}, 15, 2) AS INTEGER)
-        ) +
-        (
-          CASE substr(${EXIF_OFFSET_SQL}, 1, 1)
-            WHEN '-' THEN -1
-            ELSE 1
-          END
-        ) * (
-          CAST(substr(${EXIF_OFFSET_SQL}, 2, 2) AS INTEGER) * 60 +
-          CAST(substr(${EXIF_OFFSET_SQL}, 5, 2) AS INTEGER)
-        )
-      ) % 1440 + 1440
-    ) % 1440 / 60 AS INTEGER
-  )
+  WHEN NULLIF(${EXIF_OFFSET_SQL}, '') IS NULL OR NULLIF(${EXIF_DATETIME_SQL}, '') IS NULL THEN NULL
   ELSE CAST(substr(${EXIF_DATETIME_SQL}, 12, 2) AS INTEGER)
 END`;
 
@@ -382,10 +372,12 @@ const buildKeywordWhereClause = (activeTerms: string[]) => {
 // Constrain keyword matching to the human-meaningful content columns. The raw
 // `exif` blob is excluded so a query like "cat" no longer matches inside
 // "LensSpecification" (and the FTS snippet — used as image alt text — no longer
-// surfaces raw EXIF fragments). `path`/`album_relative_path` are file paths, not
-// content.
+// surfaces raw EXIF fragments). `colors` is excluded too so numeric queries
+// ("108", "747") stop matching serialised RGB tuples and the snippet stops
+// emitting tuple fragments. `path`/`album_relative_path` are file paths, not
+// content. `geocode` is intentionally left searchable — place names live there.
 const toFtsMatchTerm = (term: string): string => {
-  return `- {path album_relative_path exif} : "${term.replaceAll(/[\"]/g, "'")}"`;
+  return `- {path album_relative_path exif colors} : "${term.replaceAll(/[\"]/g, "'")}"`;
 };
 
 const exec = async (
@@ -423,9 +415,15 @@ const exec = async (
   }
 
   const prev =
-    !options?.page || options.page <= 0 ? undefined : options.page - 1;
+    typeof options?.page !== "number" || options.page <= 0
+      ? undefined
+      : options.page - 1;
+  // Use a typeof check so page 0 (falsy) still advertises a next page when the
+  // result set fills the page. Offset paging can't know if it's the exact-final
+  // page, so a following page of 0 rows resolves `next` to undefined then.
   const next =
-    options?.page && accumulator.length === options.pageSize
+    typeof options?.page === "number" &&
+    accumulator.length === options.pageSize
       ? options.page + 1
       : undefined;
 
@@ -657,6 +655,7 @@ const fetchColorMatchedResults = async (opts: {
 
     let bestScore = Infinity;
     let bestRawDist = Infinity;
+    let closestRawDist = Infinity;
     let matchingColor: [number, number, number] = palette[0] as [
       number,
       number,
@@ -666,6 +665,9 @@ const fetchColorMatchedResults = async (opts: {
     for (let i = 0; i < palette.length; i++) {
       const rgb = palette[i] as [number, number, number];
       const rawDist = deltaE(queryLab, rgbToLab(...rgb));
+      if (rawDist < closestRawDist) {
+        closestRawDist = rawDist;
+      }
       const score = rawDist * (1 + i * 0.1);
       if (score < bestScore) {
         bestScore = score;
@@ -674,7 +676,11 @@ const fetchColorMatchedResults = async (opts: {
       }
     }
 
-    if (bestScore === Infinity || bestRawDist > maxDistance) continue;
+    // Apply the tolerance against the *closest* palette entry, not the
+    // prominence-weighted winner: a photo containing the query colour at a
+    // less-dominant position must still qualify. Prominence weighting still
+    // drives ranking via `score`.
+    if (bestScore === Infinity || closestRawDist > maxDistance) continue;
     ranked.push({ path: row[0], score: bestScore, rawDist: bestRawDist, matchingColor });
   }
 
@@ -794,12 +800,21 @@ const fetchEmbeddingByPath = async (
   database: SearchDatabase,
   path: string,
 ): Promise<EmbeddingRow | null> => {
+  // Deterministically prefer the v2 space (then v1) so the seed's embedding
+  // space — and hence result ordering and "% match" scale — doesn't depend on
+  // physical row order when the DB holds both models.
   const result = await exec(
     database,
     `SELECT path, model_id, embedding_dim, embedding_json
       FROM embeddings
-      WHERE path = ?`,
-    [path],
+      WHERE path = ?
+      ORDER BY CASE model_id
+        WHEN ? THEN 0
+        WHEN ? THEN 1
+        ELSE 2
+      END
+      LIMIT 1`,
+    [path, PREFERRED_EMBEDDING_MODEL_ID, DEFAULT_EMBEDDING_MODEL_ID],
     { suppressMissingEmbeddingsTableError: true },
   );
 
@@ -855,7 +870,19 @@ export const fetchResults = async (opts: {
     colorSearch = null,
     colorTolerance = 100,
   } = opts;
-  const queries = query ? query.split("|").filter(Boolean) : [];
+  // Trim, lowercase and dedupe terms the same way buildKeywordWhereClause does,
+  // so a query like "cat, night" doesn't build the FTS phrase " night" (missing
+  // field-initial matches) and grid results agree with the facet counts.
+  const queries = query
+    ? Array.from(
+        new Set(
+          query
+            .split("|")
+            .map((term) => term.trim().toLowerCase())
+            .filter(Boolean),
+        ),
+      )
+    : [];
   const colorMatchedPaths = colorSearch
     ? (
         await fetchColorMatchedResults({
@@ -922,9 +949,11 @@ export const fetchResults = async (opts: {
       return {
         ...row,
         matchingColor: colorData?.matchingColor,
-        similarity: colorData
+        // Colour match goes in its own 0–100 field so the tile can distinguish
+        // it from a 0–1 semantic cosine score.
+        colorMatchScore: colorData
           ? Math.max(0, Math.min(100, 100 - colorData.rawDist))
-          : row.similarity,
+          : undefined,
       };
     });
     return result;
@@ -1140,7 +1169,7 @@ export const fetchColorSimilarResults = async (opts: {
       resolvedRows.push({
         ...row,
         snippet: getResultSnippet(row),
-        similarity: Math.max(0, Math.min(100, 100 - candidate.rawDist)),
+        colorMatchScore: Math.max(0, Math.min(100, 100 - candidate.rawDist)),
         matchingColor: candidate.matchingColor,
       });
     }
@@ -1325,6 +1354,14 @@ export const fetchHybridResults = async (opts: {
         database: vectorDatabase,
         queryVector: textVector,
         modelId,
+      }).catch((err) => {
+        // While the 52 MB embeddings DB is still downloading (or genuinely
+        // absent), the vector table is missing. Degrade to keyword-only ranking
+        // instead of discarding the already-computed keyword results (HIGH-8).
+        if (isMissingEmbeddingsTableError(err)) {
+          return [] as RankedVectorResult[];
+        }
+        throw err;
       }),
     ]);
     const fusedResults = fuseRankingsWithRrf({

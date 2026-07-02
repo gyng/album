@@ -93,6 +93,12 @@ const ensureWorker = (): Worker => {
       handlers.reject(error);
     }
     pending.clear();
+
+    // The worker is dead (e.g. a chunk 404 after a redeploy). Terminate it and
+    // drop the module-level reference so the next request spins up a fresh
+    // worker instead of posting into a broken one that never replies.
+    worker?.terminate();
+    worker = null;
   });
 
   return worker;

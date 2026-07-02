@@ -5,6 +5,31 @@ import { measureBuild } from "../services/buildTiming";
 
 const sqlite3 = require("sqlite3");
 
+// The shipped search-embeddings DB holds two embedding spaces (SigLIP v1 and
+// v2), one row per photo per model. These stats must run against a single space
+// or the maths averages two near-orthogonal populations (and double-counts every
+// photo). Prefer v2 for image-to-image quality, fall back to v1.
+const PREFERRED_EMBEDDING_MODEL_ID = "google/siglip2-base-patch16-224";
+const FALLBACK_EMBEDDING_MODEL_ID = "google/siglip-base-patch16-224";
+
+/**
+ * Chooses which embedding model to use for the visual-sameness stats given the
+ * model_ids actually present in the DB. Prefers v2, then v1, then any other
+ * single model (deterministic first entry) so a DB with only one space still
+ * works.
+ */
+export const selectEmbeddingModelId = (
+  availableModelIds: string[],
+): string | null => {
+  if (availableModelIds.includes(PREFERRED_EMBEDDING_MODEL_ID)) {
+    return PREFERRED_EMBEDDING_MODEL_ID;
+  }
+  if (availableModelIds.includes(FALLBACK_EMBEDDING_MODEL_ID)) {
+    return FALLBACK_EMBEDDING_MODEL_ID;
+  }
+  return availableModelIds[0] ?? null;
+};
+
 const MIN_EMBEDDING_SAMPLE = 24;
 const HIGH_SIMILARITY_THRESHOLD = 0.9;
 const LOW_SIMILARITY_THRESHOLD = 0.75;
@@ -295,11 +320,25 @@ export const computeVisualSamenessStats = async (
         return null;
       }
 
+      // The DB may hold multiple embedding spaces (v1 + v2). Pick exactly one so
+      // downstream maths runs over a single, coherent population (H7).
+      const modelRows = await getRows(
+        db,
+        "SELECT DISTINCT model_id AS path, '' AS embedding_json FROM embeddings",
+        [],
+      );
+      const selectedModelId = selectEmbeddingModelId(
+        modelRows.map((row) => row.path),
+      );
+      if (!selectedModelId) {
+        return null;
+      }
+
       const placeholders = selectedPaths.map(() => "?").join(", ");
       const rows = await getRows(
         db,
-        `SELECT path, embedding_json FROM embeddings WHERE path IN (${placeholders})`,
-        selectedPaths,
+        `SELECT path, embedding_json FROM embeddings WHERE model_id = ? AND path IN (${placeholders})`,
+        [selectedModelId, ...selectedPaths],
       );
 
       const parsedRows = rows.flatMap((row) => {
