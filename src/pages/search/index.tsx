@@ -90,7 +90,7 @@ const SearchPage: NextPage<PageProps> = (props) => {
           pathname: "/search",
         })}
       />
-      <main className={baseStyles.main}>
+      <main id="main-content" className={baseStyles.main}>
         {globalNav}
 
         {/* The database-download progress sits beside the title so it never

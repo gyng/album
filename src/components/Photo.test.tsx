@@ -4,7 +4,7 @@
 
 import { render, screen } from "@testing-library/react";
 import { PhotoBlock } from "../services/types";
-import { Picture, PhotoBlockEl } from "./Photo";
+import { ExifTable, Picture, PhotoBlockEl } from "./Photo";
 
 jest.mock("next/dynamic", () => () => () => null);
 
@@ -65,6 +65,55 @@ describe("PhotoBlockEl", () => {
     expect(screen.getByTestId("picture").getAttribute("alt")).toBe(
       "Harbor skyline",
     );
+  });
+});
+
+describe("ExifTable", () => {
+  it("renders a numeric 0 value such as exposure compensation 0 EV", () => {
+    render(
+      <ExifTable rows={[{ kind: "kv", k: "Exposure compensation", v: 0 }]} />,
+    );
+
+    expect(screen.getByText("Exposure compensation")).toBeTruthy();
+    expect(screen.getByText("0")).toBeTruthy();
+  });
+
+  it("hides empty-string and null values", () => {
+    render(
+      <ExifTable
+        rows={[
+          { kind: "kv", k: "Description", v: "" },
+          { kind: "kv", k: "Missing", v: null },
+        ]}
+      />,
+    );
+
+    expect(screen.queryByText("Description")).toBeNull();
+    expect(screen.queryByText("Missing")).toBeNull();
+  });
+
+  it("keeps the mini-map row for equator/meridian (0, 0) coordinates", () => {
+    const { container } = render(
+      <ExifTable
+        rows={[
+          {
+            kind: "coordinates",
+            k: "Location",
+            v: {
+              GPSLatitudeRef: "N",
+              GPSLatitude: [0, 0, 0],
+              GPSLongitudeRef: "E",
+              GPSLongitude: [0, 0, 0],
+            },
+            options: { showMap: true },
+          },
+        ]}
+      />,
+    );
+
+    // Coordinate text row + map row. The old falsy check dropped the map row
+    // when both coordinates were exactly 0.
+    expect(container.querySelectorAll("tbody tr")).toHaveLength(2);
   });
 });
 

@@ -110,7 +110,7 @@ const ExifCoordinatesRow: React.FC<{ row: ExifCoordinatesRowProps }> = (
           ) : null}
         </td>
       </tr>
-      {props.row.options.showMap && decLng && decLat ? (
+      {props.row.options.showMap && decLng != null && decLat != null ? (
         <tr>
           <td></td>
           <td>
@@ -183,7 +183,10 @@ export const ExifTable: React.FC<{
 
             switch (row.kind) {
               case "kv":
-                return row.v ? (
+                // Emptiness check (not truthiness) so a numeric 0 — e.g. an
+                // exposure compensation of 0 EV, which is very common — still
+                // renders; null/undefined and empty strings stay hidden.
+                return row.v != null && row.v !== "" ? (
                   <ExifRow
                     key={row.k}
                     k={row.k}

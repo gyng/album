@@ -35,10 +35,15 @@ const themeInitScript = `
       return;
     }
   } catch (_err) {
-    // Fall back to the default theme when storage or URL parsing is unavailable.
+    // Fall back to the system theme when storage or URL parsing is unavailable.
   }
 
-  applyTheme("dark");
+  // No explicit preference: follow the OS so "system default" persists across
+  // reloads. Default to dark when matchMedia is unavailable.
+  const prefersDark =
+    typeof window.matchMedia !== "function" ||
+    window.matchMedia("(prefers-color-scheme: dark)").matches;
+  applyTheme(prefersDark ? "dark" : "light");
 })();
 `;
 

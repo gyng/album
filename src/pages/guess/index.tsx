@@ -65,7 +65,7 @@ const GuessPage: NextPage<PageProps> = () => {
         description={description}
         pathname={`/guess${seedFromUrl ? `?seed=${seedFromUrl}` : ""}`}
       />
-      <main className={styles.page}>
+      <main id="main-content" className={styles.page}>
         <GlobalNav currentPage="guess" hasPadding={false} />
 
         {!database ? (

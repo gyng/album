@@ -276,6 +276,26 @@ export const LocalVideoBlockEl: React.FC<LocalVideoBlockElProps> = (props) => {
       return;
     }
 
+    let isIntersecting = false;
+    // Set when the viewer pauses the video themselves, so the observer stops
+    // fighting them by auto-resuming each time it scrolls back into view.
+    let userPaused = false;
+
+    const handlePause = () => {
+      // A pause while on-screen is the viewer's; a pause while off-screen is
+      // our own scroll-out pause below.
+      if (isIntersecting) {
+        userPaused = true;
+      }
+    };
+
+    const handlePlay = () => {
+      userPaused = false;
+    };
+
+    videoEl.addEventListener("pause", handlePause);
+    videoEl.addEventListener("play", handlePlay);
+
     const observer = new IntersectionObserver(
       (entries) => {
         const entry = entries[0];
@@ -283,10 +303,14 @@ export const LocalVideoBlockEl: React.FC<LocalVideoBlockElProps> = (props) => {
           return;
         }
 
+        isIntersecting = entry.isIntersecting;
+
         if (entry.isIntersecting) {
-          videoEl.play().catch(() => {
-            // noop: autoplay can be blocked depending on browser state
-          });
+          if (!userPaused) {
+            videoEl.play().catch(() => {
+              // noop: autoplay can be blocked depending on browser state
+            });
+          }
         } else {
           videoEl.pause();
         }
@@ -299,6 +323,8 @@ export const LocalVideoBlockEl: React.FC<LocalVideoBlockElProps> = (props) => {
     observer.observe(videoEl);
     return () => {
       observer.disconnect();
+      videoEl.removeEventListener("pause", handlePause);
+      videoEl.removeEventListener("play", handlePlay);
     };
   }, []);
 

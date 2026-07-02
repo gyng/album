@@ -57,7 +57,7 @@ const DesignPage: NextPage<PageProps> = () => {
   return (
     <div className={styles.page}>
       <Seo title="Design" pathname="/design" noindex />
-      <main className={styles.main}>
+      <main id="main-content" className={styles.main}>
         <GlobalNav hasPadding={false} />
         {/* Header */}
         <header className={styles.section}>

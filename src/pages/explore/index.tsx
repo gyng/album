@@ -691,7 +691,7 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
         jsonLd={[]}
       />
 
-      <main className={styles.main}>
+      <main id="main-content" className={styles.main}>
         <GlobalNav currentPage="explore" hasPadding={false} />
 
         <nav className={styles.jumpNav} aria-label="Jump to section">

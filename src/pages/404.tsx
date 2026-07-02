@@ -20,7 +20,7 @@ export default function FourOhFour() {
         })}
       />
       <GlobalNav />
-      <main className={styles.error}>
+      <main id="main-content" className={styles.error}>
         <span className={styles.glyph} aria-hidden="true">
           🔥
         </span>

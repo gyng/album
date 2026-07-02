@@ -45,24 +45,32 @@ const getInitialDarkMode = (): boolean | null => {
     return stored;
   }
 
-  return true;
+  // No explicit preference: follow the system (null = "system default"),
+  // matching the pre-paint script in _document.tsx.
+  return null;
 };
 
-const getFallbackDarkMode = (): boolean => {
-  if (typeof document !== "undefined") {
-    if (document.body.classList.contains("dark")) {
-      return true;
-    }
-    if (document.body.classList.contains("light")) {
-      return false;
-    }
-  }
+const prefersDarkMediaQuery = (): MediaQueryList | null =>
+  typeof window !== "undefined" && typeof window.matchMedia === "function"
+    ? window.matchMedia("(prefers-color-scheme: dark)")
+    : null;
 
-  if (typeof window !== "undefined" && typeof window.matchMedia === "function") {
-    return window.matchMedia("(prefers-color-scheme: dark)").matches;
+// Reactive system-theme store: the "system default" fallback must reflect the
+// live OS preference and re-render when it changes, rather than reading the
+// theme class the effect has (or hasn't yet) applied to the DOM.
+const subscribeToSystemTheme = (onChange: () => void): (() => void) => {
+  const query = prefersDarkMediaQuery();
+  if (!query) {
+    return () => {};
   }
+  query.addEventListener("change", onChange);
+  return () => query.removeEventListener("change", onChange);
+};
 
-  return true;
+const getSystemPrefersDark = (): boolean => {
+  const query = prefersDarkMediaQuery();
+  // Default to dark when matchMedia is unavailable (mirrors _document.tsx).
+  return query ? query.matches : true;
 };
 
 export const ThemeToggle: React.FC = () => {
@@ -75,6 +83,11 @@ export const ThemeToggle: React.FC = () => {
     subscribeToHydration,
     getInitialDarkMode,
     () => null,
+  );
+  const systemPrefersDark = useSyncExternalStore(
+    subscribeToSystemTheme,
+    getSystemPrefersDark,
+    () => true,
   );
   const [darkModeOverride, setDarkModeOverride] = useReducer(
     (
@@ -112,7 +125,7 @@ export const ThemeToggle: React.FC = () => {
   }, [darkMode]);
 
   const displayDarkMode =
-    darkMode == null ? (hasHydrated ? getFallbackDarkMode() : null) : darkMode;
+    darkMode == null ? (hasHydrated ? systemPrefersDark : null) : darkMode;
 
   return (
     <div className={styles.themeToggle}>
@@ -121,7 +134,9 @@ export const ThemeToggle: React.FC = () => {
         aria-label={`Switch to ${displayDarkMode ? "light" : "dark"} theme`}
         className="dark-mode-toggle"
         onClick={() => {
-          const next = !(darkMode ?? true);
+          // Toggle relative to the theme actually on screen (which may be the
+          // system default), not an "unset = dark" assumption.
+          const next = !displayDarkMode;
           setDarkModeOverride(next);
           writeStoredDarkMode(next);
         }}

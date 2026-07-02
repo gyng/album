@@ -133,6 +133,28 @@ describe("CalendarHeatmap", () => {
     ).toBe("true");
   });
 
+  it("does not fabricate a today ring from the build clock when todayDate is absent", () => {
+    const now = new Date();
+    const pad = (value: number) => `${value}`.padStart(2, "0");
+    const todayKey = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(
+      now.getDate(),
+    )}`;
+
+    render(
+      <CalendarHeatmap
+        entries={[
+          { ...entries[0], date: todayKey, href: "/album/kansai#today.jpg" },
+        ]}
+        selectedDate={null}
+        onSelectDate={() => {}}
+      />,
+    );
+
+    // With no todayDate provided (server render), the heatmap must not derive a
+    // "today" marker from the build machine's clock.
+    expect(document.querySelector('[aria-current="date"]')).toBeNull();
+  });
+
   it("highlights specified memory dates", () => {
     render(
       <CalendarHeatmap

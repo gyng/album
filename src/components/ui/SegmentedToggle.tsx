@@ -1,3 +1,4 @@
+import { useRef } from "react";
 import styles from "./SegmentedToggle.module.css";
 
 export const SegmentedToggle = <T extends string>(props: {
@@ -8,12 +9,18 @@ export const SegmentedToggle = <T extends string>(props: {
   className?: string;
 }) => {
   const { options, value, onChange, ariaLabel, className } = props;
+  const groupRef = useRef<HTMLDivElement>(null);
 
   const move = (delta: number) => {
     const index = options.findIndex((option) => option.value === value);
     if (index === -1) return;
     const next = (index + delta + options.length) % options.length;
     onChange(options[next].value);
+    // Roving tabindex: move focus onto the newly selected radio so keyboard
+    // arrow navigation doesn't strand focus on a now-unfocusable button.
+    const radios =
+      groupRef.current?.querySelectorAll<HTMLButtonElement>('[role="radio"]');
+    radios?.[next]?.focus();
   };
 
   const onKeyDown = (event: React.KeyboardEvent) => {
@@ -33,6 +40,7 @@ export const SegmentedToggle = <T extends string>(props: {
 
   return (
     <div
+      ref={groupRef}
       className={[styles.toggle, className].filter(Boolean).join(" ")}
       role="radiogroup"
       aria-label={ariaLabel}

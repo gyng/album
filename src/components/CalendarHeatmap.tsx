@@ -45,13 +45,6 @@ const formatWeekday = (date: string) =>
     weekday: "long",
   });
 
-const getLocalDateKey = (date = new Date()) => {
-  const year = date.getFullYear();
-  const month = `${date.getMonth() + 1}`.padStart(2, "0");
-  const day = `${date.getDate()}`.padStart(2, "0");
-  return `${year}-${month}-${day}`;
-};
-
 const getYearDates = (year: number) => {
   const dates: string[] = [];
   const cursor = new Date(Date.UTC(year, 0, 1));
@@ -230,7 +223,7 @@ const CalendarHeatmapYear = React.memo(
   }: {
     dates: string[];
     entriesByDate: Map<string, TimelineEntry[]>;
-    effectiveTodayDate: string;
+    effectiveTodayDate: string | null;
     highlightedDates: Set<string>;
     isHighlightedYear: boolean;
     onSelectDate: (date: string) => void;
@@ -292,8 +285,10 @@ const CalendarHeatmapYear = React.memo(
               const formattedDate = formatShortDate(date);
               const isSelected = selectedDate === date;
               const isHighlighted = highlightedDates.has(date);
-              const isToday = date === effectiveTodayDate;
-              const isFuture = date > effectiveTodayDate;
+              const isToday =
+                effectiveTodayDate != null && date === effectiveTodayDate;
+              const isFuture =
+                effectiveTodayDate != null && date > effectiveTodayDate;
               const cellDate = new Date(`${date}T00:00:00Z`);
               const isInteractive = count > 0 && !isFuture;
 
@@ -436,10 +431,13 @@ export const CalendarHeatmap = ({
     [years],
   );
 
-  const effectiveTodayDate = React.useMemo(
-    () => todayDate ?? getLocalDateKey(),
-    [todayDate],
-  );
+  // Only decorate "today"/future once the parent resolves the client's local
+  // date (todayDate is undefined during SSG). Falling back to the build
+  // machine's clock here would bake a stale "today" ring and future cells into
+  // the static HTML that React never patches on hydration; when the parent's
+  // client effect supplies the real date this prop changes, so the memoised
+  // year re-renders instead of bailing on identical props.
+  const effectiveTodayDate = todayDate ?? null;
   const highlightedDatesByYear = React.useMemo(() => {
     const grouped = new Map<number, Set<string>>();
 

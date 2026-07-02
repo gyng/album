@@ -81,10 +81,51 @@ describe("ThemeToggle", () => {
   it("keeps showing a theme icon after reset", () => {
     render(<ThemeToggle />);
 
+    // An explicit override must exist before the reset control appears.
+    fireEvent.click(screen.getByLabelText(/switch to (light|dark) theme/i));
     fireEvent.click(screen.getByLabelText(/reset theme to system default/i));
 
     expect(
       screen.getByLabelText(/switch to (light|dark) theme/i).textContent,
     ).toMatch(/☀️|🌙/);
+  });
+
+  it("reflects the live system preference after reset, not the stale applied class", () => {
+    // System prefers dark.
+    const matchMediaSpy = jest
+      .spyOn(window, "matchMedia")
+      .mockImplementation(
+        (query: string) =>
+          ({
+            matches: true,
+            media: query,
+            onchange: null,
+            addListener() {},
+            removeListener() {},
+            addEventListener() {},
+            removeEventListener() {},
+            dispatchEvent() {
+              return false;
+            },
+          }) as MediaQueryList,
+      );
+
+    render(<ThemeToggle />);
+
+    // Force light explicitly — this applies the "light" class to <body>.
+    fireEvent.click(screen.getByLabelText(/switch to light theme/i));
+    expect(document.body.classList.contains("light")).toBe(true);
+
+    // Reset to system default. The old code read document.body.classList during
+    // this render (still "light" before the effect cleared it) and never
+    // re-rendered, wrongly showing the light-theme icon. It must instead reflect
+    // the dark system preference.
+    fireEvent.click(screen.getByLabelText(/reset theme to system default/i));
+
+    expect(
+      screen.getByLabelText(/switch to (light|dark) theme/i).textContent,
+    ).toContain("🌙");
+
+    matchMediaSpy.mockRestore();
   });
 });
