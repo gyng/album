@@ -13,9 +13,12 @@ export const Albums: React.FC<{ albums: Content[] }> = (props) => {
           album.blocks.find((b) => b.kind === "photo" && b.formatting?.cover) ??
           firstPhoto;
 
+        // UTC getters so the label is identical at build time and in the
+        // viewer's browser — local getters cause hydration mismatches for
+        // timestamps near New Year
         const timeRange = album._build?.timeRange
           ?.filter(Boolean)
-          .map((ts) => new Date(ts!).getFullYear()) ?? [0, 0];
+          .map((ts) => new Date(ts!).getUTCFullYear()) ?? [0, 0];
 
         return (
           <li key={album._build.slug} className={styles.item}>

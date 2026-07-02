@@ -1,4 +1,5 @@
 import { PhotoBlock } from "../services/types";
+import { parseExifLocalDateTime } from "../util/exifTime";
 
 const normalizeWhitespace = (value?: string): string | null => {
   const normalized = value?.replace(/\s+/g, " ").trim();
@@ -21,20 +22,17 @@ const humanizeFilename = (src?: string): string | null => {
 
 const getPhotoDateLabel = (block: PhotoBlock): string | null => {
   const rawDate = block._build?.exif?.DateTimeOriginal;
-  if (!rawDate) {
+  const dt = parseExifLocalDateTime(rawDate);
+  if (!dt) {
     return null;
   }
 
-  const date = new Date(rawDate);
-  if (Number.isNaN(date.getTime())) {
-    return null;
-  }
-
-  return date.toLocaleDateString("en-US", {
+  // DateTimeOriginal is camera-local wall-clock time — label the calendar
+  // date the photographer experienced, on any build machine
+  return new Date(dt.year, dt.month - 1, dt.day).toLocaleDateString("en-US", {
     year: "numeric",
     month: "long",
     day: "numeric",
-    timeZone: "UTC",
   });
 };
 

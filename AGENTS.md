@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Personal photo gallery — Next.js 14, TypeScript, CSS Modules, MapLibre GL. Photos are static-site-generated from album directories. Python + various models for embeddings/metadata generation.
+Personal photo gallery — Next.js 16, TypeScript, CSS Modules, MapLibre GL. Photos are static-site-generated from album directories. Python + various models for embeddings/metadata generation.
 
 > Claude Code also loads `.claude/rules/` for additional scoped detail — other agents use this file only.
 
@@ -27,6 +27,7 @@ All pages use `getStaticProps` — data is computed at build time, no runtime AP
 
 ## Conventions
 - **British English** in all user-facing copy and comments: colour, centre, favourite, licence
+- **EXIF timestamps are camera-local wall-clock time, end to end.** The build pipeline serialises them as naive ISO (`YYYY-MM-DDTHH:MM:SS`, no zone — see `dateToNaiveIso` in `src/util/exifTime.ts`); derive day/hour/year via `parseExifLocalDateTime`/`exifDayKey`, never via `toISOString()`/UTC getters, and never apply `OffsetTime` arithmetic (it only names the zone the wall clock is already in)
 - CSS Modules only — no inline styles except for dynamic values (colours, widths from data)
 - No `classnames`/`clsx` — use `.filter(Boolean).join(" ")` for conditional class lists
 - Omit optional attributes/props rather than setting them to `undefined`
@@ -144,7 +145,7 @@ cd index
 - Incremental: already-indexed paths are skipped (one bulk `SELECT` into a set, then O(1) checks)
 - `colors` stored as serialised RGB tuples; `parseColorPalette` in `src/util/colorDistance.ts` deserialises them at build time
 - FTS5 uses `porter trigram` tokeniser — supports both stemmed keyword and substring search
-- Page size set to 1024 bytes and journal mode to `delete` for efficient HTTP range reads via sql.js-httpvfs in the browser
+- Page size set to 1024 bytes and journal mode to `delete` (a legacy of sql.js-httpvfs range reads; the browser now downloads the DBs in full via `@sqlite.org/sqlite-wasm`)
 
 ## CI (`.github/workflows/ci.yml`)
 Runs on PRs to `main`, pushes to `main` and `release/*`, and manual dispatch.

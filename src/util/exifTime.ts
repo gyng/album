@@ -46,3 +46,33 @@ export function parseExifLocalDateTime(
 
   return { year, month, day, hour, minute, second };
 }
+
+const pad2 = (value: number) => String(value).padStart(2, "0");
+
+// Naive ISO ("YYYY-MM-DDTHH:MM:SS", no zone designator) is the repo-wide
+// serialisation for EXIF timestamps: it preserves the camera's wall clock
+// exactly, so day/hour/year derivations are identical on every machine.
+export function formatExifWallClockIso(dt: ExifLocalDateTime): string {
+  return (
+    `${dt.year}-${pad2(dt.month)}-${pad2(dt.day)}` +
+    `T${pad2(dt.hour)}:${pad2(dt.minute)}:${pad2(dt.second)}`
+  );
+}
+
+// Wall-clock calendar day ("YYYY-MM-DD") from any EXIF-ish timestamp string.
+export function exifDayKey(raw: string | undefined | null): string | null {
+  const dt = parseExifLocalDateTime(raw);
+  return dt ? `${dt.year}-${pad2(dt.month)}-${pad2(dt.day)}` : null;
+}
+
+// Serialises a Date via its *local* components. exifr (reviveValues) parses
+// EXIF wall-clock time into a Date in the current machine's zone; reading the
+// local components back recovers the original wall clock exactly, so the
+// result is machine-independent. (toISOString would instead shift the wall
+// clock by the machine's UTC offset.)
+export function dateToNaiveIso(date: Date): string {
+  return (
+    `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}` +
+    `T${pad2(date.getHours())}:${pad2(date.getMinutes())}:${pad2(date.getSeconds())}`
+  );
+}

@@ -1,4 +1,9 @@
-import { parseExifLocalDateTime } from "./exifTime";
+import {
+  dateToNaiveIso,
+  exifDayKey,
+  formatExifWallClockIso,
+  parseExifLocalDateTime,
+} from "./exifTime";
 
 describe("parseExifLocalDateTime", () => {
   it("parses standard EXIF format YYYY:MM:DD HH:MM:SS", () => {
@@ -56,5 +61,51 @@ describe("parseExifLocalDateTime", () => {
     // We take the local part only
     const result = parseExifLocalDateTime("2024:03:22 18:30:00+09:00");
     expect(result?.hour).toBe(18);
+  });
+});
+
+describe("formatExifWallClockIso", () => {
+  it("round-trips EXIF format to naive ISO", () => {
+    const dt = parseExifLocalDateTime("2024:03:22 06:30:05");
+    expect(formatExifWallClockIso(dt!)).toBe("2024-03-22T06:30:05");
+  });
+
+  it("zero-pads all components", () => {
+    const dt = parseExifLocalDateTime("2024:01:02 03:04:05");
+    expect(formatExifWallClockIso(dt!)).toBe("2024-01-02T03:04:05");
+  });
+});
+
+describe("exifDayKey", () => {
+  it("derives the wall-clock day from EXIF format", () => {
+    expect(exifDayKey("2024:03:22 06:30:00")).toBe("2024-03-22");
+  });
+
+  it("derives the wall-clock day from naive ISO", () => {
+    // An early-morning photo must stay on its own calendar day —
+    // never shifted by the build machine's timezone
+    expect(exifDayKey("2024-03-22T00:30:00")).toBe("2024-03-22");
+  });
+
+  it("returns null for missing or malformed input", () => {
+    expect(exifDayKey(null)).toBeNull();
+    expect(exifDayKey(undefined)).toBeNull();
+    expect(exifDayKey("not a date")).toBeNull();
+  });
+});
+
+describe("dateToNaiveIso", () => {
+  it("serialises a Date using its local wall-clock components", () => {
+    // Constructed locally, so the components below are the wall clock on
+    // any machine — the output must not depend on the machine's zone
+    const date = new Date(2024, 2, 22, 6, 30, 5);
+    expect(dateToNaiveIso(date)).toBe("2024-03-22T06:30:05");
+  });
+
+  it("round-trips through parseExifLocalDateTime", () => {
+    const date = new Date(2026, 11, 31, 23, 59, 59);
+    expect(parseExifLocalDateTime(dateToNaiveIso(date))).toEqual({
+      year: 2026, month: 12, day: 31, hour: 23, minute: 59, second: 59,
+    });
   });
 });

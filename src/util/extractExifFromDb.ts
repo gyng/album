@@ -1,4 +1,5 @@
 import { getDegLatLngFromExif } from "./dms2deg";
+import { parseExifLocalDateTime } from "./exifTime";
 
 export const extractGPSFromExifString = (
   exifString: string,
@@ -117,30 +118,16 @@ export const extractDateFromExifString = (exifString: string): Date | null => {
     );
 
   try {
-    if (exifData["EXIF DateTimeOriginal"]) {
-      const splitDate = exifData["EXIF DateTimeOriginal"]
-        .split(" ")[0]
-        .replace(/:/g, "-");
-      const splitTime = exifData["EXIF DateTimeOriginal"].split(" ")[1];
-
-      const dateTimeOriginal = new Date(`${splitDate}T${splitTime}`);
-
-      if (exifData["EXIF OffsetTime"]) {
-        // This is kind of funky, needs verification
-        const [offsetHours, offsetMinutes] = exifData["EXIF OffsetTime"]
-          .split(":")
-          .map(Number);
-
-        dateTimeOriginal.setHours(dateTimeOriginal.getHours() + offsetHours);
-        dateTimeOriginal.setMinutes(
-          dateTimeOriginal.getMinutes() + offsetMinutes,
-        );
-      }
-
-      return dateTimeOriginal;
-    } else {
+    const dt = parseExifLocalDateTime(exifData["EXIF DateTimeOriginal"]);
+    if (!dt) {
       return null;
     }
+
+    // EXIF DateTimeOriginal is camera-local wall-clock time; constructing the
+    // Date from its components keeps that wall clock under local getters and
+    // formatters. OffsetTime is deliberately not applied — it only names the
+    // zone the wall clock is already expressed in.
+    return new Date(dt.year, dt.month - 1, dt.day, dt.hour, dt.minute, dt.second);
   } catch (err) {
     console.error("Error parsing exif data", err);
     return null;

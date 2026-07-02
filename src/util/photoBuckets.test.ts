@@ -147,20 +147,16 @@ describe("HOUR_FACET", () => {
     expect(HOUR_FACET.extract(exif({ DateTimeOriginal: "2024:03:22 00:00:00", OffsetTime: "+00:00" }))).toBe(0);
   });
 
-  it("recovers local hour from UTC ISO string produced by exifr reviveValues", () => {
-    // exifr converts 15:35 JST (+09:00) → "2026-02-21T06:35:19.000Z"
-    // We must add +9 back to get 15
-    expect(HOUR_FACET.extract(exif({ DateTimeOriginal: "2026-02-21T06:35:19.000Z", OffsetTime: "+09:00" }))).toBe(15);
+  it("extracts local hour from naive ISO (build pipeline wall-clock form)", () => {
+    // services/photo.ts serialises exifr Dates as zone-less wall-clock ISO —
+    // the hour is already local, regardless of the camera's offset
+    expect(HOUR_FACET.extract(exif({ DateTimeOriginal: "2026-02-21T15:35:19", OffsetTime: "+09:00" }))).toBe(15);
+    expect(HOUR_FACET.extract(exif({ DateTimeOriginal: "2026-02-21T21:00:00", OffsetTime: "-05:00" }))).toBe(21);
   });
 
-  it("handles offset crossing midnight forward", () => {
-    // 23:00 UTC + 9h = 08:00 next day local
-    expect(HOUR_FACET.extract(exif({ DateTimeOriginal: "2026-02-21T23:00:00.000Z", OffsetTime: "+09:00" }))).toBe(8);
-  });
-
-  it("handles negative offset", () => {
-    // 02:00 UTC - 5h = 21:00 previous day local
-    expect(HOUR_FACET.extract(exif({ DateTimeOriginal: "2026-02-21T02:00:00.000Z", OffsetTime: "-05:00" }))).toBe(21);
+  it("takes the wall-clock hour as-is for half-hour offsets", () => {
+    // "+05:30" previously produced a fractional hour that matched no bucket
+    expect(HOUR_FACET.extract(exif({ DateTimeOriginal: "2024:03:22 11:15:00", OffsetTime: "+05:30" }))).toBe(11);
   });
 
   it("returns null when OffsetTime is absent (camera clock may be UTC)", () => {

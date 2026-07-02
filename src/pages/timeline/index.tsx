@@ -11,6 +11,10 @@ import { getAlbums } from "../../services/album";
 import { Block, PhotoBlock } from "../../services/types";
 import { measureBuild } from "../../services/buildTiming";
 import { getDegLatLngFromExif } from "../../util/dms2deg";
+import {
+  formatExifWallClockIso,
+  parseExifLocalDateTime,
+} from "../../util/exifTime";
 import commonStyles from "../../styles/common.module.css";
 import { Seo } from "../../components/Seo";
 import { buildCollectionPageJsonLd } from "../../lib/seo";
@@ -334,9 +338,12 @@ const TimelinePage: NextPage<PageProps> = ({ entries }) => {
     }
   }, [availableDates, routeDateQuery]);
 
-  // When selectedDate changes, update the URL param (shallow push)
+  // When selectedDate changes, update the URL param (shallow push).
+  // Gated on router.isReady: on hydration router.query is {} and writing
+  // then would clobber real ?date/?filter_album params before Next
+  // populates them, destroying deep links.
   React.useEffect(() => {
-    if (!selectedDate) return;
+    if (!router.isReady || !selectedDate) return;
     const url = {
       pathname: routePathname,
       query: { ...routeQuery, date: selectedDate },
@@ -344,7 +351,14 @@ const TimelinePage: NextPage<PageProps> = ({ entries }) => {
     if (routeDateQuery !== selectedDate) {
       replaceRoute(url, undefined, { shallow: true });
     }
-  }, [replaceRoute, routeDateQuery, routePathname, routeQuery, selectedDate]);
+  }, [
+    router.isReady,
+    replaceRoute,
+    routeDateQuery,
+    routePathname,
+    routeQuery,
+    selectedDate,
+  ]);
 
   React.useEffect(() => {
     if (
@@ -442,7 +456,7 @@ const TimelinePage: NextPage<PageProps> = ({ entries }) => {
         })}
       />
 
-      <main className={styles.main}>
+      <main id="main-content" className={styles.main}>
         <GlobalNav currentPage="timeline" hasPadding={false} />
 
         <header className={styles.header}>
@@ -674,10 +688,14 @@ export const getStaticProps: GetStaticProps<PageProps> = async () => {
             return [] as TimelineEntry[];
           }
 
-          const parsedDate = new Date(dateTimeOriginal);
-          if (Number.isNaN(parsedDate.getTime())) {
+          // DateTimeOriginal is camera-local wall-clock time — derive the
+          // calendar day from it directly so early-morning photos never
+          // shift to the previous day via the build machine's timezone
+          const wallClock = parseExifLocalDateTime(dateTimeOriginal);
+          if (!wallClock) {
             return [] as TimelineEntry[];
           }
+          const wallClockIso = formatExifWallClockIso(wallClock);
 
           const filename = photo.data.src.split("/").at(-1) ?? photo.id;
           const primaryColor = photo._build?.tags?.colors?.[0];
@@ -697,13 +715,13 @@ export const getStaticProps: GetStaticProps<PageProps> = async () => {
           return [
             {
               album: album._build.slug,
-              date: parsedDate.toISOString().slice(0, 10),
-              dateTimeOriginal: parsedDate.toISOString(),
+              date: wallClockIso.slice(0, 10),
+              dateTimeOriginal: wallClockIso,
               decLat,
               decLng,
               geocode,
               src,
-              href: `/album/${album._build.slug}#${filename}`,
+              href: `/album/${album._build.slug}#${encodeURIComponent(filename)}`,
               path: photo.data.src,
               placeholderColor: primaryColor
                 ? `rgba(${primaryColor[0]}, ${primaryColor[1]}, ${primaryColor[2]}, 1)`

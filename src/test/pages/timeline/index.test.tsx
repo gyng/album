@@ -44,7 +44,7 @@ describe("timeline page data fetching", () => {
               width: 300,
               height: 200,
               exif: {
-                DateTimeOriginal: "2024-01-02T03:04:05.000Z",
+                DateTimeOriginal: "2024-01-02T03:04:05",
                 GPSLatitude: [35, 36, 0],
                 GPSLatitudeRef: "N",
                 GPSLongitude: [139, 42, 0],
@@ -81,7 +81,7 @@ describe("timeline page data fetching", () => {
             _build: {
               width: 640,
               height: 480,
-              exif: { DateTimeOriginal: "2024-03-05T11:22:33.000Z" },
+              exif: { DateTimeOriginal: "2024-03-05T11:22:33" },
               tags: { colors: [[4, 5, 6]] },
               srcset: [{ src: "/b@800.avif", width: 640, height: 480 }],
             },
@@ -100,7 +100,7 @@ describe("timeline page data fetching", () => {
           {
             album: "tokyo",
             date: "2024-03-05",
-            dateTimeOriginal: "2024-03-05T11:22:33.000Z",
+            dateTimeOriginal: "2024-03-05T11:22:33",
             decLat: null,
             decLng: null,
             href: "/album/tokyo#b.jpg",
@@ -114,7 +114,7 @@ describe("timeline page data fetching", () => {
           {
             album: "kansai",
             date: "2024-01-02",
-            dateTimeOriginal: "2024-01-02T03:04:05.000Z",
+            dateTimeOriginal: "2024-01-02T03:04:05",
             decLat: 35.6,
             decLng: 139.7,
             href: "/album/kansai#a.jpg",

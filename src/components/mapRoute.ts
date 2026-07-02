@@ -1,4 +1,6 @@
 import type { MapWorldEntry } from "./MapWorld";
+import { exifDayKey } from "../util/exifTime";
+import { unwrapLongitudes } from "../util/mapBounds";
 
 export const ROUTE_SIMPLIFY_THRESHOLD = 80;
 const CONTEXT_WHOLE_TRIP_MAX_SPAN_DAYS = 28;
@@ -80,10 +82,12 @@ export const toRouteGeoJson = (points: RoutePoint[]): RouteGeoJson | null => {
         },
         geometry: {
           type: "LineString",
-          coordinates: points.map((point) => [
-            point.decLng as number,
-            point.decLat as number,
-          ]),
+          // Unwrapped so antimeridian-crossing legs take the short way —
+          // MapLibre renders longitudes beyond ±180 on the adjacent world
+          // copy instead of drawing a near-360° line the long way round
+          coordinates: unwrapLongitudes(
+            points.map((point) => point.decLng as number),
+          ).map((lng, index) => [lng, points[index]!.decLat as number]),
         },
       },
     ],
@@ -217,6 +221,13 @@ export const buildMapRoute = (
 };
 
 const getSegmentKey = (date: string | null | undefined): string | null => {
+  // EXIF timestamps are camera-local wall-clock time, so a route "day"
+  // splits at the photo's local midnight — not the build machine's
+  const dayKey = exifDayKey(date);
+  if (dayKey) {
+    return dayKey;
+  }
+
   const timestamp = parseTimestamp(date);
   if (timestamp === null) {
     return null;

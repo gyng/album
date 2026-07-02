@@ -9,6 +9,7 @@ import {
   measureBuild,
   measureBuildSync,
 } from "./buildTiming";
+import { dateToNaiveIso } from "../util/exifTime";
 
 export const OPTIMISED_SIZES = [3200, 1600, 800];
 export const RESIZED_IMAGE_DIR = ".resized_images";
@@ -34,15 +35,21 @@ export const getPhotoSize = async (
 };
 
 export const getNextJsSafeExif = async (filepath: string): Promise<Exif> => {
-  // EXIF dates are resolved to relative datetime: this is wrong behaviour
-  // but we are lazy and don't want to turn that off as we need to compare dates
-  // https://github.com/MikeKovarik/exifr/issues/51
   return measureBuild("photo.getNextJsSafeExif", async () => {
     return exifr
       .parse(filepath, { reviveValues: true })
       .then((res) => {
-        // Next.js doesn't serialize Date objects
-        return JSON.parse(JSON.stringify(res));
+        // Next.js can't serialise Date objects, and a plain JSON round-trip
+        // renders them as UTC — shifting the camera's zone-less wall-clock
+        // time by the build machine's offset. Serialise every Date back to
+        // its wall clock instead (naive ISO, no zone designator), which is
+        // what all date consumers (day keys, hour/year facets, labels) expect.
+        return JSON.parse(
+          JSON.stringify(res, function (key, value) {
+            const raw = (this as Record<string, unknown>)[key];
+            return raw instanceof Date ? dateToNaiveIso(raw) : value;
+          }),
+        );
       })
       .catch(() => {
         return {};
@@ -64,7 +71,7 @@ export const optimiseImages = async (
     const publicAlbumDirectory = path.join(outputDirectory, albumName);
 
     return Promise.all([
-      ...OPTIMISED_SIZES.sort((a, b) => a - b).map(async (size) => {
+      ...[...OPTIMISED_SIZES].sort((a, b) => a - b).map(async (size) => {
         const newFile = path.join(
           publicAlbumDirectory,
           RESIZED_IMAGE_DIR,

@@ -111,6 +111,7 @@ describe("Timeline memories", () => {
       pathname: "/timeline",
       query: { filter_album: "kansai" },
       replace: mockReplace,
+      isReady: true,
     });
   });
 

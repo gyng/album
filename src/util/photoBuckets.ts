@@ -93,14 +93,6 @@ export const ISO_FACET: PhotoFacet<number> = {
 // ─── Hour of day ────────────────────────────────────────────────────────────
 // 24 raw hours — no bucketing. Extracted from local EXIF time.
 
-// Parses "+09:00" or "-05:30" → offset in fractional hours (e.g. 9, -5.5)
-const parseOffsetHours = (offsetTime: string): number | null => {
-  const match = /^([+-])(\d{2}):(\d{2})$/.exec(offsetTime.trim());
-  if (!match) return null;
-  const sign = match[1] === "-" ? -1 : 1;
-  return sign * (parseInt(match[2], 10) + parseInt(match[3], 10) / 60);
-};
-
 export const HOUR_FACET: PhotoFacet<number> = {
   id: "hour",
   displayName: "Time of day",
@@ -108,24 +100,13 @@ export const HOUR_FACET: PhotoFacet<number> = {
     // Only extract when OffsetTime is present — older cameras store UTC in
     // DateTimeOriginal without an offset, making the hour unreliable.
     // X-T5 and newer bodies write OffsetTime.
+    // DateTimeOriginal is camera-local wall-clock time (both the raw EXIF
+    // form and the build pipeline's naive ISO), so the parsed hour is the
+    // local hour directly — no offset arithmetic.
     if (!exif.OffsetTime) return null;
 
     const dt = parseExifLocalDateTime(exif.DateTimeOriginal);
-    if (!dt) return null;
-
-    // exifr with reviveValues:true converts DateTimeOriginal to a JS Date,
-    // which JSON.stringify then serialises as UTC (e.g. "2026-02-21T06:35:19.000Z").
-    // We detect this by checking for a trailing Z or UTC-looking ISO string,
-    // then add the OffsetTime back to recover local hour.
-    const raw = exif.DateTimeOriginal ?? "";
-    const isUtcIso = raw.endsWith("Z") || raw.includes("T");
-    if (isUtcIso) {
-      const offsetHours = parseOffsetHours(exif.OffsetTime);
-      if (offsetHours === null) return null;
-      return ((dt.hour + offsetHours) % 24 + 24) % 24;
-    }
-
-    return dt.hour;
+    return dt ? dt.hour : null;
   },
   buckets: Array.from({ length: 24 }, (_, h) => ({
     label: `${String(h).padStart(2, "0")}:00`,

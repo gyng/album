@@ -356,3 +356,61 @@ describe("mapRoute", () => {
     });
   });
 });
+
+describe("antimeridian route line", () => {
+  it("unwraps GeoJSON longitudes so Pacific-crossing legs take the short way", () => {
+    const route = buildMapRoute([
+      makePhoto({
+        href: "/album/trip#tokyo.jpg",
+        date: "2024-01-01T00:00:00.000Z",
+        decLat: 35,
+        decLng: 179.5,
+      }),
+      makePhoto({
+        href: "/album/trip#hawaii.jpg",
+        date: "2024-01-02T00:00:00.000Z",
+        decLat: 21,
+        decLng: -179.5,
+      }),
+    ]);
+
+    const coordinates =
+      route.fullRouteGeoJson?.features[0]?.geometry.coordinates;
+    // −179.5 unwraps to 180.5 (1° hop), not a 359° sweep the long way round
+    expect(coordinates).toEqual([
+      [179.5, 35],
+      [180.5, 21],
+    ]);
+  });
+});
+
+describe("wall-clock day segments", () => {
+  it("splits route days at the photo's local midnight, not the build zone's", () => {
+    // Naive wall-clock timestamps (the build pipeline's serialisation):
+    // 23:50 and 00:10 fall on different local days on ANY build machine
+    const route = buildMapRoute([
+      makePhoto({
+        href: "/album/trip#night.jpg",
+        date: "2024-01-01T23:50:00",
+        decLat: 35.1,
+        decLng: 139.1,
+      }),
+      makePhoto({
+        href: "/album/trip#after-midnight.jpg",
+        date: "2024-01-02T00:10:00",
+        decLat: 35.2,
+        decLng: 139.2,
+      }),
+    ]);
+
+    const context = buildContextRouteGeoJson(
+      route.fullPoints,
+      route.fullPoints[0]!,
+    );
+    // Hovering the 23:50 photo must trace only its own day — one point,
+    // so no line feature is produced for a single-photo segment
+    expect(
+      context?.features[0]?.geometry.coordinates ?? [],
+    ).not.toContainEqual([139.2, 35.2]);
+  });
+});
