@@ -12,6 +12,7 @@ from index import (
     extract_geocode_from_path,
     filter_exif_for_search,
     heartbeat,
+    insert_analysed_images_batch,
     log_vram,
     log_vram_peak,
     parse_caption_with_retry,
@@ -21,6 +22,7 @@ from index import (
     JanusClassifier,
     parse_classifier_response,
     parse_janus_response,
+    prune,
     sample_balanced_paths,
     Sqlite3Client,
     cli,
@@ -31,6 +33,7 @@ from index import (
 )
 import os
 import shutil
+import sqlite3
 import tempfile
 import time
 import unittest
@@ -104,6 +107,64 @@ class TestMain(unittest.TestCase):
         self.assertEqual(actual["identified_objects"], ["tram"])
         self.assertEqual(actual["themes"], ["commute"])
         self.assertEqual(actual["subject"], "tram")
+
+    def test_parse_classifier_response_coerces_bad_but_valid_json(self):
+        # Valid JSON with wrong types must be coerced, never crash a later batch
+        # insert: null lists → [], non-coercible list members dropped, numeric
+        # alt_text stringified, null subject → "".
+        actual = parse_classifier_response(
+            '{"identified_objects": null, "themes": ["a", 2, ["nested"], null], '
+            '"alt_text": 123, "subject": null}'
+        )
+        self.assertEqual(actual["identified_objects"], [])
+        self.assertEqual(actual["themes"], ["a", "2"])
+        self.assertEqual(actual["alt_text"], "123")
+        self.assertEqual(actual["subject"], "")
+
+    def test_parse_classifier_response_missing_key_is_malformed(self):
+        # A JSON block missing a required key raises so the caller can retry the
+        # model, rather than silently producing an empty caption.
+        with self.assertRaises(KeyError):
+            parse_classifier_response('{"identified_objects": ["x"]}')
+
+    def test_find_files_treats_jpg_and_jpeg_as_equivalent(self):
+        # index and prune share this glob, so both extensions must be found (and
+        # deduped) regardless of which the --glob names.
+        with tempfile.TemporaryDirectory(dir=".") as d:
+            rel = os.path.basename(d)
+            for name in ["a.jpg", "b.jpeg", "c.JPG", "d.JPEG", "e.png"]:
+                open(os.path.join(d, name), "w").close()
+
+            from_jpg = sorted(
+                os.path.basename(p) for p in find_files(".", f"./{rel}/*.jpg")
+            )
+            from_jpeg = sorted(
+                os.path.basename(p) for p in find_files(".", f"./{rel}/*.jpeg")
+            )
+
+        self.assertEqual(from_jpg, ["a.jpg", "b.jpeg", "c.JPG", "d.JPEG"])
+        self.assertEqual(from_jpeg, ["a.jpg", "b.jpeg", "c.JPG", "d.JPEG"])
+
+    def test_run_embedding_pass_skips_unreadable_images(self):
+        # A None embedding (unreadable/corrupt image) must be skipped, not stored,
+        # and must not abort the pass.
+        class StubEmbedder:
+            model_id = "stub-model"
+
+            def init_model(self):
+                pass
+
+            def predict_image_embeddings_batch(self, paths):
+                return [None if p == "bad.jpg" else [float(len(p))] for p in paths]
+
+            def release(self):
+                pass
+
+        precomputed = {}
+        with mock.patch("index.log_vram"), mock.patch("index.log"):
+            run_embedding_pass(StubEmbedder(), ["good.jpg", "bad.jpg"], precomputed)
+        self.assertIn("good.jpg", precomputed)
+        self.assertNotIn("bad.jpg", precomputed)
 
     def test_filter_exif_for_search_keeps_only_useful_fields(self):
         actual = filter_exif_for_search(
@@ -217,7 +278,7 @@ class TestMain(unittest.TestCase):
             self.assertGreater(len(analysed.get("subject")), 0)
             self.assertGreater(len(analysed.get("geocode").get("city")), 0)
             self.assertEqual(isinstance(analysed.get("exif"), dict), True)
-            self.assertGreater(len(analysed.get("datetime")), 0)
+            self.assertGreater(len(analysed.get("iso8601")), 0)
             self.assertEqual(len(analysed.get("colors")), 9)
             self.assertEqual(analysed.get("lat_deg"), 1.3714833333333334)
             self.assertEqual(analysed.get("lng_deg"), 103.7822)
@@ -273,17 +334,17 @@ class TestMain(unittest.TestCase):
         self.assertEqual(mock_log.call_args_list, [])
 
     def test_log_vram_reports_card_usage(self):
-        with mock.patch("index.torch.cuda.is_available", return_value=True), mock.patch(
-            "index.torch.cuda.memory_allocated", return_value=2_000_000_000
-        ), mock.patch(
-            "index.torch.cuda.memory_reserved", return_value=3_000_000_000
-        ), mock.patch(
-            # free=1 GB, total=10 GB → 9 GB used card-wide
-            "index.torch.cuda.mem_get_info",
-            return_value=(1_000_000_000, 10_000_000_000),
-        ), mock.patch(
-            "index.log"
-        ) as mock_log:
+        with (
+            mock.patch("index.torch.cuda.is_available", return_value=True),
+            mock.patch("index.torch.cuda.memory_allocated", return_value=2_000_000_000),
+            mock.patch("index.torch.cuda.memory_reserved", return_value=3_000_000_000),
+            mock.patch(
+                # free=1 GB, total=10 GB → 9 GB used card-wide
+                "index.torch.cuda.mem_get_info",
+                return_value=(1_000_000_000, 10_000_000_000),
+            ),
+            mock.patch("index.log") as mock_log,
+        ):
             log_vram("Janus load")
         self.assertEqual(len(mock_log.call_args_list), 1)
         message = mock_log.call_args_list[0].args[0]
@@ -417,7 +478,9 @@ class UsesTestexistsFixture:
         self._fixture_dir = tempfile.TemporaryDirectory()
         self.testexists_db = os.path.join(self._fixture_dir.name, "testexists.sqlite")
         shutil.copy(
-            os.path.join(os.path.dirname(os.path.abspath(__file__)), "testexists.sqlite"),
+            os.path.join(
+                os.path.dirname(os.path.abspath(__file__)), "testexists.sqlite"
+            ),
             self.testexists_db,
         )
 
@@ -530,6 +593,71 @@ class TestCli(UsesTestexistsFixture, unittest.TestCase):
 
         self.assertNotEqual(0, result.exit_code)
 
+    def test_prune_refuses_empty_glob_without_force(self):
+        # H4: a glob that matches nothing must NOT wipe the whole DB.
+        with tempfile.TemporaryDirectory() as tmpdir:
+            dbpath = os.path.join(tmpdir, "prune.sqlite")
+            db = Sqlite3Client(dbpath)
+            db.setup_tables()
+            db.upsert_image_fields("../albums/gone/1.jpg", {"filename": "1.jpg"})
+            db.con.close()  # release WAL lock so prune runs against a single connection
+
+            runner = CliRunner()
+            result = runner.invoke(
+                prune,
+                f"--glob ../albums/does-not-exist/*.jpg --dbpath {dbpath}".split(),
+            )
+            self.assertNotEqual(0, result.exit_code)
+            self.assertIn("refusing", result.output.lower())
+            self.assertIn("../albums/gone/1.jpg", Sqlite3Client(dbpath).list_paths())
+
+    def test_prune_force_allows_empty_glob(self):
+        # H4: --force is the explicit escape hatch when albums really are all gone.
+        with tempfile.TemporaryDirectory() as tmpdir:
+            dbpath = os.path.join(tmpdir, "prune.sqlite")
+            db = Sqlite3Client(dbpath)
+            db.setup_tables()
+            db.upsert_image_fields("../albums/gone/1.jpg", {"filename": "1.jpg"})
+            db.con.close()  # release WAL lock so prune runs against a single connection
+
+            runner = CliRunner()
+            result = runner.invoke(
+                prune,
+                f"--glob ../albums/does-not-exist/*.jpg --dbpath {dbpath} --force".split(),
+            )
+            self.assertEqual(0, result.exit_code)
+            self.assertNotIn("../albums/gone/1.jpg", Sqlite3Client(dbpath).list_paths())
+
+    def test_prune_removes_only_missing_paths(self):
+        # H4: normal operation still prunes rows whose files no longer exist and
+        # leaves the DB in delete (non-WAL) journal mode for publishing.
+        with tempfile.TemporaryDirectory() as tmpdir:
+            dbpath = os.path.join(tmpdir, "prune.sqlite")
+            db = Sqlite3Client(dbpath)
+            db.setup_tables()
+            real = "../src/test/fixtures/monkey.jpg"
+            bogus = "../src/test/fixtures/deleted.jpg"
+            db.upsert_image_fields(real, {"filename": "monkey.jpg"})
+            db.upsert_image_fields(bogus, {"filename": "deleted.jpg"})
+            db.con.close()  # release WAL lock so prune can switch back to delete mode
+
+            runner = CliRunner()
+            result = runner.invoke(
+                prune,
+                f"--glob ../src/test/fixtures/*.jpg --dbpath {dbpath}".split(),
+            )
+            self.assertEqual(0, result.exit_code)
+
+            # Read via a RAW connection FIRST — opening via Sqlite3Client would flip
+            # the DB back to WAL in __init__ and mask the mode prune left behind.
+            raw = sqlite3.connect(dbpath)
+            journal_mode = raw.execute("PRAGMA journal_mode").fetchone()[0]
+            image_paths = {r[0] for r in raw.execute("SELECT path FROM images")}
+            raw.close()
+            self.assertEqual(journal_mode.lower(), "delete")
+            self.assertIn(real, image_paths)
+            self.assertNotIn(bogus, image_paths)
+
     def test_search_tags(self):
         runner = CliRunner()
         dbpath = self.testexists_db
@@ -605,6 +733,68 @@ class TestDb(UsesTestexistsFixture, unittest.TestCase):
 
             self.assertEqual(0, result.exit_code)
             self.assertTrue("Analysing 1 files needing work" in result.output)
+
+    def test_indexed_image_populates_zfree_iso8601(self):
+        # H3/L1: a newly indexed image must get a populated metadata.iso8601 (the
+        # key mismatch previously left it NULL for every row), stored as naive
+        # camera-local wall time with NO "Z" suffix.
+        path = "../src/test/fixtures/monkey.jpg"
+        with tempfile.TemporaryDirectory() as tmpdir:
+            dbpath = os.path.join(tmpdir, "iso.sqlite")
+            db = Sqlite3Client(dbpath)
+            db.setup_tables()
+
+            with open(path, "rb") as fh:
+                analysed = analyse_image(
+                    fh,
+                    path=path,
+                    needs_classifier=False,
+                    precomputed_caption=None,
+                    precomputed_embeddings=None,
+                    precomputed_colors=[(0, 0, 0)],
+                )
+
+            iso = analysed["iso8601"]
+            self.assertTrue(iso)
+            self.assertFalse(iso.endswith("Z"))
+            self.assertRegex(iso, r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$")
+
+            insert_analysed_images_batch(
+                db,
+                [{"path": path, "analysed": analysed, "used_classifier": False}],
+            )
+            row = db.con.execute(
+                "SELECT iso8601 FROM metadata WHERE path = ?", (path,)
+            ).fetchone()
+            self.assertIsNotNone(row)
+            self.assertIsNotNone(row[0])
+            self.assertFalse(row[0].endswith("Z"))
+            self.assertRegex(row[0], r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$")
+
+    def test_delete_path_decrements_and_cleans_tag_counts(self):
+        # L2: deleting/pruning a path must decrement its tags' frequency counts
+        # and drop tags that reach zero, so the smoke-test's top tag can't end up
+        # with zero remaining images.
+        with tempfile.TemporaryDirectory() as tmpdir:
+            dbpath = os.path.join(tmpdir, "tags.sqlite")
+            db = Sqlite3Client(dbpath)
+            db.setup_tables()
+
+            shared = "../albums/test-simple/DSCF0506-2.jpg"
+            db.upsert_image_fields(shared, {"filename": "a.jpg", "tags": "cat, dog"})
+            # Seed counts directly so the test targets delete_path's decrement
+            # logic (insert_tags' own counting quirk is out of scope): cat is held
+            # by one image, dog by two.
+            db.con.execute(
+                "INSERT INTO tags (tag, count) VALUES ('cat', 1), ('dog', 2)"
+            )
+            db.con.commit()
+
+            db.delete_path(shared)
+
+            counts = dict(db.con.execute("SELECT tag, count FROM tags").fetchall())
+            # "cat" reached 0 and was removed; "dog" decremented to 1.
+            self.assertEqual(counts, {"dog": 1})
 
     def test_benchmark_index_outputs_summary_json(self):
         with tempfile.TemporaryDirectory() as tmpdir:

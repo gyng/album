@@ -26,6 +26,10 @@ if tmp_db.exists():
 dest = sqlite3.connect(tmp_db)
 src = sqlite3.connect(embedding_db)
 
+# page_size must be set before the first table is created (and takes effect on the
+# VACUUM below) so the published embeddings DB ships 1024-byte pages for small
+# HTTP range reads in the browser, not SQLite's 4096-byte default.
+dest.execute("PRAGMA page_size=1024")
 dest.execute(
     "CREATE TABLE IF NOT EXISTS embeddings (path VARCHAR NOT NULL, model_id TEXT NOT NULL, embedding_dim INTEGER, embedding_json TEXT, PRIMARY KEY(path, model_id))"
 )

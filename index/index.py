@@ -1,6 +1,6 @@
 import torch
 import click
-from pathlib import Path, PosixPath
+from pathlib import Path
 import pprint
 import fast_colorthief
 import exifread
@@ -274,6 +274,38 @@ def keywordise_text(text: str, limit: int = 6) -> list[str]:
     return keywords
 
 
+def _coerce_str(value: typing.Any) -> str:
+    """Coerce a VLM field to a plain string; non-coercible values become ""."""
+    if value is None:
+        return ""
+    if isinstance(value, str):
+        return value
+    if isinstance(value, (int, float, bool)):
+        return str(value)
+    return ""
+
+
+def _coerce_str_list(value: typing.Any) -> list[str]:
+    """Coerce a VLM list field to a list of strings.
+
+    ``null`` → ``[]``; a bare string → ``[string]``; list members are coerced to
+    ``str`` and non-coercible members (nested lists/dicts/None) are dropped."""
+    if value is None:
+        return []
+    if isinstance(value, str):
+        value = [value]
+    if not isinstance(value, (list, tuple)):
+        return []
+    coerced = []
+    for item in value:
+        if isinstance(item, str):
+            coerced.append(item)
+        elif isinstance(item, (int, float, bool)):
+            coerced.append(str(item))
+        # drop anything non-coercible (nested lists/dicts/None)
+    return coerced
+
+
 def parse_classifier_response(raw_result: str) -> Mapping[str, typing.Any]:
     JSON_BLOCK_PATTERN = re.compile(r"\{.*?\}", re.DOTALL | re.MULTILINE)
     blocks = JSON_BLOCK_PATTERN.findall(raw_result)
@@ -304,12 +336,18 @@ def parse_classifier_response(raw_result: str) -> Mapping[str, typing.Any]:
 
     if not isinstance(result, dict):
         raise ValueError("Janus response was not an object")
-    if isinstance(result.get("identified_objects"), str):
-        result["identified_objects"] = [result["identified_objects"]]
-    if isinstance(result.get("themes"), str):
-        result["themes"] = [result["themes"]]
+    # A JSON block missing a required key is treated as malformed so the caller
+    # (parse_caption_with_retry) can re-run the model rather than silently writing
+    # an empty caption. Present-but-wrong-typed values are coerced below so a
+    # bad-but-valid response (null lists, numeric alt_text, …) can never crash the
+    # batch insert downstream.
     for field in JANUS_RESPONSE_FIELDS:
-        result[field]
+        if field not in result:
+            raise KeyError(field)
+    result["identified_objects"] = _coerce_str_list(result.get("identified_objects"))
+    result["themes"] = _coerce_str_list(result.get("themes"))
+    result["alt_text"] = _coerce_str(result.get("alt_text"))
+    result["subject"] = _coerce_str(result.get("subject"))
     return result
 
 
@@ -322,16 +360,20 @@ def parse_caption_with_retry(
     path: str,
     geocode: Optional[Mapping],
     raw_caption: str,
-    max_attempts: int = 20,
+    max_attempts: int = 2,
 ) -> Mapping[str, typing.Any]:
     """Parse a batched Janus caption, re-running the live model on parse failure.
 
-    Janus occasionally emits malformed JSON; a fresh sampled prediction usually
-    parses. This retry must run while the classifier is still loaded — the
-    one-model-per-pass design releases it before per-image assembly — so it lives
-    here in the Janus pass rather than in analyse_image. The first attempt uses
-    the batched ``raw_caption``; subsequent attempts call ``classifier.predict``.
-    Returns the parsed result dict, or ``{}`` once attempts are exhausted."""
+    Janus occasionally emits malformed JSON. Generation is deterministic
+    (``do_sample=False``), so re-running the model on the same image yields a
+    byte-identical caption — there is no point retrying more than once. We cap at
+    ``max_attempts=2``: attempt 1 re-parses the batched ``raw_caption``, attempt 2
+    runs a single-image ``classifier.predict`` (which can differ from the batched
+    decode because batching/padding changes the numerics). This must run while the
+    classifier is still loaded — the one-model-per-pass design releases it before
+    per-image assembly — so it lives here in the Janus pass rather than in
+    analyse_image. Returns the parsed result dict, or ``{}`` once attempts are
+    exhausted."""
     raw_result = raw_caption
     for attempt in range(max_attempts):
         try:
@@ -891,16 +933,37 @@ class BaseImageEmbedder:
         return self.predict_image_embeddings_batch([path])[0]
 
     @torch.inference_mode()
-    def predict_image_embeddings_batch(self, paths: list[str]) -> list[list[float]]:
+    def predict_image_embeddings_batch(
+        self, paths: list[str]
+    ) -> list[Optional[list[float]]]:
         # Thread image opens — JPEG decode releases the GIL (~2.5x vs serial for large files).
+        # A single truncated/corrupt file must not abort the whole GPU run, so an
+        # unreadable image yields None (aligned to its input position) instead of
+        # raising; the caller skips None entries.
+        def _open(path: str) -> Optional["Image.Image"]:
+            try:
+                return Image.open(path).convert("RGB")
+            except Exception as err:
+                log(f"Skipping unreadable image {path}: {err}")
+                return None
+
         with concurrent.futures.ThreadPoolExecutor(max_workers=4) as ex:
-            images = list(ex.map(lambda p: Image.open(p).convert("RGB"), paths))
-        inputs = self.processor(images=images, return_tensors="pt")
+            opened = list(ex.map(_open, paths))
+
+        results: list[Optional[list[float]]] = [None] * len(paths)
+        valid = [(i, img) for i, img in enumerate(opened) if img is not None]
+        if not valid:
+            return results
+
+        inputs = self.processor(images=[img for _, img in valid], return_tensors="pt")
         inputs = {k: v.to(self.device) for k, v in inputs.items()}
         features = self.model.get_image_features(**inputs)
         # Normalise for cosine similarity; store as float list for SQLite JSON.
         features = torch.nn.functional.normalize(features, p=2, dim=-1)
-        return features.detach().float().cpu().tolist()
+        vectors = features.detach().float().cpu().tolist()
+        for (position, _), vector in zip(valid, vectors):
+            results[position] = vector
+        return results
 
     def release(self) -> None:
         """Free the embedder's GPU weights so the next pass loads into a clear card."""
@@ -1001,6 +1064,11 @@ def get_filename(path: str) -> str:
 class Sqlite3Client:
     def __init__(self, db_path: typing.Union[str, bytes, os.PathLike]):
         self.con = sqlite3.connect(db_path)
+        # page_size MUST be set before any page is written (before journal_mode=WAL
+        # writes the header, and before the first CREATE TABLE) or it is silently
+        # ignored — an existing DB keeps its page size until a VACUUM. 1024-byte
+        # pages keep HTTP range reads small when the DB is fetched in the browser.
+        self.con.execute("PRAGMA page_size=1024;")
         # allows for concurrent writes...? Not sure if it has any impact
         self.con.execute("PRAGMA journal_mode=WAL;")
         self._images_columns = None
@@ -1061,8 +1129,21 @@ class Sqlite3Client:
             "CREATE INDEX IF NOT EXISTS idx_embeddings_path ON embeddings(path)"
         )
         # Optimise loads from the browser https://github.com/phiresky/sql.js-httpvfs#readme
+        # page_size is set in __init__ before any page is written — setting it here
+        # (after the tables above exist) would be a no-op on a fresh DB.
         cur.execute("PRAGMA journal_mode = delete;")
-        cur.execute("PRAGMA page_size = 1024;")
+        self.con.commit()
+
+    def finalize_journal_mode(self):
+        """Checkpoint the WAL and return the DB to rollback-journal (delete) mode.
+
+        The published DB is copied file-by-file (no ``-wal`` sidecar) and read via
+        HTTP range requests, so it must never be left in WAL mode. Commands that
+        mutate the canonical DB without calling ``setup_tables`` (e.g. ``prune``)
+        must call this before exiting."""
+        cur = self.con.cursor()
+        cur.execute("PRAGMA wal_checkpoint(TRUNCATE);")
+        cur.execute("PRAGMA journal_mode = delete;")
         self.con.commit()
 
     def optimize(self, vacuum: bool = False):
@@ -1196,6 +1277,21 @@ class Sqlite3Client:
     def delete_path(self, path: str):
         cur = self.con.cursor()
 
+        # Read the image's tags BEFORE deleting the row so we can decrement the
+        # denormalised `tags` frequency counts. Without this, prune/delete leaves
+        # counts inflated, so the highest-count tag (used as the build smoke-test
+        # query) can end up with zero remaining images. Geocode-derived tags
+        # (country/city/country_code) are not stored per-image, so they are not
+        # tracked here.
+        tags_row = cur.execute(
+            "SELECT tags FROM images WHERE path = ? LIMIT 1",
+            (path,),
+        ).fetchone()
+        tags_value = tags_row[0] if tags_row and tags_row[0] else ""
+        tags_to_decrement = [
+            tag.strip() for tag in tags_value.split(",") if tag.strip()
+        ]
+
         statement_images = """
         DELETE FROM images WHERE path = ?
         """
@@ -1219,6 +1315,18 @@ class Sqlite3Client:
             statement_embeddings,
             (path,),
         )
+
+        if tags_to_decrement:
+            cur.executemany(
+                "UPDATE tags SET count = count - 1 WHERE tag = ?",
+                [(tag,) for tag in tags_to_decrement],
+            )
+            placeholders = ", ".join("?" for _ in tags_to_decrement)
+            cur.execute(
+                f"DELETE FROM tags WHERE count <= 0 AND tag IN ({placeholders})",
+                tags_to_decrement,
+            )
+
         cur.execute("COMMIT")
 
         return (res_images, res_metadata, res_embeddings)
@@ -1226,7 +1334,6 @@ class Sqlite3Client:
     def search(
         self, query: str, limit: Optional[int] = 999999, offset: Optional[int] = 0
     ):
-
         import pprint
 
         pprint.pprint((query, limit, offset))
@@ -1461,6 +1568,10 @@ def run_embedding_pass(
         ):
             batch_embeddings = embedder.predict_image_embeddings_batch(batch_paths)
         for path, embedding in zip(batch_paths, batch_embeddings):
+            # None ⇒ the image could not be opened (already logged); skip it so a
+            # single corrupt file does not abort or misalign the pass.
+            if embedding is None:
+                continue
             precomputed_embeddings.setdefault(path, {})[embedder.model_id] = embedding
         single_ms = (time.perf_counter() - single_started_at) * 1000
         done = min(batch_start + EMBEDDER_BATCH_SIZE, len(paths))
@@ -1635,7 +1746,14 @@ def index(
         for color_index, path in enumerate(all_paths):
             if color_index == 0:
                 warm_future: concurrent.futures.Future = concurrent.futures.Future()
-                warm_future.set_result(fast_colorthief.get_palette(path))
+                # A corrupt first image must not abort the run before it starts;
+                # the lazy imports this warms are triggered by the attempt itself,
+                # so an empty palette is a safe fallback.
+                try:
+                    warm_future.set_result(fast_colorthief.get_palette(path))
+                except Exception as err:
+                    log(f"Colour extraction failed for {path}: {err}")
+                    warm_future.set_result([])
                 color_futures[path] = warm_future
             else:
                 color_futures[path] = colors_executor.submit(
@@ -1729,7 +1847,13 @@ def index(
         precomputed_colors_by_path: dict[str, list] = {}
         colors_executor.shutdown(wait=True)
         for path, fut in color_futures.items():
-            precomputed_colors_by_path[path] = fut.result()
+            try:
+                precomputed_colors_by_path[path] = fut.result()
+            except Exception as err:
+                # A single corrupt/truncated image must not discard the whole run;
+                # skip just this image's colours (empty palette) and keep going.
+                log(f"Colour extraction failed for {path}: {err}")
+                precomputed_colors_by_path[path] = []
         colors_ms = (time.perf_counter() - colors_started_at) * 1000
         log(
             f"Color extraction complete in {colors_ms:.0f}ms (ran concurrently with GPU)"
@@ -1868,7 +1992,8 @@ def build_benchmark_sample(index_value: int) -> Mapping[str, typing.Any]:
         "subject": "street",
         "embedding": [0.1, 0.2, 0.3, 0.4],
         "embedding_model_id": "benchmark-model",
-        "iso8601": "2024-01-01T00:00:00Z",
+        # Naive camera-local wall time, no zone suffix (matches analyse_image).
+        "iso8601": "2024-01-01T00:00:00",
     }
 
 
@@ -2448,18 +2573,44 @@ def benchmark_embedder_batch(
 @click.option("--glob", help="glob to recursively index.")
 @click.option("--dbpath", default="testdb.sqlite", help="sqlite database path to use.")
 @click.option("--dry-run", is_flag=True, default=False, help="Dry run.")
-def prune(glob: str, dbpath: str, dry_run: bool):
+@click.option(
+    "--force",
+    is_flag=True,
+    default=False,
+    help="Prune even when the glob matches zero files (e.g. every album really "
+    "was removed). Without this, an empty glob is treated as a mistake — an "
+    "unmounted albums directory or wrong cwd — and prune refuses to wipe the DB.",
+)
+def prune(glob: str, dbpath: str, dry_run: bool, force: bool):
     db = Sqlite3Client(dbpath)
     files = find_files(".", glob)
     paths = db.list_paths()
     to_delete = [p for p in paths if p not in files]
 
+    # A glob that matches nothing (unmounted ../albums, wrong cwd, typo) would make
+    # `to_delete` the ENTIRE DB — days of GPU work with no committed backup. Refuse
+    # to actually delete unless --force explicitly confirms the albums really are
+    # all gone. A dry run is harmless, so it still reports what would happen.
+    if len(files) == 0 and not force and not dry_run:
+        raise click.ClickException(
+            f"prune: glob {glob!r} matched 0 files — refusing to delete all "
+            f"{len(to_delete)} row(s) from {dbpath}. If every album really was "
+            f"removed, re-run with --force."
+        )
+
     if dry_run:
+        log(f"prune: {len(to_delete)} row(s) would be deleted from {dbpath}")
         pprint.pprint(to_delete)
     else:
+        log(f"prune: deleting {len(to_delete)} row(s) from {dbpath}")
         for p in to_delete:
             _res = db.delete_path(p)
             pprint.pprint(f"deleted from db {p}")
+        log(f"prune: deleted {len(to_delete)} row(s) from {dbpath}")
+        # prune does not call setup_tables, so the DB is still in WAL mode from
+        # __init__. Restore delete mode (WAL checkpointed) so the published copy
+        # isn't left as a bare .sqlite with pending writes in an uncopied -wal.
+        db.finalize_journal_mode()
 
 
 @cli.command("search")
@@ -2600,14 +2751,32 @@ def format_mapping_values(mapping: Optional[Mapping[str, str]]) -> str:
 
 
 def find_files(directory: str, pattern: str) -> list[str]:
-    """Find files from a glob pattern in a directory, ignoring case"""
-    path_pattern = os.path.join(directory, pattern)
-    paths: list[PosixPath] = list(
-        Path(directory).glob(path_pattern, case_sensitive=False)
-    )
+    """Find files from a glob pattern in a directory, ignoring case.
+
+    ``.jpg`` and ``.jpeg`` are treated as equivalent: a pattern ending in either
+    extension also matches the other. Both index and prune call this with the same
+    glob, so the two stay consistent — prune sees exactly the set index writes and
+    never deletes freshly-indexed ``.jpeg`` rows."""
+    patterns = [pattern]
+    lowered = pattern.lower()
+    if lowered.endswith(".jpg"):
+        patterns.append(pattern[:-4] + ".jpeg")
+    elif lowered.endswith(".jpeg"):
+        patterns.append(pattern[:-5] + ".jpg")
+
+    paths: list[str] = []
+    seen: set[str] = set()
+    for pat in patterns:
+        path_pattern = os.path.join(directory, pat)
+        for p in Path(directory).glob(path_pattern, case_sensitive=False):
+            resolved = str(p)
+            if resolved not in seen:
+                seen.add(resolved)
+                paths.append(resolved)
+
     if len(paths) == 0 and Path(pattern).exists():
         return [str(Path(pattern))]
-    return [str(p) for p in paths]
+    return paths
 
 
 def sample_balanced_paths(
@@ -2825,9 +2994,24 @@ def analyse_image(
     lng_ref = exif.get("GPS GPSLongitudeRef", None)
 
     if lat and lng and lat_ref and lng_ref:
-        lat_deg = convert_to_degress(lat, lat_ref)
-        lng_deg = convert_to_degress(lng, lng_ref)
-        geo = get_image_geocode(lat_deg, lng_deg)
+        # Degenerate GPS rationals (e.g. 0/0 denominators or truncated tags) raise
+        # ZeroDivisionError/IndexError inside convert_to_degress. Treat them as
+        # missing coordinates rather than letting one bad image abort the run.
+        try:
+            lat_deg = convert_to_degress(lat, lat_ref)
+            lng_deg = convert_to_degress(lng, lng_ref)
+            geo = get_image_geocode(lat_deg, lng_deg)
+        except (
+            ZeroDivisionError,
+            ValueError,
+            TypeError,
+            IndexError,
+            AttributeError,
+        ) as err:
+            log(f"Ignoring malformed GPS coordinates for {path}: {err}")
+            lat_deg = None
+            lng_deg = None
+            geo = {}
     else:
         lat_deg = None
         lng_deg = None
@@ -2858,8 +3042,13 @@ def analyse_image(
         for model_id, embedding in (precomputed_embeddings or {}).items()
     ]
 
+    # EXIF DateTimeOriginal is "YYYY:MM:DD HH:MM:SS" — the camera's LOCAL wall-clock
+    # time, with no timezone. Convert to ISO "YYYY-MM-DDTHH:MM:SS" and store it as
+    # naive camera-local wall time with NO zone suffix (do not append "Z"): a "Z"
+    # would falsely claim UTC and shift every derived calendar field by the camera's
+    # offset. Consumers treat metadata.iso8601 as camera-local wall time.
     # 2000:01:01 12:34:56 > 2000-01-01T12:34:56
-    datetime = (
+    iso8601_local = (
         str(exif_full.get("EXIF DateTimeOriginal", ""))
         .replace(":", "-", 2)
         .replace(" ", "T", 1)
@@ -2871,8 +3060,9 @@ def analyse_image(
     end_time = time.perf_counter()
 
     return {
-        # assume TZ = Z
-        "datetime": f"{datetime}Z" if datetime else None,
+        # Camera-local wall time, no zone suffix (see comment above). This key is
+        # read as ``iso8601`` by both insert paths and written to metadata.iso8601.
+        "iso8601": iso8601_local or None,
         "exif": exif,
         "geocode": geo,
         "lat_deg": lat_deg,

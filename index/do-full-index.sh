@@ -1,6 +1,8 @@
 #!/bin/bash
 set -euox pipefail
 
+cd "$(dirname "$0")"
+
 uv run index.py index --glob "../albums/**/*.jpg" --dbpath "search.sqlite" --model-profile hybrid
 uv run index.py prune --glob "../albums/**/*.jpg" --dbpath "search.sqlite"
 # Smoke test: search must return results for the most common indexed tag
@@ -39,6 +41,10 @@ core.close()
 
 source = sqlite3.connect(source_db)
 embeddings = sqlite3.connect(tmp_embeddings)
+# page_size must be set before the first table is created (and takes effect on the
+# VACUUM below) so the published embeddings DB ships 1024-byte pages for small
+# HTTP range reads in the browser, not SQLite's 4096-byte default.
+embeddings.execute("PRAGMA page_size=1024")
 embeddings.execute(
     "CREATE TABLE embeddings (path VARCHAR NOT NULL, model_id TEXT NOT NULL, embedding_dim INTEGER, embedding_json TEXT, PRIMARY KEY(path, model_id))"
 )
