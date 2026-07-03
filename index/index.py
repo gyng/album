@@ -1105,6 +1105,14 @@ class Sqlite3Client:
         cur.execute(
             "CREATE TABLE IF NOT EXISTS metadata (path VARCHAR PRIMARY KEY, lat_deg REAL, lng_deg REAL, iso8601 TEXT)"
         )
+        # Per-file fingerprint (mtime + size) so a photo re-exported under the
+        # same filename is detected as changed and re-indexed, instead of being
+        # skipped forever by the path-presence check. Added IF NOT EXISTS so an
+        # existing DB gains it on the next run; already-indexed paths get their
+        # baseline signature backfilled during planning (no forced re-index).
+        cur.execute(
+            "CREATE TABLE IF NOT EXISTS file_signatures (path VARCHAR PRIMARY KEY, mtime REAL, size INTEGER)"
+        )
         cur.execute(
             "CREATE TABLE IF NOT EXISTS embeddings (path VARCHAR NOT NULL, model_id TEXT NOT NULL, embedding_dim INTEGER, embedding_json TEXT, PRIMARY KEY(path, model_id))"
         )
@@ -1183,6 +1191,36 @@ class Sqlite3Client:
         else:
             res = cur.execute("SELECT path FROM embeddings")
         return {row[0] for row in res.fetchall()}
+
+    def list_file_signatures(self):
+        cur = self.con.cursor()
+        res = cur.execute("SELECT path, mtime, size FROM file_signatures")
+        return {row[0]: (row[1], row[2]) for row in res.fetchall()}
+
+    def upsert_file_signature(
+        self,
+        path: str,
+        mtime: float,
+        size: int,
+        cur: Optional[sqlite3.Cursor] = None,
+    ):
+        if cur is None:
+            with self.transaction() as transactional_cur:
+                self.upsert_file_signature(path, mtime, size, transactional_cur)
+                return
+        cur.execute(
+            "INSERT OR REPLACE INTO file_signatures (path, mtime, size) VALUES (?, ?, ?)",
+            (path, mtime, size),
+        )
+
+    def upsert_file_signatures(self, signatures: Mapping[str, Tuple[float, int]]):
+        if not signatures:
+            return
+        with self.transaction() as cur:
+            cur.executemany(
+                "INSERT OR REPLACE INTO file_signatures (path, mtime, size) VALUES (?, ?, ?)",
+                [(path, sig[0], sig[1]) for path, sig in signatures.items()],
+            )
 
     def insert_geocode(self, path: str, geocode: str):
         self.insert_field(path, value=geocode, field="geocode")
@@ -1315,6 +1353,8 @@ class Sqlite3Client:
             statement_embeddings,
             (path,),
         )
+
+        cur.execute("DELETE FROM file_signatures WHERE path = ?", (path,))
 
         if tags_to_decrement:
             cur.executemany(
@@ -1685,6 +1725,34 @@ def index(
     existing_embedding_paths_v1 = db.list_embedding_paths(
         model_id=SiglipEmbedder.MODEL_ID if uses_embeddings else None
     )
+
+    # Detect files that changed on disk since they were indexed and force a
+    # re-index (path-presence alone would skip them forever). Only stat paths
+    # already in the DB — new files are handled by the loop below.
+    indexed_paths = (
+        existing_image_paths | existing_embedding_paths_v1 | existing_embedding_paths_v2
+    )
+    file_set = set(files)
+    current_signatures = {}
+    for path in indexed_paths & file_set:
+        sig = file_signature(path)
+        if sig is not None:
+            current_signatures[path] = sig
+    changed_paths, signatures_to_backfill = compute_reindex_plan(
+        indexed_paths & file_set, db.list_file_signatures(), current_signatures
+    )
+    if not dry_run:
+        for path in changed_paths:
+            db.delete_path(path)
+        db.upsert_file_signatures(signatures_to_backfill)
+    # Changed files are now absent from the DB, so the planning loop treats
+    # them as fresh work.
+    existing_image_paths -= changed_paths
+    existing_embedding_paths_v1 -= changed_paths
+    existing_embedding_paths_v2 -= changed_paths
+    if changed_paths:
+        log(f"Re-indexing {len(changed_paths)} changed file(s)")
+
     work_items = []
     for file_path in files:
         has_image = file_path in existing_image_paths
@@ -2754,6 +2822,49 @@ def format_mapping_values(mapping: Optional[Mapping[str, str]]) -> str:
     return "\n".join([str(v) for v in mapping.values()])
 
 
+def file_signature(path: str) -> Optional[Tuple[float, int]]:
+    """Cheap change-detection fingerprint: (mtime, size). Returns None if the
+    file can't be stat'd. mtime is rounded to milliseconds so sub-ms float
+    noise between runs doesn't read as a change; size makes an edit that keeps
+    the same mtime (rare, but possible with restores) still detectable."""
+    try:
+        stat = os.stat(path)
+    except OSError:
+        return None
+    return (round(stat.st_mtime, 3), stat.st_size)
+
+
+def compute_reindex_plan(
+    indexed_paths,
+    existing_signatures: Mapping[str, Tuple[float, int]],
+    current_signatures: Mapping[str, Tuple[float, int]],
+):
+    """Decide which already-indexed files changed on disk.
+
+    Returns ``(changed, backfill)``:
+      - ``changed``: indexed paths whose stored signature differs from the
+        current one — they must be deleted and fully re-indexed.
+      - ``backfill``: indexed paths with no stored signature yet (indexed
+        before this feature) — adopt the current signature as the baseline
+        WITHOUT re-indexing, so only genuine future edits trigger a rebuild.
+
+    A path missing from ``current_signatures`` (gone/unreadable) is left to
+    prune; it's neither changed nor backfilled here.
+    """
+    changed = set()
+    backfill = {}
+    for path in indexed_paths:
+        current = current_signatures.get(path)
+        if current is None:
+            continue
+        stored = existing_signatures.get(path)
+        if stored is None:
+            backfill[path] = current
+        elif current != stored:
+            changed.add(path)
+    return changed, backfill
+
+
 def find_files(directory: str, pattern: str) -> list[str]:
     """Find files from a glob pattern in a directory, ignoring case.
 
@@ -3146,6 +3257,10 @@ def insert_analysed_image(
     with db.transaction() as cur:
         db.upsert_image_fields(path, image_fields, cur=cur)
 
+        signature = file_signature(path)
+        if signature is not None:
+            db.upsert_file_signature(path, signature[0], signature[1], cur=cur)
+
         if include_classifier_fields:
             tags_to_insert = list(analysed.get("tags") or [])
             if geocode:
@@ -3204,6 +3319,10 @@ def insert_analysed_images_batch(db, results: list[Mapping]):
                 image_fields["tags"] = ", ".join(analysed.get("tags"))
 
             db.upsert_image_fields(path, image_fields, cur=cur)
+
+            signature = file_signature(path)
+            if signature is not None:
+                db.upsert_file_signature(path, signature[0], signature[1], cur=cur)
 
             if include_classifier_fields:
                 tags_to_insert = list(analysed.get("tags") or [])

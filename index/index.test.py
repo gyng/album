@@ -8,6 +8,7 @@ from index import (
     build_classifier_prompt,
     build_janus_prompt,
     compare_caption_payloads,
+    compute_reindex_plan,
     create_classifier,
     extract_geocode_from_path,
     filter_exif_for_search,
@@ -810,6 +811,47 @@ class TestDb(UsesTestexistsFixture, unittest.TestCase):
 
             counts = dict(db.con.execute("SELECT tag, count FROM tags").fetchall())
             self.assertEqual(counts, {"cat": 2, "dog": 1})
+
+    def test_compute_reindex_plan_flags_changed_and_backfills_missing(self):
+        indexed = {"a.jpg", "b.jpg", "c.jpg", "gone.jpg"}
+        existing = {
+            "a.jpg": (100.0, 10),  # unchanged
+            "b.jpg": (200.0, 20),  # will differ -> changed
+            # "c.jpg" has no stored signature -> backfill
+        }
+        current = {
+            "a.jpg": (100.0, 10),
+            "b.jpg": (250.0, 22),
+            "c.jpg": (300.0, 30),
+            # "gone.jpg" absent from disk -> neither changed nor backfilled
+        }
+        changed, backfill = compute_reindex_plan(indexed, existing, current)
+        self.assertEqual(changed, {"b.jpg"})
+        self.assertEqual(backfill, {"c.jpg": (300.0, 30)})
+
+    def test_file_signature_roundtrip_and_delete(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db = Sqlite3Client(os.path.join(tmpdir, "sig.sqlite"))
+            db.setup_tables()
+
+            db.upsert_file_signature("x.jpg", 123.5, 4096)
+            db.upsert_file_signatures({"y.jpg": (200.0, 8192)})
+            db.con.commit()
+            self.assertEqual(
+                db.list_file_signatures(),
+                {"x.jpg": (123.5, 4096), "y.jpg": (200.0, 8192)},
+            )
+
+            # Re-writing replaces rather than duplicating.
+            db.upsert_file_signature("x.jpg", 999.0, 1)
+            db.con.commit()
+            self.assertEqual(db.list_file_signatures()["x.jpg"], (999.0, 1))
+
+            # delete_path drops the signature so a re-added file re-indexes.
+            db.upsert_image_fields("x.jpg", {"filename": "x.jpg"})
+            db.con.commit()
+            db.delete_path("x.jpg")
+            self.assertNotIn("x.jpg", db.list_file_signatures())
 
     def test_benchmark_index_outputs_summary_json(self):
         with tempfile.TemporaryDirectory() as tmpdir:
