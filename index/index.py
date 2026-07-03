@@ -1433,8 +1433,12 @@ class Sqlite3Client:
                 self.insert_tags(resolved_tags, transactional_cur)
                 return
 
+        # Seed new tags at 0 so the increment below lands on 1 for a tag's
+        # first image. Seeding at 1 (as before) double-counted the first
+        # image, leaving every stored count one too high — which the frontend
+        # then compensated for with a `tag.count - 1` fudge.
         cur.executemany(
-            "INSERT OR IGNORE INTO tags (tag, count) VALUES (?, 1);",
+            "INSERT OR IGNORE INTO tags (tag, count) VALUES (?, 0);",
             [(tag,) for tag in resolved_tags],
         )
         cur.executemany(

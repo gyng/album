@@ -44,7 +44,7 @@ export const SearchRefinementSection: React.FC<Props> = ({
           const visibleCount =
             !isActive && refinementCount !== undefined
               ? refinementCount
-              : tag.count - 1;
+              : tag.count;
           return (
             <SearchTag
               key={tag.name}

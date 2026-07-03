@@ -796,6 +796,21 @@ class TestDb(UsesTestexistsFixture, unittest.TestCase):
             # "cat" reached 0 and was removed; "dog" decremented to 1.
             self.assertEqual(counts, {"dog": 1})
 
+    def test_insert_tags_counts_one_per_image(self):
+        # Stored count must equal the number of images carrying the tag — not
+        # one more. Seeding new tags at 1 then incrementing double-counted the
+        # first image (the old off-by-one the frontend used to subtract back).
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db = Sqlite3Client(os.path.join(tmpdir, "tags.sqlite"))
+            db.setup_tables()
+
+            db.insert_tags(["cat", "dog"])  # first image: cat, dog
+            db.insert_tags(["cat"])  # second image: cat only
+            db.con.commit()
+
+            counts = dict(db.con.execute("SELECT tag, count FROM tags").fetchall())
+            self.assertEqual(counts, {"cat": 2, "dog": 1})
+
     def test_benchmark_index_outputs_summary_json(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             output_path = os.path.join(tmpdir, "benchmark.json")
