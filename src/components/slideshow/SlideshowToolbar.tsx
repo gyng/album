@@ -121,6 +121,22 @@ export const SlideshowToolbar: React.FC<SlideshowToolbarProps> = (props) => {
       onMouseEnter={() => props.onPointerOverToolbar(true)}
       onMouseLeave={() => props.onPointerOverToolbar(false)}
     >
+      {/* Touch-only sticky close: the toolbar is taller than the viewport on a
+          phone, so it becomes an internal scroll region covering the photo —
+          the swipe-to-close gesture beneath it can't be reached. This pinned
+          control gives an unambiguous one-tap close that never scrolls away.
+          Hidden on fine pointers, which dismiss via the "Hide" button or by
+          moving the cursor off the top edge. */}
+      <button
+        type="button"
+        className={styles.toolbarCloseButton}
+        onClick={props.onHide}
+        aria-label="Close controls"
+      >
+        <span aria-hidden="true">✕</span>
+        <span>Done</span>
+      </button>
+
       {/* Home link / escape hatch back to the gallery. On desktop it's the
           top-left nav element; on touch it lives inside this toolbar, which
           only appears after a deliberate pull gesture — so an iPad still has a

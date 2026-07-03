@@ -407,6 +407,15 @@
     height: auto;
   }
 
+  /* The rail stacks above the content, so the fixed desktop panel height no
+     longer bounds it. Cap the content itself instead — otherwise a long tag
+     list (hundreds of pills) grows to several screens tall and pushes the
+     results grid far below the fold. The existing overflow-y: auto then makes
+     it a self-contained scroll region. */
+  .facetCategoryContent {
+    max-height: clamp(12rem, 42vh, 22rem);
+  }
+
   .facetCategoryRail {
     display: flex;
     flex-wrap: wrap;
