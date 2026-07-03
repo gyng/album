@@ -178,10 +178,52 @@ export type SearchFacetSectionData = {
   options: Array<{ value: string; count: number }>;
 };
 
+// Legacy fallback for DBs built before the structured geocode columns existed:
+// matches the value on any line of the newline-joined blob, so city "Tokyo"
+// also matches region "Tokyo". Superseded by buildGeocodeColumnClause below.
 const buildGeocodeLineClause = (value: string) => ({
   sql: `(images.geocode LIKE ? OR images.geocode LIKE ?)`,
   bind: [`%\n${value}\n%`, `%\n${value}`],
 });
+
+// Precise geocode facets query the dedicated metadata columns, so a place only
+// matches at the right admin level.
+const GEOCODE_FACET_COLUMN: Record<string, string> = {
+  [LOCATION_FACET.id]: "geo_country",
+  [REGION_FACET.id]: "geo_region",
+  [SUBREGION_FACET.id]: "geo_subregion",
+  [CITY_FACET.id]: "geo_city",
+};
+
+const buildGeocodeColumnClause = (column: string, value: string) => ({
+  // column is an internal allow-listed name from GEOCODE_FACET_COLUMN, never
+  // user input; value is bound.
+  sql: `images.path IN (SELECT path FROM metadata WHERE ${column} = ?)`,
+  bind: [value],
+});
+
+// Cache the one-time schema probe per DB handle — old DBs lack the geo_* columns.
+const structuredGeocodeCache = new WeakMap<object, boolean>();
+const hasStructuredGeocode = (db: Database): boolean => {
+  const cached = structuredGeocodeCache.get(db);
+  if (cached !== undefined) {
+    return cached;
+  }
+  let has = false;
+  try {
+    db.exec({
+      sql: "SELECT 1 FROM pragma_table_info('metadata') WHERE name = 'geo_city' LIMIT 1",
+      returnValue: "resultRows",
+      callback: () => {
+        has = true;
+      },
+    });
+  } catch {
+    has = false;
+  }
+  structuredGeocodeCache.set(db, has);
+  return has;
+};
 
 const parseDbExifString = (raw: string): Exif => {
   if (!raw) {
@@ -222,6 +264,7 @@ const parseDbExifString = (raw: string): Exif => {
 
 const buildSingleFacetClause = (
   selection: SearchFacetSelection,
+  hasGeocodeColumns: boolean,
 ): { sql: string; bind: (string | number)[] } | null => {
   if (selection.facetId === HOUR_FACET.id) {
     const bucket = HOUR_FACET.buckets.find(
@@ -264,20 +307,11 @@ const buildSingleFacetClause = (
     return { sql: `${numericSql} >= ? AND ${numericSql} <= ?`, bind: [min, max] };
   }
 
-  if (selection.facetId === LOCATION_FACET.id) {
-    return buildGeocodeLineClause(selection.value);
-  }
-
-  if (selection.facetId === REGION_FACET.id) {
-    return buildGeocodeLineClause(selection.value);
-  }
-
-  if (selection.facetId === SUBREGION_FACET.id) {
-    return buildGeocodeLineClause(selection.value);
-  }
-
-  if (selection.facetId === CITY_FACET.id) {
-    return buildGeocodeLineClause(selection.value);
+  const geocodeColumn = GEOCODE_FACET_COLUMN[selection.facetId];
+  if (geocodeColumn) {
+    return hasGeocodeColumns
+      ? buildGeocodeColumnClause(geocodeColumn, selection.value)
+      : buildGeocodeLineClause(selection.value);
   }
 
   if (selection.facetId === YEAR_FACET.id) {
@@ -320,7 +354,10 @@ const buildSingleFacetClause = (
   return null;
 };
 
-const buildFacetWhereClause = (selectedFacets: SearchFacetSelection[]) => {
+const buildFacetWhereClause = (
+  selectedFacets: SearchFacetSelection[],
+  hasGeocodeColumns: boolean,
+) => {
   if (selectedFacets.length === 0) {
     return { sql: "", bind: [] as (string | number)[] };
   }
@@ -336,7 +373,7 @@ const buildFacetWhereClause = (selectedFacets: SearchFacetSelection[]) => {
   const groups = Array.from(grouped.values())
     .map((group) => {
       const resolved = group
-        .map((selection) => buildSingleFacetClause(selection))
+        .map((selection) => buildSingleFacetClause(selection, hasGeocodeColumns))
         .filter((value): value is { sql: string; bind: (string | number)[] } =>
           Boolean(value),
         );
@@ -435,7 +472,11 @@ const exec = async (
   };
 };
 
-export const searchInternals = { exec };
+export const searchInternals = {
+  exec,
+  buildFacetWhereClause,
+  hasStructuredGeocode,
+};
 
 const mapImageRows = (rows: any[][]): SearchResultRow[] => {
   return rows.map((row) => {
@@ -605,7 +646,10 @@ const fetchFacetMatchedPaths = async (
   database: Database,
   selectedFacets: SearchFacetSelection[],
 ): Promise<Set<string>> => {
-  const facetWhere = buildFacetWhereClause(selectedFacets);
+  const facetWhere = buildFacetWhereClause(
+    selectedFacets,
+    hasStructuredGeocode(database),
+  );
   if (!facetWhere.sql) {
     return new Set();
   }
@@ -636,7 +680,10 @@ const fetchColorMatchedResults = async (opts: {
     maxDistance = 100,
     selectedFacets = [],
   } = opts;
-  const facetWhere = buildFacetWhereClause(selectedFacets);
+  const facetWhere = buildFacetWhereClause(
+    selectedFacets,
+    hasStructuredGeocode(database),
+  );
   const lightRows = await exec(
     database,
     `SELECT images.path, images.colors FROM images
@@ -699,6 +746,7 @@ export const fetchSearchFacetSections = async (opts: {
   const fetchFacetItems = async (facetId: string) => {
     const facetWhere = buildFacetWhereClause(
       selectedFacets.filter((selection) => selection.facetId !== facetId),
+      hasStructuredGeocode(database),
     );
     const whereClause = [keywordWhere.sql, facetWhere.sql].filter(Boolean);
     const result = await exec(
@@ -901,7 +949,7 @@ export const fetchResults = async (opts: {
     : null;
   const facetWhere = colorSearch
     ? { sql: "", bind: [] as (string | number)[] }
-    : buildFacetWhereClause(selectedFacets);
+    : buildFacetWhereClause(selectedFacets, hasStructuredGeocode(database));
   const whereParts = [
     ...Array.from({ length: queries.length }, () => "images MATCH ?"),
     ...(facetWhere.sql ? [facetWhere.sql] : []),
@@ -985,7 +1033,10 @@ export const fetchRefinementTagCounts = async (opts: {
       candidateTags.map((tag) => tag.trim().toLowerCase()).filter(Boolean),
     ),
   ).filter((tag) => !normalizedActiveTerms.includes(tag));
-  const facetWhere = buildFacetWhereClause(selectedFacets);
+  const facetWhere = buildFacetWhereClause(
+    selectedFacets,
+    hasStructuredGeocode(database),
+  );
 
   if (normalizedCandidateTags.length === 0) {
     return {};

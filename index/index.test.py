@@ -7,9 +7,12 @@ from index import (
     analyse_image_worker,
     build_classifier_prompt,
     build_janus_prompt,
+    build_geocode_fields,
+    clean_geocode_lines,
     compare_caption_payloads,
     compute_reindex_plan,
     create_classifier,
+    structured_geocode,
     extract_geocode_from_path,
     filter_exif_for_search,
     heartbeat,
@@ -852,6 +855,60 @@ class TestDb(UsesTestexistsFixture, unittest.TestCase):
             db.con.commit()
             db.delete_path("x.jpg")
             self.assertNotIn("x.jpg", db.list_file_signatures())
+
+    def test_structured_geocode_from_raw_blob(self):
+        # Real shipped-DB shape: country_code, city, lat, lon, population,
+        # admin1, admin2, country. Coordinates/population/code are dropped;
+        # the remaining place names map positionally to the columns.
+        raw = "JP\nKamikawa\n43.84\n142.77111\n5294\nHokkaido\nKamikawa-gun (Ishikari)\nJapan"
+        self.assertEqual(
+            clean_geocode_lines(raw),
+            ["Kamikawa", "Hokkaido", "Kamikawa-gun (Ishikari)", "Japan"],
+        )
+        self.assertEqual(
+            structured_geocode(raw),
+            {
+                "geo_city": "Kamikawa",
+                "geo_region": "Hokkaido",
+                "geo_subregion": "Kamikawa-gun (Ishikari)",
+                "geo_country": "Japan",
+            },
+        )
+
+    def test_build_geocode_fields_strips_numbers_from_searchable_blob(self):
+        # City "Singapore" == country "Singapore" is the single-line case.
+        blob, structured = build_geocode_fields(
+            {"country_code": "SG", "city": "Singapore", "country": "Singapore"}
+        )
+        self.assertEqual(blob, "Singapore\nSingapore")
+        self.assertEqual(structured["geo_city"], "Singapore")
+        self.assertEqual(structured["geo_country"], "Singapore")
+        # No geocode -> nothing to store.
+        self.assertEqual(build_geocode_fields(None), (None, {}))
+        self.assertEqual(build_geocode_fields({}), (None, {}))
+
+    def test_insert_metadata_stores_geocode_columns(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db = Sqlite3Client(os.path.join(tmpdir, "geo.sqlite"))
+            db.setup_tables()
+            db.insert_metadata(
+                "x.jpg",
+                lat_lng_deg=(35.0, 139.0),
+                iso8601="2024-01-02T03:04:05",
+                geocode={
+                    "geo_city": "Kamikawa",
+                    "geo_region": "Hokkaido",
+                    "geo_subregion": "Kamikawa-gun",
+                    "geo_country": "Japan",
+                },
+            )
+            db.con.commit()
+            row = db.con.execute(
+                "SELECT geo_city, geo_region, geo_subregion, geo_country "
+                "FROM metadata WHERE path = ?",
+                ("x.jpg",),
+            ).fetchone()
+            self.assertEqual(row, ("Kamikawa", "Hokkaido", "Kamikawa-gun", "Japan"))
 
     def test_benchmark_index_outputs_summary_json(self):
         with tempfile.TemporaryDirectory() as tmpdir:

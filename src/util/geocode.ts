@@ -1,7 +1,12 @@
-// Geocode strings stored in SQLite are produced by format_mapping_values() in index.py,
-// which serialises the reverse_geocode result dict values one-per-line:
-//   lat\nlon\nname\nadmin1\nadmin2\ncc\ncountry
-// e.g. "35.6895\n139.6917\nShinjuku-ku\nTokyo\nTokyo\nJP\nJapan"
+// Geocode strings stored in SQLite are the place names, one per line, in
+// order: city, region (admin1), subregion (admin2), country. These functions
+// clean defensively (dropping any coordinate/country-code lines) so they parse
+// both the current form and legacy blobs built before index.py stripped the
+// coordinates out — e.g. "Shinjuku-ku\nTokyo\nTokyo\nJapan" or the older
+// "35.6895\n139.6917\nShinjuku-ku\nTokyo\nTokyo\nJP\nJapan".
+// Exact facet filtering uses the dedicated metadata.geo_* columns (see
+// build_geocode_fields in index.py); these positional labels/counts must stay
+// consistent with those columns.
 
 const isCoordinate = (line: string): boolean => /^-?\d+(?:\.\d+)?$/.test(line);
 const isCountryCode = (line: string): boolean =>

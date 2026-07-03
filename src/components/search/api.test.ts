@@ -857,11 +857,13 @@ describe("fetchSearchFacetSections", () => {
         bind?.includes(`- {path album_relative_path exif colors} : "harbor"`),
       ),
     ).toBe(true);
+    // This mock's probe reports the geo_* columns present, so the Country
+    // facet matches the dedicated column exactly rather than any blob line.
     expect(
       calls.some(
         ({ sql, bind }) =>
-          sql.includes("images.geocode LIKE ? OR images.geocode LIKE ?") &&
-          bind?.includes("%\nJapan"),
+          sql.includes("SELECT path FROM metadata WHERE geo_country = ?") &&
+          bind?.includes("Japan"),
       ),
     ).toBe(true);
     expect(
@@ -1040,5 +1042,48 @@ describe("exec", () => {
     await expect(
       searchInternals.exec(database as any, "SELECT 1", []),
     ).rejects.toThrow("no such table: images");
+  });
+});
+
+describe("geocode facet precision", () => {
+  const makeDb = (hasGeoColumn: boolean) => ({
+    exec: ({ sql, callback }: ExecArgs) => {
+      if (sql.includes("pragma_table_info('metadata')") && hasGeoColumn) {
+        callback([1]);
+      }
+    },
+  });
+
+  it("detects the geo_city column and caches the probe", () => {
+    const withCol = makeDb(true);
+    const withoutCol = makeDb(false);
+    expect(searchInternals.hasStructuredGeocode(withCol as any)).toBe(true);
+    expect(searchInternals.hasStructuredGeocode(withoutCol as any)).toBe(false);
+    // cached: mutating exec to throw must not change the memoised answer
+    (withCol as any).exec = () => {
+      throw new Error("should not be called again");
+    };
+    expect(searchInternals.hasStructuredGeocode(withCol as any)).toBe(true);
+  });
+
+  it("matches the dedicated column exactly when present", () => {
+    const clause = searchInternals.buildFacetWhereClause(
+      [{ facetId: "city", value: "Tokyo" }] as any,
+      true,
+    );
+    expect(clause.sql).toContain(
+      "SELECT path FROM metadata WHERE geo_city = ?",
+    );
+    // region "Tokyo" is a different column — city and region no longer collide
+    expect(clause.sql).not.toContain("geo_region");
+    expect(clause.bind).toEqual(["Tokyo"]);
+  });
+
+  it("falls back to the any-line blob match on an old DB", () => {
+    const clause = searchInternals.buildFacetWhereClause(
+      [{ facetId: "city", value: "Tokyo" }] as any,
+      false,
+    );
+    expect(clause.sql).toContain("images.geocode LIKE ?");
   });
 });

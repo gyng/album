@@ -1105,6 +1105,16 @@ class Sqlite3Client:
         cur.execute(
             "CREATE TABLE IF NOT EXISTS metadata (path VARCHAR PRIMARY KEY, lat_deg REAL, lng_deg REAL, iso8601 TEXT)"
         )
+        # Structured geocode components so facets match a place exactly on the
+        # right admin level (city "Tokyo" no longer also matches region "Tokyo")
+        # instead of any line of the newline-joined blob. Added by migration so
+        # existing DBs gain the columns; populated on (re)index.
+        metadata_columns = {
+            row[1] for row in cur.execute("PRAGMA table_info(metadata)").fetchall()
+        }
+        for column in ("geo_city", "geo_region", "geo_subregion", "geo_country"):
+            if column not in metadata_columns:
+                cur.execute(f"ALTER TABLE metadata ADD COLUMN {column} TEXT")
         # Per-file fingerprint (mtime + size) so a photo re-exported under the
         # same filename is detected as changed and re-indexed, instead of being
         # skipped forever by the path-presence check. Added IF NOT EXISTS so an
@@ -1494,13 +1504,17 @@ class Sqlite3Client:
         path: str,
         lat_lng_deg: Tuple[float, float],
         iso8601: str,
+        geocode: Optional[Mapping[str, Optional[str]]] = None,
         cur: Optional[sqlite3.Cursor] = None,
     ):
         if cur is None:
             with self.transaction() as transactional_cur:
-                self.insert_metadata(path, lat_lng_deg, iso8601, transactional_cur)
+                self.insert_metadata(
+                    path, lat_lng_deg, iso8601, geocode, transactional_cur
+                )
                 return
 
+        geo = geocode or {}
         cur.execute(
             "INSERT OR IGNORE INTO metadata (path, lat_deg, lng_deg, iso8601) VALUES (?, ?, ?, ?);",
             (
@@ -1511,11 +1525,17 @@ class Sqlite3Client:
             ),
         )
         cur.execute(
-            "UPDATE metadata SET lat_deg = ?, lng_deg = ?, iso8601 = ? WHERE path = ?",
+            "UPDATE metadata SET lat_deg = ?, lng_deg = ?, iso8601 = ?, "
+            "geo_city = ?, geo_region = ?, geo_subregion = ?, geo_country = ? "
+            "WHERE path = ?",
             (
                 lat_lng_deg[0],
                 lat_lng_deg[1],
                 iso8601,
+                geo.get("geo_city"),
+                geo.get("geo_region"),
+                geo.get("geo_subregion"),
+                geo.get("geo_country"),
                 path,
             ),
         )
@@ -2822,6 +2842,61 @@ def format_mapping_values(mapping: Optional[Mapping[str, str]]) -> str:
     return "\n".join([str(v) for v in mapping.values()])
 
 
+# Mirror of src/util/geocode.ts cleanLines(): drop the coordinate/population
+# numbers and the country-code line, leaving just the place names in order
+# (city, region, subregion, …, country). Keeping this identical to the
+# frontend guarantees the structured columns below always agree with the
+# positional labels/counts the UI derives from the stored blob.
+_GEOCODE_NUMBER_RE = re.compile(r"^-?\d+(?:\.\d+)?$")
+
+
+def _is_geocode_country_code(line: str) -> bool:
+    return len(line) <= 3 and line == line.upper() and line.isalpha()
+
+
+def clean_geocode_lines(geocode_blob: Optional[str]) -> list[str]:
+    if not geocode_blob:
+        return []
+    lines = [line.strip() for line in geocode_blob.split("\n")]
+    return [
+        line
+        for line in lines
+        if line
+        and not _GEOCODE_NUMBER_RE.match(line)
+        and not _is_geocode_country_code(line)
+    ]
+
+
+def structured_geocode(geocode_blob: Optional[str]) -> dict:
+    """Positional geocode components for exact facet filtering. city = first
+    place name, country = last, region/subregion the ones between — matching
+    getGeocodeCity/Region/Subregion/Country on the frontend."""
+    lines = clean_geocode_lines(geocode_blob)
+    if not lines:
+        return {}
+    return {
+        "geo_city": lines[0],
+        "geo_region": lines[1] if len(lines) > 1 else None,
+        "geo_subregion": lines[2] if len(lines) > 2 else None,
+        "geo_country": lines[-1],
+    }
+
+
+def build_geocode_fields(
+    geocode: Optional[Mapping],
+) -> Tuple[Optional[str], dict]:
+    """From a reverse_geocode dict, return the coordinate-free searchable blob
+    (place names only, one per line) and the structured components for the
+    metadata columns. Dropping the coordinate/population numbers from the
+    searchable blob stops numeric queries (e.g. "139") matching a geocode."""
+    if not geocode:
+        return None, {}
+    raw = format_mapping_values(geocode)
+    cleaned = clean_geocode_lines(raw)
+    blob = "\n".join(cleaned) if cleaned else None
+    return blob, structured_geocode(raw)
+
+
 def file_signature(path: str) -> Optional[Tuple[float, int]]:
     """Cheap change-detection fingerprint: (mtime, size). Returns None if the
     file can't be stat'd. mtime is rounded to milliseconds so sub-ms float
@@ -3239,6 +3314,7 @@ def insert_analysed_image(
     db, analysed: Mapping, path, include_classifier_fields: bool = True
 ):
     geocode = analysed.get("geocode")
+    geocode_blob, geocode_structured = build_geocode_fields(geocode)
     image_fields = {
         "filename": get_filename(path),
         "album_relative_path": get_album_relative_path(path),
@@ -3246,8 +3322,8 @@ def insert_analysed_image(
         "colors": format_mapping(analysed.get("colors")),
     }
 
-    if geocode:
-        image_fields["geocode"] = format_mapping_values(geocode)
+    if geocode_blob:
+        image_fields["geocode"] = geocode_blob
 
     if include_classifier_fields:
         image_fields["alt_text"] = analysed.get("alt_text")
@@ -3280,6 +3356,7 @@ def insert_analysed_image(
                 analysed.get("lng_deg"),
             ),
             iso8601=analysed.get("iso8601"),
+            geocode=geocode_structured,
             cur=cur,
         )
 
@@ -3305,14 +3382,15 @@ def insert_analysed_images_batch(db, results: list[Mapping]):
             include_classifier_fields = item.get("used_classifier", False)
 
             geocode = analysed.get("geocode")
+            geocode_blob, geocode_structured = build_geocode_fields(geocode)
             image_fields = {
                 "filename": get_filename(path),
                 "album_relative_path": get_album_relative_path(path),
                 "exif": format_mapping(analysed.get("exif")),
                 "colors": format_mapping(analysed.get("colors")),
             }
-            if geocode:
-                image_fields["geocode"] = format_mapping_values(geocode)
+            if geocode_blob:
+                image_fields["geocode"] = geocode_blob
             if include_classifier_fields:
                 image_fields["alt_text"] = analysed.get("alt_text")
                 image_fields["subject"] = analysed.get("subject")
@@ -3340,6 +3418,7 @@ def insert_analysed_images_batch(db, results: list[Mapping]):
                 path,
                 lat_lng_deg=(analysed.get("lat_deg"), analysed.get("lng_deg")),
                 iso8601=analysed.get("iso8601"),
+                geocode=geocode_structured,
                 cur=cur,
             )
 
