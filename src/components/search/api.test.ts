@@ -819,8 +819,14 @@ describe("fetchSearchFacetSections", () => {
         calls.push({ sql, bind });
         callback([
           "Image Make: FUJIFILM\nImage Model: X-T5\nEXIF LensModel: XF35mmF1.4 R\nEXIF ISOSpeedRatings: 400\nEXIF DateTimeOriginal: 2024:03:22 17:45:00\nEXIF OffsetTime: +09:00",
-          "35.6895\n139.6917\nShinjuku-ku\nTokyo\nTokyo\nJP\nJapan",
+          "Shinjuku-ku\nTokyo\nTokyo\nJapan",
           "2024-03-22",
+          // geo_city, geo_region, geo_subregion, geo_country — the probe below
+          // reports the columns present, so facet values come from these.
+          "Shinjuku-ku",
+          "Tokyo",
+          "Tokyo",
+          "Japan",
         ]);
       },
     };
@@ -1085,5 +1091,34 @@ describe("geocode facet precision", () => {
       false,
     );
     expect(clause.sql).toContain("images.geocode LIKE ?");
+  });
+
+  it("counts region/subregion from the columns, not blob position", async () => {
+    // The blob would positionally yield region "PositionalRegion"; the columns
+    // say something different, proving the counts read the columns.
+    const database = {
+      exec: ({ sql, callback }: ExecArgs) => {
+        if (sql.includes("pragma_table_info('metadata')")) {
+          callback([1]);
+          return;
+        }
+        callback([
+          "Image Make: X",
+          "TheCity\nPositionalRegion\nTheCountry", // blob (fallback source)
+          "2024-01-01",
+          "TheCity", // geo_city
+          "RealRegion", // geo_region (admin1)
+          "RealSubregion", // geo_subregion (admin2)
+          "TheCountry", // geo_country
+        ]);
+      },
+    };
+    const sections = await fetchSearchFacetSections({ database: database as any });
+    expect(
+      sections.find((s) => s.facetId === "region")?.options,
+    ).toEqual([{ value: "RealRegion", count: 1 }]);
+    expect(
+      sections.find((s) => s.facetId === "subregion")?.options,
+    ).toEqual([{ value: "RealSubregion", count: 1 }]);
   });
 });

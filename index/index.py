@@ -2867,18 +2867,25 @@ def clean_geocode_lines(geocode_blob: Optional[str]) -> list[str]:
     ]
 
 
-def structured_geocode(geocode_blob: Optional[str]) -> dict:
-    """Positional geocode components for exact facet filtering. city = first
-    place name, country = last, region/subregion the ones between — matching
-    getGeocodeCity/Region/Subregion/Country on the frontend."""
-    lines = clean_geocode_lines(geocode_blob)
-    if not lines:
+def geocode_columns(geocode: Optional[Mapping]) -> dict:
+    """Structured geocode components keyed off reverse_geocode's own fields —
+    region is admin1 (``state``), subregion is admin2 (``county``) — so a facet
+    matches the true admin level. reverse_geocode omits ``state``/``county``
+    when they equal the city (e.g. Tokyo, whose prefecture == city), which
+    correctly leaves that level empty. Deriving from keys rather than blob
+    position avoids the ambiguity where, with admin1 absent (e.g. Kyoto), a
+    county would otherwise slide into the region slot."""
+    if not geocode:
+        return {}
+    city = geocode.get("city")
+    country = geocode.get("country")
+    if not city and not country:
         return {}
     return {
-        "geo_city": lines[0],
-        "geo_region": lines[1] if len(lines) > 1 else None,
-        "geo_subregion": lines[2] if len(lines) > 2 else None,
-        "geo_country": lines[-1],
+        "geo_city": city or None,
+        "geo_region": geocode.get("state") or None,
+        "geo_subregion": geocode.get("county") or None,
+        "geo_country": country or None,
     }
 
 
@@ -2894,7 +2901,7 @@ def build_geocode_fields(
     raw = format_mapping_values(geocode)
     cleaned = clean_geocode_lines(raw)
     blob = "\n".join(cleaned) if cleaned else None
-    return blob, structured_geocode(raw)
+    return blob, geocode_columns(geocode)
 
 
 def file_signature(path: str) -> Optional[Tuple[float, int]]:

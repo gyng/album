@@ -8,11 +8,10 @@ from index import (
     build_classifier_prompt,
     build_janus_prompt,
     build_geocode_fields,
-    clean_geocode_lines,
     compare_caption_payloads,
     compute_reindex_plan,
     create_classifier,
-    structured_geocode,
+    geocode_columns,
     extract_geocode_from_path,
     filter_exif_for_search,
     heartbeat,
@@ -856,17 +855,18 @@ class TestDb(UsesTestexistsFixture, unittest.TestCase):
             db.delete_path("x.jpg")
             self.assertNotIn("x.jpg", db.list_file_signatures())
 
-    def test_structured_geocode_from_raw_blob(self):
-        # Real shipped-DB shape: country_code, city, lat, lon, population,
-        # admin1, admin2, country. Coordinates/population/code are dropped;
-        # the remaining place names map positionally to the columns.
-        raw = "JP\nKamikawa\n43.84\n142.77111\n5294\nHokkaido\nKamikawa-gun (Ishikari)\nJapan"
+    def test_geocode_columns_keyed_off_admin_fields(self):
+        # region = admin1 (state), subregion = admin2 (county), by key.
         self.assertEqual(
-            clean_geocode_lines(raw),
-            ["Kamikawa", "Hokkaido", "Kamikawa-gun (Ishikari)", "Japan"],
-        )
-        self.assertEqual(
-            structured_geocode(raw),
+            geocode_columns(
+                {
+                    "country_code": "JP",
+                    "city": "Kamikawa",
+                    "state": "Hokkaido",
+                    "county": "Kamikawa-gun (Ishikari)",
+                    "country": "Japan",
+                }
+            ),
             {
                 "geo_city": "Kamikawa",
                 "geo_region": "Hokkaido",
@@ -874,15 +874,38 @@ class TestDb(UsesTestexistsFixture, unittest.TestCase):
                 "geo_country": "Japan",
             },
         )
+        # Kyoto: admin1 absent, admin2 present — county must NOT slide into the
+        # region slot (the positional bug this refinement fixes).
+        self.assertEqual(
+            geocode_columns(
+                {"city": "Kyoto", "county": "Kyōto Shi", "country": "Japan"}
+            ),
+            {
+                "geo_city": "Kyoto",
+                "geo_region": None,
+                "geo_subregion": "Kyōto Shi",
+                "geo_country": "Japan",
+            },
+        )
+        # Tokyo: prefecture == city, so the library omits state/county.
+        self.assertEqual(
+            geocode_columns({"city": "Tokyo", "country": "Japan"}),
+            {
+                "geo_city": "Tokyo",
+                "geo_region": None,
+                "geo_subregion": None,
+                "geo_country": "Japan",
+            },
+        )
 
     def test_build_geocode_fields_strips_numbers_from_searchable_blob(self):
         # City "Singapore" == country "Singapore" is the single-line case.
-        blob, structured = build_geocode_fields(
+        blob, columns = build_geocode_fields(
             {"country_code": "SG", "city": "Singapore", "country": "Singapore"}
         )
         self.assertEqual(blob, "Singapore\nSingapore")
-        self.assertEqual(structured["geo_city"], "Singapore")
-        self.assertEqual(structured["geo_country"], "Singapore")
+        self.assertEqual(columns["geo_city"], "Singapore")
+        self.assertEqual(columns["geo_country"], "Singapore")
         # No geocode -> nothing to store.
         self.assertEqual(build_geocode_fields(None), (None, {}))
         self.assertEqual(build_geocode_fields({}), (None, {}))

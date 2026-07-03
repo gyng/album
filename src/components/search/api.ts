@@ -742,27 +742,38 @@ export const fetchSearchFacetSections = async (opts: {
 }): Promise<SearchFacetSectionData[]> => {
   const { database, activeTerms = [], selectedFacets = [] } = opts;
   const keywordWhere = buildKeywordWhereClause(activeTerms);
+  // Geocode facet values come from the same dedicated columns the filter
+  // matches, so counts and results stay in lockstep and region/subregion carry
+  // their true admin level. Old DBs lack the columns → parse the blob instead.
+  const useGeoColumns = hasStructuredGeocode(database);
 
   const fetchFacetItems = async (facetId: string) => {
     const facetWhere = buildFacetWhereClause(
       selectedFacets.filter((selection) => selection.facetId !== facetId),
-      hasStructuredGeocode(database),
+      useGeoColumns,
     );
     const whereClause = [keywordWhere.sql, facetWhere.sql].filter(Boolean);
+    const geoSelect = useGeoColumns
+      ? ", m.geo_city, m.geo_region, m.geo_subregion, m.geo_country"
+      : "";
     const result = await exec(
       database,
-      `SELECT images.exif, images.geocode, ${NORMALIZED_IMAGE_DATE_SQL}
+      `SELECT images.exif, images.geocode, ${NORMALIZED_IMAGE_DATE_SQL}${geoSelect}
         FROM images
         LEFT JOIN metadata m ON m.path = images.path
         ${whereClause.length > 0 ? `WHERE ${whereClause.join(" AND ")}` : ""}`,
       [...keywordWhere.bind, ...facetWhere.bind],
     );
 
-    const rows = result.data as unknown as Array<[string, string, string]>;
-    return rows.map(([exif, geocode, normalizedDate]) => ({
-      exif: parseDbExifString(exif),
-      geocode,
-      normalizedDate,
+    const rows = result.data as unknown as string[][];
+    return rows.map((row) => ({
+      exif: parseDbExifString(row[0]),
+      geocode: row[1],
+      normalizedDate: row[2],
+      geoCity: useGeoColumns ? (row[3] ?? null) : null,
+      geoRegion: useGeoColumns ? (row[4] ?? null) : null,
+      geoSubregion: useGeoColumns ? (row[5] ?? null) : null,
+      geoCountry: useGeoColumns ? (row[6] ?? null) : null,
     }));
   };
 
@@ -805,13 +816,18 @@ export const fetchSearchFacetSections = async (opts: {
         facet.id === YEAR_FACET.id
           ? item.normalizedDate?.slice(0, 4) ?? null
           : facet.id === LOCATION_FACET.id
-          ? getGeocodeCountry(item.geocode) ?? null
+          ? (useGeoColumns ? item.geoCountry : getGeocodeCountry(item.geocode)) ??
+            null
           : facet.id === REGION_FACET.id
-            ? getGeocodeRegion(item.geocode) ?? null
+            ? (useGeoColumns ? item.geoRegion : getGeocodeRegion(item.geocode)) ??
+              null
             : facet.id === SUBREGION_FACET.id
-              ? getGeocodeSubregion(item.geocode) ?? null
+              ? (useGeoColumns
+                  ? item.geoSubregion
+                  : getGeocodeSubregion(item.geocode)) ?? null
           : facet.id === CITY_FACET.id
-            ? getGeocodeCity(item.geocode) ?? null
+            ? (useGeoColumns ? item.geoCity : getGeocodeCity(item.geocode)) ??
+              null
             : facet.extract(item.exif) ?? null;
       if (!value) {
         return;
