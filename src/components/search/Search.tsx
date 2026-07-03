@@ -182,7 +182,12 @@ export const Search: React.FC<{
   const [refinementCounts, setRefinementCounts] = useState<
     Record<string, number>
   >({});
+  // On phones the facet panel is collapsed behind this trigger so results
+  // lead; on desktop the trigger is hidden and the panel lays out inline.
+  const [isFilterDrawerOpen, setIsFilterDrawerOpen] = useState<boolean>(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const filterTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const filterCloseRef = useRef<HTMLButtonElement | null>(null);
   const modeSourceRef = useRef<HTMLDivElement | null>(null);
   const [
     database,
@@ -260,6 +265,45 @@ export const Search: React.FC<{
     () => mergeFacetSections(facetCatalogSections, facetSections, selectedFacets),
     [facetCatalogSections, facetSections, selectedFacets],
   );
+
+  // Total filters currently applied — mirrors the "Active filters" chips
+  // below, and badges the mobile drawer trigger.
+  const activeFilterCount =
+    selectedFacets.length +
+    normalizedSearchTerms.length +
+    (colorSearch ? 1 : 0);
+
+  // While the mobile filter drawer is open: Escape closes it, background
+  // scroll is locked, and focus moves into it (and back to the trigger on
+  // close) for keyboard and screen-reader users. Inert on desktop — the
+  // trigger is hidden there, so the drawer can't open.
+  useEffect(() => {
+    if (!isFilterDrawerOpen) {
+      return;
+    }
+    filterCloseRef.current?.focus();
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setIsFilterDrawerOpen(false);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      document.body.style.overflow = previousOverflow;
+      filterTriggerRef.current?.focus();
+    };
+  }, [isFilterDrawerOpen]);
+
+  // Similar mode hides the facet panel entirely — make sure the drawer can't
+  // linger open across that transition.
+  useEffect(() => {
+    if (isSimilarMode) {
+      setIsFilterDrawerOpen(false);
+    }
+  }, [isSimilarMode]);
 
   const similarClickstreamPaths = new Set([
     ...similarTrail.map((item) => item.path),
@@ -801,23 +845,86 @@ export const Search: React.FC<{
       />
 
       {!isSimilarMode ? (
-        <SearchFacetPanel
-          sections={visibleFacetSections}
-          selectedCategory={selectedFilterCategory}
-          colorSearch={colorSearch}
-          colorTolerance={colorTolerance}
-          selectedFacets={selectedFacets}
-          normalizedSearchTerms={normalizedSearchTerms}
-          normalizedTags={normalizedTags}
-          refinementCounts={refinementCounts}
-          isLoading={isFacetSectionsLoading}
-          onSelectCategory={setSelectedFilterCategory}
-          onClearColorSearch={handleClearColorSearch}
-          onSetColorSearch={handleFacetColorSearch}
-          onSetColorTolerance={setColorTolerance}
-          onToggleFacet={handleToggleFacet}
-          onToggleTag={handleToggleTag}
-        />
+        <>
+          {/* Mobile-only: collapses the panel behind a trigger so results
+              lead. Hidden on desktop (the panel renders inline below). */}
+          <button
+            type="button"
+            ref={filterTriggerRef}
+            className={styles.filterTrigger}
+            aria-expanded={isFilterDrawerOpen}
+            aria-controls="search-filter-drawer"
+            onClick={() => setIsFilterDrawerOpen(true)}
+          >
+            <span aria-hidden="true">⚙</span>
+            <span>Filters</span>
+            {activeFilterCount > 0 ? (
+              <span className={styles.filterTriggerBadge}>
+                {activeFilterCount}
+              </span>
+            ) : null}
+          </button>
+
+          {/* Backdrop only exists (and only catches taps) while open on
+              mobile; on desktop the drawer wrapper is display: contents so
+              the panel lays out exactly as before. */}
+          <div
+            className={[
+              styles.filterBackdrop,
+              isFilterDrawerOpen ? styles.filterBackdropOpen : "",
+            ]
+              .filter(Boolean)
+              .join(" ")}
+            onClick={() => setIsFilterDrawerOpen(false)}
+            aria-hidden="true"
+          />
+
+          <div
+            id="search-filter-drawer"
+            className={[
+              styles.filterDrawer,
+              isFilterDrawerOpen ? styles.filterDrawerOpen : "",
+            ]
+              .filter(Boolean)
+              .join(" ")}
+            role="dialog"
+            aria-modal={isFilterDrawerOpen}
+            aria-label="Search filters"
+          >
+            <div className={styles.filterDrawerHandle} aria-hidden="true">
+              <span className={styles.filterDrawerGrip} />
+            </div>
+            <div className={styles.filterDrawerHeader}>
+              <span className={styles.filterDrawerTitle}>Filters</span>
+              <button
+                type="button"
+                ref={filterCloseRef}
+                className={styles.filterDrawerClose}
+                onClick={() => setIsFilterDrawerOpen(false)}
+              >
+                Done
+              </button>
+            </div>
+
+            <SearchFacetPanel
+              sections={visibleFacetSections}
+              selectedCategory={selectedFilterCategory}
+              colorSearch={colorSearch}
+              colorTolerance={colorTolerance}
+              selectedFacets={selectedFacets}
+              normalizedSearchTerms={normalizedSearchTerms}
+              normalizedTags={normalizedTags}
+              refinementCounts={refinementCounts}
+              isLoading={isFacetSectionsLoading}
+              onSelectCategory={setSelectedFilterCategory}
+              onClearColorSearch={handleClearColorSearch}
+              onSetColorSearch={handleFacetColorSearch}
+              onSetColorTolerance={setColorTolerance}
+              onToggleFacet={handleToggleFacet}
+              onToggleTag={handleToggleTag}
+            />
+          </div>
+        </>
       ) : null}
 
       {/* DB / similarity-index / text-model download progress is shown once,

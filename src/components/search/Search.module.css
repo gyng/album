@@ -397,6 +397,27 @@
   gap: var(--m-s);
 }
 
+/* ── Mobile filter drawer ──────────────────────────────────────────────
+   Desktop-neutral by default: the trigger and backdrop are hidden and the
+   drawer wrapper is display: contents, so the facet panel lays out inline
+   exactly as before. The @media block below turns it into a bottom sheet. */
+.filterTrigger {
+  display: none;
+}
+
+.filterBackdrop {
+  display: none;
+}
+
+.filterDrawer {
+  display: contents;
+}
+
+.filterDrawerHandle,
+.filterDrawerHeader {
+  display: none;
+}
+
 @media (max-width: 900px) {
   .facetPanel {
     grid-template-columns: 1fr;
@@ -432,6 +453,139 @@
 
   .colorFacetHeader {
     gap: var(--m-s);
+  }
+
+  /* Trigger: a compact bar that opens the drawer. Sits where the panel used
+     to, so results now start right below it. */
+  .filterTrigger {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--m-s);
+    align-self: flex-start;
+    margin-bottom: var(--m-l);
+    padding: var(--m-s) var(--m-m);
+    border: solid 1px var(--c-border-on-dark);
+    border-radius: var(--m-s);
+    background: transparent;
+    color: inherit;
+    font-size: var(--fs-sm);
+    cursor: pointer;
+  }
+
+  .filterTrigger:focus-visible {
+    outline: solid 2px var(--c-bg-contrast-light);
+    outline-offset: 2px;
+  }
+
+  .filterTriggerBadge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 1.25rem;
+    height: 1.25rem;
+    padding: 0 var(--m);
+    border-radius: 999px;
+    background: var(--c-accent);
+    color: #fff;
+    font-size: var(--fs-xs);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .filterBackdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    background: var(--c-overlay-dark);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity var(--t-fast) var(--ease-out);
+  }
+
+  .filterBackdropOpen {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  /* Bottom sheet: fixed to the bottom edge, slid off-screen until open. The
+     facet panel scrolls inside; the sheet itself is capped so the results
+     behind it stay partly visible. */
+  .filterDrawer {
+    display: flex;
+    flex-direction: column;
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 1001;
+    max-height: 85vh;
+    max-height: 85dvh;
+    padding: 0 var(--m-l)
+      calc(env(safe-area-inset-bottom, 0px) + var(--m-l));
+    border-radius: var(--m-l) var(--m-l) 0 0;
+    background: var(--c-bg);
+    box-shadow: 0 -8px 32px hsl(0 0% 0% / 0.28);
+    transform: translateY(100%);
+    transition: transform var(--t-fast) var(--ease-spring);
+    overflow: hidden;
+  }
+
+  .filterDrawerOpen {
+    transform: translateY(0);
+  }
+
+  .filterDrawerHandle {
+    display: flex;
+    justify-content: center;
+    padding: var(--m-s) 0 var(--m);
+  }
+
+  .filterDrawerGrip {
+    width: var(--m-xl);
+    height: 3px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--c-font) 30%, transparent);
+  }
+
+  .filterDrawerHeader {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--m-m);
+    padding-bottom: var(--m-m);
+  }
+
+  .filterDrawerTitle {
+    font-size: var(--fs-m);
+    font-weight: 500;
+  }
+
+  .filterDrawerClose {
+    padding: var(--m-s) var(--m-m);
+    border: solid 1px var(--c-border-on-dark);
+    border-radius: 999px;
+    background: transparent;
+    color: inherit;
+    font-size: var(--fs-sm);
+    cursor: pointer;
+  }
+
+  .filterDrawerClose:focus-visible {
+    outline: solid 2px var(--c-bg-contrast-light);
+    outline-offset: 2px;
+  }
+
+  /* Inside the sheet the panel can use the room the sheet gives it, rather
+     than the tight standalone cap. */
+  .filterDrawer .facetCategoryContent {
+    max-height: min(52vh, 26rem);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .filterDrawer,
+  .filterBackdrop {
+    transition: none;
   }
 }
 
