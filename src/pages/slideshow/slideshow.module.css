@@ -978,7 +978,8 @@
   /* Pinned to the top of the (scrolling) toolbar so it's always reachable,
      however far down the panel the user has scrolled. order:-1 keeps it first
      even though it's declared after the brand link; it spans the row so the
-     tap target is generous. */
+     tap target is generous. Doubles as a sheet grabber — tap or swipe up to
+     dismiss (see SlideshowToolbar's close-handle pointer handlers). */
   .toolbarCloseButton {
     position: sticky;
     top: 0;
@@ -986,21 +987,37 @@
     order: -1;
     width: 100%;
     display: inline-flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: var(--m-s);
-    padding: var(--m-s) var(--m-m);
+    gap: calc(var(--m) + 1px);
+    padding: var(--m-s) var(--m-m) calc(var(--m-s) + 1px);
     border: solid 1px var(--glass-border);
-    border-radius: 999px;
+    border-radius: var(--m-m);
     background: var(--glass-bg-strong);
     backdrop-filter: blur(12px);
     color: var(--c-font);
     font-size: var(--fs-sm);
-    cursor: pointer;
+    cursor: grab;
+  }
+
+  /* Grabber bar signalling the swipe-up affordance. */
+  .toolbarCloseGrip {
+    width: var(--m-xl);
+    height: 3px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--c-font) 45%, transparent);
+  }
+
+  .toolbarCloseLabel {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--m-s);
   }
 
   .toolbarCloseButton:active {
     background: var(--glass-bg);
+    cursor: grabbing;
   }
 
   .toolbarCloseButton:focus-visible {

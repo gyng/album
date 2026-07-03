@@ -113,8 +113,79 @@ export const SlideshowToolbar: React.FC<SlideshowToolbarProps> = (props) => {
       ? [...SHORT_TIMINGS, ...LONG_TIMINGS]
       : SHORT_TIMINGS;
 
+  // Swipe-to-dismiss on the sticky close handle. The toolbar is taller than a
+  // phone viewport, so a "swipe up anywhere to close" gesture can't coexist
+  // with scrolling the panel body — the handle owns the dismiss instead (the
+  // standard sheet-grabber pattern). Dragging it up drives the existing
+  // retract preview (--touch-toolbar-hide-preview-progress) and commits past a
+  // threshold; a plain tap still closes via onClick.
+  const toolbarRef = React.useRef<HTMLDivElement | null>(null);
+  const closeDragStartYRef = React.useRef<number | null>(null);
+  const suppressCloseClickRef = React.useRef(false);
+  const CLOSE_DISMISS_PX = 56;
+  const CLOSE_DRAG_RANGE_PX = 120;
+  const CLOSE_TAP_SLOP_PX = 10;
+
+  const setHidePreview = (progress: number) => {
+    toolbarRef.current?.style.setProperty(
+      "--touch-toolbar-hide-preview-progress",
+      String(progress),
+    );
+  };
+  const clearHidePreview = () => {
+    toolbarRef.current?.style.removeProperty(
+      "--touch-toolbar-hide-preview-progress",
+    );
+  };
+
+  const handleCloseHandlePointerDown = (
+    event: React.PointerEvent<HTMLButtonElement>,
+  ) => {
+    if (event.pointerType === "mouse") return;
+    closeDragStartYRef.current = event.clientY;
+    // Fresh gesture: drop any stale suppression from a prior touch whose
+    // synthesised click never arrived (self-correcting).
+    suppressCloseClickRef.current = false;
+    // setPointerCapture throws if the pointer is already gone; capture is a
+    // nicety (keeps move events flowing off the element), not load-bearing.
+    try {
+      event.currentTarget.setPointerCapture(event.pointerId);
+    } catch {
+      // ignore — the gesture still resolves on pointerup
+    }
+  };
+  const handleCloseHandlePointerMove = (
+    event: React.PointerEvent<HTMLButtonElement>,
+  ) => {
+    if (closeDragStartYRef.current === null) return;
+    const delta = event.clientY - closeDragStartYRef.current;
+    // Only an upward drag reveals the retract; downward does nothing.
+    const progress = Math.max(0, Math.min(1, -delta / CLOSE_DRAG_RANGE_PX));
+    setHidePreview(progress);
+  };
+  const handleCloseHandlePointerUp = (
+    event: React.PointerEvent<HTMLButtonElement>,
+  ) => {
+    if (closeDragStartYRef.current === null) return;
+    const delta = event.clientY - closeDragStartYRef.current;
+    closeDragStartYRef.current = null;
+    clearHidePreview();
+    // Touch resolves entirely here — a synthesised click is unreliable under
+    // pointer capture + touch-action: none, so we always swallow it and decide
+    // ourselves. Tap or committed upward swipe closes; a downward drag doesn't.
+    suppressCloseClickRef.current = true;
+    if (delta <= -CLOSE_DISMISS_PX || Math.abs(delta) < CLOSE_TAP_SLOP_PX) {
+      props.onHide();
+    }
+  };
+  const handleCloseHandlePointerCancel = () => {
+    closeDragStartYRef.current = null;
+    clearHidePreview();
+  };
+
   return (
     <div
+      ref={toolbarRef}
       className={styles.toolbar}
       onFocusCapture={props.onFocusCapture}
       onBlur={() => props.onPointerOverToolbar(false)}
@@ -130,11 +201,25 @@ export const SlideshowToolbar: React.FC<SlideshowToolbarProps> = (props) => {
       <button
         type="button"
         className={styles.toolbarCloseButton}
-        onClick={props.onHide}
+        style={{ touchAction: "none" }}
+        onPointerDown={handleCloseHandlePointerDown}
+        onPointerMove={handleCloseHandlePointerMove}
+        onPointerUp={handleCloseHandlePointerUp}
+        onPointerCancel={handleCloseHandlePointerCancel}
+        onClick={() => {
+          if (suppressCloseClickRef.current) {
+            suppressCloseClickRef.current = false;
+            return;
+          }
+          props.onHide();
+        }}
         aria-label="Close controls"
       >
-        <span aria-hidden="true">✕</span>
-        <span>Done</span>
+        <span className={styles.toolbarCloseGrip} aria-hidden="true" />
+        <span className={styles.toolbarCloseLabel}>
+          <span aria-hidden="true">✕</span>
+          Done
+        </span>
       </button>
 
       {/* Home link / escape hatch back to the gallery. On desktop it's the
