@@ -1499,6 +1499,48 @@ class Sqlite3Client:
     def insert_tag(self, tag: str, cur: Optional[sqlite3.Cursor] = None):
         self.insert_tags([tag], cur=cur)
 
+    def correct_legacy_tag_counts(self, cur: Optional[sqlite3.Cursor] = None):
+        """One-way fix for the retired seed-at-1 off-by-one: every stored count
+        is exactly one too high (a seed of 1 plus one increment per image).
+        Subtract it, then drop any tag that falls to zero — an orphan whose
+        images were all deleted/re-indexed, which a fresh index would not carry.
+        Operates on the authoritative tags table, so comma-bearing tags and
+        geocode-derived tags (which are not recoverable from images.tags) are
+        preserved exactly. NOT idempotent — the caller gates it on the DB not
+        already having been backfilled."""
+        if cur is None:
+            with self.transaction() as transactional_cur:
+                self.correct_legacy_tag_counts(transactional_cur)
+                return
+        cur.execute("UPDATE tags SET count = count - 1")
+        cur.execute("DELETE FROM tags WHERE count <= 0")
+
+    def update_geocode_columns(
+        self,
+        path: str,
+        geo: Optional[Mapping[str, Optional[str]]] = None,
+        cur: Optional[sqlite3.Cursor] = None,
+    ):
+        """Write only the structured geo_* columns for a path, leaving lat/lng
+        and iso8601 untouched — the backfill derives these from coordinates
+        that are already stored."""
+        if cur is None:
+            with self.transaction() as transactional_cur:
+                self.update_geocode_columns(path, geo, transactional_cur)
+                return
+        geo = geo or {}
+        cur.execute(
+            "UPDATE metadata SET geo_city = ?, geo_region = ?, geo_subregion = ?, "
+            "geo_country = ? WHERE path = ?",
+            (
+                geo.get("geo_city"),
+                geo.get("geo_region"),
+                geo.get("geo_subregion"),
+                geo.get("geo_country"),
+                path,
+            ),
+        )
+
     def insert_metadata(
         self,
         path: str,
@@ -2703,6 +2745,82 @@ def prune(glob: str, dbpath: str, dry_run: bool, force: bool):
         # __init__. Restore delete mode (WAL checkpointed) so the published copy
         # isn't left as a bare .sqlite with pending writes in an uncopied -wal.
         db.finalize_journal_mode()
+
+
+@cli.command("backfill")
+@click.option("--dbpath", required=True, help="sqlite database path to backfill.")
+@click.option(
+    "--dry-run",
+    is_flag=True,
+    default=False,
+    help="Report what would change without writing.",
+)
+def backfill(dbpath: str, dry_run: bool):
+    """Backfill structured geo_* columns and correct legacy tag counts on an
+    existing DB without re-running the models.
+
+    A DB indexed before the structured-geocode / tag off-by-one fixes stores no
+    geo_* columns and tag counts inflated by one. Both are pure CPU work: geo_*
+    derives from the GPS coordinates already in the metadata table, and the
+    counts just need the retired seed-at-1 off-by-one subtracted back out. This
+    reaches the same result as a full from-scratch re-index for those fields,
+    without the hours of GPU work re-deriving unchanged tags and embeddings.
+
+    Idempotent: the one-way count correction is applied only when the DB has not
+    already been backfilled (detected by geo_* being populated), which also
+    leaves a fresh, already-correct index untouched."""
+    db = Sqlite3Client(dbpath)
+
+    # Detect prior backfill / fresh-index state WITHOUT mutating, so --dry-run is
+    # truly read-only. Populated geo_* means either an already-backfilled DB or a
+    # fresh index — both have correct counts, so the count fix must be skipped.
+    has_geo_column = (
+        db.con.execute(
+            "SELECT count(*) FROM pragma_table_info('metadata') "
+            "WHERE name = 'geo_country'"
+        ).fetchone()[0]
+        > 0
+    )
+    already_backfilled = has_geo_column and bool(
+        db.con.execute(
+            "SELECT EXISTS(SELECT 1 FROM metadata WHERE geo_country IS NOT NULL)"
+        ).fetchone()[0]
+    )
+
+    rows = db.con.execute("SELECT path, lat_deg, lng_deg FROM metadata").fetchall()
+    geocodable = sum(1 for _, lat, lng in rows if lat is not None and lng is not None)
+
+    if dry_run:
+        action = "skip (already backfilled)" if already_backfilled else "correct"
+        log(
+            f"backfill (dry run): would geocode {geocodable}/{len(rows)} row(s), "
+            f"tag counts: {action}, in {dbpath}"
+        )
+        return
+
+    db.setup_tables()  # adds geo_* columns / file_signatures table if missing
+
+    with db.transaction() as cur:
+        for path, lat_deg, lng_deg in rows:
+            if lat_deg is None or lng_deg is None:
+                continue
+            geo = geocode_columns(get_image_geocode(lat_deg, lng_deg))
+            db.update_geocode_columns(path, geo, cur=cur)
+
+    corrected = False
+    if not already_backfilled:
+        db.correct_legacy_tag_counts()
+        corrected = True
+
+    # Match prune/index: leave the published copy in delete journal mode with no
+    # dangling -wal, so a straight file copy ships a consistent DB.
+    db.finalize_journal_mode()
+
+    log(
+        f"backfill: {geocodable}/{len(rows)} row(s) geocoded, tag counts "
+        f"{'corrected' if corrected else 'left as-is (already backfilled)'}, "
+        f"in {dbpath}"
+    )
 
 
 @cli.command("search")

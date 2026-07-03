@@ -933,6 +933,107 @@ class TestDb(UsesTestexistsFixture, unittest.TestCase):
             ).fetchone()
             self.assertEqual(row, ("Kamikawa", "Hokkaido", "Kamikawa-gun", "Japan"))
 
+    def _seed_tags(self, db, counts):
+        with db.transaction() as cur:
+            cur.execute("DELETE FROM tags")
+            cur.executemany(
+                "INSERT INTO tags (tag, count) VALUES (?, ?)",
+                list(counts.items()),
+            )
+
+    def _read_counts(self, dbpath):
+        # Short-lived connection: a held-open one would lock the DB against the
+        # CLI's journal-mode switch on a subsequent invoke.
+        con = sqlite3.connect(dbpath)
+        try:
+            return dict(con.execute("SELECT tag, count FROM tags").fetchall())
+        finally:
+            con.close()
+
+    def _read_geo(self, dbpath, path):
+        con = sqlite3.connect(dbpath)
+        try:
+            return con.execute(
+                "SELECT geo_city, geo_country FROM metadata WHERE path = ?",
+                (path,),
+            ).fetchone()
+        finally:
+            con.close()
+
+    def test_correct_legacy_tag_counts_decrements_and_drops_orphans(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db = Sqlite3Client(os.path.join(tmpdir, "counts.sqlite"))
+            db.setup_tables()
+            # seed-at-1 counts: stored = images + 1; "ghost" is an orphan at 1.
+            self._seed_tags(db, {"cat": 3, "dog": 2, "ghost": 1})
+            db.correct_legacy_tag_counts()
+            db.con.commit()
+            counts = dict(db.con.execute("SELECT tag, count FROM tags").fetchall())
+            self.assertEqual(counts, {"cat": 2, "dog": 1})
+
+    def test_backfill_corrects_counts_and_populates_geo_idempotently(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            dbpath = os.path.join(tmpdir, "backfill.sqlite")
+            db = Sqlite3Client(dbpath)
+            db.setup_tables()
+
+            # Two geolocated images (Tokyo, Singapore), indexed the old way: no
+            # geo_* (insert_metadata with no geocode leaves them NULL).
+            db.insert_metadata("a.jpg", (35.68, 139.76), "")  # Tokyo
+            db.insert_metadata("b.jpg", (1.29, 103.85), "")  # Singapore
+            db.upsert_image_fields("a.jpg", {"tags": "cityscape"})
+            db.upsert_image_fields("b.jpg", {"tags": "skyline"})
+            # Old inflated counts: geocode-derived tags (Japan/JP/Singapore),
+            # a comma-bearing VLM tag, and a "ghost" orphan — none recoverable by
+            # re-splitting images.tags, so the fix must preserve them in place.
+            self._seed_tags(
+                db,
+                {
+                    "Japan": 2,
+                    "JP": 2,
+                    "Singapore": 2,
+                    "nature, relaxation": 3,
+                    "ghost": 1,
+                },
+            )
+            db.con.commit()
+            db.con.close()  # release the DB before the CLI re-opens it
+
+            result = CliRunner().invoke(cli, ["backfill", "--dbpath", dbpath])
+            self.assertEqual(result.exit_code, 0, result.output)
+
+            tokyo = self._read_geo(dbpath, "a.jpg")
+            self.assertEqual(tokyo[1], "Japan")
+            self.assertTrue(tokyo[0])  # a city resolved from the coordinates
+            self.assertEqual(self._read_geo(dbpath, "b.jpg")[1], "Singapore")
+            # Every count -1, orphan dropped, comma-bearing tag preserved intact.
+            expected = {"Japan": 1, "JP": 1, "Singapore": 1, "nature, relaxation": 2}
+            self.assertEqual(self._read_counts(dbpath), expected)
+
+            # Re-running must not decrement again (geo_* now populated → skip).
+            again = CliRunner().invoke(cli, ["backfill", "--dbpath", dbpath])
+            self.assertEqual(again.exit_code, 0, again.output)
+            self.assertEqual(self._read_counts(dbpath), expected)
+
+    def test_backfill_dry_run_leaves_db_untouched(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            dbpath = os.path.join(tmpdir, "backfill-dry.sqlite")
+            db = Sqlite3Client(dbpath)
+            db.setup_tables()
+            db.insert_metadata("a.jpg", (35.68, 139.76), "")
+            db.upsert_image_fields("a.jpg", {"tags": "cityscape"})
+            self._seed_tags(db, {"Japan": 2, "JP": 2})
+            db.con.commit()
+            db.con.close()
+
+            result = CliRunner().invoke(
+                cli, ["backfill", "--dbpath", dbpath, "--dry-run"]
+            )
+            self.assertEqual(result.exit_code, 0, result.output)
+
+            self.assertIsNone(self._read_geo(dbpath, "a.jpg")[0])
+            self.assertEqual(self._read_counts(dbpath), {"Japan": 2, "JP": 2})
+
     def test_benchmark_index_outputs_summary_json(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             output_path = os.path.join(tmpdir, "benchmark.json")
