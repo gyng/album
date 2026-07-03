@@ -69,6 +69,7 @@ jest.mock("./api", () => ({
   fetchSemanticResults: jest.fn(),
   fetchSimilarResults: jest.fn(),
   fetchTags: jest.fn(),
+  hasStructuredGeocode: jest.fn(() => false),
 }));
 
 jest.mock("./textEmbeddings", () => ({

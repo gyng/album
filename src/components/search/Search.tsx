@@ -11,6 +11,7 @@ import {
   fetchRefinementTagCounts,
   fetchSearchFacetSections,
   fetchTags,
+  hasStructuredGeocode,
 } from "./api";
 import { RGB } from "../../util/colorDistance";
 import styles from "./Search.module.css";
@@ -272,6 +273,10 @@ export const Search: React.FC<{
     selectedFacets.length +
     normalizedSearchTerms.length +
     (colorSearch ? 1 : 0);
+
+  // A DB built by the fixed indexer has the geo_* columns and correct tag
+  // counts; an older one stores them inflated by one. Probe is cached per DB.
+  const tagCountsAreExact = database ? hasStructuredGeocode(database) : false;
 
   // While the mobile filter drawer is open: Escape closes it, background
   // scroll is locked, and focus moves into it (and back to the trigger on
@@ -918,6 +923,7 @@ export const Search: React.FC<{
               normalizedSearchTerms={normalizedSearchTerms}
               normalizedTags={normalizedTags}
               refinementCounts={refinementCounts}
+              tagCountsAreExact={tagCountsAreExact}
               isLoading={isFacetSectionsLoading}
               onSelectCategory={setSelectedFilterCategory}
               onClearColorSearch={handleClearColorSearch}

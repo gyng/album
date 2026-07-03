@@ -66,6 +66,9 @@ type Props = {
   normalizedSearchTerms: string[];
   normalizedTags: Tag[];
   refinementCounts: Record<string, number>;
+  // Whether the DB's tag counts are already correct (built by the fixed
+  // indexer). Old DBs store counts inflated by one, so display subtracts it.
+  tagCountsAreExact: boolean;
   isLoading: boolean;
   onSelectCategory: (category: FilterCategoryId) => void;
   onClearColorSearch: () => void;
@@ -84,6 +87,7 @@ export const SearchFacetPanel: React.FC<Props> = ({
   normalizedSearchTerms,
   normalizedTags,
   refinementCounts,
+  tagCountsAreExact,
   isLoading,
   onSelectCategory,
   onClearColorSearch,
@@ -244,7 +248,9 @@ export const SearchFacetPanel: React.FC<Props> = ({
                 const visibleCount =
                   !isActive && refinementCount !== undefined
                     ? refinementCount
-                    : tag.count;
+                    : tagCountsAreExact
+                      ? tag.count
+                      : tag.count - 1;
 
                 return (
                   <SearchTag

@@ -203,8 +203,11 @@ const buildGeocodeColumnClause = (column: string, value: string) => ({
 });
 
 // Cache the one-time schema probe per DB handle — old DBs lack the geo_* columns.
+// Also serves as the "built by the fixed indexer" signal (the geo_* columns and
+// the corrected tag counts ship together), so consumers can tell whether a DB's
+// tag counts need the legacy off-by-one compensation.
 const structuredGeocodeCache = new WeakMap<object, boolean>();
-const hasStructuredGeocode = (db: Database): boolean => {
+export const hasStructuredGeocode = (db: Database): boolean => {
   const cached = structuredGeocodeCache.get(db);
   if (cached !== undefined) {
     return cached;
