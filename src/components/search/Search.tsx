@@ -282,6 +282,9 @@ export const Search: React.FC<{
       return;
     }
     filterCloseRef.current?.focus();
+    // The trigger is a stable element for the drawer's lifetime; capture it now
+    // so the cleanup restores focus to it without reading a possibly-changed ref.
+    const trigger = filterTriggerRef.current;
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         setIsFilterDrawerOpen(false);
@@ -293,7 +296,7 @@ export const Search: React.FC<{
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
       document.body.style.overflow = previousOverflow;
-      filterTriggerRef.current?.focus();
+      trigger?.focus();
     };
   }, [isFilterDrawerOpen]);
 
