@@ -2,7 +2,7 @@ const fs = require("fs");
 const path = require("path");
 const readline = require("readline/promises");
 const { stdin, stdout } = require("process");
-const { spawn, execSync } = require("child_process");
+const { spawn, execSync, execFileSync } = require("child_process");
 const exifr = require("exifr");
 const sqlite3 = require("sqlite3");
 
@@ -323,6 +323,179 @@ const hasIndexChanges = (report) =>
   report.summary.removedPhotos > 0 ||
   (report.db?.missingEmbeddingCount ?? 0) > 0 ||
   (report.db?.staleEmbeddingCount ?? 0) > 0;
+
+// The canonical production origin (mirrors getSiteOrigin in src/lib/seo.ts).
+const DEFAULT_SITE_ORIGIN = "https://photos.awoo.party";
+
+// Files the deploy treats as *data*, not code. Real albums and both search DBs
+// are gitignored so they never surface in a git diff anyway; listing them keeps
+// classifyPublishDelta honest for the tracked test fixtures and future assets.
+const DATA_PATH_PREFIXES = ["albums/"];
+const DATA_PATH_SUFFIXES = ["/search.sqlite", "/search-embeddings.sqlite"];
+
+const nonEmpty = (value) => {
+  const trimmed = typeof value === "string" ? value.trim() : "";
+  return trimmed ? trimmed : null;
+};
+
+const splitLines = (text) =>
+  typeof text === "string"
+    ? text.split("\n").map((line) => line.trim()).filter(Boolean)
+    : [];
+
+const shortSha = (sha) => (typeof sha === "string" ? sha.slice(0, 7) : null);
+
+const isDataPath = (filePath) =>
+  DATA_PATH_PREFIXES.some((prefix) => filePath.startsWith(prefix)) ||
+  DATA_PATH_SUFFIXES.some((suffix) => filePath.endsWith(suffix));
+
+// Where to read the *live* deployed commit from. The local version.json is no
+// use as a baseline — `npm run dev` and `build` both rewrite it to HEAD — so we
+// ask the deployed site what it is actually running.
+const getDeployedVersionUrl = (env = process.env) => {
+  const raw =
+    nonEmpty(env.NEXT_PUBLIC_SITE_URL) ??
+    nonEmpty(env.SITE_URL) ??
+    nonEmpty(env.VERCEL_PROJECT_PRODUCTION_URL);
+  let origin = DEFAULT_SITE_ORIGIN;
+  if (raw) {
+    origin = raw.startsWith("http://") || raw.startsWith("https://") ? raw : `https://${raw}`;
+  }
+  return `${origin.replace(/\/+$/, "")}/version.json`;
+};
+
+// Given the deployed commit and the tracked files that differ from it, decide
+// whether this publish ships new JavaScript or is a pure data refresh.
+const classifyPublishDelta = ({ deployedSha, changedFiles }) => {
+  const files = Array.isArray(changedFiles) ? changedFiles.filter(Boolean) : [];
+  const dataFiles = files.filter(isDataPath);
+  const codeFiles = files.filter((filePath) => !isDataPath(filePath));
+
+  let kind;
+  if (!deployedSha) {
+    kind = "unknown";
+  } else if (codeFiles.length > 0) {
+    kind = "code";
+  } else {
+    kind = "data-only";
+  }
+
+  return { kind, codeFiles, dataFiles };
+};
+
+const buildDeploymentInsight = (deployment) => {
+  if (!deployment || deployment.kind === "unknown") {
+    return {
+      level: "warn",
+      text: `Publish type unknown — ${deployment?.reason ?? "could not determine the live deployment"}.`,
+    };
+  }
+
+  const deployed = shortSha(deployment.deployedSha) ?? "production";
+  if (deployment.kind === "code") {
+    return {
+      level: "info",
+      text: `Includes a JS/code update: ${formatNumber(deployment.codeFiles.length)} source file(s) changed since production (${deployed}). This publish ships new JavaScript, not just data.`,
+    };
+  }
+
+  return {
+    level: "ok",
+    text: `Pure data update: app code is unchanged from production (${deployed}). This publish only refreshes photo data and the search index — no JavaScript changes.`,
+  };
+};
+
+const defaultRunGit = (cwd) => (gitArgs) =>
+  execFileSync("git", gitArgs, {
+    cwd,
+    stdio: ["ignore", "pipe", "ignore"],
+  }).toString();
+
+const fetchDeployedSha = async ({ versionUrl, fetchImpl }) => {
+  try {
+    const signal =
+      typeof AbortSignal !== "undefined" && typeof AbortSignal.timeout === "function"
+        ? AbortSignal.timeout(6000)
+        : undefined;
+    const response = await fetchImpl(versionUrl, signal ? { signal } : {});
+    if (!response.ok) {
+      return { deployedSha: null, reason: `live version.json returned HTTP ${response.status}` };
+    }
+    const body = await response.json();
+    const sha = nonEmpty(body?.gitSha) ?? nonEmpty(body?.buildVersion);
+    if (!sha) {
+      return { deployedSha: null, reason: `live version.json at ${versionUrl} had no gitSha` };
+    }
+    return { deployedSha: sha, reason: null };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return { deployedSha: null, reason: `could not fetch ${versionUrl} (${message})` };
+  }
+};
+
+// Resolves whether the pending publish is data-only or a code update by diffing
+// the working tree against the commit the live site reports it is running.
+// Never throws: any failure (offline, git error, unknown commit) resolves to a
+// shaped { kind: "unknown", reason } object so it can only ever inform, not
+// block, the publish.
+const resolveDeploymentDelta = async ({
+  repoDir,
+  versionUrl,
+  fetchImpl = globalThis.fetch,
+  runGit = defaultRunGit(repoDir),
+}) => {
+  const base = {
+    deployedSha: null,
+    headSha: null,
+    changedFiles: [],
+    codeFiles: [],
+    dataFiles: [],
+    kind: "unknown",
+    reason: null,
+    versionUrl,
+  };
+
+  if (typeof fetchImpl !== "function") {
+    return { ...base, reason: "no fetch implementation available to read the live version.json" };
+  }
+
+  const { deployedSha, reason } = await fetchDeployedSha({ versionUrl, fetchImpl });
+
+  let headSha = null;
+  try {
+    headSha = nonEmpty(runGit(["rev-parse", "HEAD"]));
+  } catch {
+    headSha = null;
+  }
+
+  if (!deployedSha) {
+    return { ...base, headSha, reason: reason ?? "could not determine the live deployment" };
+  }
+
+  try {
+    runGit(["cat-file", "-e", `${deployedSha}^{commit}`]);
+  } catch {
+    return {
+      ...base,
+      deployedSha,
+      headSha,
+      reason: `deployed commit ${shortSha(deployedSha)} is not in local history (fetch it to compare)`,
+    };
+  }
+
+  let changedFiles = [];
+  try {
+    const tracked = runGit(["diff", "--name-only", deployedSha, "--"]);
+    const untracked = runGit(["ls-files", "--others", "--exclude-standard"]);
+    changedFiles = Array.from(new Set([...splitLines(tracked), ...splitLines(untracked)]));
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return { ...base, deployedSha, headSha, reason: `git diff against ${shortSha(deployedSha)} failed (${message})` };
+  }
+
+  const { kind, codeFiles, dataFiles } = classifyPublishDelta({ deployedSha, changedFiles });
+  return { deployedSha, headSha, changedFiles, codeFiles, dataFiles, kind, reason: null, versionUrl };
+};
 
 const resolveExecutionPlan = async ({ args, report }) => {
   const indexChanges = hasIndexChanges(report);
@@ -814,7 +987,15 @@ const readLastIndexStats = (lastIndexStatsPath) => {
   }
 };
 
-const createPreflightReport = async ({ albumsDir, dbPath, embeddingsDbPath, indexDir, lastIndexStatsPath }) => {
+const createPreflightReport = async ({
+  albumsDir,
+  dbPath,
+  embeddingsDbPath,
+  indexDir,
+  lastIndexStatsPath,
+  repoDir,
+  deployedVersionUrl,
+}) => {
   const dbState = await loadDbState(dbPath, embeddingsDbPath);
   const albumNames = fs
     .readdirSync(albumsDir, { withFileTypes: true })
@@ -863,8 +1044,16 @@ const createPreflightReport = async ({ albumsDir, dbPath, embeddingsDbPath, inde
     : 0;
   const unexpectedEmbeddingModels = staleModels;
 
+  const deployment = repoDir
+    ? await resolveDeploymentDelta({
+        repoDir,
+        versionUrl: deployedVersionUrl ?? getDeployedVersionUrl(),
+      })
+    : null;
+
   return {
     generatedAt: new Date().toISOString(),
+    deployment,
     db: {
       exists: dbState.exists,
       path: dbState.dbPath,
@@ -987,6 +1176,20 @@ const printPreflightReport = (report) => {
   printSection("Preflight Insights");
   printInsightLines(buildPreflightInsights(report));
 
+  if (report.deployment) {
+    printSection("Publish Type");
+    printInsightLines([buildDeploymentInsight(report.deployment)]);
+    if (report.deployment.kind === "code" && report.deployment.codeFiles.length > 0) {
+      const preview = report.deployment.codeFiles.slice(0, 8);
+      printIndentedList(preview);
+      if (report.deployment.codeFiles.length > preview.length) {
+        printIndentedList([
+          `... ${formatNumber(report.deployment.codeFiles.length - preview.length)} more changed source file(s)`,
+        ]);
+      }
+    }
+  }
+
   printSection("Albums Needing Attention");
   if (attentionAlbums.length === 0) {
     printInsightLines([{ level: "ok", text: "No album-level issues detected." }]);
@@ -1083,6 +1286,23 @@ const formatDuration = (seconds) => {
   return `~${h}h ${m}min`;
 };
 
+const describeDeploymentPlanRow = (deployment) => {
+  if (!deployment) {
+    return null;
+  }
+  if (deployment.kind === "code") {
+    return {
+      label: "Publish type",
+      value: `JS/code + data (${formatNumber(deployment.codeFiles.length)} source file(s) changed)`,
+      level: "info",
+    };
+  }
+  if (deployment.kind === "data-only") {
+    return { label: "Publish type", value: "data only (no code changes)", level: "ok" };
+  }
+  return { label: "Publish type", value: "unknown (could not read live version)", level: "warn" };
+};
+
 const printExecutionPlan = ({ args, report, plan }) => {
   const indexChanges = hasIndexChanges(report);
 
@@ -1094,6 +1314,8 @@ const printExecutionPlan = ({ args, report, plan }) => {
       ? (indexWorkItems * stats.medianAnalysisMs) / 1000
       : null;
 
+  const deploymentRow = describeDeploymentPlanRow(report.deployment);
+
   printSection("Execution Plan");
   printStatRows([
     {
@@ -1101,6 +1323,7 @@ const printExecutionPlan = ({ args, report, plan }) => {
       value: args.fastTrack ? "fast-track (default)" : "interactive",
       level: "info",
     },
+    ...(deploymentRow ? [deploymentRow] : []),
     {
       label: "Index update",
       value: indexChanges ? (plan.runIndex ? "yes" : "no") : "not needed",
@@ -1159,12 +1382,15 @@ module.exports = {
   ALBUM_CONFIG_FILENAME,
   REPORT_FILENAME,
   buildDeletedAlbumReports,
+  buildDeploymentInsight,
   buildIndexVerification,
   buildSummary,
   buildWizardContext,
+  classifyPublishDelta,
   createPreflightReport,
   buildAttentionAlbums,
   buildPreflightInsights,
+  getDeployedVersionUrl,
   getVercelPreflightCommand,
   hasIndexChanges,
   loadDbState,
@@ -1172,6 +1398,7 @@ module.exports = {
   printExecutionPlan,
   printPreflightReport,
   printVerificationReport,
+  resolveDeploymentDelta,
   resolveExecutionPlan,
   runShellCommand,
   askYesNo,

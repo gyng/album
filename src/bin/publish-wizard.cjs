@@ -28,6 +28,7 @@ const main = async () => {
     embeddingsDbPath: context.embeddingsDbPath,
     indexDir: context.indexDir,
     lastIndexStatsPath: context.lastIndexStatsPath,
+    repoDir: context.repoDir,
   });
   writeReport(context.reportPath, report);
   printPreflightReport(report);

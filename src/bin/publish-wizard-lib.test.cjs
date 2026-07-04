@@ -2,14 +2,18 @@ const path = require("path");
 const {
   buildAttentionAlbums,
   buildDeletedAlbumReports,
+  buildDeploymentInsight,
   buildIndexVerification,
   buildPreflightInsights,
   buildSummary,
   buildVerificationInsights,
+  classifyPublishDelta,
+  getDeployedVersionUrl,
   getVercelPreflightCommand,
   hasIndexChanges,
   loadDbState,
   parseArgs,
+  resolveDeploymentDelta,
   resolveExecutionPlan,
 } = require("./publish-wizard-lib.cjs");
 
@@ -558,6 +562,158 @@ describe("publish-wizard-lib", () => {
 
       const texts = insights.map((i) => i.text).join(" ");
       expect(texts).toMatch(/missing|no embeddings|re-embedded|indexed on the next index run/i);
+    });
+  });
+
+  describe("getDeployedVersionUrl", () => {
+    it("falls back to the canonical production origin", () => {
+      expect(getDeployedVersionUrl({})).toBe("https://photos.awoo.party/version.json");
+    });
+
+    it("honours NEXT_PUBLIC_SITE_URL and trims a trailing slash", () => {
+      expect(
+        getDeployedVersionUrl({ NEXT_PUBLIC_SITE_URL: "https://photos.example.com/" }),
+      ).toBe("https://photos.example.com/version.json");
+    });
+
+    it("adds a scheme to a bare host (Vercel production URL style)", () => {
+      expect(
+        getDeployedVersionUrl({ VERCEL_PROJECT_PRODUCTION_URL: "album.vercel.app" }),
+      ).toBe("https://album.vercel.app/version.json");
+    });
+  });
+
+  describe("classifyPublishDelta", () => {
+    it("is unknown when the deployed sha could not be resolved", () => {
+      expect(
+        classifyPublishDelta({ deployedSha: null, changedFiles: ["src/pages/map.tsx"] }).kind,
+      ).toBe("unknown");
+    });
+
+    it("is a data-only update when nothing tracked changed", () => {
+      const delta = classifyPublishDelta({ deployedSha: "abc123", changedFiles: [] });
+      expect(delta.kind).toBe("data-only");
+      expect(delta.codeFiles).toEqual([]);
+    });
+
+    it("treats album and search-db changes as data, not code", () => {
+      const delta = classifyPublishDelta({
+        deployedSha: "abc123",
+        changedFiles: [
+          "albums/test-simple/new.jpg",
+          "src/public/search.sqlite",
+          "src/public/search-embeddings.sqlite",
+        ],
+      });
+      expect(delta.kind).toBe("data-only");
+      expect(delta.codeFiles).toEqual([]);
+      expect(delta.dataFiles).toHaveLength(3);
+    });
+
+    it("is a code update when any source file changed, partitioning data out", () => {
+      const delta = classifyPublishDelta({
+        deployedSha: "abc123",
+        changedFiles: ["albums/test-simple/new.jpg", "src/components/search/Search.tsx"],
+      });
+      expect(delta.kind).toBe("code");
+      expect(delta.codeFiles).toEqual(["src/components/search/Search.tsx"]);
+      expect(delta.dataFiles).toEqual(["albums/test-simple/new.jpg"]);
+    });
+  });
+
+  describe("buildDeploymentInsight", () => {
+    it("describes a pure data update as clean and references the live sha", () => {
+      const line = buildDeploymentInsight({
+        kind: "data-only",
+        deployedSha: "87923a3a5cfc0f170b98a15e9bb7d40abaaeca03",
+        codeFiles: [],
+        dataFiles: [],
+      });
+      expect(line.level).toBe("ok");
+      expect(line.text).toContain("Pure data update");
+      expect(line.text).toContain("87923a3");
+    });
+
+    it("flags a code update and counts the changed source files", () => {
+      const line = buildDeploymentInsight({
+        kind: "code",
+        deployedSha: "87923a3a5cfc0f170b98a15e9bb7d40abaaeca03",
+        codeFiles: ["src/pages/map.tsx", "src/util/exifTime.ts"],
+        dataFiles: [],
+      });
+      expect(line.level).toBe("info");
+      expect(line.text).toContain("code update");
+      expect(line.text).toContain("2");
+    });
+
+    it("warns and surfaces the reason when the update type is unknown", () => {
+      const line = buildDeploymentInsight({
+        kind: "unknown",
+        reason: "could not fetch https://photos.awoo.party/version.json (network down)",
+      });
+      expect(line.level).toBe("warn");
+      expect(line.text).toContain("network down");
+    });
+  });
+
+  describe("resolveDeploymentDelta", () => {
+    const makeRunGit = (handlers) => (args) => {
+      const handler = handlers[args[0]];
+      if (handler === "throw") {
+        throw new Error(`git ${args.join(" ")} failed`);
+      }
+      return typeof handler === "function" ? handler(args) : handler ?? "";
+    };
+
+    it("reports a code update from the live sha and working-tree diff", async () => {
+      const delta = await resolveDeploymentDelta({
+        repoDir: "/repo",
+        versionUrl: "https://example.test/version.json",
+        fetchImpl: async () => ({ ok: true, status: 200, json: async () => ({ gitSha: "dead00f" }) }),
+        runGit: makeRunGit({
+          "rev-parse": "cafe123\n",
+          "cat-file": "",
+          diff: "src/pages/map.tsx\nsrc/util/exifTime.ts\n",
+          "ls-files": "",
+        }),
+      });
+      expect(delta.kind).toBe("code");
+      expect(delta.deployedSha).toBe("dead00f");
+      expect(delta.codeFiles).toEqual(["src/pages/map.tsx", "src/util/exifTime.ts"]);
+    });
+
+    it("reports a data-only update when the tree matches the deployed commit", async () => {
+      const delta = await resolveDeploymentDelta({
+        repoDir: "/repo",
+        versionUrl: "https://example.test/version.json",
+        fetchImpl: async () => ({ ok: true, status: 200, json: async () => ({ gitSha: "dead00f" }) }),
+        runGit: makeRunGit({ "rev-parse": "dead00f\n", "cat-file": "", diff: "", "ls-files": "" }),
+      });
+      expect(delta.kind).toBe("data-only");
+    });
+
+    it("is unknown (never throws) when the live version.json cannot be fetched", async () => {
+      const delta = await resolveDeploymentDelta({
+        repoDir: "/repo",
+        versionUrl: "https://example.test/version.json",
+        fetchImpl: async () => {
+          throw new Error("network down");
+        },
+        runGit: makeRunGit({ "rev-parse": "cafe123\n" }),
+      });
+      expect(delta.kind).toBe("unknown");
+      expect(delta.reason).toContain("network down");
+    });
+
+    it("is unknown when the deployed commit is not in local history", async () => {
+      const delta = await resolveDeploymentDelta({
+        repoDir: "/repo",
+        versionUrl: "https://example.test/version.json",
+        fetchImpl: async () => ({ ok: true, status: 200, json: async () => ({ gitSha: "dead00f" }) }),
+        runGit: makeRunGit({ "rev-parse": "cafe123\n", "cat-file": "throw" }),
+      });
+      expect(delta.kind).toBe("unknown");
+      expect(delta.reason).toContain("local history");
     });
   });
 
