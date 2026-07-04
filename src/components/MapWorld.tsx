@@ -6,6 +6,8 @@ import Link from "next/link";
 import { getRelativeTimeString } from "../util/time";
 import { parseTimestampSafe } from "../util/timeRange";
 import { computeWrapAwareBounds, unwrapLongitudes } from "../util/mapBounds";
+import { mixHsl, recencyColor } from "../util/mapColor";
+import { MapRecencyLegend } from "./MapRecencyLegend";
 import MapLibreMap, {
   Marker,
   Popup,
@@ -66,6 +68,8 @@ export type MapWorldProps = {
   routeDisplayMode?: "always" | "active-only";
   /** Live time range for opacity-based filtering during drag. */
   timeRange?: TimeRange | null;
+  /** Show the colour-recency legend (defaults to true). */
+  showLegend?: boolean;
 };
 
 const MapAutoFit = ({
@@ -185,90 +189,38 @@ const MapBoundsTracker = ({
 type PhotoWithStyle = MapWorldEntry & {
   relative: number;
   markerColor: string;
-  hueRotate: string;
 };
 
+// The single-album journey line is drawn in one solid colour: the recency
+// colour of whichever photo the route currently belongs to (mid-ramp by
+// default). Kept as a 3-stop shape for the callers that index into it.
 const getRouteColorStops = (relative: number) => {
-  const hue = relative * 220;
-  const lightness = 56;
-
+  const color = recencyColor(relative);
   return [
-    {
-      offset: "0%",
-      color: `hsl(${Math.max(0, hue - 18).toFixed(1)} 38% ${lightness}%)`,
-    },
-    {
-      offset: "55%",
-      color: `hsl(${hue.toFixed(1)} 64% ${lightness}%)`,
-    },
-    {
-      offset: "100%",
-      color: `hsl(${Math.min(220, hue + 10).toFixed(1)} 92% ${lightness}%)`,
-    },
+    { offset: "0%", color },
+    { offset: "55%", color },
+    { offset: "100%", color },
   ];
 };
 
-const parseHslColor = (
-  color: string,
-): { hue: number; saturation: number; lightness: number } | null => {
-  const match = color.match(
-    /hsl\(\s*([+-]?\d*\.?\d+)(?:deg)?(?:\s+|,\s*)(\d*\.?\d+)%(?:\s+|,\s*)(\d*\.?\d+)%\s*\)/i,
-  );
-
-  if (!match) {
-    return null;
-  }
-
-  const hue = Number.parseFloat(match[1] ?? "");
-  const saturation = Number.parseFloat(match[2] ?? "");
-  const lightness = Number.parseFloat(match[3] ?? "");
-
-  if ([hue, saturation, lightness].some((value) => Number.isNaN(value))) {
-    return null;
-  }
-
-  return { hue, saturation, lightness };
-};
-
-const withSaturation = (
-  color: string,
-  nextSaturation: number,
-  nextLightness?: number,
-): string => {
-  const parsed = parseHslColor(color);
-  if (!parsed) {
-    return color;
-  }
-
-  return `hsl(${parsed.hue.toFixed(1)} ${Math.max(
-    0,
-    Math.min(100, nextSaturation),
-  ).toFixed(1)}% ${(nextLightness ?? parsed.lightness).toFixed(1)}%)`;
-};
-
-const getDirectionalGradientStops = (fromColor: string, toColor: string) => {
-  const olderColor = withSaturation(fromColor, 100, 20);
-  const middleColor = withSaturation(toColor, 100, 50);
-  const newerColor = withSaturation(toColor, 100, 78);
-
-  return [
-    { offset: "0%", color: olderColor },
-    { offset: "38%", color: middleColor },
-    { offset: "100%", color: newerColor },
-  ];
-};
+// Route gradients simply blend the recency colours of the two endpoints, so a
+// trip's line runs oldest→newest (blue→red) exactly like its markers. The end
+// colours are already recency colours from `markerColorByHref`.
+const getDirectionalGradientStops = (fromColor: string, toColor: string) => [
+  { offset: "0%", color: fromColor },
+  { offset: "50%", color: mixHsl(fromColor, toColor, 0.5) },
+  { offset: "100%", color: toColor },
+];
 
 const getBackgroundJourneyGradientColors = (
   fromColor: string,
   toColor: string,
-) => {
-  return {
-    start: withSaturation(fromColor, 100, 10),
-    quarter: withSaturation(fromColor, 100, 24),
-    middle: withSaturation(toColor, 100, 56),
-    end: withSaturation(toColor, 100, 90),
-  };
-};
+) => ({
+  start: fromColor,
+  quarter: mixHsl(fromColor, toColor, 0.25),
+  middle: mixHsl(fromColor, toColor, 0.5),
+  end: toColor,
+});
 
 // Slow real-world speed → slow animation, fast → fast.
 // Uses log10 so the huge range (walk 3km/h → flight 900km/h) maps smoothly.
@@ -762,6 +714,7 @@ export const MMap: React.FC<MapWorldProps> = ({
   routeMode = "full",
   routeDisplayMode = "active-only",
   timeRange,
+  showLegend = true,
 }) => {
   const url =
     typeof window === "undefined" ? null : new URL(window.location.toString());
@@ -819,7 +772,7 @@ export const MMap: React.FC<MapWorldProps> = ({
       .map((photo): PhotoWithStyle => {
         // Undated photos resolve to the oldest end. Guard range === 0 (single
         // photo or an all-same-timestamp burst) so relative is 0, never NaN —
-        // otherwise the colours below become hsl(NaN)/hue-rotate(NaNdeg).
+        // otherwise recencyColor would receive NaN. (recencyColor also clamps.)
         const rawRelative =
           dateStats.range > 0
             ? (new Date(photo.date ?? dateStats.oldest?.date ?? "").valueOf() -
@@ -833,8 +786,7 @@ export const MMap: React.FC<MapWorldProps> = ({
         return {
           ...photo,
           relative,
-          markerColor: `hsl(${relative * 220}, 100%, ${50 - relative * 30}%)`,
-          hueRotate: `hue-rotate(${relative * 255}deg)`,
+          markerColor: recencyColor(relative),
         };
       });
   }, [dateStats, timeFilteredPhotos]);
@@ -1069,6 +1021,23 @@ export const MMap: React.FC<MapWorldProps> = ({
 
   const routeLineWidth = routeMode === "simplified" ? 4 : 3;
 
+  // Legend end labels: the years spanning the whole photo set (colour is keyed
+  // to the full range, not the filtered subset). Slicing the naive ISO string
+  // avoids any timezone parsing. Falls back to Older/Newer when unavailable or
+  // when both ends land in the same year.
+  const legendYears = React.useMemo(() => {
+    const yearOf = (date?: string | null) =>
+      date && /^\d{4}/.test(date) ? date.slice(0, 4) : null;
+    const older = yearOf(dateStats.oldest?.date);
+    const newer = yearOf(dateStats.newest?.date);
+    if (!older || !newer || older === newer) {
+      return { older: "Older", newer: "Newer" };
+    }
+    return { older, newer };
+  }, [dateStats.oldest?.date, dateStats.newest?.date]);
+  const shouldShowLegend =
+    showLegend && dateStats.range > 0 && timeFilteredPhotos.length > 1;
+
   const pauseRouterSync = React.useCallback(() => {
     if (!syncRoute) {
       return;
@@ -1186,27 +1155,15 @@ export const MMap: React.FC<MapWorldProps> = ({
               id="journey-line-layer"
               type="line"
               paint={{
+                // Multi-album ("show all journeys") draws each trip's line in
+                // its own solid recency colour (`line-gradient` can't be
+                // data-driven per feature, so a per-feature solid colour is
+                // used instead of a shared gradient). Single-album keeps the
+                // one recency colour of the active route.
                 "line-color":
                   routeDataByAlbum.size > 1
-                    ? "#12bcd4"
+                    ? ["coalesce", ["get", "routeColorMiddle"], "#12bcd4"]
                     : (routeColorStops[1]?.color ?? "#12bcd4"),
-                ...(routeDataByAlbum.size > 1
-                  ? {
-                      "line-gradient": [
-                        "interpolate",
-                        ["linear"],
-                        ["line-progress"],
-                        0,
-                        "#0f4b6e",
-                        0.24,
-                        "#145b83",
-                        0.58,
-                        "#12bcd4",
-                        1,
-                        "#b9fbff",
-                      ],
-                    }
-                  : {}),
                 "line-opacity": alwaysVisibleRouteGeoJson
                   ? routeDataByAlbum.size > 1
                     ? 1
@@ -1396,6 +1353,12 @@ export const MMap: React.FC<MapWorldProps> = ({
         <NavigationControl />
         <GeolocateControl />
         <ScaleControl />
+        {shouldShowLegend ? (
+          <MapRecencyLegend
+            olderLabel={legendYears.older}
+            newerLabel={legendYears.newer}
+          />
+        ) : null}
         <FullscreenControl />
       </MapLibreMap>
     </div>
