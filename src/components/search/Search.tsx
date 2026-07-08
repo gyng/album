@@ -37,6 +37,8 @@ import {
   Tag,
 } from "./searchUtils";
 import { SearchMode } from "./useTextVector";
+import { useImageQuery } from "./useImageQuery";
+import { SearchDrawPad } from "./SearchDrawPad";
 import { useSearchResultsState } from "./useSearchResultsState";
 import {
   getSearchFacetChipLabel,
@@ -186,6 +188,7 @@ export const Search: React.FC<{
   // On phones the facet panel is collapsed behind this trigger so results
   // lead; on desktop the trigger is hidden and the panel lays out inline.
   const [isFilterDrawerOpen, setIsFilterDrawerOpen] = useState<boolean>(false);
+  const [isDrawPadOpen, setIsDrawPadOpen] = useState<boolean>(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const filterTriggerRef = useRef<HTMLButtonElement | null>(null);
   const filterCloseRef = useRef<HTMLButtonElement | null>(null);
@@ -197,8 +200,17 @@ export const Search: React.FC<{
     databaseError,
     retryDatabase,
   ] = useDatabase();
+  const {
+    imageQuery,
+    imageVectorError,
+    imageModelProgress,
+    imageModelProgressDetails,
+    startImageQuery,
+    clearImageQuery,
+  } = useImageQuery();
   const needsEmbeddingsDatabase =
     Boolean(similarPath) ||
+    Boolean(imageQuery) ||
     (!colorSearch &&
       searchInputValue.trim() !== "" &&
       searchMode !== "keyword");
@@ -239,6 +251,7 @@ export const Search: React.FC<{
     searchMode,
     selectedFacets,
     hasHydratedFromUrl,
+    imageQuery,
   });
 
   const normalizedTags = useMemo(() => dedupeTags(tags), [tags]);
@@ -272,7 +285,8 @@ export const Search: React.FC<{
   const activeFilterCount =
     selectedFacets.length +
     normalizedSearchTerms.length +
-    (colorSearch ? 1 : 0);
+    (colorSearch ? 1 : 0) +
+    (imageQuery ? 1 : 0);
 
   // A DB built by the fixed indexer has the geo_* columns and correct tag
   // counts; an older one stores them inflated by one. Probe is cached per DB.
@@ -320,18 +334,22 @@ export const Search: React.FC<{
   const isEmptyState =
     !isSimilarMode &&
     !isColorMode &&
+    !imageQuery &&
     searchInputValue.trim() === "" &&
     selectedFacets.length === 0;
 
-  // While the embeddings DB is still downloading, similar / pure-semantic
-  // queries can't run yet — present the grid as pending (loading) instead of a
-  // definitive empty state (HIGH-8). Hybrid is deliberately excluded: it
+  // While the embeddings DB is still downloading, similar / pure-semantic /
+  // image queries can't run yet — present the grid as pending (loading) instead
+  // of a definitive empty state (HIGH-8). Hybrid is deliberately excluded: it
   // degrades to keyword-only ranking meanwhile rather than waiting.
   const isAwaitingVectorDatabase =
     needsEmbeddingsDatabase &&
     !embeddingsDatabase &&
     !embeddingsError &&
-    (isSimilarMode || searchMode === "semantic");
+    (isSimilarMode || Boolean(imageQuery) || searchMode === "semantic");
+
+  // The image query also waits on the vision model encoding the image itself.
+  const isAwaitingImageVector = Boolean(imageQuery) && !imageQuery?.vector;
 
   useEffect(() => {
     const initialSearchState = getInitialSearchState();
@@ -610,15 +628,19 @@ export const Search: React.FC<{
     };
   }, [similarPath, isColorMode]);
 
-  const applySearchTerms = useCallback((terms: string[]) => {
-    setSimilarPath(null);
-    setSimilarTrail([]);
-    setRandomExploreError(null);
-    // Keep any active colour filter — colour composes with the text query, so
-    // typing must not silently clear it (the facet panel adds colour the same
-    // composable way).
-    setSearchInputValue(terms.join(","));
-  }, []);
+  const applySearchTerms = useCallback(
+    (terms: string[]) => {
+      setSimilarPath(null);
+      setSimilarTrail([]);
+      setRandomExploreError(null);
+      clearImageQuery();
+      // Keep any active colour filter — colour composes with the text query, so
+      // typing must not silently clear it (the facet panel adds colour the same
+      // composable way).
+      setSearchInputValue(terms.join(","));
+    },
+    [clearImageQuery],
+  );
 
   const clearSearchState = useCallback(() => {
     setSearchInputValue("");
@@ -626,7 +648,23 @@ export const Search: React.FC<{
     setSimilarTrail([]);
     setColorSearch(null);
     setSelectedFacets([]);
-  }, []);
+    clearImageQuery();
+  }, [clearImageQuery]);
+
+  // Starting an image query replaces text/similar mode, but keeps colour and
+  // facets — they compose with the vector ranking the same way they do for a
+  // semantic text query.
+  const handleImageQuery = useCallback(
+    (blob: Blob, source: "upload" | "drawing") => {
+      setSearchInputValue("");
+      setSimilarPath(null);
+      setSimilarTrail([]);
+      setRandomExploreError(null);
+      setIsDrawPadOpen(false);
+      startImageQuery(blob, source);
+    },
+    [startImageQuery],
+  );
 
   const truncateSimilarStack = useCallback((breadcrumbIndex: number) => {
     setSimilarTrail((prev) => {
@@ -708,6 +746,7 @@ export const Search: React.FC<{
 
       setSearchInputValue("");
       setSelectedFacets([]);
+      clearImageQuery();
       setSimilarTrail((prev) => {
         if (!similarPath) {
           return prev;
@@ -717,34 +756,42 @@ export const Search: React.FC<{
       });
       setSimilarPath(path);
     },
-    [similarPath],
+    [clearImageQuery, similarPath],
   );
 
-  const handleToggleTag = useCallback((tagName: string, isActive: boolean) => {
-    setSimilarPath(null);
-    setSimilarTrail([]);
-    setRandomExploreError(null);
-    setSearchInputValue((prev) => {
-      const nextTerms = parseSearchTerms(prev);
-      const updatedTerms = isActive
-        ? nextTerms.filter(
-            (term) => term && term.trim().toLowerCase() !== tagName,
-          )
-        : [...nextTerms.filter((term) => term), tagName];
-      return updatedTerms.join(",");
-    });
-  }, []);
+  const handleToggleTag = useCallback(
+    (tagName: string, isActive: boolean) => {
+      setSimilarPath(null);
+      setSimilarTrail([]);
+      setRandomExploreError(null);
+      clearImageQuery();
+      setSearchInputValue((prev) => {
+        const nextTerms = parseSearchTerms(prev);
+        const updatedTerms = isActive
+          ? nextTerms.filter(
+              (term) => term && term.trim().toLowerCase() !== tagName,
+            )
+          : [...nextTerms.filter((term) => term), tagName];
+        return updatedTerms.join(",");
+      });
+    },
+    [clearImageQuery],
+  );
 
   // Per-tile "use this photo's colour" action: starts a fresh colour search,
   // clearing any text query and similarity trail.
-  const handleSearchByColor = useCallback((color: RGB) => {
-    setSearchInputValue("");
-    setSimilarPath(null);
-    setSimilarTrail([]);
-    setRandomExploreError(null);
-    setColorSearch(color);
-    setSelectedFilterCategory("color");
-  }, []);
+  const handleSearchByColor = useCallback(
+    (color: RGB) => {
+      setSearchInputValue("");
+      setSimilarPath(null);
+      setSimilarTrail([]);
+      setRandomExploreError(null);
+      clearImageQuery();
+      setColorSearch(color);
+      setSelectedFilterCategory("color");
+    },
+    [clearImageQuery],
+  );
 
   // Facet-panel colour picker: composes with the current text query/facets, so
   // it must not clear the search input the way the per-tile action does.
@@ -799,11 +846,19 @@ export const Search: React.FC<{
         ? { progress, details: databaseProgressDetails }
         : needsEmbeddingsDatabase && !embeddingsDatabase && !embeddingsError
           ? { progress: embeddingsProgress, details: embeddingsProgressDetails }
-          : !isSimilarMode &&
-              searchMode !== "keyword" &&
-              textModelProgress < 100
-            ? { progress: textModelProgress, details: textModelProgressDetails }
-            : null;
+          : imageQuery && imageModelProgress < 100
+            ? {
+                progress: imageModelProgress,
+                details: imageModelProgressDetails,
+              }
+            : !isSimilarMode &&
+                searchMode !== "keyword" &&
+                textModelProgress < 100
+              ? {
+                  progress: textModelProgress,
+                  details: textModelProgressDetails,
+                }
+              : null;
 
     onNavStateChange?.({
       databaseReady: Boolean(database),
@@ -822,6 +877,9 @@ export const Search: React.FC<{
     embeddingsError,
     embeddingsProgress,
     embeddingsProgressDetails,
+    imageQuery,
+    imageModelProgress,
+    imageModelProgressDetails,
     isSimilarMode,
     searchMode,
     textModelProgress,
@@ -850,7 +908,16 @@ export const Search: React.FC<{
         onClearSearchState={clearSearchState}
         onStartRandomSimilarSearch={startRandomSimilarSearch}
         onSetSearchMode={setSearchMode}
+        onPickImageQuery={(file) => handleImageQuery(file, "upload")}
+        onOpenDrawPad={() => setIsDrawPadOpen(true)}
       />
+
+      {isDrawPadOpen ? (
+        <SearchDrawPad
+          onCancel={() => setIsDrawPadOpen(false)}
+          onSubmit={(blob) => handleImageQuery(blob, "drawing")}
+        />
+      ) : null}
 
       {!isSimilarMode ? (
         <>
@@ -957,6 +1024,10 @@ export const Search: React.FC<{
         <div className={styles.inlineError}>{textVectorError}</div>
       ) : null}
 
+      {imageVectorError ? (
+        <div className={styles.inlineError}>{imageVectorError}</div>
+      ) : null}
+
       {needsEmbeddingsDatabase && embeddingsError ? (
         <div className={styles.inlineError}>
           Similarity search is unavailable right now.
@@ -991,10 +1062,45 @@ export const Search: React.FC<{
 
       {selectedFacets.length > 0 ||
       normalizedSearchTerms.length > 0 ||
-      colorSearch ? (
+      colorSearch ||
+      imageQuery ? (
         <div className={styles.activeFacetSection}>
           <div className={styles.activeFacetLabel}>Active filters</div>
           <div className={styles.activeFacetChips}>
+            {imageQuery ? (
+              <button
+                key="image-query"
+                type="button"
+                className={styles.activeFacetChip}
+                onClick={clearImageQuery}
+                title="Remove image query"
+                aria-label="Remove image query"
+              >
+                {/* Plain img: the preview is an in-memory object URL, which
+                    next/image can't optimise. */}
+                <img
+                  className={styles.activeFacetImageThumb}
+                  src={imageQuery.previewUrl}
+                  alt=""
+                  aria-hidden="true"
+                />
+                <span>
+                  {imageQuery.source === "drawing"
+                    ? "Drawn sketch"
+                    : "Uploaded image"}
+                </span>
+                <span aria-hidden="true">×</span>
+                {/* Zoomed copy of the query image, revealed on hover/focus —
+                    the 20px chip thumbnail is too small to recognise. */}
+                <span
+                  className={styles.activeFacetImageZoom}
+                  data-testid="image-query-zoom"
+                  aria-hidden="true"
+                >
+                  <img src={imageQuery.previewUrl} alt="" />
+                </span>
+              </button>
+            ) : null}
             {colorSearch ? (
               <button
                 key="color-filter"
@@ -1055,6 +1161,7 @@ export const Search: React.FC<{
         <SearchResultsGrid
           isSimilarMode={isSimilarMode}
           isColorMode={isColorMode}
+          isImageQueryMode={Boolean(imageQuery)}
           isColorCategoryActive={selectedFilterCategory === "color"}
           hasFacetFilters={selectedFacets.length > 0}
           searchInputValue={searchInputValue}
@@ -1064,7 +1171,7 @@ export const Search: React.FC<{
           isSuccess={isSuccess}
           isError={isError}
           isFetching={isFetching}
-          isAwaitingResults={isAwaitingVectorDatabase}
+          isAwaitingResults={isAwaitingVectorDatabase || isAwaitingImageVector}
           isPlaceholderData={isPlaceholderData}
           hasNextPage={hasNextPage}
           similarClickstreamPaths={similarClickstreamPaths}

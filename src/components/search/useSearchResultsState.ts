@@ -27,6 +27,9 @@ type Props = {
   searchMode: SearchMode;
   selectedFacets: SearchFacetSelection[];
   hasHydratedFromUrl: boolean;
+  /** Ephemeral uploaded/drawn image query. The vector is SigLIP v1-space (the
+   *  browser vision encoder), ranked against the DB's v1 image embeddings. */
+  imageQuery?: { id: number; vector: number[] | null } | null;
   pageSize?: number;
 };
 
@@ -41,6 +44,7 @@ export const useSearchResultsState = ({
   searchMode,
   selectedFacets,
   hasHydratedFromUrl,
+  imageQuery = null,
   pageSize = 48,
 }: Props) => {
   const [debouncedSearchInputValue] = useDebounce(searchInputValue, 600);
@@ -57,6 +61,8 @@ export const useSearchResultsState = ({
   );
   const isSimilarMode = Boolean(similarPath);
   const isColorMode = Boolean(colorSearch);
+  const isImageQueryMode = Boolean(imageQuery);
+  const hasImageVector = Boolean(imageQuery?.vector);
   const colorHex = useMemo(
     () => (colorSearch ? rgbToHex(colorSearch) : null),
     [colorSearch],
@@ -81,7 +87,7 @@ export const useSearchResultsState = ({
   // Only the embeddings DB (or its search.sqlite fallback, once loaded) can
   // answer vector queries. The main DB is NOT a stand-in: in a split build it
   // has no `embeddings` table, so treating it as "ready" made cold-cache visitors
-  // see a definitive "No results" while the 52 MB embeddings DB downloaded
+  // see a definitive "No results" while the embeddings DB downloaded
   // (HIGH-8). Until it resolves, vector queries stay pending instead.
   const hasVectorDatabase = Boolean(embeddingsDatabase);
 
@@ -96,7 +102,8 @@ export const useSearchResultsState = ({
   const canRunQuery =
     hasHydratedFromUrl &&
     Boolean(database) &&
-    ((Boolean(similarPath) && hasVectorDatabase) ||
+    ((hasImageVector && hasVectorDatabase) ||
+      (Boolean(similarPath) && hasVectorDatabase) ||
       (isColorMode && !hasSearchQuery) ||
       (hasSearchQuery &&
         (searchMode === "keyword" ||
@@ -130,6 +137,9 @@ export const useSearchResultsState = ({
         selectedFacets,
         hasTextVector: hasCurrentTextVector,
         textVectorFailed,
+        // The vector itself is 768 floats — key on the query's id instead.
+        imageQueryId: imageQuery?.id ?? null,
+        hasImageVector,
       },
     ],
     queryFn: async ({ pageParam }: { pageParam: number }) => {
@@ -156,6 +166,32 @@ export const useSearchResultsState = ({
           prev: undefined,
           next: undefined,
         };
+      }
+
+      // The uploaded/drawn image query outranks the other modes: starting one
+      // clears text/similar/colour, but a facet OR colour filter can enable the
+      // query before the vision model finishes encoding — return an empty page
+      // (presented as pending via isAwaitingResults) rather than falling
+      // through to an unrelated keyword/facet search.
+      if (imageQuery) {
+        if (!imageQuery.vector) {
+          return {
+            data: [],
+            prev: undefined,
+            next: undefined,
+          };
+        }
+        return await fetchSemanticResults({
+          database,
+          embeddingsDatabase,
+          textQuery: "image query",
+          textVector: imageQuery.vector,
+          pageSize,
+          page: pageParam,
+          selectedFacets,
+          colorSearch: debouncedColorSearch,
+          colorTolerance: debouncedColorTolerance,
+        });
       }
 
       if (similarPath) {
@@ -246,6 +282,7 @@ export const useSearchResultsState = ({
   const canClear =
     isSimilarMode ||
     isColorMode ||
+    isImageQueryMode ||
     searchInputValue.trim() !== "" ||
     hasFacetFilters;
 
@@ -257,6 +294,7 @@ export const useSearchResultsState = ({
     hasSearchQuery,
     hasFacetFilters,
     isColorMode,
+    isImageQueryMode,
     isSimilarMode,
     queryResults,
     searchQuery,

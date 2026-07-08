@@ -69,6 +69,8 @@
 }
 
 .activeFacetChip {
+  /* Anchors the hover zoom preview (.activeFacetImageZoom). */
+  position: relative;
   display: inline-flex;
   align-items: center;
   gap: var(--m);
@@ -772,6 +774,61 @@
   flex-wrap: wrap;
   align-items: center;
   margin-bottom: var(--m-l);
+}
+
+.imageQueryActions {
+  display: inline-flex;
+  gap: var(--m-m);
+}
+
+/* Visually hidden but still programmatically clickable — display:none would
+   make .click() a no-op in some browsers. */
+.imageQueryFileInput {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+
+.activeFacetImageThumb {
+  width: var(--m-l);
+  height: var(--m-l);
+  border-radius: var(--m);
+  object-fit: cover;
+  flex: 0 0 auto;
+}
+
+/* Zoomed query-image preview, styled like .searchModeInfoTooltip but revealed
+   purely on hover/focus — no open state to manage. The chip is the anchor.
+   Sits ABOVE the chip: below it would cover the first row of results. */
+.activeFacetImageZoom {
+  position: absolute;
+  bottom: calc(100% + var(--m-s));
+  left: 0;
+  z-index: 2;
+  padding: var(--m-s);
+  border-radius: var(--m-s);
+  background: color-mix(in srgb, var(--c-bg) 88%, var(--c-accent));
+  border: solid 1px color-mix(in srgb, var(--c-accent) 60%, var(--c-font));
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--t-fast) ease;
+}
+
+.activeFacetImageZoom img {
+  display: block;
+  width: min(60vw, 220px);
+  height: min(60vw, 220px);
+  object-fit: contain;
+  border-radius: var(--m);
+  /* Sketches are drawn on white; photos also read fine against it. */
+  background: #fff;
+}
+
+.activeFacetChip:hover .activeFacetImageZoom,
+.activeFacetChip:focus-visible .activeFacetImageZoom {
+  opacity: 1;
 }
 
 .searchModeSelectLabel {

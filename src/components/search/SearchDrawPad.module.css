@@ -1,0 +1,104 @@
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--m-l);
+  background-color: var(--c-overlay-dark);
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--m-s);
+  max-width: 100%;
+  padding: var(--m-l);
+  border: solid 1px var(--c-bg-contrast-light);
+  border-radius: var(--m-s);
+  background-color: var(--c-bg);
+}
+
+.title {
+  font-size: var(--fs-sm);
+  font-weight: 600;
+}
+
+.canvas {
+  width: min(70vw, 320px);
+  height: min(70vw, 320px);
+  border: solid 1px var(--c-bg-contrast-light);
+  border-radius: var(--m);
+  background-color: #fff;
+  cursor: crosshair;
+  touch-action: none;
+}
+
+.toolRow {
+  display: flex;
+  align-items: center;
+  gap: var(--m);
+}
+
+.swatch {
+  width: var(--m-l);
+  height: var(--m-l);
+  padding: 0;
+  border: solid 1px var(--c-bg-contrast-dark);
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.swatchActive {
+  outline: solid 2px var(--c-accent);
+  outline-offset: 2px;
+}
+
+.sizeButton {
+  padding: var(--m) var(--m-s);
+  border: solid 1px var(--c-bg-contrast-light);
+  border-radius: var(--m-s);
+  background-color: transparent;
+  color: inherit;
+  font-size: var(--fs-s);
+  cursor: pointer;
+}
+
+.sizeButtonActive {
+  border-color: var(--c-accent);
+  outline: solid 1px var(--c-accent);
+}
+
+.actionRow {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--m-s);
+  margin-top: var(--m-s);
+}
+
+.action,
+.actionPrimary {
+  padding: var(--m-s) var(--m-m);
+  border: solid 1px var(--c-bg-contrast-light);
+  border-radius: var(--m-s);
+  background-color: transparent;
+  color: inherit;
+  font-size: var(--fs-sm);
+  cursor: pointer;
+}
+
+.actionPrimary {
+  border-color: var(--c-accent);
+  background-color: color-mix(in srgb, var(--c-accent) 18%, transparent);
+}
+
+.actionPrimary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.action:hover,
+.actionPrimary:not(:disabled):hover {
+  background-color: var(--c-bg-contrast-light);
+}

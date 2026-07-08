@@ -20,6 +20,7 @@ import {
 } from "./api";
 import { encodeSearchText } from "./textEmbeddings";
 import { warmupTextEmbeddingModel } from "./textEmbeddings";
+import { encodeSearchImage } from "./imageEmbeddings";
 
 const mockPush = jest.fn();
 const mockUseDatabase = jest.fn();
@@ -75,6 +76,10 @@ jest.mock("./api", () => ({
 jest.mock("./textEmbeddings", () => ({
   encodeSearchText: jest.fn(),
   warmupTextEmbeddingModel: jest.fn(),
+}));
+
+jest.mock("./imageEmbeddings", () => ({
+  encodeSearchImage: jest.fn(),
 }));
 
 const mockDatabase = { exec: jest.fn() };
@@ -1177,5 +1182,115 @@ describe("Search", () => {
       ][0].queryKey;
 
     expect(keyAfterLoad).not.toEqual(keyBeforeLoad);
+  });
+});
+
+describe("image query", () => {
+  beforeEach(() => {
+    Object.defineProperty(global.URL, "createObjectURL", {
+      writable: true,
+      value: jest.fn(() => "blob:mock-preview"),
+    });
+    Object.defineProperty(global.URL, "revokeObjectURL", {
+      writable: true,
+      value: jest.fn(),
+    });
+  });
+
+  const uploadImage = async () => {
+    const uploadButton = screen.getByRole("button", {
+      name: /search by image/i,
+    });
+    const fileInput = uploadButton
+      .closest("div")
+      ?.querySelector('input[type="file"]') as HTMLInputElement;
+    expect(fileInput).toBeTruthy();
+
+    const file = new File(["fake-image-bytes"], "query.png", {
+      type: "image/png",
+    });
+    await act(async () => {
+      fireEvent.change(fileInput, { target: { files: [file] } });
+    });
+    await flushEffects();
+  };
+
+  it("uploading an image runs a vector search with the encoded embedding", async () => {
+    (encodeSearchImage as jest.Mock).mockResolvedValue([1, 0, 0]);
+
+    await renderSearch();
+    await uploadImage();
+
+    expect(encodeSearchImage).toHaveBeenCalledTimes(1);
+    await waitFor(() => {
+      expect(fetchSemanticResults).toHaveBeenCalledWith(
+        expect.objectContaining({
+          textVector: [1, 0, 0],
+        }),
+      );
+    });
+  });
+
+  it("renders the ranked results for an image query", async () => {
+    // The grid must not treat an image query as the no-query empty state —
+    // there is no text/similar/colour/facet input, only the vector (caught
+    // live: 48 rows came back and the grid rendered an empty <ul>).
+    (encodeSearchImage as jest.Mock).mockResolvedValue([1, 0, 0]);
+
+    await renderSearch();
+    await uploadImage();
+
+    // The mocked useInfiniteQuery returns the hybrid-mode fixture row for any
+    // non-similar query; its tile rendering is what's under test here.
+    const tiles = await screen.findAllByTestId("result-picture");
+    expect(tiles.length).toBeGreaterThan(0);
+  });
+
+  it("embeds a zoomed preview of the query image in the chip for hover", async () => {
+    // The chip thumbnail is 20px — far too small to recognise a sketch. A
+    // larger copy rides inside the chip and is revealed on hover/focus via
+    // CSS, so the DOM contract is simply that it exists with the preview URL.
+    (encodeSearchImage as jest.Mock).mockResolvedValue([1, 0, 0]);
+
+    await renderSearch();
+    await uploadImage();
+
+    const zoom = await screen.findByTestId("image-query-zoom");
+    const zoomImage = zoom.querySelector("img");
+    expect(zoomImage?.getAttribute("src")).toBe("blob:mock-preview");
+  });
+
+  it("shows a removable image-query chip that clears the search", async () => {
+    (encodeSearchImage as jest.Mock).mockResolvedValue([1, 0, 0]);
+
+    await renderSearch();
+    await uploadImage();
+
+    const chip = await screen.findByRole("button", {
+      name: /remove image query/i,
+    });
+
+    await act(async () => {
+      fireEvent.click(chip);
+    });
+    await flushEffects();
+
+    expect(
+      screen.queryByRole("button", { name: /remove image query/i }),
+    ).toBeNull();
+  });
+
+  it("surfaces an inline error when image encoding fails", async () => {
+    (encodeSearchImage as jest.Mock).mockRejectedValue(
+      new Error("model exploded"),
+    );
+
+    await renderSearch();
+    await uploadImage();
+
+    expect(
+      await screen.findByText(/image search is unavailable right now/i),
+    ).toBeTruthy();
+    expect(fetchSemanticResults).not.toHaveBeenCalled();
   });
 });

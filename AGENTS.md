@@ -95,6 +95,8 @@ Design system primitives live in `src/components/ui/` with a barrel export. Impo
 - Colour-matched paths capped at 900 before building SQL `IN` clause (SQLite bind-parameter limit)
 - Colour filter composes with text search and facets — not a separate mode
 - Semantic search runs `Xenova/siglip-base-patch16-224` (SigLIP **v1**, ONNX, q4) in a web worker; v1 is used because the v2 model is too large to ship to the browser — do not upgrade without a viable ONNX-quantised v2 alternative
+- Image/sketch search (`useImageQuery`) runs the same repo's **vision** tower (q4, lazy-loaded on first use) and ranks against the DB's v1 image embeddings via `fetchSemanticResults`; the query is ephemeral (not URL-persisted)
+- Text AND image encoders share ONE worker entry (`embedding.worker.ts`) — two near-identical sibling worker files made Turbopack cross-wire the `new Worker(new URL(...))` bindings in production (each client got the other's worker); do not split them again
 - **Image embeddings in the DB must be SigLIP v1** (`google/siglip-base-patch16-224`) for semantic search; v2 embeddings are in a different embedding space and only work for image-to-image similarity
 - COI headers required for SharedArrayBuffer; search page is wrapped in `WithCoi`
 
@@ -138,14 +140,14 @@ cd index
 **Database schema** (FTS5 + plain tables):
 - `images` — FTS5 virtual table: `path`, `geocode`, `exif`, `tags`, `colors`, `alt_text`, `subject`
 - `metadata` — `path`, `lat_deg`, `lng_deg`, `iso8601`
-- `embeddings` — `path`, `model_id`, `embedding_dim`, `embedding_json`
+- `embeddings` — `path`, `model_id`, `embedding_dim`, `embedding_blob` (int8-quantised), `embedding_scale` (per-vector dequantisation factor); readers (`api.ts`, `computeEmbeddingStats.ts`) also accept the legacy `embedding_json` format from older DBs
 - `tags` — denormalised tag frequency counts
 
 **Key behaviours:**
 - Incremental: already-indexed paths are skipped (one bulk `SELECT` into a set, then O(1) checks)
 - `colors` stored as serialised RGB tuples; `parseColorPalette` in `src/util/colorDistance.ts` deserialises them at build time
 - FTS5 uses `porter trigram` tokeniser — supports both stemmed keyword and substring search
-- Page size set to 1024 bytes and journal mode to `delete` (a legacy of sql.js-httpvfs range reads; the browser now downloads the DBs in full via `@sqlite.org/sqlite-wasm`)
+- Page size 4096 (SQLite default) and journal mode `delete`; opening an old DB (JSON embeddings / 1024-byte pages) with any command that calls `setup_tables` — e.g. `backfill` — migrates and VACUUMs it in place
 
 ## CI (`.github/workflows/ci.yml`)
 Runs on PRs to `main`, pushes to `main` and `release/*`, and manual dispatch.

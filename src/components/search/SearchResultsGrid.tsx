@@ -7,6 +7,9 @@ import { RGB } from "../../util/colorDistance";
 type Props = {
   isSimilarMode: boolean;
   isColorMode: boolean;
+  /** An uploaded/drawn image query is active — it has no text/similar/colour
+   *  state, so it must count as an active search in its own right. */
+  isImageQueryMode: boolean;
   isColorCategoryActive: boolean;
   hasFacetFilters: boolean;
   searchInputValue: string;
@@ -30,6 +33,7 @@ type Props = {
 export const SearchResultsGrid: React.FC<Props> = ({
   isSimilarMode,
   isColorMode,
+  isImageQueryMode,
   isColorCategoryActive,
   hasFacetFilters,
   searchInputValue,
@@ -50,6 +54,7 @@ export const SearchResultsGrid: React.FC<Props> = ({
   const showResults =
     isSimilarMode ||
     isColorMode ||
+    isImageQueryMode ||
     hasFacetFilters ||
     searchInputValue.trim().length > 0;
   const hasTextQuery = trimmedQuery.length >= 3;
@@ -84,7 +89,7 @@ export const SearchResultsGrid: React.FC<Props> = ({
       !isFetching &&
       results?.length === 0 &&
       !isSimilarMode &&
-      (hasTextQuery || hasFacetFilters || isColorMode) ? (
+      (hasTextQuery || hasFacetFilters || isColorMode || isImageQueryMode) ? (
         <li className={styles.sectionStatus}>
           {hasTextQuery ? (
             <>

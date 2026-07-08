@@ -1,4 +1,4 @@
-import React, { useId, useState, useSyncExternalStore } from "react";
+import React, { useId, useRef, useState, useSyncExternalStore } from "react";
 import { Input, Select } from "../ui";
 import styles from "./Search.module.css";
 import { SearchMode } from "./useTextVector";
@@ -22,6 +22,8 @@ type Props = {
   onClearSearchState: () => void;
   onStartRandomSimilarSearch: () => void;
   onSetSearchMode: (mode: SearchMode) => void;
+  onPickImageQuery: (file: File) => void;
+  onOpenDrawPad: () => void;
 };
 
 export const SearchInputBar: React.FC<Props> = ({
@@ -40,6 +42,8 @@ export const SearchInputBar: React.FC<Props> = ({
   onClearSearchState,
   onStartRandomSimilarSearch,
   onSetSearchMode,
+  onPickImageQuery,
+  onOpenDrawPad,
 }) => {
   const isMounted = useSyncExternalStore(
     () => () => {},
@@ -48,6 +52,7 @@ export const SearchInputBar: React.FC<Props> = ({
   );
   const [isModeHelpOpen, setIsModeHelpOpen] = useState(false);
   const modeHelpId = useId();
+  const imageFileInputRef = useRef<HTMLInputElement | null>(null);
 
   return (
     <div className={styles.searchInputRow}>
@@ -135,6 +140,42 @@ export const SearchInputBar: React.FC<Props> = ({
               🎲 Random starting photo
             </button>
           ) : null}
+          <div className={styles.imageQueryActions}>
+            <input
+              ref={imageFileInputRef}
+              className={styles.imageQueryFileInput}
+              type="file"
+              accept="image/*"
+              tabIndex={-1}
+              aria-hidden="true"
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                if (file) {
+                  onPickImageQuery(file);
+                }
+                // Reset so re-picking the same file fires change again.
+                event.target.value = "";
+              }}
+            />
+            <button
+              type="button"
+              className={styles.secondaryAction}
+              onClick={() => imageFileInputRef.current?.click()}
+              disabled={!databaseReady}
+              title="Upload a photo and find visually similar ones"
+            >
+              📷 Search by image
+            </button>
+            <button
+              type="button"
+              className={styles.secondaryAction}
+              onClick={onOpenDrawPad}
+              disabled={!databaseReady}
+              title="Draw a sketch and find photos that look like it"
+            >
+              ✏️ Draw to search
+            </button>
+          </div>
         </>
       )}
 
