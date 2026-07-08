@@ -1,5 +1,12 @@
 # Plan: First-Class Video Support
 
+> **Status: implemented** — poster extraction and video presence across the
+> web app are live. The one deliberate gap is the *search index*: the Python
+> indexer still globs `*.jpg` only, so videos are not searchable. Parked until
+> a real (non-test) video exists in an album; the sketch is to feed one
+> ffmpeg-extracted frame through the existing Janus + SigLIP pipeline, with
+> ffprobe for creation time/GPS (video containers do not carry EXIF).
+
 ## Context
 
 Videos can already appear inline on album pages — `VideoBlock.tsx` renders `<video>` with IntersectionObserver play/pause, `video.ts` transcodes to H.264 MP4 via FFmpeg, and `deserialize.ts` wires it into the build pipeline. But videos are invisible everywhere else: no poster thumbnails, excluded from search, timeline, map, slideshow, explore stats, and similar-photos features. This plan makes videos first-class across the entire gallery.

@@ -1,5 +1,9 @@
 # Guess Where — Design Plan
 
+> **Status: implemented** — live at `/guess` (including daily mode and seed
+> challenge links), with e2e coverage in `src/tests/guess.spec.ts`. Kept as a
+> design record.
+
 A GeoGuessr-style game using your own photos. You're shown a photo, you click the map to guess where it was taken, and you're scored by distance.
 
 ## Core loop
