@@ -465,10 +465,13 @@ describe("Search", () => {
     expect(screen.getByText("Latest")).toBeTruthy();
     expect(screen.getByText("Random selection")).toBeTruthy();
     // DB-download progress is reported to the page (shown beside the heading),
-    // not rendered as an in-flow bar inside the Search widget.
+    // not rendered as an in-flow bar inside the Search widget. The activity
+    // label says WHAT is downloading — an unlabelled byte count reads as
+    // mystery data usage, especially for the large one-time model files.
     expect(onNavStateChange.mock.calls.at(-1)?.[0].loading).toMatchObject({
       progress: 42,
       details: { loaded: 2_000_000, total: 4_000_000 },
+      activity: "Downloading search index",
     });
     expect(screen.getByRole("button", { name: /harbor/i })).toBeTruthy();
     expect(await screen.findByAltText("Recent shot")).toBeTruthy();
@@ -1149,6 +1152,7 @@ describe("Search", () => {
       expect(onNavStateChange.mock.calls.at(-1)?.[0].loading).toMatchObject({
         progress: 50,
         details: { loaded: 2 * 1024 * 1024, total: 4 * 1024 * 1024 },
+        activity: "Downloading semantic search model (one-time)",
       });
     });
 

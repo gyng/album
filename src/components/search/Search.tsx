@@ -80,10 +80,14 @@ const isEditableTarget = (target: EventTarget | null): boolean => {
 export type SearchNavState = {
   databaseReady: boolean;
   /** Whichever resource is currently loading (database, similarity index, or
-      text model), surfaced once so the page can show a single progress bar by
-      the heading instead of in-flow bars that shift content. Null when idle. */
+      an embedding model), surfaced once so the page can show a single progress
+      bar by the heading instead of in-flow bars that shift content. `activity`
+      names what is downloading — an unlabelled byte count reads as mystery
+      data usage, especially for the large one-time model files. Null when
+      idle. */
   loading: {
     progress: number;
+    activity: string;
     details?: { loaded: number; total: number };
   } | null;
   isRandomSimilarLoading: boolean;
@@ -843,13 +847,22 @@ export const Search: React.FC<{
     const loading = databaseError
       ? null
       : progress < 100
-        ? { progress, details: databaseProgressDetails }
+        ? {
+            progress,
+            details: databaseProgressDetails,
+            activity: "Downloading search index",
+          }
         : needsEmbeddingsDatabase && !embeddingsDatabase && !embeddingsError
-          ? { progress: embeddingsProgress, details: embeddingsProgressDetails }
+          ? {
+              progress: embeddingsProgress,
+              details: embeddingsProgressDetails,
+              activity: "Downloading similarity index",
+            }
           : imageQuery && imageModelProgress < 100
             ? {
                 progress: imageModelProgress,
                 details: imageModelProgressDetails,
+                activity: "Downloading image search model (one-time)",
               }
             : !isSimilarMode &&
                 searchMode !== "keyword" &&
@@ -857,6 +870,7 @@ export const Search: React.FC<{
               ? {
                   progress: textModelProgress,
                   details: textModelProgressDetails,
+                  activity: "Downloading semantic search model (one-time)",
                 }
               : null;
 

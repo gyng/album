@@ -102,6 +102,7 @@ const SearchPage: NextPage<PageProps> = (props) => {
             <ProgressBar
               progress={searchNavState.loading.progress}
               details={searchNavState.loading.details}
+              activity={searchNavState.loading.activity}
             />
           ) : null}
         </div>

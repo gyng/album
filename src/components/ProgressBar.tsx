@@ -23,27 +23,30 @@ const formatBytes = (value: number): string => {
   return `${nextValue.toFixed(precision)} ${units[unitIndex]}`;
 };
 
-const getLabel = (details?: ProgressDetails): string => {
+const getLabel = (details?: ProgressDetails, activity = "Loading"): string => {
   if (!details || details.total <= 0) {
-    return "Loading…";
+    return `${activity}…`;
   }
 
-  return `Loading… ${formatBytes(details.loaded)} / ${formatBytes(details.total)}`;
+  return `${activity}… ${formatBytes(details.loaded)} / ${formatBytes(details.total)}`;
 };
 
 export const ProgressBar: React.FC<{
   progress: number;
   hideIfComplete?: boolean;
   details?: ProgressDetails;
-  /** Overrides the derived "Loading…" label — e.g. a status the bar should
+  /** Names what is loading, keeping the byte counter — e.g. "Downloading
+      search index… 1.2 MB / 5.1 MB". Defaults to plain "Loading". */
+  activity?: string;
+  /** Overrides the derived label entirely — e.g. a status the bar should
       show once it's full but work continues. */
   label?: string;
-}> = ({ progress, hideIfComplete = true, details, label }) => {
+}> = ({ progress, hideIfComplete = true, details, activity, label }) => {
   return !hideIfComplete || progress < 100 ? (
     <div className={styles.wrapper}>
       <div className={styles.progressBar}>
         <div className={styles.progress} style={{ width: `${progress}%` }} />
-        <div>{label ?? getLabel(details)}</div>
+        <div>{label ?? getLabel(details, activity)}</div>
       </div>
     </div>
   ) : null;
