@@ -134,6 +134,40 @@ const dotProduct = (left: number[], right: number[]): number => {
 const isTestAlbum = (album: Content): boolean =>
   album.name.startsWith("test-") || album._build.slug.startsWith("test-");
 
+const MAX_ERA_LABEL_TAGS = 2;
+
+/**
+ * Names a visual-era cluster from its members' most DISTINCTIVE tags. Raw
+ * frequency would label every cluster with gallery-wide tags (a travel
+ * gallery's country tag sits on most photos), so each tag's cluster count is
+ * weighted by its precision: count × (count / overall count). Ties break
+ * alphabetically for determinism; underscores render as spaces.
+ */
+export const deriveEraLabel = (
+  clusterTagLists: string[][],
+  overallTagCounts: Map<string, number>,
+  fallback: string,
+): string => {
+  const clusterCounts = new Map<string, number>();
+  clusterTagLists.flat().forEach((tag) => {
+    clusterCounts.set(tag, (clusterCounts.get(tag) ?? 0) + 1);
+  });
+
+  const top = Array.from(clusterCounts.entries())
+    .map(([tag, count]) => ({
+      tag,
+      score: count * (count / (overallTagCounts.get(tag) ?? count)),
+    }))
+    .sort(
+      (left, right) =>
+        right.score - left.score || left.tag.localeCompare(right.tag),
+    )
+    .slice(0, MAX_ERA_LABEL_TAGS)
+    .map((entry) => entry.tag.replace(/_/g, " "));
+
+  return top.length > 0 ? top.join(" · ") : fallback;
+};
+
 export const computeVisualSamenessFromVectors = (
   vectors: number[][],
 ): VisualSamenessStats | null => {
@@ -211,6 +245,42 @@ const buildPhotoLookup = (albums: Content[]): PhotoLookup => {
         href: `/album/${album._build.slug}#${photo.id ?? photo.data.src}`,
         label: photo.data.title ?? path.basename(photo.data.src),
       });
+    });
+  });
+
+  return lookup;
+};
+
+const buildPhotoTagLookup = (albums: Content[]): Map<string, string[]> => {
+  const lookup = new Map<string, string[]>();
+
+  albums.forEach((album) => {
+    if (isTestAlbum(album)) {
+      return;
+    }
+
+    album.blocks.forEach((block) => {
+      if (block.kind !== "photo") {
+        return;
+      }
+
+      const photo = block as PhotoBlock;
+      const indexedPath = photo._build?.tags?.path;
+      // In a real build `_build.tags` is the raw search-index row, whose
+      // `tags` column is a comma-separated string; the declared string[]
+      // shape only occurs in fixtures. Accept both.
+      const rawTags = photo._build?.tags?.tags as string[] | string | undefined;
+      const tags = Array.isArray(rawTags)
+        ? rawTags
+        : typeof rawTags === "string"
+          ? rawTags
+              .split(",")
+              .map((tag) => tag.trim())
+              .filter(Boolean)
+          : [];
+      if (indexedPath && tags.length > 0) {
+        lookup.set(indexedPath, tags);
+      }
     });
   });
 
@@ -338,6 +408,7 @@ export const computeVisualSamenessStats = async (
 
     const photoLookup = buildPhotoLookup(albums);
     const photoDateLookup = buildPhotoDateLookup(albums);
+    const photoTagLookup = buildPhotoTagLookup(albums);
     const candidatePaths = albums
       .filter((album) => !isTestAlbum(album))
       .flatMap((album) => album.blocks)
@@ -621,6 +692,15 @@ export const computeVisualSamenessStats = async (
             finalGroups[bestIndex].push(candidate);
           });
 
+          // Distinctiveness weighting in deriveEraLabel needs gallery-wide tag
+          // counts, computed once over every clustered photo.
+          const overallTagCounts = new Map<string, number>();
+          centroidCandidates.forEach((candidate) => {
+            (photoTagLookup.get(candidate.path) ?? []).forEach((tag) => {
+              overallTagCounts.set(tag, (overallTagCounts.get(tag) ?? 0) + 1);
+            });
+          });
+
           visualEras = finalGroups
             .map((group, index) => {
               const clusterCentroid = centroids[index];
@@ -640,7 +720,13 @@ export const computeVisualSamenessStats = async (
               }
 
               return {
-                label: `Era ${index + 1}`,
+                label: deriveEraLabel(
+                  group.map(
+                    (candidate) => photoTagLookup.get(candidate.path) ?? [],
+                  ),
+                  overallTagCounts,
+                  `Era ${index + 1}`,
+                ),
                 photos,
                 count: group.length,
                 sharePercent: Math.round((group.length / centroidCandidates.length) * 100),

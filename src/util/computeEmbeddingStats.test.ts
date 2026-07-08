@@ -4,6 +4,7 @@ import nodePath from "node:path";
 import {
   computeVisualSamenessFromVectors,
   computeVisualSamenessStats,
+  deriveEraLabel,
   selectEmbeddingModelId,
 } from "./computeEmbeddingStats";
 
@@ -26,7 +27,7 @@ const makePseudoRandom = (seed: number) => {
   };
 };
 
-const makeAlbum = (paths: string[]) =>
+const makeAlbum = (paths: string[], tagsForPath?: (index: number) => string[]) =>
   ({
     name: "real-album",
     _build: { slug: "real-album" },
@@ -34,7 +35,10 @@ const makeAlbum = (paths: string[]) =>
       kind: "photo",
       id: `photo-${index}`,
       data: { src: photoPath, title: `Photo ${index}` },
-      _build: { tags: { path: photoPath }, srcset: [{ src: photoPath }] },
+      _build: {
+        tags: { path: photoPath, tags: tagsForPath?.(index) },
+        srcset: [{ src: photoPath }],
+      },
     })),
   }) as any;
 
@@ -199,6 +203,107 @@ describe("computeVisualSamenessStats with a mixed v1/v2 database", () => {
 
     expect(stats).not.toBeNull();
     expect(stats?.sampleSize).toBe(30);
+  });
+});
+
+describe("deriveEraLabel", () => {
+  it("labels a cluster with its most distinctive tags, not the most common", () => {
+    // "japan" is on nearly every photo overall, so despite topping the raw
+    // count inside the cluster it must lose to the cluster-specific tags.
+    const clusterTags = [
+      ["japan", "night", "street"],
+      ["japan", "night", "street"],
+      ["japan", "night", "neon"],
+    ];
+    const overallCounts = new Map([
+      ["japan", 900],
+      ["night", 4],
+      ["street", 3],
+      ["neon", 1],
+    ]);
+
+    expect(deriveEraLabel(clusterTags, overallCounts, "Era 1")).toBe(
+      "night · street",
+    );
+  });
+
+  it("formats underscore tags for display", () => {
+    const clusterTags = [["plant_stand"], ["plant_stand"]];
+    const overallCounts = new Map([["plant_stand", 2]]);
+
+    expect(deriveEraLabel(clusterTags, overallCounts, "Era 1")).toBe(
+      "plant stand",
+    );
+  });
+
+  it("falls back when the cluster has no tags", () => {
+    expect(deriveEraLabel([[], []], new Map(), "Era 3")).toBe("Era 3");
+  });
+});
+
+describe("visual era labels from real-build tag strings", () => {
+  it("splits the comma-separated tags the search index row carries", async () => {
+    // In a real build _build.tags is the raw images row, whose `tags` column
+    // is a comma-separated string — not the string[] the fixture-style shape
+    // suggests. Both must work.
+    const paths = Array.from(
+      { length: 60 },
+      (_, index) => `../albums/real/img-${index}.jpg`,
+    );
+    const rng = makePseudoRandom(23);
+    const rows = paths.map((photoPath) => ({
+      path: photoPath,
+      model_id: V2_MODEL_ID,
+      json: JSON.stringify(
+        normalize([rng() * 2 - 1, rng() * 2 - 1, rng() * 2 - 1]),
+      ),
+    }));
+
+    const album = makeAlbum(paths);
+    album.blocks.forEach((block: any, index: number) => {
+      block._build.tags.tags =
+        index % 2 === 0 ? "night, street" : "beach, sea";
+    });
+
+    const dbPath = await createEmbeddingsDb(rows);
+    const stats = await computeVisualSamenessStats([album], dbPath);
+
+    expect(stats?.visualEras.length).toBeGreaterThan(0);
+    stats?.visualEras.forEach((era) => {
+      expect(era.label).not.toMatch(/^Era \d+$/);
+    });
+  });
+});
+
+describe("visual era labels from cluster tags", () => {
+  it("names eras from member tags instead of Era N", async () => {
+    const paths = Array.from(
+      { length: 60 },
+      (_, index) => `../albums/real/img-${index}.jpg`,
+    );
+    const rng = makePseudoRandom(11);
+    const rows = paths.map((photoPath) => ({
+      path: photoPath,
+      model_id: V2_MODEL_ID,
+      json: JSON.stringify(
+        normalize([rng() * 2 - 1, rng() * 2 - 1, rng() * 2 - 1]),
+      ),
+    }));
+
+    const dbPath = await createEmbeddingsDb(rows);
+    const stats = await computeVisualSamenessStats(
+      [
+        makeAlbum(paths, (index) =>
+          index % 2 === 0 ? ["night", "street"] : ["beach", "sea"],
+        ),
+      ],
+      dbPath,
+    );
+
+    expect(stats?.visualEras.length).toBeGreaterThan(0);
+    stats?.visualEras.forEach((era) => {
+      expect(era.label).not.toMatch(/^Era \d+$/);
+    });
   });
 });
 
