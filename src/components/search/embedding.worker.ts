@@ -42,7 +42,11 @@ type TransformersProgressInfo =
       total?: number;
     };
 
-const loadingRequestIds = new Set<number>();
+// Per-runtime sets: a text load's progress must only reach text requesters
+// (and vision likewise) — with one shared set, simultaneous loads spray each
+// other's progress (and mislabel the UI's activity text).
+const textLoadingRequestIds = new Set<number>();
+const visionLoadingRequestIds = new Set<number>();
 
 // Both towers must stay in the SigLIP v1 space — image and text query vectors
 // are ranked against the DB's `google/siglip-base-patch16-224` embeddings.
@@ -99,6 +103,7 @@ const normalizeVector = (values: Float32Array | number[]): number[] => {
 };
 
 const postLoadProgress = (
+  loadingRequestIds: Set<number>,
   progress: number,
   stage: string,
   details?: WorkerProgressDetails,
@@ -115,6 +120,7 @@ const postLoadProgress = (
 };
 
 const reportProgress = (
+  loadingRequestIds: Set<number>,
   phaseStart: number,
   phaseSpan: number,
   phaseLabel: string,
@@ -125,7 +131,7 @@ const reportProgress = (
   }
 
   const overallProgress = phaseStart + (info.progress / 100) * phaseSpan;
-  postLoadProgress(overallProgress, `${phaseLabel} (${info.file})`, {
+  postLoadProgress(loadingRequestIds, overallProgress, `${phaseLabel} (${info.file})`, {
     loaded: info.loaded,
     total: info.total,
     file: info.file,
@@ -151,6 +157,7 @@ const loadModelWithFallback = async <T>(
 };
 
 const trackLoading = async <T>(
+  loadingRequestIds: Set<number>,
   requestId: number | undefined,
   load: () => Promise<T>,
 ): Promise<T> => {
@@ -168,18 +175,18 @@ const trackLoading = async <T>(
 };
 
 const loadTextRuntime = async (requestId?: number) =>
-  trackLoading(requestId, async () => {
+  trackLoading(textLoadingRequestIds, requestId, async () => {
     if (!textRuntimePromise) {
       env.allowLocalModels = false;
 
       textRuntimePromise = (async () => {
-        postLoadProgress(5, "Starting model load");
+        postLoadProgress(textLoadingRequestIds, 5, "Starting model load");
         const tokenizer = await AutoTokenizer.from_pretrained(MODEL_ID, {
           progress_callback: (info: TransformersProgressInfo) => {
-            reportProgress(5, 30, "Loading tokenizer", info);
+            reportProgress(textLoadingRequestIds, 5, 30, "Loading tokenizer", info);
           },
         });
-        postLoadProgress(35, "Tokenizer ready");
+        postLoadProgress(textLoadingRequestIds, 35, "Tokenizer ready");
 
         const model = await loadModelWithFallback(
           (device) =>
@@ -187,20 +194,20 @@ const loadTextRuntime = async (requestId?: number) =>
               device,
               dtype: "q4",
               progress_callback: (info: TransformersProgressInfo) => {
-                reportProgress(35, 60, "Loading text model", info);
+                reportProgress(textLoadingRequestIds, 35, 60, "Loading text model", info);
               },
             }),
           "text model",
         );
 
-        postLoadProgress(95, "Search model ready");
+        postLoadProgress(textLoadingRequestIds, 95, "Search model ready");
         return { tokenizer, model };
       })();
     }
 
     try {
       const runtime = await textRuntimePromise;
-      postLoadProgress(100, "Search model ready");
+      postLoadProgress(textLoadingRequestIds, 100, "Search model ready");
       return runtime;
     } catch (error) {
       // Reset so a later attempt can retry — otherwise a single transient
@@ -211,18 +218,18 @@ const loadTextRuntime = async (requestId?: number) =>
   });
 
 const loadVisionRuntime = async (requestId?: number) =>
-  trackLoading(requestId, async () => {
+  trackLoading(visionLoadingRequestIds, requestId, async () => {
     if (!visionRuntimePromise) {
       env.allowLocalModels = false;
 
       visionRuntimePromise = (async () => {
-        postLoadProgress(5, "Starting image model load");
+        postLoadProgress(visionLoadingRequestIds, 5, "Starting image model load");
         const processor = await AutoProcessor.from_pretrained(MODEL_ID, {
           progress_callback: (info: TransformersProgressInfo) => {
-            reportProgress(5, 10, "Loading image processor", info);
+            reportProgress(visionLoadingRequestIds, 5, 10, "Loading image processor", info);
           },
         });
-        postLoadProgress(15, "Image processor ready");
+        postLoadProgress(visionLoadingRequestIds, 15, "Image processor ready");
 
         const model = await loadModelWithFallback(
           (device) =>
@@ -232,20 +239,20 @@ const loadVisionRuntime = async (requestId?: number) =>
               // re-embedded in-browser ranked themselves #1 of 1495.
               dtype: "q4",
               progress_callback: (info: TransformersProgressInfo) => {
-                reportProgress(15, 80, "Loading image model", info);
+                reportProgress(visionLoadingRequestIds, 15, 80, "Loading image model", info);
               },
             }),
           "image model",
         );
 
-        postLoadProgress(95, "Image search model ready");
+        postLoadProgress(visionLoadingRequestIds, 95, "Image search model ready");
         return { processor, model };
       })();
     }
 
     try {
       const runtime = await visionRuntimePromise;
-      postLoadProgress(100, "Image search model ready");
+      postLoadProgress(visionLoadingRequestIds, 100, "Image search model ready");
       return runtime;
     } catch (error) {
       visionRuntimePromise = null;
