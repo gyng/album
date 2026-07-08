@@ -41,11 +41,13 @@ const isMissingEmbeddingsTableError = (err: unknown): boolean => {
   );
 };
 
+type EmbeddingVector = number[] | Float32Array;
+
 type EmbeddingRow = {
   path: string;
   model_id: string;
   embedding_dim: number;
-  embedding_json: string;
+  embedding: EmbeddingVector;
 };
 
 type RankedVectorResult = {
@@ -475,10 +477,20 @@ const exec = async (
   };
 };
 
+const decodeInt8Embedding = (blob: Uint8Array, scale: number): Float32Array => {
+  const bytes = new Int8Array(blob.buffer, blob.byteOffset, blob.byteLength);
+  const vector = new Float32Array(bytes.length);
+  for (let idx = 0; idx < bytes.length; idx += 1) {
+    vector[idx] = bytes[idx] * scale;
+  }
+  return vector;
+};
+
 export const searchInternals = {
   exec,
   buildFacetWhereClause,
   hasStructuredGeocode,
+  decodeInt8Embedding,
 };
 
 const mapImageRows = (rows: any[][]): SearchResultRow[] => {
@@ -497,7 +509,10 @@ const mapImageRows = (rows: any[][]): SearchResultRow[] => {
   });
 };
 
-const cosineSimilarity = (left: number[], right: number[]): number => {
+const cosineSimilarity = (
+  left: ArrayLike<number>,
+  right: ArrayLike<number>,
+): number => {
   if (left.length === 0 || left.length !== right.length) {
     return 0;
   }
@@ -525,7 +540,7 @@ const getResultSnippet = (row: SearchResultRow): string => {
 
 const rankEmbeddingsByVector = async (opts: {
   database: SearchDatabase;
-  queryVector: number[];
+  queryVector: EmbeddingVector;
   modelId: string;
   excludePaths?: string[];
 }): Promise<RankedVectorResult[]> => {
@@ -538,23 +553,10 @@ const rankEmbeddingsByVector = async (opts: {
 
   return candidates
     .filter((candidate) => !excluded.has(candidate.path))
-    .flatMap((candidate) => {
-      try {
-        return [
-          {
-            path: candidate.path,
-            similarity: cosineSimilarity(
-              queryVector,
-              // JSON.parse is necessary here — embeddings must be deserialized to compute cosine similarity at query time
-            JSON.parse(candidate.embedding_json) as number[],
-            ),
-          },
-        ];
-      } catch {
-        console.warn(`Skipping malformed embedding for ${candidate.path}`);
-        return [];
-      }
-    })
+    .map((candidate) => ({
+      path: candidate.path,
+      similarity: cosineSimilarity(queryVector, candidate.embedding),
+    }))
     .sort((left, right) => right.similarity - left.similarity);
 };
 
@@ -863,16 +865,65 @@ export const fetchSearchFacetSections = async (opts: {
   );
 };
 
+// The embeddings table exists in two on-disk formats: int8 blobs with a
+// per-vector scale (current) and JSON text (DBs published before the format
+// change, which can outlive a deploy in caches). Detect per query — the table
+// can also appear mid-session when the lazily-downloaded embeddings DB swaps
+// in over the core DB.
+const embeddingsTableHasBlobColumn = async (
+  database: SearchDatabase,
+): Promise<boolean> => {
+  const result = await exec(database, "PRAGMA table_info(embeddings)", []);
+  return (result.data as unknown as any[][]).some(
+    (row) => String(row[1]) === "embedding_blob",
+  );
+};
+
+const decodeEmbeddingRow = (
+  row: any[],
+  hasBlobColumn: boolean,
+): EmbeddingRow | null => {
+  if (hasBlobColumn) {
+    return {
+      path: row[0],
+      model_id: row[1],
+      embedding_dim: row[2],
+      embedding: decodeInt8Embedding(row[3] as Uint8Array, Number(row[4])),
+    };
+  }
+  try {
+    const parsed = JSON.parse(row[3]) as number[];
+    if (!Array.isArray(parsed)) {
+      return null;
+    }
+    return {
+      path: row[0],
+      model_id: row[1],
+      embedding_dim: row[2],
+      embedding: parsed,
+    };
+  } catch {
+    console.warn(`Skipping malformed embedding for ${row[0]}`);
+    return null;
+  }
+};
+
+const embeddingColumnsSql = (hasBlobColumn: boolean): string =>
+  hasBlobColumn
+    ? "path, model_id, embedding_dim, embedding_blob, embedding_scale"
+    : "path, model_id, embedding_dim, embedding_json";
+
 const fetchEmbeddingByPath = async (
   database: SearchDatabase,
   path: string,
 ): Promise<EmbeddingRow | null> => {
+  const hasBlobColumn = await embeddingsTableHasBlobColumn(database);
   // Deterministically prefer the v2 space (then v1) so the seed's embedding
   // space — and hence result ordering and "% match" scale — doesn't depend on
   // physical row order when the DB holds both models.
   const result = await exec(
     database,
-    `SELECT path, model_id, embedding_dim, embedding_json
+    `SELECT ${embeddingColumnsSql(hasBlobColumn)}
       FROM embeddings
       WHERE path = ?
       ORDER BY CASE model_id
@@ -889,34 +940,27 @@ const fetchEmbeddingByPath = async (
     return null;
   }
 
-  const row = result.data[0] as unknown as any[];
-  return {
-    path: row[0],
-    model_id: row[1],
-    embedding_dim: row[2],
-    embedding_json: row[3],
-  };
+  return decodeEmbeddingRow(result.data[0] as unknown as any[], hasBlobColumn);
 };
 
 const fetchEmbeddingsByModel = async (
   database: SearchDatabase,
   modelId: string,
 ): Promise<EmbeddingRow[]> => {
+  const hasBlobColumn = await embeddingsTableHasBlobColumn(database);
   const result = await exec(
     database,
-    `SELECT path, model_id, embedding_dim, embedding_json
+    `SELECT ${embeddingColumnsSql(hasBlobColumn)}
       FROM embeddings
       WHERE model_id = ?`,
     [modelId],
     { suppressMissingEmbeddingsTableError: true },
   );
 
-  return (result.data as unknown as any[][]).map((row) => ({
-    path: row[0],
-    model_id: row[1],
-    embedding_dim: row[2],
-    embedding_json: row[3],
-  }));
+  return (result.data as unknown as any[][]).flatMap((row) => {
+    const decoded = decodeEmbeddingRow(row, hasBlobColumn);
+    return decoded ? [decoded] : [];
+  });
 };
 
 export const fetchResults = async (opts: {
@@ -1133,15 +1177,9 @@ export const fetchSimilarResults = async (opts: {
       return { data: [], query: path, prev: undefined, next: undefined };
     }
 
-    let queryVector: number[];
-    try {
-      queryVector = JSON.parse(queryEmbedding.embedding_json) as number[];
-    } catch {
-      return { data: [], query: path, prev: undefined, next: undefined };
-    }
     const rankedPaths = await rankEmbeddingsByVector({
       database: vectorDatabase,
-      queryVector,
+      queryVector: queryEmbedding.embedding,
       modelId: queryEmbedding.model_id,
       excludePaths: [path],
     });
@@ -1425,7 +1463,7 @@ export const fetchHybridResults = async (opts: {
         queryVector: textVector,
         modelId,
       }).catch((err) => {
-        // While the 52 MB embeddings DB is still downloading (or genuinely
+        // While the embeddings DB is still downloading (or genuinely
         // absent), the vector table is missing. Degrade to keyword-only ranking
         // instead of discarding the already-computed keyword results (HIGH-8).
         if (isMissingEmbeddingsTableError(err)) {

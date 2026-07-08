@@ -304,6 +304,127 @@ describe("fetchSimilarResults", () => {
   });
 });
 
+describe("blob-format embeddings", () => {
+  const int8Blob = (values: number[]): Uint8Array =>
+    new Uint8Array(Int8Array.from(values).buffer);
+
+  // Emulates a DB published after the int8-blob format change: table_info
+  // reports the blob columns, and only blob-shaped SELECTs return rows — a
+  // legacy embedding_json SELECT would fail on the real DB, so it returns
+  // nothing here and the ranking assertions below catch the wrong query.
+  const makeBlobDatabase = () => ({
+    exec: ({ sql, bind, callback }: ExecArgs) => {
+      if (sql.includes("table_info(embeddings)")) {
+        [
+          [0, "path", "VARCHAR", 1, null, 1],
+          [1, "model_id", "TEXT", 1, null, 2],
+          [2, "embedding_dim", "INTEGER", 0, null, 0],
+          [3, "embedding_blob", "BLOB", 0, null, 0],
+          [4, "embedding_scale", "REAL", 0, null, 0],
+        ].forEach((row) => callback(row as any[]));
+        return;
+      }
+
+      if (!sql.includes("embedding_blob") && sql.includes("FROM embeddings")) {
+        return;
+      }
+
+      if (sql.includes("FROM embeddings") && sql.includes("WHERE path = ?")) {
+        if (bind?.[0] === "../albums/test-simple/DSCF0506-2.jpg") {
+          callback([
+            "../albums/test-simple/DSCF0506-2.jpg",
+            "google/siglip-base-patch16-224",
+            3,
+            int8Blob([127, 0, 0]),
+            1 / 127,
+          ]);
+        }
+        return;
+      }
+
+      if (sql.includes("FROM embeddings") && sql.includes("WHERE model_id = ?")) {
+        callback([
+          "../albums/test-simple/DSCF0593.jpg",
+          "google/siglip-base-patch16-224",
+          3,
+          int8Blob([127, 14, 0]),
+          0.9 / 127,
+        ]);
+        callback([
+          "../albums/test-simple/DSCF2581-2_2.jpg",
+          "google/siglip-base-patch16-224",
+          3,
+          int8Blob([0, 127, 0]),
+          1 / 127,
+        ]);
+        return;
+      }
+
+      if (sql.includes("FROM images") && sql.includes("WHERE path IN")) {
+        callback([
+          "../albums/test-simple/DSCF0593.jpg",
+          "/album/test-simple#DSCF0593.jpg",
+          "DSCF0593.jpg",
+          "",
+          "",
+          "harbor, skyline",
+          "[(0,0,0)]",
+          "Harbor skyline",
+          "",
+          "",
+          "",
+          "",
+        ]);
+        callback([
+          "../albums/test-simple/DSCF2581-2_2.jpg",
+          "/album/test-simple#DSCF2581-2_2.jpg",
+          "DSCF2581-2_2.jpg",
+          "",
+          "",
+          "night, street",
+          "[(0,0,0)]",
+          "Night street",
+          "",
+          "",
+          "",
+          "",
+        ]);
+      }
+    },
+  });
+
+  it("ranks int8 blob embeddings by similarity", async () => {
+    const results = await fetchSimilarResults({
+      database: makeBlobDatabase() as any,
+      path: "../albums/test-simple/DSCF0506-2.jpg",
+      page: 0,
+      pageSize: 2,
+    });
+
+    expect(results.data).toHaveLength(2);
+    expect(results.data[0]?.path).toBe("../albums/test-simple/DSCF0593.jpg");
+    expect(results.data[1]?.path).toBe(
+      "../albums/test-simple/DSCF2581-2_2.jpg",
+    );
+    expect(Number(results.data[0]?.similarity)).toBeGreaterThan(
+      Number(results.data[1]?.similarity),
+    );
+  });
+
+  it("decodes int8 blobs against the per-vector scale", () => {
+    const decoded = searchInternals.decodeInt8Embedding(
+      new Uint8Array(Int8Array.from([127, -127, 64, 0]).buffer),
+      0.01,
+    );
+
+    expect(decoded).toHaveLength(4);
+    expect(decoded[0]).toBeCloseTo(1.27, 6);
+    expect(decoded[1]).toBeCloseTo(-1.27, 6);
+    expect(decoded[2]).toBeCloseTo(0.64, 6);
+    expect(decoded[3]).toBe(0);
+  });
+});
+
 describe("fetchColorSimilarResults", () => {
   it("filters color results by selected facets", async () => {
     const database = {

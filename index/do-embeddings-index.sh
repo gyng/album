@@ -26,17 +26,17 @@ if tmp_db.exists():
 dest = sqlite3.connect(tmp_db)
 src = sqlite3.connect(embedding_db)
 
-# page_size must be set before the first table is created (and takes effect on the
-# VACUUM below) so the published embeddings DB ships 1024-byte pages for small
-# HTTP range reads in the browser, not SQLite's 4096-byte default.
-dest.execute("PRAGMA page_size=1024")
+# 4096-byte pages (the SQLite default) — set explicitly to document the departure
+# from the legacy 1024-byte pages, which only paid off for sql.js-httpvfs range
+# reads; the browser now downloads the DB in full.
+dest.execute("PRAGMA page_size=4096")
 dest.execute(
-    "CREATE TABLE IF NOT EXISTS embeddings (path VARCHAR NOT NULL, model_id TEXT NOT NULL, embedding_dim INTEGER, embedding_json TEXT, PRIMARY KEY(path, model_id))"
+    "CREATE TABLE IF NOT EXISTS embeddings (path VARCHAR NOT NULL, model_id TEXT NOT NULL, embedding_dim INTEGER, embedding_blob BLOB, embedding_scale REAL, PRIMARY KEY(path, model_id))"
 )
 dest.execute("CREATE INDEX IF NOT EXISTS idx_embeddings_path ON embeddings(path)")
 
 rows = src.execute(
-    "SELECT path, model_id, embedding_dim, embedding_json FROM embeddings"
+    "SELECT path, model_id, embedding_dim, embedding_blob, embedding_scale FROM embeddings"
 ).fetchall()
 
 existing_rows = 0
@@ -56,7 +56,7 @@ if existing_rows > 0 and new_rows < int(existing_rows * 0.9):
     )
 
 dest.executemany(
-    "INSERT OR REPLACE INTO embeddings (path, model_id, embedding_dim, embedding_json) VALUES (?, ?, ?, ?)",
+    "INSERT OR REPLACE INTO embeddings (path, model_id, embedding_dim, embedding_blob, embedding_scale) VALUES (?, ?, ?, ?, ?)",
     rows,
 )
 dest.commit()

@@ -101,7 +101,9 @@ export type VisualSamenessPhoto = {
 
 type EmbeddingRow = {
   path: string;
-  embedding_json: string;
+  embedding_json?: string;
+  embedding_blob?: Buffer;
+  embedding_scale?: number;
 };
 
 type PhotoLookup = Map<string, VisualSamenessPhoto>;
@@ -277,6 +279,46 @@ const getRows = (db: any, sql: string, bind: unknown[]) =>
     });
   });
 
+// The embeddings table exists in two on-disk formats: int8 blobs with a
+// per-vector scale (current) and JSON text (DBs written before the format
+// change). Both must stay readable — the stats can run against an older
+// canonical DB that has not been re-indexed yet.
+const embeddingsTableHasBlobColumn = async (db: any): Promise<boolean> => {
+  const columns = await new Promise<Array<{ name: string }>>(
+    (resolve, reject) => {
+      db.all(
+        "PRAGMA table_info(embeddings)",
+        [],
+        (err: Error | null, rows: Array<{ name: string }>) => {
+          if (err) {
+            reject(err);
+            return;
+          }
+          resolve(rows ?? []);
+        },
+      );
+    },
+  );
+  return columns.some((column) => column.name === "embedding_blob");
+};
+
+const decodeEmbeddingRow = (row: EmbeddingRow): number[] | null => {
+  if (row.embedding_blob !== undefined) {
+    const scale = row.embedding_scale ?? 1;
+    const vector = new Array<number>(row.embedding_blob.length);
+    for (let index = 0; index < row.embedding_blob.length; index += 1) {
+      vector[index] = row.embedding_blob.readInt8(index) * scale;
+    }
+    return vector;
+  }
+  try {
+    const parsed = JSON.parse(row.embedding_json ?? "");
+    return Array.isArray(parsed) ? (parsed as number[]) : null;
+  } catch {
+    return null;
+  }
+};
+
 export const computeVisualSamenessStats = async (
   albums: Content[],
   dbPath = DEFAULT_EMBEDDINGS_DB_PATH,
@@ -334,22 +376,20 @@ export const computeVisualSamenessStats = async (
         return null;
       }
 
+      const hasBlobColumn = await embeddingsTableHasBlobColumn(db);
+      const embeddingColumns = hasBlobColumn
+        ? "embedding_blob, embedding_scale"
+        : "embedding_json";
       const placeholders = selectedPaths.map(() => "?").join(", ");
       const rows = await getRows(
         db,
-        `SELECT path, embedding_json FROM embeddings WHERE model_id = ? AND path IN (${placeholders})`,
+        `SELECT path, ${embeddingColumns} FROM embeddings WHERE model_id = ? AND path IN (${placeholders})`,
         [selectedModelId, ...selectedPaths],
       );
 
       const parsedRows = rows.flatMap((row) => {
-        try {
-          const parsed = JSON.parse(row.embedding_json);
-          return Array.isArray(parsed)
-            ? [{ path: row.path, vector: parsed as number[] }]
-            : [];
-        } catch {
-          return [];
-        }
+        const vector = decodeEmbeddingRow(row);
+        return vector ? [{ path: row.path, vector }] : [];
       });
 
       const vectors = parsedRows.map((row) => row.vector);

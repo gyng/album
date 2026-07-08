@@ -11,6 +11,8 @@ from index import (
     compare_caption_payloads,
     compute_reindex_plan,
     create_classifier,
+    decode_embedding,
+    encode_embedding,
     geocode_columns,
     extract_geocode_from_path,
     filter_exif_for_search,
@@ -719,6 +721,117 @@ class TestDb(UsesTestexistsFixture, unittest.TestCase):
             self.assertTrue(near_path in result.output)
             self.assertTrue(far_path in result.output)
             self.assertLess(result.output.find(near_path), result.output.find(far_path))
+
+    def test_embedding_blob_round_trip_within_quantisation_tolerance(self):
+        # Embeddings are stored as int8 blobs with a per-vector scale; decoding
+        # must reproduce every component within half a quantisation step.
+        vector = [0.4927, -0.2676, 0.0, 0.001, -0.499]
+        blob, scale = encode_embedding(vector)
+        self.assertEqual(len(blob), len(vector))
+        decoded = decode_embedding(blob, scale)
+        tolerance = scale / 2
+        for original, roundtripped in zip(vector, decoded):
+            self.assertAlmostEqual(original, roundtripped, delta=tolerance)
+
+    def test_encode_embedding_all_zero_vector(self):
+        blob, scale = encode_embedding([0.0, 0.0, 0.0])
+        self.assertEqual(decode_embedding(blob, scale), [0.0, 0.0, 0.0])
+
+    def test_insert_embedding_stores_blob_and_get_embedding_decodes(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            dbpath = os.path.join(tmpdir, "blob.sqlite")
+            db = Sqlite3Client(dbpath)
+            db.setup_tables()
+
+            vector = [0.25, -0.125, 0.5]
+            db.insert_embedding("a.jpg", "unit-test-model", vector)
+
+            columns = {
+                row[1]
+                for row in db.con.execute("PRAGMA table_info(embeddings)").fetchall()
+            }
+            self.assertIn("embedding_blob", columns)
+            self.assertIn("embedding_scale", columns)
+            self.assertNotIn("embedding_json", columns)
+
+            row = db.get_embedding("a.jpg", model_id="unit-test-model")
+            self.assertEqual(row[2], 3)
+            for original, stored in zip(vector, row[3]):
+                self.assertAlmostEqual(original, stored, delta=0.5 / 127)
+
+    def test_embedding_json_table_migrates_to_blob_schema(self):
+        # A DB written by the previous format (embedding_json TEXT, 1024-byte
+        # pages) must be rebuilt in place: blobs + scale columns, values
+        # preserved within quantisation tolerance, and 4096-byte pages after
+        # the migration VACUUM.
+        with tempfile.TemporaryDirectory() as tmpdir:
+            dbpath = os.path.join(tmpdir, "legacy.sqlite")
+            legacy = sqlite3.connect(dbpath)
+            legacy.execute("PRAGMA page_size=1024")
+            legacy.execute(
+                "CREATE TABLE embeddings (path VARCHAR NOT NULL, model_id TEXT NOT NULL, embedding_dim INTEGER, embedding_json TEXT, PRIMARY KEY(path, model_id))"
+            )
+            vector = [0.1, -0.2, 0.3]
+            legacy.execute(
+                "INSERT INTO embeddings VALUES (?, ?, ?, ?)",
+                ("a.jpg", "unit-test-model", len(vector), json.dumps(vector)),
+            )
+            legacy.commit()
+            legacy.close()
+
+            db = Sqlite3Client(dbpath)
+            db.setup_tables()
+
+            columns = {
+                row[1]
+                for row in db.con.execute("PRAGMA table_info(embeddings)").fetchall()
+            }
+            self.assertIn("embedding_blob", columns)
+            self.assertNotIn("embedding_json", columns)
+
+            row = db.get_embedding("a.jpg", model_id="unit-test-model")
+            self.assertIsNotNone(row)
+            for original, stored in zip(vector, row[3]):
+                self.assertAlmostEqual(original, stored, delta=0.3 / 127)
+
+            page_size = db.con.execute("PRAGMA page_size").fetchone()[0]
+            self.assertEqual(page_size, 4096)
+
+    def test_legacy_pk_path_table_migrates_to_blob_schema(self):
+        # The oldest schema (PRIMARY KEY(path) only) must also land on the blob
+        # schema in one migration pass.
+        with tempfile.TemporaryDirectory() as tmpdir:
+            dbpath = os.path.join(tmpdir, "oldest.sqlite")
+            legacy = sqlite3.connect(dbpath)
+            legacy.execute(
+                "CREATE TABLE embeddings (path VARCHAR PRIMARY KEY, model_id TEXT, embedding_dim INTEGER, embedding_json TEXT)"
+            )
+            legacy.execute(
+                "INSERT INTO embeddings VALUES (?, ?, ?, ?)",
+                ("a.jpg", None, 2, json.dumps([1.0, -1.0])),
+            )
+            legacy.commit()
+            legacy.close()
+
+            db = Sqlite3Client(dbpath)
+            db.setup_tables()
+
+            row = db.get_embedding("a.jpg")
+            self.assertIsNotNone(row)
+            self.assertEqual(row[1], "")
+            self.assertAlmostEqual(row[3][0], 1.0, delta=1.0 / 127)
+            self.assertAlmostEqual(row[3][1], -1.0, delta=1.0 / 127)
+
+    def test_fresh_db_uses_4096_byte_pages(self):
+        # 1024-byte pages were a legacy of sql.js-httpvfs range reads; the
+        # browser now downloads the DB in full, so fresh DBs use the SQLite
+        # default page size.
+        with tempfile.TemporaryDirectory() as tmpdir:
+            dbpath = os.path.join(tmpdir, "fresh.sqlite")
+            db = Sqlite3Client(dbpath)
+            db.setup_tables()
+            page_size = db.con.execute("PRAGMA page_size").fetchone()[0]
+            self.assertEqual(page_size, 4096)
 
     def test_siglip2_dry_run_backfills_missing_embeddings_for_existing_rows(self):
         with tempfile.TemporaryDirectory() as tmpdir:
