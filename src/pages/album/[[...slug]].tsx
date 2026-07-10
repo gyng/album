@@ -1,5 +1,3 @@
-/* eslint react-hooks/rules-of-hooks: 0 */
-
 import { GetStaticPaths, GetStaticProps, NextPage } from "next";
 import Link from "next/link";
 import { useRouter } from "next/router";
@@ -10,7 +8,6 @@ import { GlobalNav } from "../../components/GlobalNav";
 import { PhotoAlbum } from "../../components/PhotoAlbum";
 import { Footer } from "../../components/ui";
 import commonStyles from "../../styles/common.module.css";
-import styles from "./album.module.css";
 import { measureBuild } from "../../services/buildTiming";
 import { Seo } from "../../components/Seo";
 import {
@@ -21,7 +18,7 @@ import {
 } from "../../lib/seo";
 
 type PageProps = {
-  album?: Content;
+  album: Content;
 };
 
 const Album: NextPage<PageProps> = ({ album }) => {
@@ -58,36 +55,19 @@ const Album: NextPage<PageProps> = ({ album }) => {
     };
   }, [router.events]);
 
-  if (!album) {
-    return (
-      <div className={styles.fallbackPlaceholder}>
-        <h1>🔥</h1>
-        <Link href="/">404. Back to album list</Link>
-      </div>
-    );
-  }
-
-  // Have a stateful album for potential future state management
-  const [statefulAlbum, setStatefulAlbum] = React.useState(album);
-  React.useEffect(() => {
-
-    setStatefulAlbum(album);
-  }, [album]);
-
   // SEO/Meta tag generation
-  const title =
-    statefulAlbum.title ?? statefulAlbum.name ?? statefulAlbum._build.slug;
+  const title = album.title ?? album.name ?? album._build.slug;
 
-  const imageCount = statefulAlbum.blocks.filter(
+  const imageCount = album.blocks.filter(
     (b) => b.kind === "photo",
   ).length;
 
   const cover =
-    statefulAlbum.blocks.find(
+    album.blocks.find(
       (b) => b.kind === "photo" && b.formatting?.cover,
-    ) ?? statefulAlbum.blocks.find((b) => b.kind === "photo");
+    ) ?? album.blocks.find((b) => b.kind === "photo");
 
-  const albumName = statefulAlbum._build.slug;
+  const albumName = album._build.slug;
 
   return (
     <>
@@ -96,13 +76,13 @@ const Album: NextPage<PageProps> = ({ album }) => {
         description={
           album.kicker ?? `${title} photo album: ${imageCount} photos`
         }
-        pathname={`/album/${statefulAlbum._build.slug}`}
+        pathname={`/album/${album._build.slug}`}
         image={(cover as PhotoBlock | undefined)?._build.srcset?.[0].src}
         type="article"
         extraFeeds={[
           {
             title: `${title} RSS Feed`,
-            href: getCanonicalUrl(`/album/${statefulAlbum._build.slug}/feed.xml`),
+            href: getCanonicalUrl(`/album/${album._build.slug}/feed.xml`),
           },
         ]}
         jsonLd={[
@@ -110,7 +90,7 @@ const Album: NextPage<PageProps> = ({ album }) => {
             name: `${title} | Snapshots`,
             description:
               album.kicker ?? `${title} photo album: ${imageCount} photos`,
-            pathname: `/album/${statefulAlbum._build.slug}`,
+            pathname: `/album/${album._build.slug}`,
             image: resolveAbsoluteUrl(
               (cover as PhotoBlock | undefined)?._build.srcset?.[0]?.src,
             ),
@@ -119,7 +99,7 @@ const Album: NextPage<PageProps> = ({ album }) => {
             { name: "Snapshots", pathname: "/" },
             {
               name: title,
-              pathname: `/album/${statefulAlbum._build.slug}`,
+              pathname: `/album/${album._build.slug}`,
             },
           ]),
         ]}
@@ -156,7 +136,7 @@ const Album: NextPage<PageProps> = ({ album }) => {
         }
       />
       <main id="main-content">
-        <PhotoAlbum album={statefulAlbum} />
+        <PhotoAlbum album={album} />
       </main>
       <Footer />
     </>

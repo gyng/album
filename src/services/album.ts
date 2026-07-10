@@ -12,6 +12,11 @@ import {
 } from "./types";
 import { isVideoFile } from "./video";
 import { incrementBuildCounter, measureBuild } from "./buildTiming";
+import {
+  exifWallClockTimestamp,
+  normaliseExifWallClockIso,
+  parseExifLocalDateTime,
+} from "../util/exifTime";
 
 export const ALBUMS_DIR = "../albums";
 export const MANIFEST_NAME = "manifest.json";
@@ -59,12 +64,14 @@ export const getBlockDate = (block: Block): number => {
     return 1;
   }
   if (block.kind === "photo") {
-    const t = Date.parse(block._build?.exif?.DateTimeOriginal ?? "");
-    return isNaN(t) ? 0 : t;
+    return exifWallClockTimestamp(block._build?.exif?.DateTimeOriginal) ?? 0;
   }
   if (block.kind === "video") {
-    const t = block.data.date ? new Date(block.data.date).valueOf() : 0;
-    return isNaN(t) ? 0 : t;
+    const raw = block.data.date;
+    const wallClock = raw && /^\d{4}-\d{2}-\d{2}$/.test(raw)
+      ? `${raw}T00:00:00`
+      : raw;
+    return exifWallClockTimestamp(wallClock) ?? 0;
   }
   return 0;
 };
@@ -82,15 +89,15 @@ const sortBlocksByDate = (
 
 export const getImageTimestampRange = (
   album: Content,
-): [number | null, number | null] => {
-  // Nullable accumulators rather than 0 / MAX_VALUE sentinels, so pre-1970
-  // (negative-epoch, e.g. scanned film) dates are not mistaken for "missing".
-  let earliest: number | null = null;
-  let latest: number | null = null;
+): [string | null, string | null] => {
+  let earliest: string | null = null;
+  let latest: string | null = null;
   for (const block of album.blocks) {
     if (block.kind !== "photo") continue;
-    const dt = new Date(block._build?.exif?.DateTimeOriginal ?? "").getTime();
-    if (Number.isNaN(dt)) continue; // missing / unparseable dates skipped
+    const dt = normaliseExifWallClockIso(
+      block._build?.exif?.DateTimeOriginal,
+    );
+    if (!dt) continue;
     if (earliest === null || dt < earliest) earliest = dt;
     if (latest === null || dt > latest) latest = dt;
   }
@@ -300,8 +307,11 @@ const applyTitleKickerDefaults = (manifest: Content): void => {
   // Always render the year range ascending (earliest–latest), regardless of the
   // album's photo sort order, so the kicker matches the home page album list
   // (Albums.tsx) rather than reading as a reversed "2026–2025".
-  const from = new Date(earliest).getFullYear();
-  const to = new Date(latest).getFullYear();
+  const from = parseExifLocalDateTime(earliest)?.year;
+  const to = parseExifLocalDateTime(latest)?.year;
+  if (from == null || to == null) {
+    return;
+  }
   title.data.kicker = `${from}${to === from ? "" : `–${to}`}`;
 };
 

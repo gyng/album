@@ -49,6 +49,21 @@ export function parseExifLocalDateTime(
 
 const pad2 = (value: number) => String(value).padStart(2, "0");
 
+const MONTH_NAMES = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+] as const;
+
 // Naive ISO ("YYYY-MM-DDTHH:MM:SS", no zone designator) is the repo-wide
 // serialisation for EXIF timestamps: it preserves the camera's wall clock
 // exactly, so day/hour/year derivations are identical on every machine.
@@ -57,6 +72,50 @@ export function formatExifWallClockIso(dt: ExifLocalDateTime): string {
     `${dt.year}-${pad2(dt.month)}-${pad2(dt.day)}` +
     `T${pad2(dt.hour)}:${pad2(dt.minute)}:${pad2(dt.second)}`
   );
+}
+
+export function normaliseExifWallClockIso(
+  raw: string | undefined | null,
+): string | null {
+  const dt = parseExifLocalDateTime(raw);
+  return dt ? formatExifWallClockIso(dt) : null;
+}
+
+// A nominal numeric value for comparisons and relative-time labels. Date.UTC
+// is used only as a stable coordinate system for the already-parsed wall-clock
+// components: it does not convert the camera time or apply OffsetTime.
+export function exifWallClockTimestamp(
+  raw: string | undefined | null,
+): number | null {
+  const dt = parseExifLocalDateTime(raw);
+  if (!dt) return null;
+
+  return Date.UTC(
+    dt.year,
+    dt.month - 1,
+    dt.day,
+    dt.hour,
+    dt.minute,
+    dt.second,
+  );
+}
+
+export function formatExifWallClockDate(
+  raw: string | undefined | null,
+): string | null {
+  const dt = parseExifLocalDateTime(raw);
+  if (!dt) return null;
+
+  return `${dt.day} ${MONTH_NAMES[dt.month - 1]} ${dt.year}`;
+}
+
+export function formatExifWallClockDateTime(
+  raw: string | undefined | null,
+): string | null {
+  const dt = parseExifLocalDateTime(raw);
+  if (!dt) return null;
+
+  return `${dt.day} ${MONTH_NAMES[dt.month - 1]} ${dt.year} at ${pad2(dt.hour)}:${pad2(dt.minute)}`;
 }
 
 // Wall-clock calendar day ("YYYY-MM-DD") from any EXIF-ish timestamp string.

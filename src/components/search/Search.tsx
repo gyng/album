@@ -41,12 +41,17 @@ import { useImageQuery } from "./useImageQuery";
 import { SearchDrawPad } from "./SearchDrawPad";
 import { useSearchResultsState } from "./useSearchResultsState";
 import {
-  getSearchFacetChipLabel,
   SearchFacetSelection,
   serializeSearchFacetSelection,
   writeSearchFacetSelections,
 } from "../../util/searchFacets";
-import { rgbToHex, rgbToString } from "../../util/colorDistance";
+import {
+  getActiveFilterCount,
+  mergeFacetSections,
+  normaliseSearchTerms,
+} from "./searchViewModel";
+import { useSearchFilterDrawer } from "./useSearchFilterDrawer";
+import { SearchActiveFilters } from "./SearchActiveFilters";
 
 const useSafeLayoutEffect =
   typeof window === "undefined" ? useEffect : useLayoutEffect;
@@ -95,66 +100,6 @@ export type SearchNavState = {
   randomExploreError: string | null;
 };
 
-const mergeFacetSections = (
-  catalogSections: SearchFacetSection[],
-  liveSections: SearchFacetSection[],
-  selectedFacets: SearchFacetSelection[],
-): SearchFacetSection[] => {
-  const liveSectionMap = new Map(
-    liveSections.map((section) => [section.facetId, section]),
-  );
-  const selectedValuesByFacet = new Map<string, Set<string>>();
-  selectedFacets.forEach((selection) => {
-    const values = selectedValuesByFacet.get(selection.facetId) ?? new Set<string>();
-    values.add(selection.value);
-    selectedValuesByFacet.set(selection.facetId, values);
-  });
-
-  const mergeSection = (section: SearchFacetSection): SearchFacetSection => {
-    const liveSection = liveSectionMap.get(section.facetId);
-    const liveOptionMap = new Map(
-      (liveSection?.options ?? []).map((option) => [option.value, option.count]),
-    );
-    const orderedOptions = [...section.options];
-
-    (liveSection?.options ?? []).forEach((option) => {
-      if (!orderedOptions.some((candidate) => candidate.value === option.value)) {
-        orderedOptions.push(option);
-      }
-    });
-
-    Array.from(selectedValuesByFacet.get(section.facetId) ?? []).forEach((value) => {
-      if (!orderedOptions.some((candidate) => candidate.value === value)) {
-        orderedOptions.push({ value, count: 0 });
-      }
-    });
-
-    return {
-      ...section,
-      options: orderedOptions.map((option) => ({
-        value: option.value,
-        count: liveOptionMap.get(option.value) ?? 0,
-      })),
-    };
-  };
-
-  const merged = catalogSections.map(mergeSection);
-
-  liveSections.forEach((section) => {
-    if (!catalogSections.some((candidate) => candidate.facetId === section.facetId)) {
-      merged.push(
-        mergeSection({
-          facetId: section.facetId,
-          displayName: section.displayName,
-          options: section.options,
-        }),
-      );
-    }
-  });
-
-  return merged;
-};
-
 export const Search: React.FC<{
   disabled?: boolean;
   onNavStateChange?: (state: SearchNavState) => void;
@@ -189,13 +134,8 @@ export const Search: React.FC<{
   const [refinementCounts, setRefinementCounts] = useState<
     Record<string, number>
   >({});
-  // On phones the facet panel is collapsed behind this trigger so results
-  // lead; on desktop the trigger is hidden and the panel lays out inline.
-  const [isFilterDrawerOpen, setIsFilterDrawerOpen] = useState<boolean>(false);
   const [isDrawPadOpen, setIsDrawPadOpen] = useState<boolean>(false);
   const inputRef = useRef<HTMLInputElement>(null);
-  const filterTriggerRef = useRef<HTMLButtonElement | null>(null);
-  const filterCloseRef = useRef<HTMLButtonElement | null>(null);
   const modeSourceRef = useRef<HTMLDivElement | null>(null);
   const [
     database,
@@ -257,17 +197,21 @@ export const Search: React.FC<{
     hasHydratedFromUrl,
     imageQuery,
   });
+  const {
+    isOpen: isFilterDrawerOpen,
+    open: openFilterDrawer,
+    close: closeFilterDrawer,
+    triggerRef: filterTriggerRef,
+    closeRef: filterCloseRef,
+  } = useSearchFilterDrawer({ isSimilarMode });
 
   const normalizedTags = useMemo(() => dedupeTags(tags), [tags]);
   const normalizedSearchTerms = useMemo(
-    () => searchQuery.map((term) => term.trim().toLowerCase()).filter(Boolean),
+    () => normaliseSearchTerms(searchQuery),
     [searchQuery],
   );
   const normalizedDebouncedSearchTerms = useMemo(
-    () =>
-      debouncedSearchQuery
-        .map((term) => term.trim().toLowerCase())
-        .filter(Boolean),
+    () => normaliseSearchTerms(debouncedSearchQuery),
     [debouncedSearchQuery],
   );
   const normalizedTagNames = useMemo(
@@ -286,50 +230,16 @@ export const Search: React.FC<{
 
   // Total filters currently applied — mirrors the "Active filters" chips
   // below, and badges the mobile drawer trigger.
-  const activeFilterCount =
-    selectedFacets.length +
-    normalizedSearchTerms.length +
-    (colorSearch ? 1 : 0) +
-    (imageQuery ? 1 : 0);
+  const activeFilterCount = getActiveFilterCount({
+    selectedFacetCount: selectedFacets.length,
+    searchTermCount: normalizedSearchTerms.length,
+    hasColour: Boolean(colorSearch),
+    hasImage: Boolean(imageQuery),
+  });
 
   // A DB built by the fixed indexer has the geo_* columns and correct tag
   // counts; an older one stores them inflated by one. Probe is cached per DB.
   const tagCountsAreExact = database ? hasStructuredGeocode(database) : false;
-
-  // While the mobile filter drawer is open: Escape closes it, background
-  // scroll is locked, and focus moves into it (and back to the trigger on
-  // close) for keyboard and screen-reader users. Inert on desktop — the
-  // trigger is hidden there, so the drawer can't open.
-  useEffect(() => {
-    if (!isFilterDrawerOpen) {
-      return;
-    }
-    filterCloseRef.current?.focus();
-    // The trigger is a stable element for the drawer's lifetime; capture it now
-    // so the cleanup restores focus to it without reading a possibly-changed ref.
-    const trigger = filterTriggerRef.current;
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        setIsFilterDrawerOpen(false);
-      }
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      window.removeEventListener("keydown", handleKeyDown);
-      document.body.style.overflow = previousOverflow;
-      trigger?.focus();
-    };
-  }, [isFilterDrawerOpen]);
-
-  // Similar mode hides the facet panel entirely — make sure the drawer can't
-  // linger open across that transition.
-  useEffect(() => {
-    if (isSimilarMode) {
-      setIsFilterDrawerOpen(false);
-    }
-  }, [isSimilarMode]);
 
   const similarClickstreamPaths = new Set([
     ...similarTrail.map((item) => item.path),
@@ -943,7 +853,7 @@ export const Search: React.FC<{
             className={styles.filterTrigger}
             aria-expanded={isFilterDrawerOpen}
             aria-controls="search-filter-drawer"
-            onClick={() => setIsFilterDrawerOpen(true)}
+            onClick={openFilterDrawer}
           >
             <span aria-hidden="true">⚙</span>
             <span>Filters</span>
@@ -964,7 +874,7 @@ export const Search: React.FC<{
             ]
               .filter(Boolean)
               .join(" ")}
-            onClick={() => setIsFilterDrawerOpen(false)}
+            onClick={closeFilterDrawer}
             aria-hidden="true"
           />
 
@@ -989,7 +899,7 @@ export const Search: React.FC<{
                 type="button"
                 ref={filterCloseRef}
                 className={styles.filterDrawerClose}
-                onClick={() => setIsFilterDrawerOpen(false)}
+                onClick={closeFilterDrawer}
               >
                 Done
               </button>
@@ -1074,102 +984,16 @@ export const Search: React.FC<{
         />
       ) : null}
 
-      {selectedFacets.length > 0 ||
-      normalizedSearchTerms.length > 0 ||
-      colorSearch ||
-      imageQuery ? (
-        <div className={styles.activeFacetSection}>
-          <div className={styles.activeFacetLabel}>Active filters</div>
-          <div className={styles.activeFacetChips}>
-            {imageQuery ? (
-              <button
-                key="image-query"
-                type="button"
-                className={styles.activeFacetChip}
-                onClick={clearImageQuery}
-                title="Remove image query"
-                aria-label="Remove image query"
-              >
-                {/* Plain img: the preview is an in-memory object URL, which
-                    next/image can't optimise. */}
-                <img
-                  className={styles.activeFacetImageThumb}
-                  src={imageQuery.previewUrl}
-                  alt=""
-                  aria-hidden="true"
-                />
-                <span>
-                  {imageQuery.source === "drawing"
-                    ? "Drawn sketch"
-                    : "Uploaded image"}
-                </span>
-                <span aria-hidden="true">×</span>
-                {/* Zoomed copy of the query image, revealed on hover/focus —
-                    the 20px chip thumbnail is too small to recognise. */}
-                <span
-                  className={styles.activeFacetImageZoom}
-                  data-testid="image-query-zoom"
-                  aria-hidden="true"
-                >
-                  <img src={imageQuery.previewUrl} alt="" />
-                </span>
-              </button>
-            ) : null}
-            {colorSearch ? (
-              <button
-                key="color-filter"
-                type="button"
-                className={styles.activeFacetChip}
-                onClick={handleClearColorSearch}
-                title={`Remove filter Colour: ${rgbToHex(colorSearch)}`}
-                aria-label={`Remove filter Colour: ${rgbToHex(colorSearch)}`}
-              >
-                <span
-                  className={styles.activeFacetColorSwatch}
-                  style={{ backgroundColor: rgbToString(colorSearch) }}
-                  aria-hidden="true"
-                />
-                <span>{`Colour: ${rgbToHex(colorSearch)}`}</span>
-                <span aria-hidden="true">×</span>
-              </button>
-            ) : null}
-            {normalizedSearchTerms.map((term) => (
-              <button
-                key={`term-${term}`}
-                type="button"
-                className={styles.activeFacetChip}
-                onClick={() => {
-                  handleRemoveSearchTerm(term);
-                }}
-                title={`Remove filter ${term}`}
-                aria-label={`Remove filter ${term}`}
-              >
-                <span>{term}</span>
-                <span aria-hidden="true">×</span>
-              </button>
-            ))}
-            {selectedFacets.map((selection) => {
-              const key = serializeSearchFacetSelection(selection);
-              const chipLabel = getSearchFacetChipLabel(selection);
-              return (
-                <button
-                  key={key}
-                  type="button"
-                  className={styles.activeFacetChip}
-                  onClick={() => {
-                    handleRemoveFacet(selection);
-                  }}
-                  title={`Remove filter ${chipLabel}`}
-                  aria-label={`Remove filter ${chipLabel}`}
-                >
-                  <span>{chipLabel}</span>
-                  <span aria-hidden="true">×</span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      ) : null}
+      <SearchActiveFilters
+        imageQuery={imageQuery}
+        colour={colorSearch}
+        searchTerms={normalizedSearchTerms}
+        selectedFacets={selectedFacets}
+        onClearImage={clearImageQuery}
+        onClearColour={handleClearColorSearch}
+        onRemoveTerm={handleRemoveSearchTerm}
+        onRemoveFacet={handleRemoveFacet}
+      />
 
       <div>
         <SearchResultsGrid

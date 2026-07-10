@@ -42,11 +42,26 @@ export const ProgressBar: React.FC<{
       show once it's full but work continues. */
   label?: string;
 }> = ({ progress, hideIfComplete = true, details, activity, label }) => {
-  return !hideIfComplete || progress < 100 ? (
+  const value = Math.min(100, Math.max(0, progress));
+  const accessibleLabel = label ?? getLabel(details, activity);
+
+  return !hideIfComplete || value < 100 ? (
     <div className={styles.wrapper}>
-      <div className={styles.progressBar}>
-        <div className={styles.progress} style={{ width: `${progress}%` }} />
-        <div>{label ?? getLabel(details, activity)}</div>
+      <div
+        className={styles.progressBar}
+        role="progressbar"
+        aria-label={accessibleLabel}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={value}
+        aria-valuetext={accessibleLabel}
+      >
+        <div
+          className={styles.progress}
+          data-progress-fill
+          style={{ width: `${value}%` }}
+        />
+        <div>{accessibleLabel}</div>
       </div>
     </div>
   ) : null;

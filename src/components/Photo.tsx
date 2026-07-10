@@ -25,6 +25,10 @@ import {
   FOCAL_LENGTH_ACTUAL_FACET,
   ISO_FACET,
 } from "../util/photoBuckets";
+import {
+  exifWallClockTimestamp,
+  normaliseExifWallClockIso,
+} from "../util/exifTime";
 
 const PhotoSimilarPhotosDeferred = dynamic(
   () => import("./PhotoSimilarPhotos").then((mod) => mod.PhotoSimilarPhotos),
@@ -513,20 +517,18 @@ export const PhotoBlockEl: React.FC<{
                       kind: "kv",
                       k: "Camera datetime",
                       v: [
-                        // Strip the millisecond/UTC "Z" suffix before labelling
-                        // the value as local — a Z-suffixed string asserts UTC,
-                        // which contradicts the "(local @ …)" note.
                         (() => {
-                          const local = props.block._build.exif.DateTimeOriginal?.replace(
-                            /(\.\d+)?Z$/,
-                            "",
+                          const local = normaliseExifWallClockIso(
+                            props.block._build.exif.DateTimeOriginal,
                           );
                           return props.block._build.exif.OffsetTime
                             ? `${local} (local @ ${props.block._build.exif.OffsetTime})`
                             : local;
                         })(),
                         getRelativeTimeString(
-                          new Date(props.block._build.exif.DateTimeOriginal ?? ""),
+                          exifWallClockTimestamp(
+                            props.block._build.exif.DateTimeOriginal,
+                          ) ?? NaN,
                         ),
                       ]
                         .filter(Boolean)

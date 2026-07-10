@@ -1,7 +1,11 @@
 import {
   dateToNaiveIso,
   exifDayKey,
+  exifWallClockTimestamp,
+  formatExifWallClockDate,
+  formatExifWallClockDateTime,
   formatExifWallClockIso,
+  normaliseExifWallClockIso,
   parseExifLocalDateTime,
 } from "./exifTime";
 
@@ -73,6 +77,38 @@ describe("formatExifWallClockIso", () => {
   it("zero-pads all components", () => {
     const dt = parseExifLocalDateTime("2024:01:02 03:04:05");
     expect(formatExifWallClockIso(dt!)).toBe("2024-01-02T03:04:05");
+  });
+});
+
+describe("normaliseExifWallClockIso", () => {
+  it("normalises EXIF and zoned-looking inputs without shifting the wall clock", () => {
+    expect(normaliseExifWallClockIso("2024:01:01 00:30:00+09:00")).toBe(
+      "2024-01-01T00:30:00",
+    );
+    expect(normaliseExifWallClockIso("2024-01-01T00:30:00Z")).toBe(
+      "2024-01-01T00:30:00",
+    );
+  });
+
+  it("returns null for missing or malformed input", () => {
+    expect(normaliseExifWallClockIso(undefined)).toBeNull();
+    expect(normaliseExifWallClockIso("not-a-date")).toBeNull();
+  });
+});
+
+describe("wall-clock presentation helpers", () => {
+  it("formats the parsed camera date and time without runtime timezone conversion", () => {
+    const raw = "2024-01-01T00:30:00+09:00";
+    expect(formatExifWallClockDate(raw)).toBe("1 January 2024");
+    expect(formatExifWallClockDateTime(raw)).toBe(
+      "1 January 2024 at 00:30",
+    );
+  });
+
+  it("creates the same nominal timestamp for equivalent wall-clock inputs", () => {
+    expect(exifWallClockTimestamp("2024:01:01 00:30:00+09:00")).toBe(
+      exifWallClockTimestamp("2024-01-01T00:30:00Z"),
+    );
   });
 });
 

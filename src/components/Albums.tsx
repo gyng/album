@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Content, PhotoBlock } from "../services/types";
 import { Picture } from "./Photo";
 import { Caption } from "./ui";
+import { parseExifLocalDateTime } from "../util/exifTime";
 import styles from "./Album.module.css";
 
 export const Albums: React.FC<{ albums: Content[] }> = (props) => {
@@ -13,12 +14,9 @@ export const Albums: React.FC<{ albums: Content[] }> = (props) => {
           album.blocks.find((b) => b.kind === "photo" && b.formatting?.cover) ??
           firstPhoto;
 
-        // UTC getters so the label is identical at build time and in the
-        // viewer's browser — local getters cause hydration mismatches for
-        // timestamps near New Year
         const timeRange = album._build?.timeRange
           ?.filter(Boolean)
-          .map((ts) => new Date(ts!).getUTCFullYear()) ?? [0, 0];
+          .map((ts) => parseExifLocalDateTime(ts)?.year ?? 0) ?? [0, 0];
 
         return (
           <li key={album._build.slug} className={styles.item}>

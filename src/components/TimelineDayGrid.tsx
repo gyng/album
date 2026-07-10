@@ -6,37 +6,25 @@ import { Caption, Heading, Thumb, overlayButtonStyles } from "./ui";
 import commonStyles from "../styles/common.module.css";
 import styles from "./TimelineDayGrid.module.css";
 import { TimelineEntry } from "./timelineTypes";
+import {
+  exifWallClockTimestamp,
+  formatExifWallClockDate,
+  formatExifWallClockDateTime,
+} from "../util/exifTime";
 
 const formatLongDate = (date: string) =>
-  new Date(`${date}T00:00:00Z`).toLocaleDateString("en-GB", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-    timeZone: "UTC",
-  });
+  formatExifWallClockDate(`${date}T00:00:00`) ?? date;
 
-const formatDateTimeTitle = (dateTimeOriginal: string) => {
-  const parsed = new Date(dateTimeOriginal);
-  if (Number.isNaN(parsed.getTime())) {
-    return null;
-  }
-
-  return parsed.toLocaleString("en-GB", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  });
-};
+const formatDateTimeTitle = (dateTimeOriginal: string) =>
+  formatExifWallClockDateTime(dateTimeOriginal);
 
 const formatRelativeDateTime = (dateTimeOriginal: string) => {
-  const parsed = new Date(dateTimeOriginal);
-  if (Number.isNaN(parsed.getTime())) {
+  const timestamp = exifWallClockTimestamp(dateTimeOriginal);
+  if (timestamp === null) {
     return null;
   }
 
-  return getRelativeTimeString(parsed);
+  return getRelativeTimeString(timestamp);
 };
 
 const isGeocodeCoordinate = (line: string) => /^-?\d+(?:\.\d+)?$/.test(line);

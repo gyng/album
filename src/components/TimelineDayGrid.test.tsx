@@ -96,6 +96,9 @@ describe("TimelineDayGrid", () => {
       "/search?similar=..%2Falbums%2Fkansai%2Fa.jpg",
       "/search?similar=..%2Falbums%2Ftokyo%2Fb.jpg",
     ]);
+    expect(screen.getByText("yesterday").getAttribute("title")).toBe(
+      "2 January 2024 at 12:00",
+    );
   });
 
   it("renders an empty state when no date is selected", () => {

@@ -48,9 +48,9 @@ export const getStaticProps: GetStaticProps<PageProps> = async (context) => {
   return measureBuild("page./.getStaticProps", async () => {
     const albums = (await getAlbums())
       .sort((a, b) => {
-        const bTime = getImageTimestampRange(b)[1] ?? 0;
-        const aTime = getImageTimestampRange(a)[1] ?? 0;
-        return bTime - aTime;
+        const bTime = getImageTimestampRange(b)[1] ?? "";
+        const aTime = getImageTimestampRange(a)[1] ?? "";
+        return bTime.localeCompare(aTime);
       })
       .sort((a, b) => (b.order ?? 0) - (a.order ?? 0))
       // Push test albums to the end

@@ -161,7 +161,7 @@ export type Content = {
   };
   _build: {
     slug: string;
-    timeRange?: [number | null, number | null];
+    timeRange?: [string | null, string | null];
     srcdir: string;
   };
 };

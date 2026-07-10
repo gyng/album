@@ -77,7 +77,7 @@ describe("serialization", () => {
     },
     _build: {
       slug: "slug",
-      timeRange: [0, 1000],
+      timeRange: ["2024-01-01T00:00:00", "2024-01-02T00:00:00"],
       srcdir: "srcdir",
     },
   };

@@ -99,10 +99,10 @@ describe("getImageTimestampRange", () => {
 
   it("returns the same timestamp for both ends when there is one photo", () => {
     const date = "2024-03-10T08:00:00Z";
-    const ts = new Date(date).getTime();
+    const timestamp = "2024-03-10T08:00:00";
     expect(getImageTimestampRange(makeContent([makePhoto(date)]))).toEqual([
-      ts,
-      ts,
+      timestamp,
+      timestamp,
     ]);
   });
 
@@ -113,18 +113,18 @@ describe("getImageTimestampRange", () => {
     const [earliest, latest] = getImageTimestampRange(
       makeContent([makePhoto(mid), makePhoto(late), makePhoto(early)]),
     );
-    expect(earliest).toBe(new Date(early).getTime());
-    expect(latest).toBe(new Date(late).getTime());
+    expect(earliest).toBe("2022-01-01T00:00:00");
+    expect(latest).toBe("2024-12-31T00:00:00");
   });
 
   it("ignores non-photo blocks when computing the range", () => {
     const date = "2024-05-20T00:00:00Z";
-    const ts = new Date(date).getTime();
+    const timestamp = "2024-05-20T00:00:00";
     const [earliest, latest] = getImageTimestampRange(
       makeContent([makeText(), makePhoto(date), makeVideo("2020-01-01")]),
     );
-    expect(earliest).toBe(ts);
-    expect(latest).toBe(ts);
+    expect(earliest).toBe(timestamp);
+    expect(latest).toBe(timestamp);
   });
 
   it("returns [null, null] when all photo dates are missing", () => {
@@ -133,15 +133,11 @@ describe("getImageTimestampRange", () => {
     ).toEqual([null, null]);
   });
 
-  it("keeps pre-1970 (negative-epoch) dates instead of treating them as missing", () => {
-    // Scanned film: a valid but negative timestamp must not hit the old 0 / -1
-    // "missing" sentinels.
+  it("keeps pre-1970 scanned-film dates instead of treating them as missing", () => {
     const film = "1965-06-15T00:00:00Z";
-    const ts = new Date(film).getTime();
-    expect(ts).toBeLessThan(0);
     expect(getImageTimestampRange(makeContent([makePhoto(film)]))).toEqual([
-      ts,
-      ts,
+      "1965-06-15T00:00:00",
+      "1965-06-15T00:00:00",
     ]);
   });
 });
