@@ -47,10 +47,7 @@ export type MapWorldEntry = {
 
 export type TimeRange = { fromMs: number; toMs: number };
 
-const isPhotoInTimeRange = (
-  photo: { date: string | null },
-  range: TimeRange,
-): boolean => {
+const isPhotoInTimeRange = (photo: { date: string | null }, range: TimeRange): boolean => {
   const ms = parseTimestampSafe(photo.date);
   if (ms === null) return false;
   return ms >= range.fromMs && ms <= range.toMs;
@@ -72,13 +69,7 @@ export type MapWorldProps = {
   showLegend?: boolean;
 };
 
-const MapAutoFit = ({
-  enabled,
-  photos,
-}: {
-  enabled: boolean;
-  photos: MapWorldEntry[];
-}) => {
+const MapAutoFit = ({ enabled, photos }: { enabled: boolean; photos: MapWorldEntry[] }) => {
   const { current: map } = useMap();
 
   React.useEffect(() => {
@@ -88,10 +79,7 @@ const MapAutoFit = ({
 
     const coordinates = photos
       .filter((photo) => photo.decLat !== null && photo.decLng !== null)
-      .map(
-        (photo) =>
-          [photo.decLng as number, photo.decLat as number] as [number, number],
-      );
+      .map((photo) => [photo.decLng as number, photo.decLat as number] as [number, number]);
 
     if (coordinates.length === 0) {
       return;
@@ -146,12 +134,7 @@ const LazyImage = ({ photo }: { photo: MapWorldEntry }) => {
 const MapBoundsTracker = ({
   onBoundsChange,
 }: {
-  onBoundsChange: (bounds: {
-    north: number;
-    south: number;
-    east: number;
-    west: number;
-  }) => void;
+  onBoundsChange: (bounds: { north: number; south: number; east: number; west: number }) => void;
 }) => {
   const { current: map } = useMap();
 
@@ -212,10 +195,7 @@ const getDirectionalGradientStops = (fromColor: string, toColor: string) => [
   { offset: "100%", color: toColor },
 ];
 
-const getBackgroundJourneyGradientColors = (
-  fromColor: string,
-  toColor: string,
-) => ({
+const getBackgroundJourneyGradientColors = (fromColor: string, toColor: string) => ({
   start: fromColor,
   quarter: mixHsl(fromColor, toColor, 0.25),
   middle: mixHsl(fromColor, toColor, 0.5),
@@ -231,10 +211,7 @@ const getAnimationSecondsFromSpeed = (speedKmh: number | null): number => {
   return Number((2.5 - log * 0.67).toFixed(2));
 };
 
-const getApproxSpeedKmh = (
-  fromPoint: RoutePoint,
-  toPoint: RoutePoint,
-): number | null => {
+const getApproxSpeedKmh = (fromPoint: RoutePoint, toPoint: RoutePoint): number | null => {
   const from = fromPoint.date ? new Date(fromPoint.date).valueOf() : NaN;
   const to = toPoint.date ? new Date(toPoint.date).valueOf() : NaN;
 
@@ -300,10 +277,7 @@ const getReadableLabelAngle = (angle: number): number => {
   return angle;
 };
 
-const isTransferLeg = (
-  distanceKm: number,
-  durationSeconds: number,
-): boolean => {
+const isTransferLeg = (distanceKm: number, durationSeconds: number): boolean => {
   const hours = durationSeconds / 3600;
   return distanceKm >= 12 || hours >= 2;
 };
@@ -377,23 +351,15 @@ const MapRouteOverlay = ({
     // Project each point onto the world copy nearest its predecessor so a leg
     // crossing the Pacific (e.g. Tokyo → Honolulu) draws the short way across
     // the antimeridian instead of sweeping the long way back across the map.
-    const unwrappedLngs = unwrapLongitudes(
-      routePoints.map((point) => point.decLng as number),
-    );
+    const unwrappedLngs = unwrapLongitudes(routePoints.map((point) => point.decLng as number));
 
     return routePoints.slice(0, -1).flatMap((point, index) => {
       const nextPoint = routePoints[index + 1];
       if (!nextPoint) {
         return [];
       }
-      const start = map.project([
-        unwrappedLngs[index] as number,
-        point.decLat as number,
-      ]);
-      const end = map.project([
-        unwrappedLngs[index + 1] as number,
-        nextPoint.decLat as number,
-      ]);
+      const start = map.project([unwrappedLngs[index] as number, point.decLat as number]);
+      const end = map.project([unwrappedLngs[index + 1] as number, nextPoint.decLat as number]);
       if (
         typeof start?.x !== "number" ||
         typeof start?.y !== "number" ||
@@ -438,11 +404,7 @@ const MapRouteOverlay = ({
   }, [getPointColor, map, routePoints, version]);
 
   const routeGradient = React.useMemo(() => {
-    if (
-      !routePoints ||
-      routePoints.length < 2 ||
-      projectedSegments.length === 0
-    ) {
+    if (!routePoints || routePoints.length < 2 || projectedSegments.length === 0) {
       return null;
     }
 
@@ -484,9 +446,7 @@ const MapRouteOverlay = ({
       .map((point, index) =>
         map.project([ghostUnwrappedLngs[index] as number, point.decLat as number]),
       )
-      .filter(
-        (point) => typeof point?.x === "number" && typeof point?.y === "number",
-      );
+      .filter((point) => typeof point?.x === "number" && typeof point?.y === "number");
 
     if (points.length < 2) {
       return null;
@@ -494,8 +454,7 @@ const MapRouteOverlay = ({
 
     return points
       .map(
-        (point, index) =>
-          `${index === 0 ? "M" : "L"} ${point.x.toFixed(2)} ${point.y.toFixed(2)}`,
+        (point, index) => `${index === 0 ? "M" : "L"} ${point.x.toFixed(2)} ${point.y.toFixed(2)}`,
       )
       .join(" ");
   }, [ghostRoutePoints, map, version]);
@@ -504,8 +463,7 @@ const MapRouteOverlay = ({
     const candidates = projectedSegments
       .filter(
         (segment) =>
-          segment.approxSpeedKmh !== null &&
-          (segment.distanceKm >= 5 || segment.lengthPx >= 24),
+          segment.approxSpeedKmh !== null && (segment.distanceKm >= 5 || segment.lengthPx >= 24),
       )
       .sort((left, right) => {
         const leftScore = left.lengthPx;
@@ -518,19 +476,15 @@ const MapRouteOverlay = ({
 
     for (const candidate of candidates) {
       const tooCloseToExisting = Array.from(selected).some((selectedId) => {
-        const selectedSegment = projectedSegments.find(
-          (segment) => segment.id === selectedId,
-        );
+        const selectedSegment = projectedSegments.find((segment) => segment.id === selectedId);
 
         if (!selectedSegment) {
           return false;
         }
 
         return (
-          Math.hypot(
-            candidate.midX - selectedSegment.midX,
-            candidate.midY - selectedSegment.midY,
-          ) < minMidpointSpacingPx
+          Math.hypot(candidate.midX - selectedSegment.midX, candidate.midY - selectedSegment.midY) <
+          minMidpointSpacingPx
         );
       });
 
@@ -549,11 +503,7 @@ const MapRouteOverlay = ({
   }
 
   return (
-    <svg
-      className={styles.routeOverlay}
-      data-testid="journey-line-overlay"
-      aria-hidden="true"
-    >
+    <svg className={styles.routeOverlay} data-testid="journey-line-overlay" aria-hidden="true">
       <defs>
         {routeGradient ? (
           <linearGradient
@@ -588,10 +538,7 @@ const MapRouteOverlay = ({
       {projectedSegments.map((segment) => (
         <React.Fragment key={segment.id}>
           {(() => {
-            const transferLeg = isTransferLeg(
-              segment.distanceKm,
-              segment.durationSeconds,
-            );
+            const transferLeg = isTransferLeg(segment.distanceKm, segment.durationSeconds);
             const dashCycle = transferLeg ? 28 : 16;
 
             return (
@@ -609,9 +556,7 @@ const MapRouteOverlay = ({
                   className={styles.routeOverlayPath}
                   data-testid="journey-line-segment"
                   style={{
-                    stroke: routeGradient
-                      ? `url(#${routeGradient.id})`
-                      : segment.color,
+                    stroke: routeGradient ? `url(#${routeGradient.id})` : segment.color,
                     strokeWidth:
                       routeMode === "simplified"
                         ? transferLeg
@@ -643,9 +588,7 @@ const MapRouteOverlay = ({
                     style={{ opacity: 0.9 }}
                   >
                     <text className={styles.routeOverlayLabel}>
-                      {`${segment.approxSpeedKmh}km/h · ${formatDistanceKm(
-                        segment.distanceKm,
-                      )}`}
+                      {`${segment.approxSpeedKmh}km/h · ${formatDistanceKm(segment.distanceKm)}`}
                     </text>
                   </g>
                 ) : null}
@@ -662,13 +605,41 @@ const MapRouteOverlay = ({
             const endColor = getPointColor(routePoints.at(-1)!, routePoints.length - 1);
             return (
               <>
-                <g transform={`translate(${projectedSegments[0]?.startX ?? 0}, ${projectedSegments[0]?.startY ?? 0})`}>
-                  <circle cx="0" cy="0" r="3.5" style={{ fill: startColor }} className={styles.routeEndpointPing} />
-                  <circle cx="0" cy="0" r="3.5" style={{ fill: startColor }} className={`${styles.routeEndpointPing} ${styles.routeEndpointPingDelay}`} />
+                <g
+                  transform={`translate(${projectedSegments[0]?.startX ?? 0}, ${projectedSegments[0]?.startY ?? 0})`}
+                >
+                  <circle
+                    cx="0"
+                    cy="0"
+                    r="3.5"
+                    style={{ fill: startColor }}
+                    className={styles.routeEndpointPing}
+                  />
+                  <circle
+                    cx="0"
+                    cy="0"
+                    r="3.5"
+                    style={{ fill: startColor }}
+                    className={`${styles.routeEndpointPing} ${styles.routeEndpointPingDelay}`}
+                  />
                 </g>
-                <g transform={`translate(${projectedSegments.at(-1)?.endX ?? 0}, ${projectedSegments.at(-1)?.endY ?? 0})`}>
-                  <circle cx="0" cy="0" r="3.5" style={{ fill: endColor }} className={styles.routeEndpointPing} />
-                  <circle cx="0" cy="0" r="3.5" style={{ fill: endColor }} className={`${styles.routeEndpointPing} ${styles.routeEndpointPingDelay}`} />
+                <g
+                  transform={`translate(${projectedSegments.at(-1)?.endX ?? 0}, ${projectedSegments.at(-1)?.endY ?? 0})`}
+                >
+                  <circle
+                    cx="0"
+                    cy="0"
+                    r="3.5"
+                    style={{ fill: endColor }}
+                    className={styles.routeEndpointPing}
+                  />
+                  <circle
+                    cx="0"
+                    cy="0"
+                    r="3.5"
+                    style={{ fill: endColor }}
+                    className={`${styles.routeEndpointPing} ${styles.routeEndpointPingDelay}`}
+                  />
                 </g>
               </>
             );
@@ -716,13 +687,10 @@ export const MMap: React.FC<MapWorldProps> = ({
   timeRange,
   showLegend = true,
 }) => {
-  const url =
-    typeof window === "undefined" ? null : new URL(window.location.toString());
+  const url = typeof window === "undefined" ? null : new URL(window.location.toString());
   const initialLon = syncRoute ? (url?.searchParams.get("lon") ?? null) : null;
   const initialLat = syncRoute ? (url?.searchParams.get("lat") ?? null) : null;
-  const initialZoom = syncRoute
-    ? (url?.searchParams.get("zoom") ?? null)
-    : null;
+  const initialZoom = syncRoute ? (url?.searchParams.get("zoom") ?? null) : null;
 
   const [zoom, setZoom] = React.useState<number | null>(
     initialZoom ? Number.parseFloat(initialZoom) : null,
@@ -736,8 +704,7 @@ export const MMap: React.FC<MapWorldProps> = ({
     west: number;
   } | null>(null);
   const timeFilteredPhotos = React.useMemo(
-    () =>
-      timeRange ? photos.filter((photo) => isPhotoInTimeRange(photo, timeRange)) : photos,
+    () => (timeRange ? photos.filter((photo) => isPhotoInTimeRange(photo, timeRange)) : photos),
     [photos, timeRange],
   );
   // Memoize date range calculations (Optimization #1)
@@ -745,16 +712,11 @@ export const MMap: React.FC<MapWorldProps> = ({
     const sortedByDate = photos
       .slice()
       .filter((p) => p.date)
-      .sort(
-        (a, b) =>
-          new Date(a.date ?? "").valueOf() - new Date(b.date ?? "").valueOf(),
-      );
+      .sort((a, b) => new Date(a.date ?? "").valueOf() - new Date(b.date ?? "").valueOf());
     // Ascending sort: earliest first, latest last.
     const oldest = sortedByDate.at(0);
     const newest = sortedByDate.at(-1);
-    const range =
-      new Date(newest?.date ?? 0).valueOf() -
-      new Date(oldest?.date ?? 0).valueOf();
+    const range = new Date(newest?.date ?? 0).valueOf() - new Date(oldest?.date ?? 0).valueOf();
 
     return { oldest, newest, range };
   }, [photos]);
@@ -765,9 +727,7 @@ export const MMap: React.FC<MapWorldProps> = ({
       .slice()
       .sort((a, b) => {
         // sort so newer markers are on top
-        return (
-          new Date(a.date ?? "").valueOf() - new Date(b.date ?? "").valueOf()
-        );
+        return new Date(a.date ?? "").valueOf() - new Date(b.date ?? "").valueOf();
       })
       .map((photo): PhotoWithStyle => {
         // Undated photos resolve to the oldest end. Guard range === 0 (single
@@ -779,9 +739,7 @@ export const MMap: React.FC<MapWorldProps> = ({
                 new Date(dateStats.oldest?.date ?? 0).valueOf()) /
               dateStats.range
             : 0;
-        const relative = Number.isFinite(rawRelative)
-          ? Math.min(1, Math.max(0, rawRelative))
-          : 0;
+        const relative = Number.isFinite(rawRelative) ? Math.min(1, Math.max(0, rawRelative)) : 0;
 
         return {
           ...photo,
@@ -813,9 +771,7 @@ export const MMap: React.FC<MapWorldProps> = ({
   const [clickInfo, setClickInfo] = React.useState<MapWorldEntry | null>(null);
   const [hoverInfo, setHoverInfo] = React.useState<MapWorldEntry | null>(null);
   const lastSyncedRouteRef = React.useRef<string>("");
-  const debounceTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(
-    null,
-  );
+  const debounceTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const pauseUntilRef = React.useRef<number>(0);
   const popupInfo = clickInfo ?? hoverInfo;
   // Without clustering, many photos can share the same pixel and only the
@@ -826,18 +782,14 @@ export const MMap: React.FC<MapWorldProps> = ({
   const selectMarker = (photo: MapWorldEntry) => {
     setClickInfo((current) => {
       const coLocated = visiblePhotos.filter(
-        (candidate) =>
-          candidate.decLat === photo.decLat &&
-          candidate.decLng === photo.decLng,
+        (candidate) => candidate.decLat === photo.decLat && candidate.decLng === photo.decLng,
       );
 
       if (coLocated.length <= 1 || !current) {
         return photo;
       }
 
-      const currentIndex = coLocated.findIndex(
-        (candidate) => candidate.href === current.href,
-      );
+      const currentIndex = coLocated.findIndex((candidate) => candidate.href === current.href);
 
       if (currentIndex === -1) {
         return photo;
@@ -867,9 +819,7 @@ export const MMap: React.FC<MapWorldProps> = ({
   }, [timeFilteredPhotos]);
   const activeRouteTarget = clickInfo?.href ?? hoverInfo?.href ?? null;
   const activeRoutePhoto = React.useMemo(
-    () =>
-      photosWithStyles.find((photo) => photo.href === activeRouteTarget) ??
-      null,
+    () => photosWithStyles.find((photo) => photo.href === activeRouteTarget) ?? null,
     [activeRouteTarget, photosWithStyles],
   );
   const activeContextRoutePoints = React.useMemo(() => {
@@ -885,11 +835,7 @@ export const MMap: React.FC<MapWorldProps> = ({
   );
   const markerColorByHref = React.useMemo(
     () =>
-      new globalThis.Map(
-        photosWithStyles.map(
-          (photo) => [photo.href, photo.markerColor] as const,
-        ),
-      ),
+      new globalThis.Map(photosWithStyles.map((photo) => [photo.href, photo.markerColor] as const)),
     [photosWithStyles],
   );
   const fullRoutePoints = React.useMemo(() => {
@@ -909,7 +855,6 @@ export const MMap: React.FC<MapWorldProps> = ({
 
   React.useEffect(() => {
     if (clickInfo && !timeFilteredPhotos.some((photo) => photo.href === clickInfo.href)) {
-       
       setClickInfo(null);
     }
     if (hoverInfo && !timeFilteredPhotos.some((photo) => photo.href === hoverInfo.href)) {
@@ -925,40 +870,37 @@ export const MMap: React.FC<MapWorldProps> = ({
       return toRouteGeoJson(fullRoutePoints);
     }
 
-    const features = Array.from(routeDataByAlbum.entries()).flatMap(
-      ([album, route]) => {
-        const points =
-          routeMode === "simplified" ? route.simplifiedPoints : route.fullPoints;
-        const routeGeoJson = toRouteGeoJson(points);
-        const startPoint = points[0];
-        const endPoint = points.at(-1);
-        const gradientColors =
-          startPoint && endPoint
-            ? getBackgroundJourneyGradientColors(
-                markerColorByHref.get(startPoint.memberHrefs.at(-1) ?? startPoint.href) ??
-                  markerColorByHref.get(startPoint.href) ??
-                  "#12bcd4",
-                markerColorByHref.get(endPoint.memberHrefs.at(-1) ?? endPoint.href) ??
-                  markerColorByHref.get(endPoint.href) ??
-                  "#12bcd4",
-              )
-            : null;
+    const features = Array.from(routeDataByAlbum.entries()).flatMap(([album, route]) => {
+      const points = routeMode === "simplified" ? route.simplifiedPoints : route.fullPoints;
+      const routeGeoJson = toRouteGeoJson(points);
+      const startPoint = points[0];
+      const endPoint = points.at(-1);
+      const gradientColors =
+        startPoint && endPoint
+          ? getBackgroundJourneyGradientColors(
+              markerColorByHref.get(startPoint.memberHrefs.at(-1) ?? startPoint.href) ??
+                markerColorByHref.get(startPoint.href) ??
+                "#12bcd4",
+              markerColorByHref.get(endPoint.memberHrefs.at(-1) ?? endPoint.href) ??
+                markerColorByHref.get(endPoint.href) ??
+                "#12bcd4",
+            )
+          : null;
 
-        return (
-          routeGeoJson?.features.map((feature) => ({
-            ...feature,
-            properties: {
-              ...feature.properties,
-              album,
-              routeColorStart: gradientColors?.start ?? "#0f4b6e",
-              routeColorQuarter: gradientColors?.quarter ?? "#145b83",
-              routeColorMiddle: gradientColors?.middle ?? "#12bcd4",
-              routeColorEnd: gradientColors?.end ?? "#b9fbff",
-            },
-          })) ?? []
-        );
-      },
-    );
+      return (
+        routeGeoJson?.features.map((feature) => ({
+          ...feature,
+          properties: {
+            ...feature.properties,
+            album,
+            routeColorStart: gradientColors?.start ?? "#0f4b6e",
+            routeColorQuarter: gradientColors?.quarter ?? "#145b83",
+            routeColorMiddle: gradientColors?.middle ?? "#12bcd4",
+            routeColorEnd: gradientColors?.end ?? "#b9fbff",
+          },
+        })) ?? []
+      );
+    });
 
     if (features.length === 0) {
       return null;
@@ -995,7 +937,7 @@ export const MMap: React.FC<MapWorldProps> = ({
   );
   const shouldEmphasizeRouteMarkers = clickInfo !== null;
   const getRoutePointColor = React.useCallback(
-    (point: RoutePoint, index: number) => {
+    (point: RoutePoint, _index: number) => {
       const memberHref = point.memberHrefs.at(-1) ?? point.href;
       return (
         markerColorByHref.get(memberHref) ??
@@ -1035,8 +977,7 @@ export const MMap: React.FC<MapWorldProps> = ({
     }
     return { older, newer };
   }, [dateStats.oldest?.date, dateStats.newest?.date]);
-  const shouldShowLegend =
-    showLegend && dateStats.range > 0 && timeFilteredPhotos.length > 1;
+  const shouldShowLegend = showLegend && dateStats.range > 0 && timeFilteredPhotos.length > 1;
 
   const pauseRouterSync = React.useCallback(() => {
     if (!syncRoute) {
@@ -1120,12 +1061,7 @@ export const MMap: React.FC<MapWorldProps> = ({
         <MapAutoFit enabled={fitToPhotos} photos={photos} />
         <MapBoundsTracker onBoundsChange={setBounds} />
         {routeGeoJson ? (
-          <Source
-            id="journey-line-source"
-            type="geojson"
-            data={routeGeoJson}
-            lineMetrics
-          >
+          <Source id="journey-line-source" type="geojson" data={routeGeoJson} lineMetrics>
             <Layer
               id="journey-line-glow-layer"
               type="line"
@@ -1137,17 +1073,7 @@ export const MMap: React.FC<MapWorldProps> = ({
                 "line-opacity": routeDataByAlbum.size > 1 ? 0.34 : 0.35,
                 "line-width":
                   routeDataByAlbum.size > 1
-                    ? [
-                        "interpolate",
-                        ["linear"],
-                        ["line-progress"],
-                        0,
-                        2.4,
-                        0.32,
-                        6.2,
-                        1,
-                        10.2,
-                      ]
+                    ? ["interpolate", ["linear"], ["line-progress"], 0, 2.4, 0.32, 6.2, 1, 10.2]
                     : routeLineWidth + 4,
               }}
             />
@@ -1173,17 +1099,7 @@ export const MMap: React.FC<MapWorldProps> = ({
                   : 0.24,
                 "line-width":
                   routeDataByAlbum.size > 1
-                    ? [
-                        "interpolate",
-                        ["linear"],
-                        ["line-progress"],
-                        0,
-                        1.1,
-                        0.32,
-                        4.8,
-                        1,
-                        8,
-                      ]
+                    ? ["interpolate", ["linear"], ["line-progress"], 0, 1.1, 0.32, 4.8, 1, 8]
                     : routeLineWidth,
                 ...(routeDataByAlbum.size > 1 ? {} : { "line-dasharray": [2, 2] }),
               }}
@@ -1207,12 +1123,13 @@ export const MMap: React.FC<MapWorldProps> = ({
             onClose={() => {
               setClickInfo(null);
             }}
-            className={`${styles.popup} ${
-              clickInfo ? styles.click : styles.hover
-            }`}
+            className={`${styles.popup} ${clickInfo ? styles.click : styles.hover}`}
             offset={15}
             closeButton={false}
           >
+            {/* onClick only stops the click reaching the map's own handler — it
+                is event plumbing, not an interactive control. */}
+            {/* oxlint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions */}
             <div
               onMouseDownCapture={pauseRouterSync}
               onTouchStartCapture={pauseRouterSync}
@@ -1232,9 +1149,7 @@ export const MMap: React.FC<MapWorldProps> = ({
                 <div className={styles.details}>
                   {popupInfo.album}
                   {(() => {
-                    const parsedDate = popupInfo.date
-                      ? new Date(popupInfo.date)
-                      : null;
+                    const parsedDate = popupInfo.date ? new Date(popupInfo.date) : null;
                     if (!parsedDate || Number.isNaN(parsedDate.valueOf())) {
                       // Missing/invalid date — render nothing rather than the
                       // literal "Invalid Date".
@@ -1316,15 +1231,18 @@ export const MMap: React.FC<MapWorldProps> = ({
                           ? styles.pinActive
                           : styles.pinMuted
                         : "",
-                    ].filter(Boolean).join(" ")}
+                    ]
+                      .filter(Boolean)
+                      .join(" ")}
                     role="button"
                     tabIndex={0}
                     aria-label={`Photo from ${photo.album}${
                       photo.date
-                        ? ` on ${new Date(photo.date).toLocaleDateString(
-                            "en-GB",
-                            { day: "numeric", month: "short", year: "numeric" },
-                          )}`
+                        ? ` on ${new Date(photo.date).toLocaleDateString("en-GB", {
+                            day: "numeric",
+                            month: "short",
+                            year: "numeric",
+                          })}`
                         : ""
                     }`}
                     onMouseOver={() => {
@@ -1354,10 +1272,7 @@ export const MMap: React.FC<MapWorldProps> = ({
         <GeolocateControl />
         <ScaleControl />
         {shouldShowLegend ? (
-          <MapRecencyLegend
-            olderLabel={legendYears.older}
-            newerLabel={legendYears.newer}
-          />
+          <MapRecencyLegend olderLabel={legendYears.older} newerLabel={legendYears.newer} />
         ) : null}
         <FullscreenControl />
       </MapLibreMap>

@@ -1,11 +1,23 @@
 import { useState } from "react";
 import type { GetStaticProps, NextPage } from "next";
+import Link from "next/link";
 import { GlobalNav } from "../../components/GlobalNav";
 import { Seo } from "../../components/Seo";
 import {
-  Card, ChartTooltip, Footer, Heading, Caption, Input,
-  OverlayButton, OverlayButtonLink, Pill, PillButton,
-  pillStyles, SegmentedToggle, Select, Thumb,
+  Card,
+  ChartTooltip,
+  Footer,
+  Heading,
+  Caption,
+  Input,
+  OverlayButton,
+  OverlayButtonLink,
+  Pill,
+  PillButton,
+  pillStyles,
+  SegmentedToggle,
+  Select,
+  Thumb,
 } from "../../components/ui";
 import commonStyles from "../../styles/common.module.css";
 import styles from "./design.module.css";
@@ -42,8 +54,18 @@ const colourTokens = [
 ];
 
 const sections = [
-  "spacing", "typography", "colours", "headings", "card", "thumb",
-  "inputs", "pill", "overlay-button", "chart-tooltip", "buttons", "stack",
+  "spacing",
+  "typography",
+  "colours",
+  "headings",
+  "card",
+  "thumb",
+  "inputs",
+  "pill",
+  "overlay-button",
+  "chart-tooltip",
+  "buttons",
+  "stack",
 ] as const;
 
 const Code = ({ children }: { children: string }) => (
@@ -72,11 +94,7 @@ const DesignPage: NextPage<PageProps> = () => {
           </div>
           <nav className={styles.jumpNav} aria-label="Jump to section">
             {sections.map((id) => (
-              <a
-                key={id}
-                href={`#${id}`}
-                className={`${pillStyles.base} ${pillStyles.surface}`}
-              >
+              <a key={id} href={`#${id}`} className={`${pillStyles.base} ${pillStyles.surface}`}>
                 {id.replace(/-/g, " ")}
               </a>
             ))}
@@ -92,10 +110,7 @@ const DesignPage: NextPage<PageProps> = () => {
           <div className={styles.spacingScale}>
             {spacingTokens.map((t) => (
               <div key={t.name} className={styles.spacingSwatch}>
-                <div
-                  className={styles.spacingBox}
-                  style={{ width: t.value, height: t.value }}
-                />
+                <div className={styles.spacingBox} style={{ width: t.value, height: t.value }} />
                 <span className={styles.spacingLabel}>{t.value}</span>
                 <span className={styles.spacingLabel}>{t.name}</span>
               </div>
@@ -115,9 +130,7 @@ const DesignPage: NextPage<PageProps> = () => {
                 <span className={styles.fontLabel}>
                   {t.name} ({t.value})
                 </span>
-                <span style={{ fontSize: `var(${t.name})` }}>
-                  {t.sample}
-                </span>
+                <span style={{ fontSize: `var(${t.name})` }}>{t.sample}</span>
               </div>
             ))}
           </div>
@@ -128,17 +141,15 @@ const DesignPage: NextPage<PageProps> = () => {
           <div className={styles.sectionHeader}>
             <Heading level={1}>Colours</Heading>
             <Caption>
-              Adaptive palette using light-dark() and color-mix(). Toggle the theme in the nav bar to preview.
+              Adaptive palette using light-dark() and color-mix(). Toggle the theme in the nav bar
+              to preview.
             </Caption>
           </div>
           <div className={styles.colourGrid}>
             {colourTokens.map((t) => (
               <div key={t.name} className={styles.colourSwatch}>
                 <div className={styles.colourBoxBacking}>
-                  <div
-                    className={styles.colourBox}
-                    style={{ backgroundColor: `var(${t.name})` }}
-                  />
+                  <div className={styles.colourBox} style={{ backgroundColor: `var(${t.name})` }} />
                 </div>
                 <span className={styles.colourLabel}>{t.label}</span>
                 <span className={styles.colourLabel}>{t.name}</span>
@@ -152,7 +163,8 @@ const DesignPage: NextPage<PageProps> = () => {
           <div className={styles.sectionHeader}>
             <Heading level={1}>Headings</Heading>
             <Caption>
-              Three visual levels. The <code>as</code> prop overrides the HTML element independently.
+              Three visual levels. The <code>as</code> prop overrides the HTML element
+              independently.
             </Caption>
           </div>
           <div className={styles.subsection}>
@@ -164,15 +176,17 @@ const DesignPage: NextPage<PageProps> = () => {
             <span className={styles.subsectionLabel}>Caption</span>
             <Caption>Muted secondary text for metadata and labels.</Caption>
           </div>
-          <Code>{'<Heading level={2}>Title</Heading>'}</Code>
-          <Code>{'<Caption>Secondary text</Caption>'}</Code>
+          <Code>{"<Heading level={2}>Title</Heading>"}</Code>
+          <Code>{"<Caption>Secondary text</Caption>"}</Code>
         </section>
 
         {/* Card */}
         <section id="card" className={styles.section}>
           <div className={styles.sectionHeader}>
             <Heading level={1}>Card</Heading>
-            <Caption>Bordered surface container. Adapts to light and dark themes via color-mix.</Caption>
+            <Caption>
+              Bordered surface container. Adapts to light and dark themes via color-mix.
+            </Caption>
           </div>
           <div className={styles.cardGrid}>
             <Card>
@@ -197,7 +211,9 @@ const DesignPage: NextPage<PageProps> = () => {
         <section id="thumb" className={styles.section}>
           <div className={styles.sectionHeader}>
             <Heading level={1}>Thumb</Heading>
-            <Caption>Image thumbnail with sharp corners. Default (150px) and small (112px) variants.</Caption>
+            <Caption>
+              Image thumbnail with sharp corners. Default (150px) and small (112px) variants.
+            </Caption>
           </div>
           <div className={`${styles.row} ${styles.rowStart}`}>
             <div className={styles.subsection}>
@@ -223,7 +239,9 @@ const DesignPage: NextPage<PageProps> = () => {
         <section id="inputs" className={styles.section}>
           <div className={styles.sectionHeader}>
             <Heading level={1}>Inputs &amp; Controls</Heading>
-            <Caption>Form elements with consistent border, radius, and focus ring treatment.</Caption>
+            <Caption>
+              Form elements with consistent border, radius, and focus ring treatment.
+            </Caption>
           </div>
           <div className={styles.inputGrid}>
             <div className={styles.inputField}>
@@ -271,14 +289,19 @@ const DesignPage: NextPage<PageProps> = () => {
           </div>
           <Code>{'<Input placeholder="..." />'}</Code>
           <Code>{'<Select variant="compact">...</Select>'}</Code>
-          <Code>{'<SegmentedToggle options={[...]} value={v} onChange={set} ariaLabel="..." />'}</Code>
+          <Code>
+            {'<SegmentedToggle options={[...]} value={v} onChange={set} ariaLabel="..." />'}
+          </Code>
         </section>
 
         {/* Pill */}
         <section id="pill" className={styles.section}>
           <div className={styles.sectionHeader}>
             <Heading level={1}>Pill</Heading>
-            <Caption>Rounded link/button for navigation and actions. Surface (filled) and ghost (transparent) variants.</Caption>
+            <Caption>
+              Rounded link/button for navigation and actions. Surface (filled) and ghost
+              (transparent) variants.
+            </Caption>
           </div>
           <div className={styles.subsection}>
             <span className={styles.subsectionLabel}>Surface (default)</span>
@@ -292,20 +315,25 @@ const DesignPage: NextPage<PageProps> = () => {
           <div className={styles.subsection}>
             <span className={styles.subsectionLabel}>Ghost</span>
             <div className={styles.row}>
-              <Pill href="#" variant="ghost">Open in Search ↗</Pill>
+              <Pill href="#" variant="ghost">
+                Open in Search ↗
+              </Pill>
               <PillButton variant="ghost">Reset</PillButton>
             </div>
           </div>
           <Code>{'<Pill href="#" variant="ghost">Link</Pill>'}</Code>
-          <Code>{'<PillButton>Action</PillButton>'}</Code>
-          <Code>{'For <Link>: className={`${pillStyles.base} ${pillStyles.surface}`}'}</Code>
+          <Code>{"<PillButton>Action</PillButton>"}</Code>
+          <Code>{"For <Link>: className={`${pillStyles.base} ${pillStyles.surface}`}"}</Code>
         </section>
 
         {/* Overlay Button */}
         <section id="overlay-button" className={styles.section}>
           <div className={styles.sectionHeader}>
             <Heading level={1}>Overlay Button</Heading>
-            <Caption>Dark glass button for actions on thumbnails and media. Default and small (icon-only) sizes.</Caption>
+            <Caption>
+              Dark glass button for actions on thumbnails and media. Default and small (icon-only)
+              sizes.
+            </Caption>
           </div>
           <div className={styles.darkPreview}>
             <OverlayButton>🔍 Similar</OverlayButton>
@@ -319,7 +347,10 @@ const DesignPage: NextPage<PageProps> = () => {
         <section id="chart-tooltip" className={styles.section}>
           <div className={styles.sectionHeader}>
             <Heading level={1}>Chart Tooltip</Heading>
-            <Caption>Accent-tinted tooltip shown on hover over chart bars/cells. Visible here for reference.</Caption>
+            <Caption>
+              Accent-tinted tooltip shown on hover over chart bars/cells. Visible here for
+              reference.
+            </Caption>
           </div>
           <div className={styles.tooltipDemo}>
             <div className={styles.tooltipBar} style={{ height: 40 }}>
@@ -338,7 +369,7 @@ const DesignPage: NextPage<PageProps> = () => {
               <ChartTooltip>May · 103</ChartTooltip>
             </div>
           </div>
-          <Code>{'<ChartTooltip>Label · 42</ChartTooltip>'}</Code>
+          <Code>{"<ChartTooltip>Label · 42</ChartTooltip>"}</Code>
         </section>
 
         {/* Buttons (existing common styles) */}
@@ -353,32 +384,32 @@ const DesignPage: NextPage<PageProps> = () => {
               <button type="button" className={commonStyles.button}>
                 Button
               </button>
-              <a href="#" className={commonStyles.button}>
+              <Link href="/design" className={commonStyles.button}>
                 Link button
-              </a>
+              </Link>
             </div>
           </div>
           <div className={styles.subsection}>
             <span className={styles.subsectionLabel}>Split button</span>
             <div className={styles.row}>
               <div className={commonStyles.splitButton}>
-                <span className={commonStyles.splitButtonMain}>
-                  Primary
-                </span>
+                <span className={commonStyles.splitButtonMain}>Primary</span>
                 <button type="button" className={commonStyles.splitButtonSub}>
                   ▾
                 </button>
               </div>
             </div>
           </div>
-          <Code>{'className={commonStyles.button}'}</Code>
+          <Code>{"className={commonStyles.button}"}</Code>
         </section>
 
         {/* Stack utilities */}
         <section id="stack" className={styles.section}>
           <div className={styles.sectionHeader}>
             <Heading level={1}>Stack</Heading>
-            <Caption>Utility classes for vertical rhythm. grid + gap at each spacing level.</Caption>
+            <Caption>
+              Utility classes for vertical rhythm. grid + gap at each spacing level.
+            </Caption>
           </div>
           <div className={`${styles.row} ${styles.rowStart}`}>
             {(
@@ -401,7 +432,7 @@ const DesignPage: NextPage<PageProps> = () => {
               </div>
             ))}
           </div>
-          <Code>{'className={commonStyles.stack}'}</Code>
+          <Code>{"className={commonStyles.stack}"}</Code>
         </section>
       </main>
       <Footer />

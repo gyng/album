@@ -67,9 +67,7 @@ export const SearchDrawPad: React.FC<Props> = ({ onCancel, onSubmit }) => {
   // the pad on close.
   useEffect(() => {
     const previouslyFocused =
-      document.activeElement instanceof HTMLElement
-        ? document.activeElement
-        : null;
+      document.activeElement instanceof HTMLElement ? document.activeElement : null;
     cancelRef.current?.focus();
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
@@ -88,9 +86,7 @@ export const SearchDrawPad: React.FC<Props> = ({ onCancel, onSubmit }) => {
       return;
     }
     const focusable = Array.from(
-      panelRef.current?.querySelectorAll<HTMLElement>(
-        "button:not([disabled])",
-      ) ?? [],
+      panelRef.current?.querySelectorAll<HTMLElement>("button:not([disabled])") ?? [],
     );
     if (focusable.length === 0) {
       return;
@@ -164,6 +160,9 @@ export const SearchDrawPad: React.FC<Props> = ({ onCancel, onSubmit }) => {
   };
 
   return (
+    // Modal backdrop: click-outside dismisses (a pointer convenience); keyboard
+    // users close via Escape, handled by the dialog panel's onKeyDown below.
+    // oxlint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions
     <div
       className={styles.backdrop}
       onClick={(event) => {
@@ -172,6 +171,9 @@ export const SearchDrawPad: React.FC<Props> = ({ onCancel, onSubmit }) => {
         }
       }}
     >
+      {/* Dialog focus-trap: onKeyDown implements Escape + Tab trapping, the
+          standard keyboard behaviour for a modal dialog. */}
+      {/* oxlint-disable-next-line jsx-a11y/no-noninteractive-element-interactions */}
       <div
         ref={panelRef}
         className={styles.panel}
@@ -196,10 +198,7 @@ export const SearchDrawPad: React.FC<Props> = ({ onCancel, onSubmit }) => {
             <button
               key={colour}
               type="button"
-              className={[
-                styles.swatch,
-                colour === brushColour ? styles.swatchActive : "",
-              ]
+              className={[styles.swatch, colour === brushColour ? styles.swatchActive : ""]
                 .filter(Boolean)
                 .join(" ")}
               style={{ backgroundColor: colour }}
@@ -231,12 +230,7 @@ export const SearchDrawPad: React.FC<Props> = ({ onCancel, onSubmit }) => {
           <button type="button" className={styles.action} onClick={handleClear}>
             Clear
           </button>
-          <button
-            type="button"
-            ref={cancelRef}
-            className={styles.action}
-            onClick={onCancel}
-          >
+          <button type="button" ref={cancelRef} className={styles.action} onClick={onCancel}>
             Cancel
           </button>
           <button

@@ -2,13 +2,8 @@ import styles from "./OverlayButton.module.css";
 
 export { default as overlayButtonStyles } from "./OverlayButton.module.css";
 
-const getClassName = (
-  size: "small" | undefined,
-  className: string | undefined,
-) =>
-  [styles.base, size === "small" ? styles.small : "", className]
-    .filter(Boolean)
-    .join(" ");
+const getClassName = (size: "small" | undefined, className: string | undefined) =>
+  [styles.base, size === "small" ? styles.small : "", className].filter(Boolean).join(" ");
 
 export const OverlayButton = (
   props: {
@@ -16,13 +11,7 @@ export const OverlayButton = (
   } & React.ButtonHTMLAttributes<HTMLButtonElement>,
 ) => {
   const { size, className, ...rest } = props;
-  return (
-    <button
-      type="button"
-      className={getClassName(size, className)}
-      {...rest}
-    />
-  );
+  return <button type="button" className={getClassName(size, className)} {...rest} />;
 };
 
 export const OverlayButtonLink = (
@@ -30,6 +19,10 @@ export const OverlayButtonLink = (
     size?: "small";
   } & React.AnchorHTMLAttributes<HTMLAnchorElement>,
 ) => {
-  const { size, className, ...rest } = props;
-  return <a className={getClassName(size, className)} {...rest} />;
+  const { size, className, children, ...rest } = props;
+  return (
+    <a className={getClassName(size, className)} {...rest}>
+      {children}
+    </a>
+  );
 };

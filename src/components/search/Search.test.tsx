@@ -128,6 +128,7 @@ const createDeferred = <T,>() => {
 };
 
 const createResolvedThenable = <T,>(value: T) => ({
+  // oxlint-disable-next-line unicorn/no-thenable
   then: (onFulfilled?: (resolved: T) => unknown) => {
     const nextValue = onFulfilled ? onFulfilled(value) : value;
     return createResolvedThenable(nextValue as T);
@@ -162,10 +163,7 @@ beforeAll(() => {
 beforeEach(() => {
   jest.clearAllMocks();
   jest.spyOn(console, "error").mockImplementation((...args) => {
-    if (
-      typeof args[0] === "string" &&
-      args[0].includes("not wrapped in act")
-    ) {
+    if (typeof args[0] === "string" && args[0].includes("not wrapped in act")) {
       return;
     }
 
@@ -174,11 +172,7 @@ beforeEach(() => {
 
   window.history.replaceState({}, "", "/search");
 
-  mockUseDatabase.mockReturnValue([
-    mockDatabase,
-    42,
-    { loaded: 2_000_000, total: 4_000_000 },
-  ]);
+  mockUseDatabase.mockReturnValue([mockDatabase, 42, { loaded: 2_000_000, total: 4_000_000 }]);
   mockUseEmbeddingsDatabase.mockReturnValue([
     mockDatabase,
     100,
@@ -219,32 +213,31 @@ beforeEach(() => {
       data: {
         pages: [
           {
-            data:
-              similarPath
-                ? similarResults
-                : searchMode === "semantic"
+            data: similarPath
+              ? similarResults
+              : searchMode === "semantic"
+                ? [
+                    makeResult({
+                      path: "../albums/test-simple/semantic.jpg",
+                      album_relative_path: "/album/test-simple#semantic.jpg",
+                      filename: "semantic.jpg",
+                      snippet: "Semantic shot",
+                      similarity: 0.88,
+                    }),
+                  ]
+                : searchMode === "hybrid"
                   ? [
                       makeResult({
-                        path: "../albums/test-simple/semantic.jpg",
-                        album_relative_path: "/album/test-simple#semantic.jpg",
-                        filename: "semantic.jpg",
-                        snippet: "Semantic shot",
-                        similarity: 0.88,
+                        path: "../albums/test-simple/hybrid.jpg",
+                        album_relative_path: "/album/test-simple#hybrid.jpg",
+                        filename: "hybrid.jpg",
+                        snippet: "Hybrid shot",
+                        similarity: 0.82,
+                        bm25: 0.7,
+                        rrfScore: 0.03,
                       }),
                     ]
-                  : searchMode === "hybrid"
-                    ? [
-                        makeResult({
-                          path: "../albums/test-simple/hybrid.jpg",
-                          album_relative_path: "/album/test-simple#hybrid.jpg",
-                          filename: "hybrid.jpg",
-                          snippet: "Hybrid shot",
-                          similarity: 0.82,
-                          bm25: 0.7,
-                          rrfScore: 0.03,
-                        }),
-                      ]
-                    : [],
+                  : [],
             prev: undefined,
             next: undefined,
           },
@@ -288,12 +281,8 @@ beforeEach(() => {
       snippet: "Random shot",
     }),
   ]);
-  (fetchRandomPhoto as jest.Mock).mockResolvedValue([
-    { path: "../albums/test-simple/seed.jpg" },
-  ]);
-  (fetchRefinementTagCounts as jest.Mock).mockImplementation(
-    () => new Promise(() => {}),
-  );
+  (fetchRandomPhoto as jest.Mock).mockResolvedValue([{ path: "../albums/test-simple/seed.jpg" }]);
+  (fetchRefinementTagCounts as jest.Mock).mockImplementation(() => new Promise(() => {}));
   (fetchSearchFacetSections as jest.Mock).mockResolvedValue([
     {
       facetId: "location",
@@ -385,9 +374,7 @@ describe("Search", () => {
   });
 
   it("keeps the local similarity-search button in the search bar while color filtering lives in the facet panel", async () => {
-    (fetchRandomPhoto as jest.Mock).mockResolvedValue([
-      { path: "../albums/test-simple/seed.jpg" },
-    ]);
+    (fetchRandomPhoto as jest.Mock).mockResolvedValue([{ path: "../albums/test-simple/seed.jpg" }]);
 
     render(<Search />);
     await flushEffects();
@@ -484,7 +471,15 @@ describe("Search", () => {
     // Only fake Date, not timers — async rendering needs real setTimeout.
     jest.useFakeTimers({
       now: new Date("2026-03-20T12:00:00Z"),
-      doNotFake: ["setTimeout", "clearTimeout", "setInterval", "clearInterval", "setImmediate", "clearImmediate", "queueMicrotask"],
+      doNotFake: [
+        "setTimeout",
+        "clearTimeout",
+        "setInterval",
+        "clearInterval",
+        "setImmediate",
+        "clearImmediate",
+        "queueMicrotask",
+      ],
     });
     (fetchMemoryCandidates as jest.Mock).mockResolvedValue([
       {
@@ -529,9 +524,7 @@ describe("Search", () => {
 
     expect(screen.queryByAltText("Memory shot D")).toBeNull();
 
-    fireEvent.click(
-      screen.getByRole("button", { name: /more memories/i }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: /more memories/i }));
 
     expect(await screen.findByAltText("Memory shot D")).toBeTruthy();
 
@@ -552,7 +545,7 @@ describe("Search", () => {
         name: /clear current similarity selection/i,
       }),
     ).toBeTruthy();
-    expect(screen.getByAltText("Source photo recent.jpg")).toBeTruthy();
+    expect(screen.getByAltText("Similarity search source (recent.jpg)")).toBeTruthy();
 
     fireEvent.click(
       screen.getByRole("button", {
@@ -610,14 +603,10 @@ describe("Search", () => {
     });
     fireEvent.click(resultSimilarButton);
 
-    expect(screen.getByAltText("Source photo third.jpg")).toBeTruthy();
-    expect(
-      screen.getByRole("button", { name: /remove next.jpg from breadcrumbs/i }),
-    ).toBeTruthy();
+    expect(screen.getByAltText("Similarity search source (third.jpg)")).toBeTruthy();
+    expect(screen.getByRole("button", { name: /remove next.jpg from breadcrumbs/i })).toBeTruthy();
 
-    fireEvent.click(
-      screen.getByRole("button", { name: /remove next.jpg from breadcrumbs/i }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: /remove next.jpg from breadcrumbs/i }));
 
     await waitFor(() => {
       expect(
@@ -627,7 +616,7 @@ describe("Search", () => {
       ).toBeTruthy();
     });
 
-    expect(screen.getByAltText("Source photo recent.jpg")).toBeTruthy();
+    expect(screen.getByAltText("Similarity search source (recent.jpg)")).toBeTruthy();
     expect(
       screen.queryByRole("button", {
         name: /remove next.jpg from breadcrumbs/i,
@@ -658,10 +647,8 @@ describe("Search", () => {
     });
     fireEvent.click(resultSimilarButton);
 
-    expect(screen.getByAltText("Source photo third.jpg")).toBeTruthy();
-    expect(
-      screen.getByRole("button", { name: /remove next.jpg from breadcrumbs/i }),
-    ).toBeTruthy();
+    expect(screen.getByAltText("Similarity search source (third.jpg)")).toBeTruthy();
+    expect(screen.getByRole("button", { name: /remove next.jpg from breadcrumbs/i })).toBeTruthy();
     expect(
       screen.getByRole("button", {
         name: /remove recent.jpg from breadcrumbs/i,
@@ -675,12 +662,10 @@ describe("Search", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByAltText("Source photo next.jpg")).toBeTruthy();
+      expect(screen.getByAltText("Similarity search source (next.jpg)")).toBeTruthy();
     });
 
-    expect(
-      screen.queryByRole("button", { name: /remove next.jpg from breadcrumbs/i }),
-    ).toBeNull();
+    expect(screen.queryByRole("button", { name: /remove next.jpg from breadcrumbs/i })).toBeNull();
     expect(
       screen.getByRole("button", {
         name: /remove recent.jpg from breadcrumbs/i,
@@ -783,14 +768,13 @@ describe("Search", () => {
       expect(screen.getByRole("tab", { name: /place/i })).toBeTruthy();
     });
     expect(screen.getByLabelText("Search mode")).toBeTruthy();
-    expect(
-      screen.getByPlaceholderText(/type \/ to search/i),
-    ).toBeTruthy();
+    expect(screen.getByPlaceholderText(/type \/ to search/i)).toBeTruthy();
 
     fireEvent.click(screen.getByRole("tab", { name: /place/i }));
     fireEvent.click(
-      within(screen.getByRole("heading", { name: "Region" }).parentElement!)
-        .getByRole("button", { name: /tokyo/i }),
+      within(screen.getByRole("heading", { name: "Region" }).parentElement!).getByRole("button", {
+        name: /tokyo/i,
+      }),
     );
 
     await waitFor(() => {
@@ -817,9 +801,7 @@ describe("Search", () => {
     });
 
     await waitFor(() => {
-      expect(
-        screen.getByRole("button", { name: /remove filter colour: #ff0000/i }),
-      ).toBeTruthy();
+      expect(screen.getByRole("button", { name: /remove filter colour: #ff0000/i })).toBeTruthy();
     });
 
     fireEvent.change(screen.getByPlaceholderText(/type \/ to search/i), {
@@ -827,22 +809,17 @@ describe("Search", () => {
     });
 
     // Typing must not silently erase the active colour filter — both compose.
-    expect(
-      (screen.getByPlaceholderText(/type \/ to search/i) as HTMLInputElement)
-        .value,
-    ).toBe("harbor");
-    expect(
-      screen.getByRole("button", { name: /remove filter colour: #ff0000/i }),
-    ).toBeTruthy();
+    expect((screen.getByPlaceholderText(/type \/ to search/i) as HTMLInputElement).value).toBe(
+      "harbor",
+    );
+    expect(screen.getByRole("button", { name: /remove filter colour: #ff0000/i })).toBeTruthy();
   });
 
   it("only shows the photo color action while the color facet is active or selected", async () => {
     window.history.replaceState({}, "", "/search?q=harbor");
     await renderSearch();
 
-    expect(
-      screen.queryByRole("button", { name: /use this photo's colour/i }),
-    ).toBeNull();
+    expect(screen.queryByRole("button", { name: /use this photo's colour/i })).toBeNull();
 
     fireEvent.click(screen.getByRole("tab", { name: /colour/i }));
 
@@ -854,9 +831,7 @@ describe("Search", () => {
   it("preserves typed spaces in the search input", async () => {
     await renderSearch();
 
-    const input = screen.getByPlaceholderText(
-      /type \/ to search/i,
-    ) as HTMLInputElement;
+    const input = screen.getByPlaceholderText(/type \/ to search/i) as HTMLInputElement;
 
     fireEvent.change(input, { target: { value: "new" } });
     expect(input.value).toBe("new");
@@ -870,22 +845,15 @@ describe("Search", () => {
 
   it("hydrates semantic mode from the URL and encodes the text query", async () => {
     window.history.replaceState({}, "", "/search?q=harbor&mode=semantic");
-    (encodeSearchText as jest.Mock).mockReturnValue(
-      createResolvedThenable([1, 0, 0]),
-    );
+    (encodeSearchText as jest.Mock).mockReturnValue(createResolvedThenable([1, 0, 0]));
 
     await renderSearch();
 
     await waitFor(() => {
-      expect(encodeSearchText).toHaveBeenCalledWith(
-        "harbor",
-        expect.any(Function),
-      );
+      expect(encodeSearchText).toHaveBeenCalledWith("harbor", expect.any(Function));
     });
 
-    expect(
-      (screen.getByLabelText("Search mode") as HTMLSelectElement).value,
-    ).toBe("semantic");
+    expect((screen.getByLabelText("Search mode") as HTMLSelectElement).value).toBe("semantic");
 
     await waitFor(() => {
       expect(fetchSemanticResults).toHaveBeenCalledWith(
@@ -900,14 +868,8 @@ describe("Search", () => {
   });
 
   it("passes selected facets into semantic search", async () => {
-    window.history.replaceState(
-      {},
-      "",
-      "/search?q=harbor&mode=semantic&facet=location:Japan",
-    );
-    (encodeSearchText as jest.Mock).mockReturnValue(
-      createResolvedThenable([1, 0, 0]),
-    );
+    window.history.replaceState({}, "", "/search?q=harbor&mode=semantic&facet=location:Japan");
+    (encodeSearchText as jest.Mock).mockReturnValue(createResolvedThenable([1, 0, 0]));
 
     await renderSearch();
 
@@ -924,14 +886,8 @@ describe("Search", () => {
   });
 
   it("passes selected color into semantic search instead of falling back to color-only mode", async () => {
-    window.history.replaceState(
-      {},
-      "",
-      "/search?q=harbor&mode=semantic&color=255,0,0",
-    );
-    (encodeSearchText as jest.Mock).mockReturnValue(
-      createResolvedThenable([1, 0, 0]),
-    );
+    window.history.replaceState({}, "", "/search?q=harbor&mode=semantic&color=255,0,0");
+    (encodeSearchText as jest.Mock).mockReturnValue(createResolvedThenable([1, 0, 0]));
 
     await renderSearch();
 
@@ -954,9 +910,7 @@ describe("Search", () => {
 
   it("keeps filter pills enabled in semantic mode while ignoring keyword-only refinement counts", async () => {
     window.history.replaceState({}, "", "/search?q=harbor&mode=semantic");
-    (encodeSearchText as jest.Mock).mockReturnValue(
-      createResolvedThenable([1, 0, 0]),
-    );
+    (encodeSearchText as jest.Mock).mockReturnValue(createResolvedThenable([1, 0, 0]));
 
     await renderSearch();
 
@@ -969,29 +923,21 @@ describe("Search", () => {
     });
 
     expect(fetchRefinementTagCounts).not.toHaveBeenCalled();
-    expect(
-      (screen.getByRole("button", { name: /night/i }) as HTMLButtonElement)
-        .disabled,
-    ).toBe(false);
+    expect((screen.getByRole("button", { name: /night/i }) as HTMLButtonElement).disabled).toBe(
+      false,
+    );
   });
 
   it("defaults to hybrid mode and dispatches hybrid search", async () => {
     window.history.replaceState({}, "", "/search?q=harbor");
-    (encodeSearchText as jest.Mock).mockReturnValue(
-      createResolvedThenable([1, 0, 0]),
-    );
+    (encodeSearchText as jest.Mock).mockReturnValue(createResolvedThenable([1, 0, 0]));
 
     await renderSearch();
 
-    expect(
-      (screen.getByLabelText("Search mode") as HTMLSelectElement).value,
-    ).toBe("hybrid");
+    expect((screen.getByLabelText("Search mode") as HTMLSelectElement).value).toBe("hybrid");
 
     await waitFor(() => {
-      expect(encodeSearchText).toHaveBeenCalledWith(
-        "harbor",
-        expect.any(Function),
-      );
+      expect(encodeSearchText).toHaveBeenCalledWith("harbor", expect.any(Function));
     });
 
     await waitFor(() => {
@@ -1009,9 +955,7 @@ describe("Search", () => {
 
   it("passes selected facets into hybrid search", async () => {
     window.history.replaceState({}, "", "/search?q=harbor&facet=location:Japan");
-    (encodeSearchText as jest.Mock).mockReturnValue(
-      createResolvedThenable([1, 0, 0]),
-    );
+    (encodeSearchText as jest.Mock).mockReturnValue(createResolvedThenable([1, 0, 0]));
 
     await renderSearch();
 
@@ -1030,9 +974,7 @@ describe("Search", () => {
 
   it("keeps filter pills enabled in hybrid mode while ignoring keyword-only refinement counts", async () => {
     window.history.replaceState({}, "", "/search?q=harbor");
-    (encodeSearchText as jest.Mock).mockReturnValue(
-      createResolvedThenable([1, 0, 0]),
-    );
+    (encodeSearchText as jest.Mock).mockReturnValue(createResolvedThenable([1, 0, 0]));
 
     await renderSearch();
 
@@ -1045,10 +987,9 @@ describe("Search", () => {
     });
 
     expect(fetchRefinementTagCounts).not.toHaveBeenCalled();
-    expect(
-      (screen.getByRole("button", { name: /night/i }) as HTMLButtonElement)
-        .disabled,
-    ).toBe(false);
+    expect((screen.getByRole("button", { name: /night/i }) as HTMLButtonElement).disabled).toBe(
+      false,
+    );
   });
 
   it("does not reuse a stale semantic vector after the input changes", async () => {
@@ -1078,16 +1019,11 @@ describe("Search", () => {
       );
     });
 
-    const input = screen.getByPlaceholderText(
-      /type \/ to search/i,
-    ) as HTMLInputElement;
+    const input = screen.getByPlaceholderText(/type \/ to search/i) as HTMLInputElement;
     fireEvent.change(input, { target: { value: "marina" } });
 
     await waitFor(() => {
-      expect(encodeSearchText).toHaveBeenCalledWith(
-        "marina",
-        expect.any(Function),
-      );
+      expect(encodeSearchText).toHaveBeenCalledWith("marina", expect.any(Function));
     });
 
     expect(fetchSemanticResults).not.toHaveBeenCalledWith(
@@ -1117,11 +1053,7 @@ describe("Search", () => {
     // DB already loaded so the model-warmup progress is the active loader the
     // page surfaces (the bar now lives beside the heading, reported via
     // onNavStateChange rather than rendered inside the widget).
-    mockUseDatabase.mockReturnValue([
-      mockDatabase,
-      100,
-      { loaded: 0, total: 0 },
-    ]);
+    mockUseDatabase.mockReturnValue([mockDatabase, 100, { loaded: 0, total: 0 }]);
 
     let resolveWarmup: (() => void) | null = null;
     (warmupTextEmbeddingModel as jest.Mock).mockImplementation(
@@ -1169,21 +1101,14 @@ describe("Search", () => {
     await flushEffects();
 
     const callsBeforeLoad = mockUseInfiniteQuery.mock.calls.length;
-    const keyBeforeLoad =
-      mockUseInfiniteQuery.mock.calls[callsBeforeLoad - 1][0].queryKey;
+    const keyBeforeLoad = mockUseInfiniteQuery.mock.calls[callsBeforeLoad - 1][0].queryKey;
 
-    mockUseDatabase.mockReturnValue([
-      mockDatabase,
-      100,
-      { loaded: 0, total: 0 },
-    ]);
+    mockUseDatabase.mockReturnValue([mockDatabase, 100, { loaded: 0, total: 0 }]);
     rerender(<Search />);
     await flushEffects();
 
     const keyAfterLoad =
-      mockUseInfiniteQuery.mock.calls[
-        mockUseInfiniteQuery.mock.calls.length - 1
-      ][0].queryKey;
+      mockUseInfiniteQuery.mock.calls[mockUseInfiniteQuery.mock.calls.length - 1][0].queryKey;
 
     expect(keyAfterLoad).not.toEqual(keyBeforeLoad);
   });
@@ -1279,22 +1204,16 @@ describe("image query", () => {
     });
     await flushEffects();
 
-    expect(
-      screen.queryByRole("button", { name: /remove image query/i }),
-    ).toBeNull();
+    expect(screen.queryByRole("button", { name: /remove image query/i })).toBeNull();
   });
 
   it("surfaces an inline error when image encoding fails", async () => {
-    (encodeSearchImage as jest.Mock).mockRejectedValue(
-      new Error("model exploded"),
-    );
+    (encodeSearchImage as jest.Mock).mockRejectedValue(new Error("model exploded"));
 
     await renderSearch();
     await uploadImage();
 
-    expect(
-      await screen.findByText(/image search is unavailable right now/i),
-    ).toBeTruthy();
+    expect(await screen.findByText(/image search is unavailable right now/i)).toBeTruthy();
     expect(fetchSemanticResults).not.toHaveBeenCalled();
   });
 });

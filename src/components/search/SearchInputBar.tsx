@@ -1,4 +1,4 @@
-import React, { useId, useRef, useState, useSyncExternalStore } from "react";
+import React, { useEffect, useId, useRef, useState, useSyncExternalStore } from "react";
 import { Input, Select } from "../ui";
 import styles from "./Search.module.css";
 import { SearchMode } from "./useTextVector";
@@ -54,6 +54,13 @@ export const SearchInputBar: React.FC<Props> = ({
   const modeHelpId = useId();
   const imageFileInputRef = useRef<HTMLInputElement | null>(null);
 
+  // Focus the search box on mount so typing starts a query immediately. This
+  // replaces the `autoFocus` attribute, which jsx-a11y/no-autofocus flags as a
+  // usability hazard; a mount-time focus() is the accepted alternative.
+  useEffect(() => {
+    inputRef.current?.focus();
+  }, [inputRef]);
+
   return (
     <div className={styles.searchInputRow}>
       {isSimilarMode ? null : (
@@ -66,7 +73,6 @@ export const SearchInputBar: React.FC<Props> = ({
               value={searchInputValue}
               placeholder="Type / to search (try 'cat at night', 'white', 'mavica')"
               spellCheck={false}
-              autoFocus
               onChange={(ev) => {
                 onApplySearchTerms(ev.target.value.split(","));
               }}
@@ -185,9 +191,7 @@ export const SearchInputBar: React.FC<Props> = ({
       searchMode === "keyword" &&
       trimmedQuery.length < 3 &&
       queryResultsLength === 0 ? (
-        <div className={styles.searchHintInline}>
-          Type a minimum of 3 characters
-        </div>
+        <div className={styles.searchHintInline}>Type a minimum of 3 characters</div>
       ) : null}
     </div>
   );

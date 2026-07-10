@@ -25,17 +25,12 @@ import {
   FOCAL_LENGTH_ACTUAL_FACET,
   ISO_FACET,
 } from "../util/photoBuckets";
-import {
-  exifWallClockTimestamp,
-  normaliseExifWallClockIso,
-} from "../util/exifTime";
+import { exifWallClockTimestamp, normaliseExifWallClockIso } from "../util/exifTime";
 
 const PhotoSimilarPhotosDeferred = dynamic(
   () => import("./PhotoSimilarPhotos").then((mod) => mod.PhotoSimilarPhotos),
   {
-    loading: () => (
-      <p className={styles.similarPhotosStatus}>Loading similar photos…</p>
-    ),
+    loading: () => <p className={styles.similarPhotosStatus}>Loading similar photos…</p>,
     ssr: false,
   },
 );
@@ -57,27 +52,19 @@ type ExifCoordinatesRowProps = {
   };
 };
 
-const ExifCoordinatesRow: React.FC<{ row: ExifCoordinatesRowProps }> = (
-  props,
-) => {
+const ExifCoordinatesRow: React.FC<{ row: ExifCoordinatesRowProps }> = (props) => {
   const locationSelection = getLocationFacetSelection({
     geocode: props.row.data.geocode,
   });
-  const locationHref = locationSelection
-    ? buildSearchFacetHref(locationSelection)
-    : null;
+  const locationHref = locationSelection ? buildSearchFacetHref(locationSelection) : null;
   const formatted = [
     `${props.row.data.GPSLatitude?.[0]}°`,
     `${props.row.data.GPSLatitude?.[1]}′`,
-    props.row.data.GPSLatitude?.[2]
-      ? `${props.row.data.GPSLatitude?.[2].toFixed(0)}″`
-      : null,
+    props.row.data.GPSLatitude?.[2] ? `${props.row.data.GPSLatitude?.[2].toFixed(0)}″` : null,
     props.row.data.GPSLatitudeRef,
     `${props.row.data.GPSLongitude?.[0]}°`,
     `${props.row.data.GPSLongitude?.[1]}′`,
-    props.row.data.GPSLongitude?.[2]
-      ? `${props.row.data.GPSLongitude?.[2].toFixed(0)}″`
-      : null,
+    props.row.data.GPSLongitude?.[2] ? `${props.row.data.GPSLongitude?.[2].toFixed(0)}″` : null,
     props.row.data.GPSLongitudeRef,
   ]
     .filter(Boolean)
@@ -98,10 +85,7 @@ const ExifCoordinatesRow: React.FC<{ row: ExifCoordinatesRowProps }> = (
           <span className={styles.detailValueWithAction}>
             <span>{formatted}</span>
             {locationHref ? (
-              <FacetLinkIcon
-                href={locationHref}
-                label="Find photos from this place"
-              />
+              <FacetLinkIcon href={locationHref} label="Find photos from this place" />
             ) : null}
           </span>
           {props.row.data.geocode ? (
@@ -116,6 +100,9 @@ const ExifCoordinatesRow: React.FC<{ row: ExifCoordinatesRowProps }> = (
       </tr>
       {props.row.options.showMap && decLng != null && decLat != null ? (
         <tr>
+          {/* Empty layout spacer cell; control-has-associated-label
+              false-positives on it (it is not a control). */}
+          {/* oxlint-disable-next-line jsx-a11y/control-has-associated-label */}
           <td></td>
           <td>
             <MapDeferred coordinates={[decLat, decLng]} />
@@ -154,14 +141,7 @@ type ExifRow =
       valid?: boolean;
     };
 
-type ExifCellValue =
-  | string
-  | string[]
-  | number
-  | JSX.Element
-  | JSX.Element[]
-  | undefined
-  | null;
+type ExifCellValue = string | string[] | number | JSX.Element | JSX.Element[] | undefined | null;
 
 export const PhotoDescription: React.FC<{ description: string }> = (props) => {
   return <div>{props.description}</div>;
@@ -191,12 +171,7 @@ export const ExifTable: React.FC<{
                 // exposure compensation of 0 EV, which is very common — still
                 // renders; null/undefined and empty strings stay hidden.
                 return row.v != null && row.v !== "" ? (
-                  <ExifRow
-                    key={row.k}
-                    k={row.k}
-                    v={row.v}
-                    className={row.className}
-                  />
+                  <ExifRow key={row.k} k={row.k} v={row.v} className={row.className} />
                 ) : null;
               case "coordinates":
                 return (
@@ -271,12 +246,8 @@ export const Picture: React.FC<{
   const isExifPortrait =
     props.block?._build?.exif?.Orientation?.includes("270") ||
     props.block?._build?.exif?.Orientation?.includes("90");
-  const actualWidth = isExifPortrait
-    ? props.block._build.height
-    : props.block._build.width;
-  const actualHeight = isExifPortrait
-    ? props.block._build.width
-    : props.block._build.height;
+  const actualWidth = isExifPortrait ? props.block._build.height : props.block._build.width;
+  const actualHeight = isExifPortrait ? props.block._build.width : props.block._build.height;
 
   const colour = props.block._build?.tags?.colors?.[0];
   const placeholderColour = colour ? rgbToString(colour) : "transparent";
@@ -296,9 +267,7 @@ export const Picture: React.FC<{
       <img
         data-testid="picture"
         className={styles.image}
-        srcSet={props.block._build.srcset
-          .map((s) => `${s.src} ${s.width}w`)
-          .join(", ")}
+        srcSet={props.block._build.srcset.map((s) => `${s.src} ${s.width}w`).join(", ")}
         sizes={props.thumb ? "auto, 800px" : "auto, 100vw"}
         // Original image is not uploaded
         src={props.block._build.srcset[0].src}
@@ -337,35 +306,21 @@ export const PhotoBlockEl: React.FC<{
   const cameraSelection = getCameraFacetSelection(exif);
   const lensSelection = getLensFacetSelection(exif);
   const isoSelection = getBucketFacetSelection(ISO_FACET.id, exif.ISO);
-  const apertureSelection = getBucketFacetSelection(
-    APERTURE_FACET.id,
-    exif.FNumber,
-  );
+  const apertureSelection = getBucketFacetSelection(APERTURE_FACET.id, exif.FNumber);
   const focalLengthSelection =
-    getBucketFacetSelection(
-      FOCAL_LENGTH_35MM_FACET.id,
-      exif.FocalLengthIn35mmFormat,
-    ) ??
+    getBucketFacetSelection(FOCAL_LENGTH_35MM_FACET.id, exif.FocalLengthIn35mmFormat) ??
     getBucketFacetSelection(FOCAL_LENGTH_ACTUAL_FACET.id, exif.FocalLength);
 
   return (
     <div
-      className={`${styles.block} ${
-        props.block.formatting?.immersive ? styles.immersive : ""
-      }`}
+      className={`${styles.block} ${props.block.formatting?.immersive ? styles.immersive : ""}`}
       ref={anchorRef}
       data-testid="photoblockel"
     >
-      <Picture
-        block={props.block}
-        lazy={props.currentIndex > 2}
-        useColourPlaceholder
-      />
+      <Picture block={props.block} lazy={props.currentIndex > 2} useColourPlaceholder />
 
       <div className={styles.overlayHeader}>
-        {props.block.data.title ? (
-          <h1 className={styles.title}>{props.block.data.title}</h1>
-        ) : null}
+        {props.block.data.title ? <h1 className={styles.title}>{props.block.data.title}</h1> : null}
 
         {props.block.data.kicker ? (
           <p className={styles.kicker}>{props.block.data.kicker}</p>
@@ -376,19 +331,13 @@ export const PhotoBlockEl: React.FC<{
         ) : null}
       </div>
 
-      <div
-        id={props.block.id ?? props.block.data.src}
-        className={styles.details}
-      >
+      <div id={props.block.id ?? props.block.data.src} className={styles.details}>
         <details
           onToggle={(ev) => {
             setIsDetailsOpen(ev.currentTarget.open);
           }}
         >
-          <summary
-            title="More details&hellip;"
-            className={styles.detailsSummary}
-          >
+          <summary title="More details&hellip;" className={styles.detailsSummary}>
             <span>ⓘ</span>
           </summary>
 
@@ -403,8 +352,7 @@ export const PhotoBlockEl: React.FC<{
                       v: {
                         GPSLatitudeRef: props.block._build.exif.GPSLatitudeRef,
                         GPSLatitude: props.block._build.exif.GPSLatitude,
-                        GPSLongitudeRef:
-                          props.block._build.exif.GPSLongitudeRef,
+                        GPSLongitudeRef: props.block._build.exif.GPSLongitudeRef,
                         GPSLongitude: props.block._build.exif.GPSLongitude,
                         geocode: props.block._build?.tags?.geocode,
                       },
@@ -447,9 +395,7 @@ export const PhotoBlockEl: React.FC<{
                       k: "Aperture",
                       v: withFacetAction(
                         `𝑓/${exif.FNumber}`,
-                        apertureSelection
-                          ? buildSearchFacetHref(apertureSelection)
-                          : null,
+                        apertureSelection ? buildSearchFacetHref(apertureSelection) : null,
                         "Find photos at this aperture",
                       ),
                       valid: Boolean(exif.FNumber),
@@ -465,13 +411,11 @@ export const PhotoBlockEl: React.FC<{
                       k: "Focal length",
                       v: withFacetAction(
                         `${exif.FocalLength}mm (actual)${
-                        exif.FocalLengthIn35mmFormat
-                          ? `; ${exif.FocalLengthIn35mmFormat}mm (35mm equivalent)`
-                          : ""
+                          exif.FocalLengthIn35mmFormat
+                            ? `; ${exif.FocalLengthIn35mmFormat}mm (35mm equivalent)`
+                            : ""
                         }`,
-                        focalLengthSelection
-                          ? buildSearchFacetHref(focalLengthSelection)
-                          : null,
+                        focalLengthSelection ? buildSearchFacetHref(focalLengthSelection) : null,
                         "Find photos with this focal length",
                       ),
                       valid: Boolean(exif.FocalLength),
@@ -490,23 +434,17 @@ export const PhotoBlockEl: React.FC<{
                         lensSelection ? buildSearchFacetHref(lensSelection) : null,
                         "Find photos with this lens",
                       ),
-                      valid: Boolean(
-                        exif.LensMake || exif.LensModel || exif.LensInfo,
-                      ),
+                      valid: Boolean(exif.LensMake || exif.LensModel || exif.LensInfo),
                     },
                     {
                       kind: "kv",
                       k: "Camera",
                       v: withFacetAction(
                         [exif.Make, exif.Model].filter(Boolean).join(" "),
-                        cameraSelection
-                          ? buildSearchFacetHref(cameraSelection)
-                          : null,
+                        cameraSelection ? buildSearchFacetHref(cameraSelection) : null,
                         "Find photos with this camera",
                       ),
-                      valid: Boolean(
-                        exif.Make || exif.Model,
-                      ),
+                      valid: Boolean(exif.Make || exif.Model),
                     },
                     {
                       kind: "kv",
@@ -526,14 +464,14 @@ export const PhotoBlockEl: React.FC<{
                             : local;
                         })(),
                         getRelativeTimeString(
-                          exifWallClockTimestamp(
-                            props.block._build.exif.DateTimeOriginal,
-                          ) ?? NaN,
+                          exifWallClockTimestamp(props.block._build.exif.DateTimeOriginal) ?? NaN,
                         ),
                       ]
                         .filter(Boolean)
                         .map((it, idx) => (
-                          <React.Fragment key={`${props.block.id ?? props.block.data.src}-camera-datetime-${idx}`}>
+                          <React.Fragment
+                            key={`${props.block.id ?? props.block.data.src}-camera-datetime-${idx}`}
+                          >
                             {it}
                             <br />
                           </React.Fragment>
@@ -544,9 +482,7 @@ export const PhotoBlockEl: React.FC<{
                     {
                       kind: "kv",
                       k: "Original size",
-                      v: `${props.block._build.width}px × ${
-                        props.block._build.height
-                      }px (${(
+                      v: `${props.block._build.width}px × ${props.block._build.height}px (${(
                         (props.block._build.width * props.block._build.height) /
                         1_000_000
                       ).toPrecision(2)} MP) `,
@@ -563,24 +499,22 @@ export const PhotoBlockEl: React.FC<{
                       k: "Colours",
                       v: (
                         <div className={styles.colorswatches}>
-                          {props.block._build?.tags?.colors?.map(
-                            (rgb: number[]) => {
-                              const rgbStr = rgbToString(rgb as [number, number, number]);
-                              const colorParam = `${rgb[0]},${rgb[1]},${rgb[2]}`;
-                              return (
-                                <a
-                                  key={rgbStr}
-                                  href={`/search?color=${colorParam}`}
-                                  style={{
-                                    backgroundColor: rgbStr,
-                                  }}
-                                  className={styles.colorswatch}
-                                  title={`Search photos with similar colour: ${rgbStr}`}
-                                  aria-label={`Search photos with similar colour ${rgbStr}`}
-                                ></a>
-                              );
-                            },
-                          )}
+                          {props.block._build?.tags?.colors?.map((rgb: number[]) => {
+                            const rgbStr = rgbToString(rgb as [number, number, number]);
+                            const colorParam = `${rgb[0]},${rgb[1]},${rgb[2]}`;
+                            return (
+                              <a
+                                key={rgbStr}
+                                href={`/search?color=${colorParam}`}
+                                style={{
+                                  backgroundColor: rgbStr,
+                                }}
+                                className={styles.colorswatch}
+                                title={`Search photos with similar colour: ${rgbStr}`}
+                                aria-label={`Search photos with similar colour ${rgbStr}`}
+                              ></a>
+                            );
+                          })}
                         </div>
                       ),
                       valid: Boolean(props.block._build.tags?.colors),
@@ -596,26 +530,17 @@ export const PhotoBlockEl: React.FC<{
                 />
 
                 <div className={styles.similarPhotosWrap}>
-                  <PhotoSimilarPhotosDeferred
-                    path={props.block._build?.tags?.path}
-                  />
+                  <PhotoSimilarPhotosDeferred path={props.block._build?.tags?.path} />
                 </div>
 
                 <div className={styles.viewOriginal}>
-                  <a href={`#${props.block.id ?? props.block.data.src}`}>
-                    Permalink
-                  </a>
+                  <a href={`#${props.block.id ?? props.block.data.src}`}>Permalink</a>
                   &nbsp;&middot;&nbsp; View{" "}
                   {props.block._build.srcset.length > 0 ? (
                     <>
                       {props.block._build.srcset.map((s, i) => (
                         <React.Fragment key={s.src}>
-                          <a
-                            key={s.src}
-                            target="_blank"
-                            href={s.src}
-                            rel="noreferrer"
-                          >
+                          <a key={s.src} target="_blank" href={s.src} rel="noreferrer">
                             {s.width}px
                           </a>
                           {i < props.block._build.srcset.length - 1 ? (
