@@ -1,11 +1,4 @@
-import React, {
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   fetchRandomPhoto,
   fetchRefinementTagCounts,
@@ -15,16 +8,10 @@ import {
 } from "./api";
 import { RGB } from "../../util/colorDistance";
 import styles from "./Search.module.css";
-import {
-  useDatabase,
-  useEmbeddingsDatabase,
-} from "../database/useDatabase";
+import { useDatabase, useEmbeddingsDatabase } from "../database/useDatabase";
 import { EmptyStateExplore } from "./EmptyStateExplore";
 import { SearchInputBar } from "./SearchInputBar";
-import {
-  SearchFacetPanel,
-  SearchFacetSection,
-} from "./SearchFacetPanel";
+import { SearchFacetPanel, SearchFacetSection } from "./SearchFacetPanel";
 import { SearchResultsGrid } from "./SearchResultsGrid";
 import { SimilarTrailBar, SimilarTrailItem } from "./SimilarTrailBar";
 import {
@@ -45,16 +32,11 @@ import {
   serializeSearchFacetSelection,
   writeSearchFacetSelections,
 } from "../../util/searchFacets";
-import {
-  getActiveFilterCount,
-  mergeFacetSections,
-  normaliseSearchTerms,
-} from "./searchViewModel";
+import { getActiveFilterCount, mergeFacetSections, normaliseSearchTerms } from "./searchViewModel";
 import { useSearchFilterDrawer } from "./useSearchFilterDrawer";
 import { SearchActiveFilters } from "./SearchActiveFilters";
 
-const useSafeLayoutEffect =
-  typeof window === "undefined" ? useEffect : useLayoutEffect;
+const useSafeLayoutEffect = typeof window === "undefined" ? useEffect : useLayoutEffect;
 
 // Mirrors isEditableTarget in src/util/slideshowKeyboard.ts so the "/" focus
 // shortcut never swallows characters typed into the search box or hex input.
@@ -68,11 +50,7 @@ const isEditableTarget = (target: EventTarget | null): boolean => {
     nodeName?: string;
     isContentEditable?: boolean;
   };
-  const tagName = (
-    maybeElement.tagName ??
-    maybeElement.nodeName ??
-    ""
-  ).toUpperCase();
+  const tagName = (maybeElement.tagName ?? maybeElement.nodeName ?? "").toUpperCase();
 
   return (
     tagName === "INPUT" ||
@@ -107,43 +85,26 @@ export const Search: React.FC<{
   const [searchInputValue, setSearchInputValue] = useState<string>("");
   const [searchMode, setSearchMode] = useState<SearchMode>(DEFAULT_SEARCH_MODE);
   const [similarPath, setSimilarPath] = useState<string | null>(null);
-  const [similarityOrder, setSimilarityOrder] =
-    useState<SimilarityOrder>(DEFAULT_SIMILARITY_ORDER);
+  const [similarityOrder, setSimilarityOrder] = useState<SimilarityOrder>(DEFAULT_SIMILARITY_ORDER);
   const [colorSearch, setColorSearch] = useState<RGB | null>(null);
   const [colorTolerance, setColorTolerance] = useState<number>(35);
   const [similarTrail, setSimilarTrail] = useState<SimilarTrailItem[]>([]);
   const [hasHydratedFromUrl, setHasHydratedFromUrl] = useState<boolean>(false);
-  const [selectedFacets, setSelectedFacets] = useState<SearchFacetSelection[]>(
-    [],
-  );
-  const [facetCatalogSections, setFacetCatalogSections] = useState<
-    SearchFacetSection[]
-  >([]);
+  const [selectedFacets, setSelectedFacets] = useState<SearchFacetSelection[]>([]);
+  const [facetCatalogSections, setFacetCatalogSections] = useState<SearchFacetSection[]>([]);
   const [facetSections, setFacetSections] = useState<SearchFacetSection[]>([]);
-  const [isFacetSectionsLoading, setIsFacetSectionsLoading] =
-    useState<boolean>(false);
+  const [isFacetSectionsLoading, setIsFacetSectionsLoading] = useState<boolean>(false);
   const [selectedFilterCategory, setSelectedFilterCategory] = useState<
     "tags" | "color" | "time" | "place" | "gear" | "settings"
   >("tags");
-  const [isRandomSimilarLoading, setIsRandomSimilarLoading] =
-    useState<boolean>(false);
-  const [randomExploreError, setRandomExploreError] = useState<string | null>(
-    null,
-  );
+  const [isRandomSimilarLoading, setIsRandomSimilarLoading] = useState<boolean>(false);
+  const [randomExploreError, setRandomExploreError] = useState<string | null>(null);
   const [tags, setTags] = useState<Tag[]>([]);
-  const [refinementCounts, setRefinementCounts] = useState<
-    Record<string, number>
-  >({});
+  const [refinementCounts, setRefinementCounts] = useState<Record<string, number>>({});
   const [isDrawPadOpen, setIsDrawPadOpen] = useState<boolean>(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const modeSourceRef = useRef<HTMLDivElement | null>(null);
-  const [
-    database,
-    progress,
-    databaseProgressDetails,
-    databaseError,
-    retryDatabase,
-  ] = useDatabase();
+  const [database, progress, databaseProgressDetails, databaseError, retryDatabase] = useDatabase();
   const {
     imageQuery,
     imageVectorError,
@@ -155,15 +116,9 @@ export const Search: React.FC<{
   const needsEmbeddingsDatabase =
     Boolean(similarPath) ||
     Boolean(imageQuery) ||
-    (!colorSearch &&
-      searchInputValue.trim() !== "" &&
-      searchMode !== "keyword");
-  const [
-    embeddingsDatabase,
-    embeddingsProgress,
-    embeddingsProgressDetails,
-    embeddingsError,
-  ] = useEmbeddingsDatabase(needsEmbeddingsDatabase);
+    (!colorSearch && searchInputValue.trim() !== "" && searchMode !== "keyword");
+  const [embeddingsDatabase, embeddingsProgress, embeddingsProgressDetails, embeddingsError] =
+    useEmbeddingsDatabase(needsEmbeddingsDatabase);
 
   const {
     canClear,
@@ -206,21 +161,14 @@ export const Search: React.FC<{
   } = useSearchFilterDrawer({ isSimilarMode });
 
   const normalizedTags = useMemo(() => dedupeTags(tags), [tags]);
-  const normalizedSearchTerms = useMemo(
-    () => normaliseSearchTerms(searchQuery),
-    [searchQuery],
-  );
+  const normalizedSearchTerms = useMemo(() => normaliseSearchTerms(searchQuery), [searchQuery]);
   const normalizedDebouncedSearchTerms = useMemo(
     () => normaliseSearchTerms(debouncedSearchQuery),
     [debouncedSearchQuery],
   );
-  const normalizedTagNames = useMemo(
-    () => normalizedTags.map((tag) => tag.name),
-    [normalizedTags],
-  );
+  const normalizedTagNames = useMemo(() => normalizedTags.map((tag) => tag.name), [normalizedTags]);
   const liveFacetQueryTerms = useMemo(
-    () =>
-      searchMode === "keyword" ? normalizedDebouncedSearchTerms : [],
+    () => (searchMode === "keyword" ? normalizedDebouncedSearchTerms : []),
     [searchMode, normalizedDebouncedSearchTerms],
   );
   const visibleFacetSections = useMemo(
@@ -267,7 +215,7 @@ export const Search: React.FC<{
 
   useEffect(() => {
     const initialSearchState = getInitialSearchState();
-     
+
     setSearchInputValue(initialSearchState.searchQuery.join(","));
     setSimilarPath(initialSearchState.similarPath);
     setSimilarityOrder(initialSearchState.similarityOrder);
@@ -279,7 +227,6 @@ export const Search: React.FC<{
 
   useEffect(() => {
     if (normalizedSearchTerms.length > 0) {
-       
       setSelectedFilterCategory("tags");
     }
   }, [normalizedSearchTerms.length]);
@@ -305,10 +252,7 @@ export const Search: React.FC<{
     }
 
     if (colorSearch) {
-      searchParams.set(
-        "color",
-        `${colorSearch[0]},${colorSearch[1]},${colorSearch[2]}`,
-      );
+      searchParams.set("color", `${colorSearch[0]},${colorSearch[1]},${colorSearch[2]}`);
     }
 
     if (debouncedSearchQuery.length > 0) {
@@ -382,7 +326,6 @@ export const Search: React.FC<{
 
   useEffect(() => {
     if (!database) {
-       
       setFacetCatalogSections([]);
       return;
     }
@@ -409,7 +352,6 @@ export const Search: React.FC<{
 
   useEffect(() => {
     if (!database) {
-       
       setFacetSections([]);
       setIsFacetSectionsLoading(false);
       return;
@@ -449,14 +391,7 @@ export const Search: React.FC<{
     return () => {
       didCancel = true;
     };
-  }, [
-    database,
-    isColorMode,
-    isSimilarMode,
-    liveFacetQueryTerms,
-    searchMode,
-    selectedFacets,
-  ]);
+  }, [database, isColorMode, isSimilarMode, liveFacetQueryTerms, searchMode, selectedFacets]);
 
   useEffect(() => {
     if (
@@ -464,10 +399,8 @@ export const Search: React.FC<{
       searchMode !== "keyword" ||
       isSimilarMode ||
       isColorMode ||
-      (normalizedDebouncedSearchTerms.length === 0 &&
-        selectedFacets.length === 0)
+      (normalizedDebouncedSearchTerms.length === 0 && selectedFacets.length === 0)
     ) {
-       
       setRefinementCounts({});
       return;
     }
@@ -608,9 +541,7 @@ export const Search: React.FC<{
     try {
       const [randomPhoto] = await fetchRandomPhoto({ database });
       if (!randomPhoto) {
-        setRandomExploreError(
-          "No photos are available for random explore yet.",
-        );
+        setRandomExploreError("No photos are available for random explore yet.");
         return;
       }
 
@@ -636,9 +567,7 @@ export const Search: React.FC<{
     try {
       const [randomPhoto] = await fetchRandomPhoto({ database });
       if (!randomPhoto) {
-        setRandomExploreError(
-          "No photos are available for random explore yet.",
-        );
+        setRandomExploreError("No photos are available for random explore yet.");
         return;
       }
 
@@ -682,9 +611,7 @@ export const Search: React.FC<{
       setSearchInputValue((prev) => {
         const nextTerms = parseSearchTerms(prev);
         const updatedTerms = isActive
-          ? nextTerms.filter(
-              (term) => term && term.trim().toLowerCase() !== tagName,
-            )
+          ? nextTerms.filter((term) => term && term.trim().toLowerCase() !== tagName)
           : [...nextTerms.filter((term) => term), tagName];
         return updatedTerms.join(",");
       });
@@ -733,13 +660,9 @@ export const Search: React.FC<{
     setSimilarTrail([]);
     setRandomExploreError(null);
     setSelectedFacets((prev) => {
-      const alreadySelected = prev.some(
-        (facet) => serializeSearchFacetSelection(facet) === key,
-      );
+      const alreadySelected = prev.some((facet) => serializeSearchFacetSelection(facet) === key);
       if (alreadySelected) {
-        return prev.filter(
-          (facet) => serializeSearchFacetSelection(facet) !== key,
-        );
+        return prev.filter((facet) => serializeSearchFacetSelection(facet) !== key);
       }
       return [...prev, selection];
     });
@@ -774,9 +697,7 @@ export const Search: React.FC<{
                 details: imageModelProgressDetails,
                 activity: "Downloading image search model (one-time)",
               }
-            : !isSimilarMode &&
-                searchMode !== "keyword" &&
-                textModelProgress < 100
+            : !isSimilarMode && searchMode !== "keyword" && textModelProgress < 100
               ? {
                   progress: textModelProgress,
                   details: textModelProgressDetails,
@@ -858,9 +779,7 @@ export const Search: React.FC<{
             <span aria-hidden="true">⚙</span>
             <span>Filters</span>
             {activeFilterCount > 0 ? (
-              <span className={styles.filterTriggerBadge}>
-                {activeFilterCount}
-              </span>
+              <span className={styles.filterTriggerBadge}>{activeFilterCount}</span>
             ) : null}
           </button>
 
@@ -868,10 +787,7 @@ export const Search: React.FC<{
               mobile; on desktop the drawer wrapper is display: contents so
               the panel lays out exactly as before. */}
           <div
-            className={[
-              styles.filterBackdrop,
-              isFilterDrawerOpen ? styles.filterBackdropOpen : "",
-            ]
+            className={[styles.filterBackdrop, isFilterDrawerOpen ? styles.filterBackdropOpen : ""]
               .filter(Boolean)
               .join(" ")}
             onClick={closeFilterDrawer}
@@ -880,10 +796,7 @@ export const Search: React.FC<{
 
           <div
             id="search-filter-drawer"
-            className={[
-              styles.filterDrawer,
-              isFilterDrawerOpen ? styles.filterDrawerOpen : "",
-            ]
+            className={[styles.filterDrawer, isFilterDrawerOpen ? styles.filterDrawerOpen : ""]
               .filter(Boolean)
               .join(" ")}
             role="dialog"
@@ -934,11 +847,7 @@ export const Search: React.FC<{
       {databaseError ? (
         <div className={styles.inlineError}>
           Couldn&apos;t load the search index.{" "}
-          <button
-            type="button"
-            className={styles.retryButton}
-            onClick={() => retryDatabase()}
-          >
+          <button type="button" className={styles.retryButton} onClick={() => retryDatabase()}>
             Try again
           </button>
         </div>
@@ -948,25 +857,17 @@ export const Search: React.FC<{
         <div className={styles.inlineError}>{textVectorError}</div>
       ) : null}
 
-      {imageVectorError ? (
-        <div className={styles.inlineError}>{imageVectorError}</div>
-      ) : null}
+      {imageVectorError ? <div className={styles.inlineError}>{imageVectorError}</div> : null}
 
       {needsEmbeddingsDatabase && embeddingsError ? (
-        <div className={styles.inlineError}>
-          Similarity search is unavailable right now.
-        </div>
+        <div className={styles.inlineError}>Similarity search is unavailable right now.</div>
       ) : null}
 
       {isEmptyState ? (
         <EmptyStateExplore
           database={database}
           onStartSimilarSearch={startSimilarSearch}
-          onSearchByColor={
-            selectedFilterCategory === "color"
-              ? handleSearchByColor
-              : undefined
-          }
+          onSearchByColor={selectedFilterCategory === "color" ? handleSearchByColor : undefined}
           isColorCategoryActive={selectedFilterCategory === "color"}
         />
       ) : null}
@@ -1015,9 +916,7 @@ export const Search: React.FC<{
           similarClickstreamPaths={similarClickstreamPaths}
           onFindSimilar={handleFindSimilar}
           onSearchByColor={
-            selectedFilterCategory === "color" || colorSearch
-              ? handleSearchByColor
-              : undefined
+            selectedFilterCategory === "color" || colorSearch ? handleSearchByColor : undefined
           }
           onFetchNextPage={fetchNextPage}
         />

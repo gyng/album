@@ -1,8 +1,4 @@
-import {
-  findClustersAroundSeeds,
-  formatMemoryDateRange,
-  getMemoryClusters,
-} from "./clusterByDate";
+import { findClustersAroundSeeds, formatMemoryDateRange, getMemoryClusters } from "./clusterByDate";
 
 type Item = {
   id: string;
@@ -34,16 +30,10 @@ describe("findClustersAroundSeeds", () => {
       { id: "d", date: "2023-03-22" },
     ];
 
-    const clusters = findClustersAroundSeeds(
-      items,
-      new Set(["2023-03-01", "2023-03-20"]),
-    );
+    const clusters = findClustersAroundSeeds(items, new Set(["2023-03-01", "2023-03-20"]));
 
     expect(clusters).toHaveLength(2);
-    expect(clusters.map((cluster) => cluster.startDate)).toEqual([
-      "2023-03-01",
-      "2023-03-20",
-    ]);
+    expect(clusters.map((cluster) => cluster.startDate)).toEqual(["2023-03-01", "2023-03-20"]);
   });
 
   it("does not cross gaps larger than the max cluster size", () => {
@@ -102,14 +92,8 @@ describe("getMemoryClusters", () => {
 
 describe("formatMemoryDateRange", () => {
   it("formats same-month and cross-month ranges", () => {
-    expect(formatMemoryDateRange("2024-03-18", "2024-03-28")).toBe(
-      "Mar 18 - 28, 2024",
-    );
-    expect(formatMemoryDateRange("2024-03-28", "2024-04-02")).toBe(
-      "Mar 28 - Apr 2, 2024",
-    );
-    expect(formatMemoryDateRange("2024-03-22", "2024-03-22")).toBe(
-      "Mar 22, 2024",
-    );
+    expect(formatMemoryDateRange("2024-03-18", "2024-03-28")).toBe("Mar 18 - 28, 2024");
+    expect(formatMemoryDateRange("2024-03-28", "2024-04-02")).toBe("Mar 28 - Apr 2, 2024");
+    expect(formatMemoryDateRange("2024-03-22", "2024-03-22")).toBe("Mar 22, 2024");
   });
 });

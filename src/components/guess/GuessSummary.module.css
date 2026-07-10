@@ -22,8 +22,14 @@
 }
 
 @keyframes headerDrop {
-  from { opacity: 0; transform: translateY(-12px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(-12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .dailyLabel {
@@ -50,8 +56,14 @@
 }
 
 @keyframes ratingFade {
-  from { opacity: 0; transform: translateY(4px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 /* Round list — each row cascades in */
@@ -70,11 +82,7 @@
   align-items: center;
   padding: var(--m-s);
   border-radius: var(--m-s);
-  background-color: color-mix(
-    in srgb,
-    var(--c-bg-contrast-dark) 30%,
-    var(--c-bg)
-  );
+  background-color: color-mix(in srgb, var(--c-bg-contrast-dark) 30%, var(--c-bg));
   animation: rowSlide 0.35s ease-out both;
 }
 
@@ -92,8 +100,14 @@
 }
 
 @keyframes rowSlide {
-  from { opacity: 0; transform: translateX(-12px); }
-  to { opacity: 1; transform: translateX(0); }
+  from {
+    opacity: 0;
+    transform: translateX(-12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
 }
 
 .thumb {
@@ -157,8 +171,12 @@
 }
 
 @keyframes growBar {
-  from { transform: scaleX(0); }
-  to { transform: scaleX(1); }
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
 }
 
 .roundScoreCol {
@@ -208,7 +226,9 @@
   background-color: var(--c-bg);
   font-size: var(--fs-sm);
   color: var(--c-font);
-  transition: background-color 0.12s, transform 0.12s;
+  transition:
+    background-color 0.12s,
+    transform 0.12s;
 }
 
 .playAgain:hover,

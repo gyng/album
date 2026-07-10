@@ -11,9 +11,7 @@ describe("SearchDrawPad focus management", () => {
   it("moves focus into the dialog on open", () => {
     render(<SearchDrawPad onCancel={jest.fn()} onSubmit={jest.fn()} />);
 
-    expect(document.activeElement).toBe(
-      screen.getByRole("button", { name: "Cancel" }),
-    );
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "Cancel" }));
   });
 
   it("restores focus to the previously focused element on close", () => {
@@ -22,9 +20,7 @@ describe("SearchDrawPad focus management", () => {
     document.body.appendChild(trigger);
     trigger.focus();
 
-    const { unmount } = render(
-      <SearchDrawPad onCancel={jest.fn()} onSubmit={jest.fn()} />,
-    );
+    const { unmount } = render(<SearchDrawPad onCancel={jest.fn()} onSubmit={jest.fn()} />);
     expect(document.activeElement).not.toBe(trigger);
 
     unmount();
@@ -56,9 +52,7 @@ describe("SearchDrawPad focus management", () => {
     firstSwatch.focus();
     fireEvent.keyDown(firstSwatch, { key: "Tab", shiftKey: true });
 
-    expect(document.activeElement).toBe(
-      screen.getByRole("button", { name: "Cancel" }),
-    );
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "Cancel" }));
   });
 
   it("closes on Escape", () => {
@@ -71,9 +65,7 @@ describe("SearchDrawPad focus management", () => {
   });
 
   it("locks body scroll while open and releases it on close", () => {
-    const { unmount } = render(
-      <SearchDrawPad onCancel={jest.fn()} onSubmit={jest.fn()} />,
-    );
+    const { unmount } = render(<SearchDrawPad onCancel={jest.fn()} onSubmit={jest.fn()} />);
     expect(document.body.style.overflow).toBe("hidden");
 
     unmount();

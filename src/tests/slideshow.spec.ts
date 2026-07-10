@@ -3,8 +3,7 @@ import { existsSync, statSync } from "fs";
 import { join } from "path";
 
 const searchDbPath = join(__dirname, "..", "public", "search.sqlite");
-const hasSearchDb =
-  existsSync(searchDbPath) && statSync(searchDbPath).size > 0;
+const hasSearchDb = existsSync(searchDbPath) && statSync(searchDbPath).size > 0;
 
 /** Slideshow image — the only non-hidden img on the page. */
 const slideshowImg = 'img[alt]:not([aria-hidden="true"])';
@@ -57,14 +56,10 @@ test.describe("Slideshow", () => {
     await revealControls(page);
     await expect(page.locator('button:has-text("Next")')).toBeVisible();
     await expect(page.locator('button:has-text("Previous")')).toBeVisible();
-    await expect(
-      page.getByRole("link", { name: "Snapshots Slideshow" }),
-    ).toBeVisible();
+    await expect(page.getByRole("link", { name: "Snapshots Slideshow" })).toBeVisible();
   });
 
-  test("desktop controls auto-hide on idle and reveal on mouse-to-top", async ({
-    page,
-  }) => {
+  test("desktop controls auto-hide on idle and reveal on mouse-to-top", async ({ page }) => {
     await page.goto("/slideshow", { waitUntil: "domcontentloaded" });
     await waitForSlideshow(page);
 
@@ -159,10 +154,9 @@ test.describe("Slideshow", () => {
     await page.addInitScript(() => {
       Math.random = () => 0.99;
     });
-    await page.goto(
-      "/slideshow?mode=random&filter=test-simple&details=1&remix=1&delay=86400",
-      { waitUntil: "domcontentloaded" },
-    );
+    await page.goto("/slideshow?mode=random&filter=test-simple&details=1&remix=1&delay=86400", {
+      waitUntil: "domcontentloaded",
+    });
     await waitForSlideshow(page);
 
     await revealControls(page);
@@ -174,9 +168,10 @@ test.describe("Slideshow", () => {
 
     const geo = await page.evaluate(() => {
       const vh = window.innerHeight;
-      const cells = Array.from(
-        document.querySelectorAll('div[class*="descriptionCell"]'),
-      ).slice(0, 4);
+      const cells = Array.from(document.querySelectorAll('div[class*="descriptionCell"]')).slice(
+        0,
+        4,
+      );
       const r = (i: number) => {
         const box = cells[i].getBoundingClientRect();
         return { top: box.top, bottom: box.bottom };
@@ -200,9 +195,7 @@ test.describe("Slideshow", () => {
     const recentButton = page.locator('button:has-text("Recent")');
     const similarButton = page.locator('button:has-text("Similar")');
 
-    await expect(
-      page.locator('[role="group"][aria-label="Playback mode"]'),
-    ).toBeVisible();
+    await expect(page.locator('[role="group"][aria-label="Playback mode"]')).toBeVisible();
 
     // Default is recent/weighted
     await expect(recentButton).toHaveAttribute("aria-pressed", "true");
@@ -235,9 +228,7 @@ test.describe("Slideshow", () => {
     await expect(resumeButton).toHaveAttribute("aria-pressed", "true");
   });
 
-  test("auto-advances to the next photo after the configured delay", async ({
-    page,
-  }) => {
+  test("auto-advances to the next photo after the configured delay", async ({ page }) => {
     // delay=1 → a 1-second cadence; align-cadence is off (beforeEach) so the
     // advance timer is a plain now+delay.
     await page.goto("/slideshow?mode=random&filter=test-simple&delay=1", {
@@ -349,10 +340,7 @@ test.describe("Slideshow touch mode", () => {
     await page.addInitScript(() => {
       const orig = window.matchMedia.bind(window);
       window.matchMedia = (query: string): MediaQueryList => {
-        if (
-          query.includes("hover: none") ||
-          query.includes("pointer: coarse")
-        ) {
+        if (query.includes("hover: none") || query.includes("pointer: coarse")) {
           return {
             matches: true,
             media: query,
@@ -407,12 +395,7 @@ test.describe("Slideshow touch mode", () => {
     return { x: box.x + box.width / 2, y: box.y + box.height / 2, box };
   };
 
-  const swipe = async (
-    page: Page,
-    dx: number,
-    dy: number,
-    steps = 6,
-  ): Promise<void> => {
+  const swipe = async (page: Page, dx: number, dy: number, steps = 6): Promise<void> => {
     const { x, y } = await imageCentre(page);
     await dispatchPointer(page, "down", x, y);
     for (let i = 1; i <= steps; i += 1) {
@@ -422,9 +405,7 @@ test.describe("Slideshow touch mode", () => {
     await dispatchPointer(page, "up", x + dx, y + dy);
   };
 
-  test("horizontal swipe past commit advances to next photo", async ({
-    page,
-  }) => {
+  test("horizontal swipe past commit advances to next photo", async ({ page }) => {
     await page.goto("/slideshow?mode=random&filter=test-simple", {
       waitUntil: "domcontentloaded",
     });
@@ -439,9 +420,7 @@ test.describe("Slideshow touch mode", () => {
     expect(await image.getAttribute("src")).not.toBe(firstSrc);
   });
 
-  test("horizontal swipe below commit threshold does not change photo", async ({
-    page,
-  }) => {
+  test("horizontal swipe below commit threshold does not change photo", async ({ page }) => {
     await page.goto("/slideshow?mode=random&filter=test-simple", {
       waitUntil: "domcontentloaded",
     });
@@ -456,9 +435,7 @@ test.describe("Slideshow touch mode", () => {
     expect(await image.getAttribute("src")).toBe(firstSrc);
   });
 
-  test("right swipe goes to previous photo after advancing", async ({
-    page,
-  }) => {
+  test("right swipe goes to previous photo after advancing", async ({ page }) => {
     await page.goto("/slideshow?mode=random&filter=test-simple", {
       waitUntil: "domcontentloaded",
     });
@@ -508,9 +485,7 @@ test.describe("Slideshow touch mode", () => {
     await expect(container).toHaveAttribute("data-controls-visible", "true");
   });
 
-  test("pull up with controls hidden forces a remix advance", async ({
-    page,
-  }) => {
+  test("pull up with controls hidden forces a remix advance", async ({ page }) => {
     await page.goto("/slideshow?mode=random&filter=test-simple", {
       waitUntil: "domcontentloaded",
     });
@@ -531,9 +506,7 @@ test.describe("Slideshow touch mode", () => {
     expect(await image.getAttribute("src")).not.toBe(beforeSrc);
   });
 
-  test("data-touch-active toggles around the gesture lifecycle", async ({
-    page,
-  }) => {
+  test("data-touch-active toggles around the gesture lifecycle", async ({ page }) => {
     await page.goto("/slideshow?mode=random&filter=test-simple", {
       waitUntil: "domcontentloaded",
     });
@@ -550,9 +523,7 @@ test.describe("Slideshow touch mode", () => {
     await expect(container).toHaveAttribute("data-touch-active", "false");
   });
 
-  test("data-touch-armed flips when the gesture crosses the commit threshold", async ({
-    page,
-  }) => {
+  test("data-touch-armed flips when the gesture crosses the commit threshold", async ({ page }) => {
     await page.goto("/slideshow?mode=random&filter=test-simple", {
       waitUntil: "domcontentloaded",
     });
@@ -575,9 +546,7 @@ test.describe("Slideshow touch mode", () => {
     await expect(affordances).toHaveAttribute("data-touch-armed", "false");
   });
 
-  test("reversing past the start cancels the armed visual", async ({
-    page,
-  }) => {
+  test("reversing past the start cancels the armed visual", async ({ page }) => {
     await page.goto("/slideshow?mode=random&filter=test-simple", {
       waitUntil: "domcontentloaded",
     });
@@ -673,9 +642,7 @@ test.describe("Slideshow touch mode", () => {
     expect(await image.getAttribute("src")).toBe(firstSrc);
   });
 
-  test("synthetic click after a reversed-cancel does not advance the photo", async ({
-    page,
-  }) => {
+  test("synthetic click after a reversed-cancel does not advance the photo", async ({ page }) => {
     await page.goto("/slideshow?mode=random&filter=test-simple", {
       waitUntil: "domcontentloaded",
     });
@@ -695,9 +662,7 @@ test.describe("Slideshow touch mode", () => {
     expect(await image.getAttribute("src")).toBe(firstSrc);
   });
 
-  test("side affordances stay hidden during touch when controls are visible", async ({
-    page,
-  }) => {
+  test("side affordances stay hidden during touch when controls are visible", async ({ page }) => {
     await page.goto("/slideshow?mode=random&filter=test-simple", {
       waitUntil: "domcontentloaded",
     });
@@ -743,8 +708,7 @@ test.describe("Slideshow touch mode", () => {
     const image = page.locator(slideshowImg).first();
     const firstSrc = await image.getAttribute("src");
     const container = page.locator("[data-paused]");
-    const initialControlsVisible =
-      await container.getAttribute("data-controls-visible");
+    const initialControlsVisible = await container.getAttribute("data-controls-visible");
 
     const { x, y } = await imageCentre(page);
     await dispatchPointer(page, "down", x, y);
@@ -783,16 +747,10 @@ test.describe("Slideshow URL parameters", () => {
     }
 
     // Mode
-    await expect(page.locator('button:has-text("Recent")')).toHaveAttribute(
-      "aria-pressed",
-      "true",
-    );
+    await expect(page.locator('button:has-text("Recent")')).toHaveAttribute("aria-pressed", "true");
 
     // Delay
-    await expect(page.locator('button:has-text("1m")')).toHaveAttribute(
-      "aria-pressed",
-      "true",
-    );
+    await expect(page.locator('button:has-text("1m")')).toHaveAttribute("aria-pressed", "true");
 
     // Alignment
     await expect(page.locator('button:has-text("📍")')).toContainText("Left");

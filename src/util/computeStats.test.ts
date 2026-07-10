@@ -42,11 +42,13 @@ describe("computePhotoStats", () => {
   });
 
   it("computes dateRange from DateTimeOriginal", () => {
-    const stats = computePhotoStats([makeAlbum([
-      makePhoto({ exif: { DateTimeOriginal: "2022:06:01 10:00:00" } }),
-      makePhoto({ exif: { DateTimeOriginal: "2024:03:22 18:30:00" } }),
-      makePhoto({ exif: {} }), // no date
-    ])]);
+    const stats = computePhotoStats([
+      makeAlbum([
+        makePhoto({ exif: { DateTimeOriginal: "2022:06:01 10:00:00" } }),
+        makePhoto({ exif: { DateTimeOriginal: "2024:03:22 18:30:00" } }),
+        makePhoto({ exif: {} }), // no date
+      ]),
+    ]);
     expect(stats.dateRange).toEqual([2022, 2024]);
   });
 
@@ -56,11 +58,13 @@ describe("computePhotoStats", () => {
   });
 
   it("computes focal length 35mm coverage correctly", () => {
-    const stats = computePhotoStats([makeAlbum([
-      makePhoto({ exif: { FocalLengthIn35mmFormat: 35 } }),
-      makePhoto({ exif: { FocalLengthIn35mmFormat: 85 } }),
-      makePhoto({ exif: {} }), // missing
-    ])]);
+    const stats = computePhotoStats([
+      makeAlbum([
+        makePhoto({ exif: { FocalLengthIn35mmFormat: 35 } }),
+        makePhoto({ exif: { FocalLengthIn35mmFormat: 85 } }),
+        makePhoto({ exif: {} }), // missing
+      ]),
+    ]);
 
     const fl = stats.numericFacets.find((f) => f.facetId === "focal-length-35mm")!;
     expect(fl.coverage).toBeCloseTo(2 / 3);
@@ -70,28 +74,28 @@ describe("computePhotoStats", () => {
   });
 
   it("focal length 35mm does NOT count photos with only FocalLength", () => {
-    const stats = computePhotoStats([makeAlbum([
-      makePhoto({ exif: { FocalLength: 23 } }),
-    ])]);
+    const stats = computePhotoStats([makeAlbum([makePhoto({ exif: { FocalLength: 23 } })])]);
     const fl = stats.numericFacets.find((f) => f.facetId === "focal-length-35mm")!;
     expect(fl.coverage).toBe(0);
   });
 
   it("focal length actual does NOT count photos with only FocalLengthIn35mmFormat", () => {
-    const stats = computePhotoStats([makeAlbum([
-      makePhoto({ exif: { FocalLengthIn35mmFormat: 35 } }),
-    ])]);
+    const stats = computePhotoStats([
+      makeAlbum([makePhoto({ exif: { FocalLengthIn35mmFormat: 35 } })]),
+    ]);
     const fl = stats.numericFacets.find((f) => f.facetId === "focal-length-actual")!;
     expect(fl.coverage).toBe(0);
   });
 
   it("computes camera counts correctly", () => {
-    const stats = computePhotoStats([makeAlbum([
-      makePhoto({ exif: { Make: "FUJIFILM", Model: "X-T5" } }),
-      makePhoto({ exif: { Make: "FUJIFILM", Model: "X-T5" } }),
-      makePhoto({ exif: { Make: "SONY", Model: "A7IV" } }),
-      makePhoto({ exif: {} }),
-    ])]);
+    const stats = computePhotoStats([
+      makeAlbum([
+        makePhoto({ exif: { Make: "FUJIFILM", Model: "X-T5" } }),
+        makePhoto({ exif: { Make: "FUJIFILM", Model: "X-T5" } }),
+        makePhoto({ exif: { Make: "SONY", Model: "A7IV" } }),
+        makePhoto({ exif: {} }),
+      ]),
+    ]);
 
     const cam = stats.stringFacets.find((f) => f.facetId === "camera")!;
     expect(cam.coverage).toBeCloseTo(3 / 4);
@@ -100,42 +104,44 @@ describe("computePhotoStats", () => {
   });
 
   it("computes camera-to-lens flow data", () => {
-    const stats = computePhotoStats([makeAlbum([
-      makePhoto({
-        exif: {
-          Make: "FUJIFILM",
-          Model: "X-T5",
-          LensModel: "XF35mmF1.4 R",
-        },
-      }),
-      makePhoto({
-        exif: {
-          Make: "FUJIFILM",
-          Model: "X-T5",
-          LensModel: "XF35mmF1.4 R",
-        },
-      }),
-      makePhoto({
-        exif: {
-          Make: "FUJIFILM",
-          Model: "X-T5",
-          LensModel: "XF23mmF2 R WR",
-        },
-      }),
-      makePhoto({
-        exif: {
-          Make: "SONY",
-          Model: "A7IV",
-          LensModel: "FE 55mm F1.8 ZA",
-        },
-      }),
-      makePhoto({
-        exif: {
-          Make: "SONY",
-          Model: "A7IV",
-        },
-      }),
-    ])]);
+    const stats = computePhotoStats([
+      makeAlbum([
+        makePhoto({
+          exif: {
+            Make: "FUJIFILM",
+            Model: "X-T5",
+            LensModel: "XF35mmF1.4 R",
+          },
+        }),
+        makePhoto({
+          exif: {
+            Make: "FUJIFILM",
+            Model: "X-T5",
+            LensModel: "XF35mmF1.4 R",
+          },
+        }),
+        makePhoto({
+          exif: {
+            Make: "FUJIFILM",
+            Model: "X-T5",
+            LensModel: "XF23mmF2 R WR",
+          },
+        }),
+        makePhoto({
+          exif: {
+            Make: "SONY",
+            Model: "A7IV",
+            LensModel: "FE 55mm F1.8 ZA",
+          },
+        }),
+        makePhoto({
+          exif: {
+            Make: "SONY",
+            Model: "A7IV",
+          },
+        }),
+      ]),
+    ]);
 
     expect(stats.gearFlow.nodes).toEqual(
       expect.arrayContaining([
@@ -193,31 +199,33 @@ describe("computePhotoStats", () => {
   });
 
   it("computes prime vs zoom lens-type stats", () => {
-    const stats = computePhotoStats([makeAlbum([
-      makePhoto({
-        exif: {
-          LensModel: "XF35mmF1.4 R",
-        },
-      }),
-      makePhoto({
-        exif: {
-          LensModel: "XF23mmF2 R WR",
-        },
-      }),
-      makePhoto({
-        exif: {
-          LensModel: "RF 24-70mm F2.8 L IS USM",
-        },
-      }),
-      makePhoto({
-        exif: {
-          LensModel: "Some strange lens name",
-        },
-      }),
-      makePhoto({
-        exif: {},
-      }),
-    ])]);
+    const stats = computePhotoStats([
+      makeAlbum([
+        makePhoto({
+          exif: {
+            LensModel: "XF35mmF1.4 R",
+          },
+        }),
+        makePhoto({
+          exif: {
+            LensModel: "XF23mmF2 R WR",
+          },
+        }),
+        makePhoto({
+          exif: {
+            LensModel: "RF 24-70mm F2.8 L IS USM",
+          },
+        }),
+        makePhoto({
+          exif: {
+            LensModel: "Some strange lens name",
+          },
+        }),
+        makePhoto({
+          exif: {},
+        }),
+      ]),
+    ]);
 
     expect(stats.lensTypeStats).toEqual({
       prime: 2,
@@ -227,49 +235,48 @@ describe("computePhotoStats", () => {
   });
 
   it("precomputes technical relationship filters for camera and lens", () => {
-    const stats = computePhotoStats([makeAlbum([
-      makePhoto({
-        exif: {
-          DateTimeOriginal: "2024:03:22 17:45:00",
-          OffsetTime: "+09:00",
-          FocalLengthIn35mmFormat: 35,
-          FNumber: 2,
-          ISO: 400,
-          Make: "FUJIFILM",
-          Model: "X-T5",
-          LensModel: "XF35mmF1.4 R",
-        },
-      }),
-      makePhoto({
-        exif: {
-          DateTimeOriginal: "2024:03:22 18:45:00",
-          OffsetTime: "+09:00",
-          FocalLengthIn35mmFormat: 35,
-          FNumber: 2,
-          ISO: 800,
-          Make: "FUJIFILM",
-          Model: "X-T5",
-          LensModel: "XF35mmF1.4 R",
-        },
-      }),
-      makePhoto({
-        exif: {
-          DateTimeOriginal: "2024:03:23 09:00:00",
-          OffsetTime: "+09:00",
-          FocalLengthIn35mmFormat: 85,
-          FNumber: 4,
-          ISO: 400,
-          Make: "SONY",
-          Model: "A7IV",
-          LensModel: "FE 85mm F1.8",
-        },
-      }),
-    ])]);
-
-    expect(stats.technicalRelationshipFilters.cameras).toEqual([
-      "FUJIFILM X-T5",
-      "SONY A7IV",
+    const stats = computePhotoStats([
+      makeAlbum([
+        makePhoto({
+          exif: {
+            DateTimeOriginal: "2024:03:22 17:45:00",
+            OffsetTime: "+09:00",
+            FocalLengthIn35mmFormat: 35,
+            FNumber: 2,
+            ISO: 400,
+            Make: "FUJIFILM",
+            Model: "X-T5",
+            LensModel: "XF35mmF1.4 R",
+          },
+        }),
+        makePhoto({
+          exif: {
+            DateTimeOriginal: "2024:03:22 18:45:00",
+            OffsetTime: "+09:00",
+            FocalLengthIn35mmFormat: 35,
+            FNumber: 2,
+            ISO: 800,
+            Make: "FUJIFILM",
+            Model: "X-T5",
+            LensModel: "XF35mmF1.4 R",
+          },
+        }),
+        makePhoto({
+          exif: {
+            DateTimeOriginal: "2024:03:23 09:00:00",
+            OffsetTime: "+09:00",
+            FocalLengthIn35mmFormat: 85,
+            FNumber: 4,
+            ISO: 400,
+            Make: "SONY",
+            Model: "A7IV",
+            LensModel: "FE 85mm F1.8",
+          },
+        }),
+      ]),
     ]);
+
+    expect(stats.technicalRelationshipFilters.cameras).toEqual(["FUJIFILM X-T5", "SONY A7IV"]);
     expect(stats.technicalRelationshipFilters.lensesByCamera["FUJIFILM X-T5"]).toEqual([
       "XF35mmF1.4 R",
     ]);
@@ -288,19 +295,20 @@ describe("computePhotoStats", () => {
       )?.count,
     ).toBe(2);
     expect(
-      stats.technicalRelationshipFilters.byCameraLens["FUJIFILM X-T5"]?.[
-        "XF35mmF1.4 R"
-      ]?.technicalRelationships?.total,
+      stats.technicalRelationshipFilters.byCameraLens["FUJIFILM X-T5"]?.["XF35mmF1.4 R"]
+        ?.technicalRelationships?.total,
     ).toBe(2);
   });
 
   it("computes hour-of-day coverage (only counts photos with OffsetTime)", () => {
-    const stats = computePhotoStats([makeAlbum([
-      makePhoto({ exif: { DateTimeOriginal: "2024:03:22 17:45:00", OffsetTime: "+09:00" } }),
-      makePhoto({ exif: { DateTimeOriginal: "2024:03:22 17:30:00", OffsetTime: "+09:00" } }),
-      makePhoto({ exif: { DateTimeOriginal: "2024:03:22 09:00:00", OffsetTime: "+09:00" } }),
-      makePhoto({ exif: {} }), // no offset — excluded
-    ])]);
+    const stats = computePhotoStats([
+      makeAlbum([
+        makePhoto({ exif: { DateTimeOriginal: "2024:03:22 17:45:00", OffsetTime: "+09:00" } }),
+        makePhoto({ exif: { DateTimeOriginal: "2024:03:22 17:30:00", OffsetTime: "+09:00" } }),
+        makePhoto({ exif: { DateTimeOriginal: "2024:03:22 09:00:00", OffsetTime: "+09:00" } }),
+        makePhoto({ exif: {} }), // no offset — excluded
+      ]),
+    ]);
 
     const hour = stats.numericFacets.find((f) => f.facetId === "hour")!;
     expect(hour.coverage).toBeCloseTo(3 / 4);
@@ -310,12 +318,14 @@ describe("computePhotoStats", () => {
   });
 
   it("computes weekday and month cadence from local EXIF dates", () => {
-    const stats = computePhotoStats([makeAlbum([
-      makePhoto({ exif: { DateTimeOriginal: "2024:03:22 17:45:00" } }), // Fri Mar
-      makePhoto({ exif: { DateTimeOriginal: "2024:03:23 09:00:00" } }), // Sat Mar
-      makePhoto({ exif: { DateTimeOriginal: "2024:12:25 08:00:00" } }), // Wed Dec
-      makePhoto({ exif: {} }),
-    ])]);
+    const stats = computePhotoStats([
+      makeAlbum([
+        makePhoto({ exif: { DateTimeOriginal: "2024:03:22 17:45:00" } }), // Fri Mar
+        makePhoto({ exif: { DateTimeOriginal: "2024:03:23 09:00:00" } }), // Sat Mar
+        makePhoto({ exif: { DateTimeOriginal: "2024:12:25 08:00:00" } }), // Wed Dec
+        makePhoto({ exif: {} }),
+      ]),
+    ]);
 
     expect(stats.calendarCoverage).toBeCloseTo(3 / 4);
     expect(stats.weekdayStats.find((bucket) => bucket.label === "Fri")?.count).toBe(1);
@@ -326,13 +336,15 @@ describe("computePhotoStats", () => {
   });
 
   it("computes recent month and year trend stats from the latest dated photo", () => {
-    const stats = computePhotoStats([makeAlbum([
-      makePhoto({ exif: { DateTimeOriginal: "2023:12:31 10:00:00" } }),
-      makePhoto({ exif: { DateTimeOriginal: "2024:03:22 17:45:00" } }),
-      makePhoto({ exif: { DateTimeOriginal: "2024:03:23 09:00:00" } }),
-      makePhoto({ exif: { DateTimeOriginal: "2024:12:25 08:00:00" } }),
-      makePhoto({ exif: {} }),
-    ])]);
+    const stats = computePhotoStats([
+      makeAlbum([
+        makePhoto({ exif: { DateTimeOriginal: "2023:12:31 10:00:00" } }),
+        makePhoto({ exif: { DateTimeOriginal: "2024:03:22 17:45:00" } }),
+        makePhoto({ exif: { DateTimeOriginal: "2024:03:23 09:00:00" } }),
+        makePhoto({ exif: { DateTimeOriginal: "2024:12:25 08:00:00" } }),
+        makePhoto({ exif: {} }),
+      ]),
+    ]);
 
     expect(stats.recentMonthStats).toHaveLength(12);
     expect(stats.recentMonthStats.at(-1)).toEqual({ label: "Dec '24", count: 1 });
@@ -368,16 +380,18 @@ describe("computePhotoStats", () => {
   });
 
   it("computes a revisited place across multiple years", () => {
-    const stats = computePhotoStats([makeAlbum([
-      makePhoto({
-        exif: { DateTimeOriginal: "2020:03:22 17:45:00" },
-        tags: { geocode: "36.3286\n138.8951\nAnnaka\nGunma\nAnnaka Shi\nJP\nJapan" } as any,
-      }),
-      makePhoto({
-        exif: { DateTimeOriginal: "2024:03:22 17:45:00" },
-        tags: { geocode: "36.3286\n138.8951\nAnnaka\nGunma\nAnnaka Shi\nJP\nJapan" } as any,
-      }),
-    ])]);
+    const stats = computePhotoStats([
+      makeAlbum([
+        makePhoto({
+          exif: { DateTimeOriginal: "2020:03:22 17:45:00" },
+          tags: { geocode: "36.3286\n138.8951\nAnnaka\nGunma\nAnnaka Shi\nJP\nJapan" } as any,
+        }),
+        makePhoto({
+          exif: { DateTimeOriginal: "2024:03:22 17:45:00" },
+          tags: { geocode: "36.3286\n138.8951\nAnnaka\nGunma\nAnnaka Shi\nJP\nJapan" } as any,
+        }),
+      ]),
+    ]);
 
     expect(stats.revisitedPlaces[0]).toEqual(
       expect.objectContaining({
@@ -403,17 +417,19 @@ describe("computePhotoStats", () => {
   });
 
   it("extracts lightweight map points from geotagged photos", () => {
-    const stats = computePhotoStats([makeAlbum([
-      makePhoto({
-        exif: {
-          GPSLatitude: [35, 41, 22],
-          GPSLatitudeRef: "N",
-          GPSLongitude: [139, 41, 30],
-          GPSLongitudeRef: "E",
-        },
-      }),
-      makePhoto({ exif: {} }),
-    ])]);
+    const stats = computePhotoStats([
+      makeAlbum([
+        makePhoto({
+          exif: {
+            GPSLatitude: [35, 41, 22],
+            GPSLatitudeRef: "N",
+            GPSLongitude: [139, 41, 30],
+            GPSLongitudeRef: "E",
+          },
+        }),
+        makePhoto({ exif: {} }),
+      ]),
+    ]);
 
     expect(stats.mapPoints).toHaveLength(1);
     expect(stats.mapPoints[0]).toEqual(
@@ -425,40 +441,42 @@ describe("computePhotoStats", () => {
   });
 
   it("computes dominant color families, examples, and color drift", () => {
-    const stats = computePhotoStats([makeAlbum([
-      makePhoto({
-        tags: {
-          colors: [
-            [210, 70, 80],
-            [240, 220, 220],
-          ],
-        } as any,
-        exif: {
-          DateTimeOriginal: "2021:04:02 12:00:00",
-        },
-      }),
-      makePhoto({
-        tags: {
-          colors: [
-            [80, 120, 220],
-            [220, 220, 230],
-            [50, 60, 80],
-          ],
-        } as any,
-        exif: {
-          DateTimeOriginal: "2024:05:03 12:00:00",
-        },
-      }),
-      makePhoto({
-        tags: {
-          colors: [[140, 140, 140]],
-        } as any,
-        exif: {
-          DateTimeOriginal: "2024:06:04 12:00:00",
-        },
-      }),
-      makePhoto({ tags: null as any }),
-    ])]);
+    const stats = computePhotoStats([
+      makeAlbum([
+        makePhoto({
+          tags: {
+            colors: [
+              [210, 70, 80],
+              [240, 220, 220],
+            ],
+          } as any,
+          exif: {
+            DateTimeOriginal: "2021:04:02 12:00:00",
+          },
+        }),
+        makePhoto({
+          tags: {
+            colors: [
+              [80, 120, 220],
+              [220, 220, 230],
+              [50, 60, 80],
+            ],
+          } as any,
+          exif: {
+            DateTimeOriginal: "2024:05:03 12:00:00",
+          },
+        }),
+        makePhoto({
+          tags: {
+            colors: [[140, 140, 140]],
+          } as any,
+          exif: {
+            DateTimeOriginal: "2024:06:04 12:00:00",
+          },
+        }),
+        makePhoto({ tags: null as any }),
+      ]),
+    ]);
 
     expect(stats.colorCoverage).toBeCloseTo(3 / 4);
     expect(stats.colorStats.find((bucket) => bucket.label === "Red")?.count).toBe(1);
@@ -510,48 +528,48 @@ describe("computePhotoStats", () => {
   });
 
   it("computes time-of-day relationships from local hour, aperture, and ISO", () => {
-    const stats = computePhotoStats([makeAlbum([
-      makePhoto({
-        exif: {
-          DateTimeOriginal: "2024:03:22 17:45:00",
-          OffsetTime: "+09:00",
-          FNumber: 2,
-          ISO: 400,
-        },
-      }),
-      makePhoto({
-        exif: {
-          DateTimeOriginal: "2024:03:22 17:30:00",
-          OffsetTime: "+09:00",
-          FNumber: 2.8,
-          ISO: 400,
-        },
-      }),
-      makePhoto({
-        exif: {
-          DateTimeOriginal: "2024:03:22 09:00:00",
-          OffsetTime: "+09:00",
-          FNumber: 8,
-          ISO: 1600,
-        },
-      }),
-      makePhoto({
-        exif: {
-          DateTimeOriginal: "2024:03:22 17:00:00",
-          FNumber: 2,
-          ISO: 400,
-        },
-      }),
-    ])]);
+    const stats = computePhotoStats([
+      makeAlbum([
+        makePhoto({
+          exif: {
+            DateTimeOriginal: "2024:03:22 17:45:00",
+            OffsetTime: "+09:00",
+            FNumber: 2,
+            ISO: 400,
+          },
+        }),
+        makePhoto({
+          exif: {
+            DateTimeOriginal: "2024:03:22 17:30:00",
+            OffsetTime: "+09:00",
+            FNumber: 2.8,
+            ISO: 400,
+          },
+        }),
+        makePhoto({
+          exif: {
+            DateTimeOriginal: "2024:03:22 09:00:00",
+            OffsetTime: "+09:00",
+            FNumber: 8,
+            ISO: 1600,
+          },
+        }),
+        makePhoto({
+          exif: {
+            DateTimeOriginal: "2024:03:22 17:00:00",
+            FNumber: 2,
+            ISO: 400,
+          },
+        }),
+      ]),
+    ]);
 
     expect(stats.timeRelationships).toEqual({
       axes: [
         {
           facetId: "hour",
           label: "Time of day",
-          buckets: Array.from({ length: 24 }, (_, hour) =>
-            `${String(hour).padStart(2, "0")}:00`,
-          ),
+          buckets: Array.from({ length: 24 }, (_, hour) => `${String(hour).padStart(2, "0")}:00`),
         },
         {
           facetId: "aperture",
@@ -591,12 +609,16 @@ describe("computePhotoStats", () => {
   });
 
   it("top locations uses country from geocode", () => {
-    const stats = computePhotoStats([makeAlbum([
-      makePhoto({ tags: { geocode: "35.6895\n139.6917\nShinjuku-ku\nTokyo\nTokyo\nJP\nJapan" } }),
-      makePhoto({ tags: { geocode: "35.6895\n139.6917\nShinjuku-ku\nTokyo\nTokyo\nJP\nJapan" } }),
-      makePhoto({ tags: { geocode: "48.8566\n2.3522\nParis\nIle-de-France\nParis\nFR\nFrance" } }),
-      makePhoto({ tags: null as any }),
-    ])]);
+    const stats = computePhotoStats([
+      makeAlbum([
+        makePhoto({ tags: { geocode: "35.6895\n139.6917\nShinjuku-ku\nTokyo\nTokyo\nJP\nJapan" } }),
+        makePhoto({ tags: { geocode: "35.6895\n139.6917\nShinjuku-ku\nTokyo\nTokyo\nJP\nJapan" } }),
+        makePhoto({
+          tags: { geocode: "48.8566\n2.3522\nParis\nIle-de-France\nParis\nFR\nFrance" },
+        }),
+        makePhoto({ tags: null as any }),
+      ]),
+    ]);
 
     const loc = stats.stringFacets.find((f) => f.facetId === "location")!;
     expect(loc.coverage).toBeCloseTo(3 / 4);
@@ -605,26 +627,25 @@ describe("computePhotoStats", () => {
   });
 
   it("computes hierarchical location flow data", () => {
-    const stats = computePhotoStats([makeAlbum([
-      makePhoto({
-        tags: {
-          geocode:
-            "35.6895\n139.6917\nShinjuku-ku\nTokyo\nTokyo\nJP\nJapan",
-        },
-      }),
-      makePhoto({
-        tags: {
-          geocode:
-            "35.6804\n139.7690\nChiyoda City\nTokyo\nTokyo\nJP\nJapan",
-        },
-      }),
-      makePhoto({
-        tags: {
-          geocode:
-            "48.8566\n2.3522\nParis\nIle-de-France\nParis\nFR\nFrance",
-        },
-      }),
-    ])]);
+    const stats = computePhotoStats([
+      makeAlbum([
+        makePhoto({
+          tags: {
+            geocode: "35.6895\n139.6917\nShinjuku-ku\nTokyo\nTokyo\nJP\nJapan",
+          },
+        }),
+        makePhoto({
+          tags: {
+            geocode: "35.6804\n139.7690\nChiyoda City\nTokyo\nTokyo\nJP\nJapan",
+          },
+        }),
+        makePhoto({
+          tags: {
+            geocode: "48.8566\n2.3522\nParis\nIle-de-France\nParis\nFR\nFrance",
+          },
+        }),
+      ]),
+    ]);
 
     expect(stats.locationFlow.nodes).toEqual(
       expect.arrayContaining([
@@ -689,47 +710,43 @@ describe("computePhotoStats", () => {
   });
 
   it("keeps location flow counts conserved after pruning", () => {
-    const stats = computePhotoStats([makeAlbum([
-      makePhoto({
-        tags: {
-          geocode:
-            "35.6895\n139.6917\nShinjuku-ku\nTokyo\nTokyo\nJP\nJapan",
-        },
-      }),
-      makePhoto({
-        tags: {
-          geocode:
-            "35.6804\n139.7690\nChiyoda City\nTokyo\nTokyo\nJP\nJapan",
-        },
-      }),
-      makePhoto({
-        tags: {
-          geocode:
-            "34.6937\n135.5023\nKita-ku\nOsaka\nOsaka\nJP\nJapan",
-        },
-      }),
-      makePhoto({
-        tags: {
-          geocode:
-            "48.8566\n2.3522\nParis\nIle-de-France\nParis\nFR\nFrance",
-        },
-      }),
-      makePhoto({
-        tags: {
-          geocode:
-            "48.8584\n2.2945\nParis\nIle-de-France\nParis\nFR\nFrance",
-        },
-      }),
-      makePhoto({
-        tags: {
-          geocode:
-            "37.5665\n126.9780\nJung-gu\nSeoul\nSeoul\nKR\nSouth Korea",
-        },
-      }),
-      makePhoto({
-        tags: { geocode: "1.3521\n103.8198\nSG\nSingapore" },
-      }),
-    ])]);
+    const stats = computePhotoStats([
+      makeAlbum([
+        makePhoto({
+          tags: {
+            geocode: "35.6895\n139.6917\nShinjuku-ku\nTokyo\nTokyo\nJP\nJapan",
+          },
+        }),
+        makePhoto({
+          tags: {
+            geocode: "35.6804\n139.7690\nChiyoda City\nTokyo\nTokyo\nJP\nJapan",
+          },
+        }),
+        makePhoto({
+          tags: {
+            geocode: "34.6937\n135.5023\nKita-ku\nOsaka\nOsaka\nJP\nJapan",
+          },
+        }),
+        makePhoto({
+          tags: {
+            geocode: "48.8566\n2.3522\nParis\nIle-de-France\nParis\nFR\nFrance",
+          },
+        }),
+        makePhoto({
+          tags: {
+            geocode: "48.8584\n2.2945\nParis\nIle-de-France\nParis\nFR\nFrance",
+          },
+        }),
+        makePhoto({
+          tags: {
+            geocode: "37.5665\n126.9780\nJung-gu\nSeoul\nSeoul\nKR\nSouth Korea",
+          },
+        }),
+        makePhoto({
+          tags: { geocode: "1.3521\n103.8198\nSG\nSingapore" },
+        }),
+      ]),
+    ]);
 
     const incoming = new Map<string, number>();
     const outgoing = new Map<string, number>();
@@ -756,35 +773,37 @@ describe("computePhotoStats", () => {
   });
 
   it("computes technical relationships for focal length, aperture, and ISO", () => {
-    const stats = computePhotoStats([makeAlbum([
-      makePhoto({
-        exif: {
-          FocalLengthIn35mmFormat: 35,
-          FNumber: 2,
-          ISO: 400,
-        },
-      }),
-      makePhoto({
-        exif: {
-          FocalLengthIn35mmFormat: 35,
-          FNumber: 2,
-          ISO: 400,
-        },
-      }),
-      makePhoto({
-        exif: {
-          FocalLengthIn35mmFormat: 85,
-          FNumber: 8,
-          ISO: 1600,
-        },
-      }),
-      makePhoto({
-        exif: {
-          FocalLengthIn35mmFormat: 35,
-          FNumber: 2,
-        },
-      }),
-    ])]);
+    const stats = computePhotoStats([
+      makeAlbum([
+        makePhoto({
+          exif: {
+            FocalLengthIn35mmFormat: 35,
+            FNumber: 2,
+            ISO: 400,
+          },
+        }),
+        makePhoto({
+          exif: {
+            FocalLengthIn35mmFormat: 35,
+            FNumber: 2,
+            ISO: 400,
+          },
+        }),
+        makePhoto({
+          exif: {
+            FocalLengthIn35mmFormat: 85,
+            FNumber: 8,
+            ISO: 1600,
+          },
+        }),
+        makePhoto({
+          exif: {
+            FocalLengthIn35mmFormat: 35,
+            FNumber: 2,
+          },
+        }),
+      ]),
+    ]);
 
     expect(stats.technicalRelationships).toEqual(
       expect.objectContaining({
@@ -827,18 +846,20 @@ describe("computePhotoStats", () => {
   });
 
   it("includes city-states in location flow using hierarchy fallbacks", () => {
-    const stats = computePhotoStats([makeAlbum([
-      makePhoto({
-        tags: {
-          geocode: "1.3521\n103.8198\nSingapore\nSG\nSingapore",
-        },
-      }),
-      makePhoto({
-        tags: {
-          geocode: "1.3000\n103.8000\nTiong Bahru\nSingapore\nSG\nSingapore",
-        },
-      }),
-    ])]);
+    const stats = computePhotoStats([
+      makeAlbum([
+        makePhoto({
+          tags: {
+            geocode: "1.3521\n103.8198\nSingapore\nSG\nSingapore",
+          },
+        }),
+        makePhoto({
+          tags: {
+            geocode: "1.3000\n103.8000\nTiong Bahru\nSingapore\nSG\nSingapore",
+          },
+        }),
+      ]),
+    ]);
 
     expect(stats.locationFlow.nodes).toEqual(
       expect.arrayContaining([

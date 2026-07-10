@@ -1,10 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
-export const useSearchFilterDrawer = ({
-  isSimilarMode,
-}: {
-  isSimilarMode: boolean;
-}) => {
+export const useSearchFilterDrawer = ({ isSimilarMode }: { isSimilarMode: boolean }) => {
   const [isOpen, setIsOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
   const closeRef = useRef<HTMLButtonElement | null>(null);

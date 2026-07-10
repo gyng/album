@@ -7,20 +7,17 @@
 export type ExifLocalDateTime = {
   year: number;
   month: number; // 1–12
-  day: number;   // 1–31
-  hour: number;  // 0–23
+  day: number; // 1–31
+  hour: number; // 0–23
   minute: number;
   second: number;
 };
 
 // Matches "YYYY:MM:DD HH:MM:SS" (EXIF) and "YYYY-MM-DDTHH:MM:SS" / "YYYY-MM-DD HH:MM:SS" (ISO-like)
 // Date separator must be uniform: all colons OR all dashes, not mixed or slashes.
-const EXIF_DT_RE =
-  /^(\d{4})([-:])(\d{2})\2(\d{2})[T ](\d{2}):(\d{2}):(\d{2})/;
+const EXIF_DT_RE = /^(\d{4})([-:])(\d{2})\2(\d{2})[T ](\d{2}):(\d{2}):(\d{2})/;
 
-export function parseExifLocalDateTime(
-  raw: string | undefined | null,
-): ExifLocalDateTime | null {
+export function parseExifLocalDateTime(raw: string | undefined | null): ExifLocalDateTime | null {
   if (!raw) return null;
 
   const match = EXIF_DT_RE.exec(raw.trim());
@@ -36,10 +33,15 @@ export function parseExifLocalDateTime(
 
   // Sanity-check — reject obviously invalid values
   if (
-    year < 1900 || year > 2100 ||
-    month < 1 || month > 12 ||
-    day < 1 || day > 31 ||
-    hour > 23 || minute > 59 || second > 59
+    year < 1900 ||
+    year > 2100 ||
+    month < 1 ||
+    month > 12 ||
+    day < 1 ||
+    day > 31 ||
+    hour > 23 ||
+    minute > 59 ||
+    second > 59
   ) {
     return null;
   }
@@ -74,9 +76,7 @@ export function formatExifWallClockIso(dt: ExifLocalDateTime): string {
   );
 }
 
-export function normaliseExifWallClockIso(
-  raw: string | undefined | null,
-): string | null {
+export function normaliseExifWallClockIso(raw: string | undefined | null): string | null {
   const dt = parseExifLocalDateTime(raw);
   return dt ? formatExifWallClockIso(dt) : null;
 }
@@ -84,34 +84,21 @@ export function normaliseExifWallClockIso(
 // A nominal numeric value for comparisons and relative-time labels. Date.UTC
 // is used only as a stable coordinate system for the already-parsed wall-clock
 // components: it does not convert the camera time or apply OffsetTime.
-export function exifWallClockTimestamp(
-  raw: string | undefined | null,
-): number | null {
+export function exifWallClockTimestamp(raw: string | undefined | null): number | null {
   const dt = parseExifLocalDateTime(raw);
   if (!dt) return null;
 
-  return Date.UTC(
-    dt.year,
-    dt.month - 1,
-    dt.day,
-    dt.hour,
-    dt.minute,
-    dt.second,
-  );
+  return Date.UTC(dt.year, dt.month - 1, dt.day, dt.hour, dt.minute, dt.second);
 }
 
-export function formatExifWallClockDate(
-  raw: string | undefined | null,
-): string | null {
+export function formatExifWallClockDate(raw: string | undefined | null): string | null {
   const dt = parseExifLocalDateTime(raw);
   if (!dt) return null;
 
   return `${dt.day} ${MONTH_NAMES[dt.month - 1]} ${dt.year}`;
 }
 
-export function formatExifWallClockDateTime(
-  raw: string | undefined | null,
-): string | null {
+export function formatExifWallClockDateTime(raw: string | undefined | null): string | null {
   const dt = parseExifLocalDateTime(raw);
   if (!dt) return null;
 

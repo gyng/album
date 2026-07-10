@@ -40,9 +40,7 @@ describe("useSlideshowCadence", () => {
 
   it("does not fire onAdvance before there is a current photo", () => {
     const onAdvance = jest.fn();
-    renderHook(() =>
-      useSlideshowCadence({ ...baseInput, hasCurrentPhoto: false, onAdvance }),
-    );
+    renderHook(() => useSlideshowCadence({ ...baseInput, hasCurrentPhoto: false, onAdvance }));
     act(() => {
       jest.advanceTimersByTime(180000);
     });
@@ -51,9 +49,7 @@ describe("useSlideshowCadence", () => {
 
   it("pausing stops the advance timer", () => {
     const onAdvance = jest.fn();
-    const { result } = renderHook(() =>
-      useSlideshowCadence({ ...baseInput, onAdvance }),
-    );
+    const { result } = renderHook(() => useSlideshowCadence({ ...baseInput, onAdvance }));
 
     act(() => {
       result.current.togglePaused();

@@ -53,39 +53,30 @@ const ensureWorker = (): Worker => {
   }
 
   worker = new Worker(new URL("./embedding.worker.ts", import.meta.url));
-  worker.addEventListener(
-    "message",
-    (event: MessageEvent<EmbeddingWorkerResponse>) => {
-      const response = event.data;
-      const handlers = pending.get(response.id);
-      if (!handlers) {
-        return;
-      }
+  worker.addEventListener("message", (event: MessageEvent<EmbeddingWorkerResponse>) => {
+    const response = event.data;
+    const handlers = pending.get(response.id);
+    if (!handlers) {
+      return;
+    }
 
-      if ("progress" in response) {
-        handlers.onProgress?.(
-          response.progress,
-          response.stage,
-          response.details,
-        );
-        return;
-      }
+    if ("progress" in response) {
+      handlers.onProgress?.(response.progress, response.stage, response.details);
+      return;
+    }
 
-      pending.delete(response.id);
-      if (response.ok) {
-        handlers.resolve(response.vector);
-        return;
-      }
+    pending.delete(response.id);
+    if (response.ok) {
+      handlers.resolve(response.vector);
+      return;
+    }
 
-      handlers.reject(new Error(response.error));
-    },
-  );
+    handlers.reject(new Error(response.error));
+  });
 
   worker.addEventListener("error", (event) => {
     const error =
-      event.error instanceof Error
-        ? event.error
-        : new Error("Embedding worker failed.");
+      event.error instanceof Error ? event.error : new Error("Embedding worker failed.");
     const handlersList = Array.from(pending.values());
     for (let idx = 0; idx < handlersList.length; idx += 1) {
       const handlers = handlersList[idx];

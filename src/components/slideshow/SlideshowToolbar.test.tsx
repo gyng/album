@@ -17,9 +17,7 @@ jest.mock("next/link", () => ({
 
 const noop = () => {};
 
-const makeProps = (
-  overrides: Partial<SlideshowToolbarProps> = {},
-): SlideshowToolbarProps => ({
+const makeProps = (overrides: Partial<SlideshowToolbarProps> = {}): SlideshowToolbarProps => ({
   onFocusCapture: noop,
   onPointerOverToolbar: noop,
   poolStats: EMPTY_POOL_STATS,

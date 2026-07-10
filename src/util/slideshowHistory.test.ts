@@ -11,17 +11,13 @@ import {
 import type { RandomPhotoRow } from "../components/search/api";
 
 const row = (path: string): RandomPhotoRow => ({ path, exif: "", geocode: "" });
-const entry = (
-  seedPath: string,
-  companionPaths: string[] = [],
-): NavigationEntry => ({
+const entry = (seedPath: string, companionPaths: string[] = []): NavigationEntry => ({
   seed: row(seedPath),
   companions: companionPaths.map(row),
   strategy: companionPaths.length > 0 ? "same-album" : null,
 });
 
-const seeds = (s: SlideshowHistoryState): string[] =>
-  s.history.map((e) => e.seed.path);
+const seeds = (s: SlideshowHistoryState): string[] => s.history.map((e) => e.seed.path);
 
 describe("advanceHistory reducer", () => {
   it("commit appends and points the index at the new entry", () => {

@@ -14,17 +14,13 @@ describe("useRemixGridReveal", () => {
   });
 
   it("is always ready for a single (non-remix) slide", () => {
-    const { result } = renderHook(() =>
-      useRemixGridReveal({ seedPath: "a", companionPaths: [] }),
-    );
+    const { result } = renderHook(() => useRemixGridReveal({ seedPath: "a", companionPaths: [] }));
     expect(result.current.isRemixGridReady).toBe(true);
   });
 
   it("stays not-ready until every cell of a remix has loaded", () => {
     const companionPaths = ["b", "c"]; // 3 cells with the seed
-    const { result } = renderHook(() =>
-      useRemixGridReveal({ seedPath: "a", companionPaths }),
-    );
+    const { result } = renderHook(() => useRemixGridReveal({ seedPath: "a", companionPaths }));
     expect(result.current.isRemixGridReady).toBe(false);
 
     act(() => result.current.markRemixCellLoaded("a"));
@@ -37,9 +33,7 @@ describe("useRemixGridReveal", () => {
 
   it("ignores duplicate load events for the same cell", () => {
     const companionPaths = ["b"]; // 2 cells
-    const { result } = renderHook(() =>
-      useRemixGridReveal({ seedPath: "a", companionPaths }),
-    );
+    const { result } = renderHook(() => useRemixGridReveal({ seedPath: "a", companionPaths }));
     act(() => result.current.markRemixCellLoaded("a"));
     act(() => result.current.markRemixCellLoaded("a")); // duplicate
     // The seed counted once; the companion still pending → not ready.

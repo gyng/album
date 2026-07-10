@@ -14,17 +14,14 @@ import type { SearchNavState } from "../../components/search/Search";
 
 type PageProps = {};
 
-const SearchPage: NextPage<PageProps> = (props) => {
-  const [searchNavState, setSearchNavState] = useState<SearchNavState | null>(
-    null,
-  );
+const SearchPage: NextPage<PageProps> = (_props) => {
+  const [searchNavState, setSearchNavState] = useState<SearchNavState | null>(null);
   const [isMounted, setIsMounted] = useState(false);
   const handleNavStateChange = useCallback((state: SearchNavState) => {
     setSearchNavState(state);
   }, []);
 
   React.useEffect(() => {
-
     setIsMounted(true);
   }, []);
 
@@ -33,10 +30,8 @@ const SearchPage: NextPage<PageProps> = (props) => {
   // nav's inputs as stable primitives and memoise the nav element so those
   // progress updates don't re-render — and visibly flicker — the dice button.
   const databaseReady = searchNavState?.databaseReady ?? false;
-  const isRandomSimilarLoading =
-    searchNavState?.isRandomSimilarLoading ?? false;
-  const onStartRandomSimilarSlideshow =
-    searchNavState?.onStartRandomSimilarSlideshow;
+  const isRandomSimilarLoading = searchNavState?.isRandomSimilarLoading ?? false;
+  const onStartRandomSimilarSlideshow = searchNavState?.onStartRandomSimilarSlideshow;
 
   const slideshowAction = useMemo(
     () =>
@@ -56,12 +51,7 @@ const SearchPage: NextPage<PageProps> = (props) => {
           {isRandomSimilarLoading ? "…" : "🎲"}
         </button>
       ) : undefined,
-    [
-      isMounted,
-      databaseReady,
-      isRandomSimilarLoading,
-      onStartRandomSimilarSlideshow,
-    ],
+    [isMounted, databaseReady, isRandomSimilarLoading, onStartRandomSimilarSlideshow],
   );
 
   const globalNav = useMemo(
@@ -85,8 +75,7 @@ const SearchPage: NextPage<PageProps> = (props) => {
         noindex
         jsonLd={buildCollectionPageJsonLd({
           name: "Search | Snapshots",
-          description:
-            "Search the photo archive by text, tags, and visual similarity.",
+          description: "Search the photo archive by text, tags, and visual similarity.",
           pathname: "/search",
         })}
       />
@@ -97,7 +86,9 @@ const SearchPage: NextPage<PageProps> = (props) => {
             takes vertical space in the results flow or shifts content when it
             finishes and disappears. */}
         <div className={styles.searchHeadingRow}>
-          <Heading level={1} as="h1">Search</Heading>
+          <Heading level={1} as="h1">
+            Search
+          </Heading>
           {searchNavState?.loading ? (
             <ProgressBar
               progress={searchNavState.loading.progress}
@@ -107,9 +98,7 @@ const SearchPage: NextPage<PageProps> = (props) => {
           ) : null}
         </div>
         {searchNavState?.randomExploreError ? (
-          <p className={styles.inlineError}>
-            {searchNavState.randomExploreError}
-          </p>
+          <p className={styles.inlineError}>{searchNavState.randomExploreError}</p>
         ) : null}
         <DynamicSearchWithCoi onNavStateChange={handleNavStateChange} />
       </main>

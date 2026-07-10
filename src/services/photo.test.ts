@@ -4,12 +4,7 @@
 
 import fs from "fs";
 import { monkeyExif } from "../test/fixtures/monkey_exif";
-import {
-  getNextJsSafeExif,
-  getPhotoSize,
-  optimiseImages,
-  stripPublicFromPath,
-} from "./photo";
+import { getNextJsSafeExif, getPhotoSize, optimiseImages, stripPublicFromPath } from "./photo";
 
 describe("photo utilities", () => {
   describe("getPhotoSize", () => {
@@ -41,10 +36,7 @@ describe("photo utilities", () => {
 
   describe("optimiseImages", () => {
     it("skips cached/already-optimised images", async () => {
-      const actual = await optimiseImages(
-        "test/fixtures/monkey.jpg",
-        "fixtures",
-      );
+      const actual = await optimiseImages("test/fixtures/monkey.jpg", "fixtures");
       expect(actual).toEqual([
         {
           src: "/fixtures/.resized_images/monkey.jpg@800.avif",
@@ -90,10 +82,7 @@ describe("photo utilities", () => {
     // Also, this test does not work as intended when running locally
     // as images will have been cached. It will fail on CI.
     it("optimised unoptimised images", async () => {
-      const actual = await optimiseImages(
-        "test/fixtures/monkey-for-unoptimised.jpg",
-        "fixtures",
-      );
+      const actual = await optimiseImages("test/fixtures/monkey-for-unoptimised.jpg", "fixtures");
       expect(actual).toEqual([
         {
           src: "/fixtures/.resized_images/monkey-for-unoptimised.jpg@800.avif",

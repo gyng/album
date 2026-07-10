@@ -8,9 +8,7 @@ import { MapWorldEntry } from "./MapWorld";
 
 const mapHandlers: {
   onMoveStart?: () => void;
-  onMoveEnd?: (event: {
-    viewState: { latitude: number; longitude: number; zoom: number };
-  }) => void;
+  onMoveEnd?: (event: { viewState: { latitude: number; longitude: number; zoom: number } }) => void;
   onZoomStart?: () => void;
   onZoom?: (event: { viewState: { zoom: number } }) => void;
 } = {};
@@ -61,9 +59,7 @@ jest.mock("react-map-gl/maplibre", () => {
       onClick,
     }: {
       children?: ReactNode;
-      onClick?: (event: {
-        originalEvent: { stopPropagation: () => void };
-      }) => void;
+      onClick?: (event: { originalEvent: { stopPropagation: () => void } }) => void;
     }) => (
       <button
         type="button"
@@ -75,13 +71,7 @@ jest.mock("react-map-gl/maplibre", () => {
         {children}
       </button>
     ),
-    Popup: ({
-      children,
-      className,
-    }: {
-      children?: ReactNode;
-      className?: string;
-    }) => (
+    Popup: ({ children, className }: { children?: ReactNode; className?: string }) => (
       <div data-testid="popup" className={className}>
         {children}
       </div>
@@ -90,15 +80,7 @@ jest.mock("react-map-gl/maplibre", () => {
     NavigationControl: () => null,
     GeolocateControl: () => null,
     FullscreenControl: () => null,
-    Source: ({
-      children,
-      id,
-      data,
-    }: {
-      children?: ReactNode;
-      id?: string;
-      data?: unknown;
-    }) => (
+    Source: ({ children, id, data }: { children?: ReactNode; id?: string; data?: unknown }) => (
       <div data-testid={id ?? "source"} data-source={JSON.stringify(data)}>
         {children}
       </div>
@@ -168,9 +150,7 @@ describe("MapWorld", () => {
     mapInstance.off.mockClear();
     mapInstance.project.mockClear();
     mapInstance.getBounds.mockClear();
-    replaceStateSpy = jest
-      .spyOn(window.history, "replaceState")
-      .mockImplementation(() => {});
+    replaceStateSpy = jest.spyOn(window.history, "replaceState").mockImplementation(() => {});
   });
 
   afterEach(() => {
@@ -223,9 +203,9 @@ describe("MapWorld", () => {
 
     expect(replaceStateSpy).not.toHaveBeenCalled();
 
-    expect(
-      screen.getByRole("link", { name: /kansai/i }).getAttribute("href"),
-    ).toBe("/album/kansai#photo.jpg");
+    expect(screen.getByRole("link", { name: /kansai/i }).getAttribute("href")).toBe(
+      "/album/kansai#photo.jpg",
+    );
     expect(screen.getByTestId("popup").className).toContain("click");
   });
 
@@ -367,9 +347,7 @@ describe("MapWorld", () => {
       />,
     );
 
-    fireEvent.mouseOver(
-      screen.getAllByTestId("marker")[0]!.querySelector("span")!,
-    );
+    fireEvent.mouseOver(screen.getAllByTestId("marker")[0]!.querySelector("span")!);
 
     expect(screen.getByTestId("journey-line-overlay")).toBeTruthy();
     expect(screen.getByTestId("journey-line-ghost-route")).toBeTruthy();

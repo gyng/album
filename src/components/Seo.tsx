@@ -62,25 +62,15 @@ export const Seo: React.FC<SeoProps> = ({
       <meta name="theme-color" content={defaults.themeColor} key="theme-color" />
       <meta property="og:site_name" content={defaults.siteName} key="og:site_name" />
       <meta property="og:title" content={resolvedTitle} key="og:title" />
-      <meta
-        property="og:description"
-        content={resolvedDescription}
-        key="og:description"
-      />
+      <meta property="og:description" content={resolvedDescription} key="og:description" />
       <meta property="og:url" content={canonicalUrl} key="og:url" />
       <meta property="og:type" content={type} key="og:type" />
       <meta property="og:image" content={resolvedImage} key="og:image" />
       <meta name="twitter:card" content="summary_large_image" key="twitter:card" />
       <meta name="twitter:title" content={resolvedTitle} key="twitter:title" />
-      <meta
-        name="twitter:description"
-        content={resolvedDescription}
-        key="twitter:description"
-      />
+      <meta name="twitter:description" content={resolvedDescription} key="twitter:description" />
       <meta name="twitter:image" content={resolvedImage} key="twitter:image" />
-      {noindex ? (
-        <meta name="robots" content="noindex, nofollow" key="robots" />
-      ) : null}
+      {noindex ? <meta name="robots" content="noindex, nofollow" key="robots" /> : null}
       {jsonLdItems.map((item, index) => (
         <script
           key={`jsonld-${index}`}

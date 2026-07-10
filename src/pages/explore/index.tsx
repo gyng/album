@@ -10,10 +10,7 @@ import { StatsWorldMap } from "../../components/StatsWorldMap";
 import { TechnicalHeatmaps } from "../../components/TechnicalHeatmaps";
 import { TimeRelationshipExplorer } from "../../components/TimeRelationshipExplorer";
 import { getAlbums } from "../../services/album";
-import {
-  computeVisualSamenessStats,
-  VisualSamenessStats,
-} from "../../util/computeEmbeddingStats";
+import { computeVisualSamenessStats, VisualSamenessStats } from "../../util/computeEmbeddingStats";
 import {
   computePhotoStats,
   NumericFacetStat,
@@ -22,7 +19,16 @@ import {
   StringFacetStat,
 } from "../../util/computeStats";
 import { measureBuild } from "../../services/buildTiming";
-import { Footer, SegmentedToggle, Card, Heading, Caption, PillButton, pillStyles, Select } from "../../components/ui";
+import {
+  Footer,
+  SegmentedToggle,
+  Card,
+  Heading,
+  Caption,
+  PillButton,
+  pillStyles,
+  Select,
+} from "../../components/ui";
 import styles from "./explore.module.css";
 import { buildSearchFacetHref, isSearchableFacetId } from "../../util/searchFacets";
 import {
@@ -68,21 +74,11 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
   const [gearView, setGearView] = useState<"sankey" | "bars">("sankey");
   const [selectedTechnicalCamera, setSelectedTechnicalCamera] = useState("all");
   const [selectedTechnicalLens, setSelectedTechnicalLens] = useState("all");
-  const [visibleAverageExamples, setVisibleAverageExamples] = useState(
-    INITIAL_AVERAGE_EXAMPLES,
-  );
-  const [visibleRepeatedExamples, setVisibleRepeatedExamples] = useState(
-    INITIAL_REPEATED_EXAMPLES,
-  );
-  const [visibleDistinctExamples, setVisibleDistinctExamples] = useState(
-    INITIAL_DISTINCT_EXAMPLES,
-  );
-  const [visibleRecurringLooks, setVisibleRecurringLooks] = useState(
-    INITIAL_RECURRING_LOOKS,
-  );
-  const [visibleLookTimeline, setVisibleLookTimeline] = useState(
-    INITIAL_LOOK_TIMELINE,
-  );
+  const [visibleAverageExamples, setVisibleAverageExamples] = useState(INITIAL_AVERAGE_EXAMPLES);
+  const [visibleRepeatedExamples, setVisibleRepeatedExamples] = useState(INITIAL_REPEATED_EXAMPLES);
+  const [visibleDistinctExamples, setVisibleDistinctExamples] = useState(INITIAL_DISTINCT_EXAMPLES);
+  const [visibleRecurringLooks, setVisibleRecurringLooks] = useState(INITIAL_RECURRING_LOOKS);
+  const [visibleLookTimeline, setVisibleLookTimeline] = useState(INITIAL_LOOK_TIMELINE);
   const timeFacet = findNumericFacet(stats, "hour");
   const technicalFacets = [
     findNumericFacet(stats, "focal-length-35mm"),
@@ -102,8 +98,7 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
     stats.technicalRelationshipFilters.lensesByCamera,
   ]);
   const activeTechnicalLens =
-    selectedTechnicalLens !== "all" &&
-    !availableTechnicalLenses.includes(selectedTechnicalLens)
+    selectedTechnicalLens !== "all" && !availableTechnicalLenses.includes(selectedTechnicalLens)
       ? "all"
       : selectedTechnicalLens;
   const scopeStats = useMemo((): ShootingScopeStats | null => {
@@ -131,16 +126,14 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
     stats.technicalRelationshipFilters.byCameraLens,
     stats.technicalRelationshipFilters.byLens,
   ]);
-  const activeTimeFacet = scopeStats
-    ? findNumericFacet(scopeStats, "hour")
-    : timeFacet;
+  const activeTimeFacet = scopeStats ? findNumericFacet(scopeStats, "hour") : timeFacet;
   const activeTechnicalFacets = scopeStats
-    ? [
+    ? ([
         findNumericFacet(scopeStats, "focal-length-35mm"),
         findNumericFacet(scopeStats, "focal-length-actual"),
         findNumericFacet(scopeStats, "aperture"),
         findNumericFacet(scopeStats, "iso"),
-      ].filter(Boolean) as NumericFacetStat[]
+      ].filter(Boolean) as NumericFacetStat[])
     : technicalFacets;
   const activeWeekdayStats = scopeStats?.weekdayStats ?? stats.weekdayStats;
   const activeMonthStats = scopeStats?.monthStats ?? stats.monthStats;
@@ -190,50 +183,34 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
     findStringFacet(stats, "subregion"),
     findStringFacet(stats, "city"),
   ].filter(Boolean) as StringFacetStat[];
-  const placeBarFacets = placeFacets
-    .map((facet, depth) => {
-      const data = stats.locationFlow.nodes
-        .filter((node) => node.depth === depth)
-        .map((node) => ({
-          key: node.id,
-          label: node.displayLabel ?? node.label,
-          value: node.facetValue ?? node.label,
-          count: node.count,
-        }))
-        .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label));
+  const placeBarFacets = placeFacets.map((facet, depth) => {
+    const data = stats.locationFlow.nodes
+      .filter((node) => node.depth === depth)
+      .map((node) => ({
+        key: node.id,
+        label: node.displayLabel ?? node.label,
+        value: node.facetValue ?? node.label,
+        count: node.count,
+      }))
+      .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label));
 
-      return data.length > 0
-        ? {
-            ...facet,
-            data,
-          }
-        : facet;
-    });
-  const gearFacets = [
-    findStringFacet(stats, "camera"),
-    findStringFacet(stats, "lens"),
-  ].filter(Boolean) as StringFacetStat[];
+    return data.length > 0
+      ? {
+          ...facet,
+          data,
+        }
+      : facet;
+  });
+  const gearFacets = [findStringFacet(stats, "camera"), findStringFacet(stats, "lens")].filter(
+    Boolean,
+  ) as StringFacetStat[];
 
-  const repeatedExamples = visualSameness?.repeatedExamples.slice(
-    0,
-    visibleRepeatedExamples,
-  ) ?? [];
-  const averageExamples = visualSameness?.averageExamples.slice(
-    0,
-    visibleAverageExamples,
-  ) ?? [];
-  const distinctExamples = visualSameness?.distinctExamples.slice(
-    0,
-    visibleDistinctExamples,
-  ) ?? [];
-  const recurringLooks = visualSameness?.visualEras.slice(
-    0,
-    visibleRecurringLooks,
-  ) ?? [];
-  const lookTimeline = visualSameness?.lookTimeline.toReversed().slice(
-    0,
-    visibleLookTimeline,
-  ) ?? [];
+  const repeatedExamples = visualSameness?.repeatedExamples.slice(0, visibleRepeatedExamples) ?? [];
+  const averageExamples = visualSameness?.averageExamples.slice(0, visibleAverageExamples) ?? [];
+  const distinctExamples = visualSameness?.distinctExamples.slice(0, visibleDistinctExamples) ?? [];
+  const recurringLooks = visualSameness?.visualEras.slice(0, visibleRecurringLooks) ?? [];
+  const lookTimeline =
+    visualSameness?.lookTimeline.toReversed().slice(0, visibleLookTimeline) ?? [];
   const overviewCards = buildExploreOverviewCards(stats);
   const funStats = buildExploreFunStats(stats);
   const sectionLinks = EXPLORE_SECTION_LINKS;
@@ -258,8 +235,7 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
             count={bucket.count}
             maxCount={max}
             actionHref={
-              isSearchableFacetId(facet.facetId) &&
-              !isAggregateLocationBucket(bucket.label)
+              isSearchableFacetId(facet.facetId) && !isAggregateLocationBucket(bucket.label)
                 ? buildSearchFacetHref({
                     facetId: facet.facetId,
                     value: bucket.label,
@@ -331,10 +307,7 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
 
         <div className={styles.groups}>
           {visualSameness ? (
-            <StatGroup
-              id="visual-sameness"
-              title="Visual sameness"
-            >
+            <StatGroup id="visual-sameness" title="Visual sameness">
               <section className={`${styles.section} ${styles.sectionWide}`}>
                 <div className={styles.visualSummaryGrid}>
                   <Card as="article" className={styles.overviewCard}>
@@ -343,7 +316,9 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
                       {visualSameness.samenessPercent}%
                     </div>
                     <div className={styles.funStatDetail}>
-                      Average nearest-neighbour similarity across {visualSameness.sampleSize.toLocaleString("en")} embedded photos in the archive.
+                      Average nearest-neighbour similarity across{" "}
+                      {visualSameness.sampleSize.toLocaleString("en")} embedded photos in the
+                      archive.
                     </div>
                   </Card>
                   <Card as="article" className={styles.overviewCard}>
@@ -352,7 +327,8 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
                       {visualSameness.repeatedMotifPercent}%
                     </div>
                     <div className={styles.funStatDetail}>
-                      Photos with a very close visual neighbour at or above {Math.round(visualSameness.highSimilarityThreshold * 100)}% similarity.
+                      Photos with a very close visual neighbour at or above{" "}
+                      {Math.round(visualSameness.highSimilarityThreshold * 100)}% similarity.
                     </div>
                   </Card>
                   <Card as="article" className={styles.overviewCard}>
@@ -361,7 +337,8 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
                       {visualSameness.distinctPercent}%
                     </div>
                     <div className={styles.funStatDetail}>
-                      Photos whose nearest visual neighbour stays below {Math.round(visualSameness.lowSimilarityThreshold * 100)}% similarity.
+                      Photos whose nearest visual neighbour stays below{" "}
+                      {Math.round(visualSameness.lowSimilarityThreshold * 100)}% similarity.
                     </div>
                   </Card>
                   {visualSameness.lookDrift ? (
@@ -371,7 +348,9 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
                         {visualSameness.lookDrift.similarityPercent}%
                       </div>
                       <div className={styles.funStatDetail}>
-                        The archive’s early and recent look stays {visualSameness.lookDrift.similarityPercent}% aligned from {visualSameness.lookDrift.firstYear} to {visualSameness.lookDrift.lastYear}.
+                        The archive’s early and recent look stays{" "}
+                        {visualSameness.lookDrift.similarityPercent}% aligned from{" "}
+                        {visualSameness.lookDrift.firstYear} to {visualSameness.lookDrift.lastYear}.
                       </div>
                     </Card>
                   ) : null}
@@ -382,16 +361,17 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
                         {visualSameness.visualEras.length}
                       </div>
                       <div className={styles.funStatDetail}>
-                        The biggest era covers {visualSameness.visualEras[0]?.sharePercent ?? 0}% of embedded photos.
+                        The biggest era covers {visualSameness.visualEras[0]?.sharePercent ?? 0}% of
+                        embedded photos.
                       </div>
                     </Card>
                   ) : null}
                 </div>
-                {(visualSameness.averageExamples.length > 0 ||
-                  visualSameness.repeatedExamples.length > 0 ||
-                  visualSameness.distinctExamples.length > 0 ||
-                  visualSameness.visualEras.length > 0 ||
-                  visualSameness.lookTimeline.length > 0) ? (
+                {visualSameness.averageExamples.length > 0 ||
+                visualSameness.repeatedExamples.length > 0 ||
+                visualSameness.distinctExamples.length > 0 ||
+                visualSameness.visualEras.length > 0 ||
+                visualSameness.lookTimeline.length > 0 ? (
                   <div className={styles.visualExamplesGrid}>
                     {visualSameness.averageExamples.length > 0 ? (
                       <section
@@ -399,21 +379,14 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
                       >
                         <div className={styles.sectionHeader}>
                           <Heading level={2}>Most average photos</Heading>
-                          <Caption as="span">
-                            Closest to the archive centre
-                          </Caption>
+                          <Caption as="span">Closest to the archive centre</Caption>
                         </div>
                         <div className={styles.visualSingles}>
                           {averageExamples.map((example) => (
-                            <div
-                              key={example.photo.path}
-                              className={styles.visualSingleCard}
-                            >
+                            <div key={example.photo.path} className={styles.visualSingleCard}>
                               <VisualSimilarityThumb photo={example.photo} />
                               <div className={styles.visualExampleMeta}>
-                                <span>
-                                  {example.centroidSimilarityPercent}% to archive centre
-                                </span>
+                                <span>{example.centroidSimilarityPercent}% to archive centre</span>
                               </div>
                             </div>
                           ))}
@@ -439,9 +412,7 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
                       <section className={styles.visualExampleSection}>
                         <div className={styles.sectionHeader}>
                           <Heading level={2}>Distinct frames</Heading>
-                          <Caption as="span">
-                            Weakest nearest-neighbour matches
-                          </Caption>
+                          <Caption as="span">Weakest nearest-neighbour matches</Caption>
                         </div>
                         <div className={styles.visualSingles}>
                           {distinctExamples.map((example) => (
@@ -476,9 +447,7 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
                       >
                         <div className={styles.sectionHeader}>
                           <Heading level={2}>Repeated motifs</Heading>
-                          <Caption as="span">
-                            Closest recurring visual matches
-                          </Caption>
+                          <Caption as="span">Closest recurring visual matches</Caption>
                         </div>
                         <div className={styles.visualPairs}>
                           {repeatedExamples.map((example) => (
@@ -519,9 +488,7 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
                       >
                         <div className={styles.sectionHeader}>
                           <Heading level={2}>Recurring looks</Heading>
-                          <Caption as="span">
-                            Recurring visual modes in the archive
-                          </Caption>
+                          <Caption as="span">Recurring visual modes in the archive</Caption>
                         </div>
                         <div className={styles.visualEraGrid}>
                           {recurringLooks.map((era) => (
@@ -540,7 +507,8 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
                                 <span>{era.label}</span>
                                 <br />
                                 <span>
-                                  {era.sharePercent}% of archive · {era.count.toLocaleString("en")} photos
+                                  {era.sharePercent}% of archive · {era.count.toLocaleString("en")}{" "}
+                                  photos
                                 </span>
                               </div>
                             </div>
@@ -569,9 +537,7 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
                       >
                         <div className={styles.sectionHeader}>
                           <Heading level={2}>Changed look over time</Heading>
-                          <Caption as="span">
-                            Yearly representative sets
-                          </Caption>
+                          <Caption as="span">Yearly representative sets</Caption>
                         </div>
                         <div className={styles.visualTimeline}>
                           {lookTimeline.map((entry, index) => (
@@ -649,39 +615,31 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
             {activeCalendarCoverage > 0 ? (
               <section className={`${styles.section} ${styles.sectionWide}`}>
                 <div className={styles.sectionHeader}>
-                  <Heading level={2} as="h2">Archive cadence</Heading>
-                  <Caption as="span">
-                    {formatCoverage(activeCalendarCoverage)}
-                  </Caption>
+                  <Heading level={2} as="h2">
+                    Archive cadence
+                  </Heading>
+                  <Caption as="span">{formatCoverage(activeCalendarCoverage)}</Caption>
                   <Link href="/timeline" className={`${pillStyles.base} ${pillStyles.ghost}`}>
                     <span>Open Timeline</span>
                     <span aria-hidden="true">↗</span>
                   </Link>
                 </div>
                 <div className={styles.cadenceGrid}>
-                  <MiniHistogram
-                    title="Day of week"
-                    data={activeWeekdayStats}
-                  />
-                  <MiniHistogram
-                    title="Month"
-                    data={activeMonthStats}
-                  />
+                  <MiniHistogram title="Day of week" data={activeWeekdayStats} />
+                  <MiniHistogram title="Month" data={activeMonthStats} />
                 </div>
               </section>
             ) : null}
           </StatGroup>
 
-          <StatGroup
-            id="how-you-shoot"
-            title="How you shoot"
-            actions={renderScopeFilterControls()}
-          >
+          <StatGroup id="how-you-shoot" title="How you shoot" actions={renderScopeFilterControls()}>
             {activeTechnicalFacets.map(renderNumericFacet)}
             {stats.technicalRelationships ? (
               <section className={`${styles.section} ${styles.sectionWide}`}>
                 <div className={styles.sectionHeader}>
-                  <Heading level={2} as="h2">Settings relationships</Heading>
+                  <Heading level={2} as="h2">
+                    Settings relationships
+                  </Heading>
                   <Caption as="span">
                     {filteredTechnicalRelationships
                       ? `Based on ${filteredTechnicalRelationships.total.toLocaleString("en")} photos with focal length, aperture, and ISO`
@@ -689,10 +647,7 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
                   </Caption>
                 </div>
                 {filteredTechnicalRelationships ? (
-                  <TechnicalHeatmaps
-                    data={filteredTechnicalRelationships}
-                    layout="tri-grid"
-                  />
+                  <TechnicalHeatmaps data={filteredTechnicalRelationships} layout="tri-grid" />
                 ) : (
                   <Caption size="sm">No data available.</Caption>
                 )}
@@ -723,10 +678,9 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
             }
           >
             <div
-              className={[
-                styles.fullWidthView,
-                locationView === "map" ? "" : styles.hidden,
-              ].join(" ")}
+              className={[styles.fullWidthView, locationView === "map" ? "" : styles.hidden].join(
+                " ",
+              )}
             >
               <StatsWorldMap points={stats.mapPoints} />
             </div>
@@ -741,19 +695,14 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
               </div>
             )}
             <div
-              className={[
-                styles.desktopBarView,
-                locationView === "bars" ? "" : styles.hidden,
-              ].join(" ")}
+              className={[styles.desktopBarView, locationView === "bars" ? "" : styles.hidden].join(
+                " ",
+              )}
             >
-              <div className={styles.stackedBarGroups}>
-                {placeBarFacets.map(renderStringFacet)}
-              </div>
+              <div className={styles.stackedBarGroups}>{placeBarFacets.map(renderStringFacet)}</div>
             </div>
             <div className={styles.mobileOnly}>
-              <div className={styles.stackedBarGroups}>
-                {placeBarFacets.map(renderStringFacet)}
-              </div>
+              <div className={styles.stackedBarGroups}>{placeBarFacets.map(renderStringFacet)}</div>
             </div>
           </StatGroup>
 
@@ -778,24 +727,18 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
               </div>
             )}
             <div
-              className={[
-                styles.desktopBarView,
-                gearView === "bars" ? "" : styles.hidden,
-              ].join(" ")}
+              className={[styles.desktopBarView, gearView === "bars" ? "" : styles.hidden].join(
+                " ",
+              )}
             >
-              <div className={styles.stackedBarGroups}>
-                {gearFacets.map(renderStringFacet)}
-              </div>
+              <div className={styles.stackedBarGroups}>{gearFacets.map(renderStringFacet)}</div>
             </div>
             <div className={styles.mobileOnly}>
-              <div className={styles.stackedBarGroups}>
-                {gearFacets.map(renderStringFacet)}
-              </div>
+              <div className={styles.stackedBarGroups}>{gearFacets.map(renderStringFacet)}</div>
             </div>
           </StatGroup>
 
           <ExploreColourSection stats={stats} />
-
         </div>
       </main>
       <Footer />

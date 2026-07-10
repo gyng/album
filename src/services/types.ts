@@ -143,10 +143,7 @@ export interface IBlock {
 }
 
 export type Block = PhotoBlock | TextBlock | VideoBlock;
-export type SerializedBlock =
-  | SerializedPhotoBlock
-  | SerializedTextBlock
-  | SerializedVideoBlock;
+export type SerializedBlock = SerializedPhotoBlock | SerializedTextBlock | SerializedVideoBlock;
 
 export type Content = {
   name: string;

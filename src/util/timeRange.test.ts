@@ -67,10 +67,7 @@ describe("computeDateExtent", () => {
   });
 
   it("returns null when all dates are identical", () => {
-    const entries = [
-      { date: "2024-06-01T00:00:00Z" },
-      { date: "2024-06-01T00:00:00Z" },
-    ];
+    const entries = [{ date: "2024-06-01T00:00:00Z" }, { date: "2024-06-01T00:00:00Z" }];
     expect(computeDateExtent(entries)).toBeNull();
   });
 });
@@ -135,17 +132,13 @@ describe("positionToMs / msToPosition", () => {
 
 describe("formatRangeDate", () => {
   it("formats epoch ms as YYYY-MM-DD", () => {
-    expect(formatRangeDate(new Date("2024-03-22T10:00:00Z").valueOf())).toBe(
-      "2024-03-22",
-    );
+    expect(formatRangeDate(new Date("2024-03-22T10:00:00Z").valueOf())).toBe("2024-03-22");
   });
 });
 
 describe("formatDisplayDate", () => {
   it("formats epoch ms as human-readable date", () => {
-    const result = formatDisplayDate(
-      new Date("2024-03-22T00:00:00Z").valueOf(),
-    );
+    const result = formatDisplayDate(new Date("2024-03-22T00:00:00Z").valueOf());
     expect(result).toBe("22 Mar 2024");
   });
 });

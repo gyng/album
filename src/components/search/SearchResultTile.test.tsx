@@ -56,14 +56,9 @@ describe("SearchResultTile", () => {
       />,
     );
 
-    fireEvent.click(
-      screen.getByRole("button", { name: /find similar photos/i }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: /find similar photos/i }));
 
-    expect(onFindSimilar).toHaveBeenCalledWith(
-      "../albums/test-simple/DSCF0593.jpg",
-      0.7128,
-    );
+    expect(onFindSimilar).toHaveBeenCalledWith("../albums/test-simple/DSCF0593.jpg", 0.7128);
   });
 
   it("calls onSearchByColor when the photo color button is clicked", () => {
@@ -79,9 +74,7 @@ describe("SearchResultTile", () => {
       />,
     );
 
-    fireEvent.click(
-      screen.getByRole("button", { name: /use this photo's colour/i }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: /use this photo's colour/i }));
 
     expect(onSearchByColor).toHaveBeenCalledWith([12, 34, 56]);
   });
@@ -99,8 +92,7 @@ describe("SearchResultTile", () => {
     );
 
     expect(
-      screen.getByRole("button", { name: /use this photo's colour/i })
-        .parentElement!.className,
+      screen.getByRole("button", { name: /use this photo's colour/i }).parentElement!.className,
     ).toContain("actionButtonsPersistent");
   });
 
@@ -128,9 +120,7 @@ describe("SearchResultTile", () => {
       />,
     );
 
-    expect(screen.getByText("86%").getAttribute("title")).toBe(
-      "Colour match score 86%",
-    );
+    expect(screen.getByText("86%").getAttribute("title")).toBe("Colour match score 86%");
   });
 
   it("shows the semantic percentage (not a colour percentage) when both a cosine score and a colour swatch are present", () => {

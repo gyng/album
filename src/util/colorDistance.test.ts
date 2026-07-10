@@ -69,15 +69,18 @@ describe("minColorDistance", () => {
     const toFirst = deltaE(rgbToLab(...query), rgbToLab(...palette[0]));
     expect(closest).toBeLessThan(toFirst);
     // The closest entry drives the distance.
-    expect(closest).toBeCloseTo(
-      deltaE(rgbToLab(...query), rgbToLab(...palette[1])),
-      5,
-    );
+    expect(closest).toBeCloseTo(deltaE(rgbToLab(...query), rgbToLab(...palette[1])), 5);
   });
 
   it("is zero for an identical colour present in the palette", () => {
-    expect(minColorDistance([10, 20, 30], [[200, 200, 200], [10, 20, 30]])).toBe(
-      0,
-    );
+    expect(
+      minColorDistance(
+        [10, 20, 30],
+        [
+          [200, 200, 200],
+          [10, 20, 30],
+        ],
+      ),
+    ).toBe(0);
   });
 });

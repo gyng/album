@@ -27,12 +27,7 @@ export const SearchActiveFilters = ({
   onRemoveTerm: (term: string) => void;
   onRemoveFacet: (selection: SearchFacetSelection) => void;
 }) => {
-  if (
-    !imageQuery &&
-    !colour &&
-    searchTerms.length === 0 &&
-    selectedFacets.length === 0
-  ) {
+  if (!imageQuery && !colour && searchTerms.length === 0 && selectedFacets.length === 0) {
     return null;
   }
 
@@ -54,11 +49,7 @@ export const SearchActiveFilters = ({
               alt=""
               aria-hidden="true"
             />
-            <span>
-              {imageQuery.source === "drawing"
-                ? "Drawn sketch"
-                : "Uploaded image"}
-            </span>
+            <span>{imageQuery.source === "drawing" ? "Drawn sketch" : "Uploaded image"}</span>
             <span aria-hidden="true">×</span>
             <span
               className={styles.activeFacetImageZoom}

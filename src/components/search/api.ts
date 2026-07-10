@@ -35,10 +35,7 @@ export type PaginatedSearchResult = {
 type SearchDatabase = Database;
 
 const isMissingEmbeddingsTableError = (err: unknown): boolean => {
-  return (
-    err instanceof Error &&
-    err.message.toLowerCase().includes("no such table: embeddings")
-  );
+  return err instanceof Error && err.message.toLowerCase().includes("no such table: embeddings");
 };
 
 type EmbeddingVector = number[] | Float32Array;
@@ -272,9 +269,7 @@ const buildSingleFacetClause = (
   hasGeocodeColumns: boolean,
 ): { sql: string; bind: (string | number)[] } | null => {
   if (selection.facetId === HOUR_FACET.id) {
-    const bucket = HOUR_FACET.buckets.find(
-      (candidate) => candidate.label === selection.value,
-    );
+    const bucket = HOUR_FACET.buckets.find((candidate) => candidate.label === selection.value);
     const [min, max] = bucket?.range ?? [];
     if (min == null || max == null) {
       return null;
@@ -286,13 +281,9 @@ const buildSingleFacetClause = (
     };
   }
 
-  const numericFacet = SEARCHABLE_NUMERIC_FACETS.find(
-    (facet) => facet.id === selection.facetId,
-  );
+  const numericFacet = SEARCHABLE_NUMERIC_FACETS.find((facet) => facet.id === selection.facetId);
   if (numericFacet) {
-    const bucket = numericFacet.buckets.find(
-      (candidate) => candidate.label === selection.value,
-    );
+    const bucket = numericFacet.buckets.find((candidate) => candidate.label === selection.value);
     const fieldSql = FACET_FIELD_SQL_BY_ID[selection.facetId];
     if (!bucket?.range || !fieldSql) {
       return null;
@@ -349,9 +340,7 @@ const buildSingleFacetClause = (
     return { sql: `(${clauses.join(" OR ")})`, bind };
   }
 
-  const stringFacet = SEARCHABLE_STRING_FACETS.find(
-    (facet) => facet.id === selection.facetId,
-  );
+  const stringFacet = SEARCHABLE_STRING_FACETS.find((facet) => facet.id === selection.facetId);
   if (stringFacet) {
     return { sql: `images.exif LIKE ?`, bind: [`%${selection.value}%`] };
   }
@@ -379,9 +368,7 @@ const buildFacetWhereClause = (
     .map((group) => {
       const resolved = group
         .map((selection) => buildSingleFacetClause(selection, hasGeocodeColumns))
-        .filter((value): value is { sql: string; bind: (string | number)[] } =>
-          Boolean(value),
-        );
+        .filter((value): value is { sql: string; bind: (string | number)[] } => Boolean(value));
       if (resolved.length === 0) {
         return null;
       }
@@ -400,9 +387,7 @@ const buildFacetWhereClause = (
 
 const buildKeywordWhereClause = (activeTerms: string[]) => {
   const normalizedActiveTerms = Array.from(
-    new Set(
-      activeTerms.map((term) => term.trim().toLowerCase()).filter(Boolean),
-    ),
+    new Set(activeTerms.map((term) => term.trim().toLowerCase()).filter(Boolean)),
   );
 
   return {
@@ -419,7 +404,7 @@ const buildKeywordWhereClause = (activeTerms: string[]) => {
 // emitting tuple fragments. `path`/`album_relative_path` are file paths, not
 // content. `geocode` is intentionally left searchable — place names live there.
 const toFtsMatchTerm = (term: string): string => {
-  return `- {path album_relative_path exif colors} : "${term.replaceAll(/[\"]/g, "'")}"`;
+  return `- {path album_relative_path exif colors} : "${term.replaceAll(/["]/g, "'")}"`;
 };
 
 const exec = async (
@@ -445,27 +430,19 @@ const exec = async (
       },
     });
   } catch (err) {
-    if (
-      !(
-        options?.suppressMissingEmbeddingsTableError &&
-        isMissingEmbeddingsTableError(err)
-      )
-    ) {
+    if (!(options?.suppressMissingEmbeddingsTableError && isMissingEmbeddingsTableError(err))) {
       console.error(`Bad query ${options?.query} ${options?.page}`, err);
     }
     throw err;
   }
 
   const prev =
-    typeof options?.page !== "number" || options.page <= 0
-      ? undefined
-      : options.page - 1;
+    typeof options?.page !== "number" || options.page <= 0 ? undefined : options.page - 1;
   // Use a typeof check so page 0 (falsy) still advertises a next page when the
   // result set fills the page. Offset paging can't know if it's the exact-final
   // page, so a following page of 0 rows resolves `next` to undefined then.
   const next =
-    typeof options?.page === "number" &&
-    accumulator.length === options.pageSize
+    typeof options?.page === "number" && accumulator.length === options.pageSize
       ? options.page + 1
       : undefined;
 
@@ -509,10 +486,7 @@ const mapImageRows = (rows: any[][]): SearchResultRow[] => {
   });
 };
 
-const cosineSimilarity = (
-  left: ArrayLike<number>,
-  right: ArrayLike<number>,
-): number => {
+const cosineSimilarity = (left: ArrayLike<number>, right: ArrayLike<number>): number => {
   if (left.length === 0 || left.length !== right.length) {
     return 0;
   }
@@ -565,7 +539,10 @@ const fetchKeywordRanking = async (opts: {
   query: string;
 }): Promise<RankedKeywordResult[]> => {
   const { database, query } = opts;
-  const queries = query.split("|").map((term) => term.trim()).filter(Boolean);
+  const queries = query
+    .split("|")
+    .map((term) => term.trim())
+    .filter(Boolean);
 
   if (queries.length === 0) {
     return [];
@@ -651,10 +628,7 @@ const fetchFacetMatchedPaths = async (
   database: Database,
   selectedFacets: SearchFacetSelection[],
 ): Promise<Set<string>> => {
-  const facetWhere = buildFacetWhereClause(
-    selectedFacets,
-    hasStructuredGeocode(database),
-  );
+  const facetWhere = buildFacetWhereClause(selectedFacets, hasStructuredGeocode(database));
   if (!facetWhere.sql) {
     return new Set();
   }
@@ -668,9 +642,7 @@ const fetchFacetMatchedPaths = async (
     facetWhere.bind,
   );
 
-  return new Set(
-    (result.data as unknown as any[][]).map((row) => String(row[0])),
-  );
+  return new Set((result.data as unknown as any[][]).map((row) => String(row[0])));
 };
 
 const fetchColorMatchedResults = async (opts: {
@@ -679,16 +651,8 @@ const fetchColorMatchedResults = async (opts: {
   maxDistance?: number;
   selectedFacets?: SearchFacetSelection[];
 }): Promise<RankedColorResult[]> => {
-  const {
-    database,
-    color,
-    maxDistance = 100,
-    selectedFacets = [],
-  } = opts;
-  const facetWhere = buildFacetWhereClause(
-    selectedFacets,
-    hasStructuredGeocode(database),
-  );
+  const { database, color, maxDistance = 100, selectedFacets = [] } = opts;
+  const facetWhere = buildFacetWhereClause(selectedFacets, hasStructuredGeocode(database));
   const lightRows = await exec(
     database,
     `SELECT images.path, images.colors FROM images
@@ -708,11 +672,7 @@ const fetchColorMatchedResults = async (opts: {
     let bestScore = Infinity;
     let bestRawDist = Infinity;
     let closestRawDist = Infinity;
-    let matchingColor: [number, number, number] = palette[0] as [
-      number,
-      number,
-      number,
-    ];
+    let matchingColor: [number, number, number] = palette[0] as [number, number, number];
 
     for (let i = 0; i < palette.length; i++) {
       const rgb = palette[i] as [number, number, number];
@@ -782,87 +742,85 @@ export const fetchSearchFacetSections = async (opts: {
     }));
   };
 
-  const numericSections = await Promise.all(SEARCHABLE_NUMERIC_FACETS.map(async (facet) => {
-    const items = await fetchFacetItems(facet.id);
-    const counts = new Map(facet.buckets.map((bucket) => [bucket.label, 0]));
+  const numericSections = await Promise.all(
+    SEARCHABLE_NUMERIC_FACETS.map(async (facet) => {
+      const items = await fetchFacetItems(facet.id);
+      const counts = new Map(facet.buckets.map((bucket) => [bucket.label, 0]));
 
-    items.forEach((item) => {
-      const value = facet.extract(item.exif) ?? null;
-      if (value == null) {
-        return;
-      }
+      items.forEach((item) => {
+        const value = facet.extract(item.exif) ?? null;
+        if (value == null) {
+          return;
+        }
 
-      const bucket = facet.buckets.find((candidate) => candidate.match(value));
-      if (!bucket) {
-        return;
-      }
+        const bucket = facet.buckets.find((candidate) => candidate.match(value));
+        if (!bucket) {
+          return;
+        }
 
-      counts.set(bucket.label, (counts.get(bucket.label) ?? 0) + 1);
-    });
+        counts.set(bucket.label, (counts.get(bucket.label) ?? 0) + 1);
+      });
 
-    return {
-      facetId: facet.id,
-      displayName: facet.displayName,
-      options: facet.buckets
-        .map((bucket) => ({
-          value: bucket.label,
-          count: counts.get(bucket.label) ?? 0,
-        }))
-        .filter((option) => option.count > 0),
-    };
-  }));
-
-  const stringSections = await Promise.all(SEARCHABLE_STRING_FACETS.map(async (facet) => {
-    const items = await fetchFacetItems(facet.id);
-    const counts = new Map<string, number>();
-
-    items.forEach((item) => {
-      const value =
-        facet.id === YEAR_FACET.id
-          ? item.normalizedDate?.slice(0, 4) ?? null
-          : facet.id === LOCATION_FACET.id
-          ? (useGeoColumns ? item.geoCountry : getGeocodeCountry(item.geocode)) ??
-            null
-          : facet.id === REGION_FACET.id
-            ? (useGeoColumns ? item.geoRegion : getGeocodeRegion(item.geocode)) ??
-              null
-            : facet.id === SUBREGION_FACET.id
-              ? (useGeoColumns
-                  ? item.geoSubregion
-                  : getGeocodeSubregion(item.geocode)) ?? null
-          : facet.id === CITY_FACET.id
-            ? (useGeoColumns ? item.geoCity : getGeocodeCity(item.geocode)) ??
-              null
-            : facet.extract(item.exif) ?? null;
-      if (!value) {
-        return;
-      }
-
-      counts.set(value, (counts.get(value) ?? 0) + 1);
-    });
-
-    return {
-      facetId: facet.id,
-      displayName: facet.displayName,
-      options: Array.from(counts.entries())
-        .map(([value, count]) => ({ value, count }))
-        .sort((left, right) => {
-          if (facet.id === YEAR_FACET.id) {
-            return Number(right.value) - Number(left.value);
-          }
-
-          if (right.count !== left.count) {
-            return right.count - left.count;
-          }
-          return left.value.localeCompare(right.value);
-        })
-        .slice(0, facet.id === YEAR_FACET.id ? 20 : 12),
-    };
-  }));
-
-  return [...numericSections, ...stringSections].filter(
-    (section) => section.options.length > 0,
+      return {
+        facetId: facet.id,
+        displayName: facet.displayName,
+        options: facet.buckets
+          .map((bucket) => ({
+            value: bucket.label,
+            count: counts.get(bucket.label) ?? 0,
+          }))
+          .filter((option) => option.count > 0),
+      };
+    }),
   );
+
+  const stringSections = await Promise.all(
+    SEARCHABLE_STRING_FACETS.map(async (facet) => {
+      const items = await fetchFacetItems(facet.id);
+      const counts = new Map<string, number>();
+
+      items.forEach((item) => {
+        const value =
+          facet.id === YEAR_FACET.id
+            ? (item.normalizedDate?.slice(0, 4) ?? null)
+            : facet.id === LOCATION_FACET.id
+              ? ((useGeoColumns ? item.geoCountry : getGeocodeCountry(item.geocode)) ?? null)
+              : facet.id === REGION_FACET.id
+                ? ((useGeoColumns ? item.geoRegion : getGeocodeRegion(item.geocode)) ?? null)
+                : facet.id === SUBREGION_FACET.id
+                  ? ((useGeoColumns ? item.geoSubregion : getGeocodeSubregion(item.geocode)) ??
+                    null)
+                  : facet.id === CITY_FACET.id
+                    ? ((useGeoColumns ? item.geoCity : getGeocodeCity(item.geocode)) ?? null)
+                    : (facet.extract(item.exif) ?? null);
+        if (!value) {
+          return;
+        }
+
+        counts.set(value, (counts.get(value) ?? 0) + 1);
+      });
+
+      return {
+        facetId: facet.id,
+        displayName: facet.displayName,
+        options: Array.from(counts.entries())
+          .map(([value, count]) => ({ value, count }))
+          .sort((left, right) => {
+            if (facet.id === YEAR_FACET.id) {
+              return Number(right.value) - Number(left.value);
+            }
+
+            if (right.count !== left.count) {
+              return right.count - left.count;
+            }
+            return left.value.localeCompare(right.value);
+          })
+          .slice(0, facet.id === YEAR_FACET.id ? 20 : 12),
+      };
+    }),
+  );
+
+  return [...numericSections, ...stringSections].filter((section) => section.options.length > 0);
 };
 
 // The embeddings table exists in two on-disk formats: int8 blobs with a
@@ -870,19 +828,12 @@ export const fetchSearchFacetSections = async (opts: {
 // change, which can outlive a deploy in caches). Detect per query — the table
 // can also appear mid-session when the lazily-downloaded embeddings DB swaps
 // in over the core DB.
-const embeddingsTableHasBlobColumn = async (
-  database: SearchDatabase,
-): Promise<boolean> => {
+const embeddingsTableHasBlobColumn = async (database: SearchDatabase): Promise<boolean> => {
   const result = await exec(database, "PRAGMA table_info(embeddings)", []);
-  return (result.data as unknown as any[][]).some(
-    (row) => String(row[1]) === "embedding_blob",
-  );
+  return (result.data as unknown as any[][]).some((row) => String(row[1]) === "embedding_blob");
 };
 
-const decodeEmbeddingRow = (
-  row: any[],
-  hasBlobColumn: boolean,
-): EmbeddingRow | null => {
+const decodeEmbeddingRow = (row: any[], hasBlobColumn: boolean): EmbeddingRow | null => {
   if (hasBlobColumn) {
     return {
       path: row[0],
@@ -1080,26 +1031,14 @@ export const fetchRefinementTagCounts = async (opts: {
   candidateTags: string[];
   selectedFacets?: SearchFacetSelection[];
 }): Promise<Record<string, number>> => {
-  const {
-    database,
-    activeTerms,
-    candidateTags,
-    selectedFacets = [],
-  } = opts;
+  const { database, activeTerms, candidateTags, selectedFacets = [] } = opts;
   const normalizedActiveTerms = Array.from(
-    new Set(
-      activeTerms.map((term) => term.trim().toLowerCase()).filter(Boolean),
-    ),
+    new Set(activeTerms.map((term) => term.trim().toLowerCase()).filter(Boolean)),
   );
   const normalizedCandidateTags = Array.from(
-    new Set(
-      candidateTags.map((tag) => tag.trim().toLowerCase()).filter(Boolean),
-    ),
+    new Set(candidateTags.map((tag) => tag.trim().toLowerCase()).filter(Boolean)),
   ).filter((tag) => !normalizedActiveTerms.includes(tag));
-  const facetWhere = buildFacetWhereClause(
-    selectedFacets,
-    hasStructuredGeocode(database),
-  );
+  const facetWhere = buildFacetWhereClause(selectedFacets, hasStructuredGeocode(database));
 
   if (normalizedCandidateTags.length === 0) {
     return {};
@@ -1115,10 +1054,7 @@ export const fetchRefinementTagCounts = async (opts: {
   for (let idx = 0; idx < normalizedCandidateTags.length; idx += batchSize) {
     const batch = normalizedCandidateTags.slice(idx, idx + batchSize);
     const whereClause = [
-      ...Array.from(
-        { length: normalizedActiveTerms.length + 1 },
-        () => "images MATCH ?",
-      ),
+      ...Array.from({ length: normalizedActiveTerms.length + 1 }, () => "images MATCH ?"),
       ...(facetWhere.sql ? [facetWhere.sql] : []),
     ].join(" AND ");
     const sql = batch
@@ -1141,9 +1077,7 @@ export const fetchRefinementTagCounts = async (opts: {
     }
 
     const result = await exec(database, sql, bind);
-    for (const [tag, count] of result.data as unknown as Array<
-      [string, number]
-    >) {
+    for (const [tag, count] of result.data as unknown as Array<[string, number]>) {
       counts[String(tag)] = Number(count);
     }
   }
@@ -1219,12 +1153,7 @@ export const fetchSimilarResults = async (opts: {
           : page <= 0
             ? undefined
             : page - 1,
-      next:
-        rankedPaths.length > end
-          ? typeof offset === "number"
-            ? end
-            : page + 1
-          : undefined,
+      next: rankedPaths.length > end ? (typeof offset === "number" ? end : page + 1) : undefined,
       query: path,
     };
   } catch (err) {
@@ -1245,14 +1174,7 @@ export const fetchColorSimilarResults = async (opts: {
   maxDistance?: number;
   selectedFacets?: SearchFacetSelection[];
 }): Promise<PaginatedSearchResult> => {
-  const {
-    database,
-    color,
-    page,
-    pageSize,
-    maxDistance = 100,
-    selectedFacets = [],
-  } = opts;
+  const { database, color, page, pageSize, maxDistance = 100, selectedFacets = [] } = opts;
   try {
     const ranked = await fetchColorMatchedResults({
       database,
@@ -1342,12 +1264,8 @@ export const fetchSemanticResults = async (opts: {
       : null;
     const allowedPaths =
       facetAllowedPaths && colorAllowedPaths
-        ? new Set(
-            Array.from(facetAllowedPaths).filter((path) =>
-              colorAllowedPaths.has(path),
-            ),
-          )
-        : facetAllowedPaths ?? colorAllowedPaths;
+        ? new Set(Array.from(facetAllowedPaths).filter((path) => colorAllowedPaths.has(path)))
+        : (facetAllowedPaths ?? colorAllowedPaths);
     const rankedPaths = await rankEmbeddingsByVector({
       database: vectorDatabase,
       queryVector: textVector,
@@ -1356,10 +1274,7 @@ export const fetchSemanticResults = async (opts: {
     const filteredRankedPaths = allowedPaths
       ? rankedPaths.filter((candidate) => allowedPaths.has(candidate.path))
       : rankedPaths;
-    const pageSlice = filteredRankedPaths.slice(
-      page * pageSize,
-      (page + 1) * pageSize,
-    );
+    const pageSlice = filteredRankedPaths.slice(page * pageSize, (page + 1) * pageSize);
     const details = await fetchResultsByPaths(
       database,
       pageSlice.map((candidate) => candidate.path),
@@ -1384,10 +1299,7 @@ export const fetchSemanticResults = async (opts: {
     return {
       data: resolvedRows,
       prev: page <= 0 ? undefined : page - 1,
-      next:
-        filteredRankedPaths.length > (page + 1) * pageSize
-          ? page + 1
-          : undefined,
+      next: filteredRankedPaths.length > (page + 1) * pageSize ? page + 1 : undefined,
       query: textQuery,
     };
   } catch (err) {
@@ -1450,12 +1362,8 @@ export const fetchHybridResults = async (opts: {
       : null;
     const allowedPaths =
       facetAllowedPaths && colorAllowedPaths
-        ? new Set(
-            Array.from(facetAllowedPaths).filter((path) =>
-              colorAllowedPaths.has(path),
-            ),
-          )
-        : facetAllowedPaths ?? colorAllowedPaths;
+        ? new Set(Array.from(facetAllowedPaths).filter((path) => colorAllowedPaths.has(path)))
+        : (facetAllowedPaths ?? colorAllowedPaths);
     const [keywordResults, vectorResults] = await Promise.all([
       fetchKeywordRanking({ database, query: keywordQuery }),
       rankEmbeddingsByVector({
@@ -1506,10 +1414,7 @@ export const fetchHybridResults = async (opts: {
     return {
       data: resolvedRows,
       prev: page <= 0 ? undefined : page - 1,
-      next:
-        filteredResults.length > (page + 1) * pageSize
-          ? page + 1
-          : undefined,
+      next: filteredResults.length > (page + 1) * pageSize ? page + 1 : undefined,
       query: textQuery,
     };
   } catch (err) {
@@ -1611,11 +1516,7 @@ export const fetchMemoryCandidates = async (opts: {
       return {
         ...(resolved as SearchResultRow),
         isoDate,
-        snippet:
-          resolved.alt_text ||
-          resolved.subject ||
-          resolved.tags ||
-          resolved.filename,
+        snippet: resolved.alt_text || resolved.subject || resolved.tags || resolved.filename,
       };
     });
   } catch (err) {
@@ -1633,8 +1534,7 @@ export const fetchRandomResults = async (opts: {
 
   try {
     const placeholders = excludePaths.map(() => "?").join(", ");
-    const whereClause =
-      excludePaths.length > 0 ? `WHERE path NOT IN (${placeholders})` : "";
+    const whereClause = excludePaths.length > 0 ? `WHERE path NOT IN (${placeholders})` : "";
     const randomResults = await exec(
       database,
       `SELECT ${IMAGE_COLUMN_SELECTS.join(", ")}

@@ -7,14 +7,7 @@ const exifr = require("exifr");
 const sqlite3 = require("sqlite3");
 
 const PHOTO_EXTENSIONS = new Set([".jpg", ".jpeg"]);
-const VIDEO_EXTENSIONS = new Set([
-  ".mp4",
-  ".mov",
-  ".m4v",
-  ".webm",
-  ".mkv",
-  ".avi",
-]);
+const VIDEO_EXTENSIONS = new Set([".mp4", ".mov", ".m4v", ".webm", ".mkv", ".avi"]);
 const ALBUM_CONFIG_FILENAME = "album.json";
 const REPORT_FILENAME = ".publish-report.json";
 const VERCEL_CLI = "npx --yes vercel@latest";
@@ -32,14 +25,11 @@ const ANSI = {
 
 const toPosixPath = (value) => value.split(path.sep).join("/");
 
-const isPhotoFile = (filename) =>
-  PHOTO_EXTENSIONS.has(path.extname(filename).toLowerCase());
+const isPhotoFile = (filename) => PHOTO_EXTENSIONS.has(path.extname(filename).toLowerCase());
 
-const isVideoFile = (filename) =>
-  VIDEO_EXTENSIONS.has(path.extname(filename).toLowerCase());
+const isVideoFile = (filename) => VIDEO_EXTENSIONS.has(path.extname(filename).toLowerCase());
 
-const isZoneIdentifierFile = (filename) =>
-  filename.toLowerCase().includes(":zone.identifier");
+const isZoneIdentifierFile = (filename) => filename.toLowerCase().includes(":zone.identifier");
 
 const fileExists = (filePath) => {
   try {
@@ -150,9 +140,10 @@ const buildPreflightInsights = (report) => {
 
   if (report.db.staleEmbeddingCount > 0) {
     const oldModels = (report.db.staleEmbeddingModelIds ?? []).join(", ") || "unknown";
-    const newModels = (report.db.expectedEmbeddingModelIds ?? []).join(", ")
-      || report.db.currentEmbeddingModelId
-      || "unknown";
+    const newModels =
+      (report.db.expectedEmbeddingModelIds ?? []).join(", ") ||
+      report.db.currentEmbeddingModelId ||
+      "unknown";
     lines.push({
       level: "warn",
       text: `Embedding model changed: ${oldModels} → ${newModels}. ${formatNumber(report.db.staleEmbeddingCount)} photo(s) will be re-embedded — this run will take significantly longer than usual.`,
@@ -213,7 +204,8 @@ const buildAttentionAlbums = (report) => {
         album.blockers.length > 0,
     )
     .sort((left, right) => {
-      const leftScore = left.blockers.length * 100 + left.warnings.length * 10 + left.newPhotos.length;
+      const leftScore =
+        left.blockers.length * 100 + left.warnings.length * 10 + left.newPhotos.length;
       const rightScore =
         right.blockers.length * 100 + right.warnings.length * 10 + right.newPhotos.length;
       return rightScore - leftScore;
@@ -340,7 +332,10 @@ const nonEmpty = (value) => {
 
 const splitLines = (text) =>
   typeof text === "string"
-    ? text.split("\n").map((line) => line.trim()).filter(Boolean)
+    ? text
+        .split("\n")
+        .map((line) => line.trim())
+        .filter(Boolean)
     : [];
 
 const shortSha = (sha) => (typeof sha === "string" ? sha.slice(0, 7) : null);
@@ -490,11 +485,25 @@ const resolveDeploymentDelta = async ({
     changedFiles = Array.from(new Set([...splitLines(tracked), ...splitLines(untracked)]));
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    return { ...base, deployedSha, headSha, reason: `git diff against ${shortSha(deployedSha)} failed (${message})` };
+    return {
+      ...base,
+      deployedSha,
+      headSha,
+      reason: `git diff against ${shortSha(deployedSha)} failed (${message})`,
+    };
   }
 
   const { kind, codeFiles, dataFiles } = classifyPublishDelta({ deployedSha, changedFiles });
-  return { deployedSha, headSha, changedFiles, codeFiles, dataFiles, kind, reason: null, versionUrl };
+  return {
+    deployedSha,
+    headSha,
+    changedFiles,
+    codeFiles,
+    dataFiles,
+    kind,
+    reason: null,
+    versionUrl,
+  };
 };
 
 const resolveExecutionPlan = async ({ args, report }) => {
@@ -623,7 +632,10 @@ const loadEmbeddingsFromDb = async (embeddingsDbPath) => {
       hasEmbeddingsTable: true,
       embeddingsCount: embeddingsCountRow?.count ?? 0,
       indexedEmbeddingPaths: new Set(embeddingRows.map((row) => row.path)),
-      embeddingModelCounts: embeddingModelRows.map((row) => ({ modelId: row.model_id, count: row.count })),
+      embeddingModelCounts: embeddingModelRows.map((row) => ({
+        modelId: row.model_id,
+        count: row.count,
+      })),
     };
   } finally {
     await dbClose(db);
@@ -652,9 +664,7 @@ const loadDbState = async (dbPath, embeddingsDbPath = null) => {
     );
     const imageRows = await dbAll(db, "SELECT path FROM images");
     const hasEmbeddingsTable = Boolean(tableRow);
-    const embeddingRows = hasEmbeddingsTable
-      ? await dbAll(db, "SELECT path FROM embeddings")
-      : [];
+    const embeddingRows = hasEmbeddingsTable ? await dbAll(db, "SELECT path FROM embeddings") : [];
     const embeddingsCountRow = hasEmbeddingsTable
       ? await dbGet(db, "SELECT COUNT(*) AS count FROM embeddings")
       : { count: 0 };
@@ -670,7 +680,10 @@ const loadDbState = async (dbPath, embeddingsDbPath = null) => {
       indexedPhotoPaths: new Set(imageRows.map((row) => row.path)),
       indexedEmbeddingPaths: new Set(embeddingRows.map((row) => row.path)),
       hasEmbeddingsTable,
-      embeddingModelCounts: embeddingModelRows.map((row) => ({ modelId: row.model_id, count: row.count })),
+      embeddingModelCounts: embeddingModelRows.map((row) => ({
+        modelId: row.model_id,
+        count: row.count,
+      })),
     };
 
     if (!hasEmbeddingsTable && embeddingsDbPath && fileExists(embeddingsDbPath)) {
@@ -760,11 +773,7 @@ const extractPhotoMetadata = async (filePath) => {
   }
 };
 
-const buildIndexVerification = ({
-  discoveredPhotoPaths,
-  newPhotoPaths,
-  dbState,
-}) => {
+const buildIndexVerification = ({ discoveredPhotoPaths, newPhotoPaths, dbState }) => {
   const missingPhotoPaths = discoveredPhotoPaths.filter(
     (photoPath) => !dbState.indexedPhotoPaths.has(photoPath),
   );
@@ -782,7 +791,9 @@ const buildIndexVerification = ({
     blockers.push("search.sqlite is missing after indexing");
   }
   if (missingPhotoPaths.length > 0) {
-    blockers.push(`${missingPhotoPaths.length} discovered photos are missing from the images table`);
+    blockers.push(
+      `${missingPhotoPaths.length} discovered photos are missing from the images table`,
+    );
   }
   if (dbState.hasEmbeddingsTable && missingEmbeddingPaths.length > 0) {
     warnings.push(`${missingEmbeddingPaths.length} newly discovered photos are missing embeddings`);
@@ -804,7 +815,8 @@ const buildIndexVerification = ({
     indexedCoveragePercent:
       discoveredPhotoPaths.length === 0
         ? 100
-        : ((discoveredPhotoPaths.length - missingPhotoPaths.length) / discoveredPhotoPaths.length) * 100,
+        : ((discoveredPhotoPaths.length - missingPhotoPaths.length) / discoveredPhotoPaths.length) *
+          100,
     newPhotoCoveragePercent:
       newPhotoPaths.length === 0
         ? 100
@@ -1017,31 +1029,33 @@ const createPreflightReport = async ({
 
   const modelInfo = indexDir ? getIndexerModelInfo(indexDir) : null;
   const expectedEmbeddingModelIds =
-    modelInfo?.embeddingModelIds
-    ?? (modelInfo?.embeddingModelId ? [modelInfo.embeddingModelId] : []);
+    modelInfo?.embeddingModelIds ??
+    (modelInfo?.embeddingModelId ? [modelInfo.embeddingModelId] : []);
   const currentEmbeddingModelId = modelInfo?.embeddingModelId ?? null;
   // Stale = rows under model IDs the indexer no longer produces. These won't be
   // re-embedded automatically (the indexer skips paths that already have a row
   // under any of its current IDs), so they linger until the DB is rebuilt.
-  const staleModels = expectedEmbeddingModelIds.length > 0
-    ? dbState.embeddingModelCounts.filter((m) => !expectedEmbeddingModelIds.includes(m.modelId))
-    : [];
+  const staleModels =
+    expectedEmbeddingModelIds.length > 0
+      ? dbState.embeddingModelCounts.filter((m) => !expectedEmbeddingModelIds.includes(m.modelId))
+      : [];
   const staleEmbeddingCount = staleModels.reduce((sum, m) => sum + m.count, 0);
   const staleEmbeddingModelIds = staleModels.map((m) => m.modelId);
   // Missing = photos that don't have full coverage across every expected model.
   // Take the min count across the expected set — if any expected model is
   // absent from the DB its count is 0, so missing == imageCount.
-  const missingEmbeddingCount = expectedEmbeddingModelIds.length > 0
-    ? Math.max(
-        0,
-        dbState.imageCount
-          - Math.min(
+  const missingEmbeddingCount =
+    expectedEmbeddingModelIds.length > 0
+      ? Math.max(
+          0,
+          dbState.imageCount -
+            Math.min(
               ...expectedEmbeddingModelIds.map(
                 (id) => dbState.embeddingModelCounts.find((m) => m.modelId === id)?.count ?? 0,
               ),
             ),
-      )
-    : 0;
+        )
+      : 0;
   const unexpectedEmbeddingModels = staleModels;
 
   const deployment = repoDir
@@ -1119,9 +1133,7 @@ const runShellCommand = ({ command, cwd }) => {
     child.on("exit", (code) => {
       if (code === 0) {
         const elapsedSeconds = ((Date.now() - startedAt) / 1000).toFixed(1);
-        console.log(
-          `[${wallClockStamp()}] ${statusLabel("ok")} Finished in ${elapsedSeconds}s`
-        );
+        console.log(`[${wallClockStamp()}] ${statusLabel("ok")} Finished in ${elapsedSeconds}s`);
         resolve();
         return;
       }
@@ -1140,7 +1152,11 @@ const printPreflightReport = (report) => {
     { label: "Albums scanned", value: formatNumber(summary.totalAlbums), level: "info" },
     { label: "Photos on disk", value: formatNumber(summary.totalPhotos), level: "info" },
     { label: "Videos on disk", value: formatNumber(summary.totalVideos), level: "info" },
-    { label: "New photos", value: formatNumber(summary.newPhotos), level: summary.newPhotos > 0 ? "warn" : "ok" },
+    {
+      label: "New photos",
+      value: formatNumber(summary.newPhotos),
+      level: summary.newPhotos > 0 ? "warn" : "ok",
+    },
     {
       label: "Removed photos",
       value: formatNumber(summary.removedPhotos),
@@ -1215,7 +1231,9 @@ const printPreflightReport = (report) => {
     }
 
     const level = album.blockers.length > 0 ? "block" : album.warnings.length > 0 ? "warn" : "info";
-    console.log(`  ${statusLabel(level)} ${album.albumName}${parts.length > 0 ? `  (${parts.join(", ")})` : ""}`);
+    console.log(
+      `  ${statusLabel(level)} ${album.albumName}${parts.length > 0 ? `  (${parts.join(", ")})` : ""}`,
+    );
 
     if (album.newPhotos.length > 0) {
       const preview = album.newPhotos.slice(0, 5).map((photo) => {
@@ -1230,7 +1248,9 @@ const printPreflightReport = (report) => {
       });
       printIndentedList(preview);
       if (album.newPhotos.length > preview.length) {
-        printIndentedList([`... ${formatNumber(album.newPhotos.length - preview.length)} more new photo(s)`]);
+        printIndentedList([
+          `... ${formatNumber(album.newPhotos.length - preview.length)} more new photo(s)`,
+        ]);
       }
     }
     if (album.removedPhotos.length > 0) {
@@ -1266,7 +1286,9 @@ const printVerificationReport = (verification) => {
   printInsightLines(buildVerificationInsights(verification));
 
   if (verification.missingNewPhotoPaths.length > 0) {
-    console.log(`  ${statusLabel("block")} Missing new photos in index: ${formatNumber(verification.missingNewPhotoPaths.length)}`);
+    console.log(
+      `  ${statusLabel("block")} Missing new photos in index: ${formatNumber(verification.missingNewPhotoPaths.length)}`,
+    );
     for (const photoPath of verification.missingNewPhotoPaths.slice(0, 10)) {
       console.log(`  ${photoPath}`);
     }
@@ -1307,8 +1329,7 @@ const printExecutionPlan = ({ args, report, plan }) => {
   const indexChanges = hasIndexChanges(report);
 
   const stats = report.lastIndexStats;
-  const indexWorkItems =
-    (report.summary.newPhotos ?? 0) + (report.db.missingEmbeddingCount ?? 0);
+  const indexWorkItems = (report.summary.newPhotos ?? 0) + (report.db.missingEmbeddingCount ?? 0);
   const estimatedIndexSeconds =
     stats?.medianAnalysisMs && indexWorkItems > 0
       ? (indexWorkItems * stats.medianAnalysisMs) / 1000

@@ -8,13 +8,9 @@ export const BlockEl: React.FC<{
 }> = (props) => {
   switch (props.b.kind) {
     case "photo":
-      return (
-        <PhotoBlockEl block={props.b as PhotoBlock} currentIndex={props.i} />
-      );
+      return <PhotoBlockEl block={props.b as PhotoBlock} currentIndex={props.i} />;
     case "text":
-      return (
-        <TextBlockEl block={props.b as TextBlock} currentIndex={props.i} />
-      );
+      return <TextBlockEl block={props.b as TextBlock} currentIndex={props.i} />;
     default:
       return <pre>Unsupported block {JSON.stringify(props.b, null, 2)}</pre>;
   }

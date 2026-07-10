@@ -1,8 +1,6 @@
 import React from "react";
 import Link from "next/link";
-import {
-  BucketedStatGroup,
-} from "../util/computeStats";
+import { BucketedStatGroup } from "../util/computeStats";
 import { ChartTooltip, Heading } from "./ui";
 import styles from "./YearSplitHistogram.module.css";
 
@@ -13,10 +11,7 @@ type Props = {
 };
 
 const getMaxCount = (groups: BucketedStatGroup[]): number =>
-  Math.max(
-    ...groups.flatMap((group) => group.data.map((bucket) => bucket.count)),
-    1,
-  );
+  Math.max(...groups.flatMap((group) => group.data.map((bucket) => bucket.count)), 1);
 
 export const YearSplitHistogram: React.FC<Props> = ({ title, data, getHref }) => {
   const orderedData = data.toReversed();
@@ -86,10 +81,7 @@ export const YearSplitHistogram: React.FC<Props> = ({ title, data, getHref }) =>
               return (
                 <div
                   key={`${group.label}-${bucket.label}`}
-                  className={[
-                    styles.cell,
-                    bucket.count === 0 ? styles.cellEmpty : "",
-                  ].join(" ")}
+                  className={[styles.cell, bucket.count === 0 ? styles.cellEmpty : ""].join(" ")}
                   style={{ ["--intensity" as string]: String(intensity) }}
                   aria-label={`${group.label} ${bucket.label} · ${bucket.count.toLocaleString()} photos`}
                 >

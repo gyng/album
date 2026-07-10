@@ -7,11 +7,7 @@ type Props = {
   className?: string;
 };
 
-export const FacetLinkIcon: React.FC<Props> = ({
-  href,
-  label,
-  className,
-}) => {
+export const FacetLinkIcon: React.FC<Props> = ({ href, label, className }) => {
   return (
     <Link
       href={href}

@@ -73,7 +73,9 @@
   cursor: grab;
   touch-action: none;
   z-index: 1;
-  transition: opacity 0.15s, transform 0.1s;
+  transition:
+    opacity 0.15s,
+    transform 0.1s;
 }
 
 .thumb:active {

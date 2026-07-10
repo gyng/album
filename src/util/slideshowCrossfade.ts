@@ -29,9 +29,7 @@ export type CrossfadeLayer = {
 export const buildSlideSnapshot = (
   cells: ReadonlyArray<SlideCell | null | undefined>,
 ): SlideSnapshot | null => {
-  const valid = cells.filter(
-    (cell): cell is SlideCell => Boolean(cell && cell.src),
-  );
+  const valid = cells.filter((cell): cell is SlideCell => Boolean(cell && cell.src));
   if (valid.length === 0) return null;
   return { remix: valid.length > 1, cells: valid };
 };
@@ -76,23 +74,16 @@ export const pushLayer = (
 ): CrossfadeLayer[] => {
   const top = layers[layers.length - 1];
   if (top && top.key === key) {
-    return layers.map((layer) =>
-      layer.key === key ? { ...layer, slide } : layer,
-    );
+    return layers.map((layer) => (layer.key === key ? { ...layer, slide } : layer));
   }
   return cap([...layers, { key, slide, loaded: false }]);
 };
 
 // Reveal the layer with `key` (loaded) and start fading out every other layer —
 // the cross-fade.
-export const revealLayers = (
-  layers: CrossfadeLayer[],
-  key: string,
-): CrossfadeLayer[] =>
+export const revealLayers = (layers: CrossfadeLayer[], key: string): CrossfadeLayer[] =>
   layers.map((layer) => ({ ...layer, loaded: layer.key === key }));
 
 // Remove a layer that has finished fading out (called from its transitionend).
-export const removeLayer = (
-  layers: CrossfadeLayer[],
-  key: string,
-): CrossfadeLayer[] => layers.filter((layer) => layer.key !== key);
+export const removeLayer = (layers: CrossfadeLayer[], key: string): CrossfadeLayer[] =>
+  layers.filter((layer) => layer.key !== key);

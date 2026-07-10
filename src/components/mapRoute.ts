@@ -34,9 +34,8 @@ type BuildMapRouteOptions = {
   nearbyTimeWindowMs?: number;
 };
 
-const isFiniteCoordinate = (
-  value: number | null | undefined,
-): value is number => typeof value === "number" && Number.isFinite(value);
+const isFiniteCoordinate = (value: number | null | undefined): value is number =>
+  typeof value === "number" && Number.isFinite(value);
 
 const parseTimestamp = (value: string | null | undefined): number | null => {
   if (!value) {
@@ -59,10 +58,7 @@ export const distanceMetersBetween = (
 
   const a =
     Math.sin(deltaLat / 2) * Math.sin(deltaLat / 2) +
-    Math.cos(lat1) *
-      Math.cos(lat2) *
-      Math.sin(deltaLng / 2) *
-      Math.sin(deltaLng / 2);
+    Math.cos(lat1) * Math.cos(lat2) * Math.sin(deltaLng / 2) * Math.sin(deltaLng / 2);
 
   return earthRadiusMeters * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 };
@@ -85,9 +81,9 @@ export const toRouteGeoJson = (points: RoutePoint[]): RouteGeoJson | null => {
           // Unwrapped so antimeridian-crossing legs take the short way —
           // MapLibre renders longitudes beyond ±180 on the adjacent world
           // copy instead of drawing a near-360° line the long way round
-          coordinates: unwrapLongitudes(
-            points.map((point) => point.decLng as number),
-          ).map((lng, index) => [lng, points[index]!.decLat as number]),
+          coordinates: unwrapLongitudes(points.map((point) => point.decLng as number)).map(
+            (lng, index) => [lng, points[index]!.decLat as number],
+          ),
         },
       },
     ],
@@ -112,10 +108,8 @@ const simplifyRoutePoints = (
     return points;
   }
 
-  const nearbyDistanceMeters =
-    options?.nearbyDistanceMeters ?? DEFAULT_NEARBY_DISTANCE_METERS;
-  const nearbyTimeWindowMs =
-    options?.nearbyTimeWindowMs ?? DEFAULT_NEARBY_TIME_WINDOW_MS;
+  const nearbyDistanceMeters = options?.nearbyDistanceMeters ?? DEFAULT_NEARBY_DISTANCE_METERS;
+  const nearbyTimeWindowMs = options?.nearbyTimeWindowMs ?? DEFAULT_NEARBY_TIME_WINDOW_MS;
   const simplified: RoutePoint[] = [];
 
   for (const point of points) {
@@ -163,8 +157,7 @@ const simplifyRoutePoints = (
 
 export const getDefaultRouteMode = (photos: MapWorldEntry[]): RouteMode => {
   const geotaggedCount = photos.filter(
-    (photo) =>
-      isFiniteCoordinate(photo.decLat) && isFiniteCoordinate(photo.decLng),
+    (photo) => isFiniteCoordinate(photo.decLat) && isFiniteCoordinate(photo.decLng),
   ).length;
 
   return geotaggedCount > ROUTE_SIMPLIFY_THRESHOLD ? "simplified" : "full";
@@ -188,9 +181,7 @@ export const buildMapRoute = (
       ): candidate is {
         photo: MapWorldEntry & { decLat: number; decLng: number };
         originalIndex: number;
-      } =>
-        isFiniteCoordinate(candidate.photo.decLat) &&
-        isFiniteCoordinate(candidate.photo.decLng),
+      } => isFiniteCoordinate(candidate.photo.decLat) && isFiniteCoordinate(candidate.photo.decLng),
     )
     .sort((left, right) => {
       const leftTimestamp = parseTimestamp(left.photo.date);
@@ -298,17 +289,11 @@ export const buildContextRoutePoints = (
     return null;
   }
 
-  const route = buildMapRoute(
-    photos.filter((photo) => photo.album === target.album),
-  );
-  const points =
-    routeMode === "simplified" ? route.simplifiedPoints : route.fullPoints;
+  const route = buildMapRoute(photos.filter((photo) => photo.album === target.album));
+  const points = routeMode === "simplified" ? route.simplifiedPoints : route.fullPoints;
   const tripSpanDays = getTripSpanDays(points);
 
-  if (
-    tripSpanDays !== null &&
-    tripSpanDays <= CONTEXT_WHOLE_TRIP_MAX_SPAN_DAYS
-  ) {
+  if (tripSpanDays !== null && tripSpanDays <= CONTEXT_WHOLE_TRIP_MAX_SPAN_DAYS) {
     return points;
   }
 

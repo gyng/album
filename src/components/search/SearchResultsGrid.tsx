@@ -68,8 +68,7 @@ export const SearchResultsGrid: React.FC<Props> = ({
     <ul className={styles.results}>
       {isError && !isFetching ? (
         <li className={styles.inlineError}>
-          Something went wrong running this search. Try again or adjust your
-          query.
+          Something went wrong running this search. Try again or adjust your query.
         </li>
       ) : null}
 
@@ -80,9 +79,7 @@ export const SearchResultsGrid: React.FC<Props> = ({
       ) : null}
 
       {isSuccess && !isFetching && results?.length === 0 && isPureColorSearch ? (
-        <li className={styles.sectionStatus}>
-          No photos with a similar colour found.
-        </li>
+        <li className={styles.sectionStatus}>No photos with a similar colour found.</li>
       ) : null}
 
       {isSuccess &&
@@ -102,8 +99,7 @@ export const SearchResultsGrid: React.FC<Props> = ({
       ) : null}
 
       {results?.map((r) => {
-        const isVisitedInSimilarTrail =
-          isSimilarMode && similarClickstreamPaths.has(r.path);
+        const isVisitedInSimilarTrail = isSimilarMode && similarClickstreamPaths.has(r.path);
         return (
           <li
             key={r.path}
@@ -132,11 +128,7 @@ export const SearchResultsGrid: React.FC<Props> = ({
 
       {hasNextPage && isSuccess ? (
         <li>
-          <button
-            className={styles.moreButton}
-            onClick={onFetchNextPage}
-            disabled={isFetching}
-          >
+          <button className={styles.moreButton} onClick={onFetchNextPage} disabled={isFetching}>
             {isFetching ? <>Loading&hellip;</> : <>More&hellip;</>}
           </button>
         </li>

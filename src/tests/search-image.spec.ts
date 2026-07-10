@@ -3,17 +3,9 @@ import { existsSync, statSync } from "fs";
 import { join } from "path";
 
 const searchDbPath = join(__dirname, "..", "public", "search.sqlite");
-const hasSearchDb =
-  existsSync(searchDbPath) && statSync(searchDbPath).size > 0;
+const hasSearchDb = existsSync(searchDbPath) && statSync(searchDbPath).size > 0;
 
-const testImagePath = join(
-  __dirname,
-  "..",
-  "..",
-  "albums",
-  "test-simple",
-  "DSCF0506-2.jpg",
-);
+const testImagePath = join(__dirname, "..", "..", "albums", "test-simple", "DSCF0506-2.jpg");
 
 // Hold every embedding-model request open forever: the specs assert the UI
 // shell (buttons, dialog, chip, pending state), never a completed encode, so
@@ -40,9 +32,7 @@ test.describe("Image search UI shell", () => {
     expect(pageErrors).toEqual([]);
   });
 
-  test("draw pad opens focused, closes on Escape, and restores focus", async ({
-    page,
-  }) => {
+  test("draw pad opens focused, closes on Escape, and restores focus", async ({ page }) => {
     test.skip(!hasSearchDb, "Requires search.sqlite");
     await holdModelDownloads(page);
     await page.goto("/search");
@@ -61,9 +51,7 @@ test.describe("Image search UI shell", () => {
     await expect(drawButton).toBeFocused();
   });
 
-  test("drawing enables Search and submits to a removable query chip", async ({
-    page,
-  }) => {
+  test("drawing enables Search and submits to a removable query chip", async ({ page }) => {
     test.skip(!hasSearchDb, "Requires search.sqlite");
     await holdModelDownloads(page);
     await page.goto("/search");
@@ -128,9 +116,7 @@ test.describe("Image search UI shell", () => {
     const fileChooser = await fileChooserPromise;
     await fileChooser.setFiles(testImagePath);
 
-    await expect(
-      page.getByRole("button", { name: "Remove image query" }),
-    ).toBeVisible();
+    await expect(page.getByRole("button", { name: "Remove image query" })).toBeVisible();
     await expect(page.getByText("Uploaded image")).toBeVisible();
     await expect(page.getByText("Searching…")).toBeVisible();
   });

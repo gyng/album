@@ -12,8 +12,12 @@
 }
 
 @keyframes roundEnter {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 /* Top bar: progress dots + running score */
@@ -35,7 +39,9 @@
   height: 8px;
   border-radius: 50%;
   background-color: color-mix(in srgb, var(--c-bg-contrast-light) 30%, transparent);
-  transition: background-color 0.3s, transform 0.3s;
+  transition:
+    background-color 0.3s,
+    transform 0.3s;
 }
 
 .dotDone {
@@ -49,8 +55,15 @@
 }
 
 @keyframes dotPulse {
-  0%, 100% { transform: scale(1.3); opacity: 1; }
-  50% { transform: scale(1.0); opacity: 0.6; }
+  0%,
+  100% {
+    transform: scale(1.3);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1);
+    opacity: 0.6;
+  }
 }
 
 /* Cumulative score — bumps on reveal */
@@ -66,9 +79,15 @@
 }
 
 @keyframes scoreBump {
-  0% { transform: scale(1); }
-  40% { transform: scale(1.25); }
-  100% { transform: scale(1); }
+  0% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(1.25);
+  }
+  100% {
+    transform: scale(1);
+  }
 }
 
 .abortButton {
@@ -81,7 +100,9 @@
   padding: var(--m) var(--m-s);
   line-height: 1;
   border-radius: var(--m);
-  transition: color var(--t-fast), background-color var(--t-fast);
+  transition:
+    color var(--t-fast),
+    background-color var(--t-fast);
 }
 
 .abortButton:hover {
@@ -153,8 +174,12 @@
 }
 
 @keyframes photoLoadingShimmer {
-  from { background-position: 200% 0; }
-  to { background-position: -200% 0; }
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
 }
 
 .photo {
@@ -169,8 +194,14 @@
 }
 
 @keyframes photoCrossfade {
-  from { opacity: 0; filter: blur(6px); }
-  to { opacity: 1; filter: blur(0); }
+  from {
+    opacity: 0;
+    filter: blur(6px);
+  }
+  to {
+    opacity: 1;
+    filter: blur(0);
+  }
 }
 
 .zoomHint {
@@ -217,8 +248,13 @@
 }
 
 @keyframes timerPulse {
-  0%, 100% { box-shadow: 0 0 8px 1px rgba(239, 68, 68, 0.5); }
-  50% { box-shadow: 0 0 14px 3px rgba(239, 68, 68, 0.7); }
+  0%,
+  100% {
+    box-shadow: 0 0 8px 1px rgba(239, 68, 68, 0.5);
+  }
+  50% {
+    box-shadow: 0 0 14px 3px rgba(239, 68, 68, 0.7);
+  }
 }
 
 /* Map panel */
@@ -259,7 +295,11 @@
   background-color: var(--c-bg);
   font-size: var(--fs-sm);
   color: var(--c-font);
-  transition: background-color var(--t-fast), border-color var(--t-base), box-shadow var(--t-base), transform 0.1s;
+  transition:
+    background-color var(--t-fast),
+    border-color var(--t-base),
+    box-shadow var(--t-base),
+    transform 0.1s;
 }
 
 /* Confirm pinned to the right of the controls row; skip stays at flex-start. */
@@ -297,8 +337,13 @@
 }
 
 @keyframes confirmPulse {
-  0%, 100% { box-shadow: 0 0 0 0 transparent; }
-  50% { box-shadow: 0 0 0 4px color-mix(in srgb, var(--c-accent) 25%, transparent); }
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+  }
+  50% {
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--c-accent) 25%, transparent);
+  }
 }
 
 .nextButton {
@@ -369,8 +414,14 @@
 }
 
 @keyframes slideUp {
-  from { opacity: 0; transform: translateY(6px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .scoreReveal {
@@ -403,11 +454,22 @@
 }
 
 @keyframes shake {
-  0%, 100% { transform: translateX(0); }
-  20% { transform: translateX(-3px); }
-  40% { transform: translateX(3px); }
-  60% { transform: translateX(-2px); }
-  80% { transform: translateX(2px); }
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  20% {
+    transform: translateX(-3px);
+  }
+  40% {
+    transform: translateX(3px);
+  }
+  60% {
+    transform: translateX(-2px);
+  }
+  80% {
+    transform: translateX(2px);
+  }
 }
 
 .scoreValue {
@@ -423,9 +485,17 @@
 }
 
 @keyframes scorePop {
-  0% { transform: scale(0.5); opacity: 0; }
-  60% { transform: scale(1.15); }
-  100% { transform: scale(1); opacity: 1; }
+  0% {
+    transform: scale(0.5);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.15);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
 }
 
 /* Time bonus appears after main score */
@@ -437,8 +507,14 @@
 }
 
 @keyframes bonusSlide {
-  from { opacity: 0; transform: translateX(-6px); }
-  to { opacity: 1; transform: translateX(0); }
+  from {
+    opacity: 0;
+    transform: translateX(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
 }
 
 .scoreBarTrack {
@@ -457,6 +533,10 @@
 }
 
 @keyframes growBar {
-  from { transform: scaleX(0); }
-  to { transform: scaleX(1); }
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
 }

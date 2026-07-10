@@ -68,9 +68,7 @@ export const getBlockDate = (block: Block): number => {
   }
   if (block.kind === "video") {
     const raw = block.data.date;
-    const wallClock = raw && /^\d{4}-\d{2}-\d{2}$/.test(raw)
-      ? `${raw}T00:00:00`
-      : raw;
+    const wallClock = raw && /^\d{4}-\d{2}-\d{2}$/.test(raw) ? `${raw}T00:00:00` : raw;
     return exifWallClockTimestamp(wallClock) ?? 0;
   }
   return 0;
@@ -87,16 +85,12 @@ const sortBlocksByDate = (
   );
 };
 
-export const getImageTimestampRange = (
-  album: Content,
-): [string | null, string | null] => {
+export const getImageTimestampRange = (album: Content): [string | null, string | null] => {
   let earliest: string | null = null;
   let latest: string | null = null;
   for (const block of album.blocks) {
     if (block.kind !== "photo") continue;
-    const dt = normaliseExifWallClockIso(
-      block._build?.exif?.DateTimeOriginal,
-    );
+    const dt = normaliseExifWallClockIso(block._build?.exif?.DateTimeOriginal);
     if (!dt) continue;
     if (earliest === null || dt < earliest) earliest = dt;
     if (latest === null || dt > latest) latest = dt;
@@ -104,9 +98,7 @@ export const getImageTimestampRange = (
   return [earliest, latest];
 };
 
-export const getAlbumNames = async (
-  albumsPath = ALBUMS_DIR,
-): Promise<string[]> => {
+export const getAlbumNames = async (albumsPath = ALBUMS_DIR): Promise<string[]> => {
   return measureBuild("album.getAlbumNames", async () => {
     return listAlbumDirectories(albumsPath);
   });
@@ -134,9 +126,7 @@ export const getAlbumFromName = (albumName: string): Promise<Content> => {
   });
 };
 
-export const getAlbumWithoutManifest = async (
-  albumPath: string,
-): Promise<Content> => {
+export const getAlbumWithoutManifest = async (albumPath: string): Promise<Content> => {
   return measureBuild("album.getAlbumWithoutManifest", async () => {
     const mediaFiles = listAlbumMediaFiles(albumPath);
 
@@ -174,18 +164,14 @@ export const getAlbumWithoutManifest = async (
     }));
 
     const coverBlock: SerializedPhotoBlock | null =
-      photoBlocks.find(
-        (b) => path.parse(b.data.src).name === "cover",
-      ) ?? null;
+      photoBlocks.find((b) => path.parse(b.data.src).name === "cover") ?? null;
 
     const anonymousManifest: SerializedContent = {
       name: dirname,
       title: dirname,
       ...(coverBlock ? { cover: coverBlock } : {}),
       formatting: {
-        sort: dirname.includes(".newest-first")
-          ? "newest-first"
-          : "oldest-first",
+        sort: dirname.includes(".newest-first") ? "newest-first" : "oldest-first",
       },
       blocks: [titleBlock, ...photoBlocks, ...videoBlocks],
     };
@@ -199,10 +185,7 @@ export const getAlbumWithManifest = async (
   rootRelativePath: string,
 ): Promise<Content> => {
   return measureBuild("album.getAlbumWithManifest", async () => {
-    const txt = fs.readFileSync(
-      path.join(rootRelativePath, MANIFEST_NAME),
-      "utf-8",
-    );
+    const txt = fs.readFileSync(path.join(rootRelativePath, MANIFEST_NAME), "utf-8");
     const manifest = JSON.parse(txt);
     return deserializeContentBlock(manifest, rootRelativePath);
   });
@@ -256,31 +239,20 @@ const appendExternalBlocks = (
   });
 };
 
-const isPhotoBlockWithSrc = (
-  block: Block,
-  src: string,
-): block is import("./types").PhotoBlock => {
+const isPhotoBlockWithSrc = (block: Block, src: string): block is import("./types").PhotoBlock => {
   // Match the exact file (basename equality), not a substring — otherwise a
   // cover of "1.jpg" would also match "11.jpg". The block's src is a stripped
   // public path by this point; the manifest cover is a bare filename.
-  return (
-    block.kind === "photo" &&
-    path.basename(block.data.src) === path.basename(src)
-  );
+  return block.kind === "photo" && path.basename(block.data.src) === path.basename(src);
 };
 
-const applyCoverSelection = (
-  manifest: Content,
-  cover?: string,
-): void => {
+const applyCoverSelection = (manifest: Content, cover?: string): void => {
   if (!cover) {
     return;
   }
 
   manifest.cover = { src: cover };
-  const coverBlock = manifest.blocks.find((block) =>
-    isPhotoBlockWithSrc(block, cover),
-  );
+  const coverBlock = manifest.blocks.find((block) => isPhotoBlockWithSrc(block, cover));
 
   if (coverBlock) {
     coverBlock.formatting = { ...coverBlock.formatting, cover: true };
@@ -354,10 +326,7 @@ export const getAlbum = async (
       applyCoverSelection(manifest, v2Manifest.cover);
     }
 
-    manifest.blocks = sortBlocksByDate(
-      manifest.blocks,
-      v2Manifest?.sort ?? "oldest-first",
-    );
+    manifest.blocks = sortBlocksByDate(manifest.blocks, v2Manifest?.sort ?? "oldest-first");
     manifest.blocks = moveTextBlocksToTop(manifest.blocks);
     applyTitleKickerDefaults(manifest);
 

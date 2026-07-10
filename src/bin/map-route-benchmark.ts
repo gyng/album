@@ -49,9 +49,7 @@ const median = (values: number[]): number => {
     return sorted[middle] ?? 0;
   }
 
-  return Number(
-    (((sorted[middle - 1] ?? 0) + (sorted[middle] ?? 0)) / 2).toFixed(3),
-  );
+  return Number((((sorted[middle - 1] ?? 0) + (sorted[middle] ?? 0)) / 2).toFixed(3));
 };
 
 const runs: BenchmarkRun[] = sizes.map((size) => {

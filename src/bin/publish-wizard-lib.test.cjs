@@ -19,9 +19,7 @@ const {
 
 describe("publish-wizard-lib", () => {
   it("parses the supported CLI flags", () => {
-    expect(
-      parseArgs(["--dry-run", "--yes", "--deploy", "--index-only", "--json"]),
-    ).toEqual({
+    expect(parseArgs(["--dry-run", "--yes", "--deploy", "--index-only", "--json"])).toEqual({
       dryRun: true,
       fastTrack: true,
       yes: true,
@@ -150,10 +148,7 @@ describe("publish-wizard-lib", () => {
         imageCount: 2,
         embeddingsCount: 1,
         hasEmbeddingsTable: true,
-        indexedPhotoPaths: new Set([
-          "../albums/demo/a.jpg",
-          "../albums/demo/b.jpg",
-        ]),
+        indexedPhotoPaths: new Set(["../albums/demo/a.jpg", "../albums/demo/b.jpg"]),
         indexedEmbeddingPaths: new Set(["../albums/demo/b.jpg"]),
       },
     });
@@ -165,9 +160,7 @@ describe("publish-wizard-lib", () => {
     expect(verification.blockers).toContain(
       "1 discovered photos are missing from the images table",
     );
-    expect(verification.warnings).toContain(
-      "1 newly discovered photos are missing embeddings",
-    );
+    expect(verification.warnings).toContain("1 newly discovered photos are missing embeddings");
   });
 
   it("collects a fast-track execution plan up front", async () => {
@@ -529,9 +522,7 @@ describe("publish-wizard-lib", () => {
           ...baseReport.db,
           embeddingsCount: 1486,
           expectedEmbeddingModelIds: ["google/siglip2-base-patch16-224"],
-          unexpectedEmbeddingModels: [
-            { modelId: "google/siglip-base-patch16-224", count: 1486 },
-          ],
+          unexpectedEmbeddingModels: [{ modelId: "google/siglip-base-patch16-224", count: 1486 }],
           currentEmbeddingModelId: "google/siglip2-base-patch16-224",
           staleEmbeddingCount: 1486,
           staleEmbeddingModelIds: ["google/siglip-base-patch16-224"],
@@ -571,15 +562,15 @@ describe("publish-wizard-lib", () => {
     });
 
     it("honours NEXT_PUBLIC_SITE_URL and trims a trailing slash", () => {
-      expect(
-        getDeployedVersionUrl({ NEXT_PUBLIC_SITE_URL: "https://photos.example.com/" }),
-      ).toBe("https://photos.example.com/version.json");
+      expect(getDeployedVersionUrl({ NEXT_PUBLIC_SITE_URL: "https://photos.example.com/" })).toBe(
+        "https://photos.example.com/version.json",
+      );
     });
 
     it("adds a scheme to a bare host (Vercel production URL style)", () => {
-      expect(
-        getDeployedVersionUrl({ VERCEL_PROJECT_PRODUCTION_URL: "album.vercel.app" }),
-      ).toBe("https://album.vercel.app/version.json");
+      expect(getDeployedVersionUrl({ VERCEL_PROJECT_PRODUCTION_URL: "album.vercel.app" })).toBe(
+        "https://album.vercel.app/version.json",
+      );
     });
   });
 
@@ -662,14 +653,18 @@ describe("publish-wizard-lib", () => {
       if (handler === "throw") {
         throw new Error(`git ${args.join(" ")} failed`);
       }
-      return typeof handler === "function" ? handler(args) : handler ?? "";
+      return typeof handler === "function" ? handler(args) : (handler ?? "");
     };
 
     it("reports a code update from the live sha and working-tree diff", async () => {
       const delta = await resolveDeploymentDelta({
         repoDir: "/repo",
         versionUrl: "https://example.test/version.json",
-        fetchImpl: async () => ({ ok: true, status: 200, json: async () => ({ gitSha: "dead00f" }) }),
+        fetchImpl: async () => ({
+          ok: true,
+          status: 200,
+          json: async () => ({ gitSha: "dead00f" }),
+        }),
         runGit: makeRunGit({
           "rev-parse": "cafe123\n",
           "cat-file": "",
@@ -686,7 +681,11 @@ describe("publish-wizard-lib", () => {
       const delta = await resolveDeploymentDelta({
         repoDir: "/repo",
         versionUrl: "https://example.test/version.json",
-        fetchImpl: async () => ({ ok: true, status: 200, json: async () => ({ gitSha: "dead00f" }) }),
+        fetchImpl: async () => ({
+          ok: true,
+          status: 200,
+          json: async () => ({ gitSha: "dead00f" }),
+        }),
         runGit: makeRunGit({ "rev-parse": "dead00f\n", "cat-file": "", diff: "", "ls-files": "" }),
       });
       expect(delta.kind).toBe("data-only");
@@ -709,7 +708,11 @@ describe("publish-wizard-lib", () => {
       const delta = await resolveDeploymentDelta({
         repoDir: "/repo",
         versionUrl: "https://example.test/version.json",
-        fetchImpl: async () => ({ ok: true, status: 200, json: async () => ({ gitSha: "dead00f" }) }),
+        fetchImpl: async () => ({
+          ok: true,
+          status: 200,
+          json: async () => ({ gitSha: "dead00f" }),
+        }),
         runGit: makeRunGit({ "rev-parse": "cafe123\n", "cat-file": "throw" }),
       });
       expect(delta.kind).toBe("unknown");
@@ -725,17 +728,23 @@ describe("publish-wizard-lib", () => {
     const hasMainDb = fs.existsSync(mainDbPath);
     const hasEmbeddingsDb = fs.existsSync(embeddingsDbPath);
 
-    (hasMainDb ? it : it.skip)("reports hasEmbeddingsTable false when only main DB provided and it has no embeddings table", async () => {
-      const state = await loadDbState(mainDbPath);
-      expect(state.hasEmbeddingsTable).toBe(false);
-      expect(state.embeddingsCount).toBe(0);
-    });
+    (hasMainDb ? it : it.skip)(
+      "reports hasEmbeddingsTable false when only main DB provided and it has no embeddings table",
+      async () => {
+        const state = await loadDbState(mainDbPath);
+        expect(state.hasEmbeddingsTable).toBe(false);
+        expect(state.embeddingsCount).toBe(0);
+      },
+    );
 
-    (hasMainDb && hasEmbeddingsDb ? it : it.skip)("reads embeddings from a separate embeddings DB when main DB has no embeddings table", async () => {
-      const state = await loadDbState(mainDbPath, embeddingsDbPath);
-      expect(state.hasEmbeddingsTable).toBe(true);
-      expect(state.embeddingsCount).toBeGreaterThan(0);
-      expect(state.embeddingsCount).toBeGreaterThanOrEqual(state.imageCount);
-    });
+    (hasMainDb && hasEmbeddingsDb ? it : it.skip)(
+      "reads embeddings from a separate embeddings DB when main DB has no embeddings table",
+      async () => {
+        const state = await loadDbState(mainDbPath, embeddingsDbPath);
+        expect(state.hasEmbeddingsTable).toBe(true);
+        expect(state.embeddingsCount).toBeGreaterThan(0);
+        expect(state.embeddingsCount).toBeGreaterThanOrEqual(state.imageCount);
+      },
+    );
   });
 });

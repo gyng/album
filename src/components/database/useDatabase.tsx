@@ -1,7 +1,4 @@
-import sqlite3InitModule, {
-  Database,
-  Sqlite3Static,
-} from "@sqlite.org/sqlite-wasm";
+import sqlite3InitModule, { Database, Sqlite3Static } from "@sqlite.org/sqlite-wasm";
 import { useState, useEffect, useCallback, useReducer, useRef } from "react";
 
 type ProgressDetails = {
@@ -32,10 +29,7 @@ const initialState: UseDatabaseState = {
   error: null,
 };
 
-const reducer = (
-  state: UseDatabaseState,
-  action: Action,
-): UseDatabaseState => {
+const reducer = (state: UseDatabaseState, action: Action): UseDatabaseState => {
   switch (action.type) {
     case "load:start":
       return {
@@ -71,10 +65,7 @@ const databasePromises = new Map<string, Promise<Database>>();
 
 const fetchWithProgress = async (
   url: string,
-  onProgress: (
-    progress: number,
-    details: { loaded: number; total: number },
-  ) => void,
+  onProgress: (progress: number, details: { loaded: number; total: number }) => void,
   init?: RequestInit,
 ) => {
   const res = init ? await fetch(url, init) : await fetch(url);
@@ -131,10 +122,7 @@ const fetchWithProgress = async (
 const loadRemoteDatabase = async (
   sqlite3: Sqlite3Static,
   url: string,
-  setProgress?: (
-    percent: number,
-    details: { loaded: number; total: number },
-  ) => void,
+  setProgress?: (percent: number, details: { loaded: number; total: number }) => void,
   init?: RequestInit,
 ) => {
   console.log("Running SQLite3 version", sqlite3.version.libVersion);
@@ -172,30 +160,19 @@ const initializeSQLite = async (
   try {
     console.log("Loading and initializing SQLite3 module...");
     const sqlite3 = await sqlite3InitModule();
-    const requestInit = forceRefresh
-      ? { cache: "no-store" as RequestCache }
-      : undefined;
+    const requestInit = forceRefresh ? { cache: "no-store" as RequestCache } : undefined;
     try {
       db = await loadRemoteDatabase(sqlite3, url, setProgress, requestInit);
     } catch (err) {
       const shouldFallback =
-        fallbackUrl &&
-        err instanceof Error &&
-        err.message.includes(`Failed to fetch ${url}: 404`);
+        fallbackUrl && err instanceof Error && err.message.includes(`Failed to fetch ${url}: 404`);
 
       if (!shouldFallback) {
         throw err;
       }
 
-      console.info(
-        `Database ${url} not found, falling back to ${fallbackUrl}`,
-      );
-      db = await loadRemoteDatabase(
-        sqlite3,
-        fallbackUrl,
-        setProgress,
-        requestInit,
-      );
+      console.info(`Database ${url} not found, falling back to ${fallbackUrl}`);
+      db = await loadRemoteDatabase(sqlite3, fallbackUrl, setProgress, requestInit);
     }
   } catch (err) {
     if (err instanceof Error) {
@@ -242,12 +219,7 @@ const getDatabase = (
     databasePromises.delete(url);
   }
 
-  const databasePromise = initializeSQLite(
-    url,
-    fallbackUrl,
-    setProgress,
-    forceRefresh,
-  )
+  const databasePromise = initializeSQLite(url, fallbackUrl, setProgress, forceRefresh)
     .then((database) => {
       cachedDatabases.set(url, database);
       return database;
@@ -264,17 +236,13 @@ const getDatabase = (
 const useSqliteDatabase = (
   url: string,
   options?: { enabled?: boolean; fallbackUrl?: string },
-): [
-  Database | null,
-  number,
-  ProgressDetails,
-  Error | null,
-  (forceRefresh?: boolean) => void,
-] => {
+): [Database | null, number, ProgressDetails, Error | null, (forceRefresh?: boolean) => void] => {
   const enabled = options?.enabled ?? true;
   const fallbackUrl = options?.fallbackUrl;
-  const [{ database, progress, progressDetails, error }, dispatch] =
-    useReducer(reducer, initialState);
+  const [{ database, progress, progressDetails, error }, dispatch] = useReducer(
+    reducer,
+    initialState,
+  );
   const [retryCount, setRetryCount] = useState(0);
   const forceRefreshRef = useRef(false);
 

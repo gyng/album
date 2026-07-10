@@ -91,8 +91,7 @@ export function findClustersAroundSeeds<T extends DateItem>(
 
   uniqueDates.forEach((date, index) => {
     const previousDate = uniqueDates[index - 1];
-    const gapDays =
-      previousDate == null ? 0 : getDateGapDays(previousDate, date);
+    const gapDays = previousDate == null ? 0 : getDateGapDays(previousDate, date);
 
     if (currentCluster.length === 0 || gapDays <= maxGapDays) {
       currentCluster.push(date);
@@ -159,15 +158,13 @@ export function getMemoryClusters<T extends DateItem>(
           ),
       );
 
-      return findClustersAroundSeeds(yearItems, seedDates, maxGapDays).map(
-        (cluster) => ({
-          year,
-          yearsAgo: excludeYear - year,
-          startDate: cluster.startDate,
-          endDate: cluster.endDate,
-          items: cluster.items,
-        }),
-      );
+      return findClustersAroundSeeds(yearItems, seedDates, maxGapDays).map((cluster) => ({
+        year,
+        yearsAgo: excludeYear - year,
+        startDate: cluster.startDate,
+        endDate: cluster.endDate,
+        items: cluster.items,
+      }));
     })
     .sort((left, right) => right.startDate.localeCompare(left.startDate));
 }

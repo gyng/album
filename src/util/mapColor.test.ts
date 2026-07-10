@@ -1,13 +1,7 @@
-import {
-  recencyColor,
-  recencyGradientStops,
-  recencyGradientCss,
-} from "./mapColor";
+import { recencyColor, recencyGradientStops, recencyGradientCss } from "./mapColor";
 
 const parseHsl = (color: string) => {
-  const match = color.match(
-    /hsl\(\s*([\d.]+),\s*([\d.]+)%,\s*([\d.]+)%\s*\)/,
-  );
+  const match = color.match(/hsl\(\s*([\d.]+),\s*([\d.]+)%,\s*([\d.]+)%\s*\)/);
   if (!match) {
     throw new Error(`not an hsl() colour: ${color}`);
   }
@@ -38,12 +32,8 @@ describe("recencyColor", () => {
   });
 
   it("varies hue monotonically with recency (red is newer than blue)", () => {
-    expect(parseHsl(recencyColor(1)).hue).toBeLessThan(
-      parseHsl(recencyColor(0.5)).hue,
-    );
-    expect(parseHsl(recencyColor(0.5)).hue).toBeLessThan(
-      parseHsl(recencyColor(0)).hue,
-    );
+    expect(parseHsl(recencyColor(1)).hue).toBeLessThan(parseHsl(recencyColor(0.5)).hue);
+    expect(parseHsl(recencyColor(0.5)).hue).toBeLessThan(parseHsl(recencyColor(0)).hue);
   });
 
   it("clamps below-range and non-finite input to the oldest end without NaN", () => {

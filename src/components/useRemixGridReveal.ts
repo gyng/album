@@ -43,8 +43,7 @@ export const useRemixGridReveal = (input: {
   }, []);
 
   const totalRemixCells = companionPaths.length + 1;
-  const isRemixGridReady =
-    companionPaths.length === 0 || remixLoadedCount >= totalRemixCells;
+  const isRemixGridReady = companionPaths.length === 0 || remixLoadedCount >= totalRemixCells;
 
   // Safety net: if a cell never fires onLoad (broken file, dropped network,
   // CORS), the grid would stay at opacity 0 indefinitely. After 3s reveal

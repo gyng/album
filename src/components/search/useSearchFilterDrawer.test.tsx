@@ -6,8 +6,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { useSearchFilterDrawer } from "./useSearchFilterDrawer";
 
 const Harness = ({ isSimilarMode = false }: { isSimilarMode?: boolean }) => {
-  const { isOpen, open, close, triggerRef, closeRef } =
-    useSearchFilterDrawer({ isSimilarMode });
+  const { isOpen, open, close, triggerRef, closeRef } = useSearchFilterDrawer({ isSimilarMode });
   return (
     <>
       <button ref={triggerRef} type="button" onClick={open}>

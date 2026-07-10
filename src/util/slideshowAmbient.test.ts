@@ -55,9 +55,7 @@ describe("getTimeAffinityScore", () => {
     const now = new Date(2026, 6, 15, 12, 0); // mid-July
     const summer = new Date(2024, 6, 10, 12, 0); // mid-July (same season + hour)
     const winter = new Date(2024, 0, 10, 12, 0); // mid-January (opposite season, same hour)
-    expect(getTimeAffinityScore(summer, now)).toBeGreaterThan(
-      getTimeAffinityScore(winter, now),
-    );
+    expect(getTimeAffinityScore(summer, now)).toBeGreaterThan(getTimeAffinityScore(winter, now));
   });
 
   test("score is bounded in [0.02, 1]", () => {
@@ -99,9 +97,7 @@ describe("getTimeAffinityScore", () => {
     const dec = new Date(2024, 11, 15, 12, 0);
     const jul = new Date(2024, 6, 15, 12, 0);
     const janNow = new Date(2026, 0, 15, 12, 0);
-    expect(getTimeAffinityScore(dec, janNow)).toBeGreaterThan(
-      getTimeAffinityScore(jul, janNow),
-    );
+    expect(getTimeAffinityScore(dec, janNow)).toBeGreaterThan(getTimeAffinityScore(jul, janNow));
   });
 });
 
@@ -113,9 +109,7 @@ describe("timeAwareShufflePhotos", () => {
       makePhoto("data/albums/a/p3.jpg", new Date(2024, 9, 1, 19)),
     ];
     const out = timeAwareShufflePhotos(photos, new Date(2026, 5, 1, 14));
-    expect(new Set(out.map((p) => p.path))).toEqual(
-      new Set(photos.map((p) => p.path)),
-    );
+    expect(new Set(out.map((p) => p.path))).toEqual(new Set(photos.map((p) => p.path)));
   });
 
   test("photos without parseable EXIF still appear in the result", () => {
@@ -136,15 +130,11 @@ describe("timeAwareShufflePhotos", () => {
     const now = new Date(2026, 6, 15, 14, 30); // mid-July at 14:30
     const offBand: RandomPhotoRow[] = [];
     for (let i = 0; i < 200; i += 1) {
-      offBand.push(
-        makePhoto(`data/albums/winter/${i}.jpg`, new Date(2024, 0, 1, 3, 0)),
-      );
+      offBand.push(makePhoto(`data/albums/winter/${i}.jpg`, new Date(2024, 0, 1, 3, 0)));
     }
     const onBand: RandomPhotoRow[] = [];
     for (let i = 0; i < 5; i += 1) {
-      onBand.push(
-        makePhoto(`data/albums/summer/${i}.jpg`, new Date(2024, 6, 10, 14, 0)),
-      );
+      onBand.push(makePhoto(`data/albums/summer/${i}.jpg`, new Date(2024, 6, 10, 14, 0)));
     }
 
     // Average across many trials to smooth out single-shuffle variance.
@@ -197,18 +187,12 @@ describe("decideRemixCompanionCount", () => {
   });
 
   test("returns 2 (3-up) when layout roll lands in [0.7, 0.95)", () => {
-    const random = jest
-      .fn()
-      .mockReturnValueOnce(0.01)
-      .mockReturnValueOnce(0.85);
+    const random = jest.fn().mockReturnValueOnce(0.01).mockReturnValueOnce(0.85);
     expect(decideRemixCompanionCount(0.03, random)).toBe(2);
   });
 
   test("returns 3 (4-up) when layout roll >= 0.95", () => {
-    const random = jest
-      .fn()
-      .mockReturnValueOnce(0.01)
-      .mockReturnValueOnce(0.97);
+    const random = jest.fn().mockReturnValueOnce(0.01).mockReturnValueOnce(0.97);
     expect(decideRemixCompanionCount(0.03, random)).toBe(3);
   });
 
@@ -263,12 +247,7 @@ describe("pickRemixCompanions", () => {
       .fn()
       .mockReturnValueOnce(0.01) // strategy roll → first weighted band (same-album)
       .mockReturnValue(0.5); // subsequent draws for the shuffle
-    const pick = pickRemixCompanions(
-      seed,
-      [...sameAlbumPool, ...otherAlbumPool],
-      2,
-      random,
-    );
+    const pick = pickRemixCompanions(seed, [...sameAlbumPool, ...otherAlbumPool], 2, random);
     expect(pick.strategy).toBe("same-album");
     for (const photo of pick.companions) {
       expect(photo.path.startsWith("data/albums/japan/")).toBe(true);
@@ -296,29 +275,15 @@ describe("pickRemixCompanions", () => {
   test("falls through to a later strategy when the rolled one has too few candidates", () => {
     // Land the roll in the proximity band [0.40, 0.48). Photos lack GPS, so
     // proximity returns []; fallback walks down to same-album.
-    const random = jest
-      .fn()
-      .mockReturnValueOnce(0.44)
-      .mockReturnValue(0.5);
-    const pick = pickRemixCompanions(
-      seed,
-      [...sameAlbumPool, ...otherAlbumPool],
-      2,
-      random,
-    );
+    const random = jest.fn().mockReturnValueOnce(0.44).mockReturnValue(0.5);
+    const pick = pickRemixCompanions(seed, [...sameAlbumPool, ...otherAlbumPool], 2, random);
     expect(pick.companions).toHaveLength(2);
     expect(pick.strategy).not.toBe("proximity");
   });
 
   test("returns no duplicates", () => {
-    const pick = pickRemixCompanions(
-      seed,
-      [...sameAlbumPool, ...otherAlbumPool],
-      2,
-    );
-    expect(new Set(pick.companions.map((p) => p.path)).size).toBe(
-      pick.companions.length,
-    );
+    const pick = pickRemixCompanions(seed, [...sameAlbumPool, ...otherAlbumPool], 2);
+    expect(new Set(pick.companions.map((p) => p.path)).size).toBe(pick.companions.length);
   });
 
   test("proximity strategy picks from the seed's nearest neighbours", () => {
@@ -343,10 +308,7 @@ describe("pickRemixCompanions", () => {
 
     // Force proximity by landing the weighted roll in [0.32, 0.42) under
     // current weights (similar 0.20 + same-album 0.12 = 0.32; proximity 0.10).
-    const random = jest
-      .fn()
-      .mockReturnValueOnce(0.4)
-      .mockReturnValue(0.5);
+    const random = jest.fn().mockReturnValueOnce(0.4).mockReturnValue(0.5);
     const pick = pickRemixCompanions(gpsSeed, candidates, 2, random);
     expect(pick.strategy).toBe("proximity");
 
@@ -361,26 +323,14 @@ describe("pickRemixCompanions", () => {
   });
 
   test("shared-camera strategy matches on Make + Model", () => {
-    const withCamera = (
-      path: string,
-      make: string,
-      model: string,
-    ): RandomPhotoRow => ({
+    const withCamera = (path: string, make: string, model: string): RandomPhotoRow => ({
       path,
       exif: `Image Make: ${make}\nImage Model: ${model}`,
       geocode: "",
     });
-    const seedX100 = withCamera(
-      "data/albums/a/seed.jpg",
-      "FUJIFILM",
-      "X100V",
-    );
+    const seedX100 = withCamera("data/albums/a/seed.jpg", "FUJIFILM", "X100V");
     const sameBody = withCamera("data/albums/b/1.jpg", "FUJIFILM", "X100V");
-    const differentBody = withCamera(
-      "data/albums/c/2.jpg",
-      "FUJIFILM",
-      "X-T20",
-    );
+    const differentBody = withCamera("data/albums/c/2.jpg", "FUJIFILM", "X-T20");
     const differentMake = withCamera("data/albums/d/3.jpg", "Sony", "A7IV");
     const noCamera: RandomPhotoRow = {
       path: "data/albums/e/4.jpg",
@@ -393,10 +343,7 @@ describe("pickRemixCompanions", () => {
     // juxtapose 0.07 + anniversary 0.06 + golden-hour 0.05 + same-city 0.06 +
     // same-region 0.05 + same-year 0.04 = 0.89. shared-camera adds 0.04
     // → [0.89, 0.93). 0.91 lands inside.
-    const random = jest
-      .fn()
-      .mockReturnValueOnce(0.91)
-      .mockReturnValue(0.5);
+    const random = jest.fn().mockReturnValueOnce(0.91).mockReturnValue(0.5);
     const pick = pickRemixCompanions(
       seedX100,
       [sameBody, differentBody, differentMake, noCamera],
@@ -433,43 +380,20 @@ describe("pickRemixCompanions", () => {
     // similar 0.30 + same-album 0.10 + proximity 0.08 + dominant-colour 0.08 +
     // juxtapose 0.07 + anniversary 0.06 + golden-hour 0.05 = 0.74.
     // same-city adds 0.06 → [0.74, 0.80). 0.76 lands in same-city.
-    const random = jest
-      .fn()
-      .mockReturnValueOnce(0.76)
-      .mockReturnValue(0.5);
-    const pick = pickRemixCompanions(
-      seedTokyo,
-      [sameCity, sameCountry, elsewhere],
-      1,
-      random,
-    );
+    const random = jest.fn().mockReturnValueOnce(0.76).mockReturnValue(0.5);
+    const pick = pickRemixCompanions(seedTokyo, [sameCity, sameCountry, elsewhere], 1, random);
     expect(pick.strategy).toBe("same-city");
     expect(pick.companions[0]?.path).toBe("data/albums/japan/a.jpg");
   });
 
   test("same-day-of-year strategy matches month+day across different years", () => {
-    const seedDate = makePhoto(
-      "data/albums/a/seed.jpg",
-      new Date(2024, 4, 24, 10, 0),
-    );
-    const sameDayDifferentYear = makePhoto(
-      "data/albums/b/1.jpg",
-      new Date(2022, 4, 24, 18, 0),
-    );
-    const sameDaySameYear = makePhoto(
-      "data/albums/c/2.jpg",
-      new Date(2024, 4, 24, 14, 0),
-    );
-    const sameMonthDifferentDay = makePhoto(
-      "data/albums/d/3.jpg",
-      new Date(2022, 4, 25, 10, 0),
-    );
+    const seedDate = makePhoto("data/albums/a/seed.jpg", new Date(2024, 4, 24, 10, 0));
+    const sameDayDifferentYear = makePhoto("data/albums/b/1.jpg", new Date(2022, 4, 24, 18, 0));
+    const sameDaySameYear = makePhoto("data/albums/c/2.jpg", new Date(2024, 4, 24, 14, 0));
+    const sameMonthDifferentDay = makePhoto("data/albums/d/3.jpg", new Date(2022, 4, 25, 10, 0));
 
     // same-day-of-year cumulative band: [0.93, 0.96) — 0.94 lands inside.
-    const random = jest
-      .fn()
-      .mockReturnValueOnce(0.94)
-      .mockReturnValue(0.5);
+    const random = jest.fn().mockReturnValueOnce(0.94).mockReturnValue(0.5);
     const pick = pickRemixCompanions(
       seedDate,
       [sameDayDifferentYear, sameDaySameYear, sameMonthDifferentDay],
@@ -516,10 +440,7 @@ describe("pickRemixCompanions", () => {
     };
 
     // dominant-colour cumulative band: [0.48, 0.56) — 0.52 lands inside.
-    const random = jest
-      .fn()
-      .mockReturnValueOnce(0.52)
-      .mockReturnValue(0.5);
+    const random = jest.fn().mockReturnValueOnce(0.52).mockReturnValue(0.5);
     const pick = pickRemixCompanions(seedRed, [nearRed, blue, noColours], 1, random);
     expect(pick.strategy).toBe("dominant-colour");
     expect(pick.companions[0]?.path).toBe("data/albums/b/1.jpg");
@@ -530,11 +451,7 @@ describe("pickRemixCompanions", () => {
     // reached via the fallback iteration order — and since its filter
     // returns [], it should never be the *chosen* strategy.
     for (let i = 0; i < 50; i += 1) {
-      const pick = pickRemixCompanions(
-        seed,
-        [...sameAlbumPool, ...otherAlbumPool],
-        1,
-      );
+      const pick = pickRemixCompanions(seed, [...sameAlbumPool, ...otherAlbumPool], 1);
       expect(pick.strategy).not.toBe("similar");
       expect(pick.strategy).not.toBe("juxtapose");
     }
@@ -547,12 +464,22 @@ describe("describeRemix", () => {
     const photos: RandomPhotoRow[] = [
       {
         path: "data/albums/a/1.jpg",
-        exif: ["GPS GPSLatitude: 0,0,0", "GPS GPSLatitudeRef: N", "GPS GPSLongitude: 0,0,0", "GPS GPSLongitudeRef: E"].join("\n"),
+        exif: [
+          "GPS GPSLatitude: 0,0,0",
+          "GPS GPSLatitudeRef: N",
+          "GPS GPSLongitude: 0,0,0",
+          "GPS GPSLongitudeRef: E",
+        ].join("\n"),
         geocode: "",
       },
       {
         path: "data/albums/a/2.jpg",
-        exif: ["GPS GPSLatitude: 0,0,36", "GPS GPSLatitudeRef: N", "GPS GPSLongitude: 0,0,0", "GPS GPSLongitudeRef: E"].join("\n"),
+        exif: [
+          "GPS GPSLatitude: 0,0,36",
+          "GPS GPSLatitudeRef: N",
+          "GPS GPSLongitude: 0,0,0",
+          "GPS GPSLongitudeRef: E",
+        ].join("\n"),
         geocode: "",
       },
     ];
@@ -566,9 +493,7 @@ describe("describeRemix", () => {
   });
 
   test("same-album returns the album folder name from the seed path", () => {
-    expect(
-      describeRemix("same-album", [makePhoto("data/albums/hokkaido/1.jpg")]),
-    ).toBe("hokkaido");
+    expect(describeRemix("same-album", [makePhoto("data/albums/hokkaido/1.jpg")])).toBe("hokkaido");
   });
 
   test("same-city returns the city from the geocode line 2", () => {
@@ -708,8 +633,6 @@ describe("getRemixSwatchRgb", () => {
   });
 
   test("returns null when the seed has no colours", () => {
-    expect(
-      getRemixSwatchRgb("dominant-colour", [makePhoto("a/1.jpg")]),
-    ).toBeNull();
+    expect(getRemixSwatchRgb("dominant-colour", [makePhoto("a/1.jpg")])).toBeNull();
   });
 });

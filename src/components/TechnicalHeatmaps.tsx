@@ -42,20 +42,9 @@ type OverlayLine = {
   labelY: number;
 };
 
-const cubicBezierPoint = (
-  p0: number,
-  p1: number,
-  p2: number,
-  p3: number,
-  t: number,
-): number => {
+const cubicBezierPoint = (p0: number, p1: number, p2: number, p3: number, t: number): number => {
   const mt = 1 - t;
-  return (
-    mt * mt * mt * p0 +
-    3 * mt * mt * t * p1 +
-    3 * mt * t * t * p2 +
-    t * t * t * p3
-  );
+  return mt * mt * mt * p0 + 3 * mt * mt * t * p1 + 3 * mt * t * t * p2 + t * t * t * p3;
 };
 
 const DEFAULT_PAIRS: Array<[number, number]> = [
@@ -66,8 +55,7 @@ const DEFAULT_PAIRS: Array<[number, number]> = [
 
 const EMPTY_TITLES: Record<string, string> = {};
 
-const buildCellKey = (xLabel: string, yLabel: string) =>
-  `${xLabel}\u001f${yLabel}`;
+const buildCellKey = (xLabel: string, yLabel: string) => `${xLabel}\u001f${yLabel}`;
 
 const buildHeatmap = (
   data: ParallelRelationshipData,
@@ -96,18 +84,12 @@ const buildHeatmap = (
   };
 };
 
-const buildRelationshipIndex = (
-  data: ParallelRelationshipData,
-  heatmaps: HeatmapConfig[],
-) => {
+const buildRelationshipIndex = (data: ParallelRelationshipData, heatmaps: HeatmapConfig[]) => {
   const index = new Map<string, Map<string, number>>();
 
   data.paths.forEach((path) => {
     heatmaps.forEach((source) => {
-      const sourceCellKey = buildCellKey(
-        path.values[source.xAxis],
-        path.values[source.yAxis],
-      );
+      const sourceCellKey = buildCellKey(path.values[source.xAxis], path.values[source.yAxis]);
       const sourceSelectionKey = `${source.key}::${sourceCellKey}`;
       const current = index.get(sourceSelectionKey) ?? new Map<string, number>();
 
@@ -116,15 +98,9 @@ const buildRelationshipIndex = (
           return;
         }
 
-        const targetCellKey = buildCellKey(
-          path.values[target.xAxis],
-          path.values[target.yAxis],
-        );
+        const targetCellKey = buildCellKey(path.values[target.xAxis], path.values[target.yAxis]);
         const targetSelectionKey = `${target.key}::${targetCellKey}`;
-        current.set(
-          targetSelectionKey,
-          (current.get(targetSelectionKey) ?? 0) + path.count,
-        );
+        current.set(targetSelectionKey, (current.get(targetSelectionKey) ?? 0) + path.count);
       });
 
       index.set(sourceSelectionKey, current);
@@ -191,9 +167,8 @@ const HeatmapPanel: React.FC<{
               const cellKey = buildCellKey(xBucket, yBucket);
               const globalCellKey = `${config.key}::${cellKey}`;
               const cell =
-                config.cells.find(
-                  (item) => item.xLabel === xBucket && item.yLabel === yBucket,
-                ) ?? null;
+                config.cells.find((item) => item.xLabel === xBucket && item.yLabel === yBucket) ??
+                null;
               const count = cell?.count ?? 0;
               const intensity = count > 0 ? count / max : 0;
               const href =
@@ -226,9 +201,7 @@ const HeatmapPanel: React.FC<{
                   className={[
                     styles.cell,
                     activeXAxisBucket === xBucket ? styles.cellColumnActive : "",
-                    hasActive && !relatedKeys.has(globalCellKey)
-                      ? styles.cellDimmed
-                      : "",
+                    hasActive && !relatedKeys.has(globalCellKey) ? styles.cellDimmed : "",
                     activeSelection?.heatmapKey === config.key &&
                     activeSelection.cellKey === cellKey
                       ? styles.cellActive
@@ -286,23 +259,17 @@ export const TechnicalHeatmaps: React.FC<Props> = ({
       ),
     [data, stablePairs, stableTitles],
   );
-  const relationshipIndex = useMemo(
-    () => buildRelationshipIndex(data, heatmaps),
-    [data, heatmaps],
-  );
+  const relationshipIndex = useMemo(() => buildRelationshipIndex(data, heatmaps), [data, heatmaps]);
   const wrapperRef = useRef<HTMLDivElement | null>(null);
   const cellRefs = useRef(new Map<string, HTMLAnchorElement | null>());
-  const [activeSelection, setActiveSelection] = useState<ActiveSelection | null>(
-    null,
-  );
+  const [activeSelection, setActiveSelection] = useState<ActiveSelection | null>(null);
   const [overlayLines, setOverlayLines] = useState<OverlayLine[]>([]);
 
   const relatedMap = useMemo(
     () =>
       activeSelection
-        ? relationshipIndex.get(
-            `${activeSelection.heatmapKey}::${activeSelection.cellKey}`,
-          ) ?? new Map<string, number>()
+        ? (relationshipIndex.get(`${activeSelection.heatmapKey}::${activeSelection.cellKey}`) ??
+          new Map<string, number>())
         : new Map<string, number>(),
     [activeSelection, relationshipIndex],
   );
@@ -365,20 +332,8 @@ export const TechnicalHeatmaps: React.FC<Props> = ({
           };
           const midX = source.x + (target.x - source.x) * 0.45;
           const labelT = 0.56;
-          const labelX = cubicBezierPoint(
-            source.x,
-            midX,
-            midX,
-            target.x,
-            labelT,
-          );
-          const labelY = cubicBezierPoint(
-            source.y,
-            source.y,
-            target.y,
-            target.y,
-            labelT,
-          );
+          const labelX = cubicBezierPoint(source.x, midX, midX, target.x, labelT);
+          const labelY = cubicBezierPoint(source.y, source.y, target.y, target.y, labelT);
           return [
             {
               key: `${activeSelection.heatmapKey}-${targetKey}`,
@@ -592,9 +547,7 @@ export const TechnicalHeatmaps: React.FC<Props> = ({
           />
         ))
       )}
-      <Caption className={styles.caption}>
-        {caption}
-      </Caption>
+      <Caption className={styles.caption}>{caption}</Caption>
     </div>
   );
 };

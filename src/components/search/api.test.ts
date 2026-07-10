@@ -33,10 +33,7 @@ const makeDatabase = () => {
         return;
       }
 
-      if (
-        sql.includes("FROM embeddings") &&
-        sql.includes("WHERE model_id = ?")
-      ) {
+      if (sql.includes("FROM embeddings") && sql.includes("WHERE model_id = ?")) {
         callback([
           "../albums/test-simple/DSCF0506-2.jpg",
           "google/siglip-base-patch16-224",
@@ -119,9 +116,7 @@ describe("fetchSimilarResults", () => {
       throw new Error(`Expected 2 results, got ${results.data.length ?? 0}`);
     }
     expect(results.data[0]?.path).toBe("../albums/test-simple/DSCF0593.jpg");
-    expect(results.data[1]?.path).toBe(
-      "../albums/test-simple/DSCF2581-2_2.jpg",
-    );
+    expect(results.data[1]?.path).toBe("../albums/test-simple/DSCF2581-2_2.jpg");
     const firstSimilarity = Number(results.data[0]?.similarity ?? 0);
     const secondSimilarity = Number(results.data[1]?.similarity ?? 0);
     expect(firstSimilarity > secondSimilarity).toBe(true);
@@ -218,7 +213,7 @@ describe("fetchSimilarResults", () => {
 
   it("returns empty results when the query embedding_json is malformed", async () => {
     const database = {
-      exec: ({ sql, bind, callback }: ExecArgs) => {
+      exec: ({ sql, callback }: ExecArgs) => {
         if (sql.includes("FROM embeddings") && sql.includes("WHERE path = ?")) {
           callback([
             "../albums/test-simple/DSCF0506-2.jpg",
@@ -243,7 +238,7 @@ describe("fetchSimilarResults", () => {
 
   it("skips malformed candidate embeddings and returns the valid ones", async () => {
     const database = {
-      exec: ({ sql, bind, callback }: ExecArgs) => {
+      exec: ({ sql, callback }: ExecArgs) => {
         if (sql.includes("FROM embeddings") && sql.includes("WHERE path = ?")) {
           callback([
             "../albums/test-simple/DSCF0506-2.jpg",
@@ -254,10 +249,7 @@ describe("fetchSimilarResults", () => {
           return;
         }
 
-        if (
-          sql.includes("FROM embeddings") &&
-          sql.includes("WHERE model_id = ?")
-        ) {
+        if (sql.includes("FROM embeddings") && sql.includes("WHERE model_id = ?")) {
           callback([
             "../albums/test-simple/DSCF0593.jpg",
             "google/siglip-base-patch16-224",
@@ -305,8 +297,7 @@ describe("fetchSimilarResults", () => {
 });
 
 describe("blob-format embeddings", () => {
-  const int8Blob = (values: number[]): Uint8Array =>
-    new Uint8Array(Int8Array.from(values).buffer);
+  const int8Blob = (values: number[]): Uint8Array => new Uint8Array(Int8Array.from(values).buffer);
 
   // Emulates a DB published after the int8-blob format change: table_info
   // reports the blob columns, and only blob-shaped SELECTs return rows — a
@@ -403,9 +394,7 @@ describe("blob-format embeddings", () => {
 
     expect(results.data).toHaveLength(2);
     expect(results.data[0]?.path).toBe("../albums/test-simple/DSCF0593.jpg");
-    expect(results.data[1]?.path).toBe(
-      "../albums/test-simple/DSCF2581-2_2.jpg",
-    );
+    expect(results.data[1]?.path).toBe("../albums/test-simple/DSCF2581-2_2.jpg");
     expect(Number(results.data[0]?.similarity)).toBeGreaterThan(
       Number(results.data[1]?.similarity),
     );
@@ -434,10 +423,7 @@ describe("fetchColorSimilarResults", () => {
           sql.includes("images.geocode LIKE ? OR images.geocode LIKE ?")
         ) {
           expect(bind).toEqual(["%\nTokyo\n%", "%\nTokyo"]);
-          callback([
-            "../albums/test-simple/DSCF0593.jpg",
-            "[(255,0,0), (0,0,0)]",
-          ]);
+          callback(["../albums/test-simple/DSCF0593.jpg", "[(255,0,0), (0,0,0)]"]);
           return;
         }
 
@@ -531,10 +517,7 @@ describe("fetchSemanticResults", () => {
           return;
         }
 
-        if (
-          sql.includes("FROM embeddings") &&
-          sql.includes("WHERE model_id = ?")
-        ) {
+        if (sql.includes("FROM embeddings") && sql.includes("WHERE model_id = ?")) {
           callback([
             "../albums/test-simple/DSCF0506-2.jpg",
             "google/siglip-base-patch16-224",
@@ -594,21 +577,12 @@ describe("fetchHybridResults", () => {
           sql.includes("ORDER BY rank")
         ) {
           expect(bind).toEqual([`- {path album_relative_path exif colors} : "harbor"`]);
-          callback([
-            "../albums/test-simple/DSCF0593.jpg",
-            0.9,
-          ]);
-          callback([
-            "../albums/test-simple/DSCF2581-2_2.jpg",
-            0.5,
-          ]);
+          callback(["../albums/test-simple/DSCF0593.jpg", 0.9]);
+          callback(["../albums/test-simple/DSCF2581-2_2.jpg", 0.5]);
           return;
         }
 
-        if (
-          sql.includes("FROM embeddings") &&
-          sql.includes("WHERE model_id = ?")
-        ) {
+        if (sql.includes("FROM embeddings") && sql.includes("WHERE model_id = ?")) {
           callback([
             "../albums/test-simple/DSCF0506-2.jpg",
             "google/siglip-base-patch16-224",
@@ -721,10 +695,7 @@ describe("fetchHybridResults", () => {
           return;
         }
 
-        if (
-          sql.includes("FROM embeddings") &&
-          sql.includes("WHERE model_id = ?")
-        ) {
+        if (sql.includes("FROM embeddings") && sql.includes("WHERE model_id = ?")) {
           callback([
             "../albums/test-simple/DSCF0506-2.jpg",
             "google/siglip-base-patch16-224",
@@ -961,24 +932,24 @@ describe("fetchSearchFacetSections", () => {
       ],
     });
 
-    expect(
-      sections.find((section) => section.facetId === "camera")?.options,
-    ).toEqual([{ value: "FUJIFILM X-T5", count: 1 }]);
-    expect(
-      sections.find((section) => section.facetId === "region")?.options,
-    ).toEqual([{ value: "Tokyo", count: 1 }]);
-    expect(
-      sections.find((section) => section.facetId === "subregion")?.options,
-    ).toEqual([{ value: "Tokyo", count: 1 }]);
-    expect(
-      sections.find((section) => section.facetId === "city")?.options,
-    ).toEqual([{ value: "Shinjuku-ku", count: 1 }]);
-    expect(
-      sections.find((section) => section.facetId === "year")?.options,
-    ).toEqual([{ value: "2024", count: 1 }]);
-    expect(
-      sections.find((section) => section.facetId === "hour")?.options,
-    ).toEqual([{ value: "17:00", count: 1 }]);
+    expect(sections.find((section) => section.facetId === "camera")?.options).toEqual([
+      { value: "FUJIFILM X-T5", count: 1 },
+    ]);
+    expect(sections.find((section) => section.facetId === "region")?.options).toEqual([
+      { value: "Tokyo", count: 1 },
+    ]);
+    expect(sections.find((section) => section.facetId === "subregion")?.options).toEqual([
+      { value: "Tokyo", count: 1 },
+    ]);
+    expect(sections.find((section) => section.facetId === "city")?.options).toEqual([
+      { value: "Shinjuku-ku", count: 1 },
+    ]);
+    expect(sections.find((section) => section.facetId === "year")?.options).toEqual([
+      { value: "2024", count: 1 },
+    ]);
+    expect(sections.find((section) => section.facetId === "hour")?.options).toEqual([
+      { value: "17:00", count: 1 },
+    ]);
     expect(
       calls.some(({ bind }) =>
         bind?.includes(`- {path album_relative_path exif colors} : "harbor"`),
@@ -996,8 +967,7 @@ describe("fetchSearchFacetSections", () => {
     expect(
       calls.some(
         ({ bind }) =>
-          bind?.includes("%Image Model:FUJIFILM X-T5%") &&
-          bind?.includes("%Image Make:FUJIFILM%"),
+          bind?.includes("%Image Model:FUJIFILM X-T5%") && bind?.includes("%Image Make:FUJIFILM%"),
       ),
     ).toBe(true);
   });
@@ -1006,7 +976,7 @@ describe("fetchSearchFacetSections", () => {
 describe("fetchRandomPhoto", () => {
   it("returns an empty array when the database has no matching rows", async () => {
     const database = {
-      exec: ({ callback }: ExecArgs) => {
+      exec: (_args: ExecArgs) => {
         // return no rows
       },
     };
@@ -1146,8 +1116,34 @@ describe("exec", () => {
   it("resolves with rows collected from the callback", async () => {
     const database = {
       exec: ({ callback }: ExecArgs) => {
-        callback(["path/a.jpg", "/album/a#a.jpg", "a.jpg", "", "", "tag", "[(0,0,0)]", "Alt", "", "", "", ""]);
-        callback(["path/b.jpg", "/album/b#b.jpg", "b.jpg", "", "", "tag", "[(0,0,0)]", "Alt", "", "", "", ""]);
+        callback([
+          "path/a.jpg",
+          "/album/a#a.jpg",
+          "a.jpg",
+          "",
+          "",
+          "tag",
+          "[(0,0,0)]",
+          "Alt",
+          "",
+          "",
+          "",
+          "",
+        ]);
+        callback([
+          "path/b.jpg",
+          "/album/b#b.jpg",
+          "b.jpg",
+          "",
+          "",
+          "tag",
+          "[(0,0,0)]",
+          "Alt",
+          "",
+          "",
+          "",
+          "",
+        ]);
       },
     };
 
@@ -1166,9 +1162,9 @@ describe("exec", () => {
       },
     };
 
-    await expect(
-      searchInternals.exec(database as any, "SELECT 1", []),
-    ).rejects.toThrow("no such table: images");
+    await expect(searchInternals.exec(database as any, "SELECT 1", [])).rejects.toThrow(
+      "no such table: images",
+    );
   });
 });
 
@@ -1198,9 +1194,7 @@ describe("geocode facet precision", () => {
       [{ facetId: "city", value: "Tokyo" }] as any,
       true,
     );
-    expect(clause.sql).toContain(
-      "SELECT path FROM metadata WHERE geo_city = ?",
-    );
+    expect(clause.sql).toContain("SELECT path FROM metadata WHERE geo_city = ?");
     // region "Tokyo" is a different column — city and region no longer collide
     expect(clause.sql).not.toContain("geo_region");
     expect(clause.bind).toEqual(["Tokyo"]);
@@ -1235,11 +1229,11 @@ describe("geocode facet precision", () => {
       },
     };
     const sections = await fetchSearchFacetSections({ database: database as any });
-    expect(
-      sections.find((s) => s.facetId === "region")?.options,
-    ).toEqual([{ value: "RealRegion", count: 1 }]);
-    expect(
-      sections.find((s) => s.facetId === "subregion")?.options,
-    ).toEqual([{ value: "RealSubregion", count: 1 }]);
+    expect(sections.find((s) => s.facetId === "region")?.options).toEqual([
+      { value: "RealRegion", count: 1 },
+    ]);
+    expect(sections.find((s) => s.facetId === "subregion")?.options).toEqual([
+      { value: "RealSubregion", count: 1 },
+    ]);
   });
 });

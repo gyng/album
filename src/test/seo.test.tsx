@@ -15,7 +15,6 @@ jest.mock("../services/album", () => ({
   getAlbumNames: jest.fn(),
 }));
 
-
 const useRouter = jest.fn();
 
 jest.mock("next/router", () => ({
@@ -79,21 +78,15 @@ describe("SEO helpers", () => {
     );
 
     expect(html).toContain("<title>Search | Snapshots</title>");
-    expect(html).toContain(
-      'name="description" content="Search the photo archive."',
-    );
-    expect(html).toContain(
-      'rel="canonical" href="https://photos.example.com/search"',
-    );
+    expect(html).toContain('name="description" content="Search the photo archive."');
+    expect(html).toContain('rel="canonical" href="https://photos.example.com/search"');
     expect(html).toContain(
       'rel="alternate" type="application/rss+xml" title="Snapshots RSS Feed" href="https://photos.example.com/feed.xml"',
     );
     expect(html).toContain('property="og:url" content="https://photos.example.com/search"');
     expect(html).toContain('name="robots" content="noindex, nofollow"');
     expect(html).toContain('name="twitter:card" content="summary_large_image"');
-    expect(html).toContain(
-      'type="application/ld+json"',
-    );
+    expect(html).toContain('type="application/ld+json"');
   });
 
   it("builds canonical URLs from the configured site origin", () => {
@@ -101,17 +94,13 @@ describe("SEO helpers", () => {
   });
 
   it("uses the default social preview image when no page image is supplied", () => {
-    expect(getDefaultSocialImageUrl()).toBe(
-      "https://photos.example.com/social-preview.svg",
-    );
+    expect(getDefaultSocialImageUrl()).toBe("https://photos.example.com/social-preview.svg");
   });
 
   it("builds robots.txt with sitemap and utility route exclusions", () => {
     expect(buildRobotsTxt()).toContain("Disallow: /search");
     expect(buildRobotsTxt()).toContain("Disallow: /slideshow");
-    expect(buildRobotsTxt()).toContain(
-      "Sitemap: https://photos.example.com/sitemap.xml",
-    );
+    expect(buildRobotsTxt()).toContain("Sitemap: https://photos.example.com/sitemap.xml");
   });
 
   it("builds sitemap.xml for core pages and albums", () => {
@@ -130,17 +119,13 @@ describe("SEO helpers", () => {
   it("XML-escapes ampersands and percent-encodes spaces in <loc>", () => {
     const xml = buildSitemapXml([{ path: "/album/food & drink" }]);
 
-    expect(xml).toContain(
-      "<loc>https://photos.example.com/album/food%20&amp;%20drink</loc>",
-    );
+    expect(xml).toContain("<loc>https://photos.example.com/album/food%20&amp;%20drink</loc>");
     expect(xml).not.toContain("food & drink");
   });
 
   it("percent-encodes non-ASCII album slugs in canonical URLs", () => {
     // Canonical and sitemap must agree byte-for-byte for e.g. "türkiye".
-    expect(getCanonicalUrl("/album/türkiye")).toBe(
-      "https://photos.example.com/album/t%C3%BCrkiye",
-    );
+    expect(getCanonicalUrl("/album/türkiye")).toBe("https://photos.example.com/album/t%C3%BCrkiye");
   });
 
   it("resolves a relative page image to absolute og:image/twitter:image", () => {
@@ -185,9 +170,9 @@ describe("SEO helpers", () => {
 
     expect(website["@type"]).toBe("WebSite");
     expect(collection.url).toBe("https://photos.example.com/timeline");
-    expect(
-      (breadcrumbs.itemListElement as Array<{ item: string }>)[1]?.item,
-    ).toBe("https://photos.example.com/timeline");
+    expect((breadcrumbs.itemListElement as Array<{ item: string }>)[1]?.item).toBe(
+      "https://photos.example.com/timeline",
+    );
   });
 
   it("renders album page metadata with cover image and breadcrumb schema", () => {
@@ -225,9 +210,7 @@ describe("SEO helpers", () => {
     );
 
     expect(html).toContain("<title>Tokyo Trip | Snapshots</title>");
-    expect(html).toContain(
-      'property="og:image" content="https://photos.example.com/cover.jpg"',
-    );
+    expect(html).toContain('property="og:image" content="https://photos.example.com/cover.jpg"');
     expect(html).toContain("BreadcrumbList");
     expect(html).toContain("https://photos.example.com/album/trip");
     expect(html).toContain(
@@ -257,10 +240,7 @@ describe("SEO helpers", () => {
 
     const html = renderToStaticMarkup(<TimelinePage entries={[]} />);
 
-    expect(html).toContain(
-      'rel="canonical" href="https://photos.example.com/timeline"',
-    );
+    expect(html).toContain('rel="canonical" href="https://photos.example.com/timeline"');
     expect(html).toContain('name="robots" content="noindex, nofollow"');
   });
 });
-

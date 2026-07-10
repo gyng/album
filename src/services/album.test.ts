@@ -92,18 +92,16 @@ describe("getImageTimestampRange", () => {
   });
 
   it("returns [null, null] when there are no photo blocks", () => {
-    expect(
-      getImageTimestampRange(makeContent([makeText(), makeVideo("2024-01-01")])),
-    ).toEqual([null, null]);
+    expect(getImageTimestampRange(makeContent([makeText(), makeVideo("2024-01-01")]))).toEqual([
+      null,
+      null,
+    ]);
   });
 
   it("returns the same timestamp for both ends when there is one photo", () => {
     const date = "2024-03-10T08:00:00Z";
     const timestamp = "2024-03-10T08:00:00";
-    expect(getImageTimestampRange(makeContent([makePhoto(date)]))).toEqual([
-      timestamp,
-      timestamp,
-    ]);
+    expect(getImageTimestampRange(makeContent([makePhoto(date)]))).toEqual([timestamp, timestamp]);
   });
 
   it("returns [earliest, latest] across multiple photos", () => {
@@ -128,9 +126,7 @@ describe("getImageTimestampRange", () => {
   });
 
   it("returns [null, null] when all photo dates are missing", () => {
-    expect(
-      getImageTimestampRange(makeContent([makePhoto(), makePhoto()])),
-    ).toEqual([null, null]);
+    expect(getImageTimestampRange(makeContent([makePhoto(), makePhoto()]))).toEqual([null, null]);
   });
 
   it("keeps pre-1970 scanned-film dates instead of treating them as missing", () => {

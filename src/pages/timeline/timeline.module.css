@@ -71,8 +71,7 @@
   display: grid;
   gap: var(--m);
   padding-top: var(--m);
-  border-top: solid 1px
-    color-mix(in srgb, var(--c-bg-contrast-light) 35%, transparent);
+  border-top: solid 1px color-mix(in srgb, var(--c-bg-contrast-light) 35%, transparent);
 }
 
 .memoriesHeader {
@@ -81,8 +80,6 @@
   align-items: baseline;
   gap: var(--m-s);
 }
-
-
 
 .memoryClusters {
   display: grid;

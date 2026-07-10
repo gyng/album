@@ -9,10 +9,7 @@ import { type RefCallback, useCallback, useRef } from "react";
  * not restart the count, and reduced-motion users jump straight to the final
  * value.
  */
-export const useAnimatedCounter = (
-  target: number,
-  durationMs = 600,
-): RefCallback<HTMLElement> => {
+export const useAnimatedCounter = (target: number, durationMs = 600): RefCallback<HTMLElement> => {
   const rafRef = useRef<number>(0);
   const prevTarget = useRef<number | null>(null);
 

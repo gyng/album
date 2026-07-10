@@ -44,8 +44,7 @@ const parseNum = (value: string | null): number | null => {
 const isMode = (value: string | null): value is SlideshowMode =>
   value === "random" || value === "weighted" || value === "similar";
 
-const isTruthy = (value: string | null): boolean =>
-  TRUTHY.includes((value ?? "").toLowerCase());
+const isTruthy = (value: string | null): boolean => TRUTHY.includes((value ?? "").toLowerCase());
 
 export const parseSlideshowSearchParams = (
   search: string,
@@ -60,21 +59,16 @@ export const parseSlideshowSearchParams = (
 
   const alignmentParam = params.get("align");
   const alignment: DetailsAlignment | null =
-    alignmentParam === "left" ||
-    alignmentParam === "center" ||
-    alignmentParam === "right"
+    alignmentParam === "left" || alignmentParam === "center" || alignmentParam === "right"
       ? alignmentParam
       : null;
 
   const delaySeconds = parseNum(params.get("delay"));
-  const delayMs =
-    delaySeconds !== null && delaySeconds > 0 ? delaySeconds * 1000 : null;
+  const delayMs = delaySeconds !== null && delaySeconds > 0 ? delaySeconds * 1000 : null;
 
   const shuffleRaw = parseNum(params.get("shuffle"));
   const shuffleHistory =
-    nextMode === "similar" && shuffleRaw !== null && shuffleRaw > 0
-      ? shuffleRaw
-      : null;
+    nextMode === "similar" && shuffleRaw !== null && shuffleRaw > 0 ? shuffleRaw : null;
 
   return {
     filter: params.get("filter") || null,

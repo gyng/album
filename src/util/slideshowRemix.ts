@@ -36,9 +36,7 @@ export const decideRemixPlan = (input: {
 
   // Forced ("Remix now" / drag-up) bypasses the remix-vs-no-remix dice but
   // shares the same layout-size distribution as organic remixes.
-  const count = input.forced
-    ? input.rollLayoutCount()
-    : input.decideCount(input.probability);
+  const count = input.forced ? input.rollLayoutCount() : input.decideCount(input.probability);
   if (count <= 0) {
     return { kind: "none" };
   }

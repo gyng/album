@@ -55,9 +55,7 @@ jest.mock("next/link", () => ({
   ),
 }));
 
-const mapWorldDeferredMock = jest.fn<any, [any]>((_props: any) => (
-  <div data-testid="map-world" />
-));
+const mapWorldDeferredMock = jest.fn<any, [any]>((_props: any) => <div data-testid="map-world" />);
 jest.mock("../../../components/MapWorldDeferred", () => ({
   MapWorldDeferred: (props: any) => {
     mapWorldDeferredMock(props);
@@ -101,9 +99,7 @@ describe("WorldMap route controls", () => {
       />,
     );
 
-    expect(
-      screen.getByText(/Hover or select a photo to trace the journey/i),
-    ).toBeTruthy();
+    expect(screen.getByText(/Hover or select a photo to trace the journey/i)).toBeTruthy();
     expect(mapWorldDeferredMock).toHaveBeenLastCalledWith(
       expect.objectContaining({
         showRoute: false,
@@ -155,9 +151,7 @@ describe("WorldMap route controls", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Show all journeys" }));
 
-    expect(
-      screen.getByRole("button", { name: "Hide all journeys" }),
-    ).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Hide all journeys" })).toBeTruthy();
     expect(mapWorldDeferredMock).toHaveBeenLastCalledWith(
       expect.objectContaining({
         showRoute: true,

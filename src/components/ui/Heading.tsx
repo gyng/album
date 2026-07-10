@@ -13,11 +13,7 @@ export const Heading = (props: {
   const { level, as, className, children } = props;
   const Tag = as ?? defaultElements[level];
   return (
-    <Tag
-      className={[styles.heading, levelClasses[level], className]
-        .filter(Boolean)
-        .join(" ")}
-    >
+    <Tag className={[styles.heading, levelClasses[level], className].filter(Boolean).join(" ")}>
       {children}
     </Tag>
   );
@@ -31,9 +27,5 @@ export const Caption = (props: {
 }) => {
   const { as: Tag = "p", size, className, children } = props;
   const base = size === "sm" ? common.captionSm : common.caption;
-  return (
-    <Tag className={[base, className].filter(Boolean).join(" ")}>
-      {children}
-    </Tag>
-  );
+  return <Tag className={[base, className].filter(Boolean).join(" ")}>{children}</Tag>;
 };

@@ -75,11 +75,7 @@ const RevealFit: React.FC<{
   return null;
 };
 
-export const GuessMap: React.FC<GuessMapProps> = ({
-  guess,
-  reveal,
-  onGuess,
-}) => {
+export const GuessMap: React.FC<GuessMapProps> = ({ guess, reveal, onGuess }) => {
   const handleClick = useCallback(
     (event: MapLayerMouseEvent) => {
       if (reveal) return;
@@ -103,11 +99,7 @@ export const GuessMap: React.FC<GuessMapProps> = ({
         attributionControl={{ compact: true }}
       >
         {guess ? (
-          <Marker
-            longitude={guess.lng}
-            latitude={guess.lat}
-            anchor="center"
-          >
+          <Marker longitude={guess.lng} latitude={guess.lat} anchor="center">
             <div className={styles.guessPin} />
           </Marker>
         ) : null}
@@ -115,20 +107,12 @@ export const GuessMap: React.FC<GuessMapProps> = ({
         {reveal ? (
           <>
             <RevealFit guess={guess} reveal={reveal} />
-            <Marker
-              longitude={reveal.lng}
-              latitude={reveal.lat}
-              anchor="center"
-            >
+            <Marker longitude={reveal.lng} latitude={reveal.lat} anchor="center">
               <div className={styles.actualPin} />
             </Marker>
             {guess ? (
               <>
-                <Source
-                  id="guess-line"
-                  type="geojson"
-                  data={lineGeoJson(guess, reveal)}
-                >
+                <Source id="guess-line" type="geojson" data={lineGeoJson(guess, reveal)}>
                   <Layer
                     id="guess-line-glow"
                     type="line"
@@ -155,9 +139,7 @@ export const GuessMap: React.FC<GuessMapProps> = ({
         ) : null}
       </Map>
 
-      {!reveal && !guess ? (
-        <div className={styles.hint}>Click to place your guess</div>
-      ) : null}
+      {!reveal && !guess ? <div className={styles.hint}>Click to place your guess</div> : null}
     </div>
   );
 };

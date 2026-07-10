@@ -22,16 +22,14 @@ const parseTraceEntries = (tracePath) => {
     return [];
   }
 
-  return content
-    .split(/\n+/)
-    .flatMap((line) => {
-      try {
-        const parsed = JSON.parse(line);
-        return Array.isArray(parsed) ? parsed : [];
-      } catch {
-        return [];
-      }
-    });
+  return content.split(/\n+/).flatMap((line) => {
+    try {
+      const parsed = JSON.parse(line);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  });
 };
 
 const findLastDurationMs = (entries, name) => {
@@ -93,11 +91,9 @@ const evaluateBudget = (summary, budget) => {
 
     const regressionPercent = (regressionMs / rule.baselineMs) * 100;
     const absoluteExceeded =
-      Number.isFinite(rule.maxRegressionMs) &&
-      regressionMs > rule.maxRegressionMs;
+      Number.isFinite(rule.maxRegressionMs) && regressionMs > rule.maxRegressionMs;
     const percentExceeded =
-      Number.isFinite(rule.maxRegressionPercent) &&
-      regressionPercent > rule.maxRegressionPercent;
+      Number.isFinite(rule.maxRegressionPercent) && regressionPercent > rule.maxRegressionPercent;
 
     if (!absoluteExceeded && !percentExceeded) {
       return [];
@@ -127,10 +123,7 @@ const summarizeMetrics = (metrics = {}) => {
           count: metric.count,
           totalMs: Number(metric.totalMs.toFixed(2)),
           maxMs: Number(metric.maxMs.toFixed(2)),
-          averageMs:
-            metric.count > 0
-              ? Number((metric.totalMs / metric.count).toFixed(2))
-              : 0,
+          averageMs: metric.count > 0 ? Number((metric.totalMs / metric.count).toFixed(2)) : 0,
         },
       ]),
   );
@@ -151,9 +144,7 @@ const aggregateProfiles = (profiles) => {
       .filter(Boolean)
       .sort()
       .at(-1),
-    durationMs: Math.max(
-      ...profiles.map((profile) => Number(profile.durationMs) || 0),
-    ),
+    durationMs: Math.max(...profiles.map((profile) => Number(profile.durationMs) || 0)),
     processCount: profiles.length,
     counters: {},
     metrics: {},
@@ -184,10 +175,7 @@ const aggregateProfiles = (profiles) => {
 };
 
 const runBuild = (index) => {
-  const profileDir = path.join(
-    benchmarkProfilesRoot,
-    `album-build-profiles-run-${index}`,
-  );
+  const profileDir = path.join(benchmarkProfilesRoot, `album-build-profiles-run-${index}`);
 
   removeNextDir();
   fs.rmSync(profileDir, { recursive: true, force: true });
@@ -264,12 +252,8 @@ for (let index = 1; index <= runs; index += 1) {
 
 benchmark.summary = {
   medianWallTimeMs: median(benchmark.runs.map((run) => run.wallTimeMs)),
-  medianNextBuildMs: median(
-    benchmark.runs.map((run) => run.trace.nextBuildMs).filter(Boolean),
-  ),
-  medianStaticCheckMs: median(
-    benchmark.runs.map((run) => run.trace.staticCheckMs).filter(Boolean),
-  ),
+  medianNextBuildMs: median(benchmark.runs.map((run) => run.trace.nextBuildMs).filter(Boolean)),
+  medianStaticCheckMs: median(benchmark.runs.map((run) => run.trace.staticCheckMs).filter(Boolean)),
   medianStaticGenerationMs: median(
     benchmark.runs.map((run) => run.trace.staticGenerationMs).filter(Boolean),
   ),
@@ -312,10 +296,7 @@ if (budgetWarnings.length > 0) {
     );
   }
 
-  if (
-    budget?.warnOnly === false ||
-    process.env.ALBUM_BENCHMARK_FAIL_ON_BUDGET === "1"
-  ) {
+  if (budget?.warnOnly === false || process.env.ALBUM_BENCHMARK_FAIL_ON_BUDGET === "1") {
     process.exitCode = 1;
   }
 }

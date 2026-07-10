@@ -1,9 +1,7 @@
 import { getDegLatLngFromExif } from "./dms2deg";
 import { parseExifLocalDateTime } from "./exifTime";
 
-export const extractGPSFromExifString = (
-  exifString: string,
-): [number, number] | null => {
+export const extractGPSFromExifString = (exifString: string): [number, number] | null => {
   if (!exifString) return null;
 
   const exifData: any = Object.fromEntries(
@@ -60,11 +58,7 @@ export const extractGPSFromExifString = (
           /(\d+(?:\.\d+)?)\s*deg\s*(\d+(?:\.\d+)?)'?\s*(\d+(?:\.\d+)?)/,
         );
         if (degMatch) {
-          return [
-            parseFloat(degMatch[1]),
-            parseFloat(degMatch[2]),
-            parseFloat(degMatch[3]),
-          ];
+          return [parseFloat(degMatch[1]), parseFloat(degMatch[2]), parseFloat(degMatch[3])];
         }
 
         // Handle simple space-separated format with fractions

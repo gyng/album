@@ -58,20 +58,14 @@ describe("CalendarHeatmap", () => {
     const onSelectDate = jest.fn();
 
     render(
-      <CalendarHeatmap
-        entries={entries}
-        selectedDate="2024-01-02"
-        onSelectDate={onSelectDate}
-      />,
+      <CalendarHeatmap entries={entries} selectedDate="2024-01-02" onSelectDate={onSelectDate} />,
     );
 
     expect(screen.getByRole("heading", { name: "2024" })).toBeTruthy();
     expect(screen.getAllByText("S")).toHaveLength(2); // S for Sunday and Saturday
-    expect(
-      screen.getByRole("button", { name: /^2 Jan 2024:/i }).getAttribute(
-        "aria-pressed",
-      ),
-    ).toBe("true");
+    expect(screen.getByRole("button", { name: /^2 Jan 2024:/i }).getAttribute("aria-pressed")).toBe(
+      "true",
+    );
 
     fireEvent.click(screen.getByRole("button", { name: /^2 Jan 2024:/i }));
 
@@ -79,13 +73,7 @@ describe("CalendarHeatmap", () => {
   });
 
   it("shows a thumbnail preview popup with a remaining-count label on hover", () => {
-    render(
-      <CalendarHeatmap
-        entries={entries}
-        selectedDate="2024-01-02"
-        onSelectDate={() => {}}
-      />,
-    );
+    render(<CalendarHeatmap entries={entries} selectedDate="2024-01-02" onSelectDate={() => {}} />);
 
     fireEvent.mouseEnter(screen.getByRole("button", { name: /^2 Jan 2024:/i }));
 
@@ -103,9 +91,7 @@ describe("CalendarHeatmap", () => {
       />,
     );
 
-    fireEvent.mouseEnter(
-      screen.getByRole("button", { name: /^1 Jan 2024: no photos/i }),
-    );
+    fireEvent.mouseEnter(screen.getByRole("button", { name: /^1 Jan 2024: no photos/i }));
 
     expect(screen.getByText("Monday")).toBeTruthy();
     expect(screen.getByText("1 January 2024")).toBeTruthy();
@@ -121,30 +107,24 @@ describe("CalendarHeatmap", () => {
       />,
     );
 
+    expect(screen.getByRole("button", { name: /^2 Jan 2024:/i }).getAttribute("aria-current")).toBe(
+      "date",
+    );
     expect(
-      screen.getByRole("button", { name: /^2 Jan 2024:/i }).getAttribute(
-        "aria-current",
-      ),
-    ).toBe("date");
-    expect(
-      screen.getByRole("button", { name: /^5 Mar 2024: future date/i }).getAttribute(
-        "aria-disabled",
-      ),
+      screen
+        .getByRole("button", { name: /^5 Mar 2024: future date/i })
+        .getAttribute("aria-disabled"),
     ).toBe("true");
   });
 
   it("does not fabricate a today ring from the build clock when todayDate is absent", () => {
     const now = new Date();
     const pad = (value: number) => `${value}`.padStart(2, "0");
-    const todayKey = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(
-      now.getDate(),
-    )}`;
+    const todayKey = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
 
     render(
       <CalendarHeatmap
-        entries={[
-          { ...entries[0], date: todayKey, href: "/album/kansai#today.jpg" },
-        ]}
+        entries={[{ ...entries[0], date: todayKey, href: "/album/kansai#today.jpg" }]}
         selectedDate={null}
         onSelectDate={() => {}}
       />,
@@ -165,9 +145,9 @@ describe("CalendarHeatmap", () => {
       />,
     );
 
-    expect(
-      screen.getByRole("button", { name: /^5 Mar 2024:/i }).className,
-    ).toMatch(/memoryHighlighted/);
+    expect(screen.getByRole("button", { name: /^5 Mar 2024:/i }).className).toMatch(
+      /memoryHighlighted/,
+    );
   });
 
   it("highlights specified years and can receive a scroll target", () => {

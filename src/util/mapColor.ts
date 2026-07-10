@@ -31,8 +31,7 @@ const clamp01 = (value: number): number => {
   return Math.min(1, Math.max(0, value));
 };
 
-const lerp = (from: number, to: number, t: number): number =>
-  from + (to - from) * t;
+const lerp = (from: number, to: number, t: number): number => from + (to - from) * t;
 
 /**
  * Map a recency ratio (0 = oldest, 1 = newest) to a marker colour.
@@ -50,9 +49,7 @@ export const recencyColor = (relative: number): string => {
  * Evenly spaced stops across the recency ramp, oldest → newest, for rendering
  * the legend gradient. `count` is the number of stops (minimum 2).
  */
-export const recencyGradientStops = (
-  count = 7,
-): { offset: number; color: string }[] => {
+export const recencyGradientStops = (count = 7): { offset: number; color: string }[] => {
   const stops = Math.max(2, Math.floor(count));
   return Array.from({ length: stops }, (_, index) => {
     const offset = index / (stops - 1);
@@ -61,22 +58,15 @@ export const recencyGradientStops = (
 };
 
 /** CSS `linear-gradient(...)` value for the legend bar (oldest → newest). */
-export const recencyGradientCss = (
-  angle = "90deg",
-  count = 7,
-): string => {
+export const recencyGradientCss = (angle = "90deg", count = 7): string => {
   const stops = recencyGradientStops(count)
     .map((stop) => `${stop.color} ${(stop.offset * 100).toFixed(0)}%`)
     .join(", ");
   return `linear-gradient(${angle}, ${stops})`;
 };
 
-const parseHsl = (
-  color: string,
-): { hue: number; saturation: number; lightness: number } | null => {
-  const match = color.match(
-    /hsl\(\s*([\d.]+),\s*([\d.]+)%,\s*([\d.]+)%\s*\)/,
-  );
+const parseHsl = (color: string): { hue: number; saturation: number; lightness: number } | null => {
+  const match = color.match(/hsl\(\s*([\d.]+),\s*([\d.]+)%,\s*([\d.]+)%\s*\)/);
   if (!match) {
     return null;
   }

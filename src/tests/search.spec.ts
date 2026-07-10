@@ -3,8 +3,7 @@ import { existsSync, statSync } from "fs";
 import { join } from "path";
 
 const searchDbPath = join(__dirname, "..", "public", "search.sqlite");
-const hasSearchDb =
-  existsSync(searchDbPath) && statSync(searchDbPath).size > 0;
+const hasSearchDb = existsSync(searchDbPath) && statSync(searchDbPath).size > 0;
 
 test.describe("Search", () => {
   let pageErrors: string[] = [];
@@ -43,9 +42,7 @@ test.describe("Search", () => {
     await page.goto("/search");
 
     // Use keyword mode to avoid WebGPU dependency
-    await page
-      .getByLabel("Search mode", { exact: true })
-      .selectOption("keyword");
+    await page.getByLabel("Search mode", { exact: true }).selectOption("keyword");
 
     const input = page.locator('input[placeholder*="Type / to search"]');
     await input.fill("japan");
@@ -64,9 +61,9 @@ test.describe("Search", () => {
     await page.goto("/search");
 
     // Wait for the facet panel's "Tags" tab — needs DB to load via WASM first
-    await expect(
-      page.getByRole("tab", { name: "Tags", selected: true }),
-    ).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByRole("tab", { name: "Tags", selected: true })).toBeVisible({
+      timeout: 15_000,
+    });
 
     // Click the first tag pill button (tags load after WASM DB init)
     const tagPill = page.locator('[class*="pill"]').first();

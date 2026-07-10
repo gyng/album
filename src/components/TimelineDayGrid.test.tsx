@@ -75,7 +75,9 @@ describe("TimelineDayGrid", () => {
 
     expect(screen.getByRole("heading", { name: /2 january 2024/i })).toBeTruthy();
     expect(screen.getByText("2 photos")).toBeTruthy();
-    expect(screen.getByLabelText("Location summary").textContent).toContain("Akihabara, Chiyoda-ku, Japan");
+    expect(screen.getByLabelText("Location summary").textContent).toContain(
+      "Akihabara, Chiyoda-ku, Japan",
+    );
     expect(screen.getByText("yesterday")).toBeTruthy();
     expect(screen.getByText("20 hours ago")).toBeTruthy();
     expect(screen.getByText("kansai")).toBeTruthy();
@@ -83,12 +85,8 @@ describe("TimelineDayGrid", () => {
     expect(screen.getByRole("heading", { name: "Map" })).toBeTruthy();
     expect(screen.getByText("1 mapped photo")).toBeTruthy();
     expect(screen.getByTestId("timeline-map")).toBeTruthy();
-    expect(
-      document.querySelector('a[href="/album/kansai#a.jpg"]'),
-    ).toBeTruthy();
-    expect(
-      document.querySelector('a[href="/album/tokyo#b.jpg"]'),
-    ).toBeTruthy();
+    expect(document.querySelector('a[href="/album/kansai#a.jpg"]')).toBeTruthy();
+    expect(document.querySelector('a[href="/album/tokyo#b.jpg"]')).toBeTruthy();
     const similarLinks = screen.getAllByRole("link", {
       name: /find similar photos/i,
     });
@@ -96,9 +94,7 @@ describe("TimelineDayGrid", () => {
       "/search?similar=..%2Falbums%2Fkansai%2Fa.jpg",
       "/search?similar=..%2Falbums%2Ftokyo%2Fb.jpg",
     ]);
-    expect(screen.getByText("yesterday").getAttribute("title")).toBe(
-      "2 January 2024 at 12:00",
-    );
+    expect(screen.getByText("yesterday").getAttribute("title")).toBe("2 January 2024 at 12:00");
   });
 
   it("renders an empty state when no date is selected", () => {

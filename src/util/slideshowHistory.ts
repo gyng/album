@@ -50,10 +50,7 @@ export const advanceHistory = (
 ): SlideshowHistoryState => {
   switch (action.type) {
     case "commit": {
-      const history = [
-        ...state.history.slice(0, state.index + 1),
-        action.entry,
-      ];
+      const history = [...state.history.slice(0, state.index + 1), action.entry];
       return { history, index: history.length - 1 };
     }
     case "goTo": {
@@ -104,20 +101,13 @@ export const advanceHistory = (
 
 // --- Derived selectors (pure) -------------------------------------------
 
-export const currentEntry = (
-  state: SlideshowHistoryState,
-): NavigationEntry | null =>
+export const currentEntry = (state: SlideshowHistoryState): NavigationEntry | null =>
   state.index >= 0 ? (state.history[state.index] ?? null) : null;
 
-export const canGoBack = (state: SlideshowHistoryState): boolean =>
-  state.index > 0;
+export const canGoBack = (state: SlideshowHistoryState): boolean => state.index > 0;
 
 export const hasForwardEntry = (state: SlideshowHistoryState): boolean =>
   state.index < state.history.length - 1;
 
-export const upcomingSeed = (
-  state: SlideshowHistoryState,
-): RandomPhotoRow | null =>
-  hasForwardEntry(state)
-    ? (state.history[state.index + 1]?.seed ?? null)
-    : null;
+export const upcomingSeed = (state: SlideshowHistoryState): RandomPhotoRow | null =>
+  hasForwardEntry(state) ? (state.history[state.index + 1]?.seed ?? null) : null;

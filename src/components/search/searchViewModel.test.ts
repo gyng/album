@@ -1,17 +1,10 @@
 import type { SearchFacetSelection } from "../../util/searchFacets";
 import type { SearchFacetSection } from "./SearchFacetPanel";
-import {
-  getActiveFilterCount,
-  mergeFacetSections,
-  normaliseSearchTerms,
-} from "./searchViewModel";
+import { getActiveFilterCount, mergeFacetSections, normaliseSearchTerms } from "./searchViewModel";
 
 describe("searchViewModel", () => {
   it("normalises terms and counts each active filter domain", () => {
-    expect(normaliseSearchTerms([" Cat ", "", "NIGHT"])).toEqual([
-      "cat",
-      "night",
-    ]);
+    expect(normaliseSearchTerms([" Cat ", "", "NIGHT"])).toEqual(["cat", "night"]);
     expect(
       getActiveFilterCount({
         selectedFacetCount: 2,
@@ -43,9 +36,7 @@ describe("searchViewModel", () => {
         ],
       },
     ];
-    const selected: SearchFacetSelection[] = [
-      { facetId: "city", value: "Nagoya" },
-    ];
+    const selected: SearchFacetSelection[] = [{ facetId: "city", value: "Nagoya" }];
 
     expect(mergeFacetSections(catalog, live, selected)).toEqual([
       {

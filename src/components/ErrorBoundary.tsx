@@ -12,10 +12,7 @@ type ErrorBoundaryState = {
 // Top-level boundary so a render-time throw in any page shows a recoverable
 // fallback instead of a blank white screen. Error boundaries must be class
 // components — there is no hook equivalent for componentDidCatch.
-export class ErrorBoundary extends React.Component<
-  ErrorBoundaryProps,
-  ErrorBoundaryState
-> {
+export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
   constructor(props: ErrorBoundaryProps) {
     super(props);
     this.state = { hasError: false };
@@ -44,11 +41,7 @@ export class ErrorBoundary extends React.Component<
             <p className={styles.body}>
               This page hit an unexpected error. Reloading usually fixes it.
             </p>
-            <button
-              className={styles.button}
-              type="button"
-              onClick={this.handleReload}
-            >
+            <button className={styles.button} type="button" onClick={this.handleReload}>
               Reload page
             </button>
           </div>

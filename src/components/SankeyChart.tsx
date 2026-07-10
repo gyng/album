@@ -59,19 +59,11 @@ const truncateLabel = (label: string, max = 28) =>
   label.length > max ? `${label.slice(0, max - 1)}…` : label;
 
 const buildFacetHref = (facetId?: string, facetValue?: string) =>
-  facetId && facetValue
-    ? `/search?facet=${encodeURIComponent(`${facetId}:${facetValue}`)}`
-    : null;
+  facetId && facetValue ? `/search?facet=${encodeURIComponent(`${facetId}:${facetValue}`)}` : null;
 
 const getNodeLabel = (node: SankeyComputedNode): string =>
-  node.data?.displayLabel ??
-  node.data?.label ??
-  node.displayLabel ??
-  node.label ??
-  node.id ??
-  "";
-const getNodeDepth = (node: SankeyComputedNode): number =>
-  node.data?.depth ?? node.depth ?? 0;
+  node.data?.displayLabel ?? node.data?.label ?? node.displayLabel ?? node.label ?? node.id ?? "";
+const getNodeDepth = (node: SankeyComputedNode): number => node.data?.depth ?? node.depth ?? 0;
 const getNodeFacetId = (node: SankeyComputedNode): string | undefined =>
   node.data?.facetId ?? node.facetId;
 const getNodeFacetValue = (node: SankeyComputedNode): string | undefined =>
@@ -98,18 +90,13 @@ const ClickableLabelLayer = ({
           return null;
         }
 
-        const href = buildFacetHref(
-          getNodeFacetId(node),
-          getNodeFacetValue(node),
-        );
+        const href = buildFacetHref(getNodeFacetId(node), getNodeFacetValue(node));
         const depth = getNodeDepth(node);
         const isLeftColumn = depth === 0;
         const isRightColumn = depth === maxDepth;
-        const x =
-          isLeftColumn || !isRightColumn ? node.x1 + 12 : node.x0 - 12;
+        const x = isLeftColumn || !isRightColumn ? node.x1 + 12 : node.x0 - 12;
         const y = node.y0 + (node.y1 - node.y0) / 2;
-        const textAnchor =
-          isLeftColumn || !isRightColumn ? "start" : "end";
+        const textAnchor = isLeftColumn || !isRightColumn ? "start" : "end";
         const label = truncateLabel(
           `${getNodeLabel(node)} · ${getNodeCount(node).toLocaleString()}`,
           labelMaxLength,
@@ -214,14 +201,14 @@ const readCssSpacing = (name: string, fallback: number): number => {
     return fallback;
   }
 
-  const raw = getComputedStyle(document.documentElement)
-    .getPropertyValue(name)
-    .trim();
+  const raw = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
   const parsed = Number.parseFloat(raw);
   return Number.isFinite(parsed) ? parsed : fallback;
 };
 
-const withFlowColors = (flow: SankeyFlow): {
+const withFlowColors = (
+  flow: SankeyFlow,
+): {
   nodes: SankeyChartNode[];
   links: SankeyChartLink[];
 } => {
@@ -263,10 +250,7 @@ const withFlowColors = (flow: SankeyFlow): {
       return;
     }
 
-    rootIdByNodeId.set(
-      node.id,
-      rootIdByNodeId.get(strongestSource) ?? strongestSource,
-    );
+    rootIdByNodeId.set(node.id, rootIdByNodeId.get(strongestSource) ?? strongestSource);
   });
 
   const nodes = flow.nodes.map((node) => {

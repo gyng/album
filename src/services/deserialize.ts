@@ -1,11 +1,6 @@
 import fs from "fs";
 import path from "path";
-import {
-  getNextJsSafeExif,
-  getPhotoSize,
-  optimiseImages,
-  stripPublicFromPath,
-} from "./photo";
+import { getNextJsSafeExif, getPhotoSize, optimiseImages, stripPublicFromPath } from "./photo";
 import { getOriginalVideoTechnicalData, optimiseVideo } from "./video";
 import {
   Block,
@@ -19,10 +14,7 @@ import {
   TextBlock,
   VideoBlock,
 } from "./types";
-import {
-  incrementBuildCounter,
-  measureBuild,
-} from "./buildTiming";
+import { incrementBuildCounter, measureBuild } from "./buildTiming";
 import { parseColorPalette } from "../util/colorDistance";
 const sqlite3 = require("sqlite3").verbose();
 
@@ -65,23 +57,16 @@ const isMissingLocalMediaError = (err: unknown): boolean => {
   }
 
   const maybeNodeError = err as NodeJS.ErrnoException;
-  return (
-    maybeNodeError.code === "ENOENT" ||
-    err.message.includes("Input file is missing")
-  );
+  return maybeNodeError.code === "ENOENT" || err.message.includes("Input file is missing");
 };
 
 const makeMissingFileError = (filepath: string): NodeJS.ErrnoException => {
-  const error = new Error(
-    `Input file is missing: ${filepath}`,
-  ) as NodeJS.ErrnoException;
+  const error = new Error(`Input file is missing: ${filepath}`) as NodeJS.ErrnoException;
   error.code = "ENOENT";
   return error;
 };
 
-export const deserializeTextBlock = async (
-  serialized: SerializedTextBlock,
-): Promise<TextBlock> => {
+export const deserializeTextBlock = async (serialized: SerializedTextBlock): Promise<TextBlock> => {
   return measureBuild("deserialize.textBlock", async () => {
     const copy = { ...serialized };
     return new Promise((resolve) => {
@@ -103,10 +88,8 @@ export const deserializeVideoBlock = async (
 
     const localFilepath = path.join(options.dirname, serialized.data.href);
     const optimised = await optimiseVideo(localFilepath, "public/data/albums");
-    const originalTechnicalData =
-      await getOriginalVideoTechnicalData(localFilepath);
-    const resolvedDate =
-      serialized.data.date ?? originalTechnicalData.originalDate;
+    const originalTechnicalData = await getOriginalVideoTechnicalData(localFilepath);
+    const resolvedDate = serialized.data.date ?? originalTechnicalData.originalDate;
 
     const copy: VideoBlock = {
       ...serialized,
@@ -231,10 +214,7 @@ export const deserializePhotoBlock = async (
   });
 };
 
-export const deserializeBlock = async (
-  b: SerializedBlock,
-  dirname?: string,
-): Promise<Block> => {
+export const deserializeBlock = async (b: SerializedBlock, dirname?: string): Promise<Block> => {
   return measureBuild("deserialize.block", async () => {
     switch (b.kind) {
       case "photo":
@@ -262,31 +242,23 @@ export const deserializeContentBlock = async (
 ): Promise<Content> => {
   return measureBuild("deserialize.contentBlock", async () => {
     incrementBuildCounter("deserialize.contentBlock.calls");
-    incrementBuildCounter(
-      "deserialize.contentBlock.blockCount",
-      serialized.blocks.length,
-    );
+    incrementBuildCounter("deserialize.contentBlock.blockCount", serialized.blocks.length);
 
     const deserializedBlocks = await Promise.all(
       serialized.blocks.map(async (b) => {
         try {
           return await deserializeBlock(b, dirname);
         } catch (err) {
-          const isMissingLocalPhoto =
-            b.kind === "photo" && isMissingLocalMediaError(err);
+          const isMissingLocalPhoto = b.kind === "photo" && isMissingLocalMediaError(err);
           const isMissingLocalVideo =
-            b.kind === "video" &&
-            b.data.type === "local" &&
-            isMissingLocalMediaError(err);
+            b.kind === "video" && b.data.type === "local" && isMissingLocalMediaError(err);
 
           if (!isMissingLocalPhoto && !isMissingLocalVideo) {
             throw err;
           }
 
           const missingPath =
-            b.kind === "photo"
-              ? path.join(dirname, b.data.src)
-              : path.join(dirname, b.data.href);
+            b.kind === "photo" ? path.join(dirname, b.data.src) : path.join(dirname, b.data.href);
 
           incrementBuildCounter("deserialize.contentBlock.skippedMissingMedia");
           console.warn(`Skipping missing media file: ${missingPath}`);

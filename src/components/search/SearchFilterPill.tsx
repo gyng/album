@@ -19,11 +19,9 @@ export const SearchFilterPill: React.FC<Props> = ({
   return (
     <button
       type="button"
-      className={[
-        styles.pill,
-        isActive ? styles.active : "",
-        disabled ? styles.disabled : "",
-      ].join(" ")}
+      className={[styles.pill, isActive ? styles.active : "", disabled ? styles.disabled : ""].join(
+        " ",
+      )}
       disabled={disabled}
       aria-pressed={isActive}
       onClick={onClick}

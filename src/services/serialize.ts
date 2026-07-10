@@ -11,9 +11,7 @@ import {
   VideoBlock,
 } from "./types";
 
-export const serializePhotoBlock = (
-  block: PhotoBlock,
-): SerializedPhotoBlock => {
+export const serializePhotoBlock = (block: PhotoBlock): SerializedPhotoBlock => {
   // Work on a shallow copy of `formatting` so the source Content is never
   // mutated (the previous `delete` operated on the shared reference).
   const formatting = block.formatting ? { ...block.formatting } : undefined;
@@ -51,9 +49,7 @@ export const serializeTextBlock = (block: TextBlock): SerializedTextBlock => {
   return copy;
 };
 
-export const serializeVideoBlock = (
-  block: VideoBlock,
-): SerializedVideoBlock => {
+export const serializeVideoBlock = (block: VideoBlock): SerializedVideoBlock => {
   const copy = { ...block };
   return copy;
 };

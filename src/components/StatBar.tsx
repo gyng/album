@@ -23,12 +23,7 @@ export const StatBar: React.FC<Props> = ({
   const pct = maxCount > 0 ? (count / maxCount) * 100 : 0;
 
   return (
-    <div
-      className={[
-        styles.row,
-        actionHref ? styles.rowInteractive : "",
-      ].join(" ")}
-    >
+    <div className={[styles.row, actionHref ? styles.rowInteractive : ""].join(" ")}>
       <span className={styles.label}>
         {labelPrefix}
         <span>{label}</span>

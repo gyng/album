@@ -37,9 +37,7 @@ const VideoDetailsPanel: React.FC<{
   };
 }> = (props) => {
   const technicalProfile =
-    props.type === "local"
-      ? "H.264 (AVC) + AAC, web-optimised MP4"
-      : "YouTube adaptive stream";
+    props.type === "local" ? "H.264 (AVC) + AAC, web-optimised MP4" : "YouTube adaptive stream";
 
   return (
     <div id={props.id ?? props.src} className={styles.details}>
@@ -52,122 +50,119 @@ const VideoDetailsPanel: React.FC<{
           <div className={styles.videoDetailsTableWrapper}>
             <table>
               <tbody>
+                <tr>
+                  <td>Type</td>
+                  <td>{props.type}</td>
+                </tr>
+
+                <tr>
+                  <td>Technical profile</td>
+                  <td>{technicalProfile}</td>
+                </tr>
+
+                {props.mimeType ? (
                   <tr>
-                    <td>Type</td>
-                    <td>{props.type}</td>
+                    <td>Playback MIME</td>
+                    <td>{props.mimeType}</td>
                   </tr>
+                ) : null}
 
+                {props.type === "local" ? (
                   <tr>
-                    <td>Technical profile</td>
-                    <td>{technicalProfile}</td>
+                    <td>Max width</td>
+                    <td>1920px</td>
                   </tr>
+                ) : null}
 
-                  {props.mimeType ? (
-                    <tr>
-                      <td>Playback MIME</td>
-                      <td>{props.mimeType}</td>
-                    </tr>
-                  ) : null}
+                {props.type === "local" && props.originalSrc ? (
+                  <tr>
+                    <td>Original file</td>
+                    <td className={styles.sourceCell}>{props.originalSrc}</td>
+                  </tr>
+                ) : null}
 
-                  {props.type === "local" ? (
-                    <tr>
-                      <td>Max width</td>
-                      <td>1920px</td>
-                    </tr>
-                  ) : null}
+                {props.type === "local" && props.originalTechnicalData?.originalDate ? (
+                  <tr>
+                    <td>Original date</td>
+                    <td>{props.originalTechnicalData.originalDate}</td>
+                  </tr>
+                ) : null}
 
-                  {props.type === "local" && props.originalSrc ? (
-                    <tr>
-                      <td>Original file</td>
-                      <td className={styles.sourceCell}>{props.originalSrc}</td>
-                    </tr>
-                  ) : null}
+                {props.type === "local" && props.originalTechnicalData?.codec ? (
+                  <tr>
+                    <td>Codec</td>
+                    <td>{props.originalTechnicalData.codec}</td>
+                  </tr>
+                ) : null}
 
-                  {props.type === "local" &&
-                  props.originalTechnicalData?.originalDate ? (
-                    <tr>
-                      <td>Original date</td>
-                      <td>{props.originalTechnicalData.originalDate}</td>
-                    </tr>
-                  ) : null}
+                {props.type === "local" && props.originalTechnicalData?.profile ? (
+                  <tr>
+                    <td>Profile</td>
+                    <td>{props.originalTechnicalData.profile}</td>
+                  </tr>
+                ) : null}
 
-                  {props.type === "local" && props.originalTechnicalData?.codec ? (
-                    <tr>
-                      <td>Codec</td>
-                      <td>{props.originalTechnicalData.codec}</td>
-                    </tr>
-                  ) : null}
+                {props.type === "local" && props.originalTechnicalData?.fps ? (
+                  <tr>
+                    <td>Framerate</td>
+                    <td>{props.originalTechnicalData.fps} fps</td>
+                  </tr>
+                ) : null}
 
-                  {props.type === "local" && props.originalTechnicalData?.profile ? (
-                    <tr>
-                      <td>Profile</td>
-                      <td>{props.originalTechnicalData.profile}</td>
-                    </tr>
-                  ) : null}
+                {props.type === "local" && props.originalTechnicalData?.bitrateKbps ? (
+                  <tr>
+                    <td>Bitrate</td>
+                    <td>{props.originalTechnicalData.bitrateKbps} kbps</td>
+                  </tr>
+                ) : null}
 
-                  {props.type === "local" && props.originalTechnicalData?.fps ? (
-                    <tr>
-                      <td>Framerate</td>
-                      <td>{props.originalTechnicalData.fps} fps</td>
-                    </tr>
-                  ) : null}
+                {props.type === "local" && props.originalTechnicalData?.durationSeconds ? (
+                  <tr>
+                    <td>Duration</td>
+                    <td>{props.originalTechnicalData.durationSeconds}s</td>
+                  </tr>
+                ) : null}
 
-                  {props.type === "local" && props.originalTechnicalData?.bitrateKbps ? (
-                    <tr>
-                      <td>Bitrate</td>
-                      <td>{props.originalTechnicalData.bitrateKbps} kbps</td>
-                    </tr>
-                  ) : null}
+                {props.type === "local" &&
+                props.originalTechnicalData?.width &&
+                props.originalTechnicalData?.height ? (
+                  <tr>
+                    <td>Original size</td>
+                    <td>
+                      {props.originalTechnicalData.width}px × {props.originalTechnicalData.height}px
+                    </td>
+                  </tr>
+                ) : null}
 
-                  {props.type === "local" && props.originalTechnicalData?.durationSeconds ? (
-                    <tr>
-                      <td>Duration</td>
-                      <td>{props.originalTechnicalData.durationSeconds}s</td>
-                    </tr>
-                  ) : null}
+                {props.type === "local" && props.originalTechnicalData?.audioCodec ? (
+                  <tr>
+                    <td>Audio codec</td>
+                    <td>{props.originalTechnicalData.audioCodec}</td>
+                  </tr>
+                ) : null}
 
-                  {props.type === "local" &&
-                  props.originalTechnicalData?.width &&
-                  props.originalTechnicalData?.height ? (
-                    <tr>
-                      <td>Original size</td>
-                      <td>
-                        {props.originalTechnicalData.width}px ×{" "}
-                        {props.originalTechnicalData.height}px
-                      </td>
-                    </tr>
-                  ) : null}
+                {props.type === "local" && props.originalTechnicalData?.container ? (
+                  <tr>
+                    <td>Original container</td>
+                    <td>{props.originalTechnicalData.container}</td>
+                  </tr>
+                ) : null}
 
-                  {props.type === "local" && props.originalTechnicalData?.audioCodec ? (
-                    <tr>
-                      <td>Audio codec</td>
-                      <td>{props.originalTechnicalData.audioCodec}</td>
-                    </tr>
-                  ) : null}
+                {props.type === "local" && props.originalTechnicalData?.fileSizeBytes ? (
+                  <tr>
+                    <td>File size</td>
+                    <td>
+                      {(props.originalTechnicalData.fileSizeBytes / (1024 * 1024)).toFixed(2)} MB
+                    </td>
+                  </tr>
+                ) : null}
 
-                  {props.type === "local" && props.originalTechnicalData?.container ? (
-                    <tr>
-                      <td>Original container</td>
-                      <td>{props.originalTechnicalData.container}</td>
-                    </tr>
-                  ) : null}
-
-                  {props.type === "local" && props.originalTechnicalData?.fileSizeBytes ? (
-                    <tr>
-                      <td>File size</td>
-                      <td>
-                        {(props.originalTechnicalData.fileSizeBytes / (1024 * 1024)).toFixed(2)} MB
-                      </td>
-                    </tr>
-                  ) : null}
-
-                  {props.date ? (
-                    <tr>
-                      <td>Date</td>
-                      <td>{props.date}</td>
-                    </tr>
-                  ) : null}
-
+                {props.date ? (
+                  <tr>
+                    <td>Date</td>
+                    <td>{props.date}</td>
+                  </tr>
+                ) : null}
               </tbody>
             </table>
 
@@ -208,7 +203,6 @@ const VideoDetailsPanel: React.FC<{
             </details>
           </div>
         </div>
-
       </details>
     </div>
   );
@@ -232,12 +226,7 @@ export const YoutubeBlockEl: React.FC<YoutubeBlockElProps> = (props) => {
         ></iframe>
       </div>
 
-      <VideoDetailsPanel
-        type="youtube"
-        src={props.src}
-        date={props.date}
-        id={props.src}
-      />
+      <VideoDetailsPanel type="youtube" src={props.src} date={props.date} id={props.src} />
     </div>
   );
 };

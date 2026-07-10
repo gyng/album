@@ -141,9 +141,7 @@ describe("selectEmbeddingModelId", () => {
   });
 
   it("uses any single available model when neither known id is present", () => {
-    expect(selectEmbeddingModelId(["some/other-model"])).toBe(
-      "some/other-model",
-    );
+    expect(selectEmbeddingModelId(["some/other-model"])).toBe("some/other-model");
   });
 
   it("returns null when no models are available", () => {
@@ -153,16 +151,11 @@ describe("selectEmbeddingModelId", () => {
 
 describe("computeVisualSamenessStats with a mixed v1/v2 database", () => {
   it("counts each photo once by filtering to a single embedding space", async () => {
-    const paths = Array.from(
-      { length: 30 },
-      (_, index) => `../albums/real/img-${index}.jpg`,
-    );
+    const paths = Array.from({ length: 30 }, (_, index) => `../albums/real/img-${index}.jpg`);
     const v2Random = makePseudoRandom(7);
     const v1Random = makePseudoRandom(99);
     const randomVector = (rng: () => number) =>
-      JSON.stringify(
-        normalize([rng() * 2 - 1, rng() * 2 - 1, rng() * 2 - 1]),
-      );
+      JSON.stringify(normalize([rng() * 2 - 1, rng() * 2 - 1, rng() * 2 - 1]));
 
     const rows = [
       ...paths.map((photoPath) => ({
@@ -187,10 +180,7 @@ describe("computeVisualSamenessStats with a mixed v1/v2 database", () => {
   });
 
   it("reads int8 blob embeddings (current DB format)", async () => {
-    const paths = Array.from(
-      { length: 30 },
-      (_, index) => `../albums/real/img-${index}.jpg`,
-    );
+    const paths = Array.from({ length: 30 }, (_, index) => `../albums/real/img-${index}.jpg`);
     const rng = makePseudoRandom(7);
     const rows = paths.map((photoPath) => ({
       path: photoPath,
@@ -222,18 +212,14 @@ describe("deriveEraLabel", () => {
       ["neon", 1],
     ]);
 
-    expect(deriveEraLabel(clusterTags, overallCounts, "Era 1")).toBe(
-      "night · street",
-    );
+    expect(deriveEraLabel(clusterTags, overallCounts, "Era 1")).toBe("night · street");
   });
 
   it("formats underscore tags for display", () => {
     const clusterTags = [["plant_stand"], ["plant_stand"]];
     const overallCounts = new Map([["plant_stand", 2]]);
 
-    expect(deriveEraLabel(clusterTags, overallCounts, "Era 1")).toBe(
-      "plant stand",
-    );
+    expect(deriveEraLabel(clusterTags, overallCounts, "Era 1")).toBe("plant stand");
   });
 
   it("falls back when the cluster has no tags", () => {
@@ -246,23 +232,17 @@ describe("visual era labels from real-build tag strings", () => {
     // In a real build _build.tags is the raw images row, whose `tags` column
     // is a comma-separated string — not the string[] the fixture-style shape
     // suggests. Both must work.
-    const paths = Array.from(
-      { length: 60 },
-      (_, index) => `../albums/real/img-${index}.jpg`,
-    );
+    const paths = Array.from({ length: 60 }, (_, index) => `../albums/real/img-${index}.jpg`);
     const rng = makePseudoRandom(23);
     const rows = paths.map((photoPath) => ({
       path: photoPath,
       model_id: V2_MODEL_ID,
-      json: JSON.stringify(
-        normalize([rng() * 2 - 1, rng() * 2 - 1, rng() * 2 - 1]),
-      ),
+      json: JSON.stringify(normalize([rng() * 2 - 1, rng() * 2 - 1, rng() * 2 - 1])),
     }));
 
     const album = makeAlbum(paths);
     album.blocks.forEach((block: any, index: number) => {
-      block._build.tags.tags =
-        index % 2 === 0 ? "night, street" : "beach, sea";
+      block._build.tags.tags = index % 2 === 0 ? "night, street" : "beach, sea";
     });
 
     const dbPath = await createEmbeddingsDb(rows);
@@ -277,26 +257,17 @@ describe("visual era labels from real-build tag strings", () => {
 
 describe("visual era labels from cluster tags", () => {
   it("names eras from member tags instead of Era N", async () => {
-    const paths = Array.from(
-      { length: 60 },
-      (_, index) => `../albums/real/img-${index}.jpg`,
-    );
+    const paths = Array.from({ length: 60 }, (_, index) => `../albums/real/img-${index}.jpg`);
     const rng = makePseudoRandom(11);
     const rows = paths.map((photoPath) => ({
       path: photoPath,
       model_id: V2_MODEL_ID,
-      json: JSON.stringify(
-        normalize([rng() * 2 - 1, rng() * 2 - 1, rng() * 2 - 1]),
-      ),
+      json: JSON.stringify(normalize([rng() * 2 - 1, rng() * 2 - 1, rng() * 2 - 1])),
     }));
 
     const dbPath = await createEmbeddingsDb(rows);
     const stats = await computeVisualSamenessStats(
-      [
-        makeAlbum(paths, (index) =>
-          index % 2 === 0 ? ["night", "street"] : ["beach", "sea"],
-        ),
-      ],
+      [makeAlbum(paths, (index) => (index % 2 === 0 ? ["night", "street"] : ["beach", "sea"]))],
       dbPath,
     );
 

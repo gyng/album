@@ -12,19 +12,34 @@ import {
 describe("parseExifLocalDateTime", () => {
   it("parses standard EXIF format YYYY:MM:DD HH:MM:SS", () => {
     expect(parseExifLocalDateTime("2024:03:22 18:30:00")).toEqual({
-      year: 2024, month: 3, day: 22, hour: 18, minute: 30, second: 0,
+      year: 2024,
+      month: 3,
+      day: 22,
+      hour: 18,
+      minute: 30,
+      second: 0,
     });
   });
 
   it("parses ISO format YYYY-MM-DDTHH:MM:SS", () => {
     expect(parseExifLocalDateTime("2024-03-22T18:30:00")).toEqual({
-      year: 2024, month: 3, day: 22, hour: 18, minute: 30, second: 0,
+      year: 2024,
+      month: 3,
+      day: 22,
+      hour: 18,
+      minute: 30,
+      second: 0,
     });
   });
 
   it("parses space-separated ISO format YYYY-MM-DD HH:MM:SS", () => {
     expect(parseExifLocalDateTime("2024-03-22 18:30:00")).toEqual({
-      year: 2024, month: 3, day: 22, hour: 18, minute: 30, second: 0,
+      year: 2024,
+      month: 3,
+      day: 22,
+      hour: 18,
+      minute: 30,
+      second: 0,
     });
   });
 
@@ -82,12 +97,8 @@ describe("formatExifWallClockIso", () => {
 
 describe("normaliseExifWallClockIso", () => {
   it("normalises EXIF and zoned-looking inputs without shifting the wall clock", () => {
-    expect(normaliseExifWallClockIso("2024:01:01 00:30:00+09:00")).toBe(
-      "2024-01-01T00:30:00",
-    );
-    expect(normaliseExifWallClockIso("2024-01-01T00:30:00Z")).toBe(
-      "2024-01-01T00:30:00",
-    );
+    expect(normaliseExifWallClockIso("2024:01:01 00:30:00+09:00")).toBe("2024-01-01T00:30:00");
+    expect(normaliseExifWallClockIso("2024-01-01T00:30:00Z")).toBe("2024-01-01T00:30:00");
   });
 
   it("returns null for missing or malformed input", () => {
@@ -100,9 +111,7 @@ describe("wall-clock presentation helpers", () => {
   it("formats the parsed camera date and time without runtime timezone conversion", () => {
     const raw = "2024-01-01T00:30:00+09:00";
     expect(formatExifWallClockDate(raw)).toBe("1 January 2024");
-    expect(formatExifWallClockDateTime(raw)).toBe(
-      "1 January 2024 at 00:30",
-    );
+    expect(formatExifWallClockDateTime(raw)).toBe("1 January 2024 at 00:30");
   });
 
   it("creates the same nominal timestamp for equivalent wall-clock inputs", () => {
@@ -141,7 +150,12 @@ describe("dateToNaiveIso", () => {
   it("round-trips through parseExifLocalDateTime", () => {
     const date = new Date(2026, 11, 31, 23, 59, 59);
     expect(parseExifLocalDateTime(dateToNaiveIso(date))).toEqual({
-      year: 2026, month: 12, day: 31, hour: 23, minute: 59, second: 59,
+      year: 2026,
+      month: 12,
+      day: 31,
+      hour: 23,
+      minute: 59,
+      second: 59,
     });
   });
 });

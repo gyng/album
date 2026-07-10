@@ -121,7 +121,10 @@ const cleanupVideoCache = ({ albumDir, publicAlbumDir }) => {
       continue;
     }
 
-    if (VIDEO_EXTENSIONS.has(path.extname(originalFile).toLowerCase()) && size !== OPTIMISED_VIDEO_MAX_WIDTH) {
+    if (
+      VIDEO_EXTENSIONS.has(path.extname(originalFile).toLowerCase()) &&
+      size !== OPTIMISED_VIDEO_MAX_WIDTH
+    ) {
       removedUnneeded += removeFileIfExists(cachedFile) ? 1 : 0;
     }
   }

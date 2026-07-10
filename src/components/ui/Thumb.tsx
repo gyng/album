@@ -7,11 +7,5 @@ export const Thumb = (
 ) => {
   const { size, className, alt = "", ...rest } = props;
   const base = size === "small" ? common.thumbSmall : common.thumb;
-  return (
-    <img
-      className={[base, className].filter(Boolean).join(" ")}
-      alt={alt}
-      {...rest}
-    />
-  );
+  return <img className={[base, className].filter(Boolean).join(" ")} alt={alt} {...rest} />;
 };

@@ -105,9 +105,7 @@ describe("LocalVideoBlockEl viewport auto-play", () => {
     playSpy = jest
       .spyOn(HTMLMediaElement.prototype, "play")
       .mockImplementation(() => Promise.resolve());
-    pauseSpy = jest
-      .spyOn(HTMLMediaElement.prototype, "pause")
-      .mockImplementation(() => {});
+    pauseSpy = jest.spyOn(HTMLMediaElement.prototype, "pause").mockImplementation(() => {});
   });
 
   afterEach(() => {

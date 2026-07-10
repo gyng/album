@@ -41,8 +41,7 @@ export const resolveAbsoluteUrl = (url?: string): string | undefined => {
   return getCanonicalUrl(url);
 };
 
-export const getDefaultSocialImageUrl = (): string =>
-  getCanonicalUrl("/social-preview.svg");
+export const getDefaultSocialImageUrl = (): string => getCanonicalUrl("/social-preview.svg");
 
 export const getDefaultSeo = () => ({
   siteName: "Snapshots",

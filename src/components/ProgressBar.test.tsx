@@ -33,8 +33,6 @@ describe("ProgressBar", () => {
 
     const progressbar = screen.getByRole("progressbar", { name: "Finishing" });
     expect(progressbar.getAttribute("aria-valuenow")).toBe("100");
-    expect(
-      container.querySelector<HTMLElement>("[data-progress-fill]")?.style.width,
-    ).toBe("100%");
+    expect(container.querySelector<HTMLElement>("[data-progress-fill]")?.style.width).toBe("100%");
   });
 });

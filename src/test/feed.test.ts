@@ -85,13 +85,13 @@ describe("RSS feed", () => {
       },
     ]);
 
-    expect(xml).toContain("<rss version=\"2.0\"");
+    expect(xml).toContain('<rss version="2.0"');
     expect(xml).toContain("<title>Tokyo Trip</title>");
     expect(xml).toContain("<link>https://photos.example.com/album/tokyo</link>");
     expect(xml).toContain(
       "<description>Spring photos from Tokyo - city walks and train rides.</description>",
     );
-    expect(xml).toContain("<atom:link href=\"https://photos.example.com/feed.xml\"");
+    expect(xml).toContain('<atom:link href="https://photos.example.com/feed.xml"');
     expect(xml).toContain("<lastBuildDate>Mon, 10 Mar 2025 00:00:00 GMT</lastBuildDate>");
   });
 
@@ -114,12 +114,8 @@ describe("RSS feed", () => {
     );
 
     expect(xml).toContain("<title>Tokyo Trip | Snapshots</title>");
-    expect(xml).toContain(
-      "<atom:link href=\"https://photos.example.com/album/tokyo/feed.xml\"",
-    );
-    expect(xml).toContain(
-      "<guid>https://photos.example.com/album/tokyo#shibuya.jpg</guid>",
-    );
+    expect(xml).toContain('<atom:link href="https://photos.example.com/album/tokyo/feed.xml"');
+    expect(xml).toContain("<guid>https://photos.example.com/album/tokyo#shibuya.jpg</guid>");
   });
 
   it("escapes XML special characters", () => {

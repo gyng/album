@@ -14,10 +14,7 @@ if (typeof globalThis.ResizeObserver === "undefined") {
 // jsdom doesn't implement matchMedia. Components that respect
 // prefers-reduced-motion call window.matchMedia(...); provide a stub that
 // reports no preference so those effects can run in tests without throwing.
-if (
-  typeof window !== "undefined" &&
-  typeof window.matchMedia !== "function"
-) {
+if (typeof window !== "undefined" && typeof window.matchMedia !== "function") {
   window.matchMedia = (query) => ({
     matches: false,
     media: query,

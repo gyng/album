@@ -28,8 +28,7 @@ const ROUND_OPTIONS: { value: string; label: string }[] = [
   { value: "10", label: "10" },
 ];
 
-const timerValueToLimit = (v: TimerValue): number | null =>
-  v === "off" ? null : Number(v);
+const timerValueToLimit = (v: TimerValue): number | null => (v === "off" ? null : Number(v));
 
 const limitToTimerValue = (limit: number | null): TimerValue => {
   if (limit === 30) return "30";
@@ -37,18 +36,11 @@ const limitToTimerValue = (limit: number | null): TimerValue => {
   return "off";
 };
 
-export const GuessLobby: React.FC<GuessLobbyProps> = ({
-  database,
-  defaults,
-  onStart,
-  error,
-}) => {
+export const GuessLobby: React.FC<GuessLobbyProps> = ({ database, defaults, onStart, error }) => {
   const [regions, setRegions] = useState<GuessRegionOption[]>([]);
   const [totalPhotos, setTotalPhotos] = useState(0);
   const [region, setRegion] = useState(defaults.region ?? "");
-  const [timer, setTimer] = useState<TimerValue>(
-    limitToTimerValue(defaults.timeLimit),
-  );
+  const [timer, setTimer] = useState<TimerValue>(limitToTimerValue(defaults.timeLimit));
   const [rounds, setRounds] = useState(String(defaults.rounds));
 
   useEffect(() => {
@@ -64,7 +56,7 @@ export const GuessLobby: React.FC<GuessLobbyProps> = ({
   }, [database]);
 
   const selectedCount = region
-    ? regions.find((r) => r.country === region)?.count ?? 0
+    ? (regions.find((r) => r.country === region)?.count ?? 0)
     : totalPhotos;
 
   const handleStart = useCallback(() => {
@@ -102,9 +94,7 @@ export const GuessLobby: React.FC<GuessLobbyProps> = ({
     <div className={styles.lobby}>
       <div className={styles.header}>
         <Heading level={1}>Guess Where</Heading>
-        <Caption as="p">
-          Guess where each photo was taken on the map
-        </Caption>
+        <Caption as="p">Guess where each photo was taken on the map</Caption>
       </div>
 
       <div className={styles.options}>

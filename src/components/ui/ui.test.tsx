@@ -91,9 +91,7 @@ describe("Thumb", () => {
   });
 
   it("passes through className", () => {
-    const { container } = render(
-      <Thumb src="/p.jpg" alt="" className="extra" />,
-    );
+    const { container } = render(<Thumb src="/p.jpg" alt="" className="extra" />);
     expect(container.querySelector("img")?.className).toContain("extra");
   });
 });
@@ -112,9 +110,7 @@ describe("Input", () => {
 
   it("handles disabled state", () => {
     render(<Input disabled placeholder="Disabled" />);
-    expect(
-      (screen.getByPlaceholderText("Disabled") as HTMLInputElement).disabled,
-    ).toBe(true);
+    expect((screen.getByPlaceholderText("Disabled") as HTMLInputElement).disabled).toBe(true);
   });
 });
 
@@ -252,9 +248,7 @@ describe("OverlayButton", () => {
   });
 
   it("applies small size class", () => {
-    const { container } = render(
-      <OverlayButton size="small">×</OverlayButton>,
-    );
+    const { container } = render(<OverlayButton size="small">×</OverlayButton>);
     expect(container.querySelector("button")?.className).toContain("small");
   });
 
