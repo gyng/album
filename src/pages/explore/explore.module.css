@@ -43,7 +43,6 @@
   min-height: 6.25rem;
 }
 
-
 .overviewValue {
   font-size: var(--fs-m);
   color: var(--c-font);
@@ -59,7 +58,6 @@
   padding: var(--m-s) 0;
   background: var(--c-bg);
 }
-
 
 .jumpNavLinks {
   display: flex;
@@ -98,7 +96,6 @@
   gap: var(--m);
   flex-wrap: wrap;
 }
-
 
 .groupAnchorLink {
   display: inline-flex;
@@ -199,8 +196,6 @@
   display: none !important;
 }
 
-
-
 .sectionWide {
   grid-column: 1 / -1;
 }
@@ -216,9 +211,6 @@
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: var(--m-s);
 }
-
-
-
 
 .funStatValue {
   font-size: calc(var(--fs-m) - 0.05rem);
@@ -477,9 +469,7 @@
   top: 0.2rem;
   bottom: calc(var(--m-l) * -1);
   left: calc(
-    var(--visual-timeline-meta-width) +
-    var(--m-s) +
-    (var(--visual-timeline-rail-width) / 2)
+    var(--visual-timeline-meta-width) + var(--m-s) + (var(--visual-timeline-rail-width) / 2)
   );
   width: 1px;
   background: color-mix(in srgb, var(--c-accent) 42%, var(--c-bg-contrast-dark));
@@ -712,8 +702,6 @@
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
-
-
 
 .colorSwatch {
   width: 0.7rem;
@@ -958,7 +946,6 @@
   gap: var(--m-s);
 }
 
-
 @media (max-width: 720px) {
   .main {
     padding: var(--m-l);
@@ -1079,5 +1066,4 @@
     flex: 1 1 auto;
     min-width: 0;
   }
-
 }

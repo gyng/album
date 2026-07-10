@@ -73,10 +73,14 @@ export const TimeOfDayChart: React.FC<Props> = ({
       </div>
 
       <div className={styles.bars}>
-        {data.map((bucket, index) => {
+        {data.map((bucket, _index) => {
           const heightPct = max > 0 ? (bucket.count / max) * 100 : 0;
 
           return (
+            // Hover reveals a visual tooltip for pointer users; the same
+            // label/count is exposed to assistive tech via role="img" +
+            // aria-label, so these mouse handlers are a pointer-only enhancement.
+            // oxlint-disable-next-line jsx-a11y/no-noninteractive-element-interactions
             <div
               key={bucket.label}
               ref={(node) => {
@@ -86,18 +90,12 @@ export const TimeOfDayChart: React.FC<Props> = ({
                 styles.column,
                 activeLabel === bucket.label ? styles.columnActive : "",
               ].join(" ")}
-              tabIndex={0}
+              role="img"
               aria-label={`${bucket.label} · ${bucket.count.toLocaleString()} photos`}
               onMouseEnter={() => {
                 onActivate?.(bucket.label);
               }}
               onMouseLeave={() => {
-                onDeactivate?.();
-              }}
-              onFocus={() => {
-                onActivate?.(bucket.label);
-              }}
-              onBlur={() => {
                 onDeactivate?.();
               }}
             >
@@ -107,19 +105,12 @@ export const TimeOfDayChart: React.FC<Props> = ({
               <div className={styles.track}>
                 <div className={styles.count}>{bucket.label}</div>
                 <div
-                  className={[
-                    styles.bar,
-                    bucket.count === 0 ? styles.barEmpty : "",
-                  ].join(" ")}
+                  className={[styles.bar, bucket.count === 0 ? styles.barEmpty : ""].join(" ")}
                   style={{ height: `${Math.max(heightPct, bucket.count > 0 ? 4 : 0)}%` }}
                   aria-hidden="true"
                 />
               </div>
-              <div
-                className={styles.label}
-              >
-                {bucket.count.toLocaleString()}
-              </div>
+              <div className={styles.label}>{bucket.count.toLocaleString()}</div>
             </div>
           );
         })}

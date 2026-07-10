@@ -28,11 +28,8 @@ export const DEFAULT_GESTURE_THRESHOLDS: GestureThresholds = {
 // rather than a swipe.
 const TAP_MAX_DRIFT_PX = 12;
 
-const progressFromDistance = (
-  distance: number,
-  hintPx: number,
-  commitPx: number,
-): number => Math.max(0, Math.min(1, (distance - hintPx) / (commitPx - hintPx)));
+const progressFromDistance = (distance: number, hintPx: number, commitPx: number): number =>
+  Math.max(0, Math.min(1, (distance - hintPx) / (commitPx - hintPx)));
 
 // What the move handler should do with the current pointer delta. "ignore"
 // means leave all visuals untouched (the other axis is already committed); an
@@ -72,11 +69,9 @@ export const resolvePointerMove = (
   const verticalDistance = Math.abs(input.deltaY);
 
   const isVertical =
-    verticalDistance >= thresholds.pullHintPx &&
-    verticalDistance > horizontalDistance;
+    verticalDistance >= thresholds.pullHintPx && verticalDistance > horizontalDistance;
   const isHorizontal =
-    horizontalDistance >= thresholds.swipeHintPx &&
-    horizontalDistance > verticalDistance;
+    horizontalDistance >= thresholds.swipeHintPx && horizontalDistance > verticalDistance;
 
   if (isVertical) {
     // Once horizontal is committed, ignore vertical drift (and vice versa).
@@ -120,8 +115,7 @@ export const resolvePointerMove = (
       return { kind: "ignore" };
     }
 
-    const direction: HorizontalDirection =
-      input.deltaX < 0 ? "next" : "previous";
+    const direction: HorizontalDirection = input.deltaX < 0 ? "next" : "previous";
 
     if (input.committedHorizontal && input.committedHorizontal !== direction) {
       return IDLE;
@@ -186,20 +180,15 @@ export const resolvePointerUpAction = (
   // touch/pen so a mouse drag-up never silently triggers a remix.
   const treatAsHorizontal = horizontalCommitted
     ? horizontalDistance >= swipe
-    : !verticalCommitted &&
-      horizontalDistance >= swipe &&
-      horizontalDistance > verticalDistance;
+    : !verticalCommitted && horizontalDistance >= swipe && horizontalDistance > verticalDistance;
   const treatAsVertical =
     input.isTouchLike &&
     (verticalCommitted
       ? verticalDistance >= swipe
-      : !horizontalCommitted &&
-        verticalDistance >= swipe &&
-        verticalDistance > horizontalDistance);
+      : !horizontalCommitted && verticalDistance >= swipe && verticalDistance > horizontalDistance);
 
   if (treatAsHorizontal) {
-    const finalDirection: HorizontalDirection =
-      input.deltaX < 0 ? "next" : "previous";
+    const finalDirection: HorizontalDirection = input.deltaX < 0 ? "next" : "previous";
     // Dragged back past the start in the opposite direction → cancelled.
     if (input.committedHorizontal && finalDirection !== input.committedHorizontal) {
       return { action: "none", suppressClick: false };
@@ -235,10 +224,7 @@ export const resolvePointerUpAction = (
     // The browser synthesises a click after every touch pointerup; swallow it
     // for any touch release that reached here so a jitter or cancelled gesture
     // can't fall through to the image's onClick and silently advance.
-    if (
-      horizontalDistance < TAP_MAX_DRIFT_PX &&
-      verticalDistance < TAP_MAX_DRIFT_PX
-    ) {
+    if (horizontalDistance < TAP_MAX_DRIFT_PX && verticalDistance < TAP_MAX_DRIFT_PX) {
       const tapAction = getSlideshowTouchTapAction({
         clientX: input.tap.clientX,
         bounds: input.tap.getBounds(),

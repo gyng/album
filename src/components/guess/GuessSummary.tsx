@@ -3,12 +3,7 @@ import Link from "next/link";
 import { Heading, Caption } from "../ui";
 import { RoundResult } from "./GuessRound";
 import { GameSettings } from "./guessTypes";
-import {
-  MAX_SCORE,
-  MAX_TIME_BONUS,
-  formatDistance,
-  scoreTierColour,
-} from "./guessScoring";
+import { MAX_SCORE, MAX_TIME_BONUS, formatDistance, scoreTierColour } from "./guessScoring";
 import { useAnimatedCounter } from "./useAnimatedCounter";
 import styles from "./GuessSummary.module.css";
 
@@ -20,11 +15,7 @@ type GuessSummaryProps = {
   onChangeSettings: () => void;
 };
 
-const getRating = (
-  score: number,
-  totalRounds: number,
-  hasTimer: boolean,
-): string => {
+const getRating = (score: number, totalRounds: number, hasTimer: boolean): string => {
   const maxPerRound = MAX_SCORE + (hasTimer ? MAX_TIME_BONUS : 0);
   const ratio = score / (totalRounds * maxPerRound);
   if (ratio >= 0.9) return "Local expert";
@@ -77,11 +68,7 @@ export const GuessSummary: React.FC<GuessSummaryProps> = ({
   const totalCounterRef = useAnimatedCounter(totalScore);
   const [copied, setCopied] = useState(false);
   const bestScore = Math.max(...results.map((r) => r.score));
-  const totalTierColour = scoreTierColour(
-    results.length > 0
-      ? totalScore / results.length
-      : 0,
-  );
+  const totalTierColour = scoreTierColour(results.length > 0 ? totalScore / results.length : 0);
 
   const shareUrl = buildShareUrl(seed, settings);
 
@@ -97,7 +84,9 @@ export const GuessSummary: React.FC<GuessSummaryProps> = ({
     <div className={styles.summary}>
       <div className={styles.header}>
         {settings.daily ? (
-          <Caption as="p" className={styles.dailyLabel}>Daily challenge</Caption>
+          <Caption as="p" className={styles.dailyLabel}>
+            Daily challenge
+          </Caption>
         ) : null}
         <Heading level={1}>
           <span
@@ -124,21 +113,14 @@ export const GuessSummary: React.FC<GuessSummaryProps> = ({
               key={idx}
               className={[
                 styles.roundRow,
-                result.score === bestScore && result.score > 0
-                  ? styles.bestRound
-                  : "",
+                result.score === bestScore && result.score > 0 ? styles.bestRound : "",
               ]
                 .filter(Boolean)
                 .join(" ")}
               style={{ animationDelay: `${idx * 0.08}s` }}
             >
               <Link href={`/album/${result.photo.albumName}#${result.photo.photoName}`}>
-                <img
-                  src={thumbSrc}
-                  alt=""
-                  className={styles.thumb}
-                  draggable={false}
-                />
+                <img src={thumbSrc} alt="" className={styles.thumb} draggable={false} />
               </Link>
               <div className={styles.roundDetail}>
                 <div className={styles.roundMeta}>
@@ -148,9 +130,7 @@ export const GuessSummary: React.FC<GuessSummaryProps> = ({
                     <span className={styles.location}>Unknown location</span>
                   )}
                   <span className={styles.roundDistance}>
-                    {result.skipped
-                      ? "Skipped"
-                      : formatDistance(result.distanceMeters)}
+                    {result.skipped ? "Skipped" : formatDistance(result.distanceMeters)}
                   </span>
                 </div>
                 <div className={styles.scoreBarTrack}>
@@ -165,16 +145,11 @@ export const GuessSummary: React.FC<GuessSummaryProps> = ({
                 </div>
               </div>
               <span className={styles.roundScoreCol}>
-                <span
-                  className={styles.roundScore}
-                  style={{ color: colour }}
-                >
+                <span className={styles.roundScore} style={{ color: colour }}>
                   {result.score.toLocaleString()}
                 </span>
                 {result.timeBonus > 0 ? (
-                  <span className={styles.timeBonus}>
-                    +{result.timeBonus.toLocaleString()}
-                  </span>
+                  <span className={styles.timeBonus}>+{result.timeBonus.toLocaleString()}</span>
                 ) : null}
               </span>
             </li>
@@ -192,10 +167,7 @@ export const GuessSummary: React.FC<GuessSummaryProps> = ({
       </div>
 
       <div className={styles.footer}>
-        <button
-          className={styles.changeSettings}
-          onClick={onChangeSettings}
-        >
+        <button className={styles.changeSettings} onClick={onChangeSettings}>
           Change settings
         </button>
       </div>

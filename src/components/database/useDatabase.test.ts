@@ -14,18 +14,13 @@ describe("fetchWithProgress", () => {
 
   class MockReadableStream {
     private queue: Uint8Array[] = [];
-    private waiters: Array<
-      (result: { done: boolean; value?: Uint8Array }) => void
-    > = [];
+    private waiters: Array<(result: { done: boolean; value?: Uint8Array }) => void> = [];
     private closed = false;
 
     constructor({
       start,
     }: {
-      start: (controller: {
-        enqueue: (chunk: Uint8Array) => void;
-        close: () => void;
-      }) => void;
+      start: (controller: { enqueue: (chunk: Uint8Array) => void; close: () => void }) => void;
     }) {
       start({
         enqueue: (chunk) => {
@@ -58,25 +53,27 @@ describe("fetchWithProgress", () => {
             return { done: true, value: undefined };
           }
 
-          return await new Promise<{ done: boolean; value?: Uint8Array }>(
-            (resolve) => {
-              this.waiters.push(resolve);
-            },
-          );
+          return await new Promise<{ done: boolean; value?: Uint8Array }>((resolve) => {
+            this.waiters.push(resolve);
+          });
         },
       };
     }
   }
 
   class MockResponse {
-    body: { getReader: () => { read: () => Promise<{ done: boolean; value?: Uint8Array }> } } | null;
+    body: {
+      getReader: () => { read: () => Promise<{ done: boolean; value?: Uint8Array }> };
+    } | null;
     headers: { get: (name: string) => string | null };
     ok: boolean;
     status: number;
     statusText: string;
 
     constructor(
-      body: { getReader: () => { read: () => Promise<{ done: boolean; value?: Uint8Array }> } } | null,
+      body: {
+        getReader: () => { read: () => Promise<{ done: boolean; value?: Uint8Array }> };
+      } | null,
       init: { status?: number; statusText?: string; headers?: Record<string, string> } = {},
     ) {
       this.body = body;
@@ -85,10 +82,7 @@ describe("fetchWithProgress", () => {
       this.ok = this.status >= 200 && this.status < 300;
 
       const headerMap = new Map(
-        Object.entries(init.headers ?? {}).map(([key, value]) => [
-          key.toLowerCase(),
-          value,
-        ]),
+        Object.entries(init.headers ?? {}).map(([key, value]) => [key.toLowerCase(), value]),
       );
       this.headers = {
         get: (name: string) => headerMap.get(name.toLowerCase()) ?? null,
@@ -149,10 +143,7 @@ describe("fetchWithProgress", () => {
     global.fetch = fetchMock as typeof fetch;
     const onProgress = jest.fn();
 
-    const result = await databaseLoaderInternals.fetchWithProgress(
-      "/search.sqlite",
-      onProgress,
-    );
+    const result = await databaseLoaderInternals.fetchWithProgress("/search.sqlite", onProgress);
 
     expect(fetchMock).toHaveBeenCalledWith("/search.sqlite");
     expect(onProgress).toHaveBeenCalledWith(0, { loaded: 0, total: 0 });
@@ -163,10 +154,7 @@ describe("fetchWithProgress", () => {
     global.ReadableStream = MockReadableStream as unknown as typeof ReadableStream;
     global.Response = MockResponse as unknown as typeof Response;
 
-    const chunks = [
-      new Uint8Array([97, 98, 99]),
-      new Uint8Array([100, 101, 102, 103]),
-    ];
+    const chunks = [new Uint8Array([97, 98, 99]), new Uint8Array([100, 101, 102, 103])];
     const response = {
       ok: true,
       body: {
@@ -186,9 +174,7 @@ describe("fetchWithProgress", () => {
         },
       },
       headers: {
-        get: jest.fn((name: string) =>
-          name.toLowerCase() === "content-length" ? "7" : null,
-        ),
+        get: jest.fn((name: string) => (name.toLowerCase() === "content-length" ? "7" : null)),
       },
       status: 200,
       statusText: "OK",
@@ -198,10 +184,7 @@ describe("fetchWithProgress", () => {
     global.fetch = fetchMock as typeof fetch;
     const onProgress = jest.fn();
 
-    const result = await databaseLoaderInternals.fetchWithProgress(
-      "/search.sqlite",
-      onProgress,
-    );
+    const result = await databaseLoaderInternals.fetchWithProgress("/search.sqlite", onProgress);
 
     await result.arrayBuffer();
 
@@ -238,9 +221,9 @@ describe("initializeSQLite", () => {
       headers: { get: () => null },
     }) as typeof fetch;
 
-    await expect(
-      databaseLoaderInternals.initializeSQLite("/search.sqlite"),
-    ).rejects.toThrow("Failed to initialise SQLite");
+    await expect(databaseLoaderInternals.initializeSQLite("/search.sqlite")).rejects.toThrow(
+      "Failed to initialise SQLite",
+    );
   });
 
   it("falls back to the main database when the embeddings database is missing", async () => {
@@ -280,10 +263,7 @@ describe("initializeSQLite", () => {
       }) as typeof fetch;
 
     await expect(
-      databaseLoaderInternals.initializeSQLite(
-        "/search-embeddings.sqlite",
-        "/search.sqlite",
-      ),
+      databaseLoaderInternals.initializeSQLite("/search-embeddings.sqlite", "/search.sqlite"),
     ).resolves.toBeTruthy();
 
     expect(global.fetch).toHaveBeenNthCalledWith(1, "/search-embeddings.sqlite");

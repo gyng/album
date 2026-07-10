@@ -1,8 +1,5 @@
 import { useState } from "react";
-import {
-  NumericFacetStat,
-  ParallelRelationshipData,
-} from "../util/computeStats";
+import { NumericFacetStat, ParallelRelationshipData } from "../util/computeStats";
 import { TechnicalHeatmaps } from "./TechnicalHeatmaps";
 import { TimeOfDayChart } from "./TimeOfDayChart";
 import { Caption } from "./ui";
@@ -26,9 +23,7 @@ export const TimeRelationshipExplorer: React.FC<Props> = ({
       <section className={styles.block}>
         <div className={styles.header}>
           <h2 className={styles.title}>{hourFacet.displayName}</h2>
-          <Caption as="span">
-            {formatCoverage(hourFacet.coverage)}
-          </Caption>
+          <Caption as="span">{formatCoverage(hourFacet.coverage)}</Caption>
         </div>
         {hourFacet.coverage === 0 ? (
           <Caption size="sm">No data available.</Caption>
@@ -48,8 +43,8 @@ export const TimeRelationshipExplorer: React.FC<Props> = ({
         <div className={styles.header}>
           <h2 className={styles.title}>Time relationships</h2>
           <Caption as="span">
-            Based on {relationships.total.toLocaleString()} photos with local
-            time, aperture, and ISO
+            Based on {relationships.total.toLocaleString()} photos with local time, aperture, and
+            ISO
           </Caption>
         </div>
         <TechnicalHeatmaps

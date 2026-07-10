@@ -51,10 +51,7 @@ export const useSearchResultsState = ({
   const [debouncedColorSearch] = useDebounce(colorSearch, 300);
   const [debouncedColorTolerance] = useDebounce(colorTolerance, 400);
 
-  const searchQuery = useMemo(
-    () => parseSearchTerms(searchInputValue),
-    [searchInputValue],
-  );
+  const searchQuery = useMemo(() => parseSearchTerms(searchInputValue), [searchInputValue]);
   const debouncedSearchQuery = useMemo(
     () => parseSearchTerms(debouncedSearchInputValue),
     [debouncedSearchInputValue],
@@ -63,18 +60,12 @@ export const useSearchResultsState = ({
   const isColorMode = Boolean(colorSearch);
   const isImageQueryMode = Boolean(imageQuery);
   const hasImageVector = Boolean(imageQuery?.vector);
-  const colorHex = useMemo(
-    () => (colorSearch ? rgbToHex(colorSearch) : null),
-    [colorSearch],
-  );
+  const colorHex = useMemo(() => (colorSearch ? rgbToHex(colorSearch) : null), [colorSearch]);
   const trimmedQuery = debouncedSearchQuery.join(" ").trim();
   const hasSearchQuery = trimmedQuery.length > 0;
   const hasFacetFilters = selectedFacets.length > 0;
   const keywordQuery = debouncedSearchQuery.join("|");
-  const needsTextVector =
-    !isSimilarMode &&
-    hasSearchQuery &&
-    searchMode !== "keyword";
+  const needsTextVector = !isSimilarMode && hasSearchQuery && searchMode !== "keyword";
 
   const textVectorState = useTextVector({
     isSimilarMode,
@@ -91,8 +82,7 @@ export const useSearchResultsState = ({
   // (HIGH-8). Until it resolves, vector queries stay pending instead.
   const hasVectorDatabase = Boolean(embeddingsDatabase);
 
-  const hasCurrentTextVector =
-    Boolean(textVector) && textVectorQuery === trimmedQuery;
+  const hasCurrentTextVector = Boolean(textVector) && textVectorQuery === trimmedQuery;
 
   // When the embedding model fails, hybrid degrades to a keyword search and
   // pure semantic surfaces the error via a completed (empty) query, rather than
@@ -112,15 +102,11 @@ export const useSearchResultsState = ({
           // degrades to keyword-only ranking and re-fuses once vectors arrive.
           (searchMode === "hybrid" && hasCurrentTextVector) ||
           // Pure semantic needs the vector DB — otherwise it stays pending.
-          (searchMode === "semantic" &&
-            hasVectorDatabase &&
-            hasCurrentTextVector))) ||
+          (searchMode === "semantic" && hasVectorDatabase && hasCurrentTextVector))) ||
       (!isSimilarMode && (hasFacetFilters || isColorMode)));
 
   const similarFilename = similarPath?.split("/").at(-1) ?? null;
-  const similarPreviewSrc = similarPath
-    ? getResizedAlbumImageSrc(similarPath)
-    : null;
+  const similarPreviewSrc = similarPath ? getResizedAlbumImageSrc(similarPath) : null;
 
   const reactQuery = useInfiniteQuery({
     queryKey: [

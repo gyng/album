@@ -11,9 +11,7 @@ import { SlideshowMode } from "./slideshowUrl";
 // initial-URL seed and the pool is non-empty; the caller performs the resulting
 // commit/advance. The regression it guards against: a similar-mode kiosk that
 // had a slide showing when the 10-minute DB poll refreshed the database.
-export type PoolReloadAction =
-  | { kind: "advance" }
-  | { kind: "recommit"; photo: RandomPhotoRow };
+export type PoolReloadAction = { kind: "advance" } | { kind: "recommit"; photo: RandomPhotoRow };
 
 export const decidePoolReloadAction = (input: {
   mode: SlideshowMode;
@@ -23,11 +21,7 @@ export const decidePoolReloadAction = (input: {
 }): PoolReloadAction => {
   // Random/weighted always draw the next slide from their shuffled queue; a cold
   // start (nothing was on screen) advances to the very first slide.
-  if (
-    input.mode === "random" ||
-    input.mode === "weighted" ||
-    !input.hadCurrentPhoto
-  ) {
+  if (input.mode === "random" || input.mode === "weighted" || !input.hadCurrentPhoto) {
     return { kind: "advance" };
   }
 
@@ -37,7 +31,5 @@ export const decidePoolReloadAction = (input: {
   const surviving = input.previousSeedPath
     ? (input.pool.find((photo) => photo.path === input.previousSeedPath) ?? null)
     : null;
-  return surviving
-    ? { kind: "recommit", photo: surviving }
-    : { kind: "advance" };
+  return surviving ? { kind: "recommit", photo: surviving } : { kind: "advance" };
 };

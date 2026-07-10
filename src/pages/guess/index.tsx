@@ -20,10 +20,8 @@ const GuessPage: NextPage<PageProps> = () => {
   const router = useRouter();
   const [database, progress] = useDatabase();
 
-  const seedFromUrl =
-    typeof router.query.seed === "string" ? router.query.seed : undefined;
-  const regionFromUrl =
-    typeof router.query.region === "string" ? router.query.region : undefined;
+  const seedFromUrl = typeof router.query.seed === "string" ? router.query.seed : undefined;
+  const regionFromUrl = typeof router.query.region === "string" ? router.query.region : undefined;
   const isDaily = router.query.daily !== undefined;
 
   // When a seed or daily flag is in the URL, skip the lobby.
@@ -31,10 +29,7 @@ const GuessPage: NextPage<PageProps> = () => {
     ? { rounds: 5, timeLimit: null, daily: true }
     : seedFromUrl
       ? {
-          rounds: Math.min(
-            20,
-            Math.max(1, Number(router.query.rounds) || 5),
-          ),
+          rounds: Math.min(20, Math.max(1, Number(router.query.rounds) || 5)),
           timeLimit: parseTimer(router.query.timer),
           region: regionFromUrl,
         }

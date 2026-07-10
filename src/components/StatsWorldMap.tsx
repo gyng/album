@@ -17,17 +17,7 @@ const clusterLayer = {
     "circle-color": STATS_PINK,
     "circle-stroke-color": "rgba(255,255,255,0.78)",
     "circle-stroke-width": 2,
-    "circle-radius": [
-      "step",
-      ["get", "point_count"],
-      13,
-      10,
-      18,
-      30,
-      24,
-      80,
-      31,
-    ],
+    "circle-radius": ["step", ["get", "point_count"], 13, 10, 18, 30, 24, 80, 31],
     "circle-blur": 0.08,
   },
 };

@@ -42,9 +42,7 @@ export const SearchRefinementSection: React.FC<Props> = ({
           const refinementCount = refinementCounts[tag.name];
           const isDisabled = !isActive && refinementCount === 0;
           const visibleCount =
-            !isActive && refinementCount !== undefined
-              ? refinementCount
-              : tag.count - 1;
+            !isActive && refinementCount !== undefined ? refinementCount : tag.count - 1;
           return (
             <SearchTag
               key={tag.name}

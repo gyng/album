@@ -4,7 +4,6 @@
   align-content: start;
 }
 
-
 .matrix {
   display: grid;
   gap: 1px;
@@ -44,16 +43,9 @@
   align-items: center;
   justify-content: center;
   padding: 0.2rem;
-  background: color-mix(
-    in srgb,
-    var(--c-accent) calc(12% + (var(--intensity) * 78%)),
-    var(--c-bg)
-  );
-  border: 1px solid color-mix(
-    in srgb,
-    var(--c-bg-contrast-dark) calc(80% - (var(--intensity) * 45%)),
-    transparent
-  );
+  background: color-mix(in srgb, var(--c-accent) calc(12% + (var(--intensity) * 78%)), var(--c-bg));
+  border: 1px solid
+    color-mix(in srgb, var(--c-bg-contrast-dark) calc(80% - (var(--intensity) * 45%)), transparent);
   transition:
     background var(--t-fast) ease,
     border-color var(--t-fast) ease,
@@ -81,11 +73,7 @@
   /* Track cell intensity: dark cells (high intensity) want light text, pale
      cells (low intensity) want the theme font colour so the count stays legible
      instead of being near-white on a pale fill. */
-  color: color-mix(
-    in srgb,
-    white calc(var(--intensity, 0) * 100%),
-    var(--c-font)
-  );
+  color: color-mix(in srgb, white calc(var(--intensity, 0) * 100%), var(--c-font));
   line-height: 1;
 }
 

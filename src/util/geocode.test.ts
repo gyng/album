@@ -3,14 +3,10 @@ import { getGeocodeLabel, getGeocodeCountry, getGeocodeCity } from "./geocode";
 // Geocode format: lat\nlon\nname\nadmin1\nadmin2\ncc\ncountry
 // Produced by format_mapping_values() in index.py
 
-const TOKYO =
-  "35.6895\n139.6917\nShinjuku-ku\nTokyo\nTokyo\nJP\nJapan";
-const OSAKA =
-  "34.6937\n135.5023\nNamba\nOsaka Prefecture\nOsaka\nJP\nJapan";
-const SINGAPORE =
-  "1.3521\n103.8198\nSingapore\nCentral Singapore\nSingapore\nSG\nSingapore";
-const PARIS =
-  "48.8566\n2.3522\nParis\nIle-de-France\nParis\nFR\nFrance";
+const TOKYO = "35.6895\n139.6917\nShinjuku-ku\nTokyo\nTokyo\nJP\nJapan";
+const OSAKA = "34.6937\n135.5023\nNamba\nOsaka Prefecture\nOsaka\nJP\nJapan";
+const SINGAPORE = "1.3521\n103.8198\nSingapore\nCentral Singapore\nSingapore\nSG\nSingapore";
+const PARIS = "48.8566\n2.3522\nParis\nIle-de-France\nParis\nFR\nFrance";
 const MINIMAL = "35.0\n135.0\nKyoto\nKyoto Prefecture\nKyoto\nJP\nJapan";
 
 describe("getGeocodeLabel", () => {
@@ -30,9 +26,7 @@ describe("getGeocodeLabel", () => {
 
   it("deduplicates repeated region names", () => {
     // Singapore has city = country = "Singapore"
-    expect(getGeocodeLabel(SINGAPORE)).toBe(
-      "Singapore, Central Singapore",
-    );
+    expect(getGeocodeLabel(SINGAPORE)).toBe("Singapore, Central Singapore");
   });
 
   it("handles Paris correctly", () => {
@@ -40,9 +34,7 @@ describe("getGeocodeLabel", () => {
   });
 
   it("handles Osaka with prefecture suffix", () => {
-    expect(getGeocodeLabel(OSAKA)).toBe(
-      "Namba, Osaka Prefecture, Osaka, Japan",
-    );
+    expect(getGeocodeLabel(OSAKA)).toBe("Namba, Osaka Prefecture, Osaka, Japan");
   });
 });
 

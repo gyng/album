@@ -20,9 +20,7 @@ const cleanLines = (geocode: string): string[] =>
     .filter((line) => !isCoordinate(line))
     .filter((line) => !isCountryCode(line));
 
-const getGeocodeParts = (
-  geocode: string | null | undefined,
-): string[] => {
+const getGeocodeParts = (geocode: string | null | undefined): string[] => {
   if (!geocode) return [];
   return cleanLines(geocode);
 };
@@ -36,9 +34,7 @@ const getGeocodeParts = (
  *   "Osaka, Japan"
  *   "Japan"
  */
-export function getGeocodeLabel(
-  geocode: string | null | undefined,
-): string | null {
+export function getGeocodeLabel(geocode: string | null | undefined): string | null {
   if (!geocode) return null;
 
   const lines = cleanLines(geocode);
@@ -59,9 +55,7 @@ export function getGeocodeLabel(
  * Returns just the country from a geocode string (last non-code, non-coord line).
  * Used for aggregating top locations by country.
  */
-export function getGeocodeCountry(
-  geocode: string | null | undefined,
-): string | null {
+export function getGeocodeCountry(geocode: string | null | undefined): string | null {
   const lines = getGeocodeParts(geocode);
   return lines.at(-1) ?? null;
 }
@@ -69,23 +63,17 @@ export function getGeocodeCountry(
 /**
  * Returns city (first meaningful line) from a geocode string.
  */
-export function getGeocodeCity(
-  geocode: string | null | undefined,
-): string | null {
+export function getGeocodeCity(geocode: string | null | undefined): string | null {
   const lines = getGeocodeParts(geocode);
   return lines[0] ?? null;
 }
 
-export function getGeocodeRegion(
-  geocode: string | null | undefined,
-): string | null {
+export function getGeocodeRegion(geocode: string | null | undefined): string | null {
   const lines = getGeocodeParts(geocode);
   return lines[1] ?? null;
 }
 
-export function getGeocodeSubregion(
-  geocode: string | null | undefined,
-): string | null {
+export function getGeocodeSubregion(geocode: string | null | undefined): string | null {
   const lines = getGeocodeParts(geocode);
   return lines[2] ?? null;
 }
@@ -106,9 +94,7 @@ const TRAILING_PLACE_SUFFIXES = [
   /-gun$/,
 ];
 
-export function formatPlaceDisplayLabel(
-  value: string | null | undefined,
-): string | null {
+export function formatPlaceDisplayLabel(value: string | null | undefined): string | null {
   if (!value) return null;
 
   let label = value.trim();

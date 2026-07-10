@@ -34,16 +34,30 @@ describe("FOCAL_LENGTH_35MM_FACET", () => {
   });
 
   it("buckets correctly", () => {
-    expect(FOCAL_LENGTH_35MM_FACET.buckets.find((b) => b.match(23))?.label).toBe("<24mm · ultra-wide");
+    expect(FOCAL_LENGTH_35MM_FACET.buckets.find((b) => b.match(23))?.label).toBe(
+      "<24mm · ultra-wide",
+    );
     expect(FOCAL_LENGTH_35MM_FACET.buckets.find((b) => b.match(24))?.label).toBe("24–34mm · wide");
     expect(FOCAL_LENGTH_35MM_FACET.buckets.find((b) => b.match(34))?.label).toBe("24–34mm · wide");
-    expect(FOCAL_LENGTH_35MM_FACET.buckets.find((b) => b.match(35))?.label).toBe("35–49mm · normal");
-    expect(FOCAL_LENGTH_35MM_FACET.buckets.find((b) => b.match(49))?.label).toBe("35–49mm · normal");
-    expect(FOCAL_LENGTH_35MM_FACET.buckets.find((b) => b.match(50))?.label).toBe("50–84mm · short tele");
-    expect(FOCAL_LENGTH_35MM_FACET.buckets.find((b) => b.match(84))?.label).toBe("50–84mm · short tele");
+    expect(FOCAL_LENGTH_35MM_FACET.buckets.find((b) => b.match(35))?.label).toBe(
+      "35–49mm · normal",
+    );
+    expect(FOCAL_LENGTH_35MM_FACET.buckets.find((b) => b.match(49))?.label).toBe(
+      "35–49mm · normal",
+    );
+    expect(FOCAL_LENGTH_35MM_FACET.buckets.find((b) => b.match(50))?.label).toBe(
+      "50–84mm · short tele",
+    );
+    expect(FOCAL_LENGTH_35MM_FACET.buckets.find((b) => b.match(84))?.label).toBe(
+      "50–84mm · short tele",
+    );
     expect(FOCAL_LENGTH_35MM_FACET.buckets.find((b) => b.match(85))?.label).toBe("85–134mm · tele");
-    expect(FOCAL_LENGTH_35MM_FACET.buckets.find((b) => b.match(134))?.label).toBe("85–134mm · tele");
-    expect(FOCAL_LENGTH_35MM_FACET.buckets.find((b) => b.match(200))?.label).toBe("135mm+ · long tele");
+    expect(FOCAL_LENGTH_35MM_FACET.buckets.find((b) => b.match(134))?.label).toBe(
+      "85–134mm · tele",
+    );
+    expect(FOCAL_LENGTH_35MM_FACET.buckets.find((b) => b.match(200))?.label).toBe(
+      "135mm+ · long tele",
+    );
   });
 
   it("every value falls into exactly one bucket", () => {
@@ -70,16 +84,36 @@ describe("FOCAL_LENGTH_ACTUAL_FACET", () => {
   });
 
   it("buckets correctly", () => {
-    expect(FOCAL_LENGTH_ACTUAL_FACET.buckets.find((b) => b.match(10))?.label).toBe("<18mm · ultra-wide");
-    expect(FOCAL_LENGTH_ACTUAL_FACET.buckets.find((b) => b.match(18))?.label).toBe("18–22mm · wide");
-    expect(FOCAL_LENGTH_ACTUAL_FACET.buckets.find((b) => b.match(22))?.label).toBe("18–22mm · wide");
-    expect(FOCAL_LENGTH_ACTUAL_FACET.buckets.find((b) => b.match(23))?.label).toBe("23–34mm · normal");
-    expect(FOCAL_LENGTH_ACTUAL_FACET.buckets.find((b) => b.match(34))?.label).toBe("23–34mm · normal");
-    expect(FOCAL_LENGTH_ACTUAL_FACET.buckets.find((b) => b.match(35))?.label).toBe("35–55mm · short tele");
-    expect(FOCAL_LENGTH_ACTUAL_FACET.buckets.find((b) => b.match(55))?.label).toBe("35–55mm · short tele");
-    expect(FOCAL_LENGTH_ACTUAL_FACET.buckets.find((b) => b.match(56))?.label).toBe("56–99mm · tele");
-    expect(FOCAL_LENGTH_ACTUAL_FACET.buckets.find((b) => b.match(99))?.label).toBe("56–99mm · tele");
-    expect(FOCAL_LENGTH_ACTUAL_FACET.buckets.find((b) => b.match(200))?.label).toBe("100mm+ · long tele");
+    expect(FOCAL_LENGTH_ACTUAL_FACET.buckets.find((b) => b.match(10))?.label).toBe(
+      "<18mm · ultra-wide",
+    );
+    expect(FOCAL_LENGTH_ACTUAL_FACET.buckets.find((b) => b.match(18))?.label).toBe(
+      "18–22mm · wide",
+    );
+    expect(FOCAL_LENGTH_ACTUAL_FACET.buckets.find((b) => b.match(22))?.label).toBe(
+      "18–22mm · wide",
+    );
+    expect(FOCAL_LENGTH_ACTUAL_FACET.buckets.find((b) => b.match(23))?.label).toBe(
+      "23–34mm · normal",
+    );
+    expect(FOCAL_LENGTH_ACTUAL_FACET.buckets.find((b) => b.match(34))?.label).toBe(
+      "23–34mm · normal",
+    );
+    expect(FOCAL_LENGTH_ACTUAL_FACET.buckets.find((b) => b.match(35))?.label).toBe(
+      "35–55mm · short tele",
+    );
+    expect(FOCAL_LENGTH_ACTUAL_FACET.buckets.find((b) => b.match(55))?.label).toBe(
+      "35–55mm · short tele",
+    );
+    expect(FOCAL_LENGTH_ACTUAL_FACET.buckets.find((b) => b.match(56))?.label).toBe(
+      "56–99mm · tele",
+    );
+    expect(FOCAL_LENGTH_ACTUAL_FACET.buckets.find((b) => b.match(99))?.label).toBe(
+      "56–99mm · tele",
+    );
+    expect(FOCAL_LENGTH_ACTUAL_FACET.buckets.find((b) => b.match(200))?.label).toBe(
+      "100mm+ · long tele",
+    );
   });
 
   it("every value falls into exactly one bucket", () => {
@@ -143,20 +177,30 @@ describe("ISO_FACET", () => {
 describe("HOUR_FACET", () => {
   it("extracts local hour from native EXIF format (camera-local, no conversion needed)", () => {
     // EXIF "YYYY:MM:DD HH:MM:SS" — not a UTC ISO string, hour is already local
-    expect(HOUR_FACET.extract(exif({ DateTimeOriginal: "2024:03:22 17:45:00", OffsetTime: "+09:00" }))).toBe(17);
-    expect(HOUR_FACET.extract(exif({ DateTimeOriginal: "2024:03:22 00:00:00", OffsetTime: "+00:00" }))).toBe(0);
+    expect(
+      HOUR_FACET.extract(exif({ DateTimeOriginal: "2024:03:22 17:45:00", OffsetTime: "+09:00" })),
+    ).toBe(17);
+    expect(
+      HOUR_FACET.extract(exif({ DateTimeOriginal: "2024:03:22 00:00:00", OffsetTime: "+00:00" })),
+    ).toBe(0);
   });
 
   it("extracts local hour from naive ISO (build pipeline wall-clock form)", () => {
     // services/photo.ts serialises exifr Dates as zone-less wall-clock ISO —
     // the hour is already local, regardless of the camera's offset
-    expect(HOUR_FACET.extract(exif({ DateTimeOriginal: "2026-02-21T15:35:19", OffsetTime: "+09:00" }))).toBe(15);
-    expect(HOUR_FACET.extract(exif({ DateTimeOriginal: "2026-02-21T21:00:00", OffsetTime: "-05:00" }))).toBe(21);
+    expect(
+      HOUR_FACET.extract(exif({ DateTimeOriginal: "2026-02-21T15:35:19", OffsetTime: "+09:00" })),
+    ).toBe(15);
+    expect(
+      HOUR_FACET.extract(exif({ DateTimeOriginal: "2026-02-21T21:00:00", OffsetTime: "-05:00" })),
+    ).toBe(21);
   });
 
   it("takes the wall-clock hour as-is for half-hour offsets", () => {
     // "+05:30" previously produced a fractional hour that matched no bucket
-    expect(HOUR_FACET.extract(exif({ DateTimeOriginal: "2024:03:22 11:15:00", OffsetTime: "+05:30" }))).toBe(11);
+    expect(
+      HOUR_FACET.extract(exif({ DateTimeOriginal: "2024:03:22 11:15:00", OffsetTime: "+05:30" })),
+    ).toBe(11);
   });
 
   it("returns null when OffsetTime is absent (camera clock may be UTC)", () => {
@@ -188,7 +232,9 @@ describe("CAMERA_FACET", () => {
   });
 
   it("avoids doubling brand when Model starts with Make", () => {
-    expect(CAMERA_FACET.extract(exif({ Make: "FUJIFILM", Model: "FUJIFILM X-T5" }))).toBe("FUJIFILM X-T5");
+    expect(CAMERA_FACET.extract(exif({ Make: "FUJIFILM", Model: "FUJIFILM X-T5" }))).toBe(
+      "FUJIFILM X-T5",
+    );
   });
 
   it("returns just Model when Make is absent", () => {
@@ -228,9 +274,7 @@ describe("LOCATION_FACET", () => {
 
 describe("YEAR_FACET", () => {
   it("extracts year from DateTimeOriginal", () => {
-    expect(YEAR_FACET.extract(exif({ DateTimeOriginal: "2024:03:22 18:30:00" }))).toBe(
-      "2024",
-    );
+    expect(YEAR_FACET.extract(exif({ DateTimeOriginal: "2024:03:22 18:30:00" }))).toBe("2024");
   });
 
   it("returns null when date is absent", () => {

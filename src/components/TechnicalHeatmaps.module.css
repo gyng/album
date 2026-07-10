@@ -139,7 +139,9 @@
     var(--c-bg) calc(100% - (var(--intensity, 0) * 75%))
   );
   border: 1px solid color-mix(in srgb, var(--c-bg-contrast-dark) 88%, transparent);
-  transition: transform var(--t-fast) ease, border-color var(--t-fast) ease;
+  transition:
+    transform var(--t-fast) ease,
+    border-color var(--t-fast) ease;
 }
 
 .cell:hover,

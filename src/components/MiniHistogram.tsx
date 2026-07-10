@@ -12,7 +12,9 @@ export const MiniHistogram: React.FC<Props> = ({ title, data }) => {
 
   return (
     <section className={styles.chart}>
-      <Heading level={2} className={styles.title}>{title}</Heading>
+      <Heading level={2} className={styles.title}>
+        {title}
+      </Heading>
       <div className={styles.bars}>
         {data.map((bucket) => {
           const heightPct = max > 0 ? (bucket.count / max) * 100 : 0;
@@ -21,7 +23,7 @@ export const MiniHistogram: React.FC<Props> = ({ title, data }) => {
             <div
               key={bucket.label}
               className={styles.column}
-              tabIndex={0}
+              role="img"
               aria-label={`${bucket.label} · ${bucket.count.toLocaleString()} photos`}
             >
               <ChartTooltip>
@@ -30,10 +32,7 @@ export const MiniHistogram: React.FC<Props> = ({ title, data }) => {
               <div className={styles.track}>
                 <div className={styles.count}>{bucket.label}</div>
                 <div
-                  className={[
-                    styles.bar,
-                    bucket.count === 0 ? styles.barEmpty : "",
-                  ].join(" ")}
+                  className={[styles.bar, bucket.count === 0 ? styles.barEmpty : ""].join(" ")}
                   style={{ height: `${Math.max(heightPct, bucket.count > 0 ? 4 : 0)}%` }}
                   aria-hidden="true"
                 />

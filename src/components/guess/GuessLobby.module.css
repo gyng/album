@@ -15,8 +15,14 @@
 }
 
 @keyframes dropIn {
-  from { opacity: 0; transform: translateY(-10px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 /* Options — each row cascades in */
@@ -54,8 +60,14 @@
 }
 
 @keyframes slideIn {
-  from { opacity: 0; transform: translateX(-8px); }
-  to { opacity: 1; transform: translateX(0); }
+  from {
+    opacity: 0;
+    transform: translateX(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
 }
 
 .optionLabel {
@@ -83,8 +95,12 @@
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 /* Button row — daily + play side by side */
@@ -108,7 +124,9 @@
   background-color: var(--c-bg);
   font-size: var(--fs-sm);
   color: var(--c-font);
-  transition: background-color 0.15s, transform 0.12s;
+  transition:
+    background-color 0.15s,
+    transform 0.12s;
 }
 
 .dailyButton:hover {
@@ -142,12 +160,21 @@
   color: var(--c-font);
   position: relative;
   overflow: hidden;
-  transition: background-color 0.15s, transform 0.12s, box-shadow 0.2s;
+  transition:
+    background-color 0.15s,
+    transform 0.12s,
+    box-shadow 0.2s;
 }
 
 @keyframes buttonEnter {
-  from { opacity: 0; transform: scale(0.9); }
-  to { opacity: 1; transform: scale(1); }
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
 .playButton:hover {
@@ -178,8 +205,13 @@
 }
 
 @keyframes shimmer {
-  0%, 100% { transform: translateX(-120%); }
-  50% { transform: translateX(120%); }
+  0%,
+  100% {
+    transform: translateX(-120%);
+  }
+  50% {
+    transform: translateX(120%);
+  }
 }
 
 .kbd {

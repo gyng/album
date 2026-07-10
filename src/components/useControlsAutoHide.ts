@@ -45,9 +45,7 @@ export const useControlsAutoHide = (): UseControlsAutoHide => {
   }, [controlsVisible, isCoarsePointer]);
 
   useEffect(() => {
-    const coarsePointerQuery = window.matchMedia(
-      "(hover: none), (pointer: coarse)",
-    );
+    const coarsePointerQuery = window.matchMedia("(hover: none), (pointer: coarse)");
     const syncCoarsePointer = () => {
       setIsCoarsePointer(coarsePointerQuery.matches);
     };
@@ -79,9 +77,7 @@ export const useControlsAutoHide = (): UseControlsAutoHide => {
     // Touch/coarse-pointer gets a much longer dwell since the user can't
     // mouse-out to dismiss. The ring still renders to make the impending
     // auto-hide discoverable.
-    const autoHideMs = isCoarsePointer
-      ? TOUCH_CONTROLS_AUTO_HIDE_MS
-      : CONTROLS_AUTO_HIDE_MS;
+    const autoHideMs = isCoarsePointer ? TOUCH_CONTROLS_AUTO_HIDE_MS : CONTROLS_AUTO_HIDE_MS;
     const deadline = Date.now() + autoHideMs;
     controlsHideDeadlineRef.current = deadline;
     setControlsHideProgress(1);

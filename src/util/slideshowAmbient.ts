@@ -1,8 +1,5 @@
 import { RandomPhotoRow } from "../components/search/api";
-import {
-  extractDateFromExifString,
-  extractGPSFromExifString,
-} from "./extractExifFromDb";
+import { extractDateFromExifString, extractGPSFromExifString } from "./extractExifFromDb";
 import { deltaE, parseColorPalette, rgbToLab } from "./colorDistance";
 
 /**
@@ -24,10 +21,7 @@ const cyclicDistance = (a: number, b: number, period: number): number => {
  * photo matching only one axis still scored 0.5, which made the displayed
  * "% match" feel weakly correlated with the actual selection bias.
  */
-export const getTimeAffinityScore = (
-  photoDate: Date,
-  now: Date = new Date(),
-): number => {
+export const getTimeAffinityScore = (photoDate: Date, now: Date = new Date()): number => {
   const hourDistance = cyclicDistance(
     photoDate.getHours() + photoDate.getMinutes() / 60,
     now.getHours() + now.getMinutes() / 60,
@@ -38,11 +32,7 @@ export const getTimeAffinityScore = (
   // tracks the current hour rather than just the half-day.
   const hourScore = Math.exp(-(hourDistance ** 2) / (2 * 1.5 * 1.5));
 
-  const monthDistance = cyclicDistance(
-    photoDate.getMonth(),
-    now.getMonth(),
-    12,
-  );
+  const monthDistance = cyclicDistance(photoDate.getMonth(), now.getMonth(), 12);
   // sigma ≈ 0.8mo: adjacent months still score >0.5, but two-months-off
   // already drops below 0.05 — keeps the season feel without spilling into
   // photos from the opposite half of the year.
@@ -121,9 +111,7 @@ export const decideRemixCompanionCount = (
  *
  * `random` is injectable for tests.
  */
-export const rollRemixLayoutCount = (
-  random: () => number = Math.random,
-): 1 | 2 | 3 => {
+export const rollRemixLayoutCount = (random: () => number = Math.random): 1 | 2 | 3 => {
   const r = random();
   if (r < 0.7) return 1;
   if (r < 0.95) return 2;
@@ -159,21 +147,14 @@ const albumOfPath = (path: string): string => path.split("/")?.[2] ?? "";
 
 // Great-circle distance between two GPS points, in kilometres.
 // Used by the "proximity" remix strategy to find photos shot near a seed.
-export const haversineKm = (
-  lat1: number,
-  lon1: number,
-  lat2: number,
-  lon2: number,
-): number => {
+export const haversineKm = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
   const EARTH_RADIUS_KM = 6371;
   const toRad = (deg: number) => (deg * Math.PI) / 180;
   const dLat = toRad(lat2 - lat1);
   const dLon = toRad(lon2 - lon1);
   const a =
     Math.sin(dLat / 2) ** 2 +
-    Math.cos(toRad(lat1)) *
-      Math.cos(toRad(lat2)) *
-      Math.sin(dLon / 2) ** 2;
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
   return 2 * EARTH_RADIUS_KM * Math.asin(Math.sqrt(a));
 };
 
@@ -182,7 +163,10 @@ export const haversineKm = (
 // Matching on the *last* line is the most stable cohesion criterion.
 const lastNonNumericLine = (geocode: string): string => {
   if (!geocode) return "";
-  const lines = geocode.split("\n").map((l) => l.trim()).filter(Boolean);
+  const lines = geocode
+    .split("\n")
+    .map((l) => l.trim())
+    .filter(Boolean);
   for (let i = lines.length - 1; i >= 0; i -= 1) {
     const line = lines[i];
     if (Number.isNaN(parseFloat(line))) {
@@ -222,7 +206,10 @@ const extractAdmin1 = (geocode: string): string => {
 // accidentally match cities on a coordinate value.
 const extractCity = (geocode: string): string => {
   if (!geocode) return "";
-  const lines = geocode.split("\n").map((l) => l.trim()).filter(Boolean);
+  const lines = geocode
+    .split("\n")
+    .map((l) => l.trim())
+    .filter(Boolean);
   if (lines.length >= 2 && Number.isNaN(parseFloat(lines[1]))) {
     return lines[1];
   }
@@ -237,9 +224,7 @@ const extractCity = (geocode: string): string => {
 // Dominant colour — the first entry in the palette serialised into `colors`.
 // Returns null when the palette is missing or unparseable so the matching
 // filter can bail without inventing a colour.
-const extractDominantLab = (
-  colors: string | undefined,
-): [number, number, number] | null => {
+const extractDominantLab = (colors: string | undefined): [number, number, number] | null => {
   if (!colors) return null;
   const palette = parseColorPalette(colors);
   if (palette.length === 0) return null;
@@ -270,10 +255,7 @@ const extractCameraId = (exifString: string): string => {
   return `${make} ${model}`.trim().toLowerCase();
 };
 
-const shuffleInPlace = (
-  arr: RandomPhotoRow[],
-  random: () => number,
-): RandomPhotoRow[] => {
+const shuffleInPlace = (arr: RandomPhotoRow[], random: () => number): RandomPhotoRow[] => {
   for (let i = arr.length - 1; i > 0; i -= 1) {
     const j = Math.floor(random() * (i + 1));
     [arr[i], arr[j]] = [arr[j], arr[i]];
@@ -290,9 +272,7 @@ const strategyFilters: Record<
   "same-album": (seed, pool) => {
     const seedAlbum = albumOfPath(seed.path);
     if (!seedAlbum) return [];
-    return pool.filter(
-      (p) => p.path !== seed.path && albumOfPath(p.path) === seedAlbum,
-    );
+    return pool.filter((p) => p.path !== seed.path && albumOfPath(p.path) === seedAlbum);
   },
   "same-year": (seed, pool) => {
     const seedDate = extractDateFromExifString(seed.exif);
@@ -310,9 +290,7 @@ const strategyFilters: Record<
   "same-region": (seed, pool) => {
     const seedRegion = extractAdmin1(seed.geocode);
     if (!seedRegion) return [];
-    return pool.filter(
-      (p) => p.path !== seed.path && extractAdmin1(p.geocode) === seedRegion,
-    );
+    return pool.filter((p) => p.path !== seed.path && extractAdmin1(p.geocode) === seedRegion);
   },
   // Matches at the country line — broadest of the geo strategies. Distinct
   // from same-region so the badge can honestly say "from the same country"
@@ -321,17 +299,13 @@ const strategyFilters: Record<
     const seedCountry = lastNonNumericLine(seed.geocode);
     if (!seedCountry) return [];
     return pool.filter(
-      (p) =>
-        p.path !== seed.path &&
-        lastNonNumericLine(p.geocode) === seedCountry,
+      (p) => p.path !== seed.path && lastNonNumericLine(p.geocode) === seedCountry,
     );
   },
   "same-city": (seed, pool) => {
     const seedCity = extractCity(seed.geocode);
     if (!seedCity) return [];
-    return pool.filter(
-      (p) => p.path !== seed.path && extractCity(p.geocode) === seedCity,
-    );
+    return pool.filter((p) => p.path !== seed.path && extractCity(p.geocode) === seedCity);
   },
   // Same calendar day (month + day-of-month) in a different year. Stricter
   // than `anniversary` (which is ±3 days): this is the exact same date you
@@ -373,16 +347,16 @@ const strategyFilters: Record<
   anniversary: (seed, pool) => {
     const seedDate = extractDateFromExifString(seed.exif);
     if (!seedDate) return [];
-    const seedDoy =
-      Math.floor((seedDate.getTime() - new Date(seedDate.getFullYear(), 0, 0).getTime()) / 86400000);
+    const seedDoy = Math.floor(
+      (seedDate.getTime() - new Date(seedDate.getFullYear(), 0, 0).getTime()) / 86400000,
+    );
     return pool.filter((p) => {
       if (p.path === seed.path) return false;
       const d = extractDateFromExifString(p.exif);
       if (!d) return false;
       // Different year required so it's a real anniversary, not the same day.
       if (d.getFullYear() === seedDate.getFullYear()) return false;
-      const doy =
-        Math.floor((d.getTime() - new Date(d.getFullYear(), 0, 0).getTime()) / 86400000);
+      const doy = Math.floor((d.getTime() - new Date(d.getFullYear(), 0, 0).getTime()) / 86400000);
       const diff = Math.abs(doy - seedDoy);
       const wrappedDiff = Math.min(diff, 365 - diff);
       return wrappedDiff <= 3;
@@ -425,9 +399,7 @@ const strategyFilters: Record<
     }
 
     withDistance.sort((a, b) => a.distance - b.distance);
-    return withDistance
-      .slice(0, NEAREST_POOL_SIZE)
-      .map((entry) => entry.photo);
+    return withDistance.slice(0, NEAREST_POOL_SIZE).map((entry) => entry.photo);
   },
   // Photos shot at golden hour — roughly the hour around sunrise (5-7am)
   // or sunset (5-7pm). Both seed and candidate must be in the band, so a
@@ -435,8 +407,7 @@ const strategyFilters: Record<
   "golden-hour": (seed, pool) => {
     const seedDate = extractDateFromExifString(seed.exif);
     if (!seedDate) return [];
-    const inGoldenHour = (hour: number) =>
-      (hour >= 5 && hour <= 7) || (hour >= 17 && hour <= 19);
+    const inGoldenHour = (hour: number) => (hour >= 5 && hour <= 7) || (hour >= 17 && hour <= 19);
     if (!inGoldenHour(seedDate.getHours())) return [];
     return pool.filter((p) => {
       if (p.path === seed.path) return false;
@@ -498,9 +469,7 @@ const formatDayMonth = (date: Date): string =>
 // Max pairwise haversine distance (km) across a slide's photos. The slide is
 // a circle and this is its enclosing diameter — the radius the user can see.
 // Returns null if fewer than two photos have parseable GPS.
-const computeMaxPairwiseKm = (
-  photos: ReadonlyArray<RandomPhotoRow | null>,
-): number | null => {
+const computeMaxPairwiseKm = (photos: ReadonlyArray<RandomPhotoRow | null>): number | null => {
   const coords: Array<[number, number]> = [];
   for (const photo of photos) {
     if (!photo) continue;
@@ -511,12 +480,7 @@ const computeMaxPairwiseKm = (
   let max = 0;
   for (let i = 0; i < coords.length; i += 1) {
     for (let j = i + 1; j < coords.length; j += 1) {
-      const d = haversineKm(
-        coords[i][0],
-        coords[i][1],
-        coords[j][0],
-        coords[j][1],
-      );
+      const d = haversineKm(coords[i][0], coords[i][1], coords[j][0], coords[j][1]);
       if (d > max) max = d;
     }
   }
@@ -529,9 +493,7 @@ const formatSpreadKm = (km: number): string => {
   return `within ${Math.round(km)} km`;
 };
 
-const collectDates = (
-  photos: ReadonlyArray<RandomPhotoRow | null>,
-): Date[] => {
+const collectDates = (photos: ReadonlyArray<RandomPhotoRow | null>): Date[] => {
   const dates: Date[] = [];
   for (const photo of photos) {
     if (!photo) continue;
@@ -595,17 +557,13 @@ export const describeRemix = (
       const dates = collectDates(photos);
       if (dates.length === 0) return null;
       const day = formatDayMonth(dates[0]);
-      const years = Array.from(
-        new Set(dates.map((d) => d.getFullYear())),
-      ).sort((a, b) => a - b);
+      const years = Array.from(new Set(dates.map((d) => d.getFullYear()))).sort((a, b) => a - b);
       return `${day} · ${years.join(", ")}`;
     }
     case "anniversary": {
       const dates = collectDates(photos);
       if (dates.length === 0) return null;
-      const years = Array.from(
-        new Set(dates.map((d) => d.getFullYear())),
-      ).sort((a, b) => a - b);
+      const years = Array.from(new Set(dates.map((d) => d.getFullYear()))).sort((a, b) => a - b);
       return years.join(", ");
     }
     case "golden-hour": {
@@ -679,15 +637,11 @@ const pickWeightedStrategy = (random: () => number): RemixStrategy => {
  * strategy before resolving companions (e.g. the slideshow component takes
  * the async SigLIP path when the roll picks `similar` or `juxtapose`).
  */
-export const rollRemixStrategy = (
-  random: () => number = Math.random,
-): RemixStrategy => pickWeightedStrategy(random);
+export const rollRemixStrategy = (random: () => number = Math.random): RemixStrategy =>
+  pickWeightedStrategy(random);
 
 /** Vector-resolved strategies — the sync filter chain can't produce them. */
-export const VECTOR_REMIX_STRATEGIES = new Set<RemixStrategy>([
-  "similar",
-  "juxtapose",
-]);
+export const VECTOR_REMIX_STRATEGIES = new Set<RemixStrategy>(["similar", "juxtapose"]);
 
 /**
  * Pick `count` companion photos for a remix slide. Rolls a weighted die to

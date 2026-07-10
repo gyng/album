@@ -1,7 +1,4 @@
-import {
-  getNextSlideshowOverlayPreset,
-  getSlideshowTouchTapAction,
-} from "./slideshowTouch";
+import { getNextSlideshowOverlayPreset, getSlideshowTouchTapAction } from "./slideshowTouch";
 
 describe("getSlideshowTouchTapAction", () => {
   it("advances on right-side taps", () => {

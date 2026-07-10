@@ -30,11 +30,7 @@ describe("buildSlideSnapshot", () => {
 
   it("captures a remix slide, dropping cells with no src (unresolved companions)", () => {
     expect(
-      buildSlideSnapshot([
-        { path: "seed", src: "seed.jpg" },
-        null,
-        { path: "b", src: "b.jpg" },
-      ]),
+      buildSlideSnapshot([{ path: "seed", src: "seed.jpg" }, null, { path: "b", src: "b.jpg" }]),
     ).toEqual({
       remix: true,
       cells: [
@@ -56,12 +52,18 @@ describe("slideKeyOf", () => {
 
 describe("isIncomingReady", () => {
   it("gates a single slide on the image decode flag", () => {
-    expect(isIncomingReady({ isRemix: false, imageLoaded: false, remixGridReady: true })).toBe(false);
-    expect(isIncomingReady({ isRemix: false, imageLoaded: true, remixGridReady: false })).toBe(true);
+    expect(isIncomingReady({ isRemix: false, imageLoaded: false, remixGridReady: true })).toBe(
+      false,
+    );
+    expect(isIncomingReady({ isRemix: false, imageLoaded: true, remixGridReady: false })).toBe(
+      true,
+    );
   });
 
   it("gates a remix slide on the whole-grid ready flag", () => {
-    expect(isIncomingReady({ isRemix: true, imageLoaded: true, remixGridReady: false })).toBe(false);
+    expect(isIncomingReady({ isRemix: true, imageLoaded: true, remixGridReady: false })).toBe(
+      false,
+    );
     expect(isIncomingReady({ isRemix: true, imageLoaded: false, remixGridReady: true })).toBe(true);
   });
 });

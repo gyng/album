@@ -48,9 +48,7 @@ export const EmptyStateExplore: React.FC<Props> = ({
   onSearchByColor,
   isColorCategoryActive = false,
 }) => {
-  const [recentVisibleCount, setRecentVisibleCount] = useState<number>(
-    RECENT_ROW_INITIAL_SIZE,
-  );
+  const [recentVisibleCount, setRecentVisibleCount] = useState<number>(RECENT_ROW_INITIAL_SIZE);
   const [todayDate] = useState<string>(() => {
     const date = new Date();
     const year = date.getFullYear();
@@ -58,31 +56,23 @@ export const EmptyStateExplore: React.FC<Props> = ({
     const day = `${date.getDate()}`.padStart(2, "0");
     return `${year}-${month}-${day}`;
   });
-  const [memoryClusters, setMemoryClusters] = useState<
-    ResolvedMemoryCluster<MemoryResult>[]
-  >([]);
-  const [visibleMemoryClusterCount, setVisibleMemoryClusterCount] =
-    useState<number>(MEMORY_CLUSTER_INITIAL_SIZE);
+  const [memoryClusters, setMemoryClusters] = useState<ResolvedMemoryCluster<MemoryResult>[]>([]);
+  const [visibleMemoryClusterCount, setVisibleMemoryClusterCount] = useState<number>(
+    MEMORY_CLUSTER_INITIAL_SIZE,
+  );
   const [isMemoriesLoading, setIsMemoriesLoading] = useState<boolean>(false);
   const [recentResults, setRecentResults] = useState<SearchResultRow[]>([]);
   const [isRecentLoading, setIsRecentLoading] = useState<boolean>(false);
-  const [recentExploreError, setRecentExploreError] = useState<string | null>(
-    null,
-  );
+  const [recentExploreError, setRecentExploreError] = useState<string | null>(null);
   const [randomResults, setRandomResults] = useState<SearchResultRow[]>([]);
-  const [hasMoreRandomResults, setHasMoreRandomResults] =
-    useState<boolean>(true);
+  const [hasMoreRandomResults, setHasMoreRandomResults] = useState<boolean>(true);
   const [randomAutoLoadCount, setRandomAutoLoadCount] = useState<number>(0);
-  const [isRandomResultsLoading, setIsRandomResultsLoading] =
-    useState<boolean>(false);
-  const [randomResultsError, setRandomResultsError] = useState<string | null>(
-    null,
-  );
+  const [isRandomResultsLoading, setIsRandomResultsLoading] = useState<boolean>(false);
+  const [randomResultsError, setRandomResultsError] = useState<string | null>(null);
   const randomLoadMoreButtonRef = useRef<HTMLButtonElement | null>(null);
 
   useEffect(() => {
     if (!database) {
-       
       setMemoryClusters([]);
       setVisibleMemoryClusterCount(MEMORY_CLUSTER_INITIAL_SIZE);
       return;
@@ -127,7 +117,6 @@ export const EmptyStateExplore: React.FC<Props> = ({
 
   useEffect(() => {
     if (!database) {
-       
       setRecentResults([]);
       setRecentExploreError(null);
       return;
@@ -162,7 +151,6 @@ export const EmptyStateExplore: React.FC<Props> = ({
 
   useEffect(() => {
     if (!database) {
-       
       setRandomResults([]);
       setRandomResultsError(null);
       return;
@@ -230,11 +218,7 @@ export const EmptyStateExplore: React.FC<Props> = ({
   );
 
   useEffect(() => {
-    if (
-      !hasMoreRandomResults ||
-      isRandomResultsLoading ||
-      randomAutoLoadCount >= 50
-    ) {
+    if (!hasMoreRandomResults || isRandomResultsLoading || randomAutoLoadCount >= 50) {
       return;
     }
 
@@ -291,36 +275,28 @@ export const EmptyStateExplore: React.FC<Props> = ({
     return albums.length === 1 ? albums[0] : null;
   }, []);
 
-  const visibleMemoryClusters = memoryClusters.slice(
-    0,
-    visibleMemoryClusterCount,
-  );
+  const visibleMemoryClusters = memoryClusters.slice(0, visibleMemoryClusterCount);
 
   return (
     <section className={styles.emptyState} aria-label="Explore browse mode">
       <div className={styles.emptySections}>
         <section className={styles.sectionSurface}>
           <div className={styles.sectionHeader}>
-            <Heading level={2} as="h3">Latest</Heading>
+            <Heading level={2} as="h3">
+              Latest
+            </Heading>
           </div>
 
           {!database || isRecentLoading || isMemoriesLoading ? (
-            <div className={styles.sectionStatus}>
-              Loading recent photos…
-            </div>
+            <div className={styles.sectionStatus}>Loading recent photos…</div>
           ) : null}
 
           {recentExploreError ? (
             <div className={styles.inlineError}>{recentExploreError}</div>
           ) : null}
 
-          {database &&
-          !isRecentLoading &&
-          !recentExploreError &&
-          recentResults.length === 0 ? (
-            <div className={styles.sectionStatus}>
-              No dated photos available yet.
-            </div>
+          {database && !isRecentLoading && !recentExploreError && recentResults.length === 0 ? (
+            <div className={styles.sectionStatus}>No dated photos available yet.</div>
           ) : null}
 
           {recentResults.length > 0 ? (
@@ -344,9 +320,7 @@ export const EmptyStateExplore: React.FC<Props> = ({
                   <button
                     className={styles.moreButton}
                     onClick={() => {
-                      setRecentVisibleCount(
-                        (prev) => prev + RECENT_ROW_LOAD_MORE_SIZE,
-                      );
+                      setRecentVisibleCount((prev) => prev + RECENT_ROW_LOAD_MORE_SIZE);
                     }}
                     disabled={isRecentLoading}
                   >
@@ -361,16 +335,15 @@ export const EmptyStateExplore: React.FC<Props> = ({
         {visibleMemoryClusters.length > 0 ? (
           <section className={styles.sectionSurface}>
             <div className={styles.sectionHeader}>
-              <Heading level={2} as="h3">On this day</Heading>
+              <Heading level={2} as="h3">
+                On this day
+              </Heading>
             </div>
 
             <div className={styles.memoryClusters}>
               {visibleMemoryClusters.map((cluster) => {
                 const albumLabel = getClusterAlbumLabel(cluster.items);
-                const previewItems = cluster.items.slice(
-                  0,
-                  MEMORY_CLUSTER_ITEM_PREVIEW_SIZE,
-                );
+                const previewItems = cluster.items.slice(0, MEMORY_CLUSTER_ITEM_PREVIEW_SIZE);
                 const meta = [
                   albumLabel,
                   formatMemoryDateRange(cluster.startDate, cluster.endDate),
@@ -406,10 +379,7 @@ export const EmptyStateExplore: React.FC<Props> = ({
                       ))}
                       <li className={styles.memoryClusterItem}>
                         <Link
-                          href={buildTimelineMemoryHref(
-                            cluster.startDate,
-                            albumLabel,
-                          )}
+                          href={buildTimelineMemoryHref(cluster.startDate, albumLabel)}
                           className={`${styles.moreButton} ${styles.memoryTimelineTile}`}
                         >
                           Open timeline
@@ -427,10 +397,7 @@ export const EmptyStateExplore: React.FC<Props> = ({
                 className={`${commonStyles.button} ${styles.memoryLoadMoreButton}`}
                 onClick={() => {
                   setVisibleMemoryClusterCount((current) =>
-                    Math.min(
-                      current + MEMORY_CLUSTER_LOAD_MORE_SIZE,
-                      memoryClusters.length,
-                    ),
+                    Math.min(current + MEMORY_CLUSTER_LOAD_MORE_SIZE, memoryClusters.length),
                   );
                 }}
               >
@@ -442,13 +409,13 @@ export const EmptyStateExplore: React.FC<Props> = ({
 
         <section className={styles.sectionSurface}>
           <div className={styles.sectionHeader}>
-            <Heading level={2} as="h3">Random selection</Heading>
+            <Heading level={2} as="h3">
+              Random selection
+            </Heading>
           </div>
 
           {!database || isRandomResultsLoading ? (
-            <div className={styles.sectionStatus}>
-              Loading random photos…
-            </div>
+            <div className={styles.sectionStatus}>Loading random photos…</div>
           ) : null}
 
           {randomResultsError ? (
@@ -459,9 +426,7 @@ export const EmptyStateExplore: React.FC<Props> = ({
           !isRandomResultsLoading &&
           !randomResultsError &&
           randomResults.length === 0 ? (
-            <div className={styles.sectionStatus}>
-              No random photos available yet.
-            </div>
+            <div className={styles.sectionStatus}>No random photos available yet.</div>
           ) : null}
 
           {randomResults.length > 0 ? (
@@ -490,11 +455,7 @@ export const EmptyStateExplore: React.FC<Props> = ({
                     }}
                     disabled={isRandomResultsLoading}
                   >
-                    {isRandomResultsLoading ? (
-                      <>Loading&hellip;</>
-                    ) : (
-                      <>More&hellip;</>
-                    )}
+                    {isRandomResultsLoading ? <>Loading&hellip;</> : <>More&hellip;</>}
                   </button>
                 </li>
               ) : null}

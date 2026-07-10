@@ -15,10 +15,7 @@ describe("textEmbeddings", () => {
         this.listeners.set(type, current);
       },
     );
-    listeners = new Map<
-      string,
-      Array<(event: { data?: unknown; error?: unknown }) => void>
-    >();
+    listeners = new Map<string, Array<(event: { data?: unknown; error?: unknown }) => void>>();
 
     emitMessage(data: unknown) {
       const listeners = this.listeners.get("message") ?? [];
@@ -91,9 +88,7 @@ describe("textEmbeddings", () => {
     const workerConstructor = jest.fn(() => worker as unknown as Worker);
     global.Worker = workerConstructor as unknown as typeof Worker;
 
-    const { warmupTextEmbeddingModel, encodeSearchText } = await import(
-      "./textEmbeddings"
-    );
+    const { warmupTextEmbeddingModel, encodeSearchText } = await import("./textEmbeddings");
 
     const warmupPromise = warmupTextEmbeddingModel();
     worker.emitMessage({ id: 0, ok: true });
@@ -159,8 +154,6 @@ describe("textEmbeddings", () => {
     const resultPromise = encodeSearchText("harbor");
     worker.emitMessage({ id: 0, ok: true });
 
-    await expect(resultPromise).rejects.toThrow(
-      "Text embedding worker returned no embedding.",
-    );
+    await expect(resultPromise).rejects.toThrow("Text embedding worker returned no embedding.");
   });
 });

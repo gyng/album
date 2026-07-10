@@ -37,11 +37,11 @@ export const useImageQuery = (): ImageQueryState => {
   const [imageQuery, setImageQuery] = useState<ImageQuery | null>(null);
   const [imageVectorError, setImageVectorError] = useState<string | null>(null);
   const [imageModelProgress, setImageModelProgress] = useState(100);
-  const [imageModelStage, setImageModelStage] = useState(
-    "Loading image search model…",
-  );
-  const [imageModelProgressDetails, setImageModelProgressDetails] =
-    useState<ProgressDetails>({ loaded: 0, total: 0 });
+  const [imageModelStage, setImageModelStage] = useState("Loading image search model…");
+  const [imageModelProgressDetails, setImageModelProgressDetails] = useState<ProgressDetails>({
+    loaded: 0,
+    total: 0,
+  });
   const nextIdRef = useRef(0);
   const activeIdRef = useRef(0);
   const previewUrlRef = useRef<string | null>(null);
@@ -64,50 +64,45 @@ export const useImageQuery = (): ImageQueryState => {
     setImageModelProgressDetails({ loaded: 0, total: 0 });
   }, []);
 
-  const startImageQuery = useCallback(
-    (blob: Blob, source: ImageQuerySource) => {
-      releasePreviewUrl();
-      const previewUrl = URL.createObjectURL(blob);
-      previewUrlRef.current = previewUrl;
-      nextIdRef.current += 1;
-      const id = nextIdRef.current;
-      activeIdRef.current = id;
+  const startImageQuery = useCallback((blob: Blob, source: ImageQuerySource) => {
+    releasePreviewUrl();
+    const previewUrl = URL.createObjectURL(blob);
+    previewUrlRef.current = previewUrl;
+    nextIdRef.current += 1;
+    const id = nextIdRef.current;
+    activeIdRef.current = id;
 
-      setImageVectorError(null);
-      setImageModelProgress(0);
-      setImageModelStage("Loading image search model…");
-      setImageQuery({ id, source, previewUrl, vector: null });
+    setImageVectorError(null);
+    setImageModelProgress(0);
+    setImageModelStage("Loading image search model…");
+    setImageQuery({ id, source, previewUrl, vector: null });
 
-      encodeSearchImage(blob, (progress, stage, details) => {
+    encodeSearchImage(blob, (progress, stage, details) => {
+      if (activeIdRef.current !== id) {
+        return;
+      }
+      setImageModelProgress(progress);
+      setImageModelStage(stage);
+      setImageModelProgressDetails(details ?? { loaded: 0, total: 0 });
+    })
+      .then((vector) => {
         if (activeIdRef.current !== id) {
           return;
         }
-        setImageModelProgress(progress);
-        setImageModelStage(stage);
-        setImageModelProgressDetails(details ?? { loaded: 0, total: 0 });
+        setImageModelProgress(100);
+        setImageQuery((current) => (current?.id === id ? { ...current, vector } : current));
       })
-        .then((vector) => {
-          if (activeIdRef.current !== id) {
-            return;
-          }
-          setImageModelProgress(100);
-          setImageQuery((current) =>
-            current?.id === id ? { ...current, vector } : current,
-          );
-        })
-        .catch((err) => {
-          if (activeIdRef.current !== id) {
-            return;
-          }
-          console.error("Failed to encode search image", err);
-          releasePreviewUrl();
-          setImageModelProgress(100);
-          setImageQuery(null);
-          setImageVectorError("Image search is unavailable right now.");
-        });
-    },
-    [],
-  );
+      .catch((err) => {
+        if (activeIdRef.current !== id) {
+          return;
+        }
+        console.error("Failed to encode search image", err);
+        releasePreviewUrl();
+        setImageModelProgress(100);
+        setImageQuery(null);
+        setImageVectorError("Image search is unavailable right now.");
+      });
+  }, []);
 
   return {
     imageQuery,

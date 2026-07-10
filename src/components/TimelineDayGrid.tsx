@@ -12,8 +12,7 @@ import {
   formatExifWallClockDateTime,
 } from "../util/exifTime";
 
-const formatLongDate = (date: string) =>
-  formatExifWallClockDate(`${date}T00:00:00`) ?? date;
+const formatLongDate = (date: string) => formatExifWallClockDate(`${date}T00:00:00`) ?? date;
 
 const formatDateTimeTitle = (dateTimeOriginal: string) =>
   formatExifWallClockDateTime(dateTimeOriginal);
@@ -45,9 +44,7 @@ const getGeocodeSummary = (geocode?: string | null): string | null => {
   }
 
   const cleaned =
-    parts[0].length <= 3 && parts[0].toUpperCase() === parts[0]
-      ? parts.slice(1)
-      : parts;
+    parts[0].length <= 3 && parts[0].toUpperCase() === parts[0] ? parts.slice(1) : parts;
 
   if (cleaned.length === 0) {
     return null;
@@ -59,9 +56,7 @@ const getGeocodeSummary = (geocode?: string | null): string | null => {
     cleaned.at(-1),
   ].filter(Boolean) as string[];
 
-  return summaryParts
-    .filter((part, index) => summaryParts.indexOf(part) === index)
-    .join(", ");
+  return summaryParts.filter((part, index) => summaryParts.indexOf(part) === index).join(", ");
 };
 
 const toSimilarSearchPath = (path: string) => {
@@ -94,10 +89,10 @@ export const TimelineDayGrid = ({
   if (!date) {
     return (
       <section className={styles.emptyState} aria-label="No day selected">
-        <Heading level={1} as="h2">Pick a day</Heading>
-        <Caption size="sm">
-          Choose a day from the heatmap, or jump to a random one.
-        </Caption>
+        <Heading level={1} as="h2">
+          Pick a day
+        </Heading>
+        <Caption size="sm">Choose a day from the heatmap, or jump to a random one.</Caption>
         <div className={styles.dayNavButtons}>
           {onSelectOlderDate ? (
             <button
@@ -110,11 +105,7 @@ export const TimelineDayGrid = ({
             </button>
           ) : null}
           {onSelectRandomDate ? (
-            <button
-              type="button"
-              className={commonStyles.button}
-              onClick={onSelectRandomDate}
-            >
+            <button type="button" className={commonStyles.button} onClick={onSelectRandomDate}>
               🎲 Random
             </button>
           ) : null}
@@ -135,9 +126,7 @@ export const TimelineDayGrid = ({
 
   const formattedDate = formatLongDate(date);
   const locationSummary = Array.from(
-    new Set(
-      entries.map((entry) => getGeocodeSummary(entry.geocode)).filter(Boolean),
-    ),
+    new Set(entries.map((entry) => getGeocodeSummary(entry.geocode)).filter(Boolean)),
   ).join(" · ");
   const mappableEntries = entries.filter(
     (entry): entry is TimelineEntry & { decLat: number; decLng: number } =>
@@ -159,10 +148,7 @@ export const TimelineDayGrid = ({
   }));
 
   return (
-    <section
-      className={styles.section}
-      aria-label={`Photos from ${formattedDate}`}
-    >
+    <section className={styles.section} aria-label={`Photos from ${formattedDate}`}>
       <div className={styles.header}>
         <div ref={dateHeadingRef}>
           <Heading level={1} as="h2">
@@ -187,11 +173,7 @@ export const TimelineDayGrid = ({
           </button>
         ) : null}
         {onSelectRandomDate ? (
-          <button
-            type="button"
-            className={commonStyles.button}
-            onClick={onSelectRandomDate}
-          >
+          <button type="button" className={commonStyles.button} onClick={onSelectRandomDate}>
             🎲 Random
           </button>
         ) : null}
@@ -236,9 +218,7 @@ export const TimelineDayGrid = ({
                   />
                 </Link>
                 <Link
-                  href={`/search?similar=${encodeURIComponent(
-                    toSimilarSearchPath(entry.path),
-                  )}`}
+                  href={`/search?similar=${encodeURIComponent(toSimilarSearchPath(entry.path))}`}
                   className={`${overlayButtonStyles.base} ${styles.similarButton}`}
                   aria-label="Find similar photos"
                   title="Find similar photos"
@@ -257,9 +237,7 @@ export const TimelineDayGrid = ({
                     <span
                       suppressHydrationWarning
                       className={styles.secondaryMeta}
-                      title={
-                        formatDateTimeTitle(entry.dateTimeOriginal) ?? undefined
-                      }
+                      title={formatDateTimeTitle(entry.dateTimeOriginal) ?? undefined}
                     >
                       {formatRelativeDateTime(entry.dateTimeOriginal)}
                     </span>
@@ -272,10 +250,7 @@ export const TimelineDayGrid = ({
       </ul>
 
       {mapPhotos.length > 0 ? (
-        <section
-          className={styles.mapSection}
-          aria-label={`Map of photos from ${formattedDate}`}
-        >
+        <section className={styles.mapSection} aria-label={`Map of photos from ${formattedDate}`}>
           <div className={styles.mapHeader}>
             <h3 className={styles.mapHeading}>Map</h3>
             <Caption as="div">

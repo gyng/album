@@ -14,24 +14,17 @@ export const getActiveFilterCount = ({
   searchTermCount: number;
   hasColour: boolean;
   hasImage: boolean;
-}): number =>
-  selectedFacetCount +
-  searchTermCount +
-  (hasColour ? 1 : 0) +
-  (hasImage ? 1 : 0);
+}): number => selectedFacetCount + searchTermCount + (hasColour ? 1 : 0) + (hasImage ? 1 : 0);
 
 export const mergeFacetSections = (
   catalogSections: SearchFacetSection[],
   liveSections: SearchFacetSection[],
   selectedFacets: SearchFacetSelection[],
 ): SearchFacetSection[] => {
-  const liveSectionMap = new Map(
-    liveSections.map((section) => [section.facetId, section]),
-  );
+  const liveSectionMap = new Map(liveSections.map((section) => [section.facetId, section]));
   const selectedValuesByFacet = new Map<string, Set<string>>();
   selectedFacets.forEach((selection) => {
-    const values =
-      selectedValuesByFacet.get(selection.facetId) ?? new Set<string>();
+    const values = selectedValuesByFacet.get(selection.facetId) ?? new Set<string>();
     values.add(selection.value);
     selectedValuesByFacet.set(selection.facetId, values);
   });
@@ -44,20 +37,16 @@ export const mergeFacetSections = (
     const orderedOptions = [...section.options];
 
     (liveSection?.options ?? []).forEach((option) => {
-      if (
-        !orderedOptions.some((candidate) => candidate.value === option.value)
-      ) {
+      if (!orderedOptions.some((candidate) => candidate.value === option.value)) {
         orderedOptions.push(option);
       }
     });
 
-    Array.from(selectedValuesByFacet.get(section.facetId) ?? []).forEach(
-      (value) => {
-        if (!orderedOptions.some((candidate) => candidate.value === value)) {
-          orderedOptions.push({ value, count: 0 });
-        }
-      },
-    );
+    Array.from(selectedValuesByFacet.get(section.facetId) ?? []).forEach((value) => {
+      if (!orderedOptions.some((candidate) => candidate.value === value)) {
+        orderedOptions.push({ value, count: 0 });
+      }
+    });
 
     return {
       ...section,
@@ -71,11 +60,7 @@ export const mergeFacetSections = (
   const merged = catalogSections.map(mergeSection);
 
   liveSections.forEach((section) => {
-    if (
-      !catalogSections.some(
-        (candidate) => candidate.facetId === section.facetId,
-      )
-    ) {
+    if (!catalogSections.some((candidate) => candidate.facetId === section.facetId)) {
       merged.push(
         mergeSection({
           facetId: section.facetId,

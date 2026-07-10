@@ -41,8 +41,7 @@ const escapeXml = (value) =>
 
 const toRssDate = (date) => new Date(date).toUTCString();
 
-const formatSitemapDate = (timestampMs) =>
-  new Date(timestampMs).toISOString().slice(0, 10);
+const formatSitemapDate = (timestampMs) => new Date(timestampMs).toISOString().slice(0, 10);
 
 const joinFeedDescriptionParts = (...parts) =>
   parts
@@ -75,9 +74,7 @@ const getAlbumDirectoryEntries = () => {
       ];
       const lastModifiedMs = Math.max(
         fs.statSync(albumPath).mtimeMs,
-        ...manifestPaths
-          .filter((p) => fs.existsSync(p))
-          .map((p) => fs.statSync(p).mtimeMs),
+        ...manifestPaths.filter((p) => fs.existsSync(p)).map((p) => fs.statSync(p).mtimeMs),
       );
       return { slug, albumPath, lastmod: formatSitemapDate(lastModifiedMs) };
     });
@@ -85,14 +82,12 @@ const getAlbumDirectoryEntries = () => {
 
 const readAlbumFeedMetadata = (albumPath, slug) => {
   const manifestPath = path.join(albumPath, MANIFEST_NAME);
-  if (!fs.existsSync(manifestPath))
-    return { title: slug, description: `${slug} photo album` };
+  if (!fs.existsSync(manifestPath)) return { title: slug, description: `${slug} photo album` };
 
   try {
     const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf-8"));
     const firstTextBlock = manifest.blocks?.find((b) => b.kind === "text");
-    const title =
-      manifest.title?.trim() || firstTextBlock?.data?.title?.trim() || slug;
+    const title = manifest.title?.trim() || firstTextBlock?.data?.title?.trim() || slug;
     const description =
       joinFeedDescriptionParts(
         manifest.kicker,
@@ -109,17 +104,16 @@ const readAlbumFeedMetadata = (albumPath, slug) => {
 
 const buildRssXml = (channel) => {
   const items = channel.items
-    .map(
-      (item) =>
-        [
-          "    <item>",
-          `      <title>${escapeXml(item.title)}</title>`,
-          `      <link>${escapeXml(item.link)}</link>`,
-          `      <guid${item.guidIsPermaLink === false ? ' isPermaLink="false"' : ""}>${escapeXml(item.guid)}</guid>`,
-          `      <description>${escapeXml(item.description)}</description>`,
-          `      <pubDate>${escapeXml(item.pubDate)}</pubDate>`,
-          "    </item>",
-        ].join("\n"),
+    .map((item) =>
+      [
+        "    <item>",
+        `      <title>${escapeXml(item.title)}</title>`,
+        `      <link>${escapeXml(item.link)}</link>`,
+        `      <guid${item.guidIsPermaLink === false ? ' isPermaLink="false"' : ""}>${escapeXml(item.guid)}</guid>`,
+        `      <description>${escapeXml(item.description)}</description>`,
+        `      <pubDate>${escapeXml(item.pubDate)}</pubDate>`,
+        "    </item>",
+      ].join("\n"),
     )
     .join("\n");
 
@@ -133,9 +127,7 @@ const buildRssXml = (channel) => {
     "    <language>en</language>",
     `    <atom:link href="${escapeXml(channel.selfUrl)}" rel="self" type="application/rss+xml" />`,
     ...(channel.lastBuildDate
-      ? [
-          `    <lastBuildDate>${escapeXml(channel.lastBuildDate)}</lastBuildDate>`,
-        ]
+      ? [`    <lastBuildDate>${escapeXml(channel.lastBuildDate)}</lastBuildDate>`]
       : []),
     items,
     "  </channel>",
@@ -176,9 +168,7 @@ const generateMainFeed = (entries) => {
     link: siteUrl,
     description: "Snapshots from a better era",
     selfUrl: feedUrl,
-    lastBuildDate: entries[0]?.lastmod
-      ? toRssDate(entries[0].lastmod)
-      : undefined,
+    lastBuildDate: entries[0]?.lastmod ? toRssDate(entries[0].lastmod) : undefined,
     items: entries.map((entry) => ({
       title: entry.title,
       link: getCanonicalUrl(`/album/${entry.slug}`),
@@ -237,12 +227,9 @@ const getAlbumFeedItems = (slug, albumPath, albumMetadata, albumLastmod) => {
           localPath && fs.existsSync(localPath)
             ? formatSitemapDate(fs.statSync(localPath).mtimeMs)
             : null;
-        const sortDate =
-          block.data?.date?.slice(0, 10) ?? statDate ?? albumLastmod;
+        const sortDate = block.data?.date?.slice(0, 10) ?? statDate ?? albumLastmod;
         const label =
-          block.data?.title?.trim() ||
-          block.data?.kicker?.trim() ||
-          humanizeAlbumFeedName(source);
+          block.data?.title?.trim() || block.data?.kicker?.trim() || humanizeAlbumFeedName(source);
 
         const isYoutube = block.kind === "video" && block.data?.type === "youtube";
 
@@ -253,9 +240,7 @@ const getAlbumFeedItems = (slug, albumPath, albumMetadata, albumLastmod) => {
             block.data?.description,
             `From ${albumMetadata.title}`,
           ),
-          link: isYoutube
-            ? `/album/${slug}`
-            : `/album/${slug}#${source.split("/").at(-1)}`,
+          link: isYoutube ? `/album/${slug}` : `/album/${slug}#${source.split("/").at(-1)}`,
           // YouTube items all share the bare /album/<slug> link, so give them a
           // unique guid from the video href to stop readers deduping them.
           ...(isYoutube ? { guid: source } : {}),
@@ -297,8 +282,7 @@ const getAlbumFeedItems = (slug, albumPath, albumMetadata, albumLastmod) => {
       const albumJson = JSON.parse(fs.readFileSync(albumJsonPath, "utf-8"));
       for (const [externalIndex, external] of (albumJson.externals ?? []).entries()) {
         const sortDate =
-          external.date?.slice(0, 10) ??
-          formatSitemapDate(fs.statSync(albumJsonPath).mtimeMs);
+          external.date?.slice(0, 10) ?? formatSitemapDate(fs.statSync(albumJsonPath).mtimeMs);
         items.push({
           title: humanizeAlbumFeedName(external.href),
           description: joinFeedDescriptionParts(
@@ -408,10 +392,7 @@ const run = () => {
     .sort((a, b) => b.lastmod.localeCompare(a.lastmod));
 
   // Main feed
-  writeFile(
-    path.join(publicDir, "feed.xml"),
-    generateMainFeed(feedEntries.slice(0, 20)),
-  );
+  writeFile(path.join(publicDir, "feed.xml"), generateMainFeed(feedEntries.slice(0, 20)));
 
   // Sitemap
   writeFile(path.join(publicDir, "sitemap.xml"), generateSitemap(realAlbumEntries));
@@ -430,9 +411,7 @@ const run = () => {
     );
   }
 
-  const removedFeeds = cleanupStaleAlbumFeeds(
-    new Set(feedEntries.map((entry) => entry.slug)),
-  );
+  const removedFeeds = cleanupStaleAlbumFeeds(new Set(feedEntries.map((entry) => entry.slug)));
 
   console.log(
     `Generated feeds: feed.xml, sitemap.xml, ${feedEntries.length} album feeds` +

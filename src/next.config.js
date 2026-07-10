@@ -11,21 +11,15 @@ const nextConfig = {
   headers: async () => [
     {
       source: "/feed.xml",
-      headers: [
-        { key: "Content-Type", value: "application/rss+xml; charset=utf-8" },
-      ],
+      headers: [{ key: "Content-Type", value: "application/rss+xml; charset=utf-8" }],
     },
     {
       source: "/album/:slug/feed.xml",
-      headers: [
-        { key: "Content-Type", value: "application/rss+xml; charset=utf-8" },
-      ],
+      headers: [{ key: "Content-Type", value: "application/rss+xml; charset=utf-8" }],
     },
     {
       source: "/sitemap.xml",
-      headers: [
-        { key: "Content-Type", value: "application/xml; charset=utf-8" },
-      ],
+      headers: [{ key: "Content-Type", value: "application/xml; charset=utf-8" }],
     },
   ],
   experimental: {

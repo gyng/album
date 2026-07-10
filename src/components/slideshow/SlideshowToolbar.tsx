@@ -109,9 +109,7 @@ export const SlideshowToolbar: React.FC<SlideshowToolbarProps> = (props) => {
 
   const activeIsLong = LONG_TIMINGS.includes(props.timeDelay);
   const visibleTimings =
-    props.showLongTimings || activeIsLong
-      ? [...SHORT_TIMINGS, ...LONG_TIMINGS]
-      : SHORT_TIMINGS;
+    props.showLongTimings || activeIsLong ? [...SHORT_TIMINGS, ...LONG_TIMINGS] : SHORT_TIMINGS;
 
   // Swipe-to-dismiss on the sticky close handle. The toolbar is taller than a
   // phone viewport, so a "swipe up anywhere to close" gesture can't coexist
@@ -133,14 +131,10 @@ export const SlideshowToolbar: React.FC<SlideshowToolbarProps> = (props) => {
     );
   };
   const clearHidePreview = () => {
-    toolbarRef.current?.style.removeProperty(
-      "--touch-toolbar-hide-preview-progress",
-    );
+    toolbarRef.current?.style.removeProperty("--touch-toolbar-hide-preview-progress");
   };
 
-  const handleCloseHandlePointerDown = (
-    event: React.PointerEvent<HTMLButtonElement>,
-  ) => {
+  const handleCloseHandlePointerDown = (event: React.PointerEvent<HTMLButtonElement>) => {
     if (event.pointerType === "mouse") return;
     closeDragStartYRef.current = event.clientY;
     // Fresh gesture: drop any stale suppression from a prior touch whose
@@ -154,18 +148,14 @@ export const SlideshowToolbar: React.FC<SlideshowToolbarProps> = (props) => {
       // ignore — the gesture still resolves on pointerup
     }
   };
-  const handleCloseHandlePointerMove = (
-    event: React.PointerEvent<HTMLButtonElement>,
-  ) => {
+  const handleCloseHandlePointerMove = (event: React.PointerEvent<HTMLButtonElement>) => {
     if (closeDragStartYRef.current === null) return;
     const delta = event.clientY - closeDragStartYRef.current;
     // Only an upward drag reveals the retract; downward does nothing.
     const progress = Math.max(0, Math.min(1, -delta / CLOSE_DRAG_RANGE_PX));
     setHidePreview(progress);
   };
-  const handleCloseHandlePointerUp = (
-    event: React.PointerEvent<HTMLButtonElement>,
-  ) => {
+  const handleCloseHandlePointerUp = (event: React.PointerEvent<HTMLButtonElement>) => {
     if (closeDragStartYRef.current === null) return;
     const delta = event.clientY - closeDragStartYRef.current;
     closeDragStartYRef.current = null;
@@ -240,10 +230,7 @@ export const SlideshowToolbar: React.FC<SlideshowToolbarProps> = (props) => {
         <button
           type="button"
           className={styles.poolStats}
-          title={
-            props.dataVersionTitle ??
-            "Photo pool - tap to check for the latest data"
-          }
+          title={props.dataVersionTitle ?? "Photo pool - tap to check for the latest data"}
           onClick={props.onCheckDataVersion}
         >
           <span className={styles.poolStatsCount}>
@@ -346,10 +333,7 @@ export const SlideshowToolbar: React.FC<SlideshowToolbarProps> = (props) => {
           </button>
 
           <button
-            className={[
-              props.isPaused ? commonStyles.active : "",
-              commonStyles.button,
-            ].join(" ")}
+            className={[props.isPaused ? commonStyles.active : "", commonStyles.button].join(" ")}
             aria-pressed={props.isPaused}
             onClick={props.onTogglePaused}
           >
@@ -379,9 +363,7 @@ export const SlideshowToolbar: React.FC<SlideshowToolbarProps> = (props) => {
               aria-hidden="true"
               style={
                 {
-                  "--hide-progress": String(
-                    Math.max(0, Math.min(1, props.controlsHideProgress)),
-                  ),
+                  "--hide-progress": String(Math.max(0, Math.min(1, props.controlsHideProgress))),
                 } as React.CSSProperties
               }
             >
@@ -403,10 +385,7 @@ export const SlideshowToolbar: React.FC<SlideshowToolbarProps> = (props) => {
 
         <div className={styles.controlButtons}>
           <button
-            className={[
-              props.showClock ? commonStyles.active : "",
-              commonStyles.button,
-            ].join(" ")}
+            className={[props.showClock ? commonStyles.active : "", commonStyles.button].join(" ")}
             aria-pressed={props.showClock}
             onClick={props.onToggleClock}
           >
@@ -414,10 +393,9 @@ export const SlideshowToolbar: React.FC<SlideshowToolbarProps> = (props) => {
           </button>
 
           <button
-            className={[
-              props.showDetails ? commonStyles.active : "",
-              commonStyles.button,
-            ].join(" ")}
+            className={[props.showDetails ? commonStyles.active : "", commonStyles.button].join(
+              " ",
+            )}
             aria-pressed={props.showDetails}
             onClick={props.onToggleDetails}
           >
@@ -425,10 +403,7 @@ export const SlideshowToolbar: React.FC<SlideshowToolbarProps> = (props) => {
           </button>
 
           <button
-            className={[
-              props.showMap ? commonStyles.active : "",
-              commonStyles.button,
-            ].join(" ")}
+            className={[props.showMap ? commonStyles.active : "", commonStyles.button].join(" ")}
             aria-pressed={props.showMap}
             onClick={props.onToggleMap}
           >
@@ -442,9 +417,7 @@ export const SlideshowToolbar: React.FC<SlideshowToolbarProps> = (props) => {
             ].join(" ")}
             onClick={props.onCycleAlignment}
           >
-            📍{" "}
-            {props.detailsAlignment.charAt(0).toUpperCase() +
-              props.detailsAlignment.slice(1)}
+            📍 {props.detailsAlignment.charAt(0).toUpperCase() + props.detailsAlignment.slice(1)}
           </button>
         </div>
       </div>
@@ -461,10 +434,7 @@ export const SlideshowToolbar: React.FC<SlideshowToolbarProps> = (props) => {
 
         <div className={styles.controlButtons}>
           <button
-            className={[
-              props.showCover ? commonStyles.active : "",
-              commonStyles.button,
-            ].join(" ")}
+            className={[props.showCover ? commonStyles.active : "", commonStyles.button].join(" ")}
             aria-pressed={props.showCover}
             title={
               props.showCover
@@ -564,14 +534,11 @@ export const SlideshowToolbar: React.FC<SlideshowToolbarProps> = (props) => {
         </div>
 
         <div className={styles.controlMeta}>
-          <div className={commonStyles.toast}>
-            🔁 {formatCountdown(props.secondsLeft)}
-          </div>
+          <div className={commonStyles.toast}>🔁 {formatCountdown(props.secondsLeft)}</div>
           <button
-            className={[
-              props.alignCadence ? commonStyles.active : "",
-              commonStyles.button,
-            ].join(" ")}
+            className={[props.alignCadence ? commonStyles.active : "", commonStyles.button].join(
+              " ",
+            )}
             type="button"
             aria-pressed={props.alignCadence}
             title="When on, advances snap to wall-clock boundaries (e.g. :00 / :15 / :30 / :45 for a 15-minute cadence) instead of drifting from the moment you opened the app"
@@ -582,11 +549,7 @@ export const SlideshowToolbar: React.FC<SlideshowToolbarProps> = (props) => {
         </div>
       </div>
 
-      <div
-        className={styles.controlGroup}
-        role="group"
-        aria-label="Current photo context"
-      >
+      <div className={styles.controlGroup} role="group" aria-label="Current photo context">
         <div className={styles.controlHeader}>
           <span
             className={styles.controlLogo}
@@ -643,11 +606,7 @@ export const SlideshowToolbar: React.FC<SlideshowToolbarProps> = (props) => {
             {props.playbackContextLabel} in <i>{props.albumName}</i>
           </Link>
 
-          <button
-            className={commonStyles.button}
-            type="button"
-            onClick={props.onCopyLink}
-          >
+          <button className={commonStyles.button} type="button" onClick={props.onCopyLink}>
             {props.copiedPhotoLink ? "copied photo link" : "copy photo link"}
           </button>
 

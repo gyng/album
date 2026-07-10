@@ -3,8 +3,7 @@ import { existsSync, statSync } from "fs";
 import { join } from "path";
 
 const searchDbPath = join(__dirname, "..", "public", "search.sqlite");
-const hasSearchDb =
-  existsSync(searchDbPath) && statSync(searchDbPath).size > 0;
+const hasSearchDb = existsSync(searchDbPath) && statSync(searchDbPath).size > 0;
 
 test.describe("guess game layout", () => {
   test.skip(!hasSearchDb, "Requires search.sqlite with data");
@@ -15,9 +14,7 @@ test.describe("guess game layout", () => {
   // viewport vertically by a lot. A short, wide viewport makes the broken
   // height chain overflow for any photo (portrait, or even a 3:2 landscape), so
   // this catches the regression regardless of which photo the local DB serves.
-  test("round fits the viewport — photo and map do not overflow vertically", async ({
-    page,
-  }) => {
+  test("round fits the viewport — photo and map do not overflow vertically", async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 520 });
     await page.goto("/guess?seed=layout-regression&rounds=1");
 
@@ -26,9 +23,7 @@ test.describe("guess game layout", () => {
     // dev server that has not generated it), skip rather than fail spuriously.
     const photoLoaded = await page
       .waitForFunction(() => {
-        const img = document.querySelector(
-          '[class*="photoPanel"] img',
-        ) as HTMLImageElement | null;
+        const img = document.querySelector('[class*="photoPanel"] img') as HTMLImageElement | null;
         return !!img && img.complete && img.naturalWidth > 0;
       })
       .then(() => true)
@@ -41,8 +36,7 @@ test.describe("guess game layout", () => {
 
     const metrics = await page.evaluate(() => {
       const vh = window.innerHeight;
-      const pick = (sub: string) =>
-        document.querySelector(`[class*="${sub}"]`);
+      const pick = (sub: string) => document.querySelector(`[class*="${sub}"]`);
       const bottom = (el: Element | null) =>
         el ? Math.round(el.getBoundingClientRect().bottom) : 0;
       return {

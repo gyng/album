@@ -11,17 +11,11 @@ import { getAlbums } from "../../services/album";
 import { Block, PhotoBlock } from "../../services/types";
 import { measureBuild } from "../../services/buildTiming";
 import { getDegLatLngFromExif } from "../../util/dms2deg";
-import {
-  formatExifWallClockIso,
-  parseExifLocalDateTime,
-} from "../../util/exifTime";
+import { formatExifWallClockIso, parseExifLocalDateTime } from "../../util/exifTime";
 import commonStyles from "../../styles/common.module.css";
 import { Seo } from "../../components/Seo";
 import { buildCollectionPageJsonLd } from "../../lib/seo";
-import {
-  formatMemoryDateRange,
-  getMemoryClusters,
-} from "../../util/clusterByDate";
+import { formatMemoryDateRange, getMemoryClusters } from "../../util/clusterByDate";
 import heatmapStyles from "../../components/CalendarHeatmap.module.css";
 import styles from "./timeline.module.css";
 
@@ -34,10 +28,7 @@ type PageProps = {
 };
 
 const isTimelinePhoto = (block: Block): block is PhotoBlock => {
-  return (
-    block.kind === "photo" &&
-    Boolean((block as PhotoBlock)._build?.exif?.DateTimeOriginal)
-  );
+  return block.kind === "photo" && Boolean((block as PhotoBlock)._build?.exif?.DateTimeOriginal);
 };
 
 const getLocalDateKey = (date = new Date()) => {
@@ -91,36 +82,28 @@ const toConnectorPath = (curve: ConnectorCurve) => {
 const TimelinePage: NextPage<PageProps> = ({ entries }) => {
   const router = useRouter();
   const filterAlbum =
-    typeof router.query.filter_album === "string"
-      ? router.query.filter_album
-      : null;
-  const hasRouteState =
-    filterAlbum != null || typeof router.query.date === "string";
+    typeof router.query.filter_album === "string" ? router.query.filter_album : null;
+  const hasRouteState = filterAlbum != null || typeof router.query.date === "string";
 
   const filteredEntries = React.useMemo(() => {
-    return filterAlbum
-      ? entries.filter((entry) => entry.album === filterAlbum)
-      : entries;
+    return filterAlbum ? entries.filter((entry) => entry.album === filterAlbum) : entries;
   }, [entries, filterAlbum]);
 
   const availableDates = React.useMemo(() => {
-    return Array.from(new Set(filteredEntries.map((entry) => entry.date))).sort(
-      (left, right) => right.localeCompare(left),
+    return Array.from(new Set(filteredEntries.map((entry) => entry.date))).sort((left, right) =>
+      right.localeCompare(left),
     );
   }, [filteredEntries]);
 
   // Default to latest date (first in sorted list), but allow URL param
-  const initialDateFromUrl =
-    typeof router.query.date === "string" ? router.query.date : null;
+  const initialDateFromUrl = typeof router.query.date === "string" ? router.query.date : null;
   const [selectedDate, setSelectedDate] = React.useState<string | null>(
     initialDateFromUrl && availableDates.includes(initialDateFromUrl)
       ? initialDateFromUrl
       : (availableDates[0] ?? null),
   );
   const [todayDate, setTodayDate] = React.useState<string | null>(null);
-  const [memoryScrollTargetDate, setMemoryScrollTargetDate] = React.useState<
-    string | null
-  >(null);
+  const [memoryScrollTargetDate, setMemoryScrollTargetDate] = React.useState<string | null>(null);
   const layoutRef = React.useRef<HTMLDivElement | null>(null);
   const heatmapPanelRef = React.useRef<HTMLElement | null>(null);
   const dayHeadingRef = React.useRef<HTMLDivElement | null>(null);
@@ -129,18 +112,14 @@ const TimelinePage: NextPage<PageProps> = ({ entries }) => {
   const highlightedHeatmapElementsRef = React.useRef<HTMLElement[]>([]);
   const routePathname = router.pathname;
   const routeQuery = router.query;
-  const routeDateQuery =
-    typeof routeQuery.date === "string" ? routeQuery.date : null;
+  const routeDateQuery = typeof routeQuery.date === "string" ? routeQuery.date : null;
   const replaceRoute = router.replace;
 
   const selectableDates = React.useMemo(() => {
-    return todayDate
-      ? availableDates.filter((date) => date <= todayDate)
-      : availableDates;
+    return todayDate ? availableDates.filter((date) => date <= todayDate) : availableDates;
   }, [availableDates, todayDate]);
 
   React.useEffect(() => {
-     
     setTodayDate(getLocalDateKey());
   }, []);
 
@@ -151,11 +130,11 @@ const TimelinePage: NextPage<PageProps> = ({ entries }) => {
 
     return getMemoryClusters(filteredEntries, todayDate);
   }, [filteredEntries, todayDate]);
-  const [visibleMemoryClusterCount, setVisibleMemoryClusterCount] =
-    React.useState(MAX_TIMELINE_MEMORY_CLUSTERS);
+  const [visibleMemoryClusterCount, setVisibleMemoryClusterCount] = React.useState(
+    MAX_TIMELINE_MEMORY_CLUSTERS,
+  );
 
   React.useEffect(() => {
-     
     setVisibleMemoryClusterCount(MAX_TIMELINE_MEMORY_CLUSTERS);
   }, [filteredEntries, todayDate]);
 
@@ -163,44 +142,37 @@ const TimelinePage: NextPage<PageProps> = ({ entries }) => {
     return memories.slice(0, visibleMemoryClusterCount);
   }, [memories, visibleMemoryClusterCount]);
 
-  const applyMemoryHighlight = React.useCallback(
-    (cluster: (typeof memories)[number]) => {
-      const heatmapPanel = heatmapPanelRef.current;
-      if (!heatmapPanel) {
-        return;
+  const applyMemoryHighlight = React.useCallback((cluster: (typeof memories)[number]) => {
+    const heatmapPanel = heatmapPanelRef.current;
+    if (!heatmapPanel) {
+      return;
+    }
+
+    highlightedHeatmapElementsRef.current.forEach((element) => {
+      element.classList.remove(heatmapStyles.memoryHighlighted);
+      element.classList.remove(heatmapStyles.highlightedYearHeading);
+    });
+
+    const nextElements: HTMLElement[] = [];
+    const uniqueDates = Array.from(new Set(cluster.items.map((entry) => entry.date)));
+    uniqueDates.forEach((date) => {
+      const element = heatmapPanel.querySelector<HTMLElement>(`[data-date="${date}"]`);
+      if (element) {
+        element.classList.add(heatmapStyles.memoryHighlighted);
+        nextElements.push(element);
       }
+    });
 
-      highlightedHeatmapElementsRef.current.forEach((element) => {
-        element.classList.remove(heatmapStyles.memoryHighlighted);
-        element.classList.remove(heatmapStyles.highlightedYearHeading);
-      });
+    const yearHeading = heatmapPanel.querySelector<HTMLElement>(
+      `[data-year-heading="${cluster.year}"]`,
+    );
+    if (yearHeading) {
+      yearHeading.classList.add(heatmapStyles.highlightedYearHeading);
+      nextElements.push(yearHeading);
+    }
 
-      const nextElements: HTMLElement[] = [];
-      const uniqueDates = Array.from(
-        new Set(cluster.items.map((entry) => entry.date)),
-      );
-      uniqueDates.forEach((date) => {
-        const element = heatmapPanel.querySelector<HTMLElement>(
-          `[data-date="${date}"]`,
-        );
-        if (element) {
-          element.classList.add(heatmapStyles.memoryHighlighted);
-          nextElements.push(element);
-        }
-      });
-
-      const yearHeading = heatmapPanel.querySelector<HTMLElement>(
-        `[data-year-heading="${cluster.year}"]`,
-      );
-      if (yearHeading) {
-        yearHeading.classList.add(heatmapStyles.highlightedYearHeading);
-        nextElements.push(yearHeading);
-      }
-
-      highlightedHeatmapElementsRef.current = nextElements;
-    },
-    [],
-  );
+    highlightedHeatmapElementsRef.current = nextElements;
+  }, []);
 
   const clearMemoryHighlight = React.useCallback(() => {
     highlightedHeatmapElementsRef.current.forEach((element) => {
@@ -217,11 +189,7 @@ const TimelinePage: NextPage<PageProps> = ({ entries }) => {
   }, []);
 
   const updateSelectedConnectorPath = React.useCallback(() => {
-    if (
-      !selectedDate ||
-      typeof window === "undefined" ||
-      window.innerWidth < 960
-    ) {
+    if (!selectedDate || typeof window === "undefined" || window.innerWidth < 960) {
       clearSelectedConnectorPath();
       return;
     }
@@ -234,9 +202,7 @@ const TimelinePage: NextPage<PageProps> = ({ entries }) => {
       return;
     }
 
-    const target = layout.querySelector<HTMLElement>(
-      `[data-date="${selectedDate}"]`,
-    );
+    const target = layout.querySelector<HTMLElement>(`[data-date="${selectedDate}"]`);
     if (!target) {
       clearSelectedConnectorPath();
       return;
@@ -246,10 +212,7 @@ const TimelinePage: NextPage<PageProps> = ({ entries }) => {
     const headingRect = heading.getBoundingClientRect();
     const targetRect = target.getBoundingClientRect();
 
-    connectorSvg.setAttribute(
-      "viewBox",
-      `0 0 ${layout.clientWidth} ${layout.clientHeight}`,
-    );
+    connectorSvg.setAttribute("viewBox", `0 0 ${layout.clientWidth} ${layout.clientHeight}`);
 
     const startX = headingRect.left - layoutRect.left - 16;
     const startY = headingRect.top + headingRect.height / 2 - layoutRect.top;
@@ -323,7 +286,6 @@ const TimelinePage: NextPage<PageProps> = ({ entries }) => {
   // If availableDates changes and selectedDate is null, default to latest
   React.useEffect(() => {
     if (!selectedDate && availableDates.length > 0) {
-       
       setSelectedDate(availableDates[0]);
     }
   }, [availableDates, selectedDate]);
@@ -331,10 +293,7 @@ const TimelinePage: NextPage<PageProps> = ({ entries }) => {
   // On mount or when router.query.date changes, update selectedDate if needed
   React.useEffect(() => {
     if (routeDateQuery && availableDates.includes(routeDateQuery)) {
-       
-      setSelectedDate((current) =>
-        current === routeDateQuery ? current : routeDateQuery,
-      );
+      setSelectedDate((current) => (current === routeDateQuery ? current : routeDateQuery));
     }
   }, [availableDates, routeDateQuery]);
 
@@ -351,22 +310,13 @@ const TimelinePage: NextPage<PageProps> = ({ entries }) => {
     if (routeDateQuery !== selectedDate) {
       replaceRoute(url, undefined, { shallow: true });
     }
-  }, [
-    router.isReady,
-    replaceRoute,
-    routeDateQuery,
-    routePathname,
-    routeQuery,
-    selectedDate,
-  ]);
+  }, [router.isReady, replaceRoute, routeDateQuery, routePathname, routeQuery, selectedDate]);
 
   React.useEffect(() => {
     if (
       selectedDate &&
-      (!availableDates.includes(selectedDate) ||
-        (todayDate && selectedDate > todayDate))
+      (!availableDates.includes(selectedDate) || (todayDate && selectedDate > todayDate))
     ) {
-       
       setSelectedDate(null);
     }
   }, [availableDates, selectedDate, todayDate]);
@@ -425,9 +375,7 @@ const TimelinePage: NextPage<PageProps> = ({ entries }) => {
   }, [handleSelectNewerDate, handleSelectOlderDate]);
 
   const selectedEntries = React.useMemo(() => {
-    return selectedDate
-      ? filteredEntries.filter((entry) => entry.date === selectedDate)
-      : [];
+    return selectedDate ? filteredEntries.filter((entry) => entry.date === selectedDate) : [];
   }, [filteredEntries, selectedDate]);
 
   const canGoOlder = React.useMemo(() => {
@@ -474,9 +422,7 @@ const TimelinePage: NextPage<PageProps> = ({ entries }) => {
         </header>
 
         {filteredEntries.length === 0 ? (
-          <div className={styles.emptyState}>
-            No dated photos are available for this view yet.
-          </div>
+          <div className={styles.emptyState}>No dated photos are available for this view yet.</div>
         ) : (
           <>
             <div className={styles.layout} ref={layoutRef}>
@@ -510,7 +456,9 @@ const TimelinePage: NextPage<PageProps> = ({ entries }) => {
                 {visibleMemories.length > 0 ? (
                   <section className={styles.memories} aria-label="Memories">
                     <div className={styles.memoriesHeader}>
-                      <Heading level={2} as="h2">Memories</Heading>
+                      <Heading level={2} as="h2">
+                        Memories
+                      </Heading>
                       <Caption>Around this time</Caption>
                     </div>
 
@@ -519,24 +467,16 @@ const TimelinePage: NextPage<PageProps> = ({ entries }) => {
                         const albumLabel = getClusterAlbumLabel(
                           cluster.items.map((entry) => entry.album),
                         );
-                        const previewItems = cluster.items.slice(
-                          0,
-                          MAX_TIMELINE_MEMORY_ITEMS,
-                        );
+                        const previewItems = cluster.items.slice(0, MAX_TIMELINE_MEMORY_ITEMS);
                         const meta = [
                           albumLabel,
-                          formatMemoryDateRange(
-                            cluster.startDate,
-                            cluster.endDate,
-                          ),
+                          formatMemoryDateRange(cluster.startDate, cluster.endDate),
                         ].filter(Boolean);
                         const swatches = Array.from(
                           new Set(
                             previewItems
                               .map((entry) => entry.placeholderColor)
-                              .filter(
-                                (color) => color && color !== "transparent",
-                              ),
+                              .filter((color) => color && color !== "transparent"),
                           ),
                         ).slice(0, 4);
                         const label = [
@@ -557,9 +497,7 @@ const TimelinePage: NextPage<PageProps> = ({ entries }) => {
                             onFocusCapture={() => applyMemoryHighlight(cluster)}
                             onBlurCapture={(event) => {
                               if (
-                                !event.currentTarget.contains(
-                                  event.relatedTarget as Node | null,
-                                )
+                                !event.currentTarget.contains(event.relatedTarget as Node | null)
                               ) {
                                 clearMemoryHighlight();
                               }
@@ -576,19 +514,12 @@ const TimelinePage: NextPage<PageProps> = ({ entries }) => {
                                 aria-label={label}
                                 id={clusterId}
                               >
-                                <span className={styles.memoryClusterAge}>
-                                  {ageLabel}
-                                </span>
+                                <span className={styles.memoryClusterAge}>{ageLabel}</span>
                                 {metaLabel ? (
-                                  <span className={styles.memoryClusterLabel}>
-                                    {metaLabel}
-                                  </span>
+                                  <span className={styles.memoryClusterLabel}>{metaLabel}</span>
                                 ) : null}
                                 {swatches.length > 0 ? (
-                                  <span
-                                    className={styles.memoryClusterSwatches}
-                                    aria-hidden="true"
-                                  >
+                                  <span className={styles.memoryClusterSwatches} aria-hidden="true">
                                     {swatches.map((color) => (
                                       <span
                                         key={color}
@@ -603,10 +534,7 @@ const TimelinePage: NextPage<PageProps> = ({ entries }) => {
 
                             <ul className={styles.memoryStrip}>
                               {previewItems.map((entry) => (
-                                <li
-                                  key={entry.href}
-                                  className={styles.memoryItem}
-                                >
+                                <li key={entry.href} className={styles.memoryItem}>
                                   <button
                                     type="button"
                                     className={styles.memoryButton}
@@ -640,10 +568,7 @@ const TimelinePage: NextPage<PageProps> = ({ entries }) => {
                         className={styles.memoryLoadMoreButton}
                         onClick={() => {
                           setVisibleMemoryClusterCount((current) =>
-                            Math.min(
-                              current + TIMELINE_MEMORY_LOAD_MORE_SIZE,
-                              memories.length,
-                            ),
+                            Math.min(current + TIMELINE_MEMORY_LOAD_MORE_SIZE, memories.length),
                           );
                         }}
                       >

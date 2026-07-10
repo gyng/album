@@ -28,10 +28,7 @@ export const ExploreColourSection = ({ stats }: { stats: PhotoStats }) => (
                 key={bucket.label}
                 label={bucket.label}
                 count={bucket.count}
-                maxCount={Math.max(
-                  ...stats.colorStats.map((item) => item.count),
-                  1,
-                )}
+                maxCount={Math.max(...stats.colorStats.map((item) => item.count), 1)}
                 barColor={COLOR_SWATCHES[bucket.label] ?? undefined}
                 actionHref={buildColorSearchHref(bucket.label)}
                 actionLabel={`Find photos with similar ${bucket.label.toLowerCase()} tones`}
@@ -50,9 +47,7 @@ export const ExploreColourSection = ({ stats }: { stats: PhotoStats }) => (
         </section>
 
         {stats.colorFamilyExamples.length > 0 ? (
-          <section
-            className={`${styles.colourPanel} ${styles.colourFamilyPanel}`}
-          >
+          <section className={`${styles.colourPanel} ${styles.colourFamilyPanel}`}>
             <div className={styles.sectionHeader}>
               <Heading level={2} as="h2">
                 Representative colour looks
@@ -66,8 +61,7 @@ export const ExploreColourSection = ({ stats }: { stats: PhotoStats }) => (
                       <span
                         className={styles.colorSwatch}
                         style={{
-                          backgroundColor:
-                            COLOR_SWATCHES[family.label] ?? "#999",
+                          backgroundColor: COLOR_SWATCHES[family.label] ?? "#999",
                         }}
                         aria-hidden="true"
                       />
@@ -93,11 +87,7 @@ export const ExploreColourSection = ({ stats }: { stats: PhotoStats }) => (
                         href={photo.href}
                         className={styles.colorFamilyThumbLink}
                       >
-                        <Thumb
-                          src={photo.src}
-                          alt={photo.label}
-                          size="small"
-                        />
+                        <Thumb src={photo.src} alt={photo.label} size="small" />
                       </Link>
                     ))}
                   </div>
@@ -108,9 +98,7 @@ export const ExploreColourSection = ({ stats }: { stats: PhotoStats }) => (
         ) : null}
 
         {stats.colorYearRibbons.length > 0 ? (
-          <section
-            className={`${styles.colourPanel} ${styles.colourFullRowPanel}`}
-          >
+          <section className={`${styles.colourPanel} ${styles.colourFullRowPanel}`}>
             <div className={styles.sectionHeader}>
               <Heading level={2} as="h2">
                 Colour over time
@@ -118,10 +106,7 @@ export const ExploreColourSection = ({ stats }: { stats: PhotoStats }) => (
             </div>
             <div className={styles.colorTimeLegend}>
               {COLOR_FAMILY_ORDER.map((label) => (
-                <div
-                  key={`legend-${label}`}
-                  className={styles.colorTimeLegendItem}
-                >
+                <div key={`legend-${label}`} className={styles.colorTimeLegendItem}>
                   <span
                     className={styles.colorSwatch}
                     style={{
@@ -144,17 +129,11 @@ export const ExploreColourSection = ({ stats }: { stats: PhotoStats }) => (
                   </div>
                   <div className={styles.colorTimeBar}>
                     {year.slices.map((slice, index) => {
-                      const share =
-                        year.total > 0
-                          ? (slice.count / year.total) * 100
-                          : 0;
+                      const share = year.total > 0 ? (slice.count / year.total) * 100 : 0;
                       return (
                         <Link
                           key={`${year.label}-${slice.family}-${index}`}
-                          href={
-                            buildColorSearchHref(slice.family, year.label) ??
-                            "/search"
-                          }
+                          href={buildColorSearchHref(slice.family, year.label) ?? "/search"}
                           className={styles.colorTimeSegment}
                           title={`${slice.family} around ${year.label}: ${slice.count} photos (${Math.round(share)}%)`}
                           style={{
@@ -163,10 +142,7 @@ export const ExploreColourSection = ({ stats }: { stats: PhotoStats }) => (
                             backgroundColor: slice.rgb,
                           }}
                         >
-                          <span
-                            className={styles.colorTimeTooltip}
-                            aria-hidden="true"
-                          >
+                          <span className={styles.colorTimeTooltip} aria-hidden="true">
                             <img
                               src={slice.thumbSrc}
                               alt={slice.photoLabel}
@@ -193,8 +169,7 @@ export const ExploreColourSection = ({ stats }: { stats: PhotoStats }) => (
                         <span
                           className={styles.colorSwatch}
                           style={{
-                            backgroundColor:
-                              COLOR_SWATCHES[year.dominantFamily] ?? "#999",
+                            backgroundColor: COLOR_SWATCHES[year.dominantFamily] ?? "#999",
                           }}
                           aria-hidden="true"
                         />

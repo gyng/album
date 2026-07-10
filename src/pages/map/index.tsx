@@ -26,9 +26,7 @@ const DEBOUNCE_URL_MS = 300;
 const WorldMap: NextPage<PageProps> = (props) => {
   const router = useRouter();
   const filterAlbum =
-    typeof router.query.filter_album === "string"
-      ? router.query.filter_album
-      : null;
+    typeof router.query.filter_album === "string" ? router.query.filter_album : null;
   const hasCameraParams =
     typeof router.query.lat === "string" ||
     typeof router.query.lon === "string" ||
@@ -41,21 +39,15 @@ const WorldMap: NextPage<PageProps> = (props) => {
 
   // Album filtering (existing)
   const albumFilteredPhotos = React.useMemo(
-    () =>
-      filterAlbum
-        ? props.photos.filter((p) => p.album === filterAlbum)
-        : props.photos,
+    () => (filterAlbum ? props.photos.filter((p) => p.album === filterAlbum) : props.photos),
     [props.photos, filterAlbum],
   );
 
   // Time range state — live during drag, committed on pointer up
-  const urlFrom = parseRangeParam(
-    typeof router.query.from === "string" ? router.query.from : null,
-  );
-  const urlTo = parseRangeParam(
-    typeof router.query.to === "string" ? router.query.to : null,
-    { endOfDay: true },
-  );
+  const urlFrom = parseRangeParam(typeof router.query.from === "string" ? router.query.from : null);
+  const urlTo = parseRangeParam(typeof router.query.to === "string" ? router.query.to : null, {
+    endOfDay: true,
+  });
   const [timeRange, setTimeRange] = React.useState<TimeRange | null>(
     urlFrom !== null && urlTo !== null ? { fromMs: urlFrom, toMs: urlTo } : null,
   );
@@ -67,7 +59,6 @@ const WorldMap: NextPage<PageProps> = (props) => {
   // Sync from URL on navigation (back/forward)
   React.useEffect(() => {
     if (urlFrom !== null && urlTo !== null) {
-       
       setTimeRange({ fromMs: urlFrom, toMs: urlTo });
       setShowTimeRangeSlider(true);
     } else {
@@ -75,12 +66,9 @@ const WorldMap: NextPage<PageProps> = (props) => {
     }
   }, [urlFrom, urlTo]);
 
-  const handleTimeRangeDrag = React.useCallback(
-    (fromMs: number, toMs: number) => {
-      setTimeRange({ fromMs, toMs });
-    },
-    [],
-  );
+  const handleTimeRangeDrag = React.useCallback((fromMs: number, toMs: number) => {
+    setTimeRange({ fromMs, toMs });
+  }, []);
 
   const handleTimeRangeCommit = React.useCallback(
     (fromMs: number | null, toMs: number | null) => {
@@ -125,8 +113,7 @@ const WorldMap: NextPage<PageProps> = (props) => {
   const routeEligiblePhotoCount = React.useMemo(
     () =>
       filteredPhotos.filter(
-        (photo) =>
-          typeof photo.decLat === "number" && typeof photo.decLng === "number",
+        (photo) => typeof photo.decLat === "number" && typeof photo.decLng === "number",
       ).length,
     [filteredPhotos],
   );
@@ -134,10 +121,7 @@ const WorldMap: NextPage<PageProps> = (props) => {
   const routableAlbumCount = React.useMemo(() => {
     const byAlbum = new Map<string, number>();
     for (const photo of props.photos) {
-      if (
-        typeof photo.decLat !== "number" ||
-        typeof photo.decLng !== "number"
-      ) {
+      if (typeof photo.decLat !== "number" || typeof photo.decLng !== "number") {
         continue;
       }
 
@@ -154,10 +138,7 @@ const WorldMap: NextPage<PageProps> = (props) => {
 
   return (
     <div
-      className={[
-        styles.container,
-        showTimeRangeSlider ? styles.containerWithSlider : "",
-      ]
+      className={[styles.container, showTimeRangeSlider ? styles.containerWithSlider : ""]
         .filter(Boolean)
         .join(" ")}
     >
@@ -191,8 +172,8 @@ const WorldMap: NextPage<PageProps> = (props) => {
               {hasRoute ? (
                 <li>
                   <div className={commonStyles.toast}>
-                    Hover or select a photo to trace the journey across{" "}
-                    {routeEligiblePhotoCount} geotagged photo
+                    Hover or select a photo to trace the journey across {routeEligiblePhotoCount}{" "}
+                    geotagged photo
                     {routeEligiblePhotoCount === 1 ? "" : "s"}.
                   </div>
                 </li>
@@ -215,7 +196,9 @@ const WorldMap: NextPage<PageProps> = (props) => {
                       className={[
                         commonStyles.button,
                         showTimeRangeSlider ? commonStyles.active : "",
-                      ].filter(Boolean).join(" ")}
+                      ]
+                        .filter(Boolean)
+                        .join(" ")}
                       aria-pressed={showTimeRangeSlider}
                       onClick={() => {
                         setShowTimeRangeSlider((current) => !current);
@@ -226,14 +209,13 @@ const WorldMap: NextPage<PageProps> = (props) => {
                   </div>
                 </li>
               ) : null}
-              {(filterAlbum || routableAlbumCount === 0) ? (
+              {filterAlbum || routableAlbumCount === 0 ? (
                 <li>
                   <button
                     type="button"
-                    className={[
-                      commonStyles.button,
-                      showTimeRangeSlider ? commonStyles.active : "",
-                    ].filter(Boolean).join(" ")}
+                    className={[commonStyles.button, showTimeRangeSlider ? commonStyles.active : ""]
+                      .filter(Boolean)
+                      .join(" ")}
                     aria-pressed={showTimeRangeSlider}
                     onClick={() => {
                       setShowTimeRangeSlider((current) => !current);
@@ -254,9 +236,7 @@ const WorldMap: NextPage<PageProps> = (props) => {
         fitToPhotos={!hasCameraParams}
         showRoute={!filterAlbum && showAllRoutes}
         routeMode={filterAlbum ? defaultRouteMode : "simplified"}
-        routeDisplayMode={
-          !filterAlbum && showAllRoutes ? "always" : "active-only"
-        }
+        routeDisplayMode={!filterAlbum && showAllRoutes ? "always" : "active-only"}
         timeRange={timeRange}
       />
 
@@ -281,11 +261,7 @@ export const getStaticProps: GetStaticProps<PageProps> = async () => {
       const { GPSLongitude, GPSLatitude, GPSLongitudeRef, GPSLatitudeRef } =
         (block as PhotoBlock)._build?.exif ?? {};
       return Boolean(
-        block.kind === "photo" &&
-        GPSLongitude &&
-        GPSLatitude &&
-        GPSLongitudeRef &&
-        GPSLatitudeRef,
+        block.kind === "photo" && GPSLongitude && GPSLatitude && GPSLongitudeRef && GPSLatitudeRef,
       );
     };
 
@@ -295,13 +271,8 @@ export const getStaticProps: GetStaticProps<PageProps> = async () => {
       return validPhotos.map((photo) => {
         const src = photo._build.srcset?.[0];
         const exif = (photo as PhotoBlock)._build?.exif ?? {};
-        const {
-          GPSLongitude,
-          GPSLatitude,
-          GPSLongitudeRef,
-          GPSLatitudeRef,
-          DateTimeOriginal,
-        } = exif;
+        const { GPSLongitude, GPSLatitude, GPSLongitudeRef, GPSLatitudeRef, DateTimeOriginal } =
+          exif;
 
         const { decLng, decLat } = getDegLatLngFromExif({
           GPSLongitude,

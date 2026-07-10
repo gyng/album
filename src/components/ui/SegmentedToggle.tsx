@@ -18,8 +18,7 @@ export const SegmentedToggle = <T extends string>(props: {
     onChange(options[next].value);
     // Roving tabindex: move focus onto the newly selected radio so keyboard
     // arrow navigation doesn't strand focus on a now-unfocusable button.
-    const radios =
-      groupRef.current?.querySelectorAll<HTMLButtonElement>('[role="radio"]');
+    const radios = groupRef.current?.querySelectorAll<HTMLButtonElement>('[role="radio"]');
     radios?.[next]?.focus();
   };
 
@@ -39,6 +38,10 @@ export const SegmentedToggle = <T extends string>(props: {
   };
 
   return (
+    // Roving-tabindex radiogroup: focus lives on the radios, not the group, so
+    // the group is intentionally kept out of the tab order while its onKeyDown
+    // handles the arrow keys bubbling up from the focused radio.
+    // oxlint-disable-next-line jsx-a11y/interactive-supports-focus
     <div
       ref={groupRef}
       className={[styles.toggle, className].filter(Boolean).join(" ")}
@@ -55,10 +58,7 @@ export const SegmentedToggle = <T extends string>(props: {
             role="radio"
             aria-checked={selected}
             tabIndex={selected ? 0 : -1}
-            className={[
-              styles.button,
-              selected ? styles.buttonActive : "",
-            ]
+            className={[styles.button, selected ? styles.buttonActive : ""]
               .filter(Boolean)
               .join(" ")}
             onClick={() => onChange(option.value)}

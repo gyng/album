@@ -19,8 +19,8 @@
   border: solid 2px var(--c-bg-contrast-light);
   border-radius: var(--m-s);
   font-size: var(--fs-sm);
-  padding: calc(var(--m-m) + 1px) calc(var(--m-xl) + 2px)
-    calc(var(--m-m) + 1px) calc(var(--m-m) + 1px);
+  padding: calc(var(--m-m) + 1px) calc(var(--m-xl) + 2px) calc(var(--m-m) + 1px)
+    calc(var(--m-m) + 1px);
   min-height: 45px;
   background-image:
     linear-gradient(45deg, transparent 50%, currentColor 50%),
@@ -28,7 +28,9 @@
   background-position:
     calc(100% - 18px) 50%,
     calc(100% - 12px) 50%;
-  background-size: 6px 6px, 6px 6px;
+  background-size:
+    6px 6px,
+    6px 6px;
   background-repeat: no-repeat;
 }
 
@@ -54,16 +56,14 @@
   background-position:
     calc(100% - 12px) 50%,
     calc(100% - 8px) 50%;
-  background-size: 5px 5px, 5px 5px;
+  background-size:
+    5px 5px,
+    5px 5px;
   background-repeat: no-repeat;
 }
 
 .compact:hover {
-  background-color: color-mix(
-    in srgb,
-    var(--c-bg-contrast-light) 12%,
-    transparent
-  );
+  background-color: color-mix(in srgb, var(--c-bg-contrast-light) 12%, transparent);
 }
 
 .compact:focus-visible {

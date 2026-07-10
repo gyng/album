@@ -22,8 +22,8 @@ describe("Explore story sections", () => {
 
     expect(screen.getByRole("heading", { name: /fun stats/i })).toBeTruthy();
     expect(screen.getByText("Blue")).toBeTruthy();
-    expect(
-      screen.getByRole("link", { name: /open in search/i }).getAttribute("href"),
-    ).toBe("/search?color=blue");
+    expect(screen.getByRole("link", { name: /open in search/i }).getAttribute("href")).toBe(
+      "/search?color=blue",
+    );
   });
 });

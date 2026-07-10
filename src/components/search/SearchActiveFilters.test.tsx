@@ -32,13 +32,9 @@ describe("SearchActiveFilters", () => {
     );
 
     fireEvent.click(screen.getByRole("button", { name: "Remove image query" }));
-    fireEvent.click(
-      screen.getByRole("button", { name: /remove filter colour/i }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: /remove filter colour/i }));
     fireEvent.click(screen.getByRole("button", { name: "Remove filter night" }));
-    fireEvent.click(
-      screen.getByRole("button", { name: /remove filter year: 2024/i }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: /remove filter year: 2024/i }));
 
     expect(onClearImage).toHaveBeenCalledTimes(1);
     expect(onClearColour).toHaveBeenCalledTimes(1);

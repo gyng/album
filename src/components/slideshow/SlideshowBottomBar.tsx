@@ -9,10 +9,7 @@ import {
   getTimeAffinityScore,
   RemixStrategy,
 } from "../../util/slideshowAmbient";
-import {
-  extractDateFromExifString,
-  extractGPSFromExifString,
-} from "../../util/extractExifFromDb";
+import { extractDateFromExifString, extractGPSFromExifString } from "../../util/extractExifFromDb";
 import { getRelativeTimeString } from "../../util/time";
 
 // Stable references for the slide map's style props so the memoised MMap can
@@ -50,8 +47,7 @@ const extractGeocodeLabel = (geocode: string): string | null =>
 // Cosine similarity from SigLIP is almost always in [0, 1] for normalised image
 // embeddings, but the contract isn't strictly bounded — clamp before rounding
 // so a stray negative score can't render as "105% distance".
-const clampPercent = (value: number): number =>
-  Math.max(0, Math.min(100, Math.round(value * 100)));
+const clampPercent = (value: number): number => Math.max(0, Math.min(100, Math.round(value * 100)));
 
 // The slide's bottom overlay: per-photo descriptions + slide-level chrome
 // (map, clock, remix badge). Dual-rendered so mix-blend-mode applies to the
@@ -95,10 +91,7 @@ export const SlideshowBottomBar: React.FC<SlideshowBottomBarProps> = (props) => 
 
   // Stable coordinate reference for the slide map (see slideKey note above).
   const allCoords = React.useMemo(
-    () =>
-      slidePhotoMeta
-        .map((m) => m.coords)
-        .filter((c): c is [number, number] => !!c),
+    () => slidePhotoMeta.map((m) => m.coords).filter((c): c is [number, number] => !!c),
     [slidePhotoMeta],
   );
 
@@ -178,9 +171,7 @@ export const SlideshowBottomBar: React.FC<SlideshowBottomBarProps> = (props) => 
     const remixDescriptor =
       isRemix && remixStrategy ? describeRemix(remixStrategy, slidePhotos) : null;
     const remixSwatch =
-      isRemix && remixStrategy
-        ? getRemixSwatchRgb(remixStrategy, slidePhotos)
-        : null;
+      isRemix && remixStrategy ? getRemixSwatchRgb(remixStrategy, slidePhotos) : null;
     const vectorScoreLabel =
       isRemix &&
       (remixStrategy === "similar" || remixStrategy === "juxtapose") &&
@@ -195,8 +186,7 @@ export const SlideshowBottomBar: React.FC<SlideshowBottomBarProps> = (props) => 
       <>
         {isRemix && remixStrategy ? (
           <div className={[styles.detailsRow, styles.detailsAffinity].join(" ")}>
-            ◫ Remix · {slidePhotos.length} photos{" "}
-            {REMIX_STRATEGY_LABEL[remixStrategy]}
+            ◫ Remix · {slidePhotos.length} photos {REMIX_STRATEGY_LABEL[remixStrategy]}
             {remixSwatch ? (
               <>
                 {" "}

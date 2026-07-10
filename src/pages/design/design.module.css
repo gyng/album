@@ -30,7 +30,6 @@
   border-bottom: 1px solid var(--c-bg-contrast-dark);
 }
 
-
 .subsection {
   display: grid;
   gap: var(--m-s);

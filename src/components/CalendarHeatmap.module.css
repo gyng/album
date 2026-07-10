@@ -15,7 +15,7 @@
   width: 2px;
   height: 2px;
   border-radius: 0.5px;
-  box-shadow: 0 0 0.5px rgba(0,0,0,0.25);
+  box-shadow: 0 0 0.5px rgba(0, 0, 0, 0.25);
   flex-shrink: 0;
 }
 
@@ -156,7 +156,9 @@
 
 .cell:focus-visible {
   transform: scale(1.12);
-  box-shadow: 0 0 0 2px var(--c-bg), 0 0 0 4px var(--c-accent);
+  box-shadow:
+    0 0 0 2px var(--c-bg),
+    0 0 0 4px var(--c-accent);
   outline: none;
 }
 
@@ -165,7 +167,9 @@
   z-index: 2;
   transform: none;
   border-radius: 3px;
-  box-shadow: 0 0 0 2px var(--c-bg), 0 0 0 4px var(--c-accent);
+  box-shadow:
+    0 0 0 2px var(--c-bg),
+    0 0 0 4px var(--c-accent);
 }
 
 .memoryHighlighted {
@@ -180,7 +184,8 @@
 
 .cell.today.selected {
   background-color: var(--c-today);
-  box-shadow: 0 0 0 2px var(--c-bg),
+  box-shadow:
+    0 0 0 2px var(--c-bg),
     0 0 0 4px color-mix(in srgb, var(--c-today) 70%, white 30%);
 }
 

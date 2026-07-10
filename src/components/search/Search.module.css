@@ -217,7 +217,6 @@
   font-weight: 400;
   letter-spacing: 0.02em;
   color: var(--c-bg-contrast-light);
-
 }
 
 .colorFacetSection {
@@ -522,8 +521,7 @@
     z-index: 1001;
     max-height: 85vh;
     max-height: 85dvh;
-    padding: 0 var(--m-l)
-      calc(env(safe-area-inset-bottom, 0px) + var(--m-l));
+    padding: 0 var(--m-l) calc(env(safe-area-inset-bottom, 0px) + var(--m-l));
     border-radius: var(--m-l) var(--m-l) 0 0;
     background: var(--c-bg);
     box-shadow: 0 -8px 32px hsl(0 0% 0% / 0.28);
@@ -972,7 +970,6 @@
   flex-wrap: wrap;
 }
 
-
 .modeStack {
   display: flex;
   flex-direction: row;
@@ -999,7 +996,9 @@
   position: relative;
   display: inline-flex;
   flex: 0 0 auto;
-  transition: transform 0.22s ease, opacity 0.15s ease;
+  transition:
+    transform 0.22s ease,
+    opacity 0.15s ease;
   will-change: transform;
 }
 

@@ -7,10 +7,7 @@ import { Block, Content } from "../services/types";
 import { measureBuild } from "../services/buildTiming";
 // import DynamicSearchWithCoi from "../components/search/DynamicSearchWithCoi";
 import { Seo } from "../components/Seo";
-import {
-  buildCollectionPageJsonLd,
-  buildWebSiteJsonLd,
-} from "../lib/seo";
+import { buildCollectionPageJsonLd, buildWebSiteJsonLd } from "../lib/seo";
 import { GlobalNav } from "../components/GlobalNav";
 
 type PageProps = {
@@ -44,7 +41,7 @@ const Home: NextPage<PageProps> = (context) => {
   );
 };
 
-export const getStaticProps: GetStaticProps<PageProps> = async (context) => {
+export const getStaticProps: GetStaticProps<PageProps> = async (_context) => {
   return measureBuild("page./.getStaticProps", async () => {
     const albums = (await getAlbums())
       .sort((a, b) => {
@@ -62,9 +59,7 @@ export const getStaticProps: GetStaticProps<PageProps> = async (context) => {
           // Reduce page data size by only providing a partial list: the
           // cover(s) plus the first photo. Dedupe when the cover *is* the first
           // photo, otherwise the same block ships twice (duplicate React keys).
-          const coverBlocks = a.blocks.filter(
-            (b) => b.kind === "photo" && b.formatting?.cover,
-          );
+          const coverBlocks = a.blocks.filter((b) => b.kind === "photo" && b.formatting?.cover);
           const firstPhoto = a.blocks.find((b) => b.kind === "photo");
           const previewBlocks: Block[] =
             firstPhoto && !coverBlocks.some((b) => b.id === firstPhoto.id)

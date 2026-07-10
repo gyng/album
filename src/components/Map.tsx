@@ -43,9 +43,7 @@ const ZOOM = 12;
 const FIT_BOUNDS_PADDING_PX = 48;
 const FIT_BOUNDS_MAX_ZOOM = 11;
 
-const normaliseCoords = (
-  input: [number, number] | [number, number][],
-): [number, number][] => {
+const normaliseCoords = (input: [number, number] | [number, number][]): [number, number][] => {
   if (input.length === 0) return [];
   // A tuple is just `[number, number]` — guard by checking if the first item
   // is itself an array.
@@ -97,9 +95,7 @@ const MMapComponent: React.FC<MapProps> = (props) => {
   const mapStyle: MapTilerMapStyle = props.mapStyle ?? "streets";
   const projection = props.projection ?? "mercator";
   const projectionSpec: "mercator" | "globe" | ProjectionSpecification =
-    projection === "vertical-perspective"
-      ? { type: "vertical-perspective" }
-      : projection;
+    projection === "vertical-perspective" ? { type: "vertical-perspective" } : projection;
 
   const coords = normaliseCoords(props.coordinates);
   // First coord doubles as the initial centre + the "view on" deep-link
@@ -110,7 +106,7 @@ const MMapComponent: React.FC<MapProps> = (props) => {
   return (
     <div className={styles.map}>
       <Map
-        style={{ width: "100%", height: "100%", ...(props.style ?? {}) }}
+        style={{ width: "100%", height: "100%", ...props.style }}
         // mapStyle="https://tiles.openfreemap.org/styles/liberty"
         mapStyle={`https://api.maptiler.com/maps/${mapStyle}/style.json?key=mrjUpLh9Syjz9wcEY2Vb`}
         initialViewState={{
@@ -119,9 +115,7 @@ const MMapComponent: React.FC<MapProps> = (props) => {
           zoom: ZOOM,
         }}
         projection={projectionSpec}
-        attributionControl={
-          props.attribution === false ? false : { compact: true }
-        }
+        attributionControl={props.attribution === false ? false : { compact: true }}
       >
         {coords.map(([lat, lng], idx) => (
           <Marker
@@ -131,10 +125,7 @@ const MMapComponent: React.FC<MapProps> = (props) => {
             anchor="center"
             style={props.markerStyle ?? {}}
           >
-            <span
-              className={pinStyles.pin}
-              style={{ color: "var(--c-accent)" }}
-            />
+            <span className={pinStyles.pin} style={{ color: "var(--c-accent)" }} />
           </Marker>
         ))}
         <MapFlyer coordinates={coords} />

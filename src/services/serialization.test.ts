@@ -303,9 +303,7 @@ describe("serialization", () => {
   });
 
   it("skips missing local photo blocks instead of throwing", async () => {
-    const consoleWarnSpy = jest
-      .spyOn(console, "warn")
-      .mockImplementation(() => undefined);
+    const consoleWarnSpy = jest.spyOn(console, "warn").mockImplementation(() => undefined);
 
     const input: SerializedContent = {
       ...serializedContent,

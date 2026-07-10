@@ -18,7 +18,9 @@
   fill: var(--c-font);
   font-size: var(--fs-sm);
   font-weight: 500;
-  transition: fill var(--t-fast), opacity var(--t-fast);
+  transition:
+    fill var(--t-fast),
+    opacity var(--t-fast);
 }
 
 .svgLabelLink {

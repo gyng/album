@@ -216,8 +216,7 @@ export const GuessRound: React.FC<GuessRoundProps> = ({
     if (pointersRef.current.size >= 2 && pinchStartRef.current) {
       const dist = pointerDistance();
       if (dist === 0) return;
-      const next =
-        pinchStartRef.current.zoom * (dist / pinchStartRef.current.distance);
+      const next = pinchStartRef.current.zoom * (dist / pinchStartRef.current.distance);
       const clamped = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, next));
       setZoom(clamped);
       if (clamped === MIN_ZOOM) {
@@ -266,48 +265,49 @@ export const GuessRound: React.FC<GuessRoundProps> = ({
   }, []);
 
   // Keyboard zoom/pan for the focused photo panel: +/- zoom, arrows pan, 0 resets.
-  const handlePhotoKeyDown = useCallback((event: React.KeyboardEvent) => {
-    const PAN_STEP = 40;
-    if (event.key === "+" || event.key === "=") {
-      event.preventDefault();
-      setZoom((prev) => Math.min(MAX_ZOOM, prev * ZOOM_STEP));
-    } else if (event.key === "-" || event.key === "_") {
-      event.preventDefault();
-      setZoom((prev) => {
-        const next = Math.max(MIN_ZOOM, prev / ZOOM_STEP);
-        if (next === MIN_ZOOM) {
-          panRef.current = { x: 0, y: 0 };
-          setPan({ x: 0, y: 0 });
-        }
-        return next;
-      });
-    } else if (event.key === "0") {
-      event.preventDefault();
-      setZoom(MIN_ZOOM);
-      panRef.current = { x: 0, y: 0 };
-      setPan({ x: 0, y: 0 });
-    } else if (
-      event.key === "ArrowUp" ||
-      event.key === "ArrowDown" ||
-      event.key === "ArrowLeft" ||
-      event.key === "ArrowRight"
-    ) {
-      if (zoom <= MIN_ZOOM) return;
-      event.preventDefault();
-      const dx =
-        (event.key === "ArrowLeft" ? PAN_STEP : 0) -
-        (event.key === "ArrowRight" ? PAN_STEP : 0);
-      const dy =
-        (event.key === "ArrowUp" ? PAN_STEP : 0) -
-        (event.key === "ArrowDown" ? PAN_STEP : 0);
-      const next = {
-        x: panRef.current.x + dx,
-        y: panRef.current.y + dy,
-      };
-      panRef.current = next;
-      setPan(next);
-    }
-  }, [zoom]);
+  const handlePhotoKeyDown = useCallback(
+    (event: React.KeyboardEvent) => {
+      const PAN_STEP = 40;
+      if (event.key === "+" || event.key === "=") {
+        event.preventDefault();
+        setZoom((prev) => Math.min(MAX_ZOOM, prev * ZOOM_STEP));
+      } else if (event.key === "-" || event.key === "_") {
+        event.preventDefault();
+        setZoom((prev) => {
+          const next = Math.max(MIN_ZOOM, prev / ZOOM_STEP);
+          if (next === MIN_ZOOM) {
+            panRef.current = { x: 0, y: 0 };
+            setPan({ x: 0, y: 0 });
+          }
+          return next;
+        });
+      } else if (event.key === "0") {
+        event.preventDefault();
+        setZoom(MIN_ZOOM);
+        panRef.current = { x: 0, y: 0 };
+        setPan({ x: 0, y: 0 });
+      } else if (
+        event.key === "ArrowUp" ||
+        event.key === "ArrowDown" ||
+        event.key === "ArrowLeft" ||
+        event.key === "ArrowRight"
+      ) {
+        if (zoom <= MIN_ZOOM) return;
+        event.preventDefault();
+        const dx =
+          (event.key === "ArrowLeft" ? PAN_STEP : 0) - (event.key === "ArrowRight" ? PAN_STEP : 0);
+        const dy =
+          (event.key === "ArrowUp" ? PAN_STEP : 0) - (event.key === "ArrowDown" ? PAN_STEP : 0);
+        const next = {
+          x: panRef.current.x + dx,
+          y: panRef.current.y + dy,
+        };
+        panRef.current = next;
+        setPan(next);
+      }
+    },
+    [zoom],
+  );
 
   const isZoomed = zoom > MIN_ZOOM;
 
@@ -325,9 +325,7 @@ export const GuessRound: React.FC<GuessRoundProps> = ({
         handleConfirm();
       } else if (
         revealed &&
-        (event.key === " " ||
-          event.key === "ArrowRight" ||
-          event.key === "Enter")
+        (event.key === " " || event.key === "ArrowRight" || event.key === "Enter")
       ) {
         event.preventDefault();
         handleNext();
@@ -371,12 +369,8 @@ export const GuessRound: React.FC<GuessRoundProps> = ({
   }, [timeLimit, revealed, photoLoaded]);
 
   const geocodeLabel = revealed ? getGeocodeLabel(photo.geocode) : null;
-  const tierColour =
-    result && !result.skipped
-      ? scoreTierColour(result.distanceScore)
-      : undefined;
-  const isBadGuess =
-    result && !result.skipped && result.distanceScore / MAX_SCORE < 0.1;
+  const tierColour = result && !result.skipped ? scoreTierColour(result.distanceScore) : undefined;
+  const isBadGuess = result && !result.skipped && result.distanceScore / MAX_SCORE < 0.1;
 
   return (
     <div className={styles.round}>
@@ -397,31 +391,29 @@ export const GuessRound: React.FC<GuessRoundProps> = ({
           ))}
         </div>
         <span
-          className={[
-            styles.cumulativeScore,
-            revealed ? styles.cumulativeScoreBump : "",
-          ]
+          className={[styles.cumulativeScore, revealed ? styles.cumulativeScoreBump : ""]
             .filter(Boolean)
             .join(" ")}
         >
           <span ref={cumulativeCounterRef}>{cumulativeScore.toLocaleString()}</span> pts
         </span>
-        <button
-          className={styles.abortButton}
-          onClick={onAbort}
-          title="Quit to menu"
-        >
+        <button className={styles.abortButton} onClick={onAbort} title="Quit to menu">
           &times;
         </button>
       </div>
 
       <div className={styles.gameArea}>
-        {/* Photo panel — scroll/+/- to zoom, drag/arrows to pan, double-click resets */}
+        {/* Photo panel — scroll/+/- to zoom, drag/arrows to pan, double-click resets.
+            A custom pan/zoom surface: keyboard support is built in (handlePhotoKeyDown)
+            and no ARIA interactive role fits, so tabIndex + pointer/key handlers on the
+            role="img" element are intentional. */}
+        {/* oxlint-disable-next-line jsx-a11y/no-noninteractive-tabindex, jsx-a11y/no-noninteractive-element-interactions */}
         <div
           ref={photoPanelRef}
           className={[styles.photoPanel, isZoomed ? styles.photoZoomed : ""]
             .filter(Boolean)
             .join(" ")}
+          /* oxlint-disable-next-line jsx-a11y/no-noninteractive-tabindex */
           tabIndex={0}
           role="img"
           aria-label="Mystery photo. Use plus and minus to zoom, arrow keys to pan."
@@ -451,9 +443,7 @@ export const GuessRound: React.FC<GuessRoundProps> = ({
                 transform: `scaleX(${(timeRemaining ?? timeLimit) / timeLimit})`,
               }}
               data-urgent={
-                timeRemaining !== null && timeRemaining <= timeLimit * 0.25
-                  ? ""
-                  : undefined
+                timeRemaining !== null && timeRemaining <= timeLimit * 0.25 ? "" : undefined
               }
               data-warning={
                 timeRemaining !== null &&
@@ -464,9 +454,7 @@ export const GuessRound: React.FC<GuessRoundProps> = ({
               }
             />
           ) : null}
-          {!isZoomed ? (
-            <div className={styles.zoomHint}>Scroll or pinch to zoom</div>
-          ) : null}
+          {!isZoomed ? <div className={styles.zoomHint}>Scroll or pinch to zoom</div> : null}
         </div>
 
         {/* Map panel */}
@@ -480,10 +468,7 @@ export const GuessRound: React.FC<GuessRoundProps> = ({
                   I have no idea
                 </button>
                 <button
-                  className={[
-                    styles.confirmButton,
-                    guess ? styles.confirmReady : "",
-                  ]
+                  className={[styles.confirmButton, guess ? styles.confirmReady : ""]
                     .filter(Boolean)
                     .join(" ")}
                   onClick={handleConfirm}
@@ -501,20 +486,14 @@ export const GuessRound: React.FC<GuessRoundProps> = ({
                   <div className={styles.scoreReveal}>
                     <div className={styles.scoreLine}>
                       <span
-                        className={[
-                          styles.distance,
-                          isBadGuess ? styles.distanceBad : "",
-                        ]
+                        className={[styles.distance, isBadGuess ? styles.distanceBad : ""]
                           .filter(Boolean)
                           .join(" ")}
                       >
                         {formatDistance(result?.distanceMeters ?? 0)}
                       </span>
                       <span
-                        className={[
-                          styles.scoreValue,
-                          tierColour ? styles.scoreValueGlow : "",
-                        ]
+                        className={[styles.scoreValue, tierColour ? styles.scoreValueGlow : ""]
                           .filter(Boolean)
                           .join(" ")}
                         style={tierColour ? { color: tierColour } : undefined}

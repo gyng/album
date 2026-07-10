@@ -42,7 +42,7 @@ export const useWakeLock = (disabled: boolean): UseWakeLock => {
 
     // Capability detection must run in an effect (client-only): `navigator` is
     // undefined during SSR, so a lazy useState initialiser would throw.
-     
+
     setIsSupported(typeof wakeLock?.request === "function");
   }, []);
 
@@ -131,7 +131,7 @@ export const useWakeLock = (disabled: boolean): UseWakeLock => {
     // Releasing the platform wake lock is an external-system sync; the state
     // update merely reflects its result, which is the legitimate use of an
     // effect here (not a derived-state cascade).
-     
+
     release().catch(console.error);
   }, [disabled, release]);
 
@@ -143,7 +143,7 @@ export const useWakeLock = (disabled: boolean): UseWakeLock => {
     // Try once on load so kiosk/photo-frame sessions wake-lock automatically
     // where browsers permit non-gesture acquisition. External-system sync —
     // the state update reflects the acquired lock.
-     
+
     acquire().catch(console.error);
   }, [disabled, acquire]);
 

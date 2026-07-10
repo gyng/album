@@ -142,16 +142,14 @@
   padding: var(--m-m);
   border-radius: var(--m-s);
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(0, 0, 0, 0.16)),
-    var(--c-overlay);
+    linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(0, 0, 0, 0.16)), var(--c-overlay);
   backdrop-filter: blur(8px);
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14);
 }
 
 .similarPhotosLoadMoreTile:hover:not(:disabled) .similarPhotosLoadMoreTileBody {
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(0, 0, 0, 0.2)),
-    var(--c-overlay);
+    linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(0, 0, 0, 0.2)), var(--c-overlay);
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.22);
 }
 
@@ -281,7 +279,9 @@
   height: 1.5em;
   width: 1.5em;
   cursor: pointer;
-  transition: transform 0.15s ease, opacity 0.15s ease;
+  transition:
+    transform 0.15s ease,
+    opacity 0.15s ease;
   display: block;
 }
 

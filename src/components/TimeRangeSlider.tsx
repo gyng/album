@@ -12,8 +12,7 @@ import styles from "./TimeRangeSlider.module.css";
 
 const BIN_COUNT = 100;
 
-const clampPosition = (position: number): number =>
-  Math.max(0, Math.min(1, position));
+const clampPosition = (position: number): number => Math.max(0, Math.min(1, position));
 
 type TimeRangeSliderProps = {
   /** All photos (album-filtered, not date-filtered) for sparkline. */
@@ -76,10 +75,7 @@ export const TimeRangeSlider: React.FC<TimeRangeSliderProps> = ({
   const trackRef = React.useRef<HTMLDivElement>(null);
   const draggingRef = React.useRef<"from" | "to" | null>(null);
 
-  const extent: DateExtent | null = React.useMemo(
-    () => computeDateExtent(photos),
-    [photos],
-  );
+  const extent: DateExtent | null = React.useMemo(() => computeDateExtent(photos), [photos]);
 
   const bins = React.useMemo(
     () => (extent ? computeSparklineBins(photos, extent, BIN_COUNT) : []),
@@ -99,10 +95,7 @@ export const TimeRangeSlider: React.FC<TimeRangeSliderProps> = ({
     return Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
   };
 
-  const handlePointerDown = (
-    e: React.PointerEvent,
-    thumb: "from" | "to",
-  ) => {
+  const handlePointerDown = (e: React.PointerEvent, thumb: "from" | "to") => {
     e.preventDefault();
     e.currentTarget.setPointerCapture(e.pointerId);
     draggingRef.current = thumb;
@@ -171,10 +164,7 @@ export const TimeRangeSlider: React.FC<TimeRangeSliderProps> = ({
     onCommit(null, null);
   };
 
-  const handleKeyDown = (
-    e: React.KeyboardEvent,
-    thumb: "from" | "to",
-  ) => {
+  const handleKeyDown = (e: React.KeyboardEvent, thumb: "from" | "to") => {
     const step = (extent.maxMs - extent.minMs) / BIN_COUNT;
     let newMs: number | null = null;
 
@@ -204,9 +194,7 @@ export const TimeRangeSlider: React.FC<TimeRangeSliderProps> = ({
   };
 
   const thumbClass = (isHidden: boolean) =>
-    [styles.thumb, isHidden ? styles.thumbHidden : ""]
-      .filter(Boolean)
-      .join(" ");
+    [styles.thumb, isHidden ? styles.thumbHidden : ""].filter(Boolean).join(" ");
 
   return (
     <div
@@ -215,18 +203,12 @@ export const TimeRangeSlider: React.FC<TimeRangeSliderProps> = ({
       onPointerUp={handlePointerUp}
       onPointerCancel={handlePointerUp}
     >
-      <Sparkline
-        bins={bins}
-        fromPos={fromPos}
-        toPos={toPos}
-        hasRange={hasRange}
-      />
+      <Sparkline bins={bins} fromPos={fromPos} toPos={toPos} hasRange={hasRange} />
 
-      <div
-        ref={trackRef}
-        className={styles.trackArea}
-        onClick={handleTrackClick}
-      >
+      {/* Click-to-position is a pointer shortcut; keyboard control lives on the
+          slider thumbs below (role="slider" with arrow-key handlers). */}
+      {/* oxlint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions */}
+      <div ref={trackRef} className={styles.trackArea} onClick={handleTrackClick}>
         <div className={styles.track}>
           {hasRange && (
             <div
@@ -271,9 +253,7 @@ export const TimeRangeSlider: React.FC<TimeRangeSliderProps> = ({
       </div>
 
       <div
-        className={[styles.labels, hasRange ? styles.labelsActive : ""]
-          .filter(Boolean)
-          .join(" ")}
+        className={[styles.labels, hasRange ? styles.labelsActive : ""].filter(Boolean).join(" ")}
       >
         <span className={styles.label}>
           {hasRange ? formatDisplayDate(fromMs!) : formatDisplayDate(extent.minMs)}

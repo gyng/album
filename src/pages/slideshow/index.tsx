@@ -1,10 +1,7 @@
 import { NextPage } from "next/types";
 import Link from "next/link";
 import React, { useEffect, useCallback } from "react";
-import {
-  useDatabase,
-  useEmbeddingsDatabase,
-} from "../../components/database/useDatabase";
+import { useDatabase, useEmbeddingsDatabase } from "../../components/database/useDatabase";
 import { PhotoBlock } from "../../services/types";
 import {
   fetchSlideshowPhotos,
@@ -69,14 +66,8 @@ import {
 import { SlideshowToolbar } from "../../components/slideshow/SlideshowToolbar";
 import { SlideshowBottomBar } from "../../components/slideshow/SlideshowBottomBar";
 import { decideBuildUpdate, decideDbUpdateAction } from "../../util/kioskRefresh";
-import {
-  decideRemixPlan,
-  mapVectorRemixResult,
-} from "../../util/slideshowRemix";
-import {
-  resolvePointerMove,
-  resolvePointerUpAction,
-} from "../../util/slideshowGesture";
+import { decideRemixPlan, mapVectorRemixResult } from "../../util/slideshowRemix";
+import { resolvePointerMove, resolvePointerUpAction } from "../../util/slideshowGesture";
 import { decidePoolReloadAction } from "../../util/slideshowPoolReload";
 import {
   applySlideshowUrlState,
@@ -146,8 +137,7 @@ const formatSearchDbVersion = (response: Response): SearchDbVersion | null => {
   }
 
   const cleaned = etag.replace(/^W\//, "").replace(/^"|"$/g, "");
-  const shortVersion =
-    cleaned.length > 12 ? `${cleaned.slice(0, 12)}...` : cleaned;
+  const shortVersion = cleaned.length > 12 ? `${cleaned.slice(0, 12)}...` : cleaned;
   return {
     raw: etag,
     label: `data ${shortVersion}`,
@@ -160,7 +150,7 @@ const formatSearchDbVersion = (response: Response): SearchDbVersion | null => {
 const isTouchOrPen = (pointerType: string): boolean =>
   pointerType === "touch" || pointerType === "pen";
 
-const SlideshowPage: NextPage<PageProps> = (props) => {
+const SlideshowPage: NextPage<PageProps> = (_props) => {
   return <Slideshow />;
 };
 
@@ -382,53 +372,25 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
   // Single shared queue state for random/weighted modes. Both the forward
   // advance and the preload peek consult it, so the buffered photo always
   // matches the one the next advance shows (see util/slideshowQueue).
-  const randomQueueStateRef = React.useRef<RandomQueueState>(
-    createRandomQueueState(),
-  );
-  const [slideshowError, setSlideshowError] = React.useState<string | null>(
-    null,
-  );
+  const randomQueueStateRef = React.useRef<RandomQueueState>(createRandomQueueState());
+  const [slideshowError, setSlideshowError] = React.useState<string | null>(null);
   const [copiedPhotoLink, setCopiedPhotoLink] = React.useState(false);
 
-  const [timeDelay, setTimeDelay] = useLocalStorage(
-    "slideshow-timedelay",
-    900000,
-  );
+  const [timeDelay, setTimeDelay] = useLocalStorage("slideshow-timedelay", 900000);
   const timeDelayRef = React.useRef(timeDelay);
-  const [showClock, setShowClock] = useLocalStorage(
-    "slideshow-showclock",
-    false,
-  );
-  const [showMap, setShowMap] = useLocalStorage(
-    "slideshow-showmap",
-    false,
-  );
-  const [showDetails, setShowDetails] = useLocalStorage(
-    "slideshow-showdetails",
-    false,
-  );
-  const [showCover, setShowCover] = useLocalStorage(
-    "slideshow-showcover",
-    false,
-  );
+  const [showClock, setShowClock] = useLocalStorage("slideshow-showclock", false);
+  const [showMap, setShowMap] = useLocalStorage("slideshow-showmap", false);
+  const [showDetails, setShowDetails] = useLocalStorage("slideshow-showdetails", false);
+  const [showCover, setShowCover] = useLocalStorage("slideshow-showcover", false);
   const [detailsAlignment, setDetailsAlignment] = useLocalStorage(
     "slideshow-details-alignment",
     "center" as "left" | "center" | "right",
   );
-  const [timeAware, setTimeAware] = useLocalStorage(
-    "slideshow-time-aware",
-    false,
-  );
-  const [remixEnabled, setRemixEnabled] = useLocalStorage(
-    "slideshow-remix",
-    true,
-  );
-  const [poolStats, setPoolStats] =
-    React.useState<PoolStats>(EMPTY_POOL_STATS);
-  const [searchDbVersion, setSearchDbVersion] =
-    React.useState<SearchDbVersion | null>(null);
-  const [isCheckingSearchDbVersion, setIsCheckingSearchDbVersion] =
-    React.useState(false);
+  const [timeAware, setTimeAware] = useLocalStorage("slideshow-time-aware", false);
+  const [remixEnabled, setRemixEnabled] = useLocalStorage("slideshow-remix", true);
+  const [poolStats, setPoolStats] = React.useState<PoolStats>(EMPTY_POOL_STATS);
+  const [searchDbVersion, setSearchDbVersion] = React.useState<SearchDbVersion | null>(null);
+  const [isCheckingSearchDbVersion, setIsCheckingSearchDbVersion] = React.useState(false);
   // When set, the next forward-advance ignores the dice roll and forces a
   // remix. Used by the dedicated "Remix now" action button so users can
   // trigger a remix on demand instead of waiting for the 3% dice.
@@ -444,7 +406,6 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
   // a remix every ~5 hours — visible enough to register as a feature, rare
   // enough that it still feels like a surprise rather than a pattern.
   const REMIX_PROBABILITY = 0.05;
-
 
   const [imageLoaded, setImageLoaded] = React.useState<boolean>(false);
   // The cross-fade is a keyed STACK of slide layers (see util/slideshowCrossfade):
@@ -470,10 +431,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
   // When true, every new "next change at" snaps to the next aligned wall-clock
   // boundary (e.g. every :00/:15/:30/:45 for a 15-minute cadence), so the
   // slideshow stays in sync with the clock across days. Default on.
-  const [alignCadence, setAlignCadence] = useLocalStorage(
-    "slideshow-align-cadence",
-    true,
-  );
+  const [alignCadence, setAlignCadence] = useLocalStorage("slideshow-align-cadence", true);
   const [hasParsedInitialUrl, setHasParsedInitialUrl] = React.useState(false);
   // Controls visibility lifecycle (coarse-pointer detection, rAF auto-hide
   // countdown, desktop show/hide + post-Hide suppression) lives in a hook;
@@ -489,8 +447,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
     hideDesktopControls,
     dismissControls,
   } = useControlsAutoHide();
-  const [isFullscreenSupported, setIsFullscreenSupported] =
-    React.useState(false);
+  const [isFullscreenSupported, setIsFullscreenSupported] = React.useState(false);
   const [isFullscreenActive, setIsFullscreenActive] = React.useState(false);
   // Screen wake-lock lifecycle (acquire on load/resume, release on
   // unmount/disable) lives in a dedicated hook. Destructured to the same local
@@ -512,17 +469,13 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
   const [touchArmed, setTouchArmed] = React.useState(false);
   // The chevron handle leads the pull; the toolbar/edge peek only enters in the last 35%
   // so the two indicators don't compete. Below 0.65 only the chevron is visible.
-  const remapPeek = (progress: number) =>
-    Math.max(0, (progress - 0.65) / 0.35);
+  const remapPeek = (progress: number) => Math.max(0, (progress - 0.65) / 0.35);
   const touchToolbarShowPreviewProgress =
-    !controlsVisible &&
-    (touchGestureHint === "controls" || touchGestureHint === "reload")
+    !controlsVisible && (touchGestureHint === "controls" || touchGestureHint === "reload")
       ? remapPeek(touchPullProgress)
       : 0;
   const touchToolbarHidePreviewProgress =
-    controlsVisible && touchGestureHint === "remix"
-      ? remapPeek(touchPullProgress)
-      : 0;
+    controlsVisible && touchGestureHint === "remix" ? remapPeek(touchPullProgress) : 0;
   // Loaded for Similar mode and also whenever remixes are on, so vector
   // strategies (similar / juxtapose) can fire on the first roll. Loading
   // lazily after the first vector roll meant the first ~37% of remixes
@@ -546,20 +499,15 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
     hapticFired?: boolean;
   } | null>(null);
   const suppressImageClickRef = React.useRef(false);
-  const [bufferedPhotoSrc, setBufferedPhotoSrc] = React.useState<string | null>(
-    null,
-  );
+  const [bufferedPhotoSrc, setBufferedPhotoSrc] = React.useState<string | null>(null);
 
-  const updateSlideshowUrl = useCallback(
-    (mode: SlideshowMode, delayMs = timeDelayRef.current) => {
-      window.history.replaceState(
-        window.history.state,
-        "",
-        applySlideshowUrlState(window.location.toString(), { mode, delayMs }),
-      );
-    },
-    [],
-  );
+  const updateSlideshowUrl = useCallback((mode: SlideshowMode, delayMs = timeDelayRef.current) => {
+    window.history.replaceState(
+      window.history.state,
+      "",
+      applySlideshowUrlState(window.location.toString(), { mode, delayMs }),
+    );
+  }, []);
 
   const setSlideshowModeAndUrl = useCallback(
     (mode: SlideshowMode) => {
@@ -612,10 +560,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
   // util/slideshowUrl; this effect just fans the parsed values out to the
   // React setters/refs (applying each only when present — null means absent).
   useEffect(() => {
-    const parsed = parseSlideshowSearchParams(
-      window.location.search,
-      slideshowMode,
-    );
+    const parsed = parseSlideshowSearchParams(window.location.search, slideshowMode);
 
     if (parsed.filter) {
       setFilter(parsed.filter);
@@ -698,15 +643,12 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
   });
 
   const commitNextPhoto = useCallback(
-    (
-      candidatePhoto: RandomPhotoRow,
-      opts?: { trackRecent?: boolean; allowRemix?: boolean },
-    ) => {
+    (candidatePhoto: RandomPhotoRow, opts?: { trackRecent?: boolean; allowRemix?: boolean }) => {
       if (opts?.trackRecent) {
-        recentPhotoPathsRef.current = [
-          candidatePhoto.path,
-          ...recentPhotoPathsRef.current,
-        ].slice(0, shuffleHistorySize);
+        recentPhotoPathsRef.current = [candidatePhoto.path, ...recentPhotoPathsRef.current].slice(
+          0,
+          shuffleHistorySize,
+        );
       }
 
       // Remix decision: only on forward advance (allowRemix), never on history
@@ -764,8 +706,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
             });
             // Stale guard: if the user has advanced past this slide while we
             // were fetching, drop the result on the floor.
-            if (currentEntry(historyStateRef.current)?.seed.path !== seedPath)
-              return;
+            if (currentEntry(historyStateRef.current)?.seed.path !== seedPath) return;
 
             const mapped = mapVectorRemixResult({
               resultData: result.data,
@@ -814,13 +755,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
       setSlideshowError(null);
       scheduleNextChange();
     },
-    [
-      database,
-      embeddingsDatabase,
-      remixEnabled,
-      scheduleNextChange,
-      shuffleHistorySize,
-    ],
+    [database, embeddingsDatabase, remixEnabled, scheduleNextChange, shuffleHistorySize],
   );
 
   const showHistoryPhoto = useCallback(
@@ -909,12 +844,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
     }
 
     updateSlideshowUrl(slideshowMode);
-  }, [
-    currentPhotoPath?.path,
-    hasParsedInitialUrl,
-    slideshowMode,
-    updateSlideshowUrl,
-  ]);
+  }, [currentPhotoPath?.path, hasParsedInitialUrl, slideshowMode, updateSlideshowUrl]);
 
   useEffect(() => {
     if (!database) {
@@ -971,9 +901,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
 
         if (initialPhotoPathRef.current) {
           const seededPhoto =
-            photos.find(
-              (photo) => photo.path === initialPhotoPathRef.current,
-            ) ?? null;
+            photos.find((photo) => photo.path === initialPhotoPathRef.current) ?? null;
 
           initialPhotoPathRef.current = null;
 
@@ -1023,93 +951,84 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [database, filter]);
 
-  const advanceSimilarPhoto =
-    useCallback(async (): Promise<RandomPhotoRow | null> => {
-      if (!database) {
-        return null;
-      }
+  const advanceSimilarPhoto = useCallback(async (): Promise<RandomPhotoRow | null> => {
+    if (!database) {
+      return null;
+    }
 
-      // Embeddings not ready yet (still loading, or failed to load): keep the
-      // slideshow moving with a random advance rather than freezing on a
-      // no-op. The next advance retries the similar trail once they arrive.
-      if (!embeddingsDatabase) {
-        return advanceRandomPhoto({ trackRecent: true });
-      }
+    // Embeddings not ready yet (still loading, or failed to load): keep the
+    // slideshow moving with a random advance rather than freezing on a
+    // no-op. The next advance retries the similar trail once they arrive.
+    if (!embeddingsDatabase) {
+      return advanceRandomPhoto({ trackRecent: true });
+    }
 
-      const activePhoto = currentEntry(historyStateRef.current)?.seed ?? null;
-      if (!activePhoto?.path) {
-        return advanceRandomPhoto({ trackRecent: true });
-      }
+    const activePhoto = currentEntry(historyStateRef.current)?.seed ?? null;
+    if (!activePhoto?.path) {
+      return advanceRandomPhoto({ trackRecent: true });
+    }
 
-      const refillSimilarQueue = async (seedPath: string) => {
-        const result = await fetchSimilarResults({
-          database,
-          embeddingsDatabase,
-          path: seedPath,
-          page: 0,
-          pageSize: Math.max(shuffleHistorySize, 100),
-        });
-        const filteredResults = result.data
-          .filter((candidate) => {
-            const matchesAlbumFilter = filter
-              ? candidate.path.startsWith(`../albums/${filter}/`)
-              : true;
-            const isRecent = recentPhotoPathsRef.current.includes(
-              candidate.path,
-            );
-            return matchesAlbumFilter && !isRecent;
-          })
-          .map((candidate) => ({
-            path: candidate.path,
-            exif: candidate.exif,
-            geocode: candidate.geocode,
-            // Carry colours through: the next slide's remix uses the dominant
-            // colour of its seed, so dropping this silently disabled the
-            // dominant-colour remix strategy in similar mode.
-            colors: candidate.colors,
-          }));
+    const refillSimilarQueue = async (seedPath: string) => {
+      const result = await fetchSimilarResults({
+        database,
+        embeddingsDatabase,
+        path: seedPath,
+        page: 0,
+        pageSize: Math.max(shuffleHistorySize, 100),
+      });
+      const filteredResults = result.data
+        .filter((candidate) => {
+          const matchesAlbumFilter = filter
+            ? candidate.path.startsWith(`../albums/${filter}/`)
+            : true;
+          const isRecent = recentPhotoPathsRef.current.includes(candidate.path);
+          return matchesAlbumFilter && !isRecent;
+        })
+        .map((candidate) => ({
+          path: candidate.path,
+          exif: candidate.exif,
+          geocode: candidate.geocode,
+          // Carry colours through: the next slide's remix uses the dominant
+          // colour of its seed, so dropping this silently disabled the
+          // dominant-colour remix strategy in similar mode.
+          colors: candidate.colors,
+        }));
 
-        const nextQueue = shufflePhotos(
-          filteredResults,
-          similarQueueLastPathRef.current,
-        );
+      const nextQueue = shufflePhotos(filteredResults, similarQueueLastPathRef.current);
 
-        similarSeedPathRef.current = seedPath;
-        similarQueueRef.current = nextQueue;
-        similarQueueIndexRef.current = -1;
-        return nextQueue;
-      };
+      similarSeedPathRef.current = seedPath;
+      similarQueueRef.current = nextQueue;
+      similarQueueIndexRef.current = -1;
+      return nextQueue;
+    };
 
-      let queue = similarQueueRef.current;
-      let nextIndex = similarQueueIndexRef.current + 1;
+    let queue = similarQueueRef.current;
+    let nextIndex = similarQueueIndexRef.current + 1;
 
-      if (
-        similarSeedPathRef.current !== activePhoto.path ||
-        nextIndex >= queue.length
-      ) {
-        queue = await refillSimilarQueue(activePhoto.path);
-        nextIndex = 0;
-      }
+    if (similarSeedPathRef.current !== activePhoto.path || nextIndex >= queue.length) {
+      queue = await refillSimilarQueue(activePhoto.path);
+      nextIndex = 0;
+    }
 
-      const nextPhoto = queue[nextIndex] ?? null;
-      if (!nextPhoto) {
-        resetSimilarQueue();
-        return advanceRandomPhoto({ trackRecent: true });
-      }
+    const nextPhoto = queue[nextIndex] ?? null;
+    if (!nextPhoto) {
+      resetSimilarQueue();
+      return advanceRandomPhoto({ trackRecent: true });
+    }
 
-      similarQueueIndexRef.current = nextIndex;
-      similarQueueLastPathRef.current = nextPhoto.path;
-      commitNextPhoto(nextPhoto, { trackRecent: true, allowRemix: true });
-      return nextPhoto;
-    }, [
-      advanceRandomPhoto,
-      commitNextPhoto,
-      database,
-      embeddingsDatabase,
-      filter,
-      resetSimilarQueue,
-      shuffleHistorySize,
-    ]);
+    similarQueueIndexRef.current = nextIndex;
+    similarQueueLastPathRef.current = nextPhoto.path;
+    commitNextPhoto(nextPhoto, { trackRecent: true, allowRemix: true });
+    return nextPhoto;
+  }, [
+    advanceRandomPhoto,
+    commitNextPhoto,
+    database,
+    embeddingsDatabase,
+    filter,
+    resetSimilarQueue,
+    shuffleHistorySize,
+  ]);
 
   const goNext = useCallback(() => {
     if (!database) {
@@ -1122,10 +1041,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
     // honours the forceRemix flag. Without this, pressing "Remix now" while
     // back in history silently stepped forward with no remix and left the
     // flag armed to fire on a later, unexpected advance.
-    if (
-      !forceRemixRef.current &&
-      hasForwardEntry(historyStateRef.current)
-    ) {
+    if (!forceRemixRef.current && hasForwardEntry(historyStateRef.current)) {
       showHistoryPhoto(historyStateRef.current.index + 1);
       return;
     }
@@ -1148,13 +1064,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
     }
 
     advanceRandomPhoto({ trackRecent: true });
-  }, [
-    advanceRandomPhoto,
-    advanceSimilarPhoto,
-    database,
-    showHistoryPhoto,
-    slideshowMode,
-  ]);
+  }, [advanceRandomPhoto, advanceSimilarPhoto, database, showHistoryPhoto, slideshowMode]);
 
   const goPrevious = useCallback(() => {
     if (!canGoBack(historyStateRef.current)) {
@@ -1182,8 +1092,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
 
     if (
       slideshowMode === "similar" &&
-      similarSeedPathRef.current ===
-        currentEntry(historyStateRef.current)?.seed.path
+      similarSeedPathRef.current === currentEntry(historyStateRef.current)?.seed.path
     ) {
       const nextIndex = similarQueueIndexRef.current + 1;
       return similarQueueRef.current[nextIndex] ?? null;
@@ -1225,11 +1134,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
 
   const cycleAlignment = () => {
     const next =
-      detailsAlignment === "left"
-        ? "center"
-        : detailsAlignment === "center"
-          ? "right"
-          : "left";
+      detailsAlignment === "left" ? "center" : detailsAlignment === "center" ? "right" : "left";
     setDetailsAlignment(next);
   };
 
@@ -1313,8 +1218,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
 
     const syncFullscreenState = () => {
       const isActive = Boolean(
-        document.fullscreenElement ??
-          fullscreenDocument.webkitFullscreenElement,
+        document.fullscreenElement ?? fullscreenDocument.webkitFullscreenElement,
       );
       isFullscreenActiveRef.current = isActive;
       setIsFullscreenActive(isActive);
@@ -1326,10 +1230,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
 
     return () => {
       document.removeEventListener("fullscreenchange", syncFullscreenState);
-      document.removeEventListener(
-        "webkitfullscreenchange",
-        syncFullscreenState,
-      );
+      document.removeEventListener("webkitfullscreenchange", syncFullscreenState);
     };
   }, []);
 
@@ -1338,10 +1239,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
     const fullscreenRoot = document.documentElement as FullscreenElement;
 
     try {
-      if (
-        document.fullscreenElement ||
-        fullscreenDocument.webkitFullscreenElement
-      ) {
+      if (document.fullscreenElement || fullscreenDocument.webkitFullscreenElement) {
         if (typeof document.exitFullscreen === "function") {
           await document.exitFullscreen();
           return;
@@ -1422,85 +1320,75 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
     [controlsVisible, props.disabled, tryAcquireWakeLock, wakeLockRef],
   );
 
-  const clearImagePointerGesture = useCallback(
-    (event?: React.PointerEvent<HTMLElement>) => {
-      if (event) {
-        try {
-          if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-            event.currentTarget.releasePointerCapture(event.pointerId);
-          }
-        } catch (error) {
-          console.debug("Ignoring stale slideshow pointer capture", error);
+  const clearImagePointerGesture = useCallback((event?: React.PointerEvent<HTMLElement>) => {
+    if (event) {
+      try {
+        if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+          event.currentTarget.releasePointerCapture(event.pointerId);
+        }
+      } catch (error) {
+        console.debug("Ignoring stale slideshow pointer capture", error);
+      }
+    }
+
+    pointerGestureRef.current = null;
+    // On pointercancel the gesture ends without a follow-up click, so any
+    // suppress flag from a prior pointerup-set commit branch must be cleared
+    // — otherwise the next legitimate click could be swallowed. On pointerup
+    // this resets to false too, but the up handler immediately re-sets it
+    // for touch/pen so suppression still works there.
+    suppressImageClickRef.current = false;
+    setTouchGestureHint(null);
+    setTouchPullProgress(0);
+    setTouchSwipeProgress(0);
+    setTouchPointerActive(false);
+    setTouchArmed(false);
+  }, []);
+
+  const handleImagePointerMove = useCallback((event: React.PointerEvent<HTMLElement>) => {
+    const gesture = pointerGestureRef.current;
+    if (!gesture || gesture.pointerId !== event.pointerId || !isTouchOrPen(gesture.pointerType)) {
+      return;
+    }
+
+    const result = resolvePointerMove({
+      deltaX: event.clientX - gesture.startX,
+      deltaY: event.clientY - gesture.startY,
+      committedHorizontal: gesture.committedHorizontalDirection,
+      committedVertical: gesture.committedVerticalDirection,
+      controlsWereVisible: gesture.controlsWereVisible,
+    });
+
+    // The other axis is already committed — leave visuals untouched.
+    if (result.kind === "ignore") {
+      return;
+    }
+
+    // Persist any newly-committed axis direction for the rest of the gesture.
+    if (result.committedHorizontal) {
+      gesture.committedHorizontalDirection = result.committedHorizontal;
+    }
+    if (result.committedVertical) {
+      gesture.committedVerticalDirection = result.committedVertical;
+    }
+
+    setTouchGestureHint(result.hint);
+    setTouchPullProgress(result.pullProgress);
+    setTouchSwipeProgress(result.swipeProgress);
+
+    if (result.armed) {
+      setTouchArmed(true);
+      // Fire the commit haptic exactly once per gesture.
+      if (!gesture.hapticFired) {
+        gesture.hapticFired = true;
+        if (typeof navigator !== "undefined" && navigator.vibrate) {
+          navigator.vibrate(8);
         }
       }
-
-      pointerGestureRef.current = null;
-      // On pointercancel the gesture ends without a follow-up click, so any
-      // suppress flag from a prior pointerup-set commit branch must be cleared
-      // — otherwise the next legitimate click could be swallowed. On pointerup
-      // this resets to false too, but the up handler immediately re-sets it
-      // for touch/pen so suppression still works there.
-      suppressImageClickRef.current = false;
-      setTouchGestureHint(null);
-      setTouchPullProgress(0);
-      setTouchSwipeProgress(0);
-      setTouchPointerActive(false);
+    } else {
       setTouchArmed(false);
-    },
-    [],
-  );
-
-  const handleImagePointerMove = useCallback(
-    (event: React.PointerEvent<HTMLElement>) => {
-      const gesture = pointerGestureRef.current;
-      if (
-        !gesture ||
-        gesture.pointerId !== event.pointerId ||
-        !isTouchOrPen(gesture.pointerType)
-      ) {
-        return;
-      }
-
-      const result = resolvePointerMove({
-        deltaX: event.clientX - gesture.startX,
-        deltaY: event.clientY - gesture.startY,
-        committedHorizontal: gesture.committedHorizontalDirection,
-        committedVertical: gesture.committedVerticalDirection,
-        controlsWereVisible: gesture.controlsWereVisible,
-      });
-
-      // The other axis is already committed — leave visuals untouched.
-      if (result.kind === "ignore") {
-        return;
-      }
-
-      // Persist any newly-committed axis direction for the rest of the gesture.
-      if (result.committedHorizontal) {
-        gesture.committedHorizontalDirection = result.committedHorizontal;
-      }
-      if (result.committedVertical) {
-        gesture.committedVerticalDirection = result.committedVertical;
-      }
-
-      setTouchGestureHint(result.hint);
-      setTouchPullProgress(result.pullProgress);
-      setTouchSwipeProgress(result.swipeProgress);
-
-      if (result.armed) {
-        setTouchArmed(true);
-        // Fire the commit haptic exactly once per gesture.
-        if (!gesture.hapticFired) {
-          gesture.hapticFired = true;
-          if (typeof navigator !== "undefined" && navigator.vibrate) {
-            navigator.vibrate(8);
-          }
-        }
-      } else {
-        setTouchArmed(false);
-      }
-    },
-    [],
-  );
+    }
+  }, []);
 
   const handleImagePointerUp = useCallback(
     (event: React.PointerEvent<HTMLElement>) => {
@@ -1687,10 +1575,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
     ];
   }, [currentPhotoPath, activePhotoSrc, remixCompanions]);
 
-  const currentSnapshot = React.useMemo(
-    () => buildSlideSnapshot(currentCells),
-    [currentCells],
-  );
+  const currentSnapshot = React.useMemo(() => buildSlideSnapshot(currentCells), [currentCells]);
   // Identity of the slide on screen. Changes on a normal advance AND when a
   // single photo gains async remix companions — both push a fresh layer.
   const slideKey = slideKeyOf(currentSnapshot);
@@ -1744,9 +1629,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
     if (!incomingReady || !slideKey) return;
     let inner = 0;
     const outer = requestAnimationFrame(() => {
-      inner = requestAnimationFrame(() =>
-        setLayers((prev) => revealLayers(prev, slideKey)),
-      );
+      inner = requestAnimationFrame(() => setLayers((prev) => revealLayers(prev, slideKey)));
     });
     return () => {
       cancelAnimationFrame(outer);
@@ -1764,10 +1647,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
     if (!slideKey) return;
     const top = layersRef.current[layersRef.current.length - 1];
     if (top?.key === slideKey && top.loaded) return;
-    const t = window.setTimeout(
-      () => setLayers((prev) => revealLayers(prev, slideKey)),
-      6000,
-    );
+    const t = window.setTimeout(() => setLayers((prev) => revealLayers(prev, slideKey)), 6000);
     return () => window.clearTimeout(t);
   }, [slideKey, layers]);
 
@@ -1778,9 +1658,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
     // slide commits (currentPhotoPath stops being null) rather than dropping to
     // a featureless black screen while fetchSlideshowPhotos resolves.
     const bootProgress =
-      slideshowMode === "similar" && !embeddingsDatabase
-        ? embeddingsProgress
-        : progress;
+      slideshowMode === "similar" && !embeddingsDatabase ? embeddingsProgress : progress;
     return (
       <div className={styles.progressBarContainer}>
         <div className={styles.hiddenThemeToggle}>
@@ -1802,9 +1680,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
             <ProgressBar
               progress={bootProgress}
               hideIfComplete={false}
-              label={
-                bootProgress >= 100 ? "Preparing slideshow…" : undefined
-              }
+              label={bootProgress >= 100 ? "Preparing slideshow…" : undefined}
             />
             <Link href="/" className={styles.bootHomeLink}>
               Exit to home
@@ -1867,12 +1743,8 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
         onTouchStartCapture={handleAnyTouchStartCapture}
         style={
           {
-            "--touch-toolbar-show-preview-progress": String(
-              touchToolbarShowPreviewProgress,
-            ),
-            "--touch-toolbar-hide-preview-progress": String(
-              touchToolbarHidePreviewProgress,
-            ),
+            "--touch-toolbar-show-preview-progress": String(touchToolbarShowPreviewProgress),
+            "--touch-toolbar-hide-preview-progress": String(touchToolbarHidePreviewProgress),
           } as React.CSSProperties
         }
       >
@@ -1939,7 +1811,13 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
             <div className={styles.touchBottomAffordance}>
               <span className={styles.touchPullChevron}>
                 <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
-                  <path d="M5 12l5-5 5 5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                  <path
+                    d="M5 12l5-5 5 5"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
                 </svg>
               </span>
               <span className={styles.touchAffordanceLabel}>
@@ -1948,12 +1826,24 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
             </div>
             <div className={styles.touchSideAffordanceLeft}>
               <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
-                <path d="M12 5l-5 5 5 5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                <path
+                  d="M12 5l-5 5 5 5"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
               </svg>
             </div>
             <div className={styles.touchSideAffordanceRight}>
               <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
-                <path d="M8 5l5 5-5 5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                <path
+                  d="M8 5l5 5-5 5"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
               </svg>
             </div>
           </div>
@@ -2123,11 +2013,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
             return (
               <div
                 key={layer.key}
-                className={[
-                  styles.remixGrid,
-                  hidden,
-                  isTop ? "" : styles.backdropLayer,
-                ]
+                className={[styles.remixGrid, hidden, isTop ? "" : styles.backdropLayer]
                   .filter(Boolean)
                   .join(" ")}
                 data-count={layer.slide.cells.length}
@@ -2146,9 +2032,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
                         decoding="async"
                         {...(isTop
                           ? {
-                              onLoad: (
-                                e: React.SyntheticEvent<HTMLImageElement>,
-                              ) => {
+                              onLoad: (e: React.SyntheticEvent<HTMLImageElement>) => {
                                 // Mark the cell ready only once decoded, so the
                                 // grid reveals fully rendered rather than cell by
                                 // cell. Resolve on decode failure too, so one bad

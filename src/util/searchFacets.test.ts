@@ -30,16 +30,13 @@ describe("searchFacets", () => {
       { facetId: "location", value: "Japan" },
     ]);
 
-    expect(params.getAll("facet")).toEqual([
-      "camera:FUJIFILM X-T5",
-      "location:Japan",
-    ]);
+    expect(params.getAll("facet")).toEqual(["camera:FUJIFILM X-T5", "location:Japan"]);
   });
 
   it("builds a deep link to search with one facet", () => {
-    expect(
-      buildSearchFacetHref({ facetId: "camera", value: "FUJIFILM X-T5" }),
-    ).toBe("/search?facet=camera%3AFUJIFILM+X-T5");
+    expect(buildSearchFacetHref({ facetId: "camera", value: "FUJIFILM X-T5" })).toBe(
+      "/search?facet=camera%3AFUJIFILM+X-T5",
+    );
   });
 
   it("builds a deep link to search with query and facets", () => {
@@ -56,29 +53,21 @@ describe("searchFacets", () => {
   });
 
   it("formats active facet chip labels with short prefixes", () => {
-    expect(
-      getSearchFacetChipLabel({ facetId: "hour", value: "17:00" }),
-    ).toBe("Time: 17:00");
-    expect(
-      getSearchFacetChipLabel({ facetId: "year", value: "2024" }),
-    ).toBe("Year: 2024");
-    expect(
-      getSearchFacetChipLabel({ facetId: "iso", value: "400" }),
-    ).toBe("ISO: 400");
+    expect(getSearchFacetChipLabel({ facetId: "hour", value: "17:00" })).toBe("Time: 17:00");
+    expect(getSearchFacetChipLabel({ facetId: "year", value: "2024" })).toBe("Year: 2024");
+    expect(getSearchFacetChipLabel({ facetId: "iso", value: "400" })).toBe("ISO: 400");
     expect(
       getSearchFacetChipLabel({
         facetId: "focal-length-35mm",
         value: "35–49mm · normal",
       }),
     ).toBe("35mm eq.: 35–49mm · normal");
-    expect(
-      getSearchFacetChipLabel({ facetId: "region", value: "Tokyo" }),
-    ).toBe("Region: Tokyo");
-    expect(
-      getSearchFacetChipLabel({ facetId: "subregion", value: "Tokyo" }),
-    ).toBe("Subregion: Tokyo");
-    expect(
-      getSearchFacetChipLabel({ facetId: "city", value: "Shinjuku-ku" }),
-    ).toBe("City: Shinjuku-ku");
+    expect(getSearchFacetChipLabel({ facetId: "region", value: "Tokyo" })).toBe("Region: Tokyo");
+    expect(getSearchFacetChipLabel({ facetId: "subregion", value: "Tokyo" })).toBe(
+      "Subregion: Tokyo",
+    );
+    expect(getSearchFacetChipLabel({ facetId: "city", value: "Shinjuku-ku" })).toBe(
+      "City: Shinjuku-ku",
+    );
   });
 });

@@ -22,8 +22,7 @@ const outputDir =
   process.env.ALBUM_BUILD_PROFILE_OUTPUT_DIR ??
   path.join(process.cwd(), ".next", "album-build-profiles");
 const outputPath =
-  process.env.ALBUM_BUILD_PROFILE_OUTPUT ??
-  path.join(outputDir, `${process.pid}.json`);
+  process.env.ALBUM_BUILD_PROFILE_OUTPUT ?? path.join(outputDir, `${process.pid}.json`);
 
 const profile: BuildProfile = {
   startedAt: new Date(startedAtMs).toISOString(),
@@ -112,10 +111,7 @@ export const measureBuildSync = <T>(name: string, fn: () => T): T => {
   }
 };
 
-export const measureBuild = async <T>(
-  name: string,
-  fn: () => Promise<T>,
-): Promise<T> => {
+export const measureBuild = async <T>(name: string, fn: () => Promise<T>): Promise<T> => {
   if (!enabled) {
     return fn();
   }

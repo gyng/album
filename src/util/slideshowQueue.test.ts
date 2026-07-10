@@ -14,18 +14,19 @@ const makePhoto = (path: string, isoDate?: string): RandomPhotoRow => ({
   path,
   // extractDateFromExifString reads the "EXIF DateTimeOriginal" line in
   // "YYYY:MM:DD HH:MM:SS" form, so encode the test date that way.
-  exif: isoDate
-    ? `EXIF DateTimeOriginal: ${isoDate.replace(/-/g, ":")} 12:00:00`
-    : "",
+  exif: isoDate ? `EXIF DateTimeOriginal: ${isoDate.replace(/-/g, ":")} 12:00:00` : "",
   geocode: "",
 });
 
-const pathsOf = (photos: RandomPhotoRow[]): string[] =>
-  photos.map((p) => p.path);
+const pathsOf = (photos: RandomPhotoRow[]): string[] => photos.map((p) => p.path);
 
 describe("shufflePhotos", () => {
   it("returns a permutation of the input (same multiset of paths)", () => {
-    const input = [makePhoto("../albums/a/1.jpg"), makePhoto("../albums/a/2.jpg"), makePhoto("../albums/a/3.jpg")];
+    const input = [
+      makePhoto("../albums/a/1.jpg"),
+      makePhoto("../albums/a/2.jpg"),
+      makePhoto("../albums/a/3.jpg"),
+    ];
     const out = shufflePhotos(input);
     expect(pathsOf(out).sort()).toEqual(pathsOf(input).sort());
   });
@@ -97,8 +98,7 @@ describe("random queue peek/advance consistency (preload buffer)", () => {
     // the head is ~1/50 per trial, so ~0 false greens across 200 trials. A
     // 3-photo single run let that bug slip through ~25% of the time.
     const pool = Array.from({ length: 50 }, (_, i) => makePhoto(`p${i}`));
-    const build = (p: RandomPhotoRow[], lastPath?: string) =>
-      shufflePhotos(p, lastPath);
+    const build = (p: RandomPhotoRow[], lastPath?: string) => shufflePhotos(p, lastPath);
 
     for (let trial = 0; trial < 200; trial += 1) {
       const state = createRandomQueueState();

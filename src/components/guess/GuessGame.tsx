@@ -110,12 +110,9 @@ const reducer = (state: State, action: Action): State => {
       return {
         ...state,
         results,
-        phase:
-          results.length >= state.photos.length ? "summary" : state.phase,
+        phase: results.length >= state.photos.length ? "summary" : state.phase,
         currentRound:
-          results.length >= state.photos.length
-            ? state.currentRound
-            : state.currentRound + 1,
+          results.length >= state.photos.length ? state.currentRound : state.currentRound + 1,
       };
     }
     case "play_again":
@@ -179,8 +176,7 @@ export const GuessGame: React.FC<GuessGameProps> = ({
         if (parsed.length === 0) {
           dispatch({
             type: "error",
-            message:
-              "No GPS-tagged photos found. Try a different region.",
+            message: "No GPS-tagged photos found. Try a different region.",
           });
           return;
         }
@@ -216,15 +212,12 @@ export const GuessGame: React.FC<GuessGameProps> = ({
     dispatch({ type: "start", settings });
   }, []);
 
-  const handleRoundComplete = useCallback(
-    (result: RoundResult) => {
-      dispatch({ type: "round_complete", result });
-      // Reset guess for next round
-      setGuess(null);
-      setRevealed(false);
-    },
-    [],
-  );
+  const handleRoundComplete = useCallback((result: RoundResult) => {
+    dispatch({ type: "round_complete", result });
+    // Reset guess for next round
+    setGuess(null);
+    setRevealed(false);
+  }, []);
 
   const handlePlayAgain = useCallback(() => {
     dispatch({ type: "play_again" });

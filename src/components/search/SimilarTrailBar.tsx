@@ -1,9 +1,4 @@
-import React, {
-  useEffect,
-  useLayoutEffect,
-  useRef,
-  useState,
-} from "react";
+import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { SegmentedToggle, pillStyles } from "../ui";
 import styles from "./Search.module.css";
@@ -20,8 +15,7 @@ type BreadcrumbEntry = SimilarTrailItem & {
   key: string;
 };
 
-const useSafeLayoutEffect =
-  typeof window === "undefined" ? useEffect : useLayoutEffect;
+const useSafeLayoutEffect = typeof window === "undefined" ? useEffect : useLayoutEffect;
 
 const getAlbumAnchorHref = (path: string): string => {
   const segments = path.split("/");
@@ -64,18 +58,14 @@ export const SimilarTrailBar: React.FC<Props> = ({
     ...item,
     idx,
     key: `${item.path}::${
-      arr.slice(0, idx).filter((candidate) => candidate.path === item.path)
-        .length
+      arr.slice(0, idx).filter((candidate) => candidate.path === item.path).length
     }`,
   }));
 
   useSafeLayoutEffect(() => {
     const nextPositions: Record<string, DOMRect> = {};
 
-    const animateIntoPlace = (
-      element: HTMLDivElement,
-      startingTransform: string,
-    ) => {
+    const animateIntoPlace = (element: HTMLDivElement, startingTransform: string) => {
       element.style.transition = "none";
       element.style.transform = startingTransform;
       void element.getBoundingClientRect();
@@ -127,7 +117,10 @@ export const SimilarTrailBar: React.FC<Props> = ({
           ) : null}
         </div>
         <div className={styles.modeHeaderActions}>
-          <Link href="/explore#visual-sameness" className={`${pillStyles.base} ${pillStyles.surface}`}>
+          <Link
+            href="/explore#visual-sameness"
+            className={`${pillStyles.base} ${pillStyles.surface}`}
+          >
             <span>Visual sameness</span>
             <span aria-hidden="true">↗</span>
           </Link>
@@ -155,7 +148,7 @@ export const SimilarTrailBar: React.FC<Props> = ({
               <img
                 className={styles.modeSourcePreview}
                 src={similarPreviewSrc}
-                alt={`Source photo ${similarFilename ?? ""}`}
+                alt={`Similarity search source${similarFilename ? ` (${similarFilename})` : ""}`}
               />
             ) : null}
             <a
@@ -194,20 +187,14 @@ export const SimilarTrailBar: React.FC<Props> = ({
           ) : null}
         </div>
         {trail.length > 0 ? (
-          <div
-            className={styles.breadcrumbs}
-            aria-label="Similarity breadcrumbs"
-          >
+          <div className={styles.breadcrumbs} aria-label="Similarity breadcrumbs">
             {[...breadcrumbEntries].reverse().map((entry) => {
               const { path, idx, key, similarity } = entry;
               const label = path.split("/").at(-1) ?? path;
               const opacity = 0.35 + (0.55 * (idx + 1)) / trail.length;
               const similarityLabel =
-                typeof similarity === "number"
-                  ? `${Math.round(similarity * 100)}%`
-                  : null;
-              const wouldBeRemoved =
-                pendingRemoveIdx !== null && idx >= pendingRemoveIdx;
+                typeof similarity === "number" ? `${Math.round(similarity * 100)}%` : null;
+              const wouldBeRemoved = pendingRemoveIdx !== null && idx >= pendingRemoveIdx;
 
               return (
                 <div
@@ -230,9 +217,7 @@ export const SimilarTrailBar: React.FC<Props> = ({
                       alt=""
                     />
                     {similarityLabel ? (
-                      <span className={styles.breadcrumbSimilarity}>
-                        {similarityLabel}
-                      </span>
+                      <span className={styles.breadcrumbSimilarity}>{similarityLabel}</span>
                     ) : null}
                   </a>
                   <button

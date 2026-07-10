@@ -28,8 +28,7 @@ type Props = {
   onMapClick?: React.MouseEventHandler<HTMLAnchorElement>;
 };
 
-const cx = (...classes: (string | undefined | false)[]) =>
-  classes.filter(Boolean).join(" ");
+const cx = (...classes: (string | undefined | false)[]) => classes.filter(Boolean).join(" ");
 
 export const GlobalNav: React.FC<Props> = ({
   currentPage,
@@ -40,8 +39,7 @@ export const GlobalNav: React.FC<Props> = ({
 }) => {
   const current = (page: GlobalNavPage) =>
     currentPage === page ? commonStyles.navCurrent : undefined;
-  const ariaCurrent = (page: GlobalNavPage) =>
-    currentPage === page ? "page" : undefined;
+  const ariaCurrent = (page: GlobalNavPage) => (currentPage === page ? "page" : undefined);
 
   return (
     <Nav

@@ -24,9 +24,7 @@ export type LngLatBoundsTuple = [[number, number], [number, number]];
  * @returns MapLibre corner bounds `[[west, south], [east, north]]`, or `null`
  *          when there are no points.
  */
-export const computeWrapAwareBounds = (
-  points: [number, number][],
-): LngLatBoundsTuple | null => {
+export const computeWrapAwareBounds = (points: [number, number][]): LngLatBoundsTuple | null => {
   if (points.length === 0) {
     return null;
   }

@@ -15,9 +15,7 @@ describe("ExploreOverview", () => {
     );
 
     expect(screen.getByRole("heading", { name: "Explore" })).toBeTruthy();
-    expect(screen.getByRole("link", { name: "Colour" }).getAttribute("href")).toBe(
-      "#colour",
-    );
+    expect(screen.getByRole("link", { name: "Colour" }).getAttribute("href")).toBe("#colour");
     expect(screen.getByText("Photos")).toBeTruthy();
     expect(screen.getByText("12")).toBeTruthy();
   });

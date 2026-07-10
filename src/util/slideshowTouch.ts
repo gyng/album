@@ -13,8 +13,7 @@ export const getSlideshowTouchTapAction = ({
   canGoPrevious: boolean;
 }): "next" | "previous" => {
   const tapOffsetX = clientX - bounds.left;
-  const tappedPreviousZone =
-    bounds.width > 0 && tapOffsetX < bounds.width * 0.35;
+  const tappedPreviousZone = bounds.width > 0 && tapOffsetX < bounds.width * 0.35;
 
   return tappedPreviousZone && canGoPrevious ? "previous" : "next";
 };

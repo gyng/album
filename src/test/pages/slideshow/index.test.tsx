@@ -29,9 +29,7 @@ jest.mock("../../../components/search/api", () => ({
 }));
 
 jest.mock("../../../components/ProgressBar", () => ({
-  ProgressBar: ({ progress }: { progress: number }) => (
-    <div>Loading... {progress}%</div>
-  ),
+  ProgressBar: ({ progress }: { progress: number }) => <div>Loading... {progress}%</div>,
 }));
 
 jest.mock("../../../components/ThemeToggle", () => ({
@@ -53,11 +51,7 @@ jest.mock("next/head", () => ({
 }));
 
 jest.mock("usehooks-ts", () => ({
-  useLocalStorage: (_key: string, initialValue: unknown) => [
-    initialValue,
-    jest.fn(),
-    jest.fn(),
-  ],
+  useLocalStorage: (_key: string, initialValue: unknown) => [initialValue, jest.fn(), jest.fn()],
 }));
 
 jest.mock("../../../lib/buildVersion", () => ({
@@ -69,8 +63,7 @@ jest.mock("../../../util/navigate", () => ({
   reloadCurrentPage: () => mockReloadCurrentPage(),
 }));
 
-const SlideshowPage =
-  require("../../../pages/slideshow/index").default;
+const SlideshowPage = require("../../../pages/slideshow/index").default;
 
 describe("slideshow page", () => {
   const originalFetch = global.fetch;
@@ -199,13 +192,7 @@ describe("slideshow page", () => {
         json: async () => ({}),
       });
     });
-    mockUseDatabase.mockReturnValue([
-      { db: true },
-      100,
-      null,
-      null,
-      mockRefreshDatabase,
-    ]);
+    mockUseDatabase.mockReturnValue([{ db: true }, 100, null, null, mockRefreshDatabase]);
     mockFetchSlideshowPhotos.mockResolvedValue([samplePhoto]);
 
     render(<SlideshowPage />);
@@ -275,13 +262,7 @@ describe("slideshow page", () => {
   });
 
   it("resolves an initial photo parameter without keeping it in the URL", async () => {
-    mockUseDatabase.mockReturnValue([
-      { db: true },
-      100,
-      null,
-      null,
-      mockRefreshDatabase,
-    ]);
+    mockUseDatabase.mockReturnValue([{ db: true }, 100, null, null, mockRefreshDatabase]);
     mockFetchSlideshowPhotos.mockResolvedValue([samplePhoto]);
     window.history.replaceState(
       window.history.state,
@@ -311,13 +292,7 @@ describe("slideshow page", () => {
   });
 
   it("writes timing changes into the URL", async () => {
-    mockUseDatabase.mockReturnValue([
-      { db: true },
-      100,
-      null,
-      null,
-      mockRefreshDatabase,
-    ]);
+    mockUseDatabase.mockReturnValue([{ db: true }, 100, null, null, mockRefreshDatabase]);
     mockFetchSlideshowPhotos.mockResolvedValue([samplePhoto]);
 
     render(<SlideshowPage />);
@@ -335,13 +310,7 @@ describe("slideshow page", () => {
   });
 
   it("copies a current-photo slideshow link from the context section", async () => {
-    mockUseDatabase.mockReturnValue([
-      { db: true },
-      100,
-      null,
-      null,
-      mockRefreshDatabase,
-    ]);
+    mockUseDatabase.mockReturnValue([{ db: true }, 100, null, null, mockRefreshDatabase]);
     mockFetchSlideshowPhotos.mockResolvedValue([samplePhoto]);
 
     render(<SlideshowPage />);
@@ -363,5 +332,4 @@ describe("slideshow page", () => {
     expect(copiedUrl.searchParams.get("mode")).toBe("weighted");
     expect(copiedUrl.searchParams.get("photo")).toBe(samplePhoto.path);
   });
-
 });

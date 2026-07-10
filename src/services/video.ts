@@ -106,9 +106,7 @@ export const buildOriginalVideoTechnicalData = (
     fps: parseFps(videoStream.avg_frame_rate ?? videoStream.r_frame_rate),
     bitrateKbps: bitrateRaw ? Math.round(Number(bitrateRaw) / 1000) : undefined,
     fileSizeBytes,
-    durationSeconds: durationRaw
-      ? Number(Number(durationRaw).toFixed(3))
-      : undefined,
+    durationSeconds: durationRaw ? Number(Number(durationRaw).toFixed(3)) : undefined,
     width: videoStream.width ? Number(videoStream.width) : undefined,
     height: videoStream.height ? Number(videoStream.height) : undefined,
     audioCodec: audioStream.codec_name,
@@ -205,15 +203,7 @@ export const getOriginalVideoTechnicalData = async (
   return new Promise((resolve) => {
     const proc = spawn(
       ffprobeExecutable,
-      [
-        "-v",
-        "error",
-        "-print_format",
-        "json",
-        "-show_streams",
-        "-show_format",
-        videoPath,
-      ],
+      ["-v", "error", "-print_format", "json", "-show_streams", "-show_format", videoPath],
       { stdio: ["ignore", "pipe", "pipe"] },
     );
 

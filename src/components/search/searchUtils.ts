@@ -1,9 +1,6 @@
 import { RGB } from "../../util/colorDistance";
 import { SearchMode } from "./useTextVector";
-import {
-  readSearchFacetSelections,
-  SearchFacetSelection,
-} from "../../util/searchFacets";
+import { readSearchFacetSelections, SearchFacetSelection } from "../../util/searchFacets";
 
 export type Tag = {
   name: string;
@@ -65,19 +62,14 @@ export const isSearchMode = (value: string | null): value is SearchMode => {
   return value === "keyword" || value === "semantic" || value === "hybrid";
 };
 
-export const isSimilarityOrder = (
-  value: string | null,
-): value is SimilarityOrder => {
+export const isSimilarityOrder = (value: string | null): value is SimilarityOrder => {
   return value === "most" || value === "least";
 };
 
 export const parseColorParam = (value: string | null): RGB | null => {
   if (!value) return null;
   const parts = value.split(",").map((v) => parseInt(v.trim(), 10));
-  if (
-    parts.length === 3 &&
-    parts.every((v) => !isNaN(v) && v >= 0 && v <= 255)
-  ) {
+  if (parts.length === 3 && parts.every((v) => !isNaN(v) && v >= 0 && v <= 255)) {
     return [parts[0], parts[1], parts[2]];
   }
   return null;

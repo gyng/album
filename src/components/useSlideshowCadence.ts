@@ -28,14 +28,7 @@ export const useSlideshowCadence = (input: {
   hasCurrentPhoto: boolean;
   onAdvance: () => void;
 }): UseSlideshowCadence => {
-  const {
-    timeDelay,
-    alignCadence,
-    controlsVisible,
-    showClock,
-    hasCurrentPhoto,
-    onAdvance,
-  } = input;
+  const { timeDelay, alignCadence, controlsVisible, showClock, hasCurrentPhoto, onAdvance } = input;
 
   const [nextChangeAt, setNextChangeAt] = React.useState<Date>(new Date());
   const [secondsLeft, setSecondsLeft] = React.useState<number>(0);

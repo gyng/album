@@ -77,24 +77,18 @@ export const formatCoverage = (coverage: number): string =>
   `Available for ${Math.round(coverage * 100)}% of archive`;
 
 export const findNumericFacet = (
-  stats:
-    | Pick<PhotoStats, "numericFacets">
-    | Pick<ShootingScopeStats, "numericFacets">,
+  stats: Pick<PhotoStats, "numericFacets"> | Pick<ShootingScopeStats, "numericFacets">,
   facetId: string,
 ): NumericFacetStat | null =>
   stats.numericFacets.find((facet) => facet.facetId === facetId) ?? null;
 
-export const findStringFacet = (
-  stats: PhotoStats,
-  facetId: string,
-): StringFacetStat | null =>
+export const findStringFacet = (stats: PhotoStats, facetId: string): StringFacetStat | null =>
   stats.stringFacets.find((facet) => facet.facetId === facetId) ?? null;
 
-const getTopLabel = (facet: StringFacetStat | null): string =>
-  facet?.data[0]?.label ?? "—";
+const getTopLabel = (facet: StringFacetStat | null): string => facet?.data[0]?.label ?? "—";
 
 const getOverviewValue = (value: number | string | null): string =>
-  typeof value === "number" ? value.toLocaleString("en") : value ?? "—";
+  typeof value === "number" ? value.toLocaleString("en") : (value ?? "—");
 
 const getPeakBucketLabel = (data: BucketedStat[]): string => {
   const top = data.reduce<BucketedStat | null>((current, bucket) => {
@@ -107,18 +101,12 @@ const getPeakBucketLabel = (data: BucketedStat[]): string => {
 };
 
 const sumBuckets = (data: BucketedStat[], labels: string[]): number =>
-  data.reduce(
-    (total, bucket) => total + (labels.includes(bucket.label) ? bucket.count : 0),
-    0,
-  );
+  data.reduce((total, bucket) => total + (labels.includes(bucket.label) ? bucket.count : 0), 0);
 
 export const buildYearSearchHref = (year: string): string =>
   buildSearchHref({ facets: [{ facetId: "year", value: year }] });
 
-export const buildColorSearchHref = (
-  colorLabel: string,
-  year?: string,
-): string | null => {
+export const buildColorSearchHref = (colorLabel: string, year?: string): string | null => {
   const color = COLOR_SEARCH_PARAMS[colorLabel];
   if (!color) return null;
 
@@ -129,12 +117,9 @@ export const buildColorSearchHref = (
   return query ? `/search?${query}` : "/search";
 };
 
-export const isAggregateLocationBucket = (label: string): boolean =>
-  label.startsWith("Other ");
+export const isAggregateLocationBucket = (label: string): boolean => label.startsWith("Other ");
 
-export const buildExploreOverviewCards = (
-  stats: PhotoStats,
-): OverviewCard[] => [
+export const buildExploreOverviewCards = (stats: PhotoStats): OverviewCard[] => [
   { label: "Photos", value: getOverviewValue(stats.totalPhotos) },
   { label: "Albums", value: getOverviewValue(stats.totalAlbums) },
   {
@@ -161,15 +146,11 @@ export const buildExploreOverviewCards = (
 
 export const buildExploreFunStats = (stats: PhotoStats): FunStatCard[] => {
   const timeFacet = findNumericFacet(stats, "hour");
-  const weekdayTotal = stats.weekdayStats.reduce(
-    (sum, bucket) => sum + bucket.count,
-    0,
-  );
+  const weekdayTotal = stats.weekdayStats.reduce((sum, bucket) => sum + bucket.count, 0);
   const weekendCount = sumBuckets(stats.weekdayStats, ["Sat", "Sun"]);
   const weekendShare = weekdayTotal > 0 ? weekendCount / weekdayTotal : 0;
   const primeZoomTotal = stats.lensTypeStats.prime + stats.lensTypeStats.zoom;
-  const primeShare =
-    primeZoomTotal > 0 ? stats.lensTypeStats.prime / primeZoomTotal : 0;
+  const primeShare = primeZoomTotal > 0 ? stats.lensTypeStats.prime / primeZoomTotal : 0;
   const topComfortPath = stats.technicalRelationships?.paths[0] ?? null;
   const earlyBirdCount = sumBuckets(timeFacet?.data ?? [], [
     "05:00",
@@ -187,14 +168,11 @@ export const buildExploreFunStats = (stats: PhotoStats): FunStatCard[] => {
     "23:00",
   ]);
   const daypartTotal = earlyBirdCount + nightOwlCount;
-  const topColorMood = stats.colorStats.reduce<BucketedStat | null>(
-    (current, bucket) => {
-      if (bucket.count <= 0) return current;
-      if (!current || bucket.count > current.count) return bucket;
-      return current;
-    },
-    null,
-  );
+  const topColorMood = stats.colorStats.reduce<BucketedStat | null>((current, bucket) => {
+    if (bucket.count <= 0) return current;
+    if (!current || bucket.count > current.count) return bucket;
+    return current;
+  }, null);
 
   return [
     weekdayTotal === 0

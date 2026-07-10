@@ -4,11 +4,7 @@ import styles from "./SearchResultTile.module.css";
 import { getRelativeTimeString } from "../../util/time";
 import { extractDateFromExifString } from "../../util/extractExifFromDb";
 import { SearchResultRow } from "./searchTypes";
-import {
-  RGB,
-  rgbToString,
-  parseColorPalette,
-} from "../../util/colorDistance";
+import { RGB, rgbToString, parseColorPalette } from "../../util/colorDistance";
 import { getResizedAlbumImageSrc } from "../../util/getResizedAlbumImageSrc";
 
 const stripHtml = (value?: string): string => {
@@ -28,8 +24,7 @@ export const SearchResultTile = (props: {
   onSearchByColor?: (color: RGB) => void;
   persistColorAction?: boolean;
 }) => {
-  const { result, onFindSimilar, onSearchByColor, persistColorAction = false } =
-    props;
+  const { result, onFindSimilar, onSearchByColor, persistColorAction = false } = props;
 
   let colour = "var(--c-border-on-dark)";
   const palette = result.colors ? parseColorPalette(result.colors) : [];
@@ -41,14 +36,9 @@ export const SearchResultTile = (props: {
   const resized = getResizedAlbumImageSrc(result.path);
   const albumName = result.path.split("/").at(-2);
   const dateTimeOriginal = extractDateFromExifString(result.exif);
-  const snippet = stripHtml(
-    result.snippet || result.alt_text || result.subject || result.tags,
-  );
+  const snippet = stripHtml(result.snippet || result.alt_text || result.subject || result.tags);
   const imageAlt =
-    snippet ||
-    stripHtml(result.alt_text) ||
-    stripHtml(result.subject) ||
-    stripHtml(result.tags);
+    snippet || stripHtml(result.alt_text) || stripHtml(result.subject) || stripHtml(result.tags);
   const isHybridResult = typeof result.rrfScore === "number";
   // Colour match uses its own 0–100 field, so a semantic cosine (0–1) that
   // coexists with a colour swatch is never mistaken for a colour percentage.
@@ -56,31 +46,24 @@ export const SearchResultTile = (props: {
     typeof result.colorMatchScore === "number" ? result.colorMatchScore : null;
   const hybridScore = isHybridResult ? result.rrfScore : null;
   const hybridScoreLabel =
-    typeof hybridScore === "number"
-      ? `${Math.round(hybridScore * 1000)}`
-      : null;
+    typeof hybridScore === "number" ? `${Math.round(hybridScore * 1000)}` : null;
   const similarityLabel = isHybridResult
     ? hybridScoreLabel
     : typeof colorMatchScore === "number"
       ? `${Math.round(colorMatchScore)}%`
       : typeof result.similarity === "number"
-      ? `${Math.round(result.similarity * 100)}%`
-      : null;
+        ? `${Math.round(result.similarity * 100)}%`
+        : null;
   const actionColor = result.matchingColor ?? (palette[0] as RGB | undefined) ?? null;
   const matchingColorStyle = actionColor ? rgbToString(actionColor) : null;
-  const scoreTitle =
-    isHybridResult
-      ? `Hybrid search: semantic ${
-          typeof result.similarity === "number"
-            ? `${Math.round(result.similarity * 100)}%`
-            : "n/a"
-        }, keyword ${
-          typeof result.bm25 === "number"
-            ? (result.bm25 * -1).toFixed(1)
-            : "n/a"
-        }, fused score ${hybridScore?.toFixed(3)} (${hybridScoreLabel})`
-      : typeof colorMatchScore === "number"
-        ? `Colour match score ${Math.round(colorMatchScore)}%`
+  const scoreTitle = isHybridResult
+    ? `Hybrid search: semantic ${
+        typeof result.similarity === "number" ? `${Math.round(result.similarity * 100)}%` : "n/a"
+      }, keyword ${
+        typeof result.bm25 === "number" ? (result.bm25 * -1).toFixed(1) : "n/a"
+      }, fused score ${hybridScore?.toFixed(3)} (${hybridScoreLabel})`
+    : typeof colorMatchScore === "number"
+      ? `Colour match score ${Math.round(colorMatchScore)}%`
       : typeof result.similarity === "number"
         ? result.similarity.toFixed(3)
         : typeof result.bm25 === "number"
@@ -90,20 +73,18 @@ export const SearchResultTile = (props: {
   return (
     <div className={styles.card}>
       {similarityLabel ? (
-        <div
-          className={`${styles.overlayBadge} ${styles.similarityBadge}`}
-          title={scoreTitle}
-        >
+        <div className={`${styles.overlayBadge} ${styles.similarityBadge}`} title={scoreTitle}>
           {similarityLabel}
         </div>
       ) : null}
       {onFindSimilar || (matchingColorStyle && onSearchByColor) ? (
         <div
-          className={
-            [styles.actionButtons, persistColorAction ? styles.actionButtonsPersistent : ""]
-              .filter(Boolean)
-              .join(" ")
-          }
+          className={[
+            styles.actionButtons,
+            persistColorAction ? styles.actionButtonsPersistent : "",
+          ]
+            .filter(Boolean)
+            .join(" ")}
         >
           {matchingColorStyle && onSearchByColor && actionColor ? (
             <OverlayButton

@@ -10,7 +10,7 @@ const buildBlock = (overrides: Partial<PhotoBlock> = {}): PhotoBlock => ({
   id: "photo-1",
   data: {
     src: "albums/tokyo/IMG_1234.JPG",
-    ...(overrides.data ?? {}),
+    ...overrides.data,
   },
   _build: {
     width: 1200,
@@ -18,7 +18,7 @@ const buildBlock = (overrides: Partial<PhotoBlock> = {}): PhotoBlock => ({
     exif: {},
     tags: {},
     srcset: [{ src: "/IMG_1234.avif", width: 1200, height: 800 }],
-    ...(overrides._build ?? {}),
+    ...overrides._build,
   },
   ...overrides,
 });

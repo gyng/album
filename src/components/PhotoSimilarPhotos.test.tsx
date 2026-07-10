@@ -4,10 +4,7 @@
 
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { PhotoSimilarPhotos } from "./PhotoSimilarPhotos";
-import {
-  useDatabase,
-  useEmbeddingsDatabase,
-} from "./database/useDatabase";
+import { useDatabase, useEmbeddingsDatabase } from "./database/useDatabase";
 import { fetchSimilarResults } from "./search/api";
 
 jest.mock("next/link", () => ({
@@ -47,10 +44,7 @@ describe("PhotoSimilarPhotos", () => {
     const database = { name: "db" };
     const embeddingsDatabase = { name: "embeddings" };
     (useDatabase as jest.Mock).mockReturnValue([database, 100]);
-    (useEmbeddingsDatabase as jest.Mock).mockReturnValue([
-      embeddingsDatabase,
-      100,
-    ]);
+    (useEmbeddingsDatabase as jest.Mock).mockReturnValue([embeddingsDatabase, 100]);
     (fetchSimilarResults as jest.Mock).mockResolvedValue({
       data: [
         {
@@ -81,9 +75,9 @@ describe("PhotoSimilarPhotos", () => {
 
     const link = await screen.findByRole("link", { name: /Harbor skyline/i });
     expect(link.getAttribute("href")).toBe("/album/test-simple#DSCF0593.jpg");
-    expect(
-      screen.getByRole("img", { name: /Harbor skyline/i }).getAttribute("src"),
-    ).toBe("/data/albums/test-simple/.resized_images/DSCF0593.jpg@800.avif");
+    expect(screen.getByRole("img", { name: /Harbor skyline/i }).getAttribute("src")).toBe(
+      "/data/albums/test-simple/.resized_images/DSCF0593.jpg@800.avif",
+    );
     expect(screen.getByText(/test-simple/)).toBeTruthy();
     expect(screen.getByText("82%")).toBeTruthy();
   });
@@ -92,10 +86,7 @@ describe("PhotoSimilarPhotos", () => {
     const database = { name: "db" };
     const embeddingsDatabase = { name: "embeddings" };
     (useDatabase as jest.Mock).mockReturnValue([database, 100]);
-    (useEmbeddingsDatabase as jest.Mock).mockReturnValue([
-      embeddingsDatabase,
-      100,
-    ]);
+    (useEmbeddingsDatabase as jest.Mock).mockReturnValue([embeddingsDatabase, 100]);
     (fetchSimilarResults as jest.Mock)
       .mockResolvedValueOnce({
         data: Array.from({ length: 8 }, (_value, idx) => ({

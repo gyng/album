@@ -17,9 +17,9 @@ describe("Explore primitives", () => {
       </ExploreStatGroup>,
     );
 
-    expect(
-      screen.getByRole("link", { name: /where you shoot/i }).getAttribute("href"),
-    ).toBe("#where-you-shoot");
+    expect(screen.getByRole("link", { name: /where you shoot/i }).getAttribute("href")).toBe(
+      "#where-you-shoot",
+    );
     expect(screen.getByRole("button", { name: "Change view" })).toBeTruthy();
   });
 

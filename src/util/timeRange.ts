@@ -6,15 +6,10 @@ export type DateExtent = { minMs: number; maxMs: number };
  * Parse a date string (ISO or EXIF `YYYY:MM:DD HH:MM:SS`) to epoch ms.
  * Returns null for missing or unparseable values.
  */
-export const parseTimestampSafe = (
-  value: string | null | undefined,
-): number | null => {
+export const parseTimestampSafe = (value: string | null | undefined): number | null => {
   if (!value) return null;
   // Normalise EXIF colon-separated dates: "2024:03:22 18:30:00" → "2024-03-22 18:30:00"
-  const normalised = value.replace(
-    /^(\d{4}):(\d{2}):(\d{2})/,
-    "$1-$2-$3",
-  );
+  const normalised = value.replace(/^(\d{4}):(\d{2}):(\d{2})/, "$1-$2-$3");
   const ms = new Date(normalised).valueOf();
   return Number.isFinite(ms) ? ms : null;
 };
@@ -23,9 +18,7 @@ export const parseTimestampSafe = (
  * Compute the min/max epoch ms across all entries that have a parseable date.
  * Returns null if fewer than 2 distinct dated entries exist.
  */
-export const computeDateExtent = (
-  entries: { date: string | null }[],
-): DateExtent | null => {
+export const computeDateExtent = (entries: { date: string | null }[]): DateExtent | null => {
   let min = Infinity;
   let max = -Infinity;
   let count = 0;
@@ -51,17 +44,14 @@ export const computeSparklineBins = (
   extent: DateExtent,
   binCount: number,
 ): number[] => {
-  const bins = new Array<number>(binCount).fill(0);
+  const bins = Array.from({ length: binCount }, () => 0);
   const span = extent.maxMs - extent.minMs;
   if (span === 0) return bins;
 
   for (const entry of entries) {
     const ms = parseTimestampSafe(entry.date);
     if (ms === null) continue;
-    const idx = Math.min(
-      Math.floor(((ms - extent.minMs) / span) * binCount),
-      binCount - 1,
-    );
+    const idx = Math.min(Math.floor(((ms - extent.minMs) / span) * binCount), binCount - 1);
     bins[idx]++;
   }
 

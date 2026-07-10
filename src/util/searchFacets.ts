@@ -38,9 +38,7 @@ const SEARCHABLE_FACET_IDS = new Set([
   CITY_FACET.id,
 ]);
 
-const getFacetById = (
-  facetId: string,
-): PhotoFacet<number | string> | undefined => {
+const getFacetById = (facetId: string): PhotoFacet<number | string> | undefined => {
   return ALL_FACETS.find((facet) => facet.id === facetId);
 };
 
@@ -60,15 +58,11 @@ export const normalizeSearchFacetSelection = (
   return { facetId, value };
 };
 
-export const serializeSearchFacetSelection = (
-  selection: SearchFacetSelection,
-): string => {
+export const serializeSearchFacetSelection = (selection: SearchFacetSelection): string => {
   return `${selection.facetId}:${selection.value}`;
 };
 
-export const parseSearchFacetSelection = (
-  raw: string,
-): SearchFacetSelection | null => {
+export const parseSearchFacetSelection = (raw: string): SearchFacetSelection | null => {
   const separatorIndex = raw.indexOf(":");
   if (separatorIndex <= 0) {
     return null;
@@ -139,17 +133,13 @@ export const buildSearchHref = (opts?: {
   return queryString ? `/search?${queryString}` : "/search";
 };
 
-export const buildSimilaritySearchHref = (
-  similarPath: string,
-): string => {
+export const buildSimilaritySearchHref = (similarPath: string): string => {
   const params = new URLSearchParams();
   params.set("similar", similarPath);
   return `/search?${params.toString()}`;
 };
 
-export const buildSearchFacetHref = (
-  selection: SearchFacetSelection,
-): string | null => {
+export const buildSearchFacetHref = (selection: SearchFacetSelection): string | null => {
   const normalized = normalizeSearchFacetSelection(selection);
   if (!normalized) {
     return null;
@@ -158,9 +148,7 @@ export const buildSearchFacetHref = (
   return buildSearchHref({ facets: [normalized] });
 };
 
-export const getSearchFacetChipLabel = (
-  selection: SearchFacetSelection,
-): string => {
+export const getSearchFacetChipLabel = (selection: SearchFacetSelection): string => {
   switch (selection.facetId) {
     case ISO_FACET.id:
       return `ISO: ${selection.value}`;
@@ -215,29 +203,17 @@ export const getBucketFacetSelection = (
   return label ? { facetId, value: label } : null;
 };
 
-export const getCameraFacetSelection = (
-  exif: Exif,
-): SearchFacetSelection | null => {
+export const getCameraFacetSelection = (exif: Exif): SearchFacetSelection | null => {
   const value = CAMERA_FACET.extract(exif) ?? null;
-  return value
-    ? normalizeSearchFacetSelection({ facetId: CAMERA_FACET.id, value })
-    : null;
+  return value ? normalizeSearchFacetSelection({ facetId: CAMERA_FACET.id, value }) : null;
 };
 
-export const getLensFacetSelection = (
-  exif: Exif,
-): SearchFacetSelection | null => {
+export const getLensFacetSelection = (exif: Exif): SearchFacetSelection | null => {
   const value = LENS_FACET.extract(exif) ?? null;
-  return value
-    ? normalizeSearchFacetSelection({ facetId: LENS_FACET.id, value })
-    : null;
+  return value ? normalizeSearchFacetSelection({ facetId: LENS_FACET.id, value }) : null;
 };
 
-export const getLocationFacetSelection = (
-  tags?: Tags | null,
-): SearchFacetSelection | null => {
+export const getLocationFacetSelection = (tags?: Tags | null): SearchFacetSelection | null => {
   const value = LOCATION_FACET.extract({} as Exif, tags ?? undefined) ?? null;
-  return value
-    ? normalizeSearchFacetSelection({ facetId: LOCATION_FACET.id, value })
-    : null;
+  return value ? normalizeSearchFacetSelection({ facetId: LOCATION_FACET.id, value }) : null;
 };

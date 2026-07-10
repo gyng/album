@@ -23,11 +23,7 @@
 
 .button:active,
 .button.active {
-  background-color: color-mix(
-    in srgb,
-    var(--c-bg-contrast-light) 80%,
-    var(--c-font)
-  );
+  background-color: color-mix(in srgb, var(--c-bg-contrast-light) 80%, var(--c-font));
   color: var(--c-bg);
 }
 
@@ -37,16 +33,8 @@
 }
 
 .navCurrent {
-  border-color: color-mix(
-    in srgb,
-    var(--c-bg-contrast-light) 65%,
-    var(--c-bg)
-  );
-  background-color: color-mix(
-    in srgb,
-    var(--c-bg-contrast-light) 14%,
-    var(--c-bg)
-  );
+  border-color: color-mix(in srgb, var(--c-bg-contrast-light) 65%, var(--c-bg));
+  background-color: color-mix(in srgb, var(--c-bg-contrast-light) 14%, var(--c-bg));
 }
 
 .toast {

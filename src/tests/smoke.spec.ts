@@ -57,9 +57,7 @@ test.describe("Smoke Tests", () => {
     await expect(page.getByRole("heading", { name: "Explore" })).toBeVisible();
 
     // Jump nav and at least one data section render
-    await expect(
-      page.locator('nav[aria-label="Jump to section"]'),
-    ).toBeVisible();
+    await expect(page.locator('nav[aria-label="Jump to section"]')).toBeVisible();
   });
 
   test("timeline page loads", async ({ page }) => {
@@ -129,9 +127,7 @@ test.describe("Smoke Tests", () => {
     const html = page.locator("html");
     const initialClass = await html.getAttribute("class");
 
-    await page
-      .getByRole("button", { name: /switch to (light|dark) theme/i })
-      .click();
+    await page.getByRole("button", { name: /switch to (light|dark) theme/i }).click();
 
     await expect(html).not.toHaveAttribute("class", initialClass ?? "");
   });

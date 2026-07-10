@@ -1,8 +1,6 @@
 describe("handleSlideshowKeyboardShortcut", () => {
   const setup = async () => {
-    const { handleSlideshowKeyboardShortcut } = await import(
-      "./slideshowKeyboard"
-    );
+    const { handleSlideshowKeyboardShortcut } = await import("./slideshowKeyboard");
 
     const handlers = {
       goNext: jest.fn(),
@@ -21,8 +19,7 @@ describe("handleSlideshowKeyboardShortcut", () => {
   };
 
   it("handles ArrowRight", async () => {
-    const { handleSlideshowKeyboardShortcut, handlers, preventDefault } =
-      await setup();
+    const { handleSlideshowKeyboardShortcut, handlers, preventDefault } = await setup();
 
     const handled = handleSlideshowKeyboardShortcut(
       { key: "ArrowRight", preventDefault, target: null },
@@ -36,8 +33,7 @@ describe("handleSlideshowKeyboardShortcut", () => {
   });
 
   it("handles ArrowLeft", async () => {
-    const { handleSlideshowKeyboardShortcut, handlers, preventDefault } =
-      await setup();
+    const { handleSlideshowKeyboardShortcut, handlers, preventDefault } = await setup();
 
     const handled = handleSlideshowKeyboardShortcut(
       { key: "ArrowLeft", preventDefault, target: null },
@@ -50,8 +46,7 @@ describe("handleSlideshowKeyboardShortcut", () => {
   });
 
   it("handles Space and prevents default", async () => {
-    const { handleSlideshowKeyboardShortcut, handlers, preventDefault } =
-      await setup();
+    const { handleSlideshowKeyboardShortcut, handlers, preventDefault } = await setup();
 
     const handled = handleSlideshowKeyboardShortcut(
       { key: " ", preventDefault, target: null },
@@ -64,8 +59,7 @@ describe("handleSlideshowKeyboardShortcut", () => {
   });
 
   it("handles Escape", async () => {
-    const { handleSlideshowKeyboardShortcut, handlers, preventDefault } =
-      await setup();
+    const { handleSlideshowKeyboardShortcut, handlers, preventDefault } = await setup();
 
     const handled = handleSlideshowKeyboardShortcut(
       { key: "Escape", preventDefault, target: null },
@@ -77,8 +71,7 @@ describe("handleSlideshowKeyboardShortcut", () => {
   });
 
   it("ignores shortcuts while an input is focused", async () => {
-    const { handleSlideshowKeyboardShortcut, handlers, preventDefault } =
-      await setup();
+    const { handleSlideshowKeyboardShortcut, handlers, preventDefault } = await setup();
 
     const handled = handleSlideshowKeyboardShortcut(
       { key: "ArrowRight", preventDefault, target: { tagName: "input" } as unknown as EventTarget },
@@ -90,8 +83,7 @@ describe("handleSlideshowKeyboardShortcut", () => {
   });
 
   it("ignores shortcuts while a textarea is focused", async () => {
-    const { handleSlideshowKeyboardShortcut, handlers, preventDefault } =
-      await setup();
+    const { handleSlideshowKeyboardShortcut, handlers, preventDefault } = await setup();
 
     const handled = handleSlideshowKeyboardShortcut(
       { key: "Escape", preventDefault, target: { tagName: "textarea" } as unknown as EventTarget },
@@ -103,8 +95,7 @@ describe("handleSlideshowKeyboardShortcut", () => {
   });
 
   it("ignores shortcuts while a select is focused", async () => {
-    const { handleSlideshowKeyboardShortcut, handlers, preventDefault } =
-      await setup();
+    const { handleSlideshowKeyboardShortcut, handlers, preventDefault } = await setup();
 
     const handled = handleSlideshowKeyboardShortcut(
       { key: " ", preventDefault, target: { tagName: "select" } as unknown as EventTarget },
@@ -117,8 +108,7 @@ describe("handleSlideshowKeyboardShortcut", () => {
   });
 
   it("ignores shortcuts while contenteditable is focused", async () => {
-    const { handleSlideshowKeyboardShortcut, handlers, preventDefault } =
-      await setup();
+    const { handleSlideshowKeyboardShortcut, handlers, preventDefault } = await setup();
 
     const handled = handleSlideshowKeyboardShortcut(
       {

@@ -75,7 +75,9 @@ const main = async () => {
   }
 
   const discoveredPhotoPaths = report.albums.flatMap((album) => album.photoPaths);
-  const newPhotoPaths = report.albums.flatMap((album) => album.newPhotos.map((photo) => photo.path));
+  const newPhotoPaths = report.albums.flatMap((album) =>
+    album.newPhotos.map((photo) => photo.path),
+  );
   const refreshedDbState = await loadDbState(context.dbPath, context.embeddingsDbPath);
   const verification = buildIndexVerification({
     discoveredPhotoPaths,
@@ -116,7 +118,9 @@ const main = async () => {
 
   if (!args.skipBuild) {
     if (!executionPlan.runBuild) {
-      console.log(`\nStopping after successful index verification. Report written to ${context.reportPath}`);
+      console.log(
+        `\nStopping after successful index verification. Report written to ${context.reportPath}`,
+      );
       return;
     }
 

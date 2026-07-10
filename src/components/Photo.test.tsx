@@ -62,17 +62,13 @@ describe("PhotoBlockEl", () => {
 
     render(<PhotoBlockEl block={block} currentIndex={0} />);
 
-    expect(screen.getByTestId("picture").getAttribute("alt")).toBe(
-      "Harbor skyline",
-    );
+    expect(screen.getByTestId("picture").getAttribute("alt")).toBe("Harbor skyline");
   });
 });
 
 describe("ExifTable", () => {
   it("renders a numeric 0 value such as exposure compensation 0 EV", () => {
-    render(
-      <ExifTable rows={[{ kind: "kv", k: "Exposure compensation", v: 0 }]} />,
-    );
+    render(<ExifTable rows={[{ kind: "kv", k: "Exposure compensation", v: 0 }]} />);
 
     expect(screen.getByText("Exposure compensation")).toBeTruthy();
     expect(screen.getByText("0")).toBeTruthy();

@@ -1,9 +1,6 @@
 import React from "react";
 import styles from "./Photo.module.css";
-import {
-  useDatabase,
-  useEmbeddingsDatabase,
-} from "./database/useDatabase";
+import { useDatabase, useEmbeddingsDatabase } from "./database/useDatabase";
 import { fetchSimilarResults } from "./search/api";
 import { SearchResultRow } from "./search/searchTypes";
 import { SearchResultTile } from "./search/SearchResultTile";
@@ -16,9 +13,7 @@ export const PhotoSimilarPhotos: React.FC<{
   const pageSize = props.pageSize ?? 8;
   const initialVisibleCount = Math.max(pageSize - 1, 1);
   const [database, progress] = useDatabase();
-  const [embeddingsDatabase, embeddingsProgress] = useEmbeddingsDatabase(
-    Boolean(props.path),
-  );
+  const [embeddingsDatabase, embeddingsProgress] = useEmbeddingsDatabase(Boolean(props.path));
   const [results, setResults] = React.useState<SearchResultRow[]>([]);
   const [error, setError] = React.useState<string | null>(null);
   const [offset, setOffset] = React.useState(0);
@@ -26,7 +21,6 @@ export const PhotoSimilarPhotos: React.FC<{
   const [isLoadingResults, setIsLoadingResults] = React.useState(false);
 
   React.useEffect(() => {
-     
     setResults([]);
     setError(null);
     setOffset(0);
@@ -39,7 +33,7 @@ export const PhotoSimilarPhotos: React.FC<{
     }
 
     let isCancelled = false;
-     
+
     setIsLoadingResults(true);
     setError(null);
 
@@ -87,14 +81,7 @@ export const PhotoSimilarPhotos: React.FC<{
     return () => {
       isCancelled = true;
     };
-  }, [
-    database,
-    embeddingsDatabase,
-    initialVisibleCount,
-    offset,
-    pageSize,
-    props.path,
-  ]);
+  }, [database, embeddingsDatabase, initialVisibleCount, offset, pageSize, props.path]);
 
   if (!props.path) {
     return null;
@@ -102,7 +89,9 @@ export const PhotoSimilarPhotos: React.FC<{
 
   return (
     <section className={styles.similarPhotos} aria-live="polite">
-      <Heading level={2} as="h3" className={styles.similarPhotosTitle}>Similar photos</Heading>
+      <Heading level={2} as="h3" className={styles.similarPhotosTitle}>
+        Similar photos
+      </Heading>
 
       {!database ? (
         <p className={styles.similarPhotosStatus}>
@@ -112,17 +101,14 @@ export const PhotoSimilarPhotos: React.FC<{
       ) : !embeddingsDatabase ? (
         <p className={styles.similarPhotosStatus}>
           Loading similarity index
-          {embeddingsProgress > 0 ? ` (${Math.round(embeddingsProgress)}%)` : ""}
-          …
+          {embeddingsProgress > 0 ? ` (${Math.round(embeddingsProgress)}%)` : ""}…
         </p>
       ) : isLoadingResults && results.length === 0 ? (
         <p className={styles.similarPhotosStatus}>Finding similar photos…</p>
       ) : error ? (
         <p className={styles.similarPhotosStatus}>{error}</p>
       ) : results.length === 0 ? (
-        <p className={styles.similarPhotosStatus}>
-          No similar photos indexed for this image yet.
-        </p>
+        <p className={styles.similarPhotosStatus}>No similar photos indexed for this image yet.</p>
       ) : (
         <div className={styles.similarPhotoGrid}>
           {results.map((result) => (
@@ -131,6 +117,7 @@ export const PhotoSimilarPhotos: React.FC<{
           <a
             href={`/search?similar=${encodeURIComponent(props.path)}`}
             className={styles.similarPhotosLoadMoreTile}
+            aria-label="Explore similar photos in search"
           >
             <span className={styles.similarPhotosLoadMoreTileBody}>
               <span className={styles.similarPhotosLoadMoreLabel}>Explore →</span>
@@ -144,6 +131,7 @@ export const PhotoSimilarPhotos: React.FC<{
               type="button"
               className={styles.similarPhotosLoadMoreTile}
               disabled={isLoadingResults}
+              aria-label="Load more similar photos"
               onClick={() => {
                 setOffset(results.length);
               }}

@@ -1,10 +1,6 @@
 import fs from "fs";
 import path from "path";
-import {
-  ALBUMS_DIR,
-  MANIFEST_NAME,
-  MANIFEST_V2_NAME,
-} from "./album";
+import { ALBUMS_DIR, MANIFEST_NAME, MANIFEST_V2_NAME } from "./album";
 import { measureBuild } from "./buildTiming";
 
 type AlbumDirectoryEntry = {
@@ -20,18 +16,14 @@ const isZoneIdentifierFile = (filename: string): boolean => {
 const formatSitemapDate = (timestampMs: number): string =>
   new Date(timestampMs).toISOString().slice(0, 10);
 
-const joinFeedDescriptionParts = (
-  ...parts: Array<string | null | undefined>
-): string => {
+const joinFeedDescriptionParts = (...parts: Array<string | null | undefined>): string => {
   return parts
     .map((part) => part?.replace(/\s+/g, " ").trim())
     .filter((part): part is string => Boolean(part))
     .join(" - ");
 };
 
-const getAlbumDirectoryEntries = (
-  albumsPath = ALBUMS_DIR,
-): AlbumDirectoryEntry[] => {
+const getAlbumDirectoryEntries = (albumsPath = ALBUMS_DIR): AlbumDirectoryEntry[] => {
   const albumNames = fs.readdirSync(albumsPath).filter((it) => {
     return fs.lstatSync(path.join(albumsPath, it)).isDirectory();
   });
@@ -62,10 +54,7 @@ const getAlbumDirectoryEntry = (
   slug: string,
   albumsPath = ALBUMS_DIR,
 ): AlbumDirectoryEntry | null => {
-  return (
-    getAlbumDirectoryEntries(albumsPath).find((entry) => entry.slug === slug) ??
-    null
-  );
+  return getAlbumDirectoryEntries(albumsPath).find((entry) => entry.slug === slug) ?? null;
 };
 
 const readAlbumFeedMetadata = (
@@ -92,10 +81,7 @@ const readAlbumFeedMetadata = (
     };
 
     const firstTextBlock = manifest.blocks?.find((block) => block.kind === "text");
-    const title =
-      manifest.title?.trim() ||
-      firstTextBlock?.data?.title?.trim() ||
-      slug;
+    const title = manifest.title?.trim() || firstTextBlock?.data?.title?.trim() || slug;
     const description =
       joinFeedDescriptionParts(
         manifest.kicker,
@@ -104,7 +90,7 @@ const readAlbumFeedMetadata = (
       ) || `${title} photo album`;
 
     return { title, description };
-  } catch (_err) {
+  } catch {
     return {
       title: slug,
       description: `${slug} photo album`,
@@ -138,9 +124,7 @@ export const getAlbumSitemapEntries = async (
 export const getAlbumFeedEntries = async (
   albumsPath = ALBUMS_DIR,
   limit = 20,
-): Promise<
-  Array<{ slug: string; title: string; description: string; lastmod: string }>
-> => {
+): Promise<Array<{ slug: string; title: string; description: string; lastmod: string }>> => {
   return measureBuild("albumFeed.getAlbumFeedEntries", async () => {
     return getAlbumDirectoryEntries(albumsPath)
       .map(({ slug, albumPath, lastmod }) => {
@@ -160,9 +144,7 @@ export const getAlbumFeedEntries = async (
 export const getAlbumFeedEntry = async (
   slug: string,
   albumsPath = ALBUMS_DIR,
-): Promise<
-  { slug: string; title: string; description: string; lastmod: string } | null
-> => {
+): Promise<{ slug: string; title: string; description: string; lastmod: string } | null> => {
   return measureBuild("albumFeed.getAlbumFeedEntry", async () => {
     const albumPath = path.join(albumsPath, slug);
     if (!fs.existsSync(albumPath) || !fs.lstatSync(albumPath).isDirectory()) {
@@ -251,8 +233,7 @@ export const getAlbumFeedItems = async (
             localPath && fs.existsSync(localPath)
               ? formatSitemapDate(fs.statSync(localPath).mtimeMs)
               : null;
-          const sortDate =
-            block.data?.date?.slice(0, 10) ?? statDate ?? albumLastmod;
+          const sortDate = block.data?.date?.slice(0, 10) ?? statDate ?? albumLastmod;
           const label =
             block.data?.title?.trim() ||
             block.data?.kicker?.trim() ||
@@ -275,7 +256,7 @@ export const getAlbumFeedItems = async (
             sortDate,
           });
         });
-      } catch (_err) {
+      } catch {
         // Fall back to a filesystem-based feed when the manifest cannot be parsed.
       }
     }
@@ -317,8 +298,7 @@ export const getAlbumFeedItems = async (
 
         albumJson.externals?.forEach((external) => {
           const sortDate =
-            external.date?.slice(0, 10) ??
-            formatSitemapDate(fs.statSync(albumJsonPath).mtimeMs);
+            external.date?.slice(0, 10) ?? formatSitemapDate(fs.statSync(albumJsonPath).mtimeMs);
           const title = humanizeAlbumFeedName(external.href);
           items.push({
             title,
@@ -331,7 +311,7 @@ export const getAlbumFeedItems = async (
             sortDate,
           });
         });
-      } catch (_err) {
+      } catch {
         // Ignore malformed album.json here and let the rest of the feed render.
       }
     }

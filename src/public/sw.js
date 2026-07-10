@@ -3,13 +3,7 @@ const SHELL_CACHE = `${VERSION}-shell`;
 const RUNTIME_CACHE = `${VERSION}-runtime`;
 const IMAGE_CACHE = `${VERSION}-images`;
 
-const SHELL_ASSETS = [
-  "/",
-  "/slideshow",
-  "/manifest.webmanifest",
-  "/pwa-icon.svg",
-  "/favicon.svg",
-];
+const SHELL_ASSETS = ["/", "/slideshow", "/manifest.webmanifest", "/pwa-icon.svg", "/favicon.svg"];
 
 const isSameOrigin = (url) => url.origin === self.location.origin;
 
@@ -60,27 +54,27 @@ const networkFirst = async (request, cacheName) => {
 };
 
 self.addEventListener("install", (event) => {
-  event.waitUntil(
-    caches.open(SHELL_CACHE).then((cache) => cache.addAll(SHELL_ASSETS)),
-  );
+  event.waitUntil(caches.open(SHELL_CACHE).then((cache) => cache.addAll(SHELL_ASSETS)));
   self.skipWaiting();
 });
 
 self.addEventListener("activate", (event) => {
   event.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(
-        keys
-          .filter(
-            (key) =>
-              key.startsWith("snapshots-pwa-") &&
-              key !== SHELL_CACHE &&
-              key !== RUNTIME_CACHE &&
-              key !== IMAGE_CACHE,
-          )
-          .map((key) => caches.delete(key)),
+    caches
+      .keys()
+      .then((keys) =>
+        Promise.all(
+          keys
+            .filter(
+              (key) =>
+                key.startsWith("snapshots-pwa-") &&
+                key !== SHELL_CACHE &&
+                key !== RUNTIME_CACHE &&
+                key !== IMAGE_CACHE,
+            )
+            .map((key) => caches.delete(key)),
+        ),
       ),
-    ),
   );
   self.clients.claim();
 });

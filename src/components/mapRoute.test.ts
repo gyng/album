@@ -105,15 +105,13 @@ describe("mapRoute", () => {
   });
 
   it("recommends simplified mode for very dense albums", () => {
-    const manyPhotos = Array.from(
-      { length: ROUTE_SIMPLIFY_THRESHOLD + 1 },
-      (_, index) =>
-        makePhoto({
-          href: `/album/trip#${index}.jpg`,
-          date: `2024-01-02T00:${String(index % 60).padStart(2, "0")}:00.000Z`,
-          decLat: 35 + index * 0.001,
-          decLng: 139 + index * 0.001,
-        }),
+    const manyPhotos = Array.from({ length: ROUTE_SIMPLIFY_THRESHOLD + 1 }, (_, index) =>
+      makePhoto({
+        href: `/album/trip#${index}.jpg`,
+        date: `2024-01-02T00:${String(index % 60).padStart(2, "0")}:00.000Z`,
+        decLat: 35 + index * 0.001,
+        decLng: 139 + index * 0.001,
+      }),
     );
 
     expect(getDefaultRouteMode(manyPhotos)).toBe("simplified");
@@ -374,8 +372,7 @@ describe("antimeridian route line", () => {
       }),
     ]);
 
-    const coordinates =
-      route.fullRouteGeoJson?.features[0]?.geometry.coordinates;
+    const coordinates = route.fullRouteGeoJson?.features[0]?.geometry.coordinates;
     // −179.5 unwraps to 180.5 (1° hop), not a 359° sweep the long way round
     expect(coordinates).toEqual([
       [179.5, 35],
@@ -403,14 +400,9 @@ describe("wall-clock day segments", () => {
       }),
     ]);
 
-    const context = buildContextRouteGeoJson(
-      route.fullPoints,
-      route.fullPoints[0]!,
-    );
+    const context = buildContextRouteGeoJson(route.fullPoints, route.fullPoints[0]!);
     // Hovering the 23:50 photo must trace only its own day — one point,
     // so no line feature is produced for a single-photo segment
-    expect(
-      context?.features[0]?.geometry.coordinates ?? [],
-    ).not.toContainEqual([139.2, 35.2]);
+    expect(context?.features[0]?.geometry.coordinates ?? []).not.toContainEqual([139.2, 35.2]);
   });
 });

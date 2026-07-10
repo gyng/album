@@ -58,14 +58,11 @@ const Album: NextPage<PageProps> = ({ album }) => {
   // SEO/Meta tag generation
   const title = album.title ?? album.name ?? album._build.slug;
 
-  const imageCount = album.blocks.filter(
-    (b) => b.kind === "photo",
-  ).length;
+  const imageCount = album.blocks.filter((b) => b.kind === "photo").length;
 
   const cover =
-    album.blocks.find(
-      (b) => b.kind === "photo" && b.formatting?.cover,
-    ) ?? album.blocks.find((b) => b.kind === "photo");
+    album.blocks.find((b) => b.kind === "photo" && b.formatting?.cover) ??
+    album.blocks.find((b) => b.kind === "photo");
 
   const albumName = album._build.slug;
 
@@ -73,9 +70,7 @@ const Album: NextPage<PageProps> = ({ album }) => {
     <>
       <Seo
         title={`${title} | Snapshots`}
-        description={
-          album.kicker ?? `${title} photo album: ${imageCount} photos`
-        }
+        description={album.kicker ?? `${title} photo album: ${imageCount} photos`}
         pathname={`/album/${album._build.slug}`}
         image={(cover as PhotoBlock | undefined)?._build.srcset?.[0].src}
         type="article"
@@ -88,12 +83,9 @@ const Album: NextPage<PageProps> = ({ album }) => {
         jsonLd={[
           buildCollectionPageJsonLd({
             name: `${title} | Snapshots`,
-            description:
-              album.kicker ?? `${title} photo album: ${imageCount} photos`,
+            description: album.kicker ?? `${title} photo album: ${imageCount} photos`,
             pathname: `/album/${album._build.slug}`,
-            image: resolveAbsoluteUrl(
-              (cover as PhotoBlock | undefined)?._build.srcset?.[0]?.src,
-            ),
+            image: resolveAbsoluteUrl((cover as PhotoBlock | undefined)?._build.srcset?.[0]?.src),
           }),
           buildBreadcrumbJsonLd([
             { name: "Snapshots", pathname: "/" },
@@ -109,26 +101,17 @@ const Album: NextPage<PageProps> = ({ album }) => {
         extraItems={
           <>
             <li>
-              <Link
-                href={`/map?filter_album=${albumName}`}
-                className={commonStyles.button}
-              >
+              <Link href={`/map?filter_album=${albumName}`} className={commonStyles.button}>
                 Album map
               </Link>
             </li>
             <li>
-              <Link
-                href={`/timeline?filter_album=${albumName}`}
-                className={commonStyles.button}
-              >
+              <Link href={`/timeline?filter_album=${albumName}`} className={commonStyles.button}>
                 Album timeline
               </Link>
             </li>
             <li>
-              <Link
-                href={`/slideshow?filter=${albumName}`}
-                className={commonStyles.button}
-              >
+              <Link href={`/slideshow?filter=${albumName}`} className={commonStyles.button}>
                 Album slideshow
               </Link>
             </li>
@@ -143,10 +126,7 @@ const Album: NextPage<PageProps> = ({ album }) => {
   );
 };
 
-export const getStaticProps: GetStaticProps<
-  PageProps,
-  { slug: string[] }
-> = async (context) => {
+export const getStaticProps: GetStaticProps<PageProps, { slug: string[] }> = async (context) => {
   return measureBuild("page./album/[[...slug]].getStaticProps", async () => {
     const slug = context.params?.slug?.[0];
     if (!slug) {

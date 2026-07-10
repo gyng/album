@@ -1,10 +1,4 @@
-import Document, {
-  Head,
-  Html,
-  Main,
-  NextScript,
-  type DocumentContext,
-} from "next/document";
+import Document, { Head, Html, Main, NextScript, type DocumentContext } from "next/document";
 
 const themeInitScript = `
 (() => {

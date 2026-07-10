@@ -27,10 +27,7 @@ export const decideDbUpdateAction = (input: {
 
 // True when a newer build manifest is available: a non-empty (trimmed) latest
 // version that differs from the one this bundle was built with.
-export const decideBuildUpdate = (
-  latest: string | undefined,
-  current: string,
-): boolean => {
+export const decideBuildUpdate = (latest: string | undefined, current: string): boolean => {
   const trimmed = latest?.trim();
   return !!trimmed && trimmed !== current;
 };

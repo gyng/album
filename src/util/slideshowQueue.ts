@@ -9,14 +9,8 @@ export const avoidBoundaryRepeat = (
   photos: RandomPhotoRow[],
   previousLastPath?: string,
 ): RandomPhotoRow[] => {
-  if (
-    previousLastPath &&
-    photos.length > 1 &&
-    photos[0]?.path === previousLastPath
-  ) {
-    const swapIdx = photos.findIndex(
-      (photo) => photo.path !== previousLastPath,
-    );
+  if (previousLastPath && photos.length > 1 && photos[0]?.path === previousLastPath) {
+    const swapIdx = photos.findIndex((photo) => photo.path !== previousLastPath);
     if (swapIdx > 0) {
       [photos[0], photos[swapIdx]] = [photos[swapIdx], photos[0]];
     }
@@ -66,10 +60,7 @@ export const weightedShufflePhotos = (
 
   const weighted = stamped
     .map(({ photo, timestamp }) => {
-      const normalized =
-        timestamp === null
-          ? 0.15
-          : (timestamp - minTimestamp) / timestampRange;
+      const normalized = timestamp === null ? 0.15 : (timestamp - minTimestamp) / timestampRange;
       const weight = 1 + normalized * 5;
       const randomValue = Math.max(Math.random(), Number.EPSILON);
       return {
@@ -105,9 +96,7 @@ export const formatNewestPhotoDate = (date: Date): string =>
     year: "numeric",
   });
 
-export const getSlideshowPhotoSrc = (
-  photo: RandomPhotoRow | null,
-): string | null => {
+export const getSlideshowPhotoSrc = (photo: RandomPhotoRow | null): string | null => {
   if (!photo?.path) {
     return null;
   }
@@ -133,10 +122,7 @@ export const getSlideshowPhotoSrc = (
 // the peek builds the next queue once and stores it, and the advance consumes
 // the very photo that was peeked.
 
-export type QueueBuilder = (
-  pool: RandomPhotoRow[],
-  lastPath?: string,
-) => RandomPhotoRow[];
+export type QueueBuilder = (pool: RandomPhotoRow[], lastPath?: string) => RandomPhotoRow[];
 
 export type RandomQueueState = {
   queue: RandomPhotoRow[];

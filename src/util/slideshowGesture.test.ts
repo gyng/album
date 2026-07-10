@@ -92,15 +92,13 @@ describe("resolvePointerMove", () => {
   });
 
   it("ignores vertical drift once horizontal is committed", () => {
-    expect(
-      move({ deltaY: -40, deltaX: 0, committedHorizontal: "next" }),
-    ).toEqual({ kind: "ignore" });
+    expect(move({ deltaY: -40, deltaX: 0, committedHorizontal: "next" })).toEqual({
+      kind: "ignore",
+    });
   });
 
   it("ignores horizontal drift once vertical is committed", () => {
-    expect(
-      move({ deltaX: -40, deltaY: 0, committedVertical: "up" }),
-    ).toEqual({ kind: "ignore" });
+    expect(move({ deltaX: -40, deltaY: 0, committedVertical: "up" })).toEqual({ kind: "ignore" });
   });
 
   it("arms at the vertical commit distance", () => {
@@ -252,9 +250,10 @@ describe("resolvePointerUpAction", () => {
   });
 
   it("a committed MOUSE axis released short of commit does nothing and does not suppress", () => {
-    expect(
-      up({ deltaX: -30, committedHorizontal: "next", isTouchLike: false }),
-    ).toEqual({ action: "none", suppressClick: false });
+    expect(up({ deltaX: -30, committedHorizontal: "next", isTouchLike: false })).toEqual({
+      action: "none",
+      suppressClick: false,
+    });
   });
 
   it("suppresses the synthetic click on a mid-distance touch jitter without navigating", () => {

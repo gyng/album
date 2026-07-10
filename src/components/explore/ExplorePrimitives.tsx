@@ -1,11 +1,6 @@
 import Link from "next/link";
 import { buildSimilaritySearchHref } from "../../util/searchFacets";
-import {
-  Caption,
-  Heading,
-  OverlayButtonLink,
-  Thumb,
-} from "../ui";
+import { Caption, Heading, OverlayButtonLink, Thumb } from "../ui";
 import styles from "../../pages/explore/explore.module.css";
 import { formatCoverage } from "./exploreViewModel";
 
@@ -15,12 +10,7 @@ export const ExploreStatSection: React.FC<{
   coverage: number;
   children: React.ReactNode;
 }> = ({ facetId, title, coverage, children }) => (
-  <section
-    className={[
-      styles.section,
-      facetId === "hour" ? styles.sectionWide : "",
-    ].join(" ")}
-  >
+  <section className={[styles.section, facetId === "hour" ? styles.sectionWide : ""].join(" ")}>
     <div className={styles.sectionHeader}>
       <Heading level={2} as="h2">
         {title}
@@ -59,9 +49,7 @@ export const ExploreStatGroup: React.FC<{
         </Heading>
         {actions ? <div className={styles.groupActions}>{actions}</div> : null}
       </div>
-      {description ? (
-        <p className={styles.groupDescription}>{description}</p>
-      ) : null}
+      {description ? <p className={styles.groupDescription}>{description}</p> : null}
     </div>
     <div className={styles.groupGrid}>{children}</div>
   </section>

@@ -8,11 +8,7 @@ import { ExploreStatGroup } from "./ExplorePrimitives";
 import type { FunStatCard } from "./exploreViewModel";
 import { buildYearSearchHref } from "./exploreViewModel";
 
-export const ExploreFunStatsSection = ({
-  cards,
-}: {
-  cards: FunStatCard[];
-}) => (
+export const ExploreFunStatsSection = ({ cards }: { cards: FunStatCard[] }) => (
   <ExploreStatGroup id="fun-stats" title="Fun stats">
     <section className={`${styles.section} ${styles.sectionWide}`}>
       <div className={styles.funStatsGrid}>
@@ -34,18 +30,13 @@ export const ExploreFunStatsSection = ({
                       alt={`${example.label} (${example.year})`}
                       className={styles.funStatThumb}
                     />
-                    <span className={styles.funStatThumbYear}>
-                      {example.year}
-                    </span>
+                    <span className={styles.funStatThumbYear}>{example.year}</span>
                   </Link>
                 ))}
               </div>
             ) : null}
             {stat.actionHref ? (
-              <Link
-                href={stat.actionHref}
-                className={`${pillStyles.base} ${pillStyles.ghost}`}
-              >
+              <Link href={stat.actionHref} className={`${pillStyles.base} ${pillStyles.ghost}`}>
                 <span>Open in Search</span>
                 <span aria-hidden="true">↗</span>
               </Link>
@@ -57,20 +48,13 @@ export const ExploreFunStatsSection = ({
   </ExploreStatGroup>
 );
 
-export const ExploreRecentTrendsSection = ({
-  data,
-}: {
-  data: PhotoStats["recentYearStats"];
-}) =>
+export const ExploreRecentTrendsSection = ({ data }: { data: PhotoStats["recentYearStats"] }) =>
   data.length > 0 ? (
     <ExploreStatGroup
       id="recent-trends"
       title="Recent trends"
       actions={
-        <Link
-          href="/timeline"
-          className={`${pillStyles.base} ${pillStyles.ghost}`}
-        >
+        <Link href="/timeline" className={`${pillStyles.base} ${pillStyles.ghost}`}>
           <span>Open Timeline</span>
           <span aria-hidden="true">↗</span>
         </Link>
@@ -78,11 +62,7 @@ export const ExploreRecentTrendsSection = ({
     >
       <section className={`${styles.section} ${styles.sectionWide}`}>
         <div className={styles.recentTrendsGrid}>
-          <YearSplitHistogram
-            title="Last 5 years"
-            data={data}
-            getHref={buildYearSearchHref}
-          />
+          <YearSplitHistogram title="Last 5 years" data={data} getHref={buildYearSearchHref} />
         </div>
       </section>
     </ExploreStatGroup>
@@ -110,9 +90,7 @@ export const ExploreRevisitedPlacesSection = ({
                 </Caption>
                 <Link
                   href={buildSearchHref({
-                    facets: [
-                      { facetId: place.facetId, value: place.facetValue },
-                    ],
+                    facets: [{ facetId: place.facetId, value: place.facetValue }],
                   })}
                   className={`${pillStyles.base} ${pillStyles.ghost}`}
                 >
@@ -121,64 +99,58 @@ export const ExploreRevisitedPlacesSection = ({
                 </Link>
               </div>
               <div className={styles.visualTimeline}>
-                {place.timeline
-                  .toReversed()
-                  .map((entry, index, entries) => {
-                    const nextEntry = entries[index + 1];
-                    return (
-                      <div
-                        key={entry.year}
-                        className={`${styles.visualTimelineRow} ${!nextEntry ? styles.visualTimelineRowLast : ""}`}
-                      >
-                        <div className={styles.visualTimelineMeta}>
-                          <span className={styles.visualTimelineYear}>
-                            {entry.year}
-                          </span>
-                          <span>{entry.count.toLocaleString("en")} photos</span>
-                        </div>
-                        <div
-                          className={`${styles.visualTimelineRail} ${styles.revisitTimelineRail}`}
-                          aria-hidden="true"
-                        >
-                          <span className={styles.visualTimelineDot} />
-                          {nextEntry ? (
-                            <span className={styles.revisitGapLabelInline}>
-                              {entry.year - nextEntry.year}{" "}
-                              {entry.year - nextEntry.year === 1
-                                ? "year"
-                                : "years"}
-                            </span>
-                          ) : null}
-                        </div>
-                        <div className={styles.revisitThumbs}>
-                          {entry.photos.map((photo, photoIndex) => (
-                            <Link
-                              key={`${entry.year}-${photo.src}-${photoIndex}`}
-                              href={buildSearchHref({
-                                facets: [
-                                  {
-                                    facetId: place.facetId,
-                                    value: place.facetValue,
-                                  },
-                                  {
-                                    facetId: "year",
-                                    value: String(entry.year),
-                                  },
-                                ],
-                              })}
-                              className={`${styles.visualThumbLink} ${styles.visualEraThumbLink}`}
-                            >
-                              <Thumb
-                                src={photo.src}
-                                alt={`${photo.label} (${entry.year})`}
-                                className={`${styles.visualThumb} ${styles.visualEraThumb} ${styles.revisitThumb}`}
-                              />
-                            </Link>
-                          ))}
-                        </div>
+                {place.timeline.toReversed().map((entry, index, entries) => {
+                  const nextEntry = entries[index + 1];
+                  return (
+                    <div
+                      key={entry.year}
+                      className={`${styles.visualTimelineRow} ${!nextEntry ? styles.visualTimelineRowLast : ""}`}
+                    >
+                      <div className={styles.visualTimelineMeta}>
+                        <span className={styles.visualTimelineYear}>{entry.year}</span>
+                        <span>{entry.count.toLocaleString("en")} photos</span>
                       </div>
-                    );
-                  })}
+                      <div
+                        className={`${styles.visualTimelineRail} ${styles.revisitTimelineRail}`}
+                        aria-hidden="true"
+                      >
+                        <span className={styles.visualTimelineDot} />
+                        {nextEntry ? (
+                          <span className={styles.revisitGapLabelInline}>
+                            {entry.year - nextEntry.year}{" "}
+                            {entry.year - nextEntry.year === 1 ? "year" : "years"}
+                          </span>
+                        ) : null}
+                      </div>
+                      <div className={styles.revisitThumbs}>
+                        {entry.photos.map((photo, photoIndex) => (
+                          <Link
+                            key={`${entry.year}-${photo.src}-${photoIndex}`}
+                            href={buildSearchHref({
+                              facets: [
+                                {
+                                  facetId: place.facetId,
+                                  value: place.facetValue,
+                                },
+                                {
+                                  facetId: "year",
+                                  value: String(entry.year),
+                                },
+                              ],
+                            })}
+                            className={`${styles.visualThumbLink} ${styles.visualEraThumbLink}`}
+                          >
+                            <Thumb
+                              src={photo.src}
+                              alt={`${photo.label} (${entry.year})`}
+                              className={`${styles.visualThumb} ${styles.visualEraThumb} ${styles.revisitThumb}`}
+                            />
+                          </Link>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </section>
           ))}

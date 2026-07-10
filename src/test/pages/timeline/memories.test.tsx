@@ -147,14 +147,10 @@ describe("Timeline memories", () => {
     ).toBeTruthy();
     expect(screen.queryByLabelText(/tokyo/i)).toBeNull();
 
-    fireEvent.click(
-      screen.getByRole("button", { name: /jump to kansai on 2025-03-15/i }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: /jump to kansai on 2025-03-15/i }));
 
     await waitFor(() => {
-      expect(screen.getByTestId("selected-date").textContent).toBe(
-        "2025-03-15",
-      );
+      expect(screen.getByTestId("selected-date").textContent).toBe("2025-03-15");
     });
   });
 
@@ -182,9 +178,7 @@ describe("Timeline memories", () => {
     fireEvent.click(screen.getByRole("button", { name: "older" }));
 
     await waitFor(() => {
-      expect(screen.getByTestId("selected-date").textContent).toBe(
-        "2025-03-14",
-      );
+      expect(screen.getByTestId("selected-date").textContent).toBe("2025-03-14");
     });
 
     expect(mockReplace).toHaveBeenLastCalledWith(
@@ -224,9 +218,7 @@ describe("Timeline memories", () => {
 
     expect(screen.queryByLabelText(/2023/i)).toBeNull();
 
-    fireEvent.click(
-      await screen.findByRole("button", { name: /more memories/i }),
-    );
+    fireEvent.click(await screen.findByRole("button", { name: /more memories/i }));
 
     expect(
       await screen.findByRole("button", {
@@ -254,27 +246,23 @@ describe("Timeline memories", () => {
       />,
     );
 
-    fireEvent.mouseEnter(
-      await screen.findByTestId("memory-cluster-2025-2025-03-15-2025-03-16"),
-    );
+    fireEvent.mouseEnter(await screen.findByTestId("memory-cluster-2025-2025-03-15-2025-03-16"));
 
-    expect(
-      screen.getByRole("button", { name: "2025-03-15" }).className,
-    ).toMatch(/memoryHighlighted/);
-    expect(
-      screen.getByRole("button", { name: "2025-03-16" }).className,
-    ).toMatch(/memoryHighlighted/);
+    expect(screen.getByRole("button", { name: "2025-03-15" }).className).toMatch(
+      /memoryHighlighted/,
+    );
+    expect(screen.getByRole("button", { name: "2025-03-16" }).className).toMatch(
+      /memoryHighlighted/,
+    );
     expect(screen.getByRole("heading", { name: "2025" }).className).toMatch(
       /highlightedYearHeading/,
     );
 
-    fireEvent.mouseLeave(
-      screen.getByTestId("memory-cluster-2025-2025-03-15-2025-03-16"),
-    );
+    fireEvent.mouseLeave(screen.getByTestId("memory-cluster-2025-2025-03-15-2025-03-16"));
 
-    expect(
-      screen.getByRole("button", { name: "2025-03-15" }).className,
-    ).not.toMatch(/memoryHighlighted/);
+    expect(screen.getByRole("button", { name: "2025-03-15" }).className).not.toMatch(
+      /memoryHighlighted/,
+    );
     expect(screen.getByRole("heading", { name: "2025" }).className).not.toMatch(
       /highlightedYearHeading/,
     );
@@ -305,10 +293,7 @@ describe("Timeline memories", () => {
       }),
     );
 
-    const lastCall =
-      mockCalendarHeatmap.mock.calls[
-        mockCalendarHeatmap.mock.calls.length - 1
-      ]?.[0];
+    const lastCall = mockCalendarHeatmap.mock.calls[mockCalendarHeatmap.mock.calls.length - 1]?.[0];
     expect(lastCall.scrollToDate).toBe("2025-03-15");
     expect(screen.getByTestId("selected-date").textContent).toBe("2025-03-15");
   });
@@ -338,9 +323,9 @@ describe("Timeline memories", () => {
 
     fireEvent.focus(memoryButton);
 
-    expect(
-      screen.getByRole("button", { name: "2025-03-15" }).className,
-    ).toMatch(/memoryHighlighted/);
+    expect(screen.getByRole("button", { name: "2025-03-15" }).className).toMatch(
+      /memoryHighlighted/,
+    );
     expect(screen.getByRole("heading", { name: "2025" }).className).toMatch(
       /highlightedYearHeading/,
     );
@@ -368,17 +353,13 @@ describe("Timeline memories", () => {
     fireEvent.keyDown(window, { key: "ArrowLeft" });
 
     await waitFor(() => {
-      expect(screen.getByTestId("selected-date").textContent).toBe(
-        "2025-03-14",
-      );
+      expect(screen.getByTestId("selected-date").textContent).toBe("2025-03-14");
     });
 
     fireEvent.keyDown(window, { key: "ArrowRight" });
 
     await waitFor(() => {
-      expect(screen.getByTestId("selected-date").textContent).toBe(
-        "2025-03-15",
-      );
+      expect(screen.getByTestId("selected-date").textContent).toBe("2025-03-15");
     });
   });
 
@@ -410,9 +391,7 @@ describe("Timeline memories", () => {
     fireEvent.keyDown(input, { key: "ArrowLeft" });
 
     await waitFor(() => {
-      expect(screen.getByTestId("selected-date").textContent).toBe(
-        "2025-03-15",
-      );
+      expect(screen.getByTestId("selected-date").textContent).toBe("2025-03-15");
     });
   });
 });

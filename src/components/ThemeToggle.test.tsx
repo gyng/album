@@ -43,11 +43,9 @@ describe("ThemeToggle", () => {
 
   it("renders when localStorage access is unavailable", () => {
     const warnSpy = jest.spyOn(console, "warn").mockImplementation(() => {});
-    const getItemSpy = jest
-      .spyOn(Storage.prototype, "getItem")
-      .mockImplementation(() => {
-        throw new DOMException("The operation is insecure.", "SecurityError");
-      });
+    const getItemSpy = jest.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
+      throw new DOMException("The operation is insecure.", "SecurityError");
+    });
 
     render(<ThemeToggle />);
 
@@ -59,14 +57,10 @@ describe("ThemeToggle", () => {
 
   it("swallows localStorage write failures when toggling", () => {
     const warnSpy = jest.spyOn(console, "warn").mockImplementation(() => {});
-    const getItemSpy = jest
-      .spyOn(Storage.prototype, "getItem")
-      .mockReturnValue("null");
-    const setItemSpy = jest
-      .spyOn(Storage.prototype, "setItem")
-      .mockImplementation(() => {
-        throw new DOMException("The operation is insecure.", "SecurityError");
-      });
+    const getItemSpy = jest.spyOn(Storage.prototype, "getItem").mockReturnValue("null");
+    const setItemSpy = jest.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new DOMException("The operation is insecure.", "SecurityError");
+    });
 
     render(<ThemeToggle />);
     fireEvent.click(screen.getByLabelText(/switch to (light|dark) theme/i));
@@ -85,30 +79,26 @@ describe("ThemeToggle", () => {
     fireEvent.click(screen.getByLabelText(/switch to (light|dark) theme/i));
     fireEvent.click(screen.getByLabelText(/reset theme to system default/i));
 
-    expect(
-      screen.getByLabelText(/switch to (light|dark) theme/i).textContent,
-    ).toMatch(/☀️|🌙/);
+    expect(screen.getByLabelText(/switch to (light|dark) theme/i).textContent).toMatch(/☀️|🌙/);
   });
 
   it("reflects the live system preference after reset, not the stale applied class", () => {
     // System prefers dark.
-    const matchMediaSpy = jest
-      .spyOn(window, "matchMedia")
-      .mockImplementation(
-        (query: string) =>
-          ({
-            matches: true,
-            media: query,
-            onchange: null,
-            addListener() {},
-            removeListener() {},
-            addEventListener() {},
-            removeEventListener() {},
-            dispatchEvent() {
-              return false;
-            },
-          }) as MediaQueryList,
-      );
+    const matchMediaSpy = jest.spyOn(window, "matchMedia").mockImplementation(
+      (query: string) =>
+        ({
+          matches: true,
+          media: query,
+          onchange: null,
+          addListener() {},
+          removeListener() {},
+          addEventListener() {},
+          removeEventListener() {},
+          dispatchEvent() {
+            return false;
+          },
+        }) as MediaQueryList,
+    );
 
     render(<ThemeToggle />);
 
@@ -122,9 +112,7 @@ describe("ThemeToggle", () => {
     // the dark system preference.
     fireEvent.click(screen.getByLabelText(/reset theme to system default/i));
 
-    expect(
-      screen.getByLabelText(/switch to (light|dark) theme/i).textContent,
-    ).toContain("🌙");
+    expect(screen.getByLabelText(/switch to (light|dark) theme/i).textContent).toContain("🌙");
 
     matchMediaSpy.mockRestore();
   });

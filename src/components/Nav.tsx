@@ -45,9 +45,7 @@ export const Nav: React.FC<{
     if (!ul) return;
     const active = ul.querySelector<HTMLElement>('[aria-current="page"]');
     if (!active) return;
-    const prefersReducedMotion = window.matchMedia(
-      "(prefers-reduced-motion: reduce)",
-    ).matches;
+    const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     active.scrollIntoView({
       inline: "nearest",
       block: "nearest",
@@ -75,21 +73,14 @@ export const Nav: React.FC<{
         .filter(Boolean)
         .join(" ")}
     >
-      <a
-        href="#main-content"
-        className={styles.skipLink}
-        onClick={skipToContent}
-      >
+      <a href="#main-content" className={styles.skipLink} onClick={skipToContent}>
         Skip to content
       </a>
       <ul ref={ulRef} className={commonStyles.topBar}>
         <li>
           <Link
             href="/"
-            className={[
-              commonStyles.button,
-              props.isHome ? commonStyles.navCurrent : "",
-            ].join(" ")}
+            className={[commonStyles.button, props.isHome ? commonStyles.navCurrent : ""].join(" ")}
             aria-current={props.isHome ? "page" : undefined}
           >
             Albums
@@ -98,10 +89,7 @@ export const Nav: React.FC<{
         {props.albumName ? (
           <>
             <li>
-              <Link
-                href={`/map?filter_album=${props.albumName}`}
-                className={commonStyles.button}
-              >
+              <Link href={`/map?filter_album=${props.albumName}`} className={commonStyles.button}>
                 Album map
               </Link>
             </li>
@@ -114,10 +102,7 @@ export const Nav: React.FC<{
               </Link>
             </li>
             <li>
-              <Link
-                href={`/slideshow?filter=${props.albumName}`}
-                className={commonStyles.button}
-              >
+              <Link href={`/slideshow?filter=${props.albumName}`} className={commonStyles.button}>
                 Album slideshow
               </Link>
             </li>

@@ -1,10 +1,7 @@
 import React from "react";
 import { HexColorInput, HexColorPicker } from "react-colorful";
 import styles from "./Search.module.css";
-import {
-  SearchFacetSelection,
-  serializeSearchFacetSelection,
-} from "../../util/searchFacets";
+import { SearchFacetSelection, serializeSearchFacetSelection } from "../../util/searchFacets";
 import { SearchFilterPill } from "./SearchFilterPill";
 import { SearchTag } from "./SearchTag";
 import { hexToRgb, rgbToHex, RGB } from "../../util/colorDistance";
@@ -25,13 +22,7 @@ type Tag = {
   count: number;
 };
 
-type FilterCategoryId =
-  | "tags"
-  | "color"
-  | "time"
-  | "place"
-  | "gear"
-  | "settings";
+type FilterCategoryId = "tags" | "color" | "time" | "place" | "gear" | "settings";
 
 type FilterCategory = {
   id: FilterCategoryId;
@@ -47,10 +38,7 @@ const FILTER_CATEGORIES: FilterCategory[] = [
   { id: "settings", label: "Settings" },
 ];
 
-const CATEGORY_FACET_IDS: Record<
-  Exclude<FilterCategoryId, "tags" | "color">,
-  string[]
-> = {
+const CATEGORY_FACET_IDS: Record<Exclude<FilterCategoryId, "tags" | "color">, string[]> = {
   time: ["year", "hour"],
   place: ["location", "region", "subregion", "city"],
   gear: ["camera", "lens"],
@@ -100,13 +88,11 @@ export const SearchFacetPanel: React.FC<Props> = ({
     selectedFacets.map((selection) => serializeSearchFacetSelection(selection)),
   );
 
-  const categoryTabRefs = React.useRef<
-    Record<FilterCategoryId, HTMLButtonElement | null>
-  >({} as Record<FilterCategoryId, HTMLButtonElement | null>);
+  const categoryTabRefs = React.useRef<Record<FilterCategoryId, HTMLButtonElement | null>>(
+    {} as Record<FilterCategoryId, HTMLButtonElement | null>,
+  );
 
-  const handleCategoryKeyDown = (
-    event: React.KeyboardEvent<HTMLButtonElement>,
-  ) => {
+  const handleCategoryKeyDown = (event: React.KeyboardEvent<HTMLButtonElement>) => {
     const isForward = event.key === "ArrowRight" || event.key === "ArrowDown";
     const isBackward = event.key === "ArrowLeft" || event.key === "ArrowUp";
     if (!isForward && !isBackward) {
@@ -118,9 +104,7 @@ export const SearchFacetPanel: React.FC<Props> = ({
       (category) => category.id === selectedCategory,
     );
     const delta = isForward ? 1 : -1;
-    const nextIndex =
-      (currentIndex + delta + FILTER_CATEGORIES.length) %
-      FILTER_CATEGORIES.length;
+    const nextIndex = (currentIndex + delta + FILTER_CATEGORIES.length) % FILTER_CATEGORIES.length;
     const nextCategory = FILTER_CATEGORIES[nextIndex];
     if (!nextCategory) {
       return;
@@ -181,10 +165,9 @@ export const SearchFacetPanel: React.FC<Props> = ({
   return (
     <section
       id="search-filters-panel"
-      className={[
-        styles.facetPanel,
-        selectedCategory === "color" ? styles.facetPanelColorMode : "",
-      ].filter(Boolean).join(" ")}
+      className={[styles.facetPanel, selectedCategory === "color" ? styles.facetPanelColorMode : ""]
+        .filter(Boolean)
+        .join(" ")}
       aria-label="Search filters"
     >
       <div className={styles.facetCategoryRail} role="tablist" aria-label="Filter categories">
@@ -225,18 +208,14 @@ export const SearchFacetPanel: React.FC<Props> = ({
         onScroll={updateScrollFade}
         className={[
           styles.facetCategoryContent,
-          hasScrollAbove || hasScrollBelow
-            ? styles.facetCategoryContentFade
-            : "",
+          hasScrollAbove || hasScrollBelow ? styles.facetCategoryContentFade : "",
           hasScrollAbove ? styles.facetFadeAbove : "",
           hasScrollBelow ? styles.facetFadeBelow : "",
         ]
           .filter(Boolean)
           .join(" ")}
       >
-        {isLoading ? (
-          <div className={styles.searchModeStatus}>Loading filters…</div>
-        ) : null}
+        {isLoading ? <div className={styles.searchModeStatus}>Loading filters…</div> : null}
 
         {!isLoading && selectedCategory === "tags" ? (
           <div className={styles.facetSection}>
@@ -299,9 +278,7 @@ export const SearchFacetPanel: React.FC<Props> = ({
                         aria-label="Current colour swatch"
                       />
                     </label>
-                    <span className={styles.colorFacetCurrentHex}>
-                      {pickerHex}
-                    </span>
+                    <span className={styles.colorFacetCurrentHex}>{pickerHex}</span>
                   </div>
                   <button
                     type="button"
@@ -312,9 +289,10 @@ export const SearchFacetPanel: React.FC<Props> = ({
                     Clear
                   </button>
                 </div>
-                <label className={styles.colorFacetHexLabel}>
+                <label className={styles.colorFacetHexLabel} htmlFor="colour-filter-hex">
                   <span className={styles.facetSectionTitle}>Hex</span>
                   <HexColorInput
+                    id="colour-filter-hex"
                     aria-label="Colour filter hex value"
                     color={pickerHex}
                     onChange={handleHexChange}
@@ -331,14 +309,10 @@ export const SearchFacetPanel: React.FC<Props> = ({
                       min={5}
                       max={60}
                       value={colorTolerance}
-                      onChange={(event) =>
-                        onSetColorTolerance(Number(event.target.value))
-                      }
+                      onChange={(event) => onSetColorTolerance(Number(event.target.value))}
                       aria-label="Colour distance tolerance"
                     />
-                    <span className={styles.colorFacetToleranceValue}>
-                      ±{colorTolerance}
-                    </span>
+                    <span className={styles.colorFacetToleranceValue}>±{colorTolerance}</span>
                   </label>
                 </div>
               </div>
@@ -350,9 +324,7 @@ export const SearchFacetPanel: React.FC<Props> = ({
           ? visibleSections.map((section) => (
               <div key={section.facetId} className={styles.facetSection}>
                 {showSectionLabels ? (
-                  <h2 className={styles.facetSectionTitle}>
-                    {section.displayName}
-                  </h2>
+                  <h2 className={styles.facetSectionTitle}>{section.displayName}</h2>
                 ) : null}
                 <div className={styles.tagsContainer}>
                   {section.options.map((option) => {
@@ -367,8 +339,7 @@ export const SearchFacetPanel: React.FC<Props> = ({
                       selection.facetId === "region" ||
                       selection.facetId === "subregion" ||
                       selection.facetId === "city";
-                    const isDisabled =
-                      !isPlaceFacet && !isActive && option.count === 0;
+                    const isDisabled = !isPlaceFacet && !isActive && option.count === 0;
 
                     return (
                       <SearchFilterPill

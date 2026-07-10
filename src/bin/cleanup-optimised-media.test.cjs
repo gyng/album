@@ -6,9 +6,7 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 
-const {
-  cleanupOptimisedMedia,
-} = require("./cleanup-optimised-media.cjs");
+const { cleanupOptimisedMedia } = require("./cleanup-optimised-media.cjs");
 
 describe("cleanupOptimisedMedia", () => {
   it("removes stale and outdated cached media variants", async () => {
@@ -34,14 +32,7 @@ describe("cleanupOptimisedMedia", () => {
     const oldVideoSize = path.join(videoCacheDir, "clip.mp4@1280.mp4");
     const keptVideo = path.join(videoCacheDir, "clip.mp4@1920.mp4");
 
-    for (const file of [
-      staleImage,
-      oldImageSize,
-      keptImage,
-      staleVideo,
-      oldVideoSize,
-      keptVideo,
-    ]) {
+    for (const file of [staleImage, oldImageSize, keptImage, staleVideo, oldVideoSize, keptVideo]) {
       fs.writeFileSync(file, "cached");
     }
 

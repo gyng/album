@@ -90,14 +90,10 @@ export const ThemeToggle: React.FC = () => {
     () => true,
   );
   const [darkModeOverride, setDarkModeOverride] = useReducer(
-    (
-      _state: boolean | null | undefined,
-      next: boolean | null | undefined,
-    ) => next,
+    (_state: boolean | null | undefined, next: boolean | null | undefined) => next,
     undefined,
   );
-  const darkMode =
-    darkModeOverride === undefined ? initialDarkMode : darkModeOverride;
+  const darkMode = darkModeOverride === undefined ? initialDarkMode : darkModeOverride;
 
   useEffect(() => {
     // Mirror the pre-paint init script in _document.tsx, which toggles the
@@ -124,8 +120,7 @@ export const ThemeToggle: React.FC = () => {
     }
   }, [darkMode]);
 
-  const displayDarkMode =
-    darkMode == null ? (hasHydrated ? systemPrefersDark : null) : darkMode;
+  const displayDarkMode = darkMode == null ? (hasHydrated ? systemPrefersDark : null) : darkMode;
 
   return (
     <div className={styles.themeToggle}>

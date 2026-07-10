@@ -18,9 +18,7 @@ const FALLBACK_EMBEDDING_MODEL_ID = "google/siglip-base-patch16-224";
  * single model (deterministic first entry) so a DB with only one space still
  * works.
  */
-export const selectEmbeddingModelId = (
-  availableModelIds: string[],
-): string | null => {
+export const selectEmbeddingModelId = (availableModelIds: string[]): string | null => {
   if (availableModelIds.includes(PREFERRED_EMBEDDING_MODEL_ID)) {
     return PREFERRED_EMBEDDING_MODEL_ID;
   }
@@ -38,16 +36,8 @@ const MAX_VISUAL_EXAMPLES = 24;
 const MAX_AVERAGE_EXAMPLES = 12;
 const MAX_OUTLIER_EXAMPLES = 12;
 const MAX_VISUAL_ERAS = 6;
-const DEFAULT_EMBEDDINGS_DB_PATH = path.join(
-  process.cwd(),
-  "public",
-  "search-embeddings.sqlite",
-);
-const FALLBACK_EMBEDDINGS_DB_PATH = path.join(
-  process.cwd(),
-  "public",
-  "search.sqlite",
-);
+const DEFAULT_EMBEDDINGS_DB_PATH = path.join(process.cwd(), "public", "search-embeddings.sqlite");
+const FALLBACK_EMBEDDINGS_DB_PATH = path.join(process.cwd(), "public", "search.sqlite");
 
 export type VisualSamenessStats = {
   sampleSize: number;
@@ -158,10 +148,7 @@ export const deriveEraLabel = (
       tag,
       score: count * (count / (overallTagCounts.get(tag) ?? count)),
     }))
-    .sort(
-      (left, right) =>
-        right.score - left.score || left.tag.localeCompare(right.tag),
-    )
+    .sort((left, right) => right.score - left.score || left.tag.localeCompare(right.tag))
     .slice(0, MAX_ERA_LABEL_TAGS)
     .map((entry) => entry.tag.replace(/_/g, " "));
 
@@ -198,8 +185,7 @@ export const computeVisualSamenessFromVectors = (
     nearestScores.filter((score) => score >= HIGH_SIMILARITY_THRESHOLD).length /
     nearestScores.length;
   const distinctPercent =
-    nearestScores.filter((score) => score < LOW_SIMILARITY_THRESHOLD).length /
-    nearestScores.length;
+    nearestScores.filter((score) => score < LOW_SIMILARITY_THRESHOLD).length / nearestScores.length;
 
   return {
     sampleSize: vectors.length,
@@ -320,17 +306,13 @@ const buildPhotoDateLookup = (albums: Content[]): PhotoDateLookup => {
 
 const openReadonlyDatabase = (dbPath: string) =>
   new Promise<any>((resolve, reject) => {
-    const db = new sqlite3.Database(
-      dbPath,
-      sqlite3.OPEN_READONLY,
-      (err: Error | null) => {
-        if (err) {
-          reject(err);
-          return;
-        }
-        resolve(db);
-      },
-    );
+    const db = new sqlite3.Database(dbPath, sqlite3.OPEN_READONLY, (err: Error | null) => {
+      if (err) {
+        reject(err);
+        return;
+      }
+      resolve(db);
+    });
   });
 
 const closeDatabase = (db: any) =>
@@ -354,28 +336,26 @@ const getRows = (db: any, sql: string, bind: unknown[]) =>
 // change). Both must stay readable — the stats can run against an older
 // canonical DB that has not been re-indexed yet.
 const embeddingsTableHasBlobColumn = async (db: any): Promise<boolean> => {
-  const columns = await new Promise<Array<{ name: string }>>(
-    (resolve, reject) => {
-      db.all(
-        "PRAGMA table_info(embeddings)",
-        [],
-        (err: Error | null, rows: Array<{ name: string }>) => {
-          if (err) {
-            reject(err);
-            return;
-          }
-          resolve(rows ?? []);
-        },
-      );
-    },
-  );
+  const columns = await new Promise<Array<{ name: string }>>((resolve, reject) => {
+    db.all(
+      "PRAGMA table_info(embeddings)",
+      [],
+      (err: Error | null, rows: Array<{ name: string }>) => {
+        if (err) {
+          reject(err);
+          return;
+        }
+        resolve(rows ?? []);
+      },
+    );
+  });
   return columns.some((column) => column.name === "embedding_blob");
 };
 
 const decodeEmbeddingRow = (row: EmbeddingRow): number[] | null => {
   if (row.embedding_blob !== undefined) {
     const scale = row.embedding_scale ?? 1;
-    const vector = new Array<number>(row.embedding_blob.length);
+    const vector = Array.from({ length: row.embedding_blob.length }, () => 0);
     for (let index = 0; index < row.embedding_blob.length; index += 1) {
       vector[index] = row.embedding_blob.readInt8(index) * scale;
     }
@@ -440,17 +420,13 @@ export const computeVisualSamenessStats = async (
         "SELECT DISTINCT model_id AS path, '' AS embedding_json FROM embeddings",
         [],
       );
-      const selectedModelId = selectEmbeddingModelId(
-        modelRows.map((row) => row.path),
-      );
+      const selectedModelId = selectEmbeddingModelId(modelRows.map((row) => row.path));
       if (!selectedModelId) {
         return null;
       }
 
       const hasBlobColumn = await embeddingsTableHasBlobColumn(db);
-      const embeddingColumns = hasBlobColumn
-        ? "embedding_blob, embedding_scale"
-        : "embedding_json";
+      const embeddingColumns = hasBlobColumn ? "embedding_blob, embedding_scale" : "embedding_json";
       const placeholders = selectedPaths.map(() => "?").join(", ");
       const rows = await getRows(
         db,
@@ -501,49 +477,56 @@ export const computeVisualSamenessStats = async (
       }
 
       const averageNearestSimilarity =
-        validNearest.reduce((sum, item) => sum + item.nearestScore, 0) /
-        validNearest.length;
+        validNearest.reduce((sum, item) => sum + item.nearestScore, 0) / validNearest.length;
       const repeatedMotifPercent =
-        validNearest.filter((item) => item.nearestScore >= HIGH_SIMILARITY_THRESHOLD)
-          .length / validNearest.length;
+        validNearest.filter((item) => item.nearestScore >= HIGH_SIMILARITY_THRESHOLD).length /
+        validNearest.length;
       const distinctPercent =
-        validNearest.filter((item) => item.nearestScore < LOW_SIMILARITY_THRESHOLD)
-          .length / validNearest.length;
+        validNearest.filter((item) => item.nearestScore < LOW_SIMILARITY_THRESHOLD).length /
+        validNearest.length;
 
       const repeatedExamples = Array.from(
-        nearest.reduce((pairs, item) => {
-          if (item.nearestIndex < 0) {
-            return pairs;
-          }
+        nearest
+          .reduce(
+            (pairs, item) => {
+              if (item.nearestIndex < 0) {
+                return pairs;
+              }
 
-          const leftPath = item.path;
-          const rightPath = parsedRows[item.nearestIndex]?.path;
-          if (!rightPath) {
-            return pairs;
-          }
+              const leftPath = item.path;
+              const rightPath = parsedRows[item.nearestIndex]?.path;
+              if (!rightPath) {
+                return pairs;
+              }
 
-          const dedupeKey = [leftPath, rightPath].sort().join("::");
-          const existing = pairs.get(dedupeKey);
-          if (!existing || item.nearestScore > existing.similarityPercent / 100) {
-            const left = photoLookup.get(leftPath);
-            const right = photoLookup.get(rightPath);
-            if (!left || !right) {
+              const dedupeKey = [leftPath, rightPath].sort().join("::");
+              const existing = pairs.get(dedupeKey);
+              if (!existing || item.nearestScore > existing.similarityPercent / 100) {
+                const left = photoLookup.get(leftPath);
+                const right = photoLookup.get(rightPath);
+                if (!left || !right) {
+                  return pairs;
+                }
+
+                pairs.set(dedupeKey, {
+                  left,
+                  right,
+                  similarityPercent: Math.round(item.nearestScore * 100),
+                });
+              }
+
               return pairs;
-            }
-
-            pairs.set(dedupeKey, {
-              left,
-              right,
-              similarityPercent: Math.round(item.nearestScore * 100),
-            });
-          }
-
-          return pairs;
-        }, new Map<string, {
-          left: VisualSamenessPhoto;
-          right: VisualSamenessPhoto;
-          similarityPercent: number;
-        }>()).values(),
+            },
+            new Map<
+              string,
+              {
+                left: VisualSamenessPhoto;
+                right: VisualSamenessPhoto;
+                similarityPercent: number;
+              }
+            >(),
+          )
+          .values(),
       )
         .sort((left, right) => right.similarityPercent - left.similarityPercent)
         .slice(0, MAX_VISUAL_EXAMPLES);
@@ -560,14 +543,15 @@ export const computeVisualSamenessStats = async (
             nearestSimilarityPercent: Math.round(item.nearestScore * 100),
           };
         })
-        .filter((value): value is {
-          photo: VisualSamenessPhoto;
-          nearestSimilarityPercent: number;
-        } => value !== null)
-        .sort(
-          (left, right) =>
-            left.nearestSimilarityPercent - right.nearestSimilarityPercent,
+        .filter(
+          (
+            value,
+          ): value is {
+            photo: VisualSamenessPhoto;
+            nearestSimilarityPercent: number;
+          } => value !== null,
         )
+        .sort((left, right) => left.nearestSimilarityPercent - right.nearestSimilarityPercent)
         .slice(0, MAX_VISUAL_EXAMPLES);
 
       const centroidCandidates = parsedRows.filter((row) => photoLookup.has(row.path));
@@ -578,7 +562,7 @@ export const computeVisualSamenessStats = async (
       let lookDrift: VisualSamenessStats["lookDrift"] = null;
       if (centroidCandidates.length > 0) {
         const dimension = centroidCandidates[0]?.vector.length ?? 0;
-        const centroid = new Array<number>(dimension).fill(0);
+        const centroid = Array.from({ length: dimension }, () => 0);
 
         centroidCandidates.forEach((candidate) => {
           for (let index = 0; index < dimension; index += 1) {
@@ -587,11 +571,10 @@ export const computeVisualSamenessStats = async (
         });
 
         const normalizedCentroid = normalizeVector(centroid);
-        const centroidScores = centroidCandidates
-          .map((candidate) => ({
-            path: candidate.path,
-            score: dotProduct(candidate.vector, normalizedCentroid),
-          }));
+        const centroidScores = centroidCandidates.map((candidate) => ({
+          path: candidate.path,
+          score: dotProduct(candidate.vector, normalizedCentroid),
+        }));
         averageExamples = centroidScores
           .slice()
           .sort((left, right) => right.score - left.score)
@@ -668,7 +651,7 @@ export const computeVisualSamenessStats = async (
                 return centroids[index];
               }
 
-              const nextCentroid = new Array<number>(dimension).fill(0);
+              const nextCentroid = Array.from({ length: dimension }, () => 0);
               group.forEach((candidate) => {
                 for (let valueIndex = 0; valueIndex < dimension; valueIndex += 1) {
                   nextCentroid[valueIndex] += candidate.vector[valueIndex];
@@ -721,9 +704,7 @@ export const computeVisualSamenessStats = async (
 
               return {
                 label: deriveEraLabel(
-                  group.map(
-                    (candidate) => photoTagLookup.get(candidate.path) ?? [],
-                  ),
+                  group.map((candidate) => photoTagLookup.get(candidate.path) ?? []),
                   overallTagCounts,
                   `Era ${index + 1}`,
                 ),
@@ -742,7 +723,9 @@ export const computeVisualSamenessStats = async (
             ...candidate,
             date: photoDateLookup.get(candidate.path) ?? null,
           }))
-          .filter((candidate): candidate is typeof candidate & { date: Date } => candidate.date !== null)
+          .filter(
+            (candidate): candidate is typeof candidate & { date: Date } => candidate.date !== null,
+          )
           .sort((left, right) => left.date.getTime() - right.date.getTime());
 
         if (datedCandidates.length >= 24) {
@@ -757,7 +740,7 @@ export const computeVisualSamenessStats = async (
           lookTimeline = Array.from(byYear.entries())
             .sort((left, right) => left[0] - right[0])
             .flatMap(([year, group]) => {
-              const yearCentroid = new Array<number>(dimension).fill(0);
+              const yearCentroid = Array.from({ length: dimension }, () => 0);
               group.forEach((candidate) => {
                 for (let index = 0; index < dimension; index += 1) {
                   yearCentroid[index] += candidate.vector[index];
@@ -792,7 +775,7 @@ export const computeVisualSamenessStats = async (
           const early = datedCandidates.slice(0, bucketSize);
           const recent = datedCandidates.slice(-bucketSize);
           const buildCentroid = (group: typeof datedCandidates) => {
-            const nextCentroid = new Array<number>(dimension).fill(0);
+            const nextCentroid = Array.from({ length: dimension }, () => 0);
             group.forEach((candidate) => {
               for (let index = 0; index < dimension; index += 1) {
                 nextCentroid[index] += candidate.vector[index];
