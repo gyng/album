@@ -5,6 +5,7 @@ import {
   SiglipTextModel,
   SiglipVisionModel,
   env,
+  type ProgressInfo,
 } from "@huggingface/transformers";
 
 // One worker entry serves BOTH the text and the vision encoder. It must stay a
@@ -25,22 +26,6 @@ type WorkerProgressDetails = {
   total: number;
   file?: string;
 };
-
-type TransformersProgressInfo =
-  | {
-      status: "progress";
-      file: string;
-      progress: number;
-      loaded: number;
-      total: number;
-    }
-  | {
-      status: "download" | "done" | "initiate" | "ready";
-      file?: string;
-      progress?: number;
-      loaded?: number;
-      total?: number;
-    };
 
 // Per-runtime sets: a text load's progress must only reach text requesters
 // (and vision likewise) — with one shared set, simultaneous loads spray each
@@ -124,7 +109,7 @@ const reportProgress = (
   phaseStart: number,
   phaseSpan: number,
   phaseLabel: string,
-  info: TransformersProgressInfo,
+  info: ProgressInfo,
 ) => {
   if (info.status !== "progress") {
     return;
@@ -182,7 +167,7 @@ const loadTextRuntime = async (requestId?: number) =>
       textRuntimePromise = (async () => {
         postLoadProgress(textLoadingRequestIds, 5, "Starting model load");
         const tokenizer = await AutoTokenizer.from_pretrained(MODEL_ID, {
-          progress_callback: (info: TransformersProgressInfo) => {
+          progress_callback: (info: ProgressInfo) => {
             reportProgress(textLoadingRequestIds, 5, 30, "Loading tokenizer", info);
           },
         });
@@ -193,7 +178,7 @@ const loadTextRuntime = async (requestId?: number) =>
             SiglipTextModel.from_pretrained(MODEL_ID, {
               device,
               dtype: "q4",
-              progress_callback: (info: TransformersProgressInfo) => {
+              progress_callback: (info: ProgressInfo) => {
                 reportProgress(textLoadingRequestIds, 35, 60, "Loading text model", info);
               },
             }),
@@ -225,7 +210,7 @@ const loadVisionRuntime = async (requestId?: number) =>
       visionRuntimePromise = (async () => {
         postLoadProgress(visionLoadingRequestIds, 5, "Starting image model load");
         const processor = await AutoProcessor.from_pretrained(MODEL_ID, {
-          progress_callback: (info: TransformersProgressInfo) => {
+          progress_callback: (info: ProgressInfo) => {
             reportProgress(visionLoadingRequestIds, 5, 10, "Loading image processor", info);
           },
         });
@@ -238,7 +223,7 @@ const loadVisionRuntime = async (requestId?: number) =>
               // q4 verified against the DB embeddings: 5/5 sample photos
               // re-embedded in-browser ranked themselves #1 of 1495.
               dtype: "q4",
-              progress_callback: (info: TransformersProgressInfo) => {
+              progress_callback: (info: ProgressInfo) => {
                 reportProgress(visionLoadingRequestIds, 15, 80, "Loading image model", info);
               },
             }),
@@ -260,10 +245,7 @@ const loadVisionRuntime = async (requestId?: number) =>
     }
   });
 
-const encodeText = async (
-  text: string,
-  requestId: number,
-): Promise<number[]> => {
+const encodeText = async (text: string, requestId: number): Promise<number[]> => {
   const { tokenizer, model } = await loadTextRuntime(requestId);
   const modelInputs = tokenizer(text.toLowerCase(), {
     padding: "max_length",
@@ -294,42 +276,39 @@ const encodeImage = async (blob: Blob, requestId: number): Promise<number[]> => 
   return normalizeVector(embedding.data as Float32Array);
 };
 
-self.addEventListener(
-  "message",
-  async (event: MessageEvent<EmbeddingWorkerRequest>) => {
-    const data = event.data;
-    const requestId = data.id;
+self.addEventListener("message", async (event: MessageEvent<EmbeddingWorkerRequest>) => {
+  const data = event.data;
+  const requestId = data.id;
 
-    try {
-      if (data.type === "warmup") {
-        await loadTextRuntime(requestId);
-        self.postMessage({ id: requestId, ok: true });
-        return;
-      }
-
-      if (data.type === "encode") {
-        const vector = await encodeText(data.text, requestId);
-        self.postMessage({ id: requestId, ok: true, vector });
-        return;
-      }
-
-      if (data.type === "encode-image") {
-        const vector = await encodeImage(data.blob, requestId);
-        self.postMessage({ id: requestId, ok: true, vector });
-        return;
-      }
-
-      self.postMessage({
-        id: requestId,
-        ok: false,
-        error: "Unknown embedding worker request.",
-      });
-    } catch (error) {
-      self.postMessage({
-        id: requestId,
-        ok: false,
-        error: error instanceof Error ? error.message : "Embedding failed.",
-      });
+  try {
+    if (data.type === "warmup") {
+      await loadTextRuntime(requestId);
+      self.postMessage({ id: requestId, ok: true });
+      return;
     }
-  },
-);
+
+    if (data.type === "encode") {
+      const vector = await encodeText(data.text, requestId);
+      self.postMessage({ id: requestId, ok: true, vector });
+      return;
+    }
+
+    if (data.type === "encode-image") {
+      const vector = await encodeImage(data.blob, requestId);
+      self.postMessage({ id: requestId, ok: true, vector });
+      return;
+    }
+
+    self.postMessage({
+      id: requestId,
+      ok: false,
+      error: "Unknown embedding worker request.",
+    });
+  } catch (error) {
+    self.postMessage({
+      id: requestId,
+      ok: false,
+      error: error instanceof Error ? error.message : "Embedding failed.",
+    });
+  }
+});
