@@ -5,7 +5,6 @@ import { OptimisedPhoto } from "../services/types";
 import Link from "next/link";
 import { getRelativeTimeString } from "../util/time";
 import { exifWallClockTimestamp } from "../util/exifTime";
-import { unwrapLongitudes } from "../util/mapBounds";
 import { mixHsl, recencyColor } from "../util/mapColor";
 import { MapRecencyLegend } from "./MapRecencyLegend";
 import MapLibreMap, {
@@ -25,7 +24,6 @@ import { ThemeToggle } from "./ThemeToggle";
 import {
   buildContextRoutePoints,
   buildMapRoute,
-  distanceMetersBetween,
   RouteGeoJson,
   RouteMode,
   RoutePoint,
@@ -42,6 +40,15 @@ import {
   stylePhotosByRecency,
 } from "./mapWorldViewModel";
 import { LazyMapMarkerImage, MapAutoFit, MapBoundsTracker } from "./MapWorldMapChildren";
+import {
+  formatDistanceKm,
+  getAnimationSecondsFromSpeed,
+  getDirectionalGradientStops,
+  isTransferLeg,
+  projectGhostRoutePath,
+  projectRouteSegments,
+  selectPreferredLabelSegmentIds,
+} from "./mapRouteOverlayModel";
 
 export type MapWorldEntry = {
   album: string;
@@ -85,101 +92,12 @@ const getRouteColorStops = (relative: number) => {
   ];
 };
 
-// Route gradients simply blend the recency colours of the two endpoints, so a
-// trip's line runs oldest→newest (blue→red) exactly like its markers. The end
-// colours are already recency colours from `markerColorByHref`.
-const getDirectionalGradientStops = (fromColor: string, toColor: string) => [
-  { offset: "0%", color: fromColor },
-  { offset: "50%", color: mixHsl(fromColor, toColor, 0.5) },
-  { offset: "100%", color: toColor },
-];
-
 const getBackgroundJourneyGradientColors = (fromColor: string, toColor: string) => ({
   start: fromColor,
   quarter: mixHsl(fromColor, toColor, 0.25),
   middle: mixHsl(fromColor, toColor, 0.5),
   end: toColor,
 });
-
-// Slow real-world speed → slow animation, fast → fast.
-// Uses log10 so the huge range (walk 3km/h → flight 900km/h) maps smoothly.
-// log10(1)=0 → 2.5s, log10(10)=1 → 1.83s, log10(100)=2 → 1.16s, log10(900)≈3 → 0.5s
-const getAnimationSecondsFromSpeed = (speedKmh: number | null): number => {
-  if (speedKmh === null || speedKmh <= 0) return 1.8;
-  const log = Math.log10(Math.min(1000, Math.max(1, speedKmh)));
-  return Number((2.5 - log * 0.67).toFixed(2));
-};
-
-const getApproxSpeedKmh = (fromPoint: RoutePoint, toPoint: RoutePoint): number | null => {
-  const from = fromPoint.date ? new Date(fromPoint.date).valueOf() : NaN;
-  const to = toPoint.date ? new Date(toPoint.date).valueOf() : NaN;
-
-  if (Number.isNaN(from) || Number.isNaN(to) || to <= from) {
-    return null;
-  }
-
-  const hours = (to - from) / (60 * 60 * 1000);
-  if (hours <= 0) {
-    return null;
-  }
-
-  const distanceKm =
-    distanceMetersBetween(
-      {
-        decLat: fromPoint.decLat as number,
-        decLng: fromPoint.decLng as number,
-      },
-      { decLat: toPoint.decLat as number, decLng: toPoint.decLng as number },
-    ) / 1000;
-
-  if (distanceKm < 0.1) {
-    return null;
-  }
-
-  const speed = distanceKm / hours;
-  if (!Number.isFinite(speed) || speed < 1 || speed > 500) {
-    return null;
-  }
-
-  return Math.round(speed);
-};
-
-const getDistanceKm = (fromPoint: RoutePoint, toPoint: RoutePoint): number => {
-  return (
-    distanceMetersBetween(
-      {
-        decLat: fromPoint.decLat as number,
-        decLng: fromPoint.decLng as number,
-      },
-      { decLat: toPoint.decLat as number, decLng: toPoint.decLng as number },
-    ) / 1000
-  );
-};
-
-const formatDistanceKm = (distanceKm: number): string => {
-  if (distanceKm >= 10) {
-    return `${Math.round(distanceKm)}km`;
-  }
-
-  return `${distanceKm.toFixed(1)}km`;
-};
-
-const getReadableLabelAngle = (angle: number): number => {
-  if (angle > 90) {
-    return angle - 180;
-  }
-
-  if (angle < -90) {
-    return angle + 180;
-  }
-
-  return angle;
-};
-
-const isTransferLeg = (distanceKm: number, durationSeconds: number): boolean => {
-  const hours = durationSeconds / 3600;
-  return distanceKm >= 12 || hours >= 2;
-};
 
 const useMapOverlayVersion = () => {
   const { current: map } = useMap();
@@ -247,59 +165,11 @@ const MapRouteOverlay = ({
       return [];
     }
 
-    // Project each point onto the world copy nearest its predecessor so a leg
-    // crossing the Pacific (e.g. Tokyo → Honolulu) draws the short way across
-    // the antimeridian instead of sweeping the long way back across the map.
-    const unwrappedLngs = unwrapLongitudes(routePoints.map((point) => point.decLng as number));
-
-    return routePoints.slice(0, -1).flatMap((point, index) => {
-      const nextPoint = routePoints[index + 1];
-      if (!nextPoint) {
-        return [];
-      }
-      const start = map.project([unwrappedLngs[index] as number, point.decLat as number]);
-      const end = map.project([unwrappedLngs[index + 1] as number, nextPoint.decLat as number]);
-      if (
-        typeof start?.x !== "number" ||
-        typeof start?.y !== "number" ||
-        typeof end?.x !== "number" ||
-        typeof end?.y !== "number"
-      ) {
-        return [];
-      }
-
-      const dx = end.x - start.x;
-      const dy = end.y - start.y;
-      const length = Math.hypot(dx, dy);
-      const normalX = length > 0 ? -dy / length : 0;
-      const normalY = length > 0 ? dx / length : 0;
-      return [
-        {
-          id: `${point.href}-${nextPoint.href}`,
-          d: `M ${start.x.toFixed(2)} ${start.y.toFixed(2)} L ${end.x.toFixed(2)} ${end.y.toFixed(2)}`,
-          color: getPointColor(nextPoint, index + 1),
-          approxSpeedKmh: getApproxSpeedKmh(point, nextPoint),
-          durationSeconds: (() => {
-            const t0 = point.date ? new Date(point.date).valueOf() : NaN;
-            const t1 = nextPoint.date ? new Date(nextPoint.date).valueOf() : NaN;
-            return Number.isNaN(t0) || Number.isNaN(t1) ? 0 : Math.abs(t1 - t0) / 1000;
-          })(),
-          distanceKm: getDistanceKm(point, nextPoint),
-          midX: Number(((start.x + end.x) / 2 + normalX * 10).toFixed(2)),
-          midY: Number(((start.y + end.y) / 2 + normalY * 10).toFixed(2)),
-          startX: Number(start.x.toFixed(2)),
-          startY: Number(start.y.toFixed(2)),
-          endX: Number(end.x.toFixed(2)),
-          endY: Number(end.y.toFixed(2)),
-          angle: Number(
-            getReadableLabelAngle(
-              (Math.atan2(end.y - start.y, end.x - start.x) * 180) / Math.PI,
-            ).toFixed(2),
-          ),
-          lengthPx: length,
-        },
-      ];
-    });
+    return projectRouteSegments(
+      routePoints,
+      (coordinates) => map.project(coordinates),
+      getPointColor,
+    );
   }, [getPointColor, map, routePoints, version]);
 
   const routeGradient = React.useMemo(() => {
@@ -336,66 +206,13 @@ const MapRouteOverlay = ({
       return null;
     }
 
-    // Same antimeridian-aware projection as the main route (see above).
-    const ghostUnwrappedLngs = unwrapLongitudes(
-      ghostRoutePoints.map((point) => point.decLng as number),
-    );
-
-    const points = ghostRoutePoints
-      .map((point, index) =>
-        map.project([ghostUnwrappedLngs[index] as number, point.decLat as number]),
-      )
-      .filter((point) => typeof point?.x === "number" && typeof point?.y === "number");
-
-    if (points.length < 2) {
-      return null;
-    }
-
-    return points
-      .map(
-        (point, index) => `${index === 0 ? "M" : "L"} ${point.x.toFixed(2)} ${point.y.toFixed(2)}`,
-      )
-      .join(" ");
+    return projectGhostRoutePath(ghostRoutePoints, (coordinates) => map.project(coordinates));
   }, [ghostRoutePoints, map, version]);
 
-  const preferredLabelSegmentIds = React.useMemo(() => {
-    const candidates = projectedSegments
-      .filter(
-        (segment) =>
-          segment.approxSpeedKmh !== null && (segment.distanceKm >= 5 || segment.lengthPx >= 24),
-      )
-      .sort((left, right) => {
-        const leftScore = left.lengthPx;
-        const rightScore = right.lengthPx;
-        return rightScore - leftScore;
-      });
-
-    const selected = new Set<string>();
-    const minMidpointSpacingPx = 75;
-
-    for (const candidate of candidates) {
-      const tooCloseToExisting = Array.from(selected).some((selectedId) => {
-        const selectedSegment = projectedSegments.find((segment) => segment.id === selectedId);
-
-        if (!selectedSegment) {
-          return false;
-        }
-
-        return (
-          Math.hypot(candidate.midX - selectedSegment.midX, candidate.midY - selectedSegment.midY) <
-          minMidpointSpacingPx
-        );
-      });
-
-      if (tooCloseToExisting) {
-        continue;
-      }
-
-      selected.add(candidate.id);
-    }
-
-    return selected;
-  }, [projectedSegments]);
+  const preferredLabelSegmentIds = React.useMemo(
+    () => selectPreferredLabelSegmentIds(projectedSegments),
+    [projectedSegments],
+  );
 
   if (projectedSegments.length === 0) {
     return null;
