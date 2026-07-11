@@ -1,0 +1,4 @@
+node_modules
+dist
+# exiftool keeps a *_original backup beside each edited file
+*_original
