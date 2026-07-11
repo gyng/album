@@ -4,8 +4,8 @@ import pinStyles from "./mapPin.module.css";
 import { OptimisedPhoto } from "../services/types";
 import Link from "next/link";
 import { getRelativeTimeString } from "../util/time";
-import { parseTimestampSafe } from "../util/timeRange";
-import { computeWrapAwareBounds, unwrapLongitudes } from "../util/mapBounds";
+import { exifWallClockTimestamp } from "../util/exifTime";
+import { unwrapLongitudes } from "../util/mapBounds";
 import { mixHsl, recencyColor } from "../util/mapColor";
 import { MapRecencyLegend } from "./MapRecencyLegend";
 import MapLibreMap, {
@@ -21,7 +21,6 @@ import MapLibreMap, {
   useMap,
 } from "react-map-gl/maplibre";
 import "maplibre-gl/dist/maplibre-gl.css";
-import { useIntersectionObserver } from "usehooks-ts";
 import { ThemeToggle } from "./ThemeToggle";
 import {
   buildContextRoutePoints,
@@ -32,6 +31,17 @@ import {
   RoutePoint,
   toRouteGeoJson,
 } from "./mapRoute";
+import {
+  filterPhotosByBounds,
+  formatMapPhotoDate,
+  formatMapPhotoDateTime,
+  getLegendYears,
+  getPhotoDateStats,
+  isPhotoInTimeRange,
+  MapBounds,
+  stylePhotosByRecency,
+} from "./mapWorldViewModel";
+import { LazyMapMarkerImage, MapAutoFit, MapBoundsTracker } from "./MapWorldMapChildren";
 
 export type MapWorldEntry = {
   album: string;
@@ -47,12 +57,6 @@ export type MapWorldEntry = {
 
 export type TimeRange = { fromMs: number; toMs: number };
 
-const isPhotoInTimeRange = (photo: { date: string | null }, range: TimeRange): boolean => {
-  const ms = parseTimestampSafe(photo.date);
-  if (ms === null) return false;
-  return ms >= range.fromMs && ms <= range.toMs;
-};
-
 export type MapWorldProps = {
   photos: MapWorldEntry[];
   className: string;
@@ -67,111 +71,6 @@ export type MapWorldProps = {
   timeRange?: TimeRange | null;
   /** Show the colour-recency legend (defaults to true). */
   showLegend?: boolean;
-};
-
-const MapAutoFit = ({ enabled, photos }: { enabled: boolean; photos: MapWorldEntry[] }) => {
-  const { current: map } = useMap();
-
-  React.useEffect(() => {
-    if (!enabled || !map) {
-      return;
-    }
-
-    const coordinates = photos
-      .filter((photo) => photo.decLat !== null && photo.decLng !== null)
-      .map((photo) => [photo.decLng as number, photo.decLat as number] as [number, number]);
-
-    if (coordinates.length === 0) {
-      return;
-    }
-
-    if (coordinates.length === 1) {
-      const [longitude, latitude] = coordinates[0];
-      map.flyTo({ center: [longitude, latitude], zoom: 10.5, speed: 2.2 });
-      return;
-    }
-
-    const bounds = computeWrapAwareBounds(coordinates);
-    if (!bounds) {
-      return;
-    }
-
-    map.fitBounds(bounds, {
-      padding: 36,
-      duration: 0,
-      maxZoom: 11,
-    });
-  }, [enabled, map, photos]);
-
-  return null;
-};
-
-const LazyImage = ({ photo }: { photo: MapWorldEntry }) => {
-  const { entry, ref } = useIntersectionObserver({ rootMargin: "100px" });
-  const isVisible = !!entry?.isIntersecting;
-
-  return (
-    <div ref={ref}>
-      {isVisible && (
-        <img
-          src={photo.src.src}
-          className={styles.photoMarkerImage}
-          width={photo.placeholderWidth}
-          height={photo.placeholderHeight}
-          style={{
-            backgroundColor: `${photo.placeholderColor}`,
-          }}
-          loading="lazy"
-          alt=""
-          aria-hidden="true"
-        />
-      )}
-    </div>
-  );
-};
-
-// Component to track map bounds for viewport culling
-const MapBoundsTracker = ({
-  onBoundsChange,
-}: {
-  onBoundsChange: (bounds: { north: number; south: number; east: number; west: number }) => void;
-}) => {
-  const { current: map } = useMap();
-
-  React.useEffect(() => {
-    if (!map) return;
-
-    const updateBounds = () => {
-      const bounds = map.getBounds();
-      if (bounds) {
-        onBoundsChange({
-          north: bounds.getNorth(),
-          south: bounds.getSouth(),
-          east: bounds.getEast(),
-          west: bounds.getWest(),
-        });
-      }
-    };
-
-    // Set initial bounds
-    updateBounds();
-
-    // Update bounds on move
-    map.on("moveend", updateBounds);
-    map.on("zoomend", updateBounds);
-
-    return () => {
-      map.off("moveend", updateBounds);
-      map.off("zoomend", updateBounds);
-    };
-  }, [map, onBoundsChange]);
-
-  return null;
-};
-
-type PhotoWithStyle = MapWorldEntry & {
-  relative: number;
-  markerColor: string;
 };
 
 // The single-album journey line is drawn in one solid colour: the recency
@@ -697,76 +596,20 @@ export const MMap: React.FC<MapWorldProps> = ({
   );
   const [isInteracting, setIsInteracting] = React.useState(false);
 
-  const [bounds, setBounds] = React.useState<{
-    north: number;
-    south: number;
-    east: number;
-    west: number;
-  } | null>(null);
+  const [bounds, setBounds] = React.useState<MapBounds | null>(null);
   const timeFilteredPhotos = React.useMemo(
     () => (timeRange ? photos.filter((photo) => isPhotoInTimeRange(photo, timeRange)) : photos),
     [photos, timeRange],
   );
-  // Memoize date range calculations (Optimization #1)
-  const dateStats = React.useMemo(() => {
-    const sortedByDate = photos
-      .slice()
-      .filter((p) => p.date)
-      .sort((a, b) => new Date(a.date ?? "").valueOf() - new Date(b.date ?? "").valueOf());
-    // Ascending sort: earliest first, latest last.
-    const oldest = sortedByDate.at(0);
-    const newest = sortedByDate.at(-1);
-    const range = new Date(newest?.date ?? 0).valueOf() - new Date(oldest?.date ?? 0).valueOf();
-
-    return { oldest, newest, range };
-  }, [photos]);
-
-  // Memoize sorted photos with pre-calculated marker styles (Optimization #2)
-  const photosWithStyles = React.useMemo(() => {
-    return timeFilteredPhotos
-      .slice()
-      .sort((a, b) => {
-        // sort so newer markers are on top
-        return new Date(a.date ?? "").valueOf() - new Date(b.date ?? "").valueOf();
-      })
-      .map((photo): PhotoWithStyle => {
-        // Undated photos resolve to the oldest end. Guard range === 0 (single
-        // photo or an all-same-timestamp burst) so relative is 0, never NaN —
-        // otherwise recencyColor would receive NaN. (recencyColor also clamps.)
-        const rawRelative =
-          dateStats.range > 0
-            ? (new Date(photo.date ?? dateStats.oldest?.date ?? "").valueOf() -
-                new Date(dateStats.oldest?.date ?? 0).valueOf()) /
-              dateStats.range
-            : 0;
-        const relative = Number.isFinite(rawRelative) ? Math.min(1, Math.max(0, rawRelative)) : 0;
-
-        return {
-          ...photo,
-          relative,
-          markerColor: recencyColor(relative),
-        };
-      });
-  }, [dateStats, timeFilteredPhotos]);
-
-  // Filter photos by viewport bounds (Optimization #3)
-  const visiblePhotos = React.useMemo(() => {
-    if (!bounds) {
-      return photosWithStyles;
-    }
-
-    return photosWithStyles.filter((photo) => {
-      if (photo.decLat == null || photo.decLng == null) return false;
-
-      const inLat = photo.decLat >= bounds.south && photo.decLat <= bounds.north;
-      // Handle antimeridian wrap: west > east when viewport straddles 180°
-      const inLng =
-        bounds.west <= bounds.east
-          ? photo.decLng >= bounds.west && photo.decLng <= bounds.east
-          : photo.decLng >= bounds.west || photo.decLng <= bounds.east;
-      return inLat && inLng;
-    });
-  }, [photosWithStyles, bounds]);
+  const dateStats = React.useMemo(() => getPhotoDateStats(photos), [photos]);
+  const photosWithStyles = React.useMemo(
+    () => stylePhotosByRecency(timeFilteredPhotos, dateStats),
+    [dateStats, timeFilteredPhotos],
+  );
+  const visiblePhotos = React.useMemo(
+    () => filterPhotosByBounds(photosWithStyles, bounds),
+    [bounds, photosWithStyles],
+  );
 
   const [clickInfo, setClickInfo] = React.useState<MapWorldEntry | null>(null);
   const [hoverInfo, setHoverInfo] = React.useState<MapWorldEntry | null>(null);
@@ -963,20 +806,7 @@ export const MMap: React.FC<MapWorldProps> = ({
 
   const routeLineWidth = routeMode === "simplified" ? 4 : 3;
 
-  // Legend end labels: the years spanning the whole photo set (colour is keyed
-  // to the full range, not the filtered subset). Slicing the naive ISO string
-  // avoids any timezone parsing. Falls back to Older/Newer when unavailable or
-  // when both ends land in the same year.
-  const legendYears = React.useMemo(() => {
-    const yearOf = (date?: string | null) =>
-      date && /^\d{4}/.test(date) ? date.slice(0, 4) : null;
-    const older = yearOf(dateStats.oldest?.date);
-    const newer = yearOf(dateStats.newest?.date);
-    if (!older || !newer || older === newer) {
-      return { older: "Older", newer: "Newer" };
-    }
-    return { older, newer };
-  }, [dateStats.oldest?.date, dateStats.newest?.date]);
+  const legendYears = React.useMemo(() => getLegendYears(dateStats), [dateStats]);
   const shouldShowLegend = showLegend && dateStats.range > 0 && timeFilteredPhotos.length > 1;
 
   const pauseRouterSync = React.useCallback(() => {
@@ -1149,28 +979,19 @@ export const MMap: React.FC<MapWorldProps> = ({
                 <div className={styles.details}>
                   {popupInfo.album}
                   {(() => {
-                    const parsedDate = popupInfo.date ? new Date(popupInfo.date) : null;
-                    if (!parsedDate || Number.isNaN(parsedDate.valueOf())) {
-                      // Missing/invalid date — render nothing rather than the
-                      // literal "Invalid Date".
+                    const formattedDate = formatMapPhotoDateTime(popupInfo.date);
+                    const timestamp = exifWallClockTimestamp(popupInfo.date);
+                    if (!formattedDate || timestamp === null) {
                       return null;
                     }
 
-                    // getRelativeTimeString may return a string (current) or
-                    // null (once the util guards invalid input) — tolerate both.
-                    const relative = getRelativeTimeString(parsedDate);
+                    const relative = getRelativeTimeString(new Date(timestamp));
 
                     return (
                       <>
                         <br />
                         <span>
-                          {parsedDate.toLocaleString("en-GB", {
-                            day: "numeric",
-                            month: "short",
-                            year: "numeric",
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          })}
+                          {formattedDate}
                           {relative ? (
                             <>
                               <br />
@@ -1221,7 +1042,7 @@ export const MMap: React.FC<MapWorldProps> = ({
                 color={photo.markerColor}
               >
                 <div>
-                  {zoom && zoom > 8.5 ? <LazyImage photo={photo} /> : null}
+                  {zoom && zoom > 8.5 ? <LazyMapMarkerImage photo={photo} /> : null}
                   <span
                     style={{ color: photo.markerColor }}
                     className={[
@@ -1236,15 +1057,7 @@ export const MMap: React.FC<MapWorldProps> = ({
                       .join(" ")}
                     role="button"
                     tabIndex={0}
-                    aria-label={`Photo from ${photo.album}${
-                      photo.date
-                        ? ` on ${new Date(photo.date).toLocaleDateString("en-GB", {
-                            day: "numeric",
-                            month: "short",
-                            year: "numeric",
-                          })}`
-                        : ""
-                    }`}
+                    aria-label={`Photo from ${photo.album}${formatMapPhotoDate(photo.date) ? ` on ${formatMapPhotoDate(photo.date)}` : ""}`}
                     onMouseOver={() => {
                       setHoverInfo(photo);
                     }}
