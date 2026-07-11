@@ -1,11 +1,8 @@
 import React from "react";
-import styles from "./MapWorld.module.css";
-import pinStyles from "./mapPin.module.css";
 import { OptimisedPhoto } from "../services/types";
 import { mixHsl, recencyColor } from "../util/mapColor";
 import { MapRecencyLegend } from "./MapRecencyLegend";
 import MapLibreMap, {
-  Marker,
   ScaleControl,
   NavigationControl,
   GeolocateControl,
@@ -26,16 +23,16 @@ import {
 } from "./mapRoute";
 import {
   filterPhotosByBounds,
-  formatMapPhotoDate,
   getLegendYears,
   getPhotoDateStats,
   isPhotoInTimeRange,
   MapBounds,
   stylePhotosByRecency,
 } from "./mapWorldViewModel";
-import { LazyMapMarkerImage, MapAutoFit, MapBoundsTracker } from "./MapWorldMapChildren";
+import { MapAutoFit, MapBoundsTracker } from "./MapWorldMapChildren";
 import { MapRouteOverlay } from "./MapRouteOverlay";
 import { MapPhotoPopup } from "./MapPhotoPopup";
+import { MapPhotoMarkers } from "./MapPhotoMarkers";
 
 export type MapWorldEntry = {
   album: string;
@@ -471,58 +468,14 @@ export const MMap: React.FC<MapWorldProps> = ({
           onInteractionStart={pauseRouterSync}
         />
 
-        {visiblePhotos.map((photo) => {
-          return photo.decLat != null && photo.decLng != null ? (
-            <React.Fragment key={photo.href ?? photo?.src?.src ?? ""}>
-              <Marker
-                longitude={photo.decLng}
-                latitude={photo.decLat}
-                anchor="center"
-                onClick={(e) => {
-                  e.originalEvent.stopPropagation();
-                  selectMarker(photo);
-                }}
-                color={photo.markerColor}
-              >
-                <div>
-                  {zoom && zoom > 8.5 ? <LazyMapMarkerImage photo={photo} /> : null}
-                  <span
-                    style={{ color: photo.markerColor }}
-                    className={[
-                      pinStyles.pin,
-                      shouldEmphasizeRouteMarkers && activeRouteHrefSet.size > 0
-                        ? activeRouteHrefSet.has(photo.href)
-                          ? styles.pinActive
-                          : styles.pinMuted
-                        : "",
-                    ]
-                      .filter(Boolean)
-                      .join(" ")}
-                    role="button"
-                    tabIndex={0}
-                    aria-label={`Photo from ${photo.album}${formatMapPhotoDate(photo.date) ? ` on ${formatMapPhotoDate(photo.date)}` : ""}`}
-                    onMouseOver={() => {
-                      setHoverInfo(photo);
-                    }}
-                    onMouseLeave={() => {
-                      setHoverInfo(null);
-                    }}
-                    onFocus={() => {
-                      setHoverInfo(photo);
-                    }}
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter" || event.key === " ") {
-                        event.preventDefault();
-                        event.stopPropagation();
-                        selectMarker(photo);
-                      }
-                    }}
-                  />
-                </div>
-              </Marker>
-            </React.Fragment>
-          ) : null;
-        })}
+        <MapPhotoMarkers
+          photos={visiblePhotos}
+          zoom={zoom}
+          emphasiseRoute={shouldEmphasizeRouteMarkers}
+          activeRouteHrefSet={activeRouteHrefSet}
+          onSelect={selectMarker}
+          onHover={setHoverInfo}
+        />
 
         <NavigationControl />
         <GeolocateControl />
