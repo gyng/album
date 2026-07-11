@@ -35,6 +35,7 @@ from index import (
     search,
     search_similar_path,
     search_tags,
+    update_gps,
 )
 import os
 import shutil
@@ -507,6 +508,69 @@ class TestCli(UsesTestexistsFixture, unittest.TestCase):
             self.assertEqual(0, result.exit_code)
             self.assertTrue("Using model profile: siglip2" in result.output)
             self.assertTrue("Found 5 files" in result.output)
+
+    def test_update_gps_refreshes_coords_from_exif_without_models(self):
+        # A row seeded with deliberately wrong coords/date/geocode should be
+        # corrected to the photo's real EXIF, purely from CPU work.
+        photo = "../albums/test-simple/DSCF0506-2.jpg"
+        with tempfile.TemporaryDirectory() as tmpdir:
+            dbpath = os.path.join(tmpdir, "update-gps.sqlite")
+            db = Sqlite3Client(dbpath)
+            db.setup_tables()
+            with db.transaction() as cur:
+                db.upsert_image_fields(
+                    photo, {"filename": "DSCF0506-2.jpg", "geocode": "WRONGPLACE"}, cur=cur
+                )
+                db.insert_metadata(photo, (0.0, 0.0), "1999-01-01T00:00:00", {}, cur=cur)
+            db.con.close()
+
+            result = CliRunner().invoke(update_gps, f"--dbpath {dbpath}".split())
+            self.assertEqual(0, result.exit_code, result.output)
+
+            con = sqlite3.connect(dbpath)
+            lat, lng, iso, country = con.execute(
+                "SELECT lat_deg, lng_deg, iso8601, geo_country FROM metadata WHERE path=?",
+                (photo,),
+            ).fetchone()
+            geocode = con.execute(
+                "SELECT geocode FROM images WHERE path=?", (photo,)
+            ).fetchone()[0]
+            signature = con.execute(
+                "SELECT mtime, size FROM file_signatures WHERE path=?", (photo,)
+            ).fetchone()
+            con.close()
+
+            self.assertAlmostEqual(lat, 36.578858, places=3)
+            self.assertAlmostEqual(lng, 137.595973, places=3)
+            self.assertEqual(iso, "2019-11-06T10:48:19")
+            self.assertEqual(country, "Japan")
+            self.assertNotIn(geocode, (None, "WRONGPLACE"))
+            self.assertIsNotNone(signature)
+
+    def test_update_gps_dry_run_makes_no_changes(self):
+        photo = "../albums/test-simple/DSCF0506-2.jpg"
+        with tempfile.TemporaryDirectory() as tmpdir:
+            dbpath = os.path.join(tmpdir, "dry.sqlite")
+            db = Sqlite3Client(dbpath)
+            db.setup_tables()
+            with db.transaction() as cur:
+                db.upsert_image_fields(photo, {"geocode": "WRONGPLACE"}, cur=cur)
+                db.insert_metadata(photo, (0.0, 0.0), "1999-01-01T00:00:00", {}, cur=cur)
+            db.con.close()
+
+            result = CliRunner().invoke(update_gps, f"--dbpath {dbpath} --dry-run".split())
+            self.assertEqual(0, result.exit_code, result.output)
+
+            con = sqlite3.connect(dbpath)
+            lat = con.execute(
+                "SELECT lat_deg FROM metadata WHERE path=?", (photo,)
+            ).fetchone()[0]
+            geocode = con.execute(
+                "SELECT geocode FROM images WHERE path=?", (photo,)
+            ).fetchone()[0]
+            con.close()
+            self.assertEqual(lat, 0.0)
+            self.assertEqual(geocode, "WRONGPLACE")
 
     def test_index_dry_run_accepts_gemma_classifier_flags(self):
         with tempfile.TemporaryDirectory() as tmpdir:

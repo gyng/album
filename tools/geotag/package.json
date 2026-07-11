@@ -1,0 +1,40 @@
+{
+  "name": "geotag",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Local companion tool for manual GPS tagging + track interpolation of album photos. Shares pure logic from ../../src/util.",
+  "scripts": {
+    "dev": "concurrently -k -n api,web -c cyan,magenta \"npm:dev:server\" \"npm:dev:web\"",
+    "dev:server": "tsx watch server/index.ts",
+    "dev:web": "vite",
+    "build": "vite build",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@hono/node-server": "^1.13.7",
+    "exifr": "^7.1.3",
+    "exiftool-vendored": "^28.3.1",
+    "fast-xml-parser": "^5.9.3",
+    "hono": "^4.6.14",
+    "maplibre-gl": "^5.24.0",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "react-map-gl": "^8.1.1",
+    "sharp": "^0.35.3",
+    "tz-lookup": "^6.1.25"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^4.3.4",
+    "concurrently": "^9.1.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.9.3",
+    "vite": "^6.0.5",
+    "vitest": "^4.1.10"
+  }
+}
