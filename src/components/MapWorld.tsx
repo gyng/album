@@ -2,14 +2,10 @@ import React from "react";
 import styles from "./MapWorld.module.css";
 import pinStyles from "./mapPin.module.css";
 import { OptimisedPhoto } from "../services/types";
-import Link from "next/link";
-import { getRelativeTimeString } from "../util/time";
-import { exifWallClockTimestamp } from "../util/exifTime";
 import { mixHsl, recencyColor } from "../util/mapColor";
 import { MapRecencyLegend } from "./MapRecencyLegend";
 import MapLibreMap, {
   Marker,
-  Popup,
   ScaleControl,
   NavigationControl,
   GeolocateControl,
@@ -31,7 +27,6 @@ import {
 import {
   filterPhotosByBounds,
   formatMapPhotoDate,
-  formatMapPhotoDateTime,
   getLegendYears,
   getPhotoDateStats,
   isPhotoInTimeRange,
@@ -40,6 +35,7 @@ import {
 } from "./mapWorldViewModel";
 import { LazyMapMarkerImage, MapAutoFit, MapBoundsTracker } from "./MapWorldMapChildren";
 import { MapRouteOverlay } from "./MapRouteOverlay";
+import { MapPhotoPopup } from "./MapPhotoPopup";
 
 export type MapWorldEntry = {
   album: string;
@@ -466,87 +462,14 @@ export const MMap: React.FC<MapWorldProps> = ({
           />
         ) : null}
 
-        {popupInfo && popupInfo.decLat != null && popupInfo.decLng != null ? (
-          <Popup
-            longitude={popupInfo.decLng}
-            latitude={popupInfo.decLat}
-            onClose={() => {
-              setClickInfo(null);
-            }}
-            className={`${styles.popup} ${clickInfo ? styles.click : styles.hover}`}
-            offset={15}
-            closeButton={false}
-          >
-            {/* onClick only stops the click reaching the map's own handler — it
-                is event plumbing, not an interactive control. */}
-            {/* oxlint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions */}
-            <div
-              onMouseDownCapture={pauseRouterSync}
-              onTouchStartCapture={pauseRouterSync}
-              onClick={(event) => {
-                event.stopPropagation();
-              }}
-            >
-              <Link href={popupInfo.href ?? ""} className={styles.link}>
-                <img
-                  src={popupInfo.src.src}
-                  className={styles.image}
-                  width={popupInfo.placeholderWidth}
-                  height={popupInfo.placeholderHeight}
-                  style={{ backgroundColor: popupInfo.placeholderColor }}
-                  alt={popupInfo.album}
-                />
-                <div className={styles.details}>
-                  {popupInfo.album}
-                  {(() => {
-                    const formattedDate = formatMapPhotoDateTime(popupInfo.date);
-                    const timestamp = exifWallClockTimestamp(popupInfo.date);
-                    if (!formattedDate || timestamp === null) {
-                      return null;
-                    }
-
-                    const relative = getRelativeTimeString(new Date(timestamp));
-
-                    return (
-                      <>
-                        <br />
-                        <span>
-                          {formattedDate}
-                          {relative ? (
-                            <>
-                              <br />
-                              {relative}
-                            </>
-                          ) : null}
-                        </span>
-                      </>
-                    );
-                  })()}
-                </div>
-              </Link>
-
-              {clickInfo ? (
-                <div className={styles.viewOn}>
-                  <a
-                    href={`https://www.openstreetmap.org/?mlat=${popupInfo.decLat}&mlon=${popupInfo.decLng}&zoom=13`}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    OpenStreetMap
-                  </a>
-                  &nbsp;&middot;&nbsp;
-                  <a
-                    href={`https://www.google.com/maps/search/?api=1&query=${popupInfo.decLat},${popupInfo.decLng}`}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    Google Maps
-                  </a>
-                </div>
-              ) : null}
-            </div>
-          </Popup>
-        ) : null}
+        <MapPhotoPopup
+          photo={popupInfo}
+          selected={clickInfo !== null}
+          onClose={() => {
+            setClickInfo(null);
+          }}
+          onInteractionStart={pauseRouterSync}
+        />
 
         {visiblePhotos.map((photo) => {
           return photo.decLat != null && photo.decLng != null ? (
