@@ -2886,6 +2886,112 @@ def backfill(dbpath: str, dry_run: bool):
     )
 
 
+@cli.command("update-gps")
+@click.option("--dbpath", required=True, help="sqlite database path to refresh.")
+@click.option(
+    "--match",
+    default=None,
+    help="Only refresh indexed paths containing this substring (e.g. an album name).",
+)
+@click.option(
+    "--dry-run",
+    is_flag=True,
+    default=False,
+    help="Report what would change without writing.",
+)
+def update_gps(dbpath: str, match: Optional[str], dry_run: bool):
+    """Refresh GPS coordinates, timestamp and geocode for already-indexed photos
+    from their CURRENT EXIF, without re-running the Janus/SigLIP models.
+
+    Use this after the geotag companion tool writes GPS into originals: it reads
+    each indexed file's EXIF and updates metadata (lat/lng/iso8601/geo_*) plus the
+    searchable geocode blob, then bumps the change-detection signature so a later
+    full ``index`` run won't needlessly re-run the GPU models for these files.
+
+    Paths come from the index itself (stored album-relative), so files are read
+    relative to the index/ working directory exactly as at index time. This is
+    pure CPU work — the same result a full re-index would produce for these
+    fields, without the hours of GPU re-derivation of unchanged tags/embeddings.
+    Photos without GPS are left untouched; the geo tag-count table is not altered
+    (mirroring ``backfill``)."""
+    db = Sqlite3Client(dbpath)
+    db.setup_tables()
+
+    paths = [p for p in db.list_image_paths() if match is None or match in p]
+
+    geotagged = 0
+    updated = 0
+    missing = 0
+    with db.transaction() as cur:
+        for path in paths:
+            if not os.path.exists(path):
+                missing += 1
+                continue
+
+            with open(path, "rb") as fh:
+                exif_full = get_exif(fh)
+            exif = {k: v for k, v in exif_full.items() if not isinstance(v, bytes)}
+
+            lat = exif.get("GPS GPSLatitude")
+            lng = exif.get("GPS GPSLongitude")
+            lat_ref = exif.get("GPS GPSLatitudeRef")
+            lng_ref = exif.get("GPS GPSLongitudeRef")
+
+            lat_deg = None
+            lng_deg = None
+            geo: Mapping = {}
+            if lat and lng and lat_ref and lng_ref:
+                try:
+                    lat_deg = convert_to_degress(lat, lat_ref)
+                    lng_deg = convert_to_degress(lng, lng_ref)
+                    geo = get_image_geocode(lat_deg, lng_deg)
+                except (
+                    ZeroDivisionError,
+                    ValueError,
+                    TypeError,
+                    IndexError,
+                    AttributeError,
+                ) as err:
+                    log(f"Ignoring malformed GPS coordinates for {path}: {err}")
+                    lat_deg = None
+                    lng_deg = None
+                    geo = {}
+
+            # Nothing to refresh for a photo without usable GPS — leave its row as-is.
+            if lat_deg is None or lng_deg is None:
+                continue
+            geotagged += 1
+
+            iso8601_local = (
+                str(exif_full.get("EXIF DateTimeOriginal", ""))
+                .replace(":", "-", 2)
+                .replace(" ", "T", 1)
+            ) or None
+            blob, geo_cols = build_geocode_fields(geo)
+
+            if dry_run:
+                continue
+
+            db.insert_metadata(path, (lat_deg, lng_deg), iso8601_local, geo_cols, cur=cur)
+            if blob is not None:
+                db.upsert_image_fields(path, {"geocode": blob}, cur=cur)
+            sig = file_signature(path)
+            if sig is not None:
+                db.upsert_file_signature(path, sig[0], sig[1], cur=cur)
+            updated += 1
+
+    if not dry_run:
+        # Match prune/index: leave the published copy in delete journal mode with
+        # no dangling -wal so a straight file copy ships a consistent DB.
+        db.finalize_journal_mode()
+
+    log(
+        f"update-gps: {'would refresh' if dry_run else 'refreshed'} "
+        f"{geotagged if dry_run else updated} geotagged of {len(paths)} indexed "
+        f"path(s) (match={match!r}), {missing} missing, in {dbpath}"
+    )
+
+
 @cli.command("search")
 @click.option("--dbpath", default="testdb.sqlite", help="sqlite database path to use.")
 @click.option("--query", default="", help="Search query.")
