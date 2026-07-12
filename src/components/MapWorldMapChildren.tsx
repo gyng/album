@@ -1,6 +1,5 @@
 import React from "react";
 import { useMap } from "react-map-gl/maplibre";
-import { useIntersectionObserver } from "usehooks-ts";
 import { computeWrapAwareBounds } from "../util/mapBounds";
 import type { MapWorldEntry } from "./MapWorld";
 import type { MapBounds } from "./mapWorldViewModel";
@@ -43,25 +42,64 @@ export const MapAutoFit = ({ enabled, photos }: { enabled: boolean; photos: MapW
   return null;
 };
 
-export const LazyMapMarkerImage = ({ photo }: { photo: MapWorldEntry }) => {
-  const { entry, ref } = useIntersectionObserver({ rootMargin: "100px" });
-  const isVisible = Boolean(entry?.isIntersecting);
+export type ObserveMapMarker = (
+  element: Element,
+  onVisibilityChange: (isVisible: boolean) => void,
+) => () => void;
 
+export const useSharedMapMarkerObserver = (): ObserveMapMarker => {
+  const observerRef = React.useRef<IntersectionObserver | null>(null);
+  const listenersRef = React.useRef(new Map<Element, (isVisible: boolean) => void>());
+
+  const observe = React.useCallback<ObserveMapMarker>((element, onVisibilityChange) => {
+    if (typeof IntersectionObserver === "undefined") {
+      return () => {};
+    }
+
+    if (!observerRef.current) {
+      observerRef.current = new IntersectionObserver(
+        (entries) => {
+          entries.forEach((entry) => {
+            listenersRef.current.get(entry.target)?.(entry.isIntersecting);
+          });
+        },
+        { rootMargin: "100px" },
+      );
+    }
+
+    listenersRef.current.set(element, onVisibilityChange);
+    observerRef.current.observe(element);
+
+    return () => {
+      observerRef.current?.unobserve(element);
+      listenersRef.current.delete(element);
+    };
+  }, []);
+
+  React.useEffect(
+    () => () => {
+      observerRef.current?.disconnect();
+      observerRef.current = null;
+      listenersRef.current.clear();
+    },
+    [],
+  );
+
+  return observe;
+};
+
+export const LazyMapMarkerImage = ({ photo }: { photo: MapWorldEntry }) => {
   return (
-    <div ref={ref}>
-      {isVisible ? (
-        <img
-          src={photo.src.src}
-          className={styles.photoMarkerImage}
-          width={photo.placeholderWidth}
-          height={photo.placeholderHeight}
-          style={{ backgroundColor: photo.placeholderColor }}
-          loading="lazy"
-          alt=""
-          aria-hidden="true"
-        />
-      ) : null}
-    </div>
+    <img
+      src={photo.src.src}
+      className={styles.photoMarkerImage}
+      width={photo.placeholderWidth}
+      height={photo.placeholderHeight}
+      style={{ backgroundColor: photo.placeholderColor }}
+      loading="lazy"
+      alt=""
+      aria-hidden="true"
+    />
   );
 };
 

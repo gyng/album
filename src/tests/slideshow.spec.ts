@@ -19,8 +19,16 @@ const waitForImageChange = (page: Page, previousSrc: string) =>
 
 const revealControls = async (page: Page) => {
   await page.mouse.move(200, 10);
-  await page.waitForTimeout(150);
+  await expect(page.getByRole("group", { name: "Playback mode" })).toBeVisible();
 };
+
+const settleUi = (page: Page) =>
+  page.evaluate(
+    () =>
+      new Promise<void>((resolve) => {
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+      }),
+  );
 
 /** Wait for the slideshow to fully load (title + image visible).
  *  Uses a longer timeout for the first assertion since the slideshow
@@ -29,8 +37,6 @@ const waitForSlideshow = async (page: Page) => {
   await expect(page).toHaveTitle("Slideshow | Snapshots", { timeout: 15_000 });
   await expect(page.locator(slideshowImg).first()).toBeVisible();
 };
-
-test.describe.configure({ mode: "serial" });
 
 // Disable wall-clock cadence alignment in every slideshow test so the auto-
 // advance timer can't fire mid-test when a quarter-hour boundary happens to
@@ -60,18 +66,15 @@ test.describe("Slideshow", () => {
   });
 
   test("desktop controls auto-hide on idle and reveal on mouse-to-top", async ({ page }) => {
+    await page.clock.install();
     await page.goto("/slideshow", { waitUntil: "domcontentloaded" });
     await waitForSlideshow(page);
 
     const container = page.locator("[data-paused]");
 
-    // Controls start visible; with no pointer interaction the desktop
-    // auto-hide deadline (CONTROLS_AUTO_HIDE_MS = 3s) runs to completion.
-    // (It may already have elapsed during a slow WASM load — either way the
-    // end state is hidden.)
-    await expect(container).toHaveAttribute("data-controls-visible", "false", {
-      timeout: 8000,
-    });
+    // Advance past CONTROLS_AUTO_HIDE_MS without paying three seconds of wall time.
+    await page.clock.runFor(3100);
+    await expect(container).toHaveAttribute("data-controls-visible", "false");
 
     // Moving the cursor to the top edge reveals them again.
     await revealControls(page);
@@ -137,13 +140,18 @@ test.describe("Slideshow", () => {
     // persists, and give any (regressed) pool refetch time to settle first.
     await revealControls(page);
     await page.locator('button:has-text("Similar")').click();
-    await page.waitForTimeout(400);
+    await expect(page.locator('button:has-text("Similar")')).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    await settleUi(page);
     await expect(image).toBeVisible();
     expect(await image.getAttribute("src")).toBe(originalSrc);
 
     await revealControls(page);
     await page.locator('button:has-text("Recent")').click();
-    await page.waitForTimeout(400);
+    await expect(page.locator('button:has-text("Recent")')).toHaveAttribute("aria-pressed", "true");
+    await settleUi(page);
     await expect(image).toBeVisible();
     expect(await image.getAttribute("src")).toBe(originalSrc);
   });
@@ -164,7 +172,11 @@ test.describe("Slideshow", () => {
 
     const grid = page.locator('[data-count="4"]').first();
     await expect(grid).toBeVisible({ timeout: 8000 });
-    await page.waitForTimeout(500); // let the grid settle / cells load
+    const remixImages = page.locator(
+      'div[class*="remixGrid"][data-count="4"]:not([aria-hidden="true"]) img[class*="remixImage"]',
+    );
+    await expect(remixImages).toHaveCount(4);
+    await expect(remixImages.last()).toBeVisible();
 
     const geo = await page.evaluate(() => {
       const vh = window.innerHeight;
@@ -231,6 +243,7 @@ test.describe("Slideshow", () => {
   test("auto-advances to the next photo after the configured delay", async ({ page }) => {
     // delay=1 → a 1-second cadence; align-cadence is off (beforeEach) so the
     // advance timer is a plain now+delay.
+    await page.clock.install();
     await page.goto("/slideshow?mode=random&filter=test-simple&delay=1", {
       waitUntil: "domcontentloaded",
     });
@@ -240,11 +253,13 @@ test.describe("Slideshow", () => {
     const firstSrc = await image.getAttribute("src");
 
     // The cadence timer should advance with no user interaction.
+    await page.clock.runFor(1100);
     await waitForImageChange(page, String(firstSrc));
     expect(await image.getAttribute("src")).not.toBe(firstSrc);
   });
 
   test("pausing stops the auto-advance", async ({ page }) => {
+    await page.clock.install();
     await page.goto("/slideshow?mode=random&filter=test-simple&delay=1", {
       waitUntil: "domcontentloaded",
     });
@@ -259,7 +274,7 @@ test.describe("Slideshow", () => {
 
     const pausedSrc = await image.getAttribute("src");
     // Well past the 1s cadence: a running timer would have advanced by now.
-    await page.waitForTimeout(2500);
+    await page.clock.runFor(2500);
     expect(await image.getAttribute("src")).toBe(pausedSrc);
   });
 
@@ -314,9 +329,11 @@ test.describe("Slideshow", () => {
     expect(new URL(page.url()).searchParams.has("photo")).toBe(false);
     expect(new URL(page.url()).searchParams.has("seed")).toBe(false);
 
+    const image = page.locator(slideshowImg).first();
+    const previousSrc = await image.getAttribute("src");
     await revealControls(page);
     await page.locator('button:has-text("Next")').click();
-    await page.waitForTimeout(150);
+    await waitForImageChange(page, String(previousSrc));
 
     const url = new URL(page.url());
     expect(url.searchParams.get("mode")).toBe("random");
@@ -327,7 +344,7 @@ test.describe("Slideshow", () => {
 });
 
 test.describe("Slideshow touch mode", () => {
-  test.describe.configure({ mode: "serial" });
+  test.use({ hasTouch: true });
   test.skip(!hasSearchDb, "Requires search.sqlite with data");
   test.skip(
     ({ browserName }) => browserName !== "chromium",
@@ -405,6 +422,40 @@ test.describe("Slideshow touch mode", () => {
     await dispatchPointer(page, "up", x + dx, y + dy);
   };
 
+  test("iPad session controls keep screen-awake status and Hide together", async ({ page }) => {
+    await page.setViewportSize({ width: 1024, height: 768 });
+    await page.addInitScript(() => {
+      Object.defineProperty(navigator, "wakeLock", {
+        configurable: true,
+        value: {
+          request: async () => {
+            const sentinel = new EventTarget() as EventTarget & {
+              release: () => Promise<void>;
+            };
+            sentinel.release = async () => {
+              sentinel.dispatchEvent(new Event("release"));
+            };
+            return sentinel;
+          },
+        },
+      });
+    });
+    await page.goto("/slideshow?mode=random&filter=test-simple", {
+      waitUntil: "domcontentloaded",
+    });
+    await waitForSlideshow(page);
+
+    const session = page.getByRole("group", { name: "Slideshow session" });
+    await expect(session).toBeVisible();
+    await expect(session.getByRole("button", { name: "Screen stays awake" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+
+    await session.getByRole("button", { name: "Hide controls" }).click();
+    await expect(page.locator("[data-paused]")).toHaveAttribute("data-controls-visible", "false");
+  });
+
   test("horizontal swipe past commit advances to next photo", async ({ page }) => {
     await page.goto("/slideshow?mode=random&filter=test-simple", {
       waitUntil: "domcontentloaded",
@@ -431,7 +482,7 @@ test.describe("Slideshow touch mode", () => {
 
     // 20px is below the 48px commit threshold.
     await swipe(page, -20, 0);
-    await page.waitForTimeout(200);
+    await settleUi(page);
     expect(await image.getAttribute("src")).toBe(firstSrc);
   });
 
@@ -570,7 +621,7 @@ test.describe("Slideshow touch mode", () => {
     await expect(affordances).toHaveAttribute("data-touch-hint", "idle");
     await dispatchPointer(page, "up", x + 30, y);
     // No photo change should have occurred.
-    await page.waitForTimeout(150);
+    await settleUi(page);
     expect(await image.getAttribute("src")).toBe(firstSrc);
   });
 
@@ -615,7 +666,7 @@ test.describe("Slideshow touch mode", () => {
     await dispatchPointer(page, "up", x - 30, y);
     await dispatchClick(page, x - 30, y);
 
-    await page.waitForTimeout(150);
+    await settleUi(page);
     expect(await image.getAttribute("src")).toBe(firstSrc);
   });
 
@@ -638,7 +689,7 @@ test.describe("Slideshow touch mode", () => {
     await dispatchPointer(page, "up", x, y - 30);
     await dispatchClick(page, x, y - 30);
 
-    await page.waitForTimeout(150);
+    await settleUi(page);
     expect(await image.getAttribute("src")).toBe(firstSrc);
   });
 
@@ -658,7 +709,7 @@ test.describe("Slideshow touch mode", () => {
     await dispatchPointer(page, "up", x + 30, y);
     await dispatchClick(page, x + 30, y);
 
-    await page.waitForTimeout(150);
+    await settleUi(page);
     expect(await image.getAttribute("src")).toBe(firstSrc);
   });
 

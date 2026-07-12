@@ -2,7 +2,7 @@
  * @jest-environment jsdom
  */
 
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import type { PhotoWithStyle } from "./mapWorldViewModel";
 import { MapPhotoMarkers } from "./MapPhotoMarkers";
@@ -29,10 +29,6 @@ jest.mock("react-map-gl/maplibre", () => ({
   ),
 }));
 
-jest.mock("./MapWorldMapChildren", () => ({
-  LazyMapMarkerImage: () => <div data-testid="marker-image" />,
-}));
-
 const photo = (overrides: Partial<PhotoWithStyle> = {}): PhotoWithStyle => ({
   album: "kansai",
   src: { src: "/photo.jpg", width: 100, height: 100 },
@@ -46,8 +42,24 @@ const photo = (overrides: Partial<PhotoWithStyle> = {}): PhotoWithStyle => ({
 });
 
 describe("MapPhotoMarkers", () => {
+  let intersectionCallback: IntersectionObserverCallback;
+  const observe = jest.fn();
+  const unobserve = jest.fn();
+  const disconnect = jest.fn();
+
   beforeEach(() => {
     stopPropagation.mockClear();
+    observe.mockClear();
+    unobserve.mockClear();
+    disconnect.mockClear();
+    Object.defineProperty(globalThis, "IntersectionObserver", {
+      configurable: true,
+      writable: true,
+      value: jest.fn((callback: IntersectionObserverCallback) => {
+        intersectionCallback = callback;
+        return { observe, unobserve, disconnect };
+      }),
+    });
   });
 
   it("supports pointer, focus, and keyboard selection", () => {
@@ -58,7 +70,7 @@ describe("MapPhotoMarkers", () => {
     render(
       <MapPhotoMarkers
         photos={[currentPhoto]}
-        zoom={9}
+        showMarkerImages
         emphasiseRoute={false}
         activeRouteHrefSet={new Set()}
         onSelect={onSelect}
@@ -76,14 +88,43 @@ describe("MapPhotoMarkers", () => {
     expect(onHover.mock.calls).toEqual([[currentPhoto], [null], [currentPhoto]]);
     expect(onSelect).toHaveBeenCalledTimes(2);
     expect(stopPropagation).toHaveBeenCalledTimes(1);
-    expect(screen.getByTestId("marker-image")).toBeTruthy();
+    expect(observe).toHaveBeenCalledTimes(1);
+  });
+
+  it("shares one intersection observer between marker images", () => {
+    const { container } = render(
+      <MapPhotoMarkers
+        photos={[photo({ href: "one" }), photo({ href: "two", decLng: 140 })]}
+        showMarkerImages
+        emphasiseRoute={false}
+        activeRouteHrefSet={new Set()}
+        onSelect={jest.fn()}
+        onHover={jest.fn()}
+      />,
+    );
+
+    expect(IntersectionObserver).toHaveBeenCalledTimes(1);
+    expect(observe).toHaveBeenCalledTimes(2);
+    expect(container.querySelectorAll("img")).toHaveLength(0);
+
+    const targets = observe.mock.calls.map(([target]) => target as Element);
+    act(() => {
+      intersectionCallback(
+        targets.map(
+          (target) => ({ target, isIntersecting: true }) as unknown as IntersectionObserverEntry,
+        ),
+        {} as IntersectionObserver,
+      );
+    });
+
+    expect(container.querySelectorAll("img")).toHaveLength(2);
   });
 
   it("marks route members active and other photos muted", () => {
     render(
       <MapPhotoMarkers
         photos={[photo({ href: "active" }), photo({ href: "inactive", decLng: 140 })]}
-        zoom={8}
+        showMarkerImages={false}
         emphasiseRoute
         activeRouteHrefSet={new Set(["active"])}
         onSelect={jest.fn()}
@@ -94,14 +135,14 @@ describe("MapPhotoMarkers", () => {
     const controls = screen.getAllByRole("button", { name: /Photo from kansai/ });
     expect(controls[0]?.className).toContain("pinActive");
     expect(controls[1]?.className).toContain("pinMuted");
-    expect(screen.queryByTestId("marker-image")).toBeNull();
+    expect(IntersectionObserver).not.toHaveBeenCalled();
   });
 
   it("omits photos without complete coordinates", () => {
     render(
       <MapPhotoMarkers
         photos={[photo({ decLat: null }), photo({ href: "valid" })]}
-        zoom={null}
+        showMarkerImages={false}
         emphasiseRoute={false}
         activeRouteHrefSet={new Set()}
         onSelect={jest.fn()}

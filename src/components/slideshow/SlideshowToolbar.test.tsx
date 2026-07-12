@@ -2,7 +2,7 @@
  * @jest-environment jsdom
  */
 
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { SlideshowToolbar, SlideshowToolbarProps } from "./SlideshowToolbar";
 import { EMPTY_POOL_STATS } from "../../util/slideshowQueue";
 
@@ -74,6 +74,36 @@ const makeProps = (overrides: Partial<SlideshowToolbarProps> = {}): SlideshowToo
 });
 
 describe("SlideshowToolbar", () => {
+  it("keeps the primary iPad session actions together and easy to identify", () => {
+    const onHide = jest.fn();
+    const onTryWakeLock = jest.fn();
+
+    render(<SlideshowToolbar {...makeProps({ onHide, onTryWakeLock })} />);
+
+    const session = screen.getByRole("group", { name: "Slideshow session" });
+    const hide = within(session).getByRole("button", { name: "Hide controls" });
+    const awake = within(session).getByRole("button", { name: "Keep screen awake" });
+
+    expect(session.contains(hide)).toBe(true);
+    expect(session.contains(awake)).toBe(true);
+    expect(awake.getAttribute("aria-pressed")).toBe("false");
+
+    fireEvent.click(hide);
+    fireEvent.click(awake);
+
+    expect(onHide).toHaveBeenCalledTimes(1);
+    expect(onTryWakeLock).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows an unambiguous active screen-awake status", () => {
+    render(<SlideshowToolbar {...makeProps({ isWakeLockActive: true })} />);
+
+    const session = screen.getByRole("group", { name: "Slideshow session" });
+    const awake = within(session).getByRole("button", { name: "Screen stays awake" });
+    expect(awake.getAttribute("aria-pressed")).toBe("true");
+    expect(awake.textContent).toContain("Active for this session");
+  });
+
   it("renders a home link to the gallery root (the pull-up toolbar is the only way back on touch)", () => {
     render(<SlideshowToolbar {...makeProps()} />);
 

@@ -1,11 +1,18 @@
 import { test, expect } from "@playwright/test";
+import { stubExternalMapAssets } from "./map-network";
 
 test.describe("Map time range slider", () => {
+  test.beforeEach(async ({ page }) => {
+    await stubExternalMapAssets(page);
+  });
+
   test("slider renders with two thumbs and sparkline", async ({ page }) => {
     // URL params are the documented way to reveal the slider — the toggle
     // button is only shown when an album is filtered or there are no routable
     // albums, neither of which holds for the test data on /map.
-    await page.goto("/map?from=2020-01-01&to=2025-01-01");
+    await page.goto("/map?from=2020-01-01&to=2025-01-01", {
+      waitUntil: "domcontentloaded",
+    });
 
     // Two slider thumbs (from + to)
     const sliders = page.locator('[role="slider"]');
@@ -21,7 +28,9 @@ test.describe("Map time range slider", () => {
   });
 
   test("URL params activate range and show reset", async ({ page }) => {
-    await page.goto("/map?from=2020-01-01&to=2025-01-01");
+    await page.goto("/map?from=2020-01-01&to=2025-01-01", {
+      waitUntil: "domcontentloaded",
+    });
 
     const sliders = page.locator('[role="slider"]');
     await expect(sliders.first()).toBeVisible({ timeout: 10_000 });
@@ -32,7 +41,9 @@ test.describe("Map time range slider", () => {
   });
 
   test("reset clears range and removes URL params", async ({ page }) => {
-    await page.goto("/map?from=2020-01-01&to=2025-01-01");
+    await page.goto("/map?from=2020-01-01&to=2025-01-01", {
+      waitUntil: "domcontentloaded",
+    });
 
     const resetButton = page.locator('button:has-text("Reset")');
     await expect(resetButton).toBeVisible({ timeout: 10_000 });
@@ -52,7 +63,9 @@ test.describe("Map time range slider", () => {
   test("keyboard navigation moves thumbs", async ({ page }) => {
     // Range pre-applied via URL so the slider is mounted; keyboard then nudges
     // the start thumb and we verify the reset stays visible after the move.
-    await page.goto("/map?from=2020-01-01&to=2025-01-01");
+    await page.goto("/map?from=2020-01-01&to=2025-01-01", {
+      waitUntil: "domcontentloaded",
+    });
 
     const fromThumb = page.locator('[role="slider"][aria-label="Range start"]');
     await expect(fromThumb).toBeVisible({ timeout: 10_000 });

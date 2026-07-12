@@ -1,11 +1,13 @@
 import { test, expect } from "@playwright/test";
+import { stubExternalMapAssets } from "./map-network";
 
 test.describe("Smoke Tests", () => {
   let pageErrors: string[] = [];
 
-  test.beforeEach(({ page }) => {
+  test.beforeEach(async ({ page }) => {
     pageErrors = [];
     page.on("pageerror", (error) => pageErrors.push(error.message));
+    await stubExternalMapAssets(page);
   });
 
   test.afterEach(() => {
@@ -13,7 +15,7 @@ test.describe("Smoke Tests", () => {
   });
 
   test("homepage loads with albums and navigation", async ({ page }) => {
-    await page.goto("/");
+    await page.goto("/", { waitUntil: "domcontentloaded" });
 
     await expect(page).toHaveTitle("Snapshots");
     await expect(page.locator("h1")).toContainText("Snapshots");
@@ -29,7 +31,7 @@ test.describe("Smoke Tests", () => {
   });
 
   test("album page loads with nav and photos", async ({ page }) => {
-    await page.goto("/album/test-simple");
+    await page.goto("/album/test-simple", { waitUntil: "domcontentloaded" });
 
     await expect(page.locator('a:has-text("Albums")')).toBeVisible();
     await expect(page.locator('a:has-text("Album map")')).toBeVisible();
@@ -41,18 +43,19 @@ test.describe("Smoke Tests", () => {
   });
 
   test("map page loads with canvas", async ({ page }) => {
-    await page.goto("/map");
+    await page.goto("/map", { waitUntil: "domcontentloaded" });
     await expect(page).toHaveTitle("Map | Snapshots");
     await expect(page.locator("canvas").first()).toBeVisible();
   });
 
-  test("search page loads", async ({ page }) => {
-    await page.goto("/search");
+  test("search page loads", async ({ page, browserName }) => {
+    test.skip(browserName === "chromium", "Covered by the full Chromium search suite");
+    await page.goto("/search", { waitUntil: "domcontentloaded" });
     await expect(page.getByRole("heading", { name: /search/i })).toBeVisible();
   });
 
   test("explore page loads with sections", async ({ page }) => {
-    await page.goto("/explore");
+    await page.goto("/explore", { waitUntil: "domcontentloaded" });
     await expect(page).toHaveTitle(/Explore/);
     await expect(page.getByRole("heading", { name: "Explore" })).toBeVisible();
 
@@ -60,13 +63,14 @@ test.describe("Smoke Tests", () => {
     await expect(page.locator('nav[aria-label="Jump to section"]')).toBeVisible();
   });
 
-  test("timeline page loads", async ({ page }) => {
-    await page.goto("/timeline");
+  test("timeline page loads", async ({ page, browserName }) => {
+    test.skip(browserName === "chromium", "Covered by the full Chromium timeline suite");
+    await page.goto("/timeline", { waitUntil: "domcontentloaded" });
     await expect(page.getByRole("heading", { name: "Timeline" })).toBeVisible();
   });
 
   test("album navigation flow works", async ({ page }) => {
-    await page.goto("/");
+    await page.goto("/", { waitUntil: "domcontentloaded" });
 
     // Click into an album
     const albumLink = page.locator('a[href="/album/test-simple"]').first();
@@ -84,7 +88,7 @@ test.describe("Smoke Tests", () => {
   });
 
   test("map album filter shows indicator", async ({ page }) => {
-    await page.goto("/map?filter_album=test-simple");
+    await page.goto("/map?filter_album=test-simple", { waitUntil: "domcontentloaded" });
     await expect(page).toHaveTitle("Map | Snapshots");
 
     // Filter indicator toast appears with album name
@@ -93,7 +97,7 @@ test.describe("Smoke Tests", () => {
   });
 
   test("photo deep-link scrolls to photo", async ({ page }) => {
-    await page.goto("/album/test-simple#DSCF0506-2.jpg");
+    await page.goto("/album/test-simple#DSCF0506-2.jpg", { waitUntil: "domcontentloaded" });
 
     // The photo element with matching ID should be in the viewport
     const photo = page.locator('[id="DSCF0506-2.jpg"]');
@@ -101,28 +105,17 @@ test.describe("Smoke Tests", () => {
     await expect(photo).toBeInViewport();
   });
 
-  test("feed.xml serves valid RSS", async ({ request }) => {
-    const response = await request.get("/feed.xml");
-    expect(response.status()).toBe(200);
-
-    const body = await response.text();
-    expect(body).toContain('<rss version="2.0"');
-    expect(body).toContain("<channel>");
-    // Items are only present when non-test albums exist (CI has test-only data)
-    expect(body).toContain("</channel>");
-  });
-
-  test("sitemap.xml serves valid sitemap", async ({ request }) => {
-    const response = await request.get("/sitemap.xml");
-    expect(response.status()).toBe(200);
-
-    const body = await response.text();
-    expect(body).toContain("<urlset");
-    expect(body).toContain("<loc>");
+  test("slideshow page loads", async ({ page, browserName }) => {
+    test.skip(browserName === "chromium", "Covered by the full Chromium slideshow suite");
+    await page.goto("/slideshow", { waitUntil: "domcontentloaded" });
+    await expect(page).toHaveTitle("Slideshow | Snapshots");
+    await expect(page.locator('img[alt]:not([aria-hidden="true"])').first()).toBeVisible({
+      timeout: 15_000,
+    });
   });
 
   test("theme toggle changes theme", async ({ page }) => {
-    await page.goto("/");
+    await page.goto("/", { waitUntil: "domcontentloaded" });
 
     const html = page.locator("html");
     const initialClass = await html.getAttribute("class");

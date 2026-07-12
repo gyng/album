@@ -429,6 +429,10 @@
   display: none;
 }
 
+.sessionDock {
+  display: none;
+}
+
 .toolbarTrigger {
   position: fixed;
   top: 0;
@@ -943,44 +947,124 @@
     pointer-events: auto;
   }
 
-  /* Pinned to the top of the (scrolling) toolbar so it's always reachable,
-     however far down the panel the user has scrolled. order:-1 keeps it first
-     even though it's declared after the brand link; it spans the row so the
-     tap target is generous. Doubles as a sheet grabber — tap or swipe up to
-     dismiss (see SlideshowToolbar's close-handle pointer handlers). */
-  .toolbarCloseButton {
+  .sessionDock {
     position: sticky;
     top: 0;
-    z-index: 1;
+    z-index: 2;
     order: -1;
-    width: 100%;
-    display: inline-flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: calc(var(--m) + 1px);
-    padding: var(--m-s) var(--m-m) calc(var(--m-s) + 1px);
+    width: min(100%, 42rem);
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: var(--m-s);
+    padding: var(--m-s);
     border: solid 1px var(--glass-border);
+    border-radius: var(--m-l);
+    background: linear-gradient(135deg, hsl(210 32% 10% / 0.96), hsl(210 24% 15% / 0.94));
+    backdrop-filter: blur(18px);
+    box-shadow:
+      0 var(--m-l) var(--m-xl) hsl(0 0% 0% / 0.34),
+      inset 0 1px 0 hsl(0 0% 100% / 0.1);
+  }
+
+  /* Pinned session actions replace the buried Hide and Wake Lock controls on
+     coarse pointers. The Hide half remains the sheet grabber. */
+  .toolbarCloseButton {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: var(--m-s);
+    min-height: var(--m-2xl);
+    padding: var(--m-s) var(--m-m);
+    border: 0;
     border-radius: var(--m-m);
-    background: var(--glass-bg-strong);
-    backdrop-filter: blur(12px);
-    color: var(--c-font);
-    font-size: var(--fs-sm);
+    background: hsl(0 0% 100% / 0.08);
+    color: white;
+    font: inherit;
+    text-align: left;
     cursor: grab;
   }
 
-  /* Grabber bar signalling the swipe-up affordance. */
   .toolbarCloseGrip {
-    width: var(--m-xl);
-    height: 3px;
+    position: absolute;
+    top: var(--m);
+    left: 50%;
+    width: var(--m-l);
+    height: 2px;
+    transform: translateX(-50%);
     border-radius: 999px;
-    background: color-mix(in srgb, var(--c-font) 45%, transparent);
+    background: hsl(0 0% 100% / 0.38);
   }
 
-  .toolbarCloseLabel {
-    display: inline-flex;
+  .sessionAwakeButton {
+    display: flex;
     align-items: center;
     gap: var(--m-s);
+    min-height: var(--m-2xl);
+    padding: var(--m-s) var(--m-m);
+    border: solid 1px hsl(42 92% 68% / 0.28);
+    border-radius: var(--m-m);
+    background: hsl(42 72% 42% / 0.12);
+    color: white;
+    font: inherit;
+    text-align: left;
+  }
+
+  .sessionAwakeButtonActive {
+    border-color: hsl(142 68% 60% / 0.48);
+    background: hsl(142 54% 32% / 0.24);
+  }
+
+  .sessionAwakeButton:disabled {
+    opacity: 0.5;
+  }
+
+  .sessionActionIcon,
+  .sessionAwakeIndicator {
+    flex: 0 0 auto;
+    display: grid;
+    place-items: center;
+    width: var(--m-l);
+    height: var(--m-l);
+    border-radius: 999px;
+    background: hsl(0 0% 100% / 0.1);
+  }
+
+  .sessionAwakeIndicator {
+    width: var(--m-m);
+    height: var(--m-m);
+    background: hsl(42 92% 68%);
+    box-shadow: 0 0 var(--m-m) hsl(42 92% 68% / 0.52);
+  }
+
+  .sessionAwakeButtonActive .sessionAwakeIndicator {
+    background: hsl(142 72% 64%);
+    box-shadow: 0 0 var(--m-m) hsl(142 72% 64% / 0.52);
+  }
+
+  .sessionActionCopy {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--m);
+    line-height: 1.05;
+  }
+
+  .sessionActionCopy strong {
+    font-size: var(--fs-sm);
+    font-weight: 650;
+  }
+
+  .sessionActionCopy span {
+    color: hsl(0 0% 100% / 0.62);
+    font-size: var(--fs-s);
+  }
+
+  .sessionProgress {
+    flex: 0 0 auto;
+    width: var(--m-l);
+    height: var(--m-l);
+    margin-left: auto;
+    opacity: 0.58;
   }
 
   .toolbarCloseButton:active {
@@ -991,6 +1075,15 @@
   .toolbarCloseButton:focus-visible {
     outline: solid 2px var(--c-font);
     outline-offset: 2px;
+  }
+
+  .sessionAwakeButton:focus-visible {
+    outline: solid 2px white;
+    outline-offset: 2px;
+  }
+
+  .secondarySessionControl {
+    display: none !important;
   }
 
   .container[data-controls-visible="false"] .toolbar {

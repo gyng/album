@@ -182,35 +182,82 @@ export const SlideshowToolbar: React.FC<SlideshowToolbarProps> = (props) => {
       onMouseEnter={() => props.onPointerOverToolbar(true)}
       onMouseLeave={() => props.onPointerOverToolbar(false)}
     >
-      {/* Touch-only sticky close: the toolbar is taller than the viewport on a
-          phone, so it becomes an internal scroll region covering the photo —
-          the swipe-to-close gesture beneath it can't be reached. This pinned
-          control gives an unambiguous one-tap close that never scrolls away.
-          Hidden on fine pointers, which dismiss via the "Hide" button or by
-          moving the cursor off the top edge. */}
-      <button
-        type="button"
-        className={styles.toolbarCloseButton}
-        style={{ touchAction: "none" }}
-        onPointerDown={handleCloseHandlePointerDown}
-        onPointerMove={handleCloseHandlePointerMove}
-        onPointerUp={handleCloseHandlePointerUp}
-        onPointerCancel={handleCloseHandlePointerCancel}
-        onClick={() => {
-          if (suppressCloseClickRef.current) {
-            suppressCloseClickRef.current = false;
-            return;
-          }
-          props.onHide();
-        }}
-        aria-label="Close controls"
-      >
-        <span className={styles.toolbarCloseGrip} aria-hidden="true" />
-        <span className={styles.toolbarCloseLabel}>
-          <span aria-hidden="true">✕</span>
-          Done
-        </span>
-      </button>
+      {/* The two actions used to begin an iPad viewing session stay together
+          at the top of the touch sheet. The first button also remains the
+          swipe-up grabber, while the second makes wake-lock status visible
+          without requiring a hunt through the View section. */}
+      <div className={styles.sessionDock} role="group" aria-label="Slideshow session">
+        <button
+          type="button"
+          className={styles.toolbarCloseButton}
+          style={{ touchAction: "none" }}
+          onPointerDown={handleCloseHandlePointerDown}
+          onPointerMove={handleCloseHandlePointerMove}
+          onPointerUp={handleCloseHandlePointerUp}
+          onPointerCancel={handleCloseHandlePointerCancel}
+          onClick={() => {
+            if (suppressCloseClickRef.current) {
+              suppressCloseClickRef.current = false;
+              return;
+            }
+            props.onHide();
+          }}
+          aria-label="Hide controls"
+        >
+          <span className={styles.toolbarCloseGrip} aria-hidden="true" />
+          <span className={styles.sessionActionIcon} aria-hidden="true">
+            ↓
+          </span>
+          <span className={styles.sessionActionCopy}>
+            <strong>Hide controls</strong>
+            <span>Return to photos</span>
+          </span>
+          <span
+            className={styles.sessionProgress}
+            aria-hidden="true"
+            style={
+              {
+                "--hide-progress": String(Math.max(0, Math.min(1, props.controlsHideProgress))),
+              } as React.CSSProperties
+            }
+          >
+            <span className={styles.hideProgressRing} />
+          </span>
+        </button>
+
+        <button
+          type="button"
+          className={[
+            styles.sessionAwakeButton,
+            props.isWakeLockActive ? styles.sessionAwakeButtonActive : "",
+          ]
+            .filter(Boolean)
+            .join(" ")}
+          disabled={!props.isWakeLockSupported}
+          aria-disabled={!props.isWakeLockSupported}
+          aria-pressed={props.isWakeLockActive}
+          aria-label={props.isWakeLockActive ? "Screen stays awake" : "Keep screen awake"}
+          onClick={props.onTryWakeLock}
+        >
+          <span className={styles.sessionAwakeIndicator} aria-hidden="true" />
+          <span className={styles.sessionActionCopy}>
+            <strong>
+              {props.isWakeLockActive
+                ? "Screen stays awake"
+                : props.isWakeLockSupported
+                  ? "Keep screen awake"
+                  : "Awake unavailable"}
+            </strong>
+            <span>
+              {props.isWakeLockActive
+                ? "Active for this session"
+                : props.isWakeLockSupported
+                  ? "Recommended on iPad"
+                  : "Not supported here"}
+            </span>
+          </span>
+        </button>
+      </div>
 
       {/* Home link / escape hatch back to the gallery. On desktop it's the
           top-left nav element; on touch it lives inside this toolbar, which
@@ -353,7 +400,7 @@ export const SlideshowToolbar: React.FC<SlideshowToolbarProps> = (props) => {
             Next
           </button>
 
-          <span className={styles.playbackHideGroup}>
+          <span className={[styles.playbackHideGroup, styles.secondarySessionControl].join(" ")}>
             <button className={commonStyles.button} onClick={props.onHide}>
               Hide
             </button>
@@ -460,6 +507,7 @@ export const SlideshowToolbar: React.FC<SlideshowToolbarProps> = (props) => {
           <button
             className={[
               props.isWakeLockActive ? commonStyles.active : "",
+              styles.secondarySessionControl,
               commonStyles.button,
             ].join(" ")}
             disabled={!props.isWakeLockSupported}
@@ -472,7 +520,7 @@ export const SlideshowToolbar: React.FC<SlideshowToolbarProps> = (props) => {
             }
             onClick={props.onTryWakeLock}
           >
-            {props.isWakeLockActive ? "Wake lock active" : "Try awake lock"}
+            {props.isWakeLockActive ? "Screen stays awake" : "Keep screen awake"}
           </button>
         </div>
       </div>

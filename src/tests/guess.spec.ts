@@ -1,6 +1,7 @@
 import { test, expect } from "@playwright/test";
 import { existsSync, statSync } from "fs";
 import { join } from "path";
+import { stubExternalMapAssets } from "./map-network";
 
 const searchDbPath = join(__dirname, "..", "public", "search.sqlite");
 const hasSearchDb = existsSync(searchDbPath) && statSync(searchDbPath).size > 0;
@@ -15,8 +16,11 @@ test.describe("guess game layout", () => {
   // height chain overflow for any photo (portrait, or even a 3:2 landscape), so
   // this catches the regression regardless of which photo the local DB serves.
   test("round fits the viewport — photo and map do not overflow vertically", async ({ page }) => {
+    await stubExternalMapAssets(page);
     await page.setViewportSize({ width: 1280, height: 520 });
-    await page.goto("/guess?seed=layout-regression&rounds=1");
+    await page.goto("/guess?seed=layout-regression&rounds=1", {
+      waitUntil: "domcontentloaded",
+    });
 
     // The overflow only manifests once the <img> has real intrinsic
     // dimensions. If the resized image is unavailable (e.g. running against a

@@ -3,6 +3,12 @@ import { defineConfig, devices } from "@playwright/test";
 const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? "http://localhost:3000";
 const reuseExistingServer = !process.env.CI;
 const skipWebServer = process.env.PLAYWRIGHT_SKIP_WEBSERVER === "1";
+const recordLocalVideo = process.env.PLAYWRIGHT_VIDEO === "1";
+const configuredWorkers = process.env.PLAYWRIGHT_WORKERS
+  ? Number.parseInt(process.env.PLAYWRIGHT_WORKERS, 10)
+  : null;
+const workers =
+  configuredWorkers && configuredWorkers > 0 ? configuredWorkers : process.env.CI ? 2 : 4;
 
 /**
  * Read environment variables from file.
@@ -25,8 +31,8 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
   /* Retry on CI only */
   retries: process.env.CI ? 2 : 0,
-  /* Opt out of parallel tests on CI. */
-  workers: process.env.CI ? 1 : undefined,
+  /* Keep CI parallelism conservative; override when profiling larger runners. */
+  workers,
   /* Reporter to use. See https://playwright.dev/docs/test-reporters */
   reporter: [["list"], ["html", { open: "never" }]],
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
@@ -40,8 +46,8 @@ export default defineConfig({
     navigationTimeout: process.env.CI ? 60 * 1000 : 15 * 1000,
     /* Take screenshot on failure */
     screenshot: "only-on-failure",
-    /* Record video on failure */
-    video: "retain-on-failure",
+    /* CI retries failures, so successful first attempts need not record video. */
+    video: process.env.CI ? "on-first-retry" : recordLocalVideo ? "retain-on-failure" : "off",
   },
 
   /* Increase timeout due to slow initial page load */
@@ -63,10 +69,12 @@ export default defineConfig({
           {
             name: "firefox",
             use: { ...devices["Desktop Firefox"] },
+            testMatch: "**/smoke.spec.ts",
           },
           {
             name: "webkit",
             use: { ...devices["Desktop Safari"] },
+            testMatch: "**/smoke.spec.ts",
           },
         ]
       : []),

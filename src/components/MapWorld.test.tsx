@@ -3,7 +3,7 @@
  */
 
 import { act, fireEvent, render, screen } from "@testing-library/react";
-import type { ReactNode } from "react";
+import { Profiler, type ReactNode } from "react";
 import { MapWorldEntry } from "./MapWorld";
 
 const mapHandlers: {
@@ -207,6 +207,38 @@ describe("MapWorld", () => {
       "/album/kansai#photo.jpg",
     );
     expect(screen.getByTestId("popup").className).toContain("click");
+  });
+
+  it("only rerenders when zoom crosses the marker-image threshold", () => {
+    const onRender = jest.fn();
+    render(
+      <Profiler id="map" onRender={onRender}>
+        <MMap photos={[photo]} className="map" />
+      </Profiler>,
+    );
+
+    const initialRenderCount = onRender.mock.calls.length;
+
+    act(() => {
+      mapHandlers.onZoom?.({ viewState: { zoom: 9 } });
+    });
+    expect(onRender).toHaveBeenCalledTimes(initialRenderCount + 1);
+
+    act(() => {
+      mapHandlers.onZoom?.({ viewState: { zoom: 10 } });
+      mapHandlers.onZoom?.({ viewState: { zoom: 9.5 } });
+    });
+    expect(onRender).toHaveBeenCalledTimes(initialRenderCount + 1);
+
+    act(() => {
+      mapHandlers.onZoom?.({ viewState: { zoom: 8 } });
+    });
+    expect(onRender).toHaveBeenCalledTimes(initialRenderCount + 2);
+
+    act(() => {
+      mapHandlers.onZoom?.({ viewState: { zoom: 7 } });
+    });
+    expect(onRender).toHaveBeenCalledTimes(initialRenderCount + 2);
   });
 
   it("renders a journey line layer when enabled", () => {

@@ -35,7 +35,7 @@ test.describe("Image search UI shell", () => {
   test("draw pad opens focused, closes on Escape, and restores focus", async ({ page }) => {
     test.skip(!hasSearchDb, "Requires search.sqlite");
     await holdModelDownloads(page);
-    await page.goto("/search");
+    await page.goto("/search", { waitUntil: "domcontentloaded" });
 
     const drawButton = page.getByRole("button", { name: /draw to search/i });
     // Enabled once the WASM DB has loaded.
@@ -54,7 +54,7 @@ test.describe("Image search UI shell", () => {
   test("drawing enables Search and submits to a removable query chip", async ({ page }) => {
     test.skip(!hasSearchDb, "Requires search.sqlite");
     await holdModelDownloads(page);
-    await page.goto("/search");
+    await page.goto("/search", { waitUntil: "domcontentloaded" });
 
     const drawButton = page.getByRole("button", { name: /draw to search/i });
     await expect(drawButton).toBeEnabled({ timeout: 15_000 });
@@ -104,7 +104,7 @@ test.describe("Image search UI shell", () => {
   test("uploading a photo starts an image query", async ({ page }) => {
     test.skip(!hasSearchDb, "Requires search.sqlite");
     await holdModelDownloads(page);
-    await page.goto("/search");
+    await page.goto("/search", { waitUntil: "domcontentloaded" });
 
     const uploadButton = page.getByRole("button", {
       name: /search by image/i,

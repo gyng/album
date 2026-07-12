@@ -18,7 +18,7 @@ test.describe("Search", () => {
   });
 
   test("search page loads with explore section", async ({ page }) => {
-    await page.goto("/search");
+    await page.goto("/search", { waitUntil: "domcontentloaded" });
 
     await expect(page.getByRole("heading", { name: /search/i })).toBeVisible();
 
@@ -27,7 +27,7 @@ test.describe("Search", () => {
   });
 
   test("search accepts a query and updates URL", async ({ page }) => {
-    await page.goto("/search");
+    await page.goto("/search", { waitUntil: "domcontentloaded" });
 
     const input = page.locator('input[placeholder*="Type / to search"]');
     await expect(input).toBeVisible();
@@ -39,7 +39,7 @@ test.describe("Search", () => {
   test("keyword search returns results", async ({ page }) => {
     test.skip(!hasSearchDb, "Requires search.sqlite");
 
-    await page.goto("/search");
+    await page.goto("/search", { waitUntil: "domcontentloaded" });
 
     // Use keyword mode to avoid WebGPU dependency
     await page.getByLabel("Search mode", { exact: true }).selectOption("keyword");
@@ -58,7 +58,7 @@ test.describe("Search", () => {
   test("tag facet filters results", async ({ page }) => {
     test.skip(!hasSearchDb, "Requires search.sqlite");
 
-    await page.goto("/search");
+    await page.goto("/search", { waitUntil: "domcontentloaded" });
 
     // Wait for the facet panel's "Tags" tab — needs DB to load via WASM first
     await expect(page.getByRole("tab", { name: "Tags", selected: true })).toBeVisible({
@@ -75,7 +75,9 @@ test.describe("Search", () => {
   });
 
   test("similar mode loads source photo context", async ({ page }) => {
-    await page.goto("/search?similar=../albums/test-simple/DSCF0506-2.jpg");
+    await page.goto("/search?similar=../albums/test-simple/DSCF0506-2.jpg", {
+      waitUntil: "domcontentloaded",
+    });
 
     await expect(page).toHaveURL(/similar=/);
     // Similar-to header and filename appear immediately (before DB loads)

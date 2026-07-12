@@ -13,7 +13,7 @@ test.describe("Timeline", () => {
   });
 
   test("heatmap preview and day selection work", async ({ page }) => {
-    await page.goto("/timeline");
+    await page.goto("/timeline", { waitUntil: "domcontentloaded" });
     await expect(page.getByRole("heading", { name: "Timeline" })).toBeVisible();
 
     // Click a populated cell
@@ -37,7 +37,7 @@ test.describe("Timeline", () => {
 
   test("mobile layout works", async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
-    await page.goto("/timeline");
+    await page.goto("/timeline", { waitUntil: "domcontentloaded" });
 
     await expect(page.locator('section[aria-label^="Photos from "]')).toBeVisible();
     await page.getByRole("button", { name: /random/i }).click();

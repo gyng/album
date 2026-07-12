@@ -85,6 +85,7 @@ const getBackgroundJourneyGradientColors = (fromColor: string, toColor: string) 
 
 const ROUTER_SYNC_DEBOUNCE_MS = 200;
 const ROUTER_SYNC_PAUSE_MS = 700;
+const MARKER_IMAGE_ZOOM_THRESHOLD = 8.5;
 
 export const MMap: React.FC<MapWorldProps> = ({
   photos,
@@ -104,9 +105,11 @@ export const MMap: React.FC<MapWorldProps> = ({
   const initialLat = syncRoute ? (url?.searchParams.get("lat") ?? null) : null;
   const initialZoom = syncRoute ? (url?.searchParams.get("zoom") ?? null) : null;
 
-  const [zoom, setZoom] = React.useState<number | null>(
-    initialZoom ? Number.parseFloat(initialZoom) : null,
+  const initialShowMarkerImages = Boolean(
+    initialZoom && Number.parseFloat(initialZoom) > MARKER_IMAGE_ZOOM_THRESHOLD,
   );
+  const [showMarkerImages, setShowMarkerImages] = React.useState(initialShowMarkerImages);
+  const showMarkerImagesRef = React.useRef(initialShowMarkerImages);
   const [isInteracting, setIsInteracting] = React.useState(false);
 
   const [bounds, setBounds] = React.useState<MapBounds | null>(null);
@@ -364,6 +367,16 @@ export const MMap: React.FC<MapWorldProps> = ({
     }, ROUTER_SYNC_DEBOUNCE_MS);
   };
 
+  const updateMarkerImageVisibility = React.useCallback((nextZoom: number) => {
+    const nextShowMarkerImages = nextZoom > MARKER_IMAGE_ZOOM_THRESHOLD;
+    if (nextShowMarkerImages === showMarkerImagesRef.current) {
+      return;
+    }
+
+    showMarkerImagesRef.current = nextShowMarkerImages;
+    setShowMarkerImages(nextShowMarkerImages);
+  }, []);
+
   return (
     <div className={className}>
       {showThemeBootstrap ? (
@@ -387,7 +400,7 @@ export const MMap: React.FC<MapWorldProps> = ({
           setIsInteracting(true);
         }}
         onZoom={(e) => {
-          setZoom(e.viewState.zoom);
+          updateMarkerImageVisibility(e.viewState.zoom);
         }}
         onZoomStart={() => {
           setIsInteracting(true);
@@ -470,7 +483,7 @@ export const MMap: React.FC<MapWorldProps> = ({
 
         <MapPhotoMarkers
           photos={visiblePhotos}
-          zoom={zoom}
+          showMarkerImages={showMarkerImages}
           emphasiseRoute={shouldEmphasizeRouteMarkers}
           activeRouteHrefSet={activeRouteHrefSet}
           onSelect={selectMarker}
