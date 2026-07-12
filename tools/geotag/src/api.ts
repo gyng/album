@@ -1,4 +1,5 @@
 import type { Confidence } from "@shared/gpsTrack";
+import type { LensMetadata } from "./lens.ts";
 
 export type GeotagPhoto = {
   filename: string;
@@ -8,6 +9,10 @@ export type GeotagPhoto = {
   decLat: number | null;
   decLng: number | null;
   gpsUtcMs: number | null;
+  lensMake: string | null;
+  lensModel: string | null;
+  focalLength: number | null;
+  focalLength35mm: number | null;
 };
 
 export type SubDir = { name: string; imageCount: number };
@@ -68,6 +73,31 @@ export const writeGps = async (items: WriteItem[], root: string): Promise<WriteR
     body: JSON.stringify({ root, items }),
   });
   const data = (await res.json()) as { results?: WriteResult[]; error?: string };
+  if (!res.ok) throw new Error(data.error ?? `${res.status}`);
+  return data.results ?? [];
+};
+
+export type LensWriteItem = {
+  filename: string;
+  path: string;
+  lens: LensMetadata;
+};
+
+export type LensWriteResult = LensWriteItem & {
+  ok: boolean;
+  error?: string;
+};
+
+export const writeLens = async (
+  items: LensWriteItem[],
+  root: string,
+): Promise<LensWriteResult[]> => {
+  const res = await fetch("/api/write-lens", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "x-geotag-tool": "1" },
+    body: JSON.stringify({ root, items }),
+  });
+  const data = (await res.json()) as { results?: LensWriteResult[]; error?: string };
   if (!res.ok) throw new Error(data.error ?? `${res.status}`);
   return data.results ?? [];
 };

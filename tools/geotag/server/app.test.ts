@@ -13,6 +13,13 @@ const post = (body: unknown, headers: Record<string, string> = {}) =>
     body: JSON.stringify(body),
   });
 
+const postLens = (body: unknown, headers: Record<string, string> = {}) =>
+  app.request("/api/write-lens", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...headers },
+    body: JSON.stringify(body),
+  });
+
 describe("read endpoints", () => {
   it("health", async () => {
     const res = await app.request("/api/health");
@@ -57,6 +64,39 @@ describe("write guards", () => {
 
   it("requires root + items (400)", async () => {
     const res = await post({ items: [] }, { "x-geotag-tool": "1" });
+    expect(res.status).toBe(400);
+  });
+
+  it("applies the same header and open-folder guards to lens writes", async () => {
+    const lensItem = {
+      filename: "x.jpg",
+      path: "/tmp/opened/x.jpg",
+      lens: {
+        make: "Voigtländer",
+        model: "NOKTON 35mm F1.2",
+        focalLength: 35,
+        focalLength35mm: 53,
+      },
+    };
+    expect((await postLens({ root: "/tmp/opened", items: [lensItem] })).status).toBe(403);
+    expect(
+      (
+        await postLens(
+          { root: "/tmp/opened", items: [{ ...lensItem, path: "/etc/hostname" }] },
+          { "x-geotag-tool": "1" },
+        )
+      ).status,
+    ).toBe(400);
+  });
+
+  it("rejects incomplete lens metadata", async () => {
+    const res = await postLens(
+      {
+        root: "/tmp/opened",
+        items: [{ filename: "x.jpg", path: "/tmp/opened/x.jpg", lens: { model: "" } }],
+      },
+      { "x-geotag-tool": "1" },
+    );
     expect(res.status).toBe(400);
   });
 });

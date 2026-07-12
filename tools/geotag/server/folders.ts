@@ -27,6 +27,10 @@ export type GeotagPhoto = {
   decLat: number | null;
   decLng: number | null;
   gpsUtcMs: number | null;
+  lensMake: string | null;
+  lensModel: string | null;
+  focalLength: number | null;
+  focalLength35mm: number | null;
 };
 
 export type SubDir = { name: string; imageCount: number };
@@ -88,6 +92,15 @@ const readPhoto = async (filepath: string, filename: string): Promise<GeotagPhot
     decLat,
     decLng,
     gpsUtcMs: gpsFixUtcMs(exif),
+    lensMake: typeof exif.LensMake === "string" ? exif.LensMake : null,
+    lensModel: typeof exif.LensModel === "string" ? exif.LensModel : null,
+    focalLength: typeof exif.FocalLength === "number" ? exif.FocalLength : null,
+    focalLength35mm:
+      typeof exif.FocalLengthIn35mmFormat === "number"
+        ? exif.FocalLengthIn35mmFormat
+        : typeof exif.FocalLengthIn35mmFilm === "number"
+          ? exif.FocalLengthIn35mmFilm
+          : null,
   };
 };
 

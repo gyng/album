@@ -4,6 +4,8 @@ import sharp from "sharp";
 import tzLookup from "tz-lookup";
 import { DEFAULT_ROOT, isImageFile, listFolder } from "./folders.ts";
 import { writeGps } from "./geotagWrite.ts";
+import { writeLens } from "./lensWrite.ts";
+import type { LensMetadata } from "../src/lens.ts";
 import type { WriteAssignment } from "../../../src/util/gpsWriteModel";
 
 export const app = new Hono();
@@ -91,4 +93,44 @@ app.post("/api/write", async (c) => {
   }));
 
   return c.json({ results: await writeGps(assignments) });
+});
+
+type LensWriteRequestItem = {
+  filename: string;
+  path: string;
+  lens: LensMetadata;
+};
+
+const validOptionalNumber = (value: unknown): boolean =>
+  value === null || (typeof value === "number" && Number.isFinite(value) && value > 0);
+
+app.post("/api/write-lens", async (c) => {
+  if (!requireToolHeader(c.req.header("x-geotag-tool"))) {
+    return c.json({ error: "missing x-geotag-tool header" }, 403);
+  }
+  const body = (await c.req.json().catch(() => null)) as {
+    root?: string;
+    items?: LensWriteRequestItem[];
+  } | null;
+  const root = body?.root;
+  const items = body?.items;
+  if (typeof root !== "string" || !Array.isArray(items) || items.length === 0) {
+    return c.json({ error: "root + items[] required" }, 400);
+  }
+
+  const rootPrefix = path.resolve(root) + path.sep;
+  const valid = items.every(
+    (item) =>
+      typeof item.filename === "string" &&
+      typeof item.path === "string" &&
+      path.resolve(item.path).startsWith(rootPrefix) &&
+      typeof item.lens?.model === "string" &&
+      item.lens.model.trim().length > 0 &&
+      typeof item.lens.make === "string" &&
+      validOptionalNumber(item.lens.focalLength) &&
+      validOptionalNumber(item.lens.focalLength35mm),
+  );
+  if (!valid) return c.json({ error: "invalid lens assignment or path outside open folder" }, 400);
+
+  return c.json({ results: await writeLens(items) });
 });

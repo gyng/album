@@ -31,6 +31,8 @@ describe("listFolder", () => {
     expect(p!.decLat).toBeCloseTo(36.5789, 3);
     expect(p!.decLng).toBeCloseTo(137.596, 3);
     expect(p!.dateTimeOriginal).toBe("2019-11-06T10:48:19");
+    expect(p).toHaveProperty("lensModel");
+    expect(p).toHaveProperty("focalLength");
   });
 
   it("rejects a path that does not exist", async () => {

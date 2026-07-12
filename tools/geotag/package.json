@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Local companion tool for manual GPS tagging + track interpolation of album photos. Shares pure logic from ../../src/util.",
+  "description": "Local companion workbench for GPS and manual-lens metadata tagging. Shares pure logic from ../../src/util.",
   "scripts": {
     "dev": "concurrently -k -n api,web -c cyan,magenta \"npm:dev:server\" \"npm:dev:web\"",
     "dev:server": "tsx watch server/index.ts",

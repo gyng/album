@@ -16,6 +16,10 @@ const photo = (over: Partial<GeotagPhoto> = {}): GeotagPhoto => ({
   decLat: null,
   decLng: null,
   gpsUtcMs: null,
+  lensMake: null,
+  lensModel: null,
+  focalLength: null,
+  focalLength35mm: null,
   ...over,
 });
 
