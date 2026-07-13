@@ -1,6 +1,7 @@
 import type { MapWorldEntry, TimeRange } from "./MapWorld";
 import {
   filterPhotosByBounds,
+  filterPhotosByQuery,
   formatMapPhotoDate,
   formatMapPhotoDateTime,
   getLegendYears,
@@ -86,5 +87,34 @@ describe("mapWorldViewModel", () => {
       older: "Older",
       newer: "Newer",
     });
+  });
+
+  it("filters map photos client-side with accent-insensitive all-term matching", () => {
+    const photos = [
+      photo({ href: "hong-kong" }),
+      photo({ href: "japan" }),
+      photo({ href: "france" }),
+    ];
+    const searchIndex = new Map([
+      ["hong-kong", "Hong Kong cute café cat"],
+      ["japan", "Kyoto temple cat"],
+      ["france", "Paris café"],
+    ]);
+
+    expect(
+      filterPhotosByQuery(photos, "  CAFE hong ", searchIndex).map(({ href }) => href),
+    ).toEqual(["hong-kong"]);
+    expect(filterPhotosByQuery(photos, "cat", searchIndex).map(({ href }) => href)).toEqual([
+      "hong-kong",
+      "japan",
+    ]);
+    expect(filterPhotosByQuery(photos, "")).toBe(photos);
+    expect(
+      filterPhotosByQuery(
+        [photo({ href: "external" })],
+        "fuzzy",
+        new Map([["external", "cute fuzzy animal"]]),
+      ).map(({ href }) => href),
+    ).toEqual(["external"]);
   });
 });

@@ -41,11 +41,11 @@ const SearchPage: NextPage<PageProps> = (_props) => {
           className={commonStyles.splitButtonSub}
           onClick={() => onStartRandomSimilarSlideshow?.()}
           disabled={!databaseReady || isRandomSimilarLoading}
-          aria-label="Start similarity slideshow for a random image"
+          aria-label="Start a similar-photo slideshow from a random photo"
           title={
             isRandomSimilarLoading
               ? "Starting similarity slideshow…"
-              : "Start similarity slideshow for a random image"
+              : "Start a similar-photo slideshow from a random photo"
           }
         >
           {isRandomSimilarLoading ? "…" : "🎲"}

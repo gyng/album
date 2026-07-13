@@ -71,6 +71,91 @@
   pointer-events: none;
 }
 
+.contextPopup {
+  z-index: 5004;
+}
+
+.contextPopup :global(.maplibregl-popup-content) {
+  min-width: 190px;
+  padding: 0;
+  overflow: hidden;
+}
+
+.contextMenu {
+  display: flex;
+  flex-direction: column;
+  padding-block: var(--m);
+}
+
+.contextCoordinates {
+  padding: var(--m-s) var(--m-m);
+  border-bottom: 1px solid var(--c-border-on-dark);
+  color: var(--c-bg-contrast-light);
+  font-size: var(--fs-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.contextHeading {
+  padding: var(--m-s) var(--m-m) 0;
+  color: var(--c-bg-contrast-light);
+  font-size: var(--fs-sm);
+}
+
+.contextMenu a {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--m-l);
+  padding: var(--m-s) var(--m-m);
+  color: var(--c-bg-contrast-light);
+  text-decoration: none;
+}
+
+.contextMenu a:hover,
+.contextMenu a:focus-visible {
+  background: color-mix(in srgb, var(--c-bg-contrast-light) 14%, transparent);
+  outline: none;
+}
+
+.orbiting,
+.orbiting * {
+  cursor: grabbing !important;
+}
+
+.directorControl {
+  position: absolute;
+  left: var(--m-s);
+  bottom: calc(var(--m-xl) + var(--m-2xl));
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--m-s);
+  padding: var(--m-s) var(--m-m);
+  border: 1px solid var(--c-border-on-dark);
+  border-radius: var(--m-s);
+  background: color-mix(in srgb, var(--c-overlay-dark) 88%, transparent);
+  color: var(--c-bg-contrast-light);
+  box-shadow: 0 2px 10px color-mix(in srgb, var(--c-overlay-dark) 35%, transparent);
+  cursor: pointer;
+  font-size: var(--fs-s);
+  backdrop-filter: blur(var(--m));
+}
+
+.directorControl:hover,
+.directorControl:focus-visible,
+.directorControlActive {
+  border-color: var(--c-bg-contrast-light);
+  background: var(--c-overlay-dark);
+}
+
+.directorControl:focus-visible {
+  outline: 2px solid var(--c-bg-contrast-light);
+  outline-offset: 2px;
+}
+
+.directorControlActive span {
+  color: var(--c-accent);
+}
+
 .routeOverlay {
   position: absolute;
   inset: 0;

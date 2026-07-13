@@ -73,7 +73,7 @@ describe("WorldMap route controls", () => {
     mapWorldDeferredMock.mockClear();
   });
 
-  it("uses hover-driven route previews for album maps", () => {
+  it("uses contextual route previews for album maps", () => {
     mockQuery = { filter_album: "trip" };
 
     render(
@@ -99,7 +99,6 @@ describe("WorldMap route controls", () => {
       />,
     );
 
-    expect(screen.getByText(/Hover or select a photo to trace the journey/i)).toBeTruthy();
     expect(mapWorldDeferredMock).toHaveBeenLastCalledWith(
       expect.objectContaining({
         showRoute: false,
@@ -149,9 +148,10 @@ describe("WorldMap route controls", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Show all journeys" }));
+    const journeysControl = screen.getByRole("button", { name: /journeys/i });
+    fireEvent.click(journeysControl);
 
-    expect(screen.getByRole("button", { name: "Hide all journeys" })).toBeTruthy();
+    expect(journeysControl).toHaveAttribute("aria-pressed", "true");
     expect(mapWorldDeferredMock).toHaveBeenLastCalledWith(
       expect.objectContaining({
         showRoute: true,
@@ -159,5 +159,11 @@ describe("WorldMap route controls", () => {
         routeDisplayMode: "always",
       }),
     );
+
+    const dateControl = screen.getByRole("button", { name: "Choose dates" });
+    expect(dateControl).toHaveAttribute("aria-expanded", "false");
+    expect(dateControl).toHaveAttribute("aria-controls", "map-date-controls");
+    fireEvent.click(dateControl);
+    expect(dateControl).toHaveAttribute("aria-expanded", "true");
   });
 });

@@ -640,7 +640,7 @@ export const SlideshowToolbar: React.FC<SlideshowToolbarProps> = (props) => {
         <div className={styles.controlMeta}>
           {props.filter ? (
             <div className={commonStyles.toast}>
-              only showing photos from{" "}
+              Showing only photos from{" "}
               <Link href={`/album/${props.filter}`}>
                 <i>{props.filter}</i>
               </Link>

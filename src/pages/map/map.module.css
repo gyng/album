@@ -39,6 +39,55 @@
   gap: var(--m-s);
 }
 
+.mapSearch {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--m-s);
+  padding: var(--m);
+  border: solid 2px var(--c-bg-contrast-light);
+  border-radius: var(--m-s);
+  background: var(--c-bg);
+  margin-top: var(--m-s);
+}
+
+.mapSearch input {
+  width: min(200px, 42vw);
+  min-width: 130px;
+  padding: var(--m-s);
+  border: 0;
+  background: transparent;
+  color: var(--c-font);
+  font: inherit;
+}
+
+.mapSearch input:focus-visible {
+  outline: solid 2px var(--c-bg-contrast-light);
+  outline-offset: 1px;
+}
+
+.mapSearch span {
+  min-width: 4.5em;
+  color: color-mix(in srgb, var(--c-font) 70%, transparent);
+  font-size: var(--fs-xs);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.mapSearchRetry {
+  min-width: 4.5em;
+  padding: var(--m);
+  border: 0;
+  background: transparent;
+  color: var(--c-accent);
+  cursor: pointer;
+  font-size: var(--fs-xs);
+}
+
+.mapSearchRetry:focus-visible {
+  outline: solid 2px var(--c-bg-contrast-light);
+  outline-offset: 1px;
+}
+
 .title {
   display: inline-block;
   margin: 0;

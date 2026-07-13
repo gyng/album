@@ -124,6 +124,30 @@ export const filterPhotosByBounds = (
   });
 };
 
+const normaliseMapSearchText = (value: string): string =>
+  value
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+
+export const filterPhotosByQuery = <T extends MapWorldEntry>(
+  photos: T[],
+  query: string,
+  searchTextByHref?: ReadonlyMap<string, string>,
+): T[] => {
+  const terms = normaliseMapSearchText(query).split(/\s+/).filter(Boolean);
+  if (terms.length === 0) {
+    return photos;
+  }
+
+  return photos.filter((photo) => {
+    const corpus = normaliseMapSearchText(
+      `${photo.album} ${photo.date ?? ""} ${photo.href} ${searchTextByHref?.get(photo.href) ?? ""}`,
+    );
+    return terms.every((term) => corpus.includes(term));
+  });
+};
+
 export const getLegendYears = (
   dateStats: Pick<PhotoDateStats, "oldest" | "newest">,
 ): { older: string; newer: string } => {

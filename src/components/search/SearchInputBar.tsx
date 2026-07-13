@@ -4,7 +4,7 @@ import styles from "./Search.module.css";
 import { SearchMode } from "./useTextVector";
 
 const SEARCH_MODE_HELP =
-  "Keyword search matches indexed terms. Semantic search matches visual meaning using embeddings. Hybrid search fuses both rankings.";
+  "Keyword finds matching words. Semantic finds photos with a similar meaning. Hybrid combines both.";
 
 type Props = {
   canClear: boolean;
@@ -70,8 +70,9 @@ export const SearchInputBar: React.FC<Props> = ({
               className={styles.searchInput}
               suppressHydrationWarning
               type="text"
+              aria-label="Search photos"
               value={searchInputValue}
-              placeholder="Type / to search (try 'cat at night', 'white', 'mavica')"
+              placeholder="Search for cats at night, white, or Mavica…"
               spellCheck={false}
               onChange={(ev) => {
                 onApplySearchTerms(ev.target.value.split(","));
@@ -191,7 +192,7 @@ export const SearchInputBar: React.FC<Props> = ({
       searchMode === "keyword" &&
       trimmedQuery.length < 3 &&
       queryResultsLength === 0 ? (
-        <div className={styles.searchHintInline}>Type a minimum of 3 characters</div>
+        <div className={styles.searchHintInline}>Enter at least 3 characters</div>
       ) : null}
     </div>
   );

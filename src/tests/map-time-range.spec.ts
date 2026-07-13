@@ -6,51 +6,17 @@ test.describe("Map time range slider", () => {
     await stubExternalMapAssets(page);
   });
 
-  test("slider renders with two thumbs and sparkline", async ({ page }) => {
-    // URL params are the documented way to reveal the slider — the toggle
-    // button is only shown when an album is filtered or there are no routable
-    // albums, neither of which holds for the test data on /map.
+  test("clear dates removes the range and URL params", async ({ page }) => {
     await page.goto("/map?from=2020-01-01&to=2025-01-01", {
       waitUntil: "domcontentloaded",
     });
 
-    // Two slider thumbs (from + to)
-    const sliders = page.locator('[role="slider"]');
-    await expect(sliders.first()).toBeVisible({ timeout: 10_000 });
-    expect(await sliders.count()).toBe(2);
+    const clearButton = page.getByRole("button", { name: "Clear date filter" });
+    await expect(clearButton).toBeVisible({ timeout: 10_000 });
+    await clearButton.click();
 
-    // Sparkline SVG
-    await expect(page.locator('svg[class*="sparkline"]')).toBeVisible();
-
-    // Date labels
-    const labels = page.locator('[class*="label"]');
-    expect(await labels.count()).toBeGreaterThanOrEqual(2);
-  });
-
-  test("URL params activate range and show reset", async ({ page }) => {
-    await page.goto("/map?from=2020-01-01&to=2025-01-01", {
-      waitUntil: "domcontentloaded",
-    });
-
-    const sliders = page.locator('[role="slider"]');
-    await expect(sliders.first()).toBeVisible({ timeout: 10_000 });
-
-    // Reset button appears when range is active
-    const resetButton = page.locator('button:has-text("Reset")');
-    await expect(resetButton).toBeVisible();
-  });
-
-  test("reset clears range and removes URL params", async ({ page }) => {
-    await page.goto("/map?from=2020-01-01&to=2025-01-01", {
-      waitUntil: "domcontentloaded",
-    });
-
-    const resetButton = page.locator('button:has-text("Reset")');
-    await expect(resetButton).toBeVisible({ timeout: 10_000 });
-    await resetButton.click();
-
-    // Reset button disappears
-    await expect(resetButton).not.toBeVisible({ timeout: 5_000 });
+    // Clear action disappears
+    await expect(clearButton).not.toBeVisible({ timeout: 5_000 });
 
     // URL should no longer have from/to
     await page.waitForFunction(
@@ -58,24 +24,5 @@ test.describe("Map time range slider", () => {
         !new URL(window.location.href).searchParams.has("from") &&
         !new URL(window.location.href).searchParams.has("to"),
     );
-  });
-
-  test("keyboard navigation moves thumbs", async ({ page }) => {
-    // Range pre-applied via URL so the slider is mounted; keyboard then nudges
-    // the start thumb and we verify the reset stays visible after the move.
-    await page.goto("/map?from=2020-01-01&to=2025-01-01", {
-      waitUntil: "domcontentloaded",
-    });
-
-    const fromThumb = page.locator('[role="slider"][aria-label="Range start"]');
-    await expect(fromThumb).toBeVisible({ timeout: 10_000 });
-
-    // Focus and press right arrow to nudge the from thumb
-    await fromThumb.focus();
-    await page.keyboard.press("ArrowRight");
-
-    // Reset button stays visible (range is still active)
-    const resetButton = page.locator('button:has-text("Reset")');
-    await expect(resetButton).toBeVisible({ timeout: 5_000 });
   });
 });

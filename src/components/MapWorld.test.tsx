@@ -11,10 +11,25 @@ const mapHandlers: {
   onMoveEnd?: (event: { viewState: { latitude: number; longitude: number; zoom: number } }) => void;
   onZoomStart?: () => void;
   onZoom?: (event: { viewState: { zoom: number } }) => void;
+  onContextMenu?: (event: {
+    lngLat: { lat: number; lng: number };
+    originalEvent: { preventDefault: () => void };
+  }) => void;
 } = {};
 
+const mapCanvas = document.createElement("div");
 const mapInstance = {
   flyTo: jest.fn(),
+  stop: jest.fn(),
+  jumpTo: jest.fn(),
+  getBearing: jest.fn(() => 10),
+  getPitch: jest.fn(() => 20),
+  getCanvasContainer: jest.fn(() => mapCanvas),
+  dragPan: {
+    isEnabled: jest.fn(() => true),
+    disable: jest.fn(),
+    enable: jest.fn(),
+  },
   on: jest.fn(),
   off: jest.fn(),
   project: jest.fn(([longitude, latitude]: [number, number]) => ({
@@ -39,6 +54,7 @@ jest.mock("react-map-gl/maplibre", () => {
       onMoveEnd,
       onZoomStart,
       onZoom,
+      onContextMenu,
     }: {
       children?: ReactNode;
       onMoveStart?: () => void;
@@ -47,11 +63,16 @@ jest.mock("react-map-gl/maplibre", () => {
       }) => void;
       onZoomStart?: () => void;
       onZoom?: (event: { viewState: { zoom: number } }) => void;
+      onContextMenu?: (event: {
+        lngLat: { lat: number; lng: number };
+        originalEvent: { preventDefault: () => void };
+      }) => void;
     }) => {
       mapHandlers.onMoveStart = onMoveStart;
       mapHandlers.onMoveEnd = onMoveEnd;
       mapHandlers.onZoomStart = onZoomStart;
       mapHandlers.onZoom = onZoom;
+      mapHandlers.onContextMenu = onContextMenu;
       return <div data-testid="map">{children}</div>;
     },
     Marker: ({
@@ -145,11 +166,16 @@ describe("MapWorld", () => {
     mapHandlers.onMoveEnd = undefined;
     mapHandlers.onZoomStart = undefined;
     mapHandlers.onZoom = undefined;
+    mapHandlers.onContextMenu = undefined;
     mapInstance.flyTo.mockClear();
+    mapInstance.stop.mockClear();
     mapInstance.on.mockClear();
     mapInstance.off.mockClear();
     mapInstance.project.mockClear();
     mapInstance.getBounds.mockClear();
+    mapInstance.jumpTo.mockClear();
+    mapInstance.dragPan.disable.mockClear();
+    mapInstance.dragPan.enable.mockClear();
     replaceStateSpy = jest.spyOn(window.history, "replaceState").mockImplementation(() => {});
   });
 
@@ -207,6 +233,78 @@ describe("MapWorld", () => {
       "/album/kansai#photo.jpg",
     );
     expect(screen.getByTestId("popup").className).toContain("click");
+  });
+
+  it("opens external map actions for a right-clicked coordinate", () => {
+    const preventDefault = jest.fn();
+    render(<MMap photos={[photo]} className="map" />);
+
+    act(() => {
+      mapHandlers.onContextMenu?.({
+        lngLat: { lat: 22.3193, lng: 114.1694 },
+        originalEvent: { preventDefault },
+      });
+    });
+
+    expect(preventDefault).toHaveBeenCalled();
+    expect(screen.getByRole("group", { name: "Location actions" })).toBeInTheDocument();
+    expect(screen.getByText("Location")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Google Maps/ })).toHaveAttribute(
+      "href",
+      "https://www.google.com/maps/search/?api=1&query=22.3193%2C114.1694",
+    );
+    expect(screen.getByRole("link", { name: /OpenStreetMap/ })).toHaveAttribute(
+      "href",
+      "https://www.openstreetmap.org/?mlat=22.3193&mlon=114.1694&zoom=13",
+    );
+  });
+
+  it("orbits the camera while the middle pointer button is dragged", () => {
+    render(<MMap photos={[photo]} className="map" />);
+
+    fireEvent(mapCanvas, new MouseEvent("pointerdown", { button: 1, clientX: 100, clientY: 100 }));
+    fireEvent(window, new MouseEvent("pointermove", { clientX: 120, clientY: 80 }));
+    fireEvent(window, new MouseEvent("pointerup"));
+
+    expect(mapInstance.dragPan.disable).toHaveBeenCalled();
+    expect(mapInstance.jumpTo).toHaveBeenCalledWith({ bearing: 17, pitch: 25 });
+    expect(mapInstance.dragPan.enable).toHaveBeenCalled();
+  });
+
+  it("directs the current photo pool and can be stopped", () => {
+    window.matchMedia = jest.fn().mockReturnValue({ matches: false });
+    const london = {
+      ...photo,
+      album: "london",
+      href: "/album/london#photo.jpg",
+      decLat: 51.5,
+      decLng: -0.1,
+      date: "2023-01-01T00:00:00",
+    };
+    const { rerender } = render(<MMap photos={[london, photo]} className="map" showDirector />);
+
+    fireEvent.click(screen.getByRole("button", { name: /map tour/i }));
+
+    expect(mapInstance.flyTo).toHaveBeenCalledWith(
+      expect.objectContaining({ center: [139.6503, 35.6762], pitch: 42 }),
+    );
+    expect(screen.getByRole("button", { name: /map tour/i })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /map tour/i }));
+    expect(mapInstance.stop).toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: /map tour/i }));
+    rerender(<MMap photos={[photo]} className="map" showDirector />);
+    expect(screen.queryByRole("button", { name: /map tour/i })).not.toBeInTheDocument();
+
+    rerender(<MMap photos={[london, photo]} className="map" showDirector />);
+    expect(screen.getByRole("button", { name: /map tour/i })).toHaveAttribute(
+      "aria-pressed",
+      "false",
+    );
   });
 
   it("only rerenders when zoom crosses the marker-image threshold", () => {

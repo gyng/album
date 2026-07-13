@@ -29,7 +29,7 @@ test.describe("Search", () => {
   test("search accepts a query and updates URL", async ({ page }) => {
     await page.goto("/search", { waitUntil: "domcontentloaded" });
 
-    const input = page.locator('input[placeholder*="Type / to search"]');
+    const input = page.getByRole("textbox", { name: "Search photos" });
     await expect(input).toBeVisible();
 
     await input.fill("tokyo");
@@ -44,7 +44,7 @@ test.describe("Search", () => {
     // Use keyword mode to avoid WebGPU dependency
     await page.getByLabel("Search mode", { exact: true }).selectOption("keyword");
 
-    const input = page.locator('input[placeholder*="Type / to search"]');
+    const input = page.getByRole("textbox", { name: "Search photos" });
     await input.fill("japan");
     await expect(page).toHaveURL(/q=japan/);
 

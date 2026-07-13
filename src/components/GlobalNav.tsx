@@ -101,8 +101,8 @@ export const GlobalNav: React.FC<Props> = ({
                 <Link
                   href="/slideshow?mode=similar&random=1"
                   className={commonStyles.splitButtonSub}
-                  aria-label="Start similarity slideshow for a random image"
-                  title="Start similarity slideshow for a random image"
+                  aria-label="Start a similar-photo slideshow from a random photo"
+                  title="Start a similar-photo slideshow from a random photo"
                 >
                   🎲
                 </Link>
@@ -115,7 +115,7 @@ export const GlobalNav: React.FC<Props> = ({
               className={cx(commonStyles.button, current("guess"))}
               aria-current={ariaCurrent("guess")}
             >
-              Guess
+              Guess Where
             </Link>
           </li>
           {extraItems}

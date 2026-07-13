@@ -413,7 +413,7 @@ const TimelinePage: NextPage<PageProps> = ({ entries }) => {
           </Heading>
           {filterAlbum ? (
             <div className={commonStyles.toast}>
-              only showing photos from{" "}
+              Showing only photos from{" "}
               <Link href={`/album/${filterAlbum}`}>
                 <i>{filterAlbum}</i>
               </Link>

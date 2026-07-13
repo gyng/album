@@ -14,8 +14,8 @@ export const MapRecencyLegend = ({
   olderLabel?: string;
   newerLabel?: string;
 }) => (
-  <div className={styles.legend}>
-    <span className={styles.caption}>Colour = photo age</span>
+  <div className={`${styles.legend} maplibregl-ctrl maplibregl-ctrl-scale`}>
+    <span className={styles.caption}>Photo date</span>
     <div className={styles.scale}>
       <span className={styles.end}>{olderLabel}</span>
       <span

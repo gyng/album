@@ -43,8 +43,8 @@ describe("MapPhotoPopup", () => {
           element?.tagName === "SPAN" && element.textContent === "2 Jan 2024, 03:04two years ago",
       ),
     ).toBeTruthy();
-    expect(screen.getByRole("link", { name: "OpenStreetMap" })).toBeTruthy();
-    expect(screen.getByRole("link", { name: "Google Maps" })).toBeTruthy();
+    expect(screen.getByRole("link", { name: /Google Maps/ })).toBeTruthy();
+    expect(screen.getByRole("link", { name: /OpenStreetMap/ })).toBeTruthy();
 
     fireEvent.mouseDown(screen.getByRole("link", { name: /kansai/i }));
     expect(onInteractionStart).toHaveBeenCalledTimes(1);
@@ -60,6 +60,6 @@ describe("MapPhotoPopup", () => {
       />,
     );
 
-    expect(screen.queryByRole("link", { name: "OpenStreetMap" })).toBeNull();
+    expect(screen.queryByRole("link", { name: /OpenStreetMap/ })).toBeNull();
   });
 });

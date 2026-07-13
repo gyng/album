@@ -768,7 +768,7 @@ describe("Search", () => {
       expect(screen.getByRole("tab", { name: /place/i })).toBeTruthy();
     });
     expect(screen.getByLabelText("Search mode")).toBeTruthy();
-    expect(screen.getByPlaceholderText(/type \/ to search/i)).toBeTruthy();
+    expect(screen.getByRole("textbox", { name: "Search photos" })).toBeTruthy();
 
     fireEvent.click(screen.getByRole("tab", { name: /place/i }));
     fireEvent.click(
@@ -804,12 +804,12 @@ describe("Search", () => {
       expect(screen.getByRole("button", { name: /remove filter colour: #ff0000/i })).toBeTruthy();
     });
 
-    fireEvent.change(screen.getByPlaceholderText(/type \/ to search/i), {
+    fireEvent.change(screen.getByRole("textbox", { name: "Search photos" }), {
       target: { value: "harbor" },
     });
 
     // Typing must not silently erase the active colour filter — both compose.
-    expect((screen.getByPlaceholderText(/type \/ to search/i) as HTMLInputElement).value).toBe(
+    expect((screen.getByRole("textbox", { name: "Search photos" }) as HTMLInputElement).value).toBe(
       "harbor",
     );
     expect(screen.getByRole("button", { name: /remove filter colour: #ff0000/i })).toBeTruthy();
@@ -831,7 +831,7 @@ describe("Search", () => {
   it("preserves typed spaces in the search input", async () => {
     await renderSearch();
 
-    const input = screen.getByPlaceholderText(/type \/ to search/i) as HTMLInputElement;
+    const input = screen.getByRole("textbox", { name: "Search photos" }) as HTMLInputElement;
 
     fireEvent.change(input, { target: { value: "new" } });
     expect(input.value).toBe("new");
@@ -1019,7 +1019,7 @@ describe("Search", () => {
       );
     });
 
-    const input = screen.getByPlaceholderText(/type \/ to search/i) as HTMLInputElement;
+    const input = screen.getByRole("textbox", { name: "Search photos" }) as HTMLInputElement;
     fireEvent.change(input, { target: { value: "marina" } });
 
     await waitFor(() => {

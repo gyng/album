@@ -29,10 +29,14 @@ import {
   MapBounds,
   stylePhotosByRecency,
 } from "./mapWorldViewModel";
-import { MapAutoFit, MapBoundsTracker } from "./MapWorldMapChildren";
+import { MapAutoFit, MapBoundsTracker, MapMiddleDragOrbit } from "./MapWorldMapChildren";
 import { MapRouteOverlay } from "./MapRouteOverlay";
 import { MapPhotoPopup } from "./MapPhotoPopup";
 import { MapPhotoMarkers } from "./MapPhotoMarkers";
+import { MapContextMenu, type MapContextPoint } from "./MapContextMenu";
+import { buildMapDirectorSequence } from "./mapDirector";
+import { MapDirector } from "./MapDirector";
+import styles from "./MapWorld.module.css";
 
 export type MapWorldEntry = {
   album: string;
@@ -62,6 +66,8 @@ export type MapWorldProps = {
   timeRange?: TimeRange | null;
   /** Show the colour-recency legend (defaults to true). */
   showLegend?: boolean;
+  /** Offer the cinematic director control on the full world map. */
+  showDirector?: boolean;
 };
 
 // The single-album journey line is drawn in one solid colour: the recency
@@ -99,6 +105,7 @@ export const MMap: React.FC<MapWorldProps> = ({
   routeDisplayMode = "active-only",
   timeRange,
   showLegend = true,
+  showDirector = false,
 }) => {
   const url = typeof window === "undefined" ? null : new URL(window.location.toString());
   const initialLon = syncRoute ? (url?.searchParams.get("lon") ?? null) : null;
@@ -129,6 +136,11 @@ export const MMap: React.FC<MapWorldProps> = ({
 
   const [clickInfo, setClickInfo] = React.useState<MapWorldEntry | null>(null);
   const [hoverInfo, setHoverInfo] = React.useState<MapWorldEntry | null>(null);
+  const [contextPoint, setContextPoint] = React.useState<MapContextPoint | null>(null);
+  const [directorEnabled, setDirectorEnabled] = React.useState(false);
+  const stopDirector = React.useCallback(() => {
+    setDirectorEnabled(false);
+  }, []);
   const lastSyncedRouteRef = React.useRef<string>("");
   const debounceTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const pauseUntilRef = React.useRef<number>(0);
@@ -139,6 +151,7 @@ export const MMap: React.FC<MapWorldProps> = ({
   // ones are still reachable. Uses the functional updater so it reads the
   // current selection without capturing it.
   const selectMarker = (photo: MapWorldEntry) => {
+    stopDirector();
     setClickInfo((current) => {
       const coLocated = visiblePhotos.filter(
         (candidate) => candidate.decLat === photo.decLat && candidate.decLng === photo.decLng,
@@ -176,6 +189,20 @@ export const MMap: React.FC<MapWorldProps> = ({
       ]),
     );
   }, [timeFilteredPhotos]);
+  const directorSequence = React.useMemo(
+    () => buildMapDirectorSequence(timeFilteredPhotos),
+    [timeFilteredPhotos],
+  );
+  React.useEffect(() => {
+    if (directorSequence.length < 2) {
+      setDirectorEnabled(false);
+    }
+  }, [directorSequence.length]);
+  const visitDirectorPhoto = React.useCallback((photo: MapWorldEntry) => {
+    setClickInfo(photo);
+    setHoverInfo(null);
+    setContextPoint(null);
+  }, []);
   const activeRouteTarget = clickInfo?.href ?? hoverInfo?.href ?? null;
   const activeRoutePhoto = React.useMemo(
     () => photosWithStyles.find((photo) => photo.href === activeRouteTarget) ?? null,
@@ -397,8 +424,22 @@ export const MMap: React.FC<MapWorldProps> = ({
           zoom: initialZoom ? Number.parseFloat(initialZoom) : undefined,
         }}
         onMoveStart={() => {
+          setContextPoint(null);
           setIsInteracting(true);
         }}
+        onClick={() => {
+          setContextPoint(null);
+        }}
+        onContextMenu={(event) => {
+          event.originalEvent.preventDefault();
+          stopDirector();
+          setContextPoint({
+            latitude: event.lngLat.lat,
+            longitude: event.lngLat.lng,
+          });
+        }}
+        onDragStart={stopDirector}
+        onWheel={stopDirector}
         onZoom={(e) => {
           updateMarkerImageVisibility(e.viewState.zoom);
         }}
@@ -416,6 +457,12 @@ export const MMap: React.FC<MapWorldProps> = ({
       >
         <MapAutoFit enabled={fitToPhotos} photos={photos} />
         <MapBoundsTracker onBoundsChange={setBounds} />
+        <MapMiddleDragOrbit onInteractionStart={stopDirector} />
+        <MapDirector
+          enabled={directorEnabled}
+          sequence={directorSequence}
+          onVisit={visitDirectorPhoto}
+        />
         {routeGeoJson ? (
           <Source id="journey-line-source" type="geojson" data={routeGeoJson} lineMetrics>
             <Layer
@@ -481,6 +528,14 @@ export const MMap: React.FC<MapWorldProps> = ({
           onInteractionStart={pauseRouterSync}
         />
 
+        <MapContextMenu
+          point={contextPoint}
+          onClose={() => {
+            setContextPoint(null);
+          }}
+          onInteractionStart={pauseRouterSync}
+        />
+
         <MapPhotoMarkers
           photos={visiblePhotos}
           showMarkerImages={showMarkerImages}
@@ -498,6 +553,21 @@ export const MMap: React.FC<MapWorldProps> = ({
         ) : null}
         <FullscreenControl />
       </MapLibreMap>
+      {showDirector && directorSequence.length > 1 ? (
+        <button
+          type="button"
+          className={[styles.directorControl, directorEnabled ? styles.directorControlActive : ""]
+            .filter(Boolean)
+            .join(" ")}
+          aria-pressed={directorEnabled}
+          onClick={() => {
+            setDirectorEnabled((current) => !current);
+          }}
+        >
+          <span aria-hidden="true">{directorEnabled ? "■" : "▶"}</span>
+          {directorEnabled ? "Stop map tour" : `Play map tour · ${directorSequence.length} photos`}
+        </button>
+      ) : null}
     </div>
   );
 };

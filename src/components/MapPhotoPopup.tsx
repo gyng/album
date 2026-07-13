@@ -4,6 +4,7 @@ import { exifWallClockTimestamp } from "../util/exifTime";
 import { getRelativeTimeString } from "../util/time";
 import type { MapWorldEntry } from "./MapWorld";
 import { formatMapPhotoDateTime } from "./mapWorldViewModel";
+import { buildExternalMapLinks } from "./mapInteractions";
 import styles from "./MapWorld.module.css";
 
 type MapPhotoPopupProps = {
@@ -26,6 +27,7 @@ export const MapPhotoPopup = ({
   const formattedDate = formatMapPhotoDateTime(photo.date);
   const timestamp = exifWallClockTimestamp(photo.date);
   const relative = timestamp === null ? null : getRelativeTimeString(new Date(timestamp));
+  const mapLinks = buildExternalMapLinks(photo.decLat, photo.decLng);
 
   return (
     <Popup
@@ -75,20 +77,12 @@ export const MapPhotoPopup = ({
 
         {selected ? (
           <div className={styles.viewOn}>
-            <a
-              href={`https://www.openstreetmap.org/?mlat=${photo.decLat}&mlon=${photo.decLng}&zoom=13`}
-              target="_blank"
-              rel="noreferrer"
-            >
-              OpenStreetMap
+            <a href={mapLinks.google} target="_blank" rel="noreferrer">
+              Open in Google Maps
             </a>
             &nbsp;&middot;&nbsp;
-            <a
-              href={`https://www.google.com/maps/search/?api=1&query=${photo.decLat},${photo.decLng}`}
-              target="_blank"
-              rel="noreferrer"
-            >
-              Google Maps
+            <a href={mapLinks.osm} target="_blank" rel="noreferrer">
+              Open in OpenStreetMap
             </a>
           </div>
         ) : null}

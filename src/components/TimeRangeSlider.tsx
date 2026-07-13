@@ -24,6 +24,7 @@ type TimeRangeSliderProps = {
   onDrag: (fromMs: number, toMs: number) => void;
   /** Called on pointer up — use for committing the range (URL, filtering). */
   onCommit: (fromMs: number | null, toMs: number | null) => void;
+  id?: string;
   className?: string;
 };
 
@@ -70,6 +71,7 @@ export const TimeRangeSlider: React.FC<TimeRangeSliderProps> = ({
   toMs,
   onDrag,
   onCommit,
+  id,
   className,
 }) => {
   const trackRef = React.useRef<HTMLDivElement>(null);
@@ -198,6 +200,7 @@ export const TimeRangeSlider: React.FC<TimeRangeSliderProps> = ({
 
   return (
     <div
+      id={id}
       className={[styles.container, className].filter(Boolean).join(" ")}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
@@ -226,7 +229,7 @@ export const TimeRangeSlider: React.FC<TimeRangeSliderProps> = ({
           className={thumbClass(!hasRange)}
           style={{ left: `${fromPos * 100}%` }}
           role="slider"
-          aria-label="Range start"
+          aria-label="Start date"
           aria-valuemin={0}
           aria-valuemax={100}
           aria-valuenow={Math.round(fromPos * 100)}
@@ -241,7 +244,7 @@ export const TimeRangeSlider: React.FC<TimeRangeSliderProps> = ({
           className={thumbClass(!hasRange)}
           style={{ left: `${toPos * 100}%` }}
           role="slider"
-          aria-label="Range end"
+          aria-label="End date"
           aria-valuemin={0}
           aria-valuemax={100}
           aria-valuenow={Math.round(toPos * 100)}
@@ -262,9 +265,9 @@ export const TimeRangeSlider: React.FC<TimeRangeSliderProps> = ({
           <button
             className={styles.resetButton}
             onClick={handleReset}
-            aria-label="Clear time filter"
+            aria-label="Clear date filter"
           >
-            ✕ Reset
+            ✕ Clear dates
           </button>
         ) : null}
         <span className={styles.label}>

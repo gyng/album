@@ -3,6 +3,7 @@ import { useMap } from "react-map-gl/maplibre";
 import { computeWrapAwareBounds } from "../util/mapBounds";
 import type { MapWorldEntry } from "./MapWorld";
 import type { MapBounds } from "./mapWorldViewModel";
+import { getMiddleDragCamera } from "./mapInteractions";
 import styles from "./MapWorld.module.css";
 
 export const MapAutoFit = ({ enabled, photos }: { enabled: boolean; photos: MapWorldEntry[] }) => {
@@ -136,6 +137,98 @@ export const MapBoundsTracker = ({
       map.off("zoomend", updateBounds);
     };
   }, [map, onBoundsChange]);
+
+  return null;
+};
+
+/** Adds desktop middle-button orbit without replacing MapLibre's native gestures. */
+export const MapMiddleDragOrbit = ({ onInteractionStart }: { onInteractionStart: () => void }) => {
+  const { current: map } = useMap();
+
+  React.useEffect(() => {
+    if (!map) {
+      return;
+    }
+
+    const canvas = map.getCanvasContainer();
+    let drag: {
+      pointerId: number;
+      startX: number;
+      startY: number;
+      startBearing: number;
+      startPitch: number;
+      restoreDragPan: boolean;
+    } | null = null;
+
+    const finish = (event?: PointerEvent) => {
+      if (!drag || (event && event.pointerId !== drag.pointerId)) {
+        return;
+      }
+      if (drag.restoreDragPan) {
+        map.dragPan.enable();
+      }
+      drag = null;
+      canvas.classList.remove(styles.orbiting);
+    };
+
+    const onPointerDown = (event: PointerEvent) => {
+      if (event.button !== 1) {
+        return;
+      }
+      event.preventDefault();
+      event.stopPropagation();
+      onInteractionStart();
+      const restoreDragPan = map.dragPan.isEnabled();
+      if (restoreDragPan) {
+        map.dragPan.disable();
+      }
+      drag = {
+        pointerId: event.pointerId,
+        startX: event.clientX,
+        startY: event.clientY,
+        startBearing: map.getBearing(),
+        startPitch: map.getPitch(),
+        restoreDragPan,
+      };
+      canvas.classList.add(styles.orbiting);
+    };
+
+    const onPointerMove = (event: PointerEvent) => {
+      if (!drag || event.pointerId !== drag.pointerId) {
+        return;
+      }
+      event.preventDefault();
+      map.jumpTo(
+        getMiddleDragCamera({
+          startBearing: drag.startBearing,
+          startPitch: drag.startPitch,
+          deltaX: event.clientX - drag.startX,
+          deltaY: event.clientY - drag.startY,
+        }),
+      );
+    };
+
+    const preventMiddleAuxClick = (event: MouseEvent) => {
+      if (event.button === 1) {
+        event.preventDefault();
+      }
+    };
+
+    canvas.addEventListener("pointerdown", onPointerDown, true);
+    canvas.addEventListener("auxclick", preventMiddleAuxClick);
+    window.addEventListener("pointermove", onPointerMove, { capture: true });
+    window.addEventListener("pointerup", finish, { capture: true });
+    window.addEventListener("pointercancel", finish, { capture: true });
+
+    return () => {
+      finish();
+      canvas.removeEventListener("pointerdown", onPointerDown, true);
+      canvas.removeEventListener("auxclick", preventMiddleAuxClick);
+      window.removeEventListener("pointermove", onPointerMove, true);
+      window.removeEventListener("pointerup", finish, true);
+      window.removeEventListener("pointercancel", finish, true);
+    };
+  }, [map, onInteractionStart]);
 
   return null;
 };
