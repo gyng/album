@@ -59,9 +59,40 @@ npm run test:e2e:reuse -- ./tests/smoke.spec.ts                # reuse already-r
 - `create-test-db.sh` must be run first if fixture DBs (`testexists.sqlite`, `test-simple.sqlite`) are missing
 
 **General:**
-- Run tests after every refactor before committing
-- Red-green TDD — write the failing test first
-- Prefer unit > integration > e2e
+- Run the smallest relevant checks after each refactor, then the full required
+  gates before committing
+- Use red-green-refactor for new behaviour and bug fixes: first write the smallest
+  test that fails for the right reason, then implement, then improve the design
+- Choose the lowest test layer that can prove the behaviour without reimplementing
+  it in the test:
+  1. **Unit tests** for pure transformations, state machines, parsing, ranking,
+     formatting, and edge cases
+  2. **Component/integration tests** for user interactions, accessibility state,
+     and boundaries between a small number of modules
+  3. **E2E tests** only for critical journeys, browser integration, routing,
+     persistence, and failures that lower layers cannot represent faithfully
+- Keep the pyramid broad at the unit layer, selective at integration, and very
+  small at E2E; do not repeat the same assertion at every layer
+- Assert observable outcomes and public contracts: rendered state, accessible
+  state, data passed across a boundary, URL changes, or network effects. Avoid
+  asserting implementation details, private helpers, CSS class names, or mock
+  call sequences unless those are the contract under test
+- Do not add tests that merely freeze prose, punctuation, placeholders, or other
+  editorial copy. Exact wording belongs in a test only when it is itself a
+  requirement (for example legal text, a protocol value, or an accessible name
+  that clients depend on). Copy edits should usually update existing selectors,
+  not create new test cases
+- Prefer role- and label-based queries for controls. If harmless copy changes
+  repeatedly break a behavioural test, give the control a stable accessible name
+  or query a more durable semantic state; do not fall back to arbitrary DOM shape
+- Mock slow or external boundaries, not the behaviour being tested. A test should
+  fail when the user-visible behaviour regresses, not when an internal refactor
+  preserves it
+- Every test should have a clear regression story. Remove tests whose only value
+  is increasing counts, duplicating stronger coverage, or confirming framework
+  behaviour
+- Keep E2E cases independent, deterministic, and free of arbitrary sleeps. Do not
+  use retries to excuse flakiness; diagnose the cause
 - No perf changes without profiling evidence first
 
 ## Map
