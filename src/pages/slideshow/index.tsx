@@ -1,7 +1,11 @@
 import { NextPage } from "next/types";
 import Link from "next/link";
 import React, { useEffect, useCallback } from "react";
-import { useDatabase, useEmbeddingsDatabase } from "../../components/database/useDatabase";
+import {
+  SEARCH_DATABASE_URL,
+  useDatabase,
+  useEmbeddingsDatabase,
+} from "../../components/database/useDatabase";
 import { PhotoBlock } from "../../services/types";
 import {
   fetchSlideshowPhotos,
@@ -252,7 +256,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
 
     setIsCheckingSearchDbVersion(true);
     try {
-      const response = await fetch("/search.sqlite", {
+      const response = await fetch(SEARCH_DATABASE_URL, {
         method: "HEAD",
         cache: "no-store",
       });

@@ -1,7 +1,6 @@
 import { defineConfig, devices } from "@playwright/test";
 
 const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? "http://localhost:3000";
-const reuseExistingServer = !process.env.CI;
 const skipWebServer = process.env.PLAYWRIGHT_SKIP_WEBSERVER === "1";
 const recordLocalVideo = process.env.PLAYWRIGHT_VIDEO === "1";
 const configuredWorkers = process.env.PLAYWRIGHT_WORKERS
@@ -29,8 +28,9 @@ export default defineConfig({
   fullyParallel: true,
   /* Fail the build on CI if you accidentally left test.only in the source code. */
   forbidOnly: !!process.env.CI,
-  /* Retry on CI only */
+  /* Retry for diagnostics, but never let a retry-pass hide a flaky CI test. */
   retries: process.env.CI ? 2 : 0,
+  failOnFlakyTests: !!process.env.CI,
   /* Keep CI parallelism conservative; override when profiling larger runners. */
   workers,
   /* Reporter to use. See https://playwright.dev/docs/test-reporters */
@@ -110,7 +110,7 @@ export default defineConfig({
     : {
         command: "npm start",
         url: baseURL,
-        reuseExistingServer,
+        reuseExistingServer: false,
         timeout: 120 * 1000,
       },
 });

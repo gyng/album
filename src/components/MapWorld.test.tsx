@@ -161,6 +161,7 @@ describe("MapWorld", () => {
   let replaceStateSpy: jest.SpyInstance;
 
   beforeEach(() => {
+    window.history.replaceState({}, "", "/");
     jest.useFakeTimers();
     mapHandlers.onMoveStart = undefined;
     mapHandlers.onMoveEnd = undefined;
@@ -204,6 +205,30 @@ describe("MapWorld", () => {
       window.history.state,
       "",
       "/?lat=35.676&lon=139.650&zoom=14.00",
+    );
+  });
+
+  it("merges a pending camera update into the latest URL state", () => {
+    window.history.pushState({}, "", "/?from=2020-01-01&to=2025-01-01");
+    render(<MMap photos={[photo]} className="map" />);
+
+    act(() => {
+      mapHandlers.onMoveEnd?.({
+        viewState: { latitude: 35.6762, longitude: 139.6503, zoom: 14 },
+      });
+    });
+
+    // A different control clears its params while camera sync is pending.
+    window.history.pushState({}, "", "/?filter_album=kansai");
+
+    act(() => {
+      jest.advanceTimersByTime(200);
+    });
+
+    expect(replaceStateSpy).toHaveBeenCalledWith(
+      window.history.state,
+      "",
+      "/?filter_album=kansai&lat=35.676&lon=139.650&zoom=14.00",
     );
   });
 

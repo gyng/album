@@ -1,4 +1,7 @@
+const fs = require("node:fs");
+const os = require("node:os");
 const path = require("path");
+const { DatabaseSync } = require("node:sqlite");
 const {
   buildAttentionAlbums,
   buildDeletedAlbumReports,
@@ -721,30 +724,72 @@ describe("publish-wizard-lib", () => {
   });
 
   describe("loadDbState", () => {
-    const publicDir = path.resolve(__dirname, "../public");
-    const mainDbPath = path.join(publicDir, "search.sqlite");
-    const embeddingsDbPath = path.join(publicDir, "search-embeddings.sqlite");
-    const fs = require("fs");
-    const hasMainDb = fs.existsSync(mainDbPath);
-    const hasEmbeddingsDb = fs.existsSync(embeddingsDbPath);
+    let directory;
+    let mainDbPath;
+    let embeddingsDbPath;
 
-    (hasMainDb ? it : it.skip)(
-      "reports hasEmbeddingsTable false when only main DB provided and it has no embeddings table",
-      async () => {
-        const state = await loadDbState(mainDbPath);
-        expect(state.hasEmbeddingsTable).toBe(false);
-        expect(state.embeddingsCount).toBe(0);
-      },
-    );
+    beforeAll(() => {
+      directory = fs.mkdtempSync(path.join(os.tmpdir(), "publish-db-state-"));
+      mainDbPath = path.join(directory, "search.sqlite");
+      embeddingsDbPath = path.join(directory, "search-embeddings.sqlite");
 
-    (hasMainDb && hasEmbeddingsDb ? it : it.skip)(
-      "reads embeddings from a separate embeddings DB when main DB has no embeddings table",
-      async () => {
-        const state = await loadDbState(mainDbPath, embeddingsDbPath);
-        expect(state.hasEmbeddingsTable).toBe(true);
-        expect(state.embeddingsCount).toBeGreaterThan(0);
-        expect(state.embeddingsCount).toBeGreaterThanOrEqual(state.imageCount);
-      },
-    );
+      const mainDb = new DatabaseSync(mainDbPath);
+      mainDb.exec(`
+        CREATE TABLE images (path TEXT PRIMARY KEY);
+        INSERT INTO images (path) VALUES
+          ('../albums/test-simple/a.jpg'),
+          ('../albums/test-simple/b.jpg');
+      `);
+      mainDb.close();
+
+      const embeddingsDb = new DatabaseSync(embeddingsDbPath);
+      embeddingsDb.exec(`
+        CREATE TABLE embeddings (
+          path TEXT NOT NULL,
+          model_id TEXT NOT NULL,
+          PRIMARY KEY (path, model_id)
+        );
+        INSERT INTO embeddings (path, model_id) VALUES
+          ('../albums/test-simple/a.jpg', 'test-model'),
+          ('../albums/test-simple/b.jpg', 'test-model');
+      `);
+      embeddingsDb.close();
+    });
+
+    afterAll(() => {
+      fs.rmSync(directory, { recursive: true, force: true });
+    });
+
+    it("reports a core-only database without inventing embedding state", async () => {
+      const state = await loadDbState(mainDbPath);
+
+      expect(state).toMatchObject({
+        exists: true,
+        imageCount: 2,
+        hasEmbeddingsTable: false,
+        embeddingsCount: 0,
+      });
+      expect([...state.indexedPhotoPaths].sort()).toEqual([
+        "../albums/test-simple/a.jpg",
+        "../albums/test-simple/b.jpg",
+      ]);
+      expect([...state.indexedEmbeddingPaths]).toEqual([]);
+    });
+
+    it("combines a core database with its separate embeddings database", async () => {
+      const state = await loadDbState(mainDbPath, embeddingsDbPath);
+
+      expect(state).toMatchObject({
+        exists: true,
+        imageCount: 2,
+        hasEmbeddingsTable: true,
+        embeddingsCount: 2,
+        embeddingModelCounts: [{ modelId: "test-model", count: 2 }],
+      });
+      expect([...state.indexedEmbeddingPaths].sort()).toEqual([
+        "../albums/test-simple/a.jpg",
+        "../albums/test-simple/b.jpg",
+      ]);
+    });
   });
 });

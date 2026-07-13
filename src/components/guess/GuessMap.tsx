@@ -86,7 +86,7 @@ export const GuessMap: React.FC<GuessMapProps> = ({ guess, reveal, onGuess }) =>
   );
 
   return (
-    <div className={styles.mapContainer}>
+    <div className={styles.mapContainer} role="region" aria-label="Guess map">
       <Map
         style={{ width: "100%", height: "100%" }}
         mapStyle={MAP_STYLE}

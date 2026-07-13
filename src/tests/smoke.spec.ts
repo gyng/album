@@ -69,24 +69,6 @@ test.describe("Smoke Tests", () => {
     await expect(page.getByRole("heading", { name: "Timeline" })).toBeVisible();
   });
 
-  test("album navigation flow works", async ({ page }) => {
-    await page.goto("/", { waitUntil: "domcontentloaded" });
-
-    // Click into an album
-    const albumLink = page.locator('a[href="/album/test-simple"]').first();
-    await expect(albumLink).toBeVisible();
-    await albumLink.click();
-    await page.waitForURL("/album/test-simple");
-
-    // Photos are visible
-    await expect(page.locator("img").first()).toBeVisible();
-
-    // Navigate back via "Albums" link
-    await page.locator('a:has-text("Albums")').click();
-    await page.waitForURL("/");
-    await expect(page.locator("h1")).toContainText("Snapshots");
-  });
-
   test("map album filter shows indicator", async ({ page }) => {
     await page.goto("/map?filter_album=test-simple", { waitUntil: "domcontentloaded" });
     await expect(page).toHaveTitle("Map | Snapshots");

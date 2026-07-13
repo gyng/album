@@ -1,14 +1,7 @@
 import { test, expect } from "@playwright/test";
-import { existsSync, statSync } from "fs";
-import { join } from "path";
 import { stubExternalMapAssets } from "./map-network";
 
-const searchDbPath = join(__dirname, "..", "public", "search.sqlite");
-const hasSearchDb = existsSync(searchDbPath) && statSync(searchDbPath).size > 0;
-
 test.describe("guess game layout", () => {
-  test.skip(!hasSearchDb, "Requires search.sqlite with data");
-
   // Regression: a portrait photo's `height: 100%` used to fall back to its
   // intrinsic aspect ratio because `.page` was `min-height` (an indefinite
   // height), so the photo — and the map dragged along with it — overflowed the
@@ -22,39 +15,38 @@ test.describe("guess game layout", () => {
       waitUntil: "domcontentloaded",
     });
 
-    // The overflow only manifests once the <img> has real intrinsic
-    // dimensions. If the resized image is unavailable (e.g. running against a
-    // dev server that has not generated it), skip rather than fail spuriously.
-    const photoLoaded = await page
-      .waitForFunction(() => {
-        const img = document.querySelector('[class*="photoPanel"] img') as HTMLImageElement | null;
-        return !!img && img.complete && img.naturalWidth > 0;
-      })
-      .then(() => true)
-      .catch(() => false);
+    // The overflow only manifests once the image has real intrinsic dimensions.
+    // Missing generated media is a fixture failure, not a reason to skip coverage.
+    const photoPanel = page.getByRole("img", { name: /mystery photo/i });
+    const map = page.getByRole("region", { name: "Guess map" });
+    await expect(photoPanel).toBeVisible();
+    await expect(map).toBeVisible();
 
-    test.skip(
-      !photoLoaded,
-      "Round photo did not load (resized images not built) — skipping layout assertion",
-    );
+    const photo = photoPanel.locator("img");
+    await expect(photo).toBeVisible();
+    await expect
+      .poll(() => photo.evaluate((image: HTMLImageElement) => image.naturalWidth))
+      .toBeGreaterThan(0);
 
-    const metrics = await page.evaluate(() => {
-      const vh = window.innerHeight;
-      const pick = (sub: string) => document.querySelector(`[class*="${sub}"]`);
-      const bottom = (el: Element | null) =>
-        el ? Math.round(el.getBoundingClientRect().bottom) : 0;
-      return {
-        vh,
+    const [photoPanelBox, mapBox, metrics] = await Promise.all([
+      photoPanel.boundingBox(),
+      map.boundingBox(),
+      page.evaluate(() => ({
+        vh: window.innerHeight,
         docScrollHeight: document.documentElement.scrollHeight,
-        photoPanelBottom: bottom(pick("photoPanel")),
-        mapBottom: bottom(pick("mapContainer")),
-      };
-    });
+      })),
+    ]);
+
+    expect(photoPanelBox).not.toBeNull();
+    expect(mapBox).not.toBeNull();
+    if (!photoPanelBox || !mapBox) {
+      throw new Error("Guess round regions have no layout boxes");
+    }
 
     // The document must not scroll vertically, and neither the photo panel nor
     // the map may extend past the bottom of the viewport.
     expect(metrics.docScrollHeight).toBeLessThanOrEqual(metrics.vh + 1);
-    expect(metrics.photoPanelBottom).toBeLessThanOrEqual(metrics.vh + 1);
-    expect(metrics.mapBottom).toBeLessThanOrEqual(metrics.vh + 1);
+    expect(Math.round(photoPanelBox.y + photoPanelBox.height)).toBeLessThanOrEqual(metrics.vh + 1);
+    expect(Math.round(mapBox.y + mapBox.height)).toBeLessThanOrEqual(metrics.vh + 1);
   });
 });

@@ -10,6 +10,7 @@ const mockUseEmbeddingsDatabase = jest.fn();
 const mockFetchSlideshowPhotos = jest.fn();
 const mockRefreshDatabase = jest.fn();
 const mockReloadCurrentPage = jest.fn();
+const mockNavigateTo = jest.fn();
 const mockBuildVersion = "test-build-version";
 const mockClipboardWriteText = jest.fn();
 const samplePhoto = {
@@ -19,6 +20,7 @@ const samplePhoto = {
 };
 
 jest.mock("../../../components/database/useDatabase", () => ({
+  SEARCH_DATABASE_URL: "/search.sqlite",
   useDatabase: () => mockUseDatabase(),
   useEmbeddingsDatabase: () => mockUseEmbeddingsDatabase(),
 }));
@@ -51,7 +53,11 @@ jest.mock("next/head", () => ({
 }));
 
 jest.mock("usehooks-ts", () => ({
-  useLocalStorage: (_key: string, initialValue: unknown) => [initialValue, jest.fn(), jest.fn()],
+  useLocalStorage: <T,>(_key: string, initialValue: T) => {
+    const React = jest.requireActual<typeof import("react")>("react");
+    const [value, setValue] = React.useState(initialValue);
+    return [value, setValue, () => setValue(initialValue)] as const;
+  },
 }));
 
 jest.mock("../../../lib/buildVersion", () => ({
@@ -59,7 +65,7 @@ jest.mock("../../../lib/buildVersion", () => ({
 }));
 
 jest.mock("../../../util/navigate", () => ({
-  navigateTo: jest.fn(),
+  navigateTo: (...args: unknown[]) => mockNavigateTo(...args),
   reloadCurrentPage: () => mockReloadCurrentPage(),
 }));
 
@@ -284,11 +290,47 @@ describe("slideshow page", () => {
     );
 
     const url = new URL(window.location.href);
-    expect(url.searchParams.get("mode")).toBe("weighted");
+    expect(url.searchParams.get("mode")).toBe("random");
     expect(url.searchParams.get("filter")).toBe("test-simple");
     expect(url.searchParams.get("delay")).toBe("60");
     expect(url.searchParams.has("photo")).toBe(false);
     expect(url.searchParams.has("seed")).toBe(false);
+  });
+
+  it("applies initial URL configuration to the page controls", async () => {
+    const database = { db: true };
+    mockUseDatabase.mockReturnValue([database, 100, null, null, mockRefreshDatabase]);
+    mockFetchSlideshowPhotos.mockResolvedValue([samplePhoto]);
+    window.history.replaceState(
+      window.history.state,
+      "",
+      "/slideshow?clock=1&details=1&map=1&cover=1&mode=random&delay=60&align=right&filter=test-simple",
+    );
+
+    render(<SlideshowPage />);
+
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(screen.getByRole("button", { name: /shuffle/i }).getAttribute("aria-pressed")).toBe(
+      "true",
+    );
+    for (const name of [/🕰/i, /details/i, /^map$/i, /fill screen/i]) {
+      expect(screen.getByRole("button", { name }).getAttribute("aria-pressed")).toBe("true");
+    }
+    expect(screen.getByRole("button", { name: /right/i })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "1m" }).getAttribute("aria-pressed")).toBe("true");
+    expect(mockFetchSlideshowPhotos).toHaveBeenLastCalledWith({
+      database,
+      filter: "test-simple",
+    });
+
+    const url = new URL(window.location.href);
+    expect(url.searchParams.get("mode")).toBe("random");
+    expect(url.searchParams.get("filter")).toBe("test-simple");
+    expect(url.searchParams.get("delay")).toBe("60");
   });
 
   it("writes timing changes into the URL", async () => {
@@ -307,6 +349,22 @@ describe("slideshow page", () => {
     const url = new URL(window.location.href);
     expect(url.searchParams.get("mode")).toBe("weighted");
     expect(url.searchParams.get("delay")).toBe("60");
+  });
+
+  it("wires slideshow keyboard shortcuts to page actions", async () => {
+    mockUseDatabase.mockReturnValue([{ db: true }, 100, null, null, mockRefreshDatabase]);
+    mockFetchSlideshowPhotos.mockResolvedValue([samplePhoto]);
+
+    render(<SlideshowPage />);
+
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    fireEvent.keyDown(window, { key: "Escape" });
+
+    expect(mockNavigateTo).toHaveBeenCalledWith("/");
   });
 
   it("copies a current-photo slideshow link from the context section", async () => {

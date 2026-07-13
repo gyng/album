@@ -33,17 +33,18 @@ The SQLite write path can be benchmarked independently of model loading with the
 This project uses [uv](https://docs.astral.sh/uv/) for dependency management.
 
 ```sh
-$ uv sync
+$ uv sync                    # lightweight CLI and test dependencies
+$ uv sync --extra inference  # required for model inference/indexing
 
-$ uv run ruff --fix
-$ uv run black .
+$ uv run ruff check --fix .
+$ uv run ruff format .
 
 $ uv run index.py --help
-$ uv run python index.py index --glob "../albums/test-simple/*.[jJ][pP][gG]"
-$ uv run python index.py index --glob "../albums/**/*.jpg" --dbpath "search.sqlite" --dry-run --model-profile hybrid
+$ uv run --extra inference python index.py index --glob "../albums/test-simple/*.[jJ][pP][gG]"
+$ uv run --extra inference python index.py index --glob "../albums/**/*.jpg" --dbpath "search.sqlite" --dry-run --model-profile hybrid
 $ uv run python index.py benchmark-index --rows 200 --repeat 3 --output ".index-benchmark.json"
-$ uv run python index.py benchmark-classifier --backend gemma4-gguf --model-id "/tmp/gemma4-e4b-gguf/gemma-4-E4B-it-Q8_0.gguf" --quantization "/tmp/gemma4-e4b-gguf/mmproj-BF16.gguf" --path "../albums/test-simple/DSCF0506-2.jpg" --repeat 1 --output ".gemma4-gguf-benchmark.json"
-$ uv run python index.py compare-captioners --glob "../albums/test-simple/*.[jJ][pP][gG]" --baseline-dbpath "./test-simple.sqlite" --sample-size 5 --candidate-backend gemma4-gguf --candidate-model-id "/tmp/gemma4-e4b-gguf/gemma-4-E4B-it-Q8_0.gguf" --candidate-quantization "/tmp/gemma4-e4b-gguf/mmproj-BF16.gguf" --output-json ".caption-comparison.json" --output-md ".caption-comparison.md"
+$ uv run --extra inference python index.py benchmark-classifier --backend gemma4-gguf --model-id "/tmp/gemma4-e4b-gguf/gemma-4-E4B-it-Q8_0.gguf" --quantization "/tmp/gemma4-e4b-gguf/mmproj-BF16.gguf" --path "../albums/test-simple/DSCF0506-2.jpg" --repeat 1 --output ".gemma4-gguf-benchmark.json"
+$ uv run --extra inference python index.py compare-captioners --glob "../albums/test-simple/*.[jJ][pP][gG]" --baseline-dbpath "./test-simple.sqlite" --sample-size 5 --candidate-backend gemma4-gguf --candidate-model-id "/tmp/gemma4-e4b-gguf/gemma-4-E4B-it-Q8_0.gguf" --candidate-quantization "/tmp/gemma4-e4b-gguf/mmproj-BF16.gguf" --output-json ".caption-comparison.json" --output-md ".caption-comparison.md"
 $ uv run index.py search --query "singapore"
 $ uv run python index.py search-similar-path --dbpath "search.sqlite" --path "../albums/2511japan/DSCF6007-06.jpg"
 
@@ -56,8 +57,9 @@ $ uv run index.py prune --glob "../src/public/data/albums/**/*.jpg" --dbpath "se
 $ cp search.sqlite ../src/public/search.sqlite
 
 # Test
-$ ./create-test-db.sh
-$ ./do-test-index.sh
+$ ./create-test-db.sh              # rebuild committed fixtures; installs inference extra
+$ ./do-test-index.sh              # model-free default; suitable for CI
+$ ./do-test-index-inference.sh    # opt-in Janus/CUDA integration check
 
 # Perform a full index and copy split core + embeddings DBs to /public in the Next.js app
 $ ./do-full-index.sh
@@ -65,6 +67,10 @@ $ ./do-full-index.sh
 # Generate the frontend embeddings DB only
 $ ./do-embeddings-index.sh
 ```
+
+Live model inference is deliberately excluded from the default suite. Set
+`INDEX_RUN_MODEL_INFERENCE=1` only through `do-test-index-inference.sh`; normal CI
+must remain deterministic and must not download or execute model weights.
 
 ## Benchmarking
 

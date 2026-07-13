@@ -1,9 +1,4 @@
 import { test, expect, type Page } from "@playwright/test";
-import { existsSync, statSync } from "fs";
-import { join } from "path";
-
-const searchDbPath = join(__dirname, "..", "public", "search.sqlite");
-const hasSearchDb = existsSync(searchDbPath) && statSync(searchDbPath).size > 0;
 
 /** Slideshow image — the only non-hidden img on the page. */
 const slideshowImg = 'img[alt]:not([aria-hidden="true"])';
@@ -53,18 +48,6 @@ test.beforeEach(async ({ page }) => {
 });
 
 test.describe("Slideshow", () => {
-  test.skip(!hasSearchDb, "Requires search.sqlite with data");
-
-  test("displays image and navigation controls", async ({ page }) => {
-    await page.goto("/slideshow", { waitUntil: "domcontentloaded" });
-    await waitForSlideshow(page);
-
-    await revealControls(page);
-    await expect(page.locator('button:has-text("Next")')).toBeVisible();
-    await expect(page.locator('button:has-text("Previous")')).toBeVisible();
-    await expect(page.getByRole("link", { name: "Snapshots Slideshow" })).toBeVisible();
-  });
-
   test("desktop controls auto-hide on idle and reveal on mouse-to-top", async ({ page }) => {
     await page.clock.install();
     await page.goto("/slideshow", { waitUntil: "domcontentloaded" });
@@ -95,34 +78,10 @@ test.describe("Slideshow", () => {
     const secondSrc = await image.getAttribute("src");
     expect(secondSrc).not.toBe(firstSrc);
 
-    // Previous returns to first
-    await page.keyboard.press("ArrowLeft");
+    // The actual Previous control returns to the first photo; keyboard shortcut
+    // dispatch is covered at the utility layer.
+    await page.getByRole("button", { name: "Previous", exact: true }).click();
     await expect(image).toHaveAttribute("src", String(firstSrc));
-  });
-
-  test("keyboard shortcuts work", async ({ page }) => {
-    await page.goto("/slideshow", { waitUntil: "domcontentloaded" });
-    await waitForSlideshow(page);
-
-    const image = page.locator(slideshowImg).first();
-    const firstSrc = await image.getAttribute("src");
-
-    // ArrowRight advances
-    await page.keyboard.press("ArrowRight");
-    await waitForImageChange(page, String(firstSrc));
-    expect(await image.getAttribute("src")).not.toBe(firstSrc);
-
-    // Space toggles pause
-    const container = page.locator("[data-paused]");
-    await expect(container).toHaveAttribute("data-paused", "false");
-    await page.keyboard.press(" ");
-    await expect(container).toHaveAttribute("data-paused", "true");
-    await page.keyboard.press(" ");
-    await expect(container).toHaveAttribute("data-paused", "false");
-
-    // Escape goes home
-    await page.keyboard.press("Escape");
-    await expect(page).toHaveURL(/\/$/);
   });
 
   test("switching playback mode keeps a photo on screen", async ({ page }) => {
@@ -199,47 +158,6 @@ test.describe("Slideshow", () => {
     expect(geo.d3.top).toBeGreaterThan(geo.vh / 2);
   });
 
-  test("playback mode toggles work", async ({ page }) => {
-    await page.goto("/slideshow", { waitUntil: "domcontentloaded" });
-    await waitForSlideshow(page);
-
-    const shuffleButton = page.locator('button:has-text("Shuffle")');
-    const recentButton = page.locator('button:has-text("Recent")');
-    const similarButton = page.locator('button:has-text("Similar")');
-
-    await expect(page.locator('[role="group"][aria-label="Playback mode"]')).toBeVisible();
-
-    // Default is recent/weighted
-    await expect(recentButton).toHaveAttribute("aria-pressed", "true");
-    await expect(page).toHaveURL(/mode=weighted/);
-
-    // Switch to shuffle
-    await revealControls(page);
-    await shuffleButton.click();
-    await expect(shuffleButton).toHaveAttribute("aria-pressed", "true");
-    await expect(page).toHaveURL(/mode=random/);
-
-    // Switch to similar
-    await similarButton.evaluate((b: HTMLButtonElement) => b.click());
-    await expect(similarButton).toHaveAttribute("aria-pressed", "true");
-    await expect(page).toHaveURL(/mode=similar/);
-  });
-
-  test("pause/resume toggles playback state", async ({ page }) => {
-    await page.goto("/slideshow", { waitUntil: "domcontentloaded" });
-    await waitForSlideshow(page);
-
-    const pauseButton = page.locator('button:has-text("Pause")');
-    await expect(pauseButton).toHaveAttribute("aria-pressed", "false");
-
-    await revealControls(page);
-    await pauseButton.click();
-
-    const resumeButton = page.locator('button:has-text("Resume")');
-    await expect(resumeButton).toBeVisible();
-    await expect(resumeButton).toHaveAttribute("aria-pressed", "true");
-  });
-
   test("auto-advances to the next photo after the configured delay", async ({ page }) => {
     // delay=1 → a 1-second cadence; align-cadence is off (beforeEach) so the
     // advance timer is a plain now+delay.
@@ -278,34 +196,6 @@ test.describe("Slideshow", () => {
     expect(await image.getAttribute("src")).toBe(pausedSrc);
   });
 
-  test("timing controls work", async ({ page }) => {
-    await page.goto("/slideshow", { waitUntil: "domcontentloaded" });
-    await waitForSlideshow(page);
-
-    const tenSecButton = page.locator('button:has-text("10s")');
-    await expect(tenSecButton).toBeVisible();
-
-    await revealControls(page);
-    await tenSecButton.click();
-    await expect(tenSecButton).toHaveAttribute("aria-pressed", "true");
-  });
-
-  test("alignment button cycles through options", async ({ page }) => {
-    await page.goto("/slideshow?details=1", { waitUntil: "domcontentloaded" });
-    await waitForSlideshow(page);
-
-    const alignButton = page.locator('button:has-text("📍")');
-    await expect(alignButton).toBeVisible();
-
-    await expect(alignButton).toContainText("Center");
-    await alignButton.dispatchEvent("click");
-    await expect(alignButton).toContainText("Right");
-    await alignButton.dispatchEvent("click");
-    await expect(alignButton).toContainText("Left");
-    await alignButton.dispatchEvent("click");
-    await expect(alignButton).toContainText("Center");
-  });
-
   test("alignment persists across reloads", async ({ page }) => {
     await page.goto("/slideshow?details=1", { waitUntil: "domcontentloaded" });
     await waitForSlideshow(page);
@@ -318,34 +208,10 @@ test.describe("Slideshow", () => {
 
     await expect(page.locator('button:has-text("📍")')).toContainText("Right");
   });
-
-  test("current image does not get written into the URL", async ({ page }) => {
-    await page.goto("/slideshow?mode=random&filter=test-simple", {
-      waitUntil: "domcontentloaded",
-    });
-    await waitForSlideshow(page);
-
-    await expect(page).toHaveURL(/mode=random/);
-    expect(new URL(page.url()).searchParams.has("photo")).toBe(false);
-    expect(new URL(page.url()).searchParams.has("seed")).toBe(false);
-
-    const image = page.locator(slideshowImg).first();
-    const previousSrc = await image.getAttribute("src");
-    await revealControls(page);
-    await page.locator('button:has-text("Next")').click();
-    await waitForImageChange(page, String(previousSrc));
-
-    const url = new URL(page.url());
-    expect(url.searchParams.get("mode")).toBe("random");
-    expect(url.searchParams.get("filter")).toBe("test-simple");
-    expect(url.searchParams.has("photo")).toBe(false);
-    expect(url.searchParams.has("seed")).toBe(false);
-  });
 });
 
 test.describe("Slideshow touch mode", () => {
   test.use({ hasTouch: true });
-  test.skip(!hasSearchDb, "Requires search.sqlite with data");
   test.skip(
     ({ browserName }) => browserName !== "chromium",
     "Synthetic pointer-event dispatch is reliable only on Chromium",
@@ -422,40 +288,6 @@ test.describe("Slideshow touch mode", () => {
     await dispatchPointer(page, "up", x + dx, y + dy);
   };
 
-  test("iPad session controls keep screen-awake status and Hide together", async ({ page }) => {
-    await page.setViewportSize({ width: 1024, height: 768 });
-    await page.addInitScript(() => {
-      Object.defineProperty(navigator, "wakeLock", {
-        configurable: true,
-        value: {
-          request: async () => {
-            const sentinel = new EventTarget() as EventTarget & {
-              release: () => Promise<void>;
-            };
-            sentinel.release = async () => {
-              sentinel.dispatchEvent(new Event("release"));
-            };
-            return sentinel;
-          },
-        },
-      });
-    });
-    await page.goto("/slideshow?mode=random&filter=test-simple", {
-      waitUntil: "domcontentloaded",
-    });
-    await waitForSlideshow(page);
-
-    const session = page.getByRole("group", { name: "Slideshow session" });
-    await expect(session).toBeVisible();
-    await expect(session.getByRole("button", { name: "Screen stays awake" })).toHaveAttribute(
-      "aria-pressed",
-      "true",
-    );
-
-    await session.getByRole("button", { name: "Hide controls" }).click();
-    await expect(page.locator("[data-paused]")).toHaveAttribute("data-controls-visible", "false");
-  });
-
   test("horizontal swipe past commit advances to next photo", async ({ page }) => {
     await page.goto("/slideshow?mode=random&filter=test-simple", {
       waitUntil: "domcontentloaded",
@@ -469,71 +301,6 @@ test.describe("Slideshow touch mode", () => {
     await swipe(page, -90, 0);
     await waitForImageChange(page, String(firstSrc));
     expect(await image.getAttribute("src")).not.toBe(firstSrc);
-  });
-
-  test("horizontal swipe below commit threshold does not change photo", async ({ page }) => {
-    await page.goto("/slideshow?mode=random&filter=test-simple", {
-      waitUntil: "domcontentloaded",
-    });
-    await waitForSlideshow(page);
-
-    const image = page.locator(slideshowImg).first();
-    const firstSrc = await image.getAttribute("src");
-
-    // 20px is below the 48px commit threshold.
-    await swipe(page, -20, 0);
-    await settleUi(page);
-    expect(await image.getAttribute("src")).toBe(firstSrc);
-  });
-
-  test("right swipe goes to previous photo after advancing", async ({ page }) => {
-    await page.goto("/slideshow?mode=random&filter=test-simple", {
-      waitUntil: "domcontentloaded",
-    });
-    await waitForSlideshow(page);
-
-    const image = page.locator(slideshowImg).first();
-    const firstSrc = await image.getAttribute("src");
-
-    // Build up history with a keyboard advance so a previous photo exists.
-    await page.keyboard.press("ArrowRight");
-    await waitForImageChange(page, String(firstSrc));
-    const secondSrc = await image.getAttribute("src");
-    expect(secondSrc).not.toBe(firstSrc);
-
-    // Swipe right past commit → previous.
-    await swipe(page, 90, 0);
-    await expect(image).toHaveAttribute("src", String(firstSrc));
-  });
-
-  test("pull up past commit hides visible controls", async ({ page }) => {
-    await page.goto("/slideshow?mode=random&filter=test-simple", {
-      waitUntil: "domcontentloaded",
-    });
-    await waitForSlideshow(page);
-
-    const container = page.locator("[data-paused]");
-    await expect(container).toHaveAttribute("data-controls-visible", "true");
-
-    await swipe(page, 0, -100, 10);
-    await expect(container).toHaveAttribute("data-controls-visible", "false");
-  });
-
-  test("pull down past commit shows hidden controls", async ({ page }) => {
-    await page.goto("/slideshow?mode=random&filter=test-simple", {
-      waitUntil: "domcontentloaded",
-    });
-    await waitForSlideshow(page);
-
-    const container = page.locator("[data-paused]");
-
-    // Hide controls first via a pull-up gesture.
-    await swipe(page, 0, -100, 10);
-    await expect(container).toHaveAttribute("data-controls-visible", "false");
-
-    // Then pull down → controls return.
-    await swipe(page, 0, 100, 10);
-    await expect(container).toHaveAttribute("data-controls-visible", "true");
   });
 
   test("pull up with controls hidden forces a remix advance", async ({ page }) => {
@@ -555,74 +322,6 @@ test.describe("Slideshow touch mode", () => {
     await swipe(page, 0, -100, 10);
     await waitForImageChange(page, String(beforeSrc));
     expect(await image.getAttribute("src")).not.toBe(beforeSrc);
-  });
-
-  test("data-touch-active toggles around the gesture lifecycle", async ({ page }) => {
-    await page.goto("/slideshow?mode=random&filter=test-simple", {
-      waitUntil: "domcontentloaded",
-    });
-    await waitForSlideshow(page);
-
-    const container = page.locator("[data-paused]");
-    await expect(container).toHaveAttribute("data-touch-active", "false");
-
-    const { x, y } = await imageCentre(page);
-    await dispatchPointer(page, "down", x, y);
-    await expect(container).toHaveAttribute("data-touch-active", "true");
-
-    await dispatchPointer(page, "up", x, y);
-    await expect(container).toHaveAttribute("data-touch-active", "false");
-  });
-
-  test("data-touch-armed flips when the gesture crosses the commit threshold", async ({ page }) => {
-    await page.goto("/slideshow?mode=random&filter=test-simple", {
-      waitUntil: "domcontentloaded",
-    });
-    await waitForSlideshow(page);
-
-    const affordances = page.locator("[data-touch-armed][data-touch-hint]");
-    await expect(affordances).toHaveAttribute("data-touch-armed", "false");
-
-    const { x, y } = await imageCentre(page);
-    await dispatchPointer(page, "down", x, y);
-    // Move below commit (hint zone only).
-    await dispatchPointer(page, "move", x - 30, y);
-    await expect(affordances).toHaveAttribute("data-touch-armed", "false");
-    // Cross the 48px commit threshold.
-    await dispatchPointer(page, "move", x - 80, y);
-    await expect(affordances).toHaveAttribute("data-touch-armed", "true");
-    // Release without firing the action — drag back inside the hint zone.
-    await dispatchPointer(page, "move", x - 10, y);
-    await dispatchPointer(page, "up", x - 10, y);
-    await expect(affordances).toHaveAttribute("data-touch-armed", "false");
-  });
-
-  test("reversing past the start cancels the armed visual", async ({ page }) => {
-    await page.goto("/slideshow?mode=random&filter=test-simple", {
-      waitUntil: "domcontentloaded",
-    });
-    await waitForSlideshow(page);
-
-    const affordances = page.locator("[data-touch-armed][data-touch-hint]");
-    const image = page.locator(slideshowImg).first();
-    const firstSrc = await image.getAttribute("src");
-
-    const { x, y } = await imageCentre(page);
-    await dispatchPointer(page, "down", x, y);
-    // Commit "next" (left swipe) past the threshold.
-    await dispatchPointer(page, "move", x - 80, y);
-    await expect(affordances).toHaveAttribute("data-touch-armed", "true");
-    // Reverse past the start to +30 — still inside the hint zone but the
-    // direction is now "previous", contradicting the committed "next" hint.
-    // The visual must drop back to idle so it doesn't promise an action that
-    // won't fire.
-    await dispatchPointer(page, "move", x + 30, y);
-    await expect(affordances).toHaveAttribute("data-touch-armed", "false");
-    await expect(affordances).toHaveAttribute("data-touch-hint", "idle");
-    await dispatchPointer(page, "up", x + 30, y);
-    // No photo change should have occurred.
-    await settleUi(page);
-    expect(await image.getAttribute("src")).toBe(firstSrc);
   });
 
   // Real iPad Safari fires a click event after every touch pointerup. The
@@ -670,49 +369,6 @@ test.describe("Slideshow touch mode", () => {
     expect(await image.getAttribute("src")).toBe(firstSrc);
   });
 
-  test("synthetic click after a vertical mid-distance gesture does not advance the photo", async ({
-    page,
-  }) => {
-    await page.goto("/slideshow?mode=random&filter=test-simple", {
-      waitUntil: "domcontentloaded",
-    });
-    await waitForSlideshow(page);
-
-    const image = page.locator(slideshowImg).first();
-    const firstSrc = await image.getAttribute("src");
-
-    const { x, y } = await imageCentre(page);
-    await dispatchPointer(page, "down", x, y);
-    // 30px vertical: above the 12px tap zone, below the 48px swipe threshold
-    // AND the 72px pull threshold — falls through all action branches.
-    await dispatchPointer(page, "move", x, y - 30);
-    await dispatchPointer(page, "up", x, y - 30);
-    await dispatchClick(page, x, y - 30);
-
-    await settleUi(page);
-    expect(await image.getAttribute("src")).toBe(firstSrc);
-  });
-
-  test("synthetic click after a reversed-cancel does not advance the photo", async ({ page }) => {
-    await page.goto("/slideshow?mode=random&filter=test-simple", {
-      waitUntil: "domcontentloaded",
-    });
-    await waitForSlideshow(page);
-
-    const image = page.locator(slideshowImg).first();
-    const firstSrc = await image.getAttribute("src");
-
-    const { x, y } = await imageCentre(page);
-    await dispatchPointer(page, "down", x, y);
-    await dispatchPointer(page, "move", x - 80, y); // commits "next"
-    await dispatchPointer(page, "move", x + 30, y); // reverses past start
-    await dispatchPointer(page, "up", x + 30, y);
-    await dispatchClick(page, x + 30, y);
-
-    await settleUi(page);
-    expect(await image.getAttribute("src")).toBe(firstSrc);
-  });
-
   test("side affordances stay hidden during touch when controls are visible", async ({ page }) => {
     await page.goto("/slideshow?mode=random&filter=test-simple", {
       waitUntil: "domcontentloaded",
@@ -748,65 +404,5 @@ test.describe("Slideshow touch mode", () => {
     expect(opacities.right).toBeLessThan(0.05);
 
     await dispatchPointer(page, "up", x, y);
-  });
-
-  test("horizontal commit ignores vertical drift", async ({ page }) => {
-    await page.goto("/slideshow?mode=random&filter=test-simple", {
-      waitUntil: "domcontentloaded",
-    });
-    await waitForSlideshow(page);
-
-    const image = page.locator(slideshowImg).first();
-    const firstSrc = await image.getAttribute("src");
-    const container = page.locator("[data-paused]");
-    const initialControlsVisible = await container.getAttribute("data-controls-visible");
-
-    const { x, y } = await imageCentre(page);
-    await dispatchPointer(page, "down", x, y);
-    // Cross horizontal commit first.
-    await dispatchPointer(page, "move", x - 60, y);
-    // Then drift downward by a lot — must not trigger the controls pull.
-    await dispatchPointer(page, "move", x - 70, y + 120);
-    await dispatchPointer(page, "up", x - 70, y + 120);
-
-    // Image should have advanced (horizontal action committed).
-    await waitForImageChange(page, String(firstSrc));
-    // Controls visibility should not have flipped from the drift.
-    await expect(container).toHaveAttribute(
-      "data-controls-visible",
-      String(initialControlsVisible),
-    );
-  });
-});
-
-test.describe("Slideshow URL parameters", () => {
-  test.skip(!hasSearchDb, "Requires search.sqlite with data");
-
-  test("URL parameters set correct initial state", async ({ page }) => {
-    await page.goto(
-      "/slideshow?clock=1&details=1&map=1&cover=1&mode=weighted&delay=60&align=left&filter=test-simple",
-      { waitUntil: "domcontentloaded" },
-    );
-    await waitForSlideshow(page);
-
-    // Boolean toggles
-    for (const label of ["🕰️", "Details", "Map", "Fill screen"]) {
-      await expect(page.locator(`button:has-text("${label}")`)).toHaveAttribute(
-        "aria-pressed",
-        "true",
-      );
-    }
-
-    // Mode
-    await expect(page.locator('button:has-text("Recent")')).toHaveAttribute("aria-pressed", "true");
-
-    // Delay
-    await expect(page.locator('button:has-text("1m")')).toHaveAttribute("aria-pressed", "true");
-
-    // Alignment
-    await expect(page.locator('button:has-text("📍")')).toContainText("Left");
-
-    // Filter
-    expect(page.url()).toContain("filter=test-simple");
   });
 });

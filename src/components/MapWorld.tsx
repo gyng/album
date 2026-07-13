@@ -365,20 +365,11 @@ export const MMap: React.FC<MapWorldProps> = ({
       return;
     }
 
-    const url = new URL(window.location.toString());
-    const searchParams = new URLSearchParams(window.location.search);
-
-    // Always write every camera param — skipping at sentinel values (lat 0 /
-    // lon 0 / zoom 1) would leave a stale earlier value in the URL.
-    searchParams.set("lat", e.viewState.latitude.toFixed(3).toString());
-    searchParams.set("lon", e.viewState.longitude.toFixed(3).toString());
-    searchParams.set("zoom", e.viewState.zoom.toFixed(2).toString());
-
-    url.search = searchParams.toString();
-    const nextRoute = `${url.pathname}${url.search}${url.hash}`;
-    if (nextRoute === lastSyncedRouteRef.current) {
-      return;
-    }
+    const cameraParams = {
+      lat: e.viewState.latitude.toFixed(3).toString(),
+      lon: e.viewState.longitude.toFixed(3).toString(),
+      zoom: e.viewState.zoom.toFixed(2).toString(),
+    };
 
     if (debounceTimerRef.current) {
       clearTimeout(debounceTimerRef.current);
@@ -386,6 +377,22 @@ export const MMap: React.FC<MapWorldProps> = ({
 
     debounceTimerRef.current = setTimeout(() => {
       if (Date.now() < pauseUntilRef.current) {
+        return;
+      }
+
+      // Merge into the live URL when the timer executes. Other controls can
+      // update their query params while camera sync is pending; capturing the
+      // whole URL above would restore those stale values.
+      const url = new URL(window.location.toString());
+      const searchParams = new URLSearchParams(url.search);
+      // Always write every camera param — skipping at sentinel values (lat 0 /
+      // lon 0 / zoom 1) would leave a stale earlier value in the URL.
+      searchParams.set("lat", cameraParams.lat);
+      searchParams.set("lon", cameraParams.lon);
+      searchParams.set("zoom", cameraParams.zoom);
+      url.search = searchParams.toString();
+      const nextRoute = `${url.pathname}${url.search}${url.hash}`;
+      if (nextRoute === lastSyncedRouteRef.current) {
         return;
       }
 

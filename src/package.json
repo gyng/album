@@ -17,6 +17,8 @@
     "benchmark:warm:strict": "ALBUM_BENCHMARK_FAIL_ON_BUDGET=1 node ./bin/warm-build-benchmark.cjs",
     "benchmark:route": "node --experimental-strip-types ./bin/map-route-benchmark.ts",
     "prepare:feeds": "node ./bin/generate-feeds.cjs",
+    "prepare:e2e-fixtures": "node ./bin/create-e2e-search-db.cjs --output ./public/e2e-search.sqlite --embeddings-output ./public/e2e-search-embeddings.sqlite --force",
+    "build:e2e": "npm run prepare:e2e-fixtures && NEXT_PUBLIC_SEARCH_DATABASE_URL=/e2e-search.sqlite NEXT_PUBLIC_SEARCH_EMBEDDINGS_DATABASE_URL=/e2e-search-embeddings.sqlite npm run build",
     "build": "npm run cleanup:media-cache && npm run prepare:build-manifest && npm run prepare:feeds && next build && echo 'build done'",
     "build:profile": "npm run cleanup:media-cache && npm run prepare:build-manifest && npm run prepare:feeds && ALBUM_BUILD_PROFILE=1 next build && echo 'build done'",
     "start": "next start",
@@ -28,10 +30,10 @@
     "format:write": "oxfmt .",
     "test": "jest",
     "test:seo": "jest --runInBand test/seo.test.tsx test/alt.test.ts test/feed.test.ts services/albumFeed.test.ts",
-    "test:ci": "timeout 60s jest --maxWorkers=50% && npm run lint",
-    "test:e2e": "npm run build && playwright test",
+    "test:ci": "timeout 60s jest --maxWorkers=50% && npm run lint && npm run format:check",
+    "test:e2e": "npm run build:e2e && playwright test",
     "test:e2e:reuse": "PLAYWRIGHT_SKIP_WEBSERVER=1 playwright test",
-    "test:e2e:headed": "npm run build && playwright test --headed",
+    "test:e2e:headed": "npm run build:e2e && playwright test --headed",
     "screenshot": "playwright test --config=playwright.screenshot.config.ts"
   },
   "dependencies": {

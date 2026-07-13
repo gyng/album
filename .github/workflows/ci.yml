@@ -24,6 +24,45 @@ jobs:
       - run: npm ci
       - run: npm run prepare:build-manifest
       - run: npm run test:ci
+  test-geotag:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./tools/geotag
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          cache: "npm"
+          cache-dependency-path: tools/geotag/package-lock.json
+      - run: npm ci
+      - run: npm test
+      - run: npm run typecheck
+  test-index:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: ./index
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - name: Set up Python
+        run: uv python install
+      - name: Install dependencies
+        run: uv sync --dev
+      - name: Verify inference dependencies are excluded
+        run: uv run python -c "import importlib.util; assert importlib.util.find_spec('torch') is None"
+      - name: Run model-free index tests
+        run: ./do-test-index.sh
+      - name: Lint Python
+        run: uv run ruff check .
+      - name: Check Python formatting
+        run: uv run ruff format --check .
   playwright:
     name: Playwright (${{ matrix.browser }})
     timeout-minutes: 60
@@ -64,7 +103,7 @@ jobs:
           restore-keys: |
             nextjs-${{ runner.os }}-${{ hashFiles('src/package-lock.json') }}-
       - name: Build
-        run: npm run build
+        run: npm run build:e2e
       - name: Run Playwright tests
         run: npx playwright test --project=${{ matrix.browser }}
       - uses: actions/upload-artifact@v7
@@ -73,24 +112,3 @@ jobs:
           name: playwright-report-${{ matrix.browser }}
           path: src/playwright-report/
           retention-days: 30
-
-# FIXME: Janus fails to be installed on GHA with "git@github.com: Permission denied (publickey)."
-# test-index:
-#   runs-on: ubuntu-latest
-#   defaults:
-#     run:
-#       working-directory: ./index
-#   steps:
-#     - uses: actions/checkout@v6
-#     - name: Install uv
-#       uses: astral-sh/setup-uv@v5
-#       with:
-#         enable-cache: true
-#     - name: Set up Python
-#       run: uv python install
-#     - name: Install the project
-#       run: uv sync --all-extras --dev
-#     - run: |
-#         chmod +x ./do-test-index.sh
-#         ./do-test-index.sh
-#       shell: bash

@@ -45,9 +45,11 @@ import time
 import unittest
 import click
 from click.testing import CliRunner
-import torch
 import json
 from unittest import mock
+
+
+RUN_MODEL_INFERENCE = os.environ.get("INDEX_RUN_MODEL_INFERENCE") == "1"
 
 
 class TestMain(unittest.TestCase):
@@ -256,40 +258,39 @@ class TestMain(unittest.TestCase):
         self.assertEqual(actual["verdict"], "candidate_better")
         self.assertTrue("candidate_adds_tags" in actual["reasons"])
 
-    def test_analyse_image_worker(self):
-        if torch.cuda.is_available():
-            classifier = JanusClassifier()
-            try:
-                classifier.init_model()
-            except Exception as err:
-                self.skipTest(
-                    f"Skipping Janus CUDA integration test because Janus is not compatible with the current transformers runtime: {err}"
-                )
-            idx = 0
-            path = "../src/test/fixtures/monkey.jpg"
-            # Mirror the production Janus pass: predict + parse while the model is
-            # loaded, then assemble from the precomputed result (no live model).
-            geocode = extract_geocode_from_path(path)
-            raw = classifier.predict(path=path, geocode=geocode)
-            precomputed_caption = parse_caption_with_retry(
-                classifier, path, geocode, raw
-            )
-            input_tuple = (idx, path, True, precomputed_caption, None, None)
+    @unittest.skipUnless(
+        RUN_MODEL_INFERENCE,
+        "Set INDEX_RUN_MODEL_INFERENCE=1 to run live model inference tests",
+    )
+    def test_analyse_image_worker_with_janus(self):
+        import torch
 
-            actual = analyse_image_worker(input_tuple)
-            analysed = actual.get("analysed")
+        if not torch.cuda.is_available():
+            self.skipTest("Janus inference requires CUDA")
 
-            self.assertGreater(len(analysed.get("tags")), 0)
-            self.assertGreater(len(analysed.get("alt_text")), 0)
-            self.assertGreater(len(analysed.get("subject")), 0)
-            self.assertGreater(len(analysed.get("geocode").get("city")), 0)
-            self.assertEqual(isinstance(analysed.get("exif"), dict), True)
-            self.assertGreater(len(analysed.get("iso8601")), 0)
-            self.assertEqual(len(analysed.get("colors")), 9)
-            self.assertEqual(analysed.get("lat_deg"), 1.3714833333333334)
-            self.assertEqual(analysed.get("lng_deg"), 103.7822)
-        else:
-            print("Skipping test_analyse_image_worker as CUDA is not available")
+        classifier = JanusClassifier()
+        classifier.init_model()
+        idx = 0
+        path = "../src/test/fixtures/monkey.jpg"
+        # Mirror the production Janus pass: predict + parse while the model is
+        # loaded, then assemble from the precomputed result (no live model).
+        geocode = extract_geocode_from_path(path)
+        raw = classifier.predict(path=path, geocode=geocode)
+        precomputed_caption = parse_caption_with_retry(classifier, path, geocode, raw)
+        input_tuple = (idx, path, True, precomputed_caption, None, None)
+
+        actual = analyse_image_worker(input_tuple)
+        analysed = actual.get("analysed")
+
+        self.assertGreater(len(analysed.get("tags")), 0)
+        self.assertGreater(len(analysed.get("alt_text")), 0)
+        self.assertGreater(len(analysed.get("subject")), 0)
+        self.assertGreater(len(analysed.get("geocode").get("city")), 0)
+        self.assertEqual(isinstance(analysed.get("exif"), dict), True)
+        self.assertGreater(len(analysed.get("iso8601")), 0)
+        self.assertEqual(len(analysed.get("colors")), 9)
+        self.assertEqual(analysed.get("lat_deg"), 1.3714833333333334)
+        self.assertEqual(analysed.get("lng_deg"), 103.7822)
 
     def test_single_instance_lock_blocks_second_run(self):
         with tempfile.TemporaryDirectory() as d:
@@ -519,9 +520,13 @@ class TestCli(UsesTestexistsFixture, unittest.TestCase):
             db.setup_tables()
             with db.transaction() as cur:
                 db.upsert_image_fields(
-                    photo, {"filename": "DSCF0506-2.jpg", "geocode": "WRONGPLACE"}, cur=cur
+                    photo,
+                    {"filename": "DSCF0506-2.jpg", "geocode": "WRONGPLACE"},
+                    cur=cur,
                 )
-                db.insert_metadata(photo, (0.0, 0.0), "1999-01-01T00:00:00", {}, cur=cur)
+                db.insert_metadata(
+                    photo, (0.0, 0.0), "1999-01-01T00:00:00", {}, cur=cur
+                )
             db.con.close()
 
             result = CliRunner().invoke(update_gps, f"--dbpath {dbpath}".split())
@@ -555,10 +560,14 @@ class TestCli(UsesTestexistsFixture, unittest.TestCase):
             db.setup_tables()
             with db.transaction() as cur:
                 db.upsert_image_fields(photo, {"geocode": "WRONGPLACE"}, cur=cur)
-                db.insert_metadata(photo, (0.0, 0.0), "1999-01-01T00:00:00", {}, cur=cur)
+                db.insert_metadata(
+                    photo, (0.0, 0.0), "1999-01-01T00:00:00", {}, cur=cur
+                )
             db.con.close()
 
-            result = CliRunner().invoke(update_gps, f"--dbpath {dbpath} --dry-run".split())
+            result = CliRunner().invoke(
+                update_gps, f"--dbpath {dbpath} --dry-run".split()
+            )
             self.assertEqual(0, result.exit_code, result.output)
 
             con = sqlite3.connect(dbpath)

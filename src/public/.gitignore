@@ -2,3 +2,5 @@
 data/albums/*
 search.sqlite
 search.sqlite.bak
+e2e-search.sqlite
+e2e-search-embeddings.sqlite

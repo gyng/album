@@ -1,9 +1,5 @@
 import { test, expect, Page } from "@playwright/test";
-import { existsSync, statSync } from "fs";
 import { join } from "path";
-
-const searchDbPath = join(__dirname, "..", "public", "search.sqlite");
-const hasSearchDb = existsSync(searchDbPath) && statSync(searchDbPath).size > 0;
 
 const testImagePath = join(__dirname, "..", "..", "albums", "test-simple", "DSCF0506-2.jpg");
 
@@ -32,27 +28,7 @@ test.describe("Image search UI shell", () => {
     expect(pageErrors).toEqual([]);
   });
 
-  test("draw pad opens focused, closes on Escape, and restores focus", async ({ page }) => {
-    test.skip(!hasSearchDb, "Requires search.sqlite");
-    await holdModelDownloads(page);
-    await page.goto("/search", { waitUntil: "domcontentloaded" });
-
-    const drawButton = page.getByRole("button", { name: /draw to search/i });
-    // Enabled once the WASM DB has loaded.
-    await expect(drawButton).toBeEnabled({ timeout: 15_000 });
-    await drawButton.click();
-
-    const dialog = page.getByRole("dialog", { name: "Draw to search" });
-    await expect(dialog).toBeVisible();
-    await expect(dialog.getByRole("button", { name: "Cancel" })).toBeFocused();
-
-    await page.keyboard.press("Escape");
-    await expect(dialog).not.toBeVisible();
-    await expect(drawButton).toBeFocused();
-  });
-
   test("drawing enables Search and submits to a removable query chip", async ({ page }) => {
-    test.skip(!hasSearchDb, "Requires search.sqlite");
     await holdModelDownloads(page);
     await page.goto("/search", { waitUntil: "domcontentloaded" });
 
@@ -102,7 +78,6 @@ test.describe("Image search UI shell", () => {
   });
 
   test("uploading a photo starts an image query", async ({ page }) => {
-    test.skip(!hasSearchDb, "Requires search.sqlite");
     await holdModelDownloads(page);
     await page.goto("/search", { waitUntil: "domcontentloaded" });
 

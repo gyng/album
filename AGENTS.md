@@ -45,18 +45,21 @@ npm run test:e2e -- ./tests/smoke.spec.ts --project=chromium   # single file
 npm run test:e2e:reuse -- ./tests/smoke.spec.ts                # reuse already-running dev server
 ```
 - Config: `src/playwright.config.ts`; tests live in `src/tests/*.spec.ts`
-- Locally: Chromium only, reuses existing server if running
-- CI: all browsers (Chromium, Firefox, WebKit), fresh server always
+- Normal local runs: Chromium only, deterministic fixture preparation, fresh production server
+- CI: full Chromium suite plus smoke coverage in Firefox and WebKit, fresh server always
 - Use `test:e2e:reuse` only when a server is already running — do not use it to skip the build
+- `npm run prepare:e2e-fixtures` recreates isolated core and embeddings databases (`src/public/e2e-search*.sqlite`) using the production schema split; normal E2E builds never read or overwrite the local indexed databases
 - **CI album data:** only `albums/test-*` directories are checked into git (real albums are gitignored). Playwright tests must use `test-simple`, `test-manifest`, or `test-manifest-v2` — never hardcode real album names like `snapshots` or `24japan`
 
 **Python (indexer)** — unittest, run from `index/`:
 ```
 ./do-test-index.sh          # runs index.test.py via uv
-./create-test-db.sh         # builds fixture SQLite DBs needed by some tests
+./do-test-index-inference.sh # explicitly opt into the live Janus/CUDA check
+./create-test-db.sh         # rebuild committed fixture DBs; requires inference deps
 ```
 - Tests live in `index/index.test.py`; uses `unittest` + Click's `CliRunner`
-- `create-test-db.sh` must be run first if fixture DBs (`testexists.sqlite`, `test-simple.sqlite`) are missing
+- The default suite is model-free and safe for CI; never enable `INDEX_RUN_MODEL_INFERENCE` in normal CI
+- `create-test-db.sh` rebuilds the committed/working SQLite fixtures when needed
 
 **General:**
 - Run the smallest relevant checks after each refactor, then the full required
@@ -137,11 +140,12 @@ The search database (`src/public/search.sqlite`) is built offline by a Python CL
 **Setup** (Python 3.12, managed by [uv](https://docs.astral.sh/uv/)):
 ```
 cd index
-uv sync                 # install dependencies (including Janus from git)
-uv run ruff --fix       # lint
-uv run black .          # format
+uv sync                 # install lightweight indexing/test dependencies
+uv sync --extra inference # add Torch, Transformers, and Janus for model runs
+uv run ruff check --fix . # lint
+uv run ruff format .      # format
 ```
-Note: `janus` is installed from the `deepseek-ai/Janus` git repo, not PyPI — first `uv sync` will clone it.
+Note: `janus` is installed from the `deepseek-ai/Janus` git repo, not PyPI — the first inference sync will clone it.
 
 **Run** (use the shell scripts, which handle the DB split and copy):
 ```
@@ -185,12 +189,13 @@ Runs on PRs to `main`, pushes to `main` and `release/*`, and manual dispatch.
 
 **Jobs:**
 - `test` — `npm ci` + `npm run test:ci` from `src/` (Node 24, ubuntu-latest)
-- `playwright` — full Playwright suite (all browsers) with artifact upload (`playwright-report/`, 30-day retention)
-- `test-index` — **currently disabled** (commented out); Janus git dependency fails on GHA due to SSH auth
+- `test-geotag` — geotag Vitest suite + typecheck from `tools/geotag/`
+- `test-index` — model-free Python index suite; live Janus/CUDA inference stays opt-in locally
+- `playwright` — full Chromium suite plus Firefox/WebKit smoke tests with artifact upload (`playwright-report/`, 30-day retention)
 
 **Notes:**
-- Both JS jobs set `working-directory: ./src`
-- Playwright installs browsers via `npx playwright install --with-deps` (not cached)
+- Each job uses its package's own working directory and lockfile
+- Playwright caches browser downloads and always installs the required system dependencies
 - No deploy/build job — CI is test-only
 
 ## Do not modify

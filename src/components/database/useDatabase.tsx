@@ -1,6 +1,10 @@
 import sqlite3InitModule, { Database, Sqlite3Static } from "@sqlite.org/sqlite-wasm";
 import { useState, useEffect, useCallback, useReducer, useRef } from "react";
 
+export const SEARCH_DATABASE_URL = process.env.NEXT_PUBLIC_SEARCH_DATABASE_URL ?? "/search.sqlite";
+export const EMBEDDINGS_DATABASE_URL =
+  process.env.NEXT_PUBLIC_SEARCH_EMBEDDINGS_DATABASE_URL ?? "/search-embeddings.sqlite";
+
 type ProgressDetails = {
   loaded: number;
   total: number;
@@ -302,12 +306,12 @@ const useSqliteDatabase = (
 };
 
 export const useDatabase = () => {
-  return useSqliteDatabase("/search.sqlite");
+  return useSqliteDatabase(SEARCH_DATABASE_URL);
 };
 
 export const useEmbeddingsDatabase = (enabled = true) => {
-  return useSqliteDatabase("/search-embeddings.sqlite", {
+  return useSqliteDatabase(EMBEDDINGS_DATABASE_URL, {
     enabled,
-    fallbackUrl: "/search.sqlite",
+    fallbackUrl: SEARCH_DATABASE_URL,
   });
 };

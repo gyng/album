@@ -6,12 +6,12 @@ cd "$(dirname "$0")"
 EMBED_DB="${1:-all-embeddings.sqlite}"
 OUTPUT_DB="${2:-../src/public/search-embeddings.sqlite}"
 
-uv run python index.py index \
+uv run --extra inference python index.py index \
   --glob "../albums/**/*.jpg" \
   --dbpath "$EMBED_DB" \
   --model-profile siglip2
 
-uv run python - <<'PY' "$EMBED_DB" "$OUTPUT_DB"
+uv run --extra inference python - <<'PY' "$EMBED_DB" "$OUTPUT_DB"
 import sqlite3
 import sys
 from pathlib import Path
@@ -69,7 +69,7 @@ dest.close()
 tmp_db.replace(output_db)
 PY
 
-uv run python - <<'PY' "$OUTPUT_DB"
+uv run --extra inference python - <<'PY' "$OUTPUT_DB"
 import sqlite3
 import sys
 

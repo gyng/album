@@ -1,4 +1,5 @@
-import torch
+from __future__ import annotations
+
 import click
 from pathlib import Path
 import pprint
@@ -24,12 +25,84 @@ import shutil
 import threading
 from contextlib import contextmanager
 
-from transformers import (
-    AutoImageProcessor,
-    AutoModel,
-    AutoModelForCausalLM,
-    AutoProcessor,
-)
+try:
+    import torch
+    from transformers import (
+        AutoImageProcessor,
+        AutoModel,
+        AutoModelForCausalLM,
+        AutoProcessor,
+    )
+except ModuleNotFoundError as model_runtime_error:
+    _MODEL_RUNTIME_ERROR = model_runtime_error
+
+    class _UnavailableCuda:
+        @staticmethod
+        def is_available() -> bool:
+            return False
+
+        @staticmethod
+        def memory_allocated() -> int:
+            return 0
+
+        @staticmethod
+        def memory_reserved() -> int:
+            return 0
+
+        @staticmethod
+        def mem_get_info() -> tuple[int, int]:
+            return (0, 0)
+
+        @staticmethod
+        def max_memory_allocated() -> int:
+            return 0
+
+        @staticmethod
+        def max_memory_reserved() -> int:
+            return 0
+
+        @staticmethod
+        def empty_cache() -> None:
+            return None
+
+        @staticmethod
+        def reset_peak_memory_stats() -> None:
+            return None
+
+        @staticmethod
+        def get_device_name(_device: int) -> str:
+            raise RuntimeError("CUDA requires the indexer's inference dependencies")
+
+        @staticmethod
+        def get_device_properties(_device: int):
+            raise RuntimeError("CUDA requires the indexer's inference dependencies")
+
+    class _UnavailableTorch:
+        cuda = _UnavailableCuda()
+
+        @staticmethod
+        def inference_mode():
+            return lambda function: function
+
+        def __getattr__(self, _name: str):
+            raise RuntimeError(
+                "Model inference dependencies are not installed. "
+                "Run `uv sync --extra inference`."
+            ) from _MODEL_RUNTIME_ERROR
+
+    class _UnavailableModelFactory:
+        @classmethod
+        def from_pretrained(cls, *_args, **_kwargs):
+            raise RuntimeError(
+                "Model inference dependencies are not installed. "
+                "Run `uv sync --extra inference`."
+            ) from _MODEL_RUNTIME_ERROR
+
+    torch = _UnavailableTorch()
+    AutoImageProcessor = _UnavailableModelFactory
+    AutoModel = _UnavailableModelFactory
+    AutoModelForCausalLM = _UnavailableModelFactory
+    AutoProcessor = _UnavailableModelFactory
 
 import concurrent.futures
 import time
@@ -2972,7 +3045,9 @@ def update_gps(dbpath: str, match: Optional[str], dry_run: bool):
             if dry_run:
                 continue
 
-            db.insert_metadata(path, (lat_deg, lng_deg), iso8601_local, geo_cols, cur=cur)
+            db.insert_metadata(
+                path, (lat_deg, lng_deg), iso8601_local, geo_cols, cur=cur
+            )
             if blob is not None:
                 db.upsert_image_fields(path, {"geocode": blob}, cur=cur)
             sig = file_signature(path)
