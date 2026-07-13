@@ -36,7 +36,7 @@ Goals
 
 ## Usage
 
-You will need Node installed. The following steps are for deployment on Vercel, but you can deploy elsewhere &mdash; this is a standard Next.js application.
+You will need Node 24 or 26. The root `.nvmrc` selects Node 24 as the tested default; use `nvm use 26` explicitly when you want Node 26. The following steps are for deployment on Vercel, but you can deploy elsewhere &mdash; this is a standard Next.js application.
 
 0. Clone the repo
 

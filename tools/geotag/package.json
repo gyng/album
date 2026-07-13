@@ -4,6 +4,9 @@
   "private": true,
   "type": "module",
   "description": "Local companion workbench for GPS and manual-lens metadata tagging. Shares pure logic from ../../src/util.",
+  "engines": {
+    "node": "^24.0.0 || ^26.0.0"
+  },
   "scripts": {
     "dev": "concurrently -k -n api,web -c cyan,magenta \"npm:dev:server\" \"npm:dev:web\"",
     "dev:server": "tsx watch server/index.ts",
