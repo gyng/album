@@ -105,10 +105,7 @@ export const SearchFacetPanel: React.FC<Props> = ({
     );
     const delta = isForward ? 1 : -1;
     const nextIndex = (currentIndex + delta + FILTER_CATEGORIES.length) % FILTER_CATEGORIES.length;
-    const nextCategory = FILTER_CATEGORIES[nextIndex];
-    if (!nextCategory) {
-      return;
-    }
+    const nextCategory = FILTER_CATEGORIES[nextIndex]!;
 
     onSelectCategory(nextCategory.id);
     categoryTabRefs.current[nextCategory.id]?.focus();
@@ -146,10 +143,7 @@ export const SearchFacetPanel: React.FC<Props> = ({
 
   // …and when the panel resizes (its height is viewport-relative).
   React.useEffect(() => {
-    const el = contentRef.current;
-    if (!el) {
-      return;
-    }
+    const el = contentRef.current!;
     const observer = new ResizeObserver(updateScrollFade);
     observer.observe(el);
     return () => observer.disconnect();

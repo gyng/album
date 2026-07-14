@@ -33,7 +33,7 @@ type SankeyChartLink = {
 // `data`. Older/other shapes hang the fields directly off the node, so every
 // accessor checks both. This structural type captures just what we read.
 type SankeyComputedNode = {
-  id?: string;
+  id: string;
   label?: string;
   displayLabel?: string;
   depth?: number;
@@ -55,14 +55,14 @@ type SankeyComputedNode = {
   };
 };
 
-const truncateLabel = (label: string, max = 28) =>
+const truncateLabel = (label: string, max: number) =>
   label.length > max ? `${label.slice(0, max - 1)}…` : label;
 
 const buildFacetHref = (facetId?: string, facetValue?: string) =>
   facetId && facetValue ? `/search?facet=${encodeURIComponent(`${facetId}:${facetValue}`)}` : null;
 
 const getNodeLabel = (node: SankeyComputedNode): string =>
-  node.data?.displayLabel ?? node.data?.label ?? node.displayLabel ?? node.label ?? node.id ?? "";
+  node.data?.displayLabel ?? node.data?.label ?? node.displayLabel ?? node.label ?? node.id;
 const getNodeDepth = (node: SankeyComputedNode): number => node.data?.depth ?? node.depth ?? 0;
 const getNodeFacetId = (node: SankeyComputedNode): string | undefined =>
   node.data?.facetId ?? node.facetId;
@@ -161,14 +161,7 @@ const SANKEY_PALETTE = [
 ];
 
 const hexToRgb = (hex: string): [number, number, number] => {
-  const normalized = hex.replace("#", "");
-  const value =
-    normalized.length === 3
-      ? normalized
-          .split("")
-          .map((char) => `${char}${char}`)
-          .join("")
-      : normalized;
+  const value = hex.replace("#", "");
 
   return [
     Number.parseInt(value.slice(0, 2), 16),
@@ -178,13 +171,7 @@ const hexToRgb = (hex: string): [number, number, number] => {
 };
 
 const rgbToHex = (rgb: [number, number, number]): string =>
-  `#${rgb
-    .map((channel) =>
-      Math.max(0, Math.min(255, Math.round(channel)))
-        .toString(16)
-        .padStart(2, "0"),
-    )
-    .join("")}`;
+  `#${rgb.map((channel) => Math.round(channel).toString(16).padStart(2, "0")).join("")}`;
 
 const mixHex = (base: string, target: string, amount: number): string => {
   const baseRgb = hexToRgb(base);

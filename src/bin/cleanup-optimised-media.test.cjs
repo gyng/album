@@ -145,4 +145,119 @@ describe("cleanupOptimisedMedia", () => {
     expect(summary.removedChangedImages).toBe(0);
     expect(fs.existsSync(cached)).toBe(true);
   });
+
+  it("returns an empty summary for missing roots and absent cache directories", async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "album-media-empty-"));
+    const albumsDir = path.join(root, "albums");
+    const publicAlbumsDir = path.join(root, "public", "data", "albums");
+
+    await expect(cleanupOptimisedMedia({ albumsDir, publicAlbumsDir })).resolves.toEqual({
+      albumsScanned: 0,
+      removedStaleImages: 0,
+      removedChangedImages: 0,
+      removedUnneededImageSizes: 0,
+      removedStaleVideos: 0,
+      removedChangedVideos: 0,
+      removedUnneededVideoSizes: 0,
+    });
+
+    fs.mkdirSync(path.join(albumsDir, "trip"), { recursive: true });
+    await expect(cleanupOptimisedMedia({ albumsDir, publicAlbumsDir })).resolves.toMatchObject({
+      albumsScanned: 1,
+      removedStaleImages: 0,
+      removedStaleVideos: 0,
+    });
+  });
+
+  it("parses cache names without a size suffix", async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "album-media-no-size-"));
+    const albumsDir = path.join(root, "albums");
+    const publicAlbumsDir = path.join(root, "public", "data", "albums");
+    const albumDir = path.join(albumsDir, "trip");
+    const imageCacheDir = path.join(publicAlbumsDir, "trip", ".resized_images");
+    fs.mkdirSync(albumDir, { recursive: true });
+    fs.mkdirSync(imageCacheDir, { recursive: true });
+    fs.writeFileSync(path.join(albumDir, "orphan"), "source");
+    const cache = path.join(imageCacheDir, "orphan.avif");
+    fs.writeFileSync(cache, "cache");
+
+    const summary = await cleanupOptimisedMedia({ albumsDir, publicAlbumsDir });
+
+    expect(summary.removedUnneededImageSizes).toBe(1);
+    expect(fs.existsSync(cache)).toBe(false);
+  });
+
+  it("tolerates cache files disappearing concurrently for every removal reason", async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "album-media-race-"));
+    const albumsDir = path.join(root, "albums");
+    const publicAlbumsDir = path.join(root, "public", "data", "albums");
+    const albumDir = path.join(albumsDir, "trip");
+    const imageCacheDir = path.join(publicAlbumsDir, "trip", ".resized_images");
+    const videoCacheDir = path.join(publicAlbumsDir, "trip", ".resized_videos");
+    fs.mkdirSync(albumDir, { recursive: true });
+    fs.mkdirSync(imageCacheDir, { recursive: true });
+    fs.mkdirSync(videoCacheDir, { recursive: true });
+    fs.writeFileSync(path.join(albumDir, "changed.jpg"), "source");
+    fs.writeFileSync(path.join(albumDir, "unneeded.jpg"), "source");
+    fs.writeFileSync(path.join(albumDir, "changed.mp4"), "source");
+    fs.writeFileSync(path.join(albumDir, "unneeded.mp4"), "source");
+    const caches = [
+      path.join(imageCacheDir, "missing.jpg@800.avif"),
+      path.join(imageCacheDir, "changed.jpg@800.avif"),
+      path.join(imageCacheDir, "unneeded.jpg@999.avif"),
+      path.join(videoCacheDir, "missing.mp4@1920.mp4"),
+      path.join(videoCacheDir, "changed.mp4@1920.mp4"),
+      path.join(videoCacheDir, "unneeded.mp4@1280.mp4"),
+    ];
+    caches.forEach((file) => fs.writeFileSync(file, "cache"));
+    const older = new Date("2020-01-01");
+    const newer = new Date("2020-01-02");
+    fs.utimesSync(caches[1], older, older);
+    fs.utimesSync(caches[4], older, older);
+    fs.utimesSync(path.join(albumDir, "changed.jpg"), newer, newer);
+    fs.utimesSync(path.join(albumDir, "changed.mp4"), newer, newer);
+    const unlink = jest.spyOn(fs, "unlinkSync").mockImplementation(() => {
+      const error = new Error("already gone");
+      error.code = "ENOENT";
+      throw error;
+    });
+
+    const summary = await cleanupOptimisedMedia({ albumsDir, publicAlbumsDir });
+
+    expect(unlink).toHaveBeenCalledTimes(6);
+    expect(summary).toMatchObject({
+      removedStaleImages: 0,
+      removedChangedImages: 0,
+      removedUnneededImageSizes: 0,
+      removedStaleVideos: 0,
+      removedChangedVideos: 0,
+      removedUnneededVideoSizes: 0,
+    });
+    unlink.mockRestore();
+  });
+
+  it("propagates unexpected unlink failures", async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "album-media-unlink-error-"));
+    const albumsDir = path.join(root, "albums");
+    const publicAlbumsDir = path.join(root, "public", "data", "albums");
+    const cacheDir = path.join(publicAlbumsDir, "trip", ".resized_images");
+    fs.mkdirSync(path.join(albumsDir, "trip"), { recursive: true });
+    fs.mkdirSync(cacheDir, { recursive: true });
+    fs.writeFileSync(path.join(cacheDir, "missing.jpg@800.avif"), "cache");
+    const error = Object.assign(new Error("permission denied"), { code: "EACCES" });
+    const unlink = jest.spyOn(fs, "unlinkSync").mockImplementation(() => {
+      throw error;
+    });
+
+    await expect(cleanupOptimisedMedia({ albumsDir, publicAlbumsDir })).rejects.toBe(error);
+    unlink.mockRestore();
+  });
+
+  it("uses the repository defaults", async () => {
+    const exists = jest.spyOn(fs, "existsSync").mockReturnValue(false);
+
+    await expect(cleanupOptimisedMedia()).resolves.toMatchObject({ albumsScanned: 0 });
+
+    exists.mockRestore();
+  });
 });

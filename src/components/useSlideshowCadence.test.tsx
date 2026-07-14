@@ -115,4 +115,42 @@ describe("useSlideshowCadence", () => {
     act(() => jest.advanceTimersByTime(3000));
     expect(onAdvance).toHaveBeenCalled();
   });
+
+  it("schedules later slides on an aligned cadence when requested", () => {
+    jest.setSystemTime(new Date(2026, 6, 3, 10, 29, 58));
+    const onAdvance = jest.fn();
+    const { result } = renderHook(() =>
+      useSlideshowCadence({ ...baseInput, timeDelay: 900000, alignCadence: true, onAdvance }),
+    );
+
+    act(() => result.current.scheduleNextChange());
+    act(() => jest.advanceTimersByTime(3000));
+    expect(onAdvance).toHaveBeenCalled();
+  });
+
+  it("updates the visible countdown and preserves it across pause, align, and resume", () => {
+    jest.setSystemTime(new Date(2026, 6, 3, 10, 29, 0));
+    const { result, unmount } = renderHook(() =>
+      useSlideshowCadence({
+        ...baseInput,
+        controlsVisible: true,
+        onAdvance: jest.fn(),
+      }),
+    );
+
+    expect(result.current.time).toBeInstanceOf(Date);
+    expect(result.current.secondsLeft).toBeGreaterThan(0);
+    act(() => jest.advanceTimersByTime(1000));
+    expect(result.current.secondsLeft).toBeLessThanOrEqual(59);
+
+    act(() => result.current.togglePaused());
+    const pausedSeconds = result.current.secondsLeft;
+    act(() => result.current.alignNextChangeToCadence());
+    act(() => jest.advanceTimersByTime(1000));
+    expect(result.current.secondsLeft).toBe(pausedSeconds);
+
+    act(() => result.current.togglePaused());
+    expect(result.current.isPaused).toBe(false);
+    unmount();
+  });
 });

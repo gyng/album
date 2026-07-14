@@ -2,7 +2,7 @@
  * @jest-environment jsdom
  */
 
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { CalendarHeatmap } from "./CalendarHeatmap";
 import { TimelineEntry } from "./timelineTypes";
 
@@ -141,11 +141,14 @@ describe("CalendarHeatmap", () => {
         entries={entries}
         selectedDate="2024-01-02"
         onSelectDate={() => {}}
-        highlightedDates={["2024-03-05"]}
+        highlightedDates={["2024-03-05", "2024-01-02"]}
       />,
     );
 
     expect(screen.getByRole("button", { name: /^5 Mar 2024:/i }).className).toMatch(
+      /memoryHighlighted/,
+    );
+    expect(screen.getByRole("button", { name: /^2 Jan 2024:/i }).className).toMatch(
       /memoryHighlighted/,
     );
   });
@@ -171,5 +174,120 @@ describe("CalendarHeatmap", () => {
     expect(scrollIntoView).toHaveBeenCalled();
 
     HTMLElement.prototype.scrollIntoView = original;
+  });
+
+  it("uses instant scrolling for reduced motion and tolerates a missing target", () => {
+    const scrollIntoView = jest.fn();
+    const scrollSpy = jest
+      .spyOn(HTMLElement.prototype, "scrollIntoView")
+      .mockImplementation(scrollIntoView);
+    const media = jest
+      .spyOn(window, "matchMedia")
+      .mockReturnValue({ matches: true } as MediaQueryList);
+    const view = render(
+      <CalendarHeatmap
+        entries={entries}
+        selectedDate={null}
+        onSelectDate={jest.fn()}
+        scrollToDate="2024-01-02"
+      />,
+    );
+    expect(scrollIntoView).toHaveBeenCalledWith({
+      behavior: "auto",
+      block: "nearest",
+      inline: "nearest",
+    });
+    view.rerender(
+      <CalendarHeatmap
+        entries={entries}
+        selectedDate={null}
+        onSelectDate={jest.fn()}
+        scrollToDate="2099-01-01"
+      />,
+    );
+    expect(scrollIntoView).toHaveBeenCalledTimes(1);
+    media.mockRestore();
+    scrollSpy.mockRestore();
+  });
+
+  it("caps unique colour pips and ignores transparent or repeated swatches", () => {
+    const colours = [
+      "rgb(1, 2, 3)",
+      "rgb(1, 2, 3)",
+      "transparent",
+      "",
+      "rgb(4, 5, 6)",
+      "rgb(7, 8, 9)",
+      "rgb(10, 11, 12)",
+      "rgb(13, 14, 15)",
+    ];
+    render(
+      <CalendarHeatmap
+        entries={colours.map((placeholderColor, index) => ({
+          ...entries[0],
+          href: `/album/kansai#${index}.jpg`,
+          path: `../albums/kansai/${index}.jpg`,
+          placeholderColor,
+        }))}
+        selectedDate={null}
+        onSelectDate={jest.fn()}
+        highlightedDates={["2024-01-02"]}
+      />,
+    );
+    const cell = screen.getByRole("button", { name: /^2 Jan 2024: 8 photos/i });
+    expect(cell.className).toContain("level4");
+    expect(cell.querySelectorAll(".subpip")).toHaveLength(4);
+    expect(cell.querySelectorAll(".highlightedSubpip")).toHaveLength(4);
+  });
+
+  it("handles popup focus, delayed close, re-entry, and unmount cleanup", () => {
+    jest.useFakeTimers();
+    const view = render(
+      <CalendarHeatmap entries={entries} selectedDate={null} onSelectDate={jest.fn()} />,
+    );
+    const cell = screen.getByRole("button", { name: /^2 Jan 2024:/i });
+    fireEvent.focus(cell);
+    expect(screen.getByRole("link", { name: /view 2 jan 2024 preview/i })).toBeInTheDocument();
+    fireEvent.blur(cell);
+    fireEvent.blur(cell);
+    const popup = screen.getByRole("link", { name: /view 2 jan 2024 preview/i }).parentElement!;
+    fireEvent.mouseEnter(popup);
+    act(() => jest.advanceTimersByTime(120));
+    expect(screen.getByRole("link", { name: /view 2 jan 2024 preview/i })).toBeInTheDocument();
+    fireEvent.mouseLeave(popup);
+    expect(screen.queryByRole("link", { name: /view 2 jan 2024 preview/i })).toBeNull();
+
+    fireEvent.mouseEnter(cell);
+    fireEvent.mouseLeave(cell);
+    view.unmount();
+    jest.useRealTimers();
+  });
+
+  it("selects all photos from the popup and closes after the delay", () => {
+    jest.useFakeTimers();
+    const onSelectDate = jest.fn();
+    render(<CalendarHeatmap entries={entries} selectedDate={null} onSelectDate={onSelectDate} />);
+    const cell = screen.getByRole("button", { name: /^2 Jan 2024:/i });
+    fireEvent.mouseEnter(cell);
+    fireEvent.click(screen.getByRole("button", { name: "+1 more" }));
+    expect(onSelectDate).toHaveBeenCalledWith("2024-01-02");
+    expect(screen.queryByText("+1 more")).toBeNull();
+
+    fireEvent.mouseEnter(screen.getByRole("button", { name: /^5 Mar 2024:/i }));
+    expect(screen.queryByRole("button", { name: /more/ })).toBeNull();
+    fireEvent.mouseEnter(
+      screen.getByRole("link", { name: /view 5 mar 2024 preview/i }).parentElement!,
+    );
+    fireEvent.mouseLeave(screen.getByRole("button", { name: /^5 Mar 2024:/i }));
+    act(() => jest.advanceTimersByTime(120));
+    expect(screen.queryByRole("link", { name: /view 5 mar 2024 preview/i })).toBeNull();
+    jest.useRealTimers();
+  });
+
+  it("renders safely without any year groups", () => {
+    const { container } = render(
+      <CalendarHeatmap entries={[]} selectedDate={null} onSelectDate={jest.fn()} />,
+    );
+    expect(container.querySelectorAll("section")).toHaveLength(0);
   });
 });

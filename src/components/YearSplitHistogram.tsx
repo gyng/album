@@ -34,63 +34,65 @@ export const YearSplitHistogram: React.FC<Props> = ({ title, data, getHref }) =>
           </div>
         ))}
 
-        {orderedData.map((group) => (
-          <React.Fragment key={group.label}>
-            {getHref?.(group.label) ? (
-              <Link
-                key={`${group.label}-label`}
-                href={getHref(group.label) as string}
-                className={`${styles.yearLabel} ${styles.yearLabelLink}`}
-              >
-                {group.label}
-              </Link>
-            ) : (
-              <div key={`${group.label}-label`} className={styles.yearLabel}>
-                {group.label}
-              </div>
-            )}
-            {group.data.map((bucket) => {
-              const intensity = max > 0 ? bucket.count / max : 0;
-              const href = getHref?.(group.label) ?? null;
+        {orderedData.map((group) => {
+          const yearHref = getHref?.(group.label) ?? null;
+          return (
+            <React.Fragment key={group.label}>
+              {yearHref ? (
+                <Link
+                  key={`${group.label}-label`}
+                  href={yearHref}
+                  className={`${styles.yearLabel} ${styles.yearLabelLink}`}
+                >
+                  {group.label}
+                </Link>
+              ) : (
+                <div key={`${group.label}-label`} className={styles.yearLabel}>
+                  {group.label}
+                </div>
+              )}
+              {group.data.map((bucket) => {
+                const intensity = bucket.count / max;
 
-              const cell = (
-                <>
-                  <ChartTooltip>
-                    {group.label} {bucket.label} · {bucket.count.toLocaleString()}
-                  </ChartTooltip>
-                  {bucket.count > 0 ? (
-                    <span className={styles.count}>{bucket.count.toLocaleString()}</span>
-                  ) : null}
-                </>
-              );
+                const cell = (
+                  <>
+                    <ChartTooltip>
+                      {group.label} {bucket.label} · {bucket.count.toLocaleString()}
+                    </ChartTooltip>
+                    {bucket.count > 0 ? (
+                      <span className={styles.count}>{bucket.count.toLocaleString()}</span>
+                    ) : null}
+                  </>
+                );
 
-              if (href && bucket.count > 0) {
+                if (yearHref && bucket.count > 0) {
+                  return (
+                    <Link
+                      key={`${group.label}-${bucket.label}`}
+                      href={yearHref}
+                      className={`${styles.cell} ${styles.cellLink}`}
+                      style={{ ["--intensity" as string]: String(intensity) }}
+                      aria-label={`${group.label} ${bucket.label} · ${bucket.count.toLocaleString()} photos`}
+                    >
+                      {cell}
+                    </Link>
+                  );
+                }
+
                 return (
-                  <Link
+                  <div
                     key={`${group.label}-${bucket.label}`}
-                    href={href}
-                    className={`${styles.cell} ${styles.cellLink}`}
+                    className={[styles.cell, bucket.count === 0 ? styles.cellEmpty : ""].join(" ")}
                     style={{ ["--intensity" as string]: String(intensity) }}
                     aria-label={`${group.label} ${bucket.label} · ${bucket.count.toLocaleString()} photos`}
                   >
                     {cell}
-                  </Link>
+                  </div>
                 );
-              }
-
-              return (
-                <div
-                  key={`${group.label}-${bucket.label}`}
-                  className={[styles.cell, bucket.count === 0 ? styles.cellEmpty : ""].join(" ")}
-                  style={{ ["--intensity" as string]: String(intensity) }}
-                  aria-label={`${group.label} ${bucket.label} · ${bucket.count.toLocaleString()} photos`}
-                >
-                  {cell}
-                </div>
-              );
-            })}
-          </React.Fragment>
-        ))}
+              })}
+            </React.Fragment>
+          );
+        })}
       </div>
     </section>
   );

@@ -38,7 +38,6 @@ const getGeocodeLabel = (geocode: string): string | null => {
   if (parts.length >= 2 && /^[A-Z]{2}$/.test(parts[0])) {
     parts = parts.slice(1);
   }
-  if (parts.length === 0) return null;
   if (parts.length >= 2) return `${parts[0]}, ${parts[parts.length - 1]}`;
   return parts[0];
 };

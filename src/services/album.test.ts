@@ -18,7 +18,20 @@ jest.mock("./deserialize", () => ({
   })),
 }));
 
-import { getAlbum, getBlockDate, getImageTimestampRange } from "./album";
+import { deserializeContentBlock } from "./deserialize";
+import {
+  ALBUMS_DIR,
+  getAlbum,
+  getAlbumFromName,
+  getAlbumNames,
+  getAlbums,
+  getAlbumWithManifest,
+  getAlbumWithoutManifest,
+  getBlockDate,
+  getImageTimestampRange,
+  MANIFEST_NAME,
+  MANIFEST_V2_NAME,
+} from "./album";
 import { Block, Content, PhotoBlock, TextBlock, VideoBlock } from "./types";
 
 const makeContent = (blocks: Block[]): Content => ({
@@ -54,6 +67,8 @@ const makeVideo = (date?: string): VideoBlock => ({
   data: { type: "youtube", href: "https://youtube.com/watch?v=test", date },
 });
 
+const mockDeserialize = jest.mocked(deserializeContentBlock);
+
 describe("getBlockDate", () => {
   it("returns 1 for text blocks", () => {
     expect(getBlockDate(makeText())).toBe(1);
@@ -83,6 +98,10 @@ describe("getBlockDate", () => {
   it("returns 0 (not NaN) for a video block with an unparseable date", () => {
     // Without the isNaN guard, a malformed manifest date scrambles block order.
     expect(getBlockDate(makeVideo("not-a-date"))).toBe(0);
+  });
+
+  it("returns zero for unsupported block kinds", () => {
+    expect(getBlockDate({ kind: "audio" } as never)).toBe(0);
   });
 });
 
@@ -139,6 +158,14 @@ describe("getImageTimestampRange", () => {
 });
 
 describe("getAlbum", () => {
+  it("uses the repository album and manifest conventions", () => {
+    expect({ ALBUMS_DIR, MANIFEST_NAME, MANIFEST_V2_NAME }).toEqual({
+      ALBUMS_DIR: "../albums",
+      MANIFEST_NAME: "manifest.json",
+      MANIFEST_V2_NAME: "album.json",
+    });
+  });
+
   it("sorts external blocks by manifest sort order", async () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "album-sort-test-"));
     const albumDir = path.join(root, "trip");
@@ -231,6 +258,199 @@ describe("getAlbum", () => {
       }
     } finally {
       fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("lists only album directories and loads each one", async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "album-list-test-"));
+    fs.mkdirSync(path.join(root, "one"));
+    fs.mkdirSync(path.join(root, "two"));
+    fs.writeFileSync(path.join(root, "README.txt"), "not an album");
+
+    try {
+      await expect(getAlbumNames(root)).resolves.toEqual(["one", "two"]);
+      await expect(getAlbums(root)).resolves.toHaveLength(2);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("supports the default albums directory adapters without reading media", async () => {
+    const readdir = jest.spyOn(fs, "readdirSync").mockReturnValue([]);
+
+    try {
+      await expect(getAlbumNames()).resolves.toEqual([]);
+      await expect(getAlbums()).resolves.toEqual([]);
+      await expect(getAlbumFromName("virtual-default")).resolves.toMatchObject({
+        name: "virtual-default",
+      });
+    } finally {
+      readdir.mockRestore();
+    }
+  });
+
+  it("builds a manifest-free mixed-media album and removes Zone.Identifier files", async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "album-media-test-"));
+    const albumDir = path.join(root, "trip.newest-first");
+    fs.mkdirSync(path.join(albumDir, "nested"), { recursive: true });
+    fs.writeFileSync(path.join(albumDir, "cover.jpg"), "photo");
+    fs.writeFileSync(path.join(albumDir, "clip.MOV"), "video");
+    fs.writeFileSync(path.join(albumDir, "ignored.json"), "{}");
+    const sidecar = path.join(albumDir, "cover.jpg:Zone.Identifier");
+    fs.writeFileSync(sidecar, "zone");
+    const log = jest.spyOn(console, "log").mockImplementation(() => undefined);
+
+    try {
+      const result = await getAlbumWithoutManifest(albumDir);
+
+      expect(result.formatting.sort).toBe("newest-first");
+      expect(result.cover).toMatchObject({ data: { src: "cover.jpg" } });
+      expect(result.blocks.map(({ kind }) => kind)).toEqual(["text", "photo", "video"]);
+      expect(fs.existsSync(sidecar)).toBe(false);
+      expect(log).toHaveBeenCalledWith(expect.stringContaining("Deleted Zone.Identifier"));
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("warns and continues if a Zone.Identifier sidecar cannot be removed", async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "album-sidecar-test-"));
+    fs.writeFileSync(path.join(root, "photo.jpg:Zone.Identifier"), "zone");
+    const failure = new Error("permission denied");
+    jest.spyOn(fs, "unlinkSync").mockImplementation(() => {
+      throw failure;
+    });
+    const warn = jest.spyOn(console, "warn").mockImplementation(() => undefined);
+
+    try {
+      const result = await getAlbumWithoutManifest(root);
+
+      expect(result.blocks).toHaveLength(1);
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining("Failed to delete Zone.Identifier sidecar"),
+        failure,
+      );
+    } finally {
+      jest.restoreAllMocks();
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("loads legacy manifests directly", async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "album-legacy-test-"));
+    fs.writeFileSync(
+      path.join(root, "manifest.json"),
+      JSON.stringify({ name: "legacy", title: "Legacy", formatting: {}, blocks: [] }),
+    );
+
+    try {
+      await expect(getAlbumWithManifest(root)).resolves.toMatchObject({ name: "legacy" });
+      await expect(getAlbum(root)).resolves.toMatchObject({ name: "legacy" });
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("applies v2 cover and external-video configuration exactly", async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "album-v2-test-"));
+    fs.writeFileSync(path.join(root, "1.jpg"), "photo");
+    fs.writeFileSync(path.join(root, "11.jpg"), "photo");
+    fs.writeFileSync(
+      path.join(root, "album.json"),
+      JSON.stringify({
+        cover: "1.jpg",
+        externals: [
+          { type: "youtube", href: "https://youtu.be/undated" },
+          { type: "youtube", href: "https://youtu.be/dated", date: "2024-01-01" },
+          { type: "local", href: "clip.mp4" },
+          { type: "local", href: "dated.mp4", date: "2024-01-02" },
+          { type: "local", href: "clip.mp4:Zone.Identifier" },
+        ],
+      }),
+    );
+
+    try {
+      const result = await getAlbum(root);
+      const photos = result.blocks.filter((block) => block.kind === "photo");
+      const videos = result.blocks.filter((block) => block.kind === "video");
+
+      expect(result.cover).toEqual({ src: "1.jpg" });
+      expect(photos.find((block) => block.id === "1.jpg")?.formatting?.cover).toBe(true);
+      expect(photos.find((block) => block.id === "11.jpg")?.formatting?.cover).not.toBe(true);
+      expect(videos).toHaveLength(4);
+      expect(videos.map((block) => block.data)).toEqual(
+        expect.arrayContaining([
+          { type: "youtube", href: "https://youtu.be/undated" },
+          { type: "youtube", href: "https://youtu.be/dated", date: "2024-01-01" },
+          { type: "local", href: "clip.mp4" },
+          { type: "local", href: "dated.mp4", date: "2024-01-02" },
+        ]),
+      );
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("records a configured cover even when no matching photo exists", async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "album-cover-test-"));
+    fs.writeFileSync(path.join(root, "photo.jpg"), "photo");
+    fs.writeFileSync(path.join(root, "album.json"), JSON.stringify({ cover: "missing.jpg" }));
+
+    try {
+      await expect(getAlbum(root)).resolves.toMatchObject({ cover: { src: "missing.jpg" } });
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it.each([
+    [["2023-01-01T00:00:00", "2024-01-01T00:00:00"], "2023–2024"],
+    [["2024-01-01T00:00:00", "2024-12-31T00:00:00"], "2024"],
+  ])("derives a chronological title kicker from photo years", async (dates, expected) => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "album-kicker-years-test-"));
+    mockDeserialize.mockResolvedValueOnce(
+      makeContent([makeText(), makePhoto(dates[1]), makePhoto(dates[0])]),
+    );
+
+    try {
+      const result = await getAlbum(root);
+      const title = result.blocks[0];
+      expect(title?.kind).toBe("text");
+      if (title?.kind === "text") expect(title.data.kicker).toBe(expected);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("leaves the kicker alone when deserialisation produces no title block", async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "album-no-title-test-"));
+    mockDeserialize.mockResolvedValueOnce(makeContent([makePhoto("2024-01-01T00:00:00")]));
+
+    try {
+      await expect(getAlbum(root)).resolves.toMatchObject({ blocks: [expect.any(Object)] });
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("reuses successful album promises and evicts rejected ones", async () => {
+    const cachedRoot = fs.mkdtempSync(path.join(os.tmpdir(), "album-cache-test-"));
+    const rejectedRoot = fs.mkdtempSync(path.join(os.tmpdir(), "album-reject-test-"));
+
+    try {
+      const first = getAlbum(cachedRoot);
+      const second = getAlbum(cachedRoot);
+      await expect(second).resolves.toBe(await first);
+
+      mockDeserialize.mockRejectedValueOnce(new Error("deserialisation failed"));
+      await expect(getAlbum(rejectedRoot)).rejects.toThrow("deserialisation failed");
+      await Promise.resolve();
+      await expect(getAlbum(rejectedRoot)).resolves.toMatchObject({
+        name: path.basename(rejectedRoot),
+      });
+    } finally {
+      fs.rmSync(cachedRoot, { recursive: true, force: true });
+      fs.rmSync(rejectedRoot, { recursive: true, force: true });
     }
   });
 });

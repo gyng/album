@@ -112,8 +112,6 @@ const reducer = (state: TextVectorState, action: Action): TextVectorState => {
         ...state,
         isTextVectorLoading: false,
       };
-    default:
-      return state;
   }
 };
 

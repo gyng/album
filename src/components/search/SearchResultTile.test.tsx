@@ -171,4 +171,52 @@ describe("SearchResultTile", () => {
       "Hybrid search: semantic 71%, keyword n/a, fused score 0.031 (31)",
     );
   });
+
+  it("uses metadata fallbacks and tolerates a result with no descriptive fields", () => {
+    const alt = render(
+      <SearchResultTile
+        result={makeResult({ exif: "", colors: "", alt_text: "Harbor <b>view</b>", tags: "" })}
+      />,
+    );
+    expect(screen.getByAltText("Harbor view")).toBeInTheDocument();
+    expect(screen.queryByText(/ago/)).toBeNull();
+    alt.unmount();
+
+    const subject = render(
+      <SearchResultTile
+        result={makeResult({ exif: "", colors: "[]", subject: "Night market", tags: "" })}
+      />,
+    );
+    expect(screen.getByAltText("Night market")).toBeInTheDocument();
+    subject.unmount();
+
+    const tags = render(
+      <SearchResultTile
+        result={makeResult({ exif: "", colors: undefined, tags: "street, travel" })}
+      />,
+    );
+    expect(screen.getByAltText("street, travel")).toBeInTheDocument();
+    tags.unmount();
+
+    render(<SearchResultTile result={makeResult({ exif: "", colors: undefined, tags: "" })} />);
+    expect(screen.getByTestId("result-picture")).toHaveAttribute("alt", "");
+    expect(screen.queryByText(/%$/)).toBeNull();
+  });
+
+  it("uses the palette for a colour action when no matched swatch is supplied", () => {
+    const onSearchByColor = jest.fn();
+    render(<SearchResultTile result={makeResult()} onSearchByColor={onSearchByColor} />);
+    fireEvent.click(screen.getByRole("button", { name: /use this photo's colour/i }));
+    expect(onSearchByColor).toHaveBeenCalledWith([12, 34, 56]);
+  });
+
+  it("labels a hybrid result with missing semantic input", () => {
+    render(
+      <SearchResultTile result={makeResult({ similarity: undefined, bm25: -2, rrfScore: 0.02 })} />,
+    );
+    expect(screen.getByText("20")).toHaveAttribute(
+      "title",
+      "Hybrid search: semantic n/a, keyword 2.0, fused score 0.020 (20)",
+    );
+  });
 });

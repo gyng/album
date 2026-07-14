@@ -6,6 +6,11 @@ type Item = {
 };
 
 describe("findClustersAroundSeeds", () => {
+  it("returns no clusters without photos or seed dates", () => {
+    expect(findClustersAroundSeeds([], new Set(["2023-03-01"]))).toEqual([]);
+    expect(findClustersAroundSeeds([{ id: "a", date: "2023-03-01" }], new Set())).toEqual([]);
+  });
+
   it("expands a seed date to include the full adjacent cluster", () => {
     const items: Item[] = [
       { id: "a", date: "2023-03-01" },

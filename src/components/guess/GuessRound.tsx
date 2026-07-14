@@ -58,7 +58,6 @@ const getGeocodeLabel = (geocode: string): string | null => {
   if (parts.length >= 2 && /^[A-Z]{2}$/.test(parts[0])) {
     parts = parts.slice(1);
   }
-  if (parts.length === 0) return null;
   if (parts.length >= 2) return `${parts[0]}, ${parts[parts.length - 1]}`;
   return parts[0];
 };
@@ -111,18 +110,18 @@ export const GuessRound: React.FC<GuessRoundProps> = ({
   // Animated score counters — ref callbacks that imperatively update textContent
   const scoreCounterRef = useAnimatedCounter(result?.score ?? 0);
   const cumulativeCounterRef = useAnimatedCounter(
-    revealed ? cumulativeScore + (result?.score ?? 0) : cumulativeScore,
+    revealed ? cumulativeScore + result!.score : cumulativeScore,
   );
 
-  const timerCallbackRef = useRef<() => void>(() => {});
+  // The callback effect is declared before the interval effect, so this is
+  // populated before an interval can tick.
+  const timerCallbackRef = useRef<() => void>(null!);
 
   const photoSrc = `/data/albums/${photo.albumName}/.resized_images/${photo.photoName}@1600.avif`;
 
   const handleConfirm = useCallback(() => {
-    if (!guess) return;
-
     const distanceMeters = distanceMetersBetween(
-      { decLat: guess.lat, decLng: guess.lng },
+      { decLat: guess!.lat, decLng: guess!.lng },
       { decLat: photo.lat, decLng: photo.lng },
     );
     const distanceScore = computeScore(distanceMeters / 1000);
@@ -161,7 +160,7 @@ export const GuessRound: React.FC<GuessRoundProps> = ({
   }, [photo, onReveal]);
 
   const handleNext = useCallback(() => {
-    if (result) onComplete(result);
+    onComplete(result!);
   }, [result, onComplete]);
 
   // Photo zoom: scroll wheel zooms, drag pans, double-click resets
@@ -180,7 +179,6 @@ export const GuessRound: React.FC<GuessRoundProps> = ({
 
   const pointerDistance = (): number => {
     const pts = Array.from(pointersRef.current.values());
-    if (pts.length < 2) return 0;
     return Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
   };
 
@@ -245,14 +243,12 @@ export const GuessRound: React.FC<GuessRoundProps> = ({
         dragging.current = false;
       } else if (pointersRef.current.size === 1 && zoom > MIN_ZOOM) {
         // Pinch released to a single finger — resume drag-pan from there
-        const remaining = pointersRef.current.values().next().value;
-        if (remaining) {
-          dragging.current = true;
-          dragStart.current = {
-            x: remaining.x - panRef.current.x,
-            y: remaining.y - panRef.current.y,
-          };
-        }
+        const remaining = pointersRef.current.values().next().value!;
+        dragging.current = true;
+        dragStart.current = {
+          x: remaining.x - panRef.current.x,
+          y: remaining.y - panRef.current.y,
+        };
       }
     },
     [zoom],
@@ -440,7 +436,7 @@ export const GuessRound: React.FC<GuessRoundProps> = ({
             <div
               className={styles.timerBar}
               style={{
-                transform: `scaleX(${(timeRemaining ?? timeLimit) / timeLimit})`,
+                transform: `scaleX(${timeRemaining! / timeLimit})`,
               }}
               data-urgent={
                 timeRemaining !== null && timeRemaining <= timeLimit * 0.25 ? "" : undefined
@@ -490,19 +486,19 @@ export const GuessRound: React.FC<GuessRoundProps> = ({
                           .filter(Boolean)
                           .join(" ")}
                       >
-                        {formatDistance(result?.distanceMeters ?? 0)}
+                        {formatDistance(result!.distanceMeters)}
                       </span>
                       <span
-                        className={[styles.scoreValue, tierColour ? styles.scoreValueGlow : ""]
+                        className={[styles.scoreValue, styles.scoreValueGlow]
                           .filter(Boolean)
                           .join(" ")}
-                        style={tierColour ? { color: tierColour } : undefined}
+                        style={{ color: tierColour }}
                       >
                         +<span ref={scoreCounterRef}>0</span>
                       </span>
-                      {result && result.timeBonus > 0 ? (
+                      {result!.timeBonus > 0 ? (
                         <span className={styles.timeBonusInline}>
-                          +{result.timeBonus.toLocaleString()}
+                          +{result!.timeBonus.toLocaleString()}
                         </span>
                       ) : null}
                     </div>
@@ -510,7 +506,7 @@ export const GuessRound: React.FC<GuessRoundProps> = ({
                       <div
                         className={styles.scoreBarFill}
                         style={{
-                          width: `${scoreRatio(result?.distanceScore ?? 0) * 100}%`,
+                          width: `${scoreRatio(result!.distanceScore) * 100}%`,
                           backgroundColor: tierColour,
                         }}
                       />

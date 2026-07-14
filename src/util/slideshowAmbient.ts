@@ -143,7 +143,7 @@ export type RemixPick = {
   strategy: RemixStrategy;
 };
 
-const albumOfPath = (path: string): string => path.split("/")?.[2] ?? "";
+const albumOfPath = (path: string): string => path.split("/")[2] ?? "";
 
 // Great-circle distance between two GPS points, in kilometres.
 // Used by the "proximity" remix strategy to find photos shot near a seed.
@@ -625,10 +625,13 @@ const STRATEGY_WEIGHTS: Array<[RemixStrategy, number]> = [
 const pickWeightedStrategy = (random: () => number): RemixStrategy => {
   const total = STRATEGY_WEIGHTS.reduce((sum, [, w]) => sum + w, 0);
   let r = random() * total;
-  for (const [strategy, weight] of STRATEGY_WEIGHTS) {
+  for (const [strategy, weight] of STRATEGY_WEIGHTS.slice(0, -1)) {
     r -= weight;
     if (r < 0) return strategy;
   }
+  // The final strategy owns the remainder of the unit interval. Keeping it
+  // outside the loop avoids a defensive fallback that cannot be reached by
+  // Math.random() and makes the weighted partition explicit.
   return "random";
 };
 

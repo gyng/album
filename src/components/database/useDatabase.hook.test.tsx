@@ -4,7 +4,13 @@
 
 import sqlite3InitModule from "@sqlite.org/sqlite-wasm";
 import { act, renderHook, waitFor } from "@testing-library/react";
-import { databaseLoaderInternals, useDatabase } from "./useDatabase";
+import {
+  databaseLoaderInternals,
+  EMBEDDINGS_DATABASE_URL,
+  SEARCH_DATABASE_URL,
+  useDatabase,
+  useEmbeddingsDatabase,
+} from "./useDatabase";
 
 jest.mock("@sqlite.org/sqlite-wasm", () => ({
   __esModule: true,
@@ -116,6 +122,39 @@ describe("useDatabase", () => {
     expect(fetchMock).toHaveBeenNthCalledWith(1, "/search.sqlite");
     expect(fetchMock).toHaveBeenNthCalledWith(2, "/search.sqlite", {
       cache: "no-store",
+    });
+  });
+
+  it("does not initialise the embeddings database while disabled", () => {
+    global.fetch = jest.fn() as typeof fetch;
+    const { result } = renderHook(() => useEmbeddingsDatabase(false));
+    expect(result.current).toEqual([null, 0, { loaded: 0, total: 0 }, null, expect.any(Function)]);
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  it("loads the embeddings database by default with the main URL as fallback", async () => {
+    global.fetch = jest.fn().mockResolvedValue(okFetchResponse()) as typeof fetch;
+    const { result } = renderHook(() => useEmbeddingsDatabase());
+    await waitFor(() => expect(result.current[0]).not.toBeNull());
+    expect(global.fetch).toHaveBeenCalledWith(EMBEDDINGS_DATABASE_URL);
+    expect(SEARCH_DATABASE_URL).toBe("/search.sqlite");
+  });
+
+  it.each(["resolve", "reject"])("ignores a late database %s after unmount", async (outcome) => {
+    let settle!: (value?: unknown) => void;
+    const pending = new Promise((resolve, reject) => {
+      settle = outcome === "resolve" ? resolve : reject;
+    });
+    global.fetch = jest.fn().mockReturnValue(pending) as typeof fetch;
+    const view = renderHook(() => useDatabase());
+    view.unmount();
+    await act(async () => {
+      settle(outcome === "resolve" ? okFetchResponse() : new Error("late network failure"));
+      try {
+        await pending;
+      } catch {}
+      await Promise.resolve();
+      await Promise.resolve();
     });
   });
 });

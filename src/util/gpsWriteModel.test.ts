@@ -47,6 +47,12 @@ describe("toExifGpsTags", () => {
     expect(tags.GPSProcessingMethod).toBe("INTERPOLATED");
   });
 
+  it("marks positive altitude as above sea level", () => {
+    const tags = toExifGpsTags({ lat: 1, lng: 2, altitude: 120 });
+    expect(tags.GPSAltitude).toBe(120);
+    expect(tags.GPSAltitudeRef).toBe(0);
+  });
+
   it("throws on an invalid fix", () => {
     expect(() => toExifGpsTags({ lat: 99, lng: 0 })).toThrow();
   });

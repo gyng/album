@@ -3,8 +3,11 @@ import {
   avoidBoundaryRepeat,
   computePoolStats,
   createRandomQueueState,
+  EMPTY_POOL_STATS,
+  formatNewestPhotoDate,
   getSlideshowPhotoSrc,
   peekNextQueued,
+  resetRandomQueue,
   shufflePhotos,
   weightedShufflePhotos,
 } from "./slideshowQueue";
@@ -58,6 +61,11 @@ describe("avoidBoundaryRepeat", () => {
     const out = avoidBoundaryRepeat(photos, "x");
     expect(out[0]?.path).toBe("x");
   });
+
+  it("cannot swap when every candidate has the repeated path", () => {
+    const photos = [makePhoto("x"), makePhoto("x")];
+    expect(pathsOf(avoidBoundaryRepeat(photos, "x"))).toEqual(["x", "x"]);
+  });
 });
 
 describe("weightedShufflePhotos", () => {
@@ -77,6 +85,12 @@ describe("weightedShufflePhotos", () => {
     expect(pathsOf(out).sort()).toEqual(["a", "b"]);
   });
 
+  it("gives undated photos a small weight when mixed with dated photos", () => {
+    const input = [makePhoto("dated", "2020-01-01"), makePhoto("undated")];
+    const out = weightedShufflePhotos(input);
+    expect(pathsOf(out).sort()).toEqual(["dated", "undated"]);
+  });
+
   it("does not blow the call stack on a very large pool (no Math.min spread)", () => {
     // The previous implementation spread the timestamp array into Math.min/
     // Math.max, which throws "Maximum call stack size exceeded" past ~100k
@@ -91,6 +105,12 @@ describe("weightedShufflePhotos", () => {
 });
 
 describe("random queue peek/advance consistency (preload buffer)", () => {
+  it("resets the queue position while retaining the boundary path", () => {
+    const state = { queue: [makePhoto("a")], index: 0, lastPath: "a" };
+    resetRandomQueue(state);
+    expect(state).toEqual({ queue: [], index: -1, lastPath: "a" });
+  });
+
   it("peek is stable and matches the photo the next advance consumes, even with a randomised builder across a boundary", () => {
     // A 50-photo pool over many trials makes this an effectively deterministic
     // guard against the old throwaway-shuffle bug (where peek rebuilt a fresh
@@ -126,6 +146,13 @@ describe("random queue peek/advance consistency (preload buffer)", () => {
     expect(advanceQueued(state, [], identity)).toBeNull();
   });
 
+  it("returns null when a queue builder cannot produce a candidate", () => {
+    const state = createRandomQueueState();
+    const emptyBuilder = () => [];
+    expect(peekNextQueued(state, [makePhoto("a")], emptyBuilder)).toBeNull();
+    expect(advanceQueued(state, [makePhoto("a")], emptyBuilder)).toBeNull();
+  });
+
   it("cycles through every photo before repeating within a queue pass", () => {
     const pool = [makePhoto("a"), makePhoto("b"), makePhoto("c")];
     const build = (p: RandomPhotoRow[]) => [...p];
@@ -140,6 +167,10 @@ describe("random queue peek/advance consistency (preload buffer)", () => {
 });
 
 describe("computePoolStats", () => {
+  it("provides stable empty-pool defaults", () => {
+    expect(EMPTY_POOL_STATS).toEqual({ count: 0, newestDate: null });
+  });
+
   it("counts photos and finds the newest date", () => {
     const stats = computePoolStats([
       makePhoto("a", "2020-01-01"),
@@ -154,6 +185,10 @@ describe("computePoolStats", () => {
     const stats = computePoolStats([makePhoto("a"), makePhoto("b")]);
     expect(stats.count).toBe(2);
     expect(stats.newestDate).toBeNull();
+  });
+
+  it("formats the newest date for display in British order", () => {
+    expect(formatNewestPhotoDate(new Date("2024-03-22T00:00:00Z"))).toBe("22 Mar 2024");
   });
 });
 

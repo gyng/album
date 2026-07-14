@@ -12,7 +12,7 @@ jest.mock("react-map-gl/maplibre", () => ({
 }));
 
 jest.mock("../util/time", () => ({
-  getRelativeTimeString: () => "two years ago",
+  getRelativeTimeString: (value: Date) => (value.getFullYear() === 2024 ? "two years ago" : ""),
 }));
 
 const photo: MapWorldEntry = {
@@ -61,5 +61,45 @@ describe("MapPhotoPopup", () => {
     );
 
     expect(screen.queryByRole("link", { name: /OpenStreetMap/ })).toBeNull();
+  });
+
+  it("omits invalid photo locations and dates", () => {
+    const props = {
+      selected: false,
+      onClose: jest.fn(),
+      onInteractionStart: jest.fn(),
+    };
+    const { container, rerender } = render(<MapPhotoPopup photo={null} {...props} />);
+    expect(container).toBeEmptyDOMElement();
+
+    rerender(<MapPhotoPopup photo={{ ...photo, decLat: null }} {...props} />);
+    expect(container).toBeEmptyDOMElement();
+
+    rerender(<MapPhotoPopup photo={{ ...photo, decLng: null }} {...props} />);
+    expect(container).toBeEmptyDOMElement();
+
+    rerender(<MapPhotoPopup photo={{ ...photo, date: "not-a-date" }} {...props} />);
+    expect(screen.getByText("kansai")).toBeTruthy();
+    expect(screen.queryByText("two years ago")).toBeNull();
+  });
+
+  it("stops popup clicks from reaching the map and omits an empty relative label", () => {
+    const mapClick = jest.fn();
+    render(
+      // The wrapper models MapLibre's event surface, not a user-facing control.
+      // oxlint-disable-next-line jsx-a11y/no-noninteractive-element-interactions, jsx-a11y/no-static-element-interactions
+      <div aria-label="Map container" onClick={mapClick} onKeyDown={() => {}}>
+        <MapPhotoPopup
+          photo={{ ...photo, date: "2025-01-02T03:04:05" }}
+          selected={false}
+          onClose={jest.fn()}
+          onInteractionStart={jest.fn()}
+        />
+      </div>,
+    );
+
+    fireEvent.click(screen.getByTestId("popup").firstElementChild as Element);
+    expect(mapClick).not.toHaveBeenCalled();
+    expect(screen.getByText("2 Jan 2025, 03:04")).toBeTruthy();
   });
 });

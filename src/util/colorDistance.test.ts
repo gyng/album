@@ -40,6 +40,13 @@ describe("rgbToHex / rgbToString round-trips", () => {
   });
 });
 
+describe("rgbToLab", () => {
+  it("maps black to the LAB origin and white to full lightness", () => {
+    expect(rgbToLab(0, 0, 0)).toEqual([0, 0, 0]);
+    expect(rgbToLab(255, 255, 255)[0]).toBeCloseTo(100, 4);
+  });
+});
+
 describe("parseColorPalette", () => {
   it("deserialises the Python tuple format", () => {
     expect(parseColorPalette("[(12, 34, 56), (78, 90, 12)]")).toEqual([
@@ -79,6 +86,18 @@ describe("minColorDistance", () => {
         [
           [200, 200, 200],
           [10, 20, 30],
+        ],
+      ),
+    ).toBe(0);
+  });
+
+  it("keeps the best match when later palette entries are farther away", () => {
+    expect(
+      minColorDistance(
+        [10, 20, 30],
+        [
+          [10, 20, 30],
+          [250, 250, 250],
         ],
       ),
     ).toBe(0);

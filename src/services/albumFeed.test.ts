@@ -152,4 +152,149 @@ describe("albumFeed", () => {
       link: "/album/snapshots",
     });
   });
+
+  it("returns empty results for missing albums and ignores non-directory entries", async () => {
+    fs.writeFileSync(path.join(albumsDir, "README.txt"), "not an album");
+
+    await expect(getAlbumFeedEntry("missing", albumsDir)).resolves.toBeNull();
+    await expect(getAlbumFeedItems("missing", albumsDir)).resolves.toEqual([]);
+    await expect(getAlbumSitemapEntries(albumsDir)).resolves.toEqual([]);
+  });
+
+  it("falls back from malformed manifests and sorts and limits top-level entries", async () => {
+    fs.mkdirSync(path.join(albumsDir, "broken"), { recursive: true });
+    fs.writeFileSync(path.join(albumsDir, "broken", "manifest.json"), "{");
+    writeJson(path.join(albumsDir, "named", "manifest.json"), {
+      blocks: [{ kind: "text", data: { title: "  Text title  ", description: "Details" } }],
+    });
+    fs.utimesSync(
+      path.join(albumsDir, "named", "manifest.json"),
+      new Date("2025-01-01"),
+      new Date("2025-01-01"),
+    );
+    fs.utimesSync(
+      path.join(albumsDir, "broken", "manifest.json"),
+      new Date("2026-01-01"),
+      new Date("2026-01-01"),
+    );
+
+    const entries = await getAlbumFeedEntries(albumsDir, 1);
+
+    expect(entries).toHaveLength(1);
+    expect(entries[0]).toMatchObject({
+      slug: "broken",
+      title: "broken",
+      description: "broken photo album",
+    });
+    await expect(getAlbumFeedEntry("named", albumsDir)).resolves.toMatchObject({
+      title: "Text title",
+      description: "Details",
+    });
+  });
+
+  it("builds photo, local-video, and YouTube items with the available date and label fallbacks", async () => {
+    writeJson(path.join(albumsDir, "mixed", "manifest.json"), {
+      title: "Mixed media",
+      blocks: [
+        { kind: "text", data: { title: "Ignored" } },
+        { kind: "photo", data: {} },
+        {
+          kind: "photo",
+          data: { src: "street_scene.jpg", kicker: "Street scene", date: "2025-03-02T10:00:00" },
+        },
+        {
+          kind: "video",
+          data: { type: "local", href: "local_clip.mp4", description: "A local clip" },
+        },
+        {
+          kind: "video",
+          data: { type: "youtube", href: "https://youtu.be/example", title: "YouTube clip" },
+        },
+      ],
+    });
+    fs.writeFileSync(path.join(albumsDir, "mixed", "street_scene.jpg"), "photo");
+    fs.writeFileSync(path.join(albumsDir, "mixed", "local_clip.mp4"), "video");
+
+    const items = await getAlbumFeedItems("mixed", albumsDir);
+
+    expect(items).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          title: "Street scene",
+          link: "/album/mixed#street_scene.jpg",
+          pubDate: "2025-03-02",
+        }),
+        expect.objectContaining({
+          title: "local clip",
+          description: "A local clip - From Mixed media",
+          link: "/album/mixed#local_clip.mp4",
+        }),
+        expect.objectContaining({
+          title: "YouTube clip",
+          link: "/album/mixed",
+        }),
+      ]),
+    );
+  });
+
+  it("uses a clean filesystem fallback and tolerates malformed v2 metadata", async () => {
+    fs.mkdirSync(path.join(albumsDir, "filesystem", "nested"), { recursive: true });
+    fs.writeFileSync(path.join(albumsDir, "filesystem", "manifest.json"), "{");
+    fs.writeFileSync(path.join(albumsDir, "filesystem", "album.json"), "{");
+    fs.writeFileSync(path.join(albumsDir, "filesystem", "---.jpg"), "photo");
+    fs.writeFileSync(path.join(albumsDir, "filesystem", "ignored.json"), "{}");
+    fs.writeFileSync(path.join(albumsDir, "filesystem", "photo.jpg:Zone.Identifier"), "zone");
+
+    const items = await getAlbumFeedItems("filesystem", albumsDir);
+
+    expect(items).toHaveLength(1);
+    expect(items[0]).toMatchObject({ title: "---.jpg", link: "/album/filesystem#---.jpg" });
+  });
+
+  it("uses album metadata timestamps for undated external items", async () => {
+    writeJson(path.join(albumsDir, "external", "album.json"), {
+      externals: [{ type: "local", href: "clips/night_walk.mp4" }],
+    });
+
+    const items = await getAlbumFeedItems("external", albumsDir);
+
+    expect(items[0]).toMatchObject({
+      title: "night walk",
+      description: "External item from external - external photo album",
+      link: "/album/external",
+    });
+    expect(items[0]?.pubDate).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  });
+
+  it("uses the slug when a parsed manifest contains no title", async () => {
+    writeJson(path.join(albumsDir, "untitled", "manifest.json"), {});
+
+    await expect(getAlbumFeedEntry("untitled", albumsDir)).resolves.toMatchObject({
+      title: "untitled",
+      description: "untitled photo album",
+    });
+  });
+
+  it("falls back to the album directory timestamp if a concurrent listing omits it", async () => {
+    writeJson(path.join(albumsDir, "race", "manifest.json"), {
+      blocks: [{ kind: "photo", data: { src: "photo.jpg" } }],
+    });
+    const readdir = jest.spyOn(fs, "readdirSync").mockReturnValue([]);
+
+    try {
+      await expect(getAlbumFeedEntry("race", albumsDir)).resolves.toMatchObject({ slug: "race" });
+      await expect(getAlbumFeedItems("race", albumsDir)).resolves.toEqual([
+        expect.objectContaining({ link: "/album/race#photo.jpg" }),
+      ]);
+    } finally {
+      readdir.mockRestore();
+    }
+  });
+
+  it("supports the configured default albums directory", async () => {
+    await expect(getAlbumSitemapEntries()).resolves.toEqual(expect.any(Array));
+    await expect(getAlbumFeedEntries()).resolves.toEqual(expect.any(Array));
+    await expect(getAlbumFeedEntry("definitely-missing-default-album")).resolves.toBeNull();
+    await expect(getAlbumFeedItems("definitely-missing-default-album")).resolves.toEqual([]);
+  });
 });

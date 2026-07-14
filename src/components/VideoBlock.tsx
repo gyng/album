@@ -226,7 +226,7 @@ export const YoutubeBlockEl: React.FC<YoutubeBlockElProps> = (props) => {
         ></iframe>
       </div>
 
-      <VideoDetailsPanel type="youtube" src={props.src} date={props.date} id={props.src} />
+      <VideoDetailsPanel type="youtube" src={props.src} date={props.date} id={props.id} />
     </div>
   );
 };
@@ -256,10 +256,9 @@ export const LocalVideoBlockEl: React.FC<LocalVideoBlockElProps> = (props) => {
   const videoRef = React.useRef<HTMLVideoElement>(null);
 
   React.useEffect(() => {
-    const videoEl = videoRef.current;
-    if (!videoEl) {
-      return;
-    }
+    // The video is rendered unconditionally, so its ref is attached before
+    // this effect runs.
+    const videoEl = videoRef.current!;
 
     if (typeof IntersectionObserver === "undefined") {
       return;

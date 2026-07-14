@@ -66,9 +66,7 @@ export const SearchResultTile = (props: {
       ? `Colour match score ${Math.round(colorMatchScore)}%`
       : typeof result.similarity === "number"
         ? result.similarity.toFixed(3)
-        : typeof result.bm25 === "number"
-          ? (result.bm25 * -1).toFixed(1)
-          : undefined;
+        : undefined;
 
   return (
     <div className={styles.card}>

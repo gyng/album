@@ -122,6 +122,11 @@ describe("advanceHistory reducer", () => {
     expect(currentEntry(s)?.vectorScore ?? null).toBeNull();
   });
 
+  it("clearCurrentRemix is a no-op when there is no current entry", () => {
+    const state = initialHistoryState();
+    expect(advanceHistory(state, { type: "clearCurrentRemix" })).toBe(state);
+  });
+
   it("reset empties the history", () => {
     let s = initialHistoryState();
     s = advanceHistory(s, { type: "commit", entry: entry("a") });
@@ -165,5 +170,14 @@ describe("derived helpers", () => {
     expect(canGoBack(s)).toBe(false);
     expect(hasForwardEntry(s)).toBe(true);
     expect(upcomingSeed(s)?.path).toBe("b");
+  });
+
+  it("returns null when a cursor points at a missing sparse entry", () => {
+    const sparse = { history: [], index: 0 };
+    expect(currentEntry(sparse)).toBeNull();
+
+    const sparseForward = { history: [entry("a"), undefined] as NavigationEntry[], index: 0 };
+    expect(hasForwardEntry(sparseForward)).toBe(true);
+    expect(upcomingSeed(sparseForward)).toBeNull();
   });
 });

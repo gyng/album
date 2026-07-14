@@ -80,9 +80,6 @@ const ensureWorker = (): Worker => {
     const handlersList = Array.from(pending.values());
     for (let idx = 0; idx < handlersList.length; idx += 1) {
       const handlers = handlersList[idx];
-      if (!handlers) {
-        continue;
-      }
       handlers.reject(error);
     }
     pending.clear();

@@ -284,16 +284,13 @@ const buildSingleFacetClause = (
   const numericFacet = SEARCHABLE_NUMERIC_FACETS.find((facet) => facet.id === selection.facetId);
   if (numericFacet) {
     const bucket = numericFacet.buckets.find((candidate) => candidate.label === selection.value);
-    const fieldSql = FACET_FIELD_SQL_BY_ID[selection.facetId];
-    if (!bucket?.range || !fieldSql) {
+    if (!bucket) {
       return null;
     }
 
+    const fieldSql = FACET_FIELD_SQL_BY_ID[selection.facetId]!;
     const numericSql = `CAST(NULLIF(${fieldSql}, '') AS REAL)`;
-    const [min, max] = bucket.range;
-    if (min == null && max == null) {
-      return null;
-    }
+    const [min, max] = bucket.range!;
     if (min == null) {
       return { sql: `${numericSql} <= ?`, bind: [max as number] };
     }
@@ -326,7 +323,7 @@ const buildSingleFacetClause = (
 
   if (selection.facetId === CAMERA_FACET.id) {
     const parts = selection.value.split(" ").filter(Boolean);
-    const make = parts[0] ?? selection.value;
+    const make = parts[0]!;
     const model = parts.slice(1).join(" ");
     const bind: (string | number)[] = [
       `%Image Model:${selection.value}%`,
@@ -338,11 +335,6 @@ const buildSingleFacetClause = (
       bind.push(`%Image Make:${make}%`, `%Image Model:${model}%`);
     }
     return { sql: `(${clauses.join(" OR ")})`, bind };
-  }
-
-  const stringFacet = SEARCHABLE_STRING_FACETS.find((facet) => facet.id === selection.facetId);
-  if (stringFacet) {
-    return { sql: `images.exif LIKE ?`, bind: [`%${selection.value}%`] };
   }
 
   return null;
@@ -468,6 +460,17 @@ export const searchInternals = {
   buildFacetWhereClause,
   hasStructuredGeocode,
   decodeInt8Embedding,
+  parseDbExifString,
+  cosineSimilarity: (...args: Parameters<typeof cosineSimilarity>) => cosineSimilarity(...args),
+  getResultSnippet: (...args: Parameters<typeof getResultSnippet>) => getResultSnippet(...args),
+  fuseRankingsWithRrf: (...args: Parameters<typeof fuseRankingsWithRrf>) =>
+    fuseRankingsWithRrf(...args),
+  compareFusedResults: (...args: Parameters<typeof compareFusedResults>) =>
+    compareFusedResults(...args),
+  fetchResultsByPaths: (...args: Parameters<typeof fetchResultsByPaths>) =>
+    fetchResultsByPaths(...args),
+  fetchFacetMatchedPaths: (...args: Parameters<typeof fetchFacetMatchedPaths>) =>
+    fetchFacetMatchedPaths(...args),
 };
 
 const mapImageRows = (rows: any[][]): SearchResultRow[] => {
@@ -564,6 +567,13 @@ const fetchKeywordRanking = async (opts: {
   }));
 };
 
+const compareFusedResults = (left: RankedHybridResult, right: RankedHybridResult): number => {
+  if (right.rrfScore !== left.rrfScore) {
+    return right.rrfScore - left.rrfScore;
+  }
+  return (right.similarity ?? 0) - (left.similarity ?? 0);
+};
+
 const fuseRankingsWithRrf = (rankings: {
   keywordResults: RankedKeywordResult[];
   vectorResults: RankedVectorResult[];
@@ -591,13 +601,7 @@ const fuseRankingsWithRrf = (rankings: {
     fused.set(result.path, current);
   });
 
-  return Array.from(fused.values()).sort((left, right) => {
-    if (right.rrfScore !== left.rrfScore) {
-      return right.rrfScore - left.rrfScore;
-    }
-
-    return (right.similarity ?? 0) - (left.similarity ?? 0);
-  });
+  return Array.from(fused.values()).sort(compareFusedResults);
 };
 
 const fetchResultsByPaths = async (
@@ -648,10 +652,10 @@ const fetchFacetMatchedPaths = async (
 const fetchColorMatchedResults = async (opts: {
   database: Database;
   color: RGB;
-  maxDistance?: number;
-  selectedFacets?: SearchFacetSelection[];
+  maxDistance: number;
+  selectedFacets: SearchFacetSelection[];
 }): Promise<RankedColorResult[]> => {
-  const { database, color, maxDistance = 100, selectedFacets = [] } = opts;
+  const { database, color, maxDistance, selectedFacets } = opts;
   const facetWhere = buildFacetWhereClause(selectedFacets, hasStructuredGeocode(database));
   const lightRows = await exec(
     database,
@@ -753,12 +757,8 @@ export const fetchSearchFacetSections = async (opts: {
           return;
         }
 
-        const bucket = facet.buckets.find((candidate) => candidate.match(value));
-        if (!bucket) {
-          return;
-        }
-
-        counts.set(bucket.label, (counts.get(bucket.label) ?? 0) + 1);
+        const bucket = facet.buckets.find((candidate) => candidate.match(value))!;
+        counts.set(bucket.label, counts.get(bucket.label)! + 1);
       });
 
       return {
@@ -767,7 +767,7 @@ export const fetchSearchFacetSections = async (opts: {
         options: facet.buckets
           .map((bucket) => ({
             value: bucket.label,
-            count: counts.get(bucket.label) ?? 0,
+            count: counts.get(bucket.label)!,
           }))
           .filter((option) => option.count > 0),
       };
@@ -981,7 +981,7 @@ export const fetchResults = async (opts: {
         ? `SELECT ${IMAGE_COLUMN_SELECTS.join(", ")}, snippet(images, -1, '<i class="snippet">', '</i>', '…', 24) AS snippet, bm25(images) AS bm25
             FROM images
             LEFT JOIN metadata m ON m.path = images.path
-            ${whereParts.length > 0 ? `WHERE ${whereParts.join(" AND ")}` : ""}
+            WHERE ${whereParts.join(" AND ")}
             ORDER BY rank
             LIMIT ?
             OFFSET ?`
@@ -1262,10 +1262,7 @@ export const fetchSemanticResults = async (opts: {
     const colorMap = colorMatches
       ? new Map(colorMatches.map((candidate) => [candidate.path, candidate]))
       : null;
-    const allowedPaths =
-      facetAllowedPaths && colorAllowedPaths
-        ? new Set(Array.from(facetAllowedPaths).filter((path) => colorAllowedPaths.has(path)))
-        : (facetAllowedPaths ?? colorAllowedPaths);
+    const allowedPaths = facetAllowedPaths ?? colorAllowedPaths;
     const rankedPaths = await rankEmbeddingsByVector({
       database: vectorDatabase,
       queryVector: textVector,
@@ -1360,10 +1357,7 @@ export const fetchHybridResults = async (opts: {
     const colorMap = colorMatches
       ? new Map(colorMatches.map((candidate) => [candidate.path, candidate]))
       : null;
-    const allowedPaths =
-      facetAllowedPaths && colorAllowedPaths
-        ? new Set(Array.from(facetAllowedPaths).filter((path) => colorAllowedPaths.has(path)))
-        : (facetAllowedPaths ?? colorAllowedPaths);
+    const allowedPaths = facetAllowedPaths ?? colorAllowedPaths;
     const [keywordResults, vectorResults] = await Promise.all([
       fetchKeywordRanking({ database, query: keywordQuery }),
       rankEmbeddingsByVector({

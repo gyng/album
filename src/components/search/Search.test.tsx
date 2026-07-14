@@ -3,7 +3,7 @@
  */
 
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
-import Search from "./Search";
+import Search, { isEditableTarget } from "./Search";
 import {
   fetchColorSimilarResults,
   fetchMemoryCandidates,
@@ -21,6 +21,7 @@ import {
 import { encodeSearchText } from "./textEmbeddings";
 import { warmupTextEmbeddingModel } from "./textEmbeddings";
 import { encodeSearchImage } from "./imageEmbeddings";
+import { navigateTo } from "../../util/navigate";
 
 const mockPush = jest.fn();
 const mockUseDatabase = jest.fn();
@@ -80,6 +81,10 @@ jest.mock("./textEmbeddings", () => ({
 
 jest.mock("./imageEmbeddings", () => ({
   encodeSearchImage: jest.fn(),
+}));
+
+jest.mock("../../util/navigate", () => ({
+  navigateTo: jest.fn(),
 }));
 
 const mockDatabase = { exec: jest.fn() };
@@ -1215,5 +1220,155 @@ describe("image query", () => {
 
     expect(await screen.findByText(/image search is unavailable right now/i)).toBeTruthy();
     expect(fetchSemanticResults).not.toHaveBeenCalled();
+  });
+});
+
+describe("Search interaction edges", () => {
+  it("recognises editable keyboard targets and supports the global focus shortcut", async () => {
+    expect(isEditableTarget(null)).toBe(false);
+    expect(isEditableTarget("input" as unknown as EventTarget)).toBe(false);
+    expect(isEditableTarget({ tagName: "input" } as EventTarget)).toBe(true);
+    expect(isEditableTarget({ tagName: "textarea" } as EventTarget)).toBe(true);
+    expect(isEditableTarget({ tagName: "select" } as EventTarget)).toBe(true);
+    expect(isEditableTarget({ isContentEditable: true } as EventTarget)).toBe(true);
+    expect(isEditableTarget({ nodeName: "button" } as EventTarget)).toBe(false);
+    expect(isEditableTarget({} as EventTarget)).toBe(false);
+
+    await renderSearch();
+    const input = screen.getByRole("textbox", { name: "Search photos" });
+    input.blur();
+    const focusEvent = new KeyboardEvent("keydown", { key: "/", bubbles: true, cancelable: true });
+    window.dispatchEvent(focusEvent);
+    expect(input).toHaveFocus();
+    expect(focusEvent.defaultPrevented).toBe(true);
+
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    expect(input).not.toHaveFocus();
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "Tab", bubbles: true }));
+
+    input.focus();
+    const editableEvent = new KeyboardEvent("keydown", {
+      key: "/",
+      bubbles: true,
+      cancelable: true,
+    });
+    input.dispatchEvent(editableEvent);
+    expect(editableEvent.defaultPrevented).toBe(false);
+  });
+
+  it("reports URL synchronisation failures without breaking search", async () => {
+    const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
+    await renderSearch();
+    const replace = jest.spyOn(window.history, "replaceState").mockImplementationOnce(() => {
+      throw new Error("history unavailable");
+    });
+
+    fireEvent.change(screen.getByRole("textbox", { name: "Search photos" }), {
+      target: { value: "harbor" },
+    });
+    await waitFor(() => {
+      expect(warn).toHaveBeenCalledWith("Failed to sync search URL", expect.any(Error));
+    });
+    replace.mockRestore();
+    warn.mockRestore();
+  });
+
+  it("navigates a random slideshow once while its seed is loading", async () => {
+    const randomPhoto = createDeferred<Array<{ path: string }>>();
+    (fetchRandomPhoto as jest.Mock).mockReturnValue(randomPhoto.promise);
+    const onNavStateChange = jest.fn();
+    render(<Search onNavStateChange={onNavStateChange} />);
+    await flushEffects();
+    const start = onNavStateChange.mock.calls.at(-1)?.[0].onStartRandomSimilarSlideshow;
+
+    const first = start();
+    await act(async () => {
+      await Promise.resolve();
+    });
+    const second = onNavStateChange.mock.calls.at(-1)?.[0].onStartRandomSimilarSlideshow();
+    expect(fetchRandomPhoto).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      randomPhoto.resolve([{ path: "../albums/test-simple/a b.jpg" }]);
+      await first;
+      await second;
+    });
+    expect(navigateTo).toHaveBeenCalledWith(
+      "/slideshow?mode=similar&seed=..%2Falbums%2Ftest-simple%2Fa%20b.jpg",
+    );
+  });
+
+  it("reports failures from both random-search entry points", async () => {
+    const onNavStateChange = jest.fn();
+    (fetchRandomPhoto as jest.Mock).mockRejectedValueOnce(new Error("slideshow failed"));
+    render(<Search onNavStateChange={onNavStateChange} />);
+    await flushEffects();
+    await act(async () => {
+      await onNavStateChange.mock.calls.at(-1)?.[0].onStartRandomSimilarSlideshow();
+    });
+    expect(onNavStateChange.mock.calls.at(-1)?.[0].randomExploreError).toBe(
+      "Couldn't start random explore right now.",
+    );
+
+    (fetchRandomPhoto as jest.Mock).mockResolvedValueOnce([]);
+    fireEvent.click(screen.getByRole("button", { name: "🎲 Random starting photo" }));
+    await waitFor(() => {
+      expect(onNavStateChange.mock.calls.at(-1)?.[0].randomExploreError).toBe(
+        "No photos are available for random explore yet.",
+      );
+    });
+
+    (fetchRandomPhoto as jest.Mock).mockRejectedValueOnce(new Error("search failed"));
+    fireEvent.click(screen.getByRole("button", { name: "🎲 Random starting photo" }));
+    await waitFor(() => {
+      expect(onNavStateChange.mock.calls.at(-1)?.[0].randomExploreError).toBe(
+        "Couldn't start random explore right now.",
+      );
+    });
+  });
+
+  it("opens and closes the filter drawer and drawing panel", async () => {
+    jest.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(null);
+    await renderSearch();
+    const filters = screen.getByRole("button", { name: "Filters" });
+    fireEvent.click(filters);
+    expect(filters).toHaveAttribute("aria-expanded", "true");
+    fireEvent.click(screen.getByRole("button", { name: "Done" }));
+    expect(filters).toHaveAttribute("aria-expanded", "false");
+
+    fireEvent.click(screen.getByRole("button", { name: /Draw to search/ }));
+    expect(screen.getByRole("dialog", { name: "Draw to search" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(screen.queryByRole("dialog", { name: "Draw to search" })).toBeNull();
+  });
+
+  it("removes active terms, facets, and colour, and toggles selected filters", async () => {
+    await renderSearch();
+    const input = screen.getByRole("textbox", { name: "Search photos" });
+    fireEvent.change(input, { target: { value: "harbor,night" } });
+    fireEvent.click(screen.getByRole("button", { name: "Remove filter harbor" }));
+    expect(input).toHaveValue("night");
+
+    fireEvent.click(screen.getByRole("tab", { name: "Gear" }));
+    const camera = await screen.findByRole("button", { name: /FUJIFILM X-T5/ });
+    fireEvent.click(camera);
+    expect(
+      screen.getByRole("button", { name: "Remove filter Camera: FUJIFILM X-T5" }),
+    ).toBeVisible();
+    fireEvent.click(await screen.findByRole("button", { name: /FUJIFILM X-T5/ }));
+    await waitFor(() => {
+      expect(
+        screen.queryByRole("button", { name: "Remove filter Camera: FUJIFILM X-T5" }),
+      ).toBeNull();
+    });
+    fireEvent.click(await screen.findByRole("button", { name: /FUJIFILM X-T5/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Remove filter Camera: FUJIFILM X-T5" }));
+
+    fireEvent.click(screen.getByRole("tab", { name: "Colour" }));
+    fireEvent.change(screen.getByLabelText("Colour filter hex value"), {
+      target: { value: "#123456" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Remove filter Colour: #123456" }));
+    expect(screen.queryByRole("button", { name: "Remove filter Colour: #123456" })).toBeNull();
   });
 });

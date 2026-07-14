@@ -79,12 +79,19 @@ const writeBuildManifest = (options = {}) => {
   };
 };
 
+const run = (options, log = console.log) => {
+  const { manifest } = writeBuildManifest(options);
+  log(`Wrote build manifest ${manifest.buildVersion}`);
+  return manifest;
+};
+
 module.exports = {
   createBuildManifest,
+  run,
   writeBuildManifest,
 };
 
+/* istanbul ignore next -- direct CLI dispatch; run is tested independently */
 if (require.main === module) {
-  const { manifest } = writeBuildManifest();
-  console.log(`Wrote build manifest ${manifest.buildVersion}`);
+  run();
 }

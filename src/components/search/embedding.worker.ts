@@ -84,7 +84,7 @@ const normalizeVector = (values: Float32Array | number[]): number[] => {
   }
 
   const magnitude = Math.sqrt(norm);
-  return Array.from(values, (value) => value / magnitude);
+  return Array.from(values, (value) => (value ?? 0) / magnitude);
 };
 
 const postLoadProgress = (
@@ -95,11 +95,7 @@ const postLoadProgress = (
 ): void => {
   const requestIds = Array.from(loadingRequestIds);
   for (let idx = 0; idx < requestIds.length; idx += 1) {
-    const requestId = requestIds[idx];
-    if (typeof requestId !== "number") {
-      continue;
-    }
-
+    const requestId = requestIds[idx]!;
     self.postMessage({ id: requestId, progress, stage, details });
   }
 };

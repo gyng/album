@@ -2,7 +2,13 @@ const { DatabaseSync } = require("node:sqlite");
 const { mkdtempSync, rmSync, writeFileSync } = require("node:fs");
 const { tmpdir } = require("node:os");
 const path = require("node:path");
-const { spawnSync } = require("node:child_process");
+const {
+  coordinateRef,
+  createE2eSearchDatabases,
+  encodeEmbedding,
+  parseArgs,
+  run,
+} = require("./create-e2e-search-db.cjs");
 
 describe("create-e2e-search-db", () => {
   it("creates the deterministic gallery fixture used by browser tests", () => {
@@ -17,19 +23,12 @@ describe("create-e2e-search-db", () => {
       writeFileSync(databasePath, "stale core database");
       writeFileSync(embeddingsDatabasePath, "stale embeddings database");
 
-      const result = spawnSync(
-        process.execPath,
-        [
-          path.join(__dirname, "create-e2e-search-db.cjs"),
-          "--output",
-          databasePath,
-          "--embeddings-output",
-          embeddingsDatabasePath,
-          "--force",
-        ],
-        { encoding: "utf8" },
-      );
-      expect(result.status).toBe(0);
+      const result = createE2eSearchDatabases({
+        outputPath: databasePath,
+        embeddingsOutputPath: embeddingsDatabasePath,
+        force: true,
+      });
+      expect(result.created).toBe(true);
 
       const database = new DatabaseSync(databasePath, { readOnly: true });
       expect(database.prepare("SELECT COUNT(*) AS count FROM images").get().count).toBe(5);
@@ -71,5 +70,93 @@ describe("create-e2e-search-db", () => {
     } finally {
       rmSync(directory, { recursive: true, force: true });
     }
+  });
+
+  it("reuses existing databases unless force is requested", () => {
+    const directory = mkdtempSync(path.join(tmpdir(), "album-e2e-db-existing-"));
+    const databasePath = path.join(directory, "search.sqlite");
+    const embeddingsDatabasePath = path.join(directory, "search-embeddings.sqlite");
+
+    try {
+      createE2eSearchDatabases({
+        outputPath: databasePath,
+        embeddingsOutputPath: embeddingsDatabasePath,
+      });
+
+      expect(
+        createE2eSearchDatabases({
+          outputPath: databasePath,
+          embeddingsOutputPath: embeddingsDatabasePath,
+        }),
+      ).toEqual({
+        created: false,
+        outputPath: databasePath,
+        embeddingsOutputPath: embeddingsDatabasePath,
+      });
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
+  it("parses output flags and reports created and reused fixtures", () => {
+    const directory = mkdtempSync(path.join(tmpdir(), "album-e2e-db-run-"));
+    const databasePath = path.join(directory, "search.sqlite");
+    const embeddingsDatabasePath = path.join(directory, "search-embeddings.sqlite");
+    const args = [
+      "--output",
+      databasePath,
+      "--embeddings-output",
+      embeddingsDatabasePath,
+      "--force",
+    ];
+    const log = jest.fn();
+
+    try {
+      expect(parseArgs(args)).toEqual({
+        outputPath: databasePath,
+        embeddingsOutputPath: embeddingsDatabasePath,
+        force: true,
+      });
+      expect(run(args, log).created).toBe(true);
+      expect(log).toHaveBeenLastCalledWith(expect.stringContaining("Created deterministic"));
+
+      const reusedArgs = args.filter((arg) => arg !== "--force");
+      expect(run(reusedArgs, log).created).toBe(false);
+      expect(log).toHaveBeenLastCalledWith(expect.stringContaining("Using existing"));
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
+  it("uses default paths for missing or incomplete flags", () => {
+    const defaults = parseArgs([]);
+    const incomplete = parseArgs(["--output"]);
+
+    expect(defaults.force).toBe(false);
+    expect(defaults.outputPath).toBe(path.resolve(__dirname, "../public/e2e-search.sqlite"));
+    expect(incomplete.outputPath).toBe(defaults.outputPath);
+  });
+
+  it("uses the process arguments and console logger by default", () => {
+    const log = jest.spyOn(console, "log").mockImplementation(() => undefined);
+    const create = jest.fn((options) => ({ created: false, ...options }));
+
+    const result = run(undefined, undefined, create);
+
+    expect(result.created).toBe(false);
+    expect(create).toHaveBeenCalledWith(expect.objectContaining({ force: false }));
+    expect(log).toHaveBeenCalledWith(expect.stringContaining("Using existing"));
+    log.mockRestore();
+  });
+
+  it("quantises zero and signed embeddings and labels coordinate hemispheres", () => {
+    const zero = encodeEmbedding([0, 0, 0]);
+    const signed = encodeEmbedding([-2, 1, 4]);
+
+    expect(zero.scale).toBe(1);
+    expect([...zero.blob.values()]).toEqual([0, 0, 0]);
+    expect(signed.scale).toBe(4 / 127);
+    expect(coordinateRef(-1, "S", "N")).toBe("S");
+    expect(coordinateRef(1, "S", "N")).toBe("N");
   });
 });

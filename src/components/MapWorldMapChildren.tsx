@@ -28,10 +28,8 @@ export const MapAutoFit = ({ enabled, photos }: { enabled: boolean; photos: MapW
       return;
     }
 
-    const bounds = computeWrapAwareBounds(coordinates);
-    if (!bounds) {
-      return;
-    }
+    // Two or more validated coordinates always produce bounds.
+    const bounds = computeWrapAwareBounds(coordinates)!;
 
     map.fitBounds(bounds, {
       padding: 36,

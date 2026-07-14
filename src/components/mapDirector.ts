@@ -3,18 +3,11 @@ import type { MapWorldEntry } from "./MapWorld";
 
 const EARTH_RADIUS_KM = 6371;
 const MAX_DIRECTOR_STOPS = 24;
+type LocatedMapWorldEntry = MapWorldEntry & { decLat: number; decLng: number };
 
 const radians = (degrees: number): number => (degrees * Math.PI) / 180;
 
-const distanceKm = (left: MapWorldEntry, right: MapWorldEntry): number => {
-  if (
-    left.decLat === null ||
-    left.decLng === null ||
-    right.decLat === null ||
-    right.decLng === null
-  ) {
-    return 0;
-  }
+const distanceKm = (left: LocatedMapWorldEntry, right: LocatedMapWorldEntry): number => {
   const latDelta = radians(right.decLat - left.decLat);
   const lngDelta = radians(right.decLng - left.decLng);
   const a =
@@ -36,7 +29,8 @@ export const buildMapDirectorSequence = (
   limit = MAX_DIRECTOR_STOPS,
 ): MapWorldEntry[] => {
   const candidates = photos.filter(
-    (photo) => typeof photo.decLat === "number" && typeof photo.decLng === "number",
+    (photo): photo is LocatedMapWorldEntry =>
+      typeof photo.decLat === "number" && typeof photo.decLng === "number",
   );
   if (candidates.length === 0 || limit <= 0) {
     return [];
@@ -46,10 +40,7 @@ export const buildMapDirectorSequence = (
     exifWallClockTimestamp(photo.date) ?? Number.NEGATIVE_INFINITY;
   const start = candidates.toSorted(
     (left, right) => timestamp(right) - timestamp(left) || left.href.localeCompare(right.href),
-  )[0];
-  if (!start) {
-    return [];
-  }
+  )[0]!;
 
   const sequence = [start];
   const used = new Set([start.href]);
@@ -58,7 +49,7 @@ export const buildMapDirectorSequence = (
 
   while (sequence.length < targetLength) {
     const previous = sequence[sequence.length - 1];
-    let best: MapWorldEntry | null = null;
+    let best: LocatedMapWorldEntry | null = null;
     let bestScore = Number.NEGATIVE_INFINITY;
 
     for (const candidate of candidates) {
@@ -82,7 +73,7 @@ export const buildMapDirectorSequence = (
         albumNovelty * 0.15 +
         temporalNovelty * 0.05;
 
-      if (score > bestScore || (score === bestScore && candidate.href < (best?.href ?? ""))) {
+      if (score > bestScore || (score === bestScore && candidate.href < best!.href)) {
         best = candidate;
         bestScore = score;
       }

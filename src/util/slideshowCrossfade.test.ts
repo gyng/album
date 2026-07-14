@@ -77,11 +77,15 @@ describe("layer stack", () => {
   });
 
   it("refreshes the snapshot when the top key is unchanged (companions resolving)", () => {
-    const start: CrossfadeLayer[] = [{ key: "a", slide: snap("a.jpg"), loaded: true }];
+    const start: CrossfadeLayer[] = [
+      { key: "backdrop", slide: snap("backdrop.jpg"), loaded: false },
+      { key: "a", slide: snap("a.jpg"), loaded: true },
+    ];
     const after = pushLayer(start, "a", snap("a.jpg", "b.jpg"));
-    expect(after).toHaveLength(1);
-    expect(after[0].slide.remix).toBe(true);
-    expect(after[0].loaded).toBe(true);
+    expect(after).toHaveLength(2);
+    expect(after[0].slide.remix).toBe(false);
+    expect(after[1].slide.remix).toBe(true);
+    expect(after[1].loaded).toBe(true);
   });
 
   it("reveals one layer and fades out the rest (the cross-fade)", () => {
@@ -109,5 +113,14 @@ describe("layer stack", () => {
     layers = pushLayer(layers, "c", snap("c.jpg")); // never-shown b dropped
     expect(keys(layers)).toEqual(["a", "c"]);
     expect(layers.find((l) => l.key === "a")?.loaded).toBe(true);
+  });
+
+  it("keeps only the new top when no older layer was ever visible", () => {
+    const layers: CrossfadeLayer[] = [
+      { key: "a", slide: snap("a.jpg"), loaded: false },
+      { key: "b", slide: snap("b.jpg"), loaded: false },
+    ];
+
+    expect(keys(pushLayer(layers, "c", snap("c.jpg")))).toEqual(["c"]);
   });
 });

@@ -88,10 +88,8 @@ export const projectRouteSegments = (
   const unwrappedLngs = unwrapLongitudes(routePoints.map((point) => point.decLng as number));
 
   return routePoints.slice(0, -1).flatMap((point, index) => {
-    const nextPoint = routePoints[index + 1];
-    if (!nextPoint) {
-      return [];
-    }
+    // slice(0, -1) guarantees a following point for every visited index.
+    const nextPoint = routePoints[index + 1]!;
 
     const start = project([unwrappedLngs[index] as number, point.decLat as number]);
     const end = project([unwrappedLngs[index + 1] as number, nextPoint.decLat as number]);
@@ -167,11 +165,12 @@ export const selectPreferredLabelSegmentIds = (segments: ProjectedRouteSegment[]
   const selected = new Set<string>();
   for (const candidate of candidates) {
     const tooClose = Array.from(selected).some((selectedId) => {
-      const selectedSegment = segments.find((segment) => segment.id === selectedId);
-      return selectedSegment
-        ? Math.hypot(candidate.midX - selectedSegment.midX, candidate.midY - selectedSegment.midY) <
-            75
-        : false;
+      // IDs enter the set only from this same segment collection.
+      const selectedSegment = segments.find((segment) => segment.id === selectedId)!;
+      return (
+        Math.hypot(candidate.midX - selectedSegment.midX, candidate.midY - selectedSegment.midY) <
+        75
+      );
     });
 
     if (!tooClose) {

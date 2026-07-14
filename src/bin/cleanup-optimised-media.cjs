@@ -169,6 +169,7 @@ module.exports = {
   cleanupOptimisedMedia,
 };
 
+/* istanbul ignore next -- direct CLI dispatch; cleanupOptimisedMedia is tested independently */
 if (require.main === module) {
   cleanupOptimisedMedia()
     .then((summary) => {

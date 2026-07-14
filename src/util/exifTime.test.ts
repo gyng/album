@@ -71,8 +71,14 @@ describe("parseExifLocalDateTime", () => {
 
   it("returns null for out-of-range values", () => {
     expect(parseExifLocalDateTime("2024:13:01 00:00:00")).toBeNull(); // month 13
+    expect(parseExifLocalDateTime("2024:00:01 00:00:00")).toBeNull(); // month 0
+    expect(parseExifLocalDateTime("2024:03:00 00:00:00")).toBeNull(); // day 0
+    expect(parseExifLocalDateTime("2024:03:32 00:00:00")).toBeNull(); // day 32
     expect(parseExifLocalDateTime("2024:03:01 25:00:00")).toBeNull(); // hour 25
+    expect(parseExifLocalDateTime("2024:03:01 23:60:00")).toBeNull(); // minute 60
+    expect(parseExifLocalDateTime("2024:03:01 23:59:60")).toBeNull(); // second 60
     expect(parseExifLocalDateTime("1800:01:01 00:00:00")).toBeNull(); // year too old
+    expect(parseExifLocalDateTime("2200:01:01 00:00:00")).toBeNull(); // year too new
   });
 
   it("handles timezone suffix gracefully — ignores suffix, uses local time", () => {
@@ -118,6 +124,12 @@ describe("wall-clock presentation helpers", () => {
     expect(exifWallClockTimestamp("2024:01:01 00:30:00+09:00")).toBe(
       exifWallClockTimestamp("2024-01-01T00:30:00Z"),
     );
+  });
+
+  it("returns null for malformed wall-clock presentation inputs", () => {
+    expect(exifWallClockTimestamp("not-a-date")).toBeNull();
+    expect(formatExifWallClockDate("not-a-date")).toBeNull();
+    expect(formatExifWallClockDateTime("not-a-date")).toBeNull();
   });
 });
 

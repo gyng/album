@@ -4,15 +4,31 @@
 
 import React from "react";
 import { render, screen, fireEvent } from "@testing-library/react";
-import { Heading, Caption } from "./Heading";
-import { Card } from "./Card";
-import { Thumb } from "./Thumb";
-import { Input } from "./Input";
-import { Select } from "./Select";
-import { ChartTooltip } from "./ChartTooltip";
-import { SegmentedToggle } from "./SegmentedToggle";
-import { Pill, PillButton } from "./Pill";
-import { OverlayButton, OverlayButtonLink } from "./OverlayButton";
+import {
+  Caption,
+  Card,
+  ChartTooltip,
+  Footer,
+  Heading,
+  Input,
+  OverlayButton,
+  OverlayButtonLink,
+  overlayButtonStyles,
+  Pill,
+  PillButton,
+  pillStyles,
+  SegmentedToggle,
+  Select,
+  Thumb,
+} from ".";
+
+describe("UI public exports", () => {
+  it("exposes the shared footer and composable button styles", () => {
+    expect(Footer).toEqual(expect.any(Function));
+    expect(overlayButtonStyles.base).toBeTruthy();
+    expect(pillStyles.base).toBeTruthy();
+  });
+});
 
 describe("Heading", () => {
   it("renders the correct element for each level", () => {
@@ -93,6 +109,14 @@ describe("Thumb", () => {
   it("passes through className", () => {
     const { container } = render(<Thumb src="/p.jpg" alt="" className="extra" />);
     expect(container.querySelector("img")?.className).toContain("extra");
+  });
+
+  it("supports compact, decorative thumbnails", () => {
+    const { container } = render(<Thumb src="/compact.jpg" size="small" />);
+    const img = container.querySelector("img");
+
+    expect(img).toHaveAttribute("alt", "");
+    expect(img?.className).toContain("thumbSmall");
   });
 });
 

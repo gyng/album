@@ -195,7 +195,7 @@ export const getBucketFacetSelection = (
   value: number | null | undefined,
 ): SearchFacetSelection | null => {
   const facet = getFacetById(facetId);
-  if (!facet || facet.buckets.length === 0 || !isSearchableFacetId(facetId)) {
+  if (!facet || facet.buckets.length === 0) {
     return null;
   }
 

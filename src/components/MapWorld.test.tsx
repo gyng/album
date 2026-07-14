@@ -8,14 +8,20 @@ import { MapWorldEntry } from "./MapWorld";
 
 const mapHandlers: {
   onMoveStart?: () => void;
+  onClick?: () => void;
   onMoveEnd?: (event: { viewState: { latitude: number; longitude: number; zoom: number } }) => void;
   onZoomStart?: () => void;
+  onZoomEnd?: (event: { viewState: { latitude: number; longitude: number; zoom: number } }) => void;
   onZoom?: (event: { viewState: { zoom: number } }) => void;
+  onDragStart?: () => void;
+  onWheel?: () => void;
   onContextMenu?: (event: {
     lngLat: { lat: number; lng: number };
     originalEvent: { preventDefault: () => void };
   }) => void;
 } = {};
+const mapProps = jest.fn();
+const layerProps = new Map<string, { paint?: Record<string, unknown> }>();
 
 const mapCanvas = document.createElement("div");
 const mapInstance = {
@@ -51,28 +57,45 @@ jest.mock("react-map-gl/maplibre", () => {
     default: ({
       children,
       onMoveStart,
+      onClick,
       onMoveEnd,
       onZoomStart,
+      onZoomEnd,
       onZoom,
+      onDragStart,
+      onWheel,
       onContextMenu,
+      ...props
     }: {
       children?: ReactNode;
       onMoveStart?: () => void;
+      onClick?: () => void;
       onMoveEnd?: (event: {
         viewState: { latitude: number; longitude: number; zoom: number };
       }) => void;
       onZoomStart?: () => void;
+      onZoomEnd?: (event: {
+        viewState: { latitude: number; longitude: number; zoom: number };
+      }) => void;
       onZoom?: (event: { viewState: { zoom: number } }) => void;
+      onDragStart?: () => void;
+      onWheel?: () => void;
       onContextMenu?: (event: {
         lngLat: { lat: number; lng: number };
         originalEvent: { preventDefault: () => void };
       }) => void;
+      [key: string]: unknown;
     }) => {
       mapHandlers.onMoveStart = onMoveStart;
+      mapHandlers.onClick = onClick;
       mapHandlers.onMoveEnd = onMoveEnd;
       mapHandlers.onZoomStart = onZoomStart;
+      mapHandlers.onZoomEnd = onZoomEnd;
       mapHandlers.onZoom = onZoom;
+      mapHandlers.onDragStart = onDragStart;
+      mapHandlers.onWheel = onWheel;
       mapHandlers.onContextMenu = onContextMenu;
+      mapProps(props);
       return <div data-testid="map">{children}</div>;
     },
     Marker: ({
@@ -92,9 +115,18 @@ jest.mock("react-map-gl/maplibre", () => {
         {children}
       </button>
     ),
-    Popup: ({ children, className }: { children?: ReactNode; className?: string }) => (
+    Popup: ({
+      children,
+      className,
+      onClose,
+    }: {
+      children?: ReactNode;
+      className?: string;
+      onClose?: () => void;
+    }) => (
       <div data-testid="popup" className={className}>
         {children}
+        <button type="button" aria-label="Close popup" onClick={onClose} />
       </div>
     ),
     ScaleControl: () => null,
@@ -106,7 +138,10 @@ jest.mock("react-map-gl/maplibre", () => {
         {children}
       </div>
     ),
-    Layer: ({ id }: { id?: string }) => <div data-testid={id ?? "layer"} />,
+    Layer: ({ id, ...props }: { id?: string; paint?: Record<string, unknown> }) => {
+      layerProps.set(id ?? "layer", props);
+      return <div data-testid={id ?? "layer"} />;
+    },
     useMap: () => mapRef,
   };
 });
@@ -136,14 +171,15 @@ jest.mock("usehooks-ts", () => ({
 }));
 
 jest.mock("./ThemeToggle", () => ({
-  ThemeToggle: () => null,
+  ThemeToggle: () => <span data-testid="theme-bootstrap" />,
 }));
 
 jest.mock("../util/time", () => ({
   getRelativeTimeString: () => "just now",
 }));
 
-const { MMap } = require("./MapWorld");
+const mapWorldModule = require("./MapWorld");
+const { MMap } = mapWorldModule;
 
 describe("MapWorld", () => {
   const photo: MapWorldEntry = {
@@ -164,10 +200,16 @@ describe("MapWorld", () => {
     window.history.replaceState({}, "", "/");
     jest.useFakeTimers();
     mapHandlers.onMoveStart = undefined;
+    mapHandlers.onClick = undefined;
     mapHandlers.onMoveEnd = undefined;
     mapHandlers.onZoomStart = undefined;
+    mapHandlers.onZoomEnd = undefined;
     mapHandlers.onZoom = undefined;
+    mapHandlers.onDragStart = undefined;
+    mapHandlers.onWheel = undefined;
     mapHandlers.onContextMenu = undefined;
+    mapProps.mockClear();
+    layerProps.clear();
     mapInstance.flyTo.mockClear();
     mapInstance.stop.mockClear();
     mapInstance.on.mockClear();
@@ -507,5 +549,266 @@ describe("MapWorld", () => {
     expect(screen.getByTestId("journey-line-overlay")).toBeTruthy();
     expect(screen.getByTestId("journey-line-ghost-route")).toBeTruthy();
     expect(screen.getByTestId("journey-line-speed-label")).toBeTruthy();
+  });
+
+  it("hydrates the camera from the URL and honours presentation options", () => {
+    window.history.pushState({}, "", "/?lon=12.5&lat=-3.25&zoom=9.5");
+    render(
+      <MMap
+        photos={[photo]}
+        className="custom-map"
+        style={{ minHeight: 240 }}
+        showThemeBootstrap={false}
+        fitToPhotos
+      />,
+    );
+
+    expect(mapWorldModule.default).toBe(MMap);
+    expect(mapProps).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        initialViewState: { longitude: 12.5, latitude: -3.25, zoom: 9.5 },
+        style: expect.objectContaining({ width: "100%", height: "100%", minHeight: 240 }),
+      }),
+    );
+    expect(screen.queryByTestId("theme-bootstrap")).toBeNull();
+    expect(screen.getByTestId("marker")).toBeInTheDocument();
+  });
+
+  it("ignores camera and popup sync when route synchronisation is disabled", () => {
+    window.history.pushState({}, "", "/?lon=12.5&lat=-3.25&zoom=9.5");
+    render(<MMap photos={[photo]} className="map" syncRoute={false} />);
+    expect(mapProps).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        initialViewState: { longitude: undefined, latitude: undefined, zoom: undefined },
+      }),
+    );
+
+    fireEvent.click(screen.getByTestId("marker"));
+    fireEvent.mouseDown(screen.getByRole("link", { name: /kansai/i }));
+    act(() => {
+      mapHandlers.onMoveEnd?.({
+        viewState: { latitude: 1, longitude: 2, zoom: 3 },
+      });
+      mapHandlers.onZoomEnd?.({
+        viewState: { latitude: 4, longitude: 5, zoom: 6 },
+      });
+      jest.runAllTimers();
+    });
+    expect(replaceStateSpy).not.toHaveBeenCalled();
+  });
+
+  it("deduplicates camera routes, replaces pending updates, and clears pending work on unmount", () => {
+    const view = render(<MMap photos={[photo]} className="map" />);
+    act(() => {
+      mapHandlers.onMoveEnd?.({ viewState: { latitude: 1, longitude: 2, zoom: 3 } });
+      mapHandlers.onMoveEnd?.({ viewState: { latitude: 4, longitude: 5, zoom: 6 } });
+      jest.advanceTimersByTime(200);
+    });
+    expect(replaceStateSpy).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      mapHandlers.onZoomEnd?.({ viewState: { latitude: 4, longitude: 5, zoom: 6 } });
+      jest.advanceTimersByTime(200);
+    });
+    expect(replaceStateSpy).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      mapHandlers.onMoveEnd?.({ viewState: { latitude: 7, longitude: 8, zoom: 9 } });
+    });
+    view.unmount();
+    act(() => jest.runAllTimers());
+    expect(replaceStateSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it("closes menus on map interaction and hides route overlays while moving", () => {
+    const second = {
+      ...photo,
+      href: "/album/kansai#second.jpg",
+      decLat: 36,
+      decLng: 140,
+      date: "2024-02-02T03:04:05.000Z",
+    };
+    render(<MMap photos={[photo, second]} className="map" showRoute routeDisplayMode="always" />);
+    expect(screen.getByTestId("journey-line-overlay")).toBeInTheDocument();
+
+    act(() => mapHandlers.onZoomStart?.());
+    expect(screen.queryByTestId("journey-line-overlay")).toBeNull();
+    act(() => mapHandlers.onZoomEnd?.({ viewState: { latitude: 1, longitude: 2, zoom: 3 } }));
+    expect(screen.getByTestId("journey-line-overlay")).toBeInTheDocument();
+
+    act(() =>
+      mapHandlers.onContextMenu?.({
+        lngLat: { lat: 1, lng: 2 },
+        originalEvent: { preventDefault: jest.fn() },
+      }),
+    );
+    expect(screen.getByRole("group", { name: "Location actions" })).toBeInTheDocument();
+    act(() => mapHandlers.onClick?.());
+    expect(screen.queryByRole("group", { name: "Location actions" })).toBeNull();
+
+    act(() =>
+      mapHandlers.onContextMenu?.({
+        lngLat: { lat: 1, lng: 2 },
+        originalEvent: { preventDefault: jest.fn() },
+      }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Close popup" }));
+    expect(screen.queryByRole("group", { name: "Location actions" })).toBeNull();
+
+    act(() => mapHandlers.onMoveStart?.());
+    expect(screen.queryByTestId("journey-line-overlay")).toBeNull();
+    act(() => mapHandlers.onDragStart?.());
+    act(() => mapHandlers.onWheel?.());
+  });
+
+  it("cycles stacked photos and changes stacks from the current selection", () => {
+    const stackOne = { ...photo, href: "/album/kansai#stack-one.jpg" };
+    const stackTwo = {
+      ...photo,
+      href: "/album/kansai#stack-two.jpg",
+      src: { src: "/two.jpg", width: 100, height: 100 },
+    };
+    const elsewhereOne = {
+      ...photo,
+      href: "/album/kansai#elsewhere-one.jpg",
+      decLat: 40,
+      decLng: 120,
+    };
+    const elsewhereTwo = {
+      ...elsewhereOne,
+      href: "/album/kansai#elsewhere-two.jpg",
+      src: { src: "/four.jpg", width: 100, height: 100 },
+    };
+    render(<MMap photos={[stackOne, stackTwo, elsewhereOne, elsewhereTwo]} className="map" />);
+    const markers = screen.getAllByTestId("marker");
+    fireEvent.click(markers[0]!);
+    expect(screen.getByRole("link", { name: /kansai/i })).toHaveAttribute("href", stackOne.href);
+    fireEvent.click(markers[0]!);
+    expect(screen.getByRole("link", { name: /kansai/i })).toHaveAttribute("href", stackTwo.href);
+    fireEvent.click(markers[2]!);
+    expect(screen.getByRole("link", { name: /kansai/i })).toHaveAttribute(
+      "href",
+      elsewhereOne.href,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Close popup" }));
+    expect(screen.queryByRole("link", { name: /kansai/i })).toBeNull();
+  });
+
+  it("filters selected and hovered photos when the time range changes", () => {
+    const oldPhoto = {
+      ...photo,
+      href: "/album/kansai#old.jpg",
+      date: "2020-01-02T03:04:05",
+    };
+    const recentPhoto = {
+      ...photo,
+      href: "/album/kansai#recent.jpg",
+      decLat: 36,
+      decLng: 140,
+      date: "2024-01-02T03:04:05",
+    };
+    const view = render(<MMap photos={[oldPhoto, recentPhoto]} className="map" />);
+    fireEvent.click(screen.getAllByTestId("marker")[0]!);
+    view.rerender(
+      <MMap
+        photos={[oldPhoto, recentPhoto]}
+        className="map"
+        timeRange={{ fromMs: new Date(2023, 0, 1).valueOf(), toMs: new Date(2025, 0, 1).valueOf() }}
+      />,
+    );
+    expect(screen.queryByRole("link", { name: /kansai/i })).toBeNull();
+
+    fireEvent.mouseOver(screen.getByLabelText(/Photo from kansai/));
+    expect(screen.getByRole("link", { name: /kansai/i })).toBeInTheDocument();
+    view.rerender(
+      <MMap
+        photos={[oldPhoto, recentPhoto]}
+        className="map"
+        timeRange={{ fromMs: new Date(2019, 0, 1).valueOf(), toMs: new Date(2021, 0, 1).valueOf() }}
+      />,
+    );
+    expect(screen.queryByRole("link", { name: /kansai/i })).toBeNull();
+  });
+
+  it("builds independently coloured journeys for multiple albums", () => {
+    const photos = [
+      { ...photo, href: "/album/a#one.jpg", album: "a" },
+      {
+        ...photo,
+        href: "/album/a#two.jpg",
+        album: "a",
+        decLat: 36,
+        decLng: 140,
+        date: "2024-02-02T03:04:05",
+      },
+      {
+        ...photo,
+        href: "/album/b#one.jpg",
+        album: "b",
+        decLat: 50,
+        decLng: 10,
+        date: "2022-01-02T03:04:05",
+      },
+      {
+        ...photo,
+        href: "/album/b#two.jpg",
+        album: "b",
+        decLat: 51,
+        decLng: 11,
+        date: "2023-01-02T03:04:05",
+      },
+    ];
+    const view = render(
+      <MMap photos={photos} className="map" showRoute routeDisplayMode="always" />,
+    );
+    const source = JSON.parse(screen.getByTestId("journey-line-source").dataset.source!);
+    expect(source.features).toHaveLength(2);
+    expect(
+      source.features.map((feature: { properties: { album: string } }) => feature.properties.album),
+    ).toEqual(["a", "b"]);
+    expect(layerProps.get("journey-line-layer")?.paint).toEqual(
+      expect.objectContaining({ "line-opacity": 1 }),
+    );
+    expect(layerProps.get("journey-line-glow-layer")?.paint?.["line-color"]).toEqual(
+      expect.arrayContaining(["coalesce"]),
+    );
+
+    view.rerender(
+      <MMap
+        photos={photos}
+        className="map"
+        showRoute
+        routeDisplayMode="always"
+        routeMode="simplified"
+      />,
+    );
+    expect(screen.getByTestId("journey-line-source")).toBeInTheDocument();
+  });
+
+  it("omits empty routes and supports a simplified single-album route", () => {
+    const unlocated = { ...photo, decLat: null, decLng: null };
+    const view = render(
+      <MMap
+        photos={[unlocated, { ...unlocated, album: "other", href: "/album/other#a.jpg" }]}
+        className="map"
+        showRoute
+        routeDisplayMode="always"
+      />,
+    );
+    expect(screen.queryByTestId("journey-line-source")).toBeNull();
+
+    view.rerender(
+      <MMap
+        photos={[photo, { ...photo, href: "/album/kansai#two.jpg", decLat: 36, decLng: 140 }]}
+        className="map"
+        showRoute
+        routeDisplayMode="always"
+        routeMode="simplified"
+      />,
+    );
+    expect(screen.getByTestId("journey-line-source")).toBeInTheDocument();
+    expect(layerProps.get("journey-line-layer")?.paint).toEqual(
+      expect.objectContaining({ "line-opacity": 0.55, "line-width": 4 }),
+    );
   });
 });

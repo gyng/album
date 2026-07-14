@@ -70,6 +70,15 @@ describe("handleSlideshowKeyboardShortcut", () => {
     expect(handlers.exit).toHaveBeenCalledTimes(1);
   });
 
+  it("returns false for an unrelated key", async () => {
+    const { handleSlideshowKeyboardShortcut, handlers, preventDefault } = await setup();
+
+    expect(
+      handleSlideshowKeyboardShortcut({ key: "Home", preventDefault, target: null }, handlers),
+    ).toBe(false);
+    expect(Object.values(handlers).every((handler) => handler.mock.calls.length === 0)).toBe(true);
+  });
+
   it("ignores shortcuts while an input is focused", async () => {
     const { handleSlideshowKeyboardShortcut, handlers, preventDefault } = await setup();
 

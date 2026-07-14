@@ -244,12 +244,12 @@ export const Picture: React.FC<{
 }> = (props) => {
   // Dimensions have to be flipped if image is rotated using EXIF
   const isExifPortrait =
-    props.block?._build?.exif?.Orientation?.includes("270") ||
-    props.block?._build?.exif?.Orientation?.includes("90");
+    props.block._build.exif.Orientation?.includes("270") ||
+    props.block._build.exif.Orientation?.includes("90");
   const actualWidth = isExifPortrait ? props.block._build.height : props.block._build.width;
   const actualHeight = isExifPortrait ? props.block._build.width : props.block._build.height;
 
-  const colour = props.block._build?.tags?.colors?.[0];
+  const colour = props.block._build.tags.colors?.[0];
   const placeholderColour = colour ? rgbToString(colour) : "transparent";
   // We do this instead of simply setting background-color to `placeholderColor`
   // as using background-color instead fills the entire picture element which can't
@@ -331,7 +331,7 @@ export const PhotoBlockEl: React.FC<{
         ) : null}
       </div>
 
-      <div id={props.block.id ?? props.block.data.src} className={styles.details}>
+      <div id={props.block.id} className={styles.details}>
         <details
           onToggle={(ev) => {
             setIsDetailsOpen(ev.currentTarget.open);
@@ -354,7 +354,7 @@ export const PhotoBlockEl: React.FC<{
                         GPSLatitude: props.block._build.exif.GPSLatitude,
                         GPSLongitudeRef: props.block._build.exif.GPSLongitudeRef,
                         GPSLongitude: props.block._build.exif.GPSLongitude,
-                        geocode: props.block._build?.tags?.geocode,
+                        geocode: props.block._build.tags.geocode,
                       },
                       options: {
                         showMap: true,
@@ -469,9 +469,7 @@ export const PhotoBlockEl: React.FC<{
                       ]
                         .filter(Boolean)
                         .map((it, idx) => (
-                          <React.Fragment
-                            key={`${props.block.id ?? props.block.data.src}-camera-datetime-${idx}`}
-                          >
+                          <React.Fragment key={`${props.block.id}-camera-datetime-${idx}`}>
                             {it}
                             <br />
                           </React.Fragment>
@@ -490,8 +488,8 @@ export const PhotoBlockEl: React.FC<{
                     {
                       kind: "kv",
                       k: "Tags",
-                      v: props.block._build?.tags?.tags,
-                      valid: Boolean(props.block._build.tags),
+                      v: props.block._build.tags.tags,
+                      valid: Boolean(props.block._build.tags.tags?.length),
                       className: styles.narrowCell,
                     },
                     {
@@ -499,7 +497,7 @@ export const PhotoBlockEl: React.FC<{
                       k: "Colours",
                       v: (
                         <div className={styles.colorswatches}>
-                          {props.block._build?.tags?.colors?.map((rgb: number[]) => {
+                          {props.block._build.tags.colors?.map((rgb: number[]) => {
                             const rgbStr = rgbToString(rgb as [number, number, number]);
                             const colorParam = `${rgb[0]},${rgb[1]},${rgb[2]}`;
                             return (
@@ -517,12 +515,12 @@ export const PhotoBlockEl: React.FC<{
                           })}
                         </div>
                       ),
-                      valid: Boolean(props.block._build.tags?.colors),
+                      valid: Boolean(props.block._build.tags.colors?.length),
                     },
                     {
                       kind: "kv",
                       k: "Description (AI)",
-                      v: props.block._build?.tags?.alt_text,
+                      v: props.block._build.tags.alt_text,
                       className: styles.narrowCell,
                       valid: Boolean(props.block._build.tags?.alt_text),
                     },
@@ -530,26 +528,20 @@ export const PhotoBlockEl: React.FC<{
                 />
 
                 <div className={styles.similarPhotosWrap}>
-                  <PhotoSimilarPhotosDeferred path={props.block._build?.tags?.path} />
+                  <PhotoSimilarPhotosDeferred path={props.block._build.tags.path} />
                 </div>
 
                 <div className={styles.viewOriginal}>
-                  <a href={`#${props.block.id ?? props.block.data.src}`}>Permalink</a>
+                  <a href={`#${props.block.id}`}>Permalink</a>
                   &nbsp;&middot;&nbsp; View{" "}
-                  {props.block._build.srcset.length > 0 ? (
-                    <>
-                      {props.block._build.srcset.map((s, i) => (
-                        <React.Fragment key={s.src}>
-                          <a key={s.src} target="_blank" href={s.src} rel="noreferrer">
-                            {s.width}px
-                          </a>
-                          {i < props.block._build.srcset.length - 1 ? (
-                            <>&nbsp;&middot;&nbsp;</>
-                          ) : null}
-                        </React.Fragment>
-                      ))}
-                    </>
-                  ) : null}
+                  {props.block._build.srcset.map((s, i) => (
+                    <React.Fragment key={s.src}>
+                      <a target="_blank" href={s.src} rel="noreferrer">
+                        {s.width}px
+                      </a>
+                      {i < props.block._build.srcset.length - 1 ? <>&nbsp;&middot;&nbsp;</> : null}
+                    </React.Fragment>
+                  ))}
                 </div>
 
                 <details className={styles.rawDetails}>

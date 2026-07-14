@@ -70,6 +70,7 @@ export const EmptyStateExplore: React.FC<Props> = ({
   const [isRandomResultsLoading, setIsRandomResultsLoading] = useState<boolean>(false);
   const [randomResultsError, setRandomResultsError] = useState<string | null>(null);
   const randomLoadMoreButtonRef = useRef<HTMLButtonElement | null>(null);
+  const randomLoadInFlightRef = useRef(false);
 
   useEffect(() => {
     if (!database) {
@@ -188,16 +189,17 @@ export const EmptyStateExplore: React.FC<Props> = ({
 
   const loadMoreRandomResults = useCallback(
     async (trigger: "manual" | "auto" = "manual") => {
-      if (!database || isRandomResultsLoading) {
+      if (randomLoadInFlightRef.current) {
         return;
       }
 
+      randomLoadInFlightRef.current = true;
       setIsRandomResultsLoading(true);
       setRandomResultsError(null);
 
       try {
         const results = await fetchRandomResults({
-          database,
+          database: database!,
           pageSize: RANDOM_ROW_LOAD_MORE_SIZE,
           excludePaths: randomResults.map((result) => result.path),
         });
@@ -211,10 +213,11 @@ export const EmptyStateExplore: React.FC<Props> = ({
         console.error(err);
         setRandomResultsError("Couldn't load random photos right now.");
       } finally {
+        randomLoadInFlightRef.current = false;
         setIsRandomResultsLoading(false);
       }
     },
-    [database, isRandomResultsLoading, randomResults],
+    [database, randomResults],
   );
 
   useEffect(() => {
@@ -451,7 +454,7 @@ export const EmptyStateExplore: React.FC<Props> = ({
                     ref={randomLoadMoreButtonRef}
                     className={styles.moreButton}
                     onClick={() => {
-                      void loadMoreRandomResults("manual");
+                      void loadMoreRandomResults();
                     }}
                     disabled={isRandomResultsLoading}
                   >

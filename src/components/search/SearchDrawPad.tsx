@@ -68,7 +68,7 @@ export const SearchDrawPad: React.FC<Props> = ({ onCancel, onSubmit }) => {
   useEffect(() => {
     const previouslyFocused =
       document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    cancelRef.current?.focus();
+    cancelRef.current!.focus();
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => {
@@ -86,7 +86,7 @@ export const SearchDrawPad: React.FC<Props> = ({ onCancel, onSubmit }) => {
       return;
     }
     const focusable = Array.from(
-      panelRef.current?.querySelectorAll<HTMLElement>("button:not([disabled])") ?? [],
+      panelRef.current!.querySelectorAll<HTMLElement>("button:not([disabled])"),
     );
     if (focusable.length === 0) {
       return;
@@ -123,10 +123,10 @@ export const SearchDrawPad: React.FC<Props> = ({ onCancel, onSubmit }) => {
       return;
     }
     const context = event.currentTarget.getContext("2d");
-    const from = lastPointRef.current;
-    if (!context || !from) {
+    if (!context) {
       return;
     }
+    const from = lastPointRef.current!;
     const to = canvasPoint(event);
     context.strokeStyle = brushColour;
     context.lineWidth = brushWidth;
@@ -152,7 +152,7 @@ export const SearchDrawPad: React.FC<Props> = ({ onCancel, onSubmit }) => {
   };
 
   const handleSubmit = () => {
-    canvasRef.current?.toBlob((blob) => {
+    canvasRef.current!.toBlob((blob) => {
       if (blob) {
         onSubmit(blob);
       }

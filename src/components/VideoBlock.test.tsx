@@ -27,7 +27,17 @@ describe("VideoBlock", () => {
     expect(screen.getByText("2025-11-25")).toBeTruthy();
     expect(screen.queryByText("Source")).toBeNull();
     expect(screen.getByText("Permalink")).toBeTruthy();
+    expect(screen.getByText("Permalink")).toHaveAttribute("href", "#video-youtube-1");
     expect(screen.getByText("License")).toBeTruthy();
+  });
+
+  it("falls back to the source URL when a video has no explicit permalink ID", () => {
+    render(<YoutubeBlockEl src="https://www.youtube.com/embed/fallback" />);
+
+    expect(screen.getByText("Permalink")).toHaveAttribute(
+      "href",
+      "#https://www.youtube.com/embed/fallback",
+    );
   });
 
   it("renders details panel for local videos", () => {
@@ -161,5 +171,37 @@ describe("LocalVideoBlockEl viewport auto-play", () => {
     triggerIntersect(false, video);
     triggerIntersect(true, video);
     expect(playSpy).toHaveBeenCalledTimes(2);
+  });
+
+  it("ignores empty observer batches and treats off-screen pauses as automatic", () => {
+    render(<LocalVideoBlockEl id="v3" src="/clip.mp4" />);
+    const video = document.querySelector("video");
+    if (!video) throw new Error("video element not rendered");
+
+    act(() => {
+      observerCallback([], {} as IntersectionObserver);
+    });
+    expect(playSpy).not.toHaveBeenCalled();
+
+    triggerIntersect(false, video);
+    act(() => {
+      video.dispatchEvent(new Event("pause"));
+    });
+    triggerIntersect(true, video);
+    expect(playSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it("tolerates browsers rejecting viewport autoplay", async () => {
+    playSpy.mockRejectedValueOnce(new Error("Autoplay blocked"));
+    render(<LocalVideoBlockEl id="v4" src="/clip.mp4" />);
+    const video = document.querySelector("video");
+    if (!video) throw new Error("video element not rendered");
+
+    triggerIntersect(true, video);
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(playSpy).toHaveBeenCalledTimes(1);
   });
 });

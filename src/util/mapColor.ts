@@ -70,12 +70,10 @@ const parseHsl = (color: string): { hue: number; saturation: number; lightness: 
   if (!match) {
     return null;
   }
-  const hue = Number.parseFloat(match[1] ?? "");
-  const saturation = Number.parseFloat(match[2] ?? "");
-  const lightness = Number.parseFloat(match[3] ?? "");
-  if ([hue, saturation, lightness].some((value) => Number.isNaN(value))) {
-    return null;
-  }
+  // The required numeric capture groups are guaranteed by the regex.
+  const hue = Number.parseFloat(match[1]!);
+  const saturation = Number.parseFloat(match[2]!);
+  const lightness = Number.parseFloat(match[3]!);
   return { hue, saturation, lightness };
 };
 

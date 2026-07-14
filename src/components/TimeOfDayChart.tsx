@@ -74,7 +74,7 @@ export const TimeOfDayChart: React.FC<Props> = ({
 
       <div className={styles.bars}>
         {data.map((bucket, _index) => {
-          const heightPct = max > 0 ? (bucket.count / max) * 100 : 0;
+          const heightPct = (bucket.count / max) * 100;
 
           return (
             // Hover reveals a visual tooltip for pointer users; the same

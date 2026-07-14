@@ -103,6 +103,12 @@ describe("computeSparklineBins", () => {
     expect(bins).toEqual([0, 0, 0, 0, 0]);
   });
 
+  it("returns all zeros for a zero-width extent", () => {
+    expect(computeSparklineBins([{ date: "2024-01-01" }], { minMs: 10, maxMs: 10 }, 3)).toEqual([
+      0, 0, 0,
+    ]);
+  });
+
   it("places the max-date entry in the last bin", () => {
     const entries = [{ date: "2024-12-31T00:00:00Z" }];
     const bins = computeSparklineBins(entries, extent, 10);
@@ -159,5 +165,6 @@ describe("parseRangeParam", () => {
     expect(parseRangeParam("")).toBeNull();
     expect(parseRangeParam("2024-3-22")).toBeNull();
     expect(parseRangeParam("not-a-date")).toBeNull();
+    expect(parseRangeParam("2024-99-99")).toBeNull();
   });
 });

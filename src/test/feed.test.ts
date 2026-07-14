@@ -1,5 +1,8 @@
 import { buildRssXml, escapeXml, toRssDate } from "../lib/rss";
-import { getCanonicalUrl, getDefaultSeo } from "../lib/seo";
+const { generateAlbumFeed, generateMainFeed } = require("../bin/generate-feeds.cjs") as {
+  generateMainFeed: typeof buildFeedXml;
+  generateAlbumFeed: typeof buildAlbumFeedXml;
+};
 
 /** Mirrors the main feed builder from bin/generate-feeds.cjs for unit testing. */
 const buildFeedXml = (
@@ -10,24 +13,7 @@ const buildFeedXml = (
     lastmod: string;
   }>,
 ): string => {
-  const defaults = getDefaultSeo();
-  const siteUrl = getCanonicalUrl("/");
-  const feedUrl = getCanonicalUrl("/feed.xml");
-
-  return buildRssXml({
-    title: defaults.siteName,
-    link: siteUrl,
-    description: defaults.defaultDescription,
-    selfUrl: feedUrl,
-    lastBuildDate: entries[0]?.lastmod ? toRssDate(entries[0].lastmod) : undefined,
-    items: entries.map((entry) => ({
-      title: entry.title,
-      link: getCanonicalUrl(`/album/${entry.slug}`),
-      guid: getCanonicalUrl(`/album/${entry.slug}`),
-      description: entry.description,
-      pubDate: toRssDate(entry.lastmod),
-    })),
-  });
+  return generateMainFeed(entries);
 };
 
 /** Mirrors the per-album feed builder from bin/generate-feeds.cjs for unit testing. */
@@ -45,23 +31,7 @@ const buildAlbumFeedXml = (
     pubDate: string;
   }>,
 ): string => {
-  const albumUrl = getCanonicalUrl(`/album/${entry.slug}`);
-  const feedUrl = getCanonicalUrl(`/album/${entry.slug}/feed.xml`);
-
-  return buildRssXml({
-    title: `${entry.title} | Snapshots`,
-    link: albumUrl,
-    description: entry.description,
-    selfUrl: feedUrl,
-    lastBuildDate: toRssDate(entry.lastmod),
-    items: items.map((item) => ({
-      title: item.title,
-      link: getCanonicalUrl(item.link),
-      guid: getCanonicalUrl(item.link),
-      description: item.description,
-      pubDate: toRssDate(item.pubDate),
-    })),
-  });
+  return generateAlbumFeed(entry, items);
 };
 
 describe("RSS feed", () => {
@@ -118,11 +88,54 @@ describe("RSS feed", () => {
     expect(xml).toContain("<guid>https://photos.example.com/album/tokyo#shibuya.jpg</guid>");
   });
 
+  it("omits the optional build date when a feed has no entries", () => {
+    const xml = buildFeedXml([]);
+
+    expect(xml).not.toContain("<lastBuildDate>");
+    expect(xml).not.toContain("<item>");
+  });
+
   it("escapes XML special characters", () => {
-    expect(escapeXml("Tom & Jerry <3>")).toBe("Tom &amp; Jerry &lt;3&gt;");
+    expect(escapeXml(`Tom & Jerry's "<3>"`)).toBe("Tom &amp; Jerry&apos;s &quot;&lt;3&gt;&quot;");
   });
 
   it("converts dates to RSS format", () => {
     expect(toRssDate("2025-03-10")).toBe("Mon, 10 Mar 2025 00:00:00 GMT");
+  });
+
+  it("builds the shared RSS representation with items and an optional build date", () => {
+    const xml = buildRssXml({
+      title: "Archive & updates",
+      link: "https://photos.example.com",
+      description: "New <photos>",
+      selfUrl: "https://photos.example.com/feed.xml",
+      lastBuildDate: "Mon, 10 Mar 2025 00:00:00 GMT",
+      items: [
+        {
+          title: "Tokyo's night",
+          link: "https://photos.example.com/album/tokyo",
+          guid: "tokyo-1",
+          description: 'Neon "streets"',
+          pubDate: "Sun, 09 Mar 2025 00:00:00 GMT",
+        },
+      ],
+    });
+
+    expect(xml).toContain("<title>Archive &amp; updates</title>");
+    expect(xml).toContain("<title>Tokyo&apos;s night</title>");
+    expect(xml).toContain("<lastBuildDate>Mon, 10 Mar 2025 00:00:00 GMT</lastBuildDate>");
+    expect(xml).toContain("<description>Neon &quot;streets&quot;</description>");
+  });
+
+  it("omits the shared RSS build date when it is unavailable", () => {
+    const xml = buildRssXml({
+      title: "Archive",
+      link: "https://photos.example.com",
+      description: "Updates",
+      selfUrl: "https://photos.example.com/feed.xml",
+      items: [],
+    });
+
+    expect(xml).not.toContain("<lastBuildDate>");
   });
 });

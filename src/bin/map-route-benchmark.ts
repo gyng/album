@@ -10,16 +10,18 @@ type BenchmarkRun = {
   simplifiedPointCount: number;
 };
 
-const repeat = Number.parseInt(process.env.ROUTE_BENCH_REPEAT ?? "20", 10);
-const sizes = (process.env.ROUTE_BENCH_SIZES ?? "20,80,200,1000")
-  .split(",")
-  .map((value) => Number.parseInt(value.trim(), 10))
-  .filter((value) => Number.isFinite(value) && value > 1);
-const outputPath = path.join(process.cwd(), ".map-route-benchmark.json");
+export const getBenchmarkConfig = (env: NodeJS.ProcessEnv = process.env, cwd = process.cwd()) => ({
+  repeat: Number.parseInt(env.ROUTE_BENCH_REPEAT ?? "20", 10),
+  sizes: (env.ROUTE_BENCH_SIZES ?? "20,80,200,1000")
+    .split(",")
+    .map((value) => Number.parseInt(value.trim(), 10))
+    .filter((value) => Number.isFinite(value) && value > 1),
+  outputPath: path.join(cwd, ".map-route-benchmark.json"),
+});
 
 type BenchmarkPhoto = Parameters<typeof buildMapRoute>[0][number];
 
-const makePhotos = (size: number): BenchmarkPhoto[] =>
+export const makePhotos = (size: number): BenchmarkPhoto[] =>
   Array.from({ length: size }, (_, index) => ({
     album: "benchmark-trip",
     src: {
@@ -36,53 +38,79 @@ const makePhotos = (size: number): BenchmarkPhoto[] =>
     placeholderHeight: 100,
   }));
 
-const measureMs = (fn: () => void): number => {
-  const startedAt = performance.now();
+export const measureMs = (fn: () => void, clock = () => performance.now()): number => {
+  const startedAt = clock();
   fn();
-  return Number((performance.now() - startedAt).toFixed(3));
+  return Number((clock() - startedAt).toFixed(3));
 };
 
-const median = (values: number[]): number => {
+export const median = (values: number[]): number => {
   const sorted = values.slice().sort((left, right) => left - right);
   const middle = Math.floor(sorted.length / 2);
   if (sorted.length % 2 === 1) {
-    return sorted[middle] ?? 0;
+    return sorted[middle]!;
   }
 
   return Number((((sorted[middle - 1] ?? 0) + (sorted[middle] ?? 0)) / 2).toFixed(3));
 };
 
-const runs: BenchmarkRun[] = sizes.map((size) => {
-  const photos = makePhotos(size);
-  const samples: number[] = [];
-  let geotaggedCount = 0;
-  let simplifiedPointCount = 0;
-
-  for (let index = 0; index < repeat; index += 1) {
-    samples.push(
-      measureMs(() => {
-        const result = buildMapRoute(photos);
-        geotaggedCount = result.geotaggedCount;
-        simplifiedPointCount = result.simplifiedPoints.length;
-      }),
-    );
-  }
-
-  return {
-    size,
-    routeBuildMs: median(samples),
-    geotaggedCount,
-    simplifiedPointCount,
-  };
-});
-
-const report = {
-  generatedAt: new Date().toISOString(),
+export const runBenchmark = ({
   repeat,
-  routeSimplifyThreshold: ROUTE_SIMPLIFY_THRESHOLD,
-  runs,
+  sizes,
+  outputPath,
+  clock = () => performance.now(),
+  now = () => new Date(),
+  buildRoute = buildMapRoute,
+  write = writeFileSync,
+  log = console.log,
+}: {
+  repeat: number;
+  sizes: number[];
+  outputPath: string;
+  clock?: () => number;
+  now?: () => Date;
+  buildRoute?: typeof buildMapRoute;
+  write?: typeof writeFileSync;
+  log?: typeof console.log;
+}) => {
+  const runs: BenchmarkRun[] = sizes.map((size) => {
+    const photos = makePhotos(size);
+    const samples: number[] = [];
+    let geotaggedCount = 0;
+    let simplifiedPointCount = 0;
+
+    for (let index = 0; index < repeat; index += 1) {
+      samples.push(
+        measureMs(() => {
+          const result = buildRoute(photos);
+          geotaggedCount = result.geotaggedCount;
+          simplifiedPointCount = result.simplifiedPoints.length;
+        }, clock),
+      );
+    }
+
+    return {
+      size,
+      routeBuildMs: median(samples),
+      geotaggedCount,
+      simplifiedPointCount,
+    };
+  });
+
+  const report = {
+    generatedAt: now().toISOString(),
+    repeat,
+    routeSimplifyThreshold: ROUTE_SIMPLIFY_THRESHOLD,
+    runs,
+  };
+
+  write(outputPath, JSON.stringify(report, null, 2));
+  log(JSON.stringify(report, null, 2));
+  log(`\nMap route benchmark written to ${outputPath}`);
+  return report;
 };
 
-writeFileSync(outputPath, JSON.stringify(report, null, 2));
-console.log(JSON.stringify(report, null, 2));
-console.log(`\nMap route benchmark written to ${outputPath}`);
+/* istanbul ignore next -- direct CLI dispatch; runBenchmark is tested independently */
+if (require.main === module) {
+  runBenchmark(getBenchmarkConfig());
+}

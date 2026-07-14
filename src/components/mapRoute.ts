@@ -272,9 +272,8 @@ const splitIntoRouteSegments = (points: RoutePoint[]): RoutePoint[][] => {
     currentSegment.push(point);
   }
 
-  if (currentSegment.length > 0) {
-    segments.push(currentSegment);
-  }
+  // The empty input returned above; every other route leaves one final segment.
+  segments.push(currentSegment);
 
   return segments;
 };

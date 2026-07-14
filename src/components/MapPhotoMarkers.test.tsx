@@ -82,11 +82,13 @@ describe("MapPhotoMarkers", () => {
     fireEvent.mouseOver(control);
     fireEvent.mouseLeave(control);
     fireEvent.focus(control);
+    fireEvent.keyDown(control, { key: "ArrowDown" });
     fireEvent.keyDown(control, { key: "Enter" });
+    fireEvent.keyDown(control, { key: " " });
     fireEvent.click(screen.getByTestId("marker"));
 
     expect(onHover.mock.calls).toEqual([[currentPhoto], [null], [currentPhoto]]);
-    expect(onSelect).toHaveBeenCalledTimes(2);
+    expect(onSelect).toHaveBeenCalledTimes(3);
     expect(stopPropagation).toHaveBeenCalledTimes(1);
     expect(observe).toHaveBeenCalledTimes(1);
   });
@@ -141,7 +143,7 @@ describe("MapPhotoMarkers", () => {
   it("omits photos without complete coordinates", () => {
     render(
       <MapPhotoMarkers
-        photos={[photo({ decLat: null }), photo({ href: "valid" })]}
+        photos={[photo({ decLat: null }), photo({ href: "valid", date: null })]}
         showMarkerImages={false}
         emphasiseRoute={false}
         activeRouteHrefSet={new Set()}
@@ -151,5 +153,6 @@ describe("MapPhotoMarkers", () => {
     );
 
     expect(screen.getAllByTestId("marker")).toHaveLength(1);
+    expect(screen.getByRole("button", { name: "Photo from kansai" })).toBeTruthy();
   });
 });

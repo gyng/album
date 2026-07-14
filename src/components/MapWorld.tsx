@@ -167,7 +167,7 @@ export const MMap: React.FC<MapWorldProps> = ({
         return photo;
       }
 
-      return coLocated[(currentIndex + 1) % coLocated.length] ?? photo;
+      return coLocated[(currentIndex + 1) % coLocated.length]!;
     });
   };
   const routeDataByAlbum = React.useMemo(() => {
@@ -231,9 +231,7 @@ export const MMap: React.FC<MapWorldProps> = ({
 
     if (routeDataByAlbum.size === 1) {
       const route = Array.from(routeDataByAlbum.values())[0];
-      return routeMode === "simplified"
-        ? (route?.simplifiedPoints ?? null)
-        : (route?.fullPoints ?? null);
+      return routeMode === "simplified" ? route!.simplifiedPoints : route!.fullPoints;
     }
 
     return null;
@@ -261,31 +259,25 @@ export const MMap: React.FC<MapWorldProps> = ({
       const routeGeoJson = toRouteGeoJson(points);
       const startPoint = points[0];
       const endPoint = points.at(-1);
-      const gradientColors =
-        startPoint && endPoint
-          ? getBackgroundJourneyGradientColors(
-              markerColorByHref.get(startPoint.memberHrefs.at(-1) ?? startPoint.href) ??
-                markerColorByHref.get(startPoint.href) ??
-                "#12bcd4",
-              markerColorByHref.get(endPoint.memberHrefs.at(-1) ?? endPoint.href) ??
-                markerColorByHref.get(endPoint.href) ??
-                "#12bcd4",
-            )
-          : null;
-
-      return (
-        routeGeoJson?.features.map((feature) => ({
-          ...feature,
-          properties: {
-            ...feature.properties,
-            album,
-            routeColorStart: gradientColors?.start ?? "#0f4b6e",
-            routeColorQuarter: gradientColors?.quarter ?? "#145b83",
-            routeColorMiddle: gradientColors?.middle ?? "#12bcd4",
-            routeColorEnd: gradientColors?.end ?? "#b9fbff",
-          },
-        })) ?? []
+      if (!routeGeoJson || !startPoint || !endPoint) {
+        return [];
+      }
+      const gradientColors = getBackgroundJourneyGradientColors(
+        markerColorByHref.get(startPoint.memberHrefs.at(-1)!)!,
+        markerColorByHref.get(endPoint.memberHrefs.at(-1)!)!,
       );
+
+      return routeGeoJson.features.map((feature) => ({
+        ...feature,
+        properties: {
+          ...feature.properties,
+          album,
+          routeColorStart: gradientColors.start,
+          routeColorQuarter: gradientColors.quarter,
+          routeColorMiddle: gradientColors.middle,
+          routeColorEnd: gradientColors.end,
+        },
+      }));
     });
 
     if (features.length === 0) {
@@ -313,26 +305,16 @@ export const MMap: React.FC<MapWorldProps> = ({
       ? fullRoutePoints
       : null;
   const activeRouteHrefSet = React.useMemo(
-    () =>
-      new Set(
-        overlayRoutePoints?.flatMap((point) =>
-          point.memberHrefs.length > 0 ? point.memberHrefs : [point.href],
-        ) ?? [],
-      ),
+    () => new Set(overlayRoutePoints?.flatMap((point) => point.memberHrefs) ?? []),
     [overlayRoutePoints],
   );
   const shouldEmphasizeRouteMarkers = clickInfo !== null;
   const getRoutePointColor = React.useCallback(
     (point: RoutePoint, _index: number) => {
-      const memberHref = point.memberHrefs.at(-1) ?? point.href;
-      return (
-        markerColorByHref.get(memberHref) ??
-        markerColorByHref.get(point.href) ??
-        activeRoutePhoto?.markerColor ??
-        "#12bcd4"
-      );
+      const memberHref = point.memberHrefs.at(-1)!;
+      return markerColorByHref.get(memberHref)!;
     },
-    [activeRoutePhoto?.markerColor, markerColorByHref],
+    [markerColorByHref],
   );
   const routeColorStops = React.useMemo(
     () => getRouteColorStops(activeRoutePhoto?.relative ?? 0.6),
@@ -499,7 +481,7 @@ export const MMap: React.FC<MapWorldProps> = ({
                 "line-color":
                   routeDataByAlbum.size > 1
                     ? ["coalesce", ["get", "routeColorMiddle"], "#12bcd4"]
-                    : (routeColorStops[1]?.color ?? "#12bcd4"),
+                    : routeColorStops[1]!.color,
                 "line-opacity": alwaysVisibleRouteGeoJson
                   ? routeDataByAlbum.size > 1
                     ? 1

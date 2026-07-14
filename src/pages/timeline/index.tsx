@@ -28,7 +28,7 @@ type PageProps = {
 };
 
 const isTimelinePhoto = (block: Block): block is PhotoBlock => {
-  return block.kind === "photo" && Boolean((block as PhotoBlock)._build?.exif?.DateTimeOriginal);
+  return block.kind === "photo" && Boolean(block._build.exif.DateTimeOriginal);
 };
 
 const getLocalDateKey = (date = new Date()) => {
@@ -143,10 +143,7 @@ const TimelinePage: NextPage<PageProps> = ({ entries }) => {
   }, [memories, visibleMemoryClusterCount]);
 
   const applyMemoryHighlight = React.useCallback((cluster: (typeof memories)[number]) => {
-    const heatmapPanel = heatmapPanelRef.current;
-    if (!heatmapPanel) {
-      return;
-    }
+    const heatmapPanel = heatmapPanelRef.current!;
 
     highlightedHeatmapElementsRef.current.forEach((element) => {
       element.classList.remove(heatmapStyles.memoryHighlighted);
@@ -189,7 +186,7 @@ const TimelinePage: NextPage<PageProps> = ({ entries }) => {
   }, []);
 
   const updateSelectedConnectorPath = React.useCallback(() => {
-    if (!selectedDate || typeof window === "undefined" || window.innerWidth < 960) {
+    if (!selectedDate || window.innerWidth < 960) {
       clearSelectedConnectorPath();
       return;
     }
@@ -244,10 +241,6 @@ const TimelinePage: NextPage<PageProps> = ({ entries }) => {
   React.useEffect(() => {
     updateSelectedConnectorPath();
 
-    if (typeof window === "undefined") {
-      return;
-    }
-
     let frameId: number | null = null;
     const handleResize = () => {
       if (frameId != null) {
@@ -283,12 +276,14 @@ const TimelinePage: NextPage<PageProps> = ({ entries }) => {
     };
   }, [updateSelectedConnectorPath, filteredEntries, todayDate]);
 
-  // If availableDates changes and selectedDate is null, default to latest
+  // If the available dates change and no date is selected, default to the
+  // latest selectable date. Using all available dates here would repeatedly
+  // reselect a future date that the validity effect immediately clears.
   React.useEffect(() => {
-    if (!selectedDate && availableDates.length > 0) {
-      setSelectedDate(availableDates[0]);
+    if (!selectedDate && selectableDates.length > 0) {
+      setSelectedDate(selectableDates[0]);
     }
-  }, [availableDates, selectedDate]);
+  }, [selectableDates, selectedDate]);
 
   // On mount or when router.query.date changes, update selectedDate if needed
   React.useEffect(() => {
@@ -326,7 +321,7 @@ const TimelinePage: NextPage<PageProps> = ({ entries }) => {
       return;
     }
     const randomIndex = Math.floor(Math.random() * selectableDates.length);
-    setSelectedDate(selectableDates[randomIndex] ?? null);
+    setSelectedDate(selectableDates[randomIndex]);
   }, [selectableDates]);
 
   const handleSelectOlderDate = React.useCallback(() => {
@@ -515,9 +510,7 @@ const TimelinePage: NextPage<PageProps> = ({ entries }) => {
                                 id={clusterId}
                               >
                                 <span className={styles.memoryClusterAge}>{ageLabel}</span>
-                                {metaLabel ? (
-                                  <span className={styles.memoryClusterLabel}>{metaLabel}</span>
-                                ) : null}
+                                <span className={styles.memoryClusterLabel}>{metaLabel}</span>
                                 {swatches.length > 0 ? (
                                   <span className={styles.memoryClusterSwatches} aria-hidden="true">
                                     {swatches.map((color) => (
@@ -606,10 +599,10 @@ export const getStaticProps: GetStaticProps<PageProps> = async () => {
     const entries = albums
       .flatMap((album) => {
         return album.blocks.filter(isTimelinePhoto).flatMap((photo) => {
-          const dateTimeOriginal = photo._build?.exif?.DateTimeOriginal;
-          const src = photo._build?.srcset?.[0];
+          const dateTimeOriginal = photo._build.exif.DateTimeOriginal;
+          const src = photo._build.srcset?.[0];
 
-          if (!dateTimeOriginal || !src) {
+          if (!src) {
             return [] as TimelineEntry[];
           }
 
@@ -622,11 +615,10 @@ export const getStaticProps: GetStaticProps<PageProps> = async () => {
           }
           const wallClockIso = formatExifWallClockIso(wallClock);
 
-          const filename = photo.data.src.split("/").at(-1) ?? photo.id;
-          const primaryColor = photo._build?.tags?.colors?.[0];
-          const geocode = photo._build?.tags?.geocode ?? null;
-          const { GPSLongitude, GPSLatitude, GPSLongitudeRef, GPSLatitudeRef } =
-            photo._build?.exif ?? {};
+          const filename = photo.data.src.split("/").at(-1)!;
+          const primaryColor = photo._build.tags?.colors?.[0];
+          const geocode = photo._build.tags?.geocode ?? null;
+          const { GPSLongitude, GPSLatitude, GPSLongitudeRef, GPSLatitudeRef } = photo._build.exif;
           const { decLng, decLat } =
             GPSLongitude && GPSLatitude && GPSLongitudeRef && GPSLatitudeRef
               ? getDegLatLngFromExif({
@@ -651,8 +643,8 @@ export const getStaticProps: GetStaticProps<PageProps> = async () => {
               placeholderColor: primaryColor
                 ? `rgba(${primaryColor[0]}, ${primaryColor[1]}, ${primaryColor[2]}, 1)`
                 : "transparent",
-              placeholderWidth: photo._build?.width,
-              placeholderHeight: photo._build?.height,
+              placeholderWidth: photo._build.width,
+              placeholderHeight: photo._build.height,
             },
           ];
         });

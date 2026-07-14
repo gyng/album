@@ -66,8 +66,8 @@ const fileExists = (filePath) => {
   }
 };
 
-const printHelp = () => {
-  console.log(`Backup publish assets (databases and optional albums).
+const printHelp = (log = console.log) => {
+  log(`Backup publish assets (databases and optional albums).
 
 Usage:
   node ./bin/backup-publish-assets.cjs [options]
@@ -81,19 +81,20 @@ Options:
 `);
 };
 
-const run = ({ srcDir, argv }) => {
+const run = ({ srcDir, argv, now = () => new Date(), log = console.log }) => {
   const repoDir = path.resolve(srcDir, "..");
   const publicDir = path.join(srcDir, "public");
   const albumsDir = path.join(repoDir, "albums");
 
   const args = parseArgs(argv);
   if (args.help) {
-    printHelp();
-    return;
+    printHelp(log);
+    return null;
   }
 
+  const createdAt = now();
   const backupRoot = path.resolve(repoDir, args.outDir ?? "backups");
-  const snapshotName = `publish-backup-${formatTimestamp()}`;
+  const snapshotName = `publish-backup-${formatTimestamp(createdAt)}`;
   const snapshotDir = path.join(backupRoot, snapshotName);
   const dbBackupDir = path.join(snapshotDir, "db");
   const albumsBackupDir = path.join(snapshotDir, "albums");
@@ -130,7 +131,7 @@ const run = ({ srcDir, argv }) => {
   }
 
   const manifest = {
-    createdAt: new Date().toISOString(),
+    createdAt: createdAt.toISOString(),
     snapshotDir,
     options: {
       withDb: args.withDb,
@@ -142,21 +143,25 @@ const run = ({ srcDir, argv }) => {
   const manifestPath = path.join(snapshotDir, "manifest.json");
   fs.writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, "utf-8");
 
-  console.log(`Backup created at ${snapshotDir}`);
-  console.log(`Copied ${copiedFiles.length} item(s)`);
+  log(`Backup created at ${snapshotDir}`);
+  log(`Copied ${copiedFiles.length} item(s)`);
   if (missingFiles.length > 0) {
-    console.log(`Missing ${missingFiles.length} item(s):`);
+    log(`Missing ${missingFiles.length} item(s):`);
     for (const missingPath of missingFiles) {
-      console.log(`- ${missingPath}`);
+      log(`- ${missingPath}`);
     }
   }
+  return manifest;
 };
 
 module.exports = {
+  formatTimestamp,
   parseArgs,
+  printHelp,
   run,
 };
 
+/* istanbul ignore next -- direct CLI dispatch; run is tested independently */
 if (require.main === module) {
   try {
     run({ srcDir: path.resolve(__dirname, ".."), argv: process.argv.slice(2) });

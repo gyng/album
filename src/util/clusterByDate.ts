@@ -102,14 +102,13 @@ export function findClustersAroundSeeds<T extends DateItem>(
     currentCluster = [date];
   });
 
-  if (currentCluster.length > 0) {
-    allClusters.push({ dates: currentCluster });
-  }
+  // A non-empty input always leaves one final cluster to flush.
+  allClusters.push({ dates: currentCluster });
 
   return allClusters
     .filter((cluster) => cluster.dates.some((date) => seedDates.has(date)))
     .map((cluster) => {
-      const items = cluster.dates.flatMap((date) => itemsByDate.get(date) ?? []);
+      const items = cluster.dates.flatMap((date) => itemsByDate.get(date)!);
       const matchedSeedDates = cluster.dates.filter((date) => seedDates.has(date));
       return {
         startDate: cluster.dates[0] as string,

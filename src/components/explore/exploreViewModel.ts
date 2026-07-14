@@ -87,9 +87,6 @@ export const findStringFacet = (stats: PhotoStats, facetId: string): StringFacet
 
 const getTopLabel = (facet: StringFacetStat | null): string => facet?.data[0]?.label ?? "—";
 
-const getOverviewValue = (value: number | string | null): string =>
-  typeof value === "number" ? value.toLocaleString("en") : (value ?? "—");
-
 const getPeakBucketLabel = (data: BucketedStat[]): string => {
   const top = data.reduce<BucketedStat | null>((current, bucket) => {
     if (bucket.count <= 0) return current;
@@ -113,15 +110,14 @@ export const buildColorSearchHref = (colorLabel: string, year?: string): string 
   const params = new URLSearchParams();
   params.set("color", color);
   if (year) params.append("facet", `year:${year}`);
-  const query = params.toString();
-  return query ? `/search?${query}` : "/search";
+  return `/search?${params.toString()}`;
 };
 
 export const isAggregateLocationBucket = (label: string): boolean => label.startsWith("Other ");
 
 export const buildExploreOverviewCards = (stats: PhotoStats): OverviewCard[] => [
-  { label: "Photos", value: getOverviewValue(stats.totalPhotos) },
-  { label: "Albums", value: getOverviewValue(stats.totalAlbums) },
+  { label: "Photos", value: stats.totalPhotos.toLocaleString("en") },
+  { label: "Albums", value: stats.totalAlbums.toLocaleString("en") },
   {
     label: "Years",
     value: stats.dateRange ? `${stats.dateRange[0]}–${stats.dateRange[1]}` : "—",

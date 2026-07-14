@@ -76,10 +76,7 @@ const MapFlyer = (props: { coordinates: [number, number][] }) => {
     // layout spanning ±180° doesn't frame the whole globe.
     const bounds = computeWrapAwareBounds(
       props.coordinates.map(([lat, lng]) => [lng, lat] as [number, number]),
-    );
-    if (!bounds) {
-      return;
-    }
+    )!;
 
     map.fitBounds(bounds, {
       padding: FIT_BOUNDS_PADDING_PX,

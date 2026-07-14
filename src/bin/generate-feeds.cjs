@@ -60,14 +60,14 @@ const humanizeAlbumFeedName = (value) =>
 
 // --- Album reading ---
 
-const getAlbumDirectoryEntries = () => {
-  if (!fs.existsSync(albumsDir)) return [];
+const getAlbumDirectoryEntries = (albumsPath) => {
+  if (!fs.existsSync(albumsPath)) return [];
 
   return fs
-    .readdirSync(albumsDir)
-    .filter((it) => fs.lstatSync(path.join(albumsDir, it)).isDirectory())
+    .readdirSync(albumsPath)
+    .filter((it) => fs.lstatSync(path.join(albumsPath, it)).isDirectory())
     .map((slug) => {
-      const albumPath = path.join(albumsDir, slug);
+      const albumPath = path.join(albumsPath, slug);
       const manifestPaths = [
         path.join(albumPath, MANIFEST_NAME),
         path.join(albumPath, MANIFEST_V2_NAME),
@@ -280,7 +280,7 @@ const getAlbumFeedItems = (slug, albumPath, albumMetadata, albumLastmod) => {
   if (fs.existsSync(albumJsonPath)) {
     try {
       const albumJson = JSON.parse(fs.readFileSync(albumJsonPath, "utf-8"));
-      for (const [externalIndex, external] of (albumJson.externals ?? []).entries()) {
+      for (const external of albumJson.externals ?? []) {
         const sortDate =
           external.date?.slice(0, 10) ?? formatSitemapDate(fs.statSync(albumJsonPath).mtimeMs);
         items.push({
@@ -292,7 +292,7 @@ const getAlbumFeedItems = (slug, albumPath, albumMetadata, albumLastmod) => {
           link: `/album/${slug}`,
           // External items also share the bare album link — key their guid off
           // the (unique) external href, falling back to a positional id.
-          guid: external.href ?? `external-${slug}-${externalIndex}`,
+          guid: external.href,
           pubDate: sortDate,
           sortDate,
         });
@@ -347,8 +347,8 @@ const writeFile = (filePath, content) => {
 // otherwise their public/album/<slug>/feed.xml ships frozen forever. Deliberately
 // conservative: only ever deletes feed.xml, and only removes the containing
 // directory if it is then empty — never a recursive delete.
-const cleanupStaleAlbumFeeds = (validSlugs) => {
-  const albumOutputDir = path.join(publicDir, "album");
+const cleanupStaleAlbumFeeds = (validSlugs, outputDirectory) => {
+  const albumOutputDir = path.join(outputDirectory, "album");
   if (!fs.existsSync(albumOutputDir)) return 0;
 
   let removed = 0;
@@ -374,12 +374,12 @@ const cleanupStaleAlbumFeeds = (validSlugs) => {
   return removed;
 };
 
-const run = () => {
-  const albumEntries = getAlbumDirectoryEntries();
+const run = ({ albumsDirectory, outputDirectory, log = console.log }) => {
+  const albumEntries = getAlbumDirectoryEntries(albumsDirectory);
 
   if (albumEntries.length === 0) {
-    console.log("No albums found — skipping feed generation");
-    return;
+    log("No albums found — skipping feed generation");
+    return { generatedAlbumFeeds: 0, removedFeeds: 0 };
   }
 
   const realAlbumEntries = albumEntries.filter((e) => !isTestAlbum(e.slug));
@@ -392,10 +392,10 @@ const run = () => {
     .sort((a, b) => b.lastmod.localeCompare(a.lastmod));
 
   // Main feed
-  writeFile(path.join(publicDir, "feed.xml"), generateMainFeed(feedEntries.slice(0, 20)));
+  writeFile(path.join(outputDirectory, "feed.xml"), generateMainFeed(feedEntries.slice(0, 20)));
 
   // Sitemap
-  writeFile(path.join(publicDir, "sitemap.xml"), generateSitemap(realAlbumEntries));
+  writeFile(path.join(outputDirectory, "sitemap.xml"), generateSitemap(realAlbumEntries));
 
   // Per-album feeds
   for (const entry of feedEntries) {
@@ -406,17 +406,40 @@ const run = () => {
       entry.lastmod,
     );
     writeFile(
-      path.join(publicDir, "album", entry.slug, "feed.xml"),
+      path.join(outputDirectory, "album", entry.slug, "feed.xml"),
       generateAlbumFeed(entry, items),
     );
   }
 
-  const removedFeeds = cleanupStaleAlbumFeeds(new Set(feedEntries.map((entry) => entry.slug)));
+  const removedFeeds = cleanupStaleAlbumFeeds(
+    new Set(feedEntries.map((entry) => entry.slug)),
+    outputDirectory,
+  );
 
-  console.log(
+  log(
     `Generated feeds: feed.xml, sitemap.xml, ${feedEntries.length} album feeds` +
       (removedFeeds > 0 ? `, removed ${removedFeeds} stale album feed(s)` : ""),
   );
+  return { generatedAlbumFeeds: feedEntries.length, removedFeeds };
 };
 
-run();
+module.exports = {
+  buildRssXml,
+  buildSitemapXml,
+  cleanupStaleAlbumFeeds,
+  generateAlbumFeed,
+  generateMainFeed,
+  generateSitemap,
+  getAlbumDirectoryEntries,
+  getAlbumFeedItems,
+  getCanonicalUrl,
+  getSiteOrigin,
+  humanizeAlbumFeedName,
+  readAlbumFeedMetadata,
+  run,
+};
+
+/* istanbul ignore next -- direct CLI dispatch; run is tested independently */
+if (require.main === module) {
+  run({ albumsDirectory: albumsDir, outputDirectory: publicDir });
+}

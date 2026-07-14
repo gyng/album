@@ -79,6 +79,34 @@ describe("computePhotoStats", () => {
     expect(fl.coverage).toBe(0);
   });
 
+  it("ignores non-finite numeric EXIF values instead of reporting false coverage", () => {
+    const stats = computePhotoStats([
+      makeAlbum([
+        makePhoto({
+          exif: {
+            FocalLengthIn35mmFormat: Number.NaN,
+            FocalLength: Number.POSITIVE_INFINITY,
+            FNumber: Number.NaN,
+            ISO: Number.NEGATIVE_INFINITY,
+          },
+        }),
+      ]),
+    ]);
+
+    for (const facetId of ["focal-length-35mm", "focal-length-actual", "aperture", "iso"]) {
+      expect(stats.numericFacets.find((facet) => facet.facetId === facetId)?.coverage).toBe(0);
+    }
+    expect(stats.technicalRelationships).toBeNull();
+  });
+
+  it("reports numeric field coverage when a finite value falls between display buckets", () => {
+    const stats = computePhotoStats([makeAlbum([makePhoto({ exif: { FocalLength: 22.5 } })])]);
+
+    const facet = stats.numericFacets.find((item) => item.facetId === "focal-length-actual")!;
+    expect(facet.coverage).toBe(1);
+    expect(facet.data.every((bucket) => bucket.count === 0)).toBe(true);
+  });
+
   it("focal length actual does NOT count photos with only FocalLengthIn35mmFormat", () => {
     const stats = computePhotoStats([
       makeAlbum([makePhoto({ exif: { FocalLengthIn35mmFormat: 35 } })]),
@@ -196,6 +224,19 @@ describe("computePhotoStats", () => {
         },
       ]),
     );
+  });
+
+  it("orders equally frequent cameras alphabetically", () => {
+    const stats = computePhotoStats([
+      makeAlbum([
+        makePhoto({ exif: { Make: "ZEISS", Model: "ZX1" } }),
+        makePhoto({ exif: { Make: "CANON", Model: "R5" } }),
+      ]),
+    ]);
+
+    expect(
+      stats.gearFlow.nodes.filter((node) => node.depth === 0).map((node) => node.label),
+    ).toEqual(["CANON R5", "ZEISS ZX1"]);
   });
 
   it("computes prime vs zoom lens-type stats", () => {
@@ -338,6 +379,7 @@ describe("computePhotoStats", () => {
   it("computes recent month and year trend stats from the latest dated photo", () => {
     const stats = computePhotoStats([
       makeAlbum([
+        makePhoto({ exif: { DateTimeOriginal: "2010:01:01 10:00:00" } }),
         makePhoto({ exif: { DateTimeOriginal: "2023:12:31 10:00:00" } }),
         makePhoto({ exif: { DateTimeOriginal: "2024:03:22 17:45:00" } }),
         makePhoto({ exif: { DateTimeOriginal: "2024:03:23 09:00:00" } }),
@@ -524,6 +566,75 @@ describe("computePhotoStats", () => {
         earlyLabel: "2021",
         recentLabel: "2024",
       }),
+    );
+  });
+
+  it("classifies every colour family, caps examples, and compares multi-year windows", () => {
+    const families: Array<{
+      id: string;
+      rgb: [number, number, number];
+      year: number;
+      paletteSize?: number;
+    }> = [
+      { id: "neutral", rgb: [128, 128, 128], year: 2016 },
+      { id: "red", rgb: [255, 100, 120], year: 2017 },
+      { id: "orange", rgb: [255, 128, 0], year: 2018 },
+      { id: "yellow", rgb: [255, 255, 0], year: 2019 },
+      { id: "green", rgb: [0, 180, 0], year: 2020 },
+      { id: "cyan", rgb: [0, 220, 220], year: 2021 },
+      { id: "blue", rgb: [0, 0, 255], year: 2022 },
+      { id: "purple", rgb: [128, 0, 255], year: 2023 },
+      { id: "pink", rgb: [255, 0, 128], year: 2024, paletteSize: 5 },
+    ];
+    const photos = families.map(({ id, rgb, year, paletteSize = 1 }) => {
+      const photo = makePhoto({
+        tags: { colors: Array.from({ length: paletteSize }, () => rgb) },
+        exif: { DateTimeOriginal: `${year}:06:15 12:30:00` },
+        srcset: id === "pink" ? [{ src: "/pink-thumb.jpg", width: 80, height: 80 }] : [],
+      });
+      return {
+        ...photo,
+        id: `${id}.jpg`,
+        data: {
+          src: `/${id}.jpg`,
+          ...(id === "pink" ? { title: "Pink study" } : {}),
+        },
+      };
+    });
+    for (let index = 0; index < 6; index += 1) {
+      photos.push({
+        ...makePhoto({ tags: { colors: [[220, 30, 30]] } }),
+        id: `extra-red-${index}.jpg`,
+        data: { src: `/extra-red-${index}.jpg` },
+      });
+    }
+    const album = makeAlbum(photos);
+    album.blocks.push({ kind: "text", id: "caption", data: { title: "A caption" } });
+
+    const stats = computePhotoStats([album]);
+
+    for (const label of [
+      "Neutral",
+      "Red",
+      "Orange",
+      "Yellow",
+      "Green",
+      "Cyan",
+      "Blue",
+      "Purple",
+      "Pink",
+    ]) {
+      expect(stats.colorStats.find((bucket) => bucket.label === label)?.count).toBeGreaterThan(0);
+    }
+    expect(stats.paletteSizeStats.find((bucket) => bucket.label === "5+")?.count).toBe(1);
+    expect(stats.colorFamilyExamples.find((bucket) => bucket.label === "Red")?.photos).toHaveLength(
+      6,
+    );
+    expect(stats.colorFamilyExamples.find((bucket) => bucket.label === "Pink")?.photos[0]).toEqual(
+      expect.objectContaining({ src: "/pink-thumb.jpg", label: "Pink study" }),
+    );
+    expect(stats.colorDrift).toEqual(
+      expect.objectContaining({ earlyLabel: "2016–2018", recentLabel: "2022–2024" }),
     );
   });
 
@@ -877,5 +988,62 @@ describe("computePhotoStats", () => {
         }),
       ]),
     );
+  });
+
+  it("ranks revisited places by span, photo count, and label, then keeps four", () => {
+    const geocode = (city: string) => `${city}\nRegion\nSubregion\nCountry`;
+    const at = (city: string, year: number, suffix: string, title?: string): PhotoBlock => {
+      const photo = makePhoto({
+        exif: { DateTimeOriginal: `${year}:06:15 12:00:00` },
+        tags: { geocode: geocode(city) },
+      });
+      return {
+        ...photo,
+        id: `${city}-${suffix}.jpg`,
+        data: {
+          src: `/${city}-${suffix}.jpg`,
+          ...(title ? { title } : {}),
+        },
+      };
+    };
+    const photos = [
+      at("Longest", 2010, "a"),
+      at("Longest", 2024, "b"),
+      at("Most", 2015, "a", "First visit"),
+      at("Most", 2015, "b"),
+      at("Most", 2020, "c"),
+      at("Alpha", 2015, "a"),
+      at("Alpha", 2020, "b"),
+      at("Beta", 2015, "a"),
+      at("Beta", 2020, "b"),
+      at("Gamma", 2015, "a"),
+      at("Gamma", 2020, "b"),
+      at("One year", 2020, "a"),
+      at("One year", 2020, "b"),
+    ];
+
+    const stats = computePhotoStats([makeAlbum(photos)]);
+    expect(stats.revisitedPlaces.map((place) => place.label)).toEqual([
+      "Longest",
+      "Most",
+      "Alpha",
+      "Beta",
+    ]);
+    expect(stats.revisitedPlaces.find((place) => place.label === "Most")?.photoCount).toBe(3);
+    expect(
+      stats.revisitedPlaces.find((place) => place.label === "Most")?.timeline[0].photos[0],
+    ).toEqual(expect.objectContaining({ label: "First visit" }));
+  });
+
+  it("excludes malformed and out-of-range years from the collection date range", () => {
+    const stats = computePhotoStats([
+      makeAlbum([
+        makePhoto({ exif: { DateTimeOriginal: "1800:01:01 10:00:00" } }),
+        makePhoto({ exif: { DateTimeOriginal: "2201:01:01 10:00:00" } }),
+        makePhoto({ exif: { DateTimeOriginal: "not-a-date" } }),
+        makePhoto({ exif: { DateTimeOriginal: "2020:01:01 10:00:00" } }),
+      ]),
+    ]);
+    expect(stats.dateRange).toEqual([2020, 2020]);
   });
 });

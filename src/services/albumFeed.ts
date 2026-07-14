@@ -23,7 +23,7 @@ const joinFeedDescriptionParts = (...parts: Array<string | null | undefined>): s
     .join(" - ");
 };
 
-const getAlbumDirectoryEntries = (albumsPath = ALBUMS_DIR): AlbumDirectoryEntry[] => {
+const getAlbumDirectoryEntries = (albumsPath: string): AlbumDirectoryEntry[] => {
   const albumNames = fs.readdirSync(albumsPath).filter((it) => {
     return fs.lstatSync(path.join(albumsPath, it)).isDirectory();
   });
@@ -50,10 +50,7 @@ const getAlbumDirectoryEntries = (albumsPath = ALBUMS_DIR): AlbumDirectoryEntry[
   });
 };
 
-const getAlbumDirectoryEntry = (
-  slug: string,
-  albumsPath = ALBUMS_DIR,
-): AlbumDirectoryEntry | null => {
+const getAlbumDirectoryEntry = (slug: string, albumsPath: string): AlbumDirectoryEntry | null => {
   return getAlbumDirectoryEntries(albumsPath).find((entry) => entry.slug === slug) ?? null;
 };
 
@@ -248,10 +245,10 @@ export const getAlbumFeedItems = async (
             ),
             link:
               block.kind === "photo"
-                ? `/album/${slug}#${source.split("/").at(-1) ?? ""}`
+                ? `/album/${slug}#${source.split("/").at(-1)}`
                 : block.data?.type === "youtube"
                   ? `/album/${slug}`
-                  : `/album/${slug}#${source.split("/").at(-1) ?? ""}`,
+                  : `/album/${slug}#${source.split("/").at(-1)}`,
             pubDate: sortDate,
             sortDate,
           });

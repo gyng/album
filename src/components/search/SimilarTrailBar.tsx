@@ -3,7 +3,7 @@ import Link from "next/link";
 import { SegmentedToggle, pillStyles } from "../ui";
 import styles from "./Search.module.css";
 import { getResizedAlbumImageSrc } from "../../util/getResizedAlbumImageSrc";
-import { SimilarityOrder } from "./searchUtils";
+import { forceDocumentNavigation, SimilarityOrder } from "./searchUtils";
 
 export type SimilarTrailItem = {
   path: string;
@@ -61,6 +61,7 @@ export const SimilarTrailBar: React.FC<Props> = ({
       arr.slice(0, idx).filter((candidate) => candidate.path === item.path).length
     }`,
   }));
+  const slideshowHref = `/slideshow?mode=similar&seed=${encodeURIComponent(similarPath)}`;
 
   useSafeLayoutEffect(() => {
     const nextPositions: Record<string, DOMRect> = {};
@@ -79,11 +80,9 @@ export const SimilarTrailBar: React.FC<Props> = ({
     };
 
     breadcrumbEntries.forEach((entry) => {
-      const element = breadcrumbRefs.current[entry.key];
-
-      if (!element) {
-        return;
-      }
+      // Every entry is rendered in the same commit; callback refs have run
+      // before this layout effect.
+      const element = breadcrumbRefs.current[entry.key]!;
 
       const currentPosition = element.getBoundingClientRect();
       const previousPosition = breadcrumbPositionsRef.current[entry.key];
@@ -153,15 +152,10 @@ export const SimilarTrailBar: React.FC<Props> = ({
             ) : null}
             <a
               className={styles.modeSourceSlideshowButton}
-              href={`/slideshow?mode=similar&seed=${encodeURIComponent(similarPath)}`}
+              href={slideshowHref}
               aria-label="Start similarity trail slideshow"
               title="Start similarity trail slideshow"
-              onClick={(event) => {
-                event.preventDefault();
-                window.location.assign(
-                  `/slideshow?mode=similar&seed=${encodeURIComponent(similarPath)}`,
-                );
-              }}
+              onClick={(event) => forceDocumentNavigation(event, slideshowHref)}
             >
               🖼️
             </a>
@@ -190,7 +184,7 @@ export const SimilarTrailBar: React.FC<Props> = ({
           <div className={styles.breadcrumbs} aria-label="Similarity breadcrumbs">
             {[...breadcrumbEntries].reverse().map((entry) => {
               const { path, idx, key, similarity } = entry;
-              const label = path.split("/").at(-1) ?? path;
+              const label = path.split("/").at(-1)!;
               const opacity = 0.35 + (0.55 * (idx + 1)) / trail.length;
               const similarityLabel =
                 typeof similarity === "number" ? `${Math.round(similarity * 100)}%` : null;

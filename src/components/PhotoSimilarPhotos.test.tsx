@@ -2,7 +2,7 @@
  * @jest-environment jsdom
  */
 
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { PhotoSimilarPhotos } from "./PhotoSimilarPhotos";
 import { useDatabase, useEmbeddingsDatabase } from "./database/useDatabase";
 import { fetchSimilarResults } from "./search/api";
@@ -38,6 +38,88 @@ describe("PhotoSimilarPhotos", () => {
 
     expect(screen.getByText(/Loading search index \(42%\)/i)).toBeTruthy();
     expect(fetchSimilarResults).not.toHaveBeenCalled();
+  });
+
+  it("omits the progress suffix until either database reports progress", () => {
+    (useDatabase as jest.Mock).mockReturnValue([null, 0]);
+    (useEmbeddingsDatabase as jest.Mock).mockReturnValue([null, 0]);
+    const view = render(<PhotoSimilarPhotos path="photo.jpg" />);
+    expect(screen.getByText("Loading search index…")).toBeInTheDocument();
+
+    (useDatabase as jest.Mock).mockReturnValue([{ name: "db" }, 100]);
+    view.rerender(<PhotoSimilarPhotos path="photo.jpg" />);
+    expect(screen.getByText("Loading similarity index…")).toBeInTheDocument();
+  });
+
+  it("does not load databases when no source path is available", () => {
+    (useDatabase as jest.Mock).mockReturnValue([null, 0]);
+    (useEmbeddingsDatabase as jest.Mock).mockReturnValue([null, 0]);
+
+    const { container } = render(<PhotoSimilarPhotos path={null} />);
+
+    expect(container).toBeEmptyDOMElement();
+    expect(useEmbeddingsDatabase).toHaveBeenCalledWith(false);
+    expect(fetchSimilarResults).not.toHaveBeenCalled();
+  });
+
+  it("reports similarity-index progress after the search index opens", () => {
+    (useDatabase as jest.Mock).mockReturnValue([{ name: "db" }, 100]);
+    (useEmbeddingsDatabase as jest.Mock).mockReturnValue([null, 51.6]);
+
+    render(<PhotoSimilarPhotos path="photo.jpg" />);
+
+    expect(screen.getByText(/Loading similarity index \(52%\)/)).toBeInTheDocument();
+    expect(fetchSimilarResults).not.toHaveBeenCalled();
+  });
+
+  it("shows a search state while the first similarity query is pending", () => {
+    (useDatabase as jest.Mock).mockReturnValue([{ name: "db" }, 100]);
+    (useEmbeddingsDatabase as jest.Mock).mockReturnValue([{ name: "embeddings" }, 100]);
+    (fetchSimilarResults as jest.Mock).mockReturnValue(new Promise(() => {}));
+
+    render(<PhotoSimilarPhotos path="photo.jpg" />);
+
+    expect(screen.getByText("Finding similar photos…")).toBeInTheDocument();
+  });
+
+  it("distinguishes an empty index from a failed query", async () => {
+    const consoleError = jest.spyOn(console, "error").mockImplementation(() => {});
+    (useDatabase as jest.Mock).mockReturnValue([{ name: "db" }, 100]);
+    (useEmbeddingsDatabase as jest.Mock).mockReturnValue([{ name: "embeddings" }, 100]);
+    (fetchSimilarResults as jest.Mock).mockResolvedValueOnce({ data: [], next: null });
+
+    const view = render(<PhotoSimilarPhotos path="empty.jpg" />);
+    expect(
+      await screen.findByText("No similar photos indexed for this image yet."),
+    ).toBeInTheDocument();
+
+    (fetchSimilarResults as jest.Mock).mockRejectedValueOnce(new Error("database unavailable"));
+    view.rerender(<PhotoSimilarPhotos path="broken.jpg" />);
+    expect(await screen.findByText("Could not load similar photos.")).toBeInTheDocument();
+    expect(consoleError).toHaveBeenCalledWith("Failed to load similar photos", expect.any(Error));
+    consoleError.mockRestore();
+  });
+
+  it.each(["resolve", "reject"])("ignores a late %s after unmount", async (outcome) => {
+    (useDatabase as jest.Mock).mockReturnValue([{ name: "db" }, 100]);
+    (useEmbeddingsDatabase as jest.Mock).mockReturnValue([{ name: "embeddings" }, 100]);
+    let settle!: (value?: unknown) => void;
+    const pending = new Promise((resolve, reject) => {
+      settle = outcome === "resolve" ? resolve : reject;
+    });
+    (fetchSimilarResults as jest.Mock).mockReturnValue(pending);
+
+    const view = render(<PhotoSimilarPhotos path="photo.jpg" />);
+    view.unmount();
+    await act(async () => {
+      settle(outcome === "resolve" ? { data: [], next: null } : new Error("late failure"));
+      try {
+        await pending;
+      } catch {
+        // The component deliberately ignores rejected work after cancellation.
+      }
+      await Promise.resolve();
+    });
   });
 
   it("renders linked thumbnail results once similarity data is available", async () => {
@@ -103,7 +185,10 @@ describe("PhotoSimilarPhotos", () => {
       })
       .mockResolvedValueOnce({
         data: Array.from({ length: 9 }, (_value, idx) => ({
-          path: `../albums/test-simple/second-${idx}.jpg`,
+          path:
+            idx === 0
+              ? "../albums/test-simple/first-0.jpg"
+              : `../albums/test-simple/second-${idx}.jpg`,
           album_relative_path: `/album/test-simple#second-${idx}.jpg`,
           filename: `second-${idx}.jpg`,
           alt_text: `Second ${idx}`,
@@ -132,6 +217,7 @@ describe("PhotoSimilarPhotos", () => {
     });
 
     expect(await screen.findByRole("img", { name: /Second 8/i })).toBeTruthy();
-    expect(screen.getAllByRole("img")).toHaveLength(17);
+    expect(screen.getAllByRole("img")).toHaveLength(16);
+    expect(screen.getAllByRole("img", { name: /First 0/i })).toHaveLength(1);
   });
 });

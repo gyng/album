@@ -2,12 +2,11 @@ import { TIER_SUCCESS, TIER_WARNING, TIER_DANGER } from "./guessScoring";
 
 /** Lightweight canvas confetti burst. Self-cleans after the animation. */
 export const fireConfetti = (opts?: { x?: number; y?: number }) => {
+  if (typeof window === "undefined" || typeof document === "undefined") return;
+
   // Respect reduced-motion: a full-screen particle burst is the most
   // motion-heavy effect on the site, so skip it entirely.
-  if (
-    typeof window !== "undefined" &&
-    window.matchMedia("(prefers-reduced-motion: reduce)").matches
-  ) {
+  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
     return;
   }
 

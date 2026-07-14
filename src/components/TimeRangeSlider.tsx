@@ -91,8 +91,7 @@ export const TimeRangeSlider: React.FC<TimeRangeSliderProps> = ({
   const toPos = hasRange ? clampPosition(msToPosition(toMs, extent)) : 1;
 
   const getPositionFromPointer = (clientX: number): number => {
-    const track = trackRef.current;
-    if (!track) return 0;
+    const track = trackRef.current!;
     const rect = track.getBoundingClientRect();
     return Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
   };

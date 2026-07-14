@@ -6,7 +6,7 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 
-const { createBuildManifest, writeBuildManifest } = require("./write-build-manifest.cjs");
+const { createBuildManifest, run, writeBuildManifest } = require("./write-build-manifest.cjs");
 
 describe("build manifest generation", () => {
   const originalEnv = process.env;
@@ -31,6 +31,17 @@ describe("build manifest generation", () => {
       builtAt: "2026-03-29T00:00:00.000Z",
       gitSha: "abcdef1234567890",
     });
+  });
+
+  it("creates timestamped metadata from the running repository by default", () => {
+    delete process.env.NEXT_PUBLIC_BUILD_VERSION;
+    delete process.env.VERCEL_GIT_COMMIT_SHA;
+
+    const manifest = createBuildManifest();
+
+    expect(Date.parse(manifest.builtAt)).not.toBeNaN();
+    expect(manifest.gitSha).toMatch(/^[0-9a-f]{40}$/);
+    expect(manifest.buildVersion).toBe(manifest.gitSha);
   });
 
   it("uses the git SHA as the default reload version across timestamp-only rebuilds", () => {
@@ -129,5 +140,58 @@ describe("build manifest generation", () => {
     const buildVersionModule = fs.readFileSync(buildVersionModulePath, "utf8");
     expect(buildVersionModule).toContain('export const BUILD_VERSION = "build-456";');
     expect(buildVersionModule).toContain('"gitSha": "fedcba9876543210"');
+  });
+
+  it("uses the application root when no write options are supplied", () => {
+    const mkdir = jest.spyOn(fs, "mkdirSync").mockImplementation(() => undefined);
+    const write = jest.spyOn(fs, "writeFileSync").mockImplementation(() => undefined);
+
+    try {
+      const result = writeBuildManifest();
+
+      expect(result.versionJsonPath).toBe(path.resolve(__dirname, "../public/version.json"));
+      expect(result.buildVersionModulePath).toBe(path.resolve(__dirname, "../lib/buildVersion.ts"));
+      expect(mkdir).toHaveBeenCalledTimes(2);
+      expect(write).toHaveBeenCalledTimes(2);
+    } finally {
+      mkdir.mockRestore();
+      write.mockRestore();
+    }
+  });
+
+  it("reports the generated version through the command adapter", () => {
+    const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "album-build-manifest-run-"));
+    const log = jest.fn();
+
+    const manifest = run(
+      {
+        appRoot: tempRoot,
+        buildVersion: "release-789",
+        builtAt: "2026-03-29T01:02:03.000Z",
+        gitSha: "fedcba9876543210",
+      },
+      log,
+    );
+
+    expect(manifest.buildVersion).toBe("release-789");
+    expect(log).toHaveBeenCalledWith("Wrote build manifest release-789");
+  });
+
+  it("logs through the console by default", () => {
+    const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "album-build-manifest-console-"));
+    const log = jest.spyOn(console, "log").mockImplementation(() => undefined);
+
+    try {
+      run({
+        appRoot: tempRoot,
+        buildVersion: "release-console",
+        builtAt: "2026-03-29T01:02:03.000Z",
+        gitSha: "fedcba9876543210",
+      });
+
+      expect(log).toHaveBeenCalledWith("Wrote build manifest release-console");
+    } finally {
+      log.mockRestore();
+    }
   });
 });

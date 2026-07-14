@@ -6,24 +6,24 @@ export const hasMapCoordinates = (block: Block): block is PhotoBlock => {
   if (block.kind !== "photo") {
     return false;
   }
-  const { GPSLongitude, GPSLatitude, GPSLongitudeRef, GPSLatitudeRef } = block._build?.exif ?? {};
+  const { GPSLongitude, GPSLatitude, GPSLongitudeRef, GPSLatitudeRef } = block._build.exif;
   return Boolean(GPSLongitude && GPSLatitude && GPSLongitudeRef && GPSLatitudeRef);
 };
 
 export const getMapPhotoHref = (albumSlug: string, photo: PhotoBlock): string => {
-  const filename = photo.data.src.split("/").at(-1) ?? "";
+  const filename = photo.data.src.split("/").at(-1)!;
   return `/album/${albumSlug}#${encodeURIComponent(filename)}`;
 };
 
 export const buildMapPhotoSearchText = (photo: PhotoBlock): string => {
-  const tags = photo._build?.tags;
+  const tags = photo._build.tags;
   const rawTags = tags?.tags as unknown;
   const searchableTags = Array.isArray(rawTags)
     ? rawTags.filter((value): value is string => typeof value === "string").join(" ")
     : typeof rawTags === "string"
       ? rawTags
       : null;
-  const exif = photo._build?.exif ?? {};
+  const exif = photo._build.exif;
 
   return [
     photo.data.title,

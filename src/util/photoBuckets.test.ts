@@ -241,6 +241,10 @@ describe("CAMERA_FACET", () => {
     expect(CAMERA_FACET.extract(exif({ Model: "iPhone 15 Pro" }))).toBe("iPhone 15 Pro");
   });
 
+  it("returns just Make when Model is absent", () => {
+    expect(CAMERA_FACET.extract(exif({ Make: "Leica" }))).toBe("Leica");
+  });
+
   it("returns null when both are absent", () => {
     expect(CAMERA_FACET.extract(exif())).toBeNull();
   });

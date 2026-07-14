@@ -129,4 +129,59 @@ describe("timeline page data fetching", () => {
       },
     });
   });
+
+  it("skips unusable dated photos and deterministically sorts equal dates", async () => {
+    const makePhoto = (
+      id: string,
+      date: string,
+      exif: Record<string, unknown> = {},
+      withSrc = true,
+    ) => ({
+      kind: "photo",
+      id,
+      data: { src: `nested/${id}` },
+      _build: {
+        width: 10,
+        height: 20,
+        exif: { DateTimeOriginal: date, ...exif },
+        tags: id === "b.jpg" ? { geocode: "Somewhere" } : {},
+        srcset: withSrc ? [{ src: `/${id}`, width: 10, height: 20 }] : [],
+      },
+    });
+    getAlbums.mockResolvedValue([
+      {
+        blocks: [
+          makePhoto("missing-src.jpg", "2024-01-01T00:00:00", {}, false),
+          makePhoto("invalid.jpg", "not-a-date"),
+          makePhoto("gps-one.jpg", "2024-01-01T09:00:00", { GPSLongitude: [1] }),
+          makePhoto("gps-two.jpg", "2024-01-01T09:00:00", {
+            GPSLongitude: [1],
+            GPSLatitude: [2],
+          }),
+          makePhoto("gps-three.jpg", "2024-01-01T09:00:00", {
+            GPSLongitude: [1],
+            GPSLatitude: [2],
+            GPSLongitudeRef: "E",
+          }),
+          makePhoto("b.jpg", "2024-01-01T11:00:00"),
+          makePhoto("a.jpg", "2024-01-01T11:00:00"),
+        ],
+        _build: { slug: "equal" },
+      },
+    ]);
+
+    const result = await getTimelinePageStaticProps({});
+    expect(result.props.entries.map((entry: { path: string }) => entry.path)).toEqual([
+      "nested/a.jpg",
+      "nested/b.jpg",
+      "nested/gps-one.jpg",
+      "nested/gps-three.jpg",
+      "nested/gps-two.jpg",
+    ]);
+    expect(result.props.entries[0]).toMatchObject({
+      placeholderColor: "transparent",
+      geocode: null,
+    });
+    expect(result.props.entries[1]).toMatchObject({ geocode: "Somewhere" });
+  });
 });

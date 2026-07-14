@@ -27,7 +27,11 @@ const makePseudoRandom = (seed: number) => {
   };
 };
 
-const makeAlbum = (paths: string[], tagsForPath?: (index: number) => string[]) =>
+const makeAlbum = (
+  paths: string[],
+  tagsForPath?: (index: number) => string[],
+  dateForPath?: (index: number) => string | undefined,
+) =>
   ({
     name: "real-album",
     _build: { slug: "real-album" },
@@ -38,12 +42,13 @@ const makeAlbum = (paths: string[], tagsForPath?: (index: number) => string[]) =
       _build: {
         tags: { path: photoPath, tags: tagsForPath?.(index) },
         srcset: [{ src: photoPath }],
+        exif: dateForPath?.(index) ? { DateTimeOriginal: dateForPath(index) } : {},
       },
     })),
   }) as any;
 
 const createEmbeddingsDb = (
-  rows: Array<{ path: string; model_id: string; json: string }>,
+  rows: Array<{ path: string; model_id: string; json: string | null }>,
 ): Promise<string> => {
   const dir = fs.mkdtempSync(nodePath.join(os.tmpdir(), "embstats-"));
   const dbPath = nodePath.join(dir, "search-embeddings.sqlite");
@@ -61,7 +66,13 @@ const createEmbeddingsDb = (
           "INSERT INTO embeddings (path, model_id, embedding_dim, embedding_json) VALUES (?, ?, ?, ?)",
         );
         rows.forEach((row) => {
-          const dim = (JSON.parse(row.json) as number[]).length;
+          let parsed: unknown;
+          try {
+            parsed = typeof row.json === "string" ? JSON.parse(row.json) : null;
+          } catch {
+            parsed = null;
+          }
+          const dim = Array.isArray(parsed) ? parsed.length : 0;
           stmt.run(row.path, row.model_id, dim, row.json);
         });
         stmt.finalize((finalizeErr: Error | null) => {
@@ -91,7 +102,7 @@ const quantiseToInt8 = (vector: number[]): { blob: Buffer; scale: number } => {
 };
 
 const createBlobEmbeddingsDb = (
-  rows: Array<{ path: string; model_id: string; json: string }>,
+  rows: Array<{ path: string; model_id: string; json: string; scale?: number | null }>,
 ): Promise<string> => {
   const dir = fs.mkdtempSync(nodePath.join(os.tmpdir(), "embstats-blob-"));
   const dbPath = nodePath.join(dir, "search-embeddings.sqlite");
@@ -111,7 +122,13 @@ const createBlobEmbeddingsDb = (
         rows.forEach((row) => {
           const vector = JSON.parse(row.json) as number[];
           const { blob, scale } = quantiseToInt8(vector);
-          stmt.run(row.path, row.model_id, vector.length, blob, scale);
+          stmt.run(
+            row.path,
+            row.model_id,
+            vector.length,
+            blob,
+            row.scale === undefined ? scale : row.scale,
+          );
         });
         stmt.finalize((finalizeErr: Error | null) => {
           if (finalizeErr) {
@@ -125,6 +142,29 @@ const createBlobEmbeddingsDb = (
             }
             resolve(dbPath);
           });
+        });
+      });
+    });
+  });
+};
+
+const createDatabaseWithStatements = (statements: string[]): Promise<string> => {
+  const dir = fs.mkdtempSync(nodePath.join(os.tmpdir(), "embstats-schema-"));
+  const dbPath = nodePath.join(dir, "search-embeddings.sqlite");
+  return new Promise((resolve, reject) => {
+    const db = new sqlite3.Database(dbPath, (err: Error | null) => {
+      if (err) {
+        reject(err);
+        return;
+      }
+      db.serialize(() => {
+        statements.forEach((statement) => db.run(statement));
+        db.close((closeErr: Error | null) => {
+          if (closeErr) {
+            reject(closeErr);
+            return;
+          }
+          resolve(dbPath);
         });
       });
     });
@@ -194,6 +234,23 @@ describe("computeVisualSamenessStats with a mixed v1/v2 database", () => {
     expect(stats).not.toBeNull();
     expect(stats?.sampleSize).toBe(30);
   });
+
+  it("reads blob embeddings that omit the legacy scale", async () => {
+    const paths = Array.from({ length: 30 }, (_, index) => `../albums/real/blob-${index}.jpg`);
+    const rows = paths.map((photoPath, index) => ({
+      path: photoPath,
+      model_id: V2_MODEL_ID,
+      json: JSON.stringify(
+        Array.from({ length: 30 }, (_, valueIndex) => (valueIndex === index ? 1 : 0)),
+      ),
+      scale: null,
+    }));
+
+    const dbPath = await createBlobEmbeddingsDb(rows);
+    const stats = await computeVisualSamenessStats([makeAlbum(paths)], dbPath);
+
+    expect(stats?.sampleSize).toBe(30);
+  });
 });
 
 describe("deriveEraLabel", () => {
@@ -224,6 +281,205 @@ describe("deriveEraLabel", () => {
 
   it("falls back when the cluster has no tags", () => {
     expect(deriveEraLabel([[], []], new Map(), "Era 3")).toBe("Era 3");
+  });
+
+  it("uses the cluster count when an overall tag count is unavailable", () => {
+    expect(deriveEraLabel([["night"], ["night"]], new Map(), "Era 1")).toBe("night");
+  });
+});
+
+describe("computeVisualSamenessStats boundaries", () => {
+  const paths = Array.from({ length: 30 }, (_, index) => `../albums/real/boundary-${index}.jpg`);
+
+  it("uses the default DB, the canonical fallback, and reports no available DB", async () => {
+    await expect(computeVisualSamenessStats([])).resolves.toBeNull();
+    await expect(
+      computeVisualSamenessStats([], nodePath.join(os.tmpdir(), "does-not-exist.sqlite")),
+    ).resolves.toBeNull();
+
+    const dir = fs.mkdtempSync(nodePath.join(os.tmpdir(), "embstats-empty-file-"));
+    const emptyPath = nodePath.join(dir, "empty.sqlite");
+    fs.writeFileSync(emptyPath, "");
+    await expect(computeVisualSamenessStats([], emptyPath)).resolves.toBeNull();
+
+    const exists = jest.spyOn(fs, "existsSync").mockReturnValue(false);
+    try {
+      await expect(computeVisualSamenessStats([], emptyPath)).resolves.toBeNull();
+    } finally {
+      exists.mockRestore();
+    }
+  });
+
+  it("returns null before opening SQLite when fewer than 24 paths are selected", async () => {
+    const dbPath = await createEmbeddingsDb([]);
+    await expect(
+      computeVisualSamenessStats([makeAlbum(paths.slice(0, 23))], dbPath),
+    ).resolves.toBeNull();
+  });
+
+  it("returns null when the database lacks the embeddings table", async () => {
+    const dbPath = await createDatabaseWithStatements(["CREATE TABLE other (value TEXT)"]);
+    await expect(computeVisualSamenessStats([makeAlbum(paths)], dbPath)).resolves.toBeNull();
+  });
+
+  it("returns null when the embeddings table has no model rows", async () => {
+    const dbPath = await createEmbeddingsDb([]);
+    await expect(computeVisualSamenessStats([makeAlbum(paths)], dbPath)).resolves.toBeNull();
+  });
+
+  it("ignores missing, malformed, and non-array legacy JSON vectors", async () => {
+    const rows = paths.map((photoPath, index) => ({
+      path: photoPath,
+      model_id: V2_MODEL_ID,
+      json: index % 3 === 0 ? null : index % 3 === 1 ? "not json" : "{}",
+    }));
+    const dbPath = await createEmbeddingsDb(rows);
+    await expect(computeVisualSamenessStats([makeAlbum(paths)], dbPath)).resolves.toBeNull();
+  });
+
+  it("rejects a path SQLite cannot open", async () => {
+    const directory = fs.mkdtempSync(nodePath.join(os.tmpdir(), "embstats-directory-"));
+    await expect(computeVisualSamenessStats([makeAlbum(paths)], directory)).rejects.toBeDefined();
+  });
+
+  it("closes and rejects when a non-database file fails its first query", async () => {
+    const directory = fs.mkdtempSync(nodePath.join(os.tmpdir(), "embstats-corrupt-"));
+    const corruptPath = nodePath.join(directory, "corrupt.sqlite");
+    fs.writeFileSync(corruptPath, "this is not sqlite");
+    await expect(computeVisualSamenessStats([makeAlbum(paths)], corruptPath)).rejects.toBeDefined();
+  });
+});
+
+describe("computeVisualSamenessStats derived views", () => {
+  it("builds a camera-local timeline and drift comparison from dated photos", async () => {
+    const paths = Array.from({ length: 60 }, (_, index) => `../albums/real/dated-${index}.jpg`);
+    const rng = makePseudoRandom(41);
+    const rows = paths.map((photoPath) => ({
+      path: photoPath,
+      model_id: V2_MODEL_ID,
+      json: JSON.stringify(normalize([rng() * 2 - 1, rng() * 2 - 1, rng() * 2 - 1])),
+    }));
+    const album = makeAlbum(
+      paths,
+      (index) => (index % 2 === 0 ? ["street"] : ["landscape"]),
+      (index) =>
+        index === 0
+          ? "not-a-date"
+          : index < 30
+            ? `2020:01:${String((index % 28) + 1).padStart(2, "0")} 23:30:00`
+            : `2024:12:${String((index % 28) + 1).padStart(2, "0")} 00:30:00`,
+    );
+    const firstPhoto = album.blocks[0] as any;
+    firstPhoto.data = { src: paths[0] };
+    firstPhoto._build.srcset = [];
+    album.blocks.push({ kind: "text", id: "caption", data: { title: "Caption" } } as any);
+    album.blocks.push({
+      kind: "photo",
+      id: "missing-path",
+      data: { src: "/missing-path.jpg" },
+      _build: { tags: {}, srcset: [], exif: {} },
+    } as any);
+
+    const nameTestAlbum = makeAlbum(paths);
+    nameTestAlbum.name = "test-hidden";
+    const slugTestAlbum = makeAlbum(paths);
+    slugTestAlbum._build.slug = "test-hidden";
+    const dbPath = await createEmbeddingsDb(rows);
+    const stats = await computeVisualSamenessStats([album, nameTestAlbum, slugTestAlbum], dbPath);
+
+    expect(stats?.lookTimeline.map(({ year, count }) => ({ year, count }))).toEqual([
+      { year: 2020, count: 29 },
+      { year: 2024, count: 30 },
+    ]);
+    expect(stats?.lookDrift).toEqual(expect.objectContaining({ firstYear: 2020, lastYear: 2024 }));
+    expect(stats?.averageExamples).toHaveLength(12);
+    expect(stats?.outlierExamples).toHaveLength(12);
+  });
+
+  it("keeps one populated era when degenerate vectors leave other clusters empty", async () => {
+    const paths = Array.from({ length: 60 }, (_, index) => `../albums/real/flat-${index}.jpg`);
+    const rows = paths.map((photoPath) => ({
+      path: photoPath,
+      model_id: V2_MODEL_ID,
+      json: JSON.stringify([0.5, 0]),
+    }));
+    const dbPath = await createEmbeddingsDb(rows);
+    const stats = await computeVisualSamenessStats([makeAlbum(paths)], dbPath);
+
+    expect(stats?.visualEras).toHaveLength(1);
+    expect(stats?.visualEras[0]).toEqual(expect.objectContaining({ count: 60, label: "Era 1" }));
+  });
+
+  it("normalises an exactly balanced zero centroid", async () => {
+    const vectors = Array.from({ length: 12 }, (_, index) => {
+      const angle = (index * Math.PI) / 12;
+      const vector = [Math.cos(angle), Math.sin(angle)];
+      return [vector, vector.map((value) => -value)];
+    }).flat();
+    const paths = vectors.map((_, index) => `../albums/real/balanced-${index}.jpg`);
+    const rows = paths.map((photoPath, index) => ({
+      path: photoPath,
+      model_id: V2_MODEL_ID,
+      json: JSON.stringify(vectors[index]),
+    }));
+    const dbPath = await createEmbeddingsDb(rows);
+    const stats = await computeVisualSamenessStats([makeAlbum(paths)], dbPath);
+
+    expect(stats?.sampleSize).toBe(24);
+    expect(stats?.averageExamples.every((example) => example.centroidSimilarityPercent === 0)).toBe(
+      true,
+    );
+  });
+
+  it("skips exact duplicates while still finding the next-nearest photo", async () => {
+    const base = Array.from({ length: 15 }, (_, index) => {
+      const angle = (index * Math.PI * 2) / 15;
+      return normalize([Math.cos(angle), Math.sin(angle), 0.1]);
+    });
+    const vectors = base.flatMap((vector) => [vector, vector]);
+    const paths = vectors.map((_, index) => `../albums/real/duplicate-${index}.jpg`);
+    const rows = paths.map((photoPath, index) => ({
+      path: photoPath,
+      model_id: V2_MODEL_ID,
+      json: JSON.stringify(vectors[index]),
+    }));
+    const dbPath = await createEmbeddingsDb(rows);
+    const stats = await computeVisualSamenessStats([makeAlbum(paths)], dbPath);
+
+    expect(stats?.sampleSize).toBe(30);
+    expect(stats?.repeatedExamples.length).toBeGreaterThan(0);
+  });
+
+  it("omits an item with no usable neighbour while retaining a valid 24-photo sample", async () => {
+    const vectors = [
+      ...Array.from({ length: 24 }, (_, index) => {
+        const angle = (index * Math.PI * 2) / 24;
+        return [Math.cos(angle), Math.sin(angle), -1];
+      }),
+      [0, 0, 1],
+    ];
+    const paths = vectors.map((_, index) => `../albums/real/mixed-${index}.jpg`);
+    const rows = paths.map((photoPath, index) => ({
+      path: photoPath,
+      model_id: V2_MODEL_ID,
+      json: JSON.stringify(vectors[index]),
+    }));
+    const dbPath = await createEmbeddingsDb(rows);
+    const stats = await computeVisualSamenessStats([makeAlbum(paths)], dbPath);
+
+    expect(stats?.sampleSize).toBe(24);
+  });
+
+  it("returns null when exact duplicates leave fewer than 24 usable neighbours", async () => {
+    const paths = Array.from({ length: 24 }, (_, index) => `../albums/real/identical-${index}.jpg`);
+    const rows = paths.map((photoPath) => ({
+      path: photoPath,
+      model_id: V2_MODEL_ID,
+      json: JSON.stringify([1, 0]),
+    }));
+    const dbPath = await createEmbeddingsDb(rows);
+
+    await expect(computeVisualSamenessStats([makeAlbum(paths)], dbPath)).resolves.toBeNull();
   });
 });
 

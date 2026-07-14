@@ -11,6 +11,8 @@ import { ThemeToggle } from "./ThemeToggle";
 describe("ThemeToggle", () => {
   afterEach(() => {
     localStorage.clear();
+    window.history.replaceState(window.history.state, "", "/");
+    document.documentElement.classList.remove("dark", "light");
     document.body.className = "";
     document.body.innerHTML = "";
   });
@@ -115,5 +117,38 @@ describe("ThemeToggle", () => {
     expect(screen.getByLabelText(/switch to (light|dark) theme/i).textContent).toContain("🌙");
 
     matchMediaSpy.mockRestore();
+  });
+
+  it("gives explicit URL themes precedence over stored preferences", () => {
+    localStorage.setItem("darkMode", "false");
+    window.history.replaceState(window.history.state, "", "/?theme=dark");
+    const darkRender = render(<ThemeToggle />);
+
+    expect(screen.getByRole("button", { name: "Switch to light theme" })).toBeTruthy();
+    expect(document.documentElement).toHaveClass("dark");
+    darkRender.unmount();
+
+    localStorage.setItem("darkMode", "true");
+    window.history.replaceState(window.history.state, "", "/?theme=light");
+    render(<ThemeToggle />);
+    expect(screen.getByRole("button", { name: "Switch to dark theme" })).toBeTruthy();
+    expect(document.documentElement).toHaveClass("light");
+  });
+
+  it("defaults safely when matchMedia is unavailable", () => {
+    const originalMatchMedia = window.matchMedia;
+    Object.defineProperty(window, "matchMedia", {
+      configurable: true,
+      value: undefined,
+    });
+
+    const { unmount } = render(<ThemeToggle />);
+    expect(screen.getByRole("button", { name: "Switch to light theme" })).toBeTruthy();
+    unmount();
+
+    Object.defineProperty(window, "matchMedia", {
+      configurable: true,
+      value: originalMatchMedia,
+    });
   });
 });

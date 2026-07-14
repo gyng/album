@@ -27,10 +27,8 @@ const writeStoredDarkMode = (value: boolean | null): void => {
 };
 
 const getInitialDarkMode = (): boolean | null => {
-  if (typeof window === "undefined") {
-    return null;
-  }
-
+  // This is the client snapshot passed to useSyncExternalStore. Server renders
+  // use the explicit server snapshot below and never call this function.
   const url = new URL(window.location.toString());
   const theme = url.searchParams.get("theme");
   if (theme === "dark") {
@@ -51,7 +49,7 @@ const getInitialDarkMode = (): boolean | null => {
 };
 
 const prefersDarkMediaQuery = (): MediaQueryList | null =>
-  typeof window !== "undefined" && typeof window.matchMedia === "function"
+  typeof window.matchMedia === "function"
     ? window.matchMedia("(prefers-color-scheme: dark)")
     : null;
 

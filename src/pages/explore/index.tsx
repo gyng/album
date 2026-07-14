@@ -361,7 +361,7 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
                         {visualSameness.visualEras.length}
                       </div>
                       <div className={styles.funStatDetail}>
-                        The biggest era covers {visualSameness.visualEras[0]?.sharePercent ?? 0}% of
+                        The biggest era covers {visualSameness.visualEras[0].sharePercent}% of
                         embedded photos.
                       </div>
                     </Card>
@@ -641,16 +641,11 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
                     Settings relationships
                   </Heading>
                   <Caption as="span">
-                    {filteredTechnicalRelationships
-                      ? `Based on ${filteredTechnicalRelationships.total.toLocaleString("en")} photos with focal length, aperture, and ISO`
-                      : "No matching photos with focal length, aperture, and ISO for this combination"}
+                    Based on {filteredTechnicalRelationships!.total.toLocaleString("en")} photos
+                    with focal length, aperture, and ISO
                   </Caption>
                 </div>
-                {filteredTechnicalRelationships ? (
-                  <TechnicalHeatmaps data={filteredTechnicalRelationships} layout="tri-grid" />
-                ) : (
-                  <Caption size="sm">No data available.</Caption>
-                )}
+                <TechnicalHeatmaps data={filteredTechnicalRelationships!} layout="tri-grid" />
               </section>
             ) : null}
           </StatGroup>

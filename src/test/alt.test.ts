@@ -72,6 +72,63 @@ describe("getPhotoAltText", () => {
     ).toBe("shibuya crossing, April 7, 2024");
   });
 
+  it("uses a humanised filename when the capture date is unavailable", () => {
+    expect(
+      getPhotoAltText(
+        buildBlock({
+          data: { src: "albums/tokyo/night_train.JPG" },
+          _build: {
+            width: 1200,
+            height: 800,
+            exif: { DateTimeOriginal: "not-a-camera-date" },
+            tags: {},
+            srcset: [{ src: "/night_train.avif", width: 1200, height: 800 }],
+          },
+        }),
+      ),
+    ).toBe("night train");
+  });
+
+  it("combines the provided fallback with a capture date when no filename is available", () => {
+    expect(
+      getPhotoAltText(
+        buildBlock({
+          data: { src: "" },
+          _build: {
+            width: 1200,
+            height: 800,
+            exif: { DateTimeOriginal: "2024-04-07T12:34:56" },
+            tags: {},
+            srcset: [],
+          },
+        }),
+        "Slideshow photo",
+      ),
+    ).toBe("Slideshow photo, April 7, 2024");
+  });
+
+  it("normalises whitespace and follows the editorial fallback order", () => {
+    expect(
+      getPhotoAltText(
+        buildBlock({
+          data: {
+            src: "photo.jpg",
+            title: "   ",
+            kicker: "  Morning\n light  ",
+            description: "A later fallback",
+          },
+          _build: {
+            width: 1200,
+            height: 800,
+            exif: {},
+            tags: { alt_text: "\t" },
+            srcset: [],
+          },
+        }),
+      ),
+    ).toBe("Morning light");
+  });
+
   it("uses the provided fallback when no metadata is available", () => {
     expect(
       getPhotoAltText(
@@ -81,5 +138,11 @@ describe("getPhotoAltText", () => {
         "Slideshow photo",
       ),
     ).toBe("Slideshow photo");
+  });
+
+  it("ignores filenames that contain only separators", () => {
+    expect(getPhotoAltText(buildBlock({ data: { src: "---.jpg" } }), "Photo fallback")).toBe(
+      "Photo fallback",
+    );
   });
 });

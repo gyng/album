@@ -35,4 +35,25 @@ describe("ProgressBar", () => {
     expect(progressbar.getAttribute("aria-valuenow")).toBe("100");
     expect(container.querySelector<HTMLElement>("[data-progress-fill]")?.style.width).toBe("100%");
   });
+
+  it("uses safe byte labels for missing and invalid progress details", () => {
+    const { rerender } = render(<ProgressBar progress={-20} />);
+
+    expect(screen.getByRole("progressbar", { name: "Loading…" })).toHaveAttribute(
+      "aria-valuenow",
+      "0",
+    );
+
+    rerender(<ProgressBar progress={10} details={{ loaded: -1, total: 500 }} />);
+    expect(screen.getByRole("progressbar", { name: "Loading… 0 B / 500 B" })).toBeTruthy();
+
+    rerender(<ProgressBar progress={20} details={{ loaded: 50, total: 0 }} />);
+    expect(screen.getByRole("progressbar", { name: "Loading…" })).toBeTruthy();
+  });
+
+  it("hides a completed bar by default", () => {
+    const { container } = render(<ProgressBar progress={100} />);
+
+    expect(container).toBeEmptyDOMElement();
+  });
 });

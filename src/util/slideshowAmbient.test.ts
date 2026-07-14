@@ -4,9 +4,12 @@ import {
   describeRemix,
   getRemixSwatchRgb,
   getTimeAffinityScore,
+  haversineKm,
   pickRemixCompanions,
   rollRemixLayoutCount,
+  rollRemixStrategy,
   timeAwareShufflePhotos,
+  VECTOR_REMIX_STRATEGIES,
 } from "./slideshowAmbient";
 
 // extractDateFromExifString expects keys formatted as "EXIF DateTimeOriginal"
@@ -42,6 +45,15 @@ const formatColors = (rgbs: Array<[number, number, number]>): string =>
   `[${rgbs.map(([r, g, b]) => `(${r}, ${g}, ${b})`).join(", ")}]`;
 
 describe("getTimeAffinityScore", () => {
+  test("uses the current local wall-clock time when now is omitted", () => {
+    jest.useFakeTimers().setSystemTime(new Date(2026, 4, 15, 14, 30));
+    try {
+      expect(getTimeAffinityScore(new Date(2024, 4, 15, 14, 30))).toBe(1);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
   test("hour-of-day match scores higher than mismatch", () => {
     const now = new Date(2026, 4, 15, 14, 30); // 14:30 mid-May
     const matching = new Date(2024, 4, 10, 14, 0); // 14:00, same month
@@ -102,6 +114,19 @@ describe("getTimeAffinityScore", () => {
 });
 
 describe("timeAwareShufflePhotos", () => {
+  test("uses the current time and runtime randomness by default", () => {
+    jest.useFakeTimers().setSystemTime(new Date(2026, 5, 1, 14));
+    const random = jest.spyOn(Math, "random").mockReturnValue(0.5);
+    try {
+      const photo = makePhoto("data/albums/a/p1.jpg", new Date(2024, 5, 1, 14));
+      expect(timeAwareShufflePhotos([photo])).toEqual([photo]);
+      expect(random).toHaveBeenCalled();
+    } finally {
+      random.mockRestore();
+      jest.useRealTimers();
+    }
+  });
+
   test("returns the same set of photos", () => {
     const photos = [
       makePhoto("data/albums/a/p1.jpg", new Date(2024, 0, 1, 9)),
@@ -156,6 +181,15 @@ describe("timeAwareShufflePhotos", () => {
 });
 
 describe("rollRemixLayoutCount", () => {
+  test("uses Math.random by default", () => {
+    const random = jest.spyOn(Math, "random").mockReturnValue(0.5);
+    try {
+      expect(rollRemixLayoutCount()).toBe(1);
+    } finally {
+      random.mockRestore();
+    }
+  });
+
   test("returns 1 (2-up) when roll < 0.7", () => {
     expect(rollRemixLayoutCount(() => 0.0)).toBe(1);
     expect(rollRemixLayoutCount(() => 0.69)).toBe(1);
@@ -173,6 +207,15 @@ describe("rollRemixLayoutCount", () => {
 });
 
 describe("decideRemixCompanionCount", () => {
+  test("uses Math.random when no random source is supplied", () => {
+    const random = jest.spyOn(Math, "random").mockReturnValue(1);
+    try {
+      expect(decideRemixCompanionCount(0.03)).toBe(0);
+    } finally {
+      random.mockRestore();
+    }
+  });
+
   test("returns 0 when first random draw exceeds probability", () => {
     expect(decideRemixCompanionCount(0.03, () => 0.5)).toBe(0);
     expect(decideRemixCompanionCount(0.03, () => 0.03)).toBe(0);
@@ -210,6 +253,48 @@ describe("decideRemixCompanionCount", () => {
     const rate = hits / trials;
     expect(rate).toBeGreaterThan(0.03);
     expect(rate).toBeLessThan(0.08);
+  });
+});
+
+describe("haversineKm", () => {
+  test("returns zero for one point and the expected great-circle distance", () => {
+    expect(haversineKm(51.5, -0.1, 51.5, -0.1)).toBe(0);
+    expect(haversineKm(0, 0, 0, 1)).toBeCloseTo(111.19, 1);
+  });
+});
+
+describe("rollRemixStrategy", () => {
+  test.each([
+    [0.1, "similar"],
+    [0.25, "same-album"],
+    [0.35, "proximity"],
+    [0.45, "dominant-colour"],
+    [0.55, "juxtapose"],
+    [0.63, "anniversary"],
+    [0.7, "golden-hour"],
+    [0.77, "same-city"],
+    [0.82, "same-region"],
+    [0.87, "same-year"],
+    [0.91, "shared-camera"],
+    [0.945, "same-day-of-year"],
+    [0.97, "same-country"],
+    [0.985, "same-decade"],
+    [0.995, "random"],
+  ] as const)("maps a roll of %s to %s", (roll, strategy) => {
+    expect(rollRemixStrategy(() => roll)).toBe(strategy);
+  });
+
+  test("uses Math.random by default", () => {
+    const random = jest.spyOn(Math, "random").mockReturnValue(0.1);
+    try {
+      expect(rollRemixStrategy()).toBe("similar");
+    } finally {
+      random.mockRestore();
+    }
+  });
+
+  test("identifies the two strategies that require vector search", () => {
+    expect(VECTOR_REMIX_STRATEGIES).toEqual(new Set(["similar", "juxtapose"]));
   });
 });
 
@@ -263,6 +348,7 @@ describe("pickRemixCompanions", () => {
     const y2020 = new Date(2020, 5, 1, 12, 0);
     const seedDated = makePhoto("data/albums/japan/seed.jpg", y2020);
     const pool = [
+      seedDated,
       makePhoto("data/albums/japan/a.jpg", y2020),
       makePhoto("data/albums/japan/b.jpg", y2020),
       makePhoto("data/albums/iceland/x.jpg", y2020),
@@ -386,6 +472,72 @@ describe("pickRemixCompanions", () => {
     expect(pick.companions[0]?.path).toBe("data/albums/japan/a.jpg");
   });
 
+  test("same-city tolerates a numeric field before the city", () => {
+    const seedTokyo: RandomPhotoRow = {
+      path: "data/albums/japan/seed.jpg",
+      exif: "",
+      geocode: "JP\n35.0\nTokyo\nJapan",
+    };
+    const sameCity: RandomPhotoRow = {
+      path: "data/albums/other/a.jpg",
+      exif: "",
+      geocode: "JP\n35.1\nTokyo\nJapan",
+    };
+
+    const pick = pickRemixCompanions(seedTokyo, [sameCity, seedTokyo], 1, () => 0.5, "same-city");
+    expect(pick).toMatchObject({ strategy: "same-city", companions: [sameCity] });
+  });
+
+  test("same-region matches admin1 without widening to the whole country", () => {
+    const seedHokkaido: RandomPhotoRow = {
+      path: "data/albums/a/seed.jpg",
+      exif: "",
+      geocode: makeGeocode("JP", "Sapporo", "Japan", "Hokkaido"),
+    };
+    const hokkaido = {
+      ...makePhoto("data/albums/b/hokkaido.jpg"),
+      geocode: makeGeocode("JP", "Otaru", "Japan", "Hokkaido"),
+    };
+    const tokyo = {
+      ...makePhoto("data/albums/c/tokyo.jpg"),
+      geocode: makeGeocode("JP", "Tokyo", "Japan", "Tokyo"),
+    };
+
+    const pick = pickRemixCompanions(
+      seedHokkaido,
+      [seedHokkaido, hokkaido, tokyo],
+      1,
+      () => 0.5,
+      "same-region",
+    );
+    expect(pick).toMatchObject({ strategy: "same-region", companions: [hokkaido] });
+  });
+
+  test("same-country matches across regions", () => {
+    const seedHokkaido: RandomPhotoRow = {
+      path: "data/albums/a/seed.jpg",
+      exif: "",
+      geocode: makeGeocode("JP", "Sapporo", "Japan", "Hokkaido"),
+    };
+    const tokyo = {
+      ...makePhoto("data/albums/b/tokyo.jpg"),
+      geocode: makeGeocode("JP", "Tokyo", "Japan", "Tokyo"),
+    };
+    const london = {
+      ...makePhoto("data/albums/c/london.jpg"),
+      geocode: makeGeocode("GB", "London", "United Kingdom", "England"),
+    };
+
+    const pick = pickRemixCompanions(
+      seedHokkaido,
+      [seedHokkaido, tokyo, london],
+      1,
+      () => 0.5,
+      "same-country",
+    );
+    expect(pick).toMatchObject({ strategy: "same-country", companions: [tokyo] });
+  });
+
   test("same-day-of-year strategy matches month+day across different years", () => {
     const seedDate = makePhoto("data/albums/a/seed.jpg", new Date(2024, 4, 24, 10, 0));
     const sameDayDifferentYear = makePhoto("data/albums/b/1.jpg", new Date(2022, 4, 24, 18, 0));
@@ -396,7 +548,13 @@ describe("pickRemixCompanions", () => {
     const random = jest.fn().mockReturnValueOnce(0.94).mockReturnValue(0.5);
     const pick = pickRemixCompanions(
       seedDate,
-      [sameDayDifferentYear, sameDaySameYear, sameMonthDifferentDay],
+      [
+        seedDate,
+        sameDayDifferentYear,
+        sameDaySameYear,
+        sameMonthDifferentDay,
+        makePhoto("undated"),
+      ],
       1,
       random,
     );
@@ -441,9 +599,165 @@ describe("pickRemixCompanions", () => {
 
     // dominant-colour cumulative band: [0.48, 0.56) — 0.52 lands inside.
     const random = jest.fn().mockReturnValueOnce(0.52).mockReturnValue(0.5);
-    const pick = pickRemixCompanions(seedRed, [nearRed, blue, noColours], 1, random);
+    const pick = pickRemixCompanions(seedRed, [seedRed, nearRed, blue, noColours], 1, random);
     expect(pick.strategy).toBe("dominant-colour");
     expect(pick.companions[0]?.path).toBe("data/albums/b/1.jpg");
+  });
+
+  test("anniversary matches the same week in other years, including year wraparound", () => {
+    const seedDate = makePhoto("data/albums/a/seed.jpg", new Date(2024, 0, 2, 10));
+    const previousNewYear = makePhoto("data/albums/b/new-year.jpg", new Date(2022, 11, 31, 10));
+    const sameWeek = makePhoto("data/albums/c/same-week.jpg", new Date(2021, 0, 5, 10));
+    const sameYear = makePhoto("data/albums/d/same-year.jpg", new Date(2024, 0, 3, 10));
+    const tooFar = makePhoto("data/albums/e/far.jpg", new Date(2020, 0, 12, 10));
+    const undated = makePhoto("data/albums/f/undated.jpg");
+
+    const pick = pickRemixCompanions(
+      seedDate,
+      [seedDate, previousNewYear, sameWeek, sameYear, tooFar, undated],
+      2,
+      () => 0.5,
+      "anniversary",
+    );
+    expect(pick.strategy).toBe("anniversary");
+    expect(new Set(pick.companions)).toEqual(new Set([previousNewYear, sameWeek]));
+  });
+
+  test("same-decade matches other years in the seed's decade", () => {
+    const seedDate = makePhoto("data/albums/a/seed.jpg", new Date(2024, 0, 2));
+    const early = makePhoto("data/albums/b/early.jpg", new Date(2021, 5, 1));
+    const late = makePhoto("data/albums/c/late.jpg", new Date(2029, 5, 1));
+    const sameYear = makePhoto("data/albums/d/same-year.jpg", new Date(2024, 5, 1));
+    const priorDecade = makePhoto("data/albums/e/prior.jpg", new Date(2019, 5, 1));
+    const undated = makePhoto("data/albums/f/undated.jpg");
+
+    const pick = pickRemixCompanions(
+      seedDate,
+      [seedDate, early, late, sameYear, priorDecade, undated],
+      2,
+      () => 0.5,
+      "same-decade",
+    );
+    expect(pick.strategy).toBe("same-decade");
+    expect(new Set(pick.companions)).toEqual(new Set([early, late]));
+  });
+
+  test("golden-hour matches sunrise and sunset while rejecting ordinary hours", () => {
+    const seedDate = makePhoto("data/albums/a/seed.jpg", new Date(2024, 5, 1, 6));
+    const sunrise = makePhoto("data/albums/b/sunrise.jpg", new Date(2023, 5, 1, 5));
+    const sunset = makePhoto("data/albums/c/sunset.jpg", new Date(2022, 5, 1, 19));
+    const midday = makePhoto("data/albums/d/midday.jpg", new Date(2021, 5, 1, 12));
+    const undated = makePhoto("data/albums/e/undated.jpg");
+
+    const pick = pickRemixCompanions(
+      seedDate,
+      [seedDate, sunrise, sunset, midday, undated],
+      2,
+      () => 0.5,
+      "golden-hour",
+    );
+    expect(pick.strategy).toBe("golden-hour");
+    expect(new Set(pick.companions)).toEqual(new Set([sunrise, sunset]));
+  });
+
+  test("golden-hour falls back when the seed was shot outside its time bands", () => {
+    const middaySeed = makePhoto("data/albums/a/seed.jpg", new Date(2024, 5, 1, 12));
+    const candidate = makePhoto("data/albums/b/candidate.jpg", new Date(2010, 8, 10, 6));
+    expect(
+      pickRemixCompanions(middaySeed, [middaySeed, candidate], 1, () => 0.5, "golden-hour"),
+    ).toMatchObject({ strategy: "random", companions: [candidate] });
+  });
+
+  test("proximity ignores the seed, missing GPS, and candidates outside 50 km", () => {
+    const gpsPhoto = (path: string, longitudeSeconds: number): RandomPhotoRow => ({
+      path,
+      exif: [
+        "GPS GPSLatitude: 0,0,0",
+        "GPS GPSLatitudeRef: N",
+        `GPS GPSLongitude: 0,0,${longitudeSeconds}`,
+        "GPS GPSLongitudeRef: E",
+      ].join("\n"),
+      geocode: "",
+    });
+    const gpsSeed = gpsPhoto("data/albums/a/seed.jpg", 0);
+    const nearby = gpsPhoto("data/albums/b/nearby.jpg", 36);
+    const distant = gpsPhoto("data/albums/c/distant.jpg", 3600);
+    const noGps = makePhoto("data/albums/d/no-gps.jpg");
+
+    const pick = pickRemixCompanions(
+      gpsSeed,
+      [gpsSeed, nearby, distant, noGps],
+      1,
+      () => 0.5,
+      "proximity",
+    );
+    expect(pick).toMatchObject({ strategy: "proximity", companions: [nearby] });
+  });
+
+  test("shared-camera accepts make-only EXIF and ignores malformed lines", () => {
+    const seedCamera: RandomPhotoRow = {
+      path: "data/albums/a/seed.jpg",
+      exif: "malformed line\nEXIF ISO: 100\nImage Make: Pentax",
+      geocode: "",
+    };
+    const sameCamera = {
+      ...makePhoto("data/albums/b/same.jpg"),
+      exif: "Image Make: Pentax",
+    };
+    const modelOnly = {
+      ...makePhoto("data/albums/c/model.jpg"),
+      exif: "Image Model: Pentax",
+    };
+
+    const pick = pickRemixCompanions(
+      seedCamera,
+      [seedCamera, sameCamera, modelOnly],
+      1,
+      () => 0.5,
+      "shared-camera",
+    );
+    expect(pick).toMatchObject({ strategy: "shared-camera", companions: [sameCamera] });
+  });
+
+  test.each([
+    ["same-album", makePhoto("seed.jpg")],
+    ["same-year", makePhoto("data/albums/a/seed.jpg")],
+    ["same-region", makePhoto("data/albums/a/seed.jpg")],
+    ["same-country", { ...makePhoto("data/albums/a/seed.jpg"), geocode: "1\n2\n3" }],
+    ["same-city", { ...makePhoto("data/albums/a/seed.jpg"), geocode: "1\n2\n3" }],
+    ["same-day-of-year", makePhoto("data/albums/a/seed.jpg")],
+    ["dominant-colour", makePhoto("data/albums/a/seed.jpg")],
+    [
+      "dominant-colour",
+      { ...makePhoto("data/albums/a/seed.jpg"), colors: "not a serialised palette" },
+    ],
+    ["anniversary", makePhoto("data/albums/a/seed.jpg")],
+    ["same-decade", makePhoto("data/albums/a/seed.jpg")],
+    ["proximity", makePhoto("data/albums/a/seed.jpg")],
+    ["golden-hour", makePhoto("data/albums/a/seed.jpg")],
+    ["shared-camera", makePhoto("data/albums/a/seed.jpg")],
+    ["shared-camera", { ...makePhoto("data/albums/a/seed.jpg"), exif: "EXIF ISO: 100" }],
+  ] as const)(
+    "falls back from %s when the seed lacks required metadata",
+    (strategy, missingSeed) => {
+      const candidate = makePhoto("data/albums/b/candidate.jpg");
+      const pick = pickRemixCompanions(
+        missingSeed,
+        [missingSeed, candidate],
+        1,
+        () => 0.5,
+        strategy,
+      );
+      expect(pick).toMatchObject({ strategy: "random", companions: [candidate] });
+    },
+  );
+
+  test("returns empty when duplicate seed paths leave no genuine fallback candidate", () => {
+    const duplicateSeed = { ...seed };
+    expect(pickRemixCompanions(seed, [seed, duplicateSeed], 1, () => 0.5, "random")).toEqual({
+      companions: [],
+      strategy: "random",
+    });
   });
 
   test("similar strategy is a placeholder that falls through to other strategies", () => {
@@ -490,6 +804,51 @@ describe("describeRemix", () => {
 
   test("proximity returns null when fewer than two photos have GPS", () => {
     expect(describeRemix("proximity", [makePhoto("a/1.jpg")])).toBeNull();
+  });
+
+  test("proximity formats metre, decimal-kilometre, and rounded-kilometre spreads", () => {
+    const gpsPhoto = (path: string, latitudeSeconds: number): RandomPhotoRow => ({
+      path,
+      exif: [
+        `GPS GPSLatitude: 0,0,${latitudeSeconds}`,
+        "GPS GPSLatitudeRef: N",
+        "GPS GPSLongitude: 0,0,0",
+        "GPS GPSLongitudeRef: E",
+      ].join("\n"),
+      geocode: "",
+    });
+    const origin = gpsPhoto("a/origin.jpg", 0);
+    expect(describeRemix("proximity", [origin, gpsPhoto("a/metres.jpg", 3.6)])).toMatch(
+      /^within \d+ m$/,
+    );
+    expect(describeRemix("proximity", [origin, gpsPhoto("a/decimal.jpg", 36)])).toMatch(
+      /^within \d+\.\d km$/,
+    );
+    expect(describeRemix("proximity", [origin, gpsPhoto("a/rounded.jpg", 360)])).toMatch(
+      /^within \d+ km$/,
+    );
+  });
+
+  test("proximity ignores null photos, missing GPS, and shorter intermediate pairs", () => {
+    const gpsPhoto = (path: string, latitudeSeconds: number): RandomPhotoRow => ({
+      path,
+      exif: [
+        `GPS GPSLatitude: 0,0,${latitudeSeconds}`,
+        "GPS GPSLatitudeRef: N",
+        "GPS GPSLongitude: 0,0,0",
+        "GPS GPSLongitudeRef: E",
+      ].join("\n"),
+      geocode: "",
+    });
+    expect(
+      describeRemix("proximity", [
+        null,
+        makePhoto("a/no-gps.jpg"),
+        gpsPhoto("a/0.jpg", 0),
+        gpsPhoto("a/90.jpg", 90),
+        gpsPhoto("a/45.jpg", 45),
+      ]),
+    ).toMatch(/^within /);
   });
 
   test("same-album returns the album folder name from the seed path", () => {
@@ -598,6 +957,45 @@ describe("describeRemix", () => {
     expect(describeRemix("shared-camera", [seed])).toBe("NIKON Z 7");
   });
 
+  test("descriptors return null when their required seed metadata is absent", () => {
+    const empty = makePhoto("photo.jpg");
+    expect(describeRemix("same-album", [])).toBeNull();
+    expect(describeRemix("same-album", [empty])).toBeNull();
+    expect(describeRemix("same-city", [])).toBeNull();
+    expect(describeRemix("same-city", [{ ...empty, geocode: "1\n2\n3" }])).toBeNull();
+    expect(describeRemix("same-region", [])).toBeNull();
+    expect(describeRemix("same-country", [])).toBeNull();
+    expect(describeRemix("same-country", [{ ...empty, geocode: "1\n2\n3" }])).toBeNull();
+    expect(describeRemix("same-year", [null, empty])).toBeNull();
+    expect(describeRemix("same-decade", [])).toBeNull();
+    expect(describeRemix("same-day-of-year", [])).toBeNull();
+    expect(describeRemix("anniversary", [])).toBeNull();
+    expect(describeRemix("golden-hour", [])).toBeNull();
+    expect(describeRemix("shared-camera", [])).toBeNull();
+    expect(describeRemix("shared-camera", [empty])).toBeNull();
+    expect(describeRemix("shared-camera", [{ ...empty, exif: "malformed" }])).toBeNull();
+  });
+
+  test("same-decade collapses a one-year slide to a single year", () => {
+    expect(describeRemix("same-decade", [makePhoto("a/1.jpg", new Date(2024, 0, 1))])).toBe("2024");
+  });
+
+  test("shared-camera descriptors support make-only and model-only EXIF", () => {
+    expect(
+      describeRemix("shared-camera", [
+        { ...makePhoto("a/1.jpg"), exif: "bad line\nImage Make: Leica" },
+      ]),
+    ).toBe("Leica");
+    expect(
+      describeRemix("shared-camera", [{ ...makePhoto("a/1.jpg"), exif: "Image Model: Q3" }]),
+    ).toBe("Q3");
+    expect(
+      describeRemix("shared-camera", [
+        { ...makePhoto("a/1.jpg"), exif: "EXIF ISO: 100\nImage Make: Leica" },
+      ]),
+    ).toBe("Leica");
+  });
+
   test("returns null for strategies without a text descriptor", () => {
     const seed = makePhoto("a/1.jpg", new Date(2024, 0, 1));
     expect(describeRemix("dominant-colour", [seed])).toBeNull();
@@ -634,5 +1032,9 @@ describe("getRemixSwatchRgb", () => {
 
   test("returns null when the seed has no colours", () => {
     expect(getRemixSwatchRgb("dominant-colour", [makePhoto("a/1.jpg")])).toBeNull();
+    expect(getRemixSwatchRgb("dominant-colour", [])).toBeNull();
+    expect(
+      getRemixSwatchRgb("dominant-colour", [{ ...makePhoto("a/1.jpg"), colors: "invalid" }]),
+    ).toBeNull();
   });
 });

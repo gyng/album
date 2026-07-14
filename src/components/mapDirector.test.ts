@@ -35,4 +35,31 @@ describe("buildMapDirectorSequence", () => {
     expect(sequence).toHaveLength(8);
     expect(sequence.some(({ href }) => href === "missing")).toBe(false);
   });
+
+  it("returns no stops for an empty, unlocated, or disabled tour", () => {
+    expect(buildMapDirectorSequence([])).toEqual([]);
+    expect(buildMapDirectorSequence([photo({ decLat: null })])).toEqual([]);
+    expect(buildMapDirectorSequence([photo({ decLng: null })])).toEqual([]);
+    expect(buildMapDirectorSequence([photo({})], 0)).toEqual([]);
+    expect(buildMapDirectorSequence([photo({})], -1)).toEqual([]);
+  });
+
+  it("breaks date ties by href and handles undated candidates deterministically", () => {
+    const sequence = buildMapDirectorSequence([
+      photo({ href: "b", date: "2025-01-01T00:00:00", decLat: 0, decLng: 0 }),
+      photo({ href: "a", date: "2025-01-01T00:00:00", decLat: 0, decLng: 0 }),
+      photo({ href: "undated", date: null, decLat: 0, decLng: 0 }),
+    ]);
+
+    expect(sequence.map(({ href }) => href)).toEqual(["a", "b", "undated"]);
+  });
+
+  it("does not repeat duplicate photo hrefs", () => {
+    const sequence = buildMapDirectorSequence([
+      photo({ href: "same", decLat: 0, decLng: 0 }),
+      photo({ href: "same", decLat: 20, decLng: 20 }),
+    ]);
+
+    expect(sequence).toHaveLength(1);
+  });
 });

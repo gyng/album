@@ -13,7 +13,7 @@ export const Albums: React.FC<{ albums: Content[] }> = (props) => {
         const cover =
           album.blocks.find((b) => b.kind === "photo" && b.formatting?.cover) ?? firstPhoto;
 
-        const timeRange = album._build?.timeRange
+        const timeRange = album._build.timeRange
           ?.filter(Boolean)
           .map((ts) => parseExifLocalDateTime(ts)?.year ?? 0) ?? [0, 0];
 
@@ -22,7 +22,7 @@ export const Albums: React.FC<{ albums: Content[] }> = (props) => {
             <Link
               href={`/album/${album._build.slug}`}
               className={styles.itemLink}
-              aria-label={`View photo album: ${album.title ?? album.name}`}
+              aria-label={`View photo album: ${album.title}`}
             >
               {cover ? (
                 <Picture
@@ -39,7 +39,7 @@ export const Albums: React.FC<{ albums: Content[] }> = (props) => {
               <h2>
                 <span>
                   <Link href={`/album/${album._build.slug}`} tabIndex={-1}>
-                    {album.title ?? album.name}
+                    {album.title}
                   </Link>
                 </span>
               </h2>

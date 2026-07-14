@@ -67,8 +67,8 @@ const RevealFit: React.FC<{
     ];
     // Antimeridian-aware so a guess and answer on opposite sides of ±180° frame
     // the short hop rather than the whole globe.
-    const bounds = computeWrapAwareBounds(points);
-    if (!bounds) return;
+    // The reveal point above guarantees a non-empty input.
+    const bounds = computeWrapAwareBounds(points)!;
     map.fitBounds(bounds, { padding: 60, maxZoom: 6, duration: 800 });
   }, [map, revealLat, revealLng, guessLat, guessLng]);
 

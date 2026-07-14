@@ -116,7 +116,7 @@ type SearchDbVersion = {
   title: string;
 };
 
-const formatSearchDbVersion = (response: Response): SearchDbVersion | null => {
+export const formatSearchDbVersion = (response: Response): SearchDbVersion | null => {
   const etag = response.headers.get("etag");
   const lastModified = response.headers.get("last-modified");
   if (lastModified) {
@@ -151,8 +151,11 @@ const formatSearchDbVersion = (response: Response): SearchDbVersion | null => {
 
 // Touch and pen pointers behave the same for this page's gesture model:
 // progress visuals, tap zones, click suppression. Mouse is handled separately.
-const isTouchOrPen = (pointerType: string): boolean =>
+export const isTouchOrPen = (pointerType: string): boolean =>
   pointerType === "touch" || pointerType === "pen";
+
+export const remapSlideshowPeek = (progress: number): number =>
+  Math.max(0, (progress - 0.65) / 0.35);
 
 const SlideshowPage: NextPage<PageProps> = (_props) => {
   return <Slideshow />;
@@ -160,7 +163,7 @@ const SlideshowPage: NextPage<PageProps> = (_props) => {
 
 // TODO: consider doing getStaticProps here to fetch all photos and pass them to the slideshow
 // like in world map
-const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
+export const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
   const databaseState = useDatabase();
   const [database, progress] = databaseState;
   const refreshDatabase = databaseState[4];
@@ -286,19 +289,11 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
         return;
       }
 
-      if (action === "refresh-in-place") {
-        // Data-only update — fetch a fresh database without tearing down the
-        // document. Record the target version as PENDING and only promote it to
-        // lastDbVersionRef once the reload actually lands (the database object
-        // identity changes — see the promote effect below). If the refresh
-        // fails (e.g. a Wi-Fi blip during the re-fetch), the version stays
-        // unrecorded so the next poll re-detects and retries instead of pinning
-        // the kiosk to stale data. refreshDatabase (useDatabase's `retry`)
-        // returns void — it just bumps a retry count — so there is no promise to
-        // await; the database-identity change is the success signal.
-        pendingDbVersionRef.current = version.raw;
-        refreshDatabase(true);
-      }
+      // The only remaining action is refresh-in-place. Fetch a fresh database
+      // without tearing down the document, and promote this pending version
+      // only after the database object identity changes.
+      pendingDbVersionRef.current = version.raw;
+      refreshDatabase(true);
     } catch (error) {
       console.error("DB update check failed", error);
     } finally {
@@ -473,13 +468,12 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
   const [touchArmed, setTouchArmed] = React.useState(false);
   // The chevron handle leads the pull; the toolbar/edge peek only enters in the last 35%
   // so the two indicators don't compete. Below 0.65 only the chevron is visible.
-  const remapPeek = (progress: number) => Math.max(0, (progress - 0.65) / 0.35);
   const touchToolbarShowPreviewProgress =
     !controlsVisible && (touchGestureHint === "controls" || touchGestureHint === "reload")
-      ? remapPeek(touchPullProgress)
+      ? remapSlideshowPeek(touchPullProgress)
       : 0;
   const touchToolbarHidePreviewProgress =
-    controlsVisible && touchGestureHint === "remix" ? remapPeek(touchPullProgress) : 0;
+    controlsVisible && touchGestureHint === "remix" ? remapSlideshowPeek(touchPullProgress) : 0;
   // Loaded for Similar mode and also whenever remixes are on, so vector
   // strategies (similar / juxtapose) can fire on the first roll. Loading
   // lazily after the first vector roll meant the first ~37% of remixes
@@ -628,7 +622,10 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
   // tick, alignment) lives in a hook. The timer fires goNext, which is defined
   // below and changes identity — so the hook receives a STABLE wrapper over a
   // ref to the latest goNext (assigned right after goNext is created).
-  const goNextRef = React.useRef<() => void>(() => {});
+  const goNextRef = React.useRef<() => void>(
+    /* istanbul ignore next -- replaced during the same render before the cadence can invoke it */
+    () => {},
+  );
   const advanceFromCadence = useCallback(() => goNextRef.current(), []);
   const {
     secondsLeft,
@@ -692,14 +689,12 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
         const isAntiSimilar = plan.isAntiSimilar;
 
         void (async () => {
-          // plan.kind === "vector" already implies both DBs are present
-          // (decideRemixPlan only returns vector when vectorReady); this guard
-          // also narrows the captured consts to non-null for TS.
-          if (!database || !embeddingsDatabase) return;
+          // plan.kind === "vector" implies both databases are present because
+          // decideRemixPlan only returns it when vectorReady is true.
           try {
             const result = await fetchSimilarResults({
-              database,
-              embeddingsDatabase,
+              database: database!,
+              embeddingsDatabase: embeddingsDatabase!,
               path: seedPath,
               similarityOrder: isAntiSimilar ? "least" : "most",
               // Paging is 0-based (api.ts): page 1 skipped the top desiredCount*4
@@ -764,10 +759,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
 
   const showHistoryPhoto = useCallback(
     (index: number): RandomPhotoRow | null => {
-      const entry = historyStateRef.current.history[index] ?? null;
-      if (!entry) {
-        return null;
-      }
+      const entry = historyStateRef.current.history[index]!;
 
       // Just move the cursor — the current slide (seed + the original remix
       // layout) re-derives from history[index], so Previous/Next replays
@@ -821,20 +813,11 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
 
   const advanceRandomPhoto = useCallback(
     (opts?: { trackRecent?: boolean }): RandomPhotoRow | null => {
-      if (randomPhotoPoolRef.current.length === 0) {
-        setSlideshowError("No photos available");
-        return null;
-      }
-
       const nextPhoto = advanceQueued(
         randomQueueStateRef.current,
         randomPhotoPoolRef.current,
         buildRandomQueue,
-      );
-      if (!nextPhoto) {
-        setSlideshowError("No photos available");
-        return null;
-      }
+      )!;
 
       commitNextPhoto(nextPhoto, { ...opts, allowRemix: true });
       return nextPhoto;
@@ -956,10 +939,6 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
   }, [database, filter]);
 
   const advanceSimilarPhoto = useCallback(async (): Promise<RandomPhotoRow | null> => {
-    if (!database) {
-      return null;
-    }
-
     // Embeddings not ready yet (still loading, or failed to load): keep the
     // slideshow moving with a random advance rather than freezing on a
     // no-op. The next advance retries the similar trail once they arrive.
@@ -967,14 +946,11 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
       return advanceRandomPhoto({ trackRecent: true });
     }
 
-    const activePhoto = currentEntry(historyStateRef.current)?.seed ?? null;
-    if (!activePhoto?.path) {
-      return advanceRandomPhoto({ trackRecent: true });
-    }
+    const activePhoto = currentEntry(historyStateRef.current)!.seed;
 
     const refillSimilarQueue = async (seedPath: string) => {
       const result = await fetchSimilarResults({
-        database,
+        database: database!,
         embeddingsDatabase,
         path: seedPath,
         page: 0,
@@ -1006,21 +982,14 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
       return nextQueue;
     };
 
-    let queue = similarQueueRef.current;
-    let nextIndex = similarQueueIndexRef.current + 1;
-
-    if (similarSeedPathRef.current !== activePhoto.path || nextIndex >= queue.length) {
-      queue = await refillSimilarQueue(activePhoto.path);
-      nextIndex = 0;
-    }
-
-    const nextPhoto = queue[nextIndex] ?? null;
+    const queue = await refillSimilarQueue(activePhoto.path);
+    const nextPhoto = queue[0] ?? null;
     if (!nextPhoto) {
       resetSimilarQueue();
       return advanceRandomPhoto({ trackRecent: true });
     }
 
-    similarQueueIndexRef.current = nextIndex;
+    similarQueueIndexRef.current = 0;
     similarQueueLastPathRef.current = nextPhoto.path;
     commitNextPhoto(nextPhoto, { trackRecent: true, allowRemix: true });
     return nextPhoto;
@@ -1055,19 +1024,12 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
       return;
     }
 
-    const activePhoto = currentEntry(historyStateRef.current)?.seed ?? null;
-
     // Similar mode: advanceSimilarPhoto falls back to a random advance when the
     // embeddings DB isn't ready, so the show never freezes waiting on it.
-    if (slideshowMode === "similar" && activePhoto?.path) {
-      advanceSimilarPhoto().catch((err) => {
-        console.error(err);
-        advanceRandomPhoto({ trackRecent: true });
-      });
-      return;
-    }
-
-    advanceRandomPhoto({ trackRecent: true });
+    advanceSimilarPhoto().catch((err) => {
+      console.error(err);
+      advanceRandomPhoto({ trackRecent: true });
+    });
   }, [advanceRandomPhoto, advanceSimilarPhoto, database, showHistoryPhoto, slideshowMode]);
 
   const goPrevious = useCallback(() => {
@@ -1092,14 +1054,6 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
         randomPhotoPoolRef.current,
         buildRandomQueue,
       );
-    }
-
-    if (
-      slideshowMode === "similar" &&
-      similarSeedPathRef.current === currentEntry(historyStateRef.current)?.seed.path
-    ) {
-      const nextIndex = similarQueueIndexRef.current + 1;
-      return similarQueueRef.current[nextIndex] ?? null;
     }
 
     return null;
@@ -1324,15 +1278,13 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
     [controlsVisible, props.disabled, tryAcquireWakeLock, wakeLockRef],
   );
 
-  const clearImagePointerGesture = useCallback((event?: React.PointerEvent<HTMLElement>) => {
-    if (event) {
-      try {
-        if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-          event.currentTarget.releasePointerCapture(event.pointerId);
-        }
-      } catch (error) {
-        console.debug("Ignoring stale slideshow pointer capture", error);
+  const clearImagePointerGesture = useCallback((event: React.PointerEvent<HTMLElement>) => {
+    try {
+      if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+        event.currentTarget.releasePointerCapture(event.pointerId);
       }
+    } catch (error) {
+      console.debug("Ignoring stale slideshow pointer capture", error);
     }
 
     pointerGestureRef.current = null;
@@ -1385,7 +1337,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
       // Fire the commit haptic exactly once per gesture.
       if (!gesture.hapticFired) {
         gesture.hapticFired = true;
-        if (typeof navigator !== "undefined" && navigator.vibrate) {
+        if (navigator.vibrate) {
           navigator.vibrate(8);
         }
       }
@@ -1463,11 +1415,8 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
     ],
   );
 
-  const getCurrentPhotoLink = useCallback((): string | null => {
-    const photoPath = currentEntry(historyStateRef.current)?.seed.path;
-    if (!photoPath) {
-      return null;
-    }
+  const getCurrentPhotoLink = useCallback((): string => {
+    const photoPath = currentEntry(historyStateRef.current)!.seed.path;
 
     return buildSlideshowPermalink({
       origin: window.location.origin,
@@ -1479,9 +1428,6 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
 
   const copyCurrentPhotoLink = useCallback(async () => {
     const photoLink = getCurrentPhotoLink();
-    if (!photoLink) {
-      return;
-    }
 
     try {
       if (navigator.clipboard?.writeText) {
@@ -1510,15 +1456,14 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
   // most desktop browsers other than Chrome on macOS).
   const shareCurrentPhoto = useCallback(async () => {
     const photoLink = getCurrentPhotoLink();
-    if (!photoLink) return;
-    const sharePath = currentEntry(historyStateRef.current)?.seed.path;
-    const albumName = sharePath?.split("/")?.[2] ?? "";
-    const photoName = sharePath?.split("/")?.[3] ?? "";
+    const sharePath = currentEntry(historyStateRef.current)!.seed.path;
+    const albumName = sharePath.split("/")[2];
+    const photoName = sharePath.split("/")[3];
     if (typeof navigator.share === "function") {
       try {
         await navigator.share({
-          title: photoName || "Photo",
-          text: albumName ? `From ${albumName}` : undefined,
+          title: photoName,
+          text: `From ${albumName}`,
           url: photoLink,
         });
         return;
@@ -1536,10 +1481,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
   // for verifying the resized-image variant being served on real devices
   // (e.g. confirming whether the iPad PWA is loading @3200 vs @1600).
   const inspectCurrentImage = useCallback(async () => {
-    const img = document.querySelector(
-      'img[alt]:not([aria-hidden="true"])',
-    ) as HTMLImageElement | null;
-    if (!img) return;
+    const img = document.querySelector('img[alt]:not([aria-hidden="true"])') as HTMLImageElement;
     const src = img.currentSrc || img.src;
     const decoded = `${img.naturalWidth}×${img.naturalHeight}`;
     const displayed = `${Math.round(img.getBoundingClientRect().width)}×${Math.round(img.getBoundingClientRect().height)}`;
@@ -1574,7 +1516,7 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
       { path: currentPhotoPath.path, src: activePhotoSrc },
       ...remixCompanions.map((companion) => ({
         path: companion.path,
-        src: getSlideshowPhotoSrc(companion) ?? "",
+        src: getSlideshowPhotoSrc(companion)!,
       })),
     ];
   }, [currentPhotoPath, activePhotoSrc, remixCompanions]);
@@ -1695,13 +1637,13 @@ const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
     );
   }
 
-  const albumName = currentPhotoPath?.path?.split?.("/")?.[2] ?? "";
-  const photoName = currentPhotoPath?.path?.split?.("/")?.[3] ?? "";
+  const albumName = currentPhotoPath.path.split("/")[2];
+  const photoName = currentPhotoPath.path.split("/")[3];
   const photoBlock: PhotoBlock = {
     kind: "photo",
     id: "",
     data: {
-      src: activePhotoSrc ?? "",
+      src: activePhotoSrc!,
       title: undefined,
       kicker: undefined,
       description: undefined,

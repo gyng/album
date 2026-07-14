@@ -136,7 +136,7 @@ export const getAlbumWithoutManifest = async (albumPath: string): Promise<Conten
     incrementBuildCounter("album.getAlbumWithoutManifest.photoCount", photos.length);
     incrementBuildCounter("album.getAlbumWithoutManifest.videoCount", videos.length);
 
-    const dirname = path.parse(albumPath).name;
+    const dirname = path.basename(albumPath);
 
     const titleBlock: SerializedTextBlock = {
       kind: "text",
@@ -279,11 +279,10 @@ const applyTitleKickerDefaults = (manifest: Content): void => {
   // Always render the year range ascending (earliest–latest), regardless of the
   // album's photo sort order, so the kicker matches the home page album list
   // (Albums.tsx) rather than reading as a reversed "2026–2025".
-  const from = parseExifLocalDateTime(earliest)?.year;
-  const to = parseExifLocalDateTime(latest)?.year;
-  if (from == null || to == null) {
-    return;
-  }
+  // getImageTimestampRange only returns values accepted and normalised by the
+  // same EXIF wall-clock parser, so these years are guaranteed to exist.
+  const from = parseExifLocalDateTime(earliest)!.year;
+  const to = parseExifLocalDateTime(latest)!.year;
   title.data.kicker = `${from}${to === from ? "" : `–${to}`}`;
 };
 

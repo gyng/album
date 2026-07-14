@@ -59,8 +59,6 @@ const reducer = (state: UseDatabaseState, action: Action): UseDatabaseState => {
         ...state,
         error: action.error,
       };
-    default:
-      return state;
   }
 };
 
@@ -196,6 +194,12 @@ const initializeSQLite = async (
 export const databaseLoaderInternals = {
   fetchWithProgress,
   initializeSQLite,
+  getDatabase: (
+    url: string,
+    fallbackUrl?: string,
+    setProgress?: (percent: number, details: ProgressDetails) => void,
+    forceRefresh?: boolean,
+  ) => getDatabase(url, fallbackUrl, setProgress, forceRefresh),
   resetForTesting: () => {
     cachedDatabases.clear();
     databasePromises.clear();
@@ -288,7 +292,7 @@ const useSqliteDatabase = (
         console.error("Failed to load database", err);
         dispatch({
           type: "load:error",
-          error: err instanceof Error ? err : new Error(String(err)),
+          error: err as Error,
         });
       });
 

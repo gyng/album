@@ -97,6 +97,16 @@ describe("resolvePointerMove", () => {
     });
   });
 
+  it("drops to idle when reversing past the committed vertical direction", () => {
+    expect(move({ deltaY: 30, committedVertical: "up" })).toEqual({
+      kind: "update",
+      hint: null,
+      pullProgress: 0,
+      swipeProgress: 0,
+      armed: false,
+    });
+  });
+
   it("ignores horizontal drift once vertical is committed", () => {
     expect(move({ deltaX: -40, deltaY: 0, committedVertical: "up" })).toEqual({ kind: "ignore" });
   });

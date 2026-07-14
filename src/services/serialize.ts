@@ -42,8 +42,8 @@ export const serializeContentBlock = (block: Content): SerializedContent => {
 export const serializeTextBlock = (block: TextBlock): SerializedTextBlock => {
   const copy = { ...block };
 
-  if (block.formatting && Object.keys(block.formatting).length === 0) {
-    delete block.formatting;
+  if (copy.formatting && Object.keys(copy.formatting).length === 0) {
+    delete copy.formatting;
   }
 
   return copy;

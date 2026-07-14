@@ -95,19 +95,15 @@ export const MapRouteOverlay = ({
     const firstSegment = projectedSegments[0];
     const lastSegment = projectedSegments.at(-1);
 
-    if (!startPoint || !endPoint || !firstSegment || !lastSegment) {
-      return null;
-    }
-
     return {
       id: "journey-line-route-gradient",
-      x1: firstSegment.startX,
-      y1: firstSegment.startY,
-      x2: lastSegment.endX,
-      y2: lastSegment.endY,
+      x1: firstSegment!.startX,
+      y1: firstSegment!.startY,
+      x2: lastSegment!.endX,
+      y2: lastSegment!.endY,
       stops: getDirectionalGradientStops(
-        getPointColor(startPoint, 0),
-        getPointColor(endPoint, routePoints.length - 1),
+        getPointColor(startPoint!, 0),
+        getPointColor(endPoint!, routePoints.length - 1),
       ),
     };
   }, [getPointColor, projectedSegments, routePoints]);
@@ -131,27 +127,32 @@ export const MapRouteOverlay = ({
     return null;
   }
 
+  // Projection can discard individual invalid legs, but any surviving segment
+  // proves the source route has endpoints and gives us concrete SVG anchors.
+  const firstProjectedSegment = projectedSegments[0]!;
+  const lastProjectedSegment = projectedSegments.at(-1)!;
+  const startRoutePoint = routePoints![0]!;
+  const endRoutePoint = routePoints!.at(-1)!;
+
   return (
     <svg className={styles.routeOverlay} data-testid="journey-line-overlay" aria-hidden="true">
       <defs>
-        {routeGradient ? (
-          <linearGradient
-            id={routeGradient.id}
-            gradientUnits="userSpaceOnUse"
-            x1={routeGradient.x1}
-            y1={routeGradient.y1}
-            x2={routeGradient.x2}
-            y2={routeGradient.y2}
-          >
-            {routeGradient.stops.map((stop) => (
-              <stop
-                key={`${routeGradient.id}-${stop.offset}`}
-                offset={stop.offset}
-                stopColor={stop.color}
-              />
-            ))}
-          </linearGradient>
-        ) : null}
+        <linearGradient
+          id={routeGradient!.id}
+          gradientUnits="userSpaceOnUse"
+          x1={routeGradient!.x1}
+          y1={routeGradient!.y1}
+          x2={routeGradient!.x2}
+          y2={routeGradient!.y2}
+        >
+          {routeGradient!.stops.map((stop) => (
+            <stop
+              key={`${routeGradient!.id}-${stop.offset}`}
+              offset={stop.offset}
+              stopColor={stop.color}
+            />
+          ))}
+        </linearGradient>
       </defs>
       {projectedGhostPath ? (
         <path
@@ -185,7 +186,7 @@ export const MapRouteOverlay = ({
                   className={styles.routeOverlayPath}
                   data-testid="journey-line-segment"
                   style={{
-                    stroke: routeGradient ? `url(#${routeGradient.id})` : segment.color,
+                    stroke: `url(#${routeGradient!.id})`,
                     strokeWidth:
                       routeMode === "simplified"
                         ? transferLeg
@@ -226,76 +227,74 @@ export const MapRouteOverlay = ({
           })()}
         </React.Fragment>
       ))}
-      {routePoints && routePoints.length >= 2 ? (
-        <>
-          {/* ping rings rendered beneath the flag groups so they don't inherit the drop-shadow */}
-          {(() => {
-            const startColor = getPointColor(routePoints[0]!, 0);
-            const endColor = getPointColor(routePoints.at(-1)!, routePoints.length - 1);
-            return (
-              <>
-                <g
-                  transform={`translate(${projectedSegments[0]?.startX ?? 0}, ${projectedSegments[0]?.startY ?? 0})`}
-                >
-                  <circle
-                    cx="0"
-                    cy="0"
-                    r="3.5"
-                    style={{ fill: startColor }}
-                    className={styles.routeEndpointPing}
-                  />
-                  <circle
-                    cx="0"
-                    cy="0"
-                    r="3.5"
-                    style={{ fill: startColor }}
-                    className={`${styles.routeEndpointPing} ${styles.routeEndpointPingDelay}`}
-                  />
-                </g>
-                <g
-                  transform={`translate(${projectedSegments.at(-1)?.endX ?? 0}, ${projectedSegments.at(-1)?.endY ?? 0})`}
-                >
-                  <circle
-                    cx="0"
-                    cy="0"
-                    r="3.5"
-                    style={{ fill: endColor }}
-                    className={styles.routeEndpointPing}
-                  />
-                  <circle
-                    cx="0"
-                    cy="0"
-                    r="3.5"
-                    style={{ fill: endColor }}
-                    className={`${styles.routeEndpointPing} ${styles.routeEndpointPingDelay}`}
-                  />
-                </g>
-              </>
-            );
-          })()}
-          <g
-            data-testid="journey-line-start"
-            className={styles.routeEndpointGroup}
-            transform={`translate(${projectedSegments[0]?.startX ?? 0}, ${projectedSegments[0]?.startY ?? 0})`}
-          >
-            <line x1="0" y1="0" x2="0" y2="-24" className={styles.routeEndpointPole} />
-            <polygon points="0,-24 14,-17 0,-10" className={styles.routeEndpointStartFlag} />
-            <circle cx="0" cy="0" r="3.5" className={styles.routeEndpointBase} />
-          </g>
-          <g
-            data-testid="journey-line-end"
-            className={styles.routeEndpointGroup}
-            transform={`translate(${projectedSegments.at(-1)?.endX ?? 0}, ${projectedSegments.at(-1)?.endY ?? 0})`}
-          >
-            <line x1="0" y1="0" x2="0" y2="-24" className={styles.routeEndpointPole} />
-            <rect x="0" y="-24" width="6" height="6" className={styles.routeEndpointCheckDark} />
-            <rect x="6" y="-24" width="6" height="6" className={styles.routeEndpointCheckLight} />
-            <rect x="0" y="-18" width="6" height="6" className={styles.routeEndpointCheckLight} />
-            <rect x="6" y="-18" width="6" height="6" className={styles.routeEndpointCheckDark} />
-            <circle cx="0" cy="0" r="3.5" className={styles.routeEndpointBase} />
-          </g>
-        </>
-      ) : null}
+      <>
+        {/* ping rings rendered beneath the flag groups so they don't inherit the drop-shadow */}
+        {(() => {
+          const startColor = getPointColor(startRoutePoint, 0);
+          const endColor = getPointColor(endRoutePoint, routePoints!.length - 1);
+          return (
+            <>
+              <g
+                transform={`translate(${firstProjectedSegment.startX}, ${firstProjectedSegment.startY})`}
+              >
+                <circle
+                  cx="0"
+                  cy="0"
+                  r="3.5"
+                  style={{ fill: startColor }}
+                  className={styles.routeEndpointPing}
+                />
+                <circle
+                  cx="0"
+                  cy="0"
+                  r="3.5"
+                  style={{ fill: startColor }}
+                  className={`${styles.routeEndpointPing} ${styles.routeEndpointPingDelay}`}
+                />
+              </g>
+              <g
+                transform={`translate(${lastProjectedSegment.endX}, ${lastProjectedSegment.endY})`}
+              >
+                <circle
+                  cx="0"
+                  cy="0"
+                  r="3.5"
+                  style={{ fill: endColor }}
+                  className={styles.routeEndpointPing}
+                />
+                <circle
+                  cx="0"
+                  cy="0"
+                  r="3.5"
+                  style={{ fill: endColor }}
+                  className={`${styles.routeEndpointPing} ${styles.routeEndpointPingDelay}`}
+                />
+              </g>
+            </>
+          );
+        })()}
+        <g
+          data-testid="journey-line-start"
+          className={styles.routeEndpointGroup}
+          transform={`translate(${firstProjectedSegment.startX}, ${firstProjectedSegment.startY})`}
+        >
+          <line x1="0" y1="0" x2="0" y2="-24" className={styles.routeEndpointPole} />
+          <polygon points="0,-24 14,-17 0,-10" className={styles.routeEndpointStartFlag} />
+          <circle cx="0" cy="0" r="3.5" className={styles.routeEndpointBase} />
+        </g>
+        <g
+          data-testid="journey-line-end"
+          className={styles.routeEndpointGroup}
+          transform={`translate(${lastProjectedSegment.endX}, ${lastProjectedSegment.endY})`}
+        >
+          <line x1="0" y1="0" x2="0" y2="-24" className={styles.routeEndpointPole} />
+          <rect x="0" y="-24" width="6" height="6" className={styles.routeEndpointCheckDark} />
+          <rect x="6" y="-24" width="6" height="6" className={styles.routeEndpointCheckLight} />
+          <rect x="0" y="-18" width="6" height="6" className={styles.routeEndpointCheckLight} />
+          <rect x="6" y="-18" width="6" height="6" className={styles.routeEndpointCheckDark} />
+          <circle cx="0" cy="0" r="3.5" className={styles.routeEndpointBase} />
+        </g>
+      </>
     </svg>
   );
 };

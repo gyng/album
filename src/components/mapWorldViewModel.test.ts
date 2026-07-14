@@ -23,6 +23,7 @@ const photo = (overrides: Partial<MapWorldEntry> = {}): MapWorldEntry => ({
 describe("mapWorldViewModel", () => {
   it("formats camera-local timestamps without timezone conversion", () => {
     expect(formatMapPhotoDate("2024-01-02T03:04:05")).toBe("2 Jan 2024");
+    expect(formatMapPhotoDate("not-a-date")).toBeNull();
     expect(formatMapPhotoDateTime("2024-01-02T03:04:05")).toBe("2 Jan 2024, 03:04");
     expect(formatMapPhotoDateTime("not-a-date")).toBeNull();
   });
@@ -53,6 +54,35 @@ describe("mapWorldViewModel", () => {
     expect(styled.map(({ href }) => href)).toEqual(["undated", "oldest", "newest"]);
     expect(styled.map(({ relative }) => relative)).toEqual([0, 0, 1]);
     expect(styled.every(({ markerColor }) => !markerColor.includes("NaN"))).toBe(true);
+
+    expect(
+      stylePhotosByRecency([photo()], {
+        oldest: photo(),
+        newest: photo(),
+        oldestMs: Number.NaN,
+        range: 1,
+      })[0]?.relative,
+    ).toBe(0);
+  });
+
+  it("returns the original collection without bounds and handles an ordinary viewport", () => {
+    const photos = stylePhotosByRecency(
+      [
+        photo({ href: "inside", decLat: 35, decLng: 139 }),
+        photo({ href: "north", decLat: 55, decLng: 139 }),
+        photo({ href: "east", decLat: 35, decLng: 155 }),
+        photo({ href: "no-latitude", decLat: null }),
+        photo({ href: "no-longitude", decLng: null }),
+      ],
+      getPhotoDateStats([]),
+    );
+
+    expect(filterPhotosByBounds(photos, null)).toBe(photos);
+    expect(
+      filterPhotosByBounds(photos, { north: 50, south: 20, west: 120, east: 150 }).map(
+        ({ href }) => href,
+      ),
+    ).toEqual(["inside"]);
   });
 
   it("keeps photos inside an antimeridian-crossing viewport", () => {
@@ -87,6 +117,10 @@ describe("mapWorldViewModel", () => {
       older: "Older",
       newer: "Newer",
     });
+    expect(getLegendYears(getPhotoDateStats([]))).toEqual({ older: "Older", newer: "Newer" });
+    expect(
+      getLegendYears({ oldest: photo({ date: null }), newest: photo({ date: "not-a-date" }) }),
+    ).toEqual({ older: "Older", newer: "Newer" });
   });
 
   it("filters map photos client-side with accent-insensitive all-term matching", () => {
@@ -116,5 +150,8 @@ describe("mapWorldViewModel", () => {
         new Map([["external", "cute fuzzy animal"]]),
       ).map(({ href }) => href),
     ).toEqual(["external"]);
+    expect(
+      filterPhotosByQuery([photo({ album: "Undated archive", date: null })], "undated archive"),
+    ).toHaveLength(1);
   });
 });

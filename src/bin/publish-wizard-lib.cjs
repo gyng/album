@@ -183,10 +183,6 @@ const buildPreflightInsights = (report) => {
     });
   }
 
-  if (lines.length === 0) {
-    lines.push({ level: "ok", text: "Preflight checks are clean." });
-  }
-
   return lines;
 };
 
@@ -464,7 +460,7 @@ const resolveDeploymentDelta = async ({
   }
 
   if (!deployedSha) {
-    return { ...base, headSha, reason: reason ?? "could not determine the live deployment" };
+    return { ...base, headSha, reason };
   }
 
   try {
@@ -571,9 +567,9 @@ const getVercelPreflightCommand = ({ args, plan }) => {
   return buildOrDeployCouldFollow ? `${VERCEL_CLI} whoami` : null;
 };
 
-const openDatabase = (dbPath) => {
+const openDatabase = (dbPath, Database = sqlite3.Database) => {
   return new Promise((resolve, reject) => {
-    const db = new sqlite3.Database(dbPath, sqlite3.OPEN_READONLY, (err) => {
+    const db = new Database(dbPath, sqlite3.OPEN_READONLY, (err) => {
       if (err) {
         reject(err);
         return;
@@ -630,7 +626,7 @@ const loadEmbeddingsFromDb = async (embeddingsDbPath) => {
     );
     return {
       hasEmbeddingsTable: true,
-      embeddingsCount: embeddingsCountRow?.count ?? 0,
+      embeddingsCount: embeddingsCountRow.count,
       indexedEmbeddingPaths: new Set(embeddingRows.map((row) => row.path)),
       embeddingModelCounts: embeddingModelRows.map((row) => ({
         modelId: row.model_id,
@@ -675,8 +671,8 @@ const loadDbState = async (dbPath, embeddingsDbPath = null) => {
     const baseState = {
       exists: true,
       dbPath,
-      imageCount: imageCountRow?.count ?? 0,
-      embeddingsCount: embeddingsCountRow?.count ?? 0,
+      imageCount: imageCountRow.count,
+      embeddingsCount: embeddingsCountRow.count,
       indexedPhotoPaths: new Set(imageRows.map((row) => row.path)),
       indexedEmbeddingPaths: new Set(embeddingRows.map((row) => row.path)),
       hasEmbeddingsTable,
@@ -974,13 +970,13 @@ const buildDeletedAlbumReports = ({ indexedPhotoPaths, onDiskAlbumNames }) => {
   }));
 };
 
-const getIndexerModelInfo = (indexDir) => {
+const getIndexerModelInfo = (indexDir, run, warn) => {
   try {
-    const output = execSync("uv run index.py model-info", { cwd: indexDir, timeout: 10000 });
+    const output = run("uv run index.py model-info", { cwd: indexDir, timeout: 10000 });
     return JSON.parse(output.toString().trim());
   } catch (err) {
     const reason = err instanceof Error ? err.message : String(err);
-    console.warn(
+    warn(
       styleText(
         `Warning: could not query the indexer's embedding models (${reason}). Embedding coverage and model-change checks will be skipped for this run.`,
         ANSI.yellow,
@@ -1007,8 +1003,12 @@ const createPreflightReport = async ({
   lastIndexStatsPath,
   repoDir,
   deployedVersionUrl,
+  loadState = loadDbState,
+  getModelInfo = getIndexerModelInfo,
+  resolveDelta = resolveDeploymentDelta,
+  now = () => new Date(),
 }) => {
-  const dbState = await loadDbState(dbPath, embeddingsDbPath);
+  const dbState = await loadState(dbPath, embeddingsDbPath);
   const albumNames = fs
     .readdirSync(albumsDir, { withFileTypes: true })
     .filter((entry) => entry.isDirectory())
@@ -1027,7 +1027,7 @@ const createPreflightReport = async ({
     }),
   );
 
-  const modelInfo = indexDir ? getIndexerModelInfo(indexDir) : null;
+  const modelInfo = indexDir ? getModelInfo(indexDir, execSync, console.warn) : null;
   const expectedEmbeddingModelIds =
     modelInfo?.embeddingModelIds ??
     (modelInfo?.embeddingModelId ? [modelInfo.embeddingModelId] : []);
@@ -1059,14 +1059,14 @@ const createPreflightReport = async ({
   const unexpectedEmbeddingModels = staleModels;
 
   const deployment = repoDir
-    ? await resolveDeploymentDelta({
+    ? await resolveDelta({
         repoDir,
         versionUrl: deployedVersionUrl ?? getDeployedVersionUrl(),
       })
     : null;
 
   return {
-    generatedAt: new Date().toISOString(),
+    generatedAt: now().toISOString(),
     deployment,
     db: {
       exists: dbState.exists,
@@ -1119,11 +1119,17 @@ const wallClockStamp = () => {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}${sign}${oh}:${om}`;
 };
 
-const runShellCommand = ({ command, cwd }) => {
+const runShellCommand = ({
+  command,
+  cwd,
+  spawnImpl = spawn,
+  now = Date.now,
+  log = console.log,
+}) => {
   return new Promise((resolve, reject) => {
-    const startedAt = Date.now();
-    console.log(`\n[${wallClockStamp()}] ${statusLabel("run")} ${command}`);
-    const child = spawn(command, {
+    const startedAt = now();
+    log(`\n[${wallClockStamp()}] ${statusLabel("run")} ${command}`);
+    const child = spawnImpl(command, {
       cwd,
       stdio: "inherit",
       shell: true,
@@ -1132,8 +1138,8 @@ const runShellCommand = ({ command, cwd }) => {
 
     child.on("exit", (code) => {
       if (code === 0) {
-        const elapsedSeconds = ((Date.now() - startedAt) / 1000).toFixed(1);
-        console.log(`[${wallClockStamp()}] ${statusLabel("ok")} Finished in ${elapsedSeconds}s`);
+        const elapsedSeconds = ((now() - startedAt) / 1000).toFixed(1);
+        log(`[${wallClockStamp()}] ${statusLabel("ok")} Finished in ${elapsedSeconds}s`);
         resolve();
         return;
       }
@@ -1402,27 +1408,61 @@ const buildWizardContext = ({ srcDir }) => {
 module.exports = {
   ALBUM_CONFIG_FILENAME,
   REPORT_FILENAME,
+  askYesNo,
   buildDeletedAlbumReports,
   buildDeploymentInsight,
   buildIndexVerification,
   buildSummary,
   buildWizardContext,
+  buildVerificationInsights,
   classifyPublishDelta,
+  createAlbumReport,
   createPreflightReport,
+  calculateAlbumDiagnostics,
   buildAttentionAlbums,
   buildPreflightInsights,
+  dbAll,
+  dbClose,
+  dbGet,
+  defaultRunGit,
+  describeDeploymentPlanRow,
+  extractPhotoMetadata,
+  fetchDeployedSha,
+  fileExists,
+  formatDuration,
+  formatNumber,
+  formatPercent,
+  getIndexerModelInfo,
   getDeployedVersionUrl,
   getVercelPreflightCommand,
   hasIndexChanges,
+  isDataPath,
+  isPhotoFile,
+  isVideoFile,
+  isZoneIdentifierFile,
   loadDbState,
+  nonEmpty,
+  openDatabase,
   parseArgs,
+  printIndentedList,
+  printInsightLines,
   printExecutionPlan,
   printPreflightReport,
+  printSection,
+  printStatRows,
   printVerificationReport,
+  readAlbumFiles,
+  readAlbumManifestStatus,
+  readLastIndexStats,
   resolveDeploymentDelta,
   resolveExecutionPlan,
   runShellCommand,
-  askYesNo,
-  buildVerificationInsights,
+  shortSha,
+  splitLines,
+  statusLabel,
+  styleText,
+  toIsoStringOrNull,
+  toPosixPath,
+  wallClockStamp,
   writeReport,
 };

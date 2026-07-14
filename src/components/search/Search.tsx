@@ -35,12 +35,13 @@ import {
 import { getActiveFilterCount, mergeFacetSections, normaliseSearchTerms } from "./searchViewModel";
 import { useSearchFilterDrawer } from "./useSearchFilterDrawer";
 import { SearchActiveFilters } from "./SearchActiveFilters";
+import { navigateTo } from "../../util/navigate";
 
 const useSafeLayoutEffect = typeof window === "undefined" ? useEffect : useLayoutEffect;
 
 // Mirrors isEditableTarget in src/util/slideshowKeyboard.ts so the "/" focus
 // shortcut never swallows characters typed into the search box or hex input.
-const isEditableTarget = (target: EventTarget | null): boolean => {
+export const isEditableTarget = (target: EventTarget | null): boolean => {
   if (!target || typeof target !== "object") {
     return false;
   }
@@ -515,8 +516,7 @@ export const Search: React.FC<{
 
   const truncateSimilarStack = useCallback((breadcrumbIndex: number) => {
     setSimilarTrail((prev) => {
-      const nextCurrentPath =
-        breadcrumbIndex > 0 ? (prev[breadcrumbIndex - 1]?.path ?? null) : null;
+      const nextCurrentPath = breadcrumbIndex > 0 ? prev[breadcrumbIndex - 1]!.path : null;
       setSimilarPath(nextCurrentPath);
       return breadcrumbIndex > 1 ? prev.slice(0, breadcrumbIndex - 1) : [];
     });
@@ -545,9 +545,7 @@ export const Search: React.FC<{
         return;
       }
 
-      window.location.assign(
-        `/slideshow?mode=similar&seed=${encodeURIComponent(randomPhoto.path)}`,
-      );
+      navigateTo(`/slideshow?mode=similar&seed=${encodeURIComponent(randomPhoto.path)}`);
     } catch (err) {
       console.error("Failed to load a random photo", err);
       setRandomExploreError("Couldn't start random explore right now.");

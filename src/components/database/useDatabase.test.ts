@@ -198,6 +198,18 @@ describe("fetchWithProgress", () => {
       total: 7,
     });
   });
+
+  it("surfaces a mid-download reader failure", async () => {
+    const failure = new Error("connection reset");
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      body: { getReader: () => ({ read: () => Promise.reject(failure) }) },
+      headers: { get: () => "10" },
+    }) as typeof fetch;
+
+    const response = await databaseLoaderInternals.fetchWithProgress("/search.sqlite", jest.fn());
+    await expect(response.arrayBuffer()).rejects.toBe(failure);
+  });
 });
 
 describe("initializeSQLite", () => {
@@ -268,5 +280,94 @@ describe("initializeSQLite", () => {
 
     expect(global.fetch).toHaveBeenNthCalledWith(1, "/search-embeddings.sqlite");
     expect(global.fetch).toHaveBeenNthCalledWith(2, "/search.sqlite");
+  });
+
+  it("fails cleanly when SQLite cannot provide a database pointer", async () => {
+    (sqlite3InitModule as jest.Mock).mockResolvedValue({
+      version: { libVersion: "mock" },
+      wasm: { allocFromTypedArray: jest.fn().mockReturnValue(1) },
+      oo1: { DB: jest.fn(() => ({ pointer: 0 })) },
+      capi: { SQLITE_DESERIALIZE_FREEONCLOSE: 1 },
+    });
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      body: null,
+      headers: { get: () => null },
+      arrayBuffer: jest.fn().mockResolvedValue(new ArrayBuffer(0)),
+    }) as typeof fetch;
+
+    await expect(databaseLoaderInternals.initializeSQLite("/pointerless.sqlite")).rejects.toThrow(
+      "Failed to initialise SQLite",
+    );
+  });
+
+  it("normalises a non-Error module initialisation failure", async () => {
+    const error = jest.spyOn(console, "error").mockImplementation(() => {});
+    (sqlite3InitModule as jest.Mock).mockRejectedValue("module unavailable");
+
+    await expect(databaseLoaderInternals.initializeSQLite("/search.sqlite")).rejects.toThrow(
+      "Failed to initialise SQLite",
+    );
+    expect(error).toHaveBeenCalledWith("Initialization error:", "module unavailable");
+  });
+});
+
+describe("database cache", () => {
+  const originalFetch = global.fetch;
+  const sqlite = {
+    version: { libVersion: "mock" },
+    wasm: { allocFromTypedArray: jest.fn().mockReturnValue(1) },
+    oo1: { DB: jest.fn(() => ({ pointer: 1, checkRc: jest.fn() })) },
+    capi: { sqlite3_deserialize: jest.fn(() => 0), SQLITE_DESERIALIZE_FREEONCLOSE: 1 },
+  };
+
+  beforeEach(() => {
+    databaseLoaderInternals.resetForTesting();
+    (sqlite3InitModule as jest.Mock).mockResolvedValue(sqlite);
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      body: null,
+      headers: { get: () => null },
+      arrayBuffer: jest.fn().mockResolvedValue(new ArrayBuffer(0)),
+    }) as typeof fetch;
+  });
+
+  afterEach(() => {
+    global.fetch = originalFetch;
+  });
+
+  it("coalesces in-flight loads and serves the completed database from cache", async () => {
+    const first = databaseLoaderInternals.getDatabase("/cached.sqlite");
+    const second = databaseLoaderInternals.getDatabase("/cached.sqlite");
+    expect(second).toBe(first);
+    const database = await first;
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+
+    const progress = jest.fn();
+    await expect(
+      databaseLoaderInternals.getDatabase("/cached.sqlite", undefined, progress),
+    ).resolves.toBe(database);
+    expect(progress).toHaveBeenCalledWith(100, { loaded: 0, total: 0 });
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("evicts a failed promise so a retry refetches", async () => {
+    (global.fetch as jest.Mock)
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 500,
+        statusText: "Broken",
+        body: null,
+        headers: { get: () => null },
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        body: null,
+        headers: { get: () => null },
+        arrayBuffer: jest.fn().mockResolvedValue(new ArrayBuffer(0)),
+      });
+    await expect(databaseLoaderInternals.getDatabase("/retry.sqlite")).rejects.toThrow();
+    await expect(databaseLoaderInternals.getDatabase("/retry.sqlite")).resolves.toBeTruthy();
+    expect(global.fetch).toHaveBeenCalledTimes(2);
   });
 });

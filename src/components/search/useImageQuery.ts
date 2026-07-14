@@ -53,7 +53,13 @@ export const useImageQuery = (): ImageQueryState => {
     }
   };
 
-  useEffect(() => releasePreviewUrl, []);
+  useEffect(
+    () => () => {
+      activeIdRef.current += 1;
+      releasePreviewUrl();
+    },
+    [],
+  );
 
   const clearImageQuery = useCallback(() => {
     activeIdRef.current += 1;
@@ -90,7 +96,7 @@ export const useImageQuery = (): ImageQueryState => {
           return;
         }
         setImageModelProgress(100);
-        setImageQuery((current) => (current?.id === id ? { ...current, vector } : current));
+        setImageQuery((current) => ({ ...current!, vector }));
       })
       .catch((err) => {
         if (activeIdRef.current !== id) {

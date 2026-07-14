@@ -1,4 +1,4 @@
-import { recencyColor, recencyGradientStops, recencyGradientCss } from "./mapColor";
+import { mixHsl, recencyColor, recencyGradientCss, recencyGradientStops } from "./mapColor";
 
 const parseHsl = (color: string) => {
   const match = color.match(/hsl\(\s*([\d.]+),\s*([\d.]+)%,\s*([\d.]+)%\s*\)/);
@@ -64,6 +64,11 @@ describe("recencyGradientStops", () => {
     expect(recencyGradientStops(1)).toHaveLength(2);
     expect(recencyGradientStops(0)).toHaveLength(2);
   });
+
+  it("uses seven stops by default and floors fractional counts", () => {
+    expect(recencyGradientStops()).toHaveLength(7);
+    expect(recencyGradientStops(3.9)).toHaveLength(3);
+  });
 });
 
 describe("recencyGradientCss", () => {
@@ -73,5 +78,31 @@ describe("recencyGradientCss", () => {
     expect(css).not.toContain("NaN");
     expect(css).toContain("0%");
     expect(css).toContain("100%");
+  });
+
+  it("uses the documented default direction", () => {
+    expect(recencyGradientCss()).toMatch(/^linear-gradient\(90deg,/);
+  });
+});
+
+describe("mixHsl", () => {
+  const blue = "hsl(220.0, 58.0%, 60.0%)";
+  const red = "hsl(0.0, 88.0%, 44.0%)";
+
+  it("interpolates hue, saturation, and lightness along the recency ramp", () => {
+    expect(mixHsl(blue, red, 0)).toBe(blue);
+    expect(mixHsl(blue, red, 0.5)).toBe("hsl(110.0, 73.0%, 52.0%)");
+    expect(mixHsl(blue, red, 1)).toBe(red);
+  });
+
+  it("clamps invalid ratios to the oldest endpoint", () => {
+    expect(mixHsl(blue, red, Number.NaN)).toBe(blue);
+    expect(mixHsl(blue, red, -1)).toBe(blue);
+    expect(mixHsl(blue, red, 2)).toBe(red);
+  });
+
+  it("falls back to the source colour when either HSL value is malformed", () => {
+    expect(mixHsl("var(--c-accent)", red, 0.5)).toBe("var(--c-accent)");
+    expect(mixHsl(blue, "not-a-colour", 0.5)).toBe(blue);
   });
 });

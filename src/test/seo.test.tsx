@@ -36,6 +36,8 @@ import {
   buildWebSiteJsonLd,
   getCanonicalUrl,
   getDefaultSocialImageUrl,
+  getSiteOrigin,
+  resolveAbsoluteUrl,
 } from "../lib/seo";
 import { buildRobotsTxt } from "../pages/robots.txt";
 import { buildSitemapXml } from "../lib/sitemap";
@@ -91,6 +93,34 @@ describe("SEO helpers", () => {
 
   it("builds canonical URLs from the configured site origin", () => {
     expect(getCanonicalUrl("/timeline")).toBe("https://photos.example.com/timeline");
+  });
+
+  it("normalises configured and deployment site origins", () => {
+    process.env = { ...originalEnv, SITE_URL: "http://photos.internal/" };
+    expect(getSiteOrigin()).toBe("http://photos.internal");
+
+    process.env = { ...originalEnv, VERCEL_PROJECT_PRODUCTION_URL: "gallery.example.com/" };
+    expect(getSiteOrigin()).toBe("https://gallery.example.com");
+
+    process.env = { ...originalEnv };
+    delete process.env.NEXT_PUBLIC_SITE_URL;
+    delete process.env.SITE_URL;
+    delete process.env.VERCEL_PROJECT_PRODUCTION_URL;
+    expect(getSiteOrigin()).toBe("https://photos.awoo.party");
+  });
+
+  it("normalises canonical paths and resolves only relative asset URLs", () => {
+    expect(getCanonicalUrl()).toBe("https://photos.example.com/");
+    expect(getCanonicalUrl("timeline")).toBe("https://photos.example.com/timeline");
+    expect(resolveAbsoluteUrl()).toBeUndefined();
+    expect(resolveAbsoluteUrl("https://cdn.example.com/photo.jpg")).toBe(
+      "https://cdn.example.com/photo.jpg",
+    );
+    expect(resolveAbsoluteUrl("//cdn.example.com/photo.jpg")).toBe("//cdn.example.com/photo.jpg");
+    expect(resolveAbsoluteUrl("data:image/gif;base64,AAAA")).toBe("data:image/gif;base64,AAAA");
+    expect(resolveAbsoluteUrl("photos/cover.jpg")).toBe(
+      "https://photos.example.com/photos/cover.jpg",
+    );
   });
 
   it("uses the default social preview image when no page image is supplied", () => {
@@ -173,6 +203,15 @@ describe("SEO helpers", () => {
     expect((breadcrumbs.itemListElement as Array<{ item: string }>)[1]?.item).toBe(
       "https://photos.example.com/timeline",
     );
+
+    expect(
+      buildCollectionPageJsonLd({
+        name: "Trip",
+        description: "Trip photos",
+        pathname: "/album/trip",
+        image: "https://photos.example.com/cover.jpg",
+      }).image,
+    ).toBe("https://photos.example.com/cover.jpg");
   });
 
   it("renders album page metadata with cover image and breadcrumb schema", () => {

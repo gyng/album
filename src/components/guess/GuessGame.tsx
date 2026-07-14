@@ -128,8 +128,6 @@ const reducer = (state: State, action: Action): State => {
       };
     case "change_settings":
       return { ...state, phase: "lobby" };
-    default:
-      return state;
   }
 };
 
@@ -254,10 +252,9 @@ export const GuessGame: React.FC<GuessGameProps> = ({
     );
   }
 
-  const photo = state.photos[state.currentRound];
-  if (!photo) {
-    return <p className={styles.status}>No more photos.</p>;
-  }
+  // The reducer enters playing only with a non-empty parsed photo list and
+  // advances to summary before currentRound can exceed that list.
+  const photo = state.photos[state.currentRound]!;
 
   const cumulativeScore = state.results.reduce((sum, r) => sum + r.score, 0);
 

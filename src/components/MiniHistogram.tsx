@@ -17,7 +17,7 @@ export const MiniHistogram: React.FC<Props> = ({ title, data }) => {
       </Heading>
       <div className={styles.bars}>
         {data.map((bucket) => {
-          const heightPct = max > 0 ? (bucket.count / max) * 100 : 0;
+          const heightPct = (bucket.count / max) * 100;
 
           return (
             <div

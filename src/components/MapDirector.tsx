@@ -21,15 +21,11 @@ export const MapDirector = ({
       return;
     }
 
-    let stopped = false;
     let timer: ReturnType<typeof setTimeout> | null = null;
     let index = 0;
     const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
     const visit = () => {
-      if (stopped) {
-        return;
-      }
       const photo = sequence[index % sequence.length];
       if (!photo || photo.decLat === null || photo.decLng === null) {
         return;
@@ -48,7 +44,6 @@ export const MapDirector = ({
 
     visit();
     return () => {
-      stopped = true;
       if (timer) {
         clearTimeout(timer);
       }

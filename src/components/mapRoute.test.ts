@@ -2,8 +2,11 @@ import { MapWorldEntry } from "./MapWorld";
 import {
   ROUTE_SIMPLIFY_THRESHOLD,
   buildContextRouteGeoJson,
+  buildContextRoutePoints,
   buildMapRoute,
+  distanceMetersBetween,
   getDefaultRouteMode,
+  toRouteGeoJson,
 } from "./mapRoute";
 
 const makePhoto = (
@@ -21,6 +24,27 @@ const makePhoto = (
 });
 
 describe("mapRoute", () => {
+  it("measures geographic distance and omits lines with fewer than two points", () => {
+    expect(distanceMetersBetween({ decLat: 0, decLng: 0 }, { decLat: 0, decLng: 0 })).toBe(0);
+    expect(distanceMetersBetween({ decLat: 0, decLng: 0 }, { decLat: 0, decLng: 1 })).toBeCloseTo(
+      111_195,
+      0,
+    );
+    expect(toRouteGeoJson([])).toBeNull();
+    expect(
+      toRouteGeoJson([
+        {
+          ...makePhoto({ href: "only" }),
+          isStart: true,
+          isEnd: true,
+          sequenceIndex: 0,
+          stopPhotoCount: 1,
+          memberHrefs: ["only"],
+        },
+      ]),
+    ).toBeNull();
+  });
+
   it("sorts geotagged photos chronologically and marks endpoints", () => {
     const route = buildMapRoute([
       makePhoto({
@@ -115,6 +139,40 @@ describe("mapRoute", () => {
     );
 
     expect(getDefaultRouteMode(manyPhotos)).toBe("simplified");
+    expect(getDefaultRouteMode(manyPhotos.slice(0, ROUTE_SIMPLIFY_THRESHOLD))).toBe("full");
+    expect(
+      getDefaultRouteMode([
+        makePhoto({ href: "null-lat", decLat: null }),
+        makePhoto({ href: "null-lng", decLng: null }),
+        makePhoto({ href: "nan-lat", decLat: Number.NaN }),
+        makePhoto({ href: "infinite-lng", decLng: Number.POSITIVE_INFINITY }),
+      ]),
+    ).toBe("full");
+  });
+
+  it("sorts equal, missing, and invalid timestamps stably after dated photos", () => {
+    const route = buildMapRoute([
+      makePhoto({ href: "undated-first", date: null }),
+      makePhoto({ href: "dated-a", date: "2024-01-01T00:00:00" }),
+      makePhoto({ href: "invalid", date: "not-a-date" }),
+      makePhoto({ href: "dated-b", date: "2024-01-01T00:00:00" }),
+      makePhoto({ href: "undated-last", date: null }),
+    ]);
+
+    expect(route.fullPoints.map(({ href }) => href)).toEqual([
+      "dated-a",
+      "dated-b",
+      "undated-first",
+      "invalid",
+      "undated-last",
+    ]);
+
+    expect(
+      buildMapRoute([
+        makePhoto({ href: "dated", date: "2024-01-01T00:00:00" }),
+        makePhoto({ href: "undated", date: null }),
+      ]).fullPoints.map(({ href }) => href),
+    ).toEqual(["dated", "undated"]);
   });
 
   it("builds a local context route around the selected photo within its album", () => {
@@ -353,6 +411,98 @@ describe("mapRoute", () => {
       ],
     });
   });
+
+  it("limits trips longer than 28 days to the target's local-day segment", () => {
+    const photos = [
+      makePhoto({ href: "day-one-a", date: "2024-01-01T08:00:00", decLat: 35, decLng: 139 }),
+      makePhoto({
+        href: "day-one-b",
+        date: "2024-01-01T12:00:00",
+        decLat: 35.1,
+        decLng: 139.1,
+      }),
+      makePhoto({ href: "later", date: "2024-02-10T08:00:00", decLat: 36, decLng: 140 }),
+    ];
+
+    expect(buildContextRoutePoints(photos, "day-one-b")?.map(({ href }) => href)).toEqual([
+      "day-one-a",
+      "day-one-b",
+    ]);
+    expect(buildContextRouteGeoJson(photos, "day-one-b")?.features[0]?.properties).toEqual({
+      pointCount: 2,
+    });
+  });
+
+  it("falls back to standard timestamps when a valid date is not an EXIF format", () => {
+    const photos = [
+      makePhoto({
+        href: "rfc-a",
+        date: "Mon, 01 Jan 2024 08:00:00 GMT",
+        decLat: 35,
+        decLng: 139,
+      }),
+      makePhoto({
+        href: "rfc-b",
+        date: "Mon, 01 Jan 2024 12:00:00 GMT",
+        decLat: 35.1,
+        decLng: 139.1,
+      }),
+      makePhoto({
+        href: "rfc-later",
+        date: "Fri, 01 Mar 2024 08:00:00 GMT",
+        decLat: 36,
+        decLng: 140,
+      }),
+    ];
+
+    expect(buildContextRoutePoints(photos, "rfc-a")?.map(({ href }) => href)).toEqual([
+      "rfc-a",
+      "rfc-b",
+    ]);
+  });
+
+  it("handles undated, simplified, missing, and unlocated context targets", () => {
+    const undated = [
+      makePhoto({ href: "undated-a", date: null, decLat: 35, decLng: 139 }),
+      makePhoto({ href: "undated-b", date: null, decLat: 35.1, decLng: 139.1 }),
+    ];
+    expect(buildContextRoutePoints(undated, "undated-a")?.map(({ href }) => href)).toEqual([
+      "undated-a",
+      "undated-b",
+    ]);
+
+    const close = [
+      makePhoto({ href: "close-a", date: "2024-01-01T00:00:00", decLat: 35, decLng: 139 }),
+      makePhoto({
+        href: "close-b",
+        date: "2024-01-01T00:01:00",
+        decLat: 35.0001,
+        decLng: 139.0001,
+      }),
+      makePhoto({
+        href: "close-c",
+        date: "2024-01-01T00:02:00",
+        decLat: 35.0002,
+        decLng: 139.0002,
+      }),
+    ];
+    expect(buildContextRoutePoints(close, "close-b", "simplified")).toHaveLength(1);
+
+    expect(buildContextRoutePoints(close, "missing")).toBeNull();
+    expect(buildContextRouteGeoJson(close, "missing")).toBeNull();
+    expect(
+      buildContextRoutePoints(
+        [makePhoto({ href: "unlocated", date: null, decLat: null, decLng: null })],
+        "unlocated",
+      ),
+    ).toBeNull();
+    expect(
+      buildContextRouteGeoJson(
+        [makePhoto({ href: "single", date: null, decLat: 35, decLng: 139 })],
+        "single",
+      ),
+    ).toBeNull();
+  });
 });
 
 describe("antimeridian route line", () => {
@@ -398,11 +548,19 @@ describe("wall-clock day segments", () => {
         decLat: 35.2,
         decLng: 139.2,
       }),
+      makePhoto({
+        href: "/album/trip#much-later.jpg",
+        date: "2024-02-10T12:00:00",
+        decLat: 36,
+        decLng: 140,
+      }),
     ]);
 
-    const context = buildContextRouteGeoJson(route.fullPoints, route.fullPoints[0]!);
+    const contextPoints = buildContextRoutePoints(route.fullPoints, route.fullPoints[0]!.href);
+    const context = buildContextRouteGeoJson(route.fullPoints, route.fullPoints[0]!.href);
     // Hovering the 23:50 photo must trace only its own day — one point,
     // so no line feature is produced for a single-photo segment
-    expect(context?.features[0]?.geometry.coordinates ?? []).not.toContainEqual([139.2, 35.2]);
+    expect(contextPoints?.map(({ href }) => href)).toEqual(["/album/trip#night.jpg"]);
+    expect(context).toBeNull();
   });
 });

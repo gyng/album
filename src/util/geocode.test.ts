@@ -1,4 +1,11 @@
-import { getGeocodeLabel, getGeocodeCountry, getGeocodeCity } from "./geocode";
+import {
+  formatPlaceDisplayLabel,
+  getGeocodeCity,
+  getGeocodeCountry,
+  getGeocodeLabel,
+  getGeocodeRegion,
+  getGeocodeSubregion,
+} from "./geocode";
 
 // Geocode format: lat\nlon\nname\nadmin1\nadmin2\ncc\ncountry
 // Produced by format_mapping_values() in index.py
@@ -59,5 +66,34 @@ describe("getGeocodeCity", () => {
 
   it("returns null for empty", () => {
     expect(getGeocodeCity(null)).toBeNull();
+  });
+});
+
+describe("geocode administrative parts", () => {
+  it("returns region and subregion from their positional fields", () => {
+    expect(getGeocodeRegion(TOKYO)).toBe("Tokyo");
+    expect(getGeocodeSubregion(TOKYO)).toBe("Tokyo");
+  });
+
+  it("returns null when an administrative field is absent", () => {
+    expect(getGeocodeRegion("Japan")).toBeNull();
+    expect(getGeocodeSubregion("Tokyo\nJapan")).toBeNull();
+  });
+});
+
+describe("formatPlaceDisplayLabel", () => {
+  it("removes administrative suffixes and parenthetical qualifiers", () => {
+    expect(formatPlaceDisplayLabel("  Osaka Prefecture  ")).toBe("Osaka");
+    expect(formatPlaceDisplayLabel("Springfield (Illinois) City")).toBe("Springfield");
+    expect(formatPlaceDisplayLabel("Shinjuku-ku")).toBe("Shinjuku");
+  });
+
+  it("returns null for missing or whitespace-only labels", () => {
+    expect(formatPlaceDisplayLabel(null)).toBeNull();
+    expect(formatPlaceDisplayLabel("   ")).toBeNull();
+  });
+
+  it("falls back to the original trimmed value when the suffix is the whole label", () => {
+    expect(formatPlaceDisplayLabel("City")).toBe("City");
   });
 });

@@ -100,9 +100,15 @@ export function formatPlaceDisplayLabel(value: string | null | undefined): strin
   let label = value.trim();
   if (!label) return null;
 
-  TRAILING_PLACE_SUFFIXES.forEach((pattern) => {
-    label = label.replace(pattern, "").trim();
-  });
+  // A label may stack suffixes (for example "Springfield (Illinois) City").
+  // Repeat until stable so removing the outer suffix can expose another one.
+  let previous: string;
+  do {
+    previous = label;
+    TRAILING_PLACE_SUFFIXES.forEach((pattern) => {
+      label = label.replace(pattern, "").trim();
+    });
+  } while (label !== previous);
 
   return label || value.trim();
 }

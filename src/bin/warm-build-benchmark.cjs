@@ -240,63 +240,97 @@ const runBuild = (index) => {
   };
 };
 
-const benchmark = {
-  generatedAt: new Date().toISOString(),
-  runs: [],
-};
-
-for (let index = 1; index <= runs; index += 1) {
-  console.log(`\n=== Warm build benchmark run ${index}/${runs} ===`);
-  benchmark.runs.push(runBuild(index));
-}
-
-benchmark.summary = {
-  medianWallTimeMs: median(benchmark.runs.map((run) => run.wallTimeMs)),
-  medianNextBuildMs: median(benchmark.runs.map((run) => run.trace.nextBuildMs).filter(Boolean)),
-  medianStaticCheckMs: median(benchmark.runs.map((run) => run.trace.staticCheckMs).filter(Boolean)),
-  medianStaticGenerationMs: median(
-    benchmark.runs.map((run) => run.trace.staticGenerationMs).filter(Boolean),
-  ),
-};
-
-const budget = readBudget();
-const budgetWarnings = evaluateBudget(benchmark.summary, budget);
-
-benchmark.budget = budget
-  ? {
-      path: path.relative(projectDir, budgetPath),
-      warnOnly: budget.warnOnly !== false,
-      warnings: budgetWarnings,
-    }
-  : null;
-
-fs.writeFileSync(benchmarkOutputPath, JSON.stringify(benchmark, null, 2));
-
-console.log("\nWarm build benchmark written to", benchmarkOutputPath);
-console.log(
-  JSON.stringify(
-    {
-      medianWallTimeMs: benchmark.summary.medianWallTimeMs,
-      medianNextBuildMs: benchmark.summary.medianNextBuildMs,
-      medianStaticCheckMs: benchmark.summary.medianStaticCheckMs,
-      medianStaticGenerationMs: benchmark.summary.medianStaticGenerationMs,
-      budgetWarnings,
-      slowestPagesLastRun: benchmark.runs.at(-1)?.trace.slowestPages ?? [],
-    },
-    null,
-    2,
-  ),
-);
-
-if (budgetWarnings.length > 0) {
-  console.warn("\nWarm build performance budget warnings:");
-  for (const warning of budgetWarnings) {
-    console.warn(
-      `- ${warning.metric}: actual ${formatMs(warning.actualMs)} vs baseline ${formatMs(warning.baselineMs)} (+${formatMs(warning.regressionMs)}, +${warning.regressionPercent}%)`,
-    );
-  }
-
-  if (budget?.warnOnly === false || process.env.ALBUM_BENCHMARK_FAIL_ON_BUDGET === "1") {
+const runBenchmark = ({
+  runCount,
+  build = runBuild,
+  now = () => new Date(),
+  budget = readBudget(),
+  outputPath = benchmarkOutputPath,
+  log = console.log,
+  warn = console.warn,
+  markFailed = () => {
     process.exitCode = 1;
+  },
+}) => {
+  const benchmark = {
+    generatedAt: now().toISOString(),
+    runs: [],
+  };
+
+  for (let index = 1; index <= runCount; index += 1) {
+    log(`\n=== Warm build benchmark run ${index}/${runCount} ===`);
+    benchmark.runs.push(build(index));
   }
+
+  benchmark.summary = {
+    medianWallTimeMs: median(benchmark.runs.map((run) => run.wallTimeMs)),
+    medianNextBuildMs: median(benchmark.runs.map((run) => run.trace.nextBuildMs).filter(Boolean)),
+    medianStaticCheckMs: median(
+      benchmark.runs.map((run) => run.trace.staticCheckMs).filter(Boolean),
+    ),
+    medianStaticGenerationMs: median(
+      benchmark.runs.map((run) => run.trace.staticGenerationMs).filter(Boolean),
+    ),
+  };
+
+  const budgetWarnings = evaluateBudget(benchmark.summary, budget);
+
+  benchmark.budget = budget
+    ? {
+        path: path.relative(projectDir, budgetPath),
+        warnOnly: budget.warnOnly !== false,
+        warnings: budgetWarnings,
+      }
+    : null;
+
+  fs.writeFileSync(outputPath, JSON.stringify(benchmark, null, 2));
+
+  log("\nWarm build benchmark written to", outputPath);
+  log(
+    JSON.stringify(
+      {
+        medianWallTimeMs: benchmark.summary.medianWallTimeMs,
+        medianNextBuildMs: benchmark.summary.medianNextBuildMs,
+        medianStaticCheckMs: benchmark.summary.medianStaticCheckMs,
+        medianStaticGenerationMs: benchmark.summary.medianStaticGenerationMs,
+        budgetWarnings,
+        slowestPagesLastRun: benchmark.runs.at(-1)?.trace.slowestPages ?? [],
+      },
+      null,
+      2,
+    ),
+  );
+
+  if (budgetWarnings.length > 0) {
+    warn("\nWarm build performance budget warnings:");
+    for (const warning of budgetWarnings) {
+      warn(
+        `- ${warning.metric}: actual ${formatMs(warning.actualMs)} vs baseline ${formatMs(warning.baselineMs)} (+${formatMs(warning.regressionMs)}, +${warning.regressionPercent}%)`,
+      );
+    }
+
+    if (budget?.warnOnly === false || process.env.ALBUM_BENCHMARK_FAIL_ON_BUDGET === "1") {
+      markFailed();
+    }
+  }
+
+  return benchmark;
+};
+
+module.exports = {
+  aggregateProfiles,
+  evaluateBudget,
+  findLastDurationMs,
+  formatMs,
+  median,
+  parseTraceEntries,
+  readBudget,
+  runBenchmark,
+  runBuild,
+  summarizeMetrics,
+};
+
+/* istanbul ignore next -- direct CLI dispatch; runBenchmark is tested independently */
+if (require.main === module) {
+  runBenchmark({ runCount: runs });
 }

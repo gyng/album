@@ -237,7 +237,7 @@ export const TimelineDayGrid = ({
                     <span
                       suppressHydrationWarning
                       className={styles.secondaryMeta}
-                      title={formatDateTimeTitle(entry.dateTimeOriginal) ?? undefined}
+                      title={formatDateTimeTitle(entry.dateTimeOriginal)!}
                     >
                       {formatRelativeDateTime(entry.dateTimeOriginal)}
                     </span>

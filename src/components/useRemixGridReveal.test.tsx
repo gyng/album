@@ -14,7 +14,9 @@ describe("useRemixGridReveal", () => {
   });
 
   it("is always ready for a single (non-remix) slide", () => {
-    const { result } = renderHook(() => useRemixGridReveal({ seedPath: "a", companionPaths: [] }));
+    const { result } = renderHook(() =>
+      useRemixGridReveal({ seedPath: undefined, companionPaths: [] }),
+    );
     expect(result.current.isRemixGridReady).toBe(true);
   });
 
@@ -60,6 +62,20 @@ describe("useRemixGridReveal", () => {
       useRemixGridReveal({ seedPath: "a", companionPaths: ["b"] }),
     );
     expect(result.current.isRemixGridReady).toBe(false);
+    act(() => {
+      jest.advanceTimersByTime(3001);
+    });
+    expect(result.current.isRemixGridReady).toBe(true);
+  });
+
+  it("leaves an already loaded grid unchanged when the safety timer expires", () => {
+    const { result } = renderHook(() =>
+      useRemixGridReveal({ seedPath: "a", companionPaths: ["b"] }),
+    );
+    act(() => result.current.markRemixCellLoaded("a"));
+    act(() => result.current.markRemixCellLoaded("b"));
+    expect(result.current.isRemixGridReady).toBe(true);
+
     act(() => {
       jest.advanceTimersByTime(3001);
     });

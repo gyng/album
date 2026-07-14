@@ -320,11 +320,7 @@ export const TechnicalHeatmaps: React.FC<Props> = ({
 
       setOverlayLines(
         Array.from(relatedMap.entries()).flatMap(([targetKey, count]) => {
-          const targetNode = cellRefs.current.get(targetKey);
-          if (!targetNode) {
-            return [];
-          }
-
+          const targetNode = cellRefs.current.get(targetKey)!;
           const targetRect = targetNode.getBoundingClientRect();
           const target = {
             x: targetRect.left + targetRect.width / 2 - wrapperRect.left,

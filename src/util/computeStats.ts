@@ -1,7 +1,10 @@
 import { Content, PhotoBlock } from "../services/types";
 import {
+  APERTURE_FACET,
   CAMERA_FACET,
+  FOCAL_LENGTH_35MM_FACET,
   HOUR_FACET,
+  ISO_FACET,
   LENS_FACET,
   NUMERIC_FACETS,
   STRING_FACETS,
@@ -222,11 +225,11 @@ function computeNumericFacet(photos: PhotoBlock[], facet: PhotoFacet<number>): N
 
   for (const photo of photos) {
     const value = facet.extract(photo._build.exif, photo._build.tags ?? undefined);
-    if (value === null) continue;
+    if (value === null || !Number.isFinite(value)) continue;
     withField++;
     const bucket = facet.buckets.find((b) => b.match(value));
     if (bucket) {
-      counts.set(bucket.label, (counts.get(bucket.label) ?? 0) + 1);
+      counts.set(bucket.label, counts.get(bucket.label)! + 1);
     }
   }
 
@@ -235,7 +238,7 @@ function computeNumericFacet(photos: PhotoBlock[], facet: PhotoFacet<number>): N
     displayName: facet.displayName,
     data: facet.buckets.map((b) => ({
       label: b.label,
-      count: counts.get(b.label) ?? 0,
+      count: counts.get(b.label)!,
     })),
     coverage: photos.length > 0 ? withField / photos.length : 0,
   };
@@ -310,14 +313,12 @@ function computeGearFlow(photos: PhotoBlock[]): SankeyFlow {
       facetValue: camera,
     });
 
-    const topLenses = Array.from(lensCountsByCamera.get(camera)?.entries() ?? []).sort(
-      (left, right) => {
-        if (right[1] !== left[1]) {
-          return right[1] - left[1];
-        }
-        return left[0].localeCompare(right[0]);
-      },
-    );
+    const topLenses = Array.from(lensCountsByCamera.get(camera)!.entries()).sort((left, right) => {
+      if (right[1] !== left[1]) {
+        return right[1] - left[1];
+      }
+      return left[0].localeCompare(right[0]);
+    });
 
     topLenses.forEach(([lens, lensCount]) => {
       const lensId = `lens:${lens}`;
@@ -449,8 +450,8 @@ function computeLocationFlow(photos: PhotoBlock[]): SankeyFlow {
     pushNode({
       id: countryId,
       label: path.country,
-      displayLabel: formatPlaceDisplayLabel(path.country) ?? path.country,
-      count: countryCounts.get(path.country) ?? path.count,
+      displayLabel: formatPlaceDisplayLabel(path.country)!,
+      count: countryCounts.get(path.country)!,
       depth: 0,
       facetId: "location",
       facetValue: path.country,
@@ -458,8 +459,8 @@ function computeLocationFlow(photos: PhotoBlock[]): SankeyFlow {
     pushNode({
       id: regionId,
       label: path.region,
-      displayLabel: formatPlaceDisplayLabel(path.region) ?? path.region,
-      count: regionCounts.get(regionKey) ?? path.count,
+      displayLabel: formatPlaceDisplayLabel(path.region)!,
+      count: regionCounts.get(regionKey)!,
       depth: 1,
       facetId: "region",
       facetValue: path.region,
@@ -467,8 +468,8 @@ function computeLocationFlow(photos: PhotoBlock[]): SankeyFlow {
     pushNode({
       id: subregionId,
       label: path.subregion,
-      displayLabel: formatPlaceDisplayLabel(path.subregion) ?? path.subregion,
-      count: subregionCounts.get(subregionKey) ?? path.count,
+      displayLabel: formatPlaceDisplayLabel(path.subregion)!,
+      count: subregionCounts.get(subregionKey)!,
       depth: 2,
       facetId: "subregion",
       facetValue: path.subregion,
@@ -476,8 +477,8 @@ function computeLocationFlow(photos: PhotoBlock[]): SankeyFlow {
     pushNode({
       id: cityId,
       label: path.city,
-      displayLabel: formatPlaceDisplayLabel(path.city) ?? path.city,
-      count: cityCounts.get(cityKey) ?? path.count,
+      displayLabel: formatPlaceDisplayLabel(path.city)!,
+      count: cityCounts.get(cityKey)!,
       depth: 3,
       facetId: "city",
       facetValue: path.city,
@@ -486,17 +487,17 @@ function computeLocationFlow(photos: PhotoBlock[]): SankeyFlow {
     pushLink({
       source: countryId,
       target: regionId,
-      count: regionCounts.get(regionKey) ?? path.count,
+      count: regionCounts.get(regionKey)!,
     });
     pushLink({
       source: regionId,
       target: subregionId,
-      count: subregionCounts.get(subregionKey) ?? path.count,
+      count: subregionCounts.get(subregionKey)!,
     });
     pushLink({
       source: subregionId,
       target: cityId,
-      count: cityCounts.get(cityKey) ?? path.count,
+      count: cityCounts.get(cityKey)!,
     });
   });
 
@@ -505,12 +506,8 @@ function computeLocationFlow(photos: PhotoBlock[]): SankeyFlow {
 
 function computeRelationships(
   photos: PhotoBlock[],
-  facets: PhotoFacet<number>[],
+  facets: [PhotoFacet<number>, PhotoFacet<number>, PhotoFacet<number>],
 ): ParallelRelationshipData | null {
-  if (facets.length !== 3) {
-    return null;
-  }
-
   const pathCounts = new Map<string, number>();
   let total = 0;
 
@@ -554,13 +551,7 @@ function computeRelationships(
 }
 
 function computeTechnicalRelationships(photos: PhotoBlock[]): ParallelRelationshipData | null {
-  const facets = [
-    NUMERIC_FACETS.find((facet) => facet.id === "focal-length-35mm"),
-    NUMERIC_FACETS.find((facet) => facet.id === "aperture"),
-    NUMERIC_FACETS.find((facet) => facet.id === "iso"),
-  ].filter(Boolean) as PhotoFacet<number>[];
-
-  return computeRelationships(photos, facets);
+  return computeRelationships(photos, [FOCAL_LENGTH_35MM_FACET, APERTURE_FACET, ISO_FACET]);
 }
 
 function computeShootingScopeStats(photos: PhotoBlock[]): ShootingScopeStats {
@@ -635,12 +626,12 @@ function computeTechnicalRelationshipFilters(photos: PhotoBlock[]): TechnicalRel
 
   const byCamera: Record<string, ShootingScopeStats> = {};
   cameras.forEach((camera) => {
-    byCamera[camera] = computeShootingScopeStats(photosByCamera.get(camera) ?? []);
+    byCamera[camera] = computeShootingScopeStats(photosByCamera.get(camera)!);
   });
 
   const byLens: Record<string, ShootingScopeStats> = {};
   lenses.forEach((lens) => {
-    byLens[lens] = computeShootingScopeStats(photosByLens.get(lens) ?? []);
+    byLens[lens] = computeShootingScopeStats(photosByLens.get(lens)!);
   });
 
   const lensesByCamera: Record<string, string[]> = {};
@@ -659,7 +650,7 @@ function computeTechnicalRelationshipFilters(photos: PhotoBlock[]): TechnicalRel
 
     sortedLenses.forEach((lens) => {
       byCameraLens[camera] = byCameraLens[camera] ?? {};
-      byCameraLens[camera][lens] = computeShootingScopeStats(lensMap.get(lens) ?? []);
+      byCameraLens[camera][lens] = computeShootingScopeStats(lensMap.get(lens)!);
     });
   });
 
@@ -674,13 +665,7 @@ function computeTechnicalRelationshipFilters(photos: PhotoBlock[]): TechnicalRel
 }
 
 function computeTimeRelationships(photos: PhotoBlock[]): ParallelRelationshipData | null {
-  const facets = [
-    HOUR_FACET,
-    NUMERIC_FACETS.find((facet) => facet.id === "aperture"),
-    NUMERIC_FACETS.find((facet) => facet.id === "iso"),
-  ].filter(Boolean) as PhotoFacet<number>[];
-
-  return computeRelationships(photos, facets);
+  return computeRelationships(photos, [HOUR_FACET, APERTURE_FACET, ISO_FACET]);
 }
 
 function computeCalendarStats(photos: PhotoBlock[]): {
@@ -700,24 +685,21 @@ function computeCalendarStats(photos: PhotoBlock[]): {
 
     withDate += 1;
     const weekday = new Date(Date.UTC(parsed.year, parsed.month - 1, parsed.day)).getUTCDay();
-    weekdayCounts.set(
-      WEEKDAY_LABELS[weekday],
-      (weekdayCounts.get(WEEKDAY_LABELS[weekday]) ?? 0) + 1,
-    );
+    weekdayCounts.set(WEEKDAY_LABELS[weekday], weekdayCounts.get(WEEKDAY_LABELS[weekday])! + 1);
     monthCounts.set(
       MONTH_LABELS[parsed.month - 1],
-      (monthCounts.get(MONTH_LABELS[parsed.month - 1]) ?? 0) + 1,
+      monthCounts.get(MONTH_LABELS[parsed.month - 1])! + 1,
     );
   }
 
   return {
     weekdayStats: WEEKDAY_LABELS.map((label) => ({
       label,
-      count: weekdayCounts.get(label) ?? 0,
+      count: weekdayCounts.get(label)!,
     })),
     monthStats: MONTH_LABELS.map((label) => ({
       label,
-      count: monthCounts.get(label) ?? 0,
+      count: monthCounts.get(label)!,
     })),
     coverage: photos.length > 0 ? withDate / photos.length : 0,
   };
@@ -765,27 +747,27 @@ function computeRecentTrendStats(photos: PhotoBlock[]): {
   for (const value of dated) {
     const monthKey = `${value.year}-${value.month}`;
     if (monthCounts.has(monthKey)) {
-      monthCounts.set(monthKey, (monthCounts.get(monthKey) ?? 0) + 1);
+      monthCounts.set(monthKey, monthCounts.get(monthKey)! + 1);
     }
 
     const yearKey = String(value.year);
     const yearData = yearMonthCounts.get(yearKey);
     if (yearData) {
       const monthLabel = MONTH_LABELS[value.month - 1];
-      yearData.set(monthLabel, (yearData.get(monthLabel) ?? 0) + 1);
+      yearData.set(monthLabel, yearData.get(monthLabel)! + 1);
     }
   }
 
   return {
     recentMonthStats: monthKeys.map(({ year, month }) => ({
       label: `${MONTH_LABELS[month - 1]} '${String(year).slice(-2)}`,
-      count: monthCounts.get(`${year}-${month}`) ?? 0,
+      count: monthCounts.get(`${year}-${month}`)!,
     })),
     recentYearStats: yearKeys.map((year) => ({
       label: String(year),
       data: MONTH_LABELS.map((month) => ({
         label: month,
-        count: yearMonthCounts.get(String(year))?.get(month) ?? 0,
+        count: yearMonthCounts.get(String(year))!.get(month)!,
       })),
     })),
   };
@@ -853,7 +835,7 @@ function computeColorStats(photos: PhotoBlock[]): {
   let withPalette = 0;
 
   for (const photo of photos) {
-    const palette = photo._build?.tags?.colors;
+    const palette = photo._build.tags?.colors;
     if (!palette || palette.length === 0) {
       continue;
     }
@@ -861,21 +843,21 @@ function computeColorStats(photos: PhotoBlock[]): {
     withPalette += 1;
     const dominant = palette[0] as [number, number, number];
     const family = getColorFamilyLabel(dominant);
-    colorCounts.set(family, (colorCounts.get(family) ?? 0) + 1);
+    colorCounts.set(family, colorCounts.get(family)! + 1);
 
     const paletteLabel = palette.length >= 5 ? "5+" : String(palette.length);
-    paletteCounts.set(paletteLabel, (paletteCounts.get(paletteLabel) ?? 0) + 1);
+    paletteCounts.set(paletteLabel, paletteCounts.get(paletteLabel)! + 1);
   }
 
   return {
     colorStats: COLOR_FAMILY_LABELS.map((label) => ({
       label,
-      count: colorCounts.get(label) ?? 0,
+      count: colorCounts.get(label)!,
     })),
     colorCoverage: photos.length > 0 ? withPalette / photos.length : 0,
     paletteSizeStats: PALETTE_SIZE_LABELS.map((label) => ({
       label,
-      count: paletteCounts.get(label) ?? 0,
+      count: paletteCounts.get(label)!,
     })),
     colorFamilyExamples: [],
     colorYearStats: [],
@@ -924,24 +906,24 @@ function computeRichColorStats(albums: Content[]): {
   const datedColorEntries: Array<{ year: number; family: string }> = [];
 
   for (const { album, photo } of photoEntries) {
-    const palette = photo._build?.tags?.colors;
+    const palette = photo._build.tags?.colors;
     if (!palette || palette.length === 0) {
       continue;
     }
 
     const dominant = palette[0] as [number, number, number];
     const family = getColorFamilyLabel(dominant);
-    const examples = exampleBuckets.get(family);
-    const src = photo._build?.srcset?.[0]?.src ?? photo.data.src;
-    if (examples && src && examples.length < 6) {
+    const examples = exampleBuckets.get(family)!;
+    const src = photo._build.srcset[0]?.src ?? photo.data.src;
+    if (examples.length < 6) {
       examples.push({
         src,
-        href: `/album/${album._build.slug}#${photo.id ?? photo.data.src}`,
-        label: photo.data.title ?? photo.data.src.split("/").at(-1) ?? family,
+        href: `/album/${album._build.slug}#${photo.id}`,
+        label: photo.data.title ?? photo.data.src.split("/").at(-1)!,
       });
     }
 
-    const parsed = parseExifLocalDateTime(photo._build?.exif?.DateTimeOriginal);
+    const parsed = parseExifLocalDateTime(photo._build.exif.DateTimeOriginal);
     if (!parsed) {
       continue;
     }
@@ -950,7 +932,7 @@ function computeRichColorStats(albums: Content[]): {
     const yearBucket =
       yearCounts.get(yearKey) ??
       new Map<string, number>(COLOR_FAMILY_LABELS.map((label) => [label, 0]));
-    yearBucket.set(family, (yearBucket.get(family) ?? 0) + 1);
+    yearBucket.set(family, yearBucket.get(family)! + 1);
     yearCounts.set(yearKey, yearBucket);
     const sortKey =
       parsed.year * 100000000 +
@@ -970,8 +952,7 @@ function computeRichColorStats(albums: Content[]): {
       0,
       0,
     );
-    const position =
-      nextYearStart > yearStart ? (currentTime - yearStart) / (nextYearStart - yearStart) : 0;
+    const position = (currentTime - yearStart) / (nextYearStart - yearStart);
     yearPhotos.push({
       sortKey,
       rgb: dominant,
@@ -979,14 +960,14 @@ function computeRichColorStats(albums: Content[]): {
       position: Math.max(0, Math.min(1, position)),
       dateLabel: `${MONTH_LABELS[parsed.month - 1]} ${parsed.day}`,
       thumbSrc: src,
-      photoLabel: photo.data.title ?? photo.data.src.split("/").at(-1) ?? family,
+      photoLabel: photo.data.title ?? photo.data.src.split("/").at(-1)!,
     });
     yearPhotoColors.set(yearKey, yearPhotos);
     datedColorEntries.push({ year: parsed.year, family });
   }
 
   const colorFamilyExamples = COLOR_FAMILY_LABELS.map((label) => {
-    const count = base.colorStats.find((bucket) => bucket.label === label)?.count ?? 0;
+    const count = base.colorStats.find((bucket) => bucket.label === label)!.count;
     return {
       label,
       count,
@@ -994,7 +975,7 @@ function computeRichColorStats(albums: Content[]): {
         base.colorCoverage > 0 && photos.length > 0
           ? Math.round((count / Math.max(1, Math.round(base.colorCoverage * photos.length))) * 100)
           : 0,
-      photos: exampleBuckets.get(label) ?? [],
+      photos: exampleBuckets.get(label)!,
     };
   })
     .filter((bucket) => bucket.count > 0 && bucket.photos.length > 0)
@@ -1009,12 +990,13 @@ function computeRichColorStats(albums: Content[]): {
     label: String(year),
     data: COLOR_FAMILY_LABELS.map((label) => ({
       label,
-      count: yearCounts.get(String(year))?.get(label) ?? 0,
+      count: yearCounts.get(String(year))!.get(label)!,
     })),
   }));
   const colorYearRibbons = sortedYears.map((year) => {
     const yearKey = String(year);
-    const entries = (yearPhotoColors.get(yearKey) ?? [])
+    const entries = yearPhotoColors
+      .get(yearKey)!
       .slice()
       .sort((left, right) => left.sortKey - right.sortKey);
     const total = entries.length;
@@ -1028,12 +1010,12 @@ function computeRichColorStats(albums: Content[]): {
       photoLabel: entry.photoLabel,
     }));
 
-    const dominantFamily =
-      colorYearStats
-        .find((group) => group.label === yearKey)
-        ?.data.slice()
-        .sort((left, right) => right.count - left.count || left.label.localeCompare(right.label))[0]
-        ?.label ?? null;
+    const dominantFamily = colorYearStats
+      .find((group) => group.label === yearKey)!
+      .data.slice()
+      .sort(
+        (left, right) => right.count - left.count || left.label.localeCompare(right.label),
+      )[0].label;
 
     return {
       label: yearKey,
@@ -1048,8 +1030,7 @@ function computeRichColorStats(albums: Content[]): {
     const years = Array.from(new Set(datedColorEntries.map((entry) => entry.year))).sort(
       (left, right) => left - right,
     );
-    const windowSize =
-      years.length <= 2 ? 1 : Math.min(3, Math.max(1, Math.floor(years.length / 2)));
+    const windowSize = years.length <= 2 ? 1 : Math.min(3, Math.floor(years.length / 2));
     const earlyYears = years.slice(0, windowSize);
     const recentYears = years.slice(-windowSize);
     const earlyCounts = new Map<string, number>(COLOR_FAMILY_LABELS.map((label) => [label, 0]));
@@ -1057,10 +1038,10 @@ function computeRichColorStats(albums: Content[]): {
 
     datedColorEntries.forEach((entry) => {
       if (earlyYears.includes(entry.year)) {
-        earlyCounts.set(entry.family, (earlyCounts.get(entry.family) ?? 0) + 1);
+        earlyCounts.set(entry.family, earlyCounts.get(entry.family)! + 1);
       }
       if (recentYears.includes(entry.year)) {
-        recentCounts.set(entry.family, (recentCounts.get(entry.family) ?? 0) + 1);
+        recentCounts.set(entry.family, recentCounts.get(entry.family)! + 1);
       }
     });
 
@@ -1077,12 +1058,10 @@ function computeRichColorStats(albums: Content[]): {
           : `${recentYears[0]}–${recentYears[recentYears.length - 1]}`,
       buckets: COLOR_FAMILY_LABELS.map((label) => ({
         label,
-        earlyCount: earlyCounts.get(label) ?? 0,
-        recentCount: recentCounts.get(label) ?? 0,
-        earlySharePercent:
-          earlyTotal > 0 ? Math.round(((earlyCounts.get(label) ?? 0) / earlyTotal) * 100) : 0,
-        recentSharePercent:
-          recentTotal > 0 ? Math.round(((recentCounts.get(label) ?? 0) / recentTotal) * 100) : 0,
+        earlyCount: earlyCounts.get(label)!,
+        recentCount: recentCounts.get(label)!,
+        earlySharePercent: Math.round((earlyCounts.get(label)! / earlyTotal) * 100),
+        recentSharePercent: Math.round((recentCounts.get(label)! / recentTotal) * 100),
       }))
         .filter((bucket) => bucket.earlyCount > 0 || bucket.recentCount > 0)
         .sort(
@@ -1174,9 +1153,9 @@ function computeRevisitedPlace(photos: PhotoBlock[]): PhotoStats["revisitedPlace
     }
 
     const key = `${place.facetId}:${place.value}`;
-    const thumbSrc = photo._build.srcset?.[0]?.src ?? photo.data.src;
+    const thumbSrc = photo._build.srcset[0]?.src ?? photo.data.src;
     const existing = placeYears.get(key) ?? {
-      label: formatPlaceDisplayLabel(place.value) ?? place.value,
+      label: formatPlaceDisplayLabel(place.value)!,
       facetId: place.facetId,
       facetValue: place.value,
       years: new Set<number>(),
@@ -1185,13 +1164,11 @@ function computeRevisitedPlace(photos: PhotoBlock[]): PhotoStats["revisitedPlace
     };
     existing.years.add(parsed.year);
     existing.photoCount += 1;
-    if (thumbSrc) {
-      existing.photos.push({
-        year: parsed.year,
-        src: thumbSrc,
-        label: photo.data.title ?? place.value,
-      });
-    }
+    existing.photos.push({
+      year: parsed.year,
+      src: thumbSrc,
+      label: photo.data.title ?? place.value,
+    });
     placeYears.set(key, existing);
   }
 
@@ -1262,7 +1239,7 @@ export function computePhotoStats(albums: Content[]): PhotoStats {
   let maxYear = -Infinity;
 
   for (const photo of photos) {
-    const raw = photo._build?.exif?.DateTimeOriginal;
+    const raw = photo._build.exif.DateTimeOriginal;
     if (!raw) continue;
     const year = parseInt(raw.slice(0, 4), 10);
     if (Number.isFinite(year) && year >= 1900 && year <= 2100) {
@@ -1279,7 +1256,7 @@ export function computePhotoStats(albums: Content[]): PhotoStats {
   const technicalRelationshipFilters = computeTechnicalRelationshipFilters(photos);
   const revisitedPlaces = computeRevisitedPlace(photos);
   const mapPoints = photos.flatMap((photo) => {
-    const exif = photo._build?.exif ?? {};
+    const exif = photo._build.exif;
     const { decLat, decLng } = getDegLatLngFromExif(exif);
     return typeof decLat === "number" && typeof decLng === "number"
       ? [{ lat: decLat, lng: decLng }]

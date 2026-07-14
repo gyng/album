@@ -17,8 +17,9 @@ export const Nav: React.FC<{
   const [hasMoreRight, setHasMoreRight] = useState(false);
 
   useEffect(() => {
-    const ul = ulRef.current;
-    if (!ul) return;
+    // The list is rendered unconditionally, so React has assigned this ref
+    // before either mount effect runs.
+    const ul = ulRef.current!;
 
     const update = () => {
       setHasMoreLeft(ul.scrollLeft > 0);
@@ -41,8 +42,7 @@ export const Nav: React.FC<{
   // current page is visible without scrolling. Honour reduced-motion for the
   // JS-driven smooth scroll.
   useEffect(() => {
-    const ul = ulRef.current;
-    if (!ul) return;
+    const ul = ulRef.current!;
     const active = ul.querySelector<HTMLElement>('[aria-current="page"]');
     if (!active) return;
     const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;

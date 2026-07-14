@@ -74,6 +74,22 @@ describe("useWakeLock", () => {
     expect(result.current.ref.current).toBeNull();
   });
 
+  it("reports but tolerates a platform release failure", async () => {
+    const consoleError = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    sentinel.release.mockRejectedValueOnce(new Error("Release failed"));
+    const { result } = renderHook(() => useWakeLock(false));
+    await act(async () => {
+      await Promise.resolve();
+      await result.current.release();
+    });
+
+    expect(result.current.ref.current).toBeNull();
+    expect(consoleError).toHaveBeenCalledWith(
+      expect.objectContaining({ message: "Release failed" }),
+    );
+    consoleError.mockRestore();
+  });
+
   it("goes inactive when the platform fires the sentinel 'release' event", async () => {
     const { result } = renderHook(() => useWakeLock(false));
     await act(async () => {
@@ -169,6 +185,84 @@ describe("useWakeLock", () => {
 
     expect(sentinel.release).toHaveBeenCalled();
     expect(result.current.ref.current).toBeNull();
+    expect(result.current.isActive).toBe(false);
+  });
+
+  it("reports a failure while releasing a late superseded sentinel", async () => {
+    const consoleError = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    let resolveRequest!: (s: FakeSentinel) => void;
+    request.mockReturnValueOnce(
+      new Promise<FakeSentinel>((resolve) => {
+        resolveRequest = resolve;
+      }),
+    );
+    sentinel.release.mockRejectedValueOnce(new Error("Late release failed"));
+    const { result } = renderHook(() => useWakeLock(false));
+
+    await act(async () => {
+      await result.current.release();
+      resolveRequest(sentinel);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(consoleError).toHaveBeenCalledWith(
+      expect.objectContaining({ message: "Late release failed" }),
+    );
+    expect(result.current.ref.current).toBeNull();
+    consoleError.mockRestore();
+  });
+
+  it("reports a rejected acquisition and remains inactive", async () => {
+    const consoleError = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    request.mockRejectedValueOnce(new Error("Wake lock denied"));
+    const { result } = renderHook(() => useWakeLock(false));
+
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(result.current.isActive).toBe(false);
+    expect(result.current.ref.current).toBeNull();
+    expect(consoleError).toHaveBeenCalledWith(
+      expect.objectContaining({ message: "Wake lock denied" }),
+    );
+    consoleError.mockRestore();
+  });
+
+  it("does not clear a newer lock when an older acquisition rejects", async () => {
+    const consoleError = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    let rejectRequest!: (error: Error) => void;
+    request.mockReturnValueOnce(
+      new Promise<FakeSentinel>((_resolve, reject) => {
+        rejectRequest = reject;
+      }),
+    );
+    const { result } = renderHook(() => useWakeLock(false));
+    const newerSentinel = makeSentinel();
+    result.current.ref.current = newerSentinel;
+
+    await act(async () => {
+      rejectRequest(new Error("Older request failed"));
+      await Promise.resolve();
+    });
+
+    expect(result.current.ref.current).toBe(newerSentinel);
+    consoleError.mockRestore();
+  });
+
+  it("syncs only persisted page restores and stays idle while disabled", async () => {
+    const { result } = renderHook(() => useWakeLock(true));
+
+    await act(async () => {
+      window.dispatchEvent(new PageTransitionEvent("pageshow", { persisted: false }));
+      window.dispatchEvent(new PageTransitionEvent("pageshow", { persisted: true }));
+      document.dispatchEvent(new Event("visibilitychange"));
+      await Promise.resolve();
+    });
+
+    expect(request).not.toHaveBeenCalled();
     expect(result.current.isActive).toBe(false);
   });
 

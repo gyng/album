@@ -72,8 +72,8 @@ const GuessPage: NextPage<PageProps> = () => {
         ) : (
           <GuessGame
             database={database}
-            initialSettings={initialSettings}
-            seed={seedFromUrl}
+            {...(initialSettings ? { initialSettings } : {})}
+            {...(seedFromUrl ? { seed: seedFromUrl } : {})}
             onSeedGenerated={handleSeedGenerated}
           />
         )}

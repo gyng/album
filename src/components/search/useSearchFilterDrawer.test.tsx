@@ -34,6 +34,9 @@ describe("useSearchFilterDrawer", () => {
     expect(document.body.style.overflow).toBe("hidden");
     expect(screen.getByRole("button", { name: "Done" })).toHaveFocus();
 
+    fireEvent.keyDown(window, { key: "Enter" });
+    expect(screen.getByRole("button", { name: "Done" })).toBeTruthy();
+
     fireEvent.keyDown(window, { key: "Escape" });
     expect(screen.queryByRole("button", { name: "Done" })).toBeNull();
     expect(document.body.style.overflow).toBe("");
