@@ -2,6 +2,8 @@
  * @jest-environment jsdom
  */
 
+/* oxlint-disable typescript/unbound-method -- Jest assertions inspect mocked DOM methods without calling them. */
+
 import { fireConfetti } from "./confetti";
 
 const makeContext = () =>

@@ -13,6 +13,7 @@
 
 .editDetails {
   max-height: 80vh;
+  /* biome-ignore lint/suspicious/noDuplicateProperties: Fallback for browsers without small viewport units. */
   max-height: 80svh;
   overflow: auto;
   scrollbar-gutter: stable;
@@ -31,6 +32,7 @@
   justify-content: center;
   gap: var(--m-m);
   min-height: 60vh;
+  /* biome-ignore lint/suspicious/noDuplicateProperties: Fallback for browsers without small viewport units. */
   min-height: 60svh;
   padding: var(--m-xl);
   text-align: center;

@@ -2,6 +2,8 @@
  * @jest-environment jsdom
  */
 
+/* oxlint-disable typescript/unbound-method -- Jest assertions inspect mocked browser methods without calling them. */
+
 import { act, fireEvent, render, screen } from "@testing-library/react";
 
 const database = { db: true };
@@ -366,8 +368,12 @@ describe("slideshow page boundaries", () => {
 
     fireEvent.error(screen.getByRole("img"));
     fireEvent.error(screen.getByRole("img"));
-    act(() => jest.advanceTimersByTime(1000));
-    act(() => jest.advanceTimersByTime(6000));
+    act(() => {
+      jest.advanceTimersByTime(1000);
+    });
+    act(() => {
+      jest.advanceTimersByTime(6000);
+    });
     view.unmount();
   });
 
@@ -615,19 +621,27 @@ describe("slideshow page boundaries", () => {
     await flush();
     fireEvent.click(screen.getByRole("button", { name: "check data" }));
     await flush();
-    act(() => jest.advanceTimersByTime(600000));
-    act(() => jest.advanceTimersByTime(7 * 86400000));
+    act(() => {
+      jest.advanceTimersByTime(600000);
+    });
+    act(() => {
+      jest.advanceTimersByTime(7 * 86400000);
+    });
     expect(reloadCurrentPage).toHaveBeenCalled();
 
     Object.defineProperty(navigator, "onLine", { configurable: true, value: false });
-    act(() => jest.advanceTimersByTime(600000));
+    act(() => {
+      jest.advanceTimersByTime(600000);
+    });
   });
 
   it("preserves kiosk sessions during the fallback interval", async () => {
     wakeActive = true;
     render(<Slideshow />);
     await flush();
-    act(() => jest.advanceTimersByTime(7 * 86400000));
+    act(() => {
+      jest.advanceTimersByTime(7 * 86400000);
+    });
     expect(reloadCurrentPage).not.toHaveBeenCalled();
   });
 
@@ -798,7 +812,9 @@ describe("slideshow page boundaries", () => {
     fireEvent.click(screen.getByRole("button", { name: "copy" }));
     await flush();
     expect(execCommand).toHaveBeenCalledWith("copy");
-    act(() => jest.advanceTimersByTime(1800));
+    act(() => {
+      jest.advanceTimersByTime(1800);
+    });
 
     const share = jest
       .fn()
@@ -825,7 +841,9 @@ describe("slideshow page boundaries", () => {
     fireEvent.click(screen.getByRole("button", { name: "Dismiss" }));
     fireEvent.click(screen.getByRole("button", { name: "copy" }));
     await flush();
-    act(() => jest.advanceTimersByTime(6000));
+    act(() => {
+      jest.advanceTimersByTime(6000);
+    });
     expect(error).toHaveBeenCalled();
   });
 

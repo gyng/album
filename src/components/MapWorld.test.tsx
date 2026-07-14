@@ -616,7 +616,9 @@ describe("MapWorld", () => {
       mapHandlers.onMoveEnd?.({ viewState: { latitude: 7, longitude: 8, zoom: 9 } });
     });
     view.unmount();
-    act(() => jest.runAllTimers());
+    act(() => {
+      jest.runAllTimers();
+    });
     expect(replaceStateSpy).toHaveBeenCalledTimes(1);
   });
 

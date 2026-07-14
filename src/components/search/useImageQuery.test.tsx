@@ -42,9 +42,13 @@ describe("useImageQuery", () => {
       previewUrl: "blob:first",
       vector: null,
     });
-    act(() => report?.(55, "Encoding image", { loaded: 5, total: 9, file: "vision.onnx" }));
+    act(() => {
+      report?.(55, "Encoding image", { loaded: 5, total: 9, file: "vision.onnx" });
+    });
     expect(result.current.imageModelProgressDetails.file).toBe("vision.onnx");
-    act(() => report?.(60, "Finishing"));
+    act(() => {
+      report?.(60, "Finishing");
+    });
     expect(result.current.imageModelProgressDetails).toEqual({ loaded: 0, total: 0 });
     await act(async () => finish([0.4, 0.5]));
     expect(result.current.imageQuery?.vector).toEqual([0.4, 0.5]);
@@ -96,7 +100,9 @@ describe("useImageQuery", () => {
     act(() => result.current.clearImageQuery());
 
     if (outcome === "progress") {
-      act(() => report?.(99, "Stale"));
+      act(() => {
+        report?.(99, "Stale");
+      });
       expect(result.current.imageModelStage).not.toBe("Stale");
       resolve([]);
     } else if (outcome === "resolve") {

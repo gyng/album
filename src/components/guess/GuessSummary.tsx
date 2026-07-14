@@ -73,7 +73,7 @@ export const GuessSummary: React.FC<GuessSummaryProps> = ({
 
   const handleCopyLink = useCallback(() => {
     const fullUrl = `${window.location.origin}${shareUrl}`;
-    navigator.clipboard.writeText(fullUrl).then(() => {
+    void navigator.clipboard.writeText(fullUrl).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     });

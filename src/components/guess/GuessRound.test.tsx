@@ -130,7 +130,9 @@ describe("GuessRound", () => {
     distanceMetersBetweenMock.mockReturnValue(450_000);
     const { props, container } = renderRound({ timeLimit: 30, roundNumber: 3, totalRounds: 3 });
     fireEvent.load(container.querySelector("img")!);
-    act(() => jest.advanceTimersByTime(1_000));
+    act(() => {
+      jest.advanceTimersByTime(1_000);
+    });
     fireEvent.click(screen.getByRole("button", { name: /Confirm/ }));
 
     expect(fireConfettiMock).not.toHaveBeenCalled();
@@ -166,16 +168,24 @@ describe("GuessRound", () => {
     jest.useFakeTimers();
     const { props, container } = renderRound({ guess: null, timeLimit: 4 });
 
-    act(() => jest.advanceTimersByTime(5_000));
+    act(() => {
+      jest.advanceTimersByTime(5_000);
+    });
     expect(props.onReveal).not.toHaveBeenCalled();
     expect(container.querySelector("[data-warning]")).toBeNull();
 
     fireEvent.load(container.querySelector("img")!);
-    act(() => jest.advanceTimersByTime(2_000));
+    act(() => {
+      jest.advanceTimersByTime(2_000);
+    });
     expect(container.querySelector("[data-warning]")).not.toBeNull();
-    act(() => jest.advanceTimersByTime(1_000));
+    act(() => {
+      jest.advanceTimersByTime(1_000);
+    });
     expect(container.querySelector("[data-urgent]")).not.toBeNull();
-    act(() => jest.advanceTimersByTime(1_000));
+    act(() => {
+      jest.advanceTimersByTime(1_000);
+    });
 
     expect(props.onReveal).toHaveBeenCalledTimes(1);
     expect(screen.getByText("Skipped")).toBeInTheDocument();
@@ -187,7 +197,9 @@ describe("GuessRound", () => {
     const { props, container } = renderRound({ timeLimit: 1 });
     fireEvent.load(container.querySelector("img")!);
 
-    act(() => jest.advanceTimersByTime(1_000));
+    act(() => {
+      jest.advanceTimersByTime(1_000);
+    });
 
     expect(props.onReveal).toHaveBeenCalledTimes(1);
     expect(distanceMetersBetweenMock).toHaveBeenCalled();

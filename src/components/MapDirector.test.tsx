@@ -60,7 +60,9 @@ describe("MapDirector", () => {
       duration: 4_600,
     });
 
-    act(() => jest.advanceTimersByTime(7_500));
+    act(() => {
+      jest.advanceTimersByTime(7_500);
+    });
     expect(onVisit).toHaveBeenLastCalledWith(second);
     expect(flyTo).toHaveBeenLastCalledWith(
       expect.objectContaining({ center: [104, 2], zoom: 8.4, bearing: -49 }),
@@ -68,7 +70,9 @@ describe("MapDirector", () => {
 
     view.unmount();
     expect(stop).toHaveBeenCalledTimes(1);
-    act(() => jest.advanceTimersByTime(15_000));
+    act(() => {
+      jest.advanceTimersByTime(15_000);
+    });
     expect(onVisit).toHaveBeenCalledTimes(2);
   });
 

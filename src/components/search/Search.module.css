@@ -520,6 +520,7 @@
     bottom: 0;
     z-index: 1001;
     max-height: 85vh;
+    /* biome-ignore lint/suspicious/noDuplicateProperties: Fallback for browsers without dynamic viewport units. */
     max-height: 85dvh;
     padding: 0 var(--m-l) calc(env(safe-area-inset-bottom, 0px) + var(--m-l));
     border-radius: var(--m-l) var(--m-l) 0 0;
@@ -1253,7 +1254,6 @@
   display: flex;
   align-items: center;
   gap: var(--m-s);
-  flex-shrink: 0;
   flex: 1 1 auto;
   min-width: 0;
 }

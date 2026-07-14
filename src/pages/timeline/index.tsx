@@ -303,7 +303,7 @@ const TimelinePage: NextPage<PageProps> = ({ entries }) => {
       query: { ...routeQuery, date: selectedDate },
     };
     if (routeDateQuery !== selectedDate) {
-      replaceRoute(url, undefined, { shallow: true });
+      void replaceRoute(url, undefined, { shallow: true });
     }
   }, [router.isReady, replaceRoute, routeDateQuery, routePathname, routeQuery, selectedDate]);
 

@@ -15,7 +15,7 @@ jest.mock("next/dynamic", () => ({
   __esModule: true,
   default: (_loader: () => Promise<unknown>, options: { loading: () => React.ReactNode }) => {
     void _loader();
-    options.loading();
+    void options.loading();
     return ({
       guess,
       reveal,

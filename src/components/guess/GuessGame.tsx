@@ -192,7 +192,7 @@ export const GuessGame: React.FC<GuessGameProps> = ({
       }
     };
 
-    load();
+    void load();
     return () => {
       cancelled = true;
     };

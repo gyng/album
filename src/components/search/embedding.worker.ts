@@ -49,7 +49,7 @@ let visionRuntimePromise: Promise<{
 }> | null = null;
 
 type WebGpuNavigator = Navigator & {
-  gpu?: { requestAdapter?: () => Promise<unknown | null> };
+  gpu?: { requestAdapter?: () => Promise<object | null> };
 };
 
 // Prefer WebGPU when a usable adapter is actually available; some environments

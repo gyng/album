@@ -2,6 +2,8 @@
  * @jest-environment jsdom
  */
 
+/* oxlint-disable typescript/unbound-method -- Jest assertions inspect the mocked clipboard method without calling it. */
+
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { GuessSummary } from "./GuessSummary";
 import { MAX_SCORE, MAX_TIME_BONUS } from "./guessScoring";
@@ -69,7 +71,9 @@ describe("GuessSummary", () => {
   });
 
   afterEach(() => {
-    act(() => jest.runOnlyPendingTimers());
+    act(() => {
+      jest.runOnlyPendingTimers();
+    });
     jest.useRealTimers();
   });
 
@@ -129,7 +133,9 @@ describe("GuessSummary", () => {
     );
     expect(await screen.findByRole("button", { name: "Copied!" })).toBeInTheDocument();
 
-    act(() => jest.advanceTimersByTime(2_000));
+    act(() => {
+      jest.advanceTimersByTime(2_000);
+    });
     await waitFor(() =>
       expect(screen.getByRole("button", { name: "Copy challenge link" })).toBeInTheDocument(),
     );

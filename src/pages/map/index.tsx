@@ -100,7 +100,7 @@ const WorldMap: NextPage<PageProps> = (props) => {
           params.delete("to");
         }
         const query = Object.fromEntries(params.entries());
-        router.replace({ query }, undefined, { shallow: true });
+        void router.replace({ query }, undefined, { shallow: true });
       }, DEBOUNCE_URL_MS);
     },
     [router],

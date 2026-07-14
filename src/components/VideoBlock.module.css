@@ -5,6 +5,7 @@
   aspect-ratio: 16 / 9;
 
   max-width: 100vw;
+  /* biome-ignore lint/suspicious/noDuplicateProperties: Fallback for browsers without small viewport units. */
   max-width: 100svw;
   width: 90%;
 }
@@ -22,6 +23,7 @@
   align-items: center;
 
   max-height: 90vh !important;
+  /* biome-ignore lint/suspicious/noDuplicateProperties: Fallback for browsers without small viewport units. */
   max-height: 90svh !important;
   height: auto;
 
@@ -37,13 +39,14 @@
   grid-column: 1;
   grid-row: 1;
   max-height: 90vh;
+  /* biome-ignore lint/suspicious/noDuplicateProperties: Fallback for browsers without small viewport units. */
   max-height: 90svh;
   overflow: auto;
   position: sticky;
   right: var(--m-l);
   place-self: start end;
-  max-width: calc(100svw - var(--m-m));
   max-width: calc(100vw - var(--m-m));
+  max-width: calc(100svw - var(--m-m));
   scrollbar-gutter: stable;
   z-index: 300;
   margin-top: calc(-1 * var(--m-xl));

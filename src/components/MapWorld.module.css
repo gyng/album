@@ -12,6 +12,7 @@
   justify-content: center;
   width: 100%;
   height: 100vh;
+  /* biome-ignore lint/suspicious/noDuplicateProperties: Fallback for browsers without dynamic viewport units. */
   height: 100dvh;
   margin: 0;
   background: var(--c-bg-contrast-dark);

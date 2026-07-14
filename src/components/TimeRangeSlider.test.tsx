@@ -122,7 +122,7 @@ describe("TimeRangeSlider", () => {
     const second = renderSlider();
     const secondStart = screen.getByRole("slider", { name: "Start date" });
     const secondTrack = secondStart.parentElement!;
-    secondTrack.getBoundingClientRect = trackArea.getBoundingClientRect;
+    secondTrack.getBoundingClientRect = () => trackArea.getBoundingClientRect();
     fireEvent.click(secondTrack, { clientX: 90 });
     expect(second.onDrag).toHaveBeenLastCalledWith(fromMs, expect.any(Number));
     expect(second.onCommit).toHaveBeenLastCalledWith(fromMs, expect.any(Number));

@@ -162,7 +162,7 @@ describe("random queue peek/advance consistency (preload buffer)", () => {
       advanceQueued(state, pool, build)?.path,
       advanceQueued(state, pool, build)?.path,
     ];
-    expect(seen.slice().sort()).toEqual(["a", "b", "c"]);
+    expect(seen.slice().sort((a, b) => (a ?? "").localeCompare(b ?? ""))).toEqual(["a", "b", "c"]);
   });
 });
 

@@ -2,6 +2,8 @@
  * @jest-environment jsdom
  */
 
+/* oxlint-disable typescript/unbound-method -- The test preserves and restores a DOM prototype method. */
+
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { CalendarHeatmap } from "./CalendarHeatmap";
 import { TimelineEntry } from "./timelineTypes";
@@ -252,7 +254,9 @@ describe("CalendarHeatmap", () => {
     fireEvent.blur(cell);
     const popup = screen.getByRole("link", { name: /view 2 jan 2024 preview/i }).parentElement!;
     fireEvent.mouseEnter(popup);
-    act(() => jest.advanceTimersByTime(120));
+    act(() => {
+      jest.advanceTimersByTime(120);
+    });
     expect(screen.getByRole("link", { name: /view 2 jan 2024 preview/i })).toBeInTheDocument();
     fireEvent.mouseLeave(popup);
     expect(screen.queryByRole("link", { name: /view 2 jan 2024 preview/i })).toBeNull();
@@ -279,7 +283,9 @@ describe("CalendarHeatmap", () => {
       screen.getByRole("link", { name: /view 5 mar 2024 preview/i }).parentElement!,
     );
     fireEvent.mouseLeave(screen.getByRole("button", { name: /^5 Mar 2024:/i }));
-    act(() => jest.advanceTimersByTime(120));
+    act(() => {
+      jest.advanceTimersByTime(120);
+    });
     expect(screen.queryByRole("link", { name: /view 5 mar 2024 preview/i })).toBeNull();
     jest.useRealTimers();
   });

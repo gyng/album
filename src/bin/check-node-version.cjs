@@ -3,8 +3,8 @@ const supportedMajors = new Set([24, 26]);
 const checkNodeVersion = ({
   nodeVersion = process.versions.node,
   displayVersion = process.version,
-  reportError = console.error,
-  exit = process.exit,
+  reportError = (...messages) => console.error(...messages),
+  exit = (code) => process.exit(code),
 } = {}) => {
   const major = Number.parseInt(nodeVersion.split(".")[0], 10);
 

@@ -22,6 +22,9 @@ const MEDIUM_GAP_MS = 30 * 60_000;
 const toArray = <T>(value: T | T[] | undefined): T[] =>
   value === undefined ? [] : Array.isArray(value) ? value : [value];
 
+const scalarString = (value: unknown): string =>
+  typeof value === "string" || typeof value === "number" ? String(value) : "";
+
 const finitePoint = (p: TrackPoint): boolean =>
   Number.isFinite(p.utcMs) && Number.isFinite(p.lat) && Number.isFinite(p.lng);
 
@@ -60,7 +63,7 @@ export const parseGpx = (xml: string): Track => {
   const points: TrackPoint[] = [];
   for (const raw of rawPoints) {
     const node = raw as Record<string, unknown>;
-    const utcMs = Date.parse(String(node.time ?? ""));
+    const utcMs = Date.parse(scalarString(node.time));
     const lat = Number(node["@_lat"]);
     const lng = Number(node["@_lon"]);
     if (!Number.isNaN(utcMs)) {
@@ -91,7 +94,7 @@ export const parseGoogleTakeout = (input: string | object): Track => {
     const utcMs =
       node.timestampMs !== undefined
         ? Number(node.timestampMs)
-        : Date.parse(String(node.timestamp ?? ""));
+        : Date.parse(scalarString(node.timestamp));
     const lat = Number(node.latitudeE7) / 1e7;
     const lng = Number(node.longitudeE7) / 1e7;
     if (Number.isFinite(utcMs)) points.push({ utcMs, lat, lng });
@@ -101,8 +104,8 @@ export const parseGoogleTakeout = (input: string | object): Track => {
   for (const seg of toArray(data.semanticSegments as unknown[])) {
     for (const step of toArray((seg as Record<string, unknown>).timelinePath as unknown[])) {
       const node = step as Record<string, unknown>;
-      const coords = parsePointString(String(node.point ?? ""));
-      const utcMs = Date.parse(String(node.time ?? ""));
+      const coords = parsePointString(scalarString(node.point));
+      const utcMs = Date.parse(scalarString(node.time));
       if (coords && !Number.isNaN(utcMs)) {
         points.push({ utcMs, lat: coords.lat, lng: coords.lng });
       }

@@ -317,7 +317,7 @@ const getAlbumFeedItems = (slug, albumPath, albumMetadata, albumLastmod) => {
 const generateSitemap = (albumEntries) => {
   const latestLastmod = [...albumEntries]
     .map((e) => e.lastmod)
-    .sort()
+    .sort((a, b) => a.localeCompare(b))
     .at(-1);
 
   const entries = [

@@ -90,11 +90,15 @@ describe("useSlideshowCadence", () => {
     );
 
     // 3s in — a boundary-snapped first slide would already have advanced.
-    act(() => jest.advanceTimersByTime(3000));
+    act(() => {
+      jest.advanceTimersByTime(3000);
+    });
     expect(onAdvance).not.toHaveBeenCalled();
 
     // The full raw 15-minute delay is honoured instead.
-    act(() => jest.advanceTimersByTime(900000));
+    act(() => {
+      jest.advanceTimersByTime(900000);
+    });
     expect(onAdvance).toHaveBeenCalled();
   });
 
@@ -112,7 +116,9 @@ describe("useSlideshowCadence", () => {
     );
 
     // The first slide ends at the next boundary (~2s away), not 15 minutes on.
-    act(() => jest.advanceTimersByTime(3000));
+    act(() => {
+      jest.advanceTimersByTime(3000);
+    });
     expect(onAdvance).toHaveBeenCalled();
   });
 
@@ -124,7 +130,9 @@ describe("useSlideshowCadence", () => {
     );
 
     act(() => result.current.scheduleNextChange());
-    act(() => jest.advanceTimersByTime(3000));
+    act(() => {
+      jest.advanceTimersByTime(3000);
+    });
     expect(onAdvance).toHaveBeenCalled();
   });
 
@@ -140,13 +148,17 @@ describe("useSlideshowCadence", () => {
 
     expect(result.current.time).toBeInstanceOf(Date);
     expect(result.current.secondsLeft).toBeGreaterThan(0);
-    act(() => jest.advanceTimersByTime(1000));
+    act(() => {
+      jest.advanceTimersByTime(1000);
+    });
     expect(result.current.secondsLeft).toBeLessThanOrEqual(59);
 
     act(() => result.current.togglePaused());
     const pausedSeconds = result.current.secondsLeft;
     act(() => result.current.alignNextChangeToCadence());
-    act(() => jest.advanceTimersByTime(1000));
+    act(() => {
+      jest.advanceTimersByTime(1000);
+    });
     expect(result.current.secondsLeft).toBe(pausedSeconds);
 
     act(() => result.current.togglePaused());

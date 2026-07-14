@@ -14,6 +14,7 @@
 
 .map {
   height: 100vh;
+  /* biome-ignore lint/suspicious/noDuplicateProperties: Fallback for browsers without dynamic viewport units. */
   height: 100dvh;
   max-width: 100vw;
   width: auto;

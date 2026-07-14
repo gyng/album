@@ -769,7 +769,7 @@ describe("publish-wizard-lib", () => {
         hasEmbeddingsTable: false,
         embeddingsCount: 0,
       });
-      expect([...state.indexedPhotoPaths].sort()).toEqual([
+      expect([...state.indexedPhotoPaths].sort((a, b) => a.localeCompare(b))).toEqual([
         "../albums/test-simple/a.jpg",
         "../albums/test-simple/b.jpg",
       ]);
@@ -786,7 +786,7 @@ describe("publish-wizard-lib", () => {
         embeddingsCount: 2,
         embeddingModelCounts: [{ modelId: "test-model", count: 2 }],
       });
-      expect([...state.indexedEmbeddingPaths].sort()).toEqual([
+      expect([...state.indexedEmbeddingPaths].sort((a, b) => a.localeCompare(b))).toEqual([
         "../albums/test-simple/a.jpg",
         "../albums/test-simple/b.jpg",
       ]);

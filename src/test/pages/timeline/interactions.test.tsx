@@ -215,21 +215,33 @@ describe("timeline interactions", () => {
     const path = document.querySelector("svg path")!;
     expect(path.getAttribute("d")).toContain("M ");
 
-    act(() => window.dispatchEvent(new Event("resize")));
-    act(() => window.dispatchEvent(new Event("resize")));
+    act(() => {
+      window.dispatchEvent(new Event("resize"));
+    });
+    act(() => {
+      window.dispatchEvent(new Event("resize"));
+    });
     const callback = Array.from(animationCallbacks.values()).at(-1);
     act(() => callback?.(0));
-    act(() => window.dispatchEvent(new Event("scroll")));
-    act(() => window.dispatchEvent(new Event("scroll")));
+    act(() => {
+      window.dispatchEvent(new Event("scroll"));
+    });
+    act(() => {
+      window.dispatchEvent(new Event("scroll"));
+    });
     const scrollCallback = Array.from(animationCallbacks.values()).at(-1);
     act(() => scrollCallback?.(0));
 
     Object.defineProperty(window, "innerWidth", { configurable: true, value: 800 });
-    act(() => window.dispatchEvent(new Event("resize")));
+    act(() => {
+      window.dispatchEvent(new Event("resize"));
+    });
     const narrowCallback = Array.from(animationCallbacks.values()).at(-1);
     act(() => narrowCallback?.(0));
     expect(path.getAttribute("d")).toBe("");
-    act(() => window.dispatchEvent(new Event("scroll")));
+    act(() => {
+      window.dispatchEvent(new Event("scroll"));
+    });
     unmount();
   });
 

@@ -217,7 +217,7 @@ export const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
       void checkForNewBuild();
     };
 
-    checkForNewBuild();
+    void checkForNewBuild();
     const id = setInterval(() => {
       if (navigator.onLine) {
         void checkForNewBuild();

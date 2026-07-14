@@ -74,7 +74,9 @@ describe("useTextVector", () => {
         trimmedQuery: "",
       }),
     );
-    act(() => report(12, "Starting"));
+    act(() => {
+      report(12, "Starting");
+    });
     expect(result.current.textModelProgressDetails).toEqual({ loaded: 0, total: 0 });
     await act(async () => finish());
   });
@@ -115,7 +117,9 @@ describe("useTextVector", () => {
       }),
     );
     expect(result.current.isTextVectorLoading).toBe(true);
-    act(() => report?.(60, "Encoding", { loaded: 3, total: 5 }));
+    act(() => {
+      report?.(60, "Encoding", { loaded: 3, total: 5 });
+    });
     expect(result.current.textModelStage).toBe("Encoding");
     await act(async () => finish([0.3, 0.4]));
     expect(result.current).toEqual(

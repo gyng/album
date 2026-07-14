@@ -113,7 +113,9 @@ describe("map page boundaries", () => {
     fireEvent.click(screen.getByRole("button", { name: "Choose dates" }));
     fireEvent.click(screen.getByRole("button", { name: "drag range" }));
     fireEvent.click(screen.getByRole("button", { name: "commit range" }));
-    act(() => jest.advanceTimersByTime(300));
+    act(() => {
+      jest.advanceTimersByTime(300);
+    });
     expect(replace).toHaveBeenLastCalledWith(
       {
         query: {
@@ -129,7 +131,9 @@ describe("map page boundaries", () => {
       { shallow: true },
     );
     fireEvent.click(screen.getByRole("button", { name: "clear range" }));
-    act(() => jest.advanceTimersByTime(300));
+    act(() => {
+      jest.advanceTimersByTime(300);
+    });
 
     expect(replace).toHaveBeenLastCalledWith(
       { query: { lat: "1", lon: "2", zoom: "4", keep: "yes" } },

@@ -16,9 +16,9 @@ import {
 } from "./types";
 import { incrementBuildCounter, measureBuild } from "./buildTiming";
 import { parseColorPalette } from "../util/colorDistance";
-const sqlite3 = require("sqlite3").verbose();
+const sqlite3: typeof import("sqlite3") = require("sqlite3").verbose();
 
-let searchDb: any | null = null;
+let searchDb: import("sqlite3").Database | null = null;
 const photoSearchIndexCache = new Map<string, Promise<any[]>>();
 
 const closeSearchDb = async (): Promise<void> => {

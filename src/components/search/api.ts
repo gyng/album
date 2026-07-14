@@ -1211,7 +1211,7 @@ export const fetchColorSimilarResults = async (opts: {
       query: `${color[0]},${color[1]},${color[2]}`,
     };
   } catch (err) {
-    console.error(`Failed to fetch color similar results for ${color}`, err);
+    console.error(`Failed to fetch color similar results for ${color.join(",")}`, err);
     throw err;
   }
 };
