@@ -2,8 +2,6 @@
  * @jest-environment jsdom
  */
 
-/* oxlint-disable typescript/unbound-method -- Jest assertions inspect mocked DOM methods without calling them. */
-
 import { render, screen } from "@testing-library/react";
 import type { Content, PhotoBlock } from "../../../services/types";
 
@@ -87,11 +85,12 @@ describe("album page shell", () => {
 
     const target = document.createElement("div");
     target.id = "night market.jpg";
-    target.scrollIntoView = jest.fn();
+    const scrollIntoView = jest.fn();
+    target.scrollIntoView = scrollIntoView;
     document.body.append(target);
     window.history.replaceState(null, "", "/album/trip#night%20market.jpg");
     routeChangeHandler();
-    expect(target.scrollIntoView).toHaveBeenCalledTimes(1);
+    expect(scrollIntoView).toHaveBeenCalledTimes(1);
 
     window.history.replaceState(null, "", "/album/trip#missing.jpg");
     routeChangeHandler();
@@ -108,13 +107,14 @@ describe("album page shell", () => {
     );
     const target = document.createElement("div");
     target.id = "%";
-    target.scrollIntoView = jest.fn();
+    const scrollIntoView = jest.fn();
+    target.scrollIntoView = scrollIntoView;
     document.body.append(target);
     window.history.replaceState(null, "", "/album/trip#%");
 
     const routeChangeHandler = mockOn.mock.calls[0]?.[1] as () => void;
     expect(() => routeChangeHandler()).not.toThrow();
-    expect(target.scrollIntoView).toHaveBeenCalledTimes(1);
+    expect(scrollIntoView).toHaveBeenCalledTimes(1);
   });
 
   it("returns not-found when a build request has no album slug", async () => {

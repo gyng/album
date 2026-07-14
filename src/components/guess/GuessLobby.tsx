@@ -45,11 +45,17 @@ export const GuessLobby: React.FC<GuessLobbyProps> = ({ database, defaults, onSt
 
   useEffect(() => {
     let cancelled = false;
-    void fetchGuessRegions({ database }).then((result) => {
-      if (cancelled) return;
-      setRegions(result);
-      setTotalPhotos(result.reduce((sum, r) => sum + r.count, 0));
-    });
+    void fetchGuessRegions({ database })
+      .then((result) => {
+        if (cancelled) return;
+        setRegions(result);
+        setTotalPhotos(result.reduce((sum, r) => sum + r.count, 0));
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setRegions([]);
+        setTotalPhotos(0);
+      });
     return () => {
       cancelled = true;
     };

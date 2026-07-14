@@ -2,8 +2,6 @@
  * @jest-environment jsdom
  */
 
-/* oxlint-disable typescript/unbound-method -- Jest assertions inspect mocked browser methods without calling them. */
-
 import { act, fireEvent, render, screen } from "@testing-library/react";
 
 const database = { db: true };
@@ -23,6 +21,7 @@ let pointerUpResult: any = { action: "none", suppressClick: false };
 let coarsePointer = false;
 let wakeActive = false;
 let syncCompanions = true;
+let vibrate: jest.Mock;
 const fetchSimilarResults = jest.fn();
 const fetchRandomPhoto = jest.fn();
 const fetchSlideshowPhotos = jest.fn();
@@ -259,7 +258,8 @@ describe("slideshow page boundaries", () => {
       return { ok: false } as Response;
     });
     Object.defineProperty(navigator, "onLine", { configurable: true, value: true });
-    Object.defineProperty(navigator, "vibrate", { configurable: true, value: jest.fn() });
+    vibrate = jest.fn();
+    Object.defineProperty(navigator, "vibrate", { configurable: true, value: vibrate });
     Object.defineProperty(navigator, "clipboard", {
       configurable: true,
       value: { writeText: jest.fn() },
@@ -564,7 +564,7 @@ describe("slideshow page boundaries", () => {
       clientX: 0,
       clientY: 0,
     });
-    expect(navigator.vibrate).toHaveBeenCalled();
+    expect(vibrate).toHaveBeenCalled();
     Object.defineProperty(navigator, "vibrate", { configurable: true, value: undefined });
     pointerMoveResult = {
       kind: "update",

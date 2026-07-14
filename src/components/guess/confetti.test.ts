@@ -2,27 +2,25 @@
  * @jest-environment jsdom
  */
 
-/* oxlint-disable typescript/unbound-method -- Jest assertions inspect mocked DOM methods without calling them. */
-
 import { fireConfetti } from "./confetti";
 
-const makeContext = () =>
-  ({
-    arc: jest.fn(),
-    beginPath: jest.fn(),
-    clearRect: jest.fn(),
-    fill: jest.fn(),
-    fillRect: jest.fn(),
-    restore: jest.fn(),
-    rotate: jest.fn(),
-    save: jest.fn(),
-    translate: jest.fn(),
-    globalAlpha: 1,
-    fillStyle: "",
-  }) as unknown as CanvasRenderingContext2D;
+const makeContext = () => ({
+  arc: jest.fn(),
+  beginPath: jest.fn(),
+  clearRect: jest.fn(),
+  fill: jest.fn(),
+  fillRect: jest.fn(),
+  restore: jest.fn(),
+  rotate: jest.fn(),
+  save: jest.fn(),
+  translate: jest.fn(),
+  globalAlpha: 1,
+  fillStyle: "",
+});
 
 describe("fireConfetti", () => {
-  let context: CanvasRenderingContext2D;
+  let context: ReturnType<typeof makeContext>;
+  let getContextMock: jest.Mock;
   let frameCallbacks: Map<number, FrameRequestCallback>;
   let nextFrameId: number;
 
@@ -39,10 +37,11 @@ describe("fireConfetti", () => {
   beforeEach(() => {
     jest.useFakeTimers();
     context = makeContext();
+    getContextMock = jest.fn(() => context as unknown as CanvasRenderingContext2D);
     frameCallbacks = new Map();
     nextFrameId = 1;
 
-    jest.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(context);
+    jest.spyOn(HTMLCanvasElement.prototype, "getContext").mockImplementation(getContextMock);
     jest.spyOn(window, "requestAnimationFrame").mockImplementation((callback) => {
       const id = nextFrameId++;
       frameCallbacks.set(id, callback);
@@ -69,7 +68,7 @@ describe("fireConfetti", () => {
     fireConfetti();
 
     expect(document.querySelector("canvas")).toBeNull();
-    expect(HTMLCanvasElement.prototype.getContext).not.toHaveBeenCalled();
+    expect(getContextMock).not.toHaveBeenCalled();
   });
 
   it("removes the canvas when a drawing context is unavailable", () => {

@@ -2,8 +2,6 @@
  * @jest-environment jsdom
  */
 
-/* oxlint-disable typescript/unbound-method -- The test preserves and restores a DOM prototype method. */
-
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { CalendarHeatmap } from "./CalendarHeatmap";
 import { TimelineEntry } from "./timelineTypes";
@@ -157,8 +155,9 @@ describe("CalendarHeatmap", () => {
 
   it("highlights specified years and can receive a scroll target", () => {
     const scrollIntoView = jest.fn();
-    const original = HTMLElement.prototype.scrollIntoView;
-    HTMLElement.prototype.scrollIntoView = scrollIntoView;
+    const scrollSpy = jest
+      .spyOn(HTMLElement.prototype, "scrollIntoView")
+      .mockImplementation(scrollIntoView);
 
     render(
       <CalendarHeatmap
@@ -175,7 +174,7 @@ describe("CalendarHeatmap", () => {
     );
     expect(scrollIntoView).toHaveBeenCalled();
 
-    HTMLElement.prototype.scrollIntoView = original;
+    scrollSpy.mockRestore();
   });
 
   it("uses instant scrolling for reduced motion and tolerates a missing target", () => {

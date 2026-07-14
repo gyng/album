@@ -2,8 +2,6 @@
  * @jest-environment jsdom
  */
 
-/* oxlint-disable typescript/unbound-method -- Jest assertions inspect the mocked clipboard method without calling it. */
-
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { GuessSummary } from "./GuessSummary";
 import { MAX_SCORE, MAX_TIME_BONUS } from "./guessScoring";
@@ -62,11 +60,14 @@ const renderSummary = (
 };
 
 describe("GuessSummary", () => {
+  let writeText: jest.Mock;
+
   beforeEach(() => {
     jest.useFakeTimers();
+    writeText = jest.fn().mockResolvedValue(undefined);
     Object.defineProperty(navigator, "clipboard", {
       configurable: true,
-      value: { writeText: jest.fn().mockResolvedValue(undefined) },
+      value: { writeText },
     });
   });
 
@@ -128,7 +129,7 @@ describe("GuessSummary", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Copy challenge link" }));
 
-    expect(navigator.clipboard.writeText).toHaveBeenCalledWith(
+    expect(writeText).toHaveBeenCalledWith(
       "http://localhost/guess?seed=challenge-seed&rounds=3&region=New+Zealand&timer=15",
     );
     expect(await screen.findByRole("button", { name: "Copied!" })).toBeInTheDocument();
@@ -147,7 +148,7 @@ describe("GuessSummary", () => {
     expect(screen.getByText("Daily challenge")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Copy challenge link" }));
 
-    expect(navigator.clipboard.writeText).toHaveBeenCalledWith("http://localhost/guess?daily");
+    expect(writeText).toHaveBeenCalledWith("http://localhost/guess?daily");
     expect(await screen.findByRole("button", { name: "Copied!" })).toBeInTheDocument();
   });
 
