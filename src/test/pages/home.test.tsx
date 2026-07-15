@@ -85,6 +85,18 @@ describe("home page", () => {
 
   it("sorts albums and sends only deduplicated preview photos to the page", async () => {
     const cover = photo("cover.jpg", true);
+    cover.id = undefined as never;
+    cover._build.exif = {
+      DateTimeOriginal: "2025-02-03T04:05:06",
+      Orientation: "Rotate 90 CW",
+      Model: "Heavy camera metadata",
+    };
+    cover._build.tags = {
+      alt_text: "A useful cover description",
+      colors: [[1, 2, 3]],
+      tags: ["unused", "on", "home"],
+      geocode: "Unused location metadata",
+    };
     mockGetAlbums.mockResolvedValue([
       album("older", [text("intro"), photo("first.jpg")]),
       album("test-fixture", [photo("test.jpg")]),
@@ -107,5 +119,20 @@ describe("home page", () => {
     expect(result.props.albums[2]?.blocks.map(({ id }) => id)).toEqual(["first.jpg"]);
     expect(result.props.albums[3]?.blocks).toEqual([]);
     expect(result.props.albums[1]?._build.timeRange).toEqual(["2025-01-01", "2025-02-01"]);
+    const previewCover = result.props.albums[1]?.blocks[0];
+    expect(previewCover).toBeDefined();
+    expect((previewCover as PhotoBlock)._build).toEqual({
+      width: 100,
+      height: 100,
+      exif: {
+        DateTimeOriginal: "2025-02-03T04:05:06",
+        Orientation: "Rotate 90 CW",
+      },
+      tags: {
+        alt_text: "A useful cover description",
+        colors: [[1, 2, 3]],
+      },
+      srcset: [],
+    });
   });
 });

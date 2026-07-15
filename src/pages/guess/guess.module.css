@@ -6,7 +6,7 @@
      its intrinsic aspect ratio and overflows the viewport vertically. Lobby and
      summary, which can exceed the viewport, overflow this box and scroll the
      document as usual. */
-  height: 100dvh;
+  block-size: 100dvh;
   padding: var(--m-s) var(--m-l) var(--m-l);
 }
 
@@ -24,7 +24,7 @@
 .loading {
   display: grid;
   gap: var(--m-m);
-  max-width: 360px;
+  max-inline-size: var(--size-360);
   margin: var(--m-2xl) auto;
   text-align: center;
   color: var(--c-bg-contrast-light);

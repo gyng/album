@@ -1,9 +1,9 @@
 import Link from "next/link";
+import React from "react";
 import { MapWorldDeferred } from "./MapWorldDeferred";
 import { MapWorldEntry } from "./MapWorld";
 import { getRelativeTimeString } from "../util/time";
-import { Caption, Heading, Thumb, overlayButtonStyles } from "./ui";
-import commonStyles from "../styles/common.module.css";
+import { Caption, Heading, Thumb, buttonStyles, overlayButtonStyles } from "./ui";
 import styles from "./TimelineDayGrid.module.css";
 import { TimelineEntry } from "./timelineTypes";
 import {
@@ -11,6 +11,7 @@ import {
   formatExifWallClockDate,
   formatExifWallClockDateTime,
 } from "../util/exifTime";
+import { summariseTimelineGeocode } from "../util/pageDataRows";
 
 const formatLongDate = (date: string) => formatExifWallClockDate(`${date}T00:00:00`) ?? date;
 
@@ -24,39 +25,6 @@ const formatRelativeDateTime = (dateTimeOriginal: string) => {
   }
 
   return getRelativeTimeString(timestamp);
-};
-
-const isGeocodeCoordinate = (line: string) => /^-?\d+(?:\.\d+)?$/.test(line);
-
-const getGeocodeSummary = (geocode?: string | null): string | null => {
-  if (!geocode) {
-    return null;
-  }
-
-  const parts = geocode
-    .split("\n")
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .filter((line) => !isGeocodeCoordinate(line));
-
-  if (parts.length === 0) {
-    return null;
-  }
-
-  const cleaned =
-    parts[0].length <= 3 && parts[0].toUpperCase() === parts[0] ? parts.slice(1) : parts;
-
-  if (cleaned.length === 0) {
-    return null;
-  }
-
-  const summaryParts = [
-    cleaned[0],
-    cleaned.length > 2 ? cleaned.at(-2) : null,
-    cleaned.at(-1),
-  ].filter(Boolean) as string[];
-
-  return summaryParts.filter((part, index) => summaryParts.indexOf(part) === index).join(", ");
 };
 
 const toSimilarSearchPath = (path: string) => {
@@ -86,48 +54,8 @@ export const TimelineDayGrid = ({
   canGoNewer?: boolean;
   dateHeadingRef?: React.Ref<HTMLDivElement>;
 }) => {
-  if (!date) {
-    return (
-      <section className={styles.emptyState} aria-label="No day selected">
-        <Heading level={1} as="h2">
-          Pick a day
-        </Heading>
-        <Caption size="sm">Choose a day from the heatmap, or jump to a random one.</Caption>
-        <div className={styles.dayNavButtons}>
-          {onSelectOlderDate ? (
-            <button
-              type="button"
-              className={commonStyles.button}
-              onClick={onSelectOlderDate}
-              disabled
-            >
-              ← Older
-            </button>
-          ) : null}
-          {onSelectRandomDate ? (
-            <button type="button" className={commonStyles.button} onClick={onSelectRandomDate}>
-              🎲 Random
-            </button>
-          ) : null}
-          {onSelectNewerDate ? (
-            <button
-              type="button"
-              className={commonStyles.button}
-              onClick={onSelectNewerDate}
-              disabled
-            >
-              Newer →
-            </button>
-          ) : null}
-        </div>
-      </section>
-    );
-  }
-
-  const formattedDate = formatLongDate(date);
-  const locationSummary = Array.from(
-    new Set(entries.map((entry) => getGeocodeSummary(entry.geocode)).filter(Boolean)),
-  ).join(" · ");
+  const mapLoadTargetRef = React.useRef<HTMLDivElement | null>(null);
+  const [isMapVisible, setIsMapVisible] = React.useState(false);
   const mappableEntries = entries.filter(
     (entry): entry is TimelineEntry & { decLat: number; decLng: number } =>
       entry.decLat !== null &&
@@ -147,6 +75,76 @@ export const TimelineDayGrid = ({
     placeholderHeight: entry.placeholderHeight,
   }));
 
+  React.useEffect(() => {
+    if (!date || mapPhotos.length === 0 || isMapVisible) {
+      return;
+    }
+
+    if (typeof IntersectionObserver === "undefined") {
+      setIsMapVisible(true);
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      (observations) => {
+        if (observations.some((observation) => observation.isIntersecting)) {
+          observer.disconnect();
+          setIsMapVisible(true);
+        }
+      },
+      { rootMargin: "600px 0px" },
+    );
+    const target = mapLoadTargetRef.current;
+    if (target) {
+      observer.observe(target);
+    }
+
+    return () => observer.disconnect();
+  }, [date, isMapVisible, mapPhotos.length]);
+
+  if (!date) {
+    return (
+      <section className={styles.emptyState} aria-label="No day selected">
+        <Heading level={1} as="h2">
+          Pick a day
+        </Heading>
+        <Caption size="sm">Choose a day from the heatmap, or jump to a random one.</Caption>
+        <div className={styles.dayNavButtons}>
+          {onSelectOlderDate ? (
+            <button
+              type="button"
+              className={buttonStyles.base}
+              onClick={onSelectOlderDate}
+              disabled
+            >
+              ← Older
+            </button>
+          ) : null}
+          {onSelectRandomDate ? (
+            <button type="button" className={buttonStyles.base} onClick={onSelectRandomDate}>
+              🎲 Random
+            </button>
+          ) : null}
+          {onSelectNewerDate ? (
+            <button
+              type="button"
+              className={buttonStyles.base}
+              onClick={onSelectNewerDate}
+              disabled
+            >
+              Newer →
+            </button>
+          ) : null}
+        </div>
+      </section>
+    );
+  }
+
+  const formattedDate = formatLongDate(date);
+  const locationSummary = Array.from(
+    new Set(entries.map((entry) => summariseTimelineGeocode(entry.geocode)).filter(Boolean)),
+  ).join(" · ");
+
   return (
     <section className={styles.section} aria-label={`Photos from ${formattedDate}`}>
       <div className={styles.header}>
@@ -164,7 +162,7 @@ export const TimelineDayGrid = ({
         {onSelectOlderDate ? (
           <button
             type="button"
-            className={commonStyles.button}
+            className={buttonStyles.base}
             onClick={onSelectOlderDate}
             disabled={!canGoOlder}
             aria-disabled={!canGoOlder}
@@ -173,14 +171,14 @@ export const TimelineDayGrid = ({
           </button>
         ) : null}
         {onSelectRandomDate ? (
-          <button type="button" className={commonStyles.button} onClick={onSelectRandomDate}>
+          <button type="button" className={buttonStyles.base} onClick={onSelectRandomDate}>
             🎲 Random
           </button>
         ) : null}
         {onSelectNewerDate ? (
           <button
             type="button"
-            className={commonStyles.button}
+            className={buttonStyles.base}
             onClick={onSelectNewerDate}
             disabled={!canGoNewer}
             aria-disabled={!canGoNewer}
@@ -252,20 +250,24 @@ export const TimelineDayGrid = ({
       {mapPhotos.length > 0 ? (
         <section className={styles.mapSection} aria-label={`Map of photos from ${formattedDate}`}>
           <div className={styles.mapHeader}>
-            <h3 className={styles.mapHeading}>Map</h3>
+            <Heading level={2} as="h3" className={styles.mapHeading}>
+              Map
+            </Heading>
             <Caption as="div">
               {mapPhotos.length} mapped photo{mapPhotos.length === 1 ? "" : "s"}
             </Caption>
           </div>
 
-          <div className={styles.mapWrap}>
-            <MapWorldDeferred
-              photos={mapPhotos}
-              className={styles.mapCanvas}
-              fitToPhotos
-              syncRoute={false}
-              showThemeBootstrap={false}
-            />
+          <div ref={mapLoadTargetRef} className={styles.mapWrap} aria-busy={!isMapVisible}>
+            {isMapVisible ? (
+              <MapWorldDeferred
+                photos={mapPhotos}
+                className={styles.mapCanvas}
+                fitToPhotos
+                syncRoute={false}
+                showThemeBootstrap={false}
+              />
+            ) : null}
           </div>
         </section>
       ) : null}

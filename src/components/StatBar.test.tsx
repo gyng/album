@@ -25,7 +25,7 @@ describe("StatBar", () => {
       "/search?facet=location%3AJapan",
     );
     const bar = container.querySelector<HTMLElement>("[style]");
-    expect(bar?.style.width).toBe("50%");
+    expect(bar?.style.inlineSize).toBe("50%");
     expect(bar?.style.backgroundColor).toBe("rgb(12, 34, 56)");
   });
 
@@ -34,7 +34,7 @@ describe("StatBar", () => {
       <StatBar label="Unknown" count={0} maxCount={0} actionHref="/search" />,
     );
 
-    expect(container.querySelector<HTMLElement>("[style]")?.style.width).toBe("0%");
+    expect(container.querySelector<HTMLElement>("[style]")?.style.inlineSize).toBe("0%");
     expect(screen.queryByRole("link")).toBeNull();
 
     rerender(<StatBar label="No action" count={1} maxCount={2} actionLabel="Missing URL" />);

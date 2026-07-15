@@ -1,5 +1,7 @@
+import { mergeCssModuleStyles } from "../../util/mergeCssModuleStyles";
 import React from "react";
-import styles from "../../pages/slideshow/slideshow.module.css";
+import sharedStyles from "../../pages/slideshow/slideshow.module.css";
+import localStyles from "../../pages/slideshow/SlideshowBottomBar.module.css";
 import MMap from "../Map";
 import { RandomPhotoRow } from "../search/api";
 import { DetailsAlignment } from "../../util/slideshowUrl";
@@ -12,9 +14,31 @@ import {
 import { extractDateFromExifString, extractGPSFromExifString } from "../../util/extractExifFromDb";
 import { getRelativeTimeString } from "../../util/time";
 
+const styles = mergeCssModuleStyles(
+  sharedStyles,
+  localStyles,
+  [
+    "bottomBarStack",
+    "clock",
+    "date",
+    "descriptionCell",
+    "details",
+    "detailsAffinity",
+    "detailsRow",
+    "displaySetting",
+    "displaySettingActive",
+    "mapContainer",
+    "remixSwatch",
+    "slideClock",
+    "slideMap",
+    "time",
+  ],
+  ["bottomBarStack"],
+);
+
 // Stable references for the slide map's style props so the memoised MMap can
 // skip re-rendering when only the coordinates are unchanged.
-const SLIDE_MAP_STYLE = { width: "100%", height: "100%" } as const;
+const SLIDE_MAP_STYLE = { inlineSize: "100%", blockSize: "100%" } as const;
 const SLIDE_MARKER_STYLE = { visibility: "hidden" } as const;
 
 const REMIX_STRATEGY_LABEL: Record<RemixStrategy, string> = {
@@ -148,7 +172,6 @@ export const SlideshowBottomBar: React.FC<SlideshowBottomBarProps> = (props) => 
           styles.displaySetting,
           props.showMap ? styles.displaySettingActive : "",
         ].join(" ")}
-        style={{ mixBlendMode: "screen" }}
       >
         {mountMap ? (
           <MMap
@@ -191,6 +214,7 @@ export const SlideshowBottomBar: React.FC<SlideshowBottomBarProps> = (props) => 
               <>
                 {" "}
                 <span
+                  data-colour-swatch
                   className={styles.remixSwatch}
                   aria-hidden="true"
                   style={{

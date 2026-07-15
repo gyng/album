@@ -1,11 +1,10 @@
 .title {
   font-size: var(--fs-xl);
-  margin-top: calc(2 * var(--m-xl));
+  margin-block-start: calc(2 * var(--m-xl));
   text-align: center;
   padding: 0 var(--m-xl);
-  max-width: 100vw;
-  overflow: hidden;
-  word-wrap: break-word;
+  max-inline-size: 100%;
+  overflow: clip;
   /* Break only when a word genuinely cannot fit, rather than at arbitrary
      letters (which split words like "Singapore" mid-character). */
   overflow-wrap: anywhere;
@@ -13,7 +12,7 @@
 
 @media (max-width: 720px) {
   .title {
-    font-size: clamp(var(--fs-l), 10vw, var(--fs-xl));
+    font-size: clamp(var(--fs-l), 10dvw, var(--fs-xl));
   }
 }
 
@@ -32,9 +31,9 @@
 .overlayHeader {
   grid-row: 1;
   grid-column: 1;
-  z-index: 200;
+  z-index: var(--z-caption);
   text-align: center;
-  text-shadow: 0 0 8px rgba(0, 0, 0, 0.5);
+  text-shadow: 0 0 var(--size-8) color-mix(in oklch, var(--c-black) 50%, transparent);
 }
 
 .block {

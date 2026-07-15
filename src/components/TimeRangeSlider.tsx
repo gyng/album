@@ -262,6 +262,7 @@ export const TimeRangeSlider: React.FC<TimeRangeSliderProps> = ({
         </span>
         {hasRange ? (
           <button
+            type="button"
             className={styles.resetButton}
             onClick={handleReset}
             aria-label="Clear date filter"

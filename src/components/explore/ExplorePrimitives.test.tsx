@@ -2,10 +2,68 @@
  * @jest-environment jsdom
  */
 
-import { render, screen } from "@testing-library/react";
+import { act, render, screen } from "@testing-library/react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { ExploreStatGroup, ExploreStatSection, VisualSimilarityThumb } from "./ExplorePrimitives";
 
 describe("Explore primitives", () => {
+  it("keeps a meaningful summary in server-rendered HTML while deferring heavy content", () => {
+    const markup = renderToStaticMarkup(
+      <ExploreStatGroup
+        id="deferred-summary"
+        title="Deferred summary"
+        deferContent
+        deferredSummary={<p>42 photos across 3 years</p>}
+      >
+        <p>Expensive interactive chart</p>
+      </ExploreStatGroup>,
+    );
+
+    expect(markup).toContain("42 photos across 3 years");
+    expect(markup).not.toContain("Expensive interactive chart");
+  });
+
+  it("defers expensive group content until the group nears the viewport", () => {
+    let intersectionCallback!: IntersectionObserverCallback;
+    const disconnect = jest.fn();
+    const observe = jest.fn();
+    const unobserve = jest.fn();
+    const originalObserver = globalThis.IntersectionObserver;
+    Object.defineProperty(globalThis, "IntersectionObserver", {
+      configurable: true,
+      value: jest.fn((callback: IntersectionObserverCallback) => {
+        intersectionCallback = callback;
+        return { disconnect, observe, unobserve };
+      }),
+    });
+
+    const view = render(
+      <ExploreStatGroup id="deferred" title="Deferred" deferContent>
+        <p>Expensive chart</p>
+      </ExploreStatGroup>,
+    );
+
+    expect(screen.getByRole("heading", { name: /deferred/i })).toBeInTheDocument();
+    expect(screen.queryByText("Expensive chart")).toBeNull();
+    expect(observe).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      intersectionCallback(
+        [{ target: observe.mock.calls[0]![0], isIntersecting: true } as IntersectionObserverEntry],
+        {} as IntersectionObserver,
+      );
+    });
+
+    expect(screen.getByText("Expensive chart")).toBeInTheDocument();
+    expect(disconnect).toHaveBeenCalled();
+    view.unmount();
+
+    Object.defineProperty(globalThis, "IntersectionObserver", {
+      configurable: true,
+      value: originalObserver,
+    });
+  });
+
   it("keeps linked section headings and optional actions", () => {
     render(
       <ExploreStatGroup

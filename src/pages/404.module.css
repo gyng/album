@@ -1,15 +1,11 @@
 .page {
-  min-height: 100vh;
-  /* biome-ignore lint/suspicious/noDuplicateProperties: Fallback for browsers without dynamic viewport units. */
-  min-height: 100dvh;
+  min-block-size: 100dvh;
 }
 
 .error {
   /* Fill the viewport below the nav strip and centre the grouped content as a
      single unit (no large dead band between the glyph and the link). */
-  min-height: 70vh;
-  /* biome-ignore lint/suspicious/noDuplicateProperties: Fallback for browsers without dynamic viewport units. */
-  min-height: 70dvh;
+  min-block-size: 70dvh;
   margin: 0;
   display: grid;
   place-content: center;

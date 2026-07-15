@@ -3,27 +3,27 @@
    colour via inline `style={{ color: ... }}` — the background reads from
    currentColor. */
 .pin {
-  --outline-color: rgba(255, 255, 255, 0.84);
+  --outline-color: color-mix(in oklch, var(--c-white) 84%, transparent);
   position: relative;
   display: block;
-  width: 14px;
-  height: 14px;
-  border-radius: 999px;
+  inline-size: var(--size-14);
+  block-size: var(--size-14);
+  border-radius: var(--radius-pill);
   background: currentColor;
   box-shadow:
-    0 0 0 2px var(--outline-color),
-    0 1px 2px rgb(0 0 0 / 0.18);
+    0 0 0 var(--size-2) var(--outline-color),
+    0 var(--size-1) var(--size-2) color-mix(in oklch, var(--c-black) 18%, transparent);
   opacity: 0.9;
 }
 
 /* On touch devices the 14px dot is far below a comfortable tap target, so
-   extend an invisible padded hit area to roughly 38px without changing the
-   visible pin size. */
+   extend an invisible hit area beyond the shared 44px minimum without
+   changing the visible pin size. */
 @media (pointer: coarse) {
   .pin::after {
     content: "";
     position: absolute;
-    inset: -12px;
-    border-radius: 999px;
+    inset: calc(var(--size-16) * -1);
+    border-radius: var(--radius-pill);
   }
 }

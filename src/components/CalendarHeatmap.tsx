@@ -3,6 +3,7 @@ import React from "react";
 import { getRelativeTimeString } from "../util/time";
 import styles from "./CalendarHeatmap.module.css";
 import { TimelineEntry } from "./timelineTypes";
+import { PillButton } from "./ui";
 import {
   formatCalendarLongDate,
   formatCalendarShortDate,
@@ -31,6 +32,8 @@ const WEEKDAY_LABELS = ["S", "M", "T", "W", "T", "F", "S"];
 const EMPTY_HIGHLIGHTED_DATES: string[] = [];
 const EMPTY_HIGHLIGHTED_YEARS: number[] = [];
 const EMPTY_DATE_SET = new Set<string>();
+const INITIAL_VISIBLE_YEAR_COUNT = 2;
+const VISIBLE_YEAR_BATCH_SIZE = 3;
 
 const LEVEL_CLASSES = [styles.level0, styles.level1, styles.level2, styles.level3, styles.level4];
 
@@ -241,6 +244,29 @@ export const CalendarHeatmap = ({
     () => years.map((year) => ({ year, dates: getCalendarYearDates(year) })),
     [years],
   );
+  const yearsKey = years.join(",");
+  const [yearVisibility, setYearVisibility] = React.useState({
+    key: yearsKey,
+    count: INITIAL_VISIBLE_YEAR_COUNT,
+  });
+  const requestedVisibleYearCount =
+    yearVisibility.key === yearsKey ? yearVisibility.count : INITIAL_VISIBLE_YEAR_COUNT;
+  const requiredYears = React.useMemo(() => {
+    const values = [selectedDate, scrollToDate, ...highlightedDates]
+      .filter((date): date is string => Boolean(date))
+      .map((date) => Number.parseInt(date.slice(0, 4), 10));
+    return new Set([...values, ...highlightedYears]);
+  }, [highlightedDates, highlightedYears, scrollToDate, selectedDate]);
+  const requiredVisibleYearCount = years.reduce((count, year, index) => {
+    return requiredYears.has(year) ? Math.max(count, index + 1) : count;
+  }, 0);
+  const visibleYearCount = Math.min(
+    yearGroups.length,
+    Math.max(requestedVisibleYearCount, requiredVisibleYearCount),
+  );
+  const visibleYearGroups = yearGroups.slice(0, visibleYearCount);
+  const hiddenYearCount = yearGroups.length - visibleYearGroups.length;
+  const nextVisibleYearCount = Math.min(VISIBLE_YEAR_BATCH_SIZE, hiddenYearCount);
 
   // Only decorate "today"/future once the parent resolves the client's local
   // date (todayDate is undefined during SSG). Falling back to the build
@@ -318,7 +344,7 @@ export const CalendarHeatmap = ({
   return (
     <div className={styles.heatmap}>
       <div className={styles.yearsScroller}>
-        {yearGroups.map((group) => (
+        {visibleYearGroups.map((group) => (
           <CalendarHeatmapYear
             key={group.year}
             year={group.year}
@@ -331,9 +357,22 @@ export const CalendarHeatmap = ({
             openPopup={openPopup}
             closePopupSoon={closePopupSoon}
             selectedDate={selectedDate?.startsWith(`${group.year}-`) ? selectedDate : null}
-            showWeekdayLabels={group.year === yearGroups[0]?.year}
+            showWeekdayLabels={group.year === visibleYearGroups[0]?.year}
           />
         ))}
+        {hiddenYearCount > 0 ? (
+          <PillButton
+            variant="ghost"
+            onClick={() => {
+              setYearVisibility({
+                key: yearsKey,
+                count: Math.min(yearGroups.length, visibleYearCount + VISIBLE_YEAR_BATCH_SIZE),
+              });
+            }}
+          >
+            Show {nextVisibleYearCount} earlier {nextVisibleYearCount === 1 ? "year" : "years"}
+          </PillButton>
+        ) : null}
       </div>
 
       {popupState ? (

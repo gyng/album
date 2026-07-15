@@ -1,0 +1,231 @@
+/* Styles owned by SearchInputBar. Shared layout remains in Search.module.css. */
+
+.secondaryAction {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--m-s);
+  padding: var(--m-m);
+  border: solid var(--size-2) var(--c-bg-contrast-light);
+  border-radius: var(--m-s);
+  background-color: var(--c-bg);
+  color: inherit;
+  font-size: var(--fs-sm);
+  text-decoration: none;
+  cursor: pointer;
+  min-block-size: var(--tap-target);
+  transition:
+    background-color var(--t-theme) var(--ease-out),
+    color var(--t-theme) var(--ease-out),
+    border-color var(--t-theme) var(--ease-out);
+}
+
+.secondaryAction:disabled {
+  opacity: 0.5;
+  cursor: wait;
+}
+
+.secondaryAction:not(:disabled):hover {
+  background-color: var(--c-bg-contrast-light);
+}
+
+.secondaryAction:not(:disabled):active {
+  background-color: var(--c-bg-contrast-light);
+}
+
+.secondaryAction:focus-visible {
+  outline: solid var(--size-2) var(--c-bg-contrast-light);
+  outline-offset: var(--size-2);
+}
+
+.searchInput {
+  padding-inline-end: var(--m-xl);
+}
+
+.searchInput::placeholder {
+  user-select: none;
+}
+
+.searchHintInline {
+  align-self: center;
+  color: var(--c-bg-contrast-light);
+  font-size: var(--fs-s);
+  font-style: italic;
+}
+
+.searchInputRow {
+  display: flex;
+  flex-direction: row;
+  gap: var(--m-m);
+  flex-wrap: wrap;
+  align-items: center;
+  margin-block-end: var(--m-l);
+}
+
+.imageQueryActions {
+  display: inline-flex;
+  gap: var(--m-m);
+}
+
+/* Visually hidden but still programmatically clickable — display:none would
+   make .click() a no-op in some browsers. */
+
+.imageQueryFileInput {
+  position: absolute;
+  inline-size: var(--size-1);
+  block-size: var(--size-1);
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+
+/* Zoomed query-image preview, styled like .searchModeInfoTooltip but revealed
+   purely on hover/focus — no open state to manage. The chip is the anchor.
+   Sits ABOVE the chip: below it would cover the first row of results. */
+
+.searchModeSelectLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--m-s);
+  flex: 0 0 auto;
+}
+
+.searchModeSelect {
+  min-inline-size: var(--size-132);
+}
+
+.searchModeInfoWrap {
+  position: relative;
+  display: inline-flex;
+}
+
+.searchModeInfo {
+  anchor-name: --search-mode-help;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  appearance: none;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--c-bg-contrast-light);
+  font-size: var(--fs-m);
+  line-height: 1;
+  cursor: help;
+  min-inline-size: var(--tap-target);
+  min-block-size: var(--tap-target);
+  user-select: none;
+}
+
+.searchModeInfo:hover {
+  color: var(--c-font);
+}
+
+.searchModeInfo:focus-visible {
+  outline: solid var(--size-2) var(--c-bg-contrast-light);
+  outline-offset: var(--size-2);
+  border-radius: var(--radius-pill);
+}
+
+.searchModeInfoTooltip {
+  position: fixed;
+  /* Popovers are promoted to the top layer, so an unsupported anchor-position
+     implementation cannot fall back to the relatively positioned wrapper.
+     Centre it in that case; capable browsers enhance this to the trigger. */
+  inset: 50% auto auto 50%;
+  z-index: var(--z-float);
+  inline-size: max-content;
+  max-inline-size: min(80dvw, var(--size-280));
+  border-radius: var(--m-s);
+  font-size: var(--fs-s);
+  line-height: 1.4;
+  opacity: 0;
+  translate: -50% calc(-50% - var(--m));
+  pointer-events: none;
+  transition:
+    opacity var(--t-fast) var(--ease-out),
+    translate var(--t-fast) var(--ease-out),
+    display var(--t-fast) allow-discrete,
+    overlay var(--t-fast) allow-discrete;
+}
+
+.searchModeInfoTooltip:popover-open {
+  opacity: 1;
+  translate: -50% -50%;
+}
+
+@starting-style {
+  .searchModeInfoTooltip:popover-open {
+    opacity: 0;
+    translate: -50% calc(-50% - var(--m));
+  }
+}
+
+@supports (position-anchor: --search-mode-help) {
+  .searchModeInfoTooltip {
+    position-anchor: --search-mode-help;
+    position-area: block-end span-inline-end;
+    position-try-fallbacks: flip-block, flip-inline;
+    inset: auto;
+    margin-block-start: var(--m-s);
+    translate: 0 calc(var(--m) * -1);
+  }
+
+  .searchModeInfoTooltip:popover-open {
+    translate: 0;
+  }
+
+  @starting-style {
+    .searchModeInfoTooltip:popover-open {
+      translate: 0 calc(var(--m) * -1);
+    }
+  }
+}
+
+/* Muted status line used by the facet panel ("Loading filters…"). */
+
+.searchInputContainer {
+  position: relative;
+  display: flex;
+  align-items: center;
+  inline-size: 100%;
+  max-inline-size: min(80dvw, var(--size-420));
+}
+
+.clearButton {
+  position: absolute;
+  inset-inline-end: var(--m-m);
+  background: none;
+  border: none;
+  font-size: var(--fs-m);
+  color: var(--c-bg-contrast-light);
+  cursor: pointer;
+  padding: var(--m-s);
+  inline-size: var(--tap-target);
+  block-size: var(--tap-target);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-pill);
+  transition:
+    background-color var(--t-base) var(--ease-out),
+    color var(--t-base) var(--ease-out);
+}
+
+.clearButton:hover {
+  background-color: var(--c-bg-contrast-light);
+  color: var(--c-bg);
+}
+
+.clearButton:focus-visible {
+  outline: solid var(--size-2) var(--c-bg-contrast-light);
+}
+
+@container (max-width: 720px) {
+  .secondaryAction {
+    min-block-size: var(--tap-target);
+    padding: var(--m) var(--m-s);
+    font-size: var(--fs-s);
+    border-width: var(--size-1);
+    border-radius: var(--m-s);
+  }
+}

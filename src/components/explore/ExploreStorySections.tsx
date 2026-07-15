@@ -1,15 +1,57 @@
+import { mergeCssModuleStyles } from "../../util/mergeCssModuleStyles";
 import Link from "next/link";
 import type { PhotoStats } from "../../util/computeStats";
 import { buildSearchHref } from "../../util/searchFacets";
 import { YearSplitHistogram } from "../YearSplitHistogram";
 import { Caption, Card, Heading, Thumb, pillStyles } from "../ui";
-import styles from "../../pages/explore/explore.module.css";
+import sharedStyles from "../../pages/explore/explore.module.css";
+import localStyles from "../../pages/explore/ExploreStorySections.module.css";
 import { ExploreStatGroup } from "./ExplorePrimitives";
 import type { FunStatCard } from "./exploreViewModel";
 import { buildYearSearchHref } from "./exploreViewModel";
 
-export const ExploreFunStatsSection = ({ cards }: { cards: FunStatCard[] }) => (
-  <ExploreStatGroup id="fun-stats" title="Fun stats">
+const styles = mergeCssModuleStyles(
+  sharedStyles,
+  localStyles,
+  [
+    "funStatThumb",
+    "funStatThumbLink",
+    "funStatThumbYear",
+    "funStatThumbs",
+    "funStatValue",
+    "funStatsGrid",
+    "recentTrendsGrid",
+    "revisitGapLabelInline",
+    "revisitThumb",
+    "revisitThumbs",
+    "revisitTimelineRail",
+    "revisitedPlaceCard",
+    "revisitedPlacesGrid",
+    "timelineSectionAligned",
+    "visualEraThumb",
+    "visualEraThumbLink",
+  ],
+  // visualTimeline stays composed so the local ".revisitedPlaceCard
+  // .visualTimeline" gutter rule can match the shared-styled timeline.
+  ["revisitGapLabelInline", "revisitThumbs", "timelineSectionAligned", "visualTimeline"],
+);
+
+export const ExploreFunStatsSection = ({
+  cards,
+  deferContent = false,
+}: {
+  cards: FunStatCard[];
+  deferContent?: boolean;
+}) => (
+  <ExploreStatGroup
+    id="fun-stats"
+    title="Fun stats"
+    deferContent={deferContent}
+    deferredSummary={cards
+      .slice(0, 4)
+      .map((card) => `${card.label}: ${card.value}`)
+      .join(" · ")}
+  >
     <section className={`${styles.section} ${styles.sectionWide}`}>
       <div className={styles.funStatsGrid}>
         {cards.map((stat) => (
@@ -28,6 +70,7 @@ export const ExploreFunStatsSection = ({ cards }: { cards: FunStatCard[] }) => (
                     <img
                       src={example.src}
                       alt={`${example.label} (${example.year})`}
+                      loading="lazy"
                       className={styles.funStatThumb}
                     />
                     <span className={styles.funStatThumbYear}>{example.year}</span>
@@ -48,11 +91,19 @@ export const ExploreFunStatsSection = ({ cards }: { cards: FunStatCard[] }) => (
   </ExploreStatGroup>
 );
 
-export const ExploreRecentTrendsSection = ({ data }: { data: PhotoStats["recentYearStats"] }) =>
+export const ExploreRecentTrendsSection = ({
+  data,
+  deferContent = false,
+}: {
+  data: PhotoStats["recentYearStats"];
+  deferContent?: boolean;
+}) =>
   data.length > 0 ? (
     <ExploreStatGroup
       id="recent-trends"
       title="Recent trends"
+      deferContent={deferContent}
+      deferredSummary={`Recent-year trends cover ${data.map((item) => item.label).join(", ")}.`}
       actions={
         <Link href="/timeline" className={`${pillStyles.base} ${pillStyles.ghost}`}>
           <span>Open Timeline</span>
@@ -70,11 +121,24 @@ export const ExploreRecentTrendsSection = ({ data }: { data: PhotoStats["recentY
 
 export const ExploreRevisitedPlacesSection = ({
   places,
+  deferContent = false,
 }: {
   places: PhotoStats["revisitedPlaces"];
+  deferContent?: boolean;
 }) =>
   places.length > 0 ? (
-    <ExploreStatGroup id="revisited-places" title="Revisited places">
+    <ExploreStatGroup
+      id="revisited-places"
+      title="Revisited places"
+      deferContent={deferContent}
+      deferredSummary={places
+        .slice(0, 4)
+        .map(
+          (place) =>
+            `${place.label}: ${place.photoCount.toLocaleString("en")} photos from ${place.firstYear} to ${place.lastYear}`,
+        )
+        .join(" · ")}
+    >
       <section className={`${styles.section} ${styles.sectionWide}`}>
         <div className={styles.revisitedPlacesGrid}>
           {places.map((place) => (
@@ -143,6 +207,7 @@ export const ExploreRevisitedPlacesSection = ({
                             <Thumb
                               src={photo.src}
                               alt={`${photo.label} (${entry.year})`}
+                              loading="lazy"
                               className={`${styles.visualThumb} ${styles.visualEraThumb} ${styles.revisitThumb}`}
                             />
                           </Link>

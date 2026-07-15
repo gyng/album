@@ -63,14 +63,12 @@ describe("SearchInputBar", () => {
     expect(props.onPickImageQuery).toHaveBeenCalledTimes(1);
   });
 
-  it("opens help on demand and closes it on blur", () => {
+  it("connects search help to a native popover", () => {
     render(<SearchInputBar {...baseProps()} />);
     const help = screen.getByRole("button", { name: "Search mode help" });
-    expect(help).toHaveAttribute("aria-expanded", "false");
-    fireEvent.click(help);
-    expect(help).toHaveAttribute("aria-expanded", "true");
-    fireEvent.blur(help);
-    expect(help).toHaveAttribute("aria-expanded", "false");
+    const tooltip = screen.getByRole("tooltip");
+    expect(help).toHaveAttribute("popovertarget", tooltip.id);
+    expect(tooltip).toHaveAttribute("popover", "auto");
   });
 
   it("disables database-backed actions and explains an unavailable index", () => {

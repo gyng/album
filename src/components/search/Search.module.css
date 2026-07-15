@@ -2,8 +2,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 150px;
-  height: 150px;
+  inline-size: var(--size-150);
+  block-size: var(--size-150);
   background-color: transparent;
   border-radius: var(--m-m);
   border-style: solid;
@@ -34,209 +34,25 @@
   margin: 0;
   padding: 0;
   gap: var(--m-m);
-  min-height: 24px;
+  min-block-size: var(--size-24);
   font-size: var(--fs-sm);
 }
 
 .resultLi {
   animation-name: fadein;
-  animation-duration: 0.2s;
-  animation-timing-function: ease-out;
+  animation-duration: var(--t-base);
+  animation-timing-function: var(--ease-out);
 }
 
 .searchWidget {
-  margin-bottom: var(--m-xl);
-}
-
-.activeFacetSection {
-  display: grid;
-  gap: 0.35rem;
-  margin-top: var(--m-s);
-  margin-bottom: var(--m-xl);
-}
-
-.activeFacetLabel {
-  font-size: var(--fs-s);
-  font-weight: 400;
-  letter-spacing: 0.02em;
-  color: var(--c-bg-contrast-light);
-}
-
-.activeFacetChips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--m-s);
-}
-
-.activeFacetChip {
-  /* Anchors the hover zoom preview (.activeFacetImageZoom). */
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  gap: var(--m);
-  padding: var(--m);
-  border: solid 1px var(--c-border-on-dark);
-  border-radius: var(--m-s);
-  background: transparent;
-  color: inherit;
-  cursor: pointer;
-  font-size: var(--fs-s);
-  user-select: none;
-}
-
-@media (hover: none), (pointer: coarse) {
-  .activeFacetChip {
-    min-height: var(--m-xl);
-    padding: var(--m) var(--m-s);
-  }
-}
-
-.activeFacetChip:hover {
-  background-color: var(--c-bg-contrast-light);
-  color: var(--c-bg-contrast-dark);
-}
-
-.activeFacetChip:focus-visible {
-  outline: solid 2px var(--c-bg-contrast-light);
-  outline-offset: 2px;
-}
-
-.activeFacetColorSwatch {
-  width: 0.85rem;
-  height: 0.85rem;
-  border: solid 1px color-mix(in srgb, var(--c-bg) 55%, transparent);
-  border-radius: 999px;
-  flex: 0 0 auto;
-}
-
-.facetPanel {
-  display: grid;
-  grid-template-columns: 170px minmax(0, 1fr);
-  gap: var(--m-l);
-  height: clamp(10.5rem, 23.5vh, 13.5rem);
-  margin-bottom: var(--m-l);
-  padding: 0;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-}
-
-.facetPanelColorMode {
-  min-height: 0;
-}
-
-.facetCategoryRail {
-  display: grid;
-  align-content: start;
-  gap: var(--m-s);
-}
-
-.facetCategoryTab {
-  display: inline-flex;
-  align-items: center;
-  justify-content: flex-start;
-  padding: 0.38rem 0.55rem;
-  border: solid 1px color-mix(in srgb, var(--c-bg-contrast-light) 25%, transparent);
-  border-radius: var(--m-s);
-  background: transparent;
-  color: var(--c-bg-contrast-light);
-  cursor: pointer;
-  text-align: left;
-  font-size: var(--fs-s);
-}
-
-.facetCategoryTab:hover {
-  background: color-mix(in srgb, var(--c-bg-contrast-light) 12%, transparent);
-  color: var(--c-font);
-}
-
-.facetCategoryTab:focus-visible {
-  outline: solid 2px var(--c-bg-contrast-light);
-  outline-offset: 2px;
-}
-
-@media (hover: none), (pointer: coarse) {
-  .facetCategoryTab {
-    min-height: var(--m-xl);
-  }
-}
-
-.facetCategoryTabActive {
-  background: color-mix(in srgb, var(--c-bg-contrast-light) 18%, transparent);
-  color: var(--c-font);
-  border-color: var(--c-font);
-}
-
-.facetCategoryContent {
-  min-width: 0;
-  min-height: 0;
-  overflow: auto;
-  display: grid;
-  align-content: start;
-  gap: var(--m-s);
+  container-type: inline-size;
+  margin-block-end: var(--m-xl);
 }
 
 /* A single fade for the whole panel, on whichever edge still has off-screen
    pills (see SearchFacetPanel's scroll handler). Each edge's fade size is a
    variable, defaulting to 0 so only the scrolled-past edges actually fade. The
    mask is painted over the scrollport, so it stays put as the list scrolls. */
-.facetCategoryContentFade {
-  -webkit-mask-image: linear-gradient(
-    to bottom,
-    transparent 0,
-    #000 var(--facet-fade-top, 0px),
-    #000 calc(100% - var(--facet-fade-bottom, 0px)),
-    transparent 100%
-  );
-  mask-image: linear-gradient(
-    to bottom,
-    transparent 0,
-    #000 var(--facet-fade-top, 0px),
-    #000 calc(100% - var(--facet-fade-bottom, 0px)),
-    transparent 100%
-  );
-}
-
-.facetFadeAbove {
-  --facet-fade-top: var(--m-l);
-}
-
-.facetFadeBelow {
-  --facet-fade-bottom: var(--m-l);
-}
-
-.facetSection {
-  display: flex;
-  flex-direction: column;
-  gap: var(--m-s);
-}
-
-.facetSectionTitle {
-  margin: 0;
-  font-size: var(--fs-s);
-  font-weight: 400;
-  letter-spacing: 0.02em;
-  color: var(--c-bg-contrast-light);
-}
-
-.colorFacetSection {
-  min-height: 0;
-  align-items: flex-start;
-}
-
-.colorFacetControl {
-  display: grid;
-  grid-template-columns: 196px minmax(220px, 260px);
-  gap: var(--m-m);
-  align-items: start;
-  justify-content: start;
-  max-width: 100%;
-}
-
-.colorFacetPicker {
-  width: 196px !important;
-  height: 160px !important;
-}
 
 .colorFacetPicker :global(.react-colorful__saturation) {
   border-radius: var(--m-s) var(--m-s) 0 0;
@@ -244,153 +60,17 @@
 }
 
 .colorFacetPicker :global(.react-colorful__hue) {
-  height: 16px;
+  block-size: var(--size-16);
   border-radius: 0 0 var(--m-s) var(--m-s);
 }
 
 .colorFacetPicker :global(.react-colorful__pointer) {
-  width: 16px;
-  height: 16px;
-}
-
-.colorFacetMeta {
-  display: grid;
-  gap: var(--m-m);
-  min-width: 0;
-  width: min(260px, 100%);
-  align-content: start;
-}
-
-.colorFacetHexLabel,
-.colorFacetRangeGroup {
-  display: grid;
-  gap: var(--m-s);
-}
-
-.colorFacetRangeLabel {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  gap: var(--m-s);
-}
-
-.colorFacetHeader {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--m);
-  margin-bottom: 0;
-}
-
-.colorFacetCurrent {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--m-s);
-  min-width: 0;
-}
-
-.colorFacetCurrentSwatchButton {
-  position: relative;
-  display: inline-flex;
-  cursor: pointer;
-}
-
-.colorFacetCurrentSwatch {
-  width: 1rem;
-  height: 1rem;
-  border-radius: 999px;
-  border: solid 1px color-mix(in srgb, var(--c-bg) 55%, transparent);
-  flex: 0 0 auto;
+  inline-size: var(--size-16);
+  block-size: var(--size-16);
 }
 
 /* The native colour input is opacity:0, so surface its keyboard focus on the
    visible swatch. */
-.colorFacetCurrentSwatchButton:focus-within .colorFacetCurrentSwatch {
-  outline: solid 2px var(--c-bg-contrast-light);
-  outline-offset: 2px;
-}
-
-.colorFacetNativeInput {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  opacity: 0;
-  cursor: pointer;
-  pointer-events: auto;
-}
-
-.colorFacetCurrentHex {
-  font-family: monospace;
-  font-size: var(--fs-s);
-  color: var(--c-font);
-  letter-spacing: 0.04em;
-}
-
-.colorFacetHexInput {
-  width: 100%;
-  min-height: 34px;
-  padding: 0 0 var(--m);
-  border: 0;
-  border-bottom: solid 1px color-mix(in srgb, var(--c-bg-contrast-light) 35%, transparent);
-  border-radius: 0;
-  background: transparent;
-  color: inherit;
-  font-size: var(--fs-s);
-  font-family: monospace;
-}
-
-.colorFacetHexInput:focus-visible {
-  outline: none;
-  border-bottom-color: var(--c-font);
-}
-
-.colorFacetToleranceSlider {
-  width: 100%;
-  margin: 0;
-  accent-color: var(--c-accent);
-}
-
-.colorFacetToleranceValue {
-  font-size: var(--fs-s);
-  color: var(--c-bg-contrast-light);
-  justify-self: start;
-  line-height: 1.2;
-  min-width: 0;
-  padding: 0;
-  white-space: nowrap;
-}
-
-.colorFacetClearButton {
-  flex: 0 0 auto;
-  min-height: 32px;
-  padding: 0;
-  border: 0;
-  border-radius: 999px;
-  background: transparent;
-  color: var(--c-bg-contrast-light);
-  font-size: var(--fs-s);
-  cursor: pointer;
-}
-
-.colorFacetClearButton:disabled {
-  opacity: 0.45;
-  cursor: default;
-}
-
-.colorFacetClearButton:not(:disabled):hover {
-  color: var(--c-font);
-}
-
-.colorFacetClearButton:focus-visible {
-  outline: solid 2px var(--c-bg-contrast-light);
-  outline-offset: 2px;
-}
-
-.facetCategoryContent .tagsContainer {
-  gap: var(--m);
-  margin-bottom: 0;
-}
 
 .facetOptionList {
   display: flex;
@@ -398,74 +78,38 @@
   gap: var(--m-s);
 }
 
-/* ── Mobile filter drawer ──────────────────────────────────────────────
-   Desktop-neutral by default: the trigger and backdrop are hidden and the
-   drawer wrapper is display: contents, so the facet panel lays out inline
-   exactly as before. The @media block below turns it into a bottom sheet. */
+/* ── Mobile filter drawer ────────────────────────────────────────────── */
+.filterInline {
+  display: contents;
+}
+
 .filterTrigger {
   display: none;
 }
 
-.filterBackdrop {
-  display: none;
-}
-
 .filterDrawer {
-  display: contents;
-}
-
-.filterDrawerHandle,
-.filterDrawerHeader {
   display: none;
 }
 
 @media (max-width: 900px) {
-  .facetPanel {
-    grid-template-columns: 1fr;
-    height: auto;
-  }
-
-  .facetPanelColorMode {
-    height: auto;
-  }
-
   /* The rail stacks above the content, so the fixed desktop panel height no
      longer bounds it. Cap the content itself instead — otherwise a long tag
      list (hundreds of pills) grows to several screens tall and pushes the
      results grid far below the fold. The existing overflow-y: auto then makes
      it a self-contained scroll region. */
-  .facetCategoryContent {
-    max-height: clamp(12rem, 42vh, 22rem);
+
+  .filterInline {
+    display: none;
   }
 
-  .facetCategoryRail {
-    display: flex;
-    flex-wrap: wrap;
-  }
-
-  .colorFacetControl {
-    grid-template-columns: 1fr;
-    gap: var(--m);
-  }
-
-  .colorFacetMeta {
-    width: 100%;
-  }
-
-  .colorFacetHeader {
-    gap: var(--m-s);
-  }
-
-  /* Trigger: a compact bar that opens the drawer. Sits where the panel used
-     to, so results now start right below it. */
   .filterTrigger {
     display: inline-flex;
     align-items: center;
     gap: var(--m-s);
     align-self: flex-start;
-    margin-bottom: var(--m-l);
+    margin-block-end: var(--m-l);
     padding: var(--m-s) var(--m-m);
-    border: solid 1px var(--c-border-on-dark);
+    border: solid var(--size-1) var(--c-border-on-dark);
     border-radius: var(--m-s);
     background: transparent;
     color: inherit;
@@ -474,65 +118,74 @@
   }
 
   .filterTrigger:focus-visible {
-    outline: solid 2px var(--c-bg-contrast-light);
-    outline-offset: 2px;
+    outline: solid var(--size-2) var(--c-bg-contrast-light);
+    outline-offset: var(--size-2);
   }
 
   .filterTriggerBadge {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    min-width: 1.25rem;
-    height: 1.25rem;
+    min-inline-size: var(--size-22);
+    block-size: var(--size-22);
     padding: 0 var(--m);
-    border-radius: 999px;
+    border-radius: var(--radius-pill);
     background: var(--c-accent);
-    color: #fff;
+    color: var(--c-white);
     font-size: var(--fs-xs);
     font-variant-numeric: tabular-nums;
   }
 
-  .filterBackdrop {
-    display: block;
-    position: fixed;
-    inset: 0;
-    z-index: 1000;
-    background: var(--c-overlay-dark);
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity var(--t-fast) var(--ease-out);
-  }
-
-  .filterBackdropOpen {
-    opacity: 1;
-    pointer-events: auto;
-  }
-
-  /* Bottom sheet: fixed to the bottom edge, slid off-screen until open. The
-     facet panel scrolls inside; the sheet itself is capped so the results
-     behind it stay partly visible. */
   .filterDrawer {
-    display: flex;
     flex-direction: column;
     position: fixed;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    z-index: 1001;
-    max-height: 85vh;
-    /* biome-ignore lint/suspicious/noDuplicateProperties: Fallback for browsers without dynamic viewport units. */
-    max-height: 85dvh;
-    padding: 0 var(--m-l) calc(env(safe-area-inset-bottom, 0px) + var(--m-l));
+    inset: auto 0 0;
+    z-index: var(--z-drawer-panel);
+    inline-size: 100%;
+    max-inline-size: none;
+    max-block-size: 85dvh;
+    margin: auto 0 0;
+    padding: 0 var(--m-l) calc(env(safe-area-inset-bottom, 0) + var(--m-l));
+    border: 0;
     border-radius: var(--m-l) var(--m-l) 0 0;
     background: var(--c-bg);
-    box-shadow: 0 -8px 32px hsl(0 0% 0% / 0.28);
+    color: inherit;
+    box-shadow: 0 calc(var(--size-8) * -1) var(--size-32)
+      color-mix(in oklch, var(--c-black) 28%, transparent);
     transform: translateY(100%);
-    transition: transform var(--t-fast) var(--ease-spring);
-    overflow: hidden;
+    transition:
+      transform var(--t-base) var(--ease-spring),
+      display var(--t-base) allow-discrete,
+      overlay var(--t-base) allow-discrete;
+    overflow: clip;
   }
 
-  .filterDrawerOpen {
+  .filterDrawer[open] {
+    display: flex;
     transform: translateY(0);
+  }
+
+  .filterDrawer::backdrop {
+    background: var(--c-overlay-dark);
+    opacity: 0;
+    transition:
+      opacity var(--t-base) var(--ease-out),
+      display var(--t-base) allow-discrete,
+      overlay var(--t-base) allow-discrete;
+  }
+
+  .filterDrawer[open]::backdrop {
+    opacity: 1;
+  }
+
+  @starting-style {
+    .filterDrawer[open] {
+      transform: translateY(100%);
+    }
+
+    .filterDrawer[open]::backdrop {
+      opacity: 0;
+    }
   }
 
   .filterDrawerHandle {
@@ -542,10 +195,10 @@
   }
 
   .filterDrawerGrip {
-    width: var(--m-xl);
-    height: 3px;
-    border-radius: 999px;
-    background: color-mix(in srgb, var(--c-font) 30%, transparent);
+    inline-size: var(--m-xl);
+    block-size: var(--size-3);
+    border-radius: var(--radius-pill);
+    background: color-mix(in oklch, var(--c-font) 30%, transparent);
   }
 
   .filterDrawerHeader {
@@ -553,7 +206,7 @@
     align-items: center;
     justify-content: space-between;
     gap: var(--m-m);
-    padding-bottom: var(--m-m);
+    padding-block-end: var(--m-m);
   }
 
   .filterDrawerTitle {
@@ -563,8 +216,8 @@
 
   .filterDrawerClose {
     padding: var(--m-s) var(--m-m);
-    border: solid 1px var(--c-border-on-dark);
-    border-radius: 999px;
+    border: solid var(--size-1) var(--c-border-on-dark);
+    border-radius: var(--radius-pill);
     background: transparent;
     color: inherit;
     font-size: var(--fs-sm);
@@ -572,131 +225,26 @@
   }
 
   .filterDrawerClose:focus-visible {
-    outline: solid 2px var(--c-bg-contrast-light);
-    outline-offset: 2px;
+    outline: solid var(--size-2) var(--c-bg-contrast-light);
+    outline-offset: var(--size-2);
   }
 
   /* Inside the sheet the panel can use the room the sheet gives it, rather
      than the tight standalone cap. */
   .filterDrawer .facetCategoryContent {
-    max-height: min(52vh, 26rem);
+    max-block-size: min(52dvh, calc(var(--size-460) + var(--size-8)));
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .filterDrawer,
-  .filterBackdrop {
+  .filterDrawer::backdrop {
     transition: none;
   }
 }
 
-.emptyState {
-  display: grid;
-  gap: var(--m-l);
-  margin-bottom: var(--m-xl);
-}
-
-.secondaryAction {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.45rem;
-  padding: var(--m-m);
-  border: solid 2px var(--c-bg-contrast-light);
-  border-radius: var(--m-s);
-  background-color: var(--c-bg);
-  color: inherit;
-  font-size: var(--fs-sm);
-  text-decoration: none;
-  cursor: pointer;
-  transition:
-    background-color 0.15s ease,
-    color 0.15s ease,
-    border-color 0.15s ease;
-}
-
-.secondaryAction:disabled {
-  opacity: 0.5;
-  cursor: wait;
-}
-
-.secondaryAction:not(:disabled):hover {
-  background-color: var(--c-bg-contrast-light);
-}
-
-.secondaryAction:not(:disabled):active {
-  background-color: var(--c-bg-contrast-light);
-}
-
-.secondaryAction:focus-visible {
-  outline: solid 2px var(--c-bg-contrast-light);
-  outline-offset: 2px;
-}
-
-.emptySections {
-  display: grid;
-  gap: var(--m-xl);
-}
-
-.memoryClusters {
-  display: grid;
-  gap: var(--m-l);
-}
-
-.memoryClusterCard {
-  display: grid;
-  gap: var(--m);
-}
-
-.memoryClusterHeader {
-  min-width: 0;
-  margin-bottom: var(--m);
-}
-
-.memoryClusterLabel {
-  margin: 0;
-  color: var(--c-bg-contrast-light);
-  font-size: var(--fs-s);
-  line-height: 1.4;
-  font-weight: 400;
-}
-
-.memoryClusterStrip {
-  display: flex;
-  gap: var(--m-m);
-  list-style: none;
-  margin: 0;
-  margin-bottom: var(--m);
-  padding: 0;
-  overflow-x: auto;
-  font-size: var(--fs-sm);
-}
-
-.memoryClusterItem {
-  flex: 0 0 auto;
-}
-
 .memoryThumbLink {
   display: block;
-}
-
-.memoryLoadMoreButton {
-  margin-top: var(--m-l);
-}
-
-.memoryTimelineTile {
-  color: inherit;
-  text-decoration: none;
-}
-
-.memoryTimelineTile:visited {
-  color: inherit;
-}
-
-.sectionSurface {
-  padding: 0;
-  border: 0;
-  background: transparent;
 }
 
 .sectionHeader {
@@ -705,20 +253,20 @@
   align-items: baseline;
   justify-content: space-between;
   gap: var(--m-s);
-  margin-bottom: var(--m);
+  margin-block-end: var(--m);
 }
 
 .sectionCaption,
 .sectionStatus {
   color: var(--c-bg-contrast-light);
   font-size: var(--fs-s);
-  margin-bottom: var(--m);
+  margin-block-end: var(--m);
 }
 
 .emptyTagsCaption {
   color: var(--c-bg-contrast-light);
   font-size: var(--fs-s);
-  margin-bottom: var(--m-s);
+  margin-block-end: var(--m-s);
 }
 
 .inlineError {
@@ -727,10 +275,10 @@
 }
 
 .retryButton {
-  margin-left: var(--m-s);
+  margin-inline-start: var(--m-s);
   padding: var(--m) var(--m-s);
   background-color: transparent;
-  border: solid 1px var(--c-accent);
+  border: solid var(--size-1) var(--c-accent);
   border-radius: var(--m);
   color: var(--c-accent);
   font-size: inherit;
@@ -738,20 +286,12 @@
 }
 
 .retryButton:hover {
-  background-color: color-mix(in srgb, var(--c-accent) 12%, transparent);
-}
-
-.searchInput {
-  padding-right: var(--m-xl);
-}
-
-.searchInput::placeholder {
-  user-select: none;
+  background-color: color-mix(in oklch, var(--c-accent) 12%, transparent);
 }
 
 .link:focus-visible,
 .moreButton:focus-visible {
-  outline: solid 2px var(--c-bg-contrast-light);
+  outline: solid var(--size-2) var(--c-bg-contrast-light);
 }
 
 .searchHint {
@@ -759,428 +299,32 @@
   color: var(--c-bg-contrast-light);
 }
 
-.searchHintInline {
-  align-self: center;
-  color: var(--c-bg-contrast-light);
-  font-size: var(--fs-s);
-  font-style: italic;
-}
-
-.searchInputRow {
-  display: flex;
-  flex-direction: row;
-  gap: var(--m-m);
-  flex-wrap: wrap;
-  align-items: center;
-  margin-bottom: var(--m-l);
-}
-
-.imageQueryActions {
-  display: inline-flex;
-  gap: var(--m-m);
-}
-
 /* Visually hidden but still programmatically clickable — display:none would
    make .click() a no-op in some browsers. */
-.imageQueryFileInput {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip-path: inset(50%);
-}
-
-.activeFacetImageThumb {
-  width: var(--m-l);
-  height: var(--m-l);
-  border-radius: var(--m);
-  object-fit: cover;
-  flex: 0 0 auto;
-}
 
 /* Zoomed query-image preview, styled like .searchModeInfoTooltip but revealed
    purely on hover/focus — no open state to manage. The chip is the anchor.
    Sits ABOVE the chip: below it would cover the first row of results. */
-.activeFacetImageZoom {
-  position: absolute;
-  bottom: calc(100% + var(--m-s));
-  left: 0;
-  z-index: 2;
-  padding: var(--m-s);
-  border-radius: var(--m-s);
-  background: color-mix(in srgb, var(--c-bg) 88%, var(--c-accent));
-  border: solid 1px color-mix(in srgb, var(--c-accent) 60%, var(--c-font));
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity var(--t-fast) ease;
-}
-
-.activeFacetImageZoom img {
-  display: block;
-  width: min(60vw, 220px);
-  height: min(60vw, 220px);
-  object-fit: contain;
-  border-radius: var(--m);
-  /* Sketches are drawn on white; photos also read fine against it. */
-  background: #fff;
-}
-
-.activeFacetChip:hover .activeFacetImageZoom,
-.activeFacetChip:focus-visible .activeFacetImageZoom {
-  opacity: 1;
-}
-
-.searchModeSelectLabel {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--m-s);
-  flex: 0 0 auto;
-}
-
-.searchModeSelect {
-  min-width: 132px;
-}
-
-.searchModeInfoWrap {
-  position: relative;
-  display: inline-flex;
-}
-
-.searchModeInfo {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  appearance: none;
-  border: 0;
-  padding: 0;
-  background: transparent;
-  color: var(--c-bg-contrast-light);
-  font-size: var(--fs-m);
-  line-height: 1;
-  cursor: help;
-  user-select: none;
-}
-
-.searchModeInfo:hover {
-  color: var(--c-font);
-}
-
-.searchModeInfo:focus-visible {
-  outline: solid 2px var(--c-bg-contrast-light);
-  outline-offset: 2px;
-  border-radius: 999px;
-}
-
-.searchModeInfoTooltip {
-  position: absolute;
-  top: calc(100% + var(--m-s));
-  left: 0;
-  z-index: 2;
-  width: max-content;
-  max-width: min(80vw, 280px);
-  padding: var(--m-s) var(--m-m);
-  border-radius: var(--m-s);
-  background: color-mix(in srgb, var(--c-bg) 88%, var(--c-accent));
-  border: solid 1px color-mix(in srgb, var(--c-accent) 60%, var(--c-font));
-  color: var(--c-font);
-  font-size: var(--fs-s);
-  line-height: 1.4;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity var(--t-fast) ease;
-}
-
-.searchModeInfoWrap:hover .searchModeInfoTooltip,
-.searchModeInfoWrap:focus-within .searchModeInfoTooltip,
-.searchModeInfoTooltipOpen {
-  opacity: 1;
-}
 
 /* Muted status line used by the facet panel ("Loading filters…"). */
-.searchModeStatus {
-  margin-bottom: var(--m);
-  color: var(--c-bg-contrast-light);
-  font-size: var(--fs-s);
-}
-
-.searchInputContainer {
-  position: relative;
-  display: flex;
-  align-items: center;
-  width: 100%;
-  max-width: min(80vw, 420px);
-}
-
-.clearButton {
-  position: absolute;
-  right: var(--m-m);
-  background: none;
-  border: none;
-  font-size: var(--fs-m);
-  color: var(--c-bg-contrast-light);
-  cursor: pointer;
-  padding: var(--m-s);
-  width: 36px;
-  height: 36px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-  transition:
-    background-color var(--t-base) ease,
-    color var(--t-base) ease;
-}
-
-.clearButton:hover {
-  background-color: var(--c-bg-contrast-light);
-  color: var(--c-bg);
-}
-
-.clearButton:focus-visible {
-  outline: solid 2px var(--c-bg-contrast-light);
-}
-
-.modeBar {
-  display: flex;
-  flex-direction: column;
-  gap: var(--m-s);
-  align-items: flex-start;
-  margin-bottom: var(--m-l);
-}
-
-.modeBarHeader {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--m);
-  flex-wrap: wrap;
-  width: 100%;
-}
-
-.modeHeading {
-  display: flex;
-  align-items: baseline;
-  gap: var(--m-s);
-  min-width: 0;
-}
-
-.modeHeaderActions {
-  display: flex;
-  align-items: center;
-  gap: var(--m-s);
-  flex-wrap: wrap;
-}
-
-.modeStack {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  gap: var(--m);
-  min-width: 0;
-  flex: 1 1 auto;
-  width: 100%;
-}
-
-.breadcrumbs {
-  display: flex;
-  align-items: center;
-  gap: var(--m-xs);
-  flex-wrap: nowrap;
-  flex: 1 1 auto;
-  overflow-x: auto;
-  overflow-y: hidden;
-  padding-bottom: 2px;
-  white-space: nowrap;
-}
-
-.breadcrumbItem {
-  position: relative;
-  display: inline-flex;
-  flex: 0 0 auto;
-  transition:
-    transform 0.22s ease,
-    opacity 0.15s ease;
-  will-change: transform;
-}
-
-.breadcrumbButton {
-  display: inline-flex;
-  appearance: none;
-  border: 0;
-  background: transparent;
-  cursor: pointer;
-  padding: 0;
-  flex: 0 0 auto;
-  text-decoration: none;
-  position: relative;
-}
-
-.breadcrumbPreview {
-  width: 56px;
-  height: 56px;
-  border-radius: var(--m-s);
-  object-fit: cover;
-  object-position: center;
-  background: var(--c-bg-contrast-dark);
-  flex: 0 0 auto;
-}
-
-.breadcrumbItem:hover:not(.breadcrumbItemWillRemove) {
-  opacity: 1 !important;
-}
-
-.breadcrumbItemWillRemove {
-  opacity: 0.15 !important;
-}
-
-.breadcrumbButton:focus-visible {
-  outline: solid 2px var(--c-bg-contrast-light);
-  border-radius: var(--m-s);
-}
 
 /* Smaller-size variant of the shared overlay badge
    (SearchResultTile.module.css .overlayBadge). */
-.breadcrumbSimilarity {
-  position: absolute;
-  left: var(--m);
-  bottom: var(--m);
-  border-radius: 999px;
-  background-color: var(--c-overlay-dark);
-  color: white;
-  font-size: var(--fs-xs);
-  line-height: 1;
-  padding: var(--m) var(--m-xs);
-  pointer-events: none;
-}
-
-.breadcrumbRemoveButton {
-  position: absolute;
-  top: var(--m);
-  right: var(--m);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 18px;
-  height: 18px;
-  border: 0;
-  border-radius: 999px;
-  background: var(--c-overlay-dark);
-  color: white;
-  cursor: pointer;
-  font-size: var(--fs-sm);
-  line-height: 1;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity var(--t-fast) ease;
-}
-
-.breadcrumbItem:hover .breadcrumbRemoveButton,
-.breadcrumbItem:focus-within .breadcrumbRemoveButton {
-  opacity: 1;
-  pointer-events: auto;
-}
 
 /* On touch the breadcrumb anchor navigates on tap, so its hover-only
    remove/slideshow controls are unreachable — show them persistently and
    enlarge them to a comfortable touch target. */
-@media (hover: none), (pointer: coarse) {
-  .breadcrumbRemoveButton,
-  .modeSourceItem .breadcrumbRemoveButton,
-  .modeSourceSlideshowButton {
-    opacity: 1;
-    pointer-events: auto;
-    width: var(--m-xl);
-    height: var(--m-xl);
-  }
-}
-
-.modeSourceItem {
-  position: relative;
-  display: inline-flex;
-  flex: 0 0 auto;
-}
-
-.modeSourceItem:hover .breadcrumbRemoveButton,
-.modeSourceItem:focus-within .breadcrumbRemoveButton,
-.modeSourceItem:hover .modeSourceSlideshowButton,
-.modeSourceItem:focus-within .modeSourceSlideshowButton {
-  opacity: 1;
-  pointer-events: auto;
-}
-
-.modeSourceSlideshowButton {
-  position: absolute;
-  bottom: var(--m);
-  left: var(--m);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 26px;
-  height: 26px;
-  border-radius: 999px;
-  background: var(--c-overlay-dark);
-  font-size: var(--fs-sm);
-  line-height: 1;
-  text-decoration: none;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity var(--t-fast) ease;
-}
-
-.modeSourceSlideshowButton:focus-visible {
-  outline: solid 2px var(--c-bg-contrast-light);
-}
-
-.breadcrumbRemoveButton:focus-visible {
-  outline: solid 2px var(--c-bg-contrast-light);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .breadcrumbItem {
-    transition: opacity 0.15s ease;
-  }
-
-  .modeSource {
-    transition: none;
-  }
-}
-
-.modeSource {
-  display: flex;
-  gap: var(--m);
-  align-items: center;
-  min-width: 0;
-  flex: 0 0 auto;
-  transition:
-    transform 0.22s ease-out,
-    opacity 0.22s ease-out;
-}
-
-.modeSourcePreview {
-  width: 56px;
-  height: 56px;
-  border-radius: var(--m-s);
-  object-fit: cover;
-  object-position: center;
-  background: var(--c-bg-contrast-dark);
-}
 
 .modeColorSwatch {
-  width: 36px;
-  height: 36px;
+  inline-size: var(--tap-target);
+  block-size: var(--tap-target);
   border-radius: var(--m-s);
   flex-shrink: 0;
 }
 
-.modeArrow {
-  color: var(--c-bg-contrast-light);
-  font-size: var(--fs-l);
-  line-height: 1;
-}
-
 .modePill {
-  border-radius: 999px;
-  padding: 6px 10px;
+  border-radius: var(--radius-pill);
+  padding: var(--size-6) var(--size-10);
   background: var(--c-bg-contrast-light);
   color: var(--c-bg);
   font-size: var(--fs-s);
@@ -1200,16 +344,10 @@
   flex-wrap: wrap;
   align-items: flex-start;
   gap: var(--m);
-  margin-bottom: var(--m-l);
-}
+  margin-block-end: var(--m-l);
 
-@media (max-width: 720px) {
-  .secondaryAction {
-    min-height: calc(var(--m-xl) - var(--m-s) + 2px);
-    padding: var(--m) var(--m-s);
-    font-size: var(--fs-s);
-    border-width: 1px;
-    border-radius: var(--m-s);
+  :where(.facetCategoryContent) & {
+    margin-block-end: 0;
   }
 }
 
@@ -1221,14 +359,14 @@
 }
 
 .modeColorSwatchLabel:hover .modeColorSwatch {
-  outline: solid 2px var(--c-bg-contrast-light);
-  outline-offset: 2px;
+  outline: solid var(--size-2) var(--c-bg-contrast-light);
+  outline-offset: var(--size-2);
 }
 
 .modeColorInput {
   position: absolute;
-  width: 0;
-  height: 0;
+  inline-size: 0;
+  block-size: 0;
   opacity: 0;
   pointer-events: none;
 }
@@ -1242,7 +380,7 @@
 }
 
 .modeColorDivider {
-  width: 1px;
+  inline-size: var(--size-1);
   align-self: stretch;
   background: var(--c-bg-contrast-light);
   opacity: 0.35;
@@ -1255,27 +393,27 @@
   align-items: center;
   gap: var(--m-s);
   flex: 1 1 auto;
-  min-width: 0;
+  min-inline-size: 0;
 }
 
 .modeColorToleranceValue {
   font-size: var(--fs-s);
   color: var(--c-bg-contrast-light);
   white-space: nowrap;
-  min-width: 3.5em;
-  text-align: right;
+  min-inline-size: 3.5em;
+  text-align: end;
 }
 
 .modeColorToleranceSlider {
   flex: 1 1 auto;
-  min-width: 48px;
+  min-inline-size: var(--size-48);
   cursor: pointer;
 }
 
 .colorPickerInput {
   position: absolute;
-  width: 0;
-  height: 0;
+  inline-size: 0;
+  block-size: 0;
   opacity: 0;
   pointer-events: none;
 }
@@ -1285,55 +423,35 @@
   align-items: center;
   gap: var(--m);
   padding: var(--m-s) var(--m-m);
-  border: solid 2px var(--c-bg-contrast-light);
+  border: solid var(--size-2) var(--c-bg-contrast-light);
   border-radius: var(--m-s);
   background-color: var(--c-bg);
-  width: 100%;
-  max-width: min(80vw, 480px);
-  min-height: 45px;
+  inline-size: 100%;
+  max-inline-size: min(80dvw, var(--mode-input-max-width));
+  min-block-size: var(--tap-target);
   transition:
-    transform 0.22s ease-out,
-    opacity 0.22s ease-out;
-}
-
-.modeLabel {
-  font-size: var(--fs-s);
-  color: var(--c-bg-contrast-light);
-  white-space: nowrap;
-  flex-shrink: 0;
-  user-select: none;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-}
-
-.modeSimilarFilename {
-  font-size: var(--fs-s);
-  color: var(--c-font);
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  flex: 1 1 auto;
+    transform var(--t-base) var(--ease-out),
+    opacity var(--t-base) var(--ease-out);
 }
 
 .modeClearButton {
-  margin-left: auto;
+  margin-inline-start: auto;
   background: none;
   border: none;
   font-size: var(--fs-m);
   color: var(--c-bg-contrast-light);
   cursor: pointer;
   padding: var(--m-s);
-  width: 36px;
-  height: 36px;
+  inline-size: var(--tap-target);
+  block-size: var(--tap-target);
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 50%;
+  border-radius: var(--radius-pill);
   flex-shrink: 0;
   transition:
-    background-color var(--t-fast) ease,
-    color var(--t-fast) ease;
+    background-color var(--t-fast) var(--ease-out),
+    color var(--t-fast) var(--ease-out);
 }
 
 .modeClearButton:hover {
@@ -1342,9 +460,9 @@
 }
 
 .modeClearButton:focus-visible {
-  outline: solid 2px var(--c-bg-contrast-light);
+  outline: solid var(--size-2) var(--c-bg-contrast-light);
 }
 
 .breadcrumbsBar {
-  margin-bottom: var(--m-l);
+  margin-block-end: var(--m-l);
 }

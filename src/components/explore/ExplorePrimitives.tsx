@@ -1,8 +1,32 @@
+import { mergeCssModuleStyles } from "../../util/mergeCssModuleStyles";
 import Link from "next/link";
+import React from "react";
 import { buildSimilaritySearchHref } from "../../util/searchFacets";
 import { Caption, Heading, OverlayButtonLink, Thumb } from "../ui";
-import styles from "../../pages/explore/explore.module.css";
+import sharedStyles from "../../pages/explore/explore.module.css";
+import localStyles from "../../pages/explore/ExplorePrimitives.module.css";
 import { formatCoverage } from "./exploreViewModel";
+
+const styles = mergeCssModuleStyles(
+  sharedStyles,
+  localStyles,
+  [
+    "group",
+    "groupActions",
+    "groupAnchorLink",
+    "groupAnchorMark",
+    "groupDescription",
+    "groupDeferredContent",
+    "groupDeferredPlaceholder",
+    "groupDeferredSummary",
+    "groupGrid",
+    "groupHeader",
+    "groupTitleRow",
+    "visualThumbSearchButton",
+    "visualThumbWrap",
+  ],
+  ["visualThumbSearchButton"],
+);
 
 export const ExploreStatSection: React.FC<{
   facetId: string;
@@ -31,29 +55,85 @@ export const ExploreStatGroup: React.FC<{
   description?: string;
   actions?: React.ReactNode;
   children: React.ReactNode;
-}> = ({ id, title, description, actions, children }) => (
-  <section id={id} className={styles.group}>
-    <div className={styles.groupHeader}>
-      <div className={styles.groupTitleRow}>
-        <Heading level={1}>
-          {id ? (
-            <a href={`#${id}`} className={styles.groupAnchorLink}>
-              <span>{title}</span>
-              <span className={styles.groupAnchorMark} aria-hidden="true">
-                #
-              </span>
-            </a>
-          ) : (
-            title
-          )}
-        </Heading>
-        {actions ? <div className={styles.groupActions}>{actions}</div> : null}
+  deferContent?: boolean;
+  deferredSummary?: React.ReactNode;
+}> = ({ id, title, description, actions, children, deferContent = false, deferredSummary }) => {
+  const deferredContentRef = React.useRef<HTMLDivElement | null>(null);
+  const [isDeferredContentVisible, setIsDeferredContentVisible] = React.useState(!deferContent);
+
+  React.useEffect(() => {
+    if (!deferContent || isDeferredContentVisible) {
+      return;
+    }
+
+    if (id && window.location.hash === `#${id}`) {
+      setIsDeferredContentVisible(true);
+      return;
+    }
+
+    if (typeof IntersectionObserver === "undefined") {
+      setIsDeferredContentVisible(true);
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          observer.disconnect();
+          setIsDeferredContentVisible(true);
+        }
+      },
+      { rootMargin: "600px 0px" },
+    );
+
+    if (deferredContentRef.current) {
+      observer.observe(deferredContentRef.current);
+    }
+
+    return () => observer.disconnect();
+  }, [deferContent, id, isDeferredContentVisible]);
+
+  return (
+    <section id={id} className={styles.group}>
+      <div className={styles.groupHeader}>
+        <div className={styles.groupTitleRow}>
+          <Heading level={1}>
+            {id ? (
+              <a href={`#${id}`} className={styles.groupAnchorLink}>
+                <span>{title}</span>
+                <span className={styles.groupAnchorMark} aria-hidden="true">
+                  #
+                </span>
+              </a>
+            ) : (
+              title
+            )}
+          </Heading>
+          {actions ? <div className={styles.groupActions}>{actions}</div> : null}
+        </div>
+        {description ? <p className={styles.groupDescription}>{description}</p> : null}
       </div>
-      {description ? <p className={styles.groupDescription}>{description}</p> : null}
-    </div>
-    <div className={styles.groupGrid}>{children}</div>
-  </section>
-);
+      {deferContent && !isDeferredContentVisible && deferredSummary ? (
+        <div className={styles.groupDeferredSummary}>{deferredSummary}</div>
+      ) : null}
+      {deferContent ? (
+        <div
+          ref={deferredContentRef}
+          className={styles.groupDeferredContent}
+          aria-busy={!isDeferredContentVisible}
+        >
+          {isDeferredContentVisible ? (
+            <div className={styles.groupGrid}>{children}</div>
+          ) : (
+            <div className={styles.groupDeferredPlaceholder} aria-hidden="true" />
+          )}
+        </div>
+      ) : (
+        <div className={styles.groupGrid}>{children}</div>
+      )}
+    </section>
+  );
+};
 
 export const VisualSimilarityThumb: React.FC<{
   photo: {
@@ -70,6 +150,7 @@ export const VisualSimilarityThumb: React.FC<{
       <Thumb
         src={photo.src}
         alt={photo.label}
+        loading="lazy"
         className={`${styles.visualThumb} ${imageClassName ?? ""}`.trim()}
       />
     </Link>

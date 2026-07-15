@@ -49,7 +49,12 @@ export const PhotoAlbum: React.FC<{
       <div className={styles.album}>
         {props.album.blocks.map((b, i) => {
           return (
-            <div key={`${b.id}-${i}`} className={styles.block}>
+            <div
+              key={`${b.id}-${i}`}
+              className={[styles.block, b.kind === "photo" ? styles.photoBlock : ""]
+                .filter(Boolean)
+                .join(" ")}
+            >
               <Block b={b} i={i} />
             </div>
           );

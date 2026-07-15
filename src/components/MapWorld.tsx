@@ -11,7 +11,6 @@ import MapLibreMap, {
   Source,
   ViewStateChangeEvent,
 } from "react-map-gl/maplibre";
-import "maplibre-gl/dist/maplibre-gl.css";
 import { ThemeToggle } from "./ThemeToggle";
 import {
   buildContextRoutePoints,
@@ -396,152 +395,153 @@ export const MMap: React.FC<MapWorldProps> = ({
   return (
     <div className={className}>
       {showThemeBootstrap ? (
-        <div style={{ position: "fixed", pointerEvents: "none", opacity: "0" }}>
+        <div className={styles.themeBootstrap}>
           <ThemeToggle />
         </div>
       ) : null}
-      <MapLibreMap
-        style={{ width: "100%", height: "100%", ...style }}
-        // two options for map style
-        // mapStyle="https://tiles.openfreemap.org/styles/liberty"
-        // mapStyle="https://vector.openstreetmap.org/shortbread_v1/tilejson.json"
-        // Public API key — domain-restricted on MapTiler side, not a secret.
-        mapStyle="https://api.maptiler.com/maps/ffd8bd10-cd97-40a5-b1d6-d15f98fb3644/style.json?key=iilC4hPY1594noPX9OQ2"
-        initialViewState={{
-          longitude: initialLon ? Number.parseFloat(initialLon) : undefined,
-          latitude: initialLat ? Number.parseFloat(initialLat) : undefined,
-          zoom: initialZoom ? Number.parseFloat(initialZoom) : undefined,
-        }}
-        onMoveStart={() => {
-          setContextPoint(null);
-          setIsInteracting(true);
-        }}
-        onClick={() => {
-          setContextPoint(null);
-        }}
-        onContextMenu={(event) => {
-          event.originalEvent.preventDefault();
-          stopDirector();
-          setContextPoint({
-            latitude: event.lngLat.lat,
-            longitude: event.lngLat.lng,
-          });
-        }}
-        onDragStart={stopDirector}
-        onWheel={stopDirector}
-        onZoom={(e) => {
-          updateMarkerImageVisibility(e.viewState.zoom);
-        }}
-        onZoomStart={() => {
-          setIsInteracting(true);
-        }}
-        onZoomEnd={(event) => {
-          setIsInteracting(false);
-          updateParams(event);
-        }}
-        onMoveEnd={(event) => {
-          setIsInteracting(false);
-          updateParams(event);
-        }}
-      >
-        <MapAutoFit enabled={fitToPhotos} photos={photos} />
-        <MapBoundsTracker onBoundsChange={setBounds} />
-        <MapMiddleDragOrbit onInteractionStart={stopDirector} />
-        <MapDirector
-          enabled={directorEnabled}
-          sequence={directorSequence}
-          onVisit={visitDirectorPhoto}
-        />
-        {routeGeoJson ? (
-          <Source id="journey-line-source" type="geojson" data={routeGeoJson} lineMetrics>
-            <Layer
-              id="journey-line-glow-layer"
-              type="line"
-              paint={{
-                "line-color":
-                  routeDataByAlbum.size > 1
-                    ? ["coalesce", ["get", "routeColorMiddle"], "#b7eef5"]
-                    : "#dbfbff",
-                "line-opacity": routeDataByAlbum.size > 1 ? 0.34 : 0.35,
-                "line-width":
-                  routeDataByAlbum.size > 1
-                    ? ["interpolate", ["linear"], ["line-progress"], 0, 2.4, 0.32, 6.2, 1, 10.2]
-                    : routeLineWidth + 4,
-              }}
-            />
-            <Layer
-              id="journey-line-layer"
-              type="line"
-              paint={{
-                // Multi-album ("show all journeys") draws each trip's line in
-                // its own solid recency colour (`line-gradient` can't be
-                // data-driven per feature, so a per-feature solid colour is
-                // used instead of a shared gradient). Single-album keeps the
-                // one recency colour of the active route.
-                "line-color":
-                  routeDataByAlbum.size > 1
-                    ? ["coalesce", ["get", "routeColorMiddle"], "#12bcd4"]
-                    : routeColorStops[1]!.color,
-                "line-opacity": alwaysVisibleRouteGeoJson
-                  ? routeDataByAlbum.size > 1
-                    ? 1
-                    : routeMode === "simplified"
-                      ? 0.55
-                      : 0.78
-                  : 0.24,
-                "line-width":
-                  routeDataByAlbum.size > 1
-                    ? ["interpolate", ["linear"], ["line-progress"], 0, 1.1, 0.32, 4.8, 1, 8]
-                    : routeLineWidth,
-                ...(routeDataByAlbum.size > 1 ? {} : { "line-dasharray": [2, 2] }),
-              }}
-            />
-          </Source>
-        ) : null}
-        {!isInteracting && routeGeoJson ? (
-          <MapRouteOverlay
-            routePoints={overlayRoutePoints}
-            routeMode={routeMode}
-            getPointColor={getRoutePointColor}
-            showSpeedLabels={clickInfo !== null || hoverInfo !== null}
-            ghostRoutePoints={ghostRoutePoints}
-          />
-        ) : null}
-
-        <MapPhotoPopup
-          photo={popupInfo}
-          selected={clickInfo !== null}
-          onClose={() => {
-            setClickInfo(null);
+      <div className={styles.mapViewport} style={style}>
+        <MapLibreMap
+          // two options for map style
+          // mapStyle="https://tiles.openfreemap.org/styles/liberty"
+          // mapStyle="https://vector.openstreetmap.org/shortbread_v1/tilejson.json"
+          // Public API key — domain-restricted on MapTiler side, not a secret.
+          mapStyle="https://api.maptiler.com/maps/ffd8bd10-cd97-40a5-b1d6-d15f98fb3644/style.json?key=iilC4hPY1594noPX9OQ2"
+          initialViewState={{
+            longitude: initialLon ? Number.parseFloat(initialLon) : undefined,
+            latitude: initialLat ? Number.parseFloat(initialLat) : undefined,
+            zoom: initialZoom ? Number.parseFloat(initialZoom) : undefined,
           }}
-          onInteractionStart={pauseRouterSync}
-        />
-
-        <MapContextMenu
-          point={contextPoint}
-          onClose={() => {
+          onMoveStart={() => {
+            setContextPoint(null);
+            setIsInteracting(true);
+          }}
+          onClick={() => {
             setContextPoint(null);
           }}
-          onInteractionStart={pauseRouterSync}
-        />
+          onContextMenu={(event) => {
+            event.originalEvent.preventDefault();
+            stopDirector();
+            setContextPoint({
+              latitude: event.lngLat.lat,
+              longitude: event.lngLat.lng,
+            });
+          }}
+          onDragStart={stopDirector}
+          onWheel={stopDirector}
+          onZoom={(e) => {
+            updateMarkerImageVisibility(e.viewState.zoom);
+          }}
+          onZoomStart={() => {
+            setIsInteracting(true);
+          }}
+          onZoomEnd={(event) => {
+            setIsInteracting(false);
+            updateParams(event);
+          }}
+          onMoveEnd={(event) => {
+            setIsInteracting(false);
+            updateParams(event);
+          }}
+        >
+          <MapAutoFit enabled={fitToPhotos} photos={photos} />
+          <MapBoundsTracker onBoundsChange={setBounds} />
+          <MapMiddleDragOrbit onInteractionStart={stopDirector} />
+          <MapDirector
+            enabled={directorEnabled}
+            sequence={directorSequence}
+            onVisit={visitDirectorPhoto}
+          />
+          {routeGeoJson ? (
+            <Source id="journey-line-source" type="geojson" data={routeGeoJson} lineMetrics>
+              <Layer
+                id="journey-line-glow-layer"
+                type="line"
+                paint={{
+                  "line-color":
+                    routeDataByAlbum.size > 1
+                      ? ["coalesce", ["get", "routeColorMiddle"], "#b7eef5"]
+                      : "#dbfbff",
+                  "line-opacity": routeDataByAlbum.size > 1 ? 0.34 : 0.35,
+                  "line-width":
+                    routeDataByAlbum.size > 1
+                      ? ["interpolate", ["linear"], ["line-progress"], 0, 2.4, 0.32, 6.2, 1, 10.2]
+                      : routeLineWidth + 4,
+                }}
+              />
+              <Layer
+                id="journey-line-layer"
+                type="line"
+                paint={{
+                  // Multi-album ("show all journeys") draws each trip's line in
+                  // its own solid recency colour (`line-gradient` can't be
+                  // data-driven per feature, so a per-feature solid colour is
+                  // used instead of a shared gradient). Single-album keeps the
+                  // one recency colour of the active route.
+                  "line-color":
+                    routeDataByAlbum.size > 1
+                      ? ["coalesce", ["get", "routeColorMiddle"], "#12bcd4"]
+                      : routeColorStops[1]!.color,
+                  "line-opacity": alwaysVisibleRouteGeoJson
+                    ? routeDataByAlbum.size > 1
+                      ? 1
+                      : routeMode === "simplified"
+                        ? 0.55
+                        : 0.78
+                    : 0.24,
+                  "line-width":
+                    routeDataByAlbum.size > 1
+                      ? ["interpolate", ["linear"], ["line-progress"], 0, 1.1, 0.32, 4.8, 1, 8]
+                      : routeLineWidth,
+                  ...(routeDataByAlbum.size > 1 ? {} : { "line-dasharray": [2, 2] }),
+                }}
+              />
+            </Source>
+          ) : null}
+          {!isInteracting && routeGeoJson ? (
+            <MapRouteOverlay
+              routePoints={overlayRoutePoints}
+              routeMode={routeMode}
+              getPointColor={getRoutePointColor}
+              showSpeedLabels={clickInfo !== null || hoverInfo !== null}
+              ghostRoutePoints={ghostRoutePoints}
+            />
+          ) : null}
 
-        <MapPhotoMarkers
-          photos={visiblePhotos}
-          showMarkerImages={showMarkerImages}
-          emphasiseRoute={shouldEmphasizeRouteMarkers}
-          activeRouteHrefSet={activeRouteHrefSet}
-          onSelect={selectMarker}
-          onHover={setHoverInfo}
-        />
+          <MapPhotoPopup
+            photo={popupInfo}
+            selected={clickInfo !== null}
+            onClose={() => {
+              setClickInfo(null);
+            }}
+            onInteractionStart={pauseRouterSync}
+          />
 
-        <NavigationControl />
-        <GeolocateControl />
-        <ScaleControl />
-        {shouldShowLegend ? (
-          <MapRecencyLegend olderLabel={legendYears.older} newerLabel={legendYears.newer} />
-        ) : null}
-        <FullscreenControl />
-      </MapLibreMap>
+          <MapContextMenu
+            point={contextPoint}
+            onClose={() => {
+              setContextPoint(null);
+            }}
+            onInteractionStart={pauseRouterSync}
+          />
+
+          <MapPhotoMarkers
+            photos={visiblePhotos}
+            showMarkerImages={showMarkerImages}
+            emphasiseRoute={shouldEmphasizeRouteMarkers}
+            activeRouteHrefSet={activeRouteHrefSet}
+            onSelect={selectMarker}
+            onHover={setHoverInfo}
+          />
+
+          <NavigationControl />
+          <GeolocateControl />
+          <ScaleControl />
+          {shouldShowLegend ? (
+            <MapRecencyLegend olderLabel={legendYears.older} newerLabel={legendYears.newer} />
+          ) : null}
+          <FullscreenControl />
+        </MapLibreMap>
+      </div>
       {showDirector && directorSequence.length > 1 ? (
         <button
           type="button"

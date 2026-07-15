@@ -94,7 +94,7 @@ describe("Albums", () => {
     expect(screen.queryByText("0")).toBeNull();
   });
 
-  it("omits a cover for albums without photos and lazily loads covers after the first seven", () => {
+  it("omits a cover for albums without photos and eagerly loads only the first actual cover", () => {
     const albums = Array.from({ length: 8 }, (_, index) => album(`album-${index}`));
     albums[0] = album("text-only", { blocks: [text("only-text")] });
 
@@ -104,6 +104,10 @@ describe("Albums", () => {
     expect(screen.getByRole("img", { name: "Album cover for album-1" })).toHaveAttribute(
       "loading",
       "eager",
+    );
+    expect(screen.getByRole("img", { name: "Album cover for album-2" })).toHaveAttribute(
+      "loading",
+      "lazy",
     );
     expect(screen.getByRole("img", { name: "Album cover for album-7" })).toHaveAttribute(
       "loading",

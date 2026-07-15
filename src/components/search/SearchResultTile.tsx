@@ -95,6 +95,7 @@ export const SearchResultTile = (props: {
               }}
             >
               <span
+                data-colour-swatch
                 className={styles.actionColorSwatch}
                 style={{ backgroundColor: matchingColorStyle }}
               />

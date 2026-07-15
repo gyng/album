@@ -292,7 +292,7 @@ describe("GuessRound", () => {
     expect(screen.queryByText("Tokyo, Japan")).not.toBeInTheDocument();
     expect(container.querySelector("img")).toHaveAttribute(
       "src",
-      "/data/albums/test-simple/.resized_images/second.jpg@1600.avif",
+      "/data/albums/test-simple/.resized_images/second.jpg%401600.avif",
     );
     expect(container.querySelector("img")?.style.transform).toBe("scale(1) translate(0px, 0px)");
   });

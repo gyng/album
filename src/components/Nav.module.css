@@ -4,8 +4,12 @@
   /* Width of each edge fade. Set to 0 by default; the .scrollable* modifiers
      below switch them on. The .topBar mask-image (in common.module.css) reads
      these via inheritance — no descendant selectors needed across modules. */
-  --nav-fade-left: 0px;
-  --nav-fade-right: 0px;
+  --nav-fade-left: 0;
+  --nav-fade-right: 0;
+}
+
+.noPadding {
+  padding-inline: 0;
 }
 
 .nav ul {
@@ -13,11 +17,11 @@
 }
 
 .nav li {
-  height: 100%;
+  block-size: 100%;
 }
 
 .themeToggleItem {
-  margin-left: auto;
+  margin-inline-start: auto;
 }
 
 .scrollableLeft {
@@ -32,13 +36,13 @@
    of the nav so keyboard users can jump past the repeated links. */
 .skipLink {
   position: absolute;
-  left: var(--m-s);
-  top: var(--m-s);
-  z-index: 10;
+  inset-inline-start: var(--m-s);
+  inset-block-start: var(--m-s);
+  z-index: var(--z-sticky);
   padding: var(--m-s) var(--m-m);
   border-radius: var(--m-s);
   background-color: var(--c-bg);
-  border: solid 2px var(--c-bg-contrast-light);
+  border: solid var(--size-2) var(--c-bg-contrast-light);
   color: var(--c-font);
   font-size: var(--fs-sm);
   text-decoration: none;
@@ -51,6 +55,6 @@
   transform: translateY(0);
   opacity: 1;
   pointer-events: auto;
-  outline: solid 2px var(--c-bg-contrast-light);
-  outline-offset: 2px;
+  outline: solid var(--size-2) var(--c-bg-contrast-light);
+  outline-offset: var(--size-2);
 }

@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { Database } from "@sqlite.org/sqlite-wasm";
-import { Heading, Caption, Select, SegmentedToggle } from "../ui";
+import { Button, Caption, Heading, KeyHint, Select, SegmentedToggle } from "../ui";
 import { fetchGuessRegions, GuessRegionOption } from "../search/api";
 import { GameSettings } from "./guessTypes";
 import { isInteractiveTarget } from "./guessKeyboard";
@@ -154,13 +154,13 @@ export const GuessLobby: React.FC<GuessLobbyProps> = ({ database, defaults, onSt
       ) : null}
 
       <div className={styles.buttonRow}>
-        <button className={styles.dailyButton} onClick={handleDaily}>
+        <Button className={styles.dailyButton} onClick={handleDaily}>
           Daily challenge
-        </button>
-        <button className={styles.playButton} onClick={handleStart}>
+        </Button>
+        <Button variant="accent" size="large" className={styles.playButton} onClick={handleStart}>
           Play
-          <kbd className={styles.kbd}>Enter</kbd>
-        </button>
+          <KeyHint>Enter</KeyHint>
+        </Button>
       </div>
     </div>
   );

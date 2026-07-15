@@ -1,29 +1,14 @@
 .page {
-  min-height: 100vh;
+  min-block-size: 100dvh;
 }
 
 .main {
-  max-width: 1400px;
+  max-inline-size: var(--size-1400);
   margin: 0 auto;
   padding: var(--m-xl);
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: calc(var(--m-xl) * 1.15);
-}
-
-.header {
-  display: grid;
-  gap: var(--m-s);
-}
-
-.headerBody {
-  display: grid;
-  gap: var(--m-s);
-  max-width: 60rem;
-}
-
-.title {
-  margin: 0;
 }
 
 .kicker {
@@ -33,95 +18,10 @@
   line-height: 1.55;
 }
 
-.overview {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(165px, 1fr));
-  gap: var(--m-s);
-}
-
-.overviewCard {
-  min-height: 6.25rem;
-}
-
-.overviewValue {
-  font-size: var(--fs-m);
-  color: var(--c-font);
-  line-height: 1.2;
-}
-
-.jumpNav {
-  position: sticky;
-  top: 0;
-  z-index: 10;
-  display: grid;
-  gap: var(--m-s);
-  padding: var(--m-s) 0;
-  background: var(--c-bg);
-}
-
-.jumpNavLinks {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--m-s);
-}
-
-.jumpNavLink {
-  min-height: 2rem;
-  white-space: nowrap;
-}
-
 .groups {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: calc(var(--m-xl) * 1.35);
-}
-
-.group {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: var(--m-s);
-  scroll-margin-top: 5.5rem;
-  min-width: 0;
-}
-
-.groupHeader {
-  display: grid;
-  gap: var(--m-s);
-}
-
-.groupTitleRow {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--m);
-  flex-wrap: wrap;
-}
-
-.groupAnchorLink {
-  display: inline-flex;
-  align-items: baseline;
-  gap: var(--m-xs);
-  color: inherit;
-  text-decoration: none;
-}
-
-.groupAnchorMark {
-  color: var(--c-bg-contrast-light);
-  font-size: var(--fs-sm);
-  opacity: 0;
-  transform: translateY(-1px);
-  transition: opacity var(--t-fast) ease;
-}
-
-.groupAnchorLink:hover .groupAnchorMark,
-.groupAnchorLink:focus-visible .groupAnchorMark {
-  opacity: 1;
-}
-
-.groupActions {
-  display: flex;
-  align-items: center;
-  gap: var(--m-s);
 }
 
 .groupActionsStack {
@@ -131,47 +31,32 @@
   flex-wrap: wrap;
 }
 
-.groupDescription {
-  margin: 0;
-  color: var(--c-bg-contrast-light);
-  font-size: var(--fs-sm);
-  line-height: 1.5;
-  max-width: 52rem;
-}
-
-.groupGrid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
-  gap: var(--m-l);
-  align-items: start;
-}
-
 .desktopOnly {
   display: block;
   grid-column: 1 / -1;
-  min-width: 0;
+  min-inline-size: 0;
 }
 
 .fullWidthView {
   display: block;
   grid-column: 1 / -1;
-  min-width: 0;
+  min-inline-size: 0;
 }
 
-.mobileOnly {
-  display: none;
-}
-
-.desktopBarView {
+.responsiveBarView {
   display: block;
   grid-column: 1 / -1;
-  min-width: 0;
+  min-inline-size: 0;
+}
+
+.desktopViewHidden {
+  display: none;
 }
 
 .stackedBarGroups {
   display: grid;
   grid-column: 1 / -1;
-  min-width: 0;
+  min-inline-size: 0;
 }
 
 .cadenceGrid {
@@ -181,19 +66,12 @@
   align-items: start;
 }
 
-.recentTrendsGrid {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: var(--m-l);
-  align-items: start;
-}
-
 .stackedBarGroups > * + * {
-  margin-top: calc(var(--m-l) * 1.15);
+  margin-block-start: calc(var(--m-l) * 1.15);
 }
 
 .hidden {
-  display: none !important;
+  display: none;
 }
 
 .sectionWide {
@@ -206,71 +84,20 @@
   gap: var(--m-s);
 }
 
-.funStatsGrid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: var(--m-s);
-}
-
-.funStatValue {
-  font-size: calc(var(--fs-m) - 0.05rem);
-  color: var(--c-font);
-  line-height: 1.25;
-}
-
-.funStatDetail {
-  font-size: var(--fs-s);
-  color: var(--c-bg-contrast-light);
-  line-height: 1.4;
-}
-
-.funStatThumbs {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--m-s);
-}
-
-.funStatThumbLink {
-  position: relative;
-  display: block;
-  text-decoration: none;
-}
-
-.funStatThumb {
-  width: 100%;
-  aspect-ratio: 1;
-  object-fit: cover;
-  background-color: var(--c-bg-contrast-dark);
-}
-
-.funStatThumbYear {
-  position: absolute;
-  left: var(--m-s);
-  bottom: var(--m-s);
-  display: inline-flex;
-  align-items: center;
-  padding: 0.15rem var(--m);
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--c-bg) 76%, transparent);
-  color: var(--c-font);
-  font-size: var(--fs-xs);
-  line-height: 1;
-}
-
 .visualSummaryGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(var(--size-220), 1fr));
   gap: var(--m-s);
 }
 
 .visualSummaryValue {
-  font-size: calc(var(--fs-m) + 0.1rem);
+  font-size: calc(var(--fs-m) + var(--size-2));
   color: var(--c-font);
   line-height: 1.15;
 }
 
 .visualExamplesGrid {
-  --visual-thumb-size: 150px;
+  --visual-thumb-size: var(--size-150);
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: var(--m-xl) var(--m-l);
@@ -291,50 +118,17 @@
   grid-column: 1 / -1;
 }
 
-.timelineSectionAligned {
-  justify-items: start;
-}
-
-.timelineSectionAligned > .sectionHeader {
+:where(.timelineSectionAligned) > .sectionHeader {
   justify-content: flex-start;
 }
 
-.timelineSectionAligned > .visualTimeline {
-  width: 100%;
-}
-
-.timelineSectionAligned .visualTimelineRow {
-  grid-template-columns: var(--visual-timeline-rail-width) minmax(0, 1fr);
-  gap: var(--m);
-}
-
-.timelineSectionAligned .visualTimelineRow::after {
-  left: calc(var(--visual-timeline-rail-width) / 2);
-}
-
-.timelineSectionAligned .visualTimelineMeta {
-  grid-column: 2;
-  justify-items: start;
-  text-align: left;
-  padding-top: 0;
-  margin-bottom: var(--m-s);
-}
-
-.timelineSectionAligned .visualTimelineRail {
-  grid-column: 1;
-  grid-row: 1 / span 2;
-  align-self: stretch;
-  justify-content: flex-start;
-  padding-top: 0.15rem;
-}
-
-.timelineSectionAligned .visualTimelineThumbs,
-.timelineSectionAligned .revisitThumbs {
+:where(.timelineSectionAligned) .visualTimelineThumbs,
+:where(.timelineSectionAligned) .revisitThumbs {
   grid-column: 2;
 }
 
 .visualExamplesGrid > .visualExampleSection:not(.visualFullRowSection) {
-  min-width: 0;
+  min-inline-size: 0;
 }
 
 .visualPairs {
@@ -373,7 +167,7 @@
 
 .visualEraGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(var(--visual-era-card-min-width), 1fr));
   gap: var(--m-m);
 }
 
@@ -381,11 +175,6 @@
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: var(--m-s);
-}
-
-.visualThumbWrap {
-  position: relative;
-  inline-size: var(--visual-thumb-size);
 }
 
 .visualThumbLink {
@@ -396,19 +185,16 @@
 
 /* Positioning hook only — the dark-glass treatment comes from the shared
    OverlayButton primitive so this matches the search tiles and timeline grid. */
-.visualThumbSearchButton {
-  position: absolute;
-  right: var(--m-s);
-  bottom: var(--m-s);
-  gap: var(--m);
-}
-
-.visualEraThumbLink {
-  inline-size: auto;
-}
 
 .visualEraThumbWrap,
 .visualTimelineThumbWrap {
+  inline-size: auto;
+  min-inline-size: 0;
+}
+
+/* ExplorePrimitives gives standalone thumbs a fixed size. Era thumbs are grid
+   items instead, so let that grid own their width at narrow breakpoints. */
+.visualEraThumbs .visualEraThumbWrap {
   inline-size: auto;
 }
 
@@ -420,14 +206,14 @@
   display: none;
 }
 
-.visualThumb {
-  width: var(--visual-thumb-size);
-  height: var(--visual-thumb-size);
+.visualThumbLink .visualThumb {
+  inline-size: var(--visual-thumb-size);
+  block-size: var(--visual-thumb-size);
 }
 
-.visualEraThumb {
-  width: 100%;
-  height: auto;
+.visualEraThumbs .visualEraThumb {
+  inline-size: 100%;
+  block-size: auto;
   aspect-ratio: 1;
 }
 
@@ -437,15 +223,26 @@
 }
 
 .visualExampleMeta {
-  width: fit-content;
+  inline-size: fit-content;
   font-size: var(--fs-s);
   color: var(--c-bg-contrast-light);
   line-height: 1.35;
 }
 
+/* Secondary detail line used by overview and fun-stat style cards. */
+.funStatDetail {
+  font-size: var(--fs-s);
+  color: var(--c-bg-contrast-light);
+  line-height: 1.4;
+}
+
+.overviewCard {
+  min-block-size: calc(var(--size-112) + var(--size-0-5));
+}
+
 .visualTimeline {
-  --visual-timeline-meta-width: 5.5rem;
-  --visual-timeline-rail-width: 1.4rem;
+  --visual-timeline-meta-width: calc(var(--size-96) + var(--size-3));
+  --visual-timeline-rail-width: var(--size-24);
   position: relative;
   display: grid;
   gap: var(--m-l);
@@ -453,7 +250,7 @@
 
 .visualTimelineRow {
   position: relative;
-  z-index: 1;
+  z-index: var(--z-raised);
   display: grid;
   grid-template-columns:
     var(--visual-timeline-meta-width)
@@ -466,36 +263,27 @@
 .visualTimelineRow::after {
   content: "";
   position: absolute;
-  top: 0.2rem;
-  bottom: calc(var(--m-l) * -1);
-  left: calc(
+  inset-block-start: var(--m);
+  inset-block-end: calc(var(--m-l) * -1);
+  inset-inline-start: calc(
     var(--visual-timeline-meta-width) + var(--m-s) + (var(--visual-timeline-rail-width) / 2)
   );
-  width: 1px;
-  background: color-mix(in srgb, var(--c-accent) 42%, var(--c-bg-contrast-dark));
+  inline-size: var(--size-1);
+  background: color-mix(in oklch, var(--c-accent) 42%, var(--c-bg-contrast-dark));
 }
 
 .visualTimelineRowLast::after {
   display: none;
 }
 
-.visualTimelineRowContinues::after {
-  background: linear-gradient(
-    to bottom,
-    color-mix(in srgb, var(--c-accent) 42%, var(--c-bg-contrast-dark)) 0%,
-    color-mix(in srgb, var(--c-accent) 42%, var(--c-bg-contrast-dark)) 45%,
-    transparent 100%
-  );
-}
-
 .visualTimelineMeta {
   display: grid;
   gap: var(--m);
   justify-items: end;
-  padding-top: 0.15rem;
+  padding-block-start: var(--size-3);
   font-size: var(--fs-s);
   color: var(--c-bg-contrast-light);
-  text-align: right;
+  text-align: end;
 }
 
 .visualTimelineYear {
@@ -510,23 +298,65 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding-top: var(--m);
+  padding-block-start: var(--m);
   gap: var(--m-s);
 }
 
 .visualTimelineDot {
   position: relative;
-  z-index: 1;
-  width: 0.75rem;
-  height: 0.75rem;
-  border-radius: 999px;
-  border: 2px solid var(--c-bg);
+  z-index: var(--z-raised);
+  inline-size: var(--size-14);
+  block-size: var(--size-14);
+  border-radius: var(--radius-pill);
+  border: var(--size-2) solid var(--c-bg);
   background: var(--c-accent);
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--c-accent) 50%, transparent);
+  box-shadow: 0 0 0 var(--size-1) color-mix(in oklch, var(--c-accent) 50%, transparent);
+}
+
+/* Aligned cards use a compact two-column timeline. :where() keeps these
+   contextual adjustments at the same cascade weight as the base classes above
+   (which they must follow in source order to win), so the compact viewport
+   rules below can still override them naturally. */
+:where(.timelineSectionAligned) > .visualTimeline {
+  inline-size: 100%;
+}
+
+:where(.timelineSectionAligned) .visualTimelineRow {
+  grid-template-columns: var(--visual-timeline-rail-width) minmax(0, 1fr);
+  gap: var(--m);
+}
+
+:where(.timelineSectionAligned) .visualTimelineRow::after {
+  inset-inline-start: calc(var(--visual-timeline-rail-width) / 2);
+}
+
+:where(.timelineSectionAligned) .visualTimelineMeta {
+  grid-column: 2;
+  justify-items: start;
+  text-align: start;
+  padding-block-start: 0;
+  margin-block-end: var(--m-s);
+}
+
+:where(.timelineSectionAligned) .visualTimelineRail {
+  grid-column: 1;
+  grid-row: 1 / span 2;
+  align-self: stretch;
+  justify-content: flex-start;
+  padding-block-start: var(--size-3);
+}
+
+.visualTimelineRowContinues::after {
+  background: linear-gradient(
+    to bottom,
+    color-mix(in oklch, var(--c-accent) 42%, var(--c-bg-contrast-dark)) 0%,
+    color-mix(in oklch, var(--c-accent) 42%, var(--c-bg-contrast-dark)) 45%,
+    transparent 100%
+  );
 }
 
 .visualTimelineThumbs {
-  --visual-timeline-thumb-size: 108px;
+  --visual-timeline-thumb-size: var(--explore-timeline-thumb-size);
   display: flex;
   flex-wrap: wrap;
   gap: var(--m-s);
@@ -534,8 +364,8 @@
 }
 
 .visualTimelineThumb {
-  width: var(--visual-timeline-thumb-size);
-  max-width: var(--visual-timeline-thumb-size);
+  inline-size: var(--visual-timeline-thumb-size);
+  max-inline-size: var(--visual-timeline-thumb-size);
   flex: 0 0 var(--visual-timeline-thumb-size);
 }
 
@@ -543,56 +373,14 @@
   inline-size: var(--visual-timeline-thumb-size);
 }
 
-@media (hover: hover) and (pointer: fine) {
-  .visualThumbSearchButton {
-    opacity: 0;
-    transform: translateY(0.2rem);
-    pointer-events: none;
-    transition:
-      opacity var(--t-fast) ease,
-      transform var(--t-fast) ease,
-      border-color var(--t-fast),
-      color var(--t-fast),
-      background-color var(--t-fast);
-  }
-
-  .visualThumbWrap:hover .visualThumbSearchButton,
-  .visualThumbWrap:focus-within .visualThumbSearchButton {
-    opacity: 1;
-    transform: translateY(0);
-    pointer-events: auto;
-  }
-}
-
 .revisitSection {
   display: grid;
   gap: var(--m);
 }
 
-.revisitedPlacesGrid {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--m-l);
-  align-items: flex-start;
-}
-
-.revisitedPlaceCard {
-  display: grid;
-  gap: var(--m);
-  flex: 1 1 min(32rem, 100%);
-  min-width: min(100%, 28rem);
-  padding-top: var(--m-s);
-  border-top: 1px solid color-mix(in srgb, var(--c-bg-contrast-dark) 82%, transparent);
-}
-
-.revisitedPlacesGrid > .revisitedPlaceCard:first-child {
-  padding-top: 0;
-  border-top: 0;
-}
-
 .revisitRow {
   display: grid;
-  grid-template-columns: 10rem 1.4rem minmax(0, 1fr);
+  grid-template-columns: var(--size-180) var(--size-24) minmax(0, 1fr);
   gap: var(--m);
   align-items: start;
 }
@@ -603,7 +391,7 @@
   font-size: var(--fs-s);
   color: var(--c-bg-contrast-light);
   justify-items: end;
-  text-align: right;
+  text-align: end;
 }
 
 .revisitYear {
@@ -612,67 +400,27 @@
   line-height: 1;
 }
 
-.revisitThumbs {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--m-s);
-  align-items: flex-start;
-}
-
-.revisitThumb {
-  width: 112px;
-  max-width: 112px;
-  flex: 0 0 112px;
-}
-
 .revisitGapLabel {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 3.5rem;
-  padding: 0.15rem var(--m);
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--c-bg) 94%, var(--c-bg-contrast-dark));
+  min-inline-size: var(--m-2xl);
+  padding: var(--size-3) var(--m);
+  border-radius: var(--radius-pill);
+  background: color-mix(in oklch, var(--c-bg) 94%, var(--c-bg-contrast-dark));
   color: var(--c-bg-contrast-light);
   font-size: var(--fs-xs);
   line-height: 1;
   white-space: nowrap;
-}
-
-.revisitGapLabelInline {
-  display: inline-flex;
-  align-items: center;
-  justify-content: flex-end;
-  min-width: 3.5rem;
-  padding: 0.15rem 0;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--c-bg) 94%, var(--c-bg-contrast-dark));
-  color: var(--c-bg-contrast-light);
-  font-size: var(--fs-xs);
-  line-height: 1;
-  white-space: nowrap;
-  text-align: right;
-  position: absolute;
-  right: calc(100% + var(--m));
-  top: calc(50% + (var(--m-l) / 2));
-  transform: translateY(-50%);
-}
-
-.revisitTimelineRail {
-  align-self: stretch;
-  justify-content: flex-start;
 }
 
 /* The gap pill hangs to the left of the rail (right: 100% + gap). The rail is
    the left-most column in the aligned layout, so without a reserved gutter the
    pill is clipped off the viewport edge for left-column cards. Reserve its width
    as left padding on the timeline so the pill stays inside the card. */
-.revisitedPlaceCard .visualTimeline {
-  padding-left: calc(3.5rem + var(--m-s));
-}
 
 .loadMoreButton {
-  width: fit-content;
+  inline-size: fit-content;
   padding: var(--m-s) var(--m-m);
 }
 
@@ -688,7 +436,8 @@
   align-items: end;
   gap: var(--m-s);
   flex-wrap: wrap;
-  margin-left: auto;
+  margin-inline-start: auto;
+  min-inline-size: 0;
 }
 
 .sectionFilter {
@@ -703,241 +452,8 @@
   letter-spacing: 0.04em;
 }
 
-.colorSwatch {
-  width: 0.7rem;
-  height: 0.7rem;
-  border-radius: 999px;
-  flex: 0 0 auto;
-  border: 1px solid color-mix(in srgb, var(--c-bg) 55%, transparent);
-}
-
-.colourSectionGrid {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: var(--m-l);
-}
-
-.colourPanel {
-  display: grid;
-  gap: var(--m);
-  align-content: start;
-}
-
 .colourPanel > .sectionHeader {
-  margin-bottom: var(--m);
-}
-
-.colourFamilyPanel,
-.colourFullRowPanel {
-  grid-column: 1 / -1;
-}
-
-.colorFamilyRows {
-  display: grid;
-  gap: var(--m);
-  /* The label column plus up to six representative thumbnails fill ~64rem; cap
-     the rows there so the right-hand whitespace reads as intentional rather
-     than the rows stranding half-way across a wide section. */
-  max-width: min(100%, 64rem);
-}
-
-.colorFamilyRow {
-  display: grid;
-  grid-template-columns: minmax(10rem, 13rem) minmax(0, 1fr);
-  gap: var(--m);
-  align-items: start;
-}
-
-.colorFamilyMeta {
-  display: grid;
-  gap: var(--m-s);
-  align-content: start;
-  justify-items: start;
-}
-
-.colorFamilyHeading {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--m-s);
-  font-size: var(--fs-m);
-  color: var(--c-font);
-}
-
-.colorFamilyStat {
-  color: var(--c-bg-contrast-light);
-  font-size: var(--fs-s);
-  line-height: 1;
-}
-
-.colorFamilyThumbs {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--m-s);
-  align-items: flex-start;
-}
-
-.colorFamilyThumbLink {
-  display: block;
-  text-decoration: none;
-}
-
-.colorTimeLegend {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--m-s) var(--m);
-}
-
-.colorTimeLegendItem {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--m);
-  color: var(--c-bg-contrast-light);
-  font-size: var(--fs-s);
-  opacity: 0.9;
-}
-
-.colorTimeSeries {
-  display: grid;
-  gap: var(--m-s);
-}
-
-.colorTimeRow {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  grid-template-areas: "meta bar summary";
-  gap: var(--m-s);
-  align-items: center;
-}
-
-.colorTimeMeta {
-  grid-area: meta;
-  display: grid;
-  gap: var(--m);
-  justify-items: start;
-  text-align: left;
-}
-
-.colorTimeYear {
-  color: var(--c-font);
-  font-size: var(--fs-m);
-  line-height: 1;
-}
-
-.colorTimeDetail {
-  color: var(--c-bg-contrast-light);
-  font-size: var(--fs-s);
-  line-height: 1;
-}
-
-.colorTimeBar {
-  grid-area: bar;
-  position: relative;
-  min-height: 1.15rem;
-  border: 1px solid color-mix(in srgb, var(--c-bg-contrast-dark) 78%, transparent);
-  border-radius: 999px;
-  overflow: visible;
-  background: color-mix(in srgb, var(--c-bg) 98%, var(--c-bg-contrast-dark));
-}
-
-.colorTimeSegment {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  display: block;
-  min-width: 3px;
-}
-
-.colorTimeSegment:hover,
-.colorTimeSegment:focus-visible {
-  filter: brightness(1.08);
-  z-index: 2;
-}
-
-.colorTimeTooltip {
-  position: absolute;
-  left: 50%;
-  top: 0;
-  transform: translate(-50%, calc(-100% - var(--m-s)));
-  display: grid;
-  gap: var(--m-s);
-  width: min(220px, calc(100vw - (var(--m) * 2)));
-  padding: var(--m-s);
-  border: var(--popup-border);
-  border-radius: var(--popup-radius);
-  background-color: var(--c-bg);
-  box-shadow: var(--popup-shadow);
-  color: var(--c-font);
-  font-size: var(--fs-s);
-  line-height: 1.35;
-  pointer-events: none;
-  opacity: 0;
-  transition: opacity 0.08s ease;
-  z-index: 3;
-}
-
-.colorTimeTooltip::after {
-  content: "";
-  position: absolute;
-  left: 50%;
-  top: calc(100% - 8px);
-  width: 12px;
-  height: 12px;
-  background-color: var(--c-bg);
-  border-right: var(--popup-border);
-  border-bottom: var(--popup-border);
-  transform: translateX(-50%) rotate(45deg);
-}
-
-.colorTimeTooltipImage {
-  width: 100%;
-  height: 132px;
-  border-radius: var(--m-s);
-  object-fit: cover;
-  background: color-mix(in srgb, var(--c-bg) 90%, var(--c-bg-contrast-dark));
-}
-
-.colorTimeTooltipBody {
-  display: grid;
-  gap: var(--m-s);
-  min-width: 0;
-}
-
-.colorTimeTooltipSwatch {
-  width: 0.65rem;
-  height: 0.65rem;
-  border-radius: 999px;
-  border: 1px solid color-mix(in srgb, var(--c-bg) 55%, transparent);
-  flex: 0 0 auto;
-}
-
-.colorTimeTooltipText {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--m-s);
-  min-width: 0;
-  line-height: 1.25;
-  white-space: normal;
-  overflow-wrap: anywhere;
-}
-
-.colorTimeTooltipText span:last-child {
-  color: var(--c-bg-contrast-light);
-}
-
-.colorTimeSegment:hover .colorTimeTooltip,
-.colorTimeSegment:focus-visible .colorTimeTooltip {
-  opacity: 1;
-}
-
-.colorTimeSummary {
-  grid-area: summary;
-  display: inline-flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: var(--m);
-  min-width: 0;
-  color: var(--c-bg-contrast-light);
-  font-size: var(--fs-s);
+  margin-block-end: var(--m);
 }
 
 .bars {
@@ -951,72 +467,16 @@
     padding: var(--m-l);
   }
 
-  .overview {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .jumpNavLinks {
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    padding-bottom: 0.15rem;
-  }
-
-  .groupGrid {
-    grid-template-columns: 1fr;
-  }
-
   .desktopOnly {
     display: none;
   }
 
-  .mobileOnly {
+  .desktopViewHidden {
     display: block;
   }
 
-  .desktopBarView {
-    display: none !important;
-  }
-
   .visualExamplesGrid {
     grid-template-columns: 1fr;
-  }
-
-  .visualExamplesGrid {
-    --visual-thumb-size: 136px;
-  }
-
-  .visualSummaryGrid {
-    grid-template-columns: 1fr;
-  }
-
-  .colourSectionGrid {
-    grid-template-columns: 1fr;
-  }
-
-  .colorFamilyRow {
-    grid-template-columns: 1fr;
-  }
-
-  .colorFamilyMeta {
-    justify-items: start;
-  }
-
-  .colorTimeRow {
-    grid-template-columns: 1fr;
-    grid-template-areas:
-      "meta"
-      "bar"
-      "summary";
-    gap: var(--m-s);
-  }
-
-  .colorTimeMeta {
-    justify-items: start;
-    text-align: left;
-  }
-
-  .colorTimeSummary {
-    justify-content: flex-start;
   }
 
   .visualTimelineRow {
@@ -1030,11 +490,19 @@
 
   .visualTimelineMeta {
     justify-items: start;
-    text-align: left;
+    text-align: start;
   }
 
   .visualTimelineRail {
     display: none;
+  }
+
+  .visualExamplesGrid {
+    --visual-thumb-size: var(--explore-mobile-thumb-size);
+  }
+
+  .visualSummaryGrid {
+    grid-template-columns: 1fr;
   }
 
   .revisitRow {
@@ -1044,7 +512,7 @@
 
   .revisitMeta {
     justify-items: start;
-    text-align: left;
+    text-align: start;
   }
 
   .revisitGapLabel,
@@ -1052,18 +520,18 @@
     display: none;
   }
 
-  .groupActions {
-    width: 100%;
-    min-width: 0;
-  }
-
   .sectionFilters {
-    margin-left: 0;
-    width: 100%;
+    margin-inline-start: 0;
+    inline-size: 100%;
   }
 
   .sectionFilter {
-    flex: 1 1 auto;
-    min-width: 0;
+    flex: 1 1 100%;
+    min-inline-size: 0;
+  }
+
+  .sectionFilter > select {
+    inline-size: 100%;
+    max-inline-size: 100%;
   }
 }

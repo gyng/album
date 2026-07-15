@@ -1,8 +1,11 @@
 export { Card } from "./Card";
+export { Button, ButtonLink, buttonStyles } from "./Button";
 export { ChartTooltip } from "./ChartTooltip";
+export { TooltipSurface } from "./TooltipSurface";
 export { Footer } from "./Footer";
 export { Heading, Caption } from "./Heading";
 export { Input } from "./Input";
+export { KeyHint } from "./KeyHint";
 export { OverlayButton, OverlayButtonLink, overlayButtonStyles } from "./OverlayButton";
 export { Pill, PillButton, pillStyles } from "./Pill";
 export { SegmentedToggle } from "./SegmentedToggle";

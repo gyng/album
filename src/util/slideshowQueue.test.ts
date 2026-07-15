@@ -195,7 +195,7 @@ describe("computePoolStats", () => {
 describe("getSlideshowPhotoSrc", () => {
   it("builds the resized-image path from an album photo path", () => {
     expect(getSlideshowPhotoSrc(makePhoto("../albums/japan/IMG_1.jpg"))).toBe(
-      "/data/albums/japan/.resized_images/IMG_1.jpg@3200.avif",
+      "/data/albums/japan/.resized_images/IMG_1.jpg%403200.avif",
     );
   });
 

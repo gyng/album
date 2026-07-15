@@ -1,5 +1,6 @@
+/* "View on …" links under the mini-map. */
 .viewOn {
-  margin: var(--m) 0 0;
+  margin-block-start: var(--m);
 }
 
 /* Loading placeholder shown while the MapLibre bundle downloads — fills the
@@ -9,8 +10,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  height: 300px;
-  max-width: 300px;
+  block-size: var(--size-300);
+  max-inline-size: var(--size-300);
   margin: 0;
   border-radius: var(--m);
   background: var(--c-bg-contrast-dark);
@@ -19,11 +20,16 @@
 }
 
 .map {
-  height: 300px;
-  max-width: 300px;
-  width: auto;
+  block-size: var(--size-300);
+  max-inline-size: var(--size-300);
+  inline-size: auto;
   display: flex;
   flex-direction: column;
+}
+
+.map > :global(.maplibregl-map) {
+  inline-size: 100%;
+  block-size: 100%;
 }
 
 /* round map corners */

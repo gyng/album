@@ -23,9 +23,11 @@ export const YearSplitHistogram: React.FC<Props> = ({ title, data, getHref }) =>
       <Heading level={2}>{title}</Heading>
       <div
         className={styles.matrix}
-        style={{
-          gridTemplateColumns: `3.5rem repeat(${months.length}, minmax(0, 1fr))`,
-        }}
+        style={
+          {
+            "--month-count": months.length,
+          } as React.CSSProperties
+        }
       >
         <div className={styles.corner} />
         {months.map((month) => (

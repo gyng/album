@@ -118,7 +118,7 @@ describe("useSearchResultsState", () => {
   it("derives similar-photo metadata and optional defaults", () => {
     const { result } = renderState({ similarPath: "../albums/test-simple/photo one.jpg" });
     expect(result.current.similarFilename).toBe("photo one.jpg");
-    expect(result.current.similarPreviewSrc).toContain("photo one.jpg");
+    expect(result.current.similarPreviewSrc).toContain("photo%20one.jpg");
     expect(result.current.isSimilarMode).toBe(true);
     expect(result.current.isImageQueryMode).toBe(false);
     expect(config.queryKey[1]).toEqual(

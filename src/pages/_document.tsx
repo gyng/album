@@ -1,43 +1,51 @@
 import Document, { Head, Html, Main, NextScript, type DocumentContext } from "next/document";
+import { NAMED_THEMES, THEME_SCHEMES } from "../util/theme";
 
+// Mirrored by the ThemeToggle effect — both must set the same classes.
 const themeInitScript = `
 (() => {
-  const applyTheme = (theme) => {
-    const root = document.documentElement;
-    const body = document.body;
-    const isDark = theme === "dark";
+  const schemes = ${JSON.stringify(THEME_SCHEMES)};
+  const named = ${JSON.stringify(NAMED_THEMES)};
 
-    root.classList.toggle("dark", isDark);
-    root.classList.toggle("light", !isDark);
-    if (body) {
-      body.classList.toggle("dark", isDark);
-      body.classList.toggle("light", !isDark);
+  const applyTheme = (theme) => {
+    const scheme = theme == null ? null : schemes[theme];
+    for (const el of [document.documentElement, document.body]) {
+      if (!el) continue;
+      el.classList.toggle("light", scheme === "light");
+      el.classList.toggle("dark", scheme === "dark");
+      for (const name of named) {
+        el.classList.toggle("theme-" + name, name === theme);
+      }
     }
   };
 
   try {
     const url = new URL(window.location.href);
-    const theme = url.searchParams.get("theme");
-    if (theme === "dark" || theme === "light") {
-      applyTheme(theme);
+    const fromUrl = url.searchParams.get("theme");
+    if (fromUrl && Object.hasOwn(schemes, fromUrl)) {
+      applyTheme(fromUrl);
       return;
     }
 
-    const stored = JSON.parse(localStorage.getItem("darkMode") ?? "null");
-    if (stored === true || stored === false) {
-      applyTheme(stored ? "dark" : "light");
+    const stored = localStorage.getItem("theme");
+    if (stored && Object.hasOwn(schemes, stored)) {
+      applyTheme(stored);
+      return;
+    }
+
+    // Legacy boolean preference from the old light/dark-only toggle.
+    const legacy = JSON.parse(localStorage.getItem("darkMode") ?? "null");
+    if (legacy === true || legacy === false) {
+      applyTheme(legacy ? "dark" : "light");
       return;
     }
   } catch (_err) {
-    // Fall back to the system theme when storage or URL parsing is unavailable.
+    // Fall back to the system scheme when storage or URL parsing is unavailable.
   }
 
-  // No explicit preference: follow the OS so "system default" persists across
-  // reloads. Default to dark when matchMedia is unavailable.
-  const prefersDark =
-    typeof window.matchMedia !== "function" ||
-    window.matchMedia("(prefers-color-scheme: dark)").matches;
-  applyTheme(prefersDark ? "dark" : "light");
+  // No explicit preference: clear theme classes so :root's
+  // "color-scheme: light dark" follows the OS live.
+  applyTheme(null);
 })();
 `;
 

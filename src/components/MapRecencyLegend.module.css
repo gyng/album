@@ -1,14 +1,14 @@
 .legend {
   position: absolute;
-  left: var(--m-s);
+  inset-inline-start: var(--m-s);
   /* Sits above the MapLibre scale control (bottom-left) without overlapping. */
-  bottom: var(--m-xl);
-  z-index: 2;
+  inset-block-end: var(--m-xl);
+  z-index: var(--z-float);
   pointer-events: none;
   display: flex;
   flex-direction: column;
   gap: var(--m);
-  max-width: 200px;
+  max-inline-size: var(--size-200);
 }
 
 .caption {
@@ -24,9 +24,9 @@
 
 .bar {
   flex: 1 1 auto;
-  min-width: 72px;
-  height: 6px;
-  border: 1px solid currentColor;
+  min-inline-size: var(--map-legend-bar-min-width);
+  block-size: var(--size-6);
+  border: var(--size-1) solid currentColor;
 }
 
 .end {

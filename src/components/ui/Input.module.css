@@ -1,12 +1,12 @@
 .input {
-  width: 100%;
+  inline-size: 100%;
   padding: var(--m-m);
   color: var(--c-font);
   background-color: var(--c-bg);
-  border: solid 2px var(--c-bg-contrast-light);
+  border: solid var(--line-strong) var(--c-bg-contrast-light);
   border-radius: var(--m-s);
   font-size: var(--fs-sm);
-  transition: 0.08s ease-out opacity;
+  transition: opacity var(--t-fast) var(--ease-out);
 }
 
 .input:disabled {
@@ -18,13 +18,9 @@
   user-select: none;
 }
 
-.input:focus-visible {
-  outline: solid 2px var(--c-bg-contrast-light);
-}
-
 /* 16px on touch devices stops iOS Safari zooming the page on focus */
 @media (hover: none), (pointer: coarse) {
   .input {
-    font-size: 16px;
+    font-size: var(--fs-touch);
   }
 }

@@ -3,7 +3,7 @@ import Link from "next/link";
 import type { GetStaticProps, NextPage } from "next";
 import { GlobalNav } from "../../components/GlobalNav";
 import { MiniHistogram } from "../../components/MiniHistogram";
-import { SankeyChart } from "../../components/SankeyChart";
+import { SankeyChartDeferred } from "../../components/SankeyChartDeferred";
 import { Seo } from "../../components/Seo";
 import { StatBar } from "../../components/StatBar";
 import { StatsWorldMap } from "../../components/StatsWorldMap";
@@ -307,7 +307,12 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
 
         <div className={styles.groups}>
           {visualSameness ? (
-            <StatGroup id="visual-sameness" title="Visual sameness">
+            <StatGroup
+              id="visual-sameness"
+              title="Visual sameness"
+              deferContent
+              deferredSummary={`${visualSameness.samenessPercent}% average nearest-neighbour similarity across ${visualSameness.sampleSize.toLocaleString("en")} embedded photos; ${visualSameness.repeatedMotifPercent}% have a repeated visual motif and ${visualSameness.distinctPercent}% are distinct frames.`}
+            >
               <section className={`${styles.section} ${styles.sectionWide}`}>
                 <div className={styles.visualSummaryGrid}>
                   <Card as="article" className={styles.overviewCard}>
@@ -594,14 +599,16 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
             </StatGroup>
           ) : null}
 
-          <ExploreFunStatsSection cards={funStats} />
-          <ExploreRecentTrendsSection data={stats.recentYearStats} />
-          <ExploreRevisitedPlacesSection places={stats.revisitedPlaces} />
+          <ExploreFunStatsSection cards={funStats} deferContent />
+          <ExploreRecentTrendsSection data={stats.recentYearStats} deferContent />
+          <ExploreRevisitedPlacesSection places={stats.revisitedPlaces} deferContent />
 
           <StatGroup
             id="when-you-shoot"
             title="When you shoot"
             actions={renderScopeFilterControls()}
+            deferContent
+            deferredSummary={`${formatCoverage(activeCalendarCoverage)}. Time relationships and archive cadence summarise when photos were made.`}
           >
             {activeTimeFacet && activeTimeRelationships ? (
               <section className={`${styles.section} ${styles.sectionWide}`}>
@@ -632,7 +639,13 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
             ) : null}
           </StatGroup>
 
-          <StatGroup id="how-you-shoot" title="How you shoot" actions={renderScopeFilterControls()}>
+          <StatGroup
+            id="how-you-shoot"
+            title="How you shoot"
+            actions={renderScopeFilterControls()}
+            deferContent
+            deferredSummary={`Camera settings span ${activeTechnicalFacets.length.toLocaleString("en")} technical facets${filteredTechnicalRelationships ? `; settings relationships cover ${filteredTechnicalRelationships.total.toLocaleString("en")} photos` : ""}.`}
+          >
             {activeTechnicalFacets.map(renderNumericFacet)}
             {stats.technicalRelationships ? (
               <section className={`${styles.section} ${styles.sectionWide}`}>
@@ -653,6 +666,8 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
           <StatGroup
             id="where-you-shoot"
             title="Where you shoot"
+            deferContent
+            deferredSummary={`${stats.mapPoints.length.toLocaleString("en")} mapped photo locations are available as a map, location flow, and searchable place bars.`}
             actions={
               <div className={styles.groupActionsStack}>
                 <Link href="/map" className={`${pillStyles.base} ${pillStyles.ghost}`}>
@@ -681,7 +696,7 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
             </div>
             {locationView === "sankey" && (
               <div className={styles.desktopOnly}>
-                <SankeyChart
+                <SankeyChartDeferred
                   flow={stats.locationFlow}
                   emptyMessage="Not enough linked location data yet."
                   labelMaxLength={16}
@@ -690,13 +705,11 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
               </div>
             )}
             <div
-              className={[styles.desktopBarView, locationView === "bars" ? "" : styles.hidden].join(
-                " ",
-              )}
+              className={[
+                styles.responsiveBarView,
+                locationView === "bars" ? "" : styles.desktopViewHidden,
+              ].join(" ")}
             >
-              <div className={styles.stackedBarGroups}>{placeBarFacets.map(renderStringFacet)}</div>
-            </div>
-            <div className={styles.mobileOnly}>
               <div className={styles.stackedBarGroups}>{placeBarFacets.map(renderStringFacet)}</div>
             </div>
           </StatGroup>
@@ -704,6 +717,8 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
           <StatGroup
             id="what-you-shoot-with"
             title="What you shoot with"
+            deferContent
+            deferredSummary={`Camera and lens relationships are summarised across ${gearFacets.length.toLocaleString("en")} searchable gear facets.`}
             actions={
               <SegmentedToggle
                 options={[
@@ -718,22 +733,20 @@ const StatsPage: NextPage<PageProps> = ({ stats, visualSameness }) => {
           >
             {gearView === "sankey" && (
               <div className={styles.desktopOnly}>
-                <SankeyChart flow={stats.gearFlow} />
+                <SankeyChartDeferred flow={stats.gearFlow} />
               </div>
             )}
             <div
-              className={[styles.desktopBarView, gearView === "bars" ? "" : styles.hidden].join(
-                " ",
-              )}
+              className={[
+                styles.responsiveBarView,
+                gearView === "bars" ? "" : styles.desktopViewHidden,
+              ].join(" ")}
             >
-              <div className={styles.stackedBarGroups}>{gearFacets.map(renderStringFacet)}</div>
-            </div>
-            <div className={styles.mobileOnly}>
               <div className={styles.stackedBarGroups}>{gearFacets.map(renderStringFacet)}</div>
             </div>
           </StatGroup>
 
-          <ExploreColourSection stats={stats} />
+          <ExploreColourSection stats={stats} deferContent />
         </div>
       </main>
       <Footer />

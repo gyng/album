@@ -128,7 +128,12 @@ export const SearchResultsGrid: React.FC<Props> = ({
 
       {hasNextPage && isSuccess ? (
         <li>
-          <button className={styles.moreButton} onClick={onFetchNextPage} disabled={isFetching}>
+          <button
+            type="button"
+            className={styles.moreButton}
+            onClick={onFetchNextPage}
+            disabled={isFetching}
+          >
             {isFetching ? <>Loading&hellip;</> : <>More&hellip;</>}
           </button>
         </li>

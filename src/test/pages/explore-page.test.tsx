@@ -34,8 +34,8 @@ jest.mock("../../components/Seo", () => ({ Seo: () => null }));
 jest.mock("../../components/MiniHistogram", () => ({
   MiniHistogram: ({ title }: { title: string }) => <div>{title}</div>,
 }));
-jest.mock("../../components/SankeyChart", () => ({
-  SankeyChart: ({ emptyMessage }: { emptyMessage?: string }) => (
+jest.mock("../../components/SankeyChartDeferred", () => ({
+  SankeyChartDeferred: ({ emptyMessage }: { emptyMessage?: string }) => (
     <div data-testid="sankey">{emptyMessage}</div>
   ),
 }));

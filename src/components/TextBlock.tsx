@@ -1,6 +1,7 @@
 import { TextBlock } from "../services/types";
 import styles from "./TextBlock.module.css";
 import React from "react";
+import { Heading } from "./ui";
 
 export const TextBlockEl: React.FC<{
   block: TextBlock;
@@ -9,7 +10,9 @@ export const TextBlockEl: React.FC<{
   return (
     <div className={styles.block}>
       <div className={styles.content}>
-        <h1 className={styles.title}>{props.block.data.title}</h1>
+        <Heading level={1} as="h1" className={styles.title}>
+          {props.block.data.title}
+        </Heading>
         {props.block.data.kicker ? (
           <p className={styles.kicker}>{props.block.data.kicker}</p>
         ) : null}

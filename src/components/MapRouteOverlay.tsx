@@ -213,9 +213,9 @@ export const MapRouteOverlay = ({
                 segment.approxSpeedKmh !== null &&
                 (segment.distanceKm >= 5 || segment.lengthPx >= 24) ? (
                   <g
+                    className={styles.routeOverlaySpeedLabel}
                     data-testid="journey-line-speed-label"
                     transform={`translate(${segment.midX} ${segment.midY}) rotate(${segment.angle})`}
-                    style={{ opacity: 0.9 }}
                   >
                     <text className={styles.routeOverlayLabel}>
                       {`${segment.approxSpeedKmh}km/h · ${formatDistanceKm(segment.distanceKm)}`}

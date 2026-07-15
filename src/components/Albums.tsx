@@ -1,11 +1,15 @@
 import Link from "next/link";
 import { Content, PhotoBlock } from "../services/types";
 import { Picture } from "./Photo";
-import { Caption } from "./ui";
+import { Caption, Heading } from "./ui";
 import { parseExifLocalDateTime } from "../util/exifTime";
 import styles from "./Album.module.css";
 
 export const Albums: React.FC<{ albums: Content[] }> = (props) => {
+  const firstCoveredAlbumIndex = props.albums.findIndex((album) =>
+    album.blocks.some((block) => block.kind === "photo"),
+  );
+
   return (
     <ul className={styles.list}>
       {props.albums.map((album, i) => {
@@ -28,7 +32,7 @@ export const Albums: React.FC<{ albums: Content[] }> = (props) => {
                 <Picture
                   block={cover as PhotoBlock}
                   thumb
-                  lazy={i > 6}
+                  lazy={i !== firstCoveredAlbumIndex}
                   label={`Album cover for ${album._build.slug}`}
                   useColourPlaceholder
                 />
@@ -36,13 +40,13 @@ export const Albums: React.FC<{ albums: Content[] }> = (props) => {
             </Link>
 
             <div className={styles.name}>
-              <h2>
+              <Heading level={2} as="h2">
                 <span>
                   <Link href={`/album/${album._build.slug}`} tabIndex={-1}>
                     {album.title}
                   </Link>
                 </span>
-              </h2>
+              </Heading>
 
               {timeRange[0] && timeRange[1] && timeRange[0] !== timeRange[1] ? (
                 <Caption as="span" size="sm" className={styles.date}>

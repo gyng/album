@@ -3,10 +3,11 @@
   align-items: center;
   justify-content: center;
   appearance: none;
-  border: solid 1px var(--c-border-on-dark);
-  border-radius: 999px;
+  min-block-size: var(--tap-target);
+  border: solid var(--line-hairline) var(--c-border-on-dark);
+  border-radius: var(--radius-pill);
   background-color: var(--c-overlay-dark);
-  color: white;
+  color: var(--c-on-dark);
   cursor: pointer;
   font-size: var(--fs-s);
   line-height: 1;
@@ -19,18 +20,14 @@
 }
 
 .base:hover {
-  background-color: rgba(0, 0, 0, 0.84);
-}
-
-.base:focus-visible {
-  outline: solid 2px var(--c-bg-contrast-light);
+  background-color: var(--c-overlay-dark-hover);
 }
 
 .small {
-  width: 18px;
-  height: 18px;
-  min-width: 18px;
-  min-height: 18px;
+  inline-size: var(--tap-target);
+  block-size: var(--tap-target);
+  min-inline-size: var(--tap-target);
+  min-block-size: var(--tap-target);
   padding: 0;
   border: 0;
   font-size: var(--fs-sm);

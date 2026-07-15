@@ -24,6 +24,6 @@ describe("SankeyChart server rendering", () => {
       />,
     );
 
-    expect(mockSankeyProps.margin).toEqual({ top: 12, right: 84, bottom: 12, left: 84 });
+    expect(mockSankeyProps.margin).toEqual({ top: 8, right: 56, bottom: 8, left: 56 });
   });
 });

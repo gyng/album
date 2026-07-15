@@ -1,24 +1,23 @@
 .image {
   position: absolute;
   inset: 0;
-  width: 100%;
-  height: 100%;
+  inline-size: 100%;
+  block-size: 100%;
   object-fit: contain;
   cursor: pointer;
   opacity: 1;
   filter: grayscale(0);
   transition:
-    opacity var(--fade-duration) ease-out,
-    filter var(--t-base) ease-out;
-  z-index: 100;
+    opacity var(--fade-duration) var(--ease-out),
+    filter var(--t-base) var(--ease-out);
+  z-index: var(--z-media);
   touch-action: manipulation;
-  -webkit-user-select: none;
   user-select: none;
   -webkit-touch-callout: none;
 }
 
 .image.cover {
-  object-fit: cover !important;
+  object-fit: cover;
 }
 
 /* Cross-fade layer state. Every layer (.image or .remixGrid) defaults to
@@ -43,13 +42,12 @@
   position: absolute;
   inset: 0;
   display: grid;
-  gap: 2px;
-  background: black;
-  z-index: 100;
+  gap: var(--size-2);
+  background: var(--c-black);
+  z-index: var(--z-media);
   cursor: pointer;
   opacity: 1;
-  transition: opacity var(--fade-duration) ease-out;
-  -webkit-user-select: none;
+  transition: opacity var(--fade-duration) var(--ease-out);
   user-select: none;
   -webkit-touch-callout: none;
 }
@@ -82,18 +80,18 @@
    the image's intrinsic size from stretching the grid track. */
 .remixCell {
   position: relative;
-  overflow: hidden;
-  min-width: 0;
-  min-height: 0;
+  overflow: clip;
+  min-inline-size: 0;
+  min-block-size: 0;
 }
 
 .remixImage {
-  width: 100%;
-  height: 100%;
+  inline-size: 100%;
+  block-size: 100%;
   object-fit: cover;
   display: block;
-  min-width: 0;
-  min-height: 0;
+  min-inline-size: 0;
+  min-block-size: 0;
 }
 
 /* Fixed-position grid spanning the full viewport width. Three rows:
@@ -105,28 +103,6 @@
    All horizontal placement (centre / left / right) is done with grid
    alignment (justify-items, justify-self) — no transforms, no manual
    left/right, no hardcoded centring offsets. */
-.bottomBarStack {
-  position: fixed;
-  inset: auto 0 calc(env(safe-area-inset-bottom, 0px) + 5vh) 0;
-  z-index: 200;
-  display: grid;
-  /* Every grid item is horizontally centred in its track by default;
-     justify-self on a specific item can override per data-align below. */
-  justify-items: center;
-  /* align-items: end pins every grid item to the bottom of its row so
-     description cells with shorter content don't float up to the top of
-     a stretched cell (which made the centre cell look higher than its
-     neighbours when the row had to stretch to the tallest sibling). */
-  align-items: end;
-  pointer-events: none;
-  text-align: center;
-  text-shadow:
-    0 1px 3px hsl(0 0% 0% / 0.55),
-    1px 2px 2px hsl(0 0% 0% / 0.45),
-    2px 4px 4px hsl(0 0% 0% / 0.333),
-    3px 6px 6px hsl(0 0% 0% / 0.333);
-  color: white;
-}
 
 /* Subtle bottom scrim so white captions stay legible over predominantly
    bright photos (e.g. a near-white bokeh frame). Pinned to the viewport
@@ -134,39 +110,6 @@
    with content (and is full-height in 4-up). Sits within the stack's
    stacking context (z-index 200), so it darkens the photo beneath the
    captions without ever covering them. */
-.bottomBarStack::before {
-  content: "";
-  position: fixed;
-  inset: auto 0 0 0;
-  height: 28vh;
-  z-index: -1;
-  pointer-events: none;
-  background: linear-gradient(to top, hsl(0 0% 0% / 0.42), hsl(0 0% 0% / 0.18) 45%, transparent);
-}
-
-.bottomBarStack[data-count="1"] {
-  grid-template-columns: 1fr;
-  grid-template-areas:
-    "map"
-    "desc0"
-    "clock";
-}
-
-.bottomBarStack[data-count="2"] {
-  grid-template-columns: 1fr 1fr;
-  grid-template-areas:
-    "map   map"
-    "desc0 desc1"
-    "clock clock";
-}
-
-.bottomBarStack[data-count="3"] {
-  grid-template-columns: 1fr 1fr 1fr;
-  grid-template-areas:
-    "map   map   map"
-    "desc0 desc1 desc2"
-    "clock clock clock";
-}
 
 /* 4-up: the photo grid above is 2 columns × 2 rows (each photo fills a
    viewport quadrant). Unlike 1/2/3-up — where the photos are a single row and
@@ -178,17 +121,6 @@
    the bottom photos. The two 1fr rows mirror the 50/50 photo split; map +
    clock chrome sit in auto rows at the very bottom. align-items:end (set on
    the container) pins each cell to the bottom of its row. */
-.bottomBarStack[data-count="4"] {
-  inset: 0 0 calc(env(safe-area-inset-bottom, 0px) + 5vh) 0;
-  grid-template-columns: 1fr 1fr;
-  /* Two equal rows mirror the 2×2 photo split; align-items:end (on the
-     container) pins desc0/desc1 to the bottom of the top photo row and
-     desc2/desc3 to the bottom of the bottom photo row. */
-  grid-template-rows: 1fr 1fr;
-  grid-template-areas:
-    "desc0 desc1"
-    "desc2 desc3";
-}
 
 /* The slide chrome (map + clock + remix badge) is slide-level, not per-pane.
    In the single-row layouts it stacks above/below the descriptions, but for
@@ -196,117 +128,69 @@
    toggled off), pulling the bottom captions up off the bottom photo row. Lift
    it out of the grid flow and pin it to the bottom centre instead — the
    per-column descriptions (offset to each half) clear the centred badge. */
-.bottomBarStack[data-count="4"] .slideMap,
-.bottomBarStack[data-count="4"] .slideClock {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-}
 
 /* Single-image detailsAlignment toggle — slides every grid item to the
    start or end of its (single) column. No transforms involved: pure
    grid alignment via justify-items on the container. Multi-photo remix
    ignores data-align because per-column centring already gives each
    description its own column. */
-.bottomBarStack[data-count="1"][data-align="left"] {
-  justify-items: start;
-}
-
-.bottomBarStack[data-count="1"][data-align="right"] {
-  justify-items: end;
-}
 
 /* No inner flex layout here — the grid cell already fixes width, and a
    plain block context lets `.detailsRow { margin: ... auto }` and
    `text-align: center` (inherited) do the horizontal centring. */
-.descriptionCell {
-  min-width: 0;
-  max-width: 100%;
-  padding: 0 var(--m-s);
-  box-sizing: border-box;
-  width: 100%;
-}
 
 /* mix-blend-mode requires its own stacking context to blend with the
    layers below — without `isolation: isolate` the blend either has no
    effect or bleeds beyond the intended subject. */
-.slideMap {
-  isolation: isolate;
-  pointer-events: none;
-  width: 100%;
-}
-
-.slideMap .mapContainer {
-  width: 11rem;
-  max-width: 80vw;
-  margin-left: auto;
-  margin-right: auto;
-}
-
-.slideClock {
-  pointer-events: none;
-  width: 100%;
-}
 
 /* The remix strategy badge inside .slideClock sits directly below the
    description row above it; the default .detailsRow vertical margin
    (var(--m-s) top + bottom) opens a gap that breaks the visual line-
    height rhythm with the description rows. Tighten the top margin so
    the badge feels like a continuation of the description block. */
-.slideClock .detailsAffinity {
-  margin-top: 0;
-}
 
 .preloadBuffer {
   position: fixed;
-  width: 1px;
-  height: 1px;
-  inset: auto auto -10px -10px;
+  inline-size: var(--size-1);
+  block-size: var(--size-1);
+  inset: auto auto calc(var(--size-10) * -1) calc(var(--size-10) * -1);
   opacity: 0.001;
   pointer-events: none;
   user-select: none;
 }
 
 .container {
+  isolation: isolate;
   /* Local dark-glass palette — one source of truth for the always-dark
      slideshow chrome, seeded from the shared overlay tokens (the same glass
      OverlayButton uses on media). --glass-bg is the panel surface; the soft
      and strong variants are deliberately lighter/darker, derived from the
      token via color-mix so they stay in lockstep rather than drifting as
      hand-rolled hsl() literals. --glass-border matches the on-dark border. */
-  --glass-bg: var(--c-overlay-dark);
-  --glass-bg-soft: color-mix(in srgb, var(--c-overlay-dark) 69%, transparent);
-  --glass-bg-strong: color-mix(in srgb, var(--c-overlay-dark) 80%, black 20%);
-  --glass-border: var(--c-border-on-dark);
+  --glass-bg: var(--glass-surface-dark);
+  --glass-bg-soft: color-mix(in oklch, var(--c-overlay-dark) 69%, transparent);
+  --glass-bg-strong: color-mix(in oklch, var(--c-overlay-dark) 80%, var(--c-black) 20%);
+  --glass-border: var(--glass-border-dark);
   /* One shared cross-fade duration for every layer in the stack (.image and
-     .remixGrid) so an image↔grid advance fades at a single constant rate
-     rather than two slightly different speeds (was 0.24s for images, 0.28s
-     for grids — this midpoint keeps the established feel). */
-  --fade-duration: 0.26s;
+     .remixGrid) so an image↔grid advance fades at a single constant rate. */
+  --fade-duration: var(--t-medium);
   --touch-toolbar-show-preview-progress: 0;
   --touch-toolbar-hide-preview-progress: 0;
   position: fixed;
   inset: 0;
-  width: 100vw;
-  /* biome-ignore lint/suspicious/noDuplicateProperties: Fallback for browsers without dynamic viewport units. */
-  width: 100dvw;
-  height: 100vh;
-  height: 100dvh;
-  min-height: 100svh;
-  background-color: black;
+  inline-size: 100dvw;
+  block-size: 100dvh;
+  min-block-size: 100svh;
+  background-color: var(--c-black);
   display: flex;
   justify-content: center;
   overflow: clip;
 }
 
 .progressBarContainer {
-  width: 100vw;
-  /* biome-ignore lint/suspicious/noDuplicateProperties: Fallback for browsers without dynamic viewport units. */
-  width: 100dvw;
-  height: 100vh;
-  height: 100dvh;
-  min-height: 100svh;
+  inline-size: 100dvw;
+  block-size: 100dvh;
+  min-block-size: 100svh;
   position: fixed;
   display: grid;
   place-items: center;
@@ -336,7 +220,7 @@
   color: var(--c-bg-contrast-light);
   font-size: var(--fs-s);
   text-decoration: underline;
-  text-underline-offset: 2px;
+  text-underline-offset: var(--size-2);
   transition: color var(--t-fast) var(--ease-out);
 }
 
@@ -351,22 +235,22 @@
    The slideshow chrome is always dark, so on-dark text is intentional here. */
 .errorToast {
   position: fixed;
-  top: calc(env(safe-area-inset-top, 0px) + var(--m-l));
-  left: 50%;
+  inset-block-start: calc(env(safe-area-inset-top, 0) + var(--m-l));
+  inset-inline-start: 50%;
   transform: translateX(-50%);
-  z-index: 10002;
+  z-index: var(--z-fullscreen-toast);
   display: flex;
   align-items: center;
   gap: var(--m-s);
-  max-width: min(90vw, 30rem);
+  max-inline-size: min(90dvw, var(--overlay-width-wide));
   padding: var(--m-s) var(--m-m);
   border-radius: var(--m-s);
   background-color: var(--c-overlay-dark);
-  border: 1px solid var(--c-border-on-dark);
-  color: white;
+  border: var(--size-1) solid var(--c-border-on-dark);
+  color: var(--c-white);
   font-size: var(--fs-sm);
-  backdrop-filter: blur(10px);
-  box-shadow: 0 8px 22px hsl(0 0% 0% / 0.28);
+  backdrop-filter: blur(var(--glass-blur-control));
+  box-shadow: 0 var(--size-8) var(--size-22) color-mix(in oklch, var(--c-black) 28%, transparent);
 }
 
 .errorToastMessage {
@@ -391,57 +275,16 @@
   opacity: 1;
 }
 
-.toolbar {
-  position: fixed;
-  top: 0;
-  left: 0;
-  padding: calc(env(safe-area-inset-top, 0px) + var(--m-l)) clamp(var(--m-l), 4vw, var(--m-xl))
-    calc(env(safe-area-inset-bottom, 0px) + var(--m-l))
-    calc(env(safe-area-inset-left, 0px) + clamp(var(--m-l), 4vw, var(--m-xl))) !important;
-  width: 100%;
-  max-height: 100dvh;
-  /* The slideshow toolbar is a multi-section overlay that needs to wrap onto
-     multiple rows — it does NOT share the always-single-line scroll behavior
-     of the global .topBar. Layout is defined inline here rather than borrowing
-     .topBar from common.module.css. */
-  display: flex;
-  flex-direction: row;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--m-m);
-  font-size: var(--fs-sm);
-  opacity: 0;
-  transform: translateY(-1rem) scale(0.985);
-  transform-origin: top center;
-  transition:
-    opacity 0.28s ease-out,
-    transform 0.32s cubic-bezier(0.22, 1, 0.36, 1),
-    background-color 0.22s ease-out,
-    box-shadow 0.22s ease-out;
-  background-color: transparent;
-  z-index: 10000;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  will-change: opacity, transform;
-}
-
 /* Fine pointers dismiss the toolbar by leaving the top edge or the "Hide"
    button, so the sticky close is touch-only (see the coarse-pointer rule). */
-.toolbarCloseButton {
-  display: none;
-}
-
-.sessionDock {
-  display: none;
-}
 
 .toolbarTrigger {
   position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: clamp(5rem, 18vh, 10rem);
-  z-index: 9999;
+  inset-block-start: 0;
+  inset-inline-start: 0;
+  inline-size: 100%;
+  block-size: clamp(calc(var(--size-96) - var(--m-xs)), 18dvh, var(--size-180));
+  z-index: var(--z-fullscreen);
 }
 
 .container[data-controls-visible="true"] .toolbarTrigger {
@@ -450,65 +293,67 @@
 
 .toolbarHint {
   position: fixed;
-  top: calc(env(safe-area-inset-top, 0px) + var(--m-m));
-  left: 50%;
+  inset-block-start: calc(env(safe-area-inset-top, 0) + var(--m-m));
+  inset-inline-start: 50%;
   transform: translateX(-50%);
   padding: calc(var(--m-s) * 0.75) var(--m-l);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--glass-bg-soft);
-  color: hsl(0 0% 100% / 0.82);
+  color: color-mix(in oklch, var(--c-white) 82%, transparent);
   font-size: var(--fs-s);
   letter-spacing: 0.03em;
-  backdrop-filter: blur(10px);
+  backdrop-filter: blur(var(--glass-blur-control));
   box-shadow:
-    0 8px 22px hsl(0 0% 0% / 0.18),
-    inset 0 1px 0 hsl(0 0% 100% / 0.08);
+    0 var(--size-8) var(--size-22) color-mix(in oklch, var(--c-black) 18%, transparent),
+    inset 0 var(--size-1) 0 color-mix(in oklch, var(--c-white) 8%, transparent);
   pointer-events: none;
-  z-index: 9998;
-  animation: toolbarHintLifecycle 2.2s ease-out forwards;
+  z-index: var(--z-fullscreen-underlay);
+  animation: toolbarHintLifecycle var(--t-hint) var(--ease-out) forwards;
 }
 
 .container[data-controls-visible="true"] .toolbar {
   opacity: calc(1 - var(--touch-toolbar-hide-preview-progress));
-  transform: translateY(calc(-1.5rem * var(--touch-toolbar-hide-preview-progress)))
+  transform: translateY(calc(var(--size-28) * -1 * var(--touch-toolbar-hide-preview-progress)))
     scale(calc(1 - (0.025 * var(--touch-toolbar-hide-preview-progress))));
 }
 
 .container[data-controls-visible="false"] .toolbar {
   opacity: var(--touch-toolbar-show-preview-progress);
-  transform: translateY(calc(-1.5rem * (1 - var(--touch-toolbar-show-preview-progress))))
+  transform: translateY(
+      calc(var(--size-28) * -1 * (1 - var(--touch-toolbar-show-preview-progress)))
+    )
     scale(calc(0.975 + (0.025 * var(--touch-toolbar-show-preview-progress))));
   pointer-events: none;
 }
 
 .container[data-fullscreen-active="true"] .toolbar {
-  padding-right: calc(env(safe-area-inset-right, 0px) + var(--m-2xl) + var(--m-l)) !important;
+  padding-inline-end: calc(env(safe-area-inset-right, 0) + var(--m-2xl) + var(--m-l));
 }
 
 .fullscreenExitButton {
   position: fixed;
-  top: calc(env(safe-area-inset-top, 0px) + var(--m-m));
-  right: calc(env(safe-area-inset-right, 0px) + var(--m-m));
-  z-index: 10001;
-  min-height: calc(var(--m-xl) + var(--m));
+  inset-block-start: calc(env(safe-area-inset-top, 0) + var(--m-m));
+  right: calc(env(safe-area-inset-right, 0) + var(--m-m));
+  z-index: var(--z-fullscreen-control);
+  min-block-size: calc(var(--m-xl) + var(--m));
   padding: 0 var(--m-l);
-  border: 1px solid var(--glass-border);
-  border-radius: 999px;
+  border: var(--size-1) solid var(--glass-border);
+  border-radius: var(--radius-pill);
   background: var(--glass-bg-soft);
-  color: hsl(0 0% 100% / 0.92);
+  color: color-mix(in oklch, var(--c-white) 92%, transparent);
   font-size: var(--fs-s);
   font-weight: 600;
   line-height: 1;
   box-shadow:
-    0 var(--m-s) var(--m-l) hsl(0 0% 0% / 0.32),
-    inset 0 1px 0 hsl(0 0% 100% / 0.1);
-  backdrop-filter: blur(12px);
+    0 var(--m-s) var(--m-l) color-mix(in oklch, var(--c-black) 32%, transparent),
+    inset 0 var(--size-1) 0 color-mix(in oklch, var(--c-white) 10%, transparent);
+  backdrop-filter: blur(var(--glass-blur-panel));
 }
 
 .fullscreenExitButton:hover,
 .fullscreenExitButton:focus-visible {
   background: var(--glass-bg-strong);
-  color: white;
+  color: var(--c-white);
 }
 
 .touchAffordances {
@@ -519,15 +364,15 @@
   --touch-juice-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
   position: fixed;
   inset: 0;
-  z-index: 300;
+  z-index: var(--z-details);
   pointer-events: none;
-  color: hsl(0 0% 100% / 0.72);
+  color: color-mix(in oklch, var(--c-white) 72%, transparent);
 }
 
 .touchBottomAffordance {
   position: fixed;
-  bottom: calc(env(safe-area-inset-bottom, 0px) + var(--m-m));
-  left: 50%;
+  inset-block-end: calc(env(safe-area-inset-bottom, 0) + var(--m-m));
+  inset-inline-start: 50%;
   display: grid;
   /* Chevron sits above the label pill (JSX order: chevron, label).
      gap controls the breathing room between the two — kept generous so
@@ -538,39 +383,40 @@
   opacity: 0;
   transform: translateX(-50%) translateY(calc(var(--touch-pull-progress) * var(--m-l) * -1));
   transition:
-    opacity 0.18s var(--touch-juice-ease),
-    transform 0.18s var(--touch-juice-ease);
+    opacity var(--t-base) var(--touch-juice-ease),
+    transform var(--t-base) var(--touch-juice-ease);
 }
 
 .touchPullChevron {
   display: grid;
   place-items: center;
-  width: var(--m-xl);
-  height: var(--m-xl);
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--c-overlay-dark) 58%, transparent);
-  color: hsl(0 0% 100% / 0.92);
-  backdrop-filter: blur(10px);
+  inline-size: var(--m-xl);
+  block-size: var(--m-xl);
+  border-radius: var(--radius-pill);
+  background: color-mix(in oklch, var(--c-overlay-dark) 58%, transparent);
+  color: color-mix(in oklch, var(--c-white) 92%, transparent);
+  backdrop-filter: blur(var(--glass-blur-control));
   scale: calc(1 + var(--touch-pull-progress, 0) * 0.1);
-  box-shadow: 0 0 0 calc(var(--touch-pull-progress, 0) * 1.5px) hsl(0 0% 100% / 0.5);
+  box-shadow: 0 0 0 calc(var(--touch-pull-progress, 0) * var(--size-1-5))
+    color-mix(in oklch, var(--c-white) 50%, transparent);
   transition:
-    background-color 0.16s var(--touch-juice-ease),
-    color 0.16s var(--touch-juice-ease);
+    background-color var(--t-theme) var(--touch-juice-ease),
+    color var(--t-theme) var(--touch-juice-ease);
 }
 
 .touchAffordanceLabel {
   padding: calc(var(--m-s) * 0.65) var(--m-l);
-  border-radius: 999px;
-  border: 1px solid hsl(0 0% 60% / 0.35);
-  background: color-mix(in srgb, var(--c-bg) 97%, var(--c-bg-contrast-dark));
+  border-radius: var(--radius-pill);
+  border: var(--size-1) solid color-mix(in oklch, var(--c-white) 21%, transparent);
+  background: color-mix(in oklch, var(--c-bg) 97%, var(--c-bg-contrast-dark));
   color: var(--c-bg-contrast-light);
   font-size: var(--fs-s);
   letter-spacing: 0.02em;
   white-space: nowrap;
   box-shadow:
-    0 8px 20px hsl(0 0% 0% / 0.22),
-    inset 0 1px 0 hsl(0 0% 100% / 0.08);
-  backdrop-filter: blur(10px);
+    0 var(--size-8) var(--size-20) color-mix(in oklch, var(--c-black) 22%, transparent),
+    inset 0 var(--size-1) 0 color-mix(in oklch, var(--c-white) 8%, transparent);
+  backdrop-filter: blur(var(--glass-blur-control));
 }
 
 .touchPullChevron svg,
@@ -582,30 +428,30 @@
 .touchSideAffordanceLeft,
 .touchSideAffordanceRight {
   position: fixed;
-  top: 50%;
+  inset-block-start: 50%;
   display: grid;
   place-items: center;
-  width: var(--m-2xl);
-  height: var(--m-2xl);
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--c-overlay-dark) 39%, transparent);
-  color: hsl(0 0% 100% / 0.58);
+  inline-size: var(--m-2xl);
+  block-size: var(--m-2xl);
+  border-radius: var(--radius-pill);
+  background: color-mix(in oklch, var(--c-overlay-dark) 39%, transparent);
+  color: color-mix(in oklch, var(--c-white) 58%, transparent);
   opacity: 0;
   transform: translateY(-50%);
   transition:
-    opacity 0.18s var(--touch-juice-ease),
-    transform 0.24s var(--touch-juice-ease),
-    background-color 0.18s var(--touch-juice-ease),
-    box-shadow 0.18s var(--touch-juice-ease);
-  backdrop-filter: blur(10px);
+    opacity var(--t-base) var(--touch-juice-ease),
+    transform var(--t-medium) var(--touch-juice-ease),
+    background-color var(--t-base) var(--touch-juice-ease),
+    box-shadow var(--t-base) var(--touch-juice-ease);
+  backdrop-filter: blur(var(--glass-blur-control));
 }
 
 .touchSideAffordanceLeft {
-  left: calc(env(safe-area-inset-left, 0px) + var(--m-m));
+  left: calc(env(safe-area-inset-left, 0) + var(--m-m));
 }
 
 .touchSideAffordanceRight {
-  right: calc(env(safe-area-inset-right, 0px) + var(--m-m));
+  right: calc(env(safe-area-inset-right, 0) + var(--m-m));
 }
 
 /* While a touch is active but no direction is committed yet, the side
@@ -633,8 +479,9 @@
 .touchAffordances[data-touch-hint="next"] .touchSideAffordanceRight {
   opacity: calc(0.82 + (var(--touch-swipe-progress, 0) * 0.18));
   background: var(--glass-bg-soft);
-  color: hsl(0 0% 100% / 0.95);
-  box-shadow: 0 0 0 calc(var(--touch-swipe-progress, 0) * 1.5px) hsl(0 0% 100% / 0.55);
+  color: color-mix(in oklch, var(--c-white) 95%, transparent);
+  box-shadow: 0 0 0 calc(var(--touch-swipe-progress, 0) * var(--size-1-5))
+    color-mix(in oklch, var(--c-white) 55%, transparent);
 }
 
 .touchAffordances[data-touch-hint="previous"] .touchSideAffordanceLeft {
@@ -656,170 +503,26 @@
    feel "I'm past commit" rather than reading it off a continuous curve. */
 .touchAffordances[data-touch-armed="true"][data-touch-hint="previous"] .touchSideAffordanceLeft,
 .touchAffordances[data-touch-armed="true"][data-touch-hint="next"] .touchSideAffordanceRight {
-  background: hsl(0 0% 100% / 0.96);
-  color: hsl(0 0% 6%);
+  background: color-mix(in oklch, var(--c-white) 96%, transparent);
+  color: color-mix(in oklch, var(--c-white) 6%, var(--c-black));
   box-shadow:
-    0 0 0 3px hsl(0 0% 100% / 0.75),
-    0 0 0 5px hsl(0 0% 0% / 0.35);
+    0 0 0 var(--size-3) color-mix(in oklch, var(--c-white) 75%, transparent),
+    0 0 0 var(--size-5) color-mix(in oklch, var(--c-black) 35%, transparent);
 }
 
 .touchAffordances[data-touch-armed="true"][data-touch-hint="remix"] .touchPullChevron {
-  background: hsl(0 0% 100% / 0.96);
-  color: hsl(0 0% 6%);
+  background: color-mix(in oklch, var(--c-white) 96%, transparent);
+  color: color-mix(in oklch, var(--c-white) 6%, var(--c-black));
   box-shadow:
-    0 0 0 3px hsl(0 0% 100% / 0.75),
-    0 0 0 5px hsl(0 0% 0% / 0.35);
+    0 0 0 var(--size-3) color-mix(in oklch, var(--c-white) 75%, transparent),
+    0 0 0 var(--size-5) color-mix(in oklch, var(--c-black) 35%, transparent);
 }
 
 .touchAffordances[data-touch-armed="true"][data-touch-hint="remix"] .touchAffordanceLabel {
-  border-color: hsl(0 0% 100% / 0.95);
+  border-color: color-mix(in oklch, var(--c-white) 95%, transparent);
   box-shadow:
-    0 8px 20px hsl(0 0% 0% / 0.3),
-    0 0 0 2px hsl(0 0% 100% / 0.45);
-}
-
-.brandLink {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--m-m);
-  padding: var(--m-m) var(--m-l);
-  border-radius: calc(var(--m-s) * 1.5);
-  text-decoration: none;
-  background: linear-gradient(135deg, hsl(210 40% 14% / 0.9), hsl(26 65% 22% / 0.88));
-  color: white;
-  box-shadow:
-    0 12px 30px hsl(0 0% 0% / 0.25),
-    inset 0 1px 0 hsl(0 0% 100% / 0.12);
-}
-
-.brandLogo {
-  display: grid;
-  place-items: center;
-  width: 2.75rem;
-  height: 2.75rem;
-  border-radius: 999px;
-  background: hsl(0 0% 100% / 0.14);
-  font-size: 1.25rem;
-}
-
-.brandCopy {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  line-height: 1.1;
-}
-
-.brandTitle {
-  font-size: var(--fs-sm);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.brandSubtitle {
-  font-size: var(--fs-m);
-  font-weight: 600;
-}
-
-.poolStats {
-  display: inline-flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 2px;
-  border: 0;
-  padding: calc(var(--m-s) * 0.75) var(--m-m);
-  border-radius: calc(var(--m-s) * 1.5);
-  background: var(--glass-bg);
-  color: hsl(0 0% 100% / 0.78);
-  font: inherit;
-  font-variant-numeric: tabular-nums;
-  line-height: 1.15;
-  cursor: pointer;
-  box-shadow:
-    0 18px 40px hsl(0 0% 0% / 0.25),
-    inset 0 1px 0 hsl(0 0% 100% / 0.08);
-  backdrop-filter: blur(14px);
-}
-
-.poolStats:hover,
-.poolStats:focus-visible {
-  background: hsl(0 0% 100% / 0.18);
-  outline: 1px solid hsl(0 0% 100% / 0.3);
-}
-
-.poolStatsCount {
-  font-size: var(--fs-sm);
-  font-weight: 600;
-  color: white;
-}
-
-.poolStatsNewest {
-  font-size: var(--fs-s);
-  color: hsl(0 0% 100% / 0.6);
-}
-
-.playbackGroup {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--m-m);
-  padding: var(--m-s);
-  border-radius: calc(var(--m-s) * 1.5);
-  background: var(--glass-bg);
-  box-shadow:
-    0 18px 40px hsl(0 0% 0% / 0.25),
-    inset 0 1px 0 hsl(0 0% 100% / 0.08);
-  backdrop-filter: blur(14px);
-}
-
-.playbackHeader {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--m-s);
-  min-width: 10rem;
-  padding: 0 var(--m-s);
-}
-
-.playbackLogo {
-  display: grid;
-  place-items: center;
-  width: 2rem;
-  height: 2rem;
-  border-radius: 999px;
-  background: hsl(40 90% 58% / 0.18);
-  color: hsl(40 100% 76%);
-}
-
-.playbackCopy {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  color: white;
-  line-height: 1.1;
-}
-
-.playbackTitle {
-  font-size: var(--fs-sm);
-  font-weight: 600;
-}
-
-.playbackSubtitle {
-  font-size: var(--fs-s);
-  color: hsl(0 0% 100% / 0.72);
-}
-
-.playbackButtons {
-  display: inline-flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--m-s);
-}
-
-.playbackDivider {
-  width: 1px;
-  height: 1.5rem;
-  flex: 0 0 1px;
-  margin: 0 calc(var(--m-s) * 0.75);
-  background: var(--glass-border);
-  border-radius: 1px;
+    0 var(--size-8) var(--size-20) color-mix(in oklch, var(--c-black) 30%, transparent),
+    0 0 0 var(--size-2) color-mix(in oklch, var(--c-white) 45%, transparent);
 }
 
 /* Modifier buttons live between mode toggles and one-shot actions. They are
@@ -827,114 +530,13 @@
    than exclusive choices, so the user needs a glanceable cue that they're a
    different *kind* of button. Italic label + dashed border (when inactive)
    signals "this combines with the mode" rather than "this replaces it". */
-.playbackModifier {
-  font-style: italic;
-}
-
-.playbackModifier:not([aria-pressed="true"]) {
-  border-style: dashed !important;
-  opacity: 0.82;
-}
-
-.controlGroup {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--m-s);
-  padding: var(--m-s);
-  border-radius: calc(var(--m-s) * 1.5);
-  background: var(--glass-bg);
-  box-shadow:
-    0 18px 40px hsl(0 0% 0% / 0.25),
-    inset 0 1px 0 hsl(0 0% 100% / 0.08);
-  backdrop-filter: blur(14px);
-}
-
-.controlHeader {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--m-s);
-  /* min-width removed — header used to reserve 10rem regardless of label
-     width, which left a large gap between the title and the first button. */
-  padding: 0 calc(var(--m-s) * 0.5);
-}
-
-.controlLogo {
-  display: grid;
-  place-items: center;
-  width: 2rem;
-  height: 2rem;
-  border-radius: 999px;
-  background: hsl(184 86% 56% / 0.16);
-  color: hsl(184 100% 78%);
-}
-
-.controlCopy {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  color: white;
-  line-height: 1.1;
-}
-
-.controlTitle {
-  font-size: var(--fs-sm);
-  font-weight: 600;
-}
 
 .controlSubtitle {
   font-size: var(--fs-s);
-  color: hsl(0 0% 100% / 0.72);
-}
-
-.controlButtons,
-.controlMeta {
-  display: inline-flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--m-s);
-}
-
-.playbackButtons :global(button),
-.controlButtons :global(button),
-.controlMeta :global(a),
-.controlMeta :global(button),
-.controlMeta :global(div) {
-  min-height: 44px;
-}
-
-.hideProgress {
-  display: inline-grid;
-  place-items: center;
-  width: 1.5rem;
-  height: 1.5rem;
-  margin-left: calc(var(--m-s) * 0.5);
-  opacity: 0.46;
-  transform: translateY(0.02rem);
+  color: color-mix(in oklch, var(--c-white) 72%, transparent);
 }
 
 /* Pairs the Hide button with the auto-hide ring as a single visual unit. */
-.playbackHideGroup {
-  display: inline-flex;
-  align-items: center;
-  gap: calc(var(--m-s) * 0.5);
-  margin-left: auto;
-}
-
-.hideProgressRing {
-  width: 100%;
-  height: 100%;
-  border-radius: 999px;
-  background:
-    radial-gradient(circle closest-side, transparent 74%, hsl(0 0% 100% / 0.1) 75% 100%),
-    conic-gradient(
-      hsl(0 0% 100% / 0.5) calc(var(--hide-progress, 1) * 1turn),
-      hsl(0 0% 100% / 0.08) 0
-    );
-  box-shadow:
-    inset 0 0 0 1px hsl(0 0% 100% / 0.05),
-    0 0 0 1px hsl(0 0% 0% / 0.08);
-  filter: saturate(0.8);
-}
 
 @media (hover: none), (pointer: coarse) {
   .toolbarTrigger {
@@ -945,164 +547,26 @@
     display: none;
   }
 
-  .toolbar {
-    pointer-events: auto;
-  }
-
-  .sessionDock {
-    position: sticky;
-    top: 0;
-    z-index: 2;
-    order: -1;
-    width: min(100%, 42rem);
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    gap: var(--m-s);
-    padding: var(--m-s);
-    border: solid 1px var(--glass-border);
-    border-radius: var(--m-l);
-    background: linear-gradient(135deg, hsl(210 32% 10% / 0.96), hsl(210 24% 15% / 0.94));
-    backdrop-filter: blur(18px);
-    box-shadow:
-      0 var(--m-l) var(--m-xl) hsl(0 0% 0% / 0.34),
-      inset 0 1px 0 hsl(0 0% 100% / 0.1);
-  }
-
   /* Pinned session actions replace the buried Hide and Wake Lock controls on
      coarse pointers. The Hide half remains the sheet grabber. */
-  .toolbarCloseButton {
-    position: relative;
-    display: flex;
-    align-items: center;
-    gap: var(--m-s);
-    min-height: var(--m-2xl);
-    padding: var(--m-s) var(--m-m);
-    border: 0;
-    border-radius: var(--m-m);
-    background: hsl(0 0% 100% / 0.08);
-    color: white;
-    font: inherit;
-    text-align: left;
-    cursor: grab;
-  }
-
-  .toolbarCloseGrip {
-    position: absolute;
-    top: var(--m);
-    left: 50%;
-    width: var(--m-l);
-    height: 2px;
-    transform: translateX(-50%);
-    border-radius: 999px;
-    background: hsl(0 0% 100% / 0.38);
-  }
-
-  .sessionAwakeButton {
-    display: flex;
-    align-items: center;
-    gap: var(--m-s);
-    min-height: var(--m-2xl);
-    padding: var(--m-s) var(--m-m);
-    border: solid 1px hsl(42 92% 68% / 0.28);
-    border-radius: var(--m-m);
-    background: hsl(42 72% 42% / 0.12);
-    color: white;
-    font: inherit;
-    text-align: left;
-  }
-
-  .sessionAwakeButtonActive {
-    border-color: hsl(142 68% 60% / 0.48);
-    background: hsl(142 54% 32% / 0.24);
-  }
-
-  .sessionAwakeButton:disabled {
-    opacity: 0.5;
-  }
-
-  .sessionActionIcon,
-  .sessionAwakeIndicator {
-    flex: 0 0 auto;
-    display: grid;
-    place-items: center;
-    width: var(--m-l);
-    height: var(--m-l);
-    border-radius: 999px;
-    background: hsl(0 0% 100% / 0.1);
-  }
-
-  .sessionAwakeIndicator {
-    width: var(--m-m);
-    height: var(--m-m);
-    background: hsl(42 92% 68%);
-    box-shadow: 0 0 var(--m-m) hsl(42 92% 68% / 0.52);
-  }
-
-  .sessionAwakeButtonActive .sessionAwakeIndicator {
-    background: hsl(142 72% 64%);
-    box-shadow: 0 0 var(--m-m) hsl(142 72% 64% / 0.52);
-  }
-
-  .sessionActionCopy {
-    min-width: 0;
-    display: flex;
-    flex-direction: column;
-    gap: var(--m);
-    line-height: 1.05;
-  }
-
-  .sessionActionCopy strong {
-    font-size: var(--fs-sm);
-    font-weight: 650;
-  }
-
-  .sessionActionCopy span {
-    color: hsl(0 0% 100% / 0.62);
-    font-size: var(--fs-s);
-  }
-
-  .sessionProgress {
-    flex: 0 0 auto;
-    width: var(--m-l);
-    height: var(--m-l);
-    margin-left: auto;
-    opacity: 0.58;
-  }
-
-  .toolbarCloseButton:active {
-    background: var(--glass-bg);
-    cursor: grabbing;
-  }
-
-  .toolbarCloseButton:focus-visible {
-    outline: solid 2px var(--c-font);
-    outline-offset: 2px;
-  }
-
-  .sessionAwakeButton:focus-visible {
-    outline: solid 2px white;
-    outline-offset: 2px;
-  }
-
-  .secondarySessionControl {
-    display: none !important;
-  }
 
   .container[data-controls-visible="false"] .toolbar {
     opacity: var(--touch-toolbar-show-preview-progress);
-    transform: translateY(calc(-1.5rem * (1 - var(--touch-toolbar-show-preview-progress))))
+    transform: translateY(
+        calc(var(--size-28) * -1 * (1 - var(--touch-toolbar-show-preview-progress)))
+      )
       scale(calc(0.975 + (0.025 * var(--touch-toolbar-show-preview-progress))));
     pointer-events: none;
   }
 
   .container[data-controls-visible="true"] .toolbar {
     opacity: calc(1 - var(--touch-toolbar-hide-preview-progress));
-    transform: translateY(calc(-1.5rem * var(--touch-toolbar-hide-preview-progress)))
+    transform: translateY(calc(var(--size-28) * -1 * var(--touch-toolbar-hide-preview-progress)))
       scale(calc(1 - (0.025 * var(--touch-toolbar-hide-preview-progress))));
     background: linear-gradient(
       180deg,
-      hsl(0 0% 0% / 0.68),
-      hsl(0 0% 0% / 0.34) 38%,
+      color-mix(in oklch, var(--c-black) 68%, transparent),
+      color-mix(in oklch, var(--c-black) 34%, transparent) 38%,
       transparent 72%
     );
   }
@@ -1114,134 +578,52 @@
    well before the 720px mobile breakpoint, otherwise the groups overflow on
    tablets and small laptops. 1024px is where the three groups stop fitting
    side by side. */
-@media (max-width: 1024px) {
-  .toolbar {
-    padding: calc(env(safe-area-inset-top, 0px) + var(--m-l)) var(--m-l)
-      calc(env(safe-area-inset-bottom, 0px) + var(--m-l))
-      calc(env(safe-area-inset-left, 0px) + var(--m-l)) !important;
-  }
-
-  .brandLink,
-  .playbackGroup,
-  .controlGroup {
-    width: min(100%, 42rem);
-  }
-
-  .playbackGroup,
-  .controlGroup {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .playbackHeader,
-  .playbackButtons,
-  .controlHeader,
-  .controlButtons,
-  .controlMeta {
-    width: 100%;
-  }
-}
 
 /* Fade the clock/details panel during an active touch gesture so it
    doesn't visually clash with the centred touch affordances. */
 .container[data-touch-active="true"] .bottomBarStack {
   opacity: 0.25;
-  transition: opacity 0.18s ease-out;
+  transition: opacity var(--t-base) var(--ease-out);
 }
 
 .hide {
   visibility: hidden;
 }
 
-.displaySetting {
-  opacity: 0;
-  transform: translateY(var(--m-s));
-  transition:
-    opacity 0.28s ease-out,
-    transform 0.28s ease-out;
-  will-change: opacity, transform;
-  pointer-events: none;
-}
-
-.displaySettingActive {
-  opacity: 1;
-  transform: translateY(0);
-}
-
-.clock {
-  isolation: isolate;
-}
-
-.date {
-  font-size: var(--fs-m);
-}
-
-.time {
-  font-size: var(--fs-xl);
-}
-
-.details {
-  margin-top: var(--m-m);
-}
-
-.detailsRow {
-  /* Auto left/right margins horizontally centre the row inside its parent
-     even when the parent is wider than max-width (which happens in remix
-     column mode — each column can be wider than the 28rem cap). */
-  margin: var(--m-s) auto;
-  font-size: var(--fs-s);
-  max-width: min(80vw, 28rem);
-  text-align: center;
-}
-
 /* Subtle annotation row — used for "this photo matched because…" style
    metadata that's interesting context but not the primary detail. */
-.detailsAffinity {
-  font-size: var(--fs-xs);
-  opacity: 0.7;
-  letter-spacing: 0.02em;
-}
 
 /* Inline colour swatch shown next to the "sharing this colour" remix label,
    so the matched dominant colour is visible at a glance rather than
    buried in the photos themselves. Width matches the line height of the
    adjacent text so it sits cleanly inline. */
-.remixSwatch {
-  display: inline-block;
-  width: 0.85em;
-  height: 0.85em;
-  vertical-align: -0.1em;
-  border-radius: 50%;
-  border: 1px solid hsl(0 0% 100% / 0.5);
-  box-shadow: 0 0 0 1px hsl(0 0% 0% / 0.4);
-}
 
 /* Persistent bottom nudge shown on coarse-pointer devices until a wake lock is acquired */
 .wakeLockNudge {
   position: fixed;
-  bottom: calc(env(safe-area-inset-bottom, 0px) + var(--m-m));
-  left: 50%;
+  inset-block-end: calc(env(safe-area-inset-bottom, 0) + var(--m-m));
+  inset-inline-start: 50%;
   transform: translateX(-50%);
   padding: calc(var(--m-s) * 0.75) var(--m-l);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--glass-bg-soft);
-  color: hsl(0 0% 100% / 0.82);
+  color: color-mix(in oklch, var(--c-white) 82%, transparent);
   font-size: var(--fs-s);
   letter-spacing: 0.03em;
-  backdrop-filter: blur(10px);
+  backdrop-filter: blur(var(--glass-blur-control));
   box-shadow:
-    0 8px 22px hsl(0 0% 0% / 0.18),
-    inset 0 1px 0 hsl(0 0% 100% / 0.08);
+    0 var(--size-8) var(--size-22) color-mix(in oklch, var(--c-black) 18%, transparent),
+    inset 0 var(--size-1) 0 color-mix(in oklch, var(--c-white) 8%, transparent);
   pointer-events: none;
   white-space: nowrap;
-  z-index: 9998;
-  animation: wakeLockNudgeIn 0.6s 1.2s ease-out both;
+  z-index: var(--z-fullscreen-underlay);
+  animation: wakeLockNudgeIn var(--t-long) var(--t-loop-fast) var(--ease-out) both;
 }
 
 @keyframes wakeLockNudgeIn {
   0% {
     opacity: 0;
-    transform: translateX(-50%) translateY(0.4rem);
+    transform: translateX(-50%) translateY(var(--m-s));
   }
   100% {
     opacity: 1;
@@ -1252,7 +634,7 @@
 @keyframes toolbarHintLifecycle {
   0% {
     opacity: 0;
-    transform: translateX(-50%) translateY(-0.35rem);
+    transform: translateX(-50%) translateY(calc(var(--m-xs) * -1));
   }
   14% {
     opacity: 1;
@@ -1264,27 +646,11 @@
   }
   100% {
     opacity: 0;
-    transform: translateX(-50%) translateY(-0.2rem);
+    transform: translateX(-50%) translateY(calc(var(--m) * -1));
   }
 }
 
 .notLoaded {
   opacity: 0;
   filter: grayscale(100%);
-}
-
-.mapContainer {
-  filter: invert(1);
-
-  border-radius: 50%;
-  overflow: hidden;
-  margin: var(--m-l) 0;
-  aspect-ratio: 1 / 1;
-}
-
-.mapContainer > * {
-  box-shadow:
-    1px 2px 2px hsl(0 0% 0% / 0.333),
-    2px 4px 4px hsl(0 0% 0% / 0.333),
-    3px 6px 6px hsl(0 0% 0% / 0.333);
 }

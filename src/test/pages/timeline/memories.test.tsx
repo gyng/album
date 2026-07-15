@@ -41,12 +41,23 @@ jest.mock("../../../components/CalendarHeatmap", () => ({
     return (
       <div>
         {years.map((year) => (
-          <h2 key={year} data-year-heading={year}>
+          <h2
+            key={year}
+            data-year-heading={year}
+            className={
+              (props.highlightedYears ?? []).includes(year) ? "highlightedYearHeading" : ""
+            }
+          >
             {year}
           </h2>
         ))}
         {dates.map((date) => (
-          <button key={date} type="button" data-date={date}>
+          <button
+            key={date}
+            type="button"
+            data-date={date}
+            className={(props.highlightedDates ?? []).includes(date) ? "memoryHighlighted" : ""}
+          >
             {date}
           </button>
         ))}
@@ -247,6 +258,10 @@ describe("Timeline memories", () => {
     );
 
     fireEvent.mouseEnter(await screen.findByTestId("memory-cluster-2025-2025-03-15-2025-03-16"));
+
+    const highlightedCall = mockCalendarHeatmap.mock.calls.at(-1)?.[0];
+    expect(highlightedCall.highlightedDates).toEqual(["2025-03-15", "2025-03-16"]);
+    expect(highlightedCall.highlightedYears).toEqual([2025]);
 
     expect(screen.getByRole("button", { name: "2025-03-15" }).className).toMatch(
       /memoryHighlighted/,

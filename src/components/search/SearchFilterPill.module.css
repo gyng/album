@@ -5,7 +5,7 @@
   padding: var(--m);
   font-size: var(--fs-s);
   border-radius: var(--m-s);
-  border: solid 1px var(--c-border-on-dark);
+  border: solid var(--size-1) var(--c-border-on-dark);
   cursor: pointer;
   user-select: none;
   background: transparent;
@@ -15,7 +15,7 @@
 
 @media (hover: none), (pointer: coarse) {
   .pill {
-    min-height: var(--m-xl);
+    min-block-size: var(--tap-target);
     padding: var(--m) var(--m-s);
   }
 }
@@ -27,8 +27,8 @@
 }
 
 .pill:focus-visible {
-  outline: solid 2px var(--c-bg-contrast-light);
-  outline-offset: 2px;
+  outline: solid var(--size-2) var(--c-bg-contrast-light);
+  outline-offset: var(--size-2);
 }
 
 .pill.disabled {
@@ -44,9 +44,9 @@
 
 .count {
   display: inline-block;
-  margin-left: 0.55rem;
+  margin-inline-start: var(--size-10);
   font-style: italic;
   font-variant-numeric: tabular-nums;
-  min-width: 3ch;
-  text-align: right;
+  min-inline-size: 3ch;
+  text-align: end;
 }

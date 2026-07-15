@@ -1,15 +1,17 @@
 import { useState } from "react";
 import type { GetStaticProps, NextPage } from "next";
-import Link from "next/link";
 import { GlobalNav } from "../../components/GlobalNav";
 import { Seo } from "../../components/Seo";
 import {
   Card,
+  Button,
+  ButtonLink,
   ChartTooltip,
   Footer,
   Heading,
   Caption,
   Input,
+  KeyHint,
   OverlayButton,
   OverlayButtonLink,
   Pill,
@@ -26,6 +28,7 @@ type PageProps = Record<string, never>;
 
 const spacingTokens = [
   { name: "--m", value: 4 },
+  { name: "--m-xs", value: 6 },
   { name: "--m-s", value: 8 },
   { name: "--m-m", value: 12 },
   { name: "--m-l", value: 20 },
@@ -34,6 +37,7 @@ const spacingTokens = [
 ];
 
 const fontTokens = [
+  { name: "--fs-2xs", value: "9px", sample: "Micro — dense chart annotations" },
   { name: "--fs-xs", value: "10px", sample: "Extra small — chart labels, badges" },
   { name: "--fs-s", value: "11px", sample: "Small — captions, metadata" },
   { name: "--fs-sm", value: "14px", sample: "Small-medium — body text, controls" },
@@ -51,12 +55,27 @@ const colourTokens = [
   { name: "--c-overlay", label: "Overlay" },
   { name: "--c-overlay-dark", label: "Overlay dark" },
   { name: "--c-border-on-dark", label: "Border on dark" },
+  { name: "--c-bg-edit", label: "Editing surface" },
+  { name: "--c-success", label: "Success" },
+  { name: "--c-warning", label: "Warning" },
+  { name: "--c-danger", label: "Danger" },
+  { name: "--c-today", label: "Today" },
+];
+
+const motionTokens = [
+  { name: "--t-fast", label: "Fast interaction" },
+  { name: "--t-base", label: "Standard transition" },
+  { name: "--t-slow", label: "Deliberate reveal" },
+  { name: "--t-theme", label: "Theme cross-fade" },
+  { name: "--ease-out", label: "Natural deceleration" },
+  { name: "--ease-spring", label: "Expressive entrance" },
 ];
 
 const sections = [
   "spacing",
   "typography",
   "colours",
+  "motion",
   "headings",
   "card",
   "thumb",
@@ -105,12 +124,17 @@ const DesignPage: NextPage<PageProps> = () => {
         <section id="spacing" className={styles.section}>
           <div className={styles.sectionHeader}>
             <Heading level={1}>Spacing</Heading>
-            <Caption>Six-step scale from 4px to 64px. Used for gaps, padding, and margins.</Caption>
+            <Caption>
+              Seven-step scale from 4px to 64px. Used for gaps, padding, and margins.
+            </Caption>
           </div>
           <div className={styles.spacingScale}>
             {spacingTokens.map((t) => (
               <div key={t.name} className={styles.spacingSwatch}>
-                <div className={styles.spacingBox} style={{ width: t.value, height: t.value }} />
+                <div
+                  className={styles.spacingBox}
+                  style={{ inlineSize: t.value, blockSize: t.value }}
+                />
                 <span className={styles.spacingLabel}>{t.value}</span>
                 <span className={styles.spacingLabel}>{t.name}</span>
               </div>
@@ -122,7 +146,7 @@ const DesignPage: NextPage<PageProps> = () => {
         <section id="typography" className={styles.section}>
           <div className={styles.sectionHeader}>
             <Heading level={1}>Typography</Heading>
-            <Caption>System font stack. Six sizes from 10px to 64px.</Caption>
+            <Caption>System font stack. Seven sizes from 9px to 64px.</Caption>
           </div>
           <div className={styles.fontScale}>
             {fontTokens.map((t) => (
@@ -136,13 +160,31 @@ const DesignPage: NextPage<PageProps> = () => {
           </div>
         </section>
 
+        <section id="motion" className={styles.section}>
+          <div className={styles.sectionHeader}>
+            <Heading level={1}>Motion</Heading>
+            <Caption>
+              Shared durations and easing curves. Reduced-motion preferences are handled globally.
+            </Caption>
+          </div>
+          <div className={styles.motionGrid}>
+            {motionTokens.map((token) => (
+              <div key={token.name} className={styles.motionToken}>
+                <span className={styles.motionDot} />
+                <span>{token.label}</span>
+                <code className={styles.colourLabel}>{token.name}</code>
+              </div>
+            ))}
+          </div>
+        </section>
+
         {/* Tokens: Colours */}
         <section id="colours" className={styles.section}>
           <div className={styles.sectionHeader}>
             <Heading level={1}>Colours</Heading>
             <Caption>
-              Adaptive palette using light-dark() and color-mix(). Toggle the theme in the nav bar
-              to preview.
+              Adaptive palette using light-dark() and color-mix(). Pick a theme in the nav bar to
+              preview — System, Light, Dark, plus the Paper, Ink, and Slate palettes.
             </Caption>
           </div>
           <div className={styles.colourGrid}>
@@ -191,17 +233,17 @@ const DesignPage: NextPage<PageProps> = () => {
           <div className={styles.cardGrid}>
             <Card>
               <Caption as="div">Label</Caption>
-              <div style={{ fontSize: "var(--fs-m)" }}>128</div>
+              <div className={styles.cardMetric}>128</div>
               <Caption as="div">Description text goes here</Caption>
             </Card>
             <Card as="article">
               <Caption as="div">Another card</Caption>
-              <div style={{ fontSize: "var(--fs-m)" }}>42%</div>
+              <div className={styles.cardMetric}>42%</div>
               <Caption as="div">Some detail about this metric</Caption>
             </Card>
             <Card>
               <Caption as="div">Third example</Caption>
-              <div style={{ fontSize: "var(--fs-m)" }}>7 days</div>
+              <div className={styles.cardMetric}>7 days</div>
             </Card>
           </div>
           <Code>{'<Card as="article">content</Card>'}</Code>
@@ -353,40 +395,52 @@ const DesignPage: NextPage<PageProps> = () => {
             </Caption>
           </div>
           <div className={styles.tooltipDemo}>
-            <div className={styles.tooltipBar} style={{ height: 40 }}>
+            <div className={styles.tooltipBar} style={{ blockSize: 40 }}>
               <ChartTooltip>Jan · 42</ChartTooltip>
             </div>
-            <div className={styles.tooltipBar} style={{ height: 65 }}>
+            <div className={styles.tooltipBar} style={{ blockSize: 65 }}>
               <ChartTooltip>Feb · 87</ChartTooltip>
             </div>
-            <div className={styles.tooltipBar} style={{ height: 30 }}>
+            <div className={styles.tooltipBar} style={{ blockSize: 30 }}>
               <ChartTooltip>Mar · 24</ChartTooltip>
             </div>
-            <div className={styles.tooltipBar} style={{ height: 55 }}>
+            <div className={styles.tooltipBar} style={{ blockSize: 55 }}>
               <ChartTooltip>Apr · 61</ChartTooltip>
             </div>
-            <div className={styles.tooltipBar} style={{ height: 75 }}>
+            <div className={styles.tooltipBar} style={{ blockSize: 75 }}>
               <ChartTooltip>May · 103</ChartTooltip>
             </div>
           </div>
           <Code>{"<ChartTooltip>Label · 42</ChartTooltip>"}</Code>
         </section>
 
-        {/* Buttons (existing common styles) */}
+        {/* Buttons */}
         <section id="buttons" className={styles.section}>
           <div className={styles.sectionHeader}>
             <Heading level={1}>Buttons</Heading>
-            <Caption>Shared button styles from common.module.css.</Caption>
+            <Caption>
+              Canonical actions with consistent sizing, focus treatment, and safe button types.
+            </Caption>
           </div>
           <div className={styles.subsection}>
-            <span className={styles.subsectionLabel}>Standard button</span>
+            <span className={styles.subsectionLabel}>Variants</span>
             <div className={styles.row}>
-              <button type="button" className={commonStyles.button}>
-                Button
-              </button>
-              <Link href="/design" className={commonStyles.button}>
-                Link button
-              </Link>
+              <Button>Button</Button>
+              <Button variant="accent">Accent</Button>
+              <Button variant="quiet">Quiet</Button>
+              <ButtonLink href="/design">Link button</ButtonLink>
+              <Button size="icon" aria-label="Close">
+                ×
+              </Button>
+            </div>
+          </div>
+          <div className={styles.subsection}>
+            <span className={styles.subsectionLabel}>Large with key hint</span>
+            <div className={styles.row}>
+              <Button variant="accent" size="large">
+                Play <KeyHint>Enter</KeyHint>
+              </Button>
+              <Button disabled>Disabled</Button>
             </div>
           </div>
           <div className={styles.subsection}>
@@ -400,7 +454,7 @@ const DesignPage: NextPage<PageProps> = () => {
               </div>
             </div>
           </div>
-          <Code>{"className={commonStyles.button}"}</Code>
+          <Code>{'<Button variant="accent" size="large">Action</Button>'}</Code>
         </section>
 
         {/* Stack utilities */}

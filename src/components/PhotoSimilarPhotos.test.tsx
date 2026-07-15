@@ -158,7 +158,7 @@ describe("PhotoSimilarPhotos", () => {
     const link = await screen.findByRole("link", { name: /Harbor skyline/i });
     expect(link.getAttribute("href")).toBe("/album/test-simple#DSCF0593.jpg");
     expect(screen.getByRole("img", { name: /Harbor skyline/i }).getAttribute("src")).toBe(
-      "/data/albums/test-simple/.resized_images/DSCF0593.jpg@800.avif",
+      "/data/albums/test-simple/.resized_images/DSCF0593.jpg%40800.avif",
     );
     expect(screen.getByText(/test-simple/)).toBeTruthy();
     expect(screen.getByText("82%")).toBeTruthy();

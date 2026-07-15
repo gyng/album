@@ -1,7 +1,8 @@
 .dayNavButtons {
   display: flex;
+  flex-wrap: wrap;
   gap: var(--m-s);
-  margin: 0.5rem 0 1rem 0;
+  margin: var(--size-10) 0 var(--size-18) 0;
 }
 .section {
   display: grid;
@@ -25,13 +26,13 @@
 }
 
 .item {
-  animation: fadein 0.18s ease-out;
+  animation: fadein var(--t-base) var(--ease-out);
 }
 
 .card {
   position: relative;
   display: block;
-  width: 150px;
+  inline-size: var(--size-150);
   color: inherit;
   text-decoration: none;
 }
@@ -41,11 +42,11 @@
 }
 
 .image {
-  margin-bottom: var(--m);
+  margin-block-end: var(--m);
 }
 
 .details {
-  width: 100%;
+  inline-size: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
 }
@@ -59,7 +60,7 @@
 }
 
 .sourceText {
-  min-width: 0;
+  min-inline-size: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -71,9 +72,9 @@
 
 .similarButton {
   position: absolute;
-  bottom: calc(var(--m) + var(--m-s));
-  right: var(--m-s);
-  z-index: 1;
+  inset-block-end: calc(var(--m) + var(--m-s));
+  inset-inline-end: var(--m-s);
+  z-index: var(--z-raised);
   text-decoration: none;
 }
 
@@ -91,7 +92,7 @@
 .mapSection {
   display: grid;
   gap: var(--m-s);
-  margin-top: var(--m-s);
+  margin-block-start: var(--m-s);
 }
 
 .mapHeader {
@@ -107,13 +108,13 @@
 }
 
 .mapWrap {
-  min-height: 280px;
+  min-block-size: var(--size-280);
 }
 
 .mapCanvas {
-  height: 280px;
-  width: 100%;
-  overflow: hidden;
+  block-size: var(--size-280);
+  inline-size: 100%;
+  overflow: clip;
   border-radius: var(--m);
 }
 

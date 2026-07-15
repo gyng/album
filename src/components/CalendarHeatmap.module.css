@@ -2,31 +2,32 @@
   display: flex;
   flex-direction: row;
   flex-wrap: wrap;
-  gap: 0.5px;
+  gap: var(--size-0-5);
   position: absolute;
-  left: 1px;
-  bottom: 1px;
-  right: 1px;
-  z-index: 2;
-  max-width: calc(100% - 2px);
+  inset-inline-start: var(--size-1);
+  inset-block-end: var(--size-1);
+  inset-inline-end: var(--size-1);
+  z-index: var(--z-float);
+  max-inline-size: calc(100% - var(--size-2));
 }
 
 .subpip {
-  width: 2px;
-  height: 2px;
-  border-radius: 0.5px;
-  box-shadow: 0 0 0.5px rgba(0, 0, 0, 0.25);
+  inline-size: var(--size-2);
+  block-size: var(--size-2);
+  border-radius: var(--size-0-5);
+  box-shadow: 0 0 var(--size-0-5) color-mix(in oklch, var(--c-black) 25%, transparent);
   flex-shrink: 0;
 }
 
 .highlightedSubpip {
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--c-bg) 55%, transparent);
+  box-shadow: 0 0 0 var(--size-1) color-mix(in oklch, var(--c-bg) 55%, transparent);
   filter: brightness(1.2) saturate(1.2);
 }
 .heatmap {
-  --heatmap-cell-size: 8px;
-  --heatmap-gap: 2px;
+  --heatmap-cell-size: var(--size-8);
+  --heatmap-gap: var(--size-2);
   --heatmap-weeks: 54;
+  container-type: inline-size;
   display: grid;
   gap: var(--m-m);
   position: relative;
@@ -42,7 +43,7 @@
   display: grid;
   gap: var(--m-s);
   flex: 1 1 100%;
-  min-width: 0;
+  min-inline-size: 0;
 }
 
 .yearHeaderRow {
@@ -51,10 +52,10 @@
 
 .yearTrack {
   display: grid;
-  grid-template-columns: 16px minmax(0, 1fr);
+  grid-template-columns: var(--size-16) minmax(0, 1fr);
   column-gap: var(--m);
-  row-gap: 6px;
-  width: 100%;
+  row-gap: var(--size-6);
+  inline-size: 100%;
   grid-template-areas:
     "spacer months"
     "weekdays grid";
@@ -64,7 +65,7 @@
   margin: 0;
   font-size: var(--fs-sm);
   line-height: 1;
-  text-align: left;
+  text-align: start;
 }
 
 .highlightedYearHeading {
@@ -73,9 +74,9 @@
 
 .weekdaySpacer {
   grid-area: spacer;
-  width: 16px;
-  min-width: 16px;
-  max-width: 16px;
+  inline-size: var(--size-16);
+  min-inline-size: var(--size-16);
+  max-inline-size: var(--size-16);
 }
 
 .months {
@@ -86,7 +87,7 @@
   color: var(--c-bg-contrast-light);
   font-size: var(--fs-xs);
   line-height: 1;
-  width: 100%;
+  inline-size: 100%;
 }
 
 .weekdays {
@@ -94,7 +95,7 @@
   display: grid;
   grid-template-rows: repeat(7, minmax(0, 1fr));
   gap: var(--heatmap-gap);
-  width: 16px;
+  inline-size: var(--size-16);
   color: var(--c-bg-contrast-light);
   font-size: var(--fs-2xs);
   line-height: 1;
@@ -105,7 +106,7 @@
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  height: var(--heatmap-cell-size);
+  block-size: var(--heatmap-cell-size);
 }
 
 .monthLabel {
@@ -121,9 +122,9 @@
   grid-template-rows: repeat(7, minmax(0, 1fr));
   grid-auto-flow: column;
   gap: var(--heatmap-gap);
-  width: 100%;
+  inline-size: 100%;
   aspect-ratio: 54 / 7;
-  padding-top: 2px;
+  padding-block-start: var(--size-2);
 }
 
 .cellWrap {
@@ -131,49 +132,58 @@
 }
 
 .cell {
-  width: 100%;
-  height: 100%;
+  inline-size: 100%;
+  block-size: 100%;
   aspect-ratio: 1;
   display: block;
   border: 0;
-  border-radius: 2px;
+  border-radius: var(--size-2);
   padding: 0;
   cursor: pointer;
   transition:
-    transform var(--t-fast) ease,
-    box-shadow var(--t-fast) ease,
-    background-color var(--t-fast) ease;
+    transform var(--t-fast) var(--ease-out),
+    box-shadow var(--t-fast) var(--ease-out),
+    background-color var(--t-fast) var(--ease-out);
 }
 
 .interactiveCell {
   cursor: pointer;
 }
 
-.cell:hover {
-  transform: scale(1.12);
-  box-shadow: 0 0 0 2px var(--c-bg);
+@media (hover: hover) and (pointer: fine) {
+  .cell:hover {
+    transform: scale(1.12);
+    box-shadow: 0 0 0 var(--size-2) var(--c-bg);
+  }
 }
 
 .cell:focus-visible {
   transform: scale(1.12);
   box-shadow:
-    0 0 0 2px var(--c-bg),
-    0 0 0 4px var(--c-accent);
+    0 0 0 var(--size-2) var(--c-bg),
+    0 0 0 var(--size-4) var(--c-accent);
   outline: none;
+}
+
+@media (forced-colors: active) {
+  .cell:focus-visible {
+    outline: var(--focus-ring);
+    outline-offset: var(--size-2);
+  }
 }
 
 .selected {
   position: relative;
-  z-index: 2;
+  z-index: var(--z-float);
   transform: none;
-  border-radius: 3px;
+  border-radius: var(--size-3);
   box-shadow:
-    0 0 0 2px var(--c-bg),
-    0 0 0 4px var(--c-accent);
+    0 0 0 var(--size-2) var(--c-bg),
+    0 0 0 var(--size-4) var(--c-accent);
 }
 
 .memoryHighlighted {
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--c-bg-contrast-light) 60%, transparent);
+  box-shadow: 0 0 0 var(--size-2) color-mix(in oklch, var(--c-bg-contrast-light) 60%, transparent);
   transform: scale(1.06);
 }
 
@@ -185,33 +195,33 @@
 .cell.today.selected {
   background-color: var(--c-today);
   box-shadow:
-    0 0 0 2px var(--c-bg),
-    0 0 0 4px color-mix(in srgb, var(--c-today) 70%, white 30%);
+    0 0 0 var(--size-2) var(--c-bg),
+    0 0 0 var(--size-4) color-mix(in oklch, var(--c-today) 70%, var(--c-white) 30%);
 }
 
 .level0 {
-  background-color: color-mix(in srgb, var(--c-bg-contrast-light) 25%, transparent);
+  background-color: color-mix(in oklch, var(--c-bg-contrast-light) 25%, transparent);
 }
 
 .future {
-  background-color: color-mix(in srgb, var(--c-bg-contrast-light) 12%, transparent);
+  background-color: color-mix(in oklch, var(--c-bg-contrast-light) 12%, transparent);
   opacity: 0.55;
 }
 
 .level1 {
-  background-color: color-mix(in srgb, #f3d48b 60%, transparent);
+  background-color: color-mix(in oklch, var(--c-heatmap-low) 60%, transparent);
 }
 
 .level2 {
-  background-color: color-mix(in srgb, #d99b4f 78%, transparent);
+  background-color: color-mix(in oklch, var(--c-heatmap-mid) 78%, transparent);
 }
 
 .level3 {
-  background-color: color-mix(in srgb, #b45a27 86%, transparent);
+  background-color: color-mix(in oklch, var(--c-heatmap-high) 86%, transparent);
 }
 
 .level4 {
-  background-color: #7a2310;
+  background-color: var(--c-heatmap-peak);
 }
 
 .emptyCell {
@@ -219,26 +229,26 @@
 }
 
 .popup {
-  z-index: 200;
+  z-index: var(--z-caption);
   display: grid;
   gap: var(--m-s);
-  width: 220px;
+  inline-size: var(--size-220);
   padding: var(--m-s);
   border: var(--popup-border);
   border-radius: var(--popup-radius);
-  background-color: var(--c-overlay);
-  backdrop-filter: blur(8px);
+  background-color: var(--glass-surface);
+  backdrop-filter: blur(var(--glass-blur-surface));
   box-shadow: var(--popup-shadow);
 }
 
 .popup::after {
   content: "";
   position: absolute;
-  left: 50%;
-  top: calc(100% - 8px);
-  width: 12px;
-  height: 12px;
-  background-color: var(--c-overlay);
+  inset-inline-start: 50%;
+  inset-block-start: calc(100% - var(--size-8));
+  inline-size: var(--size-12);
+  block-size: var(--size-12);
+  background-color: var(--glass-surface);
   border-right: var(--popup-border);
   border-bottom: var(--popup-border);
   transform: translateX(-50%) rotate(45deg);
@@ -252,8 +262,8 @@
 }
 
 .popupImage {
-  width: 100%;
-  height: 132px;
+  inline-size: 100%;
+  block-size: var(--size-132);
   border-radius: var(--m-s);
   object-fit: cover;
 }
@@ -269,7 +279,7 @@
 .moreButton {
   justify-self: start;
   border: 0;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   padding: 0;
   background: transparent;
   color: var(--c-accent);
@@ -280,12 +290,13 @@
 .moreButton:hover,
 .moreButton:focus-visible {
   text-decoration: underline;
-  outline: none;
 }
 
-@media (max-width: 720px) {
+@container (max-width: 720px) {
   .yearsScroller {
     gap: var(--m-l);
+    inline-size: 100%;
+    min-inline-size: 0;
   }
 
   .monthLabel {
@@ -296,25 +307,28 @@
      them untappable. Keep a minimum cell size and let each year scroll
      horizontally inside its own container instead (mirrors TechnicalHeatmaps). */
   .yearSection {
+    /* A 22px cell plus the 2px grid gap gives adjacent controls the 24px
+       centre-to-centre separation required for dense target spacing. */
+    --heatmap-cell-size: var(--size-22);
+
+    inline-size: 100%;
+    max-inline-size: 100%;
     overflow-x: auto;
+    overscroll-behavior-inline: contain;
   }
 
   .yearTrack {
-    grid-template-columns: 16px max-content;
-  }
-
-  .heatmap {
-    --heatmap-cell-size: 14px;
+    grid-template-columns: var(--size-16) max-content;
   }
 
   .months {
     grid-template-columns: repeat(var(--heatmap-weeks), var(--heatmap-cell-size));
-    width: auto;
+    inline-size: auto;
   }
 
   .grid {
     grid-template-columns: repeat(var(--heatmap-weeks), var(--heatmap-cell-size));
-    width: auto;
+    inline-size: auto;
     aspect-ratio: auto;
   }
 }

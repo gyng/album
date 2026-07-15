@@ -1,0 +1,297 @@
+/* Styles owned by ExploreColourSection. Shared layout remains in explore.module.css. */
+
+.colorSwatch {
+  inline-size: var(--m-m);
+  block-size: var(--m-m);
+  border-radius: var(--radius-pill);
+  flex: 0 0 auto;
+  border: var(--size-1) solid color-mix(in oklch, var(--c-bg) 55%, transparent);
+}
+
+.colourSectionGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: var(--m-l);
+}
+
+.colourPanel {
+  display: grid;
+  gap: var(--m);
+  align-content: start;
+}
+
+.colourFamilyPanel,
+.colourFullRowPanel {
+  grid-column: 1 / -1;
+}
+
+.colorFamilyRows {
+  display: grid;
+  gap: var(--m);
+  /* The label column plus representative thumbnails fill roughly the gallery measure; cap
+     the rows there so the right-hand whitespace reads as intentional rather
+     than the rows stranding half-way across a wide section. */
+  max-inline-size: min(100%, var(--content-width-gallery));
+}
+
+.colorFamilyRow {
+  display: grid;
+  grid-template-columns: minmax(var(--size-180), calc(var(--size-220) + var(--size-14))) minmax(
+      0,
+      1fr
+    );
+  gap: var(--m);
+  align-items: start;
+}
+
+.colorFamilyMeta {
+  display: grid;
+  gap: var(--m-s);
+  align-content: start;
+  justify-items: start;
+}
+
+.colorFamilyHeading {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--m-s);
+  font-size: var(--fs-m);
+  color: var(--c-font);
+}
+
+.colorFamilyStat {
+  color: var(--c-bg-contrast-light);
+  font-size: var(--fs-s);
+  line-height: 1;
+}
+
+.colorFamilyThumbs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--m-s);
+  align-items: flex-start;
+}
+
+.colorFamilyThumbLink {
+  display: block;
+  text-decoration: none;
+}
+
+.colorTimeLegend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--m-s) var(--m);
+}
+
+.colorTimeLegendItem {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--m);
+  color: var(--c-bg-contrast-light);
+  font-size: var(--fs-s);
+  opacity: 0.9;
+}
+
+.colorTimeSeries {
+  display: grid;
+  gap: var(--m-s);
+}
+
+.colorTimeRow {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-areas: "meta bar summary";
+  gap: var(--m-s);
+  align-items: center;
+}
+
+.colorTimeMeta {
+  grid-area: meta;
+  display: grid;
+  gap: var(--m);
+  justify-items: start;
+  text-align: start;
+}
+
+.colorTimeYear {
+  color: var(--c-font);
+  font-size: var(--fs-m);
+  line-height: 1;
+}
+
+.colorTimeDetail {
+  color: var(--c-bg-contrast-light);
+  font-size: var(--fs-s);
+  line-height: 1;
+}
+
+.colorTimeBar {
+  grid-area: bar;
+  position: relative;
+  min-block-size: var(--m-l);
+  border: var(--size-1) solid color-mix(in oklch, var(--c-bg-contrast-dark) 78%, transparent);
+  border-radius: var(--radius-pill);
+  overflow: visible;
+  background: color-mix(in oklch, var(--c-bg) 98%, var(--c-bg-contrast-dark));
+}
+
+.colorTimeSegment {
+  position: absolute;
+  inset-block-start: 0;
+  inset-block-end: 0;
+  display: block;
+  min-inline-size: var(--size-3);
+}
+
+.colorTimeSegment:focus-visible {
+  box-shadow: 0 0 0 var(--size-2) var(--c-font);
+  z-index: var(--z-float);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .colorTimeSegment:hover {
+    box-shadow: 0 0 0 var(--size-2) var(--c-font);
+    z-index: var(--z-float);
+  }
+}
+
+.colorTimeTooltip {
+  position: absolute;
+  inset-inline-start: 50%;
+  inset-block-start: 0;
+  transform: translate(-50%, calc(-100% - var(--m-s)));
+  display: grid;
+  gap: var(--m-s);
+  inline-size: min(var(--size-220), calc(100dvw - (var(--m) * 2)));
+  padding: var(--m-s);
+  border: var(--popup-border);
+  border-radius: var(--popup-radius);
+  background-color: var(--c-bg);
+  box-shadow: var(--popup-shadow);
+  color: var(--c-font);
+  font-size: var(--fs-s);
+  line-height: 1.35;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity var(--t-instant) var(--ease-out);
+  z-index: var(--z-control);
+}
+
+.colorTimeTooltip::after {
+  content: "";
+  position: absolute;
+  inset-inline-start: 50%;
+  inset-block-start: calc(100% - var(--size-8));
+  inline-size: var(--size-12);
+  block-size: var(--size-12);
+  background-color: var(--c-bg);
+  border-right: var(--popup-border);
+  border-bottom: var(--popup-border);
+  transform: translateX(-50%) rotate(45deg);
+}
+
+.colorTimeTooltipImage {
+  inline-size: 100%;
+  block-size: var(--size-132);
+  border-radius: var(--m-s);
+  object-fit: cover;
+  background: color-mix(in oklch, var(--c-bg) 90%, var(--c-bg-contrast-dark));
+}
+
+.colorTimeTooltipBody {
+  display: grid;
+  gap: var(--m-s);
+  min-inline-size: 0;
+}
+
+.colorTimeTooltipSwatch {
+  inline-size: var(--m-m);
+  block-size: var(--m-m);
+  border-radius: var(--radius-pill);
+  border: var(--size-1) solid color-mix(in oklch, var(--c-bg) 55%, transparent);
+  flex: 0 0 auto;
+}
+
+.colorTimeTooltipText {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--m-s);
+  min-inline-size: 0;
+  line-height: 1.25;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.colorTimeTooltipText span:last-child {
+  color: var(--c-bg-contrast-light);
+}
+
+.colorTimeSegment:focus-visible .colorTimeTooltip {
+  opacity: 1;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .colorTimeSegment:hover .colorTimeTooltip {
+    opacity: 1;
+  }
+}
+
+.colorTimeSummary {
+  grid-area: summary;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--m);
+  min-inline-size: 0;
+  color: var(--c-bg-contrast-light);
+  font-size: var(--fs-s);
+}
+
+@media (max-width: 720px) {
+  .colourSectionGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .colorFamilyRow {
+    grid-template-columns: 1fr;
+  }
+
+  .colorFamilyMeta {
+    justify-items: start;
+  }
+
+  .colorTimeRow {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "meta"
+      "bar"
+      "summary";
+    gap: var(--m-s);
+  }
+
+  .colorTimeMeta {
+    justify-items: start;
+    text-align: start;
+  }
+
+  .colorTimeSummary {
+    justify-content: flex-start;
+  }
+
+  /* A segment can sit at either viewport edge, so a centred tooltip cannot be
+     clamped reliably from inside that segment. Present it as a compact mobile
+     overlay instead; this keeps keyboard focus previews visible without
+     enlarging the document or clipping the image. */
+  .colorTimeTooltip {
+    position: fixed;
+    inset-inline: 50% auto;
+    inset-block: auto var(--m-m);
+    inline-size: min(var(--size-220), calc(100dvw - (var(--m-m) * 2)));
+    transform: translateX(-50%);
+  }
+
+  .colorTimeTooltip::after {
+    display: none;
+  }
+}

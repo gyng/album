@@ -6,22 +6,24 @@ import { act } from "react";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { hydrateRoot } from "react-dom/client";
 import { renderToString } from "react-dom/server";
+import { ALL_THEME_CLASSES } from "../util/theme";
 import { ThemeToggle } from "./ThemeToggle";
+
+const getPicker = () => screen.getByRole("combobox", { name: "Theme" });
 
 describe("ThemeToggle", () => {
   afterEach(() => {
     localStorage.clear();
     window.history.replaceState(window.history.state, "", "/");
-    document.documentElement.classList.remove("dark", "light");
+    document.documentElement.classList.remove(...ALL_THEME_CLASSES);
     document.body.className = "";
     document.body.innerHTML = "";
   });
 
   it("hydrates cleanly before applying the stored theme", async () => {
-    window.history.replaceState(window.history.state, "", "/");
     const serverMarkup = renderToString(<ThemeToggle />);
 
-    localStorage.setItem("darkMode", "false");
+    localStorage.setItem("theme", "paper");
     document.body.innerHTML = `<div id="root">${serverMarkup}</div>`;
 
     const container = document.getElementById("root");
@@ -36,11 +38,60 @@ describe("ThemeToggle", () => {
     });
 
     expect(consoleError).not.toHaveBeenCalled();
-    expect(container?.textContent).toContain("☀️");
-    expect(container?.textContent).toContain("⟳");
+    expect(getPicker()).toHaveValue("paper");
+    // A named theme applies its base scheme class plus its palette class.
     expect(document.body.classList.contains("light")).toBe(true);
+    expect(document.body.classList.contains("theme-paper")).toBe(true);
 
     consoleError.mockRestore();
+  });
+
+  it("applies and persists a selected theme", () => {
+    render(<ThemeToggle />);
+
+    fireEvent.change(getPicker(), { target: { value: "slate" } });
+
+    expect(document.documentElement.classList.contains("dark")).toBe(true);
+    expect(document.documentElement.classList.contains("theme-slate")).toBe(true);
+    expect(localStorage.getItem("theme")).toBe("slate");
+  });
+
+  it("honours a legacy darkMode preference and migrates it on change", () => {
+    localStorage.setItem("darkMode", "true");
+
+    render(<ThemeToggle />);
+    expect(getPicker()).toHaveValue("dark");
+
+    fireEvent.change(getPicker(), { target: { value: "light" } });
+
+    expect(localStorage.getItem("theme")).toBe("light");
+    expect(localStorage.getItem("darkMode")).toBeNull();
+  });
+
+  it("gives explicit URL themes precedence over stored preferences", () => {
+    localStorage.setItem("theme", "light");
+    window.history.replaceState(window.history.state, "", "/?theme=ink");
+
+    render(<ThemeToggle />);
+
+    expect(getPicker()).toHaveValue("ink");
+    expect(document.documentElement).toHaveClass("dark");
+    expect(document.documentElement).toHaveClass("theme-ink");
+  });
+
+  it("returns to the system default, clearing classes and storage", () => {
+    localStorage.setItem("theme", "dark");
+
+    render(<ThemeToggle />);
+    expect(document.documentElement).toHaveClass("dark");
+
+    fireEvent.change(getPicker(), { target: { value: "system" } });
+
+    for (const className of ALL_THEME_CLASSES) {
+      expect(document.documentElement.classList.contains(className)).toBe(false);
+      expect(document.body.classList.contains(className)).toBe(false);
+    }
+    expect(localStorage.getItem("theme")).toBeNull();
   });
 
   it("renders when localStorage access is unavailable", () => {
@@ -51,104 +102,28 @@ describe("ThemeToggle", () => {
 
     render(<ThemeToggle />);
 
-    expect(screen.getByLabelText(/switch to (light|dark) theme/i)).toBeTruthy();
+    expect(getPicker()).toBeTruthy();
 
     getItemSpy.mockRestore();
     warnSpy.mockRestore();
   });
 
-  it("swallows localStorage write failures when toggling", () => {
+  it("swallows localStorage write failures when changing theme", () => {
     const warnSpy = jest.spyOn(console, "warn").mockImplementation(() => {});
-    const getItemSpy = jest.spyOn(Storage.prototype, "getItem").mockReturnValue("null");
+    const getItemSpy = jest.spyOn(Storage.prototype, "getItem").mockReturnValue(null);
     const setItemSpy = jest.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
       throw new DOMException("The operation is insecure.", "SecurityError");
     });
 
     render(<ThemeToggle />);
-    fireEvent.click(screen.getByLabelText(/switch to (light|dark) theme/i));
+    fireEvent.change(getPicker(), { target: { value: "dark" } });
 
     expect(setItemSpy).toHaveBeenCalled();
+    // The theme still applies for the session even when it cannot persist.
+    expect(document.documentElement).toHaveClass("dark");
 
     setItemSpy.mockRestore();
     getItemSpy.mockRestore();
     warnSpy.mockRestore();
-  });
-
-  it("keeps showing a theme icon after reset", () => {
-    render(<ThemeToggle />);
-
-    // An explicit override must exist before the reset control appears.
-    fireEvent.click(screen.getByLabelText(/switch to (light|dark) theme/i));
-    fireEvent.click(screen.getByLabelText(/reset theme to system default/i));
-
-    expect(screen.getByLabelText(/switch to (light|dark) theme/i).textContent).toMatch(/☀️|🌙/);
-  });
-
-  it("reflects the live system preference after reset, not the stale applied class", () => {
-    // System prefers dark.
-    const matchMediaSpy = jest.spyOn(window, "matchMedia").mockImplementation(
-      (query: string) =>
-        ({
-          matches: true,
-          media: query,
-          onchange: null,
-          addListener() {},
-          removeListener() {},
-          addEventListener() {},
-          removeEventListener() {},
-          dispatchEvent() {
-            return false;
-          },
-        }) as MediaQueryList,
-    );
-
-    render(<ThemeToggle />);
-
-    // Force light explicitly — this applies the "light" class to <body>.
-    fireEvent.click(screen.getByLabelText(/switch to light theme/i));
-    expect(document.body.classList.contains("light")).toBe(true);
-
-    // Reset to system default. The old code read document.body.classList during
-    // this render (still "light" before the effect cleared it) and never
-    // re-rendered, wrongly showing the light-theme icon. It must instead reflect
-    // the dark system preference.
-    fireEvent.click(screen.getByLabelText(/reset theme to system default/i));
-
-    expect(screen.getByLabelText(/switch to (light|dark) theme/i).textContent).toContain("🌙");
-
-    matchMediaSpy.mockRestore();
-  });
-
-  it("gives explicit URL themes precedence over stored preferences", () => {
-    localStorage.setItem("darkMode", "false");
-    window.history.replaceState(window.history.state, "", "/?theme=dark");
-    const darkRender = render(<ThemeToggle />);
-
-    expect(screen.getByRole("button", { name: "Switch to light theme" })).toBeTruthy();
-    expect(document.documentElement).toHaveClass("dark");
-    darkRender.unmount();
-
-    localStorage.setItem("darkMode", "true");
-    window.history.replaceState(window.history.state, "", "/?theme=light");
-    render(<ThemeToggle />);
-    expect(screen.getByRole("button", { name: "Switch to dark theme" })).toBeTruthy();
-    expect(document.documentElement).toHaveClass("light");
-  });
-
-  it("defaults safely when matchMedia is unavailable", () => {
-    const originalMatchMedia = window.matchMedia;
-    Object.defineProperty(window, "matchMedia", {
-      configurable: true,
-      value: undefined,
-    });
-
-    const { unmount } = render(<ThemeToggle />);
-    expect(screen.getByRole("button", { name: "Switch to light theme" })).toBeTruthy();
-    unmount();
-
-    Object.defineProperty(window, "matchMedia", {
-      configurable: true,
-      value: originalMatchMedia,
-    });
   });
 });

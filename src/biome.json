@@ -4,6 +4,7 @@
     "includes": [
       "**/*.css",
       "!!.next",
+      "!!.next-e2e",
       "!!.vercel",
       "!!out",
       "!!build",

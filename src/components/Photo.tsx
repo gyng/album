@@ -9,6 +9,8 @@ import { getDegLatLngFromExif } from "../util/dms2deg";
 import { getRelativeTimeString } from "../util/time";
 import { getPhotoAltText } from "../lib/alt";
 import { FacetLinkIcon } from "./FacetLinkIcon";
+import { Heading } from "./ui";
+import commonStyles from "../styles/common.module.css";
 
 import type { JSX } from "react";
 import { rgbToString } from "../util/colorDistance";
@@ -320,7 +322,11 @@ export const PhotoBlockEl: React.FC<{
       <Picture block={props.block} lazy={props.currentIndex > 2} useColourPlaceholder />
 
       <div className={styles.overlayHeader}>
-        {props.block.data.title ? <h1 className={styles.title}>{props.block.data.title}</h1> : null}
+        {props.block.data.title ? (
+          <Heading level={1} as="h1" className={styles.title}>
+            {props.block.data.title}
+          </Heading>
+        ) : null}
 
         {props.block.data.kicker ? (
           <p className={styles.kicker}>{props.block.data.kicker}</p>
@@ -331,19 +337,25 @@ export const PhotoBlockEl: React.FC<{
         ) : null}
       </div>
 
-      <div id={props.block.id} className={styles.details}>
+      <div
+        id={props.block.id}
+        className={[commonStyles.mediaDetails, styles.details].filter(Boolean).join(" ")}
+      >
         <details
+          className={commonStyles.disclosure}
           onToggle={(ev) => {
             setIsDetailsOpen(ev.currentTarget.open);
           }}
         >
-          <summary title="More details&hellip;" className={styles.detailsSummary}>
+          <summary title="More details&hellip;" className={commonStyles.mediaDetailsSummary}>
             <span>ⓘ</span>
           </summary>
 
           {isDetailsOpen ? (
-            <div className={styles.detailsContent}>
-              <div className={styles.exif}>
+            <div className={commonStyles.mediaDetailsContent}>
+              <div
+                className={[styles.exif, commonStyles.mediaDetailsTable].filter(Boolean).join(" ")}
+              >
                 <ExifTable
                   rows={[
                     {
@@ -502,6 +514,7 @@ export const PhotoBlockEl: React.FC<{
                             const colorParam = `${rgb[0]},${rgb[1]},${rgb[2]}`;
                             return (
                               <a
+                                data-colour-swatch
                                 key={rgbStr}
                                 href={`/search?color=${colorParam}`}
                                 style={{
@@ -531,7 +544,7 @@ export const PhotoBlockEl: React.FC<{
                   <PhotoSimilarPhotosDeferred path={props.block._build.tags.path} />
                 </div>
 
-                <div className={styles.viewOriginal}>
+                <div className={commonStyles.mediaDetailsViewOriginal}>
                   <a href={`#${props.block.id}`}>Permalink</a>
                   &nbsp;&middot;&nbsp; View{" "}
                   {props.block._build.srcset.map((s, i) => (
@@ -544,7 +557,7 @@ export const PhotoBlockEl: React.FC<{
                   ))}
                 </div>
 
-                <details className={styles.rawDetails}>
+                <details className={commonStyles.mediaDetailsRaw}>
                   <summary>Raw EXIF</summary>
                   <pre>{JSON.stringify(props.block._build.exif, null, 2)}</pre>
                 </details>

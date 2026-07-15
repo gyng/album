@@ -1,33 +1,40 @@
 .mapContainer {
   position: relative;
-  width: 100%;
-  height: 100%;
+  inline-size: 100%;
+  block-size: 100%;
   flex: 1;
-  min-height: 0;
+  min-block-size: 0;
   border-radius: var(--m-s);
-  overflow: hidden;
-  border: 1px solid color-mix(in srgb, var(--c-bg-contrast-light) 30%, transparent);
+  overflow: clip;
+  border: var(--line-hairline) solid
+    color-mix(in oklch, var(--c-bg-contrast-light) 30%, transparent);
+}
+
+.mapContainer > :global(.maplibregl-map) {
+  inline-size: 100%;
+  block-size: 100%;
 }
 
 /* Guess pin: drop + ripple */
 .guessPin {
   position: relative;
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
+  inline-size: var(--fs-sm);
+  block-size: var(--fs-sm);
+  border-radius: var(--radius-pill);
   background-color: var(--c-accent);
-  border: 2px solid #fff;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
-  animation: pinDrop 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  border: var(--line-strong) solid var(--c-on-dark);
+  box-shadow: 0 var(--line-hairline) var(--m)
+    color-mix(in oklch, var(--c-overlay-dark) 49%, transparent);
+  animation: pinDrop var(--t-slow) var(--ease-spring);
 }
 
 .guessPin::after {
   content: "";
   position: absolute;
-  inset: -4px;
-  border-radius: 50%;
-  border: 2px solid var(--c-accent);
-  animation: rippleOut 0.6s ease-out forwards;
+  inset: calc(var(--m) * -1);
+  border-radius: var(--radius-pill);
+  border: var(--line-strong) solid var(--c-accent);
+  animation: rippleOut var(--t-long) var(--ease-out) forwards;
   pointer-events: none;
 }
 
@@ -57,22 +64,23 @@
 /* Actual pin: appears with scale + ongoing pulse */
 .actualPin {
   position: relative;
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
+  inline-size: var(--fs-sm);
+  block-size: var(--fs-sm);
+  border-radius: var(--radius-pill);
   background-color: var(--c-success);
-  border: 2px solid #fff;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
-  animation: pinDrop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+  border: var(--line-strong) solid var(--c-on-dark);
+  box-shadow: 0 var(--line-hairline) var(--m)
+    color-mix(in oklch, var(--c-overlay-dark) 49%, transparent);
+  animation: pinDrop var(--t-slow) var(--ease-spring);
 }
 
 .actualPin::after {
   content: "";
   position: absolute;
-  inset: -3px;
-  border-radius: 50%;
-  border: 2px solid var(--c-success);
-  animation: pulse 1.5s ease-out infinite;
+  inset: calc(var(--line-hairline) * -3);
+  border-radius: var(--radius-pill);
+  border: var(--line-strong) solid var(--c-success);
+  animation: pulse var(--t-pulse) var(--ease-out) infinite;
   pointer-events: none;
 }
 
@@ -89,23 +97,23 @@
 
 .hint {
   position: absolute;
-  bottom: var(--m-l);
-  left: 50%;
+  inset-block-end: var(--m-l);
+  inset-inline-start: 50%;
   transform: translateX(-50%);
   background-color: var(--c-overlay-dark);
-  color: #fff;
+  color: var(--c-on-dark);
   padding: var(--m-s) var(--m-m);
   border-radius: var(--m-s);
   font-size: var(--fs-s);
   pointer-events: none;
   white-space: nowrap;
-  animation: fadeIn 0.4s ease-out;
+  animation: fadeIn var(--t-enter) var(--ease-out);
 }
 
 @keyframes fadeIn {
   from {
     opacity: 0;
-    transform: translateX(-50%) translateY(4px);
+    transform: translateX(-50%) translateY(var(--size-4));
   }
   to {
     opacity: 1;

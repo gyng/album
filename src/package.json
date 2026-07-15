@@ -18,12 +18,12 @@
     "benchmark:route": "node --experimental-strip-types ./bin/map-route-benchmark.ts",
     "prepare:feeds": "node ./bin/generate-feeds.cjs",
     "prepare:e2e-fixtures": "node ./bin/create-e2e-search-db.cjs --output ./public/e2e-search.sqlite --embeddings-output ./public/e2e-search-embeddings.sqlite --force",
-    "build:e2e": "npm run prepare:e2e-fixtures && NEXT_PUBLIC_SEARCH_DATABASE_URL=/e2e-search.sqlite NEXT_PUBLIC_SEARCH_EMBEDDINGS_DATABASE_URL=/e2e-search-embeddings.sqlite npm run build",
-    "build": "npm run cleanup:media-cache && npm run prepare:build-manifest && npm run prepare:feeds && next build && echo 'build done'",
-    "build:profile": "npm run cleanup:media-cache && npm run prepare:build-manifest && npm run prepare:feeds && ALBUM_BUILD_PROFILE=1 next build && echo 'build done'",
+    "build:prepare": "npm run typecheck && npm run cleanup:media-cache && npm run prepare:build-manifest && npm run prepare:feeds",
+    "build:e2e": "npm run prepare:e2e-fixtures && npm run build:prepare && NEXT_DIST_DIR=.next-e2e NEXT_PUBLIC_SEARCH_DATABASE_URL=/e2e-search.sqlite NEXT_PUBLIC_SEARCH_EMBEDDINGS_DATABASE_URL=/e2e-search-embeddings.sqlite ALBUM_SKIP_NEXT_TYPECHECK=1 next build && echo 'build done'",
+    "build": "npm run build:prepare && ALBUM_SKIP_NEXT_TYPECHECK=1 next build && echo 'build done'",
+    "build:profile": "npm run build:prepare && ALBUM_BUILD_PROFILE=1 ALBUM_SKIP_NEXT_TYPECHECK=1 next build && echo 'build done'",
     "start": "next start",
     "typecheck": "tsc --noEmit -p tsconfig.typecheck.json",
-    "typecheck:native": "tsgo --noEmit -p tsconfig.typecheck.json",
     "lint": "oxlint && biome lint . && npm run typecheck",
     "lint:fix": "oxlint --fix && biome lint --write .",
     "format:check": "oxfmt --check .",
@@ -72,13 +72,13 @@
     "@types/node": "25.5.0",
     "@types/react": "^19.2.17",
     "@types/react-dom": "19.2.3",
-    "@typescript/native-preview": "^7.0.0-dev.20260707.2",
+    "@typescript/native": "npm:typescript@^7.0.2",
     "jest": "^30.4.2",
     "jest-environment-jsdom": "^30.4.1",
     "oxfmt": "^0.58.0",
     "oxlint": "^1.73.0",
     "oxlint-tsgolint": "^0.24.0",
-    "typescript": "^5.9.3"
+    "typescript": "npm:@typescript/typescript6@^6.0.2"
   },
   "overrides": {
     "usehooks-ts": {

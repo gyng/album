@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import styles from "./Nav.module.css";
 import commonStyles from "../styles/common.module.css";
 import { ThemeToggle } from "./ThemeToggle";
+import { buttonStyles } from "./ui";
 
 export const Nav: React.FC<{
   albumName?: string;
@@ -68,7 +69,7 @@ export const Nav: React.FC<{
         styles.nav,
         hasMoreLeft ? styles.scrollableLeft : "",
         hasMoreRight ? styles.scrollableRight : "",
-        props.hasPadding === false ? commonStyles.noNavPadding : "",
+        props.hasPadding === false ? styles.noPadding : "",
       ]
         .filter(Boolean)
         .join(" ")}
@@ -80,7 +81,7 @@ export const Nav: React.FC<{
         <li>
           <Link
             href="/"
-            className={[commonStyles.button, props.isHome ? commonStyles.navCurrent : ""].join(" ")}
+            className={[buttonStyles.base, props.isHome ? commonStyles.navCurrent : ""].join(" ")}
             aria-current={props.isHome ? "page" : undefined}
           >
             Albums
@@ -89,20 +90,20 @@ export const Nav: React.FC<{
         {props.albumName ? (
           <>
             <li>
-              <Link href={`/map?filter_album=${props.albumName}`} className={commonStyles.button}>
+              <Link href={`/map?filter_album=${props.albumName}`} className={buttonStyles.base}>
                 Album map
               </Link>
             </li>
             <li>
               <Link
                 href={`/timeline?filter_album=${props.albumName}`}
-                className={commonStyles.button}
+                className={buttonStyles.base}
               >
                 Album timeline
               </Link>
             </li>
             <li>
-              <Link href={`/slideshow?filter=${props.albumName}`} className={commonStyles.button}>
+              <Link href={`/slideshow?filter=${props.albumName}`} className={buttonStyles.base}>
                 Album slideshow
               </Link>
             </li>

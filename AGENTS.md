@@ -106,6 +106,7 @@ npm run test:e2e:reuse -- ./tests/smoke.spec.ts                # reuse already-r
 
 ## Design tokens (src/styles/globals.css)
 Always use tokens — never raw px values or colours.
+- **Themes:** system/light/dark plus named palettes `paper`, `ink`, `slate`. Registry in `src/util/theme.ts`; each named theme is a `:root:where(.theme-*)` token-override block in `globals.css` applied alongside its base scheme class (`light`/`dark`). Preference persists as `localStorage.theme` (legacy `darkMode` still read), applied pre-paint in `_document.tsx` and reactively by `ThemeToggle` (a select in the nav). `?theme=` URL param accepts any theme name.
 - Spacing: `--m` 4 / `--m-s` 8 / `--m-m` 12 / `--m-l` 20 / `--m-xl` 40 / `--m-2xl` 64 (px)
 - Font sizes: `--fs-xs` 10 / `--fs-s` 11 / `--fs-sm` 14 / `--fs-m` 18 / `--fs-l` 24 / `--fs-xl` 64 (px)
 - Colours: `--c-bg`, `--c-font`, `--c-bg-contrast-light`, `--c-bg-contrast-dark`, `--c-accent`, `--c-overlay-dark`, `--c-border-on-dark`

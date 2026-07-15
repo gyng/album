@@ -5,7 +5,6 @@ import pinStyles from "./mapPin.module.css";
 
 import Map, { Marker, useMap } from "react-map-gl/maplibre";
 import type { ProjectionSpecification } from "maplibre-gl";
-import "maplibre-gl/dist/maplibre-gl.css";
 import Link from "next/link";
 import { computeWrapAwareBounds } from "../util/mapBounds";
 
@@ -103,7 +102,7 @@ const MMapComponent: React.FC<MapProps> = (props) => {
   return (
     <div className={styles.map}>
       <Map
-        style={{ width: "100%", height: "100%", ...props.style }}
+        style={props.style}
         // mapStyle="https://tiles.openfreemap.org/styles/liberty"
         mapStyle={`https://api.maptiler.com/maps/${mapStyle}/style.json?key=mrjUpLh9Syjz9wcEY2Vb`}
         initialViewState={{
@@ -122,7 +121,7 @@ const MMapComponent: React.FC<MapProps> = (props) => {
             anchor="center"
             style={props.markerStyle ?? {}}
           >
-            <span className={pinStyles.pin} style={{ color: "var(--c-accent)" }} />
+            <span data-map-pin className={pinStyles.pin} />
           </Marker>
         ))}
         <MapFlyer coordinates={coords} />

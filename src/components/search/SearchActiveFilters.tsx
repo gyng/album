@@ -1,3 +1,4 @@
+import { mergeCssModuleStyles } from "../../util/mergeCssModuleStyles";
 import type { RGB } from "../../util/colorDistance";
 import { rgbToHex, rgbToString } from "../../util/colorDistance";
 import {
@@ -5,8 +6,19 @@ import {
   type SearchFacetSelection,
   serializeSearchFacetSelection,
 } from "../../util/searchFacets";
-import styles from "./Search.module.css";
+import sharedStyles from "./Search.module.css";
+import localStyles from "./SearchActiveFilters.module.css";
 import type { ImageQuery } from "./useImageQuery";
+
+const styles = mergeCssModuleStyles(sharedStyles, localStyles, [
+  "activeFacetChip",
+  "activeFacetChips",
+  "activeFacetColorSwatch",
+  "activeFacetImageThumb",
+  "activeFacetImageZoom",
+  "activeFacetLabel",
+  "activeFacetSection",
+]);
 
 export const SearchActiveFilters = ({
   imageQuery,
@@ -69,6 +81,7 @@ export const SearchActiveFilters = ({
             aria-label={`Remove filter Colour: ${rgbToHex(colour)}`}
           >
             <span
+              data-colour-swatch
               className={styles.activeFacetColorSwatch}
               style={{ backgroundColor: rgbToString(colour) }}
               aria-hidden="true"

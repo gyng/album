@@ -33,7 +33,7 @@ export const MiniHistogram: React.FC<Props> = ({ title, data }) => {
                 <div className={styles.count}>{bucket.label}</div>
                 <div
                   className={[styles.bar, bucket.count === 0 ? styles.barEmpty : ""].join(" ")}
-                  style={{ height: `${Math.max(heightPct, bucket.count > 0 ? 4 : 0)}%` }}
+                  style={{ blockSize: `${Math.max(heightPct, bucket.count > 0 ? 4 : 0)}%` }}
                   aria-hidden="true"
                 />
               </div>

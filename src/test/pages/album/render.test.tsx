@@ -26,7 +26,10 @@ jest.mock("../../../components/GlobalNav", () => ({
 jest.mock("../../../components/PhotoAlbum", () => ({
   PhotoAlbum: ({ album }: { album: Content }) => <div data-testid="album">{album._build.slug}</div>,
 }));
-jest.mock("../../../components/ui", () => ({ Footer: () => <footer /> }));
+jest.mock("../../../components/ui", () => ({
+  Footer: () => <footer />,
+  buttonStyles: { base: "button" },
+}));
 
 import AlbumPage, { getStaticProps } from "../../../pages/album/[[...slug]]";
 

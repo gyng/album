@@ -1,9 +1,10 @@
+import { mergeCssModuleStyles } from "../../util/mergeCssModuleStyles";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Database } from "@sqlite.org/sqlite-wasm";
 import Link from "next/link";
-import styles from "./Search.module.css";
-import commonStyles from "../../styles/common.module.css";
-import { Heading } from "../ui";
+import sharedStyles from "./Search.module.css";
+import localStyles from "./EmptyStateExplore.module.css";
+import { Heading, buttonStyles } from "../ui";
 import { fetchMemoryCandidates, fetchRecentResults, fetchRandomResults } from "./api";
 import { SearchResultRow } from "./searchTypes";
 import { SearchResultTile } from "./SearchResultTile";
@@ -13,6 +14,20 @@ import {
   ResolvedMemoryCluster,
 } from "../../util/clusterByDate";
 import { RGB } from "../../util/colorDistance";
+
+const styles = mergeCssModuleStyles(sharedStyles, localStyles, [
+  "emptySections",
+  "emptyState",
+  "memoryClusterCard",
+  "memoryClusterHeader",
+  "memoryClusterItem",
+  "memoryClusterLabel",
+  "memoryClusterStrip",
+  "memoryClusters",
+  "memoryLoadMoreButton",
+  "memoryTimelineTile",
+  "sectionSurface",
+]);
 
 const RECENT_ROW_INITIAL_SIZE = 15;
 const RECENT_ROW_LOAD_MORE_SIZE = 16;
@@ -321,6 +336,7 @@ export const EmptyStateExplore: React.FC<Props> = ({
               {recentResults.length >= recentVisibleCount ? (
                 <li>
                   <button
+                    type="button"
                     className={styles.moreButton}
                     onClick={() => {
                       setRecentVisibleCount((prev) => prev + RECENT_ROW_LOAD_MORE_SIZE);
@@ -359,12 +375,12 @@ export const EmptyStateExplore: React.FC<Props> = ({
                     aria-label={meta.join(" · ")}
                   >
                     <div className={styles.memoryClusterHeader}>
-                      <h4 className={styles.memoryClusterLabel}>
+                      <Heading level={3} as="h4" className={styles.memoryClusterLabel}>
                         {[
                           `${cluster.yearsAgo} year${cluster.yearsAgo === 1 ? "" : "s"} ago`,
                           ...meta,
                         ].join(" · ")}
-                      </h4>
+                      </Heading>
                     </div>
 
                     <ul className={styles.memoryClusterStrip}>
@@ -397,7 +413,7 @@ export const EmptyStateExplore: React.FC<Props> = ({
             {memoryClusters.length > visibleMemoryClusterCount ? (
               <button
                 type="button"
-                className={`${commonStyles.button} ${styles.memoryLoadMoreButton}`}
+                className={`${buttonStyles.base} ${styles.memoryLoadMoreButton}`}
                 onClick={() => {
                   setVisibleMemoryClusterCount((current) =>
                     Math.min(current + MEMORY_CLUSTER_LOAD_MORE_SIZE, memoryClusters.length),
@@ -451,6 +467,7 @@ export const EmptyStateExplore: React.FC<Props> = ({
               {hasMoreRandomResults ? (
                 <li>
                   <button
+                    type="button"
                     ref={randomLoadMoreButtonRef}
                     className={styles.moreButton}
                     onClick={() => {

@@ -6,6 +6,7 @@ import { imageSizeFromFile } from "image-size/fromFile";
 import sharp from "sharp";
 import { incrementBuildCounter, measureBuild, measureBuildSync } from "./buildTiming";
 import { dateToNaiveIso } from "../util/exifTime";
+import { encodePublicAssetPath } from "../util/encodePublicAssetPath";
 
 export const OPTIMISED_SIZES = [3200, 1600, 800];
 export const RESIZED_IMAGE_DIR = ".resized_images";
@@ -98,7 +99,7 @@ export const optimiseImages = async (
                 if (metadata.width && metadata.height) {
                   incrementBuildCounter("photo.optimiseImages.cacheHits");
                   return {
-                    src: stripPublicFromPath(newFile),
+                    src: encodePublicAssetPath(stripPublicFromPath(newFile)),
                     width: metadata.width,
                     height: metadata.height,
                   };
@@ -128,7 +129,7 @@ export const optimiseImages = async (
                 .toFile(newFile)
                 .then((p) => {
                   const optimised: OptimisedPhoto = {
-                    src: stripPublicFromPath(newFile),
+                    src: encodePublicAssetPath(stripPublicFromPath(newFile)),
                     width: p.width,
                     height: p.height,
                   };

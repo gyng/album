@@ -1,31 +1,35 @@
-.maplibregl-popup-content {
-  background-color: var(--c-bg) !important;
-}
+@layer overrides {
+  .maplibregl-popup-content {
+    background-color: var(--c-bg);
+  }
 
-.maplibregl-popup-tip {
-  border-top-color: var(--c-bg) !important;
-  border-bottom-color: var(--c-bg) !important;
-}
+  .maplibregl-popup-tip {
+    border-top-color: var(--c-bg);
+    border-bottom-color: var(--c-bg);
+  }
 
-.maplibregl-marker {
-  cursor: pointer;
-}
+  .maplibregl-marker {
+    cursor: pointer;
+  }
 
-.maplibregl-marker:hover {
-  z-index: 5000;
-  filter: brightness(1.5);
-}
+  @media (hover: hover) and (pointer: fine) {
+    .maplibregl-marker:hover {
+      z-index: var(--z-map-vendor);
+      filter: brightness(1.5);
+    }
+  }
 
-.maplibregl-ctrl-attrib a {
-  color: var(--c-bg-contrast-dark) !important;
-  text-decoration: none !important;
-}
+  .maplibregl-ctrl-attrib a {
+    color: var(--c-bg-contrast-dark);
+    text-decoration: none;
+  }
 
-.maplibregl-ctrl-attrib a:hover {
-  color: var(--c-bg-contrast-dark) !important;
-  text-decoration: none !important;
-}
+  .maplibregl-ctrl-attrib a:hover {
+    color: var(--c-bg-contrast-dark);
+    text-decoration: none;
+  }
 
-.maplibregl-popup-close-button {
-  display: none;
+  .maplibregl-popup-close-button {
+    display: none;
+  }
 }

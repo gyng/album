@@ -1,4 +1,5 @@
 .chart {
+  container-type: inline-size;
   display: grid;
   gap: var(--m-s);
   align-content: start;
@@ -6,12 +7,13 @@
 
 .matrix {
   display: grid;
-  gap: 1px;
+  grid-template-columns: var(--m-2xl) repeat(var(--month-count), minmax(0, 1fr));
+  gap: var(--size-1);
   align-items: stretch;
 }
 
 .corner {
-  min-height: 1px;
+  min-block-size: var(--size-1);
 }
 
 .monthLabel {
@@ -38,33 +40,43 @@
 
 .cell {
   position: relative;
-  min-height: 2.75rem;
+  min-block-size: var(--size-48);
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 0.2rem;
-  background: color-mix(in srgb, var(--c-accent) calc(12% + (var(--intensity) * 78%)), var(--c-bg));
-  border: 1px solid
-    color-mix(in srgb, var(--c-bg-contrast-dark) calc(80% - (var(--intensity) * 45%)), transparent);
+  padding: var(--m);
+  background: color-mix(
+    in oklch,
+    var(--c-accent) calc(12% + (var(--intensity) * 78%)),
+    var(--c-bg)
+  );
+  border: var(--size-1) solid
+    color-mix(in oklch, var(--c-bg-contrast-dark) calc(80% - (var(--intensity) * 45%)), transparent);
   transition:
-    background var(--t-fast) ease,
-    border-color var(--t-fast) ease,
-    transform var(--t-fast) ease;
+    background var(--t-fast) var(--ease-out),
+    border-color var(--t-fast) var(--ease-out),
+    transform var(--t-fast) var(--ease-out);
 }
 
 .cellLink {
   text-decoration: none;
 }
 
-.cell:hover,
 .cell:focus-visible {
-  transform: translateY(-1px);
-  border-color: color-mix(in srgb, var(--c-accent) 45%, var(--c-font));
+  transform: translateY(calc(var(--size-1) * -1));
+  border-color: color-mix(in oklch, var(--c-accent) 45%, var(--c-font));
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .cell:hover {
+    transform: translateY(calc(var(--size-1) * -1));
+    border-color: color-mix(in oklch, var(--c-accent) 45%, var(--c-font));
+  }
 }
 
 .cellEmpty {
-  background: color-mix(in srgb, var(--c-bg) 97%, var(--c-bg-contrast-dark));
-  border-color: color-mix(in srgb, var(--c-bg-contrast-dark) 88%, transparent);
+  background: color-mix(in oklch, var(--c-bg) 97%, var(--c-bg-contrast-dark));
+  border-color: color-mix(in oklch, var(--c-bg-contrast-dark) 88%, transparent);
 }
 
 .count {
@@ -73,18 +85,23 @@
   /* Track cell intensity: dark cells (high intensity) want light text, pale
      cells (low intensity) want the theme font colour so the count stays legible
      instead of being near-white on a pale fill. */
-  color: color-mix(in srgb, white calc(var(--intensity, 0) * 100%), var(--c-font));
+  color: color-mix(in oklch, var(--c-white) calc(var(--intensity, 0) * 100%), var(--c-font));
   line-height: 1;
 }
 
-.cell:hover [data-tooltip],
 .cell:focus-visible [data-tooltip] {
   opacity: 1;
 }
 
-@media (max-width: 720px) {
+@media (hover: hover) and (pointer: fine) {
+  .cell:hover [data-tooltip] {
+    opacity: 1;
+  }
+}
+
+@container (max-width: 720px) {
   .matrix {
-    grid-template-columns: 3rem repeat(12, minmax(0, 1fr)) !important;
+    grid-template-columns: var(--size-56) repeat(var(--month-count), minmax(0, 1fr));
   }
 
   .monthLabel,
@@ -97,7 +114,7 @@
   }
 
   .cell {
-    min-height: 2.2rem;
-    padding: 0.15rem;
+    min-block-size: var(--tap-target);
+    padding: var(--size-3);
   }
 }

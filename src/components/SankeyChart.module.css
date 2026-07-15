@@ -1,17 +1,17 @@
 .wrapper {
   display: grid;
   gap: var(--m-s);
-  width: 100%;
-  min-width: 0;
+  inline-size: 100%;
+  min-inline-size: 0;
 }
 
 .chartShell {
-  height: var(--sankey-height, 460px);
-  border: 1px solid var(--c-bg-contrast-dark);
+  block-size: var(--sankey-height, var(--size-460));
+  border: var(--size-1) solid var(--c-bg-contrast-dark);
   border-radius: var(--m-s);
   padding: var(--m);
-  background: color-mix(in srgb, var(--c-bg) 96%, var(--c-bg-contrast-dark));
-  overflow: hidden;
+  background: color-mix(in oklch, var(--c-bg) 96%, var(--c-bg-contrast-dark));
+  overflow: clip;
 }
 
 .svgLabel {
@@ -27,13 +27,21 @@
   cursor: pointer;
 }
 
-.svgLabelLink:hover .svgLabel {
-  fill: color-mix(in srgb, var(--c-font) 78%, var(--c-accent));
+.svgLabelLink:focus-visible .svgLabel {
+  fill: color-mix(in oklch, var(--c-font) 78%, var(--c-accent));
+  text-decoration: underline;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .svgLabelLink:hover .svgLabel {
+    fill: color-mix(in oklch, var(--c-font) 78%, var(--c-accent));
+    text-decoration: underline;
+  }
 }
 
 .tooltip {
   display: grid;
-  gap: 0.1rem;
+  gap: var(--size-2);
   line-height: 1.25;
 }
 
@@ -41,14 +49,4 @@
   margin: 0;
   color: var(--c-bg-contrast-light);
   font-size: var(--fs-sm);
-}
-
-/* Aligns with the explore page's desktop/mobile switch (720px): the Sankey is
-   wrapped in .desktopOnly there, which hides at 720px and reveals the bar
-   fallback. Hiding the chart at the same width avoids an empty StatGroup in the
-   721-900px range where the wrapper was visible but the chart was not. */
-@media (max-width: 720px) {
-  .wrapper {
-    display: none;
-  }
 }

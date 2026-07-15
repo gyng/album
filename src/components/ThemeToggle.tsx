@@ -1,159 +1,118 @@
 import { useEffect, useReducer, useSyncExternalStore } from "react";
+import {
+  ALL_THEME_CLASSES,
+  isThemeName,
+  THEME_LABELS,
+  THEME_NAMES,
+  type ThemeName,
+  themeClassNames,
+} from "../util/theme";
+import { Select } from "./ui";
 import styles from "./ThemeToggle.module.css";
 
 const subscribeToHydration = () => () => {};
 
-const readStoredDarkMode = (): boolean | null => {
+const readStoredTheme = (): ThemeName | null => {
   try {
-    const stored = JSON.parse(localStorage.getItem("darkMode") ?? "null");
-    return stored === true || stored === false ? stored : null;
+    const stored = localStorage.getItem("theme");
+    if (isThemeName(stored)) {
+      return stored;
+    }
+
+    // Legacy boolean preference from the old light/dark-only toggle.
+    const legacy = JSON.parse(localStorage.getItem("darkMode") ?? "null");
+    if (legacy === true || legacy === false) {
+      return legacy ? "dark" : "light";
+    }
+
+    return null;
   } catch (err) {
-    console.warn("Failed to read dark mode preference", err);
+    console.warn("Failed to read theme preference", err);
     return null;
   }
 };
 
-const writeStoredDarkMode = (value: boolean | null): void => {
+const writeStoredTheme = (value: ThemeName | null): void => {
   try {
     if (value == null) {
-      localStorage.removeItem("darkMode");
-      return;
+      localStorage.removeItem("theme");
+    } else {
+      localStorage.setItem("theme", value);
     }
-
-    localStorage.setItem("darkMode", JSON.stringify(value));
+    // The named-theme preference supersedes the legacy boolean.
+    localStorage.removeItem("darkMode");
   } catch (err) {
-    console.warn("Failed to persist dark mode preference", err);
+    console.warn("Failed to persist theme preference", err);
   }
 };
 
-const getInitialDarkMode = (): boolean | null => {
+// Scopes each dropdown option to its theme's palette so the CSS swatch
+// (option::before) previews that theme's own background and accent tokens.
+const optionClassName = (name: ThemeName): string =>
+  name === "light" || name === "dark"
+    ? name === "light"
+      ? styles.optionLight
+      : styles.optionDark
+    : `theme-${name}`;
+
+const getInitialTheme = (): ThemeName | null => {
   // This is the client snapshot passed to useSyncExternalStore. Server renders
   // use the explicit server snapshot below and never call this function.
   const url = new URL(window.location.toString());
   const theme = url.searchParams.get("theme");
-  if (theme === "dark") {
-    return true;
-  }
-  if (theme === "light") {
-    return false;
+  if (isThemeName(theme)) {
+    return theme;
   }
 
-  const stored = readStoredDarkMode();
-  if (stored === true || stored === false) {
-    return stored;
-  }
-
-  // No explicit preference: follow the system (null = "system default"),
-  // matching the pre-paint script in _document.tsx.
-  return null;
-};
-
-const prefersDarkMediaQuery = (): MediaQueryList | null =>
-  typeof window.matchMedia === "function"
-    ? window.matchMedia("(prefers-color-scheme: dark)")
-    : null;
-
-// Reactive system-theme store: the "system default" fallback must reflect the
-// live OS preference and re-render when it changes, rather than reading the
-// theme class the effect has (or hasn't yet) applied to the DOM.
-const subscribeToSystemTheme = (onChange: () => void): (() => void) => {
-  const query = prefersDarkMediaQuery();
-  if (!query) {
-    return () => {};
-  }
-  query.addEventListener("change", onChange);
-  return () => query.removeEventListener("change", onChange);
-};
-
-const getSystemPrefersDark = (): boolean => {
-  const query = prefersDarkMediaQuery();
-  // Default to dark when matchMedia is unavailable (mirrors _document.tsx).
-  return query ? query.matches : true;
+  // No explicit preference (null) follows the system: :root declares
+  // `color-scheme: light dark`, so with no theme classes applied the
+  // light-dark() tokens track the OS, matching the pre-paint script in
+  // _document.tsx.
+  return readStoredTheme();
 };
 
 export const ThemeToggle: React.FC = () => {
-  const hasHydrated = useSyncExternalStore(
-    subscribeToHydration,
-    () => true,
-    () => false,
-  );
-  const initialDarkMode = useSyncExternalStore(
-    subscribeToHydration,
-    getInitialDarkMode,
-    () => null,
-  );
-  const systemPrefersDark = useSyncExternalStore(
-    subscribeToSystemTheme,
-    getSystemPrefersDark,
-    () => true,
-  );
-  const [darkModeOverride, setDarkModeOverride] = useReducer(
-    (_state: boolean | null | undefined, next: boolean | null | undefined) => next,
+  const initialTheme = useSyncExternalStore(subscribeToHydration, getInitialTheme, () => null);
+  const [themeOverride, setThemeOverride] = useReducer(
+    (_state: ThemeName | null | undefined, next: ThemeName | null | undefined) => next,
     undefined,
   );
-  const darkMode = darkModeOverride === undefined ? initialDarkMode : darkModeOverride;
+  const theme = themeOverride === undefined ? initialTheme : themeOverride;
 
   useEffect(() => {
-    // Mirror the pre-paint init script in _document.tsx, which toggles the
-    // theme class on both the root element and the body. Updating only the
-    // body would leave html in the stale theme — its color-scheme drives the
+    // Mirror the pre-paint init script in _document.tsx, which sets the theme
+    // classes on both the root element and the body. Updating only the body
+    // would leave html in the stale theme — its color-scheme drives the
     // viewport scrollbar and overscroll glow.
-    const root = document.documentElement;
-    const { body } = document;
-    if (darkMode === true) {
-      root.classList.add("dark");
-      root.classList.remove("light");
-      body.classList.add("dark");
-      body.classList.remove("light");
-    } else if (darkMode === false) {
-      root.classList.add("light");
-      root.classList.remove("dark");
-      body.classList.add("light");
-      body.classList.remove("dark");
-    } else {
-      root.classList.remove("light");
-      root.classList.remove("dark");
-      body.classList.remove("light");
-      body.classList.remove("dark");
+    for (const el of [document.documentElement, document.body]) {
+      el.classList.remove(...ALL_THEME_CLASSES);
+      if (theme != null) {
+        el.classList.add(...themeClassNames(theme));
+      }
     }
-  }, [darkMode]);
-
-  const displayDarkMode = darkMode == null ? (hasHydrated ? systemPrefersDark : null) : darkMode;
+  }, [theme]);
 
   return (
     <div className={styles.themeToggle}>
-      <button
-        type="button"
-        aria-label={`Switch to ${displayDarkMode ? "light" : "dark"} theme`}
-        className="dark-mode-toggle"
-        onClick={() => {
-          // Toggle relative to the theme actually on screen (which may be the
-          // system default), not an "unset = dark" assumption.
-          const next = !displayDarkMode;
-          setDarkModeOverride(next);
-          writeStoredDarkMode(next);
+      <Select
+        aria-label="Theme"
+        className={styles.picker}
+        value={theme ?? "system"}
+        onChange={(event) => {
+          const next = isThemeName(event.target.value) ? event.target.value : null;
+          setThemeOverride(next);
+          writeStoredTheme(next);
         }}
       >
-        {displayDarkMode == null ? (
-          <span aria-hidden="true" style={{ opacity: 0 }}>
-            ☀️
-          </span>
-        ) : (
-          <span aria-hidden="true">{displayDarkMode ? "🌙" : "☀️"}</span>
-        )}
-      </button>
-      {darkMode != null ? (
-        <button
-          type="button"
-          aria-label="Reset theme to system default"
-          onClick={() => {
-            setDarkModeOverride(null);
-            writeStoredDarkMode(null);
-          }}
-        >
-          <span aria-hidden="true">⟳</span>
-        </button>
-      ) : null}
+        <option className={styles.optionSystem} value="system">
+          System
+        </option>
+        {THEME_NAMES.map((name) => (
+          <option key={name} className={optionClassName(name)} value={name}>
+            {THEME_LABELS[name]}
+          </option>
+        ))}
+      </Select>
     </div>
   );
 };

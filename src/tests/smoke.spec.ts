@@ -96,14 +96,14 @@ test.describe("Smoke Tests", () => {
     });
   });
 
-  test("theme toggle changes theme", async ({ page }) => {
+  test("theme picker changes theme", async ({ page }) => {
     await page.goto("/", { waitUntil: "domcontentloaded" });
 
     const html = page.locator("html");
-    const initialClass = await html.getAttribute("class");
+    await page.getByRole("combobox", { name: "Theme" }).selectOption("slate");
 
-    await page.getByRole("button", { name: /switch to (light|dark) theme/i }).click();
-
-    await expect(html).not.toHaveAttribute("class", initialClass ?? "");
+    // A named theme applies its palette class plus its base colour scheme.
+    await expect(html).toHaveClass(/theme-slate/);
+    await expect(html).toHaveClass(/(^| )dark( |$)/);
   });
 });

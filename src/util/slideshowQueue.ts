@@ -1,5 +1,6 @@
 import { RandomPhotoRow } from "../components/search/api";
 import { extractDateFromExifString } from "./extractExifFromDb";
+import { encodePublicAssetPath } from "./encodePublicAssetPath";
 
 // Prevent the same photo showing twice in a row when one shuffled queue/pass
 // hands off to the next: if the new head repeats the previous pass's last
@@ -107,7 +108,7 @@ export const getSlideshowPhotoSrc = (photo: RandomPhotoRow | null): string | nul
     return null;
   }
 
-  return `/data/albums/${albumName}/.resized_images/${photoName}@3200.avif`;
+  return encodePublicAssetPath(`/data/albums/${albumName}/.resized_images/${photoName}@3200.avif`);
 };
 
 // --- Random/weighted queue state machine ---------------------------------

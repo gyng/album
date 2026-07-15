@@ -6,40 +6,61 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { useSearchFilterDrawer } from "./useSearchFilterDrawer";
 
 const Harness = ({ isSimilarMode = false }: { isSimilarMode?: boolean }) => {
-  const { isOpen, open, close, triggerRef, closeRef } = useSearchFilterDrawer({ isSimilarMode });
+  const { isCompact, isOpen, open, close, dialogRef, triggerRef, closeRef } = useSearchFilterDrawer(
+    { isSimilarMode },
+  );
+
+  if (!isCompact) {
+    return <span>Inline filters</span>;
+  }
+
   return (
     <>
-      <button ref={triggerRef} type="button" onClick={open}>
+      <button ref={triggerRef} type="button" aria-expanded={isOpen} onClick={open}>
         Open
       </button>
-      {isOpen ? (
+      <dialog
+        ref={dialogRef}
+        aria-label="Search filters"
+        onCancel={(event) => {
+          event.preventDefault();
+          close();
+        }}
+      >
         <button ref={closeRef} type="button" onClick={close}>
           Done
         </button>
-      ) : null}
+      </dialog>
     </>
   );
 };
 
 describe("useSearchFilterDrawer", () => {
-  afterEach(() => {
-    document.body.style.overflow = "";
+  beforeEach(() => {
+    window.matchMedia = jest.fn().mockImplementation((query: string) => ({
+      matches: query === "(max-width: 900px)",
+      media: query,
+      onchange: null,
+      addListener: jest.fn(),
+      removeListener: jest.fn(),
+      addEventListener: jest.fn(),
+      removeEventListener: jest.fn(),
+      dispatchEvent: jest.fn(),
+    }));
   });
 
-  it("locks scroll, handles Escape, and restores focus to the trigger", () => {
+  it("opens a native modal, handles cancellation, and restores trigger focus", () => {
     render(<Harness />);
     const trigger = screen.getByRole("button", { name: "Open" });
 
     fireEvent.click(trigger);
-    expect(document.body.style.overflow).toBe("hidden");
+    const dialog = screen.getByRole("dialog", { name: "Search filters" });
+    expect(dialog).toHaveAttribute("open");
+    expect(document.body.style.overflow).toBe("");
     expect(screen.getByRole("button", { name: "Done" })).toHaveFocus();
 
-    fireEvent.keyDown(window, { key: "Enter" });
-    expect(screen.getByRole("button", { name: "Done" })).toBeTruthy();
-
-    fireEvent.keyDown(window, { key: "Escape" });
-    expect(screen.queryByRole("button", { name: "Done" })).toBeNull();
-    expect(document.body.style.overflow).toBe("");
+    fireEvent(dialog, new Event("cancel", { bubbles: false, cancelable: true }));
+    expect(dialog).not.toHaveAttribute("open");
     expect(trigger).toHaveFocus();
   });
 
@@ -49,6 +70,6 @@ describe("useSearchFilterDrawer", () => {
 
     rerender(<Harness isSimilarMode />);
 
-    expect(screen.queryByRole("button", { name: "Done" })).toBeNull();
+    expect(document.querySelector("dialog")).not.toHaveAttribute("open");
   });
 });

@@ -1,10 +1,50 @@
+import { mergeCssModuleStyles } from "../../util/mergeCssModuleStyles";
 import React from "react";
 import { HexColorInput, HexColorPicker } from "react-colorful";
-import styles from "./Search.module.css";
+import sharedStyles from "./Search.module.css";
+import localStyles from "./SearchFacetPanel.module.css";
 import { SearchFacetSelection, serializeSearchFacetSelection } from "../../util/searchFacets";
 import { SearchFilterPill } from "./SearchFilterPill";
 import { SearchTag } from "./SearchTag";
 import { hexToRgb, rgbToHex, RGB } from "../../util/colorDistance";
+import { Heading } from "../ui";
+
+const styles = mergeCssModuleStyles(
+  sharedStyles,
+  localStyles,
+  [
+    "colorFacetClearButton",
+    "colorFacetControl",
+    "colorFacetCurrent",
+    "colorFacetCurrentHex",
+    "colorFacetCurrentSwatch",
+    "colorFacetCurrentSwatchButton",
+    "colorFacetHeader",
+    "colorFacetHexInput",
+    "colorFacetHexLabel",
+    "colorFacetMeta",
+    "colorFacetNativeInput",
+    "colorFacetPicker",
+    "colorFacetRangeGroup",
+    "colorFacetRangeLabel",
+    "colorFacetSection",
+    "colorFacetToleranceSlider",
+    "colorFacetToleranceValue",
+    "facetCategoryContent",
+    "facetCategoryContentFade",
+    "facetCategoryRail",
+    "facetCategoryTab",
+    "facetCategoryTabActive",
+    "facetFadeAbove",
+    "facetFadeBelow",
+    "facetPanel",
+    "facetPanelColorMode",
+    "facetSection",
+    "facetSectionTitle",
+    "searchModeStatus",
+  ],
+  ["colorFacetPicker", "facetCategoryContent"],
+);
 
 export type SearchFacetOption = {
   value: string;
@@ -258,6 +298,7 @@ export const SearchFacetPanel: React.FC<Props> = ({
                       title="Open native colour picker"
                     >
                       <span
+                        data-colour-swatch
                         className={styles.colorFacetCurrentSwatch}
                         style={{ backgroundColor: pickerHex }}
                         aria-hidden="true"
@@ -318,7 +359,9 @@ export const SearchFacetPanel: React.FC<Props> = ({
           ? visibleSections.map((section) => (
               <div key={section.facetId} className={styles.facetSection}>
                 {showSectionLabels ? (
-                  <h2 className={styles.facetSectionTitle}>{section.displayName}</h2>
+                  <Heading level={2} as="h2" className={styles.facetSectionTitle}>
+                    {section.displayName}
+                  </Heading>
                 ) : null}
                 <div className={styles.tagsContainer}>
                   {section.options.map((option) => {

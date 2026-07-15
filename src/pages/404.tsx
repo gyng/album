@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { GlobalNav } from "../components/GlobalNav";
 import { Seo } from "../components/Seo";
+import { Heading } from "../components/ui";
 import { buildCollectionPageJsonLd } from "../lib/seo";
 
 import styles from "./404.module.css";
@@ -24,7 +25,9 @@ export default function FourOhFour() {
         <span className={styles.glyph} aria-hidden="true">
           🔥
         </span>
-        <h1 className={styles.heading}>404 — page not found</h1>
+        <Heading level={1} as="h1" className={styles.heading}>
+          404 — page not found
+        </Heading>
         <Link href="/" className={styles.homeLink}>
           Back to album list
         </Link>

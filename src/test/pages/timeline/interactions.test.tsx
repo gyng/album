@@ -31,13 +31,29 @@ jest.mock("../../../util/clusterByDate", () => ({
     start === end ? start : `${start} to ${end}`,
 }));
 jest.mock("../../../components/CalendarHeatmap", () => ({
-  CalendarHeatmap: ({ entries, selectedDate, onSelectDate }: any) => (
+  CalendarHeatmap: ({
+    entries,
+    highlightedDates = [],
+    highlightedYears = [],
+    selectedDate,
+    onSelectDate,
+  }: any) => (
     <div>
       {showHeatmapTarget && selectedDate ? (
         <button data-date={selectedDate}>selected heatmap date</button>
       ) : null}
-      <span data-date="2024-07-14">memory day</span>
-      <span data-year-heading="2024">2024</span>
+      <span
+        data-date="2024-07-14"
+        className={highlightedDates.includes("2024-07-14") ? "memoryHighlighted" : ""}
+      >
+        memory day
+      </span>
+      <span
+        data-year-heading="2024"
+        className={highlightedYears.includes(2024) ? "highlightedYearHeading" : ""}
+      >
+        2024
+      </span>
       <button onClick={() => onSelectDate(entries.at(-1)?.date ?? null)}>
         select heatmap date
       </button>

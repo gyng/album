@@ -1,0 +1,111 @@
+/* Styles owned by SearchActiveFilters. Shared layout remains in Search.module.css. */
+
+.activeFacetSection {
+  display: grid;
+  gap: var(--m-xs);
+  margin-block-start: var(--m-s);
+  margin-block-end: var(--m-xl);
+}
+
+.activeFacetLabel {
+  font-size: var(--fs-s);
+  font-weight: 400;
+  letter-spacing: 0.02em;
+  color: var(--c-bg-contrast-light);
+}
+
+.activeFacetChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--m-s);
+}
+
+.activeFacetChip {
+  /* Anchors the hover zoom preview (.activeFacetImageZoom). */
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--m);
+  padding: var(--m);
+  border: solid var(--size-1) var(--c-border-on-dark);
+  border-radius: var(--m-s);
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font-size: var(--fs-s);
+  user-select: none;
+}
+
+@media (hover: none), (pointer: coarse) {
+  .activeFacetChip {
+    min-block-size: var(--tap-target);
+    padding: var(--m) var(--m-s);
+  }
+}
+
+.activeFacetChip:hover {
+  background-color: var(--c-bg-contrast-light);
+  color: var(--c-bg-contrast-dark);
+}
+
+.activeFacetChip:focus-visible {
+  outline: solid var(--size-2) var(--c-bg-contrast-light);
+  outline-offset: var(--size-2);
+}
+
+.activeFacetColorSwatch {
+  inline-size: var(--size-16);
+  block-size: var(--size-16);
+  border: solid var(--size-1) color-mix(in oklch, var(--c-bg) 55%, transparent);
+  border-radius: var(--radius-pill);
+  flex: 0 0 auto;
+}
+
+/* Visually hidden but still programmatically clickable — display:none would
+   make .click() a no-op in some browsers. */
+
+.activeFacetImageThumb {
+  inline-size: var(--m-l);
+  block-size: var(--m-l);
+  border-radius: var(--m);
+  object-fit: cover;
+  flex: 0 0 auto;
+}
+
+/* Zoomed query-image preview, styled like .searchModeInfoTooltip but revealed
+   purely on hover/focus — no open state to manage. The chip is the anchor.
+   Sits ABOVE the chip: below it would cover the first row of results. */
+
+.activeFacetImageZoom {
+  position: absolute;
+  inset-block-end: calc(100% + var(--m-s));
+  inset-inline-start: 0;
+  z-index: var(--z-float);
+  padding: var(--m-s);
+  border-radius: var(--m-s);
+  background: color-mix(in oklch, var(--c-bg) 88%, var(--c-accent));
+  border: solid var(--size-1) color-mix(in oklch, var(--c-accent) 60%, var(--c-font));
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--t-fast) var(--ease-out);
+}
+
+.activeFacetImageZoom img {
+  display: block;
+  inline-size: min(60dvw, var(--size-220));
+  block-size: min(60dvw, var(--size-220));
+  object-fit: contain;
+  border-radius: var(--m);
+  /* Sketches are drawn on white; photos also read fine against it. */
+  background: var(--c-white);
+}
+
+.activeFacetChip:focus-visible .activeFacetImageZoom {
+  opacity: 1;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .activeFacetChip:hover .activeFacetImageZoom {
+    opacity: 1;
+  }
+}

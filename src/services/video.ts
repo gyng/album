@@ -5,6 +5,7 @@ import type { Buffer } from "node:buffer";
 import ffmpegPath from "ffmpeg-static";
 import ffprobePath from "ffprobe-static";
 import { stripPublicFromPath } from "./photo";
+import { encodePublicAssetPath } from "../util/encodePublicAssetPath";
 
 export const OPTIMISED_VIDEO_MAX_WIDTH = 1920;
 export const OPTIMISED_VIDEO_PRESET = "medium";
@@ -257,7 +258,7 @@ export const optimiseVideo = async (
 
     if (isValidCached) {
       return {
-        src: stripPublicFromPath(outputFile),
+        src: encodePublicAssetPath(stripPublicFromPath(outputFile)),
         mimeType: "video/mp4",
       };
     }
@@ -307,7 +308,7 @@ export const optimiseVideo = async (
   console.log(`Optimised video ready: ${outputFile}`);
 
   return {
-    src: stripPublicFromPath(outputFile),
+    src: encodePublicAssetPath(stripPublicFromPath(outputFile)),
     mimeType: "video/mp4",
   };
 };

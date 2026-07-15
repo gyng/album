@@ -23,32 +23,34 @@ export const StatBar: React.FC<Props> = ({
   const pct = maxCount > 0 ? (count / maxCount) * 100 : 0;
 
   return (
-    <div className={[styles.row, actionHref ? styles.rowInteractive : ""].join(" ")}>
-      <span className={styles.label}>
-        {labelPrefix}
-        <span>{label}</span>
-      </span>
-      <div className={styles.barTrack}>
-        <div
-          className={styles.bar}
-          style={{
-            width: `${pct}%`,
-            ...(barColor ? { backgroundColor: barColor } : null),
-          }}
-        />
+    <div className={styles.container}>
+      <div className={[styles.row, actionHref ? styles.rowInteractive : ""].join(" ")}>
+        <span className={styles.label}>
+          {labelPrefix}
+          <span>{label}</span>
+        </span>
+        <div className={styles.barTrack}>
+          <div
+            className={styles.bar}
+            style={{
+              inlineSize: `${pct}%`,
+              ...(barColor ? { backgroundColor: barColor } : null),
+            }}
+          />
+        </div>
+        <span className={styles.count}>{count.toLocaleString("en")}</span>
+        {actionHref && actionLabel ? (
+          <Link
+            href={actionHref}
+            className={styles.action}
+            aria-label={actionLabel}
+            title={actionLabel}
+          >
+            <span className={styles.actionText}>View</span>
+            <span aria-hidden="true">↗</span>
+          </Link>
+        ) : null}
       </div>
-      <span className={styles.count}>{count.toLocaleString("en")}</span>
-      {actionHref && actionLabel ? (
-        <Link
-          href={actionHref}
-          className={styles.action}
-          aria-label={actionLabel}
-          title={actionLabel}
-        >
-          <span className={styles.actionText}>View</span>
-          <span aria-hidden="true">↗</span>
-        </Link>
-      ) : null}
     </div>
   );
 };

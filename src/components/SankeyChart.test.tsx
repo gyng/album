@@ -101,6 +101,8 @@ describe("SankeyChart", () => {
     mockSankeyProps = null;
     mockComputedNodes = [];
     document.documentElement.style.removeProperty("--m-s");
+    document.documentElement.style.removeProperty("--m-m");
+    document.documentElement.style.removeProperty("--size-18");
     delete (globalThis as { ResizeObserver?: unknown }).ResizeObserver;
   });
 
@@ -182,7 +184,7 @@ describe("SankeyChart", () => {
     expect(colours.get("middle")).not.toBe(colours.get("root-a"));
     expect(colours.get("leaf")).toMatch(/^#[0-9a-f]{6}$/);
     expect(colours.get("external-child")).toBe("#e93b77");
-    expect(mockSankeyProps.margin.left).toBe(84);
+    expect(mockSankeyProps.margin.left).toBe(56);
   });
 
   it("uses direct and fallback node fields for labels, counts, facets, and alignment", () => {
@@ -277,6 +279,30 @@ describe("SankeyChart", () => {
   it("falls back when the CSS spacing token is not numeric", () => {
     document.documentElement.style.setProperty("--m-s", "invalid");
     render(<SankeyChart flow={flow} />);
-    expect(mockSankeyProps.margin.top).toBe(12);
+    expect(mockSankeyProps.margin.top).toBe(8);
+  });
+
+  it("reads label and node geometry from the shared CSS tokens", () => {
+    document.documentElement.style.setProperty("--m-m", "16px");
+    document.documentElement.style.setProperty("--size-18", "20px");
+    mockComputedNodes = [
+      {
+        id: "root-c",
+        value: 9,
+        x0: 0,
+        x1: 10,
+        y0: 0,
+        y1: 30,
+        data: { label: "Root C", depth: 0, facetId: "camera", facetValue: "Root C" },
+      },
+    ];
+
+    const { container } = render(<SankeyChart flow={flow} minHeight={0} />);
+
+    expect(screen.getByText("Root C · 9").getAttribute("x")).toBe("26");
+    expect(mockSankeyProps.nodeThickness).toBe(20);
+    expect(
+      container.querySelector<HTMLElement>("[style]")?.style.getPropertyValue("--sankey-height"),
+    ).toBe("60px");
   });
 });

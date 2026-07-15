@@ -1,8 +1,10 @@
+import { mergeCssModuleStyles } from "../../util/mergeCssModuleStyles";
 import Link from "next/link";
 import type { PhotoStats } from "../../util/computeStats";
 import { StatBar } from "../StatBar";
 import { Caption, Heading, Thumb, pillStyles } from "../ui";
-import styles from "../../pages/explore/explore.module.css";
+import sharedStyles from "../../pages/explore/explore.module.css";
+import localStyles from "../../pages/explore/ExploreColourSection.module.css";
 import { ExploreStatGroup } from "./ExplorePrimitives";
 import {
   buildColorSearchHref,
@@ -11,11 +13,69 @@ import {
   formatCoverage,
 } from "./exploreViewModel";
 
-export const ExploreColourSection = ({ stats }: { stats: PhotoStats }) => {
+const styles = mergeCssModuleStyles(
+  sharedStyles,
+  localStyles,
+  [
+    "colorFamilyHeading",
+    "colorFamilyMeta",
+    "colorFamilyRow",
+    "colorFamilyRows",
+    "colorFamilyStat",
+    "colorFamilyThumbLink",
+    "colorFamilyThumbs",
+    "colorSwatch",
+    "colorTimeBar",
+    "colorTimeDetail",
+    "colorTimeLegend",
+    "colorTimeLegendItem",
+    "colorTimeMeta",
+    "colorTimeRow",
+    "colorTimeSegment",
+    "colorTimeSeries",
+    "colorTimeSummary",
+    "colorTimeTooltip",
+    "colorTimeTooltipBody",
+    "colorTimeTooltipImage",
+    "colorTimeTooltipSwatch",
+    "colorTimeTooltipText",
+    "colorTimeYear",
+    "colourFamilyPanel",
+    "colourFullRowPanel",
+    "colourPanel",
+    "colourSectionGrid",
+  ],
+  ["colourPanel"],
+);
+
+export const ExploreColourSection = ({
+  stats,
+  deferContent = false,
+}: {
+  stats: PhotoStats;
+  deferContent?: boolean;
+}) => {
   const maxColorCount = Math.max(...stats.colorStats.map((item) => item.count), 1);
+  const leadingColourFamily = stats.colorStats[0];
+  const deferredSummary = [
+    formatCoverage(stats.colorCoverage),
+    leadingColourFamily
+      ? `Dominant colour families are led by ${leadingColourFamily.label.toLowerCase()} across ${leadingColourFamily.count.toLocaleString("en")} photos.`
+      : "No dominant colour families are available yet.",
+    stats.colorYearRibbons.length > 0
+      ? `Colour over time covers ${stats.colorYearRibbons.length.toLocaleString("en")} years.`
+      : null,
+  ]
+    .filter(Boolean)
+    .join(" ");
 
   return (
-    <ExploreStatGroup id="colour" title="Colour">
+    <ExploreStatGroup
+      id="colour"
+      title="Colour"
+      deferContent={deferContent}
+      deferredSummary={deferredSummary}
+    >
       <section className={`${styles.section} ${styles.sectionWide}`}>
         <div className={styles.colourSectionGrid}>
           <section className={styles.colourPanel}>
@@ -37,9 +97,11 @@ export const ExploreColourSection = ({ stats }: { stats: PhotoStats }) => {
                   actionLabel={`Find photos with similar ${bucket.label.toLowerCase()} tones`}
                   labelPrefix={
                     <span
+                      data-colour-swatch
                       className={styles.colorSwatch}
                       style={{
-                        backgroundColor: COLOR_SWATCHES[bucket.label] ?? "#999",
+                        backgroundColor:
+                          COLOR_SWATCHES[bucket.label] ?? "var(--c-bg-contrast-light)",
                       }}
                       aria-hidden="true"
                     />
@@ -64,9 +126,11 @@ export const ExploreColourSection = ({ stats }: { stats: PhotoStats }) => {
                       <div className={styles.colorFamilyMeta}>
                         <div className={styles.colorFamilyHeading}>
                           <span
+                            data-colour-swatch
                             className={styles.colorSwatch}
                             style={{
-                              backgroundColor: COLOR_SWATCHES[family.label] ?? "#999",
+                              backgroundColor:
+                                COLOR_SWATCHES[family.label] ?? "var(--c-bg-contrast-light)",
                             }}
                             aria-hidden="true"
                           />
@@ -92,7 +156,7 @@ export const ExploreColourSection = ({ stats }: { stats: PhotoStats }) => {
                             href={photo.href}
                             className={styles.colorFamilyThumbLink}
                           >
-                            <Thumb src={photo.src} alt={photo.label} size="small" />
+                            <Thumb src={photo.src} alt={photo.label} size="small" loading="lazy" />
                           </Link>
                         ))}
                       </div>
@@ -114,6 +178,7 @@ export const ExploreColourSection = ({ stats }: { stats: PhotoStats }) => {
                 {COLOR_FAMILY_ORDER.map((label) => (
                   <div key={`legend-${label}`} className={styles.colorTimeLegendItem}>
                     <span
+                      data-colour-swatch
                       className={styles.colorSwatch}
                       style={{
                         backgroundColor: COLOR_SWATCHES[label],
@@ -144,7 +209,7 @@ export const ExploreColourSection = ({ stats }: { stats: PhotoStats }) => {
                             title={`${slice.family} around ${year.label}: ${slice.count} photos (${Math.round(share)}%)`}
                             style={{
                               left: `${slice.position * 100}%`,
-                              width: `max(3px, ${100 / Math.max(year.total, 1)}%)`,
+                              inlineSize: `max(3px, ${100 / Math.max(year.total, 1)}%)`,
                               backgroundColor: slice.rgb,
                             }}
                           >
@@ -152,10 +217,12 @@ export const ExploreColourSection = ({ stats }: { stats: PhotoStats }) => {
                               <img
                                 src={slice.thumbSrc}
                                 alt={slice.photoLabel}
+                                loading="lazy"
                                 className={styles.colorTimeTooltipImage}
                               />
                               <span className={styles.colorTimeTooltipBody}>
                                 <span
+                                  data-colour-swatch
                                   className={styles.colorTimeTooltipSwatch}
                                   style={{ backgroundColor: slice.rgb }}
                                 />
@@ -173,9 +240,11 @@ export const ExploreColourSection = ({ stats }: { stats: PhotoStats }) => {
                       {year.dominantFamily ? (
                         <>
                           <span
+                            data-colour-swatch
                             className={styles.colorSwatch}
                             style={{
-                              backgroundColor: COLOR_SWATCHES[year.dominantFamily] ?? "#999",
+                              backgroundColor:
+                                COLOR_SWATCHES[year.dominantFamily] ?? "var(--c-bg-contrast-light)",
                             }}
                             aria-hidden="true"
                           />

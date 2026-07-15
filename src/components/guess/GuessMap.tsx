@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect } from "react";
 import Map, { Marker, Source, Layer, useMap } from "react-map-gl/maplibre";
 import type { MapLayerMouseEvent } from "maplibre-gl";
-import "maplibre-gl/dist/maplibre-gl.css";
 import { TIER_DANGER } from "./guessScoring";
 import { computeWrapAwareBounds } from "../../util/mapBounds";
 import styles from "./GuessMap.module.css";
@@ -88,7 +87,6 @@ export const GuessMap: React.FC<GuessMapProps> = ({ guess, reveal, onGuess }) =>
   return (
     <div className={styles.mapContainer} role="region" aria-label="Guess map">
       <Map
-        style={{ width: "100%", height: "100%" }}
         mapStyle={MAP_STYLE}
         initialViewState={{ longitude: 0, latitude: 20, zoom: 1.5 }}
         scrollZoom

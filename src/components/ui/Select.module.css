@@ -4,9 +4,9 @@
   color: inherit;
   cursor: pointer;
   transition:
-    background-color var(--t-theme) ease,
-    color var(--t-theme) ease,
-    border-color var(--t-theme) ease;
+    background-color var(--t-theme) var(--ease-out),
+    color var(--t-theme) var(--ease-out),
+    border-color var(--t-theme) var(--ease-out);
 }
 
 .base:disabled {
@@ -16,21 +16,22 @@
 
 /* Default: prominent form select with CSS arrow */
 .select {
-  border: solid 2px var(--c-bg-contrast-light);
+  border: solid var(--line-strong) var(--c-bg-contrast-light);
   border-radius: var(--m-s);
   font-size: var(--fs-sm);
-  padding: calc(var(--m-m) + 1px) calc(var(--m-xl) + 2px) calc(var(--m-m) + 1px)
-    calc(var(--m-m) + 1px);
-  min-height: 45px;
+  padding-block: calc(var(--m-m) + var(--line-hairline));
+  padding-inline-start: calc(var(--m-m) + var(--line-hairline));
+  padding-inline-end: calc(var(--m-xl) + var(--line-strong));
+  min-block-size: var(--tap-target);
   background-image:
     linear-gradient(45deg, transparent 50%, currentColor 50%),
     linear-gradient(135deg, currentColor 50%, transparent 50%);
   background-position:
-    calc(100% - 18px) 50%,
-    calc(100% - 12px) 50%;
+    calc(100% - var(--fs-m)) 50%,
+    calc(100% - var(--m-m)) 50%;
   background-size:
-    6px 6px,
-    6px 6px;
+    var(--m-xs) var(--m-xs),
+    var(--m-xs) var(--m-xs);
   background-repeat: no-repeat;
 }
 
@@ -38,36 +39,38 @@
 .select:focus-visible {
   background-color: var(--c-bg-contrast-light);
   color: var(--c-bg);
-  outline: none;
 }
 
 /* Compact: pill-shaped inline filter */
 .compact {
-  border: 1px solid var(--c-bg-contrast-light);
-  border-radius: 999px;
+  min-block-size: var(--tap-target);
+  border: var(--line-hairline) solid var(--c-bg-contrast-light);
+  border-radius: var(--radius-pill);
   font-size: var(--fs-s);
-  padding: var(--m-xs) 2rem var(--m-xs) 0.65rem;
-  background: color-mix(in srgb, var(--c-bg) 98%, var(--c-bg-contrast-dark));
+  padding-block: var(--m-xs);
+  padding-inline-start: var(--m-m);
+  padding-inline-end: var(--size-36);
+  background: color-mix(in oklch, var(--c-bg) 98%, var(--c-bg-contrast-dark));
   color: var(--c-font);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--c-bg-contrast-dark) 55%, transparent);
+  box-shadow: inset 0 0 0 var(--line-hairline)
+    color-mix(in oklch, var(--c-bg-contrast-dark) 55%, transparent);
   background-image:
     linear-gradient(45deg, transparent 50%, currentColor 50%),
     linear-gradient(135deg, currentColor 50%, transparent 50%);
   background-position:
-    calc(100% - 12px) 50%,
-    calc(100% - 8px) 50%;
+    calc(100% - var(--m-m)) 50%,
+    calc(100% - var(--m-s)) 50%;
   background-size:
-    5px 5px,
-    5px 5px;
+    calc(var(--m) + var(--line-hairline)) calc(var(--m) + var(--line-hairline)),
+    calc(var(--m) + var(--line-hairline)) calc(var(--m) + var(--line-hairline));
   background-repeat: no-repeat;
 }
 
 .compact:hover {
-  background-color: color-mix(in srgb, var(--c-bg-contrast-light) 12%, transparent);
+  background-color: color-mix(in oklch, var(--c-bg-contrast-light) 12%, transparent);
 }
 
 .compact:focus-visible {
-  outline: none;
   border-color: var(--c-accent);
 }
 
@@ -75,6 +78,6 @@
 @media (hover: none), (pointer: coarse) {
   .select,
   .compact {
-    font-size: 16px;
+    font-size: var(--fs-touch);
   }
 }

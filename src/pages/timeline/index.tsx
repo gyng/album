@@ -16,15 +16,25 @@ import commonStyles from "../../styles/common.module.css";
 import { Seo } from "../../components/Seo";
 import { buildCollectionPageJsonLd } from "../../lib/seo";
 import { formatMemoryDateRange, getMemoryClusters } from "../../util/clusterByDate";
-import heatmapStyles from "../../components/CalendarHeatmap.module.css";
 import styles from "./timeline.module.css";
+import {
+  packTimelineEntry,
+  unpackTimelineEntry,
+  type TimelineEntryRow,
+} from "../../util/pageDataRows";
 
 const MAX_TIMELINE_MEMORY_CLUSTERS = 2;
 const MAX_TIMELINE_MEMORY_ITEMS = 4;
 const TIMELINE_MEMORY_LOAD_MORE_SIZE = 2;
 
 type PageProps = {
-  entries: TimelineEntry[];
+  entries?: TimelineEntry[];
+  entryRows?: TimelineEntryRow[];
+};
+
+type MemoryHighlight = {
+  dates: string[];
+  year: number;
 };
 
 const isTimelinePhoto = (block: Block): block is PhotoBlock => {
@@ -79,7 +89,11 @@ const toConnectorPath = (curve: ConnectorCurve) => {
   ].join(" ");
 };
 
-const TimelinePage: NextPage<PageProps> = ({ entries }) => {
+const TimelinePage: NextPage<PageProps> = ({ entries: suppliedEntries, entryRows }) => {
+  const entries = React.useMemo(
+    () => suppliedEntries ?? entryRows?.map(unpackTimelineEntry) ?? [],
+    [entryRows, suppliedEntries],
+  );
   const router = useRouter();
   const filterAlbum =
     typeof router.query.filter_album === "string" ? router.query.filter_album : null;
@@ -105,11 +119,10 @@ const TimelinePage: NextPage<PageProps> = ({ entries }) => {
   const [todayDate, setTodayDate] = React.useState<string | null>(null);
   const [memoryScrollTargetDate, setMemoryScrollTargetDate] = React.useState<string | null>(null);
   const layoutRef = React.useRef<HTMLDivElement | null>(null);
-  const heatmapPanelRef = React.useRef<HTMLElement | null>(null);
   const dayHeadingRef = React.useRef<HTMLDivElement | null>(null);
   const selectedConnectorSvgRef = React.useRef<SVGSVGElement | null>(null);
   const selectedConnectorPathRef = React.useRef<SVGPathElement | null>(null);
-  const highlightedHeatmapElementsRef = React.useRef<HTMLElement[]>([]);
+  const [memoryHighlight, setMemoryHighlight] = React.useState<MemoryHighlight | null>(null);
   const routePathname = router.pathname;
   const routeQuery = router.query;
   const routeDateQuery = typeof routeQuery.date === "string" ? routeQuery.date : null;
@@ -143,40 +156,14 @@ const TimelinePage: NextPage<PageProps> = ({ entries }) => {
   }, [memories, visibleMemoryClusterCount]);
 
   const applyMemoryHighlight = React.useCallback((cluster: (typeof memories)[number]) => {
-    const heatmapPanel = heatmapPanelRef.current!;
-
-    highlightedHeatmapElementsRef.current.forEach((element) => {
-      element.classList.remove(heatmapStyles.memoryHighlighted);
-      element.classList.remove(heatmapStyles.highlightedYearHeading);
+    setMemoryHighlight({
+      dates: Array.from(new Set(cluster.items.map((entry) => entry.date))),
+      year: cluster.year,
     });
-
-    const nextElements: HTMLElement[] = [];
-    const uniqueDates = Array.from(new Set(cluster.items.map((entry) => entry.date)));
-    uniqueDates.forEach((date) => {
-      const element = heatmapPanel.querySelector<HTMLElement>(`[data-date="${date}"]`);
-      if (element) {
-        element.classList.add(heatmapStyles.memoryHighlighted);
-        nextElements.push(element);
-      }
-    });
-
-    const yearHeading = heatmapPanel.querySelector<HTMLElement>(
-      `[data-year-heading="${cluster.year}"]`,
-    );
-    if (yearHeading) {
-      yearHeading.classList.add(heatmapStyles.highlightedYearHeading);
-      nextElements.push(yearHeading);
-    }
-
-    highlightedHeatmapElementsRef.current = nextElements;
   }, []);
 
   const clearMemoryHighlight = React.useCallback(() => {
-    highlightedHeatmapElementsRef.current.forEach((element) => {
-      element.classList.remove(heatmapStyles.memoryHighlighted);
-      element.classList.remove(heatmapStyles.highlightedYearHeading);
-    });
-    highlightedHeatmapElementsRef.current = [];
+    setMemoryHighlight(null);
   }, []);
 
   const clearSelectedConnectorPath = React.useCallback(() => {
@@ -434,16 +421,14 @@ const TimelinePage: NextPage<PageProps> = ({ entries }) => {
                 />
               </svg>
               <div className={styles.leftColumn}>
-                <section
-                  ref={heatmapPanelRef}
-                  className={styles.heatmapPanel}
-                  aria-label="Timeline heatmap panel"
-                >
+                <section className={styles.heatmapPanel} aria-label="Timeline heatmap panel">
                   <CalendarHeatmap
                     entries={filteredEntries}
                     selectedDate={selectedDate}
                     onSelectDate={setSelectedDate}
                     todayDate={todayDate ?? undefined}
+                    highlightedDates={memoryHighlight?.dates ?? []}
+                    highlightedYears={memoryHighlight ? [memoryHighlight.year] : []}
                     scrollToDate={memoryScrollTargetDate}
                   />
                 </section>
@@ -515,6 +500,7 @@ const TimelinePage: NextPage<PageProps> = ({ entries }) => {
                                   <span className={styles.memoryClusterSwatches} aria-hidden="true">
                                     {swatches.map((color) => (
                                       <span
+                                        data-colour-swatch
                                         key={color}
                                         className={styles.memoryClusterSwatch}
                                         style={{ backgroundColor: color }}
@@ -661,7 +647,7 @@ export const getStaticProps: GetStaticProps<PageProps> = async () => {
         return left.href.localeCompare(right.href);
       });
 
-    return { props: { entries } };
+    return { props: { entryRows: entries.map(packTimelineEntry) } };
   });
 };
 

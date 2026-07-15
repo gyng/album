@@ -1,0 +1,137 @@
+/* Styles owned by ExploreStorySections. Shared layout remains in explore.module.css. */
+
+.recentTrendsGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--m-l);
+  align-items: start;
+}
+
+.funStatsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(var(--size-220), 1fr));
+  gap: var(--m-s);
+}
+
+.funStatValue {
+  font-size: calc(var(--fs-m) - var(--size-1));
+  color: var(--c-font);
+  line-height: 1.25;
+}
+
+.funStatThumbs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--m-s);
+}
+
+.funStatThumbLink {
+  position: relative;
+  display: block;
+  text-decoration: none;
+}
+
+.funStatThumb {
+  inline-size: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+  background-color: var(--c-bg-contrast-dark);
+}
+
+.funStatThumbYear {
+  position: absolute;
+  inset-inline-start: var(--m-s);
+  inset-block-end: var(--m-s);
+  display: inline-flex;
+  align-items: center;
+  padding: var(--size-3) var(--m);
+  border-radius: var(--radius-pill);
+  background: color-mix(in oklch, var(--c-bg) 76%, transparent);
+  color: var(--c-font);
+  font-size: var(--fs-xs);
+  line-height: 1;
+}
+
+.timelineSectionAligned {
+  justify-items: start;
+}
+
+/* Positioning hook only — the dark-glass treatment comes from the shared
+   OverlayButton primitive so this matches the search tiles and timeline grid. */
+
+.visualEraThumbLink {
+  inline-size: auto;
+}
+
+.visualEraThumbLink .visualEraThumb {
+  inline-size: 100%;
+  block-size: auto;
+  aspect-ratio: 1;
+}
+
+.revisitedPlacesGrid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--m-l);
+  align-items: flex-start;
+}
+
+.revisitedPlaceCard {
+  display: grid;
+  gap: var(--m);
+  flex: 1 1 min(var(--content-width-reading), 100%);
+  min-inline-size: min(100%, var(--content-width-compact));
+  padding-block-start: var(--m-s);
+  border-top: var(--size-1) solid color-mix(in oklch, var(--c-bg-contrast-dark) 82%, transparent);
+}
+
+.revisitedPlacesGrid > .revisitedPlaceCard:first-child {
+  padding-block-start: 0;
+  border-top: 0;
+}
+
+.revisitThumbs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--m-s);
+  align-items: flex-start;
+}
+
+.revisitThumb {
+  inline-size: var(--size-112);
+  max-inline-size: var(--size-112);
+  flex: 0 0 var(--size-112);
+}
+
+.revisitGapLabelInline {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  min-inline-size: var(--m-2xl);
+  padding: var(--size-3) 0;
+  border-radius: var(--radius-pill);
+  background: color-mix(in oklch, var(--c-bg) 94%, var(--c-bg-contrast-dark));
+  color: var(--c-bg-contrast-light);
+  font-size: var(--fs-xs);
+  line-height: 1;
+  white-space: nowrap;
+  text-align: end;
+  position: absolute;
+  inset-inline-end: calc(100% + var(--m));
+  inset-block-start: calc(50% + (var(--m-l) / 2));
+  transform: translateY(-50%);
+}
+
+.revisitTimelineRail {
+  align-self: stretch;
+  justify-content: flex-start;
+}
+
+/* The gap pill hangs to the left of the rail (right: 100% + gap). The rail is
+   the left-most column in the aligned layout, so without a reserved gutter the
+   pill is clipped off the viewport edge for left-column cards. Reserve its width
+   as left padding on the timeline so the pill stays inside the card. */
+
+.revisitedPlaceCard .visualTimeline {
+  padding-inline-start: calc(var(--m-2xl) + var(--m-s));
+}

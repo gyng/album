@@ -3,7 +3,7 @@
  */
 
 import { createRef } from "react";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { TimelineDayGrid } from "./TimelineDayGrid";
 import { TimelineEntry } from "./timelineTypes";
 
@@ -166,6 +166,40 @@ describe("TimelineDayGrid", () => {
         showThemeBootstrap: false,
       }),
     );
+  });
+
+  it("waits until the map is near the viewport before loading MapLibre", () => {
+    const originalIntersectionObserver = globalThis.IntersectionObserver;
+    let notify!: IntersectionObserverCallback;
+    const observe = jest.fn();
+    const disconnect = jest.fn();
+    Object.defineProperty(globalThis, "IntersectionObserver", {
+      configurable: true,
+      value: jest.fn((callback: IntersectionObserverCallback) => {
+        notify = callback;
+        return { observe, disconnect };
+      }),
+    });
+
+    render(<TimelineDayGrid date="2024-01-02" entries={entries} />);
+
+    expect(screen.queryByTestId("timeline-map")).toBeNull();
+    expect(observe).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      notify(
+        [{ target: observe.mock.calls[0]![0], isIntersecting: true } as IntersectionObserverEntry],
+        {} as IntersectionObserver,
+      );
+    });
+
+    expect(screen.getByTestId("timeline-map")).toBeInTheDocument();
+    expect(disconnect).toHaveBeenCalled();
+
+    Object.defineProperty(globalThis, "IntersectionObserver", {
+      configurable: true,
+      value: originalIntersectionObserver,
+    });
   });
 
   it("disables unavailable selected-day navigation", () => {

@@ -24,14 +24,17 @@ body {
     color var(--t-theme);
 }
 
+p {
+  text-wrap: pretty;
+}
+
 html {
-  height: 100%;
+  block-size: 100%;
 }
 
 body {
-  min-height: 100%;
-  /* Chrome has a hard time with vw and svw units */
-  overflow-x: hidden;
+  min-block-size: 100%;
+  overflow-x: clip;
 }
 
 a {
@@ -47,6 +50,66 @@ textarea {
   padding: var(--m);
 }
 
+@property --intensity {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 0;
+}
+
+@property --month-count {
+  syntax: "<integer>";
+  inherits: false;
+  initial-value: 12;
+}
+
+@property --hide-progress {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 1;
+}
+
+@property --touch-pull-progress {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 0;
+}
+
+@property --touch-swipe-progress {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 0;
+}
+
+@property --touch-toolbar-show-preview-progress {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 0;
+}
+
+@property --touch-toolbar-hide-preview-progress {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 0;
+}
+
+@property --route-speed {
+  syntax: "<time>";
+  inherits: false;
+  initial-value: 1.4s;
+}
+
+@property --route-dash-cycle {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 16;
+}
+
+@property --sankey-height {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 460px;
+}
+
 :root {
   interpolate-size: allow-keywords;
 
@@ -57,6 +120,126 @@ textarea {
   --m-l: 20px;
   --m-xl: 40px;
   --m-2xl: 64px;
+  --line-hairline: 1px;
+  --line-strong: 2px;
+  --radius-pill: 999px;
+  --focus-offset: 2px;
+  --tap-target: 44px;
+  --thumb-size: 150px;
+  --thumb-size-small: 112px;
+  --content-width-wide: 960px;
+  --content-width-compact: 28rem;
+  --content-width-reading: 32rem;
+  --content-width-medium: 42rem;
+  --content-width-section: 52rem;
+  --content-width-overview: 60rem;
+  --content-width-gallery: 64rem;
+  --overlay-width-wide: 30rem;
+
+  /* Geometry scale for component-specific dimensions. Spacing, typography,
+     borders, thumbnails and tap targets continue to use their semantic aliases
+     above; these cover the remaining fixed chart, preview and map geometry. */
+  --size-0-5: 0.5px;
+  --size-1: var(--line-hairline);
+  --size-1-25: 1.25px;
+  --size-1-5: 1.5px;
+  --size-2: var(--line-strong);
+  --size-3: 3px;
+  --size-4: var(--m);
+  --size-5: 5px;
+  --size-6: var(--m-xs);
+  --size-8: var(--m-s);
+  --size-10: 10px;
+  --size-12: var(--m-m);
+  --size-14: 14px;
+  --size-16: 16px;
+  --size-18: 18px;
+  --size-20: var(--m-l);
+  --size-22: 22px;
+  --size-24: 24px;
+  --size-28: 28px;
+  --size-32: 32px;
+  --size-36: 36px;
+  --size-40: var(--m-xl);
+  --size-44: var(--tap-target);
+  --size-48: 48px;
+  --size-56: 56px;
+  --size-80: 80px;
+  --size-96: 96px;
+  --size-112: var(--thumb-size-small);
+  --size-120: 120px;
+  --size-132: 132px;
+  --size-150: var(--thumb-size);
+  --size-180: 180px;
+  --size-200: 200px;
+  --size-220: 220px;
+  --size-280: 280px;
+  --size-300: 300px;
+  --size-320: 320px;
+  --size-360: 360px;
+  --size-420: 420px;
+  --size-460: 460px;
+  --size-560: 560px;
+  --size-1400: 1400px;
+
+  /* Shared glass surfaces. Blur tiers describe visual weight rather than a
+     component, so maps, media overlays and popups use one depth scale. */
+  --glass-surface: var(--c-overlay);
+  --glass-surface-dark: var(--c-overlay-dark);
+  --glass-border-dark: var(--c-border-on-dark);
+  --glass-blur-subtle: var(--m);
+  --glass-blur-surface: var(--size-8);
+  --glass-blur-control: var(--size-10);
+  --glass-blur-panel: var(--size-14);
+  --glass-blur-sheet: var(--size-18);
+
+  /* Semantic component geometry. Keep specialised dimensions named for their
+     purpose rather than expanding the generic numeric scale with one-offs. */
+  --trail-action-size: 26px;
+  --facet-input-min-height: 34px;
+  --facet-picker-height: 160px;
+  --facet-rail-width: 170px;
+  --facet-picker-width: 196px;
+  --facet-meta-max-width: 260px;
+  --map-legend-bar-min-width: 72px;
+  --range-slider-clearance: 82px;
+  --map-search-min-width: 130px;
+  --context-popup-min-width: 190px;
+  --mode-input-max-width: 480px;
+  --visual-era-card-min-width: 250px;
+  --overview-card-min-width: 165px;
+  --explore-timeline-thumb-size: 108px;
+  --explore-mobile-thumb-size: 136px;
+  --design-input-min-width: 240px;
+  --timeline-day-panel-min-width: 440px;
+  --photo-description-measure: 900px;
+  --immersive-title-offset-max: 400px;
+
+  /* Named stacking levels. Page roots establish local stacking contexts where
+     possible; the upper range coordinates full-screen and MapLibre overlays. */
+  --z-behind: -1;
+  --z-base: 0;
+  --z-raised: 1;
+  --z-float: 2;
+  --z-control: 3;
+  --z-sticky: 10;
+  --z-dialog: 40;
+  --z-media: 100;
+  --z-caption: 200;
+  --z-details: 300;
+  --z-drawer: 1000;
+  --z-drawer-panel: 1001;
+  --z-map-vendor: 5000;
+  --z-map-controls: 5001;
+  --z-map-route: 5002;
+  --z-map-menu: 5003;
+  --z-map-overlay: 5004;
+  --z-fullscreen-underlay: 9998;
+  --z-fullscreen: 9999;
+  --z-fullscreen-toolbar: 10000;
+  --z-fullscreen-control: 10001;
+  --z-fullscreen-toast: 10002;
+  --fs-touch: 16px;
   --fs-2xs: 9px;
   --fs-xs: 10px;
   --fs-s: 11px;
@@ -66,34 +249,99 @@ textarea {
   --fs-xl: 64px;
 
   /* Motion tokens — durations, easings, and the theme cross-fade. */
+  --t-instant: 0.1s;
   --t-fast: 0.12s;
   --t-base: 0.2s;
+  --t-medium: 0.25s;
+  --t-deliberate: 0.3s;
   --t-slow: 0.35s;
+  --t-enter: 0.4s;
+  --t-emphasis: 0.5s;
+  --t-long: 0.6s;
+  --t-loop-fast: 1.2s;
+  --t-route: 1.4s;
+  --t-pulse: 1.5s;
+  --t-pulse-slow: 1.8s;
+  --t-hint: 2.2s;
+  --t-shimmer: 3s;
   --t-theme: 0.15s;
   --ease-out: ease-out;
+  --ease-in-out: ease-in-out;
   --ease-spring: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-bounce: cubic-bezier(0.34, 1.56, 0.64, 1);
 
   color-scheme: light dark;
 
-  --c-bg: light-dark(white, rgba(44, 44, 44, 1));
-  --c-overlay: light-dark(rgba(255, 255, 255, 0.7), rgba(44, 44, 44, 0.7));
-  --c-bg-edit: rgb(238, 245, 197);
-  --c-bg-contrast-light: light-dark(rgba(100, 100, 100, 1), rgba(200, 200, 200, 1));
-  --c-bg-contrast-dark: light-dark(black, rgb(51, 51, 51));
-  --c-accent: light-dark(rgb(210, 24, 90), rgb(240, 80, 132));
+  --c-black: black;
+  --c-white: white;
+  --c-bg: light-dark(white, rgb(44 44 44));
+  --c-overlay: light-dark(rgb(255 255 255 / 0.7), rgb(44 44 44 / 0.7));
+  --c-bg-edit: light-dark(rgb(238 245 197), oklch(37% 0.06 115));
+  --c-bg-contrast-light: light-dark(rgb(100 100 100), rgb(200 200 200));
+  --c-bg-contrast-dark: light-dark(black, rgb(51 51 51));
+  --c-accent: light-dark(oklch(56% 0.21 10), oklch(68% 0.19 8));
   --c-font: light-dark(black, white);
-  --c-overlay-dark: rgba(0, 0, 0, 0.72);
-  --c-border-on-dark: rgba(255, 255, 255, 0.28);
+  --c-overlay-dark: rgb(0 0 0 / 0.72);
+  --c-border-on-dark: rgb(255 255 255 / 0.28);
+  --c-on-dark: white;
+  --c-canvas: white;
+  --c-overlay-dark-hover: rgb(0 0 0 / 0.84);
+  --c-heatmap-low: oklch(87.992% 0.09793 87.38);
+  --c-heatmap-mid: oklch(73.485% 0.11858 69.63);
+  --c-heatmap-high: oklch(56.808% 0.13283 47.14);
+  --c-heatmap-peak: oklch(39.15% 0.12421 33.76);
+  --c-route: oklch(73.011% 0.12463 211.09);
+  --c-route-ghost: rgb(38 56 62 / 0.18);
+  --c-route-edge: rgb(28 40 44 / 0.7);
+  --c-route-check-dark: rgb(15 15 15 / 0.92);
+  --c-route-check-light: rgb(248 248 248 / 0.96);
+  --c-route-label: rgb(32 42 46 / 0.9);
+  --c-slideshow-brand-start: oklch(25.334% 0.03357 249.27 / 0.9);
+  --c-slideshow-brand-end: oklch(36.78% 0.0742 54.99 / 0.88);
+  --c-slideshow-panel-start: oklch(21.151% 0.02026 248.81 / 0.96);
+  --c-slideshow-panel-end: oklch(26.503% 0.0216 248.65 / 0.94);
+  --c-slideshow-playback-bg: oklch(80.968% 0.15309 79.79 / 0.18);
+  --c-slideshow-playback: oklch(89.431% 0.11017 83.72);
+  --c-slideshow-control-bg: oklch(83.564% 0.13502 202.57 / 0.16);
+  --c-slideshow-control: oklch(91.701% 0.09802 201.56);
+  --c-slideshow-awake-border: oklch(86.277% 0.13277 86.09 / 0.28);
+  --c-slideshow-awake-bg: oklch(66.089% 0.12744 82.84 / 0.12);
+  --c-slideshow-awake: oklch(86.277% 0.13277 86.09);
+  --c-slideshow-awake-glow: oklch(86.277% 0.13277 86.09 / 0.52);
+  --c-slideshow-active-border: oklch(80.502% 0.17292 152.36 / 0.48);
+  --c-slideshow-active-bg: oklch(52.588% 0.12006 151.72 / 0.24);
+  --c-slideshow-active: oklch(82.837% 0.16627 152.97);
+  --c-slideshow-active-glow: oklch(82.837% 0.16627 152.97 / 0.52);
+  --focus-ring: solid var(--line-strong) var(--c-accent);
 
   /* Semantic status palette (guess game tiers, heatmap "today"). Darker in
      light theme for contrast on white, brighter in dark theme. */
-  --c-success: light-dark(#16a34a, #22c55e);
-  --c-warning: light-dark(#ca8a04, #eab308);
-  --c-danger: light-dark(#dc2626, #ef4444);
-  --c-today: #2276ff;
-  --popup-border: solid 1px color-mix(in srgb, var(--c-bg-contrast-light) 45%, transparent);
+  --c-success: light-dark(oklch(63% 0.19 145), oklch(72% 0.19 150));
+  --c-warning: light-dark(oklch(67% 0.16 75), oklch(80% 0.17 85));
+  --c-danger: light-dark(oklch(58% 0.22 28), oklch(64% 0.21 25));
+  --c-today: oklch(61% 0.22 260);
+  --popup-border: solid var(--line-hairline)
+    color-mix(in oklch, var(--c-bg-contrast-light) 45%, transparent);
   --popup-radius: var(--m-s);
-  --popup-shadow: 0 10px 30px rgba(0, 0, 0, 0.18);
+  --popup-shadow: 0 10px 30px rgb(0 0 0 / 0.18);
+}
+
+/* Responsive widths are intentionally written directly in media queries because
+   custom properties cannot be used there. Use only these boundaries:
+   480px compact, 720px page, 900px dense, 960px wide (959px below it),
+   1024px cinema. */
+
+:where(
+  a[href],
+  button,
+  input,
+  select,
+  textarea,
+  summary,
+  [tabindex]:not([tabindex="-1"])
+):focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-offset);
 }
 
 html.light,
@@ -106,6 +354,47 @@ body.dark {
   color-scheme: dark;
 }
 
+/* Named themes. The pre-paint script and ThemeToggle apply a scheme class
+   (light/dark) alongside each theme-* class, so light-dark() tokens resolve
+   against the right scheme; the overrides below re-tint the semantic palette.
+   :where() keeps specificity level with :root so the accessibility overrides
+   further down (contrast, transparency, forced colours) still win. The bare
+   :where() selector also lets any element scope a theme's tokens locally —
+   the ThemeToggle dropdown uses this for its per-option swatches. */
+
+/* Paper — warm archival matte; a softer daylight read than plain white. */
+:root:where(.theme-paper),
+:where(.theme-paper) {
+  --c-bg: oklch(96% 0.02 85);
+  --c-overlay: oklch(96% 0.02 85 / 0.7);
+  --c-font: oklch(25% 0.025 55);
+  --c-bg-contrast-light: oklch(51% 0.035 75);
+  --c-bg-contrast-dark: oklch(23% 0.02 60);
+  --c-accent: oklch(50% 0.14 30);
+}
+
+/* Ink — near-black darkroom, so photographs carry all the light. */
+:root:where(.theme-ink),
+:where(.theme-ink) {
+  --c-bg: oklch(13% 0 0);
+  --c-overlay: oklch(13% 0 0 / 0.72);
+  --c-font: oklch(92% 0 0);
+  --c-bg-contrast-light: oklch(71% 0 0);
+  --c-bg-contrast-dark: oklch(24% 0 0);
+  --c-accent: oklch(71% 0.19 8);
+}
+
+/* Slate — cool blue-grey dusk with a teal accent echoing the route colour. */
+:root:where(.theme-slate),
+:where(.theme-slate) {
+  --c-bg: oklch(30% 0.035 255);
+  --c-overlay: oklch(30% 0.035 255 / 0.72);
+  --c-font: oklch(94% 0.012 250);
+  --c-bg-contrast-light: oklch(74% 0.045 245);
+  --c-bg-contrast-dark: oklch(37% 0.04 255);
+  --c-accent: oklch(72% 0.11 200);
+}
+
 /* Global reduced-motion safety net: neutralise CSS animations/transitions and
    smooth scrolling for users who ask for less motion. JS-driven motion
    (confetti, rAF count-ups, scrollIntoView) is guarded separately in code. */
@@ -113,9 +402,60 @@ body.dark {
   *,
   *::before,
   *::after {
+    /* biome-ignore lint/complexity/noImportantStyles: A reduced-motion user preference must override component motion. */
     animation-duration: 0.01ms !important;
+    /* biome-ignore lint/complexity/noImportantStyles: A reduced-motion user preference must override component motion. */
     animation-iteration-count: 1 !important;
+    /* biome-ignore lint/complexity/noImportantStyles: A reduced-motion user preference must override component motion. */
     transition-duration: 0.01ms !important;
+    /* biome-ignore lint/complexity/noImportantStyles: A reduced-motion user preference must override component scrolling. */
     scroll-behavior: auto !important;
+  }
+}
+
+@media (prefers-contrast: more) {
+  :root {
+    --c-bg-contrast-light: light-dark(oklch(38% 0 0), oklch(88% 0 0));
+    --c-border-on-dark: color-mix(in oklch, var(--c-white) 65%, transparent);
+    --focus-ring: solid var(--size-3) var(--c-accent);
+  }
+
+  :where(a, button, input, select, textarea, summary) {
+    text-decoration-thickness: var(--line-strong);
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  :root {
+    --c-overlay: var(--c-bg);
+    --c-overlay-dark: var(--c-black);
+    --c-overlay-dark-hover: var(--c-black);
+  }
+
+  *,
+  *::before,
+  *::after {
+    backdrop-filter: none;
+  }
+}
+
+@media (forced-colors: active) {
+  :root {
+    --c-bg: Canvas;
+    --c-font: CanvasText;
+    --c-bg-contrast-light: CanvasText;
+    --c-bg-contrast-dark: Canvas;
+    --c-accent: Highlight;
+    --c-border-on-dark: ButtonText;
+    --focus-ring: solid var(--size-3) Highlight;
+  }
+
+  :where(button, input, select, textarea, summary, [role="button"]) {
+    border-color: ButtonText;
+  }
+
+  :where([data-colour-swatch], [data-map-pin], [data-colour-data]) {
+    forced-color-adjust: none;
+    outline: var(--line-hairline) solid CanvasText;
   }
 }

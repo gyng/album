@@ -43,7 +43,10 @@ describe("video utilities", () => {
     const actual = await optimiseVideo(localVideo, outputDirectory);
 
     expect(actual).toEqual({
-      src: `/${cachedOutput.split(path.sep).slice(1).join(path.sep)}`,
+      src: `/${cachedOutput.split(path.sep).slice(1).join(path.sep)}`.replace(
+        "@1920.mp4",
+        "%401920.mp4",
+      ),
       mimeType: "video/mp4",
     });
   });

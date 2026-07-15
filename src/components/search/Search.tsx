@@ -154,9 +154,11 @@ export const Search: React.FC<{
     imageQuery,
   });
   const {
+    isCompact: isFilterDrawerCompact,
     isOpen: isFilterDrawerOpen,
     open: openFilterDrawer,
     close: closeFilterDrawer,
+    dialogRef: filterDialogRef,
     triggerRef: filterTriggerRef,
     closeRef: filterCloseRef,
   } = useSearchFilterDrawer({ isSimilarMode });
@@ -763,59 +765,76 @@ export const Search: React.FC<{
       ) : null}
 
       {!isSimilarMode ? (
-        <>
-          {/* Mobile-only: collapses the panel behind a trigger so results
-              lead. Hidden on desktop (the panel renders inline below). */}
-          <button
-            type="button"
-            ref={filterTriggerRef}
-            className={styles.filterTrigger}
-            aria-expanded={isFilterDrawerOpen}
-            aria-controls="search-filter-drawer"
-            onClick={openFilterDrawer}
-          >
-            <span aria-hidden="true">⚙</span>
-            <span>Filters</span>
-            {activeFilterCount > 0 ? (
-              <span className={styles.filterTriggerBadge}>{activeFilterCount}</span>
-            ) : null}
-          </button>
+        isFilterDrawerCompact ? (
+          <>
+            <button
+              type="button"
+              ref={filterTriggerRef}
+              className={styles.filterTrigger}
+              aria-expanded={isFilterDrawerOpen}
+              aria-controls="search-filter-drawer"
+              onClick={openFilterDrawer}
+            >
+              <span aria-hidden="true">⚙</span>
+              <span>Filters</span>
+              {activeFilterCount > 0 ? (
+                <span className={styles.filterTriggerBadge}>{activeFilterCount}</span>
+              ) : null}
+            </button>
 
-          {/* Backdrop only exists (and only catches taps) while open on
-              mobile; on desktop the drawer wrapper is display: contents so
-              the panel lays out exactly as before. */}
-          <div
-            className={[styles.filterBackdrop, isFilterDrawerOpen ? styles.filterBackdropOpen : ""]
-              .filter(Boolean)
-              .join(" ")}
-            onClick={closeFilterDrawer}
-            aria-hidden="true"
-          />
+            {/* oxlint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions */}
+            <dialog
+              ref={filterDialogRef}
+              id="search-filter-drawer"
+              className={styles.filterDrawer}
+              aria-label="Search filters"
+              onCancel={(event) => {
+                event.preventDefault();
+                closeFilterDrawer();
+              }}
+              onClick={(event) => {
+                if (event.target === event.currentTarget) {
+                  closeFilterDrawer();
+                }
+              }}
+            >
+              <div className={styles.filterDrawerHandle} aria-hidden="true">
+                <span className={styles.filterDrawerGrip} />
+              </div>
+              <div className={styles.filterDrawerHeader}>
+                <span className={styles.filterDrawerTitle}>Filters</span>
+                <button
+                  type="button"
+                  ref={filterCloseRef}
+                  className={styles.filterDrawerClose}
+                  onClick={closeFilterDrawer}
+                >
+                  Done
+                </button>
+              </div>
 
-          <div
-            id="search-filter-drawer"
-            className={[styles.filterDrawer, isFilterDrawerOpen ? styles.filterDrawerOpen : ""]
-              .filter(Boolean)
-              .join(" ")}
-            role="dialog"
-            aria-modal={isFilterDrawerOpen}
-            aria-label="Search filters"
-          >
-            <div className={styles.filterDrawerHandle} aria-hidden="true">
-              <span className={styles.filterDrawerGrip} />
-            </div>
-            <div className={styles.filterDrawerHeader}>
-              <span className={styles.filterDrawerTitle}>Filters</span>
-              <button
-                type="button"
-                ref={filterCloseRef}
-                className={styles.filterDrawerClose}
-                onClick={closeFilterDrawer}
-              >
-                Done
-              </button>
-            </div>
-
+              <SearchFacetPanel
+                sections={visibleFacetSections}
+                selectedCategory={selectedFilterCategory}
+                colorSearch={colorSearch}
+                colorTolerance={colorTolerance}
+                selectedFacets={selectedFacets}
+                normalizedSearchTerms={normalizedSearchTerms}
+                normalizedTags={normalizedTags}
+                refinementCounts={refinementCounts}
+                tagCountsAreExact={tagCountsAreExact}
+                isLoading={isFacetSectionsLoading}
+                onSelectCategory={setSelectedFilterCategory}
+                onClearColorSearch={handleClearColorSearch}
+                onSetColorSearch={handleFacetColorSearch}
+                onSetColorTolerance={setColorTolerance}
+                onToggleFacet={handleToggleFacet}
+                onToggleTag={handleToggleTag}
+              />
+            </dialog>
+          </>
+        ) : (
+          <div className={styles.filterInline}>
             <SearchFacetPanel
               sections={visibleFacetSections}
               selectedCategory={selectedFilterCategory}
@@ -835,7 +854,7 @@ export const Search: React.FC<{
               onToggleTag={handleToggleTag}
             />
           </div>
-        </>
+        )
       ) : null}
 
       {/* DB / similarity-index / text-model download progress is shown once,

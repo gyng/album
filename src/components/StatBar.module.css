@@ -1,9 +1,13 @@
+.container {
+  container-type: inline-size;
+}
+
 .row {
   display: grid;
-  grid-template-columns: minmax(96px, 180px) 1fr auto auto;
+  grid-template-columns: minmax(var(--size-96), var(--size-180)) 1fr auto auto;
   align-items: center;
   gap: var(--m-s);
-  min-height: 28px;
+  min-block-size: var(--size-28);
 }
 
 .rowInteractive {
@@ -18,30 +22,30 @@
   text-overflow: ellipsis;
   display: inline-flex;
   align-items: center;
-  gap: 0.45rem;
-  min-width: 0;
+  gap: var(--m-s);
+  min-inline-size: 0;
 }
 
 .barTrack {
-  height: 8px;
+  block-size: var(--size-8);
   background-color: var(--c-bg-contrast-dark);
-  border-radius: 4px;
-  overflow: hidden;
+  border-radius: var(--size-4);
+  overflow: clip;
 }
 
 .bar {
-  height: 100%;
+  block-size: 100%;
   background-color: var(--c-accent);
-  border-radius: 4px;
-  transition: width 0.3s ease;
-  min-width: 2px;
+  border-radius: var(--size-4);
+  transition: inline-size var(--t-deliberate) var(--ease-out);
+  min-inline-size: var(--size-2);
 }
 
 .count {
   font-size: var(--fs-sm);
   color: var(--c-bg-contrast-light);
-  text-align: right;
-  min-width: 44px;
+  text-align: end;
+  min-inline-size: var(--size-44);
   font-variant-numeric: tabular-nums;
 }
 
@@ -49,7 +53,8 @@
   justify-self: end;
   display: inline-flex;
   align-items: center;
-  gap: 0.3rem;
+  justify-content: center;
+  gap: var(--size-5);
   color: var(--c-bg-contrast-light);
   text-decoration: none;
   font-size: var(--fs-s);
@@ -64,12 +69,24 @@
   display: inline;
 }
 
-@media (max-width: 720px) {
+@container (max-width: 720px) {
   .row {
-    grid-template-columns: minmax(64px, 96px) 1fr auto auto;
+    grid-template-columns: minmax(var(--m-2xl), var(--size-96)) 1fr auto auto;
   }
 
   .actionText {
     display: none;
+  }
+
+  .action {
+    min-inline-size: var(--tap-target);
+    min-block-size: var(--tap-target);
+  }
+}
+
+@media (hover: none), (pointer: coarse) {
+  .action {
+    min-inline-size: var(--tap-target);
+    min-block-size: var(--tap-target);
   }
 }

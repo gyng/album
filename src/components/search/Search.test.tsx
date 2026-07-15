@@ -167,6 +167,16 @@ beforeAll(() => {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  jest.mocked(window.matchMedia).mockImplementation((query: string) => ({
+    matches: false,
+    media: query,
+    onchange: null,
+    addListener: jest.fn(),
+    removeListener: jest.fn(),
+    addEventListener: jest.fn(),
+    removeEventListener: jest.fn(),
+    dispatchEvent: jest.fn(),
+  }));
   jest.spyOn(console, "error").mockImplementation((...args) => {
     if (typeof args[0] === "string" && args[0].includes("not wrapped in act")) {
       return;
@@ -1328,6 +1338,16 @@ describe("Search interaction edges", () => {
   });
 
   it("opens and closes the filter drawer and drawing panel", async () => {
+    jest.mocked(window.matchMedia).mockImplementation((query: string) => ({
+      matches: query === "(max-width: 900px)",
+      media: query,
+      onchange: null,
+      addListener: jest.fn(),
+      removeListener: jest.fn(),
+      addEventListener: jest.fn(),
+      removeEventListener: jest.fn(),
+      dispatchEvent: jest.fn(),
+    }));
     jest.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(null);
     await renderSearch();
     const filters = screen.getByRole("button", { name: "Filters" });

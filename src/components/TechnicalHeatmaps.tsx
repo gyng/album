@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ParallelRelationshipData } from "../util/computeStats";
 import { buildSearchHref } from "../util/searchFacets";
-import { Caption } from "./ui";
+import { Caption, Heading } from "./ui";
 import styles from "./TechnicalHeatmaps.module.css";
 
 type Props = {
@@ -139,7 +139,9 @@ const HeatmapPanel: React.FC<{
 
   return (
     <section className={[styles.panel, className ?? ""].join(" ")}>
-      <h3 className={styles.panelTitle}>{config.title}</h3>
+      <Heading level={3} as="h3" className={styles.panelTitle}>
+        {config.title}
+      </Heading>
       <div
         className={styles.matrix}
         style={{
@@ -363,187 +365,189 @@ export const TechnicalHeatmaps: React.FC<Props> = ({
   }, [activeSelection, relatedMap]);
 
   return (
-    <div
-      ref={wrapperRef}
-      className={[
-        styles.wrapper,
-        layout === "two-up" ? styles.wrapperTwoUp : "",
-        layout === "diagonal" ? styles.wrapperDiagonal : "",
-        layout === "tri-grid" ? styles.wrapperTriGrid : "",
-      ].join(" ")}
-    >
-      {overlayLines.length > 0 ? (
-        <svg className={styles.overlay} aria-hidden="true">
-          {overlayLines.map((line) => (
-            <g key={line.key}>
-              <path
-                d={line.d}
-                className={styles.overlayLine}
-                style={{
-                  strokeWidth: `${line.width}px`,
-                  opacity: line.opacity,
-                }}
-              />
-              <g
-                className={styles.overlayLabel}
-                transform={`translate(${line.labelX}, ${line.labelY})`}
-                style={{ opacity: Math.max(0.45, line.opacity) }}
-              >
-                <rect
-                  x={-18}
-                  y={-9}
-                  width={36}
-                  height={18}
-                  rx={9}
-                  className={styles.overlayLabelBg}
+    <div className={styles.container}>
+      <div
+        ref={wrapperRef}
+        className={[
+          styles.wrapper,
+          layout === "two-up" ? styles.wrapperTwoUp : "",
+          layout === "diagonal" ? styles.wrapperDiagonal : "",
+          layout === "tri-grid" ? styles.wrapperTriGrid : "",
+        ].join(" ")}
+      >
+        {overlayLines.length > 0 ? (
+          <svg className={styles.overlay} aria-hidden="true">
+            {overlayLines.map((line) => (
+              <g key={line.key}>
+                <path
+                  d={line.d}
+                  className={styles.overlayLine}
+                  style={{
+                    strokeWidth: `${line.width}px`,
+                    opacity: line.opacity,
+                  }}
                 />
-                <text textAnchor="middle" dominantBaseline="central">
-                  {line.label}
-                </text>
+                <g
+                  className={styles.overlayLabel}
+                  transform={`translate(${line.labelX}, ${line.labelY})`}
+                  style={{ opacity: Math.max(0.45, line.opacity) }}
+                >
+                  <rect
+                    x={-18}
+                    y={-9}
+                    width={36}
+                    height={18}
+                    rx={9}
+                    className={styles.overlayLabelBg}
+                  />
+                  <text textAnchor="middle" dominantBaseline="central">
+                    {line.label}
+                  </text>
+                </g>
               </g>
-            </g>
-          ))}
-        </svg>
-      ) : null}
-      {layout === "diagonal" && heatmaps.length === 2 ? (
-        <>
-          <HeatmapPanel
-            key={heatmaps[0].title}
-            className={styles.panelTopLeft}
-            data={data}
-            config={heatmaps[0]}
-            activeSelection={activeSelection}
-            relatedKeys={relatedKeys}
-            onActivate={setActiveSelection}
-            onDeactivate={() => {
-              setActiveSelection(null);
-            }}
-            registerCell={(key, node) => {
-              if (node) {
-                cellRefs.current.set(key, node);
-                return;
-              }
+            ))}
+          </svg>
+        ) : null}
+        {layout === "diagonal" && heatmaps.length === 2 ? (
+          <>
+            <HeatmapPanel
+              key={heatmaps[0].title}
+              className={styles.panelTopLeft}
+              data={data}
+              config={heatmaps[0]}
+              activeSelection={activeSelection}
+              relatedKeys={relatedKeys}
+              onActivate={setActiveSelection}
+              onDeactivate={() => {
+                setActiveSelection(null);
+              }}
+              registerCell={(key, node) => {
+                if (node) {
+                  cellRefs.current.set(key, node);
+                  return;
+                }
 
-              cellRefs.current.delete(key);
-            }}
-            activeXAxisBucket={activeXAxisBucket}
-          />
-          <div className={styles.diagonalSpacer} aria-hidden="true" />
-          <div className={styles.diagonalSpacer} aria-hidden="true" />
-          <HeatmapPanel
-            key={heatmaps[1].title}
-            className={styles.panelBottomRight}
-            data={data}
-            config={heatmaps[1]}
-            activeSelection={activeSelection}
-            relatedKeys={relatedKeys}
-            onActivate={setActiveSelection}
-            onDeactivate={() => {
-              setActiveSelection(null);
-            }}
-            registerCell={(key, node) => {
-              if (node) {
-                cellRefs.current.set(key, node);
-                return;
-              }
+                cellRefs.current.delete(key);
+              }}
+              activeXAxisBucket={activeXAxisBucket}
+            />
+            <div className={styles.diagonalSpacer} aria-hidden="true" />
+            <div className={styles.diagonalSpacer} aria-hidden="true" />
+            <HeatmapPanel
+              key={heatmaps[1].title}
+              className={styles.panelBottomRight}
+              data={data}
+              config={heatmaps[1]}
+              activeSelection={activeSelection}
+              relatedKeys={relatedKeys}
+              onActivate={setActiveSelection}
+              onDeactivate={() => {
+                setActiveSelection(null);
+              }}
+              registerCell={(key, node) => {
+                if (node) {
+                  cellRefs.current.set(key, node);
+                  return;
+                }
 
-              cellRefs.current.delete(key);
-            }}
-            activeXAxisBucket={activeXAxisBucket}
-          />
-        </>
-      ) : layout === "tri-grid" && heatmaps.length === 3 ? (
-        <>
-          <HeatmapPanel
-            key={heatmaps[0].title}
-            className={styles.panelTopLeft}
-            data={data}
-            config={heatmaps[0]}
-            activeSelection={activeSelection}
-            relatedKeys={relatedKeys}
-            onActivate={setActiveSelection}
-            onDeactivate={() => {
-              setActiveSelection(null);
-            }}
-            registerCell={(key, node) => {
-              if (node) {
-                cellRefs.current.set(key, node);
-                return;
-              }
+                cellRefs.current.delete(key);
+              }}
+              activeXAxisBucket={activeXAxisBucket}
+            />
+          </>
+        ) : layout === "tri-grid" && heatmaps.length === 3 ? (
+          <>
+            <HeatmapPanel
+              key={heatmaps[0].title}
+              className={styles.panelTopLeft}
+              data={data}
+              config={heatmaps[0]}
+              activeSelection={activeSelection}
+              relatedKeys={relatedKeys}
+              onActivate={setActiveSelection}
+              onDeactivate={() => {
+                setActiveSelection(null);
+              }}
+              registerCell={(key, node) => {
+                if (node) {
+                  cellRefs.current.set(key, node);
+                  return;
+                }
 
-              cellRefs.current.delete(key);
-            }}
-            activeXAxisBucket={activeXAxisBucket}
-          />
-          <HeatmapPanel
-            key={heatmaps[1].title}
-            className={styles.panelTopRight}
-            data={data}
-            config={heatmaps[1]}
-            activeSelection={activeSelection}
-            relatedKeys={relatedKeys}
-            onActivate={setActiveSelection}
-            onDeactivate={() => {
-              setActiveSelection(null);
-            }}
-            registerCell={(key, node) => {
-              if (node) {
-                cellRefs.current.set(key, node);
-                return;
-              }
+                cellRefs.current.delete(key);
+              }}
+              activeXAxisBucket={activeXAxisBucket}
+            />
+            <HeatmapPanel
+              key={heatmaps[1].title}
+              className={styles.panelTopRight}
+              data={data}
+              config={heatmaps[1]}
+              activeSelection={activeSelection}
+              relatedKeys={relatedKeys}
+              onActivate={setActiveSelection}
+              onDeactivate={() => {
+                setActiveSelection(null);
+              }}
+              registerCell={(key, node) => {
+                if (node) {
+                  cellRefs.current.set(key, node);
+                  return;
+                }
 
-              cellRefs.current.delete(key);
-            }}
-            activeXAxisBucket={activeXAxisBucket}
-          />
-          <HeatmapPanel
-            key={heatmaps[2].title}
-            className={styles.panelBottomLeft}
-            data={data}
-            config={heatmaps[2]}
-            activeSelection={activeSelection}
-            relatedKeys={relatedKeys}
-            onActivate={setActiveSelection}
-            onDeactivate={() => {
-              setActiveSelection(null);
-            }}
-            registerCell={(key, node) => {
-              if (node) {
-                cellRefs.current.set(key, node);
-                return;
-              }
+                cellRefs.current.delete(key);
+              }}
+              activeXAxisBucket={activeXAxisBucket}
+            />
+            <HeatmapPanel
+              key={heatmaps[2].title}
+              className={styles.panelBottomLeft}
+              data={data}
+              config={heatmaps[2]}
+              activeSelection={activeSelection}
+              relatedKeys={relatedKeys}
+              onActivate={setActiveSelection}
+              onDeactivate={() => {
+                setActiveSelection(null);
+              }}
+              registerCell={(key, node) => {
+                if (node) {
+                  cellRefs.current.set(key, node);
+                  return;
+                }
 
-              cellRefs.current.delete(key);
-            }}
-            activeXAxisBucket={activeXAxisBucket}
-          />
-          <div className={styles.triSpacer} aria-hidden="true" />
-        </>
-      ) : (
-        heatmaps.map((heatmap) => (
-          <HeatmapPanel
-            key={heatmap.title}
-            data={data}
-            config={heatmap}
-            activeSelection={activeSelection}
-            relatedKeys={relatedKeys}
-            onActivate={setActiveSelection}
-            onDeactivate={() => {
-              setActiveSelection(null);
-            }}
-            registerCell={(key, node) => {
-              if (node) {
-                cellRefs.current.set(key, node);
-                return;
-              }
+                cellRefs.current.delete(key);
+              }}
+              activeXAxisBucket={activeXAxisBucket}
+            />
+            <div className={styles.triSpacer} aria-hidden="true" />
+          </>
+        ) : (
+          heatmaps.map((heatmap) => (
+            <HeatmapPanel
+              key={heatmap.title}
+              data={data}
+              config={heatmap}
+              activeSelection={activeSelection}
+              relatedKeys={relatedKeys}
+              onActivate={setActiveSelection}
+              onDeactivate={() => {
+                setActiveSelection(null);
+              }}
+              registerCell={(key, node) => {
+                if (node) {
+                  cellRefs.current.set(key, node);
+                  return;
+                }
 
-              cellRefs.current.delete(key);
-            }}
-            activeXAxisBucket={activeXAxisBucket}
-          />
-        ))
-      )}
-      <Caption className={styles.caption}>{caption}</Caption>
+                cellRefs.current.delete(key);
+              }}
+              activeXAxisBucket={activeXAxisBucket}
+            />
+          ))
+        )}
+        <Caption className={styles.caption}>{caption}</Caption>
+      </div>
     </div>
   );
 };

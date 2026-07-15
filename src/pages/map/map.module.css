@@ -1,5 +1,7 @@
 .container {
+  container-type: inline-size;
   position: relative;
+  isolation: isolate;
 }
 
 /* While the date-range slider is open it overlaps MapLibre's bottom
@@ -8,23 +10,21 @@
    attribution and scale bar stay readable. */
 .containerWithSlider :global(.maplibregl-ctrl-bottom-left),
 .containerWithSlider :global(.maplibregl-ctrl-bottom-right) {
-  bottom: calc(var(--m-l) + 82px + var(--m-s));
+  inset-block-end: calc(var(--m-l) + var(--range-slider-clearance) + var(--m-s));
   transition: bottom var(--t-base);
 }
 
 .map {
-  height: 100vh;
-  /* biome-ignore lint/suspicious/noDuplicateProperties: Fallback for browsers without dynamic viewport units. */
-  height: 100dvh;
-  max-width: 100vw;
-  width: auto;
+  block-size: 100dvh;
+  max-inline-size: 100%;
+  inline-size: auto;
   display: flex;
 }
 
 .titleBar {
   position: fixed;
-  z-index: 9999;
-  top: calc(var(--m-l) + var(--m-m));
+  z-index: var(--z-fullscreen);
+  inset-block-start: calc(var(--m-l) + var(--m-m));
   left: var(--m-l);
   /* Reserve clearance on the right for MapLibre's stacked controls
      (NavigationControl, GeolocateControl, FullscreenControl all anchor
@@ -45,15 +45,15 @@
   align-items: center;
   gap: var(--m-s);
   padding: var(--m);
-  border: solid 2px var(--c-bg-contrast-light);
+  border: solid var(--size-2) var(--c-bg-contrast-light);
   border-radius: var(--m-s);
   background: var(--c-bg);
-  margin-top: var(--m-s);
+  margin-block-start: var(--m-s);
 }
 
 .mapSearch input {
-  width: min(200px, 42vw);
-  min-width: 130px;
+  inline-size: min(var(--size-200), 42dvw);
+  min-inline-size: var(--map-search-min-width);
   padding: var(--m-s);
   border: 0;
   background: transparent;
@@ -62,20 +62,20 @@
 }
 
 .mapSearch input:focus-visible {
-  outline: solid 2px var(--c-bg-contrast-light);
-  outline-offset: 1px;
+  outline: solid var(--size-2) var(--c-bg-contrast-light);
+  outline-offset: var(--size-1);
 }
 
 .mapSearch span {
-  min-width: 4.5em;
-  color: color-mix(in srgb, var(--c-font) 70%, transparent);
+  min-inline-size: 4.5em;
+  color: color-mix(in oklch, var(--c-font) 70%, transparent);
   font-size: var(--fs-xs);
   font-variant-numeric: tabular-nums;
-  text-align: right;
+  text-align: end;
 }
 
 .mapSearchRetry {
-  min-width: 4.5em;
+  min-inline-size: 4.5em;
   padding: var(--m);
   border: 0;
   background: transparent;
@@ -85,8 +85,8 @@
 }
 
 .mapSearchRetry:focus-visible {
-  outline: solid 2px var(--c-bg-contrast-light);
-  outline-offset: 1px;
+  outline: solid var(--size-2) var(--c-bg-contrast-light);
+  outline-offset: var(--size-1);
 }
 
 .title {

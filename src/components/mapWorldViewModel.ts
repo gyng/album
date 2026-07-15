@@ -106,7 +106,7 @@ export const filterPhotosByBounds = (
   bounds: MapBounds | null,
 ): PhotoWithStyle[] => {
   if (!bounds) {
-    return photos;
+    return [];
   }
 
   return photos.filter((photo) => {

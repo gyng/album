@@ -1,0 +1,5 @@
+/* Third-party styles live in a lower cascade layer so local theme overrides do
+   not need specificity tricks or !important. */
+@layer vendor, overrides;
+
+@import "maplibre-gl/dist/maplibre-gl.css" layer(vendor);

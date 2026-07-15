@@ -6,11 +6,15 @@ import React from "react";
 import { render, screen, fireEvent } from "@testing-library/react";
 import {
   Caption,
+  Button,
+  ButtonLink,
+  buttonStyles,
   Card,
   ChartTooltip,
   Footer,
   Heading,
   Input,
+  KeyHint,
   OverlayButton,
   OverlayButtonLink,
   overlayButtonStyles,
@@ -25,8 +29,50 @@ import {
 describe("UI public exports", () => {
   it("exposes the shared footer and composable button styles", () => {
     expect(Footer).toEqual(expect.any(Function));
+    expect(buttonStyles.base).toBeTruthy();
     expect(overlayButtonStyles.base).toBeTruthy();
     expect(pillStyles.base).toBeTruthy();
+  });
+});
+
+describe("Button / ButtonLink", () => {
+  it("uses a non-submitting type by default while allowing an explicit submit type", () => {
+    render(
+      <>
+        <Button>Safe action</Button>
+        <Button type="submit">Submit action</Button>
+      </>,
+    );
+
+    expect(screen.getByRole("button", { name: "Safe action" })).toHaveAttribute("type", "button");
+    expect(screen.getByRole("button", { name: "Submit action" })).toHaveAttribute("type", "submit");
+  });
+
+  it("supports variants, sizes, active state, and links", () => {
+    render(
+      <>
+        <Button variant="accent" size="large" active>
+          Accent
+        </Button>
+        <ButtonLink href="/test">Linked action</ButtonLink>
+      </>,
+    );
+
+    expect(screen.getByRole("button", { name: "Accent" }).className).toContain("accent");
+    expect(screen.getByRole("link", { name: "Linked action" })).toHaveAttribute("href", "/test");
+  });
+
+  it("forwards its ref", () => {
+    const ref = React.createRef<HTMLButtonElement>();
+    render(<Button ref={ref}>Focus target</Button>);
+    expect(ref.current).toBeInstanceOf(HTMLButtonElement);
+  });
+});
+
+describe("KeyHint", () => {
+  it("renders a semantic keyboard hint", () => {
+    render(<KeyHint>Enter</KeyHint>);
+    expect(screen.getByText("Enter").tagName).toBe("KBD");
   });
 });
 

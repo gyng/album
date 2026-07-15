@@ -1,19 +1,27 @@
 .tooltip {
   position: absolute;
-  left: 50%;
-  top: 0;
+  inset-inline-start: 50%;
+  inset-block-start: 0;
   transform: translate(-50%, calc(-100% - var(--m-s)));
-  padding: var(--m) var(--m-xs);
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--c-bg) 88%, var(--c-accent));
-  border: 1px solid color-mix(in srgb, var(--c-accent) 60%, var(--c-font));
-  color: color-mix(in srgb, var(--c-font) 92%, var(--c-bg));
-  font-size: var(--fs-xs);
-  font-weight: 700;
   line-height: 1;
   white-space: nowrap;
   pointer-events: none;
   opacity: 0;
-  transition: opacity 0.08s ease;
-  z-index: 2;
+  transition: opacity var(--t-fast) var(--ease-out);
+  z-index: var(--z-float);
+}
+
+@media (max-width: 720px) {
+  /* Edge columns cannot centre a wide label without extending the document.
+     A stable mobile overlay keeps every chart preview readable and in-bounds. */
+  .tooltip {
+    position: fixed;
+    inset-inline: 50% auto;
+    inset-block: auto var(--m-m);
+    inline-size: max-content;
+    max-inline-size: calc(100dvw - (var(--m-m) * 2));
+    transform: translateX(-50%);
+    text-align: center;
+    white-space: normal;
+  }
 }

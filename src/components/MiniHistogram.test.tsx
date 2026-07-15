@@ -22,9 +22,9 @@ describe("MiniHistogram", () => {
     const wide = screen.getByRole("img", { name: "Wide · 100 photos" });
     const normal = screen.getByRole("img", { name: "Normal · 1 photos" });
     const tele = screen.getByRole("img", { name: "Tele · 0 photos" });
-    expect(wide.querySelector("[aria-hidden='true']")).toHaveStyle({ height: "100%" });
-    expect(normal.querySelector("[aria-hidden='true']")).toHaveStyle({ height: "4%" });
-    expect(tele.querySelector("[aria-hidden='true']")).toHaveStyle({ height: "0%" });
+    expect(wide.querySelector("[aria-hidden='true']")).toHaveStyle({ blockSize: "100%" });
+    expect(normal.querySelector("[aria-hidden='true']")).toHaveStyle({ blockSize: "4%" });
+    expect(tele.querySelector("[aria-hidden='true']")).toHaveStyle({ blockSize: "0%" });
   });
 
   it("renders an empty chart without inventing buckets", () => {

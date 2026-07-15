@@ -3,7 +3,7 @@ import { ResponsiveSankey } from "@nivo/sankey";
 import { SankeyFlow } from "../util/computeStats";
 import styles from "./SankeyChart.module.css";
 
-type Props = {
+export type SankeyChartProps = {
   flow: SankeyFlow;
   emptyMessage?: string;
   labelMaxLength?: number;
@@ -75,10 +75,12 @@ const ClickableLabelLayer = ({
   nodes,
   labelMaxLength,
   minLabelHeight,
+  labelOffset,
 }: {
   nodes: readonly SankeyComputedNode[];
   labelMaxLength: number;
   minLabelHeight: number;
+  labelOffset: number;
 }) => {
   const maxDepth = Math.max(...nodes.map((node) => getNodeDepth(node)), 0);
 
@@ -94,7 +96,7 @@ const ClickableLabelLayer = ({
         const depth = getNodeDepth(node);
         const isLeftColumn = depth === 0;
         const isRightColumn = depth === maxDepth;
-        const x = isLeftColumn || !isRightColumn ? node.x1 + 12 : node.x0 - 12;
+        const x = isLeftColumn || !isRightColumn ? node.x1 + labelOffset : node.x0 - labelOffset;
         const y = node.y0 + (node.y1 - node.y0) / 2;
         const textAnchor = isLeftColumn || !isRightColumn ? "start" : "end";
         const label = truncateLabel(
@@ -127,16 +129,16 @@ const ClickableLabelLayer = ({
 const chartTheme = {
   text: {
     fill: "var(--c-font)",
-    fontSize: 12,
+    fontSize: "var(--fs-sm)",
   },
   tooltip: {
     container: {
       background: "var(--c-bg)",
       color: "var(--c-font)",
-      fontSize: 11,
-      border: "1px solid var(--c-bg-contrast-dark)",
-      borderRadius: 6,
-      padding: "6px 8px",
+      fontSize: "var(--fs-s)",
+      border: "var(--line-hairline) solid var(--c-bg-contrast-dark)",
+      borderRadius: "var(--m-xs)",
+      padding: "var(--m-xs) var(--m-s)",
       boxShadow: "none",
     },
   },
@@ -147,8 +149,11 @@ const chartTheme = {
   },
 };
 
-const FALLBACK_SPACING = 12;
-const NODE_THICKNESS = 18;
+// Keep the non-browser fallback aligned with the --m-s design token so SSR and
+// the first browser render use identical chart margins.
+const FALLBACK_SPACING = 8;
+const FALLBACK_LABEL_OFFSET = 12;
+const FALLBACK_NODE_THICKNESS = 18;
 const SANKEY_PALETTE = [
   "#e62065",
   "#ef4c8a",
@@ -183,7 +188,7 @@ const mixHex = (base: string, target: string, amount: number): string => {
   ]);
 };
 
-const readCssSpacing = (name: string, fallback: number): number => {
+const readCssLength = (name: string, fallback: number): number => {
   if (typeof window === "undefined") {
     return fallback;
   }
@@ -261,14 +266,16 @@ const withFlowColors = (
   };
 };
 
-export const SankeyChart: React.FC<Props> = ({
+export const SankeyChart: React.FC<SankeyChartProps> = ({
   flow,
   emptyMessage = "Not enough linked data yet.",
   labelMaxLength = 28,
   minHeight = 460,
   minLabelHeight = 14,
 }) => {
-  const spacing = readCssSpacing("--m-s", FALLBACK_SPACING);
+  const spacing = readCssLength("--m-s", FALLBACK_SPACING);
+  const labelOffset = readCssLength("--m-m", FALLBACK_LABEL_OFFSET);
+  const nodeThickness = readCssLength("--size-18", FALLBACK_NODE_THICKNESS);
   const shellRef = React.useRef<HTMLDivElement | null>(null);
   const [shellWidth, setShellWidth] = React.useState(0);
 
@@ -302,7 +309,7 @@ export const SankeyChart: React.FC<Props> = ({
   for (const count of Array.from(nodesByDepth.values())) {
     if (count > maxNodesPerColumn) maxNodesPerColumn = count;
   }
-  const safeHeight = Math.max(minHeight, maxNodesPerColumn * NODE_THICKNESS);
+  const safeHeight = Math.max(minHeight, maxNodesPerColumn * nodeThickness);
 
   // The label margins (spacing * 7 each side) can exceed a narrow container,
   // which makes nivo compute a negative inner SVG width/height and emit console
@@ -337,7 +344,7 @@ export const SankeyChart: React.FC<Props> = ({
             SANKEY_PALETTE[0]
           }
           nodeOpacity={0.9}
-          nodeThickness={NODE_THICKNESS}
+          nodeThickness={nodeThickness}
           nodeSpacing={0}
           nodeBorderWidth={0}
           linkOpacity={0.28}
@@ -357,6 +364,7 @@ export const SankeyChart: React.FC<Props> = ({
                 {...props}
                 labelMaxLength={labelMaxLength}
                 minLabelHeight={minLabelHeight}
+                labelOffset={labelOffset}
               />
             ),
           ]}

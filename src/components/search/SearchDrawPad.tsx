@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
+import { Button } from "../ui";
 import styles from "./SearchDrawPad.module.css";
 
 // Canvas backing resolution. SigLIP downsamples to 224×224, so 448 keeps
@@ -29,7 +30,7 @@ type Props = {
 
 export const SearchDrawPad: React.FC<Props> = ({ onCancel, onSubmit }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const panelRef = useRef<HTMLDivElement | null>(null);
+  const dialogRef = useRef<HTMLDialogElement | null>(null);
   const cancelRef = useRef<HTMLButtonElement | null>(null);
   const isDrawingRef = useRef(false);
   const lastPointRef = useRef<{ x: number; y: number } | null>(null);
@@ -51,56 +52,26 @@ export const SearchDrawPad: React.FC<Props> = ({ onCancel, onSubmit }) => {
   }, [fillBackground]);
 
   useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        onCancel();
-      }
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => {
-      window.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [onCancel]);
-
-  // Modal focus management, mirroring the mobile filter drawer: move focus in
-  // on open, lock background scroll, and hand focus back to whatever opened
-  // the pad on close.
-  useEffect(() => {
     const previouslyFocused =
       document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    cancelRef.current!.focus();
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
+    const dialog = dialogRef.current;
+    if (dialog?.showModal) {
+      dialog.showModal();
+    } else {
+      // jsdom and older embedded browsers do not expose showModal().
+      dialog?.setAttribute("open", "");
+    }
+    cancelRef.current?.focus();
+
     return () => {
-      document.body.style.overflow = previousOverflow;
+      if (dialog?.open && dialog.close) {
+        dialog.close();
+      }
       if (previouslyFocused?.isConnected) {
         previouslyFocused.focus();
       }
     };
   }, []);
-
-  // Keep Tab inside the dialog — without a trap, tabbing past the last button
-  // lands in the page behind the backdrop.
-  const handleTrapKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (event.key !== "Tab") {
-      return;
-    }
-    const focusable = Array.from(
-      panelRef.current!.querySelectorAll<HTMLElement>("button:not([disabled])"),
-    );
-    if (focusable.length === 0) {
-      return;
-    }
-    const first = focusable[0];
-    const last = focusable[focusable.length - 1];
-    if (event.shiftKey && document.activeElement === first) {
-      event.preventDefault();
-      last.focus();
-    } else if (!event.shiftKey && document.activeElement === last) {
-      event.preventDefault();
-      first.focus();
-    }
-  };
 
   const canvasPoint = (event: React.PointerEvent<HTMLCanvasElement>) => {
     const canvas = event.currentTarget;
@@ -160,28 +131,24 @@ export const SearchDrawPad: React.FC<Props> = ({ onCancel, onSubmit }) => {
   };
 
   return (
-    // Modal backdrop: click-outside dismisses (a pointer convenience); keyboard
-    // users close via Escape, handled by the dialog panel's onKeyDown below.
-    // oxlint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions
-    <div
-      className={styles.backdrop}
+    // Native dialog backdrop clicks target the dialog itself; keyboard users
+    // receive equivalent dismissal through the native cancel event.
+    // oxlint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions
+    <dialog
+      ref={dialogRef}
+      className={styles.dialog}
+      aria-label="Draw to search"
+      onCancel={(event) => {
+        event.preventDefault();
+        onCancel();
+      }}
       onClick={(event) => {
         if (event.target === event.currentTarget) {
           onCancel();
         }
       }}
     >
-      {/* Dialog focus-trap: onKeyDown implements Escape + Tab trapping, the
-          standard keyboard behaviour for a modal dialog. */}
-      {/* oxlint-disable-next-line jsx-a11y/no-noninteractive-element-interactions */}
-      <div
-        ref={panelRef}
-        className={styles.panel}
-        role="dialog"
-        aria-modal="true"
-        aria-label="Draw to search"
-        onKeyDown={handleTrapKeyDown}
-      >
+      <div className={styles.panel}>
         <div className={styles.title}>Draw to search</div>
         <canvas
           ref={canvasRef}
@@ -202,6 +169,7 @@ export const SearchDrawPad: React.FC<Props> = ({ onCancel, onSubmit }) => {
                 .filter(Boolean)
                 .join(" ")}
               style={{ backgroundColor: colour }}
+              data-colour-swatch
               aria-label={`Brush colour ${colour}`}
               aria-pressed={colour === brushColour}
               onClick={() => setBrushColour(colour)}
@@ -227,22 +195,15 @@ export const SearchDrawPad: React.FC<Props> = ({ onCancel, onSubmit }) => {
           ))}
         </div>
         <div className={styles.actionRow}>
-          <button type="button" className={styles.action} onClick={handleClear}>
-            Clear
-          </button>
-          <button type="button" ref={cancelRef} className={styles.action} onClick={onCancel}>
+          <Button onClick={handleClear}>Clear</Button>
+          <Button ref={cancelRef} onClick={onCancel}>
             Cancel
-          </button>
-          <button
-            type="button"
-            className={styles.actionPrimary}
-            onClick={handleSubmit}
-            disabled={!hasStrokes}
-          >
+          </Button>
+          <Button variant="accent" onClick={handleSubmit} disabled={!hasStrokes}>
             Search
-          </button>
+          </Button>
         </div>
       </div>
-    </div>
+    </dialog>
   );
 };

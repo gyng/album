@@ -1,6 +1,5 @@
 import React from "react";
 import Map, { Layer, Source } from "react-map-gl/maplibre";
-import "maplibre-gl/dist/maplibre-gl.css";
 import styles from "./StatsWorldMap.module.css";
 
 type Props = {
@@ -68,30 +67,32 @@ export const StatsWorldMap: React.FC<Props> = ({ points }) => {
   );
 
   return (
-    <div className={styles.shell}>
-      <div className={styles.map}>
-        <Map
-          initialViewState={{
-            longitude: 15,
-            latitude: 20,
-            zoom: 1.25,
-          }}
-          mapStyle="https://api.maptiler.com/maps/toner-v2/style.json?key=iilC4hPY1594noPX9OQ2"
-          attributionControl={false}
-        >
-          <Source
-            id="stats-photo-points"
-            type="geojson"
-            data={geoJson}
-            cluster
-            clusterMaxZoom={12}
-            clusterRadius={42}
+    <div className={styles.container}>
+      <div className={styles.shell}>
+        <div className={styles.map}>
+          <Map
+            initialViewState={{
+              longitude: 15,
+              latitude: 20,
+              zoom: 1.25,
+            }}
+            mapStyle="https://api.maptiler.com/maps/toner-v2/style.json?key=iilC4hPY1594noPX9OQ2"
+            attributionControl={false}
           >
-            <Layer {...(clusterLayer as any)} />
-            <Layer {...(clusterCountLayer as any)} />
-            <Layer {...(pointLayer as any)} />
-          </Source>
-        </Map>
+            <Source
+              id="stats-photo-points"
+              type="geojson"
+              data={geoJson}
+              cluster
+              clusterMaxZoom={12}
+              clusterRadius={42}
+            >
+              <Layer {...(clusterLayer as any)} />
+              <Layer {...(clusterCountLayer as any)} />
+              <Layer {...(pointLayer as any)} />
+            </Source>
+          </Map>
+        </div>
       </div>
     </div>
   );

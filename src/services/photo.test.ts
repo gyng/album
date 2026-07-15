@@ -39,17 +39,17 @@ describe("photo utilities", () => {
       const actual = await optimiseImages("test/fixtures/monkey.jpg", "fixtures");
       expect(actual).toEqual([
         {
-          src: "/fixtures/.resized_images/monkey.jpg@800.avif",
+          src: "/fixtures/.resized_images/monkey.jpg%40800.avif",
           width: 800,
           height: 1176,
         },
         {
-          src: "/fixtures/.resized_images/monkey.jpg@1600.avif",
+          src: "/fixtures/.resized_images/monkey.jpg%401600.avif",
           width: 1600,
           height: 2353,
         },
         {
-          src: "/fixtures/.resized_images/monkey.jpg@3200.avif",
+          src: "/fixtures/.resized_images/monkey.jpg%403200.avif",
           width: 3200,
           height: 4706,
         },
@@ -64,9 +64,9 @@ describe("photo utilities", () => {
       try {
         const actual = await optimiseImages("test/fixtures/monkey.jpg", outputDir);
         expect(actual).toEqual([
-          expect.objectContaining({ src: "/fixtures/.resized_images/monkey.jpg@800.avif" }),
-          expect.objectContaining({ src: "/fixtures/.resized_images/monkey.jpg@1600.avif" }),
-          expect.objectContaining({ src: "/fixtures/.resized_images/monkey.jpg@3200.avif" }),
+          expect.objectContaining({ src: "/fixtures/.resized_images/monkey.jpg%40800.avif" }),
+          expect.objectContaining({ src: "/fixtures/.resized_images/monkey.jpg%401600.avif" }),
+          expect.objectContaining({ src: "/fixtures/.resized_images/monkey.jpg%403200.avif" }),
         ]);
         for (const result of actual) {
           expect(result.src).toMatch(/^\//);
@@ -85,17 +85,17 @@ describe("photo utilities", () => {
       const actual = await optimiseImages("test/fixtures/monkey-for-unoptimised.jpg", "fixtures");
       expect(actual).toEqual([
         {
-          src: "/fixtures/.resized_images/monkey-for-unoptimised.jpg@800.avif",
+          src: "/fixtures/.resized_images/monkey-for-unoptimised.jpg%40800.avif",
           width: 800,
           height: 1176,
         },
         {
-          src: "/fixtures/.resized_images/monkey-for-unoptimised.jpg@1600.avif",
+          src: "/fixtures/.resized_images/monkey-for-unoptimised.jpg%401600.avif",
           width: 1600,
           height: 2353,
         },
         {
-          src: "/fixtures/.resized_images/monkey-for-unoptimised.jpg@3200.avif",
+          src: "/fixtures/.resized_images/monkey-for-unoptimised.jpg%403200.avif",
           width: 3200,
           height: 4706,
         },

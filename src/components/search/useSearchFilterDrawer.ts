@@ -1,30 +1,64 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
+const COMPACT_FILTER_QUERY = "(max-width: 900px)";
+
 export const useSearchFilterDrawer = ({ isSimilarMode }: { isSimilarMode: boolean }) => {
+  const [isCompact, setIsCompact] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
+  const dialogRef = useRef<HTMLDialogElement | null>(null);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
   const closeRef = useRef<HTMLButtonElement | null>(null);
+  const wasOpenRef = useRef(false);
   const open = useCallback(() => setIsOpen(true), []);
   const close = useCallback(() => setIsOpen(false), []);
 
   useEffect(() => {
-    if (!isOpen) return;
+    if (typeof window.matchMedia !== "function") {
+      return;
+    }
 
-    closeRef.current?.focus();
-    const trigger = triggerRef.current;
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") close();
+    const mediaQuery = window.matchMedia(COMPACT_FILTER_QUERY);
+    const update = () => {
+      setIsCompact(mediaQuery.matches);
+      if (!mediaQuery.matches) {
+        setIsOpen(false);
+      }
     };
-    window.addEventListener("keydown", handleKeyDown);
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
+    update();
+    mediaQuery.addEventListener?.("change", update);
+    return () => mediaQuery.removeEventListener?.("change", update);
+  }, []);
 
-    return () => {
-      window.removeEventListener("keydown", handleKeyDown);
-      document.body.style.overflow = previousOverflow;
-      trigger?.focus();
-    };
-  }, [close, isOpen]);
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (!dialog || !isCompact) {
+      return;
+    }
+
+    if (isOpen) {
+      if (!dialog.open) {
+        if (dialog.showModal) {
+          dialog.showModal();
+        } else {
+          // jsdom and older embedded browsers do not expose showModal().
+          dialog.setAttribute("open", "");
+        }
+      }
+      closeRef.current?.focus();
+      wasOpenRef.current = true;
+      return;
+    }
+
+    if (wasOpenRef.current) {
+      if (dialog.open && dialog.close) {
+        dialog.close();
+      } else {
+        dialog.removeAttribute("open");
+      }
+      triggerRef.current?.focus();
+      wasOpenRef.current = false;
+    }
+  }, [isCompact, isOpen]);
 
   useEffect(() => {
     if (isSimilarMode) {
@@ -37,9 +71,11 @@ export const useSearchFilterDrawer = ({ isSimilarMode }: { isSimilarMode: boolea
   }, [close, isSimilarMode]);
 
   return {
+    isCompact,
     isOpen,
     open,
     close,
+    dialogRef,
     triggerRef,
     closeRef,
   };

@@ -1,0 +1,256 @@
+/* Styles owned by SlideshowBottomBar. Shared layout remains in slideshow.module.css. */
+
+/* Fixed-position grid spanning the full viewport width. Three rows:
+     map     (with mix-blend-mode in its own context)
+     descN   (1, 2 or 3 columns per data-count)
+     clock   (contains badge + time/date)
+   data-count drives both the column template and the named areas.
+
+   All horizontal placement (centre / left / right) is done with grid
+   alignment (justify-items, justify-self) — no transforms, no manual
+   left/right, no hardcoded centring offsets. */
+
+.bottomBarStack {
+  position: fixed;
+  inset: auto 0 calc(env(safe-area-inset-bottom, 0) + 5dvh) 0;
+  z-index: var(--z-caption);
+  display: grid;
+  /* Every grid item is horizontally centred in its track by default;
+     justify-self on a specific item can override per data-align below. */
+  justify-items: center;
+  /* align-items: end pins every grid item to the bottom of its row so
+     description cells with shorter content don't float up to the top of
+     a stretched cell (which made the centre cell look higher than its
+     neighbours when the row had to stretch to the tallest sibling). */
+  align-items: end;
+  pointer-events: none;
+  text-align: center;
+  text-shadow:
+    0 var(--size-1) var(--size-3) color-mix(in oklch, var(--c-black) 55%, transparent),
+    var(--size-1) var(--size-2) var(--size-2) color-mix(in oklch, var(--c-black) 45%, transparent),
+    var(--size-2) var(--size-4) var(--size-4) color-mix(in oklch, var(--c-black) 33.3%, transparent),
+    var(--size-3) var(--size-6) var(--size-6) color-mix(in oklch, var(--c-black) 33.3%, transparent);
+  color: var(--c-white);
+}
+
+/* Subtle bottom scrim so white captions stay legible over predominantly
+   bright photos (e.g. a near-white bokeh frame). Pinned to the viewport
+   bottom rather than the stack's own box, since the stack's height varies
+   with content (and is full-height in 4-up). Sits within the stack's
+   stacking context (z-index 200), so it darkens the photo beneath the
+   captions without ever covering them. */
+
+.bottomBarStack::before {
+  content: "";
+  position: fixed;
+  inset: auto 0 0 0;
+  block-size: 28dvh;
+  z-index: var(--z-behind);
+  pointer-events: none;
+  background: linear-gradient(
+    to top,
+    color-mix(in oklch, var(--c-black) 42%, transparent),
+    color-mix(in oklch, var(--c-black) 18%, transparent) 45%,
+    transparent
+  );
+}
+
+.bottomBarStack[data-count="1"] {
+  grid-template-columns: 1fr;
+  grid-template-areas:
+    "map"
+    "desc0"
+    "clock";
+}
+
+.bottomBarStack[data-count="2"] {
+  grid-template-columns: 1fr 1fr;
+  grid-template-areas:
+    "map   map"
+    "desc0 desc1"
+    "clock clock";
+}
+
+.bottomBarStack[data-count="3"] {
+  grid-template-columns: 1fr 1fr 1fr;
+  grid-template-areas:
+    "map   map   map"
+    "desc0 desc1 desc2"
+    "clock clock clock";
+}
+
+/* 4-up: the photo grid above is 2 columns × 2 rows (each photo fills a
+   viewport quadrant). Unlike 1/2/3-up — where the photos are a single row and
+   a bottom strip naturally sits under every column — here the top two photos
+   occupy the top half, so a bottom strip would pile all four labels at the
+   bottom (top-pane captions ending up in the bottom pane). Span the FULL
+   height instead and pin each description row to the bottom of its photo row:
+   desc0/desc1 to the bottom of the top photos, desc2/desc3 to the bottom of
+   the bottom photos. The two 1fr rows mirror the 50/50 photo split; map +
+   clock chrome sit in auto rows at the very bottom. align-items:end (set on
+   the container) pins each cell to the bottom of its row. */
+
+.bottomBarStack[data-count="4"] {
+  inset: 0 0 calc(env(safe-area-inset-bottom, 0) + 5dvh) 0;
+  grid-template-columns: 1fr 1fr;
+  /* Two equal rows mirror the 2×2 photo split; align-items:end (on the
+     container) pins desc0/desc1 to the bottom of the top photo row and
+     desc2/desc3 to the bottom of the bottom photo row. */
+  grid-template-rows: 1fr 1fr;
+  grid-template-areas:
+    "desc0 desc1"
+    "desc2 desc3";
+}
+
+/* The slide chrome (map + clock + remix badge) is slide-level, not per-pane.
+   In the single-row layouts it stacks above/below the descriptions, but for
+   4-up it would otherwise claim grid rows (the map reserves height even when
+   toggled off), pulling the bottom captions up off the bottom photo row. Lift
+   it out of the grid flow and pin it to the bottom centre instead — the
+   per-column descriptions (offset to each half) clear the centred badge. */
+
+:where(.bottomBarStack[data-count="4"]) .slideMap,
+:where(.bottomBarStack[data-count="4"]) .slideClock {
+  position: absolute;
+  inset-inline: 0;
+  inset-block-end: 0;
+}
+
+/* Single-image detailsAlignment toggle — slides every grid item to the
+   start or end of its (single) column. No transforms involved: pure
+   grid alignment via justify-items on the container. Multi-photo remix
+   ignores data-align because per-column centring already gives each
+   description its own column. */
+
+.bottomBarStack[data-count="1"][data-align="left"] {
+  justify-items: start;
+}
+
+.bottomBarStack[data-count="1"][data-align="right"] {
+  justify-items: end;
+}
+
+/* No inner flex layout here — the grid cell already fixes width, and a
+   plain block context lets `.detailsRow { margin: ... auto }` and
+   `text-align: center` (inherited) do the horizontal centring. */
+
+.descriptionCell {
+  min-inline-size: 0;
+  max-inline-size: 100%;
+  padding: 0 var(--m-s);
+  box-sizing: border-box;
+  inline-size: 100%;
+}
+
+/* mix-blend-mode requires its own stacking context to blend with the
+   layers below — without `isolation: isolate` the blend either has no
+   effect or bleeds beyond the intended subject. */
+
+.slideMap {
+  isolation: isolate;
+  pointer-events: none;
+  inline-size: 100%;
+}
+
+.slideClock {
+  pointer-events: none;
+  inline-size: 100%;
+}
+
+/* The remix strategy badge inside .slideClock sits directly below the
+   description row above it; the default .detailsRow vertical margin
+   (var(--m-s) top + bottom) opens a gap that breaks the visual line-
+   height rhythm with the description rows. Tighten the top margin so
+   the badge feels like a continuation of the description block. */
+
+:where(.slideClock) .detailsAffinity {
+  margin-block-start: 0;
+}
+
+.displaySetting {
+  opacity: 0;
+  transform: translateY(var(--m-s));
+  transition:
+    opacity var(--t-medium) var(--ease-out),
+    transform var(--t-medium) var(--ease-out);
+  will-change: opacity, transform;
+  pointer-events: none;
+}
+
+.displaySettingActive {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.clock {
+  isolation: isolate;
+}
+
+.date {
+  font-size: var(--fs-m);
+}
+
+.time {
+  font-size: var(--fs-xl);
+}
+
+.details {
+  margin-block-start: var(--m-m);
+}
+
+.detailsRow {
+  /* Auto left/right margins horizontally centre the row inside its parent
+     even when the parent is wider than max-width (which happens in remix
+     column mode — each column can be wider than the var(--content-width-compact) cap). */
+  margin: var(--m-s) auto;
+  font-size: var(--fs-s);
+  max-inline-size: min(80dvw, var(--content-width-compact));
+  text-align: center;
+}
+
+/* Subtle annotation row — used for "this photo matched because…" style
+   metadata that's interesting context but not the primary detail. */
+
+.detailsAffinity {
+  font-size: var(--fs-xs);
+  opacity: 0.7;
+  letter-spacing: 0.02em;
+}
+
+/* Inline colour swatch shown next to the "sharing this colour" remix label,
+   so the matched dominant colour is visible at a glance rather than
+   buried in the photos themselves. Width matches the line height of the
+   adjacent text so it sits cleanly inline. */
+
+.remixSwatch {
+  display: inline-block;
+  inline-size: 0.85em;
+  block-size: 0.85em;
+  vertical-align: -0.1em;
+  border-radius: var(--radius-pill);
+  border: var(--size-1) solid color-mix(in oklch, var(--c-white) 50%, transparent);
+  box-shadow: 0 0 0 var(--size-1) color-mix(in oklch, var(--c-black) 40%, transparent);
+}
+
+.mapContainer {
+  filter: invert(1);
+  mix-blend-mode: screen;
+
+  border-radius: var(--radius-pill);
+  overflow: clip;
+  margin: var(--m-l) 0;
+  aspect-ratio: 1 / 1;
+}
+
+.slideMap .mapContainer {
+  inline-size: var(--size-200);
+  max-inline-size: 80dvw;
+  margin-inline: auto;
+}
+
+.mapContainer > * {
+  box-shadow:
+    var(--size-1) var(--size-2) var(--size-2) color-mix(in oklch, var(--c-black) 33.3%, transparent),
+    var(--size-2) var(--size-4) var(--size-4) color-mix(in oklch, var(--c-black) 33.3%, transparent),
+    var(--size-3) var(--size-6) var(--size-6) color-mix(in oklch, var(--c-black) 33.3%, transparent);
+}

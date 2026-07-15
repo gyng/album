@@ -1,0 +1,66 @@
+/* Styles owned by ExploreOverview. Shared layout remains in explore.module.css. */
+
+.header {
+  display: grid;
+  gap: var(--m-s);
+}
+
+.headerBody {
+  display: grid;
+  gap: var(--m-s);
+  max-inline-size: var(--content-width-overview);
+}
+
+.title {
+  margin: 0;
+}
+
+.overview {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(var(--overview-card-min-width), 1fr));
+  gap: var(--m-s);
+}
+
+.overviewCard {
+  min-block-size: calc(var(--size-112) + var(--size-0-5));
+}
+
+.overviewValue {
+  font-size: var(--fs-m);
+  color: var(--c-font);
+  line-height: 1.2;
+}
+
+.jumpNav {
+  position: sticky;
+  inset-block-start: 0;
+  z-index: var(--z-sticky);
+  display: grid;
+  gap: var(--m-s);
+  padding: var(--m-s) 0;
+  background: var(--c-bg);
+}
+
+.jumpNavLinks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--m-s);
+}
+
+.jumpNavLink {
+  min-block-size: var(--tap-target);
+  white-space: nowrap;
+}
+
+@media (max-width: 720px) {
+  .overview {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .jumpNavLinks {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overscroll-behavior-inline: contain;
+    padding-block-end: var(--size-3);
+  }
+}

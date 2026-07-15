@@ -67,6 +67,6 @@ describe("TimeOfDayChart", () => {
     fireEvent.mouseLeave(screen.getByRole("img", { name: "01:00 · 1 photos" }));
 
     const bars = container.querySelectorAll('[aria-hidden="true"]');
-    expect((bars[1] as HTMLElement).style.height).toBe("4%");
+    expect((bars[1] as HTMLElement).style.blockSize).toBe("4%");
   });
 });

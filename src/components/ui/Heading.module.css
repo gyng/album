@@ -1,5 +1,6 @@
 .heading {
   margin: 0;
+  text-wrap: balance;
 }
 
 .level1 {

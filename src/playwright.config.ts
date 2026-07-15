@@ -108,7 +108,7 @@ export default defineConfig({
   webServer: skipWebServer
     ? undefined
     : {
-        command: "npm start",
+        command: "NEXT_DIST_DIR=.next-e2e next start",
         url: baseURL,
         reuseExistingServer: false,
         timeout: 120 * 1000,

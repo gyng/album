@@ -286,7 +286,7 @@ describe("slideshow page", () => {
     });
 
     expect(screen.getByRole("img", { name: /DSCF0506/ }).getAttribute("src")).toBe(
-      "/data/albums/test-simple/.resized_images/DSCF0506.jpg@3200.avif",
+      "/data/albums/test-simple/.resized_images/DSCF0506.jpg%403200.avif",
     );
 
     const url = new URL(window.location.href);

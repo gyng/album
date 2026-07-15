@@ -1,0 +1,328 @@
+/* Styles owned by SearchFacetPanel. Shared layout remains in Search.module.css. */
+
+.facetPanel {
+  display: grid;
+  grid-template-columns: var(--facet-rail-width) minmax(0, 1fr);
+  gap: var(--m-l);
+  block-size: clamp(
+    calc(var(--size-180) + var(--size-10)),
+    23.5dvh,
+    calc(var(--size-220) + var(--size-24))
+  );
+  margin-block-end: var(--m-l);
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.facetPanelColorMode {
+  min-block-size: 0;
+}
+
+.facetCategoryRail {
+  display: grid;
+  align-content: start;
+  gap: var(--m-s);
+}
+
+.facetCategoryTab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  padding: var(--m-xs) var(--size-10);
+  border: solid var(--size-1) color-mix(in oklch, var(--c-bg-contrast-light) 25%, transparent);
+  border-radius: var(--m-s);
+  background: transparent;
+  color: var(--c-bg-contrast-light);
+  cursor: pointer;
+  text-align: start;
+  font-size: var(--fs-s);
+}
+
+.facetCategoryTab:hover {
+  background: color-mix(in oklch, var(--c-bg-contrast-light) 12%, transparent);
+  color: var(--c-font);
+}
+
+.facetCategoryTab:focus-visible {
+  outline: solid var(--size-2) var(--c-bg-contrast-light);
+  outline-offset: var(--size-2);
+}
+
+@media (hover: none), (pointer: coarse) {
+  .facetCategoryTab {
+    min-block-size: var(--tap-target);
+  }
+}
+
+.facetCategoryTabActive {
+  background: color-mix(in oklch, var(--c-bg-contrast-light) 18%, transparent);
+  color: var(--c-font);
+  border-color: var(--c-font);
+}
+
+.facetCategoryContent {
+  min-inline-size: 0;
+  min-block-size: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  display: grid;
+  align-content: start;
+  gap: var(--m-s);
+}
+
+/* A single fade for the whole panel, on whichever edge still has off-screen
+   pills (see SearchFacetPanel's scroll handler). Each edge's fade size is a
+   variable, defaulting to 0 so only the scrolled-past edges actually fade. The
+   mask is painted over the scrollport, so it stays put as the list scrolls. */
+
+.facetCategoryContentFade {
+  mask-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    var(--c-black) var(--facet-fade-top, 0),
+    var(--c-black) calc(100% - var(--facet-fade-bottom, 0)),
+    transparent 100%
+  );
+}
+
+.facetFadeAbove {
+  --facet-fade-top: var(--m-l);
+}
+
+.facetFadeBelow {
+  --facet-fade-bottom: var(--m-l);
+}
+
+.facetSection {
+  display: flex;
+  flex-direction: column;
+  gap: var(--m-s);
+}
+
+.facetSectionTitle {
+  margin: 0;
+  font-size: var(--fs-s);
+  font-weight: 400;
+  letter-spacing: 0.02em;
+  color: var(--c-bg-contrast-light);
+}
+
+.colorFacetSection {
+  min-block-size: 0;
+  align-items: flex-start;
+}
+
+.colorFacetControl {
+  display: grid;
+  grid-template-columns: var(--facet-picker-width) minmax(
+      var(--size-220),
+      var(--facet-meta-max-width)
+    );
+  gap: var(--m-m);
+  align-items: start;
+  justify-content: start;
+  max-inline-size: 100%;
+}
+
+.colorFacetPicker.colorFacetPicker {
+  inline-size: var(--facet-picker-width);
+  block-size: var(--facet-picker-height);
+}
+
+.colorFacetMeta {
+  display: grid;
+  gap: var(--m-m);
+  min-inline-size: 0;
+  inline-size: min(var(--facet-meta-max-width), 100%);
+  align-content: start;
+}
+
+.colorFacetHexLabel,
+.colorFacetRangeGroup {
+  display: grid;
+  gap: var(--m-s);
+}
+
+.colorFacetRangeLabel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--m-s);
+}
+
+.colorFacetHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--m);
+  margin-block-end: 0;
+}
+
+.colorFacetCurrent {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--m-s);
+  min-inline-size: 0;
+}
+
+.colorFacetCurrentSwatchButton {
+  position: relative;
+  display: inline-flex;
+  cursor: pointer;
+}
+
+.colorFacetCurrentSwatch {
+  inline-size: var(--size-18);
+  block-size: var(--size-18);
+  border-radius: var(--radius-pill);
+  border: solid var(--size-1) color-mix(in oklch, var(--c-bg) 55%, transparent);
+  flex: 0 0 auto;
+}
+
+/* The native colour input is opacity:0, so surface its keyboard focus on the
+   visible swatch. */
+
+.colorFacetCurrentSwatchButton:focus-within .colorFacetCurrentSwatch {
+  outline: solid var(--size-2) var(--c-bg-contrast-light);
+  outline-offset: var(--size-2);
+}
+
+.colorFacetNativeInput {
+  position: absolute;
+  inset: 0;
+  inline-size: 100%;
+  block-size: 100%;
+  opacity: 0;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.colorFacetCurrentHex {
+  font-family: monospace;
+  font-size: var(--fs-s);
+  color: var(--c-font);
+  letter-spacing: 0.04em;
+}
+
+.colorFacetHexInput {
+  inline-size: 100%;
+  min-block-size: var(--facet-input-min-height);
+  padding: 0 0 var(--m);
+  border: 0;
+  border-bottom: solid var(--size-1)
+    color-mix(in oklch, var(--c-bg-contrast-light) 35%, transparent);
+  border-radius: 0;
+  background: transparent;
+  color: inherit;
+  font-size: var(--fs-s);
+  font-family: monospace;
+}
+
+.colorFacetHexInput:focus-visible {
+  border-bottom-color: var(--c-font);
+}
+
+.colorFacetToleranceSlider {
+  inline-size: 100%;
+  margin: 0;
+  accent-color: var(--c-accent);
+}
+
+.colorFacetToleranceValue {
+  font-size: var(--fs-s);
+  color: var(--c-bg-contrast-light);
+  justify-self: start;
+  line-height: 1.2;
+  min-inline-size: 0;
+  padding: 0;
+  white-space: nowrap;
+}
+
+.colorFacetClearButton {
+  flex: 0 0 auto;
+  min-inline-size: var(--tap-target);
+  min-block-size: var(--tap-target);
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--c-bg-contrast-light);
+  font-size: var(--fs-s);
+  cursor: pointer;
+}
+
+@media (hover: none), (pointer: coarse) {
+  .colorFacetCurrentSwatchButton {
+    align-items: center;
+    justify-content: center;
+    min-inline-size: var(--tap-target);
+    min-block-size: var(--tap-target);
+  }
+}
+
+.colorFacetClearButton:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.colorFacetClearButton:not(:disabled):hover {
+  color: var(--c-font);
+}
+
+.colorFacetClearButton:focus-visible {
+  outline: solid var(--size-2) var(--c-bg-contrast-light);
+  outline-offset: var(--size-2);
+}
+
+@container (max-width: 900px) {
+  .facetPanel {
+    grid-template-columns: 1fr;
+    block-size: auto;
+  }
+
+  .facetPanelColorMode {
+    block-size: auto;
+  }
+
+  /* The rail stacks above the content, so the fixed desktop panel height no
+     longer bounds it. Cap the content itself instead — otherwise a long tag
+     list (hundreds of pills) grows to several screens tall and pushes the
+     results grid far below the fold. The existing overflow-y: auto then makes
+     it a self-contained scroll region. */
+  .facetCategoryContent {
+    max-block-size: clamp(
+      calc(var(--size-200) + var(--size-16)),
+      42dvh,
+      calc(var(--size-360) + var(--size-36))
+    );
+  }
+
+  .facetCategoryRail {
+    display: flex;
+    flex-wrap: wrap;
+  }
+
+  .colorFacetControl {
+    grid-template-columns: 1fr;
+    gap: var(--m);
+  }
+
+  .colorFacetMeta {
+    inline-size: 100%;
+  }
+
+  .colorFacetHeader {
+    gap: var(--m-s);
+  }
+}
+
+/* Muted status line used by the facet panel ("Loading filters…"). */
+
+.searchModeStatus {
+  margin-block-end: var(--m);
+  color: var(--c-bg-contrast-light);
+  font-size: var(--fs-s);
+}

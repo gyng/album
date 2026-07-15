@@ -7,6 +7,7 @@ import { GlobalNav } from "../../components/GlobalNav";
 import { GuessGame } from "../../components/guess/GuessGame";
 import { GameSettings } from "../../components/guess/guessTypes";
 import { Seo } from "../../components/Seo";
+import { Heading } from "../../components/ui";
 import styles from "./guess.module.css";
 
 type PageProps = {};
@@ -65,7 +66,9 @@ const GuessPage: NextPage<PageProps> = () => {
 
         {!database ? (
           <div className={styles.loading}>
-            <h1 className={styles.title}>Guess Where</h1>
+            <Heading level={1} as="h1" className={styles.title}>
+              Guess Where
+            </Heading>
             <p>Loading photo database&hellip;</p>
             <ProgressBar progress={progress} />
           </div>

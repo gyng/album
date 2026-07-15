@@ -1,0 +1,16 @@
+.key {
+  padding: 0 var(--m);
+  border: var(--line-hairline) solid
+    color-mix(in oklch, var(--c-bg-contrast-light) 40%, transparent);
+  border-radius: var(--m);
+  color: var(--c-bg-contrast-light);
+  font-family: inherit;
+  font-size: var(--fs-xs);
+  line-height: 1.4;
+}
+
+@media (max-width: 480px) {
+  .key {
+    display: none;
+  }
+}

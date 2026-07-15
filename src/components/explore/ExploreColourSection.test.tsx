@@ -56,6 +56,7 @@ describe("ExploreColourSection", () => {
       screen.getByRole("heading", { name: "Representative colour looks" }),
     ).toBeInTheDocument();
     expect(screen.getAllByRole("img", { name: /Blue example/ })).toHaveLength(6);
+    expect(screen.getByRole("img", { name: "Blue example 0" })).toHaveAttribute("loading", "lazy");
     expect(screen.queryByRole("img", { name: "Blue example 6" })).toBeNull();
     expect(screen.getByRole("img", { name: "Unknown look" })).toBeInTheDocument();
     const searchLinks = screen.getAllByRole("link", { name: "Search" });
@@ -125,12 +126,13 @@ describe("ExploreColourSection", () => {
       "href",
       "/search?color=93%2C132%2C214&facet=year%3A2024",
     );
+    expect(document.querySelector('img[alt="Blue harbour"]')).toHaveAttribute("loading", "lazy");
     expect(screen.getByTitle("Unknown around 2024: 1 photos (10%)")).toHaveAttribute(
       "href",
       "/search",
     );
     expect(screen.getByTitle("Red around 2023: 0 photos (0%)")).toHaveStyle({
-      width: "max(3px, 100%)",
+      inlineSize: "max(3px, 100%)",
     });
     expect(screen.getByText("—")).toBeInTheDocument();
     expect(
@@ -140,7 +142,7 @@ describe("ExploreColourSection", () => {
       screen.getByText("Unknown", { selector: ".colorTimeSummary span:last-child" })
         .previousElementSibling,
     ).toHaveStyle({
-      backgroundColor: "rgb(153, 153, 153)",
+      backgroundColor: "var(--c-bg-contrast-light)",
     });
   });
 });

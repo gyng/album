@@ -1,20 +1,25 @@
 .page {
-  min-height: 100vh;
+  min-block-size: 100dvh;
 }
 
 .main {
-  max-width: 960px;
+  max-inline-size: var(--content-width-wide);
   margin: 0 auto;
   padding: var(--m-xl);
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--m-2xl);
+}
+
+.main > * {
+  min-inline-size: 0;
 }
 
 .intro {
   margin: 0;
   color: var(--c-bg-contrast-light);
   font-size: var(--fs-sm);
-  max-width: 42rem;
+  max-inline-size: var(--content-width-medium);
   line-height: 1.55;
 }
 
@@ -26,8 +31,8 @@
 .sectionHeader {
   display: grid;
   gap: var(--m-s);
-  padding-bottom: var(--m-s);
-  border-bottom: 1px solid var(--c-bg-contrast-dark);
+  padding-block-end: var(--m-s);
+  border-bottom: var(--line-hairline) solid var(--c-bg-contrast-dark);
 }
 
 .subsection {
@@ -69,9 +74,9 @@
 }
 
 .spacingBox {
-  background: color-mix(in srgb, var(--c-accent) 24%, var(--c-bg));
-  border: 1px solid color-mix(in srgb, var(--c-accent) 45%, transparent);
-  border-radius: 2px;
+  background: color-mix(in oklch, var(--c-accent) 24%, var(--c-bg));
+  border: var(--line-hairline) solid color-mix(in oklch, var(--c-accent) 45%, transparent);
+  border-radius: calc(var(--line-hairline) * 2);
 }
 
 .spacingLabel {
@@ -96,13 +101,13 @@
   font-size: var(--fs-xs);
   color: var(--c-bg-contrast-light);
   font-family: monospace;
-  min-width: 7rem;
+  min-inline-size: calc(var(--size-120) + var(--m-xs));
   flex-shrink: 0;
 }
 
 .colourGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(var(--size-120), 1fr));
   gap: var(--m-s);
 }
 
@@ -117,7 +122,8 @@
    through, while opaque tokens cover it entirely. */
 .colourBoxBacking {
   border-radius: var(--m);
-  border: 1px solid color-mix(in srgb, var(--c-bg-contrast-light) 25%, transparent);
+  border: var(--line-hairline) solid
+    color-mix(in oklch, var(--c-bg-contrast-light) 25%, transparent);
   overflow: clip;
   background-color: var(--c-bg);
   background-image:
@@ -134,13 +140,48 @@
 }
 
 .colourBox {
-  height: 48px;
+  block-size: var(--size-48);
 }
 
 .colourLabel {
   font-size: var(--fs-xs);
   color: var(--c-bg-contrast-light);
   font-family: monospace;
+}
+
+.motionGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(calc(var(--size-200) + var(--size-16)), 1fr));
+  gap: var(--m-s);
+}
+
+.motionToken {
+  display: grid;
+  grid-template-columns: var(--m-l) 1fr;
+  align-items: center;
+  gap: var(--m-s);
+  padding: var(--m-m);
+  border: var(--line-hairline) solid var(--c-bg-contrast-dark);
+  border-radius: var(--m-s);
+  font-size: var(--fs-s);
+}
+
+.motionToken code {
+  grid-column: 2;
+}
+
+.motionDot {
+  inline-size: var(--m-m);
+  block-size: var(--m-m);
+  border-radius: var(--radius-pill);
+  background: var(--c-accent);
+  animation: motionPreview var(--t-slow) var(--ease-spring) infinite alternate;
+}
+
+@keyframes motionPreview {
+  to {
+    transform: translateX(var(--m-s));
+  }
 }
 
 /* Component preview areas */
@@ -160,15 +201,15 @@
   position: relative;
   display: flex;
   align-items: flex-end;
-  gap: 1px;
-  height: 80px;
-  padding-top: var(--m-xl);
+  gap: var(--size-1);
+  block-size: var(--size-80);
+  padding-block-start: var(--m-xl);
 }
 
 .tooltipBar {
-  width: 32px;
+  inline-size: var(--size-32);
   background: var(--c-accent);
-  border-radius: 2px 2px 0 0;
+  border-radius: var(--size-2) var(--size-2) 0 0;
   position: relative;
 }
 
@@ -178,13 +219,17 @@
 
 .cardGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(var(--size-200), 1fr));
   gap: var(--m-s);
+}
+
+.cardMetric {
+  font-size: var(--fs-m);
 }
 
 .inputGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(var(--design-input-min-width), 1fr));
   gap: var(--m-m);
   align-items: start;
 }
@@ -200,9 +245,11 @@
   color: var(--c-bg-contrast-light);
   padding: var(--m) var(--m-s);
   border-radius: var(--m);
-  background: color-mix(in srgb, var(--c-bg) 94%, var(--c-bg-contrast-dark));
-  border: 1px solid color-mix(in srgb, var(--c-bg-contrast-dark) 60%, transparent);
-  width: fit-content;
+  background: color-mix(in oklch, var(--c-bg) 94%, var(--c-bg-contrast-dark));
+  border: var(--line-hairline) solid color-mix(in oklch, var(--c-bg-contrast-dark) 60%, transparent);
+  inline-size: fit-content;
+  max-inline-size: 100%;
+  overflow-x: auto;
 }
 
 .jumpNav {
@@ -212,16 +259,22 @@
 }
 
 .stackDemoBar {
-  height: var(--m-s);
-  width: 80px;
-  border-radius: 2px;
-  background: color-mix(in srgb, var(--c-accent) 24%, var(--c-bg));
-  border: 1px solid color-mix(in srgb, var(--c-accent) 45%, transparent);
+  block-size: var(--m-s);
+  inline-size: var(--size-80);
+  border-radius: calc(var(--line-hairline) * 2);
+  background: color-mix(in oklch, var(--c-accent) 24%, var(--c-bg));
+  border: var(--line-hairline) solid color-mix(in oklch, var(--c-accent) 45%, transparent);
 }
 
 @media (max-width: 720px) {
   .main {
     padding: var(--m-l);
+  }
+
+  .spacingScale {
+    overflow-x: auto;
+    overscroll-behavior-inline: contain;
+    padding-block-end: var(--m);
   }
 
   .fontSample {

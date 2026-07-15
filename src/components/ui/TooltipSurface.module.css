@@ -1,0 +1,10 @@
+.surface {
+  padding: var(--m) var(--m-xs);
+  border: var(--line-hairline) solid color-mix(in oklch, var(--c-accent) 60%, var(--c-font));
+  border-radius: var(--radius-pill);
+  background: color-mix(in oklch, var(--c-bg) 88%, var(--c-accent));
+  color: color-mix(in oklch, var(--c-font) 92%, var(--c-bg));
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  line-height: 1.25;
+}

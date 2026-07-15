@@ -1,0 +1,253 @@
+/* Styles owned by SimilarTrailBar. Shared layout remains in Search.module.css. */
+
+/* Muted status line used by the facet panel ("Loading filters…"). */
+
+.modeBar {
+  display: flex;
+  flex-direction: column;
+  gap: var(--m-s);
+  align-items: flex-start;
+  margin-block-end: var(--m-l);
+}
+
+.modeBarHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--m);
+  flex-wrap: wrap;
+  inline-size: 100%;
+}
+
+.modeHeading {
+  display: flex;
+  align-items: baseline;
+  gap: var(--m-s);
+  min-inline-size: 0;
+}
+
+.modeHeaderActions {
+  display: flex;
+  align-items: center;
+  gap: var(--m-s);
+  flex-wrap: wrap;
+}
+
+.modeStack {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: var(--m);
+  min-inline-size: 0;
+  flex: 1 1 auto;
+  inline-size: 100%;
+}
+
+.breadcrumbs {
+  display: flex;
+  align-items: center;
+  gap: var(--m-xs);
+  flex-wrap: nowrap;
+  flex: 1 1 auto;
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-inline: contain;
+  padding-block-end: var(--size-2);
+  white-space: nowrap;
+}
+
+.breadcrumbItem {
+  position: relative;
+  display: inline-flex;
+  flex: 0 0 auto;
+  transition:
+    transform var(--t-base) var(--ease-out),
+    opacity var(--t-theme) var(--ease-out);
+  will-change: transform;
+}
+
+.breadcrumbButton {
+  display: inline-flex;
+  appearance: none;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  padding: 0;
+  flex: 0 0 auto;
+  text-decoration: none;
+  position: relative;
+}
+
+.breadcrumbPreview {
+  inline-size: var(--size-56);
+  block-size: var(--size-56);
+  border-radius: var(--m-s);
+  object-fit: cover;
+  object-position: center;
+  background: var(--c-bg-contrast-dark);
+  flex: 0 0 auto;
+}
+
+.breadcrumbItem:hover:not(.breadcrumbItemWillRemove) {
+  opacity: 1;
+}
+
+.breadcrumbItemWillRemove {
+  opacity: 0.15;
+}
+
+.breadcrumbButton:focus-visible {
+  outline: solid var(--size-2) var(--c-bg-contrast-light);
+  border-radius: var(--m-s);
+}
+
+/* Smaller-size variant of the shared overlay badge
+   (SearchResultTile.module.css .overlayBadge). */
+
+.breadcrumbSimilarity {
+  position: absolute;
+  inset-inline-start: var(--m);
+  inset-block-end: var(--m);
+  border-radius: var(--radius-pill);
+  background-color: var(--c-overlay-dark);
+  color: var(--c-white);
+  font-size: var(--fs-xs);
+  line-height: 1;
+  padding: var(--m) var(--m-xs);
+  pointer-events: none;
+}
+
+.breadcrumbRemoveButton {
+  position: absolute;
+  inset-block-start: var(--m);
+  inset-inline-end: var(--m);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: var(--size-18);
+  block-size: var(--size-18);
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--c-overlay-dark);
+  color: var(--c-white);
+  cursor: pointer;
+  font-size: var(--fs-sm);
+  line-height: 1;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--t-fast) var(--ease-out);
+}
+
+.breadcrumbItem:hover .breadcrumbRemoveButton,
+.breadcrumbItem:focus-within .breadcrumbRemoveButton {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+@media (hover: none), (pointer: coarse) {
+  .breadcrumbRemoveButton,
+  .modeSourceItem .breadcrumbRemoveButton,
+  .modeSourceSlideshowButton {
+    opacity: 1;
+    pointer-events: auto;
+    inline-size: var(--tap-target);
+    block-size: var(--tap-target);
+  }
+}
+
+.modeSourceItem {
+  position: relative;
+  display: inline-flex;
+  flex: 0 0 auto;
+}
+
+.modeSourceItem:hover .breadcrumbRemoveButton,
+.modeSourceItem:focus-within .breadcrumbRemoveButton,
+.modeSourceItem:hover .modeSourceSlideshowButton,
+.modeSourceItem:focus-within .modeSourceSlideshowButton {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.modeSourceSlideshowButton {
+  position: absolute;
+  inset-block-end: var(--m);
+  inset-inline-start: var(--m);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: var(--trail-action-size);
+  block-size: var(--trail-action-size);
+  border-radius: var(--radius-pill);
+  background: var(--c-overlay-dark);
+  font-size: var(--fs-sm);
+  line-height: 1;
+  text-decoration: none;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--t-fast) var(--ease-out);
+}
+
+.modeSourceSlideshowButton:focus-visible {
+  outline: solid var(--size-2) var(--c-bg-contrast-light);
+}
+
+.breadcrumbRemoveButton:focus-visible {
+  outline: solid var(--size-2) var(--c-bg-contrast-light);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .breadcrumbItem {
+    transition: opacity var(--t-theme) var(--ease-out);
+  }
+
+  .modeSource {
+    transition: none;
+  }
+}
+
+.modeSource {
+  display: flex;
+  gap: var(--m);
+  align-items: center;
+  min-inline-size: 0;
+  flex: 0 0 auto;
+  transition:
+    transform var(--t-base) var(--ease-out),
+    opacity var(--t-base) var(--ease-out);
+}
+
+.modeSourcePreview {
+  inline-size: var(--size-56);
+  block-size: var(--size-56);
+  border-radius: var(--m-s);
+  object-fit: cover;
+  object-position: center;
+  background: var(--c-bg-contrast-dark);
+}
+
+.modeArrow {
+  color: var(--c-bg-contrast-light);
+  font-size: var(--fs-l);
+  line-height: 1;
+}
+
+.modeLabel {
+  font-size: var(--fs-s);
+  color: var(--c-bg-contrast-light);
+  white-space: nowrap;
+  flex-shrink: 0;
+  user-select: none;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.modeSimilarFilename {
+  font-size: var(--fs-s);
+  color: var(--c-font);
+  min-inline-size: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1 1 auto;
+}

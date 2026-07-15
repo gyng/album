@@ -4,6 +4,9 @@
 
 export {};
 
+const { unpackTimelineEntry } =
+  require("../../../util/pageDataRows") as typeof import("../../../util/pageDataRows");
+
 const getAlbums = jest.fn();
 
 jest.mock("../../../services/album", () => ({
@@ -94,40 +97,37 @@ describe("timeline page data fetching", () => {
 
     const actual = await getTimelinePageStaticProps({});
 
-    expect(actual).toEqual({
-      props: {
-        entries: [
-          {
-            album: "tokyo",
-            date: "2024-03-05",
-            dateTimeOriginal: "2024-03-05T11:22:33",
-            decLat: null,
-            decLng: null,
-            href: "/album/tokyo#b.jpg",
-            path: "b.jpg",
-            geocode: null,
-            placeholderColor: "rgba(4, 5, 6, 1)",
-            placeholderHeight: 480,
-            placeholderWidth: 640,
-            src: { src: "/b@800.avif", width: 640, height: 480 },
-          },
-          {
-            album: "kansai",
-            date: "2024-01-02",
-            dateTimeOriginal: "2024-01-02T03:04:05",
-            decLat: 35.6,
-            decLng: 139.7,
-            href: "/album/kansai#a.jpg",
-            path: "a.jpg",
-            geocode: null,
-            placeholderColor: "rgba(1, 2, 3, 1)",
-            placeholderHeight: 200,
-            placeholderWidth: 300,
-            src: { src: "/a@800.avif", width: 300, height: 200 },
-          },
-        ],
+    expect(actual.props.entryRows.every((row: unknown) => Array.isArray(row))).toBe(true);
+    expect(actual.props.entryRows.map(unpackTimelineEntry)).toEqual([
+      {
+        album: "tokyo",
+        date: "2024-03-05",
+        dateTimeOriginal: "2024-03-05T11:22:33",
+        decLat: null,
+        decLng: null,
+        href: "/album/tokyo#b.jpg",
+        path: "b.jpg",
+        geocode: null,
+        placeholderColor: "rgba(4, 5, 6, 1)",
+        placeholderHeight: 480,
+        placeholderWidth: 640,
+        src: { src: "/b@800.avif", width: 640, height: 480 },
       },
-    });
+      {
+        album: "kansai",
+        date: "2024-01-02",
+        dateTimeOriginal: "2024-01-02T03:04:05",
+        decLat: 35.6,
+        decLng: 139.7,
+        href: "/album/kansai#a.jpg",
+        path: "a.jpg",
+        geocode: null,
+        placeholderColor: "rgba(1, 2, 3, 1)",
+        placeholderHeight: 200,
+        placeholderWidth: 300,
+        src: { src: "/a@800.avif", width: 300, height: 200 },
+      },
+    ]);
   });
 
   it("skips unusable dated photos and deterministically sorts equal dates", async () => {
@@ -171,17 +171,18 @@ describe("timeline page data fetching", () => {
     ]);
 
     const result = await getTimelinePageStaticProps({});
-    expect(result.props.entries.map((entry: { path: string }) => entry.path)).toEqual([
+    const entries = result.props.entryRows.map(unpackTimelineEntry);
+    expect(entries.map((entry: { path: string }) => entry.path)).toEqual([
       "nested/a.jpg",
       "nested/b.jpg",
       "nested/gps-one.jpg",
       "nested/gps-three.jpg",
       "nested/gps-two.jpg",
     ]);
-    expect(result.props.entries[0]).toMatchObject({
+    expect(entries[0]).toMatchObject({
       placeholderColor: "transparent",
       geocode: null,
     });
-    expect(result.props.entries[1]).toMatchObject({ geocode: "Somewhere" });
+    expect(entries[1]).toMatchObject({ geocode: "Somewhere" });
   });
 });

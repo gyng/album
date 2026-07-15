@@ -3,12 +3,12 @@
 }
 
 .link {
-  text-decoration: none !important;
+  text-decoration: none;
 }
 
 .result {
-  width: 150px;
-  overflow: hidden;
+  inline-size: var(--size-150);
+  overflow: clip;
   font-size: var(--fs-s);
 }
 
@@ -17,7 +17,7 @@
 }
 
 .resultPicture {
-  margin-bottom: var(--m);
+  margin-block-end: var(--m);
   object-position: center;
   display: grid;
 }
@@ -27,7 +27,7 @@
 }
 
 .details {
-  width: 100%;
+  inline-size: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
 }
@@ -40,16 +40,16 @@
 }
 
 .sourceText {
-  min-width: 0;
+  min-inline-size: 0;
 }
 
 /* Shared dark-glass pill used for the similarity/colour-match score badge.
    The breadcrumb similarity badge (Search.module.css .breadcrumbSimilarity)
    uses the same recipe at a smaller size. */
 .overlayBadge {
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background-color: var(--c-overlay-dark);
-  color: white;
+  color: var(--c-white);
   font-size: var(--fs-s);
   line-height: 1;
   padding: var(--m-xs) var(--m-s);
@@ -57,22 +57,22 @@
 
 .similarityBadge {
   position: absolute;
-  bottom: calc(var(--m) + var(--m-l));
-  left: var(--m);
-  z-index: 1;
+  inset-block-end: calc(var(--m) + var(--m-l));
+  inset-inline-start: var(--m);
+  z-index: var(--z-raised);
 }
 
 .actionButtons {
   position: absolute;
-  bottom: calc(var(--m) + var(--m-l));
-  right: var(--m);
-  z-index: 1;
+  inset-block-end: calc(var(--m) + var(--m-l));
+  inset-inline-end: var(--m);
+  z-index: var(--z-raised);
   display: flex;
   align-items: center;
   gap: var(--m-xs);
   opacity: 0;
   pointer-events: none;
-  transition: opacity var(--t-fast) ease;
+  transition: opacity var(--t-fast) var(--ease-out);
 }
 
 .card:hover .actionButtons,
@@ -97,8 +97,8 @@
 }
 
 .actionColorSwatch {
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  border: solid 2px var(--c-border-on-dark);
+  inline-size: var(--size-14);
+  block-size: var(--size-14);
+  border-radius: var(--radius-pill);
+  border: solid var(--size-2) var(--c-border-on-dark);
 }

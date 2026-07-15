@@ -59,6 +59,7 @@ jest.mock("../../../util/dms2deg", () => ({
 }));
 
 import WorldMap, { getStaticProps } from "../../../pages/map";
+import { unpackMapWorldEntry } from "../../../util/pageDataRows";
 
 const { getAlbums } = jest.requireMock("../../../services/album") as { getAlbums: jest.Mock };
 
@@ -241,25 +242,22 @@ describe("map page boundaries", () => {
       },
     ]);
 
-    await expect(getStaticProps({} as never)).resolves.toEqual({
-      props: {
-        photos: [
-          expect.objectContaining({
-            album: "trip",
-            src: { src: "/colour.jpg", width: 10, height: 10 },
-            date: "2024-01-01",
-            placeholderColor: "rgba(1, 2, 3, 1)",
-            placeholderHeight: 10,
-            placeholderWidth: 20,
-          }),
-          expect.objectContaining({
-            album: "trip",
-            src: undefined,
-            date: null,
-            placeholderColor: "transparent",
-          }),
-        ],
-      },
-    });
+    const result = await getStaticProps({} as never);
+    const photoRows = (
+      result as { props: { photoRows: Parameters<typeof unpackMapWorldEntry>[0][] } }
+    ).props.photoRows;
+
+    expect(photoRows).toHaveLength(1);
+    expect(Array.isArray(photoRows[0])).toBe(true);
+    expect(unpackMapWorldEntry(photoRows[0]!)).toEqual(
+      expect.objectContaining({
+        album: "trip",
+        src: { src: "/colour.jpg", width: 10, height: 10 },
+        date: "2024-01-01",
+        placeholderColor: "rgba(1, 2, 3, 1)",
+        placeholderHeight: 10,
+        placeholderWidth: 10,
+      }),
+    );
   });
 });

@@ -1,28 +1,77 @@
 .themeToggle {
   display: inline-block;
-  background: var(--c-bg);
-  border: solid 2px var(--c-bg-contrast-light);
-  border-radius: var(--m-s);
-  /* optically align text */
-  line-height: 0;
-  overflow: clip;
 }
 
-.themeToggle button {
-  background: none;
-  border: none;
-  cursor: pointer;
-  padding: var(--m-m);
-  user-select: none;
-  height: 100%;
+/* Scheme islands for the light/dark options: light-dark() tokens inside the
+   swatch resolve against the option's own colour scheme, not the page's. */
+.optionLight {
+  color-scheme: light;
 }
 
-.themeToggle button:hover {
-  background-color: color-mix(in srgb, var(--c-bg-contrast-light) 25%, transparent);
+.optionDark {
+  color-scheme: dark;
 }
 
-/* Negative offset so the ring survives the wrapper's overflow: clip. */
-.themeToggle button:focus-visible {
-  outline: solid 2px var(--c-bg-contrast-light);
-  outline-offset: -2px;
+/* Swatch previews in the dropdown via the customizable-select API. Progressive:
+   browsers without ::picker support keep the native text-only menu. */
+@supports selector(::picker(select)) {
+  .picker,
+  .picker::picker(select) {
+    appearance: base-select;
+  }
+
+  .picker::picker(select) {
+    padding: var(--m);
+    border: var(--popup-border);
+    border-radius: var(--popup-radius);
+    background: var(--c-bg);
+    color: var(--c-font);
+    box-shadow: var(--popup-shadow);
+  }
+
+  /* Select.module.css already draws the dropdown arrow; drop base-select's. */
+  .picker::picker-icon {
+    display: none;
+  }
+
+  .picker option {
+    display: flex;
+    align-items: center;
+    gap: var(--m-s);
+    padding: var(--m-s) var(--m-m);
+    border-radius: var(--m);
+    font-size: var(--fs-sm);
+  }
+
+  .picker option:hover,
+  .picker option:focus-visible {
+    background: color-mix(in oklch, var(--c-bg-contrast-light) 18%, transparent);
+  }
+
+  .picker option:checked {
+    background: color-mix(in oklch, var(--c-accent) 14%, transparent);
+  }
+
+  /* Selection is shown by the row highlight; the default tick would sit
+     beside the swatch and read as clutter. */
+  .picker option::checkmark {
+    display: none;
+  }
+
+  /* The swatch: each option scopes its own theme's tokens (via its theme-*
+     class or scheme island above), so bg and accent are that theme's own. */
+  .picker option::before {
+    content: "";
+    flex: none;
+    inline-size: var(--size-16);
+    block-size: var(--size-16);
+    border: solid var(--line-hairline) color-mix(in oklch, var(--c-font) 35%, transparent);
+    border-radius: var(--m);
+    background: radial-gradient(circle, var(--c-accent) 0 34%, transparent 35%), var(--c-bg);
+  }
+
+  /* System follows the OS, so its swatch is the light/dark split itself. */
+  .picker .optionSystem::before {
+    background: linear-gradient(135deg, var(--c-white) 0 50%, var(--c-black) 50%);
+  }
 }

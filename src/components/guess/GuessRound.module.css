@@ -6,9 +6,9 @@
   grid-template-rows: auto minmax(0, 1fr);
   gap: var(--m-s);
   flex: 1;
-  min-height: 0;
-  overflow: hidden;
-  animation: roundEnter 0.35s ease-out;
+  min-block-size: 0;
+  overflow: clip;
+  animation: roundEnter var(--t-slow) var(--ease-out);
 }
 
 @keyframes roundEnter {
@@ -35,13 +35,13 @@
 }
 
 .dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background-color: color-mix(in srgb, var(--c-bg-contrast-light) 30%, transparent);
+  inline-size: var(--m-s);
+  block-size: var(--m-s);
+  border-radius: var(--radius-pill);
+  background-color: color-mix(in oklch, var(--c-bg-contrast-light) 30%, transparent);
   transition:
-    background-color 0.3s,
-    transform 0.3s;
+    background-color var(--t-deliberate),
+    transform var(--t-deliberate);
 }
 
 .dotDone {
@@ -51,7 +51,7 @@
 .dotCurrent {
   background-color: var(--c-font);
   transform: scale(1.3);
-  animation: dotPulse 1.8s ease-in-out infinite;
+  animation: dotPulse var(--t-pulse-slow) var(--ease-in-out) infinite;
 }
 
 @keyframes dotPulse {
@@ -75,7 +75,7 @@
 }
 
 .cumulativeScoreBump {
-  animation: scoreBump 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+  animation: scoreBump var(--t-enter) var(--ease-bounce);
 }
 
 @keyframes scoreBump {
@@ -91,23 +91,12 @@
 }
 
 .abortButton {
-  appearance: none;
-  border: none;
-  background: none;
-  color: var(--c-bg-contrast-light);
-  font-size: var(--fs-sm);
-  cursor: pointer;
-  padding: var(--m) var(--m-s);
-  line-height: 1;
-  border-radius: var(--m);
-  transition:
-    color var(--t-fast),
-    background-color var(--t-fast);
+  margin-inline-start: auto;
 }
 
 .abortButton:hover {
   color: var(--c-font);
-  background-color: color-mix(in srgb, var(--c-bg-contrast-light) 15%, transparent);
+  background-color: color-mix(in oklch, var(--c-bg-contrast-light) 15%, transparent);
 }
 
 /* Photo + Map side by side */
@@ -115,14 +104,14 @@
   display: grid;
   grid-template-columns: 3fr 2fr;
   gap: var(--m-m);
-  min-height: 0;
+  min-block-size: 0;
 }
 
-@media (max-width: 768px) {
+@media (max-width: 720px) {
   .gameArea {
     grid-template-columns: 1fr;
     grid-template-rows: 2fr minmax(0, 3fr);
-    min-height: 0;
+    min-block-size: 0;
   }
 }
 
@@ -135,20 +124,20 @@
 /* Photo panel — zoomable, crossfade on new round */
 .photoPanel {
   position: relative;
-  overflow: hidden;
+  overflow: clip;
   border-radius: var(--m-s);
   background-color: var(--c-bg-contrast-dark);
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 0;
+  min-block-size: 0;
   cursor: zoom-in;
   touch-action: none;
 }
 
 .photoPanel:focus-visible {
-  outline: solid 2px var(--c-bg-contrast-light);
-  outline-offset: 2px;
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-offset);
 }
 
 .photoZoomed {
@@ -166,11 +155,11 @@
   background: linear-gradient(
     100deg,
     var(--c-bg-contrast-dark) 30%,
-    color-mix(in srgb, var(--c-bg-contrast-light) 12%, var(--c-bg-contrast-dark)) 50%,
+    color-mix(in oklch, var(--c-bg-contrast-light) 12%, var(--c-bg-contrast-dark)) 50%,
     var(--c-bg-contrast-dark) 70%
   );
   background-size: 200% 100%;
-  animation: photoLoadingShimmer 1.2s ease-in-out infinite;
+  animation: photoLoadingShimmer var(--t-loop-fast) var(--ease-in-out) infinite;
 }
 
 @keyframes photoLoadingShimmer {
@@ -183,20 +172,20 @@
 }
 
 .photo {
-  width: 100%;
-  height: 100%;
+  inline-size: 100%;
+  block-size: 100%;
   object-fit: contain;
   user-select: none;
   transform-origin: center center;
   will-change: transform;
-  transition: transform 0.1s ease-out;
-  animation: photoCrossfade 0.4s ease-out;
+  transition: transform var(--t-instant) var(--ease-out);
+  animation: photoCrossfade var(--t-enter) var(--ease-out);
 }
 
 @keyframes photoCrossfade {
   from {
     opacity: 0;
-    filter: blur(6px);
+    filter: blur(var(--size-6));
   }
   to {
     opacity: 1;
@@ -206,11 +195,11 @@
 
 .zoomHint {
   position: absolute;
-  top: var(--m-m);
-  right: var(--m-m);
+  inset-block-start: var(--m-m);
+  inset-inline-end: var(--m-m);
   background-color: var(--c-overlay-dark);
-  color: #fff;
-  padding: 2px var(--m-s);
+  color: var(--c-on-dark);
+  padding: calc(var(--line-hairline) * 2) var(--m-s);
   border-radius: var(--m);
   font-size: var(--fs-xs);
   pointer-events: none;
@@ -223,17 +212,17 @@
    from the right edge. */
 .timerBar {
   position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 3px;
+  inset-block-start: 0;
+  inset-inline-start: 0;
+  inline-size: 100%;
+  block-size: calc(var(--line-hairline) * 3);
   background-color: var(--c-success);
   transform-origin: left;
   transition-property: transform, background-color;
-  transition-duration: 1s, var(--t-base);
-  transition-timing-function: linear, ease;
+  transition-duration: calc(var(--t-emphasis) * 2), var(--t-base);
+  transition-timing-function: linear, var(--ease-out);
   pointer-events: none;
-  z-index: 1;
+  z-index: var(--z-raised);
 }
 
 .timerBar[data-warning] {
@@ -242,18 +231,21 @@
 
 .timerBar[data-urgent] {
   background-color: var(--c-danger);
-  height: 4px;
-  box-shadow: 0 0 8px 1px rgba(239, 68, 68, 0.5);
-  animation: timerPulse 0.5s ease-in-out infinite;
+  block-size: var(--m);
+  box-shadow: 0 0 var(--m-s) var(--line-hairline)
+    color-mix(in oklch, var(--c-danger) 50%, transparent);
+  animation: timerPulse var(--t-emphasis) var(--ease-in-out) infinite;
 }
 
 @keyframes timerPulse {
   0%,
   100% {
-    box-shadow: 0 0 8px 1px rgba(239, 68, 68, 0.5);
+    box-shadow: 0 0 var(--m-s) var(--line-hairline)
+      color-mix(in oklch, var(--c-danger) 50%, transparent);
   }
   50% {
-    box-shadow: 0 0 14px 3px rgba(239, 68, 68, 0.7);
+    box-shadow: 0 0 var(--fs-sm) calc(var(--line-hairline) * 3)
+      color-mix(in oklch, var(--c-danger) 70%, transparent);
   }
 }
 
@@ -262,14 +254,14 @@
   display: flex;
   flex-direction: column;
   gap: var(--m-s);
-  min-height: 0;
-  overflow: hidden;
+  min-block-size: 0;
+  overflow: clip;
 }
 
 .mapPlaceholder {
-  width: 100%;
+  inline-size: 100%;
   flex: 1;
-  min-height: 0;
+  min-block-size: 0;
   background-color: var(--c-bg-contrast-dark);
   border-radius: var(--m-s);
 }
@@ -280,31 +272,17 @@
   gap: var(--m-s);
   align-items: center;
   flex-shrink: 0;
-  min-height: 44px;
+  min-block-size: var(--tap-target);
 }
 
 .confirmButton,
 .nextButton {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--m-s);
-  border: solid 2px var(--c-bg-contrast-light);
-  border-radius: var(--m-s);
-  padding: var(--m-s) var(--m-l);
-  cursor: pointer;
-  background-color: var(--c-bg);
-  font-size: var(--fs-sm);
-  color: var(--c-font);
-  transition:
-    background-color var(--t-fast),
-    border-color var(--t-base),
-    box-shadow var(--t-base),
-    transform 0.1s;
+  transition-duration: var(--t-fast), var(--t-base), var(--t-base), var(--t-fast);
 }
 
 /* Confirm pinned to the right of the controls row; skip stays at flex-start. */
 .confirmButton {
-  margin-left: auto;
+  margin-inline-start: auto;
 }
 
 .confirmButton:hover:not(:disabled),
@@ -317,23 +295,10 @@
   transform: scale(0.96);
 }
 
-.confirmButton:focus-visible,
-.nextButton:focus-visible,
-.skipButton:focus-visible,
-.abortButton:focus-visible {
-  outline: solid 2px var(--c-bg-contrast-light);
-  outline-offset: 2px;
-}
-
-.confirmButton:disabled {
-  opacity: 0.35;
-  cursor: not-allowed;
-}
-
 /* Pulse glow when a guess is placed and confirm is ready */
 .confirmReady {
   border-color: var(--c-accent);
-  animation: confirmPulse 1.5s ease-in-out infinite;
+  animation: confirmPulse var(--t-pulse) var(--ease-in-out) infinite;
 }
 
 @keyframes confirmPulse {
@@ -342,40 +307,16 @@
     box-shadow: 0 0 0 0 transparent;
   }
   50% {
-    box-shadow: 0 0 0 4px color-mix(in srgb, var(--c-accent) 25%, transparent);
+    box-shadow: 0 0 0 var(--m) color-mix(in oklch, var(--c-accent) 25%, transparent);
   }
 }
 
 .nextButton {
-  animation: slideUp 0.25s ease-out;
-}
-
-.kbd {
-  font-family: inherit;
-  font-size: var(--fs-xs);
-  color: var(--c-bg-contrast-light);
-  border: 1px solid color-mix(in srgb, var(--c-bg-contrast-light) 40%, transparent);
-  border-radius: 3px;
-  padding: 1px 4px;
-  line-height: 1;
-}
-
-@media (max-width: 480px) {
-  .kbd {
-    display: none;
-  }
+  animation: slideUp var(--t-medium) var(--ease-out);
 }
 
 .skipButton {
-  border: none;
-  background: none;
-  color: var(--c-bg-contrast-light);
-  font-size: var(--fs-s);
-  cursor: pointer;
-  text-decoration: underline;
-  text-underline-offset: 2px;
-  padding: var(--m-s);
-  transition: color var(--t-fast);
+  margin-inline-end: auto;
 }
 
 .skipButton:hover {
@@ -387,13 +328,13 @@
 @media (pointer: coarse) {
   .confirmButton,
   .nextButton {
-    padding-top: var(--m-m);
-    padding-bottom: var(--m-m);
+    padding-block-start: var(--m-m);
+    padding-block-end: var(--m-m);
   }
 
   .skipButton {
-    padding-top: var(--m-m);
-    padding-bottom: var(--m-m);
+    padding-block-start: var(--m-m);
+    padding-block-end: var(--m-m);
   }
 }
 
@@ -402,8 +343,8 @@
   display: flex;
   align-items: center;
   gap: var(--m-l);
-  width: 100%;
-  animation: slideUp 0.3s ease-out;
+  inline-size: 100%;
+  animation: slideUp var(--t-deliberate) var(--ease-out);
 }
 
 @media (max-width: 480px) {
@@ -416,7 +357,7 @@
 @keyframes slideUp {
   from {
     opacity: 0;
-    transform: translateY(6px);
+    transform: translateY(var(--size-6));
   }
   to {
     opacity: 1;
@@ -426,13 +367,13 @@
 
 .scoreReveal {
   display: grid;
-  gap: 4px;
-  min-width: 100px;
+  gap: var(--m);
+  min-inline-size: calc(var(--m-l) * 5);
 }
 
 @media (max-width: 480px) {
   .scoreReveal {
-    min-width: 80px;
+    min-inline-size: calc(var(--m-l) * 4);
   }
 }
 
@@ -450,7 +391,7 @@
 
 /* Distance shakes on bad guess */
 .distanceBad {
-  animation: shake 0.4s ease-out;
+  animation: shake var(--t-enter) var(--ease-out);
 }
 
 @keyframes shake {
@@ -459,16 +400,16 @@
     transform: translateX(0);
   }
   20% {
-    transform: translateX(-3px);
+    transform: translateX(calc(var(--size-3) * -1));
   }
   40% {
-    transform: translateX(3px);
+    transform: translateX(var(--size-3));
   }
   60% {
-    transform: translateX(-2px);
+    transform: translateX(calc(var(--size-2) * -1));
   }
   80% {
-    transform: translateX(2px);
+    transform: translateX(var(--size-2));
   }
 }
 
@@ -476,12 +417,12 @@
   font-size: var(--fs-m);
   font-weight: 700;
   font-variant-numeric: tabular-nums;
-  animation: scorePop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+  animation: scorePop var(--t-enter) var(--ease-bounce);
 }
 
 /* Glow behind score in tier colour */
 .scoreValueGlow {
-  text-shadow: 0 0 12px currentColor;
+  text-shadow: 0 0 var(--size-12) currentColor;
 }
 
 @keyframes scorePop {
@@ -503,13 +444,13 @@
   font-size: var(--fs-s);
   color: var(--c-bg-contrast-light);
   font-variant-numeric: tabular-nums;
-  animation: bonusSlide 0.35s 0.3s ease-out both;
+  animation: bonusSlide var(--t-slow) var(--t-deliberate) var(--ease-out) both;
 }
 
 @keyframes bonusSlide {
   from {
     opacity: 0;
-    transform: translateX(-6px);
+    transform: translateX(calc(var(--size-6) * -1));
   }
   to {
     opacity: 1;
@@ -518,17 +459,17 @@
 }
 
 .scoreBarTrack {
-  height: 4px;
-  border-radius: 2px;
-  background-color: color-mix(in srgb, var(--c-bg-contrast-light) 20%, transparent);
-  overflow: hidden;
+  block-size: var(--m);
+  border-radius: calc(var(--line-hairline) * 2);
+  background-color: color-mix(in oklch, var(--c-bg-contrast-light) 20%, transparent);
+  overflow: clip;
 }
 
 .scoreBarFill {
-  height: 100%;
-  border-radius: 2px;
+  block-size: 100%;
+  border-radius: calc(var(--line-hairline) * 2);
   background-color: var(--c-accent);
-  animation: growBar 0.6s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  animation: growBar var(--t-long) var(--ease-spring) forwards;
   transform-origin: left;
 }
 

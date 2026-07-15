@@ -1,4 +1,5 @@
 import { Content, PhotoBlock } from "../services/types";
+import { encodePublicAssetPath } from "./encodePublicAssetPath";
 import {
   APERTURE_FACET,
   CAMERA_FACET,
@@ -914,7 +915,7 @@ function computeRichColorStats(albums: Content[]): {
     const dominant = palette[0] as [number, number, number];
     const family = getColorFamilyLabel(dominant);
     const examples = exampleBuckets.get(family)!;
-    const src = photo._build.srcset[0]?.src ?? photo.data.src;
+    const src = photo._build.srcset[0]?.src ?? encodePublicAssetPath(photo.data.src);
     if (examples.length < 6) {
       examples.push({
         src,
@@ -1153,7 +1154,7 @@ function computeRevisitedPlace(photos: PhotoBlock[]): PhotoStats["revisitedPlace
     }
 
     const key = `${place.facetId}:${place.value}`;
-    const thumbSrc = photo._build.srcset[0]?.src ?? photo.data.src;
+    const thumbSrc = photo._build.srcset[0]?.src ?? encodePublicAssetPath(photo.data.src);
     const existing = placeYears.get(key) ?? {
       label: formatPlaceDisplayLabel(place.value)!,
       facetId: place.facetId,

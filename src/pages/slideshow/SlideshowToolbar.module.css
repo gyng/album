@@ -1,0 +1,487 @@
+/* Styles owned by SlideshowToolbar. Shared layout remains in slideshow.module.css. */
+
+.toolbar {
+  position: fixed;
+  inset-block-start: 0;
+  inset-inline-start: 0;
+  padding-block-start: calc(env(safe-area-inset-top, 0) + var(--m-l));
+  padding-block-end: calc(env(safe-area-inset-bottom, 0) + var(--m-l));
+  padding-inline-start: calc(env(safe-area-inset-left, 0) + clamp(var(--m-l), 4dvw, var(--m-xl)));
+  padding-inline-end: calc(env(safe-area-inset-right, 0) + clamp(var(--m-l), 4dvw, var(--m-xl)));
+  inline-size: 100%;
+  max-block-size: 100dvh;
+  /* The slideshow toolbar is a multi-section overlay that needs to wrap onto
+     multiple rows — it does NOT share the always-single-line scroll behavior
+     of the global .topBar. Layout is defined inline here rather than borrowing
+     .topBar from common.module.css. */
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--m-m);
+  font-size: var(--fs-sm);
+  opacity: 0;
+  transform: translateY(calc(var(--size-18) * -1)) scale(0.985);
+  transform-origin: top center;
+  transition:
+    opacity var(--t-medium) var(--ease-out),
+    transform var(--t-deliberate) var(--ease-spring),
+    background-color var(--t-base) var(--ease-out),
+    box-shadow var(--t-base) var(--ease-out);
+  background-color: transparent;
+  z-index: var(--z-fullscreen-toolbar);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  will-change: opacity, transform;
+}
+
+/* Fine pointers dismiss the toolbar by leaving the top edge or the "Hide"
+   button, so the sticky close is touch-only (see the coarse-pointer rule). */
+
+.toolbarCloseButton {
+  display: none;
+  touch-action: none;
+}
+
+.sessionDock {
+  display: none;
+}
+
+.brandLink {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--m-m);
+  padding: var(--m-m) var(--m-l);
+  border-radius: calc(var(--m-s) * 1.5);
+  text-decoration: none;
+  background: linear-gradient(135deg, var(--c-slideshow-brand-start), var(--c-slideshow-brand-end));
+  color: var(--c-white);
+  box-shadow:
+    0 var(--size-12) var(--size-32) color-mix(in oklch, var(--c-black) 25%, transparent),
+    inset 0 var(--size-1) 0 color-mix(in oklch, var(--c-white) 12%, transparent);
+}
+
+.brandLogo {
+  display: grid;
+  place-items: center;
+  inline-size: var(--size-48);
+  block-size: var(--size-48);
+  border-radius: var(--radius-pill);
+  background: color-mix(in oklch, var(--c-white) 14%, transparent);
+  font-size: var(--fs-l);
+}
+
+.brandCopy {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  line-height: 1.1;
+}
+
+.brandTitle {
+  font-size: var(--fs-sm);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.brandSubtitle {
+  font-size: var(--fs-m);
+  font-weight: 600;
+}
+
+.poolStats {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--size-2);
+  border: 0;
+  padding: calc(var(--m-s) * 0.75) var(--m-m);
+  border-radius: calc(var(--m-s) * 1.5);
+  background: var(--glass-bg);
+  color: color-mix(in oklch, var(--c-white) 78%, transparent);
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.15;
+  cursor: pointer;
+  box-shadow:
+    0 var(--size-18) var(--size-40) color-mix(in oklch, var(--c-black) 25%, transparent),
+    inset 0 var(--size-1) 0 color-mix(in oklch, var(--c-white) 8%, transparent);
+  backdrop-filter: blur(var(--glass-blur-panel));
+}
+
+.poolStats:hover,
+.poolStats:focus-visible {
+  background: color-mix(in oklch, var(--c-white) 18%, transparent);
+  outline: var(--size-1) solid color-mix(in oklch, var(--c-white) 30%, transparent);
+}
+
+.poolStatsCount {
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--c-white);
+}
+
+.poolStatsNewest {
+  font-size: var(--fs-s);
+  color: color-mix(in oklch, var(--c-white) 60%, transparent);
+}
+
+.playbackGroup {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--m-m);
+  padding: var(--m-s);
+  border-radius: calc(var(--m-s) * 1.5);
+  background: var(--glass-bg);
+  box-shadow:
+    0 var(--size-18) var(--size-40) color-mix(in oklch, var(--c-black) 25%, transparent),
+    inset 0 var(--size-1) 0 color-mix(in oklch, var(--c-white) 8%, transparent);
+  backdrop-filter: blur(var(--glass-blur-panel));
+}
+
+.playbackHeader {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--m-s);
+  min-inline-size: var(--size-180);
+  padding: 0 var(--m-s);
+}
+
+.playbackLogo {
+  display: grid;
+  place-items: center;
+  inline-size: var(--size-36);
+  block-size: var(--size-36);
+  border-radius: var(--radius-pill);
+  background: var(--c-slideshow-playback-bg);
+  color: var(--c-slideshow-playback);
+}
+
+.playbackCopy {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  color: var(--c-white);
+  line-height: 1.1;
+}
+
+.playbackTitle {
+  font-size: var(--fs-sm);
+  font-weight: 600;
+}
+
+.playbackSubtitle {
+  font-size: var(--fs-s);
+  color: color-mix(in oklch, var(--c-white) 72%, transparent);
+}
+
+.playbackButtons {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--m-s);
+}
+
+.playbackDivider {
+  inline-size: var(--size-1);
+  block-size: var(--size-28);
+  flex: 0 0 var(--size-1);
+  margin: 0 calc(var(--m-s) * 0.75);
+  background: var(--glass-border);
+  border-radius: var(--size-1);
+}
+
+/* Modifier buttons live between mode toggles and one-shot actions. They are
+   independent booleans (composable with any mode and with each other) rather
+   than exclusive choices, so the user needs a glanceable cue that they're a
+   different *kind* of button. Italic label + dashed border (when inactive)
+   signals "this combines with the mode" rather than "this replaces it". */
+
+.playbackModifier {
+  font-style: italic;
+}
+
+.playbackModifier:not([aria-pressed="true"]) {
+  border-style: dashed;
+  opacity: 0.82;
+}
+
+.controlGroup {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--m-s);
+  padding: var(--m-s);
+  border-radius: calc(var(--m-s) * 1.5);
+  background: var(--glass-bg);
+  box-shadow:
+    0 var(--size-18) var(--size-40) color-mix(in oklch, var(--c-black) 25%, transparent),
+    inset 0 var(--size-1) 0 color-mix(in oklch, var(--c-white) 8%, transparent);
+  backdrop-filter: blur(var(--glass-blur-panel));
+}
+
+.controlHeader {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--m-s);
+  /* A previous minimum width reserved excess space regardless of label
+     width, which left a large gap between the title and the first button. */
+  padding: 0 calc(var(--m-s) * 0.5);
+}
+
+.controlLogo {
+  display: grid;
+  place-items: center;
+  inline-size: var(--size-36);
+  block-size: var(--size-36);
+  border-radius: var(--radius-pill);
+  background: var(--c-slideshow-control-bg);
+  color: var(--c-slideshow-control);
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.controlCopy {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  color: var(--c-white);
+  line-height: 1.1;
+}
+
+.controlTitle {
+  font-size: var(--fs-sm);
+  font-weight: 600;
+}
+
+.controlButtons,
+.controlMeta {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--m-s);
+}
+
+.playbackButtons :global(button),
+.controlButtons :global(button),
+.controlMeta :global(a),
+.controlMeta :global(button),
+.controlMeta :global(div) {
+  min-block-size: var(--size-44);
+}
+
+.hideProgress {
+  display: inline-grid;
+  place-items: center;
+  inline-size: var(--size-28);
+  block-size: var(--size-28);
+  margin-inline-start: calc(var(--m-s) * 0.5);
+  opacity: 0.46;
+  transform: translateY(var(--size-0-5));
+}
+
+/* Pairs the Hide button with the auto-hide ring as a single visual unit. */
+
+.playbackHideGroup {
+  display: inline-flex;
+  align-items: center;
+  gap: calc(var(--m-s) * 0.5);
+  margin-inline-start: auto;
+}
+
+.hideProgressRing {
+  inline-size: 100%;
+  block-size: 100%;
+  border-radius: var(--radius-pill);
+  background:
+    radial-gradient(
+      circle closest-side,
+      transparent 74%,
+      color-mix(in oklch, var(--c-white) 10%, transparent) 75% 100%
+    ),
+    conic-gradient(
+      color-mix(in oklch, var(--c-white) 50%, transparent) calc(var(--hide-progress, 1) * 1turn),
+      color-mix(in oklch, var(--c-white) 8%, transparent) 0
+    );
+  box-shadow:
+    inset 0 0 0 var(--size-1) color-mix(in oklch, var(--c-white) 5%, transparent),
+    0 0 0 var(--size-1) color-mix(in oklch, var(--c-black) 8%, transparent);
+  filter: saturate(0.8);
+}
+
+@media (hover: none), (pointer: coarse) {
+  .toolbar {
+    pointer-events: auto;
+  }
+
+  .sessionDock {
+    position: sticky;
+    inset-block-start: 0;
+    z-index: var(--z-float);
+    order: -1;
+    inline-size: min(100%, var(--content-width-medium));
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: var(--m-s);
+    padding: var(--m-s);
+    border: solid var(--size-1) var(--glass-border);
+    border-radius: var(--m-l);
+    background: linear-gradient(
+      135deg,
+      var(--c-slideshow-panel-start),
+      var(--c-slideshow-panel-end)
+    );
+    backdrop-filter: blur(var(--glass-blur-sheet));
+    box-shadow:
+      0 var(--m-l) var(--m-xl) color-mix(in oklch, var(--c-black) 34%, transparent),
+      inset 0 var(--size-1) 0 color-mix(in oklch, var(--c-white) 10%, transparent);
+  }
+
+  /* Pinned session actions replace the buried Hide and Wake Lock controls on
+     coarse pointers. The Hide half remains the sheet grabber. */
+  .toolbarCloseButton {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: var(--m-s);
+    min-block-size: var(--m-2xl);
+    padding: var(--m-s) var(--m-m);
+    border: 0;
+    border-radius: var(--m-m);
+    background: color-mix(in oklch, var(--c-white) 8%, transparent);
+    color: var(--c-white);
+    font: inherit;
+    text-align: start;
+    cursor: grab;
+  }
+
+  .toolbarCloseGrip {
+    position: absolute;
+    inset-block-start: var(--m);
+    inset-inline-start: 50%;
+    inline-size: var(--m-l);
+    block-size: var(--size-2);
+    transform: translateX(-50%);
+    border-radius: var(--radius-pill);
+    background: color-mix(in oklch, var(--c-white) 38%, transparent);
+  }
+
+  .sessionAwakeButton {
+    display: flex;
+    align-items: center;
+    gap: var(--m-s);
+    min-block-size: var(--m-2xl);
+    padding: var(--m-s) var(--m-m);
+    border: solid var(--size-1) var(--c-slideshow-awake-border);
+    border-radius: var(--m-m);
+    background: var(--c-slideshow-awake-bg);
+    color: var(--c-white);
+    font: inherit;
+    text-align: start;
+  }
+
+  .sessionAwakeButtonActive {
+    border-color: var(--c-slideshow-active-border);
+    background: var(--c-slideshow-active-bg);
+  }
+
+  .sessionAwakeButton:disabled {
+    opacity: 0.5;
+  }
+
+  .sessionActionIcon,
+  .sessionAwakeIndicator {
+    flex: 0 0 auto;
+    display: grid;
+    place-items: center;
+    inline-size: var(--m-l);
+    block-size: var(--m-l);
+    border-radius: var(--radius-pill);
+    background: color-mix(in oklch, var(--c-white) 10%, transparent);
+  }
+
+  .sessionAwakeIndicator {
+    inline-size: var(--m-m);
+    block-size: var(--m-m);
+    background: var(--c-slideshow-awake);
+    box-shadow: 0 0 var(--m-m) var(--c-slideshow-awake-glow);
+  }
+
+  .sessionAwakeButtonActive .sessionAwakeIndicator {
+    background: var(--c-slideshow-active);
+    box-shadow: 0 0 var(--m-m) var(--c-slideshow-active-glow);
+  }
+
+  .sessionActionCopy {
+    min-inline-size: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--m);
+    line-height: 1.05;
+  }
+
+  .sessionActionCopy strong {
+    font-size: var(--fs-sm);
+    font-weight: 650;
+  }
+
+  .sessionActionCopy span {
+    color: color-mix(in oklch, var(--c-white) 62%, transparent);
+    font-size: var(--fs-s);
+  }
+
+  .sessionProgress {
+    flex: 0 0 auto;
+    inline-size: var(--m-l);
+    block-size: var(--m-l);
+    margin-inline-start: auto;
+    opacity: 0.58;
+  }
+
+  .toolbarCloseButton:active {
+    background: var(--glass-bg);
+    cursor: grabbing;
+  }
+
+  .toolbarCloseButton:focus-visible {
+    outline: solid var(--size-2) var(--c-font);
+    outline-offset: var(--size-2);
+  }
+
+  .sessionAwakeButton:focus-visible {
+    outline: solid var(--size-2) var(--c-white);
+    outline-offset: var(--size-2);
+  }
+
+  .secondarySessionControl {
+    display: none;
+  }
+}
+
+@media (max-width: 1024px) {
+  .toolbar {
+    padding: calc(env(safe-area-inset-top, 0) + var(--m-l)) var(--m-l)
+      calc(env(safe-area-inset-bottom, 0) + var(--m-l))
+      calc(env(safe-area-inset-left, 0) + var(--m-l));
+  }
+
+  .brandLink,
+  .playbackGroup,
+  .controlGroup {
+    inline-size: min(100%, var(--content-width-medium));
+  }
+
+  .playbackGroup,
+  .controlGroup {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .playbackHeader,
+  .playbackButtons,
+  .controlHeader,
+  .controlButtons,
+  .controlMeta {
+    inline-size: 100%;
+  }
+}

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { NumericFacetStat, ParallelRelationshipData } from "../util/computeStats";
 import { TechnicalHeatmaps } from "./TechnicalHeatmaps";
 import { TimeOfDayChart } from "./TimeOfDayChart";
-import { Caption } from "./ui";
+import { Caption, Heading } from "./ui";
 import styles from "./TimeRelationshipExplorer.module.css";
 
 type Props = {
@@ -22,7 +22,9 @@ export const TimeRelationshipExplorer: React.FC<Props> = ({
     <div className={styles.wrapper}>
       <section className={styles.block}>
         <div className={styles.header}>
-          <h2 className={styles.title}>{hourFacet.displayName}</h2>
+          <Heading level={2} as="h2" className={styles.title}>
+            {hourFacet.displayName}
+          </Heading>
           <Caption as="span">{formatCoverage(hourFacet.coverage)}</Caption>
         </div>
         {hourFacet.coverage === 0 ? (
@@ -41,7 +43,9 @@ export const TimeRelationshipExplorer: React.FC<Props> = ({
 
       <section className={styles.block}>
         <div className={styles.header}>
-          <h2 className={styles.title}>Time relationships</h2>
+          <Heading level={2} as="h2" className={styles.title}>
+            Time relationships
+          </Heading>
           <Caption as="span">
             Based on {relationships.total.toLocaleString()} photos with local time, aperture, and
             ISO

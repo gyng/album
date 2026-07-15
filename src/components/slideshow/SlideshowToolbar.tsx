@@ -1,9 +1,58 @@
+import { mergeCssModuleStyles } from "../../util/mergeCssModuleStyles";
 import React from "react";
 import Link from "next/link";
-import styles from "../../pages/slideshow/slideshow.module.css";
+import sharedStyles from "../../pages/slideshow/slideshow.module.css";
+import localStyles from "../../pages/slideshow/SlideshowToolbar.module.css";
 import commonStyles from "../../styles/common.module.css";
+import { buttonStyles } from "../ui";
 import { SlideshowMode, DetailsAlignment } from "../../util/slideshowUrl";
 import { PoolStats, formatNewestPhotoDate } from "../../util/slideshowQueue";
+
+const styles = mergeCssModuleStyles(
+  sharedStyles,
+  localStyles,
+  [
+    "brandCopy",
+    "brandLink",
+    "brandLogo",
+    "brandSubtitle",
+    "brandTitle",
+    "controlButtons",
+    "controlCopy",
+    "controlGroup",
+    "controlHeader",
+    "controlLogo",
+    "controlMeta",
+    "controlTitle",
+    "hideProgress",
+    "hideProgressRing",
+    "playbackButtons",
+    "playbackCopy",
+    "playbackDivider",
+    "playbackGroup",
+    "playbackHeader",
+    "playbackHideGroup",
+    "playbackLogo",
+    "playbackModifier",
+    "playbackSubtitle",
+    "playbackTitle",
+    "poolStats",
+    "poolStatsCount",
+    "poolStatsNewest",
+    "secondarySessionControl",
+    "sessionActionCopy",
+    "sessionActionIcon",
+    "sessionAwakeButton",
+    "sessionAwakeButtonActive",
+    "sessionAwakeIndicator",
+    "sessionDock",
+    "sessionProgress",
+    "toolbar",
+    "toolbarCloseButton",
+    "toolbarCloseGrip",
+  ],
+  ["toolbar"],
+);
 
 // The slideshow's control panel. Presentational: every value and action is
 // supplied by the page, which owns the state and the imperative side effects
@@ -190,7 +239,6 @@ export const SlideshowToolbar: React.FC<SlideshowToolbarProps> = (props) => {
         <button
           type="button"
           className={styles.toolbarCloseButton}
-          style={{ touchAction: "none" }}
           onPointerDown={handleCloseHandlePointerDown}
           onPointerMove={handleCloseHandlePointerMove}
           onPointerUp={handleCloseHandlePointerUp}
@@ -309,9 +357,10 @@ export const SlideshowToolbar: React.FC<SlideshowToolbarProps> = (props) => {
 
         <div className={styles.playbackButtons}>
           <button
+            type="button"
             className={[
-              props.slideshowMode === "random" ? commonStyles.active : "",
-              commonStyles.button,
+              props.slideshowMode === "random" ? buttonStyles.active : "",
+              buttonStyles.base,
             ].join(" ")}
             aria-pressed={props.slideshowMode === "random"}
             onClick={() => props.onSelectMode("random")}
@@ -320,9 +369,10 @@ export const SlideshowToolbar: React.FC<SlideshowToolbarProps> = (props) => {
           </button>
 
           <button
+            type="button"
             className={[
-              props.slideshowMode === "weighted" ? commonStyles.active : "",
-              commonStyles.button,
+              props.slideshowMode === "weighted" ? buttonStyles.active : "",
+              buttonStyles.base,
             ].join(" ")}
             aria-pressed={props.slideshowMode === "weighted"}
             onClick={() => props.onSelectMode("weighted")}
@@ -331,9 +381,10 @@ export const SlideshowToolbar: React.FC<SlideshowToolbarProps> = (props) => {
           </button>
 
           <button
+            type="button"
             className={[
-              props.slideshowMode === "similar" ? commonStyles.active : "",
-              commonStyles.button,
+              props.slideshowMode === "similar" ? buttonStyles.active : "",
+              buttonStyles.base,
             ].join(" ")}
             aria-pressed={props.slideshowMode === "similar"}
             onClick={() => props.onSelectMode("similar")}
@@ -344,10 +395,11 @@ export const SlideshowToolbar: React.FC<SlideshowToolbarProps> = (props) => {
           <span className={styles.playbackDivider} aria-hidden="true" />
 
           <button
+            type="button"
             className={[
-              props.timeAware ? commonStyles.active : "",
+              props.timeAware ? buttonStyles.active : "",
               styles.playbackModifier,
-              commonStyles.button,
+              buttonStyles.base,
             ].join(" ")}
             aria-pressed={props.timeAware}
             title="Bias the shuffle toward photos taken near the current hour and month"
@@ -357,10 +409,11 @@ export const SlideshowToolbar: React.FC<SlideshowToolbarProps> = (props) => {
           </button>
 
           <button
+            type="button"
             className={[
-              props.remixEnabled ? commonStyles.active : "",
+              props.remixEnabled ? buttonStyles.active : "",
               styles.playbackModifier,
-              commonStyles.button,
+              buttonStyles.base,
             ].join(" ")}
             aria-pressed={props.remixEnabled}
             title="Occasionally show two or three photos side by side at random"
@@ -372,7 +425,8 @@ export const SlideshowToolbar: React.FC<SlideshowToolbarProps> = (props) => {
           <span className={styles.playbackDivider} aria-hidden="true" />
 
           <button
-            className={commonStyles.button}
+            type="button"
+            className={buttonStyles.base}
             title="Force the next advance to be a remix slide (ignores the 3% dice)"
             onClick={props.onRemixNow}
           >
@@ -380,7 +434,8 @@ export const SlideshowToolbar: React.FC<SlideshowToolbarProps> = (props) => {
           </button>
 
           <button
-            className={[props.isPaused ? commonStyles.active : "", commonStyles.button].join(" ")}
+            type="button"
+            className={[props.isPaused ? buttonStyles.active : "", buttonStyles.base].join(" ")}
             aria-pressed={props.isPaused}
             onClick={props.onTogglePaused}
           >
@@ -388,7 +443,8 @@ export const SlideshowToolbar: React.FC<SlideshowToolbarProps> = (props) => {
           </button>
 
           <button
-            className={commonStyles.button}
+            type="button"
+            className={buttonStyles.base}
             disabled={!props.canGoPrevious}
             aria-disabled={!props.canGoPrevious}
             onClick={props.onPrevious}
@@ -396,12 +452,12 @@ export const SlideshowToolbar: React.FC<SlideshowToolbarProps> = (props) => {
             Previous
           </button>
 
-          <button className={commonStyles.button} onClick={props.onNext}>
+          <button type="button" className={buttonStyles.base} onClick={props.onNext}>
             Next
           </button>
 
           <span className={[styles.playbackHideGroup, styles.secondarySessionControl].join(" ")}>
-            <button className={commonStyles.button} onClick={props.onHide}>
+            <button type="button" className={buttonStyles.base} onClick={props.onHide}>
               Hide
             </button>
 
@@ -432,7 +488,8 @@ export const SlideshowToolbar: React.FC<SlideshowToolbarProps> = (props) => {
 
         <div className={styles.controlButtons}>
           <button
-            className={[props.showClock ? commonStyles.active : "", commonStyles.button].join(" ")}
+            type="button"
+            className={[props.showClock ? buttonStyles.active : "", buttonStyles.base].join(" ")}
             aria-pressed={props.showClock}
             onClick={props.onToggleClock}
           >
@@ -440,9 +497,8 @@ export const SlideshowToolbar: React.FC<SlideshowToolbarProps> = (props) => {
           </button>
 
           <button
-            className={[props.showDetails ? commonStyles.active : "", commonStyles.button].join(
-              " ",
-            )}
+            type="button"
+            className={[props.showDetails ? buttonStyles.active : "", buttonStyles.base].join(" ")}
             aria-pressed={props.showDetails}
             onClick={props.onToggleDetails}
           >
@@ -450,7 +506,8 @@ export const SlideshowToolbar: React.FC<SlideshowToolbarProps> = (props) => {
           </button>
 
           <button
-            className={[props.showMap ? commonStyles.active : "", commonStyles.button].join(" ")}
+            type="button"
+            className={[props.showMap ? buttonStyles.active : "", buttonStyles.base].join(" ")}
             aria-pressed={props.showMap}
             onClick={props.onToggleMap}
           >
@@ -458,9 +515,10 @@ export const SlideshowToolbar: React.FC<SlideshowToolbarProps> = (props) => {
           </button>
 
           <button
+            type="button"
             className={[
-              props.detailsAlignment !== "center" ? commonStyles.active : "",
-              commonStyles.button,
+              props.detailsAlignment !== "center" ? buttonStyles.active : "",
+              buttonStyles.base,
             ].join(" ")}
             onClick={props.onCycleAlignment}
           >
@@ -481,7 +539,8 @@ export const SlideshowToolbar: React.FC<SlideshowToolbarProps> = (props) => {
 
         <div className={styles.controlButtons}>
           <button
-            className={[props.showCover ? commonStyles.active : "", commonStyles.button].join(" ")}
+            type="button"
+            className={[props.showCover ? buttonStyles.active : "", buttonStyles.base].join(" ")}
             aria-pressed={props.showCover}
             title={
               props.showCover
@@ -495,7 +554,8 @@ export const SlideshowToolbar: React.FC<SlideshowToolbarProps> = (props) => {
 
           {!props.isFullscreenActive ? (
             <button
-              className={commonStyles.button}
+              type="button"
+              className={buttonStyles.base}
               disabled={!props.isFullscreenSupported}
               aria-disabled={!props.isFullscreenSupported}
               onClick={props.onToggleFullscreen}
@@ -505,10 +565,11 @@ export const SlideshowToolbar: React.FC<SlideshowToolbarProps> = (props) => {
           ) : null}
 
           <button
+            type="button"
             className={[
-              props.isWakeLockActive ? commonStyles.active : "",
+              props.isWakeLockActive ? buttonStyles.active : "",
               styles.secondarySessionControl,
-              commonStyles.button,
+              buttonStyles.base,
             ].join(" ")}
             disabled={!props.isWakeLockSupported}
             aria-disabled={!props.isWakeLockSupported}
@@ -541,10 +602,11 @@ export const SlideshowToolbar: React.FC<SlideshowToolbarProps> = (props) => {
             const delaySec = delay / 1000;
             return (
               <button
+                type="button"
                 key={delay}
                 className={[
-                  commonStyles.button,
-                  delay === props.timeDelay ? commonStyles.active : "",
+                  buttonStyles.base,
+                  delay === props.timeDelay ? buttonStyles.active : "",
                 ].join(" ")}
                 aria-pressed={delay === props.timeDelay}
                 onClick={() => props.onSelectDelay(delay)}
@@ -559,10 +621,10 @@ export const SlideshowToolbar: React.FC<SlideshowToolbarProps> = (props) => {
           })}
           {!activeIsLong ? (
             <button
-              className={[
-                commonStyles.button,
-                props.showLongTimings ? commonStyles.active : "",
-              ].join(" ")}
+              type="button"
+              className={[buttonStyles.base, props.showLongTimings ? buttonStyles.active : ""].join(
+                " ",
+              )}
               aria-pressed={props.showLongTimings}
               aria-label={
                 props.showLongTimings
@@ -584,9 +646,7 @@ export const SlideshowToolbar: React.FC<SlideshowToolbarProps> = (props) => {
         <div className={styles.controlMeta}>
           <div className={commonStyles.toast}>🔁 {formatCountdown(props.secondsLeft)}</div>
           <button
-            className={[props.alignCadence ? commonStyles.active : "", commonStyles.button].join(
-              " ",
-            )}
+            className={[props.alignCadence ? buttonStyles.active : "", buttonStyles.base].join(" ")}
             type="button"
             aria-pressed={props.alignCadence}
             title="When on, advances snap to wall-clock boundaries (e.g. :00 / :15 / :30 / :45 for a 15-minute cadence) instead of drifting from the moment you opened the app"
@@ -604,7 +664,6 @@ export const SlideshowToolbar: React.FC<SlideshowToolbarProps> = (props) => {
             role="button"
             aria-label="Long-press to inspect the current image"
             title="Long-press to inspect the current image"
-            style={{ cursor: "pointer", pointerEvents: "auto" }}
             onPointerDown={(event) => {
               if (event.pointerType === "mouse" && event.button !== 0) return;
               contextLongPressFiredRef.current = false;
@@ -654,12 +713,12 @@ export const SlideshowToolbar: React.FC<SlideshowToolbarProps> = (props) => {
             {props.playbackContextLabel} in <i>{props.albumName}</i>
           </Link>
 
-          <button className={commonStyles.button} type="button" onClick={props.onCopyLink}>
+          <button className={buttonStyles.base} type="button" onClick={props.onCopyLink}>
             {props.copiedPhotoLink ? "copied photo link" : "copy photo link"}
           </button>
 
           <button
-            className={commonStyles.button}
+            className={buttonStyles.base}
             type="button"
             title="Send the current photo to a system app via the share sheet"
             onClick={props.onShare}

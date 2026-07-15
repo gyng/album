@@ -1,6 +1,19 @@
+import { mergeCssModuleStyles } from "../../util/mergeCssModuleStyles";
 import { Caption, Card, Heading, Pill } from "../ui";
-import styles from "../../pages/explore/explore.module.css";
+import sharedStyles from "../../pages/explore/explore.module.css";
+import localStyles from "../../pages/explore/ExploreOverview.module.css";
 import type { OverviewCard } from "./exploreViewModel";
+
+const styles = mergeCssModuleStyles(sharedStyles, localStyles, [
+  "header",
+  "headerBody",
+  "jumpNav",
+  "jumpNavLink",
+  "jumpNavLinks",
+  "overview",
+  "overviewValue",
+  "title",
+]);
 
 export const ExploreOverview = ({
   sectionLinks,

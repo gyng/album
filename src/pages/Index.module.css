@@ -1,5 +1,5 @@
 .main {
-  max-width: 1400px;
+  max-inline-size: var(--size-1400);
   margin: 0 auto;
   padding: var(--m-xl);
 }

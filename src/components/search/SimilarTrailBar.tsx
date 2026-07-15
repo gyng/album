@@ -1,9 +1,33 @@
+import { mergeCssModuleStyles } from "../../util/mergeCssModuleStyles";
 import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { SegmentedToggle, pillStyles } from "../ui";
-import styles from "./Search.module.css";
+import sharedStyles from "./Search.module.css";
+import localStyles from "./SimilarTrailBar.module.css";
 import { getResizedAlbumImageSrc } from "../../util/getResizedAlbumImageSrc";
 import { forceDocumentNavigation, SimilarityOrder } from "./searchUtils";
+
+const styles = mergeCssModuleStyles(sharedStyles, localStyles, [
+  "breadcrumbButton",
+  "breadcrumbItem",
+  "breadcrumbItemWillRemove",
+  "breadcrumbPreview",
+  "breadcrumbRemoveButton",
+  "breadcrumbSimilarity",
+  "breadcrumbs",
+  "modeArrow",
+  "modeBar",
+  "modeBarHeader",
+  "modeHeaderActions",
+  "modeHeading",
+  "modeLabel",
+  "modeSimilarFilename",
+  "modeSource",
+  "modeSourceItem",
+  "modeSourcePreview",
+  "modeSourceSlideshowButton",
+  "modeStack",
+]);
 
 export type SimilarTrailItem = {
   path: string;
@@ -140,7 +164,7 @@ export const SimilarTrailBar: React.FC<Props> = ({
             className={styles.modeSourceItem}
             style={{
               opacity: pendingRemoveIdx !== null ? 0.15 : undefined,
-              transition: "opacity 0.15s ease",
+              transition: "opacity var(--t-theme) var(--ease-out)",
             }}
           >
             {similarPreviewSrc ? (

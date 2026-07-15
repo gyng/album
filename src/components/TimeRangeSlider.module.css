@@ -1,28 +1,26 @@
 .container {
   position: absolute;
-  bottom: var(--m-l);
-  left: var(--m-xl);
-  right: var(--m-xl);
-  z-index: 9998;
+  inset-block-end: var(--m-l);
+  inset-inline: var(--m-xl);
+  z-index: var(--z-fullscreen-underlay);
   pointer-events: auto;
-  background: var(--c-overlay-dark);
-  border: solid 1px var(--c-border-on-dark);
+  background: var(--glass-surface-dark);
+  border: solid var(--line-hairline) var(--glass-border-dark);
   border-radius: var(--m-s);
   padding: var(--m-s) var(--m-l) var(--m-s);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(var(--glass-blur-surface));
 }
 
 /* --- Sparkline --- */
 
 .sparkline {
   display: block;
-  width: 100%;
-  height: 28px;
+  inline-size: 100%;
+  block-size: var(--size-28);
 }
 
 .sparklineBar {
-  fill: rgba(255, 255, 255, 0.18);
+  fill: color-mix(in oklch, var(--c-on-dark) 18%, transparent);
 }
 
 .sparklineBarActive {
@@ -34,7 +32,7 @@
 
 .trackArea {
   position: relative;
-  height: 24px;
+  block-size: var(--size-24);
   display: flex;
   align-items: center;
   cursor: pointer;
@@ -43,19 +41,18 @@
 
 .track {
   position: absolute;
-  left: 0;
-  right: 0;
-  height: 3px;
-  background: rgba(255, 255, 255, 0.12);
-  border-radius: 2px;
+  inset-inline: 0;
+  block-size: calc(var(--line-hairline) * 3);
+  background: color-mix(in oklch, var(--c-on-dark) 12%, transparent);
+  border-radius: calc(var(--line-hairline) * 2);
 }
 
 .trackFill {
   position: absolute;
-  top: 0;
-  bottom: 0;
+  inset-block-start: 0;
+  inset-block-end: 0;
   background: var(--c-accent);
-  border-radius: 2px;
+  border-radius: calc(var(--line-hairline) * 2);
   opacity: 0.6;
 }
 
@@ -63,29 +60,34 @@
 
 .thumb {
   position: absolute;
-  top: 50%;
-  width: 14px;
-  height: 14px;
-  border-radius: 999px;
-  background: white;
-  border: solid 2px var(--c-accent);
+  inset-block-start: 50%;
+  display: grid;
+  place-items: center;
+  inline-size: var(--tap-target);
+  block-size: var(--tap-target);
+  border-radius: var(--radius-pill);
+  background: transparent;
   transform: translate(-50%, -50%);
   cursor: grab;
   touch-action: none;
-  z-index: 1;
+  z-index: var(--z-raised);
   transition:
-    opacity 0.15s,
-    transform 0.1s;
+    opacity var(--t-theme),
+    transform var(--t-fast);
+}
+
+.thumb::before {
+  inline-size: var(--fs-sm);
+  block-size: var(--fs-sm);
+  border: solid var(--line-strong) var(--c-accent);
+  border-radius: var(--radius-pill);
+  background: var(--c-on-dark);
+  content: "";
 }
 
 .thumb:active {
   cursor: grabbing;
   transform: translate(-50%, -50%) scale(1.2);
-}
-
-.thumb:focus-visible {
-  outline: 2px solid var(--c-accent);
-  outline-offset: 2px;
 }
 
 /* Inactive state: hide thumbs until hover */
@@ -105,55 +107,52 @@
   justify-content: space-between;
   align-items: center;
   font-size: var(--fs-xs);
-  color: rgba(255, 255, 255, 0.5);
-  margin-top: 2px;
+  color: color-mix(in oklch, var(--c-on-dark) 50%, transparent);
+  margin-block-start: calc(var(--line-hairline) * 2);
   line-height: 1;
 }
 
 .labelsActive {
-  color: rgba(255, 255, 255, 0.85);
+  color: color-mix(in oklch, var(--c-on-dark) 85%, transparent);
 }
 
 .label {
-  min-width: 0;
+  min-inline-size: 0;
   white-space: nowrap;
 }
 
 .resetButton {
   appearance: none;
   border: none;
-  background: rgba(255, 255, 255, 0.1);
-  color: rgba(255, 255, 255, 0.6);
+  min-block-size: var(--tap-target);
+  background: color-mix(in oklch, var(--c-on-dark) 10%, transparent);
+  color: color-mix(in oklch, var(--c-on-dark) 60%, transparent);
   font-size: var(--fs-xs);
   cursor: pointer;
-  padding: 2px var(--m-s);
-  border-radius: 999px;
+  padding: calc(var(--line-hairline) * 2) var(--m-s);
+  border-radius: var(--radius-pill);
   line-height: 1;
 }
 
 .resetButton:hover {
-  background: rgba(255, 255, 255, 0.18);
-  color: white;
+  background: color-mix(in oklch, var(--c-on-dark) 18%, transparent);
+  color: var(--c-on-dark);
 }
 
 /* --- Responsive --- */
 
-@media (max-width: 720px) {
+@container (max-width: 720px) {
   .container {
-    left: var(--m-s);
-    right: var(--m-s);
+    inset-inline: var(--m-s);
     padding: var(--m-s) var(--m-m);
   }
 }
 
-/* On touch devices the hover-reveal never fires, so keep the thumbs visible
-   and enlarge them to a comfortable tap target — regardless of viewport width
-   (iPads and landscape phones are wider than 720px but still touch). */
+/* On touch devices the hover-reveal never fires, so keep the full-size thumb
+   targets visible regardless of viewport width. */
 @media (hover: none), (pointer: coarse) {
   .thumb,
   .thumbHidden {
-    width: 22px;
-    height: 22px;
     opacity: 1;
   }
 }

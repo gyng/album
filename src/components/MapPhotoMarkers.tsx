@@ -82,6 +82,7 @@ const MapPhotoMarker = ({
       <div ref={markerRef}>
         {showMarkerImages && isImageVisible ? <LazyMapMarkerImage photo={photo} /> : null}
         <span
+          data-map-pin
           style={{ color: photo.markerColor }}
           className={[pinStyles.pin, routeClass].filter(Boolean).join(" ")}
           role="button"

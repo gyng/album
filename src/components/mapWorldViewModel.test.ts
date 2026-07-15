@@ -65,7 +65,7 @@ describe("mapWorldViewModel", () => {
     ).toBe(0);
   });
 
-  it("returns the original collection without bounds and handles an ordinary viewport", () => {
+  it("waits for bounds before exposing markers and handles an ordinary viewport", () => {
     const photos = stylePhotosByRecency(
       [
         photo({ href: "inside", decLat: 35, decLng: 139 }),
@@ -77,7 +77,7 @@ describe("mapWorldViewModel", () => {
       getPhotoDateStats([]),
     );
 
-    expect(filterPhotosByBounds(photos, null)).toBe(photos);
+    expect(filterPhotosByBounds(photos, null)).toEqual([]);
     expect(
       filterPhotosByBounds(photos, { north: 50, south: 20, west: 120, east: 150 }).map(
         ({ href }) => href,

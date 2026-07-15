@@ -567,9 +567,9 @@ describe("MapWorld", () => {
     expect(mapProps).toHaveBeenLastCalledWith(
       expect.objectContaining({
         initialViewState: { longitude: 12.5, latitude: -3.25, zoom: 9.5 },
-        style: expect.objectContaining({ width: "100%", height: "100%", minHeight: 240 }),
       }),
     );
+    expect(screen.getByTestId("map").parentElement).toHaveStyle({ minHeight: "240px" });
     expect(screen.queryByTestId("theme-bootstrap")).toBeNull();
     expect(screen.getByTestId("marker")).toBeInTheDocument();
   });

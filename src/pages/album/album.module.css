@@ -1,21 +1,20 @@
 .edit {
   background-color: var(--c-bg-edit);
   position: fixed;
-  top: calc(3 * var(--m-xl));
-  left: var(--m-l);
-  color: black;
+  inset-block-start: calc(3 * var(--m-xl));
+  inset-inline-start: var(--m-l);
+  color: var(--c-black);
   font-weight: bolder;
   padding: var(--m-m);
   border-radius: var(--m);
-  z-index: 9999;
+  z-index: var(--z-fullscreen);
   font-family: monospace;
 }
 
 .editDetails {
-  max-height: 80vh;
-  /* biome-ignore lint/suspicious/noDuplicateProperties: Fallback for browsers without small viewport units. */
-  max-height: 80svh;
+  max-block-size: 80svh;
   overflow: auto;
+  overscroll-behavior: contain;
   scrollbar-gutter: stable;
   font-size: var(--fs-s);
 }
@@ -31,9 +30,7 @@
   align-items: center;
   justify-content: center;
   gap: var(--m-m);
-  min-height: 60vh;
-  /* biome-ignore lint/suspicious/noDuplicateProperties: Fallback for browsers without small viewport units. */
-  min-height: 60svh;
+  min-block-size: 60svh;
   padding: var(--m-xl);
   text-align: center;
   color: var(--c-bg-contrast-light);

@@ -56,7 +56,7 @@ export const ProgressBar: React.FC<{
         aria-valuenow={value}
         aria-valuetext={accessibleLabel}
       >
-        <div className={styles.progress} data-progress-fill style={{ width: `${value}%` }} />
+        <div className={styles.progress} data-progress-fill style={{ inlineSize: `${value}%` }} />
         <div>{accessibleLabel}</div>
       </div>
     </div>

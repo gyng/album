@@ -2,24 +2,31 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 1.25rem;
-  height: 1.25rem;
+  inline-size: var(--size-22);
+  block-size: var(--size-22);
   color: var(--c-bg-contrast-light);
   text-decoration: none;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   font-size: 0.95em;
   line-height: 1;
   transition:
-    color 0.15s ease,
-    background-color 0.15s ease;
+    color var(--t-theme) var(--ease-out),
+    background-color var(--t-theme) var(--ease-out);
 }
 
 .link:hover {
   color: var(--c-font);
-  background-color: color-mix(in srgb, var(--c-bg-contrast-light) 18%, transparent);
+  background-color: color-mix(in oklch, var(--c-bg-contrast-light) 18%, transparent);
 }
 
 .link:focus-visible {
-  outline: solid 2px var(--c-bg-contrast-light);
-  outline-offset: 2px;
+  outline: solid var(--size-2) var(--c-bg-contrast-light);
+  outline-offset: var(--size-2);
+}
+
+@media (hover: none), (pointer: coarse) {
+  .link {
+    min-inline-size: var(--tap-target);
+    min-block-size: var(--tap-target);
+  }
 }

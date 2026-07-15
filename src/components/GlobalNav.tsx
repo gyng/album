@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Nav } from "./Nav";
 import commonStyles from "../styles/common.module.css";
+import { buttonStyles } from "./ui";
 
 export type GlobalNavPage =
   | "home"
@@ -50,7 +51,7 @@ export const GlobalNav: React.FC<Props> = ({
           <li>
             <Link
               href="/search"
-              className={cx(commonStyles.button, current("search"))}
+              className={cx(buttonStyles.base, current("search"))}
               aria-current={ariaCurrent("search")}
             >
               Search
@@ -59,7 +60,7 @@ export const GlobalNav: React.FC<Props> = ({
           <li>
             <Link
               href="/explore"
-              className={cx(commonStyles.button, current("explore"))}
+              className={cx(buttonStyles.base, current("explore"))}
               aria-current={ariaCurrent("explore")}
             >
               Explore
@@ -69,7 +70,7 @@ export const GlobalNav: React.FC<Props> = ({
             <Link
               href="/map"
               prefetch={onMapClick ? false : undefined}
-              className={cx(commonStyles.button, current("map"))}
+              className={cx(buttonStyles.base, current("map"))}
               onClick={onMapClick}
               aria-current={ariaCurrent("map")}
             >
@@ -79,7 +80,7 @@ export const GlobalNav: React.FC<Props> = ({
           <li>
             <Link
               href="/timeline"
-              className={cx(commonStyles.button, current("timeline"))}
+              className={cx(buttonStyles.base, current("timeline"))}
               aria-current={ariaCurrent("timeline")}
             >
               Timeline
@@ -112,7 +113,7 @@ export const GlobalNav: React.FC<Props> = ({
           <li>
             <Link
               href="/guess"
-              className={cx(commonStyles.button, current("guess"))}
+              className={cx(buttonStyles.base, current("guess"))}
               aria-current={ariaCurrent("guess")}
             >
               Guess Where

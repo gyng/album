@@ -2,7 +2,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 100vh;
+  min-block-size: 100dvh;
   padding: var(--m-l);
   background: var(--c-bg);
   color: var(--c-font);
@@ -12,9 +12,9 @@
   display: flex;
   flex-direction: column;
   gap: var(--m-m);
-  max-width: 420px;
+  max-inline-size: calc(var(--m-l) * 21);
   padding: var(--m-xl);
-  border: 1px solid var(--c-bg-contrast-light);
+  border: var(--line-hairline) solid var(--c-bg-contrast-light);
   text-align: center;
 }
 
@@ -27,19 +27,4 @@
   margin: 0;
   font-size: var(--fs-sm);
   color: var(--c-bg-contrast-dark);
-}
-
-.button {
-  align-self: center;
-  padding: var(--m-s) var(--m-l);
-  font-size: var(--fs-sm);
-  color: var(--c-font);
-  background: transparent;
-  border: 1px solid var(--c-font);
-  cursor: pointer;
-}
-
-.button:hover {
-  background: var(--c-font);
-  color: var(--c-bg);
 }

@@ -1,7 +1,25 @@
-import React, { useEffect, useId, useRef, useState, useSyncExternalStore } from "react";
-import { Input, Select } from "../ui";
-import styles from "./Search.module.css";
+import { mergeCssModuleStyles } from "../../util/mergeCssModuleStyles";
+import React, { useEffect, useId, useRef, useSyncExternalStore } from "react";
+import { Input, Select, TooltipSurface } from "../ui";
+import sharedStyles from "./Search.module.css";
+import localStyles from "./SearchInputBar.module.css";
 import { SearchMode } from "./useTextVector";
+
+const styles = mergeCssModuleStyles(sharedStyles, localStyles, [
+  "clearButton",
+  "imageQueryActions",
+  "imageQueryFileInput",
+  "searchHintInline",
+  "searchInput",
+  "searchInputContainer",
+  "searchInputRow",
+  "searchModeInfo",
+  "searchModeInfoTooltip",
+  "searchModeInfoWrap",
+  "searchModeSelect",
+  "searchModeSelectLabel",
+  "secondaryAction",
+]);
 
 const SEARCH_MODE_HELP =
   "Keyword finds matching words. Semantic finds photos with a similar meaning. Hybrid combines both.";
@@ -50,7 +68,6 @@ export const SearchInputBar: React.FC<Props> = ({
     () => true,
     () => false,
   );
-  const [isModeHelpOpen, setIsModeHelpOpen] = useState(false);
   const modeHelpId = useId();
   const imageFileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -115,25 +132,18 @@ export const SearchInputBar: React.FC<Props> = ({
                 type="button"
                 className={styles.searchModeInfo}
                 aria-label="Search mode help"
-                aria-expanded={isModeHelpOpen}
-                aria-describedby={modeHelpId}
-                onClick={() => setIsModeHelpOpen((open) => !open)}
-                onBlur={() => setIsModeHelpOpen(false)}
+                popoverTarget={modeHelpId}
               >
                 <span aria-hidden="true">ⓘ</span>
               </button>
-              <span
+              <TooltipSurface
                 id={modeHelpId}
                 role="tooltip"
-                className={[
-                  styles.searchModeInfoTooltip,
-                  isModeHelpOpen ? styles.searchModeInfoTooltipOpen : "",
-                ]
-                  .filter(Boolean)
-                  .join(" ")}
+                popover="auto"
+                className={styles.searchModeInfoTooltip}
               >
                 {SEARCH_MODE_HELP}
-              </span>
+              </TooltipSurface>
             </span>
           </div>
           {isMounted ? (

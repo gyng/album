@@ -70,6 +70,25 @@ test.describe("Search", () => {
     await expectJapanResults(page);
   });
 
+  test("compact filters open as a native modal and restore focus", async ({ page }) => {
+    await page.setViewportSize({ width: 700, height: 900 });
+    await page.goto("/search", { waitUntil: "domcontentloaded" });
+
+    const trigger = page.getByRole("button", { name: "Filters" });
+    await expect(trigger).toBeVisible();
+    await trigger.click();
+
+    const dialog = page.getByRole("dialog", { name: "Search filters" });
+    await expect(dialog).toBeVisible();
+    await expect(dialog).toHaveJSProperty("open", true);
+    expect(await dialog.evaluate((element) => element.matches(":modal"))).toBe(true);
+    await expect(page.getByRole("button", { name: "Done" })).toBeFocused();
+
+    await page.keyboard.press("Escape");
+    await expect(dialog).toBeHidden();
+    await expect(trigger).toBeFocused();
+  });
+
   test("similar mode queries the production-format embeddings database", async ({ page }) => {
     await page.goto("/search?similar=../albums/test-simple/DSCF0506-2.jpg", {
       waitUntil: "domcontentloaded",

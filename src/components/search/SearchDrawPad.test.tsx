@@ -2,7 +2,7 @@
  * @jest-environment jsdom
  */
 
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { SearchDrawPad } from "./SearchDrawPad";
 
 // jsdom has no canvas implementation — getContext returns null and the
@@ -43,10 +43,7 @@ describe("SearchDrawPad focus management", () => {
     });
   });
 
-  afterEach(() => {
-    getContext.mockRestore();
-    document.body.style.overflow = "";
-  });
+  afterEach(() => getContext.mockRestore());
 
   it("moves focus into the dialog on open", () => {
     render(<SearchDrawPad onCancel={jest.fn()} onSubmit={jest.fn()} />);
@@ -69,48 +66,16 @@ describe("SearchDrawPad focus management", () => {
     trigger.remove();
   });
 
-  it("wraps Tab from the last control back to the first", () => {
-    render(<SearchDrawPad onCancel={jest.fn()} onSubmit={jest.fn()} />);
-
-    // Search is disabled until a stroke exists, so Cancel is the last
-    // focusable control.
-    const cancel = screen.getByRole("button", { name: "Cancel" });
-    cancel.focus();
-    fireEvent.keyDown(cancel, { key: "Tab" });
-
-    expect(document.activeElement).toBe(
-      screen.getByRole("button", { name: "Brush colour #1a1a1a" }),
-    );
-  });
-
-  it("wraps Shift+Tab from the first control back to the last", () => {
-    render(<SearchDrawPad onCancel={jest.fn()} onSubmit={jest.fn()} />);
-
-    const firstSwatch = screen.getByRole("button", {
-      name: "Brush colour #1a1a1a",
-    });
-    firstSwatch.focus();
-    fireEvent.keyDown(firstSwatch, { key: "Tab", shiftKey: true });
-
-    expect(document.activeElement).toBe(screen.getByRole("button", { name: "Cancel" }));
-  });
-
-  it("closes on Escape", () => {
+  it("closes when the native dialog is cancelled", () => {
     const onCancel = jest.fn();
     render(<SearchDrawPad onCancel={onCancel} onSubmit={jest.fn()} />);
 
-    fireEvent.keyDown(window, { key: "Escape" });
+    fireEvent(
+      screen.getByRole("dialog", { name: "Draw to search" }),
+      new Event("cancel", { bubbles: false, cancelable: true }),
+    );
 
     expect(onCancel).toHaveBeenCalledTimes(1);
-  });
-
-  it("locks body scroll while open and releases it on close", () => {
-    document.body.style.overflow = "scroll";
-    const { unmount } = render(<SearchDrawPad onCancel={jest.fn()} onSubmit={jest.fn()} />);
-    expect(document.body.style.overflow).toBe("hidden");
-
-    unmount();
-    expect(document.body.style.overflow).toBe("scroll");
   });
 
   it("does not restore focus to an opener that was removed", () => {
@@ -134,32 +99,15 @@ describe("SearchDrawPad focus management", () => {
     }
   });
 
-  it("ignores non-Tab trap keys, ordinary Tab positions, and an empty focus list", () => {
-    render(<SearchDrawPad onCancel={jest.fn()} onSubmit={jest.fn()} />);
-    const dialog = screen.getByRole("dialog", { name: "Draw to search" });
-    const medium = screen.getByRole("button", { name: "Medium" });
-    medium.focus();
-    fireEvent.keyDown(dialog, { key: "A" });
-    fireEvent.keyDown(medium, { key: "Tab" });
-    expect(document.activeElement).toBe(medium);
-
-    within(dialog)
-      .getAllByRole("button")
-      .forEach((button) => {
-        (button as HTMLButtonElement).disabled = true;
-      });
-    fireEvent.keyDown(dialog, { key: "Tab" });
-  });
-
   it("dismisses only direct backdrop clicks", () => {
     const onCancel = jest.fn();
     render(<SearchDrawPad onCancel={onCancel} onSubmit={jest.fn()} />);
     const dialog = screen.getByRole("dialog", { name: "Draw to search" });
-    const backdrop = dialog.parentElement!;
+    const panel = dialog.firstElementChild!;
 
-    fireEvent.click(dialog);
+    fireEvent.click(panel);
     expect(onCancel).not.toHaveBeenCalled();
-    fireEvent.click(backdrop);
+    fireEvent.click(dialog);
     expect(onCancel).toHaveBeenCalledTimes(1);
     fireEvent.keyDown(window, { key: "Enter" });
     expect(onCancel).toHaveBeenCalledTimes(1);

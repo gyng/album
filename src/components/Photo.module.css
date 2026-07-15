@@ -1,70 +1,11 @@
 .exif {
-  font-size: var(--fs-s);
-  margin-left: var(--m-l);
-}
-
-.exif td {
-  padding: 0 var(--m) var(--m) 0;
-  vertical-align: baseline;
-}
-
-.details {
-  grid-column: 1;
-  grid-row: 1;
-  overflow: auto;
-  max-height: 90vh;
-  /* biome-ignore lint/suspicious/noDuplicateProperties: Fallback for browsers without small viewport units. */
-  max-height: 90svh;
-  position: sticky;
-  right: var(--m-l);
-  place-self: start end;
-  max-width: calc(100vw - var(--m-m));
-  max-width: calc(100svw - var(--m-m));
-  scrollbar-gutter: stable;
-  z-index: 300;
-  margin-top: calc(-1 * var(--m-xl));
-}
-
-.detailsContent {
-  display: flex;
-  align-items: flex-end;
-  flex-direction: column;
-  padding: var(--m-m);
-  margin-top: var(--m-s);
-  background-color: var(--c-overlay);
-  backdrop-filter: blur(8px);
-  border-radius: var(--m);
-}
-
-.details > details {
-  height: 1.4em;
-  transition: height 0.2s ease-out;
-  display: block;
-}
-
-.details > details[open] {
-  height: auto;
-  overflow: clip; /* Clip off contents while animating */
-}
-
-.details summary {
-  text-align: right;
-  user-select: none;
-  cursor: pointer;
-  color: var(--c-bg-contrast-light);
-}
-
-/* The top-level photo-details toggle shows a custom ⓘ glyph, so hide the
-   native WebKit disclosure marker (the nested Raw EXIF / License disclosures
-   keep theirs). */
-.detailsSummary::-webkit-details-marker {
-  display: none;
+  margin-inline-start: var(--m-l);
 }
 
 .block {
   display: grid;
   gap: var(--m-l);
-  width: 100%;
+  inline-size: 100%;
   padding: var(--m-l);
 }
 
@@ -74,11 +15,9 @@
 }
 
 .image {
-  max-height: 90vh;
-  /* biome-ignore lint/suspicious/noDuplicateProperties: Fallback for browsers without small viewport units. */
-  max-height: 90svh;
-  max-width: min(90vw, 100%);
-  height: auto;
+  max-block-size: 90svh;
+  max-inline-size: min(90svw, 100%);
+  block-size: auto;
   display: block;
   margin: 0 auto;
   object-fit: contain;
@@ -90,21 +29,13 @@
   display: none;
 }
 
-.viewOriginal {
-  text-align: right;
-}
-
-.rawDetails {
-  margin-top: var(--m-m);
-}
-
 .similarPhotos {
-  margin-top: var(--m-l);
-  max-width: min(32rem, 100%);
+  margin-block-start: var(--m-l);
+  max-inline-size: min(var(--content-width-reading), 100%);
 }
 
 .similarPhotosTitle {
-  margin-bottom: var(--m);
+  margin-block-end: var(--m);
 }
 
 .similarPhotosStatus {
@@ -114,17 +45,17 @@
 
 .similarPhotoGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(120px, 150px));
+  grid-template-columns: repeat(auto-fill, minmax(var(--size-120), var(--size-150)));
   gap: var(--m);
 }
 
 .similarPhotosLoadMoreTile {
   appearance: none;
-  width: 150px;
-  height: 150px;
+  inline-size: var(--size-150);
+  block-size: var(--size-150);
   border: 0;
   padding: 0;
-  text-align: left;
+  text-align: start;
   background: transparent;
   color: inherit;
   cursor: pointer;
@@ -136,25 +67,35 @@
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
-  width: 100%;
-  height: 100%;
+  inline-size: 100%;
+  block-size: 100%;
   padding: var(--m-m);
   border-radius: var(--m-s);
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(0, 0, 0, 0.16)), var(--c-overlay);
-  backdrop-filter: blur(8px);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14);
+    linear-gradient(
+      180deg,
+      color-mix(in oklch, var(--c-white) 4%, transparent),
+      color-mix(in oklch, var(--c-black) 16%, transparent)
+    ),
+    var(--c-overlay);
+  backdrop-filter: blur(var(--glass-blur-surface));
+  box-shadow: inset 0 0 0 var(--size-1) color-mix(in oklch, var(--c-white) 14%, transparent);
 }
 
 .similarPhotosLoadMoreTile:hover:not(:disabled) .similarPhotosLoadMoreTileBody {
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(0, 0, 0, 0.2)), var(--c-overlay);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.22);
+    linear-gradient(
+      180deg,
+      color-mix(in oklch, var(--c-white) 6%, transparent),
+      color-mix(in oklch, var(--c-black) 20%, transparent)
+    ),
+    var(--c-overlay);
+  box-shadow: inset 0 0 0 var(--size-1) color-mix(in oklch, var(--c-white) 22%, transparent);
 }
 
 .similarPhotosLoadMoreTile:focus-visible {
-  outline: solid 2px var(--c-bg-contrast-light);
-  outline-offset: 2px;
+  outline: solid var(--size-2) var(--c-bg-contrast-light);
+  outline-offset: var(--size-2);
   border-radius: var(--m-s);
 }
 
@@ -169,20 +110,20 @@
 }
 
 .similarPhotosLoadMoreHint {
-  margin-top: var(--m);
+  margin-block-start: var(--m);
   color: var(--c-bg-contrast-light);
   font-size: var(--fs-s);
 }
 
 .description {
-  max-width: 900px;
+  max-inline-size: var(--photo-description-measure);
   place-self: center;
   white-space: pre-line;
 }
 
 .moveButtons {
   display: grid;
-  grid-template-columns: 1fr 1fr 40px;
+  grid-template-columns: 1fr 1fr var(--size-40);
   gap: var(--m-m);
 }
 
@@ -198,13 +139,10 @@
 
 .immersive img {
   object-fit: cover;
-  max-width: unset;
-  max-height: unset;
-  width: 100vw;
-  /* biome-ignore lint/suspicious/noDuplicateProperties: Fallback for browsers without small viewport units. */
-  width: 100svw;
-  height: 100vh;
-  height: 100svh;
+  max-inline-size: unset;
+  max-block-size: unset;
+  inline-size: 100svw;
+  block-size: 100svh;
   margin: 0 auto;
 }
 
@@ -212,12 +150,12 @@
   position: relative;
   grid-row: 1;
   grid-column: 1;
-  z-index: 200;
+  z-index: var(--z-caption);
   pointer-events: none;
   /* Force a photo-safe colour: the text sits directly over an arbitrary
      image, so it must stay light-on-dark regardless of the active theme. */
-  color: white;
-  text-shadow: 0 1px 12px rgba(0, 0, 0, 0.6);
+  color: var(--c-white);
+  text-shadow: 0 var(--size-1) var(--size-12) color-mix(in oklch, var(--c-black) 60%, transparent);
 }
 
 /* Subtle bottom gradient scrim so the caption stays legible over busy or
@@ -225,41 +163,40 @@
 .immersive .overlayHeader::after {
   content: "";
   position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 40vh;
-  /* biome-ignore lint/suspicious/noDuplicateProperties: Fallback for browsers without small viewport units. */
-  height: 40svh;
-  background: linear-gradient(to top, rgba(0, 0, 0, 0.55), transparent);
+  inset-inline: 0;
+  inset-block-end: 0;
+  block-size: 40svh;
+  background: linear-gradient(
+    to top,
+    color-mix(in oklch, var(--c-black) 55%, transparent),
+    transparent
+  );
   pointer-events: none;
-  z-index: -1;
+  z-index: var(--z-behind);
 }
 
-.immersive .title {
+:where(.immersive) .title {
   pointer-events: auto;
-  margin-top: min(400px, 25vh);
-  /* biome-ignore lint/suspicious/noDuplicateProperties: Fallback for browsers without small viewport units. */
-  margin-top: min(400px, 25svh);
+  margin-block-start: min(var(--immersive-title-offset-max), 25svh);
 }
 
 .immersive .description {
-  margin-bottom: 15vh;
-  /* biome-ignore lint/suspicious/noDuplicateProperties: Fallback for browsers without small viewport units. */
-  margin-bottom: 15svh;
-  text-shadow: 0 1px 12px rgba(0, 0, 0, 0.8);
+  margin-block-end: 15svh;
+  text-shadow: 0 var(--size-1) var(--size-12) color-mix(in oklch, var(--c-black) 80%, transparent);
   font-size: var(--fs-l);
-  margin-top: auto;
+  margin-block-start: auto;
   pointer-events: auto;
 }
 
-.immersive .kicker {
+:where(.immersive) .kicker {
   pointer-events: auto;
 }
 
 .immersive .details {
-  margin: var(--m-m) 0 0;
-  padding: var(--m) var(--m-m) var(--m) var(--m-l);
+  margin-block-start: var(--m-m);
+  padding-block: var(--m);
+  padding-inline-start: var(--m-l);
+  padding-inline-end: var(--m-m);
 }
 
 .title {
@@ -269,7 +206,7 @@
 
 @media (max-width: 720px) {
   .title {
-    font-size: clamp(var(--fs-l), 10vw, var(--fs-xl));
+    font-size: clamp(var(--fs-l), 10dvw, var(--fs-xl));
   }
 }
 
@@ -279,23 +216,34 @@
 }
 
 .colorswatch {
-  height: 1.5em;
-  width: 1.5em;
+  block-size: 1.5em;
+  inline-size: 1.5em;
   cursor: pointer;
   transition:
-    transform 0.15s ease,
-    opacity 0.15s ease;
+    transform var(--t-theme) var(--ease-out),
+    opacity var(--t-theme) var(--ease-out);
   display: block;
 }
 
-.colorswatch:hover {
-  transform: scale(1.2);
-  opacity: 0.8;
+@media (hover: hover) and (pointer: fine) {
+  .colorswatch:hover {
+    transform: scale(1.2);
+    opacity: 0.8;
+  }
 }
 
 .colorswatch:focus-visible {
-  outline: solid 2px var(--c-bg-contrast-light);
-  outline-offset: 2px;
+  outline: solid var(--size-2) var(--c-bg-contrast-light);
+  outline-offset: var(--size-2);
+}
+
+@media (hover: none), (pointer: coarse) {
+  .colorswatch {
+    inline-size: var(--tap-target);
+    block-size: var(--tap-target);
+    padding: var(--m-m);
+    background-clip: content-box;
+  }
 }
 
 .colorswatches {
@@ -308,7 +256,7 @@
 }
 
 .narrowCell {
-  width: min-content;
+  inline-size: min-content;
 }
 
 .detailValueWithAction {

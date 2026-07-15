@@ -2,6 +2,7 @@
 import styles from "./VideoBlock.module.css";
 import React from "react";
 import { License } from "../License";
+import commonStyles from "../styles/common.module.css";
 
 export type YoutubeBlockElProps = {
   id?: string;
@@ -40,14 +41,14 @@ const VideoDetailsPanel: React.FC<{
     props.type === "local" ? "H.264 (AVC) + AAC, web-optimised MP4" : "YouTube adaptive stream";
 
   return (
-    <div id={props.id ?? props.src} className={styles.details}>
-      <details>
-        <summary title="More details&hellip;" className={styles.detailsSummary}>
+    <div id={props.id ?? props.src} className={commonStyles.mediaDetails}>
+      <details className={commonStyles.disclosure}>
+        <summary title="More details&hellip;" className={commonStyles.mediaDetailsSummary}>
           <span>ⓘ</span>
         </summary>
 
-        <div className={styles.detailsContent}>
-          <div className={styles.videoDetailsTableWrapper}>
+        <div className={commonStyles.mediaDetailsContent}>
+          <div className={commonStyles.mediaDetailsTable}>
             <table>
               <tbody>
                 <tr>
@@ -166,7 +167,7 @@ const VideoDetailsPanel: React.FC<{
               </tbody>
             </table>
 
-            <div className={styles.viewOriginal}>
+            <div className={commonStyles.mediaDetailsViewOriginal}>
               <a href={`#${props.id ?? props.src}`}>Permalink</a>
               &nbsp;&middot;&nbsp;
               {props.type === "local" ? (
@@ -178,7 +179,7 @@ const VideoDetailsPanel: React.FC<{
               )}
             </div>
 
-            <details className={styles.rawDetails}>
+            <details className={commonStyles.mediaDetailsRaw}>
               <summary>Raw video details</summary>
               <pre>
                 {JSON.stringify(

@@ -22,14 +22,25 @@ import {
   getNextBuildId,
   hasMapCoordinates,
 } from "../../components/mapSearchIndex";
+import { buttonStyles } from "../../components/ui";
+import {
+  packMapWorldEntry,
+  unpackMapWorldEntry,
+  type MapWorldEntryRow,
+} from "../../util/pageDataRows";
 
 type PageProps = {
-  photos: MapWorldEntry[];
+  photos?: MapWorldEntry[];
+  photoRows?: MapWorldEntryRow[];
 };
 
 const DEBOUNCE_URL_MS = 300;
 
 const WorldMap: NextPage<PageProps> = (props) => {
+  const photos = React.useMemo(
+    () => props.photos ?? props.photoRows?.map(unpackMapWorldEntry) ?? [],
+    [props.photoRows, props.photos],
+  );
   const router = useRouter();
   const filterAlbum =
     typeof router.query.filter_album === "string" ? router.query.filter_album : null;
@@ -45,8 +56,8 @@ const WorldMap: NextPage<PageProps> = (props) => {
 
   // Album filtering (existing)
   const albumFilteredPhotos = React.useMemo(
-    () => (filterAlbum ? props.photos.filter((p) => p.album === filterAlbum) : props.photos),
-    [props.photos, filterAlbum],
+    () => (filterAlbum ? photos.filter((p) => p.album === filterAlbum) : photos),
+    [photos, filterAlbum],
   );
 
   // Time range state — live during drag, committed on pointer up
@@ -249,7 +260,7 @@ const WorldMap: NextPage<PageProps> = (props) => {
                   <div className={styles.mapControls}>
                     <button
                       type="button"
-                      className={commonStyles.button}
+                      className={buttonStyles.base}
                       aria-pressed={showAllRoutes}
                       onClick={() => {
                         setShowAllRoutes((current) => !current);
@@ -260,10 +271,7 @@ const WorldMap: NextPage<PageProps> = (props) => {
 
                     <button
                       type="button"
-                      className={[
-                        commonStyles.button,
-                        showTimeRangeSlider ? commonStyles.active : "",
-                      ]
+                      className={[buttonStyles.base, showTimeRangeSlider ? buttonStyles.active : ""]
                         .filter(Boolean)
                         .join(" ")}
                       aria-expanded={showTimeRangeSlider}
@@ -281,7 +289,7 @@ const WorldMap: NextPage<PageProps> = (props) => {
                 <li>
                   <button
                     type="button"
-                    className={[commonStyles.button, showTimeRangeSlider ? commonStyles.active : ""]
+                    className={[buttonStyles.base, showTimeRangeSlider ? buttonStyles.active : ""]
                       .filter(Boolean)
                       .join(" ")}
                     aria-expanded={showTimeRangeSlider}
@@ -370,8 +378,11 @@ export const getStaticProps: GetStaticProps<PageProps> = async () => {
     const stripped = albums.flatMap((album) => {
       const validPhotos = album.blocks.filter(hasMapCoordinates);
 
-      return validPhotos.map((photo) => {
+      return validPhotos.flatMap((photo) => {
         const src = photo._build.srcset?.[0];
+        if (!src) {
+          return [];
+        }
         const exif = photo._build?.exif ?? {};
         const { GPSLongitude, GPSLatitude, GPSLongitudeRef, GPSLatitudeRef, DateTimeOriginal } =
           exif;
@@ -399,11 +410,11 @@ export const getStaticProps: GetStaticProps<PageProps> = async () => {
           placeholderHeight: photo._build?.height,
           placeholderWidth: photo._build?.width,
         };
-        return entry;
+        return [entry];
       });
     });
 
-    return { props: { photos: stripped } };
+    return { props: { photoRows: stripped.map(packMapWorldEntry) } };
   });
 };
 

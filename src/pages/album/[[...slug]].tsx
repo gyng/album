@@ -6,8 +6,7 @@ import { getAlbumFromName, getAlbumNames } from "../../services/album";
 import { Content, PhotoBlock } from "../../services/types";
 import { GlobalNav } from "../../components/GlobalNav";
 import { PhotoAlbum } from "../../components/PhotoAlbum";
-import { Footer } from "../../components/ui";
-import commonStyles from "../../styles/common.module.css";
+import { Footer, buttonStyles } from "../../components/ui";
 import { measureBuild } from "../../services/buildTiming";
 import { Seo } from "../../components/Seo";
 import {
@@ -101,17 +100,17 @@ const Album: NextPage<PageProps> = ({ album }) => {
         extraItems={
           <>
             <li>
-              <Link href={`/map?filter_album=${albumName}`} className={commonStyles.button}>
+              <Link href={`/map?filter_album=${albumName}`} className={buttonStyles.base}>
                 Album map
               </Link>
             </li>
             <li>
-              <Link href={`/timeline?filter_album=${albumName}`} className={commonStyles.button}>
+              <Link href={`/timeline?filter_album=${albumName}`} className={buttonStyles.base}>
                 Album timeline
               </Link>
             </li>
             <li>
-              <Link href={`/slideshow?filter=${albumName}`} className={commonStyles.button}>
+              <Link href={`/slideshow?filter=${albumName}`} className={buttonStyles.base}>
                 Album slideshow
               </Link>
             </li>

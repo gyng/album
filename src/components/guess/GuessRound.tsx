@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { distanceMetersBetween } from "../mapRoute";
-import { Caption } from "../ui";
+import { Button, Caption, KeyHint } from "../ui";
 import styles from "./GuessRound.module.css";
+import { encodePublicAssetPath } from "../../util/encodePublicAssetPath";
 import { GuessPhoto } from "./guessTypes";
 import { fireConfetti } from "./confetti";
 import { isInteractiveTarget } from "./guessKeyboard";
@@ -117,7 +118,9 @@ export const GuessRound: React.FC<GuessRoundProps> = ({
   // populated before an interval can tick.
   const timerCallbackRef = useRef<() => void>(null!);
 
-  const photoSrc = `/data/albums/${photo.albumName}/.resized_images/${photo.photoName}@1600.avif`;
+  const photoSrc = encodePublicAssetPath(
+    `/data/albums/${photo.albumName}/.resized_images/${photo.photoName}@1600.avif`,
+  );
 
   const handleConfirm = useCallback(() => {
     const distanceMeters = distanceMetersBetween(
@@ -393,9 +396,16 @@ export const GuessRound: React.FC<GuessRoundProps> = ({
         >
           <span ref={cumulativeCounterRef}>{cumulativeScore.toLocaleString()}</span> pts
         </span>
-        <button className={styles.abortButton} onClick={onAbort} title="Quit to menu">
+        <Button
+          variant="quiet"
+          size="icon"
+          className={styles.abortButton}
+          onClick={onAbort}
+          title="Quit to menu"
+          aria-label="Quit to menu"
+        >
           &times;
-        </button>
+        </Button>
       </div>
 
       <div className={styles.gameArea}>
@@ -460,10 +470,10 @@ export const GuessRound: React.FC<GuessRoundProps> = ({
           <div className={styles.controls}>
             {!revealed ? (
               <>
-                <button className={styles.skipButton} onClick={handleSkip}>
+                <Button variant="quiet" className={styles.skipButton} onClick={handleSkip}>
                   I have no idea
-                </button>
-                <button
+                </Button>
+                <Button
                   className={[styles.confirmButton, guess ? styles.confirmReady : ""]
                     .filter(Boolean)
                     .join(" ")}
@@ -471,8 +481,8 @@ export const GuessRound: React.FC<GuessRoundProps> = ({
                   disabled={!guess}
                 >
                   Confirm
-                  <kbd className={styles.kbd}>Enter</kbd>
-                </button>
+                  <KeyHint>Enter</KeyHint>
+                </Button>
               </>
             ) : (
               <div className={styles.revealPanel}>
@@ -506,7 +516,7 @@ export const GuessRound: React.FC<GuessRoundProps> = ({
                       <div
                         className={styles.scoreBarFill}
                         style={{
-                          width: `${scoreRatio(result!.distanceScore) * 100}%`,
+                          inlineSize: `${scoreRatio(result!.distanceScore) * 100}%`,
                           backgroundColor: tierColour,
                         }}
                       />
@@ -518,12 +528,10 @@ export const GuessRound: React.FC<GuessRoundProps> = ({
                     {geocodeLabel}
                   </Caption>
                 ) : null}
-                <button className={styles.nextButton} onClick={handleNext}>
+                <Button className={styles.nextButton} onClick={handleNext}>
                   {roundNumber === totalRounds ? "See results" : "Next"}
-                  <kbd className={styles.kbd}>
-                    {roundNumber === totalRounds ? "Enter" : "\u2192"}
-                  </kbd>
-                </button>
+                  <KeyHint>{roundNumber === totalRounds ? "Enter" : "\u2192"}</KeyHint>
+                </Button>
               </div>
             )}
           </div>

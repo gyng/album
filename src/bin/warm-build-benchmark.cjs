@@ -283,7 +283,7 @@ const runBenchmark = ({
       }
     : null;
 
-  fs.writeFileSync(outputPath, JSON.stringify(benchmark, null, 2));
+  fs.writeFileSync(outputPath, `${JSON.stringify(benchmark, null, 2)}\n`);
 
   log("\nWarm build benchmark written to", outputPath);
   log(

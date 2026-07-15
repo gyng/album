@@ -189,7 +189,7 @@ describe("video process boundaries", () => {
     jest.spyOn(console, "log").mockImplementation(() => undefined);
 
     await expect(optimiseVideo("albums/trip/clip.mov", "public/data/albums")).resolves.toEqual({
-      src: "/built/clip.mov@1920.mp4",
+      src: "/built/clip.mov%401920.mp4",
       mimeType: "video/mp4",
     });
     expect(mockSpawn).toHaveBeenCalledWith(

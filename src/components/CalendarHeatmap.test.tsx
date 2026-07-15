@@ -72,6 +72,33 @@ describe("CalendarHeatmap", () => {
     expect(onSelectDate).toHaveBeenCalledWith("2024-01-02");
   });
 
+  it("renders recent years first and progressively reveals older years", () => {
+    const manyYears = [2025, 2024, 2023, 2022].map((year, index) => ({
+      ...entries[0],
+      date: `${year}-01-02`,
+      dateTimeOriginal: `${year}-01-02T10:00:00`,
+      href: `/album/kansai#${year}.jpg`,
+      path: `../albums/kansai/${year}.jpg`,
+      src: { ...entries[0]!.src, src: `/${year}.jpg` },
+      placeholderColor: `rgb(${index + 1}, 2, 3)`,
+    }));
+
+    render(
+      <CalendarHeatmap entries={manyYears} selectedDate="2025-01-02" onSelectDate={jest.fn()} />,
+    );
+
+    expect(screen.getByRole("heading", { name: "2025" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "2024" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "2023" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Show 2 earlier years" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Show 2 earlier years" }));
+
+    expect(screen.getByRole("heading", { name: "2023" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "2022" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /earlier years/i })).toBeNull();
+  });
+
   it("shows a thumbnail preview popup with a remaining-count label on hover", () => {
     render(<CalendarHeatmap entries={entries} selectedDate="2024-01-02" onSelectDate={() => {}} />);
 

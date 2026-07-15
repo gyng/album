@@ -1,4 +1,5 @@
 import React from "react";
+import { Button, Heading } from "./ui";
 import styles from "./ErrorBoundary.module.css";
 
 type ErrorBoundaryProps = {
@@ -37,13 +38,13 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
       return (
         <div className={styles.container} role="alert">
           <div className={styles.card}>
-            <h1 className={styles.heading}>Something went wrong</h1>
+            <Heading level={1} as="h1" className={styles.heading}>
+              Something went wrong
+            </Heading>
             <p className={styles.body}>
               This page hit an unexpected error. Reloading usually fixes it.
             </p>
-            <button className={styles.button} type="button" onClick={this.handleReload}>
-              Reload page
-            </button>
+            <Button onClick={this.handleReload}>Reload page</Button>
           </div>
         </div>
       );

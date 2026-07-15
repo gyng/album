@@ -1,11 +1,12 @@
 import React, { useCallback, useState } from "react";
 import Link from "next/link";
-import { Heading, Caption } from "../ui";
+import { Button, Caption, Heading } from "../ui";
 import { RoundResult } from "./GuessRound";
 import { GameSettings } from "./guessTypes";
 import { MAX_SCORE, MAX_TIME_BONUS, formatDistance, scoreTierColour } from "./guessScoring";
 import { useAnimatedCounter } from "./useAnimatedCounter";
 import styles from "./GuessSummary.module.css";
+import { encodePublicAssetPath } from "../../util/encodePublicAssetPath";
 
 type GuessSummaryProps = {
   results: RoundResult[];
@@ -105,7 +106,9 @@ export const GuessSummary: React.FC<GuessSummaryProps> = ({
 
       <ol className={styles.roundList}>
         {results.map((result, idx) => {
-          const thumbSrc = `/data/albums/${result.photo.albumName}/.resized_images/${result.photo.photoName}@800.avif`;
+          const thumbSrc = encodePublicAssetPath(
+            `/data/albums/${result.photo.albumName}/.resized_images/${result.photo.photoName}@800.avif`,
+          );
           const label = getGeocodeLabel(result.photo.geocode);
           const barWidth = (result.score / maxPerRound) * 100;
           const colour = scoreTierColour(result.distanceScore);
@@ -139,7 +142,7 @@ export const GuessSummary: React.FC<GuessSummaryProps> = ({
                   <div
                     className={styles.scoreBarFill}
                     style={{
-                      width: `${barWidth}%`,
+                      inlineSize: `${barWidth}%`,
                       backgroundColor: colour,
                       animationDelay: `${0.2 + idx * 0.1}s`,
                     }}
@@ -160,18 +163,18 @@ export const GuessSummary: React.FC<GuessSummaryProps> = ({
       </ol>
 
       <div className={styles.actions}>
-        <button className={styles.playAgain} onClick={onPlayAgain}>
+        <Button className={styles.playAgain} onClick={onPlayAgain}>
           Play again
-        </button>
-        <button className={styles.shareButton} onClick={handleCopyLink}>
+        </Button>
+        <Button className={styles.shareButton} onClick={handleCopyLink}>
           {copied ? "Copied!" : "Copy challenge link"}
-        </button>
+        </Button>
       </div>
 
       <div className={styles.footer}>
-        <button className={styles.changeSettings} onClick={onChangeSettings}>
+        <Button variant="quiet" className={styles.changeSettings} onClick={onChangeSettings}>
           Change settings
-        </button>
+        </Button>
       </div>
     </div>
   );
