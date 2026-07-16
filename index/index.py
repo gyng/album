@@ -5025,14 +5025,50 @@ def assert_no_row_regression(
         )
 
 
+def backup_published_output(output: Path, backup_dir: Path) -> Optional[Path]:
+    """Keep exactly one copy of the database about to be replaced.
+
+    Publication replaces outputs by `rename`, which unlinks the previous inode, so
+    the last good published database is otherwise unrecoverable the moment a
+    publish lands. The backup deliberately lives beside the source rather than
+    beside the output: `public/` is copied wholesale into the site build, so a
+    backup there would be served as a multi-MB static asset.
+
+    A hard link keeps the old inode alive at no copy cost and cannot be caught
+    half-written, which matters because a truncated backup is worse than none.
+    Publish only ever replaces outputs by rename, so the surviving link can never
+    be written through. `--core-output` may point at another filesystem, where
+    linking is impossible, so fall back to a copy staged under a temporary name.
+    """
+    if not output.exists():
+        return None
+    backup = backup_dir / f"published-{output.name}.bak"
+    backup.unlink(missing_ok=True)
+    try:
+        os.link(output, backup)
+    except OSError:
+        partial = backup.with_suffix(backup.suffix + ".partial")
+        partial.unlink(missing_ok=True)
+        try:
+            shutil.copyfile(output, partial)
+            partial.replace(backup)
+        finally:
+            partial.unlink(missing_ok=True)
+    return backup
+
+
 def publish_index_databases(
     source_dbpath: str,
     embeddings_output: str,
     core_output: Optional[str] = None,
     allow_shrink: bool = False,
+    backup_dir: Optional[str] = None,
 ) -> None:
     """Create compact publication DBs and replace outputs only after validation."""
     source = sqlite3.connect(f"file:{os.path.abspath(source_dbpath)}?mode=ro", uri=True)
+    backup_root = (
+        Path(backup_dir) if backup_dir else Path(source_dbpath).resolve().parent
+    )
     outputs: list[tuple[Path, Path, str]] = []
     temporaries: list[Path] = []
     try:
@@ -5089,6 +5125,11 @@ def publish_index_databases(
         for temporary, output, table in outputs:
             assert_no_row_regression(temporary, output, table, allow_shrink)
 
+        for _temporary, output, _table in outputs:
+            backup = backup_published_output(output, backup_root)
+            if backup:
+                log(f"Kept the replaced {output.name} at {backup}")
+
         for temporary, output, _table in outputs:
             temporary.replace(output)
     finally:
@@ -5109,13 +5150,22 @@ def publish_index_databases(
     is_flag=True,
     help="Permit publishing a substantially smaller index than the live one.",
 )
+@click.option(
+    "--backup-dir",
+    default=None,
+    help="Where to keep the replaced databases. Defaults to the source DB's "
+    "directory; never inside public/, which ships as static assets.",
+)
 def publish_command(
     dbpath: str,
     core_output: Optional[str],
     embeddings_output: str,
     allow_shrink: bool,
+    backup_dir: Optional[str],
 ):
-    publish_index_databases(dbpath, embeddings_output, core_output, allow_shrink)
+    publish_index_databases(
+        dbpath, embeddings_output, core_output, allow_shrink, backup_dir
+    )
     log("Published validated SQLite output(s)")
 
 

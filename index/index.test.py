@@ -2195,6 +2195,112 @@ class TestDb(UsesTestexistsFixture, unittest.TestCase):
                     self.assertEqual(fh.read(), b"live-database")
                 self.assertFalse(os.path.exists(output + ".tmp"))
 
+    def test_publish_keeps_one_backup_of_each_replaced_database(self):
+        # `rename` unlinks the previous inode, so without this the last good
+        # published DB is gone the instant a publish lands. The backup goes beside
+        # the source, never into public/, which is copied wholesale into the site
+        # build and would serve it.
+        path = "../src/test/fixtures/monkey.jpg"
+        with tempfile.TemporaryDirectory() as tmpdir:
+            source_dir = os.path.join(tmpdir, "index")
+            public_dir = os.path.join(tmpdir, "public")
+            os.makedirs(source_dir)
+            os.makedirs(public_dir)
+            dbpath = os.path.join(source_dir, "source.sqlite")
+            self._seed_validatable_db(dbpath, path)
+
+            core_output = os.path.join(public_dir, "search.sqlite")
+            embeddings_output = os.path.join(public_dir, "search-embeddings.sqlite")
+            for output in (core_output, embeddings_output):
+                with open(output, "wb") as fh:
+                    fh.write(b"previous-published-database")
+
+            publish_index_databases(
+                dbpath, embeddings_output, core_output, allow_shrink=True
+            )
+
+            for output in (core_output, embeddings_output):
+                backup = os.path.join(
+                    source_dir, f"published-{os.path.basename(output)}.bak"
+                )
+                self.assertTrue(os.path.exists(backup))
+                with open(backup, "rb") as fh:
+                    self.assertEqual(fh.read(), b"previous-published-database")
+                # The replaced output is the new DB, not the old bytes.
+                with open(output, "rb") as fh:
+                    self.assertNotEqual(fh.read(), b"previous-published-database")
+                # Nothing extra may land in public/, which ships as static assets.
+                self.assertFalse(os.path.exists(output + ".bak"))
+
+    def test_publish_backup_keeps_only_the_most_recent_replaced_copy(self):
+        path = "../src/test/fixtures/monkey.jpg"
+        with tempfile.TemporaryDirectory() as tmpdir:
+            source_dir = os.path.join(tmpdir, "index")
+            public_dir = os.path.join(tmpdir, "public")
+            os.makedirs(source_dir)
+            os.makedirs(public_dir)
+            dbpath = os.path.join(source_dir, "source.sqlite")
+            self._seed_validatable_db(dbpath, path)
+            embeddings_output = os.path.join(public_dir, "search-embeddings.sqlite")
+            backup = os.path.join(source_dir, "published-search-embeddings.sqlite.bak")
+
+            with open(embeddings_output, "wb") as fh:
+                fh.write(b"generation-one")
+            publish_index_databases(dbpath, embeddings_output, allow_shrink=True)
+            with open(backup, "rb") as fh:
+                self.assertEqual(fh.read(), b"generation-one")
+
+            # Publishing again replaces the backup rather than accumulating copies.
+            publish_index_databases(dbpath, embeddings_output, allow_shrink=True)
+            with open(backup, "rb") as fh:
+                self.assertNotEqual(fh.read(), b"generation-one")
+            self.assertEqual(
+                len([n for n in os.listdir(source_dir) if n.endswith(".bak")]), 1
+            )
+
+    def test_publish_backup_falls_back_to_a_copy_across_filesystems(self):
+        # Hard linking is the fast path, but --core-output may sit on another
+        # filesystem, where link() raises EXDEV and only a copy can work.
+        path = "../src/test/fixtures/monkey.jpg"
+        with tempfile.TemporaryDirectory() as tmpdir:
+            source_dir = os.path.join(tmpdir, "index")
+            public_dir = os.path.join(tmpdir, "public")
+            os.makedirs(source_dir)
+            os.makedirs(public_dir)
+            dbpath = os.path.join(source_dir, "source.sqlite")
+            self._seed_validatable_db(dbpath, path)
+            embeddings_output = os.path.join(public_dir, "search-embeddings.sqlite")
+            with open(embeddings_output, "wb") as fh:
+                fh.write(b"previous-published-database")
+
+            with mock.patch(
+                "index.os.link", side_effect=OSError(18, "Invalid cross-device link")
+            ):
+                publish_index_databases(dbpath, embeddings_output, allow_shrink=True)
+
+            backup = os.path.join(source_dir, "published-search-embeddings.sqlite.bak")
+            with open(backup, "rb") as fh:
+                self.assertEqual(fh.read(), b"previous-published-database")
+            self.assertFalse(os.path.exists(backup + ".partial"))
+
+    def test_publish_writes_no_backup_when_there_is_nothing_to_replace(self):
+        path = "../src/test/fixtures/monkey.jpg"
+        with tempfile.TemporaryDirectory() as tmpdir:
+            source_dir = os.path.join(tmpdir, "index")
+            public_dir = os.path.join(tmpdir, "public")
+            os.makedirs(source_dir)
+            os.makedirs(public_dir)
+            dbpath = os.path.join(source_dir, "source.sqlite")
+            self._seed_validatable_db(dbpath, path)
+
+            publish_index_databases(
+                dbpath, os.path.join(public_dir, "search-embeddings.sqlite")
+            )
+
+            self.assertEqual(
+                [n for n in os.listdir(source_dir) if n.endswith(".bak")], []
+            )
+
     def test_publish_refuses_to_replace_a_live_index_with_a_much_smaller_one(self):
         # quick_check proves structure, not content. Without a row-count floor a
         # stray publish from a fixture DB replaces the live index, and rename has

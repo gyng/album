@@ -201,8 +201,16 @@ the claimed version would be the expected one by construction.
 
 `publish` refuses to replace a live output whose row count would drop below 90% of
 the published index (`--allow-shrink` overrides). `quick_check` only proves the
-generated file is structurally sound; it says nothing about content, and `rename`
-unlinks the previous inode, so there is no copy to fall back on.
+generated file is structurally sound; it says nothing about content.
+
+Because `rename` unlinks the previous inode, `publish` first keeps one copy of each
+database it is about to replace, as `index/published-<name>.bak` (`--backup-dir`
+overrides). These live beside the source, never in `public/`, which is copied
+wholesale into the site build and would serve them as multi-MB static assets. The
+copy is a hard link, so it costs no disk and cannot be caught half-written; publish
+only ever replaces outputs by rename, so the retained link keeps the old bytes. An
+output on another filesystem cannot be linked and falls back to a staged copy. Only
+the most recent replaced copy is kept.
 
 `prune` additionally refuses when an album directory still holds indexed rows but
 matches no source files, because counts cannot separate an unmounted album from
