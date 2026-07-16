@@ -5025,6 +5025,87 @@ def assert_no_row_regression(
         )
 
 
+PUBLISH_JOURNAL_NAME = ".publish-journal.json"
+
+
+def replace_atomically(source: Path, destination: Path) -> None:
+    """Rename ``source`` onto ``destination``; atomic within a filesystem."""
+    source.replace(destination)
+
+
+def materialise_from(source: Path, destination: Path) -> None:
+    """Atomically make ``destination`` hold ``source``'s bytes, leaving both."""
+    staged = destination.with_suffix(destination.suffix + ".staged")
+    staged.unlink(missing_ok=True)
+    try:
+        try:
+            os.link(source, staged)
+        except OSError:
+            shutil.copyfile(source, staged)
+        replace_atomically(staged, destination)
+    finally:
+        staged.unlink(missing_ok=True)
+
+
+def write_publish_journal(
+    backup_dir: Path, entries: typing.Iterable[tuple[Path, Optional[Path]]]
+) -> None:
+    """Record which outputs are about to move, and what to put back if they don't.
+
+    Each rename is atomic on its own, but the pair is not, and no POSIX call can
+    swap two files together. A process killed between them leaves a new core
+    against old vectors, which the site silently loads as one index. The intent is
+    written down first so the next publish can undo a half-applied one.
+    """
+    payload = {
+        "outputs": [
+            {"output": str(output), "backup": str(backup) if backup else None}
+            for output, backup in entries
+        ]
+    }
+    journal = backup_dir / PUBLISH_JOURNAL_NAME
+    partial = journal.with_suffix(journal.suffix + ".partial")
+    partial.write_text(json.dumps(payload), encoding="utf-8")
+    replace_atomically(partial, journal)
+
+
+def clear_publish_journal(backup_dir: Path) -> None:
+    (backup_dir / PUBLISH_JOURNAL_NAME).unlink(missing_ok=True)
+
+
+def restore_interrupted_publish(backup_dir: Path) -> list[str]:
+    """Put back any pair left half-replaced by an interrupted publish.
+
+    Restoring rather than rolling forward keeps one code path: the backups are by
+    definition the last mutually consistent pair, whereas the half-built temporary
+    files may have been cleaned up on the way out. A publish that completed but
+    died before clearing its journal is restored too — harmlessly, because the
+    caller re-publishes immediately afterwards.
+    """
+    journal = backup_dir / PUBLISH_JOURNAL_NAME
+    if not journal.exists():
+        return []
+    try:
+        payload = json.loads(journal.read_text(encoding="utf-8"))
+    except (ValueError, OSError):
+        journal.unlink(missing_ok=True)
+        return []
+
+    restored: list[str] = []
+    for entry in payload.get("outputs", []):
+        backup = entry.get("backup")
+        output = entry.get("output")
+        if not backup or not output:
+            continue
+        backup_path, output_path = Path(backup), Path(output)
+        if not backup_path.exists():
+            continue
+        materialise_from(backup_path, output_path)
+        restored.append(output)
+    journal.unlink(missing_ok=True)
+    return restored
+
+
 def backup_published_output(output: Path, backup_dir: Path) -> Optional[Path]:
     """Keep exactly one copy of the database about to be replaced.
 
@@ -5065,10 +5146,13 @@ def publish_index_databases(
     backup_dir: Optional[str] = None,
 ) -> None:
     """Create compact publication DBs and replace outputs only after validation."""
-    source = sqlite3.connect(f"file:{os.path.abspath(source_dbpath)}?mode=ro", uri=True)
     backup_root = (
         Path(backup_dir) if backup_dir else Path(source_dbpath).resolve().parent
     )
+    for repaired in restore_interrupted_publish(backup_root):
+        log(f"Repaired {repaired} from a previously interrupted publish")
+
+    source = sqlite3.connect(f"file:{os.path.abspath(source_dbpath)}?mode=ro", uri=True)
     outputs: list[tuple[Path, Path, str]] = []
     temporaries: list[Path] = []
     try:
@@ -5125,13 +5209,27 @@ def publish_index_databases(
         for temporary, output, table in outputs:
             assert_no_row_regression(temporary, output, table, allow_shrink)
 
+        backups: list[tuple[Path, Optional[Path]]] = []
         for _temporary, output, _table in outputs:
             backup = backup_published_output(output, backup_root)
             if backup:
                 log(f"Kept the replaced {output.name} at {backup}")
+            backups.append((output, backup))
 
-        for temporary, output, _table in outputs:
-            temporary.replace(output)
+        # The renames are atomic individually but not as a pair, and the site
+        # loads both databases as one index. Journal the intent so a process
+        # killed midway is repaired by the next publish, and undo in process for
+        # any failure we do get to see.
+        write_publish_journal(backup_root, backups)
+        try:
+            for temporary, output, _table in outputs:
+                replace_atomically(temporary, output)
+        except BaseException:
+            for output, backup in backups:
+                if backup and backup.exists():
+                    materialise_from(backup, output)
+            raise
+        clear_publish_journal(backup_root)
     finally:
         source.close()
         # A failed publish must not leave a multi-MB .tmp behind: `public/` is

@@ -1,6 +1,7 @@
 *.sqlite
 !testexists.sqlite
 *.sqlite.lock
+.publish-journal.json
 *.pt
 __pycache__
 *.bak

@@ -43,7 +43,9 @@ from index import (
     repair_classifier_json_syntax,
     prepare_staging_database,
     prune,
+    restore_interrupted_publish,
     sample_balanced_paths,
+    write_publish_journal,
     Sqlite3Client,
     cli,
     index,
@@ -67,6 +69,7 @@ import unittest
 import click
 from click.testing import CliRunner
 import json
+from pathlib import Path
 from unittest import mock
 
 
@@ -2282,6 +2285,177 @@ class TestDb(UsesTestexistsFixture, unittest.TestCase):
             with open(backup, "rb") as fh:
                 self.assertEqual(fh.read(), b"previous-published-database")
             self.assertFalse(os.path.exists(backup + ".partial"))
+
+    def _published_pair(self, tmpdir):
+        source_dir = os.path.join(tmpdir, "index")
+        public_dir = os.path.join(tmpdir, "public")
+        os.makedirs(source_dir, exist_ok=True)
+        os.makedirs(public_dir, exist_ok=True)
+        return (
+            source_dir,
+            os.path.join(source_dir, "source.sqlite"),
+            os.path.join(public_dir, "search.sqlite"),
+            os.path.join(public_dir, "search-embeddings.sqlite"),
+        )
+
+    def test_publish_restores_the_whole_pair_when_one_rename_fails(self):
+        # Each rename is atomic, but the pair is not. Replacing core and then
+        # failing on embeddings would leave a new core against old vectors: photos
+        # with no embeddings, and vectors for paths no longer in core. The site
+        # loads both, so the pair must move together or not at all.
+        path = "../src/test/fixtures/monkey.jpg"
+        with tempfile.TemporaryDirectory() as tmpdir:
+            source_dir, dbpath, core_output, embeddings_output = self._published_pair(
+                tmpdir
+            )
+            self._seed_validatable_db(dbpath, path)
+            for output in (core_output, embeddings_output):
+                with open(output, "wb") as fh:
+                    fh.write(b"consistent-live-pair")
+
+            # Count only renames onto the published outputs: replace_atomically
+            # also writes the journal, and counting those would trip the failure
+            # before anything had actually moved.
+            published = {str(core_output), str(embeddings_output)}
+            attempts = []
+            failed = []
+
+            def fail_after_first_output(source, destination):
+                # Stop counting once we have failed: the rollback restores through
+                # this same helper, and counting those would mask the failure.
+                if str(destination) in published and not failed:
+                    attempts.append(str(destination))
+                    if len(attempts) == 2:
+                        failed.append(True)
+                        raise OSError("interrupted between renames")
+                source.replace(destination)
+
+            with mock.patch(
+                "index.replace_atomically", side_effect=fail_after_first_output
+            ):
+                with self.assertRaises(OSError):
+                    publish_index_databases(
+                        dbpath, embeddings_output, core_output, allow_shrink=True
+                    )
+
+            # The first output really was replaced before the second failed, so the
+            # pair below is only consistent because it was rolled back.
+            self.assertEqual(len(attempts), 2)
+            for output in (core_output, embeddings_output):
+                with open(output, "rb") as fh:
+                    self.assertEqual(fh.read(), b"consistent-live-pair")
+
+    def test_publish_journals_its_intent_before_moving_anything(self):
+        # The journal is the only thing that survives a SIGKILL, so it has to be on
+        # disk before the first rename, not after the last.
+        path = "../src/test/fixtures/monkey.jpg"
+        with tempfile.TemporaryDirectory() as tmpdir:
+            source_dir, dbpath, core_output, embeddings_output = self._published_pair(
+                tmpdir
+            )
+            self._seed_validatable_db(dbpath, path)
+            for output in (core_output, embeddings_output):
+                with open(output, "wb") as fh:
+                    fh.write(b"consistent-live-pair")
+
+            journal = os.path.join(source_dir, ".publish-journal.json")
+            published = {str(core_output), str(embeddings_output)}
+            seen_during_rename = []
+
+            def record_journal(source, destination):
+                if str(destination) in published:
+                    seen_during_rename.append(os.path.exists(journal))
+                source.replace(destination)
+
+            with mock.patch("index.replace_atomically", side_effect=record_journal):
+                publish_index_databases(
+                    dbpath, embeddings_output, core_output, allow_shrink=True
+                )
+
+            self.assertEqual(len(seen_during_rename), 2)
+            self.assertTrue(all(seen_during_rename))
+
+    def test_publish_repairs_a_pair_left_skewed_by_an_interrupted_publish(self):
+        # A SIGKILL or power loss between the two renames cannot be caught in
+        # process, so the intent is journalled: the next publish must put the pair
+        # back before doing anything else.
+        with tempfile.TemporaryDirectory() as tmpdir:
+            source_dir, _dbpath, core_output, embeddings_output = self._published_pair(
+                tmpdir
+            )
+            backups = {}
+            for output in (core_output, embeddings_output):
+                backup = os.path.join(
+                    source_dir, f"published-{os.path.basename(output)}.bak"
+                )
+                with open(backup, "wb") as fh:
+                    fh.write(b"previous-consistent-pair")
+                backups[output] = backup
+
+            # Core was replaced; the process died before embeddings followed.
+            with open(core_output, "wb") as fh:
+                fh.write(b"half-applied-new-core")
+            with open(embeddings_output, "wb") as fh:
+                fh.write(b"previous-consistent-pair")
+            write_publish_journal(
+                Path(source_dir),
+                [(Path(o), Path(b)) for o, b in backups.items()],
+            )
+
+            restored = restore_interrupted_publish(Path(source_dir))
+
+            self.assertEqual(len(restored), 2)
+            for output in (core_output, embeddings_output):
+                with open(output, "rb") as fh:
+                    self.assertEqual(fh.read(), b"previous-consistent-pair")
+            self.assertFalse(
+                os.path.exists(os.path.join(source_dir, ".publish-journal.json"))
+            )
+
+    def test_publish_repairs_an_interrupted_publish_before_republishing(self):
+        # Proves publish actually runs the repair rather than merely offering it.
+        # The journal names the core output, which this publish does not write, so
+        # its restored content is only explicable by the repair having run.
+        path = "../src/test/fixtures/monkey.jpg"
+        with tempfile.TemporaryDirectory() as tmpdir:
+            source_dir, dbpath, core_output, embeddings_output = self._published_pair(
+                tmpdir
+            )
+            self._seed_validatable_db(dbpath, path)
+
+            core_backup = os.path.join(source_dir, "published-search.sqlite.bak")
+            with open(core_backup, "wb") as fh:
+                fh.write(b"previous-consistent-core")
+            with open(core_output, "wb") as fh:
+                fh.write(b"half-applied-new-core")
+            write_publish_journal(
+                Path(source_dir), [(Path(core_output), Path(core_backup))]
+            )
+
+            # Publishes embeddings only — nothing here touches the core output.
+            publish_index_databases(dbpath, embeddings_output)
+
+            with open(core_output, "rb") as fh:
+                self.assertEqual(fh.read(), b"previous-consistent-core")
+            self.assertFalse(
+                os.path.exists(os.path.join(source_dir, ".publish-journal.json"))
+            )
+
+    def test_publish_leaves_no_journal_behind_on_success(self):
+        # A journal surviving a good publish would make the next run roll back a
+        # perfectly healthy pair.
+        path = "../src/test/fixtures/monkey.jpg"
+        with tempfile.TemporaryDirectory() as tmpdir:
+            source_dir, dbpath, core_output, embeddings_output = self._published_pair(
+                tmpdir
+            )
+            self._seed_validatable_db(dbpath, path)
+
+            publish_index_databases(dbpath, embeddings_output, core_output)
+
+            self.assertFalse(
+                os.path.exists(os.path.join(source_dir, ".publish-journal.json"))
+            )
 
     def test_publish_writes_no_backup_when_there_is_nothing_to_replace(self):
         path = "../src/test/fixtures/monkey.jpg"

@@ -212,6 +212,18 @@ only ever replaces outputs by rename, so the retained link keeps the old bytes. 
 output on another filesystem cannot be linked and falls back to a staged copy. Only
 the most recent replaced copy is kept.
 
+The core and embeddings renames are each atomic, but the pair is not, and no POSIX
+call can swap two files together. The site loads both databases as one index, so a
+half-applied publish means photos with no vectors and vectors for paths that no
+longer exist. Rather than prevent skew, `publish` makes it unable to persist: it
+records the intended moves in `index/.publish-journal.json` before touching
+anything, restores the pair from the backups if a rename fails in process, and
+restores it on the next publish if the process was killed outright. Recovery rolls
+back to the backups rather than forward, because those are by definition the last
+mutually consistent pair, while the half-built temporaries may already have been
+cleaned up. A publish that completed but died before clearing its journal is rolled
+back too, harmlessly — the same run republishes immediately afterwards.
+
 `prune` additionally refuses when an album directory still holds indexed rows but
 matches no source files, because counts cannot separate an unmounted album from
 ordinary curation. Only the two largest albums here are big enough to trip the
