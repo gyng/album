@@ -41,6 +41,7 @@ from index import (
     parse_janus_response,
     prepare_colour_thumbnail,
     repair_classifier_json_syntax,
+    build_metadata_fallback_caption,
     cache_tokenizer_vocab,
     effective_free_vram_gb,
     enforce_vram_headroom,
@@ -1250,6 +1251,158 @@ class TestCli(UsesTestexistsFixture, unittest.TestCase):
             self.assertNotEqual(result.exit_code, 0)
             self.assertIn("large partial prune", result.output)
             self.assertEqual(len(Sqlite3Client(dbpath).list_paths()), 10)
+
+    def test_metadata_fallback_describes_only_what_is_known(self):
+        # A few photos send the model into a loop, and rejecting that is right —
+        # but validate demands a caption for every photo, so correct rejections
+        # blocked publication of the whole index permanently. The fallback keeps
+        # them findable by album, place and year, and claims nothing about the
+        # picture itself.
+        caption = build_metadata_fallback_caption(
+            "../albums/nagano/DSCF4327.JPG",
+            {"city": "Nagano", "country": "Japan"},
+            "2023-11-08T13:11:57",
+        )
+
+        self.assertEqual(caption["tags"], ["nagano", "Nagano", "Japan", "2023"])
+        self.assertEqual(caption["alt_text"], "Photo from nagano in Nagano, 2023.")
+
+    def test_metadata_fallback_copes_without_place_or_date(self):
+        caption = build_metadata_fallback_caption(
+            "../albums/snapshots/x.jpg", None, None
+        )
+
+        self.assertEqual(caption["tags"], ["snapshots"])
+        self.assertEqual(caption["alt_text"], "Photo from snapshots.")
+        # Must still satisfy the contract every other caption is held to.
+        self.assertEqual(
+            parse_classifier_response(json.dumps(caption))["tags"], ["snapshots"]
+        )
+
+    def test_over_long_alt_text_is_trimmed_not_discarded(self):
+        # Same mistake as the tag cap: rejecting a sound caption for running
+        # long left photos permanently uncaptioned, and validate then refused to
+        # publish over them. Trimming stops on a sentence so it still reads.
+        response = json.dumps(
+            {
+                "tags": ["snow", "ice"],
+                "alt_text": (
+                    "A person in white walks in front of a large illuminated structure "
+                    "with a snowy landscape and a nighttime exhibition of ice sculptures. "
+                    "Behind them a crowd gathers near the entrance while snow keeps "
+                    "falling steadily across the whole of the plaza beyond."
+                ),
+            }
+        )
+
+        parsed = parse_classifier_response(response)
+
+        self.assertLessEqual(len(parsed["alt_text"]), 200)
+        self.assertTrue(parsed["alt_text"].endswith("."))
+        self.assertTrue(parsed["alt_text"].startswith("A person in white walks"))
+
+    def test_alt_text_within_bounds_is_left_alone(self):
+        parsed = parse_classifier_response(
+            json.dumps({"tags": ["snow"], "alt_text": "A short caption."})
+        )
+
+        self.assertEqual(parsed["alt_text"], "A short caption.")
+
+    def test_json_cut_off_by_the_token_limit_is_closed_and_kept(self):
+        # Generation stops at a hard token cap, so a schema-complete caption can
+        # arrive without its closing brace. The block pattern needs that brace,
+        # so these fell through to the plain-text branch and were rejected —
+        # photos left uncaptioned over one missing character, which blocked
+        # publication because validate demands full coverage.
+        truncated = (
+            ' {\n  "tags": ["snow", "ice", "architecture"],\n'
+            '  "alt_text": "A person walks past an illuminated structure."'
+        )
+
+        parsed = parse_classifier_response(truncated)
+
+        self.assertEqual(parsed["tags"], ["snow", "ice", "architecture"])
+        self.assertEqual(
+            parsed["alt_text"], "A person walks past an illuminated structure."
+        )
+
+    def test_json_cut_mid_token_is_not_fabricated_into_a_caption(self):
+        # Closing the brace must only rescue responses that genuinely parse;
+        # anything truncated mid-value still has no usable caption.
+        with self.assertRaises((ValueError, KeyError)):
+            parse_classifier_response('{ "tags": ["snow", "ic')
+
+    def test_over_long_tag_lists_are_truncated_not_discarded(self):
+        # Rejecting on count left 16 of 1480 photos permanently uncaptioned, and
+        # because validate demands full coverage that blocked publication
+        # entirely. These are good captions that merely ran long.
+        response = json.dumps(
+            {
+                "tags": [
+                    "side mirror",
+                    "traffic",
+                    "city",
+                    "street",
+                    "cars",
+                    "mirror",
+                    "view",
+                    "traffic light",
+                    "streetlights",
+                    "shop",
+                    "shopfront",
+                    "clothes",
+                ],
+                "alt_text": "The side mirror reflects a busy city street.",
+            }
+        )
+
+        parsed = parse_classifier_response(response)
+
+        self.assertEqual(len(parsed["tags"]), 10)
+        self.assertEqual(parsed["tags"][0], "side mirror")
+        self.assertEqual(
+            parsed["alt_text"], "The side mirror reflects a busy city street."
+        )
+
+    def test_tags_that_each_extend_the_previous_are_rejected(self):
+        # The measured Janus loop. Truncating would keep its degenerate head, so
+        # it has to be caught before the list is cut — dedup cannot see it
+        # because every string differs.
+        response = json.dumps(
+            {
+                "tags": [
+                    "bicycle",
+                    "clothing",
+                    "drying",
+                    "folding",
+                    "folding table",
+                    "folding tablecloth",
+                    "folding tablecloths",
+                    "folding tablecloths hanging",
+                    "folding tablecloths hanging on",
+                ],
+                "alt_text": "Clothes drying on a rack.",
+            }
+        )
+
+        with self.assertRaises(ValueError):
+            parse_classifier_response(response)
+
+    def test_ordinary_tag_families_are_not_mistaken_for_a_runaway(self):
+        # Real captions routinely contain a couple of extending pairs; only a
+        # loop produces many.
+        response = json.dumps(
+            {
+                "tags": ["traffic", "traffic light", "shop", "shopfront", "city"],
+                "alt_text": "A busy city street.",
+            }
+        )
+
+        parsed = parse_classifier_response(response)
+
+        self.assertEqual(
+            parsed["tags"], ["traffic", "traffic light", "shop", "shopfront", "city"]
+        )
 
     def test_tokenizer_vocab_is_resolved_once(self):
         # The processor looks up three constant token ids through

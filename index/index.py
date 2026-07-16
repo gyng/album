@@ -537,9 +537,45 @@ def repair_classifier_json_syntax(value: str) -> str:
     return repaired
 
 
+def close_truncated_json_object(value: str) -> Optional[str]:
+    """Close a top-level object that the token limit cut off, if it still parses.
+
+    Generation stops at a hard token cap, so Janus regularly emits a
+    schema-complete caption whose closing brace never arrives. The block pattern
+    below needs that brace, so those responses matched nothing and fell through
+    to the plain-text branch, which rejected them outright — photos left
+    permanently uncaptioned over one missing character, holding up publication
+    because `validate` demands full coverage.
+
+    Only returns a candidate that actually parses, so anything genuinely
+    unfinished (a string cut mid-token) still takes the plain-text path.
+    ``complete_classifier_json_prefix`` performs the same repair for callers, but
+    it validates by calling this parser, so the parser cannot reuse it without
+    recursing.
+    """
+    start = value.find("{")
+    if start < 0 or "}" in value[start:]:
+        return None
+    candidate = value[start:].rstrip()
+    if candidate.endswith(","):
+        candidate = candidate[:-1].rstrip()
+    candidate += "}"
+    for attempt in (candidate, repair_classifier_json_syntax(candidate)):
+        try:
+            json.loads(attempt)
+        except json.JSONDecodeError:
+            continue
+        return attempt
+    return None
+
+
 def parse_classifier_response(raw_result: str) -> Mapping[str, typing.Any]:
     JSON_BLOCK_PATTERN = re.compile(r"\{.*?\}", re.DOTALL | re.MULTILINE)
     blocks = JSON_BLOCK_PATTERN.findall(raw_result)
+    if not blocks:
+        closed = close_truncated_json_object(raw_result)
+        if closed is not None:
+            blocks = [closed]
 
     if len(blocks) > 0:
         result = None
@@ -605,14 +641,24 @@ def parse_classifier_response(raw_result: str) -> Mapping[str, typing.Any]:
     }
     if not result["tags"] and not result["alt_text"].strip():
         raise ValueError("Classifier response contained no usable caption fields")
-    if len(result["tags"]) > MAX_CLASSIFIER_TAGS:
-        raise ValueError("Classifier response contained too many tags")
+    # Order matters: a runaway is only visible before truncation, which would
+    # otherwise keep its degenerate head and hide the loop.
+    if looks_like_runaway_tags(result["tags"]):
+        raise ValueError("Classifier response degenerated into extending tags")
+    # Keep the best tags rather than discarding an otherwise good caption for
+    # verbosity. Rejecting on count left 16 of 1480 photos permanently
+    # uncaptioned — responses like ["side mirror", "traffic", "city", "street",
+    # …] at 13 tags, with sound alt text — and because `validate` demands full
+    # coverage, that blocked publication outright rather than costing a tag.
+    # Janus emits tags in descending confidence, so the head is the useful part.
+    del result["tags"][MAX_CLASSIFIER_TAGS:]
     if any(
         len(tag) > MAX_CLASSIFIER_TAG_LENGTH
         or len(re.findall(r"\b[\w'-]+\b", tag)) > MAX_CLASSIFIER_TAG_WORDS
         for tag in result["tags"]
     ):
         raise ValueError("Classifier response contained an overlong tag")
+    result["alt_text"] = clamp_classifier_alt_text(result["alt_text"])
     if (
         len(result["alt_text"]) > MAX_CLASSIFIER_ALT_TEXT_LENGTH
         or len(re.findall(r"\b[\w'-]+\b", result["alt_text"]))
@@ -826,6 +872,99 @@ def complete_classifier_json_prefix(value: str) -> Optional[str]:
     except (ValueError, KeyError, json.JSONDecodeError):
         return None
     return repaired
+
+
+def build_metadata_fallback_caption(
+    path: str, geocode: Optional[Mapping], iso8601: Optional[str]
+) -> dict[str, typing.Any]:
+    """A minimal caption for a photo the model cannot describe.
+
+    A few photos send Janus into a loop it never escapes — "folding tablecloths
+    hanging on folding tablecloths hanging on…" — and rejecting that output is
+    correct. But `validate` demands a caption for every photo, so a handful of
+    correct rejections blocked publication of the whole index, permanently: every
+    rerun rejected them again.
+
+    This describes only what is already known — album, place, year — and claims
+    nothing about the picture. Those photos stay findable by the facts we hold
+    instead of dropping out of search entirely. A caption prompt or model change
+    bumps the pipeline version, so they are retried then rather than being stuck
+    with this forever.
+    """
+    album = os.path.basename(os.path.dirname(path)) or None
+    places = []
+    for field in ("city", "county", "state", "country"):
+        value = (geocode or {}).get(field)
+        if value and str(value) not in places:
+            places.append(str(value))
+    # Serialised as naive camera-local ISO (YYYY-MM-DDTHH:MM:SS), so the year is
+    # the leading four characters — no timezone maths, per the EXIF contract.
+    year = None
+    if iso8601 and re.match(r"^\d{4}", iso8601):
+        year = iso8601[:4]
+
+    tags = [tag for tag in [album, *places[:2], year] if tag]
+    described = " in ".join(filter(None, [album, places[0] if places else None]))
+    alt_text = f"Photo from {described or 'this collection'}"
+    if year:
+        alt_text += f", {year}"
+    alt_text += "."
+    return {"tags": tags[:MAX_CLASSIFIER_TAGS], "alt_text": alt_text}
+
+
+def clamp_classifier_alt_text(value: str) -> str:
+    """Trim alt text to the published bounds rather than discarding the caption.
+
+    Rejecting on length is the same mistake the tag cap made: a sound caption
+    thrown away for running long, leaving the photo permanently uncaptioned and
+    `validate` refusing to publish over it. The plain-text branch already clips
+    to the same ceiling, so trimming here is the consistent behaviour, not a new
+    liberty. Prefers to stop on a sentence so the result still reads as one.
+    """
+    text = value.strip()
+    words = list(re.finditer(r"\b[\w'-]+\b", text))
+    if len(text) <= MAX_CLASSIFIER_ALT_TEXT_LENGTH and len(words) <= (
+        MAX_CLASSIFIER_ALT_TEXT_WORDS
+    ):
+        return text
+
+    # A single enormous token is not prose that ran long, it is degenerate
+    # output: trimming it would just yield a shorter run of the same garbage.
+    # Leave it for the bounds check to reject.
+    if any(len(word.group(0)) > MAX_CLASSIFIER_TAG_LENGTH for word in words):
+        return text
+
+    if len(words) > MAX_CLASSIFIER_ALT_TEXT_WORDS:
+        text = text[: words[MAX_CLASSIFIER_ALT_TEXT_WORDS - 1].end()]
+    text = text[:MAX_CLASSIFIER_ALT_TEXT_LENGTH]
+    sentence = re.match(r"(.*[.!?])(?:\s|$)", text, re.DOTALL)
+    if sentence:
+        return sentence.group(1)
+    return text.rstrip().rstrip(",;:-").rstrip()
+
+
+def looks_like_runaway_tags(tags: list[str]) -> bool:
+    """Detect the measured Janus loop where each tag extends the one before it.
+
+    The model degenerates into "folding", "folding table", "folding tablecloth",
+    "folding tablecloths", "folding tablecloths hanging", "folding tablecloths
+    hanging on", … — every entry a longer prefix of the next. Deduplication
+    cannot see it because the strings all differ, and truncating to the tag limit
+    would keep the degenerate head, so this has to be judged before the list is
+    cut. A real caption has a couple of such pairs ("traffic"/"traffic light",
+    "shop"/"shopfront"); the loop had six. Mirrors the >=4 threshold
+    ``has_repeated_open_classifier_tags`` applies to the still-open array.
+    """
+    normalised = [tag.strip().casefold() for tag in tags]
+    extended = sum(
+        1
+        for index, tag in enumerate(normalised)
+        if tag
+        and any(
+            other != tag and other.startswith(tag) for other in normalised[index + 1 :]
+        )
+    )
+    return extended >= 4
 
 
 def has_repeated_open_classifier_tags(value: str) -> bool:
@@ -6306,12 +6445,27 @@ def analyse_image_worker(
                 precomputed_embeddings=precomputed_embeddings,
                 precomputed_colors=precomputed_colors,
             )
+            caption_fallback = None
+            if needs_classifier and precomputed_caption is None:
+                # The model could not describe this one. Rejecting its output was
+                # right, but leaving the photo uncaptioned blocks publication of
+                # the entire index, so fall back to what we already know.
+                caption_fallback = build_metadata_fallback_caption(
+                    path, analysed.get("geocode"), analysed.get("iso8601")
+                )
+                log(f"Captioning {path} from metadata: {caption_fallback['alt_text']}")
+                analysed = {
+                    **analysed,
+                    "tags": caption_fallback["tags"],
+                    "alt_text": caption_fallback["alt_text"],
+                }
             return {
                 "path": path,
                 "analysed": analysed,
                 "write_core": needs_core,
-                "write_caption": needs_classifier and precomputed_caption is not None,
-                "caption_failed": needs_classifier and precomputed_caption is None,
+                "write_caption": needs_classifier
+                and (precomputed_caption is not None or caption_fallback is not None),
+                "caption_failed": False,
                 "source_sha256": source_sha256,
                 "caption_version": caption_version,
                 "caption_model_id": caption_model_id,
