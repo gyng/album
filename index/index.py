@@ -274,21 +274,60 @@ def predict_caption_batch_resilient(
         return left_results + right_results, left_metrics + right_metrics
 
 
+def cache_tokenizer_vocab(tokenizer: typing.Any) -> None:
+    """Resolve the tokenizer's vocabulary once instead of on every lookup.
+
+    VLChatProcessor exposes ``image_id``/``image_start_id``/``image_end_id`` as
+    properties that read ``tokenizer.vocab``, and transformers rebuilds the whole
+    ~100k-entry dict on every access. Profiling the processor showed
+    ``get_vocab`` at ~200ms a call, six calls per image: ~1.2s of the ~1.9s spent
+    preparing each caption, dwarfing the bicubic resize that looks like the
+    obvious cost. The vocabulary is fixed once the tokenizer is loaded, so this
+    returns the same dict and the same token ids — captions are unchanged,
+    verified byte-identical across a 16-photo sample.
+    """
+    cached_vocab = tokenizer.get_vocab()
+    tokenizer.get_vocab = lambda *_args, **_kwargs: cached_vocab
+
+
+def effective_free_vram_gb() -> float:
+    """VRAM the next batch can actually draw on.
+
+    Device-free alone is the wrong signal. The caching allocator reserves memory
+    and reuses it across batches without returning it, so a perfectly healthy run
+    settles at roughly zero device-free while allocating nothing new. Measured
+    over ten identical Janus batches: device-free fell 5.1 GB to zero while live
+    tensors stayed flat at 4.84 GB, reserved plateaued, and batch time did not
+    move. Aborting on device-free stopped runs that were fine, which is why a
+    294-batch job never finished and looked like a leak.
+
+    Adding the allocator's reusable cache tells that apart from the case the
+    guard is actually for: a card oversubscribed by another process, where torch
+    cannot reserve and WSL2's WDDM silently spills to host RAM — batches went
+    from ~3s to ~22s — instead of raising OutOfMemoryError.
+    """
+    free, _total = torch.cuda.mem_get_info()
+    reusable = torch.cuda.memory_reserved() - torch.cuda.memory_allocated()
+    return (free + reusable) / 1e9
+
+
 def enforce_vram_headroom(label: str) -> float:
     """Warn on low post-batch headroom and stop before the card is exhausted."""
     if not torch.cuda.is_available():
         return math.inf
-    free, _total = torch.cuda.mem_get_info()
-    free_gb = free / 1e9
+    free_gb = effective_free_vram_gb()
     if free_gb < JANUS_WARN_FREE_VRAM_GB and not getattr(
         enforce_vram_headroom, "_warning_emitted", False
     ):
         log(f"WARNING: only {free_gb:.2f} GB VRAM free after {label}")
         enforce_vram_headroom._warning_emitted = True
     if free_gb < JANUS_MIN_FREE_VRAM_GB:
+        # Hand the allocator's cache back so another process on the card can use
+        # it. This does not change the verdict — the same bytes simply move from
+        # reusable to device-free — but it is the neighbourly thing to do before
+        # giving up, and it lets the retry land in a cleaner state.
         torch.cuda.empty_cache()
-        free, _total = torch.cuda.mem_get_info()
-        free_gb = free / 1e9
+        free_gb = effective_free_vram_gb()
         if free_gb < JANUS_MIN_FREE_VRAM_GB:
             raise click.ClickException(
                 f"Only {free_gb:.2f} GB VRAM remains after {label}; "
@@ -1031,6 +1070,8 @@ class JanusClassifier(BaseCaptionClassifier):
         )
         self.tokenizer = self.vl_chat_processor.tokenizer
 
+        cache_tokenizer_vocab(self.tokenizer)
+
         vl_gpt = AutoModelForCausalLM.from_pretrained(
             model_path, revision=JANUS_MODEL_REVISION, trust_remote_code=True
         )
@@ -1077,6 +1118,35 @@ class JanusClassifier(BaseCaptionClassifier):
         )
         return answer
 
+    def _prepare_inputs_cpu(
+        self, item: tuple[str, Optional[Mapping]]
+    ) -> tuple[typing.Any, float, float]:
+        """The CPU half of preparation: decode, resize, normalise, tokenise.
+
+        Split out so it can run on a worker thread. PIL, torchvision and numpy
+        all release the GIL, so this parallelises: measured over 16 real photos,
+        decode+resize goes from 457 ms/image serially to 148 at 4 workers and 110
+        at 16 (32 is slower again — those libraries thread internally and
+        oversubscribe the cores).
+
+        The GPU half deliberately stays on the calling thread: the host copy and
+        the vision tower touch the CUDA context from one place, and the embeds
+        keep item order.
+        """
+        path, geocode = item
+        decode_started_at = time.perf_counter()
+        with Image.open(path) as image:
+            pil_image = image.convert("RGB")
+        decode_ms = (time.perf_counter() - decode_started_at) * 1000
+        processor_started_at = time.perf_counter()
+        prepare_inputs = self.vl_chat_processor(
+            conversations=self._conversation(path, geocode),
+            images=[pil_image],
+            force_batchify=True,
+        )
+        processor_ms = (time.perf_counter() - processor_started_at) * 1000
+        return prepare_inputs, decode_ms, processor_ms
+
     @torch.inference_mode()
     def predict_batch(self, items: list[tuple[str, Optional[Mapping]]]) -> list[str]:
         """Run Janus inference on a batch of images in one GPU forward pass."""
@@ -1088,26 +1158,27 @@ class JanusClassifier(BaseCaptionClassifier):
         all_embeds = []
         all_masks = []
         preparation_metrics: list[dict[str, typing.Any]] = []
-        decoded_images, decode_ms = self._decode_images_parallel(
-            [path for path, _geocode in items]
+
+        # Preparation cost more than the inference it feeds: ~4.5 s of serial CPU
+        # per batch against ~4.1 s of batched GPU. `map` preserves order, so the
+        # embeds still line up with `items`.
+        prep_started_at = time.perf_counter()
+        prepared = list(self._decode_executor.map(self._prepare_inputs_cpu, items))
+        prep_wall_ms = (time.perf_counter() - prep_started_at) * 1000
+        log(
+            f"    prepped {len(items)} image(s) in {prep_wall_ms:.0f}ms "
+            f"({JANUS_IMAGE_DECODE_WORKERS} threads)"
         )
 
-        for idx, ((path, geocode), pil_image) in enumerate(
-            zip(items, decoded_images), start=1
+        for (_path, _geocode), (prepare_inputs, decode_ms, processor_ms) in zip(
+            items, prepared
         ):
-            prep_started_at = time.perf_counter()
-            conversation = self._conversation(path, geocode)
-            processor_started_at = time.perf_counter()
-            prepare_inputs = self.vl_chat_processor(
-                conversations=conversation, images=[pil_image], force_batchify=True
-            ).to(self.vl_gpt.device)
-            processor_ms = (time.perf_counter() - processor_started_at) * 1000
             vision_started_at = time.perf_counter()
-            embeds = self.vl_gpt.prepare_inputs_embeds(**prepare_inputs)
+            gpu_inputs = prepare_inputs.to(self.vl_gpt.device)
+            embeds = self.vl_gpt.prepare_inputs_embeds(**gpu_inputs)
             vision_ms = (time.perf_counter() - vision_started_at) * 1000
             all_embeds.append(embeds)
-            all_masks.append(prepare_inputs.attention_mask)
-            prep_ms = (time.perf_counter() - prep_started_at) * 1000
+            all_masks.append(gpu_inputs.attention_mask)
             preparation_metrics.append(
                 {
                     "attempt": "batch",
@@ -1117,9 +1188,6 @@ class JanusClassifier(BaseCaptionClassifier):
                     "processorMs": round(processor_ms, 2),
                     "visionPreparationMs": round(vision_ms, 2),
                 }
-            )
-            log(
-                f"    prepped {idx}/{len(items)} in {prep_ms:.0f}ms ({os.path.basename(path)})"
             )
 
         log(f"    generating {len(items)} caption(s)...")

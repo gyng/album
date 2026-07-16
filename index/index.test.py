@@ -41,6 +41,9 @@ from index import (
     parse_janus_response,
     prepare_colour_thumbnail,
     repair_classifier_json_syntax,
+    cache_tokenizer_vocab,
+    effective_free_vram_gb,
+    enforce_vram_headroom,
     prepare_staging_database,
     prune,
     restore_interrupted_publish,
@@ -1247,6 +1250,60 @@ class TestCli(UsesTestexistsFixture, unittest.TestCase):
             self.assertNotEqual(result.exit_code, 0)
             self.assertIn("large partial prune", result.output)
             self.assertEqual(len(Sqlite3Client(dbpath).list_paths()), 10)
+
+    def test_tokenizer_vocab_is_resolved_once(self):
+        # The processor looks up three constant token ids through
+        # tokenizer.vocab, and transformers rebuilds the whole ~100k-entry dict
+        # on every access — measured at ~200ms a call, six per image, which was
+        # most of the time spent preparing each caption.
+        calls = []
+
+        class FakeTokenizer:
+            def get_vocab(self):
+                calls.append(1)
+                return {"<image_placeholder>": 100}
+
+        tokenizer = FakeTokenizer()
+        cache_tokenizer_vocab(tokenizer)
+
+        for _ in range(6):
+            self.assertEqual(tokenizer.get_vocab()["<image_placeholder>"], 100)
+
+        self.assertEqual(len(calls), 1)
+
+    def _fake_cuda(self, free_gb, reserved_gb, allocated_gb):
+        cuda = mock.MagicMock()
+        cuda.is_available.return_value = True
+        cuda.mem_get_info.return_value = (int(free_gb * 1e9), int(10.7 * 1e9))
+        cuda.memory_reserved.return_value = int(reserved_gb * 1e9)
+        cuda.memory_allocated.return_value = int(allocated_gb * 1e9)
+        return cuda
+
+    def test_vram_headroom_counts_the_allocators_reusable_cache(self):
+        # The caching allocator reserves memory and reuses it across batches
+        # without returning it, so a healthy run sits at ~0 device-free while
+        # allocating nothing new. Judging on device-free alone stopped runs that
+        # were fine, which is what kept a 294-batch job from ever finishing.
+        cuda = self._fake_cuda(free_gb=0.03, reserved_gb=7.10, allocated_gb=4.84)
+        with mock.patch("index.torch.cuda", cuda):
+            self.assertAlmostEqual(effective_free_vram_gb(), 2.29, places=1)
+
+    def test_vram_guard_continues_when_only_device_free_is_exhausted(self):
+        cuda = self._fake_cuda(free_gb=0.03, reserved_gb=7.10, allocated_gb=4.84)
+        with mock.patch("index.torch.cuda", cuda), mock.patch("index.log"):
+            headroom = enforce_vram_headroom("janus batch 10/281")
+
+        # 0.03 device-free plus 2.26 reusable: the next batch has room.
+        self.assertAlmostEqual(headroom, 2.29, places=1)
+
+    def test_vram_guard_stops_when_the_card_is_genuinely_oversubscribed(self):
+        # Another process holding the card is the case the guard is for: torch
+        # cannot reserve, and WSL2 spills to host RAM rather than raising, so the
+        # run would crawl instead of failing.
+        cuda = self._fake_cuda(free_gb=0.05, reserved_gb=4.40, allocated_gb=4.35)
+        with mock.patch("index.torch.cuda", cuda), mock.patch("index.log"):
+            with self.assertRaises(click.ClickException):
+                enforce_vram_headroom("janus batch 1/281")
 
     def test_prepare_staging_copies_from_the_working_db_when_absent(self):
         with tempfile.TemporaryDirectory() as tmpdir:
