@@ -13,3 +13,5 @@ __pycache__
 .fixture-caption-comparison.json
 .fixture-caption-comparison.md
 .test-simple-gemma-sample.json
+.caption-quality-*.json
+.janus-final-profile.json

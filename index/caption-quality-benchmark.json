@@ -1,0 +1,36 @@
+{
+  "version": 1,
+  "description": "Frozen, visually reviewed semantic smoke set spanning landscape, infrastructure, wildlife and macro photography.",
+  "cases": [
+    {
+      "path": "../albums/test-simple/DSCF0506-2.jpg",
+      "category": "snowy landscape",
+      "requiredAny": ["mountain", "snow", "peak"],
+      "forbidden": ["beach", "ocean"]
+    },
+    {
+      "path": "../albums/test-simple/DSCF0593.jpg",
+      "category": "infrastructure",
+      "requiredAny": ["dam", "reservoir"],
+      "forbidden": ["skyscraper", "airport"]
+    },
+    {
+      "path": "../albums/test-simple/DSCF2485-2.jpg",
+      "category": "water wildlife",
+      "requiredAny": ["turtle", "duck", "waterfowl"],
+      "forbidden": ["aeroplane", "car"]
+    },
+    {
+      "path": "../albums/test-simple/DSCF2581-2_2.jpg",
+      "category": "wildlife portrait",
+      "requiredAny": ["monkey", "macaque", "primate"],
+      "forbidden": ["dog", "cat"]
+    },
+    {
+      "path": "../albums/test-simple/DSCF2768.JPG",
+      "category": "macro wildlife",
+      "requiredAny": ["spider", "arachnid", "insect"],
+      "forbidden": ["bird", "fish"]
+    }
+  ]
+}

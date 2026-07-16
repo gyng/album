@@ -6,27 +6,41 @@ from index import (
     format_mapping_values,
     analyse_image_worker,
     build_classifier_prompt,
+    caption_pipeline_version,
     build_janus_prompt,
     build_geocode_fields,
     compare_caption_payloads,
+    complete_classifier_json_prefix,
+    complete_json_object_end,
     compute_reindex_plan,
     create_classifier,
     decode_embedding,
     encode_embedding,
+    evaluate_caption_quality_cases,
+    extract_colour_palette,
+    file_content_sha256,
+    file_content_sha256_many,
     geocode_columns,
-    extract_geocode_from_path,
+    get_exif,
     filter_exif_for_search,
     heartbeat,
+    has_repeated_open_classifier_tags,
     insert_analysed_images_batch,
     log_vram,
     log_vram_peak,
     parse_caption_with_retry,
+    publish_index_databases,
+    predict_caption_batch_resilient,
     run_embedding_pass,
+    resolve_caption_result,
     Gemma4Classifier,
     Gemma4GgufClassifier,
     JanusClassifier,
+    JsonCompletionLogitsProcessor,
     parse_classifier_response,
     parse_janus_response,
+    prepare_colour_thumbnail,
+    repair_classifier_json_syntax,
     prune,
     sample_balanced_paths,
     Sqlite3Client,
@@ -36,6 +50,11 @@ from index import (
     search_similar_path,
     search_tags,
     update_gps,
+    validate_index_database,
+    CAPTION_STAGE,
+    CORE_STAGE,
+    SIGLIP_V1_STAGE,
+    SiglipEmbedder,
 )
 import os
 import shutil
@@ -70,10 +89,11 @@ class TestMain(unittest.TestCase):
     def test_build_janus_prompt_only_requests_used_fields(self):
         actual = build_janus_prompt({"city": "Tokyo", "country": "Japan"})
 
-        self.assertTrue("identified_objects" in actual)
-        self.assertTrue("themes" in actual)
+        self.assertTrue("tags" in actual)
         self.assertTrue("alt_text" in actual)
-        self.assertTrue("subject" in actual)
+        self.assertFalse("identified_objects" in actual)
+        self.assertFalse('"themes"' in actual)
+        self.assertFalse('"subject"' in actual)
         self.assertFalse("critique" in actual)
         self.assertFalse("suggested_title" in actual)
         self.assertFalse("composition_critique" in actual)
@@ -94,46 +114,96 @@ class TestMain(unittest.TestCase):
             actual["alt_text"],
             "The photo depicts a serene sky with a bird in flight and a flock of birds.",
         )
-        self.assertTrue("serene" in actual["identified_objects"])
-        self.assertTrue("bird" in actual["identified_objects"])
-        self.assertEqual(actual["themes"], [])
+        self.assertTrue("serene" in actual["tags"])
+        self.assertTrue("bird" in actual["tags"])
+
+    def test_parse_janus_response_plain_text_keeps_first_complete_sentence(self):
+        actual = parse_janus_response(
+            "A red insect rests on a green leaf. The plant has glossy patterned leaves."
+        )
+
+        self.assertEqual(actual["alt_text"], "A red insect rests on a green leaf.")
+        self.assertIn("insect", actual["tags"])
+
+    def test_parse_janus_response_rejects_incomplete_plain_text(self):
+        with self.assertRaises(ValueError):
+            parse_janus_response("A red insect rests on a green")
 
     def test_parse_classifier_response_accepts_embedded_json(self):
         actual = parse_classifier_response(
             'Sure, here it is: {"identified_objects":["tram"],"themes":["commute"],"alt_text":"Red tram at a stop.","subject":"tram"}'
         )
 
-        self.assertEqual(actual["identified_objects"], ["tram"])
-        self.assertEqual(actual["themes"], ["commute"])
-        self.assertEqual(actual["subject"], "tram")
+        self.assertEqual(actual["tags"], ["tram", "commute"])
 
     def test_parse_classifier_response_prefers_last_valid_json_block(self):
         actual = parse_classifier_response(
             '<|channel>thought {"identified_objects":["wrong"],"themes":[],"alt_text":"Wrong.","subject":"wrong"} <channel|> {"identified_objects":["tram"],"themes":["commute"],"alt_text":"Red tram at a stop.","subject":"tram"}'
         )
 
-        self.assertEqual(actual["identified_objects"], ["tram"])
-        self.assertEqual(actual["themes"], ["commute"])
-        self.assertEqual(actual["subject"], "tram")
+        self.assertEqual(actual["tags"], ["tram", "commute"])
 
     def test_parse_classifier_response_coerces_bad_but_valid_json(self):
         # Valid JSON with wrong types must be coerced, never crash a later batch
         # insert: null lists → [], non-coercible list members dropped, numeric
-        # alt_text stringified, null subject → "".
+        # Legacy arrays are merged and alt_text is stringified.
         actual = parse_classifier_response(
             '{"identified_objects": null, "themes": ["a", 2, ["nested"], null], '
             '"alt_text": 123, "subject": null}'
         )
-        self.assertEqual(actual["identified_objects"], [])
-        self.assertEqual(actual["themes"], ["a", "2"])
+        self.assertEqual(actual["tags"], ["a", "2"])
         self.assertEqual(actual["alt_text"], "123")
-        self.assertEqual(actual["subject"], "")
+
+    def test_parse_classifier_response_repairs_observed_json_punctuation(self):
+        raw = (
+            'Prose {"tags":["plant","insect",]\n"alt_text":"A small insect on a leaf."}'
+        )
+
+        actual = parse_classifier_response(raw)
+
+        self.assertEqual(actual["tags"], ["plant", "insect"])
+        self.assertEqual(actual["alt_text"], "A small insect on a leaf.")
+        self.assertEqual(
+            repair_classifier_json_syntax('{"tags":["plant",]}'),
+            '{"tags":["plant"]}',
+        )
+
+    def test_parse_classifier_response_deduplicates_tags_case_insensitively(self):
+        actual = parse_classifier_response(
+            '{"tags":["Water","duck","water"],"alt_text":"A duck."}'
+        )
+
+        self.assertEqual(actual["tags"], ["Water", "duck"])
 
     def test_parse_classifier_response_missing_key_is_malformed(self):
         # A JSON block missing a required key raises so the caller can retry the
         # model, rather than silently producing an empty caption.
         with self.assertRaises(KeyError):
             parse_classifier_response('{"identified_objects": ["x"]}')
+
+    def test_parse_classifier_response_rejects_unbounded_or_leaked_output(self):
+        with self.assertRaisesRegex(ValueError, "overlong alt text"):
+            parse_classifier_response(
+                json.dumps(
+                    {
+                        "identified_objects": ["cat"],
+                        "themes": [],
+                        "alt_text": "x" * 601,
+                        "subject": "cat",
+                    }
+                )
+            )
+        with self.assertRaisesRegex(ValueError, "control token"):
+            parse_classifier_response(
+                json.dumps(
+                    {
+                        "identified_objects": ["cat"],
+                        "themes": [],
+                        "alt_text": "<|channel> leaked output",
+                        "subject": "cat",
+                    }
+                )
+            )
 
     def test_find_files_treats_jpg_and_jpeg_as_equivalent(self):
         # index and prune share this glob, so both extensions must be found (and
@@ -152,6 +222,28 @@ class TestMain(unittest.TestCase):
 
         self.assertEqual(from_jpg, ["a.jpg", "b.jpeg", "c.JPG", "d.JPEG"])
         self.assertEqual(from_jpeg, ["a.jpg", "b.jpeg", "c.JPG", "d.JPEG"])
+
+    def test_find_files_excludes_test_albums_from_generic_production_glob(self):
+        with tempfile.TemporaryDirectory(dir=".") as root:
+            albums = os.path.join(root, "albums")
+            os.makedirs(os.path.join(albums, "real"))
+            os.makedirs(os.path.join(albums, "test-fixture"))
+            open(os.path.join(albums, "real", "real.jpg"), "w").close()
+            open(os.path.join(albums, "test-fixture", "fixture.jpg"), "w").close()
+            relative_root = os.path.basename(root)
+            pattern = f"./{relative_root}/albums/**/*.jpg"
+
+            without_tests = find_files(".", pattern)
+            with mock.patch.dict(os.environ, {"ALBUM_INCLUDE_TEST_ALBUMS": "1"}):
+                with_tests = find_files(".", pattern)
+
+        self.assertEqual(
+            [os.path.basename(path) for path in without_tests], ["real.jpg"]
+        )
+        self.assertEqual(
+            sorted(os.path.basename(path) for path in with_tests),
+            ["fixture.jpg", "real.jpg"],
+        )
 
     def test_run_embedding_pass_skips_unreadable_images(self):
         # A None embedding (unreadable/corrupt image) must be skipped, not stored,
@@ -173,6 +265,151 @@ class TestMain(unittest.TestCase):
             run_embedding_pass(StubEmbedder(), ["good.jpg", "bad.jpg"], precomputed)
         self.assertIn("good.jpg", precomputed)
         self.assertNotIn("bad.jpg", precomputed)
+
+    def test_caption_batch_oom_falls_back_to_smaller_batches(self):
+        class StubClassifier:
+            last_generation_metrics = []
+
+            def __init__(self):
+                self.batch_sizes = []
+
+            def predict_batch(self, items):
+                self.batch_sizes.append(len(items))
+                if len(items) > 1:
+                    raise RuntimeError("CUDA out of memory")
+                self.last_generation_metrics = [{"tokenCount": 12}]
+                return [items[0][0]]
+
+        classifier = StubClassifier()
+        items = [(f"{index}.jpg", {}) for index in range(4)]
+        with mock.patch("index.torch.cuda.empty_cache"), mock.patch("index.log"):
+            results, metrics = predict_caption_batch_resilient(classifier, items)
+
+        self.assertEqual(results, ["0.jpg", "1.jpg", "2.jpg", "3.jpg"])
+        self.assertEqual(classifier.batch_sizes, [4, 2, 1, 1, 2, 1, 1])
+        self.assertTrue(all(metric["oomFallback"] for metric in metrics))
+
+    def test_janus_metrics_ignore_eos_padding_and_flag_only_straggler(self):
+        import torch
+
+        classifier = JanusClassifier(max_new_tokens=5)
+        classifier.tokenizer = mock.Mock(eos_token_id=2)
+        classifier.tokenizer.decode.side_effect = [
+            '{"done": true}',
+            "unfinished",
+        ]
+        classifier._record_generation_metrics(
+            torch.tensor(
+                [
+                    [10, 11, 2, 2, 2],
+                    [20, 21, 22, 23, 24],
+                ]
+            )
+        )
+        self.assertEqual(
+            classifier.last_generation_metrics,
+            [
+                {
+                    "tokenCount": 3,
+                    "completedWithEos": True,
+                    "completedWithJson": True,
+                    "completedWithSchema": True,
+                    "hitTokenLimit": False,
+                },
+                {
+                    "tokenCount": 5,
+                    "completedWithEos": False,
+                    "completedWithJson": False,
+                    "completedWithSchema": False,
+                    "hitTokenLimit": True,
+                },
+            ],
+        )
+
+    def test_complete_json_object_end_ignores_braces_inside_strings(self):
+        value = 'preface {"alt_text": "A {brace} and \\"quote\\""} trailing'
+
+        end = complete_json_object_end(value)
+
+        self.assertEqual(
+            value[:end], 'preface {"alt_text": "A {brace} and \\"quote\\""}'
+        )
+        self.assertIsNone(complete_json_object_end('{"alt_text": "unfinished"'))
+
+    def test_complete_classifier_json_prefix_stops_repeated_schema_fields(self):
+        repeated = (
+            '{"alt_text":"A snowy mountain.",'
+            '"tags":["mountain","winter"],'
+            '"alt_text":"A snowy mountain.","tags":["mountain"]'
+        )
+
+        repaired = complete_classifier_json_prefix(repeated)
+
+        self.assertIsNotNone(repaired)
+        self.assertEqual(parse_classifier_response(repaired)["tags"][0], "mountain")
+
+    def test_complete_classifier_json_prefix_salvages_proven_tag_loop(self):
+        repeated = (
+            '{"alt_text":"A duck swimming on water.",'
+            '"tags":["duck","water","wildlife","reflection","water","water"'
+        )
+
+        repaired = complete_classifier_json_prefix(repeated)
+
+        self.assertEqual(
+            parse_classifier_response(repaired),
+            {
+                "alt_text": "A duck swimming on water.",
+                "tags": ["duck", "water", "wildlife", "reflection"],
+            },
+        )
+
+    def test_complete_classifier_json_prefix_does_not_close_unproven_tags(self):
+        partial = '{"alt_text":"A duck.","tags":["duck","water"'
+
+        self.assertIsNone(complete_classifier_json_prefix(partial))
+
+    def test_repeated_open_classifier_tags_requires_four_unique_then_repeat(self):
+        loop = '{"tags":["duck","water","wildlife","reflection","water","water"'
+
+        self.assertTrue(has_repeated_open_classifier_tags(loop))
+        self.assertFalse(
+            has_repeated_open_classifier_tags('{"tags":["duck","water","water"')
+        )
+        self.assertFalse(
+            has_repeated_open_classifier_tags(
+                '{"tags":["duck","water","wildlife","reflection"]'
+            )
+        )
+
+    def test_json_completion_logits_processor_forces_eos_per_complete_row(self):
+        import torch
+
+        tokenizer = mock.Mock()
+        tokenizer.decode.side_effect = ['{"done": true}', '{"still":']
+        processor = JsonCompletionLogitsProcessor(tokenizer, eos_token_id=2)
+        scores = torch.zeros((2, 5))
+
+        actual = processor(torch.tensor([[1, 2], [3, 4]]), scores)
+
+        self.assertEqual(actual[0, 2].item(), 0.0)
+        self.assertTrue(torch.isneginf(actual[0, 0]))
+        self.assertTrue(torch.equal(actual[1], torch.zeros(5)))
+
+    def test_json_completion_logits_processor_closes_repeated_tag_array(self):
+        import torch
+
+        tokenizer = mock.Mock()
+        tokenizer.encode.return_value = [4]
+        tokenizer.decode.return_value = (
+            '{"tags":["duck","water","wildlife","reflection","water"'
+        )
+        processor = JsonCompletionLogitsProcessor(tokenizer, eos_token_id=2)
+
+        actual = processor(torch.tensor([[1, 2]]), torch.zeros((1, 6)))
+
+        self.assertEqual(actual[0, 4].item(), 0.0)
+        self.assertTrue(torch.isneginf(actual[0, 0]))
 
     def test_filter_exif_for_search_keeps_only_useful_fields(self):
         actual = filter_exif_for_search(
@@ -200,6 +437,23 @@ class TestMain(unittest.TestCase):
                 "GPS GPSLatitude": "[35, 0, 0]",
             },
         )
+
+    def test_get_exif_skips_unused_embedded_details(self):
+        handle = mock.Mock()
+        with mock.patch("index.exifread.process_file", return_value={}) as process_file:
+            self.assertEqual(get_exif(handle), {})
+
+        process_file.assert_called_once_with(handle, details=False)
+
+    def test_colour_thumbnail_bounds_large_input_and_palette_remains_available(self):
+        path = "../src/test/fixtures/monkey.jpg"
+
+        thumbnail = prepare_colour_thumbnail(path, max_dimension=128)
+        palette = extract_colour_palette(path)
+
+        self.assertLessEqual(max(thumbnail.shape[:2]), 128)
+        self.assertEqual(thumbnail.shape[2], 4)
+        self.assertGreater(len(palette), 0)
 
     def test_create_classifier_supports_janus_gemma_and_gguf(self):
         janus = create_classifier("janus")
@@ -258,6 +512,36 @@ class TestMain(unittest.TestCase):
         self.assertEqual(actual["verdict"], "candidate_better")
         self.assertTrue("candidate_adds_tags" in actual["reasons"])
 
+    def test_evaluate_caption_quality_cases_checks_required_and_forbidden_terms(self):
+        cases = [
+            {
+                "path": "monkey.jpg",
+                "requiredAny": ["monkey", "macaque"],
+                "forbidden": ["dog"],
+            },
+            {"path": "dam.jpg", "requiredAny": ["dam"]},
+        ]
+        captions = {
+            "monkey.jpg": {
+                "identified_objects": ["macaque"],
+                "themes": ["wildlife"],
+                "alt_text": "A macaque in a forest.",
+                "subject": "macaque",
+            },
+            "dam.jpg": {
+                "identified_objects": ["bridge"],
+                "themes": [],
+                "alt_text": "A bridge over water.",
+                "subject": "bridge",
+            },
+        }
+
+        result = evaluate_caption_quality_cases(cases, captions)
+
+        self.assertFalse(result["passed"])
+        self.assertEqual(result["passedCases"], 1)
+        self.assertEqual(result["cases"][1]["reasons"], ["missing_required_concept"])
+
     @unittest.skipUnless(
         RUN_MODEL_INFERENCE,
         "Set INDEX_RUN_MODEL_INFERENCE=1 to run live model inference tests",
@@ -274,10 +558,20 @@ class TestMain(unittest.TestCase):
         path = "../src/test/fixtures/monkey.jpg"
         # Mirror the production Janus pass: predict + parse while the model is
         # loaded, then assemble from the precomputed result (no live model).
-        geocode = extract_geocode_from_path(path)
-        raw = classifier.predict(path=path, geocode=geocode)
-        precomputed_caption = parse_caption_with_retry(classifier, path, geocode, raw)
-        input_tuple = (idx, path, True, precomputed_caption, None, None)
+        raw = classifier.predict(path=path, geocode=None)
+        precomputed_caption = parse_caption_with_retry(classifier, path, None, raw)
+        input_tuple = (
+            idx,
+            path,
+            True,
+            True,
+            precomputed_caption,
+            None,
+            None,
+            file_content_sha256(path),
+            "test-caption-v1",
+            "test-model",
+        )
 
         actual = analyse_image_worker(input_tuple)
         analysed = actual.get("analysed")
@@ -379,7 +673,7 @@ class TestMain(unittest.TestCase):
         self.assertEqual(result.get("alt_text"), "a cat")
         self.assertEqual(stub.calls, 1)
 
-    def test_parse_caption_with_retry_gives_up_returns_empty(self):
+    def test_parse_caption_with_retry_gives_up_returns_retryable_none(self):
         class StubClassifier:
             def predict(self, path, geocode):
                 return "{bad}"
@@ -387,7 +681,103 @@ class TestMain(unittest.TestCase):
         result = parse_caption_with_retry(
             StubClassifier(), "p.jpg", {}, "{bad}", max_attempts=3
         )
-        self.assertEqual(result, {})
+        self.assertIsNone(result)
+
+    def test_non_eos_caption_is_retried_singly_before_acceptance(self):
+        valid = '{"identified_objects":["cat"],"themes":[],"alt_text":"A cat.","subject":"cat"}'
+
+        class StubClassifier:
+            def __init__(self):
+                self.calls = 0
+                self.last_generation_metrics = []
+
+            def predict(self, path, geocode):
+                self.calls += 1
+                self.last_generation_metrics = [
+                    {
+                        "tokenCount": 40,
+                        "completedWithEos": True,
+                        "hitTokenLimit": False,
+                    }
+                ]
+                return valid
+
+        classifier = StubClassifier()
+        metrics = []
+        with mock.patch("index.log"), mock.patch("index.heartbeat"):
+            parsed = resolve_caption_result(
+                classifier,
+                "cat.jpg",
+                {},
+                "truncated",
+                {"completedWithEos": False, "hitTokenLimit": True},
+                metrics,
+            )
+        self.assertEqual(parsed["tags"][0], "cat")
+        self.assertEqual(classifier.calls, 1)
+        self.assertTrue(metrics[0]["singleRetry"])
+
+    def test_complete_json_at_token_ceiling_is_accepted_without_retry(self):
+        valid = '{"tags":["cat"],"alt_text":"A cat."}'
+        classifier = mock.Mock()
+
+        parsed = resolve_caption_result(
+            classifier,
+            "cat.jpg",
+            {},
+            valid,
+            {"completedWithEos": False, "completedWithJson": True},
+        )
+
+        self.assertEqual(parsed["tags"][0], "cat")
+        classifier.predict.assert_not_called()
+
+    def test_complete_schema_prefix_at_token_ceiling_is_repaired_without_retry(self):
+        repeated = (
+            '{"alt_text":"A snowy mountain.",'
+            '"tags":["mountain","winter"],'
+            '"alt_text":"A snowy mountain."'
+        )
+        classifier = mock.Mock()
+
+        parsed = resolve_caption_result(
+            classifier,
+            "mountain.jpg",
+            {},
+            repeated,
+            {
+                "completedWithEos": False,
+                "completedWithJson": False,
+                "completedWithSchema": True,
+            },
+        )
+
+        self.assertEqual(parsed["tags"][0], "mountain")
+        classifier.predict.assert_not_called()
+
+    def test_non_eos_single_retry_remains_incomplete(self):
+        class StubClassifier:
+            last_generation_metrics = []
+
+            def predict(self, path, geocode):
+                self.last_generation_metrics = [
+                    {
+                        "tokenCount": 192,
+                        "completedWithEos": False,
+                        "hitTokenLimit": True,
+                    }
+                ]
+                return "still truncated"
+
+        with mock.patch("index.log"), mock.patch("index.heartbeat"):
+            parsed = resolve_caption_result(
+                StubClassifier(),
+                "cat.jpg",
+                {},
+                "truncated",
+                {"completedWithEos": False},
+            )
+        self.assertIsNone(parsed)
 
     def test_analyse_image_builds_from_precomputed(self):
         path = "../src/test/fixtures/monkey.jpg"
@@ -410,7 +800,7 @@ class TestMain(unittest.TestCase):
         self.assertIn("monkey", analysed["tags"])
         self.assertIn("nature", analysed["tags"])
         self.assertEqual(analysed["alt_text"], "a monkey")
-        self.assertEqual(analysed["subject"], "monkey")
+        self.assertIsNone(analysed["subject"])
         self.assertEqual(analysed["colors"], [(1, 2, 3)])
         # Embeddings are emitted from the precomputed dict's keys, not a live model.
         self.assertEqual(len(analysed["embeddings"]), 1)
@@ -467,7 +857,18 @@ class TestMain(unittest.TestCase):
         with mock.patch("index.analyse_image", side_effect=KeyboardInterrupt):
             with self.assertRaises(KeyboardInterrupt):
                 analyse_image_worker(
-                    (0, "../src/test/fixtures/monkey.jpg", True, None, None, None)
+                    (
+                        0,
+                        "../src/test/fixtures/monkey.jpg",
+                        True,
+                        False,
+                        None,
+                        None,
+                        None,
+                        "digest",
+                        "caption-version",
+                        None,
+                    )
                 )
 
 
@@ -509,6 +910,7 @@ class TestCli(UsesTestexistsFixture, unittest.TestCase):
             self.assertEqual(0, result.exit_code)
             self.assertTrue("Using model profile: siglip2" in result.output)
             self.assertTrue("Found 5 files" in result.output)
+            self.assertFalse(os.path.exists(dbpath))
 
     def test_update_gps_refreshes_coords_from_exif_without_models(self):
         # A row seeded with deliberately wrong coords/date/geocode should be
@@ -581,6 +983,49 @@ class TestCli(UsesTestexistsFixture, unittest.TestCase):
             self.assertEqual(lat, 0.0)
             self.assertEqual(geocode, "WRONGPLACE")
 
+    def test_update_gps_clears_removed_coordinates_and_geocode_tags(self):
+        photo = "../src/test/fixtures/monkey.jpg"
+        with tempfile.TemporaryDirectory() as tmpdir:
+            dbpath = os.path.join(tmpdir, "clear-gps.sqlite")
+            db = Sqlite3Client(dbpath)
+            db.setup_tables()
+            with db.transaction() as cur:
+                db.upsert_image_fields(photo, {"geocode": "Japan"}, cur=cur)
+                db.insert_metadata(
+                    photo,
+                    (35.0, 139.0),
+                    "2020-01-01T00:00:00",
+                    {"geo_country": "Japan"},
+                    cur=cur,
+                )
+                db.replace_tags_for_source(photo, ["Japan", "JP"], "geocode", cur)
+                db.rebuild_tag_counts(cur)
+            db.con.close()
+
+            with mock.patch(
+                "index.get_exif",
+                return_value={"EXIF DateTimeOriginal": "2020:01:02 03:04:05"},
+            ):
+                result = CliRunner().invoke(update_gps, ["--dbpath", dbpath])
+            self.assertEqual(result.exit_code, 0, result.output)
+
+            con = sqlite3.connect(dbpath)
+            metadata = con.execute(
+                "SELECT lat_deg, lng_deg, geo_country FROM metadata WHERE path = ?",
+                (photo,),
+            ).fetchone()
+            geocode = con.execute(
+                "SELECT geocode FROM images WHERE path = ?", (photo,)
+            ).fetchone()[0]
+            geo_tags = con.execute(
+                "SELECT tag FROM image_tags WHERE path = ? AND source = 'geocode'",
+                (photo,),
+            ).fetchall()
+            con.close()
+            self.assertEqual(metadata, (None, None, None))
+            self.assertIsNone(geocode)
+            self.assertEqual(geo_tags, [])
+
     def test_index_dry_run_accepts_gemma_classifier_flags(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             runner = CliRunner()
@@ -618,6 +1063,33 @@ class TestCli(UsesTestexistsFixture, unittest.TestCase):
             )
             self.assertEqual(0, result.exit_code)
             self.assertTrue("Classifier backend: gemma4-gguf" in result.output)
+
+    def test_index_refuses_experimental_janus_batch_without_override(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            dbpath = os.path.join(tmpdir, "unsafe.sqlite")
+            result = CliRunner().invoke(
+                index,
+                [
+                    "--glob",
+                    "../albums/test-simple/*.jpg",
+                    "--dbpath",
+                    dbpath,
+                    "--dry-run",
+                    "--classifier-batch-size",
+                    "5",
+                ],
+            )
+            self.assertNotEqual(result.exit_code, 0)
+            self.assertIn("production limit 4", result.output)
+            self.assertFalse(os.path.exists(dbpath))
+
+    def test_janus_batch_benchmark_refuses_experimental_default(self):
+        result = CliRunner().invoke(
+            cli,
+            ["benchmark-janus-batch", "--batch-sizes", "5"],
+        )
+        self.assertNotEqual(result.exit_code, 0)
+        self.assertIn("production limit 4", result.output)
 
     def test_skip_index_already_exists(self):
         runner = CliRunner()
@@ -706,6 +1178,27 @@ class TestCli(UsesTestexistsFixture, unittest.TestCase):
             self.assertEqual(0, result.exit_code)
             self.assertNotIn("../albums/gone/1.jpg", Sqlite3Client(dbpath).list_paths())
 
+    def test_prune_refuses_large_nonempty_partial_glob_without_force(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            dbpath = os.path.join(tmpdir, "prune.sqlite")
+            db = Sqlite3Client(dbpath)
+            db.setup_tables()
+            real = "../src/test/fixtures/monkey.jpg"
+            db.upsert_image_fields(real, {"filename": "monkey.jpg"})
+            for index in range(9):
+                db.upsert_image_fields(
+                    f"../albums/gone/{index}.jpg", {"filename": f"{index}.jpg"}
+                )
+            db.con.close()
+
+            result = CliRunner().invoke(
+                prune,
+                f"--glob {real} --dbpath {dbpath}".split(),
+            )
+            self.assertNotEqual(result.exit_code, 0)
+            self.assertIn("large partial prune", result.output)
+            self.assertEqual(len(Sqlite3Client(dbpath).list_paths()), 10)
+
     def test_prune_removes_only_missing_paths(self):
         # H4: normal operation still prunes rows whose files no longer exist and
         # leaves the DB in delete (non-WAL) journal mode for publishing.
@@ -722,7 +1215,7 @@ class TestCli(UsesTestexistsFixture, unittest.TestCase):
             runner = CliRunner()
             result = runner.invoke(
                 prune,
-                f"--glob ../src/test/fixtures/*.jpg --dbpath {dbpath}".split(),
+                f"--glob ../src/test/fixtures/*.jpg --dbpath {dbpath} --force".split(),
             )
             self.assertEqual(0, result.exit_code)
 
@@ -906,6 +1399,45 @@ class TestDb(UsesTestexistsFixture, unittest.TestCase):
             page_size = db.con.execute("PRAGMA page_size").fetchone()[0]
             self.assertEqual(page_size, 4096)
 
+    def test_legacy_fts_schema_migrates_to_current_columns(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            dbpath = os.path.join(tmpdir, "legacy-fts.sqlite")
+            legacy = sqlite3.connect(dbpath)
+            legacy.execute(
+                "CREATE VIRTUAL TABLE images USING fts5("
+                "path, album_relative_path, filename, geocode, exif, tags, colors, "
+                "alt_text, critique, suggested_title, composition_critique, subject, "
+                "tokenize='porter trigram')"
+            )
+            legacy.execute(
+                "INSERT INTO images(path, filename, tags, alt_text, critique, subject) "
+                "VALUES ('a.jpg', 'a.jpg', 'cat', 'A cat', 'unused', 'cat')"
+            )
+            legacy.commit()
+            legacy.close()
+
+            db = Sqlite3Client(dbpath)
+            db.setup_tables()
+            columns = [row[1] for row in db.con.execute("PRAGMA table_info(images)")]
+            self.assertEqual(
+                columns,
+                [
+                    "path",
+                    "album_relative_path",
+                    "filename",
+                    "geocode",
+                    "exif",
+                    "tags",
+                    "colors",
+                    "alt_text",
+                    "subject",
+                ],
+            )
+            row = db.con.execute(
+                "SELECT path, tags, alt_text, subject FROM images"
+            ).fetchone()
+            self.assertEqual(row, ("a.jpg", "cat", "A cat", "cat"))
+
     def test_siglip2_dry_run_backfills_missing_embeddings_for_existing_rows(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             dbpath = os.path.join(tmpdir, "test-simple.sqlite")
@@ -970,35 +1502,16 @@ class TestDb(UsesTestexistsFixture, unittest.TestCase):
             db.setup_tables()
 
             shared = "../albums/test-simple/DSCF0506-2.jpg"
+            other = "../albums/test-simple/DSCF0593.jpg"
             db.upsert_image_fields(shared, {"filename": "a.jpg", "tags": "cat, dog"})
-            # Seed counts directly so the test targets delete_path's decrement
-            # logic (insert_tags' own counting quirk is out of scope): cat is held
-            # by one image, dog by two.
-            db.con.execute(
-                "INSERT INTO tags (tag, count) VALUES ('cat', 1), ('dog', 2)"
-            )
-            db.con.commit()
+            db.upsert_image_fields(other, {"filename": "b.jpg", "tags": "dog"})
+            db.replace_image_tags(shared, ["cat", "dog"])
+            db.replace_image_tags(other, ["dog"])
 
             db.delete_path(shared)
 
             counts = dict(db.con.execute("SELECT tag, count FROM tags").fetchall())
-            # "cat" reached 0 and was removed; "dog" decremented to 1.
             self.assertEqual(counts, {"dog": 1})
-
-    def test_insert_tags_counts_one_per_image(self):
-        # Stored count must equal the number of images carrying the tag — not
-        # one more. Seeding new tags at 1 then incrementing double-counted the
-        # first image (the old off-by-one the frontend used to subtract back).
-        with tempfile.TemporaryDirectory() as tmpdir:
-            db = Sqlite3Client(os.path.join(tmpdir, "tags.sqlite"))
-            db.setup_tables()
-
-            db.insert_tags(["cat", "dog"])  # first image: cat, dog
-            db.insert_tags(["cat"])  # second image: cat only
-            db.con.commit()
-
-            counts = dict(db.con.execute("SELECT tag, count FROM tags").fetchall())
-            self.assertEqual(counts, {"cat": 2, "dog": 1})
 
     def test_compute_reindex_plan_flags_changed_and_backfills_missing(self):
         indexed = {"a.jpg", "b.jpg", "c.jpg", "gone.jpg"}
@@ -1040,6 +1553,267 @@ class TestDb(UsesTestexistsFixture, unittest.TestCase):
             db.con.commit()
             db.delete_path("x.jpg")
             self.assertNotIn("x.jpg", db.list_file_signatures())
+
+    def test_stage_specific_refresh_preserves_unselected_artifacts(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db = Sqlite3Client(os.path.join(tmpdir, "stage.sqlite"))
+            db.setup_tables()
+            path = "photo.jpg"
+            initial = {
+                "exif": {},
+                "geocode": {},
+                "lat_deg": None,
+                "lng_deg": None,
+                "iso8601": None,
+                "colors": [],
+                "tags": ["old_tag"],
+                "alt_text": "Old caption",
+                "subject": "old subject",
+                "embeddings": [
+                    {"model_id": SiglipEmbedder.MODEL_ID, "embedding": [1.0, 0.0]},
+                    {
+                        "model_id": "google/siglip2-base-patch16-224",
+                        "embedding": [0.0, 1.0],
+                    },
+                ],
+            }
+            insert_analysed_images_batch(
+                db,
+                [
+                    {
+                        "path": path,
+                        "analysed": initial,
+                        "write_core": True,
+                        "write_caption": True,
+                        "source_sha256": "old-digest",
+                        "caption_version": "old-caption-version",
+                        "caption_model_id": "old-caption-model",
+                    }
+                ],
+            )
+
+            insert_analysed_images_batch(
+                db,
+                [
+                    {
+                        "path": path,
+                        "analysed": {
+                            "embeddings": [
+                                {
+                                    "model_id": SiglipEmbedder.MODEL_ID,
+                                    "embedding": [0.5, 0.5],
+                                }
+                            ]
+                        },
+                        "write_core": False,
+                        "write_caption": False,
+                        "source_sha256": "new-digest",
+                    }
+                ],
+            )
+
+            row = db.get_image_row(path)
+            self.assertEqual(row["alt_text"], "Old caption")
+            self.assertEqual(row["tags"], "old_tag")
+            self.assertIsNotNone(
+                db.get_embedding(path, "google/siglip2-base-patch16-224")
+            )
+            states = db.get_pipeline_states()
+            self.assertEqual(states[(path, CAPTION_STAGE)][0], "old-digest")
+            self.assertEqual(states[(path, SIGLIP_V1_STAGE)][0], "new-digest")
+
+    def test_failed_caption_does_not_overwrite_or_complete_stage(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db = Sqlite3Client(os.path.join(tmpdir, "caption.sqlite"))
+            db.setup_tables()
+            path = "photo.jpg"
+            db.upsert_image_fields(
+                path,
+                {"alt_text": "Existing caption", "subject": "subject", "tags": "tag"},
+            )
+            db.upsert_pipeline_state(
+                path,
+                CAPTION_STAGE,
+                "old-digest",
+                "old-caption-version",
+            )
+
+            insert_analysed_images_batch(
+                db,
+                [
+                    {
+                        "path": path,
+                        "analysed": {"embeddings": []},
+                        "write_core": False,
+                        "write_caption": False,
+                        "caption_failed": True,
+                        "source_sha256": "new-digest",
+                    }
+                ],
+            )
+
+            self.assertEqual(db.get_image_row(path)["alt_text"], "Existing caption")
+            self.assertEqual(
+                db.get_pipeline_states()[(path, CAPTION_STAGE)][0], "old-digest"
+            )
+
+    def test_caption_generation_metrics_are_persisted_per_attempt(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db = Sqlite3Client(os.path.join(tmpdir, "metrics.sqlite"))
+            db.setup_tables()
+            db.insert_caption_generation_metrics(
+                [
+                    {
+                        "path": "photo.jpg",
+                        "pipelineVersion": "caption-v1",
+                        "attempt": "batch",
+                        "batchSize": 4,
+                        "maxNewTokens": 128,
+                        "tokenCount": 74,
+                        "completedWithEos": True,
+                        "hitTokenLimit": False,
+                        "parseSuccess": True,
+                        "decodeMs": 12.5,
+                        "processorMs": 4.0,
+                        "visionPreparationMs": 8.0,
+                        "generateBatchMs": 1000.0,
+                    }
+                ]
+            )
+
+            row = db.con.execute(
+                "SELECT path, attempt, batch_size, max_new_tokens, token_count, "
+                "completed_with_eos, parse_success, decode_ms, generate_batch_ms "
+                "FROM caption_generation_metrics"
+            ).fetchone()
+            self.assertEqual(
+                row,
+                ("photo.jpg", "batch", 4, 128, 74, 1, 1, 12.5, 1000.0),
+            )
+
+    def test_incomplete_core_write_remains_retryable(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db = Sqlite3Client(os.path.join(tmpdir, "core.sqlite"))
+            db.setup_tables()
+            insert_analysed_images_batch(
+                db,
+                [
+                    {
+                        "path": "photo.jpg",
+                        "analysed": {
+                            "exif": {},
+                            "geocode": {},
+                            "lat_deg": None,
+                            "lng_deg": None,
+                            "iso8601": None,
+                            "colors": [],
+                            "embeddings": [],
+                        },
+                        "write_core": True,
+                        "write_caption": False,
+                        "core_complete": False,
+                        "source_sha256": "digest",
+                    }
+                ],
+            )
+            self.assertIsNotNone(db.get_image_row("photo.jpg"))
+            self.assertNotIn(("photo.jpg", CORE_STAGE), db.get_pipeline_states())
+
+    def test_content_digest_detects_same_size_same_mtime_replacement(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = os.path.join(tmpdir, "photo.jpg")
+            with open(path, "wb") as fh:
+                fh.write(b"first")
+            timestamp = os.stat(path).st_mtime
+            first = file_content_sha256(path)
+            with open(path, "wb") as fh:
+                fh.write(b"other")
+            os.utime(path, (timestamp, timestamp))
+            self.assertNotEqual(first, file_content_sha256(path))
+
+    def test_parallel_content_digests_match_single_file_digest(self):
+        paths = [
+            "../src/test/fixtures/monkey.jpg",
+            "../src/test/fixtures/monkey-for-unoptimised.jpg",
+        ]
+
+        actual = file_content_sha256_many(paths, workers=2)
+
+        self.assertEqual(
+            actual,
+            {path: file_content_sha256(path) for path in paths},
+        )
+
+    def test_validate_proves_exact_core_and_caption_coverage(self):
+        path = "../src/test/fixtures/monkey.jpg"
+        with tempfile.TemporaryDirectory() as tmpdir:
+            dbpath = os.path.join(tmpdir, "validate.sqlite")
+            db = Sqlite3Client(dbpath)
+            db.setup_tables()
+            digest = file_content_sha256(path)
+            analysed = {
+                "exif": {},
+                "geocode": {},
+                "lat_deg": None,
+                "lng_deg": None,
+                "iso8601": None,
+                "colors": [],
+                "tags": ["monkey"],
+                "alt_text": "A monkey",
+                "subject": "monkey",
+                "embeddings": [],
+            }
+            insert_analysed_images_batch(
+                db,
+                [
+                    {
+                        "path": path,
+                        "analysed": analysed,
+                        "write_core": True,
+                        "write_caption": True,
+                        "source_sha256": digest,
+                        "caption_version": caption_pipeline_version("janus"),
+                        "caption_model_id": "deepseek-ai/Janus-Pro-1B",
+                    }
+                ],
+            )
+            db.con.close()
+
+            summary = validate_index_database(dbpath, path, "janus")
+            self.assertEqual(summary["paths"], 1)
+            self.assertEqual(summary["quickCheck"], "ok")
+
+            core_output = os.path.join(tmpdir, "core.sqlite")
+            embeddings_output = os.path.join(tmpdir, "embeddings.sqlite")
+            publish_index_databases(dbpath, embeddings_output, core_output)
+            core = sqlite3.connect(core_output)
+            embeddings = sqlite3.connect(embeddings_output)
+            self.assertIsNone(
+                core.execute(
+                    "SELECT 1 FROM sqlite_master WHERE name = 'embeddings'"
+                ).fetchone()
+            )
+            self.assertIsNone(
+                core.execute(
+                    "SELECT 1 FROM sqlite_master WHERE name = 'pipeline_state'"
+                ).fetchone()
+            )
+            self.assertIsNone(
+                core.execute(
+                    "SELECT 1 FROM sqlite_master WHERE name = 'caption_generation_metrics'"
+                ).fetchone()
+            )
+            self.assertIsNotNone(
+                embeddings.execute(
+                    "SELECT 1 FROM sqlite_master WHERE name = 'embeddings'"
+                ).fetchone()
+            )
+            self.assertEqual(core.execute("PRAGMA quick_check").fetchone()[0], "ok")
+            self.assertEqual(
+                embeddings.execute("PRAGMA quick_check").fetchone()[0], "ok"
+            )
+            core.close()
+            embeddings.close()
 
     def test_geocode_columns_keyed_off_admin_fields(self):
         # region = admin1 (state), subregion = admin2 (county), by key.
@@ -1146,17 +1920,6 @@ class TestDb(UsesTestexistsFixture, unittest.TestCase):
         finally:
             con.close()
 
-    def test_correct_legacy_tag_counts_decrements_and_drops_orphans(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
-            db = Sqlite3Client(os.path.join(tmpdir, "counts.sqlite"))
-            db.setup_tables()
-            # seed-at-1 counts: stored = images + 1; "ghost" is an orphan at 1.
-            self._seed_tags(db, {"cat": 3, "dog": 2, "ghost": 1})
-            db.correct_legacy_tag_counts()
-            db.con.commit()
-            counts = dict(db.con.execute("SELECT tag, count FROM tags").fetchall())
-            self.assertEqual(counts, {"cat": 2, "dog": 1})
-
     def test_backfill_corrects_counts_and_populates_geo_idempotently(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             dbpath = os.path.join(tmpdir, "backfill.sqlite")
@@ -1192,14 +1955,20 @@ class TestDb(UsesTestexistsFixture, unittest.TestCase):
             self.assertEqual(tokyo[1], "Japan")
             self.assertTrue(tokyo[0])  # a city resolved from the coordinates
             self.assertEqual(self._read_geo(dbpath, "b.jpg")[1], "Singapore")
-            # Every count -1, orphan dropped, comma-bearing tag preserved intact.
-            expected = {"Japan": 1, "JP": 1, "Singapore": 1, "nature, relaxation": 2}
-            self.assertEqual(self._read_counts(dbpath), expected)
+            counts = self._read_counts(dbpath)
+            self.assertEqual(counts["Japan"], 1)
+            self.assertEqual(counts["JP"], 1)
+            self.assertEqual(counts["Singapore"], 1)
+            self.assertEqual(counts["SG"], 1)
+            self.assertEqual(counts["cityscape"], 1)
+            self.assertEqual(counts["skyline"], 1)
+            self.assertNotIn("ghost", counts)
+            self.assertNotIn("nature, relaxation", counts)
 
             # Re-running must not decrement again (geo_* now populated → skip).
             again = CliRunner().invoke(cli, ["backfill", "--dbpath", dbpath])
             self.assertEqual(again.exit_code, 0, again.output)
-            self.assertEqual(self._read_counts(dbpath), expected)
+            self.assertEqual(self._read_counts(dbpath), counts)
 
     def test_backfill_dry_run_leaves_db_untouched(self):
         with tempfile.TemporaryDirectory() as tmpdir:

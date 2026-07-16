@@ -16,15 +16,20 @@ Indexes images for search with the following fields
 | metadata     | path                |              | primary key                       |
 | metadata     | lat_deg             | map          |                                   |
 | metadata     | lng_deg             | map          |                                   |
-| metadata     | iso8601             |              | assumed UTC                       |
-| embeddings   | path                | similarity   | primary key                       |
+| metadata     | iso8601             |              | camera-local naive ISO timestamp  |
+| embeddings   | path                | similarity   | composite key with `model_id`     |
 | embeddings   | model_id            | similarity   | embedding model identifier        |
 | embeddings   | embedding_dim       | similarity   | vector dimensionality             |
-| embeddings   | embedding_json      | similarity   | normalised image embedding vector |
+| embeddings   | embedding_blob      | similarity   | int8-quantised embedding vector    |
+| embeddings   | embedding_scale     | similarity   | per-vector dequantisation scale    |
+| image_tags   | path, tag, source    | tag counts   | authoritative per-image tags       |
+| pipeline_state | path, stage        | indexing     | digest, version, model provenance  |
 
 The [FTS5 SQLite extension](https://www.sqlite.org/fts5.html) requires sqlite3 >= 3.34.0 and creates a virtual table.
 
-Full indexing of ~1000 images takes around 3+ minutes. First run will download model weights which takes some time.
+The first inference run downloads pinned model snapshots. Later runs process only
+missing, changed, or pipeline-version-stale stages. Source freshness uses SHA-256,
+so replacing a file while preserving its timestamp and size is still detected.
 
 The SQLite write path can be benchmarked independently of model loading with the built-in synthetic benchmark command.
 
@@ -42,7 +47,9 @@ $ uv run ruff format .
 $ uv run index.py --help
 $ uv run --extra inference python index.py index --glob "../albums/test-simple/*.[jJ][pP][gG]"
 $ uv run --extra inference python index.py index --glob "../albums/**/*.jpg" --dbpath "search.sqlite" --dry-run --model-profile hybrid
+$ uv run python index.py validate --glob "../albums/**/*.jpg" --dbpath "search.sqlite" --model-profile hybrid
 $ uv run python index.py benchmark-index --rows 200 --repeat 3 --output ".index-benchmark.json"
+$ uv run --extra inference python index.py benchmark-janus-batch --glob "../albums/**/*.jpg" --batch-sizes 1,2,4 --repeat 2 --output ".janus-batch-benchmark.json"
 $ uv run --extra inference python index.py benchmark-classifier --backend gemma4-gguf --model-id "/tmp/gemma4-e4b-gguf/gemma-4-E4B-it-Q8_0.gguf" --quantization "/tmp/gemma4-e4b-gguf/mmproj-BF16.gguf" --path "../albums/test-simple/DSCF0506-2.jpg" --repeat 1 --output ".gemma4-gguf-benchmark.json"
 $ uv run --extra inference python index.py compare-captioners --glob "../albums/test-simple/*.[jJ][pP][gG]" --baseline-dbpath "./test-simple.sqlite" --sample-size 5 --candidate-backend gemma4-gguf --candidate-model-id "/tmp/gemma4-e4b-gguf/gemma-4-E4B-it-Q8_0.gguf" --candidate-quantization "/tmp/gemma4-e4b-gguf/mmproj-BF16.gguf" --output-json ".caption-comparison.json" --output-md ".caption-comparison.md"
 $ uv run index.py search --query "singapore"
@@ -53,8 +60,6 @@ $ uv run index.py search-tags --query "dam"
 $ uv run index.py search-metadata --query "D"
 
 $ uv run index.py prune --glob "../src/public/data/albums/**/*.jpg" --dbpath "search.sqlite" --dry-run
-
-$ cp search.sqlite ../src/public/search.sqlite
 
 # Test
 $ ./create-test-db.sh              # rebuild committed fixtures; installs inference extra
@@ -80,7 +85,22 @@ Use the synthetic benchmark to measure the SQLite-heavy portion of indexing with
 $ uv run python index.py benchmark-index --rows 200 --repeat 3 --output ".index-benchmark.json"
 ```
 
-The command reports median setup and insert timings and can write a JSON artifact for comparing future optimisations.
+The synthetic command reports median setup and current chunked-insert timings.
+Normal `index --benchmark-output ...` runs also record caption, v1, and v2 load
+and inference durations plus incomplete-stage counts for comparing future changes.
+
+Profile the model-free photo pipeline on a deterministic, album-balanced sample:
+
+```sh
+$ uv run python index.py benchmark-cpu --sample-size 128 --repeat 3 --hash-workers 8 --exif-workers 1 --colour-workers 4 --output ".index-cpu-benchmark.json"
+$ uv run python index.py benchmark-colours --sample-size 128 --max-dimension 512 --quality 10 --output ".index-colour-benchmark.json"
+```
+
+Production colour extraction decodes at JPEG draft resolution, bounds the image
+to 512px, then samples the thumbnail without a blur pass. `benchmark-colours`
+compares this with the former full-resolution palette and reports wall-time plus
+dominant and whole-palette CIE76 ΔE. Content hashing uses eight I/O workers; EXIF
+parsing skips MakerNote/thumbnail details because none of those fields are kept.
 
 To benchmark the Janus classifier path directly on a sample image:
 
@@ -104,11 +124,17 @@ The JSON artifact stores the side-by-side rows. The Markdown report is the first
 
 ## Model profiles
 
-- `janus`: generate tags, short alt text, subject text, and metadata only.
-- `siglip2`: generate image embeddings only.
+- `janus`: generate search tags, short alt text, and metadata only.
+- `siglip2`: generate both browser-compatible SigLIP v1 and visual-similarity
+  SigLIP v2 embeddings only; it does not parse EXIF, extract colours, or touch
+  caption rows.
 - `hybrid`: generate caption metadata and SigLIP embeddings in one pass.
 
-The caption prompt is intentionally limited to the fields currently used by the frontend search UX: `identified_objects`, `themes`, `alt_text`, and `subject`.
+The caption prompt emits only `tags` and `alt_text`. The primary subject is the
+first tag, followed by other concrete objects and useful visual themes. A separate
+subject field and separate object/theme arrays were removed because the frontend
+merged or treated them as fallbacks, so they added generation cost without
+preserving distinct behaviour.
 
 ## Caption backends
 
@@ -129,7 +155,52 @@ Recommended local rollout:
 3. Compare outputs on a balanced sample before changing any production DB build.
 4. If video work starts, build it first as sampled-frame processing on top of the retained Gemma groundwork.
 
-`do-full-index.sh` uses `hybrid`. `do-embeddings-index.sh` is useful when you want to preserve the current metadata-backed `search.sqlite` and only refresh the embeddings table.
+`do-full-index.sh` uses `hybrid`. `do-embeddings-index.sh` is useful when you want
+to preserve the current metadata-backed `search.sqlite` and only refresh the
+embeddings table; it uses the same working DB by default, avoiding a second
+incremental source that can drift. Both scripts work on a staging copy, prune and validate exact
+source coverage, then atomically promote the working DB and compact public DBs.
+The last good databases remain untouched when indexing or validation fails, and
+the staging DB is retained so the next invocation resumes completed batches.
+
+## Incremental stage model
+
+Core metadata/colours, captions, SigLIP v1, and SigLIP v2 are independent stages.
+A partial profile updates only the stages it owns. Each successful stage records
+the source SHA-256, pipeline version, model ID, pinned revision, and completion
+time in `pipeline_state`. Failed captions or unreadable embeddings do not receive
+a completion record, so the next run retries them without erasing the previous
+successful output.
+
+Tag frequencies are rebuilt from `image_tags`; classifier and geocode tags can
+therefore be replaced or removed without count drift. `schema_migrations` is the
+explicit source of migration state, including for galleries with no GPS rows.
+These build-only tables and `file_signatures` are removed from the compact public
+core DB; browsers receive only the runtime search, tag, and metadata tables.
+
+## Generation guardrails
+
+- Janus defaults to the measured production batch size of 4. Representative
+  profiling showed 3.28× single-image throughput and about 5.53 GB peak reserved
+  VRAM. Batch 6 reserved about 6.36 GB but was slower because decoder stragglers
+  held the larger batch open; larger batches therefore require
+  `--allow-experimental-classifier-batch-size`.
+- The Transformers runtime and model revisions are locked. Janus retains its
+  model-defined composite processor settings; forcing `use_fast=False` also
+  selects an incompatible slow Llama tokenizer for this checkpoint.
+- A CUDA OOM automatically bisects the failed caption batch down to single
+  images while retaining already committed work.
+- Generation has a 120-second batch deadline, low-VRAM warning/stop thresholds,
+  and periodic heartbeats.
+- Parsed captions reject missing fields, empty payloads, excessive tags or text,
+  overlong tags, and leaked model control tokens. Failed captions remain
+  incomplete and retry on the next run.
+- Non-EOS/token-capped rows are identified within a padded decoder batch and
+  retried singly. A measured 192-token batch straggler completed as valid JSON in
+  79 tokens when retried alone, without raising the global token cap.
+- Run statistics include generated token counts, non-EOS/token-limit counts,
+  OOM fallbacks, minimum free VRAM, per-stage time, and failure counts. Use these
+  measurements before changing the 192-token default.
 
 ## Frontend Search Pipeline
 

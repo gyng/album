@@ -287,7 +287,7 @@ requires-dist = [
     { name = "click", specifier = ">=8.1.7,<9" },
     { name = "exifread", specifier = ">=3.0.0,<4" },
     { name = "fast-colorthief", specifier = ">=0.0.5,<0.0.6" },
-    { name = "janus", marker = "extra == 'inference'", git = "https://github.com/deepseek-ai/Janus.git?rev=main" },
+    { name = "janus", marker = "extra == 'inference'", git = "https://github.com/deepseek-ai/Janus.git?rev=1daa72fa409002d40931bd7b36a9280362469ead" },
     { name = "pillow", specifier = ">=10,<13" },
     { name = "protobuf", marker = "extra == 'inference'", specifier = ">=7.34.1" },
     { name = "reverse-geocode", specifier = ">=1.4.1,<2" },
@@ -302,7 +302,7 @@ dev = [{ name = "ruff", specifier = ">=0.11.2" }]
 [[package]]
 name = "janus"
 version = "1.0.0"
-source = { git = "https://github.com/deepseek-ai/Janus.git?rev=main#1daa72fa409002d40931bd7b36a9280362469ead" }
+source = { git = "https://github.com/deepseek-ai/Janus.git?rev=1daa72fa409002d40931bd7b36a9280362469ead#1daa72fa409002d40931bd7b36a9280362469ead" }
 dependencies = [
     { name = "accelerate" },
     { name = "attrdict" },

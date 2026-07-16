@@ -4,6 +4,7 @@ import click
 from pathlib import Path
 import pprint
 import fast_colorthief
+import numpy as np
 import exifread
 import reverse_geocode
 import sqlite3
@@ -13,6 +14,7 @@ from typing import IO, Mapping, Optional, Tuple
 import os
 import fcntl
 import gc
+import hashlib
 import json
 import re
 import math
@@ -115,24 +117,32 @@ def log(message: str) -> None:
     print(f"[{stamp}] {message}", flush=True)
 
 
-def acquire_single_instance_lock(dbpath: str) -> int:
-    """Take an advisory lock so two index runs can't share one GPU / DB file.
+def acquire_single_instance_lock(dbpath: str, global_lock: bool = False) -> int:
+    """Take an advisory lock so two index runs cannot share one GPU or DB file.
 
     Two concurrent runs against the same database would contend for GPU VRAM
     (deadlocking mid-batch once the card fills up) and write the same SQLite
-    file at once. The lock is keyed to the database path and held for the
-    lifetime of the process; the OS releases it automatically on exit —
+    file at once. Mutation commands use a database-specific lock; inference uses
+    one process-wide indexer lock. The OS releases either automatically on exit —
     including crash or ``kill -9`` — so there is no stale lock to clean up the
     way a PID file would leave behind.
 
     Returns the held file descriptor (kept open intentionally). Raises
     ``click.ClickException`` if another run already holds the lock.
     """
-    lock_path = f"{dbpath}.lock"
+    lock_path = (
+        os.path.join(
+            tempfile.gettempdir(),
+            "photo-gallery-indexer-"
+            f"{hashlib.sha256(os.path.abspath(__file__).encode()).hexdigest()[:12]}.lock",
+        )
+        if global_lock
+        else f"{dbpath}.lock"
+    )
     fd = os.open(lock_path, os.O_RDWR | os.O_CREAT, 0o644)
     try:
         fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
-    except OSError:
+    except BlockingIOError:
         try:
             holder = os.pread(fd, 64, 0).decode(errors="replace").strip()
         except OSError:
@@ -225,6 +235,68 @@ def heartbeat(label: str, interval_s: float = 15.0):
         thread.join(timeout=1.0)
 
 
+def is_cuda_oom(error: BaseException) -> bool:
+    oom_type = getattr(torch, "OutOfMemoryError", None)
+    if oom_type is not None and isinstance(error, oom_type):
+        return True
+    return "out of memory" in str(error).lower() and "cuda" in str(error).lower()
+
+
+def predict_caption_batch_resilient(
+    classifier: "BaseCaptionClassifier",
+    items: list[tuple[str, Optional[Mapping]]],
+) -> tuple[list[str], list[dict[str, typing.Any]]]:
+    """Run a caption batch, recursively bisecting it after a CUDA OOM."""
+    try:
+        results = classifier.predict_batch(items)
+        metrics = list(getattr(classifier, "last_generation_metrics", []))
+        if len(metrics) < len(results):
+            metrics.extend({} for _ in range(len(results) - len(metrics)))
+        return results, metrics[: len(results)]
+    except BaseException as err:
+        if not is_cuda_oom(err) or len(items) <= 1:
+            raise
+        split = len(items) // 2
+        log(
+            f"WARNING: CUDA OOM for caption batch of {len(items)}; "
+            f"retrying as {split} + {len(items) - split}"
+        )
+        gc.collect()
+        torch.cuda.empty_cache()
+        left_results, left_metrics = predict_caption_batch_resilient(
+            classifier, items[:split]
+        )
+        right_results, right_metrics = predict_caption_batch_resilient(
+            classifier, items[split:]
+        )
+        for metric in [*left_metrics, *right_metrics]:
+            metric["oomFallback"] = True
+        return left_results + right_results, left_metrics + right_metrics
+
+
+def enforce_vram_headroom(label: str) -> float:
+    """Warn on low post-batch headroom and stop before the card is exhausted."""
+    if not torch.cuda.is_available():
+        return math.inf
+    free, _total = torch.cuda.mem_get_info()
+    free_gb = free / 1e9
+    if free_gb < JANUS_WARN_FREE_VRAM_GB and not getattr(
+        enforce_vram_headroom, "_warning_emitted", False
+    ):
+        log(f"WARNING: only {free_gb:.2f} GB VRAM free after {label}")
+        enforce_vram_headroom._warning_emitted = True
+    if free_gb < JANUS_MIN_FREE_VRAM_GB:
+        torch.cuda.empty_cache()
+        free, _total = torch.cuda.mem_get_info()
+        free_gb = free / 1e9
+        if free_gb < JANUS_MIN_FREE_VRAM_GB:
+            raise click.ClickException(
+                f"Only {free_gb:.2f} GB VRAM remains after {label}; "
+                "stopping with completed batches preserved"
+            )
+    return free_gb
+
+
 MODEL_PROFILE_JANUS = "janus"
 MODEL_PROFILE_SIGLIP2 = "siglip2"
 MODEL_PROFILE_HYBRID = "hybrid"
@@ -244,17 +316,42 @@ DEFAULT_GEMMA4_GGUF_IMAGE_MAX_TOKENS = 140
 DEFAULT_GEMMA4_GGUF_THREADS = 8
 DEFAULT_GEMMA4_GGUF_CTX_SIZE = 32768
 JANUS_RESPONSE_FIELDS = (
-    "identified_objects",
-    "themes",
+    "tags",
     "alt_text",
-    "subject",
 )
 JANUS_MAX_NEW_TOKENS = 192
+JANUS_BATCH_MAX_NEW_TOKENS = 128
 JANUS_BATCH_SIZE = 4
+JANUS_MAX_PRODUCTION_BATCH_SIZE = 4
+JANUS_MAX_GENERATION_SECONDS = 120.0
+JANUS_WARN_FREE_VRAM_GB = 0.75
+JANUS_MIN_FREE_VRAM_GB = 0.25
+MAX_CLASSIFIER_TAGS = 10
+MAX_CLASSIFIER_TAG_WORDS = 4
+MAX_CLASSIFIER_TAG_LENGTH = 60
+MAX_CLASSIFIER_ALT_TEXT_WORDS = 35
+MAX_CLASSIFIER_ALT_TEXT_LENGTH = 320
+JANUS_IMAGE_DECODE_WORKERS = 4
 GEMMA4_MAX_NEW_TOKENS = 192
 EMBEDDER_BATCH_SIZE = 16
 COLORTHIEF_WORKERS = 4
+COLOUR_THUMBNAIL_MAX_DIMENSION = 512
+COLOUR_THUMBNAIL_QUALITY = 10
+FILE_HASH_WORKERS = 8
 INSERT_CHUNK_SIZE = 64
+CORE_STAGE = "core"
+CAPTION_STAGE = "caption"
+SIGLIP_V1_STAGE = "embedding:siglip-v1"
+SIGLIP_V2_STAGE = "embedding:siglip-v2"
+CORE_PIPELINE_VERSION = "core-exif-geocode-colour-v2-thumb512"
+CAPTION_PROMPT_VERSION = "caption-search-json-v2"
+JANUS_MODEL_ID = "deepseek-ai/Janus-Pro-1B"
+JANUS_MODEL_REVISION = "960ab33191f61342a4c60ae74d8dc356a39fafcb"
+SIGLIP_V1_MODEL_REVISION = "7fd15f0689c79d79e38b1c2e2e2370a7bf2761ed"
+SIGLIP_V2_MODEL_REVISION = "75de2d55ec2d0b4efc50b3e9ad70dba96a7b2fa2"
+IMAGE_TAGS_MIGRATION = "image-tags-v1"
+IMAGES_SCHEMA_MIGRATION = "images-schema-v2"
+STRUCTURED_GEOCODE_MIGRATION = "structured-geocode-v1"
 EXIF_SEARCH_FIELDS = (
     "Image Make",
     "Image Model",
@@ -305,28 +402,19 @@ JANUS_FALLBACK_STOPWORDS = {
 }
 
 
-def build_classifier_prompt(geocode: Optional[Mapping]) -> str:
-    schema = (
-        '{ "identified_objects": string[], "themes": string[], '
-        '"alt_text": string, "subject": string }'
-    )
-
-    location_hint = ""
-    if geocode:
-        city = geocode.get("city", "")
-        country = geocode.get("country", "")
-        place = ", ".join([part for part in [city, country] if part])
-        if place:
-            location_hint = f" The photo was taken near {place}. Use that only when it is visually relevant."
+def build_classifier_prompt(_geocode: Optional[Mapping]) -> str:
+    schema = '{ "tags": string[], "alt_text": string }'
 
     return (
         "Return strict JSON only. "
         "Describe the photo for search indexing using this schema: "
         f"{schema}."
-        " Keep identified_objects and themes short and concrete."
-        " Keep alt_text and subject concise, factual, and literal."
+        f" Use at most {MAX_CLASSIFIER_TAGS} unique tags; each must be a concrete "
+        "one-to-four-word phrase. Put the primary subject first, then include other "
+        "visible objects and useful visual themes."
+        f" Write alt_text as one factual sentence of at most "
+        f"{MAX_CLASSIFIER_ALT_TEXT_WORDS} words."
         " Do not return prose outside the JSON object."
-        f"{location_hint}"
     )
 
 
@@ -380,6 +468,31 @@ def _coerce_str_list(value: typing.Any) -> list[str]:
     return coerced
 
 
+def normalise_classifier_tags(result: Mapping[str, typing.Any]) -> list[str]:
+    resolved = []
+    legacy_tags = list(result.get("identified_objects") or []) + list(
+        result.get("themes") or []
+    )
+    for tag in list(result.get("tags") or legacy_tags):
+        normalised = "_".join(tag.strip().lower().split())
+        if normalised and normalised not in resolved:
+            resolved.append(normalised)
+    return resolved
+
+
+def repair_classifier_json_syntax(value: str) -> str:
+    """Repair only two observed, unambiguous Janus JSON punctuation errors."""
+    repaired = re.sub(r",\s*([}\]])", r"\1", value)
+    repaired = re.sub(r"\]\s*(\"alt_text\"\s*:)", r"], \1", repaired, flags=re.DOTALL)
+    repaired = re.sub(
+        r"(\"(?:\\.|[^\"\\])*\")\s*(\"tags\"\s*:)",
+        r"\1, \2",
+        repaired,
+        flags=re.DOTALL,
+    )
+    return repaired
+
+
 def parse_classifier_response(raw_result: str) -> Mapping[str, typing.Any]:
     JSON_BLOCK_PATTERN = re.compile(r"\{.*?\}", re.DOTALL | re.MULTILINE)
     blocks = JSON_BLOCK_PATTERN.findall(raw_result)
@@ -393,19 +506,27 @@ def parse_classifier_response(raw_result: str) -> Mapping[str, typing.Any]:
                 break
             except json.JSONDecodeError as err:
                 last_error = err
+                repaired = repair_classifier_json_syntax(block)
+                if repaired != block:
+                    try:
+                        result = json.loads(repaired)
+                        break
+                    except json.JSONDecodeError as repaired_err:
+                        last_error = repaired_err
         if result is None:
             raise last_error or ValueError("No valid JSON block found")
     else:
         cleaned = " ".join(raw_result.split()).strip()
         if not cleaned:
             raise ValueError("Empty Janus response")
-        keywords = keywordise_text(cleaned)
-        subject = cleaned.split(".")[0].strip() or cleaned[:160]
+        sentence_match = re.match(r"(.+?[.!?])(?:\s|$)", cleaned)
+        if sentence_match is None:
+            raise ValueError("Plain-text classifier response had no complete sentence")
+        alt_text = sentence_match.group(1)[:MAX_CLASSIFIER_ALT_TEXT_LENGTH]
+        keywords = keywordise_text(alt_text)
         result = {
-            "identified_objects": keywords,
-            "themes": [],
-            "alt_text": cleaned,
-            "subject": subject,
+            "tags": keywords,
+            "alt_text": alt_text,
         }
 
     if not isinstance(result, dict):
@@ -415,13 +536,52 @@ def parse_classifier_response(raw_result: str) -> Mapping[str, typing.Any]:
     # an empty caption. Present-but-wrong-typed values are coerced below so a
     # bad-but-valid response (null lists, numeric alt_text, …) can never crash the
     # batch insert downstream.
-    for field in JANUS_RESPONSE_FIELDS:
-        if field not in result:
-            raise KeyError(field)
-    result["identified_objects"] = _coerce_str_list(result.get("identified_objects"))
-    result["themes"] = _coerce_str_list(result.get("themes"))
-    result["alt_text"] = _coerce_str(result.get("alt_text"))
-    result["subject"] = _coerce_str(result.get("subject"))
+    if "alt_text" not in result:
+        raise KeyError("alt_text")
+    if "tags" in result:
+        tags = _coerce_str_list(result.get("tags"))
+    elif "identified_objects" in result and "themes" in result:
+        # Read old comparison artifacts during the schema transition, but always
+        # return the new two-field contract to downstream code.
+        tags = _coerce_str_list(result.get("identified_objects")) + _coerce_str_list(
+            result.get("themes")
+        )
+    else:
+        raise KeyError("tags")
+    unique_tags = []
+    seen_tags = set()
+    for tag in tags:
+        key = tag.strip().casefold()
+        if key and key not in seen_tags:
+            seen_tags.add(key)
+            unique_tags.append(tag)
+    result = {
+        "tags": unique_tags,
+        "alt_text": _coerce_str(result.get("alt_text")),
+    }
+    if not result["tags"] and not result["alt_text"].strip():
+        raise ValueError("Classifier response contained no usable caption fields")
+    if len(result["tags"]) > MAX_CLASSIFIER_TAGS:
+        raise ValueError("Classifier response contained too many tags")
+    if any(
+        len(tag) > MAX_CLASSIFIER_TAG_LENGTH
+        or len(re.findall(r"\b[\w'-]+\b", tag)) > MAX_CLASSIFIER_TAG_WORDS
+        for tag in result["tags"]
+    ):
+        raise ValueError("Classifier response contained an overlong tag")
+    if (
+        len(result["alt_text"]) > MAX_CLASSIFIER_ALT_TEXT_LENGTH
+        or len(re.findall(r"\b[\w'-]+\b", result["alt_text"]))
+        > MAX_CLASSIFIER_ALT_TEXT_WORDS
+    ):
+        raise ValueError("Classifier response contained overlong alt text")
+    control_markers = ("<|channel>", "<channel|>", "<image_placeholder>")
+    if any(
+        marker in value
+        for marker in control_markers
+        for value in [*result["tags"], result["alt_text"]]
+    ):
+        raise ValueError("Classifier response leaked a control token")
     return result
 
 
@@ -435,7 +595,7 @@ def parse_caption_with_retry(
     geocode: Optional[Mapping],
     raw_caption: str,
     max_attempts: int = 2,
-) -> Mapping[str, typing.Any]:
+) -> Optional[Mapping[str, typing.Any]]:
     """Parse a batched Janus caption, re-running the live model on parse failure.
 
     Janus occasionally emits malformed JSON. Generation is deterministic
@@ -446,7 +606,7 @@ def parse_caption_with_retry(
     decode because batching/padding changes the numerics). This must run while the
     classifier is still loaded — the one-model-per-pass design releases it before
     per-image assembly — so it lives here in the Janus pass rather than in
-    analyse_image. Returns the parsed result dict, or ``{}`` once attempts are
+    analyse_image. Returns the parsed result dict, or ``None`` once attempts are
     exhausted."""
     raw_result = raw_caption
     for attempt in range(max_attempts):
@@ -460,9 +620,217 @@ def parse_caption_with_retry(
                 log(
                     f"Failed to classify {path} after {max_attempts} attempts, skipping."
                 )
-                return {}
+                return None
             raw_result = classifier.predict(path=path, geocode=geocode)
-    return {}
+    return None
+
+
+def resolve_caption_result(
+    classifier: "BaseCaptionClassifier",
+    path: str,
+    geocode: Optional[Mapping],
+    raw_caption: str,
+    generation_metric: Mapping[str, typing.Any],
+    metric_sink: Optional[list[dict[str, typing.Any]]] = None,
+) -> Optional[Mapping[str, typing.Any]]:
+    """Accept a completed batch result or retry one non-EOS straggler singly."""
+    if (
+        generation_metric.get("completedWithEos") is not False
+        or generation_metric.get("completedWithJson")
+        or generation_metric.get("completedWithSchema")
+    ):
+        caption_to_parse = raw_caption
+        if generation_metric.get("completedWithSchema") and not generation_metric.get(
+            "completedWithJson"
+        ):
+            caption_to_parse = (
+                complete_classifier_json_prefix(raw_caption) or raw_caption
+            )
+        try:
+            parsed = parse_classifier_response(caption_to_parse)
+            if isinstance(generation_metric, dict):
+                generation_metric["parseSuccess"] = True
+            return parsed
+        except (ValueError, KeyError, json.JSONDecodeError) as err:
+            if isinstance(generation_metric, dict):
+                generation_metric["parseSuccess"] = False
+            log(f"Caption JSON was malformed for {path}: {err}; retrying singly")
+    else:
+        if isinstance(generation_metric, dict):
+            generation_metric["parseSuccess"] = False
+        log(f"Caption generation did not reach EOS for {path}; retrying singly")
+
+    with heartbeat(f"single caption retry for {os.path.basename(path)}"):
+        retry_raw = classifier.predict(path=path, geocode=geocode)
+    retry_metric = (
+        dict(classifier.last_generation_metrics[0])
+        if classifier.last_generation_metrics
+        else {}
+    )
+    retry_metric["singleRetry"] = True
+    if metric_sink is not None:
+        metric_sink.append(retry_metric)
+    if retry_metric.get("completedWithEos") is False:
+        retry_metric["parseSuccess"] = False
+        log(
+            f"Single-image caption retry also failed to reach EOS for {path}; "
+            "leaving it incomplete"
+        )
+        return None
+    try:
+        parsed = parse_classifier_response(retry_raw)
+        retry_metric["parseSuccess"] = True
+        return parsed
+    except (ValueError, KeyError, json.JSONDecodeError) as err:
+        retry_metric["parseSuccess"] = False
+        log(
+            f"Single-image caption retry remained malformed for {path}: {err}; "
+            "leaving it incomplete"
+        )
+        return None
+
+
+def complete_json_object_end(value: str) -> Optional[int]:
+    """Return the end offset of the first complete top-level JSON object.
+
+    This deliberately only recognises balanced object syntax; semantic validation
+    remains the parser's job. Braces inside strings and escaped quotes do not end
+    generation early.
+    """
+    start = value.find("{")
+    if start < 0:
+        return None
+    depth = 0
+    in_string = False
+    escaped = False
+    for position, character in enumerate(value[start:], start=start):
+        if in_string:
+            if escaped:
+                escaped = False
+            elif character == "\\":
+                escaped = True
+            elif character == '"':
+                in_string = False
+            continue
+        if character == '"':
+            in_string = True
+        elif character == "{":
+            depth += 1
+        elif character == "}":
+            depth -= 1
+            if depth == 0:
+                return position + 1
+            if depth < 0:
+                return None
+    return None
+
+
+def complete_classifier_json_prefix(value: str) -> Optional[str]:
+    """Repair only a schema-complete top-level object missing its final brace.
+
+    Janus occasionally starts repeating fields after producing all four valid
+    values. Appending one brace to the current prefix is safe only when the result
+    is valid JSON and passes the full bounded classifier response contract.
+    """
+    start = value.find("{")
+    if start < 0:
+        return None
+    candidate = value[start:].rstrip()
+    if candidate.endswith(","):
+        candidate = candidate[:-1].rstrip()
+    candidate += "}"
+    try:
+        parse_classifier_response(candidate)
+    except (ValueError, KeyError, json.JSONDecodeError):
+        pass
+    else:
+        return candidate
+
+    # Janus can loop inside the final tags array. Because alt_text is generated
+    # first, salvage only after observing at least four distinct tags and then a
+    # duplicate — evidence of the measured repetition failure, not ordinary
+    # in-progress generation. json.loads decodes quoted strings safely.
+    alt_match = re.search(r'"alt_text"\s*:\s*("(?:\\.|[^"\\])*")', value, re.DOTALL)
+    tags_match = re.search(r'"tags"\s*:\s*\[(.*)$', value, re.DOTALL)
+    if not alt_match or not tags_match:
+        return None
+    if "]" in tags_match.group(1):
+        return None
+    try:
+        alt_text = json.loads(alt_match.group(1))
+        emitted_tags = [
+            json.loads(match.group(0))
+            for match in re.finditer(r'"(?:\\.|[^"\\])*"', tags_match.group(1))
+        ]
+    except (TypeError, json.JSONDecodeError):
+        return None
+    unique_tags = []
+    seen = set()
+    for tag in emitted_tags:
+        key = tag.strip().casefold()
+        if key and key not in seen:
+            seen.add(key)
+            unique_tags.append(tag)
+    repeated = len(emitted_tags) > len(unique_tags)
+    if not repeated or len(unique_tags) < 4:
+        return None
+    repaired = json.dumps(
+        {"alt_text": alt_text, "tags": unique_tags[:MAX_CLASSIFIER_TAGS]}
+    )
+    try:
+        parse_classifier_response(repaired)
+    except (ValueError, KeyError, json.JSONDecodeError):
+        return None
+    return repaired
+
+
+def has_repeated_open_classifier_tags(value: str) -> bool:
+    """Detect the measured Janus loop inside an as-yet-unclosed tags array."""
+    tags_match = re.search(r'"tags"\s*:\s*\[(.*)$', value, re.DOTALL)
+    if not tags_match or "]" in tags_match.group(1):
+        return False
+    try:
+        emitted_tags = [
+            json.loads(match.group(0))
+            for match in re.finditer(r'"(?:\\.|[^"\\])*"', tags_match.group(1))
+        ]
+    except json.JSONDecodeError:
+        return False
+    unique = {tag.strip().casefold() for tag in emitted_tags if tag.strip()}
+    return len(unique) >= 4 and len(emitted_tags) > len(unique)
+
+
+class JsonCompletionLogitsProcessor:
+    """Force EOS independently for rows whose top-level JSON is complete."""
+
+    def __init__(self, tokenizer, eos_token_id: int) -> None:
+        self.tokenizer = tokenizer
+        self.eos_token_id = eos_token_id
+        try:
+            closing_ids = tokenizer.encode("]", add_special_tokens=False)
+        except (AttributeError, TypeError):
+            closing_ids = []
+        self.closing_bracket_token_id = (
+            closing_ids[0]
+            if isinstance(closing_ids, list) and len(closing_ids) == 1
+            else None
+        )
+
+    def __call__(self, input_ids, scores):
+        for row_index, row in enumerate(input_ids):
+            text = self.tokenizer.decode(row.detach().cpu().tolist())
+            if complete_json_object_end(
+                text
+            ) is not None or complete_classifier_json_prefix(text):
+                scores[row_index].fill_(float("-inf"))
+                scores[row_index, self.eos_token_id] = 0.0
+            elif (
+                self.closing_bracket_token_id is not None
+                and has_repeated_open_classifier_tags(text)
+            ):
+                scores[row_index].fill_(float("-inf"))
+                scores[row_index, self.closing_bracket_token_id] = 0.0
+        return scores
 
 
 def filter_exif_for_search(
@@ -486,6 +854,9 @@ def filter_exif_for_search(
 class BaseCaptionClassifier:
     backend = "base"
     batch_size = 1
+
+    def __init__(self) -> None:
+        self.last_generation_metrics: list[dict[str, typing.Any]] = []
 
     def init_model(self) -> None:
         raise NotImplementedError
@@ -521,6 +892,105 @@ class JanusClassifier(BaseCaptionClassifier):
     backend = CLASSIFIER_BACKEND_JANUS
     batch_size = JANUS_BATCH_SIZE
 
+    def __init__(
+        self,
+        batch_size: int = JANUS_BATCH_SIZE,
+        max_new_tokens: int = JANUS_MAX_NEW_TOKENS,
+        batch_max_new_tokens: int = JANUS_BATCH_MAX_NEW_TOKENS,
+        max_generation_seconds: float = JANUS_MAX_GENERATION_SECONDS,
+    ) -> None:
+        super().__init__()
+        self.batch_size = batch_size
+        self.max_new_tokens = max_new_tokens
+        self.batch_max_new_tokens = min(batch_max_new_tokens, max_new_tokens)
+        self.max_generation_seconds = max_generation_seconds
+        self._decode_executor = concurrent.futures.ThreadPoolExecutor(
+            max_workers=JANUS_IMAGE_DECODE_WORKERS
+        )
+
+    def _record_generation_metrics(
+        self,
+        outputs,
+        max_new_tokens: Optional[int] = None,
+        per_item_metrics: Optional[list[Mapping[str, typing.Any]]] = None,
+    ) -> None:
+        token_limit = max_new_tokens or self.max_new_tokens
+        eos_token_id = self.tokenizer.eos_token_id
+        self.last_generation_metrics = []
+        for position, output in enumerate(outputs):
+            tokens = output.detach().cpu().tolist()
+            decoded = self.tokenizer.decode(tokens, skip_special_tokens=True)
+            completed_with_json = complete_json_object_end(decoded) is not None
+            completed_with_schema = (
+                completed_with_json
+                or complete_classifier_json_prefix(decoded) is not None
+            )
+            try:
+                token_count = tokens.index(eos_token_id) + 1
+                completed_with_eos = True
+            except ValueError:
+                token_count = len(tokens)
+                completed_with_eos = False
+            metric = {
+                "tokenCount": token_count,
+                "completedWithEos": completed_with_eos,
+                "completedWithJson": completed_with_json,
+                "completedWithSchema": completed_with_schema,
+                "hitTokenLimit": token_count >= token_limit and not completed_with_eos,
+            }
+            if per_item_metrics and position < len(per_item_metrics):
+                metric.update(per_item_metrics[position])
+            self.last_generation_metrics.append(metric)
+
+    @staticmethod
+    def _conversation(path: str, geocode: Optional[Mapping]):
+        return [
+            {
+                "role": "User",
+                "content": build_janus_prompt(geocode),
+                "images": [path],
+            },
+            {"role": "Assistant", "content": ""},
+        ]
+
+    @staticmethod
+    def _decode_image(path: str) -> Image.Image:
+        with Image.open(path) as image:
+            return image.convert("RGB")
+
+    def _decode_images_parallel(
+        self, paths: list[str]
+    ) -> tuple[list[Image.Image], float]:
+        started_at = time.perf_counter()
+        if len(paths) == 1:
+            images = [self._decode_image(paths[0])]
+        else:
+            images = list(self._decode_executor.map(self._decode_image, paths))
+        return images, (time.perf_counter() - started_at) * 1000
+
+    def release(self) -> None:
+        executor = getattr(self, "_decode_executor", None)
+        if executor is not None:
+            executor.shutdown(wait=True, cancel_futures=True)
+            self._decode_executor = None
+        super().release()
+
+    def _generation_kwargs(self, max_new_tokens: int):
+        return {
+            "pad_token_id": self.tokenizer.eos_token_id,
+            "bos_token_id": self.tokenizer.bos_token_id,
+            "eos_token_id": self.tokenizer.eos_token_id,
+            "max_new_tokens": max_new_tokens,
+            "max_time": self.max_generation_seconds,
+            "do_sample": False,
+            "use_cache": True,
+            "logits_processor": [
+                JsonCompletionLogitsProcessor(
+                    self.tokenizer, self.tokenizer.eos_token_id
+                )
+            ],
+        }
+
     def _import_janus_modules(self):
         # Janus currently expects pre-Transformers-5 PretrainedConfig subclass behaviour.
         # The temporary shim keeps Janus importable while the rest of the process uses the
@@ -542,59 +1012,63 @@ class JanusClassifier(BaseCaptionClassifier):
         return MultiModalityCausalLM, VLChatProcessor, load_pil_images
 
     def init_model(self) -> None:
+        if not torch.cuda.is_available():
+            raise RuntimeError("Janus indexing requires a CUDA-capable GPU")
         log("Loading Janus-Pro-1B...")
         # use 1B for speed/lower requirements
-        model_path = "deepseek-ai/Janus-Pro-1B"
+        model_path = JANUS_MODEL_ID
         MultiModalityCausalLM, VLChatProcessor, load_pil_images = (
             self._import_janus_modules()
         )
         self._load_pil_images = load_pil_images
-        self.vl_chat_processor = VLChatProcessor.from_pretrained(model_path)
+        self.vl_chat_processor = VLChatProcessor.from_pretrained(
+            model_path, revision=JANUS_MODEL_REVISION
+        )
         self.tokenizer = self.vl_chat_processor.tokenizer
 
         vl_gpt = AutoModelForCausalLM.from_pretrained(
-            model_path, trust_remote_code=True
+            model_path, revision=JANUS_MODEL_REVISION, trust_remote_code=True
         )
         self.vl_gpt = vl_gpt.to(torch.bfloat16).cuda().eval()
         log("Loaded Janus-Pro-1B.")
 
     @torch.inference_mode()
     def predict(self, path: str, geocode: Optional[Mapping]) -> str:
-        prompt = build_janus_prompt(geocode)
-
-        conversation = [
-            {
-                "role": "User",
-                "content": prompt,
-                "images": [path],
-            },
-            {"role": "Assistant", "content": ""},
-        ]
-
-        # load images and prepare for inputs
-        # Janus-Pro will resize images internally
-        pil_images = self._load_pil_images(conversation)
-
+        conversation = self._conversation(path, geocode)
+        pil_images, decode_ms = self._decode_images_parallel([path])
+        processor_started_at = time.perf_counter()
         prepare_inputs = self.vl_chat_processor(
             conversations=conversation, images=pil_images, force_batchify=True
         ).to(self.vl_gpt.device)
-
-        # run image encoder to get the image embeddings
+        processor_ms = (time.perf_counter() - processor_started_at) * 1000
+        vision_started_at = time.perf_counter()
         inputs_embeds = self.vl_gpt.prepare_inputs_embeds(**prepare_inputs)
-
+        vision_ms = (time.perf_counter() - vision_started_at) * 1000
+        generate_started_at = time.perf_counter()
         outputs = self.vl_gpt.language_model.generate(
             inputs_embeds=inputs_embeds,
             attention_mask=prepare_inputs.attention_mask,
-            pad_token_id=self.tokenizer.eos_token_id,
-            bos_token_id=self.tokenizer.bos_token_id,
-            eos_token_id=self.tokenizer.eos_token_id,
-            max_new_tokens=JANUS_MAX_NEW_TOKENS,
-            do_sample=False,
-            use_cache=True,
+            **self._generation_kwargs(self.max_new_tokens),
         )
+        generate_ms = (time.perf_counter() - generate_started_at) * 1000
 
         answer = self.tokenizer.decode(
             outputs[0].cpu().tolist(), skip_special_tokens=True
+        )
+        self._record_generation_metrics(
+            outputs,
+            self.max_new_tokens,
+            [
+                {
+                    "attempt": "single",
+                    "batchSize": 1,
+                    "maxNewTokens": self.max_new_tokens,
+                    "decodeMs": round(decode_ms, 2),
+                    "processorMs": round(processor_ms, 2),
+                    "visionPreparationMs": round(vision_ms, 2),
+                    "generateBatchMs": round(generate_ms, 2),
+                }
+            ],
         )
         return answer
 
@@ -608,22 +1082,37 @@ class JanusClassifier(BaseCaptionClassifier):
 
         all_embeds = []
         all_masks = []
+        preparation_metrics: list[dict[str, typing.Any]] = []
+        decoded_images, decode_ms = self._decode_images_parallel(
+            [path for path, _geocode in items]
+        )
 
-        for idx, (path, geocode) in enumerate(items, start=1):
+        for idx, ((path, geocode), pil_image) in enumerate(
+            zip(items, decoded_images), start=1
+        ):
             prep_started_at = time.perf_counter()
-            prompt = build_janus_prompt(geocode)
-            conversation = [
-                {"role": "User", "content": prompt, "images": [path]},
-                {"role": "Assistant", "content": ""},
-            ]
-            pil_images = self._load_pil_images(conversation)
+            conversation = self._conversation(path, geocode)
+            processor_started_at = time.perf_counter()
             prepare_inputs = self.vl_chat_processor(
-                conversations=conversation, images=pil_images, force_batchify=True
+                conversations=conversation, images=[pil_image], force_batchify=True
             ).to(self.vl_gpt.device)
+            processor_ms = (time.perf_counter() - processor_started_at) * 1000
+            vision_started_at = time.perf_counter()
             embeds = self.vl_gpt.prepare_inputs_embeds(**prepare_inputs)
+            vision_ms = (time.perf_counter() - vision_started_at) * 1000
             all_embeds.append(embeds)
             all_masks.append(prepare_inputs.attention_mask)
             prep_ms = (time.perf_counter() - prep_started_at) * 1000
+            preparation_metrics.append(
+                {
+                    "attempt": "batch",
+                    "batchSize": len(items),
+                    "maxNewTokens": self.batch_max_new_tokens,
+                    "decodeMs": round(decode_ms, 2),
+                    "processorMs": round(processor_ms, 2),
+                    "visionPreparationMs": round(vision_ms, 2),
+                }
+            )
             log(
                 f"    prepped {idx}/{len(items)} in {prep_ms:.0f}ms ({os.path.basename(path)})"
             )
@@ -655,15 +1144,16 @@ class JanusClassifier(BaseCaptionClassifier):
         outputs = self.vl_gpt.language_model.generate(
             inputs_embeds=batched_embeds,
             attention_mask=batched_masks,
-            pad_token_id=self.tokenizer.eos_token_id,
-            bos_token_id=self.tokenizer.bos_token_id,
-            eos_token_id=self.tokenizer.eos_token_id,
-            max_new_tokens=JANUS_MAX_NEW_TOKENS,
-            do_sample=False,
-            use_cache=True,
+            **self._generation_kwargs(self.batch_max_new_tokens),
         )
         generate_ms = (time.perf_counter() - generate_started_at) * 1000
         log(f"    generated {len(items)} caption(s) in {generate_ms:.0f}ms")
+
+        for metric in preparation_metrics:
+            metric["generateBatchMs"] = round(generate_ms, 2)
+        self._record_generation_metrics(
+            outputs, self.batch_max_new_tokens, preparation_metrics
+        )
 
         return [
             self.tokenizer.decode(output.cpu().tolist(), skip_special_tokens=True)
@@ -683,6 +1173,7 @@ class Gemma4Classifier(BaseCaptionClassifier):
         gpu_headroom_gb: Optional[float] = None,
         low_impact: bool = False,
     ):
+        super().__init__()
         self.model_id = model_id
         self.quantization = quantization
         self.batch_size = batch_size
@@ -728,7 +1219,7 @@ class Gemma4Classifier(BaseCaptionClassifier):
             log(
                 "Warning: local testing found Gemma 4 vision captions can become placeholder-like under bitsandbytes 4-bit quantisation. Prefer full precision for quality checks."
             )
-        self.processor = AutoProcessor.from_pretrained(self.model_id)
+        self.processor = AutoProcessor.from_pretrained(self.model_id, use_fast=False)
 
         model_kwargs: dict[str, typing.Any] = {}
         max_memory = self._build_max_memory()
@@ -837,6 +1328,7 @@ class Gemma4GgufClassifier(BaseCaptionClassifier):
         gpu_headroom_gb: Optional[float] = None,
         low_impact: bool = False,
     ):
+        super().__init__()
         self.model_id = model_id
         self.quantization = quantization
         self.batch_size = batch_size
@@ -860,16 +1352,11 @@ class Gemma4GgufClassifier(BaseCaptionClassifier):
         schema = {
             "type": "object",
             "properties": {
-                "identified_objects": {
-                    "type": "array",
-                    "items": {"type": "string"},
-                },
-                "themes": {
+                "tags": {
                     "type": "array",
                     "items": {"type": "string"},
                 },
                 "alt_text": {"type": "string"},
-                "subject": {"type": "string"},
             },
             "required": list(JANUS_RESPONSE_FIELDS),
             "additionalProperties": False,
@@ -890,26 +1377,7 @@ class Gemma4GgufClassifier(BaseCaptionClassifier):
         )
 
     def _build_prompt(self, geocode: Optional[Mapping]) -> str:
-        schema = (
-            '{ "identified_objects": string[], "themes": string[], '
-            '"alt_text": string, "subject": string }'
-        )
-        location_hint = ""
-        if geocode:
-            city = geocode.get("city", "")
-            country = geocode.get("country", "")
-            place = ", ".join([part for part in [city, country] if part])
-            if place:
-                location_hint = f" The photo was taken near {place}. Use that only when it is visually relevant."
-
-        return (
-            "Reply with strict JSON only using this schema: "
-            f"{schema}."
-            " Keep identified_objects and themes short and concrete."
-            " Keep alt_text and subject concise, factual, and literal."
-            " Do not include any reasoning, channel markers, code fences, or prose outside the JSON object."
-            f"{location_hint}"
-        )
+        return build_classifier_prompt(geocode)
 
     def _extract_answer_text(self, raw_output: str) -> str:
         answer = raw_output.strip()
@@ -989,15 +1457,27 @@ class Gemma4GgufClassifier(BaseCaptionClassifier):
             raise RuntimeError("llama.cpp returned no parseable output.")
         return self._extract_answer_text(output)
 
+    def release(self) -> None:
+        super().release()
+        if self._json_schema_path:
+            Path(self._json_schema_path).unlink(missing_ok=True)
+            self._json_schema_path = None
+        self.command = None
+
 
 class BaseImageEmbedder:
     MODEL_ID: str
+    MODEL_REVISION: str
 
     def init_model(self) -> None:
         self.model_id = self.MODEL_ID
         log(f"Loading image embedder {self.model_id}...")
-        self.processor = AutoImageProcessor.from_pretrained(self.model_id)
-        self.model = AutoModel.from_pretrained(self.model_id)
+        self.processor = AutoImageProcessor.from_pretrained(
+            self.model_id, revision=self.MODEL_REVISION, use_fast=False
+        )
+        self.model = AutoModel.from_pretrained(
+            self.model_id, revision=self.MODEL_REVISION
+        )
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         self.model = self.model.to(self.device).eval()
         log(f"Loaded image embedder {self.model_id} on {self.device}.")
@@ -1050,10 +1530,12 @@ class BaseImageEmbedder:
 
 class SiglipEmbedder(BaseImageEmbedder):
     MODEL_ID = "google/siglip-base-patch16-224"
+    MODEL_REVISION = SIGLIP_V1_MODEL_REVISION
 
 
 class Siglip2Embedder(BaseImageEmbedder):
     MODEL_ID = "google/siglip2-base-patch16-224"
+    MODEL_REVISION = SIGLIP_V2_MODEL_REVISION
 
 
 def create_classifier(
@@ -1062,11 +1544,16 @@ def create_classifier(
     quantization: Optional[str] = None,
     batch_size: Optional[int] = None,
     max_new_tokens: Optional[int] = None,
+    batch_max_new_tokens: Optional[int] = None,
     gpu_headroom_gb: Optional[float] = None,
     low_impact: bool = False,
 ) -> BaseCaptionClassifier:
     if backend == CLASSIFIER_BACKEND_JANUS:
-        return JanusClassifier()
+        return JanusClassifier(
+            batch_size=batch_size or JANUS_BATCH_SIZE,
+            max_new_tokens=max_new_tokens or JANUS_MAX_NEW_TOKENS,
+            batch_max_new_tokens=(batch_max_new_tokens or JANUS_BATCH_MAX_NEW_TOKENS),
+        )
 
     if backend == CLASSIFIER_BACKEND_GEMMA4:
         return Gemma4Classifier(
@@ -1116,8 +1603,35 @@ def get_image_geocode(lat_deg: float, lng_deg: float) -> Mapping:
 
 
 def get_exif(fh: IO[any]):
-    tags = exifread.process_file(fh)
+    # MakerNote decoding and embedded-thumbnail extraction are intentionally
+    # skipped: the index keeps only standard camera/lens/date/GPS fields. On the
+    # fixed CPU benchmark this is 31% faster with identical retained fields.
+    tags = exifread.process_file(fh, details=False)
     return tags
+
+
+def prepare_colour_thumbnail(
+    path: str, max_dimension: int = COLOUR_THUMBNAIL_MAX_DIMENSION
+) -> np.ndarray:
+    """Decode a bounded RGBA thumbnail for palette extraction.
+
+    JPEG ``draft`` asks the decoder for a lower DCT resolution before pixels are
+    materialised; ``thumbnail`` then bounds non-JPEG inputs too. Median-cut colour
+    clustering does not need the source's multi-megapixel spatial resolution.
+    """
+    with Image.open(path) as image:
+        image.draft("RGB", (max_dimension, max_dimension))
+        image.thumbnail((max_dimension, max_dimension), resample=Image.Resampling.BOX)
+        return np.array(image.convert("RGBA"), dtype=np.uint8)
+
+
+def extract_colour_palette(
+    path: str,
+    max_dimension: int = COLOUR_THUMBNAIL_MAX_DIMENSION,
+    quality: int = COLOUR_THUMBNAIL_QUALITY,
+) -> list[tuple[int, int, int]]:
+    thumbnail = prepare_colour_thumbnail(path, max_dimension=max_dimension)
+    return fast_colorthief.get_palette(thumbnail, quality=quality)
 
 
 def get_album_relative_path(path: str) -> str:
@@ -1139,6 +1653,10 @@ EMBEDDINGS_TABLE_SQL = (
     "path VARCHAR NOT NULL, model_id TEXT NOT NULL, embedding_dim INTEGER, "
     "embedding_blob BLOB, embedding_scale REAL, PRIMARY KEY(path, model_id))"
 )
+
+
+def _optional_bool_int(value: typing.Any) -> Optional[int]:
+    return None if value is None else int(bool(value))
 
 
 def encode_embedding(embedding: list[float]) -> Tuple[bytes, float]:
@@ -1168,17 +1686,26 @@ def decode_embedding(blob: bytes, scale: float) -> list[float]:
 
 # Repository for our search + metadata table
 class Sqlite3Client:
-    def __init__(self, db_path: typing.Union[str, bytes, os.PathLike]):
-        self.con = sqlite3.connect(db_path)
-        # page_size MUST be set before any page is written (before journal_mode=WAL
-        # writes the header, and before the first CREATE TABLE) or it is silently
+    def __init__(
+        self,
+        db_path: typing.Union[str, bytes, os.PathLike],
+        read_only: bool = False,
+    ):
+        self.db_path = str(db_path)
+        self.read_only = read_only
+        if read_only:
+            absolute = os.path.abspath(self.db_path)
+            self.con = sqlite3.connect(f"file:{absolute}?mode=ro", uri=True)
+        else:
+            self.con = sqlite3.connect(db_path)
+        # page_size MUST be set before any page is written (before the first
+        # CREATE TABLE) or it is silently
         # ignored — an existing DB keeps its page size until a VACUUM. 4096 is the
         # SQLite default; it is set explicitly to document the departure from the
         # legacy 1024-byte pages (a sql.js-httpvfs range-read optimisation — the
         # browser now downloads the DB in full).
-        self.con.execute("PRAGMA page_size=4096;")
-        # allows for concurrent writes...? Not sure if it has any impact
-        self.con.execute("PRAGMA journal_mode=WAL;")
+        if not read_only:
+            self.con.execute("PRAGMA page_size=4096;")
         self._images_columns = None
 
     @contextmanager
@@ -1197,16 +1724,69 @@ class Sqlite3Client:
         version = sqlite3.sqlite_version
         entries = 0
         try:
-            entries = len(self.inspect())
-        except Exception:
+            entries = self.con.execute("SELECT COUNT(*) FROM images").fetchone()[0]
+        except sqlite3.Error:
             pass
         return {"version": version, "entries": entries}
 
+    def table_exists(self, name: str) -> bool:
+        return (
+            self.con.execute(
+                "SELECT 1 FROM sqlite_master WHERE type IN ('table', 'view') AND name = ?",
+                (name,),
+            ).fetchone()
+            is not None
+        )
+
     def setup_tables(self):
+        if self.read_only:
+            raise RuntimeError("Cannot migrate a read-only database")
         cur = self.con.cursor()
+        cur.execute(
+            "CREATE TABLE IF NOT EXISTS schema_migrations (version TEXT PRIMARY KEY, applied_at TEXT NOT NULL)"
+        )
+        images_existed = self.table_exists("images")
         cur.execute(
             "CREATE VIRTUAL TABLE IF NOT EXISTS images USING fts5(path, album_relative_path, filename, geocode, exif, tags, colors, alt_text, subject, tokenize='porter trigram')"
         )
+        desired_image_columns = [
+            "path",
+            "album_relative_path",
+            "filename",
+            "geocode",
+            "exif",
+            "tags",
+            "colors",
+            "alt_text",
+            "subject",
+        ]
+        existing_image_columns = [
+            row[1] for row in cur.execute("PRAGMA table_info(images)").fetchall()
+        ]
+        if existing_image_columns != desired_image_columns or (
+            images_existed and not self.migration_applied(IMAGES_SCHEMA_MIGRATION)
+        ):
+            cur.execute("DROP TABLE IF EXISTS images_migrating")
+            cur.execute(
+                "CREATE VIRTUAL TABLE images_migrating USING fts5("
+                "path, album_relative_path, filename, geocode, exif, tags, colors, "
+                "alt_text, subject, tokenize='porter trigram')"
+            )
+            select_fields = [
+                column if column in existing_image_columns else f"NULL AS {column}"
+                for column in desired_image_columns
+            ]
+            cur.execute(
+                "INSERT INTO images_migrating("
+                + ", ".join(desired_image_columns)
+                + ") SELECT "
+                + ", ".join(select_fields)
+                + " FROM images"
+            )
+            cur.execute("DROP TABLE images")
+            cur.execute("ALTER TABLE images_migrating RENAME TO images")
+            self._images_columns = None
+        self.mark_migration(IMAGES_SCHEMA_MIGRATION, cur)
         cur.execute(
             "CREATE TABLE IF NOT EXISTS tags (tag VARCHAR PRIMARY KEY, count INTEGER DEFAULT 0)"
         )
@@ -1231,6 +1811,46 @@ class Sqlite3Client:
         cur.execute(
             "CREATE TABLE IF NOT EXISTS file_signatures (path VARCHAR PRIMARY KEY, mtime REAL, size INTEGER)"
         )
+        cur.execute(
+            "CREATE TABLE IF NOT EXISTS image_tags (path TEXT NOT NULL, tag TEXT NOT NULL, source TEXT NOT NULL, PRIMARY KEY(path, tag, source))"
+        )
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_image_tags_tag ON image_tags(tag)")
+        cur.execute(
+            "CREATE TABLE IF NOT EXISTS pipeline_state ("
+            "path TEXT NOT NULL, stage TEXT NOT NULL, source_sha256 TEXT NOT NULL, "
+            "pipeline_version TEXT NOT NULL, model_id TEXT, completed_at TEXT NOT NULL, "
+            "PRIMARY KEY(path, stage))"
+        )
+        cur.execute(
+            "CREATE TABLE IF NOT EXISTS caption_generation_metrics ("
+            "id INTEGER PRIMARY KEY, path TEXT NOT NULL, pipeline_version TEXT NOT NULL, "
+            "attempted_at TEXT NOT NULL, attempt TEXT NOT NULL, batch_size INTEGER, "
+            "max_new_tokens INTEGER, token_count INTEGER, completed_with_eos INTEGER, "
+            "completed_with_json INTEGER, completed_with_schema INTEGER, "
+            "hit_token_limit INTEGER, parse_success INTEGER, oom_fallback INTEGER, "
+            "decode_ms REAL, processor_ms REAL, vision_preparation_ms REAL, "
+            "generate_batch_ms REAL)"
+        )
+        cur.execute(
+            "CREATE INDEX IF NOT EXISTS idx_caption_generation_metrics_path "
+            "ON caption_generation_metrics(path, pipeline_version)"
+        )
+        metric_columns = {
+            row[1]
+            for row in cur.execute(
+                "PRAGMA table_info(caption_generation_metrics)"
+            ).fetchall()
+        }
+        if "completed_with_json" not in metric_columns:
+            cur.execute(
+                "ALTER TABLE caption_generation_metrics "
+                "ADD COLUMN completed_with_json INTEGER"
+            )
+        if "completed_with_schema" not in metric_columns:
+            cur.execute(
+                "ALTER TABLE caption_generation_metrics "
+                "ADD COLUMN completed_with_schema INTEGER"
+            )
         cur.execute(EMBEDDINGS_TABLE_SQL)
         # Rebuild older embeddings schemas in place. Two legacy shapes exist:
         # PRIMARY KEY(path) only (pre v1+v2 coexistence) and JSON-text vectors
@@ -1261,9 +1881,8 @@ class Sqlite3Client:
                     (path, model_id, len(vector), blob, scale),
                 )
             cur.execute("DROP TABLE embeddings_legacy")
-        cur.execute(
-            "CREATE INDEX IF NOT EXISTS idx_embeddings_path ON embeddings(path)"
-        )
+        # PRIMARY KEY(path, model_id) already provides the path-prefix lookup.
+        cur.execute("DROP INDEX IF EXISTS idx_embeddings_path")
         # The migration INSERTs above open an implicit transaction; the
         # journal-mode change cannot run inside one, so commit first.
         self.con.commit()
@@ -1280,13 +1899,208 @@ class Sqlite3Client:
             cur.execute("VACUUM")
             self.con.commit()
 
+        self.migrate_image_tags()
+
+    def migration_applied(self, version: str) -> bool:
+        row = self.con.execute(
+            "SELECT 1 FROM schema_migrations WHERE version = ?", (version,)
+        ).fetchone()
+        return row is not None
+
+    def mark_migration(self, version: str, cur: sqlite3.Cursor) -> None:
+        cur.execute(
+            "INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES (?, ?)",
+            (version, datetime.now().astimezone().isoformat(timespec="seconds")),
+        )
+
+    def migrate_image_tags(self) -> None:
+        """Build authoritative per-image tag relationships for legacy databases."""
+        if self.migration_applied(IMAGE_TAGS_MIGRATION):
+            return
+
+        rows = self.con.execute(
+            "SELECT i.path, i.tags, m.lat_deg, m.lng_deg "
+            "FROM images i LEFT JOIN metadata m ON m.path = i.path"
+        ).fetchall()
+        with self.transaction() as cur:
+            cur.execute("DELETE FROM image_tags")
+            for path, tags_blob, lat_deg, lng_deg in rows:
+                classifier_tags = split_tag_text(tags_blob)
+                geocode: Mapping = {}
+                if lat_deg is not None and lng_deg is not None:
+                    geocode = get_image_geocode(lat_deg, lng_deg)
+                self.replace_image_tags(
+                    path, classifier_tags, geocode, cur=cur, rebuild=False
+                )
+            self.rebuild_tag_counts(cur)
+            self.mark_migration(IMAGE_TAGS_MIGRATION, cur)
+
+    def rebuild_tag_counts(self, cur: Optional[sqlite3.Cursor] = None) -> None:
+        if cur is None:
+            with self.transaction() as transactional_cur:
+                self.rebuild_tag_counts(transactional_cur)
+            return
+        cur.execute("DELETE FROM tags")
+        cur.execute(
+            "INSERT INTO tags(tag, count) "
+            "SELECT tag, COUNT(DISTINCT path) FROM image_tags GROUP BY tag"
+        )
+
+    def replace_image_tags(
+        self,
+        path: str,
+        classifier_tags: list[str],
+        geocode: Optional[Mapping] = None,
+        cur: Optional[sqlite3.Cursor] = None,
+        rebuild: bool = True,
+    ) -> None:
+        if cur is None:
+            with self.transaction() as transactional_cur:
+                self.replace_image_tags(
+                    path,
+                    classifier_tags,
+                    geocode,
+                    transactional_cur,
+                    rebuild=rebuild,
+                )
+            return
+
+        cur.execute("DELETE FROM image_tags WHERE path = ?", (path,))
+        rows = {
+            (path, tag, "classifier")
+            for tag in classifier_tags
+            if isinstance(tag, str) and tag.strip()
+        }
+        if geocode:
+            rows.update(
+                (path, value, "geocode")
+                for value in (
+                    geocode.get("country"),
+                    geocode.get("city"),
+                    geocode.get("country_code"),
+                )
+                if isinstance(value, str) and value.strip()
+            )
+        cur.executemany(
+            "INSERT OR IGNORE INTO image_tags(path, tag, source) VALUES (?, ?, ?)",
+            sorted(rows),
+        )
+        if rebuild:
+            self.rebuild_tag_counts(cur)
+
+    def replace_tags_for_source(
+        self,
+        path: str,
+        tags: typing.Iterable[str],
+        source: str,
+        cur: sqlite3.Cursor,
+    ) -> None:
+        cur.execute(
+            "DELETE FROM image_tags WHERE path = ? AND source = ?", (path, source)
+        )
+        rows = {
+            (path, tag, source) for tag in tags if isinstance(tag, str) and tag.strip()
+        }
+        cur.executemany(
+            "INSERT OR IGNORE INTO image_tags(path, tag, source) VALUES (?, ?, ?)",
+            sorted(rows),
+        )
+
+    def get_pipeline_states(
+        self,
+    ) -> dict[tuple[str, str], tuple[str, str, Optional[str]]]:
+        if not self.table_exists("pipeline_state"):
+            return {}
+        rows = self.con.execute(
+            "SELECT path, stage, source_sha256, pipeline_version, model_id FROM pipeline_state"
+        ).fetchall()
+        return {(row[0], row[1]): (row[2], row[3], row[4]) for row in rows}
+
+    def upsert_pipeline_state(
+        self,
+        path: str,
+        stage: str,
+        source_sha256: str,
+        pipeline_version: str,
+        model_id: Optional[str] = None,
+        cur: Optional[sqlite3.Cursor] = None,
+    ) -> None:
+        if cur is None:
+            with self.transaction() as transactional_cur:
+                self.upsert_pipeline_state(
+                    path,
+                    stage,
+                    source_sha256,
+                    pipeline_version,
+                    model_id,
+                    transactional_cur,
+                )
+            return
+        cur.execute(
+            "INSERT INTO pipeline_state(path, stage, source_sha256, pipeline_version, model_id, completed_at) "
+            "VALUES (?, ?, ?, ?, ?, ?) "
+            "ON CONFLICT(path, stage) DO UPDATE SET "
+            "source_sha256=excluded.source_sha256, pipeline_version=excluded.pipeline_version, "
+            "model_id=excluded.model_id, completed_at=excluded.completed_at",
+            (
+                path,
+                stage,
+                source_sha256,
+                pipeline_version,
+                model_id,
+                datetime.now().astimezone().isoformat(timespec="seconds"),
+            ),
+        )
+
+    def insert_caption_generation_metrics(
+        self,
+        metrics: typing.Iterable[Mapping[str, typing.Any]],
+        cur: Optional[sqlite3.Cursor] = None,
+    ) -> None:
+        rows = list(metrics)
+        if not rows:
+            return
+        if cur is None:
+            with self.transaction() as transactional_cur:
+                self.insert_caption_generation_metrics(rows, transactional_cur)
+            return
+        attempted_at = datetime.now().astimezone().isoformat(timespec="seconds")
+        cur.executemany(
+            "INSERT INTO caption_generation_metrics("
+            "path, pipeline_version, attempted_at, attempt, batch_size, max_new_tokens, "
+            "token_count, completed_with_eos, completed_with_json, completed_with_schema, "
+            "hit_token_limit, parse_success, oom_fallback, decode_ms, processor_ms, "
+            "vision_preparation_ms, generate_batch_ms) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            [
+                (
+                    metric["path"],
+                    metric["pipelineVersion"],
+                    attempted_at,
+                    metric.get("attempt", "batch"),
+                    metric.get("batchSize"),
+                    metric.get("maxNewTokens"),
+                    metric.get("tokenCount"),
+                    _optional_bool_int(metric.get("completedWithEos")),
+                    _optional_bool_int(metric.get("completedWithJson")),
+                    _optional_bool_int(metric.get("completedWithSchema")),
+                    _optional_bool_int(metric.get("hitTokenLimit")),
+                    _optional_bool_int(metric.get("parseSuccess")),
+                    _optional_bool_int(metric.get("oomFallback")),
+                    metric.get("decodeMs"),
+                    metric.get("processorMs"),
+                    metric.get("visionPreparationMs"),
+                    metric.get("generateBatchMs"),
+                )
+                for metric in rows
+            ],
+        )
+
     def finalize_journal_mode(self):
         """Checkpoint the WAL and return the DB to rollback-journal (delete) mode.
 
-        The published DB is copied file-by-file (no ``-wal`` sidecar) and read via
-        HTTP range requests, so it must never be left in WAL mode. Commands that
-        mutate the canonical DB without calling ``setup_tables`` (e.g. ``prune``)
-        must call this before exiting."""
+        Published databases are single files, so no mutation command may leave
+        committed content only in an uncopied ``-wal`` sidecar."""
         cur = self.con.cursor()
         cur.execute("PRAGMA wal_checkpoint(TRUNCATE);")
         cur.execute("PRAGMA journal_mode = delete;")
@@ -1315,11 +2129,30 @@ class Sqlite3Client:
         return result is not None
 
     def list_image_paths(self):
+        if not self.table_exists("images"):
+            return set()
         cur = self.con.cursor()
         res = cur.execute("SELECT path FROM images")
         return {row[0] for row in res.fetchall()}
 
+    def list_caption_paths(self):
+        if not self.table_exists("images"):
+            return set()
+        cur = self.con.cursor()
+        res = cur.execute(
+            "SELECT path FROM images WHERE "
+            "COALESCE(tags, '') <> '' OR COALESCE(alt_text, '') <> '' OR COALESCE(subject, '') <> ''"
+        )
+        return {row[0] for row in res.fetchall()}
+
+    def list_metadata_paths(self):
+        if not self.table_exists("metadata"):
+            return set()
+        return {row[0] for row in self.con.execute("SELECT path FROM metadata")}
+
     def list_embedding_paths(self, model_id: Optional[str] = None):
+        if not self.table_exists("embeddings"):
+            return set()
         cur = self.con.cursor()
         if model_id:
             res = cur.execute(
@@ -1331,6 +2164,8 @@ class Sqlite3Client:
         return {row[0] for row in res.fetchall()}
 
     def list_file_signatures(self):
+        if not self.table_exists("file_signatures"):
+            return {}
         cur = self.con.cursor()
         res = cur.execute("SELECT path, mtime, size FROM file_signatures")
         return {row[0]: (row[1], row[2]) for row in res.fetchall()}
@@ -1450,72 +2285,27 @@ class Sqlite3Client:
         }
         return resolved_paths
 
+    def delete_paths(self, paths: typing.Iterable[str]) -> int:
+        resolved = list(dict.fromkeys(paths))
+        if not resolved:
+            return 0
+        with self.transaction() as cur:
+            for path in resolved:
+                cur.execute("DELETE FROM images WHERE path = ?", (path,))
+                cur.execute("DELETE FROM metadata WHERE path = ?", (path,))
+                cur.execute("DELETE FROM embeddings WHERE path = ?", (path,))
+                cur.execute("DELETE FROM file_signatures WHERE path = ?", (path,))
+                cur.execute("DELETE FROM image_tags WHERE path = ?", (path,))
+                cur.execute("DELETE FROM pipeline_state WHERE path = ?", (path,))
+            self.rebuild_tag_counts(cur)
+        return len(resolved)
+
     def delete_path(self, path: str):
-        cur = self.con.cursor()
-
-        # Read the image's tags BEFORE deleting the row so we can decrement the
-        # denormalised `tags` frequency counts. Without this, prune/delete leaves
-        # counts inflated, so the highest-count tag (used as the build smoke-test
-        # query) can end up with zero remaining images. Geocode-derived tags
-        # (country/city/country_code) are not stored per-image, so they are not
-        # tracked here.
-        tags_row = cur.execute(
-            "SELECT tags FROM images WHERE path = ? LIMIT 1",
-            (path,),
-        ).fetchone()
-        tags_value = tags_row[0] if tags_row and tags_row[0] else ""
-        tags_to_decrement = [
-            tag.strip() for tag in tags_value.split(",") if tag.strip()
-        ]
-
-        statement_images = """
-        DELETE FROM images WHERE path = ?
-        """
-        res_images = cur.execute(
-            statement_images,
-            (path,),
-        )
-
-        statement_metadata = """
-        DELETE FROM metadata WHERE path = ?
-        """
-        res_metadata = cur.execute(
-            statement_metadata,
-            (path,),
-        )
-
-        statement_embeddings = """
-        DELETE FROM embeddings WHERE path = ?
-        """
-        res_embeddings = cur.execute(
-            statement_embeddings,
-            (path,),
-        )
-
-        cur.execute("DELETE FROM file_signatures WHERE path = ?", (path,))
-
-        if tags_to_decrement:
-            cur.executemany(
-                "UPDATE tags SET count = count - 1 WHERE tag = ?",
-                [(tag,) for tag in tags_to_decrement],
-            )
-            placeholders = ", ".join("?" for _ in tags_to_decrement)
-            cur.execute(
-                f"DELETE FROM tags WHERE count <= 0 AND tag IN ({placeholders})",
-                tags_to_decrement,
-            )
-
-        cur.execute("COMMIT")
-
-        return (res_images, res_metadata, res_embeddings)
+        self.delete_paths([path])
 
     def search(
         self, query: str, limit: Optional[int] = 999999, offset: Optional[int] = 0
     ):
-        import pprint
-
-        pprint.pprint((query, limit, offset))
-
         cur = self.con.cursor()
         statement = """
         SELECT *, snippet(images, -1, '<i class="snippet">', '</i>', '…', 24) AS snippet, bm25(images) AS bm25
@@ -1540,19 +2330,31 @@ class Sqlite3Client:
 
     def search_tags(self, query: str, limit: Optional[int] = None):
         cur = self.con.cursor()
-        res = cur.execute(
-            "SELECT * FROM tags t WHERE t.tag LIKE ? ORDER BY t.count DESC;",
-            (f"%{query}%",),
-        )
+        if limit is None:
+            res = cur.execute(
+                "SELECT * FROM tags t WHERE t.tag LIKE ? ORDER BY t.count DESC;",
+                (f"%{query}%",),
+            )
+        else:
+            res = cur.execute(
+                "SELECT * FROM tags t WHERE t.tag LIKE ? ORDER BY t.count DESC LIMIT ?;",
+                (f"%{query}%", limit),
+            )
         resolved = res.fetchall()
         return resolved
 
     def search_metadata(self, query: str, limit: Optional[int] = None):
         cur = self.con.cursor()
-        res = cur.execute(
-            "SELECT * FROM metadata m WHERE m.path LIKE ?;",
-            (f"%{query}%",),
-        )
+        if limit is None:
+            res = cur.execute(
+                "SELECT * FROM metadata m WHERE m.path LIKE ?;",
+                (f"%{query}%",),
+            )
+        else:
+            res = cur.execute(
+                "SELECT * FROM metadata m WHERE m.path LIKE ? LIMIT ?;",
+                (f"%{query}%", limit),
+            )
         resolved = res.fetchall()
         return resolved
 
@@ -1596,52 +2398,6 @@ class Sqlite3Client:
         cur: Optional[sqlite3.Cursor] = None,
     ):
         self.upsert_image_fields(path, {field: value}, cur=cur)
-
-    def insert_tags(
-        self,
-        tags: list[str],
-        cur: Optional[sqlite3.Cursor] = None,
-    ):
-        resolved_tags = [tag for tag in tags if tag]
-        if len(resolved_tags) == 0:
-            return
-
-        if cur is None:
-            with self.transaction() as transactional_cur:
-                self.insert_tags(resolved_tags, transactional_cur)
-                return
-
-        # Seed new tags at 0 so the increment below lands on 1 for a tag's
-        # first image. Seeding at 1 (as before) double-counted the first
-        # image, leaving every stored count one too high — which the frontend
-        # then compensated for with a `tag.count - 1` fudge.
-        cur.executemany(
-            "INSERT OR IGNORE INTO tags (tag, count) VALUES (?, 0);",
-            [(tag,) for tag in resolved_tags],
-        )
-        cur.executemany(
-            "UPDATE tags SET count = count + 1 WHERE tag = ?",
-            [(tag,) for tag in resolved_tags],
-        )
-
-    def insert_tag(self, tag: str, cur: Optional[sqlite3.Cursor] = None):
-        self.insert_tags([tag], cur=cur)
-
-    def correct_legacy_tag_counts(self, cur: Optional[sqlite3.Cursor] = None):
-        """One-way fix for the retired seed-at-1 off-by-one: every stored count
-        is exactly one too high (a seed of 1 plus one increment per image).
-        Subtract it, then drop any tag that falls to zero — an orphan whose
-        images were all deleted/re-indexed, which a fresh index would not carry.
-        Operates on the authoritative tags table, so comma-bearing tags and
-        geocode-derived tags (which are not recoverable from images.tags) are
-        preserved exactly. NOT idempotent — the caller gates it on the DB not
-        already having been backfilled."""
-        if cur is None:
-            with self.transaction() as transactional_cur:
-                self.correct_legacy_tag_counts(transactional_cur)
-                return
-        cur.execute("UPDATE tags SET count = count - 1")
-        cur.execute("DELETE FROM tags WHERE count <= 0")
 
     def update_geocode_columns(
         self,
@@ -1781,6 +2537,12 @@ def run_embedding_pass(
     embedder: BaseImageEmbedder,
     paths: list[str],
     precomputed_embeddings: dict[str, dict[str, list[float]]],
+    persist_batch: Optional[
+        typing.Callable[[str, list[tuple[str, list[float]]]], None]
+    ] = None,
+    collect: bool = True,
+    batch_size: int = EMBEDDER_BATCH_SIZE,
+    timings: Optional[dict[str, dict[str, float]]] = None,
 ) -> float:
     """Load one embedder, embed all ``paths`` in batches, store results, release it.
 
@@ -1792,15 +2554,17 @@ def run_embedding_pass(
     load_ms = (time.perf_counter() - load_started_at) * 1000
     log_vram(f"{embedder.model_id} load")
 
-    total_emb_batches = math.ceil(len(paths) / EMBEDDER_BATCH_SIZE)
+    batch_size = max(1, batch_size)
+    total_emb_batches = math.ceil(len(paths) / batch_size)
     log(
-        f"Running {embedder.model_id} embeddings in batches of {EMBEDDER_BATCH_SIZE} ({len(paths)} images, {total_emb_batches} batch(es))..."
+        f"Running {embedder.model_id} embeddings in batches of {batch_size} "
+        f"({len(paths)} images, {total_emb_batches} batch(es))..."
     )
     emb_started_at = time.perf_counter()
     for emb_batch_index, batch_start in enumerate(
-        range(0, len(paths), EMBEDDER_BATCH_SIZE), start=1
+        range(0, len(paths), batch_size), start=1
     ):
-        batch_paths = paths[batch_start : batch_start + EMBEDDER_BATCH_SIZE]
+        batch_paths = paths[batch_start : batch_start + batch_size]
         log(
             f"  {embedder.model_id} batch {emb_batch_index}/{total_emb_batches} starting ({len(batch_paths)} images)..."
         )
@@ -1809,18 +2573,38 @@ def run_embedding_pass(
             f"{embedder.model_id} batch {emb_batch_index}/{total_emb_batches}"
         ):
             batch_embeddings = embedder.predict_image_embeddings_batch(batch_paths)
-        for path, embedding in zip(batch_paths, batch_embeddings):
+        if len(batch_embeddings) != len(batch_paths):
+            log(
+                f"WARNING: {embedder.model_id} returned {len(batch_embeddings)} "
+                f"embedding(s) for {len(batch_paths)} path(s)"
+            )
+        completed_batch = []
+        for position, path in enumerate(batch_paths):
+            embedding = (
+                batch_embeddings[position] if position < len(batch_embeddings) else None
+            )
             # None ⇒ the image could not be opened (already logged); skip it so a
             # single corrupt file does not abort or misalign the pass.
             if embedding is None:
                 continue
-            precomputed_embeddings.setdefault(path, {})[embedder.model_id] = embedding
+            completed_batch.append((path, embedding))
+            if collect:
+                precomputed_embeddings.setdefault(path, {})[embedder.model_id] = (
+                    embedding
+                )
+        if persist_batch and completed_batch:
+            persist_batch(embedder.model_id, completed_batch)
         single_ms = (time.perf_counter() - single_started_at) * 1000
-        done = min(batch_start + EMBEDDER_BATCH_SIZE, len(paths))
+        done = min(batch_start + batch_size, len(paths))
         log(
             f"  {embedder.model_id} batch {emb_batch_index}/{total_emb_batches} done in {single_ms:.0f}ms ({done}/{len(paths)} images)"
         )
     emb_ms = (time.perf_counter() - emb_started_at) * 1000
+    if timings is not None:
+        timings[embedder.model_id] = {
+            "loadMs": round(load_ms, 2),
+            "inferenceMs": round(emb_ms, 2),
+        }
     log(f"{embedder.model_id} embeddings complete in {emb_ms:.0f}ms")
     log_vram(f"{embedder.model_id} inference")
     embedder.release()
@@ -1838,12 +2622,19 @@ def run_embedding_pass(
         case_sensitive=False,
     ),
     default=MODEL_PROFILE_JANUS,
-    help="Indexing profile: janus (legacy tags), siglip2 (embeddings), hybrid (both).",
+    help="Indexing profile: janus (captions/core), siglip2 (embeddings), hybrid (both).",
 )
 @click.option(
     "--benchmark-output",
     default=None,
     help="Optional JSON file path for timing output.",
+)
+@click.option(
+    "--embedding-batch-size",
+    default=EMBEDDER_BATCH_SIZE,
+    type=click.IntRange(min=1),
+    show_default=True,
+    help="Image embedding batch size; tune with benchmark-embedder-batch.",
 )
 @click.option(
     "--classifier-backend",
@@ -1871,8 +2662,26 @@ def run_embedding_pass(
 @click.option(
     "--classifier-batch-size",
     default=None,
-    type=int,
+    type=click.IntRange(min=1),
     help="Optional caption batch size override. Janus defaults to 4; Gemma defaults to 1.",
+)
+@click.option(
+    "--classifier-max-new-tokens",
+    default=None,
+    type=click.IntRange(min=32),
+    help="Optional single/retry generation-token cap. Janus defaults to 192.",
+)
+@click.option(
+    "--classifier-batch-max-new-tokens",
+    default=None,
+    type=click.IntRange(min=32),
+    help="Optional Janus batched generation-token cap. Defaults to 128; incomplete rows retry singly at the single cap.",
+)
+@click.option(
+    "--allow-experimental-classifier-batch-size",
+    is_flag=True,
+    default=False,
+    help="Allow a Janus batch above the profiled production limit of 4.",
 )
 @click.option(
     "--classifier-gpu-headroom-gb",
@@ -1892,28 +2701,71 @@ def index(
     dry_run: bool,
     model_profile: str,
     benchmark_output: Optional[str],
+    embedding_batch_size: int,
     classifier_backend: str,
     classifier_model_id: Optional[str],
     classifier_quantization: Optional[str],
     classifier_batch_size: Optional[int],
+    classifier_max_new_tokens: Optional[int],
+    classifier_batch_max_new_tokens: Optional[int],
+    allow_experimental_classifier_batch_size: bool,
     classifier_gpu_headroom_gb: Optional[float],
     classifier_low_impact: bool,
 ):
     started_at = time.perf_counter()
-    # Held for the lifetime of the process (OS releases it on exit) so a second
-    # run can't deadlock this one over GPU VRAM or co-write the same DB file.
-    acquire_single_instance_lock(dbpath)
-    db = Sqlite3Client(dbpath)
     setup_started_at = time.perf_counter()
-    db.setup_tables()
+    if dry_run and os.path.exists(dbpath):
+        db = Sqlite3Client(dbpath, read_only=True)
+    elif dry_run:
+        db = Sqlite3Client(":memory:")
+        db.setup_tables()
+    else:
+        # Held for the lifetime of the process (OS releases it on exit) so a second
+        # run can't deadlock this one over GPU VRAM or co-write the same DB file.
+        global_lock_fd = acquire_single_instance_lock(dbpath, global_lock=True)
+        try:
+            database_lock_fd = acquire_single_instance_lock(dbpath)
+        except BaseException:
+            os.close(global_lock_fd)
+            raise
+        db = Sqlite3Client(dbpath)
+        db.setup_tables()
     setup_ms = (time.perf_counter() - setup_started_at) * 1000
     db_info = db.info()
     log(f"Database: {db_info['entries']} entries (SQLite {db_info['version']})")
     log(f"Using model profile: {model_profile}")
+    resolved_classifier_batch_size = max(
+        1,
+        classifier_batch_size
+        or (
+            JANUS_BATCH_SIZE
+            if classifier_backend == CLASSIFIER_BACKEND_JANUS
+            else DEFAULT_GEMMA4_BATCH_SIZE
+        ),
+    )
+    if (
+        classifier_backend == CLASSIFIER_BACKEND_JANUS
+        and resolved_classifier_batch_size > JANUS_MAX_PRODUCTION_BATCH_SIZE
+        and not allow_experimental_classifier_batch_size
+    ):
+        raise click.ClickException(
+            f"Janus batch size {resolved_classifier_batch_size} exceeds the profiled "
+            f"production limit {JANUS_MAX_PRODUCTION_BATCH_SIZE}. Larger batches "
+            "were slower on representative photos due to decoder stragglers. Use "
+            "--allow-experimental-classifier-batch-size to override."
+        )
 
     planning_started_at = time.perf_counter()
     files = find_files(".", glob)
+    current_digests = file_content_sha256_many(files)
+    unreadable = [path for path, digest in current_digests.items() if digest is None]
+    if unreadable:
+        raise click.ClickException(
+            f"Could not fingerprint {len(unreadable)} input file(s), first: {unreadable[0]}"
+        )
     existing_image_paths = db.list_image_paths()
+    existing_caption_paths = db.list_caption_paths()
+    existing_core_paths = existing_image_paths & db.list_metadata_paths()
     uses_embeddings = model_profile in [MODEL_PROFILE_SIGLIP2, MODEL_PROFILE_HYBRID]
     # One bulk SELECT into a set, then O(1) membership checks per file.
     # Better than SELECT EXISTS per image which would be N SQLite round-trips.
@@ -1939,39 +2791,146 @@ def index(
     changed_paths, signatures_to_backfill = compute_reindex_plan(
         indexed_paths & file_set, db.list_file_signatures(), current_signatures
     )
-    if not dry_run:
-        for path in changed_paths:
-            db.delete_path(path)
-        db.upsert_file_signatures(signatures_to_backfill)
-    # Changed files are now absent from the DB, so the planning loop treats
-    # them as fresh work.
-    existing_image_paths -= changed_paths
-    existing_embedding_paths_v1 -= changed_paths
-    existing_embedding_paths_v2 -= changed_paths
     if changed_paths:
-        log(f"Re-indexing {len(changed_paths)} changed file(s)")
+        log(
+            f"Detected {len(changed_paths)} legacy mtime/size change(s); "
+            "stage provenance takes precedence once present"
+        )
+
+    states = db.get_pipeline_states()
+    desired_caption_version = caption_pipeline_version(
+        classifier_backend,
+        classifier_model_id,
+        classifier_quantization,
+        classifier_batch_size,
+        classifier_max_new_tokens,
+        classifier_batch_max_new_tokens,
+    )
+    desired_embedding_versions = {
+        SIGLIP_V1_STAGE: embedding_pipeline_version(SiglipEmbedder.MODEL_ID),
+        SIGLIP_V2_STAGE: embedding_pipeline_version(Siglip2Embedder.MODEL_ID),
+    }
+
+    def stage_needs_refresh(
+        path: str, stage: str, version: str, artifact_exists: bool
+    ) -> bool:
+        if not artifact_exists:
+            return True
+        state = states.get((path, stage))
+        if state is None:
+            # Legacy rows have no stage provenance. Preserve them as an imported
+            # baseline. Legacy mtime/size signatures are often invalidated by a
+            # restore or metadata-only copy, and cannot prove whether model input
+            # changed. From this import onward SHA-256 + pipeline version is
+            # authoritative. A non-default caption backend remains an intentional
+            # re-caption, not a legacy import.
+            if (
+                stage == CAPTION_STAGE
+                and classifier_backend != CLASSIFIER_BACKEND_JANUS
+            ):
+                return True
+            return False
+        digest, stored_version, _model_id = state
+        return digest != current_digests[path] or stored_version != version
 
     work_items = []
     for file_path in files:
-        has_image = file_path in existing_image_paths
+        has_core = file_path in existing_core_paths
+        has_caption = file_path in existing_caption_paths
         has_embedding_v2 = file_path in existing_embedding_paths_v2
         has_embedding_v1 = file_path in existing_embedding_paths_v1
-        needs_classifier = (
-            model_profile in [MODEL_PROFILE_JANUS, MODEL_PROFILE_HYBRID]
-            and not has_image
+        uses_classifier = model_profile in [MODEL_PROFILE_JANUS, MODEL_PROFILE_HYBRID]
+        needs_core = uses_classifier and stage_needs_refresh(
+            file_path, CORE_STAGE, CORE_PIPELINE_VERSION, has_core
         )
-        needs_embedding_v2 = uses_embeddings and not has_embedding_v2
-        needs_embedding_v1 = uses_embeddings and not has_embedding_v1
+        needs_classifier = uses_classifier and stage_needs_refresh(
+            file_path, CAPTION_STAGE, desired_caption_version, has_caption
+        )
+        needs_embedding_v2 = uses_embeddings and stage_needs_refresh(
+            file_path,
+            SIGLIP_V2_STAGE,
+            desired_embedding_versions[SIGLIP_V2_STAGE],
+            has_embedding_v2,
+        )
+        needs_embedding_v1 = uses_embeddings and stage_needs_refresh(
+            file_path,
+            SIGLIP_V1_STAGE,
+            desired_embedding_versions[SIGLIP_V1_STAGE],
+            has_embedding_v1,
+        )
 
-        if needs_classifier or needs_embedding_v2 or needs_embedding_v1:
+        if needs_core or needs_classifier or needs_embedding_v2 or needs_embedding_v1:
             work_items.append(
                 {
                     "path": file_path,
+                    "source_sha256": current_digests[file_path],
+                    "caption_version": desired_caption_version,
+                    "caption_model_id": classifier_model_id
+                    or (
+                        JANUS_MODEL_ID
+                        if classifier_backend == CLASSIFIER_BACKEND_JANUS
+                        else None
+                    ),
+                    "needs_core": needs_core,
                     "needs_classifier": needs_classifier,
                     "needs_embedding_v2": needs_embedding_v2,
                     "needs_embedding_v1": needs_embedding_v1,
                 }
             )
+
+    if not dry_run:
+        # Import unchanged legacy artifacts into the provenance table. Changed
+        # rows remain unmarked until their selected stage succeeds, so a partial
+        # profile cannot make another stale stage look current.
+        with db.transaction() as cur:
+            for path in files:
+                digest = current_digests[path]
+                if path in existing_core_paths:
+                    if (path, CORE_STAGE) not in states:
+                        db.upsert_pipeline_state(
+                            path,
+                            CORE_STAGE,
+                            digest,
+                            CORE_PIPELINE_VERSION,
+                            cur=cur,
+                        )
+                    if (
+                        path in existing_caption_paths
+                        and (path, CAPTION_STAGE) not in states
+                    ):
+                        db.upsert_pipeline_state(
+                            path,
+                            CAPTION_STAGE,
+                            digest,
+                            caption_pipeline_version(CLASSIFIER_BACKEND_JANUS),
+                            JANUS_MODEL_ID,
+                            cur=cur,
+                        )
+                if (
+                    path in existing_embedding_paths_v1
+                    and (path, SIGLIP_V1_STAGE) not in states
+                ):
+                    db.upsert_pipeline_state(
+                        path,
+                        SIGLIP_V1_STAGE,
+                        digest,
+                        desired_embedding_versions[SIGLIP_V1_STAGE],
+                        SiglipEmbedder.MODEL_ID,
+                        cur=cur,
+                    )
+                if (
+                    path in existing_embedding_paths_v2
+                    and (path, SIGLIP_V2_STAGE) not in states
+                ):
+                    db.upsert_pipeline_state(
+                        path,
+                        SIGLIP_V2_STAGE,
+                        digest,
+                        desired_embedding_versions[SIGLIP_V2_STAGE],
+                        Siglip2Embedder.MODEL_ID,
+                        cur=cur,
+                    )
+        db.upsert_file_signatures(signatures_to_backfill)
     planning_ms = (time.perf_counter() - planning_started_at) * 1000
 
     skipped = len(files) - len(work_items)
@@ -1993,8 +2952,9 @@ def index(
         # to slow shared system memory under WSL2). Order: Janus → SigLIP v1 → v2.
         classifier = None
         model_init_ms = 0.0
+        inference_stage_durations: dict[str, typing.Any] = {}
 
-        # Kick off color extraction in a background thread pool before GPU work starts.
+        # Kick off colour extraction in a background thread pool before GPU work starts.
         # fast_colorthief (Rust) releases the GIL, so it runs truly in parallel with
         # CUDA kernels on the GPU — ~2.7 min of CPU work becomes effectively free.
         #
@@ -2007,12 +2967,17 @@ def index(
         # futex_wait forever, looking like a frozen "Loading…" with an idle GPU.
         # Warming them single-threaded means worker threads only hit the import
         # fast-path and never block. (This is an import-lock hang, not GPU/VRAM.)
-        all_paths = [item["path"] for item in work_items]
+        all_paths = [item["path"] for item in work_items if item["needs_core"]]
         colors_executor = concurrent.futures.ThreadPoolExecutor(
             max_workers=COLORTHIEF_WORKERS
         )
+
+        def abort_colour_extraction() -> None:
+            colors_executor.shutdown(wait=False, cancel_futures=True)
+
         colors_started_at = time.perf_counter()
         color_futures: dict[str, concurrent.futures.Future] = {}
+        color_failed_paths: set[str] = set()
         for color_index, path in enumerate(all_paths):
             if color_index == 0:
                 warm_future: concurrent.futures.Future = concurrent.futures.Future()
@@ -2020,42 +2985,51 @@ def index(
                 # the lazy imports this warms are triggered by the attempt itself,
                 # so an empty palette is a safe fallback.
                 try:
-                    warm_future.set_result(fast_colorthief.get_palette(path))
+                    warm_future.set_result(extract_colour_palette(path))
                 except Exception as err:
                     log(f"Colour extraction failed for {path}: {err}")
+                    color_failed_paths.add(path)
                     warm_future.set_result([])
                 color_futures[path] = warm_future
             else:
                 color_futures[path] = colors_executor.submit(
-                    fast_colorthief.get_palette, path
+                    extract_colour_palette, path
                 )
         log(
-            f"Color extraction started in background ({len(all_paths)} images, {COLORTHIEF_WORKERS} threads)"
+            f"Colour extraction started in background ({len(all_paths)} images, {COLORTHIEF_WORKERS} threads)"
         )
 
         # ---- Pass 1: Janus captions ----
-        # precomputed_captions stores PARSED result dicts: parsing (and retry on
-        # malformed JSON) runs here while the model is resident, because the model is
-        # released before per-image assembly. Batching amortises KV-cache/kernel
-        # launch overhead — ~3.8x vs single-image.
+        # Parsed captions are committed after each inference batch. A later model
+        # failure can therefore resume without retaining every caption in memory.
         precomputed_captions: dict[str, Mapping] = {}
+        completed_caption_paths: set[str] = set()
+        caption_generation_metrics: list[dict[str, typing.Any]] = []
+        minimum_free_vram_gb: Optional[float] = None
         if any(item["needs_classifier"] for item in work_items):
             classifier = create_classifier(
                 backend=classifier_backend,
                 model_id=classifier_model_id,
                 quantization=classifier_quantization,
                 batch_size=classifier_batch_size,
+                max_new_tokens=classifier_max_new_tokens,
+                batch_max_new_tokens=classifier_batch_max_new_tokens,
                 gpu_headroom_gb=classifier_gpu_headroom_gb,
                 low_impact=classifier_low_impact,
             )
             load_started_at = time.perf_counter()
-            classifier.init_model()
+            try:
+                classifier.init_model()
+            except BaseException:
+                classifier.release()
+                abort_colour_extraction()
+                raise
             model_init_ms += (time.perf_counter() - load_started_at) * 1000
             log_vram(f"{classifier.backend} load")
             classifier_paths = [
                 item["path"] for item in work_items if item["needs_classifier"]
             ]
-            resolved_batch_size = max(1, classifier_batch_size or classifier.batch_size)
+            resolved_batch_size = resolved_classifier_batch_size
             total_batches = math.ceil(len(classifier_paths) / resolved_batch_size)
             log(
                 f"Running {classifier.backend} captions in batches of {resolved_batch_size} ({len(classifier_paths)} images, {total_batches} batch(es))..."
@@ -2071,24 +3045,126 @@ def index(
                     f"  {classifier.backend} batch {batch_index}/{total_batches} starting ({len(batch_paths)} images)..."
                 )
                 single_started_at = time.perf_counter()
-                batch_geocodes = [extract_geocode_from_path(p) for p in batch_paths]
+                # Captions are pixel-grounded. Location is indexed separately by
+                # the core stage and must not leak into visual descriptions.
+                batch_geocodes = [None] * len(batch_paths)
                 with heartbeat(
                     f"{classifier.backend} batch {batch_index}/{total_batches}"
                 ):
-                    batch_results = classifier.predict_batch(
-                        list(zip(batch_paths, batch_geocodes))
+                    try:
+                        batch_results, batch_metrics = predict_caption_batch_resilient(
+                            classifier, list(zip(batch_paths, batch_geocodes))
+                        )
+                    except BaseException:
+                        classifier.release()
+                        abort_colour_extraction()
+                        raise
+                free_vram_gb = enforce_vram_headroom(
+                    f"{classifier.backend} batch {batch_index}/{total_batches}"
+                )
+                if math.isfinite(free_vram_gb):
+                    minimum_free_vram_gb = (
+                        free_vram_gb
+                        if minimum_free_vram_gb is None
+                        else min(minimum_free_vram_gb, free_vram_gb)
                     )
                 # Parse (and retry malformed JSON) now, while the model is resident.
-                for path, raw, geo in zip(batch_paths, batch_results, batch_geocodes):
-                    precomputed_captions[path] = parse_caption_with_retry(
-                        classifier, path, geo, raw
+                if len(batch_results) != len(batch_paths):
+                    log(
+                        f"WARNING: {classifier.backend} returned {len(batch_results)} "
+                        f"caption(s) for {len(batch_paths)} path(s)"
                     )
+                batch_attempt_metrics: list[dict[str, typing.Any]] = []
+                for position, (path, geo) in enumerate(
+                    zip(batch_paths, batch_geocodes)
+                ):
+                    raw = (
+                        batch_results[position] if position < len(batch_results) else ""
+                    )
+                    metric = dict(
+                        batch_metrics[position] if position < len(batch_metrics) else {}
+                    )
+                    metric.update(
+                        {
+                            "path": path,
+                            "pipelineVersion": desired_caption_version,
+                            "attempt": metric.get("attempt", "batch"),
+                        }
+                    )
+                    retry_metrics: list[dict[str, typing.Any]] = []
+                    parsed = resolve_caption_result(
+                        classifier,
+                        path,
+                        geo,
+                        raw,
+                        metric,
+                        retry_metrics,
+                    )
+                    batch_attempt_metrics.append(metric)
+                    for retry_metric in retry_metrics:
+                        retry_metric.update(
+                            {
+                                "path": path,
+                                "pipelineVersion": desired_caption_version,
+                                "attempt": "single-retry",
+                            }
+                        )
+                        batch_attempt_metrics.append(retry_metric)
+                    if parsed is not None:
+                        precomputed_captions[path] = parsed
+                caption_generation_metrics.extend(batch_attempt_metrics)
+                successful = [
+                    (path, precomputed_captions[path])
+                    for path in batch_paths
+                    if path in precomputed_captions
+                ]
+                if successful or batch_attempt_metrics:
+                    with db.transaction() as cur:
+                        db.insert_caption_generation_metrics(
+                            batch_attempt_metrics, cur=cur
+                        )
+                        for path, parsed in successful:
+                            tags = normalise_classifier_tags(parsed)
+                            db.upsert_image_fields(
+                                path,
+                                {
+                                    "alt_text": parsed.get("alt_text"),
+                                    # Clear a caption produced by the retired
+                                    # subject field when refreshing this stage.
+                                    "subject": None,
+                                    "tags": ", ".join(tags),
+                                },
+                                cur=cur,
+                            )
+                            db.replace_tags_for_source(path, tags, "classifier", cur)
+                            db.upsert_pipeline_state(
+                                path,
+                                CAPTION_STAGE,
+                                current_digests[path],
+                                desired_caption_version,
+                                classifier_model_id
+                                or (
+                                    JANUS_MODEL_ID
+                                    if classifier_backend == CLASSIFIER_BACKEND_JANUS
+                                    else None
+                                ),
+                                cur,
+                            )
+                            completed_caption_paths.add(path)
+                        if successful:
+                            db.rebuild_tag_counts(cur)
+                for path in batch_paths:
+                    precomputed_captions.pop(path, None)
                 done = min(batch_start + resolved_batch_size, len(classifier_paths))
                 single_ms = (time.perf_counter() - single_started_at) * 1000
                 log(
                     f"  {classifier.backend} batch {batch_index}/{total_batches} done in {single_ms:.0f}ms ({done}/{len(classifier_paths)} images)"
                 )
             batch_ms = (time.perf_counter() - batch_started_at) * 1000
+            inference_stage_durations[f"caption:{classifier.backend}"] = {
+                "loadMs": round(model_init_ms, 2),
+                "inferenceMs": round(batch_ms, 2),
+            }
             log(f"{classifier.backend} batch inference complete in {batch_ms:.0f}ms")
             log_vram(f"{classifier.backend} inference")
             classifier.release()
@@ -2098,22 +3174,65 @@ def index(
         # keyed as precomputed_embeddings[path][model_id] = embedding. Order per the
         # one-model-per-pass requirement: SigLIP v1 (browser-compatible) then v2.
         precomputed_embeddings: dict[str, dict[str, list[float]]] = {}
+        completed_embedding_models: dict[str, set[str]] = {}
+
+        def persist_embedding_batch(
+            model_id: str, completed: list[tuple[str, list[float]]]
+        ) -> None:
+            stage = (
+                SIGLIP_V1_STAGE
+                if model_id == SiglipEmbedder.MODEL_ID
+                else SIGLIP_V2_STAGE
+            )
+            with db.transaction() as cur:
+                for path, embedding in completed:
+                    db.insert_embedding(path, model_id, embedding, cur=cur)
+                    db.upsert_pipeline_state(
+                        path,
+                        stage,
+                        current_digests[path],
+                        embedding_pipeline_version(model_id),
+                        model_id,
+                        cur,
+                    )
+                    completed_embedding_models.setdefault(path, set()).add(model_id)
+
         if any(item["needs_embedding_v1"] for item in work_items):
             v1_paths = [
                 item["path"] for item in work_items if item["needs_embedding_v1"]
             ]
-            model_init_ms += run_embedding_pass(
-                SiglipEmbedder(), v1_paths, precomputed_embeddings
-            )
+            try:
+                model_init_ms += run_embedding_pass(
+                    SiglipEmbedder(),
+                    v1_paths,
+                    precomputed_embeddings,
+                    persist_batch=persist_embedding_batch,
+                    collect=False,
+                    batch_size=embedding_batch_size,
+                    timings=inference_stage_durations,
+                )
+            except BaseException:
+                abort_colour_extraction()
+                raise
         if any(item["needs_embedding_v2"] for item in work_items):
             v2_paths = [
                 item["path"] for item in work_items if item["needs_embedding_v2"]
             ]
-            model_init_ms += run_embedding_pass(
-                Siglip2Embedder(), v2_paths, precomputed_embeddings
-            )
+            try:
+                model_init_ms += run_embedding_pass(
+                    Siglip2Embedder(),
+                    v2_paths,
+                    precomputed_embeddings,
+                    persist_batch=persist_embedding_batch,
+                    collect=False,
+                    batch_size=embedding_batch_size,
+                    timings=inference_stage_durations,
+                )
+            except BaseException:
+                abort_colour_extraction()
+                raise
 
-        # Collect color results (GPU work is done; colors are likely already finished).
+        # Collect colour results (GPU work is done; palettes are likely finished).
         precomputed_colors_by_path: dict[str, list] = {}
         colors_executor.shutdown(wait=True)
         for path, fut in color_futures.items():
@@ -2123,25 +3242,32 @@ def index(
                 # A single corrupt/truncated image must not discard the whole run;
                 # skip just this image's colours (empty palette) and keep going.
                 log(f"Colour extraction failed for {path}: {err}")
+                color_failed_paths.add(path)
                 precomputed_colors_by_path[path] = []
         colors_ms = (time.perf_counter() - colors_started_at) * 1000
         log(
-            f"Color extraction complete in {colors_ms:.0f}ms (ran concurrently with GPU)"
+            f"Colour extraction complete in {colors_ms:.0f}ms (ran concurrently with GPU)"
         )
 
         # Assembly carries NO live model objects (all released) — only the per-image
         # needs_classifier flag and the precomputed pass outputs. Keeping a model in
         # this tuple would pin its VRAM and defeat the release()/empty_cache above.
+        assembly_items = [item for item in work_items if item["needs_core"]]
         enumerated = [
             (
                 item_index,
                 item["path"],
-                item["needs_classifier"],
-                precomputed_captions.get(item["path"]),
+                item["needs_core"],
+                False,
+                None,
                 precomputed_embeddings.get(item["path"]),
                 precomputed_colors_by_path.get(item["path"]),
+                item["source_sha256"],
+                item["caption_version"],
+                item["caption_model_id"],
+                item["path"] not in color_failed_paths,
             )
-            for item_index, item in enumerate(work_items)
+            for item_index, item in enumerate(assembly_items)
         ]
 
         # Disable concurrency as it doesn't help performance on a RTX3080
@@ -2151,7 +3277,7 @@ def index(
             analysis_durations_ms = []
             pending_results = []
             persisted_results = 0
-            total_work_items = len(work_items)
+            total_work_items = len(assembly_items)
 
             def flush_pending_results() -> None:
                 nonlocal pending_results, persisted_results
@@ -2180,7 +3306,7 @@ def index(
 
                 tags = analysed.get("tags") or []
                 tags_str = ", ".join(tags[:6]) if tags else "—"
-                alt = analysed.get("alt_text") or analysed.get("subject") or ""
+                alt = analysed.get("alt_text") or ""
                 alt_str = f" | {alt[:80]}" if alt else ""
                 filename = os.path.basename(result["path"])
                 log(
@@ -2194,22 +3320,116 @@ def index(
             flush_pending_results()
 
         log(
-            f"Inserted {persisted_results} images in {sum(insert_durations_ms):.0f}ms across {len(insert_durations_ms)} transaction(s)"
+            f"Inserted {persisted_results} core/caption row(s) in "
+            f"{sum(insert_durations_ms):.0f}ms across {len(insert_durations_ms)} transaction(s)"
         )
+        caption_failures = sum(
+            1
+            for item in work_items
+            if item["needs_classifier"] and item["path"] not in completed_caption_paths
+        )
+        embedding_failures = sum(
+            int(item["needs_embedding_v1"])
+            + int(item["needs_embedding_v2"])
+            - len(completed_embedding_models.get(item["path"], set()))
+            for item in work_items
+        )
+        core_failures = sum(
+            1
+            for item in work_items
+            if item["needs_core"] and item["path"] in color_failed_paths
+        )
+        if core_failures or caption_failures or embedding_failures:
+            log(
+                f"Incomplete stages: {core_failures} core, "
+                f"{caption_failures} caption(s), "
+                f"{embedding_failures} embedding(s); they remain retryable"
+            )
         log_vram_peak()
 
         db.optimize()
+
+        # The legacy mtime/size signature remains useful for importing old rows,
+        # but only advance it once every artifact currently stored for a path has
+        # matching stage provenance. A partial profile must not make untouched
+        # stale stages look fresh.
+        refreshed_states = db.get_pipeline_states()
+        refreshed_images = db.list_image_paths()
+        refreshed_captions = db.list_caption_paths()
+        refreshed_v1 = db.list_embedding_paths(SiglipEmbedder.MODEL_ID)
+        refreshed_v2 = db.list_embedding_paths(Siglip2Embedder.MODEL_ID)
+        completed_signatures = {}
+        for item in work_items:
+            path = item["path"]
+            digest = item["source_sha256"]
+            required_stages = []
+            if path in refreshed_images:
+                required_stages.append(CORE_STAGE)
+            if path in refreshed_captions:
+                required_stages.append(CAPTION_STAGE)
+            if path in refreshed_v1:
+                required_stages.append(SIGLIP_V1_STAGE)
+            if path in refreshed_v2:
+                required_stages.append(SIGLIP_V2_STAGE)
+            if all(
+                refreshed_states.get((path, stage), (None, None, None))[0] == digest
+                for stage in required_stages
+            ):
+                signature = file_signature(path)
+                if signature is not None:
+                    completed_signatures[path] = signature
+        db.upsert_file_signatures(completed_signatures)
     else:
         model_init_ms = 0.0
         analysis_durations_ms = []
         insert_durations_ms = []
+        caption_failures = 0
+        embedding_failures = 0
+        core_failures = 0
+        inference_stage_durations = {}
+        caption_generation_metrics = []
+        minimum_free_vram_gb = None
 
-    if not dry_run and analysis_durations_ms:
+    token_counts = [
+        metric["tokenCount"]
+        for metric in caption_generation_metrics
+        if "tokenCount" in metric
+    ]
+    generation_summary = {
+        "samples": len(caption_generation_metrics),
+        "medianTokens": (
+            round(statistics.median(token_counts), 2) if token_counts else 0.0
+        ),
+        "hitTokenLimit": sum(
+            bool(metric.get("hitTokenLimit")) for metric in caption_generation_metrics
+        ),
+        "withoutEos": sum(
+            metric.get("completedWithEos") is False
+            for metric in caption_generation_metrics
+        ),
+        "oomFallbacks": sum(
+            bool(metric.get("oomFallback")) for metric in caption_generation_metrics
+        ),
+        "minimumFreeVramGb": (
+            round(minimum_free_vram_gb, 2) if minimum_free_vram_gb is not None else None
+        ),
+    }
+
+    if not dry_run and work_items:
         stats = {
             "completedAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
             "modelProfile": model_profile,
             "workItemCount": len(work_items),
-            "medianAnalysisMs": round(statistics.median(analysis_durations_ms), 2),
+            "coreFailures": core_failures,
+            "captionFailures": caption_failures,
+            "embeddingFailures": embedding_failures,
+            "inferenceStages": inference_stage_durations,
+            "captionGeneration": generation_summary,
+            "medianAnalysisMs": (
+                round(statistics.median(analysis_durations_ms), 2)
+                if analysis_durations_ms
+                else 0.0
+            ),
         }
         stats_path = os.path.join(
             os.path.dirname(os.path.abspath(__file__)), ".last-index-stats.json"
@@ -2226,6 +3446,13 @@ def index(
             "dryRun": dry_run,
             "fileCount": len(files),
             "workItemCount": len(work_items),
+            "stageDurationsMs": inference_stage_durations,
+            "captionGeneration": generation_summary,
+            "failures": {
+                "core": core_failures,
+                "caption": caption_failures,
+                "embedding": embedding_failures,
+            },
             "durationsMs": {
                 "total": round((time.perf_counter() - started_at) * 1000, 2),
                 "setupTables": round(setup_ms, 2),
@@ -2248,6 +3475,9 @@ def index(
         with open(benchmark_output, "w", encoding="utf-8") as fh:
             json.dump(benchmark, fh, indent=2)
         print(f"Benchmark written to {benchmark_output}")
+    if not dry_run:
+        os.close(database_lock_fd)
+        os.close(global_lock_fd)
 
 
 def build_benchmark_sample(index_value: int) -> Mapping[str, typing.Any]:
@@ -2288,16 +3518,23 @@ def benchmark_index(rows: int, repeat: int, output: Optional[str]):
             setup_ms = (time.perf_counter() - setup_started_at) * 1000
 
             insert_started_at = time.perf_counter()
-            row_insert_durations_ms = []
-            for row_index in range(rows):
-                row_started_at = time.perf_counter()
-                insert_analysed_image(
-                    db,
-                    build_benchmark_sample(row_index),
-                    f"../albums/benchmark/photo-{row_index}.jpg",
+            insert_durations_ms = []
+            samples = [
+                {
+                    "path": f"../albums/benchmark/photo-{row_index}.jpg",
+                    "analysed": build_benchmark_sample(row_index),
+                    "write_core": True,
+                    "write_caption": True,
+                }
+                for row_index in range(rows)
+            ]
+            for chunk_start in range(0, len(samples), INSERT_CHUNK_SIZE):
+                chunk_started_at = time.perf_counter()
+                insert_analysed_images_batch(
+                    db, samples[chunk_start : chunk_start + INSERT_CHUNK_SIZE]
                 )
-                row_insert_durations_ms.append(
-                    (time.perf_counter() - row_started_at) * 1000
+                insert_durations_ms.append(
+                    (time.perf_counter() - chunk_started_at) * 1000
                 )
             insert_total_ms = (time.perf_counter() - insert_started_at) * 1000
 
@@ -2307,9 +3544,7 @@ def benchmark_index(rows: int, repeat: int, output: Optional[str]):
                     "run": run_index + 1,
                     "setupMs": round(setup_ms, 2),
                     "insertTotalMs": round(insert_total_ms, 2),
-                    "insertMedianMs": round(
-                        statistics.median(row_insert_durations_ms), 2
-                    ),
+                    "insertMedianMs": round(statistics.median(insert_durations_ms), 2),
                     "insertAverageMs": round(insert_total_ms / rows, 2),
                 }
             )
@@ -2336,6 +3571,238 @@ def benchmark_index(rows: int, repeat: int, output: Optional[str]):
 
     pprint.pprint(summary)
 
+    if output:
+        with open(output, "w", encoding="utf-8") as fh:
+            json.dump(summary, fh, indent=2)
+        print(f"Benchmark written to {output}")
+
+
+def _benchmark_parallel_map(
+    function: typing.Callable[[str], typing.Any],
+    paths: list[str],
+    workers: int,
+) -> float:
+    started_at = time.perf_counter()
+    if workers == 1:
+        for path in paths:
+            function(path)
+    else:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as executor:
+            list(executor.map(function, paths))
+    return (time.perf_counter() - started_at) * 1000
+
+
+def _benchmark_exif_path(path: str) -> None:
+    with open(path, "rb") as fh:
+        analyse_image(fh, path, needs_core=True, precomputed_colors=[])
+
+
+def _rgb_to_lab(rgb: tuple[int, int, int]) -> tuple[float, float, float]:
+    channels = []
+    for component in rgb:
+        value = component / 255.0
+        channels.append(
+            ((value + 0.055) / 1.055) ** 2.4 if value > 0.04045 else value / 12.92
+        )
+    red, green, blue = channels
+    x = (red * 0.4124 + green * 0.3576 + blue * 0.1805) / 0.95047
+    y = red * 0.2126 + green * 0.7152 + blue * 0.0722
+    z = (red * 0.0193 + green * 0.1192 + blue * 0.9505) / 1.08883
+
+    def pivot(value: float) -> float:
+        return value ** (1 / 3) if value > 0.008856 else 7.787 * value + 16 / 116
+
+    fx, fy, fz = pivot(x), pivot(y), pivot(z)
+    return (116 * fy - 16, 500 * (fx - fy), 200 * (fy - fz))
+
+
+def _delta_e(left: tuple[int, int, int], right: tuple[int, int, int]) -> float:
+    left_lab = _rgb_to_lab(left)
+    right_lab = _rgb_to_lab(right)
+    return math.sqrt(
+        sum(
+            (left_value - right_value) ** 2
+            for left_value, right_value in zip(left_lab, right_lab)
+        )
+    )
+
+
+def compare_colour_palettes(
+    baseline: list[tuple[int, int, int]], candidate: list[tuple[int, int, int]]
+) -> dict[str, float]:
+    if not baseline or not candidate:
+        return {"dominantDeltaE": math.inf, "symmetricMeanNearestDeltaE": math.inf}
+    nearest = [
+        min(_delta_e(colour, other) for other in candidate) for colour in baseline
+    ]
+    nearest.extend(
+        min(_delta_e(colour, other) for other in baseline) for colour in candidate
+    )
+    return {
+        "dominantDeltaE": _delta_e(baseline[0], candidate[0]),
+        "symmetricMeanNearestDeltaE": statistics.mean(nearest),
+    }
+
+
+@cli.command("benchmark-colours")
+@click.option("--glob", "glob_pattern", default="../albums/**/*.jpg", show_default=True)
+@click.option(
+    "--sample-size", default=128, type=click.IntRange(min=1), show_default=True
+)
+@click.option("--seed", default=29, type=int, show_default=True)
+@click.option(
+    "--max-dimension",
+    default=COLOUR_THUMBNAIL_MAX_DIMENSION,
+    type=click.IntRange(min=64),
+    show_default=True,
+)
+@click.option(
+    "--quality",
+    default=COLOUR_THUMBNAIL_QUALITY,
+    type=click.IntRange(min=1),
+    show_default=True,
+)
+@click.option("--output", default=None, help="Optional JSON result path.")
+def benchmark_colours(
+    glob_pattern: str,
+    sample_size: int,
+    seed: int,
+    max_dimension: int,
+    quality: int,
+    output: Optional[str],
+):
+    """Compare full-resolution and bounded-thumbnail palette cost and fidelity."""
+    paths = sample_balanced_paths(
+        find_files(".", glob_pattern), sample_size=sample_size, seed=seed
+    )
+
+    def run(function):
+        started_at = time.perf_counter()
+        with concurrent.futures.ThreadPoolExecutor(
+            max_workers=COLORTHIEF_WORKERS
+        ) as executor:
+            palettes = list(executor.map(function, paths))
+        return dict(zip(paths, palettes)), (time.perf_counter() - started_at) * 1000
+
+    baseline, baseline_ms = run(fast_colorthief.get_palette)
+    candidate, candidate_ms = run(
+        lambda path: extract_colour_palette(path, max_dimension, quality)
+    )
+    comparisons = [
+        compare_colour_palettes(baseline[path], candidate[path]) for path in paths
+    ]
+    dominant = [comparison["dominantDeltaE"] for comparison in comparisons]
+    palette = [comparison["symmetricMeanNearestDeltaE"] for comparison in comparisons]
+    summary = {
+        "generatedAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "sampleSize": len(paths),
+        "seed": seed,
+        "thumbnailMaxDimension": max_dimension,
+        "thumbnailQuality": quality,
+        "baselineMs": round(baseline_ms, 2),
+        "candidateMs": round(candidate_ms, 2),
+        "speedup": round(baseline_ms / candidate_ms, 2),
+        "dominantDeltaE": {
+            "median": round(statistics.median(dominant), 2),
+            "p95": round(
+                sorted(dominant)[max(0, math.ceil(len(dominant) * 0.95) - 1)], 2
+            ),
+        },
+        "paletteDeltaE": {
+            "median": round(statistics.median(palette), 2),
+            "p95": round(
+                sorted(palette)[max(0, math.ceil(len(palette) * 0.95) - 1)], 2
+            ),
+        },
+    }
+    pprint.pprint(summary)
+    if output:
+        with open(output, "w", encoding="utf-8") as fh:
+            json.dump(summary, fh, indent=2)
+        print(f"Benchmark written to {output}")
+
+
+@cli.command("benchmark-cpu")
+@click.option("--glob", "glob_pattern", default="../albums/**/*.jpg", show_default=True)
+@click.option(
+    "--sample-size", default=128, type=click.IntRange(min=1), show_default=True
+)
+@click.option("--repeat", default=3, type=click.IntRange(min=1), show_default=True)
+@click.option("--seed", default=29, type=int, show_default=True)
+@click.option(
+    "--hash-workers", default=1, type=click.IntRange(min=1), show_default=True
+)
+@click.option(
+    "--exif-workers", default=1, type=click.IntRange(min=1), show_default=True
+)
+@click.option(
+    "--colour-workers",
+    default=COLORTHIEF_WORKERS,
+    type=click.IntRange(min=1),
+    show_default=True,
+)
+@click.option("--output", default=None, help="Optional JSON result path.")
+def benchmark_cpu(
+    glob_pattern: str,
+    sample_size: int,
+    repeat: int,
+    seed: int,
+    hash_workers: int,
+    exif_workers: int,
+    colour_workers: int,
+    output: Optional[str],
+):
+    """Profile model-free indexing stages on a stable balanced photo sample."""
+    discovery_started_at = time.perf_counter()
+    files = find_files(".", glob_pattern)
+    discovery_ms = (time.perf_counter() - discovery_started_at) * 1000
+    if not files:
+        raise click.ClickException("CPU benchmark glob matched no photos")
+    paths = sample_balanced_paths(files, min(sample_size, len(files)), seed)
+    runs = []
+    for run_index in range(repeat):
+        stat_ms = _benchmark_parallel_map(os.stat, paths, 1)
+        hash_ms = _benchmark_parallel_map(file_content_sha256, paths, hash_workers)
+        exif_ms = _benchmark_parallel_map(_benchmark_exif_path, paths, exif_workers)
+        colour_ms = _benchmark_parallel_map(
+            extract_colour_palette, paths, colour_workers
+        )
+        runs.append(
+            {
+                "run": run_index + 1,
+                "statMs": round(stat_ms, 2),
+                "sha256Ms": round(hash_ms, 2),
+                "exifGeocodeAssemblyMs": round(exif_ms, 2),
+                "colourMs": round(colour_ms, 2),
+            }
+        )
+
+    def median(field: str) -> float:
+        return round(statistics.median(run[field] for run in runs), 2)
+
+    summary = {
+        "generatedAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "glob": glob_pattern,
+        "discoveredPhotos": len(files),
+        "sampleSize": len(paths),
+        "seed": seed,
+        "repeat": repeat,
+        "workers": {
+            "sha256": hash_workers,
+            "exif": exif_workers,
+            "colour": colour_workers,
+        },
+        "discoveryMs": round(discovery_ms, 2),
+        "median": {
+            "statMs": median("statMs"),
+            "sha256Ms": median("sha256Ms"),
+            "exifGeocodeAssemblyMs": median("exifGeocodeAssemblyMs"),
+            "colourMs": median("colourMs"),
+        },
+        "runs": runs,
+        "paths": paths,
+    }
+    pprint.pprint(summary)
     if output:
         with open(output, "w", encoding="utf-8") as fh:
             json.dump(summary, fh, indent=2)
@@ -2413,52 +3880,170 @@ def benchmark_janus(image_path: str, repeat: int, output: Optional[str]):
 )
 @click.option(
     "--batch-sizes",
-    default="1,2,4,6,8",
+    default="1,2,4",
     help="Comma-separated list of batch sizes to benchmark.",
 )
-@click.option("--repeat", default=3, help="How many runs per batch size.")
+@click.option("--repeat", default=1, help="How many runs per batch size.")
+@click.option(
+    "--glob",
+    "glob_pattern",
+    default=None,
+    help="Optional representative image glob; otherwise --path is repeated.",
+)
+@click.option(
+    "--max-new-tokens",
+    default=JANUS_MAX_NEW_TOKENS,
+    type=click.IntRange(min=32),
+    show_default=True,
+)
+@click.option(
+    "--batch-max-new-tokens",
+    default=JANUS_BATCH_MAX_NEW_TOKENS,
+    type=click.IntRange(min=32),
+    show_default=True,
+)
+@click.option("--allow-experimental-batch-size", is_flag=True, default=False)
 @click.option(
     "--output",
     default=None,
     help="Optional JSON output file for the benchmark summary.",
 )
 def benchmark_janus_batch(
-    image_path: str, batch_sizes: str, repeat: int, output: Optional[str]
+    image_path: str,
+    batch_sizes: str,
+    repeat: int,
+    glob_pattern: Optional[str],
+    max_new_tokens: int,
+    batch_max_new_tokens: int,
+    allow_experimental_batch_size: bool,
+    output: Optional[str],
 ):
-    """Compare single-image vs batched Janus inference throughput."""
-    classifier = JanusClassifier()
+    """Profile safe Janus batch sizes on representative images."""
+    sizes = [int(s.strip()) for s in batch_sizes.split(",")]
+    if any(size < 1 for size in sizes):
+        raise click.ClickException("Batch sizes must be positive")
+    experimental = [size for size in sizes if size > JANUS_MAX_PRODUCTION_BATCH_SIZE]
+    if experimental and not allow_experimental_batch_size:
+        raise click.ClickException(
+            f"Batch size(s) {experimental} exceed the profiled production limit "
+            f"{JANUS_MAX_PRODUCTION_BATCH_SIZE}; use "
+            "--allow-experimental-batch-size to override"
+        )
+
+    paths = find_files(".", glob_pattern) if glob_pattern else [image_path]
+    if not paths:
+        raise click.ClickException("No benchmark images matched")
+    if glob_pattern:
+        paths = sample_balanced_paths(paths, max(sizes) * max(1, repeat), seed=17)
+
+    lock_fd = acquire_single_instance_lock("janus-benchmark", global_lock=True)
+    classifier = JanusClassifier(
+        max_new_tokens=max_new_tokens,
+        batch_max_new_tokens=batch_max_new_tokens,
+    )
 
     init_started_at = time.perf_counter()
-    classifier.init_model()
+    try:
+        classifier.init_model()
+    except BaseException:
+        os.close(lock_fd)
+        raise
     init_ms = (time.perf_counter() - init_started_at) * 1000
-
-    geocode = {"city": "Singapore", "country": "Singapore"}
-    sizes = [int(s.strip()) for s in batch_sizes.split(",")]
 
     results_by_size = {}
     for batch_size in sizes:
-        items = [(image_path, geocode)] * batch_size
         runs = []
         for run_index in range(repeat):
+            selected_paths = [
+                paths[(run_index * batch_size + index) % len(paths)]
+                for index in range(batch_size)
+            ]
+            items = [(path, None) for path in selected_paths]
+            if torch.cuda.is_available():
+                torch.cuda.reset_peak_memory_stats()
             started_at = time.perf_counter()
-            outputs = classifier.predict_batch(items)
+            try:
+                outputs = classifier.predict_batch(items)
+                error = None
+            except BaseException as err:
+                if not is_cuda_oom(err):
+                    classifier.release()
+                    os.close(lock_fd)
+                    raise
+                outputs = []
+                error = str(err)
+                torch.cuda.empty_cache()
             duration_ms = (time.perf_counter() - started_at) * 1000
             ms_per_image = duration_ms / batch_size
+            metrics = list(classifier.last_generation_metrics) if error is None else []
+            parsed = 0
+            output_details = []
+            for position, raw in enumerate(outputs):
+                parse_error = None
+                try:
+                    parse_classifier_response(raw)
+                    parsed += 1
+                    parse_success = True
+                except (ValueError, KeyError, json.JSONDecodeError) as err:
+                    parse_success = False
+                    parse_error = str(err)
+                output_details.append(
+                    {
+                        "path": selected_paths[position],
+                        "outputChars": len(raw),
+                        "parseSuccess": parse_success,
+                        "parseError": parse_error,
+                        **(metrics[position] if position < len(metrics) else {}),
+                    }
+                )
             runs.append(
                 {
                     "run": run_index + 1,
                     "batchSize": batch_size,
+                    "paths": selected_paths,
                     "totalMs": round(duration_ms, 2),
                     "msPerImage": round(ms_per_image, 2),
                     "outputChars": sum(len(o) for o in outputs),
+                    "parseSuccess": parsed,
+                    "tokenCounts": [metric.get("tokenCount") for metric in metrics],
+                    "hitTokenLimit": sum(
+                        bool(metric.get("hitTokenLimit")) for metric in metrics
+                    ),
+                    "withoutEos": sum(
+                        metric.get("completedWithEos") is False for metric in metrics
+                    ),
+                    "outputs": output_details,
+                    "peakAllocatedGb": (
+                        round(torch.cuda.max_memory_allocated() / 1e9, 3)
+                        if torch.cuda.is_available()
+                        else None
+                    ),
+                    "peakReservedGb": (
+                        round(torch.cuda.max_memory_reserved() / 1e9, 3)
+                        if torch.cuda.is_available()
+                        else None
+                    ),
+                    "error": error,
                 }
             )
-        median_ms_per_image = statistics.median(r["msPerImage"] for r in runs)
+        successful_runs = [run for run in runs if run["error"] is None]
+        median_ms_per_image = (
+            statistics.median(run["msPerImage"] for run in successful_runs)
+            if successful_runs
+            else math.inf
+        )
         results_by_size[batch_size] = {
             "runs": runs,
-            "medianMsPerImage": round(median_ms_per_image, 2),
+            "medianMsPerImage": (
+                round(median_ms_per_image, 2)
+                if math.isfinite(median_ms_per_image)
+                else None
+            ),
         }
-        print(f"batch={batch_size}: median {median_ms_per_image:.0f}ms/image")
+        if math.isfinite(median_ms_per_image):
+            print(f"batch={batch_size}: median {median_ms_per_image:.0f}ms/image")
+        else:
+            print(f"batch={batch_size}: no successful runs")
 
     single_median = (
         results_by_size[1]["medianMsPerImage"] if 1 in results_by_size else None
@@ -2466,12 +4051,16 @@ def benchmark_janus_batch(
     speedups = {}
     if single_median:
         for size, data in results_by_size.items():
-            speedups[size] = round(single_median / data["medianMsPerImage"], 2)
+            if data["medianMsPerImage"]:
+                speedups[size] = round(single_median / data["medianMsPerImage"], 2)
 
     summary = {
         "generatedAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         "path": image_path,
+        "glob": glob_pattern,
         "repeat": repeat,
+        "maxNewTokens": max_new_tokens,
+        "batchMaxNewTokens": batch_max_new_tokens,
         "initMs": round(init_ms, 2),
         "resultsByBatchSize": results_by_size,
         "speedupVsSingle": speedups,
@@ -2483,6 +4072,159 @@ def benchmark_janus_batch(
         with open(output, "w", encoding="utf-8") as fh:
             json.dump(summary, fh, indent=2)
         print(f"Benchmark written to {output}")
+    classifier.release()
+    os.close(lock_fd)
+
+
+@cli.command("benchmark-caption-quality")
+@click.option(
+    "--fixture",
+    default=str(Path(__file__).with_name("caption-quality-benchmark.json")),
+    show_default=True,
+    help="Frozen caption-quality fixture JSON.",
+)
+@click.option("--batch-size", default=JANUS_BATCH_SIZE, type=click.IntRange(min=1))
+@click.option(
+    "--output",
+    default=".caption-quality-benchmark-result.json",
+    show_default=True,
+    help="Result artifact written on both pass and failure.",
+)
+def benchmark_caption_quality(fixture: str, batch_size: int, output: str):
+    """Run the frozen semantic caption smoke set with production generation."""
+    with open(fixture, "r", encoding="utf-8") as fh:
+        fixture_payload = json.load(fh)
+    cases = fixture_payload.get("cases", [])
+    if not cases:
+        raise click.ClickException("Caption quality fixture has no cases")
+    missing = [
+        str(case.get("path")) for case in cases if not os.path.isfile(case["path"])
+    ]
+    if missing:
+        raise click.ClickException(
+            f"Caption quality fixture path does not exist: {missing[0]}"
+        )
+    if batch_size > JANUS_MAX_PRODUCTION_BATCH_SIZE:
+        raise click.ClickException(
+            f"Quality benchmark batch size exceeds production limit "
+            f"{JANUS_MAX_PRODUCTION_BATCH_SIZE}"
+        )
+
+    lock_fd = acquire_single_instance_lock("caption-quality", global_lock=True)
+    classifier = JanusClassifier(batch_size=batch_size)
+    captions: dict[str, Mapping[str, typing.Any]] = {}
+    metrics: list[dict[str, typing.Any]] = []
+    started_at = time.perf_counter()
+    try:
+        classifier.init_model()
+        paths = [str(case["path"]) for case in cases]
+        for batch_start in range(0, len(paths), batch_size):
+            batch_paths = paths[batch_start : batch_start + batch_size]
+            raw_results, batch_metrics = predict_caption_batch_resilient(
+                classifier, [(path, None) for path in batch_paths]
+            )
+            for position, path in enumerate(batch_paths):
+                raw = raw_results[position] if position < len(raw_results) else ""
+                metric = dict(
+                    batch_metrics[position] if position < len(batch_metrics) else {}
+                )
+                retries: list[dict[str, typing.Any]] = []
+                parsed = resolve_caption_result(
+                    classifier, path, None, raw, metric, retries
+                )
+                metric["path"] = path
+                metrics.append(metric)
+                metrics.extend({**retry, "path": path} for retry in retries)
+                if parsed is not None:
+                    captions[path] = parsed
+    finally:
+        classifier.release()
+        os.close(lock_fd)
+
+    evaluation = evaluate_caption_quality_cases(cases, captions)
+    payload = {
+        "generatedAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "fixtureVersion": fixture_payload.get("version"),
+        "pipelineVersion": caption_pipeline_version(CLASSIFIER_BACKEND_JANUS),
+        "durationMs": round((time.perf_counter() - started_at) * 1000, 2),
+        "generationMetrics": metrics,
+        **evaluation,
+    }
+    with open(output, "w", encoding="utf-8") as fh:
+        json.dump(payload, fh, indent=2)
+    log(
+        f"Caption quality: {evaluation['passedCases']}/{evaluation['totalCases']} passed; "
+        f"result written to {output}"
+    )
+    if not evaluation["passed"]:
+        failures = [
+            result["path"] for result in evaluation["cases"] if not result["passed"]
+        ]
+        raise click.ClickException(
+            f"Caption quality benchmark failed for {len(failures)} case(s): "
+            + ", ".join(failures)
+        )
+
+
+@cli.command("caption-metrics")
+@click.option("--dbpath", required=True, help="Staging SQLite database.")
+@click.option("--pipeline-version", default=None, help="Optional exact version filter.")
+@click.option("--limit", default=10, type=click.IntRange(min=1), show_default=True)
+@click.option("--output", default=None, help="Optional JSON report path.")
+def caption_metrics(
+    dbpath: str, pipeline_version: Optional[str], limit: int, output: Optional[str]
+):
+    """Summarise durable caption generation timings and failure signals."""
+    db = Sqlite3Client(dbpath, read_only=True)
+    try:
+        if not db.table_exists("caption_generation_metrics"):
+            raise click.ClickException("Database has no caption generation metrics")
+        where = "WHERE pipeline_version = ?" if pipeline_version else ""
+        params = (pipeline_version,) if pipeline_version else ()
+        rows = db.con.execute(
+            "SELECT path, pipeline_version, attempt, batch_size, max_new_tokens, "
+            "token_count, completed_with_eos, completed_with_json, completed_with_schema, "
+            "hit_token_limit, parse_success, decode_ms, processor_ms, vision_preparation_ms, "
+            "generate_batch_ms "
+            f"FROM caption_generation_metrics {where}",
+            params,
+        ).fetchall()
+        if not rows:
+            raise click.ClickException("No caption generation metrics matched")
+        generate_times = [row[14] for row in rows if row[14] is not None]
+        report = {
+            "attempts": len(rows),
+            "paths": len({row[0] for row in rows}),
+            "withoutEos": sum(row[6] == 0 for row in rows),
+            "completedWithJson": sum(row[7] == 1 for row in rows),
+            "completedWithSchema": sum(row[8] == 1 for row in rows),
+            "hitTokenLimit": sum(row[9] == 1 for row in rows),
+            "parseFailures": sum(row[10] == 0 for row in rows),
+            "medianGenerateBatchMs": (
+                round(statistics.median(generate_times), 2) if generate_times else None
+            ),
+            "slowest": [
+                {
+                    "path": row[0],
+                    "pipelineVersion": row[1],
+                    "attempt": row[2],
+                    "batchSize": row[3],
+                    "tokenCount": row[5],
+                    "generateBatchMs": row[14],
+                }
+                for row in sorted(
+                    rows,
+                    key=lambda row: row[14] if row[14] is not None else -1,
+                    reverse=True,
+                )[:limit]
+            ],
+        }
+    finally:
+        db.con.close()
+    pprint.pprint(report)
+    if output:
+        with open(output, "w", encoding="utf-8") as fh:
+            json.dump(report, fh, indent=2)
 
 
 @cli.command("benchmark-classifier")
@@ -2567,8 +4309,7 @@ def benchmark_classifier(
                 "run": run_index + 1,
                 "durationMs": round(duration_ms, 2),
                 "outputChars": len(raw_output),
-                "tagCount": len(parsed.get("identified_objects", []))
-                + len(parsed.get("themes", [])),
+                "tagCount": len(parsed.get("tags", [])),
                 "altTextLength": len(parsed.get("alt_text") or ""),
             }
         )
@@ -2693,9 +4434,8 @@ def compare_captioners(
             f"[{index_value}/{len(sampled_paths)}] comparing {os.path.basename(path)}"
         )
         baseline = baseline_db.get_image_row(path) if baseline_db else None
-        geocode = extract_geocode_from_path(path)
         started_at = time.perf_counter()
-        candidate_raw = candidate.predict(path, geocode)
+        candidate_raw = candidate.predict(path, None)
         duration_ms = (time.perf_counter() - started_at) * 1000
         try:
             candidate_parsed = parse_classifier_response(candidate_raw)
@@ -2703,10 +4443,8 @@ def compare_captioners(
             parse_error = None
         except Exception as err:
             candidate_parsed = {
-                "identified_objects": [],
-                "themes": [],
+                "tags": [],
                 "alt_text": "",
-                "subject": "",
             }
             parse_error = str(err)
         comparison = compare_caption_payloads(baseline, candidate_parsed)
@@ -2852,7 +4590,9 @@ def benchmark_embedder_batch(
     "unmounted albums directory or wrong cwd — and prune refuses to wipe the DB.",
 )
 def prune(glob: str, dbpath: str, dry_run: bool, force: bool):
-    db = Sqlite3Client(dbpath)
+    db = Sqlite3Client(dbpath, read_only=dry_run)
+    if not dry_run:
+        db.setup_tables()
     files = find_files(".", glob)
     paths = db.list_paths()
     to_delete = [p for p in paths if p not in files]
@@ -2867,20 +4607,328 @@ def prune(glob: str, dbpath: str, dry_run: bool, force: bool):
             f"{len(to_delete)} row(s) from {dbpath}. If every album really was "
             f"removed, re-run with --force."
         )
+    if paths and len(to_delete) > len(paths) * 0.1 and not force and not dry_run:
+        raise click.ClickException(
+            f"prune: would delete {len(to_delete)}/{len(paths)} indexed path(s) "
+            f"({len(to_delete) / len(paths):.0%}) — refusing a large partial prune. "
+            "Check the album mount/glob, or re-run with --force if intentional."
+        )
 
     if dry_run:
         log(f"prune: {len(to_delete)} row(s) would be deleted from {dbpath}")
         pprint.pprint(to_delete)
     else:
+        lock_fd = acquire_single_instance_lock(dbpath)
         log(f"prune: deleting {len(to_delete)} row(s) from {dbpath}")
+        db.delete_paths(to_delete)
         for p in to_delete:
-            _res = db.delete_path(p)
             pprint.pprint(f"deleted from db {p}")
         log(f"prune: deleted {len(to_delete)} row(s) from {dbpath}")
-        # prune does not call setup_tables, so the DB is still in WAL mode from
-        # __init__. Restore delete mode (WAL checkpointed) so the published copy
-        # isn't left as a bare .sqlite with pending writes in an uncopied -wal.
+        # Leave a single-file, delete-journal database ready for publication.
         db.finalize_journal_mode()
+        os.close(lock_fd)
+
+
+def validate_index_database(
+    dbpath: str,
+    glob: str,
+    model_profile: str,
+    classifier_backend: str = CLASSIFIER_BACKEND_JANUS,
+    classifier_model_id: Optional[str] = None,
+    classifier_quantization: Optional[str] = None,
+    classifier_batch_size: Optional[int] = None,
+    classifier_max_new_tokens: Optional[int] = None,
+    classifier_batch_max_new_tokens: Optional[int] = None,
+) -> dict:
+    """Validate exact source coverage and all published cross-table contracts."""
+    expected = set(find_files(".", glob))
+    if not expected:
+        raise click.ClickException(f"validate: glob {glob!r} matched 0 files")
+
+    absolute = os.path.abspath(dbpath)
+    con = sqlite3.connect(f"file:{absolute}?mode=ro", uri=True)
+    try:
+        check = con.execute("PRAGMA quick_check").fetchone()[0]
+        if check != "ok":
+            raise click.ClickException(f"validate: SQLite quick_check failed: {check}")
+
+        tables = {
+            row[0]
+            for row in con.execute(
+                "SELECT name FROM sqlite_master WHERE type = 'table'"
+            )
+        }
+        required_tables = {"pipeline_state"}
+        if model_profile in (MODEL_PROFILE_JANUS, MODEL_PROFILE_HYBRID):
+            required_tables.update({"images", "metadata", "image_tags", "tags"})
+        missing_tables = required_tables - tables
+        if missing_tables:
+            raise click.ClickException(
+                f"validate: missing table(s): {', '.join(sorted(missing_tables))}"
+            )
+
+        stages: list[tuple[str, str, Optional[str]]] = []
+        if model_profile in (MODEL_PROFILE_JANUS, MODEL_PROFILE_HYBRID):
+            images = {row[0] for row in con.execute("SELECT path FROM images")}
+            metadata = {row[0] for row in con.execute("SELECT path FROM metadata")}
+            captions = {
+                row[0]
+                for row in con.execute(
+                    "SELECT path FROM images WHERE COALESCE(tags, '') <> '' "
+                    "OR COALESCE(alt_text, '') <> '' OR COALESCE(subject, '') <> ''"
+                )
+            }
+            for label, actual in (
+                ("images", images),
+                ("metadata", metadata),
+                ("captions", captions),
+            ):
+                if actual != expected:
+                    raise click.ClickException(
+                        f"validate: {label} coverage mismatch "
+                        f"(missing={len(expected - actual)}, extra={len(actual - expected)})"
+                    )
+
+            stored_counts = dict(con.execute("SELECT tag, count FROM tags"))
+            derived_counts = dict(
+                con.execute(
+                    "SELECT tag, COUNT(DISTINCT path) FROM image_tags GROUP BY tag"
+                )
+            )
+            if stored_counts != derived_counts:
+                raise click.ClickException(
+                    "validate: tags counts do not match authoritative image_tags"
+                )
+            searchable = con.execute(
+                "SELECT tag FROM image_tags WHERE source = 'classifier' "
+                "ORDER BY tag LIMIT 1"
+            ).fetchone()
+            tag_words = re.findall(r"[A-Za-z0-9]+", searchable[0] if searchable else "")
+            smoke_term = tag_words[0] if tag_words else None
+            if not smoke_term:
+                text_row = con.execute(
+                    "SELECT COALESCE(subject, alt_text, '') FROM images "
+                    "WHERE COALESCE(subject, alt_text, '') <> '' LIMIT 1"
+                ).fetchone()
+                words = re.findall(r"[A-Za-z0-9]+", text_row[0] if text_row else "")
+                smoke_term = words[0] if words else None
+            if not smoke_term:
+                raise click.ClickException(
+                    "validate: no searchable caption term is available for the FTS smoke test"
+                )
+            smoke_count = con.execute(
+                "SELECT COUNT(*) FROM images WHERE images MATCH ?",
+                (f'- {{path album_relative_path}} : "{smoke_term}"',),
+            ).fetchone()[0]
+            if smoke_count < 1:
+                raise click.ClickException(
+                    f"validate: FTS smoke query {smoke_term!r} returned no rows"
+                )
+            stages.extend(
+                [
+                    (CORE_STAGE, CORE_PIPELINE_VERSION, None),
+                    (
+                        CAPTION_STAGE,
+                        caption_pipeline_version(
+                            classifier_backend,
+                            classifier_model_id,
+                            classifier_quantization,
+                            classifier_batch_size,
+                            classifier_max_new_tokens,
+                            classifier_batch_max_new_tokens,
+                        ),
+                        classifier_model_id
+                        or (
+                            JANUS_MODEL_ID
+                            if classifier_backend == CLASSIFIER_BACKEND_JANUS
+                            else None
+                        ),
+                    ),
+                ]
+            )
+
+        if model_profile in (MODEL_PROFILE_SIGLIP2, MODEL_PROFILE_HYBRID):
+            if "embeddings" not in tables:
+                raise click.ClickException("validate: missing table: embeddings")
+            for stage, model_id in (
+                (SIGLIP_V1_STAGE, SiglipEmbedder.MODEL_ID),
+                (SIGLIP_V2_STAGE, Siglip2Embedder.MODEL_ID),
+            ):
+                rows = con.execute(
+                    "SELECT path, embedding_dim, length(embedding_blob), embedding_scale "
+                    "FROM embeddings WHERE model_id = ?",
+                    (model_id,),
+                ).fetchall()
+                actual = {row[0] for row in rows}
+                if actual != expected:
+                    raise click.ClickException(
+                        f"validate: {model_id} coverage mismatch "
+                        f"(missing={len(expected - actual)}, extra={len(actual - expected)})"
+                    )
+                invalid = [
+                    row
+                    for row in rows
+                    if row[1] is None
+                    or row[1] <= 0
+                    or row[1] != row[2]
+                    or row[3] is None
+                    or row[3] <= 0
+                ]
+                if invalid:
+                    raise click.ClickException(
+                        f"validate: {model_id} has {len(invalid)} invalid vector row(s)"
+                    )
+                stages.append((stage, embedding_pipeline_version(model_id), model_id))
+
+        state_rows = {
+            (row[0], row[1]): (row[2], row[3], row[4])
+            for row in con.execute(
+                "SELECT path, stage, source_sha256, pipeline_version, model_id FROM pipeline_state"
+            )
+        }
+        digests = file_content_sha256_many(sorted(expected))
+        for stage, version, model_id in stages:
+            for path in expected:
+                state = state_rows.get((path, stage))
+                if state is None or state[0] != digests[path]:
+                    raise click.ClickException(
+                        f"validate: stale or missing {stage} provenance for {path}"
+                    )
+                if version and state[1] != version:
+                    raise click.ClickException(
+                        f"validate: unexpected {stage} pipeline version for {path}"
+                    )
+                if model_id and state[2] != model_id:
+                    raise click.ClickException(
+                        f"validate: unexpected {stage} model id for {path}"
+                    )
+
+        return {"paths": len(expected), "stages": len(stages), "quickCheck": check}
+    finally:
+        con.close()
+
+
+@cli.command("validate")
+@click.option("--glob", "glob_pattern", required=True, help="Source image glob.")
+@click.option("--dbpath", required=True, help="SQLite database to validate.")
+@click.option(
+    "--model-profile",
+    type=click.Choice(
+        [MODEL_PROFILE_JANUS, MODEL_PROFILE_SIGLIP2, MODEL_PROFILE_HYBRID]
+    ),
+    required=True,
+)
+@click.option(
+    "--classifier-backend",
+    type=click.Choice(
+        [
+            CLASSIFIER_BACKEND_JANUS,
+            CLASSIFIER_BACKEND_GEMMA4,
+            CLASSIFIER_BACKEND_GEMMA4_GGUF,
+        ]
+    ),
+    default=CLASSIFIER_BACKEND_JANUS,
+)
+@click.option("--classifier-model-id", default=None)
+@click.option("--classifier-quantization", default=None)
+@click.option("--classifier-batch-size", default=None, type=click.IntRange(min=1))
+@click.option("--classifier-max-new-tokens", default=None, type=click.IntRange(min=32))
+@click.option(
+    "--classifier-batch-max-new-tokens", default=None, type=click.IntRange(min=32)
+)
+def validate_command(
+    glob_pattern: str,
+    dbpath: str,
+    model_profile: str,
+    classifier_backend: str,
+    classifier_model_id: Optional[str],
+    classifier_quantization: Optional[str],
+    classifier_batch_size: Optional[int],
+    classifier_max_new_tokens: Optional[int],
+    classifier_batch_max_new_tokens: Optional[int],
+):
+    summary = validate_index_database(
+        dbpath,
+        glob_pattern,
+        model_profile,
+        classifier_backend,
+        classifier_model_id,
+        classifier_quantization,
+        classifier_batch_size,
+        classifier_max_new_tokens,
+        classifier_batch_max_new_tokens,
+    )
+    log(f"Validated {summary['paths']} path(s) across {summary['stages']} stage(s)")
+
+
+def publish_index_databases(
+    source_dbpath: str,
+    embeddings_output: str,
+    core_output: Optional[str] = None,
+) -> None:
+    """Create compact publication DBs and replace outputs only after validation."""
+    source = sqlite3.connect(f"file:{os.path.abspath(source_dbpath)}?mode=ro", uri=True)
+    outputs: list[tuple[Path, Path]] = []
+    try:
+        if core_output:
+            core_path = Path(core_output)
+            core_tmp = core_path.with_suffix(core_path.suffix + ".tmp")
+            core_tmp.unlink(missing_ok=True)
+            core = sqlite3.connect(core_tmp)
+            source.backup(core)
+            core.execute("DROP TABLE IF EXISTS embeddings")
+            for build_only_table in (
+                "file_signatures",
+                "pipeline_state",
+                "schema_migrations",
+                "image_tags",
+                "caption_generation_metrics",
+            ):
+                core.execute(f"DROP TABLE IF EXISTS {build_only_table}")
+            core.execute("VACUUM")
+            if core.execute("PRAGMA quick_check").fetchone()[0] != "ok":
+                raise click.ClickException(
+                    "publish: generated core DB failed quick_check"
+                )
+            core.close()
+            outputs.append((core_tmp, core_path))
+
+        embeddings_path = Path(embeddings_output)
+        embeddings_tmp = embeddings_path.with_suffix(embeddings_path.suffix + ".tmp")
+        embeddings_tmp.unlink(missing_ok=True)
+        embeddings = sqlite3.connect(embeddings_tmp)
+        embeddings.execute("PRAGMA page_size=4096")
+        embeddings.execute(EMBEDDINGS_TABLE_SQL)
+        rows = source.execute(
+            "SELECT path, model_id, embedding_dim, embedding_blob, embedding_scale FROM embeddings"
+        )
+        embeddings.executemany(
+            "INSERT INTO embeddings(path, model_id, embedding_dim, embedding_blob, embedding_scale) "
+            "VALUES (?, ?, ?, ?, ?)",
+            rows,
+        )
+        embeddings.commit()
+        embeddings.execute("VACUUM")
+        if embeddings.execute("PRAGMA quick_check").fetchone()[0] != "ok":
+            raise click.ClickException(
+                "publish: generated embeddings DB failed quick_check"
+            )
+        embeddings.close()
+        outputs.append((embeddings_tmp, embeddings_path))
+
+        for temporary, output in outputs:
+            temporary.replace(output)
+    finally:
+        source.close()
+
+
+@cli.command("publish")
+@click.option("--dbpath", required=True, help="Validated source database.")
+@click.option("--core-output", default=None, help="Optional core DB output path.")
+@click.option("--embeddings-output", required=True, help="Embeddings DB output path.")
+def publish_command(dbpath: str, core_output: Optional[str], embeddings_output: str):
+    publish_index_databases(dbpath, embeddings_output, core_output)
+    log("Published validated SQLite output(s)")
 
 
 @cli.command("backfill")
@@ -2892,61 +4940,65 @@ def prune(glob: str, dbpath: str, dry_run: bool, force: bool):
     help="Report what would change without writing.",
 )
 def backfill(dbpath: str, dry_run: bool):
-    """Backfill structured geo_* columns and correct legacy tag counts on an
-    existing DB without re-running the models.
+    """Backfill structured geocodes and authoritative per-image tag relations.
 
-    A DB indexed before the structured-geocode / tag off-by-one fixes stores no
-    geo_* columns and tag counts inflated by one. Both are pure CPU work: geo_*
-    derives from the GPS coordinates already in the metadata table, and the
-    counts just need the retired seed-at-1 off-by-one subtracted back out. This
-    reaches the same result as a full from-scratch re-index for those fields,
-    without the hours of GPU work re-deriving unchanged tags and embeddings.
+    This is pure CPU work. Explicit ``schema_migrations`` state makes the
+    operation idempotent even when a gallery has no geotagged photos.
+    """
+    if not dry_run:
+        lock_fd = acquire_single_instance_lock(dbpath)
+    db = Sqlite3Client(dbpath, read_only=dry_run)
 
-    Idempotent: the one-way count correction is applied only when the DB has not
-    already been backfilled (detected by geo_* being populated), which also
-    leaves a fresh, already-correct index untouched."""
-    db = Sqlite3Client(dbpath)
-
-    # Detect prior backfill / fresh-index state WITHOUT mutating, so --dry-run is
-    # truly read-only. Populated geo_* means either an already-backfilled DB or a
-    # fresh index — both have correct counts, so the count fix must be skipped.
-    has_geo_column = (
+    # Explicit migration state is reliable for galleries with no GPS rows and
+    # for partially populated databases; data presence is not a migration marker.
+    already_backfilled = db.table_exists("schema_migrations") and bool(
         db.con.execute(
-            "SELECT count(*) FROM pragma_table_info('metadata') "
-            "WHERE name = 'geo_country'"
-        ).fetchone()[0]
-        > 0
-    )
-    already_backfilled = has_geo_column and bool(
-        db.con.execute(
-            "SELECT EXISTS(SELECT 1 FROM metadata WHERE geo_country IS NOT NULL)"
-        ).fetchone()[0]
+            "SELECT 1 FROM schema_migrations WHERE version = ?",
+            (STRUCTURED_GEOCODE_MIGRATION,),
+        ).fetchone()
     )
 
     rows = db.con.execute("SELECT path, lat_deg, lng_deg FROM metadata").fetchall()
+    image_rows = db.con.execute("SELECT path, tags FROM images").fetchall()
     geocodable = sum(1 for _, lat, lng in rows if lat is not None and lng is not None)
 
     if dry_run:
-        action = "skip (already backfilled)" if already_backfilled else "correct"
         log(
             f"backfill (dry run): would geocode {geocodable}/{len(rows)} row(s), "
-            f"tag counts: {action}, in {dbpath}"
+            f"migration: {'skip (already applied)' if already_backfilled else 'apply'}, "
+            f"in {dbpath}"
         )
         return
 
     db.setup_tables()  # adds geo_* columns / file_signatures table if missing
 
-    with db.transaction() as cur:
-        for path, lat_deg, lng_deg in rows:
-            if lat_deg is None or lng_deg is None:
-                continue
-            geo = geocode_columns(get_image_geocode(lat_deg, lng_deg))
-            db.update_geocode_columns(path, geo, cur=cur)
-
-    corrected = False
     if not already_backfilled:
-        db.correct_legacy_tag_counts()
-        corrected = True
+        with db.transaction() as cur:
+            for path, tags_blob in image_rows:
+                db.replace_tags_for_source(
+                    path, split_tag_text(tags_blob), "classifier", cur
+                )
+            for path, lat_deg, lng_deg in rows:
+                if lat_deg is None or lng_deg is None:
+                    continue
+                full_geo = get_image_geocode(lat_deg, lng_deg)
+                db.update_geocode_columns(path, geocode_columns(full_geo), cur=cur)
+                db.replace_tags_for_source(
+                    path,
+                    [
+                        value
+                        for value in (
+                            full_geo.get("country"),
+                            full_geo.get("city"),
+                            full_geo.get("country_code"),
+                        )
+                        if value
+                    ],
+                    "geocode",
+                    cur,
+                )
+            db.rebuild_tag_counts(cur)
+            db.mark_migration(STRUCTURED_GEOCODE_MIGRATION, cur)
 
     # Match prune/index: leave the published copy in delete journal mode with no
     # dangling -wal, so a straight file copy ships a consistent DB.
@@ -2954,9 +5006,10 @@ def backfill(dbpath: str, dry_run: bool):
 
     log(
         f"backfill: {geocodable}/{len(rows)} row(s) geocoded, tag counts "
-        f"{'corrected' if corrected else 'left as-is (already backfilled)'}, "
+        f"{'rebuilt from image_tags' if not already_backfilled else 'left as-is (already backfilled)'}, "
         f"in {dbpath}"
     )
+    os.close(lock_fd)
 
 
 @cli.command("update-gps")
@@ -2985,17 +5038,26 @@ def update_gps(dbpath: str, match: Optional[str], dry_run: bool):
     relative to the index/ working directory exactly as at index time. This is
     pure CPU work — the same result a full re-index would produce for these
     fields, without the hours of GPU re-derivation of unchanged tags/embeddings.
-    Photos without GPS are left untouched; the geo tag-count table is not altered
-    (mirroring ``backfill``)."""
-    db = Sqlite3Client(dbpath)
-    db.setup_tables()
+    Photos whose GPS was removed have stale coordinates, searchable geocode, and
+    geocode tags cleared."""
+    if not dry_run:
+        lock_fd = acquire_single_instance_lock(dbpath)
+    db = Sqlite3Client(dbpath, read_only=dry_run)
+    if not dry_run:
+        db.setup_tables()
 
     paths = [p for p in db.list_image_paths() if match is None or match in p]
+    caption_paths = db.list_caption_paths()
+    embedding_paths = {
+        SiglipEmbedder.MODEL_ID: db.list_embedding_paths(SiglipEmbedder.MODEL_ID),
+        Siglip2Embedder.MODEL_ID: db.list_embedding_paths(Siglip2Embedder.MODEL_ID),
+    }
 
     geotagged = 0
     updated = 0
     missing = 0
     with db.transaction() as cur:
+        tags_changed = False
         for path in paths:
             if not os.path.exists(path):
                 missing += 1
@@ -3030,10 +5092,8 @@ def update_gps(dbpath: str, match: Optional[str], dry_run: bool):
                     lng_deg = None
                     geo = {}
 
-            # Nothing to refresh for a photo without usable GPS — leave its row as-is.
-            if lat_deg is None or lng_deg is None:
-                continue
-            geotagged += 1
+            if lat_deg is not None and lng_deg is not None:
+                geotagged += 1
 
             iso8601_local = (
                 str(exif_full.get("EXIF DateTimeOriginal", ""))
@@ -3050,10 +5110,61 @@ def update_gps(dbpath: str, match: Optional[str], dry_run: bool):
             )
             if blob is not None:
                 db.upsert_image_fields(path, {"geocode": blob}, cur=cur)
+            else:
+                db.upsert_image_fields(path, {"geocode": None}, cur=cur)
+            db.replace_tags_for_source(
+                path,
+                [
+                    value
+                    for value in (
+                        geo.get("country"),
+                        geo.get("city"),
+                        geo.get("country_code"),
+                    )
+                    if value
+                ],
+                "geocode",
+                cur,
+            )
+            tags_changed = True
+            digest = file_content_sha256(path)
+            if digest is not None:
+                db.upsert_pipeline_state(
+                    path,
+                    CORE_STAGE,
+                    digest,
+                    CORE_PIPELINE_VERSION,
+                    cur=cur,
+                )
+                if path in caption_paths:
+                    db.upsert_pipeline_state(
+                        path,
+                        CAPTION_STAGE,
+                        digest,
+                        caption_pipeline_version(CLASSIFIER_BACKEND_JANUS),
+                        JANUS_MODEL_ID,
+                        cur,
+                    )
+                for stage, model_id in (
+                    (SIGLIP_V1_STAGE, SiglipEmbedder.MODEL_ID),
+                    (SIGLIP_V2_STAGE, Siglip2Embedder.MODEL_ID),
+                ):
+                    if path in embedding_paths[model_id]:
+                        db.upsert_pipeline_state(
+                            path,
+                            stage,
+                            digest,
+                            embedding_pipeline_version(model_id),
+                            model_id,
+                            cur,
+                        )
             sig = file_signature(path)
             if sig is not None:
                 db.upsert_file_signature(path, sig[0], sig[1], cur=cur)
             updated += 1
+
+        if tags_changed:
+            db.rebuild_tag_counts(cur)
 
     if not dry_run:
         # Match prune/index: leave the published copy in delete journal mode with
@@ -3062,9 +5173,11 @@ def update_gps(dbpath: str, match: Optional[str], dry_run: bool):
 
     log(
         f"update-gps: {'would refresh' if dry_run else 'refreshed'} "
-        f"{geotagged if dry_run else updated} geotagged of {len(paths)} indexed "
-        f"path(s) (match={match!r}), {missing} missing, in {dbpath}"
+        f"{len(paths) - missing if dry_run else updated} path(s), "
+        f"{geotagged} with GPS, {missing} missing (match={match!r}), in {dbpath}"
     )
+    if not dry_run:
+        os.close(lock_fd)
 
 
 @cli.command("search")
@@ -3080,8 +5193,7 @@ def update_gps(dbpath: str, match: Optional[str], dry_run: bool):
     "instead of silently returning nothing.",
 )
 def search(dbpath: str, query: str, limit: Optional[int], min_results: int):
-    db = Sqlite3Client(dbpath)
-    db.setup_tables()
+    db = Sqlite3Client(dbpath, read_only=True)
     results = db.search(query, limit)
     pprint.pprint(results)
     if len(results) < min_results:
@@ -3096,8 +5208,7 @@ def search(dbpath: str, query: str, limit: Optional[int], min_results: int):
 @click.option("--query", default="", help="Search query.")
 @click.option("--limit", default=None, help="Search query limit.")
 def search_tags(dbpath: str, query: str, limit: Optional[int]):
-    db = Sqlite3Client(dbpath)
-    db.setup_tables()
+    db = Sqlite3Client(dbpath, read_only=True)
     results = db.search_tags(query, limit)
     pprint.pprint(results)
 
@@ -3107,8 +5218,7 @@ def search_tags(dbpath: str, query: str, limit: Optional[int]):
 @click.option("--query", default="", help="Search query.")
 @click.option("--limit", default=None, help="Search query limit.")
 def search_metadata(dbpath: str, query: str, limit: Optional[int]):
-    db = Sqlite3Client(dbpath)
-    db.setup_tables()
+    db = Sqlite3Client(dbpath, read_only=True)
     results = db.search_metadata(query, limit)
     pprint.pprint(results)
 
@@ -3116,8 +5226,7 @@ def search_metadata(dbpath: str, query: str, limit: Optional[int]):
 @cli.command("dump")
 @click.option("--dbpath", default="testdb.sqlite", help="sqlite database path to use.")
 def dump(dbpath: str):
-    db = Sqlite3Client(dbpath)
-    db.setup_tables()
+    db = Sqlite3Client(dbpath, read_only=True)
     results = db.inspect()
     pprint.pprint(results)
 
@@ -3145,8 +5254,7 @@ def cosine_similarity(a: list[float], b: list[float]) -> float:
 def search_similar_path(
     dbpath: str, query_path: str, limit: int, model_id: Optional[str]
 ):
-    db = Sqlite3Client(dbpath)
-    db.setup_tables()
+    db = Sqlite3Client(dbpath, read_only=True)
 
     base = db.get_embedding(path=query_path, model_id=model_id)
     if not base:
@@ -3184,6 +5292,10 @@ def model_info():
                     Siglip2Embedder.MODEL_ID,
                 ],
                 "embeddingModelId": Siglip2Embedder.MODEL_ID,
+                "embeddingModelRevisions": {
+                    SiglipEmbedder.MODEL_ID: SiglipEmbedder.MODEL_REVISION,
+                    Siglip2Embedder.MODEL_ID: Siglip2Embedder.MODEL_REVISION,
+                },
             }
         )
     )
@@ -3265,6 +5377,77 @@ def build_geocode_fields(
     return blob, geocode_columns(geocode)
 
 
+def file_content_sha256(path: str) -> Optional[str]:
+    """Return a stable content fingerprint, or ``None`` when the file is unreadable.
+
+    Stage freshness is based on bytes rather than timestamps: photo-management
+    tools can preserve both mtime and size while replacing an image.
+    """
+    digest = hashlib.sha256()
+    try:
+        with open(path, "rb") as fh:
+            for chunk in iter(lambda: fh.read(1024 * 1024), b""):
+                digest.update(chunk)
+    except OSError:
+        return None
+    return digest.hexdigest()
+
+
+def file_content_sha256_many(
+    paths: typing.Iterable[str], workers: int = FILE_HASH_WORKERS
+) -> dict[str, Optional[str]]:
+    """Fingerprint paths concurrently while preserving deterministic path mapping."""
+    resolved_paths = list(paths)
+    if workers <= 1 or len(resolved_paths) <= 1:
+        return {path: file_content_sha256(path) for path in resolved_paths}
+    with concurrent.futures.ThreadPoolExecutor(
+        max_workers=min(workers, len(resolved_paths))
+    ) as executor:
+        digests = executor.map(file_content_sha256, resolved_paths)
+        return dict(zip(resolved_paths, digests))
+
+
+def caption_pipeline_version(
+    backend: str,
+    model_id: Optional[str] = None,
+    quantization: Optional[str] = None,
+    batch_size: Optional[int] = None,
+    max_new_tokens: Optional[int] = None,
+    batch_max_new_tokens: Optional[int] = None,
+) -> str:
+    resolved_model = model_id or (
+        JANUS_MODEL_ID if backend == CLASSIFIER_BACKEND_JANUS else "default"
+    )
+    revision = (
+        JANUS_MODEL_REVISION if backend == CLASSIFIER_BACKEND_JANUS else "external"
+    )
+    prompt_digest = hashlib.sha256(
+        (build_classifier_prompt(None)).encode("utf-8")
+    ).hexdigest()[:12]
+    non_default_generation = ""
+    if batch_size is not None and batch_size != JANUS_BATCH_SIZE:
+        non_default_generation += f":batch={batch_size}"
+    resolved_single_tokens = max_new_tokens or JANUS_MAX_NEW_TOKENS
+    resolved_batch_tokens = batch_max_new_tokens or JANUS_BATCH_MAX_NEW_TOKENS
+    non_default_generation += (
+        f":batchTokens={resolved_batch_tokens}:singleTokens={resolved_single_tokens}"
+        ":jsonStop=v2"
+    )
+    return (
+        f"{CAPTION_PROMPT_VERSION}-{prompt_digest}:{backend}:"
+        f"{resolved_model}@{revision}:"
+        f"{quantization or 'default'}{non_default_generation}"
+    )
+
+
+def embedding_pipeline_version(model_id: str) -> str:
+    revisions = {
+        SiglipEmbedder.MODEL_ID: SIGLIP_V1_MODEL_REVISION,
+        Siglip2Embedder.MODEL_ID: SIGLIP_V2_MODEL_REVISION,
+    }
+    return f"image-embedding-v1:{model_id}@{revisions.get(model_id, 'external')}"
+
+
 def file_signature(path: str) -> Optional[Tuple[float, int]]:
     """Cheap change-detection fingerprint: (mtime, size). Returns None if the
     file can't be stat'd. mtime is rounded to milliseconds so sub-ms float
@@ -3324,9 +5507,22 @@ def find_files(directory: str, pattern: str) -> list[str]:
 
     paths: list[str] = []
     seen: set[str] = set()
+    include_test_albums = (
+        os.environ.get("ALBUM_INCLUDE_TEST_ALBUMS") == "1" or "test-" in pattern
+    )
+
+    def is_test_album_path(path: Path) -> bool:
+        parts = path.parts
+        for index, part in enumerate(parts[:-1]):
+            if part == "albums" and index + 1 < len(parts):
+                return parts[index + 1].startswith("test-")
+        return False
+
     for pat in patterns:
         path_pattern = os.path.join(directory, pat)
         for p in Path(directory).glob(path_pattern, case_sensitive=False):
+            if not include_test_albums and is_test_album_path(p):
+                continue
             resolved = str(p)
             if resolved not in seen:
                 seen.add(resolved)
@@ -3334,7 +5530,7 @@ def find_files(directory: str, pattern: str) -> list[str]:
 
     if len(paths) == 0 and Path(pattern).exists():
         return [str(Path(pattern))]
-    return paths
+    return sorted(paths)
 
 
 def sample_balanced_paths(
@@ -3379,14 +5575,12 @@ def compare_caption_payloads(
     candidate: Mapping[str, typing.Any],
 ) -> dict[str, typing.Any]:
     baseline_tags = split_tag_text((baseline or {}).get("tags"))
-    candidate_tags = list(candidate.get("identified_objects") or []) + list(
-        candidate.get("themes") or []
-    )
+    candidate_tags = normalise_classifier_tags(candidate)
 
     baseline_alt = (baseline or {}).get("alt_text") or ""
     candidate_alt = candidate.get("alt_text") or ""
     baseline_subject = (baseline or {}).get("subject") or ""
-    candidate_subject = candidate.get("subject") or ""
+    candidate_subject = candidate_tags[0] if candidate_tags else ""
 
     shared_tags = sorted(set(baseline_tags).intersection(candidate_tags))
     added_tags = sorted(set(candidate_tags) - set(baseline_tags))
@@ -3453,6 +5647,52 @@ def compare_caption_payloads(
     }
 
 
+def evaluate_caption_quality_cases(
+    cases: list[Mapping[str, typing.Any]],
+    captions: Mapping[str, Mapping[str, typing.Any]],
+) -> dict[str, typing.Any]:
+    """Evaluate frozen, human-reviewed concepts against structured captions."""
+    results = []
+    for case in cases:
+        path = str(case["path"])
+        caption = captions.get(path)
+        if caption is None:
+            results.append({**case, "passed": False, "reasons": ["no_caption"]})
+            continue
+        searchable = " ".join(
+            [
+                *[str(value) for value in caption.get("tags", [])],
+                str(caption.get("alt_text", "")),
+            ]
+        ).casefold()
+        required = [str(value).casefold() for value in case.get("requiredAny", [])]
+        forbidden = [str(value).casefold() for value in case.get("forbidden", [])]
+        reasons = []
+        matched_required = [value for value in required if value in searchable]
+        matched_forbidden = [value for value in forbidden if value in searchable]
+        if required and not matched_required:
+            reasons.append("missing_required_concept")
+        if matched_forbidden:
+            reasons.append("forbidden_concept")
+        results.append(
+            {
+                **case,
+                "passed": not reasons,
+                "reasons": reasons,
+                "matchedRequired": matched_required,
+                "matchedForbidden": matched_forbidden,
+                "caption": caption,
+            }
+        )
+    passed = sum(bool(result["passed"]) for result in results)
+    return {
+        "passed": passed == len(results),
+        "passedCases": passed,
+        "totalCases": len(results),
+        "cases": results,
+    }
+
+
 def build_ab_report_markdown(
     summary: Mapping[str, typing.Any], rows: list[Mapping[str, typing.Any]]
 ) -> str:
@@ -3510,30 +5750,10 @@ def build_ab_report_markdown(
     return "\n".join(lines)
 
 
-def extract_geocode_from_path(path: str) -> Mapping:
-    """Extract geocode from image EXIF. Used to supply location context before batching Janus."""
-    try:
-        with open(path, "rb") as fh:
-            exif_full = get_exif(fh)
-            exif = filter_exif_for_search(
-                {k: v for k, v in exif_full.items() if not isinstance(v, bytes)}
-            )
-        lat = exif.get("GPS GPSLatitude")
-        lng = exif.get("GPS GPSLongitude")
-        lat_ref = exif.get("GPS GPSLatitudeRef")
-        lng_ref = exif.get("GPS GPSLongitudeRef")
-        if lat and lng and lat_ref and lng_ref:
-            lat_deg = convert_to_degress(lat, lat_ref)
-            lng_deg = convert_to_degress(lng, lng_ref)
-            return get_image_geocode(lat_deg, lng_deg)
-    except Exception:
-        pass
-    return {}
-
-
 def analyse_image(
     fh: IO[bytes],
     path: str,
+    needs_core: bool = True,
     needs_classifier: bool = False,
     precomputed_caption: Optional[Mapping] = None,
     precomputed_embeddings: Optional[dict[str, list[float]]] = None,
@@ -3541,9 +5761,13 @@ def analyse_image(
 ) -> Mapping:
     start_time = time.perf_counter()
 
-    exif_full = get_exif(fh)
-    exif = filter_exif_for_search(
-        {k: v for k, v in exif_full.items() if not isinstance(v, bytes)}
+    exif_full = get_exif(fh) if needs_core else {}
+    exif = (
+        filter_exif_for_search(
+            {k: v for k, v in exif_full.items() if not isinstance(v, bytes)}
+        )
+        if needs_core
+        else {}
     )
 
     lat = exif.get("GPS GPSLatitude", None)
@@ -3575,11 +5799,13 @@ def analyse_image(
         lng_deg = None
         geo = {}
 
-    colors = (
-        precomputed_colors
-        if precomputed_colors is not None
-        else fast_colorthief.get_palette(path)
-    )
+    colors = []
+    if needs_core:
+        colors = (
+            precomputed_colors
+            if precomputed_colors is not None
+            else extract_colour_palette(path)
+        )
 
     # Captions are parsed (with model retry) during the Janus pass while the model
     # is still resident; here we only consume the precomputed parsed result. The
@@ -3612,8 +5838,7 @@ def analyse_image(
         .replace(" ", "T", 1)
     )
 
-    tags = [] + result.get("identified_objects", []) + result.get("themes", [])
-    normalised_tags = [t.lower().replace(" ", "_") for t in list(set(tags))]
+    normalised_tags = normalise_classifier_tags(result)
 
     end_time = time.perf_counter()
 
@@ -3628,7 +5853,7 @@ def analyse_image(
         "colors": colors,
         "tags": normalised_tags,
         "alt_text": result.get("alt_text"),
-        "subject": result.get("subject"),
+        "subject": None,
         "embeddings": embeddings,
         "_duration": end_time - start_time,
     }
@@ -3638,10 +5863,15 @@ def analyse_image_worker(
     input: Tuple[
         int,
         str,
+        str,
+        Optional[str],
+        bool,
+        bool,
         bool,
         Optional[Mapping],
         Optional[dict],
         Optional[list],
+        str,
     ],
 ) -> Mapping[str, typing.Any]:
     """Assemble one image's record from precomputed pass outputs (no live models).
@@ -3651,16 +5881,22 @@ def analyse_image_worker(
     try:
         idx = input[0]
         path = input[1]
-        needs_classifier = input[2]
-        precomputed_caption = input[3] if len(input) > 3 else None
-        precomputed_embeddings = input[4] if len(input) > 4 else None
-        precomputed_colors = input[5] if len(input) > 5 else None
+        needs_core = input[2]
+        needs_classifier = input[3]
+        precomputed_caption = input[4] if len(input) > 4 else None
+        precomputed_embeddings = input[5] if len(input) > 5 else None
+        precomputed_colors = input[6] if len(input) > 6 else None
+        source_sha256 = input[7] if len(input) > 7 else ""
+        caption_version = input[8] if len(input) > 8 else ""
+        caption_model_id = input[9] if len(input) > 9 else None
+        core_complete = input[10] if len(input) > 10 else True
 
         print(f"[{idx + 1}] {os.path.basename(path)}...")
         with open(path, "rb") as fh:
             analysed = analyse_image(
                 fh,
                 path=path,
+                needs_core=needs_core,
                 needs_classifier=needs_classifier,
                 precomputed_caption=precomputed_caption,
                 precomputed_embeddings=precomputed_embeddings,
@@ -3669,72 +5905,19 @@ def analyse_image_worker(
             return {
                 "path": path,
                 "analysed": analysed,
-                "used_classifier": needs_classifier,
+                "write_core": needs_core,
+                "write_caption": needs_classifier and precomputed_caption is not None,
+                "caption_failed": needs_classifier and precomputed_caption is None,
+                "source_sha256": source_sha256,
+                "caption_version": caption_version,
+                "caption_model_id": caption_model_id,
+                "core_complete": core_complete,
             }
     except (KeyboardInterrupt, SystemExit):
         # Re-raise so Ctrl-C / SIGINT actually terminates the run. The old code
         # swallowed it and returned a malformed tuple, which both masked the
         # interrupt and crashed the downstream consumer.
         raise
-
-
-def insert_analysed_image(
-    db, analysed: Mapping, path, include_classifier_fields: bool = True
-):
-    geocode = analysed.get("geocode")
-    geocode_blob, geocode_structured = build_geocode_fields(geocode)
-    image_fields = {
-        "filename": get_filename(path),
-        "album_relative_path": get_album_relative_path(path),
-        "exif": format_mapping(analysed.get("exif")),
-        "colors": format_mapping(analysed.get("colors")),
-    }
-
-    if geocode_blob:
-        image_fields["geocode"] = geocode_blob
-
-    if include_classifier_fields:
-        image_fields["alt_text"] = analysed.get("alt_text")
-        image_fields["subject"] = analysed.get("subject")
-        image_fields["tags"] = ", ".join(analysed.get("tags"))
-
-    with db.transaction() as cur:
-        db.upsert_image_fields(path, image_fields, cur=cur)
-
-        signature = file_signature(path)
-        if signature is not None:
-            db.upsert_file_signature(path, signature[0], signature[1], cur=cur)
-
-        if include_classifier_fields:
-            tags_to_insert = list(analysed.get("tags") or [])
-            if geocode:
-                tags_to_insert.extend(
-                    [
-                        geocode.get("country"),
-                        geocode.get("city"),
-                        geocode.get("country_code"),
-                    ]
-                )
-            db.insert_tags(tags_to_insert, cur=cur)
-
-        db.insert_metadata(
-            path,
-            lat_lng_deg=(
-                analysed.get("lat_deg"),
-                analysed.get("lng_deg"),
-            ),
-            iso8601=analysed.get("iso8601"),
-            geocode=geocode_structured,
-            cur=cur,
-        )
-
-        for emb in analysed.get("embeddings") or []:
-            db.insert_embedding(
-                path=path,
-                model_id=emb["model_id"],
-                embedding=emb["embedding"],
-                cur=cur,
-            )
 
 
 def insert_analysed_images_batch(db, results: list[Mapping]):
@@ -3744,51 +5927,87 @@ def insert_analysed_images_batch(db, results: list[Mapping]):
     transaction eliminates that overhead (~63x faster than one txn per image).
     """
     with db.transaction() as cur:
+        tags_changed = False
         for item in results:
             path = item["path"]
             analysed = item["analysed"]
-            include_classifier_fields = item.get("used_classifier", False)
+            write_core = item.get("write_core", True)
+            write_caption = item.get(
+                "write_caption", item.get("used_classifier", False)
+            )
+            source_sha256 = item.get("source_sha256") or ""
 
             geocode = analysed.get("geocode")
             geocode_blob, geocode_structured = build_geocode_fields(geocode)
-            image_fields = {
-                "filename": get_filename(path),
-                "album_relative_path": get_album_relative_path(path),
-                "exif": format_mapping(analysed.get("exif")),
-                "colors": format_mapping(analysed.get("colors")),
-            }
-            if geocode_blob:
-                image_fields["geocode"] = geocode_blob
-            if include_classifier_fields:
+            image_fields = {}
+            if write_core:
+                image_fields.update(
+                    {
+                        "filename": get_filename(path),
+                        "album_relative_path": get_album_relative_path(path),
+                        "exif": format_mapping(analysed.get("exif")),
+                        "colors": format_mapping(analysed.get("colors")),
+                        # Explicitly clear a removed GPS value rather than leaving
+                        # the previous searchable location behind.
+                        "geocode": geocode_blob,
+                    }
+                )
+            if write_caption:
                 image_fields["alt_text"] = analysed.get("alt_text")
-                image_fields["subject"] = analysed.get("subject")
+                image_fields["subject"] = None
                 image_fields["tags"] = ", ".join(analysed.get("tags"))
 
-            db.upsert_image_fields(path, image_fields, cur=cur)
+            if image_fields:
+                db.upsert_image_fields(path, image_fields, cur=cur)
 
-            signature = file_signature(path)
-            if signature is not None:
-                db.upsert_file_signature(path, signature[0], signature[1], cur=cur)
+            if write_caption:
+                db.replace_tags_for_source(
+                    path,
+                    analysed.get("tags") or [],
+                    "classifier",
+                    cur,
+                )
+                tags_changed = True
+                if source_sha256:
+                    db.upsert_pipeline_state(
+                        path,
+                        CAPTION_STAGE,
+                        source_sha256,
+                        item.get("caption_version")
+                        or caption_pipeline_version(CLASSIFIER_BACKEND_JANUS),
+                        item.get("caption_model_id"),
+                        cur,
+                    )
 
-            if include_classifier_fields:
-                tags_to_insert = list(analysed.get("tags") or [])
+            if write_core:
+                geocode_tags = []
                 if geocode:
-                    tags_to_insert.extend(
-                        [
+                    geocode_tags = [
+                        value
+                        for value in (
                             geocode.get("country"),
                             geocode.get("city"),
                             geocode.get("country_code"),
-                        ]
+                        )
+                        if value
+                    ]
+                db.replace_tags_for_source(path, geocode_tags, "geocode", cur)
+                tags_changed = True
+                db.insert_metadata(
+                    path,
+                    lat_lng_deg=(analysed.get("lat_deg"), analysed.get("lng_deg")),
+                    iso8601=analysed.get("iso8601"),
+                    geocode=geocode_structured,
+                    cur=cur,
+                )
+                if source_sha256 and item.get("core_complete", True):
+                    db.upsert_pipeline_state(
+                        path,
+                        CORE_STAGE,
+                        source_sha256,
+                        CORE_PIPELINE_VERSION,
+                        cur=cur,
                     )
-                db.insert_tags(tags_to_insert, cur=cur)
-
-            db.insert_metadata(
-                path,
-                lat_lng_deg=(analysed.get("lat_deg"), analysed.get("lng_deg")),
-                iso8601=analysed.get("iso8601"),
-                geocode=geocode_structured,
-                cur=cur,
-            )
 
             for emb in analysed.get("embeddings") or []:
                 db.insert_embedding(
@@ -3797,6 +6016,23 @@ def insert_analysed_images_batch(db, results: list[Mapping]):
                     embedding=emb["embedding"],
                     cur=cur,
                 )
+                if source_sha256:
+                    stage = (
+                        SIGLIP_V1_STAGE
+                        if emb["model_id"] == SiglipEmbedder.MODEL_ID
+                        else SIGLIP_V2_STAGE
+                    )
+                    db.upsert_pipeline_state(
+                        path,
+                        stage,
+                        source_sha256,
+                        embedding_pipeline_version(emb["model_id"]),
+                        emb["model_id"],
+                        cur,
+                    )
+
+        if tags_changed:
+            db.rebuild_tag_counts(cur)
 
 
 if __name__ == "__main__":

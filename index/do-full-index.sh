@@ -1,85 +1,40 @@
-#!/bin/bash
-set -euox pipefail
+#!/usr/bin/env bash
+set -euo pipefail
 
 cd "$(dirname "$0")"
 
-uv run --extra inference index.py index --glob "../albums/**/*.jpg" --dbpath "search.sqlite" --model-profile hybrid
-uv run --extra inference index.py prune --glob "../albums/**/*.jpg" --dbpath "search.sqlite"
-# Smoke test: search must return results for the most common indexed tag
-# (whatever it currently is — guaranteed present), so a structurally broken FTS
-# index fails the build instead of silently publishing. A fixed query like
-# "burger" matched nothing here, and a 0-result query can't tell a working
-# search apart from a broken one.
-smoke_term=$(sqlite3 search.sqlite "SELECT tag FROM tags ORDER BY count DESC LIMIT 1;")
-uv run --extra inference index.py search --query "$smoke_term" --dbpath "search.sqlite" --min-results 1
-sqlite3 search.sqlite "VACUUM;"
-uv run --extra inference python - <<'PY'
-import shutil
-import sqlite3
-from pathlib import Path
+SOURCE_DB="search.sqlite"
+STAGING_DB="search.staging.sqlite"
+CORE_OUTPUT="../src/public/search.sqlite"
+EMBEDDINGS_OUTPUT="../src/public/search-embeddings.sqlite"
+GLOB="../albums/**/*.jpg"
 
-source_db = Path("search.sqlite")
-core_output = Path("../src/public/search.sqlite")
-embeddings_output = Path("../src/public/search-embeddings.sqlite")
+exec 9>"/tmp/photo-gallery-index-workflow.lock"
+if ! flock -n 9; then
+  echo "Another full indexing workflow is already running." >&2
+  exit 1
+fi
 
-tmp_core = core_output.with_suffix(core_output.suffix + ".tmp")
-tmp_embeddings = embeddings_output.with_suffix(embeddings_output.suffix + ".tmp")
+if [[ -f "$STAGING_DB" ]]; then
+  echo "Resuming existing staging database: $STAGING_DB"
+elif [[ -f "$SOURCE_DB" ]]; then
+  cp "$SOURCE_DB" "$STAGING_DB"
+fi
 
-if tmp_core.exists():
-    tmp_core.unlink()
-if tmp_embeddings.exists():
-    tmp_embeddings.unlink()
+uv run --extra inference python index.py index \
+  --glob "$GLOB" \
+  --dbpath "$STAGING_DB" \
+  --model-profile hybrid
+uv run python index.py prune --glob "$GLOB" --dbpath "$STAGING_DB"
+uv run python index.py validate \
+  --glob "$GLOB" \
+  --dbpath "$STAGING_DB" \
+  --model-profile hybrid
 
-shutil.copy2(source_db, tmp_core)
+uv run python index.py publish \
+  --dbpath "$STAGING_DB" \
+  --core-output "$CORE_OUTPUT" \
+  --embeddings-output "$EMBEDDINGS_OUTPUT"
 
-core = sqlite3.connect(tmp_core)
-core.execute("DROP TABLE IF EXISTS embeddings")
-core.commit()
-core.execute("VACUUM")
-core.commit()
-core.close()
-
-source = sqlite3.connect(source_db)
-embeddings = sqlite3.connect(tmp_embeddings)
-# 4096-byte pages (the SQLite default) — set explicitly to document the departure
-# from the legacy 1024-byte pages, which only paid off for sql.js-httpvfs range
-# reads; the browser now downloads the DB in full.
-embeddings.execute("PRAGMA page_size=4096")
-embeddings.execute(
-    "CREATE TABLE embeddings (path VARCHAR NOT NULL, model_id TEXT NOT NULL, embedding_dim INTEGER, embedding_blob BLOB, embedding_scale REAL, PRIMARY KEY(path, model_id))"
-)
-embeddings.execute("CREATE INDEX IF NOT EXISTS idx_embeddings_path ON embeddings(path)")
-rows = source.execute(
-    "SELECT path, model_id, embedding_dim, embedding_blob, embedding_scale FROM embeddings"
-).fetchall()
-
-existing_rows = 0
-if embeddings_output.exists():
-    existing = sqlite3.connect(embeddings_output)
-    try:
-        existing_rows = existing.execute("SELECT COUNT(*) FROM embeddings").fetchone()[0]
-    except sqlite3.Error:
-        existing_rows = 0
-    finally:
-        existing.close()
-
-new_rows = len(rows)
-if existing_rows > 0 and new_rows < int(existing_rows * 0.9):
-    raise SystemExit(
-        f"Refusing to replace {embeddings_output}: new embeddings row count {new_rows} is much smaller than existing {existing_rows}."
-    )
-
-embeddings.executemany(
-    "INSERT INTO embeddings (path, model_id, embedding_dim, embedding_blob, embedding_scale) VALUES (?, ?, ?, ?, ?)",
-    rows,
-)
-embeddings.commit()
-embeddings.execute("VACUUM")
-embeddings.commit()
-
-source.close()
-embeddings.close()
-
-tmp_core.replace(core_output)
-tmp_embeddings.replace(embeddings_output)
-PY
+mv "$STAGING_DB" "$SOURCE_DB"
+rm -f "$STAGING_DB-wal" "$STAGING_DB-shm"
