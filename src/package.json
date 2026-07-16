@@ -20,7 +20,7 @@
     "prepare:pwa-icons": "node ./bin/prepare-pwa-icons.cjs",
     "prepare:vendor-css": "node ./bin/prepare-maplibre-css.cjs",
     "prepare:e2e-fixtures": "node ./bin/create-e2e-search-db.cjs --output ./public/e2e-search.sqlite --embeddings-output ./public/e2e-search-embeddings.sqlite --force",
-    "build:prepare": "npm run typecheck && npm run cleanup:media-cache && npm run prepare:build-manifest && npm run prepare:feeds && npm run prepare:pwa-icons && npm run prepare:vendor-css",
+    "build:prepare": "npm run prepare:build-manifest && npm run typecheck && npm run cleanup:media-cache && npm run prepare:feeds && npm run prepare:pwa-icons && npm run prepare:vendor-css",
     "build:e2e": "npm run prepare:e2e-fixtures && npm run build:prepare && NEXT_DIST_DIR=.next-e2e NEXT_PUBLIC_SEARCH_DATABASE_URL=/e2e-search.sqlite NEXT_PUBLIC_SEARCH_EMBEDDINGS_DATABASE_URL=/e2e-search-embeddings.sqlite ALBUM_INCLUDE_TEST_ALBUMS=1 ALBUM_SKIP_NEXT_TYPECHECK=1 next build && echo 'build done'",
     "build": "npm run build:prepare && ALBUM_SKIP_NEXT_TYPECHECK=1 next build && echo 'build done'",
     "build:profile": "npm run build:prepare && ALBUM_BUILD_PROFILE=1 ALBUM_SKIP_NEXT_TYPECHECK=1 next build && echo 'build done'",

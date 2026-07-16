@@ -16,7 +16,9 @@ type InstallEvent = {
   waitUntil: (promise: Promise<unknown>) => void;
 };
 
-const loadInstallHandler = () => {
+const loadInstallHandler = (
+  options: { respondTo?: (input: string) => Promise<Response> | undefined } = {},
+) => {
   const handlers = new Map<string, (event: InstallEvent) => void>();
   const cacheByName = new Map<string, { match: jest.Mock; put: jest.Mock }>();
   const open = jest.fn(async (name: string) => {
@@ -28,6 +30,10 @@ const loadInstallHandler = () => {
     return cache;
   });
   const fetchMock = jest.fn(async (input: string) => {
+    const override = options.respondTo?.(input);
+    if (override) {
+      return override;
+    }
     if (input === "/" || input === "/slideshow") {
       const route = input === "/" ? "home" : "slideshow";
       return new Response(
@@ -57,6 +63,50 @@ const loadInstallHandler = () => {
 
   vm.runInNewContext(fs.readFileSync("public/sw.js", "utf8"), context);
   return { handler: handlers.get("install")!, cacheByName, fetchMock };
+};
+
+const loadActivateHandler = (existingKeys: string[]) => {
+  const handlers = new Map<string, (event: InstallEvent) => void>();
+  const deleteMock = jest.fn().mockResolvedValue(true);
+  const context = {
+    URL,
+    Response,
+    caches: {
+      open: jest.fn().mockResolvedValue({
+        match: jest.fn().mockResolvedValue(undefined),
+        put: jest.fn().mockResolvedValue(undefined),
+      }),
+      keys: jest.fn().mockResolvedValue(existingKeys),
+      delete: deleteMock,
+    },
+    fetch: jest.fn(),
+    self: {
+      location: {
+        origin: "https://photos.example.com",
+        href: "https://photos.example.com/sw.js?v=test-build",
+      },
+      addEventListener: (name: string, handler: (event: InstallEvent) => void) => {
+        handlers.set(name, handler);
+      },
+      skipWaiting: jest.fn(),
+      clients: { claim: jest.fn() },
+    },
+  };
+
+  vm.runInNewContext(fs.readFileSync("public/sw.js", "utf8"), context);
+  return { handler: handlers.get("activate")!, deleteMock };
+};
+
+const runActivate = async (existingKeys: string[]) => {
+  const { handler, deleteMock } = loadActivateHandler(existingKeys);
+  let activatePromise: Promise<unknown> | undefined;
+  handler({
+    waitUntil: (promise) => {
+      activatePromise = promise;
+    },
+  });
+  await activatePromise;
+  return (deleteMock.mock.calls as [string][]).map(([key]) => key).sort();
 };
 
 const loadFetchHandler = (options: {
@@ -131,6 +181,160 @@ describe("service worker data caching", () => {
     );
     expect(fetchMock).toHaveBeenCalledWith("/search.sqlite");
     expect(fetchMock).toHaveBeenCalledWith("/search-embeddings.sqlite");
+  });
+
+  it("deletes superseded build generations on activation", async () => {
+    // Without this the hashed chunks of every past deploy accumulate until the
+    // origin hits its storage quota, at which point cache writes start failing
+    // silently and the PWA simply stops restarting offline.
+    const deleted = await runActivate([
+      "snapshots-pwa-oldsha-shell",
+      "snapshots-pwa-oldsha-runtime",
+      "snapshots-pwa-test-build-shell",
+      "snapshots-pwa-test-build-runtime",
+    ]);
+
+    expect(deleted).toEqual(["snapshots-pwa-oldsha-runtime", "snapshots-pwa-oldsha-shell"]);
+  });
+
+  it("keeps the current generation and foreign caches on activation", async () => {
+    // Deleting the caches the worker just installed would leave it unable to
+    // restart offline at all, and the origin's other caches are not ours.
+    const deleted = await runActivate([
+      "snapshots-pwa-test-build-shell",
+      "snapshots-pwa-test-build-runtime",
+      "some-other-app-cache",
+    ]);
+
+    expect(deleted).toEqual([]);
+  });
+
+  it("keeps cached album media across build generations", async () => {
+    // Album media live at content URLs, not hashed build chunks, so a new
+    // generation cannot orphan them. Scoping their cache to the build would make
+    // every code deploy evict an installed photo frame's whole offline library.
+    const deleted = await runActivate([
+      "snapshots-pwa-images",
+      "snapshots-pwa-oldsha-shell",
+      "snapshots-pwa-test-build-shell",
+    ]);
+
+    expect(deleted).toEqual(["snapshots-pwa-oldsha-shell"]);
+  });
+
+  it("stores a document only once its generated assets are cached", async () => {
+    // Publishing the HTML first would leave a cached document pointing at JS
+    // that never arrived, so an offline restart renders a blank page.
+    let releaseAsset: (() => void) | undefined;
+    const assetGate = new Promise<void>((resolve) => {
+      releaseAsset = resolve;
+    });
+    const { handler, cacheByName } = loadInstallHandler({
+      respondTo: (input) =>
+        input.endsWith(".js")
+          ? assetGate.then(() => new Response("js", { status: 200 }))
+          : undefined,
+    });
+    let installPromise: Promise<unknown> | undefined;
+
+    handler({
+      waitUntil: (promise) => {
+        installPromise = promise;
+      },
+    });
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(cacheByName.get("snapshots-pwa-test-build-shell")?.put).not.toHaveBeenCalled();
+
+    releaseAsset?.();
+    await installPromise;
+
+    expect(cacheByName.get("snapshots-pwa-test-build-shell")?.put).toHaveBeenCalledWith(
+      "/slideshow",
+      expect.any(Response),
+    );
+  });
+
+  it("installs when a build-generated icon is missing", async () => {
+    // The icons are cosmetic and generated at build time. Rejecting install over
+    // one missing PNG would silently leave the PWA with no offline support,
+    // since registration failures are only logged.
+    const { handler } = loadInstallHandler({
+      respondTo: (input) =>
+        input === "/pwa-icon-192.png"
+          ? Promise.resolve(new Response("", { status: 404 }))
+          : undefined,
+    });
+    let installPromise: Promise<unknown> | undefined;
+
+    handler({
+      waitUntil: (promise) => {
+        installPromise = promise;
+      },
+    });
+
+    await expect(installPromise).resolves.not.toThrow();
+  });
+
+  it("installs when the optional embeddings database is absent", async () => {
+    const { handler } = loadInstallHandler({
+      respondTo: (input) =>
+        input === "/search-embeddings.sqlite"
+          ? Promise.resolve(new Response("", { status: 404 }))
+          : undefined,
+    });
+    let installPromise: Promise<unknown> | undefined;
+
+    handler({
+      waitUntil: (promise) => {
+        installPromise = promise;
+      },
+    });
+
+    await expect(installPromise).resolves.not.toThrow();
+  });
+
+  it("refuses to install without the app manifest", async () => {
+    // The manifest is what makes the app installable, so unlike the icons it is
+    // not best-effort: a PWA cached without it is not worth having.
+    const { handler } = loadInstallHandler({
+      respondTo: (input) =>
+        input === "/manifest.webmanifest"
+          ? Promise.resolve(new Response("", { status: 404 }))
+          : undefined,
+    });
+    let installPromise: Promise<unknown> | undefined;
+
+    handler({
+      waitUntil: (promise) => {
+        installPromise = promise;
+      },
+    });
+
+    await expect(installPromise).rejects.toThrow(/manifest\.webmanifest/);
+  });
+
+  it("caches WebAssembly, which is fetched with an empty destination", async () => {
+    // SQLite's wasm is requested by its own glue code, so it carries no request
+    // destination and is named nowhere in the HTML for install to discover. Left
+    // uncached it is the one artifact that breaks a cold offline start: the
+    // shell and the database both restore, then SQLite cannot initialise.
+    const wasm = new Response("wasm bytes", { status: 200 });
+    const fetchHandler = loadFetchHandler({
+      cachedResponse: undefined as unknown as Response,
+      networkResponse: wasm,
+    });
+    let responded: Promise<Response> | undefined;
+
+    fetchHandler({
+      request: request("/_next/static/media/sqlite3.abc123.wasm"),
+      respondWith: (promise) => {
+        responded = promise;
+      },
+      waitUntil: () => {},
+    });
+
+    expect(responded).toBeDefined();
+    await expect(responded).resolves.toBe(wasm);
   });
 
   it("falls back from a configured slideshow URL to the cached offline shell", async () => {
