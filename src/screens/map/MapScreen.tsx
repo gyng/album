@@ -21,6 +21,10 @@ export type MapScreenProps = {
 };
 
 const DEBOUNCE_URL_MS = 300;
+// Naming every pin only helps once a search has narrowed the map down. "japan"
+// matches over 900 photos, and captioning those would bury the map under its own
+// labels, so the previews only appear for a result set you could actually read.
+const MAX_PREVIEWABLE_RESULTS = 12;
 
 const MapScreen = (props: MapScreenProps) => {
   const { siteOrigin } = usePublicConfig();
@@ -109,6 +113,8 @@ const MapScreen = (props: MapScreenProps) => {
 
   // The compact metadata corpus is a separate static JSON resource. Loading
   // starts on first search interaction, so the initial map payload stays lean.
+  const [directorEnabled, setDirectorEnabled] = React.useState(false);
+  const [directorSequenceLength, setDirectorSequenceLength] = React.useState(0);
   const [mapSearchQuery, setMapSearchQuery] = React.useState("");
   const [mapSearchIndex, setMapSearchIndex] = React.useState<Map<string, string> | null>(null);
   const [mapSearchStatus, setMapSearchStatus] = React.useState<
@@ -160,6 +166,10 @@ const MapScreen = (props: MapScreenProps) => {
         : filteredPhotos,
     [filteredPhotos, timeRange],
   );
+  const isPreviewableResultSet =
+    Boolean(deferredMapSearchQuery.trim()) &&
+    displayedPhotos.length > 0 &&
+    displayedPhotos.length <= MAX_PREVIEWABLE_RESULTS;
   const routeEligiblePhotoCount = React.useMemo(
     () =>
       displayedPhotos.filter(
@@ -297,7 +307,7 @@ const MapScreen = (props: MapScreenProps) => {
                 loadMapSearchIndex();
               }
             }}
-            placeholder="Search places, albums or subjects…"
+            placeholder="Search photos…"
             aria-label="Search photos on the map"
             autoComplete="off"
             spellCheck={false}
@@ -323,6 +333,22 @@ const MapScreen = (props: MapScreenProps) => {
                     : `${displayedPhotos.length} photos`}
             </span>
           )}
+          {/* The tour reads as "play these results", so it belongs with the
+              result count rather than floating over the map, and only once
+              there are results to tour. */}
+          {deferredMapSearchQuery.trim() && directorSequenceLength > 1 ? (
+            <button
+              type="button"
+              className={styles.mapSearchTour}
+              aria-pressed={directorEnabled}
+              onClick={() => {
+                setDirectorEnabled((current) => !current);
+              }}
+            >
+              <span aria-hidden="true">{directorEnabled ? "■" : "▶"}</span>
+              Tour
+            </button>
+          ) : null}
         </div>
       </div>
 
@@ -334,7 +360,10 @@ const MapScreen = (props: MapScreenProps) => {
         routeMode={filterAlbum ? defaultRouteMode : "simplified"}
         routeDisplayMode={!filterAlbum && showAllRoutes ? "always" : "active-only"}
         timeRange={timeRange}
-        showDirector
+        previewMarkers={isPreviewableResultSet}
+        directorEnabled={directorEnabled}
+        onDirectorEnabledChange={setDirectorEnabled}
+        onDirectorSequenceLengthChange={setDirectorSequenceLength}
       />
 
       {showTimeRangeSlider ? (

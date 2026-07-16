@@ -321,7 +321,7 @@ describe("MapWorld", () => {
     expect(mapInstance.dragPan.enable).toHaveBeenCalled();
   });
 
-  it("directs the current photo pool and can be stopped", () => {
+  it("tours the current photo pool while the caller enables it", () => {
     window.matchMedia = jest.fn().mockReturnValue({ matches: false });
     const london = {
       ...photo,
@@ -331,30 +331,74 @@ describe("MapWorld", () => {
       decLng: -0.1,
       date: "2023-01-01T00:00:00",
     };
-    const { rerender } = render(<MMap photos={[london, photo]} className="map" showDirector />);
+    const onDirectorEnabledChange = jest.fn();
+    const onDirectorSequenceLengthChange = jest.fn();
+    const { rerender } = render(
+      <MMap
+        photos={[london, photo]}
+        className="map"
+        directorEnabled
+        onDirectorEnabledChange={onDirectorEnabledChange}
+        onDirectorSequenceLengthChange={onDirectorSequenceLengthChange}
+      />,
+    );
 
-    fireEvent.click(screen.getByRole("button", { name: /map tour/i }));
-
+    // The trigger lives outside the map, so the caller needs the tour length to
+    // decide whether offering it makes sense at all.
+    expect(onDirectorSequenceLengthChange).toHaveBeenCalledWith(2);
     expect(mapInstance.flyTo).toHaveBeenCalledWith(
       expect.objectContaining({ center: [139.6503, 35.6762], pitch: 42 }),
     );
-    expect(screen.getByRole("button", { name: /map tour/i })).toHaveAttribute(
-      "aria-pressed",
-      "true",
-    );
 
-    fireEvent.click(screen.getByRole("button", { name: /map tour/i }));
+    rerender(
+      <MMap
+        photos={[london, photo]}
+        className="map"
+        directorEnabled={false}
+        onDirectorEnabledChange={onDirectorEnabledChange}
+        onDirectorSequenceLengthChange={onDirectorSequenceLengthChange}
+      />,
+    );
     expect(mapInstance.stop).toHaveBeenCalled();
+  });
 
-    fireEvent.click(screen.getByRole("button", { name: /map tour/i }));
-    rerender(<MMap photos={[photo]} className="map" showDirector />);
-    expect(screen.queryByRole("button", { name: /map tour/i })).not.toBeInTheDocument();
-
-    rerender(<MMap photos={[london, photo]} className="map" showDirector />);
-    expect(screen.getByRole("button", { name: /map tour/i })).toHaveAttribute(
-      "aria-pressed",
-      "false",
+  it("tells the caller to stop when the pool shrinks below a tour", () => {
+    // Filtering down to one photo leaves nothing to tour. An external control
+    // would still read as playing unless the map reports the change back.
+    window.matchMedia = jest.fn().mockReturnValue({ matches: false });
+    const london = {
+      ...photo,
+      album: "london",
+      href: "/album/london#photo.jpg",
+      decLat: 51.5,
+      decLng: -0.1,
+      date: "2023-01-01T00:00:00",
+    };
+    const onDirectorEnabledChange = jest.fn();
+    const onDirectorSequenceLengthChange = jest.fn();
+    const { rerender } = render(
+      <MMap
+        photos={[london, photo]}
+        className="map"
+        directorEnabled
+        onDirectorEnabledChange={onDirectorEnabledChange}
+        onDirectorSequenceLengthChange={onDirectorSequenceLengthChange}
+      />,
     );
+    onDirectorEnabledChange.mockClear();
+
+    rerender(
+      <MMap
+        photos={[photo]}
+        className="map"
+        directorEnabled
+        onDirectorEnabledChange={onDirectorEnabledChange}
+        onDirectorSequenceLengthChange={onDirectorSequenceLengthChange}
+      />,
+    );
+
+    expect(onDirectorSequenceLengthChange).toHaveBeenLastCalledWith(1);
+    expect(onDirectorEnabledChange).toHaveBeenCalledWith(false);
   });
 
   it("only rerenders when zoom crosses the marker-image threshold", () => {

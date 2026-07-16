@@ -49,10 +49,20 @@
   border-radius: var(--m-s);
   background: var(--c-bg);
   margin-block-start: var(--m-s);
+  /* The title bar reserves its right edge for MapLibre's stacked controls, so a
+     phone leaves ~271px for the input, the result count and the tour trigger,
+     which want ~330px. The row wraps rather than squeezing the count into its
+     min-width, where it wrapped internally and made the box tall. `fit-content`
+     keeps the box hugging its widest row instead of spanning the whole bar. */
+  flex-wrap: wrap;
+  inline-size: fit-content;
+  max-inline-size: 100%;
 }
 
 .mapSearch input {
-  inline-size: min(var(--size-200), 42dvw);
+  /* Shrinkable: the result count and tour trigger only appear once a search is
+     running, and they take priority over placeholder room. */
+  flex: 1 1 min(var(--size-200), 42dvw);
   min-inline-size: var(--map-search-min-width);
   padding: var(--m-s);
   border: 0;
@@ -66,12 +76,46 @@
   outline-offset: var(--size-1);
 }
 
-.mapSearch span {
+/* Direct child only: the result count, not the icon nested inside the tour
+   button, which this was padding out to 4.5em and making the button ~86px wide
+   for a play glyph and one word. */
+.mapSearch > span {
+  /* Squeezed to its min-width the count wrapped over several lines and made the
+     whole box tall; it is short enough to just keep on one line. */
+  white-space: nowrap;
+  flex: 0 0 auto;
   min-inline-size: 4.5em;
   color: color-mix(in oklch, var(--c-font) 70%, transparent);
   font-size: var(--fs-xs);
   font-variant-numeric: tabular-nums;
   text-align: end;
+}
+
+/* Sits with the result count inside the search box: the tour plays whatever the
+   search matched, so it reads as part of the result rather than a map control. */
+.mapSearchTour {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--m);
+  flex: 0 0 auto;
+  padding: var(--m) var(--m-s);
+  border: solid var(--size-1) var(--c-bg-contrast-light);
+  border-radius: var(--m);
+  background: transparent;
+  color: var(--c-font);
+  cursor: pointer;
+  font-size: var(--fs-xs);
+  white-space: nowrap;
+}
+
+.mapSearchTour[aria-pressed="true"] {
+  border-color: var(--c-accent);
+  color: var(--c-accent);
+}
+
+.mapSearchTour:focus-visible {
+  outline: solid var(--size-2) var(--c-bg-contrast-light);
+  outline-offset: var(--size-1);
 }
 
 .mapSearchRetry {

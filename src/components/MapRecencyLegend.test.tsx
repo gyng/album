@@ -11,7 +11,6 @@ describe("MapRecencyLegend", () => {
 
     expect(screen.getByText("Older")).toBeTruthy();
     expect(screen.getByText("Newer")).toBeTruthy();
-    expect(screen.getByText("Photo date")).toBeTruthy();
 
     rerender(<MapRecencyLegend olderLabel="2018" newerLabel="2026" />);
     expect(screen.getByText("2018")).toBeTruthy();

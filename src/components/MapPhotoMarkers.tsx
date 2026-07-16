@@ -13,6 +13,12 @@ import pinStyles from "./mapPin.module.css";
 type MapPhotoMarkersProps = {
   photos: PhotoWithStyle[];
   showMarkerImages: boolean;
+  /**
+   * Preview each marker in place with its thumbnail and album, rather than
+   * making you click pins to find out what matched. Only for a small result
+   * set — captioning hundreds of pins buries the map under its own labels.
+   */
+  previewMarkers?: boolean;
   emphasiseRoute: boolean;
   activeRouteHrefSet: ReadonlySet<string>;
   onSelect: (photo: PhotoWithStyle) => void;
@@ -27,6 +33,7 @@ const hasCoordinates = (photo: PhotoWithStyle): photo is LocatedPhoto =>
 const MapPhotoMarker = ({
   photo,
   showMarkerImages,
+  previewMarkers = false,
   emphasiseRoute,
   activeRouteHrefSet,
   onSelect,
@@ -79,8 +86,18 @@ const MapPhotoMarker = ({
       }}
       color={photo.markerColor}
     >
-      <div ref={markerRef}>
-        {showMarkerImages && isImageVisible ? <LazyMapMarkerImage photo={photo} /> : null}
+      <div ref={markerRef} className={previewMarkers ? styles.markerPreview : undefined}>
+        {(showMarkerImages || previewMarkers) && isImageVisible ? (
+          <LazyMapMarkerImage photo={photo} />
+        ) : null}
+        {previewMarkers ? (
+          // Decorative: the pin below already carries the same album and date as
+          // its accessible name, so announcing it twice would only add noise.
+          <span className={styles.markerPreviewLabel} aria-hidden="true">
+            {photo.album}
+            {formattedDate ? <span>{formattedDate}</span> : null}
+          </span>
+        ) : null}
         <span
           data-map-pin
           style={{ color: photo.markerColor }}
