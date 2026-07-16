@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { AppLink as Link } from "./platform";
 import { useEffect, useRef, useState } from "react";
 import styles from "./Nav.module.css";
 import commonStyles from "../styles/common.module.css";
@@ -89,21 +89,28 @@ export const Nav: React.FC<{
         </li>
         {props.albumName ? (
           <>
+            <li aria-hidden="true" className={commonStyles.navDivider} />
             <li>
-              <Link href={`/map?filter_album=${props.albumName}`} className={buttonStyles.base}>
+              <Link
+                href={`/map?filter_album=${props.albumName}`}
+                className={`${buttonStyles.base} ${commonStyles.navContext}`}
+              >
                 Album map
               </Link>
             </li>
             <li>
               <Link
                 href={`/timeline?filter_album=${props.albumName}`}
-                className={buttonStyles.base}
+                className={`${buttonStyles.base} ${commonStyles.navContext}`}
               >
                 Album timeline
               </Link>
             </li>
             <li>
-              <Link href={`/slideshow?filter=${props.albumName}`} className={buttonStyles.base}>
+              <Link
+                href={`/slideshow?filter=${props.albumName}`}
+                className={`${buttonStyles.base} ${commonStyles.navContext}`}
+              >
                 Album slideshow
               </Link>
             </li>

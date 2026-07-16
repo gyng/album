@@ -20,6 +20,7 @@ const config = {
     "<rootDir>/components/**/*.{ts,tsx}",
     "<rootDir>/lib/**/*.{ts,tsx}",
     "<rootDir>/pages/**/*.{ts,tsx}",
+    "<rootDir>/screens/**/*.{ts,tsx}",
     "<rootDir>/services/**/*.{ts,tsx}",
     "<rootDir>/util/**/*.{ts,tsx}",
     "!<rootDir>/**/*.d.ts",

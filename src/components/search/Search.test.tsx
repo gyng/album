@@ -23,26 +23,10 @@ import { warmupTextEmbeddingModel } from "./textEmbeddings";
 import { encodeSearchImage } from "./imageEmbeddings";
 import { navigateTo } from "../../util/navigate";
 
-const mockPush = jest.fn();
 const mockUseDatabase = jest.fn();
 const mockUseEmbeddingsDatabase = jest.fn();
 const mockUseInfiniteQuery = jest.fn();
 const originalConsoleError = console.error;
-
-jest.mock("next/link", () => ({
-  __esModule: true,
-  default: ({ children, href, className }: any) => (
-    <a href={href} className={className}>
-      {children}
-    </a>
-  ),
-}));
-
-jest.mock("next/router", () => ({
-  useRouter: () => ({
-    push: mockPush,
-  }),
-}));
 
 jest.mock("use-debounce", () => ({
   useDebounce: (value: unknown) => [value],

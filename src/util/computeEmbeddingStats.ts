@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { Content, PhotoBlock } from "../services/types";
+import type { Content, PhotoBlock } from "../services/types";
 import { measureBuild } from "../services/buildTiming";
 import { parseExifLocalDateTime } from "./exifTime";
 

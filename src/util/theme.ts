@@ -1,7 +1,7 @@
 /**
  * Site theme registry. "light" and "dark" are the plain schemes; named themes
  * re-tint the token palette in globals.css on top of a base colour scheme.
- * The pre-paint script in pages/_document.tsx serialises these maps, so the
+ * The renderer-neutral pre-paint script in themeBootstrap.ts serialises these maps, so the
  * registry must stay JSON-safe.
  */
 

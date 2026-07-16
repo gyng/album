@@ -121,13 +121,23 @@ describe("MapRouteOverlay", () => {
 
   it("updates projection on map movement and unsubscribes on cleanup", () => {
     const callbacks = new Map<string, () => void>();
+    let frameCallback: FrameRequestCallback | null = null;
+    const requestFrame = jest
+      .spyOn(window, "requestAnimationFrame")
+      .mockImplementation((callback) => {
+        frameCallback = callback;
+        return 1;
+      });
     on.mockImplementation((event: string, callback: () => void) => callbacks.set(event, callback));
     const view = render(<MapRouteOverlay {...props()} />);
+    act(() => frameCallback?.(0));
     const callsAfterMount = projectSegments.mock.calls.length;
     act(() => callbacks.get("move")?.());
+    act(() => frameCallback?.(1));
     expect(projectSegments.mock.calls.length).toBeGreaterThan(callsAfterMount);
     view.unmount();
     expect(off.mock.calls.map(([event]) => event)).toEqual(["move", "zoom", "resize"]);
+    requestFrame.mockRestore();
   });
 
   it("renders simplified transfer and local legs without optional annotations", () => {

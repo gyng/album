@@ -1,4 +1,4 @@
-import Head from "next/head";
+import { DocumentHead, usePublicConfig } from "./platform";
 import {
   getCanonicalUrl,
   getDefaultSeo,
@@ -28,17 +28,19 @@ export const Seo: React.FC<SeoProps> = ({
   jsonLd,
   extraFeeds = [],
 }) => {
+  const { siteOrigin } = usePublicConfig();
   const defaults = getDefaultSeo();
   const resolvedTitle = title ?? defaults.defaultTitle;
   const resolvedDescription = description ?? defaults.defaultDescription;
-  const canonicalUrl = getCanonicalUrl(pathname);
+  const canonicalUrl = getCanonicalUrl(pathname, siteOrigin);
   // OG/Twitter scrapers require absolute image URLs; a page-relative srcset
   // path (e.g. "/data/albums/…") is resolved against the site origin here.
-  const resolvedImage = resolveAbsoluteUrl(image) ?? getDefaultSocialImageUrl();
+  const resolvedImage =
+    resolveAbsoluteUrl(image, siteOrigin) ?? getDefaultSocialImageUrl(siteOrigin);
   const jsonLdItems = jsonLd == null ? [] : Array.isArray(jsonLd) ? jsonLd : [jsonLd];
 
   return (
-    <Head>
+    <DocumentHead>
       <title>{resolvedTitle}</title>
       <meta name="description" content={resolvedDescription} key="description" />
       <link rel="canonical" href={canonicalUrl} key="canonical" />
@@ -47,7 +49,7 @@ export const Seo: React.FC<SeoProps> = ({
         rel="alternate"
         type="application/rss+xml"
         title={`${defaults.siteName} RSS Feed`}
-        href={getCanonicalUrl("/feed.xml")}
+        href={getCanonicalUrl("/feed.xml", siteOrigin)}
         key="rss-feed"
       />
       {extraFeeds.map((feed, index) => (
@@ -82,6 +84,6 @@ export const Seo: React.FC<SeoProps> = ({
           }}
         />
       ))}
-    </Head>
+    </DocumentHead>
   );
 };

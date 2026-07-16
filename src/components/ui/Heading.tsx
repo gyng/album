@@ -22,10 +22,15 @@ export const Heading = (props: {
 export const Caption = (props: {
   as?: "p" | "span" | "div";
   size?: "sm";
+  id?: string;
   className?: string;
   children: React.ReactNode;
 }) => {
-  const { as: Tag = "p", size, className, children } = props;
+  const { as: Tag = "p", size, id, className, children } = props;
   const base = size === "sm" ? common.captionSm : common.caption;
-  return <Tag className={[base, className].filter(Boolean).join(" ")}>{children}</Tag>;
+  return (
+    <Tag {...(id ? { id } : {})} className={[base, className].filter(Boolean).join(" ")}>
+      {children}
+    </Tag>
+  );
 };

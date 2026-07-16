@@ -1,12 +1,13 @@
-import dynamic from "next/dynamic";
 import { MapProps } from "./Map";
-import styles from "./Map.module.css";
-
-const Map = dynamic(() => import("./Map"), {
-  loading: () => <p className={styles.loadingPlaceholder}>Loading map&hellip;</p>,
-  ssr: false,
-});
+import { MapLibreStyles } from "./MapLibreStyles";
+import { useClientComponents } from "./platform";
 
 export const MapDeferred: React.FC<MapProps> = (props) => {
-  return <Map {...props} />;
+  const { Map } = useClientComponents();
+  return (
+    <>
+      <MapLibreStyles />
+      <Map {...props} />
+    </>
+  );
 };

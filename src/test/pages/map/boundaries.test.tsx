@@ -2,15 +2,17 @@
  * @jest-environment jsdom
  */
 
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, screen, waitFor } from "@testing-library/react";
+import { renderWithNextPlatform as render } from "../../renderWithNextPlatform";
 
 let query: Record<string, string | string[]> = {};
 const replace = jest.fn();
-let buildId: string | null = "build-1";
 const fetchIndex = jest.fn();
 const mapProps = jest.fn();
 
-jest.mock("next/router", () => ({ useRouter: () => ({ query, replace }) }));
+jest.mock("next/router", () => ({
+  useRouter: () => ({ query, replace, pathname: "/map", isReady: true }),
+}));
 jest.mock("../../../services/album", () => ({ getAlbums: jest.fn() }));
 jest.mock("../../../services/buildTiming", () => ({
   measureBuild: (_name: string, work: () => unknown) => work(),
@@ -46,10 +48,9 @@ jest.mock("../../../components/TimeRangeSlider", () => ({
     </div>
   ),
 }));
-jest.mock("../../../components/mapSearchIndex", () => ({
+jest.mock("../../../util/mapSearchIndex", () => ({
   fetchMapSearchIndex: (...args: unknown[]) => fetchIndex(...args),
   getMapPhotoHref: (album: string, photo: { id: string }) => `/album/${album}#${photo.id}`,
-  getNextBuildId: () => buildId,
   hasMapCoordinates: (block: { kind: string; valid?: boolean }) =>
     block.kind === "photo" && block.valid !== false,
 }));
@@ -58,7 +59,8 @@ jest.mock("../../../util/dms2deg", () => ({
     GPSLatitude ? { decLat: 1, decLng: 2 } : { decLat: undefined, decLng: undefined },
 }));
 
-import WorldMap, { getStaticProps } from "../../../pages/map";
+import WorldMap from "../../../screens/map/MapScreen";
+import { loadMapPageData } from "../../../services/pageData/map";
 import { unpackMapWorldEntry } from "../../../util/pageDataRows";
 
 const { getAlbums } = jest.requireMock("../../../services/album") as { getAlbums: jest.Mock };
@@ -92,7 +94,6 @@ describe("map page boundaries", () => {
   beforeEach(() => {
     jest.useFakeTimers();
     query = {};
-    buildId = "build-1";
     replace.mockReset();
     fetchIndex.mockReset().mockResolvedValue(new Map());
     mapProps.mockClear();
@@ -118,16 +119,7 @@ describe("map page boundaries", () => {
       jest.advanceTimersByTime(300);
     });
     expect(replace).toHaveBeenLastCalledWith(
-      {
-        query: {
-          lat: "1",
-          lon: "2",
-          zoom: "4",
-          keep: "yes",
-          from: "2024-01-02",
-          to: "2024-01-03",
-        },
-      },
+      "/map?lat=1&lon=2&zoom=4&keep=yes&from=2024-01-02&to=2024-01-03",
       undefined,
       { shallow: true },
     );
@@ -136,11 +128,9 @@ describe("map page boundaries", () => {
       jest.advanceTimersByTime(300);
     });
 
-    expect(replace).toHaveBeenLastCalledWith(
-      { query: { lat: "1", lon: "2", zoom: "4", keep: "yes" } },
-      undefined,
-      { shallow: true },
-    );
+    expect(replace).toHaveBeenLastCalledWith("/map?lat=1&lon=2&zoom=4&keep=yes", undefined, {
+      shallow: true,
+    });
 
     fireEvent.click(screen.getByRole("button", { name: "commit range" }));
     unmount();
@@ -184,17 +174,16 @@ describe("map page boundaries", () => {
   });
 
   it("shows unavailable search, retries, and handles a rejected retry", async () => {
-    buildId = null;
+    fetchIndex.mockRejectedValueOnce("endpoint unavailable");
     const error = jest.spyOn(console, "error").mockImplementation(() => {});
     render(<WorldMap photos={photos as never} />);
     const input = screen.getByRole("searchbox");
     fireEvent.focus(input);
-    expect(screen.getByRole("status")).toHaveTextContent("Search unavailable");
+    await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("Search unavailable"));
 
-    buildId = "retry-build";
     fetchIndex.mockRejectedValueOnce("network down");
     fireEvent.click(screen.getByRole("button", { name: "Try again" }));
-    await waitFor(() => expect(fetchIndex).toHaveBeenCalledWith("retry-build"));
+    await waitFor(() => expect(fetchIndex).toHaveBeenCalledTimes(2));
     await waitFor(() =>
       expect(error).toHaveBeenCalledWith("Failed to progressively load map search", "network down"),
     );
@@ -202,7 +191,7 @@ describe("map page boundaries", () => {
   });
 
   it("toggles controls with non-string route values and resets routes when none remain", () => {
-    query = { filter_album: ["trip"], lat: "1", from: "invalid", to: "invalid" };
+    query = { filter_album: ["trip", "solo"], lat: "1", from: "invalid", to: "invalid" };
     const { rerender } = render(<WorldMap photos={photos as never} />);
     expect(mapProps).toHaveBeenLastCalledWith(expect.objectContaining({ fitToPhotos: false }));
 
@@ -242,10 +231,7 @@ describe("map page boundaries", () => {
       },
     ]);
 
-    const result = await getStaticProps({} as never);
-    const photoRows = (
-      result as { props: { photoRows: Parameters<typeof unpackMapWorldEntry>[0][] } }
-    ).props.photoRows;
+    const { photoRows } = await loadMapPageData();
 
     expect(photoRows).toHaveLength(1);
     expect(Array.isArray(photoRows[0])).toBe(true);

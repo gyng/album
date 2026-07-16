@@ -2,10 +2,11 @@
  * @jest-environment jsdom
  */
 
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, screen } from "@testing-library/react";
+import { renderWithNextPlatform as render } from "../../renderWithNextPlatform";
 import { useRouter } from "next/router";
 import { useDatabase } from "../../../components/database/useDatabase";
-import GuessPage from "../../../pages/guess";
+import GuessPage from "../../../screens/guess/GuessScreen";
 import type { GameSettings } from "../../../components/guess/guessTypes";
 
 jest.mock("next/router", () => ({
@@ -54,8 +55,8 @@ const useRouterMock = jest.mocked(useRouter);
 const useDatabaseMock = jest.mocked(useDatabase);
 const database = {} as NonNullable<ReturnType<typeof useDatabase>[0]>;
 
-const setQuery = (query: Record<string, string | string[] | undefined>) => {
-  useRouterMock.mockReturnValue({ query } as ReturnType<typeof useRouter>);
+const setQuery = (query: Record<string, string | string[] | undefined>, isReady = true) => {
+  useRouterMock.mockReturnValue({ query, isReady } as ReturnType<typeof useRouter>);
 };
 
 describe("GuessPage", () => {
@@ -78,6 +79,21 @@ describe("GuessPage", () => {
     expect(screen.getByText("Loading photo database…")).toBeInTheDocument();
     expect(screen.getByRole("progressbar")).toHaveAttribute("aria-valuenow", "37");
     expect(screen.queryByTestId("guess-game")).not.toBeInTheDocument();
+  });
+
+  it("waits for deep-link query state before mounting the game state machine", () => {
+    setQuery({ daily: "" }, false);
+    const { rerender } = render(<GuessPage />);
+
+    expect(screen.queryByTestId("guess-game")).not.toBeInTheDocument();
+
+    setQuery({ daily: "" }, true);
+    rerender(<GuessPage />);
+
+    expect(screen.getByTestId("guess-game")).toHaveAttribute(
+      "data-settings",
+      JSON.stringify({ rounds: 5, timeLimit: null, daily: true }),
+    );
   });
 
   it("starts at the lobby and persists a newly generated seed in the URL", () => {
@@ -126,7 +142,7 @@ describe("GuessPage", () => {
       { rounds: 20, timeLimit: 30 },
     ],
     [
-      { seed: "shared", rounds: "-4", timer: "invalid", region: ["France"] },
+      { seed: "shared", rounds: "-4", timer: "invalid", region: ["France", "Japan"] },
       { rounds: 1, timeLimit: null },
     ],
     [

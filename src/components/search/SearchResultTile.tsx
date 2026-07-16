@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { AppLink as Link } from "../platform";
 import { Thumb, OverlayButton } from "../ui";
 import styles from "./SearchResultTile.module.css";
 import { getRelativeTimeString } from "../../util/time";
@@ -136,7 +136,7 @@ export const SearchResultTile = (props: {
                 {dateTimeOriginal ? "," : null}
               </div>
               {dateTimeOriginal ? (
-                <div className={styles.sourceText}>
+                <div className={styles.sourceText} title={dateTimeOriginal.toLocaleDateString()}>
                   {getRelativeTimeString(dateTimeOriginal, {
                     short: true,
                   })?.replace(" ago", "")}

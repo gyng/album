@@ -3,7 +3,11 @@
  */
 
 import React from "react";
-import { renderToStaticMarkup } from "react-dom/server";
+import { renderToStaticMarkup as renderMarkup } from "react-dom/server";
+import { NextPlatformProvider } from "../components/platform/next/NextPlatformProvider";
+
+const renderToStaticMarkup = (node: React.ReactNode): string =>
+  renderMarkup(<NextPlatformProvider>{node}</NextPlatformProvider>);
 
 jest.mock("next/head", () => ({
   __esModule: true,
@@ -39,14 +43,15 @@ import {
   getSiteOrigin,
   resolveAbsoluteUrl,
 } from "../lib/seo";
-import { buildRobotsTxt } from "../pages/robots.txt";
 import { buildSitemapXml } from "../lib/sitemap";
+const { buildRobotsTxt } = require("../bin/generate-feeds.cjs");
 
-const AlbumPage = require("../pages/album/[[...slug]]").default;
-const MapPage = require("../pages/map/index").default;
-const TimelinePage = require("../pages/timeline/index").default;
+const AlbumPage = require("../screens/album/AlbumScreen").default;
+const MapPage = require("../screens/map/MapScreen").default;
+const TimelinePage = require("../screens/timeline/TimelineScreen").default;
 
 describe("SEO helpers", () => {
+  const siteOrigin = "https://photos.example.com";
   const originalEnv = process.env;
 
   beforeEach(() => {
@@ -71,11 +76,14 @@ describe("SEO helpers", () => {
         pathname="/search"
         noindex
         image="https://photos.example.com/cover.jpg"
-        jsonLd={buildCollectionPageJsonLd({
-          name: "Search | Snapshots",
-          description: "Search the photo archive.",
-          pathname: "/search",
-        })}
+        jsonLd={buildCollectionPageJsonLd(
+          {
+            name: "Search | Snapshots",
+            description: "Search the photo archive.",
+            pathname: "/search",
+          },
+          siteOrigin,
+        )}
       />,
     );
 
@@ -92,39 +100,33 @@ describe("SEO helpers", () => {
   });
 
   it("builds canonical URLs from the configured site origin", () => {
-    expect(getCanonicalUrl("/timeline")).toBe("https://photos.example.com/timeline");
+    expect(getCanonicalUrl("/timeline", siteOrigin)).toBe("https://photos.example.com/timeline");
   });
 
   it("normalises configured and deployment site origins", () => {
-    process.env = { ...originalEnv, SITE_URL: "http://photos.internal/" };
-    expect(getSiteOrigin()).toBe("http://photos.internal");
-
-    process.env = { ...originalEnv, VERCEL_PROJECT_PRODUCTION_URL: "gallery.example.com/" };
-    expect(getSiteOrigin()).toBe("https://gallery.example.com");
-
-    process.env = { ...originalEnv };
-    delete process.env.NEXT_PUBLIC_SITE_URL;
-    delete process.env.SITE_URL;
-    delete process.env.VERCEL_PROJECT_PRODUCTION_URL;
+    expect(getSiteOrigin("http://photos.internal/")).toBe("http://photos.internal");
+    expect(getSiteOrigin("gallery.example.com/")).toBe("https://gallery.example.com");
     expect(getSiteOrigin()).toBe("https://photos.awoo.party");
   });
 
   it("normalises canonical paths and resolves only relative asset URLs", () => {
-    expect(getCanonicalUrl()).toBe("https://photos.example.com/");
-    expect(getCanonicalUrl("timeline")).toBe("https://photos.example.com/timeline");
+    expect(getCanonicalUrl("/", siteOrigin)).toBe("https://photos.example.com/");
+    expect(getCanonicalUrl("timeline", siteOrigin)).toBe("https://photos.example.com/timeline");
     expect(resolveAbsoluteUrl()).toBeUndefined();
     expect(resolveAbsoluteUrl("https://cdn.example.com/photo.jpg")).toBe(
       "https://cdn.example.com/photo.jpg",
     );
     expect(resolveAbsoluteUrl("//cdn.example.com/photo.jpg")).toBe("//cdn.example.com/photo.jpg");
     expect(resolveAbsoluteUrl("data:image/gif;base64,AAAA")).toBe("data:image/gif;base64,AAAA");
-    expect(resolveAbsoluteUrl("photos/cover.jpg")).toBe(
+    expect(resolveAbsoluteUrl("photos/cover.jpg", siteOrigin)).toBe(
       "https://photos.example.com/photos/cover.jpg",
     );
   });
 
   it("uses the default social preview image when no page image is supplied", () => {
-    expect(getDefaultSocialImageUrl()).toBe("https://photos.example.com/social-preview.svg");
+    expect(getDefaultSocialImageUrl(siteOrigin)).toBe(
+      "https://photos.example.com/social-preview.svg",
+    );
   });
 
   it("builds robots.txt with sitemap and utility route exclusions", () => {
@@ -134,11 +136,14 @@ describe("SEO helpers", () => {
   });
 
   it("builds sitemap.xml for core pages and albums", () => {
-    const xml = buildSitemapXml([
-      { path: "/", lastmod: "2025-01-01" },
-      { path: "/map", lastmod: "2025-01-01" },
-      { path: "/album/trip", lastmod: "2024-12-31" },
-    ]);
+    const xml = buildSitemapXml(
+      [
+        { path: "/", lastmod: "2025-01-01" },
+        { path: "/map", lastmod: "2025-01-01" },
+        { path: "/album/trip", lastmod: "2024-12-31" },
+      ],
+      siteOrigin,
+    );
 
     expect(xml).toContain("<loc>https://photos.example.com/</loc>");
     expect(xml).toContain("<lastmod>2025-01-01</lastmod>");
@@ -147,7 +152,7 @@ describe("SEO helpers", () => {
   });
 
   it("XML-escapes ampersands and percent-encodes spaces in <loc>", () => {
-    const xml = buildSitemapXml([{ path: "/album/food & drink" }]);
+    const xml = buildSitemapXml([{ path: "/album/food & drink" }], siteOrigin);
 
     expect(xml).toContain("<loc>https://photos.example.com/album/food%20&amp;%20drink</loc>");
     expect(xml).not.toContain("food & drink");
@@ -155,7 +160,9 @@ describe("SEO helpers", () => {
 
   it("percent-encodes non-ASCII album slugs in canonical URLs", () => {
     // Canonical and sitemap must agree byte-for-byte for e.g. "türkiye".
-    expect(getCanonicalUrl("/album/türkiye")).toBe("https://photos.example.com/album/t%C3%BCrkiye");
+    expect(getCanonicalUrl("/album/türkiye", siteOrigin)).toBe(
+      "https://photos.example.com/album/t%C3%BCrkiye",
+    );
   });
 
   it("resolves a relative page image to absolute og:image/twitter:image", () => {
@@ -187,16 +194,22 @@ describe("SEO helpers", () => {
   });
 
   it("builds reusable JSON-LD payloads", () => {
-    const website = buildWebSiteJsonLd();
-    const collection = buildCollectionPageJsonLd({
-      name: "Timeline | Snapshots",
-      description: "Explore dated photos across the archive timeline.",
-      pathname: "/timeline",
-    });
-    const breadcrumbs = buildBreadcrumbJsonLd([
-      { name: "Snapshots", pathname: "/" },
-      { name: "Timeline", pathname: "/timeline" },
-    ]);
+    const website = buildWebSiteJsonLd(siteOrigin);
+    const collection = buildCollectionPageJsonLd(
+      {
+        name: "Timeline | Snapshots",
+        description: "Explore dated photos across the archive timeline.",
+        pathname: "/timeline",
+      },
+      siteOrigin,
+    );
+    const breadcrumbs = buildBreadcrumbJsonLd(
+      [
+        { name: "Snapshots", pathname: "/" },
+        { name: "Timeline", pathname: "/timeline" },
+      ],
+      siteOrigin,
+    );
 
     expect(website["@type"]).toBe("WebSite");
     expect(collection.url).toBe("https://photos.example.com/timeline");
@@ -205,12 +218,15 @@ describe("SEO helpers", () => {
     );
 
     expect(
-      buildCollectionPageJsonLd({
-        name: "Trip",
-        description: "Trip photos",
-        pathname: "/album/trip",
-        image: "https://photos.example.com/cover.jpg",
-      }).image,
+      buildCollectionPageJsonLd(
+        {
+          name: "Trip",
+          description: "Trip photos",
+          pathname: "/album/trip",
+          image: "https://photos.example.com/cover.jpg",
+        },
+        siteOrigin,
+      ).image,
     ).toBe("https://photos.example.com/cover.jpg");
   });
 

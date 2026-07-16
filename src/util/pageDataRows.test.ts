@@ -1,5 +1,4 @@
-import type { MapWorldEntry } from "../components/MapWorld";
-import type { TimelineEntry } from "../components/timelineTypes";
+import type { MapWorldEntry, TimelineEntry } from "./pageDataTypes";
 import {
   packMapWorldEntry,
   packTimelineEntry,

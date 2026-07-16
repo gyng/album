@@ -6,7 +6,7 @@ type SitemapEntry = {
   lastmod?: string;
 };
 
-export const buildSitemapXml = (entries: SitemapEntry[]): string => {
+export const buildSitemapXml = (entries: SitemapEntry[], siteOrigin?: string): string => {
   const urls = entries
     .map(({ path, lastmod }) => {
       // getCanonicalUrl already percent-encodes the path; escapeXml then
@@ -14,7 +14,7 @@ export const buildSitemapXml = (entries: SitemapEntry[]): string => {
       // cannot invalidate the whole sitemap.
       return [
         "  <url>",
-        `    <loc>${escapeXml(getCanonicalUrl(path))}</loc>`,
+        `    <loc>${escapeXml(getCanonicalUrl(path, siteOrigin))}</loc>`,
         ...(lastmod ? [`    <lastmod>${escapeXml(lastmod)}</lastmod>`] : []),
         "  </url>",
       ].join("\n");

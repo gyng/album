@@ -5,25 +5,7 @@
 import { createRef } from "react";
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { TimelineDayGrid } from "./TimelineDayGrid";
-import { TimelineEntry } from "./timelineTypes";
-
-jest.mock("next/link", () => ({
-  __esModule: true,
-  default: ({
-    href,
-    children,
-    className,
-    ...rest
-  }: {
-    href: string;
-    children: React.ReactNode;
-    className?: string;
-  }) => (
-    <a href={href} className={className} {...rest}>
-      {children}
-    </a>
-  ),
-}));
+import type { TimelineEntry } from "../util/pageDataTypes";
 
 const mapProps = jest.fn();
 jest.mock("./MapWorldDeferred", () => ({

@@ -1,4 +1,4 @@
-import { Block, PhotoBlock, TextBlock } from "../services/types";
+import type { Block, PhotoBlock, TextBlock } from "../services/types";
 import { PhotoBlockEl } from "./Photo";
 import { TextBlockEl } from "./TextBlock";
 

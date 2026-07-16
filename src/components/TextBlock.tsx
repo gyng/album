@@ -1,4 +1,4 @@
-import { TextBlock } from "../services/types";
+import type { TextBlock } from "../services/types";
 import styles from "./TextBlock.module.css";
 import React from "react";
 import { Heading } from "./ui";

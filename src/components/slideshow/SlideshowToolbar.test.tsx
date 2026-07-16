@@ -6,15 +6,6 @@ import { fireEvent, render, screen, within } from "@testing-library/react";
 import { SlideshowToolbar, SlideshowToolbarProps } from "./SlideshowToolbar";
 import { EMPTY_POOL_STATS } from "../../util/slideshowQueue";
 
-jest.mock("next/link", () => ({
-  __esModule: true,
-  default: ({ children, href, className }: any) => (
-    <a href={href} className={className}>
-      {children}
-    </a>
-  ),
-}));
-
 const noop = () => {};
 
 const makeProps = (overrides: Partial<SlideshowToolbarProps> = {}): SlideshowToolbarProps => ({

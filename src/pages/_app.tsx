@@ -1,34 +1,17 @@
-import "../styles/vendor.css";
 import "../styles/globals.css";
 import type { AppProps } from "next/app";
-import Head from "next/head";
 import { Analytics } from "@vercel/analytics/react";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import React from "react";
-import { ErrorBoundary } from "../components/ErrorBoundary";
-import "./_app.css";
-
-const queryClient = new QueryClient();
+import { AppRuntime } from "../components/AppRuntime";
+import { NextPlatformProvider } from "../components/platform/next/NextPlatformProvider";
+import "../styles/maplibre-overrides.css";
 
 function MyApp({ Component, pageProps }: AppProps) {
-  React.useEffect(() => {
-    if (!("serviceWorker" in navigator)) {
-      return;
-    }
-
-    void navigator.serviceWorker.register("/sw.js");
-  }, []);
-
   return (
-    <ErrorBoundary>
-      <Head>
-        <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-      </Head>
-      <QueryClientProvider client={queryClient}>
-        <Analytics />
+    <NextPlatformProvider>
+      <AppRuntime telemetry={<Analytics />}>
         <Component {...pageProps} />
-      </QueryClientProvider>
-    </ErrorBoundary>
+      </AppRuntime>
+    </NextPlatformProvider>
   );
 }
 

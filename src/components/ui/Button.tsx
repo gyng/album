@@ -3,7 +3,7 @@ import styles from "./Button.module.css";
 
 export { default as buttonStyles } from "./Button.module.css";
 
-type ButtonVariant = "surface" | "accent" | "quiet";
+type ButtonVariant = "surface" | "accent" | "primary" | "quiet";
 type ButtonSize = "standard" | "large" | "icon";
 
 const getClassName = (
@@ -15,6 +15,7 @@ const getClassName = (
   [
     styles.base,
     variant === "accent" ? styles.accent : "",
+    variant === "primary" ? styles.primary : "",
     variant === "quiet" ? styles.quiet : "",
     size === "large" ? styles.large : "",
     size === "icon" ? styles.icon : "",

@@ -1,7 +1,7 @@
 import { mergeCssModuleStyles } from "../../util/mergeCssModuleStyles";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Database } from "@sqlite.org/sqlite-wasm";
-import Link from "next/link";
+import { AppLink as Link } from "../platform";
 import sharedStyles from "./Search.module.css";
 import localStyles from "./EmptyStateExplore.module.css";
 import { Heading, buttonStyles } from "../ui";

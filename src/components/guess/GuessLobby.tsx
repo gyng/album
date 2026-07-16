@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useId, useState } from "react";
 import { Database } from "@sqlite.org/sqlite-wasm";
 import { Button, Caption, Heading, KeyHint, Select, SegmentedToggle } from "../ui";
 import { fetchGuessRegions, GuessRegionOption } from "../search/api";
@@ -37,6 +37,7 @@ const limitToTimerValue = (limit: number | null): TimerValue => {
 };
 
 export const GuessLobby: React.FC<GuessLobbyProps> = ({ database, defaults, onStart, error }) => {
+  const dailyDescriptionId = useId();
   const [regions, setRegions] = useState<GuessRegionOption[]>([]);
   const [totalPhotos, setTotalPhotos] = useState(0);
   const [region, setRegion] = useState(defaults.region ?? "");
@@ -154,10 +155,19 @@ export const GuessLobby: React.FC<GuessLobbyProps> = ({ database, defaults, onSt
       ) : null}
 
       <div className={styles.buttonRow}>
-        <Button className={styles.dailyButton} onClick={handleDaily}>
-          Daily challenge
-        </Button>
-        <Button variant="accent" size="large" className={styles.playButton} onClick={handleStart}>
+        <div className={styles.dailyAction}>
+          <Button
+            className={styles.dailyButton}
+            aria-describedby={dailyDescriptionId}
+            onClick={handleDaily}
+          >
+            Daily challenge
+          </Button>
+          <Caption id={dailyDescriptionId} as="span" size="sm" className={styles.dailyDescription}>
+            Five rounds · same photos for everyone today
+          </Caption>
+        </div>
+        <Button variant="primary" size="large" className={styles.playButton} onClick={handleStart}>
           Play
           <KeyHint>Enter</KeyHint>
         </Button>

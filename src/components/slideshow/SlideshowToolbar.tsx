@@ -1,8 +1,8 @@
 import { mergeCssModuleStyles } from "../../util/mergeCssModuleStyles";
 import React from "react";
-import Link from "next/link";
-import sharedStyles from "../../pages/slideshow/slideshow.module.css";
-import localStyles from "../../pages/slideshow/SlideshowToolbar.module.css";
+import { AppLink as Link } from "../platform";
+import sharedStyles from "./SlideshowShared.module.css";
+import localStyles from "./SlideshowToolbar.module.css";
 import commonStyles from "../../styles/common.module.css";
 import { buttonStyles } from "../ui";
 import { SlideshowMode, DetailsAlignment } from "../../util/slideshowUrl";
@@ -491,9 +491,11 @@ export const SlideshowToolbar: React.FC<SlideshowToolbarProps> = (props) => {
             type="button"
             className={[props.showClock ? buttonStyles.active : "", buttonStyles.base].join(" ")}
             aria-pressed={props.showClock}
+            aria-label="Show clock"
+            title="Show clock"
             onClick={props.onToggleClock}
           >
-            🕰️
+            <span aria-hidden="true">🕰️</span>
           </button>
 
           <button

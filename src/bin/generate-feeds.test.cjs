@@ -7,6 +7,7 @@ const os = require("node:os");
 const path = require("node:path");
 
 const {
+  buildRobotsTxt,
   buildSitemapXml,
   cleanupStaleAlbumFeeds,
   generateSitemap,
@@ -49,6 +50,22 @@ describe("static feed generation", () => {
     expect(getSiteOrigin()).toBe("https://gallery.example.com");
     expect(getCanonicalUrl()).toBe("https://gallery.example.com/");
     expect(getCanonicalUrl("album/türkiye")).toBe("https://gallery.example.com/album/t%C3%BCrkiye");
+  });
+
+  it("builds robots.txt from the configured canonical origin", () => {
+    process.env.NEXT_PUBLIC_SITE_URL = "https://photos.example.com/";
+
+    expect(buildRobotsTxt()).toBe(
+      [
+        "User-agent: *",
+        "Allow: /",
+        "Disallow: /search",
+        "Disallow: /slideshow",
+        "",
+        "Sitemap: https://photos.example.com/sitemap.xml",
+        "",
+      ].join("\n"),
+    );
   });
 
   it("builds sitemap entries with optional modification dates", () => {
@@ -104,6 +121,7 @@ describe("static feed generation", () => {
       }),
     ).toEqual({ generatedAlbumFeeds: 0, removedFeeds: 0 });
     expect(log).toHaveBeenCalledWith("No albums found — skipping feed generation");
+    expect(fs.existsSync(path.join(root, "public", "robots.txt"))).toBe(true);
   });
 
   it("writes main, sitemap, and per-album feeds while cleaning stale outputs", () => {
@@ -173,6 +191,7 @@ describe("static feed generation", () => {
     expect(summary).toEqual({ generatedAlbumFeeds: 3, removedFeeds: 2 });
     expect(fs.existsSync(path.join(outputDirectory, "feed.xml"))).toBe(true);
     expect(fs.existsSync(path.join(outputDirectory, "sitemap.xml"))).toBe(true);
+    expect(fs.existsSync(path.join(outputDirectory, "robots.txt"))).toBe(true);
     expect(fs.existsSync(path.join(outputDirectory, "album", "trip", "feed.xml"))).toBe(true);
     expect(fs.existsSync(path.join(outputDirectory, "album", "test-fixture", "feed.xml"))).toBe(
       false,
@@ -221,7 +240,9 @@ describe("static feed generation", () => {
       generatedAlbumFeeds: 1,
       removedFeeds: 0,
     });
-    expect(log).toHaveBeenCalledWith("Generated feeds: feed.xml, sitemap.xml, 1 album feeds");
+    expect(log).toHaveBeenCalledWith(
+      "Generated static metadata: robots.txt, feed.xml, sitemap.xml, 1 album feeds",
+    );
 
     fs.rmSync(root, { recursive: true, force: true });
   });

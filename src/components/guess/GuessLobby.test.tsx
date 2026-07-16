@@ -91,7 +91,10 @@ describe("GuessLobby", () => {
     );
     await screen.findByText("12 photos available");
 
-    fireEvent.click(screen.getByRole("button", { name: "Daily challenge" }));
+    const dailyButton = screen.getByRole("button", { name: "Daily challenge" });
+    const description = screen.getByText("Five rounds · same photos for everyone today");
+    expect(dailyButton).toHaveAttribute("aria-describedby", description.id);
+    fireEvent.click(dailyButton);
 
     expect(onStart).toHaveBeenCalledWith({ rounds: 5, timeLimit: null, daily: true });
   });

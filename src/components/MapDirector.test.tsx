@@ -3,7 +3,7 @@
  */
 
 import { act, render } from "@testing-library/react";
-import type { MapWorldEntry } from "./MapWorld";
+import type { MapWorldEntry } from "../util/pageDataTypes";
 import { MapDirector } from "./MapDirector";
 
 const flyTo = jest.fn();

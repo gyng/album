@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { AppLink as Link } from "../platform";
 import styles from "./Footer.module.css";
 
 export const Footer = () => (

@@ -1,5 +1,5 @@
 import React from "react";
-import { OptimisedPhoto } from "../services/types";
+import type { MapWorldEntry, TimeRange } from "../util/pageDataTypes";
 import { mixHsl, recencyColor } from "../util/mapColor";
 import { MapRecencyLegend } from "./MapRecencyLegend";
 import MapLibreMap, {
@@ -35,21 +35,8 @@ import { MapPhotoMarkers } from "./MapPhotoMarkers";
 import { MapContextMenu, type MapContextPoint } from "./MapContextMenu";
 import { buildMapDirectorSequence } from "./mapDirector";
 import { MapDirector } from "./MapDirector";
+import { MapLibreStyles } from "./MapLibreStyles";
 import styles from "./MapWorld.module.css";
-
-export type MapWorldEntry = {
-  album: string;
-  src: OptimisedPhoto;
-  decLat: number | null;
-  decLng: number | null;
-  date: string | null;
-  href: string;
-  placeholderColor?: string;
-  placeholderWidth?: number;
-  placeholderHeight?: number;
-};
-
-export type TimeRange = { fromMs: number; toMs: number };
 
 export type MapWorldProps = {
   photos: MapWorldEntry[];
@@ -394,6 +381,7 @@ export const MMap: React.FC<MapWorldProps> = ({
 
   return (
     <div className={className}>
+      <MapLibreStyles />
       {showThemeBootstrap ? (
         <div className={styles.themeBootstrap}>
           <ThemeToggle />

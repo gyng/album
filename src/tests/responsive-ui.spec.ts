@@ -129,10 +129,32 @@ test.describe("Responsive UI", () => {
   test("album detail disclosures have comfortable touch targets", async ({ page }) => {
     await page.goto("/album/test-simple", { waitUntil: "domcontentloaded" });
 
-    const summary = page.locator('summary[title^="More details"]').first();
+    const photo = page.getByTestId("photoblockel").first();
+    const image = photo.getByRole("img");
+    const summary = photo.getByLabel("Photo details");
     await expect(summary).toBeVisible();
-    const box = await summary.boundingBox();
-    expect(box?.width).toBeGreaterThanOrEqual(44);
-    expect(box?.height).toBeGreaterThanOrEqual(44);
+    const [imageBox, summaryBox] = await Promise.all([image.boundingBox(), summary.boundingBox()]);
+    expect(imageBox).not.toBeNull();
+    expect(summaryBox).not.toBeNull();
+    expect(summaryBox!.width).toBeGreaterThanOrEqual(44);
+    expect(summaryBox!.height).toBeGreaterThanOrEqual(44);
+
+    const rightEdgeOffset = imageBox!.x + imageBox!.width - (summaryBox!.x + summaryBox!.width);
+    expect(rightEdgeOffset).toBeGreaterThanOrEqual(0);
+    expect(rightEdgeOffset).toBeLessThanOrEqual(24);
+  });
+
+  test("guess lobby explains the daily challenge without mobile overflow", async ({ page }) => {
+    await page.goto("/guess", { waitUntil: "domcontentloaded" });
+
+    const description = page.getByText("Five rounds · same photos for everyone today");
+    await expect(description).toBeVisible();
+    const descriptionId = await description.getAttribute("id");
+    expect(descriptionId).not.toBeNull();
+    await expect(page.getByRole("button", { name: "Daily challenge" })).toHaveAttribute(
+      "aria-describedby",
+      descriptionId!,
+    );
+    await expectNoDocumentOverflow(page);
   });
 });

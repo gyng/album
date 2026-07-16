@@ -1,5 +1,5 @@
 import React from "react";
-import Link from "next/link";
+import { AppLink as Link } from "./platform";
 import { BucketedStatGroup } from "../util/computeStats";
 import { ChartTooltip, Heading } from "./ui";
 import styles from "./YearSplitHistogram.module.css";

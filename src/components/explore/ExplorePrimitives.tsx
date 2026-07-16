@@ -1,10 +1,10 @@
 import { mergeCssModuleStyles } from "../../util/mergeCssModuleStyles";
-import Link from "next/link";
+import { AppLink as Link } from "../platform";
 import React from "react";
 import { buildSimilaritySearchHref } from "../../util/searchFacets";
 import { Caption, Heading, OverlayButtonLink, Thumb } from "../ui";
-import sharedStyles from "../../pages/explore/explore.module.css";
-import localStyles from "../../pages/explore/ExplorePrimitives.module.css";
+import sharedStyles from "./ExploreShared.module.css";
+import localStyles from "./ExplorePrimitives.module.css";
 import { formatCoverage } from "./exploreViewModel";
 
 const styles = mergeCssModuleStyles(

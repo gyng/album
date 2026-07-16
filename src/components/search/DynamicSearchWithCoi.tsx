@@ -1,5 +1,9 @@
-import dynamic from "next/dynamic";
+import { useClientComponents } from "../platform";
+import type { SearchWithCoiProps } from "../platform/clientComponents";
 
-export default dynamic(() => import("./SearchWithCoi"), {
-  loading: () => <p>Loading&hellip;</p>,
-});
+const DynamicSearchWithCoi: React.FC<SearchWithCoiProps> = (props) => {
+  const { SearchWithCoi } = useClientComponents();
+  return <SearchWithCoi {...props} />;
+};
+
+export default DynamicSearchWithCoi;

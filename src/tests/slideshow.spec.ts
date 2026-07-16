@@ -115,6 +115,16 @@ test.describe("Slideshow", () => {
     expect(await image.getAttribute("src")).toBe(originalSrc);
   });
 
+  test("map display loads its route-scoped vendor stylesheet", async ({ page }) => {
+    await page.goto("/slideshow?mode=random&filter=test-simple&map=1&delay=86400", {
+      waitUntil: "domcontentloaded",
+    });
+    await waitForSlideshow(page);
+
+    await expect(page.locator('link[href="/vendor/maplibre-gl.css"]')).toHaveCount(1);
+    await expect(page.locator(".maplibregl-map")).toBeVisible({ timeout: 15_000 });
+  });
+
   test("4-up remix positions each caption in its own pane", async ({ page }) => {
     // Force the remix layout roll to 3 companions (a 2×2 grid): rollRemix-
     // LayoutCount uses Math.random and returns 3 when r >= 0.95.

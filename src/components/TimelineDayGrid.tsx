@@ -1,11 +1,10 @@
-import Link from "next/link";
+import { AppLink as Link } from "./platform";
 import React from "react";
 import { MapWorldDeferred } from "./MapWorldDeferred";
-import { MapWorldEntry } from "./MapWorld";
+import type { MapWorldEntry, TimelineEntry } from "../util/pageDataTypes";
 import { getRelativeTimeString } from "../util/time";
 import { Caption, Heading, Thumb, buttonStyles, overlayButtonStyles } from "./ui";
 import styles from "./TimelineDayGrid.module.css";
-import { TimelineEntry } from "./timelineTypes";
 import {
   exifWallClockTimestamp,
   formatExifWallClockDate,

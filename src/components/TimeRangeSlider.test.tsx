@@ -3,7 +3,7 @@
  */
 
 import { fireEvent, render, screen } from "@testing-library/react";
-import type { MapWorldEntry } from "./MapWorld";
+import type { MapWorldEntry } from "../util/pageDataTypes";
 import { TimeRangeSlider } from "./TimeRangeSlider";
 import { exifWallClockTimestamp } from "../util/exifTime";
 

@@ -192,6 +192,21 @@
   pointer-events: auto;
 }
 
+/* Pull the details toggle to the rendered image's right edge — the image is
+   centred and capped at 90svw/90svh (see .image), so the grid cell's edge can
+   sit far outside the photo on wide viewports. Immersive blocks keep their
+   own placement. */
+.block:where(:not(.immersive)) .details {
+  margin-inline-end: max(
+    0%,
+    calc(
+      (100% -
+          min(90svw, 100%, calc(90svh * var(--photo-aspect, 1)), var(--photo-intrinsic-width, 100%))) /
+        2
+    )
+  );
+}
+
 .immersive .details {
   margin-block-start: var(--m-m);
   padding-block: var(--m);

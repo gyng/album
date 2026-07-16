@@ -7,15 +7,6 @@ import { PhotoSimilarPhotos } from "./PhotoSimilarPhotos";
 import { useDatabase, useEmbeddingsDatabase } from "./database/useDatabase";
 import { fetchSimilarResults } from "./search/api";
 
-jest.mock("next/link", () => ({
-  __esModule: true,
-  default: ({ children, href, className, title }: any) => (
-    <a href={href} className={className} title={title}>
-      {children}
-    </a>
-  ),
-}));
-
 jest.mock("./database/useDatabase", () => ({
   useDatabase: jest.fn(),
   useEmbeddingsDatabase: jest.fn(),

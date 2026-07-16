@@ -1,6 +1,7 @@
 import React from "react";
 import Map, { Layer, Source } from "react-map-gl/maplibre";
 import styles from "./StatsWorldMap.module.css";
+import { MapLibreStyles } from "./MapLibreStyles";
 
 type Props = {
   points: Array<{ lat: number; lng: number }>;
@@ -67,33 +68,36 @@ export const StatsWorldMap: React.FC<Props> = ({ points }) => {
   );
 
   return (
-    <div className={styles.container}>
-      <div className={styles.shell}>
-        <div className={styles.map}>
-          <Map
-            initialViewState={{
-              longitude: 15,
-              latitude: 20,
-              zoom: 1.25,
-            }}
-            mapStyle="https://api.maptiler.com/maps/toner-v2/style.json?key=iilC4hPY1594noPX9OQ2"
-            attributionControl={false}
-          >
-            <Source
-              id="stats-photo-points"
-              type="geojson"
-              data={geoJson}
-              cluster
-              clusterMaxZoom={12}
-              clusterRadius={42}
+    <>
+      <MapLibreStyles />
+      <div className={styles.container}>
+        <div className={styles.shell}>
+          <div className={styles.map}>
+            <Map
+              initialViewState={{
+                longitude: 15,
+                latitude: 20,
+                zoom: 1.25,
+              }}
+              mapStyle="https://api.maptiler.com/maps/toner-v2/style.json?key=iilC4hPY1594noPX9OQ2"
+              attributionControl={false}
             >
-              <Layer {...(clusterLayer as any)} />
-              <Layer {...(clusterCountLayer as any)} />
-              <Layer {...(pointLayer as any)} />
-            </Source>
-          </Map>
+              <Source
+                id="stats-photo-points"
+                type="geojson"
+                data={geoJson}
+                cluster
+                clusterMaxZoom={12}
+                clusterRadius={42}
+              >
+                <Layer {...(clusterLayer as any)} />
+                <Layer {...(clusterCountLayer as any)} />
+                <Layer {...(pointLayer as any)} />
+              </Source>
+            </Map>
+          </div>
         </div>
       </div>
-    </div>
+    </>
   );
 };

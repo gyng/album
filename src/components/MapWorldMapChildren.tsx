@@ -1,7 +1,7 @@
 import React from "react";
 import { useMap } from "react-map-gl/maplibre";
 import { computeWrapAwareBounds } from "../util/mapBounds";
-import type { MapWorldEntry } from "./MapWorld";
+import type { MapWorldEntry } from "../util/pageDataTypes";
 import type { MapBounds } from "./mapWorldViewModel";
 import { getMiddleDragCamera } from "./mapInteractions";
 import styles from "./MapWorld.module.css";

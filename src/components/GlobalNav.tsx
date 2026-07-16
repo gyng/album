@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { AppLink as Link } from "./platform";
 import { Nav } from "./Nav";
 import commonStyles from "../styles/common.module.css";
 import { buttonStyles } from "./ui";
@@ -41,6 +41,7 @@ export const GlobalNav: React.FC<Props> = ({
   const current = (page: GlobalNavPage) =>
     currentPage === page ? commonStyles.navCurrent : undefined;
   const ariaCurrent = (page: GlobalNavPage) => (currentPage === page ? "page" : undefined);
+  const MapLink = onMapClick ? "a" : Link;
 
   return (
     <Nav
@@ -67,15 +68,14 @@ export const GlobalNav: React.FC<Props> = ({
             </Link>
           </li>
           <li>
-            <Link
+            <MapLink
               href="/map"
-              prefetch={onMapClick ? false : undefined}
               className={cx(buttonStyles.base, current("map"))}
               onClick={onMapClick}
               aria-current={ariaCurrent("map")}
             >
               Map
-            </Link>
+            </MapLink>
           </li>
           <li>
             <Link

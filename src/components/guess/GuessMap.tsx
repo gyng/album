@@ -3,6 +3,7 @@ import Map, { Marker, Source, Layer, useMap } from "react-map-gl/maplibre";
 import type { MapLayerMouseEvent } from "maplibre-gl";
 import { TIER_DANGER } from "./guessScoring";
 import { computeWrapAwareBounds } from "../../util/mapBounds";
+import { MapLibreStyles } from "../MapLibreStyles";
 import styles from "./GuessMap.module.css";
 
 export type GuessMapProps = {
@@ -85,59 +86,62 @@ export const GuessMap: React.FC<GuessMapProps> = ({ guess, reveal, onGuess }) =>
   );
 
   return (
-    <div className={styles.mapContainer} role="region" aria-label="Guess map">
-      <Map
-        mapStyle={MAP_STYLE}
-        initialViewState={{ longitude: 0, latitude: 20, zoom: 1.5 }}
-        scrollZoom
-        dragPan
-        cooperativeGestures={false}
-        onClick={handleClick}
-        cursor={reveal ? "default" : "crosshair"}
-        attributionControl={{ compact: true }}
-      >
-        {guess ? (
-          <Marker longitude={guess.lng} latitude={guess.lat} anchor="center">
-            <div className={styles.guessPin} />
-          </Marker>
-        ) : null}
-
-        {reveal ? (
-          <>
-            <RevealFit guess={guess} reveal={reveal} />
-            <Marker longitude={reveal.lng} latitude={reveal.lat} anchor="center">
-              <div className={styles.actualPin} />
+    <>
+      <MapLibreStyles />
+      <div className={styles.mapContainer} role="region" aria-label="Guess map">
+        <Map
+          mapStyle={MAP_STYLE}
+          initialViewState={{ longitude: 0, latitude: 20, zoom: 1.5 }}
+          scrollZoom
+          dragPan
+          cooperativeGestures={false}
+          onClick={handleClick}
+          cursor={reveal ? "default" : "crosshair"}
+          attributionControl={{ compact: true }}
+        >
+          {guess ? (
+            <Marker longitude={guess.lng} latitude={guess.lat} anchor="center">
+              <div className={styles.guessPin} />
             </Marker>
-            {guess ? (
-              <>
-                <Source id="guess-line" type="geojson" data={lineGeoJson(guess, reveal)}>
-                  <Layer
-                    id="guess-line-glow"
-                    type="line"
-                    paint={{
-                      "line-color": TIER_DANGER,
-                      "line-width": 6,
-                      "line-opacity": 0.2,
-                      "line-blur": 4,
-                    }}
-                  />
-                  <Layer
-                    id="guess-line-layer"
-                    type="line"
-                    paint={{
-                      "line-color": TIER_DANGER,
-                      "line-width": 2,
-                      "line-dasharray": [4, 3],
-                    }}
-                  />
-                </Source>
-              </>
-            ) : null}
-          </>
-        ) : null}
-      </Map>
+          ) : null}
 
-      {!reveal && !guess ? <div className={styles.hint}>Click to place your guess</div> : null}
-    </div>
+          {reveal ? (
+            <>
+              <RevealFit guess={guess} reveal={reveal} />
+              <Marker longitude={reveal.lng} latitude={reveal.lat} anchor="center">
+                <div className={styles.actualPin} />
+              </Marker>
+              {guess ? (
+                <>
+                  <Source id="guess-line" type="geojson" data={lineGeoJson(guess, reveal)}>
+                    <Layer
+                      id="guess-line-glow"
+                      type="line"
+                      paint={{
+                        "line-color": TIER_DANGER,
+                        "line-width": 6,
+                        "line-opacity": 0.2,
+                        "line-blur": 4,
+                      }}
+                    />
+                    <Layer
+                      id="guess-line-layer"
+                      type="line"
+                      paint={{
+                        "line-color": TIER_DANGER,
+                        "line-width": 2,
+                        "line-dasharray": [4, 3],
+                      }}
+                    />
+                  </Source>
+                </>
+              ) : null}
+            </>
+          ) : null}
+        </Map>
+
+        {!reveal && !guess ? <div className={styles.hint}>Click to place your guess</div> : null}
+      </div>
+    </>
   );
 };

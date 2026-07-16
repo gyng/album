@@ -4,6 +4,10 @@
 
 import sqlite3InitModule from "@sqlite.org/sqlite-wasm";
 import { act, renderHook, waitFor } from "@testing-library/react";
+import React from "react";
+import { PlatformProvider } from "../platform";
+import type { PlatformAdapter } from "../platform";
+import { createPlatformAdapter } from "../../test/platformTestAdapter";
 import {
   databaseLoaderInternals,
   EMBEDDINGS_DATABASE_URL,
@@ -138,6 +142,39 @@ describe("useDatabase", () => {
     await waitFor(() => expect(result.current[0]).not.toBeNull());
     expect(global.fetch).toHaveBeenCalledWith(EMBEDDINGS_DATABASE_URL);
     expect(SEARCH_DATABASE_URL).toBe("/search.sqlite");
+  });
+
+  it("loads renderer-provided database URLs", async () => {
+    global.fetch = jest.fn().mockResolvedValue(okFetchResponse()) as typeof fetch;
+    const adapter: PlatformAdapter = createPlatformAdapter({
+      Link: React.forwardRef(({ children, ...props }, ref) => (
+        <a {...props} ref={ref}>
+          {children}
+        </a>
+      )),
+      Head: ({ children }) => children,
+      navigation: {
+        ready: true,
+        searchParams: new URLSearchParams(),
+        getSearchParam: () => null,
+        hasSearchParam: () => false,
+        replaceSearchParams: () => {},
+        subscribeAfterNavigation: () => () => {},
+      },
+      publicConfig: {
+        siteOrigin: "https://renderer.example.com",
+        searchDatabaseUrl: "/renderer-search.sqlite",
+        searchEmbeddingsDatabaseUrl: "/renderer-embeddings.sqlite",
+      },
+    });
+    const wrapper = ({ children }: React.PropsWithChildren) => (
+      <PlatformProvider value={adapter}>{children}</PlatformProvider>
+    );
+
+    const { result } = renderHook(() => useEmbeddingsDatabase(), { wrapper });
+
+    await waitFor(() => expect(result.current[0]).not.toBeNull());
+    expect(global.fetch).toHaveBeenCalledWith("/renderer-embeddings.sqlite");
   });
 
   it.each(["resolve", "reject"])("ignores a late database %s after unmount", async (outcome) => {

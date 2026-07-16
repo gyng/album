@@ -5,6 +5,10 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import MyApp from "../../pages/_app";
 
+jest.mock("../../components/platform/next/NextPlatformProvider", () => ({
+  NextPlatformProvider: ({ children }: React.PropsWithChildren) => children,
+}));
+
 jest.mock("next/head", () => ({
   __esModule: true,
   default: ({ children }: { children: React.ReactNode }) => <>{children}</>,
@@ -49,6 +53,10 @@ describe("custom application", () => {
       <MyApp Component={Page as never} pageProps={{ greeting: "Ready" }} router={{} as never} />,
     );
 
-    await waitFor(() => expect(register).toHaveBeenCalledWith("/sw.js"));
+    await waitFor(() =>
+      expect(register).toHaveBeenCalledWith(expect.stringMatching(/^\/sw\.js\?v=.+/), {
+        updateViaCache: "none",
+      }),
+    );
   });
 });

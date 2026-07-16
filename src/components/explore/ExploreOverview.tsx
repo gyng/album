@@ -1,7 +1,7 @@
 import { mergeCssModuleStyles } from "../../util/mergeCssModuleStyles";
 import { Caption, Card, Heading, Pill } from "../ui";
-import sharedStyles from "../../pages/explore/explore.module.css";
-import localStyles from "../../pages/explore/ExploreOverview.module.css";
+import sharedStyles from "./ExploreShared.module.css";
+import localStyles from "./ExploreOverview.module.css";
 import type { OverviewCard } from "./exploreViewModel";
 
 const styles = mergeCssModuleStyles(sharedStyles, localStyles, [

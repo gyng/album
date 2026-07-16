@@ -1,7 +1,6 @@
 import Fraction from "fraction.js";
-import dynamic from "next/dynamic";
 import styles from "./Photo.module.css";
-import { PhotoBlock } from "../services/types";
+import type { PhotoBlock } from "../services/types";
 import { MapDeferred } from "./MapDeferred";
 import React from "react";
 import { License } from "../License";
@@ -28,14 +27,7 @@ import {
   ISO_FACET,
 } from "../util/photoBuckets";
 import { exifWallClockTimestamp, normaliseExifWallClockIso } from "../util/exifTime";
-
-const PhotoSimilarPhotosDeferred = dynamic(
-  () => import("./PhotoSimilarPhotos").then((mod) => mod.PhotoSimilarPhotos),
-  {
-    loading: () => <p className={styles.similarPhotosStatus}>Loading similar photos…</p>,
-    ssr: false,
-  },
-);
+import { PhotoSimilarPhotosDeferred } from "./PhotoSimilarPhotosDeferred";
 
 type ExifCoordinatesRowProps = {
   kind: "coordinates";
@@ -52,6 +44,15 @@ type ExifCoordinatesRowProps = {
   options: {
     showMap: boolean;
   };
+};
+
+const getDisplayDimensions = (block: PhotoBlock): { width: number; height: number } => {
+  const isExifPortrait =
+    block._build.exif.Orientation?.includes("270") || block._build.exif.Orientation?.includes("90");
+
+  return isExifPortrait
+    ? { width: block._build.height, height: block._build.width }
+    : { width: block._build.width, height: block._build.height };
 };
 
 const ExifCoordinatesRow: React.FC<{ row: ExifCoordinatesRowProps }> = (props) => {
@@ -244,12 +245,8 @@ export const Picture: React.FC<{
   label?: string;
   useColourPlaceholder?: boolean;
 }> = (props) => {
-  // Dimensions have to be flipped if image is rotated using EXIF
-  const isExifPortrait =
-    props.block._build.exif.Orientation?.includes("270") ||
-    props.block._build.exif.Orientation?.includes("90");
-  const actualWidth = isExifPortrait ? props.block._build.height : props.block._build.width;
-  const actualHeight = isExifPortrait ? props.block._build.width : props.block._build.height;
+  // Dimensions have to be flipped if image is rotated using EXIF.
+  const { width: actualWidth, height: actualHeight } = getDisplayDimensions(props.block);
 
   const colour = props.block._build.tags.colors?.[0];
   const placeholderColour = colour ? rgbToString(colour) : "transparent";
@@ -312,12 +309,21 @@ export const PhotoBlockEl: React.FC<{
   const focalLengthSelection =
     getBucketFacetSelection(FOCAL_LENGTH_35MM_FACET.id, exif.FocalLengthIn35mmFormat) ??
     getBucketFacetSelection(FOCAL_LENGTH_ACTUAL_FACET.id, exif.FocalLength);
+  const displayDimensions = getDisplayDimensions(props.block);
 
   return (
     <div
       className={`${styles.block} ${props.block.formatting?.immersive ? styles.immersive : ""}`}
       ref={anchorRef}
       data-testid="photoblockel"
+      style={{
+        // Lets CSS compute the rendered (centred, viewport-capped) image
+        // width so the details toggle can sit at the image's edge.
+        ["--photo-aspect" as string]: (
+          displayDimensions.width / Math.max(1, displayDimensions.height)
+        ).toFixed(4),
+        ["--photo-intrinsic-width" as string]: `${displayDimensions.width}px`,
+      }}
     >
       <Picture block={props.block} lazy={props.currentIndex > 2} useColourPlaceholder />
 
@@ -347,8 +353,14 @@ export const PhotoBlockEl: React.FC<{
             setIsDetailsOpen(ev.currentTarget.open);
           }}
         >
-          <summary title="More details&hellip;" className={commonStyles.mediaDetailsSummary}>
-            <span>ⓘ</span>
+          <summary
+            aria-label="Photo details"
+            title="Photo details"
+            className={commonStyles.mediaDetailsSummary}
+          >
+            <span aria-hidden="true" className={commonStyles.mediaDetailsGlyph}>
+              ⓘ
+            </span>
           </summary>
 
           {isDetailsOpen ? (

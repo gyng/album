@@ -1,6 +1,6 @@
 import { mergeCssModuleStyles } from "../../util/mergeCssModuleStyles";
 import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
-import Link from "next/link";
+import { AppLink as Link } from "../platform";
 import { SegmentedToggle, pillStyles } from "../ui";
 import sharedStyles from "./Search.module.css";
 import localStyles from "./SimilarTrailBar.module.css";

@@ -1,4 +1,4 @@
-import { MapWorldEntry } from "./MapWorld";
+import type { MapWorldEntry } from "../util/pageDataTypes";
 import {
   ROUTE_SIMPLIFY_THRESHOLD,
   buildContextRouteGeoJson,

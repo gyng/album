@@ -275,6 +275,33 @@ describe("getAlbum", () => {
     }
   });
 
+  it("hides test fixture albums unless explicitly included", async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "album-list-test-"));
+    const previousIncludeTestAlbums = process.env.ALBUM_INCLUDE_TEST_ALBUMS;
+    fs.mkdirSync(path.join(root, "real"));
+    fs.mkdirSync(path.join(root, "test-simple"));
+    fs.mkdirSync(path.join(root, "test-manifest-v2"));
+    delete process.env.ALBUM_INCLUDE_TEST_ALBUMS;
+
+    try {
+      await expect(getAlbumNames(root)).resolves.toEqual(["real"]);
+
+      process.env.ALBUM_INCLUDE_TEST_ALBUMS = "1";
+      await expect(getAlbumNames(root)).resolves.toEqual([
+        "real",
+        "test-manifest-v2",
+        "test-simple",
+      ]);
+    } finally {
+      if (previousIncludeTestAlbums === undefined) {
+        delete process.env.ALBUM_INCLUDE_TEST_ALBUMS;
+      } else {
+        process.env.ALBUM_INCLUDE_TEST_ALBUMS = previousIncludeTestAlbums;
+      }
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it("supports the default albums directory adapters without reading media", async () => {
     const readdir = jest.spyOn(fs, "readdirSync").mockReturnValue([]);
 

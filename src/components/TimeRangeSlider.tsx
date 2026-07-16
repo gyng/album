@@ -7,7 +7,7 @@ import {
   formatDisplayDate,
   type DateExtent,
 } from "../util/timeRange";
-import type { MapWorldEntry } from "./MapWorld";
+import type { MapWorldEntry } from "../util/pageDataTypes";
 import styles from "./TimeRangeSlider.module.css";
 
 const BIN_COUNT = 100;

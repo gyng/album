@@ -69,7 +69,7 @@ jest.mock("../../../util/navigate", () => ({
   reloadCurrentPage: () => mockReloadCurrentPage(),
 }));
 
-const SlideshowPage = require("../../../pages/slideshow/index").default;
+const SlideshowPage = require("../../../screens/slideshow/SlideshowScreen").default;
 
 describe("slideshow page", () => {
   const originalFetch = global.fetch;
@@ -317,7 +317,7 @@ describe("slideshow page", () => {
     expect(screen.getByRole("button", { name: /shuffle/i }).getAttribute("aria-pressed")).toBe(
       "true",
     );
-    for (const name of [/🕰/i, /details/i, /^map$/i, /fill screen/i]) {
+    for (const name of [/show clock/i, /details/i, /^map$/i, /fill screen/i]) {
       expect(screen.getByRole("button", { name }).getAttribute("aria-pressed")).toBe("true");
     }
     expect(screen.getByRole("button", { name: /right/i })).toBeTruthy();

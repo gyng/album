@@ -39,32 +39,26 @@ export const buildMapPhotoSearchText = (photo: PhotoBlock): string => {
     .join(" ");
 };
 
-type FetchLike = (input: string) => Promise<{
+type FetchLike = (
+  input: string,
+  init?: RequestInit,
+) => Promise<{
   ok: boolean;
   status?: number;
   json: () => Promise<unknown>;
 }>;
 
-export const getNextBuildId = (): string | null => {
-  if (typeof window === "undefined") {
-    return null;
-  }
-  const nextData = (window as unknown as { __NEXT_DATA__?: { buildId?: unknown } }).__NEXT_DATA__;
-  return typeof nextData?.buildId === "string" ? nextData.buildId : null;
-};
+export const MAP_SEARCH_INDEX_URL = "/data/map-search-index.json";
 
 export const fetchMapSearchIndex = async (
-  buildId: string,
-  fetcher: FetchLike = (input) => fetch(input),
+  fetcher: FetchLike = (input, init) => fetch(input, init),
 ): Promise<Map<string, string>> => {
-  const response = await fetcher(
-    `/_next/data/${encodeURIComponent(buildId)}/map/search-index.json`,
-  );
+  const response = await fetcher(MAP_SEARCH_INDEX_URL, { cache: "no-store" });
   if (!response.ok) {
     throw new Error(`Failed to load map search index (${response.status ?? "unknown"})`);
   }
-  const payload = (await response.json()) as { pageProps?: { entries?: unknown } };
-  const entries = Array.isArray(payload.pageProps?.entries) ? payload.pageProps.entries : [];
+  const payload = (await response.json()) as { entries?: unknown };
+  const entries = Array.isArray(payload.entries) ? payload.entries : [];
   return new Map(
     entries.filter(
       (entry): entry is MapSearchIndexEntry =>

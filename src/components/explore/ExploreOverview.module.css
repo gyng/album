@@ -61,6 +61,7 @@
     flex-wrap: nowrap;
     overflow-x: auto;
     overscroll-behavior-inline: contain;
+    scrollbar-width: thin;
     padding-block-end: var(--size-3);
   }
 }

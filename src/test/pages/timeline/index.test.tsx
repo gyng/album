@@ -26,7 +26,7 @@ jest.mock("../../../components/TimelineDayGrid", () => ({
   TimelineDayGrid: () => null,
 }));
 
-const { getStaticProps: getTimelinePageStaticProps } = require("../../../pages/timeline/index");
+const { loadTimelinePageData } = require("../../../services/pageData/timeline");
 
 describe("timeline page data fetching", () => {
   beforeEach(() => {
@@ -95,10 +95,10 @@ describe("timeline page data fetching", () => {
       },
     ]);
 
-    const actual = await getTimelinePageStaticProps({});
+    const actual = await loadTimelinePageData();
 
-    expect(actual.props.entryRows.every((row: unknown) => Array.isArray(row))).toBe(true);
-    expect(actual.props.entryRows.map(unpackTimelineEntry)).toEqual([
+    expect(actual.entryRows.every((row: unknown) => Array.isArray(row))).toBe(true);
+    expect(actual.entryRows.map(unpackTimelineEntry)).toEqual([
       {
         album: "tokyo",
         date: "2024-03-05",
@@ -170,8 +170,8 @@ describe("timeline page data fetching", () => {
       },
     ]);
 
-    const result = await getTimelinePageStaticProps({});
-    const entries = result.props.entryRows.map(unpackTimelineEntry);
+    const result = await loadTimelinePageData();
+    const entries = result.entryRows.map(unpackTimelineEntry);
     expect(entries.map((entry: { path: string }) => entry.path)).toEqual([
       "nested/a.jpg",
       "nested/b.jpg",

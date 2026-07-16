@@ -106,10 +106,23 @@
 /* Button row — daily + play side by side */
 .buttonRow {
   display: flex;
+  flex-wrap: wrap;
   gap: var(--m-m);
   justify-content: center;
-  align-items: center;
+  align-items: end;
   animation: buttonEnter var(--t-enter) var(--t-medium) var(--ease-spring) both;
+}
+
+.dailyAction {
+  display: grid;
+  justify-items: center;
+  gap: var(--m);
+  max-inline-size: calc(var(--m-xl) * 4);
+  text-align: center;
+}
+
+.dailyDescription {
+  line-height: 1.35;
 }
 
 /* Daily button — secondary, understated */

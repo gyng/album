@@ -1,8 +1,8 @@
-import Link from "next/link";
+import { AppLink as Link } from "./platform";
 import React from "react";
 import { getRelativeTimeString } from "../util/time";
 import styles from "./CalendarHeatmap.module.css";
-import { TimelineEntry } from "./timelineTypes";
+import type { TimelineEntry } from "../util/pageDataTypes";
 import { PillButton } from "./ui";
 import {
   formatCalendarLongDate,

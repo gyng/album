@@ -4,7 +4,7 @@
 
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { Profiler, type ReactNode } from "react";
-import { MapWorldEntry } from "./MapWorld";
+import type { MapWorldEntry } from "../util/pageDataTypes";
 
 const mapHandlers: {
   onMoveStart?: () => void;
@@ -145,23 +145,6 @@ jest.mock("react-map-gl/maplibre", () => {
     useMap: () => mapRef,
   };
 });
-
-jest.mock("next/link", () => ({
-  __esModule: true,
-  default: ({
-    href,
-    children,
-    className,
-  }: {
-    href: string;
-    children: ReactNode;
-    className?: string;
-  }) => (
-    <a href={href} className={className}>
-      {children}
-    </a>
-  ),
-}));
 
 jest.mock("usehooks-ts", () => ({
   useIntersectionObserver: () => ({

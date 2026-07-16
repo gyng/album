@@ -16,7 +16,7 @@ describe("VideoBlock", () => {
       />,
     );
 
-    fireEvent.click(screen.getByTitle("More details…"));
+    fireEvent.click(screen.getByLabelText("Video details"));
 
     expect(screen.getAllByTestId("videoblockel")).toHaveLength(1);
     expect(screen.getByText("Type")).toBeTruthy();
@@ -64,7 +64,7 @@ describe("VideoBlock", () => {
       />,
     );
 
-    fireEvent.click(screen.getByTitle("More details…"));
+    fireEvent.click(screen.getByLabelText("Video details"));
 
     expect(screen.getAllByTestId("videoblockel")).toHaveLength(1);
     expect(screen.getByText("local")).toBeTruthy();

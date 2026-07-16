@@ -1,6 +1,6 @@
 import React from "react";
 import { useMap } from "react-map-gl/maplibre";
-import type { MapWorldEntry } from "./MapWorld";
+import type { MapWorldEntry } from "../util/pageDataTypes";
 
 const DIRECTOR_CADENCE_MS = 7_500;
 const DIRECTOR_FLIGHT_MS = 4_600;

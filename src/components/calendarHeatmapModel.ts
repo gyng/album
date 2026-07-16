@@ -1,4 +1,4 @@
-import type { TimelineEntry } from "./timelineTypes";
+import type { TimelineEntry } from "../util/pageDataTypes";
 import { rgbToString } from "../util/colorDistance";
 
 const DAY_MS = 24 * 60 * 60 * 1000;

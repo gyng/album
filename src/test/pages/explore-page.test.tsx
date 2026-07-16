@@ -113,7 +113,8 @@ jest.mock("../../components/ui", () => ({
   pillStyles: { base: "base", ghost: "ghost" },
 }));
 
-import ExplorePage, { getStaticProps } from "../../pages/explore";
+import ExplorePage from "../../screens/explore/ExploreScreen";
+import { loadExplorePageData } from "../../services/pageData/explore";
 
 const { getAlbums } = jest.requireMock("../../services/album") as { getAlbums: jest.Mock };
 const { computePhotoStats } = jest.requireMock("../../util/computeStats") as {
@@ -338,15 +339,14 @@ describe("explore page", () => {
     computePhotoStats.mockReturnValue(stats);
     computeVisualSamenessStats.mockResolvedValueOnce(makeVisualSameness());
 
-    await expect(getStaticProps({} as never)).resolves.toEqual({
-      props: { stats, visualSameness: makeVisualSameness() },
+    await expect(loadExplorePageData()).resolves.toEqual({
+      stats,
+      visualSameness: makeVisualSameness(),
     });
 
     const error = jest.spyOn(console, "error").mockImplementation(() => {});
     computeVisualSamenessStats.mockRejectedValueOnce(new Error("corrupt database"));
-    await expect(getStaticProps({} as never)).resolves.toEqual({
-      props: { stats, visualSameness: null },
-    });
+    await expect(loadExplorePageData()).resolves.toEqual({ stats, visualSameness: null });
     expect(error).toHaveBeenCalledWith(
       "Failed to compute visual sameness stats",
       expect.any(Error),

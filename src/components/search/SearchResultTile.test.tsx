@@ -5,15 +5,6 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { SearchResultTile } from "./SearchResultTile";
 
-jest.mock("next/link", () => ({
-  __esModule: true,
-  default: ({ children, href, className }: any) => (
-    <a href={href} className={className}>
-      {children}
-    </a>
-  ),
-}));
-
 const makeResult = (overrides: Record<string, unknown> = {}) => ({
   path: "../albums/test-simple/DSCF0593.jpg",
   album_relative_path: "/album/test-simple#DSCF0593.jpg",

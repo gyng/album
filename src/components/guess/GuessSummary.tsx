@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from "react";
-import Link from "next/link";
+import { AppLink as Link } from "../platform";
 import { Button, Caption, Heading } from "../ui";
 import { RoundResult } from "./GuessRound";
 import { GameSettings } from "./guessTypes";

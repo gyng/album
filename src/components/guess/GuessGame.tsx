@@ -1,5 +1,4 @@
 import React, { useCallback, useEffect, useReducer, useState } from "react";
-import dynamic from "next/dynamic";
 import { Database } from "@sqlite.org/sqlite-wasm";
 import { fetchGuessPhotos, RandomPhotoRow } from "../search/api";
 import { extractGPSFromExifString } from "../../util/extractExifFromDb";
@@ -8,11 +7,7 @@ import { GuessSummary } from "./GuessSummary";
 import { GuessLobby } from "./GuessLobby";
 import { GameSettings, GuessPhoto } from "./guessTypes";
 import styles from "./GuessGame.module.css";
-
-const GuessMap = dynamic(() => import("./GuessMapExport"), {
-  loading: () => <div className={styles.mapLoading} />,
-  ssr: false,
-});
+import { GuessMapDeferred } from "./GuessMapDeferred";
 
 type GuessGameProps = {
   database: Database;
@@ -270,7 +265,7 @@ export const GuessGame: React.FC<GuessGameProps> = ({
       onReveal={handleReveal}
       onAbort={handleChangeSettings}
       mapSlot={
-        <GuessMap
+        <GuessMapDeferred
           guess={guess}
           reveal={revealed ? { lat: photo.lat, lng: photo.lng } : undefined}
           onGuess={handleGuess}

@@ -22,9 +22,16 @@ export const ALBUMS_DIR = "../albums";
 export const MANIFEST_NAME = "manifest.json";
 export const MANIFEST_V2_NAME = "album.json";
 
+// The committed CI fixture albums (albums/test-*) live alongside real albums
+// in a full working copy, so production listings must hide them. E2E builds
+// opt back in via ALBUM_INCLUDE_TEST_ALBUMS=1 (set by build:e2e); pass it to
+// `npm run dev` too when running test:e2e:reuse against a dev server.
+const isHiddenFixtureAlbum = (name: string): boolean =>
+  name.startsWith("test-") && process.env.ALBUM_INCLUDE_TEST_ALBUMS !== "1";
+
 const listAlbumDirectories = (albumsPath: string): string[] => {
   return fs.readdirSync(albumsPath).filter((it) => {
-    return fs.lstatSync(path.join(albumsPath, it)).isDirectory();
+    return !isHiddenFixtureAlbum(it) && fs.lstatSync(path.join(albumsPath, it)).isDirectory();
   });
 };
 

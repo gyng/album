@@ -1,6 +1,6 @@
 import { exifWallClockTimestamp, parseExifLocalDateTime } from "../util/exifTime";
 import { recencyColor } from "../util/mapColor";
-import type { MapWorldEntry, TimeRange } from "./MapWorld";
+import type { MapWorldEntry, TimeRange } from "../util/pageDataTypes";
 
 export type MapBounds = {
   north: number;

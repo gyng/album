@@ -1,4 +1,4 @@
-import type { MapWorldEntry } from "./MapWorld";
+import type { MapWorldEntry } from "../util/pageDataTypes";
 import { buildMapDirectorSequence } from "./mapDirector";
 
 const photo = (overrides: Partial<MapWorldEntry>): MapWorldEntry => ({

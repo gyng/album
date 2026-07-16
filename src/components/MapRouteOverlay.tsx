@@ -23,7 +23,7 @@ const useMapOverlayVersion = () => {
 
     let frameId: number | null = null;
     const update = () => {
-      if (process.env.NODE_ENV === "test") {
+      if (typeof requestAnimationFrame !== "function") {
         setVersion((current) => current + 1);
         return;
       }

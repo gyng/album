@@ -11,36 +11,26 @@ import type { RoundResult } from "./GuessRound";
 
 let mockStartSettings: GameSettings = { rounds: 2, timeLimit: 30, region: "Japan" };
 
-jest.mock("next/dynamic", () => ({
-  __esModule: true,
-  default: (_loader: () => Promise<unknown>, options: { loading: () => React.ReactNode }) => {
-    void _loader();
-    void options.loading();
-    return ({
-      guess,
-      reveal,
-      onGuess,
-    }: {
-      guess: unknown;
-      reveal?: unknown;
-      onGuess: (lat: number, lng: number) => void;
-    }) => (
-      <button
-        type="button"
-        data-testid="guess-map"
-        data-guess={JSON.stringify(guess)}
-        data-reveal={JSON.stringify(reveal)}
-        onClick={() => onGuess(10, 20)}
-      >
-        Map
-      </button>
-    );
-  },
-}));
-
-jest.mock("./GuessMapExport", () => ({
-  __esModule: true,
-  default: () => null,
+jest.mock("./GuessMapDeferred", () => ({
+  GuessMapDeferred: ({
+    guess,
+    reveal,
+    onGuess,
+  }: {
+    guess: unknown;
+    reveal?: unknown;
+    onGuess: (lat: number, lng: number) => void;
+  }) => (
+    <button
+      type="button"
+      data-testid="guess-map"
+      data-guess={JSON.stringify(guess)}
+      data-reveal={JSON.stringify(reveal)}
+      onClick={() => onGuess(10, 20)}
+    >
+      Map
+    </button>
+  ),
 }));
 
 jest.mock("../search/api", () => ({

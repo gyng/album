@@ -1,4 +1,4 @@
-import type { TimelineEntry } from "./timelineTypes";
+import type { TimelineEntry } from "../util/pageDataTypes";
 import {
   formatCalendarLongDate,
   formatCalendarShortDate,

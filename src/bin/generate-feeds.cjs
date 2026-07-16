@@ -1,7 +1,7 @@
 /**
- * Pre-build script: generates feed.xml, sitemap.xml, and per-album feed.xml
- * as static files in public/. These were previously SSR pages that read from
- * ../albums at request time, which fails on Vercel where albums aren't deployed.
+ * Pre-build script: generates robots.txt, feed.xml, sitemap.xml, and per-album
+ * feed.xml as static files in public/. These resources have no request-time
+ * dependencies and can be served by any static host.
  */
 const fs = require("fs");
 const path = require("path");
@@ -334,6 +334,17 @@ const generateSitemap = (albumEntries) => {
   return buildSitemapXml(entries);
 };
 
+const buildRobotsTxt = () =>
+  [
+    "User-agent: *",
+    "Allow: /",
+    "Disallow: /search",
+    "Disallow: /slideshow",
+    "",
+    `Sitemap: ${getCanonicalUrl("/sitemap.xml")}`,
+    "",
+  ].join("\n");
+
 // --- Main ---
 
 const ensureDir = (dirPath) => fs.mkdirSync(dirPath, { recursive: true });
@@ -377,6 +388,10 @@ const cleanupStaleAlbumFeeds = (validSlugs, outputDirectory) => {
 const run = ({ albumsDirectory, outputDirectory, log = console.log }) => {
   const albumEntries = getAlbumDirectoryEntries(albumsDirectory);
 
+  // robots.txt does not depend on album discovery, so generate it even when a
+  // checkout has no local album source directories.
+  writeFile(path.join(outputDirectory, "robots.txt"), buildRobotsTxt());
+
   if (albumEntries.length === 0) {
     log("No albums found — skipping feed generation");
     return { generatedAlbumFeeds: 0, removedFeeds: 0 };
@@ -417,13 +432,14 @@ const run = ({ albumsDirectory, outputDirectory, log = console.log }) => {
   );
 
   log(
-    `Generated feeds: feed.xml, sitemap.xml, ${feedEntries.length} album feeds` +
+    `Generated static metadata: robots.txt, feed.xml, sitemap.xml, ${feedEntries.length} album feeds` +
       (removedFeeds > 0 ? `, removed ${removedFeeds} stale album feed(s)` : ""),
   );
   return { generatedAlbumFeeds: feedEntries.length, removedFeeds };
 };
 
 module.exports = {
+  buildRobotsTxt,
   buildRssXml,
   buildSitemapXml,
   cleanupStaleAlbumFeeds,

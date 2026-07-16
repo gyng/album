@@ -37,7 +37,8 @@ jest.mock("../../components/ui", () => ({
   Heading: ({ children }: { children: React.ReactNode }) => <h1>{children}</h1>,
 }));
 
-import Home, { getStaticProps } from "../../pages/index";
+import Home from "../../screens/HomeScreen";
+import { loadHomePageData } from "../../services/pageData/home";
 
 const { getAlbums: mockGetAlbums, getImageTimestampRange: mockGetImageTimestampRange } =
   jest.requireMock("../../services/album") as {
@@ -105,21 +106,21 @@ describe("home page", () => {
       album("empty", [text("only-text")]),
     ]);
 
-    const result = (await getStaticProps({} as never)) as { props: { albums: Content[] } };
+    const result = await loadHomePageData();
 
-    expect(result.props.albums.map(({ name }) => name)).toEqual([
+    expect(result.albums.map(({ name }) => name)).toEqual([
       "featured",
       "recent",
       "older",
       "empty",
       "test-fixture",
     ]);
-    expect(result.props.albums[0]?.blocks.map(({ id }) => id)).toEqual(["hero.jpg", "first.jpg"]);
-    expect(result.props.albums[1]?.blocks.map(({ id }) => id)).toEqual(["cover.jpg"]);
-    expect(result.props.albums[2]?.blocks.map(({ id }) => id)).toEqual(["first.jpg"]);
-    expect(result.props.albums[3]?.blocks).toEqual([]);
-    expect(result.props.albums[1]?._build.timeRange).toEqual(["2025-01-01", "2025-02-01"]);
-    const previewCover = result.props.albums[1]?.blocks[0];
+    expect(result.albums[0]?.blocks.map(({ id }) => id)).toEqual(["hero.jpg", "first.jpg"]);
+    expect(result.albums[1]?.blocks.map(({ id }) => id)).toEqual(["cover.jpg"]);
+    expect(result.albums[2]?.blocks.map(({ id }) => id)).toEqual(["first.jpg"]);
+    expect(result.albums[3]?.blocks).toEqual([]);
+    expect(result.albums[1]?._build.timeRange).toEqual(["2025-01-01", "2025-02-01"]);
+    const previewCover = result.albums[1]?.blocks[0];
     expect(previewCover).toBeDefined();
     expect((previewCover as PhotoBlock)._build).toEqual({
       width: 100,

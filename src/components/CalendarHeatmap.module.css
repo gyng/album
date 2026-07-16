@@ -315,6 +315,8 @@
     max-inline-size: 100%;
     overflow-x: auto;
     overscroll-behavior-inline: contain;
+    /* The default scrollbar reads as a heavy bar under every year grid. */
+    scrollbar-width: thin;
   }
 
   .yearTrack {

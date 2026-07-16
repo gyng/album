@@ -30,6 +30,10 @@ jest.mock("react-map-gl/maplibre", () => {
   };
 });
 
+jest.mock("./MapLibreStyles", () => ({
+  MapLibreStyles: () => <link data-testid="maplibre-styles" />,
+}));
+
 describe("MMap", () => {
   beforeEach(() => {
     flyTo.mockClear();
@@ -42,6 +46,7 @@ describe("MMap", () => {
   it("renders the album map link as a relative app route", () => {
     render(<MMap coordinates={[35.6762, 139.6503]} />);
 
+    expect(screen.getByTestId("maplibre-styles")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Album map" }).getAttribute("href")).toBe(
       "/map?lat=35.6762&lon=139.650&zoom=14",
     );

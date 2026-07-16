@@ -3,6 +3,28 @@
   background-color: color-mix(in oklch, var(--c-bg-contrast-light) 14%, var(--c-bg));
 }
 
+/* Vertical rule separating contextual (e.g. album-scoped) actions from the
+   global destinations in the nav. The rule lives on ::before so the list
+   item's own sizing rules cannot stretch it. */
+.navDivider {
+  display: flex;
+  align-items: center;
+}
+
+.navDivider::before {
+  content: "";
+  inline-size: var(--line-hairline);
+  block-size: var(--m-l);
+  background: color-mix(in oklch, var(--c-bg-contrast-light) 55%, transparent);
+}
+
+/* Contextual nav actions: same geometry as the global pills, quieter chrome,
+   so scope reads at a glance. */
+.navContext {
+  border-color: transparent;
+  background-color: color-mix(in oklch, var(--c-bg-contrast-light) 10%, transparent);
+}
+
 .toast {
   background-color: var(--c-bg);
   padding: var(--m-m) var(--m-l);
@@ -198,6 +220,25 @@
 
 .mediaDetailsSummary::-webkit-details-marker {
   display: none;
+}
+
+/* Circled chip so the details toggle reads as a control, not a stray glyph. */
+.mediaDetailsGlyph {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: var(--size-28);
+  block-size: var(--size-28);
+  border: solid var(--line-hairline)
+    color-mix(in oklch, var(--c-bg-contrast-light) 45%, transparent);
+  border-radius: var(--radius-pill);
+  background: color-mix(in oklch, var(--c-bg-contrast-light) 10%, transparent);
+  font-size: var(--fs-sm);
+  transition: background-color var(--t-fast);
+}
+
+.mediaDetails summary:hover .mediaDetailsGlyph {
+  background: color-mix(in oklch, var(--c-bg-contrast-light) 26%, transparent);
 }
 
 .mediaDetailsContent {

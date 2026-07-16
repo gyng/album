@@ -185,7 +185,7 @@ import {
   formatSearchDbVersion,
   isTouchOrPen,
   remapSlideshowPeek,
-} from "../../../pages/slideshow";
+} from "../../../screens/slideshow/SlideshowScreen";
 
 const photo = (id: string, album = "trip") => ({
   path: `../albums/${album}/${id}.jpg`,

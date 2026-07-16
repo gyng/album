@@ -3,7 +3,6 @@ import {
   buildMapPhotoSearchText,
   fetchMapSearchIndex,
   getMapPhotoHref,
-  getNextBuildId,
   hasMapCoordinates,
 } from "./mapSearchIndex";
 
@@ -78,79 +77,54 @@ describe("mapSearchIndex", () => {
     expect(hasMapCoordinates(candidate)).toBe(true);
   });
 
-  it("fetches and validates the separate static Next data chunk", async () => {
+  it("fetches and validates the stable public data endpoint", async () => {
     const fetcher = jest.fn().mockResolvedValue({
       ok: true,
       json: async () => ({
-        pageProps: {
-          entries: [
-            ["/album/hong-kong#cat.jpg", "cute cat"],
-            ["bad"],
-            "not-a-tuple",
-            [42, "numeric href"],
-            ["/valid-href", 42],
-          ],
-        },
+        entries: [
+          ["/album/hong-kong#cat.jpg", "cute cat"],
+          ["bad"],
+          "not-a-tuple",
+          [42, "numeric href"],
+          ["/valid-href", 42],
+        ],
       }),
     });
 
-    await expect(fetchMapSearchIndex("build/hash", fetcher)).resolves.toEqual(
+    await expect(fetchMapSearchIndex(fetcher)).resolves.toEqual(
       new Map([["/album/hong-kong#cat.jpg", "cute cat"]]),
     );
-    expect(fetcher).toHaveBeenCalledWith("/_next/data/build%2Fhash/map/search-index.json");
+    expect(fetcher).toHaveBeenCalledWith("/data/map-search-index.json", { cache: "no-store" });
   });
 
   it("returns an empty index for a payload without an entries array", async () => {
     const fetcher = jest.fn().mockResolvedValue({
       ok: true,
-      json: async () => ({ pageProps: {} }),
+      json: async () => ({}),
     });
 
-    await expect(fetchMapSearchIndex("build", fetcher)).resolves.toEqual(new Map());
+    await expect(fetchMapSearchIndex(fetcher)).resolves.toEqual(new Map());
   });
 
   it("reports static-data response failures with and without a status code", async () => {
     await expect(
       fetchMapSearchIndex(
-        "build",
         jest.fn().mockResolvedValue({ ok: false, status: 503, json: async () => ({}) }),
       ),
     ).rejects.toThrow("Failed to load map search index (503)");
 
     await expect(
-      fetchMapSearchIndex(
-        "build",
-        jest.fn().mockResolvedValue({ ok: false, json: async () => ({}) }),
-      ),
+      fetchMapSearchIndex(jest.fn().mockResolvedValue({ ok: false, json: async () => ({}) })),
     ).rejects.toThrow("Failed to load map search index (unknown)");
   });
 
   it("uses the browser fetch implementation by default", async () => {
     const fetchSpy = jest.spyOn(globalThis, "fetch").mockResolvedValue({
       ok: true,
-      json: async () => ({ pageProps: { entries: [["/photo", "search text"]] } }),
+      json: async () => ({ entries: [["/photo", "search text"]] }),
     } as Response);
 
-    await expect(fetchMapSearchIndex("default-build")).resolves.toEqual(
-      new Map([["/photo", "search text"]]),
-    );
+    await expect(fetchMapSearchIndex()).resolves.toEqual(new Map([["/photo", "search text"]]));
     fetchSpy.mockRestore();
-  });
-
-  it("reads a string Next build ID only in a browser environment", () => {
-    expect(getNextBuildId()).toBeNull();
-
-    Object.defineProperty(globalThis, "window", {
-      configurable: true,
-      value: { __NEXT_DATA__: { buildId: "next-build" } },
-    });
-    expect(getNextBuildId()).toBe("next-build");
-
-    Object.assign(window, { __NEXT_DATA__: { buildId: 123 } });
-    expect(getNextBuildId()).toBeNull();
-
-    Object.assign(window, { __NEXT_DATA__: undefined });
-    expect(getNextBuildId()).toBeNull();
-    Reflect.deleteProperty(globalThis, "window");
   });
 });

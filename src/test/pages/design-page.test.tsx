@@ -7,7 +7,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 jest.mock("../../components/GlobalNav", () => ({ GlobalNav: () => <nav /> }));
 jest.mock("../../components/Seo", () => ({ Seo: () => null }));
 
-import DesignPage, { getStaticProps } from "../../pages/design";
+import DesignPage from "../../screens/design/DesignScreen";
 
 describe("design catalogue", () => {
   it("renders the shared primitives and keeps interactive examples live", () => {
@@ -26,9 +26,5 @@ describe("design catalogue", () => {
       "true",
     );
     expect(screen.getByText(".stackPage (64px)")).toBeInTheDocument();
-  });
-
-  it("has no build-time data dependencies", async () => {
-    await expect(getStaticProps({} as never)).resolves.toEqual({ props: {} });
   });
 });

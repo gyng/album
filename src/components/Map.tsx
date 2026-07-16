@@ -5,8 +5,9 @@ import pinStyles from "./mapPin.module.css";
 
 import Map, { Marker, useMap } from "react-map-gl/maplibre";
 import type { ProjectionSpecification } from "maplibre-gl";
-import Link from "next/link";
+import { AppLink as Link } from "./platform";
 import { computeWrapAwareBounds } from "../util/mapBounds";
+import { MapLibreStyles } from "./MapLibreStyles";
 
 type MapTilerMapStyle =
   | "aquarelle"
@@ -100,60 +101,63 @@ const MMapComponent: React.FC<MapProps> = (props) => {
   const primary = coords[0] ?? ([0, 0] as [number, number]);
 
   return (
-    <div className={styles.map}>
-      <Map
-        style={props.style}
-        // mapStyle="https://tiles.openfreemap.org/styles/liberty"
-        mapStyle={`https://api.maptiler.com/maps/${mapStyle}/style.json?key=mrjUpLh9Syjz9wcEY2Vb`}
-        initialViewState={{
-          longitude: primary[1],
-          latitude: primary[0],
-          zoom: ZOOM,
-        }}
-        projection={projectionSpec}
-        attributionControl={props.attribution === false ? false : { compact: true }}
-      >
-        {coords.map(([lat, lng], idx) => (
-          <Marker
-            key={`${lat}-${lng}-${idx}`}
-            longitude={lng}
-            latitude={lat}
-            anchor="center"
-            style={props.markerStyle ?? {}}
-          >
-            <span data-map-pin className={pinStyles.pin} />
-          </Marker>
-        ))}
-        <MapFlyer coordinates={coords} />
-      </Map>
+    <>
+      <MapLibreStyles />
+      <div className={styles.map}>
+        <Map
+          style={props.style}
+          // mapStyle="https://tiles.openfreemap.org/styles/liberty"
+          mapStyle={`https://api.maptiler.com/maps/${mapStyle}/style.json?key=mrjUpLh9Syjz9wcEY2Vb`}
+          initialViewState={{
+            longitude: primary[1],
+            latitude: primary[0],
+            zoom: ZOOM,
+          }}
+          projection={projectionSpec}
+          attributionControl={props.attribution === false ? false : { compact: true }}
+        >
+          {coords.map(([lat, lng], idx) => (
+            <Marker
+              key={`${lat}-${lng}-${idx}`}
+              longitude={lng}
+              latitude={lat}
+              anchor="center"
+              style={props.markerStyle ?? {}}
+            >
+              <span data-map-pin className={pinStyles.pin} />
+            </Marker>
+          ))}
+          <MapFlyer coordinates={coords} />
+        </Map>
 
-      {props.details !== false ? (
-        <div className={styles.viewOn}>
-          View on{" "}
-          <Link
-            href={`/map?lat=${primary[0].toPrecision(6)}&lon=${primary[1].toPrecision(6)}&zoom=14`}
-          >
-            Album map
-          </Link>
-          &nbsp;&middot;&nbsp;
-          <a
-            href={`https://www.openstreetmap.org/?mlat=${primary[0]}&mlon=${primary[1]}&zoom=14`}
-            target="_blank"
-            rel="noreferrer"
-          >
-            OpenStreetMap
-          </a>
-          &nbsp;&middot;&nbsp;
-          <a
-            href={`https://www.google.com/maps/search/?api=1&query=${primary[0]},${primary[1]}`}
-            target="_blank"
-            rel="noreferrer"
-          >
-            Google Maps
-          </a>
-        </div>
-      ) : null}
-    </div>
+        {props.details !== false ? (
+          <div className={styles.viewOn}>
+            View on{" "}
+            <Link
+              href={`/map?lat=${primary[0].toPrecision(6)}&lon=${primary[1].toPrecision(6)}&zoom=14`}
+            >
+              Album map
+            </Link>
+            &nbsp;&middot;&nbsp;
+            <a
+              href={`https://www.openstreetmap.org/?mlat=${primary[0]}&mlon=${primary[1]}&zoom=14`}
+              target="_blank"
+              rel="noreferrer"
+            >
+              OpenStreetMap
+            </a>
+            &nbsp;&middot;&nbsp;
+            <a
+              href={`https://www.google.com/maps/search/?api=1&query=${primary[0]},${primary[1]}`}
+              target="_blank"
+              rel="noreferrer"
+            >
+              Google Maps
+            </a>
+          </div>
+        ) : null}
+      </div>
+    </>
   );
 };
 

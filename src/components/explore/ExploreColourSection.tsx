@@ -1,10 +1,10 @@
 import { mergeCssModuleStyles } from "../../util/mergeCssModuleStyles";
-import Link from "next/link";
+import { AppLink as Link } from "../platform";
 import type { PhotoStats } from "../../util/computeStats";
 import { StatBar } from "../StatBar";
 import { Caption, Heading, Thumb, pillStyles } from "../ui";
-import sharedStyles from "../../pages/explore/explore.module.css";
-import localStyles from "../../pages/explore/ExploreColourSection.module.css";
+import sharedStyles from "./ExploreShared.module.css";
+import localStyles from "./ExploreColourSection.module.css";
 import { ExploreStatGroup } from "./ExplorePrimitives";
 import {
   buildColorSearchHref,

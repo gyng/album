@@ -66,8 +66,7 @@ const getInitialTheme = (): ThemeName | null => {
 
   // No explicit preference (null) follows the system: :root declares
   // `color-scheme: light dark`, so with no theme classes applied the
-  // light-dark() tokens track the OS, matching the pre-paint script in
-  // _document.tsx.
+  // light-dark() tokens track the OS, matching THEME_BOOTSTRAP_SCRIPT.
   return readStoredTheme();
 };
 
@@ -80,7 +79,7 @@ export const ThemeToggle: React.FC = () => {
   const theme = themeOverride === undefined ? initialTheme : themeOverride;
 
   useEffect(() => {
-    // Mirror the pre-paint init script in _document.tsx, which sets the theme
+    // Mirror THEME_BOOTSTRAP_SCRIPT, which sets the theme
     // classes on both the root element and the body. Updating only the body
     // would leave html in the stale theme — its color-scheme drives the
     // viewport scrollbar and overscroll glow.

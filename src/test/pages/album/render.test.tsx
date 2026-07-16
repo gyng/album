@@ -2,7 +2,8 @@
  * @jest-environment jsdom
  */
 
-import { render, screen } from "@testing-library/react";
+import { screen } from "@testing-library/react";
+import { renderWithNextPlatform as render } from "../../renderWithNextPlatform";
 import type { Content, PhotoBlock } from "../../../services/types";
 
 const mockOn = jest.fn();
@@ -31,7 +32,8 @@ jest.mock("../../../components/ui", () => ({
   buttonStyles: { base: "button" },
 }));
 
-import AlbumPage, { getStaticProps } from "../../../pages/album/[[...slug]]";
+import AlbumPage from "../../../screens/album/AlbumScreen";
+import { getStaticProps } from "../../../pages/album/[[...slug]]";
 
 const photo = (cover = false): PhotoBlock => ({
   kind: "photo",

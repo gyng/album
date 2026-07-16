@@ -53,6 +53,9 @@ describe("custom document", () => {
 
     expect(html).toContain('<html lang="en-GB">');
     expect(html).toContain('<link rel="manifest" href="/manifest.webmanifest"/>');
+    expect(html).toContain(
+      '<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png"/>',
+    );
     expect(html).toContain('name="theme-color" content="#000000"');
     expect(html).toContain('localStorage.getItem("darkMode")');
     expect(html).toContain('data-next-main="true"');

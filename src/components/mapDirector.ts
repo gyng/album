@@ -1,5 +1,5 @@
 import { exifWallClockTimestamp } from "../util/exifTime";
-import type { MapWorldEntry } from "./MapWorld";
+import type { MapWorldEntry } from "../util/pageDataTypes";
 
 const EARTH_RADIUS_KM = 6371;
 const MAX_DIRECTOR_STOPS = 24;

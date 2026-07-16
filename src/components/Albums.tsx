@@ -1,5 +1,5 @@
-import Link from "next/link";
-import { Content, PhotoBlock } from "../services/types";
+import { AppLink as Link } from "./platform";
+import type { Content, PhotoBlock } from "../services/types";
 import { Picture } from "./Photo";
 import { Caption, Heading } from "./ui";
 import { parseExifLocalDateTime } from "../util/exifTime";

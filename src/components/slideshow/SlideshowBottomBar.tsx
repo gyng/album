@@ -1,7 +1,7 @@
 import { mergeCssModuleStyles } from "../../util/mergeCssModuleStyles";
 import React from "react";
-import sharedStyles from "../../pages/slideshow/slideshow.module.css";
-import localStyles from "../../pages/slideshow/SlideshowBottomBar.module.css";
+import sharedStyles from "./SlideshowShared.module.css";
+import localStyles from "./SlideshowBottomBar.module.css";
 import MMap from "../Map";
 import { RandomPhotoRow } from "../search/api";
 import { DetailsAlignment } from "../../util/slideshowUrl";

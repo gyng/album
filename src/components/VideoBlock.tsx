@@ -1,4 +1,3 @@
-// import { OnDeleteFn, TextBlock } from "../services/types";
 import styles from "./VideoBlock.module.css";
 import React from "react";
 import { License } from "../License";
@@ -43,8 +42,14 @@ const VideoDetailsPanel: React.FC<{
   return (
     <div id={props.id ?? props.src} className={commonStyles.mediaDetails}>
       <details className={commonStyles.disclosure}>
-        <summary title="More details&hellip;" className={commonStyles.mediaDetailsSummary}>
-          <span>ⓘ</span>
+        <summary
+          aria-label="Video details"
+          title="Video details"
+          className={commonStyles.mediaDetailsSummary}
+        >
+          <span aria-hidden="true" className={commonStyles.mediaDetailsGlyph}>
+            ⓘ
+          </span>
         </summary>
 
         <div className={commonStyles.mediaDetailsContent}>

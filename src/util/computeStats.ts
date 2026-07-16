@@ -1,4 +1,4 @@
-import { Content, PhotoBlock } from "../services/types";
+import type { Content, PhotoBlock } from "../services/types";
 import { encodePublicAssetPath } from "./encodePublicAssetPath";
 import {
   APERTURE_FACET,

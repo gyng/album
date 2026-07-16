@@ -1,4 +1,4 @@
-import { Exif, Tags } from "../services/types";
+import type { Exif, Tags } from "../services/types";
 import {
   ALL_FACETS,
   APERTURE_FACET,

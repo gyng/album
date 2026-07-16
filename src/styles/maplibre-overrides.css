@@ -1,3 +1,7 @@
+/* Establish cascade order globally before the route-scoped MapLibre vendor
+   stylesheet is loaded. Later declarations cannot reorder named layers. */
+@layer vendor, overrides;
+
 @layer overrides {
   .maplibregl-popup-content {
     background-color: var(--c-bg);

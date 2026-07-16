@@ -14,13 +14,6 @@ jest.mock("./useAnimatedCounter", () => ({
   },
 }));
 
-jest.mock("next/link", () => ({
-  __esModule: true,
-  default: ({ href, children }: { href: string; children: React.ReactNode }) => (
-    <a href={href}>{children}</a>
-  ),
-}));
-
 const photo = (overrides: Partial<GuessPhoto> = {}): GuessPhoto => ({
   path: "/data/albums/test-simple/photo.jpg",
   albumName: "test-simple",

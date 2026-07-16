@@ -3,8 +3,8 @@
  */
 
 import { fireEvent, render, screen } from "@testing-library/react";
-import Link from "next/link";
 import { GlobalNav } from "./GlobalNav";
+import { AppLink } from "./platform";
 
 jest.mock("./Nav", () => ({
   Nav: ({
@@ -43,7 +43,7 @@ describe("GlobalNav", () => {
         slideshowAction={<button type="button">Start filtered slideshow</button>}
         extraItems={
           <li>
-            <Link href="/album/example">Current album</Link>
+            <AppLink href="/album/example">Current album</AppLink>
           </li>
         }
       />,

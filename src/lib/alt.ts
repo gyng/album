@@ -1,4 +1,4 @@
-import { PhotoBlock } from "../services/types";
+import type { PhotoBlock } from "../services/types";
 import { parseExifLocalDateTime } from "../util/exifTime";
 
 const normalizeWhitespace = (value?: string): string | null => {

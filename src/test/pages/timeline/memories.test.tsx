@@ -2,9 +2,10 @@
  * @jest-environment jsdom
  */
 
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import TimelinePage from "../../../pages/timeline/index";
-import { TimelineEntry } from "../../../components/timelineTypes";
+import { fireEvent, screen, waitFor } from "@testing-library/react";
+import { renderWithNextPlatform as render } from "../../renderWithNextPlatform";
+import TimelinePage from "../../../screens/timeline/TimelineScreen";
+import type { TimelineEntry } from "../../../util/pageDataTypes";
 
 const mockReplace = jest.fn();
 const mockUseRouter = jest.fn();
@@ -193,10 +194,7 @@ describe("Timeline memories", () => {
     });
 
     expect(mockReplace).toHaveBeenLastCalledWith(
-      {
-        pathname: "/timeline",
-        query: { filter_album: "kansai", date: "2025-03-14" },
-      },
+      "/timeline?filter_album=kansai&date=2025-03-14",
       undefined,
       { shallow: true },
     );

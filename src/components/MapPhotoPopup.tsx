@@ -1,8 +1,8 @@
-import Link from "next/link";
+import { AppLink as Link } from "./platform";
 import { Popup } from "react-map-gl/maplibre";
 import { exifWallClockTimestamp } from "../util/exifTime";
 import { getRelativeTimeString } from "../util/time";
-import type { MapWorldEntry } from "./MapWorld";
+import type { MapWorldEntry } from "../util/pageDataTypes";
 import { formatMapPhotoDateTime } from "./mapWorldViewModel";
 import { buildExternalMapLinks } from "./mapInteractions";
 import styles from "./MapWorld.module.css";

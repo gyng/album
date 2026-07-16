@@ -1,12 +1,13 @@
-import dynamic from "next/dynamic";
-import { MapWorldProps } from "./MapWorld";
-import styles from "./MapWorld.module.css";
-
-const Map = dynamic(() => import("./MapWorld"), {
-  loading: () => <p className={styles.loadingPlaceholder}>Loading map&hellip;</p>,
-  ssr: false,
-});
+import type { MapWorldProps } from "./MapWorld";
+import { MapLibreStyles } from "./MapLibreStyles";
+import { useClientComponents } from "./platform";
 
 export const MapWorldDeferred: React.FC<MapWorldProps> = (props) => {
-  return <Map {...props} />;
+  const { MapWorld } = useClientComponents();
+  return (
+    <>
+      <MapLibreStyles />
+      <MapWorld {...props} />
+    </>
+  );
 };

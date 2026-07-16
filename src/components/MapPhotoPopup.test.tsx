@@ -4,7 +4,7 @@
 
 import { fireEvent, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
-import type { MapWorldEntry } from "./MapWorld";
+import type { MapWorldEntry } from "../util/pageDataTypes";
 import { MapPhotoPopup } from "./MapPhotoPopup";
 
 jest.mock("react-map-gl/maplibre", () => ({

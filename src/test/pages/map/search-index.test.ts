@@ -1,20 +1,9 @@
-/**
- * @jest-environment jsdom
- */
-
-import { renderToStaticMarkup } from "react-dom/server";
 import type { Content, PhotoBlock, TextBlock } from "../../../services/types";
 
 jest.mock("../../../services/album", () => ({ getAlbums: jest.fn() }));
-jest.mock("../../../services/buildTiming", () => ({
-  measureBuild: (_name: string, work: () => unknown) => work(),
-}));
-jest.mock("next/head", () => ({
-  __esModule: true,
-  default: ({ children }: { children: React.ReactNode }) => <>{children}</>,
-}));
 
-import MapSearchIndexPage, { getStaticProps } from "../../../pages/map/search-index";
+import { GET } from "../../../app/data/map-search-index.json/route";
+import { loadMapSearchIndexEntries } from "../../../services/mapSearchIndex";
 
 const { getAlbums: mockGetAlbums } = jest.requireMock("../../../services/album") as {
   getAlbums: jest.Mock;
@@ -41,11 +30,9 @@ const mappedPhoto = (description?: string): PhotoBlock => ({
   },
 });
 
-describe("map search data page", () => {
-  it("renders only the no-index metadata shell", () => {
-    expect(renderToStaticMarkup(<MapSearchIndexPage />)).toContain(
-      '<meta name="robots" content="noindex, nofollow"/>',
-    );
+describe("map search data endpoint", () => {
+  beforeEach(() => {
+    mockGetAlbums.mockReset();
   });
 
   it("builds compact entries only for mapped photos with searchable text", async () => {
@@ -59,10 +46,18 @@ describe("map search data page", () => {
     };
     mockGetAlbums.mockResolvedValue([album]);
 
-    await expect(getStaticProps({} as never)).resolves.toEqual({
-      props: {
-        entries: [["/album/singapore#night%20market.jpg", "Night market"]],
-      },
-    });
+    await expect(loadMapSearchIndexEntries()).resolves.toEqual([
+      ["/album/singapore#night%20market.jpg", "Night market"],
+    ]);
+  });
+
+  it("exposes the entries as a framework-neutral JSON response", async () => {
+    mockGetAlbums.mockResolvedValue([]);
+
+    const response = await GET();
+
+    expect(response.headers.get("content-type")).toContain("application/json");
+    expect(response.headers.get("cache-control")).toBe("public, max-age=0, must-revalidate");
+    await expect(response.json()).resolves.toEqual({ entries: [] });
   });
 });

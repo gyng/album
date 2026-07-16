@@ -14,12 +14,12 @@ test.describe("World map interactions", () => {
       await page.evaluate(() =>
         performance
           .getEntriesByType("resource")
-          .some(({ name }) => name.includes("map/search-index") || name.includes("search.sqlite")),
+          .some(({ name }) => name.includes("map-search-index") || name.includes("search.sqlite")),
       ),
     ).toBe(false);
 
     const indexResponse = page.waitForResponse((response) =>
-      response.url().includes("map/search-index.json"),
+      response.url().includes("map-search-index.json"),
     );
     await input.focus();
     await indexResponse;

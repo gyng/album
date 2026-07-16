@@ -1,4 +1,4 @@
-import { Exif, Tags } from "../services/types";
+import type { Exif, Tags } from "../services/types";
 import { parseExifLocalDateTime } from "./exifTime";
 import {
   getGeocodeCity,

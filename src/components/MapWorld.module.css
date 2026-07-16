@@ -168,12 +168,17 @@
   border: var(--size-1) solid var(--c-border-on-dark);
   border-radius: var(--m-s);
   background: color-mix(in oklch, var(--c-overlay-dark) 88%, transparent);
-  color: var(--c-bg-contrast-light);
+  /* Fixed dark glass surface, so the label must stay on-dark in every theme. */
+  color: var(--c-on-dark);
   box-shadow: 0 var(--size-2) var(--size-10)
     color-mix(in oklch, var(--c-overlay-dark) 35%, transparent);
   cursor: pointer;
-  font-size: var(--fs-s);
+  font-size: var(--fs-sm);
   backdrop-filter: blur(var(--glass-blur-subtle));
+}
+
+.directorControl > span {
+  color: var(--c-accent);
 }
 
 .directorControl:hover,
@@ -186,10 +191,6 @@
 .directorControl:focus-visible {
   outline: var(--size-2) solid var(--c-bg-contrast-light);
   outline-offset: var(--size-2);
-}
-
-.directorControlActive span {
-  color: var(--c-accent);
 }
 
 .routeOverlay {

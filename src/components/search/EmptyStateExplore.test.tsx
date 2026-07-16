@@ -7,15 +7,6 @@ import { EmptyStateExplore } from "./EmptyStateExplore";
 import { fetchMemoryCandidates, fetchRandomResults, fetchRecentResults } from "./api";
 import { getMemoryClusters } from "../../util/clusterByDate";
 
-jest.mock("next/link", () => ({
-  __esModule: true,
-  default: ({ children, href, className }: any) => (
-    <a href={href} className={className}>
-      {children}
-    </a>
-  ),
-}));
-
 jest.mock("./api", () => ({
   fetchMemoryCandidates: jest.fn(),
   fetchRecentResults: jest.fn(),

@@ -54,7 +54,7 @@ jest.mock("../../components/ui", () => ({
   Heading: ({ children }: { children: React.ReactNode }) => <h1>{children}</h1>,
 }));
 
-import SearchPage from "../../pages/search";
+import SearchPage from "../../screens/search/SearchScreen";
 
 const { forceDocumentNavigation: mockForceDocumentNavigation } = jest.requireMock(
   "../../components/search/searchUtils",

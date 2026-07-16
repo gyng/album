@@ -1,6 +1,6 @@
 import { defineConfig, devices } from "@playwright/test";
 
-const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? "http://localhost:3000";
+const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? "http://127.0.0.1:3000";
 const skipWebServer = process.env.PLAYWRIGHT_SKIP_WEBSERVER === "1";
 const recordLocalVideo = process.env.PLAYWRIGHT_VIDEO === "1";
 const configuredWorkers = process.env.PLAYWRIGHT_WORKERS
@@ -108,8 +108,9 @@ export default defineConfig({
   webServer: skipWebServer
     ? undefined
     : {
-        command: "NEXT_DIST_DIR=.next-e2e next start",
-        url: baseURL,
+        command: "next start -H 127.0.0.1",
+        env: { NEXT_DIST_DIR: ".next-e2e" },
+        port: 3000,
         reuseExistingServer: false,
         timeout: 120 * 1000,
       },

@@ -2,7 +2,8 @@
  * @jest-environment jsdom
  */
 
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, screen } from "@testing-library/react";
+import { renderWithNextPlatform as render } from "../../renderWithNextPlatform";
 
 let router = {
   query: {} as Record<string, string | string[]>,
@@ -75,7 +76,7 @@ jest.mock("../../../components/TimelineDayGrid", () => ({
   },
 }));
 
-import TimelinePage from "../../../pages/timeline";
+import TimelinePage from "../../../screens/timeline/TimelineScreen";
 
 const entry = (date: string, album = "trip", suffix = date) => ({
   album,

@@ -194,17 +194,13 @@
 
 /* Modifier buttons live between mode toggles and one-shot actions. They are
    independent booleans (composable with any mode and with each other) rather
-   than exclusive choices, so the user needs a glanceable cue that they're a
-   different *kind* of button. Italic label + dashed border (when inactive)
-   signals "this combines with the mode" rather than "this replaces it". */
-
-.playbackModifier {
-  font-style: italic;
-}
+   than exclusive choices. A dashed border while inactive signals "this
+   combines with the mode" rather than "this replaces it"; once active they
+   use the same filled treatment as every other pressed control so the active
+   state reads identically across the toolbar. */
 
 .playbackModifier:not([aria-pressed="true"]) {
   border-style: dashed;
-  opacity: 0.82;
 }
 
 .controlGroup {

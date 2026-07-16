@@ -47,4 +47,9 @@ node_modules/
 # Generated at build time by bin/generate-feeds.cjs
 /public/feed.xml
 /public/sitemap.xml
+/public/robots.txt
 /public/album/*/feed.xml
+/public/vendor/maplibre-gl.css
+/public/pwa-icon-192.png
+/public/pwa-icon-512.png
+/public/apple-touch-icon.png

@@ -1,11 +1,11 @@
 import { mergeCssModuleStyles } from "../../util/mergeCssModuleStyles";
-import Link from "next/link";
+import { AppLink as Link } from "../platform";
 import type { PhotoStats } from "../../util/computeStats";
 import { buildSearchHref } from "../../util/searchFacets";
 import { YearSplitHistogram } from "../YearSplitHistogram";
 import { Caption, Card, Heading, Thumb, pillStyles } from "../ui";
-import sharedStyles from "../../pages/explore/explore.module.css";
-import localStyles from "../../pages/explore/ExploreStorySections.module.css";
+import sharedStyles from "./ExploreShared.module.css";
+import localStyles from "./ExploreStorySections.module.css";
 import { ExploreStatGroup } from "./ExplorePrimitives";
 import type { FunStatCard } from "./exploreViewModel";
 import { buildYearSearchHref } from "./exploreViewModel";

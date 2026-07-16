@@ -1,4 +1,4 @@
-import { Content, IBlock, PhotoBlock, TextBlock, VideoBlock } from "../services/types";
+import type { Content, IBlock, PhotoBlock, TextBlock, VideoBlock } from "../services/types";
 import { PhotoBlockEl } from "./Photo";
 import styles from "./PhotoAlbum.module.css";
 import { TextBlockEl } from "./TextBlock";

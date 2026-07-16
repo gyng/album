@@ -3,15 +3,8 @@
  */
 
 import { act, fireEvent, render, screen } from "@testing-library/react";
-import type { ReactNode } from "react";
 import { Nav } from "./Nav";
 
-jest.mock("next/link", () => ({
-  __esModule: true,
-  default: ({ children, ...props }: { children: ReactNode; href: string }) => (
-    <a {...props}>{children}</a>
-  ),
-}));
 jest.mock("./ThemeToggle", () => ({ ThemeToggle: () => <button type="button">Theme</button> }));
 
 describe("Nav", () => {

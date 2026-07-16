@@ -11,19 +11,23 @@ Personal photo gallery — Next.js 16, TypeScript, CSS Modules, MapLibre GL. Pho
 - **Tests:** `npx jest` from `src/` (not the repo root)
 - Subset: `npx jest --testPathPatterns="MapWorld"` (plural flag)
 - **Dev:** `npm run dev` from `src/`
-- **Lint/typecheck:** `npm run lint` from `src/`
+- **Lint/typecheck:** `npm run lint` from `src/` (includes the framework-neutral screen graph via `tsconfig.portable.json`)
 
 ## Structure
 - `src/components/` — React components with co-located `.module.css`; complex components have `.test.tsx`, not all
-- `src/pages/` — Next.js pages (`/map`, `/search`, `/explore`, `/timeline`, `/slideshow`, `/design`)
+- `src/components/platform/` — injectable renderer ports for links, document metadata, navigation, and public configuration; Next's implementation lives only in `platform/next/`
+- `src/pages/` — thin Next.js route/build `.tsx` adapters; do not put rendered screen implementations or application-owned styles here
+- `src/screens/` — framework-neutral route-level React screens (`map`, `search`, `explore`, `timeline`, `slideshow`, `design`, etc.) with screen-owned CSS Modules
+- `src/app/` — build-only Next.js route adapters for stable data URLs; do not put application UI here
 - `src/util/` — pure utility functions (no React)
 - `src/services/` — build-time data: album/photo loading, serialisation, EXIF extraction (Node only, never imported client-side)
+- `src/services/pageData/` — route-sized, framework-neutral loaders used by page build adapters
 - `../albums/` — album source directories (sibling to `src/`); each album is a folder of images with an optional `album.json` (v2 manifest)
 - `src/components/search/` — search page, SQLite API layer, facet panel, result tiles
 - `src/components/mapRoute.ts` — all route/journey logic
 - `index/` — Python indexing pipeline (Janus, SigLIP, EXIF, geocoding → SQLite)
 
-All pages use `getStaticProps` — data is computed at build time, no runtime API. Client state is UI-only (filters, view toggles).
+Data-backed display pages use `getStaticProps`; client-only pages are statically optimised without it. The App Router is used only for build-generated payloads at stable URLs, currently `/data/map-search-index.json`; it is not a runtime application API. Client state is UI-only (filters, view toggles).
 
 ## Conventions
 - **British English** in all user-facing copy and comments: colour, centre, favourite, licence
@@ -32,11 +36,34 @@ All pages use `getStaticProps` — data is computed at build time, no runtime AP
 - No `classnames`/`clsx` — use `.filter(Boolean).join(" ")` for conditional class lists
 - Omit optional attributes/props rather than setting them to `undefined`
 
+## Framework boundary
+- Application components must not import `next/link`, `next/head`, or `next/router` directly. Use `AppLink`, `DocumentHead`, and the navigation hooks exported by `src/components/platform/`; `_app.tsx` installs `NextPlatformProvider`
+- Renderer integrations implement `PlatformAdapter` and install it with `PlatformProvider`; the contract includes links, head rendering, reactive navigation, public database URLs, and deferred client components. `BrowserPlatformProvider` from `components/platform/browser` supplies the native History API plus client-gated `React.lazy` registry; Next installs its own provider. Lightweight links/navigation/head have unprovided browser fallbacks, but any screen using deferred components requires a provider
+- Browser-portable screens and their runtime dependency graph must not reference Next, Node built-ins, `process`, `Buffer`, `__dirname`, or `__filename`. Site origins and public asset/database URLs come from `usePublicConfig`, never directly from environment variables
+- Keep `getStaticProps`, `getStaticPaths`, `_app`, and `_document` confined to `src/pages/`. Rendered implementations live in `src/screens/` and use ordinary typed functions rather than `NextPage`. Put data construction in `src/services/pageData/` so it can be called without Next.js
+- Co-locate CSS Modules with their screen or component. Renderer entries import the reusable global `styles/globals.css` and `styles/maplibre-overrides.css`; the `pages/` route tree must not own application styles
+- `components/AppRuntime.tsx` owns the renderer-neutral application shell (error boundary, query client, viewport metadata, and service-worker registration). Renderer entry points install a `PlatformProvider` outside it and inject renderer-specific telemetry explicitly
+- HTML entry adapters must install `THEME_BOOTSTRAP_SCRIPT` from `util/themeBootstrap.ts` inline before application markup; it is the shared pre-paint theme initialiser used by Next's `_document`
+- Keep `public/sw.js` renderer-neutral: classify generated scripts, styles, and fonts by request destination, never by framework-owned URL prefixes such as `/_next/`
+- The installed slideshow PWA precaches its HTML plus discovered generated JS/CSS, install icons, and best-effort default SQLite databases. All same-origin `.sqlite` URLs use network-first runtime caching so renderer-configured database paths also restart offline; configured slideshow query URLs fall back to the cached `/slideshow` document. Its `navigate-existing` launch handler reuses an installed window but always returns it to the slideshow launch URL; do not use `focus-existing` without also implementing `launchQueue`
+- `AppRuntime` registers `/sw.js?v=<build version>` with `updateViaCache: "none"`; the worker derives its cache generation from that URL and deletes older `snapshots-pwa-*` generations on activation. Preserve this link so code deploys cannot accumulate stale hashed chunks
+- `npm run prepare:pwa-icons` derives the 192px, 512px, and Apple touch PNGs from `public/pwa-icon.svg`; edit only the canonical SVG, not the generated PNGs
+- Shared page-data and map/timeline view contracts belong in `src/util/pageDataTypes.ts`; import them from that canonical module rather than re-exporting types from components. Services must never import React, Next.js, components, or component-owned types
+- `useUrlSearchParams` excludes dynamic route parameters, rejects ambiguous repeated scalar values through `getSearchParam`, and exposes `ready`. Gate the initial mount of stateful children on `ready` when their reducer/state is seeded from the URL
+- Client-only application wrappers (`*Deferred.tsx` and `DynamicSearchWithCoi`) resolve components through `useClientComponents`. Next's literal, statically analysed `next/dynamic(() => import(...))` calls all live in `platform/next/nextClientComponents.tsx`; the native fallback uses client-gated `React.lazy`
+- Keep framework-generated data behind stable application URLs rather than `/_next/data/...` or `__NEXT_DATA__`. Fetch those URLs through utility functions, not from components directly
+- `src/components/platform/boundary.test.ts` enforces the allowed Next.js runtime imports and dependency direction. `next/link`, `next/head`, and `next/router` belong together in `platform/next/NextPlatformProvider.tsx`; `next/dynamic` belongs in `platform/next/nextClientComponents.tsx`. Update the allowlist only when adding a deliberate renderer adapter
+- `exifr` must remain in `serverExternalPackages` in `next.config.js`; bundling it into the App route selects the wrong runtime branch and produces an empty map index
+- `robots.txt`, feeds, and sitemaps are generated static assets via `src/bin/generate-feeds.cjs`, not framework routes
+- Keep `tsconfig.json` framework-neutral. Normal and E2E Next builds use `tsconfig.next.json` and `tsconfig.e2e.json` respectively; put Next's TypeScript plugin and generated-route includes there so builds do not rewrite the shared config
+- `tsconfig.portable.json` compiles the screen/component graph without Next, Node, or build-time service types. Keep it passing and keep its exclusions narrow; `components/platform/next/` and the explicitly Node-only embedding stats utility do not belong in the portable graph
+
 ## Testing
 
 **Jest** — unit/integration tests, run from `src/`:
 - Config: `src/jest.config.mjs`; test environment is `node`
 - Playwright tests in `src/tests/` are excluded from Jest automatically
+- Screen behaviour tests import from `src/screens/`; import `src/pages/` only when testing a Next route adapter such as `getStaticProps` or `getStaticPaths`
 
 **Playwright** — e2e tests, run from `src/`:
 ```
@@ -50,6 +77,7 @@ npm run test:e2e:reuse -- ./tests/smoke.spec.ts                # reuse already-r
 - Use `test:e2e:reuse` only when a server is already running — do not use it to skip the build
 - `npm run prepare:e2e-fixtures` recreates isolated core and embeddings databases (`src/public/e2e-search*.sqlite`) using the production schema split; normal E2E builds never read or overwrite the local indexed databases
 - **CI album data:** only `albums/test-*` directories are checked into git (real albums are gitignored). Playwright tests must use `test-simple`, `test-manifest`, or `test-manifest-v2` — never hardcode real album names like `snapshots` or `24japan`
+- **Test albums are hidden from normal builds:** `albums/test-*` only appear when `ALBUM_INCLUDE_TEST_ALBUMS=1` (set by `build:e2e`). For `test:e2e:reuse` against a dev server, start it with `ALBUM_INCLUDE_TEST_ALBUMS=1 npm run dev`
 
 **Python (indexer)** — unittest, run from `index/`:
 ```
@@ -103,6 +131,7 @@ npm run test:e2e:reuse -- ./tests/smoke.spec.ts                # reuse already-r
 - Omit MapLibre paint properties entirely (spread `{}`) instead of passing `undefined` — MapLibre throws on undefined values
 - `useMap()` only works inside children of `<MapLibreMap>` — use small child components for imperative map calls
 - Route overlay is SVG (screen-space), projected via `map.project()`
+- Map search metadata is build-generated at `/data/map-search-index.json`. Fetch it with `fetchMapSearchIndex`; preserve `cache: "no-store"`, the response's `must-revalidate` header, and the service worker's network-first handling so deployments cannot leave a stale index cached indefinitely
 
 ## Design tokens (src/styles/globals.css)
 Always use tokens — never raw px values or colours.
@@ -119,7 +148,7 @@ Design system primitives live in `src/components/ui/` with a barrel export. Impo
 - `Input` / `Select` — form controls with consistent border, radius, and focus ring; Input supports forwardRef
 - `ChartTooltip` — accent-tinted hover tooltip for charts; consumer provides the hover trigger via `[data-tooltip]`
 - `SegmentedToggle` — pill-shaped option switcher (generic over value type)
-- `Pill` / `PillButton` / `pillStyles` — rounded nav link / action button; `variant="surface"` (default) or `"ghost"`; use `pillStyles` for composing with Next.js `<Link>`
+- `Pill` / `PillButton` / `pillStyles` — rounded nav link / action button; `variant="surface"` (default) or `"ghost"`; use `pillStyles` for composing with `AppLink`
 - `OverlayButton` / `OverlayButtonLink` / `overlayButtonStyles` — dark glass button for media overlays; `size="small"` for icon-only
 - `Footer` — site footer with standard links (GitHub, Fediverse, Bluesky, Design)
 - Stack utilities in `common.module.css`: `.stack` (8px) / `.stackL` (20px) / `.stackXl` (40px) / `.stackPage` (64px)

@@ -1,4 +1,4 @@
-import type { MapWorldEntry, TimeRange } from "./MapWorld";
+import type { MapWorldEntry, TimeRange } from "../util/pageDataTypes";
 import {
   filterPhotosByBounds,
   filterPhotosByQuery,

@@ -6,23 +6,14 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { PhotoBlock } from "../services/types";
 import { ExifRow, ExifTable, Picture, PhotoBlockEl, PhotoDescription } from "./Photo";
 
-jest.mock(
-  "next/dynamic",
-  () =>
-    (loader: () => Promise<unknown>, options: { loading: () => React.ReactNode }): React.FC => {
-      Object.assign(globalThis, { __photoDynamicLoadPromise: loader() });
-      return () => options.loading();
-    },
-);
-
 jest.mock("./MapDeferred", () => ({
   MapDeferred: ({ coordinates }: { coordinates: [number, number] }) => (
     <div data-testid="photo-map">{coordinates.join(",")}</div>
   ),
 }));
 
-jest.mock("./PhotoSimilarPhotos", () => ({
-  PhotoSimilarPhotos: () => null,
+jest.mock("./PhotoSimilarPhotosDeferred", () => ({
+  PhotoSimilarPhotosDeferred: () => <p>Loading similar photos…</p>,
 }));
 
 type BlockOptions = {
@@ -84,20 +75,27 @@ describe("PhotoBlockEl", () => {
     expect(screen.queryByText("Camera datetime")).toBeNull();
   });
 
-  it("resolves the deferred similar-photos implementation", async () => {
-    const loadPromise = (
-      globalThis as typeof globalThis & { __photoDynamicLoadPromise: Promise<unknown> }
-    ).__photoDynamicLoadPromise;
-
-    await expect(loadPromise).resolves.toEqual(expect.any(Function));
-  });
-
   it("prefers explicit photo metadata for alt text", () => {
     const block = createBlock({ data: { title: "Harbour skyline" } });
 
     render(<PhotoBlockEl block={block} currentIndex={0} />);
 
     expect(screen.getByTestId("picture").getAttribute("alt")).toBe("Harbour skyline");
+  });
+
+  it("positions details from the EXIF-corrected image aspect ratio", () => {
+    const block = createBlock({
+      width: 6000,
+      height: 4000,
+      exif: { Orientation: "Rotate 90 CW" },
+    });
+
+    render(<PhotoBlockEl block={block} currentIndex={0} />);
+
+    expect(screen.getByTestId("photoblockel")).toHaveStyle({
+      "--photo-aspect": "0.6667",
+      "--photo-intrinsic-width": "4000px",
+    });
   });
 
   it("reveals rich photo metadata and search actions when details are opened", () => {

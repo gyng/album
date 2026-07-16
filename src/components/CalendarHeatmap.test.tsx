@@ -4,7 +4,7 @@
 
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { CalendarHeatmap } from "./CalendarHeatmap";
-import { TimelineEntry } from "./timelineTypes";
+import type { TimelineEntry } from "../util/pageDataTypes";
 
 describe("CalendarHeatmap", () => {
   const entries: TimelineEntry[] = [

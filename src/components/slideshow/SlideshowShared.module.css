@@ -525,12 +525,6 @@
     0 0 0 var(--size-2) color-mix(in oklch, var(--c-white) 45%, transparent);
 }
 
-/* Modifier buttons live between mode toggles and one-shot actions. They are
-   independent booleans (composable with any mode and with each other) rather
-   than exclusive choices, so the user needs a glanceable cue that they're a
-   different *kind* of button. Italic label + dashed border (when inactive)
-   signals "this combines with the mode" rather than "this replaces it". */
-
 .controlSubtitle {
   font-size: var(--fs-s);
   color: color-mix(in oklch, var(--c-white) 72%, transparent);

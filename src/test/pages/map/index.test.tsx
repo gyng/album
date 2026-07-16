@@ -2,7 +2,8 @@
  * @jest-environment jsdom
  */
 
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, screen } from "@testing-library/react";
+import { renderWithNextPlatform as render } from "../../renderWithNextPlatform";
 
 const push = jest.fn();
 const replace = jest.fn();
@@ -61,7 +62,7 @@ jest.mock("../../../components/MapWorldDeferred", () => ({
   ),
 }));
 
-const { default: WorldMap } = require("../../../pages/map/index");
+const { default: WorldMap } = require("../../../screens/map/MapScreen");
 
 describe("WorldMap page", () => {
   beforeEach(() => {

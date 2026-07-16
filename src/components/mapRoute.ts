@@ -1,4 +1,4 @@
-import type { MapWorldEntry } from "./MapWorld";
+import type { MapWorldEntry } from "../util/pageDataTypes";
 import { exifDayKey } from "../util/exifTime";
 import { unwrapLongitudes } from "../util/mapBounds";
 
