@@ -174,6 +174,14 @@ source coverage, then atomically promote the working DB and compact public DBs.
 The last good databases remain untouched when indexing or validation fails, and
 the staging DB is retained so the next invocation resumes completed batches.
 
+Both derive the same staging name (`search.sqlite` → `search.staging.sqlite`) and
+seed it through `index.py prepare-staging`, so a paused full index is resumable
+from either workflow instead of one silently re-seeding from the stale working DB.
+`prepare-staging` refuses to resume a staging database that fails `PRAGMA
+quick_check`, and seeds via a temporary file renamed into place: a `cp` interrupted
+by Ctrl-C or ENOSPC would otherwise leave a truncated file that the next run treats
+as resumable and commits GPU hours to.
+
 ## Incremental stage model
 
 Core metadata/colours, captions, SigLIP v1, and SigLIP v2 are independent stages.

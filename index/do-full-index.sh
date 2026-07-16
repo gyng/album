@@ -15,11 +15,7 @@ if ! flock -n 9; then
   exit 1
 fi
 
-if [[ -f "$STAGING_DB" ]]; then
-  echo "Resuming existing staging database: $STAGING_DB"
-elif [[ -f "$SOURCE_DB" ]]; then
-  cp "$SOURCE_DB" "$STAGING_DB"
-fi
+uv run python index.py prepare-staging --source "$SOURCE_DB" --staging "$STAGING_DB"
 
 uv run --extra inference python index.py index \
   --glob "$GLOB" \

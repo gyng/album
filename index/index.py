@@ -4593,6 +4593,75 @@ def benchmark_embedder_batch(
         print(f"Benchmark written to {output}")
 
 
+def sqlite_quick_check(dbpath: Path) -> str:
+    """``PRAGMA quick_check`` output, or the driver's error for an unusable file."""
+    try:
+        con = sqlite3.connect(f"file:{os.path.abspath(str(dbpath))}?mode=ro", uri=True)
+    except sqlite3.Error as err:
+        return str(err)
+    try:
+        return con.execute("PRAGMA quick_check").fetchone()[0]
+    except sqlite3.DatabaseError as err:
+        return str(err)
+    finally:
+        con.close()
+
+
+def prepare_staging_database(source: str, staging: str) -> str:
+    """Make a staging DB that is safe to resume, seeding it from ``source``.
+
+    Both workflows resume by reusing whatever staging file is on disk, which means
+    a damaged one silently absorbs another run of GPU inference and can never be
+    published. `cp` is not atomic either: an interrupted copy leaves a truncated
+    file that looks exactly like a resumable staging DB, so the copy lands under a
+    temporary name and is renamed in only once it verifies.
+
+    Returns ``resumed``, ``copied``, or ``created``.
+    """
+    staging_path = Path(staging)
+    if staging_path.exists():
+        check = sqlite_quick_check(staging_path)
+        if check != "ok":
+            raise click.ClickException(
+                f"prepare-staging: {staging} failed PRAGMA quick_check ({check}) — "
+                "refusing to resume a damaged staging database. Inspect it, or "
+                "remove it to seed a fresh copy from the working database."
+            )
+        return "resumed"
+
+    source_path = Path(source)
+    if not source_path.exists():
+        return "created"
+
+    partial = staging_path.with_suffix(staging_path.suffix + ".partial")
+    partial.unlink(missing_ok=True)
+    try:
+        shutil.copyfile(source_path, partial)
+        check = sqlite_quick_check(partial)
+        if check != "ok":
+            raise click.ClickException(
+                f"prepare-staging: copy of {source} failed PRAGMA quick_check "
+                f"({check}) — refusing to seed staging from it."
+            )
+        partial.replace(staging_path)
+    finally:
+        partial.unlink(missing_ok=True)
+    return "copied"
+
+
+@cli.command("prepare-staging")
+@click.option("--source", required=True, help="Working database to seed from.")
+@click.option("--staging", required=True, help="Staging database path.")
+def prepare_staging_command(source: str, staging: str):
+    outcome = prepare_staging_database(source, staging)
+    if outcome == "resumed":
+        log(f"Resuming existing staging database: {staging}")
+    elif outcome == "copied":
+        log(f"Seeded staging database {staging} from {source}")
+    else:
+        log(f"No working database at {source}; {staging} will be created by index")
+
+
 def detect_vanished_albums(
     indexed_paths: typing.Iterable[str], files: typing.Iterable[str]
 ) -> dict[str, int]:

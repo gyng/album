@@ -41,6 +41,7 @@ from index import (
     parse_janus_response,
     prepare_colour_thumbnail,
     repair_classifier_json_syntax,
+    prepare_staging_database,
     prune,
     sample_balanced_paths,
     Sqlite3Client,
@@ -1243,6 +1244,78 @@ class TestCli(UsesTestexistsFixture, unittest.TestCase):
             self.assertNotEqual(result.exit_code, 0)
             self.assertIn("large partial prune", result.output)
             self.assertEqual(len(Sqlite3Client(dbpath).list_paths()), 10)
+
+    def test_prepare_staging_copies_from_the_working_db_when_absent(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            source = os.path.join(tmpdir, "search.sqlite")
+            staging = os.path.join(tmpdir, "search.staging.sqlite")
+            db = Sqlite3Client(source)
+            db.setup_tables()
+            db.upsert_image_fields("a.jpg", {"filename": "a.jpg"})
+            db.con.close()
+
+            outcome = prepare_staging_database(source, staging)
+
+            self.assertEqual(outcome, "copied")
+            self.assertEqual(Sqlite3Client(staging).list_paths(), {"a.jpg"})
+            self.assertFalse(os.path.exists(staging + ".partial"))
+
+    def test_prepare_staging_resumes_a_sound_existing_staging_db(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            source = os.path.join(tmpdir, "search.sqlite")
+            staging = os.path.join(tmpdir, "search.staging.sqlite")
+            for path, filename in ((source, "old.jpg"), (staging, "resumed.jpg")):
+                db = Sqlite3Client(path)
+                db.setup_tables()
+                db.upsert_image_fields(filename, {"filename": filename})
+                db.con.close()
+
+            outcome = prepare_staging_database(source, staging)
+
+            # Resuming must not re-copy over completed staged work.
+            self.assertEqual(outcome, "resumed")
+            self.assertEqual(Sqlite3Client(staging).list_paths(), {"resumed.jpg"})
+
+    def test_prepare_staging_leaves_nothing_resumable_when_the_copy_fails(self):
+        # A copy interrupted by Ctrl-C or ENOSPC must not leave a truncated file at
+        # the staging path: the next run matches on existence alone and would
+        # resume it, committing GPU hours to a database that can never publish.
+        # Copying aside and renaming in is what keeps a partial write invisible.
+        def interrupted_copy(src, dst):
+            with open(src, "rb") as source_fh, open(dst, "wb") as dest_fh:
+                dest_fh.write(source_fh.read(512))
+            raise OSError("interrupted")
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            source = os.path.join(tmpdir, "search.sqlite")
+            staging = os.path.join(tmpdir, "search.staging.sqlite")
+            db = Sqlite3Client(source)
+            db.setup_tables()
+            db.con.close()
+
+            with mock.patch("index.shutil.copyfile", side_effect=interrupted_copy):
+                with self.assertRaises(OSError):
+                    prepare_staging_database(source, staging)
+
+            self.assertFalse(os.path.exists(staging))
+            self.assertFalse(os.path.exists(staging + ".partial"))
+
+    def test_prepare_staging_refuses_to_resume_a_corrupt_staging_db(self):
+        # cp is not atomic: an interrupted copy leaves a truncated staging DB.
+        # Resuming it commits GPU hours to a database that cannot be published.
+        with tempfile.TemporaryDirectory() as tmpdir:
+            source = os.path.join(tmpdir, "search.sqlite")
+            staging = os.path.join(tmpdir, "search.staging.sqlite")
+            db = Sqlite3Client(source)
+            db.setup_tables()
+            db.con.close()
+            with open(source, "rb") as fh:
+                truncated = fh.read(2048)
+            with open(staging, "wb") as fh:
+                fh.write(truncated[:1024])
+
+            with self.assertRaises(click.ClickException):
+                prepare_staging_database(source, staging)
 
     def test_prune_refuses_when_an_entire_album_has_vanished(self):
         # An album that fails to mount takes every one of its photos at once while
