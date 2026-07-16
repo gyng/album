@@ -53,6 +53,7 @@ from index import (
     validate_index_database,
     CAPTION_STAGE,
     CORE_STAGE,
+    JANUS_MODEL_ID,
     SIGLIP_V1_STAGE,
     SiglipEmbedder,
 )
@@ -1091,7 +1092,11 @@ class TestCli(UsesTestexistsFixture, unittest.TestCase):
         self.assertNotEqual(result.exit_code, 0)
         self.assertIn("production limit 4", result.output)
 
-    def test_skip_index_already_exists(self):
+    def test_legacy_captions_without_provenance_are_recaptioned(self):
+        # A caption row with no pipeline_state may have come from the retired
+        # four-field v1 prompt. Importing it under the current version would claim
+        # provenance that cannot be shown, and validate could never catch it
+        # because the claimed version is by construction the expected one.
         runner = CliRunner()
         glob = "../src/test/fixtures/*.jpg"
         dbpath = self.testexists_db
@@ -1100,7 +1105,47 @@ class TestCli(UsesTestexistsFixture, unittest.TestCase):
         )
         self.assertEqual(0, result.exit_code)
         self.assertTrue("Found 2 files" in result.output)
-        self.assertTrue("skipping 2 already-indexed)" in result.output)
+        self.assertTrue("(2 to index, 0 already indexed)" in result.output)
+
+    def test_index_skips_paths_whose_provenance_is_current(self):
+        path = "../src/test/fixtures/monkey.jpg"
+        with tempfile.TemporaryDirectory() as tmpdir:
+            dbpath = os.path.join(tmpdir, "skip.sqlite")
+            db = Sqlite3Client(dbpath)
+            db.setup_tables()
+            insert_analysed_images_batch(
+                db,
+                [
+                    {
+                        "path": path,
+                        "analysed": {
+                            "exif": {},
+                            "geocode": {},
+                            "lat_deg": None,
+                            "lng_deg": None,
+                            "iso8601": None,
+                            "colors": [],
+                            "tags": ["monkey"],
+                            "alt_text": "A monkey",
+                            "subject": None,
+                            "embeddings": [],
+                        },
+                        "write_core": True,
+                        "write_caption": True,
+                        "source_sha256": file_content_sha256(path),
+                        "caption_version": caption_pipeline_version("janus"),
+                        "caption_model_id": JANUS_MODEL_ID,
+                    }
+                ],
+            )
+            db.con.close()
+
+            result = CliRunner().invoke(
+                index,
+                f"--glob {path} --dbpath {dbpath} --model-profile janus --dry-run".split(),
+            )
+            self.assertEqual(0, result.exit_code)
+            self.assertIn("(0 to index, 1 already indexed)", result.output)
 
     def test_search(self):
         runner = CliRunner()
@@ -1198,6 +1243,72 @@ class TestCli(UsesTestexistsFixture, unittest.TestCase):
             self.assertNotEqual(result.exit_code, 0)
             self.assertIn("large partial prune", result.output)
             self.assertEqual(len(Sqlite3Client(dbpath).list_paths()), 10)
+
+    def test_prune_refuses_when_an_entire_album_has_vanished(self):
+        # An album that fails to mount takes every one of its photos at once while
+        # staying well under the whole-DB percentage guard, so the count-based
+        # guards cannot see it: validate then derives `expected` from the same
+        # shrunken glob and passes, publish replaces the live DBs, and the working
+        # DB is overwritten — losing that album's captions and embeddings from
+        # every copy. A whole album matching zero files is an unmounted directory,
+        # not curation; individual deletions leave their album still present.
+        # Path.glob rejects absolute patterns, and the suite runs from index/.
+        with tempfile.TemporaryDirectory(dir=".") as absolute_tmpdir:
+            tmpdir = os.path.relpath(absolute_tmpdir, ".")
+            albums = os.path.join(tmpdir, "albums")
+            for album, count in (("kept", 20), ("gone", 1)):
+                os.makedirs(os.path.join(albums, album))
+                for i in range(count):
+                    shutil.copy(
+                        "../src/test/fixtures/monkey.jpg",
+                        os.path.join(albums, album, f"{i}.jpg"),
+                    )
+
+            dbpath = os.path.join(tmpdir, "prune.sqlite")
+            glob_pattern = os.path.join(albums, "**", "*.jpg")
+            db = Sqlite3Client(dbpath)
+            db.setup_tables()
+            indexed = find_files(".", glob_pattern)
+            self.assertEqual(len(indexed), 21)
+            for path in indexed:
+                db.upsert_image_fields(path, {"filename": os.path.basename(path)})
+            db.con.close()
+
+            shutil.rmtree(os.path.join(albums, "gone"))  # album fails to mount
+
+            result = CliRunner().invoke(
+                prune, ["--glob", glob_pattern, "--dbpath", dbpath]
+            )
+            self.assertNotEqual(result.exit_code, 0)
+            self.assertEqual(len(Sqlite3Client(dbpath).list_paths()), 21)
+
+    def test_prune_allows_individual_photos_to_be_removed_from_a_live_album(self):
+        # The vanished-album guard must not block ordinary curation: the album is
+        # still present, so deleting some of its photos is a real intent.
+        with tempfile.TemporaryDirectory(dir=".") as absolute_tmpdir:
+            tmpdir = os.path.relpath(absolute_tmpdir, ".")
+            albums = os.path.join(tmpdir, "albums", "kept")
+            os.makedirs(albums)
+            for i in range(20):
+                shutil.copy(
+                    "../src/test/fixtures/monkey.jpg", os.path.join(albums, f"{i}.jpg")
+                )
+
+            dbpath = os.path.join(tmpdir, "prune.sqlite")
+            db = Sqlite3Client(dbpath)
+            db.setup_tables()
+            glob_pattern = os.path.join(tmpdir, "albums", "**", "*.jpg")
+            for path in find_files(".", glob_pattern):
+                db.upsert_image_fields(path, {"filename": os.path.basename(path)})
+            db.con.close()
+
+            os.remove(os.path.join(albums, "0.jpg"))
+
+            result = CliRunner().invoke(
+                prune, ["--glob", glob_pattern, "--dbpath", dbpath]
+            )
+            self.assertEqual(0, result.exit_code)
+            self.assertEqual(len(Sqlite3Client(dbpath).list_paths()), 19)
 
     def test_prune_removes_only_missing_paths(self):
         # H4: normal operation still prunes rows whose files no longer exist and
@@ -1731,18 +1842,41 @@ class TestDb(UsesTestexistsFixture, unittest.TestCase):
             os.utime(path, (timestamp, timestamp))
             self.assertNotEqual(first, file_content_sha256(path))
 
-    def test_parallel_content_digests_match_single_file_digest(self):
-        paths = [
-            "../src/test/fixtures/monkey.jpg",
-            "../src/test/fixtures/monkey-for-unoptimised.jpg",
-        ]
+    def test_parallel_content_digests_map_to_their_own_paths(self):
+        # Every file must get *its own* digest back. Descending sizes mean workers
+        # finish in a different order to submission, so a concurrency change that
+        # stops preserving order (`as_completed` in place of `executor.map`) hands
+        # each photo a neighbour's digest and silently corrupts every stage
+        # freshness decision. Distinct contents are what make that detectable.
+        with tempfile.TemporaryDirectory() as tmpdir:
+            paths = []
+            for i in range(8):
+                path = os.path.join(tmpdir, f"file-{i}.bin")
+                with open(path, "wb") as fh:
+                    fh.write(f"content-{i}".encode() * (10_000 - i * 1_000))
+                paths.append(path)
 
-        actual = file_content_sha256_many(paths, workers=2)
+            actual = file_content_sha256_many(paths, workers=4)
+            expected = {path: file_content_sha256(path) for path in paths}
 
-        self.assertEqual(
-            actual,
-            {path: file_content_sha256(path) for path in paths},
-        )
+            self.assertEqual(actual, expected)
+            self.assertEqual(len(set(expected.values())), len(paths))
+
+    def test_parallel_content_digests_report_unreadable_files_as_none(self):
+        # `index` turns a None digest into an actionable "could not fingerprint"
+        # error and `validate` treats it as stale provenance. Dropping the file or
+        # killing the pool instead would either abort a whole run over one bad
+        # photo, or mark it fresh forever.
+        with tempfile.TemporaryDirectory() as tmpdir:
+            readable = os.path.join(tmpdir, "readable.bin")
+            with open(readable, "wb") as fh:
+                fh.write(b"readable")
+            missing = os.path.join(tmpdir, "missing.bin")
+
+            actual = file_content_sha256_many([readable, missing], workers=2)
+
+            self.assertEqual(actual[readable], file_content_sha256(readable))
+            self.assertIsNone(actual[missing])
 
     def test_validate_proves_exact_core_and_caption_coverage(self):
         path = "../src/test/fixtures/monkey.jpg"
@@ -1814,6 +1948,231 @@ class TestDb(UsesTestexistsFixture, unittest.TestCase):
             )
             core.close()
             embeddings.close()
+
+    def _seed_validatable_db(self, dbpath, path, embeddings=None):
+        """Build a single-path DB that passes validate, for negative-case tests."""
+        db = Sqlite3Client(dbpath)
+        db.setup_tables()
+        insert_analysed_images_batch(
+            db,
+            [
+                {
+                    "path": path,
+                    "analysed": {
+                        "exif": {},
+                        "geocode": {},
+                        "lat_deg": None,
+                        "lng_deg": None,
+                        "iso8601": None,
+                        "colors": [],
+                        "tags": ["monkey"],
+                        "alt_text": "A monkey",
+                        "subject": "monkey",
+                        "embeddings": embeddings or [],
+                    },
+                    "write_core": True,
+                    "write_caption": True,
+                    "source_sha256": file_content_sha256(path),
+                    "caption_version": caption_pipeline_version("janus"),
+                    "caption_model_id": JANUS_MODEL_ID,
+                }
+            ],
+        )
+        db.con.close()
+
+    # validate is the only gate between a partial staging DB and publish
+    # overwriting the live databases, so each rejection branch needs a test: an
+    # inverted comparison here turns the gate into a no-op that always passes.
+
+    def test_validate_rejects_missing_image_coverage(self):
+        path = "../src/test/fixtures/monkey.jpg"
+        with tempfile.TemporaryDirectory() as tmpdir:
+            dbpath = os.path.join(tmpdir, "validate.sqlite")
+            self._seed_validatable_db(dbpath, path)
+            con = sqlite3.connect(dbpath)
+            con.execute("DELETE FROM images WHERE path = ?", (path,))
+            con.commit()
+            con.close()
+
+            with self.assertRaises(click.ClickException):
+                validate_index_database(dbpath, path, "janus")
+
+    def test_validate_rejects_stale_source_provenance(self):
+        path = "../src/test/fixtures/monkey.jpg"
+        with tempfile.TemporaryDirectory() as tmpdir:
+            dbpath = os.path.join(tmpdir, "validate.sqlite")
+            self._seed_validatable_db(dbpath, path)
+            con = sqlite3.connect(dbpath)
+            con.execute(
+                "UPDATE pipeline_state SET source_sha256 = ? WHERE stage = ?",
+                ("0" * 64, CORE_STAGE),
+            )
+            con.commit()
+            con.close()
+
+            with self.assertRaises(click.ClickException):
+                validate_index_database(dbpath, path, "janus")
+
+    def test_validate_rejects_unexpected_caption_pipeline_version(self):
+        path = "../src/test/fixtures/monkey.jpg"
+        with tempfile.TemporaryDirectory() as tmpdir:
+            dbpath = os.path.join(tmpdir, "validate.sqlite")
+            self._seed_validatable_db(dbpath, path)
+            con = sqlite3.connect(dbpath)
+            con.execute(
+                "UPDATE pipeline_state SET pipeline_version = ? WHERE stage = ?",
+                ("caption-search-json-v1-deadbeef:janus", CAPTION_STAGE),
+            )
+            con.commit()
+            con.close()
+
+            with self.assertRaises(click.ClickException):
+                validate_index_database(dbpath, path, "janus")
+
+    def test_validate_rejects_tag_counts_diverging_from_image_tags(self):
+        path = "../src/test/fixtures/monkey.jpg"
+        with tempfile.TemporaryDirectory() as tmpdir:
+            dbpath = os.path.join(tmpdir, "validate.sqlite")
+            self._seed_validatable_db(dbpath, path)
+            con = sqlite3.connect(dbpath)
+            con.execute("UPDATE tags SET count = count + 41")
+            con.commit()
+            con.close()
+
+            with self.assertRaises(click.ClickException):
+                validate_index_database(dbpath, path, "janus")
+
+    def test_publish_copies_embedding_rows_to_their_own_paths(self):
+        # The publish INSERT lists five columns positionally; a reordering or a
+        # row-dropping filter ships an empty or scrambled search-embeddings.sqlite
+        # and semantic search silently returns garbage. Nothing validates the
+        # published outputs, so this is the only place it can be caught.
+        path = "../src/test/fixtures/monkey.jpg"
+        vector = [0.5, -0.25, 0.75, 1.0]
+        with tempfile.TemporaryDirectory() as tmpdir:
+            dbpath = os.path.join(tmpdir, "source.sqlite")
+            self._seed_validatable_db(
+                dbpath,
+                path,
+                embeddings=[{"model_id": SiglipEmbedder.MODEL_ID, "embedding": vector}],
+            )
+            embeddings_output = os.path.join(tmpdir, "embeddings.sqlite")
+            publish_index_databases(dbpath, embeddings_output)
+
+            con = sqlite3.connect(embeddings_output)
+            row = con.execute(
+                "SELECT path, model_id, embedding_dim, embedding_blob, embedding_scale "
+                "FROM embeddings"
+            ).fetchone()
+            con.close()
+
+            self.assertEqual(row[0], path)
+            self.assertEqual(row[1], SiglipEmbedder.MODEL_ID)
+            self.assertEqual(row[2], len(vector))
+            decoded = decode_embedding(row[3], row[4])
+            for actual, expected in zip(decoded, vector):
+                self.assertAlmostEqual(actual, expected, places=2)
+
+    def test_publish_retains_runtime_tables_in_the_core_output(self):
+        # The core output drops build-only tables. Adding a runtime table to that
+        # drop list would ship a DB with no facets or no map, which the existing
+        # "these tables are absent" assertions cannot detect.
+        path = "../src/test/fixtures/monkey.jpg"
+        with tempfile.TemporaryDirectory() as tmpdir:
+            dbpath = os.path.join(tmpdir, "source.sqlite")
+            self._seed_validatable_db(dbpath, path)
+            core_output = os.path.join(tmpdir, "core.sqlite")
+            embeddings_output = os.path.join(tmpdir, "embeddings.sqlite")
+            publish_index_databases(dbpath, embeddings_output, core_output)
+
+            con = sqlite3.connect(core_output)
+            self.assertEqual(
+                con.execute("SELECT COUNT(*) FROM images").fetchone()[0], 1
+            )
+            self.assertEqual(
+                con.execute("SELECT COUNT(*) FROM metadata").fetchone()[0], 1
+            )
+            self.assertEqual(con.execute("SELECT COUNT(*) FROM tags").fetchone()[0], 1)
+            con.close()
+
+    def test_publish_leaves_live_outputs_untouched_when_generation_fails(self):
+        # Publication builds .tmp files and only renames after both pass their
+        # checks. Connecting straight to the output path, or renaming inside the
+        # build loop, would truncate the live DB on any mid-run failure.
+        path = "../src/test/fixtures/monkey.jpg"
+        with tempfile.TemporaryDirectory() as tmpdir:
+            dbpath = os.path.join(tmpdir, "source.sqlite")
+            self._seed_validatable_db(dbpath, path)
+            con = sqlite3.connect(dbpath)
+            con.execute("DROP TABLE embeddings")
+            con.commit()
+            con.close()
+
+            core_output = os.path.join(tmpdir, "core.sqlite")
+            embeddings_output = os.path.join(tmpdir, "embeddings.sqlite")
+            for output in (core_output, embeddings_output):
+                with open(output, "wb") as fh:
+                    fh.write(b"live-database")
+
+            with self.assertRaises(Exception):
+                publish_index_databases(dbpath, embeddings_output, core_output)
+
+            for output in (core_output, embeddings_output):
+                with open(output, "rb") as fh:
+                    self.assertEqual(fh.read(), b"live-database")
+                self.assertFalse(os.path.exists(output + ".tmp"))
+
+    def test_publish_refuses_to_replace_a_live_index_with_a_much_smaller_one(self):
+        # quick_check proves structure, not content. Without a row-count floor a
+        # stray publish from a fixture DB replaces the live index, and rename has
+        # already unlinked the only copy.
+        path = "../src/test/fixtures/monkey.jpg"
+        with tempfile.TemporaryDirectory() as tmpdir:
+            dbpath = os.path.join(tmpdir, "source.sqlite")
+            self._seed_validatable_db(dbpath, path)
+            core_output = os.path.join(tmpdir, "core.sqlite")
+            embeddings_output = os.path.join(tmpdir, "embeddings.sqlite")
+
+            published = Sqlite3Client(core_output)
+            published.setup_tables()
+            with published.transaction() as cur:
+                for i in range(50):
+                    cur.execute("INSERT INTO images(path) VALUES (?)", (f"{path}#{i}",))
+            published.con.close()
+
+            with self.assertRaises(click.ClickException):
+                publish_index_databases(dbpath, embeddings_output, core_output)
+
+            con = sqlite3.connect(core_output)
+            self.assertEqual(
+                con.execute("SELECT COUNT(*) FROM images").fetchone()[0], 50
+            )
+            con.close()
+
+    def test_publish_allows_a_smaller_index_when_explicitly_permitted(self):
+        path = "../src/test/fixtures/monkey.jpg"
+        with tempfile.TemporaryDirectory() as tmpdir:
+            dbpath = os.path.join(tmpdir, "source.sqlite")
+            self._seed_validatable_db(dbpath, path)
+            core_output = os.path.join(tmpdir, "core.sqlite")
+            embeddings_output = os.path.join(tmpdir, "embeddings.sqlite")
+
+            published = Sqlite3Client(core_output)
+            published.setup_tables()
+            with published.transaction() as cur:
+                for i in range(50):
+                    cur.execute("INSERT INTO images(path) VALUES (?)", (f"{path}#{i}",))
+            published.con.close()
+
+            publish_index_databases(
+                dbpath, embeddings_output, core_output, allow_shrink=True
+            )
+
+            con = sqlite3.connect(core_output)
+            self.assertEqual(
+                con.execute("SELECT COUNT(*) FROM images").fetchone()[0], 1
+            )
+            con.close()
 
     def test_geocode_columns_keyed_off_admin_fields(self):
         # region = admin1 (state), subregion = admin2 (county), by key.

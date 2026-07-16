@@ -335,6 +335,7 @@ JANUS_IMAGE_DECODE_WORKERS = 4
 GEMMA4_MAX_NEW_TOKENS = 192
 EMBEDDER_BATCH_SIZE = 16
 COLORTHIEF_WORKERS = 4
+# Comparison-tooling defaults only; the published palette is full-resolution.
 COLOUR_THUMBNAIL_MAX_DIMENSION = 512
 COLOUR_THUMBNAIL_QUALITY = 10
 FILE_HASH_WORKERS = 8
@@ -343,7 +344,11 @@ CORE_STAGE = "core"
 CAPTION_STAGE = "caption"
 SIGLIP_V1_STAGE = "embedding:siglip-v1"
 SIGLIP_V2_STAGE = "embedding:siglip-v2"
-CORE_PIPELINE_VERSION = "core-exif-geocode-colour-v2-thumb512"
+# Unchanged from v1 on purpose: the published core output (EXIF fields, geocode,
+# full-resolution palette) is byte-identical to what v1 produced, verified across
+# real photos. `details=False` only drops MakerNote/thumbnail tags that were never
+# retained. Bumping this would force a needless recompute of every existing row.
+CORE_PIPELINE_VERSION = "core-exif-geocode-colour-v1"
 CAPTION_PROMPT_VERSION = "caption-search-json-v2"
 JANUS_MODEL_ID = "deepseek-ai/Janus-Pro-1B"
 JANUS_MODEL_REVISION = "960ab33191f61342a4c60ae74d8dc356a39fafcb"
@@ -1625,11 +1630,27 @@ def prepare_colour_thumbnail(
         return np.array(image.convert("RGBA"), dtype=np.uint8)
 
 
-def extract_colour_palette(
+def extract_colour_palette(path: str) -> list[tuple[int, int, int]]:
+    """Extract the published palette from the full-resolution source.
+
+    Deliberately full-resolution. Bounding the source to a thumbnail first is
+    ~4.5x faster in isolation but reorders the median-cut clusters: measured over
+    300 real photos it moves ``palette[0]`` by more than deltaE 18 for 23% of them,
+    and ``palette[0]`` is the dominant colour the map, timeline, photo placeholder
+    and slideshow pairing all read. Colours are extracted on background threads
+    concurrently with GPU inference, so that cost is hidden behind captioning and
+    the speedup buys no measurable wall-clock on a full index. See
+    ``benchmark-colours`` for the comparison.
+    """
+    return fast_colorthief.get_palette(path)
+
+
+def extract_thumbnail_colour_palette(
     path: str,
     max_dimension: int = COLOUR_THUMBNAIL_MAX_DIMENSION,
     quality: int = COLOUR_THUMBNAIL_QUALITY,
 ) -> list[tuple[int, int, int]]:
+    """Bounded-thumbnail palette. Comparison tooling only — never published."""
     thumbnail = prepare_colour_thumbnail(path, max_dimension=max_dimension)
     return fast_colorthief.get_palette(thumbnail, quality=quality)
 
@@ -2818,18 +2839,21 @@ def index(
             return True
         state = states.get((path, stage))
         if state is None:
-            # Legacy rows have no stage provenance. Preserve them as an imported
-            # baseline. Legacy mtime/size signatures are often invalidated by a
-            # restore or metadata-only copy, and cannot prove whether model input
-            # changed. From this import onward SHA-256 + pipeline version is
-            # authoritative. A non-default caption backend remains an intentional
-            # re-caption, not a legacy import.
-            if (
-                stage == CAPTION_STAGE
-                and classifier_backend != CLASSIFIER_BACKEND_JANUS
-            ):
-                return True
-            return False
+            # Legacy rows have no stage provenance. Core and embedding output is
+            # reproducible from the pinned pipeline/model, so preserving them as an
+            # imported baseline is safe: legacy mtime/size signatures are often
+            # invalidated by a restore or metadata-only copy and cannot prove
+            # whether model input changed. From this import onward SHA-256 +
+            # pipeline version is authoritative.
+            #
+            # Captions are the exception and must be regenerated. A legacy caption
+            # may have come from the retired four-field v1 prompt, whose output is
+            # a different shape to the current two-field contract, and nothing in
+            # the row proves which prompt produced it. Importing it under the
+            # current version would assert provenance we cannot demonstrate, and
+            # `validate` could never catch it because the claimed version is by
+            # construction the expected one.
+            return stage == CAPTION_STAGE
         digest, stored_version, _model_id = state
         return digest != current_digests[path] or stored_version != version
 
@@ -2894,18 +2918,10 @@ def index(
                             CORE_PIPELINE_VERSION,
                             cur=cur,
                         )
-                    if (
-                        path in existing_caption_paths
-                        and (path, CAPTION_STAGE) not in states
-                    ):
-                        db.upsert_pipeline_state(
-                            path,
-                            CAPTION_STAGE,
-                            digest,
-                            caption_pipeline_version(CLASSIFIER_BACKEND_JANUS),
-                            JANUS_MODEL_ID,
-                            cur=cur,
-                        )
+                    # Legacy captions are deliberately not imported: their prompt
+                    # generation is unknowable, so they are re-captioned instead
+                    # and get their provenance from that run. Stamping them here
+                    # would claim the current version for v1-shaped output.
                 if (
                     path in existing_embedding_paths_v1
                     and (path, SIGLIP_V1_STAGE) not in states
@@ -3684,9 +3700,9 @@ def benchmark_colours(
             palettes = list(executor.map(function, paths))
         return dict(zip(paths, palettes)), (time.perf_counter() - started_at) * 1000
 
-    baseline, baseline_ms = run(fast_colorthief.get_palette)
+    baseline, baseline_ms = run(extract_colour_palette)
     candidate, candidate_ms = run(
-        lambda path: extract_colour_palette(path, max_dimension, quality)
+        lambda path: extract_thumbnail_colour_palette(path, max_dimension, quality)
     )
     comparisons = [
         compare_colour_palettes(baseline[path], candidate[path]) for path in paths
@@ -4577,6 +4593,32 @@ def benchmark_embedder_batch(
         print(f"Benchmark written to {output}")
 
 
+def detect_vanished_albums(
+    indexed_paths: typing.Iterable[str], files: typing.Iterable[str]
+) -> dict[str, int]:
+    """Album directories that hold indexed rows but now match no source files.
+
+    Counts cannot separate an unmounted album from ordinary curation: one album
+    of 100 photos out of 1480 is under 7%, which clears both the percentage guard
+    here and the row-count floor in `publish`. `validate` cannot catch it either,
+    because it derives its expected set from the same shrunken glob.
+
+    The album still renders — pages are built from the album directories and treat
+    the index as optional enrichment — so the loss is quiet: it drops out of text,
+    facet, and semantic search and loses `colors`, leaving its map markers
+    transparent. Restoring it costs GPU inference for the whole album, not a file
+    copy. A whole album going to zero is the unmount signature; deleting individual
+    photos leaves the album still matching.
+    """
+    present = {os.path.dirname(path) for path in files}
+    counts: dict[str, int] = {}
+    for path in indexed_paths:
+        album = os.path.dirname(path)
+        if album not in present:
+            counts[album] = counts.get(album, 0) + 1
+    return counts
+
+
 @cli.command("prune")
 @click.option("--glob", help="glob to recursively index.")
 @click.option("--dbpath", default="testdb.sqlite", help="sqlite database path to use.")
@@ -4612,6 +4654,19 @@ def prune(glob: str, dbpath: str, dry_run: bool, force: bool):
             f"prune: would delete {len(to_delete)}/{len(paths)} indexed path(s) "
             f"({len(to_delete) / len(paths):.0%}) — refusing a large partial prune. "
             "Check the album mount/glob, or re-run with --force if intentional."
+        )
+
+    vanished = detect_vanished_albums(paths, files)
+    if vanished and not force and not dry_run:
+        summary = ", ".join(
+            f"{album} ({count} row(s))" for album, count in sorted(vanished.items())
+        )
+        raise click.ClickException(
+            f"prune: {len(vanished)} album(s) hold indexed rows but now match no "
+            f"source files: {summary}. A single unmounted or renamed album can sit "
+            "far below the percentage guard above while still dropping every one of "
+            "its photos from the published index. Check the album mount/glob, or "
+            "re-run with --force if those albums really were removed."
         )
 
     if dry_run:
@@ -4861,18 +4916,61 @@ def validate_command(
     log(f"Validated {summary['paths']} path(s) across {summary['stages']} stage(s)")
 
 
+PUBLISH_MIN_ROW_RATIO = 0.9
+
+
+def count_table_rows(dbpath: Path, table: str) -> Optional[int]:
+    """Row count for ``table``, or ``None`` when the DB or table is unavailable."""
+    if not dbpath.exists():
+        return None
+    con = sqlite3.connect(f"file:{os.path.abspath(str(dbpath))}?mode=ro", uri=True)
+    try:
+        return con.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
+    except sqlite3.Error:
+        return None
+    finally:
+        con.close()
+
+
+def assert_no_row_regression(
+    candidate: Path, existing: Path, table: str, allow_shrink: bool
+) -> None:
+    """Refuse to replace a published DB with a substantially smaller one.
+
+    `quick_check` only proves the generated file is structurally sound; it says
+    nothing about content. Without this, publishing a fixture or a partially
+    indexed DB silently destroys the live output, which has no backup once
+    `rename` unlinks the old inode.
+    """
+    if allow_shrink:
+        return
+    previous = count_table_rows(existing, table)
+    if not previous:
+        return
+    current = count_table_rows(candidate, table) or 0
+    if current < previous * PUBLISH_MIN_ROW_RATIO:
+        raise click.ClickException(
+            f"publish: refusing to replace {existing} — {table} would go from "
+            f"{previous} to {current} row(s) ({current / previous:.0%} of the "
+            "published index). Re-run with --allow-shrink if this is intended."
+        )
+
+
 def publish_index_databases(
     source_dbpath: str,
     embeddings_output: str,
     core_output: Optional[str] = None,
+    allow_shrink: bool = False,
 ) -> None:
     """Create compact publication DBs and replace outputs only after validation."""
     source = sqlite3.connect(f"file:{os.path.abspath(source_dbpath)}?mode=ro", uri=True)
-    outputs: list[tuple[Path, Path]] = []
+    outputs: list[tuple[Path, Path, str]] = []
+    temporaries: list[Path] = []
     try:
         if core_output:
             core_path = Path(core_output)
             core_tmp = core_path.with_suffix(core_path.suffix + ".tmp")
+            temporaries.append(core_tmp)
             core_tmp.unlink(missing_ok=True)
             core = sqlite3.connect(core_tmp)
             source.backup(core)
@@ -4891,10 +4989,11 @@ def publish_index_databases(
                     "publish: generated core DB failed quick_check"
                 )
             core.close()
-            outputs.append((core_tmp, core_path))
+            outputs.append((core_tmp, core_path, "images"))
 
         embeddings_path = Path(embeddings_output)
         embeddings_tmp = embeddings_path.with_suffix(embeddings_path.suffix + ".tmp")
+        temporaries.append(embeddings_tmp)
         embeddings_tmp.unlink(missing_ok=True)
         embeddings = sqlite3.connect(embeddings_tmp)
         embeddings.execute("PRAGMA page_size=4096")
@@ -4914,20 +5013,40 @@ def publish_index_databases(
                 "publish: generated embeddings DB failed quick_check"
             )
         embeddings.close()
-        outputs.append((embeddings_tmp, embeddings_path))
+        outputs.append((embeddings_tmp, embeddings_path, "embeddings"))
 
-        for temporary, output in outputs:
+        # Both outputs are fully built and checked before any rename, so a failure
+        # here leaves the published pair untouched rather than half-replaced.
+        for temporary, output, table in outputs:
+            assert_no_row_regression(temporary, output, table, allow_shrink)
+
+        for temporary, output, _table in outputs:
             temporary.replace(output)
     finally:
         source.close()
+        # A failed publish must not leave a multi-MB .tmp behind: `public/` is
+        # copied wholesale into the site build, so leftovers ship as assets. On
+        # success these have already been renamed away.
+        for temporary in temporaries:
+            temporary.unlink(missing_ok=True)
 
 
 @cli.command("publish")
 @click.option("--dbpath", required=True, help="Validated source database.")
 @click.option("--core-output", default=None, help="Optional core DB output path.")
 @click.option("--embeddings-output", required=True, help="Embeddings DB output path.")
-def publish_command(dbpath: str, core_output: Optional[str], embeddings_output: str):
-    publish_index_databases(dbpath, embeddings_output, core_output)
+@click.option(
+    "--allow-shrink",
+    is_flag=True,
+    help="Permit publishing a substantially smaller index than the live one.",
+)
+def publish_command(
+    dbpath: str,
+    core_output: Optional[str],
+    embeddings_output: str,
+    allow_shrink: bool,
+):
+    publish_index_databases(dbpath, embeddings_output, core_output, allow_shrink)
     log("Published validated SQLite output(s)")
 
 

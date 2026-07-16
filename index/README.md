@@ -96,11 +96,22 @@ $ uv run python index.py benchmark-cpu --sample-size 128 --repeat 3 --hash-worke
 $ uv run python index.py benchmark-colours --sample-size 128 --max-dimension 512 --quality 10 --output ".index-colour-benchmark.json"
 ```
 
-Production colour extraction decodes at JPEG draft resolution, bounds the image
-to 512px, then samples the thumbnail without a blur pass. `benchmark-colours`
-compares this with the former full-resolution palette and reports wall-time plus
-dominant and whole-palette CIE76 ΔE. Content hashing uses eight I/O workers; EXIF
-parsing skips MakerNote/thumbnail details because none of those fields are kept.
+Production colour extraction is deliberately full-resolution. `benchmark-colours`
+compares it against a bounded-thumbnail candidate (JPEG draft decode plus a BOX
+thumbnail) and reports wall-time alongside dominant and whole-palette CIE76 ΔE.
+
+Read those two ΔE figures together. The thumbnail is ~4.5x faster in isolation and
+its whole-palette ΔE stays low, but it reorders the median-cut clusters: across 300
+real photos it moved `palette[0]` by more than ΔE 18 for 23% of them, sometimes
+inverting light and dark. `palette[0]` is the dominant colour behind map markers,
+timeline entries, photo placeholders and slideshow pairing, so a low whole-palette
+ΔE alone does not mean a candidate is safe to publish. Colours are extracted on
+background threads concurrently with GPU inference, so the speedup is hidden behind
+captioning and buys no measurable wall-clock on a full index.
+
+Content hashing uses eight I/O workers; EXIF parsing skips MakerNote/thumbnail
+details because none of those fields are kept (verified byte-identical on the
+retained fields across real photos).
 
 To benchmark the Janus classifier path directly on a sample image:
 
@@ -171,6 +182,34 @@ the source SHA-256, pipeline version, model ID, pinned revision, and completion
 time in `pipeline_state`. Failed captions or unreadable embeddings do not receive
 a completion record, so the next run retries them without erasing the previous
 successful output.
+
+A database predating `pipeline_state` has its core and embedding rows imported as
+a baseline, because that output is reproducible from the pinned pipeline and model.
+Captions are the exception: a legacy caption may have come from the retired
+four-field v1 prompt and nothing in the row proves which prompt produced it, so it
+is re-captioned rather than imported. Importing it under the current version would
+assert provenance that cannot be shown, and `validate` could never catch it because
+the claimed version would be the expected one by construction.
+
+`publish` refuses to replace a live output whose row count would drop below 90% of
+the published index (`--allow-shrink` overrides). `quick_check` only proves the
+generated file is structurally sound; it says nothing about content, and `rename`
+unlinks the previous inode, so there is no copy to fall back on.
+
+`prune` additionally refuses when an album directory still holds indexed rows but
+matches no source files, because counts cannot separate an unmounted album from
+ordinary curation. Only the two largest albums here are big enough to trip the
+percentage guard, so an album of ~100 photos failing to mount would otherwise be
+pruned, validated against the same shrunken glob, published, and then written over
+the working DB.
+
+The failure is quiet rather than obvious. Album pages are built from the album
+directories and treat the index as optional enrichment, so the album still renders;
+it just disappears from text, facet, and semantic search, and loses `colors`, which
+drops its map markers back to `transparent`. Restoring it means re-running GPU
+inference for the whole album, not re-copying a file. Deleting individual photos
+leaves the album matching, so curation is unaffected; `--force` covers deliberately
+removing a whole album.
 
 Tag frequencies are rebuilt from `image_tags`; classifier and geocode tags can
 therefore be replaced or removed without count drift. `schema_migrations` is the
