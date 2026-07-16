@@ -30,10 +30,34 @@
     box-shadow var(--t-base) var(--ease-out);
   background-color: transparent;
   z-index: var(--z-fullscreen-toolbar);
+  isolation: isolate;
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-gutter: stable;
   will-change: opacity, transform;
+}
+
+/* The drawer floats straight over the photo, so its controls had nothing to read
+   against on a bright image. The scrim and the blur both live here rather than
+   on .toolbar because backdrop-filter does not follow a gradient: it applies at
+   full strength across the whole box and stops dead at the bottom edge, leaving
+   a hard line across the photo. Masking this layer fades the blur out with the
+   scrim, while the controls above stay crisp. Fixed dark glass, so the contents
+   stay on-dark in every theme. */
+.toolbar::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image: linear-gradient(
+    to bottom,
+    color-mix(in oklch, var(--c-overlay-dark) 92%, transparent) 0%,
+    color-mix(in oklch, var(--c-overlay-dark) 78%, transparent) 55%,
+    transparent 100%
+  );
+  backdrop-filter: blur(var(--glass-blur-subtle));
+  mask-image: linear-gradient(to bottom, #000 0%, #000 55%, transparent 100%);
 }
 
 /* Fine pointers dismiss the toolbar by leaving the top edge or the "Hide"

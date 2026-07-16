@@ -344,6 +344,65 @@ export const SlideshowToolbar: React.FC<SlideshowToolbarProps> = (props) => {
         </button>
       ) : null}
 
+      <div className={styles.controlGroup} role="group" aria-label="View controls">
+        <div className={styles.controlHeader}>
+          <span className={styles.controlLogo} aria-hidden="true">
+            ⛶
+          </span>
+          <span className={styles.controlCopy}>
+            <span className={styles.controlTitle}>View</span>
+          </span>
+        </div>
+
+        <div className={styles.controlButtons}>
+          <button
+            type="button"
+            className={[props.showCover ? buttonStyles.active : "", buttonStyles.base].join(" ")}
+            aria-pressed={props.showCover}
+            title={
+              props.showCover
+                ? "Photos fill the screen (cropping). Tap to switch to fit."
+                : "Photos fit the screen (letterboxed). Tap to switch to fill."
+            }
+            onClick={props.onToggleCover}
+          >
+            ⛶ Fill screen
+          </button>
+
+          {!props.isFullscreenActive ? (
+            <button
+              type="button"
+              className={buttonStyles.base}
+              disabled={!props.isFullscreenSupported}
+              aria-disabled={!props.isFullscreenSupported}
+              onClick={props.onToggleFullscreen}
+            >
+              ⇱ Fullscreen
+            </button>
+          ) : null}
+
+          <button
+            type="button"
+            className={[
+              props.isWakeLockActive ? buttonStyles.active : "",
+              styles.secondarySessionControl,
+              buttonStyles.base,
+            ].join(" ")}
+            disabled={!props.isWakeLockSupported}
+            aria-disabled={!props.isWakeLockSupported}
+            aria-pressed={props.isWakeLockActive}
+            title={
+              props.isWakeLockSupported
+                ? "Try to acquire a wake lock for this slideshow session"
+                : "Screen wake lock is not available in this browser"
+            }
+            onClick={props.onTryWakeLock}
+          >
+            {props.isWakeLockActive ? "Screen stays awake" : "Keep screen awake"}
+          </button>
+        </div>
+      </div>
+
       <div className={styles.playbackGroup} role="group" aria-label="Playback mode">
         <div className={styles.playbackHeader}>
           <span className={styles.playbackLogo} aria-hidden="true">
@@ -525,65 +584,6 @@ export const SlideshowToolbar: React.FC<SlideshowToolbarProps> = (props) => {
             onClick={props.onCycleAlignment}
           >
             📍 {props.detailsAlignment.charAt(0).toUpperCase() + props.detailsAlignment.slice(1)}
-          </button>
-        </div>
-      </div>
-
-      <div className={styles.controlGroup} role="group" aria-label="View controls">
-        <div className={styles.controlHeader}>
-          <span className={styles.controlLogo} aria-hidden="true">
-            ⛶
-          </span>
-          <span className={styles.controlCopy}>
-            <span className={styles.controlTitle}>View</span>
-          </span>
-        </div>
-
-        <div className={styles.controlButtons}>
-          <button
-            type="button"
-            className={[props.showCover ? buttonStyles.active : "", buttonStyles.base].join(" ")}
-            aria-pressed={props.showCover}
-            title={
-              props.showCover
-                ? "Photos fill the screen (cropping). Tap to switch to fit."
-                : "Photos fit the screen (letterboxed). Tap to switch to fill."
-            }
-            onClick={props.onToggleCover}
-          >
-            ⛶ Fill screen
-          </button>
-
-          {!props.isFullscreenActive ? (
-            <button
-              type="button"
-              className={buttonStyles.base}
-              disabled={!props.isFullscreenSupported}
-              aria-disabled={!props.isFullscreenSupported}
-              onClick={props.onToggleFullscreen}
-            >
-              ⇱ Fullscreen
-            </button>
-          ) : null}
-
-          <button
-            type="button"
-            className={[
-              props.isWakeLockActive ? buttonStyles.active : "",
-              styles.secondarySessionControl,
-              buttonStyles.base,
-            ].join(" ")}
-            disabled={!props.isWakeLockSupported}
-            aria-disabled={!props.isWakeLockSupported}
-            aria-pressed={props.isWakeLockActive}
-            title={
-              props.isWakeLockSupported
-                ? "Try to acquire a wake lock for this slideshow session"
-                : "Screen wake lock is not available in this browser"
-            }
-            onClick={props.onTryWakeLock}
-          >
-            {props.isWakeLockActive ? "Screen stays awake" : "Keep screen awake"}
           </button>
         </div>
       </div>
