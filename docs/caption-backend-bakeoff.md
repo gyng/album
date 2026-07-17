@@ -1,4 +1,9 @@
-# Caption backend bake-off — 17 July 2026
+# Caption backend bake-off — 17–18 July 2026
+
+> **Status: shipped.** Default swapped from Janus-Pro-1B to Gemma 4 E4B `UD-Q4_K_XL` on a
+> resident `llama-server`, tags reshaped for facets, visible-text capture added, and the full
+> library reindexed and published on 18 Jul. See *Decision and outcome* below for the result and
+> the one bug the pipeline caught before publish.
 
 Twelve models captioning the same eleven photos. Five run locally on a 10GB RTX 3080;
 seven are remote (Anthropic and OpenAI) and are **marked cloud throughout** — they are not a
@@ -208,29 +213,71 @@ tags from 14% to 6%. The residue — a few catch-alls and synonym clusters
 a deterministic post-filter at the facet-display layer, which keeps those tags
 searchable while hiding them from the panel and can be tuned without re-captioning.
 
-### 8. Caption backend is orthogonal to semantic search
+### 9. Caption backend is orthogonal to semantic search
 
 `embedding_pipeline_version` keys only off the SigLIP model id and revision and never reads
 the caption backend; `BaseCaptionClassifier` and `BaseImageEmbedder` are separate hierarchies
 with separate stages. **Swapping the captioner never invalidates embeddings or touches
 semantic search.** Changing the captioner requires no re-embed.
 
-### 9. Junk tags are a latent bug, not a live one
+### 10. Junk tags are a latent bug, not a live one
 
-Current Janus + the current prompt emit 11% literal junk tags (`depicts`, `under`, `image`).
-The live DB is clean because it predates this prompt version, and the `tags` frequency table
-that powers the facet panel is geocode-only (`Japan`, `Singapore`, …). But nothing filters
-single junk words, so **a reindex today would push them into the FTS `images.tags` column.**
+Janus + its prompt emitted 11% literal junk tags (`depicts`, `under`, `image`). At the time the
+live DB was clean only because it predated that prompt and the `tags` facet table was
+geocode-only — a Janus reindex would have pushed junk into the FTS `images.tags` column.
+**Resolved by the swap:** Gemma `UD-Q4_K_XL` emits 0% junk, and the 18 Jul reindex verified a
+clean facet table. Had we reindexed on Janus instead, this would have shipped the junk live.
 
-## Recommendation
+## Decision and outcome (18 Jul)
 
-**Keep Janus as the default for now.** It is 3× faster than anything else local, and its
-deficit is tag *shape*, which may be fixable with a prompt change or a post-filter rather
-than a model swap — try that before paying 3× the time.
+**Swapped the default to Gemma 4 E4B `UD-Q4_K_XL`, and reindexed the whole library.** The
+original recommendation was "keep Janus, its deficit is tag *shape*, try to fix that first" —
+so that is what happened, and the fix changed the answer:
 
-If the tag deficit proves unfixable, **Gemma `UD-Q4_K_XL`** is the local candidate: same
-quality as `Q8_0` for 3 GB less, 10/11 in tags, 91% phrases, 0% junk. Fix the per-image
-subprocess reload first — it is most of the cost.
+1. **The per-image subprocess reload was the whole speed gap.** Porting `Gemma4GgufClassifier`
+   to one resident `llama-server` took it from 5.40 to **2.09 s/image** end to end (finding 2).
+   That is 25% slower than Janus (1.67 s), not 3×.
+2. **Tags were reshaped for facets** (finding 8): short lowercase nouns, subject first, catch-alls
+   named and discouraged. Janus's tag deficit is structural (bare words from its own sentence);
+   Gemma's tags are clean facet vocabulary.
+3. Trading 0.4 s/image for 9/11 concept-in-tags vs 7/11, 91% phrases vs 6%, and 0% junk vs 11%
+   is the right call for a search index. On the library that is ~10 extra minutes on a one-off
+   reindex.
+
+**Shipped in production**, verified against the published `search.sqlite`:
+
+- 1,480 photos re-captioned; the facet `tags` table now has a real head — `sky` (166),
+  `trees` (158), `building` (153), `night` (136), `mountain` (117) — where it was geocode-only
+  before. 2,047 unique facets, versus the ~8,500 the descriptive prompt would have produced.
+- **Visible-text capture** (an explicit prompt clause): 275 photos now quote their signage in
+  `alt_text` and are findable by it — `gelato`, `TOSHIBA`, `メニュー`, `第45雪映氷まつり`. CJK is
+  searchable for 3+ character queries; 2-char queries miss on the porter-trigram ≥3-char floor,
+  a pre-existing tokenizer trait, not a capture gap (146 photos carry CJK text).
+- `search.sqlite` grew 5.0 → 6.1 MB; the embeddings DB stayed 3.3 MB (embeddings reused — the
+  caption swap does not touch them, finding 9).
+
+**One bug the pipeline caught, worth recording.** The swap changed the default backend in the
+`index` command and in `validate_index_database`, but missed the `validate` CLI command's own
+`--classifier-backend` default (still `janus`). `validate` recomputes the expected caption
+pipeline version from that backend, so it compared janus-versioned expectations against
+correctly gemma-versioned captions and **rejected every row, aborting `do-full-index` before
+publish**. The data was correct; the check was stale. Fixed, with a regression test asserting
+the two CLI defaults stay equal. The guard doing its job is why a mismatched DB never shipped.
+
+**BM25 column weighting was investigated and rejected as not-warranted.** The hypothesis was
+that a `tags` match should outrank the same term in a long `alt_text` sentence. Measured on the
+real DB: unweighted BM25 already puts 20/20 tag-matches in the top 20 for `building` and `city`,
+because BM25 length-normalises and `tags` is a short field. Filename (camera-code) collisions do
+not occur (0 filename-only matches across six content queries), and place search already works
+unweighted (`paris` → Paris). Explicit weights only reshuffle equally-valid tag-matches and risk
+regressing place search by demoting `geocode`. No change shipped.
+
+**SigLIP v1/v2 left as-is** (separate analysis). The DB stores both image-embedding sets; text
+search is v1 end to end, "more like this" uses v2 for free (both sides pre-computed, no client
+encoder). v2 text search stays blocked by the client text-encoder weight — ~350 MB, because
+SigLIP2's Gemma tokenizer is a 256k vocab (8× v1), 70% of the model. Gemma 4 does not change
+this: it runs server-side and is a generative decoder, not a retrieval dual-encoder. The reindex
+made keyword search strong enough that the v2 text upgrade matters even less than before.
 
 **Do not adopt Qwen3-VL-8B blind**: it peaks at 9981 of 10240 MiB (97% of the card) and would
 OOM under the hybrid profile, which already loads three models.
