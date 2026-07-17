@@ -52,12 +52,54 @@ fit and spills via `--gpu-layers auto`.
 
 The docs' 9.9–10.4 s/image figure for `Q8_0` is stale; it now measures 5.70 s.
 
-### 2. The GGUF speed gap is architecture, not the model
+### 2. The GGUF speed gap is architecture, not the model — and ~70% of it is recoverable
 
 `Gemma4GgufClassifier` spawns one `llama-mtmd-cli` subprocess **per image**, reloading 5–8 GB
-of weights every time. Janus loads once (8 s) and batches four images per forward pass. That
-is the whole 3× gap. A persistent `llama-server` would likely close most of it — **untested,
-and the highest-value remaining experiment.**
+of weights every time. Janus loads once (8 s) and batches four images per forward pass. The
+~75 ms "init" the GGUF backends report is not a model load at all — it is `shutil.which()`
+finding the binary. The real load happens inside every `predict()`.
+
+Measured directly on `UD-Q4_K_XL`, one image, from llama.cpp's own log:
+
+| | wall | where it goes |
+|---|---|---|
+| cold | 5.15 s | |
+| warm (page cache) | 4.11 s | model load completes ~2.44 s in; image encode done at 2.87 s; generation ≈1.2 s |
+
+**About 70% of per-image wall-clock is process startup and weight loading; only ~1.2 s is
+inference.** Across the 1,495-photo library that is ~1,495 redundant model loads.
+
+Running `llama-server` once and posting per image should therefore land Gemma `UD-Q4_K_XL`
+near **~1.2 s/image — at or below Janus's 1.67 s** — while keeping its 9/11 tags, 91% phrase
+rate and 0% junk. If that holds it removes the only real argument for keeping Janus, whose
+deficit is tag *shape*.
+
+**Prototyped and measured — it works, and it beats the incumbent.** `llama-server` was built
+and driven directly over HTTP against the same prompt and frames:
+
+| path | s/img | concept in tags |
+|---|---|---|
+| Gemma `UD-Q4_K_XL`, subprocess per image (current) | 5.40 | 9/11 |
+| **Gemma `UD-Q4_K_XL`, persistent `llama-server`** | **1.39** | 9/11 |
+| Janus-Pro-1B (incumbent) | 1.67 | 7/11 |
+
+**3.9× faster than the current GGUF path, and faster than Janus**, with 5/5 valid JSON and ten
+concrete tags per image. This removes the only argument for keeping Janus: its speed. Gemma
+`UD-Q4_K_XL` on a persistent server is faster *and* has the better search payload (9/11 vs
+7/11 in tags, 91% phrases vs 6%, 0% junk vs 11%), in 6.2 GB.
+
+**One non-obvious gotcha, worth its own note.** Naively posting to `/v1/chat/completions`
+returns an **empty `content`**: Gemma 4's chat template puts the server in thinking mode, the
+whole token budget is spent in `reasoning_content`, and the response stops at
+`finish_reason: "length"` having said nothing. `response_format: json_schema` does not prevent
+it and a request-level `reasoning_budget: 0` is ignored. The switch that works is
+`chat_template_kwargs: {"enable_thinking": false}` — which also accounts for most of the gain
+(2.6 s → 1.39 s). The subprocess path never hit this because `--json-schema-file` grammar-
+constrained the output from the first token.
+
+**Still to do:** port `Gemma4GgufClassifier` from `subprocess.run` per image to start-once /
+health-check / POST-per-image / tear-down-on-release, and re-run the full fixture to confirm
+the 9/11 holds end to end through the real harness rather than a prototype script.
 
 ### 3. Inter-model disagreement is a usable confidence signal
 
