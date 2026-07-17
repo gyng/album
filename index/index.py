@@ -351,7 +351,7 @@ DEFAULT_GEMMA4_QUANTIZATION = None
 DEFAULT_GEMMA4_BATCH_SIZE = 1
 DEFAULT_GEMMA4_LOW_IMPACT_HEADROOM_GB = 3.0
 DEFAULT_GEMMA4_CPU_MAX_MEMORY = "24GiB"
-DEFAULT_GEMMA4_GGUF_MODEL_ID = "unsloth/gemma-4-E4B-it-GGUF:Q8_0"
+DEFAULT_GEMMA4_GGUF_MODEL_ID = "unsloth/gemma-4-E4B-it-GGUF:UD-Q4_K_XL"
 DEFAULT_GEMMA4_GGUF_BATCH_SIZE = 1
 DEFAULT_GEMMA4_GGUF_MAX_NEW_TOKENS = 256
 DEFAULT_GEMMA4_GGUF_IMAGE_MIN_TOKENS = 70
@@ -3014,7 +3014,7 @@ def run_embedding_pass(
         ],
         case_sensitive=False,
     ),
-    default=CLASSIFIER_BACKEND_JANUS,
+    default=CLASSIFIER_BACKEND_GEMMA4_GGUF,
     help="Caption classifier backend to use when the profile includes classifier fields.",
 )
 @click.option(
@@ -5163,7 +5163,7 @@ def validate_index_database(
     dbpath: str,
     glob: str,
     model_profile: str,
-    classifier_backend: str = CLASSIFIER_BACKEND_JANUS,
+    classifier_backend: str = CLASSIFIER_BACKEND_GEMMA4_GGUF,
     classifier_model_id: Optional[str] = None,
     classifier_quantization: Optional[str] = None,
     classifier_batch_size: Optional[int] = None,

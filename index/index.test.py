@@ -1309,6 +1309,10 @@ class TestCli(UsesTestexistsFixture, unittest.TestCase):
                     "--dbpath",
                     dbpath,
                     "--dry-run",
+                    # This guard is a Janus production limit, so name the backend
+                    # rather than inherit whatever the default happens to be.
+                    "--classifier-backend",
+                    "janus",
                     "--classifier-batch-size",
                     "5",
                 ],
@@ -1373,9 +1377,16 @@ class TestCli(UsesTestexistsFixture, unittest.TestCase):
             )
             db.con.close()
 
+            # The row above is stamped with Janus provenance, so index must be told
+            # to use Janus too — provenance is per backend, and the default is no
+            # longer Janus. Inheriting the default here would silently test
+            # "backend changed, so reindex", which is a different behaviour.
             result = CliRunner().invoke(
                 index,
-                f"--glob {path} --dbpath {dbpath} --model-profile janus --dry-run".split(),
+                (
+                    f"--glob {path} --dbpath {dbpath} --model-profile janus "
+                    "--classifier-backend janus --dry-run"
+                ).split(),
             )
             self.assertEqual(0, result.exit_code)
             self.assertIn("(0 to index, 1 already indexed)", result.output)
@@ -2424,7 +2435,9 @@ class TestDb(UsesTestexistsFixture, unittest.TestCase):
             )
             db.con.close()
 
-            summary = validate_index_database(dbpath, path, "janus")
+            summary = validate_index_database(
+                dbpath, path, "janus", classifier_backend="janus"
+            )
             self.assertEqual(summary["paths"], 1)
             self.assertEqual(summary["quickCheck"], "ok")
 
@@ -2506,7 +2519,9 @@ class TestDb(UsesTestexistsFixture, unittest.TestCase):
             con.close()
 
             with self.assertRaises(click.ClickException):
-                validate_index_database(dbpath, path, "janus")
+                validate_index_database(
+                    dbpath, path, "janus", classifier_backend="janus"
+                )
 
     def test_validate_rejects_stale_source_provenance(self):
         path = "../src/test/fixtures/monkey.jpg"
@@ -2522,7 +2537,9 @@ class TestDb(UsesTestexistsFixture, unittest.TestCase):
             con.close()
 
             with self.assertRaises(click.ClickException):
-                validate_index_database(dbpath, path, "janus")
+                validate_index_database(
+                    dbpath, path, "janus", classifier_backend="janus"
+                )
 
     def test_validate_rejects_unexpected_caption_pipeline_version(self):
         path = "../src/test/fixtures/monkey.jpg"
@@ -2538,7 +2555,9 @@ class TestDb(UsesTestexistsFixture, unittest.TestCase):
             con.close()
 
             with self.assertRaises(click.ClickException):
-                validate_index_database(dbpath, path, "janus")
+                validate_index_database(
+                    dbpath, path, "janus", classifier_backend="janus"
+                )
 
     def test_validate_rejects_tag_counts_diverging_from_image_tags(self):
         path = "../src/test/fixtures/monkey.jpg"
@@ -2551,7 +2570,9 @@ class TestDb(UsesTestexistsFixture, unittest.TestCase):
             con.close()
 
             with self.assertRaises(click.ClickException):
-                validate_index_database(dbpath, path, "janus")
+                validate_index_database(
+                    dbpath, path, "janus", classifier_backend="janus"
+                )
 
     def test_publish_copies_embedding_rows_to_their_own_paths(self):
         # The publish INSERT lists five columns positionally; a reordering or a

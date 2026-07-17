@@ -149,9 +149,15 @@ preserving distinct behaviour.
 
 ## Caption backends
 
-- `janus`: current default and rollback path.
+- `gemma4-gguf`: **current default**. Runs Gemma 4 E4B `UD-Q4_K_XL` against one resident
+  `llama-server` (started on init, torn down on release). 2.09s/image, 9/11 concept-in-tags
+  on the local fixture, 6.2 GB peak.
+- `janus`: previous default and the rollback path — `--classifier-backend janus`. Faster
+  (1.67s/image) but its tags are bare words lifted from its own alt text: 7/11 in tags, 6%
+  concrete phrases, 11% junk. See docs/caption-backend-bakeoff.md.
 - `gemma4`: retained experimental backend for future work. In practice, this needs a newer `transformers` runtime than the default Janus environment.
-- `gemma4-gguf`: `llama.cpp` backend for local GGUF Gemma 4 runs. The best local quantised result so far is `unsloth/gemma-4-E4B-it-GGUF:Q8_0` with `mmproj-BF16`.
+The default quant is `unsloth/gemma-4-E4B-it-GGUF:UD-Q4_K_XL`. `Q8_0` scores identically and
+needs 3 GB more, which does not fit alongside `mmproj-BF16` on a 10 GB card.
 
 ### Running a GGUF backend locally
 
@@ -182,7 +188,7 @@ Quantisation choice is VRAM-bound. On a 10GB card, `Q8_0` (8.19GB) plus
 compare them before changing any default.
 
 Current compatibility note:
-Janus-Pro-1B is the default production path in this repo. The GGUF Gemma path is kept as experimental groundwork for future image and video work. The full-precision `transformers` Gemma path is also retained in code, but it is not the normal runtime and should be treated as separate experimental work.
+Gemma 4 E4B GGUF is the default production path. Janus-Pro-1B is retained as the rollback. The full-precision `transformers` Gemma path is also retained in code, but it is not the normal runtime and should be treated as separate experimental work.
 
 Current local-debugging note:
 In local testing, the `transformers` `bnb-4bit` Gemma path repeatedly hallucinated placeholder-like "gray image" descriptions for normal photos. Keep the GGUF path as the preferred quantised experiment instead.
