@@ -489,8 +489,11 @@ def build_classifier_prompt(_geocode: Optional[Mapping]) -> str:
         " indoor, nature, scenery, sky, landscape, scene, view, area) unless"
         " nothing more specific fits. No descriptive phrases, actions, moods, or"
         " synonyms of a tag you already gave. Put all descriptive detail in"
-        f" alt_text: one factual sentence of at most {MAX_CLASSIFIER_ALT_TEXT_WORDS}"
-        " words. Do not return prose outside the JSON object."
+        " alt_text: one factual sentence. If the photo has clearly legible text"
+        " (a sign, menu, label, or brand name), quote that text in alt_text so the"
+        " photo can be found by it; do not invent text that is not there. Keep"
+        f" alt_text to at most {MAX_CLASSIFIER_ALT_TEXT_WORDS} words. Do not return"
+        " prose outside the JSON object."
     )
 
 
