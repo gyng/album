@@ -61,9 +61,11 @@ from index import (
     update_gps,
     validate_index_database,
     resolve_llama_mtmd_command,
+    resolve_llama_server_command,
     CAPTION_STAGE,
     CORE_STAGE,
     DEFAULT_LLAMA_MTMD_CLI_PATHS,
+    DEFAULT_LLAMA_SERVER_PATHS,
     JANUS_MODEL_ID,
     LLAMA_MTMD_CLI_ENV,
     SIGLIP_V1_STAGE,
@@ -528,6 +530,62 @@ class TestMain(unittest.TestCase):
         self.assertEqual(actual["cases"][0]["junkTags"], [])
         self.assertEqual(actual["phraseRate"], 1.0)
         self.assertEqual(actual["conceptCoverage"], 1.0)
+
+    def test_gemma_gguf_request_disables_thinking_and_constrains_json(self):
+        """Without enable_thinking=false Gemma 4 spends the whole token budget in
+        reasoning_content and returns an empty message, so the request must carry it."""
+        classifier = Gemma4GgufClassifier(
+            model_id="/models/m.gguf", quantization="/models/p.gguf"
+        )
+        body = classifier._build_request_body("a prompt", "BASE64DATA")
+
+        self.assertFalse(body["chat_template_kwargs"]["enable_thinking"])
+        self.assertEqual(body["response_format"]["type"], "json_schema")
+        self.assertEqual(
+            sorted(body["response_format"]["json_schema"]["schema"]["required"]),
+            ["alt_text", "tags"],
+        )
+        content = body["messages"][0]["content"]
+        self.assertEqual(
+            content[0]["image_url"]["url"], "data:image/jpeg;base64,BASE64DATA"
+        )
+        self.assertEqual(content[1]["text"], "a prompt")
+
+    def test_gemma_gguf_reads_content_and_rejects_an_empty_thinking_only_reply(self):
+        classifier = Gemma4GgufClassifier()
+        good = {
+            "choices": [{"message": {"content": '{"tags": ["a"], "alt_text": "b"}'}}]
+        }
+        self.assertEqual(
+            classifier._read_completion(good), '{"tags": ["a"], "alt_text": "b"}'
+        )
+
+        # The failure mode this port exists to avoid: all budget spent thinking.
+        empty = {
+            "choices": [
+                {
+                    "finish_reason": "length",
+                    "message": {"content": "", "reasoning_content": "Let me think..."},
+                }
+            ]
+        }
+        with self.assertRaises(RuntimeError) as raised:
+            classifier._read_completion(empty)
+        self.assertIn("reasoning", str(raised.exception).lower())
+
+    def test_resolve_llama_server_command_does_not_fall_back_to_tmp(self):
+        with (
+            mock.patch.dict(os.environ, {}, clear=True),
+            mock.patch("index.shutil.which", return_value=None),
+            mock.patch("index.DEFAULT_LLAMA_SERVER_PATHS", ()),
+            self.assertRaises(RuntimeError) as raised,
+        ):
+            resolve_llama_server_command()
+        self.assertIn("llama.cpp", str(raised.exception))
+        self.assertTrue(
+            all(not p.startswith("/tmp/") for p in DEFAULT_LLAMA_SERVER_PATHS),
+            DEFAULT_LLAMA_SERVER_PATHS,
+        )
 
     def test_resolve_llama_mtmd_command_prefers_env_override_then_path(self):
         with tempfile.TemporaryDirectory() as tmpdir:

@@ -74,32 +74,33 @@ near **~1.2 s/image — at or below Janus's 1.67 s** — while keeping its 9/11 
 rate and 0% junk. If that holds it removes the only real argument for keeping Janus, whose
 deficit is tag *shape*.
 
-**Prototyped and measured — it works, and it beats the incumbent.** `llama-server` was built
-and driven directly over HTTP against the same prompt and frames:
+**Ported, and measured end to end.** `Gemma4GgufClassifier` now starts one `llama-server`,
+health-checks it, POSTs per image and tears it down on release:
 
-| path | s/img | concept in tags |
+| path | pass | s/img |
 |---|---|---|
-| Gemma `UD-Q4_K_XL`, subprocess per image (current) | 5.40 | 9/11 |
-| **Gemma `UD-Q4_K_XL`, persistent `llama-server`** | **1.39** | 9/11 |
-| Janus-Pro-1B (incumbent) | 1.67 | 7/11 |
+| Gemma `UD-Q4_K_XL`, subprocess per image (was) | 9/11 | 5.40 |
+| **Gemma `UD-Q4_K_XL`, persistent server (now)** | **9/11** | **2.09** |
+| Janus-Pro-1B | 10/11 | 1.67 |
 
-**3.9× faster than the current GGUF path, and faster than Janus**, with 5/5 valid JSON and ten
-concrete tags per image. This removes the only argument for keeping Janus: its speed. Gemma
-`UD-Q4_K_XL` on a persistent server is faster *and* has the better search payload (9/11 vs
-7/11 in tags, 91% phrases vs 6%, 0% junk vs 11%), in 6.2 GB.
+**2.6x faster with no quality change.** A prototype script over three small frames suggested
+1.39 s/image; the full fixture, which includes large album photos through the real harness,
+gives 2.09 s. Take the 2.09.
+
+That does not make Gemma faster than Janus — it makes it 25% slower instead of 3x slower,
+which is a different argument. Against that, Gemma `UD-Q4_K_XL` carries 9/11 concept-in-tags
+to Janus's 7/11, 91% concrete phrases to 6%, and 0% junk to 11%, in 6.2 GB. Trading 0.4 s per
+image for a search payload that is actually usable now looks like the right call; on the
+1,495-photo library that is about ten extra minutes for a one-off reindex.
 
 **One non-obvious gotcha, worth its own note.** Naively posting to `/v1/chat/completions`
 returns an **empty `content`**: Gemma 4's chat template puts the server in thinking mode, the
-whole token budget is spent in `reasoning_content`, and the response stops at
+whole token budget is spent in `reasoning_content`, and the reply stops at
 `finish_reason: "length"` having said nothing. `response_format: json_schema` does not prevent
-it and a request-level `reasoning_budget: 0` is ignored. The switch that works is
-`chat_template_kwargs: {"enable_thinking": false}` — which also accounts for most of the gain
-(2.6 s → 1.39 s). The subprocess path never hit this because `--json-schema-file` grammar-
-constrained the output from the first token.
-
-**Still to do:** port `Gemma4GgufClassifier` from `subprocess.run` per image to start-once /
-health-check / POST-per-image / tear-down-on-release, and re-run the full fixture to confirm
-the 9/11 holds end to end through the real harness rather than a prototype script.
+it and a request-level `reasoning_budget: 0` is ignored. The switch is
+`chat_template_kwargs: {"enable_thinking": false}`, which is also most of the speed win. The
+subprocess path never hit this because `--json-schema-file` constrained output from the first
+token. There is a regression test for it.
 
 ### 3. Inter-model disagreement is a usable confidence signal
 
