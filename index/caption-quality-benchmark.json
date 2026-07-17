@@ -17,8 +17,9 @@
     {
       "path": "../albums/test-simple/DSCF2485-2.jpg",
       "category": "water wildlife",
-      "requiredAny": ["turtle", "duck", "waterfowl"],
-      "forbidden": ["aeroplane", "car"]
+      "comment": "Water monitor lizard swimming, head above water and long tail trailing. Previously mislabelled turtle/duck/waterfowl, which passed models that hallucinated 'snapping turtle' and failed ones that said 'reptile'. The forbidden list is the set of confusions observed from real models.",
+      "requiredAny": ["lizard", "monitor", "varanus", "reptile"],
+      "forbidden": ["otter", "turtle", "duck", "snake", "alligator", "crocodile"]
     },
     {
       "path": "../albums/test-simple/DSCF2581-2_2.jpg",

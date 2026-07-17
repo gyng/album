@@ -28,5 +28,9 @@ export const Footer = () => (
     <Link href="/design" className={styles.link}>
       Design
     </Link>
+    <span className={styles.separator}>&middot;</span>
+    <Link href="/benchmark" className={styles.link}>
+      Benchmark
+    </Link>
   </footer>
 );

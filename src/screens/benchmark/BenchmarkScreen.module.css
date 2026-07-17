@@ -1,0 +1,593 @@
+.page {
+  max-inline-size: var(--content-width-gallery);
+  margin-inline: auto;
+  padding-inline: var(--m-l);
+  padding-block-start: var(--m-xl);
+  padding-block-end: var(--m-2xl);
+}
+
+.header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--m-s);
+  max-inline-size: var(--content-width-section);
+}
+
+.eyebrow {
+  margin: 0;
+  font-family: monospace;
+  font-size: var(--fs-xs);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--c-accent);
+}
+
+.byline {
+  margin: 0;
+  font-size: var(--fs-s);
+  opacity: 0.6;
+}
+
+.lede {
+  margin: 0;
+  font-size: var(--fs-sm);
+  opacity: 0.8;
+}
+
+/* The finding: the whole point of the page, so it gets the one loud moment. */
+.finding {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--m-l) var(--m-xl);
+  align-items: center;
+  border-block: var(--line-strong) solid var(--c-bg-contrast-light);
+  padding-block: var(--m-l);
+}
+
+@media (max-width: 760px) {
+  .finding {
+    grid-template-columns: 1fr;
+    gap: var(--m-m);
+  }
+}
+
+.findingFigures {
+  display: flex;
+  align-items: center;
+  gap: var(--m-l);
+}
+
+.figureBlock {
+  display: flex;
+  flex-direction: column;
+  gap: var(--m);
+}
+
+.figureBig {
+  font-size: var(--fs-xl);
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
+.figureAlarm {
+  color: var(--c-accent);
+}
+
+.figureDenominator {
+  font-size: var(--fs-l);
+  font-weight: 400;
+  opacity: 0.5;
+}
+
+.figureLabel {
+  font-size: var(--fs-s);
+  opacity: 0.7;
+  max-inline-size: 14ch;
+}
+
+.figureArrow {
+  font-size: var(--fs-l);
+  opacity: 0.4;
+}
+
+.findingBody {
+  margin: 0;
+  font-size: var(--fs-sm);
+  max-inline-size: var(--content-width-reading);
+}
+
+.findingBody code {
+  font-family: monospace;
+  font-size: var(--fs-s);
+  background-color: color-mix(in oklch, var(--c-bg-contrast-light) 18%, transparent);
+  padding: 0 var(--m);
+  border-radius: 2px;
+}
+
+/* Comparison table */
+.tableScroll {
+  overflow-x: auto;
+}
+
+.table {
+  inline-size: 100%;
+  border-collapse: collapse;
+  font-size: var(--fs-sm);
+}
+
+.tableCaption {
+  caption-side: bottom;
+  text-align: start;
+  font-size: var(--fs-s);
+  opacity: 0.6;
+  padding-block-start: var(--m-s);
+}
+
+.table th,
+.table td {
+  text-align: start;
+  padding: var(--m-s) var(--m-m) var(--m-s) 0;
+  border-block-end: var(--line-hairline) solid var(--c-bg-contrast-light);
+  vertical-align: baseline;
+}
+
+.table thead th {
+  font-size: var(--fs-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  opacity: 0.6;
+  font-weight: 400;
+  white-space: nowrap;
+}
+
+.table thead th abbr {
+  text-decoration: none;
+  border-block-end: 1px dotted var(--c-bg-contrast-light);
+  cursor: help;
+}
+
+/* Must stay a real table-cell: setting display:flex/grid on a th takes it out of
+   the table formatting context, so it stops sharing the row's baseline and
+   borders and the row visibly misaligns. Lay the contents out with block
+   children instead. */
+.modelCell {
+  padding-inline-end: var(--m-l);
+  vertical-align: top;
+}
+
+.modelNote {
+  display: block;
+}
+
+.modelName {
+  font-weight: 600;
+  display: grid;
+  grid-template-columns: var(--m-l) 1fr auto;
+  align-items: center;
+  gap: var(--m-s);
+  min-block-size: var(--m-l);
+}
+
+.modelNameText {
+  white-space: nowrap;
+}
+
+/* Fixed-width so the vendor marks form a column and the names stay aligned. */
+.vendorIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: var(--m-l);
+}
+
+/* Monochrome: the marks follow the theme's ink rather than carrying brand
+   colour, so they read as one set and stay legible in both themes. */
+.vendorIcon svg {
+  color: var(--c-font);
+  opacity: 0.8;
+}
+
+.badge {
+  font-family: monospace;
+  font-size: var(--fs-xs);
+  font-weight: 400;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 0 var(--m);
+  border: solid var(--size-1) var(--c-accent);
+  border-radius: var(--m-s);
+  color: var(--c-accent);
+  white-space: nowrap;
+}
+
+.star {
+  color: var(--c-accent);
+}
+
+/* Per-frame answers: a table so models line up column-wise and can be compared
+   down the page, rather than a stack of cards. */
+.answerTable {
+  table-layout: fixed;
+}
+
+.answerTable th[scope="col"]:nth-child(1) {
+  inline-size: 12rem;
+}
+
+.answerTable th[scope="col"]:nth-child(2) {
+  inline-size: 7rem;
+}
+
+.answerTable th[scope="col"]:nth-child(3) {
+  inline-size: 40%;
+}
+
+.answerTable td,
+.answerTable th {
+  vertical-align: top;
+  padding-block: var(--m-s);
+}
+
+/* Also a real table-cell — see .modelCell. */
+.answerModel {
+  font-weight: 600;
+  font-size: var(--fs-s);
+  padding-inline-end: var(--m-m);
+  vertical-align: top;
+}
+
+.answerModel .modelName {
+  grid-template-columns: var(--m-l) 1fr;
+  font-size: var(--fs-s);
+}
+
+.answerVerdict {
+  vertical-align: top;
+}
+
+.answerVerdict > * {
+  display: block;
+}
+
+.passMark,
+.failMark {
+  font-family: monospace;
+  font-size: var(--fs-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.passMark {
+  opacity: 0.55;
+}
+
+.failMark {
+  color: var(--c-accent);
+}
+
+.failRow {
+  background-color: color-mix(in oklch, var(--c-accent) 6%, transparent);
+}
+
+.answerAlt {
+  font-size: var(--fs-s);
+  opacity: 0.85;
+}
+
+/* Mobile: a 12-row, 7-column table is unreadable when it has to be dragged
+   sideways, so below this width each row becomes its own stacked block and the
+   column headers move into per-cell labels (data-label). No horizontal scroll. */
+@media (max-width: 760px) {
+  .page {
+    padding-inline: var(--m-m);
+  }
+
+  .tableScroll {
+    overflow-x: visible;
+  }
+
+  .table,
+  .answerTable {
+    table-layout: auto;
+    display: block;
+  }
+
+  .table thead {
+    display: none;
+  }
+
+  .table tbody,
+  .table tr,
+  .table td,
+  .table th {
+    display: block;
+  }
+
+  .table tr {
+    padding-block: var(--m-m);
+    border-block-end: var(--line-hairline) solid var(--c-bg-contrast-light);
+  }
+
+  .table th,
+  .table td {
+    border-block-end: none;
+    padding: 0;
+  }
+
+  .modelCell,
+  .answerModel {
+    padding-inline-end: 0;
+    margin-block-end: var(--m-s);
+  }
+
+  /* label | value, so the numbers still form a scannable column */
+  .table td[data-label] {
+    display: grid;
+    grid-template-columns: 8.5rem 1fr;
+    align-items: baseline;
+    gap: var(--m-s);
+    padding-block: var(--m);
+  }
+
+  .table td[data-label]::before {
+    content: attr(data-label);
+    font-size: var(--fs-xs);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    opacity: 0.6;
+  }
+
+  .cellValue {
+    margin-block-end: var(--m);
+  }
+
+  .barTrack {
+    inline-size: 100%;
+    max-inline-size: 120px;
+  }
+
+  /* The bar would otherwise sit under the label column. */
+  .table td[data-label] .barTrack {
+    grid-column: 2;
+  }
+
+  /* A caption inside a display:block table loses its table-caption sizing and
+     collapses to a sliver — make it a plain full-width block. */
+  .tableCaption {
+    display: block;
+    inline-size: 100%;
+    padding-block-start: var(--m-m);
+  }
+
+  .answerTable td[data-label] {
+    grid-template-columns: 1fr;
+  }
+
+  .answerTable td[data-label]::before {
+    margin-block-end: var(--m);
+  }
+
+  .modelName {
+    grid-template-columns: var(--m-l) 1fr auto;
+  }
+
+  .modelNameText {
+    white-space: normal;
+  }
+}
+
+.modelNote {
+  font-size: var(--fs-s);
+  opacity: 0.6;
+  font-weight: 400;
+}
+
+.cellValue {
+  display: block;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  margin-block-end: var(--m);
+}
+
+/* Tint the track rather than setting opacity on it: opacity on the track would
+   fade the fill inside it too. */
+.barTrack {
+  display: block;
+  block-size: var(--size-6);
+  inline-size: 72px;
+  background-color: color-mix(in oklch, var(--c-bg-contrast-light) 25%, transparent);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.barFill {
+  display: block;
+  block-size: 100%;
+  background-color: var(--c-accent);
+  border-start-end-radius: 2px;
+  border-end-end-radius: 2px;
+}
+
+.barFillMuted {
+  background-color: var(--c-font);
+  opacity: 0.55;
+}
+
+/* Frames */
+.case {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  gap: var(--m-l);
+  align-items: start;
+  padding-block-end: var(--m-xl);
+  border-block-end: var(--line-hairline) solid var(--c-bg-contrast-light);
+}
+
+.case:last-of-type {
+  border-block-end: none;
+}
+
+@media (max-width: 900px) {
+  .case {
+    grid-template-columns: 1fr;
+  }
+}
+
+.plate {
+  display: flex;
+  flex-direction: column;
+  gap: var(--m-s);
+  position: sticky;
+  inset-block-start: var(--m-l);
+}
+
+@media (max-width: 900px) {
+  .plate {
+    position: static;
+  }
+}
+
+.photo {
+  inline-size: 100%;
+  max-inline-size: 100%;
+  block-size: auto;
+  display: block;
+  background-color: color-mix(in oklch, var(--c-bg-contrast-light) 20%, transparent);
+}
+
+.note {
+  margin: 0;
+  font-size: var(--fs-s);
+  opacity: 0.65;
+  border-inline-start: var(--line-strong) solid var(--c-bg-contrast-light);
+  padding-inline-start: var(--m-s);
+}
+
+.truth {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--m) var(--m-s);
+  align-items: start;
+}
+
+.truthLabel {
+  font-size: var(--fs-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  opacity: 0.55;
+  padding-block-start: 3px;
+  white-space: nowrap;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--m);
+}
+
+/* Same shape as the search facet tags (SearchFilterPill): transparent ground,
+   hairline border, inherited ink. These are read, not tapped, so they skip the
+   pill's tap-target sizing. */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  padding: var(--m);
+  font-size: var(--fs-s);
+  line-height: 1.2;
+  border: solid var(--size-1) var(--c-bg-contrast-light);
+  border-radius: var(--m-s);
+  background: transparent;
+  color: inherit;
+  white-space: nowrap;
+}
+
+.chipRequired {
+  border-color: var(--c-accent);
+  color: var(--c-accent);
+}
+
+.chipForbidden {
+  opacity: 0.65;
+  text-decoration: line-through;
+}
+
+.chipJunk {
+  border-style: dashed;
+  border-color: var(--c-accent);
+  color: var(--c-accent);
+}
+
+.answers {
+  display: flex;
+  flex-direction: column;
+  gap: var(--m-m);
+  min-inline-size: 0;
+}
+
+.analysis {
+  margin: 0;
+  font-size: var(--fs-sm);
+  border-inline-start: var(--line-strong) solid var(--c-accent);
+  padding-inline-start: var(--m-m);
+  max-inline-size: var(--content-width-reading);
+}
+
+.analysisLabel {
+  display: block;
+  font-family: monospace;
+  font-size: var(--fs-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--c-accent);
+  margin-block-end: var(--m);
+}
+
+.answer {
+  border: var(--line-hairline) solid var(--c-bg-contrast-light);
+  border-inline-start-width: var(--size-3);
+  padding: var(--m-s) var(--m-m);
+}
+
+.pass {
+  border-inline-start-color: var(--c-bg-contrast-light);
+}
+
+.fail {
+  border-inline-start-color: var(--c-accent);
+}
+
+.answerHead {
+  display: flex;
+  align-items: baseline;
+  gap: var(--m-s);
+  flex-wrap: wrap;
+}
+
+.who {
+  font-weight: 600;
+  font-size: var(--fs-sm);
+}
+
+.verdict {
+  font-family: monospace;
+  font-size: var(--fs-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  opacity: 0.6;
+}
+
+.fail .verdict {
+  color: var(--c-accent);
+  opacity: 1;
+}
+
+.why {
+  font-size: var(--fs-s);
+  opacity: 0.7;
+}
+
+.alt {
+  margin-block: var(--m-s);
+  font-size: var(--fs-sm);
+}

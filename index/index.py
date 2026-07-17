@@ -354,6 +354,13 @@ DEFAULT_GEMMA4_GGUF_IMAGE_MIN_TOKENS = 70
 DEFAULT_GEMMA4_GGUF_IMAGE_MAX_TOKENS = 140
 DEFAULT_GEMMA4_GGUF_THREADS = 8
 DEFAULT_GEMMA4_GGUF_CTX_SIZE = 32768
+LLAMA_MTMD_CLI_ENV = "LLAMA_MTMD_CLI"
+# Discovery paths must outlive a reboot: a /tmp build silently disappears and
+# turns a working GGUF backend into "could not find llama-mtmd-cli".
+DEFAULT_LLAMA_MTMD_CLI_PATHS = (
+    os.path.expanduser("~/.local/opt/llama.cpp/build/bin/llama-mtmd-cli"),
+    "/usr/local/bin/llama-mtmd-cli",
+)
 JANUS_RESPONSE_FIELDS = (
     "tags",
     "alt_text",
@@ -1528,6 +1535,30 @@ class Gemma4Classifier(BaseCaptionClassifier):
         )[0]
 
 
+def resolve_llama_mtmd_command() -> str:
+    """Locate llama-mtmd-cli: explicit override, then PATH, then a known build."""
+    override = os.environ.get(LLAMA_MTMD_CLI_ENV)
+    if override:
+        if not os.path.exists(override):
+            raise RuntimeError(
+                f"{LLAMA_MTMD_CLI_ENV} points at a missing file: {override}"
+            )
+        return override
+
+    command = shutil.which("llama-mtmd-cli")
+    if command is not None:
+        return command
+
+    for candidate in DEFAULT_LLAMA_MTMD_CLI_PATHS:
+        if os.path.exists(candidate):
+            return candidate
+
+    raise RuntimeError(
+        "Could not find llama-mtmd-cli. Build llama.cpp (see index/README.md), "
+        f"add it to PATH, or set {LLAMA_MTMD_CLI_ENV} to its path."
+    )
+
+
 class Gemma4GgufClassifier(BaseCaptionClassifier):
     backend = CLASSIFIER_BACKEND_GEMMA4_GGUF
 
@@ -1551,15 +1582,7 @@ class Gemma4GgufClassifier(BaseCaptionClassifier):
         self._json_schema_path = None
 
     def init_model(self) -> None:
-        command = shutil.which("llama-mtmd-cli")
-        if command is None:
-            candidate = "/tmp/llama.cpp/build/bin/llama-mtmd-cli"
-            if os.path.exists(candidate):
-                command = candidate
-        if command is None:
-            raise RuntimeError(
-                "Could not find llama-mtmd-cli. Install llama.cpp or add it to PATH."
-            )
+        command = resolve_llama_mtmd_command()
         self.command = command
         schema = {
             "type": "object",
@@ -4306,14 +4329,54 @@ def benchmark_janus_batch(
     show_default=True,
     help="Frozen caption-quality fixture JSON.",
 )
-@click.option("--batch-size", default=JANUS_BATCH_SIZE, type=click.IntRange(min=1))
+@click.option(
+    "--backend",
+    type=click.Choice(
+        [
+            CLASSIFIER_BACKEND_JANUS,
+            CLASSIFIER_BACKEND_GEMMA4,
+            CLASSIFIER_BACKEND_GEMMA4_GGUF,
+        ],
+        case_sensitive=False,
+    ),
+    default=CLASSIFIER_BACKEND_JANUS,
+    show_default=True,
+    help="Caption classifier backend to score.",
+)
+@click.option(
+    "--model-id",
+    default=None,
+    help="Optional model id override for the selected backend.",
+)
+@click.option(
+    "--quantization",
+    default=None,
+    help=(
+        "Optional quantisation mode, for example bnb-4bit for Gemma 4. For "
+        "gemma4-gguf, pick the quant via the --model-id tag; this option is "
+        "instead the mmproj path used when --model-id is a local .gguf file."
+    ),
+)
+@click.option(
+    "--batch-size",
+    default=None,
+    type=click.IntRange(min=1),
+    help="Batch size override; defaults to the selected backend's production batch size.",
+)
 @click.option(
     "--output",
     default=".caption-quality-benchmark-result.json",
     show_default=True,
     help="Result artifact written on both pass and failure.",
 )
-def benchmark_caption_quality(fixture: str, batch_size: int, output: str):
+def benchmark_caption_quality(
+    fixture: str,
+    backend: str,
+    model_id: Optional[str],
+    quantization: Optional[str],
+    batch_size: Optional[int],
+    output: str,
+):
     """Run the frozen semantic caption smoke set with production generation."""
     with open(fixture, "r", encoding="utf-8") as fh:
         fixture_payload = json.load(fh)
@@ -4327,14 +4390,24 @@ def benchmark_caption_quality(fixture: str, batch_size: int, output: str):
         raise click.ClickException(
             f"Caption quality fixture path does not exist: {missing[0]}"
         )
-    if batch_size > JANUS_MAX_PRODUCTION_BATCH_SIZE:
+    if (
+        backend == CLASSIFIER_BACKEND_JANUS
+        and batch_size is not None
+        and batch_size > JANUS_MAX_PRODUCTION_BATCH_SIZE
+    ):
         raise click.ClickException(
             f"Quality benchmark batch size exceeds production limit "
             f"{JANUS_MAX_PRODUCTION_BATCH_SIZE}"
         )
 
     lock_fd = acquire_single_instance_lock("caption-quality", global_lock=True)
-    classifier = JanusClassifier(batch_size=batch_size)
+    classifier = create_classifier(
+        backend=backend,
+        model_id=model_id,
+        quantization=quantization,
+        batch_size=batch_size,
+    )
+    batch_size = classifier.batch_size
     captions: dict[str, Mapping[str, typing.Any]] = {}
     metrics: list[dict[str, typing.Any]] = []
     started_at = time.perf_counter()
@@ -4368,7 +4441,16 @@ def benchmark_caption_quality(fixture: str, batch_size: int, output: str):
     payload = {
         "generatedAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         "fixtureVersion": fixture_payload.get("version"),
-        "pipelineVersion": caption_pipeline_version(CLASSIFIER_BACKEND_JANUS),
+        "backend": backend,
+        "modelId": getattr(classifier, "model_id", None),
+        "quantization": getattr(classifier, "quantization", None),
+        "batchSize": batch_size,
+        "pipelineVersion": caption_pipeline_version(
+            backend,
+            model_id=model_id,
+            quantization=quantization,
+            batch_size=batch_size,
+        ),
         "durationMs": round((time.perf_counter() - started_at) * 1000, 2),
         "generationMetrics": metrics,
         **evaluation,
@@ -6232,6 +6314,97 @@ def evaluate_caption_quality_cases(
         "passed": passed == len(results),
         "passedCases": passed,
         "totalCases": len(results),
+        "cases": results,
+    }
+
+
+CAPTION_TAG_STOPWORDS = frozenset(
+    {
+        "image",
+        "photo",
+        "picture",
+        "shot",
+        "view",
+        "depicts",
+        "shows",
+        "showing",
+        "features",
+        "featuring",
+        "sits",
+        "sitting",
+        "gathered",
+        "under",
+        "with",
+        "this",
+        "the",
+        "a",
+        "an",
+        "of",
+        "in",
+        "on",
+        "and",
+        "is",
+        "are",
+        "it",
+        "series",
+    }
+)
+
+
+def evaluate_tag_quality(
+    cases: list[Mapping[str, typing.Any]],
+    captions: Mapping[str, Mapping[str, typing.Any]],
+) -> dict[str, typing.Any]:
+    """Score the tags field on its own, separately from alt_text.
+
+    ``evaluate_caption_quality_cases`` searches tags and alt_text joined
+    together, so a model can pass every concept on the strength of its sentence
+    while its tags are unusable. Janus does exactly this: it lifts bare words out
+    of its own alt_text ("depicts", "under", "image") and still scores 10/11.
+    Tags are what the FTS index and any tag facet actually store, so they are
+    measured here alone: concept coverage from tags only, plus hygiene.
+    """
+    results = []
+    total_tags = 0
+    total_junk = 0
+    total_phrases = 0
+    concept_hits = 0
+    for case in cases:
+        path = str(case["path"])
+        caption = captions.get(path)
+        if caption is None:
+            results.append({**case, "conceptInTags": False, "tagCount": 0})
+            continue
+        tags = [str(tag).strip() for tag in caption.get("tags", [])]
+        required = [str(value).casefold() for value in case.get("requiredAny", [])]
+        tag_text = " ".join(tags).casefold()
+        concept_in_tags = bool(required) and any(
+            value in tag_text for value in required
+        )
+        junk = [tag for tag in tags if tag.casefold() in CAPTION_TAG_STOPWORDS]
+        phrases = [tag for tag in tags if len(tag.split()) > 1]
+        duplicates = len(tags) - len({tag.casefold() for tag in tags})
+        total_tags += len(tags)
+        total_junk += len(junk)
+        total_phrases += len(phrases)
+        concept_hits += bool(concept_in_tags)
+        results.append(
+            {
+                **case,
+                "conceptInTags": concept_in_tags,
+                "tagCount": len(tags),
+                "junkTags": junk,
+                "phraseCount": len(phrases),
+                "duplicateTags": duplicates,
+                "tags": tags,
+            }
+        )
+    return {
+        "conceptCoverage": (concept_hits / len(cases)) if cases else 0.0,
+        "meanTags": (total_tags / len(cases)) if cases else 0.0,
+        "junkTagRate": (total_junk / total_tags) if total_tags else 0.0,
+        "phraseRate": (total_phrases / total_tags) if total_tags else 0.0,
+        "totalTags": total_tags,
         "cases": results,
     }
 

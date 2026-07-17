@@ -153,6 +153,34 @@ preserving distinct behaviour.
 - `gemma4`: retained experimental backend for future work. In practice, this needs a newer `transformers` runtime than the default Janus environment.
 - `gemma4-gguf`: `llama.cpp` backend for local GGUF Gemma 4 runs. The best local quantised result so far is `unsloth/gemma-4-E4B-it-GGUF:Q8_0` with `mmproj-BF16`.
 
+### Running a GGUF backend locally
+
+The GGUF path shells out to `llama-mtmd-cli`, which is resolved in this order:
+
+1. `$LLAMA_MTMD_CLI`, if set (must exist).
+2. `llama-mtmd-cli` on `PATH`.
+3. `~/.local/opt/llama.cpp/build/bin/llama-mtmd-cli`, then `/usr/local/bin/llama-mtmd-cli`.
+
+Build it somewhere persistent — a `/tmp` build is wiped on reboot and turns a
+working backend into "could not find llama-mtmd-cli":
+
+```
+git clone --depth 1 https://github.com/ggml-org/llama.cpp ~/.local/opt/llama.cpp
+cd ~/.local/opt/llama.cpp
+cmake -B build -G Ninja -DGGML_CUDA=ON -DCMAKE_CUDA_ARCHITECTURES=86 -DLLAMA_CURL=ON
+cmake --build build --target llama-mtmd-cli
+```
+
+Pass a quant with the `--model-id` repo tag (`unsloth/gemma-4-E4B-it-GGUF:UD-Q5_K_XL`),
+or point `--model-id` at a local `.gguf` and give the mmproj path via `--quantization`.
+
+Quantisation choice is VRAM-bound. On a 10GB card, `Q8_0` (8.19GB) plus
+`mmproj-BF16` (0.99GB) leaves almost nothing for the KV cache at the default
+32768 context, so `--gpu-layers auto` offloads to CPU. The Unsloth Dynamic quants
+(`UD-Q5_K_XL` 6.66GB, `UD-Q4_K_XL` 5.13GB) fit fully on-GPU with headroom. Use
+`benchmark-caption-quality --backend gemma4-gguf --model-id <repo:quant>` to
+compare them before changing any default.
+
 Current compatibility note:
 Janus-Pro-1B is the default production path in this repo. The GGUF Gemma path is kept as experimental groundwork for future image and video work. The full-precision `transformers` Gemma path is also retained in code, but it is not the normal runtime and should be treated as separate experimental work.
 

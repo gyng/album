@@ -1,0 +1,2670 @@
+{
+  "generatedAt": "2026-07-17",
+  "models": [
+    {
+      "key": "janus",
+      "where": "local",
+      "name": "Janus-Pro-1B",
+      "note": "1B VLM, resident, batches 4 per pass",
+      "conceptPass": 10,
+      "conceptTotal": 11,
+      "conceptInTags": 7,
+      "meanTags": 5.0,
+      "junkRate": 0.109,
+      "phraseRate": 0.055,
+      "peakVramGb": 5.4,
+      "perImageMs": 1670,
+      "vendor": "deepseek"
+    },
+    {
+      "key": "gemma-q8",
+      "where": "local",
+      "name": "Gemma 4 E4B \u00b7 Q8_0",
+      "note": "8.19 GB GGUF",
+      "conceptPass": 8,
+      "conceptTotal": 11,
+      "conceptInTags": 9,
+      "meanTags": 9.5,
+      "junkRate": 0.0,
+      "phraseRate": 0.904,
+      "peakVramGb": 8.0,
+      "perImageMs": 5700,
+      "vendor": "google"
+    },
+    {
+      "key": "gemma-q5",
+      "where": "local",
+      "name": "Gemma 4 E4B \u00b7 UD-Q5_K_XL",
+      "note": "6.66 GB GGUF \u00b7 Unsloth Dynamic",
+      "conceptPass": 9,
+      "conceptTotal": 11,
+      "conceptInTags": 9,
+      "meanTags": 10.0,
+      "junkRate": 0.0,
+      "phraseRate": 0.891,
+      "peakVramGb": 7.2,
+      "perImageMs": 5200,
+      "vendor": "google"
+    },
+    {
+      "key": "gemma-q4",
+      "where": "local",
+      "name": "Gemma 4 E4B \u00b7 UD-Q4_K_XL",
+      "note": "5.13 GB GGUF \u00b7 Unsloth Dynamic",
+      "conceptPass": 8,
+      "conceptTotal": 11,
+      "conceptInTags": 9,
+      "meanTags": 8.6,
+      "junkRate": 0.0,
+      "phraseRate": 0.905,
+      "peakVramGb": 6.2,
+      "perImageMs": 5400,
+      "vendor": "google"
+    },
+    {
+      "key": "qwen",
+      "where": "local",
+      "name": "Qwen3-VL-8B \u00b7 UD-Q5_K_XL",
+      "note": "5.88 GB GGUF \u00b7 Unsloth Dynamic",
+      "conceptPass": 9,
+      "conceptTotal": 11,
+      "conceptInTags": 9,
+      "meanTags": 9.4,
+      "junkRate": 0.0,
+      "phraseRate": 0.922,
+      "peakVramGb": 9.1,
+      "perImageMs": 9550,
+      "vendor": "qwen"
+    },
+    {
+      "key": "haiku-4.5",
+      "where": "cloud",
+      "name": "Claude Haiku 4.5",
+      "note": "Anthropic \u00b7 $1/$5 per MTok",
+      "conceptPass": 10,
+      "conceptTotal": 11,
+      "conceptInTags": 10,
+      "meanTags": 5.0,
+      "junkRate": 0.0,
+      "phraseRate": 0.673,
+      "costPer1kImagesUsd": 1.92,
+      "vendor": "anthropic"
+    },
+    {
+      "key": "luna",
+      "where": "cloud",
+      "name": "GPT-5.6 Luna",
+      "note": "OpenAI \u00b7 $1.10/$6.60 per MTok",
+      "conceptPass": 10,
+      "conceptTotal": 11,
+      "conceptInTags": 10,
+      "meanTags": 7.3,
+      "junkRate": 0.0,
+      "phraseRate": 0.938,
+      "costPer1kImagesUsd": 2.3,
+      "vendor": "openai"
+    },
+    {
+      "key": "sonnet-5",
+      "where": "cloud",
+      "name": "Claude Sonnet 5",
+      "note": "Anthropic \u00b7 $2/$10 per MTok (intro)",
+      "conceptPass": 11,
+      "conceptTotal": 11,
+      "conceptInTags": 11,
+      "meanTags": 10.0,
+      "junkRate": 0.0,
+      "phraseRate": 0.982,
+      "costPer1kImagesUsd": 4.22,
+      "vendor": "anthropic"
+    },
+    {
+      "key": "terra",
+      "where": "cloud",
+      "name": "GPT-5.6 Terra",
+      "note": "OpenAI \u00b7 $2.75/$16.50 per MTok",
+      "conceptPass": 9,
+      "conceptTotal": 11,
+      "conceptInTags": 9,
+      "meanTags": 7.1,
+      "junkRate": 0.0,
+      "phraseRate": 0.923,
+      "costPer1kImagesUsd": 5.67,
+      "vendor": "openai"
+    },
+    {
+      "key": "opus-4.8",
+      "where": "cloud",
+      "name": "Claude Opus 4.8",
+      "note": "Anthropic \u00b7 $5/$25 per MTok",
+      "conceptPass": 11,
+      "conceptTotal": 11,
+      "conceptInTags": 11,
+      "meanTags": 10.0,
+      "junkRate": 0.0,
+      "phraseRate": 0.991,
+      "costPer1kImagesUsd": 10.85,
+      "vendor": "anthropic"
+    },
+    {
+      "key": "sol",
+      "where": "cloud",
+      "name": "GPT-5.6 Sol",
+      "note": "OpenAI \u00b7 $5.50/$33 per MTok",
+      "conceptPass": 10,
+      "conceptTotal": 11,
+      "conceptInTags": 10,
+      "meanTags": 6.2,
+      "junkRate": 0.0,
+      "phraseRate": 0.941,
+      "costPer1kImagesUsd": 11.25,
+      "vendor": "openai"
+    },
+    {
+      "key": "fable-5",
+      "where": "cloud",
+      "name": "Claude Fable 5",
+      "note": "Anthropic \u00b7 $10/$50 per MTok",
+      "conceptPass": 11,
+      "conceptTotal": 11,
+      "conceptInTags": 11,
+      "meanTags": 9.2,
+      "junkRate": 0.0,
+      "phraseRate": 0.911,
+      "costPer1kImagesUsd": 20.96,
+      "vendor": "anthropic"
+    }
+  ],
+  "cases": [
+    {
+      "category": "snowy landscape",
+      "album": "test-simple",
+      "file": "DSCF0506-2.jpg",
+      "comment": "",
+      "requiredAny": [
+        "mountain",
+        "snow",
+        "peak"
+      ],
+      "forbidden": [
+        "beach",
+        "ocean"
+      ],
+      "results": {
+        "janus": {
+          "passed": true,
+          "tags": [
+            "mountain",
+            "path",
+            "snow",
+            "pathway",
+            "mountain view"
+          ],
+          "alt": "A scenic mountain path with snow-covered peaks and a clear blue sky.",
+          "trippedOn": null,
+          "conceptInTags": true,
+          "junkTags": []
+        },
+        "gemma-q8": {
+          "passed": true,
+          "tags": [
+            "snowy mountain landscape",
+            "alpine trail",
+            "high altitude",
+            "winter hiking",
+            "rocky terrain",
+            "blue sky",
+            "mountain peaks",
+            "wilderness scenery"
+          ],
+          "alt": "A solitary hiking trail winds through rocky, snowy mountains under a clear blue sky.",
+          "trippedOn": null,
+          "conceptInTags": true,
+          "junkTags": []
+        },
+        "gemma-q5": {
+          "passed": true,
+          "tags": [
+            "snowy mountain landscape",
+            "winding dirt road",
+            "alpine environment",
+            "high altitude",
+            "sparse vegetation",
+            "winter scenery",
+            "mountain pass",
+            "clear blue sky",
+            "rocky terrain",
+            "remote hiking trail"
+          ],
+          "alt": "A winding dirt road traverses a remote, snowy mountain pass under a clear blue sky, showing sparse alpine vegetation.",
+          "trippedOn": null,
+          "conceptInTags": true,
+          "junkTags": []
+        },
+        "gemma-q4": {
+          "passed": true,
+          "tags": [
+            "Mountain range",
+            "Snow-covered peaks",
+            "Alpine landscape",
+            "Dirt road",
+            "High altitude",
+            "Rocky terrain",
+            "Winter setting",
+            "Mountain travel"
+          ],
+          "alt": "A dirt road winds through an alpine landscape beneath snow-covered mountains under a bright blue sky.",
+          "trippedOn": null,
+          "conceptInTags": true,
+          "junkTags": []
+        },
+        "qwen": {
+          "passed": true,
+          "tags": [
+            "snowy mountain road",
+            "stone pathway",
+            "wooden fence",
+            "clear blue sky",
+            "mountain landscape",
+            "rural trail",
+            "winter scenery",
+            "bare bushes",
+            "mountain peak",
+            "gravel path"
+          ],
+          "alt": "A snowy mountain road with stone pathway, wooden fence, and clear blue sky in a winter landscape.",
+          "trippedOn": null,
+          "conceptInTags": true,
+          "junkTags": []
+        },
+        "haiku-4.5": {
+          "passed": true,
+          "tags": [
+            "snow-covered mountain",
+            "geothermal area",
+            "volcanic terrain",
+            "wooden fence",
+            "steam vents"
+          ],
+          "alt": "Snow-covered mountain with wooden fence and poles near geothermal steam area.",
+          "trippedOn": null,
+          "conceptInTags": true,
+          "junkTags": []
+        },
+        "luna": {
+          "passed": true,
+          "tags": [
+            "snowy mountain",
+            "stone path",
+            "blue sky",
+            "rocky slopes",
+            "alpine landscape",
+            "wooden posts",
+            "winter scenery"
+          ],
+          "alt": "A stone path leads towards a rugged, snow-covered mountain beneath a broad blue sky with wispy clouds.",
+          "trippedOn": null,
+          "conceptInTags": true,
+          "junkTags": []
+        },
+        "sonnet-5": {
+          "passed": true,
+          "tags": [
+            "snow-capped mountain",
+            "stone pathway",
+            "wooden fence",
+            "hiking trail",
+            "mountain ridge",
+            "clear blue sky",
+            "alpine landscape",
+            "trail marker pole",
+            "dry grass",
+            "stone monument"
+          ],
+          "alt": "A paved stone path lined with a wooden rope fence leads toward a snow-streaked mountain peak under a clear blue sky.",
+          "trippedOn": null,
+          "conceptInTags": true,
+          "junkTags": []
+        },
+        "terra": {
+          "passed": true,
+          "tags": [
+            "snowy mountain",
+            "stone path",
+            "blue sky",
+            "alpine landscape",
+            "wooden fence",
+            "dry grass",
+            "rocky slopes"
+          ],
+          "alt": "A stone path curves through dry alpine grass towards a rugged, snow-covered mountain beneath a clear blue sky.",
+          "trippedOn": null,
+          "conceptInTags": true,
+          "junkTags": []
+        },
+        "opus-4.8": {
+          "passed": true,
+          "tags": [
+            "snow-capped mountain",
+            "cobblestone path",
+            "alpine valley",
+            "wooden fence posts",
+            "tall bamboo poles",
+            "dry golden grass",
+            "stone retaining wall",
+            "blue sky",
+            "patchy snow",
+            "autumn highland"
+          ],
+          "alt": "A cobbled path lined with wooden fence posts and tall bamboo poles curves through dry golden grassland towards a snow-covered mountain ridge under a clear blue sky.",
+          "trippedOn": null,
+          "conceptInTags": true,
+          "junkTags": []
+        },
+        "sol": {
+          "passed": true,
+          "tags": [
+            "snowy mountain",
+            "stone path",
+            "blue sky",
+            "alpine landscape",
+            "wooden fence",
+            "winter scenery"
+          ],
+          "alt": "A stone path curves towards a rugged, snow-covered mountain beneath a clear blue sky.",
+          "trippedOn": null,
+          "conceptInTags": true,
+          "junkTags": []
+        },
+        "fable-5": {
+          "passed": true,
+          "tags": [
+            "snow-capped mountain",
+            "cobblestone path",
+            "alpine valley",
+            "rope fence",
+            "bamboo poles",
+            "dry grassland",
+            "blue sky",
+            "stone marker",
+            "hiking trail",
+            "autumn"
+          ],
+          "alt": "A cobblestone trail lined with rope fencing and bamboo poles crosses dry alpine grassland towards a snow-dusted mountain under a clear blue sky.",
+          "trippedOn": null,
+          "conceptInTags": true,
+          "junkTags": []
+        }
+      },
+      "analysis": "Local and cloud are indistinguishable here, and the only fabrication comes from the cloud side: Haiku describes a geothermal field \u2014 steam vents, volcanic terrain \u2014 that does not exist, having decided the bamboo poles were venting. The five local models are duller and entirely honest. Paying more bought a hallucination."
+    },
+    {
+      "category": "infrastructure",
+      "album": "test-simple",
+      "file": "DSCF0593.jpg",
+      "comment": "",
+      "requiredAny": [
+        "dam",
+        "reservoir"
+      ],
+      "forbidden": [
+        "skyscraper",
+        "airport"
+      ],
+      "results": {
+        "janus": {
+          "passed": true,
+          "tags": [
+            "water dam",
+            "mountain",
+            "forest",
+            "water",
+            "bridge"
+          ],
+          "alt": "A large dam stands majestically in a forested mountain range, with a bridge crossing over it.",
+          "trippedOn": null,
+          "conceptInTags": true,
+          "junkTags": []
+        },
+        "gemma-q8": {
+          "passed": true,
+          "tags": [
+            "dam structure",
+            "mountain landscape",
+            "reservoir water",
+            "forest hillside",
+            "waterfall",
+            "rock cliff",
+            "power plant"
+          ],
+          "alt": "A large dam structure is visible at the base of a steep, densely forested mountain hillside overlooking the reservoir.",
+          "trippedOn": null,
+          "conceptInTags": true,
+          "junkTags": []
+        },
+        "gemma-q5": {
+          "passed": true,
+          "tags": [
+            "Dam structure",
+            "Mountain landscape",
+            "Forest hillside",
+            "Water reservoir",
+            "Hydroelectric power",
+            "Concrete barrier",
+            "Natural scenery",
+            "Autumn colors",
+            "River gorge",
+            "Dam crest"
+          ],
+          "alt": "A massive concrete dam spans a river gorge, with dense, autumnal forests covering the steep mountain slopes behind it.",
+          "trippedOn": null,
+          "conceptInTags": true,
+          "junkTags": []
+        },
+        "gemma-q4": {
+          "passed": true,
+          "tags": [
+            "hydroelectric dam",
+            "mountain landscape",
+            "reservoir",
+            "forested hills",
+            "dam structure",
+            "alpine environment",
+            "water dam",
+            "nature scene",
+            "power generation"
+          ],
+          "alt": "A large hydroelectric dam is visible, stretching across the foreground with dense, forested mountains and a reservoir in the background.",
+          "trippedOn": null,
+          "conceptInTags": true,
+          "junkTags": []
+        },
+        "qwen": {
+          "passed": true,
+          "tags": [
+            "large concrete dam",
+            "mountainous terrain",
+            "autumn foliage",
+            "reservoir water",
+            "sunny day",
+            "steep hillside",
+            "rocky cliffs",
+            "waterfall structure",
+            "forest canopy",
+            "sunlit landscape"
+          ],
+          "alt": "A large concrete dam spans a reservoir, surrounded by autumn-colored forests and steep mountain slopes under bright sunlight.",
+          "trippedOn": null,
+          "conceptInTags": true,
+          "junkTags": []
+        },
+        "haiku-4.5": {
+          "passed": true,
+          "tags": [
+            "concrete dam",
+            "mountain landscape",
+            "autumn forest",
+            "infrastructure",
+            "turquoise water"
+          ],
+          "alt": "Large concrete dam spanning a mountain valley surrounded by autumn forest.",
+          "trippedOn": null,
+          "conceptInTags": true,
+          "junkTags": []
+        },
+        "luna": {
+          "passed": true,
+          "tags": [
+            "concrete dam",
+            "mountain reservoir",
+            "forested mountains",
+            "autumn trees",
+            "turquoise water",
+            "industrial structure",
+            "mountain landscape"
+          ],
+          "alt": "A massive concrete dam spans a turquoise reservoir below forested mountains dotted with autumn foliage.",
+          "trippedOn": null,
+          "conceptInTags": true,
+          "junkTags": []
+        },
+        "sonnet-5": {
+          "passed": true,
+          "tags": [
+            "concrete dam",
+            "turquoise reservoir",
+            "autumn foliage",
+            "mountain valley",
+            "arch dam wall",
+            "forested slopes",
+            "walkway railing",
+            "power lines",
+            "rocky cliffs",
+            "hydroelectric dam"
+          ],
+          "alt": "A large curved concrete dam holds back a turquoise reservoir in a steep mountain valley covered with autumn-coloured trees.",
+          "trippedOn": null,
+          "conceptInTags": true,
+          "junkTags": []
+        },
+        "terra": {
+          "passed": true,
+          "tags": [
+            "concrete dam",
+            "mountain reservoir",
+            "autumn forest",
+            "rocky mountains",
+            "turquoise water",
+            "engineering structure",
+            "sunlit landscape"
+          ],
+          "alt": "A large concrete dam spans a turquoise reservoir below forested mountains covered in autumn foliage.",
+          "trippedOn": null,
+          "conceptInTags": true,
+          "junkTags": []
+        },
+        "opus-4.8": {
+          "passed": true,
+          "tags": [
+            "concrete arch dam",
+            "turquoise reservoir",
+            "forested mountainside",
+            "autumn foliage",
+            "dam walkway",
+            "power lines",
+            "rocky cliff",
+            "hydroelectric infrastructure",
+            "hazy sunlight",
+            "mountain valley"
+          ],
+          "alt": "An elevated view of a curved concrete dam holding back a turquoise reservoir, with a walkway along its crest and autumn-coloured forested mountains rising on either side.",
+          "trippedOn": null,
+          "conceptInTags": true,
+          "junkTags": []
+        },
+        "sol": {
+          "passed": true,
+          "tags": [
+            "concrete dam",
+            "mountain reservoir",
+            "autumn forest",
+            "mountain valley",
+            "turquoise water",
+            "hydroelectric infrastructure"
+          ],
+          "alt": "A large concrete dam spans a turquoise reservoir below forested mountains dotted with autumn foliage.",
+          "trippedOn": null,
+          "conceptInTags": true,
+          "junkTags": []
+        },
+        "fable-5": {
+          "passed": true,
+          "tags": [
+            "arch dam",
+            "concrete dam wall",
+            "mountain reservoir",
+            "turquoise lake",
+            "autumn foliage",
+            "forested mountains",
+            "larch trees",
+            "walkway railing",
+            "gorge",
+            "hazy sunlight"
+          ],
+          "alt": "A large curved concrete arch dam holds back a turquoise reservoir among steep forested mountains with golden autumn larches.",
+          "trippedOn": null,
+          "conceptInTags": true,
+          "junkTags": []
+        }
+      },
+      "analysis": "No gap. All five local models and all seven cloud ones agree on dam, reservoir, concrete, autumn. Janus adds a bridge, which is the dam; Fable identifies the larches because it can. On unambiguous scenes the local models are simply adequate and the cloud premium buys adjectives."
+    },
+    {
+      "category": "water wildlife",
+      "album": "test-simple",
+      "file": "DSCF2485-2.jpg",
+      "comment": "Water monitor lizard. Forbidden list is the set of real observed confusions.",
+      "requiredAny": [
+        "lizard",
+        "monitor",
+        "varanus",
+        "reptile"
+      ],
+      "forbidden": [
+        "otter",
+        "turtle",
+        "duck",
+        "snake",
+        "alligator",
+        "crocodile"
+      ],
+      "results": {
+        "janus": {
+          "passed": false,
+          "tags": [
+            "water",
+            "duck",
+            "waterfall",
+            "nature"
+          ],
+          "alt": "A small duck swims in a calm waterfall surrounded by clear water and ripples.",
+          "trippedOn": "duck",
+          "conceptInTags": false,
+          "junkTags": []
+        },
+        "gemma-q8": {
+          "passed": false,
+          "tags": [
+            "dark water",
+            "submerged fish",
+            "fishing lure",
+            "aquatic scene",
+            "calm water",
+            "pond life",
+            "outdoor fishing",
+            "clear shallow water",
+            "daytime fishing",
+            "fish hunting"
+          ],
+          "alt": "A dark-colored fish is submerged near a fishing lure in clear, shallow water during the daytime.",
+          "trippedOn": null,
+          "conceptInTags": false,
+          "junkTags": []
+        },
+        "gemma-q5": {
+          "passed": false,
+          "tags": [
+            "fishing",
+            "fish in water",
+            "calm pond",
+            "surface ripples",
+            "wildlife",
+            "natural setting",
+            "shallow water",
+            "water reflection",
+            "angler's tackle",
+            "nature photography"
+          ],
+          "alt": "A dark fish is visible under the calm, clear water of a pond, with ripples spreading from the spot.",
+          "trippedOn": null,
+          "conceptInTags": false,
+          "junkTags": []
+        },
+        "gemma-q4": {
+          "passed": false,
+          "tags": [
+            "dark water",
+            "fish swimming",
+            "shallow bay",
+            "surface reflection",
+            "aquatic life",
+            "algae growth",
+            "calm water",
+            "nature scene",
+            "outdoor",
+            "wet environment"
+          ],
+          "alt": "A dark fish swims beneath the surface of calm, shallow bay water covered in algae and reflecting the sky.",
+          "trippedOn": null,
+          "conceptInTags": false,
+          "junkTags": []
+        },
+        "qwen": {
+          "passed": false,
+          "tags": [
+            "alligator swimming",
+            "water surface",
+            "ripples",
+            "algae patches",
+            "shallow water",
+            "dark silhouette",
+            "natural habitat",
+            "pond",
+            "wildlife",
+            "reflection"
+          ],
+          "alt": "An alligator swims in shallow water with algae patches and ripples visible on the surface.",
+          "trippedOn": "alligator",
+          "conceptInTags": false,
+          "junkTags": []
+        },
+        "haiku-4.5": {
+          "passed": false,
+          "tags": [
+            "seal",
+            "marine animal",
+            "coastal water",
+            "rocky seabed",
+            "shallow water"
+          ],
+          "alt": "Seal swimming in shallow coastal water with rocky seabed and seaweed.",
+          "trippedOn": null,
+          "conceptInTags": false,
+          "junkTags": []
+        },
+        "luna": {
+          "passed": false,
+          "tags": [
+            "swimming turtle",
+            "pond water",
+            "water ripples",
+            "submerged shell",
+            "floating leaves",
+            "aquatic plants",
+            "wildlife"
+          ],
+          "alt": "A dark turtle swims through shallow pond water, leaving ripples behind its partially submerged shell among floating leaves and aquatic vegetation.",
+          "trippedOn": "turtle",
+          "conceptInTags": false,
+          "junkTags": []
+        },
+        "sonnet-5": {
+          "passed": true,
+          "tags": [
+            "swimming reptile",
+            "lake surface",
+            "water ripples",
+            "aquatic plants",
+            "shallow water",
+            "long tail",
+            "submerged vegetation",
+            "reflection on water",
+            "wildlife in water",
+            "murky pond"
+          ],
+          "alt": "A reptile with a long tail swims just below the surface of shallow, plant-strewn water, its head poking above the ripples.",
+          "trippedOn": null,
+          "conceptInTags": true,
+          "junkTags": []
+        },
+        "terra": {
+          "passed": false,
+          "tags": [
+            "swimming turtle",
+            "freshwater pond",
+            "water ripples",
+            "aquatic plants",
+            "shallow water",
+            "wildlife"
+          ],
+          "alt": "A turtle swims through shallow pond water, leaving ripples among submerged plants and scattered floating leaves.",
+          "trippedOn": "turtle",
+          "conceptInTags": false,
+          "junkTags": []
+        },
+        "opus-4.8": {
+          "passed": true,
+          "tags": [
+            "swimming monitor lizard",
+            "shallow water",
+            "water ripples",
+            "submerged algae",
+            "long tail",
+            "floating leaves",
+            "sandy lakebed",
+            "reptile wildlife",
+            "calm surface",
+            "murky pond"
+          ],
+          "alt": "A monitor lizard swims just below the surface of shallow murky water, its head raised above the ripples and long tail trailing behind over a sandy, algae-strewn bottom.",
+          "trippedOn": null,
+          "conceptInTags": true,
+          "junkTags": []
+        },
+        "sol": {
+          "passed": false,
+          "tags": [
+            "swimming turtle",
+            "pond water",
+            "water ripples",
+            "aquatic plants",
+            "shallow water",
+            "wildlife"
+          ],
+          "alt": "A dark turtle swims through shallow pond water, leaving ripples among submerged plants and scattered leaves.",
+          "trippedOn": "turtle",
+          "conceptInTags": false,
+          "junkTags": []
+        },
+        "fable-5": {
+          "passed": true,
+          "tags": [
+            "monitor lizard",
+            "swimming reptile",
+            "calm water",
+            "water ripples",
+            "aquatic weeds",
+            "shallow lake",
+            "long tail",
+            "floating leaves",
+            "wildlife"
+          ],
+          "alt": "A dark monitor lizard swims through calm shallow water, its long tail trailing behind and ripples spreading around patches of aquatic weed.",
+          "trippedOn": null,
+          "conceptInTags": true,
+          "junkTags": []
+        }
+      },
+      "analysis": "The one frame where the gap is real. All five local models fail, in five directions \u2014 duck, snake, otter, snapping turtle, alligator \u2014 and two Gemmas invent an angler with tackle rather than admit uncertainty. Cloud does better but not well: Haiku says seal, and all three GPT-5.6s say turtle, the exact wrong answer the retired fixture rewarded. Only Opus 4.8 and Fable 5 name the monitor lizard. If species precision matters, no local model can currently deliver it."
+    },
+    {
+      "category": "wildlife portrait",
+      "album": "test-simple",
+      "file": "DSCF2581-2_2.jpg",
+      "comment": "Long-tailed macaque in SE Asian forest. Baboon is forbidden: Gemma emitted both 'Baboon primate' and 'Macaque group' and passed on the hedge.",
+      "requiredAny": [
+        "macaque",
+        "monkey",
+        "primate"
+      ],
+      "forbidden": [
+        "dog",
+        "cat",
+        "baboon",
+        "african"
+      ],
+      "results": {
+        "janus": {
+          "passed": true,
+          "tags": [
+            "monkey",
+            "forest",
+            "natural",
+            "animal",
+            "tree",
+            "plant"
+          ],
+          "alt": "A monkey sits on a tree branch surrounded by lush green foliage.",
+          "trippedOn": null,
+          "conceptInTags": true,
+          "junkTags": []
+        },
+        "gemma-q8": {
+          "passed": false,
+          "tags": [
+            "baboon monkey",
+            "savanna wildlife",
+            "tree branch",
+            "forest background",
+            "animal portraits",
+            "African wildlife",
+            "wild nature",
+            "jungle scene",
+            "primate",
+            "natural habitat"
+          ],
+          "alt": "A baboon monkey is perched on a mossy tree branch, looking directly at the camera in a dense forest environment.",
+          "trippedOn": "baboon",
+          "conceptInTags": true,
+          "junkTags": []
+        },
+        "gemma-q5": {
+          "passed": false,
+          "tags": [
+            "Baboon monkey",
+            "Savanna wildlife",
+            "Forest environment",
+            "Primate portrait",
+            "Tree branch",
+            "African animal",
+            "Wildlife nature",
+            "Monkeys in trees",
+            "Outdoor scene",
+            "Animal close-up"
+          ],
+          "alt": "A baboon sits on a mossy log in a dense, green forest environment, looking directly at the viewer.",
+          "trippedOn": "baboon",
+          "conceptInTags": true,
+          "junkTags": []
+        },
+        "gemma-q4": {
+          "passed": false,
+          "tags": [
+            "baboon primate",
+            "wild animal",
+            "tropical forest",
+            "arboreal scene",
+            "nature portrait",
+            "monkey family",
+            "bush environment",
+            "outdoor photography",
+            "primates"
+          ],
+          "alt": "A small baboon primate sits on a moss-covered branch in a dense, humid tropical forest.",
+          "trippedOn": "baboon",
+          "conceptInTags": true,
+          "junkTags": []
+        },
+        "qwen": {
+          "passed": true,
+          "tags": [
+            "monkey sitting on rock",
+            "forest background",
+            "green foliage",
+            "tree trunk",
+            "wildlife photo",
+            "animal in nature",
+            "dappled sunlight",
+            "long tail",
+            "white chest fur",
+            "outdoor setting"
+          ],
+          "alt": "A monkey sits on a mossy rock in a dense forest, surrounded by green foliage and dappled sunlight.",
+          "trippedOn": null,
+          "conceptInTags": true,
+          "junkTags": []
+        },
+        "haiku-4.5": {
+          "passed": true,
+          "tags": [
+            "monkey",
+            "primate",
+            "tropical forest",
+            "mossy rock",
+            "wildlife"
+          ],
+          "alt": "Primate sitting on moss-covered rock within dense tropical jungle environment.",
+          "trippedOn": null,
+          "conceptInTags": true,
+          "junkTags": []
+        },
+        "luna": {
+          "passed": true,
+          "tags": [
+            "long-tailed macaque",
+            "tree branch",
+            "tropical forest",
+            "green foliage",
+            "wild primate",
+            "direct gaze",
+            "dappled light"
+          ],
+          "alt": "A long-tailed macaque sits on a mossy branch and looks towards the camera amid dense green tropical foliage.",
+          "trippedOn": null,
+          "conceptInTags": true,
+          "junkTags": []
+        },
+        "sonnet-5": {
+          "passed": true,
+          "tags": [
+            "macaque monkey",
+            "tree log",
+            "jungle foliage",
+            "vines",
+            "forest floor",
+            "monkey face",
+            "sitting primate",
+            "green leaves",
+            "second monkey background",
+            "wildlife portrait"
+          ],
+          "alt": "A long-tailed macaque sits alert on a fallen log amid dense green jungle foliage and hanging vines, staring at the camera.",
+          "trippedOn": null,
+          "conceptInTags": true,
+          "junkTags": []
+        },
+        "terra": {
+          "passed": true,
+          "tags": [
+            "macaque",
+            "tropical forest",
+            "tree branch",
+            "green foliage",
+            "wild primate",
+            "long tail",
+            "dappled light"
+          ],
+          "alt": "A macaque sits alert on a low tree branch amid dense green tropical forest foliage.",
+          "trippedOn": null,
+          "conceptInTags": true,
+          "junkTags": []
+        },
+        "opus-4.8": {
+          "passed": true,
+          "tags": [
+            "long-tailed macaque",
+            "mossy tree stump",
+            "tropical rainforest",
+            "green foliage",
+            "second monkey",
+            "long tail",
+            "hanging vines",
+            "leaf litter",
+            "dappled sunlight",
+            "primate wildlife"
+          ],
+          "alt": "A long-tailed macaque sits upright on a mossy log in dense green rainforest, looking towards the camera while a second monkey is visible blurred in the background.",
+          "trippedOn": null,
+          "conceptInTags": true,
+          "junkTags": []
+        },
+        "sol": {
+          "passed": true,
+          "tags": [
+            "macaque monkey",
+            "fallen log",
+            "tropical forest",
+            "green foliage",
+            "wild primate",
+            "dappled sunlight"
+          ],
+          "alt": "A macaque sits alert on a fallen log amid dense green foliage in a sun-dappled tropical forest.",
+          "trippedOn": null,
+          "conceptInTags": true,
+          "junkTags": []
+        },
+        "fable-5": {
+          "passed": true,
+          "tags": [
+            "macaque monkey",
+            "fallen log",
+            "tropical forest",
+            "green foliage",
+            "long tail",
+            "hanging vines",
+            "second monkey",
+            "leaf litter",
+            "wildlife",
+            "dappled light"
+          ],
+          "alt": "A long-tailed macaque sits upright on a mossy fallen log in dense tropical forest, staring ahead while another monkey forages in the background.",
+          "trippedOn": null,
+          "conceptInTags": true,
+          "junkTags": []
+        }
+      },
+      "analysis": "Cloud sweeps this 7\u20130; local goes 2\u20133. Every Gemma quant says 'baboon', and Q8 relocates this Singaporean macaque to Africa \u2014 quantisation does not cure an opinion. Janus and Qwen scrape through. Three cloud models independently note the long tail and the second monkey in the background; no local model sees either."
+    },
+    {
+      "category": "macro wildlife",
+      "album": "test-simple",
+      "file": "DSCF2768.JPG",
+      "comment": "",
+      "requiredAny": [
+        "spider",
+        "arachnid",
+        "insect"
+      ],
+      "forbidden": [
+        "bird",
+        "fish"
+      ],
+      "results": {
+        "janus": {
+          "passed": true,
+          "tags": [
+            "plant",
+            "leaves",
+            "green",
+            "botanical"
+          ],
+          "alt": "A close-up of a green leafy plant with a small insect on one of its leaves.",
+          "trippedOn": null,
+          "conceptInTags": false,
+          "junkTags": []
+        },
+        "gemma-q8": {
+          "passed": true,
+          "tags": [
+            "leafhopper insect",
+            "green foliage",
+            "close-up macro",
+            "plant macro",
+            "natural insect",
+            "tropical plants",
+            "bright green leaves",
+            "green leaves",
+            "garden life",
+            "macro photography"
+          ],
+          "alt": "A tiny leafhopper insect rests on a vibrant, glossy green leaf surrounded by lush, textured foliage.",
+          "trippedOn": null,
+          "conceptInTags": true,
+          "junkTags": []
+        },
+        "gemma-q5": {
+          "passed": true,
+          "tags": [
+            "green leaf macro",
+            "small spider",
+            "plant life",
+            "natural detail",
+            "foliage closeup",
+            "bright green",
+            "spotted leaf",
+            "macro photography",
+            "outdoor plant",
+            "leaf texture"
+          ],
+          "alt": "A tiny red spider rests on a glossy, bright green leaf surrounded by large, variegated foliage.",
+          "trippedOn": null,
+          "conceptInTags": true,
+          "junkTags": []
+        },
+        "gemma-q4": {
+          "passed": true,
+          "tags": [
+            "mint leaf",
+            "small insect",
+            "botanical macro",
+            "green foliage",
+            "natural light",
+            "plant texture",
+            "leaf surface",
+            "garden setting",
+            "closeup shot",
+            "wildlife"
+          ],
+          "alt": "A tiny insect rests on the bright green, textured surface of a mint leaf in a lush garden setting.",
+          "trippedOn": null,
+          "conceptInTags": true,
+          "junkTags": []
+        },
+        "qwen": {
+          "passed": true,
+          "tags": [
+            "spider on leaf",
+            "green leaf",
+            "plant close-up",
+            "small spider",
+            "nature photo",
+            "leaf texture",
+            "outdoor scene",
+            "glossy leaf",
+            "microscopic view",
+            "botanical detail"
+          ],
+          "alt": "A small spider rests on a glossy green leaf among other leaves in a close-up nature photo.",
+          "trippedOn": null,
+          "conceptInTags": true,
+          "junkTags": []
+        },
+        "haiku-4.5": {
+          "passed": true,
+          "tags": [
+            "insect",
+            "macro photography",
+            "plant",
+            "bug",
+            "seedpod"
+          ],
+          "alt": "Small reddish-brown insect perched on green plant seedpod in nature.",
+          "trippedOn": null,
+          "conceptInTags": true,
+          "junkTags": []
+        },
+        "luna": {
+          "passed": true,
+          "tags": [
+            "orange spider",
+            "green leaf",
+            "spider web",
+            "macro photography",
+            "glossy foliage",
+            "shallow focus",
+            "small arachnid"
+          ],
+          "alt": "A tiny orange spider stands on a glossy green leaf beside faint strands of web in a softly blurred setting.",
+          "trippedOn": null,
+          "conceptInTags": true,
+          "junkTags": []
+        },
+        "sonnet-5": {
+          "passed": true,
+          "tags": [
+            "small spider",
+            "green leaves",
+            "variegated foliage",
+            "macro photography",
+            "houseplant leaf",
+            "leaf texture",
+            "orange spider",
+            "spider web strands",
+            "close-up insect",
+            "leaf close-up"
+          ],
+          "alt": "A tiny orange spider with long legs perches on a variegated green leaf in an extreme macro close-up.",
+          "trippedOn": null,
+          "conceptInTags": true,
+          "junkTags": []
+        },
+        "terra": {
+          "passed": true,
+          "tags": [
+            "small spider",
+            "green leaf",
+            "spider web",
+            "macro photography",
+            "houseplant",
+            "orange spider",
+            "shallow focus"
+          ],
+          "alt": "A tiny orange spider stands on a glossy green leaf surrounded by faint strands of web.",
+          "trippedOn": null,
+          "conceptInTags": true,
+          "junkTags": []
+        },
+        "opus-4.8": {
+          "passed": true,
+          "tags": [
+            "small orange spider",
+            "variegated leaves",
+            "spider web strands",
+            "green foliage",
+            "macro close-up",
+            "hoya plant",
+            "silvery leaf markings",
+            "shallow depth of field",
+            "houseplant detail",
+            "arachnid"
+          ],
+          "alt": "A tiny orange spider rests on the curled edge of a variegated green and silver leaf, with fine web strands crossing the surrounding foliage in this macro close-up.",
+          "trippedOn": null,
+          "conceptInTags": true,
+          "junkTags": []
+        },
+        "sol": {
+          "passed": true,
+          "tags": [
+            "small spider",
+            "green leaf",
+            "spider web",
+            "macro photography",
+            "houseplant",
+            "orange spider"
+          ],
+          "alt": "A tiny orange spider rests on a glossy green leaf beside faint strands of web.",
+          "trippedOn": null,
+          "conceptInTags": true,
+          "junkTags": []
+        },
+        "fable-5": {
+          "passed": true,
+          "tags": [
+            "tiny spider",
+            "green leaves",
+            "succulent plant",
+            "leaf close-up",
+            "orange spider",
+            "spider silk",
+            "macro photography",
+            "glossy foliage"
+          ],
+          "alt": "A tiny orange spider with long thin legs sits on the edge of a glossy green succulent leaf in a close-up shot.",
+          "trippedOn": null,
+          "conceptInTags": true,
+          "junkTags": []
+        }
+      },
+      "analysis": "Both sides get one wrong: Gemma Q8 says leafhopper, Haiku says a bug on a seedpod. It is a spider on a leaf. The interesting failure is local and structural \u2014 Janus passes on its sentence alone, 'spider' appearing nowhere in its tags. Opus is alone in naming the houseplant."
+    },
+    {
+      "category": "architectural detail",
+      "album": "snapshots",
+      "file": "DSCF3121.JPG",
+      "comment": "Modernist facade: row of yellow circular porthole windows on a white ribbed concrete wall, car park deck above. The portholes read as a ship to a careless model.",
+      "requiredAny": [
+        "facade",
+        "building",
+        "wall",
+        "architect",
+        "window"
+      ],
+      "forbidden": [
+        "ship",
+        "boat",
+        "vessel",
+        "submarine",
+        "aircraft"
+      ],
+      "results": {
+        "janus": {
+          "passed": true,
+          "tags": [
+            "depicts",
+            "modern",
+            "building",
+            "facade",
+            "series",
+            "yellow"
+          ],
+          "alt": "The photo depicts a modern building facade with a series of yellow circular openings, a textured gray wall, and a balcony with visible windows.",
+          "trippedOn": null,
+          "conceptInTags": true,
+          "junkTags": [
+            "depicts",
+            "series"
+          ]
+        },
+        "gemma-q8": {
+          "passed": true,
+          "tags": [
+            "Modern facade",
+            "Building architecture",
+            "Yellow cladding",
+            "Circular openings",
+            "Office exterior",
+            "Contemporary design",
+            "Sunlight reflection",
+            "Vertical paneling",
+            "Industrial style",
+            "Building details"
+          ],
+          "alt": "A modern office building exterior featuring a bright yellow band contrasted with white vertical paneling and large circular windows.",
+          "trippedOn": null,
+          "conceptInTags": true,
+          "junkTags": []
+        },
+        "gemma-q5": {
+          "passed": true,
+          "tags": [
+            "modern building facade",
+            "architectural design",
+            "yellow accent",
+            "circular windows",
+            "exterior wall",
+            "contemporary architecture",
+            "geometric pattern",
+            "commercial building",
+            "building details",
+            "bright sunlight"
+          ],
+          "alt": "A modern commercial building facade featuring large yellow bands and a series of circular windows against a grey ribbed wall.",
+          "trippedOn": null,
+          "conceptInTags": true,
+          "junkTags": []
+        },
+        "gemma-q4": {
+          "passed": true,
+          "tags": [
+            "modern building facade",
+            "yellow architectural design",
+            "circular windows",
+            "urban architecture",
+            "exterior wall",
+            "commercial building",
+            "structural elements",
+            "minimalist design",
+            "building detail",
+            "cityscape"
+          ],
+          "alt": "A modern building facade features yellow horizontal banding and striking circular windows set into a gray ribbed wall.",
+          "trippedOn": null,
+          "conceptInTags": true,
+          "junkTags": []
+        },
+        "qwen": {
+          "passed": true,
+          "tags": [
+            "yellow circular pipes",
+            "concrete building facade",
+            "industrial architecture",
+            "sunlit exterior",
+            "vertical corrugated panels",
+            "modern construction"
+          ],
+          "alt": "Sunlit concrete building facade with yellow circular pipes and vertical corrugated panels.",
+          "trippedOn": null,
+          "conceptInTags": true,
+          "junkTags": []
+        },
+        "haiku-4.5": {
+          "passed": true,
+          "tags": [
+            "building facade",
+            "yellow portholes",
+            "architecture",
+            "modern design",
+            "metal panels"
+          ],
+          "alt": "Modern building with bright yellow circular portholes and corrugated metal panels.",
+          "trippedOn": null,
+          "conceptInTags": true,
+          "junkTags": []
+        },
+        "luna": {
+          "passed": true,
+          "tags": [
+            "circular windows",
+            "yellow facade",
+            "concrete building",
+            "repeating shapes",
+            "geometric architecture",
+            "sunlit wall",
+            "urban exterior"
+          ],
+          "alt": "Yellow-rimmed circular windows repeat across a ribbed concrete building facade illuminated by warm sunlight.",
+          "trippedOn": null,
+          "conceptInTags": true,
+          "junkTags": []
+        },
+        "sonnet-5": {
+          "passed": true,
+          "tags": [
+            "building facade",
+            "round windows",
+            "yellow porthole windows",
+            "corrugated wall panels",
+            "concrete structure",
+            "architectural detail",
+            "yellow stripe",
+            "modern building",
+            "circular windows row",
+            "urban architecture"
+          ],
+          "alt": "A row of circular yellow porthole-style windows lines a corrugated grey building facade beneath a yellow horizontal stripe.",
+          "trippedOn": null,
+          "conceptInTags": true,
+          "junkTags": []
+        },
+        "terra": {
+          "passed": true,
+          "tags": [
+            "circular windows",
+            "yellow facade",
+            "modern architecture",
+            "repeating pattern",
+            "building exterior",
+            "geometric design",
+            "sunlight shadows"
+          ],
+          "alt": "A row of yellow circular windows projects from a ribbed building facade in warm sunlight.",
+          "trippedOn": null,
+          "conceptInTags": true,
+          "junkTags": []
+        },
+        "opus-4.8": {
+          "passed": true,
+          "tags": [
+            "circular porthole windows",
+            "yellow painted concrete",
+            "modernist facade",
+            "ribbed white wall",
+            "yellow stripe",
+            "receding perspective",
+            "car park building",
+            "wall-mounted floodlight",
+            "warm sunlight",
+            "brutalist architecture"
+          ],
+          "alt": "A row of yellow-rimmed circular porthole windows recedes along a ribbed white concrete facade banded with a bright yellow stripe, lit by warm low-angle sunlight.",
+          "trippedOn": null,
+          "conceptInTags": true,
+          "junkTags": []
+        },
+        "sol": {
+          "passed": true,
+          "tags": [
+            "circular windows",
+            "yellow facade",
+            "modern architecture",
+            "concrete building",
+            "geometric pattern",
+            "sunlit wall"
+          ],
+          "alt": "A row of yellow circular windows projects from a sunlit white and yellow concrete building facade.",
+          "trippedOn": null,
+          "conceptInTags": true,
+          "junkTags": []
+        },
+        "fable-5": {
+          "passed": true,
+          "tags": [
+            "round windows",
+            "yellow porthole windows",
+            "concrete facade",
+            "modernist building",
+            "yellow stripe",
+            "ribbed cladding",
+            "evening light",
+            "architecture detail",
+            "shadows"
+          ],
+          "alt": "A row of yellow-rimmed circular porthole windows punctuates a ribbed concrete facade with a bold yellow horizontal stripe in warm low sunlight.",
+          "trippedOn": null,
+          "conceptInTags": true,
+          "junkTags": []
+        }
+      },
+      "analysis": "Nobody mistook the portholes for a ship, so the trap went unsprung and every model passes. The difference is ambition rather than accuracy: Janus offers 'depicts, modern, building', Opus works out it is a brutalist car park. For search, local is sufficient here."
+    },
+    {
+      "category": "street signage",
+      "album": "snapshots",
+      "file": "DSCF1279.JPG",
+      "comment": "Hand-painted 'COFFEE TEA TOAST FRIES GELATO' on a white door, aluminium stepladder, green wheelie bin. Tests reading text in the scene. No people are present.",
+      "requiredAny": [
+        "coffee",
+        "gelato",
+        "toast",
+        "sign"
+      ],
+      "forbidden": [
+        "person",
+        "people",
+        "crowd",
+        "portrait"
+      ],
+      "results": {
+        "janus": {
+          "passed": true,
+          "tags": [
+            "food",
+            "menu",
+            "restaurant"
+          ],
+          "alt": "A small outdoor food establishment with a menu offering coffee, tea, toast, fries, and gelato.",
+          "trippedOn": null,
+          "conceptInTags": false,
+          "junkTags": []
+        },
+        "gemma-q8": {
+          "passed": true,
+          "tags": [
+            "Coffee shop facade",
+            "Store front sign",
+            "Exterior wall",
+            "Metal door",
+            "Fire escape ladder",
+            "Business signage",
+            "Urban architecture",
+            "Cafe exterior",
+            "Menu list",
+            "Commercial building"
+          ],
+          "alt": "A white metal facade with a bolted door features a handwritten list of food items including coffee, tea, and gelato, next to a metal fire escape ladder.",
+          "trippedOn": null,
+          "conceptInTags": true,
+          "junkTags": []
+        },
+        "gemma-q5": {
+          "passed": true,
+          "tags": [
+            "coffee shop sign",
+            "storefront door",
+            "metal siding",
+            "hand painted text",
+            "business signage",
+            "exterior wall",
+            "ladder",
+            "urban architecture",
+            "cafe sign",
+            "street scene"
+          ],
+          "alt": "A hand-painted list of menu items, including coffee, tea, and gelato, is displayed on the weathered metal exterior door of a storefront.",
+          "trippedOn": null,
+          "conceptInTags": true,
+          "junkTags": []
+        },
+        "gemma-q4": {
+          "passed": true,
+          "tags": [
+            "storefront sign",
+            "coffee menu",
+            "exterior wall",
+            "metal door",
+            "stairs",
+            "building entrance"
+          ],
+          "alt": "A menu listing coffee, tea, toast, fries, and gelato is painted on a white metal door next to an exterior staircase.",
+          "trippedOn": null,
+          "conceptInTags": true,
+          "junkTags": []
+        },
+        "qwen": {
+          "passed": true,
+          "tags": [
+            "coffee shop door",
+            "ladder leaning",
+            "green trash bin",
+            "menu items listed",
+            "urban alleyway",
+            "white wall",
+            "yellow bucket"
+          ],
+          "alt": "A coffee shop door lists menu items like coffee, tea, toast, fries, and gelato, with a ladder and trash bin nearby.",
+          "trippedOn": null,
+          "conceptInTags": true,
+          "junkTags": []
+        },
+        "haiku-4.5": {
+          "passed": true,
+          "tags": [
+            "cafe menu",
+            "storefront signage",
+            "building wall",
+            "ladder",
+            "street scene"
+          ],
+          "alt": "Building wall displaying cafe menu text with ladder and trash bins.",
+          "trippedOn": null,
+          "conceptInTags": true,
+          "junkTags": []
+        },
+        "luna": {
+          "passed": true,
+          "tags": [
+            "aluminium ladder",
+            "painted menu",
+            "metal door",
+            "green wheelie bin",
+            "coffee sign",
+            "service entrance",
+            "urban details"
+          ],
+          "alt": "An aluminium ladder leans beside a pale metal door painted with a simple menu, while a green wheelie bin fills the foreground.",
+          "trippedOn": null,
+          "conceptInTags": true,
+          "junkTags": []
+        },
+        "sonnet-5": {
+          "passed": true,
+          "tags": [
+            "hand-painted menu sign",
+            "aluminium ladder",
+            "wheelie bin",
+            "shop back door",
+            "coffee tea toast",
+            "gelato sign",
+            "white wall",
+            "green rubbish bin",
+            "outdoor alley",
+            "storage door"
+          ],
+          "alt": "A metal door painted with a hand-lettered menu reading coffee, tea, toast, fries and gelato stands beside a ladder and a green wheelie bin.",
+          "trippedOn": null,
+          "conceptInTags": true,
+          "junkTags": []
+        },
+        "terra": {
+          "passed": false,
+          "tags": [
+            "painted menu",
+            "metal door",
+            "aluminium ladder",
+            "green rubbish bin",
+            "food lettering",
+            "urban details",
+            "white wall"
+          ],
+          "alt": "A white metal door bears a painted menu beside an aluminium ladder and a green rubbish bin.",
+          "trippedOn": null,
+          "conceptInTags": false,
+          "junkTags": []
+        },
+        "opus-4.8": {
+          "passed": true,
+          "tags": [
+            "hand-painted sign",
+            "aluminium stepladder",
+            "green wheelie bin",
+            "white metal door",
+            "painted wall text",
+            "yellow bollard",
+            "back alley",
+            "rusted mesh",
+            "conduit pipe",
+            "urban shopfront"
+          ],
+          "alt": "A white metal door hand-painted with the words coffee, tea, toast, fries and gelato stands beside an aluminium stepladder and a green wheelie bin numbered 37.",
+          "trippedOn": null,
+          "conceptInTags": true,
+          "junkTags": []
+        },
+        "sol": {
+          "passed": true,
+          "tags": [
+            "painted food sign",
+            "metal ladder",
+            "green rubbish bin",
+            "white door",
+            "coffee lettering",
+            "service entrance"
+          ],
+          "alt": "A metal ladder and green rubbish bin stand beside a white door painted with a list of cafe foods.",
+          "trippedOn": null,
+          "conceptInTags": true,
+          "junkTags": []
+        },
+        "fable-5": {
+          "passed": true,
+          "tags": [
+            "painted menu sign",
+            "white door",
+            "aluminium ladder",
+            "green wheelie bin",
+            "cafe backdoor",
+            "hand-painted lettering",
+            "coffee tea toast",
+            "yellow bollard",
+            "alleyway"
+          ],
+          "alt": "Hand-painted black lettering reading coffee, tea, toast, fries and gelato marks a white door beside a folded aluminium ladder resting on a green wheelie bin.",
+          "trippedOn": null,
+          "conceptInTags": true,
+          "junkTags": []
+        }
+      },
+      "analysis": "Every model on both sides reads the hand-painted menu, so OCR is not the local weakness anyone expected it to be. The single fail is a cloud model \u2014 Terra reads the sign and then forgets to tag it. Opus reads the number off the wheelie bin, which nobody asked for."
+    },
+    {
+      "category": "night festival",
+      "album": "2511japan",
+      "file": "DSCF6271-12.jpg",
+      "comment": "Silhouetted crowd under a vermilion shrine frame at night, hung with BOTH paper lanterns and glass furin wind chimes (confirmed by the photographer). Either reading is correct, so both terms are accepted. A zoom of one region shows only furin - which is why a single crop is not sufficient evidence to relabel a whole frame. 'fireworks' is the only wrong answer any model gave here.",
+      "requiredAny": [
+        "lantern",
+        "wind chime",
+        "furin",
+        "chime",
+        "shrine"
+      ],
+      "forbidden": [
+        "fireworks",
+        "daylight",
+        "sunny",
+        "beach",
+        "snow"
+      ],
+      "results": {
+        "janus": {
+          "passed": true,
+          "tags": [
+            "depicts",
+            "crowd",
+            "people",
+            "gathered",
+            "under",
+            "stage"
+          ],
+          "alt": "The photo depicts a crowd of people gathered under a stage illuminated by bright red lights and hanging lanterns, creating a warm and festive atmosphere.",
+          "trippedOn": null,
+          "conceptInTags": false,
+          "junkTags": [
+            "depicts",
+            "gathered",
+            "under"
+          ]
+        },
+        "gemma-q8": {
+          "passed": false,
+          "tags": [
+            "Party lights",
+            "Group silhouette",
+            "Celebration scene",
+            "Outdoor gathering",
+            "Bright bokeh",
+            "Evening event",
+            "Party atmosphere",
+            "People standing",
+            "String lights",
+            "Festive ambiance"
+          ],
+          "alt": "A silhouette of people standing in the foreground against a bright, festive outdoor party scene filled with glowing string lights and bokeh.",
+          "trippedOn": null,
+          "conceptInTags": false,
+          "junkTags": []
+        },
+        "gemma-q5": {
+          "passed": true,
+          "tags": [
+            "people at night",
+            "outdoor party",
+            "string lights",
+            "crowd silhouette",
+            "evening event",
+            "festive atmosphere",
+            "gathering lights",
+            "social event",
+            "ambient glow",
+            "night scene"
+          ],
+          "alt": "Silhouettes of people gather at an outdoor nighttime event illuminated by bright string lights and lanterns.",
+          "trippedOn": null,
+          "conceptInTags": false,
+          "junkTags": []
+        },
+        "gemma-q4": {
+          "passed": false,
+          "tags": [
+            "crowd gathering",
+            "outdoor party",
+            "nighttime event",
+            "party lights",
+            "social gathering",
+            "people in shadow",
+            "event venue",
+            "dancing",
+            "illumination"
+          ],
+          "alt": "Silhouettes of people attend a lively outdoor party at night, illuminated by warm, glowing string lights.",
+          "trippedOn": null,
+          "conceptInTags": false,
+          "junkTags": []
+        },
+        "qwen": {
+          "passed": false,
+          "tags": [
+            "fireworks display",
+            "crowd watching",
+            "night festival",
+            "red canopy",
+            "silhouetted people",
+            "string lights",
+            "outdoor event",
+            "celebration scene",
+            "dark background",
+            "festive atmosphere"
+          ],
+          "alt": "Silhouetted crowd watches vibrant fireworks display under red canopy at night festival.",
+          "trippedOn": "fireworks",
+          "conceptInTags": false,
+          "junkTags": []
+        },
+        "haiku-4.5": {
+          "passed": true,
+          "tags": [
+            "festival crowd",
+            "night event",
+            "lanterns",
+            "celebration",
+            "silhouettes"
+          ],
+          "alt": "Silhouettes of festival crowds gathered before red building with hanging lanterns.",
+          "trippedOn": null,
+          "conceptInTags": true,
+          "junkTags": []
+        },
+        "luna": {
+          "passed": true,
+          "tags": [
+            "crowd silhouettes",
+            "glowing lanterns",
+            "night festival",
+            "red illumination",
+            "people walking",
+            "Japanese lanterns",
+            "nightlife"
+          ],
+          "alt": "Silhouetted people move beneath numerous glowing lanterns in a dim, red-lit festival setting at night.",
+          "trippedOn": null,
+          "conceptInTags": true,
+          "junkTags": []
+        },
+        "sonnet-5": {
+          "passed": true,
+          "tags": [
+            "night crowd silhouettes",
+            "illuminated lanterns",
+            "shrine roof",
+            "glass wind chimes",
+            "red torii structure",
+            "people watching",
+            "festival lights",
+            "night photography",
+            "temple architecture",
+            "onlookers silhouette"
+          ],
+          "alt": "Silhouetted onlookers stand before a red shrine structure hung with glowing lanterns and glass wind chimes at night.",
+          "trippedOn": null,
+          "conceptInTags": true,
+          "junkTags": []
+        },
+        "terra": {
+          "passed": true,
+          "tags": [
+            "festival crowd",
+            "glowing lanterns",
+            "night event",
+            "people silhouettes",
+            "red pavilion",
+            "Japanese festival",
+            "wind chimes"
+          ],
+          "alt": "Silhouetted visitors face a red pavilion filled with glowing lanterns and hanging wind chimes at night.",
+          "trippedOn": null,
+          "conceptInTags": true,
+          "junkTags": []
+        },
+        "opus-4.8": {
+          "passed": true,
+          "tags": [
+            "glowing paper lanterns",
+            "silhouetted crowd",
+            "night festival",
+            "red painted shrine",
+            "hanging lights",
+            "backlit heads",
+            "vermilion structure",
+            "dark foliage",
+            "warm bokeh",
+            "japanese shrine"
+          ],
+          "alt": "Silhouetted heads of onlookers frame rows of glowing white paper lanterns hanging beneath a red-lit shrine structure at night.",
+          "trippedOn": null,
+          "conceptInTags": true,
+          "junkTags": []
+        },
+        "sol": {
+          "passed": true,
+          "tags": [
+            "festival crowd",
+            "glowing lanterns",
+            "people silhouettes",
+            "night festival",
+            "red pavilion",
+            "hanging decorations"
+          ],
+          "alt": "Silhouetted visitors face a red pavilion filled with glowing lanterns and hanging decorations at a crowded night festival.",
+          "trippedOn": null,
+          "conceptInTags": true,
+          "junkTags": []
+        },
+        "fable-5": {
+          "passed": true,
+          "tags": [
+            "glass wind chimes",
+            "night crowd",
+            "red frame canopy",
+            "glowing lanterns",
+            "people silhouettes",
+            "hanging ornaments",
+            "festival at night",
+            "warm lights",
+            "phone photography"
+          ],
+          "alt": "Silhouetted visitors crowd beneath a red framework hung with glowing glass wind chimes and lanterns at a night-time festival display.",
+          "trippedOn": null,
+          "conceptInTags": true,
+          "junkTags": []
+        }
+      },
+      "analysis": "Local goes 2\u20133: Gemma Q8 and Q4 see a generic party, Qwen sees fireworks that are not there. All seven cloud models pass. Sonnet and Fable identify glass furin wind chimes where everyone else says lanterns \u2014 both are right, the photographer confirms both are hanging, which is why one crop was never enough to relabel the frame."
+    },
+    {
+      "category": "food",
+      "album": "kansai",
+      "file": "IMG_20161115_195908.jpg",
+      "comment": "Shoyu ramen: chashu slices, menma, spring onion, dragon-pattern bowl, chopsticks, water glass, Japanese menu behind.",
+      "requiredAny": [
+        "ramen",
+        "noodle",
+        "soup",
+        "broth"
+      ],
+      "forbidden": [
+        "pizza",
+        "burger",
+        "salad",
+        "cake",
+        "dessert"
+      ],
+      "results": {
+        "janus": {
+          "passed": true,
+          "tags": [
+            "image",
+            "bowl",
+            "ramen",
+            "chopsticks",
+            "spoon",
+            "glass"
+          ],
+          "alt": "The image shows a bowl of ramen with chopsticks, a spoon, and a glass of water.",
+          "trippedOn": null,
+          "conceptInTags": true,
+          "junkTags": [
+            "image"
+          ]
+        },
+        "gemma-q8": {
+          "passed": true,
+          "tags": [
+            "tonkotsu ramen",
+            "ramen bowl",
+            "noodles",
+            "pork slices",
+            "broth",
+            "chashu",
+            "restaurant setting",
+            "chopsticks",
+            "table"
+          ],
+          "alt": "A bowl of rich tonkotsu ramen featuring noodles, creamy broth, sliced pork, and green vegetables sits on a wooden table.",
+          "trippedOn": null,
+          "conceptInTags": true,
+          "junkTags": []
+        },
+        "gemma-q5": {
+          "passed": true,
+          "tags": [
+            "tonkotsu ramen",
+            "pork slice",
+            "ramen bowl",
+            "chopsticks",
+            "chopsticks holder",
+            "tabletop",
+            "Japanese food",
+            "noodle soup",
+            "meat topping",
+            "miso ramen"
+          ],
+          "alt": "A hearty bowl of tonkotsu ramen topped with slices of pork and garnished with green onions, resting on a wooden table.",
+          "trippedOn": null,
+          "conceptInTags": true,
+          "junkTags": []
+        },
+        "gemma-q4": {
+          "passed": true,
+          "tags": [
+            "pork bone broth",
+            "ramen soup",
+            "chicken broth",
+            "wooden table",
+            "chopsticks",
+            "restaurant dish"
+          ],
+          "alt": "A bowl of hearty pork bone ramen soup with slices of chicken and bamboo shoots sits on a wooden restaurant table.",
+          "trippedOn": null,
+          "conceptInTags": true,
+          "junkTags": []
+        },
+        "qwen": {
+          "passed": true,
+          "tags": [
+            "ramen bowl",
+            "chopsticks",
+            "glass water",
+            "wooden table",
+            "white spoon",
+            "noodles",
+            "meat slice",
+            "green onions",
+            "Japanese restaurant",
+            "decorative bowl"
+          ],
+          "alt": "A steaming bowl of ramen with noodles, meat, and green onions, served with chopsticks and a glass of water on a wooden table.",
+          "trippedOn": null,
+          "conceptInTags": true,
+          "junkTags": []
+        },
+        "haiku-4.5": {
+          "passed": true,
+          "tags": [
+            "ramen",
+            "Japanese food",
+            "noodles",
+            "soup bowl",
+            "pork"
+          ],
+          "alt": "Traditional ramen bowl with noodles, broth, sliced pork and green onions.",
+          "trippedOn": null,
+          "conceptInTags": true,
+          "junkTags": []
+        },
+        "luna": {
+          "passed": true,
+          "tags": [
+            "ramen bowl",
+            "sliced pork",
+            "noodles",
+            "bamboo shoots",
+            "spring onions",
+            "soup broth",
+            "chopsticks",
+            "ceramic spoon",
+            "Japanese food"
+          ],
+          "alt": "A bowl of ramen contains noodles, sliced pork, bamboo shoots and spring onions in clear brown broth, with chopsticks and a ceramic spoon.",
+          "trippedOn": null,
+          "conceptInTags": true,
+          "junkTags": []
+        },
+        "sonnet-5": {
+          "passed": true,
+          "tags": [
+            "ramen bowl",
+            "chashu pork slices",
+            "noodle soup",
+            "chopsticks",
+            "spring onion garnish",
+            "bamboo shoots",
+            "ceramic bowl",
+            "japanese restaurant",
+            "water glass",
+            "menu board"
+          ],
+          "alt": "A steaming bowl of ramen topped with sliced chashu pork, bamboo shoots and spring onion sits on a wooden table with chopsticks resting on top.",
+          "trippedOn": null,
+          "conceptInTags": true,
+          "junkTags": []
+        },
+        "terra": {
+          "passed": true,
+          "tags": [
+            "ramen bowl",
+            "sliced pork",
+            "noodles",
+            "broth",
+            "spring onions",
+            "bamboo shoots",
+            "chopsticks",
+            "Japanese food",
+            "restaurant counter"
+          ],
+          "alt": "A bowl of ramen with sliced pork, bamboo shoots, spring onions and noodles sits beneath chopsticks on a restaurant counter.",
+          "trippedOn": null,
+          "conceptInTags": true,
+          "junkTags": []
+        },
+        "opus-4.8": {
+          "passed": true,
+          "tags": [
+            "bowl of ramen",
+            "chashu pork slices",
+            "wooden chopsticks",
+            "clear soy broth",
+            "spring onions",
+            "bamboo shoots",
+            "white soup spoon",
+            "dragon-patterned bowl",
+            "wooden counter",
+            "japanese menu sign"
+          ],
+          "alt": "A dragon-patterned bowl of ramen with clear broth, sliced pork, bamboo shoots and spring onions sits on a wooden counter with chopsticks resting across the rim.",
+          "trippedOn": null,
+          "conceptInTags": true,
+          "junkTags": []
+        },
+        "sol": {
+          "passed": true,
+          "tags": [
+            "ramen bowl",
+            "sliced pork",
+            "noodles",
+            "spring onions",
+            "bamboo shoots",
+            "chopsticks",
+            "soup spoon",
+            "Japanese restaurant"
+          ],
+          "alt": "A bowl of ramen with sliced pork, spring onions and bamboo shoots sits beside chopsticks and a glass of water.",
+          "trippedOn": null,
+          "conceptInTags": true,
+          "junkTags": []
+        },
+        "fable-5": {
+          "passed": true,
+          "tags": [
+            "ramen bowl",
+            "sliced pork chashu",
+            "noodle soup",
+            "bamboo shoots",
+            "spring onions",
+            "chopsticks",
+            "white soup spoon",
+            "dragon-patterned bowl",
+            "wooden counter",
+            "japanese restaurant"
+          ],
+          "alt": "A dragon-patterned bowl of ramen with sliced pork, bamboo shoots and spring onions sits on a wooden counter with chopsticks resting across the rim.",
+          "trippedOn": null,
+          "conceptInTags": true,
+          "junkTags": []
+        }
+      },
+      "analysis": "Twelve for twelve. No local/cloud gap at all: ramen is ramen. Gemma Q4 does contrive to serve pork bone broth and chicken broth in the same bowl, and Opus reads the menu sign behind it, but neither changes what a search index would return."
+    },
+    {
+      "category": "pet outdoors",
+      "album": "2511japan",
+      "file": "DSCF8107.JPG",
+      "comment": "White cat against a lichen-covered rock, looking up, greenery behind.",
+      "requiredAny": [
+        "cat",
+        "kitten",
+        "feline"
+      ],
+      "forbidden": [
+        "dog",
+        "puppy",
+        "rabbit"
+      ],
+      "results": {
+        "janus": {
+          "passed": true,
+          "tags": [
+            "cat",
+            "white",
+            "stone",
+            "tree",
+            "nature",
+            "outdoor"
+          ],
+          "alt": "A white cat with yellow eyes is perched on a stone, surrounded by green foliage and a tree.",
+          "trippedOn": null,
+          "conceptInTags": true,
+          "junkTags": []
+        },
+        "gemma-q8": {
+          "passed": true,
+          "tags": [
+            "white cat",
+            "staring pet",
+            "tree branch",
+            "outdoors",
+            "kitten",
+            "pet portrait",
+            "animal face",
+            "daylight",
+            "nature background",
+            "cute animal"
+          ],
+          "alt": "A curious white cat looks directly at the camera while resting near a large tree trunk and a branch outdoors.",
+          "trippedOn": null,
+          "conceptInTags": true,
+          "junkTags": []
+        },
+        "gemma-q5": {
+          "passed": true,
+          "tags": [
+            "cat",
+            "grey cat",
+            "tree bark",
+            "outdoor setting",
+            "nature",
+            "animal",
+            "feline",
+            "portrait",
+            "claws",
+            "wildlife"
+          ],
+          "alt": "A small grey cat peeks out from behind a rough tree trunk outdoors, looking directly at the camera.",
+          "trippedOn": null,
+          "conceptInTags": true,
+          "junkTags": []
+        },
+        "gemma-q4": {
+          "passed": true,
+          "tags": [
+            "white cat",
+            "outdoor animal",
+            "tree trunk",
+            "garden setting",
+            "pet cat",
+            "nature photography",
+            "domestic cat",
+            "light background"
+          ],
+          "alt": "A fluffy white cat peeks out from behind a large tree trunk in a sunny outdoor garden setting.",
+          "trippedOn": null,
+          "conceptInTags": true,
+          "junkTags": []
+        },
+        "qwen": {
+          "passed": true,
+          "tags": [
+            "white cat",
+            "climbing tree",
+            "looking up",
+            "tree bark",
+            "green leaves",
+            "outdoor",
+            "furry animal",
+            "wide eyes",
+            "natural light",
+            "curious"
+          ],
+          "alt": "A white cat climbs a tree, looking up with wide eyes, surrounded by green leaves and natural light.",
+          "trippedOn": null,
+          "conceptInTags": true,
+          "junkTags": []
+        },
+        "haiku-4.5": {
+          "passed": true,
+          "tags": [
+            "white cat",
+            "feline portrait",
+            "yellow eyes",
+            "outdoor cat",
+            "domestic animal"
+          ],
+          "alt": "White cat with striking yellow-green eyes looking upward in outdoor setting.",
+          "trippedOn": null,
+          "conceptInTags": true,
+          "junkTags": []
+        },
+        "luna": {
+          "passed": true,
+          "tags": [
+            "white cat",
+            "amber eyes",
+            "pink nose",
+            "stone ledge",
+            "outdoor portrait",
+            "green foliage",
+            "shallow focus"
+          ],
+          "alt": "A white cat with amber eyes sits on a stone ledge and looks towards the camera against softly blurred foliage.",
+          "trippedOn": null,
+          "conceptInTags": true,
+          "junkTags": []
+        },
+        "sonnet-5": {
+          "passed": true,
+          "tags": [
+            "white cat",
+            "green eyes",
+            "tree trunk",
+            "outdoor cat",
+            "cat whiskers",
+            "lichen covered bark",
+            "cat portrait",
+            "climbing cat",
+            "pink ears",
+            "curious expression"
+          ],
+          "alt": "A white cat with striking green-gold eyes perches on a lichen-covered tree trunk, looking directly at the camera.",
+          "trippedOn": null,
+          "conceptInTags": true,
+          "junkTags": []
+        },
+        "terra": {
+          "passed": true,
+          "tags": [
+            "white cat",
+            "yellow eyes",
+            "rock wall",
+            "outdoor portrait",
+            "green foliage",
+            "animal portrait",
+            "shallow focus"
+          ],
+          "alt": "A white cat with yellow eyes sits on a rock beneath trees and looks directly at the camera.",
+          "trippedOn": null,
+          "conceptInTags": true,
+          "junkTags": []
+        },
+        "opus-4.8": {
+          "passed": true,
+          "tags": [
+            "white cat",
+            "tree trunk",
+            "green eyes",
+            "lichen-covered bark",
+            "cat paw",
+            "bare branch",
+            "looking upward",
+            "blurred foliage",
+            "outdoor stray cat",
+            "shallow depth of field"
+          ],
+          "alt": "A white cat with golden-green eyes rests against a lichen-covered tree trunk, tilting its head to look directly upward at the camera amid blurred branches and grass.",
+          "trippedOn": null,
+          "conceptInTags": true,
+          "junkTags": []
+        },
+        "sol": {
+          "passed": true,
+          "tags": [
+            "white cat",
+            "yellow eyes",
+            "stone ledge",
+            "outdoor portrait",
+            "green foliage",
+            "shallow focus"
+          ],
+          "alt": "A white cat with yellow eyes sits on a stone ledge beneath trees and looks towards the camera.",
+          "trippedOn": null,
+          "conceptInTags": true,
+          "junkTags": []
+        },
+        "fable-5": {
+          "passed": true,
+          "tags": [
+            "white cat",
+            "cat on rock",
+            "amber eyes",
+            "upward gaze",
+            "pink ears",
+            "whiskers",
+            "grass background",
+            "tree branch",
+            "outdoor cat"
+          ],
+          "alt": "A white cat with amber eyes perches on a lichen-covered rock and gazes up at the camera against blurred grass and branches.",
+          "trippedOn": null,
+          "conceptInTags": true,
+          "junkTags": []
+        }
+      },
+      "analysis": "No gap, no fails. Gemma Q5 files a domestic cat under 'wildlife' and Opus files it as a stray; the search index does not care which. This is the common case in a personal photo library, and local handles it."
+    },
+    {
+      "category": "pet portrait",
+      "album": "snapshots",
+      "file": "DSCF5682.JPG",
+      "comment": "Ginger tabby dozing, eyes shut, backlit perforated metal panel with bokeh behind. Tests backlit exposure.",
+      "requiredAny": [
+        "cat",
+        "kitten",
+        "feline",
+        "tabby"
+      ],
+      "forbidden": [
+        "dog",
+        "puppy",
+        "rabbit"
+      ],
+      "results": {
+        "janus": {
+          "passed": true,
+          "tags": [
+            "cat",
+            "relaxing",
+            "sunny",
+            "cat bed"
+          ],
+          "alt": "A close-up of a cat lying on a sunny cat bed, enjoying the warmth.",
+          "trippedOn": null,
+          "conceptInTags": true,
+          "junkTags": []
+        },
+        "gemma-q8": {
+          "passed": true,
+          "tags": [
+            "ginger cat",
+            "sleeping cat",
+            "domestic cat",
+            "cat resting",
+            "metal grate",
+            "indoor pet",
+            "orange tabby",
+            "feline portrait",
+            "relaxed cat",
+            "pet photography"
+          ],
+          "alt": "An orange tabby cat sleeps peacefully, resting against a textured, perforated metal background.",
+          "trippedOn": null,
+          "conceptInTags": true,
+          "junkTags": []
+        },
+        "gemma-q5": {
+          "passed": true,
+          "tags": [
+            "ginger cat",
+            "sleeping cat",
+            "orange cat",
+            "cat resting",
+            "metal grate",
+            "indoor pet",
+            "domestic animal",
+            "cute cat",
+            "relaxed cat",
+            "feline slumber"
+          ],
+          "alt": "A fluffy ginger cat is peacefully sleeping while resting its head near a shiny metal grate background.",
+          "trippedOn": null,
+          "conceptInTags": true,
+          "junkTags": []
+        },
+        "gemma-q4": {
+          "passed": true,
+          "tags": [
+            "Orange tabby cat",
+            "Sleeping cat",
+            "Indoor cat",
+            "Pet animal",
+            "Warm sunlight",
+            "Cozy moment",
+            "Domestic feline",
+            "Abstract background",
+            "Cute pet",
+            "Relaxing pose"
+          ],
+          "alt": "A fluffy orange tabby cat is peacefully asleep, resting in front of a modern, perforated metal background.",
+          "trippedOn": null,
+          "conceptInTags": true,
+          "junkTags": []
+        },
+        "qwen": {
+          "passed": true,
+          "tags": [
+            "sleeping orange cat",
+            "perforated metal background",
+            "closed eyes",
+            "fluffy fur",
+            "relaxed posture",
+            "indoor setting",
+            "warm lighting",
+            "cat resting",
+            "metal bench",
+            "cat nap"
+          ],
+          "alt": "A fluffy orange cat sleeps peacefully with closed eyes on a perforated metal bench under warm lighting.",
+          "trippedOn": null,
+          "conceptInTags": true,
+          "junkTags": []
+        },
+        "haiku-4.5": {
+          "passed": true,
+          "tags": [
+            "orange cat",
+            "tabby cat",
+            "sleeping cat",
+            "peaceful expression",
+            "portrait"
+          ],
+          "alt": "Orange tabby cat with closed eyes in peaceful, relaxed expression.",
+          "trippedOn": null,
+          "conceptInTags": true,
+          "junkTags": []
+        },
+        "luna": {
+          "passed": true,
+          "tags": [
+            "sleeping ginger cat",
+            "cat portrait",
+            "closed eyes",
+            "pink nose",
+            "orange fur",
+            "perforated basket",
+            "resting animal",
+            "close-up"
+          ],
+          "alt": "A ginger cat rests with its eyes closed and one paw raised inside a dark perforated basket.",
+          "trippedOn": null,
+          "conceptInTags": true,
+          "junkTags": []
+        },
+        "sonnet-5": {
+          "passed": true,
+          "tags": [
+            "ginger cat",
+            "sleeping cat",
+            "close-up portrait",
+            "perforated metal bench",
+            "orange tabby",
+            "cat whiskers",
+            "eyes closed",
+            "sunlit background",
+            "resting cat",
+            "cat fur texture"
+          ],
+          "alt": "A close-up of a ginger tabby cat dozing with eyes closed against a perforated metal bench backlit by sunlight.",
+          "trippedOn": null,
+          "conceptInTags": true,
+          "junkTags": []
+        },
+        "terra": {
+          "passed": true,
+          "tags": [
+            "orange cat",
+            "sleeping cat",
+            "close-up portrait",
+            "perforated panel",
+            "pink nose",
+            "relaxed animal",
+            "shallow focus"
+          ],
+          "alt": "An orange cat rests with its eyes nearly closed beside a dark perforated panel.",
+          "trippedOn": null,
+          "conceptInTags": true,
+          "junkTags": []
+        },
+        "opus-4.8": {
+          "passed": true,
+          "tags": [
+            "ginger tabby cat",
+            "squinting eyes",
+            "perforated metal panel",
+            "pink nose",
+            "cat whiskers",
+            "circular holes",
+            "backlit bokeh",
+            "resting cat",
+            "cream fur",
+            "close-up portrait"
+          ],
+          "alt": "A ginger tabby cat with eyes squeezed almost shut rests contentedly in front of a dark perforated metal panel whose circular holes glow with bright backlight.",
+          "trippedOn": null,
+          "conceptInTags": true,
+          "junkTags": []
+        },
+        "sol": {
+          "passed": true,
+          "tags": [
+            "sleepy orange cat",
+            "cat close-up",
+            "ginger fur",
+            "perforated bench",
+            "closed eyes",
+            "animal portrait"
+          ],
+          "alt": "A sleepy orange cat rests with nearly closed eyes against the perforated back of a bench.",
+          "trippedOn": null,
+          "conceptInTags": true,
+          "junkTags": []
+        },
+        "fable-5": {
+          "passed": true,
+          "tags": [
+            "ginger cat",
+            "sleeping cat",
+            "closed eyes",
+            "perforated metal panel",
+            "cat close-up",
+            "whiskers",
+            "tabby fur",
+            "resting outdoors"
+          ],
+          "alt": "A ginger tabby cat dozes with eyes closed and chin tucked into its fur in front of a black perforated metal panel.",
+          "trippedOn": null,
+          "conceptInTags": true,
+          "junkTags": []
+        }
+      },
+      "analysis": "No fails either side, but the backlit panel exposes the depth difference. Opus reads the rig \u2014 perforated metal, circular holes, backlit bokeh \u2014 and Qwen, alone among the local models, also catches 'perforated'. Janus invents a cat bed and some sunshine. Gemma Q4 retreats to 'abstract', 'cozy', 'moment': three words nobody has ever typed into a search box."
+    }
+  ]
+}

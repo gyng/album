@@ -5,6 +5,7 @@ from index import (
     format_mapping,
     format_mapping_values,
     analyse_image_worker,
+    benchmark_caption_quality,
     build_classifier_prompt,
     caption_pipeline_version,
     build_janus_prompt,
@@ -17,6 +18,7 @@ from index import (
     decode_embedding,
     encode_embedding,
     evaluate_caption_quality_cases,
+    evaluate_tag_quality,
     extract_colour_palette,
     file_content_sha256,
     file_content_sha256_many,
@@ -58,9 +60,12 @@ from index import (
     search_tags,
     update_gps,
     validate_index_database,
+    resolve_llama_mtmd_command,
     CAPTION_STAGE,
     CORE_STAGE,
+    DEFAULT_LLAMA_MTMD_CLI_PATHS,
     JANUS_MODEL_ID,
+    LLAMA_MTMD_CLI_ENV,
     SIGLIP_V1_STAGE,
     SiglipEmbedder,
 )
@@ -487,6 +492,168 @@ class TestMain(unittest.TestCase):
         self.assertEqual(gemma.gpu_headroom_gb, 3.0)
         self.assertEqual(gemma.low_impact, True)
         self.assertEqual(gemma_gguf.model_id, "unsloth/gemma-4-E4B-it-GGUF:Q8_0")
+
+    def test_evaluate_tag_quality_scores_tags_without_the_alt_sentence(self):
+        """Tags carry the FTS index, so a good sentence must not mask bad tags."""
+        cases = [{"path": "a.jpg", "requiredAny": ["ramen"]}]
+        # Real Janus output shape: the concept only exists in the sentence, and
+        # the tags are bare words lifted out of it, including a junk head verb.
+        captions = {
+            "a.jpg": {
+                "tags": ["image", "bowl", "chopsticks"],
+                "alt_text": "The image shows a bowl of ramen with chopsticks.",
+            }
+        }
+
+        actual = evaluate_tag_quality(cases, captions)
+
+        self.assertFalse(actual["cases"][0]["conceptInTags"])
+        self.assertEqual(actual["cases"][0]["junkTags"], ["image"])
+        self.assertEqual(actual["cases"][0]["tagCount"], 3)
+        self.assertEqual(actual["junkTagRate"], 1 / 3)
+        self.assertEqual(actual["conceptCoverage"], 0.0)
+
+    def test_evaluate_tag_quality_rewards_concrete_phrases(self):
+        cases = [{"path": "a.jpg", "requiredAny": ["ramen"]}]
+        captions = {
+            "a.jpg": {
+                "tags": ["ramen bowl", "pork bone broth", "wooden table"],
+                "alt_text": "A bowl of ramen on a wooden table.",
+            }
+        }
+
+        actual = evaluate_tag_quality(cases, captions)
+
+        self.assertTrue(actual["cases"][0]["conceptInTags"])
+        self.assertEqual(actual["cases"][0]["junkTags"], [])
+        self.assertEqual(actual["phraseRate"], 1.0)
+        self.assertEqual(actual["conceptCoverage"], 1.0)
+
+    def test_resolve_llama_mtmd_command_prefers_env_override_then_path(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            override = os.path.join(tmpdir, "llama-mtmd-cli")
+            Path(override).write_bytes(b"")
+
+            with mock.patch.dict(os.environ, {LLAMA_MTMD_CLI_ENV: override}):
+                self.assertEqual(resolve_llama_mtmd_command(), override)
+
+            on_path = os.path.join(tmpdir, "from-path")
+            with (
+                mock.patch.dict(os.environ, {}, clear=True),
+                mock.patch("index.shutil.which", return_value=on_path),
+            ):
+                self.assertEqual(resolve_llama_mtmd_command(), on_path)
+
+    def test_resolve_llama_mtmd_command_rejects_a_missing_env_override(self):
+        with (
+            mock.patch.dict(os.environ, {LLAMA_MTMD_CLI_ENV: "/nope/llama-mtmd-cli"}),
+            self.assertRaises(RuntimeError) as raised,
+        ):
+            resolve_llama_mtmd_command()
+
+        self.assertIn(LLAMA_MTMD_CLI_ENV, str(raised.exception))
+
+    def test_resolve_llama_mtmd_command_does_not_fall_back_to_tmp(self):
+        """A /tmp build is wiped on reboot, so it must not be a discovery path."""
+        self.assertTrue(
+            all(
+                not candidate.startswith("/tmp/")
+                for candidate in DEFAULT_LLAMA_MTMD_CLI_PATHS
+            ),
+            DEFAULT_LLAMA_MTMD_CLI_PATHS,
+        )
+
+        with (
+            mock.patch.dict(os.environ, {}, clear=True),
+            mock.patch("index.shutil.which", return_value=None),
+            mock.patch("index.DEFAULT_LLAMA_MTMD_CLI_PATHS", ()),
+            self.assertRaises(RuntimeError) as raised,
+        ):
+            resolve_llama_mtmd_command()
+
+        self.assertIn("llama.cpp", str(raised.exception))
+
+    def test_benchmark_caption_quality_runs_the_requested_backend(self):
+        class StubClassifier:
+            model_id = "unsloth/gemma-4-E4B-it-GGUF:Q8_0"
+            quantization = None
+            batch_size = 1
+
+            def __init__(self):
+                self.last_generation_metrics = []
+
+            def init_model(self):
+                pass
+
+            def release(self):
+                pass
+
+            def predict_batch(self, items):
+                self.last_generation_metrics = [
+                    {"completedWithEos": True} for _ in items
+                ]
+                return [
+                    json.dumps(
+                        {"tags": ["mountain", "snow"], "alt_text": "A snowy peak."}
+                    )
+                    for _ in items
+                ]
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            image_path = os.path.join(tmpdir, "peak.jpg")
+            Path(image_path).write_bytes(b"")
+            fixture_path = os.path.join(tmpdir, "fixture.json")
+            output_path = os.path.join(tmpdir, "result.json")
+            with open(fixture_path, "w", encoding="utf-8") as fh:
+                json.dump(
+                    {
+                        "version": 1,
+                        "cases": [
+                            {
+                                "path": image_path,
+                                "category": "snowy landscape",
+                                "requiredAny": ["mountain"],
+                                "forbidden": ["beach"],
+                            }
+                        ],
+                    },
+                    fh,
+                )
+
+            stub = StubClassifier()
+            # Take a throwaway fd rather than the real global lock: the command
+            # closes whatever it is given, and holding the true lock would make
+            # this test fail whenever a real benchmark happens to be running.
+            with (
+                mock.patch("index.create_classifier", return_value=stub) as create,
+                mock.patch(
+                    "index.acquire_single_instance_lock",
+                    side_effect=lambda *a, **k: os.open(os.devnull, os.O_RDONLY),
+                ),
+                mock.patch("index.log"),
+            ):
+                result = CliRunner().invoke(
+                    benchmark_caption_quality,
+                    [
+                        "--fixture",
+                        fixture_path,
+                        "--backend",
+                        "gemma4-gguf",
+                        "--output",
+                        output_path,
+                    ],
+                )
+
+            self.assertEqual(result.exit_code, 0, result.output)
+            self.assertEqual(create.call_args.kwargs["backend"], "gemma4-gguf")
+
+            with open(output_path, encoding="utf-8") as fh:
+                payload = json.load(fh)
+
+        self.assertTrue(payload["passed"])
+        self.assertEqual(payload["backend"], "gemma4-gguf")
+        self.assertEqual(payload["modelId"], "unsloth/gemma-4-E4B-it-GGUF:Q8_0")
+        self.assertIn("gemma4-gguf", payload["pipelineVersion"])
 
     def test_sample_balanced_paths_spreads_across_groups(self):
         paths = [
