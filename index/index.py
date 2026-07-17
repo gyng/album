@@ -5373,7 +5373,10 @@ def validate_index_database(
             CLASSIFIER_BACKEND_GEMMA4_GGUF,
         ]
     ),
-    default=CLASSIFIER_BACKEND_JANUS,
+    # Must match the `index` default: validate recomputes the expected caption
+    # pipeline version from this backend, so a mismatched default rejects a
+    # correctly-indexed DB (the whole point of the do-full-index abort here).
+    default=CLASSIFIER_BACKEND_GEMMA4_GGUF,
 )
 @click.option("--classifier-model-id", default=None)
 @click.option("--classifier-quantization", default=None)

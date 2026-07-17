@@ -56,6 +56,7 @@ from index import (
     cli,
     index,
     search,
+    validate_command,
     search_similar_path,
     search_tags,
     update_gps,
@@ -530,6 +531,19 @@ class TestMain(unittest.TestCase):
         self.assertEqual(actual["cases"][0]["junkTags"], [])
         self.assertEqual(actual["phraseRate"], 1.0)
         self.assertEqual(actual["conceptCoverage"], 1.0)
+
+    def test_validate_default_backend_tracks_index_default(self):
+        """validate recomputes the expected caption version from its backend, so if
+        its default drifts from index's, a correctly-indexed DB is rejected — which
+        is exactly the do-full-index abort this guards against."""
+
+        def default_backend(command):
+            (option,) = [
+                p for p in command.params if p.name == "classifier_backend"
+            ]
+            return option.default
+
+        self.assertEqual(default_backend(validate_command), default_backend(index))
 
     def test_gemma_gguf_request_disables_thinking_and_constrains_json(self):
         """Without enable_thinking=false Gemma 4 spends the whole token budget in
