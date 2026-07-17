@@ -77,8 +77,8 @@ const ModelLabel = ({ model, compact }: { model: ModelSummary; compact?: boolean
     </span>
     <span className={styles.modelNameText}>
       {model.name}
-      {model.key === "janus" ? (
-        <span className={styles.star} title="Sentence was carrying the score — see note below">
+      {model.key === "gemma-q4" ? (
+        <span className={styles.star} title="Shipped default — see note below">
           {" ★"}
         </span>
       ) : null}
@@ -158,12 +158,12 @@ const ComparisonTable = () => (
   <div className={styles.tableScroll}>
     <table className={styles.table}>
       <caption className={styles.tableCaption}>
-        Bars are scaled within each column. Shaded bars are measures where less is better. ★ Janus
-        scores {data.models[0]?.conceptPass}/{data.models[0]?.conceptTotal} when tags and sentence
-        are scored together, but only {data.models[0]?.conceptInTags}/
-        {data.models[0]?.conceptTotal} on tags alone — its sentence was carrying the score, while
-        its tags are bare words lifted out of that same sentence. Tags are what the search index
-        stores.
+        Bars are scaled within each column. Shaded bars are measures where less is better. ★ marks
+        Gemma&nbsp;UD-Q4, the shipped default — chosen for its tags, not its raw score. The “tags
+        only” column is why: Janus scores {data.models[0]?.conceptPass}/
+        {data.models[0]?.conceptTotal} with tags and sentence merged but only{" "}
+        {data.models[0]?.conceptInTags}/{data.models[0]?.conceptTotal} on tags alone — its sentence
+        propping up bare-word tags. Tags are what the search index stores.
       </caption>
       <thead>
         <tr>
