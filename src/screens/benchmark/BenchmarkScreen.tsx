@@ -129,7 +129,7 @@ const columns: Column[] = [
   },
   {
     label: "Per image",
-    hint: "Wall-clock seconds per photo. Only the local models were measured — the others ran through a different harness.",
+    hint: "Steady-state seconds per photo on the resident llama-server (the one-time model load is excluded — it amortises to nothing over a real batch). Only the local models were measured; the others ran through a different harness.",
     value: (m) => (m.perImageMs === undefined ? "—" : seconds(m.perImageMs)),
     fraction: (m) =>
       m.perImageMs === undefined ? 0 : m.perImageMs / maxOf((x) => x.perImageMs ?? 0),
@@ -328,6 +328,25 @@ const BenchmarkScreen = () => {
               : ""}
           </p>
         </header>
+
+        <section className={styles.outcome}>
+          <p className={styles.outcomeLabel}>What happened next</p>
+          <p className={styles.outcomeBody}>
+            Janus’s 3× speed lead was the old code reloading the model for every photo. On one
+            resident server Gemma 4 E4B runs 1.6s a photo against Janus’s 1.3 — a fraction slower,
+            not 3×, and with tags a search index can use. (The trick barely helped the larger Qwen,
+            which is inference-bound, not load-bound.) So Gemma became the default and the library
+            was re-captioned and shipped.
+          </p>
+          <p className={styles.outcomeBody}>
+            The facet panel, previously “Japan” or “Singapore” and nothing else, now has a
+            vocabulary — <em>sky, trees, building, night, mountain</em> — and 275 photos are
+            findable by the text on their signs. The safety-check refused the first publish because
+            the captions were made by the new model while it expected the old one; correct, if
+            pedantic. A plan to hand-tune the ranking was measured, found to fix a problem the
+            algorithm had already solved, and dropped.
+          </p>
+        </section>
 
         <section className={commonStyles.stack}>
           <Heading level={2}>How they compare</Heading>

@@ -13,7 +13,7 @@
       "junkRate": 0.109,
       "phraseRate": 0.055,
       "peakVramGb": 5.4,
-      "perImageMs": 1670,
+      "perImageMs": 1310,
       "vendor": "deepseek"
     },
     {
@@ -28,7 +28,7 @@
       "junkRate": 0.0,
       "phraseRate": 0.904,
       "peakVramGb": 8.0,
-      "perImageMs": 5700,
+      "perImageMs": 1850,
       "vendor": "google"
     },
     {
@@ -43,7 +43,7 @@
       "junkRate": 0.0,
       "phraseRate": 0.891,
       "peakVramGb": 7.2,
-      "perImageMs": 5200,
+      "perImageMs": 1590,
       "vendor": "google"
     },
     {
@@ -58,7 +58,7 @@
       "junkRate": 0.0,
       "phraseRate": 0.905,
       "peakVramGb": 6.2,
-      "perImageMs": 5400,
+      "perImageMs": 1550,
       "vendor": "google"
     },
     {
@@ -73,7 +73,7 @@
       "junkRate": 0.0,
       "phraseRate": 0.922,
       "peakVramGb": 9.1,
-      "perImageMs": 9550,
+      "perImageMs": 9080,
       "vendor": "qwen"
     },
     {

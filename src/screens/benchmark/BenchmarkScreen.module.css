@@ -28,6 +28,31 @@
   opacity: 0.6;
 }
 
+/* Epilogue: what the bake-off led to and what shipped. Set apart with the accent
+   rail used elsewhere for commentary. */
+.outcome {
+  display: flex;
+  flex-direction: column;
+  gap: var(--m-s);
+  border-inline-start: var(--line-strong) solid var(--c-accent);
+  padding-inline-start: var(--m-l);
+  max-inline-size: var(--content-width-reading);
+}
+
+.outcomeLabel {
+  margin: 0;
+  font-family: monospace;
+  font-size: var(--fs-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--c-accent);
+}
+
+.outcomeBody {
+  margin: 0;
+  font-size: var(--fs-sm);
+}
+
 .lede {
   margin: 0;
   font-size: var(--fs-sm);

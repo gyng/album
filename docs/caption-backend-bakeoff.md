@@ -29,11 +29,11 @@ stores, so that is the number that matters.
 
 | | model | tags+alt | tags only | tags/img | junk% | phrase% | s/img | peak VRAM | $/1k | all 1,495 |
 |---|---|---|---|---|---|---|---|---|---|---|
-| local | Janus-Pro-1B | 10/11 | **7/11** | 5.0 | 11% | 6% | 1.67 | 5.4 GB | free | free |
-| local | Gemma 4 E4B · Q8_0 | 8/11 | **9/11** | 9.5 | 0% | 90% | 5.70 | 8.0 GB | free | free |
-| local | Gemma 4 E4B · UD-Q5_K_XL | 9/11 | **9/11** | 10.0 | 0% | 89% | 5.20 | 7.2 GB | free | free |
-| local | Gemma 4 E4B · UD-Q4_K_XL | 8/11 | **9/11** | 8.6 | 0% | 90% | 5.40 | 6.2 GB | free | free |
-| local | Qwen3-VL-8B · UD-Q5_K_XL | 9/11 | **9/11** | 9.4 | 0% | 92% | 9.55 | 9.1 GB | free | free |
+| local | Janus-Pro-1B | 10/11 | **7/11** | 5.0 | 11% | 6% | 1.31 | 5.4 GB | free | free |
+| local | Gemma 4 E4B · Q8_0 | 8/11 | **9/11** | 9.5 | 0% | 90% | 1.85 | 8.0 GB | free | free |
+| local | Gemma 4 E4B · UD-Q5_K_XL | 9/11 | **9/11** | 10.0 | 0% | 89% | 1.59 | 7.2 GB | free | free |
+| local | Gemma 4 E4B · UD-Q4_K_XL | 8/11 | **9/11** | 8.6 | 0% | 90% | 1.55 | 6.2 GB | free | free |
+| local | Qwen3-VL-8B · UD-Q5_K_XL | 9/11 | **9/11** | 9.4 | 0% | 92% | 9.08 | 9.1 GB | free | free |
 | **cloud** | Claude Haiku 4.5 | 10/11 | **10/11** | 5.0 | 0% | 67% | — | — | $1.92 | $2.87 |
 | **cloud** | GPT-5.6 Luna | 10/11 | **10/11** | 7.3 | 0% | 94% | — | — | $2.30 | $3.44 |
 | **cloud** | Claude Sonnet 5 | 11/11 | **11/11** | 10.0 | 0% | 98% | — | — | $4.22 | $6.31 |
@@ -42,9 +42,12 @@ stores, so that is the number that matters.
 | **cloud** | GPT-5.6 Sol | 10/11 | **10/11** | 6.2 | 0% | 94% | — | — | $11.25 | $16.82 |
 | **cloud** | Claude Fable 5 | 11/11 | **11/11** | 9.2 | 0% | 91% | — | — | $20.96 | $31.34 |
 
-Timings and VRAM are single-image measurements via `benchmark-classifier`, peak sampled at
-0.3s against a 688 MiB idle baseline. Janus init is 8014 ms once; the GGUF backends report
-~80 ms "init" because that is only the binary lookup — see Architecture below.
+s/img is **steady-state on the resident `llama-server`** (re-measured 18 Jul after the port):
+mean of images 2-11 per model, excluding the one-time load, which amortises to nothing over a
+real 1,480-photo batch. The earlier subprocess-per-image numbers were 3-3.5x higher for the
+Gemma quants (5.2-5.7s) because each photo paid a fresh model load; Janus (1.31s, batches four)
+and Qwen (9.08s, big model, inference-bound) barely moved. VRAM is peak above a 688 MiB idle
+baseline.
 
 ## Findings
 
@@ -55,7 +58,8 @@ gives the same captions for **3 GB less VRAM**. Real free VRAM is ~9.07 GB (WSL2
 a 10240 MiB card), so `Q8_0` (8.19 GB) + `mmproj-BF16` (0.99 GB) = 9.18 GB genuinely cannot
 fit and spills via `--gpu-layers auto`.
 
-The docs' 9.9–10.4 s/image figure for `Q8_0` is stale; it now measures 5.70 s.
+The docs' 9.9–10.4 s/image figure for `Q8_0` is stale; on the resident server it measures
+1.85 s steady-state (5.70 s under the old subprocess-per-image path).
 
 ### 2. The GGUF speed gap is architecture, not the model — and ~70% of it is recoverable
 
@@ -75,28 +79,35 @@ Measured directly on `UD-Q4_K_XL`, one image, from llama.cpp's own log:
 inference.** Across the 1,495-photo library that is ~1,495 redundant model loads.
 
 Running `llama-server` once and posting per image should therefore land Gemma `UD-Q4_K_XL`
-near **~1.2 s/image — at or below Janus's 1.67 s** — while keeping its 9/11 tags, 91% phrase
-rate and 0% junk. If that holds it removes the only real argument for keeping Janus, whose
-deficit is tag *shape*.
+near **Janus's speed** — while keeping its 9/11 tags, 91% phrase rate and 0% junk. If that holds
+it removes the only real argument for keeping Janus, whose deficit is tag *shape*. (It did: see
+the measured result below.)
 
-**Ported, and measured end to end.** `Gemma4GgufClassifier` now starts one `llama-server`,
-health-checks it, POSTs per image and tears it down on release:
+**Ported, and re-measured steady-state (18 Jul).** `Gemma4GgufClassifier` now starts one
+`llama-server`, health-checks it, POSTs per image and tears it down on release. Steady-state
+per image (mean of fixture images 2-11, one-time load excluded — it amortises to nothing over a
+real batch):
 
 | path | pass | s/img |
 |---|---|---|
 | Gemma `UD-Q4_K_XL`, subprocess per image (was) | 9/11 | 5.40 |
-| **Gemma `UD-Q4_K_XL`, persistent server (now)** | **9/11** | **2.09** |
-| Janus-Pro-1B | 10/11 | 1.67 |
+| **Gemma `UD-Q4_K_XL`, persistent server (now)** | **9/11** | **1.55** |
+| Janus-Pro-1B (batches four) | 10/11 | 1.31 |
 
-**2.6x faster with no quality change.** A prototype script over three small frames suggested
-1.39 s/image; the full fixture, which includes large album photos through the real harness,
-gives 2.09 s. Take the 2.09.
+**~3.5x faster with no quality change.** (An earlier draft reported 2.09 s for the server path;
+that was the full-fixture average *including* the one-time model load — a fixture artefact that
+overstates the per-photo cost at scale. The steady-state 1.55 s is the honest number for a
+1,480-photo run.)
 
-That does not make Gemma faster than Janus — it makes it 25% slower instead of 3x slower,
-which is a different argument. Against that, Gemma `UD-Q4_K_XL` carries 9/11 concept-in-tags
-to Janus's 7/11, 91% concrete phrases to 6%, and 0% junk to 11%, in 6.2 GB. Trading 0.4 s per
-image for a search payload that is actually usable now looks like the right call; on the
-1,495-photo library that is about ten extra minutes for a one-off reindex.
+That does not make Gemma faster than Janus — Janus, batching four images per pass, is 1.31 s to
+Gemma's 1.55 s, ~18% quicker. But that is a different argument from 3x. Against 0.24 s/image,
+Gemma `UD-Q4_K_XL` carries 9/11 concept-in-tags to Janus's 7/11, 91% concrete phrases to 6%,
+and 0% junk to 11%, in 6.2 GB. The right call for a search index; on the library, a few extra
+minutes on a one-off reindex.
+
+The win is proportional to how much of per-image time *was* model load: the small Gemma (fast
+inference, load-dominated) gains 3.5x, while the much larger Qwen3-VL-8B (inference-bound at
+~9 s) barely moved on the server (9.55 -> 9.08 s).
 
 **One non-obvious gotcha, worth its own note.** Naively posting to `/v1/chat/completions`
 returns an **empty `content`**: Gemma 4's chat template puts the server in thinking mode, the
@@ -235,8 +246,8 @@ original recommendation was "keep Janus, its deficit is tag *shape*, try to fix 
 so that is what happened, and the fix changed the answer:
 
 1. **The per-image subprocess reload was the whole speed gap.** Porting `Gemma4GgufClassifier`
-   to one resident `llama-server` took it from 5.40 to **2.09 s/image** end to end (finding 2).
-   That is 25% slower than Janus (1.67 s), not 3×.
+   to one resident `llama-server` took it from 5.40 to **1.55 s/image** steady-state (finding 2).
+   That is ~18% slower than Janus (1.31 s, which batches four), not 3×.
 2. **Tags were reshaped for facets** (finding 8): short lowercase nouns, subject first, catch-alls
    named and discouraged. Janus's tag deficit is structural (bare words from its own sentence);
    Gemma's tags are clean facet vocabulary.
