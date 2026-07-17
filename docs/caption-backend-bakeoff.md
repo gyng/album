@@ -182,6 +182,32 @@ unfamiliar subject matter, and a benchmark that encodes a model's own error as t
 than no benchmark — it actively certifies the failure. Cross-model disagreement (finding 3)
 is what flagged both cases.
 
+### 8. Tags must be facet-shaped, not caption-shaped
+
+The caption `tags` do double duty: they populate the click-to-filter facet panel
+(`image_tags` -> `tags` table, exact-string `COUNT(DISTINCT path)`) and they are a
+searched FTS column. The original prompt asked for "concrete one-to-four-word
+phrases" and "useful visual themes", which produced good *descriptions* and useless
+*facets*. Measured on 17 real album photos:
+
+| prompt | tags/photo | words/tag | unique tags | shared across photos |
+|---|---|---|---|---|
+| original ("phrases + themes") | 9.9 | 1.89 | 168 of 168 | 1 |
+| facet-tuned (short nouns) | 6.0 | 1.04 | 81 of 102 | 13 |
+
+The original produced **~100% unique tags** — projected to the 863-photo library
+that is ~8,500 facet entries all at count 1, a filter panel with no usable head.
+The facet-tuned prompt builds a real head (`building`, `temple`, `autumn`, `panda`,
+...) because it emits short reusable nouns. Nothing is lost for search: `alt_text`
+is also an FTS column, so the descriptive richness that used to be crammed into tag
+phrases still gets indexed there.
+
+A tightening pass (prefer the specific word, name and forbid catch-alls) cut vague
+tags from 14% to 6%. The residue — a few catch-alls and synonym clusters
+(`railroad`/`train`/`railway`) — resists further prompting and is better handled by
+a deterministic post-filter at the facet-display layer, which keeps those tags
+searchable while hiding them from the panel and can be tuned without re-captioning.
+
 ### 8. Caption backend is orthogonal to semantic search
 
 `embedding_pipeline_version` keys only off the SigLIP model id and revision and never reads

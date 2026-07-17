@@ -468,16 +468,29 @@ JANUS_FALLBACK_STOPWORDS = {
 def build_classifier_prompt(_geocode: Optional[Mapping]) -> str:
     schema = '{ "tags": string[], "alt_text": string }'
 
+    # Tags are click-to-filter facets AND a searched FTS column, so they must be
+    # short and reusable across photos, not per-photo descriptions. The rich,
+    # searchable detail lives in alt_text (also indexed), so nothing is lost by
+    # keeping tags terse. A/B measured on real albums: descriptive multi-word tags
+    # were ~100% unique (useless as facets); this shape produces a shared head
+    # (building, temple, autumn, panda, ...) at ~6% catch-alls. See
+    # docs/caption-backend-bakeoff.md. Residual synonym/catch-all cleanup is a
+    # post-filter, not more prompt-wrestling.
     return (
-        "Return strict JSON only. "
-        "Describe the photo for search indexing using this schema: "
+        "Return strict JSON only, matching this schema: "
         f"{schema}."
-        f" Use at most {MAX_CLASSIFIER_TAGS} unique tags; each must be a concrete "
-        "one-to-four-word phrase. Put the primary subject first, then include other "
-        "visible objects and useful visual themes."
-        f" Write alt_text as one factual sentence of at most "
-        f"{MAX_CLASSIFIER_ALT_TEXT_WORDS} words."
-        " Do not return prose outside the JSON object."
+        " tags are click-to-filter facets, so they must be reusable across photos"
+        " and specific enough to be worth filtering by. Each tag is ONE or TWO"
+        " lowercase words naming a concrete thing: the main subject first (an"
+        " object, animal, food, place, or landmark), then a few other notable"
+        f" ones, {MAX_CLASSIFIER_TAGS} at most. Use the most specific ordinary"
+        ' word: prefer "beach hut" over "building", "panda" over "animal", "ramen"'
+        ' over "food". Avoid vague catch-alls (building, structure, outdoor,'
+        " indoor, nature, scenery, sky, landscape, scene, view, area) unless"
+        " nothing more specific fits. No descriptive phrases, actions, moods, or"
+        " synonyms of a tag you already gave. Put all descriptive detail in"
+        f" alt_text: one factual sentence of at most {MAX_CLASSIFIER_ALT_TEXT_WORDS}"
+        " words. Do not return prose outside the JSON object."
     )
 
 
