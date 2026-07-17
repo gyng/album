@@ -105,9 +105,13 @@
   border-radius: 2px;
 }
 
-/* Comparison table */
+/* Comparison table.
+   overflow-y must be stated: if only one axis is set to a non-visible value the
+   other computes to `auto`, which silently turns this into a vertical scroll
+   container too. The height is content-sized, so `hidden` clips nothing. */
 .tableScroll {
   overflow-x: auto;
+  overflow-y: hidden;
 }
 
 .table {
@@ -153,7 +157,7 @@
    children instead. */
 .modelCell {
   padding-inline-end: var(--m-l);
-  vertical-align: top;
+  vertical-align: baseline;
 }
 
 .modelNote {
@@ -225,7 +229,7 @@
 
 .answerTable td,
 .answerTable th {
-  vertical-align: top;
+  vertical-align: baseline;
   padding-block: var(--m-s);
 }
 
@@ -234,7 +238,7 @@
   font-weight: 600;
   font-size: var(--fs-s);
   padding-inline-end: var(--m-m);
-  vertical-align: top;
+  vertical-align: baseline;
 }
 
 .answerModel .modelName {
@@ -243,7 +247,7 @@
 }
 
 .answerVerdict {
-  vertical-align: top;
+  vertical-align: baseline;
 }
 
 .answerVerdict > * {
@@ -270,9 +274,12 @@
   background-color: color-mix(in oklch, var(--c-accent) 6%, transparent);
 }
 
+/* Exempt from the row baseline: it is a wrapping paragraph, so aligning its
+   first line's baseline to the model name drags the whole block down. */
 .answerAlt {
   font-size: var(--fs-s);
   opacity: 0.85;
+  vertical-align: top;
 }
 
 /* Mobile: a 12-row, 7-column table is unreadable when it has to be dragged
@@ -283,8 +290,9 @@
     padding-inline: var(--m-m);
   }
 
+  /* Stacked on mobile — no scroll container on either axis. */
   .tableScroll {
-    overflow-x: visible;
+    overflow: visible;
   }
 
   .table,
