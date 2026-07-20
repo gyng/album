@@ -44,9 +44,7 @@ test.describe("World map interactions", () => {
     const dateLegend = page.locator(".maplibregl-ctrl-scale").filter({
       has: page.locator("span"),
     });
-    const distanceLegend = page.locator(
-      ".maplibregl-ctrl-bottom-left .maplibregl-ctrl-scale",
-    );
+    const distanceLegend = page.locator(".maplibregl-ctrl-bottom-left .maplibregl-ctrl-scale");
     const [dateLegendBox, distanceLegendBox] = await Promise.all([
       dateLegend.boundingBox(),
       distanceLegend.boundingBox(),
