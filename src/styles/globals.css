@@ -2,18 +2,7 @@ html,
 body {
   padding: 0;
   margin: 0;
-  font-family:
-    -apple-system,
-    BlinkMacSystemFont,
-    Segoe UI,
-    Roboto,
-    Oxygen,
-    Ubuntu,
-    Cantarell,
-    Fira Sans,
-    Droid Sans,
-    Helvetica Neue,
-    sans-serif;
+  font-family: var(--font-sans);
   font-size: var(--fs-m);
   color: var(--c-font);
   background-color: var(--c-bg);
@@ -112,6 +101,10 @@ textarea {
 
 :root {
   interpolate-size: allow-keywords;
+
+  --font-sans:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Fira Sans",
+    "Droid Sans", "Helvetica Neue", sans-serif;
 
   --m: 4px;
   --m-xs: 6px;

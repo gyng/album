@@ -324,6 +324,9 @@
   background: color-mix(in oklch, var(--c-overlay-dark) 88%, transparent);
   /* Fixed dark glass surface, so the text must stay on-dark in every theme. */
   color: var(--c-on-dark);
+  /* MapLibre sets its own typeface on the map root; keep photo captions in the
+     same familiar system stack as the rest of the gallery. */
+  font-family: var(--font-sans);
   font-size: var(--fs-xs);
   line-height: 1.3;
   text-align: center;
