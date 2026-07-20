@@ -233,13 +233,19 @@
 }
 
 .mapContainer {
-  filter: invert(1);
   mix-blend-mode: screen;
 
   border-radius: var(--radius-pill);
   overflow: clip;
   margin: var(--m-l) 0;
   aspect-ratio: 1 / 1;
+}
+
+/* Keep the toner map luminous over the photo while leaving its location
+   marker in a recognisable red. Inverting the whole container also inverted
+   the marker, which is why it was previously hidden altogether. */
+.mapContainer :global(.maplibregl-canvas) {
+  filter: invert(1);
 }
 
 .slideMap .mapContainer {

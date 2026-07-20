@@ -39,7 +39,7 @@ const styles = mergeCssModuleStyles(
 // Stable references for the slide map's style props so the memoised MMap can
 // skip re-rendering when only the coordinates are unchanged.
 const SLIDE_MAP_STYLE = { inlineSize: "100%", blockSize: "100%" } as const;
-const SLIDE_MARKER_STYLE = { visibility: "hidden" } as const;
+const SLIDE_MARKER_STYLE = { color: "var(--c-danger)" } as const;
 
 const REMIX_STRATEGY_LABEL: Record<RemixStrategy, string> = {
   "same-album": "from this album",

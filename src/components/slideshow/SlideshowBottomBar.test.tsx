@@ -86,6 +86,7 @@ describe("SlideshowBottomBar", () => {
         details: false,
         mapStyle: "toner-v2",
         projection: "vertical-perspective",
+        markerStyle: { color: "var(--c-danger)" },
       }),
     );
     expect(container.querySelectorAll('[data-align="left"]')).toHaveLength(2);

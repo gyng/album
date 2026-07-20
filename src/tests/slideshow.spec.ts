@@ -123,6 +123,19 @@ test.describe("Slideshow", () => {
 
     await expect(page.locator('link[href="/vendor/maplibre-gl.css"]')).toHaveCount(1);
     await expect(page.locator(".maplibregl-map")).toBeVisible({ timeout: 15_000 });
+    const marker = page.locator("[data-map-pin]").first();
+    await expect(marker).toBeVisible();
+    expect(
+      await marker.evaluate((element) => {
+        const colourProbe = document.createElement("span");
+        colourProbe.style.color = "var(--c-danger)";
+        document.body.append(colourProbe);
+        const markerColour = getComputedStyle(element).color;
+        const dangerColour = getComputedStyle(colourProbe).color;
+        colourProbe.remove();
+        return markerColour === dangerColour;
+      }),
+    ).toBe(true);
   });
 
   test("4-up remix positions each caption in its own pane", async ({ page }) => {
