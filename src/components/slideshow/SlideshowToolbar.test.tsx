@@ -20,6 +20,8 @@ const makeProps = (overrides: Partial<SlideshowToolbarProps> = {}): SlideshowToo
   photoName: "Photo",
   playbackSubtitle: "Sub",
   playbackContextLabel: "Context",
+  onExit: noop,
+  onNavigate: noop,
   slideshowMode: "random",
   onSelectMode: noop,
   timeAware: false,
@@ -96,6 +98,24 @@ describe("SlideshowToolbar", () => {
 
     expect(onHide).toHaveBeenCalledTimes(1);
     expect(onTryWakeLock).toHaveBeenCalledTimes(1);
+  });
+
+  it("delegates gallery exit so an embedded slideshow can leave its outer shell", () => {
+    const onExit = jest.fn();
+    render(<SlideshowToolbar {...makeProps({ onExit })} />);
+
+    fireEvent.click(screen.getByRole("link", { name: /Snapshots Slideshow/ }));
+
+    expect(onExit).toHaveBeenCalledTimes(1);
+  });
+
+  it("delegates album navigation so an embedded slideshow does not navigate inside its frame", () => {
+    const onNavigate = jest.fn();
+    render(<SlideshowToolbar {...makeProps({ onNavigate })} />);
+
+    fireEvent.click(screen.getByRole("link", { name: /Context in Album/ }));
+
+    expect(onNavigate).toHaveBeenCalledWith("/album/Album#Photo");
   });
 
   it("shows an unambiguous active screen-awake status", () => {

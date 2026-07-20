@@ -75,6 +75,14 @@ import {
   parseSlideshowSearchParams,
   SlideshowMode,
 } from "../../util/slideshowUrl";
+import {
+  isSlideshowShellStateMessage,
+  SLIDESHOW_EXIT_MESSAGE,
+  SLIDESHOW_NAVIGATE_MESSAGE,
+  SLIDESHOW_RUNTIME_STATE_MESSAGE,
+  SLIDESHOW_WAKE_REQUEST_MESSAGE,
+  type SlideshowShellWakeState,
+} from "../../util/slideshowShell";
 
 // Stable empty companions array so the derived current-slide companions keep a
 // constant identity across renders for a non-remix slide (memo/dep stability).
@@ -153,10 +161,48 @@ export const remapSlideshowPeek = (progress: number): number =>
   Math.max(0, (progress - 0.65) / 0.35);
 
 const SlideshowScreen = () => {
-  return <Slideshow />;
+  const managedCodeReload =
+    typeof window !== "undefined" &&
+    window.parent !== window &&
+    new URLSearchParams(window.location.search).get("shell") === "1";
+  const [shellWakeLock, setShellWakeLock] = React.useState<SlideshowShellWakeState | null>(null);
+
+  useEffect(() => {
+    if (!managedCodeReload) {
+      return;
+    }
+    const handleShellState = (event: MessageEvent) => {
+      if (
+        event.origin === window.location.origin &&
+        event.source === window.parent &&
+        isSlideshowShellStateMessage(event.data)
+      ) {
+        setShellWakeLock({
+          isSupported: event.data.isSupported,
+          isActive: event.data.isActive,
+        });
+      }
+    };
+    window.addEventListener("message", handleShellState);
+    window.parent.postMessage(
+      {
+        type: SLIDESHOW_RUNTIME_STATE_MESSAGE,
+        buildVersion: BUILD_VERSION,
+        search: window.location.search,
+      },
+      window.location.origin,
+    );
+    return () => window.removeEventListener("message", handleShellState);
+  }, [managedCodeReload]);
+
+  return <Slideshow managedCodeReload={managedCodeReload} shellWakeLock={shellWakeLock} />;
 };
 
-export const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
+export const Slideshow: React.FC<{
+  disabled?: boolean;
+  managedCodeReload?: boolean;
+  shellWakeLock?: SlideshowShellWakeState | null;
+}> = (props) => {
   const { searchDatabaseUrl, siteOrigin } = usePublicConfig();
   const databaseState = useDatabase();
   const [database, progress] = databaseState;
@@ -185,6 +231,10 @@ export const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
 
   // Check for a new build manifest we control and reload when one is detected.
   useEffect(() => {
+    if (props.managedCodeReload) {
+      return;
+    }
+
     const checkForNewBuild = async () => {
       try {
         const response = await fetch("/version.json", {
@@ -224,7 +274,7 @@ export const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
       window.removeEventListener("online", handleOnline);
     };
-  }, []);
+  }, [props.managedCodeReload]);
 
   // Fallback hard reload for long-running kiosk sessions. Guarded by wake lock
   // and fullscreen state: if the page is actively acting as a kiosk, DON'T
@@ -233,6 +283,10 @@ export const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
   // The version-manifest poll above handles real build updates; this interval
   // is purely a "something is broken if we got here" safety net.
   useEffect(() => {
+    if (props.managedCodeReload) {
+      return;
+    }
+
     const id = setInterval(() => {
       if (wakeLockRef.current || isFullscreenActiveRef.current) {
         return;
@@ -244,7 +298,7 @@ export const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
     // isFullscreenActiveRef are stable refs read lazily inside the interval —
     // not reactive dependencies.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [props.managedCodeReload]);
 
   const checkForDbUpdates = useCallback(async () => {
     if (!database) {
@@ -452,7 +506,20 @@ export const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
     isSupported: isWakeLockSupported,
     isActive: isWakeLockActive,
     acquire: tryAcquireWakeLock,
-  } = useWakeLock(!!props.disabled);
+  } = useWakeLock(!!props.disabled || !!props.managedCodeReload);
+  const isSessionWakeLockSupported = props.managedCodeReload
+    ? (props.shellWakeLock?.isSupported ?? false)
+    : isWakeLockSupported;
+  const isSessionWakeLockActive = props.managedCodeReload
+    ? (props.shellWakeLock?.isActive ?? false)
+    : isWakeLockActive;
+  const requestSessionWakeLock = useCallback(async () => {
+    if (props.managedCodeReload) {
+      window.parent.postMessage({ type: SLIDESHOW_WAKE_REQUEST_MESSAGE }, window.location.origin);
+      return;
+    }
+    await tryAcquireWakeLock();
+  }, [props.managedCodeReload, tryAcquireWakeLock]);
   const [touchGestureHint, setTouchGestureHint] = React.useState<
     "next" | "previous" | "controls" | "reload" | "remix" | null
   >(null);
@@ -827,6 +894,48 @@ export const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
     updateSlideshowUrl(slideshowMode);
   }, [currentPhotoPath?.path, hasParsedInitialUrl, slideshowMode, updateSlideshowUrl]);
 
+  // Give the persistent PWA shell a restart URL that includes the live photo
+  // and controls. The visible slideshow URL intentionally drops `photo` after
+  // boot; this private frame message restores it only for seamless code swaps.
+  useEffect(() => {
+    if (!props.managedCodeReload || !hasParsedInitialUrl || !currentPhotoPath) {
+      return;
+    }
+
+    const restartUrl = new URL(window.location.href);
+    restartUrl.searchParams.set("photo", currentPhotoPath.path);
+    window.parent.postMessage(
+      {
+        type: SLIDESHOW_RUNTIME_STATE_MESSAGE,
+        buildVersion: BUILD_VERSION,
+        search: restartUrl.search,
+      },
+      window.location.origin,
+    );
+  }, [currentPhotoPath, hasParsedInitialUrl, props.managedCodeReload, slideshowMode, timeDelay]);
+
+  const exitSlideshow = useCallback(() => {
+    if (props.managedCodeReload) {
+      window.parent.postMessage({ type: SLIDESHOW_EXIT_MESSAGE }, window.location.origin);
+      return;
+    }
+    navigateTo("/");
+  }, [props.managedCodeReload]);
+
+  const navigateFromSlideshow = useCallback(
+    (href: string) => {
+      if (props.managedCodeReload) {
+        window.parent.postMessage(
+          { type: SLIDESHOW_NAVIGATE_MESSAGE, href },
+          window.location.origin,
+        );
+        return;
+      }
+      navigateTo(href);
+    },
+    [props.managedCodeReload],
+  );
+
   useEffect(() => {
     if (!database) {
       return;
@@ -1150,14 +1259,12 @@ export const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
           goPrevious();
         },
         togglePaused,
-        exit: () => {
-          navigateTo("/");
-        },
+        exit: exitSlideshow,
       });
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [advanceToNextPhoto, goPrevious, togglePaused]);
+  }, [advanceToNextPhoto, exitSlideshow, goPrevious, togglePaused]);
 
   useEffect(() => {
     const fullscreenDocument = document as FullscreenDocument;
@@ -1228,11 +1335,11 @@ export const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
   // happen inside a gesture handler. Capture-phase so taps on buttons or
   // overlays that stop propagation still trigger it.
   const handleAnyTouchStartCapture = useCallback(() => {
-    if (props.disabled || wakeLockRef.current) {
+    if (props.disabled || isSessionWakeLockActive) {
       return;
     }
-    tryAcquireWakeLock().catch(console.error);
-  }, [props.disabled, tryAcquireWakeLock, wakeLockRef]);
+    requestSessionWakeLock().catch(console.error);
+  }, [isSessionWakeLockActive, props.disabled, requestSessionWakeLock]);
 
   const handleImagePointerDown = useCallback(
     (event: React.PointerEvent<HTMLElement>) => {
@@ -1244,8 +1351,8 @@ export const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
 
       // Use the gesture to silently acquire a wake lock if not already held.
       // This is the most reliable path in Safari PWAs which block gesturer-free acquisition.
-      if (!wakeLockRef.current && !props.disabled) {
-        tryAcquireWakeLock().catch(console.error);
+      if (!isSessionWakeLockActive && !props.disabled) {
+        requestSessionWakeLock().catch(console.error);
       }
 
       pointerGestureRef.current = {
@@ -1269,7 +1376,7 @@ export const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
         setTouchPointerActive(true);
       }
     },
-    [controlsVisible, props.disabled, tryAcquireWakeLock, wakeLockRef],
+    [controlsVisible, isSessionWakeLockActive, props.disabled, requestSessionWakeLock],
   );
 
   const clearImagePointerGesture = useCallback((event: React.PointerEvent<HTMLElement>) => {
@@ -1607,7 +1714,14 @@ export const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
         {slideshowError ? (
           <div className={commonStyles.toast}>
             {slideshowError}{" "}
-            <Link href="/" className={styles.bootHomeLink}>
+            <Link
+              href="/"
+              className={styles.bootHomeLink}
+              onClick={(event) => {
+                event.preventDefault();
+                exitSlideshow();
+              }}
+            >
               Back to home
             </Link>
           </div>
@@ -1622,7 +1736,14 @@ export const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
               hideIfComplete={false}
               label={bootProgress >= 100 ? "Preparing slideshow…" : undefined}
             />
-            <Link href="/" className={styles.bootHomeLink}>
+            <Link
+              href="/"
+              className={styles.bootHomeLink}
+              onClick={(event) => {
+                event.preventDefault();
+                exitSlideshow();
+              }}
+            >
               Exit to home
             </Link>
           </div>
@@ -1792,8 +1913,8 @@ export const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
           </div>
         ) : null}
         {isCoarsePointer &&
-        isWakeLockSupported &&
-        !isWakeLockActive &&
+        isSessionWakeLockSupported &&
+        !isSessionWakeLockActive &&
         !controlsVisible &&
         !touchPointerActive ? (
           <div className={styles.wakeLockNudge} aria-hidden="true">
@@ -1816,6 +1937,8 @@ export const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
           photoName={photoName}
           playbackSubtitle={playbackSubtitle}
           playbackContextLabel={playbackContextLabel}
+          onExit={exitSlideshow}
+          onNavigate={navigateFromSlideshow}
           slideshowMode={slideshowMode}
           onSelectMode={setSlideshowModeAndUrl}
           timeAware={timeAware}
@@ -1851,10 +1974,10 @@ export const Slideshow: React.FC<{ disabled?: boolean }> = (props) => {
           onToggleFullscreen={() => {
             handleFullscreenToggle().catch(console.error);
           }}
-          isWakeLockActive={isWakeLockActive}
-          isWakeLockSupported={isWakeLockSupported}
+          isWakeLockActive={isSessionWakeLockActive}
+          isWakeLockSupported={isSessionWakeLockSupported}
           onTryWakeLock={() => {
-            tryAcquireWakeLock().catch(console.error);
+            requestSessionWakeLock().catch(console.error);
           }}
           timeDelay={timeDelay}
           onSelectDelay={setTimeDelayAndUrl}

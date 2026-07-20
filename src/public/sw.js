@@ -8,7 +8,7 @@ const RUNTIME_CACHE = `${VERSION}-runtime`;
 // frame's entire offline library. Only RUNTIME_CACHE holds per-build chunks.
 const IMAGE_CACHE = "snapshots-pwa-images";
 
-const SHELL_DOCUMENTS = ["/", "/slideshow"];
+const SHELL_DOCUMENTS = ["/", "/slideshow", "/slideshow/shell"];
 const SHELL_STATIC_ASSETS = [
   "/manifest.webmanifest",
   "/pwa-icon.svg",

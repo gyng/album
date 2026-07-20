@@ -74,6 +74,8 @@ export type SlideshowToolbarProps = {
   photoName: string;
   playbackSubtitle: string;
   playbackContextLabel: string;
+  onExit: () => void;
+  onNavigate: (href: string) => void;
 
   // Playback
   slideshowMode: SlideshowMode;
@@ -311,7 +313,14 @@ export const SlideshowToolbar: React.FC<SlideshowToolbarProps> = (props) => {
           top-left nav element; on touch it lives inside this toolbar, which
           only appears after a deliberate pull gesture — so an iPad still has a
           way home without it being a one-tap accident on a kiosk. */}
-      <Link className={styles.brandLink} href="/">
+      <Link
+        className={styles.brandLink}
+        href="/"
+        onClick={(event) => {
+          event.preventDefault();
+          props.onExit();
+        }}
+      >
         <span className={styles.brandLogo} aria-hidden="true">
           🖼️
         </span>
@@ -702,7 +711,13 @@ export const SlideshowToolbar: React.FC<SlideshowToolbarProps> = (props) => {
           {props.filter ? (
             <div className={commonStyles.toast}>
               Showing only photos from{" "}
-              <Link href={`/album/${props.filter}`}>
+              <Link
+                href={`/album/${props.filter}`}
+                onClick={(event) => {
+                  event.preventDefault();
+                  props.onNavigate(`/album/${props.filter}`);
+                }}
+              >
                 <i>{props.filter}</i>
               </Link>
             </div>
@@ -711,6 +726,10 @@ export const SlideshowToolbar: React.FC<SlideshowToolbarProps> = (props) => {
           <Link
             href={`/album/${props.albumName}#${props.photoName}`}
             className={commonStyles.toast}
+            onClick={(event) => {
+              event.preventDefault();
+              props.onNavigate(`/album/${props.albumName}#${props.photoName}`);
+            }}
           >
             {props.playbackContextLabel} in <i>{props.albumName}</i>
           </Link>

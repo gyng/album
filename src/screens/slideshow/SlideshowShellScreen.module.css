@@ -1,0 +1,184 @@
+.shell {
+  position: fixed;
+  inset: 0;
+  inline-size: 100dvw;
+  block-size: 100dvh;
+  overflow: clip;
+  background: var(--c-black);
+  color: var(--c-white);
+}
+
+.runtime {
+  display: block;
+  inline-size: 100%;
+  block-size: 100%;
+  border: 0;
+  background: var(--c-black);
+}
+
+.bootStatus {
+  display: grid;
+  place-items: center;
+  inline-size: 100%;
+  block-size: 100%;
+  color: color-mix(in oklch, var(--c-white) 70%, transparent);
+  font-size: var(--fs-sm);
+}
+
+.wakeGate {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-fullscreen-toast);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: var(--m-s);
+  inline-size: 100%;
+  padding: var(--m-l) var(--m-l) calc(env(safe-area-inset-bottom, 0) + var(--m-xl));
+  border: 0;
+  background: color-mix(in oklch, var(--c-black) 4%, transparent);
+  color: var(--c-white);
+  font: inherit;
+  font-size: var(--fs-sm);
+  text-shadow: 0 var(--size-1) var(--m) var(--c-black);
+}
+
+.wakeGateDot,
+.statusDot {
+  flex: 0 0 auto;
+  inline-size: var(--size-8);
+  block-size: var(--size-8);
+  border-radius: var(--radius-pill);
+  background: var(--c-slideshow-awake);
+  box-shadow: 0 0 var(--m-m) var(--c-slideshow-awake-glow);
+}
+
+.diagnostics {
+  position: fixed;
+  inset-block-start: calc(env(safe-area-inset-top, 0) + var(--m-s));
+  inset-inline-end: calc(env(safe-area-inset-right, 0) + var(--m-s));
+  z-index: var(--z-fullscreen-control);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  color: var(--c-white);
+  font-size: var(--fs-s);
+}
+
+.diagnosticsToggle {
+  display: flex;
+  align-items: center;
+  gap: var(--m-xs);
+  min-block-size: var(--tap-target);
+  max-inline-size: var(--size-180);
+  padding: var(--m) var(--m-s);
+  border: solid var(--size-1) var(--c-border-on-dark);
+  border-radius: var(--radius-pill);
+  background: color-mix(in oklch, var(--c-overlay-dark) 78%, transparent);
+  color: inherit;
+  font: inherit;
+  backdrop-filter: blur(var(--glass-blur-control));
+  box-shadow: 0 var(--m) var(--m-m) color-mix(in oklch, var(--c-black) 28%, transparent);
+}
+
+.diagnosticsCompactLabel {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.statusGood {
+  background: var(--c-slideshow-active);
+  box-shadow: 0 0 var(--m-m) var(--c-slideshow-active-glow);
+}
+
+.statusWarn {
+  background: var(--c-slideshow-awake);
+  box-shadow: 0 0 var(--m-m) var(--c-slideshow-awake-glow);
+}
+
+.diagnosticsPanel {
+  inline-size: min(var(--size-220), calc(100dvw - var(--m-l)));
+  margin-block-start: var(--m);
+  padding: var(--m-m);
+  border: solid var(--size-1) var(--c-border-on-dark);
+  border-radius: var(--m-m);
+  background: color-mix(in oklch, var(--c-overlay-dark) 92%, transparent);
+  backdrop-filter: blur(var(--glass-blur-panel));
+  box-shadow: 0 var(--m-s) var(--m-xl) color-mix(in oklch, var(--c-black) 40%, transparent);
+}
+
+.diagnosticRow {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--m-m);
+  padding-block: var(--m);
+}
+
+.diagnosticRow span,
+.versionRow {
+  color: color-mix(in oklch, var(--c-white) 58%, transparent);
+}
+
+.diagnosticRow strong {
+  font-weight: 600;
+}
+
+.versionRow {
+  padding-block-start: var(--m);
+  font-variant-numeric: tabular-nums;
+}
+
+.diagnosticActions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--m);
+  margin-block-start: var(--m-m);
+}
+
+.diagnosticActions button {
+  min-block-size: var(--tap-target);
+  padding: var(--m) var(--m-s);
+  border: solid var(--size-1) var(--c-border-on-dark);
+  border-radius: var(--m-s);
+  background: color-mix(in oklch, var(--c-white) 8%, transparent);
+  color: inherit;
+  font: inherit;
+  font-size: var(--fs-s);
+}
+
+.wakeAction {
+  grid-column: 1 / -1;
+}
+
+.diagnosticsToggle:focus-visible,
+.diagnosticActions button:focus-visible,
+.wakeGate:focus-visible {
+  outline: solid var(--size-2) var(--c-white);
+  outline-offset: var(--size-2);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .diagnosticsToggle {
+    min-block-size: var(--size-32);
+  }
+
+  .diagnosticActions button {
+    min-block-size: var(--size-36);
+  }
+
+  .diagnosticsToggle:hover,
+  .diagnosticActions button:hover {
+    background: color-mix(in oklch, var(--c-white) 14%, var(--c-overlay-dark));
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .statusDot,
+  .wakeGateDot {
+    transition:
+      background-color var(--t-fast) var(--ease-out),
+      box-shadow var(--t-fast) var(--ease-out);
+  }
+}

@@ -34,8 +34,8 @@ const loadInstallHandler = (
     if (override) {
       return override;
     }
-    if (input === "/" || input === "/slideshow") {
-      const route = input === "/" ? "home" : "slideshow";
+    if (input === "/" || input === "/slideshow" || input === "/slideshow/shell") {
+      const route = input === "/" ? "home" : input === "/slideshow" ? "slideshow" : "shell";
       return new Response(
         `<link rel="stylesheet" href="/assets/${route}.css"><script src="/assets/${route}.js"></script>`,
         { status: 200, headers: { "content-type": "text/html" } },
@@ -169,10 +169,15 @@ describe("service worker data caching", () => {
     await installPromise;
 
     expect(fetchMock).toHaveBeenCalledWith("/slideshow");
+    expect(fetchMock).toHaveBeenCalledWith("/slideshow/shell");
     expect(fetchMock).toHaveBeenCalledWith("https://photos.example.com/assets/slideshow.js");
     expect(fetchMock).toHaveBeenCalledWith("https://photos.example.com/assets/slideshow.css");
     expect(cacheByName.get("snapshots-pwa-test-build-shell")?.put).toHaveBeenCalledWith(
       "/slideshow",
+      expect.any(Response),
+    );
+    expect(cacheByName.get("snapshots-pwa-test-build-shell")?.put).toHaveBeenCalledWith(
+      "/slideshow/shell",
       expect.any(Response),
     );
     expect(cacheByName.get("snapshots-pwa-test-build-runtime")?.put).toHaveBeenCalledWith(

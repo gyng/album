@@ -18,7 +18,7 @@ describe("PWA manifest", () => {
   it("launches the slideshow as one stable, chrome-free application", () => {
     expect(manifest).toMatchObject({
       id: "/",
-      start_url: "/slideshow",
+      start_url: "/slideshow/shell",
       scope: "/",
       display: "standalone",
       display_override: ["fullscreen", "standalone"],

@@ -3,7 +3,7 @@
   "short_name": "Snapshots",
   "description": "Fullscreen photo frame for the photo archive.",
   "id": "/",
-  "start_url": "/slideshow",
+  "start_url": "/slideshow/shell",
   "scope": "/",
   "display": "standalone",
   "display_override": ["fullscreen", "standalone"],
