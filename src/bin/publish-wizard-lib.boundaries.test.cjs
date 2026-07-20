@@ -549,6 +549,51 @@ describe("publish wizard boundary adapters", () => {
     ).resolves.toMatchObject({ warnings: ["album has no media files"] });
   });
 
+  it("excludes test fixture albums from production preflight discovery", async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "publish-test-albums-"));
+    const albumsDir = path.join(root, "albums");
+    fs.mkdirSync(path.join(albumsDir, "trip"), { recursive: true });
+    fs.mkdirSync(path.join(albumsDir, "test-fixture"));
+    fs.writeFileSync(path.join(albumsDir, "trip", "real.jpg"), "photo");
+    fs.writeFileSync(path.join(albumsDir, "test-fixture", "fixture.jpg"), "photo");
+    jest.spyOn(exifr, "parse").mockResolvedValue(healthyMetadata);
+
+    const previousIncludeTestAlbums = process.env.ALBUM_INCLUDE_TEST_ALBUMS;
+    delete process.env.ALBUM_INCLUDE_TEST_ALBUMS;
+
+    try {
+      const productionReport = await createPreflightReport({
+        albumsDir,
+        dbPath: path.join(root, "missing.sqlite"),
+        embeddingsDbPath: null,
+        indexDir: null,
+        lastIndexStatsPath: null,
+        repoDir: null,
+      });
+      expect(productionReport.albums.map((album) => album.albumName)).toEqual(["trip"]);
+
+      process.env.ALBUM_INCLUDE_TEST_ALBUMS = "1";
+      const fixtureReport = await createPreflightReport({
+        albumsDir,
+        dbPath: path.join(root, "missing.sqlite"),
+        embeddingsDbPath: null,
+        indexDir: null,
+        lastIndexStatsPath: null,
+        repoDir: null,
+      });
+      expect(fixtureReport.albums.map((album) => album.albumName)).toEqual([
+        "test-fixture",
+        "trip",
+      ]);
+    } finally {
+      if (previousIncludeTestAlbums === undefined) {
+        delete process.env.ALBUM_INCLUDE_TEST_ALBUMS;
+      } else {
+        process.env.ALBUM_INCLUDE_TEST_ALBUMS = previousIncludeTestAlbums;
+      }
+    }
+  });
+
   it("derives expected, stale, and missing embedding model health in preflight", async () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "publish-model-health-"));
     const albumsDir = path.join(root, "albums");

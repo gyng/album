@@ -12,6 +12,9 @@ const ALBUM_CONFIG_FILENAME = "album.json";
 const REPORT_FILENAME = ".publish-report.json";
 const VERCEL_CLI = "npx --yes vercel@latest";
 
+const shouldIncludeAlbum = (albumName) =>
+  !albumName.startsWith("test-") || process.env.ALBUM_INCLUDE_TEST_ALBUMS === "1";
+
 const NUMBER_FORMAT = new Intl.NumberFormat("en-US");
 const ANSI = {
   reset: "\u001b[0m",
@@ -1013,6 +1016,7 @@ const createPreflightReport = async ({
     .readdirSync(albumsDir, { withFileTypes: true })
     .filter((entry) => entry.isDirectory())
     .map((entry) => entry.name)
+    .filter(shouldIncludeAlbum)
     .sort();
 
   const albums = [];
