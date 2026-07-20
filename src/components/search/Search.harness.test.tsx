@@ -145,7 +145,7 @@ jest.mock("./SearchResultsGrid", () => ({
       <button type="button" onClick={props.onFetchNextPage}>
         Next page
       </button>
-      <span data-testid="awaiting">{String(props.isAwaitingResults)}</span>
+      <span data-testid="searching">{String(props.isSearching)}</span>
     </div>
   ),
 }));

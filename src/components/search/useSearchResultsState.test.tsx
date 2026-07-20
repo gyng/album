@@ -14,7 +14,10 @@ import {
 import { useTextVector } from "./useTextVector";
 import { useSearchResultsState } from "./useSearchResultsState";
 
-jest.mock("use-debounce", () => ({ useDebounce: (value: unknown) => [value] }));
+const mockUseDebounce = jest.fn((value: unknown) => [value]);
+jest.mock("use-debounce", () => ({
+  useDebounce: (...args: unknown[]) => mockUseDebounce(...args),
+}));
 jest.mock("@tanstack/react-query", () => ({
   keepPreviousData: Symbol("keepPreviousData"),
   useInfiniteQuery: jest.fn(),
@@ -62,6 +65,7 @@ describe("useSearchResultsState", () => {
 
   beforeEach(() => {
     jest.resetAllMocks();
+    mockUseDebounce.mockImplementation((value: unknown) => [value]);
     textVector.mockReturnValue(baseVectorState());
     infinite.mockImplementation((options: any) => {
       config = options;
@@ -124,6 +128,16 @@ describe("useSearchResultsState", () => {
     expect(config.queryKey[1]).toEqual(
       expect.objectContaining({ imageQueryId: null, hasImageVector: false }),
     );
+  });
+
+  it("reports input as pending before the debounced query catches up", () => {
+    mockUseDebounce.mockImplementation((value: unknown, delay?: unknown) => [
+      delay === 600 ? "previous query" : value,
+    ]);
+
+    const { result } = renderState({ searchInputValue: "new query" });
+
+    expect(result.current.isSearchInputPending).toBe(true);
   });
 
   it.each([

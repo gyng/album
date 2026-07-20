@@ -53,6 +53,7 @@ const baseProps = {
   isSuccess: false,
   isError: false,
   isFetching: false,
+  isSearching: false,
   isPlaceholderData: false,
   hasNextPage: false,
   similarClickstreamPaths: new Set<string>(),
@@ -104,7 +105,15 @@ describe("SearchResultsGrid", () => {
     const view = render(<SearchResultsGrid {...baseProps} searchInputValue="query" isError />);
     expect(screen.getByText(/Something went wrong/)).toBeInTheDocument();
 
-    view.rerender(<SearchResultsGrid {...baseProps} searchInputValue="query" isError isFetching />);
+    view.rerender(
+      <SearchResultsGrid
+        {...baseProps}
+        searchInputValue="query"
+        isError
+        isFetching
+        isSearching
+      />,
+    );
     expect(screen.queryByText(/Something went wrong/)).toBeNull();
     expect(screen.getByText("Searching…")).toBeInTheDocument();
   });
@@ -169,9 +178,26 @@ describe("SearchResultsGrid", () => {
         isImageQueryMode
         results={undefined}
         isSuccess
-        isAwaitingResults
+        isSearching
       />,
     );
     expect(screen.getByText("Searching…")).toBeInTheDocument();
+  });
+
+  it("keeps search progress visible while showing results from the previous query", () => {
+    render(
+      <SearchResultsGrid
+        {...baseProps}
+        searchInputValue="new query"
+        trimmedQuery="new query"
+        results={[result("previous.jpg")]}
+        isSuccess
+        isFetching
+        isSearching
+      />,
+    );
+
+    expect(screen.getByRole("status")).toHaveTextContent("Searching…");
+    expect(screen.getByText("previous.jpg")).toBeInTheDocument();
   });
 });

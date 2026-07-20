@@ -44,6 +44,32 @@
   animation-timing-function: var(--ease-out);
 }
 
+.searchingStatus {
+  display: flex;
+  flex: 1 0 100%;
+  align-items: center;
+  gap: var(--m-s);
+  min-block-size: var(--size-24);
+  color: var(--c-bg-contrast-light);
+  font-size: var(--fs-s);
+}
+
+.searchingPulse {
+  inline-size: var(--size-8);
+  block-size: var(--size-8);
+  flex: 0 0 auto;
+  border-radius: var(--radius-pill);
+  background-color: var(--c-accent);
+  animation: searchPulse var(--t-pulse) var(--ease-in-out) infinite;
+}
+
+@keyframes searchPulse {
+  50% {
+    opacity: 0.35;
+    scale: 0.7;
+  }
+}
+
 .searchWidget {
   container-type: inline-size;
   margin-block-end: var(--m-xl);

@@ -129,7 +129,9 @@ export const Search: React.FC<{
     isColorMode,
     isError,
     isFetching,
+    isFetchingNextPage,
     isPlaceholderData,
+    isSearchInputPending,
     isSimilarMode,
     isSuccess,
     queryResults,
@@ -138,6 +140,7 @@ export const Search: React.FC<{
     similarPreviewSrc,
     textModelProgress,
     textModelProgressDetails,
+    isTextVectorLoading,
     textVectorError,
     trimmedQuery,
   } = useSearchResultsState({
@@ -215,6 +218,12 @@ export const Search: React.FC<{
 
   // The image query also waits on the vision model encoding the image itself.
   const isAwaitingImageVector = Boolean(imageQuery) && !imageQuery?.vector;
+  const isSearching =
+    isSearchInputPending ||
+    isTextVectorLoading ||
+    (isFetching && !isFetchingNextPage) ||
+    isAwaitingVectorDatabase ||
+    isAwaitingImageVector;
 
   useEffect(() => {
     const initialSearchState = getInitialSearchState();
@@ -742,7 +751,7 @@ export const Search: React.FC<{
         databaseReady={Boolean(database)}
         disabled={disabled}
         inputRef={inputRef}
-        isFetching={isFetching}
+        isSearching={isSearching}
         isSimilarMode={isSimilarMode}
         isSuccess={isSuccess}
         queryResultsLength={queryResults?.length}
@@ -927,7 +936,7 @@ export const Search: React.FC<{
           isSuccess={isSuccess}
           isError={isError}
           isFetching={isFetching}
-          isAwaitingResults={isAwaitingVectorDatabase || isAwaitingImageVector}
+          isSearching={isSearching}
           isPlaceholderData={isPlaceholderData}
           hasNextPage={hasNextPage}
           similarClickstreamPaths={similarClickstreamPaths}

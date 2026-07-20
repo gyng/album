@@ -20,7 +20,7 @@ const baseProps = () => ({
   canClear: false,
   databaseReady: true,
   inputRef: createRef<HTMLInputElement>(),
-  isFetching: false,
+  isSearching: false,
   isSimilarMode: false,
   isSuccess: false,
   queryResultsLength: undefined,
@@ -102,7 +102,7 @@ describe("SearchInputBar", () => {
     view.rerender(<SearchInputBar {...props} isSuccess queryResultsLength={1} trimmedQuery="ab" />);
     expect(screen.queryByText("Enter at least 3 characters")).toBeNull();
     view.rerender(
-      <SearchInputBar {...props} isSuccess isFetching queryResultsLength={0} trimmedQuery="ab" />,
+      <SearchInputBar {...props} isSuccess isSearching queryResultsLength={0} trimmedQuery="ab" />,
     );
     expect(screen.queryByText("Enter at least 3 characters")).toBeNull();
     view.rerender(
@@ -115,6 +115,24 @@ describe("SearchInputBar", () => {
       />,
     );
     expect(screen.queryByText("Enter at least 3 characters")).toBeNull();
+  });
+
+  it("marks the search field busy while results are pending", () => {
+    const props = baseProps();
+    const view = render(<SearchInputBar {...props} isSearching />);
+
+    expect(screen.getByRole("textbox", { name: "Search photos" })).toHaveAttribute(
+      "aria-busy",
+      "true",
+    );
+    expect(screen.getByRole("img", { name: "Searching" })).toBeInTheDocument();
+
+    view.rerender(<SearchInputBar {...props} />);
+    expect(screen.getByRole("textbox", { name: "Search photos" })).toHaveAttribute(
+      "aria-busy",
+      "false",
+    );
+    expect(screen.queryByRole("img", { name: "Searching" })).toBeNull();
   });
 
   it("omits client-only random controls from server markup", () => {

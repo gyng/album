@@ -10,7 +10,9 @@ const styles = mergeCssModuleStyles(sharedStyles, localStyles, [
   "imageQueryActions",
   "imageQueryFileInput",
   "searchHintInline",
+  "searchActivity",
   "searchInput",
+  "searchInputBusy",
   "searchInputContainer",
   "searchInputRow",
   "searchModeInfo",
@@ -29,7 +31,7 @@ type Props = {
   databaseReady: boolean;
   disabled?: boolean;
   inputRef: React.RefObject<HTMLInputElement | null>;
-  isFetching: boolean;
+  isSearching: boolean;
   isSimilarMode: boolean;
   isSuccess: boolean;
   queryResultsLength?: number;
@@ -49,7 +51,7 @@ export const SearchInputBar: React.FC<Props> = ({
   databaseReady,
   disabled,
   inputRef,
-  isFetching,
+  isSearching,
   isSimilarMode,
   isSuccess,
   queryResultsLength,
@@ -84,10 +86,13 @@ export const SearchInputBar: React.FC<Props> = ({
         <>
           <div className={styles.searchInputContainer}>
             <Input
-              className={styles.searchInput}
+              className={[styles.searchInput, isSearching ? styles.searchInputBusy : ""]
+                .filter(Boolean)
+                .join(" ")}
               suppressHydrationWarning
               type="text"
               aria-label="Search photos"
+              aria-busy={isSearching}
               value={searchInputValue}
               placeholder="Search for cats at night, white, or Mavica…"
               spellCheck={false}
@@ -102,6 +107,9 @@ export const SearchInputBar: React.FC<Props> = ({
                   : undefined
               }
             />
+            {isSearching ? (
+              <span className={styles.searchActivity} role="img" aria-label="Searching" />
+            ) : null}
             {canClear ? (
               <button
                 className={styles.clearButton}
@@ -197,7 +205,7 @@ export const SearchInputBar: React.FC<Props> = ({
       )}
 
       {isSuccess &&
-      !isFetching &&
+      !isSearching &&
       !isSimilarMode &&
       searchMode === "keyword" &&
       trimmedQuery.length < 3 &&

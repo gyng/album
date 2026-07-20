@@ -51,6 +51,13 @@ export const useSearchResultsState = ({
   const [debouncedColorSearch] = useDebounce(colorSearch, 300);
   const [debouncedColorTolerance] = useDebounce(colorTolerance, 400);
 
+  const isColourInputPending =
+    (colorSearch === null) !== (debouncedColorSearch === null) ||
+    colorSearch?.some((channel, index) => channel !== debouncedColorSearch?.[index]) === true ||
+    (colorSearch !== null && colorTolerance !== debouncedColorTolerance);
+  const isSearchInputPending =
+    searchInputValue !== debouncedSearchInputValue || isColourInputPending;
+
   const searchQuery = useMemo(() => parseSearchTerms(searchInputValue), [searchInputValue]);
   const debouncedSearchQuery = useMemo(
     () => parseSearchTerms(debouncedSearchInputValue),
@@ -157,7 +164,7 @@ export const useSearchResultsState = ({
       // The uploaded/drawn image query outranks the other modes: starting one
       // clears text/similar/colour, but a facet OR colour filter can enable the
       // query before the vision model finishes encoding — return an empty page
-      // (presented as pending via isAwaitingResults) rather than falling
+      // (presented through the shared searching state) rather than falling
       // through to an unrelated keyword/facet search.
       if (imageQuery) {
         if (!imageQuery.vector) {
@@ -281,6 +288,7 @@ export const useSearchResultsState = ({
     hasFacetFilters,
     isColorMode,
     isImageQueryMode,
+    isSearchInputPending,
     isSimilarMode,
     queryResults,
     searchQuery,

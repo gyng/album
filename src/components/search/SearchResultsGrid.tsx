@@ -19,9 +19,8 @@ type Props = {
   isSuccess: boolean;
   isError: boolean;
   isFetching: boolean;
-  /** True while a vector query is deferred because the embeddings DB is still
-   *  downloading — show a pending state instead of a definitive empty one. */
-  isAwaitingResults?: boolean;
+  /** Includes debounce, vector encoding, deferred database work, and fetches. */
+  isSearching: boolean;
   isPlaceholderData: boolean;
   hasNextPage: boolean;
   similarClickstreamPaths: Set<string>;
@@ -43,7 +42,7 @@ export const SearchResultsGrid: React.FC<Props> = ({
   isSuccess,
   isError,
   isFetching,
-  isAwaitingResults = false,
+  isSearching,
   isPlaceholderData,
   hasNextPage,
   similarClickstreamPaths,
@@ -65,25 +64,32 @@ export const SearchResultsGrid: React.FC<Props> = ({
   }
 
   return (
-    <ul className={styles.results}>
-      {isError && !isFetching ? (
+    <ul className={styles.results} aria-busy={isSearching}>
+      {isSearching ? (
+        <li className={styles.searchingStatus} role="status" aria-live="polite">
+          <span className={styles.searchingPulse} aria-hidden="true" />
+          Searching&hellip;
+        </li>
+      ) : null}
+
+      {isError && !isSearching ? (
         <li className={styles.inlineError}>
           Something went wrong running this search. Try again or adjust your query.
         </li>
       ) : null}
 
-      {isSuccess && !isFetching && results?.length === 0 && isSimilarMode ? (
+      {isSuccess && !isSearching && results?.length === 0 && isSimilarMode ? (
         <li className={styles.sectionStatus}>
           No similar results for <i>{similarPath?.split("/").at(-1)}</i>
         </li>
       ) : null}
 
-      {isSuccess && !isFetching && results?.length === 0 && isPureColorSearch ? (
+      {isSuccess && !isSearching && results?.length === 0 && isPureColorSearch ? (
         <li className={styles.sectionStatus}>No photos with a similar colour found.</li>
       ) : null}
 
       {isSuccess &&
-      !isFetching &&
+      !isSearching &&
       results?.length === 0 &&
       !isSimilarMode &&
       (hasTextQuery || hasFacetFilters || isColorMode || isImageQueryMode) ? (
@@ -137,10 +143,6 @@ export const SearchResultsGrid: React.FC<Props> = ({
             {isFetching ? <>Loading&hellip;</> : <>More&hellip;</>}
           </button>
         </li>
-      ) : null}
-
-      {(isFetching && !isSuccess) || isAwaitingResults ? (
-        <li className={styles.sectionStatus}>Searching&hellip;</li>
       ) : null}
     </ul>
   );
