@@ -42,16 +42,18 @@ test.describe("Responsive UI", () => {
     expect(albumsBox!.x).toBeCloseTo(headingBox!.x, 0);
   });
 
-  test("timeline keeps its heatmap inside the mobile viewport", async ({ page }) => {
+  test("timeline shows each full year without nested horizontal scrolling", async ({ page }) => {
     await page.goto("/timeline", { waitUntil: "domcontentloaded" });
 
     await expectNoDocumentOverflow(page);
 
     const cell = page.locator("button[data-date]").first();
     await expect(cell).toBeVisible();
-    const box = await cell.boundingBox();
-    expect(box?.width).toBeGreaterThanOrEqual(22);
-    expect(box?.height).toBeGreaterThanOrEqual(22);
+    const yearScroll = await page
+      .getByRole("region", { name: /^\d{4} timeline$/ })
+      .first()
+      .evaluate((year) => ({ clientWidth: year.clientWidth, scrollWidth: year.scrollWidth }));
+    expect(yearScroll.scrollWidth).toBeLessThanOrEqual(yearScroll.clientWidth);
   });
 
   test("design catalogue contains wide token previews locally", async ({ page }) => {

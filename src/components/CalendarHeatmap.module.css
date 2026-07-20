@@ -293,6 +293,13 @@
 }
 
 @container (max-width: 720px) {
+  .heatmap {
+    /* Keep the full 54-week overview visible in narrow timeline panels. A
+       one-pixel rhythm gives the cells more room without merging adjacent
+       days into an unreadable strip. */
+    --heatmap-gap: var(--size-1);
+  }
+
   .yearsScroller {
     gap: var(--m-l);
     inline-size: 100%;
@@ -303,34 +310,11 @@
     font-size: var(--fs-2xs);
   }
 
-  /* On phones the fluid 54-column grid shrinks day cells to ~4-10px, making
-     them untappable. Keep a minimum cell size and let each year scroll
-     horizontally inside its own container instead (mirrors TechnicalHeatmaps). */
+  /* The timeline is an overview first: keep every week in view instead of
+     turning each year into a separate horizontal scroll surface. Selecting a
+     day still exposes the larger photo controls in the adjacent day panel. */
   .yearSection {
-    /* A 22px cell plus the 2px grid gap gives adjacent controls the 24px
-       centre-to-centre separation required for dense target spacing. */
-    --heatmap-cell-size: var(--size-22);
-
     inline-size: 100%;
     max-inline-size: 100%;
-    overflow-x: auto;
-    overscroll-behavior-inline: contain;
-    /* The default scrollbar reads as a heavy bar under every year grid. */
-    scrollbar-width: thin;
-  }
-
-  .yearTrack {
-    grid-template-columns: var(--size-16) max-content;
-  }
-
-  .months {
-    grid-template-columns: repeat(var(--heatmap-weeks), var(--heatmap-cell-size));
-    inline-size: auto;
-  }
-
-  .grid {
-    grid-template-columns: repeat(var(--heatmap-weeks), var(--heatmap-cell-size));
-    inline-size: auto;
-    aspect-ratio: auto;
   }
 }
