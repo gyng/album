@@ -309,21 +309,11 @@ export const PhotoBlockEl: React.FC<{
   const focalLengthSelection =
     getBucketFacetSelection(FOCAL_LENGTH_35MM_FACET.id, exif.FocalLengthIn35mmFormat) ??
     getBucketFacetSelection(FOCAL_LENGTH_ACTUAL_FACET.id, exif.FocalLength);
-  const displayDimensions = getDisplayDimensions(props.block);
-
   return (
     <div
       className={`${styles.block} ${props.block.formatting?.immersive ? styles.immersive : ""}`}
       ref={anchorRef}
       data-testid="photoblockel"
-      style={{
-        // Lets CSS compute the rendered (centred, viewport-capped) image
-        // width so the details toggle can sit at the image's edge.
-        ["--photo-aspect" as string]: (
-          displayDimensions.width / Math.max(1, displayDimensions.height)
-        ).toFixed(4),
-        ["--photo-intrinsic-width" as string]: `${displayDimensions.width}px`,
-      }}
     >
       <Picture block={props.block} lazy={props.currentIndex > 2} useColourPlaceholder />
 

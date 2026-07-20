@@ -83,21 +83,6 @@ describe("PhotoBlockEl", () => {
     expect(screen.getByTestId("picture").getAttribute("alt")).toBe("Harbour skyline");
   });
 
-  it("positions details from the EXIF-corrected image aspect ratio", () => {
-    const block = createBlock({
-      width: 6000,
-      height: 4000,
-      exif: { Orientation: "Rotate 90 CW" },
-    });
-
-    render(<PhotoBlockEl block={block} currentIndex={0} />);
-
-    expect(screen.getByTestId("photoblockel")).toHaveStyle({
-      "--photo-aspect": "0.6667",
-      "--photo-intrinsic-width": "4000px",
-    });
-  });
-
   it("reveals rich photo metadata and search actions when details are opened", () => {
     const block = createBlock({
       data: {

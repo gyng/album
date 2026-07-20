@@ -179,11 +179,12 @@ export const deserializePhotoBlock = async (
     const exif = await getNextJsSafeExif(localFilepath);
     const srcset = await optimiseImages(localFilepath, "public/data/albums");
 
-    // Tags are optional
-    // Needs to be null for same de/serialization result
-    let tags = null;
+    // Search metadata is optional, but application consumers rely on the
+    // PhotoBlock contract that `_build.tags` is always an object. Normalise a
+    // missing database, missing row, or failed lookup at this build boundary.
+    let tags: PhotoBlock["_build"]["tags"] = {};
     try {
-      tags = (await getPhotoDetailsFromSearchIndex(localFilepath))?.[0] ?? null;
+      tags = (await getPhotoDetailsFromSearchIndex(localFilepath))?.[0] ?? {};
     } catch (err) {
       console.info("Failed to get details from index, skipping", err);
     }

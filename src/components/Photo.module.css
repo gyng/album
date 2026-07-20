@@ -14,6 +14,13 @@
   grid-row: 1;
 }
 
+/* Non-immersive photos reserve a compact control strip above the media. This
+   keeps the details disclosure inside content-visibility's paint boundary
+   without laying its touch target over the photo. */
+.block:where(:not(.immersive)) .imageWrapper {
+  padding-block-start: var(--tap-target);
+}
+
 .image {
   max-block-size: 90svh;
   max-inline-size: min(90svw, 100%);
@@ -192,19 +199,10 @@
   pointer-events: auto;
 }
 
-/* Pull the details toggle to the rendered image's right edge — the image is
-   centred and capped at 90svw/90svh (see .image), so the grid cell's edge can
-   sit far outside the photo on wide viewports. Immersive blocks keep their
-   own placement. */
+/* Keep the non-immersive details toggle in the reserved strip at the far-right
+   edge of the album block. Immersive blocks retain their overlay placement. */
 .block:where(:not(.immersive)) .details {
-  margin-inline-end: max(
-    0%,
-    calc(
-      (100% -
-          min(90svw, 100%, calc(90svh * var(--photo-aspect, 1)), var(--photo-intrinsic-width, 100%))) /
-        2
-    )
-  );
+  margin-block-start: 0;
 }
 
 .immersive .details {

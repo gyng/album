@@ -125,7 +125,7 @@ describe("deserialisation adapter boundaries", () => {
     );
   });
 
-  it("deserialises photos without a search database", async () => {
+  it("normalises missing search metadata to an empty tags object", async () => {
     jest.spyOn(fs, "existsSync").mockImplementation((value) => value !== "public/search.sqlite");
 
     const result = await deserializePhotoBlock(
@@ -136,7 +136,7 @@ describe("deserialisation adapter boundaries", () => {
     expect(result).toMatchObject({
       data: { src: "/built/cover.jpg" },
       formatting: { cover: false, immersive: true },
-      _build: { width: 1200, height: 800, tags: null },
+      _build: { width: 1200, height: 800, tags: {} },
     });
   });
 
@@ -164,7 +164,7 @@ describe("deserialisation adapter boundaries", () => {
     expect(result._build.tags).toEqual({ geocode: "Tokyo" });
   });
 
-  it("drops failed index lookups from the cache and continues without tags", async () => {
+  it("drops failed index lookups from the cache and continues with empty tags", async () => {
     jest.spyOn(fs, "existsSync").mockReturnValue(true);
     const databaseFailure = new Error("database read failed");
     db.get.mockImplementation((_sql, _params, callback) => callback(databaseFailure));
@@ -174,8 +174,8 @@ describe("deserialisation adapter boundaries", () => {
     await Promise.resolve();
     const second = await deserializePhotoBlock(photo(), { dirname: "albums/trip" });
 
-    expect(first._build.tags).toBeNull();
-    expect(second._build.tags).toBeNull();
+    expect(first._build.tags).toEqual({});
+    expect(second._build.tags).toEqual({});
     expect(db.get).toHaveBeenCalledTimes(2);
     expect(info).toHaveBeenCalledWith(
       "Failed to get details from index, skipping",

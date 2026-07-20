@@ -133,15 +133,22 @@ test.describe("Responsive UI", () => {
     const image = photo.getByRole("img");
     const summary = photo.getByLabel("Photo details");
     await expect(summary).toBeVisible();
-    const [imageBox, summaryBox] = await Promise.all([image.boundingBox(), summary.boundingBox()]);
+    const [photoBox, imageBox, summaryBox] = await Promise.all([
+      photo.boundingBox(),
+      image.boundingBox(),
+      summary.boundingBox(),
+    ]);
+    expect(photoBox).not.toBeNull();
     expect(imageBox).not.toBeNull();
     expect(summaryBox).not.toBeNull();
     expect(summaryBox!.width).toBeGreaterThanOrEqual(44);
     expect(summaryBox!.height).toBeGreaterThanOrEqual(44);
+    expect(summaryBox!.y).toBeGreaterThanOrEqual(photoBox!.y);
 
-    const rightEdgeOffset = imageBox!.x + imageBox!.width - (summaryBox!.x + summaryBox!.width);
+    const rightEdgeOffset = photoBox!.x + photoBox!.width - (summaryBox!.x + summaryBox!.width);
     expect(rightEdgeOffset).toBeGreaterThanOrEqual(0);
-    expect(rightEdgeOffset).toBeLessThanOrEqual(24);
+    expect(rightEdgeOffset).toBeLessThanOrEqual(48);
+    expect(summaryBox!.y + summaryBox!.height).toBeLessThanOrEqual(imageBox!.y);
   });
 
   test("guess lobby explains the daily challenge without mobile overflow", async ({ page }) => {
