@@ -153,6 +153,25 @@ test.describe("Responsive UI", () => {
     expect(summaryBox!.y + summaryBox!.height).toBeLessThanOrEqual(imageBox!.y);
   });
 
+  test("album detail disclosures sit beside wide photos", async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await page.goto("/album/test-simple", { waitUntil: "domcontentloaded" });
+
+    const photo = page.getByTestId("photoblockel").first();
+    const image = photo.getByRole("img");
+    await expect
+      .poll(() => image.evaluate((element) => element.complete && element.naturalWidth > 0))
+      .toBe(true);
+    const [imageBox, summaryBox] = await Promise.all([
+      image.boundingBox(),
+      photo.getByLabel("Photo details").boundingBox(),
+    ]);
+    expect(imageBox).not.toBeNull();
+    expect(summaryBox).not.toBeNull();
+    expect(summaryBox!.x).toBeGreaterThanOrEqual(imageBox!.x + imageBox!.width);
+    expect(summaryBox!.y).toBeCloseTo(imageBox!.y, 0);
+  });
+
   test("guess lobby explains the daily challenge without mobile overflow", async ({ page }) => {
     await page.goto("/guess", { waitUntil: "domcontentloaded" });
 

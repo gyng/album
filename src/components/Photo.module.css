@@ -14,13 +14,6 @@
   grid-row: 1;
 }
 
-/* Non-immersive photos reserve a compact control strip above the media. This
-   keeps the details disclosure inside content-visibility's paint boundary
-   without laying its touch target over the photo. */
-.block:where(:not(.immersive)) .imageWrapper {
-  padding-block-start: var(--tap-target);
-}
-
 .image {
   max-block-size: 90svh;
   max-inline-size: min(90svw, 100%);
@@ -199,10 +192,35 @@
   pointer-events: auto;
 }
 
-/* Keep the non-immersive details toggle in the reserved strip at the far-right
-   edge of the album block. Immersive blocks retain their overlay placement. */
+/* Leave room beside a normal photo, then align the details toggle immediately
+   outside its top-right corner. The matching width expression keeps the
+   positioning based on the rendered image rather than its grid cell. */
+.block:where(:not(.immersive)) .image {
+  inline-size: min(
+    90svw,
+    calc(100% - (var(--tap-target) + var(--m-s)) * 2),
+    calc(90svh * var(--photo-aspect, 1)),
+    var(--photo-intrinsic-width, 100%)
+  );
+  max-inline-size: none;
+  max-block-size: none;
+}
+
 .block:where(:not(.immersive)) .details {
   margin-block-start: 0;
+  scrollbar-gutter: auto;
+  margin-inline-end: calc(
+    (100% -
+          min(
+            90svw,
+            calc(100% - (var(--tap-target) + var(--m-s)) * 2),
+            calc(90svh * var(--photo-aspect, 1)),
+            var(--photo-intrinsic-width, 100%)
+          )) /
+      2 -
+      var(--tap-target) -
+      var(--m-s)
+  );
 }
 
 .immersive .details {
@@ -218,6 +236,26 @@
 }
 
 @media (max-width: 720px) {
+  /* On narrow screens the side control would make the photo needlessly small.
+     Move it into a reserved strip above the image instead; it never overlays
+     the media in either layout. */
+  .block:where(:not(.immersive)) .imageWrapper {
+    padding-block-start: var(--tap-target);
+  }
+
+  .block:where(:not(.immersive)) .image {
+    inline-size: min(
+      90svw,
+      100%,
+      calc(90svh * var(--photo-aspect, 1)),
+      var(--photo-intrinsic-width, 100%)
+    );
+  }
+
+  .block:where(:not(.immersive)) .details {
+    margin-inline-end: 0;
+  }
+
   .title {
     font-size: clamp(var(--fs-l), 10dvw, var(--fs-xl));
   }
