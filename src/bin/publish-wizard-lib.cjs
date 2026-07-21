@@ -976,7 +976,24 @@ const buildDeletedAlbumReports = ({ indexedPhotoPaths, onDiskAlbumNames }) => {
 const getIndexerModelInfo = (indexDir, run, warn) => {
   try {
     const output = run("uv run index.py model-info", { cwd: indexDir, timeout: 10000 });
-    return JSON.parse(output.toString().trim());
+    const lines = output
+      .toString()
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(Boolean);
+
+    // The index CLI emits a human-readable cwd diagnostic before dispatching
+    // commands. Parse the final JSON value instead of requiring pristine
+    // stdout so model-change protection cannot be disabled by harmless CLI
+    // diagnostics (or similar launcher preambles).
+    for (let i = lines.length - 1; i >= 0; i -= 1) {
+      try {
+        return JSON.parse(lines[i]);
+      } catch {
+        // Keep scanning backwards for the command's JSON payload.
+      }
+    }
+    throw new SyntaxError("Indexer model-info produced no JSON payload");
   } catch (err) {
     const reason = err instanceof Error ? err.message : String(err);
     warn(

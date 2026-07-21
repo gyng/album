@@ -673,6 +673,11 @@ describe("publish wizard boundary adapters", () => {
     expect(
       getIndexerModelInfo("/index", () => Buffer.from('{"embeddingModelId":"model"}')),
     ).toEqual({ embeddingModelId: "model" });
+    expect(
+      getIndexerModelInfo("/index", () =>
+        Buffer.from('cwd:\t/index\n{"embeddingModelId":"model"}\n'),
+      ),
+    ).toEqual({ embeddingModelId: "model" });
     const warn = jest.fn();
     expect(
       getIndexerModelInfo(
