@@ -81,11 +81,50 @@ import unittest
 import click
 from click.testing import CliRunner
 import json
+import math
 from pathlib import Path
 from unittest import mock
 
 
 RUN_MODEL_INFERENCE = os.environ.get("INDEX_RUN_MODEL_INFERENCE") == "1"
+
+
+class FakeTensor:
+    """Small mutable tensor-shaped test double for model-free logic tests."""
+
+    def __init__(self, values):
+        self.values = values
+
+    def __iter__(self):
+        return (FakeTensor(row) for row in self.values)
+
+    def __getitem__(self, index):
+        if isinstance(index, tuple):
+            row, column = index
+            return self.values[row][column]
+        value = self.values[index]
+        return FakeTensor(value) if isinstance(value, list) else value
+
+    def __setitem__(self, index, value):
+        if isinstance(index, tuple):
+            row, column = index
+            self.values[row][column] = value
+            return
+        self.values[index] = value
+
+    def detach(self):
+        return self
+
+    def cpu(self):
+        return self
+
+    def tolist(self):
+        return self.values.copy() if isinstance(self.values, list) else self.values
+
+    def fill_(self, value):
+        for position in range(len(self.values)):
+            self.values[position] = value
+        return self
 
 
 class TestMain(unittest.TestCase):
@@ -307,8 +346,6 @@ class TestMain(unittest.TestCase):
         self.assertTrue(all(metric["oomFallback"] for metric in metrics))
 
     def test_janus_metrics_ignore_eos_padding_and_flag_only_straggler(self):
-        import torch
-
         classifier = JanusClassifier(max_new_tokens=5)
         classifier.tokenizer = mock.Mock(eos_token_id=2)
         classifier.tokenizer.decode.side_effect = [
@@ -316,7 +353,7 @@ class TestMain(unittest.TestCase):
             "unfinished",
         ]
         classifier._record_generation_metrics(
-            torch.tensor(
+            FakeTensor(
                 [
                     [10, 11, 2, 2, 2],
                     [20, 21, 22, 23, 24],
@@ -400,22 +437,18 @@ class TestMain(unittest.TestCase):
         )
 
     def test_json_completion_logits_processor_forces_eos_per_complete_row(self):
-        import torch
-
         tokenizer = mock.Mock()
         tokenizer.decode.side_effect = ['{"done": true}', '{"still":']
         processor = JsonCompletionLogitsProcessor(tokenizer, eos_token_id=2)
-        scores = torch.zeros((2, 5))
+        scores = FakeTensor([[0.0] * 5 for _ in range(2)])
 
-        actual = processor(torch.tensor([[1, 2], [3, 4]]), scores)
+        actual = processor(FakeTensor([[1, 2], [3, 4]]), scores).tolist()
 
-        self.assertEqual(actual[0, 2].item(), 0.0)
-        self.assertTrue(torch.isneginf(actual[0, 0]))
-        self.assertTrue(torch.equal(actual[1], torch.zeros(5)))
+        self.assertEqual(actual[0][2], 0.0)
+        self.assertTrue(math.isinf(actual[0][0]) and actual[0][0] < 0)
+        self.assertEqual(actual[1], [0.0] * 5)
 
     def test_json_completion_logits_processor_closes_repeated_tag_array(self):
-        import torch
-
         tokenizer = mock.Mock()
         tokenizer.encode.return_value = [4]
         tokenizer.decode.return_value = (
@@ -423,10 +456,10 @@ class TestMain(unittest.TestCase):
         )
         processor = JsonCompletionLogitsProcessor(tokenizer, eos_token_id=2)
 
-        actual = processor(torch.tensor([[1, 2]]), torch.zeros((1, 6)))
+        actual = processor(FakeTensor([[1, 2]]), FakeTensor([[0.0] * 6])).tolist()
 
-        self.assertEqual(actual[0, 4].item(), 0.0)
-        self.assertTrue(torch.isneginf(actual[0, 0]))
+        self.assertEqual(actual[0][4], 0.0)
+        self.assertTrue(math.isinf(actual[0][0]) and actual[0][0] < 0)
 
     def test_filter_exif_for_search_keeps_only_useful_fields(self):
         actual = filter_exif_for_search(
@@ -538,9 +571,7 @@ class TestMain(unittest.TestCase):
         is exactly the do-full-index abort this guards against."""
 
         def default_backend(command):
-            (option,) = [
-                p for p in command.params if p.name == "classifier_backend"
-            ]
+            (option,) = [p for p in command.params if p.name == "classifier_backend"]
             return option.default
 
         self.assertEqual(default_backend(validate_command), default_backend(index))

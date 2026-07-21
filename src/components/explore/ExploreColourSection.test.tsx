@@ -132,7 +132,8 @@ describe("ExploreColourSection", () => {
       "/search",
     );
     expect(screen.getByTitle("Red around 2023: 0 photos (0%)")).toHaveStyle({
-      inlineSize: "max(3px, 100%)",
+      inlineSize: "max(var(--size-3), 100%)",
+      left: "min(0%, calc(100% - max(var(--size-3), 100%)))",
     });
     expect(screen.getByText("—")).toBeInTheDocument();
     expect(

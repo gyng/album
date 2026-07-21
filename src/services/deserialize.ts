@@ -20,6 +20,25 @@ const sqlite3: typeof import("sqlite3") = require("sqlite3").verbose();
 
 let searchDb: import("sqlite3").Database | null = null;
 const photoSearchIndexCache = new Map<string, Promise<any[]>>();
+const DEFAULT_SEARCH_DB_PATH = "public/search.sqlite";
+
+const getConfiguredSearchDbPath = (): string => {
+  const configuredUrl = process.env.NEXT_PUBLIC_SEARCH_DATABASE_URL;
+  if (!configuredUrl?.startsWith("/") || configuredUrl.startsWith("//")) {
+    return DEFAULT_SEARCH_DB_PATH;
+  }
+
+  try {
+    const pathname = decodeURIComponent(new URL(configuredUrl, "https://build.local").pathname);
+    const segments = pathname.split("/").filter(Boolean);
+    if (segments.length === 0 || segments.includes("..")) {
+      return DEFAULT_SEARCH_DB_PATH;
+    }
+    return path.join("public", ...segments);
+  } catch {
+    return DEFAULT_SEARCH_DB_PATH;
+  }
+};
 
 const closeSearchDb = async (): Promise<void> => {
   if (!searchDb) {
@@ -114,7 +133,7 @@ export const deserializeVideoBlock = async (
 
 const getPhotoDetailsFromSearchIndex = async (
   path: string,
-  dbPath = "public/search.sqlite",
+  dbPath = getConfiguredSearchDbPath(),
 ): Promise<any[]> => {
   const cached = photoSearchIndexCache.get(path);
 
@@ -280,6 +299,7 @@ export const deserializeContentBlock = async (
 };
 
 export const deserializeInternals = {
+  getConfiguredSearchDbPath,
   resetForTesting: async () => {
     photoSearchIndexCache.clear();
     await closeSearchDb();

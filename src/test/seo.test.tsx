@@ -277,6 +277,7 @@ describe("SEO helpers", () => {
     useRouter.mockReturnValue({
       pathname: "/map",
       query: { filter_album: "trip" },
+      isReady: true,
       replace: jest.fn(),
     });
 

@@ -8,6 +8,7 @@ import { renderWithNextPlatform as render } from "../../renderWithNextPlatform";
 const push = jest.fn();
 const replace = jest.fn();
 let mockQuery: Record<string, string> = {};
+let mockRouterReady = true;
 
 jest.mock("../../../services/album", () => ({
   getAlbums: jest.fn(),
@@ -16,6 +17,7 @@ jest.mock("../../../services/album", () => ({
 jest.mock("next/router", () => ({
   useRouter: () => ({
     query: mockQuery,
+    isReady: mockRouterReady,
     push,
     replace,
   }),
@@ -67,6 +69,7 @@ const { default: WorldMap } = require("../../../screens/map/MapScreen");
 describe("WorldMap page", () => {
   beforeEach(() => {
     mockQuery = {};
+    mockRouterReady = true;
     push.mockClear();
     replace.mockClear();
   });
@@ -87,5 +90,19 @@ describe("WorldMap page", () => {
     fireEvent.click(screen.getByRole("link", { name: "kansai" }));
 
     expect(push).toHaveBeenCalledWith("/album/kansai");
+  });
+
+  it("waits for URL state before rendering an album filter", () => {
+    mockQuery = { filter_album: "kansai" };
+    mockRouterReady = false;
+
+    const { rerender } = render(<WorldMap photos={[]} />);
+
+    expect(screen.queryByRole("link", { name: "kansai" })).not.toBeInTheDocument();
+
+    mockRouterReady = true;
+    rerender(<WorldMap photos={[]} />);
+
+    expect(screen.getByRole("link", { name: "kansai" })).toBeInTheDocument();
   });
 });

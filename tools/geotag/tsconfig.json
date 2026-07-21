@@ -14,7 +14,8 @@
     "types": ["node"],
     "paths": {
       "@shared/*": ["../../src/util/*"],
-      "@sharedTypes/*": ["../../src/services/*"]
+      "@sharedTypes/*": ["../../src/services/*"],
+      "fast-xml-parser": ["./node_modules/fast-xml-parser/src/fxp.d.ts"]
     }
   },
   "include": ["src", "server", "vite.config.ts"]

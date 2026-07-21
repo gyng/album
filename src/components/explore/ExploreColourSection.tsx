@@ -201,6 +201,8 @@ export const ExploreColourSection = ({
                     <div className={styles.colorTimeBar}>
                       {year.slices.map((slice, index) => {
                         const share = year.total > 0 ? (slice.count / year.total) * 100 : 0;
+                        const segmentWidth = 100 / Math.max(year.total, 1);
+                        const segmentPosition = slice.position * 100;
                         return (
                           <Link
                             key={`${year.label}-${slice.family}-${index}`}
@@ -208,8 +210,8 @@ export const ExploreColourSection = ({
                             className={styles.colorTimeSegment}
                             title={`${slice.family} around ${year.label}: ${slice.count} photos (${Math.round(share)}%)`}
                             style={{
-                              left: `${slice.position * 100}%`,
-                              inlineSize: `max(3px, ${100 / Math.max(year.total, 1)}%)`,
+                              left: `min(${segmentPosition}%, calc(100% - max(var(--size-3), ${segmentWidth}%)))`,
+                              inlineSize: `max(var(--size-3), ${segmentWidth}%)`,
                               backgroundColor: slice.rgb,
                             }}
                           >

@@ -32,14 +32,25 @@ const MapScreen = (props: MapScreenProps) => {
     () => props.photos ?? props.photoRows?.map(unpackMapWorldEntry) ?? [],
     [props.photoRows, props.photos],
   );
-  const { getSearchParam, hasSearchParam, replaceSearchParams } = useUrlSearchParams();
-  const filterAlbum = getSearchParam("filter_album");
+  const {
+    ready: urlReady,
+    getSearchParam,
+    hasSearchParam,
+    replaceSearchParams,
+  } = useUrlSearchParams();
+  // Statically generated pages do not know their query during server rendering.
+  // Keep the first client render identical, then apply URL state once the
+  // renderer says navigation is ready.
+  const filterAlbum = urlReady ? getSearchParam("filter_album") : null;
   const hasCameraParams =
-    getSearchParam("lat") != null ||
-    getSearchParam("lon") != null ||
-    getSearchParam("zoom") != null;
+    urlReady &&
+    (getSearchParam("lat") != null ||
+      getSearchParam("lon") != null ||
+      getSearchParam("zoom") != null);
   const hasRouteState =
-    filterAlbum != null || hasCameraParams || hasSearchParam("from") || hasSearchParam("to");
+    filterAlbum != null ||
+    hasCameraParams ||
+    (urlReady && (hasSearchParam("from") || hasSearchParam("to")));
 
   // Album filtering (existing)
   const albumFilteredPhotos = React.useMemo(
@@ -48,8 +59,8 @@ const MapScreen = (props: MapScreenProps) => {
   );
 
   // Time range state — live during drag, committed on pointer up
-  const urlFrom = parseRangeParam(getSearchParam("from"));
-  const urlTo = parseRangeParam(getSearchParam("to"), {
+  const urlFrom = parseRangeParam(urlReady ? getSearchParam("from") : null);
+  const urlTo = parseRangeParam(urlReady ? getSearchParam("to") : null, {
     endOfDay: true,
   });
   const [timeRange, setTimeRange] = React.useState<TimeRange | null>(

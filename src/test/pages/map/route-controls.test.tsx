@@ -16,6 +16,7 @@ jest.mock("../../../services/album", () => ({
 jest.mock("next/router", () => ({
   useRouter: () => ({
     query: mockQuery,
+    isReady: true,
     push,
     replace,
   }),

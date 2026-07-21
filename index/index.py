@@ -29,7 +29,12 @@ import random
 import subprocess
 import shutil
 import threading
+import time
+import concurrent.futures
 from contextlib import contextmanager
+from datetime import datetime
+
+_MODEL_RUNTIME_AVAILABLE = True
 
 try:
     import torch
@@ -40,6 +45,7 @@ try:
         AutoProcessor,
     )
 except ModuleNotFoundError as model_runtime_error:
+    _MODEL_RUNTIME_AVAILABLE = False
     _MODEL_RUNTIME_ERROR = model_runtime_error
 
     class _UnavailableCuda:
@@ -109,10 +115,6 @@ except ModuleNotFoundError as model_runtime_error:
     AutoModel = _UnavailableModelFactory
     AutoModelForCausalLM = _UnavailableModelFactory
     AutoProcessor = _UnavailableModelFactory
-
-import concurrent.futures
-import time
-from datetime import datetime
 
 
 def log(message: str) -> None:
@@ -240,7 +242,9 @@ def heartbeat(label: str, interval_s: float = 15.0):
 
 
 def is_cuda_oom(error: BaseException) -> bool:
-    oom_type = getattr(torch, "OutOfMemoryError", None)
+    oom_type = (
+        getattr(torch, "OutOfMemoryError", None) if _MODEL_RUNTIME_AVAILABLE else None
+    )
     if oom_type is not None and isinstance(error, oom_type):
         return True
     return "out of memory" in str(error).lower() and "cuda" in str(error).lower()

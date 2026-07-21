@@ -140,6 +140,24 @@ describe("deserialisation adapter boundaries", () => {
     });
   });
 
+  it("uses the configured same-origin search database during builds", () => {
+    const originalUrl = process.env.NEXT_PUBLIC_SEARCH_DATABASE_URL;
+    try {
+      process.env.NEXT_PUBLIC_SEARCH_DATABASE_URL = "/e2e-search.sqlite?v=fixture";
+
+      expect(deserializeInternals.getConfiguredSearchDbPath()).toBe("public/e2e-search.sqlite");
+
+      process.env.NEXT_PUBLIC_SEARCH_DATABASE_URL = "https://cdn.example.com/search.sqlite";
+      expect(deserializeInternals.getConfiguredSearchDbPath()).toBe("public/search.sqlite");
+    } finally {
+      if (originalUrl === undefined) {
+        delete process.env.NEXT_PUBLIC_SEARCH_DATABASE_URL;
+      } else {
+        process.env.NEXT_PUBLIC_SEARCH_DATABASE_URL = originalUrl;
+      }
+    }
+  });
+
   it("caches database rows, reuses the connection, and parses stored colours", async () => {
     jest.spyOn(fs, "existsSync").mockReturnValue(true);
 
