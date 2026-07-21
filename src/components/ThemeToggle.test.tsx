@@ -60,6 +60,8 @@ describe("ThemeToggle", () => {
     ["porcelain", "Porcelain", "light"],
     ["ember", "Ember", "dark"],
     ["bling", "Bling", "dark"],
+    ["herbarium", "Herbarium", "light"],
+    ["arcana", "Arcana", "dark"],
   ])("offers and applies the %s theme", (value, label, scheme) => {
     render(<ThemeToggle />);
 

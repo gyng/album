@@ -42,6 +42,50 @@ test.describe("Responsive UI", () => {
     expect(albumsBox!.x).toBeCloseTo(headingBox!.x, 0);
   });
 
+  test("fantasy themes have distinct scenery and typography", async ({ page }) => {
+    const themes = ["slate", "porcelain", "ember", "bling", "herbarium", "arcana"];
+    const typeSignatures = new Set<string>();
+
+    for (const theme of themes) {
+      await page.goto(`/?theme=${theme}`, { waitUntil: "domcontentloaded" });
+
+      const heading = page.getByRole("heading", { name: "Snapshots", exact: true });
+      await expect(heading).toBeVisible();
+      await expect(page.locator("html")).toHaveClass(new RegExp(`theme-${theme}`));
+
+      const appearance = await heading.evaluate((element) => ({
+        bodyFont: getComputedStyle(document.body).fontFamily,
+        headingFont: getComputedStyle(element).fontFamily,
+        scenery: getComputedStyle(document.body).backgroundImage,
+      }));
+
+      expect(appearance.scenery).not.toBe("none");
+      expect(appearance.headingFont).not.toBe(appearance.bodyFont);
+      typeSignatures.add(`${appearance.bodyFont}|${appearance.headingFont}`);
+      await expectNoDocumentOverflow(page);
+    }
+
+    expect(typeSignatures.size).toBe(themes.length);
+  });
+
+  test("plain light and dark retain the original heading typography", async ({ page }) => {
+    for (const theme of ["light", "dark"]) {
+      await page.goto(`/?theme=${theme}`, { waitUntil: "domcontentloaded" });
+
+      const typography = await page
+        .getByRole("heading", { name: "Snapshots", exact: true })
+        .evaluate((element) => ({
+          bodyFamily: getComputedStyle(document.body).fontFamily,
+          bodyWeight: getComputedStyle(document.body).fontWeight,
+          headingFamily: getComputedStyle(element).fontFamily,
+          headingWeight: getComputedStyle(element).fontWeight,
+        }));
+
+      expect(typography.headingFamily).toBe(typography.bodyFamily);
+      expect(Number(typography.headingWeight)).toBeGreaterThan(Number(typography.bodyWeight));
+    }
+  });
+
   test("timeline shows each full year without nested horizontal scrolling", async ({ page }) => {
     await page.goto("/timeline", { waitUntil: "domcontentloaded" });
 

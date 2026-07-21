@@ -143,7 +143,7 @@ const DesignPage = () => {
         <section id="typography" className={styles.section}>
           <div className={styles.sectionHeader}>
             <Heading level={1}>Typography</Heading>
-            <Caption>System font stack. Seven sizes from 9px to 64px.</Caption>
+            <Caption>Theme-responsive type systems. Seven sizes from 9px to 64px.</Caption>
           </div>
           <div className={styles.fontScale}>
             {fontTokens.map((t) => (
@@ -180,8 +180,8 @@ const DesignPage = () => {
           <div className={styles.sectionHeader}>
             <Heading level={1}>Colours</Heading>
             <Caption>
-              Adaptive palette using light-dark() and color-mix(). Pick a theme in the nav bar to
-              preview — System, Light, Dark, plus the Paper, Ink, and Slate palettes.
+              Adaptive palette using light-dark() and color-mix(). Pick any theme in the nav bar to
+              preview its colour, scenery, and typography together.
             </Caption>
           </div>
           <div className={styles.colourGrid}>
