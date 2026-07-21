@@ -48,7 +48,11 @@ test.describe("Responsive UI", () => {
     const picker = page.getByLabel("Theme");
     const resting = await picker.evaluate((element) => {
       const style = getComputedStyle(element);
-      return { background: style.backgroundColor, colour: style.color };
+      return {
+        background: style.backgroundColor,
+        border: style.borderColor,
+        colour: style.color,
+      };
     });
 
     await picker.hover();
@@ -57,7 +61,11 @@ test.describe("Responsive UI", () => {
     );
     const hovered = await picker.evaluate((element) => {
       const style = getComputedStyle(element);
-      return { background: style.backgroundColor, colour: style.color };
+      return {
+        background: style.backgroundColor,
+        border: style.borderColor,
+        colour: style.color,
+      };
     });
 
     expect(hovered).toEqual(resting);

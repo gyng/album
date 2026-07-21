@@ -678,6 +678,16 @@ describe("publish wizard boundary adapters", () => {
         Buffer.from('cwd:\t/index\n{"embeddingModelId":"model"}\n'),
       ),
     ).toEqual({ embeddingModelId: "model" });
+    expect(
+      getIndexerModelInfo("/index", () =>
+        Buffer.from('cwd:\t/index\n{\n  "embeddingModelIds": ["v1", "v2"]\n}\n"done"\n'),
+      ),
+    ).toEqual({ embeddingModelIds: ["v1", "v2"] });
+    const invalidWarn = jest.fn();
+    expect(
+      getIndexerModelInfo("/index", () => Buffer.from('{"status":"ready"}\n'), invalidWarn),
+    ).toBeNull();
+    expect(invalidWarn).toHaveBeenCalledWith(expect.stringContaining("no valid model metadata"));
     const warn = jest.fn();
     expect(
       getIndexerModelInfo(

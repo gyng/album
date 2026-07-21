@@ -2,6 +2,13 @@
   display: inline-block;
 }
 
+/* This utility lives in persistent navigation, so hovering it should not
+   compete with the page links. Keep the shared Select hover affordance for
+   forms, but leave this picker's resting colours entirely unchanged. */
+.themeToggle .picker:hover {
+  border-color: var(--c-bg-contrast-light);
+}
+
 /* Scheme islands for the light/dark options: light-dark() tokens inside the
    swatch resolve against the option's own colour scheme, not the page's. */
 .optionLight {

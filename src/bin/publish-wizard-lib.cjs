@@ -982,18 +982,34 @@ const getIndexerModelInfo = (indexDir, run, warn) => {
       .map((line) => line.trim())
       .filter(Boolean);
 
+    const isModelInfo = (value) => {
+      if (value == null || typeof value !== "object" || Array.isArray(value)) return false;
+      const ids = value.embeddingModelIds;
+      const currentId = value.embeddingModelId;
+      const hasIds =
+        Array.isArray(ids) &&
+        ids.length > 0 &&
+        ids.every((id) => typeof id === "string" && id.length > 0);
+      const hasCurrentId = typeof currentId === "string" && currentId.length > 0;
+      return hasIds || hasCurrentId;
+    };
+
     // The index CLI emits a human-readable cwd diagnostic before dispatching
-    // commands. Parse the final JSON value instead of requiring pristine
-    // stdout so model-change protection cannot be disabled by harmless CLI
-    // diagnostics (or similar launcher preambles).
-    for (let i = lines.length - 1; i >= 0; i -= 1) {
-      try {
-        return JSON.parse(lines[i]);
-      } catch {
-        // Keep scanning backwards for the command's JSON payload.
+    // commands. Search complete line ranges for the last object matching the
+    // model-info contract. This tolerates launcher preambles, trailing status
+    // messages, and pretty-printed JSON without accepting an unrelated JSON
+    // diagnostic that would silently disable model-change protection.
+    for (let end = lines.length; end > 0; end -= 1) {
+      for (let start = end - 1; start >= 0; start -= 1) {
+        try {
+          const parsed = JSON.parse(lines.slice(start, end).join("\n"));
+          if (isModelInfo(parsed)) return parsed;
+        } catch {
+          // Keep scanning backwards for the command's JSON payload.
+        }
       }
     }
-    throw new SyntaxError("Indexer model-info produced no JSON payload");
+    throw new SyntaxError("Indexer model-info produced no valid model metadata");
   } catch (err) {
     const reason = err instanceof Error ? err.message : String(err);
     warn(
