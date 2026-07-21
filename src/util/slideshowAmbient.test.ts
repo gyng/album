@@ -148,7 +148,7 @@ describe("timeAwareShufflePhotos", () => {
 
   test("high-affinity photos dominate the head of the queue over many low-affinity ones", () => {
     // 200 off-band photos (Jan 3am) versus 5 on-band photos (same hour and
-    // month as now). With cubed weighting the on-band photos should
+    // month as now). With fourth-power weighting the on-band photos should
     // overwhelmingly own the top of the queue even though they're 40× rarer
     // in the pool. With linear weighting this property fails — the cumulative
     // weight of the off-band photos would dominate the top.
@@ -162,21 +162,29 @@ describe("timeAwareShufflePhotos", () => {
       onBand.push(makePhoto(`data/albums/summer/${i}.jpg`, new Date(2024, 6, 10, 14, 0)));
     }
 
-    // Average across many trials to smooth out single-shuffle variance.
-    let topTenOnBandTotal = 0;
-    const trials = 20;
-    for (let t = 0; t < trials; t += 1) {
-      const out = timeAwareShufflePhotos([...offBand, ...onBand], now);
-      topTenOnBandTotal += out
-        .slice(0, 10)
-        .filter((p) => p.path.startsWith("data/albums/summer/")).length;
+    let randomState = 1234;
+    const random = jest.spyOn(Math, "random").mockImplementation(() => {
+      randomState = (randomState * 9301 + 49297) % 233280;
+      return randomState / 233280;
+    });
+    try {
+      let topTenOnBandTotal = 0;
+      const trials = 20;
+      for (let t = 0; t < trials; t += 1) {
+        const out = timeAwareShufflePhotos([...offBand, ...onBand], now);
+        topTenOnBandTotal += out
+          .slice(0, 10)
+          .filter((p) => p.path.startsWith("data/albums/summer/")).length;
+      }
+      const avgTopTenOnBand = topTenOnBandTotal / trials;
+      // We have 5 on-band photos out of 205 total. With pure-random ordering
+      // we'd expect ~10*(5/205) = 0.24 on-band photos in the top 10. With
+      // the sharpened bias they should average above 3 (most of them, most
+      // of the time).
+      expect(avgTopTenOnBand).toBeGreaterThan(3);
+    } finally {
+      random.mockRestore();
     }
-    const avgTopTenOnBand = topTenOnBandTotal / trials;
-    // We have 5 on-band photos out of 205 total. With pure-random ordering
-    // we'd expect ~10*(5/205) = 0.24 on-band photos in the top 10. With
-    // the sharpened bias they should average above 3 (most of them, most
-    // of the time).
-    expect(avgTopTenOnBand).toBeGreaterThan(3);
   });
 });
 

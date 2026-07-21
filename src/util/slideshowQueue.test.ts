@@ -111,32 +111,24 @@ describe("random queue peek/advance consistency (preload buffer)", () => {
     expect(state).toEqual({ queue: [], index: -1, lastPath: "a" });
   });
 
-  it("peek is stable and matches the photo the next advance consumes, even with a randomised builder across a boundary", () => {
-    // A 50-photo pool over many trials makes this an effectively deterministic
-    // guard against the old throwaway-shuffle bug (where peek rebuilt a fresh
-    // shuffle each call): two independent shuffles coincidentally agreeing on
-    // the head is ~1/50 per trial, so ~0 false greens across 200 trials. A
-    // 3-photo single run let that bug slip through ~25% of the time.
-    const pool = Array.from({ length: 50 }, (_, i) => makePhoto(`p${i}`));
-    const build = (p: RandomPhotoRow[], lastPath?: string) => shufflePhotos(p, lastPath);
+  it("builds once at a boundary so peek and advance consume the same photo", () => {
+    const pool = [makePhoto("a"), makePhoto("b"), makePhoto("c")];
+    const build = jest
+      .fn<RandomPhotoRow[], [RandomPhotoRow[], string?]>()
+      .mockReturnValueOnce([...pool])
+      .mockReturnValueOnce([...pool].reverse());
+    const state = createRandomQueueState();
 
-    for (let trial = 0; trial < 200; trial += 1) {
-      const state = createRandomQueueState();
+    pool.forEach(() => advanceQueued(state, pool, build));
 
-      // Drain a whole queue so the next peek/advance straddles a refill.
-      for (let i = 0; i < pool.length; i += 1) {
-        advanceQueued(state, pool, build);
-      }
+    const firstPeek = peekNextQueued(state, pool, build);
+    const secondPeek = peekNextQueued(state, pool, build);
+    const advanced = advanceQueued(state, pool, build);
 
-      // At the boundary: two peeks must agree (no throwaway reshuffle), and the
-      // subsequent advance must consume exactly that peeked photo.
-      const peek1 = peekNextQueued(state, pool, build);
-      const peek2 = peekNextQueued(state, pool, build);
-      const advanced = advanceQueued(state, pool, build);
-
-      expect(peek1).toBe(peek2);
-      expect(peek1).toBe(advanced);
-    }
+    expect(build).toHaveBeenCalledTimes(2);
+    expect(firstPeek).toBe(pool[2]);
+    expect(secondPeek).toBe(firstPeek);
+    expect(advanced).toBe(firstPeek);
   });
 
   it("returns null for an empty pool", () => {

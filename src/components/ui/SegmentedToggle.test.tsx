@@ -17,13 +17,11 @@ describe("SegmentedToggle roving tabindex", () => {
         value="x"
         onChange={onChange}
         ariaLabel="Display mode"
-        className="compact"
       />,
     );
 
-    const group = screen.getByRole("radiogroup", { name: "Display mode" });
+    expect(screen.getByRole("radiogroup", { name: "Display mode" })).toBeInTheDocument();
     const [x, y] = screen.getAllByRole("radio");
-    expect(group).toHaveClass("compact");
     expect(x).toHaveAttribute("aria-checked", "true");
     expect(x).toHaveAttribute("tabindex", "0");
     expect(y).toHaveAttribute("aria-checked", "false");

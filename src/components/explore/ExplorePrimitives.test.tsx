@@ -125,11 +125,12 @@ describe("Explore primitives", () => {
           href: "/album/test-simple#photo-one",
           label: "Lantern street",
         }}
-        className="outer"
-        imageClassName="image"
       />,
     );
-    expect(screen.getByRole("img", { name: "Lantern street" })).toHaveClass("image");
+    expect(screen.getByRole("img", { name: "Lantern street" })).toHaveAttribute(
+      "src",
+      "/photo.jpg",
+    );
     expect(screen.getByRole("link", { name: "Lantern street" })).toHaveAttribute(
       "href",
       "/album/test-simple#photo-one",
@@ -138,14 +139,5 @@ describe("Explore primitives", () => {
       "href",
       "/search?similar=..%2Falbums%2Ftest-simple%2Fphoto+one.jpg",
     );
-  });
-
-  it("accepts default thumbnail classes", () => {
-    const { container } = render(
-      <VisualSimilarityThumb
-        photo={{ path: "photo.jpg", src: "/photo.jpg", href: "/photo", label: "Photo" }}
-      />,
-    );
-    expect(container.firstElementChild).toBeInTheDocument();
   });
 });

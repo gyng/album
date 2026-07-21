@@ -76,7 +76,7 @@ import os
 import shutil
 import sqlite3
 import tempfile
-import time
+import threading
 import unittest
 import click
 from click.testing import CliRunner
@@ -893,11 +893,20 @@ class TestMain(unittest.TestCase):
             os.close(acquire_single_instance_lock(dbpath))
 
     def test_heartbeat_beats_while_running(self):
-        with mock.patch("index.log") as mock_log:
-            with heartbeat("test op", interval_s=0.05):
-                time.sleep(0.18)
+        heartbeat_waits = iter([False, False, True])
+        real_event_wait = threading.Event.wait
+
+        def controlled_wait(event, timeout=None):
+            if timeout == 0.05:
+                return next(heartbeat_waits)
+            return real_event_wait(event, timeout)
+
+        with mock.patch("index.threading.Event.wait", new=controlled_wait):
+            with mock.patch("index.log") as mock_log:
+                with heartbeat("test op", interval_s=0.05):
+                    pass
         messages = [call.args[0] for call in mock_log.call_args_list]
-        self.assertGreaterEqual(len(messages), 2)
+        self.assertEqual(len(messages), 2)
         self.assertTrue(all("still running" in m for m in messages))
 
     def test_heartbeat_silent_when_fast(self):

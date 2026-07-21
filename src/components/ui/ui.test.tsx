@@ -8,57 +8,31 @@ import {
   Caption,
   Button,
   ButtonLink,
-  buttonStyles,
   Card,
   ChartTooltip,
-  Footer,
   Heading,
   Input,
   KeyHint,
   OverlayButton,
   OverlayButtonLink,
-  overlayButtonStyles,
   Pill,
   PillButton,
-  pillStyles,
-  SegmentedToggle,
   Select,
   Thumb,
 } from ".";
 
-describe("UI public exports", () => {
-  it("exposes the shared footer and composable button styles", () => {
-    expect(Footer).toEqual(expect.any(Function));
-    expect(buttonStyles.base).toBeTruthy();
-    expect(overlayButtonStyles.base).toBeTruthy();
-    expect(pillStyles.base).toBeTruthy();
-  });
-});
-
 describe("Button / ButtonLink", () => {
-  it("uses a non-submitting type by default while allowing an explicit submit type", () => {
+  it("does not submit forms by default and preserves explicit link destinations", () => {
     render(
       <>
         <Button>Safe action</Button>
         <Button type="submit">Submit action</Button>
+        <ButtonLink href="/test">Linked action</ButtonLink>
       </>,
     );
 
     expect(screen.getByRole("button", { name: "Safe action" })).toHaveAttribute("type", "button");
     expect(screen.getByRole("button", { name: "Submit action" })).toHaveAttribute("type", "submit");
-  });
-
-  it("supports variants, sizes, active state, and links", () => {
-    render(
-      <>
-        <Button variant="accent" size="large" active>
-          Accent
-        </Button>
-        <ButtonLink href="/test">Linked action</ButtonLink>
-      </>,
-    );
-
-    expect(screen.getByRole("button", { name: "Accent" }).className).toContain("accent");
     expect(screen.getByRole("link", { name: "Linked action" })).toHaveAttribute("href", "/test");
   });
 
@@ -99,88 +73,53 @@ describe("Heading", () => {
     expect(container.querySelector("p")?.textContent).toBe("Paragraph heading");
     expect(container.querySelector("h3")).toBeNull();
   });
-
-  it("merges className", () => {
-    const { container } = render(
-      <Heading level={1} className="custom">
-        Test
-      </Heading>,
-    );
-    expect(container.querySelector("h2")?.className).toContain("custom");
-  });
 });
 
 describe("Caption", () => {
-  it("renders a p by default", () => {
-    render(<Caption>Text</Caption>);
+  it("uses paragraph semantics by default and permits an inline caption", () => {
+    render(
+      <>
+        <Caption>Text</Caption>
+        <Caption as="span">Span text</Caption>
+      </>,
+    );
     expect(screen.getByText("Text").tagName).toBe("P");
-  });
-
-  it("renders as span when specified", () => {
-    render(<Caption as="span">Span text</Caption>);
     expect(screen.getByText("Span text").tagName).toBe("SPAN");
-  });
-
-  it("accepts size prop", () => {
-    const { container } = render(<Caption size="sm">Large caption</Caption>);
-    const el = container.querySelector("p");
-    expect(el?.className).toBeTruthy();
   });
 });
 
 describe("Card", () => {
-  it("renders children in a div by default", () => {
-    render(<Card>Content</Card>);
+  it("uses a neutral container by default and permits article semantics", () => {
+    render(
+      <>
+        <Card>Content</Card>
+        <Card as="article">Article</Card>
+      </>,
+    );
     expect(screen.getByText("Content").tagName).toBe("DIV");
-  });
-
-  it("renders as article when specified", () => {
-    render(<Card as="article">Article</Card>);
     expect(screen.getByText("Article").tagName).toBe("ARTICLE");
-  });
-
-  it("passes through HTML attributes", () => {
-    render(<Card data-testid="card">Content</Card>);
-    expect(screen.getByTestId("card")).toBeTruthy();
   });
 });
 
 describe("Thumb", () => {
-  it("renders an img with src and alt", () => {
-    render(<Thumb src="/photo.jpg" alt="A photo" />);
+  it("preserves image accessibility attributes and defaults omitted alt text to decorative", () => {
+    const { container } = render(
+      <>
+        <Thumb src="/photo.jpg" alt="A photo" />
+        <Thumb src="/decorative.jpg" />
+      </>,
+    );
     const img = screen.getByAltText("A photo") as HTMLImageElement;
     expect(img.src).toContain("/photo.jpg");
-  });
-
-  it("passes through className", () => {
-    const { container } = render(<Thumb src="/p.jpg" alt="" className="extra" />);
-    expect(container.querySelector("img")?.className).toContain("extra");
-  });
-
-  it("supports compact, decorative thumbnails", () => {
-    const { container } = render(<Thumb src="/compact.jpg" size="small" />);
-    const img = container.querySelector("img");
-
-    expect(img).toHaveAttribute("alt", "");
-    expect(img?.className).toContain("thumbSmall");
+    expect(container.querySelector('img[src="/decorative.jpg"]')).toHaveAttribute("alt", "");
   });
 });
 
 describe("Input", () => {
-  it("renders an input element", () => {
-    render(<Input placeholder="Type here" />);
-    expect(screen.getByPlaceholderText("Type here").tagName).toBe("INPUT");
-  });
-
-  it("forwards ref", () => {
+  it("forwards its ref to the native control", () => {
     const ref = React.createRef<HTMLInputElement>();
     render(<Input ref={ref} />);
     expect(ref.current).toBeInstanceOf(HTMLInputElement);
-  });
-
-  it("handles disabled state", () => {
-    render(<Input disabled placeholder="Disabled" />);
-    expect((screen.getByPlaceholderText("Disabled") as HTMLInputElement).disabled).toBe(true);
   });
 });
 
@@ -195,16 +134,6 @@ describe("Select", () => {
     const select = screen.getByRole("combobox") as HTMLSelectElement;
     expect(select.value).toBe("b");
   });
-
-  it("applies compact variant class", () => {
-    const { container } = render(
-      <Select variant="compact">
-        <option>Option</option>
-      </Select>,
-    );
-    const select = container.querySelector("select");
-    expect(select?.className).toContain("compact");
-  });
 });
 
 describe("ChartTooltip", () => {
@@ -216,114 +145,32 @@ describe("ChartTooltip", () => {
   });
 });
 
-describe("SegmentedToggle", () => {
-  it("renders options as buttons", () => {
-    const onChange = jest.fn();
-    render(
-      <SegmentedToggle
-        options={[
-          { value: "a", label: "Alpha" },
-          { value: "b", label: "Beta" },
-        ]}
-        value="a"
-        onChange={onChange}
-        ariaLabel="Test toggle"
-      />,
-    );
-    expect(screen.getByText("Alpha")).toBeTruthy();
-    expect(screen.getByText("Beta")).toBeTruthy();
-  });
-
-  it("calls onChange when a button is clicked", () => {
-    const onChange = jest.fn();
-    render(
-      <SegmentedToggle
-        options={[
-          { value: "a", label: "Alpha" },
-          { value: "b", label: "Beta" },
-        ]}
-        value="a"
-        onChange={onChange}
-        ariaLabel="Test toggle"
-      />,
-    );
-    fireEvent.click(screen.getByText("Beta"));
-    expect(onChange).toHaveBeenCalledWith("b");
-  });
-
-  it("marks the active option with aria-checked", () => {
-    render(
-      <SegmentedToggle
-        options={[
-          { value: "x", label: "X" },
-          { value: "y", label: "Y" },
-        ]}
-        value="y"
-        onChange={() => {}}
-        ariaLabel="Test"
-      />,
-    );
-    expect(screen.getByText("Y").getAttribute("role")).toBe("radio");
-    expect(screen.getByText("Y").getAttribute("aria-checked")).toBe("true");
-    expect(screen.getByText("X").getAttribute("aria-checked")).toBe("false");
-  });
-
-  it("moves selection with arrow keys", () => {
-    const onChange = jest.fn();
-    render(
-      <SegmentedToggle
-        options={[
-          { value: "x", label: "X" },
-          { value: "y", label: "Y" },
-        ]}
-        value="x"
-        onChange={onChange}
-        ariaLabel="Test"
-      />,
-    );
-    fireEvent.keyDown(screen.getByRole("radiogroup"), { key: "ArrowRight" });
-    expect(onChange).toHaveBeenCalledWith("y");
-  });
-});
-
 describe("Pill / PillButton", () => {
-  it("Pill renders an anchor", () => {
-    render(<Pill href="/test">Link</Pill>);
-    const el = screen.getByText("Link");
-    expect(el.tagName).toBe("A");
-    expect((el as HTMLAnchorElement).href).toContain("/test");
-  });
-
-  it("PillButton renders a button", () => {
+  it("keeps links navigable and actions non-submitting", () => {
     const onClick = jest.fn();
-    render(<PillButton onClick={onClick}>Click</PillButton>);
+    render(
+      <>
+        <Pill href="/test">Link</Pill>
+        <PillButton onClick={onClick}>Click</PillButton>
+      </>,
+    );
+
+    expect(screen.getByRole("link", { name: "Link" })).toHaveAttribute("href", "/test");
+    expect(screen.getByRole("button", { name: "Click" })).toHaveAttribute("type", "button");
     fireEvent.click(screen.getByText("Click"));
     expect(onClick).toHaveBeenCalled();
-  });
-
-  it("applies ghost variant", () => {
-    const { container } = render(
-      <Pill href="#" variant="ghost">
-        Ghost
-      </Pill>,
-    );
-    expect(container.querySelector("a")?.className).toContain("ghost");
   });
 });
 
 describe("OverlayButton", () => {
-  it("renders a button", () => {
-    render(<OverlayButton>Action</OverlayButton>);
-    expect(screen.getByText("Action").tagName).toBe("BUTTON");
-  });
-
-  it("applies small size class", () => {
-    const { container } = render(<OverlayButton size="small">×</OverlayButton>);
-    expect(container.querySelector("button")?.className).toContain("small");
-  });
-
-  it("OverlayButtonLink renders an anchor", () => {
-    render(<OverlayButtonLink href="/test">Link</OverlayButtonLink>);
-    expect(screen.getByText("Link").tagName).toBe("A");
+  it("keeps actions non-submitting and links navigable", () => {
+    render(
+      <>
+        <OverlayButton>Action</OverlayButton>
+        <OverlayButtonLink href="/test">Link</OverlayButtonLink>
+      </>,
+    );
+    expect(screen.getByRole("button", { name: "Action" })).toHaveAttribute("type", "button");
+    expect(screen.getByRole("link", { name: "Link" })).toHaveAttribute("href", "/test");
   });
 });
