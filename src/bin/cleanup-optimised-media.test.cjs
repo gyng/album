@@ -7,6 +7,17 @@ const os = require("node:os");
 const path = require("node:path");
 
 const { cleanupOptimisedMedia } = require("./cleanup-optimised-media.cjs");
+const imageOptimisationConfig = require("../services/imageOptimisationConfig.json");
+
+const IMAGE_CACHE_CONFIG_FILE = ".image-optimisation-config.json";
+
+const markImageCacheCurrent = (publicAlbumsDir) => {
+  fs.mkdirSync(publicAlbumsDir, { recursive: true });
+  fs.writeFileSync(
+    path.join(publicAlbumsDir, IMAGE_CACHE_CONFIG_FILE),
+    JSON.stringify(imageOptimisationConfig),
+  );
+};
 
 describe("cleanupOptimisedMedia", () => {
   it("removes stale and outdated cached media variants", async () => {
@@ -21,6 +32,7 @@ describe("cleanupOptimisedMedia", () => {
     fs.mkdirSync(albumDir, { recursive: true });
     fs.mkdirSync(imageCacheDir, { recursive: true });
     fs.mkdirSync(videoCacheDir, { recursive: true });
+    markImageCacheCurrent(publicAlbumsDir);
 
     fs.writeFileSync(path.join(albumDir, "kept.jpg"), "image");
     fs.writeFileSync(path.join(albumDir, "clip.mp4"), "video");
@@ -58,6 +70,7 @@ describe("cleanupOptimisedMedia", () => {
     fs.mkdirSync(albumDir, { recursive: true });
     fs.mkdirSync(imageCacheDir, { recursive: true });
     fs.mkdirSync(videoCacheDir, { recursive: true });
+    markImageCacheCurrent(publicAlbumsDir);
 
     const sourceImage = path.join(albumDir, "edited.jpg");
     const sourceVideo = path.join(albumDir, "edited.mp4");
@@ -93,6 +106,7 @@ describe("cleanupOptimisedMedia", () => {
 
     fs.mkdirSync(albumDir, { recursive: true });
     fs.mkdirSync(imageCacheDir, { recursive: true });
+    markImageCacheCurrent(publicAlbumsDir);
 
     const source = path.join(albumDir, "me@beach.jpg");
     const keptCache = path.join(imageCacheDir, "me@beach.jpg@800.avif");
@@ -126,6 +140,7 @@ describe("cleanupOptimisedMedia", () => {
 
     fs.mkdirSync(albumDir, { recursive: true });
     fs.mkdirSync(imageCacheDir, { recursive: true });
+    markImageCacheCurrent(publicAlbumsDir);
 
     const source = path.join(albumDir, "kept.jpg");
     const cached = path.join(imageCacheDir, "kept.jpg@800.avif");
@@ -156,6 +171,7 @@ describe("cleanupOptimisedMedia", () => {
       removedStaleImages: 0,
       removedChangedImages: 0,
       removedUnneededImageSizes: 0,
+      removedOutdatedImages: 0,
       removedStaleVideos: 0,
       removedChangedVideos: 0,
       removedUnneededVideoSizes: 0,
@@ -177,6 +193,7 @@ describe("cleanupOptimisedMedia", () => {
     const imageCacheDir = path.join(publicAlbumsDir, "trip", ".resized_images");
     fs.mkdirSync(albumDir, { recursive: true });
     fs.mkdirSync(imageCacheDir, { recursive: true });
+    markImageCacheCurrent(publicAlbumsDir);
     fs.writeFileSync(path.join(albumDir, "orphan"), "source");
     const cache = path.join(imageCacheDir, "orphan.avif");
     fs.writeFileSync(cache, "cache");
@@ -197,6 +214,7 @@ describe("cleanupOptimisedMedia", () => {
     fs.mkdirSync(albumDir, { recursive: true });
     fs.mkdirSync(imageCacheDir, { recursive: true });
     fs.mkdirSync(videoCacheDir, { recursive: true });
+    markImageCacheCurrent(publicAlbumsDir);
     fs.writeFileSync(path.join(albumDir, "changed.jpg"), "source");
     fs.writeFileSync(path.join(albumDir, "unneeded.jpg"), "source");
     fs.writeFileSync(path.join(albumDir, "changed.mp4"), "source");
@@ -243,6 +261,7 @@ describe("cleanupOptimisedMedia", () => {
     const cacheDir = path.join(publicAlbumsDir, "trip", ".resized_images");
     fs.mkdirSync(path.join(albumsDir, "trip"), { recursive: true });
     fs.mkdirSync(cacheDir, { recursive: true });
+    markImageCacheCurrent(publicAlbumsDir);
     fs.writeFileSync(path.join(cacheDir, "missing.jpg@800.avif"), "cache");
     const error = Object.assign(new Error("permission denied"), { code: "EACCES" });
     const unlink = jest.spyOn(fs, "unlinkSync").mockImplementation(() => {
@@ -251,6 +270,29 @@ describe("cleanupOptimisedMedia", () => {
 
     await expect(cleanupOptimisedMedia({ albumsDir, publicAlbumsDir })).rejects.toBe(error);
     unlink.mockRestore();
+  });
+
+  it("invalidates image variants when the optimisation settings change", async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "album-media-config-"));
+    const albumsDir = path.join(root, "albums");
+    const publicAlbumsDir = path.join(root, "public", "data", "albums");
+    const albumDir = path.join(albumsDir, "trip");
+    const imageCacheDir = path.join(publicAlbumsDir, "trip", ".resized_images");
+    const cachedImage = path.join(imageCacheDir, "kept.jpg@800.avif");
+
+    fs.mkdirSync(albumDir, { recursive: true });
+    fs.mkdirSync(imageCacheDir, { recursive: true });
+    fs.writeFileSync(path.join(albumDir, "kept.jpg"), "image");
+    fs.writeFileSync(cachedImage, "old settings");
+    fs.writeFileSync(path.join(publicAlbumsDir, IMAGE_CACHE_CONFIG_FILE), "old settings");
+
+    const summary = await cleanupOptimisedMedia({ albumsDir, publicAlbumsDir });
+
+    expect(summary.removedOutdatedImages).toBe(1);
+    expect(fs.existsSync(cachedImage)).toBe(false);
+    expect(fs.readFileSync(path.join(publicAlbumsDir, IMAGE_CACHE_CONFIG_FILE), "utf8")).toBe(
+      JSON.stringify(imageOptimisationConfig),
+    );
   });
 
   it("uses the repository defaults", async () => {

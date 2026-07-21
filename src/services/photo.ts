@@ -7,10 +7,15 @@ import sharp from "sharp";
 import { incrementBuildCounter, measureBuild, measureBuildSync } from "./buildTiming";
 import { dateToNaiveIso } from "../util/exifTime";
 import { encodePublicAssetPath } from "../util/encodePublicAssetPath";
+import imageOptimisationConfig from "./imageOptimisationConfig.json";
 
-export const OPTIMISED_SIZES = [3200, 1600, 800];
+export const OPTIMISED_SIZES = imageOptimisationConfig.sizes;
 export const RESIZED_IMAGE_DIR = ".resized_images";
-export const AVIF_OPTIONS = { quality: 75, effort: 2 } as const;
+export const AVIF_OPTIONS = {
+  ...imageOptimisationConfig.avif,
+  tune: imageOptimisationConfig.avif.tune as "iq",
+  chromaSubsampling: imageOptimisationConfig.avif.chromaSubsampling as "4:4:4",
+} as const;
 
 export const getPhotoSize = async (
   filepath: string,
@@ -66,21 +71,21 @@ export const optimiseImages = async (
     const albumName = path.basename(dirname);
 
     const publicAlbumDirectory = path.join(outputDirectory, albumName);
+    const resizedImageDirectory = path.join(publicAlbumDirectory, RESIZED_IMAGE_DIR);
+    measureBuildSync("photo.optimiseImages.ensureDirectory", () => {
+      fs.mkdirSync(resizedImageDirectory, { recursive: true });
+    });
+
+    // All generated sizes have the same input transformations. Cloning this
+    // pipeline lets libvips share the source instead of opening and rotating
+    // the original once per output size.
+    let sourcePipeline: ReturnType<typeof sharp> | null = null;
 
     return Promise.all(
       [...OPTIMISED_SIZES]
         .sort((a, b) => a - b)
         .map(async (size) => {
-          const newFile = path.join(
-            publicAlbumDirectory,
-            RESIZED_IMAGE_DIR,
-            `${filename}@${size}.avif`,
-          );
-          measureBuildSync("photo.optimiseImages.ensureDirectory", () => {
-            fs.mkdirSync(path.join(publicAlbumDirectory, RESIZED_IMAGE_DIR), {
-              recursive: true,
-            });
-          });
+          const newFile = path.join(resizedImageDirectory, `${filename}@${size}.avif`);
 
           if (fs.existsSync(newFile)) {
             incrementBuildCounter("photo.optimiseImages.cacheChecks");
@@ -119,9 +124,10 @@ export const optimiseImages = async (
           incrementBuildCounter("photo.optimiseImages.encodes");
 
           return measureBuild("photo.optimiseImages.encode", async () => {
+            sourcePipeline ??= sharp(photoPath).rotate();
             return (
-              sharp(photoPath)
-                .rotate()
+              sourcePipeline
+                .clone()
                 .resize(size)
                 // .withMetadata() // larger filesize than .rotate(), but preserves more metadata (eg, width/height)
                 // .webp({ quality: 90, smartSubsample: true })

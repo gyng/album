@@ -1,0 +1,9 @@
+{
+  "sizes": [3200, 1600, 800],
+  "avif": {
+    "quality": 85,
+    "effort": 2,
+    "tune": "iq",
+    "chromaSubsampling": "4:4:4"
+  }
+}

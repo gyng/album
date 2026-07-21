@@ -35,15 +35,20 @@ const mockExifParse = jest.mocked(exifr.parse);
 const mockImageSize = jest.mocked(imageSizeFromFile);
 const mockSharp = jest.mocked(sharp);
 
-const successfulEncoder = (width = 800, height = 600) => ({
-  rotate: () => ({
+const successfulEncoder = (width = 800, height = 600) => {
+  const outputPipeline = {
     resize: () => ({
       avif: () => ({
         toFile: async () => ({ width, height }),
       }),
     }),
-  }),
-});
+  };
+  return {
+    rotate: () => ({
+      clone: () => outputPipeline,
+    }),
+  };
+};
 
 describe("photo adapter boundaries", () => {
   afterEach(() => {
@@ -56,7 +61,39 @@ describe("photo adapter boundaries", () => {
   it("uses the production image variants and AVIF settings", () => {
     expect(OPTIMISED_SIZES).toEqual([3200, 1600, 800]);
     expect(RESIZED_IMAGE_DIR).toBe(".resized_images");
-    expect(AVIF_OPTIONS).toEqual({ quality: 75, effort: 2 });
+    expect(AVIF_OPTIONS).toEqual({
+      quality: 85,
+      effort: 2,
+      tune: "iq",
+      chromaSubsampling: "4:4:4",
+    });
+  });
+
+  it("shares one source pipeline across generated variants", async () => {
+    jest.spyOn(fs, "mkdirSync").mockImplementation(() => undefined);
+    jest.spyOn(fs, "existsSync").mockReturnValue(false);
+    jest.spyOn(console, "log").mockImplementation(() => undefined);
+
+    const toFile = jest.fn(async () => ({ width: 800, height: 600 }));
+    const avif = jest.fn(() => ({ toFile }));
+    const resize = jest.fn(() => ({ avif }));
+    const pipeline = { resize };
+    const clone = jest.fn(() => pipeline);
+    const rotate = jest.fn(() => ({ ...pipeline, clone }));
+    mockSharp.mockReturnValue({ rotate } as never);
+
+    await expect(
+      optimiseImages("albums/trip/photo.jpg", "public/data/albums"),
+    ).resolves.toHaveLength(3);
+
+    expect(mockSharp).toHaveBeenCalledTimes(1);
+    expect(mockSharp).toHaveBeenCalledWith("albums/trip/photo.jpg");
+    expect(rotate).toHaveBeenCalledTimes(1);
+    expect(clone).toHaveBeenCalledTimes(3);
+    expect(resize).toHaveBeenCalledTimes(3);
+    expect(avif).toHaveBeenCalledTimes(3);
+    expect(avif).toHaveBeenCalledWith(AVIF_OPTIONS);
+    expect(fs.mkdirSync).toHaveBeenCalledTimes(1);
   });
 
   it("normalises missing dimensions from the image adapter", async () => {
@@ -123,8 +160,10 @@ describe("photo adapter boundaries", () => {
       () =>
         ({
           rotate: () => ({
-            resize: () => ({
-              avif: () => ({ toFile: async () => Promise.reject(failure) }),
+            clone: () => ({
+              resize: () => ({
+                avif: () => ({ toFile: async () => Promise.reject(failure) }),
+              }),
             }),
           }),
         }) as never,
