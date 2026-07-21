@@ -16,6 +16,19 @@
   }
 }
 
+/* iPad landscape has desktop-like width but much less vertical runway. Keep
+   the album masthead ceremonial while letting the first photograph enter the
+   opening viewport instead of spending nearly half the screen on whitespace. */
+@media (min-width: 721px) and (max-height: 900px) and (pointer: coarse) {
+  .title {
+    margin-block-start: var(--m-l);
+  }
+
+  .kicker {
+    margin-block: var(--m-m) 0;
+  }
+}
+
 .kicker {
   font-size: var(--fs-l);
   white-space: pre-line;

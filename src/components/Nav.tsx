@@ -77,50 +77,52 @@ export const Nav: React.FC<{
       <a href="#main-content" className={styles.skipLink} onClick={skipToContent}>
         Skip to content
       </a>
-      <ul ref={ulRef} className={commonStyles.topBar}>
-        <li>
-          <Link
-            href="/"
-            className={[buttonStyles.base, props.isHome ? commonStyles.navCurrent : ""].join(" ")}
-            aria-current={props.isHome ? "page" : undefined}
-          >
-            Albums
-          </Link>
-        </li>
-        {props.albumName ? (
-          <>
-            <li aria-hidden="true" className={commonStyles.navDivider} />
-            <li>
-              <Link
-                href={`/map?filter_album=${props.albumName}`}
-                className={`${buttonStyles.base} ${commonStyles.navContext}`}
-              >
-                Album map
-              </Link>
-            </li>
-            <li>
-              <Link
-                href={`/timeline?filter_album=${props.albumName}`}
-                className={`${buttonStyles.base} ${commonStyles.navContext}`}
-              >
-                Album timeline
-              </Link>
-            </li>
-            <li>
-              <Link
-                href={`/slideshow?filter=${props.albumName}`}
-                className={`${buttonStyles.base} ${commonStyles.navContext}`}
-              >
-                Album slideshow
-              </Link>
-            </li>
-          </>
-        ) : null}
-        {props.extraItems}
-        <li className={styles.themeToggleItem}>
+      <div className={styles.navRow}>
+        <ul ref={ulRef} className={commonStyles.topBar}>
+          <li>
+            <Link
+              href="/"
+              className={[buttonStyles.base, props.isHome ? commonStyles.navCurrent : ""].join(" ")}
+              aria-current={props.isHome ? "page" : undefined}
+            >
+              Albums
+            </Link>
+          </li>
+          {props.albumName ? (
+            <>
+              <li aria-hidden="true" className={commonStyles.navDivider} />
+              <li>
+                <Link
+                  href={`/map?filter_album=${props.albumName}`}
+                  className={`${buttonStyles.base} ${commonStyles.navContext}`}
+                >
+                  Album map
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href={`/timeline?filter_album=${props.albumName}`}
+                  className={`${buttonStyles.base} ${commonStyles.navContext}`}
+                >
+                  Album timeline
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href={`/slideshow?filter=${props.albumName}`}
+                  className={`${buttonStyles.base} ${commonStyles.navContext}`}
+                >
+                  Album slideshow
+                </Link>
+              </li>
+            </>
+          ) : null}
+          {props.extraItems}
+        </ul>
+        <div className={styles.themeToggleItem}>
           <ThemeToggle />
-        </li>
-      </ul>
+        </div>
+      </div>
     </nav>
   );
 };

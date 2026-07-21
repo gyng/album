@@ -1,6 +1,9 @@
 .nav {
   position: relative;
-  padding: var(--m-m) var(--m-l);
+  padding-block-start: max(var(--m-m), env(safe-area-inset-top, 0));
+  padding-block-end: var(--m-m);
+  padding-inline-start: max(var(--m-l), env(safe-area-inset-left, 0));
+  padding-inline-end: max(var(--m-l), env(safe-area-inset-right, 0));
   /* Width of each edge fade. Set to 0 by default; the .scrollable* modifiers
      below switch them on. The .topBar mask-image (in common.module.css) reads
      these via inheritance — no descendant selectors needed across modules. */
@@ -12,6 +15,18 @@
   padding-inline: 0;
 }
 
+.navRow {
+  display: flex;
+  align-items: center;
+  min-inline-size: 0;
+  gap: var(--m-m);
+}
+
+.navRow ul {
+  flex: 1 1 auto;
+  min-inline-size: 0;
+}
+
 .nav ul {
   list-style: none;
 }
@@ -21,7 +36,10 @@
 }
 
 .themeToggleItem {
-  margin-inline-start: auto;
+  flex: none;
+  padding-inline-start: var(--m-m);
+  border-inline-start: var(--line-hairline) solid
+    color-mix(in oklch, var(--c-bg-contrast-light) 35%, transparent);
 }
 
 .scrollableLeft {

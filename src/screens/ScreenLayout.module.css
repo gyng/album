@@ -1,7 +1,9 @@
 .main {
   max-inline-size: var(--size-1400);
   margin: 0 auto;
-  padding: var(--m-xl);
+  padding-block: var(--m-xl);
+  padding-inline-start: max(var(--m-xl), env(safe-area-inset-left, 0));
+  padding-inline-end: max(var(--m-xl), env(safe-area-inset-right, 0));
 }
 
 .main h1 {
@@ -10,6 +12,8 @@
 
 @media (max-width: 720px) {
   .main {
-    padding: var(--m-l);
+    padding-block: var(--m-l);
+    padding-inline-start: max(var(--m-l), env(safe-area-inset-left, 0));
+    padding-inline-end: max(var(--m-l), env(safe-area-inset-right, 0));
   }
 }

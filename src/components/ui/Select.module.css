@@ -35,10 +35,12 @@
   background-repeat: no-repeat;
 }
 
-.select:hover,
+.select:hover {
+  border-color: color-mix(in oklch, var(--c-accent) 72%, var(--c-bg-contrast-light));
+}
+
 .select:focus-visible {
-  background-color: var(--c-bg-contrast-light);
-  color: var(--c-bg);
+  border-color: var(--c-accent);
 }
 
 /* Compact: pill-shaped inline filter */

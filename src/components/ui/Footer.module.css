@@ -4,7 +4,10 @@
   justify-content: center;
   align-items: center;
   gap: var(--m-m);
-  padding: var(--m-xl) var(--m-l);
+  padding-block-start: var(--m-xl);
+  padding-block-end: max(var(--m-xl), calc(env(safe-area-inset-bottom, 0) + var(--m-l)));
+  padding-inline-start: max(var(--m-l), env(safe-area-inset-left, 0));
+  padding-inline-end: max(var(--m-l), env(safe-area-inset-right, 0));
   font-size: var(--fs-s);
   color: var(--c-bg-contrast-light);
 }

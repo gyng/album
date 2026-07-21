@@ -42,6 +42,86 @@ test.describe("Responsive UI", () => {
     expect(albumsBox!.x).toBeCloseTo(headingBox!.x, 0);
   });
 
+  test("theme picker hover stays visually quiet", async ({ page }) => {
+    await page.goto("/?theme=light", { waitUntil: "domcontentloaded" });
+
+    const picker = page.getByLabel("Theme");
+    const resting = await picker.evaluate((element) => {
+      const style = getComputedStyle(element);
+      return { background: style.backgroundColor, colour: style.color };
+    });
+
+    await picker.hover();
+    await picker.evaluate((element) =>
+      Promise.all(element.getAnimations().map((animation) => animation.finished)),
+    );
+    const hovered = await picker.evaluate((element) => {
+      const style = getComputedStyle(element);
+      return { background: style.backgroundColor, colour: style.color };
+    });
+
+    expect(hovered).toEqual(resting);
+  });
+
+  test("iPad portrait keeps the theme picker visible beside the scrolling navigation", async ({
+    browser,
+    baseURL,
+  }) => {
+    const context = await browser.newContext({
+      baseURL,
+      hasTouch: true,
+      isMobile: true,
+      viewport: { width: 834, height: 1194 },
+    });
+    const tabletPage = await context.newPage();
+
+    try {
+      await tabletPage.goto("/", { waitUntil: "domcontentloaded" });
+
+      const picker = tabletPage.getByLabel("Theme");
+      await expect(picker).toBeInViewport();
+      const pickerBox = await picker.boundingBox();
+      expect(pickerBox).not.toBeNull();
+      expect(pickerBox!.x + pickerBox!.width).toBeLessThanOrEqual(834);
+      expect(pickerBox!.height).toBeGreaterThanOrEqual(44);
+
+      const navigation = await tabletPage.locator("nav ul").evaluate((list) => ({
+        clientWidth: list.clientWidth,
+        scrollWidth: list.scrollWidth,
+      }));
+      expect(navigation.scrollWidth).toBeGreaterThan(navigation.clientWidth);
+      await expectNoDocumentOverflow(tabletPage);
+    } finally {
+      await context.close();
+    }
+  });
+
+  test("iPad landscape brings the first album photograph into the opening viewport", async ({
+    browser,
+    baseURL,
+  }) => {
+    const context = await browser.newContext({
+      baseURL,
+      hasTouch: true,
+      isMobile: true,
+      viewport: { width: 1194, height: 834 },
+    });
+    const tabletPage = await context.newPage();
+
+    try {
+      await tabletPage.goto("/album/test-simple", { waitUntil: "domcontentloaded" });
+
+      const photograph = tabletPage.getByTestId("photoblockel").first().getByRole("img");
+      const photographBox = await photograph.boundingBox();
+      expect(photographBox).not.toBeNull();
+      expect(photographBox!.y).toBeLessThan(834 * 0.4);
+      await expect(tabletPage.getByLabel("Photo details").first()).toBeInViewport();
+      await expectNoDocumentOverflow(tabletPage);
+    } finally {
+      await context.close();
+    }
+  });
+
   test("fantasy themes have distinct scenery and typography", async ({ page }) => {
     const themes = [
       "slate",
