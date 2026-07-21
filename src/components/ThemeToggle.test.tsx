@@ -57,11 +57,13 @@ describe("ThemeToggle", () => {
   });
 
   it.each([
-    ["porcelain", "Porcelain", "light"],
+    ["watercolour", "Watercolour", "light"],
     ["ember", "Ember", "dark"],
     ["bling", "Bling", "dark"],
     ["herbarium", "Herbarium", "light"],
     ["arcana", "Arcana", "dark"],
+    ["terminal", "Terminal", "dark"],
+    ["desktop", "Desktop 84", "light"],
   ])("offers and applies the %s theme", (value, label, scheme) => {
     render(<ThemeToggle />);
 
@@ -85,6 +87,15 @@ describe("ThemeToggle", () => {
 
     expect(localStorage.getItem("theme")).toBe("light");
     expect(localStorage.getItem("darkMode")).toBeNull();
+  });
+
+  it("honours the renamed porcelain preference as Watercolour", () => {
+    localStorage.setItem("theme", "porcelain");
+
+    render(<ThemeToggle />);
+
+    expect(getPicker()).toHaveValue("watercolour");
+    expect(document.documentElement).toHaveClass("theme-watercolour");
   });
 
   it("gives explicit URL themes precedence over stored preferences", () => {

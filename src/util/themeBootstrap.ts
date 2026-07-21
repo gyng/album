@@ -1,4 +1,4 @@
-import { NAMED_THEMES, THEME_SCHEMES } from "./theme";
+import { LEGACY_THEME_ALIASES, NAMED_THEMES, THEME_SCHEMES } from "./theme";
 
 /**
  * Renderer-neutral, pre-paint theme initialiser. HTML entry adapters should
@@ -8,6 +8,7 @@ export const THEME_BOOTSTRAP_SCRIPT = `
 (() => {
   const schemes = ${JSON.stringify(THEME_SCHEMES)};
   const named = ${JSON.stringify(NAMED_THEMES)};
+  const aliases = ${JSON.stringify(LEGACY_THEME_ALIASES)};
 
   // Enable theme-change transitions only after the correctly themed first
   // frame has painted. Two frames ensure the class cannot animate the initial
@@ -33,14 +34,17 @@ export const THEME_BOOTSTRAP_SCRIPT = `
   try {
     const url = new URL(window.location.href);
     const fromUrl = url.searchParams.get("theme");
-    if (fromUrl && Object.hasOwn(schemes, fromUrl)) {
-      applyTheme(fromUrl);
+    const urlTheme = aliases[fromUrl] || fromUrl;
+    if (urlTheme && Object.hasOwn(schemes, urlTheme)) {
+      applyTheme(urlTheme);
       return;
     }
 
     const stored = localStorage.getItem("theme");
-    if (stored && Object.hasOwn(schemes, stored)) {
-      applyTheme(stored);
+    const storedTheme = aliases[stored] || stored;
+    if (storedTheme && Object.hasOwn(schemes, storedTheme)) {
+      if (storedTheme !== stored) localStorage.setItem("theme", storedTheme);
+      applyTheme(storedTheme);
       return;
     }
 

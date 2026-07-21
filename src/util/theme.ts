@@ -9,11 +9,13 @@ export const NAMED_THEMES = [
   "paper",
   "ink",
   "slate",
-  "porcelain",
+  "watercolour",
   "ember",
   "bling",
   "herbarium",
   "arcana",
+  "terminal",
+  "desktop",
 ] as const;
 
 export type NamedTheme = (typeof NAMED_THEMES)[number];
@@ -26,11 +28,13 @@ export const THEME_SCHEMES: Record<ThemeName, "light" | "dark"> = {
   paper: "light",
   ink: "dark",
   slate: "dark",
-  porcelain: "light",
+  watercolour: "light",
   ember: "dark",
   bling: "dark",
   herbarium: "light",
   arcana: "dark",
+  terminal: "dark",
+  desktop: "light",
 };
 
 export const THEME_NAMES = Object.keys(THEME_SCHEMES) as readonly ThemeName[];
@@ -41,15 +45,26 @@ export const THEME_LABELS: Record<ThemeName, string> = {
   paper: "Paper",
   ink: "Ink",
   slate: "Slate",
-  porcelain: "Porcelain",
+  watercolour: "Watercolour",
   ember: "Ember",
   bling: "Bling",
   herbarium: "Herbarium",
   arcana: "Arcana",
+  terminal: "Terminal",
+  desktop: "Desktop 84",
 };
 
 export const isThemeName = (value: unknown): value is ThemeName =>
   typeof value === "string" && Object.hasOwn(THEME_SCHEMES, value);
+
+export const LEGACY_THEME_ALIASES: Readonly<Record<string, ThemeName>> = {
+  porcelain: "watercolour",
+};
+
+export const resolveThemeName = (value: unknown): ThemeName | null => {
+  if (isThemeName(value)) return value;
+  return typeof value === "string" ? (LEGACY_THEME_ALIASES[value] ?? null) : null;
+};
 
 /** Every class the theme system may set on html/body. */
 export const ALL_THEME_CLASSES: readonly string[] = [

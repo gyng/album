@@ -43,11 +43,21 @@ test.describe("Responsive UI", () => {
   });
 
   test("fantasy themes have distinct scenery and typography", async ({ page }) => {
-    const themes = ["slate", "porcelain", "ember", "bling", "herbarium", "arcana"];
+    const themes = [
+      "slate",
+      "watercolour",
+      "ember",
+      "bling",
+      "herbarium",
+      "arcana",
+      "terminal",
+      "desktop",
+    ];
     const typeSignatures = new Set<string>();
 
     for (const theme of themes) {
-      await page.goto(`/?theme=${theme}`, { waitUntil: "domcontentloaded" });
+      await page.goto(`/?theme=${theme}`, { waitUntil: "load" });
+      await page.evaluate(() => document.fonts.ready);
 
       const heading = page.getByRole("heading", { name: "Snapshots", exact: true });
       await expect(heading).toBeVisible();
@@ -57,15 +67,75 @@ test.describe("Responsive UI", () => {
         bodyFont: getComputedStyle(document.body).fontFamily,
         headingFont: getComputedStyle(element).fontFamily,
         scenery: getComputedStyle(document.body).backgroundImage,
+        bodyFontLoaded: document.fonts.check(
+          `${getComputedStyle(document.body).fontSize} ${getComputedStyle(document.body).fontFamily}`,
+        ),
+        headingFontLoaded: document.fonts.check(
+          `${getComputedStyle(element).fontWeight} ${getComputedStyle(element).fontSize} ${getComputedStyle(element).fontFamily}`,
+        ),
       }));
 
       expect(appearance.scenery).not.toBe("none");
       expect(appearance.headingFont).not.toBe(appearance.bodyFont);
+      expect(appearance.bodyFontLoaded).toBe(true);
+      expect(appearance.headingFontLoaded).toBe(true);
       typeSignatures.add(`${appearance.bodyFont}|${appearance.headingFont}`);
       await expectNoDocumentOverflow(page);
     }
 
     expect(typeSignatures.size).toBe(themes.length);
+  });
+
+  test("expressive themes render distinct material treatments", async ({ page }) => {
+    const themes = [
+      "slate",
+      "watercolour",
+      "ember",
+      "bling",
+      "herbarium",
+      "arcana",
+      "terminal",
+      "desktop",
+    ];
+
+    const materialSignatures = new Set<string>();
+    const photographSignatures = new Set<string>();
+
+    for (const theme of themes) {
+      await page.goto(`/?theme=${theme}`, { waitUntil: "load" });
+      await page.evaluate(() => document.fonts.ready);
+
+      const material = await page.evaluate(() => {
+        const control = document.querySelector("select");
+        const photograph = document.querySelector("main img");
+        if (!control || !photograph) return null;
+        const controlStyle = getComputedStyle(control);
+        const photographStyle = getComputedStyle(photograph);
+        return {
+          control: [
+            controlStyle.backgroundColor,
+            controlStyle.backgroundImage,
+            controlStyle.borderColor,
+            controlStyle.borderRadius,
+            controlStyle.boxShadow,
+          ].join("|"),
+          photograph: [
+            photographStyle.border,
+            photographStyle.borderRadius,
+            photographStyle.boxShadow,
+            photographStyle.filter,
+            photographStyle.outline,
+          ].join("|"),
+        };
+      });
+
+      expect(material).not.toBeNull();
+      materialSignatures.add(material!.control);
+      photographSignatures.add(material!.photograph);
+    }
+
+    expect(materialSignatures.size).toBe(themes.length);
+    expect(photographSignatures.size).toBe(themes.length);
   });
 
   test("plain light and dark retain the original heading typography", async ({ page }) => {

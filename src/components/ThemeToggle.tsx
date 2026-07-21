@@ -1,7 +1,7 @@
 import { useEffect, useReducer, useSyncExternalStore } from "react";
 import {
   ALL_THEME_CLASSES,
-  isThemeName,
+  resolveThemeName,
   THEME_LABELS,
   THEME_NAMES,
   type ThemeName,
@@ -15,8 +15,9 @@ const subscribeToHydration = () => () => {};
 const readStoredTheme = (): ThemeName | null => {
   try {
     const stored = localStorage.getItem("theme");
-    if (isThemeName(stored)) {
-      return stored;
+    const theme = resolveThemeName(stored);
+    if (theme) {
+      return theme;
     }
 
     // Legacy boolean preference from the old light/dark-only toggle.
@@ -60,8 +61,9 @@ const getInitialTheme = (): ThemeName | null => {
   // use the explicit server snapshot below and never call this function.
   const url = new URL(window.location.toString());
   const theme = url.searchParams.get("theme");
-  if (isThemeName(theme)) {
-    return theme;
+  const resolvedTheme = resolveThemeName(theme);
+  if (resolvedTheme) {
+    return resolvedTheme;
   }
 
   // No explicit preference (null) follows the system: :root declares
@@ -98,7 +100,7 @@ export const ThemeToggle: React.FC = () => {
         className={styles.picker}
         value={theme ?? "system"}
         onChange={(event) => {
-          const next = isThemeName(event.target.value) ? event.target.value : null;
+          const next = resolveThemeName(event.target.value);
           setThemeOverride(next);
           writeStoredTheme(next);
         }}

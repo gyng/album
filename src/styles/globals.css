@@ -1,3 +1,24 @@
+@import "@fontsource/barlow/latin-400.css";
+@import "@fontsource/barlow/latin-600.css";
+@import "@fontsource/barlow-condensed/latin-700.css";
+@import "@fontsource/alegreya-sans/latin-400.css";
+@import "@fontsource/alegreya-sans/latin-700.css";
+@import "@fontsource/grenze-gotisch/latin-700.css";
+@import "@fontsource/eb-garamond/latin-400.css";
+@import "@fontsource/eb-garamond/latin-600.css";
+@import "@fontsource/cormorant-sc/latin-600.css";
+@import "@fontsource/cormorant-sc/latin-700.css";
+@import "@fontsource/alegreya/latin-400.css";
+@import "@fontsource/alegreya/latin-600.css";
+@import "@fontsource/uncial-antiqua/latin-400.css";
+@import "@fontsource/newsreader/latin-400.css";
+@import "@fontsource/newsreader/latin-600.css";
+@import "@fontsource/caveat/latin-700.css";
+@import "@fontsource/ibm-plex-mono/latin-400.css";
+@import "@fontsource/ibm-plex-mono/latin-600.css";
+@import "@fontsource/pixelify-sans/latin-700.css";
+@import "@fontsource/vt323/latin-400.css";
+
 html,
 body {
   padding: 0;
@@ -35,11 +56,13 @@ body {
 
 body:where(
     .theme-slate,
-    .theme-porcelain,
+    .theme-watercolour,
     .theme-ember,
     .theme-bling,
     .theme-herbarium,
-    .theme-arcana
+    .theme-arcana,
+    .theme-terminal,
+    .theme-desktop
   )
   :where(h1, h2, h3, h4, h5, h6) {
   font-family: var(--font-display);
@@ -409,8 +432,8 @@ body.dark {
    condensed labelling and cool steel surfaces. */
 :root:where(.theme-slate),
 :where(.theme-slate) {
-  --font-sans: Optima, Candara, "Noto Sans", "Trebuchet MS", sans-serif;
-  --font-display: "DIN Condensed", "Avenir Next Condensed", "Liberation Sans Narrow", sans-serif;
+  --font-sans: Barlow, Optima, Candara, "Trebuchet MS", sans-serif;
+  --font-display: "Barlow Condensed", "DIN Condensed", "Avenir Next Condensed", sans-serif;
   --theme-heading-font-weight: 700;
   --theme-heading-letter-spacing: 0.08em;
   --theme-heading-text-transform: uppercase;
@@ -433,25 +456,29 @@ body.dark {
   --theme-background-attachment: fixed;
 }
 
-/* Porcelain — a watercolour travel sketchbook: warm rag paper, overlapping
-   pigment blooms and handwritten titles around softly mounted photographs. */
-:root:where(.theme-porcelain),
-:where(.theme-porcelain) {
-  --font-sans: Charter, "Bitstream Charter", "Sitka Text", Cambria, Georgia, serif;
-  --font-display: "Bradley Hand", "Segoe Print", "Chalkboard SE", cursive;
-  --theme-heading-font-style: italic;
-  --theme-heading-font-weight: 600;
-  --theme-heading-letter-spacing: 0.012em;
+/* Watercolour — a painter's travel folio: deckled rag paper, wet pigment,
+   pencil annotations and photographs mounted like studies from the road. */
+:root:where(.theme-watercolour),
+:where(.theme-watercolour) {
+  --font-sans: Newsreader, Charter, Cambria, Georgia, serif;
+  --font-display: Caveat, "Segoe Print", "Chalkboard SE", cursive;
+  --theme-heading-font-weight: 700;
+  --theme-heading-letter-spacing: 0.006em;
   --c-bg: oklch(96% 0.025 92);
   --c-overlay: oklch(97% 0.022 92 / 0.8);
   --c-font: oklch(26% 0.055 260);
   --c-bg-contrast-light: oklch(48% 0.1 255);
   --c-bg-contrast-dark: oklch(28% 0.1 265);
   --c-accent: oklch(53% 0.19 255);
+  --c-watercolour-paper: oklch(97% 0.025 92);
+  --c-watercolour-pencil: oklch(31% 0.035 255 / 0.24);
+  --c-watercolour-blue: oklch(58% 0.19 250 / 0.24);
+  --c-watercolour-rose: oklch(68% 0.17 18 / 0.2);
+  --c-watercolour-ochre: oklch(72% 0.15 82 / 0.2);
   --theme-background-image:
-    radial-gradient(ellipse at 8% 12%, oklch(72% 0.14 245 / 0.3), transparent 48%),
-    radial-gradient(ellipse at 92% 18%, oklch(78% 0.13 15 / 0.24), transparent 44%),
-    radial-gradient(ellipse at 72% 88%, oklch(80% 0.12 90 / 0.22), transparent 48%),
+    radial-gradient(ellipse at 8% 12%, var(--c-watercolour-blue), transparent 48%),
+    radial-gradient(ellipse at 92% 18%, var(--c-watercolour-rose), transparent 44%),
+    radial-gradient(ellipse at 72% 88%, var(--c-watercolour-ochre), transparent 48%),
     radial-gradient(ellipse at 18% 82%, oklch(72% 0.13 165 / 0.2), transparent 46%),
     repeating-linear-gradient(
       8deg,
@@ -466,8 +493,8 @@ body.dark {
    oxblood paper, molten contours and sturdy slab-serif headings. */
 :root:where(.theme-ember),
 :where(.theme-ember) {
-  --font-sans: "Gill Sans", "Gill Sans Nova", Corbel, "Trebuchet MS", sans-serif;
-  --font-display: Rockwell, "Rockwell Nova", "Roboto Slab", "DejaVu Serif", serif;
+  --font-sans: "Alegreya Sans", "Gill Sans", Corbel, "Trebuchet MS", sans-serif;
+  --font-display: "Grenze Gotisch", Rockwell, "DejaVu Serif", serif;
   --theme-heading-font-weight: 700;
   --theme-heading-letter-spacing: 0.045em;
   --theme-heading-text-transform: uppercase;
@@ -535,23 +562,37 @@ body.dark {
    and copperplate labels on warm rag paper. */
 :root:where(.theme-herbarium),
 :where(.theme-herbarium) {
-  --font-sans: Garamond, "EB Garamond", "Adobe Garamond Pro", Georgia, serif;
-  --font-display: Copperplate, "Copperplate Gothic Light", "Bookman Old Style", fantasy;
+  --font-sans: "EB Garamond", Garamond, Georgia, serif;
+  --font-display: "Cormorant SC", Copperplate, "Bookman Old Style", fantasy;
   --theme-heading-font-variant: small-caps;
   --theme-heading-font-weight: 600;
   --theme-heading-letter-spacing: 0.07em;
   --theme-heading-text-transform: uppercase;
-  --c-bg: oklch(92% 0.04 102);
-  --c-overlay: oklch(94% 0.035 100 / 0.82);
-  --c-font: oklch(27% 0.065 125);
+  --c-bg: oklch(89% 0.055 96);
+  --c-overlay: oklch(94% 0.045 94 / 0.88);
+  --c-font: oklch(24% 0.075 125);
   --c-bg-contrast-light: oklch(47% 0.09 122);
   --c-bg-contrast-dark: oklch(23% 0.075 128);
   --c-accent: oklch(49% 0.13 42);
   --c-herbarium-leaf: oklch(43% 0.1 125 / 0.18);
+  --c-herbarium-ink: oklch(29% 0.09 128);
+  --c-herbarium-copper: oklch(49% 0.13 42);
+  --c-herbarium-foxing: oklch(52% 0.105 65 / 0.14);
   --theme-herbarium-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 280 200'%3E%3Cg fill='none' stroke='black' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 205C65 160 70 72 125 0'/%3E%3Cpath d='M55 157C26 150 19 124 21 110C45 112 62 128 55 157Z'/%3E%3Cpath d='M72 119C99 113 111 91 109 75C84 79 69 95 72 119Z'/%3E%3Cpath d='M91 72C66 64 58 43 62 28C84 34 97 49 91 72Z'/%3E%3Cpath d='M184 205C211 167 218 98 199 45'/%3E%3Cpath d='M207 148C237 140 247 117 242 100C217 106 201 124 207 148Z'/%3E%3Cpath d='M204 105C179 98 167 78 170 62C193 66 207 81 204 105Z'/%3E%3C/g%3E%3C/svg%3E");
   --theme-background-image:
-    radial-gradient(circle at 88% 8%, oklch(67% 0.08 110 / 0.22), transparent 28%),
-    linear-gradient(90deg, oklch(100% 0 0 / 0.18), transparent 35%, oklch(54% 0.09 80 / 0.08));
+    radial-gradient(circle at 88% 8%, oklch(67% 0.08 110 / 0.28), transparent 28%),
+    radial-gradient(
+      circle at 12% 72%,
+      var(--c-herbarium-foxing) 0 var(--size-2),
+      transparent var(--size-3)
+    ),
+    repeating-linear-gradient(
+      0deg,
+      transparent 0 var(--size-32),
+      oklch(35% 0.06 125 / 0.08) var(--size-32) calc(var(--size-32) + var(--line-hairline))
+    ),
+    linear-gradient(90deg, oklch(100% 0 0 / 0.2), transparent 35%, oklch(54% 0.09 80 / 0.1));
+  --theme-background-size: auto, var(--size-120) var(--size-120), auto, auto;
   --theme-background-attachment: fixed;
 }
 
@@ -559,19 +600,21 @@ body.dark {
    spell circles and uncial inventory headings. */
 :root:where(.theme-arcana),
 :where(.theme-arcana) {
-  --font-sans: "Lucida Bright", "DejaVu Serif", "Bitstream Vera Serif", serif;
+  --font-sans: Alegreya, "Lucida Bright", "DejaVu Serif", serif;
   --font-display: "Uncial Antiqua", Luminari, Papyrus, fantasy;
   --theme-heading-font-variant: small-caps;
   --theme-heading-font-weight: 700;
   --theme-heading-letter-spacing: 0.09em;
-  --c-bg: oklch(12% 0.055 295);
-  --c-overlay: oklch(15% 0.075 295 / 0.88);
+  --c-bg: oklch(10% 0.05 305);
+  --c-overlay: oklch(14% 0.075 300 / 0.9);
   --c-font: oklch(93% 0.045 86);
   --c-bg-contrast-light: oklch(79% 0.105 88);
   --c-bg-contrast-dark: oklch(22% 0.11 295);
   --c-accent: oklch(82% 0.16 88);
   --c-arcana-gold: oklch(84% 0.15 88);
   --c-arcana-violet: oklch(66% 0.24 305);
+  --c-arcana-leather: oklch(18% 0.075 25);
+  --c-arcana-rune: oklch(76% 0.18 305 / 0.18);
   --theme-background-image:
     repeating-conic-gradient(
       from 7deg at 82% 18%,
@@ -595,6 +638,69 @@ body.dark {
     ),
     radial-gradient(circle at 82% 18%, oklch(48% 0.21 305 / 0.3), transparent 36%),
     linear-gradient(135deg, oklch(18% 0.08 275 / 0.6), transparent 52%);
+  --theme-background-attachment: fixed;
+}
+
+/* Terminal — a curved green-phosphor workstation display with scanlines,
+   bloom and command-line typography. */
+:root:where(.theme-terminal),
+:where(.theme-terminal) {
+  --font-sans: "IBM Plex Mono", "Courier New", monospace;
+  --font-display: VT323, "IBM Plex Mono", monospace;
+  --theme-heading-font-weight: 400;
+  --theme-heading-letter-spacing: 0.055em;
+  --theme-heading-text-transform: uppercase;
+  --c-bg: oklch(9% 0.035 145);
+  --c-overlay: oklch(11% 0.045 145 / 0.9);
+  --c-font: oklch(88% 0.2 135);
+  --c-bg-contrast-light: oklch(78% 0.2 135);
+  --c-bg-contrast-dark: oklch(16% 0.075 145);
+  --c-accent: oklch(91% 0.24 130);
+  --c-terminal-dim: oklch(63% 0.16 140 / 0.28);
+  --c-terminal-glow: oklch(85% 0.24 135 / 0.32);
+  --theme-background-image:
+    radial-gradient(ellipse at center, oklch(24% 0.09 145 / 0.42), transparent 72%),
+    repeating-linear-gradient(
+      0deg,
+      transparent 0 var(--size-3),
+      var(--c-terminal-dim) var(--size-3) var(--size-4)
+    );
+  --theme-background-size: auto, auto;
+  --theme-background-attachment: fixed;
+}
+
+/* Desktop 84 — an early graphical workstation: dithered teal desktop,
+   chunky pixels and deeply bevelled grey interface chrome. */
+:root:where(.theme-desktop),
+:where(.theme-desktop) {
+  --font-sans: "IBM Plex Mono", "Courier New", monospace;
+  --font-display: "Pixelify Sans", "IBM Plex Mono", monospace;
+  --theme-heading-font-weight: 700;
+  --theme-heading-letter-spacing: 0.025em;
+  --c-bg: oklch(67% 0.12 195);
+  --c-overlay: oklch(88% 0.018 245 / 0.94);
+  --c-font: oklch(18% 0.025 255);
+  --c-bg-contrast-light: oklch(96% 0.01 250);
+  --c-bg-contrast-dark: oklch(32% 0.04 250);
+  --c-accent: oklch(48% 0.22 292);
+  --c-desktop-face: oklch(83% 0.018 245);
+  --c-desktop-light: oklch(98% 0.005 245);
+  --c-desktop-shadow: oklch(35% 0.035 245);
+  --c-desktop-blue: oklch(48% 0.17 255);
+  --theme-background-image:
+    linear-gradient(
+      45deg,
+      oklch(38% 0.08 205 / 0.24) 25%,
+      transparent 25% 75%,
+      oklch(38% 0.08 205 / 0.24) 75%
+    ),
+    linear-gradient(
+      45deg,
+      oklch(38% 0.08 205 / 0.24) 25%,
+      transparent 25% 75%,
+      oklch(38% 0.08 205 / 0.24) 75%
+    );
+  --theme-background-size: var(--size-8) var(--size-8), var(--size-8) var(--size-8);
   --theme-background-attachment: fixed;
 }
 
@@ -635,7 +741,17 @@ body.theme-bling :where(a, button, input, select, summary) {
   text-decoration-thickness: var(--line-strong);
 }
 
-body.theme-bling :where(img, video) {
+body.theme-bling :is(button, input, select, textarea, summary) {
+  border-color: var(--c-bling-cyan);
+  background: linear-gradient(135deg, var(--c-bling-pink), var(--c-bg-contrast-dark));
+  box-shadow:
+    inset var(--size-2) var(--size-2) 0 color-mix(in oklch, var(--c-bling-gold) 68%, transparent),
+    inset calc(var(--size-2) * -1) calc(var(--size-2) * -1) 0
+      color-mix(in oklch, var(--c-bling-cyan) 58%, transparent),
+    0 0 var(--m-m) var(--c-bling-pink);
+}
+
+body.theme-bling :is(img, video) {
   outline: var(--line-strong) solid var(--c-bling-cyan);
   outline-offset: var(--size-2);
   box-shadow:
@@ -648,16 +764,87 @@ body.theme-ember :where(h1, h2, h3) {
   text-shadow: 0 0 var(--m-l) color-mix(in oklch, var(--c-accent) 30%, transparent);
 }
 
-body.theme-porcelain :where(img, video) {
+body.theme-slate :is(img, video) {
+  outline: var(--line-hairline) solid var(--c-accent);
+  outline-offset: var(--m);
+  box-shadow:
+    0 0 0 var(--m-s) color-mix(in oklch, var(--c-bg-contrast-dark) 82%, transparent),
+    var(--m-m) var(--m-m) 0 color-mix(in oklch, var(--c-accent) 18%, transparent);
+}
+
+body.theme-slate :is(button, input, select, textarea, summary) {
+  border-radius: 0;
+  border-color: var(--c-accent);
+  background-color: color-mix(in oklch, var(--c-bg) 88%, var(--c-accent));
+  box-shadow: inset 0 0 0 var(--line-hairline) color-mix(in oklch, var(--c-accent) 35%, transparent);
+}
+
+body.theme-ember :is(img, video) {
+  outline: var(--size-3) double var(--c-accent);
+  outline-offset: var(--m);
+  box-shadow:
+    0 0 0 var(--m-m) color-mix(in oklch, var(--c-bg-contrast-dark) 88%, transparent),
+    0 var(--m-l) var(--m-xl) oklch(5% 0.02 25 / 0.68),
+    inset 0 0 var(--m-l) var(--c-accent);
+}
+
+body.theme-ember :is(button, input, select, textarea, summary) {
+  border-color: var(--c-accent);
+  background: linear-gradient(oklch(34% 0.07 35 / 0.92), oklch(17% 0.05 30 / 0.96));
+  box-shadow:
+    inset 0 var(--size-2) var(--m) oklch(78% 0.16 55 / 0.24),
+    inset 0 calc(var(--size-2) * -1) var(--m) oklch(4% 0.01 25 / 0.72),
+    0 0 var(--m-m) oklch(70% 0.2 45 / 0.18);
+}
+
+body.theme-watercolour {
+  isolation: isolate;
+}
+
+body.theme-watercolour::before {
+  content: "";
+  position: fixed;
+  inset: var(--m-m);
+  z-index: var(--z-behind);
+  pointer-events: none;
+  border: var(--line-hairline) solid var(--c-watercolour-pencil);
+  box-shadow:
+    inset 0 0 var(--m-xl) var(--c-watercolour-pencil),
+    inset 0 0 0 var(--m) color-mix(in oklch, var(--c-watercolour-paper) 70%, transparent);
+}
+
+body.theme-watercolour::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-behind);
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse at 10% 48%, var(--c-watercolour-blue), transparent 24%),
+    radial-gradient(ellipse at 90% 62%, var(--c-watercolour-rose), transparent 26%),
+    radial-gradient(ellipse at 58% 4%, var(--c-watercolour-ochre), transparent 22%);
+  filter: blur(var(--size-14));
+}
+
+body.theme-watercolour :is(img, video) {
   box-shadow:
     0 0 0 var(--m) oklch(99% 0.018 92 / 0.9),
+    0 0 0 var(--m-s) var(--c-watercolour-pencil),
     calc(var(--m-s) * -1) var(--m-m) var(--m-xl) oklch(58% 0.15 245 / 0.14),
     var(--m-m) calc(var(--m-s) * -1) var(--m-xl) oklch(68% 0.14 20 / 0.12);
 }
 
-body.theme-porcelain :where(h1, h2, h3) {
+body.theme-watercolour :where(h1, h2, h3) {
   color: var(--c-accent);
   text-shadow: 0 var(--size-1) var(--m-s) oklch(58% 0.15 245 / 0.16);
+}
+
+body.theme-watercolour :is(button, input, select, textarea, summary) {
+  border-color: var(--c-watercolour-pencil);
+  background-color: color-mix(in oklch, var(--c-watercolour-paper) 88%, transparent);
+  box-shadow:
+    inset 0 0 var(--m-s) color-mix(in oklch, var(--c-watercolour-blue) 32%, transparent),
+    var(--size-2) var(--size-3) var(--m-s) var(--c-watercolour-pencil);
 }
 
 body.theme-herbarium {
@@ -682,28 +869,238 @@ body.theme-herbarium::before {
   opacity: 0.72;
 }
 
+body.theme-herbarium::after {
+  content: "SPECIMEN · FIELD NOTES · HERBARIUM · ARCHIVE";
+  position: fixed;
+  inset-block: var(--m-xl);
+  inset-inline-end: var(--m-m);
+  z-index: var(--z-behind);
+  pointer-events: none;
+  writing-mode: vertical-rl;
+  color: var(--c-herbarium-copper);
+  font-family: var(--font-display);
+  font-size: var(--fs-s);
+  font-weight: 700;
+  letter-spacing: 0.26em;
+  opacity: 0.46;
+  border-inline-start: var(--size-3) double var(--c-herbarium-copper);
+  padding-inline-start: var(--m-s);
+}
+
 body.theme-herbarium :where(h1, h2, h3),
 body.theme-arcana :where(h1, h2, h3) {
   color: var(--c-accent);
 }
 
+body.theme-herbarium :where(h1, h2, h3) {
+  border-block-end: var(--size-3) double var(--c-herbarium-copper);
+  text-shadow: 0 var(--size-1) 0 oklch(100% 0 0 / 0.68);
+}
+
+body.theme-herbarium :where(h1, h2, h3)::before {
+  content: "";
+  display: inline-block;
+  inline-size: var(--m-m);
+  block-size: var(--m-l);
+  margin-inline-end: var(--m-s);
+  background-color: var(--c-herbarium-ink);
+  clip-path: polygon(48% 100%, 46% 54%, 0 22%, 42% 42%, 52% 0, 58% 42%, 100% 20%, 62% 54%);
+}
+
+body.theme-herbarium :is(img, video) {
+  outline: var(--size-3) double var(--c-herbarium-ink);
+  outline-offset: var(--m);
+  box-shadow:
+    0 0 0 var(--m-m) color-mix(in oklch, var(--c-bg) 88%, transparent),
+    var(--m-m) var(--m-l) var(--m-xl) oklch(28% 0.08 120 / 0.3);
+}
+
+body.theme-herbarium :is(button, input, select, textarea, summary) {
+  border-color: var(--c-herbarium-ink);
+  background-color: color-mix(in oklch, var(--c-bg) 82%, var(--c-herbarium-copper));
+  box-shadow:
+    inset 0 0 0 var(--line-hairline) oklch(100% 0 0 / 0.5),
+    inset 0 calc(var(--size-2) * -1) var(--m) var(--c-herbarium-foxing),
+    var(--size-2) var(--size-3) 0 color-mix(in oklch, var(--c-herbarium-ink) 34%, transparent);
+}
+
+body.theme-arcana {
+  isolation: isolate;
+}
+
+body.theme-arcana::before {
+  content: "✦";
+  position: fixed;
+  inset-block-start: calc(50% - (var(--size-320) / 2));
+  inset-inline-start: calc(50% - (var(--size-320) / 2));
+  inline-size: var(--size-320);
+  block-size: var(--size-320);
+  z-index: var(--z-behind);
+  pointer-events: none;
+  display: grid;
+  place-items: center;
+  border: var(--size-3) double var(--c-arcana-gold);
+  border-radius: var(--radius-pill);
+  color: var(--c-arcana-gold);
+  font-family: var(--font-display);
+  font-size: var(--fs-xl);
+  background:
+    repeating-conic-gradient(var(--c-arcana-rune) 0 1deg, transparent 1deg 18deg),
+    radial-gradient(
+      circle,
+      transparent 0 34%,
+      var(--c-arcana-violet) 34.5% 35%,
+      transparent 35.5% 58%,
+      var(--c-arcana-gold) 58.5% 59%,
+      transparent 59.5%
+    );
+  box-shadow:
+    0 0 var(--m-xl) var(--c-arcana-violet),
+    inset 0 0 var(--m-xl) var(--c-arcana-violet);
+  opacity: 0.44;
+  animation: arcana-sigil-turn calc(var(--t-shimmer) * 24) linear infinite;
+}
+
+body.theme-arcana::after {
+  content: "✦  ·  ✧  ·  ☾  ·  ✦  ·  ✧  ·  ☽";
+  position: fixed;
+  inset: var(--m-xl);
+  z-index: var(--z-behind);
+  pointer-events: none;
+  color: var(--c-arcana-gold);
+  font-family: var(--font-display);
+  font-size: var(--fs-l);
+  line-height: 24svh;
+  overflow-wrap: anywhere;
+  opacity: 0.24;
+  text-shadow: 0 0 var(--m-m) var(--c-arcana-violet);
+}
+
 body.theme-arcana :where(h1, h2, h3) {
+  color: transparent;
+  background-image: linear-gradient(
+    180deg,
+    oklch(96% 0.08 92),
+    var(--c-arcana-gold) 56%,
+    oklch(54% 0.16 65)
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
   text-shadow:
     0 0 var(--m-s) color-mix(in oklch, var(--c-arcana-gold) 45%, transparent),
     0 0 var(--m-l) color-mix(in oklch, var(--c-arcana-violet) 42%, transparent);
 }
 
-body.theme-arcana :where(img, video) {
-  outline: var(--line-hairline) solid var(--c-arcana-gold);
+body.theme-arcana :is(img, video) {
+  outline: var(--size-3) double var(--c-arcana-gold);
   outline-offset: var(--m);
   box-shadow:
-    0 0 0 var(--m-s) color-mix(in oklch, var(--c-arcana-violet) 20%, transparent),
-    0 0 var(--m-xl) color-mix(in oklch, var(--c-arcana-violet) 30%, transparent);
+    0 0 0 var(--m-s) var(--c-arcana-leather),
+    0 0 0 var(--m-m) color-mix(in oklch, var(--c-arcana-gold) 48%, transparent),
+    0 0 var(--m-xl) color-mix(in oklch, var(--c-arcana-violet) 52%, transparent);
 }
 
-body.theme-arcana :where(button, input, select, summary) {
+body.theme-arcana :is(button, input, select, textarea, summary) {
   border-color: var(--c-arcana-gold);
-  box-shadow: inset 0 0 var(--m-m) color-mix(in oklch, var(--c-arcana-violet) 20%, transparent);
+  background: linear-gradient(var(--c-arcana-leather), var(--c-bg-contrast-dark));
+  box-shadow:
+    inset 0 0 var(--m-m) color-mix(in oklch, var(--c-arcana-violet) 38%, transparent),
+    inset 0 0 0 var(--line-hairline) color-mix(in oklch, var(--c-arcana-gold) 52%, transparent),
+    0 0 var(--m-s) color-mix(in oklch, var(--c-arcana-violet) 30%, transparent);
+}
+
+body.theme-terminal {
+  isolation: isolate;
+  text-shadow: 0 0 var(--m-s) var(--c-terminal-glow);
+}
+
+body.theme-terminal::before {
+  content: "";
+  position: fixed;
+  inset: var(--m);
+  z-index: var(--z-behind);
+  pointer-events: none;
+  border: var(--m-s) solid oklch(16% 0.025 145);
+  border-radius: var(--m-xl);
+  box-shadow:
+    inset 0 0 var(--m-xl) oklch(0% 0 0 / 0.9),
+    inset 0 0 var(--size-80) var(--c-terminal-dim),
+    0 0 0 var(--m) oklch(5% 0.01 145);
+}
+
+body.theme-terminal::after {
+  content: "SYSTEM READY_";
+  position: fixed;
+  inset-block-end: var(--m-m);
+  inset-inline-end: var(--m-l);
+  z-index: var(--z-behind);
+  pointer-events: none;
+  color: var(--c-accent);
+  font-family: var(--font-display);
+  font-size: var(--fs-sm);
+  opacity: 0.4;
+  animation: terminal-cursor var(--t-pulse-slow) steps(2, jump-none) infinite;
+}
+
+body.theme-terminal :where(h1, h2, h3)::before {
+  content: "";
+  display: inline-block;
+  inline-size: 0.62em;
+  block-size: 0.78em;
+  margin-inline-end: var(--m-s);
+  border-inline-start: var(--line-strong) solid currentcolor;
+  border-block-end: var(--line-strong) solid currentcolor;
+  transform: skewX(-18deg);
+}
+
+body.theme-terminal :is(img, video) {
+  filter: sepia(1) hue-rotate(68deg) saturate(0.72) contrast(1.08);
+  outline: var(--line-strong) solid var(--c-accent);
+  box-shadow: 0 0 var(--m-l) var(--c-terminal-glow);
+}
+
+body.theme-terminal :is(button, input, select, textarea, summary) {
+  border-radius: 0;
+  border-color: var(--c-accent);
+  background-color: oklch(9% 0.035 145 / 0.9);
+  box-shadow:
+    inset 0 0 var(--m-s) var(--c-terminal-dim),
+    0 0 var(--m-s) var(--c-terminal-dim);
+}
+
+body.theme-desktop :where(h1, h2, h3) {
+  color: var(--c-desktop-light);
+  background: repeating-linear-gradient(
+    90deg,
+    var(--c-desktop-blue) 0 var(--size-2),
+    transparent var(--size-2) var(--size-4)
+  );
+  padding: var(--m-s) var(--m-m);
+  border: var(--line-strong) solid var(--c-font);
+  text-shadow: var(--size-2) var(--size-2) 0 var(--c-font);
+  box-shadow:
+    inset var(--size-2) var(--size-2) 0 var(--c-desktop-light),
+    inset calc(var(--size-2) * -1) calc(var(--size-2) * -1) 0 var(--c-desktop-shadow);
+}
+
+body.theme-desktop :is(img, video) {
+  border: var(--m-s) solid var(--c-desktop-face);
+  outline: var(--line-strong) solid var(--c-font);
+  box-shadow:
+    inset var(--size-2) var(--size-2) 0 var(--c-desktop-light),
+    inset calc(var(--size-2) * -1) calc(var(--size-2) * -1) 0 var(--c-desktop-shadow),
+    var(--m-s) var(--m-s) 0 oklch(20% 0.03 250 / 0.45);
+}
+
+body.theme-desktop :is(button, input, select, textarea, summary) {
+  border-radius: 0;
+  border: var(--line-strong) solid var(--c-font);
+  background-color: var(--c-desktop-face);
+  box-shadow:
+    inset var(--size-2) var(--size-2) 0 var(--c-desktop-light),
+    inset calc(var(--size-2) * -1) calc(var(--size-2) * -1) 0 var(--c-desktop-shadow),
+    var(--size-2) var(--size-2) 0 var(--c-font);
 }
 
 @keyframes bling-background-drift {
@@ -730,6 +1127,18 @@ body.theme-arcana :where(button, input, select, summary) {
       var(--size-3) calc(var(--size-2) * -1) 0 var(--c-bling-cyan),
       calc(var(--size-3) * -1) var(--size-2) 0 var(--c-bling-pink),
       0 0 var(--m-l) var(--c-bling-gold);
+  }
+}
+
+@keyframes arcana-sigil-turn {
+  to {
+    rotate: 1turn;
+  }
+}
+
+@keyframes terminal-cursor {
+  50% {
+    opacity: 0.08;
   }
 }
 
@@ -797,16 +1206,28 @@ body.theme-arcana :where(button, input, select, summary) {
     outline: var(--line-hairline) solid CanvasText;
   }
 
-  body.theme-bling::before {
+  body.theme-bling::before,
+  body.theme-watercolour::before,
+  body.theme-watercolour::after,
+  body.theme-herbarium::before,
+  body.theme-herbarium::after,
+  body.theme-arcana::before,
+  body.theme-arcana::after,
+  body.theme-terminal::before,
+  body.theme-terminal::after {
     display: none;
   }
 
-  body.theme-herbarium::before {
-    display: none;
-  }
-
-  body.theme-bling :where(h1, h2, h3) {
+  body.theme-bling :where(h1, h2, h3),
+  body.theme-arcana :where(h1, h2, h3),
+  body.theme-desktop :where(h1, h2, h3) {
     color: CanvasText;
+    background: Canvas;
+    -webkit-text-fill-color: CanvasText;
     text-shadow: none;
+  }
+
+  body.theme-terminal :where(img, video) {
+    filter: none;
   }
 }
