@@ -177,14 +177,16 @@
 }
 
 .disclosure {
-  display: block;
+  display: flex;
+  align-items: flex-end;
+  flex-direction: column;
   block-size: var(--tap-target);
+  max-block-size: 90svh;
   transition: block-size var(--t-base) var(--ease-out);
 }
 
 .disclosure[open] {
   block-size: auto;
-  overflow: clip;
 }
 
 .mediaDetails {
@@ -192,13 +194,11 @@
   grid-row: 1;
   position: sticky;
   place-self: start end;
+  inset-block-start: var(--m-l);
   inset-inline-end: var(--m-l);
   max-inline-size: calc(100svw - var(--m-m));
   max-block-size: 90svh;
   margin-block-start: calc(var(--m-xl) * -1);
-  overflow: auto;
-  overscroll-behavior: contain;
-  scrollbar-gutter: stable;
   z-index: var(--z-details);
 }
 
@@ -212,8 +212,9 @@
 
 .mediaDetailsSummary {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: flex-end;
+  flex: 0 0 var(--tap-target);
   min-inline-size: var(--tap-target);
   list-style: none;
 }
@@ -222,19 +223,29 @@
   display: none;
 }
 
-/* Circled chip so the details toggle reads as a control, not a stray glyph. */
+/* The SVG avoids the baseline drift of the former text glyph. Its box starts
+   at the same block position as the media, while the summary retains a full
+   tap target below it. */
 .mediaDetailsGlyph {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   inline-size: var(--size-28);
   block-size: var(--size-28);
-  border: solid var(--line-hairline)
-    color-mix(in oklch, var(--c-bg-contrast-light) 45%, transparent);
   border-radius: var(--radius-pill);
   background: color-mix(in oklch, var(--c-bg-contrast-light) 10%, transparent);
-  font-size: var(--fs-sm);
   transition: background-color var(--t-fast);
+}
+
+.mediaDetailsGlyph svg {
+  display: block;
+  inline-size: 100%;
+  block-size: 100%;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: var(--size-1-5);
 }
 
 .mediaDetails summary:hover .mediaDetailsGlyph {
@@ -245,8 +256,13 @@
   display: flex;
   align-items: flex-end;
   flex-direction: column;
+  min-block-size: 0;
+  max-block-size: calc(90svh - var(--tap-target) - var(--m-s));
   margin-block-start: var(--m-s);
   padding: var(--m-m);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
   border-radius: var(--m);
   background-color: var(--glass-surface);
   backdrop-filter: blur(var(--glass-blur-surface));

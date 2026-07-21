@@ -170,6 +170,35 @@ test.describe("Responsive UI", () => {
     expect(summaryBox).not.toBeNull();
     expect(summaryBox!.x).toBeGreaterThanOrEqual(imageBox!.x + imageBox!.width);
     expect(summaryBox!.y).toBeCloseTo(imageBox!.y, 0);
+
+    const summary = photo.getByLabel("Photo details");
+    const glyphBox = await summary.locator("span").boundingBox();
+    expect(glyphBox).not.toBeNull();
+    expect(glyphBox!.y).toBeCloseTo(imageBox!.y, 0);
+
+    await summary.click();
+    const disclosure = summary.locator("xpath=..");
+    const scrollLayout = await disclosure.evaluate((element) => {
+      const content = element.querySelector<HTMLElement>(":scope > div");
+      if (!content) throw new Error("Expected photo details content");
+
+      return {
+        contentClientHeight: content.clientHeight,
+        contentOverflowY: getComputedStyle(content).overflowY,
+        contentScrollHeight: content.scrollHeight,
+        disclosureOverflowY: getComputedStyle(element).overflowY,
+      };
+    });
+
+    expect(scrollLayout.disclosureOverflowY).not.toMatch(/auto|scroll/);
+    expect(scrollLayout.contentOverflowY).toBe("auto");
+    expect(scrollLayout.contentScrollHeight).toBeGreaterThan(scrollLayout.contentClientHeight);
+
+    const triggerYBeforeScroll = (await summary.boundingBox())!.y;
+    await disclosure.locator(":scope > div").evaluate((content) => {
+      content.scrollTop = content.scrollHeight;
+    });
+    expect((await summary.boundingBox())!.y).toBeCloseTo(triggerYBeforeScroll, 0);
   });
 
   test("guess lobby explains the daily challenge without mobile overflow", async ({ page }) => {

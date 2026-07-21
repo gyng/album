@@ -65,6 +65,10 @@ describe("PhotoBlockEl", () => {
     expect(screen.getAllByTestId("picture")).toHaveLength(1);
     expect(screen.queryByText("Similar photos")).toBeNull();
 
+    const detailsControl = screen.getByLabelText("Photo details");
+    expect(detailsControl.querySelector("svg")).not.toBeNull();
+    expect(detailsControl.textContent).toBe("");
+
     const img: HTMLImageElement = screen.getByTestId("picture");
     expect(img!.src).toBeTruthy();
     expect(img!.srcset).toBeTruthy();

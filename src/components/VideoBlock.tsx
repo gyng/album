@@ -2,6 +2,7 @@ import styles from "./VideoBlock.module.css";
 import React from "react";
 import { License } from "../License";
 import commonStyles from "../styles/common.module.css";
+import { MediaDetailsIcon } from "./MediaDetailsIcon";
 
 export type YoutubeBlockElProps = {
   id?: string;
@@ -48,7 +49,7 @@ const VideoDetailsPanel: React.FC<{
           className={commonStyles.mediaDetailsSummary}
         >
           <span aria-hidden="true" className={commonStyles.mediaDetailsGlyph}>
-            ⓘ
+            <MediaDetailsIcon />
           </span>
         </summary>
 

@@ -28,6 +28,7 @@ import {
 } from "../util/photoBuckets";
 import { exifWallClockTimestamp, normaliseExifWallClockIso } from "../util/exifTime";
 import { PhotoSimilarPhotosDeferred } from "./PhotoSimilarPhotosDeferred";
+import { MediaDetailsIcon } from "./MediaDetailsIcon";
 
 type ExifCoordinatesRowProps = {
   kind: "coordinates";
@@ -365,7 +366,7 @@ export const PhotoBlockEl: React.FC<{
             className={commonStyles.mediaDetailsSummary}
           >
             <span aria-hidden="true" className={commonStyles.mediaDetailsGlyph}>
-              ⓘ
+              <MediaDetailsIcon />
             </span>
           </summary>
 
