@@ -221,6 +221,8 @@ export type PhotoBlockEditDetails = {
   description: string;
 };
 
+const THUMBNAIL_MIN_SOURCE_WIDTH = 1600;
+
 const withFacetAction = (
   value: ExifCellValue,
   href: string | null,
@@ -247,6 +249,11 @@ export const Picture: React.FC<{
 }> = (props) => {
   // Dimensions have to be flipped if image is rotated using EXIF.
   const { width: actualWidth, height: actualHeight } = getDisplayDimensions(props.block);
+  const thumbnailSources = props.block._build.srcset.filter(
+    ({ width }) => width >= THUMBNAIL_MIN_SOURCE_WIDTH,
+  );
+  const sources =
+    props.thumb && thumbnailSources.length > 0 ? thumbnailSources : props.block._build.srcset;
 
   const colour = props.block._build.tags.colors?.[0];
   const placeholderColour = colour ? rgbToString(colour) : "transparent";
@@ -266,10 +273,10 @@ export const Picture: React.FC<{
       <img
         data-testid="picture"
         className={styles.image}
-        srcSet={props.block._build.srcset.map((s) => `${s.src} ${s.width}w`).join(", ")}
+        srcSet={sources.map((s) => `${s.src} ${s.width}w`).join(", ")}
         sizes={props.thumb ? "auto, 800px" : "auto, 100vw"}
         // Original image is not uploaded
-        src={props.block._build.srcset[0].src}
+        src={sources[0].src}
         loading={props.lazy === false ? "eager" : "lazy"}
         style={{
           aspectRatio: `${actualWidth} / ${actualHeight}`,

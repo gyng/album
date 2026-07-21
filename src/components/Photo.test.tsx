@@ -330,14 +330,28 @@ describe("Picture", () => {
     expect(img.getAttribute("sizes")).toBe("auto, 100vw");
   });
 
-  it("emits full srcset and `sizes=auto, 800px` for thumbnails", () => {
+  it("uses 1600px and larger candidates for thumbnails", () => {
     render(<Picture block={block} thumb />);
 
     const img: HTMLImageElement = screen.getByTestId("picture");
-    expect(img.getAttribute("srcset")).toBe(
-      "monkey@800.avif 800w, monkey@1600.avif 1600w, monkey@3200.avif 3200w",
-    );
+    expect(img.getAttribute("srcset")).toBe("monkey@1600.avif 1600w, monkey@3200.avif 3200w");
+    expect(img.getAttribute("src")).toBe("monkey@1600.avif");
     expect(img.getAttribute("sizes")).toBe("auto, 800px");
+  });
+
+  it("keeps every candidate when a thumbnail has no 1600px source", () => {
+    const smallBlock = createBlock({
+      srcset: [
+        { src: "small@400.avif", width: 400, height: 600 },
+        { src: "small@800.avif", width: 800, height: 1200 },
+      ],
+    });
+
+    render(<Picture block={smallBlock} thumb />);
+
+    const img: HTMLImageElement = screen.getByTestId("picture");
+    expect(img.getAttribute("srcset")).toBe("small@400.avif 400w, small@800.avif 800w");
+    expect(img.getAttribute("src")).toBe("small@400.avif");
   });
 
   it.each(["Rotate 90 CW", "Rotate 270 CW"])(
