@@ -124,7 +124,12 @@ const columns: Column[] = [
     label: "Junk tags",
     hint: "Tags that are stopwords lifted out of the model's own sentence.",
     value: (m) => percent(m.junkRate),
-    fraction: (m) => m.junkRate / Math.max(0.01, maxOf((x) => x.junkRate)),
+    fraction: (m) =>
+      m.junkRate /
+      Math.max(
+        0.01,
+        maxOf((x) => x.junkRate),
+      ),
     lowerIsBetter: true,
   },
   {
@@ -238,53 +243,53 @@ const CaseRow = ({ entry }: { entry: BenchmarkCase }) => (
       <div className={styles.tableScroll}>
         <table className={[styles.table, styles.answerTable].join(" ")}>
           <thead>
-          <tr>
-            <th scope="col">Model</th>
-            <th scope="col">Result</th>
-            <th scope="col">Tags</th>
-            <th scope="col">Alt text</th>
-          </tr>
-        </thead>
-        <tbody>
-          {data.models.map((model) => {
-            const result = entry.results[model.key];
-            if (!result) return null;
-            return (
-              <tr key={model.key} className={result.passed ? "" : styles.failRow}>
-                <th scope="row" className={styles.answerModel}>
-                  <ModelLabel model={model} compact />
-                </th>
-                <td className={styles.answerVerdict} data-label="Result">
-                  <span className={result.passed ? styles.passMark : styles.failMark}>
-                    {result.passed ? "Pass" : "Fail"}
-                  </span>
-                  {result.trippedOn ? (
-                    <span className={styles.why}>“{result.trippedOn}”</span>
-                  ) : null}
-                  {!result.conceptInTags && result.passed ? (
-                    <span className={styles.why}>sentence only</span>
-                  ) : null}
-                </td>
-                <td data-label="Tags">
-                  <div className={styles.chips}>
-                    {result.tags.map((tag) => (
-                      <span
-                        key={tag}
-                        className={[
-                          styles.chip,
-                          result.junkTags.includes(tag) ? styles.chipJunk : "",
-                        ]
-                          .filter(Boolean)
-                          .join(" ")}
-                      >
-                        {tag}
-                      </span>
-                    ))}
-                  </div>
-                </td>
-                <td className={styles.answerAlt} data-label="Alt text">
-                  {result.alt}
-                </td>
+            <tr>
+              <th scope="col">Model</th>
+              <th scope="col">Result</th>
+              <th scope="col">Tags</th>
+              <th scope="col">Alt text</th>
+            </tr>
+          </thead>
+          <tbody>
+            {data.models.map((model) => {
+              const result = entry.results[model.key];
+              if (!result) return null;
+              return (
+                <tr key={model.key} className={result.passed ? "" : styles.failRow}>
+                  <th scope="row" className={styles.answerModel}>
+                    <ModelLabel model={model} compact />
+                  </th>
+                  <td className={styles.answerVerdict} data-label="Result">
+                    <span className={result.passed ? styles.passMark : styles.failMark}>
+                      {result.passed ? "Pass" : "Fail"}
+                    </span>
+                    {result.trippedOn ? (
+                      <span className={styles.why}>“{result.trippedOn}”</span>
+                    ) : null}
+                    {!result.conceptInTags && result.passed ? (
+                      <span className={styles.why}>sentence only</span>
+                    ) : null}
+                  </td>
+                  <td data-label="Tags">
+                    <div className={styles.chips}>
+                      {result.tags.map((tag) => (
+                        <span
+                          key={tag}
+                          className={[
+                            styles.chip,
+                            result.junkTags.includes(tag) ? styles.chipJunk : "",
+                          ]
+                            .filter(Boolean)
+                            .join(" ")}
+                        >
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                  </td>
+                  <td className={styles.answerAlt} data-label="Alt text">
+                    {result.alt}
+                  </td>
                 </tr>
               );
             })}

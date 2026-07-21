@@ -211,15 +211,13 @@
   scrollbar-gutter: auto;
   margin-inline-end: calc(
     (100% -
-          min(
-            90svw,
-            calc(100% - (var(--tap-target) + var(--m-s)) * 2),
-            calc(90svh * var(--photo-aspect, 1)),
-            var(--photo-intrinsic-width, 100%)
-          )) /
-      2 -
-      var(--tap-target) -
-      var(--m-s)
+        min(
+          90svw,
+          calc(100% - (var(--tap-target) + var(--m-s)) * 2),
+          calc(90svh * var(--photo-aspect, 1)),
+          var(--photo-intrinsic-width, 100%)
+        )) /
+      2 - var(--tap-target) - var(--m-s)
   );
 }
 

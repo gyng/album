@@ -106,13 +106,7 @@ describe("SearchResultsGrid", () => {
     expect(screen.getByText(/Something went wrong/)).toBeInTheDocument();
 
     view.rerender(
-      <SearchResultsGrid
-        {...baseProps}
-        searchInputValue="query"
-        isError
-        isFetching
-        isSearching
-      />,
+      <SearchResultsGrid {...baseProps} searchInputValue="query" isError isFetching isSearching />,
     );
     expect(screen.queryByText(/Something went wrong/)).toBeNull();
     expect(screen.getByText("Searching…")).toBeInTheDocument();

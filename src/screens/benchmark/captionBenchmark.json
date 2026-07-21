@@ -181,25 +181,12 @@
       "album": "test-simple",
       "file": "DSCF0506-2.jpg",
       "comment": "",
-      "requiredAny": [
-        "mountain",
-        "snow",
-        "peak"
-      ],
-      "forbidden": [
-        "beach",
-        "ocean"
-      ],
+      "requiredAny": ["mountain", "snow", "peak"],
+      "forbidden": ["beach", "ocean"],
       "results": {
         "janus": {
           "passed": true,
-          "tags": [
-            "mountain",
-            "path",
-            "snow",
-            "pathway",
-            "mountain view"
-          ],
+          "tags": ["mountain", "path", "snow", "pathway", "mountain view"],
           "alt": "A scenic mountain path with snow-covered peaks and a clear blue sky.",
           "trippedOn": null,
           "conceptInTags": true,
@@ -403,24 +390,12 @@
       "album": "test-simple",
       "file": "DSCF0593.jpg",
       "comment": "",
-      "requiredAny": [
-        "dam",
-        "reservoir"
-      ],
-      "forbidden": [
-        "skyscraper",
-        "airport"
-      ],
+      "requiredAny": ["dam", "reservoir"],
+      "forbidden": ["skyscraper", "airport"],
       "results": {
         "janus": {
           "passed": true,
-          "tags": [
-            "water dam",
-            "mountain",
-            "forest",
-            "water",
-            "bridge"
-          ],
+          "tags": ["water dam", "mountain", "forest", "water", "bridge"],
           "alt": "A large dam stands majestically in a forested mountain range, with a bridge crossing over it.",
           "trippedOn": null,
           "conceptInTags": true,
@@ -624,29 +599,12 @@
       "album": "test-simple",
       "file": "DSCF2485-2.jpg",
       "comment": "Water monitor lizard. Forbidden list is the set of real observed confusions.",
-      "requiredAny": [
-        "lizard",
-        "monitor",
-        "varanus",
-        "reptile"
-      ],
-      "forbidden": [
-        "otter",
-        "turtle",
-        "duck",
-        "snake",
-        "alligator",
-        "crocodile"
-      ],
+      "requiredAny": ["lizard", "monitor", "varanus", "reptile"],
+      "forbidden": ["otter", "turtle", "duck", "snake", "alligator", "crocodile"],
       "results": {
         "janus": {
           "passed": false,
-          "tags": [
-            "water",
-            "duck",
-            "waterfall",
-            "nature"
-          ],
+          "tags": ["water", "duck", "waterfall", "nature"],
           "alt": "A small duck swims in a calm waterfall surrounded by clear water and ripples.",
           "trippedOn": "duck",
           "conceptInTags": false,
@@ -730,13 +688,7 @@
         },
         "haiku-4.5": {
           "passed": false,
-          "tags": [
-            "seal",
-            "marine animal",
-            "coastal water",
-            "rocky seabed",
-            "shallow water"
-          ],
+          "tags": ["seal", "marine animal", "coastal water", "rocky seabed", "shallow water"],
           "alt": "Seal swimming in shallow coastal water with rocky seabed and seaweed.",
           "trippedOn": null,
           "conceptInTags": false,
@@ -852,28 +804,12 @@
       "album": "test-simple",
       "file": "DSCF2581-2_2.jpg",
       "comment": "Long-tailed macaque in SE Asian forest. Baboon is forbidden: Gemma emitted both 'Baboon primate' and 'Macaque group' and passed on the hedge.",
-      "requiredAny": [
-        "macaque",
-        "monkey",
-        "primate"
-      ],
-      "forbidden": [
-        "dog",
-        "cat",
-        "baboon",
-        "african"
-      ],
+      "requiredAny": ["macaque", "monkey", "primate"],
+      "forbidden": ["dog", "cat", "baboon", "african"],
       "results": {
         "janus": {
           "passed": true,
-          "tags": [
-            "monkey",
-            "forest",
-            "natural",
-            "animal",
-            "tree",
-            "plant"
-          ],
+          "tags": ["monkey", "forest", "natural", "animal", "tree", "plant"],
           "alt": "A monkey sits on a tree branch surrounded by lush green foliage.",
           "trippedOn": null,
           "conceptInTags": true,
@@ -956,13 +892,7 @@
         },
         "haiku-4.5": {
           "passed": true,
-          "tags": [
-            "monkey",
-            "primate",
-            "tropical forest",
-            "mossy rock",
-            "wildlife"
-          ],
+          "tags": ["monkey", "primate", "tropical forest", "mossy rock", "wildlife"],
           "alt": "Primate sitting on moss-covered rock within dense tropical jungle environment.",
           "trippedOn": null,
           "conceptInTags": true,
@@ -1080,24 +1010,12 @@
       "album": "test-simple",
       "file": "DSCF2768.JPG",
       "comment": "",
-      "requiredAny": [
-        "spider",
-        "arachnid",
-        "insect"
-      ],
-      "forbidden": [
-        "bird",
-        "fish"
-      ],
+      "requiredAny": ["spider", "arachnid", "insect"],
+      "forbidden": ["bird", "fish"],
       "results": {
         "janus": {
           "passed": true,
-          "tags": [
-            "plant",
-            "leaves",
-            "green",
-            "botanical"
-          ],
+          "tags": ["plant", "leaves", "green", "botanical"],
           "alt": "A close-up of a green leafy plant with a small insect on one of its leaves.",
           "trippedOn": null,
           "conceptInTags": false,
@@ -1181,13 +1099,7 @@
         },
         "haiku-4.5": {
           "passed": true,
-          "tags": [
-            "insect",
-            "macro photography",
-            "plant",
-            "bug",
-            "seedpod"
-          ],
+          "tags": ["insect", "macro photography", "plant", "bug", "seedpod"],
           "alt": "Small reddish-brown insect perched on green plant seedpod in nature.",
           "trippedOn": null,
           "conceptInTags": true,
@@ -1303,38 +1215,16 @@
       "album": "snapshots",
       "file": "DSCF3121.JPG",
       "comment": "Modernist facade: row of yellow circular porthole windows on a white ribbed concrete wall, car park deck above. The portholes read as a ship to a careless model.",
-      "requiredAny": [
-        "facade",
-        "building",
-        "wall",
-        "architect",
-        "window"
-      ],
-      "forbidden": [
-        "ship",
-        "boat",
-        "vessel",
-        "submarine",
-        "aircraft"
-      ],
+      "requiredAny": ["facade", "building", "wall", "architect", "window"],
+      "forbidden": ["ship", "boat", "vessel", "submarine", "aircraft"],
       "results": {
         "janus": {
           "passed": true,
-          "tags": [
-            "depicts",
-            "modern",
-            "building",
-            "facade",
-            "series",
-            "yellow"
-          ],
+          "tags": ["depicts", "modern", "building", "facade", "series", "yellow"],
           "alt": "The photo depicts a modern building facade with a series of yellow circular openings, a textured gray wall, and a balcony with visible windows.",
           "trippedOn": null,
           "conceptInTags": true,
-          "junkTags": [
-            "depicts",
-            "series"
-          ]
+          "junkTags": ["depicts", "series"]
         },
         "gemma-q8": {
           "passed": true,
@@ -1533,26 +1423,12 @@
       "album": "snapshots",
       "file": "DSCF1279.JPG",
       "comment": "Hand-painted 'COFFEE TEA TOAST FRIES GELATO' on a white door, aluminium stepladder, green wheelie bin. Tests reading text in the scene. No people are present.",
-      "requiredAny": [
-        "coffee",
-        "gelato",
-        "toast",
-        "sign"
-      ],
-      "forbidden": [
-        "person",
-        "people",
-        "crowd",
-        "portrait"
-      ],
+      "requiredAny": ["coffee", "gelato", "toast", "sign"],
+      "forbidden": ["person", "people", "crowd", "portrait"],
       "results": {
         "janus": {
           "passed": true,
-          "tags": [
-            "food",
-            "menu",
-            "restaurant"
-          ],
+          "tags": ["food", "menu", "restaurant"],
           "alt": "A small outdoor food establishment with a menu offering coffee, tea, toast, fries, and gelato.",
           "trippedOn": null,
           "conceptInTags": false,
@@ -1629,13 +1505,7 @@
         },
         "haiku-4.5": {
           "passed": true,
-          "tags": [
-            "cafe menu",
-            "storefront signage",
-            "building wall",
-            "ladder",
-            "street scene"
-          ],
+          "tags": ["cafe menu", "storefront signage", "building wall", "ladder", "street scene"],
           "alt": "Building wall displaying cafe menu text with ladder and trash bins.",
           "trippedOn": null,
           "conceptInTags": true,
@@ -1752,39 +1622,16 @@
       "album": "2511japan",
       "file": "DSCF6271-12.jpg",
       "comment": "Silhouetted crowd under a vermilion shrine frame at night, hung with BOTH paper lanterns and glass furin wind chimes (confirmed by the photographer). Either reading is correct, so both terms are accepted. A zoom of one region shows only furin - which is why a single crop is not sufficient evidence to relabel a whole frame. 'fireworks' is the only wrong answer any model gave here.",
-      "requiredAny": [
-        "lantern",
-        "wind chime",
-        "furin",
-        "chime",
-        "shrine"
-      ],
-      "forbidden": [
-        "fireworks",
-        "daylight",
-        "sunny",
-        "beach",
-        "snow"
-      ],
+      "requiredAny": ["lantern", "wind chime", "furin", "chime", "shrine"],
+      "forbidden": ["fireworks", "daylight", "sunny", "beach", "snow"],
       "results": {
         "janus": {
           "passed": true,
-          "tags": [
-            "depicts",
-            "crowd",
-            "people",
-            "gathered",
-            "under",
-            "stage"
-          ],
+          "tags": ["depicts", "crowd", "people", "gathered", "under", "stage"],
           "alt": "The photo depicts a crowd of people gathered under a stage illuminated by bright red lights and hanging lanterns, creating a warm and festive atmosphere.",
           "trippedOn": null,
           "conceptInTags": false,
-          "junkTags": [
-            "depicts",
-            "gathered",
-            "under"
-          ]
+          "junkTags": ["depicts", "gathered", "under"]
         },
         "gemma-q8": {
           "passed": false,
@@ -1863,13 +1710,7 @@
         },
         "haiku-4.5": {
           "passed": true,
-          "tags": [
-            "festival crowd",
-            "night event",
-            "lanterns",
-            "celebration",
-            "silhouettes"
-          ],
+          "tags": ["festival crowd", "night event", "lanterns", "celebration", "silhouettes"],
           "alt": "Silhouettes of festival crowds gathered before red building with hanging lanterns.",
           "trippedOn": null,
           "conceptInTags": true,
@@ -1986,36 +1827,16 @@
       "album": "kansai",
       "file": "IMG_20161115_195908.jpg",
       "comment": "Shoyu ramen: chashu slices, menma, spring onion, dragon-pattern bowl, chopsticks, water glass, Japanese menu behind.",
-      "requiredAny": [
-        "ramen",
-        "noodle",
-        "soup",
-        "broth"
-      ],
-      "forbidden": [
-        "pizza",
-        "burger",
-        "salad",
-        "cake",
-        "dessert"
-      ],
+      "requiredAny": ["ramen", "noodle", "soup", "broth"],
+      "forbidden": ["pizza", "burger", "salad", "cake", "dessert"],
       "results": {
         "janus": {
           "passed": true,
-          "tags": [
-            "image",
-            "bowl",
-            "ramen",
-            "chopsticks",
-            "spoon",
-            "glass"
-          ],
+          "tags": ["image", "bowl", "ramen", "chopsticks", "spoon", "glass"],
           "alt": "The image shows a bowl of ramen with chopsticks, a spoon, and a glass of water.",
           "trippedOn": null,
           "conceptInTags": true,
-          "junkTags": [
-            "image"
-          ]
+          "junkTags": ["image"]
         },
         "gemma-q8": {
           "passed": true,
@@ -2090,13 +1911,7 @@
         },
         "haiku-4.5": {
           "passed": true,
-          "tags": [
-            "ramen",
-            "Japanese food",
-            "noodles",
-            "soup bowl",
-            "pork"
-          ],
+          "tags": ["ramen", "Japanese food", "noodles", "soup bowl", "pork"],
           "alt": "Traditional ramen bowl with noodles, broth, sliced pork and green onions.",
           "trippedOn": null,
           "conceptInTags": true,
@@ -2220,27 +2035,12 @@
       "album": "2511japan",
       "file": "DSCF8107.JPG",
       "comment": "White cat against a lichen-covered rock, looking up, greenery behind.",
-      "requiredAny": [
-        "cat",
-        "kitten",
-        "feline"
-      ],
-      "forbidden": [
-        "dog",
-        "puppy",
-        "rabbit"
-      ],
+      "requiredAny": ["cat", "kitten", "feline"],
+      "forbidden": ["dog", "puppy", "rabbit"],
       "results": {
         "janus": {
           "passed": true,
-          "tags": [
-            "cat",
-            "white",
-            "stone",
-            "tree",
-            "nature",
-            "outdoor"
-          ],
+          "tags": ["cat", "white", "stone", "tree", "nature", "outdoor"],
           "alt": "A white cat with yellow eyes is perched on a stone, surrounded by green foliage and a tree.",
           "trippedOn": null,
           "conceptInTags": true,
@@ -2322,13 +2122,7 @@
         },
         "haiku-4.5": {
           "passed": true,
-          "tags": [
-            "white cat",
-            "feline portrait",
-            "yellow eyes",
-            "outdoor cat",
-            "domestic animal"
-          ],
+          "tags": ["white cat", "feline portrait", "yellow eyes", "outdoor cat", "domestic animal"],
           "alt": "White cat with striking yellow-green eyes looking upward in outdoor setting.",
           "trippedOn": null,
           "conceptInTags": true,
@@ -2445,26 +2239,12 @@
       "album": "snapshots",
       "file": "DSCF5682.JPG",
       "comment": "Ginger tabby dozing, eyes shut, backlit perforated metal panel with bokeh behind. Tests backlit exposure.",
-      "requiredAny": [
-        "cat",
-        "kitten",
-        "feline",
-        "tabby"
-      ],
-      "forbidden": [
-        "dog",
-        "puppy",
-        "rabbit"
-      ],
+      "requiredAny": ["cat", "kitten", "feline", "tabby"],
+      "forbidden": ["dog", "puppy", "rabbit"],
       "results": {
         "janus": {
           "passed": true,
-          "tags": [
-            "cat",
-            "relaxing",
-            "sunny",
-            "cat bed"
-          ],
+          "tags": ["cat", "relaxing", "sunny", "cat bed"],
           "alt": "A close-up of a cat lying on a sunny cat bed, enjoying the warmth.",
           "trippedOn": null,
           "conceptInTags": true,
@@ -2548,13 +2328,7 @@
         },
         "haiku-4.5": {
           "passed": true,
-          "tags": [
-            "orange cat",
-            "tabby cat",
-            "sleeping cat",
-            "peaceful expression",
-            "portrait"
-          ],
+          "tags": ["orange cat", "tabby cat", "sleeping cat", "peaceful expression", "portrait"],
           "alt": "Orange tabby cat with closed eyes in peaceful, relaxed expression.",
           "trippedOn": null,
           "conceptInTags": true,

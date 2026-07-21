@@ -47,9 +47,7 @@ test.describe("Search", () => {
     const input = page.getByRole("textbox", { name: "Search photos" });
     await input.fill("japan");
     await expect(input).toHaveAttribute("aria-busy", "true");
-    await expect(page.locator('ul[aria-busy="true"] > li[role="status"]')).toHaveText(
-      "Searching…",
-    );
+    await expect(page.locator('ul[aria-busy="true"] > li[role="status"]')).toHaveText("Searching…");
     await expect(page).toHaveURL(/q=japan/);
 
     await expectJapanResults(page);
