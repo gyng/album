@@ -122,6 +122,32 @@ test.describe("Responsive UI", () => {
     }
   });
 
+  test("iPad Split View retains the compact landscape album opening", async ({
+    browser,
+    baseURL,
+  }) => {
+    const context = await browser.newContext({
+      baseURL,
+      hasTouch: true,
+      isMobile: true,
+      viewport: { width: 597, height: 834 },
+    });
+    const tabletPage = await context.newPage();
+
+    try {
+      await tabletPage.goto("/album/test-simple", { waitUntil: "domcontentloaded" });
+
+      const photograph = tabletPage.getByTestId("photoblockel").first().getByRole("img");
+      const photographBox = await photograph.boundingBox();
+      expect(photographBox).not.toBeNull();
+      expect(photographBox!.y).toBeLessThan(834 * 0.4);
+      await expect(tabletPage.getByLabel("Theme")).toBeInViewport();
+      await expectNoDocumentOverflow(tabletPage);
+    } finally {
+      await context.close();
+    }
+  });
+
   test("fantasy themes have distinct scenery and typography", async ({ page }) => {
     const themes = [
       "slate",

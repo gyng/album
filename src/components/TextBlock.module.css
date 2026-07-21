@@ -16,10 +16,10 @@
   }
 }
 
-/* iPad landscape has desktop-like width but much less vertical runway. Keep
-   the album masthead ceremonial while letting the first photograph enter the
-   opening viewport instead of spending nearly half the screen on whitespace. */
-@media (min-width: 721px) and (max-height: 900px) and (pointer: coarse) {
+/* Short touch viewports include both full-width iPad landscape and Split View,
+   whose CSS width can look phone-like. Key this to the actual constraint—low
+   vertical runway—so the first photograph enters the opening viewport. */
+@media (max-height: 900px) and (pointer: coarse) {
   .title {
     margin-block-start: var(--m-l);
   }
