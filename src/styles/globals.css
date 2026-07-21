@@ -7,7 +7,10 @@ body {
   color: var(--c-font);
   background-color: var(--c-bg);
   scrollbar-gutter: stable;
+}
 
+html[data-theme-ready],
+html[data-theme-ready] body {
   transition:
     background-color var(--t-theme),
     color var(--t-theme);
@@ -24,6 +27,9 @@ html {
 body {
   min-block-size: 100%;
   overflow-x: clip;
+  background-image: var(--theme-background-image);
+  background-size: var(--theme-background-size);
+  background-attachment: var(--theme-background-attachment);
 }
 
 a {
@@ -105,6 +111,9 @@ textarea {
   --font-sans:
     -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Fira Sans",
     "Droid Sans", "Helvetica Neue", sans-serif;
+  --theme-background-image: none;
+  --theme-background-size: auto;
+  --theme-background-attachment: scroll;
 
   --m: 4px;
   --m-xs: 6px;
@@ -386,6 +395,92 @@ body.dark {
   --c-bg-contrast-light: oklch(74% 0.045 245);
   --c-bg-contrast-dark: oklch(37% 0.04 255);
   --c-accent: oklch(72% 0.11 200);
+}
+
+/* Porcelain — crisp gallery daylight, blue glaze and a restrained vermilion
+   accent. The serif face gives captions the feel of a printed collection. */
+:root:where(.theme-porcelain),
+:where(.theme-porcelain) {
+  --font-sans: Charter, "Bitstream Charter", "Sitka Text", Cambria, Georgia, serif;
+  --c-bg: oklch(97% 0.012 235);
+  --c-overlay: oklch(97% 0.012 235 / 0.76);
+  --c-font: oklch(24% 0.055 255);
+  --c-bg-contrast-light: oklch(48% 0.09 255);
+  --c-bg-contrast-dark: oklch(27% 0.12 260);
+  --c-accent: oklch(55% 0.2 28);
+  --theme-background-image: linear-gradient(
+    135deg,
+    oklch(100% 0 0 / 0.72),
+    transparent 48%,
+    oklch(83% 0.055 235 / 0.22)
+  );
+  --theme-background-attachment: fixed;
+}
+
+/* Ember — smoke, oxidised copper and the last glow in a darkroom tray. */
+:root:where(.theme-ember),
+:where(.theme-ember) {
+  --c-bg: oklch(19% 0.035 45);
+  --c-overlay: oklch(19% 0.035 45 / 0.78);
+  --c-font: oklch(91% 0.035 72);
+  --c-bg-contrast-light: oklch(72% 0.09 58);
+  --c-bg-contrast-dark: oklch(27% 0.055 38);
+  --c-accent: oklch(72% 0.18 48);
+  --theme-background-image:
+    radial-gradient(circle at 12% 8%, oklch(56% 0.16 42 / 0.2), transparent 32%),
+    radial-gradient(circle at 88% 90%, oklch(45% 0.11 72 / 0.16), transparent 36%);
+  --theme-background-attachment: fixed;
+}
+
+/* Bling — an unapologetic dial-up-era party: black velvet, neon stickers,
+   glitter tiles and Comic Sans. It is opt-in, loud and still high-contrast. */
+:root:where(.theme-bling),
+:where(.theme-bling) {
+  --font-sans: "Comic Sans MS", "Chalkboard SE", "Marker Felt", cursive;
+  --c-bg: oklch(14% 0.08 305);
+  --c-overlay: oklch(18% 0.1 305 / 0.82);
+  --c-font: oklch(96% 0.055 105);
+  --c-bg-contrast-light: oklch(82% 0.17 195);
+  --c-bg-contrast-dark: oklch(25% 0.14 315);
+  --c-accent: oklch(72% 0.3 345);
+  --c-bling-cyan: oklch(86% 0.18 195);
+  --c-bling-gold: oklch(88% 0.18 96);
+  --c-bling-pink: oklch(72% 0.3 345);
+  --theme-background-image:
+    radial-gradient(circle, var(--c-bling-gold) 0 var(--size-1), transparent var(--size-2)),
+    radial-gradient(circle, var(--c-bling-cyan) 0 var(--size-1), transparent var(--size-2)),
+    repeating-conic-gradient(from 18deg, oklch(40% 0.24 320 / 0.22) 0 7deg, transparent 7deg 18deg);
+  --theme-background-size:
+    var(--size-40) var(--size-40), var(--size-80) var(--size-80), var(--size-200) var(--size-200);
+  --theme-background-attachment: fixed;
+}
+
+body.theme-bling {
+  animation: bling-background-drift calc(var(--t-shimmer) * 8) linear infinite;
+}
+
+body.theme-bling :where(h1, h2, h3) {
+  color: var(--c-bling-gold);
+  text-shadow:
+    var(--size-2) var(--size-2) 0 var(--c-bling-pink),
+    calc(var(--size-2) * -1) calc(var(--size-2) * -1) 0 var(--c-bling-cyan);
+}
+
+body.theme-bling :where(img, video) {
+  outline: var(--line-strong) solid var(--c-bling-cyan);
+  outline-offset: var(--size-2);
+  box-shadow:
+    0 0 0 var(--m) color-mix(in oklch, var(--c-bling-pink) 48%, transparent),
+    0 0 var(--m-l) color-mix(in oklch, var(--c-bling-cyan) 62%, transparent);
+}
+
+@keyframes bling-background-drift {
+  to {
+    background-position:
+      var(--size-40) var(--size-40),
+      calc(var(--size-80) * -1) var(--size-80),
+      var(--size-200) calc(var(--size-200) * -1);
+  }
 }
 
 /* Global reduced-motion safety net: neutralise CSS animations/transitions and

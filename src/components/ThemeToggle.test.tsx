@@ -56,6 +56,23 @@ describe("ThemeToggle", () => {
     expect(localStorage.getItem("theme")).toBe("slate");
   });
 
+  it.each([
+    ["porcelain", "Porcelain", "light"],
+    ["ember", "Ember", "dark"],
+    ["bling", "Bling", "dark"],
+  ])("offers and applies the %s theme", (value, label, scheme) => {
+    render(<ThemeToggle />);
+
+    expect(screen.getByRole("option", { name: label })).toBeInTheDocument();
+    fireEvent.change(getPicker(), { target: { value } });
+
+    expect(document.documentElement).toHaveClass(scheme);
+    expect(document.documentElement).toHaveClass(`theme-${value}`);
+    expect(document.body).toHaveClass(scheme);
+    expect(document.body).toHaveClass(`theme-${value}`);
+    expect(localStorage.getItem("theme")).toBe(value);
+  });
+
   it("honours a legacy darkMode preference and migrates it on change", () => {
     localStorage.setItem("darkMode", "true");
 

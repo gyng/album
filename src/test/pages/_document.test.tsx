@@ -50,6 +50,8 @@ describe("custom document", () => {
 
   it("renders metadata and the pre-hydration theme initialiser", () => {
     const html = renderToStaticMarkup(<MyDocument />);
+    const themeInitialiser = html.indexOf('localStorage.getItem("theme")');
+    const headEnd = html.indexOf("</head>");
 
     expect(html).toContain('<html lang="en-GB">');
     expect(html).toContain('<link rel="manifest" href="/manifest.webmanifest"/>');
@@ -58,6 +60,8 @@ describe("custom document", () => {
     );
     expect(html).toContain('name="theme-color" content="#000000"');
     expect(html).toContain('localStorage.getItem("darkMode")');
+    expect(themeInitialiser).toBeGreaterThan(-1);
+    expect(themeInitialiser).toBeLessThan(headEnd);
     expect(html).toContain('data-next-main="true"');
     expect(html).toContain('data-next-script="true"');
   });

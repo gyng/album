@@ -5,7 +5,7 @@
  * registry must stay JSON-safe.
  */
 
-export const NAMED_THEMES = ["paper", "ink", "slate"] as const;
+export const NAMED_THEMES = ["paper", "ink", "slate", "porcelain", "ember", "bling"] as const;
 
 export type NamedTheme = (typeof NAMED_THEMES)[number];
 export type ThemeName = "light" | "dark" | NamedTheme;
@@ -17,6 +17,9 @@ export const THEME_SCHEMES: Record<ThemeName, "light" | "dark"> = {
   paper: "light",
   ink: "dark",
   slate: "dark",
+  porcelain: "light",
+  ember: "dark",
+  bling: "dark",
 };
 
 export const THEME_NAMES = Object.keys(THEME_SCHEMES) as readonly ThemeName[];
@@ -27,6 +30,9 @@ export const THEME_LABELS: Record<ThemeName, string> = {
   paper: "Paper",
   ink: "Ink",
   slate: "Slate",
+  porcelain: "Porcelain",
+  ember: "Ember",
+  bling: "Bling",
 };
 
 export const isThemeName = (value: unknown): value is ThemeName =>

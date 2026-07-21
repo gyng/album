@@ -9,6 +9,15 @@ export const THEME_BOOTSTRAP_SCRIPT = `
   const schemes = ${JSON.stringify(THEME_SCHEMES)};
   const named = ${JSON.stringify(NAMED_THEMES)};
 
+  // Enable theme-change transitions only after the correctly themed first
+  // frame has painted. Two frames ensure the class cannot animate the initial
+  // system-to-stored-theme change.
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      document.documentElement.dataset.themeReady = "";
+    });
+  });
+
   const applyTheme = (theme) => {
     const scheme = theme == null ? null : schemes[theme];
     for (const el of [document.documentElement, document.body]) {
