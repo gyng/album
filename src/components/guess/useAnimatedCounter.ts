@@ -23,7 +23,7 @@ export const useAnimatedCounter = (target: number, durationMs = 600): RefCallbac
         window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
       if (target === 0 || target === prevTarget.current || prefersReducedMotion) {
-        node.textContent = target.toLocaleString();
+        node.textContent = target.toLocaleString("en-GB");
         prevTarget.current = target;
         return;
       }
@@ -34,7 +34,7 @@ export const useAnimatedCounter = (target: number, durationMs = 600): RefCallbac
         const elapsed = now - start;
         const progress = Math.min(elapsed / durationMs, 1);
         const eased = 1 - Math.pow(1 - progress, 3);
-        node.textContent = Math.round(eased * target).toLocaleString();
+        node.textContent = Math.round(eased * target).toLocaleString("en-GB");
         if (progress < 1) {
           rafRef.current = requestAnimationFrame(animate);
         }

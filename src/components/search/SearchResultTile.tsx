@@ -1,7 +1,7 @@
 import { AppLink as Link } from "../platform";
 import { Thumb, OverlayButton } from "../ui";
 import styles from "./SearchResultTile.module.css";
-import { getRelativeTimeString } from "../../util/time";
+import { HydratedRelativeTime } from "../HydratedRelativeTime";
 import { extractDateFromExifString } from "../../util/extractExifFromDb";
 import { SearchResultRow } from "./searchTypes";
 import { RGB, rgbToString, parseColorPalette } from "../../util/colorDistance";
@@ -136,10 +136,11 @@ export const SearchResultTile = (props: {
                 {dateTimeOriginal ? "," : null}
               </div>
               {dateTimeOriginal ? (
-                <div className={styles.sourceText} title={dateTimeOriginal.toLocaleDateString()}>
-                  {getRelativeTimeString(dateTimeOriginal, {
-                    short: true,
-                  })?.replace(" ago", "")}
+                <div
+                  className={styles.sourceText}
+                  title={dateTimeOriginal.toLocaleDateString("en-GB")}
+                >
+                  <HydratedRelativeTime date={dateTimeOriginal} short trimPastSuffix />
                 </div>
               ) : null}
             </div>

@@ -18,7 +18,7 @@ jest.mock("./confetti", () => ({
 
 jest.mock("./useAnimatedCounter", () => ({
   useAnimatedCounter: (target: number) => (node: HTMLElement | null) => {
-    if (node) node.textContent = target.toLocaleString();
+    if (node) node.textContent = target.toLocaleString("en-GB");
   },
 }));
 

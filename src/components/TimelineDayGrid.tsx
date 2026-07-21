@@ -2,7 +2,7 @@ import { AppLink as Link } from "./platform";
 import React from "react";
 import { MapWorldDeferred } from "./MapWorldDeferred";
 import type { MapWorldEntry, TimelineEntry } from "../util/pageDataTypes";
-import { getRelativeTimeString } from "../util/time";
+import { HydratedRelativeTime } from "./HydratedRelativeTime";
 import { Caption, Heading, Thumb, buttonStyles, overlayButtonStyles } from "./ui";
 import styles from "./TimelineDayGrid.module.css";
 import {
@@ -17,13 +17,9 @@ const formatLongDate = (date: string) => formatExifWallClockDate(`${date}T00:00:
 const formatDateTimeTitle = (dateTimeOriginal: string) =>
   formatExifWallClockDateTime(dateTimeOriginal);
 
-const formatRelativeDateTime = (dateTimeOriginal: string) => {
+const relativeDateTimestamp = (dateTimeOriginal: string) => {
   const timestamp = exifWallClockTimestamp(dateTimeOriginal);
-  if (timestamp === null) {
-    return null;
-  }
-
-  return getRelativeTimeString(timestamp);
+  return timestamp === null ? null : timestamp;
 };
 
 const toSimilarSearchPath = (path: string) => {
@@ -200,11 +196,7 @@ export const TimelineDayGrid = ({
           <li key={entry.href} className={styles.item}>
             <div className={styles.card}>
               <div className={styles.thumbnailWrap}>
-                <Link
-                  suppressHydrationWarning
-                  href={entry.href}
-                  aria-label={`${entry.album} ${formattedDate} ${formatRelativeDateTime(entry.dateTimeOriginal) ?? ""}`.trim()}
-                >
+                <Link href={entry.href} aria-label={`${entry.album} ${formattedDate}`}>
                   <Thumb
                     src={entry.src.src}
                     width={entry.placeholderWidth}
@@ -230,13 +222,12 @@ export const TimelineDayGrid = ({
               <div className={styles.details}>
                 <div className={styles.source}>
                   <strong className={styles.sourceText}>{entry.album}</strong>
-                  {formatRelativeDateTime(entry.dateTimeOriginal) ? (
+                  {relativeDateTimestamp(entry.dateTimeOriginal) !== null ? (
                     <span
-                      suppressHydrationWarning
                       className={styles.secondaryMeta}
                       title={formatDateTimeTitle(entry.dateTimeOriginal)!}
                     >
-                      {formatRelativeDateTime(entry.dateTimeOriginal)}
+                      <HydratedRelativeTime date={relativeDateTimestamp(entry.dateTimeOriginal)!} />
                     </span>
                   ) : null}
                 </div>

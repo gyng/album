@@ -59,10 +59,10 @@ export const YearSplitHistogram: React.FC<Props> = ({ title, data, getHref }) =>
                 const cell = (
                   <>
                     <ChartTooltip>
-                      {group.label} {bucket.label} · {bucket.count.toLocaleString()}
+                      {group.label} {bucket.label} · {bucket.count.toLocaleString("en-GB")}
                     </ChartTooltip>
                     {bucket.count > 0 ? (
-                      <span className={styles.count}>{bucket.count.toLocaleString()}</span>
+                      <span className={styles.count}>{bucket.count.toLocaleString("en-GB")}</span>
                     ) : null}
                   </>
                 );
@@ -74,7 +74,7 @@ export const YearSplitHistogram: React.FC<Props> = ({ title, data, getHref }) =>
                       href={yearHref}
                       className={`${styles.cell} ${styles.cellLink}`}
                       style={{ ["--intensity" as string]: String(intensity) }}
-                      aria-label={`${group.label} ${bucket.label} · ${bucket.count.toLocaleString()} photos`}
+                      aria-label={`${group.label} ${bucket.label} · ${bucket.count.toLocaleString("en-GB")} photos`}
                     >
                       {cell}
                     </Link>
@@ -86,7 +86,7 @@ export const YearSplitHistogram: React.FC<Props> = ({ title, data, getHref }) =>
                     key={`${group.label}-${bucket.label}`}
                     className={[styles.cell, bucket.count === 0 ? styles.cellEmpty : ""].join(" ")}
                     style={{ ["--intensity" as string]: String(intensity) }}
-                    aria-label={`${group.label} ${bucket.label} · ${bucket.count.toLocaleString()} photos`}
+                    aria-label={`${group.label} ${bucket.label} · ${bucket.count.toLocaleString("en-GB")} photos`}
                   >
                     {cell}
                   </div>

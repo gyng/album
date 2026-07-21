@@ -89,7 +89,6 @@ export const SearchInputBar: React.FC<Props> = ({
               className={[styles.searchInput, isSearching ? styles.searchInputBusy : ""]
                 .filter(Boolean)
                 .join(" ")}
-              suppressHydrationWarning
               type="text"
               aria-label="Search photos"
               aria-busy={isSearching}

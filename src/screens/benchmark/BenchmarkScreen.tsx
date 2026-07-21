@@ -329,7 +329,7 @@ const BenchmarkScreen = () => {
             lizard a turtle, and once by the reviewer of this run, who was so pleased to catch the
             first error that he promptly committed a second.
             {sonnet?.costPer1kImagesUsd
-              ? ` Cost, incidentally, is not the argument for staying local: all ${LIBRARY_SIZE.toLocaleString()} photos through Sonnet 5 come to about ${money((sonnet.costPer1kImagesUsd * LIBRARY_SIZE) / 1000)}, which is less than the coffee consumed while measuring it.`
+              ? ` Cost, incidentally, is not the argument for staying local: all ${LIBRARY_SIZE.toLocaleString("en-GB")} photos through Sonnet 5 come to about ${money((sonnet.costPer1kImagesUsd * LIBRARY_SIZE) / 1000)}, which is less than the coffee consumed while measuring it.`
               : ""}
           </p>
         </header>

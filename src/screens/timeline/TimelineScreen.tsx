@@ -11,6 +11,7 @@ import { buildCollectionPageJsonLd } from "../../lib/seo";
 import { formatMemoryDateRange, getMemoryClusters } from "../../util/clusterByDate";
 import styles from "./TimelineScreen.module.css";
 import { unpackTimelineEntry, type TimelineEntryRow } from "../../util/pageDataRows";
+import { useHydrated } from "../../components/useHydrated";
 
 const MAX_TIMELINE_MEMORY_CLUSTERS = 2;
 const MAX_TIMELINE_MEMORY_ITEMS = 4;
@@ -87,8 +88,10 @@ const TimelineScreen = ({ entries: suppliedEntries, entryRows }: TimelineScreenP
     hasSearchParam,
     replaceSearchParams,
   } = useUrlSearchParams();
-  const filterAlbum = getSearchParam("filter_album");
-  const hasRouteState = filterAlbum != null || hasSearchParam("date");
+  const hydrated = useHydrated();
+  const routeReady = hydrated && urlReady;
+  const filterAlbum = routeReady ? getSearchParam("filter_album") : null;
+  const hasRouteState = routeReady && (filterAlbum != null || hasSearchParam("date"));
 
   const filteredEntries = React.useMemo(() => {
     return filterAlbum ? entries.filter((entry) => entry.album === filterAlbum) : entries;
@@ -100,13 +103,9 @@ const TimelineScreen = ({ entries: suppliedEntries, entryRows }: TimelineScreenP
     );
   }, [filteredEntries]);
 
-  // Default to latest date (first in sorted list), but allow URL param
-  const initialDateFromUrl = getSearchParam("date");
-  const [selectedDate, setSelectedDate] = React.useState<string | null>(
-    initialDateFromUrl && availableDates.includes(initialDateFromUrl)
-      ? initialDateFromUrl
-      : (availableDates[0] ?? null),
-  );
+  // The static server never sees query parameters, so initialise from album
+  // data only. Route state is applied after the hydration snapshot matches.
+  const [selectedDate, setSelectedDate] = React.useState<string | null>(availableDates[0] ?? null);
   const [todayDate, setTodayDate] = React.useState<string | null>(null);
   const [memoryScrollTargetDate, setMemoryScrollTargetDate] = React.useState<string | null>(null);
   const layoutRef = React.useRef<HTMLDivElement | null>(null);
@@ -114,7 +113,7 @@ const TimelineScreen = ({ entries: suppliedEntries, entryRows }: TimelineScreenP
   const selectedConnectorSvgRef = React.useRef<SVGSVGElement | null>(null);
   const selectedConnectorPathRef = React.useRef<SVGPathElement | null>(null);
   const [memoryHighlight, setMemoryHighlight] = React.useState<MemoryHighlight | null>(null);
-  const routeDateQuery = getSearchParam("date");
+  const routeDateQuery = routeReady ? getSearchParam("date") : null;
 
   const selectableDates = React.useMemo(() => {
     return todayDate ? availableDates.filter((date) => date <= todayDate) : availableDates;
@@ -262,22 +261,30 @@ const TimelineScreen = ({ entries: suppliedEntries, entryRows }: TimelineScreenP
 
   // On mount or when router.query.date changes, update selectedDate if needed
   React.useEffect(() => {
-    if (routeDateQuery && availableDates.includes(routeDateQuery)) {
+    if (routeReady && routeDateQuery && availableDates.includes(routeDateQuery)) {
       setSelectedDate((current) => (current === routeDateQuery ? current : routeDateQuery));
     }
-  }, [availableDates, routeDateQuery]);
+  }, [availableDates, routeDateQuery, routeReady]);
 
   // When selectedDate changes, update the URL param (shallow push).
   // Gated until the platform has populated query state so hydration cannot
   // clobber real ?date/?filter_album deep links.
   React.useEffect(() => {
-    if (!urlReady || !selectedDate) return;
+    if (!routeReady || !selectedDate) return;
+    if (!availableDates.includes(selectedDate)) return;
+    if (
+      routeDateQuery &&
+      availableDates.includes(routeDateQuery) &&
+      routeDateQuery !== selectedDate
+    ) {
+      return;
+    }
     if (routeDateQuery !== selectedDate) {
       const next = new URLSearchParams(searchParams);
       next.set("date", selectedDate);
       replaceSearchParams(next);
     }
-  }, [replaceSearchParams, routeDateQuery, searchParams, selectedDate, urlReady]);
+  }, [availableDates, replaceSearchParams, routeDateQuery, routeReady, searchParams, selectedDate]);
 
   React.useEffect(() => {
     if (

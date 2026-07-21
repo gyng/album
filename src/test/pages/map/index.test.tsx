@@ -90,6 +90,10 @@ describe("WorldMap page", () => {
     fireEvent.click(screen.getByRole("link", { name: "kansai" }));
 
     expect(push).toHaveBeenCalledWith("/album/kansai");
+    expect(document.head.querySelector('meta[name="robots"]')).toHaveAttribute(
+      "content",
+      "noindex, nofollow",
+    );
   });
 
   it("waits for URL state before rendering an album filter", () => {

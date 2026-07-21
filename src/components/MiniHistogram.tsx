@@ -24,10 +24,10 @@ export const MiniHistogram: React.FC<Props> = ({ title, data }) => {
               key={bucket.label}
               className={styles.column}
               role="img"
-              aria-label={`${bucket.label} · ${bucket.count.toLocaleString()} photos`}
+              aria-label={`${bucket.label} · ${bucket.count.toLocaleString("en-GB")} photos`}
             >
               <ChartTooltip>
-                {bucket.label} · {bucket.count.toLocaleString()}
+                {bucket.label} · {bucket.count.toLocaleString("en-GB")}
               </ChartTooltip>
               <div className={styles.track}>
                 <div className={styles.count}>{bucket.label}</div>
@@ -37,7 +37,7 @@ export const MiniHistogram: React.FC<Props> = ({ title, data }) => {
                   aria-hidden="true"
                 />
               </div>
-              <div className={styles.label}>{bucket.count.toLocaleString()}</div>
+              <div className={styles.label}>{bucket.count.toLocaleString("en-GB")}</div>
             </div>
           );
         })}

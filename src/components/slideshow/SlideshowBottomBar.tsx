@@ -86,7 +86,7 @@ export type SlideshowBottomBarProps = {
   detailsAlignment: DetailsAlignment;
   remixStrategy: RemixStrategy | null;
   remixVectorScore: number | null;
-  time: Date;
+  time: Date | null;
 };
 
 export const SlideshowBottomBar: React.FC<SlideshowBottomBarProps> = (props) => {
@@ -143,7 +143,7 @@ export const SlideshowBottomBar: React.FC<SlideshowBottomBarProps> = (props) => 
         {photoDate ? (
           <div className={styles.detailsRow}>
             {photoRelative ? `${photoRelative} · ` : ""}
-            {photoDate.toLocaleDateString(undefined, {
+            {photoDate.toLocaleDateString("en-GB", {
               year: "numeric",
               month: "long",
             })}
@@ -236,19 +236,23 @@ export const SlideshowBottomBar: React.FC<SlideshowBottomBarProps> = (props) => 
           ].join(" ")}
         >
           <div className={styles.time}>
-            {props.time.toLocaleTimeString(undefined, {
-              hour: "numeric",
-              minute: "numeric",
-              hour12: false,
-            })}
+            {props.time
+              ? props.time.toLocaleTimeString("en-GB", {
+                  hour: "numeric",
+                  minute: "numeric",
+                  hour12: false,
+                })
+              : null}
           </div>
           <div className={styles.date}>
-            {props.time.toLocaleDateString(undefined, {
-              weekday: "long",
-              year: "numeric",
-              month: "long",
-              day: "numeric",
-            })}
+            {props.time
+              ? props.time.toLocaleDateString("en-GB", {
+                  weekday: "long",
+                  year: "numeric",
+                  month: "long",
+                  day: "numeric",
+                })
+              : null}
           </div>
         </div>
       </>

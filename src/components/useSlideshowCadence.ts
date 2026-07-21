@@ -3,7 +3,7 @@ import { getNextAlignedSlideshowChange } from "../util/slideshowTiming";
 
 export type UseSlideshowCadence = {
   secondsLeft: number;
-  time: Date;
+  time: Date | null;
   isPaused: boolean;
   togglePaused: () => void;
   // Reschedule the next change to now + delay (honouring the alignment toggle).
@@ -32,7 +32,9 @@ export const useSlideshowCadence = (input: {
 
   const [nextChangeAt, setNextChangeAt] = React.useState<Date>(new Date());
   const [secondsLeft, setSecondsLeft] = React.useState<number>(0);
-  const [time, setTime] = React.useState<Date>(new Date());
+  // Wall-clock output cannot be rendered during SSR: the build server and the
+  // browser never share an exact clock or necessarily a timezone.
+  const [time, setTime] = React.useState<Date | null>(null);
   const [isPaused, setIsPaused] = React.useState(false);
   const pausedRemainingMsRef = React.useRef<number | null>(null);
 

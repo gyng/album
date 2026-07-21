@@ -10,7 +10,7 @@ import type { GameSettings, GuessPhoto } from "./guessTypes";
 
 jest.mock("./useAnimatedCounter", () => ({
   useAnimatedCounter: (target: number) => (node: HTMLElement | null) => {
-    if (node) node.textContent = target.toLocaleString();
+    if (node) node.textContent = target.toLocaleString("en-GB");
   },
 }));
 
@@ -109,7 +109,7 @@ describe("GuessSummary", () => {
     expect(screen.getByText("Unknown location")).toBeInTheDocument();
     expect(screen.getByText("1.3 km")).toBeInTheDocument();
     expect(screen.getByText("Skipped")).toBeInTheDocument();
-    expect(screen.getByText(`+${MAX_TIME_BONUS.toLocaleString()}`)).toBeInTheDocument();
+    expect(screen.getByText(`+${MAX_TIME_BONUS.toLocaleString("en-GB")}`)).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Play again" }));
     fireEvent.click(screen.getByRole("button", { name: "Change settings" }));

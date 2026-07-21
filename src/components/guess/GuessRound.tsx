@@ -394,7 +394,7 @@ export const GuessRound: React.FC<GuessRoundProps> = ({
             .filter(Boolean)
             .join(" ")}
         >
-          <span ref={cumulativeCounterRef}>{cumulativeScore.toLocaleString()}</span> pts
+          <span ref={cumulativeCounterRef}>{cumulativeScore.toLocaleString("en-GB")}</span> pts
         </span>
         <Button
           variant="quiet"
@@ -508,7 +508,7 @@ export const GuessRound: React.FC<GuessRoundProps> = ({
                       </span>
                       {result!.timeBonus > 0 ? (
                         <span className={styles.timeBonusInline}>
-                          +{result!.timeBonus.toLocaleString()}
+                          +{result!.timeBonus.toLocaleString("en-GB")}
                         </span>
                       ) : null}
                     </div>

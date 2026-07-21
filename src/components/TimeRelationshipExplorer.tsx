@@ -47,8 +47,8 @@ export const TimeRelationshipExplorer: React.FC<Props> = ({
             Time relationships
           </Heading>
           <Caption as="span">
-            Based on {relationships.total.toLocaleString()} photos with local time, aperture, and
-            ISO
+            Based on {relationships.total.toLocaleString("en-GB")} photos with local time, aperture,
+            and ISO
           </Caption>
         </div>
         <TechnicalHeatmaps

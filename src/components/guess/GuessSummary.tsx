@@ -99,7 +99,7 @@ export const GuessSummary: React.FC<GuessSummaryProps> = ({
           >
             0
           </span>{" "}
-          <span className={styles.maxScore}>/ {maxScore.toLocaleString()}</span>
+          <span className={styles.maxScore}>/ {maxScore.toLocaleString("en-GB")}</span>
         </Heading>
         <p className={styles.rating}>{rating}</p>
       </div>
@@ -151,10 +151,12 @@ export const GuessSummary: React.FC<GuessSummaryProps> = ({
               </div>
               <span className={styles.roundScoreCol}>
                 <span className={styles.roundScore} style={{ color: colour }}>
-                  {result.score.toLocaleString()}
+                  {result.score.toLocaleString("en-GB")}
                 </span>
                 {result.timeBonus > 0 ? (
-                  <span className={styles.timeBonus}>+{result.timeBonus.toLocaleString()}</span>
+                  <span className={styles.timeBonus}>
+                    +{result.timeBonus.toLocaleString("en-GB")}
+                  </span>
                 ) : null}
               </span>
             </li>

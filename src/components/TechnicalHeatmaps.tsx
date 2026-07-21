@@ -217,7 +217,7 @@ const HeatmapPanel: React.FC<{
                       : "",
                   ].join(" ")}
                   style={{ ["--intensity" as string]: String(intensity) }}
-                  title={`${xBucket} · ${yBucket} · ${count.toLocaleString()} photos`}
+                  title={`${xBucket} · ${yBucket} · ${count.toLocaleString("en-GB")} photos`}
                   onMouseEnter={() => {
                     onActivate({ heatmapKey: config.key, cellKey });
                   }}
@@ -227,7 +227,7 @@ const HeatmapPanel: React.FC<{
                   }}
                   onBlur={onDeactivate}
                 >
-                  <span className={styles.cellCount}>{count.toLocaleString()}</span>
+                  <span className={styles.cellCount}>{count.toLocaleString("en-GB")}</span>
                 </a>
               );
             })}
@@ -338,7 +338,7 @@ export const TechnicalHeatmaps: React.FC<Props> = ({
               d: `M ${source.x} ${source.y} C ${midX} ${source.y}, ${midX} ${target.y}, ${target.x} ${target.y}`,
               width: 1.5 + (count / maxCount) * 5,
               opacity: 0.18 + (count / maxCount) * 0.55,
-              label: count.toLocaleString(),
+              label: count.toLocaleString("en-GB"),
               labelX,
               labelY,
             },

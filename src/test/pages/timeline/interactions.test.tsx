@@ -15,10 +15,16 @@ let clusters: Array<any> = [];
 let showHeatmapTarget = true;
 let showDayHeading = true;
 const dayGridProps = jest.fn();
+const seoProps = jest.fn();
 
 jest.mock("next/router", () => ({ useRouter: () => router }));
 jest.mock("../../../services/album", () => ({ getAlbums: jest.fn() }));
-jest.mock("../../../components/Seo", () => ({ Seo: () => null }));
+jest.mock("../../../components/Seo", () => ({
+  Seo: (props: unknown) => {
+    seoProps(props);
+    return null;
+  },
+}));
 jest.mock("../../../components/GlobalNav", () => ({ GlobalNav: () => <nav /> }));
 jest.mock("../../../components/ui", () => ({
   Caption: ({ children }: React.PropsWithChildren) => <span>{children}</span>,
@@ -106,6 +112,7 @@ describe("timeline interactions", () => {
     showHeatmapTarget = true;
     showDayHeading = true;
     dayGridProps.mockClear();
+    seoProps.mockClear();
     animationCallbacks = new Map();
     nextFrame = 1;
     jest.spyOn(window, "requestAnimationFrame").mockImplementation((callback) => {
@@ -141,6 +148,7 @@ describe("timeline interactions", () => {
     const { rerender } = render(<TimelinePage entries={entries as never} />);
     expect(screen.getByTestId("selected-date")).toHaveTextContent("2026-07-13");
     expect(screen.getByRole("link", { name: "trip" })).toHaveAttribute("href", "/album/trip");
+    expect(seoProps).toHaveBeenLastCalledWith(expect.objectContaining({ noindex: true }));
 
     fireEvent.click(screen.getByRole("button", { name: "older date" }));
     expect(screen.getByTestId("selected-date")).toHaveTextContent("2026-07-13");
@@ -176,9 +184,11 @@ describe("timeline interactions", () => {
     document.body.append(editable);
     fireEvent.keyDown(editable, { key: "ArrowLeft" });
 
+    router.replace.mockClear();
     router.query = { date: "2026-07-14" };
     rerender(<TimelinePage entries={entries as never} />);
-    expect(router.replace).toHaveBeenCalled();
+    expect(screen.getByTestId("selected-date")).toHaveTextContent("2026-07-14");
+    expect(router.replace).not.toHaveBeenCalled();
   });
 
   it("renders memories, highlights their heatmap dates, and loads more", () => {

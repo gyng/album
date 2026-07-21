@@ -5,7 +5,7 @@ import { MapDeferred } from "./MapDeferred";
 import React from "react";
 import { License } from "../License";
 import { getDegLatLngFromExif } from "../util/dms2deg";
-import { getRelativeTimeString } from "../util/time";
+import { HydratedRelativeTime } from "./HydratedRelativeTime";
 import { getPhotoAltText } from "../lib/alt";
 import { FacetLinkIcon } from "./FacetLinkIcon";
 import { Heading } from "./ui";
@@ -494,9 +494,12 @@ export const PhotoBlockEl: React.FC<{
                             ? `${local} (local @ ${props.block._build.exif.OffsetTime})`
                             : local;
                         })(),
-                        getRelativeTimeString(
-                          exifWallClockTimestamp(props.block._build.exif.DateTimeOriginal) ?? NaN,
-                        ),
+                        <HydratedRelativeTime
+                          key="relative-camera-datetime"
+                          date={
+                            exifWallClockTimestamp(props.block._build.exif.DateTimeOriginal) ?? NaN
+                          }
+                        />,
                       ]
                         .filter(Boolean)
                         .map((it, idx) => (

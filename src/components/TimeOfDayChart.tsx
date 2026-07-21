@@ -91,7 +91,7 @@ export const TimeOfDayChart: React.FC<Props> = ({
                 activeLabel === bucket.label ? styles.columnActive : "",
               ].join(" ")}
               role="img"
-              aria-label={`${bucket.label} · ${bucket.count.toLocaleString()} photos`}
+              aria-label={`${bucket.label} · ${bucket.count.toLocaleString("en-GB")} photos`}
               onMouseEnter={() => {
                 onActivate?.(bucket.label);
               }}
@@ -100,7 +100,7 @@ export const TimeOfDayChart: React.FC<Props> = ({
               }}
             >
               <ChartTooltip>
-                {bucket.label} · {bucket.count.toLocaleString()}
+                {bucket.label} · {bucket.count.toLocaleString("en-GB")}
               </ChartTooltip>
               <div className={styles.track}>
                 <div className={styles.count}>{bucket.label}</div>
@@ -110,7 +110,7 @@ export const TimeOfDayChart: React.FC<Props> = ({
                   aria-hidden="true"
                 />
               </div>
-              <div className={styles.label}>{bucket.count.toLocaleString()}</div>
+              <div className={styles.label}>{bucket.count.toLocaleString("en-GB")}</div>
             </div>
           );
         })}

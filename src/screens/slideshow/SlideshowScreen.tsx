@@ -97,6 +97,7 @@ const FALLBACK_RELOAD_MS = 7 * 86400000;
 // bytes per request), so 10 minutes is plenty responsive for a sideboard
 // without being chatty.
 const DB_POLL_MS = 600000;
+const useSafeLayoutEffect = typeof window === "undefined" ? useEffect : React.useLayoutEffect;
 
 type FullscreenDocument = Document & {
   webkitExitFullscreen?: () => Promise<void> | void;
@@ -161,11 +162,18 @@ export const remapSlideshowPeek = (progress: number): number =>
   Math.max(0, (progress - 0.65) / 0.35);
 
 const SlideshowScreen = () => {
-  const managedCodeReload =
-    typeof window !== "undefined" &&
-    window.parent !== window &&
-    new URLSearchParams(window.location.search).get("shell") === "1";
+  const [managedCodeReload, setManagedCodeReload] = React.useState(false);
   const [shellWakeLock, setShellWakeLock] = React.useState<SlideshowShellWakeState | null>(null);
+
+  // The static server cannot know whether this document will run in the PWA
+  // shell's iframe. Start with the matching false snapshot, then resolve it in
+  // a layout effect so child passive effects (notably wake-lock acquisition)
+  // see the correct managed state before they run.
+  useSafeLayoutEffect(() => {
+    setManagedCodeReload(
+      window.parent !== window && new URLSearchParams(window.location.search).get("shell") === "1",
+    );
+  }, []);
 
   useEffect(() => {
     if (!managedCodeReload) {
@@ -204,6 +212,15 @@ export const Slideshow: React.FC<{
   shellWakeLock?: SlideshowShellWakeState | null;
 }> = (props) => {
   const { searchDatabaseUrl, siteOrigin } = usePublicConfig();
+  // The server and first hydration render use the unmanaged UI snapshot. Keep
+  // shell-owned external lifecycles disabled immediately in the browser,
+  // though, so the frame cannot start a competing code poll or wake lock before
+  // the wrapper's layout-effect state update lands.
+  const delegateShellLifecycleImmediately =
+    !!props.managedCodeReload ||
+    (typeof window !== "undefined" &&
+      window.parent !== window &&
+      new URLSearchParams(window.location.search).get("shell") === "1");
   const databaseState = useDatabase();
   const [database, progress] = databaseState;
   const refreshDatabase = databaseState[4];
@@ -231,7 +248,7 @@ export const Slideshow: React.FC<{
 
   // Check for a new build manifest we control and reload when one is detected.
   useEffect(() => {
-    if (props.managedCodeReload) {
+    if (delegateShellLifecycleImmediately) {
       return;
     }
 
@@ -274,7 +291,7 @@ export const Slideshow: React.FC<{
       document.removeEventListener("visibilitychange", handleVisibilityChange);
       window.removeEventListener("online", handleOnline);
     };
-  }, [props.managedCodeReload]);
+  }, [delegateShellLifecycleImmediately]);
 
   // Fallback hard reload for long-running kiosk sessions. Guarded by wake lock
   // and fullscreen state: if the page is actively acting as a kiosk, DON'T
@@ -283,7 +300,7 @@ export const Slideshow: React.FC<{
   // The version-manifest poll above handles real build updates; this interval
   // is purely a "something is broken if we got here" safety net.
   useEffect(() => {
-    if (props.managedCodeReload) {
+    if (delegateShellLifecycleImmediately) {
       return;
     }
 
@@ -298,7 +315,7 @@ export const Slideshow: React.FC<{
     // isFullscreenActiveRef are stable refs read lazily inside the interval —
     // not reactive dependencies.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [props.managedCodeReload]);
+  }, [delegateShellLifecycleImmediately]);
 
   const checkForDbUpdates = useCallback(async () => {
     if (!database) {
@@ -423,18 +440,33 @@ export const Slideshow: React.FC<{
   const [slideshowError, setSlideshowError] = React.useState<string | null>(null);
   const [copiedPhotoLink, setCopiedPhotoLink] = React.useState(false);
 
-  const [timeDelay, setTimeDelay] = useLocalStorage("slideshow-timedelay", 900000);
+  const [timeDelay, setTimeDelay] = useLocalStorage("slideshow-timedelay", 900000, {
+    initializeWithValue: false,
+  });
   const timeDelayRef = React.useRef(timeDelay);
-  const [showClock, setShowClock] = useLocalStorage("slideshow-showclock", false);
-  const [showMap, setShowMap] = useLocalStorage("slideshow-showmap", false);
-  const [showDetails, setShowDetails] = useLocalStorage("slideshow-showdetails", false);
-  const [showCover, setShowCover] = useLocalStorage("slideshow-showcover", false);
+  const [showClock, setShowClock] = useLocalStorage("slideshow-showclock", false, {
+    initializeWithValue: false,
+  });
+  const [showMap, setShowMap] = useLocalStorage("slideshow-showmap", false, {
+    initializeWithValue: false,
+  });
+  const [showDetails, setShowDetails] = useLocalStorage("slideshow-showdetails", false, {
+    initializeWithValue: false,
+  });
+  const [showCover, setShowCover] = useLocalStorage("slideshow-showcover", false, {
+    initializeWithValue: false,
+  });
   const [detailsAlignment, setDetailsAlignment] = useLocalStorage(
     "slideshow-details-alignment",
     "center" as "left" | "center" | "right",
+    { initializeWithValue: false },
   );
-  const [timeAware, setTimeAware] = useLocalStorage("slideshow-time-aware", false);
-  const [remixEnabled, setRemixEnabled] = useLocalStorage("slideshow-remix", true);
+  const [timeAware, setTimeAware] = useLocalStorage("slideshow-time-aware", false, {
+    initializeWithValue: false,
+  });
+  const [remixEnabled, setRemixEnabled] = useLocalStorage("slideshow-remix", true, {
+    initializeWithValue: false,
+  });
   const [poolStats, setPoolStats] = React.useState<PoolStats>(EMPTY_POOL_STATS);
   const [searchDbVersion, setSearchDbVersion] = React.useState<SearchDbVersion | null>(null);
   const [isCheckingSearchDbVersion, setIsCheckingSearchDbVersion] = React.useState(false);
@@ -448,6 +480,7 @@ export const Slideshow: React.FC<{
   const [showLongTimings, setShowLongTimings] = useLocalStorage(
     "slideshow-show-long-timings",
     false,
+    { initializeWithValue: false },
   );
   // 5% per slide ≈ one remix every 20 photos. At a 15-minute cadence that's
   // a remix every ~5 hours — visible enough to register as a feature, rare
@@ -470,15 +503,19 @@ export const Slideshow: React.FC<{
   const [shuffleHistorySize, setShuffleHistorySize] = useLocalStorage(
     "slideshow-shuffle-history-size",
     100,
+    { initializeWithValue: false },
   );
   const [slideshowMode, setSlideshowMode] = useLocalStorage(
     "slideshow-mode",
     "weighted" as SlideshowMode,
+    { initializeWithValue: false },
   );
   // When true, every new "next change at" snaps to the next aligned wall-clock
   // boundary (e.g. every :00/:15/:30/:45 for a 15-minute cadence), so the
   // slideshow stays in sync with the clock across days. Default on.
-  const [alignCadence, setAlignCadence] = useLocalStorage("slideshow-align-cadence", true);
+  const [alignCadence, setAlignCadence] = useLocalStorage("slideshow-align-cadence", true, {
+    initializeWithValue: false,
+  });
   const [hasParsedInitialUrl, setHasParsedInitialUrl] = React.useState(false);
   // Controls visibility lifecycle (coarse-pointer detection, rAF auto-hide
   // countdown, desktop show/hide + post-Hide suppression) lives in a hook;
@@ -506,7 +543,7 @@ export const Slideshow: React.FC<{
     isSupported: isWakeLockSupported,
     isActive: isWakeLockActive,
     acquire: tryAcquireWakeLock,
-  } = useWakeLock(!!props.disabled || !!props.managedCodeReload);
+  } = useWakeLock(!!props.disabled || delegateShellLifecycleImmediately);
   const isSessionWakeLockSupported = props.managedCodeReload
     ? (props.shellWakeLock?.isSupported ?? false)
     : isWakeLockSupported;

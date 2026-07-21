@@ -32,7 +32,7 @@ export const computeTimeBonus = (
 export const formatDistance = (meters: number): string => {
   if (meters < 1000) return `${Math.round(meters)} m`;
   if (meters < 100_000) return `${(meters / 1000).toFixed(1)} km`;
-  return `${Math.round(meters / 1000).toLocaleString()} km`;
+  return `${Math.round(meters / 1000).toLocaleString("en-GB")} km`;
 };
 
 /** 0–1 ratio for the score bar width (distance portion only). */

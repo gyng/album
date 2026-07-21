@@ -144,7 +144,7 @@ export const GuessLobby: React.FC<GuessLobbyProps> = ({ database, defaults, onSt
 
       {selectedCount > 0 ? (
         <Caption as="p" className={styles.photoCount}>
-          {selectedCount.toLocaleString()} photos available
+          {selectedCount.toLocaleString("en-GB")} photos available
         </Caption>
       ) : null}
 

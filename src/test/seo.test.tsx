@@ -273,7 +273,7 @@ describe("SEO helpers", () => {
     );
   });
 
-  it("marks filtered map views as noindex while keeping the base canonical", () => {
+  it("keeps statically rendered map metadata canonical until client route state is available", () => {
     useRouter.mockReturnValue({
       pathname: "/map",
       query: { filter_album: "trip" },
@@ -284,10 +284,10 @@ describe("SEO helpers", () => {
     const html = renderToStaticMarkup(<MapPage photos={[]} />);
 
     expect(html).toContain('rel="canonical" href="https://photos.example.com/map"');
-    expect(html).toContain('name="robots" content="noindex, nofollow"');
+    expect(html).not.toContain('name="robots" content="noindex, nofollow"');
   });
 
-  it("marks dated timeline views as noindex while keeping the base canonical", () => {
+  it("keeps statically rendered timeline metadata canonical until client route state is available", () => {
     useRouter.mockReturnValue({
       pathname: "/timeline",
       query: { date: "2024-04-07" },
@@ -297,6 +297,6 @@ describe("SEO helpers", () => {
     const html = renderToStaticMarkup(<TimelinePage entries={[]} />);
 
     expect(html).toContain('rel="canonical" href="https://photos.example.com/timeline"');
-    expect(html).toContain('name="robots" content="noindex, nofollow"');
+    expect(html).not.toContain('name="robots" content="noindex, nofollow"');
   });
 });

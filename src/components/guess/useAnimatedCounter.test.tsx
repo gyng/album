@@ -43,7 +43,7 @@ describe("useAnimatedCounter", () => {
     expect(Number(node.textContent?.replaceAll(",", ""))).toBeLessThan(1_000);
 
     frames.shift()?.(700);
-    expect(node.textContent).toBe((1_000).toLocaleString());
+    expect(node.textContent).toBe((1_000).toLocaleString("en-GB"));
     expect(frames).toHaveLength(0);
   });
 
@@ -57,7 +57,7 @@ describe("useAnimatedCounter", () => {
     const reduced = renderHook(() => useAnimatedCounter(12_345));
     const reducedNode = document.createElement("span");
     reduced.result.current(reducedNode);
-    expect(reducedNode.textContent).toBe((12_345).toLocaleString());
+    expect(reducedNode.textContent).toBe((12_345).toLocaleString("en-GB"));
 
     expect(requestAnimationFrameMock).not.toHaveBeenCalled();
   });
@@ -70,7 +70,7 @@ describe("useAnimatedCounter", () => {
     expect(requestAnimationFrameMock).toHaveBeenCalledTimes(1);
 
     result.current(node);
-    expect(node.textContent).toBe((250).toLocaleString());
+    expect(node.textContent).toBe((250).toLocaleString("en-GB"));
     expect(requestAnimationFrameMock).toHaveBeenCalledTimes(1);
     expect(cancelAnimationFrameMock).toHaveBeenLastCalledWith(1);
   });

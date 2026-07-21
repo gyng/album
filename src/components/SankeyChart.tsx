@@ -100,7 +100,7 @@ const ClickableLabelLayer = ({
         const y = node.y0 + (node.y1 - node.y0) / 2;
         const textAnchor = isLeftColumn || !isRightColumn ? "start" : "end";
         const label = truncateLabel(
-          `${getNodeLabel(node)} · ${getNodeCount(node).toLocaleString()}`,
+          `${getNodeLabel(node)} · ${getNodeCount(node).toLocaleString("en-GB")}`,
           labelMaxLength,
         );
 
@@ -369,11 +369,11 @@ export const SankeyChart: React.FC<SankeyChartProps> = ({
             ),
           ]}
           theme={chartTheme}
-          valueFormat={(value) => `${Number(value).toLocaleString()} photos`}
+          valueFormat={(value) => `${Number(value).toLocaleString("en-GB")} photos`}
           nodeTooltip={({ node }) => (
             <div className={styles.tooltip}>
               <strong>{getNodeLabel(node)}</strong>
-              <div>{Number(node.value).toLocaleString()} photos</div>
+              <div>{Number(node.value).toLocaleString("en-GB")} photos</div>
             </div>
           )}
           linkTooltip={({ link }) => (
@@ -381,7 +381,7 @@ export const SankeyChart: React.FC<SankeyChartProps> = ({
               <strong>
                 {getNodeLabel(link.source)} to {getNodeLabel(link.target)}
               </strong>
-              <div>{Number(link.value).toLocaleString()} photos</div>
+              <div>{Number(link.value).toLocaleString("en-GB")} photos</div>
             </div>
           )}
         />
