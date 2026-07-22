@@ -439,6 +439,32 @@ describe("SlideshowToolbar", () => {
     expect(onClearTopic).toHaveBeenCalledTimes(1);
   });
 
+  it("returns focus to the reappearing topic input after the chip is dismissed", () => {
+    const { rerender } = render(<SlideshowToolbar {...makeProps({ topic: "cat" })} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Clear topic" }));
+    // The parent clears the topic in response; the input comes back and should
+    // take focus rather than dropping it to the document body.
+    rerender(<SlideshowToolbar {...makeProps({ topic: null })} />);
+
+    const input = screen.getByRole("textbox", { name: "Slideshow topic" });
+    expect(document.activeElement).toBe(input);
+  });
+
+  it("reflects seed progress and an embeddings wait in the busy button label", () => {
+    const { rerender } = render(
+      <SlideshowToolbar {...makeProps({ topicBusy: true, topicBusyLabel: "Seeding… 42%" })} />,
+    );
+    expect(screen.getByRole("button", { name: "Seeding… 42%" })).toBeDisabled();
+
+    rerender(
+      <SlideshowToolbar
+        {...makeProps({ topicBusy: true, topicBusyLabel: "Loading embeddings…" })}
+      />,
+    );
+    expect(screen.getByRole("button", { name: "Loading embeddings…" })).toBeDisabled();
+  });
+
   it("surfaces a topic error and keeps the input available for a retry", () => {
     render(
       <SlideshowToolbar {...makeProps({ topicError: "Topic search is unavailable right now." })} />,

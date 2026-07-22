@@ -135,6 +135,10 @@ export type SlideshowToolbarProps = {
   // short message shown when the model is unavailable (e.g. offline first use).
   topic: string | null;
   topicBusy: boolean;
+  // Label for the busy Seed button — reflects cold-model download progress
+  // ("Seeding… 42%") or a wait on the embeddings DB ("Loading embeddings…").
+  // Defaults to "Seeding…" when omitted.
+  topicBusyLabel?: string;
   topicError: string | null;
   onSubmitTopic: (topic: string) => void;
   onClearTopic: () => void;
@@ -170,9 +174,18 @@ export const SlideshowToolbar: React.FC<SlideshowToolbarProps> = (props) => {
   // replaced by the chip).
   const [topicDraft, setTopicDraft] = React.useState("");
   const { topic: activeTopic } = props;
+  const topicInputRef = React.useRef<HTMLInputElement | null>(null);
+  // Set when the user dismisses the chip so focus returns to the reappearing
+  // input instead of dropping to the document body.
+  const topicDismissedRef = React.useRef(false);
   React.useEffect(() => {
     if (activeTopic) {
       setTopicDraft("");
+      return;
+    }
+    if (topicDismissedRef.current) {
+      topicDismissedRef.current = false;
+      topicInputRef.current?.focus();
     }
   }, [activeTopic]);
 
@@ -594,7 +607,10 @@ export const SlideshowToolbar: React.FC<SlideshowToolbarProps> = (props) => {
                 className={styles.topicDismiss}
                 aria-label="Clear topic"
                 title="Stop topic mode and restore the previous playback"
-                onClick={props.onClearTopic}
+                onClick={() => {
+                  topicDismissedRef.current = true;
+                  props.onClearTopic();
+                }}
               >
                 ✕
               </button>
@@ -611,6 +627,7 @@ export const SlideshowToolbar: React.FC<SlideshowToolbarProps> = (props) => {
               }}
             >
               <input
+                ref={topicInputRef}
                 className={styles.topicInput}
                 type="text"
                 value={topicDraft}
@@ -625,7 +642,7 @@ export const SlideshowToolbar: React.FC<SlideshowToolbarProps> = (props) => {
                 className={buttonStyles.base}
                 disabled={props.topicBusy || topicDraft.trim().length === 0}
               >
-                {props.topicBusy ? "Seeding…" : "Seed"}
+                {props.topicBusy ? (props.topicBusyLabel ?? "Seeding…") : "Seed"}
               </button>
             </form>
           )}
