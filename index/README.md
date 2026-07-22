@@ -234,6 +234,19 @@ is re-captioned rather than imported. Importing it under the current version wou
 assert provenance that cannot be shown, and `validate` could never catch it because
 the claimed version would be the expected one by construction.
 
+Captions produced before default model ids were resolved are a separate case and
+are **migrated in place, not recaptioned**. Such rows recorded the resolved model
+as the literal `default` (a `<backend>:default@external` pipeline version with a
+NULL model id) even though a concrete default model produced them. On the first
+open that runs `setup_tables`, those rows are rewritten to the model id the backend
+now resolves by default — both the version string and the stored model id — so
+`stage_needs_refresh` and `validate` treat them as current. The rewrite is
+idempotent and maps `default` to the *current* default: the marker never recorded
+which quant ran, and the July 2026 caption bake-off measured the Gemma 4 quant
+variants as quality-neutral, so this avoids hours of GPU recaptioning for
+byte-identical output. A genuine recaption is still available by bumping
+`CAPTION_PROMPT_VERSION`.
+
 `publish` refuses to replace a live output whose row count would drop below 90% of
 the published index (`--allow-shrink` overrides). `quick_check` only proves the
 generated file is structurally sound; it says nothing about content.

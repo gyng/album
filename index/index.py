@@ -411,6 +411,11 @@ JANUS_MODEL_ID = "deepseek-ai/Janus-Pro-1B"
 JANUS_MODEL_REVISION = "960ab33191f61342a4c60ae74d8dc356a39fafcb"
 SIGLIP_V1_MODEL_REVISION = "7fd15f0689c79d79e38b1c2e2e2370a7bf2761ed"
 SIGLIP_V2_MODEL_REVISION = "75de2d55ec2d0b4efc50b3e9ad70dba96a7b2fa2"
+# Caption provenance written before default model ids were resolved (pre-commit
+# 3006353) recorded the resolved model as the literal "default", producing a
+# "<backend>:default@external" segment paired with a NULL model_id. Detected and
+# healed in place on the next DB open — see rewrite_default_caption_provenance.
+DEFAULT_CAPTION_PROVENANCE_MARKER = "default@external"
 IMAGE_TAGS_MIGRATION = "image-tags-v1"
 IMAGES_SCHEMA_MIGRATION = "images-schema-v2"
 STRUCTURED_GEOCODE_MIGRATION = "structured-geocode-v1"
@@ -1743,6 +1748,7 @@ class Gemma4GgufClassifier(BaseCaptionClassifier):
         (measured 4.11s warm, of which ~2.4s was load and ~1.2s inference). Starting
         once takes the same path to ~1.4s per image.
         """
+        self._sweep_stale_stderr_logs()
         self.command = resolve_llama_server_command()
         model_args, _ = self._model_and_mmproj()
         self.port = _free_tcp_port()
@@ -1776,6 +1782,28 @@ class Gemma4GgufClassifier(BaseCaptionClassifier):
             env=os.environ.copy(),
         )
         self._await_health()
+
+    @staticmethod
+    def _sweep_stale_stderr_logs(max_age_seconds: float = 7 * 24 * 3600) -> None:
+        """Best-effort cleanup of llama-server stderr logs left by past runs.
+
+        release() deliberately keeps each run's log on disk so a startup-failure
+        error can point at it, so successful runs accumulate one temp log apiece
+        and nothing ever reclaims them. Sweep logs older than a week at init to
+        bound the pile; swallow every error — this is housekeeping and must never
+        turn into a reason a caption run fails, and it must never touch a log a
+        concurrent run may still be writing.
+        """
+        try:
+            cutoff = time.time() - max_age_seconds
+            for entry in Path(tempfile.gettempdir()).glob("llama-server-*"):
+                try:
+                    if entry.is_file() and entry.stat().st_mtime < cutoff:
+                        entry.unlink()
+                except OSError:
+                    continue
+        except Exception:
+            pass
 
     def _read_stderr_log_tail(self, max_chars: int = 2000) -> str:
         if not self._stderr_log_path:
@@ -2246,6 +2274,10 @@ class Sqlite3Client:
             "pipeline_version TEXT NOT NULL, model_id TEXT, completed_at TEXT NOT NULL, "
             "PRIMARY KEY(path, stage))"
         )
+        # Heal captions stamped with the pre-resolution "default@external" marker
+        # in place (committed with the rest of setup_tables below) so a default
+        # model change never recaptions the library for identical output.
+        self.migrate_default_caption_provenance(cur)
         cur.execute(
             "CREATE TABLE IF NOT EXISTS caption_generation_metrics ("
             "id INTEGER PRIMARY KEY, path TEXT NOT NULL, pipeline_version TEXT NOT NULL, "
@@ -2430,6 +2462,39 @@ class Sqlite3Client:
             "INSERT OR IGNORE INTO image_tags(path, tag, source) VALUES (?, ?, ?)",
             sorted(rows),
         )
+
+    def migrate_default_caption_provenance(self, cur: sqlite3.Cursor) -> None:
+        """Heal caption provenance written before default model ids were resolved.
+
+        Rows stamped ``<backend>:default@external`` with a NULL model_id name the
+        same effective default model the resolver now spells out in full. Rewrite
+        them in place to that current resolved form — both the pipeline_version
+        string and the stored model_id — so stage_needs_refresh and
+        validate_index_database treat them as current instead of recaptioning the
+        whole library for byte-identical output (see the note on
+        rewrite_default_caption_provenance for why mapping "default" to the
+        *current* default is acceptable).
+
+        Idempotent: once rewritten the marker is gone, so a later open matches no
+        rows. Gated on the marker's presence exactly like the embedding_json
+        rebuild is gated on the legacy column, so any command that calls
+        setup_tables heals the DB and a second call is a no-op.
+        """
+        rows = cur.execute(
+            "SELECT path, stage, pipeline_version FROM pipeline_state "
+            "WHERE stage = ? AND pipeline_version LIKE ?",
+            (CAPTION_STAGE, f"%{DEFAULT_CAPTION_PROVENANCE_MARKER}%"),
+        ).fetchall()
+        for path, stage, version in rows:
+            rewritten = rewrite_default_caption_provenance(version)
+            if rewritten is None:
+                continue
+            new_version, new_model_id = rewritten
+            cur.execute(
+                "UPDATE pipeline_state SET pipeline_version = ?, model_id = ? "
+                "WHERE path = ? AND stage = ?",
+                (new_version, new_model_id, path, stage),
+            )
 
     def get_pipeline_states(
         self,
@@ -3077,7 +3142,11 @@ def run_embedding_pass(
 @click.option(
     "--classifier-model-id",
     default=None,
-    help="Optional model id for the selected classifier backend. Full Gemma defaults to google/gemma-4-E2B-it and GGUF defaults to unsloth/gemma-4-E4B-it-GGUF:Q8_0.",
+    help=(
+        "Optional model id for the selected classifier backend. Full Gemma "
+        f"defaults to {DEFAULT_GEMMA4_MODEL_ID} and GGUF defaults to "
+        f"{DEFAULT_GEMMA4_GGUF_MODEL_ID}."
+    ),
 )
 @click.option(
     "--classifier-quantization",
@@ -4801,26 +4870,32 @@ def benchmark_classifier(
         low_impact=low_impact,
     )
 
+    # Same discipline as the index caption pass: any failure after init_model
+    # must release the classifier, or a GGUF backend orphans a llama-server
+    # subprocess holding ~5-6GB of VRAM that outlives this command.
     init_started_at = time.perf_counter()
-    classifier.init_model()
-    init_ms = (time.perf_counter() - init_started_at) * 1000
-
-    geocode = {"city": "Singapore", "country": "Singapore"}
     runs = []
-    for run_index in range(repeat):
-        started_at = time.perf_counter()
-        raw_output = classifier.predict(image_path, geocode)
-        duration_ms = (time.perf_counter() - started_at) * 1000
-        parsed = parse_classifier_response(raw_output)
-        runs.append(
-            {
-                "run": run_index + 1,
-                "durationMs": round(duration_ms, 2),
-                "outputChars": len(raw_output),
-                "tagCount": len(parsed.get("tags", [])),
-                "altTextLength": len(parsed.get("alt_text") or ""),
-            }
-        )
+    try:
+        classifier.init_model()
+        init_ms = (time.perf_counter() - init_started_at) * 1000
+
+        geocode = {"city": "Singapore", "country": "Singapore"}
+        for run_index in range(repeat):
+            started_at = time.perf_counter()
+            raw_output = classifier.predict(image_path, geocode)
+            duration_ms = (time.perf_counter() - started_at) * 1000
+            parsed = parse_classifier_response(raw_output)
+            runs.append(
+                {
+                    "run": run_index + 1,
+                    "durationMs": round(duration_ms, 2),
+                    "outputChars": len(raw_output),
+                    "tagCount": len(parsed.get("tags", [])),
+                    "altTextLength": len(parsed.get("alt_text") or ""),
+                }
+            )
+    finally:
+        classifier.release()
 
     summary = {
         "generatedAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
@@ -4931,48 +5006,54 @@ def compare_captioners(
         gpu_headroom_gb=candidate_gpu_headroom_gb,
         low_impact=candidate_low_impact,
     )
-    candidate.init_model()
-
     rows = []
     verdict_counts = {"candidate_better": 0, "neutral": 0, "baseline_better": 0}
     parse_success = 0
 
-    for index_value, path in enumerate(sampled_paths, start=1):
-        print(
-            f"[{index_value}/{len(sampled_paths)}] comparing {os.path.basename(path)}"
-        )
-        baseline = baseline_db.get_image_row(path) if baseline_db else None
-        started_at = time.perf_counter()
-        candidate_raw = candidate.predict(path, None)
-        duration_ms = (time.perf_counter() - started_at) * 1000
-        try:
-            candidate_parsed = parse_classifier_response(candidate_raw)
-            parse_success += 1
-            parse_error = None
-        except Exception as err:
-            candidate_parsed = {
-                "tags": [],
-                "alt_text": "",
-            }
-            parse_error = str(err)
-        comparison = compare_caption_payloads(baseline, candidate_parsed)
-        verdict_counts[comparison["verdict"]] += 1
-        rows.append(
-            {
-                "path": path,
-                "baseline": baseline,
-                "candidate": {
-                    "backend": candidate_backend,
-                    "modelId": getattr(candidate, "model_id", None),
-                    "quantization": getattr(candidate, "quantization", None),
-                    "raw": candidate_raw,
-                    "parsed": candidate_parsed,
-                    "parseError": parse_error,
-                    "durationMs": round(duration_ms, 2),
-                },
-                "comparison": comparison,
-            }
-        )
+    # A mid-comparison failure must still release the candidate, or a GGUF
+    # backend leaves its llama-server subprocess (~5-6GB VRAM) resident after
+    # this command exits. getattr on the released classifier below still works —
+    # release frees the server, not the recorded model id/quantisation.
+    try:
+        candidate.init_model()
+        for index_value, path in enumerate(sampled_paths, start=1):
+            print(
+                f"[{index_value}/{len(sampled_paths)}] comparing {os.path.basename(path)}"
+            )
+            baseline = baseline_db.get_image_row(path) if baseline_db else None
+            started_at = time.perf_counter()
+            candidate_raw = candidate.predict(path, None)
+            duration_ms = (time.perf_counter() - started_at) * 1000
+            try:
+                candidate_parsed = parse_classifier_response(candidate_raw)
+                parse_success += 1
+                parse_error = None
+            except Exception as err:
+                candidate_parsed = {
+                    "tags": [],
+                    "alt_text": "",
+                }
+                parse_error = str(err)
+            comparison = compare_caption_payloads(baseline, candidate_parsed)
+            verdict_counts[comparison["verdict"]] += 1
+            rows.append(
+                {
+                    "path": path,
+                    "baseline": baseline,
+                    "candidate": {
+                        "backend": candidate_backend,
+                        "modelId": getattr(candidate, "model_id", None),
+                        "quantization": getattr(candidate, "quantization", None),
+                        "raw": candidate_raw,
+                        "parsed": candidate_parsed,
+                        "parseError": parse_error,
+                        "durationMs": round(duration_ms, 2),
+                    },
+                    "comparison": comparison,
+                }
+            )
+    finally:
+        candidate.release()
 
     candidate_durations = [row["candidate"]["durationMs"] for row in rows]
     summary = {
@@ -6259,6 +6340,42 @@ def resolve_classifier_model_id(
     if backend == CLASSIFIER_BACKEND_GEMMA4_GGUF:
         return DEFAULT_GEMMA4_GGUF_MODEL_ID
     return None
+
+
+def rewrite_default_caption_provenance(version: str) -> Optional[Tuple[str, str]]:
+    """Rewrite a legacy default-stamped caption pipeline version to the form the
+    resolver now produces.
+
+    Returns ``(new_version, new_model_id)`` when ``version`` carries the
+    pre-resolution ``<backend>:default@external`` marker (a caption whose model
+    id the old CLI recorded as the literal ``default`` because it was left
+    unset), or ``None`` otherwise. The backend is read straight from the segment
+    preceding the marker, so the same rewrite serves any external backend.
+
+    NOTE: this maps the historical ``default`` marker to the backend's *current*
+    default model id, not necessarily the exact quant that produced the row.
+    That is deliberate and safe: the marker never recorded which quant ran, and
+    the July 2026 caption bake-off measured the gemma-4 quant variants as
+    quality-neutral, so an existing default-stamped caption is treated as current
+    rather than triggering a full-library recaption for byte-identical output. A
+    user who genuinely wants fresh captions bumps CAPTION_PROMPT_VERSION.
+    """
+    segments = version.split(":")
+    try:
+        marker_index = segments.index(DEFAULT_CAPTION_PROVENANCE_MARKER)
+    except ValueError:
+        return None
+    if marker_index < 1:
+        return None
+    backend = segments[marker_index - 1]
+    resolved = resolve_classifier_model_id(backend)
+    if not resolved:
+        return None
+    # The marker's revision is "external"; splitting the resolved model id back
+    # in (it may itself contain a ":") reconstructs exactly what
+    # caption_pipeline_version now emits for this backend's default.
+    segments[marker_index] = f"{resolved}@external"
+    return ":".join(segments), resolved
 
 
 def caption_pipeline_version(

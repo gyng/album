@@ -37,6 +37,7 @@ from index import (
     predict_caption_batch_resilient,
     run_embedding_pass,
     resolve_caption_result,
+    rewrite_default_caption_provenance,
     Gemma4Classifier,
     Gemma4GgufClassifier,
     JanusClassifier,
@@ -2297,6 +2298,119 @@ class TestDb(UsesTestexistsFixture, unittest.TestCase):
             ).fetchone()
             self.assertEqual(row, ("a.jpg", "cat", "A cat", "cat"))
 
+    def test_rewrite_default_caption_provenance_names_current_default(self):
+        # The pure rewrite must reconstruct exactly what caption_pipeline_version
+        # now emits for the backend's default, and report the resolved model id.
+        current = caption_pipeline_version(CLASSIFIER_BACKEND_GEMMA4_GGUF)
+        resolved = resolve_classifier_model_id(CLASSIFIER_BACKEND_GEMMA4_GGUF)
+        legacy = current.replace(f":{resolved}@external:", ":default@external:")
+        self.assertIn(":default@external:", legacy)
+        self.assertNotEqual(legacy, current)
+
+        rewritten = rewrite_default_caption_provenance(legacy)
+        self.assertEqual(rewritten, (current, resolved))
+        # A version with no default marker is left alone.
+        self.assertIsNone(rewrite_default_caption_provenance(current))
+
+    def _seed_default_stamped_caption_db(self, dbpath, path):
+        """Build a DB whose only caption row carries the legacy default marker."""
+        resolved = resolve_classifier_model_id(CLASSIFIER_BACKEND_GEMMA4_GGUF)
+        current_version = caption_pipeline_version(CLASSIFIER_BACKEND_GEMMA4_GGUF)
+        legacy_version = current_version.replace(
+            f":{resolved}@external:", ":default@external:"
+        )
+        db = Sqlite3Client(dbpath)
+        db.setup_tables()
+        insert_analysed_images_batch(
+            db,
+            [
+                {
+                    "path": path,
+                    "analysed": {
+                        "exif": {},
+                        "geocode": {},
+                        "lat_deg": None,
+                        "lng_deg": None,
+                        "iso8601": None,
+                        "colors": [],
+                        "tags": ["monkey"],
+                        "alt_text": "A monkey",
+                        "subject": "monkey",
+                        "embeddings": [],
+                    },
+                    "write_core": True,
+                    "write_caption": True,
+                    "source_sha256": file_content_sha256(path),
+                    "caption_version": legacy_version,
+                    # NULL model id, as the pre-resolution pass recorded it.
+                    "caption_model_id": None,
+                }
+            ],
+        )
+        db.con.close()
+        return legacy_version, current_version, resolved
+
+    def test_default_stamped_caption_provenance_migrates_on_open(self):
+        # A DB stamped with the pre-resolution `default@external` caption marker
+        # (NULL model id) must be healed in place on the next setup_tables open,
+        # not recaptioned: the version and model id are rewritten to the current
+        # resolved default so validate passes and a re-index does no caption work.
+        path = "../src/test/fixtures/monkey.jpg"
+        with tempfile.TemporaryDirectory() as tmpdir:
+            dbpath = os.path.join(tmpdir, "default-caption.sqlite")
+            legacy_version, current_version, resolved = (
+                self._seed_default_stamped_caption_db(dbpath, path)
+            )
+
+            # Precondition: stored as the legacy default marker with NULL model id.
+            con = sqlite3.connect(dbpath)
+            stored = con.execute(
+                "SELECT pipeline_version, model_id FROM pipeline_state WHERE stage = ?",
+                (CAPTION_STAGE,),
+            ).fetchone()
+            con.close()
+            self.assertEqual(stored, (legacy_version, None))
+
+            # Any setup_tables-calling open heals it.
+            healed = Sqlite3Client(dbpath)
+            healed.setup_tables()
+            digest, stored_version, stored_model_id = healed.get_pipeline_states()[
+                (path, CAPTION_STAGE)
+            ]
+            healed.con.close()
+            self.assertEqual(stored_version, current_version)
+            self.assertEqual(stored_model_id, resolved)
+
+            # validate now accepts it for the default gemma4-gguf backend.
+            summary = validate_index_database(dbpath, path, "janus")
+            self.assertEqual(summary["paths"], 1)
+
+            # stage_needs_refresh is False through the real planner: a dry-run
+            # index against the same default backend finds nothing to caption.
+            result = CliRunner().invoke(
+                index,
+                [
+                    "--glob",
+                    path,
+                    "--dbpath",
+                    dbpath,
+                    "--dry-run",
+                    "--model-profile",
+                    "janus",
+                ],
+            )
+            self.assertEqual(0, result.exit_code, result.output)
+            self.assertIn("(0 to index", result.output)
+
+            # Idempotent: a second open matches no marker and changes nothing.
+            second = Sqlite3Client(dbpath)
+            second.setup_tables()
+            self.assertEqual(
+                second.get_pipeline_states()[(path, CAPTION_STAGE)],
+                (digest, current_version, resolved),
+            )
+            second.con.close()
+
     def test_siglip2_dry_run_backfills_missing_embeddings_for_existing_rows(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             dbpath = os.path.join(tmpdir, "test-simple.sqlite")
@@ -3431,6 +3545,9 @@ class TestDb(UsesTestexistsFixture, unittest.TestCase):
                 quantization = "bnb-4bit"
 
                 def init_model(self):
+                    return None
+
+                def release(self):
                     return None
 
                 def predict(self, _path, _geocode):
