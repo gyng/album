@@ -26,6 +26,7 @@
 
 .moreButton:not(:disabled):active {
   background-color: var(--c-bg);
+  color: inherit;
 }
 
 .results {

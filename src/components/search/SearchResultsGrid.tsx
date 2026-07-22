@@ -66,12 +66,7 @@ export const SearchResultsGrid: React.FC<Props> = ({
   // taken out of flow so it never contributes a flex gap before the first
   // tile; the visible progress indicator below is purely decorative.
   const statusItem = (
-    <li
-      className={styles.visuallyHidden}
-      role="status"
-      aria-live="polite"
-      aria-busy={isSearching}
-    >
+    <li className={styles.visuallyHidden} role="status" aria-live="polite">
       {isSearching ? "Searching…" : ""}
     </li>
   );

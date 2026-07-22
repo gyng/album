@@ -69,7 +69,9 @@ test.describe("Image search UI shell", () => {
     const chip = page.getByRole("button", { name: "Remove image query" });
     await expect(chip).toBeVisible();
     await expect(page.getByText("Drawn sketch")).toBeVisible();
-    await expect(page.getByText("Searching…")).toBeVisible();
+    await expect(page.locator('ul[aria-busy="true"] > li[role="status"]')).toHaveText(
+      "Searching…",
+    );
 
     await chip.click();
     await expect(chip).not.toBeVisible();
@@ -93,6 +95,8 @@ test.describe("Image search UI shell", () => {
 
     await expect(page.getByRole("button", { name: "Remove image query" })).toBeVisible();
     await expect(page.getByText("Uploaded image")).toBeVisible();
-    await expect(page.getByText("Searching…")).toBeVisible();
+    await expect(page.locator('ul[aria-busy="true"] > li[role="status"]')).toHaveText(
+      "Searching…",
+    );
   });
 });

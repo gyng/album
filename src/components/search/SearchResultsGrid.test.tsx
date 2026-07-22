@@ -186,8 +186,14 @@ describe("SearchResultsGrid", () => {
     // starts, or a screen reader misses the first "Searching…" announcement.
     const view = render(<SearchResultsGrid {...baseProps} />);
     const status = screen.getByRole("status");
+    const ul = status.closest("ul");
     expect(status).toBeEmptyDOMElement();
-    expect(status).toHaveAttribute("aria-busy", "false");
+    // aria-busy belongs on the ul, not the status node itself — aria-busy=true
+    // on the status region would tell assistive tech to defer announcing
+    // changes inside it, withholding the very "Searching…" text it exists to
+    // announce.
+    expect(status).not.toHaveAttribute("aria-busy");
+    expect(ul).toHaveAttribute("aria-busy", "false");
 
     view.rerender(
       <SearchResultsGrid
@@ -199,7 +205,8 @@ describe("SearchResultsGrid", () => {
     );
     expect(screen.getByRole("status")).toBe(status);
     expect(status).toHaveTextContent("Searching…");
-    expect(status).toHaveAttribute("aria-busy", "true");
+    expect(status).not.toHaveAttribute("aria-busy");
+    expect(ul).toHaveAttribute("aria-busy", "true");
 
     view.rerender(
       <SearchResultsGrid {...baseProps} searchInputValue="query" trimmedQuery="query" />,
