@@ -59,77 +59,6 @@
   opacity: 0.8;
 }
 
-/* The finding: the whole point of the page, so it gets the one loud moment. */
-.finding {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: var(--m-l) var(--m-xl);
-  align-items: center;
-  border-block: var(--line-strong) solid var(--c-bg-contrast-light);
-  padding-block: var(--m-l);
-}
-
-@media (max-width: 760px) {
-  .finding {
-    grid-template-columns: 1fr;
-    gap: var(--m-m);
-  }
-}
-
-.findingFigures {
-  display: flex;
-  align-items: center;
-  gap: var(--m-l);
-}
-
-.figureBlock {
-  display: flex;
-  flex-direction: column;
-  gap: var(--m);
-}
-
-.figureBig {
-  font-size: var(--fs-xl);
-  line-height: 1;
-  font-variant-numeric: tabular-nums;
-  font-weight: 700;
-}
-
-.figureAlarm {
-  color: var(--c-accent);
-}
-
-.figureDenominator {
-  font-size: var(--fs-l);
-  font-weight: 400;
-  opacity: 0.5;
-}
-
-.figureLabel {
-  font-size: var(--fs-s);
-  opacity: 0.7;
-  max-inline-size: 14ch;
-}
-
-.figureArrow {
-  font-size: var(--fs-l);
-  opacity: 0.4;
-}
-
-.findingBody {
-  margin: 0;
-  font-size: var(--fs-sm);
-  max-inline-size: var(--content-width-reading);
-}
-
-.findingBody code {
-  font-family: monospace;
-  font-size: var(--fs-s);
-  background-color: color-mix(in oklch, var(--c-bg-contrast-light) 18%, transparent);
-  padding: 0 var(--m);
-  border-radius: 2px;
-}
-
 /* Comparison table.
    overflow-y must be stated: if only one axis is set to a non-visible value the
    other computes to `auto`, which silently turns this into a vertical scroll
@@ -172,8 +101,30 @@
 
 .table thead th abbr {
   text-decoration: none;
-  border-block-end: 1px dotted var(--c-bg-contrast-light);
+  border-block-end: var(--line-hairline) dotted var(--c-bg-contrast-light);
   cursor: help;
+}
+
+/* Visible companion to the header abbrs: the same definitions, reachable
+   without hover. */
+.columnDefinitions {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(var(--size-200), 1fr));
+  gap: var(--m-m) var(--m-l);
+  margin: 0;
+  font-size: var(--fs-s);
+}
+
+.columnDefinition dt {
+  font-size: var(--fs-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  opacity: 0.6;
+}
+
+.columnDefinition dd {
+  margin: 0;
+  opacity: 0.8;
 }
 
 /* Must stay a real table-cell: setting display:flex/grid on a th takes it out of
@@ -310,7 +261,7 @@
 /* Mobile: a 12-row, 7-column table is unreadable when it has to be dragged
    sideways, so below this width each row becomes its own stacked block and the
    column headers move into per-cell labels (data-label). No horizontal scroll. */
-@media (max-width: 760px) {
+@media (max-width: 720px) {
   .page {
     padding-inline: var(--m-m);
   }
@@ -377,7 +328,7 @@
 
   .barTrack {
     inline-size: 100%;
-    max-inline-size: 120px;
+    max-inline-size: var(--size-120);
   }
 
   /* The bar would otherwise sit under the label column. */
@@ -428,9 +379,9 @@
 .barTrack {
   display: block;
   block-size: var(--size-6);
-  inline-size: 72px;
+  inline-size: var(--size-80);
   background-color: color-mix(in oklch, var(--c-bg-contrast-light) 25%, transparent);
-  border-radius: 2px;
+  border-radius: calc(var(--line-hairline) * 2);
   overflow: hidden;
 }
 
@@ -438,8 +389,8 @@
   display: block;
   block-size: 100%;
   background-color: var(--c-accent);
-  border-start-end-radius: 2px;
-  border-end-end-radius: 2px;
+  border-start-end-radius: calc(var(--line-hairline) * 2);
+  border-end-end-radius: calc(var(--line-hairline) * 2);
 }
 
 .barFillMuted {
@@ -450,7 +401,7 @@
 /* Frames */
 .case {
   display: grid;
-  grid-template-columns: 280px 1fr;
+  grid-template-columns: var(--size-280) 1fr;
   gap: var(--m-l);
   align-items: start;
   padding-block-end: var(--m-xl);
@@ -509,7 +460,7 @@
   text-transform: uppercase;
   letter-spacing: 0.08em;
   opacity: 0.55;
-  padding-block-start: 3px;
+  padding-block-start: var(--size-3);
   white-space: nowrap;
 }
 
@@ -576,51 +527,7 @@
   margin-block-end: var(--m);
 }
 
-.answer {
-  border: var(--line-hairline) solid var(--c-bg-contrast-light);
-  border-inline-start-width: var(--size-3);
-  padding: var(--m-s) var(--m-m);
-}
-
-.pass {
-  border-inline-start-color: var(--c-bg-contrast-light);
-}
-
-.fail {
-  border-inline-start-color: var(--c-accent);
-}
-
-.answerHead {
-  display: flex;
-  align-items: baseline;
-  gap: var(--m-s);
-  flex-wrap: wrap;
-}
-
-.who {
-  font-weight: 600;
-  font-size: var(--fs-sm);
-}
-
-.verdict {
-  font-family: monospace;
-  font-size: var(--fs-xs);
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  opacity: 0.6;
-}
-
-.fail .verdict {
-  color: var(--c-accent);
-  opacity: 1;
-}
-
 .why {
   font-size: var(--fs-s);
   opacity: 0.7;
-}
-
-.alt {
-  margin-block: var(--m-s);
-  font-size: var(--fs-sm);
 }

@@ -54,14 +54,19 @@ type BenchmarkCase = {
 // so the shape is declared here rather than inferred from the literal.
 const data = benchmarkJson as unknown as {
   generatedAt: string;
+  librarySize: number;
   models: ModelSummary[];
   cases: BenchmarkCase[];
 };
 
-const LIBRARY_SIZE = 1495;
-
+// The five test-simple cases have no source images in a production build (test
+// albums are excluded from normal builds), so their derivatives are generated
+// once into a committed, non-gitignored location instead of the usual
+// per-album resized-image cache.
 const photoSrc = (album: string, file: string, size: 800 | 1600) =>
-  encodePublicAssetPath(`/data/albums/${album}/.resized_images/${file}@${size}.avif`);
+  album.startsWith("test-")
+    ? encodePublicAssetPath(`/data/benchmark/${file}@${size}.avif`)
+    : encodePublicAssetPath(`/data/albums/${album}/.resized_images/${file}@${size}.avif`);
 
 const percent = (value: number) => `${Math.round(value * 100)}%`;
 const seconds = (ms: number) => `${(ms / 1000).toFixed(2)}s`;
@@ -72,7 +77,7 @@ const WhereBadge = ({ where }: { where: Where }) =>
 
 const ModelLabel = ({ model, compact }: { model: ModelSummary; compact?: boolean }) => (
   <span className={styles.modelName}>
-    <span className={styles.vendorIcon} aria-hidden={false}>
+    <span className={styles.vendorIcon}>
       <VendorIcon vendor={model.vendor} />
     </span>
     <span className={styles.modelNameText}>
@@ -142,7 +147,7 @@ const columns: Column[] = [
   },
   {
     label: "Peak VRAM",
-    hint: "Peak GPU memory above idle, on a 10GB card. Cloud and Codex models run remotely and use none.",
+    hint: "Peak GPU memory above idle, on a 10GB card. Cloud models run remotely and use none.",
     value: (m) => (m.peakVramGb === undefined ? "—" : `${m.peakVramGb}GB`),
     fraction: (m) => (m.peakVramGb === undefined ? 0 : m.peakVramGb / 10),
     lowerIsBetter: true,
@@ -159,45 +164,60 @@ const columns: Column[] = [
   },
 ];
 
-const ComparisonTable = () => (
-  <div className={styles.tableScroll}>
-    <table className={styles.table}>
-      <caption className={styles.tableCaption}>
-        Bars are scaled within each column. Shaded bars are measures where less is better. ★ marks
-        Gemma&nbsp;UD-Q4, the shipped default — chosen for its tags, not its raw score. The “tags
-        only” column is why: Janus scores {data.models[0]?.conceptPass}/
-        {data.models[0]?.conceptTotal} with tags and sentence merged but only{" "}
-        {data.models[0]?.conceptInTags}/{data.models[0]?.conceptTotal} on tags alone — its sentence
-        propping up bare-word tags. Tags are what the search index stores.
-      </caption>
-      <thead>
-        <tr>
-          <th scope="col">Model</th>
-          {columns.map((column) => (
-            <th key={column.label} scope="col">
-              <abbr title={column.hint}>{column.label}</abbr>
-            </th>
-          ))}
-        </tr>
-      </thead>
-      <tbody>
-        {data.models.map((model) => (
-          <tr key={model.key}>
-            <th scope="row" className={styles.modelCell}>
-              <ModelLabel model={model} />
-              <span className={styles.modelNote}>{model.note}</span>
-            </th>
+const ComparisonTable = () => {
+  const janus = data.models.find((model) => model.key === "janus");
+
+  return (
+    <div className={styles.tableScroll}>
+      <table className={styles.table}>
+        <caption className={styles.tableCaption}>
+          Bars are scaled within each column. Shaded bars are measures where less is better. ★
+          marks Gemma&nbsp;UD-Q4, the shipped default — chosen for its tags, not its raw score. The
+          “tags only” column is why: Janus scores {janus?.conceptPass}/{janus?.conceptTotal} with
+          tags and sentence merged but only {janus?.conceptInTags}/{janus?.conceptTotal} on tags
+          alone — its sentence propping up bare-word tags. Tags are what the search index stores.
+        </caption>
+        <thead>
+          <tr>
+            <th scope="col">Model</th>
             {columns.map((column) => (
-              <td key={column.label} data-label={column.label}>
-                <span className={styles.cellValue}>{column.value(model)}</span>
-                <Bar fraction={column.fraction(model)} muted={column.lowerIsBetter} />
-              </td>
+              <th key={column.label} scope="col">
+                <abbr title={column.hint}>{column.label}</abbr>
+              </th>
             ))}
           </tr>
-        ))}
-      </tbody>
-    </table>
-  </div>
+        </thead>
+        <tbody>
+          {data.models.map((model) => (
+            <tr key={model.key}>
+              <th scope="row" className={styles.modelCell}>
+                <ModelLabel model={model} />
+                <span className={styles.modelNote}>{model.note}</span>
+              </th>
+              {columns.map((column) => (
+                <td key={column.label} data-label={column.label}>
+                  <span className={styles.cellValue}>{column.value(model)}</span>
+                  <Bar fraction={column.fraction(model)} muted={column.lowerIsBetter} />
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+};
+
+/** Visible companion to the header abbrs, which touch and keyboard users can't reach. */
+const ColumnDefinitions = () => (
+  <dl className={styles.columnDefinitions}>
+    {columns.map((column) => (
+      <div key={column.label} className={styles.columnDefinition}>
+        <dt>{column.label}</dt>
+        <dd>{column.hint}</dd>
+      </div>
+    ))}
+  </dl>
 );
 
 const CaseRow = ({ entry }: { entry: BenchmarkCase }) => (
@@ -329,7 +349,7 @@ const BenchmarkScreen = () => {
             lizard a turtle, and once by the reviewer of this run, who was so pleased to catch the
             first error that he promptly committed a second.
             {sonnet?.costPer1kImagesUsd
-              ? ` Cost, incidentally, is not the argument for staying local: all ${LIBRARY_SIZE.toLocaleString("en-GB")} photos through Sonnet 5 come to about ${money((sonnet.costPer1kImagesUsd * LIBRARY_SIZE) / 1000)}, which is less than the coffee consumed while measuring it.`
+              ? ` Cost, incidentally, is not the argument for staying local: all ${data.librarySize.toLocaleString("en-GB")} photos through Sonnet 5 come to about ${money((sonnet.costPer1kImagesUsd * data.librarySize) / 1000)}, which is less than the coffee consumed while measuring it.`
               : ""}
           </p>
         </header>
@@ -356,6 +376,7 @@ const BenchmarkScreen = () => {
         <section className={commonStyles.stack}>
           <Heading level={2}>How they compare</Heading>
           <ComparisonTable />
+          <ColumnDefinitions />
         </section>
 
         <section className={commonStyles.stackXl}>
