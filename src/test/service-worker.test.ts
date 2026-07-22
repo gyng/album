@@ -636,6 +636,81 @@ describe("service worker data caching", () => {
     expect(fetchMockOf(fetchHandler)).toHaveBeenCalledTimes(2);
   });
 
+  it("marks a cold download as fresh so its first hit does not immediately revalidate", async () => {
+    // The miss path just fetched the full bytes; treating the URL as still
+    // needing revalidation would re-fetch it on the very next hit, roughly
+    // doubling first-cycle bandwidth on a kiosk looping a cold album.
+    const cached = new Response("cached image");
+    let missed = false;
+    const fetchHandler = loadFetchHandler({
+      cachedResponse: cached,
+      networkResponse: new Response("network image"),
+      cacheMatch: () => {
+        if (!missed) {
+          missed = true;
+          return Promise.resolve(undefined);
+        }
+        return Promise.resolve(cached);
+      },
+    });
+    const lifetimes: Promise<unknown>[] = [];
+    const hit = async () => {
+      let responsePromise: Promise<Response> | undefined;
+      fetchHandler({
+        request: request("/data/albums/trip/photo.avif", "image"),
+        respondWith: (promise) => {
+          responsePromise = promise;
+        },
+        waitUntil: (promise) => {
+          lifetimes.push(promise);
+        },
+      });
+      await responsePromise;
+    };
+
+    await hit();
+    await Promise.all(lifetimes);
+    await hit();
+    await Promise.all(lifetimes);
+
+    // One network fetch total: the cold download. The following cache hit must
+    // not schedule a background revalidation of bytes fetched moments earlier.
+    expect(fetchMockOf(fetchHandler)).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps a URL marked done after a revalidation that answered non-ok", async () => {
+    // A server-side deletion (404 while the stale copy stays cached) must not
+    // turn into an unbounded refetch-per-hit loop for the worker's lifetime;
+    // only thrown network errors (offline) unmark the URL for retry.
+    const cached = new Response("cached image");
+    const fetchHandler = loadFetchHandler({
+      cachedResponse: cached,
+      networkResponse: new Response(null, { status: 404 }),
+    });
+    const lifetimes: Promise<unknown>[] = [];
+    const hit = async () => {
+      let responsePromise: Promise<Response> | undefined;
+      fetchHandler({
+        request: request("/data/albums/trip/photo.avif", "image"),
+        respondWith: (promise) => {
+          responsePromise = promise;
+        },
+        waitUntil: (promise) => {
+          lifetimes.push(promise);
+        },
+      });
+      await responsePromise;
+    };
+
+    await hit();
+    await Promise.all(lifetimes);
+    await hit();
+    await Promise.all(lifetimes);
+
+    expect(lifetimes).toHaveLength(1);
+    expect(fetchMockOf(fetchHandler)).toHaveBeenCalledTimes(1);
+  });
+
   it("ignores a failed image revalidation so the cached copy still serves offline", async () => {
     const cached = new Response("cached image");
     const fetchHandler = loadFetchHandler({

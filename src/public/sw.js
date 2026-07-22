@@ -149,15 +149,13 @@ const fetchImageAndStore = async (cache, request) => {
 
 // Background revalidation for the stale-while-revalidate hit path below. The
 // caller has already marked the URL as done (in revalidatedImageUrls) before
-// scheduling this; on failure — a thrown network error, or a non-ok response —
-// that mark is undone so the next hit for the same URL retries instead of
-// being stuck marked-done for the rest of the worker's lifetime.
+// scheduling this. Only a thrown network error (offline) undoes that mark so
+// the next hit retries; a non-ok response (e.g. the media was deleted
+// server-side) keeps the mark, because unmarking it would turn every later
+// hit into a fresh doomed round-trip for the worker's whole lifetime.
 const revalidateImageInBackground = async (cache, request) => {
   try {
-    const response = await fetchImageAndStore(cache, request);
-    if (!response.ok) {
-      revalidatedImageUrls.delete(request.url);
-    }
+    await fetchImageAndStore(cache, request);
   } catch (_error) {
     revalidatedImageUrls.delete(request.url);
   }
@@ -195,6 +193,9 @@ const staleWhileRevalidateImage = async (request, event) => {
     return new Response(null, { status: 504 });
   }
   if (response.ok) {
+    // The full bytes were fetched moments ago — mark the URL as fresh so the
+    // next hit serves from cache without immediately revalidating it.
+    revalidatedImageUrls.add(request.url);
     const responseToCache = response.clone();
     const store = (async () => {
       await cache.put(request, responseToCache).catch(() => {
