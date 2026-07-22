@@ -127,7 +127,7 @@ describe("SearchResultsGrid", () => {
       />,
     );
 
-    const items = container.querySelectorAll("li");
+    const items = container.querySelectorAll("li:not([role='status'])");
     expect(items[0]).toHaveStyle({ filter: "saturate(0.5) grayscale(1)", opacity: "0.55" });
     expect(items[1]).toHaveStyle({ filter: "saturate(0.5)", opacity: "1" });
     expect(tileProps).toHaveBeenLastCalledWith(
@@ -176,6 +176,33 @@ describe("SearchResultsGrid", () => {
       />,
     );
     expect(screen.getByText("Searching…")).toBeInTheDocument();
+  });
+
+  it("keeps a persistent live region for the searching status rather than mounting it fresh", () => {
+    const view = render(
+      <SearchResultsGrid {...baseProps} searchInputValue="query" trimmedQuery="query" />,
+    );
+    const status = screen.getByRole("status");
+    expect(status).toBeEmptyDOMElement();
+    expect(status).toHaveAttribute("aria-busy", "false");
+
+    view.rerender(
+      <SearchResultsGrid
+        {...baseProps}
+        searchInputValue="query"
+        trimmedQuery="query"
+        isSearching
+      />,
+    );
+    expect(screen.getByRole("status")).toBe(status);
+    expect(status).toHaveTextContent("Searching…");
+    expect(status).toHaveAttribute("aria-busy", "true");
+
+    view.rerender(
+      <SearchResultsGrid {...baseProps} searchInputValue="query" trimmedQuery="query" />,
+    );
+    expect(screen.getByRole("status")).toBe(status);
+    expect(status).toBeEmptyDOMElement();
   });
 
   it("keeps search progress visible while showing results from the previous query", () => {

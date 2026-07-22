@@ -17,11 +17,6 @@ const formatLongDate = (date: string) => formatExifWallClockDate(`${date}T00:00:
 const formatDateTimeTitle = (dateTimeOriginal: string) =>
   formatExifWallClockDateTime(dateTimeOriginal);
 
-const relativeDateTimestamp = (dateTimeOriginal: string) => {
-  const timestamp = exifWallClockTimestamp(dateTimeOriginal);
-  return timestamp === null ? null : timestamp;
-};
-
 const toSimilarSearchPath = (path: string) => {
   if (path.startsWith("/data/albums/")) {
     return path.replace(/^\/data\/albums\//, "../albums/");
@@ -222,12 +217,12 @@ export const TimelineDayGrid = ({
               <div className={styles.details}>
                 <div className={styles.source}>
                   <strong className={styles.sourceText}>{entry.album}</strong>
-                  {relativeDateTimestamp(entry.dateTimeOriginal) !== null ? (
+                  {exifWallClockTimestamp(entry.dateTimeOriginal) !== null ? (
                     <span
                       className={styles.secondaryMeta}
                       title={formatDateTimeTitle(entry.dateTimeOriginal)!}
                     >
-                      <HydratedRelativeTime date={relativeDateTimestamp(entry.dateTimeOriginal)!} />
+                      <HydratedRelativeTime date={exifWallClockTimestamp(entry.dateTimeOriginal)!} />
                     </span>
                   ) : null}
                 </div>

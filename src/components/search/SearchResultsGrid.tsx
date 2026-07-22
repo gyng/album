@@ -65,12 +65,19 @@ export const SearchResultsGrid: React.FC<Props> = ({
 
   return (
     <ul className={styles.results} aria-busy={isSearching}>
-      {isSearching ? (
-        <li className={styles.searchingStatus} role="status" aria-live="polite">
-          <span className={styles.searchingPulse} aria-hidden="true" />
-          Searching&hellip;
-        </li>
-      ) : null}
+      <li
+        className={isSearching ? styles.searchingStatus : undefined}
+        role="status"
+        aria-live="polite"
+        aria-busy={isSearching}
+      >
+        {isSearching ? (
+          <>
+            <span className={styles.searchingPulse} aria-hidden="true" />
+            Searching&hellip;
+          </>
+        ) : null}
+      </li>
 
       {isError && !isSearching ? (
         <li className={styles.inlineError}>

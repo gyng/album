@@ -669,6 +669,53 @@ describe("publish wizard boundary adapters", () => {
     });
   });
 
+  it("flags model info as unavailable in the report rather than silently reporting clean zeros", async () => {
+    // Regression: when the indexer query fails (including its timeout), the old
+    // code fell back to expectedEmbeddingModelIds = [] and forced stale/missing
+    // counts to 0 — the printed report looked green with no trace beyond a
+    // scrollable console.warn, so a publish after a model change proceeded
+    // unflagged. The report itself must carry the unavailability.
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "publish-model-unavailable-"));
+    const albumsDir = path.join(root, "albums");
+    fs.mkdirSync(albumsDir);
+    const loadState = jest.fn(async () => ({
+      exists: true,
+      dbPath: "db",
+      imageCount: 10,
+      embeddingsCount: 10,
+      hasEmbeddingsTable: true,
+      indexedPhotoPaths: new Set(),
+      indexedEmbeddingPaths: new Set(),
+      embeddingModelCounts: [{ modelId: "current", count: 10 }],
+    }));
+
+    const report = await createPreflightReport({
+      albumsDir,
+      dbPath: "db",
+      embeddingsDbPath: null,
+      indexDir: "/index",
+      lastIndexStatsPath: null,
+      repoDir: null,
+      loadState,
+      getModelInfo: () => null,
+    });
+
+    expect(report.db).toMatchObject({
+      modelInfoUnavailable: true,
+      expectedEmbeddingModelIds: [],
+      staleEmbeddingCount: 0,
+      missingEmbeddingCount: 0,
+    });
+
+    const insights = buildPreflightInsights(report);
+    expect(insights).toContainEqual(
+      expect.objectContaining({
+        level: "warn",
+        text: expect.stringContaining("skipped (model info unavailable)"),
+      }),
+    );
+  });
+
   it("queries indexer model metadata and handles command failures", () => {
     expect(
       getIndexerModelInfo("/index", () => Buffer.from('{"embeddingModelId":"model"}')),
@@ -708,6 +755,21 @@ describe("publish wizard boundary adapters", () => {
         warn,
       ),
     ).toBeNull();
+  });
+
+  it("gives the indexer's model-info query a longer, but still bounded, timeout", () => {
+    // A cold `uv run` can exceed 10s; that false timeout used to degrade a
+    // safety check (see the "flags model info as unavailable" test above), so
+    // the budget was raised. It must still be a hard cap, not unbounded.
+    const run = jest.fn(() => Buffer.from('{"embeddingModelId":"model"}'));
+    getIndexerModelInfo("/index", run);
+    expect(run).toHaveBeenCalledWith(
+      "uv run index.py model-info",
+      expect.objectContaining({ cwd: "/index", timeout: expect.any(Number) }),
+    );
+    const [, options] = run.mock.calls[0];
+    expect(options.timeout).toBeGreaterThan(10000);
+    expect(options.timeout).toBeLessThanOrEqual(30000);
   });
 
   it("reads optional index stats safely", () => {

@@ -141,7 +141,17 @@ const buildPreflightInsights = (report) => {
     });
   }
 
-  if (report.db.staleEmbeddingCount > 0) {
+  if (report.db.modelInfoUnavailable) {
+    // Surface this loudly: without model info, expectedEmbeddingModelIds is
+    // forced to [] and the stale/missing checks below can't run, so they'd
+    // otherwise report clean zeros indistinguishable from a genuinely healthy
+    // DB. A publish after an embedding-model change must not sail through on
+    // that false green.
+    lines.push({
+      level: "warn",
+      text: "Indexer embedding model metadata unavailable — stale/missing embedding checks skipped (model info unavailable). Re-run once the indexer responds before trusting embedding coverage.",
+    });
+  } else if (report.db.staleEmbeddingCount > 0) {
     const oldModels = (report.db.staleEmbeddingModelIds ?? []).join(", ") || "unknown";
     const newModels =
       (report.db.expectedEmbeddingModelIds ?? []).join(", ") ||
@@ -975,7 +985,11 @@ const buildDeletedAlbumReports = ({ indexedPhotoPaths, onDiskAlbumNames }) => {
 
 const getIndexerModelInfo = (indexDir, run, warn) => {
   try {
-    const output = run("uv run index.py model-info", { cwd: indexDir, timeout: 10000 });
+    // A cold `uv run` (first invocation, fresh venv resolution) can take longer
+    // than 10s; a false timeout here silently disables the embedding
+    // model-change safety check below, so give it more room while keeping a
+    // hard cap.
+    const output = run("uv run index.py model-info", { cwd: indexDir, timeout: 30000 });
     const lines = output
       .toString()
       .split(/\r?\n/)
@@ -1065,6 +1079,11 @@ const createPreflightReport = async ({
   );
 
   const modelInfo = indexDir ? getModelInfo(indexDir, execSync, console.warn) : null;
+  // The indexer's model metadata is only trustworthy when this is false — a
+  // null modelInfo (query failed, timed out, or was never attempted) forces
+  // expectedEmbeddingModelIds to [] below, which would otherwise report clean
+  // zeros for stale/missing embeddings instead of "we don't actually know".
+  const modelInfoUnavailable = modelInfo === null;
   const expectedEmbeddingModelIds =
     modelInfo?.embeddingModelIds ??
     (modelInfo?.embeddingModelId ? [modelInfo.embeddingModelId] : []);
@@ -1111,6 +1130,7 @@ const createPreflightReport = async ({
       imageCount: dbState.imageCount,
       embeddingsCount: dbState.embeddingsCount,
       hasEmbeddingsTable: dbState.hasEmbeddingsTable,
+      modelInfoUnavailable,
       expectedEmbeddingModelIds,
       currentEmbeddingModelId,
       staleEmbeddingCount,
