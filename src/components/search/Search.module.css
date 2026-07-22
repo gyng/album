@@ -21,6 +21,7 @@
 
 .moreButton:not(:disabled):hover {
   background-color: var(--c-bg-contrast-light);
+  color: var(--c-bg);
 }
 
 .moreButton:not(:disabled):active {
@@ -42,6 +43,21 @@
   animation-name: fadein;
   animation-duration: var(--t-base);
   animation-timing-function: var(--ease-out);
+}
+
+/* Visually hidden but still announced by assistive tech. position:absolute
+   takes it out of the flex flow entirely, so — unlike an empty in-flow <li> —
+   it cannot introduce a phantom gap before the first tile. display:none was
+   not used because that would also stop screen readers announcing the text
+   changes here. */
+
+.visuallyHidden {
+  position: absolute;
+  inline-size: var(--size-1);
+  block-size: var(--size-1);
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 
 .searchingStatus {

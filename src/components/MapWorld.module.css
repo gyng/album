@@ -30,7 +30,7 @@
   block-size: 100dvh;
   margin: 0;
   background: var(--c-bg-contrast-dark);
-  color: var(--c-bg-contrast-light);
+  color: var(--c-on-dark);
   font-size: var(--fs-sm);
 }
 

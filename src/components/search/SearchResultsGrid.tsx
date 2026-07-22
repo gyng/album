@@ -59,25 +59,41 @@ export const SearchResultsGrid: React.FC<Props> = ({
   const hasTextQuery = trimmedQuery.length >= 3;
   const isPureColorSearch = isColorMode && !hasTextQuery && !hasFacetFilters;
 
+  // Always rendered, on every return path, so assistive tech keeps a single
+  // persistent live region to announce into — mounting it together with its
+  // first "Searching…" text (or unmounting it once the query is cleared)
+  // means screen readers miss the announcement. It is visually hidden and
+  // taken out of flow so it never contributes a flex gap before the first
+  // tile; the visible progress indicator below is purely decorative.
+  const statusItem = (
+    <li
+      className={styles.visuallyHidden}
+      role="status"
+      aria-live="polite"
+      aria-busy={isSearching}
+    >
+      {isSearching ? "Searching…" : ""}
+    </li>
+  );
+
   if (!showResults) {
-    return <ul className={styles.results} />;
+    return (
+      <ul className={styles.results} aria-busy={isSearching}>
+        {statusItem}
+      </ul>
+    );
   }
 
   return (
     <ul className={styles.results} aria-busy={isSearching}>
-      <li
-        className={isSearching ? styles.searchingStatus : undefined}
-        role="status"
-        aria-live="polite"
-        aria-busy={isSearching}
-      >
-        {isSearching ? (
-          <>
-            <span className={styles.searchingPulse} aria-hidden="true" />
-            Searching&hellip;
-          </>
-        ) : null}
-      </li>
+      {statusItem}
+
+      {isSearching ? (
+        <li className={styles.searchingStatus} aria-hidden="true">
+          <span className={styles.searchingPulse} aria-hidden="true" />
+          Searching&hellip;
+        </li>
+      ) : null}
 
       {isError && !isSearching ? (
         <li className={styles.inlineError}>

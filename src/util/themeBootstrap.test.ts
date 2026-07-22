@@ -56,4 +56,26 @@ describe("THEME_BOOTSTRAP_SCRIPT", () => {
     expect(document.documentElement.classList.contains("dark")).toBe(true);
     expect(document.documentElement.classList.contains("theme-ink")).toBe(true);
   });
+
+  it("does not resolve Object.prototype members as theme aliases from the URL or storage", () => {
+    window.history.pushState({}, "", "/?theme=constructor");
+
+    runBootstrapScript();
+
+    // Neither an inherited alias lookup nor a scheme lookup must match —
+    // the theme falls through to the system scheme (no explicit class set).
+    expect(document.documentElement.classList.contains("theme-watercolour")).toBe(false);
+    for (const cls of ALL_THEME_CLASSES) {
+      expect(document.documentElement.classList.contains(cls)).toBe(false);
+    }
+
+    window.history.pushState({}, "", "/");
+    localStorage.setItem("theme", "constructor");
+
+    runBootstrapScript();
+
+    for (const cls of ALL_THEME_CLASSES) {
+      expect(document.documentElement.classList.contains(cls)).toBe(false);
+    }
+  });
 });

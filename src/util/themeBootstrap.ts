@@ -34,14 +34,14 @@ export const THEME_BOOTSTRAP_SCRIPT = `
   try {
     const url = new URL(window.location.href);
     const fromUrl = url.searchParams.get("theme");
-    const urlTheme = aliases[fromUrl] || fromUrl;
+    const urlTheme = fromUrl && Object.hasOwn(aliases, fromUrl) ? aliases[fromUrl] : fromUrl;
     if (urlTheme && Object.hasOwn(schemes, urlTheme)) {
       applyTheme(urlTheme);
       return;
     }
 
     const stored = localStorage.getItem("theme");
-    const storedTheme = aliases[stored] || stored;
+    const storedTheme = stored && Object.hasOwn(aliases, stored) ? aliases[stored] : stored;
     if (storedTheme && Object.hasOwn(schemes, storedTheme)) {
       applyTheme(storedTheme);
       if (storedTheme !== stored) {

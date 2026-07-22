@@ -155,7 +155,7 @@
   background: linear-gradient(
     100deg,
     var(--c-bg-contrast-dark) 30%,
-    color-mix(in oklch, var(--c-bg-contrast-light) 12%, var(--c-bg-contrast-dark)) 50%,
+    color-mix(in oklch, var(--c-on-dark) 12%, var(--c-bg-contrast-dark)) 50%,
     var(--c-bg-contrast-dark) 70%
   );
   background-size: 200% 100%;

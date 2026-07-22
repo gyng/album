@@ -68,9 +68,11 @@ describe("SearchResultsGrid", () => {
     baseProps.onFetchNextPage.mockClear();
   });
 
-  it("keeps an inactive search empty", () => {
+  it("keeps an inactive search empty aside from the persistent status region", () => {
     const { container } = render(<SearchResultsGrid {...baseProps} />);
-    expect(container.querySelector("ul")).toBeEmptyDOMElement();
+    const ul = container.querySelector("ul");
+    expect(ul?.querySelectorAll("li:not([role='status'])")).toHaveLength(0);
+    expect(screen.getByRole("status")).toBeEmptyDOMElement();
   });
 
   it.each([
@@ -109,7 +111,7 @@ describe("SearchResultsGrid", () => {
       <SearchResultsGrid {...baseProps} searchInputValue="query" isError isFetching isSearching />,
     );
     expect(screen.queryByText(/Something went wrong/)).toBeNull();
-    expect(screen.getByText("Searching…")).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent("Searching…");
   });
 
   it("renders results, forwards actions, and distinguishes trail members", () => {
@@ -175,13 +177,14 @@ describe("SearchResultsGrid", () => {
         isSearching
       />,
     );
-    expect(screen.getByText("Searching…")).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent("Searching…");
   });
 
-  it("keeps a persistent live region for the searching status rather than mounting it fresh", () => {
-    const view = render(
-      <SearchResultsGrid {...baseProps} searchInputValue="query" trimmedQuery="query" />,
-    );
+  it("keeps a persistent live region for the searching status across the inactive-to-active transition", () => {
+    // Starts inactive (bare-ul path, showResults false) — the status node
+    // must already exist here, not mount for the first time once a query
+    // starts, or a screen reader misses the first "Searching…" announcement.
+    const view = render(<SearchResultsGrid {...baseProps} />);
     const status = screen.getByRole("status");
     expect(status).toBeEmptyDOMElement();
     expect(status).toHaveAttribute("aria-busy", "false");
@@ -201,6 +204,11 @@ describe("SearchResultsGrid", () => {
     view.rerender(
       <SearchResultsGrid {...baseProps} searchInputValue="query" trimmedQuery="query" />,
     );
+    expect(screen.getByRole("status")).toBe(status);
+    expect(status).toBeEmptyDOMElement();
+
+    // Clearing the input back to inactive must not unmount it either.
+    view.rerender(<SearchResultsGrid {...baseProps} />);
     expect(screen.getByRole("status")).toBe(status);
     expect(status).toBeEmptyDOMElement();
   });

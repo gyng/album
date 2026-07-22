@@ -15,5 +15,5 @@
   border-radius: var(--m-s);
   background-color: var(--c-bg-contrast-dark);
   border: var(--line-hairline) solid
-    color-mix(in oklch, var(--c-bg-contrast-light) 30%, transparent);
+    color-mix(in oklch, var(--c-on-dark) 30%, transparent);
 }
