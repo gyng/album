@@ -161,20 +161,21 @@ needs 3 GB more, which does not fit alongside `mmproj-BF16` on a 10 GB card.
 
 ### Running a GGUF backend locally
 
-The GGUF path shells out to `llama-mtmd-cli`, which is resolved in this order:
+The GGUF path runs one resident `llama-server` (see `resolve_llama_server_command`),
+which is resolved in this order:
 
-1. `$LLAMA_MTMD_CLI`, if set (must exist).
-2. `llama-mtmd-cli` on `PATH`.
-3. `~/.local/opt/llama.cpp/build/bin/llama-mtmd-cli`, then `/usr/local/bin/llama-mtmd-cli`.
+1. `$LLAMA_SERVER`, if set (must exist).
+2. `llama-server` on `PATH`.
+3. `~/.local/opt/llama.cpp/build/bin/llama-server`, then `/usr/local/bin/llama-server`.
 
 Build it somewhere persistent — a `/tmp` build is wiped on reboot and turns a
-working backend into "could not find llama-mtmd-cli":
+working backend into "could not find llama-server":
 
 ```
 git clone --depth 1 https://github.com/ggml-org/llama.cpp ~/.local/opt/llama.cpp
 cd ~/.local/opt/llama.cpp
 cmake -B build -G Ninja -DGGML_CUDA=ON -DCMAKE_CUDA_ARCHITECTURES=86 -DLLAMA_CURL=ON
-cmake --build build --target llama-mtmd-cli
+cmake --build build --target llama-server
 ```
 
 Pass a quant with the `--model-id` repo tag (`unsloth/gemma-4-E4B-it-GGUF:UD-Q5_K_XL`),

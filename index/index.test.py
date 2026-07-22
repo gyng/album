@@ -8,6 +8,8 @@ from index import (
     benchmark_caption_quality,
     build_classifier_prompt,
     caption_pipeline_version,
+    resolve_classifier_model_id,
+    normalise_classifier_tags,
     build_janus_prompt,
     build_geocode_fields,
     compare_caption_payloads,
@@ -61,14 +63,14 @@ from index import (
     search_tags,
     update_gps,
     validate_index_database,
-    resolve_llama_mtmd_command,
     resolve_llama_server_command,
     CAPTION_STAGE,
     CORE_STAGE,
-    DEFAULT_LLAMA_MTMD_CLI_PATHS,
+    CLASSIFIER_BACKEND_JANUS,
+    CLASSIFIER_BACKEND_GEMMA4_GGUF,
+    DEFAULT_GEMMA4_GGUF_MODEL_ID,
     DEFAULT_LLAMA_SERVER_PATHS,
     JANUS_MODEL_ID,
-    LLAMA_MTMD_CLI_ENV,
     SIGLIP_V1_STAGE,
     SiglipEmbedder,
 )
@@ -565,6 +567,47 @@ class TestMain(unittest.TestCase):
         self.assertEqual(actual["phraseRate"], 1.0)
         self.assertEqual(actual["conceptCoverage"], 1.0)
 
+    def test_resolve_classifier_model_id_fills_backend_defaults(self):
+        # Provenance must name the model that actually ran; an unset CLI id
+        # resolves to each backend's effective default, not None.
+        self.assertEqual(
+            resolve_classifier_model_id(CLASSIFIER_BACKEND_JANUS), JANUS_MODEL_ID
+        )
+        self.assertEqual(
+            resolve_classifier_model_id(CLASSIFIER_BACKEND_GEMMA4_GGUF),
+            DEFAULT_GEMMA4_GGUF_MODEL_ID,
+        )
+        self.assertEqual(
+            resolve_classifier_model_id(CLASSIFIER_BACKEND_GEMMA4_GGUF, "custom:tag"),
+            "custom:tag",
+        )
+
+    def test_changing_default_gguf_model_bumps_caption_pipeline_version(self):
+        """Changing a backend's default model must change the computed pipeline
+        version (and name the model), or stale captions validate as current when
+        the default drifts, e.g. Q8_0 -> UD-Q4_K_XL."""
+        baseline = caption_pipeline_version(CLASSIFIER_BACKEND_GEMMA4_GGUF)
+        self.assertIn(DEFAULT_GEMMA4_GGUF_MODEL_ID, baseline)
+        self.assertNotIn("default@external", baseline)
+
+        with mock.patch(
+            "index.DEFAULT_GEMMA4_GGUF_MODEL_ID", "unsloth/other-model-GGUF:Q2_K"
+        ):
+            changed = caption_pipeline_version(CLASSIFIER_BACKEND_GEMMA4_GGUF)
+
+        self.assertNotEqual(baseline, changed)
+        self.assertIn("unsloth/other-model-GGUF:Q2_K", changed)
+
+    def test_normalise_classifier_tags_drops_degenerate_stopwords(self):
+        # Junk single words the model lifts from its own sentence must never reach
+        # the FTS tags column, whatever backend produced them; real multi-word
+        # tags keep an underscore and survive.
+        tags = normalise_classifier_tags(
+            {"tags": ["image", "Depicts", "ramen bowl", "the", "chopsticks"]}
+        )
+
+        self.assertEqual(tags, ["ramen_bowl", "chopsticks"])
+
     def test_validate_default_backend_tracks_index_default(self):
         """validate recomputes the expected caption version from its backend, so if
         its default drifts from index's, a correctly-indexed DB is rejected — which
@@ -631,50 +674,6 @@ class TestMain(unittest.TestCase):
             all(not p.startswith("/tmp/") for p in DEFAULT_LLAMA_SERVER_PATHS),
             DEFAULT_LLAMA_SERVER_PATHS,
         )
-
-    def test_resolve_llama_mtmd_command_prefers_env_override_then_path(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
-            override = os.path.join(tmpdir, "llama-mtmd-cli")
-            Path(override).write_bytes(b"")
-
-            with mock.patch.dict(os.environ, {LLAMA_MTMD_CLI_ENV: override}):
-                self.assertEqual(resolve_llama_mtmd_command(), override)
-
-            on_path = os.path.join(tmpdir, "from-path")
-            with (
-                mock.patch.dict(os.environ, {}, clear=True),
-                mock.patch("index.shutil.which", return_value=on_path),
-            ):
-                self.assertEqual(resolve_llama_mtmd_command(), on_path)
-
-    def test_resolve_llama_mtmd_command_rejects_a_missing_env_override(self):
-        with (
-            mock.patch.dict(os.environ, {LLAMA_MTMD_CLI_ENV: "/nope/llama-mtmd-cli"}),
-            self.assertRaises(RuntimeError) as raised,
-        ):
-            resolve_llama_mtmd_command()
-
-        self.assertIn(LLAMA_MTMD_CLI_ENV, str(raised.exception))
-
-    def test_resolve_llama_mtmd_command_does_not_fall_back_to_tmp(self):
-        """A /tmp build is wiped on reboot, so it must not be a discovery path."""
-        self.assertTrue(
-            all(
-                not candidate.startswith("/tmp/")
-                for candidate in DEFAULT_LLAMA_MTMD_CLI_PATHS
-            ),
-            DEFAULT_LLAMA_MTMD_CLI_PATHS,
-        )
-
-        with (
-            mock.patch.dict(os.environ, {}, clear=True),
-            mock.patch("index.shutil.which", return_value=None),
-            mock.patch("index.DEFAULT_LLAMA_MTMD_CLI_PATHS", ()),
-            self.assertRaises(RuntimeError) as raised,
-        ):
-            resolve_llama_mtmd_command()
-
-        self.assertIn("llama.cpp", str(raised.exception))
 
     def test_benchmark_caption_quality_runs_the_requested_backend(self):
         class StubClassifier:
@@ -757,6 +756,11 @@ class TestMain(unittest.TestCase):
         self.assertEqual(payload["backend"], "gemma4-gguf")
         self.assertEqual(payload["modelId"], "unsloth/gemma-4-E4B-it-GGUF:Q8_0")
         self.assertIn("gemma4-gguf", payload["pipelineVersion"])
+        # The tag-only quality metric is surfaced alongside the joined score so a
+        # good alt sentence cannot hide unusable tags.
+        self.assertIn("tagQuality", payload)
+        self.assertIn("junkTagRate", payload["tagQuality"])
+        self.assertIn("conceptCoverage", payload["tagQuality"])
 
     def test_sample_balanced_paths_spreads_across_groups(self):
         paths = [
@@ -1445,6 +1449,171 @@ class TestCli(UsesTestexistsFixture, unittest.TestCase):
             self.assertEqual(0, result.exit_code)
             self.assertIn("(0 to index, 1 already indexed)", result.output)
 
+    class _StubGgufClassifier:
+        """Model-free stand-in for the GGUF caption backend used by full `index`
+        runs. Subclasses decide what predict_batch/predict return."""
+
+        backend = "gemma4-gguf"
+        model_id = DEFAULT_GEMMA4_GGUF_MODEL_ID
+        quantization = None
+        batch_size = 4
+
+        def __init__(self):
+            self.last_generation_metrics = []
+            self.released = False
+
+        def init_model(self):
+            return None
+
+        def release(self):
+            self.released = True
+
+    @staticmethod
+    def _lock_stub(*_args, **_kwargs):
+        return os.open(os.devnull, os.O_RDONLY)
+
+    def test_index_falls_back_to_metadata_caption_when_model_rejects(self):
+        """A caption the model cannot produce must not block the whole index:
+        the assembly pass writes a metadata-only fallback so every photo has a
+        caption row and validate passes (the fallback's raison d'etre, previously
+        dead because the assembly tuple hardcoded needs_classifier=False)."""
+        # find_files globs relative to cwd, so the album must live under it.
+        with tempfile.TemporaryDirectory(dir=".") as tmpdir:
+            album = os.path.join(tmpdir, "nagano")
+            os.makedirs(album)
+            good = os.path.join(album, "good.jpg")
+            rejected = os.path.join(album, "rejected.jpg")
+            shutil.copyfile("../src/test/fixtures/monkey.jpg", good)
+            shutil.copyfile("../src/test/fixtures/monkey.jpg", rejected)
+            dbpath = os.path.join(tmpdir, "index.sqlite")
+            glob = os.path.relpath(os.path.join(album, "*.jpg"))
+
+            class RejectingClassifier(self._StubGgufClassifier):
+                def predict_batch(inner, items):
+                    results = []
+                    metrics = []
+                    for path, _geo in items:
+                        if os.path.basename(path) == "rejected.jpg":
+                            results.append("{ not valid json")
+                        else:
+                            results.append(
+                                json.dumps(
+                                    {
+                                        "tags": ["monkey", "branch"],
+                                        "alt_text": "A monkey on a branch.",
+                                    }
+                                )
+                            )
+                        metrics.append({"completedWithEos": True})
+                    inner.last_generation_metrics = metrics
+                    return results
+
+                def predict(inner, path, geocode):
+                    # Single-image retry also fails, so the caption is rejected.
+                    inner.last_generation_metrics = [{"completedWithEos": True}]
+                    return "{ not valid json"
+
+            stub = RejectingClassifier()
+            with (
+                mock.patch("index.create_classifier", return_value=stub),
+                mock.patch(
+                    "index.acquire_single_instance_lock", side_effect=self._lock_stub
+                ),
+            ):
+                result = CliRunner().invoke(
+                    index,
+                    [
+                        "--glob",
+                        glob,
+                        "--dbpath",
+                        dbpath,
+                        "--model-profile",
+                        "janus",
+                        "--classifier-backend",
+                        "gemma4-gguf",
+                    ],
+                )
+            self.assertEqual(0, result.exit_code, result.output)
+
+            con = sqlite3.connect(dbpath)
+            captions = {
+                os.path.basename(p): alt
+                for p, alt in con.execute("SELECT path, alt_text FROM images")
+            }
+            tags = {
+                os.path.basename(p): tag
+                for p, tag in con.execute("SELECT path, tags FROM images")
+            }
+            con.close()
+
+            self.assertEqual(captions["good.jpg"], "A monkey on a branch.")
+            # The rejected photo still has a caption row, built from its album.
+            self.assertIn("nagano", captions["rejected.jpg"].lower())
+            self.assertIn("nagano", (tags["rejected.jpg"] or "").lower())
+
+            # Validation — the gate that previously blocked publication forever —
+            # now passes because every photo has a caption with fresh provenance.
+            summary = validate_index_database(
+                dbpath, glob, "janus", classifier_backend="gemma4-gguf"
+            )
+            self.assertEqual(summary["paths"], 2)
+
+    def test_caption_pass_releases_classifier_when_db_write_fails(self):
+        """A failure in the per-batch caption DB write must still release the
+        classifier through the try/finally, or a backend like llama-server
+        orphans a subprocess holding several GB of VRAM after the parent exits."""
+        # find_files globs relative to cwd, so the album must live under it.
+        with tempfile.TemporaryDirectory(dir=".") as tmpdir:
+            album = os.path.join(tmpdir, "nagano")
+            os.makedirs(album)
+            good = os.path.join(album, "good.jpg")
+            shutil.copyfile("../src/test/fixtures/monkey.jpg", good)
+            dbpath = os.path.join(tmpdir, "index.sqlite")
+            glob = os.path.relpath(os.path.join(album, "*.jpg"))
+
+            class WorkingClassifier(self._StubGgufClassifier):
+                def predict_batch(inner, items):
+                    inner.last_generation_metrics = [
+                        {"completedWithEos": True} for _ in items
+                    ]
+                    return [
+                        json.dumps({"tags": ["monkey"], "alt_text": "A monkey."})
+                        for _ in items
+                    ]
+
+                def predict(inner, path, geocode):
+                    inner.last_generation_metrics = [{"completedWithEos": True}]
+                    return json.dumps({"tags": ["monkey"], "alt_text": "A monkey."})
+
+            stub = WorkingClassifier()
+            with (
+                mock.patch("index.create_classifier", return_value=stub),
+                mock.patch(
+                    "index.acquire_single_instance_lock", side_effect=self._lock_stub
+                ),
+                mock.patch.object(
+                    Sqlite3Client,
+                    "insert_caption_generation_metrics",
+                    side_effect=RuntimeError("boom"),
+                ),
+            ):
+                result = CliRunner().invoke(
+                    index,
+                    [
+                        "--glob",
+                        glob,
+                        "--dbpath",
+                        dbpath,
+                        "--model-profile",
+                        "janus",
+                        "--classifier-backend",
+                        "gemma4-gguf",
+                    ],
+                )
+
+            self.assertNotEqual(0, result.exit_code)
+            self.assertTrue(stub.released)
+
     def test_search(self):
         runner = CliRunner()
         dbpath = self.testexists_db
@@ -1554,7 +1723,10 @@ class TestCli(UsesTestexistsFixture, unittest.TestCase):
             "2023-11-08T13:11:57",
         )
 
-        self.assertEqual(caption["tags"], ["nagano", "Nagano", "Japan", "2023"])
+        # Tags run through normalise_classifier_tags like every other caption:
+        # lower-cased and case-insensitively deduplicated, so album "nagano" and
+        # city "Nagano" collapse to one entry rather than a mixed-case duplicate.
+        self.assertEqual(caption["tags"], ["nagano", "japan", "2023"])
         self.assertEqual(caption["alt_text"], "Photo from nagano in Nagano, 2023.")
 
     def test_metadata_fallback_copes_without_place_or_date(self):

@@ -366,13 +366,8 @@ GEMMA4_GGUF_IMAGE_MAX_EDGE = 1024
 DEFAULT_GEMMA4_GGUF_SERVER_STARTUP_SECONDS = 180.0
 DEFAULT_GEMMA4_GGUF_REQUEST_TIMEOUT = 300.0
 LLAMA_SERVER_ENV = "LLAMA_SERVER"
-LLAMA_MTMD_CLI_ENV = "LLAMA_MTMD_CLI"
 # Discovery paths must outlive a reboot: a /tmp build silently disappears and
-# turns a working GGUF backend into "could not find llama-mtmd-cli".
-DEFAULT_LLAMA_MTMD_CLI_PATHS = (
-    os.path.expanduser("~/.local/opt/llama.cpp/build/bin/llama-mtmd-cli"),
-    "/usr/local/bin/llama-mtmd-cli",
-)
+# turns a working GGUF backend into "could not find llama-server".
 DEFAULT_LLAMA_SERVER_PATHS = (
     os.path.expanduser("~/.local/opt/llama.cpp/build/bin/llama-server"),
     "/usr/local/bin/llama-server",
@@ -558,7 +553,12 @@ def normalise_classifier_tags(result: Mapping[str, typing.Any]) -> list[str]:
     )
     for tag in list(result.get("tags") or legacy_tags):
         normalised = "_".join(tag.strip().lower().split())
-        if normalised and normalised not in resolved:
+        # Drop degenerate single-word junk ("image", "depicts", "the", …) before
+        # it ever reaches the FTS tags column, whatever backend produced it.
+        # Multi-word tags keep an underscore and never match this single-word set.
+        if not normalised or normalised in CAPTION_TAG_STOPWORDS:
+            continue
+        if normalised not in resolved:
             resolved.append(normalised)
     return resolved
 
@@ -942,7 +942,12 @@ def build_metadata_fallback_caption(
     if iso8601 and re.match(r"^\d{4}", iso8601):
         year = iso8601[:4]
 
-    tags = [tag for tag in [album, *places[:2], year] if tag]
+    raw_tags = [tag for tag in [album, *places[:2], year] if tag]
+    # Held to the same contract as model tags: lower-cased, case-insensitively
+    # deduplicated (album "nagano" and place "Nagano" collapse), stopwords
+    # dropped — so the fallback cannot smuggle raw mixed-case duplicates into the
+    # FTS tags column that every other caption is normalised before entering.
+    tags = normalise_classifier_tags({"tags": raw_tags})
     described = " in ".join(filter(None, [album, places[0] if places else None]))
     alt_text = f"Photo from {described or 'this collection'}"
     if year:
@@ -1596,12 +1601,6 @@ def _resolve_llama_binary(name: str, env_var: str, defaults: tuple[str, ...]) ->
     )
 
 
-def resolve_llama_mtmd_command() -> str:
-    return _resolve_llama_binary(
-        "llama-mtmd-cli", LLAMA_MTMD_CLI_ENV, DEFAULT_LLAMA_MTMD_CLI_PATHS
-    )
-
-
 def resolve_llama_server_command() -> str:
     return _resolve_llama_binary(
         "llama-server", LLAMA_SERVER_ENV, DEFAULT_LLAMA_SERVER_PATHS
@@ -1631,6 +1630,8 @@ class Gemma4GgufClassifier(BaseCaptionClassifier):
         self.port: Optional[int] = None
         self._server: Optional[subprocess.Popen] = None
         self._base_url: Optional[str] = None
+        self._stderr_log_path: Optional[str] = None
+        self._stderr_log_handle: Optional[typing.IO[bytes]] = None
 
     def _model_and_mmproj(self) -> tuple[list[str], Optional[str]]:
         """Server args for a local .gguf pair, or an -hf-repo tag."""
@@ -1761,20 +1762,42 @@ class Gemma4GgufClassifier(BaseCaptionClassifier):
             "127.0.0.1",
         ]
         log(f"Starting llama-server for {self.model_id} on port {self.port}.")
+        # Capture stderr to a temp log instead of discarding it: when startup
+        # fails the reason (missing binary, bad model tag, port clash, VRAM) is
+        # here, and its tail is folded into the error rather than lost to DEVNULL.
+        stderr_fd, self._stderr_log_path = tempfile.mkstemp(
+            prefix="llama-server-", suffix=".log"
+        )
+        self._stderr_log_handle = os.fdopen(stderr_fd, "wb")
         self._server = subprocess.Popen(
             command,
             stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
+            stderr=self._stderr_log_handle,
             env=os.environ.copy(),
         )
         self._await_health()
+
+    def _read_stderr_log_tail(self, max_chars: int = 2000) -> str:
+        if not self._stderr_log_path:
+            return ""
+        try:
+            with open(
+                self._stderr_log_path, "r", encoding="utf-8", errors="replace"
+            ) as fh:
+                return fh.read()[-max_chars:].strip()
+        except OSError:
+            return ""
 
     def _await_health(self) -> None:
         deadline = time.monotonic() + DEFAULT_GEMMA4_GGUF_SERVER_STARTUP_SECONDS
         while time.monotonic() < deadline:
             if self._server is not None and self._server.poll() is not None:
+                code = self._server.returncode
+                tail = self._read_stderr_log_tail()
+                self.release()
                 raise RuntimeError(
-                    f"llama-server exited during startup (code {self._server.returncode})."
+                    f"llama-server exited during startup (code {code}). "
+                    f"Server log tail:\n{tail or '(empty)'}"
                 )
             try:
                 with urllib.request.urlopen(f"{self._base_url}/health", timeout=2) as r:
@@ -1783,10 +1806,16 @@ class Gemma4GgufClassifier(BaseCaptionClassifier):
                         return
             except Exception:
                 time.sleep(1.0)
+        # The deadline is left generous on purpose: a first run may be downloading
+        # several GB of weights from Hugging Face. Point at the log rather than
+        # shortening it, so a slow cold download is diagnosable but not killed.
+        log_path = self._stderr_log_path
         self.release()
         raise RuntimeError(
             "llama-server did not become healthy within "
-            f"{DEFAULT_GEMMA4_GGUF_SERVER_STARTUP_SECONDS:.0f}s."
+            f"{DEFAULT_GEMMA4_GGUF_SERVER_STARTUP_SECONDS:.0f}s "
+            "(a first run may still be downloading weights). "
+            f"See the server log at {log_path}."
         )
 
     @torch.inference_mode()
@@ -1833,6 +1862,14 @@ class Gemma4GgufClassifier(BaseCaptionClassifier):
                 self._server.kill()
                 self._server.wait(timeout=15)
             self._server = None
+        # Close the stderr handle but leave the temp log on disk: a
+        # startup-failure error points the user at it for post-mortem.
+        if self._stderr_log_handle is not None:
+            try:
+                self._stderr_log_handle.close()
+            except OSError:
+                pass
+            self._stderr_log_handle = None
         self.command = None
         self._base_url = None
 
@@ -3256,11 +3293,8 @@ def index(
                     "path": file_path,
                     "source_sha256": current_digests[file_path],
                     "caption_version": desired_caption_version,
-                    "caption_model_id": classifier_model_id
-                    or (
-                        JANUS_MODEL_ID
-                        if classifier_backend == CLASSIFIER_BACKEND_JANUS
-                        else None
+                    "caption_model_id": resolve_classifier_model_id(
+                        classifier_backend, classifier_model_id
                     ),
                     "needs_core": needs_core,
                     "needs_classifier": needs_classifier,
@@ -3400,157 +3434,164 @@ def index(
                 gpu_headroom_gb=classifier_gpu_headroom_gb,
                 low_impact=classifier_low_impact,
             )
-            load_started_at = time.perf_counter()
+            # One guard around the whole caption pass. Every failure inside it —
+            # model load, batch inference, the VRAM-headroom check, a single-image
+            # retry, or the per-batch DB write — must release the classifier, or a
+            # backend like llama-server orphans a subprocess holding ~5-6GB of VRAM
+            # that outlives the parent. `finally` releases it on success and
+            # failure alike; the `except` also aborts the background colour pool so
+            # nothing is left running when the run unwinds.
             try:
+                load_started_at = time.perf_counter()
                 classifier.init_model()
-            except BaseException:
-                classifier.release()
-                abort_colour_extraction()
-                raise
-            model_init_ms += (time.perf_counter() - load_started_at) * 1000
-            log_vram(f"{classifier.backend} load")
-            classifier_paths = [
-                item["path"] for item in work_items if item["needs_classifier"]
-            ]
-            resolved_batch_size = resolved_classifier_batch_size
-            total_batches = math.ceil(len(classifier_paths) / resolved_batch_size)
-            log(
-                f"Running {classifier.backend} captions in batches of {resolved_batch_size} ({len(classifier_paths)} images, {total_batches} batch(es))..."
-            )
-            batch_started_at = time.perf_counter()
-            for batch_index, batch_start in enumerate(
-                range(0, len(classifier_paths), resolved_batch_size), start=1
-            ):
-                batch_paths = classifier_paths[
-                    batch_start : batch_start + resolved_batch_size
+                model_init_ms += (time.perf_counter() - load_started_at) * 1000
+                log_vram(f"{classifier.backend} load")
+                classifier_paths = [
+                    item["path"] for item in work_items if item["needs_classifier"]
                 ]
+                resolved_batch_size = resolved_classifier_batch_size
+                total_batches = math.ceil(len(classifier_paths) / resolved_batch_size)
                 log(
-                    f"  {classifier.backend} batch {batch_index}/{total_batches} starting ({len(batch_paths)} images)..."
+                    f"Running {classifier.backend} captions in batches of {resolved_batch_size} ({len(classifier_paths)} images, {total_batches} batch(es))..."
                 )
-                single_started_at = time.perf_counter()
-                # Captions are pixel-grounded. Location is indexed separately by
-                # the core stage and must not leak into visual descriptions.
-                batch_geocodes = [None] * len(batch_paths)
-                with heartbeat(
-                    f"{classifier.backend} batch {batch_index}/{total_batches}"
+                batch_started_at = time.perf_counter()
+                for batch_index, batch_start in enumerate(
+                    range(0, len(classifier_paths), resolved_batch_size), start=1
                 ):
-                    try:
+                    batch_paths = classifier_paths[
+                        batch_start : batch_start + resolved_batch_size
+                    ]
+                    log(
+                        f"  {classifier.backend} batch {batch_index}/{total_batches} starting ({len(batch_paths)} images)..."
+                    )
+                    single_started_at = time.perf_counter()
+                    # Captions are pixel-grounded. Location is indexed separately by
+                    # the core stage and must not leak into visual descriptions.
+                    batch_geocodes = [None] * len(batch_paths)
+                    with heartbeat(
+                        f"{classifier.backend} batch {batch_index}/{total_batches}"
+                    ):
                         batch_results, batch_metrics = predict_caption_batch_resilient(
                             classifier, list(zip(batch_paths, batch_geocodes))
                         )
-                    except BaseException:
-                        classifier.release()
-                        abort_colour_extraction()
-                        raise
-                free_vram_gb = enforce_vram_headroom(
-                    f"{classifier.backend} batch {batch_index}/{total_batches}"
-                )
-                if math.isfinite(free_vram_gb):
-                    minimum_free_vram_gb = (
-                        free_vram_gb
-                        if minimum_free_vram_gb is None
-                        else min(minimum_free_vram_gb, free_vram_gb)
+                    free_vram_gb = enforce_vram_headroom(
+                        f"{classifier.backend} batch {batch_index}/{total_batches}"
                     )
-                # Parse (and retry malformed JSON) now, while the model is resident.
-                if len(batch_results) != len(batch_paths):
-                    log(
-                        f"WARNING: {classifier.backend} returned {len(batch_results)} "
-                        f"caption(s) for {len(batch_paths)} path(s)"
-                    )
-                batch_attempt_metrics: list[dict[str, typing.Any]] = []
-                for position, (path, geo) in enumerate(
-                    zip(batch_paths, batch_geocodes)
-                ):
-                    raw = (
-                        batch_results[position] if position < len(batch_results) else ""
-                    )
-                    metric = dict(
-                        batch_metrics[position] if position < len(batch_metrics) else {}
-                    )
-                    metric.update(
-                        {
-                            "path": path,
-                            "pipelineVersion": desired_caption_version,
-                            "attempt": metric.get("attempt", "batch"),
-                        }
-                    )
-                    retry_metrics: list[dict[str, typing.Any]] = []
-                    parsed = resolve_caption_result(
-                        classifier,
-                        path,
-                        geo,
-                        raw,
-                        metric,
-                        retry_metrics,
-                    )
-                    batch_attempt_metrics.append(metric)
-                    for retry_metric in retry_metrics:
-                        retry_metric.update(
+                    if math.isfinite(free_vram_gb):
+                        minimum_free_vram_gb = (
+                            free_vram_gb
+                            if minimum_free_vram_gb is None
+                            else min(minimum_free_vram_gb, free_vram_gb)
+                        )
+                    # Parse (retry malformed JSON) now, while the model is resident.
+                    if len(batch_results) != len(batch_paths):
+                        log(
+                            f"WARNING: {classifier.backend} returned {len(batch_results)} "
+                            f"caption(s) for {len(batch_paths)} path(s)"
+                        )
+                    batch_attempt_metrics: list[dict[str, typing.Any]] = []
+                    for position, (path, geo) in enumerate(
+                        zip(batch_paths, batch_geocodes)
+                    ):
+                        raw = (
+                            batch_results[position]
+                            if position < len(batch_results)
+                            else ""
+                        )
+                        metric = dict(
+                            batch_metrics[position]
+                            if position < len(batch_metrics)
+                            else {}
+                        )
+                        metric.update(
                             {
                                 "path": path,
                                 "pipelineVersion": desired_caption_version,
-                                "attempt": "single-retry",
+                                "attempt": metric.get("attempt", "batch"),
                             }
                         )
-                        batch_attempt_metrics.append(retry_metric)
-                    if parsed is not None:
-                        precomputed_captions[path] = parsed
-                caption_generation_metrics.extend(batch_attempt_metrics)
-                successful = [
-                    (path, precomputed_captions[path])
-                    for path in batch_paths
-                    if path in precomputed_captions
-                ]
-                if successful or batch_attempt_metrics:
-                    with db.transaction() as cur:
-                        db.insert_caption_generation_metrics(
-                            batch_attempt_metrics, cur=cur
+                        retry_metrics: list[dict[str, typing.Any]] = []
+                        parsed = resolve_caption_result(
+                            classifier,
+                            path,
+                            geo,
+                            raw,
+                            metric,
+                            retry_metrics,
                         )
-                        for path, parsed in successful:
-                            tags = normalise_classifier_tags(parsed)
-                            db.upsert_image_fields(
-                                path,
+                        batch_attempt_metrics.append(metric)
+                        for retry_metric in retry_metrics:
+                            retry_metric.update(
                                 {
-                                    "alt_text": parsed.get("alt_text"),
-                                    # Clear a caption produced by the retired
-                                    # subject field when refreshing this stage.
-                                    "subject": None,
-                                    "tags": ", ".join(tags),
-                                },
-                                cur=cur,
+                                    "path": path,
+                                    "pipelineVersion": desired_caption_version,
+                                    "attempt": "single-retry",
+                                }
                             )
-                            db.replace_tags_for_source(path, tags, "classifier", cur)
-                            db.upsert_pipeline_state(
-                                path,
-                                CAPTION_STAGE,
-                                current_digests[path],
-                                desired_caption_version,
-                                classifier_model_id
-                                or (
-                                    JANUS_MODEL_ID
-                                    if classifier_backend == CLASSIFIER_BACKEND_JANUS
-                                    else None
-                                ),
-                                cur,
+                            batch_attempt_metrics.append(retry_metric)
+                        if parsed is not None:
+                            precomputed_captions[path] = parsed
+                    caption_generation_metrics.extend(batch_attempt_metrics)
+                    successful = [
+                        (path, precomputed_captions[path])
+                        for path in batch_paths
+                        if path in precomputed_captions
+                    ]
+                    if successful or batch_attempt_metrics:
+                        with db.transaction() as cur:
+                            db.insert_caption_generation_metrics(
+                                batch_attempt_metrics, cur=cur
                             )
-                            completed_caption_paths.add(path)
-                        if successful:
-                            db.rebuild_tag_counts(cur)
-                for path in batch_paths:
-                    precomputed_captions.pop(path, None)
-                done = min(batch_start + resolved_batch_size, len(classifier_paths))
-                single_ms = (time.perf_counter() - single_started_at) * 1000
+                            for path, parsed in successful:
+                                tags = normalise_classifier_tags(parsed)
+                                db.upsert_image_fields(
+                                    path,
+                                    {
+                                        "alt_text": parsed.get("alt_text"),
+                                        # Clear a caption produced by the retired
+                                        # subject field when refreshing this stage.
+                                        "subject": None,
+                                        "tags": ", ".join(tags),
+                                    },
+                                    cur=cur,
+                                )
+                                db.replace_tags_for_source(
+                                    path, tags, "classifier", cur
+                                )
+                                db.upsert_pipeline_state(
+                                    path,
+                                    CAPTION_STAGE,
+                                    current_digests[path],
+                                    desired_caption_version,
+                                    resolve_classifier_model_id(
+                                        classifier_backend, classifier_model_id
+                                    ),
+                                    cur,
+                                )
+                                completed_caption_paths.add(path)
+                            if successful:
+                                db.rebuild_tag_counts(cur)
+                    for path in batch_paths:
+                        precomputed_captions.pop(path, None)
+                    done = min(batch_start + resolved_batch_size, len(classifier_paths))
+                    single_ms = (time.perf_counter() - single_started_at) * 1000
+                    log(
+                        f"  {classifier.backend} batch {batch_index}/{total_batches} done in {single_ms:.0f}ms ({done}/{len(classifier_paths)} images)"
+                    )
+                batch_ms = (time.perf_counter() - batch_started_at) * 1000
+                inference_stage_durations[f"caption:{classifier.backend}"] = {
+                    "loadMs": round(model_init_ms, 2),
+                    "inferenceMs": round(batch_ms, 2),
+                }
                 log(
-                    f"  {classifier.backend} batch {batch_index}/{total_batches} done in {single_ms:.0f}ms ({done}/{len(classifier_paths)} images)"
+                    f"{classifier.backend} batch inference complete in {batch_ms:.0f}ms"
                 )
-            batch_ms = (time.perf_counter() - batch_started_at) * 1000
-            inference_stage_durations[f"caption:{classifier.backend}"] = {
-                "loadMs": round(model_init_ms, 2),
-                "inferenceMs": round(batch_ms, 2),
-            }
-            log(f"{classifier.backend} batch inference complete in {batch_ms:.0f}ms")
-            log_vram(f"{classifier.backend} inference")
-            classifier.release()
+                log_vram(f"{classifier.backend} inference")
+            except BaseException:
+                abort_colour_extraction()
+                raise
+            finally:
+                classifier.release()
             classifier = None  # free VRAM before the embedding passes load
 
         # ---- Embedding passes: one model resident at a time ----
@@ -3632,16 +3673,37 @@ def index(
             f"Colour extraction complete in {colors_ms:.0f}ms (ran concurrently with GPU)"
         )
 
-        # Assembly carries NO live model objects (all released) — only the per-image
-        # needs_classifier flag and the precomputed pass outputs. Keeping a model in
-        # this tuple would pin its VRAM and defeat the release()/empty_cache above.
-        assembly_items = [item for item in work_items if item["needs_core"]]
+        # A caption the model could not produce (rejected as runaway/malformed, or
+        # never parsed) leaves the photo with no caption row, and `validate` then
+        # blocks publication of the WHOLE index over it — permanently, because
+        # every rerun rejects it again. These paths get a metadata-only fallback
+        # caption assembled from album/place/year, which needs no model resident.
+        fallback_caption_paths = {
+            item["path"]
+            for item in work_items
+            if item["needs_classifier"] and item["path"] not in completed_caption_paths
+        }
+        # The fallback always produces a caption, so those paths are complete for
+        # provenance/accounting: they are stamped with the current caption version
+        # and skipped until a prompt/model change bumps it — not retried every run.
+        completed_caption_paths |= fallback_caption_paths
+
+        # Assembly carries NO live model objects (all released) — only precomputed
+        # pass outputs and, per path, whether a metadata fallback caption is owed.
+        # The fallback is metadata-only, so passing that flag (never a classifier)
+        # keeps the promise that this tuple pins no model's VRAM. Paths needing a
+        # fallback but not core (a caption-only refresh) still join the pass.
+        assembly_items = [
+            item
+            for item in work_items
+            if item["needs_core"] or item["path"] in fallback_caption_paths
+        ]
         enumerated = [
             (
                 item_index,
                 item["path"],
                 item["needs_core"],
-                False,
+                item["path"] in fallback_caption_paths,
                 None,
                 precomputed_embeddings.get(item["path"]),
                 precomputed_colors_by_path.get(item["path"]),
@@ -4590,6 +4652,10 @@ def benchmark_caption_quality(
         ),
         "durationMs": round((time.perf_counter() - started_at) * 1000, 2),
         "generationMetrics": metrics,
+        # Tags carry the FTS index on their own, so their quality is surfaced as a
+        # first-class metric rather than being hidden inside the joined alt+tags
+        # concept score that alt_text alone can carry.
+        "tagQuality": evaluate_tag_quality(cases, captions),
         **evaluation,
     }
     with open(output, "w", encoding="utf-8") as fh:
@@ -5287,11 +5353,8 @@ def validate_index_database(
                             classifier_max_new_tokens,
                             classifier_batch_max_new_tokens,
                         ),
-                        classifier_model_id
-                        or (
-                            JANUS_MODEL_ID
-                            if classifier_backend == CLASSIFIER_BACKEND_JANUS
-                            else None
+                        resolve_classifier_model_id(
+                            classifier_backend, classifier_model_id
                         ),
                     ),
                 ]
@@ -5578,6 +5641,10 @@ def publish_index_databases(
     backup_root = (
         Path(backup_dir) if backup_dir else Path(source_dbpath).resolve().parent
     )
+    # A caller-supplied --backup-dir may not exist yet; create it before it is
+    # read or written so a missing directory does not abort mid-publish (after
+    # temporaries are built) with the live databases already partly touched.
+    backup_root.mkdir(parents=True, exist_ok=True)
     for repaired in restore_interrupted_publish(backup_root):
         log(f"Repaired {repaired} from a previously interrupted publish")
 
@@ -6172,6 +6239,28 @@ def file_content_sha256_many(
         return dict(zip(resolved_paths, digests))
 
 
+def resolve_classifier_model_id(
+    backend: str, model_id: Optional[str] = None
+) -> Optional[str]:
+    """The effective model id a backend runs when the CLI leaves it unset.
+
+    Provenance and the pipeline version must name the model that actually ran,
+    not the raw ``None`` the CLI defaults to. Otherwise changing a backend's
+    default model (Q8_0 -> UD-Q4_K_XL, say) bumps nothing: the version stays
+    ``default@external`` with a NULL model id and stale captions validate as
+    current. Mirrors the defaults ``create_classifier`` applies per backend.
+    """
+    if model_id:
+        return model_id
+    if backend == CLASSIFIER_BACKEND_JANUS:
+        return JANUS_MODEL_ID
+    if backend == CLASSIFIER_BACKEND_GEMMA4:
+        return DEFAULT_GEMMA4_MODEL_ID
+    if backend == CLASSIFIER_BACKEND_GEMMA4_GGUF:
+        return DEFAULT_GEMMA4_GGUF_MODEL_ID
+    return None
+
+
 def caption_pipeline_version(
     backend: str,
     model_id: Optional[str] = None,
@@ -6180,9 +6269,7 @@ def caption_pipeline_version(
     max_new_tokens: Optional[int] = None,
     batch_max_new_tokens: Optional[int] = None,
 ) -> str:
-    resolved_model = model_id or (
-        JANUS_MODEL_ID if backend == CLASSIFIER_BACKEND_JANUS else "default"
-    )
+    resolved_model = resolve_classifier_model_id(backend, model_id) or "default"
     revision = (
         JANUS_MODEL_REVISION if backend == CLASSIFIER_BACKEND_JANUS else "external"
     )
@@ -6617,12 +6704,16 @@ def analyse_image(
 ) -> Mapping:
     start_time = time.perf_counter()
 
-    exif_full = get_exif(fh) if needs_core else {}
+    # A metadata-only caption fallback (needs_classifier with no precomputed
+    # caption) also needs EXIF/GPS to name the place and year, so read it here too
+    # even when core output itself is current and not being rewritten.
+    read_exif = needs_core or needs_classifier
+    exif_full = get_exif(fh) if read_exif else {}
     exif = (
         filter_exif_for_search(
             {k: v for k, v in exif_full.items() if not isinstance(v, bytes)}
         )
-        if needs_core
+        if read_exif
         else {}
     )
 
@@ -6738,7 +6829,11 @@ def analyse_image_worker(
         idx = input[0]
         path = input[1]
         needs_core = input[2]
-        needs_classifier = input[3]
+        # input[3] flags a path whose caption the model could not produce; the
+        # assembly pass sets it (never a live classifier) so a metadata-only
+        # fallback caption is built here. It is passed to analyse_image as
+        # needs_classifier only to make it read EXIF/geocode for the fallback.
+        needs_caption_fallback = input[3]
         precomputed_caption = input[4] if len(input) > 4 else None
         precomputed_embeddings = input[5] if len(input) > 5 else None
         precomputed_colors = input[6] if len(input) > 6 else None
@@ -6753,13 +6848,13 @@ def analyse_image_worker(
                 fh,
                 path=path,
                 needs_core=needs_core,
-                needs_classifier=needs_classifier,
+                needs_classifier=needs_caption_fallback,
                 precomputed_caption=precomputed_caption,
                 precomputed_embeddings=precomputed_embeddings,
                 precomputed_colors=precomputed_colors,
             )
             caption_fallback = None
-            if needs_classifier and precomputed_caption is None:
+            if needs_caption_fallback and precomputed_caption is None:
                 # The model could not describe this one. Rejecting its output was
                 # right, but leaving the photo uncaptioned blocks publication of
                 # the entire index, so fall back to what we already know.
@@ -6776,8 +6871,7 @@ def analyse_image_worker(
                 "path": path,
                 "analysed": analysed,
                 "write_core": needs_core,
-                "write_caption": needs_classifier
-                and (precomputed_caption is not None or caption_fallback is not None),
+                "write_caption": caption_fallback is not None,
                 "caption_failed": False,
                 "source_sha256": source_sha256,
                 "caption_version": caption_version,
