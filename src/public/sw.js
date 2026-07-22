@@ -121,12 +121,13 @@ const trimCache = async (cache, maxEntries) => {
   await Promise.all(keys.slice(0, keys.length - maxEntries).map((key) => cache.delete(key)));
 };
 
-// URLs whose media bytes have already been (re)fetched successfully during this
-// worker's lifetime. Bounds background revalidation to at most once per URL per
-// lifetime: without it a kiosk re-downloads full image bytes on every single
-// hit. Marked done only on success — a failed revalidation removes the URL
-// again so the next hit retries, rather than being silently marked done for
-// the rest of the worker's life.
+// URLs whose media bytes have been fetched (cold download) or revalidated
+// during this worker's lifetime. Bounds background revalidation to at most
+// once per URL per lifetime: without it a kiosk re-downloads full image bytes
+// on every single hit. The hit path marks a URL before scheduling its
+// revalidation (deduping concurrent hits); only a thrown network error
+// (offline) unmarks it for retry — a non-ok response keeps the mark, see
+// revalidateImageInBackground below.
 const revalidatedImageUrls = new Set();
 
 // Fetch fresh media and store it, bounded by the cache cap. Uses `no-cache` so

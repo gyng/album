@@ -326,23 +326,23 @@ const parseArgs = (argv) => {
 // from a genuinely clean DB. An unknown state must never be reported (or
 // fast-tracked past) as "nothing to do"; it must always route through the
 // interactive confirmation in resolveExecutionPlan.
-const hasIndexChanges = (report) =>
-  report.db?.modelInfoUnavailable === true ||
-  report.summary.newPhotos > 0 ||
-  report.summary.removedPhotos > 0 ||
-  (report.db?.missingEmbeddingCount ?? 0) > 0 ||
-  (report.db?.staleEmbeddingCount ?? 0) > 0;
-
-// The subset of hasIndexChanges' triggers that stay reliable even when
-// modelInfoUnavailable is true: new/removed photo counts are diffed straight
-// from disk vs the DB, never from the indexer's model metadata. Used to tell
-// whether modelInfoUnavailable is the *sole* reason indexing looks needed, or
-// whether there are real, known changes on top of it.
+// The concrete index-changes triggers that stay meaningful even when
+// modelInfoUnavailable is true: photo counts are diffed straight from disk vs
+// the DB, and the embedding counts are forced to zero in that state (so they
+// simply cannot fire, rather than firing wrongly). Used to tell whether
+// modelInfoUnavailable is the *sole* reason indexing looks needed, or whether
+// there are real, known changes on top of it.
 const hasRealIndexChanges = (report) =>
   report.summary.newPhotos > 0 ||
   report.summary.removedPhotos > 0 ||
   (report.db?.missingEmbeddingCount ?? 0) > 0 ||
   (report.db?.staleEmbeddingCount ?? 0) > 0;
+
+// Composed from hasRealIndexChanges so a future trigger added there cannot
+// drift out of this check (which would silently recreate the --yes-skips-
+// real-changes bug this split exists to prevent).
+const hasIndexChanges = (report) =>
+  report.db?.modelInfoUnavailable === true || hasRealIndexChanges(report);
 
 // The canonical production origin (mirrors getSiteOrigin in src/lib/seo.ts).
 const DEFAULT_SITE_ORIGIN = "https://photos.awoo.party";
@@ -1412,7 +1412,7 @@ const printVerificationReport = (verification, { modelInfoUnavailable = false } 
   // than relying solely on the one-shot warning earlier in the run.
   if (modelInfoUnavailable) {
     console.log(
-      `  ${statusLabel("warn")} Embedding checks were skipped — model info unavailable; path coverage only.`,
+      `  ${statusLabel("warn")} Model-scoped embedding checks were skipped — model info unavailable; presence and path coverage were still verified.`,
     );
   }
 };

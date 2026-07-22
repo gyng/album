@@ -1,11 +1,7 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const imageOptimisationConfig = require("../services/imageOptimisationConfig.json");
-const {
-  PHOTO_EXTENSIONS,
-  TEMP_FILE_SEPARATOR,
-  STALE_TEMP_FILE_THRESHOLD_MS,
-} = require("./prepare-optimised-images.cjs");
+const { PHOTO_EXTENSIONS, STALE_TEMP_FILE_THRESHOLD_MS } = require("./prepare-optimised-images.cjs");
 
 const OPTIMISED_IMAGE_SIZES = new Set(imageOptimisationConfig.sizes);
 const OPTIMISED_VIDEO_MAX_WIDTH = 1920;
@@ -153,7 +149,12 @@ const hasSourceChangedSinceCache = (sourcePath, cachedPath) => {
 // to prevent. Apply the same stale-only discipline as the stray-temp cleanup
 // there: only remove it once it's older than the threshold a concurrent
 // writer could plausibly still be using.
-const isTempFile = (file) => file.includes(TEMP_FILE_SEPARATOR);
+// End-anchored on the ".tmp-<pid>" / ".tmp-<pid>-<n>" suffix shapes the encode
+// scripts produce, so a source photo whose own name merely contains ".tmp-"
+// (and its derived cache entries like "scan.tmp-final.jpg@800.avif") is never
+// misclassified as a temp file and repeatedly deleted.
+const TEMP_FILE_PATTERN = /\.tmp-\d+(-\d+)?$/;
+const isTempFile = (file) => TEMP_FILE_PATTERN.test(file);
 
 const isFreshTempFile = (targetPath) => {
   let stat;

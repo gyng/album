@@ -523,6 +523,33 @@ describe("cleanupOptimisedMedia", () => {
     exists.mockRestore();
   });
 
+  it("never classifies a source photo whose name contains .tmp- as a temp file", async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "album-media-tmpname-"));
+    const albumsDir = path.join(root, "albums");
+    const publicAlbumsDir = path.join(root, "public", "data", "albums");
+    const albumDir = path.join(albumsDir, "trip");
+    const imageCacheDir = path.join(publicAlbumsDir, "trip", ".resized_images");
+
+    fs.mkdirSync(albumDir, { recursive: true });
+    fs.mkdirSync(imageCacheDir, { recursive: true });
+    markImageCacheCurrent(publicAlbumsDir);
+
+    const source = path.join(albumDir, "scan.tmp-final.jpg");
+    const cached = path.join(imageCacheDir, "scan.tmp-final.jpg@800.avif");
+    fs.writeFileSync(source, "image");
+    fs.writeFileSync(cached, "cached");
+    // Settle both well past the stale-temp threshold so a misclassification as
+    // a temp file would delete the cache entry on every run.
+    const older = new Date("2020-01-01T00:00:00.000Z");
+    fs.utimesSync(source, older, older);
+    fs.utimesSync(cached, older, older);
+
+    const summary = await cleanupOptimisedMedia({ albumsDir, publicAlbumsDir });
+
+    expect(fs.existsSync(cached)).toBe(true);
+    expect(summary.removedStaleTempImages).toBe(0);
+  });
+
   it("keeps a fresh in-flight temp file in the resized image dir but removes a stale one", async () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "album-media-temp-image-"));
     const albumsDir = path.join(root, "albums");
