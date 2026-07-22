@@ -2485,6 +2485,7 @@ class Sqlite3Client:
             "WHERE stage = ? AND pipeline_version LIKE ?",
             (CAPTION_STAGE, f"%{DEFAULT_CAPTION_PROVENANCE_MARKER}%"),
         ).fetchall()
+        migrated = 0
         for path, stage, version in rows:
             rewritten = rewrite_default_caption_provenance(version)
             if rewritten is None:
@@ -2494,6 +2495,13 @@ class Sqlite3Client:
                 "UPDATE pipeline_state SET pipeline_version = ?, model_id = ? "
                 "WHERE path = ? AND stage = ?",
                 (new_version, new_model_id, path, stage),
+            )
+            migrated += 1
+        if migrated:
+            click.echo(
+                f"Migrated caption provenance for {migrated} path(s) from the "
+                "legacy default-model marker to the resolved model id "
+                "(in place, no recaptioning)."
             )
 
     def get_pipeline_states(
