@@ -1796,7 +1796,7 @@ class Gemma4GgufClassifier(BaseCaptionClassifier):
         """
         try:
             cutoff = time.time() - max_age_seconds
-            for entry in Path(tempfile.gettempdir()).glob("llama-server-*"):
+            for entry in Path(tempfile.gettempdir()).glob("llama-server-*.log"):
                 try:
                     if entry.is_file() and entry.stat().st_mtime < cutoff:
                         entry.unlink()
@@ -3328,6 +3328,18 @@ def index(
             # construction the expected one.
             return stage == CAPTION_STAGE
         digest, stored_version, _model_id = state
+        if stage == CAPTION_STAGE:
+            # Read-only planning (index --dry-run against an existing DB) never
+            # runs setup_tables, so the physical default-provenance migration
+            # cannot heal a legacy `<backend>:default@external` caption row.
+            # Normalise the stored version through the same marker-gated rewrite
+            # at comparison time so a would-migrate row compares as current
+            # instead of reporting every default-stamped caption stale. The
+            # rewrite returns None for non-marker rows, which pass through
+            # unchanged, so genuine staleness is still caught.
+            rewritten = rewrite_default_caption_provenance(stored_version)
+            if rewritten is not None:
+                stored_version = rewritten[0]
         return digest != current_digests[path] or stored_version != version
 
     work_items = []
@@ -5488,11 +5500,23 @@ def validate_index_database(
                     raise click.ClickException(
                         f"validate: stale or missing {stage} provenance for {path}"
                     )
-                if version and state[1] != version:
+                stored_version, stored_model_id = state[1], state[2]
+                if stage == CAPTION_STAGE:
+                    # validate opens read-only (mode=ro), so a DB no write-intent
+                    # command has healed still carries the legacy
+                    # `<backend>:default@external` caption marker. Normalise the
+                    # stored version and model id through the marker-gated rewrite
+                    # so an unmigrated default-stamped caption validates as current
+                    # rather than hard-failing. Non-marker rows return None and
+                    # pass through unchanged, so genuine staleness is still caught.
+                    rewritten = rewrite_default_caption_provenance(stored_version)
+                    if rewritten is not None:
+                        stored_version, stored_model_id = rewritten
+                if version and stored_version != version:
                     raise click.ClickException(
                         f"validate: unexpected {stage} pipeline version for {path}"
                     )
-                if model_id and state[2] != model_id:
+                if model_id and stored_model_id != model_id:
                     raise click.ClickException(
                         f"validate: unexpected {stage} model id for {path}"
                     )

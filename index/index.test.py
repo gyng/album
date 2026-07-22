@@ -676,6 +676,28 @@ class TestMain(unittest.TestCase):
             DEFAULT_LLAMA_SERVER_PATHS,
         )
 
+    def test_sweep_stale_stderr_logs_only_removes_old_log_files(self):
+        # The sweep must reclaim its own stale stderr logs (llama-server-*.log)
+        # without touching an unrelated old file that merely shares the
+        # llama-server- prefix — e.g. a llama-server binary or tarball parked in
+        # the shared temp dir, a real historical habit on this machine.
+        with tempfile.TemporaryDirectory() as tmpdir:
+            stale_log = Path(tmpdir) / "llama-server-abcd.log"
+            binary = Path(tmpdir) / "llama-server-binary"
+            fresh_log = Path(tmpdir) / "llama-server-efgh.log"
+            for entry in (stale_log, binary, fresh_log):
+                entry.write_bytes(b"")
+            # Age the stale log and the binary well past the 7-day cutoff.
+            for entry in (stale_log, binary):
+                os.utime(entry, (0, 0))
+
+            with mock.patch("index.tempfile.gettempdir", return_value=tmpdir):
+                Gemma4GgufClassifier._sweep_stale_stderr_logs()
+
+            self.assertFalse(stale_log.exists(), "stale .log should be swept")
+            self.assertTrue(binary.exists(), "non-.log file must be preserved")
+            self.assertTrue(fresh_log.exists(), "recent .log must be preserved")
+
     def test_benchmark_caption_quality_runs_the_requested_backend(self):
         class StubClassifier:
             model_id = "unsloth/gemma-4-E4B-it-GGUF:Q8_0"
@@ -2410,6 +2432,99 @@ class TestDb(UsesTestexistsFixture, unittest.TestCase):
                 (digest, current_version, resolved),
             )
             second.con.close()
+
+    def test_dry_run_treats_legacy_default_caption_as_current_without_migrating(self):
+        # A read-only path (index --dry-run against an existing DB) never runs
+        # setup_tables, so the physical migration cannot heal the default marker.
+        # The staleness comparison must still normalise the stored provenance
+        # through the marker-gated rewrite, or every default-stamped caption is
+        # reported stale ("N to caption") — the exact scare the migration exists
+        # to prevent — even though a real run would do byte-identical work.
+        path = "../src/test/fixtures/monkey.jpg"
+        with tempfile.TemporaryDirectory() as tmpdir:
+            dbpath = os.path.join(tmpdir, "default-caption.sqlite")
+            self._seed_default_stamped_caption_db(dbpath, path)
+
+            # Deliberately do NOT open/heal the DB before the dry run.
+            result = CliRunner().invoke(
+                index,
+                [
+                    "--glob",
+                    path,
+                    "--dbpath",
+                    dbpath,
+                    "--dry-run",
+                    "--model-profile",
+                    "janus",
+                ],
+            )
+            self.assertEqual(0, result.exit_code, result.output)
+            self.assertIn("(0 to index", result.output)
+
+            # The DB is genuinely untouched: the marker is still on disk.
+            con = sqlite3.connect(dbpath)
+            stored = con.execute(
+                "SELECT pipeline_version FROM pipeline_state WHERE stage = ?",
+                (CAPTION_STAGE,),
+            ).fetchone()[0]
+            con.close()
+            self.assertIn(":default@external:", stored)
+
+    def test_validate_accepts_unmigrated_default_caption_db(self):
+        # Standalone `validate` opens read-only (mode=ro) and no write-intent
+        # command may have healed the DB first. It must accept a default-stamped
+        # caption via the same marker-gated normalisation rather than hard-failing
+        # on "unexpected caption pipeline version".
+        path = "../src/test/fixtures/monkey.jpg"
+        with tempfile.TemporaryDirectory() as tmpdir:
+            dbpath = os.path.join(tmpdir, "default-caption.sqlite")
+            self._seed_default_stamped_caption_db(dbpath, path)
+
+            summary = validate_index_database(dbpath, path, "janus")
+            self.assertEqual(summary["paths"], 1)
+
+    def test_stale_default_marked_caption_still_reported_through_readonly_path(self):
+        # The normalisation must not mask genuine staleness: a marker row whose
+        # prompt version differs from the current one is rewritten (marker →
+        # resolved) but the prompt-version prefix survives, so it stays stale.
+        # Both the dry-run plan and validate must still flag it.
+        path = "../src/test/fixtures/monkey.jpg"
+        with tempfile.TemporaryDirectory() as tmpdir:
+            dbpath = os.path.join(tmpdir, "default-caption.sqlite")
+            legacy_version, _current_version, _resolved = (
+                self._seed_default_stamped_caption_db(dbpath, path)
+            )
+            # Bump only the prompt-version prefix (first ':'-separated segment),
+            # keeping the ':default@external:' marker intact.
+            first_segment, rest = legacy_version.split(":", 1)
+            stale_version = f"v999-deadbeefcafe:{rest}"
+            self.assertIn(":default@external:", stale_version)
+            con = sqlite3.connect(dbpath)
+            con.execute(
+                "UPDATE pipeline_state SET pipeline_version = ? WHERE stage = ?",
+                (stale_version, CAPTION_STAGE),
+            )
+            con.commit()
+            con.close()
+
+            result = CliRunner().invoke(
+                index,
+                [
+                    "--glob",
+                    path,
+                    "--dbpath",
+                    dbpath,
+                    "--dry-run",
+                    "--model-profile",
+                    "janus",
+                ],
+            )
+            self.assertEqual(0, result.exit_code, result.output)
+            self.assertIn("(1 to index", result.output)
+
+            with self.assertRaises(click.ClickException) as raised:
+                validate_index_database(dbpath, path, "janus")
+            self.assertIn("caption pipeline version", str(raised.exception))
 
     def test_siglip2_dry_run_backfills_missing_embeddings_for_existing_rows(self):
         with tempfile.TemporaryDirectory() as tmpdir:
