@@ -24,6 +24,56 @@ const listDirectories = (root) => {
   });
 };
 
+// Mirrors prepare-optimised-images.cjs's PHOTO_EXTENSIONS allowlist. Kept as
+// a small local duplicate rather than a shared module: .cjs build scripts
+// can't import the TypeScript photo.ts service, and this is the only other
+// caller that needs it.
+const PHOTO_EXTENSIONS = new Set([
+  ".jpg",
+  ".jpeg",
+  ".png",
+  ".webp",
+  ".avif",
+  ".gif",
+  ".tif",
+  ".tiff",
+]);
+
+const directoryHasPhotoFile = (dir) => {
+  let entries;
+  try {
+    entries = fs.readdirSync(dir, { withFileTypes: true });
+  } catch (err) {
+    if (err.code === "ENOENT") {
+      return false;
+    }
+    throw err;
+  }
+
+  return entries.some((entry) => {
+    return entry.isFile() && PHOTO_EXTENSIONS.has(path.extname(entry.name).toLowerCase());
+  });
+};
+
+// A directory only counts as a real album if it isn't a test fixture or a
+// hidden/system directory left behind by something other than album
+// authoring (a Syncthing `.stfolder`, a Synology `@eaDir`, an fsck
+// `lost+found`) AND it directly contains at least one photo file. The name
+// checks alone aren't enough: any of those non-`test-` directories left on an
+// improperly mounted or synced albums/ would otherwise be counted as a real
+// album and defeat the orphan-sweep guard below.
+const isRealAlbumName = (albumsDir, name) => {
+  return (
+    !name.startsWith("test-") &&
+    !name.startsWith(".") &&
+    directoryHasPhotoFile(path.join(albumsDir, name))
+  );
+};
+
+const albumsDirHasRealAlbum = (albumsDir, albumNames) => {
+  return albumNames.some((name) => isRealAlbumName(albumsDir, name));
+};
+
 const removeFileIfExists = (targetPath) => {
   // Tolerate ENOENT rather than pre-checking with existsSync: under concurrent
   // builds the file can vanish between the check and the unlink (TOCTOU).
@@ -152,13 +202,13 @@ const cleanupVideoCache = ({ albumDir, publicAlbumDir }) => {
 // other content.
 //
 // Guarded the same way as the image-cache-config sentinel write below: if
-// `albumNames` has no real (non-`test-`) album at all — `albums/` missing or
-// unmounted, or a fresh clone/CI checkout where only the committed `test-*`
-// fixtures exist — every real album name in `albumNames` would be empty, so
-// every real album's public cache would look orphaned and get deleted. Skip
-// the sweep entirely in that case rather than mass-deleting real caches.
-const removeOrphanedAlbumMediaCaches = ({ publicAlbumsDir, albumNames }) => {
-  const hasRealAlbum = albumNames.some((name) => !name.startsWith("test-"));
+// there is no real album at all — `albums/` missing or unmounted, a fresh
+// clone/CI checkout where only the committed `test-*` fixtures exist, or an
+// improperly mounted/synced albums/ containing only non-album directories
+// like `.stfolder` or `lost+found` — every real album's public cache would
+// look orphaned and get deleted. Skip the sweep entirely in that case rather
+// than mass-deleting real caches.
+const removeOrphanedAlbumMediaCaches = ({ publicAlbumsDir, albumNames, hasRealAlbum }) => {
   if (!hasRealAlbum) {
     return 0;
   }
@@ -197,6 +247,7 @@ const cleanupOptimisedMedia = async ({
   publicAlbumsDir = path.resolve(__dirname, "..", "public", "data", "albums"),
 } = {}) => {
   const albumNames = listDirectories(albumsDir);
+  const hasRealAlbum = albumsDirHasRealAlbum(albumsDir, albumNames);
   const imageCacheConfigPath = path.join(publicAlbumsDir, IMAGE_CACHE_CONFIG_FILE);
   let imageCacheConfigIsCurrent = false;
   try {
@@ -243,9 +294,15 @@ const cleanupOptimisedMedia = async ({
   totals.removedOrphanedAlbums = removeOrphanedAlbumMediaCaches({
     publicAlbumsDir,
     albumNames,
+    hasRealAlbum,
   });
 
-  if (!imageCacheConfigIsCurrent && albumNames.length > 0) {
+  // Gated on the same hasRealAlbum condition as the sweep above: if there is
+  // no real album, invalidation/cleanup above was skipped, so stamping the
+  // sentinel "current" here would be a lie — a real album reappearing later
+  // would then look already up to date and its outdated caches would never
+  // get invalidated.
+  if (!imageCacheConfigIsCurrent && hasRealAlbum) {
     fs.mkdirSync(publicAlbumsDir, { recursive: true });
     fs.writeFileSync(imageCacheConfigPath, IMAGE_CACHE_CONFIG);
   }

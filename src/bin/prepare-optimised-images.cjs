@@ -11,6 +11,12 @@ const TEMP_FILE_SEPARATOR = ".tmp-";
 // still writing it — deleting that out from under it makes its renameSync
 // throw ENOENT.
 const STALE_TEMP_FILE_THRESHOLD_MS = 15 * 60 * 1000;
+// Monotonic per-process counter appended to every temp file name so that two
+// concurrent encode attempts for the SAME output within this process (this
+// script racing photo.ts's own optimiseImages(), or two overlapping variants
+// for the same file) never share a temp path — see nextTempFileSuffix below.
+let tempFileCounter = 0;
+const nextTempFileSuffix = () => `${TEMP_FILE_SEPARATOR}${process.pid}-${++tempFileCounter}`;
 
 // album.ts's listAlbumMediaFiles + getAlbumWithoutManifest treat every
 // non-JSON, non-video file in an album directory as a photo passed to
@@ -130,19 +136,28 @@ const isUsableCacheFile = async (target) => {
 };
 
 // A process that died mid-encode (crash, OOM-kill, `process.exit`) can leave
-// behind a "<output>.tmp-<pid>" file from a previous run. It's never read as
-// a cache hit (isUsableCacheFile only looks at the exact output path), but it
-// is silent disk litter — clear out any stray temp siblings for the variants
-// we're about to (re)encode. Only delete a temp file if it's ours (our own
-// pid — left by an earlier, already-finished attempt in this same process,
-// e.g. a retry) or old enough to be considered abandoned: a fresh
-// foreign-pid temp file may belong to a concurrent encoder (the dev server's
-// photo.ts) that is still writing it, and deleting it out from under that
-// writer makes its renameSync throw ENOENT.
+// behind a "<output>.tmp-<pid>-<n>" file from a previous run. It's never read
+// as a cache hit (isUsableCacheFile only looks at the exact output path), but
+// it is silent disk litter — clear out any stray temp siblings for the
+// variants we're about to (re)encode.
+//
+// Every entry matching the prefix is only ever removed once it's stale,
+// regardless of which pid created it: a fresh temp file — including one
+// created by this same process for a still-in-flight sibling encode (this
+// script racing photo.ts's own optimiseImages() for the same output, or two
+// overlapping variants) — may still be mid-write, and deleting it out from
+// under that writer makes its renameSync throw ENOENT. There used to be an
+// "own pid" fast path that deleted our own process's temp files
+// unconditionally, on the assumption that they could only be leftovers from
+// an earlier, already-finished attempt; that assumption breaks once two
+// concurrent same-process encodes can share one pid. Since
+// nextTempFileSuffix now makes every temp file name unique per attempt (see
+// above), a crashed run's temp files simply age past the threshold below like
+// any other stray file, so the own-pid special case is unnecessary as well as
+// unsafe — dropped entirely.
 const cleanupStrayTempFiles = (output) => {
   const dir = path.dirname(output);
   const prefix = `${path.basename(output)}${TEMP_FILE_SEPARATOR}`;
-  const ownPidSuffix = `${TEMP_FILE_SEPARATOR}${process.pid}`;
   let entries;
   try {
     entries = fs.readdirSync(dir);
@@ -158,19 +173,17 @@ const cleanupStrayTempFiles = (output) => {
       continue;
     }
     const entryPath = path.join(dir, entry);
-    if (!entry.endsWith(ownPidSuffix)) {
-      let stat;
-      try {
-        stat = fs.statSync(entryPath);
-      } catch (err) {
-        if (err.code === "ENOENT") {
-          continue;
-        }
-        throw err;
-      }
-      if (Date.now() - stat.mtimeMs < STALE_TEMP_FILE_THRESHOLD_MS) {
+    let stat;
+    try {
+      stat = fs.statSync(entryPath);
+    } catch (err) {
+      if (err.code === "ENOENT") {
         continue;
       }
+      throw err;
+    }
+    if (Date.now() - stat.mtimeMs < STALE_TEMP_FILE_THRESHOLD_MS) {
+      continue;
     }
     try {
       fs.unlinkSync(entryPath);
@@ -182,9 +195,20 @@ const cleanupStrayTempFiles = (output) => {
   }
 };
 
-const encodeVariant = (sourcePipeline, { size, output }) => {
+// `async` matters here, not just style: this is called from inside
+// `missing.map(...)` below, before Promise.allSettled attaches to any of the
+// returned promises. cleanupStrayTempFiles is a synchronous call — as a plain
+// (non-async) function, a non-ENOENT throw from it (EACCES, EISDIR on a path
+// collision) would propagate synchronously out of the .map() callback itself,
+// aborting the whole missing.map(...) array construction and rejecting the
+// pool's `work` for every variant in this photo — including a sibling
+// variant's encode that .map() already started earlier in the same pass and
+// left unawaited. Declaring this `async` converts that synchronous throw into
+// a rejected promise instead, so it settles like any other single-variant
+// failure and Promise.allSettled still awaits every sibling to completion.
+const encodeVariant = async (sourcePipeline, { size, output }) => {
   cleanupStrayTempFiles(output);
-  const tempOutput = `${output}${TEMP_FILE_SEPARATOR}${process.pid}`;
+  const tempOutput = `${output}${nextTempFileSuffix()}`;
 
   return sourcePipeline
     .clone()

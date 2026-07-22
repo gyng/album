@@ -388,6 +388,63 @@ describe("prepareOptimisedImages", () => {
     expect(fs.existsSync(staleForeignTemp)).toBe(false);
   });
 
+  it("reports a synchronous stray-temp-cleanup failure for one variant without abandoning an in-flight sibling variant of the same photo", async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "album-image-cleanup-throw-"));
+    const albumsDir = path.join(root, "albums");
+    const publicAlbumsDir = path.join(root, "public", "data", "albums");
+    const albumDir = path.join(albumsDir, "trip");
+    const cacheDir = path.join(publicAlbumsDir, "trip", ".resized_images");
+    const source = path.join(albumDir, "photo.jpg");
+
+    fs.mkdirSync(albumDir, { recursive: true });
+    fs.mkdirSync(cacheDir, { recursive: true });
+    fs.writeFileSync(source, "source");
+
+    let encodeCalls = 0;
+    mockSharpPipeline({
+      toFile: jest.fn(async (output) => {
+        encodeCalls += 1;
+        if (encodeCalls === 1) {
+          // Keep the first variant's encode in flight while the second
+          // variant's stray-temp-file cleanup throws synchronously below.
+          await new Promise((resolve) => setTimeout(resolve, 20));
+        }
+        fs.writeFileSync(output, "generated");
+        return { width: 800, height: 600 };
+      }),
+    });
+
+    const realReaddirSync = fs.readdirSync.bind(fs);
+    let cacheDirReaddirCalls = 0;
+    const cleanupError = Object.assign(new Error("permission denied"), { code: "EACCES" });
+    jest.spyOn(fs, "readdirSync").mockImplementation((dir, opts) => {
+      if (dir === cacheDir) {
+        cacheDirReaddirCalls += 1;
+        // Fail only the second variant's cleanup pass (cleanupStrayTempFiles
+        // reads the cache dir once per missing variant) — the first variant's
+        // encode is already kicked off by then.
+        if (cacheDirReaddirCalls === 2) {
+          throw cleanupError;
+        }
+      }
+      return realReaddirSync(dir, opts);
+    });
+
+    const summary = await prepareOptimisedImages({ albumsDir, publicAlbumsDir, jobs: 1 });
+
+    // The cleanup failure for one variant is reported alongside the encode
+    // failures, not thrown out of the run.
+    expect(summary.failures).toHaveLength(1);
+    expect(summary.failures[0]).toMatchObject({
+      albumName: "trip",
+      filename: "photo.jpg",
+      message: cleanupError.message,
+    });
+    // The sibling variants — including the one already in flight when the
+    // cleanup throw happened — were not abandoned and completed normally.
+    expect(summary.variantsEncoded).toBe(2);
+  });
+
   it("drains an in-flight encode to completion before rejecting when an unexpected error occurs for a sibling item", async () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "album-image-drain-"));
     const albumsDir = path.join(root, "albums");

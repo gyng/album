@@ -23,6 +23,12 @@ export const AVIF_OPTIONS = {
 // with the wrong colour space, visibly shifting the output.
 export const ICC_PROFILE = imageOptimisationConfig.iccProfile;
 const TEMP_FILE_SEPARATOR = ".tmp-";
+// Monotonic per-process counter appended to every temp file name so that two
+// concurrent optimiseImages() calls for the SAME photo inside one process
+// (e.g. two overlapping dev-server requests) never share a temp path — see
+// nextTempFileSuffix below.
+let tempFileCounter = 0;
+const nextTempFileSuffix = () => `${TEMP_FILE_SEPARATOR}${process.pid}-${++tempFileCounter}`;
 
 export const getPhotoSize = async (
   filepath: string,
@@ -133,7 +139,7 @@ export const optimiseImages = async (
           return measureBuild("photo.optimiseImages.encode", async () => {
             sourcePipeline ??= sharp(photoPath).rotate();
             cleanupStrayTempFiles(newFile);
-            const tempFile = `${newFile}${TEMP_FILE_SEPARATOR}${process.pid}`;
+            const tempFile = `${newFile}${nextTempFileSuffix()}`;
             return (
               sourcePipeline
                 .clone()
@@ -176,19 +182,29 @@ export const stripPublicFromPath = (p: string) => {
 };
 
 // A process that died mid-encode (crash, OOM-kill) can leave a
-// "<newFile>.tmp-<pid>" file from a previous run behind. It's never read as a
-// cache hit (the cache check only looks at the exact final path), but it is
-// silent disk litter — clear out any stray temp siblings for the variant
-// we're about to (re)encode. Only our own pid's temp files or stale ones are
-// removed: a fresh foreign-pid temp may be mid-write by a concurrent encoder
-// (prepare:images alongside next dev), and deleting it out from under that
-// writer makes its renameSync throw ENOENT.
+// "<newFile>.tmp-<pid>-<n>" file from a previous run behind. It's never read
+// as a cache hit (the cache check only looks at the exact final path), but it
+// is silent disk litter — clear out any stray temp siblings for the variant
+// we're about to (re)encode.
+//
+// Every entry matching the prefix is only ever removed once it's stale,
+// regardless of which pid created it: a fresh temp file — including one
+// created by an earlier, still-in-flight variant of THIS SAME process (two
+// overlapping optimiseImages() calls for the same photo) — may still be
+// mid-write, and deleting it out from under that writer makes its renameSync
+// throw ENOENT. There used to be an "own pid" fast path that deleted our own
+// process's temp files unconditionally, on the assumption that they could
+// only be leftovers from an earlier, already-finished attempt; that
+// assumption breaks for two concurrent same-process encodes sharing one pid.
+// Since nextTempFileSuffix now makes every temp file name unique per attempt
+// (see above), a crashed run's temp files simply age past the threshold below
+// like any other stray file, so the own-pid special case is unnecessary as
+// well as unsafe — dropped entirely.
 const STALE_TEMP_FILE_THRESHOLD_MS = 15 * 60 * 1000;
 
 const cleanupStrayTempFiles = (finalPath: string) => {
   const dir = path.dirname(finalPath);
   const prefix = `${path.basename(finalPath)}${TEMP_FILE_SEPARATOR}`;
-  const ownPidSuffix = `${TEMP_FILE_SEPARATOR}${process.pid}`;
   let entries: string[];
   try {
     entries = fs.readdirSync(dir);
@@ -204,19 +220,17 @@ const cleanupStrayTempFiles = (finalPath: string) => {
       continue;
     }
     const entryPath = path.join(dir, entry);
-    if (!entry.endsWith(ownPidSuffix)) {
-      let stat: fs.Stats;
-      try {
-        stat = fs.statSync(entryPath);
-      } catch (err) {
-        if ((err as NodeJS.ErrnoException).code === "ENOENT") {
-          continue;
-        }
-        throw err;
-      }
-      if (Date.now() - stat.mtimeMs < STALE_TEMP_FILE_THRESHOLD_MS) {
+    let stat: fs.Stats;
+    try {
+      stat = fs.statSync(entryPath);
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code === "ENOENT") {
         continue;
       }
+      throw err;
+    }
+    if (Date.now() - stat.mtimeMs < STALE_TEMP_FILE_THRESHOLD_MS) {
+      continue;
     }
     try {
       fs.unlinkSync(entryPath);

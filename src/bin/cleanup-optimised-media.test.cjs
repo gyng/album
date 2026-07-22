@@ -306,6 +306,9 @@ describe("cleanupOptimisedMedia", () => {
 
     fs.mkdirSync(keptAlbumDir, { recursive: true });
     fs.mkdirSync(orphanedImageCacheDir, { recursive: true });
+    // "kept" must actually contain a photo file to count as a real album for
+    // the orphan-sweep guard — see the ".stfolder"/hasRealAlbum tests below.
+    fs.writeFileSync(path.join(keptAlbumDir, "kept.jpg"), "image");
     markImageCacheCurrent(publicAlbumsDir);
     fs.writeFileSync(path.join(orphanedImageCacheDir, "photo.jpg@800.avif"), "cached");
 
@@ -326,10 +329,12 @@ describe("cleanupOptimisedMedia", () => {
     const unrelatedFile = path.join(orphanedPublicAlbumDir, "notes.txt");
 
     // A real (non-test-) album must still exist for the orphan sweep to run
-    // at all — see "skips the orphan sweep" tests below.
+    // at all — see "skips the orphan sweep" tests below. It must also
+    // actually contain a photo file (see the hasRealAlbum tests below).
     fs.mkdirSync(keptAlbumDir, { recursive: true });
     fs.mkdirSync(orphanedImageCacheDir, { recursive: true });
     fs.mkdirSync(orphanedVideoCacheDir, { recursive: true });
+    fs.writeFileSync(path.join(keptAlbumDir, "kept.jpg"), "image");
     markImageCacheCurrent(publicAlbumsDir);
     fs.writeFileSync(path.join(orphanedImageCacheDir, "photo.jpg@800.avif"), "cached");
     fs.writeFileSync(path.join(orphanedVideoCacheDir, "clip.mp4@1920.mp4"), "cached");
@@ -356,9 +361,11 @@ describe("cleanupOptimisedMedia", () => {
     const orphanedVideoCacheDir = path.join(orphanedPublicAlbumDir, ".resized_videos");
 
     // A real (non-test-) album must still exist for the orphan sweep to run
-    // at all — see "skips the orphan sweep" tests below.
+    // at all — see "skips the orphan sweep" tests below. It must also
+    // actually contain a photo file (see the hasRealAlbum tests below).
     fs.mkdirSync(keptAlbumDir, { recursive: true });
     fs.mkdirSync(orphanedVideoCacheDir, { recursive: true });
+    fs.writeFileSync(path.join(keptAlbumDir, "kept.jpg"), "image");
     markImageCacheCurrent(publicAlbumsDir);
     fs.writeFileSync(path.join(orphanedVideoCacheDir, "clip.mp4@1920.mp4"), "cached");
 
@@ -412,6 +419,78 @@ describe("cleanupOptimisedMedia", () => {
 
     expect(summary.removedOrphanedAlbums).toBe(0);
     expect(fs.existsSync(realCachedFile)).toBe(true);
+  });
+
+  it("does not treat a non-test directory without any photo file as a real album (Syncthing/NAS/lost+found guard)", async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "album-media-orphan-nonalbum-dirs-"));
+    const albumsDir = path.join(root, "albums");
+    const publicAlbumsDir = path.join(root, "public", "data", "albums");
+    // None of these should count as a "real" album: a Syncthing sync-state
+    // directory, a Synology NAS metadata directory, an fsck lost+found, and
+    // the committed test-* fixture — none contain a photo file directly.
+    const stfolderDir = path.join(albumsDir, ".stfolder");
+    const eaDirDir = path.join(albumsDir, "@eaDir");
+    const lostFoundDir = path.join(albumsDir, "lost+found");
+    const testAlbumDir = path.join(albumsDir, "test-simple");
+    const realPublicAlbumDir = path.join(publicAlbumsDir, "snapshots");
+    const realImageCacheDir = path.join(realPublicAlbumDir, ".resized_images");
+    const realCachedFile = path.join(realImageCacheDir, "photo.jpg@800.avif");
+
+    fs.mkdirSync(stfolderDir, { recursive: true });
+    fs.mkdirSync(eaDirDir, { recursive: true });
+    fs.mkdirSync(lostFoundDir, { recursive: true });
+    fs.mkdirSync(testAlbumDir, { recursive: true });
+    fs.mkdirSync(realImageCacheDir, { recursive: true });
+    markImageCacheCurrent(publicAlbumsDir);
+    fs.writeFileSync(realCachedFile, "cached");
+
+    const summary = await cleanupOptimisedMedia({ albumsDir, publicAlbumsDir });
+
+    expect(summary.removedOrphanedAlbums).toBe(0);
+    expect(fs.existsSync(realCachedFile)).toBe(true);
+  });
+
+  it("runs the orphan sweep once a non-test directory actually contains a photo file", async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "album-media-orphan-real-photo-"));
+    const albumsDir = path.join(root, "albums");
+    const publicAlbumsDir = path.join(root, "public", "data", "albums");
+    const stfolderDir = path.join(albumsDir, ".stfolder");
+    const realAlbumDir = path.join(albumsDir, "kept");
+    const orphanedPublicAlbumDir = path.join(publicAlbumsDir, "deleted-trip");
+    const orphanedImageCacheDir = path.join(orphanedPublicAlbumDir, ".resized_images");
+
+    fs.mkdirSync(stfolderDir, { recursive: true });
+    fs.mkdirSync(realAlbumDir, { recursive: true });
+    fs.mkdirSync(orphanedImageCacheDir, { recursive: true });
+    fs.writeFileSync(path.join(realAlbumDir, "kept.jpg"), "image");
+    markImageCacheCurrent(publicAlbumsDir);
+    fs.writeFileSync(path.join(orphanedImageCacheDir, "photo.jpg@800.avif"), "cached");
+
+    const summary = await cleanupOptimisedMedia({ albumsDir, publicAlbumsDir });
+
+    expect(summary.removedOrphanedAlbums).toBe(1);
+    expect(fs.existsSync(orphanedPublicAlbumDir)).toBe(false);
+  });
+
+  it("does not rewrite the image-cache-config sentinel when only test-* albums are present, even if settings changed", async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "album-media-sentinel-guard-"));
+    const albumsDir = path.join(root, "albums");
+    const publicAlbumsDir = path.join(root, "public", "data", "albums");
+    const testAlbumDir = path.join(albumsDir, "test-simple");
+
+    fs.mkdirSync(testAlbumDir, { recursive: true });
+    fs.mkdirSync(publicAlbumsDir, { recursive: true });
+    fs.writeFileSync(path.join(publicAlbumsDir, IMAGE_CACHE_CONFIG_FILE), "old settings");
+
+    await cleanupOptimisedMedia({ albumsDir, publicAlbumsDir });
+
+    // No real album exists to invalidate/re-warm, so the sentinel must stay
+    // exactly as it was rather than being stamped "current" — otherwise a
+    // real album reappearing later would look already up to date and never
+    // get its outdated AVIFs invalidated.
+    expect(fs.readFileSync(path.join(publicAlbumsDir, IMAGE_CACHE_CONFIG_FILE), "utf8")).toBe(
+      "old settings",
+    );
   });
 
   it("does not delete anything when the albums directory is missing", async () => {
