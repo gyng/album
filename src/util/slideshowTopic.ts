@@ -211,3 +211,15 @@ export const decideTopicSeed = (input: {
     commit: !input.preserveCurrentPhoto,
   };
 };
+
+/**
+ * A deferred topic (waiting on the embeddings database) staled if the playback
+ * mode changed while it waited — e.g. a cross-tab flip via localStorage sync,
+ * which bypasses the toolbar dismissal path entirely. The mode captured at
+ * deferral is the user-intent baseline the eventual seed must still match;
+ * running it after a flip would hijack the newer mode choice back to similar.
+ */
+export const isDeferredTopicStale = (input: {
+  modeAtDefer: SlideshowMode;
+  currentMode: SlideshowMode;
+}): boolean => input.currentMode !== input.modeAtDefer;

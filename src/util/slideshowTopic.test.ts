@@ -1,5 +1,6 @@
 import { RandomPhotoRow } from "../components/search/api";
 import {
+  isDeferredTopicStale,
   advanceUserNavCount,
   clampTopicProgress,
   decideModeSelection,
@@ -302,5 +303,15 @@ describe("decideModeSelection", () => {
       dismissTopic: false,
       clearTopicParam: false,
     });
+  });
+});
+
+describe("isDeferredTopicStale", () => {
+  it("stales a deferred topic when the mode changed while it waited (cross-tab flip)", () => {
+    expect(isDeferredTopicStale({ modeAtDefer: "weighted", currentMode: "random" })).toBe(true);
+  });
+
+  it("keeps a deferred topic fresh while the mode it deferred under still holds", () => {
+    expect(isDeferredTopicStale({ modeAtDefer: "weighted", currentMode: "weighted" })).toBe(false);
   });
 });

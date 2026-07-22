@@ -82,6 +82,7 @@ import {
   clampTopicProgress,
   decideModeSelection,
   decideTopicSeed,
+  isDeferredTopicStale,
   isSeedCurrent,
   isTopicActive,
   isTopicSeedStale,
@@ -293,6 +294,7 @@ export const Slideshow: React.FC<{
     text: string;
     preserveCurrentPhoto: boolean;
     isInitial: boolean;
+    modeAtDefer: SlideshowMode;
   } | null>(null);
   // Monotonic token bumped on every topic submit / dismiss, and a running count
   // of USER navigations (manual next/previous, gesture, keyboard, history
@@ -1061,6 +1063,10 @@ export const Slideshow: React.FC<{
           text: topicText,
           preserveCurrentPhoto: opts?.preserveCurrentPhoto ?? false,
           isInitial: opts?.isInitial ?? false,
+          // The user-intent baseline for the eventual seed: a mode change while
+          // we wait (e.g. a cross-tab flip, which bypasses the toolbar
+          // dismissal) must abandon this deferral, not be hijacked by it.
+          modeAtDefer: slideshowModeRef.current,
         };
         setTopicError(null);
         setTopicBusy(true);
@@ -1193,11 +1199,31 @@ export const Slideshow: React.FC<{
       return;
     }
     pendingTopicRef.current = null;
+    if (
+      isDeferredTopicStale({
+        modeAtDefer: pending.modeAtDefer,
+        currentMode: slideshowModeRef.current,
+      })
+    ) {
+      // The mode changed while the deferral waited (cross-tab flip): honour the
+      // newer choice — abandon the wait, and for the one-shot initial seed
+      // strip its orphaned URL param so the URL and UI agree.
+      setTopicAwaitingEmbeddings(false);
+      setTopicBusy(false);
+      setTopicProgress(null);
+      if (pending.isInitial) {
+        initialTopicRef.current = null;
+        initialTopicSeededRef.current = true;
+        setHasPendingInitialTopic(false);
+        updateSlideshowUrl(slideshowModeRef.current, timeDelayRef.current, null);
+      }
+      return;
+    }
     void seedTopic(pending.text, {
       preserveCurrentPhoto: pending.preserveCurrentPhoto,
       isInitial: pending.isInitial,
     });
-  }, [database, embeddingsDatabase, seedTopic]);
+  }, [database, embeddingsDatabase, seedTopic, updateSlideshowUrl]);
 
   // If the embeddings DB fails to load while a topic is waiting on it, abandon
   // the wait rather than spinning "Loading embeddings…" forever: clear the
@@ -1220,6 +1246,7 @@ export const Slideshow: React.FC<{
     ) {
       return;
     }
+    const abandonedInitial = hasPendingInitialTopic || pendingTopicRef.current?.isInitial === true;
     pendingTopicRef.current = null;
     initialTopicRef.current = null;
     initialTopicSeededRef.current = true;
@@ -1228,7 +1255,13 @@ export const Slideshow: React.FC<{
     setTopicBusy(false);
     setTopicProgress(null);
     setTopicError(TOPIC_EMBEDDINGS_UNAVAILABLE_MESSAGE);
-  }, [embeddingsError, topicAwaitingEmbeddings, hasPendingInitialTopic]);
+    if (abandonedInitial) {
+      // The one-shot initial `topic=` seed can never activate this session;
+      // strip the param so the URL stops advertising a topic that will not
+      // run — mirroring the stale-abandon path's cleanup.
+      updateSlideshowUrl(slideshowModeRef.current, timeDelayRef.current, null);
+    }
+  }, [embeddingsError, topicAwaitingEmbeddings, hasPendingInitialTopic, updateSlideshowUrl]);
 
   // Stop topic mode and restore the pre-topic mode. The show keeps running from
   // the current photo under the restored mode. The album filter is not
