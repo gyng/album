@@ -135,7 +135,8 @@ describe("publish wizard orchestration", () => {
 
     expect(harness.log).toHaveBeenCalledWith("Skipping indexing by user choice.");
     expect(harness.services.askYesNo).toHaveBeenCalledWith({
-      prompt: "Proceed with build and deploy without index verification?",
+      prompt:
+        "Proceed with build and deploy without updating the index? Path verification still runs; embedding checks stay unknown.",
       defaultValue: false,
       yes: false,
     });
@@ -148,6 +149,24 @@ describe("publish wizard orchestration", () => {
       command: "npx --yes vercel@latest build --prod",
       cwd: "/src",
     });
+    // Regression: the final "Index Verification" block used to print a fully
+    // green report with no repeated caveat once the one-shot warning above
+    // had scrolled past, even though model info stayed unavailable.
+    expect(harness.services.printVerificationReport).toHaveBeenCalledWith(
+      { ok: true },
+      { modelInfoUnavailable: true },
+    );
+  });
+
+  it("does not flag model-info-unavailable in the final verification output when model info was available", async () => {
+    const harness = makeHarness();
+
+    await main(harness.input);
+
+    expect(harness.services.printVerificationReport).toHaveBeenCalledWith(
+      { ok: true },
+      { modelInfoUnavailable: false },
+    );
   });
 
   it("asks a second confirmation and exits when model info is unavailable and the user declines twice", async () => {
@@ -164,7 +183,8 @@ describe("publish wizard orchestration", () => {
 
     expect(harness.log).toHaveBeenCalledWith("Skipping indexing by user choice.");
     expect(harness.services.askYesNo).toHaveBeenCalledWith({
-      prompt: "Proceed with build and deploy without index verification?",
+      prompt:
+        "Proceed with build and deploy without updating the index? Path verification still runs; embedding checks stay unknown.",
       defaultValue: false,
       yes: false,
     });
@@ -189,6 +209,12 @@ describe("publish wizard orchestration", () => {
       expect.objectContaining({ command: "npm run index:update" }),
     );
     expect(harness.error).toHaveBeenCalledWith(expect.stringContaining("index state is unknown"));
+    // The old wording claimed no verification runs at all; path-coverage
+    // verification still runs right after this warning, so the copy must say
+    // so rather than reading as fully unverified.
+    expect(harness.error).toHaveBeenCalledWith(
+      expect.stringContaining("Path verification still runs"),
+    );
     expect(harness.services.loadDbState).toHaveBeenCalled();
     expect(harness.services.runShellCommand).toHaveBeenCalledWith({
       command: "npx --yes vercel@latest build --prod",
@@ -230,6 +256,32 @@ describe("publish wizard orchestration", () => {
       expect.objectContaining({ completedAt: "2026-07-14T12:00:00.000Z" }),
     );
     expect(harness.log).toHaveBeenCalledWith(expect.stringContaining("Index-only run complete"));
+  });
+
+  it("asks an index-only-appropriate prompt when model info is unavailable in --index-only mode", async () => {
+    // Regression: the prompt used to say "build and deploy" even in
+    // --index-only runs, which never build or deploy anything.
+    const harness = makeHarness({
+      args: { indexOnly: true },
+      report: {
+        ...makeReport(),
+        db: { missingEmbeddingCount: 0, staleEmbeddingCount: 0, modelInfoUnavailable: true },
+      },
+      plan: { runIndex: false, runBuild: false, runDeploy: false },
+      answers: [true],
+    });
+
+    await main(harness.input);
+
+    expect(harness.services.askYesNo).toHaveBeenCalledWith({
+      prompt:
+        "Proceed without updating the index? Path verification still runs; embedding checks stay unknown.",
+      defaultValue: false,
+      yes: false,
+    });
+    expect(harness.error).toHaveBeenCalledWith(
+      expect.stringContaining("proceeding without updating the index"),
+    );
   });
 
   it("stops when an interactive user declines the build", async () => {

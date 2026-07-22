@@ -333,6 +333,17 @@ const hasIndexChanges = (report) =>
   (report.db?.missingEmbeddingCount ?? 0) > 0 ||
   (report.db?.staleEmbeddingCount ?? 0) > 0;
 
+// The subset of hasIndexChanges' triggers that stay reliable even when
+// modelInfoUnavailable is true: new/removed photo counts are diffed straight
+// from disk vs the DB, never from the indexer's model metadata. Used to tell
+// whether modelInfoUnavailable is the *sole* reason indexing looks needed, or
+// whether there are real, known changes on top of it.
+const hasRealIndexChanges = (report) =>
+  report.summary.newPhotos > 0 ||
+  report.summary.removedPhotos > 0 ||
+  (report.db?.missingEmbeddingCount ?? 0) > 0 ||
+  (report.db?.staleEmbeddingCount ?? 0) > 0;
+
 // The canonical production origin (mirrors getSiteOrigin in src/lib/seo.ts).
 const DEFAULT_SITE_ORIGIN = "https://photos.awoo.party";
 
@@ -533,13 +544,22 @@ const resolveExecutionPlan = async ({ args, report }) => {
   };
 
   if (indexChanges) {
-    if (report.db?.modelInfoUnavailable && args.yes) {
+    const modelInfoIsSoleReason = report.db?.modelInfoUnavailable && !hasRealIndexChanges(report);
+    if (modelInfoIsSoleReason && args.yes) {
       // askYesNo({ yes: true }) short-circuits straight to defaultValue
       // (true), so an unattended --yes run would otherwise auto-launch the
       // indexer purely because its own model metadata couldn't be read — the
       // same broken-environment reason it would likely fail again for. Skip
       // indexing quietly here; the wizard's main flow is responsible for a
       // loud warning and the decision whether to proceed without it.
+      //
+      // This only applies when modelInfoUnavailable is the *sole* reason
+      // indexChanges is true. If there are real, disk-vs-DB changes too (new
+      // or removed photos), auto-skipping would silently leave them
+      // unindexed — fall through to the old behaviour instead, which asks
+      // (and under --yes, defaults to running the indexer; if the
+      // environment really is broken it fails loudly, which beats shipping
+      // an unindexed DB).
       plan.runIndex = false;
     } else {
       plan.runIndex = await askYesNo({
@@ -1353,7 +1373,7 @@ const printPreflightReport = (report) => {
   }
 };
 
-const printVerificationReport = (verification) => {
+const printVerificationReport = (verification, { modelInfoUnavailable = false } = {}) => {
   printSection("Index Verification");
   printStatRows([
     { label: "Images rows", value: formatNumber(verification.imageCount), level: "info" },
@@ -1382,6 +1402,17 @@ const printVerificationReport = (verification) => {
   if (verification.missingEmbeddingPaths.length > 0) {
     console.log(
       `  ${statusLabel("warn")} Missing embeddings for new photos: ${formatNumber(verification.missingEmbeddingPaths.length)}`,
+    );
+  }
+
+  // A clean-looking, all-[OK] report above does not mean the DB is actually
+  // fully verified: modelInfoUnavailable means only path coverage could be
+  // checked here, never embeddings/model state. Repeat that caveat at the
+  // point the user is most likely to be looking — the final report — rather
+  // than relying solely on the one-shot warning earlier in the run.
+  if (modelInfoUnavailable) {
+    console.log(
+      `  ${statusLabel("warn")} Embedding checks were skipped — model info unavailable; path coverage only.`,
     );
   }
 };

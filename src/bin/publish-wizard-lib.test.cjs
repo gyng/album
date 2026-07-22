@@ -340,6 +340,78 @@ describe("publish-wizard-lib", () => {
     }
   });
 
+  it("still runs indexing under --yes when model info is unavailable but new photos are on disk", async () => {
+    // Regression: the --yes auto-skip only exists because modelInfoUnavailable
+    // makes the *embedding* portion of hasIndexChanges unreliable. new/removed
+    // photo counts are diffed straight from disk vs the DB and stay reliable
+    // even when model info couldn't be read, so a transient model-info hiccup
+    // must never silently skip indexing real, known changes. Old behaviour
+    // (ask, which under --yes short-circuits to the default of true) must
+    // still apply here.
+    const originalCreateInterface = require("readline/promises").createInterface;
+    const createInterface = jest.fn(() => ({
+      question: async () => "y",
+      close: () => {},
+    }));
+    require("readline/promises").createInterface = createInterface;
+
+    try {
+      const plan = await resolveExecutionPlan({
+        args: {
+          dryRun: false,
+          fastTrack: true,
+          yes: true,
+          json: false,
+          indexOnly: false,
+          deploy: false,
+          force: false,
+          skipPull: false,
+          skipBuild: true,
+        },
+        report: {
+          summary: { newPhotos: 3, removedPhotos: 0 },
+          db: { missingEmbeddingCount: 0, staleEmbeddingCount: 0, modelInfoUnavailable: true },
+        },
+      });
+
+      expect(plan.runIndex).toBe(true);
+    } finally {
+      require("readline/promises").createInterface = originalCreateInterface;
+    }
+  });
+
+  it("still runs indexing under --yes when model info is unavailable but photos were removed on disk", async () => {
+    const originalCreateInterface = require("readline/promises").createInterface;
+    require("readline/promises").createInterface = () => ({
+      question: async () => "y",
+      close: () => {},
+    });
+
+    try {
+      const plan = await resolveExecutionPlan({
+        args: {
+          dryRun: false,
+          fastTrack: true,
+          yes: true,
+          json: false,
+          indexOnly: false,
+          deploy: false,
+          force: false,
+          skipPull: false,
+          skipBuild: true,
+        },
+        report: {
+          summary: { newPhotos: 0, removedPhotos: 2 },
+          db: { missingEmbeddingCount: 0, staleEmbeddingCount: 0, modelInfoUnavailable: true },
+        },
+      });
+
+      expect(plan.runIndex).toBe(true);
+    } finally {
+      require("readline/promises").createInterface = originalCreateInterface;
+    }
+  });
+
   it("checks Vercel up front when a fast-track plan builds or deploys", () => {
     const args = {
       indexOnly: false,

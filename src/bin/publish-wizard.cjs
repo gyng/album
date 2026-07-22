@@ -86,14 +86,23 @@ const main = async ({ args, context, services, now, log, error, setExitCode }) =
       // Model info was unavailable, so the earlier "index changes?" signal was
       // forced true and is unreliable — declining to index here does not mean
       // the DB is actually clean. Never silently treat that unknown state as
-      // safe: ask an explicit second confirmation before continuing to
-      // build/deploy, unless this is an unattended --yes run, where prompting
-      // is impossible and auto-launching a likely-broken indexer would be
-      // worse than skipping (see resolveExecutionPlan).
+      // safe: ask an explicit second confirmation before continuing, unless
+      // this is an unattended --yes run, where prompting is impossible and
+      // auto-launching a likely-broken indexer would be worse than skipping
+      // (see resolveExecutionPlan).
+      //
+      // Path-coverage verification still runs right after this regardless of
+      // the answer (only the index UPDATE and embedding/model checks are
+      // skipped), and --index-only runs never build or deploy anything, so
+      // the copy must not claim otherwise.
+      const proceedPrompt = args.indexOnly
+        ? "Proceed without updating the index? Path verification still runs; embedding checks stay unknown."
+        : "Proceed with build and deploy without updating the index? Path verification still runs; embedding checks stay unknown.";
+
       const proceedWithoutIndex = args.yes
         ? true
         : await services.askYesNo({
-            prompt: "Proceed with build and deploy without index verification?",
+            prompt: proceedPrompt,
             defaultValue: false,
             yes: args.yes,
           });
@@ -103,7 +112,7 @@ const main = async ({ args, context, services, now, log, error, setExitCode }) =
       }
 
       error(
-        "\nWARNING: indexer model info was unavailable, so index state is unknown — proceeding without index verification.",
+        "\nWARNING: indexer model info was unavailable, so index state is unknown — proceeding without updating the index. Path verification still runs; embedding checks stay unknown.",
       );
     } else {
       await services.runShellCommand({ command: "npm run index:update", cwd: context.srcDir });
@@ -129,7 +138,9 @@ const main = async ({ args, context, services, now, log, error, setExitCode }) =
     completedAt: now().toISOString(),
   };
   services.writeReport(context.reportPath, finalReport);
-  services.printVerificationReport(verification);
+  services.printVerificationReport(verification, {
+    modelInfoUnavailable: Boolean(report.db?.modelInfoUnavailable),
+  });
 
   if (args.json) {
     log(`\n${JSON.stringify(finalReport, null, 2)}`);

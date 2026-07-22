@@ -1056,6 +1056,64 @@ describe("publish wizard boundary adapters", () => {
     log.mockRestore();
   });
 
+  it("warns in the final verification output when model info was unavailable, even though the rest is all-clear", () => {
+    // Regression: a one-shot warning earlier in the run was the only signal
+    // that embedding checks were skipped; the final "Index Verification"
+    // block printed a fully green report with no repeated caveat, even
+    // though finalReport JSON still carries modelInfoUnavailable: true.
+    const log = jest.spyOn(console, "log").mockImplementation(() => undefined);
+    printVerificationReport(
+      {
+        imageCount: 5,
+        embeddingsCount: 5,
+        indexedCoveragePercent: 100,
+        ok: true,
+        discoveredPhotoCount: 5,
+        newPhotoCount: 0,
+        missingPhotoPaths: [],
+        missingNewPhotoPaths: [],
+        missingEmbeddingPaths: [],
+        newPhotoCoveragePercent: 100,
+        newEmbeddingCoveragePercent: null,
+        warnings: [],
+        blockers: [],
+      },
+      { modelInfoUnavailable: true },
+    );
+
+    const warnLine = log.mock.calls
+      .map((args) => args[0])
+      .find((line) => line.includes("model info unavailable"));
+    expect(warnLine).toBeDefined();
+    expect(warnLine).toContain("[WARN]");
+    log.mockRestore();
+  });
+
+  it("prints no model-info caveat in the final verification output when model info was available", () => {
+    const log = jest.spyOn(console, "log").mockImplementation(() => undefined);
+    printVerificationReport({
+      imageCount: 5,
+      embeddingsCount: 5,
+      indexedCoveragePercent: 100,
+      ok: true,
+      discoveredPhotoCount: 5,
+      newPhotoCount: 0,
+      missingPhotoPaths: [],
+      missingNewPhotoPaths: [],
+      missingEmbeddingPaths: [],
+      newPhotoCoveragePercent: 100,
+      newEmbeddingCoveragePercent: null,
+      warnings: [],
+      blockers: [],
+    });
+
+    const warnLine = log.mock.calls
+      .map((args) => args[0])
+      .find((line) => line.includes("model info unavailable"));
+    expect(warnLine).toBeUndefined();
+    log.mockRestore();
+  });
+
   it("prints a clean preflight with no attention albums", () => {
     const log = jest.spyOn(console, "log").mockImplementation(() => undefined);
     printPreflightReport({
