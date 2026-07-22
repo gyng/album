@@ -88,6 +88,7 @@ import {
   normaliseTopic,
   shouldAbortPendingTopicOnEmbeddingsError,
   shouldEnableTopicEmbeddings,
+  SlideChangeSource,
   TOPIC_EMBEDDINGS_UNAVAILABLE_MESSAGE,
   TopicSnapshot,
 } from "../../util/slideshowTopic";
@@ -309,6 +310,12 @@ export const Slideshow: React.FC<{
   // Mirror of the embeddings-DB load error, read inside the topic submit without
   // re-creating the callback when it toggles.
   const embeddingsErrorRef = React.useRef<Error | null>(null);
+  // The embeddings-DB error object that was present when a topic was DEFERRED to
+  // wait on the DB (and retryEmbeddings() fired). The abort effect compares
+  // identity against this so the STALE error that triggered the retry does not
+  // insta-kill the fresh deferral in the same commit — only a genuinely NEW
+  // failure that arrives afterwards aborts the wait.
+  const errorAtDeferralRef = React.useRef<Error | null>(null);
 
   // Check for a new build manifest we control and reload when one is detected.
   useEffect(() => {
@@ -812,11 +819,13 @@ export const Slideshow: React.FC<{
   // tick, alignment) lives in a hook. The timer fires goNext, which is defined
   // below and changes identity — so the hook receives a STABLE wrapper over a
   // ref to the latest goNext (assigned right after goNext is created).
-  const goNextRef = React.useRef<() => void>(
+  const goNextRef = React.useRef<(source: SlideChangeSource) => void>(
     /* istanbul ignore next -- replaced during the same render before the cadence can invoke it */
     () => {},
   );
-  const advanceFromCadence = useCallback(() => goNextRef.current(), []);
+  // The cadence timer is an app-driven advance: it must never move the
+  // user-navigation counter that stales an in-flight topic seed.
+  const advanceFromCadence = useCallback(() => goNextRef.current("app"), []);
   const {
     secondsLeft,
     time,
@@ -838,7 +847,8 @@ export const Slideshow: React.FC<{
       // NB: a commit does NOT advance the user-navigation counter. This runs for
       // every slide, including app-driven ones (cadence advances, pool reloads,
       // the topic seed's own commit) that must not burn an in-flight topic seed.
-      // User intent is counted at the manual advance handlers and showHistoryPhoto.
+      // User intent is counted by goNext / showHistoryPhoto, each threading the
+      // provenance of its own caller.
       if (opts?.trackRecent) {
         recentPhotoPathsRef.current = [candidatePhoto.path, ...recentPhotoPathsRef.current].slice(
           0,
@@ -952,13 +962,16 @@ export const Slideshow: React.FC<{
   );
 
   const showHistoryPhoto = useCallback(
-    (index: number): RandomPhotoRow | null => {
+    (index: number, source: SlideChangeSource): RandomPhotoRow | null => {
       const entry = historyStateRef.current.history[index]!;
 
-      // Previous / forward replay is a user-initiated navigation: advance the
-      // user-navigation counter so an in-flight topic seed that the user has
-      // moved past is abandoned rather than clobbering the slide they chose.
-      userNavCountRef.current = advanceUserNavCount(userNavCountRef.current, "user");
+      // A history replay carries its caller's provenance. Previous and a manual
+      // Next are user intent — advance the counter so an in-flight topic seed the
+      // user moved past is abandoned rather than clobbering the slide they chose.
+      // But a cadence tick or a broken-image auto-skip that happens to land on a
+      // recorded forward entry is app-driven and must NOT burn a topic the user
+      // just typed, so it passes "app" and the counter stays put.
+      userNavCountRef.current = advanceUserNavCount(userNavCountRef.current, source);
 
       // Just move the cursor — the current slide (seed + the original remix
       // layout) re-derives from history[index], so Previous/Next replays
@@ -1052,6 +1065,11 @@ export const Slideshow: React.FC<{
         setTopicError(null);
         setTopicBusy(true);
         setTopicAwaitingEmbeddings(true);
+        // Remember which error (if any) was present as we deferred, so the abort
+        // effect can tell this stale error — the one we are retrying past — from
+        // a genuinely new failure. Without this the effect re-runs in the same
+        // commit, still sees the stale error, and insta-kills this fresh submit.
+        errorAtDeferralRef.current = embeddingsErrorRef.current;
         // If a previous embeddings load FAILED, this submit re-triggers it so a
         // retry doesn't sit forever behind the errored (but still-enabled) hook.
         if (embeddingsErrorRef.current) {
@@ -1186,9 +1204,15 @@ export const Slideshow: React.FC<{
   // pending/busy/progress state and surface a distinct error. The next submit
   // re-triggers the load via retryEmbeddings() (see seedTopic).
   useEffect(() => {
+    // Only a NEW failure aborts a fresh deferral. When a topic submitted after a
+    // prior failure defers and fires retryEmbeddings(), this effect re-runs in
+    // the same commit with the SAME (stale) error object still non-null — that
+    // error is the one being retried past, not a fresh failure, so ignore it.
+    const isNewEmbeddingsError =
+      embeddingsError !== null && embeddingsError !== errorAtDeferralRef.current;
     if (
       !shouldAbortPendingTopicOnEmbeddingsError({
-        hasEmbeddingsError: embeddingsError !== null,
+        hasEmbeddingsError: isNewEmbeddingsError,
         topicAwaitingEmbeddings,
         hasDeferredTopic: pendingTopicRef.current !== null,
         hasPendingInitialTopic,
@@ -1261,24 +1285,24 @@ export const Slideshow: React.FC<{
 
   // Safety net for a mode flip that did NOT go through handleSelectMode — most
   // notably a cross-tab localStorage sync of `slideshow-mode` (usehooks-ts fires
-  // storage events across tabs). If the mode lands on anything other than
-  // "similar" while a topic is active or pending, apply the same implicit
-  // dismissal so the chip, URL, and mode stay consistent. Guarded by the
-  // mode !== "similar" check so seedTopic's own switch to "similar" and
-  // clearTopic's restore (which clears the topic first) do not trip it.
+  // storage events across tabs). If a COMMITTED topic (chip visible) sees the
+  // mode leave "similar", apply the same implicit dismissal so the chip, URL,
+  // and mode stay consistent.
+  //
+  // Scope is deliberately narrow: only a committed topic (`topic !== null`), NOT
+  // a pending/busy submission. A submission made while the mode is still
+  // weighted/random renders `topicBusy` with the OLD (non-similar) mode during
+  // its pre-success window; keying this effect on busy/pending state made it
+  // fire in that window and cancel every fresh submit before it could switch to
+  // similar. Pending seeds are already protected by the token + mode-at-submit
+  // staleness guard, so they do not belong here. The mode !== "similar" check
+  // still lets seedTopic's own switch to "similar" and clearTopic's restore
+  // (which clears the topic first) pass without tripping.
   useEffect(() => {
     if (slideshowMode === "similar") {
       return;
     }
-    if (
-      !isTopicActive({
-        topic,
-        topicBusy,
-        hasDeferredTopic: pendingTopicRef.current !== null,
-        hasUnconsumedInitialTopic:
-          !initialTopicSeededRef.current && initialTopicRef.current !== null,
-      })
-    ) {
+    if (topic === null) {
       return;
     }
     topicSnapshotRef.current = null;
@@ -1289,7 +1313,7 @@ export const Slideshow: React.FC<{
     setTopic(null);
     setTopicError(null);
     updateSlideshowUrl(slideshowMode, timeDelayRef.current, null);
-  }, [slideshowMode, topic, topicBusy, cancelTopicSeeding, updateSlideshowUrl]);
+  }, [slideshowMode, topic, cancelTopicSeeding, updateSlideshowUrl]);
 
   // Seed a shared/bookmarked `topic=` frame once, after the pool AND the
   // embeddings DB have loaded — the encode needs something to rank against, and
@@ -1559,41 +1583,56 @@ export const Slideshow: React.FC<{
     shuffleHistorySize,
   ]);
 
-  const goNext = useCallback(() => {
-    if (!database) {
-      return;
-    }
+  // `source` is the provenance of whatever triggered this advance: "user" for a
+  // manual next (keyboard / toolbar / gesture / click / remix), "app" for the
+  // cadence timer and the broken-image auto-skip. It is threaded all the way
+  // through so a forward-history replay or a real advance only counts as user
+  // navigation — and thus only stales an in-flight topic seed — when the user
+  // actually asked for it.
+  const goNext = useCallback(
+    (source: SlideChangeSource) => {
+      if (!database) {
+        return;
+      }
 
-    // A pending forced remix ("Remix now" / drag-up) must produce a brand-new
-    // remixed slide. Skip replaying recorded forward history in that case and
-    // fall through to a real advance, which truncates forward history and
-    // honours the forceRemix flag. Without this, pressing "Remix now" while
-    // back in history silently stepped forward with no remix and left the
-    // flag armed to fire on a later, unexpected advance.
-    if (!forceRemixRef.current && hasForwardEntry(historyStateRef.current)) {
-      showHistoryPhoto(historyStateRef.current.index + 1);
-      return;
-    }
+      // A pending forced remix ("Remix now" / drag-up) must produce a brand-new
+      // remixed slide. Skip replaying recorded forward history in that case and
+      // fall through to a real advance, which truncates forward history and
+      // honours the forceRemix flag. Without this, pressing "Remix now" while
+      // back in history silently stepped forward with no remix and left the
+      // flag armed to fire on a later, unexpected advance.
+      if (!forceRemixRef.current && hasForwardEntry(historyStateRef.current)) {
+        showHistoryPhoto(historyStateRef.current.index + 1, source);
+        return;
+      }
 
-    if (slideshowMode === "random" || slideshowMode === "weighted") {
-      advanceRandomPhoto();
-      return;
-    }
+      // A real forward advance (no recorded forward entry to replay): count user
+      // intent here — showHistoryPhoto owns the replay branch — so an app-driven
+      // advance never moves the counter and never burns a fresh topic seed.
+      userNavCountRef.current = advanceUserNavCount(userNavCountRef.current, source);
 
-    // Similar mode: advanceSimilarPhoto falls back to a random advance when the
-    // embeddings DB isn't ready, so the show never freezes waiting on it.
-    advanceSimilarPhoto().catch((err) => {
-      console.error(err);
-      advanceRandomPhoto({ trackRecent: true });
-    });
-  }, [advanceRandomPhoto, advanceSimilarPhoto, database, showHistoryPhoto, slideshowMode]);
+      if (slideshowMode === "random" || slideshowMode === "weighted") {
+        advanceRandomPhoto();
+        return;
+      }
+
+      // Similar mode: advanceSimilarPhoto falls back to a random advance when the
+      // embeddings DB isn't ready, so the show never freezes waiting on it.
+      advanceSimilarPhoto().catch((err) => {
+        console.error(err);
+        advanceRandomPhoto({ trackRecent: true });
+      });
+    },
+    [advanceRandomPhoto, advanceSimilarPhoto, database, showHistoryPhoto, slideshowMode],
+  );
 
   const goPrevious = useCallback(() => {
     if (!canGoBack(historyStateRef.current)) {
       return;
     }
 
-    showHistoryPhoto(historyStateRef.current.index - 1);
+    // Previous is always a deliberate user navigation.
+    showHistoryPhoto(historyStateRef.current.index - 1, "user");
   }, [showHistoryPhoto]);
 
   const getUpcomingPhoto = useCallback((): RandomPhotoRow | null => {
@@ -1668,26 +1707,30 @@ export const Slideshow: React.FC<{
     }
   }, []);
 
-  // App-driven advance: no user-navigation increment. Used by the broken-image
-  // retry (a 404 auto-skip is not a user gesture) so it can't burn a topic seed.
-  const advanceCurrentSlide = useCallback(() => {
-    clearImageErrorRetry();
-    setImageLoaded(false);
-    goNext();
-  }, [clearImageErrorRetry, goNext]);
+  // Cancel any pending image-error retry, reset the load flag, and advance —
+  // threading the caller's provenance into goNext so only genuine user intent
+  // moves the topic-seed stale counter.
+  const advanceCurrentSlide = useCallback(
+    (source: SlideChangeSource) => {
+      clearImageErrorRetry();
+      setImageLoaded(false);
+      goNext(source);
+    },
+    [clearImageErrorRetry, goNext],
+  );
 
   // The manual next handler (keyboard / toolbar / gesture / click / remix): a
   // fresh user intent that supersedes an in-flight topic seed.
   const advanceToNextPhoto = useCallback(() => {
-    userNavCountRef.current = advanceUserNavCount(userNavCountRef.current, "user");
-    advanceCurrentSlide();
+    advanceCurrentSlide("user");
   }, [advanceCurrentSlide]);
 
   const scheduleImageErrorRetry = useCallback(() => {
     clearImageErrorRetry();
     imageErrorRetryTimerRef.current = window.setTimeout(() => {
       imageErrorRetryTimerRef.current = null;
-      advanceCurrentSlide();
+      // A 404 auto-skip is app-driven, not a user gesture.
+      advanceCurrentSlide("app");
     }, 1000);
   }, [advanceCurrentSlide, clearImageErrorRetry]);
 
