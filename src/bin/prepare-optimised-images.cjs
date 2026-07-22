@@ -3,23 +3,38 @@ const path = require("node:path");
 const sharp = require("sharp");
 const imageOptimisationConfig = require("../services/imageOptimisationConfig.json");
 
-// Mirrors video.ts's own VIDEO_EXTENSIONS list. Duplicated (not imported)
-// because this is a plain Node CJS script with no TypeScript loader — same
-// reasoning cleanup-optimised-media.cjs already documents for its copy.
-const VIDEO_EXTENSIONS = new Set([".mp4", ".mov", ".m4v", ".webm", ".mkv", ".avi"]);
 const RESIZED_IMAGE_DIR = ".resized_images";
 const TEMP_FILE_SEPARATOR = ".tmp-";
+// A stray "<output>.tmp-<pid>" temp file older than this is assumed to be
+// left behind by a process that died mid-encode. Anything younger might
+// belong to a concurrent encoder (e.g. the dev server's photo.ts) that is
+// still writing it — deleting that out from under it makes its renameSync
+// throw ENOENT.
+const STALE_TEMP_FILE_THRESHOLD_MS = 15 * 60 * 1000;
 
 // album.ts's listAlbumMediaFiles + getAlbumWithoutManifest treat every
 // non-JSON, non-video file in an album directory as a photo passed to
 // photo.ts's optimiseImages() — there is no image-extension allowlist
-// upstream. Match that here by exclusion rather than a fixed allowlist so
-// this warm-cache pass stays in parity with what the real build will encode.
+// upstream, so a RAW file (e.g. the committed `DSCF2770.RAF` fixture) or any
+// other sharp-undecodable format reaches the real build's encoder too. This
+// warm-cache pass only pre-populates the AVIF cache as an optimisation, so it
+// allowlists the extensions sharp actually decodes and the build serves —
+// case-insensitively, which also excludes WSL2 `:Zone.Identifier` sidecars,
+// odd-case `.JSON`, and RAW/undecodable formats outright rather than relying
+// on a per-file encode failure to skip them.
+const PHOTO_EXTENSIONS = new Set([
+  ".jpg",
+  ".jpeg",
+  ".png",
+  ".webp",
+  ".avif",
+  ".gif",
+  ".tif",
+  ".tiff",
+]);
+
 const isPhotoFile = (filename) => {
-  if (/\.json$/i.test(filename)) {
-    return false;
-  }
-  return !VIDEO_EXTENSIONS.has(path.extname(filename).toLowerCase());
+  return PHOTO_EXTENSIONS.has(path.extname(filename).toLowerCase());
 };
 
 // withFileTypes() reports isDirectory()/isFile() as false for symlinks, so a
@@ -118,10 +133,16 @@ const isUsableCacheFile = async (target) => {
 // behind a "<output>.tmp-<pid>" file from a previous run. It's never read as
 // a cache hit (isUsableCacheFile only looks at the exact output path), but it
 // is silent disk litter — clear out any stray temp siblings for the variants
-// we're about to (re)encode.
+// we're about to (re)encode. Only delete a temp file if it's ours (our own
+// pid — left by an earlier, already-finished attempt in this same process,
+// e.g. a retry) or old enough to be considered abandoned: a fresh
+// foreign-pid temp file may belong to a concurrent encoder (the dev server's
+// photo.ts) that is still writing it, and deleting it out from under that
+// writer makes its renameSync throw ENOENT.
 const cleanupStrayTempFiles = (output) => {
   const dir = path.dirname(output);
   const prefix = `${path.basename(output)}${TEMP_FILE_SEPARATOR}`;
+  const ownPidSuffix = `${TEMP_FILE_SEPARATOR}${process.pid}`;
   let entries;
   try {
     entries = fs.readdirSync(dir);
@@ -136,8 +157,23 @@ const cleanupStrayTempFiles = (output) => {
     if (!entry.startsWith(prefix)) {
       continue;
     }
+    const entryPath = path.join(dir, entry);
+    if (!entry.endsWith(ownPidSuffix)) {
+      let stat;
+      try {
+        stat = fs.statSync(entryPath);
+      } catch (err) {
+        if (err.code === "ENOENT") {
+          continue;
+        }
+        throw err;
+      }
+      if (Date.now() - stat.mtimeMs < STALE_TEMP_FILE_THRESHOLD_MS) {
+        continue;
+      }
+    }
     try {
-      fs.unlinkSync(path.join(dir, entry));
+      fs.unlinkSync(entryPath);
     } catch (err) {
       if (err.code !== "ENOENT") {
         throw err;
@@ -172,11 +208,15 @@ const encodeVariant = (sourcePipeline, { size, output }) => {
     });
 };
 
-// Runs `work` over `items` with up to `jobs` items in flight at once. On
-// error, workers stop picking up new items but any already-started item is
-// allowed to finish (drain) before the pool rejects — the CLI entry point's
-// `process.exit(1)` must never fire while another worker is still mid-write,
-// or it truncates an unrelated file.
+// Runs `work` over `items` with up to `jobs` items in flight at once. Per-file
+// encode failures are caught inside `work` itself (see prepareOptimisedImages
+// below) and never reach this pool, so in practice `work` only throws for
+// something outside a single photo's encode — e.g. a failed mkdirSync. On
+// such an error, workers stop picking up new items but any already-started
+// item is allowed to finish before the pool rejects; that item's own
+// in-flight variant writes are awaited (not merely left running) because
+// `work` awaits its Promise.allSettled before returning, so a rejection here
+// still can't race a sibling variant's write.
 const runPool = async (items, jobs, work) => {
   let nextIndex = 0;
   let firstError = null;
@@ -217,6 +257,7 @@ const prepareOptimisedImages = async ({
     photosEncoded: 0,
     variantsEncoded: 0,
     variantsCached: 0,
+    failures: [],
     jobs,
     durationMs: 0,
   };
@@ -237,12 +278,43 @@ const prepareOptimisedImages = async ({
 
     fs.mkdirSync(outputDir, { recursive: true });
     const sourcePipeline = sharp(source).rotate();
-    await Promise.all(missing.map((variant) => encodeVariant(sourcePipeline, variant)));
-    summary.photosEncoded += 1;
-    summary.variantsEncoded += missing.length;
+    // This pre-warm pass is only an optimisation: Promise.allSettled (not
+    // Promise.all) so one variant failing to encode — a source file that is
+    // technically a listed photo extension but that sharp still can't decode
+    // — doesn't abandon its sibling variants mid-write and doesn't abort the
+    // whole pool. The real build encodes every photo it actually needs and
+    // will surface a genuinely broken file there instead.
+    const results = await Promise.allSettled(
+      missing.map((variant) => encodeVariant(sourcePipeline, variant)),
+    );
+
+    let encodedCount = 0;
+    results.forEach((result, index) => {
+      if (result.status === "fulfilled") {
+        encodedCount += 1;
+        return;
+      }
+      const { size, output } = missing[index];
+      const message = result.reason instanceof Error ? result.reason.message : String(result.reason);
+      summary.failures.push({ albumName, filename, size, output, message });
+      console.warn(`Could not pre-warm ${output} (will be re-attempted by the real build): ${message}`);
+    });
+
+    if (encodedCount > 0) {
+      summary.photosEncoded += 1;
+    }
+    summary.variantsEncoded += encodedCount;
   });
 
   summary.durationMs = Date.now() - startedAt;
+  if (summary.failures.length > 0) {
+    console.warn(
+      `${summary.failures.length} variant(s) could not be pre-warmed and were skipped:`,
+    );
+    for (const failure of summary.failures) {
+      console.warn(`  - ${failure.output}: ${failure.message}`);
+    }
+  }
   return summary;
 };
 

@@ -16,10 +16,11 @@ export const AVIF_OPTIONS = {
   tune: imageOptimisationConfig.avif.tune as "iq",
   chromaSubsampling: imageOptimisationConfig.avif.chromaSubsampling as "4:4:4",
 } as const;
-// sharp strips the ICC profile without converting pixel values on its own;
-// left alone, a Display P3 source gets its wide-gamut pixels reinterpreted as
-// sRGB by browsers, visibly desaturating the output. withIccProfile("srgb")
-// converts pixel data to sRGB and tags the output correctly.
+// sharp already converts an embedded-profile input's pixel data to sRGB by
+// default; withIccProfile("srgb") only tags the output with that profile
+// explicitly rather than performing the conversion itself. Without the tag,
+// a browser that doesn't assume sRGB for untagged AVIF can render the pixels
+// with the wrong colour space, visibly shifting the output.
 export const ICC_PROFILE = imageOptimisationConfig.iccProfile;
 const TEMP_FILE_SEPARATOR = ".tmp-";
 
@@ -178,10 +179,16 @@ export const stripPublicFromPath = (p: string) => {
 // "<newFile>.tmp-<pid>" file from a previous run behind. It's never read as a
 // cache hit (the cache check only looks at the exact final path), but it is
 // silent disk litter — clear out any stray temp siblings for the variant
-// we're about to (re)encode.
+// we're about to (re)encode. Only our own pid's temp files or stale ones are
+// removed: a fresh foreign-pid temp may be mid-write by a concurrent encoder
+// (prepare:images alongside next dev), and deleting it out from under that
+// writer makes its renameSync throw ENOENT.
+const STALE_TEMP_FILE_THRESHOLD_MS = 15 * 60 * 1000;
+
 const cleanupStrayTempFiles = (finalPath: string) => {
   const dir = path.dirname(finalPath);
   const prefix = `${path.basename(finalPath)}${TEMP_FILE_SEPARATOR}`;
+  const ownPidSuffix = `${TEMP_FILE_SEPARATOR}${process.pid}`;
   let entries: string[];
   try {
     entries = fs.readdirSync(dir);
@@ -196,8 +203,23 @@ const cleanupStrayTempFiles = (finalPath: string) => {
     if (!entry.startsWith(prefix)) {
       continue;
     }
+    const entryPath = path.join(dir, entry);
+    if (!entry.endsWith(ownPidSuffix)) {
+      let stat: fs.Stats;
+      try {
+        stat = fs.statSync(entryPath);
+      } catch (err) {
+        if ((err as NodeJS.ErrnoException).code === "ENOENT") {
+          continue;
+        }
+        throw err;
+      }
+      if (Date.now() - stat.mtimeMs < STALE_TEMP_FILE_THRESHOLD_MS) {
+        continue;
+      }
+    }
     try {
-      fs.unlinkSync(path.join(dir, entry));
+      fs.unlinkSync(entryPath);
     } catch (err) {
       if ((err as NodeJS.ErrnoException).code !== "ENOENT") {
         throw err;

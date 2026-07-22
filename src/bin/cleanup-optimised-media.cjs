@@ -150,7 +150,19 @@ const cleanupVideoCache = ({ albumDir, publicAlbumDir }) => {
 // Conservative: only the two known cache directories are ever deleted, plus
 // the now-empty public album directory if nothing else remains in it — no
 // other content.
+//
+// Guarded the same way as the image-cache-config sentinel write below: if
+// `albumNames` has no real (non-`test-`) album at all — `albums/` missing or
+// unmounted, or a fresh clone/CI checkout where only the committed `test-*`
+// fixtures exist — every real album name in `albumNames` would be empty, so
+// every real album's public cache would look orphaned and get deleted. Skip
+// the sweep entirely in that case rather than mass-deleting real caches.
 const removeOrphanedAlbumMediaCaches = ({ publicAlbumsDir, albumNames }) => {
+  const hasRealAlbum = albumNames.some((name) => !name.startsWith("test-"));
+  if (!hasRealAlbum) {
+    return 0;
+  }
+
   const knownAlbums = new Set(albumNames);
   let removedOrphanedAlbums = 0;
 

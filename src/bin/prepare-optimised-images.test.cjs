@@ -165,6 +165,10 @@ describe("prepareOptimisedImages", () => {
     fs.mkdirSync(cacheDir, { recursive: true });
     fs.writeFileSync(source, "source");
     fs.writeFileSync(strayTemp, "leftover from a crashed run");
+    // Backdate it past the staleness threshold — a crashed run's temp file is
+    // old, unlike one a concurrent encoder might still be actively writing.
+    const old = new Date(Date.now() - 20 * 60 * 1000);
+    fs.utimesSync(strayTemp, old, old);
 
     mockSharpPipeline();
 
@@ -175,8 +179,8 @@ describe("prepareOptimisedImages", () => {
     expect(listTempFiles(cacheDir)).toEqual([]);
   });
 
-  it("drains an in-flight encode to completion before rejecting when a sibling item fails", async () => {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), "album-image-drain-"));
+  it("does not abort a sibling item's encode when one photo's encode fails", async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "album-image-sibling-failure-"));
     const albumsDir = path.join(root, "albums");
     const publicAlbumsDir = path.join(root, "public", "data", "albums");
     const failAlbumDir = path.join(albumsDir, "fails");
@@ -193,8 +197,7 @@ describe("prepareOptimisedImages", () => {
     fs.writeFileSync(failSource, "source");
     fs.writeFileSync(okSource, "source");
     // Pre-cache the 3200/1600 variants for both photos so each only has a
-    // single 800px variant left to encode, keeping one in-flight encode per
-    // worker so the drain behaviour is unambiguous.
+    // single 800px variant left to encode.
     for (const dir of [failCacheDir, okCacheDir]) {
       fs.writeFileSync(path.join(dir, "photo.jpg@3200.avif"), "cached");
       fs.writeFileSync(path.join(dir, "photo.jpg@1600.avif"), "cached");
@@ -236,14 +239,20 @@ describe("prepareOptimisedImages", () => {
       return { metadata };
     });
 
-    await expect(
-      prepareOptimisedImages({ albumsDir, publicAlbumsDir, jobs: 2, includeTestAlbums: false }),
-    ).rejects.toBe(encodeError);
+    // One photo failing to encode no longer aborts the pool or the overall
+    // run: the promise resolves, the sibling photo still gets encoded, and
+    // the failure is reported in the summary instead.
+    const summary = await prepareOptimisedImages({
+      albumsDir,
+      publicAlbumsDir,
+      jobs: 2,
+      includeTestAlbums: false,
+    });
 
-    // The sibling worker's already-started encode was allowed to finish
-    // (drain) rather than being torn down mid-write by an early exit.
     expect(fs.readFileSync(okOutput, "utf8")).toBe("generated");
     expect(listTempFiles(okCacheDir)).toEqual([]);
+    expect(summary.failures).toHaveLength(1);
+    expect(summary.failures[0]).toMatchObject({ albumName: "fails", filename: "photo.jpg" });
   });
 
   it("follows symlinked album directories and symlinked photo files", async () => {
@@ -270,7 +279,7 @@ describe("prepareOptimisedImages", () => {
     ).toBe(true);
   });
 
-  it("treats every non-JSON, non-video file as a photo (matches photo.ts's build-time optimiser, which has no extension allowlist)", async () => {
+  it("only recognises an allowlist of extensions sharp can decode, case-insensitively", async () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "album-image-extensions-"));
     const albumsDir = path.join(root, "albums");
     const publicAlbumsDir = path.join(root, "public", "data", "albums");
@@ -279,14 +288,153 @@ describe("prepareOptimisedImages", () => {
     fs.mkdirSync(albumDir, { recursive: true });
     fs.writeFileSync(path.join(albumDir, "photo.jpg"), "source");
     fs.writeFileSync(path.join(albumDir, "photo.png"), "source");
+    fs.writeFileSync(path.join(albumDir, "SCREAMING.JPG"), "source");
     fs.writeFileSync(path.join(albumDir, "album.json"), "{}");
+    fs.writeFileSync(path.join(albumDir, "ALBUM.JSON"), "{}");
     fs.writeFileSync(path.join(albumDir, "clip.mp4"), "source");
+    // A committed RAW fixture (e.g. albums/test-manifest/DSCF2770.RAF) is
+    // undecodable by sharp; it must never reach the encoder.
+    fs.writeFileSync(path.join(albumDir, "raw.RAF"), "source");
+    // A WSL2 NTFS zone-identifier sidecar extracted as a real file.
+    fs.writeFileSync(path.join(albumDir, "photo.jpg:Zone.Identifier"), "source");
 
     mockSharpPipeline();
 
     const summary = await prepareOptimisedImages({ albumsDir, publicAlbumsDir, jobs: 1 });
 
-    // Only photo.jpg and photo.png are photos; album.json and clip.mp4 are not.
-    expect(summary.photosDiscovered).toBe(2);
+    // Only photo.jpg, photo.png, and SCREAMING.JPG are recognised photos.
+    expect(summary.photosDiscovered).toBe(3);
+  });
+
+  it("skips a RAW file undecodable by sharp without any error", async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "album-image-raw-"));
+    const albumsDir = path.join(root, "albums");
+    const publicAlbumsDir = path.join(root, "public", "data", "albums");
+    const albumDir = path.join(albumsDir, "trip");
+
+    fs.mkdirSync(albumDir, { recursive: true });
+    fs.writeFileSync(path.join(albumDir, "DSCF2770.RAF"), "not a decodable image");
+
+    mockSharpPipeline();
+
+    await expect(
+      prepareOptimisedImages({ albumsDir, publicAlbumsDir, jobs: 1 }),
+    ).resolves.toMatchObject({ photosDiscovered: 0, failures: [] });
+    // sharp was never even invoked for the RAW file.
+    expect(sharp).not.toHaveBeenCalled();
+  });
+
+  it("reports a source file that fails to encode in the summary instead of aborting the run", async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "album-image-corrupt-"));
+    const albumsDir = path.join(root, "albums");
+    const publicAlbumsDir = path.join(root, "public", "data", "albums");
+    const albumDir = path.join(albumsDir, "trip");
+    const cacheDir = path.join(publicAlbumsDir, "trip", ".resized_images");
+    const source = path.join(albumDir, "corrupt.jpg");
+
+    fs.mkdirSync(albumDir, { recursive: true });
+    fs.writeFileSync(source, "not actually a valid jpeg");
+
+    const encodeError = new Error("Input file contains unsupported image format");
+    mockSharpPipeline({
+      toFile: jest.fn(async () => {
+        throw encodeError;
+      }),
+    });
+
+    const summary = await prepareOptimisedImages({ albumsDir, publicAlbumsDir, jobs: 1 });
+
+    expect(summary.photosDiscovered).toBe(1);
+    expect(summary.photosEncoded).toBe(0);
+    expect(summary.variantsEncoded).toBe(0);
+    expect(summary.failures).toHaveLength(3);
+    expect(summary.failures[0]).toMatchObject({
+      albumName: "trip",
+      filename: "corrupt.jpg",
+      message: encodeError.message,
+    });
+    // No temp files left behind by the failed encodes.
+    expect(listTempFiles(cacheDir)).toEqual([]);
+  });
+
+  it("keeps a foreign-pid temp file that is still fresh, but removes a stale one", async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "album-image-temp-age-"));
+    const albumsDir = path.join(root, "albums");
+    const publicAlbumsDir = path.join(root, "public", "data", "albums");
+    const albumDir = path.join(albumsDir, "trip");
+    const cacheDir = path.join(publicAlbumsDir, "trip", ".resized_images");
+    const source = path.join(albumDir, "photo.jpg");
+    const output800 = path.join(cacheDir, "photo.jpg@800.avif");
+    const output1600 = path.join(cacheDir, "photo.jpg@1600.avif");
+    const freshForeignTemp = `${output800}.tmp-99999`;
+    const staleForeignTemp = `${output1600}.tmp-88888`;
+
+    fs.mkdirSync(albumDir, { recursive: true });
+    fs.mkdirSync(cacheDir, { recursive: true });
+    fs.writeFileSync(source, "source");
+    fs.writeFileSync(freshForeignTemp, "still being written by another process");
+    fs.writeFileSync(staleForeignTemp, "abandoned by a crashed process");
+    const old = new Date(Date.now() - 20 * 60 * 1000);
+    fs.utimesSync(staleForeignTemp, old, old);
+
+    mockSharpPipeline();
+
+    await prepareOptimisedImages({ albumsDir, publicAlbumsDir, jobs: 1 });
+
+    // The fresh foreign-pid temp file survives cleanup — it may belong to a
+    // concurrent encoder still writing it.
+    expect(fs.existsSync(freshForeignTemp)).toBe(true);
+    // The stale one (older than the threshold) is cleared out as litter.
+    expect(fs.existsSync(staleForeignTemp)).toBe(false);
+  });
+
+  it("drains an in-flight encode to completion before rejecting when an unexpected error occurs for a sibling item", async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "album-image-drain-"));
+    const albumsDir = path.join(root, "albums");
+    const publicAlbumsDir = path.join(root, "public", "data", "albums");
+    const failAlbumDir = path.join(albumsDir, "fails");
+    const okAlbumDir = path.join(albumsDir, "succeeds");
+    const okCacheDir = path.join(publicAlbumsDir, "succeeds", ".resized_images");
+    const failSource = path.join(failAlbumDir, "photo.jpg");
+    const okSource = path.join(okAlbumDir, "photo.jpg");
+
+    fs.mkdirSync(failAlbumDir, { recursive: true });
+    fs.mkdirSync(okAlbumDir, { recursive: true });
+    fs.writeFileSync(failSource, "source");
+    fs.writeFileSync(okSource, "source");
+
+    const okOutput = path.join(okCacheDir, "photo.jpg@800.avif");
+    // A failure outside any single photo's encode (e.g. mkdirSync failing —
+    // disk full, permissions) is still fatal and should abort the pool,
+    // unlike a per-file encode failure (see the "reports a source file that
+    // fails to encode" test above).
+    const mkdirError = new Error("disk full");
+    const realMkdirSync = fs.mkdirSync.bind(fs);
+    const mkdirSpy = jest.spyOn(fs, "mkdirSync").mockImplementation((dir, opts) => {
+      if (typeof dir === "string" && dir.includes(`${path.sep}fails${path.sep}`)) {
+        throw mkdirError;
+      }
+      return realMkdirSync(dir, opts);
+    });
+
+    mockSharpPipeline({
+      toFile: jest.fn(async (output) => {
+        // Give the "succeeds" album's encode time to still be in flight when
+        // the "fails" album's mkdirSync throws.
+        await new Promise((resolve) => setTimeout(resolve, 20));
+        fs.writeFileSync(output, "generated");
+        return { width: 800, height: 600 };
+      }),
+    });
+
+    await expect(
+      prepareOptimisedImages({ albumsDir, publicAlbumsDir, jobs: 2, includeTestAlbums: false }),
+    ).rejects.toBe(mkdirError);
+
+    // The sibling worker's already-started encode was allowed to finish
+    // (drain) rather than being torn down mid-write by an early exit.
+    expect(fs.readFileSync(okOutput, "utf8")).toBe("generated");
+    expect(listTempFiles(okCacheDir)).toEqual([]);
+    mkdirSpy.mockRestore();
   });
 });

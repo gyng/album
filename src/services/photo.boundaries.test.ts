@@ -112,6 +112,49 @@ describe("photo adapter boundaries", () => {
     }
   });
 
+  it("spares a fresh foreign-pid temp file from stray cleanup while removing stale ones", async () => {
+    jest.spyOn(fs, "mkdirSync").mockImplementation(() => undefined);
+    jest.spyOn(fs, "existsSync").mockReturnValue(false);
+    jest.spyOn(fs, "renameSync").mockImplementation(() => undefined);
+    jest.spyOn(console, "log").mockImplementation(() => undefined);
+    const unlink = jest.spyOn(fs, "unlinkSync").mockImplementation(() => undefined);
+
+    const foreignPid = process.pid + 1;
+    const freshForeignTemp = `photo.jpg@800.avif.tmp-${foreignPid}`;
+    const staleForeignTemp = `photo.jpg@1600.avif.tmp-${foreignPid}`;
+    const ownTemp = `photo.jpg@3200.avif.tmp-${process.pid}`;
+    jest
+      .spyOn(fs, "readdirSync")
+      .mockReturnValue([freshForeignTemp, staleForeignTemp, ownTemp] as never);
+    jest.spyOn(fs, "statSync").mockImplementation(
+      (target) =>
+        ({
+          mtimeMs: String(target).endsWith(freshForeignTemp)
+            ? Date.now()
+            : Date.now() - 60 * 60 * 1000,
+        }) as fs.Stats,
+    );
+
+    const toFile = jest.fn(async () => ({ width: 800, height: 600 }));
+    const avif = jest.fn(() => ({ toFile }));
+    const withIccProfile = jest.fn(() => ({ avif }));
+    const resize = jest.fn(() => ({ withIccProfile }));
+    const pipeline = { resize };
+    const clone = jest.fn(() => pipeline);
+    const rotate = jest.fn(() => ({ ...pipeline, clone }));
+    mockSharp.mockReturnValue({ rotate } as never);
+
+    await optimiseImages("albums/trip/photo.jpg", "public/data/albums");
+
+    const unlinked = unlink.mock.calls.map(([target]) => String(target));
+    // A fresh foreign-pid temp may be mid-write by a concurrent encoder
+    // (prepare:images alongside next dev) — deleting it would make that
+    // writer's renameSync throw ENOENT.
+    expect(unlinked.some((target) => target.endsWith(freshForeignTemp))).toBe(false);
+    expect(unlinked.some((target) => target.endsWith(staleForeignTemp))).toBe(true);
+    expect(unlinked.some((target) => target.endsWith(ownTemp))).toBe(true);
+  });
+
   it("normalises missing dimensions from the image adapter", async () => {
     mockImageSize.mockResolvedValue({ width: undefined, height: undefined, type: "jpg" });
 

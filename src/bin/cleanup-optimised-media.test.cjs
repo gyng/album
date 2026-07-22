@@ -319,12 +319,15 @@ describe("cleanupOptimisedMedia", () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "album-media-orphan-partial-"));
     const albumsDir = path.join(root, "albums");
     const publicAlbumsDir = path.join(root, "public", "data", "albums");
+    const keptAlbumDir = path.join(albumsDir, "kept");
     const orphanedPublicAlbumDir = path.join(publicAlbumsDir, "deleted-trip");
     const orphanedImageCacheDir = path.join(orphanedPublicAlbumDir, ".resized_images");
     const orphanedVideoCacheDir = path.join(orphanedPublicAlbumDir, ".resized_videos");
     const unrelatedFile = path.join(orphanedPublicAlbumDir, "notes.txt");
 
-    fs.mkdirSync(albumsDir, { recursive: true });
+    // A real (non-test-) album must still exist for the orphan sweep to run
+    // at all — see "skips the orphan sweep" tests below.
+    fs.mkdirSync(keptAlbumDir, { recursive: true });
     fs.mkdirSync(orphanedImageCacheDir, { recursive: true });
     fs.mkdirSync(orphanedVideoCacheDir, { recursive: true });
     markImageCacheCurrent(publicAlbumsDir);
@@ -348,10 +351,13 @@ describe("cleanupOptimisedMedia", () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "album-media-orphan-video-"));
     const albumsDir = path.join(root, "albums");
     const publicAlbumsDir = path.join(root, "public", "data", "albums");
+    const keptAlbumDir = path.join(albumsDir, "kept");
     const orphanedPublicAlbumDir = path.join(publicAlbumsDir, "deleted-trip");
     const orphanedVideoCacheDir = path.join(orphanedPublicAlbumDir, ".resized_videos");
 
-    fs.mkdirSync(albumsDir, { recursive: true });
+    // A real (non-test-) album must still exist for the orphan sweep to run
+    // at all — see "skips the orphan sweep" tests below.
+    fs.mkdirSync(keptAlbumDir, { recursive: true });
     fs.mkdirSync(orphanedVideoCacheDir, { recursive: true });
     markImageCacheCurrent(publicAlbumsDir);
     fs.writeFileSync(path.join(orphanedVideoCacheDir, "clip.mp4@1920.mp4"), "cached");
@@ -383,6 +389,48 @@ describe("cleanupOptimisedMedia", () => {
 
     expect(summary.removedOrphanedAlbums).toBe(0);
     expect(fs.existsSync(cachedImage)).toBe(true);
+  });
+
+  it("skips the orphan sweep and keeps a real album's public cache when only test-* albums are present", async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "album-media-orphan-test-only-"));
+    const albumsDir = path.join(root, "albums");
+    const publicAlbumsDir = path.join(root, "public", "data", "albums");
+    const testAlbumDir = path.join(albumsDir, "test-simple");
+    // "snapshots" has no matching source directory here — real albums are
+    // gitignored, so a fresh clone / CI checkout with only the committed
+    // test-* fixtures looks exactly like this on disk.
+    const realPublicAlbumDir = path.join(publicAlbumsDir, "snapshots");
+    const realImageCacheDir = path.join(realPublicAlbumDir, ".resized_images");
+    const realCachedFile = path.join(realImageCacheDir, "photo.jpg@800.avif");
+
+    fs.mkdirSync(testAlbumDir, { recursive: true });
+    fs.mkdirSync(realImageCacheDir, { recursive: true });
+    markImageCacheCurrent(publicAlbumsDir);
+    fs.writeFileSync(realCachedFile, "cached");
+
+    const summary = await cleanupOptimisedMedia({ albumsDir, publicAlbumsDir });
+
+    expect(summary.removedOrphanedAlbums).toBe(0);
+    expect(fs.existsSync(realCachedFile)).toBe(true);
+  });
+
+  it("does not delete anything when the albums directory is missing", async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "album-media-orphan-no-albums-dir-"));
+    const albumsDir = path.join(root, "albums");
+    const publicAlbumsDir = path.join(root, "public", "data", "albums");
+    const realPublicAlbumDir = path.join(publicAlbumsDir, "snapshots");
+    const realImageCacheDir = path.join(realPublicAlbumDir, ".resized_images");
+    const realCachedFile = path.join(realImageCacheDir, "photo.jpg@800.avif");
+
+    // albumsDir is never created — simulates a missing or unmounted albums/.
+    fs.mkdirSync(realImageCacheDir, { recursive: true });
+    markImageCacheCurrent(publicAlbumsDir);
+    fs.writeFileSync(realCachedFile, "cached");
+
+    const summary = await cleanupOptimisedMedia({ albumsDir, publicAlbumsDir });
+
+    expect(summary.removedOrphanedAlbums).toBe(0);
+    expect(fs.existsSync(realCachedFile)).toBe(true);
   });
 
   it("uses the repository defaults", async () => {
