@@ -7,6 +7,8 @@ import { navigateTo } from "../../util/navigate";
 import {
   buildSlideshowRuntimeUrl,
   isSlideshowRuntimeMessage,
+  planRuntimeReload,
+  RuntimeReloadTracker,
   SLIDESHOW_EXIT_MESSAGE,
   SLIDESHOW_NAVIGATE_MESSAGE,
   SLIDESHOW_SHELL_STATE_MESSAGE,
@@ -15,6 +17,15 @@ import {
 import styles from "./SlideshowShellScreen.module.css";
 
 const VERSION_POLL_MS = 300000;
+// How long a freshly mounted runtime frame has to report it is ready before the
+// shell treats it as a failed load and attempts a capped recovery reload. This
+// rescues a first-ever visit whose runtime request failed transiently: the
+// version poll cannot help because the advertised and running versions match.
+export const RUNTIME_READY_TIMEOUT_MS = 20000;
+// Give the browser's automatic (gesture-free) wake-lock acquisition a moment to
+// settle before offering the full-screen tap gate, so it does not flash and
+// swallow taps during the acquire window on every launch.
+export const AUTO_WAKE_SETTLE_MS = 1000;
 
 type VersionManifest = {
   buildVersion?: string;
@@ -56,6 +67,8 @@ export const SlideshowShellScreen = () => {
   const runtimeSearchRef = React.useRef("");
   const checkInFlightRef = React.useRef(false);
   const runtimeReadyRef = React.useRef(false);
+  const reloadTrackerRef = React.useRef<RuntimeReloadTracker | null>(null);
+  const reloadTimerRef = React.useRef<number | null>(null);
   const [runtimeFrame, setRuntimeFrame] = React.useState<RuntimeFrame | null>(null);
   const [runtimeVersion, setRuntimeVersion] = React.useState(BUILD_VERSION);
   const runtimeVersionRef = React.useRef(BUILD_VERSION);
@@ -63,6 +76,7 @@ export const SlideshowShellScreen = () => {
   const [isOnline, setIsOnline] = React.useState(true);
   const [diagnosticsOpen, setDiagnosticsOpen] = React.useState(false);
   const [wakePromptAcknowledged, setWakePromptAcknowledged] = React.useState(false);
+  const [autoWakeSettled, setAutoWakeSettled] = React.useState(false);
   const [lastCheckedAt, setLastCheckedAt] = React.useState<Date | null>(null);
   const {
     isSupported: isWakeLockSupported,
@@ -76,6 +90,11 @@ export const SlideshowShellScreen = () => {
     setIsOnline(navigator.onLine);
   }, []);
 
+  React.useEffect(() => {
+    const timer = window.setTimeout(() => setAutoWakeSettled(true), AUTO_WAKE_SETTLE_MS);
+    return () => window.clearTimeout(timer);
+  }, []);
+
   const reloadRuntime = React.useCallback((buildVersion: string) => {
     runtimeReadyRef.current = false;
     setCodeStatus("reloading");
@@ -84,6 +103,65 @@ export const SlideshowShellScreen = () => {
       generation: (current?.generation ?? -1) + 1,
     }));
   }, []);
+
+  // Reboot the runtime frame toward a target build under a per-target retry cap
+  // and escalating backoff, so a version the served bundle can never satisfy
+  // (CDN skew, a stale cached document, or a frame that never loads) stops
+  // rebooting the slideshow forever. Shared by the version poll and the
+  // readiness-recovery path.
+  const attemptRuntimeReload = React.useCallback(
+    (targetVersion: string) => {
+      const plan = planRuntimeReload(targetVersion, reloadTrackerRef.current);
+      reloadTrackerRef.current = plan.tracker;
+      if (reloadTimerRef.current !== null) {
+        window.clearTimeout(reloadTimerRef.current);
+        reloadTimerRef.current = null;
+      }
+      if (!plan.shouldReload) {
+        // Budget exhausted — hold until the target version changes again.
+        setCodeStatus("retry");
+        return;
+      }
+      if (plan.delayMs === 0) {
+        reloadRuntime(targetVersion);
+        return;
+      }
+      setCodeStatus("retry");
+      reloadTimerRef.current = window.setTimeout(() => {
+        reloadTimerRef.current = null;
+        reloadRuntime(targetVersion);
+      }, plan.delayMs);
+    },
+    [reloadRuntime],
+  );
+
+  React.useEffect(
+    () => () => {
+      if (reloadTimerRef.current !== null) {
+        window.clearTimeout(reloadTimerRef.current);
+      }
+    },
+    [],
+  );
+
+  // Recover a frame that never reports it is ready — e.g. a first-ever visit
+  // whose runtime request failed transiently, where the version poll cannot
+  // help because the advertised and running versions already match. Each new
+  // generation gets one readiness deadline; missing it triggers a capped,
+  // backed-off reload toward the version we intend to run.
+  const generation = runtimeFrame?.generation;
+  React.useEffect(() => {
+    if (generation === undefined || runtimeReadyRef.current) {
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      if (runtimeReadyRef.current) {
+        return;
+      }
+      attemptRuntimeReload(latestVersionRef.current);
+    }, RUNTIME_READY_TIMEOUT_MS);
+    return () => window.clearTimeout(timer);
+  }, [generation, attemptRuntimeReload]);
 
   const checkForCodeUpdate = React.useCallback(async () => {
     if (checkInFlightRef.current) {
@@ -115,10 +193,17 @@ export const SlideshowShellScreen = () => {
 
       latestVersionRef.current = latestVersion;
       if (decideBuildUpdate(latestVersion, runtimeVersionRef.current)) {
-        reloadRuntime(latestVersion);
+        attemptRuntimeReload(latestVersion);
         return;
       }
-      setCodeStatus(runtimeReadyRef.current ? "current" : "loading");
+      if (runtimeReadyRef.current) {
+        // Healthy: the running build matches the latest advertised one. Clear
+        // any spent retry budget so a future update starts from a full count.
+        reloadTrackerRef.current = null;
+        setCodeStatus("current");
+      } else {
+        setCodeStatus("loading");
+      }
     } catch (error) {
       console.error("Slideshow code update check failed", error);
       const online = navigator.onLine;
@@ -127,7 +212,7 @@ export const SlideshowShellScreen = () => {
     } finally {
       checkInFlightRef.current = false;
     }
-  }, [reloadRuntime]);
+  }, [attemptRuntimeReload]);
 
   React.useEffect(() => {
     void checkForCodeUpdate();
@@ -199,6 +284,10 @@ export const SlideshowShellScreen = () => {
       runtimeReadyRef.current = true;
       runtimeVersionRef.current = nextVersion;
       setRuntimeVersion(nextVersion);
+      if (nextVersion === latestVersionRef.current) {
+        // The frame loaded the intended build — clear any spent retry budget.
+        reloadTrackerRef.current = null;
+      }
       setCodeStatus(
         !navigator.onLine
           ? "offline"
@@ -244,7 +333,7 @@ export const SlideshowShellScreen = () => {
         </div>
       )}
 
-      {isWakeLockSupported && !isWakeLockActive && !wakePromptAcknowledged ? (
+      {autoWakeSettled && isWakeLockSupported && !isWakeLockActive && !wakePromptAcknowledged ? (
         <button
           type="button"
           className={styles.wakeGate}

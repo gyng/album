@@ -73,3 +73,55 @@ export const buildSlideshowRuntimeUrl = (search: string, buildVersion?: string):
   const query = params.toString();
   return `/slideshow${query ? `?${query}` : ""}`;
 };
+
+// A click the browser natively opens in a new tab/window (or is not a plain
+// primary-button click). Link handlers that call preventDefault must early-out
+// on these so cmd/ctrl/shift/alt-click and middle-click "open in new tab" keep
+// working instead of being forced into a same-tab navigation.
+export const isModifiedClick = (event: {
+  metaKey: boolean;
+  ctrlKey: boolean;
+  shiftKey: boolean;
+  altKey: boolean;
+  button: number;
+}): boolean =>
+  event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0;
+
+// Caps how many times the shell will reboot the runtime frame toward a single
+// target build before giving up. A version the served bundle can never satisfy
+// (CDN skew, or the service worker serving a stale cached /slideshow document)
+// otherwise reboots the slideshow on every poll forever.
+export const MAX_RUNTIME_RELOAD_ATTEMPTS = 3;
+// Base backoff between retries toward the same target; each retry doubles it.
+export const RUNTIME_RELOAD_BASE_DELAY_MS = 15000;
+
+export type RuntimeReloadTracker = {
+  targetVersion: string;
+  attempts: number;
+};
+
+export type RuntimeReloadPlan = {
+  shouldReload: boolean;
+  delayMs: number;
+  tracker: RuntimeReloadTracker;
+};
+
+// Decide whether to (re)mount the runtime frame toward `targetVersion`, given
+// the attempts already spent on it. A changed target resets the budget and
+// reloads immediately; retries toward the same target back off with an
+// escalating delay; once the budget is exhausted it holds (no reload) until the
+// target version itself changes.
+export const planRuntimeReload = (
+  targetVersion: string,
+  previous: RuntimeReloadTracker | null,
+): RuntimeReloadPlan => {
+  const attempts = previous?.targetVersion === targetVersion ? previous.attempts : 0;
+  if (attempts >= MAX_RUNTIME_RELOAD_ATTEMPTS) {
+    return { shouldReload: false, delayMs: 0, tracker: { targetVersion, attempts } };
+  }
+  return {
+    shouldReload: true,
+    delayMs: attempts === 0 ? 0 : RUNTIME_RELOAD_BASE_DELAY_MS * 2 ** (attempts - 1),
+    tracker: { targetVersion, attempts: attempts + 1 },
+  };
+};

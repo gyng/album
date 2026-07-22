@@ -76,6 +76,7 @@ import {
   SlideshowMode,
 } from "../../util/slideshowUrl";
 import {
+  isModifiedClick,
   isSlideshowShellStateMessage,
   SLIDESHOW_EXIT_MESSAGE,
   SLIDESHOW_NAVIGATE_MESSAGE,
@@ -1755,6 +1756,7 @@ export const Slideshow: React.FC<{
               href="/"
               className={styles.bootHomeLink}
               onClick={(event) => {
+                if (isModifiedClick(event)) return;
                 event.preventDefault();
                 exitSlideshow();
               }}
@@ -1777,6 +1779,7 @@ export const Slideshow: React.FC<{
               href="/"
               className={styles.bootHomeLink}
               onClick={(event) => {
+                if (isModifiedClick(event)) return;
                 event.preventDefault();
                 exitSlideshow();
               }}

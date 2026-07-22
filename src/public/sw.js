@@ -7,6 +7,12 @@ const RUNTIME_CACHE = `${VERSION}-runtime`;
 // generation-scoping this would make every code deploy evict an installed photo
 // frame's entire offline library. Only RUNTIME_CACHE holds per-build chunks.
 const IMAGE_CACHE = "snapshots-pwa-images";
+// Album media are keyed by original filename, not a content hash, so a re-edited
+// photo reuses its URL. A cache-first strategy would pin the first bytes forever
+// and never bound its own growth; stale-while-revalidate refreshes in the
+// background and this cap evicts the oldest entries so the store cannot grow
+// without limit.
+const IMAGE_CACHE_MAX_ENTRIES = 1000;
 
 const SHELL_DOCUMENTS = ["/", "/slideshow", "/slideshow/shell"];
 const SHELL_STATIC_ASSETS = [
@@ -51,7 +57,10 @@ const installOfflineShell = async () => {
   ]);
   const documents = await Promise.all(
     SHELL_DOCUMENTS.map(async (pathname) => {
-      const response = await fetch(pathname);
+      // Bypass the HTTP cache for the shell HTML. A stale cached document can
+      // reference hashed chunks that no longer exist, which makes fetchAndStore
+      // throw for the missing chunk and rejects the whole install.
+      const response = await fetch(pathname, { cache: "no-cache" });
       if (!response.ok) {
         throw new Error(`Failed to precache ${pathname}: ${response.status}`);
       }
@@ -95,6 +104,47 @@ const cacheFirst = async (request, cacheName) => {
     });
   }
   return response;
+};
+
+const trimCache = async (cache, maxEntries) => {
+  const keys = await cache.keys();
+  if (keys.length <= maxEntries) {
+    return;
+  }
+  // Cache.keys() preserves insertion order, so the entries at the front are the
+  // oldest. Drop just enough of them to return to the cap.
+  await Promise.all(keys.slice(0, keys.length - maxEntries).map((key) => cache.delete(key)));
+};
+
+// Stale-while-revalidate for original-filename album media: serve the cached
+// copy immediately, refresh it in the background on a 200 (failures ignored so
+// offline stays fine), and keep the unversioned cache bounded after each write.
+const staleWhileRevalidateImage = async (request, event) => {
+  const cache = await caches.open(IMAGE_CACHE);
+  const cached = await cache.match(request);
+  const revalidate = fetch(request)
+    .then(async (response) => {
+      if (response.ok) {
+        await cache.put(request, response.clone()).catch(() => {
+          // Cache quota or storage failures must not hide a valid response.
+        });
+        await trimCache(cache, IMAGE_CACHE_MAX_ENTRIES).catch(() => {
+          // Eviction is best-effort; a failed trim must not break the response.
+        });
+      }
+      return response;
+    })
+    .catch(() => null);
+
+  if (cached) {
+    // respondWith settles immediately with the stale copy; keep the worker alive
+    // separately until the background refresh and trim land.
+    if (typeof event.waitUntil === "function") {
+      event.waitUntil(revalidate);
+    }
+    return cached;
+  }
+  return (await revalidate) ?? new Response(null, { status: 504 });
 };
 
 const staleWhileRevalidate = async (request, cacheName, event) => {
@@ -247,7 +297,7 @@ self.addEventListener("fetch", (event) => {
   }
 
   if (event.request.destination === "image" || url.pathname.startsWith("/data/")) {
-    event.respondWith(cacheFirst(event.request, IMAGE_CACHE));
+    event.respondWith(staleWhileRevalidateImage(event.request, event));
     return;
   }
 

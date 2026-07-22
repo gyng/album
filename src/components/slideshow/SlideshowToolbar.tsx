@@ -7,6 +7,7 @@ import commonStyles from "../../styles/common.module.css";
 import { buttonStyles } from "../ui";
 import { SlideshowMode, DetailsAlignment } from "../../util/slideshowUrl";
 import { PoolStats, formatNewestPhotoDate } from "../../util/slideshowQueue";
+import { isModifiedClick } from "../../util/slideshowShell";
 
 const styles = mergeCssModuleStyles(
   sharedStyles,
@@ -317,6 +318,7 @@ export const SlideshowToolbar: React.FC<SlideshowToolbarProps> = (props) => {
         className={styles.brandLink}
         href="/"
         onClick={(event) => {
+          if (isModifiedClick(event)) return;
           event.preventDefault();
           props.onExit();
         }}
@@ -714,6 +716,7 @@ export const SlideshowToolbar: React.FC<SlideshowToolbarProps> = (props) => {
               <Link
                 href={`/album/${props.filter}`}
                 onClick={(event) => {
+                  if (isModifiedClick(event)) return;
                   event.preventDefault();
                   props.onNavigate(`/album/${props.filter}`);
                 }}
@@ -727,6 +730,7 @@ export const SlideshowToolbar: React.FC<SlideshowToolbarProps> = (props) => {
             href={`/album/${props.albumName}#${props.photoName}`}
             className={commonStyles.toast}
             onClick={(event) => {
+              if (isModifiedClick(event)) return;
               event.preventDefault();
               props.onNavigate(`/album/${props.albumName}#${props.photoName}`);
             }}

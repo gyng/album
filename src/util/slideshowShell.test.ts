@@ -1,12 +1,25 @@
 import {
   buildSlideshowRuntimeUrl,
+  isModifiedClick,
   isSlideshowRuntimeMessage,
   isSlideshowShellStateMessage,
+  MAX_RUNTIME_RELOAD_ATTEMPTS,
+  planRuntimeReload,
+  RUNTIME_RELOAD_BASE_DELAY_MS,
   SLIDESHOW_EXIT_MESSAGE,
   SLIDESHOW_NAVIGATE_MESSAGE,
   SLIDESHOW_RUNTIME_STATE_MESSAGE,
   SLIDESHOW_SHELL_STATE_MESSAGE,
 } from "./slideshowShell";
+
+const click = (overrides: Partial<Parameters<typeof isModifiedClick>[0]> = {}) => ({
+  metaKey: false,
+  ctrlKey: false,
+  shiftKey: false,
+  altKey: false,
+  button: 0,
+  ...overrides,
+});
 
 describe("slideshow shell protocol", () => {
   it("builds an explicitly managed runtime URL and replaces stale shell versions", () => {
@@ -33,6 +46,46 @@ describe("slideshow shell protocol", () => {
       isSlideshowRuntimeMessage({ type: SLIDESHOW_RUNTIME_STATE_MESSAGE, buildVersion: " " }),
     ).toBe(false);
     expect(isSlideshowRuntimeMessage({ type: "unrelated" })).toBe(false);
+  });
+
+  it("treats modifier and non-primary-button clicks as browser-managed", () => {
+    expect(isModifiedClick(click())).toBe(false);
+    expect(isModifiedClick(click({ metaKey: true }))).toBe(true);
+    expect(isModifiedClick(click({ ctrlKey: true }))).toBe(true);
+    expect(isModifiedClick(click({ shiftKey: true }))).toBe(true);
+    expect(isModifiedClick(click({ altKey: true }))).toBe(true);
+    expect(isModifiedClick(click({ button: 1 }))).toBe(true);
+  });
+
+  it("reloads a fresh target immediately, then caps retries with backoff", () => {
+    // First sight of a target reloads at once (a real deploy).
+    const first = planRuntimeReload("build-next", null);
+    expect(first).toEqual({
+      shouldReload: true,
+      delayMs: 0,
+      tracker: { targetVersion: "build-next", attempts: 1 },
+    });
+
+    // Retries toward the same target back off with an escalating delay.
+    const second = planRuntimeReload("build-next", first.tracker);
+    expect(second.shouldReload).toBe(true);
+    expect(second.delayMs).toBe(RUNTIME_RELOAD_BASE_DELAY_MS);
+    const third = planRuntimeReload("build-next", second.tracker);
+    expect(third.shouldReload).toBe(true);
+    expect(third.delayMs).toBe(RUNTIME_RELOAD_BASE_DELAY_MS * 2);
+
+    // Budget exhausted — hold until the target itself changes.
+    expect(third.tracker.attempts).toBe(MAX_RUNTIME_RELOAD_ATTEMPTS);
+    const held = planRuntimeReload("build-next", third.tracker);
+    expect(held.shouldReload).toBe(false);
+  });
+
+  it("resets the retry budget when the target version changes", () => {
+    const exhausted = { targetVersion: "build-next", attempts: MAX_RUNTIME_RELOAD_ATTEMPTS };
+    const plan = planRuntimeReload("build-newer", exhausted);
+    expect(plan.shouldReload).toBe(true);
+    expect(plan.delayMs).toBe(0);
+    expect(plan.tracker).toEqual({ targetVersion: "build-newer", attempts: 1 });
   });
 
   it("requires both wake-lock capability fields from shell state", () => {

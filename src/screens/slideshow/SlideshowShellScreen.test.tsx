@@ -2,8 +2,13 @@
  * @jest-environment jsdom
  */
 
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { SlideshowShellScreen } from "./SlideshowShellScreen";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  AUTO_WAKE_SETTLE_MS,
+  RUNTIME_READY_TIMEOUT_MS,
+  SlideshowShellScreen,
+} from "./SlideshowShellScreen";
+import { RUNTIME_RELOAD_BASE_DELAY_MS } from "../../util/slideshowShell";
 import { useWakeLock } from "../../components/useWakeLock";
 import { navigateTo } from "../../util/navigate";
 
@@ -78,58 +83,89 @@ describe("slideshow code shell", () => {
     expect(releaseWakeLock).not.toHaveBeenCalled();
   });
 
-  it("forces a fresh frame when retrying the same pending build", async () => {
-    global.fetch = jest
-      .fn()
-      .mockImplementationOnce(() => versionResponse("build-current"))
-      .mockImplementationOnce(() => versionResponse("build-next"))
-      .mockImplementationOnce(() => versionResponse("build-next")) as jest.Mock;
+  it("stops rebooting the frame once a stuck build exhausts its retry budget", async () => {
+    // A frame that never reports it is ready drives the readiness-recovery path
+    // to its cap. version.json keeps advertising the shell's own build so the
+    // update path stays idle and only the recovery cap governs the reboots.
+    jest.useFakeTimers();
+    try {
+      global.fetch = jest.fn(() => versionResponse("build-current")) as jest.Mock;
+      render(<SlideshowShellScreen />);
 
-    render(<SlideshowShellScreen />);
-    const firstFrame = screen.getByTitle("Slideshow");
-    fireEvent(
-      window,
-      new MessageEvent("message", {
-        data: { type: "snapshots:slideshow-ready", buildVersion: "build-current" },
-        origin: window.location.origin,
-        source: (firstFrame as HTMLIFrameElement).contentWindow,
-      }),
-    );
-    await waitFor(() => expect(screen.getByText("Code current")).toBeInTheDocument());
-    fireEvent.click(screen.getByRole("button", { name: "Slideshow diagnostics" }));
-    fireEvent.click(screen.getByRole("button", { name: "Check for code update" }));
+      // Advance well past every readiness deadline and escalating backoff.
+      for (let step = 0; step < 12; step++) {
+        // eslint-disable-next-line no-await-in-loop
+        await act(async () => {
+          jest.advanceTimersByTime(RUNTIME_READY_TIMEOUT_MS + RUNTIME_RELOAD_BASE_DELAY_MS * 4);
+          await Promise.resolve();
+          await Promise.resolve();
+        });
+      }
 
-    await waitFor(() => expect(screen.getByTitle("Slideshow")).not.toBe(firstFrame));
-    const secondFrame = screen.getByTitle("Slideshow");
-    fireEvent(
-      window,
-      new MessageEvent("message", {
-        data: { type: "snapshots:slideshow-ready", buildVersion: "build-current" },
-        origin: window.location.origin,
-        source: (secondFrame as HTMLIFrameElement).contentWindow,
-      }),
-    );
-    await waitFor(() => expect(screen.getAllByText("Update retry pending")).not.toHaveLength(0));
-    fireEvent.click(screen.getByRole("button", { name: "Check for code update" }));
+      const settled = screen.getByTitle("Slideshow").getAttribute("data-runtime-generation");
+      // Exactly the capped number of reboots (generations 1..3 past the initial 0).
+      expect(settled).toBe("3");
 
-    await waitFor(() => expect(screen.getByTitle("Slideshow")).not.toBe(secondFrame));
+      // Further time must not reboot again until the target version changes.
+      await act(async () => {
+        jest.advanceTimersByTime(RUNTIME_READY_TIMEOUT_MS * 20);
+        await Promise.resolve();
+      });
+      expect(screen.getByTitle("Slideshow").getAttribute("data-runtime-generation")).toBe("3");
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
-  it("removes the one-tap wake prompt even when acquisition remains inactive", async () => {
-    mockWakeLockActive = false;
-    global.fetch = jest.fn(() => versionResponse("build-current")) as jest.Mock;
+  it("recovers a frame that never reports it is ready even when versions match", async () => {
+    // First-ever visit whose runtime request fails transiently: the advertised
+    // and running versions are equal, so the version poll cannot help — only the
+    // readiness deadline can force a reload.
+    jest.useFakeTimers();
+    try {
+      global.fetch = jest.fn(() => versionResponse("build-current")) as jest.Mock;
+      render(<SlideshowShellScreen />);
+      const initial = screen.getByTitle("Slideshow").getAttribute("data-runtime-generation");
+      expect(initial).toBe("0");
 
-    render(<SlideshowShellScreen />);
+      await act(async () => {
+        jest.advanceTimersByTime(RUNTIME_READY_TIMEOUT_MS + 1);
+        await Promise.resolve();
+        await Promise.resolve();
+      });
 
-    const prompt = screen.getByRole("button", {
-      name: "Tap once to keep this slideshow awake through code updates",
-    });
-    fireEvent.click(prompt);
+      expect(screen.getByTitle("Slideshow").getAttribute("data-runtime-generation")).toBe("1");
+    } finally {
+      jest.useRealTimers();
+    }
+  });
 
-    expect(acquireWakeLock).toHaveBeenCalledTimes(1);
-    expect(screen.queryByRole("button", { name: prompt.textContent! })).not.toBeInTheDocument();
-    expect(screen.getByTitle("Slideshow")).toBeInTheDocument();
-    await waitFor(() => expect(screen.getAllByText("Starting runtime")).not.toHaveLength(0));
+  it("withholds the one-tap wake prompt until the auto-acquire window settles", async () => {
+    jest.useFakeTimers();
+    try {
+      mockWakeLockActive = false;
+      global.fetch = jest.fn(() => versionResponse("build-current")) as jest.Mock;
+
+      render(<SlideshowShellScreen />);
+
+      const promptName = "Tap once to keep this slideshow awake through code updates";
+      // Chrome may acquire without a gesture; the gate must not flash meanwhile.
+      expect(screen.queryByRole("button", { name: promptName })).not.toBeInTheDocument();
+
+      await act(async () => {
+        jest.advanceTimersByTime(AUTO_WAKE_SETTLE_MS);
+        await Promise.resolve();
+      });
+
+      const prompt = screen.getByRole("button", { name: promptName });
+      fireEvent.click(prompt);
+
+      expect(acquireWakeLock).toHaveBeenCalledTimes(1);
+      expect(screen.queryByRole("button", { name: promptName })).not.toBeInTheDocument();
+      expect(screen.getByTitle("Slideshow")).toBeInTheDocument();
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   it("exits the outer shell when the slideshow runtime asks to leave", async () => {

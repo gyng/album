@@ -118,6 +118,30 @@ describe("SlideshowToolbar", () => {
     expect(onNavigate).toHaveBeenCalledWith("/album/Album#Photo");
   });
 
+  it("lets the browser open links in a new tab on modifier and middle-clicks", () => {
+    const onExit = jest.fn();
+    const onNavigate = jest.fn();
+    render(<SlideshowToolbar {...makeProps({ onExit, onNavigate })} />);
+
+    const home = screen.getByRole("link", { name: /Snapshots Slideshow/ });
+    const context = screen.getByRole("link", { name: /Context in Album/ });
+
+    // A meta/ctrl/shift-click, or a middle-click, must fall through to the
+    // native navigation instead of being hijacked into a same-tab handler.
+    const metaClick = fireEvent.click(home, { metaKey: true });
+    const middleClick = fireEvent.click(context, { button: 1 });
+
+    expect(onExit).not.toHaveBeenCalled();
+    expect(onNavigate).not.toHaveBeenCalled();
+    // Not prevented: fireEvent returns false only when preventDefault was called.
+    expect(metaClick).toBe(true);
+    expect(middleClick).toBe(true);
+
+    // A plain primary click is still handled in-shell.
+    fireEvent.click(home);
+    expect(onExit).toHaveBeenCalledTimes(1);
+  });
+
   it("shows an unambiguous active screen-awake status", () => {
     render(<SlideshowToolbar {...makeProps({ isWakeLockActive: true })} />);
 
