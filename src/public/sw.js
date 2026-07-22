@@ -121,9 +121,12 @@ const trimCache = async (cache, maxEntries) => {
   await Promise.all(keys.slice(0, keys.length - maxEntries).map((key) => cache.delete(key)));
 };
 
-// URLs whose media bytes have already been (re)fetched during this worker's
-// lifetime. Bounds background revalidation to at most once per URL per lifetime:
-// without it a kiosk re-downloads full image bytes on every single hit.
+// URLs whose media bytes have already been (re)fetched successfully during this
+// worker's lifetime. Bounds background revalidation to at most once per URL per
+// lifetime: without it a kiosk re-downloads full image bytes on every single
+// hit. Marked done only on success — a failed revalidation removes the URL
+// again so the next hit retries, rather than being silently marked done for
+// the rest of the worker's life.
 const revalidatedImageUrls = new Set();
 
 // Fetch fresh media and store it, bounded by the cache cap. Uses `no-cache` so
@@ -134,7 +137,6 @@ const revalidatedImageUrls = new Set();
 const fetchImageAndStore = async (cache, request) => {
   const response = await fetch(request, { cache: "no-cache" });
   if (response.ok) {
-    revalidatedImageUrls.add(request.url);
     await cache.put(request, response.clone()).catch(() => {
       // Cache quota or storage failures must not hide a valid response.
     });
@@ -143,6 +145,22 @@ const fetchImageAndStore = async (cache, request) => {
     });
   }
   return response;
+};
+
+// Background revalidation for the stale-while-revalidate hit path below. The
+// caller has already marked the URL as done (in revalidatedImageUrls) before
+// scheduling this; on failure — a thrown network error, or a non-ok response —
+// that mark is undone so the next hit for the same URL retries instead of
+// being stuck marked-done for the rest of the worker's lifetime.
+const revalidateImageInBackground = async (cache, request) => {
+  try {
+    const response = await fetchImageAndStore(cache, request);
+    if (!response.ok) {
+      revalidatedImageUrls.delete(request.url);
+    }
+  } catch (_error) {
+    revalidatedImageUrls.delete(request.url);
+  }
 };
 
 // Stale-while-revalidate for original-filename album media: serve the cached
@@ -159,13 +177,38 @@ const staleWhileRevalidateImage = async (request, event) => {
     // keep the worker alive to finish the write and trim.
     if (!revalidatedImageUrls.has(request.url) && typeof event.waitUntil === "function") {
       revalidatedImageUrls.add(request.url);
-      event.waitUntil(fetchImageAndStore(cache, request).catch(() => null));
+      event.waitUntil(revalidateImageInBackground(cache, request));
     }
     return cached;
   }
-  // Nothing cached yet — this is the initial download, not a revalidation, so it
-  // is not subject to the throttle above.
-  return (await fetchImageAndStore(cache, request).catch(() => null)) ?? new Response(null, { status: 504 });
+
+  // Nothing cached yet — this is the initial download, not a revalidation, so
+  // it is not subject to the throttle above. Return the network response as
+  // soon as it arrives rather than waiting on it to be written to the cache:
+  // trimCache does a full cache.keys() scan (up to IMAGE_CACHE_MAX_ENTRIES
+  // entries) and must not delay first paint of a cold image. The write is
+  // started immediately and kept alive separately via waitUntil.
+  let response;
+  try {
+    response = await fetch(request, { cache: "no-cache" });
+  } catch (_error) {
+    return new Response(null, { status: 504 });
+  }
+  if (response.ok) {
+    const responseToCache = response.clone();
+    const store = (async () => {
+      await cache.put(request, responseToCache).catch(() => {
+        // Cache quota or storage failures must not hide a valid response.
+      });
+      await trimCache(cache, IMAGE_CACHE_MAX_ENTRIES).catch(() => {
+        // Eviction is best-effort; a failed trim must not break the response.
+      });
+    })();
+    if (typeof event.waitUntil === "function") {
+      event.waitUntil(store);
+    }
+  }
+  return response;
 };
 
 const staleWhileRevalidate = async (request, cacheName, event) => {

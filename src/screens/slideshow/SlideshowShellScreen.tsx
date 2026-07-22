@@ -142,8 +142,12 @@ export const SlideshowShellScreen = () => {
         return;
       }
       // Backoff. Keep an existing timer toward the same target untouched so
-      // repeated re-plans neither reset the delay nor spend the budget.
+      // repeated re-plans neither reset the delay nor spend the budget, but
+      // still reflect the pending retry in diagnostics — checkForCodeUpdate
+      // optimistically sets "checking" before this call, and without this the
+      // status would read as an in-flight check that already finished.
       if (reloadTimerRef.current !== null && pendingReloadTargetRef.current === targetVersion) {
+        setCodeStatus("retry");
         return;
       }
       clearPendingReload();
@@ -168,6 +172,17 @@ export const SlideshowShellScreen = () => {
     },
     [],
   );
+
+  // A deliberate user gesture (the diagnostics "Reload slideshow" button) always
+  // reloads, bypassing the retry budget cap — but it must still cancel a pending
+  // backoff timer (otherwise that timer later fires a spurious back-to-back
+  // second reload) and record the attempt, same as every other reload path.
+  const reloadRuntimeManually = React.useCallback(() => {
+    const targetVersion = latestVersionRef.current;
+    clearPendingReload();
+    reloadTrackerRef.current = recordRuntimeReload(targetVersion, reloadTrackerRef.current);
+    reloadRuntime(targetVersion);
+  }, [clearPendingReload, reloadRuntime]);
 
   // Recover a frame that never reports it is ready — e.g. a first-ever visit
   // whose runtime request failed transiently, where the version poll cannot
@@ -312,11 +327,16 @@ export const SlideshowShellScreen = () => {
       runtimeReadyRef.current = true;
       runtimeVersionRef.current = nextVersion;
       setRuntimeVersion(nextVersion);
-      // The frame is up: cancel any pending backoff reload so a stale timer
-      // (e.g. a slow first load that reports ready mid-backoff) cannot reboot it.
-      clearPendingReload();
       if (nextVersion === latestVersionRef.current) {
-        // The frame loaded the intended build — clear any spent retry budget.
+        // The frame loaded the intended build: cancel any pending backoff reload
+        // (e.g. a slow first load that reports ready mid-backoff) so a stale
+        // timer cannot reboot it, and clear any spent retry budget. A ready
+        // message reporting a DIFFERENT (stale) version must NOT cancel a
+        // pending backoff timer — the runtime re-posts this message on every
+        // photo advance, so during version skew the frame keeps reporting its
+        // old version and an unconditional cancel here would suppress every
+        // retry toward the version that is still outstanding.
+        clearPendingReload();
         reloadTrackerRef.current = null;
       }
       setCodeStatus(
@@ -450,12 +470,7 @@ export const SlideshowShellScreen = () => {
             <button type="button" onClick={() => void checkForCodeUpdate()}>
               Check for code update
             </button>
-            <button
-              type="button"
-              onClick={() => {
-                reloadRuntime(latestVersionRef.current);
-              }}
-            >
+            <button type="button" onClick={reloadRuntimeManually}>
               Reload slideshow
             </button>
           </div>

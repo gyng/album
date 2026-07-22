@@ -431,7 +431,11 @@ describe("service worker data caching", () => {
     await expect(lifetimePromise).resolves.toBeDefined();
   });
 
-  it("finishes storing a newly fetched image before settling the response", async () => {
+  it("settles a newly fetched image response without waiting for it to be cached", async () => {
+    // A full cache.keys() scan under trimCache (up to 4000 entries) must not
+    // delay first paint of a cold image. The response resolves as soon as the
+    // network responds; storing it and trimming the cache happen afterwards,
+    // kept alive separately via waitUntil.
     let finishCaching!: () => void;
     const caching = new Promise<void>((resolve) => {
       finishCaching = resolve;
@@ -444,23 +448,31 @@ describe("service worker data caching", () => {
       cacheMatch: async () => undefined,
     });
     let responsePromise: Promise<Response> | undefined;
+    let lifetimePromise: Promise<unknown> | undefined;
 
     fetchHandler({
       request: request("/data/albums/trip/photo.avif", "image"),
       respondWith: (response) => {
         responsePromise = response;
       },
+      waitUntil: (promise) => {
+        lifetimePromise = promise;
+      },
     });
 
-    let settled = false;
-    void responsePromise?.then(() => {
-      settled = true;
+    // The mocked cache.put hangs on `caching`, which is never resolved before
+    // this assertion — the response must still settle.
+    await expect(responsePromise).resolves.toBe(network);
+    expect(lifetimePromise).toBeDefined();
+
+    let stored = false;
+    void lifetimePromise?.then(() => {
+      stored = true;
     });
     await Promise.resolve();
-    await Promise.resolve();
-    expect(settled).toBe(false);
+    expect(stored).toBe(false);
     finishCaching();
-    await expect(responsePromise).resolves.toBe(network);
+    await expect(lifetimePromise).resolves.toBeUndefined();
   });
 
   it("revalidates the map search index while retaining an offline fallback", async () => {
@@ -589,6 +601,41 @@ describe("service worker data caching", () => {
     expect(fetchMockOf(fetchHandler)).toHaveBeenCalledTimes(1);
   });
 
+  it("retries a background image revalidation after a failed attempt", async () => {
+    // A failed revalidation (network error) must not permanently mark the URL
+    // as done for the worker's lifetime, or a kiosk that briefly drops offline
+    // during a background refresh would never revalidate that image again.
+    const cached = new Response("cached image");
+    const fetchHandler = loadFetchHandler({
+      cachedResponse: cached,
+      networkError: new Error("offline"),
+    });
+    const lifetimes: Promise<unknown>[] = [];
+    const hit = async () => {
+      let responsePromise: Promise<Response> | undefined;
+      fetchHandler({
+        request: request("/data/albums/trip/photo.avif", "image"),
+        respondWith: (promise) => {
+          responsePromise = promise;
+        },
+        waitUntil: (promise) => {
+          lifetimes.push(promise);
+        },
+      });
+      await responsePromise;
+    };
+
+    await hit();
+    await Promise.all(lifetimes);
+    await hit();
+    await Promise.all(lifetimes);
+
+    // Both hits scheduled a background revalidation attempt because the first
+    // one failed and must not have been left marked as done.
+    expect(lifetimes).toHaveLength(2);
+    expect(fetchMockOf(fetchHandler)).toHaveBeenCalledTimes(2);
+  });
+
   it("ignores a failed image revalidation so the cached copy still serves offline", async () => {
     const cached = new Response("cached image");
     const fetchHandler = loadFetchHandler({
@@ -625,16 +672,21 @@ describe("service worker data caching", () => {
       cacheDelete: del,
     });
     let responsePromise: Promise<Response> | undefined;
+    let lifetimePromise: Promise<unknown> | undefined;
 
     fetchHandler({
       request: request("/data/albums/trip/new.avif", "image"),
       respondWith: (response) => {
         responsePromise = response;
       },
-      waitUntil: () => {},
+      waitUntil: (promise) => {
+        lifetimePromise = promise;
+      },
     });
 
     await expect(responsePromise).resolves.toBe(network);
+    // Trimming happens in the background store, not before the response settles.
+    await lifetimePromise;
     expect(del).toHaveBeenCalledTimes(2);
     expect(del).toHaveBeenCalledWith(keys[0]);
     expect(del).toHaveBeenCalledWith(keys[1]);

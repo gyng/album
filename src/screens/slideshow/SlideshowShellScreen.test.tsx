@@ -169,6 +169,181 @@ describe("slideshow code shell", () => {
     }
   });
 
+  it("keeps a pending backoff reload alive when the frame reports a stale version", async () => {
+    // Version skew: reload #1 lands, but the frame comes back ready on the OLD
+    // build (it keeps re-posting its ready state on every photo advance). That
+    // stale-version ready message must NOT cancel a backoff timer aimed at the
+    // still-outstanding target version, otherwise retries 2-3 never run and the
+    // kiosk is stuck on the old build forever.
+    jest.useFakeTimers();
+    try {
+      const fetchMock = jest
+        .fn()
+        .mockImplementationOnce(() => versionResponse("build-current"))
+        .mockImplementationOnce(() => versionResponse("build-next"));
+      global.fetch = fetchMock;
+
+      render(<SlideshowShellScreen />);
+
+      // Initial check: no update yet.
+      await act(async () => {
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+
+      // A new build appears: immediate reload (attempt 1) to generation 1.
+      fireEvent.click(screen.getByRole("button", { name: "Slideshow diagnostics" }));
+      await act(async () => {
+        fireEvent.click(screen.getByRole("button", { name: "Check for code update" }));
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+      expect(screen.getByTitle("Slideshow").getAttribute("data-runtime-generation")).toBe("1");
+
+      // Generation 1 never reports ready in time: schedules a backed-off retry
+      // (attempt 2) toward "build-next", but does not reboot yet.
+      await act(async () => {
+        jest.advanceTimersByTime(RUNTIME_READY_TIMEOUT_MS + 1);
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+      expect(screen.getByTitle("Slideshow").getAttribute("data-runtime-generation")).toBe("1");
+
+      // The stuck frame is still alive and posting its OLD build version (e.g. it
+      // is still advancing photos on the old bundle) while the backoff toward
+      // "build-next" is pending.
+      const frame = screen.getByTitle("Slideshow");
+      await act(async () => {
+        fireEvent(
+          window,
+          new MessageEvent("message", {
+            data: { type: "snapshots:slideshow-ready", buildVersion: "build-current" },
+            origin: window.location.origin,
+            source: (frame as HTMLIFrameElement).contentWindow,
+          }),
+        );
+        await Promise.resolve();
+      });
+
+      // The pending backoff timer must survive and still fire the retry.
+      await act(async () => {
+        jest.advanceTimersByTime(RUNTIME_RELOAD_BASE_DELAY_MS * 4);
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+      expect(screen.getByTitle("Slideshow").getAttribute("data-runtime-generation")).toBe("2");
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it("resets a stuck 'checking' status back to retry when a pending backoff timer is kept", async () => {
+    // checkForCodeUpdate optimistically sets "checking" before attemptRuntimeReload
+    // runs. When that call hits the keep-existing-timer early return (a re-plan
+    // toward the same still-pending target), the status must be restored to
+    // "retry" rather than left showing a check that already finished.
+    jest.useFakeTimers();
+    try {
+      const fetchMock = jest
+        .fn()
+        .mockImplementationOnce(() => versionResponse("build-current"))
+        .mockImplementationOnce(() => versionResponse("build-next"))
+        .mockImplementationOnce(() => versionResponse("build-next"));
+      global.fetch = fetchMock;
+
+      render(<SlideshowShellScreen />);
+      await act(async () => {
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+
+      fireEvent.click(screen.getByRole("button", { name: "Slideshow diagnostics" }));
+      await act(async () => {
+        fireEvent.click(screen.getByRole("button", { name: "Check for code update" }));
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+      expect(screen.getByTitle("Slideshow").getAttribute("data-runtime-generation")).toBe("1");
+
+      // Miss generation 1's readiness deadline: schedules the backed-off retry.
+      await act(async () => {
+        jest.advanceTimersByTime(RUNTIME_READY_TIMEOUT_MS + 1);
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+      expect(screen.getAllByText("Update retry pending")).not.toHaveLength(0);
+
+      // A re-plan toward the same pending target (another manual check) must not
+      // leave the status stuck on "checking".
+      await act(async () => {
+        fireEvent.click(screen.getByRole("button", { name: "Check for code update" }));
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+      expect(screen.getAllByText("Update retry pending")).not.toHaveLength(0);
+      expect(screen.queryByText("Checking code")).not.toBeInTheDocument();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it("routes the manual reload button through the same reload discipline", async () => {
+    // The manual "Reload slideshow" diagnostics button is a deliberate user
+    // gesture that may bypass the retry budget, but it must still cancel a
+    // pending backoff timer (otherwise the timer fires afterwards for a
+    // spurious back-to-back double reload) and record the attempt.
+    jest.useFakeTimers();
+    try {
+      const fetchMock = jest
+        .fn()
+        .mockImplementationOnce(() => versionResponse("build-current"))
+        .mockImplementationOnce(() => versionResponse("build-next"));
+      global.fetch = fetchMock;
+
+      render(<SlideshowShellScreen />);
+      await act(async () => {
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+
+      fireEvent.click(screen.getByRole("button", { name: "Slideshow diagnostics" }));
+      await act(async () => {
+        fireEvent.click(screen.getByRole("button", { name: "Check for code update" }));
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+      expect(screen.getByTitle("Slideshow").getAttribute("data-runtime-generation")).toBe("1");
+
+      // Miss generation 1's readiness deadline: schedules a backed-off retry.
+      await act(async () => {
+        jest.advanceTimersByTime(RUNTIME_READY_TIMEOUT_MS + 1);
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+      expect(screen.getByTitle("Slideshow").getAttribute("data-runtime-generation")).toBe("1");
+
+      // Manual reload fires immediately, cancelling the pending timer.
+      await act(async () => {
+        fireEvent.click(screen.getByRole("button", { name: "Reload slideshow" }));
+        await Promise.resolve();
+      });
+      expect(screen.getByTitle("Slideshow").getAttribute("data-runtime-generation")).toBe("2");
+
+      // The now-cancelled backoff timer must not fire a second, back-to-back
+      // reload once its original delay elapses. Advance past that delay but
+      // stay under the new generation's own readiness deadline, so only the
+      // (would-be) stale timer is under test here.
+      await act(async () => {
+        jest.advanceTimersByTime(RUNTIME_RELOAD_BASE_DELAY_MS + 1000);
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+      expect(screen.getByTitle("Slideshow").getAttribute("data-runtime-generation")).toBe("2");
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
   it("recovers a frame that never reports it is ready even when versions match", async () => {
     // First-ever visit whose runtime request fails transiently: the advertised
     // and running versions are equal, so the version poll cannot help — only the
