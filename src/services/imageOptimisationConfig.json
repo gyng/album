@@ -1,5 +1,6 @@
 {
   "sizes": [3200, 1600, 800],
+  "iccProfile": "srgb",
   "avif": {
     "quality": 85,
     "effort": 2,

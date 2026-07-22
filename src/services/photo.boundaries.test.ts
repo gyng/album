@@ -26,6 +26,7 @@ import {
   AVIF_OPTIONS,
   getNextJsSafeExif,
   getPhotoSize,
+  ICC_PROFILE,
   optimiseImages,
   OPTIMISED_SIZES,
   RESIZED_IMAGE_DIR,
@@ -38,8 +39,10 @@ const mockSharp = jest.mocked(sharp);
 const successfulEncoder = (width = 800, height = 600) => {
   const outputPipeline = {
     resize: () => ({
-      avif: () => ({
-        toFile: async () => ({ width, height }),
+      withIccProfile: () => ({
+        avif: () => ({
+          toFile: async () => ({ width, height }),
+        }),
       }),
     }),
   };
@@ -67,16 +70,19 @@ describe("photo adapter boundaries", () => {
       tune: "iq",
       chromaSubsampling: "4:4:4",
     });
+    expect(ICC_PROFILE).toBe("srgb");
   });
 
-  it("shares one source pipeline across generated variants", async () => {
+  it("shares one source pipeline across generated variants, encoding atomically via a temp file rename", async () => {
     jest.spyOn(fs, "mkdirSync").mockImplementation(() => undefined);
     jest.spyOn(fs, "existsSync").mockReturnValue(false);
+    jest.spyOn(fs, "renameSync").mockImplementation(() => undefined);
     jest.spyOn(console, "log").mockImplementation(() => undefined);
 
     const toFile = jest.fn(async () => ({ width: 800, height: 600 }));
     const avif = jest.fn(() => ({ toFile }));
-    const resize = jest.fn(() => ({ avif }));
+    const withIccProfile = jest.fn(() => ({ avif }));
+    const resize = jest.fn(() => ({ withIccProfile }));
     const pipeline = { resize };
     const clone = jest.fn(() => pipeline);
     const rotate = jest.fn(() => ({ ...pipeline, clone }));
@@ -91,9 +97,19 @@ describe("photo adapter boundaries", () => {
     expect(rotate).toHaveBeenCalledTimes(1);
     expect(clone).toHaveBeenCalledTimes(3);
     expect(resize).toHaveBeenCalledTimes(3);
+    expect(withIccProfile).toHaveBeenCalledTimes(3);
+    expect(withIccProfile).toHaveBeenCalledWith(ICC_PROFILE);
     expect(avif).toHaveBeenCalledTimes(3);
     expect(avif).toHaveBeenCalledWith(AVIF_OPTIONS);
     expect(fs.mkdirSync).toHaveBeenCalledTimes(1);
+    // Each variant is encoded to "<newFile>.tmp-<pid>" then renamed into
+    // place — never written directly to the final destination.
+    expect(fs.renameSync).toHaveBeenCalledTimes(3);
+    for (const [tempArg, finalArg] of jest.mocked(fs.renameSync).mock.calls) {
+      expect(String(tempArg)).toMatch(/\.avif\.tmp-\d+$/);
+      expect(String(finalArg)).toMatch(/\.avif$/);
+      expect(String(tempArg)).toBe(`${String(finalArg)}.tmp-${process.pid}`);
+    }
   });
 
   it("normalises missing dimensions from the image adapter", async () => {
@@ -121,6 +137,7 @@ describe("photo adapter boundaries", () => {
     jest.spyOn(fs, "mkdirSync").mockImplementation(() => undefined);
     jest.spyOn(fs, "existsSync").mockReturnValue(true);
     jest.spyOn(fs, "statSync").mockReturnValue({ size: 0 } as fs.Stats);
+    jest.spyOn(fs, "renameSync").mockImplementation(() => undefined);
     jest.spyOn(console, "log").mockImplementation(() => undefined);
     mockSharp.mockImplementation(() => successfulEncoder() as never);
 
@@ -137,6 +154,7 @@ describe("photo adapter boundaries", () => {
     jest.spyOn(fs, "mkdirSync").mockImplementation(() => undefined);
     jest.spyOn(fs, "existsSync").mockReturnValue(true);
     jest.spyOn(fs, "statSync").mockReturnValue({ size: 10 } as fs.Stats);
+    jest.spyOn(fs, "renameSync").mockImplementation(() => undefined);
     jest.spyOn(console, "log").mockImplementation(() => undefined);
     mockSharp.mockImplementation((input) => {
       if (String(input).includes("@")) {
@@ -162,7 +180,9 @@ describe("photo adapter boundaries", () => {
           rotate: () => ({
             clone: () => ({
               resize: () => ({
-                avif: () => ({ toFile: async () => Promise.reject(failure) }),
+                withIccProfile: () => ({
+                  avif: () => ({ toFile: async () => Promise.reject(failure) }),
+                }),
               }),
             }),
           }),
@@ -173,5 +193,37 @@ describe("photo adapter boundaries", () => {
       failure,
     );
     expect(error).toHaveBeenCalledWith("Failed to optimise albums/trip/photo.jpg");
+  });
+
+  it("cleans up the partial temp file when the encoder fails", async () => {
+    const failure = new Error("encoder failed");
+    jest.spyOn(fs, "mkdirSync").mockImplementation(() => undefined);
+    jest.spyOn(fs, "existsSync").mockReturnValue(false);
+    jest.spyOn(console, "log").mockImplementation(() => undefined);
+    jest.spyOn(console, "error").mockImplementation(() => undefined);
+    const unlink = jest.spyOn(fs, "unlinkSync").mockImplementation(() => undefined);
+    mockSharp.mockImplementation(
+      () =>
+        ({
+          rotate: () => ({
+            clone: () => ({
+              resize: () => ({
+                withIccProfile: () => ({
+                  avif: () => ({ toFile: async () => Promise.reject(failure) }),
+                }),
+              }),
+            }),
+          }),
+        }) as never,
+    );
+
+    await expect(
+      optimiseImages("albums/trip/photo.jpg", "public/data/albums"),
+    ).rejects.toBe(failure);
+
+    expect(unlink).toHaveBeenCalledTimes(3);
+    for (const [tempArg] of unlink.mock.calls) {
+      expect(String(tempArg)).toMatch(/\.avif\.tmp-\d+$/);
+    }
   });
 });

@@ -16,6 +16,12 @@ export const AVIF_OPTIONS = {
   tune: imageOptimisationConfig.avif.tune as "iq",
   chromaSubsampling: imageOptimisationConfig.avif.chromaSubsampling as "4:4:4",
 } as const;
+// sharp strips the ICC profile without converting pixel values on its own;
+// left alone, a Display P3 source gets its wide-gamut pixels reinterpreted as
+// sRGB by browsers, visibly desaturating the output. withIccProfile("srgb")
+// converts pixel data to sRGB and tags the output correctly.
+export const ICC_PROFILE = imageOptimisationConfig.iccProfile;
+const TEMP_FILE_SEPARATOR = ".tmp-";
 
 export const getPhotoSize = async (
   filepath: string,
@@ -125,15 +131,22 @@ export const optimiseImages = async (
 
           return measureBuild("photo.optimiseImages.encode", async () => {
             sourcePipeline ??= sharp(photoPath).rotate();
+            cleanupStrayTempFiles(newFile);
+            const tempFile = `${newFile}${TEMP_FILE_SEPARATOR}${process.pid}`;
             return (
               sourcePipeline
                 .clone()
                 .resize(size)
                 // .withMetadata() // larger filesize than .rotate(), but preserves more metadata (eg, width/height)
                 // .webp({ quality: 90, smartSubsample: true })
+                .withIccProfile(ICC_PROFILE)
                 .avif(AVIF_OPTIONS)
-                .toFile(newFile)
+                .toFile(tempFile)
                 .then((p) => {
+                  // Encode-then-rename makes the write atomic: a reader (including
+                  // a concurrent build) either sees no file at `newFile` or a
+                  // complete one, never one truncated by an interrupted encode.
+                  fs.renameSync(tempFile, newFile);
                   const optimised: OptimisedPhoto = {
                     src: encodePublicAssetPath(stripPublicFromPath(newFile)),
                     width: p.width,
@@ -143,6 +156,11 @@ export const optimiseImages = async (
                 })
                 .catch((err) => {
                   console.error(`Failed to optimise ${photoPath}`);
+                  try {
+                    fs.unlinkSync(tempFile);
+                  } catch {
+                    // best-effort cleanup of the partial temp file; ignore if already gone
+                  }
                   throw err;
                 })
             );
@@ -154,4 +172,36 @@ export const optimiseImages = async (
 
 export const stripPublicFromPath = (p: string) => {
   return `/${p.split(path.sep).slice(1).join(path.sep)}`;
+};
+
+// A process that died mid-encode (crash, OOM-kill) can leave a
+// "<newFile>.tmp-<pid>" file from a previous run behind. It's never read as a
+// cache hit (the cache check only looks at the exact final path), but it is
+// silent disk litter — clear out any stray temp siblings for the variant
+// we're about to (re)encode.
+const cleanupStrayTempFiles = (finalPath: string) => {
+  const dir = path.dirname(finalPath);
+  const prefix = `${path.basename(finalPath)}${TEMP_FILE_SEPARATOR}`;
+  let entries: string[];
+  try {
+    entries = fs.readdirSync(dir);
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === "ENOENT") {
+      return;
+    }
+    throw err;
+  }
+
+  for (const entry of entries) {
+    if (!entry.startsWith(prefix)) {
+      continue;
+    }
+    try {
+      fs.unlinkSync(path.join(dir, entry));
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code !== "ENOENT") {
+        throw err;
+      }
+    }
+  }
 };

@@ -12,12 +12,35 @@ const sharp = require("sharp");
 const imageOptimisationConfig = require("../services/imageOptimisationConfig.json");
 const { prepareOptimisedImages } = require("./prepare-optimised-images.cjs");
 
+// Builds a single mock object exposing both the metadata-read shape
+// (`sharp(cachedFile).metadata()`, used by the cache-validity check) and the
+// encode-pipeline shape (`sharp(source).rotate().clone()...avif().toFile()`).
+// Real code only ever calls the method relevant to what it passed in, so one
+// shared mock covers both call sites without argument-based branching.
+const mockSharpPipeline = ({
+  metadata = jest.fn(async () => ({ width: 800, height: 600 })),
+  toFile = jest.fn(async (output) => {
+    fs.writeFileSync(output, "generated");
+    return { width: 800, height: 600 };
+  }),
+} = {}) => {
+  const avif = jest.fn(() => ({ toFile }));
+  const withIccProfile = jest.fn(() => ({ avif }));
+  const resize = jest.fn(() => ({ withIccProfile }));
+  const clone = jest.fn(() => ({ resize }));
+  const rotate = jest.fn(() => ({ clone }));
+  sharp.mockImplementation((input) => ({ rotate, metadata: () => metadata(input) }));
+  return { rotate, clone, resize, withIccProfile, avif, toFile, metadata };
+};
+
+const listTempFiles = (dir) => fs.readdirSync(dir).filter((name) => name.includes(".tmp-"));
+
 describe("prepareOptimisedImages", () => {
   afterEach(() => {
     sharp.mockReset();
   });
 
-  it("preserves cached variants and generates only missing sizes", async () => {
+  it("preserves cached variants, atomically encodes only missing sizes, and leaves no temp files behind", async () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "album-image-prepare-"));
     const albumsDir = path.join(root, "albums");
     const publicAlbumsDir = path.join(root, "public", "data", "albums");
@@ -34,15 +57,7 @@ describe("prepareOptimisedImages", () => {
     fs.writeFileSync(path.join(hiddenAlbumDir, "hidden.jpg"), "source");
     fs.writeFileSync(cached, "keep me");
 
-    const toFile = jest.fn(async (output) => {
-      fs.writeFileSync(output, "generated");
-      return { width: 800, height: 600 };
-    });
-    const avif = jest.fn(() => ({ toFile }));
-    const resize = jest.fn(() => ({ avif }));
-    const clone = jest.fn(() => ({ resize }));
-    const rotate = jest.fn(() => ({ clone }));
-    sharp.mockReturnValue({ rotate });
+    const pipeline = mockSharpPipeline();
 
     const summary = await prepareOptimisedImages({
       albumsDir,
@@ -58,12 +73,220 @@ describe("prepareOptimisedImages", () => {
       variantsCached: 1,
     });
     expect(fs.readFileSync(cached, "utf8")).toBe("keep me");
-    expect(sharp).toHaveBeenCalledTimes(1);
+    expect(fs.readFileSync(path.join(cacheDir, "photo.jpg@1600.avif"), "utf8")).toBe("generated");
+    expect(fs.readFileSync(path.join(cacheDir, "photo.jpg@3200.avif"), "utf8")).toBe("generated");
     expect(sharp).toHaveBeenCalledWith(source);
-    expect(rotate).toHaveBeenCalledTimes(1);
-    expect(clone).toHaveBeenCalledTimes(2);
-    expect(resize).toHaveBeenCalledTimes(2);
-    expect(avif).toHaveBeenCalledTimes(2);
-    expect(avif).toHaveBeenCalledWith(imageOptimisationConfig.avif);
+    expect(sharp).toHaveBeenCalledWith(cached);
+    expect(pipeline.rotate).toHaveBeenCalledTimes(1);
+    expect(pipeline.clone).toHaveBeenCalledTimes(2);
+    expect(pipeline.resize).toHaveBeenCalledTimes(2);
+    expect(pipeline.withIccProfile).toHaveBeenCalledTimes(2);
+    expect(pipeline.withIccProfile).toHaveBeenCalledWith(imageOptimisationConfig.iccProfile);
+    expect(pipeline.avif).toHaveBeenCalledTimes(2);
+    expect(pipeline.avif).toHaveBeenCalledWith(imageOptimisationConfig.avif);
+    // Every encode went through "<output>.tmp-<pid>" then fs.renameSync into
+    // place: no stray temp siblings should remain once the run finishes.
+    expect(listTempFiles(cacheDir)).toEqual([]);
+  });
+
+  it("re-encodes a pre-existing zero-byte cache file", async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "album-image-zero-byte-"));
+    const albumsDir = path.join(root, "albums");
+    const publicAlbumsDir = path.join(root, "public", "data", "albums");
+    const albumDir = path.join(albumsDir, "trip");
+    const cacheDir = path.join(publicAlbumsDir, "trip", ".resized_images");
+    const source = path.join(albumDir, "photo.jpg");
+    const zeroByteCache = path.join(cacheDir, "photo.jpg@800.avif");
+
+    fs.mkdirSync(albumDir, { recursive: true });
+    fs.mkdirSync(cacheDir, { recursive: true });
+    fs.writeFileSync(source, "source");
+    fs.writeFileSync(zeroByteCache, "");
+
+    mockSharpPipeline();
+
+    const summary = await prepareOptimisedImages({ albumsDir, publicAlbumsDir, jobs: 1 });
+
+    expect(summary.variantsCached).toBe(0);
+    expect(summary.variantsEncoded).toBe(3);
+    expect(fs.readFileSync(zeroByteCache, "utf8")).toBe("generated");
+  });
+
+  it("re-encodes a pre-existing non-empty cache file that fails to decode (truncated/corrupt)", async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "album-image-truncated-"));
+    const albumsDir = path.join(root, "albums");
+    const publicAlbumsDir = path.join(root, "public", "data", "albums");
+    const albumDir = path.join(albumsDir, "trip");
+    const cacheDir = path.join(publicAlbumsDir, "trip", ".resized_images");
+    const source = path.join(albumDir, "photo.jpg");
+    const truncatedCache = path.join(cacheDir, "photo.jpg@800.avif");
+    const validCache1600 = path.join(cacheDir, "photo.jpg@1600.avif");
+    const validCache3200 = path.join(cacheDir, "photo.jpg@3200.avif");
+
+    fs.mkdirSync(albumDir, { recursive: true });
+    fs.mkdirSync(cacheDir, { recursive: true });
+    fs.writeFileSync(source, "source");
+    // Non-empty but not a decodable AVIF — what an interrupted write from
+    // before this fix could have left behind.
+    fs.writeFileSync(truncatedCache, "partial-bytes-from-an-interrupted-write");
+    fs.writeFileSync(validCache1600, "cached");
+    fs.writeFileSync(validCache3200, "cached");
+
+    mockSharpPipeline({
+      metadata: jest.fn(async (target) => {
+        if (target === truncatedCache) {
+          throw new Error("unsupported image format");
+        }
+        return { width: 800, height: 600 };
+      }),
+    });
+
+    const summary = await prepareOptimisedImages({ albumsDir, publicAlbumsDir, jobs: 1 });
+
+    expect(summary.variantsCached).toBe(2);
+    expect(summary.variantsEncoded).toBe(1);
+    expect(fs.readFileSync(truncatedCache, "utf8")).toBe("generated");
+    // The genuinely valid cache entries were left untouched.
+    expect(fs.readFileSync(validCache1600, "utf8")).toBe("cached");
+    expect(fs.readFileSync(validCache3200, "utf8")).toBe("cached");
+  });
+
+  it("cleans up a stray temp file left by a previous interrupted run before re-encoding", async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "album-image-stray-temp-"));
+    const albumsDir = path.join(root, "albums");
+    const publicAlbumsDir = path.join(root, "public", "data", "albums");
+    const albumDir = path.join(albumsDir, "trip");
+    const cacheDir = path.join(publicAlbumsDir, "trip", ".resized_images");
+    const source = path.join(albumDir, "photo.jpg");
+    const output = path.join(cacheDir, "photo.jpg@800.avif");
+    const strayTemp = `${output}.tmp-99999`;
+
+    fs.mkdirSync(albumDir, { recursive: true });
+    fs.mkdirSync(cacheDir, { recursive: true });
+    fs.writeFileSync(source, "source");
+    fs.writeFileSync(strayTemp, "leftover from a crashed run");
+
+    mockSharpPipeline();
+
+    await prepareOptimisedImages({ albumsDir, publicAlbumsDir, jobs: 1 });
+
+    expect(fs.existsSync(strayTemp)).toBe(false);
+    expect(fs.readFileSync(output, "utf8")).toBe("generated");
+    expect(listTempFiles(cacheDir)).toEqual([]);
+  });
+
+  it("drains an in-flight encode to completion before rejecting when a sibling item fails", async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "album-image-drain-"));
+    const albumsDir = path.join(root, "albums");
+    const publicAlbumsDir = path.join(root, "public", "data", "albums");
+    const failAlbumDir = path.join(albumsDir, "fails");
+    const okAlbumDir = path.join(albumsDir, "succeeds");
+    const failCacheDir = path.join(publicAlbumsDir, "fails", ".resized_images");
+    const okCacheDir = path.join(publicAlbumsDir, "succeeds", ".resized_images");
+    const failSource = path.join(failAlbumDir, "photo.jpg");
+    const okSource = path.join(okAlbumDir, "photo.jpg");
+
+    fs.mkdirSync(failAlbumDir, { recursive: true });
+    fs.mkdirSync(okAlbumDir, { recursive: true });
+    fs.mkdirSync(failCacheDir, { recursive: true });
+    fs.mkdirSync(okCacheDir, { recursive: true });
+    fs.writeFileSync(failSource, "source");
+    fs.writeFileSync(okSource, "source");
+    // Pre-cache the 3200/1600 variants for both photos so each only has a
+    // single 800px variant left to encode, keeping one in-flight encode per
+    // worker so the drain behaviour is unambiguous.
+    for (const dir of [failCacheDir, okCacheDir]) {
+      fs.writeFileSync(path.join(dir, "photo.jpg@3200.avif"), "cached");
+      fs.writeFileSync(path.join(dir, "photo.jpg@1600.avif"), "cached");
+    }
+
+    const okOutput = path.join(okCacheDir, "photo.jpg@800.avif");
+    const encodeError = new Error("boom");
+    const metadata = jest.fn(async () => ({ width: 800, height: 600 }));
+    const failingAvifPipeline = {
+      rotate: () => ({
+        clone: () => ({
+          resize: () => ({
+            withIccProfile: () => ({
+              avif: () => ({ toFile: async () => Promise.reject(encodeError) }),
+            }),
+          }),
+        }),
+      }),
+    };
+    const succeedingAvifPipeline = {
+      rotate: () => ({
+        clone: () => ({
+          resize: () => ({
+            withIccProfile: () => ({
+              avif: () => ({
+                toFile: async (output) => {
+                  fs.writeFileSync(output, "generated");
+                  return { width: 800, height: 600 };
+                },
+              }),
+            }),
+          }),
+        }),
+      }),
+    };
+    sharp.mockImplementation((input) => {
+      if (input === failSource) return failingAvifPipeline;
+      if (input === okSource) return succeedingAvifPipeline;
+      return { metadata };
+    });
+
+    await expect(
+      prepareOptimisedImages({ albumsDir, publicAlbumsDir, jobs: 2, includeTestAlbums: false }),
+    ).rejects.toBe(encodeError);
+
+    // The sibling worker's already-started encode was allowed to finish
+    // (drain) rather than being torn down mid-write by an early exit.
+    expect(fs.readFileSync(okOutput, "utf8")).toBe("generated");
+    expect(listTempFiles(okCacheDir)).toEqual([]);
+  });
+
+  it("follows symlinked album directories and symlinked photo files", async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "album-image-symlink-"));
+    const albumsDir = path.join(root, "albums");
+    const publicAlbumsDir = path.join(root, "public", "data", "albums");
+    const realAlbumDir = path.join(root, "real-album-storage");
+    const realPhotoPath = path.join(root, "real-photo-storage", "photo.jpg");
+
+    fs.mkdirSync(albumsDir, { recursive: true });
+    fs.mkdirSync(realAlbumDir, { recursive: true });
+    fs.mkdirSync(path.dirname(realPhotoPath), { recursive: true });
+    fs.writeFileSync(realPhotoPath, "source");
+    fs.symlinkSync(realPhotoPath, path.join(realAlbumDir, "photo.jpg"));
+    fs.symlinkSync(realAlbumDir, path.join(albumsDir, "trip"), "dir");
+
+    mockSharpPipeline();
+
+    const summary = await prepareOptimisedImages({ albumsDir, publicAlbumsDir, jobs: 1 });
+
+    expect(summary.photosDiscovered).toBe(1);
+    expect(
+      fs.existsSync(path.join(publicAlbumsDir, "trip", ".resized_images", "photo.jpg@800.avif")),
+    ).toBe(true);
+  });
+
+  it("treats every non-JSON, non-video file as a photo (matches photo.ts's build-time optimiser, which has no extension allowlist)", async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "album-image-extensions-"));
+    const albumsDir = path.join(root, "albums");
+    const publicAlbumsDir = path.join(root, "public", "data", "albums");
+    const albumDir = path.join(albumsDir, "trip");
+
+    fs.mkdirSync(albumDir, { recursive: true });
+    fs.writeFileSync(path.join(albumDir, "photo.jpg"), "source");
+    fs.writeFileSync(path.join(albumDir, "photo.png"), "source");
+    fs.writeFileSync(path.join(albumDir, "album.json"), "{}");
+    fs.writeFileSync(path.join(albumDir, "clip.mp4"), "source");
+
+    mockSharpPipeline();
+
+    const summary = await prepareOptimisedImages({ albumsDir, publicAlbumsDir, jobs: 1 });
+
+    // Only photo.jpg and photo.png are photos; album.json and clip.mp4 are not.
+    expect(summary.photosDiscovered).toBe(2);
   });
 });

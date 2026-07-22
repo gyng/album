@@ -142,6 +142,44 @@ const cleanupVideoCache = ({ albumDir, publicAlbumDir }) => {
   return { removedStale, removedUnneeded, removedChanged };
 };
 
+// listDirectories(albumsDir) only ever sees albums that still exist, so a
+// deleted album's `public/data/albums/<name>/.resized_images` and
+// `.resized_videos` caches are never visited by the per-album loop above and
+// ship forever. Walk the public albums dir separately and remove the media
+// caches for any name that no longer has a matching source album.
+// Conservative: only the two known cache directories are ever deleted, plus
+// the now-empty public album directory if nothing else remains in it — no
+// other content.
+const removeOrphanedAlbumMediaCaches = ({ publicAlbumsDir, albumNames }) => {
+  const knownAlbums = new Set(albumNames);
+  let removedOrphanedAlbums = 0;
+
+  for (const publicAlbumName of listDirectories(publicAlbumsDir)) {
+    if (knownAlbums.has(publicAlbumName)) {
+      continue;
+    }
+
+    const publicAlbumDir = path.join(publicAlbumsDir, publicAlbumName);
+    const cacheDirs = [RESIZED_IMAGE_DIR, RESIZED_VIDEO_DIR]
+      .map((dir) => path.join(publicAlbumDir, dir))
+      .filter(isDirectory);
+    if (cacheDirs.length === 0) {
+      continue;
+    }
+
+    for (const cacheDir of cacheDirs) {
+      fs.rmSync(cacheDir, { recursive: true, force: true });
+    }
+    removedOrphanedAlbums += 1;
+
+    if (fs.readdirSync(publicAlbumDir).length === 0) {
+      fs.rmdirSync(publicAlbumDir);
+    }
+  }
+
+  return removedOrphanedAlbums;
+};
+
 const cleanupOptimisedMedia = async ({
   albumsDir = path.resolve(__dirname, "..", "..", "albums"),
   publicAlbumsDir = path.resolve(__dirname, "..", "public", "data", "albums"),
@@ -167,6 +205,7 @@ const cleanupOptimisedMedia = async ({
     removedStaleVideos: 0,
     removedChangedVideos: 0,
     removedUnneededVideoSizes: 0,
+    removedOrphanedAlbums: 0,
   };
 
   for (const albumName of albumNames) {
@@ -188,6 +227,11 @@ const cleanupOptimisedMedia = async ({
     totals.removedChangedVideos += videoResults.removedChanged;
     totals.removedUnneededVideoSizes += videoResults.removedUnneeded;
   }
+
+  totals.removedOrphanedAlbums = removeOrphanedAlbumMediaCaches({
+    publicAlbumsDir,
+    albumNames,
+  });
 
   if (!imageCacheConfigIsCurrent && albumNames.length > 0) {
     fs.mkdirSync(publicAlbumsDir, { recursive: true });
