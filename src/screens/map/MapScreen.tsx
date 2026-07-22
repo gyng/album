@@ -155,6 +155,14 @@ const MapScreen = (props: MapScreenProps) => {
     mapSearchLoadRef.current = loading;
   }, [mapSearchIndex]);
   const deferredMapSearchQuery = React.useDeferredValue(mapSearchQuery);
+  // The tour reads as "play these results": clearing the query back to the
+  // full library removes the only control that can stop it, so stop it here
+  // instead of leaving it to run over every photo unattended.
+  React.useEffect(() => {
+    if (!deferredMapSearchQuery.trim()) {
+      setDirectorEnabled(false);
+    }
+  }, [deferredMapSearchQuery]);
   const filteredPhotos = React.useMemo(
     () =>
       deferredMapSearchQuery.trim() && !mapSearchIndex

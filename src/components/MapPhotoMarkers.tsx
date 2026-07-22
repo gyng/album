@@ -49,16 +49,18 @@ const MapPhotoMarker = ({
     (element: HTMLDivElement | null) => {
       stopObservingRef.current?.();
       stopObservingRef.current =
-        element && showMarkerImages ? observeMarker(element, setIsImageVisible) : null;
+        element && (showMarkerImages || previewMarkers)
+          ? observeMarker(element, setIsImageVisible)
+          : null;
     },
-    [observeMarker, showMarkerImages],
+    [observeMarker, showMarkerImages, previewMarkers],
   );
 
   React.useEffect(() => {
-    if (!showMarkerImages) {
+    if (!showMarkerImages && !previewMarkers) {
       setIsImageVisible(false);
     }
-  }, [showMarkerImages]);
+  }, [showMarkerImages, previewMarkers]);
 
   React.useEffect(
     () => () => {

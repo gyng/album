@@ -140,6 +140,36 @@ describe("MapPhotoMarkers", () => {
     expect(IntersectionObserver).not.toHaveBeenCalled();
   });
 
+  it("shows a preview marker's thumbnail once visible even below the marker-image zoom threshold", () => {
+    // Small, spread-out result sets auto-fit far below the zoom threshold that
+    // drives showMarkerImages, so previewMarkers is the only signal available —
+    // it must still observe and reveal the thumbnail on its own.
+    const { container } = render(
+      <MapPhotoMarkers
+        photos={[photo()]}
+        showMarkerImages={false}
+        previewMarkers
+        emphasiseRoute={false}
+        activeRouteHrefSet={new Set()}
+        onSelect={jest.fn()}
+        onHover={jest.fn()}
+      />,
+    );
+
+    expect(observe).toHaveBeenCalledTimes(1);
+    expect(container.querySelectorAll("img")).toHaveLength(0);
+
+    const target = observe.mock.calls[0]![0] as Element;
+    act(() => {
+      intersectionCallback(
+        [{ target, isIntersecting: true } as unknown as IntersectionObserverEntry],
+        {} as IntersectionObserver,
+      );
+    });
+
+    expect(container.querySelectorAll("img")).toHaveLength(1);
+  });
+
   it("omits photos without complete coordinates", () => {
     render(
       <MapPhotoMarkers
