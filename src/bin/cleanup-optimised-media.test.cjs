@@ -8,6 +8,7 @@ const path = require("node:path");
 
 const { cleanupOptimisedMedia } = require("./cleanup-optimised-media.cjs");
 const imageOptimisationConfig = require("../services/imageOptimisationConfig.json");
+const { STALE_TEMP_FILE_THRESHOLD_MS } = require("./prepare-optimised-images.cjs");
 
 const IMAGE_CACHE_CONFIG_FILE = ".image-optimisation-config.json";
 
@@ -172,9 +173,11 @@ describe("cleanupOptimisedMedia", () => {
       removedChangedImages: 0,
       removedUnneededImageSizes: 0,
       removedOutdatedImages: 0,
+      removedStaleTempImages: 0,
       removedStaleVideos: 0,
       removedChangedVideos: 0,
       removedUnneededVideoSizes: 0,
+      removedStaleTempVideos: 0,
       removedOrphanedAlbums: 0,
     });
 
@@ -519,4 +522,163 @@ describe("cleanupOptimisedMedia", () => {
 
     exists.mockRestore();
   });
+
+  it("keeps a fresh in-flight temp file in the resized image dir but removes a stale one", async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "album-media-temp-image-"));
+    const albumsDir = path.join(root, "albums");
+    const publicAlbumsDir = path.join(root, "public", "data", "albums");
+    const albumDir = path.join(albumsDir, "trip");
+    const imageCacheDir = path.join(publicAlbumsDir, "trip", ".resized_images");
+
+    fs.mkdirSync(albumDir, { recursive: true });
+    fs.mkdirSync(imageCacheDir, { recursive: true });
+    markImageCacheCurrent(publicAlbumsDir);
+    fs.writeFileSync(path.join(albumDir, "photo.jpg"), "image");
+
+    // A fresh in-flight temp file, exactly as photo.ts / prepare-optimised-images.cjs
+    // would leave one mid-encode: it must survive because its size segment
+    // parses to NaN, which must never be treated as "an unneeded size".
+    const freshTemp = path.join(imageCacheDir, "photo.jpg@800.avif.tmp-12345-1");
+    fs.writeFileSync(freshTemp, "still being written");
+
+    // A stale temp left behind by a process that died mid-encode.
+    const staleTemp = path.join(imageCacheDir, "photo.jpg@1600.avif.tmp-99999-1");
+    fs.writeFileSync(staleTemp, "abandoned");
+    const old = new Date(Date.now() - STALE_TEMP_FILE_THRESHOLD_MS - 60 * 1000);
+    fs.utimesSync(staleTemp, old, old);
+
+    const summary = await cleanupOptimisedMedia({ albumsDir, publicAlbumsDir });
+
+    expect(fs.existsSync(freshTemp)).toBe(true);
+    expect(fs.existsSync(staleTemp)).toBe(false);
+    expect(summary.removedStaleTempImages).toBe(1);
+    // The fresh temp must not be counted as an "unneeded size" removal.
+    expect(summary.removedUnneededImageSizes).toBe(0);
+  });
+
+  it("keeps a fresh in-flight temp file in the resized video dir but removes a stale one", async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "album-media-temp-video-"));
+    const albumsDir = path.join(root, "albums");
+    const publicAlbumsDir = path.join(root, "public", "data", "albums");
+    const albumDir = path.join(albumsDir, "trip");
+    const videoCacheDir = path.join(publicAlbumsDir, "trip", ".resized_videos");
+
+    fs.mkdirSync(albumDir, { recursive: true });
+    fs.mkdirSync(videoCacheDir, { recursive: true });
+    markImageCacheCurrent(publicAlbumsDir);
+    fs.writeFileSync(path.join(albumDir, "clip.mp4"), "video");
+
+    const freshTemp = path.join(videoCacheDir, "clip.mp4@1920.mp4.tmp-12345-1");
+    fs.writeFileSync(freshTemp, "still being written");
+
+    const staleTemp = path.join(videoCacheDir, "clip.mp4@1280.mp4.tmp-99999-1");
+    fs.writeFileSync(staleTemp, "abandoned");
+    const old = new Date(Date.now() - STALE_TEMP_FILE_THRESHOLD_MS - 60 * 1000);
+    fs.utimesSync(staleTemp, old, old);
+
+    const summary = await cleanupOptimisedMedia({ albumsDir, publicAlbumsDir });
+
+    expect(fs.existsSync(freshTemp)).toBe(true);
+    expect(fs.existsSync(staleTemp)).toBe(false);
+    expect(summary.removedStaleTempVideos).toBe(1);
+    expect(summary.removedUnneededVideoSizes).toBe(0);
+  });
+
+  it("tolerates the cached file disappearing between readdir and the changed-since check instead of crashing", async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "album-media-cache-vanish-"));
+    const albumsDir = path.join(root, "albums");
+    const publicAlbumsDir = path.join(root, "public", "data", "albums");
+    const albumDir = path.join(albumsDir, "trip");
+    const imageCacheDir = path.join(publicAlbumsDir, "trip", ".resized_images");
+    const source = path.join(albumDir, "kept.jpg");
+    const cached = path.join(imageCacheDir, "kept.jpg@800.avif");
+
+    fs.mkdirSync(albumDir, { recursive: true });
+    fs.mkdirSync(imageCacheDir, { recursive: true });
+    markImageCacheCurrent(publicAlbumsDir);
+    fs.writeFileSync(source, "image");
+    fs.writeFileSync(cached, "cached");
+
+    const realStatSync = fs.statSync.bind(fs);
+    const statSpy = jest.spyOn(fs, "statSync").mockImplementation((target, ...rest) => {
+      if (target === cached) {
+        const error = new Error("vanished between readdir and stat");
+        error.code = "ENOENT";
+        throw error;
+      }
+      return realStatSync(target, ...rest);
+    });
+
+    await expect(cleanupOptimisedMedia({ albumsDir, publicAlbumsDir })).resolves.toMatchObject({
+      removedChangedImages: 0,
+    });
+
+    statSpy.mockRestore();
+  });
+
+  it("counts a symlinked photo file as a real album, keeping the orphan sweep and sentinel stamp active", async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "album-media-symlink-real-"));
+    const albumsDir = path.join(root, "albums");
+    const publicAlbumsDir = path.join(root, "public", "data", "albums");
+    const realAlbumDir = path.join(albumsDir, "trip");
+    const realPhotoStorage = path.join(root, "real-photo-storage", "photo.jpg");
+    const orphanedPublicAlbumDir = path.join(publicAlbumsDir, "deleted-trip");
+    const orphanedImageCacheDir = path.join(orphanedPublicAlbumDir, ".resized_images");
+
+    fs.mkdirSync(realAlbumDir, { recursive: true });
+    fs.mkdirSync(path.dirname(realPhotoStorage), { recursive: true });
+    fs.mkdirSync(orphanedImageCacheDir, { recursive: true });
+    fs.writeFileSync(realPhotoStorage, "image");
+    // The album's only photo is a symlink — directoryHasPhotoFile must resolve
+    // it via statSync, not rely on entry.isFile() (false for symlinks).
+    fs.symlinkSync(realPhotoStorage, path.join(realAlbumDir, "photo.jpg"));
+    fs.writeFileSync(path.join(orphanedImageCacheDir, "photo.jpg@800.avif"), "cached");
+    fs.writeFileSync(path.join(publicAlbumsDir, IMAGE_CACHE_CONFIG_FILE), "old settings");
+
+    const summary = await cleanupOptimisedMedia({ albumsDir, publicAlbumsDir });
+
+    // hasRealAlbum must be true even though the only photo is a symlink: the
+    // orphan sweep ran and the sentinel got restamped to the current settings.
+    expect(summary.removedOrphanedAlbums).toBe(1);
+    expect(fs.existsSync(orphanedPublicAlbumDir)).toBe(false);
+    expect(fs.readFileSync(path.join(publicAlbumsDir, IMAGE_CACHE_CONFIG_FILE), "utf8")).toBe(
+      JSON.stringify(imageOptimisationConfig),
+    );
+  });
+
+  const itUnlessRoot = process.getuid && process.getuid() === 0 ? it.skip : it;
+
+  itUnlessRoot(
+    "treats an unreadable album source directory as having no photo instead of crashing predev",
+    async () => {
+      const root = fs.mkdtempSync(path.join(os.tmpdir(), "album-media-eacces-"));
+      const albumsDir = path.join(root, "albums");
+      const publicAlbumsDir = path.join(root, "public", "data", "albums");
+      // A single unreadable album, so evaluating it can't be skipped by
+      // Array.prototype.some() short-circuiting on some other real album —
+      // this deterministically forces directoryHasPhotoFile to hit EACCES.
+      const lockedAlbumDir = path.join(albumsDir, "locked");
+
+      fs.mkdirSync(lockedAlbumDir, { recursive: true });
+      fs.writeFileSync(path.join(lockedAlbumDir, "photo.jpg"), "image");
+      fs.mkdirSync(publicAlbumsDir, { recursive: true });
+      fs.writeFileSync(path.join(publicAlbumsDir, IMAGE_CACHE_CONFIG_FILE), "old settings");
+      fs.chmodSync(lockedAlbumDir, 0o000);
+
+      try {
+        const summary = await cleanupOptimisedMedia({ albumsDir, publicAlbumsDir });
+
+        expect(summary.albumsScanned).toBe(1);
+        // Treated as "no photo here" (not a real album), just like the
+        // test-*/`.stfolder`-only scenarios: the sentinel is left untouched
+        // rather than being stamped "current" on the strength of a directory
+        // whose contents could not actually be verified.
+        expect(fs.readFileSync(path.join(publicAlbumsDir, IMAGE_CACHE_CONFIG_FILE), "utf8")).toBe(
+          "old settings",
+        );
+      } finally {
+        fs.chmodSync(lockedAlbumDir, 0o700);
+      }
+    },
+  );
 });

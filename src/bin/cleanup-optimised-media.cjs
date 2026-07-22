@@ -1,6 +1,11 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const imageOptimisationConfig = require("../services/imageOptimisationConfig.json");
+const {
+  PHOTO_EXTENSIONS,
+  TEMP_FILE_SEPARATOR,
+  STALE_TEMP_FILE_THRESHOLD_MS,
+} = require("./prepare-optimised-images.cjs");
 
 const OPTIMISED_IMAGE_SIZES = new Set(imageOptimisationConfig.sizes);
 const OPTIMISED_VIDEO_MAX_WIDTH = 1920;
@@ -24,34 +29,44 @@ const listDirectories = (root) => {
   });
 };
 
-// Mirrors prepare-optimised-images.cjs's PHOTO_EXTENSIONS allowlist. Kept as
-// a small local duplicate rather than a shared module: .cjs build scripts
-// can't import the TypeScript photo.ts service, and this is the only other
-// caller that needs it.
-const PHOTO_EXTENSIONS = new Set([
-  ".jpg",
-  ".jpeg",
-  ".png",
-  ".webp",
-  ".avif",
-  ".gif",
-  ".tif",
-  ".tiff",
-]);
-
-const directoryHasPhotoFile = (dir) => {
-  let entries;
+// isFileEntry mirrors prepare-optimised-images.cjs's own helper of the same
+// shape: withFileTypes() reports isFile() as false for symlinks, so a
+// symlinked photo would otherwise never count, permanently disabling the
+// orphan sweep and the sentinel stamp for a symlink-based album library.
+const isFileEntry = (dir, entry) => {
+  if (entry.isFile()) {
+    return true;
+  }
+  if (!entry.isSymbolicLink()) {
+    return false;
+  }
   try {
-    entries = fs.readdirSync(dir, { withFileTypes: true });
+    return fs.statSync(path.join(dir, entry.name)).isFile();
   } catch (err) {
     if (err.code === "ENOENT") {
       return false;
     }
     throw err;
   }
+};
+
+const directoryHasPhotoFile = (dir) => {
+  let entries;
+  try {
+    entries = fs.readdirSync(dir, { withFileTypes: true });
+  } catch (err) {
+    // ENOENT: the directory vanished (TOCTOU). EACCES: unreadable (e.g. a
+    // permissions mistake on the albums mount). Neither is grounds to crash
+    // the whole predev run — treat it as "no photo here" and keep scanning
+    // the other albums.
+    if (err.code === "ENOENT" || err.code === "EACCES") {
+      return false;
+    }
+    throw err;
+  }
 
   return entries.some((entry) => {
-    return entry.isFile() && PHOTO_EXTENSIONS.has(path.extname(entry.name).toLowerCase());
+    return isFileEntry(dir, entry) && PHOTO_EXTENSIONS.has(path.extname(entry.name).toLowerCase());
   });
 };
 
@@ -109,25 +124,80 @@ const hasSourceChangedSinceCache = (sourcePath, cachedPath) => {
   // rsync/restore over albums/), which would needlessly invalidate the entire
   // media cache and trigger hours of re-encoding despite unchanged content.
   const sourceStat = fs.statSync(sourcePath);
-  const cachedStat = fs.statSync(cachedPath);
+
+  let cachedStat;
+  try {
+    cachedStat = fs.statSync(cachedPath);
+  } catch (err) {
+    // Tolerate ENOENT rather than pre-checking with existsSync: under a
+    // concurrent build the cached file (or a temp file renamed into place)
+    // can vanish between readdirSync and this stat (TOCTOU, same as
+    // removeFileIfExists above). Treat it as not-changed and let the caller
+    // skip the entry rather than crashing the whole cleanup pass.
+    if (err.code === "ENOENT") {
+      return false;
+    }
+    throw err;
+  }
 
   return sourceStat.mtimeMs > cachedStat.mtimeMs;
+};
+
+// A cache-dir entry like "photo.jpg@800.avif.tmp-<pid>-<n>" is a still-live or
+// crashed in-flight write from prepare-optimised-images.cjs / photo.ts's own
+// encoder (see TEMP_FILE_SEPARATOR there). parseCacheFileName has no size
+// segment to parse for it (it parses to NaN), which OPTIMISED_IMAGE_SIZES
+// would never contain — without this check every fresh in-flight temp file
+// would be deleted out from under its writer as a bogus "unneeded size",
+// resurrecting the exact delete-under-writer race the temp-file scheme exists
+// to prevent. Apply the same stale-only discipline as the stray-temp cleanup
+// there: only remove it once it's older than the threshold a concurrent
+// writer could plausibly still be using.
+const isTempFile = (file) => file.includes(TEMP_FILE_SEPARATOR);
+
+const isFreshTempFile = (targetPath) => {
+  let stat;
+  try {
+    stat = fs.statSync(targetPath);
+  } catch (err) {
+    // Already gone (TOCTOU) — nothing to protect, treat as not-fresh so the
+    // caller's removal attempt below is a harmless no-op.
+    if (err.code === "ENOENT") {
+      return false;
+    }
+    throw err;
+  }
+  return Date.now() - stat.mtimeMs < STALE_TEMP_FILE_THRESHOLD_MS;
 };
 
 const cleanupImageCache = ({ albumDir, publicAlbumDir, invalidateOptimisedImages }) => {
   const resizedDir = path.join(publicAlbumDir, RESIZED_IMAGE_DIR);
 
   if (!isDirectory(resizedDir)) {
-    return { removedStale: 0, removedUnneeded: 0, removedChanged: 0, removedOutdated: 0 };
+    return {
+      removedStale: 0,
+      removedUnneeded: 0,
+      removedChanged: 0,
+      removedOutdated: 0,
+      removedStaleTemp: 0,
+    };
   }
 
   let removedStale = 0;
   let removedUnneeded = 0;
   let removedChanged = 0;
   let removedOutdated = 0;
+  let removedStaleTemp = 0;
 
   for (const file of fs.readdirSync(resizedDir)) {
     const cachedFile = path.join(resizedDir, file);
+
+    if (isTempFile(file)) {
+      if (!isFreshTempFile(cachedFile)) {
+        removedStaleTemp += removeFileIfExists(cachedFile) ? 1 : 0;
+      }
+      continue;
+    }
 
     if (invalidateOptimisedImages && path.extname(file).toLowerCase() === ".avif") {
       removedOutdated += removeFileIfExists(cachedFile) ? 1 : 0;
@@ -152,22 +222,31 @@ const cleanupImageCache = ({ albumDir, publicAlbumDir, invalidateOptimisedImages
     }
   }
 
-  return { removedStale, removedUnneeded, removedChanged, removedOutdated };
+  return { removedStale, removedUnneeded, removedChanged, removedOutdated, removedStaleTemp };
 };
 
 const cleanupVideoCache = ({ albumDir, publicAlbumDir }) => {
   const resizedDir = path.join(publicAlbumDir, RESIZED_VIDEO_DIR);
 
   if (!isDirectory(resizedDir)) {
-    return { removedStale: 0, removedUnneeded: 0, removedChanged: 0 };
+    return { removedStale: 0, removedUnneeded: 0, removedChanged: 0, removedStaleTemp: 0 };
   }
 
   let removedStale = 0;
   let removedUnneeded = 0;
   let removedChanged = 0;
+  let removedStaleTemp = 0;
 
   for (const file of fs.readdirSync(resizedDir)) {
     const cachedFile = path.join(resizedDir, file);
+
+    if (isTempFile(file)) {
+      if (!isFreshTempFile(cachedFile)) {
+        removedStaleTemp += removeFileIfExists(cachedFile) ? 1 : 0;
+      }
+      continue;
+    }
+
     const { originalName, size } = parseCacheFileName(file);
     const originalFile = path.join(albumDir, originalName);
 
@@ -189,7 +268,7 @@ const cleanupVideoCache = ({ albumDir, publicAlbumDir }) => {
     }
   }
 
-  return { removedStale, removedUnneeded, removedChanged };
+  return { removedStale, removedUnneeded, removedChanged, removedStaleTemp };
 };
 
 // listDirectories(albumsDir) only ever sees albums that still exist, so a
@@ -265,9 +344,11 @@ const cleanupOptimisedMedia = async ({
     removedChangedImages: 0,
     removedUnneededImageSizes: 0,
     removedOutdatedImages: 0,
+    removedStaleTempImages: 0,
     removedStaleVideos: 0,
     removedChangedVideos: 0,
     removedUnneededVideoSizes: 0,
+    removedStaleTempVideos: 0,
     removedOrphanedAlbums: 0,
   };
 
@@ -286,9 +367,11 @@ const cleanupOptimisedMedia = async ({
     totals.removedChangedImages += imageResults.removedChanged;
     totals.removedUnneededImageSizes += imageResults.removedUnneeded;
     totals.removedOutdatedImages += imageResults.removedOutdated;
+    totals.removedStaleTempImages += imageResults.removedStaleTemp;
     totals.removedStaleVideos += videoResults.removedStale;
     totals.removedChangedVideos += videoResults.removedChanged;
     totals.removedUnneededVideoSizes += videoResults.removedUnneeded;
+    totals.removedStaleTempVideos += videoResults.removedStaleTemp;
   }
 
   totals.removedOrphanedAlbums = removeOrphanedAlbumMediaCaches({

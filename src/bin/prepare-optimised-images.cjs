@@ -344,6 +344,9 @@ const prepareOptimisedImages = async ({
 
 module.exports = {
   prepareOptimisedImages,
+  PHOTO_EXTENSIONS,
+  TEMP_FILE_SEPARATOR,
+  STALE_TEMP_FILE_THRESHOLD_MS,
 };
 
 /* istanbul ignore next -- direct CLI dispatch; preparation is tested through its exported API */

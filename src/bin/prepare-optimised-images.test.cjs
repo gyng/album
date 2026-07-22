@@ -10,7 +10,12 @@ jest.mock("sharp", () => jest.fn());
 
 const sharp = require("sharp");
 const imageOptimisationConfig = require("../services/imageOptimisationConfig.json");
-const { prepareOptimisedImages } = require("./prepare-optimised-images.cjs");
+const {
+  prepareOptimisedImages,
+  PHOTO_EXTENSIONS,
+  TEMP_FILE_SEPARATOR,
+  STALE_TEMP_FILE_THRESHOLD_MS,
+} = require("./prepare-optimised-images.cjs");
 
 // Builds a single mock object exposing both the metadata-read shape
 // (`sharp(cachedFile).metadata()`, used by the cache-validity check) and the
@@ -493,5 +498,12 @@ describe("prepareOptimisedImages", () => {
     expect(fs.readFileSync(okOutput, "utf8")).toBe("generated");
     expect(listTempFiles(okCacheDir)).toEqual([]);
     mkdirSpy.mockRestore();
+  });
+
+  it("exports the photo-extension allowlist and temp-file constants for reuse by cleanup-optimised-media.cjs", () => {
+    expect(PHOTO_EXTENSIONS.has(".jpg")).toBe(true);
+    expect(PHOTO_EXTENSIONS.has(".raf")).toBe(false);
+    expect(TEMP_FILE_SEPARATOR).toBe(".tmp-");
+    expect(STALE_TEMP_FILE_THRESHOLD_MS).toBe(15 * 60 * 1000);
   });
 });
