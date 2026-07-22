@@ -302,6 +302,44 @@ describe("publish-wizard-lib", () => {
     }
   });
 
+  it("skips indexing without prompting when --yes is used and model info is unavailable", async () => {
+    // Regression: askYesNo({ yes: true }) short-circuits straight to
+    // defaultValue (true) for "Run indexing now?", so an unattended --yes run
+    // used to auto-launch a likely-broken indexer on a transient model-info
+    // failure. --yes must instead skip indexing quietly here (the wizard's
+    // main flow prints a loud warning and decides whether to proceed).
+    const originalCreateInterface = require("readline/promises").createInterface;
+    const createInterface = jest.fn(() => {
+      throw new Error("must not prompt in an unattended --yes run");
+    });
+    require("readline/promises").createInterface = createInterface;
+
+    try {
+      const plan = await resolveExecutionPlan({
+        args: {
+          dryRun: false,
+          fastTrack: true,
+          yes: true,
+          json: false,
+          indexOnly: false,
+          deploy: false,
+          force: false,
+          skipPull: false,
+          skipBuild: true,
+        },
+        report: {
+          summary: { newPhotos: 0, removedPhotos: 0 },
+          db: { missingEmbeddingCount: 0, staleEmbeddingCount: 0, modelInfoUnavailable: true },
+        },
+      });
+
+      expect(plan.runIndex).toBe(false);
+      expect(createInterface).not.toHaveBeenCalled();
+    } finally {
+      require("readline/promises").createInterface = originalCreateInterface;
+    }
+  });
+
   it("checks Vercel up front when a fast-track plan builds or deploys", () => {
     const args = {
       indexOnly: false,

@@ -121,6 +121,81 @@ describe("publish wizard orchestration", () => {
     expect(harness.services.loadDbState).not.toHaveBeenCalled();
   });
 
+  it("asks a second confirmation and continues when model info is unavailable and the user declines then accepts", async () => {
+    const harness = makeHarness({
+      report: {
+        ...makeReport(),
+        db: { missingEmbeddingCount: 0, staleEmbeddingCount: 0, modelInfoUnavailable: true },
+      },
+      plan: { runIndex: false, runBuild: true, runDeploy: false },
+      answers: [true],
+    });
+
+    await main(harness.input);
+
+    expect(harness.log).toHaveBeenCalledWith("Skipping indexing by user choice.");
+    expect(harness.services.askYesNo).toHaveBeenCalledWith({
+      prompt: "Proceed with build and deploy without index verification?",
+      defaultValue: false,
+      yes: false,
+    });
+    expect(harness.services.runShellCommand).not.toHaveBeenCalledWith(
+      expect.objectContaining({ command: "npm run index:update" }),
+    );
+    expect(harness.error).toHaveBeenCalledWith(expect.stringContaining("index state is unknown"));
+    expect(harness.services.loadDbState).toHaveBeenCalled();
+    expect(harness.services.runShellCommand).toHaveBeenCalledWith({
+      command: "npx --yes vercel@latest build --prod",
+      cwd: "/src",
+    });
+  });
+
+  it("asks a second confirmation and exits when model info is unavailable and the user declines twice", async () => {
+    const harness = makeHarness({
+      report: {
+        ...makeReport(),
+        db: { missingEmbeddingCount: 0, staleEmbeddingCount: 0, modelInfoUnavailable: true },
+      },
+      plan: { runIndex: false, runBuild: true, runDeploy: false },
+      answers: [false],
+    });
+
+    await main(harness.input);
+
+    expect(harness.log).toHaveBeenCalledWith("Skipping indexing by user choice.");
+    expect(harness.services.askYesNo).toHaveBeenCalledWith({
+      prompt: "Proceed with build and deploy without index verification?",
+      defaultValue: false,
+      yes: false,
+    });
+    expect(harness.services.runShellCommand).not.toHaveBeenCalled();
+    expect(harness.services.loadDbState).not.toHaveBeenCalled();
+  });
+
+  it("--yes skips index:update on unknown model info without prompting, and continues with a warning", async () => {
+    const harness = makeHarness({
+      args: { yes: true },
+      report: {
+        ...makeReport(),
+        db: { missingEmbeddingCount: 0, staleEmbeddingCount: 0, modelInfoUnavailable: true },
+      },
+      plan: { runIndex: false, runBuild: true, runDeploy: false },
+    });
+
+    await main(harness.input);
+
+    expect(harness.services.askYesNo).not.toHaveBeenCalled();
+    expect(harness.services.runShellCommand).not.toHaveBeenCalledWith(
+      expect.objectContaining({ command: "npm run index:update" }),
+    );
+    expect(harness.error).toHaveBeenCalledWith(expect.stringContaining("index state is unknown"));
+    expect(harness.services.loadDbState).toHaveBeenCalled();
+    expect(harness.services.runShellCommand).toHaveBeenCalledWith({
+      command: "npx --yes vercel@latest build --prod",
+      cwd: "/src",
+    });
+  });
+
   it("skips an unnecessary index and reports a failed verification", async () => {
     const harness = makeHarness({
       args: { json: true },

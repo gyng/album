@@ -78,10 +78,36 @@ const main = async ({ args, context, services, now, log, error, setExitCode }) =
   if (services.hasIndexChanges(report)) {
     if (!executionPlan.runIndex) {
       log("Skipping indexing by user choice.");
-      return;
-    }
 
-    await services.runShellCommand({ command: "npm run index:update", cwd: context.srcDir });
+      if (!report.db?.modelInfoUnavailable) {
+        return;
+      }
+
+      // Model info was unavailable, so the earlier "index changes?" signal was
+      // forced true and is unreliable — declining to index here does not mean
+      // the DB is actually clean. Never silently treat that unknown state as
+      // safe: ask an explicit second confirmation before continuing to
+      // build/deploy, unless this is an unattended --yes run, where prompting
+      // is impossible and auto-launching a likely-broken indexer would be
+      // worse than skipping (see resolveExecutionPlan).
+      const proceedWithoutIndex = args.yes
+        ? true
+        : await services.askYesNo({
+            prompt: "Proceed with build and deploy without index verification?",
+            defaultValue: false,
+            yes: args.yes,
+          });
+
+      if (!proceedWithoutIndex) {
+        return;
+      }
+
+      error(
+        "\nWARNING: indexer model info was unavailable, so index state is unknown — proceeding without index verification.",
+      );
+    } else {
+      await services.runShellCommand({ command: "npm run index:update", cwd: context.srcDir });
+    }
   } else {
     log("\nNo new or removed photos detected. Skipping index update.");
   }

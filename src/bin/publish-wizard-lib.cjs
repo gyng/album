@@ -533,11 +533,21 @@ const resolveExecutionPlan = async ({ args, report }) => {
   };
 
   if (indexChanges) {
-    plan.runIndex = await askYesNo({
-      prompt: "Run indexing now?",
-      defaultValue: true,
-      yes: args.yes,
-    });
+    if (report.db?.modelInfoUnavailable && args.yes) {
+      // askYesNo({ yes: true }) short-circuits straight to defaultValue
+      // (true), so an unattended --yes run would otherwise auto-launch the
+      // indexer purely because its own model metadata couldn't be read — the
+      // same broken-environment reason it would likely fail again for. Skip
+      // indexing quietly here; the wizard's main flow is responsible for a
+      // loud warning and the decision whether to proceed without it.
+      plan.runIndex = false;
+    } else {
+      plan.runIndex = await askYesNo({
+        prompt: "Run indexing now?",
+        defaultValue: true,
+        yes: args.yes,
+      });
+    }
   }
 
   if (args.indexOnly) {
