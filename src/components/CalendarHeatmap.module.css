@@ -209,15 +209,15 @@
 }
 
 .level1 {
-  background-color: color-mix(in oklch, var(--c-heatmap-low) 60%, transparent);
+  background-color: color-mix(in oklch, var(--c-heatmap-low) var(--heatmap-mix-low), transparent);
 }
 
 .level2 {
-  background-color: color-mix(in oklch, var(--c-heatmap-mid) 78%, transparent);
+  background-color: color-mix(in oklch, var(--c-heatmap-mid) var(--heatmap-mix-mid), transparent);
 }
 
 .level3 {
-  background-color: color-mix(in oklch, var(--c-heatmap-high) 86%, transparent);
+  background-color: color-mix(in oklch, var(--c-heatmap-high) var(--heatmap-mix-high), transparent);
 }
 
 .level4 {

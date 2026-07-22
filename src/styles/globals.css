@@ -50,6 +50,7 @@ body {
   overflow-x: clip;
   background-image: var(--theme-background-image);
   background-size: var(--theme-background-size);
+  background-position: var(--theme-background-position);
   background-attachment: var(--theme-background-attachment);
   background-blend-mode: var(--theme-background-blend-mode);
 }
@@ -154,6 +155,7 @@ textarea {
     "Droid Sans", "Helvetica Neue", sans-serif;
   --theme-background-image: none;
   --theme-background-size: auto;
+  --theme-background-position: 0 0;
   --theme-background-attachment: scroll;
   --theme-background-blend-mode: normal;
 
@@ -334,6 +336,12 @@ textarea {
   --c-heatmap-mid: oklch(73.485% 0.11858 69.63);
   --c-heatmap-high: oklch(56.808% 0.13283 47.14);
   --c-heatmap-peak: oklch(39.15% 0.12421 33.76);
+  /* Sub-peak heatmap cells are softened with transparency by default; themes
+     whose backgrounds sit too close to the translucent result override these
+     to 100% and supply a full opaque ramp instead. */
+  --heatmap-mix-low: 60%;
+  --heatmap-mix-mid: 78%;
+  --heatmap-mix-high: 86%;
   --c-route: oklch(73.011% 0.12463 211.09);
   --c-route-ghost: rgb(38 56 62 / 0.18);
   --c-route-edge: rgb(28 40 44 / 0.7);
@@ -521,6 +529,10 @@ body.dark {
    typography and enough neon chrome to make a Blingee profile jealous. */
 :root:where(.theme-bling),
 :where(.theme-bling) {
+  /* Deliberate nostalgia gamble: unlike every other themed family, this one
+     has no bundled @fontsource fallback, so platforms without one of these
+     installed (Linux, Android) fall through to generic cursive. Accepted
+     trade-off — do not add a font dependency to "fix" it. */
   --font-sans: "Comic Sans MS", "Chalkboard SE", "Marker Felt", cursive;
   --font-display: Impact, Haettenschweiler, "Arial Black", fantasy;
   --theme-heading-font-style: italic;
@@ -567,7 +579,6 @@ body.dark {
   --theme-heading-font-variant: small-caps;
   --theme-heading-font-weight: 600;
   --theme-heading-letter-spacing: 0.07em;
-  --theme-heading-text-transform: uppercase;
   --c-bg: oklch(89% 0.055 96);
   --c-overlay: oklch(94% 0.045 94 / 0.88);
   --c-font: oklch(24% 0.075 125);
@@ -578,6 +589,16 @@ body.dark {
   --c-herbarium-ink: oklch(29% 0.09 128);
   --c-herbarium-copper: oklch(49% 0.13 42);
   --c-herbarium-foxing: oklch(52% 0.105 65 / 0.14);
+  /* The default translucent ramp cannot reach 3:1 on this L89 warm bg (the
+     60% mix alone caps low at ~2.3:1), so use a solid copper ramp instead.
+     Effective contrast vs --c-bg: 3.70 / 5.45 / 7.92 / 10.89. */
+  --heatmap-mix-low: 100%;
+  --heatmap-mix-mid: 100%;
+  --heatmap-mix-high: 100%;
+  --c-heatmap-low: oklch(55% 0.13 42);
+  --c-heatmap-mid: oklch(46% 0.13 42);
+  --c-heatmap-high: oklch(37% 0.12 40);
+  --c-heatmap-peak: oklch(28% 0.1 38);
   --theme-herbarium-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 280 200'%3E%3Cg fill='none' stroke='black' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 205C65 160 70 72 125 0'/%3E%3Cpath d='M55 157C26 150 19 124 21 110C45 112 62 128 55 157Z'/%3E%3Cpath d='M72 119C99 113 111 91 109 75C84 79 69 95 72 119Z'/%3E%3Cpath d='M91 72C66 64 58 43 62 28C84 34 97 49 91 72Z'/%3E%3Cpath d='M184 205C211 167 218 98 199 45'/%3E%3Cpath d='M207 148C237 140 247 117 242 100C217 106 201 124 207 148Z'/%3E%3Cpath d='M204 105C179 98 167 78 170 62C193 66 207 81 204 105Z'/%3E%3C/g%3E%3C/svg%3E");
   --theme-background-image:
     radial-gradient(circle at 88% 8%, oklch(67% 0.08 110 / 0.28), transparent 28%),
@@ -680,13 +701,23 @@ body.dark {
   --c-bg: oklch(67% 0.12 195);
   --c-overlay: oklch(88% 0.018 245 / 0.94);
   --c-font: oklch(18% 0.025 255);
-  --c-bg-contrast-light: oklch(96% 0.01 250);
+  --c-bg-contrast-light: oklch(31% 0.03 195);
   --c-bg-contrast-dark: oklch(32% 0.04 250);
   --c-accent: oklch(48% 0.22 292);
   --c-desktop-face: oklch(83% 0.018 245);
   --c-desktop-light: oklch(98% 0.005 245);
   --c-desktop-shadow: oklch(35% 0.035 245);
   --c-desktop-blue: oklch(48% 0.17 255);
+  /* The default translucent warm ramp sits too close to this mid-lightness
+     teal bg (60% mix caps low at ~2.1:1), so use a solid shadow/blue ramp.
+     Effective contrast vs --c-bg: 3.78 / 4.92 / 6.12 / 6.99. */
+  --heatmap-mix-low: 100%;
+  --heatmap-mix-mid: 100%;
+  --heatmap-mix-high: 100%;
+  --c-heatmap-low: oklch(36% 0.07 225);
+  --c-heatmap-mid: oklch(29% 0.08 240);
+  --c-heatmap-high: oklch(22% 0.08 250);
+  --c-heatmap-peak: oklch(15% 0.06 255);
   --theme-background-image:
     linear-gradient(
       45deg,
@@ -701,10 +732,15 @@ body.dark {
       oklch(38% 0.08 205 / 0.24) 75%
     );
   --theme-background-size: var(--size-8) var(--size-8), var(--size-8) var(--size-8);
+  --theme-background-position: 0 0, var(--size-4) var(--size-4);
   --theme-background-attachment: fixed;
 }
 
 body.theme-bling {
+  isolation: isolate;
+  /* Known cost: animating background-position on a fixed-attachment layer
+     repaints continuously. Left as-is because changing it would alter the
+     visuals; out of scope for this fix. */
   animation: bling-background-drift calc(var(--t-shimmer) * 8) linear infinite;
 }
 
@@ -712,6 +748,7 @@ body.theme-bling::before {
   content: "✦ · ✧ ★ ｡ ✦ · ✧ ★ ｡ ✦ · ✧ ★";
   position: fixed;
   inset: 0;
+  z-index: var(--z-behind);
   overflow: hidden;
   pointer-events: none;
   color: var(--c-bling-gold);

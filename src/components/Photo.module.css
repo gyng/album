@@ -193,15 +193,21 @@
 }
 
 /* Leave room beside a normal photo, then align the details toggle immediately
-   outside its top-right corner. The matching width expression keeps the
-   positioning based on the rendered image rather than its grid cell. */
-.block:where(:not(.immersive)) .image {
-  inline-size: min(
+   outside its top-right corner. --photo-render-width is the single source of
+   truth for the rendered image width so .image and the .details margin (its
+   inverse) are structurally guaranteed to match rather than hand-duplicated;
+   the 720px variant below only needs to redefine the custom property. */
+.block:where(:not(.immersive)) {
+  --photo-render-width: min(
     90svw,
     calc(100% - (var(--tap-target) + var(--m-s)) * 2),
     calc(90svh * var(--photo-aspect, 1)),
     var(--photo-intrinsic-width, 100%)
   );
+}
+
+.block:where(:not(.immersive)) .image {
+  inline-size: var(--photo-render-width);
   max-inline-size: none;
   max-block-size: none;
 }
@@ -210,14 +216,7 @@
   margin-block-start: 0;
   scrollbar-gutter: auto;
   margin-inline-end: calc(
-    (100% -
-        min(
-          90svw,
-          calc(100% - (var(--tap-target) + var(--m-s)) * 2),
-          calc(90svh * var(--photo-aspect, 1)),
-          var(--photo-intrinsic-width, 100%)
-        )) /
-      2 - var(--tap-target) - var(--m-s)
+    (100% - var(--photo-render-width)) / 2 - var(--tap-target) - var(--m-s)
   );
 }
 
@@ -241,8 +240,9 @@
     padding-block-start: var(--tap-target);
   }
 
-  .block:where(:not(.immersive)) .image {
-    inline-size: min(
+  .block:where(:not(.immersive)) {
+    /* No side control on narrow screens, so the clearance term drops out. */
+    --photo-render-width: min(
       90svw,
       100%,
       calc(90svh * var(--photo-aspect, 1)),
