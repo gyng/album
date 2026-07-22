@@ -12,7 +12,12 @@ const IMAGE_CACHE = "snapshots-pwa-images";
 // and never bound its own growth; stale-while-revalidate refreshes in the
 // background and this cap evicts the oldest entries so the store cannot grow
 // without limit.
-const IMAGE_CACHE_MAX_ENTRIES = 1000;
+//
+// Sizing: an offline photo-frame library of ~1.5k photos served at two variants
+// (thumbnail + full) is ~3k entries, and this cache also holds non-image /data/
+// payloads, so a lower cap would silently punch holes in a large offline
+// library. 4000 covers that with headroom while still bounding growth.
+const IMAGE_CACHE_MAX_ENTRIES = 4000;
 
 const SHELL_DOCUMENTS = ["/", "/slideshow", "/slideshow/shell"];
 const SHELL_STATIC_ASSETS = [
@@ -116,35 +121,51 @@ const trimCache = async (cache, maxEntries) => {
   await Promise.all(keys.slice(0, keys.length - maxEntries).map((key) => cache.delete(key)));
 };
 
+// URLs whose media bytes have already been (re)fetched during this worker's
+// lifetime. Bounds background revalidation to at most once per URL per lifetime:
+// without it a kiosk re-downloads full image bytes on every single hit.
+const revalidatedImageUrls = new Set();
+
+// Fetch fresh media and store it, bounded by the cache cap. Uses `no-cache` so
+// the request is conditional (ETag/Last-Modified): a server that supports
+// validators answers unchanged media with a cheap 304 instead of resending the
+// bytes, and — crucially — a long `max-age` response header cannot let the HTTP
+// cache satisfy this from disk and skip revalidation entirely.
+const fetchImageAndStore = async (cache, request) => {
+  const response = await fetch(request, { cache: "no-cache" });
+  if (response.ok) {
+    revalidatedImageUrls.add(request.url);
+    await cache.put(request, response.clone()).catch(() => {
+      // Cache quota or storage failures must not hide a valid response.
+    });
+    await trimCache(cache, IMAGE_CACHE_MAX_ENTRIES).catch(() => {
+      // Eviction is best-effort; a failed trim must not break the response.
+    });
+  }
+  return response;
+};
+
 // Stale-while-revalidate for original-filename album media: serve the cached
-// copy immediately, refresh it in the background on a 200 (failures ignored so
-// offline stays fine), and keep the unversioned cache bounded after each write.
+// copy immediately, refresh it in the background at most once per URL per worker
+// lifetime (failures ignored so offline stays fine), and keep the unversioned
+// cache bounded after each write.
 const staleWhileRevalidateImage = async (request, event) => {
   const cache = await caches.open(IMAGE_CACHE);
   const cached = await cache.match(request);
-  const revalidate = fetch(request)
-    .then(async (response) => {
-      if (response.ok) {
-        await cache.put(request, response.clone()).catch(() => {
-          // Cache quota or storage failures must not hide a valid response.
-        });
-        await trimCache(cache, IMAGE_CACHE_MAX_ENTRIES).catch(() => {
-          // Eviction is best-effort; a failed trim must not break the response.
-        });
-      }
-      return response;
-    })
-    .catch(() => null);
 
   if (cached) {
-    // respondWith settles immediately with the stale copy; keep the worker alive
-    // separately until the background refresh and trim land.
-    if (typeof event.waitUntil === "function") {
-      event.waitUntil(revalidate);
+    // respondWith settles immediately with the cached copy. Revalidate in the
+    // background only if we have not already done so this lifetime and we can
+    // keep the worker alive to finish the write and trim.
+    if (!revalidatedImageUrls.has(request.url) && typeof event.waitUntil === "function") {
+      revalidatedImageUrls.add(request.url);
+      event.waitUntil(fetchImageAndStore(cache, request).catch(() => null));
     }
     return cached;
   }
-  return (await revalidate) ?? new Response(null, { status: 504 });
+  // Nothing cached yet — this is the initial download, not a revalidation, so it
+  // is not subject to the throttle above.
+  return (await fetchImageAndStore(cache, request).catch(() => null)) ?? new Response(null, { status: 504 });
 };
 
 const staleWhileRevalidate = async (request, cacheName, event) => {

@@ -5,6 +5,7 @@ import {
   isSlideshowShellStateMessage,
   MAX_RUNTIME_RELOAD_ATTEMPTS,
   planRuntimeReload,
+  recordRuntimeReload,
   RUNTIME_RELOAD_BASE_DELAY_MS,
   SLIDESHOW_EXIT_MESSAGE,
   SLIDESHOW_NAVIGATE_MESSAGE,
@@ -57,27 +58,47 @@ describe("slideshow shell protocol", () => {
     expect(isModifiedClick(click({ button: 1 }))).toBe(true);
   });
 
-  it("reloads a fresh target immediately, then caps retries with backoff", () => {
-    // First sight of a target reloads at once (a real deploy).
-    const first = planRuntimeReload("build-next", null);
-    expect(first).toEqual({
-      shouldReload: true,
-      delayMs: 0,
-      tracker: { targetVersion: "build-next", attempts: 1 },
-    });
+  it("reloads a fresh target immediately, then caps retries with backoff as reloads execute", () => {
+    // First sight of a target reloads at once (a real deploy). Planning is a pure
+    // read-only decision; the attempt count advances only when a reload runs.
+    let tracker = null as ReturnType<typeof recordRuntimeReload> | null;
+    const first = planRuntimeReload("build-next", tracker);
+    expect(first).toEqual({ shouldReload: true, delayMs: 0 });
+    tracker = recordRuntimeReload("build-next", tracker);
+    expect(tracker).toEqual({ targetVersion: "build-next", attempts: 1 });
 
     // Retries toward the same target back off with an escalating delay.
-    const second = planRuntimeReload("build-next", first.tracker);
+    const second = planRuntimeReload("build-next", tracker);
     expect(second.shouldReload).toBe(true);
     expect(second.delayMs).toBe(RUNTIME_RELOAD_BASE_DELAY_MS);
-    const third = planRuntimeReload("build-next", second.tracker);
+    tracker = recordRuntimeReload("build-next", tracker);
+
+    const third = planRuntimeReload("build-next", tracker);
     expect(third.shouldReload).toBe(true);
     expect(third.delayMs).toBe(RUNTIME_RELOAD_BASE_DELAY_MS * 2);
+    tracker = recordRuntimeReload("build-next", tracker);
 
-    // Budget exhausted — hold until the target itself changes.
-    expect(third.tracker.attempts).toBe(MAX_RUNTIME_RELOAD_ATTEMPTS);
-    const held = planRuntimeReload("build-next", third.tracker);
+    // Budget exhausted (three reloads executed) — hold until the target changes.
+    expect(tracker.attempts).toBe(MAX_RUNTIME_RELOAD_ATTEMPTS);
+    const held = planRuntimeReload("build-next", tracker);
     expect(held.shouldReload).toBe(false);
+  });
+
+  it("does not spend the budget when reloads are planned but never executed", () => {
+    // A kiosk waking several times inside one backoff window drives the planner
+    // repeatedly, but until a frame actually reloads the count must not move —
+    // otherwise a single real reload could exhaust the whole budget.
+    const tracker = { targetVersion: "build-next", attempts: 1 };
+    planRuntimeReload("build-next", tracker);
+    planRuntimeReload("build-next", tracker);
+    planRuntimeReload("build-next", tracker);
+    expect(tracker).toEqual({ targetVersion: "build-next", attempts: 1 });
+
+    // Only an executed reload advances the count, and by exactly one.
+    expect(recordRuntimeReload("build-next", tracker)).toEqual({
+      targetVersion: "build-next",
+      attempts: 2,
+    });
   });
 
   it("resets the retry budget when the target version changes", () => {
@@ -85,7 +106,10 @@ describe("slideshow shell protocol", () => {
     const plan = planRuntimeReload("build-newer", exhausted);
     expect(plan.shouldReload).toBe(true);
     expect(plan.delayMs).toBe(0);
-    expect(plan.tracker).toEqual({ targetVersion: "build-newer", attempts: 1 });
+    expect(recordRuntimeReload("build-newer", exhausted)).toEqual({
+      targetVersion: "build-newer",
+      attempts: 1,
+    });
   });
 
   it("requires both wake-lock capability fields from shell state", () => {

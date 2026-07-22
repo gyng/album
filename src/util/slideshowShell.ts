@@ -97,31 +97,49 @@ export const RUNTIME_RELOAD_BASE_DELAY_MS = 15000;
 
 export type RuntimeReloadTracker = {
   targetVersion: string;
+  // Number of reloads that have actually *executed* toward `targetVersion` — not
+  // the number that have merely been planned. The budget is spent by real
+  // reloads only, so a kiosk that wakes repeatedly during one backoff window
+  // (poll + visibilitychange + online + manual button all call the planner)
+  // cannot exhaust the budget without a single frame ever reloading.
   attempts: number;
 };
 
 export type RuntimeReloadPlan = {
   shouldReload: boolean;
   delayMs: number;
-  tracker: RuntimeReloadTracker;
 };
 
 // Decide whether to (re)mount the runtime frame toward `targetVersion`, given
-// the attempts already spent on it. A changed target resets the budget and
-// reloads immediately; retries toward the same target back off with an
-// escalating delay; once the budget is exhausted it holds (no reload) until the
-// target version itself changes.
+// the reloads already *executed* against it. A changed target resets the budget
+// and reloads immediately; retries toward the same target back off with an
+// escalating delay; once the executed budget is exhausted it holds (no reload)
+// until the target version itself changes. This is a pure read-only decision:
+// it never advances the attempt count. The count advances only when a reload
+// actually runs — see `recordRuntimeReload`.
 export const planRuntimeReload = (
   targetVersion: string,
   previous: RuntimeReloadTracker | null,
 ): RuntimeReloadPlan => {
   const attempts = previous?.targetVersion === targetVersion ? previous.attempts : 0;
   if (attempts >= MAX_RUNTIME_RELOAD_ATTEMPTS) {
-    return { shouldReload: false, delayMs: 0, tracker: { targetVersion, attempts } };
+    return { shouldReload: false, delayMs: 0 };
   }
   return {
     shouldReload: true,
     delayMs: attempts === 0 ? 0 : RUNTIME_RELOAD_BASE_DELAY_MS * 2 ** (attempts - 1),
-    tracker: { targetVersion, attempts: attempts + 1 },
   };
+};
+
+// Record that a reload toward `targetVersion` actually executed, advancing the
+// attempt count by one (and resetting it when the target changed). Callers must
+// invoke this only from the path where the frame is genuinely remounted (the
+// immediate-reload branch or the backoff timer callback), never when a reload is
+// merely planned or re-planned.
+export const recordRuntimeReload = (
+  targetVersion: string,
+  previous: RuntimeReloadTracker | null,
+): RuntimeReloadTracker => {
+  const attempts = previous?.targetVersion === targetVersion ? previous.attempts : 0;
+  return { targetVersion, attempts: attempts + 1 };
 };

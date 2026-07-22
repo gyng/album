@@ -117,6 +117,58 @@ describe("slideshow code shell", () => {
     }
   });
 
+  it("cancels a pending backoff reload once the frame finally reports it is ready", async () => {
+    // A slow first load can miss one readiness deadline (scheduling a backoff
+    // reload) and then report ready during the backoff window. The pending timer
+    // must be cancelled, otherwise it fires a guaranteed spurious reboot.
+    jest.useFakeTimers();
+    try {
+      global.fetch = jest.fn(() => versionResponse("build-current")) as jest.Mock;
+      render(<SlideshowShellScreen />);
+
+      // Miss the first readiness deadline → immediate recovery reload → gen 1.
+      await act(async () => {
+        jest.advanceTimersByTime(RUNTIME_READY_TIMEOUT_MS + 1);
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+      expect(screen.getByTitle("Slideshow").getAttribute("data-runtime-generation")).toBe("1");
+
+      // Miss gen 1's readiness deadline → a backoff reload is scheduled, but no
+      // reboot happens yet (the frame stays on generation 1).
+      await act(async () => {
+        jest.advanceTimersByTime(RUNTIME_READY_TIMEOUT_MS + 1);
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+      expect(screen.getByTitle("Slideshow").getAttribute("data-runtime-generation")).toBe("1");
+
+      // The frame reports ready during the backoff window.
+      const frame = screen.getByTitle("Slideshow");
+      await act(async () => {
+        fireEvent(
+          window,
+          new MessageEvent("message", {
+            data: { type: "snapshots:slideshow-ready", buildVersion: "build-current" },
+            origin: window.location.origin,
+            source: (frame as HTMLIFrameElement).contentWindow,
+          }),
+        );
+        await Promise.resolve();
+      });
+
+      // Advancing past the backoff delay must not reboot the now-healthy frame.
+      await act(async () => {
+        jest.advanceTimersByTime(RUNTIME_RELOAD_BASE_DELAY_MS * 4);
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+      expect(screen.getByTitle("Slideshow").getAttribute("data-runtime-generation")).toBe("1");
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
   it("recovers a frame that never reports it is ready even when versions match", async () => {
     // First-ever visit whose runtime request fails transiently: the advertised
     // and running versions are equal, so the version poll cannot help — only the

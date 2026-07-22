@@ -150,8 +150,16 @@ const loadFetchHandler = (options: {
   };
 
   vm.runInNewContext(fs.readFileSync("public/sw.js", "utf8"), context);
-  return handlers.get("fetch")!;
+  const fetchHandler = handlers.get("fetch")!;
+  // Expose the context fetch mock so lifetime-scoped behaviour (conditional
+  // revalidation, once-per-URL throttling) can be asserted without changing the
+  // handler's call signature.
+  (fetchHandler as unknown as { fetchMock: jest.Mock }).fetchMock = context.fetch as jest.Mock;
+  return fetchHandler;
 };
+
+const fetchMockOf = (handler: (event: FetchEvent) => void): jest.Mock =>
+  (handler as unknown as { fetchMock: jest.Mock }).fetchMock;
 
 const request = (pathname: string, destination = "") => ({
   method: "GET",
@@ -520,6 +528,67 @@ describe("service worker data caching", () => {
     expect(put).toHaveBeenCalled();
   });
 
+  it("revalidates cached media conditionally so long-lived caches cannot skip it", async () => {
+    // A default-cache-mode fetch would be satisfied by the HTTP cache under a
+    // long max-age header and never actually revalidate. `no-cache` forces a
+    // conditional request (ETag/Last-Modified) instead.
+    const fetchHandler = loadFetchHandler({
+      cachedResponse: new Response("cached image"),
+      networkResponse: new Response("network image"),
+    });
+    let responsePromise: Promise<Response> | undefined;
+    let lifetimePromise: Promise<unknown> | undefined;
+
+    fetchHandler({
+      request: request("/data/albums/trip/photo.avif", "image"),
+      respondWith: (promise) => {
+        responsePromise = promise;
+      },
+      waitUntil: (promise) => {
+        lifetimePromise = promise;
+      },
+    });
+
+    await responsePromise;
+    await lifetimePromise;
+    expect(fetchMockOf(fetchHandler)).toHaveBeenCalledWith(expect.anything(), { cache: "no-cache" });
+  });
+
+  it("revalidates a given media URL at most once per worker lifetime", async () => {
+    // Without a per-lifetime cap a kiosk re-downloads full image bytes on every
+    // hit. The second hit of the same URL must serve from cache without a
+    // background refetch; put() is a proxy for a revalidation having happened.
+    const put = jest.fn().mockResolvedValue(undefined);
+    const fetchHandler = loadFetchHandler({
+      cachedResponse: new Response("cached image"),
+      networkResponse: new Response("network image"),
+      cachePut: put,
+    });
+    const lifetimes: Promise<unknown>[] = [];
+    const hit = async () => {
+      let responsePromise: Promise<Response> | undefined;
+      fetchHandler({
+        request: request("/data/albums/trip/photo.avif", "image"),
+        respondWith: (promise) => {
+          responsePromise = promise;
+        },
+        waitUntil: (promise) => {
+          lifetimes.push(promise);
+        },
+      });
+      await responsePromise;
+    };
+
+    await hit();
+    await hit();
+    await Promise.all(lifetimes);
+
+    // Only the first hit scheduled a revalidation; the second was throttled.
+    expect(lifetimes).toHaveLength(1);
+    expect(put).toHaveBeenCalledTimes(1);
+    expect(fetchMockOf(fetchHandler)).toHaveBeenCalledTimes(1);
+  });
+
   it("ignores a failed image revalidation so the cached copy still serves offline", async () => {
     const cached = new Response("cached image");
     const fetchHandler = loadFetchHandler({
@@ -541,10 +610,10 @@ describe("service worker data caching", () => {
 
   it("evicts the oldest image entries once the cache exceeds its cap", async () => {
     // Without a bound the unversioned media cache grows forever. keys() is in
-    // insertion order, so the two entries past the 1000 cap here are the oldest.
+    // insertion order, so the two entries past the 4000 cap here are the oldest.
     const network = new Response("fresh image");
     const keys = Array.from(
-      { length: 1002 },
+      { length: 4002 },
       (_, index) => `https://photos.example.com/data/albums/trip/photo-${index}.avif`,
     );
     const del = jest.fn().mockResolvedValue(true);

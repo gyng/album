@@ -8,6 +8,7 @@ import {
   buildSlideshowRuntimeUrl,
   isSlideshowRuntimeMessage,
   planRuntimeReload,
+  recordRuntimeReload,
   RuntimeReloadTracker,
   SLIDESHOW_EXIT_MESSAGE,
   SLIDESHOW_NAVIGATE_MESSAGE,
@@ -69,6 +70,9 @@ export const SlideshowShellScreen = () => {
   const runtimeReadyRef = React.useRef(false);
   const reloadTrackerRef = React.useRef<RuntimeReloadTracker | null>(null);
   const reloadTimerRef = React.useRef<number | null>(null);
+  // The target a pending backoff timer is aiming at, so a re-plan toward the same
+  // target can keep the existing timer instead of resetting it.
+  const pendingReloadTargetRef = React.useRef<string | null>(null);
   const [runtimeFrame, setRuntimeFrame] = React.useState<RuntimeFrame | null>(null);
   const [runtimeVersion, setRuntimeVersion] = React.useState(BUILD_VERSION);
   const runtimeVersionRef = React.useRef(BUILD_VERSION);
@@ -95,6 +99,14 @@ export const SlideshowShellScreen = () => {
     return () => window.clearTimeout(timer);
   }, []);
 
+  const clearPendingReload = React.useCallback(() => {
+    if (reloadTimerRef.current !== null) {
+      window.clearTimeout(reloadTimerRef.current);
+      reloadTimerRef.current = null;
+    }
+    pendingReloadTargetRef.current = null;
+  }, []);
+
   const reloadRuntime = React.useCallback((buildVersion: string) => {
     runtimeReadyRef.current = false;
     setCodeStatus("reloading");
@@ -108,31 +120,44 @@ export const SlideshowShellScreen = () => {
   // and escalating backoff, so a version the served bundle can never satisfy
   // (CDN skew, a stale cached document, or a frame that never loads) stops
   // rebooting the slideshow forever. Shared by the version poll and the
-  // readiness-recovery path.
+  // readiness-recovery path. The attempt budget is spent only when a reload
+  // actually runs, and a re-plan toward a target that already has a pending
+  // timer keeps that timer rather than resetting it — otherwise a kiosk waking
+  // several times inside one backoff window would burn the whole budget without
+  // a single frame ever reloading.
   const attemptRuntimeReload = React.useCallback(
     (targetVersion: string) => {
       const plan = planRuntimeReload(targetVersion, reloadTrackerRef.current);
-      reloadTrackerRef.current = plan.tracker;
-      if (reloadTimerRef.current !== null) {
-        window.clearTimeout(reloadTimerRef.current);
-        reloadTimerRef.current = null;
-      }
       if (!plan.shouldReload) {
         // Budget exhausted — hold until the target version changes again.
+        clearPendingReload();
         setCodeStatus("retry");
         return;
       }
       if (plan.delayMs === 0) {
+        // Immediate reload: cancel any pending timer and count this execution.
+        clearPendingReload();
+        reloadTrackerRef.current = recordRuntimeReload(targetVersion, reloadTrackerRef.current);
         reloadRuntime(targetVersion);
         return;
       }
+      // Backoff. Keep an existing timer toward the same target untouched so
+      // repeated re-plans neither reset the delay nor spend the budget.
+      if (reloadTimerRef.current !== null && pendingReloadTargetRef.current === targetVersion) {
+        return;
+      }
+      clearPendingReload();
       setCodeStatus("retry");
+      pendingReloadTargetRef.current = targetVersion;
       reloadTimerRef.current = window.setTimeout(() => {
         reloadTimerRef.current = null;
+        pendingReloadTargetRef.current = null;
+        // The attempt is counted here, at actual execution, not when planned.
+        reloadTrackerRef.current = recordRuntimeReload(targetVersion, reloadTrackerRef.current);
         reloadRuntime(targetVersion);
       }, plan.delayMs);
     },
-    [reloadRuntime],
+    [clearPendingReload, reloadRuntime],
   );
 
   React.useEffect(
@@ -198,8 +223,11 @@ export const SlideshowShellScreen = () => {
       }
       if (runtimeReadyRef.current) {
         // Healthy: the running build matches the latest advertised one. Clear
-        // any spent retry budget so a future update starts from a full count.
+        // any spent retry budget so a future update starts from a full count,
+        // and cancel a pending backoff reload — the frame is fine, so a stale
+        // timer would otherwise fire a spurious reboot.
         reloadTrackerRef.current = null;
+        clearPendingReload();
         setCodeStatus("current");
       } else {
         setCodeStatus("loading");
@@ -212,7 +240,7 @@ export const SlideshowShellScreen = () => {
     } finally {
       checkInFlightRef.current = false;
     }
-  }, [attemptRuntimeReload]);
+  }, [attemptRuntimeReload, clearPendingReload]);
 
   React.useEffect(() => {
     void checkForCodeUpdate();
@@ -284,6 +312,9 @@ export const SlideshowShellScreen = () => {
       runtimeReadyRef.current = true;
       runtimeVersionRef.current = nextVersion;
       setRuntimeVersion(nextVersion);
+      // The frame is up: cancel any pending backoff reload so a stale timer
+      // (e.g. a slow first load that reports ready mid-backoff) cannot reboot it.
+      clearPendingReload();
       if (nextVersion === latestVersionRef.current) {
         // The frame loaded the intended build — clear any spent retry budget.
         reloadTrackerRef.current = null;
@@ -301,7 +332,13 @@ export const SlideshowShellScreen = () => {
     window.addEventListener("message", handleRuntimeMessage);
     sendShellState();
     return () => window.removeEventListener("message", handleRuntimeMessage);
-  }, [acquireWakeLock, isWakeLockActive, isWakeLockSupported, runtimeFrame?.generation]);
+  }, [
+    acquireWakeLock,
+    clearPendingReload,
+    isWakeLockActive,
+    isWakeLockSupported,
+    runtimeFrame?.generation,
+  ]);
 
   const diagnosticsSummary = [
     isWakeLockActive ? "awake" : isWakeLockSupported ? "wake lock off" : "no wake lock",
