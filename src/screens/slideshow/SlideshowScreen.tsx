@@ -78,11 +78,17 @@ import {
   SlideshowMode,
 } from "../../util/slideshowUrl";
 import {
+  advanceUserNavCount,
+  clampTopicProgress,
   decideModeSelection,
   decideTopicSeed,
+  isSeedCurrent,
+  isTopicActive,
   isTopicSeedStale,
   normaliseTopic,
+  shouldAbortPendingTopicOnEmbeddingsError,
   shouldEnableTopicEmbeddings,
+  TOPIC_EMBEDDINGS_UNAVAILABLE_MESSAGE,
   TopicSnapshot,
 } from "../../util/slideshowTopic";
 import {
@@ -280,15 +286,29 @@ export const Slideshow: React.FC<{
   // alongside it must not clobber that starting slide (it activates but drifts).
   const initialHadPhotoRef = React.useRef(false);
   // A topic deferred until the embeddings DB is ready; the retry effect re-runs
-  // it once the DB lands.
-  const pendingTopicRef = React.useRef<{ text: string; preserveCurrentPhoto: boolean } | null>(
-    null,
-  );
+  // it once the DB lands. `isInitial` marks a deferred one-shot `topic=` URL
+  // seed so its abandonment can strip the orphaned URL param.
+  const pendingTopicRef = React.useRef<{
+    text: string;
+    preserveCurrentPhoto: boolean;
+    isInitial: boolean;
+  } | null>(null);
   // Monotonic token bumped on every topic submit / dismiss, and a running count
-  // of committed slides — together they let a landed async seed detect that a
-  // newer topic, a mode change, or a slide advance superseded it.
+  // of USER navigations (manual next/previous, gesture, keyboard, history
+  // replay) — together they let a landed async seed detect that a newer topic, a
+  // mode change, or a user-initiated slide change superseded it. The count keys
+  // on user INTENT, not on every commit: app-driven advances (cadence timer,
+  // pool reloads, the seed's own commit) must not burn a topic the user just
+  // typed.
   const topicSeedTokenRef = React.useRef(0);
-  const commitCountRef = React.useRef(0);
+  const userNavCountRef = React.useRef(0);
+  // The highest seed-encode progress shown for the current seed, so the busy
+  // chip never counts backwards when the worker's per-file progress regresses.
+  // Reset to 0 at the start of each seed.
+  const topicProgressFloorRef = React.useRef(0);
+  // Mirror of the embeddings-DB load error, read inside the topic submit without
+  // re-creating the callback when it toggles.
+  const embeddingsErrorRef = React.useRef<Error | null>(null);
 
   // Check for a new build manifest we control and reload when one is detected.
   useEffect(() => {
@@ -625,15 +645,19 @@ export const Slideshow: React.FC<{
   // lazily after the first vector roll meant the first ~37% of remixes
   // silently fell through to the next-priority sync strategy (same-album),
   // which dominated the badge in practice.
-  const [embeddingsDatabase, embeddingsProgress] = useEmbeddingsDatabase(
-    shouldEnableTopicEmbeddings({
-      mode: slideshowMode,
-      remixEnabled,
-      activeTopic: topic,
-      topicPending: topicBusy || topicAwaitingEmbeddings,
-      initialTopicPending: hasPendingInitialTopic,
-    }),
-  );
+  const [embeddingsDatabase, embeddingsProgress, , embeddingsError, retryEmbeddings] =
+    useEmbeddingsDatabase(
+      shouldEnableTopicEmbeddings({
+        mode: slideshowMode,
+        remixEnabled,
+        activeTopic: topic,
+        topicPending: topicBusy || topicAwaitingEmbeddings,
+        initialTopicPending: hasPendingInitialTopic,
+      }),
+    );
+  // Mirror the embeddings error into a ref so the topic submit can decide
+  // whether to re-trigger the load without depending on the reactive value.
+  embeddingsErrorRef.current = embeddingsError;
   const pointerGestureRef = React.useRef<{
     pointerId: number;
     pointerType: string;
@@ -811,9 +835,10 @@ export const Slideshow: React.FC<{
 
   const commitNextPhoto = useCallback(
     (candidatePhoto: RandomPhotoRow, opts?: { trackRecent?: boolean; allowRemix?: boolean }) => {
-      // Count every committed slide so an in-flight topic seed can tell whether
-      // the show moved on beneath it while its model loaded (stale-seed guard).
-      commitCountRef.current += 1;
+      // NB: a commit does NOT advance the user-navigation counter. This runs for
+      // every slide, including app-driven ones (cadence advances, pool reloads,
+      // the topic seed's own commit) that must not burn an in-flight topic seed.
+      // User intent is counted at the manual advance handlers and showHistoryPhoto.
       if (opts?.trackRecent) {
         recentPhotoPathsRef.current = [candidatePhoto.path, ...recentPhotoPathsRef.current].slice(
           0,
@@ -930,6 +955,11 @@ export const Slideshow: React.FC<{
     (index: number): RandomPhotoRow | null => {
       const entry = historyStateRef.current.history[index]!;
 
+      // Previous / forward replay is a user-initiated navigation: advance the
+      // user-navigation counter so an in-flight topic seed that the user has
+      // moved past is abandoned rather than clobbering the slide they chose.
+      userNavCountRef.current = advanceUserNavCount(userNavCountRef.current, "user");
+
       // Just move the cursor — the current slide (seed + the original remix
       // layout) re-derives from history[index], so Previous/Next replays
       // the side-by-side faithfully.
@@ -1004,7 +1034,7 @@ export const Slideshow: React.FC<{
   // unavailable — e.g. offline first use) it surfaces an error and leaves the
   // previous mode untouched.
   const seedTopic = useCallback(
-    async (rawTopic: string, opts?: { preserveCurrentPhoto?: boolean }) => {
+    async (rawTopic: string, opts?: { preserveCurrentPhoto?: boolean; isInitial?: boolean }) => {
       const topicText = normaliseTopic(rawTopic);
       if (!topicText || !database) {
         return;
@@ -1017,25 +1047,38 @@ export const Slideshow: React.FC<{
         pendingTopicRef.current = {
           text: topicText,
           preserveCurrentPhoto: opts?.preserveCurrentPhoto ?? false,
+          isInitial: opts?.isInitial ?? false,
         };
         setTopicError(null);
         setTopicBusy(true);
         setTopicAwaitingEmbeddings(true);
+        // If a previous embeddings load FAILED, this submit re-triggers it so a
+        // retry doesn't sit forever behind the errored (but still-enabled) hook.
+        if (embeddingsErrorRef.current) {
+          retryEmbeddings();
+        }
         return;
       }
 
       pendingTopicRef.current = null;
       const seedToken = (topicSeedTokenRef.current += 1);
       const modeAtSubmit = slideshowModeRef.current;
-      const commitCountAtSubmit = commitCountRef.current;
+      const userNavAtSubmit = userNavCountRef.current;
 
       setTopicError(null);
       setTopicAwaitingEmbeddings(false);
       setTopicBusy(true);
+      topicProgressFloorRef.current = 0;
       setTopicProgress(null);
       try {
         const textVector = await encodeSearchText(topicText, (progress) => {
-          setTopicProgress(progress);
+          // Only the current seed may write progress, and never backwards.
+          if (!isSeedCurrent(seedToken, topicSeedTokenRef.current)) {
+            return;
+          }
+          const clamped = clampTopicProgress(topicProgressFloorRef.current, progress);
+          topicProgressFloorRef.current = clamped;
+          setTopicProgress(clamped);
         });
         const result = await fetchSemanticResults({
           database,
@@ -1046,7 +1089,7 @@ export const Slideshow: React.FC<{
           pageSize: Math.max(shuffleHistorySize, 200),
         });
 
-        // Stale-seed guard: a newer topic, a mode change, or a slide advance
+        // Stale-seed guard: a newer topic, a mode change, or a user navigation
         // landing while we encoded means this result would clobber the user's
         // newer choice. Abandon it — no commit, no chip, no topic= URL write.
         if (
@@ -1055,10 +1098,17 @@ export const Slideshow: React.FC<{
             currentToken: topicSeedTokenRef.current,
             modeAtSubmit,
             currentMode: slideshowModeRef.current,
-            commitCountAtSubmit,
-            currentCommitCount: commitCountRef.current,
+            userNavAtSubmit,
+            currentUserNav: userNavCountRef.current,
           })
         ) {
+          // If this was the one-shot initial `topic=` URL seed and nothing newer
+          // took over (token unchanged), strip the now-orphaned param and clear
+          // its ref so the URL and UI agree rather than leaving topic= dangling.
+          if (opts?.isInitial && isSeedCurrent(seedToken, topicSeedTokenRef.current)) {
+            initialTopicRef.current = null;
+            updateSlideshowUrl(slideshowModeRef.current, timeDelayRef.current, null);
+          }
           return;
         }
 
@@ -1089,16 +1139,25 @@ export const Slideshow: React.FC<{
         updateSlideshowUrl("similar", timeDelayRef.current, topicText);
       } catch (err) {
         console.error("Topic seeding failed", err);
-        setTopicError("Topic search is unavailable right now.");
+        // Only surface the error if this seed is still the current one — a
+        // cancelled/superseded seed must not clobber a newer seed's state.
+        if (isSeedCurrent(seedToken, topicSeedTokenRef.current)) {
+          setTopicError("Topic search is unavailable right now.");
+        }
       } finally {
-        setTopicBusy(false);
-        setTopicProgress(null);
+        // Likewise, only the current seed clears the busy chip — a cancelled
+        // seed's finally must not re-enable the input mid-encode of a newer one.
+        if (isSeedCurrent(seedToken, topicSeedTokenRef.current)) {
+          setTopicBusy(false);
+          setTopicProgress(null);
+        }
       }
     },
     [
       commitNextPhoto,
       database,
       embeddingsDatabase,
+      retryEmbeddings,
       setSlideshowMode,
       shuffleHistorySize,
       updateSlideshowUrl,
@@ -1116,8 +1175,36 @@ export const Slideshow: React.FC<{
       return;
     }
     pendingTopicRef.current = null;
-    void seedTopic(pending.text, { preserveCurrentPhoto: pending.preserveCurrentPhoto });
+    void seedTopic(pending.text, {
+      preserveCurrentPhoto: pending.preserveCurrentPhoto,
+      isInitial: pending.isInitial,
+    });
   }, [database, embeddingsDatabase, seedTopic]);
+
+  // If the embeddings DB fails to load while a topic is waiting on it, abandon
+  // the wait rather than spinning "Loading embeddings…" forever: clear the
+  // pending/busy/progress state and surface a distinct error. The next submit
+  // re-triggers the load via retryEmbeddings() (see seedTopic).
+  useEffect(() => {
+    if (
+      !shouldAbortPendingTopicOnEmbeddingsError({
+        hasEmbeddingsError: embeddingsError !== null,
+        topicAwaitingEmbeddings,
+        hasDeferredTopic: pendingTopicRef.current !== null,
+        hasPendingInitialTopic,
+      })
+    ) {
+      return;
+    }
+    pendingTopicRef.current = null;
+    initialTopicRef.current = null;
+    initialTopicSeededRef.current = true;
+    setHasPendingInitialTopic(false);
+    setTopicAwaitingEmbeddings(false);
+    setTopicBusy(false);
+    setTopicProgress(null);
+    setTopicError(TOPIC_EMBEDDINGS_UNAVAILABLE_MESSAGE);
+  }, [embeddingsError, topicAwaitingEmbeddings, hasPendingInitialTopic]);
 
   // Stop topic mode and restore the pre-topic mode. The show keeps running from
   // the current photo under the restored mode. The album filter is not
@@ -1141,11 +1228,26 @@ export const Slideshow: React.FC<{
   const handleSelectMode = useCallback(
     (mode: SlideshowMode) => {
       const decision = decideModeSelection({
-        topicActive: topic !== null || topicBusy || pendingTopicRef.current !== null,
+        // An unconsumed `topic=` URL seed counts as active too: without this a
+        // mode chosen BEFORE the pool/embeddings loaded would later be hijacked
+        // when the initial topic finally seeds.
+        topicActive: isTopicActive({
+          topic,
+          topicBusy,
+          hasDeferredTopic: pendingTopicRef.current !== null,
+          hasUnconsumedInitialTopic:
+            !initialTopicSeededRef.current && initialTopicRef.current !== null,
+        }),
       });
       if (decision.dismissTopic) {
         topicSnapshotRef.current = null;
         cancelTopicSeeding();
+        // Cancel any unconsumed initial URL topic so it can't seed later and
+        // override this explicit choice — no snapshot restore, the user's mode
+        // stands.
+        initialTopicRef.current = null;
+        initialTopicSeededRef.current = true;
+        setHasPendingInitialTopic(false);
         setTopic(null);
         setTopicError(null);
       }
@@ -1156,6 +1258,38 @@ export const Slideshow: React.FC<{
     },
     [cancelTopicSeeding, setSlideshowMode, topic, topicBusy, updateSlideshowUrl],
   );
+
+  // Safety net for a mode flip that did NOT go through handleSelectMode — most
+  // notably a cross-tab localStorage sync of `slideshow-mode` (usehooks-ts fires
+  // storage events across tabs). If the mode lands on anything other than
+  // "similar" while a topic is active or pending, apply the same implicit
+  // dismissal so the chip, URL, and mode stay consistent. Guarded by the
+  // mode !== "similar" check so seedTopic's own switch to "similar" and
+  // clearTopic's restore (which clears the topic first) do not trip it.
+  useEffect(() => {
+    if (slideshowMode === "similar") {
+      return;
+    }
+    if (
+      !isTopicActive({
+        topic,
+        topicBusy,
+        hasDeferredTopic: pendingTopicRef.current !== null,
+        hasUnconsumedInitialTopic:
+          !initialTopicSeededRef.current && initialTopicRef.current !== null,
+      })
+    ) {
+      return;
+    }
+    topicSnapshotRef.current = null;
+    cancelTopicSeeding();
+    initialTopicRef.current = null;
+    initialTopicSeededRef.current = true;
+    setHasPendingInitialTopic(false);
+    setTopic(null);
+    setTopicError(null);
+    updateSlideshowUrl(slideshowMode, timeDelayRef.current, null);
+  }, [slideshowMode, topic, topicBusy, cancelTopicSeeding, updateSlideshowUrl]);
 
   // Seed a shared/bookmarked `topic=` frame once, after the pool AND the
   // embeddings DB have loaded — the encode needs something to rank against, and
@@ -1174,7 +1308,10 @@ export const Slideshow: React.FC<{
     }
     initialTopicSeededRef.current = true;
     setHasPendingInitialTopic(false);
-    void seedTopic(pendingTopic, { preserveCurrentPhoto: initialHadPhotoRef.current });
+    void seedTopic(pendingTopic, {
+      preserveCurrentPhoto: initialHadPhotoRef.current,
+      isInitial: true,
+    });
   }, [database, embeddingsDatabase, hasParsedInitialUrl, poolStats, seedTopic]);
 
   const advanceRandomPhoto = useCallback(
@@ -1269,6 +1406,12 @@ export const Slideshow: React.FC<{
         resetSimilarQueue();
 
         if (photos.length === 0) {
+          // Dead end for the initial `topic=` seed: there is nothing to rank
+          // against, so clear its refs/latch rather than leaving embeddings
+          // enablement pinned on for the whole session.
+          initialTopicRef.current = null;
+          initialTopicSeededRef.current = true;
+          setHasPendingInitialTopic(false);
           updateSlideshowUrl(slideshowMode);
           setSlideshowError("No photos available");
           return;
@@ -1327,6 +1470,11 @@ export const Slideshow: React.FC<{
       .catch((err) => {
         console.error(err);
         if (!cancelled) {
+          // Same dead end on a DB error: unlatch the initial-topic embeddings
+          // enablement so it doesn't stay pinned for the session.
+          initialTopicRef.current = null;
+          initialTopicSeededRef.current = true;
+          setHasPendingInitialTopic(false);
           updateSlideshowUrl(slideshowMode);
           setSlideshowError("No photos available");
         }
@@ -1520,19 +1668,28 @@ export const Slideshow: React.FC<{
     }
   }, []);
 
-  const advanceToNextPhoto = useCallback(() => {
+  // App-driven advance: no user-navigation increment. Used by the broken-image
+  // retry (a 404 auto-skip is not a user gesture) so it can't burn a topic seed.
+  const advanceCurrentSlide = useCallback(() => {
     clearImageErrorRetry();
     setImageLoaded(false);
     goNext();
   }, [clearImageErrorRetry, goNext]);
 
+  // The manual next handler (keyboard / toolbar / gesture / click / remix): a
+  // fresh user intent that supersedes an in-flight topic seed.
+  const advanceToNextPhoto = useCallback(() => {
+    userNavCountRef.current = advanceUserNavCount(userNavCountRef.current, "user");
+    advanceCurrentSlide();
+  }, [advanceCurrentSlide]);
+
   const scheduleImageErrorRetry = useCallback(() => {
     clearImageErrorRetry();
     imageErrorRetryTimerRef.current = window.setTimeout(() => {
       imageErrorRetryTimerRef.current = null;
-      advanceToNextPhoto();
+      advanceCurrentSlide();
     }, 1000);
-  }, [advanceToNextPhoto, clearImageErrorRetry]);
+  }, [advanceCurrentSlide, clearImageErrorRetry]);
 
   // Cancel any pending image-error retry on unmount.
   useEffect(() => clearImageErrorRetry, [clearImageErrorRetry]);

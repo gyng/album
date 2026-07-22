@@ -1,11 +1,17 @@
 import { RandomPhotoRow } from "../components/search/api";
 import {
+  advanceUserNavCount,
+  clampTopicProgress,
   decideModeSelection,
   decideTopicSeed,
+  isSeedCurrent,
+  isTopicActive,
   isTopicSeedStale,
   mapTopicSeedResults,
   normaliseTopic,
+  shouldAbortPendingTopicOnEmbeddingsError,
   shouldEnableTopicEmbeddings,
+  TOPIC_EMBEDDINGS_UNAVAILABLE_MESSAGE,
 } from "./slideshowTopic";
 
 const row = (path: string): RandomPhotoRow => ({
@@ -150,11 +156,11 @@ describe("isTopicSeedStale", () => {
     currentToken: 1,
     modeAtSubmit: "weighted" as const,
     currentMode: "weighted" as const,
-    commitCountAtSubmit: 3,
-    currentCommitCount: 3,
+    userNavAtSubmit: 3,
+    currentUserNav: 3,
   };
 
-  it("keeps a result whose token, mode, and commit count are unchanged", () => {
+  it("keeps a result whose token, mode, and user-navigation count are unchanged", () => {
     expect(isTopicSeedStale(fresh)).toBe(false);
   });
 
@@ -166,8 +172,120 @@ describe("isTopicSeedStale", () => {
     expect(isTopicSeedStale({ ...fresh, currentMode: "random" })).toBe(true);
   });
 
-  it("abandons when a photo was committed since submit", () => {
-    expect(isTopicSeedStale({ ...fresh, currentCommitCount: 4 })).toBe(true);
+  it("abandons when the user navigated since submit", () => {
+    expect(isTopicSeedStale({ ...fresh, currentUserNav: 4 })).toBe(true);
+  });
+});
+
+describe("advanceUserNavCount", () => {
+  const fresh = {
+    seedToken: 1,
+    currentToken: 1,
+    modeAtSubmit: "weighted" as const,
+    currentMode: "weighted" as const,
+  };
+
+  it("does NOT advance for an app-driven slide change (cadence timer / pool reload)", () => {
+    expect(advanceUserNavCount(5, "app")).toBe(5);
+  });
+
+  it("advances for a user-initiated navigation", () => {
+    expect(advanceUserNavCount(5, "user")).toBe(6);
+  });
+
+  it("keeps a topic seed fresh across a timer-style advance, but stales it on a user advance", () => {
+    const userNavAtSubmit = 5;
+    // A cadence-timer advance is app-driven: the counter does not move, so a
+    // topic the user just typed survives the automatic slide change.
+    const afterTimer = advanceUserNavCount(userNavAtSubmit, "app");
+    expect(isTopicSeedStale({ ...fresh, userNavAtSubmit, currentUserNav: afterTimer })).toBe(false);
+    // A manual advance is user intent: it supersedes the in-flight seed.
+    const afterUser = advanceUserNavCount(userNavAtSubmit, "user");
+    expect(isTopicSeedStale({ ...fresh, userNavAtSubmit, currentUserNav: afterUser })).toBe(true);
+  });
+});
+
+describe("isSeedCurrent", () => {
+  it("is current only while the token has not moved on", () => {
+    expect(isSeedCurrent(3, 3)).toBe(true);
+    expect(isSeedCurrent(3, 4)).toBe(false);
+  });
+});
+
+describe("clampTopicProgress", () => {
+  it("never returns a value below the floor already shown", () => {
+    expect(clampTopicProgress(40, 55)).toBe(55);
+    expect(clampTopicProgress(60, 42)).toBe(60);
+  });
+});
+
+describe("isTopicActive", () => {
+  const base = {
+    topic: null,
+    topicBusy: false,
+    hasDeferredTopic: false,
+    hasUnconsumedInitialTopic: false,
+  };
+
+  it("is inactive when no topic is showing, pending, deferred, or URL-seeded", () => {
+    expect(isTopicActive(base)).toBe(false);
+  });
+
+  it("is active for a showing chip, an in-flight encode, a deferred topic, or an unconsumed URL seed", () => {
+    expect(isTopicActive({ ...base, topic: "cat" })).toBe(true);
+    expect(isTopicActive({ ...base, topicBusy: true })).toBe(true);
+    expect(isTopicActive({ ...base, hasDeferredTopic: true })).toBe(true);
+    expect(isTopicActive({ ...base, hasUnconsumedInitialTopic: true })).toBe(true);
+  });
+});
+
+describe("shouldAbortPendingTopicOnEmbeddingsError", () => {
+  const base = {
+    hasEmbeddingsError: false,
+    topicAwaitingEmbeddings: false,
+    hasDeferredTopic: false,
+    hasPendingInitialTopic: false,
+  };
+
+  it("does nothing without an embeddings error", () => {
+    expect(
+      shouldAbortPendingTopicOnEmbeddingsError({ ...base, topicAwaitingEmbeddings: true }),
+    ).toBe(false);
+  });
+
+  it("does nothing when nothing is waiting on the embeddings DB", () => {
+    expect(shouldAbortPendingTopicOnEmbeddingsError({ ...base, hasEmbeddingsError: true })).toBe(
+      false,
+    );
+  });
+
+  it("aborts when a wait, a deferred topic, or an initial URL seed is stuck behind the failed load", () => {
+    expect(
+      shouldAbortPendingTopicOnEmbeddingsError({
+        ...base,
+        hasEmbeddingsError: true,
+        topicAwaitingEmbeddings: true,
+      }),
+    ).toBe(true);
+    expect(
+      shouldAbortPendingTopicOnEmbeddingsError({
+        ...base,
+        hasEmbeddingsError: true,
+        hasDeferredTopic: true,
+      }),
+    ).toBe(true);
+    expect(
+      shouldAbortPendingTopicOnEmbeddingsError({
+        ...base,
+        hasEmbeddingsError: true,
+        hasPendingInitialTopic: true,
+      }),
+    ).toBe(true);
+  });
+
+  it("has British-English failure copy distinct from the encode failure", () => {
+    expect(TOPIC_EMBEDDINGS_UNAVAILABLE_MESSAGE).toContain("similarity data");
+    expect(TOPIC_EMBEDDINGS_UNAVAILABLE_MESSAGE).not.toBe("Topic search is unavailable right now.");
   });
 });
 

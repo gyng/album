@@ -46,21 +46,83 @@ export const shouldEnableTopicEmbeddings = (input: {
 
 // A topic encode+rank is asynchronous and can take seconds on a cold model
 // load. By the time it lands the user may have changed the playback mode,
-// advanced the slideshow, or submitted a newer topic — committing the stale
-// result would clobber those newer choices. Capture a token, the mode, and the
-// commit count at submit; abandon the landed result when any of them has moved
-// on. Mirrors the vector-remix stale guard in commitNextPhoto.
+// navigated the slideshow themselves, or submitted a newer topic — committing
+// the stale result would clobber those newer choices. Capture a token, the
+// mode, and the USER-navigation count at submit; abandon the landed result when
+// any of them has moved on. Crucially the count keys on user intent, NOT on all
+// commits: an app-driven advance (the cadence timer, a pool reload, the seed's
+// own commit) must not stale a topic the user just typed. Mirrors the
+// vector-remix stale guard in commitNextPhoto.
 export const isTopicSeedStale = (input: {
   seedToken: number;
   currentToken: number;
   modeAtSubmit: SlideshowMode;
   currentMode: SlideshowMode;
-  commitCountAtSubmit: number;
-  currentCommitCount: number;
+  userNavAtSubmit: number;
+  currentUserNav: number;
 }): boolean =>
   input.seedToken !== input.currentToken ||
   input.modeAtSubmit !== input.currentMode ||
-  input.commitCountAtSubmit !== input.currentCommitCount;
+  input.userNavAtSubmit !== input.currentUserNav;
+
+// Slide changes come from two sources. USER navigation — a manual next/previous,
+// a gesture, a keyboard shortcut, or a history replay — is a fresh intent that
+// supersedes an in-flight topic seed. APP-driven advances — the cadence timer,
+// pool (re)loads, permalink/seed commits — are not: a topic the user just typed
+// must survive an automatic slide change. Only user navigation advances the
+// counter the topic stale-guard compares.
+export type SlideChangeSource = "user" | "app";
+export const advanceUserNavCount = (current: number, source: SlideChangeSource): number =>
+  source === "user" ? current + 1 : current;
+
+// The topic encode is async; a cancel or a newer submit bumps the seed token.
+// Only the CURRENT token may write the busy / progress / error UI, so a
+// cancelled or superseded seed's finally / catch / onProgress cannot clobber a
+// newer seed's state.
+export const isSeedCurrent = (seedToken: number, currentToken: number): boolean =>
+  seedToken === currentToken;
+
+// Worker progress is mapped into per-file phase spans and can momentarily
+// regress; the busy chip must never count backwards within a single seed. Clamp
+// each reported value up to the highest already shown; the caller resets the
+// floor to 0 when a new seed starts.
+export const clampTopicProgress = (floor: number, next: number): number => Math.max(floor, next);
+
+// A topic is "active" for dismissal purposes when the chip is showing, an encode
+// is in flight, a topic is deferred waiting on the embeddings DB, or an
+// unconsumed `topic=` URL seed is still pending. All four must be dismissed when
+// the user (or a cross-tab localStorage sync) selects a non-topic playback mode,
+// otherwise a still-pending topic later hijacks that explicit choice.
+export const isTopicActive = (input: {
+  topic: string | null;
+  topicBusy: boolean;
+  hasDeferredTopic: boolean;
+  hasUnconsumedInitialTopic: boolean;
+}): boolean =>
+  input.topic !== null ||
+  input.topicBusy ||
+  input.hasDeferredTopic ||
+  input.hasUnconsumedInitialTopic;
+
+// Copy shown when the embeddings DB fails to load while a topic is waiting on
+// it. British English; distinct from the model-encode failure message so the
+// two failure modes are told apart.
+export const TOPIC_EMBEDDINGS_UNAVAILABLE_MESSAGE =
+  "Couldn't load the similarity data — check the connection and try again.";
+
+// A topic deferred (or an initial URL seed) waiting on the embeddings DB is
+// abandoned when that DB load fails: there is nothing to rank against, so the
+// caller clears the busy state and surfaces the error rather than spinning
+// "Loading embeddings…" forever. Only act when the error is real AND something
+// is actually waiting on the DB.
+export const shouldAbortPendingTopicOnEmbeddingsError = (input: {
+  hasEmbeddingsError: boolean;
+  topicAwaitingEmbeddings: boolean;
+  hasDeferredTopic: boolean;
+  hasPendingInitialTopic: boolean;
+}): boolean =>
+  input.hasEmbeddingsError &&
+  (input.topicAwaitingEmbeddings || input.hasDeferredTopic || input.hasPendingInitialTopic);
 
 // When the user manually picks a playback mode, an active (or in-flight) topic
 // is IMPLICITLY dismissed: clear the chip/topic state and drop the topic= URL
