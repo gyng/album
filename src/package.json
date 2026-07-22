@@ -28,7 +28,7 @@
     "start": "next start",
     "typecheck": "tsc --noEmit -p tsconfig.typecheck.json",
     "typecheck:portable": "tsc --noEmit -p tsconfig.portable.json",
-    "lint": "oxlint && biome lint . && npm run typecheck && npm run typecheck:portable",
+    "lint": "oxlint && biome lint . && npm run typecheck && npm run typecheck:portable && npm run format:check",
     "lint:fix": "oxlint --fix && biome lint --write .",
     "format:check": "oxfmt --check .",
     "format:write": "oxfmt .",

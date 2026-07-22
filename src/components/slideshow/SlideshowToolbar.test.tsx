@@ -441,9 +441,7 @@ describe("SlideshowToolbar", () => {
 
   it("surfaces a topic error and keeps the input available for a retry", () => {
     render(
-      <SlideshowToolbar
-        {...makeProps({ topicError: "Topic search is unavailable right now." })}
-      />,
+      <SlideshowToolbar {...makeProps({ topicError: "Topic search is unavailable right now." })} />,
     );
 
     const topicGroup = screen.getByRole("group", { name: "Topic" });

@@ -185,25 +185,42 @@ test.describe("Responsive UI", () => {
         // never needed (e.g. Desktop 84's IBM Plex Mono behind Pixelify
         // Sans), so a full-stack check fails on exactly the healthy path.
         const firstFamily = (fontFamily: string) => fontFamily.split(",")[0].trim();
+        const stripQuotes = (family: string) => family.replace(/^"|"$/g, "");
+        // fonts.check treats an UNREGISTERED family as an always-available
+        // system font, so on its own it cannot catch a deleted @fontsource
+        // import. Pair it with an existence check: the themed face must have a
+        // registered FontFace that actually loaded.
+        const faceLoaded = (fontFamily: string) => {
+          const wanted = stripQuotes(firstFamily(fontFamily));
+          return [...document.fonts].some(
+            (face) => stripQuotes(face.family) === wanted && face.status === "loaded",
+          );
+        };
         const bodyStyle = getComputedStyle(document.body);
         const headingStyle = getComputedStyle(element);
         return {
           bodyFont: bodyStyle.fontFamily,
           headingFont: headingStyle.fontFamily,
           scenery: bodyStyle.backgroundImage,
-          bodyFontLoaded: document.fonts.check(
-            `${bodyStyle.fontSize} ${firstFamily(bodyStyle.fontFamily)}`,
-          ),
-          headingFontLoaded: document.fonts.check(
-            `${headingStyle.fontWeight} ${headingStyle.fontSize} ${firstFamily(headingStyle.fontFamily)}`,
-          ),
+          bodyFontLoaded:
+            document.fonts.check(`${bodyStyle.fontSize} ${firstFamily(bodyStyle.fontFamily)}`) &&
+            faceLoaded(bodyStyle.fontFamily),
+          headingFontLoaded:
+            document.fonts.check(
+              `${headingStyle.fontWeight} ${headingStyle.fontSize} ${firstFamily(headingStyle.fontFamily)}`,
+            ) && faceLoaded(headingStyle.fontFamily),
         };
       });
 
       expect(appearance.scenery).not.toBe("none");
       expect(appearance.headingFont).not.toBe(appearance.bodyFont);
-      expect(appearance.bodyFontLoaded).toBe(true);
-      expect(appearance.headingFontLoaded).toBe(true);
+      // Bling's stacks are deliberately system-only (Impact / Comic Sans MS —
+      // a documented nostalgia gamble with no bundled face), so the
+      // loaded-webfont assertions do not apply to it.
+      if (theme !== "bling") {
+        expect(appearance.bodyFontLoaded).toBe(true);
+        expect(appearance.headingFontLoaded).toBe(true);
+      }
       typeSignatures.add(`${appearance.bodyFont}|${appearance.headingFont}`);
       await expectNoDocumentOverflow(page);
     }
