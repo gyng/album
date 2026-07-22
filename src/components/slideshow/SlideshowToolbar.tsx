@@ -51,6 +51,12 @@ const styles = mergeCssModuleStyles(
     "toolbar",
     "toolbarCloseButton",
     "toolbarCloseGrip",
+    "topicForm",
+    "topicInput",
+    "topicChip",
+    "topicChipLabel",
+    "topicDismiss",
+    "topicError",
   ],
   ["toolbar"],
 );
@@ -123,6 +129,16 @@ export type SlideshowToolbarProps = {
   alignCadence: boolean;
   onToggleAlign: () => void;
 
+  // Topic seeding — encode a free-text topic with the SigLIP text tower and
+  // seed the similar-mode flow from the top matches. `topic` is the active
+  // topic (null when off); busy covers model load + query encode; error is a
+  // short message shown when the model is unavailable (e.g. offline first use).
+  topic: string | null;
+  topicBusy: boolean;
+  topicError: string | null;
+  onSubmitTopic: (topic: string) => void;
+  onClearTopic: () => void;
+
   // Context actions
   onInspectImage: () => void;
   onCopyLink: () => void;
@@ -148,6 +164,17 @@ export const SlideshowToolbar: React.FC<SlideshowToolbarProps> = (props) => {
   // toolbar, so the timer/fired refs live here.
   const contextLongPressTimerRef = React.useRef<number | null>(null);
   const contextLongPressFiredRef = React.useRef(false);
+
+  // Draft text for the topic input. Owned here so the parent only hears about a
+  // deliberate submit; cleared once a topic becomes active (the input is then
+  // replaced by the chip).
+  const [topicDraft, setTopicDraft] = React.useState("");
+  const { topic: activeTopic } = props;
+  React.useEffect(() => {
+    if (activeTopic) {
+      setTopicDraft("");
+    }
+  }, [activeTopic]);
 
   // Clear a pending long-press timer on unmount so its inspect `alert` can't
   // fire after the toolbar (or the whole slideshow) has gone.
@@ -543,6 +570,70 @@ export const SlideshowToolbar: React.FC<SlideshowToolbarProps> = (props) => {
               <div className={styles.hideProgressRing} />
             </div>
           </span>
+        </div>
+      </div>
+
+      <div className={styles.controlGroup} role="group" aria-label="Topic">
+        <div className={styles.controlHeader}>
+          <span className={styles.controlLogo} aria-hidden="true">
+            🔎
+          </span>
+          <span className={styles.controlCopy}>
+            <span className={styles.controlTitle}>Topic</span>
+          </span>
+        </div>
+
+        <div className={styles.controlMeta}>
+          {props.topic ? (
+            <span className={styles.topicChip}>
+              <span className={styles.topicChipLabel}>
+                Topic: <i>{props.topic}</i>
+              </span>
+              <button
+                type="button"
+                className={styles.topicDismiss}
+                aria-label="Clear topic"
+                title="Stop topic mode and restore the previous playback"
+                onClick={props.onClearTopic}
+              >
+                ✕
+              </button>
+            </span>
+          ) : (
+            <form
+              className={styles.topicForm}
+              onSubmit={(event) => {
+                event.preventDefault();
+                const value = topicDraft.trim();
+                if (value) {
+                  props.onSubmitTopic(value);
+                }
+              }}
+            >
+              <input
+                className={styles.topicInput}
+                type="text"
+                value={topicDraft}
+                onChange={(event) => setTopicDraft(event.target.value)}
+                placeholder="Seed by topic, e.g. cat"
+                aria-label="Slideshow topic"
+                disabled={props.topicBusy}
+                aria-busy={props.topicBusy}
+              />
+              <button
+                type="submit"
+                className={buttonStyles.base}
+                disabled={props.topicBusy || topicDraft.trim().length === 0}
+              >
+                {props.topicBusy ? "Seeding…" : "Seed"}
+              </button>
+            </form>
+          )}
+          {props.topicError ? (
+            <span className={styles.topicError} role="status">
+              {props.topicError}
+            </span>
+          ) : null}
         </div>
       </div>
 

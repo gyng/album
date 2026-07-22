@@ -290,6 +290,81 @@
   min-block-size: var(--size-44);
 }
 
+/* Topic seeding: a compact text field + submit, replaced by a dismissible chip
+   once a topic is active. Styled to sit on the toolbar's dark glass like the
+   other controls. */
+
+.topicForm {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--m-s);
+}
+
+.topicInput {
+  min-inline-size: var(--size-180);
+  min-block-size: var(--size-44);
+  padding: var(--m-s) var(--m-m);
+  border: solid var(--size-1) var(--glass-border);
+  border-radius: var(--m-m);
+  background: color-mix(in oklch, var(--c-black) 24%, transparent);
+  color: var(--c-white);
+  font: inherit;
+  font-size: var(--fs-sm);
+}
+
+.topicInput::placeholder {
+  color: color-mix(in oklch, var(--c-white) 52%, transparent);
+}
+
+.topicInput:focus-visible {
+  outline: solid var(--size-2) var(--c-white);
+  outline-offset: var(--size-2);
+}
+
+.topicInput:disabled {
+  opacity: 0.6;
+}
+
+.topicChip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--m-s);
+  min-block-size: var(--size-44);
+  padding: var(--m-s) var(--m-s) var(--m-s) var(--m-m);
+  border-radius: var(--radius-pill);
+  background: var(--c-slideshow-active-bg, color-mix(in oklch, var(--c-white) 18%, transparent));
+  border: solid var(--size-1) var(--c-slideshow-active-border, var(--glass-border));
+  color: var(--c-white);
+}
+
+.topicChipLabel {
+  font-size: var(--fs-sm);
+}
+
+.topicDismiss {
+  display: grid;
+  place-items: center;
+  inline-size: var(--size-28);
+  block-size: var(--size-28);
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: color-mix(in oklch, var(--c-white) 16%, transparent);
+  color: var(--c-white);
+  font: inherit;
+  cursor: pointer;
+}
+
+.topicDismiss:hover,
+.topicDismiss:focus-visible {
+  background: color-mix(in oklch, var(--c-white) 30%, transparent);
+  outline: none;
+}
+
+.topicError {
+  font-size: var(--fs-s);
+  color: color-mix(in oklch, var(--c-white) 82%, transparent);
+}
+
 .hideProgress {
   display: inline-grid;
   place-items: center;

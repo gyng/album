@@ -26,6 +26,9 @@ export type ParsedSlideshowParams = {
   alignment: DetailsAlignment | null;
   delayMs: number | null;
   shuffleHistory: number | null;
+  // A free-text topic to seed the semantic similar-mode flow from. null when
+  // the param is absent or blank.
+  topic: string | null;
 };
 
 const TRUTHY = ["1", "true", "yes", "on"];
@@ -86,21 +89,34 @@ export const parseSlideshowSearchParams = (
     alignment,
     delayMs,
     shuffleHistory,
+    topic: params.get("topic")?.trim() || null,
   };
 };
 
 // updateSlideshowUrl: rewrite the live URL in place — set mode and delay (as
 // SECONDS), drop the one-shot photo/seed params, and PRESERVE every other
 // param (filter, clock, …) the user may have set. Returns the new href.
+//
+// `topic` is tri-state: omit it (undefined) to preserve any existing topic
+// param — the common case, since the frequent mode/delay writes must not drop
+// an active topic; pass a string to set it (seeding); pass null to delete it
+// (dismissing).
 export const applySlideshowUrlState = (
   currentHref: string,
-  opts: { mode: SlideshowMode; delayMs: number },
+  opts: { mode: SlideshowMode; delayMs: number; topic?: string | null },
 ): string => {
   const url = new URL(currentHref);
   url.searchParams.set("mode", opts.mode);
   url.searchParams.set("delay", String(opts.delayMs / 1000));
   url.searchParams.delete("photo");
   url.searchParams.delete("seed");
+  if (opts.topic !== undefined) {
+    if (opts.topic) {
+      url.searchParams.set("topic", opts.topic);
+    } else {
+      url.searchParams.delete("topic");
+    }
+  }
   return url.toString();
 };
 
@@ -111,11 +127,15 @@ export const buildSlideshowPermalink = (opts: {
   mode: SlideshowMode;
   photoPath: string;
   filter?: string;
+  topic?: string;
 }): string => {
   const url = new URL("/slideshow", opts.origin);
   url.searchParams.set("mode", opts.mode);
   if (opts.filter) {
     url.searchParams.set("filter", opts.filter);
+  }
+  if (opts.topic) {
+    url.searchParams.set("topic", opts.topic);
   }
   url.searchParams.set("photo", opts.photoPath);
   return url.toString();

@@ -88,6 +88,14 @@ describe("parseSlideshowSearchParams", () => {
     expect(parse("filter=japan").filter).toBe("japan");
     expect(parse("filter=").filter).toBeNull();
   });
+
+  it("parses a trimmed topic, treating blank as null", () => {
+    expect(parse("topic=cat").topic).toBe("cat");
+    expect(parse("topic=%20cat%20").topic).toBe("cat");
+    expect(parse("topic=").topic).toBeNull();
+    expect(parse("topic=%20%20").topic).toBeNull();
+    expect(parse("").topic).toBeNull();
+  });
 });
 
 describe("applySlideshowUrlState", () => {
@@ -103,6 +111,32 @@ describe("applySlideshowUrlState", () => {
     expect(u.searchParams.get("seed")).toBeNull();
     expect(u.searchParams.get("filter")).toBe("japan"); // preserved
     expect(u.searchParams.get("clock")).toBe("1"); // preserved
+  });
+
+  it("preserves an existing topic param when topic is omitted", () => {
+    const out = applySlideshowUrlState("https://x.test/slideshow?topic=cat", {
+      mode: "similar",
+      delayMs: 30000,
+    });
+    expect(new URL(out).searchParams.get("topic")).toBe("cat");
+  });
+
+  it("sets the topic param when a topic string is given", () => {
+    const out = applySlideshowUrlState("https://x.test/slideshow", {
+      mode: "similar",
+      delayMs: 30000,
+      topic: "dog",
+    });
+    expect(new URL(out).searchParams.get("topic")).toBe("dog");
+  });
+
+  it("deletes the topic param when topic is null (dismiss)", () => {
+    const out = applySlideshowUrlState("https://x.test/slideshow?topic=cat", {
+      mode: "weighted",
+      delayMs: 30000,
+      topic: null,
+    });
+    expect(new URL(out).searchParams.has("topic")).toBe(false);
   });
 });
 
@@ -129,5 +163,22 @@ describe("buildSlideshowPermalink", () => {
       photoPath: "a/b.jpg",
     });
     expect(new URL(out).searchParams.has("filter")).toBe(false);
+  });
+
+  it("includes the topic param when a topic is active, and omits it otherwise", () => {
+    const withTopic = buildSlideshowPermalink({
+      origin: "https://x.test",
+      mode: "similar",
+      photoPath: "../albums/japan/IMG_1.jpg",
+      topic: "cat",
+    });
+    expect(new URL(withTopic).searchParams.get("topic")).toBe("cat");
+
+    const withoutTopic = buildSlideshowPermalink({
+      origin: "https://x.test",
+      mode: "similar",
+      photoPath: "../albums/japan/IMG_1.jpg",
+    });
+    expect(new URL(withoutTopic).searchParams.has("topic")).toBe(false);
   });
 });

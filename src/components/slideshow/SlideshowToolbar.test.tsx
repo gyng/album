@@ -59,6 +59,11 @@ const makeProps = (overrides: Partial<SlideshowToolbarProps> = {}): SlideshowToo
   secondsLeft: 10,
   alignCadence: false,
   onToggleAlign: noop,
+  topic: null,
+  topicBusy: false,
+  topicError: null,
+  onSubmitTopic: noop,
+  onClearTopic: noop,
   onInspectImage: noop,
   onCopyLink: noop,
   copiedPhotoLink: false,
@@ -398,6 +403,54 @@ describe("SlideshowToolbar", () => {
     expect(screen.queryByRole("button", { name: /longer cadences/i })).toBeNull();
     expect(screen.getByRole("button", { name: "3h" }).getAttribute("aria-pressed")).toBe("true");
     expect(screen.getByRole("button", { name: /Right/ })).toBeTruthy();
+  });
+
+  it("submits a trimmed topic and shows a busy state while it encodes", () => {
+    const onSubmitTopic = jest.fn();
+    const { rerender } = render(<SlideshowToolbar {...makeProps({ onSubmitTopic })} />);
+
+    const topicGroup = screen.getByRole("group", { name: "Topic" });
+    const input = within(topicGroup).getByRole("textbox", { name: "Slideshow topic" });
+    const seed = within(topicGroup).getByRole("button", { name: "Seed" });
+
+    // Empty submit does nothing; the button is disabled with no draft.
+    expect(seed).toBeDisabled();
+
+    fireEvent.change(input, { target: { value: "  cat " } });
+    fireEvent.click(within(topicGroup).getByRole("button", { name: "Seed" }));
+    expect(onSubmitTopic).toHaveBeenCalledWith("cat");
+
+    // While busy the field is disabled and the button reflects progress.
+    rerender(<SlideshowToolbar {...makeProps({ onSubmitTopic, topicBusy: true })} />);
+    expect(within(topicGroup).getByRole("textbox", { name: "Slideshow topic" })).toBeDisabled();
+    expect(within(topicGroup).getByRole("button", { name: "Seeding…" })).toBeDisabled();
+  });
+
+  it("shows an active topic as a dismissible chip that restores the previous mode", () => {
+    const onClearTopic = jest.fn();
+    render(<SlideshowToolbar {...makeProps({ topic: "cat", onClearTopic })} />);
+
+    const topicGroup = screen.getByRole("group", { name: "Topic" });
+    expect(within(topicGroup).getByText(/Topic:/)).toHaveTextContent("Topic: cat");
+    // The input is replaced by the chip while a topic is active.
+    expect(within(topicGroup).queryByRole("textbox", { name: "Slideshow topic" })).toBeNull();
+
+    fireEvent.click(within(topicGroup).getByRole("button", { name: "Clear topic" }));
+    expect(onClearTopic).toHaveBeenCalledTimes(1);
+  });
+
+  it("surfaces a topic error and keeps the input available for a retry", () => {
+    render(
+      <SlideshowToolbar
+        {...makeProps({ topicError: "Topic search is unavailable right now." })}
+      />,
+    );
+
+    const topicGroup = screen.getByRole("group", { name: "Topic" });
+    expect(within(topicGroup).getByRole("status")).toHaveTextContent(
+      "Topic search is unavailable right now.",
+    );
+    expect(within(topicGroup).getByRole("textbox", { name: "Slideshow topic" })).not.toBeDisabled();
   });
 
   it("handles cancelled, repeated, completed, and unmounted image long-presses", () => {

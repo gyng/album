@@ -7,8 +7,10 @@ import {
   fetchSlideshowPhotos,
   fetchRandomPhoto,
   fetchSimilarResults,
+  fetchSemanticResults,
   RandomPhotoRow,
 } from "../../components/search/api";
+import { encodeSearchText } from "../../components/search/textEmbeddings";
 import { ProgressBar } from "../../components/ProgressBar";
 import styles from "../../components/slideshow/SlideshowShared.module.css";
 import commonStyles from "../../styles/common.module.css";
@@ -75,6 +77,7 @@ import {
   parseSlideshowSearchParams,
   SlideshowMode,
 } from "../../util/slideshowUrl";
+import { decideTopicSeed, normaliseTopic, TopicSnapshot } from "../../util/slideshowTopic";
 import {
   isModifiedClick,
   isSlideshowShellStateMessage,
@@ -246,6 +249,16 @@ export const Slideshow: React.FC<{
   const similarQueueRef = React.useRef<RandomPhotoRow[]>([]);
   const similarQueueIndexRef = React.useRef<number>(-1);
   const similarQueueLastPathRef = React.useRef<string | undefined>(undefined);
+  // Topic seeding state. `topic` drives the toolbar chip; the snapshot ref
+  // remembers the pre-topic mode/filter so a dismiss restores it exactly. The
+  // initial-topic refs seed a shared/bookmarked `topic=` frame once, after the
+  // pool has loaded.
+  const [topic, setTopic] = React.useState<string | null>(null);
+  const [topicBusy, setTopicBusy] = React.useState(false);
+  const [topicError, setTopicError] = React.useState<string | null>(null);
+  const topicSnapshotRef = React.useRef<TopicSnapshot | null>(null);
+  const initialTopicRef = React.useRef<string | null>(null);
+  const initialTopicSeededRef = React.useRef(false);
 
   // Check for a new build manifest we control and reload when one is detected.
   useEffect(() => {
@@ -511,6 +524,10 @@ export const Slideshow: React.FC<{
     "weighted" as SlideshowMode,
     { initializeWithValue: false },
   );
+  // Synchronous mirror for reads inside the async topic seed, whose snapshot
+  // must capture the mode at seed time without recreating the callback.
+  const slideshowModeRef = React.useRef(slideshowMode);
+  slideshowModeRef.current = slideshowMode;
   // When true, every new "next change at" snaps to the next aligned wall-clock
   // boundary (e.g. every :00/:15/:30/:45 for a 15-minute cadence), so the
   // slideshow stays in sync with the clock across days. Default on.
@@ -598,13 +615,23 @@ export const Slideshow: React.FC<{
   const suppressImageClickRef = React.useRef(false);
   const [bufferedPhotoSrc, setBufferedPhotoSrc] = React.useState<string | null>(null);
 
-  const updateSlideshowUrl = useCallback((mode: SlideshowMode, delayMs = timeDelayRef.current) => {
-    window.history.replaceState(
-      window.history.state,
-      "",
-      applySlideshowUrlState(window.location.toString(), { mode, delayMs }),
-    );
-  }, []);
+  // `topic` is tri-state (see applySlideshowUrlState): undefined preserves any
+  // existing topic param — the default for the frequent mode/delay writes — a
+  // string sets it (seeding), null deletes it (dismissing).
+  const updateSlideshowUrl = useCallback(
+    (mode: SlideshowMode, delayMs = timeDelayRef.current, topicParam?: string | null) => {
+      window.history.replaceState(
+        window.history.state,
+        "",
+        applySlideshowUrlState(window.location.toString(), {
+          mode,
+          delayMs,
+          ...(topicParam !== undefined ? { topic: topicParam } : {}),
+        }),
+      );
+    },
+    [],
+  );
 
   const setSlideshowModeAndUrl = useCallback(
     (mode: SlideshowMode) => {
@@ -640,6 +667,11 @@ export const Slideshow: React.FC<{
    *   - mode=random|weighted|similar Slideshow playback mode
    *   - photo=<photo-path>          Start on a specific photo; the live URL drops this after load
    *   - seed=<photo-path>           Similar mode only: backward-compatible alias for the starting photo
+   *   - topic=<text>                Seed similar mode from a semantic topic (e.g. cat); the
+   *                                 text tower encodes it and the library is ranked, then the
+   *                                 top matches seed the similar-mode drift. Shareable; degrades
+   *                                 to the previous behaviour with an error if the model can't load
+   *                                 (e.g. offline first use). Dismissing the chip restores the mode.
    *   - align=left|center|right  Set details alignment
    *   - delay=<seconds>          Set slide duration in seconds (e.g., 60 = 60 seconds)
    *   - shuffle=<number>         Similar mode only: avoid repeating the last N photos
@@ -665,6 +697,7 @@ export const Slideshow: React.FC<{
 
     initialPhotoPathRef.current = parsed.initialPhotoPath;
     randomSimilarRequestedRef.current = parsed.randomSimilar;
+    initialTopicRef.current = parsed.topic;
     if (parsed.mode) {
       setSlideshowMode(parsed.mode);
     }
@@ -909,6 +942,109 @@ export const Slideshow: React.FC<{
     similarQueueRef.current = [];
     similarQueueIndexRef.current = -1;
   }, []);
+
+  // Seed the slideshow from a free-text topic. Encodes the text with the shared
+  // SigLIP text tower (the SAME worker the search page uses — never a second
+  // worker entry), ranks the library semantically, then hands the ranked paths
+  // to the pure decideTopicSeed to reconcile against the pool/filter. On success
+  // it switches to similar mode, installs the ranked queue, commits the best
+  // match, and remembers the pre-topic mode/filter for a later dismiss; the
+  // existing image-similarity drift takes over from there. On failure (model
+  // unavailable — e.g. offline first use) it surfaces an error and leaves the
+  // previous mode untouched.
+  const seedTopic = useCallback(
+    async (rawTopic: string) => {
+      const topicText = normaliseTopic(rawTopic);
+      if (!topicText || !database) {
+        return;
+      }
+
+      setTopicError(null);
+      setTopicBusy(true);
+      try {
+        const textVector = await encodeSearchText(topicText);
+        const result = await fetchSemanticResults({
+          database,
+          embeddingsDatabase,
+          textQuery: topicText,
+          textVector,
+          page: 0,
+          pageSize: Math.max(shuffleHistorySize, 200),
+        });
+
+        const plan = decideTopicSeed({
+          resultData: result.data,
+          pool: randomPhotoPoolRef.current,
+          // Preserve the ORIGINAL snapshot across a re-seed so dismiss always
+          // returns to the pre-topic mode, never to "similar".
+          previousMode: topicSnapshotRef.current?.mode ?? slideshowModeRef.current,
+          ...(filterRef.current ? { filter: filterRef.current } : {}),
+        });
+
+        if (plan.kind === "empty") {
+          setTopicError("No photos match that topic.");
+          return;
+        }
+
+        topicSnapshotRef.current = plan.snapshot;
+        setTopic(topicText);
+        setSlideshowMode("similar");
+        // Install the ranked results as the similar queue; the existing drift
+        // reseeds from the committed best match on the next advance.
+        similarSeedPathRef.current = plan.seed.path;
+        similarQueueRef.current = plan.queue;
+        similarQueueIndexRef.current = 0;
+        similarQueueLastPathRef.current = plan.seed.path;
+        commitNextPhoto(plan.seed, { trackRecent: true });
+        updateSlideshowUrl("similar", timeDelayRef.current, topicText);
+      } catch (err) {
+        console.error("Topic seeding failed", err);
+        setTopicError("Topic search is unavailable right now.");
+      } finally {
+        setTopicBusy(false);
+      }
+    },
+    [
+      commitNextPhoto,
+      database,
+      embeddingsDatabase,
+      setSlideshowMode,
+      shuffleHistorySize,
+      updateSlideshowUrl,
+    ],
+  );
+
+  // Stop topic mode and restore the pre-topic mode + filter exactly. The show
+  // keeps running from the current photo under the restored mode.
+  const clearTopic = useCallback(() => {
+    const snapshot = topicSnapshotRef.current;
+    topicSnapshotRef.current = null;
+    setTopic(null);
+    setTopicError(null);
+
+    const restoreMode = snapshot?.mode ?? slideshowModeRef.current;
+    setSlideshowMode(restoreMode);
+    if (snapshot && snapshot.filter !== filterRef.current) {
+      setFilter(snapshot.filter);
+    }
+    updateSlideshowUrl(restoreMode, timeDelayRef.current, null);
+  }, [setSlideshowMode, updateSlideshowUrl]);
+
+  // Seed a shared/bookmarked `topic=` frame once, after the pool has loaded so
+  // the encode has something to rank against. seedTopic's own error path means
+  // an offline launch with no cached model degrades to the already-running
+  // previous mode rather than hanging.
+  useEffect(() => {
+    if (!hasParsedInitialUrl || !database || initialTopicSeededRef.current) {
+      return;
+    }
+    const pendingTopic = initialTopicRef.current;
+    if (!pendingTopic || poolStats.count === 0) {
+      return;
+    }
+    initialTopicSeededRef.current = true;
+    void seedTopic(pendingTopic);
+  }, [database, hasParsedInitialUrl, poolStats, seedTopic]);
 
   const advanceRandomPhoto = useCallback(
     (opts?: { trackRecent?: boolean }): RandomPhotoRow | null => {
@@ -1562,8 +1698,9 @@ export const Slideshow: React.FC<{
       mode: slideshowMode,
       photoPath,
       ...(filter ? { filter } : {}),
+      ...(topic ? { topic } : {}),
     });
-  }, [filter, slideshowMode]);
+  }, [filter, slideshowMode, topic]);
 
   const copyCurrentPhotoLink = useCallback(async () => {
     const photoLink = getCurrentPhotoLink();
@@ -2032,6 +2169,13 @@ export const Slideshow: React.FC<{
               alignNextChangeToCadence();
             }
           }}
+          topic={topic}
+          topicBusy={topicBusy}
+          topicError={topicError}
+          onSubmitTopic={(value) => {
+            void seedTopic(value);
+          }}
+          onClearTopic={clearTopic}
           onInspectImage={() => {
             void inspectCurrentImage();
           }}
