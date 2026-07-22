@@ -716,6 +716,53 @@ describe("publish wizard boundary adapters", () => {
     );
   });
 
+  it("treats a not-configured indexer as quiet, distinct from a failed model-info query", async () => {
+    // Regression: a run with no indexer configured (indexDir falsy) reused the
+    // same modelInfoUnavailable flag as an attempted-and-failed query, so
+    // every publish without an indexer emitted the loud "checks skipped"
+    // warning even though nothing was ever attempted.
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "publish-no-indexer-"));
+    const albumsDir = path.join(root, "albums");
+    fs.mkdirSync(albumsDir);
+    const loadState = jest.fn(async () => ({
+      exists: true,
+      dbPath: "db",
+      imageCount: 10,
+      embeddingsCount: 10,
+      hasEmbeddingsTable: true,
+      indexedPhotoPaths: new Set(),
+      indexedEmbeddingPaths: new Set(),
+      embeddingModelCounts: [{ modelId: "current", count: 10 }],
+    }));
+    const getModelInfo = jest.fn(() => null);
+
+    const report = await createPreflightReport({
+      albumsDir,
+      dbPath: "db",
+      embeddingsDbPath: null,
+      indexDir: null,
+      lastIndexStatsPath: null,
+      repoDir: null,
+      loadState,
+      getModelInfo,
+    });
+
+    expect(getModelInfo).not.toHaveBeenCalled();
+    expect(report.db).toMatchObject({
+      modelInfoUnavailable: false,
+      expectedEmbeddingModelIds: [],
+      staleEmbeddingCount: 0,
+      missingEmbeddingCount: 0,
+    });
+
+    const insights = buildPreflightInsights(report);
+    expect(insights).not.toContainEqual(
+      expect.objectContaining({
+        text: expect.stringContaining("skipped (model info unavailable)"),
+      }),
+    );
+  });
+
   it("queries indexer model metadata and handles command failures", () => {
     expect(
       getIndexerModelInfo("/index", () => Buffer.from('{"embeddingModelId":"model"}')),
@@ -984,6 +1031,29 @@ describe("publish wizard boundary adapters", () => {
       plan: { runIndex: false, runBuild: false, runDeploy: true },
     });
     expect(log).toHaveBeenCalled();
+  });
+
+  it("shows the index step as unknown, not clean, when model info is unavailable", () => {
+    // Regression: hasIndexChanges saw forced-zero embedding counts and
+    // printExecutionPlan rendered a clean "not needed" at info level even
+    // though the underlying model-info query failed or timed out.
+    const log = jest.spyOn(console, "log").mockImplementation(() => undefined);
+    printExecutionPlan({
+      args: { fastTrack: true, skipBuild: false, deploy: false },
+      report: {
+        summary: { newPhotos: 0, removedPhotos: 0 },
+        db: { missingEmbeddingCount: 0, staleEmbeddingCount: 0, modelInfoUnavailable: true },
+        deployment: null,
+        lastIndexStats: null,
+      },
+      plan: { runIndex: false, runBuild: true, runDeploy: false },
+    });
+
+    const indexRow = log.mock.calls.map((args) => args[0]).find((line) => line.includes("Index update"));
+    expect(indexRow).toContain("unknown — model info unavailable");
+    expect(indexRow).toContain("[WARN]");
+    expect(indexRow).not.toContain("not needed");
+    log.mockRestore();
   });
 
   it("prints a clean preflight with no attention albums", () => {

@@ -262,6 +262,46 @@ describe("publish-wizard-lib", () => {
     }
   });
 
+  it("still asks to index when model info is unavailable, even with no visible changes", async () => {
+    // Regression: fast-track silently left plan.runIndex false in this case,
+    // because hasIndexChanges saw the forced-zero embedding counts and never
+    // asked at all. An unknown state must not be fast-tracked past the user.
+    const prompts = [];
+    const originalCreateInterface = require("readline/promises").createInterface;
+    require("readline/promises").createInterface = () => ({
+      question: async (prompt) => {
+        prompts.push(prompt);
+        return "n";
+      },
+      close: () => {},
+    });
+
+    try {
+      const plan = await resolveExecutionPlan({
+        args: {
+          dryRun: false,
+          fastTrack: true,
+          yes: false,
+          json: false,
+          indexOnly: false,
+          deploy: false,
+          force: false,
+          skipPull: false,
+          skipBuild: true,
+        },
+        report: {
+          summary: { newPhotos: 0, removedPhotos: 0 },
+          db: { missingEmbeddingCount: 0, staleEmbeddingCount: 0, modelInfoUnavailable: true },
+        },
+      });
+
+      expect(prompts).toEqual(["Run indexing now? [Y/n] "]);
+      expect(plan.runIndex).toBe(false);
+    } finally {
+      require("readline/promises").createInterface = originalCreateInterface;
+    }
+  });
+
   it("checks Vercel up front when a fast-track plan builds or deploys", () => {
     const args = {
       indexOnly: false,
@@ -422,6 +462,18 @@ describe("publish-wizard-lib", () => {
       // printed "Skipping index update" even though the plan re-indexed.
       expect(
         hasIndexChanges({ ...base, db: { missingEmbeddingCount: 0, staleEmbeddingCount: 1486 } }),
+      ).toBe(true);
+    });
+
+    it("is true when model info is unavailable, even though counts look clean", () => {
+      // Regression: modelInfoUnavailable forces expectedEmbeddingModelIds to
+      // [], which forces missing/staleEmbeddingCount to 0 — an unknown state
+      // must never be reported as "nothing to do".
+      expect(
+        hasIndexChanges({
+          ...base,
+          db: { missingEmbeddingCount: 0, staleEmbeddingCount: 0, modelInfoUnavailable: true },
+        }),
       ).toBe(true);
     });
   });

@@ -319,7 +319,15 @@ const parseArgs = (argv) => {
 // across resolveExecutionPlan, printExecutionPlan and the wizard entry point so
 // the plan the user consents to matches what actually runs. Covers new/removed
 // photos as well as missing and stale (post-model-switch) embeddings.
+//
+// modelInfoUnavailable is treated as an unconditional "yes": when the indexer's
+// model metadata couldn't be read, expectedEmbeddingModelIds is forced to []
+// upstream, which forces missing/staleEmbeddingCount to 0 — indistinguishable
+// from a genuinely clean DB. An unknown state must never be reported (or
+// fast-tracked past) as "nothing to do"; it must always route through the
+// interactive confirmation in resolveExecutionPlan.
 const hasIndexChanges = (report) =>
+  report.db?.modelInfoUnavailable === true ||
   report.summary.newPhotos > 0 ||
   report.summary.removedPhotos > 0 ||
   (report.db?.missingEmbeddingCount ?? 0) > 0 ||
@@ -1080,10 +1088,15 @@ const createPreflightReport = async ({
 
   const modelInfo = indexDir ? getModelInfo(indexDir, execSync, console.warn) : null;
   // The indexer's model metadata is only trustworthy when this is false — a
-  // null modelInfo (query failed, timed out, or was never attempted) forces
-  // expectedEmbeddingModelIds to [] below, which would otherwise report clean
-  // zeros for stale/missing embeddings instead of "we don't actually know".
-  const modelInfoUnavailable = modelInfo === null;
+  // null modelInfo (query failed or timed out) forces expectedEmbeddingModelIds
+  // to [] below, which would otherwise report clean zeros for stale/missing
+  // embeddings instead of "we don't actually know".
+  //
+  // Distinct from "never attempted because no indexer is configured"
+  // (indexDir falsy): that's a legitimate, quiet "not applicable" — there is
+  // no indexer to distrust — not an unknown state that should warn or force
+  // the interactive index-confirmation path.
+  const modelInfoUnavailable = Boolean(indexDir) && modelInfo === null;
   const expectedEmbeddingModelIds =
     modelInfo?.embeddingModelIds ??
     (modelInfo?.embeddingModelId ? [modelInfo.embeddingModelId] : []);
@@ -1410,8 +1423,24 @@ const printExecutionPlan = ({ args, report, plan }) => {
     ...(deploymentRow ? [deploymentRow] : []),
     {
       label: "Index update",
-      value: indexChanges ? (plan.runIndex ? "yes" : "no") : "not needed",
-      level: indexChanges ? (plan.runIndex ? "ok" : "warn") : "info",
+      // modelInfoUnavailable means the embedding portion of indexChanges is
+      // unreliable (see hasIndexChanges) — never present that as a clean "not
+      // needed"/"no", even though hasIndexChanges now also forces the
+      // decision itself into the interactive path.
+      value: report.db?.modelInfoUnavailable
+        ? "unknown — model info unavailable"
+        : indexChanges
+          ? plan.runIndex
+            ? "yes"
+            : "no"
+          : "not needed",
+      level: report.db?.modelInfoUnavailable
+        ? "warn"
+        : indexChanges
+          ? plan.runIndex
+            ? "ok"
+            : "warn"
+          : "info",
     },
     ...(estimatedIndexSeconds !== null && plan.runIndex
       ? [
