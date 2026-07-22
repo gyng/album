@@ -177,17 +177,28 @@ test.describe("Responsive UI", () => {
       await expect(heading).toBeVisible();
       await expect(page.locator("html")).toHaveClass(new RegExp(`theme-${theme}`));
 
-      const appearance = await heading.evaluate((element) => ({
-        bodyFont: getComputedStyle(document.body).fontFamily,
-        headingFont: getComputedStyle(element).fontFamily,
-        scenery: getComputedStyle(document.body).backgroundImage,
-        bodyFontLoaded: document.fonts.check(
-          `${getComputedStyle(document.body).fontSize} ${getComputedStyle(document.body).fontFamily}`,
-        ),
-        headingFontLoaded: document.fonts.check(
-          `${getComputedStyle(element).fontWeight} ${getComputedStyle(element).fontSize} ${getComputedStyle(element).fontFamily}`,
-        ),
-      }));
+      const appearance = await heading.evaluate((element) => {
+        // Check only the stack's FIRST family — the themed display face this
+        // test exists to prove is shipped and loaded. fonts.check() over the
+        // whole stack would also demand every registered fallback WEBFONT be
+        // loaded, but the browser never fetches a fallback whose glyphs are
+        // never needed (e.g. Desktop 84's IBM Plex Mono behind Pixelify
+        // Sans), so a full-stack check fails on exactly the healthy path.
+        const firstFamily = (fontFamily: string) => fontFamily.split(",")[0].trim();
+        const bodyStyle = getComputedStyle(document.body);
+        const headingStyle = getComputedStyle(element);
+        return {
+          bodyFont: bodyStyle.fontFamily,
+          headingFont: headingStyle.fontFamily,
+          scenery: bodyStyle.backgroundImage,
+          bodyFontLoaded: document.fonts.check(
+            `${bodyStyle.fontSize} ${firstFamily(bodyStyle.fontFamily)}`,
+          ),
+          headingFontLoaded: document.fonts.check(
+            `${headingStyle.fontWeight} ${headingStyle.fontSize} ${firstFamily(headingStyle.fontFamily)}`,
+          ),
+        };
+      });
 
       expect(appearance.scenery).not.toBe("none");
       expect(appearance.headingFont).not.toBe(appearance.bodyFont);

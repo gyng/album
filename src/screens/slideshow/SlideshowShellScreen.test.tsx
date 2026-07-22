@@ -378,12 +378,17 @@ describe("slideshow code shell", () => {
       const promptName = "Tap once to keep this slideshow awake through code updates";
       // Chrome may acquire without a gesture; the gate must not flash meanwhile.
       expect(screen.queryByRole("button", { name: promptName })).not.toBeInTheDocument();
+      // The e2e specs key off this attribute to know when the gate decision is
+      // final — it must read false until the settle window elapses.
+      const diagnostics = screen.getByRole("group", { name: "Slideshow diagnostics" });
+      expect(diagnostics).toHaveAttribute("data-wake-settled", "false");
 
       await act(async () => {
         jest.advanceTimersByTime(AUTO_WAKE_SETTLE_MS);
         await Promise.resolve();
       });
 
+      expect(diagnostics).toHaveAttribute("data-wake-settled", "true");
       const prompt = screen.getByRole("button", { name: promptName });
       fireEvent.click(prompt);
 

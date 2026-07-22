@@ -1,7 +1,10 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const imageOptimisationConfig = require("../services/imageOptimisationConfig.json");
-const { PHOTO_EXTENSIONS, STALE_TEMP_FILE_THRESHOLD_MS } = require("./prepare-optimised-images.cjs");
+const {
+  PHOTO_EXTENSIONS,
+  STALE_TEMP_FILE_THRESHOLD_MS,
+} = require("./prepare-optimised-images.cjs");
 
 const OPTIMISED_IMAGE_SIZES = new Set(imageOptimisationConfig.sizes);
 const OPTIMISED_VIDEO_MAX_WIDTH = 1920;

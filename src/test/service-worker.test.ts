@@ -563,7 +563,9 @@ describe("service worker data caching", () => {
 
     await responsePromise;
     await lifetimePromise;
-    expect(fetchMockOf(fetchHandler)).toHaveBeenCalledWith(expect.anything(), { cache: "no-cache" });
+    expect(fetchMockOf(fetchHandler)).toHaveBeenCalledWith(expect.anything(), {
+      cache: "no-cache",
+    });
   });
 
   it("revalidates a given media URL at most once per worker lifetime", async () => {

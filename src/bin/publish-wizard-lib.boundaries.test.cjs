@@ -1049,7 +1049,9 @@ describe("publish wizard boundary adapters", () => {
       plan: { runIndex: false, runBuild: true, runDeploy: false },
     });
 
-    const indexRow = log.mock.calls.map((args) => args[0]).find((line) => line.includes("Index update"));
+    const indexRow = log.mock.calls
+      .map((args) => args[0])
+      .find((line) => line.includes("Index update"));
     expect(indexRow).toContain("unknown — model info unavailable");
     expect(indexRow).toContain("[WARN]");
     expect(indexRow).not.toContain("not needed");

@@ -171,11 +171,11 @@ const ComparisonTable = () => {
     <div className={styles.tableScroll}>
       <table className={styles.table}>
         <caption className={styles.tableCaption}>
-          Bars are scaled within each column. Shaded bars are measures where less is better. ★
-          marks Gemma&nbsp;UD-Q4, the shipped default — chosen for its tags, not its raw score. The
-          “tags only” column is why: Janus scores {janus?.conceptPass}/{janus?.conceptTotal} with
-          tags and sentence merged but only {janus?.conceptInTags}/{janus?.conceptTotal} on tags
-          alone — its sentence propping up bare-word tags. Tags are what the search index stores.
+          Bars are scaled within each column. Shaded bars are measures where less is better. ★ marks
+          Gemma&nbsp;UD-Q4, the shipped default — chosen for its tags, not its raw score. The “tags
+          only” column is why: Janus scores {janus?.conceptPass}/{janus?.conceptTotal} with tags and
+          sentence merged but only {janus?.conceptInTags}/{janus?.conceptTotal} on tags alone — its
+          sentence propping up bare-word tags. Tags are what the search index stores.
         </caption>
         <thead>
           <tr>

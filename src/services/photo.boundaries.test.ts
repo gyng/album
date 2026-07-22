@@ -235,9 +235,7 @@ describe("photo adapter boundaries", () => {
     await expect(Promise.all([firstCall, secondCall])).resolves.toBeDefined();
 
     const resizedDir = path.join(outputDirectory, "trip", RESIZED_IMAGE_DIR);
-    const leftoverTempFiles = fs
-      .readdirSync(resizedDir)
-      .filter((name) => name.includes(".tmp-"));
+    const leftoverTempFiles = fs.readdirSync(resizedDir).filter((name) => name.includes(".tmp-"));
     expect(leftoverTempFiles).toEqual([]);
     for (const size of OPTIMISED_SIZES) {
       expect(fs.existsSync(path.join(resizedDir, `photo.jpg@${size}.avif`))).toBe(true);
@@ -349,9 +347,9 @@ describe("photo adapter boundaries", () => {
         }) as never,
     );
 
-    await expect(
-      optimiseImages("albums/trip/photo.jpg", "public/data/albums"),
-    ).rejects.toBe(failure);
+    await expect(optimiseImages("albums/trip/photo.jpg", "public/data/albums")).rejects.toBe(
+      failure,
+    );
 
     expect(unlink).toHaveBeenCalledTimes(3);
     for (const [tempArg] of unlink.mock.calls) {

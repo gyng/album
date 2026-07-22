@@ -222,7 +222,9 @@ export const TimelineDayGrid = ({
                       className={styles.secondaryMeta}
                       title={formatDateTimeTitle(entry.dateTimeOriginal)!}
                     >
-                      <HydratedRelativeTime date={exifWallClockTimestamp(entry.dateTimeOriginal)!} />
+                      <HydratedRelativeTime
+                        date={exifWallClockTimestamp(entry.dateTimeOriginal)!}
+                      />
                     </span>
                   ) : null}
                 </div>

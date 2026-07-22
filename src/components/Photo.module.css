@@ -215,9 +215,7 @@
 .block:where(:not(.immersive)) .details {
   margin-block-start: 0;
   scrollbar-gutter: auto;
-  margin-inline-end: calc(
-    (100% - var(--photo-render-width)) / 2 - var(--tap-target) - var(--m-s)
-  );
+  margin-inline-end: calc((100% - var(--photo-render-width)) / 2 - var(--tap-target) - var(--m-s));
 }
 
 .immersive .details {

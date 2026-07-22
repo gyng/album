@@ -319,9 +319,12 @@ const prepareOptimisedImages = async ({
         return;
       }
       const { size, output } = missing[index];
-      const message = result.reason instanceof Error ? result.reason.message : String(result.reason);
+      const message =
+        result.reason instanceof Error ? result.reason.message : String(result.reason);
       summary.failures.push({ albumName, filename, size, output, message });
-      console.warn(`Could not pre-warm ${output} (will be re-attempted by the real build): ${message}`);
+      console.warn(
+        `Could not pre-warm ${output} (will be re-attempted by the real build): ${message}`,
+      );
     });
 
     if (encodedCount > 0) {
@@ -332,9 +335,7 @@ const prepareOptimisedImages = async ({
 
   summary.durationMs = Date.now() - startedAt;
   if (summary.failures.length > 0) {
-    console.warn(
-      `${summary.failures.length} variant(s) could not be pre-warmed and were skipped:`,
-    );
+    console.warn(`${summary.failures.length} variant(s) could not be pre-warmed and were skipped:`);
     for (const failure of summary.failures) {
       console.warn(`  - ${failure.output}: ${failure.message}`);
     }

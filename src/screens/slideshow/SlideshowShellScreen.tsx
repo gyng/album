@@ -410,6 +410,7 @@ export const SlideshowShellScreen = () => {
         aria-label="Slideshow diagnostics"
         data-open={String(diagnosticsOpen)}
         data-code-status={codeStatus}
+        data-wake-settled={String(autoWakeSettled)}
       >
         <button
           type="button"

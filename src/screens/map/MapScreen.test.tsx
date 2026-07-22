@@ -64,9 +64,9 @@ jest.mock("next/link", () => ({
   ),
 }));
 
-const mapWorldDeferredMock = jest.fn<React.ReactElement, [Record<string, unknown>]>(
-  () => <div data-testid="map-world" />,
-);
+const mapWorldDeferredMock = jest.fn<React.ReactElement, [Record<string, unknown>]>(() => (
+  <div data-testid="map-world" />
+));
 jest.mock("../../components/MapWorldDeferred", () => ({
   MapWorldDeferred: (props: Record<string, unknown>) => {
     mapWorldDeferredMock(props);

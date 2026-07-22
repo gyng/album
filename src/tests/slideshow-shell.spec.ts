@@ -114,8 +114,16 @@ test("slideshow exit controls leave the outer shell", async ({ page }) => {
   const wakePrompt = page.getByRole("button", {
     name: "Tap once to keep this slideshow awake through code updates",
   });
+  // The wake gate only renders after the automatic acquisition attempt has
+  // settled; wait for that deterministic signal before deciding whether a
+  // dismissal tap is needed, or the gate can appear mid-test and swallow the
+  // link click below.
+  await expect(
+    page.locator('[aria-label="Slideshow diagnostics"][data-wake-settled="true"]'),
+  ).toBeAttached();
   if (await wakePrompt.isVisible()) {
     await wakePrompt.click();
+    await expect(wakePrompt).toBeHidden();
   }
 
   await runtime.getByRole("link", { name: /Snapshots Slideshow/ }).click();
@@ -133,8 +141,16 @@ test("slideshow context links leave the outer shell", async ({ page }) => {
   const wakePrompt = page.getByRole("button", {
     name: "Tap once to keep this slideshow awake through code updates",
   });
+  // The wake gate only renders after the automatic acquisition attempt has
+  // settled; wait for that deterministic signal before deciding whether a
+  // dismissal tap is needed, or the gate can appear mid-test and swallow the
+  // link click below.
+  await expect(
+    page.locator('[aria-label="Slideshow diagnostics"][data-wake-settled="true"]'),
+  ).toBeAttached();
   if (await wakePrompt.isVisible()) {
     await wakePrompt.click();
+    await expect(wakePrompt).toBeHidden();
   }
 
   await runtime.getByRole("link", { name: / in / }).last().click();
