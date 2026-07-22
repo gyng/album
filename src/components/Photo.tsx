@@ -318,6 +318,7 @@ export const PhotoBlockEl: React.FC<{
     getBucketFacetSelection(FOCAL_LENGTH_35MM_FACET.id, exif.FocalLengthIn35mmFormat) ??
     getBucketFacetSelection(FOCAL_LENGTH_ACTUAL_FACET.id, exif.FocalLength);
   const displayDimensions = getDisplayDimensions(props.block);
+  const cameraDateTimestamp = exifWallClockTimestamp(exif.DateTimeOriginal);
   return (
     <div
       className={`${styles.block} ${props.block.formatting?.immersive ? styles.immersive : ""}`}
@@ -494,12 +495,12 @@ export const PhotoBlockEl: React.FC<{
                             ? `${local} (local @ ${props.block._build.exif.OffsetTime})`
                             : local;
                         })(),
-                        <HydratedRelativeTime
-                          key="relative-camera-datetime"
-                          date={
-                            exifWallClockTimestamp(props.block._build.exif.DateTimeOriginal) ?? NaN
-                          }
-                        />,
+                        cameraDateTimestamp != null ? (
+                          <HydratedRelativeTime
+                            key="relative-camera-datetime"
+                            date={cameraDateTimestamp}
+                          />
+                        ) : null,
                       ]
                         .filter(Boolean)
                         .map((it, idx) => (
@@ -508,7 +509,10 @@ export const PhotoBlockEl: React.FC<{
                             <br />
                           </React.Fragment>
                         )), // TODO: shift TZ option
-                      valid: Boolean(props.block._build.exif.DateTimeOriginal),
+                      // Truthy-but-unparseable DateTimeOriginal values parse to
+                      // no usable local string or timestamp, so the row would
+                      // otherwise render a bare label with an empty value.
+                      valid: cameraDateTimestamp != null,
                     },
                     //   { kind: "kv", k: "Software", v: [props.block._build.exif.Software].join(" ") },
                     {

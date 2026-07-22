@@ -202,6 +202,22 @@ describe("PhotoBlockEl", () => {
     ).toBeTruthy();
     expect(screen.queryByRole("link", { name: "Find photos at this ISO" })).toBeNull();
   });
+
+  it("hides the camera datetime row entirely when DateTimeOriginal is unparseable", () => {
+    // Truthy but not matched by the EXIF-ish datetime pattern in exifTime.ts,
+    // so both the formatted local string and the relative-time value are
+    // null — the row must not render a bare label with a blank/broken value.
+    const block = createBlock({
+      exif: {
+        DateTimeOriginal: "not-a-real-timestamp",
+      },
+    });
+    const { container } = render(<PhotoBlockEl block={block} currentIndex={0} />);
+
+    openPhotoDetails(container);
+
+    expect(screen.queryByText("Camera datetime")).toBeNull();
+  });
 });
 
 describe("ExifTable", () => {

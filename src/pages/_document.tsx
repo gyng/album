@@ -11,7 +11,6 @@ class MyDocument extends Document {
     return (
       <Html lang="en-GB">
         <Head>
-          <script dangerouslySetInnerHTML={{ __html: THEME_BOOTSTRAP_SCRIPT }} />
           <link rel="manifest" href="/manifest.webmanifest" />
           <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
           <meta name="theme-color" content="#000000" />
@@ -20,6 +19,7 @@ class MyDocument extends Document {
           <meta name="mobile-web-app-capable" content="yes" />
         </Head>
         <body>
+          <script dangerouslySetInnerHTML={{ __html: THEME_BOOTSTRAP_SCRIPT }} />
           <Main />
           <NextScript />
         </body>

@@ -43,8 +43,17 @@ export const THEME_BOOTSTRAP_SCRIPT = `
     const stored = localStorage.getItem("theme");
     const storedTheme = aliases[stored] || stored;
     if (storedTheme && Object.hasOwn(schemes, storedTheme)) {
-      if (storedTheme !== stored) localStorage.setItem("theme", storedTheme);
       applyTheme(storedTheme);
+      if (storedTheme !== stored) {
+        // Best-effort migration of the legacy alias to its canonical name.
+        // The theme is already applied above, so a quota/private-mode
+        // failure here must not discard the (already-applied) preference.
+        try {
+          localStorage.setItem("theme", storedTheme);
+        } catch (_migrateErr) {
+          // Ignore — the resolved theme still applies for this session.
+        }
+      }
       return;
     }
 
