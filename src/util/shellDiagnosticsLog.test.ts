@@ -275,3 +275,38 @@ describe("coalescing repeated events", () => {
     expect(describeShellEvent(log[0])).toContain("×2");
   });
 });
+
+describe("retry-cycle coalescing across the decay pattern", () => {
+  it("keeps a whole night of decay cycles down to one entry per cycle type", () => {
+    const storage = makeStorage();
+    appendShellEvent({ category: "wake", type: "lost" }, 0, storage);
+    // Three full cycles: failed attempts, cap, decay, repeat.
+    let t = 1000;
+    for (let cycle = 0; cycle < 3; cycle++) {
+      for (let i = 0; i < 5; i++) {
+        appendShellEvent({ category: "wake", type: "reacquire-failed" }, (t += 60000), storage);
+      }
+      appendShellEvent({ category: "wake", type: "cap-reached" }, (t += 1000), storage);
+      appendShellEvent({ category: "wake", type: "cap-decayed" }, (t += 600000), storage);
+    }
+
+    const log = readShellLog(storage);
+    // Onset entry plus one coalesced entry per cycle type — not 3 per cycle.
+    expect(log).toHaveLength(4);
+    const failed = log.find(
+      (e): e is Extract<ShellLogEntry, { category: "wake" }> =>
+        e.category === "wake" && e.type === "reacquire-failed",
+    );
+    expect(failed?.count).toBe(15);
+    expect(failed?.lastAt).toBeGreaterThan(failed?.at ?? 0);
+  });
+
+  it("does not reach across non-cycle entries to coalesce", () => {
+    const storage = makeStorage();
+    appendShellEvent({ category: "wake", type: "reacquire-failed" }, 1000, storage);
+    appendShellEvent({ category: "network", type: "offline" }, 2000, storage);
+    appendShellEvent({ category: "wake", type: "reacquire-failed" }, 3000, storage);
+
+    expect(readShellLog(storage)).toHaveLength(3);
+  });
+});

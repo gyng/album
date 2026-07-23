@@ -156,23 +156,49 @@ export const appendShellEvent = (
 ): ShellLogEntry[] => {
   const entry = { at, ...input } as ShellLogEntry;
   const existing = readShellLog(storage);
-  const newest = existing[existing.length - 1];
+  const matches = (candidate: ShellLogEntry): boolean =>
+    input.category !== "gap" &&
+    candidate.category === input.category &&
+    candidate.type === input.type &&
+    (candidate.category !== "code" ||
+      (candidate as { version?: string }).version === (input as { version?: string }).version);
   // Coalesce a repeat of the newest entry (same category, type, and version)
   // rather than appending — gap entries always stand alone so each freeze
-  // keeps its own duration.
-  const isRepeatOfNewest =
-    newest !== undefined &&
-    input.category !== "gap" &&
-    newest.category === input.category &&
-    newest.type === input.type &&
-    (newest.category !== "code" ||
-      (newest as { version?: string }).version === (input as { version?: string }).version);
-  const next = isRepeatOfNewest
-    ? [
-        ...existing.slice(0, -1),
-        { ...newest, count: ((newest as Coalesced).count ?? 1) + 1, lastAt: at } as ShellLogEntry,
-      ]
-    : [...existing, entry].slice(-SHELL_LOG_MAX_ENTRIES);
+  // keeps its own duration. The wake retry CYCLE (failed attempts, cap, decay,
+  // repeat) additionally coalesces through its own siblings: a pure-rejection
+  // night otherwise appends one alternating triple per decay cycle and evicts
+  // the onset evidence after ~6 hours; looking back through cycle-type entries
+  // keeps a whole night at one entry per cycle type.
+  const isWakeCycleType = (candidate: ShellLogEntry): boolean =>
+    candidate.category === "wake" &&
+    (candidate.type === "reacquire-failed" ||
+      candidate.type === "cap-reached" ||
+      candidate.type === "cap-decayed");
+  let mergeIndex = -1;
+  for (let i = existing.length - 1; i >= 0 && i >= existing.length - 3; i--) {
+    const candidate = existing[i];
+    if (matches(candidate)) {
+      mergeIndex = i;
+      break;
+    }
+    // Only reach past the newest entry when both the new input and the entry
+    // being skipped belong to the retry cycle.
+    if (!(entry.category === "wake" && isWakeCycleType(entry) && isWakeCycleType(candidate))) {
+      break;
+    }
+  }
+  const next =
+    mergeIndex >= 0
+      ? existing.map((candidate, i) =>
+          i === mergeIndex
+            ? ({
+                ...candidate,
+                count: ((candidate as Coalesced).count ?? 1) + 1,
+                lastAt: at,
+              } as ShellLogEntry)
+            : candidate,
+        )
+      : [...existing, entry].slice(-SHELL_LOG_MAX_ENTRIES);
   if (storage) {
     try {
       storage.setItem(SHELL_LOG_STORAGE_KEY, JSON.stringify(next));
@@ -349,10 +375,13 @@ export const serialiseDiagnostics = (report: DiagnosticsReport): string => {
     "",
     `Event history (${report.log.length}):`,
     ...(report.log.length > 0
-      ? report.log.map(
-          (entry) =>
-            `${iso(entry.at)}  [${categoryLabel(entry.category)}] ${describeShellEvent(entry)}`,
-        )
+      ? report.log.map((entry) => {
+          const lastAt = entry.category === "gap" ? undefined : entry.lastAt;
+          // A coalesced entry spans onset..lastAt; the span end is the datum a
+          // morning-after read needs to know when the episode stopped.
+          const span = lastAt !== undefined && lastAt !== entry.at ? ` until ${iso(lastAt)}` : "";
+          return `${iso(entry.at)}${span}  [${categoryLabel(entry.category)}] ${describeShellEvent(entry)}`;
+        })
       : ["(no events recorded)"]),
   ];
   return lines.join("\n");

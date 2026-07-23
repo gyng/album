@@ -745,6 +745,11 @@ export const SlideshowShellScreen = () => {
                       <span>{describeShellEvent(entry)}</span>
                       <time dateTime={new Date(entry.at).toISOString()}>
                         {new Date(entry.at).toLocaleString("en-GB")}
+                        {entry.category !== "gap" &&
+                        entry.lastAt !== undefined &&
+                        entry.lastAt !== entry.at
+                          ? ` – ${new Date(entry.lastAt).toLocaleTimeString("en-GB")}`
+                          : null}
                       </time>
                     </li>
                   ))}
