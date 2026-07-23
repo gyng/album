@@ -1,6 +1,6 @@
 import React from "react";
 import { useWakeLock } from "../../components/useWakeLock";
-import { DocumentHead } from "../../components/platform";
+import { AppLink, DocumentHead } from "../../components/platform";
 import { BUILD_VERSION } from "../../lib/buildVersion";
 import { decideBuildUpdate } from "../../util/kioskRefresh";
 import { navigateTo } from "../../util/navigate";
@@ -13,7 +13,9 @@ import {
   readShellLog,
   serialiseDiagnostics,
   writeHeartbeat,
+  writeShellStatus,
   type ShellLogEntry,
+  type ShellStatusSnapshot,
 } from "../../util/shellDiagnosticsLog";
 import {
   buildSlideshowRuntimeUrl,
@@ -118,6 +120,9 @@ export const SlideshowShellScreen = () => {
   // When this session started, for the copied report. A ref (not state) — it is
   // read only on demand and must never trigger a render.
   const sessionStartRef = React.useRef(Date.now());
+  // The live state as last mirrored into storage, so the heartbeat can re-stamp
+  // it without depending on (and re-subscribing to) every state value.
+  const statusRef = React.useRef<ShellStatusSnapshot | null>(null);
   // The last runtime build we recorded as skewed, so the per-photo re-post of the
   // ready message during a stuck deploy records "version skew" once per episode
   // rather than on every advance.
@@ -184,7 +189,16 @@ export const SlideshowShellScreen = () => {
     };
     // Mount check reads the PRE-relaunch beat before the interval overwrites it.
     recordGapIfAny();
-    const beat = window.setInterval(() => writeHeartbeat(Date.now()), HEARTBEAT_INTERVAL_MS);
+    const beat = window.setInterval(() => {
+      const now = Date.now();
+      writeHeartbeat(now);
+      // Re-stamp the mirrored status too: a kiosk can run for hours without a
+      // single state change, and a snapshot frozen at launch would read to the
+      // report page as hours-stale rather than as steady.
+      if (statusRef.current) {
+        writeShellStatus({ ...statusRef.current, at: now });
+      }
+    }, HEARTBEAT_INTERVAL_MS);
     const handleVisible = () => {
       if (document.visibilityState === "visible") {
         recordGapIfAny();
@@ -233,6 +247,25 @@ export const SlideshowShellScreen = () => {
       setEventHistory(appendShellEvent({ category: "wake", type: "acquired" }));
     }
   }, [isWakeLockActive]);
+
+  // Mirror the live state for `/slideshow/diagnostics`, which runs as its own
+  // document (it replaces this one, or sits in a second window) and so cannot
+  // see this tree. Storage is the only channel between them. The code status is
+  // stored already-labelled so the report page needs none of this file's
+  // vocabulary.
+  React.useEffect(() => {
+    const snapshot: ShellStatusSnapshot = {
+      at: Date.now(),
+      sessionStart: sessionStartRef.current,
+      shellVersion: BUILD_VERSION,
+      runtimeVersion,
+      codeStatus: codeStatusLabel(codeStatus),
+      online: isOnline,
+      wake: { supported: isWakeLockSupported, active: isWakeLockActive, losses: wakeLossCount },
+    };
+    statusRef.current = snapshot;
+    writeShellStatus(snapshot);
+  }, [codeStatus, isOnline, isWakeLockActive, isWakeLockSupported, runtimeVersion, wakeLossCount]);
 
   // A lock lost long after the launch tap must bring the one-tap gate back, but
   // only on a SUSTAINED loss — a brief blip while the hook re-acquires must not
@@ -779,6 +812,11 @@ export const SlideshowShellScreen = () => {
             >
               {copiedDiagnostics ? "Copied" : "Copy diagnostics"}
             </button>
+            {/* The same evidence at document size, for reading on a tablet
+                rather than squinting at this corner overlay. */}
+            <AppLink className={styles.reportLink} href="/slideshow/diagnostics">
+              Open full report
+            </AppLink>
           </div>
         </div>
       </section>

@@ -7,7 +7,7 @@ import commonStyles from "../../styles/common.module.css";
 import { buttonStyles, Input } from "../ui";
 import { SlideshowMode, DetailsAlignment } from "../../util/slideshowUrl";
 import { PoolStats, formatNewestPhotoDate } from "../../util/slideshowQueue";
-import { isModifiedClick } from "../../util/slideshowShell";
+import { isModifiedClick, SLIDESHOW_DIAGNOSTICS_HREF } from "../../util/slideshowShell";
 
 const styles = mergeCssModuleStyles(
   sharedStyles,
@@ -352,6 +352,25 @@ export const SlideshowToolbar: React.FC<SlideshowToolbarProps> = (props) => {
             </span>
           </span>
         </button>
+
+        {/* The wake-lock state beside this answers "is it awake now"; this
+            answers "why did it stop overnight". Icon-sized on purpose: it is a
+            rarely-needed escape hatch, not a third session action, and the
+            shell's own corner overlay is too easy to miss on a tablet to be the
+            only way in. */}
+        <Link
+          className={styles.sessionDiagnosticsLink}
+          href={SLIDESHOW_DIAGNOSTICS_HREF}
+          aria-label="Diagnostics"
+          title="Wake losses, updates, and freezes"
+          onClick={(event) => {
+            if (isModifiedClick(event)) return;
+            event.preventDefault();
+            props.onNavigate(SLIDESHOW_DIAGNOSTICS_HREF);
+          }}
+        >
+          <span aria-hidden="true">ⓘ</span>
+        </Link>
       </div>
 
       {/* Home link / escape hatch back to the gallery. On desktop it's the

@@ -438,7 +438,7 @@
     order: -1;
     inline-size: min(100%, var(--content-width-medium));
     display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
     gap: var(--m-s);
     padding: var(--m-s);
     border: solid var(--size-1) var(--glass-border);
@@ -500,6 +500,22 @@
   .sessionAwakeButtonActive {
     border-color: var(--c-slideshow-active-border);
     background: var(--c-slideshow-active-bg);
+  }
+
+  /* A third, icon-sized column beside the two session halves: a destination
+     rather than a session action, so it stays visually quieter than its
+     neighbours while keeping a full tap target. */
+  .sessionDiagnosticsLink {
+    display: grid;
+    place-items: center;
+    inline-size: var(--tap-target);
+    min-block-size: var(--tap-target);
+    border: solid var(--size-1) var(--glass-border);
+    border-radius: var(--m-m);
+    background: color-mix(in oklch, var(--c-white) 6%, transparent);
+    color: color-mix(in oklch, var(--c-white) 72%, transparent);
+    font-size: var(--fs-m);
+    text-decoration: none;
   }
 
   .sessionAwakeButton:disabled {

@@ -7,10 +7,13 @@ import {
   HEARTBEAT_STORAGE_KEY,
   readHeartbeat,
   readShellLog,
+  readShellStatus,
   serialiseDiagnostics,
   SHELL_LOG_MAX_ENTRIES,
   SHELL_LOG_STORAGE_KEY,
+  SHELL_STATUS_STORAGE_KEY,
   writeHeartbeat,
+  writeShellStatus,
   type DiagnosticsReport,
   type ShellLogEntry,
 } from "./shellDiagnosticsLog";
@@ -232,6 +235,52 @@ describe("serialiseDiagnostics", () => {
   it("handles an empty log without throwing", () => {
     const report = { ...baseReport(), log: [] };
     expect(serialiseDiagnostics(report)).toContain("(no events recorded)");
+  });
+});
+
+describe("shell status snapshot", () => {
+  const snapshot = () => ({
+    at: 5000,
+    sessionStart: 1000,
+    shellVersion: "build-shell",
+    runtimeVersion: "build-runtime",
+    codeStatus: "current",
+    online: true,
+    wake: { supported: true, active: false, losses: 2 },
+  });
+
+  it("writes and reads back the shell's own view of its state", () => {
+    const storage = makeStorage();
+    writeShellStatus(snapshot(), storage);
+    expect(readShellStatus(storage)).toEqual(snapshot());
+  });
+
+  it("returns null when nothing has been written", () => {
+    expect(readShellStatus(makeStorage())).toBeNull();
+  });
+
+  it("tolerates corrupt or malformed snapshots", () => {
+    expect(readShellStatus(makeStorage({ [SHELL_STATUS_STORAGE_KEY]: "{" }))).toBeNull();
+    expect(
+      readShellStatus(makeStorage({ [SHELL_STATUS_STORAGE_KEY]: JSON.stringify({ at: "soon" }) })),
+    ).toBeNull();
+    expect(
+      readShellStatus(
+        makeStorage({ [SHELL_STATUS_STORAGE_KEY]: JSON.stringify({ ...snapshot(), wake: null }) }),
+      ),
+    ).toBeNull();
+  });
+
+  it("silently tolerates a storage that throws", () => {
+    const throwing = makeStorage();
+    throwing.getItem = () => {
+      throw new Error("denied");
+    };
+    throwing.setItem = () => {
+      throw new Error("denied");
+    };
+    expect(() => writeShellStatus(snapshot(), throwing)).not.toThrow();
+    expect(readShellStatus(throwing)).toBeNull();
   });
 });
 

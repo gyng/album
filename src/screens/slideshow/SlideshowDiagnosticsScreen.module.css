@@ -1,0 +1,124 @@
+/* Document-sized counterpart to the shell's corner panel: comfortable to read at
+   arm's length on a wall-mounted iPad, and wide enough to keep an event and its
+   timestamp on one line. */
+.page {
+  max-inline-size: var(--content-width-section);
+  margin-inline: auto;
+  padding: var(--m-l) var(--m-m) var(--m-2xl);
+  padding-block-start: calc(env(safe-area-inset-top, 0px) + var(--m-l));
+  display: flex;
+  flex-direction: column;
+  gap: var(--m-l);
+}
+
+.header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--m-s);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--m-s);
+  margin-block-start: var(--m-s);
+}
+
+.actions button,
+.backLink {
+  min-block-size: var(--tap-target);
+  display: inline-flex;
+  align-items: center;
+}
+
+.backLink {
+  padding-inline: var(--m-m);
+  border: solid var(--size-1) var(--c-bg-contrast-light);
+  border-radius: var(--radius-pill);
+  color: inherit;
+  font-size: var(--fs-sm);
+  text-decoration: none;
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--m-s);
+}
+
+.rows {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--m-m);
+  padding-block: var(--m-s);
+  border-block-start: solid var(--size-1) var(--c-bg-contrast-light);
+  font-size: var(--fs-sm);
+}
+
+.row:first-child {
+  border-block-start: 0;
+}
+
+.row dt {
+  color: var(--c-bg-contrast-dark);
+}
+
+.row dd {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--m);
+  text-align: end;
+}
+
+.hint {
+  color: var(--c-bg-contrast-dark);
+  font-size: var(--fs-s);
+  font-variant-numeric: tabular-nums;
+}
+
+.events {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+}
+
+.event {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--m-s);
+  padding-block: var(--m-s);
+  border-block-start: solid var(--size-1) var(--c-bg-contrast-light);
+  font-size: var(--fs-sm);
+}
+
+.event:first-child {
+  border-block-start: 0;
+}
+
+/* The two categories a morning-after read is looking for get an accent rule so
+   they can be found by scrolling rather than by reading every line. */
+.event[data-category="wake"],
+.event[data-category="gap"] {
+  border-inline-start: solid var(--m) var(--c-accent);
+  padding-inline-start: var(--m-s);
+}
+
+.eventTime {
+  color: var(--c-bg-contrast-dark);
+  font-size: var(--fs-s);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}

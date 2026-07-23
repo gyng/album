@@ -34,8 +34,20 @@ const loadInstallHandler = (
     if (override) {
       return override;
     }
-    if (input === "/" || input === "/slideshow" || input === "/slideshow/shell") {
-      const route = input === "/" ? "home" : input === "/slideshow" ? "slideshow" : "shell";
+    if (
+      input === "/" ||
+      input === "/slideshow" ||
+      input === "/slideshow/shell" ||
+      input === "/slideshow/diagnostics"
+    ) {
+      const route =
+        input === "/"
+          ? "home"
+          : input === "/slideshow"
+            ? "slideshow"
+            : input === "/slideshow/shell"
+              ? "shell"
+              : "diagnostics";
       return new Response(
         `<link rel="stylesheet" href="/assets/${route}.css"><script src="/assets/${route}.js"></script>`,
         { status: 200, headers: { "content-type": "text/html" } },
@@ -192,6 +204,12 @@ describe("service worker data caching", () => {
     );
     expect(cacheByName.get("snapshots-pwa-test-build-shell")?.put).toHaveBeenCalledWith(
       "/slideshow/shell",
+      expect.any(Response),
+    );
+    // The diagnostics report is most needed on a kiosk that has just failed —
+    // including one that failed because it is offline.
+    expect(cacheByName.get("snapshots-pwa-test-build-shell")?.put).toHaveBeenCalledWith(
+      "/slideshow/diagnostics",
       expect.any(Response),
     );
     expect(cacheByName.get("snapshots-pwa-test-build-runtime")?.put).toHaveBeenCalledWith(

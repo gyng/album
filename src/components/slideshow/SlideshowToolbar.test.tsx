@@ -147,6 +147,20 @@ describe("SlideshowToolbar", () => {
     expect(onExit).toHaveBeenCalledTimes(1);
   });
 
+  it("offers the diagnostics report beside the wake-lock control", () => {
+    // The shell's own diagnostics live in a corner overlay that is easy to miss
+    // on a tablet, so the session dock carries the way in.
+    const onNavigate = jest.fn();
+    render(<SlideshowToolbar {...makeProps({ onNavigate })} />);
+
+    const session = screen.getByRole("group", { name: "Slideshow session" });
+    const diagnostics = within(session).getByRole("link", { name: /diagnostics/i });
+    expect(diagnostics).toHaveAttribute("href", "/slideshow/diagnostics");
+
+    fireEvent.click(diagnostics);
+    expect(onNavigate).toHaveBeenCalledWith("/slideshow/diagnostics");
+  });
+
   it("shows an unambiguous active screen-awake status", () => {
     render(<SlideshowToolbar {...makeProps({ isWakeLockActive: true })} />);
 

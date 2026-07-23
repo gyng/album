@@ -19,7 +19,7 @@ const IMAGE_CACHE = "snapshots-pwa-images";
 // library. 4000 covers that with headroom while still bounding growth.
 const IMAGE_CACHE_MAX_ENTRIES = 4000;
 
-const SHELL_DOCUMENTS = ["/", "/slideshow", "/slideshow/shell"];
+const SHELL_DOCUMENTS = ["/", "/slideshow", "/slideshow/shell", "/slideshow/diagnostics"];
 const SHELL_STATIC_ASSETS = [
   "/manifest.webmanifest",
   "/pwa-icon.svg",

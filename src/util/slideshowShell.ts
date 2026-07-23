@@ -4,6 +4,10 @@ export const SLIDESHOW_NAVIGATE_MESSAGE = "snapshots:slideshow-navigate";
 export const SLIDESHOW_WAKE_REQUEST_MESSAGE = "snapshots:slideshow-wake-request";
 export const SLIDESHOW_SHELL_STATE_MESSAGE = "snapshots:slideshow-shell-state";
 
+// The full-page diagnostics report. A stable URL, so it can be bookmarked on a
+// kiosk device and precached for offline reading by the service worker.
+export const SLIDESHOW_DIAGNOSTICS_HREF = "/slideshow/diagnostics";
+
 export type SlideshowShellWakeState = {
   isSupported: boolean;
   isActive: boolean;

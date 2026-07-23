@@ -180,8 +180,23 @@
 }
 
 .wakeAction,
-.copyAction {
+.copyAction,
+.reportLink {
   grid-column: 1 / -1;
+}
+
+.reportLink {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-block-size: var(--tap-target);
+  padding: var(--m) var(--m-s);
+  border: solid var(--size-1) var(--c-border-on-dark);
+  border-radius: var(--m-s);
+  background: color-mix(in oklch, var(--c-white) 8%, transparent);
+  color: inherit;
+  font-size: var(--fs-s);
+  text-decoration: none;
 }
 
 .diagnosticsToggle:focus-visible,

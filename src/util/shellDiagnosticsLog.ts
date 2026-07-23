@@ -254,6 +254,80 @@ export const detectHeartbeatGap = (previous: number | null, now: number): number
   return gap > HEARTBEAT_GAP_THRESHOLD_MS ? gap : null;
 };
 
+// --- Status snapshot --------------------------------------------------------
+
+// The shell's live state lives in its own React tree, which the full-page
+// diagnostics view cannot see (it replaces the shell document rather than
+// running beside it). The shell therefore mirrors a small snapshot into storage
+// whenever the state changes, so the report page can show what the kiosk
+// believed a moment ago — stamped with `at`, so a stale snapshot reads as stale
+// rather than as current truth.
+export const SHELL_STATUS_STORAGE_KEY = "slideshow-shell-status";
+
+export type ShellStatusSnapshot = {
+  at: number;
+  sessionStart: number;
+  shellVersion: string;
+  runtimeVersion: string;
+  codeStatus: string;
+  online: boolean;
+  wake: { supported: boolean; active: boolean; losses: number };
+};
+
+const isShellStatusSnapshot = (value: unknown): value is ShellStatusSnapshot => {
+  if (typeof value !== "object" || value === null) {
+    return false;
+  }
+  const status = value as Record<string, unknown>;
+  const wake = status.wake as Record<string, unknown> | undefined;
+  return (
+    typeof status.at === "number" &&
+    Number.isFinite(status.at) &&
+    typeof status.sessionStart === "number" &&
+    typeof status.shellVersion === "string" &&
+    typeof status.runtimeVersion === "string" &&
+    typeof status.codeStatus === "string" &&
+    typeof status.online === "boolean" &&
+    typeof wake === "object" &&
+    wake !== null &&
+    typeof wake.supported === "boolean" &&
+    typeof wake.active === "boolean" &&
+    typeof wake.losses === "number"
+  );
+};
+
+export const readShellStatus = (
+  storage: Storage | null = defaultStorage(),
+): ShellStatusSnapshot | null => {
+  if (!storage) {
+    return null;
+  }
+  try {
+    const raw = storage.getItem(SHELL_STATUS_STORAGE_KEY);
+    if (!raw) {
+      return null;
+    }
+    const parsed: unknown = JSON.parse(raw);
+    return isShellStatusSnapshot(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+};
+
+export const writeShellStatus = (
+  status: ShellStatusSnapshot,
+  storage: Storage | null = defaultStorage(),
+): void => {
+  if (!storage) {
+    return;
+  }
+  try {
+    storage.setItem(SHELL_STATUS_STORAGE_KEY, JSON.stringify(status));
+  } catch {
+    // Best-effort only.
+  }
+};
+
 // --- Describe / serialise ---------------------------------------------------
 
 const shortVersion = (version: string): string => version.slice(0, 8);

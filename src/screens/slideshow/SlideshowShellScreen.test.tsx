@@ -17,6 +17,7 @@ import {
   HEARTBEAT_INTERVAL_MS,
   HEARTBEAT_STORAGE_KEY,
   readShellLog,
+  readShellStatus,
   SHELL_LOG_STORAGE_KEY,
 } from "../../util/shellDiagnosticsLog";
 
@@ -392,6 +393,36 @@ describe("slideshow code shell", () => {
     } finally {
       jest.useRealTimers();
     }
+  });
+
+  it("mirrors its live state into storage so the full report page can read it", async () => {
+    // The full-page report replaces this document rather than running beside it,
+    // so it can only see what the shell has persisted.
+    mockWakeLockActive = false;
+    global.fetch = jest.fn(() => versionResponse("build-current")) as jest.Mock;
+
+    render(<SlideshowShellScreen />);
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    await waitFor(() => {
+      const status = readShellStatus();
+      expect(status?.wake).toEqual({ supported: true, active: false, losses: 0 });
+      expect(status?.shellVersion).toBe("build-current");
+    });
+  });
+
+  it("links from the diagnostics panel to the full report page", () => {
+    global.fetch = jest.fn(() => versionResponse("build-current")) as jest.Mock;
+
+    render(<SlideshowShellScreen />);
+    fireEvent.click(screen.getByRole("button", { name: "Slideshow diagnostics" }));
+
+    expect(screen.getByRole("link", { name: /full report/i })).toHaveAttribute(
+      "href",
+      "/slideshow/diagnostics",
+    );
   });
 
   it("withholds the one-tap wake prompt until the auto-acquire window settles", async () => {
