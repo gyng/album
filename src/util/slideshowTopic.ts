@@ -184,7 +184,7 @@ export const decideTopicSeed = (input: {
   const seeded = mapTopicSeedResults({
     resultData: input.resultData,
     pool: input.pool,
-    filter: input.filter,
+    ...(input.filter !== undefined ? { filter: input.filter } : {}),
   });
 
   if (seeded.length === 0) {

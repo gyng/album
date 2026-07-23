@@ -197,7 +197,7 @@ const ComparisonTable = () => {
               {columns.map((column) => (
                 <td key={column.label} data-label={column.label}>
                   <span className={styles.cellValue}>{column.value(model)}</span>
-                  <Bar fraction={column.fraction(model)} muted={column.lowerIsBetter} />
+                  <Bar fraction={column.fraction(model)} muted={column.lowerIsBetter ?? false} />
                 </td>
               ))}
             </tr>

@@ -9,7 +9,7 @@ const waitForImageChange = (page: Page, previousSrc: string) =>
       const img = document.querySelector(selector);
       return img?.getAttribute("src") !== prev;
     },
-    [slideshowImg, previousSrc],
+    [slideshowImg, previousSrc] as const,
   );
 
 const revealControls = async (page: Page) => {
@@ -167,7 +167,7 @@ test.describe("Slideshow", () => {
         4,
       );
       const r = (i: number) => {
-        const box = cells[i].getBoundingClientRect();
+        const box = cells[i]!.getBoundingClientRect();
         return { top: box.top, bottom: box.bottom };
       };
       return { vh, d0: r(0), d1: r(1), d2: r(2), d3: r(3) };

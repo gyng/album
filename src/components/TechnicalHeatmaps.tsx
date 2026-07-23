@@ -68,6 +68,9 @@ const buildHeatmap = (
   data.paths.forEach((path) => {
     const xLabel = path.values[xAxis];
     const yLabel = path.values[yAxis];
+    if (xLabel === undefined || yLabel === undefined) {
+      return;
+    }
     const key = buildCellKey(xLabel, yLabel);
     counts.set(key, (counts.get(key) ?? 0) + path.count);
   });
@@ -78,7 +81,7 @@ const buildHeatmap = (
     xAxis,
     yAxis,
     cells: Array.from(counts.entries()).map(([key, count]) => {
-      const [xLabel, yLabel] = key.split("\u001f");
+      const [xLabel = "", yLabel = ""] = key.split("\u001f");
       return { xLabel, yLabel, count };
     }),
   };
@@ -89,7 +92,10 @@ const buildRelationshipIndex = (data: ParallelRelationshipData, heatmaps: Heatma
 
   data.paths.forEach((path) => {
     heatmaps.forEach((source) => {
-      const sourceCellKey = buildCellKey(path.values[source.xAxis], path.values[source.yAxis]);
+      const sourceCellKey = buildCellKey(
+        path.values[source.xAxis] ?? "",
+        path.values[source.yAxis] ?? "",
+      );
       const sourceSelectionKey = `${source.key}::${sourceCellKey}`;
       const current = index.get(sourceSelectionKey) ?? new Map<string, number>();
 
@@ -98,7 +104,10 @@ const buildRelationshipIndex = (data: ParallelRelationshipData, heatmaps: Heatma
           return;
         }
 
-        const targetCellKey = buildCellKey(path.values[target.xAxis], path.values[target.yAxis]);
+        const targetCellKey = buildCellKey(
+          path.values[target.xAxis] ?? "",
+          path.values[target.yAxis] ?? "",
+        );
         const targetSelectionKey = `${target.key}::${targetCellKey}`;
         current.set(targetSelectionKey, (current.get(targetSelectionKey) ?? 0) + path.count);
       });
@@ -113,7 +122,7 @@ const buildRelationshipIndex = (data: ParallelRelationshipData, heatmaps: Heatma
 const HeatmapPanel: React.FC<{
   data: ParallelRelationshipData;
   config: HeatmapConfig;
-  className?: string;
+  className?: string | undefined;
   activeSelection: ActiveSelection | null;
   relatedKeys: Set<string>;
   onActivate: (selection: ActiveSelection) => void;
@@ -135,6 +144,9 @@ const HeatmapPanel: React.FC<{
   const yAxis = data.axes[config.yAxis];
   const max = Math.max(...config.cells.map((cell) => cell.count), 1);
   const hasActive = activeSelection !== null;
+  if (!xAxis || !yAxis) {
+    return null;
+  }
   const sparseXAxisLabels = xAxis.facetId === "hour" && xAxis.buckets.length >= 24;
 
   return (
@@ -256,7 +268,7 @@ export const TechnicalHeatmaps: React.FC<Props> = ({
           xAxis,
           yAxis,
           stableTitles[`${xAxis}-${yAxis}`] ??
-            `${data.axes[xAxis].label} × ${data.axes[yAxis].label}`,
+            `${data.axes[xAxis]?.label ?? ""} × ${data.axes[yAxis]?.label ?? ""}`,
         ),
       ),
     [data, stablePairs, stableTitles],
@@ -364,6 +376,8 @@ export const TechnicalHeatmaps: React.FC<Props> = ({
     };
   }, [activeSelection, relatedMap]);
 
+  const [firstHeatmap, secondHeatmap, thirdHeatmap] = heatmaps;
+
   return (
     <div className={styles.container}>
       <div
@@ -408,13 +422,13 @@ export const TechnicalHeatmaps: React.FC<Props> = ({
             ))}
           </svg>
         ) : null}
-        {layout === "diagonal" && heatmaps.length === 2 ? (
+        {layout === "diagonal" && firstHeatmap && secondHeatmap && heatmaps.length === 2 ? (
           <>
             <HeatmapPanel
-              key={heatmaps[0].title}
+              key={firstHeatmap.title}
               className={styles.panelTopLeft}
               data={data}
-              config={heatmaps[0]}
+              config={firstHeatmap}
               activeSelection={activeSelection}
               relatedKeys={relatedKeys}
               onActivate={setActiveSelection}
@@ -434,10 +448,10 @@ export const TechnicalHeatmaps: React.FC<Props> = ({
             <div className={styles.diagonalSpacer} aria-hidden="true" />
             <div className={styles.diagonalSpacer} aria-hidden="true" />
             <HeatmapPanel
-              key={heatmaps[1].title}
+              key={secondHeatmap.title}
               className={styles.panelBottomRight}
               data={data}
-              config={heatmaps[1]}
+              config={secondHeatmap}
               activeSelection={activeSelection}
               relatedKeys={relatedKeys}
               onActivate={setActiveSelection}
@@ -455,13 +469,17 @@ export const TechnicalHeatmaps: React.FC<Props> = ({
               activeXAxisBucket={activeXAxisBucket}
             />
           </>
-        ) : layout === "tri-grid" && heatmaps.length === 3 ? (
+        ) : layout === "tri-grid" &&
+          firstHeatmap &&
+          secondHeatmap &&
+          thirdHeatmap &&
+          heatmaps.length === 3 ? (
           <>
             <HeatmapPanel
-              key={heatmaps[0].title}
+              key={firstHeatmap.title}
               className={styles.panelTopLeft}
               data={data}
-              config={heatmaps[0]}
+              config={firstHeatmap}
               activeSelection={activeSelection}
               relatedKeys={relatedKeys}
               onActivate={setActiveSelection}
@@ -479,10 +497,10 @@ export const TechnicalHeatmaps: React.FC<Props> = ({
               activeXAxisBucket={activeXAxisBucket}
             />
             <HeatmapPanel
-              key={heatmaps[1].title}
+              key={secondHeatmap.title}
               className={styles.panelTopRight}
               data={data}
-              config={heatmaps[1]}
+              config={secondHeatmap}
               activeSelection={activeSelection}
               relatedKeys={relatedKeys}
               onActivate={setActiveSelection}
@@ -500,10 +518,10 @@ export const TechnicalHeatmaps: React.FC<Props> = ({
               activeXAxisBucket={activeXAxisBucket}
             />
             <HeatmapPanel
-              key={heatmaps[2].title}
+              key={thirdHeatmap.title}
               className={styles.panelBottomLeft}
               data={data}
-              config={heatmaps[2]}
+              config={thirdHeatmap}
               activeSelection={activeSelection}
               relatedKeys={relatedKeys}
               onActivate={setActiveSelection}

@@ -52,7 +52,8 @@ export const computeSparklineBins = (
     const ms = parseTimestampSafe(entry.date);
     if (ms === null) continue;
     const idx = Math.min(Math.floor(((ms - extent.minMs) / span) * binCount), binCount - 1);
-    bins[idx]++;
+    // invariant: idx is clamped to [0, binCount-1], a valid index of bins
+    bins[idx]!++;
   }
 
   return bins;

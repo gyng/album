@@ -31,7 +31,7 @@ const styles = mergeCssModuleStyles(sharedStyles, localStyles, [
 
 export type SimilarTrailItem = {
   path: string;
-  similarity?: number;
+  similarity?: number | undefined;
 };
 
 type BreadcrumbEntry = SimilarTrailItem & {

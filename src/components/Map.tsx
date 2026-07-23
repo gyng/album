@@ -61,7 +61,11 @@ const MapFlyer = (props: { coordinates: [number, number][] }) => {
     }
 
     if (props.coordinates.length === 1) {
-      const [lat, lng] = props.coordinates[0];
+      const first = props.coordinates[0];
+      if (!first) {
+        return;
+      }
+      const [lat, lng] = first;
       map.flyTo({
         center: [lng, lat],
         zoom: ZOOM,
@@ -105,7 +109,7 @@ const MMapComponent: React.FC<MapProps> = (props) => {
       <MapLibreStyles />
       <div className={styles.map}>
         <Map
-          style={props.style}
+          {...(props.style !== undefined ? { style: props.style } : {})}
           // mapStyle="https://tiles.openfreemap.org/styles/liberty"
           mapStyle={`https://api.maptiler.com/maps/${mapStyle}/style.json?key=mrjUpLh9Syjz9wcEY2Vb`}
           initialViewState={{

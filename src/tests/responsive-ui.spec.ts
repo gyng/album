@@ -17,7 +17,7 @@ const doubleRenderedTextSize = async (page: Page) => {
     );
 
     elements.forEach((element, index) => {
-      element.style.fontSize = `${fontSizes[index] * 2}px`;
+      element.style.fontSize = `${fontSizes[index]! * 2}px`;
     });
   });
 };
@@ -76,7 +76,7 @@ test.describe("Responsive UI", () => {
     baseURL,
   }) => {
     const context = await browser.newContext({
-      baseURL,
+      ...(baseURL !== undefined ? { baseURL } : {}),
       hasTouch: true,
       isMobile: true,
       viewport: { width: 834, height: 1194 },
@@ -109,7 +109,7 @@ test.describe("Responsive UI", () => {
     baseURL,
   }) => {
     const context = await browser.newContext({
-      baseURL,
+      ...(baseURL !== undefined ? { baseURL } : {}),
       hasTouch: true,
       isMobile: true,
       viewport: { width: 1194, height: 834 },
@@ -135,7 +135,7 @@ test.describe("Responsive UI", () => {
     baseURL,
   }) => {
     const context = await browser.newContext({
-      baseURL,
+      ...(baseURL !== undefined ? { baseURL } : {}),
       hasTouch: true,
       isMobile: true,
       viewport: { width: 597, height: 834 },
@@ -184,7 +184,7 @@ test.describe("Responsive UI", () => {
         // loaded, but the browser never fetches a fallback whose glyphs are
         // never needed (e.g. Desktop 84's IBM Plex Mono behind Pixelify
         // Sans), so a full-stack check fails on exactly the healthy path.
-        const firstFamily = (fontFamily: string) => fontFamily.split(",")[0].trim();
+        const firstFamily = (fontFamily: string) => fontFamily.split(",")[0]!.trim();
         const stripQuotes = (family: string) => family.replace(/^"|"$/g, "");
         // fonts.check treats an UNREGISTERED family as an always-available
         // system font, so on its own it cannot catch a deleted @fontsource
@@ -343,7 +343,7 @@ test.describe("Responsive UI", () => {
     baseURL,
   }) => {
     const context = await browser.newContext({
-      baseURL,
+      ...(baseURL !== undefined ? { baseURL } : {}),
       hasTouch: true,
       isMobile: true,
       viewport: { width: 320, height: 568 },

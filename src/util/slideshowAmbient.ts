@@ -169,7 +169,7 @@ const lastNonNumericLine = (geocode: string): string => {
     .filter(Boolean);
   for (let i = lines.length - 1; i >= 0; i -= 1) {
     const line = lines[i];
-    if (Number.isNaN(parseFloat(line))) {
+    if (line !== undefined && Number.isNaN(parseFloat(line))) {
       return line;
     }
   }
@@ -210,8 +210,9 @@ const extractCity = (geocode: string): string => {
     .split("\n")
     .map((l) => l.trim())
     .filter(Boolean);
-  if (lines.length >= 2 && Number.isNaN(parseFloat(lines[1]))) {
-    return lines[1];
+  const secondLine = lines[1];
+  if (secondLine !== undefined && Number.isNaN(parseFloat(secondLine))) {
+    return secondLine;
   }
   for (const line of lines.slice(1)) {
     if (Number.isNaN(parseFloat(line))) {
@@ -227,8 +228,9 @@ const extractCity = (geocode: string): string => {
 const extractDominantLab = (colors: string | undefined): [number, number, number] | null => {
   if (!colors) return null;
   const palette = parseColorPalette(colors);
-  if (palette.length === 0) return null;
-  return rgbToLab(...palette[0]);
+  const dominant = palette[0];
+  if (dominant === undefined) return null;
+  return rgbToLab(...dominant);
 };
 
 // Delta-E threshold for the dominant-colour remix. ~18 lands in the "clearly
@@ -258,7 +260,8 @@ const extractCameraId = (exifString: string): string => {
 const shuffleInPlace = (arr: RandomPhotoRow[], random: () => number): RandomPhotoRow[] => {
   for (let i = arr.length - 1; i > 0; i -= 1) {
     const j = Math.floor(random() * (i + 1));
-    [arr[i], arr[j]] = [arr[j], arr[i]];
+    // invariant: i and j are both in-bounds indices of arr
+    [arr[i], arr[j]] = [arr[j]!, arr[i]!];
   }
   return arr;
 };
@@ -480,7 +483,10 @@ const computeMaxPairwiseKm = (photos: ReadonlyArray<RandomPhotoRow | null>): num
   let max = 0;
   for (let i = 0; i < coords.length; i += 1) {
     for (let j = i + 1; j < coords.length; j += 1) {
-      const d = haversineKm(coords[i][0], coords[i][1], coords[j][0], coords[j][1]);
+      // invariant: i and j iterate valid indices of coords
+      const a = coords[i]!;
+      const b = coords[j]!;
+      const d = haversineKm(a[0], a[1], b[0], b[1]);
       if (d > max) max = d;
     }
   }
@@ -544,7 +550,8 @@ export const describeRemix = (
     case "same-year": {
       const dates = collectDates(photos);
       if (dates.length === 0) return null;
-      return String(dates[0].getFullYear());
+      // invariant: dates is non-empty after the length guard
+      return String(dates[0]!.getFullYear());
     }
     case "same-decade": {
       const dates = collectDates(photos);
@@ -556,7 +563,8 @@ export const describeRemix = (
     case "same-day-of-year": {
       const dates = collectDates(photos);
       if (dates.length === 0) return null;
-      const day = formatDayMonth(dates[0]);
+      // invariant: dates is non-empty after the length guard
+      const day = formatDayMonth(dates[0]!);
       const years = Array.from(new Set(dates.map((d) => d.getFullYear()))).sort((a, b) => a - b);
       return `${day} · ${years.join(", ")}`;
     }
@@ -595,7 +603,7 @@ export const getRemixSwatchRgb = (
   const seed = photos[0];
   if (!seed?.colors) return null;
   const palette = parseColorPalette(seed.colors);
-  return palette.length > 0 ? palette[0] : null;
+  return palette[0] ?? null;
 };
 
 // Probability weights for one unified roll across every strategy, including

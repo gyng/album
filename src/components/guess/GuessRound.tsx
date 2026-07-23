@@ -56,11 +56,12 @@ const getGeocodeLabel = (geocode: string): string | null => {
   if (parts.length === 0) return null;
   // Drop a leading 2-letter country code when a fuller place name follows,
   // so "JP\nJapan" reads as "Japan" rather than the redundant "JP, Japan".
-  if (parts.length >= 2 && /^[A-Z]{2}$/.test(parts[0])) {
+  // invariant: length checks above guarantee the indexed parts are present
+  if (parts.length >= 2 && /^[A-Z]{2}$/.test(parts[0]!)) {
     parts = parts.slice(1);
   }
-  if (parts.length >= 2) return `${parts[0]}, ${parts[parts.length - 1]}`;
-  return parts[0];
+  if (parts.length >= 2) return `${parts[0]!}, ${parts[parts.length - 1]!}`;
+  return parts[0]!;
 };
 
 export const GuessRound: React.FC<GuessRoundProps> = ({
@@ -182,7 +183,8 @@ export const GuessRound: React.FC<GuessRoundProps> = ({
 
   const pointerDistance = (): number => {
     const pts = Array.from(pointersRef.current.values());
-    return Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+    // invariant: only called with two active pointers (pinch gesture)
+    return Math.hypot(pts[0]!.x - pts[1]!.x, pts[0]!.y - pts[1]!.y);
   };
 
   const handlePointerDown = useCallback(

@@ -282,6 +282,8 @@ describe("YEAR_FACET", () => {
   });
 
   it("returns null when date is absent", () => {
-    expect(YEAR_FACET.extract(exif({ DateTimeOriginal: undefined }))).toBeNull();
+    const withoutDate = exif();
+    delete withoutDate.DateTimeOriginal;
+    expect(YEAR_FACET.extract(withoutDate)).toBeNull();
   });
 });

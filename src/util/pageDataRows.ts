@@ -39,12 +39,12 @@ export const summariseTimelineGeocode = (geocode?: string | null): string | null
     .filter(Boolean)
     .filter((line) => !isGeocodeCoordinate(line));
 
-  if (parts.length === 0) {
+  const first = parts[0];
+  if (first === undefined) {
     return null;
   }
 
-  const cleaned =
-    parts[0].length <= 3 && parts[0].toUpperCase() === parts[0] ? parts.slice(1) : parts;
+  const cleaned = first.length <= 3 && first.toUpperCase() === first ? parts.slice(1) : parts;
   if (cleaned.length === 0) {
     return null;
   }

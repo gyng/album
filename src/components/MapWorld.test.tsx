@@ -7,18 +7,24 @@ import { Profiler, type ReactNode } from "react";
 import type { MapWorldEntry } from "../util/pageDataTypes";
 
 const mapHandlers: {
-  onMoveStart?: () => void;
-  onClick?: () => void;
-  onMoveEnd?: (event: { viewState: { latitude: number; longitude: number; zoom: number } }) => void;
-  onZoomStart?: () => void;
-  onZoomEnd?: (event: { viewState: { latitude: number; longitude: number; zoom: number } }) => void;
-  onZoom?: (event: { viewState: { zoom: number } }) => void;
-  onDragStart?: () => void;
-  onWheel?: () => void;
-  onContextMenu?: (event: {
-    lngLat: { lat: number; lng: number };
-    originalEvent: { preventDefault: () => void };
-  }) => void;
+  onMoveStart?: (() => void) | undefined;
+  onClick?: (() => void) | undefined;
+  onMoveEnd?:
+    | ((event: { viewState: { latitude: number; longitude: number; zoom: number } }) => void)
+    | undefined;
+  onZoomStart?: (() => void) | undefined;
+  onZoomEnd?:
+    | ((event: { viewState: { latitude: number; longitude: number; zoom: number } }) => void)
+    | undefined;
+  onZoom?: ((event: { viewState: { zoom: number } }) => void) | undefined;
+  onDragStart?: (() => void) | undefined;
+  onWheel?: (() => void) | undefined;
+  onContextMenu?:
+    | ((event: {
+        lngLat: { lat: number; lng: number };
+        originalEvent: { preventDefault: () => void };
+      }) => void)
+    | undefined;
 } = {};
 const mapProps = jest.fn();
 const layerProps = new Map<string, { paint?: Record<string, unknown> }>();
@@ -477,7 +483,7 @@ describe("MapWorld", () => {
 
     expect(screen.queryByTestId("journey-line-source")).toBeNull();
 
-    fireEvent.click(screen.getAllByTestId("marker")[0]);
+    fireEvent.click(screen.getAllByTestId("marker")[0]!);
 
     expect(screen.getByTestId("journey-line-source")).toBeTruthy();
     expect(screen.getByTestId("journey-line-layer")).toBeTruthy();

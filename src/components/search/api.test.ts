@@ -799,10 +799,11 @@ describe("fetchRecentResults", () => {
     if ((results.length ?? 0) !== 2) {
       throw new Error(`Expected 2 recent results, got ${results.length ?? 0}`);
     }
-    expect(results[0].path).toBe("../albums/test-simple/newer.jpg");
-    expect(results[0].snippet).toBe("City at dawn");
-    expect(results[1].path).toBe("../albums/test-simple/older.jpg");
-    expect(results[1].snippet).toBe("night, street");
+    // invariant: length asserted to be exactly 2 above
+    expect(results[0]!.path).toBe("../albums/test-simple/newer.jpg");
+    expect(results[0]!.snippet).toBe("City at dawn");
+    expect(results[1]!.path).toBe("../albums/test-simple/older.jpg");
+    expect(results[1]!.snippet).toBe("night, street");
   });
 });
 
@@ -912,7 +913,7 @@ describe("fetchRefinementTagCounts", () => {
 
 describe("fetchSearchFacetSections", () => {
   it("recalculates each section against keywords and the other selected facets", async () => {
-    const calls: Array<{ sql: string; bind?: Array<string | number> }> = [];
+    const calls: Array<{ sql: string; bind?: Array<string | number> | undefined }> = [];
     const database = {
       exec: ({ sql, bind, callback }: ExecArgs) => {
         calls.push({ sql, bind });
@@ -1247,7 +1248,7 @@ describe("geocode facet precision", () => {
 
 describe("browse and slideshow queries", () => {
   it("maps tags, random rows, slideshow rows, and a random seed photo", async () => {
-    const calls: Array<{ sql: string; bind?: Array<string | number> }> = [];
+    const calls: Array<{ sql: string; bind?: Array<string | number> | undefined }> = [];
     const database = {
       exec: ({ sql, bind, callback }: ExecArgs) => {
         calls.push({ sql, bind });
@@ -1299,7 +1300,7 @@ describe("browse and slideshow queries", () => {
   });
 
   it("supports defaults and an empty random exclusion list", async () => {
-    const calls: Array<{ sql: string; bind?: Array<string | number> }> = [];
+    const calls: Array<{ sql: string; bind?: Array<string | number> | undefined }> = [];
     const database = {
       exec: ({ sql, bind }: ExecArgs) => {
         calls.push({ sql, bind });
@@ -1494,12 +1495,13 @@ describe("search API pure query helpers", () => {
       Make: "FUJIFILM",
       Model: "X-T5",
       FocalLength: 23,
-      FNumber: undefined,
       ExposureTime: 0.01,
-      ISO: undefined,
       DateTimeOriginal: "2024:01:02 03:04:05",
       OffsetTime: "+08:00",
     });
+    // An invalid FNumber and an empty ISO parse to no numeric value.
+    expect(parsed.FNumber).toBeUndefined();
+    expect(parsed.ISO).toBeUndefined();
   });
 
   it("builds every supported facet clause and ignores invalid selections", () => {

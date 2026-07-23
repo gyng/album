@@ -3,9 +3,9 @@ import styles from "./SearchFilterPill.module.css";
 
 type Props = {
   label: string;
-  count?: number;
-  isActive?: boolean;
-  disabled?: boolean;
+  count?: number | undefined;
+  isActive?: boolean | undefined;
+  disabled?: boolean | undefined;
   onClick: () => void;
 };
 

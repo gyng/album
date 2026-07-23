@@ -153,7 +153,7 @@ describe("useControlsAutoHide", () => {
 
     act(() => {
       result.current.hideDesktopControls();
-      callbacks[0](0);
+      callbacks[0]!(0);
     });
 
     expect(result.current.controlsVisible).toBe(false);

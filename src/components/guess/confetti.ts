@@ -62,7 +62,8 @@ export const fireConfetti = (opts?: { x?: number; y?: number }) => {
       y: originY,
       vx: Math.cos(angle) * speed,
       vy: Math.sin(angle) * speed - 4,
-      colour: COLOURS[Math.floor(Math.random() * COLOURS.length)],
+      // invariant: index is always within COLOURS bounds
+      colour: COLOURS[Math.floor(Math.random() * COLOURS.length)]!,
       size: 3 + Math.random() * 5,
       rotation: Math.random() * Math.PI * 2,
       rotationSpeed: (Math.random() - 0.5) * 0.3,

@@ -331,7 +331,7 @@ export const EmptyStateExplore: React.FC<Props> = ({
                       onFindSimilar={(path) => {
                         onStartSimilarSearch(path);
                       }}
-                      onSearchByColor={onSearchByColor}
+                      {...(onSearchByColor ? { onSearchByColor } : {})}
                       persistColorAction={isColorCategoryActive}
                     />
                   </li>
@@ -395,7 +395,7 @@ export const EmptyStateExplore: React.FC<Props> = ({
                             onFindSimilar={(path) => {
                               onStartSimilarSearch(path);
                             }}
-                            onSearchByColor={onSearchByColor}
+                            {...(onSearchByColor ? { onSearchByColor } : {})}
                             persistColorAction={isColorCategoryActive}
                           />
                         </li>
@@ -465,7 +465,7 @@ export const EmptyStateExplore: React.FC<Props> = ({
                       onFindSimilar={(path) => {
                         onStartSimilarSearch(path);
                       }}
-                      onSearchByColor={onSearchByColor}
+                      {...(onSearchByColor ? { onSearchByColor } : {})}
                       persistColorAction={isColorCategoryActive}
                     />
                   </li>

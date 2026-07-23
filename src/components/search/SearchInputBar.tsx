@@ -29,12 +29,12 @@ const SEARCH_MODE_HELP =
 type Props = {
   canClear: boolean;
   databaseReady: boolean;
-  disabled?: boolean;
+  disabled?: boolean | undefined;
   inputRef: React.RefObject<HTMLInputElement | null>;
   isSearching: boolean;
   isSimilarMode: boolean;
   isSuccess: boolean;
-  queryResultsLength?: number;
+  queryResultsLength?: number | undefined;
   searchInputValue: string;
   searchMode: SearchMode;
   trimmedQuery: string;

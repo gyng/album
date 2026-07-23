@@ -31,15 +31,24 @@ const getPeakSummary = (data: BucketedStat[]): string => {
 
   const start = peakIndices[0];
   const end = peakIndices[peakIndices.length - 1];
-  const contiguous = peakIndices.every((value, index) =>
-    index === 0 ? true : value === peakIndices[index - 1] + 1,
-  );
+  const startBucket = start === undefined ? undefined : data[start];
+  const endBucket = end === undefined ? undefined : data[end];
+  if (!startBucket || !endBucket) {
+    return "No time-of-day data yet.";
+  }
+  const contiguous = peakIndices.every((value, index) => {
+    if (index === 0) {
+      return true;
+    }
+    const previous = peakIndices[index - 1];
+    return previous !== undefined && value === previous + 1;
+  });
 
   if (contiguous && start !== end) {
-    return `Peak window: ${data[start].label}-${data[end].label}`;
+    return `Peak window: ${startBucket.label}-${endBucket.label}`;
   }
 
-  return `Peak hour: ${data[start].label}`;
+  return `Peak hour: ${startBucket.label}`;
 };
 
 export const TimeOfDayChart: React.FC<Props> = ({

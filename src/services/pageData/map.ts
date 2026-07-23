@@ -15,10 +15,10 @@ export const loadMapPageData = async (): Promise<MapPageData> => {
       const { GPSLongitude, GPSLatitude, GPSLongitudeRef, GPSLatitudeRef, DateTimeOriginal } =
         photo._build.exif;
       const { decLng, decLat } = getDegLatLngFromExif({
-        GPSLongitude,
-        GPSLatitude,
-        GPSLongitudeRef,
-        GPSLatitudeRef,
+        ...(GPSLongitude !== undefined ? { GPSLongitude } : {}),
+        ...(GPSLatitude !== undefined ? { GPSLatitude } : {}),
+        ...(GPSLongitudeRef !== undefined ? { GPSLongitudeRef } : {}),
+        ...(GPSLatitudeRef !== undefined ? { GPSLatitudeRef } : {}),
       });
       const color = photo._build.tags?.colors?.[0];
       const entry: MapWorldEntry = {

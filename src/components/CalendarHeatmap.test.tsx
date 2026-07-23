@@ -74,7 +74,8 @@ describe("CalendarHeatmap", () => {
 
   it("renders recent years first and progressively reveals older years", () => {
     const manyYears = [2025, 2024, 2023, 2022].map((year, index) => ({
-      ...entries[0],
+      // invariant: entries fixture is a non-empty literal
+      ...entries[0]!,
       date: `${year}-01-02`,
       dateTimeOriginal: `${year}-01-02T10:00:00`,
       href: `/album/kansai#${year}.jpg`,
@@ -151,7 +152,7 @@ describe("CalendarHeatmap", () => {
 
     render(
       <CalendarHeatmap
-        entries={[{ ...entries[0], date: todayKey, href: "/album/kansai#today.jpg" }]}
+        entries={[{ ...entries[0]!, date: todayKey, href: "/album/kansai#today.jpg" }]}
         selectedDate={null}
         onSelectDate={() => {}}
       />,
@@ -252,7 +253,8 @@ describe("CalendarHeatmap", () => {
     render(
       <CalendarHeatmap
         entries={colours.map((placeholderColor, index) => ({
-          ...entries[0],
+          // invariant: entries fixture is a non-empty literal
+          ...entries[0]!,
           href: `/album/kansai#${index}.jpg`,
           path: `../albums/kansai/${index}.jpg`,
           placeholderColor,

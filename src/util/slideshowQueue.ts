@@ -13,7 +13,8 @@ export const avoidBoundaryRepeat = (
   if (previousLastPath && photos.length > 1 && photos[0]?.path === previousLastPath) {
     const swapIdx = photos.findIndex((photo) => photo.path !== previousLastPath);
     if (swapIdx > 0) {
-      [photos[0], photos[swapIdx]] = [photos[swapIdx], photos[0]];
+      // invariant: swapIdx > 0 and photos.length > 1, so both indices are set
+      [photos[0], photos[swapIdx]] = [photos[swapIdx]!, photos[0]!];
     }
   }
 
@@ -28,7 +29,8 @@ export const shufflePhotos = (
 
   for (let idx = shuffled.length - 1; idx > 0; idx -= 1) {
     const randomIdx = Math.floor(Math.random() * (idx + 1));
-    [shuffled[idx], shuffled[randomIdx]] = [shuffled[randomIdx], shuffled[idx]];
+    // invariant: idx and randomIdx are both in-bounds indices of shuffled
+    [shuffled[idx], shuffled[randomIdx]] = [shuffled[randomIdx]!, shuffled[idx]!];
   }
 
   return avoidBoundaryRepeat(shuffled, previousLastPath);

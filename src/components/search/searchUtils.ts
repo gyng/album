@@ -70,7 +70,8 @@ export const parseColorParam = (value: string | null): RGB | null => {
   if (!value) return null;
   const parts = value.split(",").map((v) => parseInt(v.trim(), 10));
   if (parts.length === 3 && parts.every((v) => !isNaN(v) && v >= 0 && v <= 255)) {
-    return [parts[0], parts[1], parts[2]];
+    // invariant: length checked to be exactly 3 above
+    return [parts[0]!, parts[1]!, parts[2]!];
   }
   return null;
 };

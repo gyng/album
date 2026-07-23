@@ -1,7 +1,11 @@
 type Query = Record<string, string | string[] | undefined>;
 
 const dynamicRouteParamNames = (pathname: string): Set<string> =>
-  new Set([...pathname.matchAll(/\[{1,2}(?:\.\.\.)?([^\]]+)\]{1,2}/g)].map((match) => match[1]));
+  new Set(
+    [...pathname.matchAll(/\[{1,2}(?:\.\.\.)?([^\]]+)\]{1,2}/g)]
+      .map((match) => match[1])
+      .filter((name): name is string => name !== undefined),
+  );
 
 export const queryToSearchParams = (query: Query, pathname: string): URLSearchParams => {
   const params = new URLSearchParams();

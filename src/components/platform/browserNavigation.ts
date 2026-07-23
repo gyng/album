@@ -69,7 +69,8 @@ export const useBrowserNavigation = (enabled = true): PlatformNavigation => {
   const getSearchParam = React.useCallback(
     (name: string) => {
       const values = searchParams.getAll(name);
-      return values.length === 1 ? values[0] : null;
+      // invariant: length check guarantees the single value is present
+      return values.length === 1 ? values[0]! : null;
     },
     [searchParams],
   );

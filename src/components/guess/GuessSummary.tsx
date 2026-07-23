@@ -36,11 +36,12 @@ const getGeocodeLabel = (geocode: string): string | null => {
   if (parts.length === 0) return null;
   // Drop a leading 2-letter country code when a fuller place name follows,
   // so "JP\nJapan" reads as "Japan" rather than the redundant "JP, Japan".
-  if (parts.length >= 2 && /^[A-Z]{2}$/.test(parts[0])) {
+  // invariant: length checks above guarantee the indexed parts are present
+  if (parts.length >= 2 && /^[A-Z]{2}$/.test(parts[0]!)) {
     parts = parts.slice(1);
   }
-  if (parts.length >= 2) return `${parts[0]}, ${parts[parts.length - 1]}`;
-  return parts[0];
+  if (parts.length >= 2) return `${parts[0]!}, ${parts[parts.length - 1]!}`;
+  return parts[0]!;
 };
 
 const buildShareUrl = (seed: string, settings: GameSettings): string => {

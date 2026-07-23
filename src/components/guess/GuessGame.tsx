@@ -160,7 +160,7 @@ export const GuessGame: React.FC<GuessGameProps> = ({
         const rows = await fetchGuessPhotos({
           database,
           count: state.settings.rounds + 5,
-          region: state.settings.region,
+          ...(state.settings.region ? { region: state.settings.region } : {}),
           seed,
         });
         if (cancelled) return;
@@ -267,7 +267,7 @@ export const GuessGame: React.FC<GuessGameProps> = ({
       mapSlot={
         <GuessMapDeferred
           guess={guess}
-          reveal={revealed ? { lat: photo.lat, lng: photo.lng } : undefined}
+          {...(revealed ? { reveal: { lat: photo.lat, lng: photo.lng } } : {})}
           onGuess={handleGuess}
         />
       }

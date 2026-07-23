@@ -54,7 +54,7 @@ describe("mapSearchIndex", () => {
     );
     expect(getMapPhotoHref("hong-kong", richPhoto)).toBe("/album/hong-kong#night%20market.jpg");
 
-    richPhoto._build.tags.tags = undefined;
+    delete richPhoto._build.tags.tags;
     expect(buildMapPhotoSearchText(richPhoto)).toBe("Night market Kowloon X-T5 NOKTON 35mm F1.2");
   });
 

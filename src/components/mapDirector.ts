@@ -49,6 +49,9 @@ export const buildMapDirectorSequence = (
 
   while (sequence.length < targetLength) {
     const previous = sequence[sequence.length - 1];
+    if (!previous) {
+      break;
+    }
     let best: LocatedMapWorldEntry | null = null;
     let bestScore = Number.NEGATIVE_INFINITY;
 

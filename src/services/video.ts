@@ -67,14 +67,18 @@ export const isVideoFile = (filepath: string): boolean => {
 // static build on any explicit `undefined` in page props, and this object is
 // serialised into album-page props, so we omit absent fields rather than
 // setting them to `undefined` (matching the "omit optional props" convention).
-const omitUndefined = <T extends Record<string, unknown>>(obj: T): T => {
-  const result = {} as T;
+const omitUndefined = <T extends Record<string, unknown>>(
+  obj: T,
+): { [K in keyof T]?: Exclude<T[K], undefined> } => {
+  const result: Partial<T> = {};
   (Object.keys(obj) as Array<keyof T>).forEach((key) => {
-    if (obj[key] !== undefined) {
-      result[key] = obj[key];
+    const value = obj[key];
+    if (value !== undefined) {
+      result[key] = value;
     }
   });
-  return result;
+  // The loop above drops every `undefined`, so no present key holds `undefined`.
+  return result as { [K in keyof T]?: Exclude<T[K], undefined> };
 };
 
 type FfprobeResult = {

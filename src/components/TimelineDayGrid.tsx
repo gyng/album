@@ -249,7 +249,7 @@ export const TimelineDayGrid = ({
             {isMapVisible ? (
               <MapWorldDeferred
                 photos={mapPhotos}
-                className={styles.mapCanvas}
+                className={styles.mapCanvas ?? ""}
                 fitToPhotos
                 syncRoute={false}
                 showThemeBootstrap={false}

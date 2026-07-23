@@ -70,7 +70,15 @@ export const offsetForZoneAt = (zone: string, utcMs: number): number => {
   for (const part of dtf.formatToParts(utcMs)) {
     if (part.type !== "literal") wall[part.type] = Number(part.value);
   }
-  const asUtc = Date.UTC(wall.year, wall.month - 1, wall.day, wall.hour, wall.minute, wall.second);
+  // invariant: the formatter options request every part, so all are present
+  const asUtc = Date.UTC(
+    wall.year!,
+    wall.month! - 1,
+    wall.day!,
+    wall.hour!,
+    wall.minute!,
+    wall.second!,
+  );
   return Math.round((asUtc - utcMs) / 60_000);
 };
 

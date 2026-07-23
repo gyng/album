@@ -42,7 +42,14 @@ export function getRelativeTimeString(
 
   // Get the divisor to divide from the seconds. E.g. if our unit is "day" our divisor
   // is one day in seconds, so we can divide our seconds by this to get the # of days
-  const divisor = unitIndex ? cutoffs[unitIndex - 1] : 1;
+  const divisor = unitIndex ? (cutoffs[unitIndex - 1] ?? 1) : 1;
+
+  // The final cutoff is Infinity, so findIndex always matches and unitIndex is
+  // a valid index into `units`; guard anyway to satisfy the type checker.
+  const unit = units[unitIndex];
+  if (unit === undefined) {
+    return null;
+  }
 
   // Intl.RelativeTimeFormat do its magic
   const rtf = new Intl.RelativeTimeFormat(lang, {
@@ -50,5 +57,5 @@ export function getRelativeTimeString(
     style: short ? "narrow" : "long",
   });
 
-  return rtf.format(Math.floor(deltaSeconds / divisor), units[unitIndex]);
+  return rtf.format(Math.floor(deltaSeconds / divisor), unit);
 }

@@ -362,7 +362,7 @@ const ExploreScreen = ({ stats, visualSameness }: ExploreScreenProps) => {
                         {visualSameness.visualEras.length}
                       </div>
                       <div className={styles.funStatDetail}>
-                        The biggest era covers {visualSameness.visualEras[0].sharePercent}% of
+                        The biggest era covers {visualSameness.visualEras[0]?.sharePercent}% of
                         embedded photos.
                       </div>
                     </Card>
@@ -499,8 +499,9 @@ const ExploreScreen = ({ stats, visualSameness }: ExploreScreenProps) => {
                                   <VisualSimilarityThumb
                                     key={photo.path}
                                     photo={photo}
-                                    className={styles.visualEraThumbWrap}
-                                    imageClassName={styles.visualEraThumb}
+                                    // invariant: CSS module classes always resolve
+                                    className={styles.visualEraThumbWrap!}
+                                    imageClassName={styles.visualEraThumb!}
                                   />
                                 ))}
                               </div>
@@ -564,7 +565,8 @@ const ExploreScreen = ({ stats, visualSameness }: ExploreScreenProps) => {
                                   <VisualSimilarityThumb
                                     key={photo.path}
                                     photo={photo}
-                                    className={styles.visualTimelineThumbWrap}
+                                    // invariant: CSS module classes always resolve
+                                    className={styles.visualTimelineThumbWrap!}
                                     imageClassName={`${styles.visualEraThumb} ${styles.visualTimelineThumb}`}
                                   />
                                 ))}

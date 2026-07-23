@@ -55,10 +55,12 @@ export const isIncomingReady = (input: {
 const cap = (layers: CrossfadeLayer[]): CrossfadeLayer[] => {
   if (layers.length <= 2) return layers;
   const top = layers[layers.length - 1];
+  if (top === undefined) return layers;
   let backdrop: CrossfadeLayer | null = null;
   for (let i = layers.length - 2; i >= 0; i--) {
-    if (layers[i].loaded) {
-      backdrop = layers[i];
+    const layer = layers[i];
+    if (layer?.loaded) {
+      backdrop = layer;
       break;
     }
   }

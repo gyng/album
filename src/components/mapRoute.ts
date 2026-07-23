@@ -239,6 +239,9 @@ const getTripSpanDays = (points: RoutePoint[]): number | null => {
 
   const first = timestamps[0];
   const last = timestamps[timestamps.length - 1];
+  if (first === undefined || last === undefined) {
+    return null;
+  }
   const dayMs = 24 * 60 * 60 * 1000;
 
   return Math.floor((last - first) / dayMs) + 1;

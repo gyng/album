@@ -177,6 +177,8 @@ export const appendShellEvent = (
   let mergeIndex = -1;
   for (let i = existing.length - 1; i >= 0 && i >= existing.length - 3; i--) {
     const candidate = existing[i];
+    // invariant: i stays within existing bounds, so candidate is defined
+    if (candidate === undefined) continue;
     if (matches(candidate)) {
       mergeIndex = i;
       break;

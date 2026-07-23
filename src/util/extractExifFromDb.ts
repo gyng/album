@@ -27,12 +27,12 @@ export const extractGPSFromExifString = (exifString: string): [number, number] |
       if (coordStr.includes("[") && coordStr.includes("]")) {
         const arrayMatch = coordStr.match(/\[([^\]]+)\]/);
         if (arrayMatch) {
-          return arrayMatch[1].split(",").map((s) => {
+          return (arrayMatch[1] ?? "").split(",").map((s) => {
             const trimmed = s.trim();
             // Handle fractions like "341/40"
             if (trimmed.includes("/")) {
               const [num, den] = trimmed.split("/");
-              return parseFloat(num) / parseFloat(den);
+              return parseFloat(num ?? "") / parseFloat(den ?? "");
             }
             return parseFloat(trimmed);
           });
@@ -46,7 +46,7 @@ export const extractGPSFromExifString = (exifString: string): [number, number] |
           // Handle fractions like "341/40"
           if (trimmed.includes("/")) {
             const [num, den] = trimmed.split("/");
-            return parseFloat(num) / parseFloat(den);
+            return parseFloat(num ?? "") / parseFloat(den ?? "");
           }
           return parseFloat(trimmed);
         });
@@ -57,7 +57,11 @@ export const extractGPSFromExifString = (exifString: string): [number, number] |
         /(\d+(?:\.\d+)?)\s*deg\s*(\d+(?:\.\d+)?)'?\s*(\d+(?:\.\d+)?)/,
       );
       if (degMatch) {
-        return [parseFloat(degMatch[1]), parseFloat(degMatch[2]), parseFloat(degMatch[3])];
+        return [
+          parseFloat(degMatch[1] ?? ""),
+          parseFloat(degMatch[2] ?? ""),
+          parseFloat(degMatch[3] ?? ""),
+        ];
       }
 
       // Handle simple space-separated format with fractions
@@ -67,7 +71,7 @@ export const extractGPSFromExifString = (exifString: string): [number, number] |
           // Handle fractions like "341/40"
           if (s.includes("/")) {
             const [num, den] = s.split("/");
-            return parseFloat(num) / parseFloat(den);
+            return parseFloat(num ?? "") / parseFloat(den ?? "");
           }
           return parseFloat(s);
         });

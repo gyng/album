@@ -1031,7 +1031,7 @@ describe("computePhotoStats", () => {
     ]);
     expect(stats.revisitedPlaces.find((place) => place.label === "Most")?.photoCount).toBe(3);
     expect(
-      stats.revisitedPlaces.find((place) => place.label === "Most")?.timeline[0].photos[0],
+      stats.revisitedPlaces.find((place) => place.label === "Most")?.timeline[0]?.photos[0],
     ).toEqual(expect.objectContaining({ label: "First visit" }));
   });
 

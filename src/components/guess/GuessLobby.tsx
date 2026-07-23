@@ -70,7 +70,7 @@ export const GuessLobby: React.FC<GuessLobbyProps> = ({ database, defaults, onSt
     onStart({
       rounds: Number(rounds),
       timeLimit: timerValueToLimit(timer),
-      region: region || undefined,
+      ...(region ? { region } : {}),
     });
   }, [onStart, rounds, timer, region]);
 

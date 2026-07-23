@@ -223,10 +223,12 @@ export const buildExploreFunStats = (stats: PhotoStats): FunStatCard[] => {
           value: topComfortPath.values.join(" · "),
           detail: `${topComfortPath.count.toLocaleString("en")} photos use this combo most often.`,
           actionHref: buildSearchHref({
+            // invariant: comfort paths are built from exactly three facets
+            // (focal length, aperture, ISO), so all three values are present
             facets: [
-              { facetId: "focal-length-35mm", value: topComfortPath.values[0] },
-              { facetId: "aperture", value: topComfortPath.values[1] },
-              { facetId: "iso", value: topComfortPath.values[2] },
+              { facetId: "focal-length-35mm", value: topComfortPath.values[0]! },
+              { facetId: "aperture", value: topComfortPath.values[1]! },
+              { facetId: "iso", value: topComfortPath.values[2]! },
             ],
           }),
         }

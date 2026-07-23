@@ -34,7 +34,9 @@ export type ResolvedMemoryCluster<T extends DateItem> = {
 
 const parseDateParts = (date: string) => {
   const [year, month, day] = date.split("-").map(Number);
-  return { year, month, day };
+  // Malformed dates yield NaN parts, which propagate to non-finite Dates and
+  // are filtered by the Number.isFinite guards downstream.
+  return { year: year ?? NaN, month: month ?? NaN, day: day ?? NaN };
 };
 
 const toUtcDate = (date: string) => {

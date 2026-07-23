@@ -35,7 +35,10 @@ export const SearchRefinementSection: React.FC<Props> = ({
           <SharedTagsCaption />
         </div>
       </div>
-      <ProgressBar progress={progress} details={databaseProgressDetails} />
+      <ProgressBar
+        progress={progress}
+        {...(databaseProgressDetails ? { details: databaseProgressDetails } : {})}
+      />
       <div className={styles.tagsContainer}>
         {normalizedTags.map((tag) => {
           const isActive = normalizedSearchTerms.includes(tag.name);

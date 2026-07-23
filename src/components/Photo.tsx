@@ -36,11 +36,11 @@ type ExifCoordinatesRowProps = {
   k: string;
   /** https://exiftool.org/TagNames/GPS.html */
   data: {
-    GPSLatitudeRef?: string;
-    GPSLatitude?: [number, number, number];
-    GPSLongitudeRef?: string;
-    GPSLongitude?: [number, number, number];
-    geocode?: string;
+    GPSLatitudeRef?: string | undefined;
+    GPSLatitude?: [number, number, number] | undefined;
+    GPSLongitudeRef?: string | undefined;
+    GPSLongitude?: [number, number, number] | undefined;
+    geocode?: string | undefined;
   };
   options: {
     showMap: boolean;
@@ -57,9 +57,9 @@ const getDisplayDimensions = (block: PhotoBlock): { width: number; height: numbe
 };
 
 const ExifCoordinatesRow: React.FC<{ row: ExifCoordinatesRowProps }> = (props) => {
-  const locationSelection = getLocationFacetSelection({
-    geocode: props.row.data.geocode,
-  });
+  const locationSelection = getLocationFacetSelection(
+    props.row.data.geocode !== undefined ? { geocode: props.row.data.geocode } : {},
+  );
   const locationHref = locationSelection ? buildSearchFacetHref(locationSelection) : null;
   const formatted = [
     `${props.row.data.GPSLatitude?.[0]}°`,
@@ -75,10 +75,18 @@ const ExifCoordinatesRow: React.FC<{ row: ExifCoordinatesRowProps }> = (props) =
     .join(" ");
 
   const { decLat, decLng } = getDegLatLngFromExif({
-    GPSLongitude: props.row.data.GPSLongitude,
-    GPSLatitude: props.row.data.GPSLatitude,
-    GPSLongitudeRef: props.row.data.GPSLongitudeRef,
-    GPSLatitudeRef: props.row.data.GPSLatitudeRef,
+    ...(props.row.data.GPSLongitude !== undefined
+      ? { GPSLongitude: props.row.data.GPSLongitude }
+      : {}),
+    ...(props.row.data.GPSLatitude !== undefined
+      ? { GPSLatitude: props.row.data.GPSLatitude }
+      : {}),
+    ...(props.row.data.GPSLongitudeRef !== undefined
+      ? { GPSLongitudeRef: props.row.data.GPSLongitudeRef }
+      : {}),
+    ...(props.row.data.GPSLatitudeRef !== undefined
+      ? { GPSLatitudeRef: props.row.data.GPSLatitudeRef }
+      : {}),
   });
 
   return (
@@ -125,7 +133,7 @@ type ExifRow =
       /** Display value */
       v: ExifCellValue;
       valid?: boolean;
-      className?: string;
+      className?: string | undefined;
     }
   | {
       kind: "coordinates";
@@ -133,11 +141,11 @@ type ExifRow =
       k: string;
       /** https://exiftool.org/TagNames/GPS.html */
       v: {
-        GPSLatitudeRef?: string;
-        GPSLatitude?: [number, number, number];
-        GPSLongitudeRef?: string;
-        GPSLongitude?: [number, number, number];
-        geocode?: string;
+        GPSLatitudeRef?: string | undefined;
+        GPSLatitude?: [number, number, number] | undefined;
+        GPSLongitudeRef?: string | undefined;
+        GPSLongitude?: [number, number, number] | undefined;
+        geocode?: string | undefined;
       };
       options: {
         showMap: boolean;
@@ -204,7 +212,7 @@ export const ExifRow: React.FC<{
   k: string;
   v: ExifCellValue;
   valid?: boolean;
-  className?: string;
+  className?: string | undefined;
 }> = (props) => {
   if (props.valid === false) {
     return null;
@@ -277,7 +285,7 @@ export const Picture: React.FC<{
         srcSet={sources.map((s) => `${s.src} ${s.width}w`).join(", ")}
         sizes={props.thumb ? "auto, 800px" : "auto, 100vw"}
         // Original image is not uploaded
-        src={sources[0].src}
+        src={sources[0]?.src}
         loading={props.lazy === false ? "eager" : "lazy"}
         style={{
           aspectRatio: `${actualWidth} / ${actualHeight}`,
@@ -567,7 +575,11 @@ export const PhotoBlockEl: React.FC<{
                 />
 
                 <div className={styles.similarPhotosWrap}>
-                  <PhotoSimilarPhotosDeferred path={props.block._build.tags.path} />
+                  <PhotoSimilarPhotosDeferred
+                    {...(props.block._build.tags.path !== undefined
+                      ? { path: props.block._build.tags.path }
+                      : {})}
+                  />
                 </div>
 
                 <div className={commonStyles.mediaDetailsViewOriginal}>

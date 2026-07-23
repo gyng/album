@@ -112,7 +112,10 @@ export const getCalendarDominantColor = (
     if (entry.placeholderColor && entry.placeholderColor !== "transparent") {
       const match = entry.placeholderColor.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
       if (match) {
-        colors.push([parseInt(match[1]), parseInt(match[2]), parseInt(match[3])]);
+        const [, r, g, b] = match;
+        if (r !== undefined && g !== undefined && b !== undefined) {
+          colors.push([parseInt(r), parseInt(g), parseInt(b)]);
+        }
       }
     }
   }

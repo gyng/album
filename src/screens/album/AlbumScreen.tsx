@@ -51,13 +51,16 @@ const AlbumScreen = ({ album }: AlbumScreenProps) => {
 
   const albumName = album._build.slug;
 
+  const coverImageSrc = (cover as PhotoBlock | undefined)?._build.srcset?.[0]?.src;
+  const coverImageAbsolute = resolveAbsoluteUrl(coverImageSrc, siteOrigin);
+
   return (
     <>
       <Seo
         title={`${title} | Snapshots`}
         description={album.kicker ?? `${title} photo album: ${imageCount} photos`}
         pathname={`/album/${album._build.slug}`}
-        image={(cover as PhotoBlock | undefined)?._build.srcset?.[0].src}
+        {...(coverImageSrc ? { image: coverImageSrc } : {})}
         type="article"
         extraFeeds={[
           {
@@ -71,10 +74,7 @@ const AlbumScreen = ({ album }: AlbumScreenProps) => {
               name: `${title} | Snapshots`,
               description: album.kicker ?? `${title} photo album: ${imageCount} photos`,
               pathname: `/album/${album._build.slug}`,
-              image: resolveAbsoluteUrl(
-                (cover as PhotoBlock | undefined)?._build.srcset?.[0]?.src,
-                siteOrigin,
-              ),
+              ...(coverImageAbsolute ? { image: coverImageAbsolute } : {}),
             },
             siteOrigin,
           ),

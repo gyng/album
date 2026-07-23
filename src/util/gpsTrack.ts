@@ -36,7 +36,8 @@ export const normalizeTrack = (points: TrackPoint[], source: TrackSource): Track
     .sort((a, b) => a.utcMs - b.utcMs);
   const deduped: TrackPoint[] = [];
   for (const point of sorted) {
-    if (deduped.length === 0 || deduped[deduped.length - 1].utcMs !== point.utcMs) {
+    const last = deduped[deduped.length - 1];
+    if (last === undefined || last.utcMs !== point.utcMs) {
       deduped.push(point);
     }
   }
@@ -81,7 +82,9 @@ const parsePointString = (raw: string): { lat: number; lng: number } | null => {
   // Handles "35.0°, 139.0°", "35.0, 139.0", and "geo:35.0,139.0".
   const cleaned = raw.replace(/geo:/i, "").replace(/°/g, "").trim();
   const [lat, lng] = cleaned.split(",").map((n) => Number(n.trim()));
-  return Number.isFinite(lat) && Number.isFinite(lng) ? { lat, lng } : null;
+  return lat !== undefined && lng !== undefined && Number.isFinite(lat) && Number.isFinite(lng)
+    ? { lat, lng }
+    : null;
 };
 
 export const parseGoogleTakeout = (input: string | object): Track => {
@@ -128,20 +131,24 @@ const normalizeLng = (lng: number): number => {
 /** Interpolate a position at `utcMs`, or null when outside the track's span. */
 export const sampleTrackAt = (track: Track, utcMs: number): TrackSample => {
   const { points } = track;
-  if (points.length === 0) return null;
-  if (utcMs < points[0].utcMs || utcMs > points[points.length - 1].utcMs) return null;
+  const firstPoint = points[0];
+  const lastPoint = points[points.length - 1];
+  if (points.length === 0 || firstPoint === undefined || lastPoint === undefined) return null;
+  if (utcMs < firstPoint.utcMs || utcMs > lastPoint.utcMs) return null;
 
   // Binary search for the leg [lo, lo+1] bracketing utcMs.
   let lo = 0;
   let hi = points.length - 1;
   while (hi - lo > 1) {
     const mid = (lo + hi) >> 1;
-    if (points[mid].utcMs <= utcMs) lo = mid;
+    // invariant: mid is between lo and hi, both valid indices of points
+    if (points[mid]!.utcMs <= utcMs) lo = mid;
     else hi = mid;
   }
 
   const a = points[lo];
   const b = points[hi];
+  if (a === undefined || b === undefined) return null;
   if (utcMs === a.utcMs) return { lat: a.lat, lng: a.lng, confidence: "high", gapMs: 0 };
   if (utcMs === b.utcMs) return { lat: b.lat, lng: b.lng, confidence: "high", gapMs: 0 };
 

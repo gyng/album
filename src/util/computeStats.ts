@@ -686,11 +686,11 @@ function computeCalendarStats(photos: PhotoBlock[]): {
 
     withDate += 1;
     const weekday = new Date(Date.UTC(parsed.year, parsed.month - 1, parsed.day)).getUTCDay();
-    weekdayCounts.set(WEEKDAY_LABELS[weekday], weekdayCounts.get(WEEKDAY_LABELS[weekday])! + 1);
-    monthCounts.set(
-      MONTH_LABELS[parsed.month - 1],
-      monthCounts.get(MONTH_LABELS[parsed.month - 1])! + 1,
-    );
+    // invariant: weekday is 0-6 and month is 1-12, valid label indices
+    const weekdayLabel = WEEKDAY_LABELS[weekday]!;
+    const monthLabel = MONTH_LABELS[parsed.month - 1]!;
+    weekdayCounts.set(weekdayLabel, weekdayCounts.get(weekdayLabel)! + 1);
+    monthCounts.set(monthLabel, monthCounts.get(monthLabel)! + 1);
   }
 
   return {
@@ -754,7 +754,8 @@ function computeRecentTrendStats(photos: PhotoBlock[]): {
     const yearKey = String(value.year);
     const yearData = yearMonthCounts.get(yearKey);
     if (yearData) {
-      const monthLabel = MONTH_LABELS[value.month - 1];
+      // invariant: value.month is 1-12, a valid MONTH_LABELS index
+      const monthLabel = MONTH_LABELS[value.month - 1]!;
       yearData.set(monthLabel, yearData.get(monthLabel)! + 1);
     }
   }
@@ -1016,7 +1017,7 @@ function computeRichColorStats(albums: Content[]): {
       .data.slice()
       .sort(
         (left, right) => right.count - left.count || left.label.localeCompare(right.label),
-      )[0].label;
+      )[0]!.label;
 
     return {
       label: yearKey,
@@ -1176,11 +1177,14 @@ function computeRevisitedPlace(photos: PhotoBlock[]): PhotoStats["revisitedPlace
   return Array.from(placeYears.values())
     .map((place) => {
       const years = Array.from(place.years).sort((left, right) => left - right);
+      // invariant: every place records at least one year, so years is non-empty
+      const firstYear = years[0]!;
+      const lastYear = years[years.length - 1]!;
       return {
         ...place,
-        firstYear: years[0],
-        lastYear: years[years.length - 1],
-        spanYears: years.length > 1 ? years[years.length - 1] - years[0] : 0,
+        firstYear,
+        lastYear,
+        spanYears: years.length > 1 ? lastYear - firstYear : 0,
       };
     })
     .filter((place) => place.years.size > 1 && place.spanYears > 0)

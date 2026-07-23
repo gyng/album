@@ -83,9 +83,9 @@ describe("layer stack", () => {
     ];
     const after = pushLayer(start, "a", snap("a.jpg", "b.jpg"));
     expect(after).toHaveLength(2);
-    expect(after[0].slide.remix).toBe(false);
-    expect(after[1].slide.remix).toBe(true);
-    expect(after[1].loaded).toBe(true);
+    expect(after[0]!.slide.remix).toBe(false);
+    expect(after[1]!.slide.remix).toBe(true);
+    expect(after[1]!.loaded).toBe(true);
   });
 
   it("reveals one layer and fades out the rest (the cross-fade)", () => {

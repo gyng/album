@@ -8,13 +8,13 @@ export type SearchResultRow = {
   colors: string;
   alt_text: string;
   subject: string;
-  snippet?: string;
-  bm25?: number;
+  snippet?: string | undefined;
+  bm25?: number | undefined;
   /** Semantic/similar cosine score in the 0–1 range. */
-  similarity?: number;
+  similarity?: number | undefined;
   /** Colour-match score already scaled to a 0–100 percentage. Kept separate
    *  from `similarity` so the tile never renders a 0–1 cosine as "0%". */
-  colorMatchScore?: number;
-  rrfScore?: number;
-  matchingColor?: [number, number, number];
+  colorMatchScore?: number | undefined;
+  rrfScore?: number | undefined;
+  matchingColor?: [number, number, number] | undefined;
 };

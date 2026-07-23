@@ -107,7 +107,9 @@ type PhotoDateLookup = Map<string, PhotoDate>;
 const normalizeVector = (vector: number[]): number[] => {
   let norm = 0;
   for (let index = 0; index < vector.length; index += 1) {
-    norm += vector[index] * vector[index];
+    // invariant: index < vector.length, so the component is defined
+    const component = vector[index]!;
+    norm += component * component;
   }
 
   if (norm === 0) {
@@ -121,7 +123,8 @@ const normalizeVector = (vector: number[]): number[] => {
 const dotProduct = (left: number[], right: number[]): number => {
   let total = 0;
   for (let index = 0; index < left.length; index += 1) {
-    total += left[index] * right[index];
+    // invariant: callers pass equal-length vectors, so both are defined
+    total += left[index]! * right[index]!;
   }
   return total;
 };
@@ -175,7 +178,8 @@ export const computeVisualSamenessFromVectors = (
         continue;
       }
 
-      const score = dotProduct(vector, vectors[targetIndex]);
+      // invariant: targetIndex < vectors.length, so the vector is defined
+      const score = dotProduct(vector, vectors[targetIndex]!);
       if (score > best) {
         best = score;
       }
@@ -453,7 +457,8 @@ export const computeVisualSamenessStats = async (
             continue;
           }
 
-          const score = dotProduct(source.vector, parsedRows[targetIndex].vector);
+          // invariant: targetIndex < parsedRows.length, so the row is defined
+          const score = dotProduct(source.vector, parsedRows[targetIndex]!.vector);
           if (score >= IDENTICAL_SIMILARITY_THRESHOLD) {
             continue;
           }
@@ -494,7 +499,8 @@ export const computeVisualSamenessStats = async (
               }
 
               const leftPath = item.path;
-              const rightPath = parsedRows[item.nearestIndex].path;
+              // invariant: nearestIndex >= 0 guarded above, indexing a valid row
+              const rightPath = parsedRows[item.nearestIndex]!.path;
 
               const dedupeKey = [leftPath, rightPath].sort().join("::");
               const existing = pairs.get(dedupeKey);
@@ -540,12 +546,13 @@ export const computeVisualSamenessStats = async (
       let lookTimeline: VisualSamenessStats["lookTimeline"] = [];
       let lookDrift: VisualSamenessStats["lookDrift"] = null;
       {
-        const dimension = centroidCandidates[0].vector.length;
+        // invariant: the sample-size guard above ensures at least one candidate
+        const dimension = centroidCandidates[0]!.vector.length;
         const centroid = Array.from({ length: dimension }, () => 0);
 
         centroidCandidates.forEach((candidate) => {
           for (let index = 0; index < dimension; index += 1) {
-            centroid[index] += candidate.vector[index];
+            centroid[index] = (centroid[index] ?? 0) + (candidate.vector[index] ?? 0);
           }
         });
 
@@ -584,9 +591,10 @@ export const computeVisualSamenessStats = async (
             MAX_VISUAL_ERAS,
             Math.max(4, Math.floor(centroidCandidates.length / 250)),
           );
-          const seeds = [centroidCandidates[0]];
+          // invariant: length >= 48 guard above ensures index 0 is present
+          const seeds = [centroidCandidates[0]!];
           while (seeds.length < Math.min(visualEraCount, centroidCandidates.length)) {
-            let bestCandidate = centroidCandidates[0];
+            let bestCandidate = centroidCandidates[0]!;
             let bestDistance = -1;
             centroidCandidates.forEach((candidate) => {
               const nearestSeed = Math.max(
@@ -614,18 +622,21 @@ export const computeVisualSamenessStats = async (
                   bestIndex = index;
                 }
               });
-              nextGroups[bestIndex].push(candidate);
+              // invariant: bestIndex indexes a group created per centroid
+              nextGroups[bestIndex]!.push(candidate);
             });
 
             centroids = nextGroups.map((group, index) => {
               if (group.length === 0) {
-                return centroids[index];
+                // invariant: index aligns with the centroids array
+                return centroids[index]!;
               }
 
               const nextCentroid = Array.from({ length: dimension }, () => 0);
               group.forEach((candidate) => {
                 for (let valueIndex = 0; valueIndex < dimension; valueIndex += 1) {
-                  nextCentroid[valueIndex] += candidate.vector[valueIndex];
+                  nextCentroid[valueIndex] =
+                    (nextCentroid[valueIndex] ?? 0) + (candidate.vector[valueIndex] ?? 0);
                 }
               });
               return normalizeVector(nextCentroid);
@@ -643,7 +654,8 @@ export const computeVisualSamenessStats = async (
                 bestIndex = index;
               }
             });
-            finalGroups[bestIndex].push(candidate);
+            // invariant: bestIndex indexes a group created per centroid
+            finalGroups[bestIndex]!.push(candidate);
           });
 
           // Distinctiveness weighting in deriveEraLabel needs gallery-wide tag
@@ -657,7 +669,8 @@ export const computeVisualSamenessStats = async (
 
           visualEras = finalGroups
             .map((group, index) => {
-              const clusterCentroid = centroids[index];
+              // invariant: finalGroups and centroids share the same length
+              const clusterCentroid = centroids[index]!;
               const photos = group
                 .map((candidate) => ({
                   candidate,
@@ -713,7 +726,7 @@ export const computeVisualSamenessStats = async (
               const yearCentroid = Array.from({ length: dimension }, () => 0);
               group.forEach((candidate) => {
                 for (let index = 0; index < dimension; index += 1) {
-                  yearCentroid[index] += candidate.vector[index];
+                  yearCentroid[index] = (yearCentroid[index] ?? 0) + (candidate.vector[index] ?? 0);
                 }
               });
               const normalizedYearCentroid = normalizeVector(yearCentroid);
@@ -739,7 +752,7 @@ export const computeVisualSamenessStats = async (
             const nextCentroid = Array.from({ length: dimension }, () => 0);
             group.forEach((candidate) => {
               for (let index = 0; index < dimension; index += 1) {
-                nextCentroid[index] += candidate.vector[index];
+                nextCentroid[index] = (nextCentroid[index] ?? 0) + (candidate.vector[index] ?? 0);
               }
             });
             return normalizeVector(nextCentroid);
@@ -748,8 +761,10 @@ export const computeVisualSamenessStats = async (
           const recentCentroid = buildCentroid(recent);
           lookDrift = {
             similarityPercent: Math.round(dotProduct(earlyCentroid, recentCentroid) * 100),
-            firstYear: early[0].date.year,
-            lastYear: recent[recent.length - 1].date.year,
+            // invariant: bucketSize >= 12 and datedCandidates.length >= 24, so
+            // both buckets are non-empty
+            firstYear: early[0]!.date.year,
+            lastYear: recent[recent.length - 1]!.date.year,
           };
         }
       }

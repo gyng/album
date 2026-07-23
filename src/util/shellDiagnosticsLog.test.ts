@@ -273,7 +273,7 @@ describe("coalescing repeated events", () => {
     appendShellEvent({ category: "wake", type: "reacquire-failed" }, 1000, storage);
     const log = appendShellEvent({ category: "wake", type: "reacquire-failed" }, 2000, storage);
 
-    expect(describeShellEvent(log[0])).toContain("×2");
+    expect(describeShellEvent(log[0]!)).toContain("×2");
   });
 });
 

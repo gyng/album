@@ -5,9 +5,9 @@ import commonStyles from "../styles/common.module.css";
 import { MediaDetailsIcon } from "./MediaDetailsIcon";
 
 export type YoutubeBlockElProps = {
-  id?: string;
+  id?: string | undefined;
   src: string;
-  date?: string;
+  date?: string | undefined;
 
   // Deprecated
   //   isEditing: boolean;
@@ -18,24 +18,26 @@ export type YoutubeBlockElProps = {
 
 const VideoDetailsPanel: React.FC<{
   type: "youtube" | "local";
-  id?: string;
+  id?: string | undefined;
   src: string;
-  originalSrc?: string;
-  date?: string;
-  mimeType?: string;
-  originalTechnicalData?: {
-    originalDate?: string;
-    codec?: string;
-    profile?: string;
-    fps?: number;
-    bitrateKbps?: number;
-    fileSizeBytes?: number;
-    durationSeconds?: number;
-    width?: number;
-    height?: number;
-    audioCodec?: string;
-    container?: string;
-  };
+  originalSrc?: string | undefined;
+  date?: string | undefined;
+  mimeType?: string | undefined;
+  originalTechnicalData?:
+    | {
+        originalDate?: string;
+        codec?: string;
+        profile?: string;
+        fps?: number;
+        bitrateKbps?: number;
+        fileSizeBytes?: number;
+        durationSeconds?: number;
+        width?: number;
+        height?: number;
+        audioCodec?: string;
+        container?: string;
+      }
+    | undefined;
 }> = (props) => {
   const technicalProfile =
     props.type === "local" ? "H.264 (AVC) + AAC, web-optimised MP4" : "YouTube adaptive stream";
@@ -239,24 +241,26 @@ export const YoutubeBlockEl: React.FC<YoutubeBlockElProps> = (props) => {
 };
 
 export type LocalVideoBlockElProps = {
-  id?: string;
+  id?: string | undefined;
   src: string;
-  originalSrc?: string;
-  date?: string;
-  mimeType?: string;
-  originalTechnicalData?: {
-    originalDate?: string;
-    codec?: string;
-    profile?: string;
-    fps?: number;
-    bitrateKbps?: number;
-    fileSizeBytes?: number;
-    durationSeconds?: number;
-    width?: number;
-    height?: number;
-    audioCodec?: string;
-    container?: string;
-  };
+  originalSrc?: string | undefined;
+  date?: string | undefined;
+  mimeType?: string | undefined;
+  originalTechnicalData?:
+    | {
+        originalDate?: string;
+        codec?: string;
+        profile?: string;
+        fps?: number;
+        bitrateKbps?: number;
+        fileSizeBytes?: number;
+        durationSeconds?: number;
+        width?: number;
+        height?: number;
+        audioCodec?: string;
+        container?: string;
+      }
+    | undefined;
 };
 
 export const LocalVideoBlockEl: React.FC<LocalVideoBlockElProps> = (props) => {

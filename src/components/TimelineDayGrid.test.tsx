@@ -114,11 +114,11 @@ describe("TimelineDayGrid", () => {
     const onSelectNewerDate = jest.fn();
     const dateHeadingRef = createRef<HTMLDivElement>();
     mapProps.mockClear();
-    const secondMapped = { ...entries[1], decLat: 35.7, decLng: 139.2 };
+    const secondMapped = { ...entries[1]!, decLat: 35.7, decLng: 139.2 };
     render(
       <TimelineDayGrid
         date="2024-01-02"
-        entries={[entries[0], secondMapped]}
+        entries={[entries[0]!, secondMapped]}
         onSelectRandomDate={onSelectRandomDate}
         onSelectOlderDate={onSelectOlderDate}
         onSelectNewerDate={onSelectNewerDate}
@@ -202,35 +202,37 @@ describe("TimelineDayGrid", () => {
   });
 
   it("cleans varied geocodes and tolerates invalid timestamps and source paths", () => {
+    // Drop the fixture's coordinates so each variant can express "no
+    // coordinate" by omitting the property (equivalent to undefined) rather
+    // than assigning undefined, which exactOptionalPropertyTypes rejects.
+    const { decLat: _baseLat, decLng: _baseLng, ...baseNoCoords } = entries[0]!;
     const variants: TimelineEntry[] = [
       {
-        ...entries[0],
+        ...baseNoCoords,
         album: "unknown",
         href: "/album/unknown#one.jpg",
         path: "custom/one.jpg",
         dateTimeOriginal: "not-a-date",
         geocode: null,
-        decLat: undefined,
-        decLng: undefined,
       },
       {
-        ...entries[0],
+        ...baseNoCoords,
+        decLat: 35.6,
         album: "coordinates",
         href: "/album/coordinates#two.jpg",
         path: "custom/two.jpg",
         geocode: "35.6\n139.7",
-        decLng: undefined,
       },
       {
-        ...entries[0],
+        ...baseNoCoords,
+        decLng: 139.7,
         album: "code-only",
         href: "/album/code-only#three.jpg",
         path: "custom/three.jpg",
         geocode: "JP",
-        decLat: undefined,
       },
       {
-        ...entries[0],
+        ...baseNoCoords,
         album: "paris",
         href: "/album/paris#four.jpg",
         path: "custom/four.jpg",
@@ -239,7 +241,7 @@ describe("TimelineDayGrid", () => {
         decLng: null,
       },
       {
-        ...entries[0],
+        ...baseNoCoords,
         album: "tokyo",
         href: "/album/tokyo#five.jpg",
         path: "custom/five.jpg",
@@ -261,14 +263,14 @@ describe("TimelineDayGrid", () => {
     expect(screen.getByRole("link", { name: "unknown 2 January 2024" })).not.toHaveAttribute(
       "title",
     );
-    fireEvent.click(screen.getAllByRole("link", { name: "Find similar photos" })[0]);
+    fireEvent.click(screen.getAllByRole("link", { name: "Find similar photos" })[0]!);
   });
 
   it("uses singular photo copy for one unmapped entry", () => {
     render(
       <TimelineDayGrid
         date="2024-01-02"
-        entries={[{ ...entries[0], decLat: null, decLng: null, geocode: "Paris\nParis" }]}
+        entries={[{ ...entries[0]!, decLat: null, decLng: null, geocode: "Paris\nParis" }]}
       />,
     );
     expect(screen.getByText("1 photo")).toBeInTheDocument();

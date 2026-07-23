@@ -27,7 +27,7 @@ export const MapContextMenu = ({
       closeButton={false}
       closeOnClick={false}
       offset={8}
-      className={styles.contextPopup}
+      {...(styles.contextPopup ? { className: styles.contextPopup } : {})}
     >
       <div className={styles.contextMenu} role="group" aria-label="Location actions">
         <strong className={styles.contextHeading}>Location</strong>

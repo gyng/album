@@ -23,7 +23,11 @@ export const MapAutoFit = ({ enabled, photos }: { enabled: boolean; photos: MapW
     }
 
     if (coordinates.length === 1) {
-      const [longitude, latitude] = coordinates[0];
+      const first = coordinates[0];
+      if (!first) {
+        return;
+      }
+      const [longitude, latitude] = first;
       map.flyTo({ center: [longitude, latitude], zoom: 10.5, speed: 2.2 });
       return;
     }
@@ -166,7 +170,9 @@ export const MapMiddleDragOrbit = ({ onInteractionStart }: { onInteractionStart:
         map.dragPan.enable();
       }
       drag = null;
-      canvas.classList.remove(styles.orbiting);
+      if (styles.orbiting) {
+        canvas.classList.remove(styles.orbiting);
+      }
     };
 
     const onPointerDown = (event: PointerEvent) => {
@@ -188,7 +194,9 @@ export const MapMiddleDragOrbit = ({ onInteractionStart }: { onInteractionStart:
         startPitch: map.getPitch(),
         restoreDragPan,
       };
-      canvas.classList.add(styles.orbiting);
+      if (styles.orbiting) {
+        canvas.classList.add(styles.orbiting);
+      }
     };
 
     const onPointerMove = (event: PointerEvent) => {

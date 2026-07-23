@@ -105,13 +105,15 @@ export default defineConfig({
    * Use PLAYWRIGHT_SKIP_WEBSERVER=1 only when you intentionally want to point
    * Playwright at an already-running server that you know is serving fresh code.
    */
-  webServer: skipWebServer
-    ? undefined
+  ...(skipWebServer
+    ? {}
     : {
-        command: "next start -H 127.0.0.1",
-        env: { NEXT_DIST_DIR: ".next-e2e" },
-        port: 3000,
-        reuseExistingServer: false,
-        timeout: 120 * 1000,
-      },
+        webServer: {
+          command: "next start -H 127.0.0.1",
+          env: { NEXT_DIST_DIR: ".next-e2e" },
+          port: 3000,
+          reuseExistingServer: false,
+          timeout: 120 * 1000,
+        },
+      }),
 });

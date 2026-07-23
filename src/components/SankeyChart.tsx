@@ -163,7 +163,7 @@ const SANKEY_PALETTE = [
   "#f28bb1",
   "#b82b60",
   "#f5a7c7",
-];
+] as const;
 
 const hexToRgb = (hex: string): [number, number, number] => {
   const value = hex.replace("#", "");
@@ -210,7 +210,7 @@ const withFlowColors = (
 
   const colorByRootId = new Map<string, string>();
   rootNodes.forEach((node, index) => {
-    colorByRootId.set(node.id, SANKEY_PALETTE[index % SANKEY_PALETTE.length]);
+    colorByRootId.set(node.id, SANKEY_PALETTE[index % SANKEY_PALETTE.length] ?? SANKEY_PALETTE[0]);
   });
 
   const sourceLinksByTarget = new Map<string, typeof flow.links>();

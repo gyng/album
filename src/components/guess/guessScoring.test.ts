@@ -28,7 +28,7 @@ describe("computeScore", () => {
     const distances = [0, 1, 10, 50, 100, 200, 300, 400, 500];
     const scores = distances.map(computeScore);
     for (let i = 1; i < scores.length; i++) {
-      expect(scores[i]).toBeLessThanOrEqual(scores[i - 1]);
+      expect(scores[i]).toBeLessThanOrEqual(scores[i - 1]!);
     }
   });
 

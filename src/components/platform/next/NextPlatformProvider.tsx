@@ -10,8 +10,21 @@ import { getSiteOrigin } from "../../../lib/seo";
 
 const EMPTY_QUERY = {};
 
-const NextAppLink: PlatformLink = React.forwardRef(function NextAppLink(props, ref) {
-  return <NextLink {...props} ref={ref} />;
+const NextAppLink: PlatformLink = React.forwardRef(function NextAppLink(
+  { onMouseEnter, onTouchStart, onClick, ...rest },
+  ref,
+) {
+  // Next's LinkProps types these handlers without `| undefined`, so omit them
+  // when absent rather than forwarding an explicit undefined (exactOptionalPropertyTypes).
+  return (
+    <NextLink
+      {...rest}
+      {...(onMouseEnter ? { onMouseEnter } : {})}
+      {...(onTouchStart ? { onTouchStart } : {})}
+      {...(onClick ? { onClick } : {})}
+      ref={ref}
+    />
+  );
 });
 
 const NextDocumentHead: PlatformHead = ({ children }) => <Head>{children}</Head>;
@@ -32,7 +45,8 @@ export const NextPlatformProvider = ({ children }: React.PropsWithChildren): Rea
   const getSearchParam = React.useCallback(
     (name: string) => {
       const values = searchParams.getAll(name);
-      return values.length === 1 ? values[0] : null;
+      // invariant: length check guarantees the single value is present
+      return values.length === 1 ? values[0]! : null;
     },
     [searchParams],
   );

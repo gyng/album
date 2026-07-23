@@ -63,24 +63,26 @@ export const advanceHistory = (
       // path match — keeps the visible slide correct even if the same photo
       // path happens to occupy another history position.
       const target = state.index;
-      if (target < 0 || state.history[target]?.seed.path !== action.seedPath) {
+      const current = state.history[target];
+      if (target < 0 || current?.seed.path !== action.seedPath) {
         return state;
       }
       const history = state.history.slice();
       history[target] = {
-        ...history[target],
+        ...current,
         companions: action.companions,
         vectorScore: action.vectorScore,
       };
       return { ...state, history };
     }
     case "clearCurrentRemix": {
-      if (state.index < 0 || !state.history[state.index]) {
+      const current = state.history[state.index];
+      if (state.index < 0 || !current) {
         return state;
       }
       const history = state.history.slice();
       history[state.index] = {
-        ...history[state.index],
+        ...current,
         companions: [],
         strategy: null,
         vectorScore: null,

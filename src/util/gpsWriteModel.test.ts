@@ -76,10 +76,10 @@ describe("buildWritePlan", () => {
     ];
     const plan = buildWritePlan(assignments);
     expect(plan).toHaveLength(2);
-    expect(plan[0].tags.GPSLatitudeRef).toBe("N");
-    expect(plan[0].before).toEqual({ lat: 1, lng: 2 });
-    expect(plan[1].tags.GPSLatitudeRef).toBe("S");
-    expect(plan[1].tags.GPSProcessingMethod).toBe("INTERPOLATED");
+    expect(plan[0]!.tags.GPSLatitudeRef).toBe("N");
+    expect(plan[0]!.before).toEqual({ lat: 1, lng: 2 });
+    expect(plan[1]!.tags.GPSLatitudeRef).toBe("S");
+    expect(plan[1]!.tags.GPSProcessingMethod).toBe("INTERPOLATED");
   });
 
   it("skips assignments whose target coordinates are invalid", () => {

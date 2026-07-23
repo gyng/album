@@ -376,7 +376,8 @@ const MapScreen = (props: MapScreenProps) => {
 
       <MapWorldDeferred
         photos={filteredPhotos}
-        className={styles.map}
+        // invariant: CSS module classes always resolve
+        className={styles.map!}
         fitToPhotos={!hasCameraParams}
         showRoute={!filterAlbum && showAllRoutes}
         routeMode={filterAlbum ? defaultRouteMode : "simplified"}

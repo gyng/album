@@ -27,9 +27,9 @@ import {
 
 export type PaginatedSearchResult = {
   data: SearchResultRow[];
-  next?: number;
-  prev?: number;
-  query?: string;
+  next?: number | undefined;
+  prev?: number | undefined;
+  query?: string | undefined;
 };
 
 type SearchDatabase = Database;
@@ -248,19 +248,31 @@ const parseDbExifString = (raw: string): Exif => {
     return Number.isFinite(numeric) ? numeric : undefined;
   };
 
+  // Omit absent fields rather than assigning explicit undefined, so the parsed
+  // object satisfies the optional-property contract of Exif.
+  const focalLength = parseNumber(values["EXIF FocalLength"]);
+  const focalLength35 = parseNumber(values["EXIF FocalLengthIn35mmFilm"]);
+  const fNumber = parseNumber(values["EXIF FNumber"]);
+  const exposureTime = parseNumber(values["EXIF ExposureTime"]);
+  const iso = parseNumber(values["EXIF ISOSpeedRatings"]);
+
   return {
-    Make: values["Image Make"],
-    Model: values["Image Model"],
-    LensMake: values["EXIF LensMake"],
-    LensModel: values["EXIF LensModel"],
-    LensInfo: values["EXIF LensSpecification"],
-    FocalLength: parseNumber(values["EXIF FocalLength"]),
-    FocalLengthIn35mmFormat: parseNumber(values["EXIF FocalLengthIn35mmFilm"]),
-    FNumber: parseNumber(values["EXIF FNumber"]),
-    ExposureTime: parseNumber(values["EXIF ExposureTime"]),
-    ISO: parseNumber(values["EXIF ISOSpeedRatings"]),
-    DateTimeOriginal: values["EXIF DateTimeOriginal"],
-    OffsetTime: values["EXIF OffsetTime"],
+    ...(values["Image Make"] !== undefined ? { Make: values["Image Make"] } : {}),
+    ...(values["Image Model"] !== undefined ? { Model: values["Image Model"] } : {}),
+    ...(values["EXIF LensMake"] !== undefined ? { LensMake: values["EXIF LensMake"] } : {}),
+    ...(values["EXIF LensModel"] !== undefined ? { LensModel: values["EXIF LensModel"] } : {}),
+    ...(values["EXIF LensSpecification"] !== undefined
+      ? { LensInfo: values["EXIF LensSpecification"] }
+      : {}),
+    ...(focalLength !== undefined ? { FocalLength: focalLength } : {}),
+    ...(focalLength35 !== undefined ? { FocalLengthIn35mmFormat: focalLength35 } : {}),
+    ...(fNumber !== undefined ? { FNumber: fNumber } : {}),
+    ...(exposureTime !== undefined ? { ExposureTime: exposureTime } : {}),
+    ...(iso !== undefined ? { ISO: iso } : {}),
+    ...(values["EXIF DateTimeOriginal"] !== undefined
+      ? { DateTimeOriginal: values["EXIF DateTimeOriginal"] }
+      : {}),
+    ...(values["EXIF OffsetTime"] !== undefined ? { OffsetTime: values["EXIF OffsetTime"] } : {}),
   };
 };
 
@@ -450,7 +462,8 @@ const decodeInt8Embedding = (blob: Uint8Array, scale: number): Float32Array => {
   const bytes = new Int8Array(blob.buffer, blob.byteOffset, blob.byteLength);
   const vector = new Float32Array(bytes.length);
   for (let idx = 0; idx < bytes.length; idx += 1) {
-    vector[idx] = bytes[idx] * scale;
+    // invariant: idx is bounded by bytes.length
+    vector[idx] = bytes[idx]! * scale;
   }
   return vector;
 };
@@ -499,9 +512,12 @@ const cosineSimilarity = (left: ArrayLike<number>, right: ArrayLike<number>): nu
   let rightNorm = 0;
 
   for (let idx = 0; idx < left.length; idx += 1) {
-    dot += left[idx] * right[idx];
-    leftNorm += left[idx] * left[idx];
-    rightNorm += right[idx] * right[idx];
+    // invariant: idx is bounded by left.length, and left.length === right.length
+    const l = left[idx]!;
+    const r = right[idx]!;
+    dot += l * r;
+    leftNorm += l * l;
+    rightNorm += r * r;
   }
 
   if (leftNorm === 0 || rightNorm === 0) {
@@ -736,7 +752,7 @@ export const fetchSearchFacetSections = async (opts: {
 
     const rows = result.data as unknown as string[][];
     return rows.map((row) => ({
-      exif: parseDbExifString(row[0]),
+      exif: parseDbExifString(row[0] ?? ""),
       geocode: row[1],
       normalizedDate: row[2],
       geoCity: useGeoColumns ? (row[3] ?? null) : null,
@@ -1574,10 +1590,10 @@ export const fetchSlideshowPhotos = async (opts: {
     );
 
     return (result.data as unknown as string[][]).map((row) => ({
-      path: row[0],
-      exif: row[1],
-      geocode: row[2],
-      colors: row[3],
+      path: row[0] ?? "",
+      exif: row[1] ?? "",
+      geocode: row[2] ?? "",
+      colors: row[3] ?? "",
     }));
   } catch (err) {
     console.error(`Failed to fetch slideshow photos`, err);
@@ -1607,9 +1623,9 @@ export const fetchRandomPhoto = async (opts: {
     }
     return [
       {
-        path: row[0],
-        exif: row[1],
-        geocode: row[2],
+        path: row[0] ?? "",
+        exif: row[1] ?? "",
+        geocode: row[2] ?? "",
       },
     ];
   } catch (err) {
@@ -1674,9 +1690,9 @@ export const fetchGuessPhotos = async (opts: {
         [...baseParams, count],
       );
       return (result.data as unknown as string[][]).map((row) => ({
-        path: row[0],
-        exif: row[1],
-        geocode: row[2],
+        path: row[0] ?? "",
+        exif: row[1] ?? "",
+        geocode: row[2] ?? "",
       }));
     }
 
@@ -1687,7 +1703,9 @@ export const fetchGuessPhotos = async (opts: {
       `SELECT path FROM images WHERE ${baseWhere}${regionClause}`,
       baseParams,
     );
-    const allPaths = (allResult.data as unknown as string[][]).map((r) => r[0]);
+    const allPaths = (allResult.data as unknown as string[][])
+      .map((r) => r[0])
+      .filter((p): p is string => p !== undefined);
     const selected = seededShuffle(allPaths, seed).slice(0, count);
 
     if (selected.length === 0) return [];
@@ -1700,8 +1718,8 @@ export const fetchGuessPhotos = async (opts: {
     );
     const rowMap = new Map(
       (result.data as unknown as string[][]).map((row) => [
-        row[0],
-        { path: row[0], exif: row[1], geocode: row[2] },
+        row[0] ?? "",
+        { path: row[0] ?? "", exif: row[1] ?? "", geocode: row[2] ?? "" },
       ]),
     );
     return selected.flatMap((p) => {
@@ -1740,7 +1758,8 @@ export const seededShuffle = <T>(arr: T[], seed: string): T[] => {
   const rng = mulberry32(hashSeed(seed));
   for (let i = result.length - 1; i > 0; i--) {
     const j = Math.floor(rng() * (i + 1));
-    [result[i], result[j]] = [result[j], result[i]];
+    // invariant: i and j are valid indices within result
+    [result[i], result[j]] = [result[j]!, result[i]!];
   }
   return result;
 };

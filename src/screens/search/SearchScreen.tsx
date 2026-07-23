@@ -94,7 +94,9 @@ const SearchPage = () => {
           {searchNavState?.loading ? (
             <ProgressBar
               progress={searchNavState.loading.progress}
-              details={searchNavState.loading.details}
+              {...(searchNavState.loading.details
+                ? { details: searchNavState.loading.details }
+                : {})}
               activity={searchNavState.loading.activity}
             />
           ) : null}

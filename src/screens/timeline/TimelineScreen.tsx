@@ -255,7 +255,8 @@ const TimelineScreen = ({ entries: suppliedEntries, entryRows }: TimelineScreenP
   // reselect a future date that the validity effect immediately clears.
   React.useEffect(() => {
     if (!selectedDate && selectableDates.length > 0) {
-      setSelectedDate(selectableDates[0]);
+      // invariant: length checked above
+      setSelectedDate(selectableDates[0]!);
     }
   }, [selectableDates, selectedDate]);
 
@@ -300,7 +301,8 @@ const TimelineScreen = ({ entries: suppliedEntries, entryRows }: TimelineScreenP
       return;
     }
     const randomIndex = Math.floor(Math.random() * selectableDates.length);
-    setSelectedDate(selectableDates[randomIndex]);
+    // invariant: randomIndex is within bounds (length checked above)
+    setSelectedDate(selectableDates[randomIndex]!);
   }, [selectableDates]);
 
   const handleSelectOlderDate = React.useCallback(() => {
@@ -308,7 +310,8 @@ const TimelineScreen = ({ entries: suppliedEntries, entryRows }: TimelineScreenP
     const idx = selectableDates.indexOf(selectedDate);
     // Older = higher index (dates sorted newest first)
     if (idx >= 0 && idx < selectableDates.length - 1) {
-      setSelectedDate(selectableDates[idx + 1]);
+      // invariant: idx + 1 is within bounds (checked above)
+      setSelectedDate(selectableDates[idx + 1]!);
     }
   }, [selectableDates, selectedDate]);
 
@@ -317,7 +320,8 @@ const TimelineScreen = ({ entries: suppliedEntries, entryRows }: TimelineScreenP
     const idx = selectableDates.indexOf(selectedDate);
     // Newer = lower index (dates sorted newest first)
     if (idx > 0) {
-      setSelectedDate(selectableDates[idx - 1]);
+      // invariant: idx - 1 is within bounds (idx > 0 checked above)
+      setSelectedDate(selectableDates[idx - 1]!);
     }
   }, [selectableDates, selectedDate]);
 
@@ -421,7 +425,7 @@ const TimelineScreen = ({ entries: suppliedEntries, entryRows }: TimelineScreenP
                     entries={filteredEntries}
                     selectedDate={selectedDate}
                     onSelectDate={setSelectedDate}
-                    todayDate={todayDate ?? undefined}
+                    {...(todayDate ? { todayDate } : {})}
                     highlightedDates={memoryHighlight?.dates ?? []}
                     highlightedYears={memoryHighlight ? [memoryHighlight.year] : []}
                     scrollToDate={memoryScrollTargetDate}

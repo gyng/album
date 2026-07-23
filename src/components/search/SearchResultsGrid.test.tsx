@@ -136,8 +136,9 @@ describe("SearchResultsGrid", () => {
     expect(tileProps).toHaveBeenLastCalledWith(
       expect.objectContaining({ persistColorAction: true }),
     );
-    fireEvent.click(screen.getAllByRole("button", { name: "Similar" })[0]);
-    fireEvent.click(screen.getAllByRole("button", { name: "Colour" })[0]);
+    // getAllByRole throws if empty, so the first button exists
+    fireEvent.click(screen.getAllByRole("button", { name: "Similar" })[0]!);
+    fireEvent.click(screen.getAllByRole("button", { name: "Colour" })[0]!);
     expect(baseProps.onFindSimilar).toHaveBeenCalledWith("visited.jpg", 0.8);
     expect(onSearchByColor).toHaveBeenCalledWith([1, 2, 3]);
   });

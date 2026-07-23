@@ -29,7 +29,7 @@ const GuessScreen = () => {
       ? {
           rounds: Math.min(20, Math.max(1, Number(getSearchParam("rounds")) || 5)),
           timeLimit: parseTimer(getSearchParam("timer") ?? undefined),
-          region: regionFromUrl,
+          ...(regionFromUrl ? { region: regionFromUrl } : {}),
         }
       : undefined;
 

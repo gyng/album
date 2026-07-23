@@ -91,7 +91,7 @@ const FIRST_SIGNAL_TIMEOUT_MS = 12000;
 type PendingEntry = {
   resolve: (value: number[] | void) => void;
   reject: (reason?: unknown) => void;
-  onProgress?: ProgressHandler;
+  onProgress?: ProgressHandler | undefined;
   timeoutId: ReturnType<typeof setTimeout> | null;
 };
 

@@ -64,7 +64,7 @@ export const LEGACY_THEME_ALIASES: Readonly<Record<string, ThemeName>> = {
 export const resolveThemeName = (value: unknown): ThemeName | null => {
   if (isThemeName(value)) return value;
   return typeof value === "string" && Object.hasOwn(LEGACY_THEME_ALIASES, value)
-    ? LEGACY_THEME_ALIASES[value]
+    ? (LEGACY_THEME_ALIASES[value] ?? null)
     : null;
 };
 

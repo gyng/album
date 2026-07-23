@@ -73,7 +73,7 @@ describe("TimeRangeSlider", () => {
 
   it("renders nothing when no photo has a usable date", () => {
     const { container } = renderSlider({
-      photos: [{ ...photos[0], date: null }],
+      photos: [{ ...photos[0]!, date: null }],
       fromMs: null,
       toMs: null,
     });
@@ -156,8 +156,8 @@ describe("TimeRangeSlider", () => {
   });
 
   it("clears a range whose thumbs are already at the two extremes", () => {
-    const minMs = exifWallClockTimestamp(photos[0].date)!;
-    const maxMs = exifWallClockTimestamp(photos[1].date)!;
+    const minMs = exifWallClockTimestamp(photos[0]!.date)!;
+    const maxMs = exifWallClockTimestamp(photos[1]!.date)!;
     const { onCommit } = renderSlider({ fromMs: minMs, toMs: maxMs });
     const start = screen.getByRole("slider", { name: "Start date" });
     const container = start.parentElement!.parentElement!;
@@ -217,8 +217,8 @@ describe("TimeRangeSlider", () => {
   });
 
   it("clamps externally supplied positions to the visual track", () => {
-    const minMs = exifWallClockTimestamp(photos[0].date)!;
-    const maxMs = exifWallClockTimestamp(photos[1].date)!;
+    const minMs = exifWallClockTimestamp(photos[0]!.date)!;
+    const maxMs = exifWallClockTimestamp(photos[1]!.date)!;
     renderSlider({ fromMs: minMs - 100_000, toMs: maxMs + 100_000 });
 
     expect(screen.getByRole("slider", { name: "Start date" }).getAttribute("aria-valuenow")).toBe(

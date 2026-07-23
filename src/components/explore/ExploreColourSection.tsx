@@ -92,7 +92,9 @@ export const ExploreColourSection = ({
                   label={bucket.label}
                   count={bucket.count}
                   maxCount={maxColorCount}
-                  barColor={COLOR_SWATCHES[bucket.label] ?? undefined}
+                  {...(COLOR_SWATCHES[bucket.label]
+                    ? { barColor: COLOR_SWATCHES[bucket.label] }
+                    : {})}
                   actionHref={buildColorSearchHref(bucket.label)}
                   actionLabel={`Find photos with similar ${bucket.label.toLowerCase()} tones`}
                   labelPrefix={

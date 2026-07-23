@@ -45,7 +45,7 @@ export const GlobalNav: React.FC<Props> = ({
 
   return (
     <Nav
-      hasPadding={hasPadding}
+      {...(hasPadding !== undefined ? { hasPadding } : {})}
       isHome={currentPage === "home"}
       extraItems={
         <>

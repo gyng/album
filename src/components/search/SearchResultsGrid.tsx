@@ -150,7 +150,7 @@ export const SearchResultsGrid: React.FC<Props> = ({
               onFindSimilar={(path, similarity) => {
                 onFindSimilar(path, similarity);
               }}
-              onSearchByColor={onSearchByColor}
+              {...(onSearchByColor ? { onSearchByColor } : {})}
             />
           </li>
         );

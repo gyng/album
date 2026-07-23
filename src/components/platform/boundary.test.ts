@@ -66,7 +66,8 @@ const importedModules = (source: string, filename: string): ModuleImport[] => {
     } else if (
       ts.isCallExpression(node) &&
       node.arguments.length === 1 &&
-      ts.isStringLiteralLike(node.arguments[0]) &&
+      // invariant: length check above guarantees the first argument exists
+      ts.isStringLiteralLike(node.arguments[0]!) &&
       (node.expression.kind === ts.SyntaxKind.ImportKeyword ||
         (ts.isIdentifier(node.expression) && node.expression.text === "require"))
     ) {

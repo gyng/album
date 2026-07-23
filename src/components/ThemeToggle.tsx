@@ -49,12 +49,15 @@ const writeStoredTheme = (value: ThemeName | null): void => {
 
 // Scopes each dropdown option to its theme's palette so the CSS swatch
 // (option::before) previews that theme's own background and accent tokens.
-const optionClassName = (name: ThemeName): string =>
-  name === "light" || name === "dark"
-    ? name === "light"
-      ? styles.optionLight
-      : styles.optionDark
-    : `theme-${name}`;
+const optionClassName = (name: ThemeName): string => {
+  if (name === "light") {
+    return styles.optionLight ?? "";
+  }
+  if (name === "dark") {
+    return styles.optionDark ?? "";
+  }
+  return `theme-${name}`;
+};
 
 const getInitialTheme = (): ThemeName | null => {
   // This is the client snapshot passed to useSyncExternalStore. Server renders

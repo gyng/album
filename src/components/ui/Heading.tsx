@@ -7,7 +7,7 @@ const levelClasses = { 1: styles.level1, 2: styles.level2, 3: styles.level3 };
 export const Heading = (props: {
   level: 1 | 2 | 3;
   as?: "h1" | "h2" | "h3" | "h4" | "p" | "div";
-  className?: string;
+  className?: string | undefined;
   children: React.ReactNode;
 }) => {
   const { level, as, className, children } = props;
@@ -23,7 +23,7 @@ export const Caption = (props: {
   as?: "p" | "span" | "div";
   size?: "sm";
   id?: string;
-  className?: string;
+  className?: string | undefined;
   children: React.ReactNode;
 }) => {
   const { as: Tag = "p", size, id, className, children } = props;

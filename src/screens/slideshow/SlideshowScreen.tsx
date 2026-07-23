@@ -916,7 +916,12 @@ export const Slideshow: React.FC<{
             if (currentEntry(historyStateRef.current)?.seed.path !== seedPath) return;
 
             const mapped = mapVectorRemixResult({
-              resultData: result.data,
+              // Normalise the optional similarity (SearchResultRow widens it to
+              // `number | undefined`) to the `number | null` the helper reads.
+              resultData: result.data.map((row) => ({
+                path: row.path,
+                similarity: row.similarity ?? null,
+              })),
               pool: randomPhotoPoolRef.current,
               desiredCount,
             });
@@ -1457,7 +1462,7 @@ export const Slideshow: React.FC<{
 
     let cancelled = false;
 
-    fetchSlideshowPhotos({ database, filter })
+    fetchSlideshowPhotos({ database, ...(filter ? { filter } : {}) })
       .then(async (photos) => {
         if (cancelled) {
           return;
@@ -1496,7 +1501,7 @@ export const Slideshow: React.FC<{
         ) {
           const [randomPhoto] = await fetchRandomPhoto({
             database,
-            filter,
+            ...(filter ? { filter } : {}),
           });
 
           if (cancelled) {
@@ -1960,8 +1965,12 @@ export const Slideshow: React.FC<{
     const result = resolvePointerMove({
       deltaX: event.clientX - gesture.startX,
       deltaY: event.clientY - gesture.startY,
-      committedHorizontal: gesture.committedHorizontalDirection,
-      committedVertical: gesture.committedVerticalDirection,
+      ...(gesture.committedHorizontalDirection
+        ? { committedHorizontal: gesture.committedHorizontalDirection }
+        : {}),
+      ...(gesture.committedVerticalDirection
+        ? { committedVertical: gesture.committedVerticalDirection }
+        : {}),
       controlsWereVisible: gesture.controlsWereVisible,
     });
 
@@ -2010,8 +2019,12 @@ export const Slideshow: React.FC<{
         deltaX: event.clientX - gesture.startX,
         deltaY: event.clientY - gesture.startY,
         isTouchLike: isTouchOrPen(gesture.pointerType),
-        committedHorizontal: gesture.committedHorizontalDirection,
-        committedVertical: gesture.committedVerticalDirection,
+        ...(gesture.committedHorizontalDirection
+          ? { committedHorizontal: gesture.committedHorizontalDirection }
+          : {}),
+        ...(gesture.committedVerticalDirection
+          ? { committedVertical: gesture.committedVerticalDirection }
+          : {}),
         controlsWereVisible: gesture.controlsWereVisible,
         tap: {
           clientX: event.clientX,
@@ -2108,8 +2121,9 @@ export const Slideshow: React.FC<{
   const shareCurrentPhoto = useCallback(async () => {
     const photoLink = getCurrentPhotoLink();
     const sharePath = currentEntry(historyStateRef.current)!.seed.path;
-    const albumName = sharePath.split("/")[2];
-    const photoName = sharePath.split("/")[3];
+    // invariant: album media paths are `../albums/<album>/<photo>`
+    const albumName = sharePath.split("/")[2]!;
+    const photoName = sharePath.split("/")[3]!;
     if (typeof navigator.share === "function") {
       try {
         await navigator.share({
@@ -2285,7 +2299,7 @@ export const Slideshow: React.FC<{
             <ProgressBar
               progress={bootProgress}
               hideIfComplete={false}
-              label={bootProgress >= 100 ? "Preparing slideshow…" : undefined}
+              {...(bootProgress >= 100 ? { label: "Preparing slideshow…" } : {})}
             />
             <Link
               href="/"
@@ -2304,16 +2318,14 @@ export const Slideshow: React.FC<{
     );
   }
 
-  const albumName = currentPhotoPath.path.split("/")[2];
-  const photoName = currentPhotoPath.path.split("/")[3];
+  // invariant: album media paths are `../albums/<album>/<photo>`
+  const albumName = currentPhotoPath.path.split("/")[2]!;
+  const photoName = currentPhotoPath.path.split("/")[3]!;
   const photoBlock: PhotoBlock = {
     kind: "photo",
     id: "",
     data: {
       src: activePhotoSrc!,
-      title: undefined,
-      kicker: undefined,
-      description: undefined,
     },
     _build: {
       height: 0,
@@ -2708,7 +2720,8 @@ export const Slideshow: React.FC<{
               ]
                 .filter(Boolean)
                 .join(" ")}
-              src={layer.slide.cells[0].src}
+              // invariant: every slide has at least a seed cell
+              src={layer.slide.cells[0]!.src}
               alt={isTop ? photoAltText : ""}
               decoding="async"
               onTransitionEnd={onFadeEnd}

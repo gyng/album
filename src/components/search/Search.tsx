@@ -893,7 +893,7 @@ export const Search: React.FC<{
         <EmptyStateExplore
           database={database}
           onStartSimilarSearch={startSimilarSearch}
-          onSearchByColor={selectedFilterCategory === "color" ? handleSearchByColor : undefined}
+          {...(selectedFilterCategory === "color" ? { onSearchByColor: handleSearchByColor } : {})}
           isColorCategoryActive={selectedFilterCategory === "color"}
         />
       ) : null}
@@ -941,9 +941,9 @@ export const Search: React.FC<{
           hasNextPage={hasNextPage}
           similarClickstreamPaths={similarClickstreamPaths}
           onFindSimilar={handleFindSimilar}
-          onSearchByColor={
-            selectedFilterCategory === "color" || colorSearch ? handleSearchByColor : undefined
-          }
+          {...(selectedFilterCategory === "color" || colorSearch
+            ? { onSearchByColor: handleSearchByColor }
+            : {})}
           onFetchNextPage={fetchNextPage}
         />
       </div>

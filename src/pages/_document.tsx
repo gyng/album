@@ -2,12 +2,12 @@ import Document, { Head, Html, Main, NextScript, type DocumentContext } from "ne
 import { THEME_BOOTSTRAP_SCRIPT } from "../util/themeBootstrap";
 
 class MyDocument extends Document {
-  static async getInitialProps(ctx: DocumentContext) {
+  static override async getInitialProps(ctx: DocumentContext) {
     const initialProps = await Document.getInitialProps(ctx);
     return initialProps;
   }
 
-  render() {
+  override render() {
     return (
       <Html lang="en-GB">
         <Head>

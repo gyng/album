@@ -65,7 +65,7 @@ describe("advanceHistory reducer", () => {
     expect(patched?.companions.map((c) => c.path)).toEqual(["x", "y"]);
     expect(patched?.vectorScore).toBe(0.91);
     // The other entry is untouched.
-    expect(s.history[0].companions).toEqual([]);
+    expect(s.history[0]!.companions).toEqual([]);
   });
 
   it("patchEntry targets the CURRENT slide, not an earlier entry with the same path", () => {
@@ -80,8 +80,8 @@ describe("advanceHistory reducer", () => {
       vectorScore: 0.8,
     });
     // The current occurrence (index 2) is patched; the earlier "dup" is not.
-    expect(s.history[2].companions.map((c) => c.path)).toEqual(["x"]);
-    expect(s.history[0].companions).toEqual([]);
+    expect(s.history[2]!.companions.map((c) => c.path)).toEqual(["x"]);
+    expect(s.history[0]!.companions).toEqual([]);
   });
 
   it("patchEntry is a no-op when the user has navigated away from the seed", () => {

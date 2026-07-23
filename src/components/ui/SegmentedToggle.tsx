@@ -6,7 +6,7 @@ export const SegmentedToggle = <T extends string>(props: {
   value: T;
   onChange: (value: T) => void;
   ariaLabel: string;
-  className?: string;
+  className?: string | undefined;
 }) => {
   const { options, value, onChange, ariaLabel, className } = props;
   const groupRef = useRef<HTMLDivElement>(null);
@@ -15,7 +15,9 @@ export const SegmentedToggle = <T extends string>(props: {
     const index = options.findIndex((option) => option.value === value);
     if (index === -1) return;
     const next = (index + delta + options.length) % options.length;
-    onChange(options[next].value);
+    const nextOption = options[next];
+    if (nextOption === undefined) return;
+    onChange(nextOption.value);
     // Roving tabindex: move focus onto the newly selected radio so keyboard
     // arrow navigation doesn't strand focus on a now-unfocusable button.
     const radios = groupRef.current?.querySelectorAll<HTMLButtonElement>('[role="radio"]');

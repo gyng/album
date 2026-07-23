@@ -254,24 +254,24 @@ describe("explore page", () => {
     expect(screen.queryByRole("button", { name: "Load more years" })).not.toBeInTheDocument();
 
     const locationControls = screen.getByLabelText("Location chart view");
-    fireEvent.click(locationControls.querySelectorAll("button")[1]);
+    fireEvent.click(locationControls.querySelectorAll("button")[1]!);
     expect(screen.getAllByTestId("sankey").length).toBeGreaterThan(1);
-    fireEvent.click(locationControls.querySelectorAll("button")[2]);
+    fireEvent.click(locationControls.querySelectorAll("button")[2]!);
 
     const gearControls = screen.getByLabelText("Gear chart view");
-    fireEvent.click(gearControls.querySelectorAll("button")[1]);
+    fireEvent.click(gearControls.querySelectorAll("button")[1]!);
 
     const selects = screen.getAllByRole("combobox");
-    fireEvent.change(selects[0], { target: { value: "Cam 1" } });
-    fireEvent.change(selects[1], { target: { value: "Lens 1" } });
+    fireEvent.change(selects[0]!, { target: { value: "Cam 1" } });
+    fireEvent.change(selects[1]!, { target: { value: "Lens 1" } });
     expect(screen.getAllByTestId("heatmaps").at(-1)).toHaveTextContent("11");
-    fireEvent.change(selects[0], { target: { value: "all" } });
+    fireEvent.change(selects[0]!, { target: { value: "all" } });
     expect(screen.getAllByTestId("heatmaps").at(-1)).toHaveTextContent("13");
-    fireEvent.change(selects[1], { target: { value: "Lens X" } });
-    fireEvent.change(selects[0], { target: { value: "Cam 2" } });
-    fireEvent.change(selects[1], { target: { value: "Lens 2" } });
-    fireEvent.change(selects[1], { target: { value: "all" } });
-    fireEvent.change(selects[0], { target: { value: "Cam 3" } });
+    fireEvent.change(selects[1]!, { target: { value: "Lens X" } });
+    fireEvent.change(selects[0]!, { target: { value: "Cam 2" } });
+    fireEvent.change(selects[1]!, { target: { value: "Lens 2" } });
+    fireEvent.change(selects[1]!, { target: { value: "all" } });
+    fireEvent.change(selects[0]!, { target: { value: "Cam 3" } });
   });
 
   it("omits unavailable visual and cadence sections", () => {

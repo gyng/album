@@ -102,7 +102,7 @@ describe("SlideshowBottomBar", () => {
     view.rerender(
       <SlideshowBottomBar
         {...props}
-        slidePhotos={[{ ...props.slidePhotos[0], exif: "changed" }]}
+        slidePhotos={[{ ...props.slidePhotos[0]!, exif: "changed" }]}
         time={new Date(2024, 0, 3, 14, 5, 1)}
       />,
     );
@@ -116,7 +116,7 @@ describe("SlideshowBottomBar", () => {
       <SlideshowBottomBar
         {...props}
         slidePhotos={[
-          props.slidePhotos[0],
+          props.slidePhotos[0]!,
           photo("two.jpg", "coords2", ""),
           photo("three.jpg", "date", "1.2\n3.4"),
         ]}
@@ -153,7 +153,7 @@ describe("SlideshowBottomBar", () => {
     render(
       <SlideshowBottomBar
         {...props}
-        slidePhotos={[props.slidePhotos[0], photo("two.jpg", "coords2")]}
+        slidePhotos={[props.slidePhotos[0]!, photo("two.jpg", "coords2")]}
         remixStrategy="same-album"
       />,
     );
@@ -173,7 +173,7 @@ describe("SlideshowBottomBar", () => {
     render(
       <SlideshowBottomBar
         {...props}
-        slidePhotos={[props.slidePhotos[0], photo("two.jpg", "coords2")]}
+        slidePhotos={[props.slidePhotos[0]!, photo("two.jpg", "coords2")]}
         remixStrategy={strategy}
         remixVectorScore={score}
       />,
@@ -189,7 +189,7 @@ describe("SlideshowBottomBar", () => {
     view.rerender(
       <SlideshowBottomBar
         {...props}
-        slidePhotos={[props.slidePhotos[0], photo("two.jpg", "coords2")]}
+        slidePhotos={[props.slidePhotos[0]!, photo("two.jpg", "coords2")]}
         remixStrategy={null}
       />,
     );
@@ -198,7 +198,7 @@ describe("SlideshowBottomBar", () => {
     view.rerender(
       <SlideshowBottomBar
         {...props}
-        slidePhotos={[props.slidePhotos[0], photo("two.jpg", "coords2")]}
+        slidePhotos={[props.slidePhotos[0]!, photo("two.jpg", "coords2")]}
         remixStrategy="similar"
         remixVectorScore={null}
         timeAware={false}

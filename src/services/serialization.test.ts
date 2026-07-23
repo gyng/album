@@ -72,9 +72,7 @@ describe("serialization", () => {
         },
       },
     ],
-    formatting: {
-      overlay: undefined,
-    },
+    formatting: {},
     _build: {
       slug: "slug",
       timeRange: ["2024-01-01T00:00:00", "2024-01-02T00:00:00"],
@@ -110,9 +108,7 @@ describe("serialization", () => {
     ],
     name: "foo",
     title: "bar",
-    formatting: {
-      overlay: undefined,
-    },
+    formatting: {},
   };
 
   const fullyDeserializedContent: Content = {
@@ -185,7 +181,7 @@ describe("serialization", () => {
     ],
     name: "foo",
     title: "bar",
-    formatting: { overlay: undefined },
+    formatting: {},
     _build: { slug: "foo", srcdir: "." },
   };
 
@@ -212,7 +208,7 @@ describe("serialization", () => {
     const input: SerializedContent = {
       ...serializedContent,
       blocks: [
-        serializedContent.blocks[0],
+        serializedContent.blocks[0]!,
         {
           kind: "video",
           id: "video-local-no-date",
@@ -225,7 +221,7 @@ describe("serialization", () => {
     };
 
     const actual = await deserializeContentBlock(input, ".");
-    const localVideo = actual.blocks[1];
+    const localVideo = actual.blocks[1]!;
 
     expect(localVideo.kind).toBe("video");
     expect((localVideo as any).data.date).toBe("2023-11-20T10:11:12.000Z");
@@ -254,7 +250,7 @@ describe("serialization", () => {
     };
 
     const actual = await deserializeContentBlock(input, ".");
-    const block = actual.blocks[0];
+    const block = actual.blocks[0]!;
 
     // The `date` key is omitted entirely (not `date: undefined`).
     expect(block.kind).toBe("video");
@@ -315,7 +311,7 @@ describe("serialization", () => {
             src: "test/fixtures/does-not-exist.jpg",
           },
         },
-        serializedContent.blocks[0],
+        serializedContent.blocks[0]!,
       ],
     };
 

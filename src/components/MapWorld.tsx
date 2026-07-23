@@ -433,9 +433,9 @@ export const MMap: React.FC<MapWorldProps> = ({
             attribution?.removeAttribute("open");
           }}
           initialViewState={{
-            longitude: initialLon ? Number.parseFloat(initialLon) : undefined,
-            latitude: initialLat ? Number.parseFloat(initialLat) : undefined,
-            zoom: initialZoom ? Number.parseFloat(initialZoom) : undefined,
+            ...(initialLon ? { longitude: Number.parseFloat(initialLon) } : {}),
+            ...(initialLat ? { latitude: Number.parseFloat(initialLat) } : {}),
+            ...(initialZoom ? { zoom: Number.parseFloat(initialZoom) } : {}),
           }}
           onMoveStart={() => {
             setContextPoint(null);

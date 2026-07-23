@@ -42,7 +42,7 @@ describe("mapTopicSeedResults", () => {
     expect(seeded.map((r) => r.path)).toEqual(["../albums/b/3.jpg", "../albums/a/1.jpg"]);
     // The pool's own row object is reused so its colours survive the round-trip.
     expect(seeded[0]).toBe(pool[2]);
-    expect(seeded[0].colors).toBe("colors:../albums/b/3.jpg");
+    expect(seeded[0]!.colors).toBe("colors:../albums/b/3.jpg");
   });
 
   it("drops results that are not present in the current pool", () => {

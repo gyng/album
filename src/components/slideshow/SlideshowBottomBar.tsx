@@ -175,7 +175,7 @@ export const SlideshowBottomBar: React.FC<SlideshowBottomBarProps> = (props) => 
       >
         {mountMap ? (
           <MMap
-            coordinates={allCoords.length === 1 ? allCoords[0] : allCoords}
+            coordinates={allCoords.length === 1 ? allCoords[0]! : allCoords}
             attribution={false}
             details={false}
             style={SLIDE_MAP_STYLE}
@@ -292,7 +292,8 @@ export const SlideshowBottomBar: React.FC<SlideshowBottomBarProps> = (props) => 
                 visibility: isMapLayer ? "hidden" : "visible",
               }}
             >
-              {renderPhotoDescription(slidePhotoMeta[idx])}
+              {/* invariant: slidePhotoMeta is derived from slidePhotos, so indices align */}
+              {renderPhotoDescription(slidePhotoMeta[idx]!)}
             </div>
           ))}
           <div

@@ -155,10 +155,11 @@ describe("EmptyStateExplore", () => {
     expect(screen.getByText(/3 years ago/)).toBeTruthy();
     expect(screen.queryByText(/6 years ago/)).toBeNull();
     expect(
-      screen.getAllByRole("link", { name: "Open timeline" })[0].getAttribute("href"),
+      // getAllByRole throws if empty, so the first two links exist
+      screen.getAllByRole("link", { name: "Open timeline" })[0]!.getAttribute("href"),
     ).toContain("filter_album=japan");
     expect(
-      screen.getAllByRole("link", { name: "Open timeline" })[1].getAttribute("href"),
+      screen.getAllByRole("link", { name: "Open timeline" })[1]!.getAttribute("href"),
     ).not.toContain("filter_album");
 
     fireEvent.click(screen.getByRole("button", { name: "Similar recent-0" }));
@@ -172,7 +173,8 @@ describe("EmptyStateExplore", () => {
     expect(await screen.findByText(/6 years ago/)).toBeTruthy();
 
     const moreButtons = screen.getAllByRole("button", { name: "More…" });
-    fireEvent.click(moreButtons[0]);
+    // getAllByRole throws if empty, so the first button exists
+    fireEvent.click(moreButtons[0]!);
     await waitFor(() => expect(mockRecent).toHaveBeenCalledTimes(2));
     fireEvent.click(screen.getByRole("button", { name: "More…" }));
     await waitFor(() => expect(mockRandom).toHaveBeenCalledTimes(2));

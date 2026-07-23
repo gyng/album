@@ -34,8 +34,9 @@ export const SearchDrawPad: React.FC<Props> = ({ onCancel, onSubmit }) => {
   const cancelRef = useRef<HTMLButtonElement | null>(null);
   const isDrawingRef = useRef(false);
   const lastPointRef = useRef<{ x: number; y: number } | null>(null);
-  const [brushColour, setBrushColour] = useState(BRUSH_COLOURS[0]);
-  const [brushWidth, setBrushWidth] = useState(BRUSH_SIZES[1].width);
+  // invariant: BRUSH_COLOURS and BRUSH_SIZES are non-empty module constants
+  const [brushColour, setBrushColour] = useState(BRUSH_COLOURS[0]!);
+  const [brushWidth, setBrushWidth] = useState(BRUSH_SIZES[1]!.width);
   const [hasStrokes, setHasStrokes] = useState(false);
 
   const fillBackground = useCallback(() => {

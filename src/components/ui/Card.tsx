@@ -3,7 +3,7 @@ import styles from "./Card.module.css";
 export const Card = (
   props: {
     as?: "div" | "article" | "section";
-    className?: string;
+    className?: string | undefined;
     children: React.ReactNode;
   } & React.HTMLAttributes<HTMLElement>,
 ) => {

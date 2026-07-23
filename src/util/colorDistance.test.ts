@@ -73,10 +73,10 @@ describe("minColorDistance", () => {
       [250, 5, 5], // close (near red)
     ];
     const closest = minColorDistance(query, palette);
-    const toFirst = deltaE(rgbToLab(...query), rgbToLab(...palette[0]));
+    const toFirst = deltaE(rgbToLab(...query), rgbToLab(...palette[0]!));
     expect(closest).toBeLessThan(toFirst);
     // The closest entry drives the distance.
-    expect(closest).toBeCloseTo(deltaE(rgbToLab(...query), rgbToLab(...palette[1])), 5);
+    expect(closest).toBeCloseTo(deltaE(rgbToLab(...query), rgbToLab(...palette[1]!)), 5);
   });
 
   it("is zero for an identical colour present in the palette", () => {

@@ -537,7 +537,8 @@ describe("Search", () => {
       name: /find similar photos/i,
     });
 
-    fireEvent.click(similarButtons[0]);
+    // findAllByRole throws if empty, so the first button exists
+    fireEvent.click(similarButtons[0]!);
 
     expect(
       await screen.findByRole("button", {
@@ -567,7 +568,8 @@ describe("Search", () => {
     const similarButtons = await screen.findAllByRole("button", {
       name: /find similar photos/i,
     });
-    fireEvent.click(similarButtons[0]);
+    // findAllByRole throws if empty, so the first button exists
+    fireEvent.click(similarButtons[0]!);
 
     const leastSimilarTab = await screen.findByRole("radio", {
       name: /least similar/i,
@@ -590,7 +592,8 @@ describe("Search", () => {
     const browseSimilarButtons = await screen.findAllByRole("button", {
       name: /find similar photos/i,
     });
-    fireEvent.click(browseSimilarButtons[0]);
+    // findAllByRole throws if empty, so the first button exists
+    fireEvent.click(browseSimilarButtons[0]!);
 
     let resultSimilarButton = await screen.findByRole("button", {
       name: /find similar photos/i,
@@ -634,7 +637,8 @@ describe("Search", () => {
     const browseSimilarButtons = await screen.findAllByRole("button", {
       name: /find similar photos/i,
     });
-    fireEvent.click(browseSimilarButtons[0]);
+    // findAllByRole throws if empty, so the first button exists
+    fireEvent.click(browseSimilarButtons[0]!);
 
     let resultSimilarButton = await screen.findByRole("button", {
       name: /find similar photos/i,

@@ -27,7 +27,8 @@ describe("SegmentedToggle roving tabindex", () => {
     expect(y).toHaveAttribute("aria-checked", "false");
     expect(y).toHaveAttribute("tabindex", "-1");
 
-    fireEvent.click(y);
+    // getAllByRole throws unless both radios are present, so y is defined here.
+    fireEvent.click(y!);
     expect(onChange).toHaveBeenCalledWith("y");
   });
 

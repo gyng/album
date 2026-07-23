@@ -45,7 +45,7 @@ type Action =
       type: "progress";
       progress: number;
       stage: string;
-      details?: ProgressDetails;
+      details?: ProgressDetails | undefined;
     }
   | { type: "warmup:ready" }
   | { type: "warmup:error"; outcome: EncodeFailureOutcome }

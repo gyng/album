@@ -49,7 +49,7 @@ const makePhoto = (dateStr?: string): PhotoBlock => ({
   _build: {
     height: 100,
     width: 100,
-    exif: { DateTimeOriginal: dateStr },
+    exif: dateStr !== undefined ? { DateTimeOriginal: dateStr } : {},
     tags: {},
     srcset: [],
   },
@@ -64,7 +64,11 @@ const makeText = (): TextBlock => ({
 const makeVideo = (date?: string): VideoBlock => ({
   kind: "video",
   id: "v1",
-  data: { type: "youtube", href: "https://youtube.com/watch?v=test", date },
+  data: {
+    type: "youtube",
+    href: "https://youtube.com/watch?v=test",
+    ...(date !== undefined ? { date } : {}),
+  },
 });
 
 const mockDeserialize = jest.mocked(deserializeContentBlock);

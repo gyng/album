@@ -5,6 +5,9 @@
 type Listener = (event: any) => void;
 
 class FakeWorker {
+  // invariant: sendEmbeddingWorkerRequest constructs a worker synchronously, so
+  // the indexed instances asserted below with `!` are always present by the time
+  // the test reads them.
   static instances: FakeWorker[] = [];
   listeners = new Map<string, Listener>();
   postMessage = jest.fn();
@@ -51,7 +54,7 @@ describe("embeddingWorkerClient", () => {
     const onProgress = jest.fn();
     const first = sendEmbeddingWorkerRequest({ type: "encode", text: "night cats" }, onProgress);
     const second = sendEmbeddingWorkerRequest({ type: "warmup" });
-    const worker = FakeWorker.instances[0];
+    const worker = FakeWorker.instances[0]!;
 
     expect(FakeWorker.instances).toHaveLength(1);
     expect(worker.postMessage.mock.calls).toEqual([
@@ -86,7 +89,7 @@ describe("embeddingWorkerClient", () => {
   it("rejects a failed request", async () => {
     const { sendEmbeddingWorkerRequest } = loadClient();
     const request = sendEmbeddingWorkerRequest({ type: "warmup" });
-    const worker = FakeWorker.instances[0];
+    const worker = FakeWorker.instances[0]!;
     worker.emit("message", { data: { boot: true } });
     worker.emit("message", {
       data: { id: 0, ok: false, error: "Model could not load" },
@@ -103,7 +106,7 @@ describe("embeddingWorkerClient", () => {
     const { sendEmbeddingWorkerRequest } = loadClient();
     const first = sendEmbeddingWorkerRequest({ type: "warmup" });
     const second = sendEmbeddingWorkerRequest({ type: "encode", text: "rain" });
-    const failedWorker = FakeWorker.instances[0];
+    const failedWorker = FakeWorker.instances[0]!;
     failedWorker.emit("message", { data: { boot: true } });
     const crash = new Error("worker crashed");
     failedWorker.emit("error", { error: crash });
@@ -114,8 +117,8 @@ describe("embeddingWorkerClient", () => {
 
     const recovered = sendEmbeddingWorkerRequest({ type: "warmup" });
     expect(FakeWorker.instances).toHaveLength(2);
-    FakeWorker.instances[1].emit("message", { data: { boot: true } });
-    FakeWorker.instances[1].emit("message", { data: { id: 2, ok: true } });
+    FakeWorker.instances[1]!.emit("message", { data: { boot: true } });
+    FakeWorker.instances[1]!.emit("message", { data: { id: 2, ok: true } });
     await expect(recovered).resolves.toBeUndefined();
   });
 
@@ -125,7 +128,7 @@ describe("embeddingWorkerClient", () => {
     request.catch(() => {});
     // The worker's entry script 404'd: it fires "error" without ever posting a
     // boot ack. Respawning re-fetches the same baked-in URL and 404s again.
-    FakeWorker.instances[0].emit("error", {
+    FakeWorker.instances[0]!.emit("error", {
       error: new Error("Importing a module script failed."),
     });
 
@@ -133,7 +136,7 @@ describe("embeddingWorkerClient", () => {
       expect(isEmbeddingWorkerUnavailable(err)).toBe(true);
     });
     await expect(request).rejects.toBeInstanceOf(Error);
-    expect(FakeWorker.instances[0].terminate).toHaveBeenCalled();
+    expect(FakeWorker.instances[0]!.terminate).toHaveBeenCalled();
 
     const instancesBefore = FakeWorker.instances.length;
     const next = sendEmbeddingWorkerRequest({ type: "warmup" });
@@ -150,7 +153,7 @@ describe("embeddingWorkerClient", () => {
   it("uses a stable fallback error for worker events without an Error", async () => {
     const { sendEmbeddingWorkerRequest } = loadClient();
     const request = sendEmbeddingWorkerRequest({ type: "warmup" });
-    const worker = FakeWorker.instances[0];
+    const worker = FakeWorker.instances[0]!;
     worker.emit("message", { data: { boot: true } });
     worker.emit("error", { error: "failed" });
     await expect(request).rejects.toThrow("Embedding worker failed.");
@@ -180,7 +183,7 @@ describe("embeddingWorkerClient", () => {
       // 12s (the per-request window) passes with no boot ack: nothing fires,
       // because per-request timers only arm after boot.
       jest.advanceTimersByTime(12000);
-      expect(FakeWorker.instances[0].terminate).not.toHaveBeenCalled();
+      expect(FakeWorker.instances[0]!.terminate).not.toHaveBeenCalled();
 
       // The 40s boot window elapses: reject as a SLOW START — not the
       // permanent unavailable class, whose reload advice would restart the
@@ -191,13 +194,13 @@ describe("embeddingWorkerClient", () => {
         expect(isEmbeddingWorkerUnavailable(err)).toBe(false);
       });
       await expect(first).rejects.toBeInstanceOf(Error);
-      expect(FakeWorker.instances[0].terminate).toHaveBeenCalled();
+      expect(FakeWorker.instances[0]!.terminate).toHaveBeenCalled();
 
       // A slow network deserves a retry: the next request spins a fresh worker.
       const second = sendEmbeddingWorkerRequest({ type: "warmup" });
       expect(FakeWorker.instances).toHaveLength(2);
-      FakeWorker.instances[1].emit("message", { data: { boot: true } });
-      FakeWorker.instances[1].emit("message", { data: { id: 1, ok: true } });
+      FakeWorker.instances[1]!.emit("message", { data: { boot: true } });
+      FakeWorker.instances[1]!.emit("message", { data: { id: 1, ok: true } });
       await expect(second).resolves.toBeUndefined();
     });
 
@@ -208,7 +211,7 @@ describe("embeddingWorkerClient", () => {
       const { sendEmbeddingWorkerRequest, isEmbeddingWorkerUnavailable } = loadClient();
       const request = sendEmbeddingWorkerRequest({ type: "warmup" });
       request.catch(() => {});
-      const worker = FakeWorker.instances[0];
+      const worker = FakeWorker.instances[0]!;
 
       // Before boot, the 12s window must be inert.
       jest.advanceTimersByTime(12000);
@@ -229,10 +232,10 @@ describe("embeddingWorkerClient", () => {
       const { sendEmbeddingWorkerRequest, isEmbeddingWorkerUnavailable } = loadClient();
       const first = sendEmbeddingWorkerRequest({ type: "warmup" });
       first.catch(() => {});
-      FakeWorker.instances[0].emit("message", { data: { boot: true } });
+      FakeWorker.instances[0]!.emit("message", { data: { boot: true } });
       jest.advanceTimersByTime(12000);
       await first.catch(() => {});
-      expect(FakeWorker.instances[0].terminate).toHaveBeenCalled();
+      expect(FakeWorker.instances[0]!.terminate).toHaveBeenCalled();
 
       const instancesBefore = FakeWorker.instances.length;
       const second = sendEmbeddingWorkerRequest({ type: "encode", text: "cats" });
@@ -247,7 +250,7 @@ describe("embeddingWorkerClient", () => {
     it("keeps a request alive once it has emitted a first progress signal", async () => {
       const { sendEmbeddingWorkerRequest } = loadClient();
       const request = sendEmbeddingWorkerRequest({ type: "warmup" });
-      const worker = FakeWorker.instances[0];
+      const worker = FakeWorker.instances[0]!;
       worker.emit("message", { data: { boot: true } });
 
       jest.advanceTimersByTime(6000);
@@ -267,7 +270,7 @@ describe("embeddingWorkerClient", () => {
       const { sendEmbeddingWorkerRequest } = loadClient();
       const requestA = sendEmbeddingWorkerRequest({ type: "encode", text: "a" });
       const requestB = sendEmbeddingWorkerRequest({ type: "encode", text: "b" });
-      const worker = FakeWorker.instances[0];
+      const worker = FakeWorker.instances[0]!;
       worker.emit("message", { data: { boot: true } });
 
       // A never signals; B keeps the worker demonstrably alive across the window.

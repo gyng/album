@@ -21,7 +21,7 @@ describe("parseGpx", () => {
     expect(track.source).toBe("gpx");
     expect(track.points).toHaveLength(3);
     expect(track.points[0]).toMatchObject({ lat: 35.0, lng: 139.0, utcMs: at(10, 0), ele: 10 });
-    expect(track.points[2].utcMs).toBe(at(10, 24));
+    expect(track.points[2]!.utcMs).toBe(at(10, 24));
   });
 
   it("falls back through route points and waypoints", () => {
@@ -58,7 +58,7 @@ describe("parseGoogleTakeout", () => {
     expect(track.source).toBe("takeout");
     expect(track.points).toHaveLength(2);
     expect(track.points[0]).toMatchObject({ lat: 35.0, lng: 139.0, utcMs: at(10, 0) });
-    expect(track.points[1].utcMs).toBe(at(10, 4));
+    expect(track.points[1]!.utcMs).toBe(at(10, 4));
   });
 
   it("parses the newer semanticSegments/timelinePath shape", () => {
@@ -109,7 +109,7 @@ describe("normalizeTrack", () => {
     ];
     const track = normalizeTrack(raw, "gpx");
     expect(track.points.map((p) => p.utcMs)).toEqual([at(10, 0), at(10, 4)]);
-    expect(track.points[0].lat).toBe(35.0);
+    expect(track.points[0]!.lat).toBe(35.0);
   });
 });
 
