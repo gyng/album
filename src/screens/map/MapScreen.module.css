@@ -68,7 +68,16 @@
   border: 0;
   background: transparent;
   color: var(--c-font);
-  font: inherit;
+  font-family: inherit;
+  /* Match the search page's canonical Input sizing for a consistent field. */
+  font-size: var(--fs-sm);
+}
+
+/* 16px on touch devices stops iOS Safari zooming the page on focus */
+@media (hover: none), (pointer: coarse) {
+  .mapSearch input {
+    font-size: var(--fs-touch);
+  }
 }
 
 .mapSearch input:focus-visible {
