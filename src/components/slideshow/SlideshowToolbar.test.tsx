@@ -431,7 +431,7 @@ describe("SlideshowToolbar", () => {
     render(<SlideshowToolbar {...makeProps({ topic: "cat", onClearTopic })} />);
 
     const topicGroup = screen.getByRole("group", { name: "Topic" });
-    expect(within(topicGroup).getByText(/Topic:/)).toHaveTextContent("Topic: cat");
+    expect(within(topicGroup).getByText("cat", { selector: "i" })).toBeTruthy();
     // The input is replaced by the chip while a topic is active.
     expect(within(topicGroup).queryByRole("textbox", { name: "Slideshow topic" })).toBeNull();
 
@@ -471,10 +471,12 @@ describe("SlideshowToolbar", () => {
     );
 
     const topicGroup = screen.getByRole("group", { name: "Topic" });
-    expect(within(topicGroup).getByRole("status")).toHaveTextContent(
-      "Topic search is unavailable right now.",
-    );
-    expect(within(topicGroup).getByRole("textbox", { name: "Slideshow topic" })).not.toBeDisabled();
+    const alert = within(topicGroup).getByRole("alert");
+    expect(alert).toHaveTextContent("Topic search is unavailable right now.");
+    // The error is wired to the input for assistive tech.
+    const input = within(topicGroup).getByRole("textbox", { name: "Slideshow topic" });
+    expect(input).not.toBeDisabled();
+    expect(input.getAttribute("aria-describedby")).toBe(alert.id);
   });
 
   it("handles cancelled, repeated, completed, and unmounted image long-presses", () => {

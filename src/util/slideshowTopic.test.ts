@@ -3,7 +3,6 @@ import {
   isDeferredTopicStale,
   advanceUserNavCount,
   clampTopicProgress,
-  decideModeSelection,
   decideTopicSeed,
   isSeedCurrent,
   isTopicActive,
@@ -12,7 +11,6 @@ import {
   normaliseTopic,
   shouldAbortPendingTopicOnEmbeddingsError,
   shouldEnableTopicEmbeddings,
-  TOPIC_EMBEDDINGS_UNAVAILABLE_MESSAGE,
 } from "./slideshowTopic";
 
 const row = (path: string): RandomPhotoRow => ({
@@ -282,27 +280,6 @@ describe("shouldAbortPendingTopicOnEmbeddingsError", () => {
         hasPendingInitialTopic: true,
       }),
     ).toBe(true);
-  });
-
-  it("has British-English failure copy distinct from the encode failure", () => {
-    expect(TOPIC_EMBEDDINGS_UNAVAILABLE_MESSAGE).toContain("similarity data");
-    expect(TOPIC_EMBEDDINGS_UNAVAILABLE_MESSAGE).not.toBe("Topic search is unavailable right now.");
-  });
-});
-
-describe("decideModeSelection", () => {
-  it("implicitly dismisses an active topic and clears its URL param", () => {
-    expect(decideModeSelection({ topicActive: true })).toEqual({
-      dismissTopic: true,
-      clearTopicParam: true,
-    });
-  });
-
-  it("leaves an ordinary mode change untouched when no topic is active", () => {
-    expect(decideModeSelection({ topicActive: false })).toEqual({
-      dismissTopic: false,
-      clearTopicParam: false,
-    });
   });
 });
 

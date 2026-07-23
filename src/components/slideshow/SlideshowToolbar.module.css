@@ -300,16 +300,28 @@
   gap: var(--m-s);
 }
 
+/* The shared Input (components/ui) supplies the base structure and, crucially,
+   the 16px touch font-size that stops iOS zooming on focus. Only the toolbar's
+   layout sizing and its fixed on-dark theming live here. The dark-glass
+   overrides are scoped under .topicForm so they beat Input's single-class
+   `.input` selector regardless of stylesheet order. */
+
 .topicInput {
   min-inline-size: var(--size-180);
   min-block-size: var(--size-44);
+}
+
+.topicForm .topicInput {
+  inline-size: auto;
   padding: var(--m-s) var(--m-m);
   border: solid var(--size-1) var(--glass-border);
   border-radius: var(--m-m);
   background: color-mix(in oklch, var(--c-black) 24%, transparent);
   color: var(--c-white);
-  font: inherit;
-  font-size: var(--fs-sm);
+}
+
+.topicForm .topicInput:disabled {
+  opacity: 0.6;
 }
 
 .topicInput::placeholder {
@@ -321,8 +333,11 @@
   outline-offset: var(--size-2);
 }
 
-.topicInput:disabled {
-  opacity: 0.6;
+/* Sized to the widest busy label ("Loading embeddings…") so the progress ticks
+   ("Seeding… 41%" → "42%") don't reflow the row while a seed encodes. */
+
+.topicSeedButton {
+  min-inline-size: var(--size-180);
 }
 
 .topicChip {
@@ -339,6 +354,10 @@
 
 .topicChipLabel {
   font-size: var(--fs-sm);
+  max-inline-size: var(--size-200);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .topicDismiss {

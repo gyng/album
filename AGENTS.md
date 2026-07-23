@@ -11,7 +11,7 @@ Personal photo gallery — Next.js 16, TypeScript, CSS Modules, MapLibre GL. Pho
 - **Tests:** `npx jest` from `src/` (not the repo root)
 - Subset: `npx jest --testPathPatterns="MapWorld"` (plural flag)
 - **Dev:** `npm run dev` from `src/`
-- **Lint/typecheck:** `npm run lint` from `src/` (includes the framework-neutral screen graph via `tsconfig.portable.json`)
+- **Lint/typecheck:** `npm run lint` from `src/` — runs oxlint, biome, both `tsc` configs (including the framework-neutral screen graph via `tsconfig.portable.json`), and the formatting check (`oxfmt --check` via `format:check`). Note `npm run lint:fix` only fixes oxlint/biome findings — run `npm run format:write` separately to fix formatting failures
 
 ## Structure
 - `src/components/` — React components with co-located `.module.css`; complex components have `.test.tsx`, not all
@@ -45,7 +45,7 @@ Data-backed display pages use `getStaticProps`; client-only pages are statically
 - `components/AppRuntime.tsx` owns the renderer-neutral application shell (error boundary, query client, viewport metadata, and service-worker registration). Renderer entry points install a `PlatformProvider` outside it and inject renderer-specific telemetry explicitly
 - HTML entry adapters must install `THEME_BOOTSTRAP_SCRIPT` from `util/themeBootstrap.ts` inline before application markup; it is the shared pre-paint theme initialiser used by Next's `_document`
 - Keep `public/sw.js` renderer-neutral: classify generated scripts, styles, and fonts by request destination, never by framework-owned URL prefixes such as `/_next/`
-- The installed slideshow PWA precaches its HTML plus discovered generated JS/CSS, install icons, and best-effort default SQLite databases. All same-origin `.sqlite` URLs use network-first runtime caching so renderer-configured database paths also restart offline; configured slideshow query URLs fall back to the cached `/slideshow` document. Its `navigate-existing` launch handler reuses an installed window but always returns it to the slideshow launch URL; do not use `focus-existing` without also implementing `launchQueue`
+- The installed slideshow PWA precaches its HTML plus discovered generated JS/CSS, install icons, and best-effort default SQLite databases. All same-origin `.sqlite` URLs use network-first runtime caching so renderer-configured database paths also restart offline; configured slideshow query URLs fall back to the cached `/slideshow` document. Its `navigate-existing` launch handler reuses an installed window but always returns it to the slideshow launch URL; do not use `focus-existing` without also implementing `launchQueue`. Original-filename album media uses stale-while-revalidate in the unversioned `IMAGE_CACHE`, capped at `IMAGE_CACHE_MAX_ENTRIES` with oldest-first trimming and at most one revalidation per URL per worker lifetime — do not switch it back to unbounded cache-first. Wake-lock settling is exposed as `data-wake-settled` on the "Slideshow diagnostics" element; tests that depend on wake-lock state should await it rather than sleeping. Slideshow URL params (including `topic=`, which seeds similar mode from a semantic text query) are documented in the comment block in `src/screens/slideshow/SlideshowScreen.tsx`
 - `AppRuntime` registers `/sw.js?v=<build version>` with `updateViaCache: "none"`; the worker derives its cache generation from that URL and deletes older `snapshots-pwa-*` generations on activation. Preserve this link so code deploys cannot accumulate stale hashed chunks
 - `npm run prepare:pwa-icons` derives the 192px, 512px, and Apple touch PNGs from `public/pwa-icon.svg`; edit only the canonical SVG, not the generated PNGs
 - Shared page-data and map/timeline view contracts belong in `src/util/pageDataTypes.ts`; import them from that canonical module rather than re-exporting types from components. Services must never import React, Next.js, components, or component-owned types
@@ -191,7 +191,7 @@ cd index
 **What it does per image:**
 1. Reads EXIF (via `exifread`) — camera make/model, lens, focal length, GPS, timestamp
 2. Reverse-geocodes GPS coords to city/country (in-process k-d tree, no API)
-3. Runs **Janus-Pro-1B** (VLM, GPU) — produces `identified_objects`, `themes`, `alt_text`, `subject` as JSON
+3. Runs the configured caption backend (default **Gemma 4 E4B GGUF** via a resident `llama-server`; **Janus-Pro-1B** is the rollback via `--classifier-backend janus`) — produces `tags` and `alt_text` as JSON (see `index/README.md` for backends; the retired `identified_objects`/`themes`/`subject` fields are parsed only for legacy DBs)
 4. Runs **SigLIP v1** (`google/siglip-base-patch16-224`, GPU) — embeddings compatible with the browser text encoder; required for semantic search
 5. Optionally runs **SigLIP v2** (`google/siglip2-base-patch16-224`, GPU) — higher-quality embeddings for image-to-image similarity only (incompatible with the browser text encoder)
 6. Extracts dominant colour palette via `fast_colorthief` (Rust, runs concurrently with GPU work)
@@ -207,6 +207,8 @@ cd index
 - `metadata` — `path`, `lat_deg`, `lng_deg`, `iso8601`
 - `embeddings` — `path`, `model_id`, `embedding_dim`, `embedding_blob` (int8-quantised), `embedding_scale` (per-vector dequantisation factor); readers (`api.ts`, `computeEmbeddingStats.ts`) also accept the legacy `embedding_json` format from older DBs
 - `tags` — denormalised tag frequency counts
+- `image_tags` — `path`, `tag`, `source`; the authoritative per-image tags (`tags` counts are rebuilt from this, never from the lossy `images.tags` column)
+- `pipeline_state` — `path`, `stage`, source digest, pipeline version, and model provenance; drives incremental stage refresh and the in-place caption-provenance migration
 
 **Key behaviours:**
 - Incremental: already-indexed paths are skipped (one bulk `SELECT` into a set, then O(1) checks)

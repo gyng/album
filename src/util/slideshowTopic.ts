@@ -124,18 +124,6 @@ export const shouldAbortPendingTopicOnEmbeddingsError = (input: {
   input.hasEmbeddingsError &&
   (input.topicAwaitingEmbeddings || input.hasDeferredTopic || input.hasPendingInitialTopic);
 
-// When the user manually picks a playback mode, an active (or in-flight) topic
-// is IMPLICITLY dismissed: clear the chip/topic state and drop the topic= URL
-// param, but do NOT restore the pre-topic snapshot — the user's explicit new
-// choice stands. When no topic is active it is an ordinary mode change that
-// leaves the (absent) topic param untouched.
-export const decideModeSelection = (input: {
-  topicActive: boolean;
-}): { dismissTopic: boolean; clearTopicParam: boolean } => ({
-  dismissTopic: input.topicActive,
-  clearTopicParam: input.topicActive,
-});
-
 // Map ranked semantic results onto the in-memory pool, preserving ranked
 // (best-first) order and respecting the active album filter — the same
 // pool/filter intersection the similar path applies. Returns the pool's own row

@@ -4,7 +4,7 @@ import { AppLink as Link } from "../platform";
 import sharedStyles from "./SlideshowShared.module.css";
 import localStyles from "./SlideshowToolbar.module.css";
 import commonStyles from "../../styles/common.module.css";
-import { buttonStyles } from "../ui";
+import { buttonStyles, Input } from "../ui";
 import { SlideshowMode, DetailsAlignment } from "../../util/slideshowUrl";
 import { PoolStats, formatNewestPhotoDate } from "../../util/slideshowQueue";
 import { isModifiedClick } from "../../util/slideshowShell";
@@ -53,6 +53,7 @@ const styles = mergeCssModuleStyles(
     "toolbarCloseGrip",
     "topicForm",
     "topicInput",
+    "topicSeedButton",
     "topicChip",
     "topicChipLabel",
     "topicDismiss",
@@ -149,6 +150,9 @@ export type SlideshowToolbarProps = {
   copiedPhotoLink: boolean;
   onShare: () => void;
 };
+
+// Stable id linking the topic input to its error message via aria-describedby.
+const TOPIC_ERROR_ID = "slideshow-topic-error";
 
 const SHORT_TIMINGS = [10000, 30000, 60000, 900000, 3600000];
 const LONG_TIMINGS = [10800000, 43200000, 86400000];
@@ -600,7 +604,7 @@ export const SlideshowToolbar: React.FC<SlideshowToolbarProps> = (props) => {
           {props.topic ? (
             <span className={styles.topicChip}>
               <span className={styles.topicChipLabel}>
-                Topic: <i>{props.topic}</i>
+                <i>{props.topic}</i>
               </span>
               <button
                 type="button"
@@ -612,7 +616,7 @@ export const SlideshowToolbar: React.FC<SlideshowToolbarProps> = (props) => {
                   props.onClearTopic();
                 }}
               >
-                ✕
+                ×
               </button>
             </span>
           ) : (
@@ -626,7 +630,7 @@ export const SlideshowToolbar: React.FC<SlideshowToolbarProps> = (props) => {
                 }
               }}
             >
-              <input
+              <Input
                 ref={topicInputRef}
                 className={styles.topicInput}
                 type="text"
@@ -636,10 +640,11 @@ export const SlideshowToolbar: React.FC<SlideshowToolbarProps> = (props) => {
                 aria-label="Slideshow topic"
                 disabled={props.topicBusy}
                 aria-busy={props.topicBusy}
+                {...(props.topicError ? { "aria-describedby": TOPIC_ERROR_ID } : {})}
               />
               <button
                 type="submit"
-                className={buttonStyles.base}
+                className={[buttonStyles.base, styles.topicSeedButton].join(" ")}
                 disabled={props.topicBusy || topicDraft.trim().length === 0}
               >
                 {props.topicBusy ? (props.topicBusyLabel ?? "Seeding…") : "Seed"}
@@ -647,7 +652,7 @@ export const SlideshowToolbar: React.FC<SlideshowToolbarProps> = (props) => {
             </form>
           )}
           {props.topicError ? (
-            <span className={styles.topicError} role="status">
+            <span className={styles.topicError} id={TOPIC_ERROR_ID} role="alert">
               {props.topicError}
             </span>
           ) : null}

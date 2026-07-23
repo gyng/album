@@ -4,11 +4,11 @@
 
 // Screen-level integration harness for SlideshowScreen's topical-seeding
 // behaviour. The pure decision core in util/slideshowTopic is unit-tested
-// separately; these tests exist because the round-three findings are all
-// CALL-SITE wiring bugs (effect triggers, provenance threading, error identity)
-// that pure-helper tests cannot see. The DB hooks, the embedding encode, the
-// semantic fetch, and the cadence hook are mocked at their module boundaries so
-// the test can drive a topic submit and observe the committed chip / mode / URL.
+// separately; these tests cover the CALL-SITE wiring (effect triggers,
+// provenance threading, error identity) that pure-helper tests cannot see. The
+// DB hooks, the embedding encode, the semantic fetch, and the cadence hook are
+// mocked at their module boundaries so the test can drive a topic submit and
+// observe the committed chip / mode / URL.
 
 import { act, fireEvent, render, screen } from "@testing-library/react";
 
@@ -185,9 +185,8 @@ describe("SlideshowScreen topic seeding (screen-level)", () => {
     global.fetch = originalFetch;
   });
 
-  // FINDING 1 (CRITICAL) — the primary-flow regression. Submitting a topic while
-  // the mode is still weighted must not be cancelled by the cross-tab safety-net
-  // effect during the busy (pre-success) window.
+  // Submitting a topic while the mode is still weighted must not be cancelled by
+  // the cross-tab safety-net effect during the busy (pre-success) window.
   it("commits a topic submitted from weighted mode: seed lands, mode becomes similar, chip appears", async () => {
     const encode = deferred<Float32Array>();
     mockEncodeSearchText.mockReturnValue(encode.promise);
@@ -223,10 +222,10 @@ describe("SlideshowScreen topic seeding (screen-level)", () => {
     expect(new URL(window.location.href).searchParams.get("topic")).toBe("cat");
   });
 
-  // FINDING 2 (HIGH) — an app-driven advance (cadence tick) that replays a
-  // recorded forward-history entry must NOT count as user navigation, so it may
-  // not stale a topic the user just submitted. Isolated in similar mode so the
-  // finding-1 safety-net effect stays dormant.
+  // An app-driven advance (cadence tick) that replays a recorded forward-history
+  // entry must NOT count as user navigation, so it may not stale a topic the
+  // user just submitted. Isolated in similar mode so the safety-net effect stays
+  // dormant.
   it("keeps a pending topic alive across a cadence advance that replays forward history", async () => {
     window.history.replaceState(window.history.state, "", "/slideshow?mode=similar");
 
@@ -271,9 +270,8 @@ describe("SlideshowScreen topic seeding (screen-level)", () => {
     expect(screen.getByText("cat")).toBeTruthy();
   });
 
-  // FINDING 2 (companion) — a MANUAL next during the pending seed IS user intent
-  // and must supersede it, proving the provenance really is threaded (not just
-  // globally suppressed).
+  // A MANUAL next during the pending seed IS user intent and must supersede it,
+  // proving the provenance really is threaded (not just globally suppressed).
   it("stales a pending topic when the user manually advances during the seed", async () => {
     window.history.replaceState(window.history.state, "", "/slideshow?mode=similar");
 
@@ -303,9 +301,9 @@ describe("SlideshowScreen topic seeding (screen-level)", () => {
     expect(chipVisible()).toBe(false);
   });
 
-  // FINDING 3 (MED) — a topic submitted AFTER a prior embeddings-load failure
-  // must defer and retry, not be insta-killed by the stale error still present
-  // in the same commit.
+  // A topic submitted AFTER a prior embeddings-load failure must defer and
+  // retry, not be insta-killed by the stale error still present in the same
+  // commit.
   it("defers (and retries) a fresh submit after a prior embeddings failure instead of aborting it", async () => {
     const staleError = new Error("previous embeddings load failed");
     mockUseEmbeddingsDatabase.mockReturnValue([

@@ -80,7 +80,6 @@ import {
 import {
   advanceUserNavCount,
   clampTopicProgress,
-  decideModeSelection,
   decideTopicSeed,
   isDeferredTopicStale,
   isSeedCurrent,
@@ -265,9 +264,7 @@ export const Slideshow: React.FC<{
   const similarQueueIndexRef = React.useRef<number>(-1);
   const similarQueueLastPathRef = React.useRef<string | undefined>(undefined);
   // Topic seeding state. `topic` drives the toolbar chip; the snapshot ref
-  // remembers the pre-topic mode/filter so a dismiss restores it exactly. The
-  // initial-topic refs seed a shared/bookmarked `topic=` frame once, after the
-  // pool has loaded.
+  // remembers the pre-topic mode so a dismiss restores it exactly.
   const [topic, setTopic] = React.useState<string | null>(null);
   const [topicBusy, setTopicBusy] = React.useState(false);
   const [topicError, setTopicError] = React.useState<string | null>(null);
@@ -278,15 +275,16 @@ export const Slideshow: React.FC<{
   // Cold-model download / encode progress (0–100) surfaced in the busy chip.
   const [topicProgress, setTopicProgress] = React.useState<number | null>(null);
   const topicSnapshotRef = React.useRef<TopicSnapshot | null>(null);
-  const initialTopicRef = React.useRef<string | null>(null);
-  const initialTopicSeededRef = React.useRef(false);
-  // True while an unconsumed `topic=` URL param is waiting for the pool and
-  // embeddings DB — drives the embeddings-DB enablement so a shared topic frame
-  // can load the model it needs.
-  const [hasPendingInitialTopic, setHasPendingInitialTopic] = React.useState(false);
-  // Whether the initial URL carried a `photo=` permalink; a topic seeded
-  // alongside it must not clobber that starting slide (it activates but drifts).
-  const initialHadPhotoRef = React.useRef(false);
+  // An unconsumed `topic=` URL seed waiting for the pool and embeddings DB to
+  // load, or null once consumed. `text` is the topic; `preserveCurrentPhoto`
+  // records whether the initial URL also carried a `photo=` permalink, so the
+  // seed activates but drifts from the pinned slide rather than jumping to the
+  // best match. A non-null value also pins the embeddings-DB enablement so a
+  // shared topic frame can load the model it needs.
+  const [pendingInitialTopic, setPendingInitialTopic] = React.useState<{
+    text: string;
+    preserveCurrentPhoto: boolean;
+  } | null>(null);
   // A topic deferred until the embeddings DB is ready; the retry effect re-runs
   // it once the DB lands. `isInitial` marks a deferred one-shot `topic=` URL
   // seed so its abandonment can strip the orphaned URL param.
@@ -305,10 +303,6 @@ export const Slideshow: React.FC<{
   // typed.
   const topicSeedTokenRef = React.useRef(0);
   const userNavCountRef = React.useRef(0);
-  // The highest seed-encode progress shown for the current seed, so the busy
-  // chip never counts backwards when the worker's per-file progress regresses.
-  // Reset to 0 at the start of each seed.
-  const topicProgressFloorRef = React.useRef(0);
   // Mirror of the embeddings-DB load error, read inside the topic submit without
   // re-creating the callback when it toggles.
   const embeddingsErrorRef = React.useRef<Error | null>(null);
@@ -661,7 +655,7 @@ export const Slideshow: React.FC<{
         remixEnabled,
         activeTopic: topic,
         topicPending: topicBusy || topicAwaitingEmbeddings,
-        initialTopicPending: hasPendingInitialTopic,
+        initialTopicPending: pendingInitialTopic !== null,
       }),
     );
   // Mirror the embeddings error into a ref so the topic submit can decide
@@ -733,6 +727,9 @@ export const Slideshow: React.FC<{
    *                                 top matches seed the similar-mode drift. Shareable; degrades
    *                                 to the previous behaviour with an error if the model can't load
    *                                 (e.g. offline first use). Dismissing the chip restores the mode.
+   *                                 With a `photo=` permalink present the show keeps that starting
+   *                                 photo — the topic only steers the drift and does NOT jump to the
+   *                                 topic's best match.
    *   - align=left|center|right  Set details alignment
    *   - delay=<seconds>          Set slide duration in seconds (e.g., 60 = 60 seconds)
    *   - shuffle=<number>         Similar mode only: avoid repeating the last N photos
@@ -758,12 +755,13 @@ export const Slideshow: React.FC<{
 
     initialPhotoPathRef.current = parsed.initialPhotoPath;
     randomSimilarRequestedRef.current = parsed.randomSimilar;
-    initialTopicRef.current = parsed.topic;
-    initialHadPhotoRef.current = parsed.initialPhotoPath !== null;
     if (parsed.topic) {
-      // Mark the topic pending so the embeddings DB it needs starts loading;
+      // Record the pending seed so the embeddings DB it needs starts loading;
       // the seed itself waits for the pool and the DB below.
-      setHasPendingInitialTopic(true);
+      setPendingInitialTopic({
+        text: parsed.topic,
+        preserveCurrentPhoto: parsed.initialPhotoPath !== null,
+      });
     }
     if (parsed.mode) {
       setSlideshowMode(parsed.mode);
@@ -1092,7 +1090,9 @@ export const Slideshow: React.FC<{
       setTopicError(null);
       setTopicAwaitingEmbeddings(false);
       setTopicBusy(true);
-      topicProgressFloorRef.current = 0;
+      // Reset the progress floor for this seed; the functional update below then
+      // clamps upward from it so the busy chip never counts backwards when the
+      // worker's per-file progress momentarily regresses.
       setTopicProgress(null);
       try {
         const textVector = await encodeSearchText(topicText, (progress) => {
@@ -1100,9 +1100,7 @@ export const Slideshow: React.FC<{
           if (!isSeedCurrent(seedToken, topicSeedTokenRef.current)) {
             return;
           }
-          const clamped = clampTopicProgress(topicProgressFloorRef.current, progress);
-          topicProgressFloorRef.current = clamped;
-          setTopicProgress(clamped);
+          setTopicProgress((prev) => clampTopicProgress(prev ?? 0, progress));
         });
         const result = await fetchSemanticResults({
           database,
@@ -1130,7 +1128,8 @@ export const Slideshow: React.FC<{
           // took over (token unchanged), strip the now-orphaned param and clear
           // its ref so the URL and UI agree rather than leaving topic= dangling.
           if (opts?.isInitial && isSeedCurrent(seedToken, topicSeedTokenRef.current)) {
-            initialTopicRef.current = null;
+            // The initial seed was already consumed (pendingInitialTopic
+            // cleared) when this effect fired; just strip the orphaned param.
             updateSlideshowUrl(slideshowModeRef.current, timeDelayRef.current, null);
           }
           return;
@@ -1212,9 +1211,7 @@ export const Slideshow: React.FC<{
       setTopicBusy(false);
       setTopicProgress(null);
       if (pending.isInitial) {
-        initialTopicRef.current = null;
-        initialTopicSeededRef.current = true;
-        setHasPendingInitialTopic(false);
+        setPendingInitialTopic(null);
         updateSlideshowUrl(slideshowModeRef.current, timeDelayRef.current, null);
       }
       return;
@@ -1241,16 +1238,18 @@ export const Slideshow: React.FC<{
         hasEmbeddingsError: isNewEmbeddingsError,
         topicAwaitingEmbeddings,
         hasDeferredTopic: pendingTopicRef.current !== null,
-        hasPendingInitialTopic,
+        hasPendingInitialTopic: pendingInitialTopic !== null,
       })
     ) {
       return;
     }
-    const abandonedInitial = hasPendingInitialTopic || pendingTopicRef.current?.isInitial === true;
+    const abandonedInitial =
+      pendingInitialTopic !== null || pendingTopicRef.current?.isInitial === true;
+    // Deliberately NOT dismissTopic(): this abort surfaces an error (rather than
+    // clearing it) and clears the busy/awaiting/progress flags in place without
+    // bumping the seed token, since there is no in-flight encode to invalidate.
     pendingTopicRef.current = null;
-    initialTopicRef.current = null;
-    initialTopicSeededRef.current = true;
-    setHasPendingInitialTopic(false);
+    setPendingInitialTopic(null);
     setTopicAwaitingEmbeddings(false);
     setTopicBusy(false);
     setTopicProgress(null);
@@ -1261,7 +1260,7 @@ export const Slideshow: React.FC<{
       // run — mirroring the stale-abandon path's cleanup.
       updateSlideshowUrl(slideshowModeRef.current, timeDelayRef.current, null);
     }
-  }, [embeddingsError, topicAwaitingEmbeddings, hasPendingInitialTopic, updateSlideshowUrl]);
+  }, [embeddingsError, topicAwaitingEmbeddings, pendingInitialTopic, updateSlideshowUrl]);
 
   // Stop topic mode and restore the pre-topic mode. The show keeps running from
   // the current photo under the restored mode. The album filter is not
@@ -1278,42 +1277,46 @@ export const Slideshow: React.FC<{
     updateSlideshowUrl(restoreMode, timeDelayRef.current, null);
   }, [cancelTopicSeeding, setSlideshowMode, updateSlideshowUrl]);
 
+  // Implicitly drop an active topic without restoring the pre-topic mode: clear
+  // the chip/error, cancel any in-flight or deferred seed, and cancel an
+  // unconsumed initial URL topic so it can't seed later. The caller owns the URL
+  // and the new mode. (Distinct from the embeddings-abort effect, which keeps a
+  // surfaced error and does not bump the seed token — see that effect.)
+  const dismissTopic = useCallback(() => {
+    topicSnapshotRef.current = null;
+    cancelTopicSeeding();
+    setPendingInitialTopic(null);
+    setTopic(null);
+    setTopicError(null);
+  }, [cancelTopicSeeding]);
+
   // A manual playback-mode change while a topic is active implicitly dismisses
   // the topic: clear the chip and drop the topic= URL param, but keep the
   // user's new mode (do NOT restore the snapshot). Ordinary mode changes fall
   // through untouched.
   const handleSelectMode = useCallback(
     (mode: SlideshowMode) => {
-      const decision = decideModeSelection({
-        // An unconsumed `topic=` URL seed counts as active too: without this a
-        // mode chosen BEFORE the pool/embeddings loaded would later be hijacked
-        // when the initial topic finally seeds.
-        topicActive: isTopicActive({
-          topic,
-          topicBusy,
-          hasDeferredTopic: pendingTopicRef.current !== null,
-          hasUnconsumedInitialTopic:
-            !initialTopicSeededRef.current && initialTopicRef.current !== null,
-        }),
+      // An unconsumed `topic=` URL seed counts as active too: without this a
+      // mode chosen BEFORE the pool/embeddings loaded would later be hijacked
+      // when the initial topic finally seeds.
+      const topicActive = isTopicActive({
+        topic,
+        topicBusy,
+        hasDeferredTopic: pendingTopicRef.current !== null,
+        hasUnconsumedInitialTopic: pendingInitialTopic !== null,
       });
-      if (decision.dismissTopic) {
-        topicSnapshotRef.current = null;
-        cancelTopicSeeding();
-        // Cancel any unconsumed initial URL topic so it can't seed later and
-        // override this explicit choice — no snapshot restore, the user's mode
-        // stands.
-        initialTopicRef.current = null;
-        initialTopicSeededRef.current = true;
-        setHasPendingInitialTopic(false);
-        setTopic(null);
-        setTopicError(null);
+      if (topicActive) {
+        // Also cancels any unconsumed initial URL topic so it can't seed later
+        // and override this explicit choice — no snapshot restore, the user's
+        // mode stands.
+        dismissTopic();
       }
       setSlideshowMode(mode);
       // Pass null to delete an active topic's param; undefined to preserve
       // (there is none) on an ordinary mode change.
-      updateSlideshowUrl(mode, timeDelayRef.current, decision.clearTopicParam ? null : undefined);
+      updateSlideshowUrl(mode, timeDelayRef.current, topicActive ? null : undefined);
     },
-    [cancelTopicSeeding, setSlideshowMode, topic, topicBusy, updateSlideshowUrl],
+    [dismissTopic, pendingInitialTopic, setSlideshowMode, topic, topicBusy, updateSlideshowUrl],
   );
 
   // Safety net for a mode flip that did NOT go through handleSelectMode — most
@@ -1338,38 +1341,40 @@ export const Slideshow: React.FC<{
     if (topic === null) {
       return;
     }
-    topicSnapshotRef.current = null;
-    cancelTopicSeeding();
-    initialTopicRef.current = null;
-    initialTopicSeededRef.current = true;
-    setHasPendingInitialTopic(false);
-    setTopic(null);
-    setTopicError(null);
+    dismissTopic();
     updateSlideshowUrl(slideshowMode, timeDelayRef.current, null);
-  }, [slideshowMode, topic, cancelTopicSeeding, updateSlideshowUrl]);
+  }, [slideshowMode, topic, dismissTopic, updateSlideshowUrl]);
 
   // Seed a shared/bookmarked `topic=` frame once, after the pool AND the
   // embeddings DB have loaded — the encode needs something to rank against, and
   // ranking against the fallback search.sqlite (no embeddings table) would burn
-  // the one-shot seed on a bogus empty result. Holding off on consuming
-  // `initialTopicSeededRef` until the DB is ready lets a slow/cold model still
+  // the one-shot seed on a bogus empty result. Holding off on clearing
+  // `pendingInitialTopic` until the DB is ready lets a slow/cold model still
   // seed the shared frame once it arrives. When a `photo=` permalink is also
   // present the topic activates but must not clobber that starting slide.
   useEffect(() => {
-    if (!hasParsedInitialUrl || !database || initialTopicSeededRef.current) {
+    if (!hasParsedInitialUrl || !database || !pendingInitialTopic) {
       return;
     }
-    const pendingTopic = initialTopicRef.current;
-    if (!pendingTopic || poolStats.count === 0 || !embeddingsDatabase) {
+    if (poolStats.count === 0 || !embeddingsDatabase) {
       return;
     }
-    initialTopicSeededRef.current = true;
-    setHasPendingInitialTopic(false);
-    void seedTopic(pendingTopic, {
-      preserveCurrentPhoto: initialHadPhotoRef.current,
+    const { text, preserveCurrentPhoto } = pendingInitialTopic;
+    // Clearing the state cell latches the one-shot: the effect re-runs with a
+    // null pending topic and early-returns.
+    setPendingInitialTopic(null);
+    void seedTopic(text, {
+      preserveCurrentPhoto,
       isInitial: true,
     });
-  }, [database, embeddingsDatabase, hasParsedInitialUrl, poolStats, seedTopic]);
+  }, [
+    database,
+    embeddingsDatabase,
+    hasParsedInitialUrl,
+    poolStats,
+    seedTopic,
+    pendingInitialTopic,
+  ]);
 
   const advanceRandomPhoto = useCallback(
     (opts?: { trackRecent?: boolean }): RandomPhotoRow | null => {
@@ -1464,11 +1469,9 @@ export const Slideshow: React.FC<{
 
         if (photos.length === 0) {
           // Dead end for the initial `topic=` seed: there is nothing to rank
-          // against, so clear its refs/latch rather than leaving embeddings
+          // against, so clear the pending seed rather than leaving embeddings
           // enablement pinned on for the whole session.
-          initialTopicRef.current = null;
-          initialTopicSeededRef.current = true;
-          setHasPendingInitialTopic(false);
+          setPendingInitialTopic(null);
           updateSlideshowUrl(slideshowMode);
           setSlideshowError("No photos available");
           return;
@@ -1529,9 +1532,7 @@ export const Slideshow: React.FC<{
         if (!cancelled) {
           // Same dead end on a DB error: unlatch the initial-topic embeddings
           // enablement so it doesn't stay pinned for the session.
-          initialTopicRef.current = null;
-          initialTopicSeededRef.current = true;
-          setHasPendingInitialTopic(false);
+          setPendingInitialTopic(null);
           updateSlideshowUrl(slideshowMode);
           setSlideshowError("No photos available");
         }
