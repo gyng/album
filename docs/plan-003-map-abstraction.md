@@ -76,6 +76,43 @@ The hypothesis is that the ~1400 DOM markers dominate. If the trace says otherwi
 `DataLayer` work is re-scoped to whatever the trace *does* implicate; the abstraction work stands
 on its own regardless.
 
+### Measured baseline (production, before any change)
+
+Captured on `photos.awoo.party/map`: 1440×900 viewport, camera reset with
+`map.jumpTo({ center: [11.488, 9.124], zoom: 1.83 })` before every run, a 400px horizontal drag
+over 1000ms driven from inside `requestAnimationFrame`, frame deltas sampled in the same loop,
+`PerformanceObserver({ entryTypes: ["longtask"] })` over the same window, three runs per
+condition, medians reported.
+
+| | A: 1444 markers | B: 1444, `display:none` | C: 5 markers |
+| --- | --- | --- | --- |
+| Marker nodes | 1444 | 1444 | 5 |
+| DOM elements | 4,521 | 4,521 | 223 |
+| Frames in a 1s pan | 15 | 21 | 30 |
+| Mean frame time | **70.0ms** | 50.0ms | **34.5ms** |
+| p95 | 100.1ms | 66.7ms | 50.0ms |
+| Long tasks | **17** | 16 | **0** |
+| Total blocking time | **410ms** | 63ms | **0ms** |
+
+A six-point marker-count sweep (1444 / 935 / 256 / 105 / 39 / 5) fits
+**frame time ≈ 39.2ms + 0.0225ms × markers, R² = 0.987** — cost is linear at ~22.5µs per marker
+per frame. A `MutationObserver` recorded **1,729 DOM mutations per frame**: every marker's
+transform is rewritten on every frame.
+
+**Verdict — hypothesis confirmed.** At world zoom the markers add ~35.5ms per frame, roughly
+doubling frame time (15fps vs 30fps), and they are solely responsible for main-thread blocking
+(17 long tasks / 410ms TBT with them, zero without). The `display:none` control splits that cost
+into ~20ms of layout/paint for the marker DOM and ~15.5ms of pure JS (React re-rendering 1444
+`<Marker>`s plus MapLibre's transform writes). A `DataLayer` removes **both** halves, which a
+CSS-only or virtualisation-only fix would not.
+
+Two caveats for anyone re-running this. The measuring browser rasterises WebGL through
+**SwiftShader (software)**, so the ~34.5ms floor at 5 markers is MapLibre's tile rendering, not
+app code; on real GPU hardware that floor collapses and the marker overhead becomes a *larger*
+share of frame time, not a smaller one. And batch-to-batch noise is ±8%, so only compare runs
+captured in the same batch — after-numbers must be taken the same way, on the same machine, with
+the same `jumpTo` reset.
+
 ---
 
 ## Architecture
