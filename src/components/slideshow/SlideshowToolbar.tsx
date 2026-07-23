@@ -7,6 +7,7 @@ import commonStyles from "../../styles/common.module.css";
 import { buttonStyles, Input } from "../ui";
 import { SlideshowMode, DetailsAlignment } from "../../util/slideshowUrl";
 import { PoolStats, formatNewestPhotoDate } from "../../util/slideshowQueue";
+import { getRelativeTimeString } from "../../util/time";
 import { isModifiedClick, SLIDESHOW_DIAGNOSTICS_HREF } from "../../util/slideshowShell";
 
 const styles = mergeCssModuleStyles(
@@ -39,7 +40,9 @@ const styles = mergeCssModuleStyles(
     "playbackSubtitle",
     "playbackTitle",
     "poolStats",
+    "poolStatsCheck",
     "poolStatsCount",
+    "poolStatsLink",
     "poolStatsNewest",
     "secondarySessionControl",
     "sessionActionCopy",
@@ -47,7 +50,6 @@ const styles = mergeCssModuleStyles(
     "sessionAwakeButton",
     "sessionAwakeButtonActive",
     "sessionAwakeIndicator",
-    "sessionDiagnosticsLink",
     "sessionDock",
     "sessionProgress",
     "toolbar",
@@ -79,6 +81,11 @@ export type SlideshowToolbarProps = {
   dataVersionTitle: string | null;
   isCheckingDataVersion: boolean;
   onCheckDataVersion: () => void;
+  // When this viewing session began — the PWA shell's own start when one is
+  // hosting the slideshow, otherwise this document's. Null until known.
+  sessionStartedAt: number | null;
+  // ISO build timestamp of the running code, so a kiosk shows how stale it is.
+  codeBuiltAt: string | null;
   filter?: string;
   albumName: string;
   photoName: string;
@@ -159,6 +166,15 @@ const TOPIC_ERROR_ID = "slideshow-topic-error";
 const SHORT_TIMINGS = [10000, 30000, 60000, 900000, 3600000];
 const LONG_TIMINGS = [10800000, 43200000, 86400000];
 
+// "14 hr ago" → "14 hr": the surrounding label already says what the span is
+// measuring, and the toolbar has no room for the redundant suffix.
+const spanSince = (at: number | string | null): string | null => {
+  if (at === null) return null;
+  const ms = typeof at === "number" ? at : Date.parse(at);
+  if (!Number.isFinite(ms)) return null;
+  return getRelativeTimeString(ms, { short: true })?.replace(/\s*ago$/, "") ?? null;
+};
+
 const formatCountdown = (secondsLeft: number): string => {
   if (secondsLeft >= 3600) {
     return `${Math.floor(secondsLeft / 3600)}h ${Math.floor((secondsLeft % 3600) / 60)}m`;
@@ -170,6 +186,9 @@ const formatCountdown = (secondsLeft: number): string => {
 };
 
 export const SlideshowToolbar: React.FC<SlideshowToolbarProps> = (props) => {
+  const sessionStarted = spanSince(props.sessionStartedAt);
+  const codeBuilt = spanSince(props.codeBuiltAt);
+
   // Long-press the Context icon to inspect the current image — local to the
   // toolbar, so the timer/fired refs live here.
   const contextLongPressTimerRef = React.useRef<number | null>(null);
@@ -354,25 +373,6 @@ export const SlideshowToolbar: React.FC<SlideshowToolbarProps> = (props) => {
             </span>
           </span>
         </button>
-
-        {/* The wake-lock state beside this answers "is it awake now"; this
-            answers "why did it stop overnight". Icon-sized on purpose: it is a
-            rarely-needed escape hatch, not a third session action, and the
-            shell's own corner overlay is too easy to miss on a tablet to be the
-            only way in. */}
-        <Link
-          className={styles.sessionDiagnosticsLink}
-          href={SLIDESHOW_DIAGNOSTICS_HREF}
-          aria-label="Diagnostics"
-          title="Wake losses, updates, and freezes"
-          onClick={(event) => {
-            if (isModifiedClick(event)) return;
-            event.preventDefault();
-            props.onNavigate(SLIDESHOW_DIAGNOSTICS_HREF);
-          }}
-        >
-          <span aria-hidden="true">ⓘ</span>
-        </Link>
       </div>
 
       {/* Home link / escape hatch back to the gallery. On desktop it's the
@@ -397,12 +397,22 @@ export const SlideshowToolbar: React.FC<SlideshowToolbarProps> = (props) => {
         </span>
       </Link>
 
-      {props.poolStats.count > 0 ? (
-        <button
-          type="button"
-          className={styles.poolStats}
-          title={props.dataVersionTitle ?? "Photo pool - tap to check for the latest data"}
-          onClick={props.onCheckDataVersion}
+      {/* The provenance block: where the photos came from, how old the data is,
+          and how long this session and its code have been running. It is also
+          the way in to the full diagnostics report — the session's state is
+          what this panel is already about, so it needs no control of its own.
+          The data check keeps its own small button because a link cannot carry
+          a second action. */}
+      <div className={styles.poolStats}>
+        <Link
+          className={styles.poolStatsLink}
+          href={SLIDESHOW_DIAGNOSTICS_HREF}
+          aria-label={`Diagnostics · ${props.poolStats.count.toLocaleString("en-GB")} photos`}
+          onClick={(event) => {
+            if (isModifiedClick(event)) return;
+            event.preventDefault();
+            props.onNavigate(SLIDESHOW_DIAGNOSTICS_HREF);
+          }}
         >
           <span className={styles.poolStatsCount}>
             {props.poolStats.count.toLocaleString("en-GB")} photos
@@ -417,8 +427,26 @@ export const SlideshowToolbar: React.FC<SlideshowToolbarProps> = (props) => {
               ? "checking data"
               : (props.dataVersionLabel ?? "data unknown")}
           </span>
+          <span className={styles.poolStatsNewest}>
+            {[
+              sessionStarted ? `running ${sessionStarted}` : null,
+              codeBuilt ? `code ${codeBuilt} old` : null,
+            ]
+              .filter(Boolean)
+              .join(" · ") || "session age unknown"}
+          </span>
+        </Link>
+
+        <button
+          type="button"
+          className={styles.poolStatsCheck}
+          aria-label="Check for the latest photo data"
+          title={props.dataVersionTitle ?? "Check for the latest photo data"}
+          onClick={props.onCheckDataVersion}
+        >
+          <span aria-hidden="true">↻</span>
         </button>
-      ) : null}
+      </div>
 
       <div className={styles.controlGroup} role="group" aria-label="View controls">
         <div className={styles.controlHeader}>

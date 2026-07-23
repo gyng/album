@@ -116,9 +116,8 @@
 
 .poolStats {
   display: inline-flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: var(--size-2);
+  align-items: stretch;
+  gap: var(--m-s);
   border: 0;
   padding: calc(var(--m-s) * 0.75) var(--m-m);
   border-radius: calc(var(--m-s) * 1.5);
@@ -134,8 +133,37 @@
   backdrop-filter: blur(var(--glass-blur-panel));
 }
 
-.poolStats:hover,
-.poolStats:focus-visible {
+/* The block is now a container: the stats are a link to the diagnostics report
+   and the refresh is its own control, so the hover/focus affordance belongs to
+   each target rather than to the surrounding panel. */
+.poolStatsLink {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--size-2);
+  min-block-size: var(--tap-target);
+  justify-content: center;
+  color: inherit;
+  text-decoration: none;
+}
+
+.poolStatsCheck {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  inline-size: var(--tap-target);
+  border: solid var(--size-1) var(--glass-border);
+  border-radius: var(--m-s);
+  background: color-mix(in oklch, var(--c-white) 6%, transparent);
+  color: inherit;
+  font: inherit;
+  font-size: var(--fs-m);
+}
+
+.poolStatsLink:hover,
+.poolStatsLink:focus-visible,
+.poolStatsCheck:hover,
+.poolStatsCheck:focus-visible {
   background: color-mix(in oklch, var(--c-white) 18%, transparent);
   outline: var(--size-1) solid color-mix(in oklch, var(--c-white) 30%, transparent);
 }
@@ -308,8 +336,19 @@
 
 .topicForm {
   display: inline-flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: var(--m-s);
+  /* Without this the input's minimum width plus the Seed button overflowed a
+     phone's viewport horizontally — a flex item's min-content floor keeps it
+     from shrinking unless the floor is lifted. */
+  min-inline-size: 0;
+  max-inline-size: 100%;
+}
+
+.topicForm .topicInput {
+  flex: 1 1 var(--size-180);
+  min-inline-size: 0;
 }
 
 /* The shared Input (components/ui) supplies the base structure and, crucially,
@@ -450,7 +489,7 @@
     order: -1;
     inline-size: min(100%, var(--content-width-medium));
     display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     gap: var(--m-s);
     padding: var(--m-s);
     border: solid var(--size-1) var(--glass-border);
@@ -512,22 +551,6 @@
   .sessionAwakeButtonActive {
     border-color: var(--c-slideshow-active-border);
     background: var(--c-slideshow-active-bg);
-  }
-
-  /* A third, icon-sized column beside the two session halves: a destination
-     rather than a session action, so it stays visually quieter than its
-     neighbours while keeping a full tap target. */
-  .sessionDiagnosticsLink {
-    display: grid;
-    place-items: center;
-    inline-size: var(--tap-target);
-    min-block-size: var(--tap-target);
-    border: solid var(--size-1) var(--glass-border);
-    border-radius: var(--m-m);
-    background: color-mix(in oklch, var(--c-white) 6%, transparent);
-    color: color-mix(in oklch, var(--c-white) 72%, transparent);
-    font-size: var(--fs-m);
-    text-decoration: none;
   }
 
   .sessionAwakeButton:disabled {
@@ -622,12 +645,52 @@
     align-items: stretch;
   }
 
+  /* Put each group's title BESIDE its controls rather than above them. Six
+     groups × a full title row is ~210px of a tablet sheet and ~16% of a phone's,
+     spent on six words. The narrow column keeps the icon and title legible; the
+     playback subtitle drops here because it restates the pressed buttons
+     directly beneath it. */
+  .playbackGroup,
+  .controlGroup {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: start;
+    column-gap: var(--m-s);
+    row-gap: var(--m-s);
+  }
+
   .playbackHeader,
+  .controlHeader {
+    inline-size: auto;
+    min-inline-size: 0;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--size-2);
+    padding: 0;
+  }
+
+  .playbackCopy,
+  .controlCopy {
+    align-items: center;
+    text-align: center;
+  }
+
+  .playbackSubtitle {
+    display: none;
+  }
+
   .playbackButtons,
-  .controlHeader,
   .controlButtons,
   .controlMeta {
     inline-size: 100%;
+  }
+
+  /* The home banner and the stats are both compact blocks; side by side they
+     cost one row instead of two. */
+  .brandLink,
+  .poolStats {
+    inline-size: auto;
+    flex: 1 1 auto;
   }
 
   /* Nine playback controls cannot fit one tablet-width row, and left to

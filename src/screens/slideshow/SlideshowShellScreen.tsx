@@ -570,6 +570,7 @@ export const SlideshowShellScreen = () => {
           type: SLIDESHOW_SHELL_STATE_MESSAGE,
           isSupported: isWakeLockSupported,
           isActive: isWakeLockActive,
+          sessionStart: sessionStartRef.current,
         },
         window.location.origin,
       );

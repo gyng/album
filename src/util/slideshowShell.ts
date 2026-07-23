@@ -27,6 +27,10 @@ export type SlideshowRuntimeMessage =
 
 export type SlideshowShellStateMessage = SlideshowShellWakeState & {
   type: typeof SLIDESHOW_SHELL_STATE_MESSAGE;
+  // When the hosting shell document started. Optional: during a deploy the
+  // shell and the runtime frame can be different builds, so a runtime must
+  // tolerate a shell that predates this field.
+  sessionStart?: number;
 };
 
 export const isSlideshowRuntimeMessage = (value: unknown): value is SlideshowRuntimeMessage => {
@@ -65,7 +69,8 @@ export const isSlideshowShellStateMessage = (
   return (
     message.type === SLIDESHOW_SHELL_STATE_MESSAGE &&
     typeof message.isSupported === "boolean" &&
-    typeof message.isActive === "boolean"
+    typeof message.isActive === "boolean" &&
+    (message.sessionStart === undefined || typeof message.sessionStart === "number")
   );
 };
 

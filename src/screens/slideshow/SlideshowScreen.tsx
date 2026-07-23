@@ -47,7 +47,7 @@ import {
   rollRemixStrategy,
   timeAwareShufflePhotos,
 } from "../../util/slideshowAmbient";
-import { BUILD_VERSION } from "../../lib/buildVersion";
+import { BUILD_METADATA, BUILD_VERSION } from "../../lib/buildVersion";
 import { useWakeLock } from "../../components/useWakeLock";
 import { useControlsAutoHide } from "../../components/useControlsAutoHide";
 import { useSlideshowCadence } from "../../components/useSlideshowCadence";
@@ -186,6 +186,9 @@ export const remapSlideshowPeek = (progress: number): number =>
 const SlideshowScreen = () => {
   const [managedCodeReload, setManagedCodeReload] = React.useState(false);
   const [shellWakeLock, setShellWakeLock] = React.useState<SlideshowShellWakeState | null>(null);
+  // When the hosting shell started, once it tells us. Null while unhosted or
+  // before the first shell-state message arrives.
+  const [shellSessionStart, setShellSessionStart] = React.useState<number | null>(null);
 
   // The static server cannot know whether this document will run in the PWA
   // shell's iframe. Start with the matching false snapshot, then resolve it in
@@ -211,6 +214,9 @@ const SlideshowScreen = () => {
           isSupported: event.data.isSupported,
           isActive: event.data.isActive,
         });
+        if (typeof event.data.sessionStart === "number") {
+          setShellSessionStart(event.data.sessionStart);
+        }
       }
     };
     window.addEventListener("message", handleShellState);
@@ -225,13 +231,20 @@ const SlideshowScreen = () => {
     return () => window.removeEventListener("message", handleShellState);
   }, [managedCodeReload]);
 
-  return <Slideshow managedCodeReload={managedCodeReload} shellWakeLock={shellWakeLock} />;
+  return (
+    <Slideshow
+      managedCodeReload={managedCodeReload}
+      shellWakeLock={shellWakeLock}
+      shellSessionStart={shellSessionStart}
+    />
+  );
 };
 
 export const Slideshow: React.FC<{
   disabled?: boolean;
   managedCodeReload?: boolean;
   shellWakeLock?: SlideshowShellWakeState | null;
+  shellSessionStart?: number | null;
 }> = (props) => {
   const { searchDatabaseUrl, siteOrigin } = usePublicConfig();
   // The server and first hydration render use the unmanaged UI snapshot. Keep
@@ -247,6 +260,9 @@ export const Slideshow: React.FC<{
   const [database, progress] = databaseState;
   const refreshDatabase = databaseState[4];
   const buildVersionRef = React.useRef<string>(BUILD_VERSION);
+  // When this document started playing, used as the session age when no shell
+  // is hosting it (the shell's own start wins when there is one).
+  const runtimeStartedAtRef = React.useRef(Date.now());
   // Tracks the search DB's Last-Modified / ETag so we can detect a
   // re-indexed DB without a full page reload. Initialised to null and seeded
   // by the first successful HEAD response so the *first* poll never triggers
@@ -2496,6 +2512,8 @@ export const Slideshow: React.FC<{
           onCheckDataVersion={() => {
             void checkForDbUpdates();
           }}
+          sessionStartedAt={props.shellSessionStart ?? runtimeStartedAtRef.current}
+          codeBuiltAt={BUILD_METADATA.builtAt}
           {...(filter ? { filter } : {})}
           albumName={albumName}
           photoName={photoName}

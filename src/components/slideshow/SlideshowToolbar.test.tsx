@@ -16,6 +16,8 @@ const makeProps = (overrides: Partial<SlideshowToolbarProps> = {}): SlideshowToo
   dataVersionTitle: null,
   isCheckingDataVersion: false,
   onCheckDataVersion: noop,
+  sessionStartedAt: null,
+  codeBuiltAt: null,
   albumName: "Album",
   photoName: "Photo",
   playbackSubtitle: "Sub",
@@ -147,18 +149,40 @@ describe("SlideshowToolbar", () => {
     expect(onExit).toHaveBeenCalledTimes(1);
   });
 
-  it("offers the diagnostics report beside the wake-lock control", () => {
-    // The shell's own diagnostics live in a corner overlay that is easy to miss
-    // on a tablet, so the session dock carries the way in.
+  it("opens the diagnostics report from the pool stats", () => {
+    // The pool stats already report where the photos came from and how old the
+    // data is, so they carry the way in to the rest of the session's state
+    // rather than a control of their own.
     const onNavigate = jest.fn();
     render(<SlideshowToolbar {...makeProps({ onNavigate })} />);
 
-    const session = screen.getByRole("group", { name: "Slideshow session" });
-    const diagnostics = within(session).getByRole("link", { name: /diagnostics/i });
+    const diagnostics = screen.getByRole("link", { name: /diagnostics/i });
     expect(diagnostics).toHaveAttribute("href", "/slideshow/diagnostics");
 
     fireEvent.click(diagnostics);
     expect(onNavigate).toHaveBeenCalledWith("/slideshow/diagnostics");
+  });
+
+  it("reports how long the session has run and how old the running code is", () => {
+    const hourMs = 3600000;
+    render(
+      <SlideshowToolbar
+        {...makeProps({
+          sessionStartedAt: Date.now() - 14 * hourMs,
+          codeBuiltAt: new Date(Date.now() - 3 * 24 * hourMs).toISOString(),
+        })}
+      />,
+    );
+
+    const diagnostics = screen.getByRole("link", { name: /diagnostics/i });
+    expect(diagnostics.textContent).toMatch(/running 14 hr/i);
+    expect(diagnostics.textContent).toMatch(/code 3 days/i);
+  });
+
+  it("still offers diagnostics before any photos have loaded", () => {
+    render(<SlideshowToolbar {...makeProps({ poolStats: EMPTY_POOL_STATS })} />);
+
+    expect(screen.getByRole("link", { name: /diagnostics/i })).toBeInTheDocument();
   });
 
   it("shows an unambiguous active screen-awake status", () => {
@@ -194,10 +218,10 @@ describe("SlideshowToolbar", () => {
       />,
     );
 
-    const badge = screen.getByRole("button", { name: /1,234 photos/i });
+    const badge = screen.getByRole("link", { name: /1,234 photos/i });
     expect(badge.textContent).toContain("data 29 Jun 20:00");
 
-    fireEvent.click(badge);
+    fireEvent.click(screen.getByRole("button", { name: /check for the latest photo data/i }));
 
     expect(onCheckDataVersion).toHaveBeenCalledTimes(1);
   });
@@ -211,12 +235,16 @@ describe("SlideshowToolbar", () => {
         })}
       />,
     );
-    const checking = screen.getByRole("button", { name: /2 photos/i });
+    const checking = screen.getByRole("link", { name: /2 photos/i });
     expect(checking.textContent).toContain("checking data");
-    expect(checking.getAttribute("title")).toContain("Photo pool");
+    expect(
+      screen
+        .getByRole("button", { name: /check for the latest photo data/i })
+        .getAttribute("title"),
+    ).toContain("photo data");
 
     rerender(<SlideshowToolbar {...makeProps({ poolStats: { count: 2, newestDate: null } })} />);
-    expect(screen.getByRole("button", { name: /2 photos/i }).textContent).toContain("data unknown");
+    expect(screen.getByRole("link", { name: /2 photos/i }).textContent).toContain("data unknown");
   });
 
   it("supports close-handle taps, swipes, cancellation, and click suppression", () => {

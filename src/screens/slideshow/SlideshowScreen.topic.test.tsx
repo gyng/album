@@ -106,6 +106,11 @@ jest.mock("usehooks-ts", () => ({
 
 jest.mock("../../lib/buildVersion", () => ({
   BUILD_VERSION: "test-build-version",
+  BUILD_METADATA: {
+    buildVersion: "test-build-version",
+    builtAt: "2026-07-20T09:00:00.000Z",
+    gitSha: "test-build-version",
+  },
 }));
 
 jest.mock("../../util/navigate", () => ({

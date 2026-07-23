@@ -174,7 +174,14 @@ jest.mock("usehooks-ts", () => ({
     return [value, setValue, () => setValue(initial)] as const;
   },
 }));
-jest.mock("../../../lib/buildVersion", () => ({ BUILD_VERSION: "build-current" }));
+jest.mock("../../../lib/buildVersion", () => ({
+  BUILD_VERSION: "build-current",
+  BUILD_METADATA: {
+    buildVersion: "build-current",
+    builtAt: "2026-07-20T09:00:00.000Z",
+    gitSha: "build-current",
+  },
+}));
 jest.mock("../../../util/navigate", () => ({
   navigateTo: (...args: unknown[]) => navigateTo(...args),
   reloadCurrentPage: () => reloadCurrentPage(),

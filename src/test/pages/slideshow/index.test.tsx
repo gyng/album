@@ -62,6 +62,11 @@ jest.mock("usehooks-ts", () => ({
 
 jest.mock("../../../lib/buildVersion", () => ({
   BUILD_VERSION: "test-build-version",
+  BUILD_METADATA: {
+    buildVersion: "test-build-version",
+    builtAt: "2026-07-20T09:00:00.000Z",
+    gitSha: "test-build-version",
+  },
 }));
 
 jest.mock("../../../util/navigate", () => ({
@@ -208,15 +213,16 @@ describe("slideshow page", () => {
       await Promise.resolve();
     });
 
-    const badge = screen.getByRole("button", { name: /1 photos/i });
+    const badge = screen.getByRole("link", { name: /1 photos/i });
     expect(badge.textContent).toContain("data 29 Jun");
     expect(mockRefreshDatabase).not.toHaveBeenCalled();
+    const check = screen.getByRole("button", { name: /check for the latest photo data/i });
 
     dbVersion = "db-v2";
     dbLastModified = "Mon, 29 Jun 2026 12:10:00 GMT";
 
     await act(async () => {
-      fireEvent.click(badge);
+      fireEvent.click(check);
       await Promise.resolve();
       await Promise.resolve();
     });
