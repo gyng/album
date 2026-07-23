@@ -185,6 +185,28 @@ describe("SlideshowToolbar", () => {
     expect(screen.getByRole("link", { name: /diagnostics/i })).toBeInTheDocument();
   });
 
+  it("collapses the rarely-used groups behind one disclosure", () => {
+    // Phone-only in effect (the collapse itself is a media query), but the
+    // control and the region it owns are the part a screen reader and a test
+    // can hold on to.
+    render(<SlideshowToolbar {...makeProps()} />);
+
+    const toggle = screen.getByRole("button", { name: /more settings/i });
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+
+    const region = document.getElementById(toggle.getAttribute("aria-controls") ?? "");
+    expect(region).not.toBeNull();
+    expect(region?.contains(screen.getByRole("group", { name: "Display controls" }))).toBe(true);
+    expect(region?.contains(screen.getByRole("group", { name: "Playback mode" }))).toBe(false);
+
+    fireEvent.click(toggle);
+
+    expect(screen.getByRole("button", { name: /fewer settings/i })).toHaveAttribute(
+      "aria-expanded",
+      "true",
+    );
+  });
+
   it("shows an unambiguous active screen-awake status", () => {
     render(<SlideshowToolbar {...makeProps({ isWakeLockActive: true })} />);
 

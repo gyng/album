@@ -179,6 +179,17 @@
   color: color-mix(in oklch, var(--c-white) 60%, transparent);
 }
 
+/* The phone-only disclosure. Everywhere else the button does not exist and the
+   wrapper is transparent, so the groups inside lay out exactly as siblings of
+   the toolbar's own flex row. */
+.moreToggle {
+  display: none;
+}
+
+.moreSettings {
+  display: contents;
+}
+
 .playbackGroup {
   display: inline-flex;
   align-items: center;
@@ -717,5 +728,36 @@
 
   .playbackDivider {
     display: none;
+  }
+}
+
+/* Phones only. Twenty-five controls at a 44px tap target is ~1100px of sheet
+   against an 844px viewport, so the four groups a running frame rarely needs
+   collapse behind one control; what remains — session, pool, playback, timing
+   — fits a single screen. */
+@media (max-width: 599px) {
+  .moreToggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--m-s);
+    inline-size: min(100%, var(--content-width-medium));
+    min-block-size: var(--tap-target);
+    padding: var(--m-s) var(--m-m);
+    border: solid var(--size-1) var(--glass-border);
+    border-radius: var(--m-m);
+    background: var(--glass-bg);
+    color: var(--c-white);
+    font: inherit;
+    font-size: var(--fs-sm);
+    backdrop-filter: blur(var(--glass-blur-panel));
+  }
+
+  .moreSettings {
+    display: none;
+  }
+
+  .moreSettingsOpen {
+    display: contents;
   }
 }

@@ -28,6 +28,9 @@ const styles = mergeCssModuleStyles(
     "controlTitle",
     "hideProgress",
     "hideProgressRing",
+    "moreSettings",
+    "moreSettingsOpen",
+    "moreToggle",
     "playbackButtons",
     "playbackCluster",
     "playbackCopy",
@@ -163,6 +166,9 @@ export type SlideshowToolbarProps = {
 // Stable id linking the topic input to its error message via aria-describedby.
 const TOPIC_ERROR_ID = "slideshow-topic-error";
 
+// Ties the phone-only disclosure button to the region it collapses.
+const MORE_SETTINGS_ID = "slideshow-more-settings";
+
 const SHORT_TIMINGS = [10000, 30000, 60000, 900000, 3600000];
 const LONG_TIMINGS = [10800000, 43200000, 86400000];
 
@@ -186,6 +192,8 @@ const formatCountdown = (secondsLeft: number): string => {
 };
 
 export const SlideshowToolbar: React.FC<SlideshowToolbarProps> = (props) => {
+  // Only consulted by the phone layout; wider ones render the region regardless.
+  const [moreSettingsOpen, setMoreSettingsOpen] = React.useState(false);
   const sessionStarted = spanSince(props.sessionStartedAt);
   const codeBuilt = spanSince(props.codeBuiltAt);
 
@@ -448,65 +456,6 @@ export const SlideshowToolbar: React.FC<SlideshowToolbarProps> = (props) => {
         </button>
       </div>
 
-      <div className={styles.controlGroup} role="group" aria-label="View controls">
-        <div className={styles.controlHeader}>
-          <span className={styles.controlLogo} aria-hidden="true">
-            ⛶
-          </span>
-          <span className={styles.controlCopy}>
-            <span className={styles.controlTitle}>View</span>
-          </span>
-        </div>
-
-        <div className={styles.controlButtons}>
-          <button
-            type="button"
-            className={[props.showCover ? buttonStyles.active : "", buttonStyles.base].join(" ")}
-            aria-pressed={props.showCover}
-            title={
-              props.showCover
-                ? "Photos fill the screen (cropping). Tap to switch to fit."
-                : "Photos fit the screen (letterboxed). Tap to switch to fill."
-            }
-            onClick={props.onToggleCover}
-          >
-            ⛶ Fill screen
-          </button>
-
-          {!props.isFullscreenActive ? (
-            <button
-              type="button"
-              className={buttonStyles.base}
-              disabled={!props.isFullscreenSupported}
-              aria-disabled={!props.isFullscreenSupported}
-              onClick={props.onToggleFullscreen}
-            >
-              ⇱ Fullscreen
-            </button>
-          ) : null}
-
-          <button
-            type="button"
-            className={[
-              props.isWakeLockActive ? buttonStyles.active : "",
-              styles.secondarySessionControl,
-              buttonStyles.base,
-            ].join(" ")}
-            disabled={!props.isWakeLockSupported}
-            aria-disabled={!props.isWakeLockSupported}
-            aria-pressed={props.isWakeLockActive}
-            title={
-              props.isWakeLockSupported
-                ? "Try to acquire a wake lock for this slideshow session"
-                : "Screen wake lock is not available in this browser"
-            }
-            onClick={props.onTryWakeLock}
-          >
-            {props.isWakeLockActive ? "Screen stays awake" : "Keep screen awake"}
-          </button>
-        </div>
-      </div>
-
       <div className={styles.playbackGroup} role="group" aria-label="Playback mode">
         <div className={styles.playbackHeader}>
           <span className={styles.playbackLogo} aria-hidden="true">
@@ -649,128 +598,6 @@ export const SlideshowToolbar: React.FC<SlideshowToolbarProps> = (props) => {
         </div>
       </div>
 
-      <div className={styles.controlGroup} role="group" aria-label="Topic">
-        <div className={styles.controlHeader}>
-          <span className={styles.controlLogo} aria-hidden="true">
-            🔎
-          </span>
-          <span className={styles.controlCopy}>
-            <span className={styles.controlTitle}>Topic</span>
-          </span>
-        </div>
-
-        <div className={styles.controlMeta}>
-          {props.topic ? (
-            <span className={styles.topicChip}>
-              <span className={styles.topicChipLabel}>
-                <i>{props.topic}</i>
-              </span>
-              <button
-                type="button"
-                className={styles.topicDismiss}
-                aria-label="Clear topic"
-                title="Stop topic mode and restore the previous playback"
-                onClick={() => {
-                  topicDismissedRef.current = true;
-                  props.onClearTopic();
-                }}
-              >
-                ×
-              </button>
-            </span>
-          ) : (
-            <form
-              className={styles.topicForm}
-              onSubmit={(event) => {
-                event.preventDefault();
-                const value = topicDraft.trim();
-                if (value) {
-                  props.onSubmitTopic(value);
-                }
-              }}
-            >
-              <Input
-                ref={topicInputRef}
-                className={styles.topicInput}
-                type="text"
-                value={topicDraft}
-                onChange={(event) => setTopicDraft(event.target.value)}
-                placeholder="Seed by topic, e.g. cat"
-                aria-label="Slideshow topic"
-                disabled={props.topicBusy}
-                aria-busy={props.topicBusy}
-                {...(props.topicError ? { "aria-describedby": TOPIC_ERROR_ID } : {})}
-              />
-              <button
-                type="submit"
-                className={[buttonStyles.base, styles.topicSeedButton].join(" ")}
-                disabled={props.topicBusy || topicDraft.trim().length === 0}
-              >
-                {props.topicBusy ? (props.topicBusyLabel ?? "Seeding…") : "Seed"}
-              </button>
-            </form>
-          )}
-          {props.topicError ? (
-            <span className={styles.topicError} id={TOPIC_ERROR_ID} role="alert">
-              {props.topicError}
-            </span>
-          ) : null}
-        </div>
-      </div>
-
-      <div className={styles.controlGroup} role="group" aria-label="Display controls">
-        <div className={styles.controlHeader}>
-          <span className={styles.controlLogo} aria-hidden="true">
-            ✦
-          </span>
-          <span className={styles.controlCopy}>
-            <span className={styles.controlTitle}>Display</span>
-          </span>
-        </div>
-
-        <div className={styles.controlButtons}>
-          <button
-            type="button"
-            className={[props.showClock ? buttonStyles.active : "", buttonStyles.base].join(" ")}
-            aria-pressed={props.showClock}
-            aria-label="Show clock"
-            title="Show clock"
-            onClick={props.onToggleClock}
-          >
-            <span aria-hidden="true">🕰️</span>
-          </button>
-
-          <button
-            type="button"
-            className={[props.showDetails ? buttonStyles.active : "", buttonStyles.base].join(" ")}
-            aria-pressed={props.showDetails}
-            onClick={props.onToggleDetails}
-          >
-            Details
-          </button>
-
-          <button
-            type="button"
-            className={[props.showMap ? buttonStyles.active : "", buttonStyles.base].join(" ")}
-            aria-pressed={props.showMap}
-            onClick={props.onToggleMap}
-          >
-            Map
-          </button>
-
-          <button
-            type="button"
-            className={[
-              props.detailsAlignment !== "center" ? buttonStyles.active : "",
-              buttonStyles.base,
-            ].join(" ")}
-            onClick={props.onCycleAlignment}
-          >
-            📍 {props.detailsAlignment.charAt(0).toUpperCase() + props.detailsAlignment.slice(1)}
-          </button>
-        </div>
-      </div>
-
       <div className={styles.controlGroup} role="group" aria-label="Timing controls">
         <div className={styles.controlHeader}>
           <span className={styles.controlLogo} aria-hidden="true">
@@ -842,86 +669,292 @@ export const SlideshowToolbar: React.FC<SlideshowToolbarProps> = (props) => {
         </div>
       </div>
 
-      <div className={styles.controlGroup} role="group" aria-label="Current photo context">
-        <div className={styles.controlHeader}>
-          <span
-            className={styles.controlLogo}
-            role="button"
-            aria-label="Long-press to inspect the current image"
-            title="Long-press to inspect the current image"
-            onPointerDown={(event) => {
-              if (event.pointerType === "mouse" && event.button !== 0) return;
-              contextLongPressFiredRef.current = false;
-              if (contextLongPressTimerRef.current !== null) {
-                window.clearTimeout(contextLongPressTimerRef.current);
+      {/* A phone cannot show twenty-five controls at once: the sheet runs to
+          about a screen and a half. The four groups below are the ones a
+          running frame rarely needs, so on a phone they collapse behind this
+          one control and the essentials — session, pool, playback, timing —
+          fit a single screen. Wider layouts ignore both the button and the
+          collapse entirely (see the phone media query).  */}
+      <button
+        type="button"
+        className={styles.moreToggle}
+        aria-expanded={moreSettingsOpen}
+        aria-controls={MORE_SETTINGS_ID}
+        onClick={() => setMoreSettingsOpen((open) => !open)}
+      >
+        {moreSettingsOpen ? "Fewer settings" : "More settings"}
+      </button>
+
+      <div
+        id={MORE_SETTINGS_ID}
+        className={[styles.moreSettings, moreSettingsOpen ? styles.moreSettingsOpen : ""]
+          .filter(Boolean)
+          .join(" ")}
+      >
+        <div className={styles.controlGroup} role="group" aria-label="View controls">
+          <div className={styles.controlHeader}>
+            <span className={styles.controlLogo} aria-hidden="true">
+              ⛶
+            </span>
+            <span className={styles.controlCopy}>
+              <span className={styles.controlTitle}>View</span>
+            </span>
+          </div>
+
+          <div className={styles.controlButtons}>
+            <button
+              type="button"
+              className={[props.showCover ? buttonStyles.active : "", buttonStyles.base].join(" ")}
+              aria-pressed={props.showCover}
+              title={
+                props.showCover
+                  ? "Photos fill the screen (cropping). Tap to switch to fit."
+                  : "Photos fit the screen (letterboxed). Tap to switch to fill."
               }
-              contextLongPressTimerRef.current = window.setTimeout(() => {
-                contextLongPressFiredRef.current = true;
-                contextLongPressTimerRef.current = null;
-                props.onInspectImage();
-              }, 500);
-            }}
-            onPointerUp={() => {
-              if (contextLongPressTimerRef.current !== null) {
-                window.clearTimeout(contextLongPressTimerRef.current);
-                contextLongPressTimerRef.current = null;
+              onClick={props.onToggleCover}
+            >
+              ⛶ Fill screen
+            </button>
+
+            {!props.isFullscreenActive ? (
+              <button
+                type="button"
+                className={buttonStyles.base}
+                disabled={!props.isFullscreenSupported}
+                aria-disabled={!props.isFullscreenSupported}
+                onClick={props.onToggleFullscreen}
+              >
+                ⇱ Fullscreen
+              </button>
+            ) : null}
+
+            <button
+              type="button"
+              className={[
+                props.isWakeLockActive ? buttonStyles.active : "",
+                styles.secondarySessionControl,
+                buttonStyles.base,
+              ].join(" ")}
+              disabled={!props.isWakeLockSupported}
+              aria-disabled={!props.isWakeLockSupported}
+              aria-pressed={props.isWakeLockActive}
+              title={
+                props.isWakeLockSupported
+                  ? "Try to acquire a wake lock for this slideshow session"
+                  : "Screen wake lock is not available in this browser"
               }
-            }}
-            onPointerCancel={() => {
-              if (contextLongPressTimerRef.current !== null) {
-                window.clearTimeout(contextLongPressTimerRef.current);
-                contextLongPressTimerRef.current = null;
-              }
-            }}
-          >
-            📎
-          </span>
-          <span className={styles.controlCopy}>
-            <span className={styles.controlTitle}>Context</span>
-          </span>
+              onClick={props.onTryWakeLock}
+            >
+              {props.isWakeLockActive ? "Screen stays awake" : "Keep screen awake"}
+            </button>
+          </div>
         </div>
 
-        <div className={styles.controlMeta}>
-          {props.filter ? (
-            <div className={commonStyles.toast}>
-              Showing only photos from{" "}
-              <Link
-                href={`/album/${props.filter}`}
-                onClick={(event) => {
-                  if (isModifiedClick(event)) return;
+        <div className={styles.controlGroup} role="group" aria-label="Topic">
+          <div className={styles.controlHeader}>
+            <span className={styles.controlLogo} aria-hidden="true">
+              🔎
+            </span>
+            <span className={styles.controlCopy}>
+              <span className={styles.controlTitle}>Topic</span>
+            </span>
+          </div>
+
+          <div className={styles.controlMeta}>
+            {props.topic ? (
+              <span className={styles.topicChip}>
+                <span className={styles.topicChipLabel}>
+                  <i>{props.topic}</i>
+                </span>
+                <button
+                  type="button"
+                  className={styles.topicDismiss}
+                  aria-label="Clear topic"
+                  title="Stop topic mode and restore the previous playback"
+                  onClick={() => {
+                    topicDismissedRef.current = true;
+                    props.onClearTopic();
+                  }}
+                >
+                  ×
+                </button>
+              </span>
+            ) : (
+              <form
+                className={styles.topicForm}
+                onSubmit={(event) => {
                   event.preventDefault();
-                  props.onNavigate(`/album/${props.filter}`);
+                  const value = topicDraft.trim();
+                  if (value) {
+                    props.onSubmitTopic(value);
+                  }
                 }}
               >
-                <i>{props.filter}</i>
-              </Link>
-            </div>
-          ) : null}
+                <Input
+                  ref={topicInputRef}
+                  className={styles.topicInput}
+                  type="text"
+                  value={topicDraft}
+                  onChange={(event) => setTopicDraft(event.target.value)}
+                  placeholder="Seed by topic, e.g. cat"
+                  aria-label="Slideshow topic"
+                  disabled={props.topicBusy}
+                  aria-busy={props.topicBusy}
+                  {...(props.topicError ? { "aria-describedby": TOPIC_ERROR_ID } : {})}
+                />
+                <button
+                  type="submit"
+                  className={[buttonStyles.base, styles.topicSeedButton].join(" ")}
+                  disabled={props.topicBusy || topicDraft.trim().length === 0}
+                >
+                  {props.topicBusy ? (props.topicBusyLabel ?? "Seeding…") : "Seed"}
+                </button>
+              </form>
+            )}
+            {props.topicError ? (
+              <span className={styles.topicError} id={TOPIC_ERROR_ID} role="alert">
+                {props.topicError}
+              </span>
+            ) : null}
+          </div>
+        </div>
 
-          <Link
-            href={`/album/${props.albumName}#${props.photoName}`}
-            className={commonStyles.toast}
-            onClick={(event) => {
-              if (isModifiedClick(event)) return;
-              event.preventDefault();
-              props.onNavigate(`/album/${props.albumName}#${props.photoName}`);
-            }}
-          >
-            {props.playbackContextLabel} in <i>{props.albumName}</i>
-          </Link>
+        <div className={styles.controlGroup} role="group" aria-label="Display controls">
+          <div className={styles.controlHeader}>
+            <span className={styles.controlLogo} aria-hidden="true">
+              ✦
+            </span>
+            <span className={styles.controlCopy}>
+              <span className={styles.controlTitle}>Display</span>
+            </span>
+          </div>
 
-          <button className={buttonStyles.base} type="button" onClick={props.onCopyLink}>
-            {props.copiedPhotoLink ? "copied photo link" : "copy photo link"}
-          </button>
+          <div className={styles.controlButtons}>
+            <button
+              type="button"
+              className={[props.showClock ? buttonStyles.active : "", buttonStyles.base].join(" ")}
+              aria-pressed={props.showClock}
+              aria-label="Show clock"
+              title="Show clock"
+              onClick={props.onToggleClock}
+            >
+              <span aria-hidden="true">🕰️</span>
+            </button>
 
-          <button
-            className={buttonStyles.base}
-            type="button"
-            title="Send the current photo to a system app via the share sheet"
-            onClick={props.onShare}
-          >
-            ⤴ Share
-          </button>
+            <button
+              type="button"
+              className={[props.showDetails ? buttonStyles.active : "", buttonStyles.base].join(
+                " ",
+              )}
+              aria-pressed={props.showDetails}
+              onClick={props.onToggleDetails}
+            >
+              Details
+            </button>
+
+            <button
+              type="button"
+              className={[props.showMap ? buttonStyles.active : "", buttonStyles.base].join(" ")}
+              aria-pressed={props.showMap}
+              onClick={props.onToggleMap}
+            >
+              Map
+            </button>
+
+            <button
+              type="button"
+              className={[
+                props.detailsAlignment !== "center" ? buttonStyles.active : "",
+                buttonStyles.base,
+              ].join(" ")}
+              onClick={props.onCycleAlignment}
+            >
+              📍 {props.detailsAlignment.charAt(0).toUpperCase() + props.detailsAlignment.slice(1)}
+            </button>
+          </div>
+        </div>
+
+        <div className={styles.controlGroup} role="group" aria-label="Current photo context">
+          <div className={styles.controlHeader}>
+            <span
+              className={styles.controlLogo}
+              role="button"
+              aria-label="Long-press to inspect the current image"
+              title="Long-press to inspect the current image"
+              onPointerDown={(event) => {
+                if (event.pointerType === "mouse" && event.button !== 0) return;
+                contextLongPressFiredRef.current = false;
+                if (contextLongPressTimerRef.current !== null) {
+                  window.clearTimeout(contextLongPressTimerRef.current);
+                }
+                contextLongPressTimerRef.current = window.setTimeout(() => {
+                  contextLongPressFiredRef.current = true;
+                  contextLongPressTimerRef.current = null;
+                  props.onInspectImage();
+                }, 500);
+              }}
+              onPointerUp={() => {
+                if (contextLongPressTimerRef.current !== null) {
+                  window.clearTimeout(contextLongPressTimerRef.current);
+                  contextLongPressTimerRef.current = null;
+                }
+              }}
+              onPointerCancel={() => {
+                if (contextLongPressTimerRef.current !== null) {
+                  window.clearTimeout(contextLongPressTimerRef.current);
+                  contextLongPressTimerRef.current = null;
+                }
+              }}
+            >
+              📎
+            </span>
+            <span className={styles.controlCopy}>
+              <span className={styles.controlTitle}>Context</span>
+            </span>
+          </div>
+
+          <div className={styles.controlMeta}>
+            {props.filter ? (
+              <div className={commonStyles.toast}>
+                Showing only photos from{" "}
+                <Link
+                  href={`/album/${props.filter}`}
+                  onClick={(event) => {
+                    if (isModifiedClick(event)) return;
+                    event.preventDefault();
+                    props.onNavigate(`/album/${props.filter}`);
+                  }}
+                >
+                  <i>{props.filter}</i>
+                </Link>
+              </div>
+            ) : null}
+
+            <Link
+              href={`/album/${props.albumName}#${props.photoName}`}
+              className={commonStyles.toast}
+              onClick={(event) => {
+                if (isModifiedClick(event)) return;
+                event.preventDefault();
+                props.onNavigate(`/album/${props.albumName}#${props.photoName}`);
+              }}
+            >
+              {props.playbackContextLabel} in <i>{props.albumName}</i>
+            </Link>
+
+            <button className={buttonStyles.base} type="button" onClick={props.onCopyLink}>
+              {props.copiedPhotoLink ? "copied photo link" : "copy photo link"}
+            </button>
+
+            <button
+              className={buttonStyles.base}
+              type="button"
+              title="Send the current photo to a system app via the share sheet"
+              onClick={props.onShare}
+            >
+              ⤴ Share
+            </button>
+          </div>
         </div>
       </div>
     </div>
