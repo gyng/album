@@ -26,10 +26,14 @@ const settleUi = (page: Page) =>
   );
 
 /** Wait for the slideshow to fully load (title + image visible).
- *  Uses a longer timeout for the first assertion since the slideshow
- *  page is heavy (WASM sql.js init) and may load slowly under contention. */
+ *  The first assertion carries a generous timeout because the slideshow page is
+ *  heavy — client-side sql.js WASM init before it can render and set its title —
+ *  and when the full Chromium suite runs alongside the Firefox/WebKit smoke jobs
+ *  on one runner, 15s was occasionally not enough and exhausted CI retries. The
+ *  page load itself is not slow enough to mask a real hang: a genuinely broken
+ *  page fails deterministically rather than passing on the next run. */
 const waitForSlideshow = async (page: Page) => {
-  await expect(page).toHaveTitle("Slideshow | Snapshots", { timeout: 15_000 });
+  await expect(page).toHaveTitle("Slideshow | Snapshots", { timeout: 30_000 });
   await expect(page.locator(slideshowImg).first()).toBeVisible();
 };
 
