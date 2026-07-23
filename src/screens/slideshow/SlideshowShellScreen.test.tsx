@@ -2,6 +2,7 @@
  * @jest-environment jsdom
  */
 
+import { Profiler } from "react";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import {
   AUTO_WAKE_SETTLE_MS,
@@ -12,7 +13,12 @@ import {
 import { RUNTIME_RELOAD_BASE_DELAY_MS } from "../../util/slideshowShell";
 import { useWakeLock, type WakeLockEvent } from "../../components/useWakeLock";
 import { navigateTo } from "../../util/navigate";
-import { readWakeLog, WAKE_LOG_STORAGE_KEY } from "../../util/wakeLockLog";
+import {
+  HEARTBEAT_INTERVAL_MS,
+  HEARTBEAT_STORAGE_KEY,
+  readShellLog,
+  SHELL_LOG_STORAGE_KEY,
+} from "../../util/shellDiagnosticsLog";
 
 const acquireWakeLock = jest.fn().mockResolvedValue(undefined);
 const releaseWakeLock = jest.fn().mockResolvedValue(undefined);
@@ -532,15 +538,16 @@ describe("slideshow code shell", () => {
       wakeEventListener?.("cap-reached");
     });
 
-    const stored = readWakeLog(window.localStorage);
+    const stored = readShellLog(window.localStorage);
     expect(stored.map((entry) => entry.type)).toEqual(["lost", "acquired", "cap-reached"]);
+    expect(stored.every((entry) => entry.category === "wake")).toBe(true);
     // The raw payload really is in localStorage under the shared key so it
     // survives a relaunch.
-    expect(window.localStorage.getItem(WAKE_LOG_STORAGE_KEY)).toContain("cap-reached");
+    expect(window.localStorage.getItem(SHELL_LOG_STORAGE_KEY)).toContain("cap-reached");
 
     // The diagnostics panel surfaces the history under a disclosure.
     fireEvent.click(screen.getByRole("button", { name: "Slideshow diagnostics" }));
-    expect(screen.getByText("Wake history")).toBeInTheDocument();
+    expect(screen.getByText("Event history")).toBeInTheDocument();
     expect(screen.getByText("Gave up retrying")).toBeInTheDocument();
   });
 
@@ -628,5 +635,121 @@ describe("slideshow code shell", () => {
 
     expect(screen.getAllByText("Code check offline")).not.toHaveLength(0);
     expect(screen.queryByText("Code current")).not.toBeInTheDocument();
+  });
+
+  it("beats the heartbeat to storage without ever re-rendering", async () => {
+    // The heartbeat proves the JS loop is alive for the gap detector, but a
+    // days-long kiosk must not re-render once per minute forever. The interval
+    // callback writes storage only — no setState — so advancing many beats (while
+    // staying under the 5-minute version poll) must not add a single render.
+    jest.useFakeTimers();
+    try {
+      mockWakeLockActive = true;
+      global.fetch = jest.fn(() => versionResponse("build-current")) as jest.Mock;
+      const onRender = jest.fn();
+
+      render(
+        <Profiler id="shell" onRender={onRender}>
+          <SlideshowShellScreen />
+        </Profiler>,
+      );
+
+      // Settle the auto-acquire window and let the initial version check resolve,
+      // then mark the frame ready so the readiness-recovery timeout stays dormant
+      // (it would otherwise reload the frame and re-render inside our window).
+      await act(async () => {
+        jest.advanceTimersByTime(AUTO_WAKE_SETTLE_MS);
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+      const frame = screen.getByTitle("Slideshow");
+      await act(async () => {
+        fireEvent(
+          window,
+          new MessageEvent("message", {
+            data: { type: "snapshots:slideshow-ready", buildVersion: "build-current" },
+            origin: window.location.origin,
+            source: (frame as HTMLIFrameElement).contentWindow,
+          }),
+        );
+        await Promise.resolve();
+      });
+
+      const heartbeatAfterMount = window.localStorage.getItem(HEARTBEAT_STORAGE_KEY);
+      expect(heartbeatAfterMount).not.toBeNull();
+      const baselineRenders = onRender.mock.calls.length;
+
+      // Four heartbeats (240s), staying under the 300s version poll so only the
+      // heartbeat interval fires in this window.
+      await act(async () => {
+        jest.advanceTimersByTime(HEARTBEAT_INTERVAL_MS * 4);
+        await Promise.resolve();
+      });
+
+      // Not one extra render from four beats.
+      expect(onRender.mock.calls.length).toBe(baselineRenders);
+      // The rolling key advanced (the beats really wrote), and no gap event was
+      // recorded for these in-threshold beats.
+      expect(window.localStorage.getItem(HEARTBEAT_STORAGE_KEY)).not.toBe(heartbeatAfterMount);
+      expect(readShellLog(window.localStorage).some((entry) => entry.category === "gap")).toBe(
+        false,
+      );
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it("records a gap event when the previous heartbeat is older than the freeze threshold", () => {
+    // A pre-relaunch heartbeat left far in the past means the JS loop was frozen /
+    // the device slept in between: the mount check must record a "not running"
+    // gap event, distinguishing a freeze from a merely refused wake lock.
+    global.fetch = jest.fn(() => versionResponse("build-current")) as jest.Mock;
+    const threeHoursAgo = Date.now() - 3 * 60 * 60 * 1000;
+    window.localStorage.setItem(HEARTBEAT_STORAGE_KEY, String(threeHoursAgo));
+
+    render(<SlideshowShellScreen />);
+
+    const gap = readShellLog(window.localStorage).find((entry) => entry.category === "gap");
+    expect(gap).toBeDefined();
+    fireEvent.click(screen.getByRole("button", { name: "Slideshow diagnostics" }));
+    expect(screen.getByText(/Page was not running for/)).toBeInTheDocument();
+  });
+
+  it("does not record a gap event for a heartbeat within the threshold", () => {
+    global.fetch = jest.fn(() => versionResponse("build-current")) as jest.Mock;
+    window.localStorage.setItem(HEARTBEAT_STORAGE_KEY, String(Date.now() - 30_000));
+
+    render(<SlideshowShellScreen />);
+
+    expect(readShellLog(window.localStorage).some((entry) => entry.category === "gap")).toBe(false);
+  });
+
+  it("copies an on-demand diagnostics payload carrying an event and the build version", async () => {
+    const writeText = jest.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText },
+    });
+    global.fetch = jest.fn(() => versionResponse("build-current")) as jest.Mock;
+
+    render(<SlideshowShellScreen />);
+
+    // Seed a known event into the timeline.
+    await act(async () => {
+      wakeEventListener?.("cap-reached");
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Slideshow diagnostics" }));
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Copy diagnostics" }));
+      await Promise.resolve();
+    });
+
+    expect(writeText).toHaveBeenCalledTimes(1);
+    const payload = writeText.mock.calls[0][0] as string;
+    expect(payload).toContain("Gave up retrying");
+    expect(payload).toContain("build-current");
+    // A transient confirmation replaces the label.
+    expect(screen.getByRole("button", { name: "Copied" })).toBeInTheDocument();
   });
 });

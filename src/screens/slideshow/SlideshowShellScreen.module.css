@@ -179,7 +179,8 @@
   font-size: var(--fs-s);
 }
 
-.wakeAction {
+.wakeAction,
+.copyAction {
   grid-column: 1 / -1;
 }
 

@@ -5,11 +5,16 @@ import { BUILD_VERSION } from "../../lib/buildVersion";
 import { decideBuildUpdate } from "../../util/kioskRefresh";
 import { navigateTo } from "../../util/navigate";
 import {
-  appendWakeEvent,
-  describeWakeEvent,
-  readWakeLog,
-  type WakeLogEntry,
-} from "../../util/wakeLockLog";
+  appendShellEvent,
+  describeShellEvent,
+  detectHeartbeatGap,
+  HEARTBEAT_INTERVAL_MS,
+  readHeartbeat,
+  readShellLog,
+  serialiseDiagnostics,
+  writeHeartbeat,
+  type ShellLogEntry,
+} from "../../util/shellDiagnosticsLog";
 import {
   buildSlideshowRuntimeUrl,
   isSlideshowRuntimeMessage,
@@ -84,6 +89,9 @@ export const SlideshowShellScreen = () => {
   // The target a pending backoff timer is aiming at, so a re-plan toward the same
   // target can keep the existing timer instead of resetting it.
   const pendingReloadTargetRef = React.useRef<string | null>(null);
+  // The target version we last recorded a "retry cap reached" event for, so the
+  // repeating version poll logs that milestone once per stuck deploy, not per poll.
+  const retryCapVersionRef = React.useRef<string | null>(null);
   const [runtimeFrame, setRuntimeFrame] = React.useState<RuntimeFrame | null>(null);
   const [runtimeVersion, setRuntimeVersion] = React.useState(BUILD_VERSION);
   const runtimeVersionRef = React.useRef(BUILD_VERSION);
@@ -96,7 +104,15 @@ export const SlideshowShellScreen = () => {
   const [pageVisible, setPageVisible] = React.useState(true);
   const [wakeLossCount, setWakeLossCount] = React.useState(0);
   const [lastWakeLossAt, setLastWakeLossAt] = React.useState<Date | null>(null);
-  const [wakeHistory, setWakeHistory] = React.useState<WakeLogEntry[]>([]);
+  const [eventHistory, setEventHistory] = React.useState<ShellLogEntry[]>([]);
+  const [copiedDiagnostics, setCopiedDiagnostics] = React.useState(false);
+  // When this session started, for the copied report. A ref (not state) — it is
+  // read only on demand and must never trigger a render.
+  const sessionStartRef = React.useRef(Date.now());
+  // The last runtime build we recorded as skewed, so the per-photo re-post of the
+  // ready message during a stuck deploy records "version skew" once per episode
+  // rather than on every advance.
+  const lastSkewVersionRef = React.useRef<string | null>(null);
   const {
     isSupported: isWakeLockSupported,
     isActive: isWakeLockActive,
@@ -120,18 +136,62 @@ export const SlideshowShellScreen = () => {
   }, []);
 
   // Track document visibility so the sustained-loss detector does not count a
-  // backgrounded page (whose lock is inactive by design) as a wake-lock loss.
+  // backgrounded page (whose lock is inactive by design) as a wake-lock loss,
+  // and record each hidden/visible transition to the timeline.
+  const prevVisibleRef = React.useRef(true);
   React.useEffect(() => {
-    const syncVisibility = () => setPageVisible(document.visibilityState === "visible");
-    syncVisibility();
+    const syncVisibility = () => {
+      const visible = document.visibilityState === "visible";
+      setPageVisible(visible);
+      if (visible !== prevVisibleRef.current) {
+        prevVisibleRef.current = visible;
+        setEventHistory(
+          appendShellEvent({ category: "visibility", type: visible ? "visible" : "hidden" }),
+        );
+      }
+    };
+    prevVisibleRef.current = document.visibilityState === "visible";
+    setPageVisible(prevVisibleRef.current);
     document.addEventListener("visibilitychange", syncVisibility);
     return () => document.removeEventListener("visibilitychange", syncVisibility);
   }, []);
 
-  // Load the persisted wake history once on mount so an overnight incident is
+  // Heartbeat gap forensics. Every 60s overwrite ONE rolling storage key with the
+  // current time — deliberately WITHOUT setState, so a days-long kiosk never
+  // re-renders per beat. On mount and on every return to visibility, compare the
+  // last persisted beat against now: a gap past the freeze threshold means the JS
+  // loop was frozen/asleep in between (the device slept), which is distinct from
+  // "running but the lock was refused" — the key forensic ambiguity a field
+  // report otherwise cannot resolve. The interval and listener are both cleared
+  // on unmount.
+  React.useEffect(() => {
+    const recordGapIfAny = () => {
+      const now = Date.now();
+      const gap = detectHeartbeatGap(readHeartbeat(), now);
+      if (gap !== null) {
+        setEventHistory(appendShellEvent({ category: "gap", type: "gap", durationMs: gap }, now));
+      }
+      writeHeartbeat(now);
+    };
+    // Mount check reads the PRE-relaunch beat before the interval overwrites it.
+    recordGapIfAny();
+    const beat = window.setInterval(() => writeHeartbeat(Date.now()), HEARTBEAT_INTERVAL_MS);
+    const handleVisible = () => {
+      if (document.visibilityState === "visible") {
+        recordGapIfAny();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisible);
+    return () => {
+      window.clearInterval(beat);
+      document.removeEventListener("visibilitychange", handleVisible);
+    };
+  }, []);
+
+  // Load the persisted event timeline once on mount so an overnight incident is
   // still readable the morning after a relaunch.
   React.useEffect(() => {
-    setWakeHistory(readWakeLog());
+    setEventHistory(readShellLog());
   }, []);
 
   // Subscribe to the hook's internal outcomes (re-acquire failures, cap
@@ -139,7 +199,7 @@ export const SlideshowShellScreen = () => {
   // and append each to the persistent log.
   React.useEffect(() => {
     return subscribeWakeEvents((event) => {
-      setWakeHistory(appendWakeEvent(event));
+      setEventHistory(appendShellEvent({ category: "wake", type: event }));
     });
   }, [subscribeWakeEvents]);
 
@@ -158,10 +218,10 @@ export const SlideshowShellScreen = () => {
       setWakeLossCount((count) => count + 1);
       setLastWakeLossAt(new Date());
       hadWakeLossRef.current = true;
-      setWakeHistory(appendWakeEvent("lost"));
+      setEventHistory(appendShellEvent({ category: "wake", type: "lost" }));
     } else if (isWakeLockActive && hadWakeLossRef.current) {
       hadWakeLossRef.current = false;
-      setWakeHistory(appendWakeEvent("acquired"));
+      setEventHistory(appendShellEvent({ category: "wake", type: "acquired" }));
     }
   }, [isWakeLockActive]);
 
@@ -211,6 +271,7 @@ export const SlideshowShellScreen = () => {
   const reloadRuntime = React.useCallback((buildVersion: string) => {
     runtimeReadyRef.current = false;
     setCodeStatus("reloading");
+    setEventHistory(appendShellEvent({ category: "code", type: "reload", version: buildVersion }));
     setRuntimeFrame((current) => ({
       src: buildSlideshowRuntimeUrl(runtimeSearchRef.current, buildVersion),
       generation: (current?.generation ?? -1) + 1,
@@ -230,9 +291,16 @@ export const SlideshowShellScreen = () => {
     (targetVersion: string) => {
       const plan = planRuntimeReload(targetVersion, reloadTrackerRef.current);
       if (!plan.shouldReload) {
-        // Budget exhausted — hold until the target version changes again.
+        // Budget exhausted — hold until the target version changes again. Record
+        // the cap once per target: the version poll keeps re-planning the same
+        // exhausted target every few minutes, and an unguarded append would flood
+        // the timeline out of every other event over a night.
         clearPendingReload();
         setCodeStatus("retry");
+        if (retryCapVersionRef.current !== targetVersion) {
+          retryCapVersionRef.current = targetVersion;
+          setEventHistory(appendShellEvent({ category: "code", type: "retry-cap-reached" }));
+        }
         return;
       }
       if (plan.delayMs === 0) {
@@ -284,6 +352,59 @@ export const SlideshowShellScreen = () => {
     reloadTrackerRef.current = recordRuntimeReload(targetVersion, reloadTrackerRef.current);
     reloadRuntime(targetVersion);
   }, [clearPendingReload, reloadRuntime]);
+
+  // Serialise a full diagnostics report ON DEMAND (built only here, retained
+  // nowhere) and copy it to the clipboard so a field report is one tap away. The
+  // device/runtime context is read transiently; the payload is the event
+  // timeline plus current status. Clipboard write falls back to the hidden
+  // textarea + execCommand path used elsewhere in the slideshow for browsers
+  // without the async Clipboard API.
+  const copyDiagnostics = React.useCallback(async () => {
+    const payload = serialiseDiagnostics({
+      now: Date.now(),
+      sessionStart: sessionStartRef.current,
+      buildVersion: BUILD_VERSION,
+      runtimeVersion: runtimeVersionRef.current,
+      codeStatus,
+      wake: {
+        supported: isWakeLockSupported,
+        active: isWakeLockActive,
+        losses: wakeLossCount,
+      },
+      online: isOnline,
+      device: {
+        userAgent: navigator.userAgent,
+        standalone:
+          typeof window.matchMedia === "function" &&
+          window.matchMedia("(display-mode: standalone)").matches,
+        screen: {
+          width: window.screen?.width ?? 0,
+          height: window.screen?.height ?? 0,
+        },
+        devicePixelRatio: window.devicePixelRatio ?? 1,
+      },
+      log: readShellLog(),
+    });
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(payload);
+      } else {
+        const textArea = document.createElement("textarea");
+        textArea.value = payload;
+        textArea.setAttribute("readonly", "");
+        textArea.style.position = "fixed";
+        textArea.style.inset = "0 auto auto -9999px";
+        document.body.appendChild(textArea);
+        textArea.select();
+        document.execCommand("copy");
+        document.body.removeChild(textArea);
+      }
+      setCopiedDiagnostics(true);
+      window.setTimeout(() => setCopiedDiagnostics(false), 1800);
+    } catch (error) {
+      console.error("Failed to copy slideshow diagnostics", error);
+    }
+  }, [codeStatus, isOnline, isWakeLockActive, isWakeLockSupported, wakeLossCount]);
 
   // Recover a frame that never reports it is ready — e.g. a first-ever visit
   // whose runtime request failed transiently, where the version poll cannot
@@ -370,11 +491,13 @@ export const SlideshowShellScreen = () => {
     };
     const handleOnline = () => {
       setIsOnline(true);
+      setEventHistory(appendShellEvent({ category: "network", type: "online" }));
       void checkForCodeUpdate();
     };
     const handleOffline = () => {
       setIsOnline(false);
       setCodeStatus("offline");
+      setEventHistory(appendShellEvent({ category: "network", type: "offline" }));
     };
 
     document.addEventListener("visibilitychange", handleVisibilityChange);
@@ -439,6 +562,15 @@ export const SlideshowShellScreen = () => {
         // retry toward the version that is still outstanding.
         clearPendingReload();
         reloadTrackerRef.current = null;
+        lastSkewVersionRef.current = null;
+      } else if (lastSkewVersionRef.current !== nextVersion) {
+        // Newly-observed skew: the running frame is behind the advertised build.
+        // The runtime re-posts this on every photo advance, so record it once per
+        // episode rather than on every advance.
+        lastSkewVersionRef.current = nextVersion;
+        setEventHistory(
+          appendShellEvent({ category: "code", type: "version-skew", version: nextVersion }),
+        );
       }
       setCodeStatus(
         !navigator.onLine
@@ -568,16 +700,29 @@ export const SlideshowShellScreen = () => {
               checked {lastCheckedAt.toLocaleTimeString("en-GB")}
             </div>
           ) : null}
-          {wakeHistory.length > 0 ? (
-            <details className={styles.wakeHistory}>
-              <summary>Wake history</summary>
+          {eventHistory.length > 0 ? (
+            <details
+              className={styles.wakeHistory}
+              onToggle={(event) => {
+                // Refresh the rendered tail lazily, only when the disclosure is
+                // opened — the timeline is never polled on a timer.
+                if ((event.currentTarget as HTMLDetailsElement).open) {
+                  setEventHistory(readShellLog());
+                }
+              }}
+            >
+              <summary>Event history</summary>
               <ul className={styles.wakeHistoryList}>
-                {wakeHistory
-                  .slice(-8)
+                {eventHistory
+                  .slice(-10)
                   .reverse()
                   .map((entry, index) => (
-                    <li key={`${entry.at}-${index}`} className={styles.wakeHistoryItem}>
-                      <span>{describeWakeEvent(entry.type)}</span>
+                    <li
+                      key={`${entry.at}-${index}`}
+                      className={styles.wakeHistoryItem}
+                      data-category={entry.category}
+                    >
+                      <span>{describeShellEvent(entry)}</span>
                       <time dateTime={new Date(entry.at).toISOString()}>
                         {new Date(entry.at).toLocaleString("en-GB")}
                       </time>
@@ -601,6 +746,13 @@ export const SlideshowShellScreen = () => {
             </button>
             <button type="button" onClick={reloadRuntimeManually}>
               Reload slideshow
+            </button>
+            <button
+              type="button"
+              className={styles.copyAction}
+              onClick={() => void copyDiagnostics()}
+            >
+              {copiedDiagnostics ? "Copied" : "Copy diagnostics"}
             </button>
           </div>
         </div>
