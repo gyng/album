@@ -28,6 +28,7 @@ const styles = mergeCssModuleStyles(
     "hideProgress",
     "hideProgressRing",
     "playbackButtons",
+    "playbackCluster",
     "playbackCopy",
     "playbackDivider",
     "playbackGroup",
@@ -46,6 +47,7 @@ const styles = mergeCssModuleStyles(
     "sessionAwakeButton",
     "sessionAwakeButtonActive",
     "sessionAwakeIndicator",
+    "sessionDiagnosticsLink",
     "sessionDock",
     "sessionProgress",
     "toolbar",
@@ -488,124 +490,134 @@ export const SlideshowToolbar: React.FC<SlideshowToolbarProps> = (props) => {
           </span>
         </div>
 
+        {/* Three clusters — modes, modifiers, transport. They are `display:
+            contents` on a wide toolbar, so this reads as one row there; on a
+            tablet each cluster becomes its own equal-width row, which is what
+            keeps the controls from wrapping raggedly mid-cluster. */}
         <div className={styles.playbackButtons}>
-          <button
-            type="button"
-            className={[
-              props.slideshowMode === "random" ? buttonStyles.active : "",
-              buttonStyles.base,
-            ].join(" ")}
-            aria-pressed={props.slideshowMode === "random"}
-            onClick={() => props.onSelectMode("random")}
-          >
-            🔀 Shuffle
-          </button>
-
-          <button
-            type="button"
-            className={[
-              props.slideshowMode === "weighted" ? buttonStyles.active : "",
-              buttonStyles.base,
-            ].join(" ")}
-            aria-pressed={props.slideshowMode === "weighted"}
-            onClick={() => props.onSelectMode("weighted")}
-          >
-            🕒 Recent
-          </button>
-
-          <button
-            type="button"
-            className={[
-              props.slideshowMode === "similar" ? buttonStyles.active : "",
-              buttonStyles.base,
-            ].join(" ")}
-            aria-pressed={props.slideshowMode === "similar"}
-            onClick={() => props.onSelectMode("similar")}
-          >
-            🧭 Similar
-          </button>
-
-          <span className={styles.playbackDivider} aria-hidden="true" />
-
-          <button
-            type="button"
-            className={[
-              props.timeAware ? buttonStyles.active : "",
-              styles.playbackModifier,
-              buttonStyles.base,
-            ].join(" ")}
-            aria-pressed={props.timeAware}
-            title="Bias the shuffle toward photos taken near the current hour and month"
-            onClick={props.onToggleTimeAware}
-          >
-            🌅 Time-of-day
-          </button>
-
-          <button
-            type="button"
-            className={[
-              props.remixEnabled ? buttonStyles.active : "",
-              styles.playbackModifier,
-              buttonStyles.base,
-            ].join(" ")}
-            aria-pressed={props.remixEnabled}
-            title="Occasionally show two or three photos side by side at random"
-            onClick={props.onToggleRemix}
-          >
-            ◫ Remix
-          </button>
-
-          <span className={styles.playbackDivider} aria-hidden="true" />
-
-          <button
-            type="button"
-            className={buttonStyles.base}
-            title="Force the next advance to be a remix slide (ignores the 3% dice)"
-            onClick={props.onRemixNow}
-          >
-            ◫ Remix now
-          </button>
-
-          <button
-            type="button"
-            className={[props.isPaused ? buttonStyles.active : "", buttonStyles.base].join(" ")}
-            aria-pressed={props.isPaused}
-            onClick={props.onTogglePaused}
-          >
-            {props.isPaused ? "▶ Resume" : "⏸ Pause"}
-          </button>
-
-          <button
-            type="button"
-            className={buttonStyles.base}
-            disabled={!props.canGoPrevious}
-            aria-disabled={!props.canGoPrevious}
-            onClick={props.onPrevious}
-          >
-            Previous
-          </button>
-
-          <button type="button" className={buttonStyles.base} onClick={props.onNext}>
-            Next
-          </button>
-
-          <span className={[styles.playbackHideGroup, styles.secondarySessionControl].join(" ")}>
-            <button type="button" className={buttonStyles.base} onClick={props.onHide}>
-              Hide
+          <div className={styles.playbackCluster}>
+            <button
+              type="button"
+              className={[
+                props.slideshowMode === "random" ? buttonStyles.active : "",
+                buttonStyles.base,
+              ].join(" ")}
+              aria-pressed={props.slideshowMode === "random"}
+              onClick={() => props.onSelectMode("random")}
+            >
+              🔀 Shuffle
             </button>
 
-            <div
-              className={styles.hideProgress}
-              aria-hidden="true"
-              style={
-                {
-                  "--hide-progress": String(Math.max(0, Math.min(1, props.controlsHideProgress))),
-                } as React.CSSProperties
-              }
+            <button
+              type="button"
+              className={[
+                props.slideshowMode === "weighted" ? buttonStyles.active : "",
+                buttonStyles.base,
+              ].join(" ")}
+              aria-pressed={props.slideshowMode === "weighted"}
+              onClick={() => props.onSelectMode("weighted")}
             >
-              <div className={styles.hideProgressRing} />
-            </div>
-          </span>
+              🕒 Recent
+            </button>
+
+            <button
+              type="button"
+              className={[
+                props.slideshowMode === "similar" ? buttonStyles.active : "",
+                buttonStyles.base,
+              ].join(" ")}
+              aria-pressed={props.slideshowMode === "similar"}
+              onClick={() => props.onSelectMode("similar")}
+            >
+              🧭 Similar
+            </button>
+          </div>
+
+          <span className={styles.playbackDivider} aria-hidden="true" />
+
+          <div className={styles.playbackCluster}>
+            <button
+              type="button"
+              className={[
+                props.timeAware ? buttonStyles.active : "",
+                styles.playbackModifier,
+                buttonStyles.base,
+              ].join(" ")}
+              aria-pressed={props.timeAware}
+              title="Bias the shuffle toward photos taken near the current hour and month"
+              onClick={props.onToggleTimeAware}
+            >
+              🌅 Time-of-day
+            </button>
+
+            <button
+              type="button"
+              className={[
+                props.remixEnabled ? buttonStyles.active : "",
+                styles.playbackModifier,
+                buttonStyles.base,
+              ].join(" ")}
+              aria-pressed={props.remixEnabled}
+              title="Occasionally show two or three photos side by side at random"
+              onClick={props.onToggleRemix}
+            >
+              ◫ Remix
+            </button>
+          </div>
+
+          <span className={styles.playbackDivider} aria-hidden="true" />
+
+          <div className={styles.playbackCluster}>
+            <button
+              type="button"
+              className={buttonStyles.base}
+              title="Force the next advance to be a remix slide (ignores the 3% dice)"
+              onClick={props.onRemixNow}
+            >
+              ◫ Remix now
+            </button>
+
+            <button
+              type="button"
+              className={[props.isPaused ? buttonStyles.active : "", buttonStyles.base].join(" ")}
+              aria-pressed={props.isPaused}
+              onClick={props.onTogglePaused}
+            >
+              {props.isPaused ? "▶ Resume" : "⏸ Pause"}
+            </button>
+
+            <button
+              type="button"
+              className={buttonStyles.base}
+              disabled={!props.canGoPrevious}
+              aria-disabled={!props.canGoPrevious}
+              onClick={props.onPrevious}
+            >
+              Previous
+            </button>
+
+            <button type="button" className={buttonStyles.base} onClick={props.onNext}>
+              Next
+            </button>
+
+            <span className={[styles.playbackHideGroup, styles.secondarySessionControl].join(" ")}>
+              <button type="button" className={buttonStyles.base} onClick={props.onHide}>
+                Hide
+              </button>
+
+              <div
+                className={styles.hideProgress}
+                aria-hidden="true"
+                style={
+                  {
+                    "--hide-progress": String(Math.max(0, Math.min(1, props.controlsHideProgress))),
+                  } as React.CSSProperties
+                }
+              >
+                <div className={styles.hideProgressRing} />
+              </div>
+            </span>
+          </div>
         </div>
       </div>
 

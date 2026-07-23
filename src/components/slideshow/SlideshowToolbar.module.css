@@ -207,6 +207,12 @@
   gap: var(--m-s);
 }
 
+/* Transparent on a wide toolbar: the clusters exist to give the narrow layout
+   somewhere sensible to break, not to change the desktop row. */
+.playbackCluster {
+  display: contents;
+}
+
 .playbackDivider {
   inline-size: var(--size-1);
   block-size: var(--size-28);
@@ -616,5 +622,31 @@
   .controlButtons,
   .controlMeta {
     inline-size: 100%;
+  }
+
+  /* Nine playback controls cannot fit one tablet-width row, and left to
+     flex-wrap they break mid-cluster — a lone "Next" under the modifiers, with
+     the dividers stranded at line ends. Stack the three clusters instead, each
+     an equal-width row of its own members, so the wrap lands where the meaning
+     already divides. */
+  .playbackButtons {
+    flex-direction: column;
+    align-items: stretch;
+    flex-wrap: nowrap;
+  }
+
+  .playbackCluster {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(0, 1fr);
+    gap: var(--m-s);
+  }
+
+  .playbackCluster :global(button) {
+    inline-size: 100%;
+  }
+
+  .playbackDivider {
+    display: none;
   }
 }
