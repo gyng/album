@@ -348,6 +348,39 @@ numbers.
 
 ---
 
+## Outcome: MapLibre 6 (the reason Phase 1 existed)
+
+Shipped. `maplibre-gl` is on 6.0.0, and every change needed to get there was confined to
+`adapters/maplibre/` — the port and all consumers were untouched, which is the seam doing exactly
+what it was built for. The failure that blocked v6 under `react-map-gl` (its `_onCameraEvent`
+reading `.center` off a reshaped payload) never reproduced, because the adapter synthesises camera
+state from `getCenter()`/`getZoom()`/`getBearing()`/`getPitch()` instead of trusting event shapes.
+
+Three things broke, only one of them interesting:
+
+- `{set,get}{Layout,Paint}Property` became keyed lookups; the adapter reads specs structurally, so
+  it needed one cast boundary.
+- `GeoJSONSource.setData` is async now and no longer returns the source.
+- **The real one, and it was silent.** v6 is ESM-only and resolves its tile worker from
+  `import.meta.url` inside its own bundle. Turbopack's production output does not keep that as an
+  `http(s)` URL, so the resolver returned `""` — and `new Worker("")` is not an error, it resolves
+  against the document. The map loaded *the page itself* as its worker. The worker died parsing
+  HTML, zero tiles were requested, `load` never fired, `readyMap` stayed null, and no markers,
+  layers or popups ever mounted. Nothing threw; it never even reached the error boundary. Fixed by
+  vendoring the worker (`adapters/maplibre/worker.ts` calling `setWorkerUrl`, and
+  `bin/prepare-maplibre-vendor.cjs` copying the worker plus `maplibre-gl-shared.mjs` into
+  `public/vendor/`).
+
+### The testing gap this exposed
+
+**Typecheck, the 1880 unit tests, and the entire map e2e suite all passed while the map rendered
+nothing.** The map specs stub the style to `{ version: 8, sources: {}, layers: [] }` — with no
+sources there are no tiles to wait for, so `load` fires whether or not the tile worker works. The
+only test that caught it was the slideshow mini-map, which happens to use the real MapTiler style.
+
+Any map spec that stubs its sources away can only prove the map *mounts*, never that it *renders*.
+At least one map test must run against a style with real sources so a dead tile pipeline is fatal.
+
 ## Phase 3 (deferred): a second adapter
 
 Not built now. Adding one — `mapbox-gl` is nearly free via seam 1; a non-GL provider is not —
