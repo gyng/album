@@ -10,11 +10,21 @@ import {
   SlideshowShellScreen,
 } from "./SlideshowShellScreen";
 import { RUNTIME_RELOAD_BASE_DELAY_MS } from "../../util/slideshowShell";
-import { useWakeLock } from "../../components/useWakeLock";
+import { useWakeLock, type WakeLockEvent } from "../../components/useWakeLock";
 import { navigateTo } from "../../util/navigate";
+import { readWakeLog, WAKE_LOG_STORAGE_KEY } from "../../util/wakeLockLog";
 
 const acquireWakeLock = jest.fn().mockResolvedValue(undefined);
 const releaseWakeLock = jest.fn().mockResolvedValue(undefined);
+// Captures the shell's wake-event listener so tests can push internal outcomes
+// (re-acquire failures, cap reached/decayed) the real hook would emit.
+let wakeEventListener: ((event: WakeLockEvent) => void) | null = null;
+const subscribeWakeEvents = jest.fn((listener: (event: WakeLockEvent) => void) => {
+  wakeEventListener = listener;
+  return () => {
+    wakeEventListener = null;
+  };
+});
 let mockWakeLockSupported = true;
 let mockWakeLockActive = true;
 
@@ -36,7 +46,15 @@ const versionResponse = (buildVersion: string) =>
 describe("slideshow code shell", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    window.localStorage.clear();
+    wakeEventListener = null;
     mockWakeLockSupported = true;
+    // Default the lock to ACTIVE. This keeps two effects dormant for the whole
+    // suite: the sustained-loss reset timer and the pointerdown re-acquire
+    // listener both early-return while the lock is active, so most tests never
+    // render the full-screen wake gate. Any future fake-timer test that flips
+    // this to false and advances >= WAKE_LOSS_RESET_MS will re-render the
+    // full-screen gate over the diagnostics UI — query around it accordingly.
     mockWakeLockActive = true;
     mockUseWakeLock.mockImplementation(() => ({
       ref: { current: new EventTarget() },
@@ -44,6 +62,7 @@ describe("slideshow code shell", () => {
       isActive: mockWakeLockActive,
       acquire: acquireWakeLock,
       release: releaseWakeLock,
+      subscribe: subscribeWakeEvents,
     }));
     Object.defineProperty(navigator, "onLine", { configurable: true, value: true });
     window.history.replaceState({}, "", "/slideshow/shell?filter=test-simple&delay=60");
@@ -443,6 +462,86 @@ describe("slideshow code shell", () => {
     } finally {
       jest.useRealTimers();
     }
+  });
+
+  it("restarts the sustained-loss window when the gate is dismissed part-way", async () => {
+    // Dismissing the gate is a fresh user interaction: it must buy a full new
+    // 60s window, not let the original window fire moments later. (This also
+    // moves the wake-lock-failure e2e's flake horizon from settle+60s to
+    // dismissal+60s.)
+    jest.useFakeTimers();
+    try {
+      mockWakeLockActive = false;
+      global.fetch = jest.fn(() => versionResponse("build-current")) as jest.Mock;
+
+      render(<SlideshowShellScreen />);
+      const promptName = "Tap once to keep this slideshow awake through code updates";
+
+      // Settle the auto-acquire window; the sustained-loss timer arms.
+      await act(async () => {
+        jest.advanceTimersByTime(AUTO_WAKE_SETTLE_MS);
+        await Promise.resolve();
+      });
+
+      // Part-way through the loss window (t~=50s), dismiss the gate.
+      await act(async () => {
+        jest.advanceTimersByTime(WAKE_LOSS_RESET_MS - 10000);
+        await Promise.resolve();
+      });
+      fireEvent.click(screen.getByRole("button", { name: promptName }));
+      expect(screen.queryByRole("button", { name: promptName })).not.toBeInTheDocument();
+
+      // Past where the ORIGINAL window would have fired (t~=61s): the gate must
+      // NOT reappear, because dismissal restarted the clock.
+      await act(async () => {
+        jest.advanceTimersByTime(11000);
+        await Promise.resolve();
+      });
+      expect(screen.queryByRole("button", { name: promptName })).not.toBeInTheDocument();
+
+      // A full fresh window after dismissal (t~=110s): now it returns.
+      await act(async () => {
+        jest.advanceTimersByTime(WAKE_LOSS_RESET_MS);
+        await Promise.resolve();
+      });
+      expect(screen.getByRole("button", { name: promptName })).toBeInTheDocument();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it("persists wake events to the wake history log and renders them", async () => {
+    mockWakeLockActive = true;
+    global.fetch = jest.fn(() => versionResponse("build-current")) as jest.Mock;
+
+    const { rerender } = render(<SlideshowShellScreen />);
+
+    // A true -> false transition records a "lost" event; a subsequent
+    // false -> true records an "acquired" event.
+    await act(async () => {
+      mockWakeLockActive = false;
+      rerender(<SlideshowShellScreen />);
+    });
+    await act(async () => {
+      mockWakeLockActive = true;
+      rerender(<SlideshowShellScreen />);
+    });
+
+    // An internal hook outcome (delivered through the subscription) is recorded.
+    await act(async () => {
+      wakeEventListener?.("cap-reached");
+    });
+
+    const stored = readWakeLog(window.localStorage);
+    expect(stored.map((entry) => entry.type)).toEqual(["lost", "acquired", "cap-reached"]);
+    // The raw payload really is in localStorage under the shared key so it
+    // survives a relaunch.
+    expect(window.localStorage.getItem(WAKE_LOG_STORAGE_KEY)).toContain("cap-reached");
+
+    // The diagnostics panel surfaces the history under a disclosure.
+    fireEvent.click(screen.getByRole("button", { name: "Slideshow diagnostics" }));
+    expect(screen.getByText("Wake history")).toBeInTheDocument();
+    expect(screen.getByText("Gave up retrying")).toBeInTheDocument();
   });
 
   it("records wake-lock losses in the diagnostics panel", async () => {

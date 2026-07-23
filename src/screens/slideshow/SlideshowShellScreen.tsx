@@ -5,6 +5,12 @@ import { BUILD_VERSION } from "../../lib/buildVersion";
 import { decideBuildUpdate } from "../../util/kioskRefresh";
 import { navigateTo } from "../../util/navigate";
 import {
+  appendWakeEvent,
+  describeWakeEvent,
+  readWakeLog,
+  type WakeLogEntry,
+} from "../../util/wakeLockLog";
+import {
   buildSlideshowRuntimeUrl,
   isSlideshowRuntimeMessage,
   planRuntimeReload,
@@ -90,12 +96,17 @@ export const SlideshowShellScreen = () => {
   const [pageVisible, setPageVisible] = React.useState(true);
   const [wakeLossCount, setWakeLossCount] = React.useState(0);
   const [lastWakeLossAt, setLastWakeLossAt] = React.useState<Date | null>(null);
+  const [wakeHistory, setWakeHistory] = React.useState<WakeLogEntry[]>([]);
   const {
     isSupported: isWakeLockSupported,
     isActive: isWakeLockActive,
     acquire: acquireWakeLock,
+    subscribe: subscribeWakeEvents,
   } = useWakeLock(false);
   const prevWakeActiveRef = React.useRef(isWakeLockActive);
+  // Whether a loss is currently outstanding, so a later true transition is
+  // logged as a genuine "re-acquired after loss" rather than the initial acquire.
+  const hadWakeLossRef = React.useRef(false);
 
   React.useEffect(() => {
     runtimeSearchRef.current = window.location.search;
@@ -117,15 +128,40 @@ export const SlideshowShellScreen = () => {
     return () => document.removeEventListener("visibilitychange", syncVisibility);
   }, []);
 
+  // Load the persisted wake history once on mount so an overnight incident is
+  // still readable the morning after a relaunch.
+  React.useEffect(() => {
+    setWakeHistory(readWakeLog());
+  }, []);
+
+  // Subscribe to the hook's internal outcomes (re-acquire failures, cap
+  // reached/decayed) — the only wake facts the shell cannot see from isActive —
+  // and append each to the persistent log.
+  React.useEffect(() => {
+    return subscribeWakeEvents((event) => {
+      setWakeHistory(appendWakeEvent(event));
+    });
+  }, [subscribeWakeEvents]);
+
   // Record wake-lock losses for the diagnostics panel so the next field report
   // is debuggable. Count only a true→false transition while the page is
   // visible — a backgrounding turns the lock off deliberately and is not a loss.
+  // The paired false→true transition (only after a real loss) records a
+  // re-acquisition, so the persistent log shows the full lost/regained cycle.
   React.useEffect(() => {
     const wasActive = prevWakeActiveRef.current;
     prevWakeActiveRef.current = isWakeLockActive;
-    if (wasActive && !isWakeLockActive && document.visibilityState === "visible") {
+    if (wasActive === isWakeLockActive) {
+      return;
+    }
+    if (!isWakeLockActive && document.visibilityState === "visible") {
       setWakeLossCount((count) => count + 1);
       setLastWakeLossAt(new Date());
+      hadWakeLossRef.current = true;
+      setWakeHistory(appendWakeEvent("lost"));
+    } else if (isWakeLockActive && hadWakeLossRef.current) {
+      hadWakeLossRef.current = false;
+      setWakeHistory(appendWakeEvent("acquired"));
     }
   }, [isWakeLockActive]);
 
@@ -133,17 +169,26 @@ export const SlideshowShellScreen = () => {
   // only on a SUSTAINED loss — a brief blip while the hook re-acquires must not
   // re-surface it. Arm a timer while the lock stays off (settled and visible);
   // it is cleared the moment the lock returns, the page hides, or we unmount.
+  // Acknowledging the gate is itself a fresh user interaction, so it is a
+  // dependency here: dismissing restarts the window, buying a full 60s before
+  // the gate can reappear (and moving the wake-failure e2e's flake horizon from
+  // settle+60s to dismissal+60s).
   React.useEffect(() => {
     if (!isWakeLockSupported || !autoWakeSettled || isWakeLockActive || !pageVisible) {
       return;
     }
     const timer = window.setTimeout(() => setWakePromptAcknowledged(false), WAKE_LOSS_RESET_MS);
     return () => window.clearTimeout(timer);
-  }, [isWakeLockSupported, autoWakeSettled, isWakeLockActive, pageVisible]);
+  }, [isWakeLockSupported, autoWakeSettled, isWakeLockActive, pageVisible, wakePromptAcknowledged]);
 
-  // Any user gesture on the shell while the lock is off is a chance to acquire
-  // it, since Safari grants wake locks under user activation where it rejects a
-  // gesture-free request. Passive, no visual change, removed once active.
+  // A pointer gesture on the SHELL CHROME (the diagnostics control, the wake
+  // gate, and any letterbox margin around the frame) while the lock is off is a
+  // chance to acquire it, since Safari grants wake locks under user activation
+  // where it rejects a gesture-free request. This window listener does NOT see
+  // taps inside the runtime iframe — those never bubble to the parent window;
+  // the runtime forwards its own gestures via SLIDESHOW_WAKE_REQUEST_MESSAGE,
+  // which covers the main slideshow surface. Passive, no visual change, removed
+  // once active.
   React.useEffect(() => {
     if (!isWakeLockSupported || isWakeLockActive) {
       return;
@@ -522,6 +567,24 @@ export const SlideshowShellScreen = () => {
             <div className={styles.versionRow}>
               checked {lastCheckedAt.toLocaleTimeString("en-GB")}
             </div>
+          ) : null}
+          {wakeHistory.length > 0 ? (
+            <details className={styles.wakeHistory}>
+              <summary>Wake history</summary>
+              <ul className={styles.wakeHistoryList}>
+                {wakeHistory
+                  .slice(-8)
+                  .reverse()
+                  .map((entry, index) => (
+                    <li key={`${entry.at}-${index}`} className={styles.wakeHistoryItem}>
+                      <span>{describeWakeEvent(entry.type)}</span>
+                      <time dateTime={new Date(entry.at).toISOString()}>
+                        {new Date(entry.at).toLocaleString("en-GB")}
+                      </time>
+                    </li>
+                  ))}
+              </ul>
+            </details>
           ) : null}
           <div className={styles.diagnosticActions}>
             {isWakeLockSupported && !isWakeLockActive ? (

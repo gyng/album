@@ -10,6 +10,12 @@ type WakeLockNavigator = Navigator & {
   };
 };
 
+// Internal wake-lock outcomes the shell cannot observe from `isActive` alone:
+// a rejected re-acquire, hitting the give-up cap, and decaying that cap to retry
+// unattended. The shell records lock acquisition/loss itself from `isActive`
+// transitions; the hook pushes only these facts it alone knows.
+export type WakeLockEvent = "reacquire-failed" | "cap-reached" | "cap-decayed";
+
 export type UseWakeLock = {
   // Live sentinel ref — consumers (e.g. the kiosk DB-update poll and the
   // fallback reload) read `.current` to decide whether a wake lock is held.
@@ -18,6 +24,10 @@ export type UseWakeLock = {
   isActive: boolean;
   acquire: () => Promise<void>;
   release: () => Promise<void>;
+  // Subscribe to internal outcomes for the persistent wake event log. Push-based
+  // (not a polled ref) so the log is exact and the callback identity is stable,
+  // never churning the hook's effects. Returns an unsubscribe.
+  subscribe: (listener: (event: WakeLockEvent) => void) => () => void;
 };
 
 // After the system silently drops a held lock (iPadOS does this for thermal /
@@ -37,6 +47,12 @@ const MAX_SYSTEM_REACQUIRES = 5;
 // held; a transiently rejected request recovers once conditions clear. A held
 // lock makes the check a no-op.
 const WAKE_WATCHDOG_INTERVAL_MS = 60000;
+// Once the give-up cap is reached, an unattended kiosk still deserves a chance
+// to recover after the OS condition clears. When this long has passed since the
+// last re-acquire attempt, the watchdog decays the cap and tries again — worst
+// case one 5-attempt burst per this window, so the fight cannot drain a battery
+// yet the kiosk self-heals overnight without a human tap.
+const REACQUIRE_CAP_DECAY_MS = 600000;
 
 // Screen wake-lock lifecycle for the slideshow kiosk: acquire on load and on
 // resume (visibilitychange / Safari PWA pageshow), release on unmount or when
@@ -64,6 +80,12 @@ export const useWakeLock = (disabled: boolean): UseWakeLock => {
   // Pending delayed re-acquire after a system release, so a deliberate release
   // or unmount can cancel it.
   const reacquireTimerRef = React.useRef<number | null>(null);
+  // When the last re-acquire attempt fired (release-listener retry or watchdog),
+  // so the watchdog can decay the give-up cap after a long unattended gap.
+  const lastReacquireAttemptAtRef = React.useRef(0);
+  // Subscribers to internal wake outcomes (the persistent event log). A plain
+  // Set kept in a ref, so subscribing never re-runs the hook's effects.
+  const eventListenersRef = React.useRef(new Set<(event: WakeLockEvent) => void>());
   // Current `disabled` for the release listener / watchdog, whose closures must
   // not act on a stale value.
   const disabledRef = React.useRef(disabled);
@@ -83,6 +105,19 @@ export const useWakeLock = (disabled: boolean): UseWakeLock => {
     // undefined during SSR, so a lazy useState initialiser would throw.
 
     setIsSupported(typeof wakeLock?.request === "function");
+  }, []);
+
+  const emitEvent = useCallback((event: WakeLockEvent) => {
+    for (const listener of eventListenersRef.current) {
+      listener(event);
+    }
+  }, []);
+
+  const subscribe = useCallback((listener: (event: WakeLockEvent) => void) => {
+    eventListenersRef.current.add(listener);
+    return () => {
+      eventListenersRef.current.delete(listener);
+    };
   }, []);
 
   const clearReacquireTimer = useCallback(() => {
@@ -183,13 +218,16 @@ export const useWakeLock = (disabled: boolean): UseWakeLock => {
           }
           if (systemReacquireCountRef.current >= MAX_SYSTEM_REACQUIRES) {
             // Gave up fighting the OS — wait for a visibility change or gesture
-            // (public acquire()) to reset the counter and try again.
+            // (public acquire()) to reset the counter, or for the watchdog to
+            // decay the cap after a long unattended gap.
+            emitEvent("cap-reached");
             return;
           }
           systemReacquireCountRef.current += 1;
           clearReacquireTimer();
           reacquireTimerRef.current = window.setTimeout(() => {
             reacquireTimerRef.current = null;
+            lastReacquireAttemptAtRef.current = Date.now();
             runAcquireRef.current(false);
           }, SYSTEM_REACQUIRE_DELAY_MS);
         });
@@ -199,11 +237,16 @@ export const useWakeLock = (disabled: boolean): UseWakeLock => {
         if (!wakeLockRef.current) {
           setIsActive(false);
         }
+        // Only an internal retry (release listener / watchdog) is a "re-acquire"
+        // — a first/deliberate acquire that fails is not logged as one.
+        if (!resetGiveUp) {
+          emitEvent("reacquire-failed");
+        }
       } finally {
         isAcquiringRef.current = false;
       }
     },
-    [disabled, release, clearReacquireTimer],
+    [disabled, release, clearReacquireTimer, emitEvent],
   );
 
   useEffect(() => {
@@ -283,12 +326,19 @@ export const useWakeLock = (disabled: boolean): UseWakeLock => {
         return;
       }
       if (systemReacquireCountRef.current >= MAX_SYSTEM_REACQUIRES) {
-        return;
+        // The cap holds until a long quiet gap has passed since the last attempt,
+        // then it decays so an unattended kiosk recovers once the OS relents.
+        if (Date.now() - lastReacquireAttemptAtRef.current < REACQUIRE_CAP_DECAY_MS) {
+          return;
+        }
+        systemReacquireCountRef.current = 0;
+        emitEvent("cap-decayed");
       }
+      lastReacquireAttemptAtRef.current = Date.now();
       runAcquireRef.current(false);
     }, WAKE_WATCHDOG_INTERVAL_MS);
     return () => window.clearInterval(interval);
-  }, [disabled]);
+  }, [disabled, emitEvent]);
 
   useEffect(() => {
     return () => {
@@ -296,5 +346,5 @@ export const useWakeLock = (disabled: boolean): UseWakeLock => {
     };
   }, [release]);
 
-  return { ref: wakeLockRef, isSupported, isActive, acquire, release };
+  return { ref: wakeLockRef, isSupported, isActive, acquire, release, subscribe };
 };

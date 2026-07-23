@@ -130,6 +130,37 @@
   font-variant-numeric: tabular-nums;
 }
 
+.wakeHistory {
+  margin-block-start: var(--m-s);
+  padding-block-start: var(--m);
+  border-block-start: solid var(--size-1) var(--c-border-on-dark);
+}
+
+.wakeHistory summary {
+  cursor: pointer;
+  color: color-mix(in oklch, var(--c-white) 58%, transparent);
+  font-size: var(--fs-s);
+}
+
+.wakeHistoryList {
+  margin-block-start: var(--m);
+  padding: 0;
+  list-style: none;
+}
+
+.wakeHistoryItem {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--m-s);
+  padding-block: var(--m);
+  font-variant-numeric: tabular-nums;
+}
+
+.wakeHistoryItem time {
+  color: color-mix(in oklch, var(--c-white) 58%, transparent);
+  white-space: nowrap;
+}
+
 .diagnosticActions {
   display: grid;
   grid-template-columns: 1fr 1fr;

@@ -369,6 +369,71 @@ describe("useWakeLock", () => {
     }
   });
 
+  it("decays the give-up cap and re-attempts after a long unattended gap", async () => {
+    // Once the hook gives up fighting the OS (cap reached), an UNATTENDED kiosk
+    // must still recover on its own once the OS condition clears. The watchdog
+    // holds off while the cap stands, but after a long quiet gap since the last
+    // attempt it decays the cap and tries again — worst case one 5-attempt burst
+    // per decay window.
+    jest.useFakeTimers();
+    const nowSpy = jest.spyOn(Date, "now");
+    let now = 0;
+    nowSpy.mockImplementation(() => now);
+    try {
+      let latest = makeSentinel();
+      request.mockImplementation(() => {
+        latest = makeSentinel();
+        return Promise.resolve(latest);
+      });
+      const { unmount } = renderHook(() => useWakeLock(false));
+      await act(async () => {
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+      expect(request).toHaveBeenCalledTimes(1); // mount acquire
+
+      // Six quick system releases: the counter climbs to the cap (five capped
+      // re-acquires) and the sixth gives up. Each hold is far under the sustained
+      // threshold, so the counter never resets.
+      for (let i = 0; i < 6; i++) {
+        // eslint-disable-next-line no-await-in-loop
+        await act(async () => {
+          latest.dispatchEvent(new Event("release"));
+          now += 1500;
+          jest.advanceTimersByTime(1500);
+          await Promise.resolve();
+          await Promise.resolve();
+        });
+      }
+      // One mount acquire plus five capped re-acquires — the sixth gave up.
+      expect(request).toHaveBeenCalledTimes(6);
+
+      // The last attempt landed at t=7500ms. Advance the watchdog to just under
+      // ten minutes past it: the cap still holds, no new attempt.
+      now = 7500 + 9 * 60000;
+      await act(async () => {
+        jest.advanceTimersByTime(9 * 60000);
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+      expect(request).toHaveBeenCalledTimes(6);
+
+      // Now cross the ten-minute decay window: the watchdog resets the counter
+      // and re-attempts, and the fresh lock holds.
+      now = 7500 + 11 * 60000;
+      await act(async () => {
+        jest.advanceTimersByTime(2 * 60000);
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+      expect(request).toHaveBeenCalledTimes(7);
+      unmount();
+    } finally {
+      nowSpy.mockRestore();
+      jest.useRealTimers();
+    }
+  });
+
   it("ignores a release event from a superseded sentinel", async () => {
     const { result } = renderHook(() => useWakeLock(false));
     await act(async () => {
