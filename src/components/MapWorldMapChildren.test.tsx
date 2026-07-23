@@ -8,6 +8,7 @@ import {
   LazyMapMarkerImage,
   MapAutoFit,
   MapBoundsTracker,
+  MapFitOnRequest,
   MapMiddleDragOrbit,
   useSharedMapMarkerObserver,
 } from "./MapWorldMapChildren";
@@ -77,6 +78,32 @@ describe("MapAutoFit", () => {
       ],
       { padding: 36, duration: 0, maxZoom: 11 },
     );
+  });
+});
+
+describe("MapFitOnRequest", () => {
+  const flyTo = jest.fn();
+  const fitBounds = jest.fn();
+
+  beforeEach(() => {
+    flyTo.mockClear();
+    fitBounds.mockClear();
+    currentMap = { flyTo, fitBounds };
+  });
+
+  it("does not fit on mount, nor when only the photos change", () => {
+    const { rerender } = render(<MapFitOnRequest requestId={0} photos={[photo()]} />);
+    // Refining a search changes the photos but not the request id: filter in
+    // place, leaving the map where the user put it.
+    rerender(<MapFitOnRequest requestId={0} photos={[photo({ decLng: 104 })]} />);
+    expect(flyTo).not.toHaveBeenCalled();
+    expect(fitBounds).not.toHaveBeenCalled();
+  });
+
+  it("frames the photos current at the moment the request id increments", () => {
+    const { rerender } = render(<MapFitOnRequest requestId={0} photos={[photo()]} />);
+    rerender(<MapFitOnRequest requestId={1} photos={[photo({ decLat: 5, decLng: 50 })]} />);
+    expect(flyTo).toHaveBeenCalledWith({ center: [50, 5], zoom: 10.5, speed: 2.2 });
   });
 });
 

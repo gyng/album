@@ -130,6 +130,9 @@ const MapScreen = (props: MapScreenProps) => {
   const [directorEnabled, setDirectorEnabled] = React.useState(false);
   const [directorSequenceLength, setDirectorSequenceLength] = React.useState(0);
   const [mapSearchQuery, setMapSearchQuery] = React.useState("");
+  // Bumped by the "Fit to results" control. Typing filters the markers in place
+  // (auto-fit is off during a search); this lets the user reframe on demand.
+  const [fitRequestId, setFitRequestId] = React.useState(0);
   const [mapSearchIndex, setMapSearchIndex] = React.useState<Map<string, string> | null>(null);
   const [mapSearchStatus, setMapSearchStatus] = React.useState<
     "idle" | "loading" | "ready" | "error"
@@ -365,6 +368,21 @@ const MapScreen = (props: MapScreenProps) => {
                       : `${displayedPhotos.length} photos`}
               </span>
             )}
+            {/* Reframe on demand: the search filters the markers in place, so
+                this is how the user asks the map to fly to the matches. */}
+            {deferredMapSearchQuery.trim() && displayedPhotos.length > 0 ? (
+              <button
+                type="button"
+                className={styles.mapSearchFit}
+                aria-label="Fit the map to the results"
+                onClick={() => {
+                  setFitRequestId((id) => id + 1);
+                }}
+              >
+                <span aria-hidden="true">⤢</span>
+                Fit
+              </button>
+            ) : null}
             {/* The tour reads as "play these results", so it belongs with the
                 result count rather than floating over the map, and only once
                 there are results to tour. */}
@@ -389,7 +407,10 @@ const MapScreen = (props: MapScreenProps) => {
         photos={filteredPhotos}
         // invariant: CSS module classes always resolve
         className={styles.map!}
-        fitToPhotos={!hasCameraParams}
+        // Auto-fit only frames the initial view; a search filters in place
+        // rather than flying the map to the matches.
+        fitToPhotos={!hasCameraParams && !deferredMapSearchQuery.trim()}
+        fitRequestId={fitRequestId}
         showRoute={!filterAlbum && showAllRoutes}
         routeMode={filterAlbum ? defaultRouteMode : "simplified"}
         routeDisplayMode={!filterAlbum && showAllRoutes ? "always" : "active-only"}

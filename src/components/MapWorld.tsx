@@ -28,7 +28,12 @@ import {
   MapBounds,
   stylePhotosByRecency,
 } from "./mapWorldViewModel";
-import { MapAutoFit, MapBoundsTracker, MapMiddleDragOrbit } from "./MapWorldMapChildren";
+import {
+  MapAutoFit,
+  MapBoundsTracker,
+  MapFitOnRequest,
+  MapMiddleDragOrbit,
+} from "./MapWorldMapChildren";
 import { MapRouteOverlay } from "./MapRouteOverlay";
 import { MapPhotoPopup } from "./MapPhotoPopup";
 import { MapPhotoMarkers } from "./MapPhotoMarkers";
@@ -44,6 +49,9 @@ export type MapWorldProps = {
   style?: React.CSSProperties;
   syncRoute?: boolean;
   fitToPhotos?: boolean;
+  /** Increment to frame the current photos on demand (the "Fit to results"
+   *  control), independent of the auto-fit that stays off during a search. */
+  fitRequestId?: number;
   showThemeBootstrap?: boolean;
   showRoute?: boolean;
   routeMode?: RouteMode;
@@ -98,6 +106,7 @@ export const MMap: React.FC<MapWorldProps> = ({
   style,
   syncRoute = true,
   fitToPhotos = false,
+  fitRequestId = 0,
   showThemeBootstrap = true,
   showRoute = false,
   routeMode = "full",
@@ -470,6 +479,7 @@ export const MMap: React.FC<MapWorldProps> = ({
           }}
         >
           <MapAutoFit enabled={fitToPhotos} photos={photos} />
+          <MapFitOnRequest requestId={fitRequestId} photos={photos} />
           <MapBoundsTracker onBoundsChange={setBounds} />
           <MapMiddleDragOrbit onInteractionStart={stopDirector} />
           <MapDirector

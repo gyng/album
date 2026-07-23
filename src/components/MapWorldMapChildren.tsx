@@ -1,10 +1,42 @@
 import React from "react";
-import { useMap } from "react-map-gl/maplibre";
+import { type MapRef, useMap } from "react-map-gl/maplibre";
 import { computeWrapAwareBounds } from "../util/mapBounds";
 import type { MapWorldEntry } from "../util/pageDataTypes";
 import type { MapBounds } from "./mapWorldViewModel";
 import { getMiddleDragCamera } from "./mapInteractions";
 import styles from "./MapWorld.module.css";
+
+// Frames the map on a set of photos: flyTo a single point, or fitBounds the
+// enclosing rectangle. Shared by the initial auto-fit and the on-demand
+// "Fit to results" control.
+const fitMapToPhotos = (map: MapRef, photos: MapWorldEntry[]) => {
+  const coordinates = photos
+    .filter((photo) => photo.decLat !== null && photo.decLng !== null)
+    .map((photo) => [photo.decLng as number, photo.decLat as number] as [number, number]);
+
+  if (coordinates.length === 0) {
+    return;
+  }
+
+  if (coordinates.length === 1) {
+    const first = coordinates[0];
+    if (!first) {
+      return;
+    }
+    const [longitude, latitude] = first;
+    map.flyTo({ center: [longitude, latitude], zoom: 10.5, speed: 2.2 });
+    return;
+  }
+
+  // Two or more validated coordinates always produce bounds.
+  const bounds = computeWrapAwareBounds(coordinates)!;
+
+  map.fitBounds(bounds, {
+    padding: 36,
+    duration: 0,
+    maxZoom: 11,
+  });
+};
 
 export const MapAutoFit = ({ enabled, photos }: { enabled: boolean; photos: MapWorldEntry[] }) => {
   const { current: map } = useMap();
@@ -13,34 +45,32 @@ export const MapAutoFit = ({ enabled, photos }: { enabled: boolean; photos: MapW
     if (!enabled || !map) {
       return;
     }
-
-    const coordinates = photos
-      .filter((photo) => photo.decLat !== null && photo.decLng !== null)
-      .map((photo) => [photo.decLng as number, photo.decLat as number] as [number, number]);
-
-    if (coordinates.length === 0) {
-      return;
-    }
-
-    if (coordinates.length === 1) {
-      const first = coordinates[0];
-      if (!first) {
-        return;
-      }
-      const [longitude, latitude] = first;
-      map.flyTo({ center: [longitude, latitude], zoom: 10.5, speed: 2.2 });
-      return;
-    }
-
-    // Two or more validated coordinates always produce bounds.
-    const bounds = computeWrapAwareBounds(coordinates)!;
-
-    map.fitBounds(bounds, {
-      padding: 36,
-      duration: 0,
-      maxZoom: 11,
-    });
+    fitMapToPhotos(map, photos);
   }, [enabled, map, photos]);
+
+  return null;
+};
+
+// Frames the current photos on demand, whenever `requestId` changes. This lets
+// the map filter in place while a search is typed (auto-fit stays off during a
+// search) yet still offer a one-tap "fit to these results".
+export const MapFitOnRequest = ({
+  requestId,
+  photos,
+}: {
+  requestId: number;
+  photos: MapWorldEntry[];
+}) => {
+  const { current: map } = useMap();
+  const handledRef = React.useRef(requestId);
+
+  React.useEffect(() => {
+    if (!map || requestId === handledRef.current) {
+      return;
+    }
+    handledRef.current = requestId;
+    fitMapToPhotos(map, photos);
+  }, [map, requestId, photos]);
 
   return null;
 };

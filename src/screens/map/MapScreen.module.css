@@ -76,7 +76,6 @@
 .mapSearchStatus {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: var(--m-s);
   min-block-size: var(--size-22);
 }
@@ -97,15 +96,19 @@
    nested inside the tour button. It takes the space the tour trigger leaves and
    may wrap within the fixed box width rather than widening it. */
 .mapSearchStatus > span {
+  /* Take the leading space so the Fit/Tour actions group at the trailing edge. */
+  flex: 1 1 auto;
   min-inline-size: 0;
   color: color-mix(in oklch, var(--c-font) 70%, transparent);
   font-size: var(--fs-xs);
   font-variant-numeric: tabular-nums;
 }
 
-/* Sits with the result count inside the search box: the tour plays whatever the
-   search matched, so it reads as part of the result rather than a map control. */
-.mapSearchTour {
+/* Sit with the result count inside the search box: the tour plays whatever the
+   search matched and Fit reframes it, so they read as part of the result rather
+   than map controls. */
+.mapSearchTour,
+.mapSearchFit {
   display: inline-flex;
   align-items: center;
   gap: var(--m);
@@ -125,7 +128,8 @@
   color: var(--c-accent);
 }
 
-.mapSearchTour:focus-visible {
+.mapSearchTour:focus-visible,
+.mapSearchFit:focus-visible {
   outline: solid var(--size-2) var(--c-bg-contrast-light);
   outline-offset: var(--size-1);
 }

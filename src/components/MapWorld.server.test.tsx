@@ -20,6 +20,7 @@ jest.mock("react-map-gl/maplibre", () => ({
 jest.mock("./ThemeToggle", () => ({ ThemeToggle: () => null }));
 jest.mock("./MapWorldMapChildren", () => ({
   MapAutoFit: () => null,
+  MapFitOnRequest: () => null,
   MapBoundsTracker: () => null,
   MapMiddleDragOrbit: () => null,
 }));
