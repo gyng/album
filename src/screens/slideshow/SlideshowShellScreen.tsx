@@ -27,6 +27,11 @@ export const RUNTIME_READY_TIMEOUT_MS = 20000;
 // settle before offering the full-screen tap gate, so it does not flash and
 // swallow taps during the acquire window on every launch.
 export const AUTO_WAKE_SETTLE_MS = 1000;
+// How long the lock may stay inactive (while settled and visible) before the
+// shell treats it as a SUSTAINED loss and re-shows the one-tap wake gate. A
+// short blip while the hook re-acquires must not re-surface the affordance, so
+// only a continuous loss past this window counts.
+export const WAKE_LOSS_RESET_MS = 60000;
 
 type VersionManifest = {
   buildVersion?: string;
@@ -82,11 +87,15 @@ export const SlideshowShellScreen = () => {
   const [wakePromptAcknowledged, setWakePromptAcknowledged] = React.useState(false);
   const [autoWakeSettled, setAutoWakeSettled] = React.useState(false);
   const [lastCheckedAt, setLastCheckedAt] = React.useState<Date | null>(null);
+  const [pageVisible, setPageVisible] = React.useState(true);
+  const [wakeLossCount, setWakeLossCount] = React.useState(0);
+  const [lastWakeLossAt, setLastWakeLossAt] = React.useState<Date | null>(null);
   const {
     isSupported: isWakeLockSupported,
     isActive: isWakeLockActive,
     acquire: acquireWakeLock,
   } = useWakeLock(false);
+  const prevWakeActiveRef = React.useRef(isWakeLockActive);
 
   React.useEffect(() => {
     runtimeSearchRef.current = window.location.search;
@@ -98,6 +107,53 @@ export const SlideshowShellScreen = () => {
     const timer = window.setTimeout(() => setAutoWakeSettled(true), AUTO_WAKE_SETTLE_MS);
     return () => window.clearTimeout(timer);
   }, []);
+
+  // Track document visibility so the sustained-loss detector does not count a
+  // backgrounded page (whose lock is inactive by design) as a wake-lock loss.
+  React.useEffect(() => {
+    const syncVisibility = () => setPageVisible(document.visibilityState === "visible");
+    syncVisibility();
+    document.addEventListener("visibilitychange", syncVisibility);
+    return () => document.removeEventListener("visibilitychange", syncVisibility);
+  }, []);
+
+  // Record wake-lock losses for the diagnostics panel so the next field report
+  // is debuggable. Count only a true→false transition while the page is
+  // visible — a backgrounding turns the lock off deliberately and is not a loss.
+  React.useEffect(() => {
+    const wasActive = prevWakeActiveRef.current;
+    prevWakeActiveRef.current = isWakeLockActive;
+    if (wasActive && !isWakeLockActive && document.visibilityState === "visible") {
+      setWakeLossCount((count) => count + 1);
+      setLastWakeLossAt(new Date());
+    }
+  }, [isWakeLockActive]);
+
+  // A lock lost long after the launch tap must bring the one-tap gate back, but
+  // only on a SUSTAINED loss — a brief blip while the hook re-acquires must not
+  // re-surface it. Arm a timer while the lock stays off (settled and visible);
+  // it is cleared the moment the lock returns, the page hides, or we unmount.
+  React.useEffect(() => {
+    if (!isWakeLockSupported || !autoWakeSettled || isWakeLockActive || !pageVisible) {
+      return;
+    }
+    const timer = window.setTimeout(() => setWakePromptAcknowledged(false), WAKE_LOSS_RESET_MS);
+    return () => window.clearTimeout(timer);
+  }, [isWakeLockSupported, autoWakeSettled, isWakeLockActive, pageVisible]);
+
+  // Any user gesture on the shell while the lock is off is a chance to acquire
+  // it, since Safari grants wake locks under user activation where it rejects a
+  // gesture-free request. Passive, no visual change, removed once active.
+  React.useEffect(() => {
+    if (!isWakeLockSupported || isWakeLockActive) {
+      return;
+    }
+    const handlePointerDown = () => {
+      void acquireWakeLock();
+    };
+    window.addEventListener("pointerdown", handlePointerDown, { passive: true });
+    return () => window.removeEventListener("pointerdown", handlePointerDown);
+  }, [isWakeLockSupported, isWakeLockActive, acquireWakeLock]);
 
   const clearPendingReload = React.useCallback(() => {
     if (reloadTimerRef.current !== null) {
@@ -450,6 +506,15 @@ export const SlideshowShellScreen = () => {
             <span>Network</span>
             <strong>{isOnline ? "Online" : "Offline"}</strong>
           </div>
+          <div className={styles.diagnosticRow}>
+            <span>Wake losses</span>
+            <strong>{wakeLossCount}</strong>
+          </div>
+          {lastWakeLossAt ? (
+            <div className={styles.versionRow}>
+              last loss {lastWakeLossAt.toLocaleTimeString("en-GB")}
+            </div>
+          ) : null}
           <div className={styles.versionRow} title={runtimeVersion}>
             runtime {shortVersion(runtimeVersion)} · shell {shortVersion(BUILD_VERSION)}
           </div>

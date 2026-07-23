@@ -6,6 +6,7 @@ import { act, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import {
   AUTO_WAKE_SETTLE_MS,
   RUNTIME_READY_TIMEOUT_MS,
+  WAKE_LOSS_RESET_MS,
   SlideshowShellScreen,
 } from "./SlideshowShellScreen";
 import { RUNTIME_RELOAD_BASE_DELAY_MS } from "../../util/slideshowShell";
@@ -398,6 +399,67 @@ describe("slideshow code shell", () => {
     } finally {
       jest.useRealTimers();
     }
+  });
+
+  it("re-acquires the wake lock on a pointer gesture while it is inactive", async () => {
+    // User gestures grant activation where Safari requires it, so a tap anywhere
+    // on the shell while the lock is off must attempt a fresh acquire.
+    mockWakeLockActive = false;
+    global.fetch = jest.fn(() => versionResponse("build-current")) as jest.Mock;
+
+    render(<SlideshowShellScreen />);
+    await act(async () => {
+      await Promise.resolve();
+    });
+    acquireWakeLock.mockClear();
+
+    fireEvent.pointerDown(document.body);
+    expect(acquireWakeLock).toHaveBeenCalled();
+  });
+
+  it("re-shows the one-tap wake gate after a sustained wake-lock loss", async () => {
+    // A lock lost long after the launch tap must bring the affordance back so a
+    // daytime user can restore it with a single tap.
+    jest.useFakeTimers();
+    try {
+      mockWakeLockActive = false;
+      global.fetch = jest.fn(() => versionResponse("build-current")) as jest.Mock;
+
+      render(<SlideshowShellScreen />);
+      const promptName = "Tap once to keep this slideshow awake through code updates";
+
+      await act(async () => {
+        jest.advanceTimersByTime(AUTO_WAKE_SETTLE_MS);
+        await Promise.resolve();
+      });
+      fireEvent.click(screen.getByRole("button", { name: promptName }));
+      expect(screen.queryByRole("button", { name: promptName })).not.toBeInTheDocument();
+
+      await act(async () => {
+        jest.advanceTimersByTime(WAKE_LOSS_RESET_MS);
+        await Promise.resolve();
+      });
+      expect(screen.getByRole("button", { name: promptName })).toBeInTheDocument();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it("records wake-lock losses in the diagnostics panel", async () => {
+    mockWakeLockActive = true;
+    global.fetch = jest.fn(() => versionResponse("build-current")) as jest.Mock;
+
+    const { rerender } = render(<SlideshowShellScreen />);
+    fireEvent.click(screen.getByRole("button", { name: "Slideshow diagnostics" }));
+    expect(screen.getByText("Wake losses").parentElement).toHaveTextContent("0");
+
+    await act(async () => {
+      mockWakeLockActive = false;
+      rerender(<SlideshowShellScreen />);
+    });
+
+    expect(screen.getByText("Wake losses").parentElement).toHaveTextContent("1");
+    expect(screen.getByText(/last loss/)).toBeInTheDocument();
   });
 
   it("exits the outer shell when the slideshow runtime asks to leave", async () => {

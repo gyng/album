@@ -266,6 +266,109 @@ describe("useWakeLock", () => {
     expect(result.current.isActive).toBe(false);
   });
 
+  it("re-acquires after the system silently drops the lock while visible", async () => {
+    // iPadOS drops a held screen lock for thermal/battery/system-UI reasons
+    // while the page stays visible. Nothing deliberate released it, so the hook
+    // must fight back and re-acquire after a short settling delay.
+    jest.useFakeTimers();
+    try {
+      let latest = makeSentinel();
+      request.mockImplementation(() => {
+        latest = makeSentinel();
+        return Promise.resolve(latest);
+      });
+      const { result, unmount } = renderHook(() => useWakeLock(false));
+      await act(async () => {
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+      expect(request).toHaveBeenCalledTimes(1);
+      expect(result.current.isActive).toBe(true);
+
+      act(() => {
+        latest.dispatchEvent(new Event("release"));
+      });
+      expect(result.current.isActive).toBe(false);
+
+      await act(async () => {
+        jest.advanceTimersByTime(1500);
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+      expect(request).toHaveBeenCalledTimes(2);
+      expect(result.current.isActive).toBe(true);
+      unmount();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it("stops re-acquiring after repeated system releases without a sustained hold", async () => {
+    // If the OS instantly re-releases every re-acquire, the hook must not drain
+    // the battery fighting it forever — it caps the consecutive retries.
+    jest.useFakeTimers();
+    try {
+      let latest = makeSentinel();
+      request.mockImplementation(() => {
+        latest = makeSentinel();
+        return Promise.resolve(latest);
+      });
+      const { unmount } = renderHook(() => useWakeLock(false));
+      await act(async () => {
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+      expect(request).toHaveBeenCalledTimes(1);
+
+      for (let i = 0; i < 8; i++) {
+        // eslint-disable-next-line no-await-in-loop
+        await act(async () => {
+          latest.dispatchEvent(new Event("release"));
+          jest.advanceTimersByTime(1500);
+          await Promise.resolve();
+          await Promise.resolve();
+        });
+      }
+
+      // One mount acquire plus at most five capped re-acquires.
+      expect(request).toHaveBeenCalledTimes(6);
+      unmount();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it("watchdog re-acquires a lost lock a minute later once conditions clear", async () => {
+    // Safari can reject a request transiently (e.g. low battery). The 60s
+    // watchdog retries so the lock recovers once the platform is willing again.
+    jest.useFakeTimers();
+    try {
+      const consoleError = jest.spyOn(console, "error").mockImplementation(() => undefined);
+      request.mockRejectedValueOnce(new Error("low battery"));
+      const recovered = makeSentinel();
+      request.mockImplementation(() => Promise.resolve(recovered));
+      const { result, unmount } = renderHook(() => useWakeLock(false));
+
+      await act(async () => {
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+      expect(result.current.isActive).toBe(false);
+
+      await act(async () => {
+        jest.advanceTimersByTime(60000);
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+      expect(request).toHaveBeenCalledTimes(2);
+      expect(result.current.isActive).toBe(true);
+      consoleError.mockRestore();
+      unmount();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
   it("ignores a release event from a superseded sentinel", async () => {
     const { result } = renderHook(() => useWakeLock(false));
     await act(async () => {
