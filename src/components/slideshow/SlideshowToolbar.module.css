@@ -312,6 +312,9 @@
 }
 
 .topicForm .topicInput {
+  /* The shared Input primitive sets no font-family; inherit the toolbar's so
+     this field matches its sibling controls rather than the UA input face. */
+  font-family: inherit;
   inline-size: auto;
   padding: var(--m-s) var(--m-m);
   border: solid var(--size-1) var(--glass-border);
