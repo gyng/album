@@ -41,29 +41,26 @@
 }
 
 .mapSearch {
-  display: inline-flex;
-  align-items: center;
+  /* A fixed-footprint column: the input, then a persistent status row. The old
+     inline-flex + flex-wrap + fit-content box let the status content drive the
+     layout, so as the text swung between "1444 photos", "935 of 1444 photos"
+     and "No photos match …" the box grew from 273→362px wide and reflowed
+     2→3 rows, throwing the count across the box on every keystroke. A stable
+     width and a dedicated status row keep the whole thing still. */
+  display: flex;
+  flex-direction: column;
   gap: var(--m-s);
   padding: var(--m);
   border: solid var(--size-2) var(--c-bg-contrast-light);
   border-radius: var(--m-s);
   background: var(--c-bg);
   margin-block-start: var(--m-s);
-  /* The title bar reserves its right edge for MapLibre's stacked controls, so a
-     phone leaves ~271px for the input, the result count and the tour trigger,
-     which want ~330px. The row wraps rather than squeezing the count into its
-     min-width, where it wrapped internally and made the box tall. `fit-content`
-     keeps the box hugging its widest row instead of spanning the whole bar. */
-  flex-wrap: wrap;
-  inline-size: fit-content;
-  max-inline-size: 100%;
+  inline-size: min(var(--size-280), 100%);
 }
 
 .mapSearch input {
-  /* Shrinkable: the result count and tour trigger only appear once a search is
-     running, and they take priority over placeholder room. */
-  flex: 1 1 min(var(--size-200), 42dvw);
-  min-inline-size: var(--map-search-min-width);
+  inline-size: 100%;
+  min-inline-size: 0;
   padding: var(--m-s);
   border: 0;
   background: transparent;
@@ -71,6 +68,17 @@
   font-family: inherit;
   /* Match the search page's canonical Input sizing for a consistent field. */
   font-size: var(--fs-sm);
+}
+
+/* Always present, so it never pops the box taller when a search starts; the
+   tour trigger is the tallest child, so reserving its height keeps the box a
+   constant height whether or not the trigger is shown. */
+.mapSearchStatus {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--m-s);
+  min-block-size: var(--size-22);
 }
 
 /* 16px on touch devices stops iOS Safari zooming the page on focus */
@@ -85,19 +93,14 @@
   outline-offset: var(--size-1);
 }
 
-/* Direct child only: the result count, not the icon nested inside the tour
-   button, which this was padding out to 4.5em and making the button ~86px wide
-   for a play glyph and one word. */
-.mapSearch > span {
-  /* Squeezed to its min-width the count wrapped over several lines and made the
-     whole box tall; it is short enough to just keep on one line. */
-  white-space: nowrap;
-  flex: 0 0 auto;
-  min-inline-size: 4.5em;
+/* Direct child of the status row: the result count / message, not the icon
+   nested inside the tour button. It takes the space the tour trigger leaves and
+   may wrap within the fixed box width rather than widening it. */
+.mapSearchStatus > span {
+  min-inline-size: 0;
   color: color-mix(in oklch, var(--c-font) 70%, transparent);
   font-size: var(--fs-xs);
   font-variant-numeric: tabular-nums;
-  text-align: end;
 }
 
 /* Sits with the result count inside the search box: the tour plays whatever the

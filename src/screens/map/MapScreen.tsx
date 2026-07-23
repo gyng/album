@@ -335,42 +335,53 @@ const MapScreen = (props: MapScreenProps) => {
             spellCheck={false}
             aria-busy={mapSearchStatus === "loading"}
           />
-          {mapSearchStatus === "error" ? (
-            <>
-              <span role="status">Search unavailable</span>
-              <button type="button" className={styles.mapSearchRetry} onClick={loadMapSearchIndex}>
-                Try again
+          {/* A persistent status row below the input. Keeping it in its own row
+              (rather than wrapping inline off the input) is what stops the count,
+              the "N of M" text and the tour trigger reflowing the whole box —
+              which grew from 273 to 362px wide and jumped 2→3 rows on every
+              keystroke, teleporting the count from bottom-left to top-right. */}
+          <div className={styles.mapSearchStatus}>
+            {mapSearchStatus === "error" ? (
+              <>
+                <span role="status">Search unavailable</span>
+                <button
+                  type="button"
+                  className={styles.mapSearchRetry}
+                  onClick={loadMapSearchIndex}
+                >
+                  Try again
+                </button>
+              </>
+            ) : (
+              <span aria-live="polite">
+                {mapSearchStatus === "loading"
+                  ? "Loading search…"
+                  : deferredMapSearchQuery.trim() && displayedPhotos.length === 0
+                    ? timeRange && filteredPhotos.length > 0
+                      ? "No matching photos in these dates."
+                      : `No photos match “${deferredMapSearchQuery.trim()}”.`
+                    : deferredMapSearchQuery.trim()
+                      ? `${displayedPhotos.length} of ${dateFilteredAlbumPhotos.length} photos`
+                      : `${displayedPhotos.length} photos`}
+              </span>
+            )}
+            {/* The tour reads as "play these results", so it belongs with the
+                result count rather than floating over the map, and only once
+                there are results to tour. */}
+            {deferredMapSearchQuery.trim() && directorSequenceLength > 1 ? (
+              <button
+                type="button"
+                className={styles.mapSearchTour}
+                aria-pressed={directorEnabled}
+                onClick={() => {
+                  setDirectorEnabled((current) => !current);
+                }}
+              >
+                <span aria-hidden="true">{directorEnabled ? "■" : "▶"}</span>
+                Tour
               </button>
-            </>
-          ) : (
-            <span aria-live="polite">
-              {mapSearchStatus === "loading"
-                ? "Loading search…"
-                : deferredMapSearchQuery.trim() && displayedPhotos.length === 0
-                  ? timeRange && filteredPhotos.length > 0
-                    ? "No matching photos in these dates."
-                    : `No photos match “${deferredMapSearchQuery.trim()}”.`
-                  : deferredMapSearchQuery.trim()
-                    ? `${displayedPhotos.length} of ${dateFilteredAlbumPhotos.length} photos`
-                    : `${displayedPhotos.length} photos`}
-            </span>
-          )}
-          {/* The tour reads as "play these results", so it belongs with the
-              result count rather than floating over the map, and only once
-              there are results to tour. */}
-          {deferredMapSearchQuery.trim() && directorSequenceLength > 1 ? (
-            <button
-              type="button"
-              className={styles.mapSearchTour}
-              aria-pressed={directorEnabled}
-              onClick={() => {
-                setDirectorEnabled((current) => !current);
-              }}
-            >
-              <span aria-hidden="true">{directorEnabled ? "■" : "▶"}</span>
-              Tour
-            </button>
-          ) : null}
+            ) : null}
+          </div>
         </div>
       </div>
 
