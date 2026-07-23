@@ -225,6 +225,9 @@ describe("EmptyStateExplore", () => {
 
     await waitFor(() => expect(mockRandom).toHaveBeenCalledTimes(2));
     expect(disconnect).toHaveBeenCalled();
+    // The auto-extend is in flight over the already-rendered tiles: no in-flow
+    // status line may appear above them (it would shift the page mid-scroll).
+    expect(screen.queryByText("Loading random photos…")).toBeNull();
     await act(async () => {
       resolveAuto(rows("auto", 8));
       await Promise.resolve();
@@ -265,6 +268,10 @@ describe("EmptyStateExplore", () => {
     const more = await screen.findByRole("button", { name: "More…" });
     fireEvent.click(more);
     expect(await screen.findByRole("button", { name: "Loading…" })).toBeTruthy();
+    // The in-flow "Loading recent photos…" line must not reappear above the
+    // already-mounted grid during a refresh — that would shove the tiles down
+    // and snap them back. The load-more button's own label carries the state.
+    expect(screen.queryByText("Loading recent photos…")).toBeNull();
     await act(async () => {
       resolveNext([]);
       await Promise.resolve();

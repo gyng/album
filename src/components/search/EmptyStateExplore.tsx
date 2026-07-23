@@ -305,7 +305,11 @@ export const EmptyStateExplore: React.FC<Props> = ({
             </Heading>
           </div>
 
-          {!database || isRecentLoading || isMemoriesLoading ? (
+          {/* Only while the grid is still empty: during a "More…"/refresh the
+              existing tiles stay mounted, so an in-flow status line here would
+              shove them down and snap them back. The load-more button carries
+              its own "Loading…" label for that case. */}
+          {(!database || isRecentLoading || isMemoriesLoading) && recentResults.length === 0 ? (
             <div className={styles.sectionStatus}>Loading recent photos…</div>
           ) : null}
 
@@ -433,7 +437,10 @@ export const EmptyStateExplore: React.FC<Props> = ({
             </Heading>
           </div>
 
-          {!database || isRandomResultsLoading ? (
+          {/* Guarded like the recent section: the random grid auto-loads on
+              scroll (IntersectionObserver), so an in-flow status line above the
+              mounted tiles would shift the whole page down on every extend. */}
+          {(!database || isRandomResultsLoading) && randomResults.length === 0 ? (
             <div className={styles.sectionStatus}>Loading random photos…</div>
           ) : null}
 
