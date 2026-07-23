@@ -15,7 +15,7 @@ describe("video tools without bundled binaries", () => {
   const originalNodeEnv = process.env.NODE_ENV;
 
   afterEach(() => {
-    process.env.NODE_ENV = originalNodeEnv;
+    (process.env as Record<string, string | undefined>).NODE_ENV = originalNodeEnv;
     jest.restoreAllMocks();
   });
 
@@ -24,7 +24,7 @@ describe("video tools without bundled binaries", () => {
   });
 
   it("rejects encoding after invalidating a cache when ffmpeg is unavailable", async () => {
-    process.env.NODE_ENV = "production";
+    (process.env as Record<string, string | undefined>).NODE_ENV = "production";
     jest.spyOn(fs, "mkdirSync").mockImplementation(() => undefined);
     jest.spyOn(fs, "existsSync").mockReturnValue(true);
     jest.spyOn(fs, "statSync").mockReturnValue({ size: 10 } as fs.Stats);

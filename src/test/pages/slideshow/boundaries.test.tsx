@@ -252,7 +252,7 @@ describe("slideshow page boundaries", () => {
     reloadCurrentPage.mockClear();
     navigateTo.mockClear();
     window.history.replaceState({}, "", "/slideshow");
-    global.fetch = jest.fn(async (input: string, init?: RequestInit) => {
+    global.fetch = jest.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       if (input === "/version.json") return { ok: false } as Response;
       if (init?.method === "HEAD") return { ok: false } as Response;
       return { ok: false } as Response;
@@ -591,7 +591,7 @@ describe("slideshow page boundaries", () => {
 
   it("runs online, visibility, database, and fallback polling paths", async () => {
     let dbEtag: string | null = null;
-    global.fetch = jest.fn(async (input: string, init?: RequestInit) => {
+    global.fetch = jest.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       if (input === "/version.json") {
         return { ok: true, json: async () => ({ buildVersion: "build-current" }) } as Response;
       }
@@ -647,7 +647,7 @@ describe("slideshow page boundaries", () => {
 
   it("reports polling failures without breaking the slideshow", async () => {
     const error = jest.spyOn(console, "error").mockImplementation(() => {});
-    global.fetch = jest.fn(async (input: string) => {
+    global.fetch = jest.fn(async (input: RequestInfo | URL) => {
       if (input === "/version.json") throw new Error("manifest offline");
       throw new Error("database offline");
     });

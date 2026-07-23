@@ -48,7 +48,7 @@ const baseProps = {
   cumulativeScore: 200,
   timeLimit: null,
   guess: { lat: 35.01, lng: 139.01 },
-  onComplete: jest.fn<(result: RoundResult) => void>(),
+  onComplete: jest.fn<void, [RoundResult]>(),
   onReveal: jest.fn(),
   onAbort: jest.fn(),
   mapSlot: <div>Map slot</div>,
@@ -57,7 +57,7 @@ const baseProps = {
 const renderRound = (overrides: Partial<React.ComponentProps<typeof GuessRound>> = {}) => {
   const props = {
     ...baseProps,
-    onComplete: jest.fn<(result: RoundResult) => void>(),
+    onComplete: jest.fn<void, [RoundResult]>(),
     onReveal: jest.fn(),
     onAbort: jest.fn(),
     ...overrides,

@@ -63,7 +63,8 @@ describe("slideshow code shell", () => {
     // full-screen gate over the diagnostics UI — query around it accordingly.
     mockWakeLockActive = true;
     mockUseWakeLock.mockImplementation(() => ({
-      ref: { current: new EventTarget() },
+      // A bare EventTarget stands in for the WakeLockSentinel the ref carries.
+      ref: { current: new EventTarget() as unknown as WakeLockSentinel },
       isSupported: mockWakeLockSupported,
       isActive: mockWakeLockActive,
       acquire: acquireWakeLock,

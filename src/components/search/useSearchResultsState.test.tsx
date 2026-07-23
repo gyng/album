@@ -12,9 +12,13 @@ import {
   fetchSimilarResults,
 } from "./api";
 import { useTextVector } from "./useTextVector";
+import type { SearchMode } from "./useTextVector";
 import { useSearchResultsState } from "./useSearchResultsState";
+import type { RGB } from "../../util/colorDistance";
+import type { SimilarityOrder } from "./searchUtils";
+import type { SearchFacetSelection } from "../../util/searchFacets";
 
-const mockUseDebounce = jest.fn((value: unknown) => [value]);
+const mockUseDebounce = jest.fn((...args: unknown[]) => [args[0]]);
 jest.mock("use-debounce", () => ({
   useDebounce: (...args: unknown[]) => mockUseDebounce(...args),
 }));
@@ -41,12 +45,12 @@ const baseProps = () => ({
   database,
   embeddingsDatabase,
   searchInputValue: "",
-  similarPath: null,
-  similarityOrder: "most" as const,
-  colorSearch: null,
+  similarPath: null as string | null,
+  similarityOrder: "most" as SimilarityOrder,
+  colorSearch: null as RGB | null,
   colorTolerance: 20,
-  searchMode: "keyword" as const,
-  selectedFacets: [],
+  searchMode: "keyword" as SearchMode,
+  selectedFacets: [] as SearchFacetSelection[],
   hasHydratedFromUrl: true,
 });
 

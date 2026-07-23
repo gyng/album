@@ -6,6 +6,7 @@ import { act, renderHook } from "@testing-library/react";
 import { encodeSearchText, warmupTextEmbeddingModel } from "./textEmbeddings";
 import { EmbeddingWorkerUnavailableError } from "./embeddingWorkerClient";
 import { SEARCH_UNAVAILABLE_MESSAGE, useTextVector } from "./useTextVector";
+import type { SearchMode } from "./useTextVector";
 
 jest.mock("./textEmbeddings", () => ({
   encodeSearchText: jest.fn(),
@@ -27,7 +28,7 @@ describe("useTextVector", () => {
     const view = renderHook(
       ({ isSimilarMode, searchMode }) =>
         useTextVector({ isSimilarMode, searchMode, needsTextVector: false, trimmedQuery: "cats" }),
-      { initialProps: { isSimilarMode: false, searchMode: "keyword" as const } },
+      { initialProps: { isSimilarMode: false, searchMode: "keyword" as SearchMode } },
     );
     expect(warmup).not.toHaveBeenCalled();
     view.rerender({ isSimilarMode: true, searchMode: "semantic" });
@@ -50,7 +51,7 @@ describe("useTextVector", () => {
     );
 
     await act(async () => {
-      report(40, "Downloading", { loaded: 4, total: 10, file: "model.onnx" });
+      report!(40, "Downloading", { loaded: 4, total: 10, file: "model.onnx" });
       await resolved();
     });
     expect(result.current.textModelProgress).toBe(100);
@@ -76,7 +77,7 @@ describe("useTextVector", () => {
       }),
     );
     act(() => {
-      report(12, "Starting");
+      report!(12, "Starting");
     });
     expect(result.current.textModelProgressDetails).toEqual({ loaded: 0, total: 0 });
     await act(async () => finish());

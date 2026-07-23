@@ -243,7 +243,12 @@ describe("photo adapter boundaries", () => {
   });
 
   it("normalises missing dimensions from the image adapter", async () => {
-    mockImageSize.mockResolvedValue({ width: undefined, height: undefined, type: "jpg" });
+    // Deliberately simulate the adapter returning undefined dimensions.
+    mockImageSize.mockResolvedValue({
+      width: undefined,
+      height: undefined,
+      type: "jpg",
+    } as unknown as Awaited<ReturnType<typeof imageSizeFromFile>>);
 
     await expect(getPhotoSize("photo.jpg")).resolves.toEqual({ width: 0, height: 0 });
   });
@@ -287,7 +292,7 @@ describe("photo adapter boundaries", () => {
     jest.spyOn(fs, "renameSync").mockImplementation(() => undefined);
     jest.spyOn(console, "log").mockImplementation(() => undefined);
     mockSharp.mockImplementation((input) => {
-      if (String(input).includes("@")) {
+      if (typeof input === "string" && input.includes("@")) {
         return { metadata } as never;
       }
       return successfulEncoder() as never;

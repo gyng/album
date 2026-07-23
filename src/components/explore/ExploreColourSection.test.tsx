@@ -13,7 +13,7 @@ describe("ExploreColourSection", () => {
       colorStats: [{ label: "Blue", count: 6 }],
       colorFamilyExamples: [],
       colorYearRibbons: [],
-    } as PhotoStats;
+    } as unknown as PhotoStats;
 
     render(<ExploreColourSection stats={stats} />);
 
@@ -48,7 +48,7 @@ describe("ExploreColourSection", () => {
         },
       ],
       colorYearRibbons: [],
-    } as PhotoStats;
+    } as unknown as PhotoStats;
 
     render(<ExploreColourSection stats={stats} />);
     expect(screen.getByText("Available for 50% of archive")).toBeInTheDocument();
@@ -118,7 +118,7 @@ describe("ExploreColourSection", () => {
           slices: [],
         },
       ],
-    } as PhotoStats;
+    } as unknown as PhotoStats;
 
     render(<ExploreColourSection stats={stats} />);
     expect(screen.getByRole("heading", { name: "Colour over time" })).toBeInTheDocument();

@@ -116,7 +116,7 @@ describe("useSharedMapMarkerObserver", () => {
           { target: first, isIntersecting: true },
           { target: second, isIntersecting: false },
           { target: document.createElement("div"), isIntersecting: true },
-        ] as IntersectionObserverEntry[],
+        ] as unknown as IntersectionObserverEntry[],
         {} as IntersectionObserver,
       );
     });

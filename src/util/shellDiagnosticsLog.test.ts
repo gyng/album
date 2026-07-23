@@ -244,9 +244,10 @@ describe("coalescing repeated events", () => {
 
     const log = readShellLog(storage);
     expect(log).toHaveLength(1);
-    expect(log[0].at).toBe(1000);
-    expect(log[0].count).toBe(3);
-    expect(log[0].lastAt).toBe(121000);
+    const entry = log[0] as Extract<ShellLogEntry, { category: "wake" }>;
+    expect(entry.at).toBe(1000);
+    expect(entry.count).toBe(3);
+    expect(entry.lastAt).toBe(121000);
   });
 
   it("does not coalesce across different types, categories, or code versions", () => {

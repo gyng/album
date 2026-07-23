@@ -1221,11 +1221,11 @@ describe("Search interaction edges", () => {
   it("recognises editable keyboard targets and supports the global focus shortcut", async () => {
     expect(isEditableTarget(null)).toBe(false);
     expect(isEditableTarget("input" as unknown as EventTarget)).toBe(false);
-    expect(isEditableTarget({ tagName: "input" } as EventTarget)).toBe(true);
-    expect(isEditableTarget({ tagName: "textarea" } as EventTarget)).toBe(true);
-    expect(isEditableTarget({ tagName: "select" } as EventTarget)).toBe(true);
-    expect(isEditableTarget({ isContentEditable: true } as EventTarget)).toBe(true);
-    expect(isEditableTarget({ nodeName: "button" } as EventTarget)).toBe(false);
+    expect(isEditableTarget({ tagName: "input" } as unknown as EventTarget)).toBe(true);
+    expect(isEditableTarget({ tagName: "textarea" } as unknown as EventTarget)).toBe(true);
+    expect(isEditableTarget({ tagName: "select" } as unknown as EventTarget)).toBe(true);
+    expect(isEditableTarget({ isContentEditable: true } as unknown as EventTarget)).toBe(true);
+    expect(isEditableTarget({ nodeName: "button" } as unknown as EventTarget)).toBe(false);
     expect(isEditableTarget({} as EventTarget)).toBe(false);
 
     await renderSearch();

@@ -63,7 +63,7 @@ describe("GuessPage", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     setQuery({});
-    useDatabaseMock.mockReturnValue([database, 100]);
+    useDatabaseMock.mockReturnValue([database, 100] as unknown as ReturnType<typeof useDatabase>);
     window.history.replaceState(null, "", "/guess");
   });
 
@@ -72,7 +72,7 @@ describe("GuessPage", () => {
   });
 
   it("shows database loading progress before the game can start", () => {
-    useDatabaseMock.mockReturnValue([null, 37]);
+    useDatabaseMock.mockReturnValue([null, 37] as unknown as ReturnType<typeof useDatabase>);
 
     render(<GuessPage />);
 

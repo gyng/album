@@ -4,6 +4,7 @@
 
 import { render, screen } from "@testing-library/react";
 import { PlatformProvider } from "./platform";
+import type { ClientComponents } from "./platform";
 import { createPlatformAdapter } from "../test/platformTestAdapter";
 
 import { MapDeferred } from "./MapDeferred";
@@ -13,7 +14,7 @@ describe("MapDeferred", () => {
     const adapter = createPlatformAdapter({
       clientComponents: {
         Map: ({ coordinates }) => <div data-testid="deferred-map">{coordinates.join(",")}</div>,
-      },
+      } as ClientComponents,
     });
     render(
       <PlatformProvider value={adapter}>

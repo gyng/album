@@ -416,7 +416,9 @@ test.describe("Responsive UI", () => {
     const photo = page.getByTestId("photoblockel").first();
     const image = photo.getByRole("img");
     await expect
-      .poll(() => image.evaluate((element) => element.complete && element.naturalWidth > 0))
+      .poll(() =>
+        image.evaluate((element: HTMLImageElement) => element.complete && element.naturalWidth > 0),
+      )
       .toBe(true);
     const [imageBox, summaryBox] = await Promise.all([
       image.boundingBox(),

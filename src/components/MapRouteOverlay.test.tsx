@@ -188,7 +188,7 @@ describe("MapRouteOverlay", () => {
 
   it("coalesces production map events into one animation frame and cancels it", () => {
     const originalNodeEnv = process.env.NODE_ENV;
-    process.env.NODE_ENV = "production";
+    (process.env as Record<string, string | undefined>).NODE_ENV = "production";
     const callbacks = new Map<string, () => void>();
     on.mockImplementation((event: string, callback: () => void) => callbacks.set(event, callback));
     const frameCallbacks: FrameRequestCallback[] = [];
@@ -205,6 +205,6 @@ describe("MapRouteOverlay", () => {
     expect(frame).toHaveBeenCalledTimes(2);
     view.unmount();
     expect(cancel).toHaveBeenCalledWith(12);
-    process.env.NODE_ENV = originalNodeEnv;
+    (process.env as Record<string, string | undefined>).NODE_ENV = originalNodeEnv;
   });
 });

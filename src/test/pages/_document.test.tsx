@@ -49,7 +49,9 @@ describe("custom document", () => {
   });
 
   it("renders metadata and the pre-hydration theme initialiser", () => {
-    const html = renderToStaticMarkup(<MyDocument />);
+    const html = renderToStaticMarkup(
+      <MyDocument {...({} as React.ComponentProps<typeof MyDocument>)} />,
+    );
     const themeInitialiser = html.indexOf('localStorage.getItem("theme")');
     const bodyStart = html.indexOf("<body>");
     const mainStart = html.indexOf('data-next-main="true"');

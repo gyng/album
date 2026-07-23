@@ -6,6 +6,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { createRef } from "react";
 import { forceDocumentNavigation } from "./searchUtils";
 import { SimilarTrailBar } from "./SimilarTrailBar";
+import type { SimilarTrailItem } from "./SimilarTrailBar";
 
 jest.mock("./searchUtils", () => ({
   ...jest.requireActual("./searchUtils"),
@@ -18,7 +19,7 @@ const baseProps = () => ({
   similarPreviewSrc: "/source.jpg",
   similarFilename: "source photo.jpg",
   similarityOrder: "most" as const,
-  trail: [],
+  trail: [] as SimilarTrailItem[],
   sourceRef: createRef<HTMLDivElement>(),
   onSetSimilarityOrder: jest.fn(),
   onTruncate: jest.fn(),

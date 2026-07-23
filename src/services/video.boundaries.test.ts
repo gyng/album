@@ -60,7 +60,7 @@ describe("video process boundaries", () => {
   });
 
   afterEach(() => {
-    process.env.NODE_ENV = originalNodeEnv;
+    (process.env as Record<string, string | undefined>).NODE_ENV = originalNodeEnv;
     jest.restoreAllMocks();
   });
 
@@ -235,7 +235,7 @@ describe("video process boundaries", () => {
   });
 
   it("removes a corrupt production cache before re-encoding", async () => {
-    process.env.NODE_ENV = "production";
+    (process.env as Record<string, string | undefined>).NODE_ENV = "production";
     scenarios.push(
       (proc) => proc.emit("close", 1),
       (proc) => proc.emit("close", 0),
@@ -253,7 +253,7 @@ describe("video process boundaries", () => {
   });
 
   it("treats validation process errors as a corrupt cache", async () => {
-    process.env.NODE_ENV = "production";
+    (process.env as Record<string, string | undefined>).NODE_ENV = "production";
     scenarios.push(
       (proc) => proc.emit("error", new Error("validation failed")),
       (proc) => proc.emit("close", 0),
@@ -271,7 +271,7 @@ describe("video process boundaries", () => {
 
   it("kills timed-out validation before re-encoding", async () => {
     jest.useFakeTimers();
-    process.env.NODE_ENV = "production";
+    (process.env as Record<string, string | undefined>).NODE_ENV = "production";
     let validationProcess: FakeProcess | undefined;
     scenarios.push(
       (proc) => {

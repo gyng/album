@@ -113,6 +113,7 @@ jest.mock("../../components/ui", () => ({
   pillStyles: { base: "base", ghost: "ghost" },
 }));
 
+import type { VisualSamenessStats } from "../../util/computeEmbeddingStats";
 import ExplorePage from "../../screens/explore/ExploreScreen";
 import { loadExplorePageData } from "../../services/pageData/explore";
 
@@ -203,40 +204,43 @@ const makeStats = () => ({
 });
 
 const photo = (id: string) => ({ path: id, src: `/${id}`, href: `/album/${id}`, label: id });
-const makeVisualSameness = () => ({
-  sampleSize: 10,
-  samenessPercent: 70,
-  repeatedMotifPercent: 20,
-  distinctPercent: 10,
-  averageNearestSimilarity: 0.7,
-  highSimilarityThreshold: 0.9,
-  lowSimilarityThreshold: 0.2,
-  lookDrift: { similarityPercent: 60, firstYear: 2020, lastYear: 2026 },
-  averageExamples: Array.from({ length: 5 }, (_, index) => ({
-    photo: photo(`average-${index}`),
-    centroidSimilarityPercent: 70,
-  })),
-  distinctExamples: Array.from({ length: 5 }, (_, index) => ({
-    photo: photo(`distinct-${index}`),
-    nearestSimilarityPercent: 20,
-  })),
-  repeatedExamples: Array.from({ length: 3 }, (_, index) => ({
-    left: photo(`left-${index}`),
-    right: photo(`right-${index}`),
-    similarityPercent: 95,
-  })),
-  visualEras: Array.from({ length: 5 }, (_, index) => ({
-    label: `Era ${index}`,
-    photos: [photo(`era-${index}`)],
-    sharePercent: 20,
-    count: 2,
-  })),
-  lookTimeline: Array.from({ length: 5 }, (_, index) => ({
-    year: 2020 + index,
-    photos: [photo(`year-${index}`)],
-    count: 2,
-  })),
-});
+const makeVisualSameness = () =>
+  ({
+    sampleSize: 10,
+    samenessPercent: 70,
+    repeatedMotifPercent: 20,
+    distinctPercent: 10,
+    averageNearestSimilarity: 0.7,
+    highSimilarityThreshold: 0.9,
+    lowSimilarityThreshold: 0.2,
+    lookDrift: { similarityPercent: 60, firstYear: 2020, lastYear: 2026 },
+    averageExamples: Array.from({ length: 5 }, (_, index) => ({
+      photo: photo(`average-${index}`),
+      centroidSimilarityPercent: 70,
+    })),
+    distinctExamples: Array.from({ length: 5 }, (_, index) => ({
+      photo: photo(`distinct-${index}`),
+      nearestSimilarityPercent: 20,
+    })),
+    repeatedExamples: Array.from({ length: 3 }, (_, index) => ({
+      left: photo(`left-${index}`),
+      right: photo(`right-${index}`),
+      similarityPercent: 95,
+    })),
+    visualEras: Array.from({ length: 5 }, (_, index) => ({
+      label: `Era ${index}`,
+      photos: [photo(`era-${index}`)],
+      sharePercent: 20,
+      count: 2,
+    })),
+    lookTimeline: Array.from({ length: 5 }, (_, index) => ({
+      year: 2020 + index,
+      photos: [photo(`year-${index}`)],
+      count: 2,
+    })),
+    // The factory deliberately omits outlierExamples; the cast keeps the
+    // absent-outliers scenario while satisfying the required-field contract.
+  }) as unknown as VisualSamenessStats;
 
 describe("explore page", () => {
   it("switches charts, scopes technical data, and expands visual examples", () => {

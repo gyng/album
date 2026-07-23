@@ -4,6 +4,7 @@
 
 import { render, screen } from "@testing-library/react";
 import { PlatformProvider } from "./platform";
+import type { ClientComponents } from "./platform";
 import { createPlatformAdapter } from "../test/platformTestAdapter";
 
 import { MapWorldDeferred } from "./MapWorldDeferred";
@@ -17,7 +18,7 @@ describe("MapWorldDeferred", () => {
             {props.className}:{props.photos.length}
           </div>
         ),
-      },
+      } as ClientComponents,
     });
     render(
       <PlatformProvider value={adapter}>

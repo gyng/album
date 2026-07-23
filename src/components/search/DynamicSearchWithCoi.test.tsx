@@ -4,6 +4,7 @@
 
 import { render, screen } from "@testing-library/react";
 import { PlatformProvider } from "../platform";
+import type { ClientComponents } from "../platform";
 import { createPlatformAdapter } from "../../test/platformTestAdapter";
 
 import DynamicSearchWithCoi from "./DynamicSearchWithCoi";
@@ -13,7 +14,7 @@ describe("DynamicSearchWithCoi", () => {
     const adapter = createPlatformAdapter({
       clientComponents: {
         SearchWithCoi: () => <div data-testid="dynamic-search" />,
-      },
+      } as unknown as ClientComponents,
     });
     render(
       <PlatformProvider value={adapter}>

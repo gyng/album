@@ -3,7 +3,6 @@
  */
 
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import React from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { AppRuntime } from "./AppRuntime";
 import { BrowserPlatformProvider } from "./platform/browser";

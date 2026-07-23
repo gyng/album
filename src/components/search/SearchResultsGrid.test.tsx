@@ -33,12 +33,13 @@ jest.mock("./SearchResultTile", () => ({
   },
 }));
 
-const result = (path: string, similarity?: number): SearchResultRow => ({
-  path,
-  album_relative_path: `/album/test-simple#${path}`,
-  filename: path,
-  ...(similarity === undefined ? {} : { similarity }),
-});
+const result = (path: string, similarity?: number): SearchResultRow =>
+  ({
+    path,
+    album_relative_path: `/album/test-simple#${path}`,
+    filename: path,
+    ...(similarity === undefined ? {} : { similarity }),
+  }) as unknown as SearchResultRow;
 
 const baseProps = {
   isSimilarMode: false,

@@ -15,14 +15,17 @@ import {
 
 describe("map route benchmark", () => {
   it("parses default and custom benchmark configuration", () => {
-    expect(getBenchmarkConfig({}, "/tmp/gallery")).toEqual({
+    expect(getBenchmarkConfig({} as NodeJS.ProcessEnv, "/tmp/gallery")).toEqual({
       repeat: 20,
       sizes: [20, 80, 200, 1000],
       outputPath: path.join("/tmp/gallery", ".map-route-benchmark.json"),
     });
     expect(
       getBenchmarkConfig(
-        { ROUTE_BENCH_REPEAT: "3", ROUTE_BENCH_SIZES: "1, 2, nope, 5" },
+        {
+          ROUTE_BENCH_REPEAT: "3",
+          ROUTE_BENCH_SIZES: "1, 2, nope, 5",
+        } as unknown as NodeJS.ProcessEnv,
         "/tmp/gallery",
       ),
     ).toMatchObject({ repeat: 3, sizes: [2, 5] });

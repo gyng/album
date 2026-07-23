@@ -22,7 +22,8 @@ describe("encodeSearchImage", () => {
   });
 
   it("rejects an empty worker response instead of treating it as an embedding", async () => {
-    sendRequest.mockResolvedValue(null);
+    // The worker contract excludes null; deliberately supply it to exercise the guard.
+    sendRequest.mockResolvedValue(null as unknown as number[]);
 
     await expect(encodeSearchImage(new Blob())).rejects.toThrow(
       "Image embedding worker returned no embedding.",

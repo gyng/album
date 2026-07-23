@@ -78,7 +78,11 @@ describe("search page shell", () => {
         databaseReady: true,
         isRandomSimilarLoading: false,
         onStartRandomSimilarSlideshow: startSlideshow,
-        loading: { progress: 45, details: "4 MB", activity: "Loading index" },
+        loading: {
+          progress: 45,
+          details: "4 MB" as unknown as { loaded: number; total: number },
+          activity: "Loading index",
+        },
         randomExploreError: "No suitable random photo",
       });
     });
@@ -94,10 +98,12 @@ describe("search page shell", () => {
     expect(mockForceDocumentNavigation).toHaveBeenCalledWith(expect.any(Event), "/map");
 
     act(() => {
+      // Deliberately partial: exercises tolerance of a state missing the
+      // optional slideshow wiring.
       mockSetNavState?.({
         databaseReady: true,
         isRandomSimilarLoading: true,
-      });
+      } as unknown as SearchNavState);
     });
 
     const loadingButton = screen.getByRole("button", {
@@ -113,7 +119,10 @@ describe("search page shell", () => {
     render(<SearchPage />);
 
     act(() => {
-      mockSetNavState?.({ databaseReady: true, isRandomSimilarLoading: false });
+      mockSetNavState?.({
+        databaseReady: true,
+        isRandomSimilarLoading: false,
+      } as unknown as SearchNavState);
     });
 
     expect(() =>
