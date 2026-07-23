@@ -1,5 +1,5 @@
 import React from "react";
-import { type MapRef, useMap } from "react-map-gl/maplibre";
+import { type MapRef, useMap } from "./map/adapters/maplibre";
 import { computeWrapAwareBounds } from "../util/mapBounds";
 import type { MapWorldEntry } from "../util/pageDataTypes";
 import type { MapBounds } from "./mapWorldViewModel";

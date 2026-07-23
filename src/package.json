@@ -72,7 +72,6 @@
     "react": "^19.2.7",
     "react-colorful": "^5.8.0",
     "react-dom": "^19.2.7",
-    "react-map-gl": "^8.1.1",
     "sharp": "^0.35.3",
     "sqlite3": "^6.0.1",
     "use-debounce": "^10.1.1",

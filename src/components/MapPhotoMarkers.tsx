@@ -1,4 +1,4 @@
-import { Marker } from "react-map-gl/maplibre";
+import { Marker } from "./map/adapters/maplibre";
 import type { PhotoWithStyle } from "./mapWorldViewModel";
 import { formatMapPhotoDate } from "./mapWorldViewModel";
 import {

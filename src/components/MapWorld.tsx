@@ -9,8 +9,8 @@ import MapLibreMap, {
   FullscreenControl,
   Layer,
   Source,
-  ViewStateChangeEvent,
-} from "react-map-gl/maplibre";
+  type ViewStateChangeEvent,
+} from "./map/adapters/maplibre";
 import { ThemeToggle } from "./ThemeToggle";
 import {
   buildContextRoutePoints,

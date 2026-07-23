@@ -7,7 +7,7 @@ import type { ReactNode } from "react";
 import type { MapWorldEntry } from "../util/pageDataTypes";
 import { MapPhotoPopup } from "./MapPhotoPopup";
 
-jest.mock("react-map-gl/maplibre", () => ({
+jest.mock("./map/adapters/maplibre", () => ({
   Popup: ({ children }: { children?: ReactNode }) => <div data-testid="popup">{children}</div>,
 }));
 

@@ -13,7 +13,7 @@ import {
 import { MapRouteOverlay } from "./MapRouteOverlay";
 
 let currentMap: any = null;
-jest.mock("react-map-gl/maplibre", () => ({ useMap: () => ({ current: currentMap }) }));
+jest.mock("./map/adapters/maplibre", () => ({ useMap: () => ({ current: currentMap }) }));
 jest.mock("./mapRouteOverlayModel", () => ({
   ...jest.requireActual("./mapRouteOverlayModel"),
   projectRouteSegments: jest.fn(),

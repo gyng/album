@@ -1,5 +1,5 @@
 import React from "react";
-import { useMap } from "react-map-gl/maplibre";
+import { useMap } from "./map/adapters/maplibre";
 import type { RouteMode, RoutePoint } from "./mapRoute";
 import {
   formatDistanceKm,

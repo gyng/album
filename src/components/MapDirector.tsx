@@ -1,5 +1,5 @@
 import React from "react";
-import { useMap } from "react-map-gl/maplibre";
+import { useMap } from "./map/adapters/maplibre";
 import type { MapWorldEntry } from "../util/pageDataTypes";
 
 const DIRECTOR_CADENCE_MS = 7_500;

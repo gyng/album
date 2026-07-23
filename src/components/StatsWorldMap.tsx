@@ -1,5 +1,5 @@
 import React from "react";
-import Map, { Layer, Source } from "react-map-gl/maplibre";
+import Map, { Layer, Source } from "./map/adapters/maplibre";
 import styles from "./StatsWorldMap.module.css";
 import { MapLibreStyles } from "./MapLibreStyles";
 

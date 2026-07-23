@@ -8,7 +8,7 @@ import type { PhotoWithStyle } from "./mapWorldViewModel";
 import { MapPhotoMarkers } from "./MapPhotoMarkers";
 
 const stopPropagation = jest.fn();
-jest.mock("react-map-gl/maplibre", () => ({
+jest.mock("./map/adapters/maplibre", () => ({
   Marker: ({
     children,
     onClick,

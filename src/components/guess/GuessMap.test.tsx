@@ -8,7 +8,7 @@ import { GuessMap } from "./GuessMap";
 const mockFitBounds = jest.fn();
 let mockCurrentMap: { fitBounds: typeof mockFitBounds } | null = { fitBounds: mockFitBounds };
 
-jest.mock("react-map-gl/maplibre", () => ({
+jest.mock("../map/adapters/maplibre", () => ({
   __esModule: true,
   default: ({
     children,

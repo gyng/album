@@ -57,7 +57,7 @@ const mapInstance = {
 };
 
 const mapRef = { current: mapInstance };
-jest.mock("react-map-gl/maplibre", () => {
+jest.mock("./map/adapters/maplibre", () => {
   return {
     __esModule: true,
     default: ({

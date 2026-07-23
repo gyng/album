@@ -1,5 +1,5 @@
 import { AppLink as Link } from "./platform";
-import { Popup } from "react-map-gl/maplibre";
+import { Popup } from "./map/adapters/maplibre";
 import { exifWallClockTimestamp } from "../util/exifTime";
 import { getRelativeTimeString } from "../util/time";
 import type { MapWorldEntry } from "../util/pageDataTypes";

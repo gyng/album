@@ -9,7 +9,7 @@ import { StatsWorldMap } from "./StatsWorldMap";
 const mapProps = jest.fn();
 const sourceProps = jest.fn();
 const layerProps = jest.fn();
-jest.mock("react-map-gl/maplibre", () => ({
+jest.mock("./map/adapters/maplibre", () => ({
   __esModule: true,
   default: ({ children, ...props }: { children?: ReactNode }) => {
     mapProps(props);

@@ -3,7 +3,7 @@ import React from "react";
 import styles from "./Map.module.css";
 import pinStyles from "./mapPin.module.css";
 
-import Map, { Marker, useMap } from "react-map-gl/maplibre";
+import Map, { Marker, useMap } from "./map/adapters/maplibre";
 import type { ProjectionSpecification } from "maplibre-gl";
 import { AppLink as Link } from "./platform";
 import { computeWrapAwareBounds } from "../util/mapBounds";

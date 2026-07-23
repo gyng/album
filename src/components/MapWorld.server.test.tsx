@@ -5,7 +5,7 @@
 import { renderToString } from "react-dom/server";
 import type { ReactNode } from "react";
 
-jest.mock("react-map-gl/maplibre", () => ({
+jest.mock("./map/adapters/maplibre", () => ({
   __esModule: true,
   default: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
   ScaleControl: () => null,

@@ -14,7 +14,7 @@ import {
 } from "./MapWorldMapChildren";
 
 let currentMap: any = null;
-jest.mock("react-map-gl/maplibre", () => ({ useMap: () => ({ current: currentMap }) }));
+jest.mock("./map/adapters/maplibre", () => ({ useMap: () => ({ current: currentMap }) }));
 
 const photo = (overrides: Partial<MapWorldEntry> = {}): MapWorldEntry => ({
   album: "test-simple",

@@ -1,4 +1,4 @@
-import { Popup } from "react-map-gl/maplibre";
+import { Popup } from "./map/adapters/maplibre";
 import { buildExternalMapLinks } from "./mapInteractions";
 import styles from "./MapWorld.module.css";
 

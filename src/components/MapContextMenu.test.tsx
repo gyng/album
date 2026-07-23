@@ -7,7 +7,7 @@ import type { ReactNode } from "react";
 import { MapContextMenu } from "./MapContextMenu";
 
 const popupProps = jest.fn();
-jest.mock("react-map-gl/maplibre", () => ({
+jest.mock("./map/adapters/maplibre", () => ({
   Popup: ({ children, ...props }: { children?: ReactNode }) => {
     popupProps(props);
     return <div data-testid="popup">{children}</div>;

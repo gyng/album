@@ -15,7 +15,7 @@ let currentMap: { flyTo: typeof flyTo; fitBounds: typeof fitBounds } | null = {
 const mapProps = jest.fn();
 const markerProps = jest.fn();
 
-jest.mock("react-map-gl/maplibre", () => {
+jest.mock("./map/adapters/maplibre", () => {
   return {
     __esModule: true,
     default: ({ children, ...props }: { children?: ReactNode }) => {

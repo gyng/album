@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect } from "react";
-import Map, { Marker, Source, Layer, useMap } from "react-map-gl/maplibre";
+import Map, { Marker, Source, Layer, useMap } from "../map/adapters/maplibre";
 import type { MapLayerMouseEvent } from "maplibre-gl";
 // Imported directly rather than via the ambient `GeoJSON` namespace: the base
 // tsconfig pins `types`, so the global is not auto-included, and maplibre no

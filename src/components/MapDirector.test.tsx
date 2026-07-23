@@ -10,7 +10,7 @@ const flyTo = jest.fn();
 const stop = jest.fn();
 let currentMap: { flyTo: typeof flyTo; stop: typeof stop } | null = { flyTo, stop };
 
-jest.mock("react-map-gl/maplibre", () => ({
+jest.mock("./map/adapters/maplibre", () => ({
   useMap: () => ({ current: currentMap }),
 }));
 
