@@ -11,6 +11,7 @@ import type {
   StyleSpecification,
 } from "./engine";
 import { MapContext, type MapContextValue } from "./context";
+import { installVendoredWorker } from "./worker";
 import {
   type MapRef,
   toViewStateChangeEvent,
@@ -151,6 +152,7 @@ const MapViewImpl = (
     // whole page down with it.
     let map: MapRef;
     try {
+      installVendoredWorker();
       map = new gl.Map(buildMapOptions(container, propsRef.current));
     } catch (error) {
       console.error(error);

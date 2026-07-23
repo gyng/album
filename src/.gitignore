@@ -49,7 +49,7 @@ node_modules/
 /public/sitemap.xml
 /public/robots.txt
 /public/album/*/feed.xml
-/public/vendor/maplibre-gl.css
+/public/vendor/
 /public/pwa-icon-192.png
 /public/pwa-icon-512.png
 /public/apple-touch-icon.png

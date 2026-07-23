@@ -73,7 +73,13 @@ export const Source = (props: SourceProps): React.JSX.Element | null => {
 
     const source = map.getSource(id);
     if (source instanceof gl.GeoJSONSource) {
-      source.setData(data);
+      // MapLibre 6 made `setData` asynchronous (it no longer returns the source
+      // to chain off). Load failures are reported through the map's own `error`
+      // event rather than by rejecting, so there is nothing here to await or
+      // recover from — the catch only stops a rejection escaping the effect.
+      source.setData(data).catch((error: unknown) => {
+        console.error(error);
+      });
     }
   }, [attached, map, id, data]);
 

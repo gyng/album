@@ -2,6 +2,7 @@ import React from "react";
 import type { AddLayerObject, FilterSpecification, LayerSpecification } from "./engine";
 import { SourceIdContext, useAttachedMap } from "./context";
 import { deepEqual, isStyleUsable, useGeneratedId, useStyleVersion } from "./internal";
+import type { MapRef } from "./types";
 
 type OptionalId<T> = T extends { id: string } ? Omit<T, "id"> & { id?: string } : T;
 type OptionalSource<T> = T extends { source: string } ? Omit<T, "source"> & { source?: string } : T;
@@ -28,6 +29,26 @@ type LayerView = {
 };
 
 const asLayerView = (props: LayerProps): LayerView => props as unknown as LayerView;
+
+/**
+ * MapLibre 6 types the layout and paint setters as a keyed lookup over the whole
+ * style spec (`setPaintProperty<K extends keyof AllPaintProperties>`). This
+ * adapter only ever sees a layer spec structurally — consumers spread raw
+ * style-spec objects in, so a property name is a `string` here and the name and
+ * value are correlated by MapLibre's own runtime validation, not by us. Clearing
+ * a property (passing `undefined`) is likewise outside the keyed value types.
+ * Both assertions live at this one boundary rather than pushing generics that
+ * cannot be satisfied into `LayerView`.
+ */
+type StylePropertySetter = (layerId: string, name: string, value: unknown) => void;
+
+const setLayoutProperty = (map: MapRef, layerId: string, name: string, value: unknown): void => {
+  (map.setLayoutProperty as unknown as StylePropertySetter)(layerId, name, value);
+};
+
+const setPaintProperty = (map: MapRef, layerId: string, name: string, value: unknown): void => {
+  (map.setPaintProperty as unknown as StylePropertySetter)(layerId, name, value);
+};
 
 const toAddLayerObject = (props: LayerProps, id: string, source: string | null): AddLayerObject => {
   const spec: Record<string, unknown> = { id };
@@ -97,12 +118,12 @@ export const Layer = (props: LayerProps): null => {
       const previousLayout = previous.layout ?? {};
       for (const [key, value] of Object.entries(layout ?? {})) {
         if (!deepEqual(previousLayout[key], value)) {
-          map.setLayoutProperty(id, key, value);
+          setLayoutProperty(map, id, key, value);
         }
       }
       for (const key of Object.keys(previousLayout)) {
         if (!(layout && key in layout)) {
-          map.setLayoutProperty(id, key, undefined);
+          setLayoutProperty(map, id, key, undefined);
         }
       }
     }
@@ -111,12 +132,12 @@ export const Layer = (props: LayerProps): null => {
       const previousPaint = previous.paint ?? {};
       for (const [key, value] of Object.entries(paint ?? {})) {
         if (!deepEqual(previousPaint[key], value)) {
-          map.setPaintProperty(id, key, value);
+          setPaintProperty(map, id, key, value);
         }
       }
       for (const key of Object.keys(previousPaint)) {
         if (!(paint && key in paint)) {
-          map.setPaintProperty(id, key, undefined);
+          setPaintProperty(map, id, key, undefined);
         }
       }
     }
