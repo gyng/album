@@ -207,10 +207,16 @@
   gap: var(--m-s);
 }
 
-/* Transparent on a wide toolbar: the clusters exist to give the narrow layout
-   somewhere sensible to break, not to change the desktop row. */
+/* Each cluster is an unbreakable unit, so the row can only wrap BETWEEN
+   clusters. On a wide toolbar the gap matches the parent's, which keeps the
+   single-row appearance identical to an unclustered row; the moment it has to
+   wrap — iPad landscape is 1180–1194px, well above the narrow breakpoint — it
+   breaks at a meaning boundary rather than mid-cluster. */
 .playbackCluster {
-  display: contents;
+  display: flex;
+  align-items: center;
+  gap: var(--m-s);
+  flex-wrap: nowrap;
 }
 
 .playbackDivider {
