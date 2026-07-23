@@ -1,10 +1,5 @@
 import React, { useCallback, useEffect } from "react";
-import Map, { Marker, Source, Layer, useMap } from "../map/adapters/maplibre";
-import type { MapLayerMouseEvent } from "maplibre-gl";
-// Imported directly rather than via the ambient `GeoJSON` namespace: the base
-// tsconfig pins `types`, so the global is not auto-included, and maplibre no
-// longer guarantees to re-reference it.
-import type { FeatureCollection } from "geojson";
+import { DataLayer, type LineFeature, type MapPointerEvent, MapView, Marker, useMap } from "../map";
 import { TIER_DANGER } from "./guessScoring";
 import { computeWrapAwareBounds } from "../../util/mapBounds";
 import { MapLibreStyles } from "../MapLibreStyles";
@@ -20,37 +15,36 @@ export type GuessMapProps = {
 
 const MAP_STYLE = "https://tiles.openfreemap.org/styles/liberty";
 
-const lineGeoJson = (
+/**
+ * The guess-to-answer connection: a soft wide glow with the dashed line drawn
+ * over it, so the link reads at a glance without hiding the map beneath.
+ */
+const connectionLines = (
   from: { lat: number; lng: number },
   to: { lat: number; lng: number },
-): FeatureCollection => ({
-  type: "FeatureCollection",
-  features: [
-    {
-      type: "Feature",
-      properties: {},
-      geometry: {
-        type: "LineString",
-        coordinates: [
-          [from.lng, from.lat],
-          [to.lng, to.lat],
-        ],
-      },
-    },
-  ],
-});
+): LineFeature[] => {
+  const path = [
+    { lng: from.lng, lat: from.lat },
+    { lng: to.lng, lat: to.lat },
+  ];
+
+  return [
+    { id: "guess-line-glow", path, color: TIER_DANGER, width: 6, opacity: 0.2, blur: 4 },
+    { id: "guess-line-stroke", path, color: TIER_DANGER, width: 2, dash: [4, 3] },
+  ];
+};
 
 /**
  * Re-frames the map on reveal so both the guess pin and the true location are
  * visible — otherwise the connecting line runs off-screen and the answer marker
- * is never seen. Rendered as a child of <Map> so it can use the map imperatively
- * (useMap() only works inside MapLibreMap children — see the map rules).
+ * is never seen. Rendered as a child of <MapView> so it can use the map
+ * imperatively (useMap() only works inside map children — see the map rules).
  */
 const RevealFit: React.FC<{
   guess: { lat: number; lng: number } | null;
   reveal: { lat: number; lng: number };
 }> = ({ guess, reveal }) => {
-  const { current: map } = useMap();
+  const map = useMap();
   // Depend on primitive coordinates rather than the object identities: the
   // parent recreates the `reveal`/`guess` objects each render, which would
   // otherwise re-fire fitBounds on every re-render of the revealed round.
@@ -62,8 +56,7 @@ const RevealFit: React.FC<{
   useEffect(() => {
     if (!map) return;
     // Frame both the guess and the true location (or just the answer when the
-    // round was skipped). Uses the corner-array form of fitBounds to match the
-    // map's MapAutoFit pattern.
+    // round was skipped).
     const hasGuess = guessLat !== null && guessLng !== null;
     const points: [number, number][] = [
       [revealLng, revealLat],
@@ -72,8 +65,14 @@ const RevealFit: React.FC<{
     // Antimeridian-aware so a guess and answer on opposite sides of ±180° frame
     // the short hop rather than the whole globe.
     // The reveal point above guarantees a non-empty input.
-    const bounds = computeWrapAwareBounds(points)!;
-    map.fitBounds(bounds, { padding: 60, maxZoom: 6, duration: 800 });
+    const [[west, south], [east, north]] = computeWrapAwareBounds(points)!;
+    map.fitBounds(
+      [
+        { lng: west, lat: south },
+        { lng: east, lat: north },
+      ],
+      { padding: 60, maxZoom: 6, duration: 800 },
+    );
   }, [map, revealLat, revealLng, guessLat, guessLng]);
 
   return null;
@@ -81,10 +80,9 @@ const RevealFit: React.FC<{
 
 export const GuessMap: React.FC<GuessMapProps> = ({ guess, reveal, onGuess }) => {
   const handleClick = useCallback(
-    (event: MapLayerMouseEvent) => {
+    (event: MapPointerEvent) => {
       if (reveal) return;
-      const { lat, lng } = event.lngLat;
-      onGuess(lat, lng);
+      onGuess(event.at.lat, event.at.lng);
     },
     [reveal, onGuess],
   );
@@ -93,18 +91,17 @@ export const GuessMap: React.FC<GuessMapProps> = ({ guess, reveal, onGuess }) =>
     <>
       <MapLibreStyles />
       <div className={styles.mapContainer} role="region" aria-label="Guess map">
-        <Map
-          mapStyle={MAP_STYLE}
-          initialViewState={{ longitude: 0, latitude: 20, zoom: 1.5 }}
-          scrollZoom
-          dragPan
-          cooperativeGestures={false}
+        {/* Scroll-zoom, drag-pan and one-finger gestures are the provider
+            defaults, which is what a guessing map wants. */}
+        <MapView
+          styleUrl={MAP_STYLE}
+          initialView={{ center: { lng: 0, lat: 20 }, zoom: 1.5 }}
           onClick={handleClick}
           cursor={reveal ? "default" : "crosshair"}
-          attributionControl={{ compact: true }}
+          attribution={{ compact: true }}
         >
           {guess ? (
-            <Marker longitude={guess.lng} latitude={guess.lat} anchor="center">
+            <Marker at={{ lng: guess.lng, lat: guess.lat }} anchor="center">
               <div className={styles.guessPin} />
             </Marker>
           ) : null}
@@ -112,37 +109,13 @@ export const GuessMap: React.FC<GuessMapProps> = ({ guess, reveal, onGuess }) =>
           {reveal ? (
             <>
               <RevealFit guess={guess} reveal={reveal} />
-              <Marker longitude={reveal.lng} latitude={reveal.lat} anchor="center">
+              <Marker at={{ lng: reveal.lng, lat: reveal.lat }} anchor="center">
                 <div className={styles.actualPin} />
               </Marker>
-              {guess ? (
-                <>
-                  <Source id="guess-line" type="geojson" data={lineGeoJson(guess, reveal)}>
-                    <Layer
-                      id="guess-line-glow"
-                      type="line"
-                      paint={{
-                        "line-color": TIER_DANGER,
-                        "line-width": 6,
-                        "line-opacity": 0.2,
-                        "line-blur": 4,
-                      }}
-                    />
-                    <Layer
-                      id="guess-line-layer"
-                      type="line"
-                      paint={{
-                        "line-color": TIER_DANGER,
-                        "line-width": 2,
-                        "line-dasharray": [4, 3],
-                      }}
-                    />
-                  </Source>
-                </>
-              ) : null}
+              {guess ? <DataLayer id="guess-line" lines={connectionLines(guess, reveal)} /> : null}
             </>
           ) : null}
-        </Map>
+        </MapView>
 
         {!reveal && !guess ? <div className={styles.hint}>Click to place your guess</div> : null}
       </div>

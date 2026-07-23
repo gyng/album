@@ -24,6 +24,12 @@ export type FlyToOptions = {
   zoom?: number;
   /** Animation speed multiplier; 1 is the provider's default pace. */
   speed?: number;
+  /** Rotation in degrees, anticlockwise from north. */
+  bearing?: number;
+  /** Angle in degrees at which the camera looks at the ground; 0 is straight down. */
+  pitch?: number;
+  /** Flight length in milliseconds; `0` arrives immediately. */
+  duration?: number;
 };
 
 export type FitBoundsOptions = {
@@ -32,6 +38,18 @@ export type FitBoundsOptions = {
   maxZoom?: number;
   /** `false` jumps straight to the destination. */
   animate?: boolean;
+  /** Animation length in milliseconds; `0` arrives immediately. */
+  duration?: number;
+};
+
+/** An immediate camera move — no animation, whatever the provider's default is. */
+export type JumpToOptions = {
+  center?: LngLat;
+  zoom?: number;
+  /** Rotation in degrees, anticlockwise from north. */
+  bearing?: number;
+  /** Angle in degrees at which the camera looks at the ground; 0 is straight down. */
+  pitch?: number;
 };
 
 /** Reading and moving the camera. */
@@ -39,8 +57,15 @@ export interface MapCamera {
   getCenter(): LngLat;
   getZoom(): number;
   getBounds(): Bounds;
+  /** Rotation in degrees, anticlockwise from north. */
+  getBearing(): number;
+  /** Angle in degrees at which the camera looks at the ground; 0 is straight down. */
+  getPitch(): number;
   flyTo(options: FlyToOptions): void;
   fitBounds(bounds: Bounds, options?: FitBoundsOptions): void;
+  jumpTo(options: JumpToOptions): void;
+  /** Halts any camera animation in flight, leaving the camera where it is. */
+  stop(): void;
 }
 
 /** Converting between geographic and screen coordinates. */
@@ -50,7 +75,16 @@ export interface MapProjection {
 }
 
 /** Events that only report where the camera ended up. */
-export type MapCameraEventName = "load" | "move" | "moveend" | "zoom" | "zoomend" | "dragstart";
+export type MapCameraEventName =
+  | "load"
+  | "movestart"
+  | "move"
+  | "moveend"
+  | "zoomstart"
+  | "zoom"
+  | "zoomend"
+  | "dragstart"
+  | "resize";
 
 /** Events raised by a pointer over the map surface. */
 export type MapPointerEventName = "click" | "contextmenu";
@@ -77,11 +111,14 @@ export type MapWheelEvent = {
 /** The payload each subscribable event carries. */
 export type MapEventMap = {
   load: MapCameraEvent;
+  movestart: MapCameraEvent;
   move: MapCameraEvent;
   moveend: MapCameraEvent;
+  zoomstart: MapCameraEvent;
   zoom: MapCameraEvent;
   zoomend: MapCameraEvent;
   dragstart: MapCameraEvent;
+  resize: MapCameraEvent;
   click: MapPointerEvent;
   contextmenu: MapPointerEvent;
   wheel: MapWheelEvent;
@@ -106,7 +143,37 @@ export interface MapInstance extends MapCamera, MapProjection {
     listener: (event: MapEventMap[Name]) => void,
   ): () => void;
   getContainer(): HTMLElement;
+  /**
+   * The element the provider handles map gestures on, inside the container.
+   * Listen here — rather than on the container — to add a gesture without
+   * catching pointer work aimed at overlaid controls.
+   */
+  getGestureSurface(): HTMLElement;
+  /** Whether dragging the map surface pans the camera. */
+  isDragPanEnabled(): boolean;
+  /** Suspends or restores drag-to-pan, so another gesture can own the drag. */
+  setDragPanEnabled(enabled: boolean): void;
 }
+
+/** How the globe is flattened onto the screen. */
+export type MapProjectionMode = "mercator" | "globe" | "vertical-perspective";
+
+/** The attribution notice: hidden outright, or shown with these options. */
+export type MapAttribution =
+  | false
+  | {
+      /** Shrink the credit line to a badge the reader expands. */
+      compact?: boolean;
+      /**
+       * Start that badge shut. Providers tend to render a compact notice open
+       * and only fold it away once you touch the map, which crowds the bottom
+       * of a small screen until then. Only meaningful with `compact`.
+       */
+      collapsed?: boolean;
+    };
+
+/** Where a map control is anchored inside the map's own frame. */
+export type MapControlPosition = "top-left" | "top-right" | "bottom-left" | "bottom-right";
 
 /** Where a marker's element sits relative to its position. */
 export type MarkerAnchor =
@@ -132,12 +199,49 @@ export type PointFeature = {
   color?: string;
   /** Radius in pixels. Falls back to the port default. */
   radius?: number;
+  /**
+   * Opacity from 0 to 1, applied to the point and its halo. Falls back to
+   * fully opaque. Per-feature so one layer can still de-emphasise part of a
+   * set — fading everything off a route, say — without splitting it in two.
+   */
+  opacity?: number;
 };
+
+/** The point a pointer interaction landed on. */
+export type PointFeatureHit = {
+  /** The `id` of the `PointFeature` under the pointer. */
+  id: string;
+  /** Where the pointer was, on the ground. */
+  at: LngLat;
+};
+
+/** A halo drawn around every point in a layer. */
+export type PointStroke = { color: string; width: number };
+
+/**
+ * A stroke width in pixels at a fraction along a line — `0` at its start, `1`
+ * at its end. A run of stops describes a taper, interpolated between them.
+ */
+export type LineWidthStop = { at: number; width: number };
 
 export type LineFeature = {
   id: string;
   path: LngLat[];
   color: string;
-  /** Stroke width in pixels. */
+  /**
+   * Stroke width in pixels. Where the layer tapers its lines (see
+   * `lineWidthAlong`) this is the flat width a provider that cannot taper
+   * falls back to.
+   */
   width: number;
+  /** Opacity from 0 to 1. Falls back to fully opaque. */
+  opacity?: number;
+  /** Softens the stroke by this many pixels — a glow rather than a crisp edge. */
+  blur?: number;
+  /**
+   * Alternating dash and gap lengths, in stroke widths; omitted draws a solid
+   * line. Providers cannot vary a dash pattern within one drawn layer, so lines
+   * are grouped by pattern behind the port.
+   */
+  dash?: number[];
 };

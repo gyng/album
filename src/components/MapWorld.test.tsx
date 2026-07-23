@@ -7,21 +7,34 @@ import { Profiler, type ReactNode } from "react";
 import type { MapWorldEntry } from "../util/pageDataTypes";
 
 const mapHandlers: {
-  onMoveStart?: (() => void) | undefined;
-  onClick?: (() => void) | undefined;
+  onMoveStart?:
+    | ((event: { viewState: { latitude: number; longitude: number; zoom: number } }) => void)
+    | undefined;
+  onClick?:
+    | ((event: {
+        lngLat: { lat: number; lng: number };
+        point: { x: number; y: number };
+        originalEvent: MouseEvent;
+      }) => void)
+    | undefined;
   onMoveEnd?:
     | ((event: { viewState: { latitude: number; longitude: number; zoom: number } }) => void)
     | undefined;
-  onZoomStart?: (() => void) | undefined;
+  onZoomStart?:
+    | ((event: { viewState: { latitude: number; longitude: number; zoom: number } }) => void)
+    | undefined;
   onZoomEnd?:
     | ((event: { viewState: { latitude: number; longitude: number; zoom: number } }) => void)
     | undefined;
   onZoom?: ((event: { viewState: { zoom: number } }) => void) | undefined;
-  onDragStart?: (() => void) | undefined;
-  onWheel?: (() => void) | undefined;
+  onDragStart?:
+    | ((event: { viewState: { latitude: number; longitude: number; zoom: number } }) => void)
+    | undefined;
+  onWheel?: ((event: { originalEvent: WheelEvent }) => void) | undefined;
   onContextMenu?:
     | ((event: {
         lngLat: { lat: number; lng: number };
+        point: { x: number; y: number };
         originalEvent: { preventDefault: () => void };
       }) => void)
     | undefined;
@@ -74,20 +87,31 @@ jest.mock("./map/adapters/maplibre", () => {
       ...props
     }: {
       children?: ReactNode;
-      onMoveStart?: () => void;
-      onClick?: () => void;
+      onMoveStart?: (event: {
+        viewState: { latitude: number; longitude: number; zoom: number };
+      }) => void;
+      onClick?: (event: {
+        lngLat: { lat: number; lng: number };
+        point: { x: number; y: number };
+        originalEvent: MouseEvent;
+      }) => void;
       onMoveEnd?: (event: {
         viewState: { latitude: number; longitude: number; zoom: number };
       }) => void;
-      onZoomStart?: () => void;
+      onZoomStart?: (event: {
+        viewState: { latitude: number; longitude: number; zoom: number };
+      }) => void;
       onZoomEnd?: (event: {
         viewState: { latitude: number; longitude: number; zoom: number };
       }) => void;
       onZoom?: (event: { viewState: { zoom: number } }) => void;
-      onDragStart?: () => void;
-      onWheel?: () => void;
+      onDragStart?: (event: {
+        viewState: { latitude: number; longitude: number; zoom: number };
+      }) => void;
+      onWheel?: (event: { originalEvent: WheelEvent }) => void;
       onContextMenu?: (event: {
         lngLat: { lat: number; lng: number };
+        point: { x: number; y: number };
         originalEvent: { preventDefault: () => void };
       }) => void;
       [key: string]: unknown;
@@ -151,6 +175,75 @@ jest.mock("./map/adapters/maplibre", () => {
     useMap: () => mapRef,
   };
 });
+
+/**
+ * Away from the marker-image zoom the photo pins are one GPU layer rather than a
+ * DOM node each, so a pin is picked the way the map picks one: by the layer's
+ * own listener reporting the feature under the pointer.
+ */
+const PIN_LAYER_ID = "photo-markers-point-circles";
+
+/**
+ * The journey line is handed to the map as data rather than as a style, so the
+ * port owns the source and layer names: one line layer per dash pattern, and the
+ * single-album route is the dashed one.
+ */
+const JOURNEY_SOURCE_ID = "journey-line-lines";
+const JOURNEY_GLOW_SOURCE_ID = "journey-line-glow-lines";
+const JOURNEY_LAYER_ID = "journey-line-line-strokes";
+const JOURNEY_DASHED_LAYER_ID = "journey-line-line-strokes-2-2";
+
+type JourneyLineProperties = {
+  id: string;
+  color: string;
+  width: number;
+  opacity?: number;
+};
+
+const journeyLineProperties = (sourceId: string): JourneyLineProperties[] => {
+  const source = screen.getByTestId(sourceId).dataset.source;
+  const data = JSON.parse(source ?? "{}") as {
+    features?: { properties: JourneyLineProperties }[];
+  };
+
+  return (data.features ?? []).map((feature) => feature.properties);
+};
+
+type PinLayerEvent = {
+  lngLat: { lng: number; lat: number };
+  features: { properties: { id: string } }[];
+};
+type PinLayerListener = (event: PinLayerEvent) => void;
+
+const pinLayerListener = (type: "click" | "mousemove"): PinLayerListener => {
+  const calls = mapInstance.on.mock.calls as unknown as [string, string, PinLayerListener][];
+  const listener = calls
+    .filter(([event, layerId]) => event === type && layerId === PIN_LAYER_ID)
+    .at(-1)?.[2];
+
+  if (!listener) {
+    throw new Error(`No "${type}" listener is registered on ${PIN_LAYER_ID}`);
+  }
+
+  return listener;
+};
+
+const firePin = (type: "click" | "mousemove", photo: MapWorldEntry) => {
+  act(() => {
+    pinLayerListener(type)({
+      lngLat: { lng: photo.decLng ?? 0, lat: photo.decLat ?? 0 },
+      features: [{ properties: { id: photo.href } }],
+    });
+  });
+};
+
+const clickPin = (photo: MapWorldEntry) => {
+  firePin("click", photo);
+};
+
+const hoverPin = (photo: MapWorldEntry) => {
+  firePin("mousemove", photo);
+};
 
 jest.mock("usehooks-ts", () => ({
   useIntersectionObserver: () => ({
@@ -298,6 +391,7 @@ describe("MapWorld", () => {
     act(() => {
       mapHandlers.onContextMenu?.({
         lngLat: { lat: 22.3193, lng: 114.1694 },
+        point: { x: 10, y: 20 },
         originalEvent: { preventDefault },
       });
     });
@@ -458,8 +552,8 @@ describe("MapWorld", () => {
       />,
     );
 
-    expect(screen.getByTestId("journey-line-source")).toBeTruthy();
-    expect(screen.getByTestId("journey-line-layer")).toBeTruthy();
+    expect(screen.getByTestId(JOURNEY_SOURCE_ID)).toBeTruthy();
+    expect(screen.getByTestId(JOURNEY_DASHED_LAYER_ID)).toBeTruthy();
     expect(screen.getByTestId("journey-line-overlay")).toBeTruthy();
   });
 
@@ -481,12 +575,12 @@ describe("MapWorld", () => {
       />,
     );
 
-    expect(screen.queryByTestId("journey-line-source")).toBeNull();
+    expect(screen.queryByTestId(JOURNEY_SOURCE_ID)).toBeNull();
 
-    fireEvent.click(screen.getAllByTestId("marker")[0]!);
+    clickPin(photo);
 
-    expect(screen.getByTestId("journey-line-source")).toBeTruthy();
-    expect(screen.getByTestId("journey-line-layer")).toBeTruthy();
+    expect(screen.getByTestId(JOURNEY_SOURCE_ID)).toBeTruthy();
+    expect(screen.getByTestId(JOURNEY_DASHED_LAYER_ID)).toBeTruthy();
     expect(screen.getByTestId("journey-line-overlay")).toBeTruthy();
     expect(screen.getByTestId("journey-line-speed-label")).toBeTruthy();
   });
@@ -577,7 +671,7 @@ describe("MapWorld", () => {
       />,
     );
 
-    fireEvent.mouseOver(screen.getAllByTestId("marker")[0]!.querySelector("span")!);
+    hoverPin(photo);
 
     expect(screen.getByTestId("journey-line-overlay")).toBeTruthy();
     expect(screen.getByTestId("journey-line-ghost-route")).toBeTruthy();
@@ -616,7 +710,7 @@ describe("MapWorld", () => {
       }),
     );
 
-    fireEvent.click(screen.getByTestId("marker"));
+    clickPin(photo);
     fireEvent.mouseDown(screen.getByRole("link", { name: /kansai/i }));
     act(() => {
       mapHandlers.onMoveEnd?.({
@@ -666,7 +760,7 @@ describe("MapWorld", () => {
     render(<MMap photos={[photo, second]} className="map" showRoute routeDisplayMode="always" />);
     expect(screen.getByTestId("journey-line-overlay")).toBeInTheDocument();
 
-    act(() => mapHandlers.onZoomStart?.());
+    act(() => mapHandlers.onZoomStart?.({ viewState: { latitude: 1, longitude: 2, zoom: 3 } }));
     expect(screen.queryByTestId("journey-line-overlay")).toBeNull();
     act(() => mapHandlers.onZoomEnd?.({ viewState: { latitude: 1, longitude: 2, zoom: 3 } }));
     expect(screen.getByTestId("journey-line-overlay")).toBeInTheDocument();
@@ -674,26 +768,34 @@ describe("MapWorld", () => {
     act(() =>
       mapHandlers.onContextMenu?.({
         lngLat: { lat: 1, lng: 2 },
+        point: { x: 3, y: 4 },
         originalEvent: { preventDefault: jest.fn() },
       }),
     );
     expect(screen.getByRole("group", { name: "Location actions" })).toBeInTheDocument();
-    act(() => mapHandlers.onClick?.());
+    act(() =>
+      mapHandlers.onClick?.({
+        lngLat: { lat: 1, lng: 2 },
+        point: { x: 3, y: 4 },
+        originalEvent: new MouseEvent("click"),
+      }),
+    );
     expect(screen.queryByRole("group", { name: "Location actions" })).toBeNull();
 
     act(() =>
       mapHandlers.onContextMenu?.({
         lngLat: { lat: 1, lng: 2 },
+        point: { x: 3, y: 4 },
         originalEvent: { preventDefault: jest.fn() },
       }),
     );
     fireEvent.click(screen.getByRole("button", { name: "Close popup" }));
     expect(screen.queryByRole("group", { name: "Location actions" })).toBeNull();
 
-    act(() => mapHandlers.onMoveStart?.());
+    act(() => mapHandlers.onMoveStart?.({ viewState: { latitude: 1, longitude: 2, zoom: 3 } }));
     expect(screen.queryByTestId("journey-line-overlay")).toBeNull();
-    act(() => mapHandlers.onDragStart?.());
-    act(() => mapHandlers.onWheel?.());
+    act(() => mapHandlers.onDragStart?.({ viewState: { latitude: 1, longitude: 2, zoom: 3 } }));
+    act(() => mapHandlers.onWheel?.({ originalEvent: new WheelEvent("wheel") }));
   });
 
   it("cycles stacked photos and changes stacks from the current selection", () => {
@@ -715,12 +817,12 @@ describe("MapWorld", () => {
       src: { src: "/four.jpg", width: 100, height: 100 },
     };
     render(<MMap photos={[stackOne, stackTwo, elsewhereOne, elsewhereTwo]} className="map" />);
-    const markers = screen.getAllByTestId("marker");
-    fireEvent.click(markers[0]!);
+    clickPin(stackOne);
     expect(screen.getByRole("link", { name: /kansai/i })).toHaveAttribute("href", stackOne.href);
-    fireEvent.click(markers[0]!);
+    // A second tap on the same stack reaches the photo hidden beneath the first.
+    clickPin(stackOne);
     expect(screen.getByRole("link", { name: /kansai/i })).toHaveAttribute("href", stackTwo.href);
-    fireEvent.click(markers[2]!);
+    clickPin(elsewhereOne);
     expect(screen.getByRole("link", { name: /kansai/i })).toHaveAttribute(
       "href",
       elsewhereOne.href,
@@ -743,7 +845,7 @@ describe("MapWorld", () => {
       date: "2024-01-02T03:04:05",
     };
     const view = render(<MMap photos={[oldPhoto, recentPhoto]} className="map" />);
-    fireEvent.click(screen.getAllByTestId("marker")[0]!);
+    clickPin(oldPhoto);
     view.rerender(
       <MMap
         photos={[oldPhoto, recentPhoto]}
@@ -753,7 +855,7 @@ describe("MapWorld", () => {
     );
     expect(screen.queryByRole("link", { name: /kansai/i })).toBeNull();
 
-    fireEvent.mouseOver(screen.getByLabelText(/Photo from kansai/));
+    hoverPin(recentPhoto);
     expect(screen.getByRole("link", { name: /kansai/i })).toBeInTheDocument();
     view.rerender(
       <MMap
@@ -796,16 +898,17 @@ describe("MapWorld", () => {
     const view = render(
       <MMap photos={photos} className="map" showRoute routeDisplayMode="always" />,
     );
-    const source = JSON.parse(screen.getByTestId("journey-line-source").dataset.source!);
-    expect(source.features).toHaveLength(2);
-    expect(
-      source.features.map((feature: { properties: { album: string } }) => feature.properties.album),
-    ).toEqual(["a", "b"]);
-    expect(layerProps.get("journey-line-layer")?.paint).toEqual(
-      expect.objectContaining({ "line-opacity": 1 }),
-    );
-    expect(layerProps.get("journey-line-glow-layer")?.paint?.["line-color"]).toEqual(
-      expect.arrayContaining(["coalesce"]),
+    const lines = journeyLineProperties(JOURNEY_SOURCE_ID);
+    expect(lines).toHaveLength(2);
+    expect(lines.map((line) => line.id)).toEqual(["a", "b"]);
+    expect(lines.map((line) => line.opacity)).toEqual([1, 1]);
+    // Each album's journey carries its own colour rather than falling back to a
+    // shared one, and the lines taper along their own length.
+    const glow = journeyLineProperties(JOURNEY_GLOW_SOURCE_ID);
+    expect(glow.map((line) => line.color)).toHaveLength(2);
+    expect(glow[0]!.color).not.toEqual(glow[1]!.color);
+    expect(layerProps.get(JOURNEY_LAYER_ID)?.paint?.["line-width"]).toEqual(
+      expect.arrayContaining(["interpolate"]),
     );
 
     view.rerender(
@@ -817,7 +920,7 @@ describe("MapWorld", () => {
         routeMode="simplified"
       />,
     );
-    expect(screen.getByTestId("journey-line-source")).toBeInTheDocument();
+    expect(screen.getByTestId(JOURNEY_SOURCE_ID)).toBeInTheDocument();
   });
 
   it("omits empty routes and supports a simplified single-album route", () => {
@@ -830,7 +933,7 @@ describe("MapWorld", () => {
         routeDisplayMode="always"
       />,
     );
-    expect(screen.queryByTestId("journey-line-source")).toBeNull();
+    expect(screen.queryByTestId(JOURNEY_SOURCE_ID)).toBeNull();
 
     view.rerender(
       <MMap
@@ -841,9 +944,12 @@ describe("MapWorld", () => {
         routeMode="simplified"
       />,
     );
-    expect(screen.getByTestId("journey-line-source")).toBeInTheDocument();
-    expect(layerProps.get("journey-line-layer")?.paint).toEqual(
-      expect.objectContaining({ "line-opacity": 0.55, "line-width": 4 }),
+    expect(screen.getByTestId(JOURNEY_SOURCE_ID)).toBeInTheDocument();
+    expect(journeyLineProperties(JOURNEY_SOURCE_ID)).toEqual([
+      expect.objectContaining({ opacity: 0.55, width: 4 }),
+    ]);
+    expect(layerProps.get(JOURNEY_DASHED_LAYER_ID)?.paint).toEqual(
+      expect.objectContaining({ "line-dasharray": [2, 2] }),
     );
   });
 });

@@ -3,8 +3,7 @@ import React from "react";
 import styles from "./Map.module.css";
 import pinStyles from "./mapPin.module.css";
 
-import Map, { Marker, useMap } from "./map/adapters/maplibre";
-import type { ProjectionSpecification } from "maplibre-gl";
+import { type Bounds, MapView, Marker, useMap } from "./map";
 import { AppLink as Link } from "./platform";
 import { computeWrapAwareBounds } from "../util/mapBounds";
 import { MapLibreStyles } from "./MapLibreStyles";
@@ -54,7 +53,7 @@ const normaliseCoords = (input: [number, number] | [number, number][]): [number,
 };
 
 const MapFlyer = (props: { coordinates: [number, number][] }) => {
-  const { current: map } = useMap();
+  const map = useMap();
   useEffect(() => {
     if (!map || props.coordinates.length === 0) {
       return;
@@ -67,7 +66,7 @@ const MapFlyer = (props: { coordinates: [number, number][] }) => {
       }
       const [lat, lng] = first;
       map.flyTo({
-        center: [lng, lat],
+        center: { lng, lat },
         zoom: ZOOM,
         speed: 2.4,
       });
@@ -78,9 +77,13 @@ const MapFlyer = (props: { coordinates: [number, number][] }) => {
     // with a small margin around them. coordinates are [lat, lng]; the bounds
     // helper wants [lng, lat] and returns antimeridian-aware corners so a
     // layout spanning ±180° doesn't frame the whole globe.
-    const bounds = computeWrapAwareBounds(
+    const [[west, south], [east, north]] = computeWrapAwareBounds(
       props.coordinates.map(([lat, lng]) => [lng, lat] as [number, number]),
     )!;
+    const bounds: Bounds = [
+      { lng: west, lat: south },
+      { lng: east, lat: north },
+    ];
 
     map.fitBounds(bounds, {
       padding: FIT_BOUNDS_PADDING_PX,
@@ -95,8 +98,6 @@ const MapFlyer = (props: { coordinates: [number, number][] }) => {
 const MMapComponent: React.FC<MapProps> = (props) => {
   const mapStyle: MapTilerMapStyle = props.mapStyle ?? "streets";
   const projection = props.projection ?? "mercator";
-  const projectionSpec: "mercator" | "globe" | ProjectionSpecification =
-    projection === "vertical-perspective" ? { type: "vertical-perspective" } : projection;
 
   const coords = normaliseCoords(props.coordinates);
   // First coord doubles as the initial centre + the "view on" deep-link
@@ -108,31 +109,29 @@ const MMapComponent: React.FC<MapProps> = (props) => {
     <>
       <MapLibreStyles />
       <div className={styles.map}>
-        <Map
+        <MapView
           {...(props.style !== undefined ? { style: props.style } : {})}
-          // mapStyle="https://tiles.openfreemap.org/styles/liberty"
-          mapStyle={`https://api.maptiler.com/maps/${mapStyle}/style.json?key=mrjUpLh9Syjz9wcEY2Vb`}
-          initialViewState={{
-            longitude: primary[1],
-            latitude: primary[0],
+          // styleUrl="https://tiles.openfreemap.org/styles/liberty"
+          styleUrl={`https://api.maptiler.com/maps/${mapStyle}/style.json?key=mrjUpLh9Syjz9wcEY2Vb`}
+          initialView={{
+            center: { lng: primary[1], lat: primary[0] },
             zoom: ZOOM,
           }}
-          projection={projectionSpec}
-          attributionControl={props.attribution === false ? false : { compact: true }}
+          projection={projection}
+          attribution={props.attribution === false ? false : { compact: true }}
         >
           {coords.map(([lat, lng], idx) => (
             <Marker
               key={`${lat}-${lng}-${idx}`}
-              longitude={lng}
-              latitude={lat}
+              at={{ lng, lat }}
               anchor="center"
-              style={props.markerStyle ?? {}}
+              {...(props.markerStyle !== undefined ? { style: props.markerStyle } : {})}
             >
               <span data-map-pin className={pinStyles.pin} />
             </Marker>
           ))}
           <MapFlyer coordinates={coords} />
-        </Map>
+        </MapView>
 
         {props.details !== false ? (
           <div className={styles.viewOn}>

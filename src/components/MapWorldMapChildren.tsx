@@ -1,5 +1,5 @@
 import React from "react";
-import { type MapRef, useMap } from "./map/adapters/maplibre";
+import { type Bounds, type MapCamera, useMap } from "./map";
 import { computeWrapAwareBounds } from "../util/mapBounds";
 import type { MapWorldEntry } from "../util/pageDataTypes";
 import type { MapBounds } from "./mapWorldViewModel";
@@ -9,7 +9,7 @@ import styles from "./MapWorld.module.css";
 // Frames the map on a set of photos: flyTo a single point, or fitBounds the
 // enclosing rectangle. Shared by the initial auto-fit and the on-demand
 // "Fit to results" control.
-const fitMapToPhotos = (map: MapRef, photos: MapWorldEntry[]) => {
+const fitMapToPhotos = (map: MapCamera, photos: MapWorldEntry[]) => {
   const coordinates = photos
     .filter((photo) => photo.decLat !== null && photo.decLng !== null)
     .map((photo) => [photo.decLng as number, photo.decLat as number] as [number, number]);
@@ -24,12 +24,16 @@ const fitMapToPhotos = (map: MapRef, photos: MapWorldEntry[]) => {
       return;
     }
     const [longitude, latitude] = first;
-    map.flyTo({ center: [longitude, latitude], zoom: 10.5, speed: 2.2 });
+    map.flyTo({ center: { lng: longitude, lat: latitude }, zoom: 10.5, speed: 2.2 });
     return;
   }
 
   // Two or more validated coordinates always produce bounds.
-  const bounds = computeWrapAwareBounds(coordinates)!;
+  const [[west, south], [east, north]] = computeWrapAwareBounds(coordinates)!;
+  const bounds: Bounds = [
+    { lng: west, lat: south },
+    { lng: east, lat: north },
+  ];
 
   map.fitBounds(bounds, {
     padding: 36,
@@ -39,7 +43,7 @@ const fitMapToPhotos = (map: MapRef, photos: MapWorldEntry[]) => {
 };
 
 export const MapAutoFit = ({ enabled, photos }: { enabled: boolean; photos: MapWorldEntry[] }) => {
-  const { current: map } = useMap();
+  const map = useMap();
 
   React.useEffect(() => {
     if (!enabled || !map) {
@@ -61,7 +65,7 @@ export const MapFitOnRequest = ({
   requestId: number;
   photos: MapWorldEntry[];
 }) => {
-  const { current: map } = useMap();
+  const map = useMap();
   const handledRef = React.useRef(requestId);
 
   React.useEffect(() => {
@@ -141,7 +145,7 @@ export const MapBoundsTracker = ({
 }: {
   onBoundsChange: (bounds: MapBounds) => void;
 }) => {
-  const { current: map } = useMap();
+  const map = useMap();
 
   React.useEffect(() => {
     if (!map) {
@@ -149,40 +153,38 @@ export const MapBoundsTracker = ({
     }
 
     const updateBounds = () => {
-      const bounds = map.getBounds();
-      if (bounds) {
-        onBoundsChange({
-          north: bounds.getNorth(),
-          south: bounds.getSouth(),
-          east: bounds.getEast(),
-          west: bounds.getWest(),
-        });
-      }
+      const [southWest, northEast] = map.getBounds();
+      onBoundsChange({
+        north: northEast.lat,
+        south: southWest.lat,
+        east: northEast.lng,
+        west: southWest.lng,
+      });
     };
 
     updateBounds();
-    map.on("moveend", updateBounds);
-    map.on("zoomend", updateBounds);
+    const unsubscribes = [map.on("moveend", updateBounds), map.on("zoomend", updateBounds)];
 
     return () => {
-      map.off("moveend", updateBounds);
-      map.off("zoomend", updateBounds);
+      unsubscribes.forEach((unsubscribe) => {
+        unsubscribe();
+      });
     };
   }, [map, onBoundsChange]);
 
   return null;
 };
 
-/** Adds desktop middle-button orbit without replacing MapLibre's native gestures. */
+/** Adds desktop middle-button orbit without replacing the map's native gestures. */
 export const MapMiddleDragOrbit = ({ onInteractionStart }: { onInteractionStart: () => void }) => {
-  const { current: map } = useMap();
+  const map = useMap();
 
   React.useEffect(() => {
     if (!map) {
       return;
     }
 
-    const canvas = map.getCanvasContainer();
+    const canvas = map.getGestureSurface();
     let drag: {
       pointerId: number;
       startX: number;
@@ -197,7 +199,7 @@ export const MapMiddleDragOrbit = ({ onInteractionStart }: { onInteractionStart:
         return;
       }
       if (drag.restoreDragPan) {
-        map.dragPan.enable();
+        map.setDragPanEnabled(true);
       }
       drag = null;
       if (styles.orbiting) {
@@ -212,9 +214,9 @@ export const MapMiddleDragOrbit = ({ onInteractionStart }: { onInteractionStart:
       event.preventDefault();
       event.stopPropagation();
       onInteractionStart();
-      const restoreDragPan = map.dragPan.isEnabled();
+      const restoreDragPan = map.isDragPanEnabled();
       if (restoreDragPan) {
-        map.dragPan.disable();
+        map.setDragPanEnabled(false);
       }
       drag = {
         pointerId: event.pointerId,

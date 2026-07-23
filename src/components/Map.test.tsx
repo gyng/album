@@ -15,10 +15,10 @@ let currentMap: { flyTo: typeof flyTo; fitBounds: typeof fitBounds } | null = {
 const mapProps = jest.fn();
 const markerProps = jest.fn();
 
-jest.mock("./map/adapters/maplibre", () => {
+jest.mock("./map", () => {
   return {
     __esModule: true,
-    default: ({ children, ...props }: { children?: ReactNode }) => {
+    MapView: ({ children, ...props }: { children?: ReactNode }) => {
       mapProps(props);
       return <div data-testid="map">{children}</div>;
     },
@@ -26,7 +26,7 @@ jest.mock("./map/adapters/maplibre", () => {
       markerProps(props);
       return <div data-testid="marker">{children}</div>;
     },
-    useMap: () => ({ current: currentMap }),
+    useMap: () => currentMap ?? undefined,
   };
 });
 
@@ -50,11 +50,15 @@ describe("MMap", () => {
     expect(screen.getByRole("link", { name: "Album map" }).getAttribute("href")).toBe(
       "/map?lat=35.6762&lon=139.650&zoom=14",
     );
-    expect(flyTo).toHaveBeenCalledWith({ center: [139.6503, 35.6762], zoom: 12, speed: 2.4 });
+    expect(flyTo).toHaveBeenCalledWith({
+      center: { lng: 139.6503, lat: 35.6762 },
+      zoom: 12,
+      speed: 2.4,
+    });
     expect(mapProps).toHaveBeenCalledWith(
       expect.objectContaining({
         projection: "mercator",
-        attributionControl: { compact: true },
+        attribution: { compact: true },
       }),
     );
   });
@@ -78,20 +82,20 @@ describe("MMap", () => {
     expect(screen.getAllByTestId("marker")).toHaveLength(2);
     expect(markerProps).toHaveBeenNthCalledWith(
       1,
-      expect.objectContaining({ longitude: 103, latitude: 1, style: { opacity: 0.5 } }),
+      expect.objectContaining({ at: { lng: 103, lat: 1 }, style: { opacity: 0.5 } }),
     );
     expect(fitBounds).toHaveBeenCalledWith(
       [
-        [103, 1],
-        [104, 2],
+        { lng: 103, lat: 1 },
+        { lng: 104, lat: 2 },
       ],
       { padding: 48, maxZoom: 11, duration: 800 },
     );
     expect(mapProps).toHaveBeenCalledWith(
       expect.objectContaining({
-        mapStyle: expect.stringContaining("/satellite/style.json"),
-        projection: { type: "vertical-perspective" },
-        attributionControl: false,
+        styleUrl: expect.stringContaining("/satellite/style.json"),
+        projection: "vertical-perspective",
+        attribution: false,
         style: expect.objectContaining({ minHeight: 200 }),
       }),
     );
@@ -105,7 +109,7 @@ describe("MMap", () => {
     expect(flyTo).not.toHaveBeenCalled();
     expect(fitBounds).not.toHaveBeenCalled();
     expect(mapProps).toHaveBeenCalledWith(
-      expect.objectContaining({ initialViewState: { longitude: 0, latitude: 0, zoom: 12 } }),
+      expect.objectContaining({ initialView: { center: { lng: 0, lat: 0 }, zoom: 12 } }),
     );
   });
 

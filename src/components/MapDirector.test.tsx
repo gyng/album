@@ -10,8 +10,8 @@ const flyTo = jest.fn();
 const stop = jest.fn();
 let currentMap: { flyTo: typeof flyTo; stop: typeof stop } | null = { flyTo, stop };
 
-jest.mock("./map/adapters/maplibre", () => ({
-  useMap: () => ({ current: currentMap }),
+jest.mock("./map", () => ({
+  useMap: () => currentMap ?? undefined,
 }));
 
 const photo = (overrides: Partial<MapWorldEntry> = {}): MapWorldEntry => ({
@@ -53,7 +53,7 @@ describe("MapDirector", () => {
 
     expect(onVisit).toHaveBeenLastCalledWith(first);
     expect(flyTo).toHaveBeenLastCalledWith({
-      center: [103.75, 1.25],
+      center: { lng: 103.75, lat: 1.25 },
       zoom: 6.2,
       pitch: 42,
       bearing: -102,
@@ -65,7 +65,7 @@ describe("MapDirector", () => {
     });
     expect(onVisit).toHaveBeenLastCalledWith(second);
     expect(flyTo).toHaveBeenLastCalledWith(
-      expect.objectContaining({ center: [104, 2], zoom: 8.4, bearing: -49 }),
+      expect.objectContaining({ center: { lng: 104, lat: 2 }, zoom: 8.4, bearing: -49 }),
     );
 
     view.unmount();

@@ -2,15 +2,17 @@ import React from "react";
 import type { MapWorldEntry, TimeRange } from "../util/pageDataTypes";
 import { mixHsl, recencyColor } from "../util/mapColor";
 import { MapRecencyLegend } from "./MapRecencyLegend";
-import MapLibreMap, {
-  ScaleControl,
-  NavigationControl,
-  GeolocateControl,
+import {
+  type CameraView,
+  DataLayer,
   FullscreenControl,
-  Layer,
-  Source,
-  type ViewStateChangeEvent,
-} from "./map/adapters/maplibre";
+  GeolocateControl,
+  type LineFeature,
+  type LineWidthStop,
+  MapView,
+  NavigationControl,
+  ScaleControl,
+} from "./map";
 import { ThemeToggle } from "./ThemeToggle";
 import {
   buildContextRoutePoints,
@@ -100,6 +102,37 @@ const ROUTER_SYNC_DEBOUNCE_MS = 200;
 const ROUTER_SYNC_PAUSE_MS = 700;
 const MARKER_IMAGE_ZOOM_THRESHOLD = 8.5;
 
+// With every album's journey drawn at once, each line tapers from thin where
+// the trip began to thick where it ended, so its direction reads without a
+// legend. A single album's route is one even width instead — there is no other
+// journey to tell it apart from.
+const JOURNEY_GLOW_TAPER: LineWidthStop[] = [
+  { at: 0, width: 2.4 },
+  { at: 0.32, width: 6.2 },
+  { at: 1, width: 10.2 },
+];
+const JOURNEY_LINE_TAPER: LineWidthStop[] = [
+  { at: 0, width: 1.1 },
+  { at: 0.32, width: 4.8 },
+  { at: 1, width: 8 },
+];
+/** The flat width a taper falls back to: the middle of its ramp. */
+const taperFallbackWidth = (taper: readonly LineWidthStop[]): number => taper[1]!.width;
+
+/** Used when an album's journey has no recency colour of its own to take. */
+const JOURNEY_GLOW_FALLBACK_COLOR = "#b7eef5";
+const JOURNEY_LINE_FALLBACK_COLOR = "#12bcd4";
+const SINGLE_JOURNEY_GLOW_COLOR = "#dbfbff";
+
+const readStringProperty = (
+  properties: Record<string, unknown>,
+  key: string,
+): string | undefined => {
+  const value = properties[key];
+
+  return typeof value === "string" ? value : undefined;
+};
+
 export const MMap: React.FC<MapWorldProps> = ({
   photos,
   className,
@@ -122,6 +155,16 @@ export const MMap: React.FC<MapWorldProps> = ({
   const initialLon = syncRoute ? (url?.searchParams.get("lon") ?? null) : null;
   const initialLat = syncRoute ? (url?.searchParams.get("lat") ?? null) : null;
   const initialZoom = syncRoute ? (url?.searchParams.get("zoom") ?? null) : null;
+
+  // Either half of the pair is honoured on its own; the missing one falls back
+  // to zero, exactly as the map would have defaulted it.
+  const initialCenter =
+    initialLon || initialLat
+      ? {
+          lng: initialLon ? Number.parseFloat(initialLon) : 0,
+          lat: initialLat ? Number.parseFloat(initialLat) : 0,
+        }
+      : null;
 
   const initialShowMarkerImages = Boolean(
     initialZoom && Number.parseFloat(initialZoom) > MARKER_IMAGE_ZOOM_THRESHOLD,
@@ -344,6 +387,60 @@ export const MMap: React.FC<MapWorldProps> = ({
   }, []);
 
   const routeLineWidth = routeMode === "simplified" ? 4 : 3;
+  // "Show all journeys" draws each trip in its own solid recency colour: a
+  // gradient cannot vary per feature, so a per-feature colour stands in for one.
+  // A single album keeps the one recency colour of the active route.
+  const isMultiAlbumJourney = routeDataByAlbum.size > 1;
+  const journeyLines = React.useMemo(() => {
+    if (!routeGeoJson) {
+      return null;
+    }
+
+    const lineOpacity = alwaysVisibleRouteGeoJson
+      ? isMultiAlbumJourney
+        ? 1
+        : routeMode === "simplified"
+          ? 0.55
+          : 0.78
+      : 0.24;
+    const glow: LineFeature[] = [];
+    const line: LineFeature[] = [];
+
+    routeGeoJson.features.forEach((feature, index) => {
+      const id = readStringProperty(feature.properties, "album") ?? `journey-${index}`;
+      const albumColor = readStringProperty(feature.properties, "routeColorMiddle");
+      const path = feature.geometry.coordinates.map(([lng, lat]) => ({ lng, lat }));
+
+      glow.push({
+        id,
+        path,
+        color: isMultiAlbumJourney
+          ? (albumColor ?? JOURNEY_GLOW_FALLBACK_COLOR)
+          : SINGLE_JOURNEY_GLOW_COLOR,
+        width: isMultiAlbumJourney ? taperFallbackWidth(JOURNEY_GLOW_TAPER) : routeLineWidth + 4,
+        opacity: isMultiAlbumJourney ? 0.34 : 0.35,
+      });
+      line.push({
+        id,
+        path,
+        color: isMultiAlbumJourney
+          ? (albumColor ?? JOURNEY_LINE_FALLBACK_COLOR)
+          : routeColorStops[1]!.color,
+        width: isMultiAlbumJourney ? taperFallbackWidth(JOURNEY_LINE_TAPER) : routeLineWidth,
+        opacity: lineOpacity,
+        ...(isMultiAlbumJourney ? {} : { dash: [2, 2] }),
+      });
+    });
+
+    return { glow, line };
+  }, [
+    alwaysVisibleRouteGeoJson,
+    isMultiAlbumJourney,
+    routeColorStops,
+    routeGeoJson,
+    routeLineWidth,
+    routeMode,
+  ]);
 
   const legendYears = React.useMemo(() => getLegendYears(dateStats), [dateStats]);
   const shouldShowLegend = showLegend && dateStats.range > 0 && timeFilteredPhotos.length > 1;
@@ -356,15 +453,15 @@ export const MMap: React.FC<MapWorldProps> = ({
     pauseUntilRef.current = Date.now() + ROUTER_SYNC_PAUSE_MS;
   }, [syncRoute]);
 
-  const updateParams = (e: ViewStateChangeEvent) => {
+  const updateParams = (view: CameraView) => {
     if (!syncRoute) {
       return;
     }
 
     const cameraParams = {
-      lat: e.viewState.latitude.toFixed(3).toString(),
-      lon: e.viewState.longitude.toFixed(3).toString(),
-      zoom: e.viewState.zoom.toFixed(2).toString(),
+      lat: view.center.lat.toFixed(3).toString(),
+      lon: view.center.lng.toFixed(3).toString(),
+      zoom: view.zoom.toFixed(2).toString(),
     };
 
     if (debounceTimerRef.current) {
@@ -416,34 +513,18 @@ export const MMap: React.FC<MapWorldProps> = ({
         </div>
       ) : null}
       <div className={styles.mapViewport} style={style}>
-        <MapLibreMap
+        <MapView
           // two options for map style
-          // mapStyle="https://tiles.openfreemap.org/styles/liberty"
-          // mapStyle="https://vector.openstreetmap.org/shortbread_v1/tilejson.json"
+          // styleUrl="https://tiles.openfreemap.org/styles/liberty"
+          // styleUrl="https://vector.openstreetmap.org/shortbread_v1/tilejson.json"
           // Public API key — domain-restricted on MapTiler side, not a secret.
-          mapStyle="https://api.maptiler.com/maps/ffd8bd10-cd97-40a5-b1d6-d15f98fb3644/style.json?key=iilC4hPY1594noPX9OQ2"
+          styleUrl="https://api.maptiler.com/maps/ffd8bd10-cd97-40a5-b1d6-d15f98fb3644/style.json?key=iilC4hPY1594noPX9OQ2"
           // Collapsed to an "i" the reader can expand, as Map.tsx already does.
           // The full credit line is wide enough to crowd the bottom of a phone
           // screen, and the attribution stays one tap away either way.
-          attributionControl={{ compact: true }}
-          onLoad={(event) => {
-            // `compact` only makes the attribution collapsible: MapLibre still
-            // renders it open and only minimises it once you touch the map
-            // (_updateCompact adds `maplibregl-compact-show`,
-            // _updateCompactMinimize removes it on interaction). Collapse it up
-            // front instead. This does not fight the control: _updateCompact
-            // only re-adds the class when `maplibregl-compact` is absent, and by
-            // now it is set, so resizing will not reopen it.
-            // It is a <details>, so `open` has to go too, not just the class.
-            const attribution = event.target
-              .getContainer()
-              .querySelector(".maplibregl-ctrl-attrib.maplibregl-compact");
-            attribution?.classList.remove("maplibregl-compact-show");
-            attribution?.removeAttribute("open");
-          }}
-          initialViewState={{
-            ...(initialLon ? { longitude: Number.parseFloat(initialLon) } : {}),
-            ...(initialLat ? { latitude: Number.parseFloat(initialLat) } : {}),
+          attribution={{ compact: true, collapsed: true }}
+          initialView={{
+            ...(initialCenter ? { center: initialCenter } : {}),
             ...(initialZoom ? { zoom: Number.parseFloat(initialZoom) } : {}),
           }}
           onMoveStart={() => {
@@ -457,25 +538,25 @@ export const MMap: React.FC<MapWorldProps> = ({
             event.originalEvent.preventDefault();
             stopDirector();
             setContextPoint({
-              latitude: event.lngLat.lat,
-              longitude: event.lngLat.lng,
+              latitude: event.at.lat,
+              longitude: event.at.lng,
             });
           }}
           onDragStart={stopDirector}
           onWheel={stopDirector}
-          onZoom={(e) => {
-            updateMarkerImageVisibility(e.viewState.zoom);
+          onZoom={(view) => {
+            updateMarkerImageVisibility(view.zoom);
           }}
           onZoomStart={() => {
             setIsInteracting(true);
           }}
-          onZoomEnd={(event) => {
+          onZoomEnd={(view) => {
             setIsInteracting(false);
-            updateParams(event);
+            updateParams(view);
           }}
-          onMoveEnd={(event) => {
+          onMoveEnd={(view) => {
             setIsInteracting(false);
-            updateParams(event);
+            updateParams(view);
           }}
         >
           <MapAutoFit enabled={fitToPhotos} photos={photos} />
@@ -487,51 +568,19 @@ export const MMap: React.FC<MapWorldProps> = ({
             sequence={directorSequence}
             onVisit={visitDirectorPhoto}
           />
-          {routeGeoJson ? (
-            <Source id="journey-line-source" type="geojson" data={routeGeoJson} lineMetrics>
-              <Layer
-                id="journey-line-glow-layer"
-                type="line"
-                paint={{
-                  "line-color":
-                    routeDataByAlbum.size > 1
-                      ? ["coalesce", ["get", "routeColorMiddle"], "#b7eef5"]
-                      : "#dbfbff",
-                  "line-opacity": routeDataByAlbum.size > 1 ? 0.34 : 0.35,
-                  "line-width":
-                    routeDataByAlbum.size > 1
-                      ? ["interpolate", ["linear"], ["line-progress"], 0, 2.4, 0.32, 6.2, 1, 10.2]
-                      : routeLineWidth + 4,
-                }}
+          {journeyLines ? (
+            <>
+              <DataLayer
+                id="journey-line-glow"
+                lines={journeyLines.glow}
+                {...(isMultiAlbumJourney ? { lineWidthAlong: JOURNEY_GLOW_TAPER } : {})}
               />
-              <Layer
-                id="journey-line-layer"
-                type="line"
-                paint={{
-                  // Multi-album ("show all journeys") draws each trip's line in
-                  // its own solid recency colour (`line-gradient` can't be
-                  // data-driven per feature, so a per-feature solid colour is
-                  // used instead of a shared gradient). Single-album keeps the
-                  // one recency colour of the active route.
-                  "line-color":
-                    routeDataByAlbum.size > 1
-                      ? ["coalesce", ["get", "routeColorMiddle"], "#12bcd4"]
-                      : routeColorStops[1]!.color,
-                  "line-opacity": alwaysVisibleRouteGeoJson
-                    ? routeDataByAlbum.size > 1
-                      ? 1
-                      : routeMode === "simplified"
-                        ? 0.55
-                        : 0.78
-                    : 0.24,
-                  "line-width":
-                    routeDataByAlbum.size > 1
-                      ? ["interpolate", ["linear"], ["line-progress"], 0, 1.1, 0.32, 4.8, 1, 8]
-                      : routeLineWidth,
-                  ...(routeDataByAlbum.size > 1 ? {} : { "line-dasharray": [2, 2] }),
-                }}
+              <DataLayer
+                id="journey-line"
+                lines={journeyLines.line}
+                {...(isMultiAlbumJourney ? { lineWidthAlong: JOURNEY_LINE_TAPER } : {})}
               />
-            </Source>
+            </>
           ) : null}
           {!isInteracting && routeGeoJson ? (
             <MapRouteOverlay
@@ -577,7 +626,7 @@ export const MMap: React.FC<MapWorldProps> = ({
             <MapRecencyLegend olderLabel={legendYears.older} newerLabel={legendYears.newer} />
           ) : null}
           <FullscreenControl />
-        </MapLibreMap>
+        </MapView>
       </div>
     </div>
   );

@@ -1,5 +1,5 @@
 import React from "react";
-import { useMap } from "./map/adapters/maplibre";
+import { useMap } from "./map";
 import type { RouteMode, RoutePoint } from "./mapRoute";
 import {
   formatDistanceKm,
@@ -13,7 +13,7 @@ import {
 import styles from "./MapWorld.module.css";
 
 const useMapOverlayVersion = () => {
-  const { current: map } = useMap();
+  const map = useMap();
   const [version, setVersion] = React.useState(0);
 
   React.useEffect(() => {
@@ -39,17 +39,15 @@ const useMapOverlayVersion = () => {
     };
 
     update();
-    map.on("move", update);
-    map.on("zoom", update);
-    map.on("resize", update);
+    const unsubscribes = [map.on("move", update), map.on("zoom", update), map.on("resize", update)];
 
     return () => {
       if (frameId !== null) {
         cancelAnimationFrame(frameId);
       }
-      map.off("move", update);
-      map.off("zoom", update);
-      map.off("resize", update);
+      unsubscribes.forEach((unsubscribe) => {
+        unsubscribe();
+      });
     };
   }, [map]);
 
@@ -80,7 +78,7 @@ export const MapRouteOverlay = ({
 
     return projectRouteSegments(
       routePoints,
-      (coordinates) => map.project(coordinates),
+      ([lng, lat]) => map.project({ lng, lat }),
       getPointColor,
     );
   }, [getPointColor, map, routePoints, version]);
@@ -115,7 +113,7 @@ export const MapRouteOverlay = ({
       return null;
     }
 
-    return projectGhostRoutePath(ghostRoutePoints, (coordinates) => map.project(coordinates));
+    return projectGhostRoutePath(ghostRoutePoints, ([lng, lat]) => map.project({ lng, lat }));
   }, [ghostRoutePoints, map, version]);
 
   const preferredLabelSegmentIds = React.useMemo(

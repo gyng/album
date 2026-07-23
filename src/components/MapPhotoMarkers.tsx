@@ -1,4 +1,4 @@
-import { Marker } from "./map/adapters/maplibre";
+import { DataLayer, Marker, type PointFeature } from "./map";
 import type { PhotoWithStyle } from "./mapWorldViewModel";
 import { formatMapPhotoDate } from "./mapWorldViewModel";
 import {
@@ -29,6 +29,33 @@ type LocatedPhoto = PhotoWithStyle & { decLat: number; decLng: number };
 
 const hasCoordinates = (photo: PhotoWithStyle): photo is LocatedPhoto =>
   photo.decLat !== null && photo.decLng !== null;
+
+/* -------------------------------------------------------------------------- */
+/* Bulk pins — drawn on the GPU                                                */
+/* -------------------------------------------------------------------------- */
+
+/** Half of the 14px pin the DOM markers draw (see `mapPin.module.css`). */
+const PIN_RADIUS = 7;
+/** The pin's white ring, matching `.pin`'s outline shadow. */
+const PIN_HALO = { color: "rgba(255, 255, 255, 0.84)", width: 2 };
+/** `.pin`'s resting opacity. */
+const PIN_OPACITY = 0.9;
+/** `.pinActive` — the photo's own route. */
+const ROUTE_ACTIVE_OPACITY = 1;
+/** `.pinMuted` — everything off the emphasised route. */
+const ROUTE_MUTED_OPACITY = 0.28;
+
+const pinOpacity = (photo: LocatedPhoto, emphasisedHrefs: ReadonlySet<string> | null): number => {
+  if (!emphasisedHrefs) {
+    return PIN_OPACITY;
+  }
+
+  return emphasisedHrefs.has(photo.href) ? ROUTE_ACTIVE_OPACITY : ROUTE_MUTED_OPACITY;
+};
+
+/* -------------------------------------------------------------------------- */
+/* Rich pins — one DOM marker each                                             */
+/* -------------------------------------------------------------------------- */
 
 const MapPhotoMarker = ({
   photo,
@@ -79,14 +106,12 @@ const MapPhotoMarker = ({
 
   return (
     <Marker
-      longitude={photo.decLng}
-      latitude={photo.decLat}
+      at={{ lng: photo.decLng, lat: photo.decLat }}
       anchor="center"
       onClick={(event) => {
         event.originalEvent.stopPropagation();
         onSelect(photo);
       }}
-      color={photo.markerColor}
     >
       <div ref={markerRef} className={previewMarkers ? styles.markerPreview : undefined}>
         {(showMarkerImages || previewMarkers) && isImageVisible ? (
@@ -129,20 +154,69 @@ const MapPhotoMarker = ({
   );
 };
 
+/**
+ * Photo pins take one of two forms, and the choice is what keeps the map fast.
+ *
+ * Plain pins are bulk data: one `<DataLayer>` hands the whole set to the map,
+ * which draws it in a single GPU pass. A DOM marker each meant ~1400 nodes at
+ * world zoom, every one of them reprojected on every frame of a pan (measured
+ * at ~22.5µs per marker per frame — roughly half the frame budget, and all of
+ * the main-thread blocking).
+ *
+ * A marker showing its thumbnail cannot be expressed that way: the image is
+ * lazily loaded once the marker scrolls into view, which needs a real element
+ * to observe. That set is deliberately small — it only appears zoomed in, or
+ * when a search has narrowed the map to a handful of results — so a DOM marker
+ * each costs little.
+ */
 export const MapPhotoMarkers = ({ photos, ...props }: MapPhotoMarkersProps) => {
+  const { showMarkerImages, previewMarkers = false, emphasiseRoute, activeRouteHrefSet } = props;
   const observeMarker = useSharedMapMarkerObserver();
+  const locatedPhotos = React.useMemo(() => photos.filter(hasCoordinates), [photos]);
+  // Held as `null` unless a route is actually being emphasised: the set behind
+  // it changes on every hover, and rebuilding the whole feature collection for
+  // an emphasis nobody is drawing would give the cost straight back.
+  const emphasisedHrefs = emphasiseRoute && activeRouteHrefSet.size > 0 ? activeRouteHrefSet : null;
+  const points = React.useMemo(
+    (): PointFeature[] =>
+      locatedPhotos.map((photo) => ({
+        id: photo.href,
+        at: { lng: photo.decLng, lat: photo.decLat },
+        color: photo.markerColor,
+        radius: PIN_RADIUS,
+        opacity: pinOpacity(photo, emphasisedHrefs),
+      })),
+    [locatedPhotos, emphasisedHrefs],
+  );
+  const photosByHref = React.useMemo(
+    () => new Map(locatedPhotos.map((photo) => [photo.href, photo])),
+    [locatedPhotos],
+  );
+
+  if (!showMarkerImages && !previewMarkers) {
+    return (
+      <DataLayer
+        id="photo-markers"
+        points={points}
+        stroke={PIN_HALO}
+        onPointClick={({ id }) => {
+          const photo = photosByHref.get(id);
+          if (photo) {
+            props.onSelect(photo);
+          }
+        }}
+        onPointHover={(point) => {
+          props.onHover(point ? (photosByHref.get(point.id) ?? null) : null);
+        }}
+      />
+    );
+  }
 
   return (
     <>
-      {photos.map((photo) => {
-        if (!hasCoordinates(photo)) {
-          return null;
-        }
-
-        return (
-          <MapPhotoMarker key={photo.href} photo={photo} {...props} observeMarker={observeMarker} />
-        );
-      })}
+      {locatedPhotos.map((photo) => (
+        <MapPhotoMarker key={photo.href} photo={photo} {...props} observeMarker={observeMarker} />
+      ))}
     </>
   );
 };

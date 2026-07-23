@@ -8,9 +8,9 @@ import { GuessMap } from "./GuessMap";
 const mockFitBounds = jest.fn();
 let mockCurrentMap: { fitBounds: typeof mockFitBounds } | null = { fitBounds: mockFitBounds };
 
-jest.mock("../map/adapters/maplibre", () => ({
+jest.mock("../map", () => ({
   __esModule: true,
-  default: ({
+  MapView: ({
     children,
     cursor,
     onClick,
@@ -19,28 +19,25 @@ jest.mock("../map/adapters/maplibre", () => ({
       type="button"
       aria-label="Map surface"
       data-cursor={cursor}
-      onClick={() => onClick({ lngLat: { lat: 1.25, lng: 103.75 } })}
+      onClick={() => onClick({ type: "click", at: { lat: 1.25, lng: 103.75 } })}
     >
       {children}
     </button>
   ),
-  Marker: ({
-    children,
-    latitude,
-    longitude,
-  }: React.PropsWithChildren<{ latitude: number; longitude: number }>) => (
-    <div data-testid="marker" data-position={`${latitude},${longitude}`}>
+  Marker: ({ children, at }: React.PropsWithChildren<{ at: { lat: number; lng: number } }>) => (
+    <div data-testid="marker" data-position={`${at.lat},${at.lng}`}>
       {children}
     </div>
   ),
-  Source: ({ children, data }: React.PropsWithChildren<{ data: unknown }>) => (
-    <div data-testid="line-source" data-geojson={JSON.stringify(data)}>
-      {children}
-    </div>
+  DataLayer: ({ id, lines }: { id: string; lines?: unknown }) => (
+    <div data-testid={id} data-lines={JSON.stringify(lines)} />
   ),
-  Layer: ({ id }: { id: string }) => <div data-testid={id} />,
-  useMap: () => ({ current: mockCurrentMap }),
+  useMap: () => mockCurrentMap ?? undefined,
 }));
+
+/** The line features the guess-to-answer layer was handed. */
+const renderedLines = () =>
+  JSON.parse(screen.getByTestId("guess-line").getAttribute("data-lines") ?? "null");
 
 describe("GuessMap", () => {
   beforeEach(() => {
@@ -80,8 +77,8 @@ describe("GuessMap", () => {
     expect(screen.getByTestId("marker")).toHaveAttribute("data-position", "-33.9,151.2");
     expect(mockFitBounds).toHaveBeenCalledWith(
       [
-        [151.2, -33.9],
-        [151.2, -33.9],
+        { lng: 151.2, lat: -33.9 },
+        { lng: 151.2, lat: -33.9 },
       ],
       { padding: 60, maxZoom: 6, duration: 800 },
     );
@@ -100,13 +97,15 @@ describe("GuessMap", () => {
     );
 
     expect(screen.getAllByTestId("marker")).toHaveLength(2);
-    const data = JSON.parse(screen.getByTestId("line-source").getAttribute("data-geojson") ?? "");
-    expect(data.features[0].geometry.coordinates).toEqual([
-      [179, 10],
-      [-179, 12],
+    const path = [
+      { lng: 179, lat: 10 },
+      { lng: -179, lat: 12 },
+    ];
+    // A wide soft glow underneath, the dashed line over it.
+    expect(renderedLines()).toEqual([
+      expect.objectContaining({ path, width: 6, opacity: 0.2, blur: 4 }),
+      expect.objectContaining({ path, width: 2, dash: [4, 3] }),
     ]);
-    expect(screen.getByTestId("guess-line-glow")).toBeInTheDocument();
-    expect(screen.getByTestId("guess-line-layer")).toBeInTheDocument();
     expect(mockFitBounds).toHaveBeenCalledTimes(1);
 
     rerender(

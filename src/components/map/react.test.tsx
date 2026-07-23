@@ -3,8 +3,17 @@
  */
 
 import { act, render, screen } from "@testing-library/react";
-import type { ReactNode } from "react";
-import { DataLayer, MapView, useMap } from "./index";
+import type { ComponentType, ReactNode } from "react";
+import {
+  DataLayer,
+  FullscreenControl,
+  GeolocateControl,
+  type MapControlProps,
+  MapView,
+  NavigationControl,
+  ScaleControl,
+  useMap,
+} from "./index";
 import type { MapInstance } from "./port";
 
 const mapProps = jest.fn();
@@ -12,6 +21,8 @@ const sourceProps = jest.fn();
 const layerProps = jest.fn();
 const markerProps = jest.fn();
 const popupProps = jest.fn();
+/** Records which adapter control was rendered, and with what. */
+const controlProps = jest.fn();
 
 // jsdom has no WebGL, so the adapter is replaced wholesale — the same pattern
 // the existing map component tests use. What is under test here is the
@@ -39,6 +50,24 @@ jest.mock("./adapters/maplibre", () => ({
     popupProps(props);
     return <div data-testid="popup">{children}</div>;
   },
+  // The real controls render nothing of their own — they hand an object to the
+  // engine — so the mocks record the call and render nothing either.
+  NavigationControl: (props: { position?: string }) => {
+    controlProps("NavigationControl", props);
+    return null;
+  },
+  GeolocateControl: (props: { position?: string }) => {
+    controlProps("GeolocateControl", props);
+    return null;
+  },
+  ScaleControl: (props: { position?: string }) => {
+    controlProps("ScaleControl", props);
+    return null;
+  },
+  FullscreenControl: (props: { position?: string }) => {
+    controlProps("FullscreenControl", props);
+    return null;
+  },
   useMap: () => ({ current: currentEngineMap }),
 }));
 
@@ -61,13 +90,23 @@ const engine = {
   project: jest.fn(() => ({ x: 12, y: 34 })),
   unproject: jest.fn(() => ({ lng: 5, lat: 6 })),
   getContainer: jest.fn(() => container),
-  on: jest.fn((type: string, listener: EngineListener) => {
+  // Layer-scoped subscriptions take an extra layer id between the event name
+  // and the listener, so both arities are accepted here.
+  on: jest.fn((type: string, second: string | EngineListener, third?: EngineListener) => {
+    const listener = typeof second === "function" ? second : third;
+    if (!listener) {
+      return;
+    }
+
     const registered = engineListeners.get(type) ?? new Set<EngineListener>();
     registered.add(listener);
     engineListeners.set(type, registered);
   }),
-  off: jest.fn((type: string, listener: EngineListener) => {
-    engineListeners.get(type)?.delete(listener);
+  off: jest.fn((type: string, second: string | EngineListener, third?: EngineListener) => {
+    const listener = typeof second === "function" ? second : third;
+    if (listener) {
+      engineListeners.get(type)?.delete(listener);
+    }
   }),
 };
 
@@ -111,6 +150,7 @@ beforeEach(() => {
   layerProps.mockClear();
   markerProps.mockClear();
   popupProps.mockClear();
+  controlProps.mockClear();
   engine.flyTo.mockClear();
   engine.fitBounds.mockClear();
   engine.project.mockClear();
@@ -263,6 +303,125 @@ describe("MapView", () => {
       originalEvent: click,
     });
   });
+
+  it("reports every camera event a gesture-driven consumer listens for", () => {
+    const onMoveStart = jest.fn();
+    const onZoomStart = jest.fn();
+    const onZoom = jest.fn();
+    const onZoomEnd = jest.fn();
+    const onDragStart = jest.fn();
+    const onWheel = jest.fn();
+    const wheel = new WheelEvent("wheel");
+    render(
+      <MapView
+        styleUrl="style.json"
+        onMoveStart={onMoveStart}
+        onZoomStart={onZoomStart}
+        onZoom={onZoom}
+        onZoomEnd={onZoomEnd}
+        onDragStart={onDragStart}
+        onWheel={onWheel}
+      >
+        {null}
+      </MapView>,
+    );
+
+    // A different camera per event, so a handler wired to the wrong engine
+    // event would show up as the wrong view rather than passing by luck.
+    act(() => {
+      lastMapProps().onMoveStart({ viewState: { longitude: 1, latitude: 2, zoom: 3 } });
+      lastMapProps().onZoomStart({ viewState: { longitude: 4, latitude: 5, zoom: 6 } });
+      lastMapProps().onZoom({ viewState: { longitude: 7, latitude: 8, zoom: 9 } });
+      lastMapProps().onZoomEnd({ viewState: { longitude: 10, latitude: 11, zoom: 12 } });
+      lastMapProps().onDragStart({ viewState: { longitude: 13, latitude: 14, zoom: 15 } });
+      lastMapProps().onWheel({ originalEvent: wheel });
+    });
+
+    expect(onMoveStart).toHaveBeenCalledWith({ center: { lng: 1, lat: 2 }, zoom: 3 });
+    expect(onZoomStart).toHaveBeenCalledWith({ center: { lng: 4, lat: 5 }, zoom: 6 });
+    expect(onZoom).toHaveBeenCalledWith({ center: { lng: 7, lat: 8 }, zoom: 9 });
+    expect(onZoomEnd).toHaveBeenCalledWith({ center: { lng: 10, lat: 11 }, zoom: 12 });
+    expect(onDragStart).toHaveBeenCalledWith({ center: { lng: 13, lat: 14 }, zoom: 15 });
+    expect(onWheel).toHaveBeenCalledWith({ type: "wheel", originalEvent: wheel });
+  });
+
+  it("collapses the attribution itself rather than asking the provider to", () => {
+    // A compact notice as the provider first renders it: shown, and open.
+    const notice = document.createElement("details");
+    notice.className = "maplibregl-ctrl-attrib maplibregl-compact maplibregl-compact-show";
+    notice.setAttribute("open", "");
+    container.append(notice);
+    const onLoad = jest.fn();
+
+    render(
+      <MapView
+        styleUrl="style.json"
+        attribution={{ compact: true, collapsed: true }}
+        onLoad={onLoad}
+      >
+        {null}
+      </MapView>,
+    );
+    act(() => {
+      lastMapProps().onLoad({ type: "load", target: engine });
+    });
+
+    // `collapsed` is the port's own idea, so the provider is only told to be
+    // compact; starting shut is the binding's own work on load.
+    expect(lastMapProps().attributionControl).toEqual({ compact: true });
+    expect(notice.classList.contains("maplibregl-compact-show")).toBe(false);
+    expect(notice.hasAttribute("open")).toBe(false);
+    // …and that work does not stand in for the caller's own load handler.
+    expect(onLoad).toHaveBeenCalledTimes(1);
+    expect(onLoad.mock.calls[0]?.[0].getCenter()).toEqual({ lng: 10, lat: 20 });
+
+    notice.remove();
+  });
+
+  it("leaves a compact notice open when it was not asked to start shut", () => {
+    const notice = document.createElement("details");
+    notice.className = "maplibregl-ctrl-attrib maplibregl-compact maplibregl-compact-show";
+    notice.setAttribute("open", "");
+    container.append(notice);
+
+    render(
+      <MapView styleUrl="style.json" attribution={{ compact: true }}>
+        {null}
+      </MapView>,
+    );
+    act(() => {
+      lastMapProps().onLoad({ type: "load", target: engine });
+    });
+
+    expect(lastMapProps().attributionControl).toEqual({ compact: true });
+    expect(notice.classList.contains("maplibregl-compact-show")).toBe(true);
+    expect(notice.hasAttribute("open")).toBe(true);
+
+    notice.remove();
+  });
+});
+
+describe("map controls", () => {
+  const controls: ReadonlyArray<[string, ComponentType<MapControlProps>]> = [
+    ["NavigationControl", NavigationControl],
+    ["GeolocateControl", GeolocateControl],
+    ["ScaleControl", ScaleControl],
+    ["FullscreenControl", FullscreenControl],
+  ];
+
+  it.each(controls)("renders the adapter's %s, anchored where asked", (name, Control) => {
+    render(<Control position="bottom-left" />);
+
+    expect(controlProps).toHaveBeenCalledTimes(1);
+    expect(controlProps).toHaveBeenCalledWith(name, { position: "bottom-left" });
+  });
+
+  it.each(controls)("leaves %s in the provider's own corner by default", (name, Control) => {
+    render(<Control />);
+
+    // Omitted rather than passed as undefined, so the provider's default stands.
+    expect(controlProps).toHaveBeenCalledWith(name, {});
+  });
 });
 
 describe("useMap", () => {
@@ -330,8 +489,85 @@ describe("DataLayer", () => {
       paint: {
         "circle-color": ["coalesce", ["get", "color"], "rgb(230, 32, 101)"],
         "circle-radius": ["coalesce", ["get", "radius"], 5],
+        "circle-opacity": ["coalesce", ["get", "opacity"], 1],
       },
     });
+  });
+
+  it("carries per-feature opacity and draws a halo when one is asked for", () => {
+    render(
+      <MapView styleUrl="style.json">
+        {
+          <DataLayer
+            id="photos"
+            points={[{ id: "a", at: { lng: 1, lat: 2 }, opacity: 0.28 }]}
+            stroke={{ color: "rgba(255, 255, 255, 0.84)", width: 2 }}
+          />
+        }
+      </MapView>,
+    );
+
+    expect(sourceProps.mock.calls.at(-1)?.[0].data.features[0].properties).toEqual({
+      id: "a",
+      opacity: 0.28,
+    });
+    // The halo fades with its point, so a de-emphasised point keeps no ring.
+    expect(layerProps.mock.calls.at(-1)?.[0].paint).toEqual(
+      expect.objectContaining({
+        "circle-stroke-color": "rgba(255, 255, 255, 0.84)",
+        "circle-stroke-width": 2,
+        "circle-stroke-opacity": ["coalesce", ["get", "opacity"], 1],
+      }),
+    );
+  });
+
+  it("reports clicks and hovers on points, and detaches them on unmount", () => {
+    currentEngineMap = engine;
+    const onPointClick = jest.fn();
+    const onPointHover = jest.fn();
+    const view = render(
+      <MapView styleUrl="style.json">
+        {
+          <DataLayer
+            id="photos"
+            points={points}
+            onPointClick={onPointClick}
+            onPointHover={onPointHover}
+          />
+        }
+      </MapView>,
+    );
+
+    const hit = { lngLat: { lng: 103.75, lat: 1.25 }, features: [{ properties: { id: "a" } }] };
+    act(() => {
+      fireEngineEvent("click", hit);
+      fireEngineEvent("mousemove", hit);
+      // Staying on the same point is not a new hover.
+      fireEngineEvent("mousemove", hit);
+      fireEngineEvent("mouseleave", undefined);
+    });
+
+    expect(onPointClick).toHaveBeenCalledWith({ id: "a", at: { lng: 103.75, lat: 1.25 } });
+    expect(onPointHover.mock.calls).toEqual([
+      [{ id: "a", at: { lng: 103.75, lat: 1.25 } }],
+      [null],
+    ]);
+    // Subscribed against the circle layer, so clusters and other layers are
+    // not mistaken for points.
+    expect(engine.on).toHaveBeenCalledWith("click", "photos-point-circles", expect.any(Function));
+
+    view.unmount();
+    expect(engine.off).toHaveBeenCalledWith("click", "photos-point-circles", expect.any(Function));
+    expect(engine.off).toHaveBeenCalledWith(
+      "mousemove",
+      "photos-point-circles",
+      expect.any(Function),
+    );
+    expect(engine.off).toHaveBeenCalledWith(
+      "mouseleave",
+      "photos-point-circles",
+      expect.any(Function),
+    );
   });
 
   it("adds cluster and cluster-count layers when clustering is asked for", () => {
@@ -408,6 +644,100 @@ describe("DataLayer", () => {
         paint: { "line-color": ["get", "color"], "line-width": ["get", "width"] },
       }),
     );
+  });
+
+  it("tapers lines along their own length, and only then measures them", () => {
+    const path = [
+      { lng: 0, lat: 0 },
+      { lng: 10, lat: 20 },
+    ];
+    const lines = [{ id: "trip", path, color: "rgb(9, 9, 9)", width: 3 }];
+    const view = render(
+      <MapView styleUrl="style.json">
+        <DataLayer id="route" lines={lines} />
+      </MapView>,
+    );
+
+    // Untapered: the width is read off each feature, and the provider is not
+    // asked for the line-progress it would otherwise have to compute.
+    expect(layerProps.mock.calls.at(-1)?.[0].paint["line-width"]).toEqual(["get", "width"]);
+    expect(sourceProps.mock.calls.at(-1)?.[0]).not.toHaveProperty("lineMetrics");
+
+    view.rerender(
+      <MapView styleUrl="style.json">
+        <DataLayer
+          id="route"
+          lines={lines}
+          lineWidthAlong={[
+            { at: 0, width: 1 },
+            { at: 0.55, width: 6 },
+            { at: 1, width: 2 },
+          ]}
+        />
+      </MapView>,
+    );
+
+    expect(layerProps.mock.calls.at(-1)?.[0].paint["line-width"]).toEqual([
+      "interpolate",
+      ["linear"],
+      ["line-progress"],
+      0,
+      1,
+      0.55,
+      6,
+      1,
+      2,
+    ]);
+    expect(sourceProps.mock.calls.at(-1)?.[0].lineMetrics).toBe(true);
+  });
+
+  it("splits lines into one layer per dash pattern, sharing a source", () => {
+    const path = [
+      { lng: 0, lat: 0 },
+      { lng: 10, lat: 20 },
+    ];
+    render(
+      <MapView styleUrl="style.json">
+        {
+          <DataLayer
+            id="round"
+            lines={[
+              { id: "glow", path, color: "rgb(9, 9, 9)", width: 6, opacity: 0.2, blur: 4 },
+              { id: "guess", path, color: "rgb(9, 9, 9)", width: 2, dash: [4, 3] },
+            ]}
+          />
+        }
+      </MapView>,
+    );
+
+    // A dash pattern cannot vary within one drawn layer, so the solid line and
+    // the dashed one are drawn separately — in the order they were given.
+    expect(sourceProps).toHaveBeenCalledTimes(1);
+    expect(screen.getAllByTestId("layer").map((node) => node.textContent)).toEqual([
+      "round-line-strokes",
+      "round-line-strokes-4-3",
+    ]);
+    const [solid, dashed] = layerProps.mock.calls.map(([props]) => props);
+    expect(solid.filter).toEqual(["!", ["has", "dashKey"]]);
+    expect(solid.paint).toEqual(
+      expect.objectContaining({
+        "line-opacity": ["coalesce", ["get", "opacity"], 1],
+        "line-blur": ["coalesce", ["get", "blur"], 0],
+      }),
+    );
+    expect(solid.paint["line-dasharray"]).toBeUndefined();
+    expect(dashed.filter).toEqual(["==", ["get", "dashKey"], "4-3"]);
+    expect(dashed.paint["line-dasharray"]).toEqual([4, 3]);
+
+    const [features] = sourceProps.mock.calls.map(([props]) => props.data.features);
+    expect(features[0].properties).toEqual({
+      id: "glow",
+      color: "rgb(9, 9, 9)",
+      width: 6,
+      opacity: 0.2,
+      blur: 4,
+    });
+    expect(features[1].properties.dashKey).toBe("4-3");
   });
 
   it("updates the source data in place when the points change", () => {

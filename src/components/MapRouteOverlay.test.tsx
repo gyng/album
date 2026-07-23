@@ -13,7 +13,7 @@ import {
 import { MapRouteOverlay } from "./MapRouteOverlay";
 
 let currentMap: any = null;
-jest.mock("./map/adapters/maplibre", () => ({ useMap: () => ({ current: currentMap }) }));
+jest.mock("./map", () => ({ useMap: () => currentMap ?? undefined }));
 jest.mock("./mapRouteOverlayModel", () => ({
   ...jest.requireActual("./mapRouteOverlayModel"),
   projectRouteSegments: jest.fn(),
@@ -72,8 +72,10 @@ const props = () => ({
 
 describe("MapRouteOverlay", () => {
   const on = jest.fn();
-  const off = jest.fn();
-  const project = jest.fn(([x, y]: [number, number]) => ({ x, y }));
+  const project = jest.fn();
+  // The port hands back an unsubscribe rather than taking an `off` pair.
+  const unsubscribed: string[] = [];
+  const callbacks = new Map<string, () => void>();
   const segments = [
     segment("one-two", { distanceKm: 4 }),
     segment("two-three", {
@@ -89,7 +91,19 @@ describe("MapRouteOverlay", () => {
 
   beforeEach(() => {
     jest.resetAllMocks();
-    currentMap = { on, off, project };
+    unsubscribed.length = 0;
+    callbacks.clear();
+    on.mockImplementation((event: string, callback: () => void) => {
+      callbacks.set(event, callback);
+      return () => {
+        unsubscribed.push(event);
+      };
+    });
+    project.mockImplementation(({ lng, lat }: { lng: number; lat: number }) => ({
+      x: lng,
+      y: lat,
+    }));
+    currentMap = { on, project };
     projectSegments.mockImplementation((_points, projectPoint) => {
       projectPoint([1, 2]);
       return segments;
@@ -120,7 +134,6 @@ describe("MapRouteOverlay", () => {
   });
 
   it("updates projection on map movement and unsubscribes on cleanup", () => {
-    const callbacks = new Map<string, () => void>();
     let frameCallback: FrameRequestCallback | null = null;
     const requestFrame = jest
       .spyOn(window, "requestAnimationFrame")
@@ -128,7 +141,6 @@ describe("MapRouteOverlay", () => {
         frameCallback = callback;
         return 1;
       });
-    on.mockImplementation((event: string, callback: () => void) => callbacks.set(event, callback));
     const view = render(<MapRouteOverlay {...props()} />);
     act(() => frameCallback?.(0));
     const callsAfterMount = projectSegments.mock.calls.length;
@@ -136,7 +148,7 @@ describe("MapRouteOverlay", () => {
     act(() => frameCallback?.(1));
     expect(projectSegments.mock.calls.length).toBeGreaterThan(callsAfterMount);
     view.unmount();
-    expect(off.mock.calls.map(([event]) => event)).toEqual(["move", "zoom", "resize"]);
+    expect(unsubscribed).toEqual(["move", "zoom", "resize"]);
     requestFrame.mockRestore();
   });
 
@@ -178,7 +190,7 @@ describe("MapRouteOverlay", () => {
     [true, null],
     [true, [routePoints[0]]],
   ])("renders nothing without a projectable route", (hasMap, points) => {
-    currentMap = hasMap ? { on, off, project } : null;
+    currentMap = hasMap ? { on, project } : null;
     projectSegments.mockReturnValue([]);
     const { container } = render(
       <MapRouteOverlay {...props()} routePoints={points as RoutePoint[] | null} />,
@@ -189,8 +201,6 @@ describe("MapRouteOverlay", () => {
   it("coalesces production map events into one animation frame and cancels it", () => {
     const originalNodeEnv = process.env.NODE_ENV;
     (process.env as Record<string, string | undefined>).NODE_ENV = "production";
-    const callbacks = new Map<string, () => void>();
-    on.mockImplementation((event: string, callback: () => void) => callbacks.set(event, callback));
     const frameCallbacks: FrameRequestCallback[] = [];
     const frame = jest.spyOn(window, "requestAnimationFrame").mockImplementation((callback) => {
       frameCallbacks.push(callback);

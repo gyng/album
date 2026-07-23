@@ -1,5 +1,5 @@
 import React from "react";
-import { useMap } from "./map/adapters/maplibre";
+import { useMap } from "./map";
 import type { MapWorldEntry } from "../util/pageDataTypes";
 
 const DIRECTOR_CADENCE_MS = 7_500;
@@ -14,7 +14,7 @@ export const MapDirector = ({
   sequence: MapWorldEntry[];
   onVisit: (photo: MapWorldEntry) => void;
 }) => {
-  const { current: map } = useMap();
+  const map = useMap();
 
   React.useEffect(() => {
     if (!enabled || !map || sequence.length === 0) {
@@ -32,7 +32,7 @@ export const MapDirector = ({
       }
       onVisit(photo);
       map.flyTo({
-        center: [photo.decLng, photo.decLat],
+        center: { lng: photo.decLng, lat: photo.decLat },
         zoom: index % 3 === 0 ? 6.2 : 8.4,
         pitch: reduceMotion ? 0 : 42,
         bearing: reduceMotion ? 0 : ((index * 53 + 18) % 240) - 120,

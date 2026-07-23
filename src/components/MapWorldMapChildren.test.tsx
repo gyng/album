@@ -14,7 +14,7 @@ import {
 } from "./MapWorldMapChildren";
 
 let currentMap: any = null;
-jest.mock("./map/adapters/maplibre", () => ({ useMap: () => ({ current: currentMap }) }));
+jest.mock("./map", () => ({ useMap: () => currentMap ?? undefined }));
 
 const photo = (overrides: Partial<MapWorldEntry> = {}): MapWorldEntry => ({
   album: "test-simple",
@@ -64,7 +64,11 @@ describe("MapAutoFit", () => {
 
   it("flies to one located photo", () => {
     render(<MapAutoFit enabled photos={[photo()]} />);
-    expect(flyTo).toHaveBeenCalledWith({ center: [103, 1], zoom: 10.5, speed: 2.2 });
+    expect(flyTo).toHaveBeenCalledWith({
+      center: { lng: 103, lat: 1 },
+      zoom: 10.5,
+      speed: 2.2,
+    });
   });
 
   it("fits several photos, including an antimeridian-aware span", () => {
@@ -73,8 +77,8 @@ describe("MapAutoFit", () => {
     );
     expect(fitBounds).toHaveBeenCalledWith(
       [
-        [179, 1],
-        [-179, 2],
+        { lng: 179, lat: 1 },
+        { lng: -179, lat: 2 },
       ],
       { padding: 36, duration: 0, maxZoom: 11 },
     );
@@ -103,7 +107,7 @@ describe("MapFitOnRequest", () => {
   it("frames the photos current at the moment the request id increments", () => {
     const { rerender } = render(<MapFitOnRequest requestId={0} photos={[photo()]} />);
     rerender(<MapFitOnRequest requestId={1} photos={[photo({ decLat: 5, decLng: 50 })]} />);
-    expect(flyTo).toHaveBeenCalledWith({ center: [50, 5], zoom: 10.5, speed: 2.2 });
+    expect(flyTo).toHaveBeenCalledWith({ center: { lng: 50, lat: 5 }, zoom: 10.5, speed: 2.2 });
   });
 });
 
@@ -191,66 +195,62 @@ describe("LazyMapMarkerImage", () => {
 
 describe("MapBoundsTracker", () => {
   const on = jest.fn();
-  const off = jest.fn();
+  const unsubscribed: string[] = [];
   const onBoundsChange = jest.fn();
   let moveEnd!: () => void;
 
   beforeEach(() => {
+    on.mockClear();
+    // The port hands back an unsubscribe rather than taking an `off` pair.
     on.mockImplementation((event: string, callback: () => void) => {
       if (event === "moveend") moveEnd = callback;
+      return () => {
+        unsubscribed.push(event);
+      };
     });
-    off.mockClear();
+    unsubscribed.length = 0;
     onBoundsChange.mockClear();
   });
 
   it("publishes initial and subsequent map bounds and removes listeners", () => {
-    const bounds = {
-      getNorth: () => 10,
-      getSouth: () => -10,
-      getEast: () => 120,
-      getWest: () => 80,
-    };
-    currentMap = { getBounds: jest.fn(() => bounds), on, off };
+    const bounds = [
+      { lng: 80, lat: -10 },
+      { lng: 120, lat: 10 },
+    ];
+    currentMap = { getBounds: jest.fn(() => bounds), on };
     const view = render(<MapBoundsTracker onBoundsChange={onBoundsChange} />);
     expect(onBoundsChange).toHaveBeenCalledWith({ north: 10, south: -10, east: 120, west: 80 });
     act(() => moveEnd());
     expect(onBoundsChange).toHaveBeenCalledTimes(2);
     view.unmount();
-    expect(off.mock.calls.map(([event]) => event)).toEqual(["moveend", "zoomend"]);
+    expect(unsubscribed).toEqual(["moveend", "zoomend"]);
   });
 
-  it("waits for both a map and available bounds", () => {
+  it("waits for a map", () => {
     currentMap = null;
-    const first = render(<MapBoundsTracker onBoundsChange={onBoundsChange} />);
-    first.unmount();
-    currentMap = { getBounds: () => null, on, off };
     render(<MapBoundsTracker onBoundsChange={onBoundsChange} />);
     expect(onBoundsChange).not.toHaveBeenCalled();
+    expect(on).not.toHaveBeenCalled();
   });
 });
 
 describe("MapMiddleDragOrbit", () => {
   const jumpTo = jest.fn();
-  const enable = jest.fn();
-  const disable = jest.fn();
+  const setDragPanEnabled = jest.fn();
   const onInteractionStart = jest.fn();
   let canvas: HTMLDivElement;
   let dragPanEnabled = true;
 
   beforeEach(() => {
     jumpTo.mockClear();
-    enable.mockClear();
-    disable.mockClear();
+    setDragPanEnabled.mockClear();
     onInteractionStart.mockClear();
     canvas = document.createElement("div");
     dragPanEnabled = true;
     currentMap = {
-      getCanvasContainer: () => canvas,
-      dragPan: {
-        isEnabled: () => dragPanEnabled,
-        enable,
-        disable,
-      },
+      getGestureSurface: () => canvas,
+      isDragPanEnabled: () => dragPanEnabled,
+      setDragPanEnabled,
       getBearing: () => 10,
       getPitch: () => 20,
       jumpTo,
@@ -263,7 +263,7 @@ describe("MapMiddleDragOrbit", () => {
     canvas.dispatchEvent(down);
     expect(down.defaultPrevented).toBe(true);
     expect(onInteractionStart).toHaveBeenCalled();
-    expect(disable).toHaveBeenCalled();
+    expect(setDragPanEnabled).toHaveBeenCalledWith(false);
     expect(canvas.className).toContain("orbiting");
 
     window.dispatchEvent(pointerEvent("pointermove", { pointerId: 8, clientX: 20, clientY: 30 }));
@@ -274,9 +274,9 @@ describe("MapMiddleDragOrbit", () => {
     expect(jumpTo).toHaveBeenCalledWith({ bearing: 13.5, pitch: 17.5 });
 
     window.dispatchEvent(pointerEvent("pointerup", { pointerId: 8 }));
-    expect(enable).not.toHaveBeenCalled();
+    expect(setDragPanEnabled).not.toHaveBeenCalledWith(true);
     window.dispatchEvent(pointerEvent("pointerup", { pointerId: 7 }));
-    expect(enable).toHaveBeenCalled();
+    expect(setDragPanEnabled).toHaveBeenCalledWith(true);
     expect(canvas.className).not.toContain("orbiting");
   });
 
@@ -297,9 +297,9 @@ describe("MapMiddleDragOrbit", () => {
     dragPanEnabled = false;
     const view = render(<MapMiddleDragOrbit onInteractionStart={onInteractionStart} />);
     canvas.dispatchEvent(pointerEvent("pointerdown", { button: 1, pointerId: 4 }));
-    expect(disable).not.toHaveBeenCalled();
+    expect(setDragPanEnabled).not.toHaveBeenCalledWith(false);
     view.unmount();
-    expect(enable).not.toHaveBeenCalled();
+    expect(setDragPanEnabled).not.toHaveBeenCalledWith(true);
     expect(canvas.className).not.toContain("orbiting");
   });
 

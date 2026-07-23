@@ -7,32 +7,29 @@ import type { ReactNode } from "react";
 import { StatsWorldMap } from "./StatsWorldMap";
 
 const mapProps = jest.fn();
-const sourceProps = jest.fn();
-const layerProps = jest.fn();
-jest.mock("./map/adapters/maplibre", () => ({
+const dataLayerProps = jest.fn();
+jest.mock("./map", () => ({
   __esModule: true,
-  default: ({ children, ...props }: { children?: ReactNode }) => {
+  MapView: ({ children, ...props }: { children?: ReactNode }) => {
     mapProps(props);
     return <div data-testid="stats-map">{children}</div>;
   },
-  Source: ({ children, ...props }: { children?: ReactNode }) => {
-    sourceProps(props);
-    return <div data-testid="point-source">{children}</div>;
-  },
-  Layer: (props: { id: string }) => {
-    layerProps(props);
-    return <div data-testid="map-layer">{props.id}</div>;
+  DataLayer: (props: { id: string }) => {
+    dataLayerProps(props);
+    return <div data-testid="data-layer">{props.id}</div>;
   },
 }));
+
+/** The props the mocked data layer was last rendered with. */
+const lastDataLayerProps = () => dataLayerProps.mock.calls.at(-1)?.[0];
 
 describe("StatsWorldMap", () => {
   beforeEach(() => {
     mapProps.mockClear();
-    sourceProps.mockClear();
-    layerProps.mockClear();
+    dataLayerProps.mockClear();
   });
 
-  it("converts latitude/longitude points into clustered GeoJSON", () => {
+  it("describes latitude/longitude points as clustered map features", () => {
     const points = [
       { lat: 1.25, lng: 103.75 },
       { lat: -33.86, lng: 151.21 },
@@ -40,42 +37,40 @@ describe("StatsWorldMap", () => {
     const { rerender } = render(<StatsWorldMap points={points} />);
 
     expect(screen.getByTestId("stats-map")).toBeInTheDocument();
-    expect(sourceProps).toHaveBeenLastCalledWith(
+    expect(dataLayerProps).toHaveBeenLastCalledWith(
       expect.objectContaining({
-        id: "stats-photo-points",
-        type: "geojson",
+        id: "stats-photos",
         cluster: true,
-        clusterMaxZoom: 12,
-        clusterRadius: 42,
-        data: {
-          type: "FeatureCollection",
-          features: [
-            expect.objectContaining({ geometry: { type: "Point", coordinates: [103.75, 1.25] } }),
-            expect.objectContaining({ geometry: { type: "Point", coordinates: [151.21, -33.86] } }),
-          ],
-        },
+        stroke: { color: "rgba(255, 255, 255, 0.84)", width: 2 },
+        points: [
+          expect.objectContaining({ at: { lng: 103.75, lat: 1.25 } }),
+          expect.objectContaining({ at: { lng: 151.21, lat: -33.86 } }),
+        ],
       }),
     );
-    expect(screen.getAllByTestId("map-layer").map((node) => node.textContent)).toEqual([
-      "stats-clusters",
-      "stats-cluster-count",
-      "stats-unclustered-point",
-    ]);
+    // Every photo is drawn the same way — the pink dot the stats page's accent
+    // colour comes from.
+    expect(lastDataLayerProps().points[0]).toEqual({
+      id: expect.any(String),
+      at: { lng: 103.75, lat: 1.25 },
+      color: "rgb(230, 32, 101)",
+      radius: 5,
+    });
     expect(mapProps).toHaveBeenCalledWith(
       expect.objectContaining({
-        initialViewState: { longitude: 15, latitude: 20, zoom: 1.25 },
-        attributionControl: false,
+        initialView: { center: { lng: 15, lat: 20 }, zoom: 1.25 },
+        attribution: false,
       }),
     );
 
     rerender(<StatsWorldMap points={points} />);
-    expect(sourceProps.mock.calls.at(-1)?.[0].data).toBe(sourceProps.mock.calls.at(-2)?.[0].data);
+    expect(dataLayerProps.mock.calls.at(-1)?.[0].points).toBe(
+      dataLayerProps.mock.calls.at(-2)?.[0].points,
+    );
   });
 
-  it("provides an empty feature collection when there are no mapped photos", () => {
+  it("provides no features when there are no mapped photos", () => {
     render(<StatsWorldMap points={[]} />);
-    expect(sourceProps).toHaveBeenCalledWith(
-      expect.objectContaining({ data: { type: "FeatureCollection", features: [] } }),
-    );
+    expect(lastDataLayerProps().points).toEqual([]);
   });
 });

@@ -142,7 +142,21 @@ const MapViewImpl = (
       return;
     }
 
-    const map = new gl.Map(buildMapOptions(container, propsRef.current));
+    // Constructing the map is fallible: MapLibre throws "Failed to initialize
+    // WebGL" whenever the browser cannot hand it a GL context — a machine with
+    // no GL driver, a headless browser, a blocked or exhausted context, or a
+    // user who has turned WebGL off. That is a degraded map, not a broken
+    // application, so the failure is contained here: letting it escape a
+    // `useEffect` would surface it to the nearest error boundary and take the
+    // whole page down with it.
+    let map: MapRef;
+    try {
+      map = new gl.Map(buildMapOptions(container, propsRef.current));
+    } catch (error) {
+      console.error(error);
+
+      return;
+    }
     mapRef.current = map;
 
     const emitCamera =
