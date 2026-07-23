@@ -24,6 +24,26 @@ const isStaleChunkRejection = (reason: unknown): boolean => {
   );
 };
 
+// Only a first-party application build asset failing to load signals a
+// redeploy. A cross-origin script/stylesheet, or Vercel's own platform
+// analytics endpoints (/_vercel/insights, /_vercel/speed-insights), fail
+// routinely — a privacy or ad blocker returns ERR_BLOCKED_BY_CLIENT for them on
+// every single load — and treating those as a stale chunk latched a permanent
+// "reload to continue" banner for anyone running a content blocker. Build
+// chunks are served same-origin here (no assetPrefix/CDN), so origin plus the
+// /_vercel/ carve-out is a reliable discriminator.
+const isFirstPartyBuildAsset = (url: string): boolean => {
+  if (typeof window === "undefined" || url === "") return false;
+  let parsed: URL;
+  try {
+    parsed = new URL(url, window.location.href);
+  } catch {
+    return false;
+  }
+  if (parsed.origin !== window.location.origin) return false;
+  return !parsed.pathname.startsWith("/_vercel/");
+};
+
 type AppRuntimeProps = React.PropsWithChildren<{
   telemetry?: React.ReactNode;
 }>;
@@ -59,7 +79,9 @@ export const AppRuntime = ({ children, telemetry }: AppRuntimeProps) => {
     };
 
     const handleResourceError = (event: Event) => {
-      const target = event.target as (Element & { tagName?: string; rel?: string }) | null;
+      const target = event.target as
+        | (Element & { tagName?: string; rel?: string; src?: string; href?: string })
+        | null;
       // Resource load errors target the failing element; a plain script error
       // targets window (no tagName) and must be ignored. Only a SCRIPT or a
       // STYLESHEET link indicates a missing chunk: prefetch/preload/icon links
@@ -68,7 +90,14 @@ export const AppRuntime = ({ children, telemetry }: AppRuntimeProps) => {
       // failure once parked this bar over the map's bottom controls in CI.
       const tagName = (target?.tagName ?? "").toUpperCase();
       const isStylesheet = tagName === "LINK" && (target?.rel ?? "").toLowerCase() === "stylesheet";
-      if (tagName === "SCRIPT" || isStylesheet) {
+      if (tagName !== "SCRIPT" && !isStylesheet) {
+        return;
+      }
+      // ...and only when the failing resource is a first-party build asset. A
+      // blocked analytics script (/_vercel/insights) or any third-party script
+      // is not a redeploy and must not raise the banner.
+      const url = tagName === "LINK" ? (target?.href ?? "") : (target?.src ?? "");
+      if (isFirstPartyBuildAsset(url)) {
         flagStaleDeploy();
       }
     };

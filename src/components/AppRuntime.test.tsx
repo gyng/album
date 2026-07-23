@@ -100,6 +100,14 @@ describe("portable application runtime", () => {
     });
   };
 
+  // A failed first-party build chunk — the only script failure that should
+  // raise the banner (same-origin, not under /_vercel/).
+  const failedChunkScript = (src = "/_next/static/chunks/app.js") => {
+    const script = document.createElement("script");
+    script.src = src;
+    return script;
+  };
+
   // Copy hedges to "may have been updated": a failed chunk is not proof of a
   // redeploy (an offline prefetch can fail too), so the banner must not state it
   // as fact.
@@ -127,8 +135,11 @@ describe("portable application runtime", () => {
 
     expect(screen.queryByText(bannerText)).not.toBeInTheDocument();
     // Resource load errors do not bubble, so the shell listens in the capture
-    // phase; the failing <script> is the event target.
-    dispatchResourceError(document.createElement("script"));
+    // phase; the failing <script> is the event target. Only a first-party build
+    // asset counts, so the script needs a same-origin src.
+    const script = document.createElement("script");
+    script.src = "/_next/static/chunks/main.js";
+    dispatchResourceError(script);
     expect(screen.getByText(bannerText)).toBeInTheDocument();
   });
 
@@ -156,7 +167,40 @@ describe("portable application runtime", () => {
 
     const stylesheet = document.createElement("link");
     stylesheet.rel = "stylesheet";
+    stylesheet.href = "/_next/static/chunks/main.css";
     dispatchResourceError(stylesheet);
+    expect(screen.getByText(bannerText)).toBeInTheDocument();
+  });
+
+  it("ignores a blocked analytics or third-party script — a content blocker is not a redeploy", () => {
+    withServiceWorker();
+
+    render(
+      <BrowserPlatformProvider>
+        <AppRuntime>
+          <Probe label="Gallery" />
+        </AppRuntime>
+      </BrowserPlatformProvider>,
+    );
+
+    // Vercel's analytics beacon is same-origin but not a build chunk, and ad /
+    // privacy blockers return ERR_BLOCKED_BY_CLIENT for it on every load. A
+    // permanent "reload to continue" banner from that is the bug this guards.
+    const analytics = document.createElement("script");
+    analytics.src = "/_vercel/insights/script.js";
+    dispatchResourceError(analytics);
+    expect(screen.queryByText(bannerText)).not.toBeInTheDocument();
+
+    // A cross-origin third-party script failing is likewise not our deploy.
+    const thirdParty = document.createElement("script");
+    thirdParty.src = "https://cdn.example.com/widget.js";
+    dispatchResourceError(thirdParty);
+    expect(screen.queryByText(bannerText)).not.toBeInTheDocument();
+
+    // ...but a genuine first-party build chunk still raises it.
+    const chunk = document.createElement("script");
+    chunk.src = "/_next/static/chunks/app.js";
+    dispatchResourceError(chunk);
     expect(screen.getByText(bannerText)).toBeInTheDocument();
   });
 
@@ -172,7 +216,7 @@ describe("portable application runtime", () => {
       </BrowserPlatformProvider>,
     );
 
-    dispatchResourceError(document.createElement("script"));
+    dispatchResourceError(failedChunkScript());
     // Offline: do not claim the site changed — point at the connection instead.
     expect(screen.getByText(offlineBannerText)).toBeInTheDocument();
     expect(screen.queryByText(bannerText)).not.toBeInTheDocument();
@@ -206,12 +250,15 @@ describe("portable application runtime", () => {
       </BrowserPlatformProvider>,
     );
 
-    dispatchResourceError(document.createElement("script"));
+    dispatchResourceError(failedChunkScript());
     fireEvent.click(screen.getByRole("button", { name: "Dismiss" }));
     expect(screen.queryByText(bannerText)).not.toBeInTheDocument();
 
     // Once shown, the banner latches — a later failed chunk is a no-op.
-    dispatchResourceError(document.createElement("link"));
+    const laterChunk = document.createElement("link");
+    laterChunk.rel = "stylesheet";
+    laterChunk.href = "/_next/static/chunks/late.css";
+    dispatchResourceError(laterChunk);
     expect(screen.queryByText(bannerText)).not.toBeInTheDocument();
   });
 
@@ -226,7 +273,7 @@ describe("portable application runtime", () => {
       </BrowserPlatformProvider>,
     );
 
-    dispatchResourceError(document.createElement("script"));
+    dispatchResourceError(failedChunkScript());
     fireEvent.click(screen.getByRole("button", { name: "Reload" }));
     expect(reloadCurrentPage).toHaveBeenCalled();
   });
