@@ -133,6 +133,34 @@ describe("portable application runtime", () => {
     expect(screen.getByText(bannerText)).toBeInTheDocument();
   });
 
+  it("ignores failing prefetch and preload links — only stylesheets count", () => {
+    withServiceWorker();
+
+    render(
+      <BrowserPlatformProvider>
+        <AppRuntime>
+          <Probe label="Gallery" />
+        </AppRuntime>
+      </BrowserPlatformProvider>,
+    );
+
+    // Cancelled route prefetches fire error events routinely during
+    // navigation; they must never raise the banner (one parked the bar over
+    // the map's bottom controls in CI).
+    const prefetch = document.createElement("link");
+    prefetch.rel = "prefetch";
+    dispatchResourceError(prefetch);
+    const preload = document.createElement("link");
+    preload.rel = "preload";
+    dispatchResourceError(preload);
+    expect(screen.queryByText(bannerText)).not.toBeInTheDocument();
+
+    const stylesheet = document.createElement("link");
+    stylesheet.rel = "stylesheet";
+    dispatchResourceError(stylesheet);
+    expect(screen.getByText(bannerText)).toBeInTheDocument();
+  });
+
   it("shows connection-focused copy when the failure happens offline", () => {
     withServiceWorker();
     setOnline(false);

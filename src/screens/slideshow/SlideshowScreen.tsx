@@ -10,6 +10,10 @@ import {
   fetchSemanticResults,
   RandomPhotoRow,
 } from "../../components/search/api";
+import {
+  isEmbeddingWorkerSlowStart,
+  isEmbeddingWorkerUnavailable,
+} from "../../components/search/embeddingWorkerClient";
 import { encodeSearchText } from "../../components/search/textEmbeddings";
 import { ProgressBar } from "../../components/ProgressBar";
 import styles from "../../components/slideshow/SlideshowShared.module.css";
@@ -1165,7 +1169,13 @@ export const Slideshow: React.FC<{
         // Only surface the error if this seed is still the current one — a
         // cancelled/superseded seed must not clobber a newer seed's state.
         if (isSeedCurrent(seedToken, topicSeedTokenRef.current)) {
-          setTopicError("Topic search is unavailable right now.");
+          setTopicError(
+            isEmbeddingWorkerUnavailable(err)
+              ? "Topic search could not start — the app may have been updated. Reload to try again."
+              : isEmbeddingWorkerSlowStart(err)
+                ? "The topic model is taking a while to load — check the connection and try again."
+                : "Topic search is unavailable right now.",
+          );
         }
       } finally {
         // Likewise, only the current seed clears the busy chip — a cancelled

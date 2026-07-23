@@ -1,6 +1,6 @@
 import { useEffect, useReducer } from "react";
 import { encodeSearchText, warmupTextEmbeddingModel } from "./textEmbeddings";
-import { isEmbeddingWorkerUnavailable } from "./embeddingWorkerClient";
+import { isEmbeddingWorkerSlowStart, isEmbeddingWorkerUnavailable } from "./embeddingWorkerClient";
 
 export type SearchMode = "keyword" | "semantic" | "hybrid";
 
@@ -9,6 +9,19 @@ export type SearchMode = "keyword" | "semantic" | "hybrid";
 export const SEARCH_UNAVAILABLE_MESSAGE =
   "Search could not start — the site may have been updated. Reload the page to try again.";
 const SEMANTIC_UNAVAILABLE_MESSAGE = "Semantic search is unavailable right now.";
+// A recoverable slow start (the worker chunk is still downloading): retrying
+// is the designed recovery — reloading would restart the download from zero.
+export const SEARCH_SLOW_START_MESSAGE =
+  "The search engine is taking a while to load — check the connection and try again.";
+
+type EncodeFailureOutcome = "unavailable" | "slow-start" | "generic";
+
+const classifyEncodeFailure = (error: unknown): EncodeFailureOutcome =>
+  isEmbeddingWorkerUnavailable(error)
+    ? "unavailable"
+    : isEmbeddingWorkerSlowStart(error)
+      ? "slow-start"
+      : "generic";
 
 type ProgressDetails = {
   loaded: number;
@@ -35,11 +48,11 @@ type Action =
       details?: ProgressDetails;
     }
   | { type: "warmup:ready" }
-  | { type: "warmup:error"; unavailable: boolean }
+  | { type: "warmup:error"; outcome: EncodeFailureOutcome }
   | { type: "vector:clear" }
   | { type: "vector:start" }
   | { type: "vector:success"; vector: number[]; query: string }
-  | { type: "vector:error"; unavailable: boolean }
+  | { type: "vector:error"; outcome: EncodeFailureOutcome }
   | { type: "vector:done" };
 
 const initialState: TextVectorState = {
@@ -83,7 +96,12 @@ const reducer = (state: TextVectorState, action: Action): TextVectorState => {
         // A dead worker surfaces immediately so the vanished progress bar is
         // replaced by a reload prompt; a normal warmup failure stays silent and
         // degrades gracefully once the user actually runs a query.
-        textVectorError: action.unavailable ? SEARCH_UNAVAILABLE_MESSAGE : state.textVectorError,
+        textVectorError:
+          action.outcome === "unavailable"
+            ? SEARCH_UNAVAILABLE_MESSAGE
+            : action.outcome === "slow-start"
+              ? SEARCH_SLOW_START_MESSAGE
+              : state.textVectorError,
       };
     case "vector:clear":
       return {
@@ -115,9 +133,12 @@ const reducer = (state: TextVectorState, action: Action): TextVectorState => {
       return {
         ...state,
         textVector: null,
-        textVectorError: action.unavailable
-          ? SEARCH_UNAVAILABLE_MESSAGE
-          : SEMANTIC_UNAVAILABLE_MESSAGE,
+        textVectorError:
+          action.outcome === "unavailable"
+            ? SEARCH_UNAVAILABLE_MESSAGE
+            : action.outcome === "slow-start"
+              ? SEARCH_SLOW_START_MESSAGE
+              : SEMANTIC_UNAVAILABLE_MESSAGE,
         textModelProgressDetails: { loaded: 0, total: 0 },
       };
     case "vector:done":
@@ -156,7 +177,7 @@ export const useTextVector = ({
       })
       .catch((err) => {
         console.warn("Failed to warm semantic search model", err);
-        dispatch({ type: "warmup:error", unavailable: isEmbeddingWorkerUnavailable(err) });
+        dispatch({ type: "warmup:error", outcome: classifyEncodeFailure(err) });
       });
   }, [isSimilarMode, searchMode]);
 
@@ -181,7 +202,7 @@ export const useTextVector = ({
       .catch((err) => {
         if (!didCancel) {
           console.error("Failed to encode semantic search text", err);
-          dispatch({ type: "vector:error", unavailable: isEmbeddingWorkerUnavailable(err) });
+          dispatch({ type: "vector:error", outcome: classifyEncodeFailure(err) });
         }
       })
       .finally(() => {

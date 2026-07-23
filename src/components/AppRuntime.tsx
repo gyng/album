@@ -59,13 +59,16 @@ export const AppRuntime = ({ children, telemetry }: AppRuntimeProps) => {
     };
 
     const handleResourceError = (event: Event) => {
-      const target = event.target as (Element & { tagName?: string }) | null;
+      const target = event.target as (Element & { tagName?: string; rel?: string }) | null;
       // Resource load errors target the failing element; a plain script error
-      // targets window (no tagName) and must be ignored. Only generated
-      // scripts/stylesheets indicate a missing chunk — images and the like do
-      // not, so we do not treat them as a stale deploy.
+      // targets window (no tagName) and must be ignored. Only a SCRIPT or a
+      // STYLESHEET link indicates a missing chunk: prefetch/preload/icon links
+      // fail routinely (cancelled route prefetches during navigation fire
+      // error events too) and must never raise the banner — a benign prefetch
+      // failure once parked this bar over the map's bottom controls in CI.
       const tagName = (target?.tagName ?? "").toUpperCase();
-      if (tagName === "SCRIPT" || tagName === "LINK") {
+      const isStylesheet = tagName === "LINK" && (target?.rel ?? "").toLowerCase() === "stylesheet";
+      if (tagName === "SCRIPT" || isStylesheet) {
         flagStaleDeploy();
       }
     };

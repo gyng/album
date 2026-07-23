@@ -53,6 +53,23 @@ export const isEmbeddingWorkerUnavailable = (error: unknown): boolean =>
   error instanceof EmbeddingWorkerUnavailableError ||
   (error instanceof Error && error.name === "EmbeddingWorkerUnavailableError");
 
+// A boot timeout is RECOVERABLE (a slow network, not a missing script): the
+// next request spawns a fresh worker. It must not borrow the permanent
+// unavailable classification, whose reload advice would restart the very
+// download that was making progress.
+export class EmbeddingWorkerSlowStartError extends Error {
+  constructor(
+    message = "The search engine is taking a while to load — check the connection and try again.",
+  ) {
+    super(message);
+    this.name = "EmbeddingWorkerSlowStartError";
+  }
+}
+
+export const isEmbeddingWorkerSlowStart = (error: unknown): boolean =>
+  error instanceof EmbeddingWorkerSlowStartError ||
+  (error instanceof Error && error.name === "EmbeddingWorkerSlowStartError");
+
 // Boot window: time allowed from `new Worker()` until the worker posts its
 // top-level boot ack. This must cover downloading and parsing the worker chunk
 // itself (~1MB with transformers.js — 20s+ on slow 3G, longer on old-iPad CPUs),
@@ -171,11 +188,20 @@ const ensureWorker = (): Worker => {
   // acknowledges boot within a generous window the chunk likely never arrived;
   // reject and retire it, but do NOT mark it permanently dead.
   bootTimeoutId = setTimeout(() => {
-    resetWorker(new EmbeddingWorkerUnavailableError());
+    resetWorker(new EmbeddingWorkerSlowStartError());
   }, BOOT_TIMEOUT_MS);
 
-  worker = new Worker(new URL("./embedding.worker.ts", import.meta.url));
-  worker.addEventListener("message", (event: MessageEvent<EmbeddingWorkerResponse>) => {
+  const created = new Worker(new URL("./embedding.worker.ts", import.meta.url));
+  worker = created;
+  created.addEventListener("message", (event: MessageEvent<EmbeddingWorkerResponse>) => {
+    // A message task queued by a worker that has since been retired (boot
+    // timeout, post-boot reset) can still dispatch after termination. It must
+    // never touch the module state of a REPLACEMENT worker — a stale boot ack
+    // would cancel the new worker's boot guard and arm its first-signal timers
+    // prematurely, converting a recoverable slow start into permanent death.
+    if (worker !== created) {
+      return;
+    }
     const response = event.data;
 
     // Every message — including the boot ack — proves the worker is alive right
@@ -218,7 +244,12 @@ const ensureWorker = (): Worker => {
     handlers.reject(new Error(response.error));
   });
 
-  worker.addEventListener("error", (event) => {
+  created.addEventListener("error", (event) => {
+    // Same instance guard as the message listener: a retired worker's error
+    // must not kill or reset its replacement.
+    if (worker !== created) {
+      return;
+    }
     const error =
       event.error instanceof Error ? event.error : new Error("Embedding worker failed.");
 

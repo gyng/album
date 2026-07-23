@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { isEmbeddingWorkerSlowStart, isEmbeddingWorkerUnavailable } from "./embeddingWorkerClient";
 import { encodeSearchImage } from "./imageEmbeddings";
 
 export type ImageQuerySource = "upload" | "drawing";
@@ -106,7 +107,13 @@ export const useImageQuery = (): ImageQueryState => {
         releasePreviewUrl();
         setImageModelProgress(100);
         setImageQuery(null);
-        setImageVectorError("Image search is unavailable right now.");
+        setImageVectorError(
+          isEmbeddingWorkerUnavailable(err)
+            ? "Image search could not start — the site may have been updated. Reload the page to try again."
+            : isEmbeddingWorkerSlowStart(err)
+              ? "The image model is taking a while to load — check the connection and try again."
+              : "Image search is unavailable right now.",
+        );
       });
   }, []);
 

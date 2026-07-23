@@ -169,7 +169,11 @@ describe("embeddingWorkerClient", () => {
     // worker permanently for a slow network reproduces the failure on reload, so
     // a boot timeout rejects + retires the worker but a later request may retry.
     it("treats a boot timeout as recoverable, not permanent death", async () => {
-      const { sendEmbeddingWorkerRequest, isEmbeddingWorkerUnavailable } = loadClient();
+      const {
+        sendEmbeddingWorkerRequest,
+        isEmbeddingWorkerUnavailable,
+        isEmbeddingWorkerSlowStart,
+      } = loadClient();
       const first = sendEmbeddingWorkerRequest({ type: "warmup" });
       first.catch(() => {});
 
@@ -178,10 +182,13 @@ describe("embeddingWorkerClient", () => {
       jest.advanceTimersByTime(12000);
       expect(FakeWorker.instances[0].terminate).not.toHaveBeenCalled();
 
-      // The 40s boot window elapses: reject as unavailable and retire the worker.
+      // The 40s boot window elapses: reject as a SLOW START — not the
+      // permanent unavailable class, whose reload advice would restart the
+      // very download that was in progress — and retire the worker.
       jest.advanceTimersByTime(28000);
       await first.catch((err) => {
-        expect(isEmbeddingWorkerUnavailable(err)).toBe(true);
+        expect(isEmbeddingWorkerSlowStart(err)).toBe(true);
+        expect(isEmbeddingWorkerUnavailable(err)).toBe(false);
       });
       await expect(first).rejects.toBeInstanceOf(Error);
       expect(FakeWorker.instances[0].terminate).toHaveBeenCalled();

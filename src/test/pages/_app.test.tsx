@@ -3,7 +3,7 @@
  */
 
 import { render, screen, waitFor } from "@testing-library/react";
-import MyApp from "../../pages/_app";
+import MyApp, { shouldEnableAnalytics } from "../../pages/_app";
 
 jest.mock("../../components/platform/next/NextPlatformProvider", () => ({
   NextPlatformProvider: ({ children }: React.PropsWithChildren) => children,
@@ -39,7 +39,16 @@ describe("custom application", () => {
     );
 
     expect(screen.getByRole("main")).toHaveTextContent("Hello gallery");
-    expect(screen.getByTestId("analytics")).toBeInTheDocument();
+    // jsdom runs on localhost, where the host gate keeps Vercel Analytics
+    // unmounted: its script only exists on the production host, and the 404 it
+    // causes elsewhere used to raise the stale-deploy banner in e2e runs.
+    expect(screen.queryByTestId("analytics")).not.toBeInTheDocument();
+  });
+
+  it("enables analytics only away from local hosts", () => {
+    expect(shouldEnableAnalytics("localhost")).toBe(false);
+    expect(shouldEnableAnalytics("127.0.0.1")).toBe(false);
+    expect(shouldEnableAnalytics("photos.awoo.party")).toBe(true);
   });
 
   it("registers the application service worker when the browser supports it", async () => {
