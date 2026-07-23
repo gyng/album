@@ -261,6 +261,12 @@
     min-inline-size: var(--tap-target);
     min-block-size: var(--tap-target);
   }
+
+  /* 16px on touch stops iOS Safari zooming the page when the hex field takes
+     focus. The compact --fs-s size is kept on pointer devices. */
+  .colorFacetHexInput {
+    font-size: var(--fs-touch);
+  }
 }
 
 .colorFacetClearButton:disabled {
