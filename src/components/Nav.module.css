@@ -38,8 +38,6 @@
 .themeToggleItem {
   flex: none;
   padding-inline-start: var(--m-m);
-  border-inline-start: var(--line-hairline) solid
-    color-mix(in oklch, var(--c-bg-contrast-light) 35%, transparent);
 }
 
 .scrollableLeft {
