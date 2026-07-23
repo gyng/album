@@ -277,6 +277,7 @@ textarea {
   --z-media: 100;
   --z-caption: 200;
   --z-details: 300;
+  --z-update-banner: 350;
   --z-drawer: 1000;
   --z-drawer-panel: 1001;
   --z-map-vendor: 5000;

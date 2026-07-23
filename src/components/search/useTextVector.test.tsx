@@ -4,7 +4,8 @@
 
 import { act, renderHook } from "@testing-library/react";
 import { encodeSearchText, warmupTextEmbeddingModel } from "./textEmbeddings";
-import { useTextVector } from "./useTextVector";
+import { EmbeddingWorkerUnavailableError } from "./embeddingWorkerClient";
+import { SEARCH_UNAVAILABLE_MESSAGE, useTextVector } from "./useTextVector";
 
 jest.mock("./textEmbeddings", () => ({
   encodeSearchText: jest.fn(),
@@ -148,6 +149,39 @@ describe("useTextVector", () => {
     expect(result.current.isTextVectorLoading).toBe(false);
     expect(error).toHaveBeenCalled();
     error.mockRestore();
+  });
+
+  it("surfaces a reload prompt when the worker is unavailable after a redeploy", async () => {
+    const error = jest.spyOn(console, "error").mockImplementation(() => {});
+    encode.mockRejectedValue(new EmbeddingWorkerUnavailableError());
+    const { result } = renderHook(() =>
+      useTextVector({
+        isSimilarMode: false,
+        searchMode: "semantic",
+        needsTextVector: true,
+        trimmedQuery: "cats",
+      }),
+    );
+    await act(resolved);
+    expect(result.current.textVectorError).toBe(SEARCH_UNAVAILABLE_MESSAGE);
+    error.mockRestore();
+  });
+
+  it("surfaces the reload prompt when warmup itself hits a dead worker", async () => {
+    const warning = jest.spyOn(console, "warn").mockImplementation(() => {});
+    warmup.mockRejectedValue(new EmbeddingWorkerUnavailableError());
+    const { result } = renderHook(() =>
+      useTextVector({
+        isSimilarMode: false,
+        searchMode: "semantic",
+        needsTextVector: false,
+        trimmedQuery: "",
+      }),
+    );
+    await act(resolved);
+    expect(result.current.textVectorError).toBe(SEARCH_UNAVAILABLE_MESSAGE);
+    expect(result.current.textModelProgress).toBe(100);
+    warning.mockRestore();
   });
 
   it.each(["resolve", "reject"])("ignores a stale query that later %ss", async (outcome) => {

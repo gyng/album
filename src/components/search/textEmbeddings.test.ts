@@ -117,6 +117,10 @@ describe("textEmbeddings", () => {
     const { encodeSearchText } = await import("./textEmbeddings");
 
     const resultPromise = encodeSearchText("harbor");
+    // A worker that has acknowledged boot but then errors forwards the crash and
+    // recovers next time; a never-booted error is a distinct permanent case
+    // (covered in embeddingWorkerClient.test.ts).
+    worker.emitMessage({ boot: true });
     worker.emitError(new Error("worker exploded"));
 
     await expect(resultPromise).rejects.toThrow("worker exploded");
@@ -134,6 +138,9 @@ describe("textEmbeddings", () => {
     const { encodeSearchText } = await import("./textEmbeddings");
 
     const failed = encodeSearchText("harbor");
+    // A post-boot crash (worker booted, then a later chunk failed) is recoverable:
+    // the worker is retired and the next request builds a fresh one.
+    firstWorker.emitMessage({ boot: true });
     firstWorker.emitError(new Error("chunk 404"));
     await expect(failed).rejects.toThrow("chunk 404");
     expect(firstWorker.terminate).toHaveBeenCalledTimes(1);
@@ -141,6 +148,7 @@ describe("textEmbeddings", () => {
     // The module-level worker was reset, so the next request builds a new one.
     const retried = encodeSearchText("night");
     expect(workerConstructor).toHaveBeenCalledTimes(2);
+    secondWorker.emitMessage({ boot: true });
     secondWorker.emitMessage({ id: 1, ok: true, vector: [0, 1, 0] });
     await expect(retried).resolves.toEqual([0, 1, 0]);
   });

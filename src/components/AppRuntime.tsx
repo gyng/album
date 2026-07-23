@@ -3,6 +3,26 @@ import React from "react";
 import { DocumentHead } from "./platform";
 import { ErrorBoundary } from "./ErrorBoundary";
 import { BUILD_VERSION } from "../lib/buildVersion";
+import { reloadCurrentPage } from "../util/navigate";
+import styles from "./AppRuntime.module.css";
+
+// Chunk-load failures after a redeploy surface either as a resource "error"
+// event on the injected <script>/<link> (these do not bubble — capture is
+// required to see them) or, for dynamic import(), as an unhandled rejection.
+// Match the rejection conservatively against the well-known shapes: webpack's
+// ChunkLoadError, and the standard browser/bundler messages for a failed
+// dynamic import.
+const isStaleChunkRejection = (reason: unknown): boolean => {
+  const asError = reason as { name?: string; message?: string } | null | undefined;
+  const name = asError?.name ?? "";
+  if (name === "ChunkLoadError") {
+    return true;
+  }
+  const message = typeof asError?.message === "string" ? asError.message : "";
+  return /Loading (?:CSS )?chunk|Failed to fetch dynamically imported module|error loading dynamically imported module/i.test(
+    message,
+  );
+};
 
 type AppRuntimeProps = React.PropsWithChildren<{
   telemetry?: React.ReactNode;
@@ -18,6 +38,52 @@ export const AppRuntime = ({ children, telemetry }: AppRuntimeProps) => {
   // convenient for a client-only entry, but leaks request state if another
   // renderer mounts the shell independently for concurrent SSR requests.
   const [queryClient] = React.useState(() => new QueryClient());
+  const [staleDeploy, setStaleDeploy] = React.useState(false);
+  // A chunk that fails to load while the device is offline is far more likely a
+  // dropped connection / failed prefetch than an actual redeploy, so we must not
+  // assert the site changed. Captured once, at first detection, alongside the
+  // latch below.
+  const [bannerOffline, setBannerOffline] = React.useState(false);
+  // Latches on first detection so repeated failures never stack banners, and so
+  // dismissing one does not let the next failed chunk reopen it.
+  const staleDetectedRef = React.useRef(false);
+
+  React.useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const flagStaleDeploy = () => {
+      if (staleDetectedRef.current) return;
+      staleDetectedRef.current = true;
+      setBannerOffline(navigator.onLine === false);
+      setStaleDeploy(true);
+    };
+
+    const handleResourceError = (event: Event) => {
+      const target = event.target as (Element & { tagName?: string }) | null;
+      // Resource load errors target the failing element; a plain script error
+      // targets window (no tagName) and must be ignored. Only generated
+      // scripts/stylesheets indicate a missing chunk — images and the like do
+      // not, so we do not treat them as a stale deploy.
+      const tagName = (target?.tagName ?? "").toUpperCase();
+      if (tagName === "SCRIPT" || tagName === "LINK") {
+        flagStaleDeploy();
+      }
+    };
+
+    const handleRejection = (event: PromiseRejectionEvent) => {
+      if (isStaleChunkRejection(event.reason)) {
+        flagStaleDeploy();
+      }
+    };
+
+    window.addEventListener("error", handleResourceError, true);
+    window.addEventListener("unhandledrejection", handleRejection);
+
+    return () => {
+      window.removeEventListener("error", handleResourceError, true);
+      window.removeEventListener("unhandledrejection", handleRejection);
+    };
+  }, []);
 
   React.useEffect(() => {
     if (!("serviceWorker" in navigator)) return;
@@ -35,6 +101,30 @@ export const AppRuntime = ({ children, telemetry }: AppRuntimeProps) => {
         <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
       </DocumentHead>
       <QueryClientProvider client={queryClient}>
+        {staleDeploy ? (
+          <div className={styles.updateBanner} role="status" aria-live="polite">
+            <span className={styles.updateBannerText}>
+              {bannerOffline
+                ? "Some parts of the site could not load — check the connection, then reload."
+                : "This site may have been updated — reload to continue."}
+            </span>
+            <button
+              type="button"
+              className={styles.updateReloadButton}
+              onClick={() => reloadCurrentPage()}
+            >
+              Reload
+            </button>
+            <button
+              type="button"
+              className={styles.updateDismissButton}
+              aria-label="Dismiss"
+              onClick={() => setStaleDeploy(false)}
+            >
+              ×
+            </button>
+          </div>
+        ) : null}
         {telemetry}
         {children}
       </QueryClientProvider>

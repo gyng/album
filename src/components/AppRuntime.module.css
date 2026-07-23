@@ -1,0 +1,48 @@
+/* Stale-deploy recovery banner: shown when a generated script/stylesheet load
+   or a dynamic-import chunk fails, which after a redeploy means the open page is
+   referencing chunks that no longer exist. Token-styled, dismissible, and never
+   auto-reloading — an offline kiosk must never reload-loop. */
+.updateBanner {
+  position: fixed;
+  inset-block-end: 0;
+  inset-inline: 0;
+  z-index: var(--z-update-banner);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--m-s);
+  padding: var(--m-m) var(--m-l);
+  background-color: var(--c-bg);
+  border-block-start: solid var(--size-1) var(--c-accent);
+  color: var(--c-font);
+  font-size: var(--fs-sm);
+}
+
+.updateBannerText {
+  flex: 1 1 auto;
+  min-inline-size: 0;
+}
+
+.updateReloadButton {
+  padding: var(--m) var(--m-m);
+  background-color: transparent;
+  border: solid var(--size-1) var(--c-accent);
+  border-radius: var(--m);
+  color: var(--c-accent);
+  font-size: inherit;
+  cursor: pointer;
+}
+
+.updateReloadButton:hover {
+  background-color: color-mix(in oklch, var(--c-accent) 12%, transparent);
+}
+
+.updateDismissButton {
+  padding: var(--m) var(--m-s);
+  background-color: transparent;
+  border: none;
+  color: var(--c-font);
+  font-size: var(--fs-m);
+  line-height: 1;
+  cursor: pointer;
+}

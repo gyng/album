@@ -1,7 +1,14 @@
 import { useEffect, useReducer } from "react";
 import { encodeSearchText, warmupTextEmbeddingModel } from "./textEmbeddings";
+import { isEmbeddingWorkerUnavailable } from "./embeddingWorkerClient";
 
 export type SearchMode = "keyword" | "semantic" | "hybrid";
+
+// A dead worker (its script/chunk 404'd after a redeploy) can never encode, so
+// point the user at a reload rather than the generic "try later" wording.
+export const SEARCH_UNAVAILABLE_MESSAGE =
+  "Search could not start — the site may have been updated. Reload the page to try again.";
+const SEMANTIC_UNAVAILABLE_MESSAGE = "Semantic search is unavailable right now.";
 
 type ProgressDetails = {
   loaded: number;
@@ -28,11 +35,11 @@ type Action =
       details?: ProgressDetails;
     }
   | { type: "warmup:ready" }
-  | { type: "warmup:error" }
+  | { type: "warmup:error"; unavailable: boolean }
   | { type: "vector:clear" }
   | { type: "vector:start" }
   | { type: "vector:success"; vector: number[]; query: string }
-  | { type: "vector:error" }
+  | { type: "vector:error"; unavailable: boolean }
   | { type: "vector:done" };
 
 const initialState: TextVectorState = {
@@ -73,6 +80,10 @@ const reducer = (state: TextVectorState, action: Action): TextVectorState => {
         ...state,
         textModelProgress: 100,
         textModelProgressDetails: { loaded: 0, total: 0 },
+        // A dead worker surfaces immediately so the vanished progress bar is
+        // replaced by a reload prompt; a normal warmup failure stays silent and
+        // degrades gracefully once the user actually runs a query.
+        textVectorError: action.unavailable ? SEARCH_UNAVAILABLE_MESSAGE : state.textVectorError,
       };
     case "vector:clear":
       return {
@@ -104,7 +115,9 @@ const reducer = (state: TextVectorState, action: Action): TextVectorState => {
       return {
         ...state,
         textVector: null,
-        textVectorError: "Semantic search is unavailable right now.",
+        textVectorError: action.unavailable
+          ? SEARCH_UNAVAILABLE_MESSAGE
+          : SEMANTIC_UNAVAILABLE_MESSAGE,
         textModelProgressDetails: { loaded: 0, total: 0 },
       };
     case "vector:done":
@@ -143,7 +156,7 @@ export const useTextVector = ({
       })
       .catch((err) => {
         console.warn("Failed to warm semantic search model", err);
-        dispatch({ type: "warmup:error" });
+        dispatch({ type: "warmup:error", unavailable: isEmbeddingWorkerUnavailable(err) });
       });
   }, [isSimilarMode, searchMode]);
 
@@ -168,7 +181,7 @@ export const useTextVector = ({
       .catch((err) => {
         if (!didCancel) {
           console.error("Failed to encode semantic search text", err);
-          dispatch({ type: "vector:error" });
+          dispatch({ type: "vector:error", unavailable: isEmbeddingWorkerUnavailable(err) });
         }
       })
       .finally(() => {

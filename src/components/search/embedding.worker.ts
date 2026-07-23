@@ -16,6 +16,14 @@ import {
 // Each model still lazy-loads on first use, so a text-only session never pays
 // for the vision tower and vice versa.
 
+// Liveness acknowledgement: post as soon as the module body executes so the
+// client can tell "worker is booting (a slow ~1MB chunk is still downloading)"
+// apart from "worker script 404'd after a redeploy and will never run". The
+// heavy static imports above evaluate before this line — the ack necessarily
+// posts only after module eval, which is exactly the signal we want. It carries
+// no request id, so the client's id-keyed pending map never sees it.
+self.postMessage({ boot: true });
+
 type EmbeddingWorkerRequest =
   | { id: number; type: "warmup" }
   | { id: number; type: "encode"; text: string }
