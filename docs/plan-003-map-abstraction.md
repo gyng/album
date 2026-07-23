@@ -106,6 +106,39 @@ into ~20ms of layout/paint for the marker DOM and ~15.5ms of pure JS (React re-r
 `<Marker>`s plus MapLibre's transform writes). A `DataLayer` removes **both** halves, which a
 CSS-only or virtualisation-only fix would not.
 
+### Measured result (after the DataLayer change)
+
+Same method, same machine, on a preview deploy of the migrated code.
+
+| | Before: 1444 DOM markers | After: GPU DataLayer |
+| --- | --- | --- |
+| Marker DOM nodes | 1444 | **0** |
+| DOM elements | 4,521 | **195** |
+| Mean frame time | 70.0ms | **31.8ms** |
+| p95 | 100.1ms | **50.0ms** |
+| Frames in a 1s pan | 15 | **32** |
+| Long tasks | 17 | **1** (ambient — a 5-marker run showed 19) |
+| Total blocking time | 410ms | **0ms** |
+| DOM mutations per frame | 1,729 | **1.0** |
+
+**2.20× mean frame time, 2.00× p95, blocking eliminated.** But the headline is not
+the ratio — it is that *marker count stopped being a cost at all*. At world zoom with all
+1444 points the map runs at **31.8ms**; with 5 points, **32.1ms**; with the photo layer hidden
+entirely, **31.4ms**. Those are the same number. Per-photo cost fell from ~22.5µs to ~0.3µs per
+frame, and the baseline's fitted line (`39.2ms + 0.0225 × markers`, predicting 71.7ms at 1444)
+has collapsed flat — the new full-marker measurement sits *below the old fit's intercept*.
+
+The ~32ms residue is the SwiftShader tile-rasterisation floor, not app code, which is why the
+observed speedup is 2.2× rather than the ~4× the old fit implies. Because the after-figure now
+sits exactly on that floor, the win on real GPU hardware is **larger** than 2.2×, not smaller.
+The map is not "fast" on this machine — 27 of 32 frames still exceed 33ms — but none of that
+remaining cost is ours, and none of it responds to further marker work.
+
+Correctness was verified alongside the timing: 1444 features present and rendered worldwide, 191
+distinct recency colours applied through data-driven paint, click-to-select still opening the
+photo popup, and the DOM-marker fallback still mounting exactly 5 lazy-thumbnail markers for a
+narrowed query. Zero console errors.
+
 Two caveats for anyone re-running this. The measuring browser rasterises WebGL through
 **SwiftShader (software)**, so the ~34.5ms floor at 5 markers is MapLibre's tile rendering, not
 app code; on real GPU hardware that floor collapses and the marker overhead becomes a *larger*
