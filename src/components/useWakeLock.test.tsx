@@ -454,4 +454,39 @@ describe("useWakeLock", () => {
     expect(result.current.ref.current).toBe(newerSentinel);
     expect(result.current.isActive).toBe(true);
   });
+
+  it("caps watchdog retries when the platform rejects every request", async () => {
+    // A night of rejected requests (Safari low battery) must engage the same
+    // give-up cap as the release-fight path — otherwise the watchdog fires a
+    // doomed request every minute forever, draining the battery and flooding
+    // the diagnostics log.
+    jest.useFakeTimers();
+    try {
+      const consoleError = jest.spyOn(console, "error").mockImplementation(() => undefined);
+      request.mockImplementation(() => Promise.reject(new Error("denied")));
+      const { unmount } = renderHook(() => useWakeLock(false));
+      await act(async () => {
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+      const mountAttempts = request.mock.calls.length;
+
+      for (let i = 0; i < 12; i++) {
+        // eslint-disable-next-line no-await-in-loop
+        await act(async () => {
+          jest.advanceTimersByTime(60000);
+          await Promise.resolve();
+          await Promise.resolve();
+        });
+      }
+
+      // At most five capped watchdog attempts on top of the mount acquire —
+      // not one per minute for the whole window.
+      expect(request.mock.calls.length - mountAttempts).toBeLessThanOrEqual(5);
+      consoleError.mockRestore();
+      unmount();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
 });

@@ -55,7 +55,9 @@ describe("shellDiagnosticsLog", () => {
     const storage = makeStorage();
     const total = SHELL_LOG_MAX_ENTRIES + 10;
     for (let i = 0; i < total; i++) {
-      appendShellEvent({ category: "wake", type: "lost" }, i, storage);
+      // Alternate types so consecutive entries never coalesce — this test is
+      // about the cap, not the coalescing behaviour.
+      appendShellEvent({ category: "wake", type: i % 2 === 0 ? "lost" : "acquired" }, i, storage);
     }
     const log = readShellLog(storage);
     expect(log).toHaveLength(SHELL_LOG_MAX_ENTRIES);
@@ -230,5 +232,46 @@ describe("serialiseDiagnostics", () => {
   it("handles an empty log without throwing", () => {
     const report = { ...baseReport(), log: [] };
     expect(serialiseDiagnostics(report)).toContain("(no events recorded)");
+  });
+});
+
+describe("coalescing repeated events", () => {
+  it("coalesces consecutive identical events into one entry preserving the onset time", () => {
+    const storage = makeStorage();
+    appendShellEvent({ category: "wake", type: "reacquire-failed" }, 1000, storage);
+    appendShellEvent({ category: "wake", type: "reacquire-failed" }, 61000, storage);
+    appendShellEvent({ category: "wake", type: "reacquire-failed" }, 121000, storage);
+
+    const log = readShellLog(storage);
+    expect(log).toHaveLength(1);
+    expect(log[0].at).toBe(1000);
+    expect(log[0].count).toBe(3);
+    expect(log[0].lastAt).toBe(121000);
+  });
+
+  it("does not coalesce across different types, categories, or code versions", () => {
+    const storage = makeStorage();
+    appendShellEvent({ category: "wake", type: "lost" }, 1000, storage);
+    appendShellEvent({ category: "wake", type: "acquired" }, 2000, storage);
+    appendShellEvent({ category: "code", type: "reload", version: "a" }, 3000, storage);
+    appendShellEvent({ category: "code", type: "reload", version: "b" }, 4000, storage);
+
+    expect(readShellLog(storage)).toHaveLength(4);
+  });
+
+  it("never coalesces gap events so each freeze keeps its own duration", () => {
+    const storage = makeStorage();
+    appendShellEvent({ category: "gap", type: "gap", durationMs: 5000 }, 1000, storage);
+    appendShellEvent({ category: "gap", type: "gap", durationMs: 5000 }, 2000, storage);
+
+    expect(readShellLog(storage)).toHaveLength(2);
+  });
+
+  it("renders the repeat multiplier in the description", () => {
+    const storage = makeStorage();
+    appendShellEvent({ category: "wake", type: "reacquire-failed" }, 1000, storage);
+    const log = appendShellEvent({ category: "wake", type: "reacquire-failed" }, 2000, storage);
+
+    expect(describeShellEvent(log[0])).toContain("×2");
   });
 });

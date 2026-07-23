@@ -238,9 +238,17 @@ export const useWakeLock = (disabled: boolean): UseWakeLock => {
           setIsActive(false);
         }
         // Only an internal retry (release listener / watchdog) is a "re-acquire"
-        // — a first/deliberate acquire that fails is not logged as one.
+        // — a first/deliberate acquire that fails is not logged as one. A
+        // rejection also spends the give-up budget, exactly like an instant
+        // re-release: without this, a platform that REJECTS every request
+        // (low battery) would make the watchdog fire a doomed attempt each
+        // minute forever, bypassing the cap and its decay entirely.
         if (!resetGiveUp) {
+          systemReacquireCountRef.current += 1;
           emitEvent("reacquire-failed");
+          if (systemReacquireCountRef.current >= MAX_SYSTEM_REACQUIRES) {
+            emitEvent("cap-reached");
+          }
         }
       } finally {
         isAcquiringRef.current = false;

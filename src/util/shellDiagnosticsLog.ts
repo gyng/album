@@ -33,11 +33,17 @@ export type VisibilityEventType = "visible" | "hidden";
 
 export type GapEventType = "gap"; // the JS loop was frozen/asleep between beats
 
+// `count`/`lastAt` appear when consecutive identical events coalesce into one
+// entry: `at` keeps the ONSET time (the forensic anchor), `lastAt` the most
+// recent repeat. Without coalescing, a night of once-a-minute failures would
+// evict the whole capped log and destroy the onset evidence by morning.
+type Coalesced = { count?: number; lastAt?: number };
+
 export type ShellLogEntry =
-  | { at: number; category: "wake"; type: WakeEventType }
-  | { at: number; category: "code"; type: CodeEventType; version?: string }
-  | { at: number; category: "network"; type: NetworkEventType }
-  | { at: number; category: "visibility"; type: VisibilityEventType }
+  | ({ at: number; category: "wake"; type: WakeEventType } & Coalesced)
+  | ({ at: number; category: "code"; type: CodeEventType; version?: string } & Coalesced)
+  | ({ at: number; category: "network"; type: NetworkEventType } & Coalesced)
+  | ({ at: number; category: "visibility"; type: VisibilityEventType } & Coalesced)
   | { at: number; category: "gap"; type: GapEventType; durationMs: number };
 
 // The input to a record call: an entry minus its timestamp (the log stamps it).
@@ -149,7 +155,24 @@ export const appendShellEvent = (
   storage: Storage | null = defaultStorage(),
 ): ShellLogEntry[] => {
   const entry = { at, ...input } as ShellLogEntry;
-  const next = [...readShellLog(storage), entry].slice(-SHELL_LOG_MAX_ENTRIES);
+  const existing = readShellLog(storage);
+  const newest = existing[existing.length - 1];
+  // Coalesce a repeat of the newest entry (same category, type, and version)
+  // rather than appending — gap entries always stand alone so each freeze
+  // keeps its own duration.
+  const isRepeatOfNewest =
+    newest !== undefined &&
+    input.category !== "gap" &&
+    newest.category === input.category &&
+    newest.type === input.type &&
+    (newest.category !== "code" ||
+      (newest as { version?: string }).version === (input as { version?: string }).version);
+  const next = isRepeatOfNewest
+    ? [
+        ...existing.slice(0, -1),
+        { ...newest, count: ((newest as Coalesced).count ?? 1) + 1, lastAt: at } as ShellLogEntry,
+      ]
+    : [...existing, entry].slice(-SHELL_LOG_MAX_ENTRIES);
   if (storage) {
     try {
       storage.setItem(SHELL_LOG_STORAGE_KEY, JSON.stringify(next));
@@ -229,6 +252,12 @@ export const formatGapDuration = (ms: number): string => {
 
 // British-English short label for one timeline entry, per category.
 export const describeShellEvent = (entry: ShellLogEntry): string => {
+  const count = entry.category === "gap" ? undefined : entry.count;
+  const base = describeShellEventBase(entry);
+  return count !== undefined && count > 1 ? `${base} (×${count})` : base;
+};
+
+const describeShellEventBase = (entry: ShellLogEntry): string => {
   switch (entry.category) {
     case "wake":
       switch (entry.type) {
@@ -243,7 +272,6 @@ export const describeShellEvent = (entry: ShellLogEntry): string => {
         case "cap-decayed":
           return "Retrying after a quiet spell";
       }
-      break;
     case "code":
       switch (entry.type) {
         case "reload":
@@ -257,7 +285,6 @@ export const describeShellEvent = (entry: ShellLogEntry): string => {
             ? `Version skew (running ${shortVersion(entry.version)})`
             : "Version skew detected";
       }
-      break;
     case "network":
       return entry.type === "online" ? "Came online" : "Went offline";
     case "visibility":

@@ -106,6 +106,15 @@ export const SlideshowShellScreen = () => {
   const [lastWakeLossAt, setLastWakeLossAt] = React.useState<Date | null>(null);
   const [eventHistory, setEventHistory] = React.useState<ShellLogEntry[]>([]);
   const [copiedDiagnostics, setCopiedDiagnostics] = React.useState(false);
+  const copiedTimerRef = React.useRef<number | null>(null);
+  React.useEffect(
+    () => () => {
+      if (copiedTimerRef.current !== null) {
+        window.clearTimeout(copiedTimerRef.current);
+      }
+    },
+    [],
+  );
   // When this session started, for the copied report. A ref (not state) — it is
   // read only on demand and must never trigger a render.
   const sessionStartRef = React.useRef(Date.now());
@@ -400,7 +409,13 @@ export const SlideshowShellScreen = () => {
         document.body.removeChild(textArea);
       }
       setCopiedDiagnostics(true);
-      window.setTimeout(() => setCopiedDiagnostics(false), 1800);
+      if (copiedTimerRef.current !== null) {
+        window.clearTimeout(copiedTimerRef.current);
+      }
+      copiedTimerRef.current = window.setTimeout(() => {
+        copiedTimerRef.current = null;
+        setCopiedDiagnostics(false);
+      }, 1800);
     } catch (error) {
       console.error("Failed to copy slideshow diagnostics", error);
     }
@@ -464,6 +479,10 @@ export const SlideshowShellScreen = () => {
         // and cancel a pending backoff reload — the frame is fine, so a stale
         // timer would otherwise fire a spurious reboot.
         reloadTrackerRef.current = null;
+        // The stuck episode is over — allow the NEXT one toward the same
+        // target to log its own retry-cap event rather than being deduped
+        // against a night that ended weeks ago.
+        retryCapVersionRef.current = null;
         clearPendingReload();
         setCodeStatus("current");
       } else {
@@ -563,6 +582,7 @@ export const SlideshowShellScreen = () => {
         clearPendingReload();
         reloadTrackerRef.current = null;
         lastSkewVersionRef.current = null;
+        retryCapVersionRef.current = null;
       } else if (lastSkewVersionRef.current !== nextVersion) {
         // Newly-observed skew: the running frame is behind the advertised build.
         // The runtime re-posts this on every photo advance, so record it once per
