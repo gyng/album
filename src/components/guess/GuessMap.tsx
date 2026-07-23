@@ -1,6 +1,10 @@
 import React, { useCallback, useEffect } from "react";
 import Map, { Marker, Source, Layer, useMap } from "react-map-gl/maplibre";
 import type { MapLayerMouseEvent } from "maplibre-gl";
+// Imported directly rather than via the ambient `GeoJSON` namespace: the base
+// tsconfig pins `types`, so the global is not auto-included, and maplibre no
+// longer guarantees to re-reference it.
+import type { FeatureCollection } from "geojson";
 import { TIER_DANGER } from "./guessScoring";
 import { computeWrapAwareBounds } from "../../util/mapBounds";
 import { MapLibreStyles } from "../MapLibreStyles";
@@ -19,7 +23,7 @@ const MAP_STYLE = "https://tiles.openfreemap.org/styles/liberty";
 const lineGeoJson = (
   from: { lat: number; lng: number },
   to: { lat: number; lng: number },
-): GeoJSON.FeatureCollection => ({
+): FeatureCollection => ({
   type: "FeatureCollection",
   features: [
     {
