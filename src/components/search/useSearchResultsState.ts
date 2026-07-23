@@ -96,6 +96,16 @@ export const useSearchResultsState = ({
   // leaving the query disabled forever with a blank results area (HIGH-7).
   const textVectorFailed = Boolean(textVectorError);
 
+  // The progress indicator flickered off for one painted frame each time the
+  // debounce settled on a semantic/hybrid query: `isSearchInputPending` drops in
+  // that commit, but the vector-encoding effect only dispatches `vector:start`
+  // after paint, so `isTextVectorLoading` was still false in between. Deriving
+  // "the settled query still needs a vector it doesn't yet have" during render
+  // bridges that gap without depending on effect timing.
+  const isTextQueryResolving =
+    textVectorState.isTextVectorLoading ||
+    (needsTextVector && !hasCurrentTextVector && !textVectorFailed);
+
   const canRunQuery =
     hasHydratedFromUrl &&
     Boolean(database) &&
@@ -290,6 +300,7 @@ export const useSearchResultsState = ({
     isImageQueryMode,
     isSearchInputPending,
     isSimilarMode,
+    isTextQueryResolving,
     queryResults,
     searchQuery,
     similarFilename,

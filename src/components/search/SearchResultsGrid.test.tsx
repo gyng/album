@@ -236,4 +236,38 @@ describe("SearchResultsGrid", () => {
     expect(screen.getByRole("status")).toHaveTextContent("Searching…");
     expect(screen.getByText("previous.jpg")).toBeInTheDocument();
   });
+
+  it("does not add a displacing progress row once results are on screen", () => {
+    // The visible progress row is full-width and in-flow: rendered above
+    // existing tiles it would shove them down and snap them back when the
+    // search resolves. While the grid is still empty it has nothing below to
+    // displace, so it may show (it is the only aria-hidden list item).
+    const view = render(
+      <SearchResultsGrid
+        {...baseProps}
+        searchInputValue="query"
+        trimmedQuery="query"
+        results={[]}
+        isSearching
+      />,
+    );
+    expect(view.container.querySelectorAll("li[aria-hidden='true']")).toHaveLength(1);
+
+    // Refining over previous results (kept in place, desaturated) must not
+    // reintroduce that row — progress stays conveyed by the live region.
+    view.rerender(
+      <SearchResultsGrid
+        {...baseProps}
+        searchInputValue="query"
+        trimmedQuery="query"
+        results={[result("previous.jpg")]}
+        isSuccess
+        isFetching
+        isSearching
+        isPlaceholderData
+      />,
+    );
+    expect(view.container.querySelectorAll("li[aria-hidden='true']")).toHaveLength(0);
+    expect(screen.getByRole("status")).toHaveTextContent("Searching…");
+  });
 });

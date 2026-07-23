@@ -140,7 +140,7 @@ export const Search: React.FC<{
     similarPreviewSrc,
     textModelProgress,
     textModelProgressDetails,
-    isTextVectorLoading,
+    isTextQueryResolving,
     textVectorError,
     trimmedQuery,
   } = useSearchResultsState({
@@ -220,7 +220,7 @@ export const Search: React.FC<{
   const isAwaitingImageVector = Boolean(imageQuery) && !imageQuery?.vector;
   const isSearching =
     isSearchInputPending ||
-    isTextVectorLoading ||
+    isTextQueryResolving ||
     (isFetching && !isFetchingNextPage) ||
     isAwaitingVectorDatabase ||
     isAwaitingImageVector;

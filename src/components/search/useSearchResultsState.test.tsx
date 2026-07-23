@@ -171,6 +171,29 @@ describe("useSearchResultsState", () => {
     expect(config.enabled).toBe(expected);
   });
 
+  it.each([
+    // The debounce has settled but the encoding effect has not yet dispatched
+    // `vector:start`, so `isTextVectorLoading` is still false — the derived
+    // signal must already report the query as resolving to avoid a blink.
+    ["encoding has not yet started", { textVector: null, textVectorQuery: null }, true],
+    ["encoding is in progress", { isTextVectorLoading: true }, true],
+    [
+      "a stale vector from a previous query is held",
+      { textVector: [0.1], textVectorQuery: "dogs" },
+      true,
+    ],
+    [
+      "the vector for the current query has arrived",
+      { textVector: [0.1], textVectorQuery: "cats" },
+      false,
+    ],
+    ["encoding has failed", { textVectorError: "failed" }, false],
+  ])("keeps the semantic search signal gapless when %s", (_name, vector, expected) => {
+    textVector.mockReturnValue({ ...baseVectorState(), ...vector } as any);
+    const { result } = renderState({ searchInputValue: "cats", searchMode: "semantic" });
+    expect(result.current.isTextQueryResolving).toBe(expected);
+  });
+
   it("returns an empty page defensively without the primary database", async () => {
     renderState({ database: null });
     await expect(config.queryFn({ pageParam: 2 })).resolves.toEqual(emptyPage);

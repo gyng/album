@@ -83,7 +83,13 @@ export const SearchResultsGrid: React.FC<Props> = ({
     <ul className={styles.results} aria-busy={isSearching}>
       {statusItem}
 
-      {isSearching ? (
+      {/* Only shown while the grid is empty, where it has nothing below it to
+          push. Once tiles are rendered — a refine keeps the previous results in
+          place (desaturated) and even the debounce window keeps the committed
+          ones — an in-flow full-width row here would shove every tile down and
+          snap it back when the search resolves. In that case the desaturated
+          tiles and the input's own spinner signal progress without the shift. */}
+      {isSearching && (results?.length ?? 0) === 0 ? (
         <li className={styles.searchingStatus} aria-hidden="true">
           <span className={styles.searchingPulse} aria-hidden="true" />
           Searching&hellip;
