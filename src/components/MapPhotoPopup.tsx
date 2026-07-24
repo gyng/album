@@ -1,5 +1,5 @@
 import { AppLink as Link } from "./platform";
-import { Popup } from "./map/adapters/maplibre";
+import { Popup } from "./map";
 import { exifWallClockTimestamp } from "../util/exifTime";
 import { getRelativeTimeString } from "../util/time";
 import type { MapWorldEntry } from "../util/pageDataTypes";
@@ -31,12 +31,14 @@ export const MapPhotoPopup = ({
 
   return (
     <Popup
-      longitude={photo.decLng}
-      latitude={photo.decLat}
-      onClose={onClose}
+      at={{ lng: photo.decLng, lat: photo.decLat }}
+      // Deliberately without the provider's click-away: a pin's own click is the
+      // same gesture as the map's, so a popup that dismissed itself on a map
+      // click would shut the moment the tap that opened it finished. `MapWorld`
+      // owns dismissal instead, where it can tell the two apart.
       className={`${styles.popup} ${selected ? styles.click : styles.hover}`}
       offset={15}
-      closeButton={false}
+      onDismiss={onClose}
     >
       {/* This is event plumbing, not an interactive control. */}
       {/* oxlint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions */}

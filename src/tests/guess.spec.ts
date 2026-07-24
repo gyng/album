@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { expectMapLoaded } from "./map-loaded";
 import { stubExternalMapAssets } from "./map-network";
 
 test.describe("guess game layout", () => {
@@ -21,6 +22,11 @@ test.describe("guess game layout", () => {
     const map = page.getByRole("region", { name: "Guess map" });
     await expect(photoPanel).toBeVisible();
     await expect(map).toBeVisible();
+    // `map` is the app's own labelled container, which is laid out whether or
+    // not the map inside it ever loaded. The round is only really playable once
+    // the map has mounted its children, so measure that too — the layout this
+    // test guards is the layout of a working map.
+    await expectMapLoaded(map);
 
     const photo = photoPanel.locator("img");
     await expect(photo).toBeVisible();

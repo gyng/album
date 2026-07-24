@@ -10,13 +10,16 @@ import type {
   ScaleControlOptions,
 } from "./engine";
 import { useAttachedMap } from "./context";
+import { useLatestRef } from "./internal";
 
 type ControlPlacement = { position?: ControlPosition };
 
 const useMapControl = (create: () => IControl, position: ControlPosition | undefined): null => {
+  // Written from an effect, not during render: the factory closes over the
+  // caller's props, and a render React abandons must not be able to hand the
+  // map a control built from options that were never committed.
+  const createRef = useLatestRef(create);
   const map = useAttachedMap();
-  const createRef = React.useRef(create);
-  createRef.current = create;
 
   React.useEffect(() => {
     if (!map) {
@@ -34,7 +37,7 @@ const useMapControl = (create: () => IControl, position: ControlPosition | undef
         map.removeControl(control);
       }
     };
-  }, [map, position]);
+  }, [map, position, createRef]);
 
   return null;
 };

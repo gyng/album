@@ -18,7 +18,11 @@
 
 /* On touch devices the 14px dot is far below a comfortable tap target, so
    extend an invisible hit area beyond the shared 44px minimum without
-   changing the visible pin size. */
+   changing the visible pin size.
+
+   The world map draws its bulk pins on the GPU, where there is no element to
+   hang this off; `TOUCH_TARGET_RADIUS` in `MapPhotoMarkers.tsx` buys the same
+   room with a transparent circle instead. Keep the two in step. */
 @media (pointer: coarse) {
   .pin::after {
     content: "";

@@ -5,7 +5,12 @@
  *
  * The GL library is reached exclusively through `./engine` (seam 1).
  */
-export { MapView as default, type MapViewProps as MapProps } from "./MapView";
+export {
+  MapView as default,
+  type MapErrorEvent,
+  type MapViewProps as MapProps,
+  type MapViewStatus,
+} from "./MapView";
 export { Marker, type MarkerEvent, type MarkerProps } from "./Marker";
 export { Popup, type PopupEvent, type PopupProps } from "./Popup";
 export { Source, type SourceProps } from "./Source";

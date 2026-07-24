@@ -1,4 +1,4 @@
-import { Popup } from "./map/adapters/maplibre";
+import { Popup } from "./map";
 import { buildExternalMapLinks } from "./mapInteractions";
 import styles from "./MapWorld.module.css";
 
@@ -21,12 +21,11 @@ export const MapContextMenu = ({
 
   return (
     <Popup
-      longitude={point.longitude}
-      latitude={point.latitude}
-      onClose={onClose}
-      closeButton={false}
-      closeOnClick={false}
+      at={{ lng: point.longitude, lat: point.latitude }}
+      // No close button and no click-away of its own: the map dismisses this
+      // menu itself, so the popup does not need a second way to shut.
       offset={8}
+      onDismiss={onClose}
       {...(styles.contextPopup ? { className: styles.contextPopup } : {})}
     >
       <div className={styles.contextMenu} role="group" aria-label="Location actions">

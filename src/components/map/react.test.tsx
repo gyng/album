@@ -6,11 +6,14 @@ import { act, render, screen } from "@testing-library/react";
 import type { ComponentType, ReactNode } from "react";
 import {
   DataLayer,
+  DEFAULT_CLUSTER_LABEL_FONT,
   FullscreenControl,
   GeolocateControl,
   type MapControlProps,
   MapView,
+  Marker,
   NavigationControl,
+  Popup,
   ScaleControl,
   useMap,
 } from "./index";
@@ -90,6 +93,11 @@ const engine = {
   project: jest.fn(() => ({ x: 12, y: 34 })),
   unproject: jest.fn(() => ({ lng: 5, lat: 6 })),
   getContainer: jest.fn(() => container),
+  // Stacking reads and reorders the layers the adapter added; the double
+  // reports every layer as present so the port's ordering decisions show up in
+  // the moves it asks for.
+  getLayer: jest.fn((id: string) => ({ id })),
+  moveLayer: jest.fn(),
   // Layer-scoped subscriptions take an extra layer id between the event name
   // and the listener, so both arities are accepted here.
   on: jest.fn((type: string, second: string | EngineListener, third?: EngineListener) => {
@@ -157,6 +165,8 @@ beforeEach(() => {
   engine.unproject.mockClear();
   engine.on.mockClear();
   engine.off.mockClear();
+  engine.getLayer.mockClear();
+  engine.moveLayer.mockClear();
   engineListeners.clear();
   currentEngineMap = null;
 });
@@ -424,6 +434,97 @@ describe("map controls", () => {
   });
 });
 
+describe("Marker", () => {
+  it("places the marker, and sits its element where the caller asked", () => {
+    render(
+      <MapView styleUrl="style.json">
+        <Marker at={{ lng: 103.75, lat: 1.25 }} anchor="bottom">
+          pin
+        </Marker>
+      </MapView>,
+    );
+
+    expect(markerProps).toHaveBeenCalledWith(
+      expect.objectContaining({ longitude: 103.75, latitude: 1.25, anchor: "bottom" }),
+    );
+    expect(screen.getByTestId("marker").textContent).toBe("pin");
+  });
+
+  it("leaves the anchor to the provider when the caller does not choose one", () => {
+    render(
+      <MapView styleUrl="style.json">
+        <Marker at={{ lng: 1, lat: 2 }}>pin</Marker>
+      </MapView>,
+    );
+
+    expect(markerProps.mock.calls.at(-1)?.[0]).not.toHaveProperty("anchor");
+  });
+});
+
+describe("Popup", () => {
+  it("anchors the popup at the position it was given", () => {
+    render(
+      <MapView styleUrl="style.json">
+        <Popup at={{ lng: 103.75, lat: 1.25 }}>details</Popup>
+      </MapView>,
+    );
+
+    expect(popupProps).toHaveBeenCalledWith(
+      expect.objectContaining({ longitude: 103.75, latitude: 1.25 }),
+    );
+    expect(screen.getByTestId("popup").textContent).toBe("details");
+  });
+
+  it("stays open through a map click, and shows no dismiss button, unless asked", () => {
+    render(
+      <MapView styleUrl="style.json">
+        <Popup at={{ lng: 1, lat: 2 }}>details</Popup>
+      </MapView>,
+    );
+
+    // The port's defaults, not the provider's: a popup opened by the very click
+    // the application is still handling must not close itself on that click.
+    const props = popupProps.mock.calls.at(-1)?.[0];
+    expect(props).toEqual(expect.objectContaining({ closeButton: false, closeOnClick: false }));
+    expect(props).not.toHaveProperty("offset");
+    expect(props).not.toHaveProperty("className");
+    expect(props).not.toHaveProperty("onClose");
+  });
+
+  it("carries the popup options a caller sets, and reports a dismissal back", () => {
+    const onDismiss = jest.fn();
+    render(
+      <MapView styleUrl="style.json">
+        <Popup
+          at={{ lng: 1, lat: 2 }}
+          offset={15}
+          className="photo"
+          showCloseButton
+          dismissOnMapClick
+          onDismiss={onDismiss}
+        >
+          details
+        </Popup>
+      </MapView>,
+    );
+
+    const props = popupProps.mock.calls.at(-1)?.[0];
+    expect(props).toEqual(
+      expect.objectContaining({
+        offset: 15,
+        className: "photo",
+        closeButton: true,
+        closeOnClick: true,
+      }),
+    );
+
+    act(() => {
+      props.onClose({ type: "close" });
+    });
+    expect(onDismiss).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe("useMap", () => {
   const Probe = ({ report }: { report: (map: MapInstance | undefined) => void }) => {
     report(useMap());
@@ -594,9 +695,23 @@ describe("DataLayer", () => {
         layout: expect.objectContaining({ "text-field": ["get", "point_count"] }),
       }),
     );
+    // A provider draws no label at all when asked for a face its style has no
+    // glyphs for, so the default is part of the layer's contract.
+    expect(labels.layout["text-font"]).toEqual(DEFAULT_CLUSTER_LABEL_FONT);
     // Individual points must not be drawn twice: clustered ones belong to the
     // cluster layer, so the circle layer only takes what is left.
     expect(circles.filter).toEqual(["!", ["has", "point_count"]]);
+  });
+
+  it("letters cluster counts with the face a caller's own style provides", () => {
+    render(
+      <MapView styleUrl="style.json">
+        <DataLayer id="photos" points={points} cluster clusterLabelFont={["Open Sans Bold"]} />
+      </MapView>,
+    );
+
+    const labels = layerProps.mock.calls.map(([props]) => props)[1];
+    expect(labels.layout["text-font"]).toEqual(["Open Sans Bold"]);
   });
 
   it("draws lines as their own source and line layer", () => {
@@ -691,6 +806,62 @@ describe("DataLayer", () => {
     expect(sourceProps.mock.calls.at(-1)?.[0].lineMetrics).toBe(true);
   });
 
+  it("puts taper stops in the order and range a provider will accept", () => {
+    const path = [
+      { lng: 0, lat: 0 },
+      { lng: 10, lat: 20 },
+    ];
+    render(
+      <MapView styleUrl="style.json">
+        <DataLayer
+          id="route"
+          lines={[{ id: "trip", path, color: "rgb(9, 9, 9)", width: 3 }]}
+          lineWidthAlong={[
+            { at: 1.4, width: 2 },
+            { at: 0.55, width: 6 },
+            { at: -0.2, width: 1 },
+            { at: 0.55, width: 99 },
+          ]}
+        />
+      </MapView>,
+    );
+
+    // Ascending, inside the line, and one width per position: a provider
+    // interpolates over strictly increasing inputs and otherwise refuses the
+    // layer outright, so the line would simply never draw. Callers building
+    // stops from data should not have to know that.
+    expect(layerProps.mock.calls.at(-1)?.[0].paint["line-width"]).toEqual([
+      "interpolate",
+      ["linear"],
+      ["line-progress"],
+      0,
+      1,
+      0.55,
+      6,
+      1,
+      2,
+    ]);
+  });
+
+  it("falls back to each line's own width when the stops describe no taper", () => {
+    const path = [
+      { lng: 0, lat: 0 },
+      { lng: 10, lat: 20 },
+    ];
+    render(
+      <MapView styleUrl="style.json">
+        <DataLayer
+          id="route"
+          lines={[{ id: "trip", path, color: "rgb(9, 9, 9)", width: 3 }]}
+          lineWidthAlong={[]}
+        />
+      </MapView>,
+    );
+
+    expect(layerProps.mock.calls.at(-1)?.[0].paint["line-width"]).toEqual(["get", "width"]);
+    expect(sourceProps.mock.calls.at(-1)?.[0]).not.toHaveProperty("lineMetrics");
+  });
+
   it("splits lines into one layer per dash pattern, sharing a source", () => {
     const path = [
       { lng: 0, lat: 0 },
@@ -759,5 +930,56 @@ describe("DataLayer", () => {
     expect(next.id).toBe(previous.id);
     expect(next.data.features).toHaveLength(1);
     expect(next.data.features[0].geometry.coordinates).toEqual([5, 6]);
+  });
+});
+
+describe("DataLayer stacking", () => {
+  const points = [{ id: "a", at: { lng: 103.75, lat: 1.25 } }];
+  const lines = [
+    {
+      id: "trip",
+      path: [
+        { lng: 0, lat: 0 },
+        { lng: 10, lat: 20 },
+      ],
+      color: "rgb(9, 9, 9)",
+      width: 2,
+    },
+  ];
+
+  const ordered = (route: boolean) => (
+    <MapView styleUrl="style.json">
+      <DataLayer id="pins" points={points} order={20} />
+      {route ? <DataLayer id="route" lines={lines} order={10} /> : null}
+    </MapView>
+  );
+
+  it("keeps the declared order when a layer remounts beside a settled one", () => {
+    currentEngineMap = engine;
+    const view = render(ordered(true));
+
+    engine.moveLayer.mockClear();
+    // The route goes away and comes back — the case a provider quietly resolves
+    // by re-appending its layers on top of the pins that never moved.
+    view.rerender(ordered(false));
+    view.rerender(ordered(true));
+
+    // Raised bottom-first, so the pins are back on top however the mounting went.
+    expect(engine.moveLayer.mock.calls.map(([id]: [string]) => id).slice(-2)).toEqual([
+      "route-line-strokes",
+      "pins-point-circles",
+    ]);
+  });
+
+  it("leaves the provider's own stacking alone when no layer declares an order", () => {
+    currentEngineMap = engine;
+    render(
+      <MapView styleUrl="style.json">
+        <DataLayer id="pins" points={points} />
+        <DataLayer id="route" lines={lines} />
+      </MapView>,
+    );
+
+    expect(engine.moveLayer).not.toHaveBeenCalled();
   });
 });

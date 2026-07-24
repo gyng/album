@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { expectMapLoaded } from "./map-loaded";
 import { stubVectorTileMapAssets } from "./map-network";
 
 /*
@@ -29,9 +30,15 @@ test.describe("Map tile rendering", () => {
       .toBeGreaterThan(0);
 
     // MapLibre fires `load` only once every source's tiles are in, and the
-    // adapter mounts the map's children on `load`. So the scale legend — a child
-    // of the map — appearing means the fixture tile completed the round trip
+    // adapter mounts the map's children on `load`. So a navigation control —
+    // a child of the map, put in the DOM by `addControl` on the live map
+    // instance — appearing means the fixture tile completed the round trip
     // through the worker and the map genuinely rendered it.
-    await expect(page.locator(".maplibregl-ctrl-scale").first()).toBeVisible();
+    //
+    // Deliberately not `.maplibregl-ctrl-scale`: `MapRecencyLegend` borrows
+    // that class for its own styling, so the selector matches an app element
+    // that renders with or without a map, and the assertion would quietly
+    // decay into "tiles were requested".
+    await expectMapLoaded(page);
   });
 });

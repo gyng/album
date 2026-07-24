@@ -12,7 +12,6 @@ import AdapterMap, {
   FullscreenControl as AdapterFullscreenControl,
   GeolocateControl as AdapterGeolocateControl,
   Layer,
-  type LayerProps,
   type MapRef,
   Marker as AdapterMarker,
   NavigationControl as AdapterNavigationControl,
@@ -21,6 +20,7 @@ import AdapterMap, {
   Source,
   useMap as useAdapterMap,
 } from "./adapters/maplibre";
+import { DEFAULT_CLUSTER_LABEL_FONT, DEFAULT_POINT_COLOUR, DEFAULT_POINT_RADIUS } from "./port";
 import type {
   Bounds,
   CameraView,
@@ -33,6 +33,7 @@ import type {
   MapAttribution,
   MapControlPosition,
   MapEvent,
+  MapEventMap,
   MapEventName,
   MapInstance,
   MapPointerEvent,
@@ -77,11 +78,19 @@ const toCameraView = (event: EngineCameraEvent): CameraView => ({
   zoom: event.viewState.zoom,
 });
 
-const subscribe = (
+const subscribe = <Name extends MapEventName>(
   map: MapRef,
-  event: MapEventName,
-  emit: (event: MapEvent) => void,
+  event: Name,
+  listener: (event: MapEventMap[Name]) => void,
 ): (() => void) => {
+  // Each branch below builds the payload `MapEventMap` pairs with the names it
+  // handles: the literals are checked against `MapEvent`, and each carries its
+  // own name as `type`, so a branch cannot quietly emit another branch's shape.
+  // That is what the widening here rests on — `emit` is only ever called with
+  // the variant belonging to `event`. The assertion lives beside the code that
+  // upholds it rather than at the call site, which cannot see the branches.
+  const emit = listener as (event: MapEvent) => void;
+
   if (event === "click" || event === "contextmenu") {
     const handler = (engineEvent: EnginePointerEvent) => {
       emit({
@@ -177,7 +186,7 @@ const createMapInstance = (map: MapRef): MapInstance => ({
     return { x: point.x, y: point.y };
   },
   unproject: (at: ScreenPoint): LngLat => toLngLat(map.unproject([at.x, at.y])),
-  on: (event, listener) => subscribe(map, event, listener as (value: MapEvent) => void),
+  on: (event, listener) => subscribe(map, event, listener),
   getContainer: (): HTMLElement => map.getContainer(),
   getGestureSurface: (): HTMLElement => map.getCanvasContainer(),
   isDragPanEnabled: (): boolean => map.dragPan.isEnabled(),
@@ -446,12 +455,65 @@ export const Marker = ({
 );
 
 export type PopupProps = {
+  /** Where the popup points, on the ground. */
   at: LngLat;
+  /**
+   * Pixels between `at` and the popup's tip, so it can clear whatever it is
+   * pointing at. Omitted, the provider's own spacing stands.
+   */
+  offset?: number;
+  /**
+   * Draws the provider's own dismiss button. Off by default: most popups here
+   * are opened and shut by the thing that opened them, and a second way to
+   * close one is a second piece of state to keep straight.
+   */
+  showCloseButton?: boolean;
+  /**
+   * Dismisses the popup when the map surface is clicked. Off by default, and
+   * deliberately so: providers close on the same click the application is still
+   * handling, so a popup opened *by* that click reports itself dismissed
+   * immediately and takes the caller's selection with it. A caller that wants
+   * click-away dismissal owns it in its own map click handler, where it can
+   * sequence dismissal against its own state.
+   */
+  dismissOnMapClick?: boolean;
+  /** Applied to the popup's own element, on top of the provider's styling. */
+  className?: string;
+  /**
+   * Fired when the popup dismisses itself — its close button, or a map click
+   * when `dismissOnMapClick` is set. Unmounting is not a dismissal, so a popup
+   * the caller stops rendering does not report one back.
+   */
+  onDismiss?: () => void;
   children: React.ReactNode;
 };
 
-export const Popup = ({ at, children }: PopupProps): React.JSX.Element => (
-  <AdapterPopup longitude={at.lng} latitude={at.lat}>
+export const Popup = ({
+  at,
+  offset,
+  showCloseButton = false,
+  dismissOnMapClick = false,
+  className,
+  onDismiss,
+  children,
+}: PopupProps): React.JSX.Element => (
+  <AdapterPopup
+    longitude={at.lng}
+    latitude={at.lat}
+    // Both are passed whatever the caller said, because the port's defaults are
+    // not the provider's: leaving them out would hand back MapLibre's `true`.
+    closeButton={showCloseButton}
+    closeOnClick={dismissOnMapClick}
+    {...(offset !== undefined ? { offset } : {})}
+    {...(className !== undefined ? { className } : {})}
+    {...(onDismiss !== undefined
+      ? {
+          onClose: () => {
+            onDismiss();
+          },
+        }
+      : {})}
+  >
     {children}
   </AdapterPopup>
 );
@@ -460,12 +522,43 @@ export const Popup = ({ at, children }: PopupProps): React.JSX.Element => (
 /* DataLayer                                                                   */
 /* -------------------------------------------------------------------------- */
 
-/** Used when a point does not carry its own colour. */
-const DEFAULT_POINT_COLOUR = "rgb(230, 32, 101)";
-/** Used when a point does not carry its own radius, in pixels. */
-const DEFAULT_POINT_RADIUS = 5;
 const CLUSTER_MAX_ZOOM = 12;
 const CLUSTER_RADIUS = 42;
+
+/* -------------------------------------------------------------------------- */
+/* Style construction                                                          */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * The style vocabulary this module writes, declared structurally so the port
+ * does not lean on the provider's own type surface. A value is either a literal
+ * or a nested expression the provider evaluates per feature.
+ *
+ * Authoring style-spec here at all is a known leak — the plan
+ * (`docs/plan-003-map-abstraction.md`) puts this translation in the adapter, and
+ * relocating it needs the adapter to accept a neutral layer description. Until
+ * then it is at least written against types this file owns.
+ */
+type StyleValue = string | number | boolean | readonly StyleValue[];
+type StyleExpression = readonly StyleValue[];
+type StyleProperties = Readonly<Record<string, StyleValue>>;
+
+/** A drawn layer, as the provider's style document describes one. */
+type LayerSpec = {
+  id: string;
+  type: "circle" | "line" | "symbol";
+  filter?: StyleExpression;
+  layout?: StyleProperties;
+  paint?: StyleProperties;
+};
+
+/**
+ * The one point where a layer description crosses into the adapter. The
+ * provider validates the spec it is handed at runtime, so this assertion is the
+ * seam between the types this module owns and the provider's own — not a claim
+ * that the two happen to line up.
+ */
+const StyleLayer = Layer as unknown as React.ComponentType<LayerSpec>;
 
 type PointProperties = { id: string; color?: string; radius?: number; opacity?: number };
 type LineProperties = {
@@ -524,14 +617,12 @@ const toLineCollection = (
   ),
 });
 
-type CirclePaint = NonNullable<Extract<LayerProps, { type: "circle" }>["paint"]>;
-
 /**
  * Colour, radius, and opacity are read off each feature so one layer can draw a
  * whole set of differently styled points — that is what keeps bulk data on the
  * GPU. The halo, if asked for, is uniform across the layer.
  */
-const circlePaint = (stroke: PointStroke | undefined): CirclePaint => ({
+const circlePaint = (stroke: PointStroke | undefined): StyleProperties => ({
   "circle-color": ["coalesce", ["get", "color"], DEFAULT_POINT_COLOUR],
   "circle-radius": ["coalesce", ["get", "radius"], DEFAULT_POINT_RADIUS],
   "circle-opacity": ["coalesce", ["get", "opacity"], 1],
@@ -546,11 +637,7 @@ const circlePaint = (stroke: PointStroke | undefined): CirclePaint => ({
     : {}),
 });
 
-const circleLayer = (
-  id: string,
-  clustered: boolean,
-  stroke: PointStroke | undefined,
-): LayerProps =>
+const circleLayer = (id: string, clustered: boolean, stroke: PointStroke | undefined): LayerSpec =>
   clustered
     ? {
         id: `${id}-point-circles`,
@@ -564,7 +651,7 @@ const circleLayer = (
         paint: circlePaint(stroke),
       };
 
-const clusterLayer = (id: string): LayerProps => ({
+const clusterLayer = (id: string): LayerSpec => ({
   id: `${id}-clusters`,
   type: "circle",
   filter: ["has", "point_count"],
@@ -577,14 +664,17 @@ const clusterLayer = (id: string): LayerProps => ({
   },
 });
 
-const clusterLabelLayer = (id: string): LayerProps => ({
+const clusterLabelLayer = (id: string, font: readonly string[]): LayerSpec => ({
   id: `${id}-cluster-labels`,
   type: "symbol",
   filter: ["has", "point_count"],
   layout: {
     "text-field": ["get", "point_count"],
     "text-size": 12,
-    "text-font": ["Noto Sans Bold"],
+    // A provider letters only with faces its style ships glyphs for, and draws
+    // nothing at all when asked for one it has not got — so the face is part of
+    // the layer's contract, not a detail. See `DEFAULT_CLUSTER_LABEL_FONT`.
+    "text-font": font,
   },
   paint: {
     "text-color": "rgba(0, 0, 0, 0.9)",
@@ -594,16 +684,42 @@ const clusterLabelLayer = (id: string): LayerProps => ({
   },
 });
 
-type LineLayer = Extract<LayerProps, { type: "line" }>;
-type LineWidth = NonNullable<NonNullable<LineLayer["paint"]>["line-width"]>;
+/**
+ * Puts a caller's taper stops in the shape a provider will accept: positions
+ * clamped to the line they are measured along, in ascending order, and each
+ * position appearing once.
+ *
+ * Providers interpolate over strictly ascending inputs and reject the whole
+ * layer otherwise — the line simply never draws. A caller deriving stops from
+ * data should not have to know that, so the tidying happens here rather than
+ * being left as a trap. Where two stops land on the same position (which
+ * clamping can cause on its own) the first one given wins, and a position that
+ * is not a real number cannot be placed at all, so it is dropped.
+ */
+const toTaperStops = (stops: readonly LineWidthStop[]): LineWidthStop[] => {
+  const ordered = stops
+    .filter((stop) => Number.isFinite(stop.at))
+    .map((stop) => ({ at: Math.min(Math.max(stop.at, 0), 1), width: stop.width }))
+    .sort((a, b) => a.at - b.at);
+
+  const ascending: LineWidthStop[] = [];
+  for (const stop of ordered) {
+    const previous = ascending.at(-1);
+    if (!previous || stop.at > previous.at) {
+      ascending.push(stop);
+    }
+  }
+
+  return ascending;
+};
 
 /**
  * A taper is measured along each line's own length, so it is one expression for
- * the whole layer rather than a value per feature. Without one the width is read
- * off each feature as usual.
+ * the whole layer rather than a value per feature. Without one — or with stops
+ * that reduced to nothing — the width is read off each feature as usual.
  */
-const lineWidth = (widthAlong: readonly LineWidthStop[] | undefined): LineWidth =>
-  widthAlong
+const lineWidth = (widthAlong: readonly LineWidthStop[]): StyleExpression =>
+  widthAlong.length > 0
     ? [
         "interpolate",
         ["linear"],
@@ -621,8 +737,8 @@ const lineWidth = (widthAlong: readonly LineWidthStop[] | undefined): LineWidth 
 const lineLayers = (
   id: string,
   lines: readonly LineFeature[],
-  widthAlong: readonly LineWidthStop[] | undefined,
-): LayerProps[] => {
+  widthAlong: readonly LineWidthStop[],
+): LayerSpec[] => {
   const fades = lines.some((line) => line.opacity !== undefined);
   const blurs = lines.some((line) => line.blur !== undefined);
 
@@ -637,9 +753,9 @@ const lineLayers = (
   // is needed — and the common case stays a single draw.
   const split = patterns.length > 1;
 
-  return patterns.map((pattern): LayerProps => {
+  return patterns.map((pattern): LayerSpec => {
     const key = pattern ? dashKey(pattern) : null;
-    const filter: LineLayer["filter"] =
+    const filter: StyleExpression =
       key === null ? ["!", ["has", "dashKey"]] : ["==", ["get", "dashKey"], key];
 
     return {
@@ -743,6 +859,103 @@ const usePointInteractions = (
   }, [map, layerId, wantsClick, wantsHover]);
 };
 
+/* -------------------------------------------------------------------------- */
+/* Stacking                                                                    */
+/* -------------------------------------------------------------------------- */
+
+/** One `<DataLayer>` group's layers, and where its caller wants them drawn. */
+type StackEntry = {
+  /** Higher draws on top. `undefined` is "no opinion". */
+  order: number | undefined;
+  /** Mount sequence, so groups that express no preference keep mount order. */
+  seq: number;
+  /** Sub-group within one `<DataLayer>`: its points draw beneath its lines. */
+  group: number;
+  ids: readonly string[];
+};
+
+/** The stacking groups registered against each map. */
+const stacks = new WeakMap<MapRef, Set<StackEntry>>();
+let stackSeq = 0;
+
+const byStackOrder = (a: StackEntry, b: StackEntry): number =>
+  (a.order ?? 0) - (b.order ?? 0) || a.seq - b.seq || a.group - b.group;
+
+/**
+ * Re-applies the stack in declared order, bottom group first — raising each
+ * group in turn leaves the last one on top.
+ *
+ * Providers append a layer as it is added, so without this the stacking depends
+ * on which layer happened to mount last: one branch of a tree remounting puts
+ * its layers above everything mounted before it, and the same tree draws
+ * differently depending on what the reader did on the way there.
+ *
+ * Nothing moves while no group has declared an `order`. Equal orders express no
+ * preference, and mount order is already what the provider has, so a map whose
+ * callers say nothing behaves exactly as it did.
+ */
+const restack = (map: MapRef, entries: ReadonlySet<StackEntry>): void => {
+  const groups = [...entries];
+  if (!groups.some((entry) => entry.order !== undefined)) {
+    return;
+  }
+
+  for (const entry of groups.sort(byStackOrder)) {
+    for (const layerId of entry.ids) {
+      // A group registers once its own layers are added, but another group's
+      // may not be there yet — or may have gone with a style reload.
+      if (map.getLayer(layerId)) {
+        map.moveLayer(layerId);
+      }
+    }
+  }
+};
+
+/**
+ * Registers a group of layers for stacking, and re-applies the stack whenever
+ * the registered set changes.
+ *
+ * Rendered as the last child of the source that owns the layers, which is what
+ * makes the timing work: React runs effects depth-first in tree order, so the
+ * layers rendered above this element have already added themselves by the time
+ * this effect runs and there is something to move.
+ */
+const StackOrder = ({
+  order,
+  group,
+  ids,
+}: {
+  order?: number;
+  group: number;
+  ids: readonly string[];
+}): null => {
+  const { current: map } = useAdapterMap();
+  // The ids are rebuilt every render, so the effect keys off their names.
+  const idKey = ids.join(" ");
+  const idsRef = React.useRef(ids);
+  idsRef.current = ids;
+
+  React.useEffect(() => {
+    if (!map) {
+      return;
+    }
+
+    stackSeq += 1;
+    const entry: StackEntry = { order, seq: stackSeq, group, ids: idsRef.current };
+    const entries = stacks.get(map) ?? new Set<StackEntry>();
+    stacks.set(map, entries);
+    entries.add(entry);
+    restack(map, entries);
+
+    return () => {
+      entries.delete(entry);
+      restack(map, entries);
+    };
+  }, [map, order, group, idKey]);
+
+  return null;
+};
+
 export type DataLayerProps = {
   /** Prefixes the source and layer ids this layer owns. */
   id: string;
@@ -750,8 +963,25 @@ export type DataLayerProps = {
   lines?: readonly LineFeature[];
   /** Groups nearby points into counted clusters at low zoom. */
   cluster?: boolean;
+  /**
+   * The face a cluster's count is lettered in, named as the style's glyph set
+   * spells it. Defaults to `DEFAULT_CLUSTER_LABEL_FONT`, which the styles this
+   * site uses provide; a style without that face draws no count at all, so any
+   * other one has to name its own.
+   */
+  clusterLabelFont?: readonly string[];
   /** A halo around every point. Omitted, points are drawn without one. */
   stroke?: PointStroke;
+  /**
+   * Where this layer's drawing sits relative to the other `<DataLayer>`s on the
+   * same map: higher draws on top, whatever order they happened to mount in.
+   *
+   * Layers that leave it out keep mount order relative to each other, and a map
+   * where nobody declares one is left exactly as the provider stacked it — so
+   * this is opt-in per map, and worth opting into wherever a layer can mount,
+   * unmount, and mount again while its neighbours stay put.
+   */
+  order?: number;
   /**
    * Tapers every line in the layer, widths interpolated between stops measured
    * along each line's own length. Like `stroke` it is uniform across the layer:
@@ -774,21 +1004,35 @@ export const DataLayer = ({
   points,
   lines,
   cluster = false,
+  clusterLabelFont = DEFAULT_CLUSTER_LABEL_FONT,
   stroke,
   lineWidthAlong,
+  order,
   onPointClick,
   onPointHover,
 }: DataLayerProps): React.JSX.Element => {
   const pointData = React.useMemo(() => (points ? toPointCollection(points) : null), [points]);
+  const taper = React.useMemo(
+    () => (lineWidthAlong ? toTaperStops(lineWidthAlong) : []),
+    [lineWidthAlong],
+  );
   // Data and layers are derived together: the layers depend on which dash
   // patterns the data uses, and memoising both keeps a re-render from looking
   // like a style change to the adapter.
   const lineDraw = React.useMemo(
+    () => (lines ? { data: toLineCollection(lines), layers: lineLayers(id, lines, taper) } : null),
+    [id, lines, taper],
+  );
+  const pointLayerIds = React.useMemo(
     () =>
-      lines
-        ? { data: toLineCollection(lines), layers: lineLayers(id, lines, lineWidthAlong) }
-        : null,
-    [id, lines, lineWidthAlong],
+      cluster
+        ? [`${id}-clusters`, `${id}-cluster-labels`, `${id}-point-circles`]
+        : [`${id}-point-circles`],
+    [id, cluster],
+  );
+  const lineLayerIds = React.useMemo(
+    () => lineDraw?.layers.map((layer) => layer.id) ?? [],
+    [lineDraw],
   );
 
   usePointInteractions(`${id}-point-circles`, onPointClick, onPointHover);
@@ -803,9 +1047,10 @@ export const DataLayer = ({
           cluster={cluster}
           {...(cluster ? { clusterMaxZoom: CLUSTER_MAX_ZOOM, clusterRadius: CLUSTER_RADIUS } : {})}
         >
-          {cluster ? <Layer {...clusterLayer(id)} /> : null}
-          {cluster ? <Layer {...clusterLabelLayer(id)} /> : null}
-          <Layer {...circleLayer(id, cluster, stroke)} />
+          {cluster ? <StyleLayer {...clusterLayer(id)} /> : null}
+          {cluster ? <StyleLayer {...clusterLabelLayer(id, clusterLabelFont)} /> : null}
+          <StyleLayer {...circleLayer(id, cluster, stroke)} />
+          <StackOrder group={0} ids={pointLayerIds} {...(order !== undefined ? { order } : {})} />
         </Source>
       ) : null}
       {lineDraw ? (
@@ -815,11 +1060,12 @@ export const DataLayer = ({
           data={lineDraw.data}
           // A taper is expressed as a fraction along each line, which the
           // provider can only measure if it is asked to.
-          {...(lineWidthAlong !== undefined ? { lineMetrics: true } : {})}
+          {...(taper.length > 0 ? { lineMetrics: true } : {})}
         >
           {lineDraw.layers.map((layer) => (
-            <Layer key={layer.id} {...layer} />
+            <StyleLayer key={layer.id} {...layer} />
           ))}
+          <StackOrder group={1} ids={lineLayerIds} {...(order !== undefined ? { order } : {})} />
         </Source>
       ) : null}
     </>

@@ -20,11 +20,17 @@ const WORKER_URL = "/vendor/maplibre-gl-worker.mjs";
 
 let applied = false;
 
-/** Idempotent, and must run before the first `new gl.Map(...)`. */
+/**
+ * Idempotent, and must run before the first `new gl.Map(...)`.
+ *
+ * The flag is set *after* the call, not before: if `setWorkerUrl` throws, the
+ * worker has not been installed, and marking it as done would leave every later
+ * map on the page silently falling back to the broken empty-worker path.
+ */
 export const installVendoredWorker = (): void => {
   if (applied) {
     return;
   }
-  applied = true;
   gl.setWorkerUrl(WORKER_URL);
+  applied = true;
 };

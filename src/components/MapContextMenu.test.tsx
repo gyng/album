@@ -7,7 +7,7 @@ import type { ReactNode } from "react";
 import { MapContextMenu } from "./MapContextMenu";
 
 const popupProps = jest.fn();
-jest.mock("./map/adapters/maplibre", () => ({
+jest.mock("./map", () => ({
   Popup: ({ children, ...props }: { children?: ReactNode }) => {
     popupProps(props);
     return <div data-testid="popup">{children}</div>;
@@ -69,14 +69,22 @@ describe("MapContextMenu", () => {
     expect(onInteractionStart).toHaveBeenCalledTimes(2);
     expect(onParentClick).not.toHaveBeenCalled();
     expect(onParentKeyDown).not.toHaveBeenCalled();
-    expect(popupProps).toHaveBeenCalledWith(
-      expect.objectContaining({
-        latitude: 1.234567,
-        longitude: 103.765432,
-        onClose,
-        closeButton: false,
-        closeOnClick: false,
-      }),
-    );
+    // The menu points at the coordinate it describes, and neither closes itself
+    // on a map click nor offers a dismiss button of its own — the map dismisses
+    // it, so a second piece of state to keep straight would buy nothing.
+    const props = popupProps.mock.calls.at(-1)?.[0] as {
+      at: { lng: number; lat: number };
+      offset: number;
+      onDismiss: () => void;
+      dismissOnMapClick?: boolean;
+      showCloseButton?: boolean;
+    };
+    expect(props.at).toEqual({ lng: 103.765432, lat: 1.234567 });
+    expect(props.offset).toBe(8);
+    expect(props.dismissOnMapClick).toBeUndefined();
+    expect(props.showCloseButton).toBeUndefined();
+
+    props.onDismiss();
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 });

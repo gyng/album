@@ -41,6 +41,8 @@ const mapHandlers: {
 } = {};
 const mapProps = jest.fn();
 const layerProps = new Map<string, { paint?: Record<string, unknown> }>();
+/** The popups the provider would close on the next map click. */
+const popupCloseOnMapClick = new Set<() => void>();
 
 const mapCanvas = document.createElement("div");
 const mapInstance = {
@@ -57,6 +59,10 @@ const mapInstance = {
   },
   on: jest.fn(),
   off: jest.fn(),
+  // Stacking: the port raises each declared group in turn, skipping any layer
+  // the style does not currently hold.
+  getLayer: jest.fn(() => ({})),
+  moveLayer: jest.fn(),
   project: jest.fn(([longitude, latitude]: [number, number]) => ({
     x: longitude * 100,
     y: latitude * 100,
@@ -149,16 +155,38 @@ jest.mock("./map/adapters/maplibre", () => {
       children,
       className,
       onClose,
+      closeOnClick,
     }: {
       children?: ReactNode;
       className?: string;
       onClose?: () => void;
-    }) => (
-      <div data-testid="popup" className={className}>
-        {children}
-        <button type="button" aria-label="Close popup" onClick={onClose} />
-      </div>
-    ),
+      closeOnClick?: boolean;
+    }) => {
+      const { useEffect } = require("react") as typeof import("react");
+      // MapLibre shuts a popup on the next map click unless told otherwise, and
+      // that default is the whole difficulty: a pin's click and the map's click
+      // are one gesture, so a popup opened by that click would report itself
+      // dismissed before the reader ever saw it. Modelled here so the map's own
+      // dismissal is tested against the provider's behaviour, not around it.
+      useEffect(() => {
+        if (closeOnClick === false || !onClose) {
+          return;
+        }
+
+        popupCloseOnMapClick.add(onClose);
+
+        return () => {
+          popupCloseOnMapClick.delete(onClose);
+        };
+      }, [closeOnClick, onClose]);
+
+      return (
+        <div data-testid="popup" className={className}>
+          {children}
+          <button type="button" aria-label="Close popup" onClick={onClose} />
+        </div>
+      );
+    },
     ScaleControl: () => null,
     NavigationControl: () => null,
     GeolocateControl: () => null,
@@ -192,6 +220,7 @@ const JOURNEY_SOURCE_ID = "journey-line-lines";
 const JOURNEY_GLOW_SOURCE_ID = "journey-line-glow-lines";
 const JOURNEY_LAYER_ID = "journey-line-line-strokes";
 const JOURNEY_DASHED_LAYER_ID = "journey-line-line-strokes-2-2";
+const JOURNEY_GLOW_LAYER_ID = "journey-line-glow-line-strokes";
 
 type JourneyLineProperties = {
   id: string;
@@ -228,22 +257,60 @@ const pinLayerListener = (type: "click" | "mousemove"): PinLayerListener => {
   return listener;
 };
 
-const firePin = (type: "click" | "mousemove", photo: MapWorldEntry) => {
+/**
+ * Everything one click on the map surface sets off, in the order a real map
+ * does it: the map's own click event, then the layer reporting whatever feature
+ * was under the pointer, then the provider shutting the popups that were
+ * already open, and finally the click reaching the gesture surface — which is
+ * where the application gets to decide whether the click landed on anything.
+ */
+const clickGesture = (at: { lng: number; lat: number }, hitPin?: () => void) => {
+  const alreadyOpen = [...popupCloseOnMapClick];
   act(() => {
-    pinLayerListener(type)({
+    fireEvent(mapCanvas, new MouseEvent("pointerdown"));
+  });
+  act(() => {
+    mapHandlers.onClick?.({
+      lngLat: at,
+      point: { x: 0, y: 0 },
+      originalEvent: new MouseEvent("click"),
+    });
+    hitPin?.();
+    alreadyOpen.forEach((close) => {
+      close();
+    });
+  });
+  act(() => {
+    fireEvent.click(mapCanvas);
+  });
+};
+
+const clickPin = (photo: MapWorldEntry) => {
+  clickGesture({ lng: photo.decLng ?? 0, lat: photo.decLat ?? 0 }, () => {
+    pinLayerListener("click")({
       lngLat: { lng: photo.decLng ?? 0, lat: photo.decLat ?? 0 },
       features: [{ properties: { id: photo.href } }],
     });
   });
 };
 
-const clickPin = (photo: MapWorldEntry) => {
-  firePin("click", photo);
+/** A click that lands on the basemap and nothing else. */
+const clickEmptyMap = () => {
+  clickGesture({ lng: 0, lat: 0 });
 };
 
 const hoverPin = (photo: MapWorldEntry) => {
-  firePin("mousemove", photo);
+  act(() => {
+    pinLayerListener("mousemove")({
+      lngLat: { lng: photo.decLng ?? 0, lat: photo.decLat ?? 0 },
+      features: [{ properties: { id: photo.href } }],
+    });
+  });
 };
+
+/** The layers the port has restacked, in the order it moved them. */
+const restackedLayers = (): string[] =>
+  (mapInstance.moveLayer.mock.calls as unknown as [string][]).map(([layerId]) => layerId);
 
 jest.mock("usehooks-ts", () => ({
   useIntersectionObserver: () => ({
@@ -299,6 +366,8 @@ describe("MapWorld", () => {
     mapInstance.project.mockClear();
     mapInstance.getBounds.mockClear();
     mapInstance.jumpTo.mockClear();
+    mapInstance.moveLayer.mockClear();
+    popupCloseOnMapClick.clear();
     mapInstance.dragPan.disable.mockClear();
     mapInstance.dragPan.enable.mockClear();
     replaceStateSpy = jest.spyOn(window.history, "replaceState").mockImplementation(() => {});
@@ -773,13 +842,7 @@ describe("MapWorld", () => {
       }),
     );
     expect(screen.getByRole("group", { name: "Location actions" })).toBeInTheDocument();
-    act(() =>
-      mapHandlers.onClick?.({
-        lngLat: { lat: 1, lng: 2 },
-        point: { x: 3, y: 4 },
-        originalEvent: new MouseEvent("click"),
-      }),
-    );
+    clickEmptyMap();
     expect(screen.queryByRole("group", { name: "Location actions" })).toBeNull();
 
     act(() =>
@@ -796,6 +859,95 @@ describe("MapWorld", () => {
     expect(screen.queryByTestId("journey-line-overlay")).toBeNull();
     act(() => mapHandlers.onDragStart?.({ viewState: { latitude: 1, longitude: 2, zoom: 3 } }));
     act(() => mapHandlers.onWheel?.({ originalEvent: new WheelEvent("wheel") }));
+  });
+
+  it("opens the selected photo's popup from the same tap the map also hears", () => {
+    // A pin's click and the map's click are one gesture. The map reports the
+    // feature under the pointer, the provider offers to shut whatever popup was
+    // open, and the click then reaches the surface — all before the reader has
+    // let go. Any of those steps clearing the selection loses the selected
+    // popup, and with it the external map links and the route emphasis.
+    render(
+      <MMap
+        photos={[
+          photo,
+          {
+            ...photo,
+            href: "/album/kansai#two.jpg",
+            src: { src: "/photo-2.jpg", width: 100, height: 100 },
+            decLat: 36.8,
+            decLng: 140.8,
+            date: "2024-01-02T06:14:05.000Z",
+          },
+        ]}
+        className="map"
+      />,
+    );
+
+    // Moving onto the pin first is the ordinary desktop path, and it is what
+    // leaves a popup open for the click to shut.
+    hoverPin(photo);
+    clickPin(photo);
+
+    expect(screen.getByRole("link", { name: /kansai/i })).toHaveAttribute("href", photo.href);
+    expect(screen.getByTestId("popup").className).toContain("click");
+    expect(screen.getByRole("link", { name: /Google Maps/ })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /OpenStreetMap/ })).toBeInTheDocument();
+    // The selection is what emphasises the photo's own journey.
+    expect(screen.getByTestId("journey-line-overlay")).toBeInTheDocument();
+  });
+
+  it("keeps the location menu open when the next click lands on a pin", () => {
+    render(<MMap photos={[photo]} className="map" />);
+
+    act(() =>
+      mapHandlers.onContextMenu?.({
+        lngLat: { lat: 1, lng: 2 },
+        point: { x: 3, y: 4 },
+        originalEvent: { preventDefault: jest.fn() },
+      }),
+    );
+    expect(screen.getByRole("group", { name: "Location actions" })).toBeInTheDocument();
+
+    clickPin(photo);
+    expect(screen.getByRole("group", { name: "Location actions" })).toBeInTheDocument();
+
+    // Only a click that lands on nothing puts the map's overlays away.
+    clickEmptyMap();
+    expect(screen.queryByRole("group", { name: "Location actions" })).toBeNull();
+    expect(screen.queryByRole("link", { name: /kansai/i })).toBeNull();
+  });
+
+  it("keeps the photo pins above the journey lines a selection brings back", () => {
+    render(
+      <MMap
+        photos={[
+          photo,
+          {
+            ...photo,
+            href: "/album/kansai#two.jpg",
+            src: { src: "/photo-2.jpg", width: 100, height: 100 },
+            decLat: 36.8,
+            decLng: 140.8,
+            date: "2024-01-02T06:14:05.000Z",
+          },
+        ]}
+        className="map"
+      />,
+    );
+
+    // Selecting a pin mounts the journey lines, which a provider appends on top
+    // of whatever is already drawn — burying the pins the reader is aiming at.
+    clickPin(photo);
+
+    const stack = restackedLayers();
+    expect(stack.at(-1)).toBe(PIN_LAYER_ID);
+    expect(stack.lastIndexOf(JOURNEY_DASHED_LAYER_ID)).toBeLessThan(
+      stack.lastIndexOf(PIN_LAYER_ID),
+    );
+    expect(stack.lastIndexOf(JOURNEY_GLOW_LAYER_ID)).toBeLessThan(
+      stack.lastIndexOf(JOURNEY_DASHED_LAYER_ID),
+    );
   });
 
   it("cycles stacked photos and changes stacks from the current selection", () => {
@@ -827,7 +979,7 @@ describe("MapWorld", () => {
       "href",
       elsewhereOne.href,
     );
-    fireEvent.click(screen.getByRole("button", { name: "Close popup" }));
+    clickEmptyMap();
     expect(screen.queryByRole("link", { name: /kansai/i })).toBeNull();
   });
 

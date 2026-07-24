@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { expectMapLoaded } from "./map-loaded";
 import { stubExternalMapAssets } from "./map-network";
 
 test.describe("Smoke Tests", () => {
@@ -42,10 +43,17 @@ test.describe("Smoke Tests", () => {
     expect(await photos.count()).toBeGreaterThan(0);
   });
 
-  test("map page loads with canvas", async ({ page }) => {
+  test("map page loads a map that really rendered", async ({ page }) => {
     await page.goto("/map", { waitUntil: "domcontentloaded" });
     await expect(page).toHaveTitle("Map | Snapshots");
     await expect(page.locator("canvas").first()).toBeVisible();
+
+    // The canvas above exists from the moment the map is constructed, and so do
+    // the port's children, so both stay put even when the tile worker is dead.
+    // Only the load status distinguishes a rendered map from a blank one — and
+    // the smoke suite is the only map coverage Firefox and WebKit get, so it
+    // has to ask for the real thing.
+    await expectMapLoaded(page);
   });
 
   test("search page loads", async ({ page, browserName }) => {
@@ -76,6 +84,11 @@ test.describe("Smoke Tests", () => {
     // Filter indicator toast appears with album name
     await expect(page.locator("i", { hasText: "test-simple" })).toBeVisible();
     expect(page.url()).toContain("filter_album=test-simple");
+
+    // The toast is page chrome outside <MapView>, so asserting it alone stays
+    // green when the map itself renders nothing. Gate on the load status so the
+    // album-filtered map path is guarded too.
+    await expectMapLoaded(page);
   });
 
   test("photo deep-link scrolls to photo", async ({ page }) => {

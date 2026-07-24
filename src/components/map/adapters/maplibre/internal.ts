@@ -5,6 +5,12 @@ import type { MapRef } from "./types";
  * Whether the map can still take style mutations. React destroys a parent's
  * effects before its children's, so a `<Source>` or `<Layer>` cleanup can run
  * after `<MapView>` has already removed the map.
+ *
+ * This reads two properties MapLibre marks internal — `map._removed` and
+ * `map.style._loaded` — because it has no public equivalent: `map.loaded()`
+ * also waits for tiles, and `map.isStyleLoaded()` throws once the map is gone.
+ * Both are declared in MapLibre's own `.d.ts`, so a rename is a type error
+ * rather than a silent one, and `internal.test.ts` pins the behaviour.
  */
 export const isStyleUsable = (map: MapRef | null): map is MapRef => {
   if (!map || map._removed) {
@@ -66,15 +72,38 @@ export const deepEqual = (a: unknown, b: unknown): boolean => {
   return false;
 };
 
-let idCounter = 0;
+/** `useId` returns a token full of punctuation; style-spec ids read better without it. */
+const toIdFragment = (id: string): string => id.replace(/[^a-zA-Z0-9_-]/g, "");
 
-/** The caller's id, or a stable generated one for anonymous sources and layers. */
+/**
+ * The caller's id, or a stable generated one for anonymous sources and layers.
+ *
+ * `React.useId` rather than a module-level counter: a counter is mutated during
+ * render, so a render React abandons (or replays under concurrent rendering)
+ * burns an id, and two components can end up disagreeing about which id each of
+ * them owns.
+ */
 export const useGeneratedId = (prefix: string, id: string | undefined): string => {
-  const generated = React.useRef<string | null>(null);
-  if (generated.current === null) {
-    idCounter += 1;
-    generated.current = `${prefix}-${idCounter}`;
-  }
+  const generated = React.useId();
 
-  return id ?? generated.current;
+  return id ?? `${prefix}-${toIdFragment(generated)}`;
+};
+
+/**
+ * The latest committed props, for effects and long-lived event listeners to read.
+ *
+ * Written from an effect rather than during render: a render React abandons must
+ * not be able to publish props that were never committed, or a listener
+ * registered once — a marker's `click`, say — would act on a state the reader
+ * never saw. Hooks run in call order, so calling this first in a component
+ * guarantees the ref is current before any of that component's other effects.
+ */
+export const useLatestRef = <T>(value: T): React.RefObject<T> => {
+  const ref = React.useRef(value);
+
+  React.useEffect(() => {
+    ref.current = value;
+  });
+
+  return ref;
 };

@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { expectMapLoaded } from "./map-loaded";
 import { stubExternalMapAssets } from "./map-network";
 
 test.describe("Map time range slider", () => {
@@ -10,6 +11,11 @@ test.describe("Map time range slider", () => {
     await page.goto("/map?from=2020-01-01&to=2025-01-01", {
       waitUntil: "domcontentloaded",
     });
+
+    // The slider is page chrome: it renders, clears and rewrites the URL even
+    // when the map beside it is a blank canvas. Filtering a map nobody can see
+    // is not the feature, so require a live map before exercising the control.
+    await expectMapLoaded(page);
 
     const clearButton = page.getByRole("button", { name: "Clear date filter" });
     await expect(clearButton).toBeVisible({ timeout: 10_000 });

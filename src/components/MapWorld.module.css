@@ -271,6 +271,23 @@
   opacity: 0.9;
 }
 
+/* Keyboard and screen-reader access to the pins drawn on the GPU. The points
+   themselves are pixels on a canvas — nothing to focus, nothing to announce —
+   so the photos in view are offered again here as real buttons. Hidden from
+   sight because the map already shows them, but reachable by tab: focusing one
+   opens its popup on the map. */
+.keyboardPins {
+  position: absolute;
+  inline-size: var(--size-1);
+  block-size: var(--size-1);
+  margin: calc(var(--size-1) * -1);
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
 .pinMuted {
   opacity: 0.28;
 }

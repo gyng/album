@@ -7,8 +7,12 @@ import type { ReactNode } from "react";
 import type { MapWorldEntry } from "../util/pageDataTypes";
 import { MapPhotoPopup } from "./MapPhotoPopup";
 
-jest.mock("./map/adapters/maplibre", () => ({
-  Popup: ({ children }: { children?: ReactNode }) => <div data-testid="popup">{children}</div>,
+const popupProps = jest.fn();
+jest.mock("./map", () => ({
+  Popup: ({ children, ...props }: { children?: ReactNode }) => {
+    popupProps(props);
+    return <div data-testid="popup">{children}</div>;
+  },
 }));
 
 jest.mock("../util/time", () => ({
@@ -25,6 +29,33 @@ const photo: MapWorldEntry = {
 };
 
 describe("MapPhotoPopup", () => {
+  beforeEach(() => popupProps.mockClear());
+
+  it("points at the photo without taking the map's click-away for itself", () => {
+    const onClose = jest.fn();
+    render(
+      <MapPhotoPopup photo={photo} selected onClose={onClose} onInteractionStart={jest.fn()} />,
+    );
+
+    // A pin's click and the map's click are the same gesture, so a popup that
+    // dismissed itself on a map click would shut the moment the tap that opened
+    // it finished. Dismissal belongs to the map, which can tell the two apart.
+    const props = popupProps.mock.calls.at(-1)?.[0] as {
+      at: { lng: number; lat: number };
+      offset: number;
+      onDismiss: () => void;
+      dismissOnMapClick?: boolean;
+      showCloseButton?: boolean;
+    };
+    expect(props.at).toEqual({ lng: 139.6503, lat: 35.6762 });
+    expect(props.offset).toBe(15);
+    expect(props.dismissOnMapClick).toBeUndefined();
+    expect(props.showCloseButton).toBeUndefined();
+
+    props.onDismiss();
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
   it("renders selected-photo details and pauses route sync before link interaction", () => {
     const onInteractionStart = jest.fn();
 

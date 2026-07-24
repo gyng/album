@@ -1,7 +1,13 @@
 import React from "react";
 import type { AddLayerObject, FilterSpecification, LayerSpecification } from "./engine";
-import { SourceIdContext, useAttachedMap } from "./context";
-import { deepEqual, isStyleUsable, useGeneratedId, useStyleVersion } from "./internal";
+import { SourceContext, useAttachedMap } from "./context";
+import {
+  deepEqual,
+  isStyleUsable,
+  useGeneratedId,
+  useLatestRef,
+  useStyleVersion,
+} from "./internal";
 import type { MapRef } from "./types";
 
 type OptionalId<T> = T extends { id: string } ? Omit<T, "id"> & { id?: string } : T;
@@ -65,13 +71,33 @@ const toAddLayerObject = (props: LayerProps, id: string, source: string | null):
 };
 
 export const Layer = (props: LayerProps): null => {
+  const propsRef = useLatestRef(props);
   const map = useAttachedMap();
   const styleVersion = useStyleVersion(map);
   const view = asLayerView(props);
   const id = useGeneratedId("jsx-layer", view.id);
-  const sourceId = React.useContext(SourceIdContext);
-  const propsRef = React.useRef(props);
+  const attachment = React.useContext(SourceContext);
+  const sourceId = attachment?.id ?? null;
+  // Bumped by the enclosing <Source> only once the source is back on the map,
+  // which is what keeps a re-add after a style rebuild in the right order.
+  const sourceGeneration = attachment?.generation ?? 0;
+  const registerLayer = attachment?.registerLayer;
+  const unregisterLayer = attachment?.unregisterLayer;
   const previousViewRef = React.useRef(view);
+
+  // Announced to the enclosing source for the whole lifetime of the component,
+  // added or not: the source sweeps by id and checks the style itself.
+  React.useEffect(() => {
+    if (!registerLayer || !unregisterLayer) {
+      return;
+    }
+
+    registerLayer(id);
+
+    return () => {
+      unregisterLayer(id);
+    };
+  }, [id, registerLayer, unregisterLayer]);
 
   // Adding is separate from removing: `styleVersion` re-adds a layer that a
   // style reload dropped, but must never tear down a healthy one.
@@ -81,10 +107,18 @@ export const Layer = (props: LayerProps): null => {
     }
 
     const current = propsRef.current;
+    const resolvedSource = asLayerView(current).source ?? sourceId;
+    // MapLibre rejects a layer whose source is not in the style and does not
+    // retry, so the add waits instead: the enclosing source bumps its
+    // generation once it is back, and that re-runs this effect.
+    if (resolvedSource !== null && !map.getSource(resolvedSource)) {
+      return;
+    }
+
     const beforeId = asLayerView(current).beforeId;
     map.addLayer(toAddLayerObject(current, id, sourceId), beforeId);
     previousViewRef.current = asLayerView(current);
-  }, [map, id, sourceId, styleVersion]);
+  }, [map, id, sourceId, sourceGeneration, styleVersion, propsRef]);
 
   React.useEffect(() => {
     if (!map) {
@@ -102,8 +136,6 @@ export const Layer = (props: LayerProps): null => {
   const { paint, layout, filter, minzoom, maxzoom, beforeId } = view;
 
   React.useEffect(() => {
-    propsRef.current = props;
-
     if (!isStyleUsable(map) || !map.getLayer(id)) {
       return;
     }

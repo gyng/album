@@ -10,6 +10,9 @@ const mapProps = jest.fn();
 const dataLayerProps = jest.fn();
 jest.mock("./map", () => ({
   __esModule: true,
+  // The port's own defaults, which this map deliberately draws its points with.
+  DEFAULT_POINT_COLOUR: "rgb(230, 32, 101)",
+  DEFAULT_POINT_RADIUS: 5,
   MapView: ({ children, ...props }: { children?: ReactNode }) => {
     mapProps(props);
     return <div data-testid="stats-map">{children}</div>;

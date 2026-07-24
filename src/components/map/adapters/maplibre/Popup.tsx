@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import { gl } from "./engine";
 import type { GlPopup, PopupOptions } from "./engine";
 import { useAttachedMap } from "./context";
-import { deepEqual } from "./internal";
+import { deepEqual, useLatestRef } from "./internal";
 
 export type PopupEvent = {
   type: "open" | "close";
@@ -24,21 +24,19 @@ const PopupImpl = (
   props: PopupProps,
   ref: React.ForwardedRef<GlPopup | null>,
 ): React.JSX.Element | null => {
+  const propsRef = useLatestRef(props);
   const map = useAttachedMap();
-  const propsRef = React.useRef(props);
   const previousPropsRef = React.useRef(props);
-  propsRef.current = props;
 
   // A stable container the popup renders through, so React owns the content and
   // MapLibre owns the positioning.
   const container = React.useMemo(() => document.createElement("div"), []);
-  const popup = React.useMemo(() => {
-    const initial = propsRef.current;
-    const instance = new gl.Popup({ ...initial });
-    instance.setLngLat([initial.longitude, initial.latitude]);
+  const [popup] = React.useState<GlPopup>(() => {
+    const instance = new gl.Popup({ ...props });
+    instance.setLngLat([props.longitude, props.latitude]);
 
     return instance;
-  }, []);
+  });
 
   React.useEffect(() => {
     if (!map) {
@@ -65,7 +63,7 @@ const PopupImpl = (
         popup.remove();
       }
     };
-  }, [map, popup, container]);
+  }, [map, popup, container, propsRef]);
 
   React.useImperativeHandle(ref, () => popup, [popup]);
 
@@ -74,15 +72,31 @@ const PopupImpl = (
   // `anchor` is a construction-time option here — no call site changes it after
   // mount, and MapLibre only reads it while placing an open popup.
   React.useEffect(() => {
-    if (!popup.isOpen()) {
-      return;
-    }
-
     const previous = previousPropsRef.current;
     const position = popup.getLngLat();
-    if (position.lng !== longitude || position.lat !== latitude) {
+    const moved = position.lng !== longitude || position.lat !== latitude;
+    if (moved) {
       popup.setLngLat([longitude, latitude]);
     }
+
+    if (!popup.isOpen()) {
+      // MapLibre closes popups behind React's back: `closeOnClick` (on by
+      // default), `closeOnMove`, and the close button all call `remove()`
+      // themselves. Nothing here re-adds it, so a component whose consumer did
+      // not unmount on `onClose` would stay mounted and permanently invisible.
+      //
+      // Moving the anchor is an unambiguous request for a popup *here*, so that
+      // is the one signal that puts it back; a popup dismissed where it stands
+      // stays dismissed, and `closeOnClick` still means what it says. Nothing is
+      // recorded as applied either, so the pending offset/class differences are
+      // still waiting when it does come back.
+      if (!moved || !map) {
+        return;
+      }
+
+      popup.addTo(map);
+    }
+
     if (offset !== undefined && !deepEqual(previous.offset, offset)) {
       popup.setOffset(offset);
     }
@@ -99,7 +113,7 @@ const PopupImpl = (
     }
 
     previousPropsRef.current = propsRef.current;
-  }, [popup, longitude, latitude, offset, maxWidth, className]);
+  }, [map, popup, longitude, latitude, offset, maxWidth, className, propsRef]);
 
   if (!map) {
     return null;

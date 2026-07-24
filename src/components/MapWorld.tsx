@@ -12,6 +12,7 @@ import {
   MapView,
   NavigationControl,
   ScaleControl,
+  useMap,
 } from "./map";
 import { ThemeToggle } from "./ThemeToggle";
 import {
@@ -133,6 +134,68 @@ const readStringProperty = (
   return typeof value === "string" ? value : undefined;
 };
 
+/**
+ * Where each of the map's data layers draws, so stacking is declared rather
+ * than inherited from whatever mounted last. Selecting a pin rebuilds the
+ * journey lines, and without an order that remount would put them over the pins
+ * the reader is aiming at.
+ */
+const LAYER_ORDER = {
+  journeyGlow: 10,
+  journeyLine: 20,
+  /** The pins, and — one below — their coarse-pointer tap targets. */
+  photoMarkers: 40,
+} as const;
+
+/**
+ * Dismisses the map's overlays when a click lands on nothing.
+ *
+ * A pin's click and the map's click are one gesture: the map reports the
+ * feature under the pointer while it is still dispatching that click, so
+ * anything hung off the map's own click event would clear the very selection
+ * the tap just made — and would clear the location menu on the way past too.
+ *
+ * Listening on the gesture surface runs after the map has finished dispatching,
+ * by which point a pin has had its say and `onGestureClick` can tell an empty
+ * click from a pin's. A DOM marker stops its click at its own element, so one
+ * never arrives here at all; `onGestureStart` opens each gesture with a clean
+ * slate so a click that was swallowed cannot leave a stale claim behind.
+ */
+const MapClickAway = ({
+  onGestureStart,
+  onGestureClick,
+}: {
+  onGestureStart: () => void;
+  onGestureClick: () => void;
+}) => {
+  const map = useMap();
+  const handlersRef = React.useRef({ onGestureStart, onGestureClick });
+  handlersRef.current = { onGestureStart, onGestureClick };
+
+  React.useEffect(() => {
+    if (!map) {
+      return;
+    }
+
+    const surface = map.getGestureSurface();
+    const start = () => {
+      handlersRef.current.onGestureStart();
+    };
+    const click = () => {
+      handlersRef.current.onGestureClick();
+    };
+    surface.addEventListener("pointerdown", start);
+    surface.addEventListener("click", click);
+
+    return () => {
+      surface.removeEventListener("pointerdown", start);
+      surface.removeEventListener("click", click);
+    };
+  }, [map]);
+
+  return null;
+};
+
 export const MMap: React.FC<MapWorldProps> = ({
   photos,
   className,
@@ -198,12 +261,28 @@ export const MMap: React.FC<MapWorldProps> = ({
   const debounceTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const pauseUntilRef = React.useRef<number>(0);
   const popupInfo = clickInfo ?? hoverInfo;
+  // Whether the gesture being dispatched has already landed on a pin. Read by
+  // the click-away listener, which runs once the map is done dispatching.
+  const pinClickedRef = React.useRef(false);
+  const beginMapGesture = React.useCallback(() => {
+    pinClickedRef.current = false;
+  }, []);
+  const dismissOnEmptyClick = React.useCallback(() => {
+    if (pinClickedRef.current) {
+      pinClickedRef.current = false;
+      return;
+    }
+
+    setClickInfo(null);
+    setContextPoint(null);
+  }, []);
   // Without clustering, many photos can share the same pixel and only the
   // topmost marker intercepts a tap. As a minimal mitigation, repeated clicks
   // on a stacked location cycle through every co-located photo so occluded
   // ones are still reachable. Uses the functional updater so it reads the
   // current selection without capturing it.
   const selectMarker = (photo: MapWorldEntry) => {
+    pinClickedRef.current = true;
     stopDirector();
     setClickInfo((current) => {
       const coLocated = visiblePhotos.filter(
@@ -531,9 +610,6 @@ export const MMap: React.FC<MapWorldProps> = ({
             setContextPoint(null);
             setIsInteracting(true);
           }}
-          onClick={() => {
-            setContextPoint(null);
-          }}
           onContextMenu={(event) => {
             event.originalEvent.preventDefault();
             stopDirector();
@@ -563,6 +639,7 @@ export const MMap: React.FC<MapWorldProps> = ({
           <MapFitOnRequest requestId={fitRequestId} photos={photos} />
           <MapBoundsTracker onBoundsChange={setBounds} />
           <MapMiddleDragOrbit onInteractionStart={stopDirector} />
+          <MapClickAway onGestureStart={beginMapGesture} onGestureClick={dismissOnEmptyClick} />
           <MapDirector
             enabled={directorEnabled}
             sequence={directorSequence}
@@ -573,11 +650,13 @@ export const MMap: React.FC<MapWorldProps> = ({
               <DataLayer
                 id="journey-line-glow"
                 lines={journeyLines.glow}
+                order={LAYER_ORDER.journeyGlow}
                 {...(isMultiAlbumJourney ? { lineWidthAlong: JOURNEY_GLOW_TAPER } : {})}
               />
               <DataLayer
                 id="journey-line"
                 lines={journeyLines.line}
+                order={LAYER_ORDER.journeyLine}
                 {...(isMultiAlbumJourney ? { lineWidthAlong: JOURNEY_LINE_TAPER } : {})}
               />
             </>
@@ -610,11 +689,13 @@ export const MMap: React.FC<MapWorldProps> = ({
           />
 
           <MapPhotoMarkers
-            photos={visiblePhotos}
+            photos={photosWithStyles}
+            visiblePhotos={visiblePhotos}
             showMarkerImages={showMarkerImages}
             previewMarkers={previewMarkers}
             emphasiseRoute={shouldEmphasizeRouteMarkers}
             activeRouteHrefSet={activeRouteHrefSet}
+            order={LAYER_ORDER.photoMarkers}
             onSelect={selectMarker}
             onHover={setHoverInfo}
           />

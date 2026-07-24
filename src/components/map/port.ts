@@ -74,9 +74,14 @@ export interface MapProjection {
   unproject(at: ScreenPoint): LngLat;
 }
 
-/** Events that only report where the camera ended up. */
+/**
+ * Events that only report where the camera ended up.
+ *
+ * There is deliberately no `load`: a `MapInstance` only exists once the map has
+ * loaded, and every child mounts after that, so a listener attached here could
+ * never fire. `MapView`'s `onLoad` is how loading is heard about.
+ */
 export type MapCameraEventName =
-  | "load"
   | "movestart"
   | "move"
   | "moveend"
@@ -110,7 +115,6 @@ export type MapWheelEvent = {
 
 /** The payload each subscribable event carries. */
 export type MapEventMap = {
-  load: MapCameraEvent;
   movestart: MapCameraEvent;
   move: MapCameraEvent;
   moveend: MapCameraEvent;
@@ -206,6 +210,23 @@ export type PointFeature = {
    */
   opacity?: number;
 };
+
+/** The colour a point is drawn in when it carries none of its own. */
+export const DEFAULT_POINT_COLOUR = "rgb(230, 32, 101)";
+
+/** The radius, in pixels, a point is drawn at when it carries none of its own. */
+export const DEFAULT_POINT_RADIUS = 5;
+
+/**
+ * The font a cluster's count is lettered in when the caller names none.
+ *
+ * A font stack is not decoration: a provider can only letter with faces its
+ * style ships glyphs for, and asking for one it does not have draws nothing at
+ * all rather than falling back. This is the face the MapTiler styles this site
+ * uses provide — any other style has to name its own through
+ * `DataLayer`'s `clusterLabelFont`.
+ */
+export const DEFAULT_CLUSTER_LABEL_FONT: readonly string[] = ["Noto Sans Bold"];
 
 /** The point a pointer interaction landed on. */
 export type PointFeatureHit = {
