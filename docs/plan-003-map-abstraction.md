@@ -384,6 +384,62 @@ only test that caught it was the slideshow mini-map, which happens to use the re
 Any map spec that stubs its sources away can only prove the map *mounts*, never that it *renders*.
 At least one map test must run against a style with real sources so a dead tile pipeline is fatal.
 
+## Zoomed-in thumbnail path — profiling (pre-optimisation baseline)
+
+Above zoom 8.5 photos stop being GPU circles and become DOM `<Marker>`s with an 80px `<img>`
+thumbnail (`MapPhotoMarker` + `LazyMapMarkerImage`, shared IntersectionObserver, bounds-filtered
+and `moveend`-gated). This is a different cost shape from the world-zoom path above, so it was
+profiled separately before any optimisation. Same rig as *Performance evidence* — SwiftShader
+renderer, so absolute ms are inflated and only the deltas transfer — over dense central Tokyo.
+
+**Method correction worth keeping:** `panBy({ duration: 0 })` per frame fires a `moveend` every
+frame, rebuilding the whole marker list each frame — which a real drag never does. Numbers below
+are from a faithful synthetic pointer-drag (one `movestart`/`moveend`); the gap to the panBy rig
+*is* the per-`moveend` reconciliation cost.
+
+| Zoom | Markers | imgs loaded | p50 (ms) | mutations/frame | image cost (A−B) |
+| --- | --- | --- | --- | --- | --- |
+| 9 | 229 | 196 | 116.7 | 280 | +20ms |
+| 11 | 65 | 65 | 83.3 | 86 | +0ms |
+| 13 | 40 | 25 | 133.3 | 52 | +23ms |
+
+Cost decomposition (each control same-zoom, dense Tokyo):
+
+- **Vector-tile rasterisation dominates and is not app code** — 55–90ms/frame of SwiftShader
+  raster (Beijing 55, Shanghai 69, Seoul 85 at z13 with *zero* photos). This is why z13 with 40
+  markers runs slower than z11 with 65.
+- **DOM marker `transform` writes are the dominant app-controllable cost** — ~0.2–0.35ms per
+  marker per frame, i.e. ~22ms (z11, 65) to ~40ms (z9, 229). It is pure per-frame transform churn
+  (mutations), **not** paint or layout: hiding the whole marker leaves the mutation count
+  unchanged.
+- **Marker paint/layout: ≈0. Image decode: a post-gesture burst** — because the list is
+  `moveend`-gated, new thumbnails mount only after you stop (a fresh jump decoded ~60 images / 10
+  long tasks / ~1.2s, entirely in the settle, ~0 image requests during the drag). It affects how
+  fast the map fills in after release, not pan smoothness.
+- **React reconciliation on `moveend`** is real but fires once per gesture normally.
+
+**Verdict.** The path is not broken at typical zoomed-in counts — z11 (65 markers, all loaded)
+carries only ~16–22ms of app overhead and images add nothing; most of the frame is the non-app
+tile floor. The one genuinely weak spot is a **low thumbnail zoom (~z9) over a dense metro (~229
+markers, ~40ms overhead)**.
+
+Optimisation candidates, by value:
+
+1. **Clustering, or nudging `MARKER_IMAGE_ZOOM_THRESHOLD` up** — attacks the z9 worst case roughly
+   linearly (~40ms recoverable), cheapest and lowest-risk. Little to gain at z11+ where counts are
+   already small.
+2. **MapLibre symbol layer with `icon-image` (GPU thumbnails)** — removes both the transform
+   writes and the reconciliation; collapses to the tile floor here (z9 113→~73). The biggest
+   structural win, but masked by SwiftShader — its real payoff only shows once real-GPU profiling
+   confirms the marker delta dominates after the tile floor drops. Costs the per-marker DOM
+   richness and lazy-load.
+3. **Virtualising the DOM markers is already effectively done** (bounds + 100px + `moveend`-gated;
+   40–229 mount, not ~1400). Little further headroom.
+4. **decode hints / smaller thumbnails** help only the post-`moveend` fill-in burst, not the pan.
+
+Recommendation: if optimising, start with (1) for the dense-metro low-zoom case; only take (2) on
+evidence from a real-GPU profile, not this software-rendered one.
+
 ## Phase 3 (deferred): a second adapter
 
 Not built now. Adding one — `mapbox-gl` is nearly free via seam 1; a non-GL provider is not —
