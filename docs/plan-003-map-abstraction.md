@@ -440,6 +440,46 @@ Optimisation candidates, by value:
 Recommendation: if optimising, start with (1) for the dense-metro low-zoom case; only take (2) on
 evidence from a real-GPU profile, not this software-rendered one.
 
+### Re-profiled on real GPU, and a symbol-layer prototype — verdict: don't build it
+
+The software-rendered numbers above inflate the tile floor and understate the marker share, so
+the symbol-layer question was settled on real hardware: Playwright's Chromium forced onto the
+NVIDIA GPU via WSLg — `UNMASKED_RENDERER = ANGLE (Microsoft, D3D12 (NVIDIA GeForce RTX 3080),
+OpenGL 4.6)`. The recipe (recorded so it is reproducible): **headed** (`headless: false`,
+`DISPLAY=:0`), env `GALLIUM_DRIVER=d3d12 LD_LIBRARY_PATH=/usr/lib/wsl/lib`, Chromium args
+`--use-gl=angle --use-angle=gl --ignore-gpu-blocklist --enable-gpu-rasterization
+--disable-gpu-vsync`. Default flags and `--use-angle=vulkan` fall back to SwiftShader or llvmpipe;
+GPU Vulkan is unreachable in WSL (the NVIDIA ICD is a Windows DLL), but GPU GL via D3D12 works,
+which is all MapLibre needs. p50 is the load-bearing figure — mean/p95 on the live preview are
+dominated by tile/network stalls that neither path removes; deltas are same-pose so the tile
+floor cancels.
+
+| Zoom | DOM p50 (real GPU) | symbol-layer p50 | no-marker floor | saving (DOM − symbol) |
+| --- | --- | --- | --- | --- |
+| 9 (≈262 markers) | 14.4ms | 5.0ms | 4.3ms | **9.4ms** |
+| 11 (≈41) | 3.4ms | 2.5ms | 2.3ms | 0.9ms |
+| 13 (≈41) | 4.5ms | 3.5ms | 2.7ms | 1.0ms |
+
+What real hardware showed:
+
+- **The tile floor collapsed** from 34–90ms (SwiftShader) to a 2.3–4.3ms CPU floor — so the
+  premise for re-measuring was right.
+- **Per-marker DOM cost is ~6–9× cheaper than the software profile implied** — ~0.039ms/marker
+  (10ms for 262) versus the 0.2–0.35ms above. SwiftShader *overstated* the marker delta.
+- **The symbol layer does remove the transform churn** — mutations/frame 391 → 1, cost collapses
+  onto the floor. But the saving is only material at the z9 dense-metro worst case (9.4ms), where
+  the DOM path *already* runs at ~69fps; at typical zoomed-in counts it saves ~1ms, imperceptible.
+
+**Verdict: NO-GO on a production symbol-layer migration.** Real GPU made the case weaker, not
+stronger. The one meaningful win is at a single worst-case pose where both paths already exceed
+60fps, and buying it would cost: a port extension for `icon-image` layers; an **unbounded image
+atlas** that has to be fixed (the prototype OOM'd past 512MB feeding full-res thumbnails — MapLibre
+packs every icon into one sprite atlas, so production needs DPR-aware small icons plus LRU
+eviction against the max GL texture); loss of the DOM markers' lazy-load; and rebuilding their
+keyboard/hover/click accessibility on the symbol layer. All to shave a sub-frame CPU cost off an
+already-smooth map. If the z9 dense-metro case is ever worth attacking, option (1) above —
+clustering or nudging the thumbnail threshold — is the right, cheap lever.
+
 ## Phase 3 (deferred): a second adapter
 
 Not built now. Adding one — `mapbox-gl` is nearly free via seam 1; a non-GL provider is not —
