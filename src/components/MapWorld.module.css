@@ -1,5 +1,9 @@
 .image {
-  inline-size: var(--size-200);
+  /* Full width on any normal screen, but never wider than the viewport itself
+     so the popup cannot overflow sideways on an ultra-narrow or split-screen
+     device — the image is the popup's widest child, so this is what sets the
+     popup's width. */
+  inline-size: min(var(--size-200), calc(100dvw - var(--m-2xl)));
   block-size: auto;
   object-fit: cover;
 }
@@ -56,6 +60,20 @@
 
 .popup {
   z-index: var(--z-map-controls);
+}
+
+/* MapLibre flips a popup to whichever side of the pin has more room but never
+   clamps it to the viewport, so a tall photo popup (the selected case, with the
+   external-map links) spills past the top or bottom edge on a short landscape
+   phone. Capping the content to just under half the viewport height guarantees
+   it fits whichever side it is flipped to — for any pin position the larger
+   side always has at least half the viewport — and it scrolls internally when
+   the content is taller. Portrait and desktop viewports are tall enough that
+   the cap never bites, so they are unchanged. Scoped to the photo popup: the
+   context menu popup keeps its own sizing. */
+.popup :global(.maplibregl-popup-content) {
+  max-block-size: calc(50dvh - var(--m-xl));
+  overflow-y: auto;
 }
 
 .click {
