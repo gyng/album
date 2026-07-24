@@ -37,6 +37,17 @@ export type SourceAttachment = {
  */
 export const SourceContext = React.createContext<SourceAttachment | null>(null);
 
+/**
+ * The enclosing `<Source>`'s generation, or `0` outside one.
+ *
+ * Exposed because the generation is the only signal that the source's layers
+ * have just been put back on the map: a rebuild for an option MapLibre reads
+ * once, or a whole style reloaded underneath. Anything that has to run *after*
+ * a re-add — restacking, above all, since a provider appends what it is handed
+ * — watches this rather than trying to hear the re-add itself.
+ */
+export const useSourceGeneration = (): number => React.useContext(SourceContext)?.generation ?? 0;
+
 /** Internal accessor — returns null outside a map, so children stay harmless. */
 export const useMapContext = (): MapContextValue | null => React.useContext(MapContext);
 

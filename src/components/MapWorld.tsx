@@ -273,7 +273,12 @@ export const MMap: React.FC<MapWorldProps> = ({
       return;
     }
 
+    // The hover goes too. On a desktop mouse a click on empty map implies the
+    // pointer already left the pin and `mouseleave` cleared it, but an emulated
+    // mouse (a tap on a touch browser) sends no leave at all — so without this
+    // the dismissed popup simply stays put, fed by a hover nothing will clear.
     setClickInfo(null);
+    setHoverInfo(null);
     setContextPoint(null);
   }, []);
   // Without clustering, many photos can share the same pixel and only the

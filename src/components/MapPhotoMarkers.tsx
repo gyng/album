@@ -19,8 +19,9 @@ type MapPhotoMarkersProps = {
   photos: PhotoWithStyle[];
   /**
    * The photos inside the current viewport. A DOM marker each is only affordable
-   * for what can actually be seen, and the keyboard list is only useful if it
-   * offers what the reader is looking at.
+   * for what can actually be seen, the keyboard list is only useful if it offers
+   * what the reader is looking at, and a coarse-pointer tap target is only worth
+   * laying down over a pin that is on the screen.
    */
   visiblePhotos: PhotoWithStyle[];
   showMarkerImages: boolean;
@@ -72,6 +73,24 @@ const ROUTE_MUTED_OPACITY = 0.28;
  */
 const TOUCH_TARGET_RADIUS = 22;
 
+/**
+ * How many tap targets are worth laying down.
+ *
+ * The targets are a second source, a second tiling pass and a second draw, and
+ * they only exist on the hardware least able to afford one — so they are kept to
+ * the photos in view, and dropped entirely once there are more of those than the
+ * screen has room for. A 44px target covers ~1,500px² of a ~273,000px² phone
+ * viewport, so past roughly 180 of them in view they tile the screen edge to
+ * edge: every tap lands on some pin either way, and a widened target no longer
+ * decides *which*. Below that the pins are sparse, and the widening is the only
+ * thing that makes an 18px dot reachable with a fingertip.
+ *
+ * MapLibre would not skip the draw even at zero opacity: `drawCircles` only
+ * bails when the opacity is a *constant* zero, and the layer's opacity is a
+ * per-feature expression.
+ */
+const TOUCH_TARGET_LIMIT = 180;
+
 /** How many of the photos in view the keyboard list offers at once. */
 const KEYBOARD_LIST_LIMIT = 40;
 
@@ -96,7 +115,11 @@ const useCoarsePointer = (): boolean => {
       return;
     }
 
-    const query = window.matchMedia("(pointer: coarse)");
+    // `any-pointer`, not `pointer`: `pointer` describes the *primary* pointer, so
+    // a laptop with a touchscreen and a mouse reports `fine` and its touch users
+    // would be left with the 18px target. Keep this in step with the same query
+    // in `mapPin.module.css`.
+    const query = window.matchMedia("(any-pointer: coarse)");
     setIsCoarse(query.matches);
     // A hybrid device can gain or lose a fine pointer mid-session, but not every
     // environment's media query list is subscribable.
@@ -133,23 +156,41 @@ const useCoarsePointer = (): boolean => {
  */
 const MapPhotoKeyboardList = ({
   photos,
-  total,
   onSelect,
   onHover,
 }: {
   photos: LocatedPhoto[];
-  total: number;
   onSelect: (photo: PhotoWithStyle) => void;
   onHover: (photo: PhotoWithStyle | null) => void;
 }) => {
-  if (photos.length === 0) {
+  // What is in view is recomputed from the camera, so a pan — the auto-fit, or
+  // the cinematic tour flying off on its own — can take the entry the reader is
+  // standing on out from under them, dropping focus to `<body>` with nothing
+  // announced and the traverse back at the top of the document. While focus is
+  // anywhere in the list, the list it is reading holds still; the new viewport
+  // is taken up the moment focus leaves.
+  const [heldPhotos, setHeldPhotos] = React.useState<LocatedPhoto[] | null>(null);
+  const listRef = React.useRef<HTMLUListElement>(null);
+  const listed = heldPhotos ?? photos;
+
+  if (listed.length === 0) {
     return null;
   }
 
+  const offered = listed.slice(0, KEYBOARD_LIST_LIMIT);
+
   return (
-    <ul className={styles.keyboardPins} aria-label="Photos in view">
-      {photos.map((photo) => (
+    <ul ref={listRef} className={styles.keyboardPins} aria-label="Photos in view">
+      {/* Ahead of the entries, not after them: read as the last item it would
+          only reach someone who had already tabbed past forty photos whose
+          names are frequently identical, which is precisely who it is for. */}
+      {listed.length > offered.length ? (
+        <li>{`Showing the first ${offered.length} of ${listed.length} photos in view. Zoom in to reach the rest.`}</li>
+      ) : null}
+      {offered.map((photo) => (
         <li key={photo.href}>
+          {/* A real button, so Enter and Space activate it without this having
+              to reimplement what a button already does. */}
           <button
             type="button"
             onClick={() => {
@@ -157,18 +198,22 @@ const MapPhotoKeyboardList = ({
             }}
             onFocus={() => {
               onHover(photo);
+              setHeldPhotos((current) => current ?? photos);
             }}
-            onBlur={() => {
+            onBlur={(event) => {
               onHover(null);
+              // Moving between entries is not leaving: the list only takes up
+              // the new viewport once focus has gone somewhere else entirely.
+              const next = event.relatedTarget;
+              if (!(next instanceof Node) || !listRef.current?.contains(next)) {
+                setHeldPhotos(null);
+              }
             }}
           >
             {photoLabel(photo)}
           </button>
         </li>
       ))}
-      {total > photos.length ? (
-        <li>{`Zoom in to reach the other ${total - photos.length} photos in view.`}</li>
-      ) : null}
     </ul>
   );
 };
@@ -335,17 +380,20 @@ export const MapPhotoMarkers = ({
   );
   // Invisible, and deliberately independent of the drawn pins: nothing about a
   // tap target changes when a route is emphasised, so it is not rebuilt then.
+  // Bounds-filtered and capped, unlike the pins — see `TOUCH_TARGET_LIMIT`. The
+  // bounds only settle at the end of a gesture, so this is rebuilt once a pan,
+  // not once a frame, and never with more than the cap's worth of features.
   const touchTargets = React.useMemo(
     (): PointFeature[] =>
-      isCoarsePointer
-        ? locatedPhotos.map((photo) => ({
+      isCoarsePointer && locatedVisiblePhotos.length <= TOUCH_TARGET_LIMIT
+        ? locatedVisiblePhotos.map((photo) => ({
             id: photo.href,
             at: { lng: photo.decLng, lat: photo.decLat },
             radius: TOUCH_TARGET_RADIUS,
             opacity: 0,
           }))
         : [],
-    [isCoarsePointer, locatedPhotos],
+    [isCoarsePointer, locatedVisiblePhotos],
   );
   const photosByHref = React.useMemo(
     () => new Map(locatedPhotos.map((photo) => [photo.href, photo])),
@@ -390,12 +438,7 @@ export const MapPhotoMarkers = ({
           {...(order !== undefined ? { order } : {})}
           {...(touchTargets.length > 0 ? {} : interactions)}
         />
-        <MapPhotoKeyboardList
-          photos={locatedVisiblePhotos.slice(0, KEYBOARD_LIST_LIMIT)}
-          total={locatedVisiblePhotos.length}
-          onSelect={onSelect}
-          onHover={onHover}
-        />
+        <MapPhotoKeyboardList photos={locatedVisiblePhotos} onSelect={onSelect} onHover={onHover} />
       </>
     );
   }

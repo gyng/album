@@ -22,8 +22,12 @@
 
    The world map draws its bulk pins on the GPU, where there is no element to
    hang this off; `TOUCH_TARGET_RADIUS` in `MapPhotoMarkers.tsx` buys the same
-   room with a transparent circle instead. Keep the two in step. */
-@media (pointer: coarse) {
+   room with a transparent circle instead. Keep the two in step.
+
+   `any-pointer`, not `pointer`: `pointer` describes the primary pointer only, so
+   a touchscreen laptop with a mouse attached reports `fine` and its touch users
+   would be left with the 14px dot. */
+@media (any-pointer: coarse) {
   .pin::after {
     content: "";
     position: absolute;

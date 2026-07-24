@@ -252,6 +252,20 @@ jest.mock("./engine", () => {
     }
   }
 
+  /**
+   * What MapLibre focuses when a popup opens, verbatim from
+   * `maplibre-gl-dev.mjs` (`focusQuerySelector`, beside `_focusFirstElement`).
+   */
+  const FOCUS_QUERY = [
+    "a[href]",
+    "[tabindex]:not([tabindex='-1'])",
+    "[contenteditable]:not([contenteditable='false'])",
+    "button:not([disabled])",
+    "input:not([disabled])",
+    "select:not([disabled])",
+    "textarea:not([disabled])",
+  ].join(", ");
+
   class PopupMock {
     static instances: PopupMock[] = [];
     options: Spec;
@@ -289,15 +303,29 @@ jest.mock("./engine", () => {
 
       return this;
     }
+    /**
+     * A real popup puts its content in the document and then — unless
+     * `focusAfterOpen` says otherwise, and it defaults to true — moves focus to
+     * the first focusable thing inside it (`Popup._focusFirstElement`). Both
+     * halves are modelled, because the focus grab is only observable once the
+     * content is actually attached.
+     */
     addTo(): this {
       this.addToCount += 1;
       this.open = true;
+      if (this.content) {
+        document.body.append(this.content);
+      }
       this.fire("open");
+      if (this.options.focusAfterOpen !== false) {
+        this.content?.querySelector<HTMLElement>(FOCUS_QUERY)?.focus();
+      }
 
       return this;
     }
     remove(): this {
       this.open = false;
+      this.content?.remove();
       this.fire("close");
 
       return this;
@@ -369,6 +397,7 @@ type MockMarkerApi = {
 };
 
 type MockPopupApi = {
+  options: Record<string, unknown>;
   lngLat: [number, number];
   addToCount: number;
   open: boolean;
@@ -654,6 +683,30 @@ describe("Source and Layer lifecycle", () => {
     expect(map.operations).not.toContain("removeLayer:style-owned");
   });
 
+  it("leaves a source the style document declared where it found it", () => {
+    const map = createMap();
+    // Already in the style, as a source the style document declares would be.
+    map.addSource("s", { type: "geojson", data: EMPTY_GEOJSON });
+
+    const { unmount } = renderInMap(
+      map,
+      <Source id="s" type="geojson" data={EMPTY_GEOJSON}>
+        <Layer id="l" type="circle" />
+      </Source>,
+    );
+    // Adopted rather than rebuilt, so the layers can still mount on it.
+    expect(map.getLayer("l")).toBeDefined();
+    expect(map.operations).toEqual(["addSource:s", "addLayer:l"]);
+
+    unmount();
+
+    // The layer sweep is careful to leave style-declared layers alone; taking
+    // the source they hang off would undo that care one level up.
+    expect(map.operations).toContain("removeLayer:l");
+    expect(map.operations).not.toContain("removeSource:s");
+    expect(map.getSource("s")).toBeDefined();
+  });
+
   it("waits rather than adding a layer whose source is not in the style", () => {
     const map = createMap();
 
@@ -715,6 +768,27 @@ describe("Marker reconciliation", () => {
     expect(markerInstances()[1]?.options.anchor).toBe("bottom");
   });
 
+  it("puts an offset back to the default when the caller stops setting one", () => {
+    const map = createMap();
+    const { update } = renderInMap(
+      map,
+      <Marker longitude={1} latitude={2} offset={[0, 5]}>
+        <span>pin</span>
+      </Marker>,
+    );
+
+    update(
+      <Marker longitude={1} latitude={2}>
+        <span>pin</span>
+      </Marker>,
+    );
+
+    // Named rather than passed through: MapLibre has no "unset", and its
+    // `setOffset` hands the argument straight to `Point.convert`, which throws
+    // on `undefined`.
+    expect(markerInstances()[0]?.calls).toContain("setOffset:[0,0]");
+  });
+
   it("clears style properties that the new style no longer sets", () => {
     const map = createMap();
     const { update } = renderInMap(
@@ -742,6 +816,55 @@ describe("Marker reconciliation", () => {
 /* -------------------------------------------------------------------------- */
 /* Popup                                                                       */
 /* -------------------------------------------------------------------------- */
+
+describe("Popup focus", () => {
+  /** Something outside the popup for focus to be taken away from. */
+  const renderOpener = (): HTMLElement => {
+    const opener = document.createElement("button");
+    opener.type = "button";
+    document.body.append(opener);
+    opener.focus();
+
+    return opener;
+  };
+
+  afterEach(() => {
+    document.body.replaceChildren();
+  });
+
+  it("leaves focus where it was when a popup opens", () => {
+    const map = createMap();
+    const opener = renderOpener();
+
+    renderInMap(
+      map,
+      <Popup longitude={1} latitude={2}>
+        <a href="#kansai">kansai</a>
+      </Popup>,
+    );
+
+    // MapLibre would have pulled focus onto the link. Popups here open because
+    // something else was hovered or focused, so that both robs the reader of
+    // their place and unmounts the popup: the opener blurs, whatever state was
+    // holding the popup open is dropped, and focus falls through to <body>.
+    expect(document.activeElement).toBe(opener);
+  });
+
+  it("still lets a caller ask for the provider's own focus behaviour", () => {
+    const map = createMap();
+    renderOpener();
+
+    renderInMap(
+      map,
+      <Popup longitude={1} latitude={2} focusAfterOpen>
+        <a href="#kansai">kansai</a>
+      </Popup>,
+    );
+
+    expect(popupInstances()[0]?.options.focusAfterOpen).toBe(true);
+    expect((document.activeElement as HTMLAnchorElement | null)?.textContent).toBe("kansai");
+  });
+});
 
 describe("Popup re-attachment", () => {
   it("comes back when the anchor moves after MapLibre closed it", () => {

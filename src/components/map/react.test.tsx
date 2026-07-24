@@ -72,6 +72,10 @@ jest.mock("./adapters/maplibre", () => ({
     return null;
   },
   useMap: () => ({ current: currentEngineMap }),
+  // The port restacks whenever the enclosing source re-adds its layers; this
+  // fake source never rebuilds, so it never reports one. `stacking.test.tsx`
+  // covers what happens when a real one does.
+  useSourceGeneration: () => 0,
 }));
 
 type EngineListener = (event: unknown) => void;
@@ -97,6 +101,9 @@ const engine = {
   // reports every layer as present so the port's ordering decisions show up in
   // the moves it asks for.
   getLayer: jest.fn((id: string) => ({ id })),
+  // Reported as empty so the port never mistakes this double for a style that
+  // already holds the declared stack, and the moves it wants are all visible.
+  getLayersOrder: jest.fn(() => []),
   moveLayer: jest.fn(),
   // Layer-scoped subscriptions take an extra layer id between the event name
   // and the listener, so both arities are accepted here.
@@ -841,6 +848,32 @@ describe("DataLayer", () => {
       1,
       2,
     ]);
+  });
+
+  it("draws no taper from stops that reduce to a single position", () => {
+    const path = [
+      { lng: 0, lat: 0 },
+      { lng: 10, lat: 20 },
+    ];
+    render(
+      <MapView styleUrl="style.json">
+        <DataLayer
+          id="route"
+          lines={[{ id: "trip", path, color: "rgb(9, 9, 9)", width: 3 }]}
+          lineWidthAlong={[
+            { at: 1.2, width: 2 },
+            { at: 4, width: 6 },
+          ]}
+        />
+      </MapView>,
+    );
+
+    // Both stops clamp to the end of the line, leaving one position and nothing
+    // to interpolate between. A provider is not reliably willing to accept a
+    // one-stop `interpolate`, and refusing it means the line never draws at all
+    // — so a caller whose data happens to collapse gets the flat width instead.
+    expect(layerProps.mock.calls.at(-1)?.[0].paint["line-width"]).toEqual(["get", "width"]);
+    expect(sourceProps.mock.calls.at(-1)?.[0]).not.toHaveProperty("lineMetrics");
   });
 
   it("falls back to each line's own width when the stops describe no taper", () => {

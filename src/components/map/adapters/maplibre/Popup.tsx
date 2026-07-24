@@ -32,7 +32,22 @@ const PopupImpl = (
   // MapLibre owns the positioning.
   const container = React.useMemo(() => document.createElement("div"), []);
   const [popup] = React.useState<GlPopup>(() => {
-    const instance = new gl.Popup({ ...props });
+    // MapLibre moves focus into a popup as it opens — `focusAfterOpen` defaults
+    // to true, and `addTo` focuses the first focusable element it finds. Nothing
+    // here opens a popup the way a dialog is opened: a popup appears because
+    // something *else* was hovered or focused, so taking focus off that thing is
+    // never what the reader asked for. It is also self-defeating — the control
+    // that opened the popup blurs, the state holding the popup open goes with it,
+    // the popup unmounts, and focus ends up on `<body>`. A keyboard reader
+    // cannot get past the first item in a list of pins that way.
+    //
+    // Defaulted here rather than at the port or per consumer: the port describes
+    // a popup as something its opener owns and says nothing about focus, so this
+    // is the adapter holding the provider to the port's contract rather than
+    // every caller separately remembering to. The adapter's props are MapLibre's
+    // own options, so a caller that genuinely wants the provider's behaviour can
+    // still ask for it by name and win the spread below.
+    const instance = new gl.Popup({ focusAfterOpen: false, ...props });
     instance.setLngLat([props.longitude, props.latitude]);
 
     return instance;
@@ -97,7 +112,9 @@ const PopupImpl = (
       popup.addTo(map);
     }
 
-    if (offset !== undefined && !deepEqual(previous.offset, offset)) {
+    // Cleared back to nothing counts as a change, the same as for a marker;
+    // MapLibre's popup normalises a missing offset to its own default itself.
+    if (!deepEqual(previous.offset, offset)) {
       popup.setOffset(offset);
     }
     if (maxWidth !== undefined && previous.maxWidth !== maxWidth) {

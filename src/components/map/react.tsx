@@ -19,6 +19,7 @@ import AdapterMap, {
   ScaleControl as AdapterScaleControl,
   Source,
   useMap as useAdapterMap,
+  useSourceGeneration,
 } from "./adapters/maplibre";
 import { DEFAULT_CLUSTER_LABEL_FONT, DEFAULT_POINT_COLOUR, DEFAULT_POINT_RADIUS } from "./port";
 import type {
@@ -695,6 +696,11 @@ const clusterLabelLayer = (id: string, font: readonly string[]): LayerSpec => ({
  * being left as a trap. Where two stops land on the same position (which
  * clamping can cause on its own) the first one given wins, and a position that
  * is not a real number cannot be placed at all, so it is dropped.
+ *
+ * A taper needs two positions to interpolate between, and clamping and
+ * de-duplication can leave a caller's stops with fewer — so anything that
+ * describes no taper comes back as none at all, rather than as a lone stop the
+ * provider would have to make sense of on its own.
  */
 const toTaperStops = (stops: readonly LineWidthStop[]): LineWidthStop[] => {
   const ordered = stops
@@ -710,16 +716,21 @@ const toTaperStops = (stops: readonly LineWidthStop[]): LineWidthStop[] => {
     }
   }
 
-  return ascending;
+  return ascending.length < 2 ? [] : ascending;
 };
 
 /**
  * A taper is measured along each line's own length, so it is one expression for
  * the whole layer rather than a value per feature. Without one — or with stops
- * that reduced to nothing — the width is read off each feature as usual.
+ * that did not describe a taper — the width is read off each feature as usual.
+ *
+ * Two stops is the floor, not one: interpolating needs something to interpolate
+ * between, and a provider handed a one-stop `interpolate` is not reliably
+ * willing to accept it. `toTaperStops` already refuses to hand one over, and
+ * this is the guard on the expression itself.
  */
 const lineWidth = (widthAlong: readonly LineWidthStop[]): StyleExpression =>
-  widthAlong.length > 0
+  widthAlong.length >= 2
     ? [
         "interpolate",
         ["linear"],
@@ -867,7 +878,13 @@ const usePointInteractions = (
 type StackEntry = {
   /** Higher draws on top. `undefined` is "no opinion". */
   order: number | undefined;
-  /** Mount sequence, so groups that express no preference keep mount order. */
+  /**
+   * Mount sequence, so groups that express no preference keep mount order. Taken
+   * once per mounted group and kept across re-registrations: a group whose
+   * source is rebuilt must not thereby overtake a peer that declared the same
+   * order, or the drawing order would depend on rebuild history — the very
+   * thing this stacking exists to stop.
+   */
   seq: number;
   /** Sub-group within one `<DataLayer>`: its points draw beneath its lines. */
   group: number;
@@ -900,25 +917,47 @@ const restack = (map: MapRef, entries: ReadonlySet<StackEntry>): void => {
     return;
   }
 
-  for (const entry of groups.sort(byStackOrder)) {
-    for (const layerId of entry.ids) {
-      // A group registers once its own layers are added, but another group's
-      // may not be there yet — or may have gone with a style reload.
-      if (map.getLayer(layerId)) {
-        map.moveLayer(layerId);
-      }
-    }
+  // A group registers once its own layers are added, but another group's may
+  // not be there yet — or may have gone with a style reload.
+  const wanted = groups
+    .sort(byStackOrder)
+    .flatMap((entry) => entry.ids.filter((layerId) => Boolean(map.getLayer(layerId))));
+
+  // Raising a layer marks the style changed, and every `<Source>` and `<Layer>`
+  // on the map hears that and re-renders, so a pass that would move nothing is
+  // not worth making. Raising each group in turn leaves all of them on top in
+  // `wanted` order, so the style already ending in exactly that run means the
+  // stack is applied and there is nothing to do.
+  const drawn = map.getLayersOrder();
+  const tail = drawn.slice(drawn.length - wanted.length);
+  if (tail.length === wanted.length && wanted.every((layerId, at) => tail[at] === layerId)) {
+    return;
+  }
+
+  for (const layerId of wanted) {
+    map.moveLayer(layerId);
   }
 };
 
 /**
  * Registers a group of layers for stacking, and re-applies the stack whenever
- * the registered set changes.
+ * the registered set changes or the layers themselves are put back on the map.
  *
  * Rendered as the last child of the source that owns the layers, which is what
  * makes the timing work: React runs effects depth-first in tree order, so the
  * layers rendered above this element have already added themselves by the time
  * this effect runs and there is something to move.
+ *
+ * The source's `generation` is a dependency for the same reason the layers
+ * themselves watch it. A provider appends a layer as it is added, so a group
+ * whose layers are re-added lands on top of everything — and they are re-added
+ * whenever the source is, either because an option MapLibre only reads at
+ * construction changed or because the whole style reloaded under the map.
+ * Applying the stack once at mount would silently revert the first time either
+ * happened. The generation is bumped in the same commit the layers re-add
+ * themselves in, so watching it restacks exactly then and never in between;
+ * watching the style version instead would run a pass on every style mutation,
+ * including the ones this component's own `moveLayer` calls cause.
  */
 const StackOrder = ({
   order,
@@ -930,6 +969,11 @@ const StackOrder = ({
   ids: readonly string[];
 }): null => {
   const { current: map } = useAdapterMap();
+  const generation = useSourceGeneration();
+  // Taken on the first registration and kept afterwards — see `StackEntry.seq`.
+  // Assigned from the effect rather than during render, so a render React
+  // abandons cannot burn a sequence number.
+  const seqRef = React.useRef(0);
   // The ids are rebuilt every render, so the effect keys off their names.
   const idKey = ids.join(" ");
   const idsRef = React.useRef(ids);
@@ -940,8 +984,11 @@ const StackOrder = ({
       return;
     }
 
-    stackSeq += 1;
-    const entry: StackEntry = { order, seq: stackSeq, group, ids: idsRef.current };
+    if (seqRef.current === 0) {
+      stackSeq += 1;
+      seqRef.current = stackSeq;
+    }
+    const entry: StackEntry = { order, seq: seqRef.current, group, ids: idsRef.current };
     const entries = stacks.get(map) ?? new Set<StackEntry>();
     stacks.set(map, entries);
     entries.add(entry);
@@ -951,7 +998,7 @@ const StackOrder = ({
       entries.delete(entry);
       restack(map, entries);
     };
-  }, [map, order, group, idKey]);
+  }, [map, order, group, idKey, generation]);
 
   return null;
 };

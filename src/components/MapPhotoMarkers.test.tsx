@@ -3,9 +3,12 @@
  */
 
 import { act, fireEvent, render, screen } from "@testing-library/react";
-import type { ReactNode } from "react";
+import React, { type ReactNode } from "react";
 import type { PhotoWithStyle } from "./mapWorldViewModel";
 import { MapPhotoMarkers } from "./MapPhotoMarkers";
+import { MapContext } from "./map/adapters/maplibre/context";
+import { Popup as AdapterPopup } from "./map/adapters/maplibre/Popup";
+import type { MapRef } from "./map/adapters/maplibre/types";
 
 type PointHit = { id: string; at: { lng: number; lat: number } };
 
@@ -55,6 +58,96 @@ jest.mock("./map", () => ({
   },
 }));
 
+/**
+ * Only `gl.Popup` is needed: the map port itself is mocked above, so the one
+ * piece of real map code these tests run is the MapLibre popup adapter — the
+ * seam where a popup opening decides what happens to the reader's focus.
+ *
+ * `addTo` reproduces what MapLibre does: the content goes into the document,
+ * and then, unless `focusAfterOpen` says otherwise (it defaults to true), focus
+ * moves to the first focusable element inside it. The selector is verbatim from
+ * `maplibre-gl-dev.mjs` (`focusQuerySelector`, beside `_focusFirstElement`).
+ */
+jest.mock("./map/adapters/maplibre/engine", () => {
+  const FOCUS_QUERY = [
+    "a[href]",
+    "[tabindex]:not([tabindex='-1'])",
+    "[contenteditable]:not([contenteditable='false'])",
+    "button:not([disabled])",
+    "input:not([disabled])",
+    "select:not([disabled])",
+    "textarea:not([disabled])",
+  ].join(", ");
+
+  class PopupMock {
+    options: Record<string, unknown>;
+    open = false;
+    content: HTMLElement | null = null;
+    lngLat: [number, number] = [0, 0];
+    listeners = new Map<string, Set<(event: unknown) => void>>();
+
+    constructor(options: Record<string, unknown> = {}) {
+      this.options = options;
+    }
+
+    on(type: string, listener: (event: unknown) => void): this {
+      const registered = this.listeners.get(type) ?? new Set<(event: unknown) => void>();
+      registered.add(listener);
+      this.listeners.set(type, registered);
+
+      return this;
+    }
+    off(type: string, listener: (event: unknown) => void): this {
+      this.listeners.get(type)?.delete(listener);
+
+      return this;
+    }
+    setDOMContent(content: HTMLElement): this {
+      this.content = content;
+
+      return this;
+    }
+    addTo(): this {
+      this.open = true;
+      if (this.content) {
+        document.body.append(this.content);
+      }
+      if (this.options.focusAfterOpen !== false) {
+        this.content?.querySelector<HTMLElement>(FOCUS_QUERY)?.focus();
+      }
+
+      return this;
+    }
+    remove(): this {
+      this.open = false;
+      this.content?.remove();
+
+      return this;
+    }
+    isOpen(): boolean {
+      return this.open;
+    }
+    setLngLat(lngLat: [number, number]): this {
+      this.lngLat = lngLat;
+
+      return this;
+    }
+    getLngLat(): { lng: number; lat: number } {
+      return { lng: this.lngLat[0], lat: this.lngLat[1] };
+    }
+    setOffset(): this {
+      return this;
+    }
+    setMaxWidth(): this {
+      return this;
+    }
+    addClassName(): void {}
+    removeClassName(): void {}
+  }
+
+  return { gl: { Popup: PopupMock } };
+});
+
 const dataLayerCalls = (): DataLayerCall[] =>
   dataLayer.mock.calls.map((call) => call[0] as DataLayerCall);
 
@@ -72,13 +165,27 @@ const layer = (id: string): DataLayerCall => {
 
 const lastDataLayer = (): DataLayerCall => layer("photo-markers");
 
-/** Reports the pointer as coarse (or not), the way a touch device would. */
-const setCoarsePointer = (coarse: boolean) => {
+/** Answers the pointer media queries the way a device with these would. */
+const setPointerQueries = (matching: string[]) => {
   window.matchMedia = jest.fn().mockImplementation((query: string) => ({
-    matches: coarse && query === "(pointer: coarse)",
+    matches: matching.includes(query),
     addEventListener: jest.fn(),
     removeEventListener: jest.fn(),
   }));
+};
+
+/** A phone, or a mouse-only desktop: one pointer, and it is the primary one. */
+const setCoarsePointer = (coarse: boolean) => {
+  setPointerQueries(
+    coarse
+      ? ["(pointer: coarse)", "(any-pointer: coarse)"]
+      : ["(pointer: fine)", "(any-pointer: fine)"],
+  );
+};
+
+/** A touchscreen laptop: the mouse is primary, but a fingertip is still a pointer. */
+const setHybridPointer = () => {
+  setPointerQueries(["(pointer: fine)", "(any-pointer: fine)", "(any-pointer: coarse)"]);
 };
 
 const photo = (overrides: Partial<PhotoWithStyle> = {}): PhotoWithStyle => ({
@@ -320,6 +427,76 @@ describe("MapPhotoMarkers", () => {
         expect(screen.queryByTestId("photo-marker-targets")).toBeNull();
         expect(lastDataLayer().onPointClick).toBeDefined();
       });
+
+      it("counts a touchscreen laptop as coarse even though its mouse is primary", () => {
+        // `pointer` reports the *primary* pointer only, so a hybrid device says
+        // `fine` and its touch users would be left tapping at an 18px dot.
+        setHybridPointer();
+        render(
+          <MapPhotoMarkers
+            photos={[photo()]}
+            visiblePhotos={[photo()]}
+            showMarkerImages={false}
+            emphasiseRoute={false}
+            activeRouteHrefSet={new Set()}
+            onSelect={jest.fn()}
+            onHover={jest.fn()}
+          />,
+        );
+
+        expect(layer("photo-marker-targets").points).toHaveLength(1);
+      });
+
+      // The targets are a second source, a second tiling pass and a second draw
+      // — on the hardware least able to afford one. They are kept to what the
+      // map is actually showing, and dropped once a 44px circle stops telling
+      // one pin from another.
+      it("lays targets over the photos in view rather than the whole world", () => {
+        setCoarsePointer(true);
+        const inView = photo({ href: "in-view" });
+        render(
+          <MapPhotoMarkers
+            photos={[inView, photo({ href: "off-screen", decLng: 140 })]}
+            visiblePhotos={[inView]}
+            showMarkerImages={false}
+            emphasiseRoute={false}
+            activeRouteHrefSet={new Set()}
+            onSelect={jest.fn()}
+            onHover={jest.fn()}
+          />,
+        );
+
+        expect(layer("photo-marker-targets").points.map((point) => point.id)).toEqual(["in-view"]);
+        // The drawn pins still take the whole set: the map clips them itself.
+        expect(layer("photo-markers").points).toHaveLength(2);
+      });
+
+      it("drops the targets once the view is too dense for them to mean anything", () => {
+        setCoarsePointer(true);
+        const photos = Array.from({ length: 181 }, (_, index) =>
+          photo({ href: `photo-${index}`, decLng: index / 10 }),
+        );
+        const onSelect = jest.fn();
+        render(
+          <MapPhotoMarkers
+            photos={photos}
+            visiblePhotos={photos}
+            showMarkerImages={false}
+            emphasiseRoute={false}
+            activeRouteHrefSet={new Set()}
+            onSelect={onSelect}
+            onHover={jest.fn()}
+          />,
+        );
+
+        expect(screen.queryByTestId("photo-marker-targets")).toBeNull();
+        // With no target layer the pins take the interactions back, so a tap
+        // still reaches a photo — the pins are shoulder to shoulder by now.
+        act(() => {
+          lastDataLayer().onPointClick?.({ id: "photo-7", at: { lng: 0.7, lat: 35.6762 } });
+        });
+        expect(onSelect).toHaveBeenCalledWith(expect.objectContaining({ href: "photo-7" }));
+      });
     });
 
     // Drawn points are pixels on a canvas: nothing to focus, nothing to
@@ -358,7 +535,7 @@ describe("MapPhotoMarkers", () => {
         expect(onSelect).toHaveBeenCalledWith(inView);
       });
 
-      it("caps the list and says how to reach the rest", () => {
+      it("caps the list and says how to reach the rest before the entries, not after", () => {
         const photos = Array.from({ length: 42 }, (_, index) =>
           photo({ href: `photo-${index}`, decLng: index }),
         );
@@ -377,7 +554,124 @@ describe("MapPhotoMarkers", () => {
         // Reinstating a control per photo is the cost the drawn layer exists to
         // avoid, so the list is capped rather than complete.
         expect(screen.getAllByRole("button", { name: /Photo from kansai/ })).toHaveLength(40);
-        expect(screen.getByText("Zoom in to reach the other 2 photos in view.")).toBeTruthy();
+        const notice = screen.getByText(
+          "Showing the first 40 of 42 photos in view. Zoom in to reach the rest.",
+        );
+        // After the entries the notice is unreachable in practice: it would only
+        // find someone who had already traversed forty photos whose names are
+        // frequently identical, which is exactly who needs to be told sooner.
+        const items = screen.getAllByRole("listitem");
+        expect(items[0]).toBe(notice);
+      });
+
+      /**
+       * The list as the map actually assembles it: a popup for whatever is
+       * hovered or focused — the real MapLibre popup adapter, against the engine
+       * fake above — rendered alongside the pins, exactly as `MapWorld` does.
+       */
+      const KeyboardMap = ({
+        photos,
+        visiblePhotos,
+        onSelect,
+      }: {
+        photos: PhotoWithStyle[];
+        visiblePhotos: PhotoWithStyle[];
+        onSelect: (photo: PhotoWithStyle) => void;
+      }) => {
+        const [hovered, setHovered] = React.useState<PhotoWithStyle | null>(null);
+
+        return (
+          <MapContext.Provider value={{ map: {} as unknown as MapRef }}>
+            {hovered ? (
+              <AdapterPopup longitude={hovered.decLng ?? 0} latitude={hovered.decLat ?? 0}>
+                <a href={hovered.href}>{hovered.album}</a>
+              </AdapterPopup>
+            ) : null}
+            <MapPhotoMarkers
+              photos={photos}
+              visiblePhotos={visiblePhotos}
+              showMarkerImages={false}
+              emphasiseRoute={false}
+              activeRouteHrefSet={new Set()}
+              onSelect={onSelect}
+              onHover={setHovered}
+            />
+          </MapContext.Provider>
+        );
+      };
+
+      /** Moves focus the way Tab does: on to the next focusable element. */
+      const tab = () => {
+        const focusable = [
+          ...document.querySelectorAll<HTMLElement>("a[href], button:not([disabled])"),
+        ];
+        const next = focusable.indexOf(document.activeElement as HTMLElement) + 1;
+        act(() => {
+          focusable[next === focusable.length ? 0 : next]?.focus();
+        });
+      };
+
+      it("tabs from one entry to the next, and the second one can be activated", () => {
+        const onSelect = jest.fn();
+        const photos = [
+          photo({ href: "one" }),
+          photo({ href: "two", album: "kyushu", decLng: 140 }),
+        ];
+        render(<KeyboardMap photos={photos} visiblePhotos={photos} onSelect={onSelect} />);
+
+        const first = screen.getByRole("button", { name: "Photo from kansai on 2 Jan 2024" });
+        const second = screen.getByRole("button", { name: "Photo from kyushu on 2 Jan 2024" });
+
+        tab();
+        expect(document.activeElement).toBe(first);
+        // Focusing an entry opens that photo's popup, which is the visible
+        // feedback a sighted keyboard user gets in place of a hover — and the
+        // popup must not take the focus that opened it, or the entry blurs, the
+        // popup unmounts with the state that held it, and the reader is left on
+        // <body> with the traverse back at the top of the document.
+        expect(screen.getByRole("link", { name: "kansai" })).toBeTruthy();
+
+        tab();
+        expect(document.activeElement).toBe(second);
+        expect(screen.getByRole("link", { name: "kyushu" })).toBeTruthy();
+
+        // Enter and Space are a real button's job, so the entry has to be one.
+        expect(second.tagName).toBe("BUTTON");
+        fireEvent.click(second);
+        expect(onSelect).toHaveBeenCalledWith(photos[1]);
+      });
+
+      it("keeps the entry under the reader's focus when the viewport moves", () => {
+        const photos = [
+          photo({ href: "one" }),
+          photo({ href: "two", album: "kyushu", decLng: 140 }),
+        ];
+        const { rerender } = render(
+          <KeyboardMap photos={photos} visiblePhotos={photos} onSelect={jest.fn()} />,
+        );
+
+        const second = screen.getByRole("button", { name: "Photo from kyushu on 2 Jan 2024" });
+        act(() => {
+          second.focus();
+        });
+
+        // The cinematic tour flies the camera on its own, and the auto-fit
+        // reframes on a new result set: either can take what is in view out from
+        // under a focused entry, dropping the reader to <body> unannounced.
+        rerender(<KeyboardMap photos={photos} visiblePhotos={[photos[0]!]} onSelect={jest.fn()} />);
+
+        expect(document.activeElement).toBe(second);
+        expect(screen.getByRole("button", { name: "Photo from kyushu on 2 Jan 2024" })).toBe(
+          second,
+        );
+
+        // Once focus leaves, the list takes up the viewport it was holding off.
+        act(() => {
+          second.blur();
+        });
+        expect(
+          screen.queryByRole("button", { name: "Photo from kyushu on 2 Jan 2024" }),
+        ).toBeNull();
       });
 
       it("says nothing when the viewport holds no photos", () => {

@@ -15,6 +15,7 @@ export { Marker, type MarkerEvent, type MarkerProps } from "./Marker";
 export { Popup, type PopupEvent, type PopupProps } from "./Popup";
 export { Source, type SourceProps } from "./Source";
 export { Layer, type LayerProps } from "./Layer";
+export { useSourceGeneration } from "./context";
 export { useMap, type MapCollection } from "./useMapInstance";
 export {
   AttributionControl,

@@ -80,8 +80,11 @@ const applySettableOptions = (
   props: MarkerProps,
   previous: MarkerProps,
 ): void => {
-  if (props.offset !== undefined && !deepEqual(props.offset, previous.offset)) {
-    marker.setOffset(props.offset);
+  // Cleared back to nothing counts as a change: MapLibre has no "unset", so the
+  // default it would have used is passed explicitly (`setOffset` hands its
+  // argument straight to `Point.convert`, which throws on `undefined`).
+  if (!deepEqual(props.offset, previous.offset)) {
+    marker.setOffset(props.offset ?? [0, 0]);
   }
   if (props.draggable !== previous.draggable) {
     marker.setDraggable(props.draggable ?? false);

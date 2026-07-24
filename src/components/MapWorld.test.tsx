@@ -62,6 +62,9 @@ const mapInstance = {
   // Stacking: the port raises each declared group in turn, skipping any layer
   // the style does not currently hold.
   getLayer: jest.fn(() => ({})),
+  // Reported as empty so the port never mistakes this double for a style that
+  // already holds the declared stack, and the moves it wants are all visible.
+  getLayersOrder: jest.fn(() => []),
   moveLayer: jest.fn(),
   project: jest.fn(([longitude, latitude]: [number, number]) => ({
     x: longitude * 100,
@@ -201,6 +204,9 @@ jest.mock("./map/adapters/maplibre", () => {
       return <div data-testid={id ?? "layer"} />;
     },
     useMap: () => mapRef,
+    // The port restacks whenever the enclosing source re-adds its layers; this
+    // fake source never rebuilds, so it never reports one.
+    useSourceGeneration: () => 0,
   };
 });
 
@@ -915,6 +921,20 @@ describe("MapWorld", () => {
     // Only a click that lands on nothing puts the map's overlays away.
     clickEmptyMap();
     expect(screen.queryByRole("group", { name: "Location actions" })).toBeNull();
+    expect(screen.queryByRole("link", { name: /kansai/i })).toBeNull();
+  });
+
+  it("puts a hover-opened popup away with the click that lands on nothing", () => {
+    render(<MMap photos={[photo]} className="map" />);
+
+    hoverPin(photo);
+    expect(screen.getByRole("link", { name: /kansai/i })).toBeInTheDocument();
+
+    // A mouse leaving a pin reports it, so this is unreachable with one; an
+    // emulated mouse — a tap on a touch browser — sends no leave at all, and
+    // without clearing the hover the dismissed popup simply stays put, fed by a
+    // hover nothing is ever going to clear.
+    clickEmptyMap();
     expect(screen.queryByRole("link", { name: /kansai/i })).toBeNull();
   });
 

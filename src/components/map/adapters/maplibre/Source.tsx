@@ -72,6 +72,11 @@ export const Source = (props: SourceProps): React.JSX.Element | null => {
   // The options the live source was built from, or null while it is not on the
   // map. Doubles as the "nothing to reconcile against yet" signal.
   const appliedOptionsRef = React.useRef<Record<string, unknown> | null>(null);
+  // Whether the source on the map is one this component put there. A source the
+  // style document declared is adopted so layers can mount, but never torn down
+  // again: the layer sweep is careful to leave style-declared layers alone, and
+  // removing the source out from under them would undo that one level up.
+  const addedSourceRef = React.useRef(false);
   // Monotonic: never reset, so a teardown followed by a re-add in the same
   // effect flush still reads as a change to the layers watching it.
   const [generation, setGeneration] = React.useState(0);
@@ -103,6 +108,7 @@ export const Source = (props: SourceProps): React.JSX.Element | null => {
 
     map.addSource(id, toSourceSpec(propsRef.current));
     appliedOptionsRef.current = toSourceOptions(propsRef.current);
+    addedSourceRef.current = true;
     setGeneration((current) => current + 1);
   }, [map, id, styleVersion, propsRef]);
 
@@ -117,14 +123,19 @@ export const Source = (props: SourceProps): React.JSX.Element | null => {
 
     return () => {
       appliedOptionsRef.current = null;
+      const added = addedSourceRef.current;
+      addedSourceRef.current = false;
       if (!isStyleUsable(map) || !map.getSource(id)) {
         return;
       }
 
       // React destroys a deleted subtree parent-first, so the layers React added
-      // on this source are still there and still have to go before it does.
+      // on this source are still there and still have to go before it does. They
+      // go whoever owns the source — they are this component's either way.
       sweepRegisteredLayers(map, registered);
-      map.removeSource(id);
+      if (added) {
+        map.removeSource(id);
+      }
     };
   }, [map, id]);
 
@@ -145,10 +156,14 @@ export const Source = (props: SourceProps): React.JSX.Element | null => {
     // None of these have a setter, so the source is rebuilt. Its layers are
     // swept first (MapLibre refuses to remove a source still in use) and re-add
     // themselves off the bumped generation, which React flushes before paint.
+    // Rebuilding is an explicit request for a source built these options' way,
+    // so this component owns whatever stands there afterwards even if it only
+    // adopted what it found.
     appliedOptionsRef.current = next;
     sweepRegisteredLayers(map, layerIdsRef.current);
     map.removeSource(id);
     map.addSource(id, toSourceSpec(props));
+    addedSourceRef.current = true;
     setGeneration((current) => current + 1);
   }, [map, id, props]);
 
