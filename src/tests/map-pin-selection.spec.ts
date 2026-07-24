@@ -108,7 +108,21 @@ const expectCanvasAt = async (page: Page, point: ScreenPoint): Promise<void> => 
  */
 const selectCentredPin = async (page: Page, centre: ScreenPoint): Promise<void> => {
   await expectCanvasAt(page, centre);
-  await page.mouse.move(centre.x, centre.y);
+  // Retried, because a pointer move is a one-off event and the pin it has to
+  // land on is not: the drawn pins are hit-tested against a source the map
+  // tiles in a worker, so a single move dispatched before that finished would
+  // report no feature and nothing would ever move the pointer again. The nudge
+  // alternates between the centre and a pixel to its right, because moving the
+  // pointer to where it already stands raises no event to hit-test on.
+  let nudge = 0;
+  await expect
+    .poll(async () => {
+      nudge = nudge === 0 ? 1 : 0;
+      await page.mouse.move(centre.x + nudge, centre.y);
+
+      return page.locator(".maplibregl-popup").count();
+    })
+    .toBeGreaterThan(0);
   // The hover popup: a popup, with no selection-only links in it.
   await expect(page.locator(".maplibregl-popup")).toBeVisible();
   await expect(page.getByRole("link", { name: "Open in Google Maps" })).toHaveCount(0);

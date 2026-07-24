@@ -240,6 +240,16 @@ const scene = (taper: boolean) => (
   </MapView>
 );
 
+/**
+ * One `<DataLayer>` drawing both, which it does on two sources — so the two can
+ * arrive, and be rebuilt, independently of each other.
+ */
+const oneLayerBoth = (withPoints: boolean) => (
+  <MapView styleUrl="style.json">
+    <DataLayer id="trip" lines={lines} order={30} {...(withPoints ? { points } : {})} />
+  </MapView>
+);
+
 /** The same two layers, with the journey declared to draw above the pins. */
 const journeyOnTop = (taper: boolean) => (
   <MapView styleUrl="style.json">
@@ -303,6 +313,7 @@ describe("DataLayer stacking against a live style", () => {
 
     expect(map.layerOrder).toEqual(["pins-point-circles", "journey-line-strokes"]);
     const settled = map.operations.length;
+    const drawn = [...map.layerOrder];
 
     view.rerender(journeyOnTop(true));
 
@@ -310,13 +321,27 @@ describe("DataLayer stacking against a live style", () => {
     // the stack is already the declared one. Every move marks the style changed
     // and re-renders every source and layer on the map, so a pass that would
     // move nothing must not make one — which is also what keeps a restack
-    // provoked by a style change from provoking another one.
-    expect(map.operations.slice(settled)).toEqual([
-      "removeLayer:journey-line-strokes",
-      "removeSource:journey-lines",
-      "addSource:journey-lines",
-      "addLayer:journey-line-strokes",
-    ]);
-    expect(map.layerOrder).toEqual(["pins-point-circles", "journey-line-strokes"]);
+    // provoked by a style change from provoking another one. What else the
+    // rebuild does is its own business, so only the moves are counted.
+    expect(map.operations.slice(settled).filter((op) => op.startsWith("moveLayer:"))).toEqual([]);
+    expect(map.layerOrder).toEqual(drawn);
+  });
+
+  it("draws a layer's points beneath its lines however they came to be there", () => {
+    // Points and lines are two sources, and either can arrive — or be rebuilt —
+    // on its own: a layer given points once it already has lines adds them last,
+    // and the provider appends whatever is added last on top. Mount order alone
+    // would therefore draw the pins over the route that is supposed to run
+    // under them, on a layer that never changed what it declared.
+    const view = render(oneLayerBoth(false));
+    const map = lastMap();
+    const lineLayers = [...map.layerOrder];
+    expect(lineLayers.length).toBeGreaterThan(0);
+
+    view.rerender(oneLayerBoth(true));
+
+    const pointLayers = map.layerOrder.filter((layerId) => !lineLayers.includes(layerId));
+    expect(pointLayers.length).toBeGreaterThan(0);
+    expect(map.layerOrder).toEqual([...pointLayers, ...lineLayers]);
   });
 });

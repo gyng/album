@@ -886,7 +886,16 @@ type StackEntry = {
    * thing this stacking exists to stop.
    */
   seq: number;
-  /** Sub-group within one `<DataLayer>`: its points draw beneath its lines. */
+  /**
+   * Sub-group within one `<DataLayer>`: its points draw beneath its lines.
+   *
+   * Decided ahead of `seq`, because mount order does not say this. A layer's
+   * points and lines live on two sources, and either can be rebuilt on its own
+   * — a points source that is rebuilt (or that only appears once the layer is
+   * given points) re-adds its layers on top, which is the contract inverted.
+   * Only where the `<DataLayer>` declares an `order` at all: with none declared
+   * nothing is moved on the map and what the provider appended stands.
+   */
   group: number;
   ids: readonly string[];
 };
@@ -896,7 +905,7 @@ const stacks = new WeakMap<MapRef, Set<StackEntry>>();
 let stackSeq = 0;
 
 const byStackOrder = (a: StackEntry, b: StackEntry): number =>
-  (a.order ?? 0) - (b.order ?? 0) || a.seq - b.seq || a.group - b.group;
+  (a.order ?? 0) - (b.order ?? 0) || a.group - b.group || a.seq - b.seq;
 
 /**
  * Re-applies the stack in declared order, bottom group first — raising each
@@ -975,7 +984,7 @@ const StackOrder = ({
   // abandons cannot burn a sequence number.
   const seqRef = React.useRef(0);
   // The ids are rebuilt every render, so the effect keys off their names.
-  const idKey = ids.join(" ");
+  const idKey = ids.join("\u0000");
   const idsRef = React.useRef(ids);
   idsRef.current = ids;
 

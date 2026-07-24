@@ -74,22 +74,39 @@ const ROUTE_MUTED_OPACITY = 0.28;
 const TOUCH_TARGET_RADIUS = 22;
 
 /**
- * How many tap targets are worth laying down.
+ * How many targets a screen has room for at full size.
  *
- * The targets are a second source, a second tiling pass and a second draw, and
- * they only exist on the hardware least able to afford one — so they are kept to
- * the photos in view, and dropped entirely once there are more of those than the
- * screen has room for. A 44px target covers ~1,500px² of a ~273,000px² phone
- * viewport, so past roughly 180 of them in view they tile the screen edge to
- * edge: every tap lands on some pin either way, and a widened target no longer
- * decides *which*. Below that the pins are sparse, and the widening is the only
- * thing that makes an 18px dot reachable with a fingertip.
+ * A 44px target covers ~1,500px² of a ~273,000px² phone viewport, so around 180
+ * of them in view is where they would tile it edge to edge — past that a tap
+ * lands on some pin whatever the target's size, and widening no longer decides
+ * *which*. That is a total-area figure and nothing more: circles cannot tile
+ * (the best packing is ~0.9069, which alone puts the uniform crossover nearer
+ * 160), and photo pins are not uniformly spread — they pile up on cities, so a
+ * count in view says little about the density under any particular fingertip.
  *
- * MapLibre would not skip the draw even at zero opacity: `drawCircles` only
- * bails when the opacity is a *constant* zero, and the layer's opacity is a
- * per-feature expression.
+ * So it is not a threshold: it is where `touchTargetRadius` starts shrinking.
  */
-const TOUCH_TARGET_LIMIT = 180;
+export const TOUCH_TARGET_FULL_SIZE_COUNT = 180;
+
+/**
+ * The radius a tap target is drawn at with this many photos in view.
+ *
+ * Continuous on purpose. A count that switched the widening off would invert the
+ * feature at its own boundary: one pan admitting the count-th photo would drop
+ * every target at once, including the sparse ones at the edge of the viewport
+ * that have a fingertip's worth of empty map around them and are exactly what
+ * this exists for — on the hardware it exists for. Crossing such a boundary also
+ * unmounts a layer mid-gesture, and `usePointInteractions` reports a leave as it
+ * goes, closing the popup under the reader's thumb.
+ *
+ * Shrinking as the inverse square root of the count keeps each target's share of
+ * the screen constant instead, so a pan changes the targets by a pixel or two
+ * rather than taking them away.
+ */
+const touchTargetRadius = (inView: number): number =>
+  inView <= TOUCH_TARGET_FULL_SIZE_COUNT
+    ? TOUCH_TARGET_RADIUS
+    : Math.max(PIN_RADIUS, TOUCH_TARGET_RADIUS * Math.sqrt(TOUCH_TARGET_FULL_SIZE_COUNT / inView));
 
 /** How many of the photos in view the keyboard list offers at once. */
 export const KEYBOARD_LIST_LIMIT = 40;
@@ -156,10 +173,17 @@ const useCoarsePointer = (): boolean => {
  */
 const MapPhotoKeyboardList = ({
   photos,
+  available,
   onSelect,
   onHover,
 }: {
   photos: LocatedPhoto[];
+  /**
+   * Every photo the map still has, by href — not just the ones in view. The
+   * hold below is over the camera, and this is what tells a photo the camera
+   * has left behind from one the data no longer contains.
+   */
+  available: ReadonlyMap<string, LocatedPhoto>;
   onSelect: (photo: PhotoWithStyle) => void;
   onHover: (photo: PhotoWithStyle | null) => void;
 }) => {
@@ -169,9 +193,27 @@ const MapPhotoKeyboardList = ({
   // announced and the traverse back at the top of the document. While focus is
   // anywhere in the list, the list it is reading holds still; the new viewport
   // is taken up the moment focus leaves.
-  const [heldPhotos, setHeldPhotos] = React.useState<LocatedPhoto[] | null>(null);
+  //
+  // Held by href rather than by value, and resolved through the photos the map
+  // still has: what is in view also changes when the *data* does — a search, the
+  // time-range slider, an album filter — and a photo the map has dropped is not
+  // one the camera merely moved away from. Holding it would go on announcing a
+  // photo that is no longer on the map, and activating it would select something
+  // the screen reconciles away again the moment it arrives: a control that does
+  // nothing visible, having stopped the cinematic tour on its way.
+  const [heldHrefs, setHeldHrefs] = React.useState<readonly string[] | null>(null);
   const listRef = React.useRef<HTMLUListElement>(null);
-  const listed = heldPhotos ?? photos;
+  const listed = React.useMemo(
+    () =>
+      heldHrefs
+        ? heldHrefs.flatMap((href) => {
+            const photo = available.get(href);
+
+            return photo ? [photo] : [];
+          })
+        : photos,
+    [available, heldHrefs, photos],
+  );
 
   if (listed.length === 0) {
     return null;
@@ -198,16 +240,35 @@ const MapPhotoKeyboardList = ({
             }}
             onFocus={() => {
               onHover(photo);
-              setHeldPhotos((current) => current ?? photos);
+              setHeldHrefs((current) => current ?? photos.map((inView) => inView.href));
             }}
             onBlur={(event) => {
               onHover(null);
               // Moving between entries is not leaving: the list only takes up
               // the new viewport once focus has gone somewhere else entirely.
               const next = event.relatedTarget;
-              if (!(next instanceof Node) || !listRef.current?.contains(next)) {
-                setHeldPhotos(null);
+              if (next instanceof Node) {
+                if (!listRef.current?.contains(next)) {
+                  setHeldHrefs(null);
+                }
+
+                return;
               }
+
+              // No `relatedTarget` is ambiguous. Focus may have gone nowhere —
+              // or the *window* may have lost it, to another application, a tab,
+              // or the devtools, which fires `focusout` with nothing to point at
+              // while this entry stays the document's active element. Releasing
+              // then would rebuild the list under a still-focused entry and
+              // strand the reader on `<body>` when they came back, which is
+              // precisely what the hold exists to stop. So where focus actually
+              // is decides it, rather than what the event says about where it
+              // went.
+              if (listRef.current?.contains(document.activeElement)) {
+                return;
+              }
+
+              setHeldHrefs(null);
             }}
           >
             {photoLabel(photo)}
@@ -380,21 +441,37 @@ export const MapPhotoMarkers = ({
   );
   // Invisible, and deliberately independent of the drawn pins: nothing about a
   // tap target changes when a route is emphasised, so it is not rebuilt then.
-  // Bounds-filtered and capped, unlike the pins — see `TOUCH_TARGET_LIMIT`. The
-  // bounds only settle at the end of a gesture, so this is rebuilt once a pan,
-  // not once a frame, and never with more than the cap's worth of features.
-  const touchTargets = React.useMemo(
-    (): PointFeature[] =>
-      isCoarsePointer && locatedVisiblePhotos.length <= TOUCH_TARGET_LIMIT
-        ? locatedVisiblePhotos.map((photo) => ({
-            id: photo.href,
-            at: { lng: photo.decLng, lat: photo.decLat },
-            radius: TOUCH_TARGET_RADIUS,
-            opacity: 0,
-          }))
-        : [],
-    [isCoarsePointer, locatedVisiblePhotos],
-  );
+  // Bounds-filtered, unlike the pins, and so never the larger of the two layers
+  // — the pins take the whole set and let the map clip it. The bounds only
+  // settle at the end of a gesture, so this is rebuilt once a pan, not once a
+  // frame.
+  //
+  // Zero opacity is not a way out of drawing it: MapLibre's `drawCircles` only
+  // bails on a *constant* zero, and this layer's opacity is a per-feature
+  // expression.
+  const touchTargets = React.useMemo((): PointFeature[] => {
+    if (!isCoarsePointer) {
+      return [];
+    }
+
+    const radius = touchTargetRadius(locatedVisiblePhotos.length);
+    // Shrunk all the way to the drawn pin's own radius, the target is no longer
+    // widening anything: MapLibre hit-tests a circle at its radius plus its
+    // stroke, so the pins — 7px and a 2px halo — answer a tap over at least as
+    // much of the screen as this would. Handing the interactions back there
+    // costs the reader nothing, which is what makes this boundary safe to have:
+    // the two behave identically where it falls.
+    if (radius <= PIN_RADIUS) {
+      return [];
+    }
+
+    return locatedVisiblePhotos.map((photo) => ({
+      id: photo.href,
+      at: { lng: photo.decLng, lat: photo.decLat },
+      radius,
+      opacity: 0,
+    }));
+  }, [isCoarsePointer, locatedVisiblePhotos]);
   const photosByHref = React.useMemo(
     () => new Map(locatedPhotos.map((photo) => [photo.href, photo])),
     [locatedPhotos],
@@ -438,7 +515,12 @@ export const MapPhotoMarkers = ({
           {...(order !== undefined ? { order } : {})}
           {...(touchTargets.length > 0 ? {} : interactions)}
         />
-        <MapPhotoKeyboardList photos={locatedVisiblePhotos} onSelect={onSelect} onHover={onHover} />
+        <MapPhotoKeyboardList
+          photos={locatedVisiblePhotos}
+          available={photosByHref}
+          onSelect={onSelect}
+          onHover={onHover}
+        />
       </>
     );
   }

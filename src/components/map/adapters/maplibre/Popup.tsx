@@ -44,9 +44,18 @@ const PopupImpl = (
     // Defaulted here rather than at the port or per consumer: the port describes
     // a popup as something its opener owns and says nothing about focus, so this
     // is the adapter holding the provider to the port's contract rather than
-    // every caller separately remembering to. The adapter's props are MapLibre's
-    // own options, so a caller that genuinely wants the provider's behaviour can
-    // still ask for it by name and win the spread below.
+    // every caller separately remembering to.
+    //
+    // This adapter's props are MapLibre's own options, so code inside the map
+    // module can name `focusAfterOpen` and win the spread below. The port
+    // exposes no way to, and application code may not reach past it (see
+    // `components/map/boundary.test.ts`) — so as things stand no application
+    // popup takes focus as it opens. That is the right default for every popup
+    // there is one of today, all of which appear because something else was
+    // hovered or focused; a popup that is *invoked*, like a context menu, would
+    // want the opposite, and wants more besides — returning focus on dismissal,
+    // and Escape to dismiss — so it should arrive as a deliberate port addition
+    // rather than as an option left lying open here.
     const instance = new gl.Popup({ focusAfterOpen: false, ...props });
     instance.setLngLat([props.longitude, props.latitude]);
 

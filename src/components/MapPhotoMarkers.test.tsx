@@ -5,7 +5,11 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import React, { type ReactNode } from "react";
 import type { PhotoWithStyle } from "./mapWorldViewModel";
-import { KEYBOARD_LIST_LIMIT, MapPhotoMarkers } from "./MapPhotoMarkers";
+import {
+  KEYBOARD_LIST_LIMIT,
+  MapPhotoMarkers,
+  TOUCH_TARGET_FULL_SIZE_COUNT,
+} from "./MapPhotoMarkers";
 import { MapContext } from "./map/adapters/maplibre/context";
 import { Popup as AdapterPopup } from "./map/adapters/maplibre/Popup";
 import type { MapRef } from "./map/adapters/maplibre/types";
@@ -555,10 +559,69 @@ describe("MapPhotoMarkers", () => {
         expect(layer("photo-markers").points).toHaveLength(2);
       });
 
-      it("drops the targets once the view is too dense for them to mean anything", () => {
+      /**
+       * Renders a coarse-pointer map showing this many photos, and reports the
+       * radius its tap targets were laid down at — `undefined` where there is no
+       * target layer at all.
+       */
+      const targetRadiusFor = (inView: number): number | undefined => {
+        dataLayer.mockClear();
+        const photos = Array.from({ length: inView }, (_, index) =>
+          photo({ href: `photo-${index}`, decLng: index / 100 }),
+        );
+        const view = render(
+          <MapPhotoMarkers
+            photos={photos}
+            visiblePhotos={photos}
+            showMarkerImages={false}
+            emphasiseRoute={false}
+            activeRouteHrefSet={new Set()}
+            onSelect={jest.fn()}
+            onHover={jest.fn()}
+          />,
+        );
+        const targets = dataLayerCalls()
+          .filter((props) => props.id === "photo-marker-targets")
+          .at(-1);
+        const radii = new Set(targets?.points.map((point) => point.radius));
+        view.unmount();
+
+        // One radius for the whole layer, so the caller can report a number.
+        expect(radii.size).toBeLessThan(2);
+
+        return [...radii][0];
+      };
+
+      // A count that switched the widening off would invert the feature at its
+      // own boundary: the pan that admits one more photo would take the target
+      // away from every pin in view, including the sparse ones at the edge with
+      // a fingertip of empty map around them — which is what it is for.
+      it("shrinks the tap targets as the view fills up rather than dropping them", () => {
         setCoarsePointer(true);
-        const photos = Array.from({ length: 181 }, (_, index) =>
-          photo({ href: `photo-${index}`, decLng: index / 10 }),
+
+        expect(targetRadiusFor(TOUCH_TARGET_FULL_SIZE_COUNT)).toBe(22);
+
+        const justPast = targetRadiusFor(TOUCH_TARGET_FULL_SIZE_COUNT + 1);
+        expect(justPast).toBeDefined();
+        // One more photo costs a fraction of a pixel, not the whole target.
+        expect(justPast!).toBeLessThan(22);
+        expect(justPast!).toBeGreaterThan(21);
+
+        // And it only ever shrinks: no amount of panning can widen a target by
+        // finding fewer photos, so nothing oscillates across a boundary.
+        const denser = targetRadiusFor(TOUCH_TARGET_FULL_SIZE_COUNT * 4);
+        expect(denser!).toBeLessThan(justPast!);
+        expect(denser!).toBeGreaterThan(7);
+      });
+
+      it("hands the interactions back once a target is no wider than the pin itself", () => {
+        setCoarsePointer(true);
+        // Dense enough that the widening has shrunk to the drawn pin's own
+        // radius. MapLibre hit-tests a circle at its radius plus its stroke, so
+        // the pins answer a tap over at least as much of the screen — this is a
+        // boundary that cannot invert, unlike a count-based one.
+        const photos = Array.from({ length: TOUCH_TARGET_FULL_SIZE_COUNT * 10 }, (_, index) =>
+          photo({ href: `photo-${index}`, decLng: index / 100 }),
         );
         const onSelect = jest.fn();
         render(
@@ -577,7 +640,7 @@ describe("MapPhotoMarkers", () => {
         // With no target layer the pins take the interactions back, so a tap
         // still reaches a photo — the pins are shoulder to shoulder by now.
         act(() => {
-          lastDataLayer().onPointClick?.({ id: "photo-7", at: { lng: 0.7, lat: 35.6762 } });
+          lastDataLayer().onPointClick?.({ id: "photo-7", at: { lng: 0.07, lat: 35.6762 } });
         });
         expect(onSelect).toHaveBeenCalledWith(expect.objectContaining({ href: "photo-7" }));
       });
@@ -753,6 +816,78 @@ describe("MapPhotoMarkers", () => {
         );
 
         // Once focus leaves, the list takes up the viewport it was holding off.
+        act(() => {
+          second.blur();
+        });
+        expect(
+          screen.queryByRole("button", { name: "Photo from kyushu on 2 Jan 2024" }),
+        ).toBeNull();
+      });
+
+      it("lets go of an entry the map itself has dropped, hold or no hold", () => {
+        const onSelect = jest.fn();
+        const photos = [
+          photo({ href: "one" }),
+          photo({ href: "two", album: "kyushu", decLng: 140 }),
+        ];
+        const { rerender } = render(
+          <KeyboardMap photos={photos} visiblePhotos={photos} onSelect={onSelect} />,
+        );
+
+        const second = screen.getByRole("button", { name: "Photo from kyushu on 2 Jan 2024" });
+        act(() => {
+          second.focus();
+        });
+
+        // What is in view also changes when the *data* does — a map search, the
+        // time-range slider, an album filter. A photo the map no longer has is
+        // not one the camera merely moved away from: holding it would go on
+        // announcing a photo that is not there, and activating it would select
+        // something `MapWorld` reconciles away again on arrival — a control that
+        // does nothing visible, having stopped the cinematic tour on its way.
+        rerender(
+          <KeyboardMap photos={[photos[0]!]} visiblePhotos={[photos[0]!]} onSelect={onSelect} />,
+        );
+
+        expect(
+          screen.queryByRole("button", { name: "Photo from kyushu on 2 Jan 2024" }),
+        ).toBeNull();
+        // The rest of the list is still there: dropping one photo is not a
+        // reason to take the reader's list away.
+        expect(
+          screen.getByRole("button", { name: "Photo from kansai on 2 Jan 2024" }),
+        ).toBeTruthy();
+      });
+
+      it("keeps holding when it is the window that lost focus, not the list", () => {
+        const photos = [
+          photo({ href: "one" }),
+          photo({ href: "two", album: "kyushu", decLng: 140 }),
+        ];
+        const { rerender } = render(
+          <KeyboardMap photos={photos} visiblePhotos={photos} onSelect={jest.fn()} />,
+        );
+
+        const second = screen.getByRole("button", { name: "Photo from kyushu on 2 Jan 2024" });
+        act(() => {
+          second.focus();
+        });
+
+        // Alt-tab, the devtools, another application: the window loses focus
+        // and `focusout` fires with nothing to point at, while this entry stays
+        // the document's active element. Releasing on that would rebuild the
+        // list under a focused entry and strand the reader on <body> when they
+        // came back — exactly what the hold exists to prevent.
+        fireEvent.focusOut(second, { relatedTarget: null });
+        rerender(<KeyboardMap photos={photos} visiblePhotos={[photos[0]!]} onSelect={jest.fn()} />);
+
+        expect(screen.getByRole("button", { name: "Photo from kyushu on 2 Jan 2024" })).toBe(
+          second,
+        );
+        expect(document.activeElement).toBe(second);
+
+        // Focus leaving the entry for real — nowhere in the list is still
+        // focused — does release it.
         act(() => {
           second.blur();
         });
