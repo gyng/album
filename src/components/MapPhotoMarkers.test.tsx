@@ -559,6 +559,27 @@ describe("MapPhotoMarkers", () => {
         expect(layer("photo-markers").points).toHaveLength(2);
       });
 
+      it("keeps tap targets on the exact viewport even when a padded render set is given", () => {
+        setCoarsePointer(true);
+        const inView = photo({ href: "in-view" });
+        render(
+          <MapPhotoMarkers
+            photos={[inView, photo({ href: "just-off", decLng: 140 })]}
+            visiblePhotos={[inView]}
+            // The padded set is for the DOM image markers only; a tap target
+            // over a pin that is off the screen would be untappable.
+            renderPhotos={[inView, photo({ href: "just-off", decLng: 140 })]}
+            showMarkerImages={false}
+            emphasiseRoute={false}
+            activeRouteHrefSet={new Set()}
+            onSelect={jest.fn()}
+            onHover={jest.fn()}
+          />,
+        );
+
+        expect(layer("photo-marker-targets").points.map((point) => point.id)).toEqual(["in-view"]);
+      });
+
       /**
        * Renders a coarse-pointer map showing this many photos, and reports the
        * radius its tap targets were laid down at — `undefined` where there is no
@@ -1039,6 +1060,25 @@ describe("MapPhotoMarkers", () => {
 
       // A DOM node each is only affordable for what can actually be seen.
       expect(screen.getAllByTestId("marker")).toHaveLength(1);
+    });
+
+    it("gives a marker to the padded render set so images mount before they scroll in", () => {
+      render(
+        <MapPhotoMarkers
+          photos={[photo({ href: "one" }), photo({ href: "just-off", decLng: 140 })]}
+          visiblePhotos={[photo({ href: "one" })]}
+          // "just-off" is outside the viewport but inside the padded ring, so its
+          // thumbnail is mounted and ready rather than popping in at the edge.
+          renderPhotos={[photo({ href: "one" }), photo({ href: "just-off", decLng: 140 })]}
+          showMarkerImages
+          emphasiseRoute={false}
+          activeRouteHrefSet={new Set()}
+          onSelect={jest.fn()}
+          onHover={jest.fn()}
+        />,
+      );
+
+      expect(screen.getAllByTestId("marker")).toHaveLength(2);
     });
 
     it("shares one intersection observer between marker images", () => {

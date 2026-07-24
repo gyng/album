@@ -102,6 +102,12 @@ const getBackgroundJourneyGradientColors = (fromColor: string, toColor: string) 
 const ROUTER_SYNC_DEBOUNCE_MS = 200;
 const ROUTER_SYNC_PAUSE_MS = 700;
 const MARKER_IMAGE_ZOOM_THRESHOLD = 8.5;
+// A thumbnail image is 80px tall and sits ~12px above its anchor, so mounting
+// markers whose anchor is within this many pixels of the viewport keeps the
+// image in place before it scrolls in. Generous enough to cover the taller
+// preview-label marker too; the ring only holds a handful of extra DOM markers
+// at the zoom where images show.
+const MARKER_RENDER_PADDING_PX = 120;
 
 // With every album's journey drawn at once, each line tapers from thin where
 // the trip began to thick where it ended, so its direction reads without a
@@ -237,6 +243,11 @@ export const MMap: React.FC<MapWorldProps> = ({
   const [isInteracting, setIsInteracting] = React.useState(false);
 
   const [bounds, setBounds] = React.useState<MapBounds | null>(null);
+  // The viewport grown by a thumbnail's height, so an image marker mounts just
+  // outside the visible area and is already there when it scrolls in, rather
+  // than popping in at the edge. Only the DOM image markers use it; the "in
+  // view" set (keyboard list, co-located cycling) stays on the exact viewport.
+  const [renderBounds, setRenderBounds] = React.useState<MapBounds | null>(null);
   const timeFilteredPhotos = React.useMemo(
     () => (timeRange ? photos.filter((photo) => isPhotoInTimeRange(photo, timeRange)) : photos),
     [photos, timeRange],
@@ -249,6 +260,10 @@ export const MMap: React.FC<MapWorldProps> = ({
   const visiblePhotos = React.useMemo(
     () => filterPhotosByBounds(photosWithStyles, bounds),
     [bounds, photosWithStyles],
+  );
+  const renderPhotos = React.useMemo(
+    () => filterPhotosByBounds(photosWithStyles, renderBounds),
+    [renderBounds, photosWithStyles],
   );
 
   const [clickInfo, setClickInfo] = React.useState<MapWorldEntry | null>(null);
@@ -642,7 +657,11 @@ export const MMap: React.FC<MapWorldProps> = ({
         >
           <MapAutoFit enabled={fitToPhotos} photos={photos} />
           <MapFitOnRequest requestId={fitRequestId} photos={photos} />
-          <MapBoundsTracker onBoundsChange={setBounds} />
+          <MapBoundsTracker
+            onBoundsChange={setBounds}
+            onRenderBoundsChange={setRenderBounds}
+            renderPadding={MARKER_RENDER_PADDING_PX}
+          />
           <MapMiddleDragOrbit onInteractionStart={stopDirector} />
           <MapClickAway onGestureStart={beginMapGesture} onGestureClick={dismissOnEmptyClick} />
           <MapDirector
@@ -696,6 +715,7 @@ export const MMap: React.FC<MapWorldProps> = ({
           <MapPhotoMarkers
             photos={photosWithStyles}
             visiblePhotos={visiblePhotos}
+            renderPhotos={renderPhotos}
             showMarkerImages={showMarkerImages}
             previewMarkers={previewMarkers}
             emphasiseRoute={shouldEmphasizeRouteMarkers}

@@ -140,10 +140,46 @@ export const LazyMapMarkerImage = ({ photo }: { photo: MapWorldEntry }) => {
   );
 };
 
+// Expands a viewport bounds by `padding` screen pixels on every edge, converting
+// pixels to degrees from the current span so it is correct at any zoom. Used to
+// mount thumbnail markers just outside the viewport, so their images are already
+// in place by the time they scroll into view rather than popping in at the edge.
+const padBoundsByPixels = (
+  bounds: MapBounds,
+  container: HTMLElement,
+  padding: number,
+): MapBounds => {
+  if (padding <= 0) {
+    return bounds;
+  }
+
+  const width = container.clientWidth || 1;
+  const height = container.clientHeight || 1;
+  const latitudeSpan = bounds.north - bounds.south;
+  // Longitude span, allowing for the antimeridian wrap where east < west.
+  const rawLongitudeSpan = bounds.east - bounds.west;
+  const longitudeSpan = rawLongitudeSpan >= 0 ? rawLongitudeSpan : rawLongitudeSpan + 360;
+  const padLatitude = (padding / height) * latitudeSpan;
+  const padLongitude = (padding / width) * longitudeSpan;
+
+  return {
+    north: bounds.north + padLatitude,
+    south: bounds.south - padLatitude,
+    east: bounds.east + padLongitude,
+    west: bounds.west - padLongitude,
+  };
+};
+
 export const MapBoundsTracker = ({
   onBoundsChange,
+  onRenderBoundsChange,
+  renderPadding = 0,
 }: {
   onBoundsChange: (bounds: MapBounds) => void;
+  /** Reports the viewport expanded by `renderPadding` pixels, for markers that
+   *  should mount just outside the visible area. */
+  onRenderBoundsChange?: (bounds: MapBounds) => void;
+  renderPadding?: number;
 }) => {
   const map = useMap();
 
@@ -154,12 +190,14 @@ export const MapBoundsTracker = ({
 
     const updateBounds = () => {
       const [southWest, northEast] = map.getBounds();
-      onBoundsChange({
+      const viewport: MapBounds = {
         north: northEast.lat,
         south: southWest.lat,
         east: northEast.lng,
         west: southWest.lng,
-      });
+      };
+      onBoundsChange(viewport);
+      onRenderBoundsChange?.(padBoundsByPixels(viewport, map.getContainer(), renderPadding));
     };
 
     updateBounds();
@@ -170,7 +208,7 @@ export const MapBoundsTracker = ({
         unsubscribe();
       });
     };
-  }, [map, onBoundsChange]);
+  }, [map, onBoundsChange, onRenderBoundsChange, renderPadding]);
 
   return null;
 };

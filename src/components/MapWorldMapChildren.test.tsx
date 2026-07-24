@@ -232,6 +232,54 @@ describe("MapBoundsTracker", () => {
     expect(onBoundsChange).not.toHaveBeenCalled();
     expect(on).not.toHaveBeenCalled();
   });
+
+  it("also reports the viewport grown by a pixel padding, converted to degrees", () => {
+    const bounds = [
+      { lng: 80, lat: -10 },
+      { lng: 120, lat: 10 },
+    ];
+    // A 400x200 viewport: 100px is a quarter of the width (10deg of the 40deg
+    // longitude span) and half the height (10deg of the 20deg latitude span).
+    const container = { clientWidth: 400, clientHeight: 200 } as HTMLElement;
+    currentMap = { getBounds: jest.fn(() => bounds), on, getContainer: () => container };
+    const onRenderBoundsChange = jest.fn();
+    render(
+      <MapBoundsTracker
+        onBoundsChange={onBoundsChange}
+        onRenderBoundsChange={onRenderBoundsChange}
+        renderPadding={100}
+      />,
+    );
+    expect(onBoundsChange).toHaveBeenCalledWith({ north: 10, south: -10, east: 120, west: 80 });
+    expect(onRenderBoundsChange).toHaveBeenCalledWith({
+      north: 20,
+      south: -20,
+      east: 130,
+      west: 70,
+    });
+  });
+
+  it("leaves the reported bounds unpadded when no padding is asked for", () => {
+    const bounds = [
+      { lng: 80, lat: -10 },
+      { lng: 120, lat: 10 },
+    ];
+    const container = { clientWidth: 400, clientHeight: 200 } as HTMLElement;
+    currentMap = { getBounds: jest.fn(() => bounds), on, getContainer: () => container };
+    const onRenderBoundsChange = jest.fn();
+    render(
+      <MapBoundsTracker
+        onBoundsChange={onBoundsChange}
+        onRenderBoundsChange={onRenderBoundsChange}
+      />,
+    );
+    expect(onRenderBoundsChange).toHaveBeenCalledWith({
+      north: 10,
+      south: -10,
+      east: 120,
+      west: 80,
+    });
+  });
 });
 
 describe("MapMiddleDragOrbit", () => {

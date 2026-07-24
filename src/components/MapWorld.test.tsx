@@ -52,6 +52,7 @@ const mapInstance = {
   getBearing: jest.fn(() => 10),
   getPitch: jest.fn(() => 20),
   getCanvasContainer: jest.fn(() => mapCanvas),
+  getContainer: jest.fn(() => mapCanvas),
   dragPan: {
     isEnabled: jest.fn(() => true),
     disable: jest.fn(),

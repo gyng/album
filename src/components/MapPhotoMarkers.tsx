@@ -24,6 +24,13 @@ type MapPhotoMarkersProps = {
    * laying down over a pin that is on the screen.
    */
   visiblePhotos: PhotoWithStyle[];
+  /**
+   * The viewport grown by a marker's height, used only for the DOM image
+   * markers: an image mounts just outside the visible area so it is already in
+   * place when it scrolls in rather than popping in at the edge. Defaults to
+   * `visiblePhotos` when the caller does not distinguish the two.
+   */
+  renderPhotos?: PhotoWithStyle[];
   showMarkerImages: boolean;
   /**
    * Preview each marker in place with its thumbnail and album, rather than
@@ -444,6 +451,7 @@ const MapPhotoMarker = ({
 export const MapPhotoMarkers = ({
   photos,
   visiblePhotos,
+  renderPhotos,
   showMarkerImages,
   previewMarkers = false,
   emphasiseRoute,
@@ -458,6 +466,14 @@ export const MapPhotoMarkers = ({
   const locatedVisiblePhotos = React.useMemo(
     () => visiblePhotos.filter(hasCoordinates),
     [visiblePhotos],
+  );
+  // The image markers below use the padded set so they mount just off-screen;
+  // everything keyed to what is actually visible (keyboard list, tap targets)
+  // stays on `visiblePhotos`. Falls back to the visible set when the caller
+  // passes no padded set.
+  const locatedRenderPhotos = React.useMemo(
+    () => (renderPhotos ? renderPhotos.filter(hasCoordinates) : locatedVisiblePhotos),
+    [renderPhotos, locatedVisiblePhotos],
   );
   // Held as `null` unless a route is actually being emphasised: the set behind
   // it changes on every hover, and rebuilding the whole feature collection for
@@ -562,7 +578,7 @@ export const MapPhotoMarkers = ({
 
   return (
     <>
-      {locatedVisiblePhotos.map((photo) => (
+      {locatedRenderPhotos.map((photo) => (
         <MapPhotoMarker
           key={photo.href}
           photo={photo}
