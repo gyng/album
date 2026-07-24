@@ -127,10 +127,15 @@ npm run test:e2e:reuse -- ./tests/smoke.spec.ts                # reuse already-r
 - No perf changes without profiling evidence first
 
 ## Map
-- MapLibre via `react-map-gl/maplibre`; `MMap` is the main component
-- Omit MapLibre paint properties entirely (spread `{}`) instead of passing `undefined` — MapLibre throws on undefined values
-- `useMap()` only works inside children of `<MapLibreMap>` — use small child components for imperative map calls
-- Route overlay is SVG (screen-space), projected via `map.project()`
+- The map is behind a provider-neutral port. Application components import **only** from `src/components/map` (`MapView`, `useMap`, `Marker`, `Popup`, `DataLayer`, and the neutral `LngLat`/`Bounds`/`PointFeature`/`LineFeature` types). `react-map-gl` is gone
+- MapLibre lives **only** in `src/components/map/adapters/maplibre/`, and `src/components/map/port.ts` has no imports at all. `src/components/map/boundary.test.ts` enforces both — nothing outside `components/map/` may import the adapter, and nothing outside the adapter may import `maplibre-gl`. It is not an allowlist; migrate the consumer instead
+- GL style-spec never crosses the port. Describe bulk data with `DataLayer` (neutral points/lines, clustering, halo, dash, taper) rather than a source plus layer objects
+- **Bulk markers must stay on the GPU.** ~1400 photos as DOM markers cost ~35.5ms/frame and all of the main-thread blocking; as one `DataLayer` marker count stops affecting frame time at all. DOM `Marker`s are only for the small, rich case (lazy thumbnails). See `docs/plan-003-map-abstraction.md` for the measurements
+- A GPU layer has no DOM, so it carries no roles, labels, focus or tap targets. `MapPhotoMarkers` compensates with a visually-hidden focusable list and a coarse-pointer hit layer — keep both working when changing that path
+- `useMap()` returns the `MapInstance` directly (not `{ current }`) and only inside `<MapView>` children — use small child components for imperative work (`MapAutoFit` is the pattern)
+- Children mount as soon as the map object exists, not on `load`, so a failed style or dead tile worker degrades to controls over a blank basemap rather than deleting the map UI. e2e liveness therefore asserts `data-map-status="loaded"`, never the presence of a child
+- Give `DataLayer` an explicit `order` where stacking matters; without one, draw order follows mount history
+- Route overlay is SVG (screen-space), projected via the port's `project()`
 - Map search metadata is build-generated at `/data/map-search-index.json`. Fetch it with `fetchMapSearchIndex`; preserve `cache: "no-store"`, the response's `must-revalidate` header, and the service worker's network-first handling so deployments cannot leave a stale index cached indefinitely
 
 ## Design tokens (src/styles/globals.css)

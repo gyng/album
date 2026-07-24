@@ -859,6 +859,79 @@ describe("MapPhotoMarkers", () => {
         ).toBeTruthy();
       });
 
+      // Removing the focused element fires `focusout` on Chromium, but no event
+      // at all on Firefox and WebKit (jsdom behaves as they do). So when the
+      // data drops the entry the reader is standing on, the blur that would
+      // release the hold never comes — and the hold has no other exit.
+      it("takes up the new viewport once the data drops the entry that was holding it", () => {
+        const photos = [
+          photo({ href: "one" }),
+          photo({ href: "two", album: "kyushu", decLng: 140 }),
+          photo({ href: "three", album: "hokkaido", decLng: 141 }),
+        ];
+        const { rerender } = render(
+          <KeyboardMap
+            photos={photos}
+            visiblePhotos={[photos[0]!, photos[1]!]}
+            onSelect={jest.fn()}
+          />,
+        );
+
+        const second = screen.getByRole("button", { name: "Photo from kyushu on 2 Jan 2024" });
+        act(() => {
+          second.focus();
+        });
+
+        // A search narrows the map while focus is inside the list: the focused
+        // photo goes, and the camera settles on a different one. A list still
+        // holding would announce a viewport nobody is standing in — offering a
+        // photo that is not on screen and omitting the one that is.
+        rerender(
+          <KeyboardMap
+            photos={[photos[0]!, photos[2]!]}
+            visiblePhotos={[photos[2]!]}
+            onSelect={jest.fn()}
+          />,
+        );
+
+        expect(
+          screen.getByRole("button", { name: "Photo from hokkaido on 2 Jan 2024" }),
+        ).toBeTruthy();
+        expect(
+          screen.queryByRole("button", { name: "Photo from kansai on 2 Jan 2024" }),
+        ).toBeNull();
+      });
+
+      it("comes back when the data leaves nothing it was holding", () => {
+        const photos = [
+          photo({ href: "one" }),
+          photo({ href: "two", album: "kyushu", decLng: 140 }),
+        ];
+        const narrowed = photo({ href: "three", album: "hokkaido", decLng: 141 });
+        const { rerender } = render(
+          <KeyboardMap photos={photos} visiblePhotos={photos} onSelect={jest.fn()} />,
+        );
+
+        const second = screen.getByRole("button", { name: "Photo from kyushu on 2 Jan 2024" });
+        act(() => {
+          second.focus();
+        });
+
+        // A search narrowing to a disjoint set leaves the held hrefs naming
+        // nothing the map still has. Holding on would render no entries at all
+        // — and with no control left there is no blur to release it, so the
+        // map's only keyboard and screen-reader route to its pins would be gone
+        // for the rest of the session.
+        rerender(
+          <KeyboardMap photos={[narrowed]} visiblePhotos={[narrowed]} onSelect={jest.fn()} />,
+        );
+
+        expect(screen.getByRole("list", { name: "Photos in view" })).toBeTruthy();
+        expect(
+          screen.getByRole("button", { name: "Photo from hokkaido on 2 Jan 2024" }),
+        ).toBeTruthy();
+      });
+
       it("keeps holding when it is the window that lost focus, not the list", () => {
         const photos = [
           photo({ href: "one" }),

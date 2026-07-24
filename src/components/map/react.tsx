@@ -887,14 +887,22 @@ type StackEntry = {
    */
   seq: number;
   /**
-   * Sub-group within one `<DataLayer>`: its points draw beneath its lines.
+   * Kind of layer: points (0) draw beneath lines (1).
    *
    * Decided ahead of `seq`, because mount order does not say this. A layer's
    * points and lines live on two sources, and either can be rebuilt on its own
    * — a points source that is rebuilt (or that only appears once the layer is
    * given points) re-adds its layers on top, which is the contract inverted.
-   * Only where the `<DataLayer>` declares an `order` at all: with none declared
-   * nothing is moved on the map and what the provider appended stands.
+   *
+   * It sorts across every entry at the same `order`, not only the two halves of
+   * one `<DataLayer>`: two different layers declaring the same order — one
+   * lines-only, one points-only — have the points put below the lines whatever
+   * they declared or whichever mounted first. No such pair exists today; a
+   * caller wanting one over the other should give them different orders.
+   *
+   * It applies whenever *any* entry on the map declares an `order` — see
+   * `restack`, which then restacks every entry, order-less ones included. Only
+   * a map where nobody declares one is left exactly as the provider appended it.
    */
   group: number;
   ids: readonly string[];

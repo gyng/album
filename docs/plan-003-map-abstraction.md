@@ -1,9 +1,12 @@
 # Plan: Replacing react-map-gl and Abstracting the Map Provider
 
-> **Status: proposed** — nothing implemented. Three phases, each shipping value on its own.
-> Phase 1 removes `react-map-gl`; Phase 2 confines MapLibre behind a port *and* banks the
-> marker performance win (they are the same change); Phase 3 is deferred until a real second
-> provider exists. Phase 2 must open with a profiling trace — see *Performance evidence*.
+> **Status: Phases 1 and 2 shipped.** `react-map-gl` is gone, MapLibre is confined to
+> `components/map/adapters/maplibre/` behind the port, the marker work landed and was
+> re-measured, and MapLibre 6 followed — see *Performance evidence* and *Outcome: MapLibre 6*
+> below for what was measured and what broke. Phase 3 (a second adapter) remains deferred until
+> a real second provider exists. The sketches below record the plan as written; where the
+> shipped port differs — it also carries `opacity`, `order`, `stroke`, `lineWidthAlong` and
+> point interactions — the code is the authority.
 
 ## Context
 

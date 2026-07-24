@@ -158,6 +158,18 @@ const useCoarsePointer = (): boolean => {
 };
 
 /**
+ * The viewport the keyboard list is holding still, and the entry holding it.
+ *
+ * The hrefs are the photos that were in view when focus arrived. The focused
+ * entry is kept with them because it is the only thing that can let go: a hold
+ * whose entry has gone has nobody left to blur, and no other exit.
+ */
+type KeyboardListHold = {
+  hrefs: readonly string[];
+  focusedHref: string;
+};
+
+/**
  * Keyboard and screen-reader access to pins that have no element of their own.
  *
  * Drawn points cannot be focused or announced: there is nothing there but
@@ -201,19 +213,38 @@ const MapPhotoKeyboardList = ({
   // photo that is no longer on the map, and activating it would select something
   // the screen reconciles away again the moment it arrives: a control that does
   // nothing visible, having stopped the cinematic tour on its way.
-  const [heldHrefs, setHeldHrefs] = React.useState<readonly string[] | null>(null);
+  const [held, setHeld] = React.useState<KeyboardListHold | null>(null);
   const listRef = React.useRef<HTMLUListElement>(null);
   const listed = React.useMemo(
     () =>
-      heldHrefs
-        ? heldHrefs.flatMap((href) => {
+      held
+        ? held.hrefs.flatMap((href) => {
             const photo = available.get(href);
 
             return photo ? [photo] : [];
           })
         : photos,
-    [available, heldHrefs, photos],
+    [available, held, photos],
   );
+
+  // The hold is let go of by focus leaving, and the data can take the entry
+  // that would do the leaving. Removing a focused element fires `focusout` on
+  // Chromium, but *no event at all* on Firefox and WebKit — so on those engines
+  // the entry, and with it the hold's only ordinary exit, simply vanishes.
+  //
+  // What is left is a list frozen on a viewport nobody is standing in: it goes
+  // on offering photos the camera has left behind, and once the held hrefs stop
+  // naming anything the map still has it renders nothing at all — no control,
+  // so no blur, so no way back for the rest of the session. Watching the photo
+  // the reader was actually on is what makes the release event-independent.
+  //
+  // Not "release whenever the list does not contain `document.activeElement`":
+  // `focusout` and `focusin` are separate tasks, and a render committed between
+  // them sees `<body>` focused mid-tab, which would let go exactly as a reader
+  // moves from one entry to the next.
+  React.useEffect(() => {
+    setHeld((current) => (current && !available.has(current.focusedHref) ? null : current));
+  }, [available]);
 
   if (listed.length === 0) {
     return null;
@@ -240,7 +271,11 @@ const MapPhotoKeyboardList = ({
             }}
             onFocus={() => {
               onHover(photo);
-              setHeldHrefs((current) => current ?? photos.map((inView) => inView.href));
+              setHeld((current) =>
+                current
+                  ? { ...current, focusedHref: photo.href }
+                  : { hrefs: photos.map((inView) => inView.href), focusedHref: photo.href },
+              );
             }}
             onBlur={(event) => {
               onHover(null);
@@ -249,7 +284,7 @@ const MapPhotoKeyboardList = ({
               const next = event.relatedTarget;
               if (next instanceof Node) {
                 if (!listRef.current?.contains(next)) {
-                  setHeldHrefs(null);
+                  setHeld(null);
                 }
 
                 return;
@@ -268,7 +303,7 @@ const MapPhotoKeyboardList = ({
                 return;
               }
 
-              setHeldHrefs(null);
+              setHeld(null);
             }}
           >
             {photoLabel(photo)}
