@@ -3,10 +3,14 @@ import type { MapRef } from "./types";
 
 /**
  * `isStyleUsable` is the guard in front of every style mutation this adapter
- * makes, and it reads two properties MapLibre marks internal. If either is
- * renamed the guard quietly answers "no" for ever: no source, no layer and no
- * projection would ever be applied again, and nothing would throw. These cases
- * pin the shape it depends on so that break is loud.
+ * makes. These cases pin its decision — which combinations of removed, loading
+ * and absent count as usable — and nothing more.
+ *
+ * They deliberately do not pin the two internal MapLibre properties it reads
+ * (`_removed`, `style._loaded`): each case builds its own literal and casts it
+ * to `MapRef`, so a rename in MapLibre would leave every one of them passing.
+ * What catches that is `tsc`, because `MapRef` is MapLibre's own `Map` type and
+ * `internal.ts` reads the properties off it unaliased.
  */
 const asMap = (map: Partial<MapRef>): MapRef => map as MapRef;
 

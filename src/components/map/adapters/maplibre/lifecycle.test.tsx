@@ -5,13 +5,29 @@
 import { act, render } from "@testing-library/react";
 import React from "react";
 import { MapContext } from "./context";
+import type { FilterSpecification } from "./engine";
 import { gl } from "./engine";
 import { Layer } from "./Layer";
-import { Marker } from "./Marker";
+import { Marker, type MarkerProps } from "./Marker";
 import { MapView } from "./MapView";
 import { Popup } from "./Popup";
 import { Source } from "./Source";
 import type { MapRef } from "./types";
+
+/** The marker options MapLibre can change without rebuilding the marker. */
+type SettableMarkerProps = Partial<
+  Pick<
+    MarkerProps,
+    | "offset"
+    | "draggable"
+    | "rotation"
+    | "rotationAlignment"
+    | "pitchAlignment"
+    | "subpixelPositioning"
+    | "opacity"
+    | "className"
+  >
+>;
 
 /*
  * jsdom has no WebGL, so the engine seam is replaced wholesale. The fakes are
@@ -50,7 +66,13 @@ jest.mock("./engine", () => {
     layerOrder: string[] = [];
     listeners = new Map<string, Set<Listener>>();
     paintCalls: [string, string, unknown][] = [];
+    layoutCalls: [string, string, unknown][] = [];
+    filterCalls: [string, unknown][] = [];
+    zoomRangeCalls: [string, number, number][] = [];
+    moveCalls: [string, string | undefined][] = [];
     projection: { type: string } | undefined;
+    /** How deep a `setProjection` → `styledata` → `setProjection` chain is. */
+    projectionDepth = 0;
     canvas = document.createElement("canvas");
 
     constructor() {
@@ -147,19 +169,42 @@ jest.mock("./engine", () => {
       this.layerOrder = this.layerOrder.filter((layerId) => layerId !== id);
     }
 
-    moveLayer(): void {}
+    moveLayer(id: string, beforeId?: string): void {
+      this.moveCalls.push([id, beforeId]);
+    }
     setPaintProperty(layerId: string, name: string, value: unknown): void {
       this.paintCalls.push([layerId, name, value]);
     }
-    setLayoutProperty(): void {}
-    setFilter(): void {}
-    setLayerZoomRange(): void {}
+    setLayoutProperty(layerId: string, name: string, value: unknown): void {
+      this.layoutCalls.push([layerId, name, value]);
+    }
+    setFilter(layerId: string, filter: unknown): void {
+      this.filterCalls.push([layerId, filter]);
+    }
+    setLayerZoomRange(layerId: string, minzoom: number, maxzoom: number): void {
+      this.zoomRangeCalls.push([layerId, minzoom, maxzoom]);
+    }
     getProjection(): { type: string } | undefined {
       return this.projection;
     }
+    /**
+     * Setting the projection mutates the style, so MapLibre fires `styledata`
+     * again — which is what the adapter's re-entry guard exists for. The depth
+     * cap keeps an unguarded loop from recursing without bound, so the case
+     * reports how many times the projection was set rather than a stack trace.
+     */
     setProjection(projection: { type: string }): void {
       this.operations.push(`setProjection:${projection.type}`);
       this.projection = projection;
+      if (this.projectionDepth >= 3) {
+        return;
+      }
+      this.projectionDepth += 1;
+      try {
+        this.fire("styledata");
+      } finally {
+        this.projectionDepth -= 1;
+      }
     }
     setStyle(): void {}
     getCanvas(): HTMLCanvasElement {
@@ -214,33 +259,35 @@ jest.mock("./engine", () => {
 
       return this;
     }
-    setDraggable(): this {
-      this.calls.push("setDraggable");
+    setDraggable(draggable: unknown): this {
+      this.calls.push(`setDraggable:${JSON.stringify(draggable)}`);
 
       return this;
     }
-    setRotation(): this {
-      this.calls.push("setRotation");
+    setRotation(rotation: unknown): this {
+      this.calls.push(`setRotation:${JSON.stringify(rotation)}`);
 
       return this;
     }
-    setRotationAlignment(): this {
-      this.calls.push("setRotationAlignment");
+    setRotationAlignment(alignment: unknown): this {
+      this.calls.push(`setRotationAlignment:${JSON.stringify(alignment)}`);
 
       return this;
     }
-    setPitchAlignment(): this {
-      this.calls.push("setPitchAlignment");
+    setPitchAlignment(alignment: unknown): this {
+      this.calls.push(`setPitchAlignment:${JSON.stringify(alignment)}`);
 
       return this;
     }
-    setSubpixelPositioning(): this {
-      this.calls.push("setSubpixelPositioning");
+    setSubpixelPositioning(positioning: unknown): this {
+      this.calls.push(`setSubpixelPositioning:${JSON.stringify(positioning)}`);
 
       return this;
     }
-    setOpacity(): this {
-      this.calls.push("setOpacity");
+    setOpacity(opacity: unknown, opacityWhenCovered: unknown): this {
+      this.calls.push(
+        `setOpacity:${JSON.stringify([opacity ?? null, opacityWhenCovered ?? null])}`,
+      );
 
       return this;
     }
@@ -379,6 +426,10 @@ jest.mock("./engine", () => {
 type MockMapApi = MapRef & {
   operations: string[];
   paintCalls: [string, string, unknown][];
+  layoutCalls: [string, string, unknown][];
+  filterCalls: [string, unknown][];
+  zoomRangeCalls: [string, number, number][];
+  moveCalls: [string, string | undefined][];
   fire: (type: string, event?: unknown) => void;
   reloadStyle: () => void;
   sources: Map<string, { spec: Record<string, unknown>; instance: unknown }>;
@@ -556,7 +607,7 @@ describe("MapView failure handling", () => {
     });
   });
 
-  it("does not touch the projection until the style can take it", () => {
+  it("does not touch the projection until the style can take it, and sets it once", () => {
     render(<MapView projection="globe" />);
     const map = lastMap();
     map.style._loaded = false;
@@ -570,7 +621,27 @@ describe("MapView failure handling", () => {
     act(() => {
       map.fire("styledata");
     });
-    expect(map.operations).toContain("setProjection:globe");
+    // Setting it mutates the style, so MapLibre fires `styledata` again — the
+    // very event this is applied from. Without the compare-first guard that is
+    // an unbounded loop; the fake stops recursing after a few rounds so the
+    // count reports it rather than a stack overflow.
+    expect(map.operations.filter((operation) => operation === "setProjection:globe")).toHaveLength(
+      1,
+    );
+  });
+
+  it("gives its WebGL context back when the map unmounts", () => {
+    // Route-level, and behind a deferred component: every navigation away
+    // unmounts it, and a context that is never released is one fewer the
+    // browser will hand out (they are capped, and the cap is low).
+    const { unmount } = render(<MapView />);
+    const map = lastMap();
+
+    expect(map._removed).toBe(false);
+
+    unmount();
+
+    expect(map._removed).toBe(true);
   });
 });
 
@@ -650,17 +721,27 @@ describe("Source and Layer lifecycle", () => {
     ]);
   });
 
-  it("leaves the source alone when only the data changes", () => {
+  it("sends new data through the live source instead of rebuilding it", () => {
     const map = createMap();
-    const tree = (data: typeof EMPTY_GEOJSON) => (
+    const tree = (data: GeoJSON.FeatureCollection) => (
       <Source id="s" type="geojson" data={data}>
         <Layer id="l" type="line" />
       </Source>
     );
     const { update } = renderInMap(map, tree(EMPTY_GEOJSON));
+    // Every update the map makes — a time-range filter, a search narrowing the
+    // results, a journey rebuilt around the selected pin — arrives this way.
+    const next: GeoJSON.FeatureCollection = {
+      type: "FeatureCollection",
+      features: [
+        { type: "Feature", properties: {}, geometry: { type: "Point", coordinates: [1, 2] } },
+      ],
+    };
 
-    update(tree({ type: "FeatureCollection", features: [] }));
+    update(tree(next));
 
+    expect((map.getSource("s") as unknown as { data: unknown }).data).toBe(next);
+    // In place: rebuilding would drop and re-add the layers drawn on it.
     expect(map.operations).toEqual(["addSource:s", "addLayer:l"]);
   });
 
@@ -715,6 +796,127 @@ describe("Source and Layer lifecycle", () => {
     // Not even attempted: MapLibre would reject it and never retry.
     expect(map.operations).toEqual([]);
     expect(map.getLayer("orphan")).toBeUndefined();
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+/* Layer reconciliation — the steady state, not the mount                      */
+/* -------------------------------------------------------------------------- */
+
+describe("Layer reconciliation", () => {
+  type CirclePaint = {
+    "circle-color"?: string;
+    "circle-opacity"?: number;
+  };
+
+  const circleLayer = (paint: CirclePaint) => (
+    <Source id="s" type="geojson" data={EMPTY_GEOJSON}>
+      <Layer id="l" type="circle" paint={paint} />
+    </Source>
+  );
+
+  it("sends the paint a change touched, and clears what the new style stopped setting", () => {
+    const map = createMap();
+    const { update } = renderInMap(
+      map,
+      circleLayer({ "circle-color": "#12bcd4", "circle-opacity": 0.24 }),
+    );
+
+    // The layer was added with its paint, so nothing has been set on it yet.
+    expect(map.paintCalls).toEqual([]);
+
+    // Selecting a pin brightens that pin's own journey back up. Miss this and
+    // a route de-emphasised once stays dimmed for the rest of the session.
+    update(circleLayer({ "circle-color": "#12bcd4", "circle-opacity": 1 }));
+
+    // Only the property that moved: re-sending the colour would repaint the
+    // whole layer on every hover.
+    expect(map.paintCalls).toEqual([["l", "circle-opacity", 1]]);
+
+    // Dropped from the style altogether, which means "back to the default".
+    update(circleLayer({ "circle-color": "#12bcd4" }));
+
+    expect(map.paintCalls).toEqual([
+      ["l", "circle-opacity", 1],
+      ["l", "circle-opacity", undefined],
+    ]);
+  });
+
+  it("sends the layout a change touched, and clears what the new style stopped setting", () => {
+    const map = createMap();
+    const tree = (layout: { visibility?: "visible" | "none" }) => (
+      <Source id="s" type="geojson" data={EMPTY_GEOJSON}>
+        <Layer id="l" type="circle" layout={layout} />
+      </Source>
+    );
+    const { update } = renderInMap(map, tree({ visibility: "none" }));
+
+    update(tree({ visibility: "visible" }));
+    expect(map.layoutCalls).toEqual([["l", "visibility", "visible"]]);
+
+    update(tree({}));
+    expect(map.layoutCalls).toEqual([
+      ["l", "visibility", "visible"],
+      ["l", "visibility", undefined],
+    ]);
+  });
+
+  it("applies a filter when it changes, and not when it is only a new array", () => {
+    const map = createMap();
+    const tree = (dash: string) => (
+      <Source id="s" type="geojson" data={EMPTY_GEOJSON}>
+        <Layer id="l" type="line" filter={["==", ["get", "dash"], dash] as FilterSpecification} />
+      </Source>
+    );
+    const { update } = renderInMap(map, tree("2-2"));
+
+    // `MapWorld` splits its journey lines into one layer per dash pattern, and
+    // the filter is what decides which features each of them draws.
+    update(tree("solid"));
+    expect(map.filterCalls).toEqual([["l", ["==", ["get", "dash"], "solid"]]]);
+
+    // Rebuilt every render, so identity says nothing — an equal filter must not
+    // reach the map, or every render would re-run the layer's feature pass.
+    update(tree("solid"));
+    expect(map.filterCalls).toHaveLength(1);
+  });
+
+  it("moves the layer's zoom bounds, and falls back to the spec defaults when they go", () => {
+    const map = createMap();
+    const tree = (zoom: { minzoom?: number; maxzoom?: number }) => (
+      <Source id="s" type="geojson" data={EMPTY_GEOJSON}>
+        <Layer id="l" type="circle" {...zoom} />
+      </Source>
+    );
+    const { update } = renderInMap(map, tree({ minzoom: 4 }));
+
+    update(tree({ minzoom: 6, maxzoom: 12 }));
+    expect(map.zoomRangeCalls).toEqual([["l", 6, 12]]);
+
+    // MapLibre has no "unset" for either bound, so the style-spec defaults are
+    // named explicitly; leaving them would pin the layer to the old window.
+    update(tree({}));
+    expect(map.zoomRangeCalls).toEqual([
+      ["l", 6, 12],
+      ["l", 0, 24],
+    ]);
+  });
+
+  it("restacks the layer when the layer it draws beneath changes", () => {
+    const map = createMap();
+    const tree = (beforeId?: string) => (
+      <Source id="s" type="geojson" data={EMPTY_GEOJSON}>
+        <Layer id="pins" type="circle" />
+        <Layer id="l" type="line" {...(beforeId ? { beforeId } : {})} />
+      </Source>
+    );
+    const { update } = renderInMap(map, tree());
+
+    // Selecting a pin remounts the journey lines, which arrive on top of
+    // everything already drawn — including the pins being aimed at.
+    update(tree("pins"));
+
+    expect(map.moveCalls).toEqual([["l", "pins"]]);
   });
 });
 
@@ -787,6 +989,53 @@ describe("Marker reconciliation", () => {
     // `setOffset` hands the argument straight to `Point.convert`, which throws
     // on `undefined`.
     expect(markerInstances()[0]?.calls).toContain("setOffset:[0,0]");
+  });
+
+  /**
+   * Every option MapLibre can change on a live marker. Each of them is a
+   * separate branch that only runs when that one prop moves, so a table is the
+   * only shape that keeps them all honest.
+   */
+  const settableOptions: [
+    name: string,
+    from: SettableMarkerProps,
+    to: SettableMarkerProps,
+    expected: string[],
+  ][] = [
+    ["offset", {}, { offset: [0, 5] }, ["setOffset:[0,5]"]],
+    ["draggable", {}, { draggable: true }, ["setDraggable:true"]],
+    ["rotation", {}, { rotation: 45 }, ["setRotation:45"]],
+    ["rotationAlignment", {}, { rotationAlignment: "map" }, ['setRotationAlignment:"map"']],
+    ["pitchAlignment", {}, { pitchAlignment: "map" }, ['setPitchAlignment:"map"']],
+    ["subpixelPositioning", {}, { subpixelPositioning: true }, ["setSubpixelPositioning:true"]],
+    ["opacity", {}, { opacity: "0.4" }, ['setOpacity:["0.4",null]']],
+    [
+      "className",
+      { className: "hover" },
+      { className: "click" },
+      ["removeClassName:hover", "addClassName:click"],
+    ],
+  ];
+
+  it.each(settableOptions)("reconciles %s on the live marker", (_name, from, to, expected) => {
+    const map = createMap();
+    const { update } = renderInMap(
+      map,
+      <Marker longitude={1} latitude={2} {...from}>
+        <span>pin</span>
+      </Marker>,
+    );
+
+    update(
+      <Marker longitude={1} latitude={2} {...to}>
+        <span>pin</span>
+      </Marker>,
+    );
+
+    // None of these is a construction option, so the marker — and the portal
+    // rendering into it — has to survive the change.
+    expect(markerInstances()).toHaveLength(1);
+    expect(markerInstances()[0]?.calls).toEqual(expected);
   });
 
   it("clears style properties that the new style no longer sets", () => {

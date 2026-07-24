@@ -92,7 +92,7 @@ const TOUCH_TARGET_RADIUS = 22;
 const TOUCH_TARGET_LIMIT = 180;
 
 /** How many of the photos in view the keyboard list offers at once. */
-const KEYBOARD_LIST_LIMIT = 40;
+export const KEYBOARD_LIST_LIMIT = 40;
 
 const pinOpacity = (photo: LocatedPhoto, emphasisedHrefs: ReadonlySet<string> | null): number => {
   if (!emphasisedHrefs) {

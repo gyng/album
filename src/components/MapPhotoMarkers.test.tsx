@@ -5,7 +5,7 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import React, { type ReactNode } from "react";
 import type { PhotoWithStyle } from "./mapWorldViewModel";
-import { MapPhotoMarkers } from "./MapPhotoMarkers";
+import { KEYBOARD_LIST_LIMIT, MapPhotoMarkers } from "./MapPhotoMarkers";
 import { MapContext } from "./map/adapters/maplibre/context";
 import { Popup as AdapterPopup } from "./map/adapters/maplibre/Popup";
 import type { MapRef } from "./map/adapters/maplibre/types";
@@ -186,6 +186,36 @@ const setCoarsePointer = (coarse: boolean) => {
 /** A touchscreen laptop: the mouse is primary, but a fingertip is still a pointer. */
 const setHybridPointer = () => {
   setPointerQueries(["(pointer: fine)", "(any-pointer: fine)", "(any-pointer: coarse)"]);
+};
+
+/**
+ * A media-query list that can be followed, as a browser's can: it starts fine,
+ * and `setCoarse` moves it the way a device gaining or losing a pointer does.
+ */
+const setSubscribablePointer = () => {
+  const listeners = new Set<() => void>();
+  const query = {
+    matches: false,
+    addEventListener: jest.fn((_type: string, listener: () => void) => {
+      listeners.add(listener);
+    }),
+    removeEventListener: jest.fn((_type: string, listener: () => void) => {
+      listeners.delete(listener);
+    }),
+  };
+  window.matchMedia = jest.fn(() => query) as unknown as typeof window.matchMedia;
+
+  return {
+    query,
+    setCoarse: (coarse: boolean) => {
+      query.matches = coarse;
+      act(() => {
+        listeners.forEach((listener) => {
+          listener();
+        });
+      });
+    },
+  };
 };
 
 const photo = (overrides: Partial<PhotoWithStyle> = {}): PhotoWithStyle => ({
@@ -428,6 +458,60 @@ describe("MapPhotoMarkers", () => {
         expect(lastDataLayer().onPointClick).toBeDefined();
       });
 
+      it("follows the pointer changing under it, and stops following on unmount", () => {
+        // A tablet's keyboard cover coming off, or a phone gaining a mouse: the
+        // reader does not remount the map to tell us, so the query is followed.
+        const pointer = setSubscribablePointer();
+        const { unmount } = render(
+          <MapPhotoMarkers
+            photos={[photo()]}
+            visiblePhotos={[photo()]}
+            showMarkerImages={false}
+            emphasiseRoute={false}
+            activeRouteHrefSet={new Set()}
+            onSelect={jest.fn()}
+            onHover={jest.fn()}
+          />,
+        );
+
+        expect(screen.queryByTestId("photo-marker-targets")).toBeNull();
+
+        pointer.setCoarse(true);
+        expect(layer("photo-marker-targets").points).toHaveLength(1);
+
+        pointer.setCoarse(false);
+        expect(screen.queryByTestId("photo-marker-targets")).toBeNull();
+
+        unmount();
+        expect(pointer.query.removeEventListener).toHaveBeenCalledWith(
+          "change",
+          expect.any(Function),
+        );
+      });
+
+      it("reads a media-query list it cannot subscribe to and leaves it there", () => {
+        // Not every environment hands back something subscribable — an older
+        // Safari, or a test double. The one reading still has to be honoured,
+        // and subscribing to what has no subscription must not throw.
+        window.matchMedia = jest.fn(() => ({
+          matches: true,
+        })) as unknown as typeof window.matchMedia;
+
+        render(
+          <MapPhotoMarkers
+            photos={[photo()]}
+            visiblePhotos={[photo()]}
+            showMarkerImages={false}
+            emphasiseRoute={false}
+            activeRouteHrefSet={new Set()}
+            onSelect={jest.fn()}
+            onHover={jest.fn()}
+          />,
+        );
+
+        expect(layer("photo-marker-targets").points).toHaveLength(1);
+      });
+
       it("counts a touchscreen laptop as coarse even though its mouse is primary", () => {
         // `pointer` reports the *primary* pointer only, so a hybrid device says
         // `fine` and its touch users would be left tapping at an 18px dot.
@@ -536,7 +620,8 @@ describe("MapPhotoMarkers", () => {
       });
 
       it("caps the list and says how to reach the rest before the entries, not after", () => {
-        const photos = Array.from({ length: 42 }, (_, index) =>
+        const total = KEYBOARD_LIST_LIMIT + 2;
+        const photos = Array.from({ length: total }, (_, index) =>
           photo({ href: `photo-${index}`, decLng: index }),
         );
         render(
@@ -553,9 +638,11 @@ describe("MapPhotoMarkers", () => {
 
         // Reinstating a control per photo is the cost the drawn layer exists to
         // avoid, so the list is capped rather than complete.
-        expect(screen.getAllByRole("button", { name: /Photo from kansai/ })).toHaveLength(40);
+        expect(screen.getAllByRole("button", { name: /Photo from kansai/ })).toHaveLength(
+          KEYBOARD_LIST_LIMIT,
+        );
         const notice = screen.getByText(
-          "Showing the first 40 of 42 photos in view. Zoom in to reach the rest.",
+          `Showing the first ${KEYBOARD_LIST_LIMIT} of ${total} photos in view. Zoom in to reach the rest.`,
         );
         // After the entries the notice is unreachable in practice: it would only
         // find someone who had already traversed forty photos whose names are

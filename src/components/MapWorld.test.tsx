@@ -350,6 +350,26 @@ describe("MapWorld", () => {
   };
 
   let replaceStateSpy: jest.SpyInstance;
+  const originalMatchMedia = window.matchMedia;
+
+  /**
+   * A media-query list shaped the way a browser's is — subscribable, and
+   * answering every query the same way. Assigning a bare `{ matches }` leaks
+   * into every case that runs afterwards and leaves `addEventListener` missing
+   * for anything that tries to follow the query.
+   */
+  const stubMatchMedia = (matches: boolean) => {
+    window.matchMedia = jest.fn((media: string) => ({
+      matches,
+      media,
+      onchange: null,
+      addEventListener: jest.fn(),
+      removeEventListener: jest.fn(),
+      addListener: jest.fn(),
+      removeListener: jest.fn(),
+      dispatchEvent: jest.fn(),
+    })) as unknown as typeof window.matchMedia;
+  };
 
   beforeEach(() => {
     window.history.replaceState({}, "", "/");
@@ -383,6 +403,7 @@ describe("MapWorld", () => {
     jest.runOnlyPendingTimers();
     jest.useRealTimers();
     replaceStateSpy.mockRestore();
+    window.matchMedia = originalMatchMedia;
   });
 
   it("updates the URL with debounced next router replace", () => {
@@ -497,7 +518,8 @@ describe("MapWorld", () => {
   });
 
   it("tours the current photo pool while the caller enables it", () => {
-    window.matchMedia = jest.fn().mockReturnValue({ matches: false });
+    // Nothing asks for reduced motion, so the tour actually flies.
+    stubMatchMedia(false);
     const london = {
       ...photo,
       album: "london",
@@ -540,7 +562,7 @@ describe("MapWorld", () => {
   it("tells the caller to stop when the pool shrinks below a tour", () => {
     // Filtering down to one photo leaves nothing to tour. An external control
     // would still read as playing unless the map reports the change back.
-    window.matchMedia = jest.fn().mockReturnValue({ matches: false });
+    stubMatchMedia(false);
     const london = {
       ...photo,
       album: "london",
@@ -922,6 +944,35 @@ describe("MapWorld", () => {
     clickEmptyMap();
     expect(screen.queryByRole("group", { name: "Location actions" })).toBeNull();
     expect(screen.queryByRole("link", { name: /kansai/i })).toBeNull();
+  });
+
+  it("still dismisses on a click that follows a pin click the surface never heard", () => {
+    render(<MMap photos={[photo]} className="map" />);
+
+    act(() =>
+      mapHandlers.onContextMenu?.({
+        lngLat: { lat: 1, lng: 2 },
+        point: { x: 3, y: 4 },
+        originalEvent: { preventDefault: jest.fn() },
+      }),
+    );
+    expect(screen.getByRole("group", { name: "Location actions" })).toBeInTheDocument();
+
+    // Zoomed past the marker-image threshold the pins are DOM markers, and a
+    // marker stops its click at its own element: the gesture surface never
+    // hears it, so the claim that click leaves behind is never spent.
+    act(() => {
+      mapHandlers.onZoom?.({ viewState: { zoom: 9 } });
+    });
+    fireEvent.click(screen.getByTestId("marker"));
+    expect(screen.getByRole("group", { name: "Location actions" })).toBeInTheDocument();
+
+    // Each gesture has to open with a clean slate, or this one is spent
+    // clearing the stale claim instead of dismissing, and the reader has to
+    // click a second time to put the map's overlays away.
+    clickEmptyMap();
+
+    expect(screen.queryByRole("group", { name: "Location actions" })).toBeNull();
   });
 
   it("puts a hover-opened popup away with the click that lands on nothing", () => {
