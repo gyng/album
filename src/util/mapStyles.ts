@@ -21,8 +21,8 @@ export const MAP_TILER_KEY = "iilC4hPY1594noPX9OQ2";
 const GALLERY_STYLE_ID = "ffd8bd10-cd97-40a5-b1d6-d15f98fb3644";
 
 export type MapStyleName =
-  | "streets"
   | "gallery"
+  | "streets"
   | "outdoor"
   | "topographic"
   | "dark"
@@ -38,9 +38,9 @@ export type MapStyleName =
  * decorative.
  */
 export const MAP_STYLES: Record<MapStyleName, { id: string; label: string }> = {
-  // The default first, then the gallery's own style, then the rest.
-  streets: { id: "streets-v2", label: "Streets" },
+  // The default first, then the rest.
   gallery: { id: GALLERY_STYLE_ID, label: "Gallery" },
+  streets: { id: "streets-v2", label: "Streets" },
   outdoor: { id: "outdoor-v2", label: "Outdoor" },
   topographic: { id: "topo-v2", label: "Topographic" },
   dark: { id: "dataviz-dark", label: "Dark" },
@@ -51,7 +51,7 @@ export const MAP_STYLES: Record<MapStyleName, { id: string; label: string }> = {
 
 export const MAP_STYLE_NAMES = Object.keys(MAP_STYLES) as MapStyleName[];
 
-export const DEFAULT_MAP_STYLE: MapStyleName = "streets";
+export const DEFAULT_MAP_STYLE: MapStyleName = "gallery";
 
 export const MAP_STYLE_STORAGE_KEY = "mapStyle";
 
