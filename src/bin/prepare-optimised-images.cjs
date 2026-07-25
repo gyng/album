@@ -206,30 +206,86 @@ const cleanupStrayTempFiles = (output) => {
 // left unawaited. Declaring this `async` converts that synchronous throw into
 // a rejected promise instead, so it settles like any other single-variant
 // failure and Promise.allSettled still awaits every sibling to completion.
+// How far an encoded variant's pixels may drift from the source's, averaged per
+// channel over a 4x4 reduction. AVIF is lossy and the ICC conversion moves
+// colours a little, so a good encode is not identical — measured at 0-5, even
+// where the variant is an upscale of a smaller source. A file that shipped
+// corrupt measured ~90: the top of the image, then magenta garbage.
+const VARIANT_COLOUR_TOLERANCE = 20;
+
+// 4x4, deliberately coarse. At finer resolution a one-pixel resampling
+// difference in a contrasty photo (black trees against bright sky) reads as a
+// large deviation, while the failure being caught here — a corrupt encode — is
+// a colour cast that shows at any scale.
+const samplePixels = (pipeline) =>
+  pipeline.resize(4, 4, { fit: "fill" }).removeAlpha().raw().toBuffer();
+
+const meanChannelDeviation = (expected, actual) => {
+  if (expected.length === 0 || expected.length !== actual.length) {
+    return Number.POSITIVE_INFINITY;
+  }
+  let total = 0;
+  for (let index = 0; index < expected.length; index += 1) {
+    total += Math.abs(expected[index] - actual[index]);
+  }
+  return total / expected.length;
+};
+
+// Encoders are not supposed to return success and write garbage, but one did:
+// a complete, decodable AVIF whose lower four fifths were magenta noise, which
+// then shipped. Nothing upstream can catch that — the encode resolved, the file
+// renamed atomically, and every "does it decode" check passes. So each variant
+// is read back and compared against the source it came from.
+const encodedVariantMatchesSource = async (sourcePipeline, encodedPath) => {
+  const [expected, actual] = await Promise.all([
+    samplePixels(sourcePipeline.clone()),
+    samplePixels(sharp(encodedPath)),
+  ]);
+
+  return meanChannelDeviation(expected, actual) <= VARIANT_COLOUR_TOLERANCE;
+};
+
+const ENCODE_ATTEMPTS = 2;
+
 const encodeVariant = async (sourcePipeline, { size, output }) => {
   cleanupStrayTempFiles(output);
-  const tempOutput = `${output}${nextTempFileSuffix()}`;
 
-  return sourcePipeline
-    .clone()
-    .resize(size)
-    .withIccProfile(imageOptimisationConfig.iccProfile)
-    .avif(imageOptimisationConfig.avif)
-    .toFile(tempOutput)
-    .then(() => {
-      // Encode-then-rename makes the write atomic: readers (including a
-      // concurrent build) either see no file at `output` or a complete one,
-      // never a truncated one left by an interrupted encode.
-      fs.renameSync(tempOutput, output);
-    })
-    .catch((err) => {
+  let lastError = null;
+  for (let attempt = 1; attempt <= ENCODE_ATTEMPTS; attempt += 1) {
+    const tempOutput = `${output}${nextTempFileSuffix()}`;
+    try {
+      await sourcePipeline
+        .clone()
+        .resize(size)
+        .withIccProfile(imageOptimisationConfig.iccProfile)
+        .avif(imageOptimisationConfig.avif)
+        .toFile(tempOutput);
+
+      if (await encodedVariantMatchesSource(sourcePipeline, tempOutput)) {
+        // Encode-then-rename makes the write atomic: readers (including a
+        // concurrent build) either see no file at `output` or a complete one,
+        // never a truncated one left by an interrupted encode.
+        fs.renameSync(tempOutput, output);
+        return;
+      }
+
+      // The corruption seen in the wild was not reproducible from the same
+      // input, so one more attempt is usually all it takes.
+      lastError = new Error(
+        `Encoded variant does not match its source (attempt ${attempt} of ${ENCODE_ATTEMPTS})`,
+      );
+    } catch (err) {
+      lastError = err;
+    } finally {
       try {
         fs.unlinkSync(tempOutput);
       } catch {
         // best-effort cleanup of the partial temp file; ignore if already gone
       }
-      throw err;
-    });
+    }
+  }
+
+  throw lastError;
 };
 
 // Runs `work` over `items` with up to `jobs` items in flight at once. Per-file

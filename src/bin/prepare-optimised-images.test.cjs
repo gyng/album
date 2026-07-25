@@ -28,13 +28,25 @@ const mockSharpPipeline = ({
     fs.writeFileSync(output, "generated");
     return { width: 800, height: 600 };
   }),
+  // Pixels the verification pass reads back: the source's, and each encoded
+  // file's. Equal by default, so an ordinary encode passes its check.
+  samples = { source: [0, 0, 0], encoded: () => [0, 0, 0] },
 } = {}) => {
   const avif = jest.fn(() => ({ toFile }));
   const withIccProfile = jest.fn(() => ({ avif }));
-  const resize = jest.fn(() => ({ withIccProfile }));
+  const sampleFor = (input) =>
+    jest.fn(async () => Buffer.from(input === undefined ? samples.source : samples.encoded(input)));
+  const verifyChain = (input) => ({
+    removeAlpha: jest.fn(() => ({ raw: jest.fn(() => ({ toBuffer: sampleFor(input) })) })),
+  });
+  const resize = jest.fn(() => ({ withIccProfile, ...verifyChain(undefined) }));
   const clone = jest.fn(() => ({ resize }));
   const rotate = jest.fn(() => ({ clone }));
-  sharp.mockImplementation((input) => ({ rotate, metadata: () => metadata(input) }));
+  sharp.mockImplementation((input) => ({
+    rotate,
+    metadata: () => metadata(input),
+    resize: jest.fn(() => verifyChain(input)),
+  }));
   return { rotate, clone, resize, withIccProfile, avif, toFile, metadata };
 };
 
@@ -83,8 +95,10 @@ describe("prepareOptimisedImages", () => {
     expect(sharp).toHaveBeenCalledWith(source);
     expect(sharp).toHaveBeenCalledWith(cached);
     expect(pipeline.rotate).toHaveBeenCalledTimes(1);
-    expect(pipeline.clone).toHaveBeenCalledTimes(2);
-    expect(pipeline.resize).toHaveBeenCalledTimes(2);
+    // Two clones per encoded variant: one to encode from, one for the
+    // verification pass that reads the result back and compares it.
+    expect(pipeline.clone).toHaveBeenCalledTimes(4);
+    expect(pipeline.resize).toHaveBeenCalledTimes(4);
     expect(pipeline.withIccProfile).toHaveBeenCalledTimes(2);
     expect(pipeline.withIccProfile).toHaveBeenCalledWith(imageOptimisationConfig.iccProfile);
     expect(pipeline.avif).toHaveBeenCalledTimes(2);
@@ -156,6 +170,68 @@ describe("prepareOptimisedImages", () => {
     expect(fs.readFileSync(validCache3200, "utf8")).toBe("cached");
   });
 
+  it("rejects an encode whose pixels do not match the source, and retries it", async () => {
+    // The failure this exists for: an encoder that returns success and writes a
+    // complete file whose contents are garbage. It decodes without error — the
+    // shipped one did — so the only way to catch it is to look at the pixels.
+    // Measured on the real corrupt file: ~90 per channel against the source,
+    // where a good encode sits at 0-5 even when it is an upscale.
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "album-image-garbage-"));
+    const albumsDir = path.join(root, "albums");
+    const publicAlbumsDir = path.join(root, "public", "data", "albums");
+    const albumDir = path.join(albumsDir, "trip");
+    fs.mkdirSync(albumDir, { recursive: true });
+    fs.writeFileSync(path.join(albumDir, "photo.jpg"), "source");
+
+    let attempts = 0;
+    mockSharpPipeline({
+      toFile: jest.fn(async (output) => {
+        attempts += 1;
+        fs.writeFileSync(output, "generated");
+        return { width: 800, height: 600 };
+      }),
+      samples: {
+        source: [10, 10, 10],
+        // Every first attempt comes back as garbage; the retry is clean.
+        encoded: () => (attempts % 2 === 1 ? [250, 10, 250] : [10, 10, 10]),
+      },
+    });
+
+    const summary = await prepareOptimisedImages({ albumsDir, publicAlbumsDir, jobs: 1 });
+
+    // Three variants, each rejected once and re-encoded: six writes, no
+    // failures, and nothing corrupt left in the cache.
+    expect(attempts).toBe(6);
+    expect(summary.variantsEncoded).toBe(3);
+    expect(summary.failures).toEqual([]);
+    const cacheDir = path.join(publicAlbumsDir, "trip", ".resized_images");
+    expect(listTempFiles(cacheDir)).toEqual([]);
+  });
+
+  it("gives up on a variant that keeps encoding to the wrong pixels", async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "album-image-garbage-persist-"));
+    const albumsDir = path.join(root, "albums");
+    const publicAlbumsDir = path.join(root, "public", "data", "albums");
+    const albumDir = path.join(albumsDir, "trip");
+    fs.mkdirSync(albumDir, { recursive: true });
+    fs.writeFileSync(path.join(albumDir, "photo.jpg"), "source");
+
+    mockSharpPipeline({
+      samples: { source: [10, 10, 10], encoded: () => [250, 10, 250] },
+    });
+
+    const summary = await prepareOptimisedImages({ albumsDir, publicAlbumsDir, jobs: 1 });
+
+    // Reported rather than published: a missing size is recoverable, a corrupt
+    // one that decodes is not.
+    expect(summary.variantsEncoded).toBe(0);
+    expect(summary.failures).toHaveLength(3);
+    expect(summary.failures[0].message).toMatch(/does not match its source/i);
+    const cacheDir = path.join(publicAlbumsDir, "trip", ".resized_images");
+    expect(fs.existsSync(path.join(cacheDir, "photo.jpg@800.avif"))).toBe(false);
+    expect(listTempFiles(cacheDir)).toEqual([]);
+  });
+
   it("cleans up a stray temp file left by a previous interrupted run before re-encoding", async () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "album-image-stray-temp-"));
     const albumsDir = path.join(root, "albums");
@@ -211,6 +287,11 @@ describe("prepareOptimisedImages", () => {
     const okOutput = path.join(okCacheDir, "photo.jpg@800.avif");
     const encodeError = new Error("boom");
     const metadata = jest.fn(async () => ({ width: 800, height: 600 }));
+    const sampleChain = (pixels) => ({
+      resize: () => ({
+        removeAlpha: () => ({ raw: () => ({ toBuffer: async () => Buffer.from(pixels) }) }),
+      }),
+    });
     const failingAvifPipeline = {
       rotate: () => ({
         clone: () => ({
@@ -222,10 +303,14 @@ describe("prepareOptimisedImages", () => {
         }),
       }),
     };
+    // Each clone serves both callers: the encode chain, and the verification
+    // pass that samples the source's pixels to compare against the encode.
     const succeedingAvifPipeline = {
       rotate: () => ({
         clone: () => ({
+          ...sampleChain([0, 0, 0]),
           resize: () => ({
+            ...sampleChain([0, 0, 0]).resize(),
             withIccProfile: () => ({
               avif: () => ({
                 toFile: async (output) => {
@@ -241,7 +326,9 @@ describe("prepareOptimisedImages", () => {
     sharp.mockImplementation((input) => {
       if (input === failSource) return failingAvifPipeline;
       if (input === okSource) return succeedingAvifPipeline;
-      return { metadata };
+      // Reading an encoded file back for verification, or a cached file's
+      // metadata.
+      return { metadata, ...sampleChain([0, 0, 0]) };
     });
 
     // One photo failing to encode no longer aborts the pool or the overall
