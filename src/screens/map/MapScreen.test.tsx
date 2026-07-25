@@ -9,6 +9,9 @@ import type { MapWorldEntry } from "../../util/pageDataTypes";
 const push = jest.fn();
 const replace = jest.fn();
 let mockQuery: Record<string, string> = {};
+// A statically optimised Next page does not know its query on the first client
+// render: `isReady` flips a tick later. Mutable so a test can live in that gap.
+let mockRouterReady = true;
 
 jest.mock("../../services/album", () => ({
   getAlbums: jest.fn(),
@@ -23,7 +26,7 @@ jest.mock("../../util/mapSearchIndex", () => ({
 jest.mock("next/router", () => ({
   useRouter: () => ({
     query: mockQuery,
-    isReady: true,
+    isReady: mockRouterReady,
     push,
     replace,
   }),
@@ -98,6 +101,7 @@ describe("MapScreen tour lifecycle", () => {
 
   beforeEach(() => {
     mockQuery = {};
+    mockRouterReady = true;
     push.mockClear();
     replace.mockClear();
     mapWorldDeferredMock.mockClear();
@@ -132,5 +136,22 @@ describe("MapScreen tour lifecycle", () => {
 
     expect(lastMapWorldProps().directorEnabled).toBe(false);
     expect(screen.queryByRole("button", { name: /Tour/ })).not.toBeInTheDocument();
+  });
+
+  it("never auto-fits a camera the URL has already framed", () => {
+    // The camera params are only readable once the renderer says navigation is
+    // ready, and the auto-fit is enabled by their *absence* — so for the first
+    // render the map is told to frame every photo. If it mounts inside that
+    // window it flies to a world view and the shared link is lost, which is
+    // why every render has to be checked, not just the settled one.
+    mockQuery = { lat: "35.681", lon: "139.767", zoom: "9.35" };
+    mockRouterReady = false;
+    const { rerender } = render(<MapScreen photos={photos} />);
+    mockRouterReady = true;
+    rerender(<MapScreen photos={photos} />);
+
+    expect(mapWorldDeferredMock).toHaveBeenCalled();
+    const fits = mapWorldDeferredMock.mock.calls.map(([props]) => props.fitToPhotos);
+    expect(fits).not.toContain(true);
   });
 });

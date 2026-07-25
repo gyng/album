@@ -409,7 +409,12 @@ const MapScreen = (props: MapScreenProps) => {
         className={styles.map!}
         // Auto-fit only frames the initial view; a search filters in place
         // rather than flying the map to the matches.
-        fitToPhotos={!hasCameraParams && !deferredMapSearchQuery.trim()}
+        //
+        // Gated on the route being readable, not merely on the camera params
+        // being absent: until the renderer reports navigation ready they are
+        // *always* absent, so a map that mounts in that window would frame every
+        // photo and throw away the position a shared link asked for.
+        fitToPhotos={routeReady && !hasCameraParams && !deferredMapSearchQuery.trim()}
         fitRequestId={fitRequestId}
         showRoute={!filterAlbum && showAllRoutes}
         routeMode={filterAlbum ? defaultRouteMode : "simplified"}
