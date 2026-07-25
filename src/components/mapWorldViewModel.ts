@@ -160,3 +160,45 @@ export const getLegendYears = (
 
   return { older, newer };
 };
+
+/* -------------------------------------------------------------------------- */
+/* Thumbnail reveal                                                            */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * What the photo markers are doing about their thumbnails right now.
+ *
+ * `hidden` is the bulk GPU layer, `shown` is a DOM marker each with its image.
+ * `warming` is neither: still the GPU layer, but close enough to the reveal
+ * that the images worth showing are worth fetching, so the swap lands on
+ * pictures the browser already has rather than on empty boxes.
+ */
+export type ThumbnailStage = "hidden" | "warming" | "shown";
+
+/** Above this zoom the markers carry their thumbnails. */
+export const THUMBNAIL_REVEAL_ZOOM = 8.5;
+/**
+ * And below *this* one they give them up again — deliberately not the same
+ * number. A single threshold is a coin balanced on its edge: a trackpad pinch
+ * or a momentum zoom settling on 8.5 flips the entire marker path, GPU layer to
+ * DOM markers and back, on consecutive frames. The gap is the wobble a gesture
+ * is allowed before the map changes its mind.
+ */
+export const THUMBNAIL_HIDE_ZOOM = 8.2;
+/**
+ * Where the images start loading, half a zoom level before anything shows them.
+ * A thumbnail that arrives with the marker fades in from nothing; one that has
+ * to be fetched first shows its placeholder colour, then snaps to the photo.
+ */
+export const THUMBNAIL_WARM_ZOOM = 8;
+
+export const nextThumbnailStage = (zoom: number, current: ThumbnailStage): ThumbnailStage => {
+  // Which threshold applies depends on where the markers already are: the
+  // reveal zoom going up, the lower hide zoom coming back down.
+  const revealed = current === "shown" ? zoom >= THUMBNAIL_HIDE_ZOOM : zoom > THUMBNAIL_REVEAL_ZOOM;
+  if (revealed) {
+    return "shown";
+  }
+
+  return zoom > THUMBNAIL_WARM_ZOOM ? "warming" : "hidden";
+};

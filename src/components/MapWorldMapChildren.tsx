@@ -79,6 +79,22 @@ export const MapFitOnRequest = ({
   return null;
 };
 
+/**
+ * How far a thumbnail reaches above the point it belongs to: an 80px image,
+ * 12px of gap, and half of the 14px pin it hangs over. The marker's own box is
+ * only the pin — the image is absolutely positioned — so anything measuring a
+ * marker against the viewport has to add this back by hand.
+ */
+export const MARKER_IMAGE_EXTENT_PX = 99;
+
+/**
+ * How far outside the viewport a thumbnail marker still mounts, so its image is
+ * already in place by the time it scrolls in rather than appearing at the edge.
+ * Covers a marker's own height with room to spare, the taller preview-label
+ * form included.
+ */
+export const MARKER_RENDER_PADDING_PX = 120;
+
 export type ObserveMapMarker = (
   element: Element,
   onVisibilityChange: (isVisible: boolean) => void,
@@ -100,7 +116,13 @@ export const useSharedMapMarkerObserver = (): ObserveMapMarker => {
             listenersRef.current.get(entry.target)?.(entry.isIntersecting);
           });
         },
-        { rootMargin: "100px" },
+        // Wide enough to cover both gates at once: the ring of markers mounted
+        // outside the viewport, and the height of the thumbnail hanging above
+        // each of them. Observed on the marker's box, which is only the pin, so
+        // a tighter margin unloads images that are still on screen — and holds
+        // the rest back until the frame they become visible, which is precisely
+        // the pop that mounting early was meant to avoid.
+        { rootMargin: `${MARKER_RENDER_PADDING_PX + MARKER_IMAGE_EXTENT_PX}px` },
       );
     }
 
@@ -126,16 +148,34 @@ export const useSharedMapMarkerObserver = (): ObserveMapMarker => {
 };
 
 export const LazyMapMarkerImage = ({ photo }: { photo: MapWorldEntry }) => {
+  // The fade waits for the photo rather than starting at mount. Mounting is
+  // only the request going out: an image that takes a moment to arrive would
+  // otherwise fade its placeholder colour in as a bare rectangle and then snap
+  // to the picture, which is two transitions where the reader wanted one.
+  const [isLoaded, setIsLoaded] = React.useState(false);
+  const imageRef = React.useCallback((element: HTMLImageElement | null) => {
+    // An image already in the browser's cache can finish before React has
+    // anything listening, and a `load` that already happened never fires again.
+    if (element?.complete && element.naturalWidth > 0) {
+      setIsLoaded(true);
+    }
+  }, []);
+
   return (
     <img
+      ref={imageRef}
       src={photo.src.src}
       className={styles.photoMarkerImage}
+      data-loaded={isLoaded}
       width={photo.placeholderWidth}
       height={photo.placeholderHeight}
       style={{ backgroundColor: photo.placeholderColor }}
       loading="lazy"
       alt=""
       aria-hidden="true"
+      onLoad={() => {
+        setIsLoaded(true);
+      }}
     />
   );
 };
@@ -170,6 +210,15 @@ const padBoundsByPixels = (
   };
 };
 
+/**
+ * How often the render bounds may be republished mid-gesture.
+ *
+ * A drag fires `move` every frame, and each republished bound reconciles the
+ * whole marker list. Often enough that markers arrive while the map is still
+ * moving; rarely enough that a drag is not a per-frame rebuild.
+ */
+const RENDER_BOUNDS_GESTURE_INTERVAL_MS = 150;
+
 export const MapBoundsTracker = ({
   onBoundsChange,
   onRenderBoundsChange,
@@ -188,20 +237,49 @@ export const MapBoundsTracker = ({
       return;
     }
 
-    const updateBounds = () => {
+    const viewportBounds = (): MapBounds => {
       const [southWest, northEast] = map.getBounds();
-      const viewport: MapBounds = {
+
+      return {
         north: northEast.lat,
         south: southWest.lat,
         east: northEast.lng,
         west: southWest.lng,
       };
+    };
+
+    const updateBounds = () => {
+      const viewport = viewportBounds();
       onBoundsChange(viewport);
       onRenderBoundsChange?.(padBoundsByPixels(viewport, map.getContainer(), renderPadding));
     };
 
+    // Mid-gesture, only the *render* bounds are republished. They decide which
+    // markers exist, and a drag whose markers wait for `moveend` empties the
+    // map behind the reader and fills it back in when they let go. What is
+    // exactly in view keeps waiting for the gesture to finish: the keyboard
+    // list and the tap targets have no business changing under a moving thumb.
+    let lastGestureUpdate = 0;
+    const updateRenderBounds = () => {
+      if (!onRenderBoundsChange) {
+        return;
+      }
+
+      const now = Date.now();
+      if (now - lastGestureUpdate < RENDER_BOUNDS_GESTURE_INTERVAL_MS) {
+        return;
+      }
+
+      lastGestureUpdate = now;
+      onRenderBoundsChange(padBoundsByPixels(viewportBounds(), map.getContainer(), renderPadding));
+    };
+
     updateBounds();
-    const unsubscribes = [map.on("moveend", updateBounds), map.on("zoomend", updateBounds)];
+    const unsubscribes = [
+      map.on("moveend", updateBounds),
+      map.on("zoomend", updateBounds),
+      map.on("move", updateRenderBounds),
+    ];
 
     return () => {
       unsubscribes.forEach((unsubscribe) => {

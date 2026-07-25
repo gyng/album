@@ -6,6 +6,7 @@ import {
   type ObserveMapMarker,
   useSharedMapMarkerObserver,
 } from "./MapWorldMapChildren";
+import { MARKER_MOUNT_CHUNK, useStaggeredMarkerMounts } from "./useStaggeredMarkerMounts";
 import React from "react";
 import styles from "./MapWorld.module.css";
 import pinStyles from "./mapPin.module.css";
@@ -475,6 +476,13 @@ export const MapPhotoMarkers = ({
     () => (renderPhotos ? renderPhotos.filter(hasCoordinates) : locatedVisiblePhotos),
     [renderPhotos, locatedVisiblePhotos],
   );
+  // Let them arrive over a few frames. Everything in view mounting on one frame
+  // is what makes crossing the thumbnail zoom lurch instead of zoom.
+  const mountedPhotos = useStaggeredMarkerMounts(
+    locatedRenderPhotos,
+    MARKER_MOUNT_CHUNK,
+    showMarkerImages || previewMarkers,
+  );
   // Held as `null` unless a route is actually being emphasised: the set behind
   // it changes on every hover, and rebuilding the whole feature collection for
   // an emphasis nobody is drawing would give the cost straight back.
@@ -578,7 +586,7 @@ export const MapPhotoMarkers = ({
 
   return (
     <>
-      {locatedRenderPhotos.map((photo) => (
+      {mountedPhotos.map((photo) => (
         <MapPhotoMarker
           key={photo.href}
           photo={photo}

@@ -609,26 +609,82 @@ describe("MapWorld", () => {
 
     const initialRenderCount = onRender.mock.calls.length;
 
+    // A crossing costs renders — the marker path changes, and the markers are
+    // admitted over several of them. What must cost nothing is a zoom that
+    // stays on one side of it: `onZoom` fires every frame of every gesture.
     act(() => {
       mapHandlers.onZoom?.({ viewState: { zoom: 9 } });
     });
-    expect(onRender).toHaveBeenCalledTimes(initialRenderCount + 1);
+    expect(onRender.mock.calls.length).toBeGreaterThan(initialRenderCount);
+    const afterReveal = onRender.mock.calls.length;
 
     act(() => {
       mapHandlers.onZoom?.({ viewState: { zoom: 10 } });
       mapHandlers.onZoom?.({ viewState: { zoom: 9.5 } });
     });
-    expect(onRender).toHaveBeenCalledTimes(initialRenderCount + 1);
+    expect(onRender).toHaveBeenCalledTimes(afterReveal);
 
     act(() => {
       mapHandlers.onZoom?.({ viewState: { zoom: 8 } });
     });
-    expect(onRender).toHaveBeenCalledTimes(initialRenderCount + 2);
+    expect(onRender.mock.calls.length).toBeGreaterThan(afterReveal);
+    const afterHide = onRender.mock.calls.length;
 
     act(() => {
       mapHandlers.onZoom?.({ viewState: { zoom: 7 } });
     });
-    expect(onRender).toHaveBeenCalledTimes(initialRenderCount + 2);
+    expect(onRender).toHaveBeenCalledTimes(afterHide);
+  });
+
+  it("keeps the thumbnails through a wobble back below the reveal zoom", () => {
+    render(<MMap photos={[photo]} className="map" />);
+    expect(screen.queryAllByTestId("marker")).toHaveLength(0);
+
+    act(() => {
+      mapHandlers.onZoom?.({ viewState: { zoom: 8.6 } });
+    });
+    expect(screen.queryAllByTestId("marker")).toHaveLength(1);
+
+    // A pinch settling just under the reveal zoom must not swap the entire
+    // marker path back to the drawn pins and then forwards again.
+    act(() => {
+      mapHandlers.onZoom?.({ viewState: { zoom: 8.3 } });
+    });
+    expect(screen.queryAllByTestId("marker")).toHaveLength(1);
+
+    act(() => {
+      mapHandlers.onZoom?.({ viewState: { zoom: 8.1 } });
+    });
+    expect(screen.queryAllByTestId("marker")).toHaveLength(0);
+  });
+
+  it("fetches the thumbnails before the zoom that reveals them", () => {
+    const requested: string[] = [];
+    const realImage = window.Image;
+    class RecordingImage {
+      decoding = "";
+      fetchPriority = "";
+      addEventListener() {}
+      set src(value: string) {
+        requested.push(value);
+      }
+    }
+    Object.defineProperty(window, "Image", { configurable: true, value: RecordingImage });
+
+    try {
+      render(<MMap photos={[photo]} className="map" />);
+      expect(requested).toEqual([]);
+
+      // Still the drawn pins at this zoom — but close enough that the images
+      // should be on their way, so the reveal lands on a decoded photo.
+      act(() => {
+        mapHandlers.onZoom?.({ viewState: { zoom: 8.3 } });
+      });
+      expect(screen.queryAllByTestId("marker")).toHaveLength(0);
+      expect(requested).toEqual(["/photo.jpg"]);
+    } finally {
+      Object.defineProperty(window, "Image", { configurable: true, value: realImage });
+    }
   });
 
   it("renders a journey line layer when enabled", () => {

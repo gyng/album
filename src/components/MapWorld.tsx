@@ -29,11 +29,15 @@ import {
   getPhotoDateStats,
   isPhotoInTimeRange,
   MapBounds,
+  nextThumbnailStage,
   stylePhotosByRecency,
+  type ThumbnailStage,
 } from "./mapWorldViewModel";
+import { useMapThumbnailPrefetch } from "./useMapThumbnailPrefetch";
 import {
   MapAutoFit,
   MapBoundsTracker,
+  MARKER_RENDER_PADDING_PX,
   MapFitOnRequest,
   MapMiddleDragOrbit,
 } from "./MapWorldMapChildren";
@@ -101,13 +105,6 @@ const getBackgroundJourneyGradientColors = (fromColor: string, toColor: string) 
 
 const ROUTER_SYNC_DEBOUNCE_MS = 200;
 const ROUTER_SYNC_PAUSE_MS = 700;
-const MARKER_IMAGE_ZOOM_THRESHOLD = 8.5;
-// A thumbnail image is 80px tall and sits ~12px above its anchor, so mounting
-// markers whose anchor is within this many pixels of the viewport keeps the
-// image in place before it scrolls in. Generous enough to cover the taller
-// preview-label marker too; the ring only holds a handful of extra DOM markers
-// at the zoom where images show.
-const MARKER_RENDER_PADDING_PX = 120;
 
 // With every album's journey drawn at once, each line tapers from thin where
 // the trip began to thick where it ended, so its direction reads without a
@@ -235,11 +232,12 @@ export const MMap: React.FC<MapWorldProps> = ({
         }
       : null;
 
-  const initialShowMarkerImages = Boolean(
-    initialZoom && Number.parseFloat(initialZoom) > MARKER_IMAGE_ZOOM_THRESHOLD,
-  );
-  const [showMarkerImages, setShowMarkerImages] = React.useState(initialShowMarkerImages);
-  const showMarkerImagesRef = React.useRef(initialShowMarkerImages);
+  const initialThumbnailStage: ThumbnailStage = initialZoom
+    ? nextThumbnailStage(Number.parseFloat(initialZoom), "hidden")
+    : "hidden";
+  const [thumbnailStage, setThumbnailStage] = React.useState(initialThumbnailStage);
+  const thumbnailStageRef = React.useRef(initialThumbnailStage);
+  const showMarkerImages = thumbnailStage === "shown";
   const [isInteracting, setIsInteracting] = React.useState(false);
 
   const [bounds, setBounds] = React.useState<MapBounds | null>(null);
@@ -265,6 +263,10 @@ export const MMap: React.FC<MapWorldProps> = ({
     () => filterPhotosByBounds(photosWithStyles, renderBounds),
     [renderBounds, photosWithStyles],
   );
+  // Approaching the reveal zoom, fetch what is about to be shown. The same set
+  // the image markers will mount from, so the swap finds the photos decoded
+  // instead of starting every request at the moment the reader is watching.
+  useMapThumbnailPrefetch(renderPhotos, thumbnailStage === "warming");
 
   const [clickInfo, setClickInfo] = React.useState<MapWorldEntry | null>(null);
   const [hoverInfo, setHoverInfo] = React.useState<MapWorldEntry | null>(null);
@@ -593,14 +595,16 @@ export const MMap: React.FC<MapWorldProps> = ({
     }, ROUTER_SYNC_DEBOUNCE_MS);
   };
 
+  // Runs on every frame of a zoom, so it only touches state where the stage
+  // actually changes — a zoom that stays inside one band re-renders nothing.
   const updateMarkerImageVisibility = React.useCallback((nextZoom: number) => {
-    const nextShowMarkerImages = nextZoom > MARKER_IMAGE_ZOOM_THRESHOLD;
-    if (nextShowMarkerImages === showMarkerImagesRef.current) {
+    const nextStage = nextThumbnailStage(nextZoom, thumbnailStageRef.current);
+    if (nextStage === thumbnailStageRef.current) {
       return;
     }
 
-    showMarkerImagesRef.current = nextShowMarkerImages;
-    setShowMarkerImages(nextShowMarkerImages);
+    thumbnailStageRef.current = nextStage;
+    setThumbnailStage(nextStage);
   }, []);
 
   return (

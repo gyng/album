@@ -7,6 +7,7 @@ import {
   getLegendYears,
   getPhotoDateStats,
   isPhotoInTimeRange,
+  nextThumbnailStage,
   stylePhotosByRecency,
 } from "./mapWorldViewModel";
 
@@ -153,5 +154,28 @@ describe("mapWorldViewModel", () => {
     expect(
       filterPhotosByQuery([photo({ album: "Undated archive", date: null })], "undated archive"),
     ).toHaveLength(1);
+  });
+});
+
+describe("nextThumbnailStage", () => {
+  it("reveals above the reveal zoom and warms in the band below it", () => {
+    expect(nextThumbnailStage(8.6, "hidden")).toBe("shown");
+    expect(nextThumbnailStage(8.3, "hidden")).toBe("warming");
+    expect(nextThumbnailStage(7.9, "hidden")).toBe("hidden");
+  });
+
+  it("holds the thumbnails through a wobble around the reveal zoom", () => {
+    // Revealed at 8.6, a zoom that drifts back to 8.3 keeps them: without the
+    // hysteresis band a pinch resting on the threshold swaps the whole marker
+    // path back and forth every frame.
+    expect(nextThumbnailStage(8.3, "shown")).toBe("shown");
+    expect(nextThumbnailStage(8.1, "shown")).toBe("warming");
+    expect(nextThumbnailStage(7.5, "shown")).toBe("hidden");
+  });
+
+  it("warms again on the way back up before revealing", () => {
+    expect(nextThumbnailStage(8.2, "warming")).toBe("warming");
+    expect(nextThumbnailStage(8.51, "warming")).toBe("shown");
+    expect(nextThumbnailStage(8, "warming")).toBe("hidden");
   });
 });

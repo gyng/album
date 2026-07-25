@@ -2,10 +2,12 @@
  * @jest-environment jsdom
  */
 
-import { act, render, renderHook } from "@testing-library/react";
+import { act, fireEvent, render, renderHook } from "@testing-library/react";
 import type { MapWorldEntry } from "../util/pageDataTypes";
 import {
   LazyMapMarkerImage,
+  MARKER_IMAGE_EXTENT_PX,
+  MARKER_RENDER_PADDING_PX,
   MapAutoFit,
   MapBoundsTracker,
   MapFitOnRequest,
@@ -160,6 +162,21 @@ describe("useSharedMapMarkerObserver", () => {
     expect(disconnect).toHaveBeenCalled();
   });
 
+  it("keeps an image loaded for as long as any of it could be on screen", () => {
+    const view = renderHook(() => useSharedMapMarkerObserver());
+    view.result.current(document.createElement("div"), jest.fn());
+
+    // The observer watches the *pin*, but the thumbnail hangs ~100px above it,
+    // and markers mount a further ring outside the viewport so their images are
+    // ready before they scroll in. A margin tighter than the two together
+    // unloads pictures the reader can still see, and delays the rest until the
+    // moment they appear — which is the popping this margin exists to prevent.
+    const [, options] = (IntersectionObserver as unknown as jest.Mock).mock.calls[0];
+    expect(Number.parseInt(options.rootMargin, 10)).toBeGreaterThanOrEqual(
+      MARKER_RENDER_PADDING_PX + MARKER_IMAGE_EXTENT_PX,
+    );
+  });
+
   it("falls back to a harmless disposer without IntersectionObserver", () => {
     Object.defineProperty(globalThis, "IntersectionObserver", {
       configurable: true,
@@ -190,6 +207,18 @@ describe("LazyMapMarkerImage", () => {
 
     rerender(<LazyMapMarkerImage photo={photo()} />);
     expect(image).not.toHaveAttribute("width");
+  });
+
+  it("stays transparent until the photo itself has arrived", () => {
+    // The fade used to run from mount, so a slow image faded its placeholder
+    // colour in and then snapped to the photo. Deferring it to `load` makes the
+    // one transition the reader sees be the picture appearing.
+    render(<LazyMapMarkerImage photo={photo()} />);
+    const image = document.querySelector("img")!;
+    expect(image).toHaveAttribute("data-loaded", "false");
+
+    fireEvent.load(image);
+    expect(image).toHaveAttribute("data-loaded", "true");
   });
 });
 
@@ -223,7 +252,7 @@ describe("MapBoundsTracker", () => {
     act(() => moveEnd());
     expect(onBoundsChange).toHaveBeenCalledTimes(2);
     view.unmount();
-    expect(unsubscribed).toEqual(["moveend", "zoomend"]);
+    expect(unsubscribed).toEqual(["moveend", "zoomend", "move"]);
   });
 
   it("waits for a map", () => {
@@ -257,6 +286,55 @@ describe("MapBoundsTracker", () => {
       east: 130,
       west: 70,
     });
+  });
+
+  it("streams the render bounds during a gesture, throttled, without churning the exact bounds", () => {
+    // Bounds used to settle only at `moveend`, so a drag emptied the map: the
+    // markers it left behind unmounted while nothing ahead of it could mount
+    // until the reader let go. The exact bounds stay gesture-end — the keyboard
+    // list and tap targets have no business changing mid-drag.
+    jest.useFakeTimers();
+    const bounds = [
+      { lng: 80, lat: -10 },
+      { lng: 120, lat: 10 },
+    ];
+    const container = { clientWidth: 400, clientHeight: 200 } as HTMLElement;
+    let move!: () => void;
+    on.mockImplementation((event: string, callback: () => void) => {
+      if (event === "moveend") moveEnd = callback;
+      if (event === "move") move = callback;
+      return () => {
+        unsubscribed.push(event);
+      };
+    });
+    currentMap = { getBounds: jest.fn(() => bounds), on, getContainer: () => container };
+    const onRenderBoundsChange = jest.fn();
+    render(
+      <MapBoundsTracker
+        onBoundsChange={onBoundsChange}
+        onRenderBoundsChange={onRenderBoundsChange}
+        renderPadding={100}
+      />,
+    );
+    onRenderBoundsChange.mockClear();
+    onBoundsChange.mockClear();
+
+    act(() => {
+      move();
+      move();
+      move();
+    });
+    expect(onRenderBoundsChange).toHaveBeenCalledTimes(1);
+    expect(onBoundsChange).not.toHaveBeenCalled();
+
+    act(() => {
+      jest.advanceTimersByTime(1000);
+      move();
+    });
+    expect(onRenderBoundsChange).toHaveBeenCalledTimes(2);
+    expect(onBoundsChange).not.toHaveBeenCalled();
+
+    jest.useRealTimers();
   });
 
   it("leaves the reported bounds unpadded when no padding is asked for", () => {

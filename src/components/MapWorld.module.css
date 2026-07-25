@@ -106,9 +106,12 @@
   inline-size: var(--size-80);
   block-size: var(--size-80);
   object-fit: cover;
-  animation: fadein;
-  animation-duration: var(--t-emphasis);
-  animation-delay: 0;
+  /* Held back until the photo has decoded (see `LazyMapMarkerImage`), so what
+     fades in is the picture and never the placeholder rectangle waiting for
+     it. Reduced motion turns the transition off globally, which leaves the
+     thumbnail simply appearing once it is ready — still no empty box. */
+  opacity: 0;
+  transition: opacity var(--t-medium) var(--ease-out);
   object-position: bottom;
   border-radius: var(--m-s);
 
@@ -118,6 +121,10 @@
   transform: translateX(-50%);
   isolation: isolate;
   border: solid var(--size-1) color-mix(in oklch, var(--c-white) 50%, transparent);
+}
+
+.photoMarkerImage[data-loaded="true"] {
+  opacity: 1;
 }
 
 .hover,
@@ -317,15 +324,6 @@
 .pinTimeFiltered {
   opacity: 0.07;
   pointer-events: none;
-}
-
-@keyframes fadein {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
 }
 
 @keyframes routeMarch {
