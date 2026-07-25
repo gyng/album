@@ -590,24 +590,30 @@ expensive is in `Marker._update`: it allocates an `AbortController`, a promise a
 ours; what we control is how many markers exist.
 
 At the measured pose those 164 thumbnails covered ~1.05M px² of a 1.02M px² viewport — they were
-almost entirely hidden behind one another. So thumbnails are now thinned to one per
-`THUMBNAIL_CELL_PX` (140px) cell, the grid anchored to the world so panning does not reshuffle
-winners, with **incumbency**: a photo that already wears a thumbnail keeps its cell while it is in
-range. Without incumbency a newcomer entering range displaced the incumbent and 26 thumbnails
-swapped mid-drag. Everything thinned out keeps its pin on the drawn layer — which now renders at
-every zoom, carrying clicks, hovers, the hidden keyboard list and the coarse-pointer targets for
-exactly the photos that have no marker of their own.
+almost entirely hidden behind one another. So thumbnails were thinned to one per 140px cell of the
+screen (world-anchored grid, incumbents keeping their cell — without that, newcomers displaced them
+and 26 thumbnails swapped mid-drag), with everything thinned out keeping a pin on a drawn layer that
+then rendered at every zoom.
+
+**That thinning was reverted, by preference, not by measurement.** It worked and it was cheaper — the
+table below is what it bought — but a dense city went from a wall of thumbnails to ~19 of them, and
+that is not the map anyone wanted. Every photo in view gets its thumbnail again, and the per-frame
+marker cost at a dense pose is accepted. If it is ever revisited, the mechanism is in the history
+(`thinPhotosByScreenCell`, commit 64dff85) and the two traps it hit are worth knowing: the winner of
+a cell must be sticky, and the photos left without a thumbnail still need their pin, click, hover,
+keyboard entry and tap target.
 
 | Dense drag at z9.35 (same gesture) | thumbnails | frame p95 | frames > 32ms | lost while visible |
 | --- | --- | --- | --- | --- |
 | Before | 164 | 67ms | 65 | 61 |
 | Observer removed, padding 150px | 164 | 67ms | 65 | 0 |
-| Thinned to one per 140px cell | ~19 | 50ms | 55–58 | 0 |
+| Thinned to one per 140px cell (since reverted) | ~19 | 50ms | 55–58 | 0 |
 | **Same pose, no photos (floor)** | 0 | **33ms** | **34–42** | — |
 
-Crossing the reveal improved with it, since the reveal now mounts ~20 markers rather than 126:
-**worst frame 600ms → 283–317ms, long tasks 1289ms → ~274ms** — at or below the no-photo floor for
-that pose (241–269ms), which is where this stops being ours.
+Crossing the reveal improved with the thinning, since it mounted ~20 markers rather than 126 —
+**worst frame 600ms → 283–317ms, long tasks 1289ms → ~274ms**, at or below the no-photo floor for
+that pose (241–269ms). Reverting the thinning gives that back: what remains from the earlier work is
+the stagger and the streaming bounds (**1289ms → 416ms** of long tasks at the crossing).
 
 **Not fixed, and worth knowing before someone re-measures.** One stall remains that thinning did not
 touch: a single **~480ms `FireAnimationFrame` task, entirely inside the MapLibre chunk**, with no

@@ -20,11 +20,10 @@ globs:
 - GL style-spec never crosses the port. Describe bulk data with `DataLayer` (neutral points and
   lines, clustering, halo, dash, `lineWidthAlong`) instead of a source plus layer objects
 - **Bulk markers stay on the GPU.** One `DataLayer` draws every photo in a single pass; ~1400 as
-  DOM markers cost ~35.5ms per frame and every long task on the page. The drawn layer is there at
-  every zoom, and DOM `Marker`s are only the thumbnails sitting on top of it — thinned to one per
-  screen cell (`thinPhotosByScreenCell`), because MapLibre reschedules every marker on every frame
-  and a dense city's 164 thumbnails overlapped almost completely anyway. A photo without a
-  thumbnail still has its pin, its interactions and its entry in the hidden keyboard list
+  DOM markers cost ~35.5ms per frame and every long task on the page. DOM `Marker`s are only for the
+  thumbnail zooms, and there every photo in view gets one: thinning them by screen density was
+  built, measured and then rejected on looks, so the per-frame marker cost at a dense pose is
+  accepted (MapLibre reschedules every marker every frame — plan-003 has the numbers)
 - **Nothing gates a marker's image except the bounds it mounted in.** An `IntersectionObserver`
   used to, and unloaded pictures with half of themselves still on screen: `rootMargin` expands the
   viewport, but the map container clips first. `MARKER_RENDER_PADDING_PX` therefore has to exceed

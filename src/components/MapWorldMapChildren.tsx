@@ -177,13 +177,9 @@ export const MapBoundsTracker = ({
   renderPadding = 0,
 }: {
   onBoundsChange: (bounds: MapBounds) => void;
-  /**
-   * Reports the viewport expanded by `renderPadding` pixels, for markers that
-   * should mount just outside the visible area, along with the container's size
-   * in pixels — which is what lets a caller reason in screen distances rather
-   * than degrees.
-   */
-  onRenderBoundsChange?: (bounds: MapBounds, viewport: { width: number; height: number }) => void;
+  /** Reports the viewport expanded by `renderPadding` pixels, for markers that
+   *  should mount just outside the visible area. */
+  onRenderBoundsChange?: (bounds: MapBounds) => void;
   renderPadding?: number;
 }) => {
   const map = useMap();
@@ -211,11 +207,7 @@ export const MapBoundsTracker = ({
         return;
       }
 
-      const container = map.getContainer();
-      onRenderBoundsChange(padBoundsByPixels(viewport, container, renderPadding), {
-        width: container.clientWidth,
-        height: container.clientHeight,
-      });
+      onRenderBoundsChange(padBoundsByPixels(viewport, map.getContainer(), renderPadding));
     };
 
     // Mid-gesture, only the *render* bounds are republished. They decide which
@@ -235,11 +227,7 @@ export const MapBoundsTracker = ({
       }
 
       lastGestureUpdate = now;
-      const container = map.getContainer();
-      onRenderBoundsChange(padBoundsByPixels(viewportBounds(), container, renderPadding), {
-        width: container.clientWidth,
-        height: container.clientHeight,
-      });
+      onRenderBoundsChange(padBoundsByPixels(viewportBounds(), map.getContainer(), renderPadding));
     };
 
     updateBounds();

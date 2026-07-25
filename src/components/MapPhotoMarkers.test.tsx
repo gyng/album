@@ -1003,52 +1003,6 @@ describe("MapPhotoMarkers", () => {
   // Rich pins: a thumbnail needs a real element of its own, so
   // this set stays on DOM markers. It is always small.
   describe("with marker images", () => {
-    it("draws the photos it did not give a thumbnail, and keeps them reachable", () => {
-      // Over a dense city the thumbnails overlap almost completely, so only a
-      // thinned set gets a DOM marker. The rest are not dropped: they stay on
-      // the drawn layer, which costs nothing per photo, and stay clickable and
-      // reachable by keyboard — a photo without a thumbnail is still a photo.
-      const photos = [
-        photo({ href: "shown" }),
-        photo({ href: "thinned", decLng: 140 }),
-        photo({ href: "also-thinned", decLng: 141 }),
-      ];
-      const onSelect = jest.fn();
-
-      render(
-        <MapPhotoMarkers
-          photos={photos}
-          visiblePhotos={photos}
-          renderPhotos={photos}
-          thumbnailPhotos={[photos[0]!]}
-          showMarkerImages
-          emphasiseRoute={false}
-          activeRouteHrefSet={new Set()}
-          onSelect={onSelect}
-          onHover={jest.fn()}
-        />,
-      );
-
-      // One thumbnail marker, and every photo still on the drawn layer.
-      expect(screen.getAllByTestId("marker")).toHaveLength(1);
-      const drawn = dataLayer.mock.calls.map(([props]) => props).at(-1);
-      expect(drawn?.points.map((point) => point.id)).toEqual(["shown", "thinned", "also-thinned"]);
-
-      // A tap on a drawn pin opens its photo.
-      drawn?.onPointClick?.({ id: "thinned" });
-      expect(onSelect).toHaveBeenCalledWith(expect.objectContaining({ href: "thinned" }));
-
-      // The hidden list offers exactly the photos that have no marker of their
-      // own, so nothing is announced twice.
-      const listed = screen
-        .getAllByRole("button", { name: /Photo from kansai/ })
-        .map((control) => control.tagName);
-      expect(listed).toHaveLength(3);
-      expect(screen.getByRole("list", { name: "Photos in view" }).textContent).not.toContain(
-        "shown",
-      );
-    });
-
     it("supports pointer, focus, and keyboard selection", () => {
       const onSelect = jest.fn();
       const onHover = jest.fn();
@@ -1066,6 +1020,7 @@ describe("MapPhotoMarkers", () => {
         />,
       );
 
+      expect(dataLayer).not.toHaveBeenCalled();
       const control = screen.getByRole("button", { name: "Photo from kansai on 2 Jan 2024" });
       fireEvent.mouseOver(control);
       fireEvent.mouseLeave(control);
@@ -1194,8 +1149,7 @@ describe("MapPhotoMarkers", () => {
         />,
       );
 
-      // The pin under the thumbnail is still drawn; what the marker adds is the
-      // picture, the label, and a target the reader can actually hit.
+      expect(dataLayer).not.toHaveBeenCalled();
       expect(container.querySelectorAll("img")).toHaveLength(1);
     });
   });

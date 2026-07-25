@@ -215,12 +215,12 @@ describe("MapBoundsTracker", () => {
       />,
     );
     expect(onBoundsChange).toHaveBeenCalledWith({ north: 10, south: -10, east: 120, west: 80 });
-    expect(onRenderBoundsChange).toHaveBeenCalledWith(
-      { north: 20, south: -20, east: 130, west: 70 },
-      // The container's size travels with the bounds: thinning thumbnails by how
-      // far apart they look is a screen measurement, not a geographic one.
-      { width: 400, height: 200 },
-    );
+    expect(onRenderBoundsChange).toHaveBeenCalledWith({
+      north: 20,
+      south: -20,
+      east: 130,
+      west: 70,
+    });
   });
 
   it("streams the render bounds during a gesture, throttled, without churning the exact bounds", () => {
@@ -286,10 +286,12 @@ describe("MapBoundsTracker", () => {
         onRenderBoundsChange={onRenderBoundsChange}
       />,
     );
-    expect(onRenderBoundsChange).toHaveBeenCalledWith(
-      { north: 10, south: -10, east: 120, west: 80 },
-      { width: 400, height: 200 },
-    );
+    expect(onRenderBoundsChange).toHaveBeenCalledWith({
+      north: 10,
+      south: -10,
+      east: 120,
+      west: 80,
+    });
   });
 });
 
