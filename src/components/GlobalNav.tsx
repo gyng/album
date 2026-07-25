@@ -23,6 +23,12 @@ type Props = {
   /** Extra items appended after the standard set (e.g. album-scoped links). */
   extraItems?: React.ReactNode;
   /**
+   * A control pinned to the trailing end of the row, outside the scrolling list.
+   * The map's search field lives here: it stays on screen at every width, and the
+   * scroller would clip the actions it hangs below itself.
+   */
+  trailingItem?: React.ReactNode;
+  /**
    * onClick for the Map link. Used by the Search page to force a full
    * document navigation (needed when COI headers are active).
    */
@@ -36,6 +42,7 @@ export const GlobalNav: React.FC<Props> = ({
   hasPadding,
   slideshowAction,
   extraItems,
+  trailingItem,
   onMapClick,
 }) => {
   const current = (page: GlobalNavPage) =>
@@ -46,6 +53,7 @@ export const GlobalNav: React.FC<Props> = ({
   return (
     <Nav
       {...(hasPadding !== undefined ? { hasPadding } : {})}
+      {...(trailingItem !== undefined ? { trailingItem } : {})}
       isHome={currentPage === "home"}
       extraItems={
         <>

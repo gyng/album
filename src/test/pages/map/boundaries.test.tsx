@@ -18,9 +18,19 @@ jest.mock("../../../services/buildTiming", () => ({
   measureBuild: (_name: string, work: () => unknown) => work(),
 }));
 jest.mock("../../../components/GlobalNav", () => ({
-  GlobalNav: ({ extraItems }: { extraItems: React.ReactNode }) => (
+  // `trailingItem` is the nav row's non-scrolling slot, and the map's search
+  // field lives there rather than among the scrolling items — so a stand-in that
+  // dropped it would hide the search from every case below.
+  GlobalNav: ({
+    extraItems,
+    trailingItem,
+  }: {
+    extraItems: React.ReactNode;
+    trailingItem?: React.ReactNode;
+  }) => (
     <nav>
       <ul>{extraItems}</ul>
+      {trailingItem}
     </nav>
   ),
 }));

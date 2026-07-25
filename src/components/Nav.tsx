@@ -9,6 +9,12 @@ export const Nav: React.FC<{
   albumName?: string;
   hasPadding?: boolean;
   extraItems?: React.ReactNode;
+  /**
+   * A control pinned to the trailing end of the nav row, outside the scrolling
+   * list — for something that has to stay reachable at every width, or that
+   * needs to hang content below the row.
+   */
+  trailingItem?: React.ReactNode;
   isHome?: boolean;
 }> = (props) => {
   const ulRef = useRef<HTMLUListElement>(null);
@@ -77,7 +83,11 @@ export const Nav: React.FC<{
       <a href="#main-content" className={styles.skipLink} onClick={skipToContent}>
         Skip to content
       </a>
-      <div className={styles.navRow}>
+      <div
+        className={[styles.navRow, props.trailingItem ? styles.navRowWithTrailing : ""]
+          .filter(Boolean)
+          .join(" ")}
+      >
         <ul ref={ulRef} className={commonStyles.topBar}>
           <li>
             <Link
@@ -119,6 +129,14 @@ export const Nav: React.FC<{
           ) : null}
           {props.extraItems}
         </ul>
+        {/* Outside the scrolling list, like the theme toggle: a control put here
+            stays on screen at every width, and — because nothing on this side of
+            the row clips — it can hang content below itself. The list cannot: it
+            is a horizontal scroller, so `overflow-y` is hidden and anything
+            escaping the row is invisible and untappable. */}
+        {props.trailingItem ? (
+          <div className={styles.trailingItem}>{props.trailingItem}</div>
+        ) : null}
         <div className={styles.themeToggleItem}>
           <ThemeToggle />
         </div>

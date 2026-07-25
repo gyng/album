@@ -35,6 +35,33 @@
   block-size: 100%;
 }
 
+.trailingItem {
+  flex: none;
+}
+
+/* Narrow viewports: the trailing control takes a line of its own rather than
+   squeezing the scrolling links into a peephole — a 244px field beside a theme
+   toggle leaves a phone about 40px of nav to scroll through. Keyed to the
+   viewport, not to content, so nothing shifts while the control is used. */
+@media (max-width: 720px) {
+  .navRowWithTrailing {
+    flex-wrap: wrap;
+  }
+
+  /* Zero basis so the scrolling list still shares the first line with the theme
+     toggle: left to size itself from its content it takes the whole line and
+     pushes the toggle onto one of its own, turning two rows of chrome into
+     three. */
+  .navRowWithTrailing ul {
+    flex: 1 1 0;
+  }
+
+  .navRowWithTrailing .trailingItem {
+    flex-basis: 100%;
+    order: 1;
+  }
+}
+
 .themeToggleItem {
   flex: none;
   padding-inline-start: var(--m-m);

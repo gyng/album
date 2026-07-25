@@ -40,14 +40,12 @@
   gap: var(--m-s);
 }
 
-/* The field lives in the nav row beside the date controls, so its footprint has
-   to be a single line and it has to keep that line's height no matter what the
-   search is doing. Two rules carry that: the count beside it is a fixed width,
-   and the Fit/Tour actions hang below the box rather than sitting in it. */
-.mapSearchItem {
-  flex: 0 0 auto;
-}
-
+/* The field sits in the nav row, in the slot beside the theme toggle rather than
+   among the scrolling items: that slot stays on screen at every width, and it can
+   hang the Fit/Tour actions below the row — the scrolling list clips them, being
+   a horizontal scroller with `overflow-y: hidden`. Its footprint is one line and
+   it has to keep that line's height whatever the search is doing, which is what
+   the fixed-width count and the out-of-flow actions are for. */
 .mapSearch {
   position: relative;
   display: flex;
