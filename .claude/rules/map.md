@@ -46,6 +46,7 @@ globs:
 - Route overlay is SVG (screen-space), not a MapLibre layer — projected via the port's `project()`
 - The basemap is a reader preference, not a constant: the curated styles, the shared public key and
   the store live in `util/mapStyles.ts`, `MapStyleToggle` sets it and `MapWorld` reads it through
-  `useMapStyleName`. Keep every option on the same provider and key — a style from elsewhere would
+  `useMapStyleName`. The picker is a map overlay (`showStylePicker`) rather than site chrome: on a
+  390px viewport two selects are wider than the nav row, so in the chrome it cost a whole band. Keep every option on the same provider and key — a style from elsewhere would
   bring its own credential and its own attribution requirement
 - `mapRoute.ts` owns all route/journey logic: `RoutePoint`, `buildMapRoute`, `splitRouteByDay`

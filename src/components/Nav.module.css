@@ -63,9 +63,6 @@
 }
 
 .themeToggleItem {
-  display: flex;
-  align-items: center;
-  gap: var(--m-s);
   flex: none;
   padding-inline-start: var(--m-m);
 }

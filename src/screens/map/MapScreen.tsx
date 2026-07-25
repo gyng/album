@@ -1,7 +1,6 @@
 import React from "react";
 import { MapWorldDeferred } from "../../components/MapWorldDeferred";
 import { GlobalNav } from "../../components/GlobalNav";
-import { MapStyleToggle } from "../../components/MapStyleToggle";
 import type { MapWorldEntry, TimeRange } from "../../util/pageDataTypes";
 import styles from "./MapScreen.module.css";
 import commonStyles from "../../styles/common.module.css";
@@ -276,7 +275,6 @@ const MapScreen = (props: MapScreenProps) => {
         <GlobalNav
           currentPage="map"
           hasPadding={false}
-          themeAdjacentItem={<MapStyleToggle />}
           trailingItem={
             <div className={styles.mapSearch} role="search">
               <input
@@ -442,6 +440,7 @@ const MapScreen = (props: MapScreenProps) => {
         // photo and throw away the position a shared link asked for.
         fitToPhotos={routeReady && !hasCameraParams && !deferredMapSearchQuery.trim()}
         fitRequestId={fitRequestId}
+        showStylePicker
         showRoute={!filterAlbum && showAllRoutes}
         routeMode={filterAlbum ? defaultRouteMode : "simplified"}
         routeDisplayMode={!filterAlbum && showAllRoutes ? "always" : "active-only"}

@@ -18,6 +18,17 @@
   block-size: 100%;
 }
 
+/* Over the map, out of the way: the same 10px inset MapLibre gives its own
+   controls, stacked above the recency legend and the distance scale. A basemap
+   choice belongs on the map, and the site chrome has no room for it on a phone —
+   two selects are wider than a 390px nav row on their own. */
+.stylePicker {
+  position: absolute;
+  z-index: var(--z-map-overlay);
+  inset-inline-start: var(--size-10);
+  inset-block-end: calc(var(--m-xl) + var(--m-l));
+}
+
 .themeBootstrap {
   position: fixed;
   opacity: 0;

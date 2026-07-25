@@ -28,8 +28,6 @@ type Props = {
    * scroller would clip the actions it hangs below itself.
    */
   trailingItem?: React.ReactNode;
-  /** A control shown beside the theme picker (the map's basemap picker uses it). */
-  themeAdjacentItem?: React.ReactNode;
   /**
    * onClick for the Map link. Used by the Search page to force a full
    * document navigation (needed when COI headers are active).
@@ -45,7 +43,6 @@ export const GlobalNav: React.FC<Props> = ({
   slideshowAction,
   extraItems,
   trailingItem,
-  themeAdjacentItem,
   onMapClick,
 }) => {
   const current = (page: GlobalNavPage) =>
@@ -57,7 +54,6 @@ export const GlobalNav: React.FC<Props> = ({
     <Nav
       {...(hasPadding !== undefined ? { hasPadding } : {})}
       {...(trailingItem !== undefined ? { trailingItem } : {})}
-      {...(themeAdjacentItem !== undefined ? { themeAdjacentItem } : {})}
       isHome={currentPage === "home"}
       extraItems={
         <>
