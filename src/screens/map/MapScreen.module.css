@@ -40,28 +40,29 @@
   gap: var(--m-s);
 }
 
+/* The field lives in the nav row beside the date controls, so its footprint has
+   to be a single line and it has to keep that line's height no matter what the
+   search is doing. Two rules carry that: the count beside it is a fixed width,
+   and the Fit/Tour actions hang below the box rather than sitting in it. */
+.mapSearchItem {
+  flex: 0 0 auto;
+}
+
 .mapSearch {
-  /* A fixed-footprint column: the input, then a persistent status row. The old
-     inline-flex + flex-wrap + fit-content box let the status content drive the
-     layout, so as the text swung between "1444 photos", "935 of 1444 photos"
-     and "No photos match …" the box grew from 273→362px wide and reflowed
-     2→3 rows, throwing the count across the box on every keystroke. A stable
-     width and a dedicated status row keep the whole thing still. */
+  position: relative;
   display: flex;
-  flex-direction: column;
+  align-items: center;
   gap: var(--m-s);
-  padding: var(--m);
+  padding-inline: var(--m-s);
   border: solid var(--size-2) var(--c-bg-contrast-light);
   border-radius: var(--m-s);
   background: var(--c-bg);
-  margin-block-start: var(--m-s);
-  inline-size: min(var(--size-280), 100%);
 }
 
-.mapSearch input {
-  inline-size: 100%;
+.mapSearchInput {
+  inline-size: var(--size-120);
   min-inline-size: 0;
-  padding: var(--m-s);
+  padding-block: var(--m-s);
   border: 0;
   background: transparent;
   color: var(--c-font);
@@ -70,81 +71,67 @@
   font-size: var(--fs-sm);
 }
 
-/* Always present, so it never pops the box taller when a search starts; the
-   tour trigger is the tallest child, so reserving its height keeps the box a
-   constant height whether or not the trigger is shown. */
-.mapSearchStatus {
-  display: flex;
-  align-items: center;
-  gap: var(--m-s);
-  min-block-size: var(--size-22);
-}
-
 /* 16px on touch devices stops iOS Safari zooming the page on focus */
 @media (hover: none), (pointer: coarse) {
-  .mapSearch input {
+  .mapSearchInput {
     font-size: var(--fs-touch);
   }
 }
 
-.mapSearch input:focus-visible {
+.mapSearchInput:focus-visible {
   outline: solid var(--size-2) var(--c-bg-contrast-light);
   outline-offset: var(--size-1);
 }
 
-/* Direct child of the status row: the result count / message, not the icon
-   nested inside the tour button. It takes the space the tour trigger leaves and
-   may wrap within the fixed box width rather than widening it. */
-.mapSearchStatus > span {
-  /* Take the leading space so the Fit/Tour actions group at the trailing edge. */
-  flex: 1 1 auto;
+/* Fixed width, trailing-aligned, tabular figures: "1444 photos", "935/1444" and
+   "No matches" all have to land in the same box without moving the field. */
+.mapSearchCount {
+  flex: 0 0 auto;
+  /* Wide enough for the longest form ("1444 photos"), and `min-inline-size: 0`
+     because a flex item defaults to `min-width: auto` — without it the text
+     pushes the item past its own width and everything after the field slides
+     8px sideways the moment a query shortens the count. */
+  inline-size: var(--size-96);
   min-inline-size: 0;
   color: color-mix(in oklch, var(--c-font) 70%, transparent);
   font-size: var(--fs-xs);
   font-variant-numeric: tabular-nums;
+  text-align: end;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-/* Sit with the result count inside the search box: the tour plays whatever the
-   search matched and Fit reframes it, so they read as part of the result rather
-   than map controls. */
-.mapSearchTour,
-.mapSearchFit {
+/* Out of flow entirely — under the count, aligned to the same trailing edge.
+   A Fit or Tour arriving mid-search must not grow the nav row. */
+.mapSearchActions {
+  position: absolute;
+  inset-block-start: calc(100% + var(--m));
+  inset-inline-end: 0;
+  display: flex;
+  gap: var(--m);
+}
+
+.mapSearchAction {
   display: inline-flex;
   align-items: center;
   gap: var(--m);
-  flex: 0 0 auto;
   padding: var(--m) var(--m-s);
   border: solid var(--size-1) var(--c-bg-contrast-light);
   border-radius: var(--m);
-  background: transparent;
+  background: var(--c-bg);
   color: var(--c-font);
   cursor: pointer;
   font-size: var(--fs-xs);
   white-space: nowrap;
 }
 
-.mapSearchTour[aria-pressed="true"] {
+.mapSearchActionActive {
   border-color: var(--c-accent);
   color: var(--c-accent);
 }
 
-.mapSearchTour:focus-visible,
-.mapSearchFit:focus-visible {
-  outline: solid var(--size-2) var(--c-bg-contrast-light);
-  outline-offset: var(--size-1);
-}
-
-.mapSearchRetry {
-  min-inline-size: 4.5em;
-  padding: var(--m);
-  border: 0;
-  background: transparent;
-  color: var(--c-accent);
-  cursor: pointer;
-  font-size: var(--fs-xs);
-}
-
-.mapSearchRetry:focus-visible {
+.mapSearchAction:focus-visible {
   outline: solid var(--size-2) var(--c-bg-contrast-light);
   outline-offset: var(--size-1);
 }

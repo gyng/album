@@ -157,9 +157,15 @@ describe("map page boundaries", () => {
     await waitFor(() => expect(input).toHaveAttribute("aria-busy", "false"));
     fireEvent.focus(input);
     expect(fetchIndex).toHaveBeenCalledTimes(1);
-    expect(screen.getByText(/photos$/)).toBeInTheDocument();
+    // Compact by design — the count shares a nav row with the field. The full
+    // sentence stays available as its title rather than widening the row.
+    expect(screen.getByRole("status")).toHaveTextContent(/^\d+\/\d+$/);
     fireEvent.change(input, { target: { value: "nothing-matches" } });
-    expect(screen.getByText("No photos match “nothing-matches”.")).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent("No matches");
+    expect(screen.getByRole("status")).toHaveAttribute(
+      "title",
+      "No photos match “nothing-matches”.",
+    );
     inputRender.unmount();
   });
 
@@ -169,7 +175,10 @@ describe("map page boundaries", () => {
     const input = screen.getByRole("searchbox");
     fireEvent.change(input, { target: { value: "trip" } });
     await waitFor(() =>
-      expect(screen.getByText("No matching photos in these dates.")).toBeInTheDocument(),
+      expect(screen.getByRole("status")).toHaveAttribute(
+        "title",
+        "No matching photos in these dates.",
+      ),
     );
   });
 
@@ -179,7 +188,7 @@ describe("map page boundaries", () => {
     render(<WorldMap photos={photos as never} />);
     const input = screen.getByRole("searchbox");
     fireEvent.focus(input);
-    await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("Search unavailable"));
+    await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("Unavailable"));
 
     fetchIndex.mockRejectedValueOnce("network down");
     fireEvent.click(screen.getByRole("button", { name: "Try again" }));

@@ -191,6 +191,31 @@ const MapScreen = (props: MapScreenProps) => {
         : filteredPhotos,
     [filteredPhotos, timeRange],
   );
+  // The count that sits beside the search field. Compact by design: it shares a
+  // single nav row with the field, so it has to read at a glance and — more
+  // importantly — never change width enough to move the field. The longer
+  // sentence survives as a title for anyone who wants the detail.
+  const trimmedQuery = deferredMapSearchQuery.trim();
+  const searchCount =
+    mapSearchStatus === "error"
+      ? "Unavailable"
+      : mapSearchStatus === "loading"
+        ? "Loading…"
+        : trimmedQuery && displayedPhotos.length === 0
+          ? "No matches"
+          : trimmedQuery
+            ? `${displayedPhotos.length}/${dateFilteredAlbumPhotos.length}`
+            : `${displayedPhotos.length} photos`;
+  const searchCountTitle =
+    mapSearchStatus === "error"
+      ? "Search is unavailable"
+      : trimmedQuery && displayedPhotos.length === 0
+        ? timeRange && filteredPhotos.length > 0
+          ? "No matching photos in these dates."
+          : `No photos match “${trimmedQuery}”.`
+        : trimmedQuery
+          ? `${displayedPhotos.length} of ${dateFilteredAlbumPhotos.length} photos match`
+          : `${displayedPhotos.length} photos on the map`;
   const isPreviewableResultSet =
     Boolean(deferredMapSearchQuery.trim()) &&
     displayedPhotos.length > 0 &&
@@ -270,6 +295,86 @@ const MapScreen = (props: MapScreenProps) => {
                   </div>
                 </li>
               ) : null}
+              <li className={styles.mapSearchItem}>
+                <div className={styles.mapSearch} role="search">
+                  <input
+                    type="search"
+                    className={styles.mapSearchInput}
+                    value={mapSearchQuery}
+                    onFocus={loadMapSearchIndex}
+                    onChange={(event) => {
+                      const nextQuery = event.target.value;
+                      setMapSearchQuery(nextQuery);
+                      if (nextQuery.trim()) {
+                        loadMapSearchIndex();
+                      }
+                    }}
+                    placeholder="Search photos…"
+                    aria-label="Search photos on the map"
+                    autoComplete="off"
+                    spellCheck={false}
+                    aria-busy={mapSearchStatus === "loading"}
+                  />
+                  {/* Beside the field, not below it, and a fixed width: the text
+                      swings between "1444 photos", "935/1444" and "No matches",
+                      and anything that let it size itself would shove the field
+                      sideways on every keystroke. */}
+                  <span className={styles.mapSearchCount} title={searchCountTitle} role="status">
+                    {searchCount}
+                  </span>
+                  {/* Hung below the count rather than laid out in the row, so a
+                      Fit or Tour appearing cannot change the height of the nav
+                      line the field sits on. */}
+                  <div className={styles.mapSearchActions}>
+                    {mapSearchStatus === "error" ? (
+                      <button
+                        type="button"
+                        className={styles.mapSearchAction}
+                        onClick={loadMapSearchIndex}
+                      >
+                        Try again
+                      </button>
+                    ) : null}
+                    {/* Reframe on demand: the search filters the markers in
+                        place, so this is how the user asks the map to fly to the
+                        matches. */}
+                    {trimmedQuery && displayedPhotos.length > 0 ? (
+                      <button
+                        type="button"
+                        className={styles.mapSearchAction}
+                        aria-label="Fit the map to the results"
+                        onClick={() => {
+                          setFitRequestId((id) => id + 1);
+                        }}
+                      >
+                        <span aria-hidden="true">⤢</span>
+                        Fit
+                      </button>
+                    ) : null}
+                    {/* The tour reads as "play these results", so it belongs
+                        with the result count rather than floating over the map,
+                        and only once there are results to tour. */}
+                    {trimmedQuery && directorSequenceLength > 1 ? (
+                      <button
+                        type="button"
+                        className={[
+                          styles.mapSearchAction,
+                          directorEnabled ? styles.mapSearchActionActive : "",
+                        ]
+                          .filter(Boolean)
+                          .join(" ")}
+                        aria-pressed={directorEnabled}
+                        onClick={() => {
+                          setDirectorEnabled((current) => !current);
+                        }}
+                      >
+                        <span aria-hidden="true">{directorEnabled ? "■" : "▶"}</span>
+                        Tour
+                      </button>
+                    ) : null}
+                  </div>
+                </div>
+              </li>
               {!filterAlbum && routableAlbumCount > 0 ? (
                 <li>
                   <div className={styles.mapControls}>
@@ -320,87 +425,6 @@ const MapScreen = (props: MapScreenProps) => {
             </>
           }
         />
-        <div className={styles.mapSearch} role="search">
-          <input
-            type="search"
-            value={mapSearchQuery}
-            onFocus={loadMapSearchIndex}
-            onChange={(event) => {
-              const nextQuery = event.target.value;
-              setMapSearchQuery(nextQuery);
-              if (nextQuery.trim()) {
-                loadMapSearchIndex();
-              }
-            }}
-            placeholder="Search photos…"
-            aria-label="Search photos on the map"
-            autoComplete="off"
-            spellCheck={false}
-            aria-busy={mapSearchStatus === "loading"}
-          />
-          {/* A persistent status row below the input. Keeping it in its own row
-              (rather than wrapping inline off the input) is what stops the count,
-              the "N of M" text and the tour trigger reflowing the whole box —
-              which grew from 273 to 362px wide and jumped 2→3 rows on every
-              keystroke, teleporting the count from bottom-left to top-right. */}
-          <div className={styles.mapSearchStatus}>
-            {mapSearchStatus === "error" ? (
-              <>
-                <span role="status">Search unavailable</span>
-                <button
-                  type="button"
-                  className={styles.mapSearchRetry}
-                  onClick={loadMapSearchIndex}
-                >
-                  Try again
-                </button>
-              </>
-            ) : (
-              <span aria-live="polite">
-                {mapSearchStatus === "loading"
-                  ? "Loading search…"
-                  : deferredMapSearchQuery.trim() && displayedPhotos.length === 0
-                    ? timeRange && filteredPhotos.length > 0
-                      ? "No matching photos in these dates."
-                      : `No photos match “${deferredMapSearchQuery.trim()}”.`
-                    : deferredMapSearchQuery.trim()
-                      ? `${displayedPhotos.length} of ${dateFilteredAlbumPhotos.length} photos`
-                      : `${displayedPhotos.length} photos`}
-              </span>
-            )}
-            {/* Reframe on demand: the search filters the markers in place, so
-                this is how the user asks the map to fly to the matches. */}
-            {deferredMapSearchQuery.trim() && displayedPhotos.length > 0 ? (
-              <button
-                type="button"
-                className={styles.mapSearchFit}
-                aria-label="Fit the map to the results"
-                onClick={() => {
-                  setFitRequestId((id) => id + 1);
-                }}
-              >
-                <span aria-hidden="true">⤢</span>
-                Fit
-              </button>
-            ) : null}
-            {/* The tour reads as "play these results", so it belongs with the
-                result count rather than floating over the map, and only once
-                there are results to tour. */}
-            {deferredMapSearchQuery.trim() && directorSequenceLength > 1 ? (
-              <button
-                type="button"
-                className={styles.mapSearchTour}
-                aria-pressed={directorEnabled}
-                onClick={() => {
-                  setDirectorEnabled((current) => !current);
-                }}
-              >
-                <span aria-hidden="true">{directorEnabled ? "■" : "▶"}</span>
-                Tour
-              </button>
-            ) : null}
-          </div>
-        </div>
       </div>
 
       <MapWorldDeferred

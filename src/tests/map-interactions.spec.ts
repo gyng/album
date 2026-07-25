@@ -20,6 +20,41 @@ test.describe("World map interactions", () => {
     await expect(page.locator("canvas").first()).toBeVisible({ timeout: 10_000 });
   });
 
+  test("keeps the search field still while the result count changes under it", async ({ page }) => {
+    // The count sits beside the field and the Fit/Tour actions hang below the
+    // box, precisely so neither can move or resize the field. Typing swings the
+    // count between "N photos", "N/M" and "No matches"; an earlier version of
+    // this box grew 273→362px and reflowed 2→3 rows on a keystroke, and the
+    // first cut of this one slid 8px sideways because a flex item's default
+    // `min-width: auto` let the longest count push past its own width.
+    const input = page.getByRole("searchbox", { name: "Search photos on the map" });
+    const count = page.getByRole("status");
+    const field = page.locator('[role="search"]');
+
+    await expect(count).toHaveText(/photos$/);
+    const box = await field.boundingBox();
+    const countBox = await count.boundingBox();
+
+    const indexResponse = page.waitForResponse((response) =>
+      response.url().includes("map-search-index.json"),
+    );
+    await input.focus();
+    await indexResponse;
+
+    await input.fill("test-simple");
+    await expect(count).toHaveText(/^\d+\/\d+$/);
+    // The actions appear below the box rather than inside it, so the box keeps
+    // its height as well as its width.
+    await expect(page.getByRole("button", { name: "Fit the map to the results" })).toBeVisible();
+    expect(await field.boundingBox()).toEqual(box);
+    expect(await count.boundingBox()).toEqual(countBox);
+
+    await input.fill("a phrase that cannot exist in the fixture archive");
+    await expect(count).toHaveText("No matches");
+    expect(await field.boundingBox()).toEqual(box);
+    expect(await count.boundingBox()).toEqual(countBox);
+  });
+
   test("filters mapped photos with the lightweight index", async ({ page }) => {
     const input = page.getByRole("searchbox", { name: "Search photos on the map" });
     expect(
