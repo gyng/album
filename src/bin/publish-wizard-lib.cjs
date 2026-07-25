@@ -733,7 +733,16 @@ const loadDbState = async (dbPath, embeddingsDbPath = null) => {
       })),
     };
 
-    if (!hasEmbeddingsTable && embeddingsDbPath && fileExists(embeddingsDbPath)) {
+    // `do-full-index.sh` moves the embeddings into their own file and leaves the
+    // table behind, empty — so "has a table" says nothing about whether this
+    // database is where the embeddings live. An empty one has to defer to the
+    // split file too, or every indexed photo reads as unembedded and the next
+    // publish offers to re-derive all of them on the GPU.
+    if (
+      (!hasEmbeddingsTable || embeddingsCountRow.count === 0) &&
+      embeddingsDbPath &&
+      fileExists(embeddingsDbPath)
+    ) {
       const embeddingsState = await loadEmbeddingsFromDb(embeddingsDbPath);
       return { ...baseState, ...embeddingsState };
     }

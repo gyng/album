@@ -3703,6 +3703,56 @@ class TestDb(UsesTestexistsFixture, unittest.TestCase):
             self.assertEqual(payload["summary"]["verdictCounts"]["candidate_better"], 1)
 
 
+class SplitEmbeddingsDatabaseTest(unittest.TestCase):
+    """`do-full-index.sh` moves the embeddings into their own database and leaves
+    the table behind, empty. Anything that asks "which photos are embedded?" has
+    to look there too — otherwise every indexed photo reads as unembedded and the
+    next index run re-derives thousands of embeddings on the GPU for photos that
+    already have them."""
+
+    def test_reads_embedding_paths_from_the_split_database(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            core_path = os.path.join(tmp, "search.sqlite")
+            split_path = os.path.join(tmp, "search-embeddings.sqlite")
+
+            core = Sqlite3Client(core_path)
+            core.setup_tables()
+            core.con.commit()
+
+            split = sqlite3.connect(split_path)
+            split.execute(
+                "CREATE TABLE embeddings (path VARCHAR, model_id TEXT, embedding_dim INTEGER,"
+                " embedding_blob BLOB, embedding_scale REAL)"
+            )
+            split.execute(
+                "INSERT INTO embeddings (path, model_id) VALUES (?, ?)",
+                ("../albums/trip/a.jpg", "google/siglip-base-patch16-224"),
+            )
+            split.commit()
+            split.close()
+
+            self.assertEqual(
+                core.list_embedding_paths("google/siglip-base-patch16-224"),
+                {"../albums/trip/a.jpg"},
+            )
+
+    def test_prefers_its_own_embeddings_when_it_has_them(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            core_path = os.path.join(tmp, "search.sqlite")
+            core = Sqlite3Client(core_path)
+            core.setup_tables()
+            core.con.execute(
+                "INSERT INTO embeddings (path, model_id) VALUES (?, ?)",
+                ("../albums/trip/own.jpg", "google/siglip-base-patch16-224"),
+            )
+            core.con.commit()
+
+            self.assertEqual(
+                core.list_embedding_paths("google/siglip-base-patch16-224"),
+                {"../albums/trip/own.jpg"},
+            )
+
+
 if __name__ == "__main__":
     print(f"cwd:\t{os.getcwd()}")
     unittest.main()

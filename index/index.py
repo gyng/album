@@ -2648,18 +2648,55 @@ class Sqlite3Client:
             return set()
         return {row[0] for row in self.con.execute("SELECT path FROM metadata")}
 
+    def _split_embeddings_path(self) -> Optional[str]:
+        """The sibling database ``do-full-index.sh`` moves the embeddings into.
+
+        The split is the last step of a full index run, and it leaves this
+        database's own ``embeddings`` table in place but empty. Anything asking
+        which photos are embedded therefore has to look next door, or every
+        indexed photo reads as unembedded and the next run re-derives thousands
+        of embeddings on the GPU for photos that already have them."""
+        directory = os.path.dirname(os.path.abspath(self.db_path))
+        base = os.path.basename(self.db_path)
+        stem = base[: -len(".sqlite")] if base.endswith(".sqlite") else base
+        candidate = os.path.join(directory, f"{stem}-embeddings.sqlite")
+        return candidate if os.path.exists(candidate) else None
+
     def list_embedding_paths(self, model_id: Optional[str] = None):
-        if not self.table_exists("embeddings"):
-            return set()
-        cur = self.con.cursor()
-        if model_id:
-            res = cur.execute(
-                "SELECT path FROM embeddings WHERE model_id = ?",
-                (model_id,),
-            )
-        else:
-            res = cur.execute("SELECT path FROM embeddings")
-        return {row[0] for row in res.fetchall()}
+        def read(connection) -> set:
+            cur = connection.cursor()
+            if model_id:
+                res = cur.execute(
+                    "SELECT path FROM embeddings WHERE model_id = ?",
+                    (model_id,),
+                )
+            else:
+                res = cur.execute("SELECT path FROM embeddings")
+            return {row[0] for row in res.fetchall()}
+
+        paths = read(self.con) if self.table_exists("embeddings") else set()
+        if paths:
+            return paths
+
+        # Empty (or absent) here means the embeddings may have been split out.
+        split_path = self._split_embeddings_path()
+        if split_path is None:
+            return paths
+
+        try:
+            absolute = os.path.abspath(split_path)
+            split_con = sqlite3.connect(f"file:{absolute}?mode=ro", uri=True)
+        except sqlite3.Error:
+            return paths
+
+        try:
+            return read(split_con)
+        except sqlite3.Error:
+            # A sibling that is unreadable or has no embeddings table tells us
+            # nothing; fall back to what this database itself knows.
+            return paths
+        finally:
+            split_con.close()
 
     def list_file_signatures(self):
         if not self.table_exists("file_signatures"):

@@ -922,6 +922,37 @@ describe("publish-wizard-lib", () => {
       fs.rmSync(directory, { recursive: true, force: true });
     });
 
+    it("reads the split database when the core one keeps an empty embeddings table", async () => {
+      // What `do-full-index.sh` actually leaves behind: the embeddings are moved
+      // into their own file and the table stays, empty. Keying the fallback on
+      // the table's *existence* made the wizard read zero embeddings from it and
+      // report every indexed photo as unembedded — which is not just a wrong
+      // warning, it is a real index run that re-derives 1,487 embeddings on the
+      // GPU for photos that already have them.
+      const splitDbPath = path.join(directory, "split.sqlite");
+      const splitDb = new DatabaseSync(splitDbPath);
+      splitDb.exec(`
+        CREATE TABLE images (path TEXT PRIMARY KEY);
+        INSERT INTO images (path) VALUES
+          ('../albums/test-simple/a.jpg'),
+          ('../albums/test-simple/b.jpg');
+        CREATE TABLE embeddings (
+          path TEXT NOT NULL,
+          model_id TEXT NOT NULL,
+          PRIMARY KEY (path, model_id)
+        );
+      `);
+      splitDb.close();
+
+      const state = await loadDbState(splitDbPath, embeddingsDbPath);
+
+      expect(state.embeddingsCount).toBe(2);
+      expect([...state.indexedEmbeddingPaths].sort((a, b) => a.localeCompare(b))).toEqual([
+        "../albums/test-simple/a.jpg",
+        "../albums/test-simple/b.jpg",
+      ]);
+    });
+
     it("reports a core-only database without inventing embedding state", async () => {
       const state = await loadDbState(mainDbPath);
 
