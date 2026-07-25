@@ -4,3 +4,5 @@ search.sqlite
 search.sqlite.bak
 e2e-search.sqlite
 e2e-search-embeddings.sqlite
+# The indexer's single-instance lock — runtime state, never an asset.
+search.sqlite.lock
