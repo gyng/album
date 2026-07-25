@@ -109,7 +109,7 @@ describe("ThemeToggle", () => {
     expect(document.documentElement).toHaveClass("theme-ink");
   });
 
-  it("returns to the system default, clearing classes and storage", () => {
+  it("follows the system only when asked, and stores that as a choice", () => {
     localStorage.setItem("theme", "dark");
 
     render(<ThemeToggle />);
@@ -121,7 +121,15 @@ describe("ThemeToggle", () => {
       expect(document.documentElement.classList.contains(className)).toBe(false);
       expect(document.body.classList.contains(className)).toBe(false);
     }
-    expect(localStorage.getItem("theme")).toBeNull();
+    // Stored, not cleared: an empty slot now means "never chose", which is dark.
+    expect(localStorage.getItem("theme")).toBe("system");
+  });
+
+  it("shows dark as the starting point when nothing has been chosen", () => {
+    render(<ThemeToggle />);
+
+    expect(document.documentElement).toHaveClass("dark");
+    expect(getPicker()).toHaveValue("dark");
   });
 
   it("renders when localStorage access is unavailable", () => {

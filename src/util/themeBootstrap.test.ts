@@ -21,6 +21,24 @@ describe("THEME_BOOTSTRAP_SCRIPT", () => {
     document.body.classList.remove(...ALL_THEME_CLASSES);
   });
 
+  it("starts dark when nothing has been chosen, and follows the OS only on request", () => {
+    // A first visit gets the dark theme rather than whatever the OS happens to
+    // be set to. Following the system is still available, but it is now a choice
+    // someone makes rather than the absence of one — so it has to be stored, or
+    // it would be indistinguishable from never having chosen.
+    runBootstrapScript();
+    expect(document.documentElement).toHaveClass("dark");
+    expect(document.body).toHaveClass("dark");
+
+    document.documentElement.classList.remove(...ALL_THEME_CLASSES);
+    document.body.classList.remove(...ALL_THEME_CLASSES);
+    localStorage.setItem("theme", "system");
+    runBootstrapScript();
+    for (const className of ALL_THEME_CLASSES) {
+      expect(document.documentElement.classList.contains(className)).toBe(false);
+    }
+  });
+
   it("applies a stored legacy-alias theme even when persisting the migrated name fails", () => {
     localStorage.setItem("theme", "porcelain");
     const setItemSpy = jest.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
@@ -62,20 +80,25 @@ describe("THEME_BOOTSTRAP_SCRIPT", () => {
 
     runBootstrapScript();
 
-    // Neither an inherited alias lookup nor a scheme lookup must match —
-    // the theme falls through to the system scheme (no explicit class set).
+    // Neither an inherited alias lookup nor a scheme lookup must match: no named
+    // palette is applied, and the value falls through to the default rather than
+    // resolving to whatever `constructor` happens to inherit.
+    const namedClasses = ALL_THEME_CLASSES.filter((cls) => cls.startsWith("theme-"));
     expect(document.documentElement.classList.contains("theme-watercolour")).toBe(false);
-    for (const cls of ALL_THEME_CLASSES) {
+    for (const cls of namedClasses) {
       expect(document.documentElement.classList.contains(cls)).toBe(false);
     }
+    expect(document.documentElement).toHaveClass("dark");
 
     window.history.pushState({}, "", "/");
+    document.documentElement.classList.remove(...ALL_THEME_CLASSES);
     localStorage.setItem("theme", "constructor");
 
     runBootstrapScript();
 
-    for (const cls of ALL_THEME_CLASSES) {
+    for (const cls of namedClasses) {
       expect(document.documentElement.classList.contains(cls)).toBe(false);
     }
+    expect(document.documentElement).toHaveClass("dark");
   });
 });

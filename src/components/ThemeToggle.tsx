@@ -12,9 +12,24 @@ import styles from "./ThemeToggle.module.css";
 
 const subscribeToHydration = () => () => {};
 
-const readStoredTheme = (): ThemeName | null => {
+/**
+ * What the reader has chosen: a theme, or the OS's own scheme.
+ *
+ * "system" is a stored choice rather than an empty slot, because an empty slot
+ * now means something else — nobody has chosen, which starts dark.
+ */
+type ThemeChoice = ThemeName | "system";
+
+/** A first visit gets this, rather than whatever the OS happens to be set to. */
+const DEFAULT_THEME: ThemeChoice = "dark";
+
+const readStoredTheme = (): ThemeChoice | null => {
   try {
     const stored = localStorage.getItem("theme");
+    if (stored === "system") {
+      return "system";
+    }
+
     const theme = resolveThemeName(stored);
     if (theme) {
       return theme;
@@ -33,13 +48,9 @@ const readStoredTheme = (): ThemeName | null => {
   }
 };
 
-const writeStoredTheme = (value: ThemeName | null): void => {
+const writeStoredTheme = (value: ThemeChoice): void => {
   try {
-    if (value == null) {
-      localStorage.removeItem("theme");
-    } else {
-      localStorage.setItem("theme", value);
-    }
+    localStorage.setItem("theme", value);
     // The named-theme preference supersedes the legacy boolean.
     localStorage.removeItem("darkMode");
   } catch (err) {
@@ -59,26 +70,34 @@ const optionClassName = (name: ThemeName): string => {
   return `theme-${name}`;
 };
 
-const getInitialTheme = (): ThemeName | null => {
+const getInitialTheme = (): ThemeChoice => {
   // This is the client snapshot passed to useSyncExternalStore. Server renders
   // use the explicit server snapshot below and never call this function.
   const url = new URL(window.location.toString());
   const theme = url.searchParams.get("theme");
+  if (theme === "system") {
+    return "system";
+  }
+
   const resolvedTheme = resolveThemeName(theme);
   if (resolvedTheme) {
     return resolvedTheme;
   }
 
-  // No explicit preference (null) follows the system: :root declares
-  // `color-scheme: light dark`, so with no theme classes applied the
-  // light-dark() tokens track the OS, matching THEME_BOOTSTRAP_SCRIPT.
-  return readStoredTheme();
+  // "system" applies no theme classes, so :root's `color-scheme: light dark`
+  // tracks the OS; anything else applies its own. Nothing stored starts dark,
+  // matching THEME_BOOTSTRAP_SCRIPT.
+  return readStoredTheme() ?? DEFAULT_THEME;
 };
 
 export const ThemeToggle: React.FC = () => {
-  const initialTheme = useSyncExternalStore(subscribeToHydration, getInitialTheme, () => null);
+  const initialTheme = useSyncExternalStore(
+    subscribeToHydration,
+    getInitialTheme,
+    () => DEFAULT_THEME,
+  );
   const [themeOverride, setThemeOverride] = useReducer(
-    (_state: ThemeName | null | undefined, next: ThemeName | null | undefined) => next,
+    (_state: ThemeChoice | undefined, next: ThemeChoice | undefined) => next,
     undefined,
   );
   const theme = themeOverride === undefined ? initialTheme : themeOverride;
@@ -90,7 +109,7 @@ export const ThemeToggle: React.FC = () => {
     // viewport scrollbar and overscroll glow.
     for (const el of [document.documentElement, document.body]) {
       el.classList.remove(...ALL_THEME_CLASSES);
-      if (theme != null) {
+      if (theme !== "system") {
         el.classList.add(...themeClassNames(theme));
       }
     }
@@ -101,9 +120,9 @@ export const ThemeToggle: React.FC = () => {
       <Select
         aria-label="Theme"
         className={styles.picker}
-        value={theme ?? "system"}
+        value={theme}
         onChange={(event) => {
-          const next = resolveThemeName(event.target.value);
+          const next = resolveThemeName(event.target.value) ?? "system";
           setThemeOverride(next);
           writeStoredTheme(next);
         }}

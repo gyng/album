@@ -34,6 +34,11 @@ export const THEME_BOOTSTRAP_SCRIPT = `
   try {
     const url = new URL(window.location.href);
     const fromUrl = url.searchParams.get("theme");
+    if (fromUrl === "system") {
+      applyTheme(null);
+      return;
+    }
+
     const urlTheme = fromUrl && Object.hasOwn(aliases, fromUrl) ? aliases[fromUrl] : fromUrl;
     if (urlTheme && Object.hasOwn(schemes, urlTheme)) {
       applyTheme(urlTheme);
@@ -41,6 +46,13 @@ export const THEME_BOOTSTRAP_SCRIPT = `
     }
 
     const stored = localStorage.getItem("theme");
+    // Following the OS is a choice someone made, and it is stored as one: an
+    // empty slot means nobody has chosen, which starts dark.
+    if (stored === "system") {
+      applyTheme(null);
+      return;
+    }
+
     const storedTheme = stored && Object.hasOwn(aliases, stored) ? aliases[stored] : stored;
     if (storedTheme && Object.hasOwn(schemes, storedTheme)) {
       applyTheme(storedTheme);
@@ -67,8 +79,8 @@ export const THEME_BOOTSTRAP_SCRIPT = `
     // Fall back to the system scheme when storage or URL parsing is unavailable.
   }
 
-  // No explicit preference: clear theme classes so :root's
-  // "color-scheme: light dark" follows the OS live.
-  applyTheme(null);
+  // Nobody has chosen: start dark rather than following whatever the OS happens
+  // to be set to. "System" remains available, and is stored when picked.
+  applyTheme("dark");
 })();
 `;

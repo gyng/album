@@ -21,3 +21,6 @@ src/public/search-embeddings.sqlite
 # Claude Code harness state — per-session lock file, not source.
 # .claude/rules/ is intentionally committed and not ignored here.
 .claude/scheduled_tasks.lock
+
+# Record of in-place EXIF corrections to the (untracked) album originals.
+exif-corrections.log
