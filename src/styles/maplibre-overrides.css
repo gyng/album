@@ -3,8 +3,23 @@
 @layer vendor, overrides;
 
 @layer overrides {
+  /* The map ships its own Helvetica stack, so the distance scale, the
+     attribution and our recency legend — which borrows the scale's classes —
+     were the only text on the page not in the site's typeface. `--font-sans` is
+     themeable, so this follows the palette's face too (slate sets Barlow), not
+     just the default one. Sizes are left to the vendor: this is map chrome, and
+     its 10-12px is deliberate. */
+  .maplibregl-map,
+  .maplibregl-ctrl-scale,
+  .maplibregl-ctrl-attrib,
+  .maplibregl-ctrl-attrib-inner,
+  .maplibregl-ctrl-group button {
+    font-family: var(--font-sans);
+  }
+
   .maplibregl-popup-content {
     background-color: var(--c-bg);
+    font-family: var(--font-sans);
   }
 
   .maplibregl-popup-tip {

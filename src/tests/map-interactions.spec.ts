@@ -131,6 +131,22 @@ test.describe("World map interactions", () => {
     await indexResponse;
     await input.fill("test-simple");
 
+    // The map's own chrome is held to the same typeface: MapLibre ships a
+    // Helvetica stack, and the scale, the attribution and the recency legend
+    // that borrows the scale's classes were the only text on the page not in the
+    // site's face — which is themeable, so this follows the palette's too.
+    const bodyFont = await page
+      .locator("body")
+      .evaluate((body) => getComputedStyle(body).fontFamily);
+    for (const chrome of [".maplibregl-ctrl-scale", ".maplibregl-ctrl-attrib-inner"]) {
+      expect(
+        await page
+          .locator(chrome)
+          .first()
+          .evaluate((el) => getComputedStyle(el).fontFamily),
+      ).toBe(bodyFont);
+    }
+
     const previewLabel = mapPin(page, /Photo from test-simple/i)
       .first()
       .locator("..")
