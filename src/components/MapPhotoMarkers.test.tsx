@@ -235,25 +235,17 @@ const photo = (overrides: Partial<PhotoWithStyle> = {}): PhotoWithStyle => ({
 });
 
 describe("MapPhotoMarkers", () => {
-  let intersectionCallback: IntersectionObserverCallback;
-  const observe = jest.fn();
-  const unobserve = jest.fn();
-  const disconnect = jest.fn();
-
   beforeEach(() => {
     stopPropagation.mockClear();
     dataLayer.mockClear();
-    observe.mockClear();
-    unobserve.mockClear();
-    disconnect.mockClear();
     setCoarsePointer(false);
+    // Stubbed only so the cases below can assert that *nothing* reaches for it:
+    // marker images are virtualised by the map's bounds, and a second
+    // element-level gate used to unload pictures still on screen.
     Object.defineProperty(globalThis, "IntersectionObserver", {
       configurable: true,
       writable: true,
-      value: jest.fn((callback: IntersectionObserverCallback) => {
-        intersectionCallback = callback;
-        return { observe, unobserve, disconnect };
-      }),
+      value: jest.fn(() => ({ observe: jest.fn(), unobserve: jest.fn(), disconnect: jest.fn() })),
     });
   });
 
@@ -1008,9 +1000,55 @@ describe("MapPhotoMarkers", () => {
     });
   });
 
-  // Rich pins: a lazily loaded thumbnail needs a real element to observe, so
+  // Rich pins: a thumbnail needs a real element of its own, so
   // this set stays on DOM markers. It is always small.
   describe("with marker images", () => {
+    it("draws the photos it did not give a thumbnail, and keeps them reachable", () => {
+      // Over a dense city the thumbnails overlap almost completely, so only a
+      // thinned set gets a DOM marker. The rest are not dropped: they stay on
+      // the drawn layer, which costs nothing per photo, and stay clickable and
+      // reachable by keyboard — a photo without a thumbnail is still a photo.
+      const photos = [
+        photo({ href: "shown" }),
+        photo({ href: "thinned", decLng: 140 }),
+        photo({ href: "also-thinned", decLng: 141 }),
+      ];
+      const onSelect = jest.fn();
+
+      render(
+        <MapPhotoMarkers
+          photos={photos}
+          visiblePhotos={photos}
+          renderPhotos={photos}
+          thumbnailPhotos={[photos[0]!]}
+          showMarkerImages
+          emphasiseRoute={false}
+          activeRouteHrefSet={new Set()}
+          onSelect={onSelect}
+          onHover={jest.fn()}
+        />,
+      );
+
+      // One thumbnail marker, and every photo still on the drawn layer.
+      expect(screen.getAllByTestId("marker")).toHaveLength(1);
+      const drawn = dataLayer.mock.calls.map(([props]) => props).at(-1);
+      expect(drawn?.points.map((point) => point.id)).toEqual(["shown", "thinned", "also-thinned"]);
+
+      // A tap on a drawn pin opens its photo.
+      drawn?.onPointClick?.({ id: "thinned" });
+      expect(onSelect).toHaveBeenCalledWith(expect.objectContaining({ href: "thinned" }));
+
+      // The hidden list offers exactly the photos that have no marker of their
+      // own, so nothing is announced twice.
+      const listed = screen
+        .getAllByRole("button", { name: /Photo from kansai/ })
+        .map((control) => control.tagName);
+      expect(listed).toHaveLength(3);
+      expect(screen.getByRole("list", { name: "Photos in view" }).textContent).not.toContain(
+        "shown",
+      );
+    });
+
     it("supports pointer, focus, and keyboard selection", () => {
       const onSelect = jest.fn();
       const onHover = jest.fn();
@@ -1028,7 +1066,6 @@ describe("MapPhotoMarkers", () => {
         />,
       );
 
-      expect(dataLayer).not.toHaveBeenCalled();
       const control = screen.getByRole("button", { name: "Photo from kansai on 2 Jan 2024" });
       fireEvent.mouseOver(control);
       fireEvent.mouseLeave(control);
@@ -1042,7 +1079,6 @@ describe("MapPhotoMarkers", () => {
       expect(onSelect).toHaveBeenCalledTimes(3);
       // Clicking a pin must not also read as a click on the map beneath it.
       expect(stopPropagation).toHaveBeenCalledTimes(1);
-      expect(observe).toHaveBeenCalledTimes(1);
     });
 
     it("gives a marker only to the photos in view", () => {
@@ -1081,7 +1117,12 @@ describe("MapPhotoMarkers", () => {
       expect(screen.getAllByTestId("marker")).toHaveLength(2);
     });
 
-    it("shares one intersection observer between marker images", () => {
+    it("gives a mounted marker its thumbnail without a second visibility gate", () => {
+      // A marker only exists inside the padded viewport to begin with, so the
+      // bounds are the virtualisation. A second, element-level gate was worse
+      // than redundant: `rootMargin` expands the *viewport*, but the map
+      // container clips first, so images were dropped the instant the pin
+      // crossed the edge — with up to half the picture still on screen.
       const photos = [photo({ href: "one" }), photo({ href: "two", decLng: 140 })];
       const { container } = render(
         <MapPhotoMarkers
@@ -1095,21 +1136,8 @@ describe("MapPhotoMarkers", () => {
         />,
       );
 
-      expect(IntersectionObserver).toHaveBeenCalledTimes(1);
-      expect(observe).toHaveBeenCalledTimes(2);
-      expect(container.querySelectorAll("img")).toHaveLength(0);
-
-      const targets = observe.mock.calls.map(([target]) => target as Element);
-      act(() => {
-        intersectionCallback(
-          targets.map(
-            (target) => ({ target, isIntersecting: true }) as unknown as IntersectionObserverEntry,
-          ),
-          {} as IntersectionObserver,
-        );
-      });
-
       expect(container.querySelectorAll("img")).toHaveLength(2);
+      expect(IntersectionObserver).not.toHaveBeenCalled();
     });
 
     it("marks route members active and other photos muted", () => {
@@ -1149,7 +1177,7 @@ describe("MapPhotoMarkers", () => {
       expect(screen.getByRole("button", { name: "Photo from kansai" })).toBeTruthy();
     });
 
-    it("shows a preview marker's thumbnail once visible even below the marker-image zoom threshold", () => {
+    it("shows a preview marker's thumbnail even below the marker-image zoom threshold", () => {
       // Small, spread-out result sets auto-fit far below the zoom threshold that
       // drives showMarkerImages, so previewMarkers is the only signal available —
       // it must still take the DOM-marker path and reveal the thumbnail.
@@ -1166,18 +1194,8 @@ describe("MapPhotoMarkers", () => {
         />,
       );
 
-      expect(dataLayer).not.toHaveBeenCalled();
-      expect(observe).toHaveBeenCalledTimes(1);
-      expect(container.querySelectorAll("img")).toHaveLength(0);
-
-      const target = observe.mock.calls[0]![0] as Element;
-      act(() => {
-        intersectionCallback(
-          [{ target, isIntersecting: true } as unknown as IntersectionObserverEntry],
-          {} as IntersectionObserver,
-        );
-      });
-
+      // The pin under the thumbnail is still drawn; what the marker adds is the
+      // picture, the label, and a target the reader can actually hit.
       expect(container.querySelectorAll("img")).toHaveLength(1);
     });
   });

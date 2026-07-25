@@ -564,6 +564,65 @@ Long tasks are within ~150–280ms of the no-photo floor, down from ~1s above it
 *ocean* pose is not a valid floor for this (16.7ms p50, no stalls): it removes the city, not just
 the markers.
 
+### Thumbnails that popped at the edges, and a dense pan that still stuttered
+
+Two follow-up reports, both real, and the first was not where the padding suggested.
+
+**Thumbnails vanished with half of themselves still on screen.** Instrumented properly — a
+time-based census of every thumbnail's rect, reporting the visible overlap at the instant it
+disappeared — a slow drag lost **61 thumbnails with up to 40x80px still inside the viewport**, and
+*every one of them kept its marker*. So it was not the render bounds: it was the
+`IntersectionObserver` that gated each marker's image. `rootMargin` expands the **root** rect, but
+the intersection is clipped by every ancestor with `overflow: hidden` on the way — and the map
+container is one. The margin was therefore never applied, and images unloaded exactly as their pin
+crossed the container edge. The observer is gone: markers only exist inside the padded bounds in the
+first place, which is the virtualisation, and `loading="lazy"` defers the fetch without ever
+*unloading*. The padding then had to cover a marker's real extent, measured in the browser rather
+than derived: **139px above the anchor** for the preview form (label, gap, image, half a pin), 99px
+for a plain thumbnail, 40px to each side. It is 150px. Result: **61 → 0** thumbnails lost while
+visible.
+
+**The dense pan.** A CPU profile said script was nearly idle (2.8s of 4.3s), so the cost was not
+ours to see there; a `devtools.timeline` trace named it — **11,647 calls / 523ms in the MapLibre
+chunk** over a ~2s drag with 164 markers, one reposition per marker per frame. The reason each is so
+expensive is in `Marker._update`: it allocates an `AbortController`, a promise and a
+`browser.frameAsync` **per marker per frame** to schedule `_updateOpacity`. That is MapLibre's, not
+ours; what we control is how many markers exist.
+
+At the measured pose those 164 thumbnails covered ~1.05M px² of a 1.02M px² viewport — they were
+almost entirely hidden behind one another. So thumbnails are now thinned to one per
+`THUMBNAIL_CELL_PX` (140px) cell, the grid anchored to the world so panning does not reshuffle
+winners, with **incumbency**: a photo that already wears a thumbnail keeps its cell while it is in
+range. Without incumbency a newcomer entering range displaced the incumbent and 26 thumbnails
+swapped mid-drag. Everything thinned out keeps its pin on the drawn layer — which now renders at
+every zoom, carrying clicks, hovers, the hidden keyboard list and the coarse-pointer targets for
+exactly the photos that have no marker of their own.
+
+| Dense drag at z9.35 (same gesture) | thumbnails | frame p95 | frames > 32ms | lost while visible |
+| --- | --- | --- | --- | --- |
+| Before | 164 | 67ms | 65 | 61 |
+| Observer removed, padding 150px | 164 | 67ms | 65 | 0 |
+| Thinned to one per 140px cell | ~19 | 50ms | 55–58 | 0 |
+| **Same pose, no photos (floor)** | 0 | **33ms** | **34–42** | — |
+
+Crossing the reveal improved with it, since the reveal now mounts ~20 markers rather than 126:
+**worst frame 600ms → 283–317ms, long tasks 1289ms → ~274ms** — at or below the no-photo floor for
+that pose (241–269ms), which is where this stops being ours.
+
+**Not fixed, and worth knowing before someone re-measures.** One stall remains that thinning did not
+touch: a single **~480ms `FireAnimationFrame` task, entirely inside the MapLibre chunk**, with no
+layout or paint children, appearing mid-drag once per gesture when photos are present but *not*
+tracking marker count (164 markers did not produce it; 16 did). Bounding the drawn layer to the
+padded viewport instead of the whole set did not change it either. It needs its own investigation —
+a full devtools trace with stacks, or a look at what MapLibre does with a GeoJSON source while
+re-tiling — and it, plus the map's own 34–42 spikes per drag at a dense city, is what is left of the
+stutter.
+
+Method notes that cost time to learn: a **frame-tied (rAF) sampler cannot measure a stall** — it is
+starved by the very work it is sampling, and reported one mount step of 302 markers where a 4ms
+`setInterval` showed nine steps of 24. And **an empty-ocean pose is not a floor** for a dense-city
+measurement: it removes the city, not the markers. Use the same pose with the photos filtered out.
+
 Bug found while profiling, since fixed: roughly one page load in four ignored the `lat`/`lon`/`zoom`
 deep link and auto-fitted to the whole world (zoom 1.65). `MapScreen` enabled the auto-fit from the
 *absence* of camera params, and they are always absent until the renderer reports navigation ready —

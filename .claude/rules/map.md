@@ -20,9 +20,16 @@ globs:
 - GL style-spec never crosses the port. Describe bulk data with `DataLayer` (neutral points and
   lines, clustering, halo, dash, `lineWidthAlong`) instead of a source plus layer objects
 - **Bulk markers stay on the GPU.** One `DataLayer` draws every photo in a single pass; ~1400 as
-  DOM markers cost ~35.5ms per frame and every long task on the page. DOM `Marker`s are only for
-  the small, rich case (lazy-loaded thumbnails). Measurements are in
-  `docs/plan-003-map-abstraction.md`
+  DOM markers cost ~35.5ms per frame and every long task on the page. The drawn layer is there at
+  every zoom, and DOM `Marker`s are only the thumbnails sitting on top of it — thinned to one per
+  screen cell (`thinPhotosByScreenCell`), because MapLibre reschedules every marker on every frame
+  and a dense city's 164 thumbnails overlapped almost completely anyway. A photo without a
+  thumbnail still has its pin, its interactions and its entry in the hidden keyboard list
+- **Nothing gates a marker's image except the bounds it mounted in.** An `IntersectionObserver`
+  used to, and unloaded pictures with half of themselves still on screen: `rootMargin` expands the
+  viewport, but the map container clips first. `MARKER_RENDER_PADDING_PX` therefore has to exceed
+  `MARKER_PREVIEW_EXTENT_PX` — a marker's own box is just its pin, while its thumbnail hangs ~139px
+  above it. Measurements are in `docs/plan-003-map-abstraction.md`
 - A GPU layer has no DOM, so it has no roles, labels, keyboard focus or tap targets.
   `MapPhotoMarkers` compensates with a visually-hidden focusable list and a coarse-pointer hit
   layer whose radius degrades continuously with density. Both are load-bearing accessibility —

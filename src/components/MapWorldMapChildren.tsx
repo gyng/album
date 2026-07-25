@@ -80,72 +80,24 @@ export const MapFitOnRequest = ({
 };
 
 /**
- * How far a thumbnail reaches above the point it belongs to: an 80px image,
- * 12px of gap, and half of the 14px pin it hangs over. The marker's own box is
- * only the pin — the image is absolutely positioned — so anything measuring a
- * marker against the viewport has to add this back by hand.
+ * How far the tallest marker reaches above the point it belongs to, measured in
+ * the browser: 139px for the preview form (label, then image, then the pin it
+ * hangs over) against 99px for a plain thumbnail. A marker's own box is just the
+ * pin — the image is absolutely positioned — so anything measuring a marker
+ * against the viewport has to add this back by hand.
  */
-export const MARKER_IMAGE_EXTENT_PX = 99;
+export const MARKER_PREVIEW_EXTENT_PX = 139;
 
 /**
- * How far outside the viewport a thumbnail marker still mounts, so its image is
- * already in place by the time it scrolls in rather than appearing at the edge.
- * Covers a marker's own height with room to spare, the taller preview-label
- * form included.
+ * How far outside the viewport a thumbnail marker still mounts.
+ *
+ * This is now the *only* gate on a marker's image, so it has to clear the
+ * tallest marker: what leaves the screen is the picture, not the point it hangs
+ * over, and a marker dropped when its anchor crosses the edge takes a thumbnail
+ * with half of itself still visible. Uniform rather than per-edge because the
+ * map rotates — with a bearing, "above the anchor" is not north.
  */
-export const MARKER_RENDER_PADDING_PX = 120;
-
-export type ObserveMapMarker = (
-  element: Element,
-  onVisibilityChange: (isVisible: boolean) => void,
-) => () => void;
-
-export const useSharedMapMarkerObserver = (): ObserveMapMarker => {
-  const observerRef = React.useRef<IntersectionObserver | null>(null);
-  const listenersRef = React.useRef(new Map<Element, (isVisible: boolean) => void>());
-
-  const observe = React.useCallback<ObserveMapMarker>((element, onVisibilityChange) => {
-    if (typeof IntersectionObserver === "undefined") {
-      return () => {};
-    }
-
-    if (!observerRef.current) {
-      observerRef.current = new IntersectionObserver(
-        (entries) => {
-          entries.forEach((entry) => {
-            listenersRef.current.get(entry.target)?.(entry.isIntersecting);
-          });
-        },
-        // Wide enough to cover both gates at once: the ring of markers mounted
-        // outside the viewport, and the height of the thumbnail hanging above
-        // each of them. Observed on the marker's box, which is only the pin, so
-        // a tighter margin unloads images that are still on screen — and holds
-        // the rest back until the frame they become visible, which is precisely
-        // the pop that mounting early was meant to avoid.
-        { rootMargin: `${MARKER_RENDER_PADDING_PX + MARKER_IMAGE_EXTENT_PX}px` },
-      );
-    }
-
-    listenersRef.current.set(element, onVisibilityChange);
-    observerRef.current.observe(element);
-
-    return () => {
-      observerRef.current?.unobserve(element);
-      listenersRef.current.delete(element);
-    };
-  }, []);
-
-  React.useEffect(
-    () => () => {
-      observerRef.current?.disconnect();
-      observerRef.current = null;
-      listenersRef.current.clear();
-    },
-    [],
-  );
-
-  return observe;
-};
+export const MARKER_RENDER_PADDING_PX = 150;
 
 export const LazyMapMarkerImage = ({ photo }: { photo: MapWorldEntry }) => {
   // The fade waits for the photo rather than starting at mount. Mounting is
@@ -225,9 +177,13 @@ export const MapBoundsTracker = ({
   renderPadding = 0,
 }: {
   onBoundsChange: (bounds: MapBounds) => void;
-  /** Reports the viewport expanded by `renderPadding` pixels, for markers that
-   *  should mount just outside the visible area. */
-  onRenderBoundsChange?: (bounds: MapBounds) => void;
+  /**
+   * Reports the viewport expanded by `renderPadding` pixels, for markers that
+   * should mount just outside the visible area, along with the container's size
+   * in pixels — which is what lets a caller reason in screen distances rather
+   * than degrees.
+   */
+  onRenderBoundsChange?: (bounds: MapBounds, viewport: { width: number; height: number }) => void;
   renderPadding?: number;
 }) => {
   const map = useMap();
@@ -251,7 +207,15 @@ export const MapBoundsTracker = ({
     const updateBounds = () => {
       const viewport = viewportBounds();
       onBoundsChange(viewport);
-      onRenderBoundsChange?.(padBoundsByPixels(viewport, map.getContainer(), renderPadding));
+      if (!onRenderBoundsChange) {
+        return;
+      }
+
+      const container = map.getContainer();
+      onRenderBoundsChange(padBoundsByPixels(viewport, container, renderPadding), {
+        width: container.clientWidth,
+        height: container.clientHeight,
+      });
     };
 
     // Mid-gesture, only the *render* bounds are republished. They decide which
@@ -271,7 +235,11 @@ export const MapBoundsTracker = ({
       }
 
       lastGestureUpdate = now;
-      onRenderBoundsChange(padBoundsByPixels(viewportBounds(), map.getContainer(), renderPadding));
+      const container = map.getContainer();
+      onRenderBoundsChange(padBoundsByPixels(viewportBounds(), container, renderPadding), {
+        width: container.clientWidth,
+        height: container.clientHeight,
+      });
     };
 
     updateBounds();

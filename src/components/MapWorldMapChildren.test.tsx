@@ -2,17 +2,16 @@
  * @jest-environment jsdom
  */
 
-import { act, fireEvent, render, renderHook } from "@testing-library/react";
+import { act, fireEvent, render } from "@testing-library/react";
 import type { MapWorldEntry } from "../util/pageDataTypes";
 import {
   LazyMapMarkerImage,
-  MARKER_IMAGE_EXTENT_PX,
+  MARKER_PREVIEW_EXTENT_PX,
   MARKER_RENDER_PADDING_PX,
   MapAutoFit,
   MapBoundsTracker,
   MapFitOnRequest,
   MapMiddleDragOrbit,
-  useSharedMapMarkerObserver,
 } from "./MapWorldMapChildren";
 
 let currentMap: any = null;
@@ -113,78 +112,14 @@ describe("MapFitOnRequest", () => {
   });
 });
 
-describe("useSharedMapMarkerObserver", () => {
-  const observe = jest.fn();
-  const unobserve = jest.fn();
-  const disconnect = jest.fn();
-  let notify!: IntersectionObserverCallback;
-
-  beforeEach(() => {
-    observe.mockClear();
-    unobserve.mockClear();
-    disconnect.mockClear();
-    Object.defineProperty(globalThis, "IntersectionObserver", {
-      configurable: true,
-      value: jest.fn((callback: IntersectionObserverCallback) => {
-        notify = callback;
-        return { observe, unobserve, disconnect };
-      }),
-    });
-  });
-
-  it("shares an observer and routes visibility to each element", () => {
-    const view = renderHook(() => useSharedMapMarkerObserver());
-    const first = document.createElement("div");
-    const second = document.createElement("div");
-    const onFirst = jest.fn();
-    const onSecond = jest.fn();
-    const stopFirst = view.result.current(first, onFirst);
-    view.result.current(second, onSecond);
-
-    expect(IntersectionObserver).toHaveBeenCalledTimes(1);
-    expect(observe.mock.calls).toEqual([[first], [second]]);
-    act(() => {
-      notify(
-        [
-          { target: first, isIntersecting: true },
-          { target: second, isIntersecting: false },
-          { target: document.createElement("div"), isIntersecting: true },
-        ] as unknown as IntersectionObserverEntry[],
-        {} as IntersectionObserver,
-      );
-    });
-    expect(onFirst).toHaveBeenCalledWith(true);
-    expect(onSecond).toHaveBeenCalledWith(false);
-
-    stopFirst();
-    expect(unobserve).toHaveBeenCalledWith(first);
-    view.unmount();
-    expect(disconnect).toHaveBeenCalled();
-  });
-
-  it("keeps an image loaded for as long as any of it could be on screen", () => {
-    const view = renderHook(() => useSharedMapMarkerObserver());
-    view.result.current(document.createElement("div"), jest.fn());
-
-    // The observer watches the *pin*, but the thumbnail hangs ~100px above it,
-    // and markers mount a further ring outside the viewport so their images are
-    // ready before they scroll in. A margin tighter than the two together
-    // unloads pictures the reader can still see, and delays the rest until the
-    // moment they appear — which is the popping this margin exists to prevent.
-    const [, options] = (IntersectionObserver as unknown as jest.Mock).mock.calls[0];
-    expect(Number.parseInt(options.rootMargin, 10)).toBeGreaterThanOrEqual(
-      MARKER_RENDER_PADDING_PX + MARKER_IMAGE_EXTENT_PX,
-    );
-  });
-
-  it("falls back to a harmless disposer without IntersectionObserver", () => {
-    Object.defineProperty(globalThis, "IntersectionObserver", {
-      configurable: true,
-      value: undefined,
-    });
-    const { result } = renderHook(() => useSharedMapMarkerObserver());
-    const dispose = result.current(document.createElement("div"), jest.fn());
-    expect(dispose()).toBeUndefined();
+describe("marker virtualisation padding", () => {
+  it("mounts markers far enough outside the viewport to cover the tallest one", () => {
+    // The bounds are keyed to a marker's *anchor*, but what the reader sees is
+    // the thumbnail hanging above it — 99px for a plain one, 139px for the
+    // preview form that also carries a label. Padding below that drops markers
+    // whose picture is still partly on screen, which reads as thumbnails
+    // popping out at the edges.
+    expect(MARKER_RENDER_PADDING_PX).toBeGreaterThanOrEqual(MARKER_PREVIEW_EXTENT_PX);
   });
 });
 
@@ -280,12 +215,12 @@ describe("MapBoundsTracker", () => {
       />,
     );
     expect(onBoundsChange).toHaveBeenCalledWith({ north: 10, south: -10, east: 120, west: 80 });
-    expect(onRenderBoundsChange).toHaveBeenCalledWith({
-      north: 20,
-      south: -20,
-      east: 130,
-      west: 70,
-    });
+    expect(onRenderBoundsChange).toHaveBeenCalledWith(
+      { north: 20, south: -20, east: 130, west: 70 },
+      // The container's size travels with the bounds: thinning thumbnails by how
+      // far apart they look is a screen measurement, not a geographic one.
+      { width: 400, height: 200 },
+    );
   });
 
   it("streams the render bounds during a gesture, throttled, without churning the exact bounds", () => {
@@ -351,12 +286,10 @@ describe("MapBoundsTracker", () => {
         onRenderBoundsChange={onRenderBoundsChange}
       />,
     );
-    expect(onRenderBoundsChange).toHaveBeenCalledWith({
-      north: 10,
-      south: -10,
-      east: 120,
-      west: 80,
-    });
+    expect(onRenderBoundsChange).toHaveBeenCalledWith(
+      { north: 10, south: -10, east: 120, west: 80 },
+      { width: 400, height: 200 },
+    );
   });
 });
 

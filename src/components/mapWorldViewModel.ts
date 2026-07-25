@@ -202,3 +202,100 @@ export const nextThumbnailStage = (zoom: number, current: ThumbnailStage): Thumb
 
   return zoom > THUMBNAIL_WARM_ZOOM ? "warming" : "hidden";
 };
+
+/* -------------------------------------------------------------------------- */
+/* Thumbnail thinning                                                          */
+/* -------------------------------------------------------------------------- */
+
+export type ScreenCellOptions = {
+  bounds: MapBounds;
+  /** The map container's size, which is what turns a cell in pixels into one in degrees. */
+  width: number;
+  height: number;
+  cellPx: number;
+};
+
+/**
+ * Splits photos into the ones worth a DOM thumbnail and the ones a drawn pin
+ * will do for.
+ *
+ * Over a dense city every photo in view used to get its own marker — 164 of
+ * them at one measured pose, ~80px each in a 1280x800 viewport, so their
+ * thumbnails covered more area than the screen has and almost all of them were
+ * hidden behind each other. They were not free: the map repositions every marker
+ * every frame, measured at ~0.045ms each, which is where a dense pan's stutter
+ * comes from (frame p95 67ms against 33ms with no photos at the same pose).
+ *
+ * So at most one thumbnail per cell of the screen, and the rest keep a pin on
+ * the GPU layer, which costs nothing per marker. The grid is anchored to the
+ * world rather than to the viewport, so panning does not reshuffle which photo
+ * in a cell is the one wearing the thumbnail.
+ */
+export const thinPhotosByScreenCell = <T extends MapWorldEntry>(
+  photos: T[],
+  { bounds, width, height, cellPx }: ScreenCellOptions,
+  /**
+   * The photos that already carry a thumbnail. They keep their cell for as long
+   * as they are in range: a pan brings new photos into range constantly, and
+   * without incumbency a newcomer could take the cell from the picture the
+   * reader is looking at — swapping one photo for another in the same spot.
+   */
+  incumbents: ReadonlySet<string> = new Set(),
+): { thumbnails: T[]; pins: T[] } => {
+  const latitudeSpan = bounds.north - bounds.south;
+  const rawLongitudeSpan = bounds.east - bounds.west;
+  const longitudeSpan = rawLongitudeSpan >= 0 ? rawLongitudeSpan : rawLongitudeSpan + 360;
+  const cellLat = (cellPx / height) * latitudeSpan;
+  const cellLng = (cellPx / width) * longitudeSpan;
+
+  // Nothing measurable to thin by — a container with no size, or a viewport
+  // with no span. Keep every thumbnail rather than dropping photos on the
+  // strength of a degenerate calculation.
+  if (!Number.isFinite(cellLat) || !Number.isFinite(cellLng) || cellLat <= 0 || cellLng <= 0) {
+    return { thumbnails: photos, pins: [] };
+  }
+
+  const cellOf = (photo: T): string | null =>
+    photo.decLat === null || photo.decLng === null
+      ? null
+      : `${Math.floor(photo.decLat / cellLat)}:${Math.floor(photo.decLng / cellLng)}`;
+
+  // Incumbents first, so they claim their cells before anything else can.
+  const taken = new Set<string>();
+  photos.forEach((photo) => {
+    if (!incumbents.has(photo.href)) {
+      return;
+    }
+    const cell = cellOf(photo);
+    if (cell !== null) {
+      taken.add(cell);
+    }
+  });
+
+  const thumbnails: T[] = [];
+  const pins: T[] = [];
+  photos.forEach((photo) => {
+    const cell = cellOf(photo);
+    // A photo with no coordinates is not on the map to begin with; it is not the
+    // thinning's business to drop it.
+    if (cell === null) {
+      thumbnails.push(photo);
+      return;
+    }
+
+    if (incumbents.has(photo.href)) {
+      thumbnails.push(photo);
+      return;
+    }
+
+    if (taken.has(cell)) {
+      pins.push(photo);
+      return;
+    }
+
+    taken.add(cell);
+    thumbnails.push(photo);
+  });
+
+  return { thumbnails, pins };
+};

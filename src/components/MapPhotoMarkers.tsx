@@ -1,11 +1,7 @@
 import { DataLayer, Marker, type PointFeature } from "./map";
 import type { PhotoWithStyle } from "./mapWorldViewModel";
 import { formatMapPhotoDate } from "./mapWorldViewModel";
-import {
-  LazyMapMarkerImage,
-  type ObserveMapMarker,
-  useSharedMapMarkerObserver,
-} from "./MapWorldMapChildren";
+import { LazyMapMarkerImage } from "./MapWorldMapChildren";
 import { MARKER_MOUNT_CHUNK, useStaggeredMarkerMounts } from "./useStaggeredMarkerMounts";
 import React from "react";
 import styles from "./MapWorld.module.css";
@@ -32,6 +28,13 @@ type MapPhotoMarkersProps = {
    * `visiblePhotos` when the caller does not distinguish the two.
    */
   renderPhotos?: PhotoWithStyle[];
+  /**
+   * The subset of `renderPhotos` that has earned a DOM thumbnail. Over a dense
+   * city the thumbnails overlap almost completely, so only one per cell of the
+   * screen gets a marker; the rest are drawn as pins like any other photo.
+   * Defaults to all of `renderPhotos` when the caller does not thin them.
+   */
+  thumbnailPhotos?: PhotoWithStyle[];
   showMarkerImages: boolean;
   /**
    * Preview each marker in place with its thumbnail and album, rather than
@@ -334,7 +337,6 @@ const MapPhotoMarker = ({
   activeRouteHrefSet,
   onSelect,
   onHover,
-  observeMarker,
 }: {
   photo: LocatedPhoto;
   showMarkerImages: boolean;
@@ -343,34 +345,7 @@ const MapPhotoMarker = ({
   activeRouteHrefSet: ReadonlySet<string>;
   onSelect: (photo: PhotoWithStyle) => void;
   onHover: (photo: PhotoWithStyle | null) => void;
-  observeMarker: ObserveMapMarker;
 }) => {
-  const [isImageVisible, setIsImageVisible] = React.useState(false);
-  const stopObservingRef = React.useRef<(() => void) | null>(null);
-  const markerRef = React.useCallback(
-    (element: HTMLDivElement | null) => {
-      stopObservingRef.current?.();
-      stopObservingRef.current =
-        element && (showMarkerImages || previewMarkers)
-          ? observeMarker(element, setIsImageVisible)
-          : null;
-    },
-    [observeMarker, showMarkerImages, previewMarkers],
-  );
-
-  React.useEffect(() => {
-    if (!showMarkerImages && !previewMarkers) {
-      setIsImageVisible(false);
-    }
-  }, [showMarkerImages, previewMarkers]);
-
-  React.useEffect(
-    () => () => {
-      stopObservingRef.current?.();
-    },
-    [],
-  );
-
   const formattedDate = formatMapPhotoDate(photo.date);
   const routeClass =
     emphasiseRoute && activeRouteHrefSet.size > 0
@@ -388,10 +363,8 @@ const MapPhotoMarker = ({
         onSelect(photo);
       }}
     >
-      <div ref={markerRef} className={previewMarkers ? styles.markerPreview : undefined}>
-        {(showMarkerImages || previewMarkers) && isImageVisible ? (
-          <LazyMapMarkerImage photo={photo} />
-        ) : null}
+      <div className={previewMarkers ? styles.markerPreview : undefined}>
+        {showMarkerImages || previewMarkers ? <LazyMapMarkerImage photo={photo} /> : null}
         {previewMarkers ? (
           // Decorative: the pin below already carries the same album and date as
           // its accessible name, so announcing it twice would only add noise.
@@ -453,6 +426,7 @@ export const MapPhotoMarkers = ({
   photos,
   visiblePhotos,
   renderPhotos,
+  thumbnailPhotos,
   showMarkerImages,
   previewMarkers = false,
   emphasiseRoute,
@@ -461,7 +435,6 @@ export const MapPhotoMarkers = ({
   onSelect,
   onHover,
 }: MapPhotoMarkersProps) => {
-  const observeMarker = useSharedMapMarkerObserver();
   const isCoarsePointer = useCoarsePointer();
   const locatedPhotos = React.useMemo(() => photos.filter(hasCoordinates), [photos]);
   const locatedVisiblePhotos = React.useMemo(
@@ -476,10 +449,14 @@ export const MapPhotoMarkers = ({
     () => (renderPhotos ? renderPhotos.filter(hasCoordinates) : locatedVisiblePhotos),
     [renderPhotos, locatedVisiblePhotos],
   );
+  const locatedThumbnailPhotos = React.useMemo(
+    () => (thumbnailPhotos ? thumbnailPhotos.filter(hasCoordinates) : locatedRenderPhotos),
+    [thumbnailPhotos, locatedRenderPhotos],
+  );
   // Let them arrive over a few frames. Everything in view mounting on one frame
   // is what makes crossing the thumbnail zoom lurch instead of zoom.
   const mountedPhotos = useStaggeredMarkerMounts(
-    locatedRenderPhotos,
+    locatedThumbnailPhotos,
     MARKER_MOUNT_CHUNK,
     showMarkerImages || previewMarkers,
   );
@@ -487,16 +464,23 @@ export const MapPhotoMarkers = ({
   // it changes on every hover, and rebuilding the whole feature collection for
   // an emphasis nobody is drawing would give the cost straight back.
   const emphasisedHrefs = emphasiseRoute && activeRouteHrefSet.size > 0 ? activeRouteHrefSet : null;
+  // Away from the thumbnail zoom the layer takes every photo and lets the map
+  // clip it — that is what keeps a world view to one draw call and no rebuilds
+  // per pan. Where thumbnails are showing, it takes only what is near the
+  // viewport instead: handing a 1,400-feature collection to a source that is
+  // re-tiling as the map moves cost a measured 439ms frame mid-drag, and at this
+  // zoom what is off-screen is far off-screen anyway.
+  const drawnPhotos = showMarkerImages || previewMarkers ? locatedRenderPhotos : locatedPhotos;
   const points = React.useMemo(
     (): PointFeature[] =>
-      locatedPhotos.map((photo) => ({
+      drawnPhotos.map((photo) => ({
         id: photo.href,
         at: { lng: photo.decLng, lat: photo.decLat },
         color: photo.markerColor,
         radius: PIN_RADIUS,
         opacity: pinOpacity(photo, emphasisedHrefs),
       })),
-    [locatedPhotos, emphasisedHrefs],
+    [drawnPhotos, emphasisedHrefs],
   );
   // Invisible, and deliberately independent of the drawn pins: nothing about a
   // tap target changes when a route is emphasised, so it is not rebuilt then.
@@ -508,12 +492,27 @@ export const MapPhotoMarkers = ({
   // Zero opacity is not a way out of drawing it: MapLibre's `drawCircles` only
   // bails on a *constant* zero, and this layer's opacity is a per-feature
   // expression.
+  // Photos in view that have no marker of their own. In the drawn-only path that
+  // is all of them; where thumbnails are showing it is what the thinning left
+  // behind — the ones with a marker already have a focusable pin and a tap
+  // target of their own, and offering them twice would announce them twice.
+  const thumbnailedHrefs = React.useMemo(
+    () => new Set(mountedPhotos.map((photo) => photo.href)),
+    [mountedPhotos],
+  );
+  const pinOnlyVisiblePhotos = React.useMemo(
+    () =>
+      showMarkerImages || previewMarkers
+        ? locatedVisiblePhotos.filter((photo) => !thumbnailedHrefs.has(photo.href))
+        : locatedVisiblePhotos,
+    [locatedVisiblePhotos, previewMarkers, showMarkerImages, thumbnailedHrefs],
+  );
   const touchTargets = React.useMemo((): PointFeature[] => {
     if (!isCoarsePointer) {
       return [];
     }
 
-    const radius = touchTargetRadius(locatedVisiblePhotos.length);
+    const radius = touchTargetRadius(pinOnlyVisiblePhotos.length);
     // Shrunk all the way to the drawn pin's own radius, the target is no longer
     // widening anything: MapLibre hit-tests a circle at its radius plus its
     // stroke, so the pins — 7px and a 2px halo — answer a tap over at least as
@@ -524,13 +523,13 @@ export const MapPhotoMarkers = ({
       return [];
     }
 
-    return locatedVisiblePhotos.map((photo) => ({
+    return pinOnlyVisiblePhotos.map((photo) => ({
       id: photo.href,
       at: { lng: photo.decLng, lat: photo.decLat },
       radius,
       opacity: 0,
     }));
-  }, [isCoarsePointer, locatedVisiblePhotos]);
+  }, [isCoarsePointer, pinOnlyVisiblePhotos]);
   const photosByHref = React.useMemo(
     () => new Map(locatedPhotos.map((photo) => [photo.href, photo])),
     [locatedPhotos],
@@ -551,41 +550,38 @@ export const MapPhotoMarkers = ({
     [onHover, photosByHref],
   );
 
-  if (!showMarkerImages && !previewMarkers) {
-    // Where a coarse-pointer target layer exists it is the one that listens: two
-    // layers reporting the same tap would read as two taps, which is how a
-    // stacked location cycles past the photo the reader meant to open.
-    const interactions = { onPointClick: selectPoint, onPointHover: hoverPoint };
+  // Where a coarse-pointer target layer exists it is the one that listens: two
+  // layers reporting the same tap would read as two taps, which is how a
+  // stacked location cycles past the photo the reader meant to open.
+  const interactions = { onPointClick: selectPoint, onPointHover: hoverPoint };
 
-    return (
-      <>
-        {touchTargets.length > 0 ? (
-          <DataLayer
-            id="photo-marker-targets"
-            points={touchTargets}
-            {...(order !== undefined ? { order: order - 1 } : {})}
-            {...interactions}
-          />
-        ) : null}
-        <DataLayer
-          id="photo-markers"
-          points={points}
-          stroke={PIN_HALO}
-          {...(order !== undefined ? { order } : {})}
-          {...(touchTargets.length > 0 ? {} : interactions)}
-        />
-        <MapPhotoKeyboardList
-          photos={locatedVisiblePhotos}
-          available={photosByHref}
-          onSelect={onSelect}
-          onHover={onHover}
-        />
-      </>
-    );
-  }
-
+  // The drawn layer carries every photo at every zoom, thumbnails or not. Where
+  // a photo has a marker the marker sits over its own pin and takes the pointer
+  // first, so the two never both answer; where the thinning left a photo without
+  // one, the pin is all it has and it still opens, hovers and announces.
   return (
     <>
+      {touchTargets.length > 0 ? (
+        <DataLayer
+          id="photo-marker-targets"
+          points={touchTargets}
+          {...(order !== undefined ? { order: order - 1 } : {})}
+          {...interactions}
+        />
+      ) : null}
+      <DataLayer
+        id="photo-markers"
+        points={points}
+        stroke={PIN_HALO}
+        {...(order !== undefined ? { order } : {})}
+        {...(touchTargets.length > 0 ? {} : interactions)}
+      />
+      <MapPhotoKeyboardList
+        photos={pinOnlyVisiblePhotos}
+        available={photosByHref}
+        onSelect={onSelect}
+        onHover={onHover}
+      />
       {mountedPhotos.map((photo) => (
         <MapPhotoMarker
           key={photo.href}
@@ -596,7 +592,6 @@ export const MapPhotoMarkers = ({
           activeRouteHrefSet={activeRouteHrefSet}
           onSelect={onSelect}
           onHover={onHover}
-          observeMarker={observeMarker}
         />
       ))}
     </>

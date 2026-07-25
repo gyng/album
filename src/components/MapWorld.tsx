@@ -31,6 +31,7 @@ import {
   MapBounds,
   nextThumbnailStage,
   stylePhotosByRecency,
+  thinPhotosByScreenCell,
   type ThumbnailStage,
 } from "./mapWorldViewModel";
 import { useMapThumbnailPrefetch } from "./useMapThumbnailPrefetch";
@@ -102,6 +103,11 @@ const getBackgroundJourneyGradientColors = (fromColor: string, toColor: string) 
   middle: mixHsl(fromColor, toColor, 0.5),
   end: toColor,
 });
+
+// One thumbnail per cell of roughly this many pixels. A thumbnail is 80px wide,
+// so a slightly larger cell leaves the ones that are shown legible instead of
+// stacked — and cuts the per-frame marker cost with them.
+const THUMBNAIL_CELL_PX = 140;
 
 const ROUTER_SYNC_DEBOUNCE_MS = 200;
 const ROUTER_SYNC_PAUSE_MS = 700;
@@ -246,6 +252,24 @@ export const MMap: React.FC<MapWorldProps> = ({
   // than popping in at the edge. Only the DOM image markers use it; the "in
   // view" set (keyboard list, co-located cycling) stays on the exact viewport.
   const [renderBounds, setRenderBounds] = React.useState<MapBounds | null>(null);
+  // The container's size in pixels, reported with the render bounds. Needed to
+  // thin the thumbnails by how far apart they *look*, which is a screen
+  // distance, not a geographic one.
+  const [renderViewport, setRenderViewport] = React.useState<{
+    width: number;
+    height: number;
+  } | null>(null);
+  const handleRenderBoundsChange = React.useCallback(
+    (bounds: MapBounds, viewport: { width: number; height: number }) => {
+      setRenderBounds(bounds);
+      setRenderViewport((current) =>
+        current && current.width === viewport.width && current.height === viewport.height
+          ? current
+          : viewport,
+      );
+    },
+    [],
+  );
   const timeFilteredPhotos = React.useMemo(
     () => (timeRange ? photos.filter((photo) => isPhotoInTimeRange(photo, timeRange)) : photos),
     [photos, timeRange],
@@ -263,6 +287,35 @@ export const MMap: React.FC<MapWorldProps> = ({
     () => filterPhotosByBounds(photosWithStyles, renderBounds),
     [renderBounds, photosWithStyles],
   );
+  // Over a dense city the thumbnails overlap almost completely — 164 of them at
+  // one measured pose, covering more area than the screen has. Only one per cell
+  // of the screen gets a DOM marker; the rest keep their pin on the GPU layer,
+  // which costs nothing per photo. Preview markers are exempt: that set is a
+  // handful of search results, and each one is there to be read.
+  // Which photos wore a thumbnail last time, so they keep their cell rather than
+  // being displaced by a newcomer as the map moves. Held in a ref because it is
+  // an input to its own next value, not state anything renders from.
+  const thumbnailHrefsRef = React.useRef<ReadonlySet<string>>(new Set());
+  const thumbnailPhotos = React.useMemo(() => {
+    if (previewMarkers || !renderBounds || !renderViewport) {
+      thumbnailHrefsRef.current = new Set(renderPhotos.map((photo) => photo.href));
+      return renderPhotos;
+    }
+
+    const { thumbnails } = thinPhotosByScreenCell(
+      renderPhotos,
+      {
+        bounds: renderBounds,
+        width: renderViewport.width,
+        height: renderViewport.height,
+        cellPx: THUMBNAIL_CELL_PX,
+      },
+      thumbnailHrefsRef.current,
+    );
+    thumbnailHrefsRef.current = new Set(thumbnails.map((photo) => photo.href));
+
+    return thumbnails;
+  }, [previewMarkers, renderBounds, renderPhotos, renderViewport]);
   // Approaching the reveal zoom, fetch what is about to be shown. The same set
   // the image markers will mount from, so the swap finds the photos decoded
   // instead of starting every request at the moment the reader is watching.
@@ -663,7 +716,7 @@ export const MMap: React.FC<MapWorldProps> = ({
           <MapFitOnRequest requestId={fitRequestId} photos={photos} />
           <MapBoundsTracker
             onBoundsChange={setBounds}
-            onRenderBoundsChange={setRenderBounds}
+            onRenderBoundsChange={handleRenderBoundsChange}
             renderPadding={MARKER_RENDER_PADDING_PX}
           />
           <MapMiddleDragOrbit onInteractionStart={stopDirector} />
@@ -720,6 +773,7 @@ export const MMap: React.FC<MapWorldProps> = ({
             photos={photosWithStyles}
             visiblePhotos={visiblePhotos}
             renderPhotos={renderPhotos}
+            thumbnailPhotos={thumbnailPhotos}
             showMarkerImages={showMarkerImages}
             previewMarkers={previewMarkers}
             emphasiseRoute={shouldEmphasizeRouteMarkers}

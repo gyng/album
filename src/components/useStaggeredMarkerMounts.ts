@@ -3,10 +3,12 @@ import React from "react";
 /**
  * How many markers may mount in one frame.
  *
- * Small enough that a frame's worth of mounting is not felt, large enough that
- * a viewport fills in within a few frames rather than visibly drawing itself.
+ * Measured at 4 and at 24 with the thinned thumbnail counts this now produces
+ * (~20 in view) and the difference was not visible in frame times either way, so
+ * this sits between them: it only starts to matter where many markers arrive at
+ * once, which is the reveal, a preview-marker search, or a looser thinning.
  */
-export const MARKER_MOUNT_CHUNK = 24;
+export const MARKER_MOUNT_CHUNK = 8;
 
 /**
  * Lets markers arrive over several frames instead of all in one.
