@@ -374,6 +374,41 @@ describe("service worker data caching", () => {
     await expect(responded).resolves.toBe(wasm);
   });
 
+  it("serves the vendored map worker from the network, falling back to cache offline", async () => {
+    // MapLibre's worker is the one script with a stable, unhashed URL, and the
+    // main bundle it pairs with is hashed. Served stale-while-revalidate, a
+    // cached copy — stale from an upgrade, or truncated by a bad moment on the
+    // network — keeps being handed out, and the symptom is a map that reaches
+    // "ready" and never "loaded": the worker fetches the tiles, so when it does
+    // not come up the basemap stays blank. Fresh whenever the network answers.
+    const network = new Response("current worker");
+    const cached = new Response("older worker");
+    const online = loadFetchHandler({ cachedResponse: cached, networkResponse: network });
+    let fresh: Promise<Response> | undefined;
+    online({
+      request: request("/vendor/maplibre-gl-worker.mjs"),
+      respondWith: (response) => {
+        fresh = response;
+      },
+      waitUntil: () => {},
+    });
+    await expect(fresh).resolves.toBe(network);
+
+    const offline = loadFetchHandler({
+      cachedResponse: cached,
+      networkError: new Error("offline"),
+    });
+    let fallback: Promise<Response> | undefined;
+    offline({
+      request: request("/vendor/maplibre-gl-shared.mjs"),
+      respondWith: (response) => {
+        fallback = response;
+      },
+      waitUntil: () => {},
+    });
+    await expect(fallback).resolves.toBe(cached);
+  });
+
   it("falls back from a configured slideshow URL to the cached offline shell", async () => {
     const shell = new Response("cached slideshow shell");
     const fetchHandler = loadFetchHandler({

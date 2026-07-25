@@ -33,6 +33,10 @@ const PRECACHE_DATA_PATHS = ["/search.sqlite", "/search-embeddings.sqlite"];
 const isSameOrigin = (url) => url.origin === self.location.origin;
 const isGeneratedAsset = (url) => /\.(?:css|js|mjs|wasm|otf|ttf|woff|woff2)$/i.test(url.pathname);
 const isOfflineDataPath = (url) => url.pathname.endsWith(".sqlite");
+// MapLibre's worker and the module it shares with the main bundle. Vendored
+// because MapLibre 6 locates its worker from `import.meta.url`, which a bundled
+// build cannot resolve — see `bin/prepare-maplibre-vendor.cjs`.
+const isVendoredWorker = (url) => url.pathname.startsWith("/vendor/");
 
 const documentAssetUrls = (html) => {
   const urls = new Set();
@@ -352,6 +356,22 @@ self.addEventListener("fetch", (event) => {
   // The SQLite databases are the slideshow's application data. Keep the last
   // successfully fetched copies available so an installed photo-frame PWA can
   // restart offline; online requests still revalidate before using the cache.
+  // The only scripts we serve from a stable, unhashed URL, paired with a main
+  // bundle that *is* hashed. Stale-while-revalidate would keep handing out a
+  // cached copy — stale after a MapLibre upgrade, or truncated by a bad moment
+  // on the network — and the failure is quiet and total: the worker fetches the
+  // tiles, so a worker that does not come up leaves the map at "ready" with a
+  // blank basemap. Network first, with the cache kept for offline.
+  if (isVendoredWorker(url)) {
+    event.respondWith(
+      networkFirst(event.request, RUNTIME_CACHE, {
+        fallbackOnErrorResponse: true,
+        waitForCache: true,
+      }),
+    );
+    return;
+  }
+
   if (isOfflineDataPath(url)) {
     event.respondWith(
       networkFirst(event.request, RUNTIME_CACHE, {
