@@ -11,7 +11,9 @@ import {
   HEARTBEAT_INTERVAL_MS,
   readHeartbeat,
   readShellLog,
+  readStatusPillVisible,
   serialiseDiagnostics,
+  STATUS_PILL_STORAGE_KEY,
   writeHeartbeat,
   writeShellStatus,
   type ShellLogEntry,
@@ -100,6 +102,11 @@ export const SlideshowShellScreen = () => {
   const [codeStatus, setCodeStatus] = React.useState<CodeStatus>("checking");
   const [isOnline, setIsOnline] = React.useState(true);
   const [diagnosticsOpen, setDiagnosticsOpen] = React.useState(false);
+  // Whether the corner pill is shown at all. Read after mount rather than during
+  // render: this document is prerendered, and reading storage inline would
+  // hydrate into a mismatch. Starts hidden, which is also the honest first paint
+  // — a pill that appeared a moment after load would be its own distraction.
+  const [statusPillVisible, setStatusPillVisible] = React.useState(false);
   const [wakePromptAcknowledged, setWakePromptAcknowledged] = React.useState(false);
   const [autoWakeSettled, setAutoWakeSettled] = React.useState(false);
   const [lastCheckedAt, setLastCheckedAt] = React.useState<Date | null>(null);
@@ -563,6 +570,39 @@ export const SlideshowShellScreen = () => {
     };
   }, [checkForCodeUpdate]);
 
+  // The pill's preference is set on `/slideshow/diagnostics`, which replaces this
+  // document rather than running beside it — storage is the only channel between
+  // the two. Watched rather than read once, so a kiosk that has been running for
+  // hours starts showing the pill the moment someone asks for it, and stops
+  // again without a reload. `visibilitychange` covers the same-document case,
+  // where the reader left for the report page and came back.
+  React.useEffect(() => {
+    const syncStatusPill = () => {
+      const visible = readStatusPillVisible();
+      setStatusPillVisible(visible);
+      // Turning the pill off closes the panel with it, so turning it back on
+      // later opens to the glance-sized pill rather than to whatever was
+      // expanded when someone last hid it.
+      if (!visible) {
+        setDiagnosticsOpen(false);
+      }
+    };
+
+    syncStatusPill();
+    const handleStorage = (event: StorageEvent) => {
+      if (event.key === null || event.key === STATUS_PILL_STORAGE_KEY) {
+        syncStatusPill();
+      }
+    };
+
+    window.addEventListener("storage", handleStorage);
+    document.addEventListener("visibilitychange", syncStatusPill);
+    return () => {
+      window.removeEventListener("storage", handleStorage);
+      document.removeEventListener("visibilitychange", syncStatusPill);
+    };
+  }, []);
+
   React.useEffect(() => {
     const sendShellState = () => {
       frameRef.current?.contentWindow?.postMessage(
@@ -699,127 +739,141 @@ export const SlideshowShellScreen = () => {
         data-code-status={codeStatus}
         data-wake-settled={String(autoWakeSettled)}
       >
-        <button
-          type="button"
-          className={styles.diagnosticsToggle}
-          aria-expanded={diagnosticsOpen}
-          aria-label="Slideshow diagnostics"
-          title={diagnosticsSummary}
-          onClick={() => setDiagnosticsOpen((current) => !current)}
-        >
-          <span
-            className={[styles.statusDot, isWakeLockActive ? styles.statusGood : styles.statusWarn]
-              .filter(Boolean)
-              .join(" ")}
-            aria-hidden="true"
-          />
-          <span className={styles.diagnosticsCompactLabel}>
-            {codeStatus === "current" ? shortVersion(runtimeVersion) : codeStatusLabel(codeStatus)}
-          </span>
-        </button>
-
-        <div className={styles.diagnosticsPanel} hidden={!diagnosticsOpen}>
-          <div className={styles.diagnosticRow}>
-            <span>Screen</span>
-            <strong>
-              {isWakeLockActive
-                ? "Screen awake"
-                : isWakeLockSupported
-                  ? "Wake lock off"
-                  : "Unavailable"}
-            </strong>
-          </div>
-          <div className={styles.diagnosticRow}>
-            <span>Code</span>
-            <strong>{codeStatusLabel(codeStatus)}</strong>
-          </div>
-          <div className={styles.diagnosticRow}>
-            <span>Network</span>
-            <strong>{isOnline ? "Online" : "Offline"}</strong>
-          </div>
-          <div className={styles.diagnosticRow}>
-            <span>Wake losses</span>
-            <strong>{wakeLossCount}</strong>
-          </div>
-          {lastWakeLossAt ? (
-            <div className={styles.versionRow}>
-              last loss {lastWakeLossAt.toLocaleTimeString("en-GB")}
-            </div>
-          ) : null}
-          <div className={styles.versionRow} title={runtimeVersion}>
-            runtime {shortVersion(runtimeVersion)} · shell {shortVersion(BUILD_VERSION)}
-          </div>
-          {lastCheckedAt ? (
-            <div className={styles.versionRow}>
-              checked {lastCheckedAt.toLocaleTimeString("en-GB")}
-            </div>
-          ) : null}
-          {eventHistory.length > 0 ? (
-            <details
-              className={styles.wakeHistory}
-              onToggle={(event) => {
-                // Refresh the rendered tail lazily, only when the disclosure is
-                // opened — the timeline is never polled on a timer.
-                if ((event.currentTarget as HTMLDetailsElement).open) {
-                  setEventHistory(readShellLog());
-                }
-              }}
-            >
-              <summary>Event history</summary>
-              <ul className={styles.wakeHistoryList}>
-                {eventHistory
-                  .slice(-10)
-                  .reverse()
-                  .map((entry, index) => (
-                    <li
-                      key={`${entry.at}-${index}`}
-                      className={styles.wakeHistoryItem}
-                      data-category={entry.category}
-                    >
-                      <span>{describeShellEvent(entry)}</span>
-                      <time dateTime={new Date(entry.at).toISOString()}>
-                        {new Date(entry.at).toLocaleString("en-GB")}
-                        {entry.category !== "gap" &&
-                        entry.lastAt !== undefined &&
-                        entry.lastAt !== entry.at
-                          ? ` – ${new Date(entry.lastAt).toLocaleTimeString("en-GB")}`
-                          : null}
-                      </time>
-                    </li>
-                  ))}
-              </ul>
-            </details>
-          ) : null}
-          <div className={styles.diagnosticActions}>
-            {isWakeLockSupported && !isWakeLockActive ? (
-              <button
-                type="button"
-                className={styles.wakeAction}
-                onClick={() => void acquireWakeLock()}
-              >
-                Keep screen awake
-              </button>
-            ) : null}
-            <button type="button" onClick={() => void checkForCodeUpdate()}>
-              Check for code update
-            </button>
-            <button type="button" onClick={reloadRuntimeManually}>
-              Reload slideshow
-            </button>
+        {/* Opt-in, and off by default: the slideshow is something to look at,
+            and a build hash with a wake-lock dot floating over the photos is
+            instrumentation. The enclosing group stays mounted either way — its
+            `data-wake-settled` is how the report page and the e2e tests learn
+            that the automatic wake attempt has finished. */}
+        {statusPillVisible ? (
+          <>
             <button
               type="button"
-              className={styles.copyAction}
-              onClick={() => void copyDiagnostics()}
+              className={styles.diagnosticsToggle}
+              aria-expanded={diagnosticsOpen}
+              aria-label="Slideshow diagnostics"
+              title={diagnosticsSummary}
+              onClick={() => setDiagnosticsOpen((current) => !current)}
             >
-              {copiedDiagnostics ? "Copied" : "Copy diagnostics"}
+              <span
+                className={[
+                  styles.statusDot,
+                  isWakeLockActive ? styles.statusGood : styles.statusWarn,
+                ]
+                  .filter(Boolean)
+                  .join(" ")}
+                aria-hidden="true"
+              />
+              <span className={styles.diagnosticsCompactLabel}>
+                {codeStatus === "current"
+                  ? shortVersion(runtimeVersion)
+                  : codeStatusLabel(codeStatus)}
+              </span>
             </button>
-            {/* The same evidence at document size, for reading on a tablet
-                rather than squinting at this corner overlay. */}
-            <AppLink className={styles.reportLink} href="/slideshow/diagnostics">
-              Open full report
-            </AppLink>
-          </div>
-        </div>
+
+            <div className={styles.diagnosticsPanel} hidden={!diagnosticsOpen}>
+              <div className={styles.diagnosticRow}>
+                <span>Screen</span>
+                <strong>
+                  {isWakeLockActive
+                    ? "Screen awake"
+                    : isWakeLockSupported
+                      ? "Wake lock off"
+                      : "Unavailable"}
+                </strong>
+              </div>
+              <div className={styles.diagnosticRow}>
+                <span>Code</span>
+                <strong>{codeStatusLabel(codeStatus)}</strong>
+              </div>
+              <div className={styles.diagnosticRow}>
+                <span>Network</span>
+                <strong>{isOnline ? "Online" : "Offline"}</strong>
+              </div>
+              <div className={styles.diagnosticRow}>
+                <span>Wake losses</span>
+                <strong>{wakeLossCount}</strong>
+              </div>
+              {lastWakeLossAt ? (
+                <div className={styles.versionRow}>
+                  last loss {lastWakeLossAt.toLocaleTimeString("en-GB")}
+                </div>
+              ) : null}
+              <div className={styles.versionRow} title={runtimeVersion}>
+                runtime {shortVersion(runtimeVersion)} · shell {shortVersion(BUILD_VERSION)}
+              </div>
+              {lastCheckedAt ? (
+                <div className={styles.versionRow}>
+                  checked {lastCheckedAt.toLocaleTimeString("en-GB")}
+                </div>
+              ) : null}
+              {eventHistory.length > 0 ? (
+                <details
+                  className={styles.wakeHistory}
+                  onToggle={(event) => {
+                    // Refresh the rendered tail lazily, only when the disclosure is
+                    // opened — the timeline is never polled on a timer.
+                    if ((event.currentTarget as HTMLDetailsElement).open) {
+                      setEventHistory(readShellLog());
+                    }
+                  }}
+                >
+                  <summary>Event history</summary>
+                  <ul className={styles.wakeHistoryList}>
+                    {eventHistory
+                      .slice(-10)
+                      .reverse()
+                      .map((entry, index) => (
+                        <li
+                          key={`${entry.at}-${index}`}
+                          className={styles.wakeHistoryItem}
+                          data-category={entry.category}
+                        >
+                          <span>{describeShellEvent(entry)}</span>
+                          <time dateTime={new Date(entry.at).toISOString()}>
+                            {new Date(entry.at).toLocaleString("en-GB")}
+                            {entry.category !== "gap" &&
+                            entry.lastAt !== undefined &&
+                            entry.lastAt !== entry.at
+                              ? ` – ${new Date(entry.lastAt).toLocaleTimeString("en-GB")}`
+                              : null}
+                          </time>
+                        </li>
+                      ))}
+                  </ul>
+                </details>
+              ) : null}
+              <div className={styles.diagnosticActions}>
+                {isWakeLockSupported && !isWakeLockActive ? (
+                  <button
+                    type="button"
+                    className={styles.wakeAction}
+                    onClick={() => void acquireWakeLock()}
+                  >
+                    Keep screen awake
+                  </button>
+                ) : null}
+                <button type="button" onClick={() => void checkForCodeUpdate()}>
+                  Check for code update
+                </button>
+                <button type="button" onClick={reloadRuntimeManually}>
+                  Reload slideshow
+                </button>
+                <button
+                  type="button"
+                  className={styles.copyAction}
+                  onClick={() => void copyDiagnostics()}
+                >
+                  {copiedDiagnostics ? "Copied" : "Copy diagnostics"}
+                </button>
+                {/* The same evidence at document size, for reading on a tablet
+                  rather than squinting at this corner overlay. */}
+                <AppLink className={styles.reportLink} href="/slideshow/diagnostics">
+                  Open full report
+                </AppLink>
+              </div>
+            </div>
+          </>
+        ) : null}
       </section>
     </main>
   );

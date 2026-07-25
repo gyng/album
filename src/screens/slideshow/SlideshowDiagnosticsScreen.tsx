@@ -9,7 +9,9 @@ import {
   readHeartbeat,
   readShellLog,
   readShellStatus,
+  readStatusPillVisible,
   serialiseDiagnostics,
+  writeStatusPillVisible,
   type ShellLogEntry,
   type ShellStatusSnapshot,
 } from "../../util/shellDiagnosticsLog";
@@ -53,11 +55,15 @@ export const SlideshowDiagnosticsScreen = () => {
   // is prerendered, and reading it inline would hydrate into a mismatch.
   const [reading, setReading] = React.useState<Reading>(emptyReading);
   const [copied, setCopied] = React.useState(false);
+  // Read after mount for the same reason as the reading above: this page is
+  // prerendered, and storage does not exist then.
+  const [statusPillVisible, setStatusPillVisible] = React.useState(false);
   const [canShare, setCanShare] = React.useState(false);
   const copiedTimerRef = React.useRef<number | null>(null);
 
   React.useEffect(() => {
     setReading(takeReading());
+    setStatusPillVisible(readStatusPillVisible());
     setCanShare(typeof navigator !== "undefined" && typeof navigator.share === "function");
     // Returning to this page (from the slideshow, or from a backgrounded tab)
     // should show what happened while it was away.
@@ -175,6 +181,33 @@ export const SlideshowDiagnosticsScreen = () => {
           <Button onClick={() => void copyReport()}>{copied ? "Copied" : "Copy report"}</Button>
         </div>
       </header>
+
+      <Card as="section" className={styles.section} role="group" aria-label="Slideshow overlay">
+        <Heading level={2}>Overlay</Heading>
+        <div className={[styles.row, styles.setting].filter(Boolean).join(" ")}>
+          <div className={styles.settingText}>
+            <strong>Status pill</strong>
+            <span className={styles.hint}>
+              The build and wake-lock pill in the slideshow&rsquo;s top corner. Off by default, so
+              the photos are all there is to look at; turn it on while watching a kiosk.
+            </span>
+          </div>
+          {/* The label stays put and `aria-pressed` carries the state, so the
+              control does not rename itself under the reader who just used it;
+              `active` gives the same state to the eye. */}
+          <Button
+            active={statusPillVisible}
+            aria-pressed={statusPillVisible}
+            onClick={() => {
+              const next = !statusPillVisible;
+              setStatusPillVisible(next);
+              writeStatusPillVisible(next);
+            }}
+          >
+            Show status pill
+          </Button>
+        </div>
+      </Card>
 
       <Card as="section" className={styles.section} role="group" aria-label="Screen wake lock">
         <Heading level={2}>Screen</Heading>

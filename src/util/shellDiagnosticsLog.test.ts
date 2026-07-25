@@ -8,12 +8,15 @@ import {
   readHeartbeat,
   readShellLog,
   readShellStatus,
+  readStatusPillVisible,
   serialiseDiagnostics,
   SHELL_LOG_MAX_ENTRIES,
   SHELL_LOG_STORAGE_KEY,
   SHELL_STATUS_STORAGE_KEY,
+  STATUS_PILL_STORAGE_KEY,
   writeHeartbeat,
   writeShellStatus,
+  writeStatusPillVisible,
   type DiagnosticsReport,
   type ShellLogEntry,
 } from "./shellDiagnosticsLog";
@@ -358,5 +361,31 @@ describe("retry-cycle coalescing across the decay pattern", () => {
     appendShellEvent({ category: "wake", type: "reacquire-failed" }, 3000, storage);
 
     expect(readShellLog(storage)).toHaveLength(3);
+  });
+});
+
+describe("status pill preference", () => {
+  it("keeps the pill off until something has explicitly turned it on", () => {
+    const storage = makeStorage();
+    expect(readStatusPillVisible(storage)).toBe(false);
+
+    writeStatusPillVisible(true, storage);
+    expect(readStatusPillVisible(storage)).toBe(true);
+
+    writeStatusPillVisible(false, storage);
+    expect(readStatusPillVisible(storage)).toBe(false);
+  });
+
+  it("treats an unreadable or nonsense value as off", () => {
+    expect(readStatusPillVisible(makeStorage({ [STATUS_PILL_STORAGE_KEY]: "maybe" }))).toBe(false);
+    const throwing = makeStorage();
+    throwing.getItem = () => {
+      throw new Error("denied");
+    };
+    throwing.setItem = () => {
+      throw new Error("denied");
+    };
+    expect(readStatusPillVisible(throwing)).toBe(false);
+    expect(() => writeStatusPillVisible(true, throwing)).not.toThrow();
   });
 });

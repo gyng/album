@@ -328,6 +328,41 @@ export const writeShellStatus = (
   }
 };
 
+// --- Status pill preference -------------------------------------------------
+
+// Whether the shell shows its corner status pill over the slideshow. Off by
+// default: the slideshow is something to look at, and a version string with a
+// wake-lock dot floating over the photos is instrumentation, not decoration.
+// Turned on from the full-page diagnostics view for as long as someone is
+// actually watching a kiosk, and read back through storage because the shell and
+// that page are separate documents.
+export const STATUS_PILL_STORAGE_KEY = "slideshow-status-pill";
+
+export const readStatusPillVisible = (storage: Storage | null = defaultStorage()): boolean => {
+  if (!storage) {
+    return false;
+  }
+  try {
+    return storage.getItem(STATUS_PILL_STORAGE_KEY) === "on";
+  } catch {
+    return false;
+  }
+};
+
+export const writeStatusPillVisible = (
+  visible: boolean,
+  storage: Storage | null = defaultStorage(),
+): void => {
+  if (!storage) {
+    return;
+  }
+  try {
+    storage.setItem(STATUS_PILL_STORAGE_KEY, visible ? "on" : "off");
+  } catch {
+    // Best-effort only.
+  }
+};
+
 // --- Describe / serialise ---------------------------------------------------
 
 const shortVersion = (version: string): string => version.slice(0, 8);

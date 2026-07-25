@@ -19,6 +19,8 @@ import {
   readShellLog,
   readShellStatus,
   SHELL_LOG_STORAGE_KEY,
+  STATUS_PILL_STORAGE_KEY,
+  writeStatusPillVisible,
 } from "../../util/shellDiagnosticsLog";
 
 const acquireWakeLock = jest.fn().mockResolvedValue(undefined);
@@ -73,7 +75,38 @@ describe("slideshow code shell", () => {
       subscribe: subscribeWakeEvents,
     }));
     Object.defineProperty(navigator, "onLine", { configurable: true, value: true });
+    // The corner status pill is opt-in — the slideshow shows photos, not
+    // instrumentation. Most cases here are about what the panel reports, so
+    // they turn it on; the default-off behaviour has its own case below.
+    writeStatusPillVisible(true);
     window.history.replaceState({}, "", "/slideshow/shell?filter=test-simple&delay=60");
+  });
+
+  it("keeps the status pill off the slideshow until diagnostics asks for it", async () => {
+    // Nothing about the pill is load-bearing for the slideshow itself, and a
+    // version string with a wake-lock dot floating over the photos is
+    // instrumentation. The diagnostics *group* stays in the tree either way:
+    // `data-wake-settled` is how tests and the report page learn that the
+    // automatic wake attempt has finished.
+    writeStatusPillVisible(false);
+    global.fetch = jest.fn(() => versionResponse("build-current"));
+
+    render(<SlideshowShellScreen />);
+    expect(screen.getByRole("group", { name: "Slideshow diagnostics" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Slideshow diagnostics" })).not.toBeInTheDocument();
+
+    // Turned on from the other document, which can only reach this one through
+    // storage — so the running shell has to notice without being reloaded.
+    act(() => {
+      writeStatusPillVisible(true);
+      fireEvent(
+        window,
+        new StorageEvent("storage", { key: STATUS_PILL_STORAGE_KEY, newValue: "on" }),
+      );
+    });
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Slideshow diagnostics" })).toBeInTheDocument(),
+    );
   });
 
   it("reloads only the slideshow frame when a new build appears", async () => {

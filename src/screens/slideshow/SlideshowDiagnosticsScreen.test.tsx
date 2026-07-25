@@ -5,8 +5,10 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { SlideshowDiagnosticsScreen } from "./SlideshowDiagnosticsScreen";
 import {
+  readStatusPillVisible,
   SHELL_LOG_STORAGE_KEY,
   SHELL_STATUS_STORAGE_KEY,
+  writeStatusPillVisible,
   type ShellLogEntry,
   type ShellStatusSnapshot,
 } from "../../util/shellDiagnosticsLog";
@@ -42,6 +44,31 @@ describe("slideshow diagnostics page", () => {
 
   afterEach(() => {
     jest.restoreAllMocks();
+  });
+
+  it("turns the slideshow's status pill on and off, and reflects what is stored", () => {
+    // This page is the only way in: the pill is hidden by default, so the
+    // control that reveals it cannot live behind the pill itself.
+    render(<SlideshowDiagnosticsScreen />);
+    const toggle = screen.getByRole("button", { name: /status pill/i });
+    expect(toggle).toHaveAttribute("aria-pressed", "false");
+
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute("aria-pressed", "true");
+    expect(readStatusPillVisible(window.localStorage)).toBe(true);
+
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute("aria-pressed", "false");
+    expect(readStatusPillVisible(window.localStorage)).toBe(false);
+  });
+
+  it("shows the status pill as already on when the shell is showing it", () => {
+    writeStatusPillVisible(true, window.localStorage);
+    render(<SlideshowDiagnosticsScreen />);
+    expect(screen.getByRole("button", { name: /status pill/i })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
   });
 
   it("reports the wake-lock state and loss count the shell last recorded", () => {

@@ -4,6 +4,12 @@ const slideshowImage = 'img[alt]:not([aria-hidden="true"])';
 
 test("the slideshow shell swaps code without releasing its wake lock", async ({ page }) => {
   test.setTimeout(45_000);
+  // The corner status pill is opt-in — a kiosk shows photos, not a build hash —
+  // and this test drives the panel behind it, so it asks for the pill the same
+  // way the diagnostics page does.
+  await page.addInitScript(() => {
+    window.localStorage.setItem("slideshow-status-pill", "on");
+  });
   await page.addInitScript(() => {
     const state = window as Window & {
       __wakeLockReleaseCount?: number;
@@ -82,6 +88,11 @@ test("the slideshow shell swaps code without releasing its wake lock", async ({ 
 });
 
 test("wake-lock failure never blocks the embedded slideshow", async ({ page }) => {
+  // This case reads the panel's own account of the failure, so it opts into the
+  // pill that opens it.
+  await page.addInitScript(() => {
+    window.localStorage.setItem("slideshow-status-pill", "on");
+  });
   await page.addInitScript(() => {
     Object.defineProperty(navigator, "wakeLock", {
       configurable: true,
