@@ -649,7 +649,7 @@ describe("MapWorld", () => {
     expect(mapProps).toHaveBeenLastCalledWith(
       // The port hands the adapter its own `mapStyle`; `styleUrl` is the neutral
       // name on the way in.
-      expect.objectContaining({ mapStyle: mapStyleUrl("default") }),
+      expect.objectContaining({ mapStyle: mapStyleUrl("streets") }),
     );
 
     act(() => {

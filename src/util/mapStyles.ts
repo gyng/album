@@ -2,27 +2,27 @@
  * The basemaps the reader can choose between, and the preference that remembers
  * which one they picked.
  *
- * All of them come from the same provider and the same key as the default map,
- * so switching adds no new third party, no new credential, and no new
- * attribution burden — each style carries its own attribution, which the map
- * already renders from whatever style is loaded.
+ * All of them come from the same provider and the same key, so switching adds no
+ * new third party, no new credential, and no new attribution burden — each style
+ * carries its own attribution, which the map already renders from whatever style
+ * is loaded.
  *
  * Framework-neutral on purpose: the map screens are part of the portable graph,
  * so this reads `localStorage` defensively and imports nothing.
  */
 
 /**
- * Public, domain-restricted MapTiler key — the same one the default style has
- * always used. Not a secret; restricted on MapTiler's side by referrer.
+ * Public, domain-restricted MapTiler key — the one the map has always used. Not a
+ * secret; restricted on MapTiler's side by referrer.
  */
 export const MAP_TILER_KEY = "iilC4hPY1594noPX9OQ2";
 
-/** The gallery's own MapTiler style, and the default. */
-const DEFAULT_STYLE_ID = "ffd8bd10-cd97-40a5-b1d6-d15f98fb3644";
+/** The gallery's own MapTiler style. */
+const GALLERY_STYLE_ID = "ffd8bd10-cd97-40a5-b1d6-d15f98fb3644";
 
 export type MapStyleName =
-  | "default"
   | "streets"
+  | "gallery"
   | "outdoor"
   | "topographic"
   | "dark"
@@ -38,8 +38,9 @@ export type MapStyleName =
  * decorative.
  */
 export const MAP_STYLES: Record<MapStyleName, { id: string; label: string }> = {
-  default: { id: DEFAULT_STYLE_ID, label: "Gallery" },
+  // The default first, then the gallery's own style, then the rest.
   streets: { id: "streets-v2", label: "Streets" },
+  gallery: { id: GALLERY_STYLE_ID, label: "Gallery" },
   outdoor: { id: "outdoor-v2", label: "Outdoor" },
   topographic: { id: "topo-v2", label: "Topographic" },
   dark: { id: "dataviz-dark", label: "Dark" },
@@ -50,12 +51,21 @@ export const MAP_STYLES: Record<MapStyleName, { id: string; label: string }> = {
 
 export const MAP_STYLE_NAMES = Object.keys(MAP_STYLES) as MapStyleName[];
 
-export const DEFAULT_MAP_STYLE: MapStyleName = "default";
+export const DEFAULT_MAP_STYLE: MapStyleName = "streets";
 
 export const MAP_STYLE_STORAGE_KEY = "mapStyle";
 
-export const resolveMapStyleName = (value: unknown): MapStyleName | null =>
-  typeof value === "string" && value in MAP_STYLES ? (value as MapStyleName) : null;
+export const resolveMapStyleName = (value: unknown): MapStyleName | null => {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  // "default" was this preference's first name for the gallery's own style, back
+  // when it was also the default. Readers who chose it deliberately keep it.
+  const name = value === "default" ? "gallery" : value;
+
+  return name in MAP_STYLES ? (name as MapStyleName) : null;
+};
 
 export const mapStyleUrl = (name: MapStyleName, key: string = MAP_TILER_KEY): string =>
   `https://api.maptiler.com/maps/${MAP_STYLES[name].id}/style.json?key=${key}`;

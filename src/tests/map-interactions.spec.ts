@@ -64,7 +64,7 @@ test.describe("World map interactions", () => {
     // attribution, and the port applies it with `setStyle` and re-adds our
     // layers, so the pins survive the change.
     const picker = page.getByRole("combobox", { name: "Map style" });
-    await expect(picker).toHaveValue("default");
+    await expect(picker).toHaveValue("streets");
 
     const styleRequest = page.waitForRequest((request) =>
       request.url().includes("/maps/aquarelle"),

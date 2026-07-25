@@ -30,6 +30,8 @@ it("builds every choice's URL against the same provider and key", () => {
 
 it("falls back to the default for anything it does not recognise", () => {
   expect(resolveMapStyleName("streets")).toBe("streets");
+  // The preference's first name for the gallery's own style, kept working.
+  expect(resolveMapStyleName("default")).toBe("gallery");
   expect(resolveMapStyleName("no-such-style")).toBeNull();
   expect(resolveMapStyleName(undefined)).toBeNull();
   window.localStorage.setItem(MAP_STYLE_STORAGE_KEY, "no-such-style");

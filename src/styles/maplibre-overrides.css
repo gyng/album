@@ -23,6 +23,47 @@
     }
   }
 
+  /* The map's own chrome — zoom, compass, geolocate, fullscreen, the attribution
+     bar, the distance scale — ships white with dark glyphs. Left alone it floats
+     as a set of light boxes over a dark-themed page. Every colour below is a
+     token, so it follows the palette (and the system scheme, via light-dark())
+     without this file knowing which theme is on. */
+  .maplibregl-ctrl-group {
+    background: var(--c-bg);
+    box-shadow: 0 0 0 var(--size-1) color-mix(in oklch, var(--c-font) 18%, transparent);
+  }
+
+  .maplibregl-ctrl-group button + button {
+    border-block-start-color: color-mix(in oklch, var(--c-font) 18%, transparent);
+  }
+
+  .maplibregl-ctrl-group button:not(:disabled):hover {
+    background: color-mix(in oklch, var(--c-font) 10%, transparent);
+  }
+
+  /* The glyphs are background images with a fixed dark fill, so a dark palette
+     needs them inverted. Colours resolve themselves; a bitmap cannot, and there
+     is no `light-dark()` for a filter. Both branches are needed: the class for an
+     explicit choice, the query for "system" — and `:not(.light)` so an explicit
+     light theme on a dark OS is left alone. */
+  :root.dark .maplibregl-ctrl-icon,
+  :root.dark .maplibregl-ctrl-attrib-button {
+    filter: invert(1);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not(.light) .maplibregl-ctrl-icon,
+    :root:not(.light) .maplibregl-ctrl-attrib-button {
+      filter: invert(1);
+    }
+  }
+
+  .maplibregl-ctrl-attrib,
+  .maplibregl-ctrl-attrib.maplibregl-compact {
+    background: color-mix(in oklch, var(--c-bg) 88%, transparent);
+    color: var(--c-font);
+  }
+
   .maplibregl-ctrl-attrib a {
     color: var(--c-bg-contrast-dark);
     text-decoration: none;
@@ -31,6 +72,14 @@
   .maplibregl-ctrl-attrib a:hover {
     color: var(--c-bg-contrast-dark);
     text-decoration: none;
+  }
+
+  /* The distance scale, and with it the recency legend — which wears the same
+     vendor classes so the two read as one set of controls down the left edge. */
+  .maplibregl-ctrl-scale {
+    border-color: color-mix(in oklch, var(--c-font) 45%, transparent);
+    background: color-mix(in oklch, var(--c-bg) 82%, transparent);
+    color: var(--c-font);
   }
 
   .maplibregl-popup-close-button {
