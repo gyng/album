@@ -34,6 +34,8 @@ import {
   type ThumbnailStage,
 } from "./mapWorldViewModel";
 import { useMapThumbnailPrefetch } from "./useMapThumbnailPrefetch";
+import { useMapStyleName } from "./MapStyleToggle";
+import { mapStyleUrl } from "../util/mapStyles";
 import {
   MapAutoFit,
   MapBoundsTracker,
@@ -217,6 +219,7 @@ export const MMap: React.FC<MapWorldProps> = ({
   onDirectorEnabledChange,
   onDirectorSequenceLengthChange,
 }) => {
+  const mapStyleName = useMapStyleName();
   const url = typeof window === "undefined" ? null : new URL(window.location.toString());
   const initialLon = syncRoute ? (url?.searchParams.get("lon") ?? null) : null;
   const initialLat = syncRoute ? (url?.searchParams.get("lat") ?? null) : null;
@@ -617,11 +620,15 @@ export const MMap: React.FC<MapWorldProps> = ({
       ) : null}
       <div className={styles.mapViewport} style={style}>
         <MapView
-          // two options for map style
+          // The reader's chosen basemap, all of them the same provider and key
+          // (see `util/mapStyles.ts`). The port applies a style change with
+          // `setStyle` and re-adds our sources and layers on `styledata`, so
+          // switching keeps the pins, journeys and thumbnails.
+          //
+          // Other providers, kept for reference:
           // styleUrl="https://tiles.openfreemap.org/styles/liberty"
           // styleUrl="https://vector.openstreetmap.org/shortbread_v1/tilejson.json"
-          // Public API key — domain-restricted on MapTiler side, not a secret.
-          styleUrl="https://api.maptiler.com/maps/ffd8bd10-cd97-40a5-b1d6-d15f98fb3644/style.json?key=iilC4hPY1594noPX9OQ2"
+          styleUrl={mapStyleUrl(mapStyleName)}
           // Collapsed to an "i" the reader can expand, as Map.tsx already does.
           // The full credit line is wide enough to crowd the bottom of a phone
           // screen, and the attribution stays one tap away either way.

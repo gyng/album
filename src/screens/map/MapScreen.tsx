@@ -1,6 +1,7 @@
 import React from "react";
 import { MapWorldDeferred } from "../../components/MapWorldDeferred";
 import { GlobalNav } from "../../components/GlobalNav";
+import { MapStyleToggle } from "../../components/MapStyleToggle";
 import type { MapWorldEntry, TimeRange } from "../../util/pageDataTypes";
 import styles from "./MapScreen.module.css";
 import commonStyles from "../../styles/common.module.css";
@@ -275,6 +276,7 @@ const MapScreen = (props: MapScreenProps) => {
         <GlobalNav
           currentPage="map"
           hasPadding={false}
+          themeAdjacentItem={<MapStyleToggle />}
           trailingItem={
             <div className={styles.mapSearch} role="search">
               <input

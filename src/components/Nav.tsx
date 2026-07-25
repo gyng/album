@@ -15,6 +15,8 @@ export const Nav: React.FC<{
    * needs to hang content below the row.
    */
   trailingItem?: React.ReactNode;
+  /** A control shown beside the theme picker — another page-appearance choice. */
+  themeAdjacentItem?: React.ReactNode;
   isHome?: boolean;
 }> = (props) => {
   const ulRef = useRef<HTMLUListElement>(null);
@@ -138,6 +140,7 @@ export const Nav: React.FC<{
           <div className={styles.trailingItem}>{props.trailingItem}</div>
         ) : null}
         <div className={styles.themeToggleItem}>
+          {props.themeAdjacentItem}
           <ThemeToggle />
         </div>
       </div>

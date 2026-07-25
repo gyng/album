@@ -55,6 +55,27 @@ test.describe("World map interactions", () => {
     expect(await count.boundingBox()).toEqual(countBox);
   });
 
+  test("switches the basemap to another of the provider's styles, and remembers it", async ({
+    page,
+  }) => {
+    // Every option is the same provider and the same key as the default, so the
+    // style swap needs no new credential and carries its own attribution. The
+    // port applies it with `setStyle` and re-adds our layers, so the pins have to
+    // survive the change.
+    const picker = page.getByRole("combobox", { name: "Map style" });
+    await expect(picker).toHaveValue("default");
+
+    const styleRequest = page.waitForRequest((request) =>
+      request.url().includes("/maps/aquarelle"),
+    );
+    await picker.selectOption("watercolour");
+    await styleRequest;
+    await expect(page.locator('[data-map-status="loaded"]')).toBeVisible();
+
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await expect(page.getByRole("combobox", { name: "Map style" })).toHaveValue("watercolour");
+  });
+
   test("filters mapped photos with the lightweight index", async ({ page }) => {
     const input = page.getByRole("searchbox", { name: "Search photos on the map" });
     expect(

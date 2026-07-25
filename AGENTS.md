@@ -136,6 +136,7 @@ npm run test:e2e:reuse -- ./tests/smoke.spec.ts                # reuse already-r
 - Children mount as soon as the map object exists, not on `load`, so a failed style or dead tile worker degrades to controls over a blank basemap rather than deleting the map UI. e2e liveness therefore asserts `data-map-status="loaded"`, never the presence of a child
 - Give `DataLayer` an explicit `order` where stacking matters; without one, draw order follows mount history
 - Route overlay is SVG (screen-space), projected via the port's `project()`
+- The basemap is the reader's choice: `util/mapStyles.ts` holds the curated MapTiler styles, the shared public key and the preference (a small external store, because a `localStorage` write raises no event in its own tab). `MapStyleToggle` picks; `MapWorld` reads it through `useMapStyleName`. Every option is the same provider and key as the default, so no option adds a credential or an attribution obligation — the map renders whatever attribution the loaded style declares. `Map.tsx` and `StatsWorldMap` keep their own deliberate styles
 - Map search metadata is build-generated at `/data/map-search-index.json`. Fetch it with `fetchMapSearchIndex`; preserve `cache: "no-store"`, the response's `must-revalidate` header, and the service worker's network-first handling so deployments cannot leave a stale index cached indefinitely
 
 ## Design tokens (src/styles/globals.css)

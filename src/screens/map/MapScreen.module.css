@@ -51,8 +51,12 @@
   display: flex;
   align-items: center;
   gap: var(--m-s);
+  /* Sized to match the nav's buttons — same tap-target height, border weight and
+     radius — so the row reads as one set of controls rather than a field that
+     happens to sit among them. */
+  min-block-size: var(--tap-target);
   padding-inline: var(--m-s);
-  border: solid var(--size-2) var(--c-bg-contrast-light);
+  border: solid var(--line-strong) var(--c-bg-contrast-light);
   border-radius: var(--m-s);
   background: var(--c-bg);
 }

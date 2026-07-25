@@ -334,6 +334,9 @@ jest.mock("../util/time", () => ({
   getRelativeTimeString: () => "just now",
 }));
 
+const { mapStyleUrl, resetMapStyleCache, setMapStyleName } =
+  require("../util/mapStyles") as typeof import("../util/mapStyles");
+
 const mapWorldModule = require("./MapWorld");
 const { MMap } = mapWorldModule;
 
@@ -373,6 +376,8 @@ describe("MapWorld", () => {
   };
 
   beforeEach(() => {
+    window.localStorage.clear();
+    resetMapStyleCache();
     window.history.replaceState({}, "", "/");
     jest.useFakeTimers();
     mapHandlers.onMoveStart = undefined;
@@ -634,6 +639,26 @@ describe("MapWorld", () => {
       mapHandlers.onZoom?.({ viewState: { zoom: 7 } });
     });
     expect(onRender).toHaveBeenCalledTimes(afterHide);
+  });
+
+  it("draws the basemap the reader picked, from the same provider as the default", () => {
+    // The picker writes the preference; the map is a different subtree, and a
+    // localStorage write raises no event in its own tab — so the store has to
+    // tell it directly or the choice does nothing until a reload.
+    render(<MMap photos={[photo]} className="map" />);
+    expect(mapProps).toHaveBeenLastCalledWith(
+      // The port hands the adapter its own `mapStyle`; `styleUrl` is the neutral
+      // name on the way in.
+      expect.objectContaining({ mapStyle: mapStyleUrl("default") }),
+    );
+
+    act(() => {
+      setMapStyleName("watercolour");
+    });
+    expect(mapProps).toHaveBeenLastCalledWith(
+      expect.objectContaining({ mapStyle: mapStyleUrl("watercolour") }),
+    );
+    expect(mapStyleUrl("watercolour")).toContain("api.maptiler.com");
   });
 
   it("keeps the thumbnails through a wobble back below the reveal zoom", () => {
