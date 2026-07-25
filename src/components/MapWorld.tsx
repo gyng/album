@@ -34,7 +34,7 @@ import {
   type ThumbnailStage,
 } from "./mapWorldViewModel";
 import { useMapThumbnailPrefetch } from "./useMapThumbnailPrefetch";
-import { MapStyleToggle, useMapStyleName } from "./MapStyleToggle";
+import { useMapStyleName } from "./MapStyleToggle";
 import { mapStyleUrl } from "../util/mapStyles";
 import {
   MapAutoFit,
@@ -67,13 +67,6 @@ export type MapWorldProps = {
   routeDisplayMode?: "always" | "active-only";
   /** Live time range for opacity-based filtering during drag. */
   timeRange?: TimeRange | null;
-  /**
-   * Offer the basemap picker over the map (defaults to false). It lives here
-   * rather than in the site chrome because a phone cannot afford another row of
-   * it: two selects side by side are wider than a 390px viewport's nav row, so
-   * they took a line of their own and the map wore three bands of chrome.
-   */
-  showStylePicker?: boolean;
   /** Show the colour-recency legend (defaults to true). */
   showLegend?: boolean;
   /**
@@ -221,7 +214,6 @@ export const MMap: React.FC<MapWorldProps> = ({
   routeDisplayMode = "active-only",
   timeRange,
   showLegend = true,
-  showStylePicker = false,
   previewMarkers = false,
   directorEnabled = false,
   onDirectorEnabledChange,
@@ -627,11 +619,6 @@ export const MMap: React.FC<MapWorldProps> = ({
         </div>
       ) : null}
       <div className={styles.mapViewport} style={style}>
-        {showStylePicker ? (
-          <div className={styles.stylePicker}>
-            <MapStyleToggle />
-          </div>
-        ) : null}
         <MapView
           // The reader's chosen basemap, all of them the same provider and key
           // (see `util/mapStyles.ts`). The port applies a style change with

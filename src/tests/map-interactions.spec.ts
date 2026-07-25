@@ -58,12 +58,11 @@ test.describe("World map interactions", () => {
   test("switches the basemap to another of the provider's styles, and remembers it", async ({
     page,
   }) => {
-    // The picker sits on the map rather than in the site chrome: two selects side
-    // by side are wider than a phone's nav row, so in the chrome they took a line
-    // of their own and the map wore three bands of it. Every option is the same
-    // provider and key as the default, so the swap needs no new credential and
-    // carries its own attribution — and the port applies it with `setStyle` and
-    // re-adds our layers, so the pins survive the change.
+    // The picker sits in the nav between the search field and the site theme —
+    // the two appearance choices together. Every option is the same provider and
+    // key as the default, so the swap needs no new credential and carries its own
+    // attribution, and the port applies it with `setStyle` and re-adds our
+    // layers, so the pins survive the change.
     const picker = page.getByRole("combobox", { name: "Map style" });
     await expect(picker).toHaveValue("default");
 
