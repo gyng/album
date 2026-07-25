@@ -480,6 +480,96 @@ keyboard/hover/click accessibility on the symbol layer. All to shave a sub-frame
 already-smooth map. If the z9 dense-metro case is ever worth attacking, option (1) above —
 clustering or nudging the thumbnail threshold — is the right, cheap lever.
 
+### Smoothing the reveal itself — what shipped, and what a continuous fade would cost
+
+The reveal was three separate discontinuities stacked on one zoom threshold, and they were fixed
+in that order:
+
+1. **Hysteresis** (`nextThumbnailStage`, `mapWorldViewModel.ts`) — reveal above 8.5, hide below
+   8.2. A single threshold is a coin on its edge: a pinch settling on 8.5 swapped the whole marker
+   path, GPU layer to DOM markers and back, on consecutive frames.
+2. **A warming band** (`useMapThumbnailPrefetch`) — above zoom 8.0 the thumbnails that are about
+   to be shown are fetched, capped at 60 per pass and deduplicated across pans, so the swap lands
+   on images the browser already has.
+3. **Fade on decode, not on mount** (`LazyMapMarkerImage` + `data-loaded`) — the CSS animation ran
+   from mount, so a slow image faded its placeholder colour in as a bare rectangle and then
+   snapped to the photo. Two transitions where the reader wanted one.
+
+The remaining question was whether to drive the reveal *continuously* off the camera — opacity
+ramped across an 8.2–8.8 band from a CSS custom property rewritten every frame — rather than
+switching it on at a threshold. Measured on the real GPU with the recipe above (RTX 3080 via WSLg
+D3D12/ANGLE), 1280×800, dense central Tokyo, 126 thumbnails; medians of three measured runs after
+a warming run. The continuous option was measured by injecting its runtime shape onto the shipped
+page — a per-frame `setProperty` plus `img[data-loaded] { opacity: var(--thumb-reveal) }` — so the
+DOM, images and gesture are identical and the delta is only what the feature adds.
+
+| Steady drag at z9.35, 124 thumbnails mounted | frame p50 | frames > 50ms |
+| --- | --- | --- |
+| Shipped (no per-frame reveal) | 50.0ms | 9–18 |
+| Continuous fade, property on `documentElement` | 66.7ms | 28–40 |
+| Continuous fade, property on the map container | 50.0ms | 10–17 |
+
+**The per-frame reveal is free, but only scoped.** Writing the custom property on the root element
+costs a whole 60Hz frame — it invalidates every inherited lookup in the document. Written on
+`[data-map-children]` instead, 124 thumbnails recomputing opacity every frame is not measurable
+against the shipped path. So if the continuous reveal is ever built, the scope of that write is
+the load-bearing detail.
+
+**But it is not the thing that made the reveal feel abrupt.** Crossing the threshold at this pose
+(one +1 zoom on the map's own control, 8.35 → 9.35) cost a **500–700ms worst frame and ~1.29s of
+long tasks** — mounting 126 markers on one frame. Aborting the album media so the same markers
+mounted with nothing to decode still left **~0.79s of long tasks**, so roughly two thirds of the
+stall was DOM and React and one third image decode. A continuous fade does not touch that, and
+would enlarge it: it wants the thumbnails mounted from 8.0, where the viewport covers ~2.3× the
+area and therefore many more markers.
+
+**Verdict: don't build the continuous fade.** The lever was the burst itself.
+
+### Fixing the burst, and the pan that emptied the map
+
+Two virtualisation gates were doing the damage, and neither was the zoom threshold:
+
+1. **Everything mounted on one frame.** `useStaggeredMarkerMounts` now admits
+   `MARKER_MOUNT_CHUNK` (24) markers per animation frame, pruning departures immediately —
+   unmounting is cheap and a marker that has left has no reason to linger. It is gated on the
+   marker path actually being drawn: the first attempt ran while the GPU layer was still up, spent
+   the whole stagger before the reveal, and handed the reveal all 302 markers at once anyway. The
+   profile said so plainly (one mount step of 302), which is why the gate exists.
+2. **A drag emptied the map.** Bounds settled only on `moveend`, so markers behind the reader
+   unmounted while nothing ahead could mount until they let go. `MapBoundsTracker` now republishes
+   the *render* bounds on `move`, throttled to 150ms. The exact bounds still wait for the gesture:
+   the keyboard list and tap targets have no business changing under a moving thumb.
+
+A third fix came out of the same reading. The observer that loads marker images watches the
+**pin**, but the thumbnail hangs ~99px above it and markers mount a 120px ring outside the
+viewport — so a 100px `rootMargin` both unloaded images still on screen and held the rest back
+until the frame they appeared. The margin is now `MARKER_RENDER_PADDING_PX + MARKER_IMAGE_EXTENT_PX`,
+and a test pins that relationship.
+
+| Crossing the reveal, dense Tokyo, 126 thumbnails | worst frame | long tasks | biggest mount step |
+| --- | --- | --- | --- |
+| Before | 600ms | 1289ms | 126 (all at once) |
+| Staggered mounts | 450ms | 451ms | 24 |
+| Staggered + live render bounds | 500ms | 416ms | 24 |
+| **Same pose, zero photos (floor)** | **500–517ms** | **241–269ms** | — |
+
+| Drag at z9.35 | thumbnails mid-drag | frame p50 | first arrival |
+| --- | --- | --- | --- |
+| Before | 71 (from 126, falling) | 33.3ms | after mouse-up |
+| After | 112 | 16.7ms | ~1.1s, mid-gesture |
+
+**Marker mounting is now under the map's own floor.** The remaining ~500ms worst frame at that pose
+is MapLibre's label and tile work — the same pose with every photo filtered out produces it too.
+Long tasks are within ~150–280ms of the no-photo floor, down from ~1s above it. Note that an empty
+*ocean* pose is not a valid floor for this (16.7ms p50, no stalls): it removes the city, not just
+the markers.
+
+Bug found while profiling, since fixed: roughly one page load in four ignored the `lat`/`lon`/`zoom`
+deep link and auto-fitted to the whole world (zoom 1.65). `MapScreen` enabled the auto-fit from the
+*absence* of camera params, and they are always absent until the renderer reports navigation ready —
+so a map mounting in that window framed every photo and threw the shared position away. It is gated
+on `routeReady` now.
+
 ## Phase 3 (deferred): a second adapter
 
 Not built now. Adding one — `mapbox-gl` is nearly free via seam 1; a non-GL provider is not —
