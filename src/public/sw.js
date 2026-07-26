@@ -18,6 +18,12 @@ const IMAGE_CACHE = "snapshots-pwa-images";
 // payloads, so a lower cap would silently punch holes in a large offline
 // library. 4000 covers that with headroom while still bounding growth.
 const IMAGE_CACHE_MAX_ENTRIES = 4000;
+// A thumbnail reveal can expose well over a hundred cached photos in a few
+// frames. Revalidating every one concurrently holds all of those response
+// bodies and starts a full Cache Storage trim for each, which can starve a map
+// worker request or exhaust Firefox during a reload. Four keeps the background
+// work moving without turning one zoom gesture into an unbounded fetch burst.
+const IMAGE_REVALIDATION_CONCURRENCY = 4;
 
 const SHELL_DOCUMENTS = ["/", "/slideshow", "/slideshow/shell", "/slideshow/diagnostics"];
 const SHELL_STATIC_ASSETS = [
@@ -166,6 +172,34 @@ const revalidateImageInBackground = async (cache, request) => {
   }
 };
 
+const pendingImageRevalidations = [];
+let activeImageRevalidations = 0;
+
+const drainImageRevalidations = () => {
+  while (
+    activeImageRevalidations < IMAGE_REVALIDATION_CONCURRENCY &&
+    pendingImageRevalidations.length > 0
+  ) {
+    const next = pendingImageRevalidations.shift();
+    activeImageRevalidations += 1;
+    void next().finally(() => {
+      activeImageRevalidations -= 1;
+      drainImageRevalidations();
+    });
+  }
+};
+
+// Each caller gives the resulting promise to FetchEvent.waitUntil(), so queued
+// work keeps the worker alive just like immediately-started revalidation did.
+const queueImageRevalidation = (cache, request) =>
+  new Promise((resolve) => {
+    pendingImageRevalidations.push(async () => {
+      await revalidateImageInBackground(cache, request);
+      resolve();
+    });
+    drainImageRevalidations();
+  });
+
 // Stale-while-revalidate for original-filename album media: serve the cached
 // copy immediately, refresh it in the background at most once per URL per worker
 // lifetime (failures ignored so offline stays fine), and keep the unversioned
@@ -180,7 +214,7 @@ const staleWhileRevalidateImage = async (request, event) => {
     // keep the worker alive to finish the write and trim.
     if (!revalidatedImageUrls.has(request.url) && typeof event.waitUntil === "function") {
       revalidatedImageUrls.add(request.url);
-      event.waitUntil(revalidateImageInBackground(cache, request));
+      event.waitUntil(queueImageRevalidation(cache, request));
     }
     return cached;
   }
@@ -367,7 +401,7 @@ self.addEventListener("fetch", (event) => {
     event.respondWith(
       networkFirst(event.request, RUNTIME_CACHE, {
         fallbackOnErrorResponse: true,
-        waitForCache: true,
+        event,
       }),
     );
     return;

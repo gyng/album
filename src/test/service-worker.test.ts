@@ -125,6 +125,7 @@ const loadFetchHandler = (options: {
   cachedResponse: Response;
   networkResponse?: Response;
   networkError?: Error;
+  networkFetch?: (input: unknown, init?: unknown) => Promise<Response>;
   cachePut?: () => Promise<void>;
   cacheMatch?: (request: unknown) => Promise<Response | undefined>;
   cacheKeys?: () => Promise<unknown[]>;
@@ -145,9 +146,11 @@ const loadFetchHandler = (options: {
       open: jest.fn().mockResolvedValue(cache),
       keys: jest.fn().mockResolvedValue([]),
     },
-    fetch: options.networkError
-      ? jest.fn().mockRejectedValue(options.networkError)
-      : jest.fn().mockResolvedValue(options.networkResponse),
+    fetch: options.networkFetch
+      ? jest.fn(options.networkFetch)
+      : options.networkError
+        ? jest.fn().mockRejectedValue(options.networkError)
+        : jest.fn().mockResolvedValue(options.networkResponse),
     self: {
       location: {
         origin: "https://photos.example.com",
@@ -409,6 +412,46 @@ describe("service worker data caching", () => {
     await expect(fallback).resolves.toBe(cached);
   });
 
+  it("returns a fresh vendored map worker before its cache write settles", async () => {
+    // A rapid Firefox reload can abandon the previous document while its map
+    // worker request is still being cached. The replacement document asks for
+    // the same worker immediately; making that response wait for Cache Storage
+    // strands MapLibre at "ready" with no worker to request tiles.
+    let finishCaching!: () => void;
+    const caching = new Promise<void>((resolve) => {
+      finishCaching = resolve;
+    });
+    const network = new Response("current worker");
+    const fetchHandler = loadFetchHandler({
+      cachedResponse: new Response("older worker"),
+      networkResponse: network,
+      cachePut: () => caching,
+    });
+    let responsePromise: Promise<Response> | undefined;
+    let lifetimePromise: Promise<unknown> | undefined;
+
+    fetchHandler({
+      request: request("/vendor/maplibre-gl/6.0.0/maplibre-gl-worker.mjs"),
+      respondWith: (response) => {
+        responsePromise = response;
+      },
+      waitUntil: (promise) => {
+        lifetimePromise = promise;
+      },
+    });
+
+    let response: Response | undefined;
+    void responsePromise?.then((value) => {
+      response = value;
+    });
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(response).toBe(network);
+    expect(lifetimePromise).toBeDefined();
+
+    finishCaching();
+    await expect(lifetimePromise).resolves.toBeUndefined();
+  });
+
   it("falls back from a configured slideshow URL to the cached offline shell", async () => {
     const shell = new Response("cached slideshow shell");
     const fetchHandler = loadFetchHandler({
@@ -654,6 +697,63 @@ describe("service worker data caching", () => {
     expect(lifetimes).toHaveLength(1);
     expect(put).toHaveBeenCalledTimes(1);
     expect(fetchMockOf(fetchHandler)).toHaveBeenCalledTimes(1);
+  });
+
+  it("bounds concurrent cached-media revalidations", async () => {
+    // Crossing the thumbnail zoom can expose well over a hundred cached
+    // photos. Starting every revalidation together downloads all of those
+    // bodies and runs a full cache.keys() trim for each one, competing with the
+    // map worker and exhausting Firefox under a rapid reload.
+    const releases: Array<() => void> = [];
+    let active = 0;
+    let peak = 0;
+    const fetchHandler = loadFetchHandler({
+      cachedResponse: new Response("cached image"),
+      networkFetch: () =>
+        new Promise<Response>((resolve) => {
+          active += 1;
+          peak = Math.max(peak, active);
+          releases.push(() => {
+            active -= 1;
+            resolve(new Response("network image"));
+          });
+        }),
+    });
+    const lifetimes: Promise<unknown>[] = [];
+
+    for (let index = 0; index < 8; index += 1) {
+      let responsePromise: Promise<Response> | undefined;
+      fetchHandler({
+        request: request(`/data/albums/trip/photo-${index}.avif`, "image"),
+        respondWith: (promise) => {
+          responsePromise = promise;
+        },
+        waitUntil: (promise) => {
+          lifetimes.push(promise);
+        },
+      });
+      await expect(responsePromise).resolves.toBeDefined();
+    }
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(peak).toBe(4);
+    expect(fetchMockOf(fetchHandler)).toHaveBeenCalledTimes(4);
+
+    releases.shift()?.();
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(fetchMockOf(fetchHandler)).toHaveBeenCalledTimes(5);
+
+    while (fetchMockOf(fetchHandler).mock.calls.length < 8) {
+      releases.splice(0).forEach((release) => {
+        release();
+      });
+      await new Promise((resolve) => setImmediate(resolve));
+    }
+    releases.splice(0).forEach((release) => {
+      release();
+    });
+    await Promise.all(lifetimes);
   });
 
   it("retries a background image revalidation after a failed attempt", async () => {
