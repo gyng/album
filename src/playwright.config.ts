@@ -71,10 +71,16 @@ export default defineConfig({
             use: {
               ...devices["Desktop Firefox"],
               launchOptions: {
+                env: {
+                  ...process.env,
+                  LIBGL_ALWAYS_SOFTWARE: "1",
+                  MOZ_WEBGL_FORCE_EGL: "1",
+                },
                 firefoxUserPrefs: {
-                  // MapLibre 6 requires WebGL2. Firefox blocklists it on the
-                  // headless Ubuntu runner unless the available Mesa backend
-                  // is explicitly allowed.
+                  // MapLibre 6 requires WebGL2. The headless Ubuntu runner has
+                  // no native GL driver, so Firefox must permit the Mesa
+                  // software context selected by the launch environment.
+                  "webgl.forbid-software": false,
                   "webgl.force-enabled": true,
                 },
               },
