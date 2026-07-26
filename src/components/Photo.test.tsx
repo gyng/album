@@ -7,8 +7,16 @@ import { PhotoBlock } from "../services/types";
 import { ExifRow, ExifTable, Picture, PhotoBlockEl, PhotoDescription } from "./Photo";
 
 jest.mock("./MapDeferred", () => ({
-  MapDeferred: ({ coordinates }: { coordinates: [number, number] }) => (
-    <div data-testid="photo-map">{coordinates.join(",")}</div>
+  MapDeferred: ({
+    coordinates,
+    markerStyle,
+  }: {
+    coordinates: [number, number];
+    markerStyle?: { color?: string };
+  }) => (
+    <div data-testid="photo-map" data-marker-colour={markerStyle?.color}>
+      {coordinates.join(",")}
+    </div>
   ),
 }));
 
@@ -150,7 +158,10 @@ describe("PhotoBlockEl", () => {
       ),
     ).toBeTruthy();
     expect(screen.getByText("Japan, Chiyoda, Kanto")).toBeTruthy();
-    expect(screen.getByTestId("photo-map")).toBeTruthy();
+    expect(screen.getByTestId("photo-map")).toHaveAttribute(
+      "data-marker-colour",
+      "rgb(12, 34, 56)",
+    );
     expect(screen.getByRole("link", { name: "Find photos from this place" })).toHaveAttribute(
       "href",
       expect.stringContaining("location%3AKanto"),

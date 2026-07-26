@@ -140,13 +140,30 @@ const trimCache = async (cache, maxEntries) => {
 // revalidateImageInBackground below.
 const revalidatedImageUrls = new Set();
 
-// Fetch fresh media and store it, bounded by the cache cap. Uses `no-cache` so
-// the request is conditional (ETag/Last-Modified): a server that supports
-// validators answers unchanged media with a cheap 304 instead of resending the
-// bytes, and — crucially — a long `max-age` response header cannot let the HTTP
-// cache satisfy this from disk and skip revalidation entirely.
-const fetchImageAndStore = async (cache, request) => {
-  const response = await fetch(request, { cache: "no-cache" });
+// Fetch fresh media and store it, bounded by the cache cap. Cache Storage and
+// the browser HTTP cache are separate: `no-cache` alone cannot recover the ETag
+// held on a cached Response. Carry that validator over explicitly so unchanged
+// album media answer with a bodyless 304 instead of being downloaded again.
+// Fetch by URL when adding the conditional header: an <img> Request uses
+// `mode: "no-cors"`, whose header guard would otherwise reject If-None-Match.
+const fetchImageAndStore = async (cache, request, cached) => {
+  const headers = new Headers();
+  const etag = cached.headers.get("ETag");
+  const lastModified = cached.headers.get("Last-Modified");
+  if (etag) {
+    headers.set("If-None-Match", etag);
+  } else if (lastModified) {
+    headers.set("If-Modified-Since", lastModified);
+  }
+
+  const response = await fetch(request.url, {
+    cache: "no-cache",
+    credentials: "same-origin",
+    ...(etag || lastModified ? { headers } : {}),
+  });
+  if (response.status === 304) {
+    return cached;
+  }
   if (response.ok) {
     await cache.put(request, response.clone()).catch(() => {
       // Cache quota or storage failures must not hide a valid response.
@@ -164,9 +181,9 @@ const fetchImageAndStore = async (cache, request) => {
 // the next hit retries; a non-ok response (e.g. the media was deleted
 // server-side) keeps the mark, because unmarking it would turn every later
 // hit into a fresh doomed round-trip for the worker's whole lifetime.
-const revalidateImageInBackground = async (cache, request) => {
+const revalidateImageInBackground = async (cache, request, cached) => {
   try {
-    await fetchImageAndStore(cache, request);
+    await fetchImageAndStore(cache, request, cached);
   } catch (_error) {
     revalidatedImageUrls.delete(request.url);
   }
@@ -191,10 +208,10 @@ const drainImageRevalidations = () => {
 
 // Each caller gives the resulting promise to FetchEvent.waitUntil(), so queued
 // work keeps the worker alive just like immediately-started revalidation did.
-const queueImageRevalidation = (cache, request) =>
+const queueImageRevalidation = (cache, request, cached) =>
   new Promise((resolve) => {
     pendingImageRevalidations.push(async () => {
-      await revalidateImageInBackground(cache, request);
+      await revalidateImageInBackground(cache, request, cached);
       resolve();
     });
     drainImageRevalidations();
@@ -214,7 +231,7 @@ const staleWhileRevalidateImage = async (request, event) => {
     // keep the worker alive to finish the write and trim.
     if (!revalidatedImageUrls.has(request.url) && typeof event.waitUntil === "function") {
       revalidatedImageUrls.add(request.url);
-      event.waitUntil(queueImageRevalidation(cache, request));
+      event.waitUntil(queueImageRevalidation(cache, request, cached));
     }
     return cached;
   }

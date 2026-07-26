@@ -104,6 +104,10 @@ const MMapComponent: React.FC<MapProps> = (props) => {
   // anchor. Centroid would be more honest for multi-point but rarely useful
   // to deep-link to.
   const primary = coords[0] ?? ([0, 0] as [number, number]);
+  const markerStyle = {
+    color: "var(--c-accent)",
+    ...props.markerStyle,
+  };
 
   return (
     <>
@@ -125,7 +129,7 @@ const MMapComponent: React.FC<MapProps> = (props) => {
               key={`${lat}-${lng}-${idx}`}
               at={{ lng, lat }}
               anchor="center"
-              {...(props.markerStyle !== undefined ? { style: props.markerStyle } : {})}
+              style={markerStyle}
             >
               <span data-map-pin className={pinStyles.pin} />
             </Marker>

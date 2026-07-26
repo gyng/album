@@ -141,6 +141,7 @@ const loadFetchHandler = (options: {
   };
   const context = {
     URL,
+    Headers,
     Response,
     caches: {
       open: jest.fn().mockResolvedValue(cache),
@@ -637,12 +638,16 @@ describe("service worker data caching", () => {
   });
 
   it("revalidates cached media conditionally so long-lived caches cannot skip it", async () => {
-    // A default-cache-mode fetch would be satisfied by the HTTP cache under a
-    // long max-age header and never actually revalidate. `no-cache` forces a
-    // conditional request (ETag/Last-Modified) instead.
+    // Cache Storage is separate from Firefox's HTTP cache, so `no-cache` alone
+    // does not give fetch() the validator stored on our cached Response. Carry
+    // the ETag over explicitly; unchanged media can then answer 304 without
+    // retransmitting the image body seen in the reload HAR.
+    const cached = new Response("cached image", {
+      headers: { ETag: '"photo-version-1"' },
+    });
     const fetchHandler = loadFetchHandler({
-      cachedResponse: new Response("cached image"),
-      networkResponse: new Response("network image"),
+      cachedResponse: cached,
+      networkResponse: new Response(null, { status: 304 }),
     });
     let responsePromise: Promise<Response> | undefined;
     let lifetimePromise: Promise<unknown> | undefined;
@@ -659,9 +664,12 @@ describe("service worker data caching", () => {
 
     await responsePromise;
     await lifetimePromise;
-    expect(fetchMockOf(fetchHandler)).toHaveBeenCalledWith(expect.anything(), {
-      cache: "no-cache",
-    });
+    const init = fetchMockOf(fetchHandler).mock.calls[0]?.[1] as {
+      cache?: string;
+      headers?: Headers;
+    };
+    expect(init.cache).toBe("no-cache");
+    expect(init.headers?.get("If-None-Match")).toBe('"photo-version-1"');
   });
 
   it("revalidates a given media URL at most once per worker lifetime", async () => {

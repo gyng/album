@@ -82,7 +82,10 @@ describe("MMap", () => {
     expect(screen.getAllByTestId("marker")).toHaveLength(2);
     expect(markerProps).toHaveBeenNthCalledWith(
       1,
-      expect.objectContaining({ at: { lng: 103, lat: 1 }, style: { opacity: 0.5 } }),
+      expect.objectContaining({
+        at: { lng: 103, lat: 1 },
+        style: { color: "var(--c-accent)", opacity: 0.5 },
+      }),
     );
     expect(fitBounds).toHaveBeenCalledWith(
       [
@@ -100,6 +103,14 @@ describe("MMap", () => {
       }),
     );
     expect(screen.queryByText("View on", { exact: false })).toBeNull();
+  });
+
+  it("gives its location indicator a non-white default colour", () => {
+    render(<MMap coordinates={[1, 103]} />);
+
+    expect(markerProps).toHaveBeenCalledWith(
+      expect.objectContaining({ style: { color: "var(--c-accent)" } }),
+    );
   });
 
   it("uses a safe origin for an empty coordinate collection", () => {

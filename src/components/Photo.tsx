@@ -44,6 +44,7 @@ type ExifCoordinatesRowProps = {
   };
   options: {
     showMap: boolean;
+    markerColour?: string;
   };
 };
 
@@ -117,7 +118,12 @@ const ExifCoordinatesRow: React.FC<{ row: ExifCoordinatesRowProps }> = (props) =
           {/* oxlint-disable-next-line jsx-a11y/control-has-associated-label */}
           <td></td>
           <td>
-            <MapDeferred coordinates={[decLat, decLng]} />
+            <MapDeferred
+              coordinates={[decLat, decLng]}
+              markerStyle={{
+                color: props.row.options.markerColour ?? "var(--c-accent)",
+              }}
+            />
           </td>
         </tr>
       ) : null}
@@ -149,6 +155,7 @@ type ExifRow =
       };
       options: {
         showMap: boolean;
+        markerColour?: string;
       };
       valid?: boolean;
     };
@@ -398,6 +405,11 @@ export const PhotoBlockEl: React.FC<{
                       },
                       options: {
                         showMap: true,
+                        ...(props.block._build.tags.colors?.[0]
+                          ? {
+                              markerColour: rgbToString(props.block._build.tags.colors[0]),
+                            }
+                          : {}),
                       },
                       valid: Boolean(
                         props.block._build.exif.GPSLatitudeRef &&
