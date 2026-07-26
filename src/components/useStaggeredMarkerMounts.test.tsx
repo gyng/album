@@ -3,7 +3,7 @@
  */
 
 import { act, renderHook } from "@testing-library/react";
-import { useStaggeredMarkerMounts } from "./useStaggeredMarkerMounts";
+import { MARKER_MOUNT_CHUNK, useStaggeredMarkerMounts } from "./useStaggeredMarkerMounts";
 
 const photos = (count: number, prefix = "p") =>
   Array.from({ length: count }, (_, index) => ({ href: `${prefix}-${index}` }));
@@ -46,6 +46,16 @@ it("admits markers a chunk at a time instead of all at once", () => {
 
   // Converged: nothing left to schedule.
   expect(frames).toHaveLength(0);
+});
+
+it("admits twenty-four markers in each default rendering batch", () => {
+  const { result } = renderHook(() => useStaggeredMarkerMounts(photos(30)));
+
+  expect(MARKER_MOUNT_CHUNK).toBe(24);
+  expect(result.current).toHaveLength(24);
+
+  nextFrame();
+  expect(result.current).toHaveLength(30);
 });
 
 it("keeps what is already mounted while the rest arrive", () => {

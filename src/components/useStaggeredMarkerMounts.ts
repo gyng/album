@@ -3,12 +3,12 @@ import React from "react";
 /**
  * How many markers may mount in one frame.
  *
- * Measured at 4 and at 24 with the thinned thumbnail counts this now produces
- * (~20 in view) and the difference was not visible in frame times either way, so
- * this sits between them: it only starts to matter where many markers arrive at
- * once, which is the reveal, a preview-marker search, or a looser thinning.
+ * A warmed Firefox reload with 91 thumbnails took roughly 500ms to admit them
+ * eight at a time, so cached pictures still visibly streamed in. Twenty-four
+ * reduces that view to four batches while preserving the stagger that prevents
+ * the measured 500–700ms frozen frame when every marker mounts together.
  */
-export const MARKER_MOUNT_CHUNK = 8;
+export const MARKER_MOUNT_CHUNK = 24;
 
 /**
  * Lets markers arrive over several frames instead of all in one.
