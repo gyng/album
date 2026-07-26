@@ -68,7 +68,17 @@ export default defineConfig({
       ? [
           {
             name: "firefox",
-            use: { ...devices["Desktop Firefox"] },
+            use: {
+              ...devices["Desktop Firefox"],
+              launchOptions: {
+                firefoxUserPrefs: {
+                  // MapLibre 6 requires WebGL2. Firefox blocklists it on the
+                  // headless Ubuntu runner unless the available Mesa backend
+                  // is explicitly allowed.
+                  "webgl.force-enabled": true,
+                },
+              },
+            },
             testMatch: "**/smoke.spec.ts",
           },
           {
