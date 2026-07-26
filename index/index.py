@@ -1,38 +1,40 @@
 from __future__ import annotations
 
-import click
-from pathlib import Path
-import pprint
-import fast_colorthief
-import numpy as np
-import exifread
-import reverse_geocode
-import sqlite3
-import typing
-from PIL import Image, ImageOps
-from typing import IO, Mapping, Optional, Tuple
-import os
+import base64
+import concurrent.futures
 import fcntl
 import gc
 import hashlib
-import base64
 import io
 import json
-import socket
-import urllib.request
-import re
 import math
-import struct
-import tempfile
-import statistics
+import os
+import pprint
 import random
-import subprocess
+import re
 import shutil
+import socket
+import sqlite3
+import statistics
+import struct
+import subprocess
+import tempfile
 import threading
 import time
-import concurrent.futures
+import typing
+import urllib.request
+from collections.abc import Mapping
 from contextlib import contextmanager
 from datetime import datetime
+from pathlib import Path
+from typing import IO
+
+import click
+import exifread
+import fast_colorthief
+import numpy as np
+import reverse_geocode
+from PIL import Image, ImageOps
 
 _MODEL_RUNTIME_AVAILABLE = True
 
@@ -251,8 +253,8 @@ def is_cuda_oom(error: BaseException) -> bool:
 
 
 def predict_caption_batch_resilient(
-    classifier: "BaseCaptionClassifier",
-    items: list[tuple[str, Optional[Mapping]]],
+    classifier: BaseCaptionClassifier,
+    items: list[tuple[str, Mapping | None]],
 ) -> tuple[list[str], list[dict[str, typing.Any]]]:
     """Run a caption batch, recursively bisecting it after a CUDA OOM."""
     try:
@@ -469,7 +471,7 @@ JANUS_FALLBACK_STOPWORDS = {
 }
 
 
-def build_classifier_prompt(_geocode: Optional[Mapping]) -> str:
+def build_classifier_prompt(_geocode: Mapping | None) -> str:
     schema = '{ "tags": string[], "alt_text": string }'
 
     # Tags are click-to-filter facets AND a searched FTS column, so they must be
@@ -501,7 +503,7 @@ def build_classifier_prompt(_geocode: Optional[Mapping]) -> str:
     )
 
 
-def build_janus_prompt(geocode: Optional[Mapping]) -> str:
+def build_janus_prompt(geocode: Mapping | None) -> str:
     return f"<image_placeholder>{build_classifier_prompt(geocode)}"
 
 
@@ -581,7 +583,7 @@ def repair_classifier_json_syntax(value: str) -> str:
     return repaired
 
 
-def close_truncated_json_object(value: str) -> Optional[str]:
+def close_truncated_json_object(value: str) -> str | None:
     """Close a top-level object that the token limit cut off, if it still parses.
 
     Generation stops at a hard token cap, so Janus regularly emits a
@@ -654,7 +656,7 @@ def parse_classifier_response(raw_result: str) -> Mapping[str, typing.Any]:
         }
 
     if not isinstance(result, dict):
-        raise ValueError("Janus response was not an object")
+        raise TypeError("Janus response was not an object")
     # A JSON block missing a required key is treated as malformed so the caller
     # (parse_caption_with_retry) can re-run the model rather than silently writing
     # an empty caption. Present-but-wrong-typed values are coerced below so a
@@ -724,12 +726,12 @@ def parse_janus_response(raw_result: str) -> Mapping[str, typing.Any]:
 
 
 def parse_caption_with_retry(
-    classifier: "BaseCaptionClassifier",
+    classifier: BaseCaptionClassifier,
     path: str,
-    geocode: Optional[Mapping],
+    geocode: Mapping | None,
     raw_caption: str,
     max_attempts: int = 2,
-) -> Optional[Mapping[str, typing.Any]]:
+) -> Mapping[str, typing.Any] | None:
     """Parse a batched Janus caption, re-running the live model on parse failure.
 
     Janus occasionally emits malformed JSON. Generation is deterministic
@@ -746,7 +748,7 @@ def parse_caption_with_retry(
     for attempt in range(max_attempts):
         try:
             return parse_classifier_response(raw_result)
-        except Exception:
+        except (KeyError, TypeError, ValueError):
             log(
                 f"Caption parse attempt {attempt + 1}/{max_attempts} failed for {path}, got {raw_result}"
             )
@@ -760,13 +762,13 @@ def parse_caption_with_retry(
 
 
 def resolve_caption_result(
-    classifier: "BaseCaptionClassifier",
+    classifier: BaseCaptionClassifier,
     path: str,
-    geocode: Optional[Mapping],
+    geocode: Mapping | None,
     raw_caption: str,
     generation_metric: Mapping[str, typing.Any],
-    metric_sink: Optional[list[dict[str, typing.Any]]] = None,
-) -> Optional[Mapping[str, typing.Any]]:
+    metric_sink: list[dict[str, typing.Any]] | None = None,
+) -> Mapping[str, typing.Any] | None:
     """Accept a completed batch result or retry one non-EOS straggler singly."""
     if (
         generation_metric.get("completedWithEos") is not False
@@ -824,7 +826,7 @@ def resolve_caption_result(
         return None
 
 
-def complete_json_object_end(value: str) -> Optional[int]:
+def complete_json_object_end(value: str) -> int | None:
     """Return the end offset of the first complete top-level JSON object.
 
     This deliberately only recognises balanced object syntax; semantic validation
@@ -859,7 +861,7 @@ def complete_json_object_end(value: str) -> Optional[int]:
     return None
 
 
-def complete_classifier_json_prefix(value: str) -> Optional[str]:
+def complete_classifier_json_prefix(value: str) -> str | None:
     """Repair only a schema-complete top-level object missing its final brace.
 
     Janus occasionally starts repeating fields after producing all four valid
@@ -919,7 +921,7 @@ def complete_classifier_json_prefix(value: str) -> Optional[str]:
 
 
 def build_metadata_fallback_caption(
-    path: str, geocode: Optional[Mapping], iso8601: Optional[str]
+    path: str, geocode: Mapping | None, iso8601: str | None
 ) -> dict[str, typing.Any]:
     """A minimal caption for a photo the model cannot describe.
 
@@ -1066,7 +1068,7 @@ class JsonCompletionLogitsProcessor:
 
 
 def filter_exif_for_search(
-    exif: Optional[Mapping[str, typing.Any]],
+    exif: Mapping[str, typing.Any] | None,
 ) -> Mapping[str, typing.Any]:
     if not exif or not hasattr(exif, "get"):
         return {}
@@ -1093,10 +1095,10 @@ class BaseCaptionClassifier:
     def init_model(self) -> None:
         raise NotImplementedError
 
-    def predict(self, path: str, geocode: Optional[Mapping]) -> str:
+    def predict(self, path: str, geocode: Mapping | None) -> str:
         raise NotImplementedError
 
-    def predict_batch(self, items: list[tuple[str, Optional[Mapping]]]) -> list[str]:
+    def predict_batch(self, items: list[tuple[str, Mapping | None]]) -> list[str]:
         return [self.predict(path, geocode) for path, geocode in items]
 
     def release(self) -> None:
@@ -1143,8 +1145,8 @@ class JanusClassifier(BaseCaptionClassifier):
     def _record_generation_metrics(
         self,
         outputs,
-        max_new_tokens: Optional[int] = None,
-        per_item_metrics: Optional[list[Mapping[str, typing.Any]]] = None,
+        max_new_tokens: int | None = None,
+        per_item_metrics: list[Mapping[str, typing.Any]] | None = None,
     ) -> None:
         token_limit = max_new_tokens or self.max_new_tokens
         eos_token_id = self.tokenizer.eos_token_id
@@ -1175,7 +1177,7 @@ class JanusClassifier(BaseCaptionClassifier):
             self.last_generation_metrics.append(metric)
 
     @staticmethod
-    def _conversation(path: str, geocode: Optional[Mapping]):
+    def _conversation(path: str, geocode: Mapping | None):
         return [
             {
                 "role": "User",
@@ -1249,7 +1251,7 @@ class JanusClassifier(BaseCaptionClassifier):
         log("Loading Janus-Pro-1B...")
         # use 1B for speed/lower requirements
         model_path = JANUS_MODEL_ID
-        MultiModalityCausalLM, VLChatProcessor, load_pil_images = (
+        _MultiModalityCausalLM, VLChatProcessor, load_pil_images = (
             self._import_janus_modules()
         )
         self._load_pil_images = load_pil_images
@@ -1267,7 +1269,7 @@ class JanusClassifier(BaseCaptionClassifier):
         log("Loaded Janus-Pro-1B.")
 
     @torch.inference_mode()
-    def predict(self, path: str, geocode: Optional[Mapping]) -> str:
+    def predict(self, path: str, geocode: Mapping | None) -> str:
         conversation = self._conversation(path, geocode)
         pil_images, decode_ms = self._decode_images_parallel([path])
         processor_started_at = time.perf_counter()
@@ -1307,7 +1309,7 @@ class JanusClassifier(BaseCaptionClassifier):
         return answer
 
     def _prepare_inputs_cpu(
-        self, item: tuple[str, Optional[Mapping]]
+        self, item: tuple[str, Mapping | None]
     ) -> tuple[typing.Any, float, float]:
         """The CPU half of preparation: decode, resize, normalise, tokenise.
 
@@ -1336,7 +1338,7 @@ class JanusClassifier(BaseCaptionClassifier):
         return prepare_inputs, decode_ms, processor_ms
 
     @torch.inference_mode()
-    def predict_batch(self, items: list[tuple[str, Optional[Mapping]]]) -> list[str]:
+    def predict_batch(self, items: list[tuple[str, Mapping | None]]) -> list[str]:
         """Run Janus inference on a batch of images in one GPU forward pass."""
         if not items:
             return []
@@ -1428,10 +1430,10 @@ class Gemma4Classifier(BaseCaptionClassifier):
     def __init__(
         self,
         model_id: str = DEFAULT_GEMMA4_MODEL_ID,
-        quantization: Optional[str] = DEFAULT_GEMMA4_QUANTIZATION,
+        quantization: str | None = DEFAULT_GEMMA4_QUANTIZATION,
         batch_size: int = DEFAULT_GEMMA4_BATCH_SIZE,
         max_new_tokens: int = GEMMA4_MAX_NEW_TOKENS,
-        gpu_headroom_gb: Optional[float] = None,
+        gpu_headroom_gb: float | None = None,
         low_impact: bool = False,
     ):
         super().__init__()
@@ -1443,7 +1445,7 @@ class Gemma4Classifier(BaseCaptionClassifier):
         self.low_impact = low_impact
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
 
-    def _build_max_memory(self) -> Optional[dict[typing.Any, str]]:
+    def _build_max_memory(self) -> dict[typing.Any, str] | None:
         if not torch.cuda.is_available():
             return None
 
@@ -1521,11 +1523,11 @@ class Gemma4Classifier(BaseCaptionClassifier):
         self.model = self.model.eval()
         log(f"Loaded Gemma 4 classifier {self.model_id}.")
 
-    def _build_prompt(self, geocode: Optional[Mapping]) -> str:
+    def _build_prompt(self, geocode: Mapping | None) -> str:
         return build_classifier_prompt(geocode)
 
     def _build_inputs(
-        self, path: str, geocode: Optional[Mapping]
+        self, path: str, geocode: Mapping | None
     ) -> dict[str, torch.Tensor]:
         prompt = self._build_prompt(geocode)
         with Image.open(path) as raw_image:
@@ -1554,7 +1556,7 @@ class Gemma4Classifier(BaseCaptionClassifier):
         return {k: v.to(resolved_device) for k, v in inputs.items()}
 
     @torch.inference_mode()
-    def predict(self, path: str, geocode: Optional[Mapping]) -> str:
+    def predict(self, path: str, geocode: Mapping | None) -> str:
         inputs = self._build_inputs(path, geocode)
         input_ids = inputs.get("input_ids")
         generated = self.model.generate(
@@ -1618,10 +1620,10 @@ class Gemma4GgufClassifier(BaseCaptionClassifier):
     def __init__(
         self,
         model_id: str = DEFAULT_GEMMA4_GGUF_MODEL_ID,
-        quantization: Optional[str] = None,
+        quantization: str | None = None,
         batch_size: int = DEFAULT_GEMMA4_GGUF_BATCH_SIZE,
         max_new_tokens: int = DEFAULT_GEMMA4_GGUF_MAX_NEW_TOKENS,
-        gpu_headroom_gb: Optional[float] = None,
+        gpu_headroom_gb: float | None = None,
         low_impact: bool = False,
     ):
         super().__init__()
@@ -1632,13 +1634,13 @@ class Gemma4GgufClassifier(BaseCaptionClassifier):
         self.gpu_headroom_gb = gpu_headroom_gb
         self.low_impact = low_impact
         self.command = None
-        self.port: Optional[int] = None
-        self._server: Optional[subprocess.Popen] = None
-        self._base_url: Optional[str] = None
-        self._stderr_log_path: Optional[str] = None
-        self._stderr_log_handle: Optional[typing.IO[bytes]] = None
+        self.port: int | None = None
+        self._server: subprocess.Popen | None = None
+        self._base_url: str | None = None
+        self._stderr_log_path: str | None = None
+        self._stderr_log_handle: typing.IO[bytes] | None = None
 
-    def _model_and_mmproj(self) -> tuple[list[str], Optional[str]]:
+    def _model_and_mmproj(self) -> tuple[list[str], str | None]:
         """Server args for a local .gguf pair, or an -hf-repo tag."""
         if self.model_id.endswith(".gguf") and os.path.exists(self.model_id):
             mmproj_path = self.quantization
@@ -1656,7 +1658,7 @@ class Gemma4GgufClassifier(BaseCaptionClassifier):
             return ["--model", self.model_id, "--mmproj", mmproj_path], mmproj_path
         return ["--hf-repo", self.model_id], None
 
-    def _build_prompt(self, geocode: Optional[Mapping]) -> str:
+    def _build_prompt(self, geocode: Mapping | None) -> str:
         return build_classifier_prompt(geocode)
 
     def _extract_answer_text(self, raw_output: str) -> str:
@@ -1802,8 +1804,8 @@ class Gemma4GgufClassifier(BaseCaptionClassifier):
                         entry.unlink()
                 except OSError:
                     continue
-        except Exception:
-            pass
+        except OSError as err:
+            log(f"Could not sweep stale llama-server logs: {err}")
 
     def _read_stderr_log_tail(self, max_chars: int = 2000) -> str:
         if not self._stderr_log_path:
@@ -1832,7 +1834,7 @@ class Gemma4GgufClassifier(BaseCaptionClassifier):
                     if r.status == 200:
                         log(f"llama-server ready for {self.model_id}.")
                         return
-            except Exception:
+            except OSError:
                 time.sleep(1.0)
         # The deadline is left generous on purpose: a first run may be downloading
         # several GB of weights from Hugging Face. Point at the log rather than
@@ -1847,7 +1849,7 @@ class Gemma4GgufClassifier(BaseCaptionClassifier):
         )
 
     @torch.inference_mode()
-    def predict(self, path: str, geocode: Optional[Mapping]) -> str:
+    def predict(self, path: str, geocode: Mapping | None) -> str:
         if self._server is None:
             raise RuntimeError(
                 "Gemma4GgufClassifier.init_model() must be called first."
@@ -1926,22 +1928,22 @@ class BaseImageEmbedder:
     @torch.inference_mode()
     def predict_image_embeddings_batch(
         self, paths: list[str]
-    ) -> list[Optional[list[float]]]:
+    ) -> list[list[float] | None]:
         # Thread image opens — JPEG decode releases the GIL (~2.5x vs serial for large files).
         # A single truncated/corrupt file must not abort the whole GPU run, so an
         # unreadable image yields None (aligned to its input position) instead of
         # raising; the caller skips None entries.
-        def _open(path: str) -> Optional["Image.Image"]:
+        def _open(path: str) -> Image.Image | None:
             try:
                 return Image.open(path).convert("RGB")
-            except Exception as err:
+            except (OSError, ValueError) as err:
                 log(f"Skipping unreadable image {path}: {err}")
                 return None
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=4) as ex:
             opened = list(ex.map(_open, paths))
 
-        results: list[Optional[list[float]]] = [None] * len(paths)
+        results: list[list[float] | None] = [None] * len(paths)
         valid = [(i, img) for i, img in enumerate(opened) if img is not None]
         if not valid:
             return results
@@ -1977,12 +1979,12 @@ class Siglip2Embedder(BaseImageEmbedder):
 
 def create_classifier(
     backend: str,
-    model_id: Optional[str] = None,
-    quantization: Optional[str] = None,
-    batch_size: Optional[int] = None,
-    max_new_tokens: Optional[int] = None,
-    batch_max_new_tokens: Optional[int] = None,
-    gpu_headroom_gb: Optional[float] = None,
+    model_id: str | None = None,
+    quantization: str | None = None,
+    batch_size: int | None = None,
+    max_new_tokens: int | None = None,
+    batch_max_new_tokens: int | None = None,
+    gpu_headroom_gb: float | None = None,
     low_impact: bool = False,
 ) -> BaseCaptionClassifier:
     if backend == CLASSIFIER_BACKEND_JANUS:
@@ -2093,7 +2095,7 @@ def get_album_relative_path(path: str) -> str:
     p = Path(path)
     try:
         return f"/album/{p.parts[-2]}#{p.parts[-1]}"
-    except Exception:
+    except IndexError:
         return str(p)
 
 
@@ -2108,11 +2110,11 @@ EMBEDDINGS_TABLE_SQL = (
 )
 
 
-def _optional_bool_int(value: typing.Any) -> Optional[int]:
+def _optional_bool_int(value: typing.Any) -> int | None:
     return None if value is None else int(bool(value))
 
 
-def encode_embedding(embedding: list[float]) -> Tuple[bytes, float]:
+def encode_embedding(embedding: list[float]) -> tuple[bytes, float]:
     """Quantise a float vector to int8 bytes with a per-vector scale.
 
     scale = max|v| / 127 maps the largest component to ±127; decoding multiplies
@@ -2141,7 +2143,7 @@ def decode_embedding(blob: bytes, scale: float) -> list[float]:
 class Sqlite3Client:
     def __init__(
         self,
-        db_path: typing.Union[str, bytes, os.PathLike],
+        db_path: str | bytes | os.PathLike,
         read_only: bool = False,
     ):
         self.db_path = str(db_path)
@@ -2392,7 +2394,7 @@ class Sqlite3Client:
             self.rebuild_tag_counts(cur)
             self.mark_migration(IMAGE_TAGS_MIGRATION, cur)
 
-    def rebuild_tag_counts(self, cur: Optional[sqlite3.Cursor] = None) -> None:
+    def rebuild_tag_counts(self, cur: sqlite3.Cursor | None = None) -> None:
         if cur is None:
             with self.transaction() as transactional_cur:
                 self.rebuild_tag_counts(transactional_cur)
@@ -2407,8 +2409,8 @@ class Sqlite3Client:
         self,
         path: str,
         classifier_tags: list[str],
-        geocode: Optional[Mapping] = None,
-        cur: Optional[sqlite3.Cursor] = None,
+        geocode: Mapping | None = None,
+        cur: sqlite3.Cursor | None = None,
         rebuild: bool = True,
     ) -> None:
         if cur is None:
@@ -2506,7 +2508,7 @@ class Sqlite3Client:
 
     def get_pipeline_states(
         self,
-    ) -> dict[tuple[str, str], tuple[str, str, Optional[str]]]:
+    ) -> dict[tuple[str, str], tuple[str, str, str | None]]:
         if not self.table_exists("pipeline_state"):
             return {}
         rows = self.con.execute(
@@ -2520,8 +2522,8 @@ class Sqlite3Client:
         stage: str,
         source_sha256: str,
         pipeline_version: str,
-        model_id: Optional[str] = None,
-        cur: Optional[sqlite3.Cursor] = None,
+        model_id: str | None = None,
+        cur: sqlite3.Cursor | None = None,
     ) -> None:
         if cur is None:
             with self.transaction() as transactional_cur:
@@ -2553,7 +2555,7 @@ class Sqlite3Client:
     def insert_caption_generation_metrics(
         self,
         metrics: typing.Iterable[Mapping[str, typing.Any]],
-        cur: Optional[sqlite3.Cursor] = None,
+        cur: sqlite3.Cursor | None = None,
     ) -> None:
         rows = list(metrics)
         if not rows:
@@ -2648,7 +2650,7 @@ class Sqlite3Client:
             return set()
         return {row[0] for row in self.con.execute("SELECT path FROM metadata")}
 
-    def _split_embeddings_path(self) -> Optional[str]:
+    def _split_embeddings_path(self) -> str | None:
         """The sibling database ``do-full-index.sh`` moves the embeddings into.
 
         The split is the last step of a full index run, and it leaves this
@@ -2658,11 +2660,11 @@ class Sqlite3Client:
         of embeddings on the GPU for photos that already have them."""
         directory = os.path.dirname(os.path.abspath(self.db_path))
         base = os.path.basename(self.db_path)
-        stem = base[: -len(".sqlite")] if base.endswith(".sqlite") else base
+        stem = base.removesuffix(".sqlite")
         candidate = os.path.join(directory, f"{stem}-embeddings.sqlite")
         return candidate if os.path.exists(candidate) else None
 
-    def list_embedding_paths(self, model_id: Optional[str] = None):
+    def list_embedding_paths(self, model_id: str | None = None):
         def read(connection) -> set:
             cur = connection.cursor()
             if model_id:
@@ -2710,7 +2712,7 @@ class Sqlite3Client:
         path: str,
         mtime: float,
         size: int,
-        cur: Optional[sqlite3.Cursor] = None,
+        cur: sqlite3.Cursor | None = None,
     ):
         if cur is None:
             with self.transaction() as transactional_cur:
@@ -2721,7 +2723,7 @@ class Sqlite3Client:
             (path, mtime, size),
         )
 
-    def upsert_file_signatures(self, signatures: Mapping[str, Tuple[float, int]]):
+    def upsert_file_signatures(self, signatures: Mapping[str, tuple[float, int]]):
         if not signatures:
             return
         with self.transaction() as cur:
@@ -2838,9 +2840,7 @@ class Sqlite3Client:
     def delete_path(self, path: str):
         self.delete_paths([path])
 
-    def search(
-        self, query: str, limit: Optional[int] = 999999, offset: Optional[int] = 0
-    ):
+    def search(self, query: str, limit: int | None = 999999, offset: int | None = 0):
         cur = self.con.cursor()
         statement = """
         SELECT *, snippet(images, -1, '<i class="snippet">', '</i>', '…', 24) AS snippet, bm25(images) AS bm25
@@ -2863,7 +2863,7 @@ class Sqlite3Client:
         resolved = res.fetchall()
         return resolved
 
-    def search_tags(self, query: str, limit: Optional[int] = None):
+    def search_tags(self, query: str, limit: int | None = None):
         cur = self.con.cursor()
         if limit is None:
             res = cur.execute(
@@ -2878,7 +2878,7 @@ class Sqlite3Client:
         resolved = res.fetchall()
         return resolved
 
-    def search_metadata(self, query: str, limit: Optional[int] = None):
+    def search_metadata(self, query: str, limit: int | None = None):
         cur = self.con.cursor()
         if limit is None:
             res = cur.execute(
@@ -2897,7 +2897,7 @@ class Sqlite3Client:
         self,
         path: str,
         fields: Mapping[str, typing.Any],
-        cur: Optional[sqlite3.Cursor] = None,
+        cur: sqlite3.Cursor | None = None,
     ):
         if cur is None:
             with self.transaction() as transactional_cur:
@@ -2930,15 +2930,15 @@ class Sqlite3Client:
         path: str,
         field: str,
         value: str,
-        cur: Optional[sqlite3.Cursor] = None,
+        cur: sqlite3.Cursor | None = None,
     ):
         self.upsert_image_fields(path, {field: value}, cur=cur)
 
     def update_geocode_columns(
         self,
         path: str,
-        geo: Optional[Mapping[str, Optional[str]]] = None,
-        cur: Optional[sqlite3.Cursor] = None,
+        geo: Mapping[str, str | None] | None = None,
+        cur: sqlite3.Cursor | None = None,
     ):
         """Write only the structured geo_* columns for a path, leaving lat/lng
         and iso8601 untouched — the backfill derives these from coordinates
@@ -2963,10 +2963,10 @@ class Sqlite3Client:
     def insert_metadata(
         self,
         path: str,
-        lat_lng_deg: Tuple[float, float],
+        lat_lng_deg: tuple[float, float],
         iso8601: str,
-        geocode: Optional[Mapping[str, Optional[str]]] = None,
-        cur: Optional[sqlite3.Cursor] = None,
+        geocode: Mapping[str, str | None] | None = None,
+        cur: sqlite3.Cursor | None = None,
     ):
         if cur is None:
             with self.transaction() as transactional_cur:
@@ -3006,7 +3006,7 @@ class Sqlite3Client:
         path: str,
         model_id: str,
         embedding: list[float],
-        cur: Optional[sqlite3.Cursor] = None,
+        cur: sqlite3.Cursor | None = None,
     ):
         if cur is None:
             with self.transaction() as transactional_cur:
@@ -3028,7 +3028,7 @@ class Sqlite3Client:
         path, model_id, dim, blob, scale = row
         return (path, model_id, dim, decode_embedding(blob, scale))
 
-    def get_embedding(self, path: str, model_id: Optional[str] = None):
+    def get_embedding(self, path: str, model_id: str | None = None):
         cur = self.con.cursor()
         if model_id:
             res = cur.execute(
@@ -3048,7 +3048,7 @@ class Sqlite3Client:
             )
         return self._decode_embedding_row(res.fetchone())
 
-    def list_embeddings(self, model_id: Optional[str] = None):
+    def list_embeddings(self, model_id: str | None = None):
         cur = self.con.cursor()
         if model_id:
             res = cur.execute(
@@ -3072,12 +3072,11 @@ def run_embedding_pass(
     embedder: BaseImageEmbedder,
     paths: list[str],
     precomputed_embeddings: dict[str, dict[str, list[float]]],
-    persist_batch: Optional[
-        typing.Callable[[str, list[tuple[str, list[float]]]], None]
-    ] = None,
+    persist_batch: typing.Callable[[str, list[tuple[str, list[float]]]], None]
+    | None = None,
     collect: bool = True,
     batch_size: int = EMBEDDER_BATCH_SIZE,
-    timings: Optional[dict[str, dict[str, float]]] = None,
+    timings: dict[str, dict[str, float]] | None = None,
 ) -> float:
     """Load one embedder, embed all ``paths`` in batches, store results, release it.
 
@@ -3239,16 +3238,16 @@ def index(
     dbpath: str,
     dry_run: bool,
     model_profile: str,
-    benchmark_output: Optional[str],
+    benchmark_output: str | None,
     embedding_batch_size: int,
     classifier_backend: str,
-    classifier_model_id: Optional[str],
-    classifier_quantization: Optional[str],
-    classifier_batch_size: Optional[int],
-    classifier_max_new_tokens: Optional[int],
-    classifier_batch_max_new_tokens: Optional[int],
+    classifier_model_id: str | None,
+    classifier_quantization: str | None,
+    classifier_batch_size: int | None,
+    classifier_max_new_tokens: int | None,
+    classifier_batch_max_new_tokens: int | None,
     allow_experimental_classifier_batch_size: bool,
-    classifier_gpu_headroom_gb: Optional[float],
+    classifier_gpu_headroom_gb: float | None,
     classifier_low_impact: bool,
 ):
     started_at = time.perf_counter()
@@ -3436,15 +3435,14 @@ def index(
         with db.transaction() as cur:
             for path in files:
                 digest = current_digests[path]
-                if path in existing_core_paths:
-                    if (path, CORE_STAGE) not in states:
-                        db.upsert_pipeline_state(
-                            path,
-                            CORE_STAGE,
-                            digest,
-                            CORE_PIPELINE_VERSION,
-                            cur=cur,
-                        )
+                if path in existing_core_paths and (path, CORE_STAGE) not in states:
+                    db.upsert_pipeline_state(
+                        path,
+                        CORE_STAGE,
+                        digest,
+                        CORE_PIPELINE_VERSION,
+                        cur=cur,
+                    )
                     # Legacy captions are deliberately not imported: their prompt
                     # generation is unknowable, so they are re-captioned instead
                     # and get their provenance from that run. Stamping them here
@@ -3529,7 +3527,7 @@ def index(
                 # so an empty palette is a safe fallback.
                 try:
                     warm_future.set_result(extract_colour_palette(path))
-                except Exception as err:
+                except (OSError, RuntimeError, ValueError) as err:
                     log(f"Colour extraction failed for {path}: {err}")
                     color_failed_paths.add(path)
                     warm_future.set_result([])
@@ -3548,7 +3546,7 @@ def index(
         precomputed_captions: dict[str, Mapping] = {}
         completed_caption_paths: set[str] = set()
         caption_generation_metrics: list[dict[str, typing.Any]] = []
-        minimum_free_vram_gb: Optional[float] = None
+        minimum_free_vram_gb: float | None = None
         if any(item["needs_classifier"] for item in work_items):
             classifier = create_classifier(
                 backend=classifier_backend,
@@ -3788,7 +3786,7 @@ def index(
         for path, fut in color_futures.items():
             try:
                 precomputed_colors_by_path[path] = fut.result()
-            except Exception as err:
+            except Exception as err:  # noqa: BLE001 -- futures propagate decoder failures
                 # A single corrupt/truncated image must not discard the whole run;
                 # skip just this image's colours (empty palette) and keep going.
                 log(f"Colour extraction failed for {path}: {err}")
@@ -4076,7 +4074,7 @@ def build_benchmark_sample(index_value: int) -> Mapping[str, typing.Any]:
     default=None,
     help="Optional JSON output file for the benchmark summary.",
 )
-def benchmark_index(rows: int, repeat: int, output: Optional[str]):
+def benchmark_index(rows: int, repeat: int, output: str | None):
     runs = []
 
     for run_index in range(repeat):
@@ -4240,7 +4238,7 @@ def benchmark_colours(
     seed: int,
     max_dimension: int,
     quality: int,
-    output: Optional[str],
+    output: str | None,
 ):
     """Compare full-resolution and bounded-thumbnail palette cost and fidelity."""
     paths = sample_balanced_paths(
@@ -4321,7 +4319,7 @@ def benchmark_cpu(
     hash_workers: int,
     exif_workers: int,
     colour_workers: int,
-    output: Optional[str],
+    output: str | None,
 ):
     """Profile model-free indexing stages on a stable balanced photo sample."""
     discovery_started_at = time.perf_counter()
@@ -4393,7 +4391,7 @@ def benchmark_cpu(
     default=None,
     help="Optional JSON output file for the benchmark summary.",
 )
-def benchmark_janus(image_path: str, repeat: int, output: Optional[str]):
+def benchmark_janus(image_path: str, repeat: int, output: str | None):
     classifier = JanusClassifier()
 
     init_started_at = time.perf_counter()
@@ -4483,11 +4481,11 @@ def benchmark_janus_batch(
     image_path: str,
     batch_sizes: str,
     repeat: int,
-    glob_pattern: Optional[str],
+    glob_pattern: str | None,
     max_new_tokens: int,
     batch_max_new_tokens: int,
     allow_experimental_batch_size: bool,
-    output: Optional[str],
+    output: str | None,
 ):
     """Profile safe Janus batch sizes on representative images."""
     sizes = [int(s.strip()) for s in batch_sizes.split(",")]
@@ -4697,9 +4695,9 @@ def benchmark_janus_batch(
 def benchmark_caption_quality(
     fixture: str,
     backend: str,
-    model_id: Optional[str],
-    quantization: Optional[str],
-    batch_size: Optional[int],
+    model_id: str | None,
+    quantization: str | None,
+    batch_size: int | None,
     output: str,
 ):
     """Run the frozen semantic caption smoke set with production generation."""
@@ -4806,7 +4804,7 @@ def benchmark_caption_quality(
 @click.option("--limit", default=10, type=click.IntRange(min=1), show_default=True)
 @click.option("--output", default=None, help="Optional JSON report path.")
 def caption_metrics(
-    dbpath: str, pipeline_version: Optional[str], limit: int, output: Optional[str]
+    dbpath: str, pipeline_version: str | None, limit: int, output: str | None
 ):
     """Summarise durable caption generation timings and failure signals."""
     db = Sqlite3Client(dbpath, read_only=True)
@@ -4912,12 +4910,12 @@ def caption_metrics(
 def benchmark_classifier(
     image_path: str,
     backend: str,
-    model_id: Optional[str],
-    quantization: Optional[str],
-    gpu_headroom_gb: Optional[float],
+    model_id: str | None,
+    quantization: str | None,
+    gpu_headroom_gb: float | None,
     low_impact: bool,
     repeat: int,
-    output: Optional[str],
+    output: str | None,
 ):
     classifier = create_classifier(
         backend=backend,
@@ -5041,13 +5039,13 @@ def benchmark_classifier(
 )
 def compare_captioners(
     glob: str,
-    baseline_dbpath: Optional[str],
+    baseline_dbpath: str | None,
     sample_size: int,
     seed: int,
     candidate_backend: str,
-    candidate_model_id: Optional[str],
-    candidate_quantization: Optional[str],
-    candidate_gpu_headroom_gb: Optional[float],
+    candidate_model_id: str | None,
+    candidate_quantization: str | None,
+    candidate_gpu_headroom_gb: float | None,
     candidate_low_impact: bool,
     output_json: str,
     output_md: str,
@@ -5085,7 +5083,7 @@ def compare_captioners(
                 candidate_parsed = parse_classifier_response(candidate_raw)
                 parse_success += 1
                 parse_error = None
-            except Exception as err:
+            except (KeyError, TypeError, ValueError) as err:
                 candidate_parsed = {
                     "tags": [],
                     "alt_text": "",
@@ -5163,7 +5161,7 @@ def compare_captioners(
 @click.option("--repeat", default=3, help="Runs per batch size.")
 @click.option("--output", default=None, help="Optional JSON output file.")
 def benchmark_embedder_batch(
-    image_path: str, model: str, batch_sizes: str, repeat: int, output: Optional[str]
+    image_path: str, model: str, batch_sizes: str, repeat: int, output: str | None
 ):
     """Compare single-image vs batched SigLIP embedding throughput."""
     embedder = Siglip2Embedder() if model == "siglip2" else SiglipEmbedder()
@@ -5388,11 +5386,11 @@ def validate_index_database(
     glob: str,
     model_profile: str,
     classifier_backend: str = CLASSIFIER_BACKEND_GEMMA4_GGUF,
-    classifier_model_id: Optional[str] = None,
-    classifier_quantization: Optional[str] = None,
-    classifier_batch_size: Optional[int] = None,
-    classifier_max_new_tokens: Optional[int] = None,
-    classifier_batch_max_new_tokens: Optional[int] = None,
+    classifier_model_id: str | None = None,
+    classifier_quantization: str | None = None,
+    classifier_batch_size: int | None = None,
+    classifier_max_new_tokens: int | None = None,
+    classifier_batch_max_new_tokens: int | None = None,
 ) -> dict:
     """Validate exact source coverage and all published cross-table contracts."""
     expected = set(find_files(".", glob))
@@ -5421,7 +5419,7 @@ def validate_index_database(
                 f"validate: missing table(s): {', '.join(sorted(missing_tables))}"
             )
 
-        stages: list[tuple[str, str, Optional[str]]] = []
+        stages: list[tuple[str, str, str | None]] = []
         if model_profile in (MODEL_PROFILE_JANUS, MODEL_PROFILE_HYBRID):
             images = {row[0] for row in con.execute("SELECT path FROM images")}
             metadata = {row[0] for row in con.execute("SELECT path FROM metadata")}
@@ -5607,11 +5605,11 @@ def validate_command(
     dbpath: str,
     model_profile: str,
     classifier_backend: str,
-    classifier_model_id: Optional[str],
-    classifier_quantization: Optional[str],
-    classifier_batch_size: Optional[int],
-    classifier_max_new_tokens: Optional[int],
-    classifier_batch_max_new_tokens: Optional[int],
+    classifier_model_id: str | None,
+    classifier_quantization: str | None,
+    classifier_batch_size: int | None,
+    classifier_max_new_tokens: int | None,
+    classifier_batch_max_new_tokens: int | None,
 ):
     summary = validate_index_database(
         dbpath,
@@ -5630,7 +5628,7 @@ def validate_command(
 PUBLISH_MIN_ROW_RATIO = 0.9
 
 
-def count_table_rows(dbpath: Path, table: str) -> Optional[int]:
+def count_table_rows(dbpath: Path, table: str) -> int | None:
     """Row count for ``table``, or ``None`` when the DB or table is unavailable."""
     if not dbpath.exists():
         return None
@@ -5690,7 +5688,7 @@ def materialise_from(source: Path, destination: Path) -> None:
 
 
 def write_publish_journal(
-    backup_dir: Path, entries: typing.Iterable[tuple[Path, Optional[Path]]]
+    backup_dir: Path, entries: typing.Iterable[tuple[Path, Path | None]]
 ) -> None:
     """Record which outputs are about to move, and what to put back if they don't.
 
@@ -5748,7 +5746,7 @@ def restore_interrupted_publish(backup_dir: Path) -> list[str]:
     return restored
 
 
-def backup_published_output(output: Path, backup_dir: Path) -> Optional[Path]:
+def backup_published_output(output: Path, backup_dir: Path) -> Path | None:
     """Keep exactly one copy of the database about to be replaced.
 
     Publication replaces outputs by `rename`, which unlinks the previous inode, so
@@ -5783,9 +5781,9 @@ def backup_published_output(output: Path, backup_dir: Path) -> Optional[Path]:
 def publish_index_databases(
     source_dbpath: str,
     embeddings_output: str,
-    core_output: Optional[str] = None,
+    core_output: str | None = None,
     allow_shrink: bool = False,
-    backup_dir: Optional[str] = None,
+    backup_dir: str | None = None,
 ) -> None:
     """Create compact publication DBs and replace outputs only after validation."""
     backup_root = (
@@ -5855,7 +5853,7 @@ def publish_index_databases(
         for temporary, output, table in outputs:
             assert_no_row_regression(temporary, output, table, allow_shrink)
 
-        backups: list[tuple[Path, Optional[Path]]] = []
+        backups: list[tuple[Path, Path | None]] = []
         for _temporary, output, _table in outputs:
             backup = backup_published_output(output, backup_root)
             if backup:
@@ -5902,10 +5900,10 @@ def publish_index_databases(
 )
 def publish_command(
     dbpath: str,
-    core_output: Optional[str],
+    core_output: str | None,
     embeddings_output: str,
     allow_shrink: bool,
-    backup_dir: Optional[str],
+    backup_dir: str | None,
 ):
     publish_index_databases(
         dbpath, embeddings_output, core_output, allow_shrink, backup_dir
@@ -6007,7 +6005,7 @@ def backfill(dbpath: str, dry_run: bool):
     default=False,
     help="Report what would change without writing.",
 )
-def update_gps(dbpath: str, match: Optional[str], dry_run: bool):
+def update_gps(dbpath: str, match: str | None, dry_run: bool):
     """Refresh GPS coordinates, timestamp and geocode for already-indexed photos
     from their CURRENT EXIF, without re-running the Janus/SigLIP models.
 
@@ -6174,7 +6172,7 @@ def update_gps(dbpath: str, match: Optional[str], dry_run: bool):
     "post-build smoke test so a structurally broken FTS index fails loudly "
     "instead of silently returning nothing.",
 )
-def search(dbpath: str, query: str, limit: Optional[int], min_results: int):
+def search(dbpath: str, query: str, limit: int | None, min_results: int):
     db = Sqlite3Client(dbpath, read_only=True)
     results = db.search(query, limit)
     pprint.pprint(results)
@@ -6189,7 +6187,7 @@ def search(dbpath: str, query: str, limit: Optional[int], min_results: int):
 @click.option("--dbpath", default="testdb.sqlite", help="sqlite database path to use.")
 @click.option("--query", default="", help="Search query.")
 @click.option("--limit", default=None, help="Search query limit.")
-def search_tags(dbpath: str, query: str, limit: Optional[int]):
+def search_tags(dbpath: str, query: str, limit: int | None):
     db = Sqlite3Client(dbpath, read_only=True)
     results = db.search_tags(query, limit)
     pprint.pprint(results)
@@ -6199,7 +6197,7 @@ def search_tags(dbpath: str, query: str, limit: Optional[int]):
 @click.option("--dbpath", default="testdb.sqlite", help="sqlite database path to use.")
 @click.option("--query", default="", help="Search query.")
 @click.option("--limit", default=None, help="Search query limit.")
-def search_metadata(dbpath: str, query: str, limit: Optional[int]):
+def search_metadata(dbpath: str, query: str, limit: int | None):
     db = Sqlite3Client(dbpath, read_only=True)
     results = db.search_metadata(query, limit)
     pprint.pprint(results)
@@ -6233,9 +6231,7 @@ def cosine_similarity(a: list[float], b: list[float]) -> float:
     default=None,
     help="Optional model_id filter. Defaults to the query path's stored model_id.",
 )
-def search_similar_path(
-    dbpath: str, query_path: str, limit: int, model_id: Optional[str]
-):
+def search_similar_path(dbpath: str, query_path: str, limit: int, model_id: str | None):
     db = Sqlite3Client(dbpath, read_only=True)
 
     base = db.get_embedding(path=query_path, model_id=model_id)
@@ -6283,14 +6279,14 @@ def model_info():
     )
 
 
-def format_mapping(mapping: Optional[Mapping[str, str]]) -> str:
+def format_mapping(mapping: Mapping[str, str] | None) -> str:
     """Formats a mapping for insertion into sqlite via a paramaterised query"""
     if not mapping or not hasattr(mapping, "items"):
         return str(mapping)
     return "\n".join([f"{k}:{v}" for k, v in mapping.items()])
 
 
-def format_mapping_values(mapping: Optional[Mapping[str, str]]) -> str:
+def format_mapping_values(mapping: Mapping[str, str] | None) -> str:
     """Formats a mapping for insertion of values into sqlite via a paramaterised query"""
     if not mapping or not hasattr(mapping, "items"):
         return str(mapping)
@@ -6309,7 +6305,7 @@ def _is_geocode_country_code(line: str) -> bool:
     return len(line) <= 3 and line == line.upper() and line.isalpha()
 
 
-def clean_geocode_lines(geocode_blob: Optional[str]) -> list[str]:
+def clean_geocode_lines(geocode_blob: str | None) -> list[str]:
     if not geocode_blob:
         return []
     lines = [line.strip() for line in geocode_blob.split("\n")]
@@ -6322,7 +6318,7 @@ def clean_geocode_lines(geocode_blob: Optional[str]) -> list[str]:
     ]
 
 
-def geocode_columns(geocode: Optional[Mapping]) -> dict:
+def geocode_columns(geocode: Mapping | None) -> dict:
     """Structured geocode components keyed off reverse_geocode's own fields —
     region is admin1 (``state``), subregion is admin2 (``county``) — so a facet
     matches the true admin level. reverse_geocode omits ``state``/``county``
@@ -6345,8 +6341,8 @@ def geocode_columns(geocode: Optional[Mapping]) -> dict:
 
 
 def build_geocode_fields(
-    geocode: Optional[Mapping],
-) -> Tuple[Optional[str], dict]:
+    geocode: Mapping | None,
+) -> tuple[str | None, dict]:
     """From a reverse_geocode dict, return the coordinate-free searchable blob
     (place names only, one per line) and the structured components for the
     metadata columns. Dropping the coordinate/population numbers from the
@@ -6359,7 +6355,7 @@ def build_geocode_fields(
     return blob, geocode_columns(geocode)
 
 
-def file_content_sha256(path: str) -> Optional[str]:
+def file_content_sha256(path: str) -> str | None:
     """Return a stable content fingerprint, or ``None`` when the file is unreadable.
 
     Stage freshness is based on bytes rather than timestamps: photo-management
@@ -6377,7 +6373,7 @@ def file_content_sha256(path: str) -> Optional[str]:
 
 def file_content_sha256_many(
     paths: typing.Iterable[str], workers: int = FILE_HASH_WORKERS
-) -> dict[str, Optional[str]]:
+) -> dict[str, str | None]:
     """Fingerprint paths concurrently while preserving deterministic path mapping."""
     resolved_paths = list(paths)
     if workers <= 1 or len(resolved_paths) <= 1:
@@ -6390,8 +6386,8 @@ def file_content_sha256_many(
 
 
 def resolve_classifier_model_id(
-    backend: str, model_id: Optional[str] = None
-) -> Optional[str]:
+    backend: str, model_id: str | None = None
+) -> str | None:
     """The effective model id a backend runs when the CLI leaves it unset.
 
     Provenance and the pipeline version must name the model that actually ran,
@@ -6411,7 +6407,7 @@ def resolve_classifier_model_id(
     return None
 
 
-def rewrite_default_caption_provenance(version: str) -> Optional[Tuple[str, str]]:
+def rewrite_default_caption_provenance(version: str) -> tuple[str, str] | None:
     """Rewrite a legacy default-stamped caption pipeline version to the form the
     resolver now produces.
 
@@ -6449,11 +6445,11 @@ def rewrite_default_caption_provenance(version: str) -> Optional[Tuple[str, str]
 
 def caption_pipeline_version(
     backend: str,
-    model_id: Optional[str] = None,
-    quantization: Optional[str] = None,
-    batch_size: Optional[int] = None,
-    max_new_tokens: Optional[int] = None,
-    batch_max_new_tokens: Optional[int] = None,
+    model_id: str | None = None,
+    quantization: str | None = None,
+    batch_size: int | None = None,
+    max_new_tokens: int | None = None,
+    batch_max_new_tokens: int | None = None,
 ) -> str:
     resolved_model = resolve_classifier_model_id(backend, model_id) or "default"
     revision = (
@@ -6486,7 +6482,7 @@ def embedding_pipeline_version(model_id: str) -> str:
     return f"image-embedding-v1:{model_id}@{revisions.get(model_id, 'external')}"
 
 
-def file_signature(path: str) -> Optional[Tuple[float, int]]:
+def file_signature(path: str) -> tuple[float, int] | None:
     """Cheap change-detection fingerprint: (mtime, size). Returns None if the
     file can't be stat'd. mtime is rounded to milliseconds so sub-ms float
     noise between runs doesn't read as a change; size makes an edit that keeps
@@ -6500,8 +6496,8 @@ def file_signature(path: str) -> Optional[Tuple[float, int]]:
 
 def compute_reindex_plan(
     indexed_paths,
-    existing_signatures: Mapping[str, Tuple[float, int]],
-    current_signatures: Mapping[str, Tuple[float, int]],
+    existing_signatures: Mapping[str, tuple[float, int]],
+    current_signatures: Mapping[str, tuple[float, int]],
 ):
     """Decide which already-indexed files changed on disk.
 
@@ -6602,14 +6598,14 @@ def sample_balanced_paths(
     return sampled
 
 
-def split_tag_text(tags: Optional[str]) -> list[str]:
+def split_tag_text(tags: str | None) -> list[str]:
     if not tags:
         return []
     return [tag.strip() for tag in tags.split(",") if tag.strip()]
 
 
 def compare_caption_payloads(
-    baseline: Optional[Mapping[str, typing.Any]],
+    baseline: Mapping[str, typing.Any] | None,
     candidate: Mapping[str, typing.Any],
 ) -> dict[str, typing.Any]:
     baseline_tags = split_tag_text((baseline or {}).get("tags"))
@@ -6884,9 +6880,9 @@ def analyse_image(
     path: str,
     needs_core: bool = True,
     needs_classifier: bool = False,
-    precomputed_caption: Optional[Mapping] = None,
-    precomputed_embeddings: Optional[dict[str, list[float]]] = None,
-    precomputed_colors: Optional[list] = None,
+    precomputed_caption: Mapping | None = None,
+    precomputed_embeddings: dict[str, list[float]] | None = None,
+    precomputed_colors: list | None = None,
 ) -> Mapping:
     start_time = time.perf_counter()
 
@@ -6993,17 +6989,17 @@ def analyse_image(
 
 
 def analyse_image_worker(
-    input: Tuple[
+    input: tuple[
         int,
         str,
         str,
-        Optional[str],
+        str | None,
         bool,
         bool,
         bool,
-        Optional[Mapping],
-        Optional[dict],
-        Optional[list],
+        Mapping | None,
+        dict | None,
+        list | None,
         str,
     ],
 ) -> Mapping[str, typing.Any]:
@@ -7011,64 +7007,58 @@ def analyse_image_worker(
 
     By the time this runs, every GPU model has been loaded, used, and released in
     its own pass — so it consumes only precomputed captions/embeddings/colours."""
-    try:
-        idx = input[0]
-        path = input[1]
-        needs_core = input[2]
-        # input[3] flags a path whose caption the model could not produce; the
-        # assembly pass sets it (never a live classifier) so a metadata-only
-        # fallback caption is built here. It is passed to analyse_image as
-        # needs_classifier only to make it read EXIF/geocode for the fallback.
-        needs_caption_fallback = input[3]
-        precomputed_caption = input[4] if len(input) > 4 else None
-        precomputed_embeddings = input[5] if len(input) > 5 else None
-        precomputed_colors = input[6] if len(input) > 6 else None
-        source_sha256 = input[7] if len(input) > 7 else ""
-        caption_version = input[8] if len(input) > 8 else ""
-        caption_model_id = input[9] if len(input) > 9 else None
-        core_complete = input[10] if len(input) > 10 else True
+    idx = input[0]
+    path = input[1]
+    needs_core = input[2]
+    # input[3] flags a path whose caption the model could not produce; the
+    # assembly pass sets it (never a live classifier) so a metadata-only
+    # fallback caption is built here. It is passed to analyse_image as
+    # needs_classifier only to make it read EXIF/geocode for the fallback.
+    needs_caption_fallback = input[3]
+    precomputed_caption = input[4] if len(input) > 4 else None
+    precomputed_embeddings = input[5] if len(input) > 5 else None
+    precomputed_colors = input[6] if len(input) > 6 else None
+    source_sha256 = input[7] if len(input) > 7 else ""
+    caption_version = input[8] if len(input) > 8 else ""
+    caption_model_id = input[9] if len(input) > 9 else None
+    core_complete = input[10] if len(input) > 10 else True
 
-        print(f"[{idx + 1}] {os.path.basename(path)}...")
-        with open(path, "rb") as fh:
-            analysed = analyse_image(
-                fh,
-                path=path,
-                needs_core=needs_core,
-                needs_classifier=needs_caption_fallback,
-                precomputed_caption=precomputed_caption,
-                precomputed_embeddings=precomputed_embeddings,
-                precomputed_colors=precomputed_colors,
+    print(f"[{idx + 1}] {os.path.basename(path)}...")
+    with open(path, "rb") as fh:
+        analysed = analyse_image(
+            fh,
+            path=path,
+            needs_core=needs_core,
+            needs_classifier=needs_caption_fallback,
+            precomputed_caption=precomputed_caption,
+            precomputed_embeddings=precomputed_embeddings,
+            precomputed_colors=precomputed_colors,
+        )
+        caption_fallback = None
+        if needs_caption_fallback and precomputed_caption is None:
+            # The model could not describe this one. Rejecting its output was
+            # right, but leaving the photo uncaptioned blocks publication of
+            # the entire index, so fall back to what we already know.
+            caption_fallback = build_metadata_fallback_caption(
+                path, analysed.get("geocode"), analysed.get("iso8601")
             )
-            caption_fallback = None
-            if needs_caption_fallback and precomputed_caption is None:
-                # The model could not describe this one. Rejecting its output was
-                # right, but leaving the photo uncaptioned blocks publication of
-                # the entire index, so fall back to what we already know.
-                caption_fallback = build_metadata_fallback_caption(
-                    path, analysed.get("geocode"), analysed.get("iso8601")
-                )
-                log(f"Captioning {path} from metadata: {caption_fallback['alt_text']}")
-                analysed = {
-                    **analysed,
-                    "tags": caption_fallback["tags"],
-                    "alt_text": caption_fallback["alt_text"],
-                }
-            return {
-                "path": path,
-                "analysed": analysed,
-                "write_core": needs_core,
-                "write_caption": caption_fallback is not None,
-                "caption_failed": False,
-                "source_sha256": source_sha256,
-                "caption_version": caption_version,
-                "caption_model_id": caption_model_id,
-                "core_complete": core_complete,
+            log(f"Captioning {path} from metadata: {caption_fallback['alt_text']}")
+            analysed = {
+                **analysed,
+                "tags": caption_fallback["tags"],
+                "alt_text": caption_fallback["alt_text"],
             }
-    except (KeyboardInterrupt, SystemExit):
-        # Re-raise so Ctrl-C / SIGINT actually terminates the run. The old code
-        # swallowed it and returned a malformed tuple, which both masked the
-        # interrupt and crashed the downstream consumer.
-        raise
+        return {
+            "path": path,
+            "analysed": analysed,
+            "write_core": needs_core,
+            "write_caption": caption_fallback is not None,
+            "caption_failed": False,
+            "source_sha256": source_sha256,
+            "caption_version": caption_version,
+            "caption_model_id": caption_model_id,
+            "core_complete": core_complete,
+        }
 
 
 def insert_analysed_images_batch(db, results: list[Mapping]):

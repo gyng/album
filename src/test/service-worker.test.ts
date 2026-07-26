@@ -386,7 +386,7 @@ describe("service worker data caching", () => {
     const online = loadFetchHandler({ cachedResponse: cached, networkResponse: network });
     let fresh: Promise<Response> | undefined;
     online({
-      request: request("/vendor/maplibre-gl-worker.mjs"),
+      request: request("/vendor/maplibre-gl/6.0.0/maplibre-gl-worker.mjs"),
       respondWith: (response) => {
         fresh = response;
       },
@@ -400,7 +400,7 @@ describe("service worker data caching", () => {
     });
     let fallback: Promise<Response> | undefined;
     offline({
-      request: request("/vendor/maplibre-gl-shared.mjs"),
+      request: request("/vendor/maplibre-gl/6.0.0/maplibre-gl-shared.mjs"),
       respondWith: (response) => {
         fallback = response;
       },

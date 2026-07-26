@@ -2,6 +2,7 @@ const mockSetWorkerUrl = jest.fn();
 
 jest.mock("./engine", () => ({
   gl: {
+    getVersion: () => "6.0.0",
     setWorkerUrl: (url: string) => {
       mockSetWorkerUrl(url);
     },
@@ -21,7 +22,9 @@ describe("installVendoredWorker", () => {
     installVendoredWorker();
 
     expect(mockSetWorkerUrl).toHaveBeenCalledTimes(1);
-    expect(mockSetWorkerUrl).toHaveBeenCalledWith("/vendor/maplibre-gl-worker.mjs");
+    expect(mockSetWorkerUrl).toHaveBeenCalledWith(
+      "/vendor/maplibre-gl/6.0.0/maplibre-gl-worker.mjs",
+    );
   });
 
   it("retries after a failure rather than pretending the worker is installed", async () => {

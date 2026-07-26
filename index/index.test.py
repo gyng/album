@@ -1,93 +1,94 @@
-from index import (
-    acquire_single_instance_lock,
-    analyse_image,
-    find_files,
-    format_mapping,
-    format_mapping_values,
-    analyse_image_worker,
-    benchmark_caption_quality,
-    build_classifier_prompt,
-    caption_pipeline_version,
-    resolve_classifier_model_id,
-    normalise_classifier_tags,
-    build_janus_prompt,
-    build_geocode_fields,
-    compare_caption_payloads,
-    complete_classifier_json_prefix,
-    complete_json_object_end,
-    compute_reindex_plan,
-    create_classifier,
-    decode_embedding,
-    encode_embedding,
-    evaluate_caption_quality_cases,
-    evaluate_tag_quality,
-    extract_colour_palette,
-    file_content_sha256,
-    file_content_sha256_many,
-    geocode_columns,
-    get_exif,
-    filter_exif_for_search,
-    heartbeat,
-    has_repeated_open_classifier_tags,
-    insert_analysed_images_batch,
-    log_vram,
-    log_vram_peak,
-    parse_caption_with_retry,
-    publish_index_databases,
-    predict_caption_batch_resilient,
-    run_embedding_pass,
-    resolve_caption_result,
-    rewrite_default_caption_provenance,
-    Gemma4Classifier,
-    Gemma4GgufClassifier,
-    JanusClassifier,
-    JsonCompletionLogitsProcessor,
-    parse_classifier_response,
-    parse_janus_response,
-    prepare_colour_thumbnail,
-    repair_classifier_json_syntax,
-    build_metadata_fallback_caption,
-    cache_tokenizer_vocab,
-    effective_free_vram_gb,
-    enforce_vram_headroom,
-    prepare_staging_database,
-    prune,
-    restore_interrupted_publish,
-    sample_balanced_paths,
-    write_publish_journal,
-    Sqlite3Client,
-    cli,
-    index,
-    search,
-    validate_command,
-    search_similar_path,
-    search_tags,
-    update_gps,
-    validate_index_database,
-    resolve_llama_server_command,
-    CAPTION_STAGE,
-    CORE_STAGE,
-    CLASSIFIER_BACKEND_JANUS,
-    CLASSIFIER_BACKEND_GEMMA4_GGUF,
-    DEFAULT_GEMMA4_GGUF_MODEL_ID,
-    DEFAULT_LLAMA_SERVER_PATHS,
-    JANUS_MODEL_ID,
-    SIGLIP_V1_STAGE,
-    SiglipEmbedder,
-)
+import json
+import math
 import os
 import shutil
 import sqlite3
 import tempfile
 import threading
 import unittest
-import click
-from click.testing import CliRunner
-import json
-import math
 from pathlib import Path
 from unittest import mock
 
+import click
+from click.testing import CliRunner
+
+from index import (
+    CAPTION_STAGE,
+    CLASSIFIER_BACKEND_GEMMA4_GGUF,
+    CLASSIFIER_BACKEND_JANUS,
+    CORE_STAGE,
+    DEFAULT_GEMMA4_GGUF_MODEL_ID,
+    DEFAULT_LLAMA_SERVER_PATHS,
+    JANUS_MODEL_ID,
+    SIGLIP_V1_STAGE,
+    Gemma4Classifier,
+    Gemma4GgufClassifier,
+    JanusClassifier,
+    JsonCompletionLogitsProcessor,
+    SiglipEmbedder,
+    Sqlite3Client,
+    acquire_single_instance_lock,
+    analyse_image,
+    analyse_image_worker,
+    benchmark_caption_quality,
+    build_classifier_prompt,
+    build_geocode_fields,
+    build_janus_prompt,
+    build_metadata_fallback_caption,
+    cache_tokenizer_vocab,
+    caption_pipeline_version,
+    cli,
+    compare_caption_payloads,
+    complete_classifier_json_prefix,
+    complete_json_object_end,
+    compute_reindex_plan,
+    create_classifier,
+    decode_embedding,
+    effective_free_vram_gb,
+    encode_embedding,
+    enforce_vram_headroom,
+    evaluate_caption_quality_cases,
+    evaluate_tag_quality,
+    extract_colour_palette,
+    file_content_sha256,
+    file_content_sha256_many,
+    filter_exif_for_search,
+    find_files,
+    format_mapping,
+    format_mapping_values,
+    geocode_columns,
+    get_exif,
+    has_repeated_open_classifier_tags,
+    heartbeat,
+    index,
+    insert_analysed_images_batch,
+    log_vram,
+    log_vram_peak,
+    normalise_classifier_tags,
+    parse_caption_with_retry,
+    parse_classifier_response,
+    parse_janus_response,
+    predict_caption_batch_resilient,
+    prepare_colour_thumbnail,
+    prepare_staging_database,
+    prune,
+    publish_index_databases,
+    repair_classifier_json_syntax,
+    resolve_caption_result,
+    resolve_classifier_model_id,
+    resolve_llama_server_command,
+    restore_interrupted_publish,
+    rewrite_default_caption_provenance,
+    run_embedding_pass,
+    sample_balanced_paths,
+    search,
+    search_similar_path,
+    search_tags,
+    update_gps,
+    validate_command,
+    validate_index_database,
+    write_publish_journal,
+)
 
 RUN_MODEL_INFERENCE = os.environ.get("INDEX_RUN_MODEL_INFERENCE") == "1"
 
@@ -327,10 +328,9 @@ class TestMain(unittest.TestCase):
 
     def test_caption_batch_oom_falls_back_to_smaller_batches(self):
         class StubClassifier:
-            last_generation_metrics = []
-
             def __init__(self):
                 self.batch_sizes = []
+                self.last_generation_metrics = []
 
             def predict_batch(self, items):
                 self.batch_sizes.append(len(items))
@@ -928,25 +928,28 @@ class TestMain(unittest.TestCase):
                 return next(heartbeat_waits)
             return real_event_wait(event, timeout)
 
-        with mock.patch("index.threading.Event.wait", new=controlled_wait):
-            with mock.patch("index.log") as mock_log:
-                with heartbeat("test op", interval_s=0.05):
-                    pass
+        with (
+            mock.patch("index.threading.Event.wait", new=controlled_wait),
+            mock.patch("index.log") as mock_log,
+            heartbeat("test op", interval_s=0.05),
+        ):
+            pass
         messages = [call.args[0] for call in mock_log.call_args_list]
         self.assertEqual(len(messages), 2)
         self.assertTrue(all("still running" in m for m in messages))
 
     def test_heartbeat_silent_when_fast(self):
-        with mock.patch("index.log") as mock_log:
-            with heartbeat("test op", interval_s=10.0):
-                pass
+        with mock.patch("index.log") as mock_log, heartbeat("test op", interval_s=10.0):
+            pass
         self.assertEqual(mock_log.call_args_list, [])
 
     def test_log_vram_is_noop_without_cuda(self):
-        with mock.patch("index.torch.cuda.is_available", return_value=False):
-            with mock.patch("index.log") as mock_log:
-                log_vram("load")
-                log_vram_peak()
+        with (
+            mock.patch("index.torch.cuda.is_available", return_value=False),
+            mock.patch("index.log") as mock_log,
+        ):
+            log_vram("load")
+            log_vram_peak()
         self.assertEqual(mock_log.call_args_list, [])
 
     def test_log_vram_reports_card_usage(self):
@@ -1072,7 +1075,8 @@ class TestMain(unittest.TestCase):
 
     def test_non_eos_single_retry_remains_incomplete(self):
         class StubClassifier:
-            last_generation_metrics = []
+            def __init__(self):
+                self.last_generation_metrics = []
 
             def predict(self, path, geocode):
                 self.last_generation_metrics = [
@@ -1169,22 +1173,24 @@ class TestMain(unittest.TestCase):
 
     def test_analyse_image_worker_reraises_keyboard_interrupt(self):
         # Ctrl-C must propagate (not be swallowed into a malformed tuple).
-        with mock.patch("index.analyse_image", side_effect=KeyboardInterrupt):
-            with self.assertRaises(KeyboardInterrupt):
-                analyse_image_worker(
-                    (
-                        0,
-                        "../src/test/fixtures/monkey.jpg",
-                        True,
-                        False,
-                        None,
-                        None,
-                        None,
-                        "digest",
-                        "caption-version",
-                        None,
-                    )
+        with (
+            mock.patch("index.analyse_image", side_effect=KeyboardInterrupt),
+            self.assertRaises(KeyboardInterrupt),
+        ):
+            analyse_image_worker(
+                (
+                    0,
+                    "../src/test/fixtures/monkey.jpg",
+                    True,
+                    False,
+                    None,
+                    None,
+                    None,
+                    "digest",
+                    "caption-version",
+                    None,
                 )
+            )
 
 
 class UsesTestexistsFixture:
@@ -1939,9 +1945,12 @@ class TestCli(UsesTestexistsFixture, unittest.TestCase):
         # cannot reserve, and WSL2 spills to host RAM rather than raising, so the
         # run would crawl instead of failing.
         cuda = self._fake_cuda(free_gb=0.05, reserved_gb=4.40, allocated_gb=4.35)
-        with mock.patch("index.torch.cuda", cuda), mock.patch("index.log"):
-            with self.assertRaises(click.ClickException):
-                enforce_vram_headroom("janus batch 1/281")
+        with (
+            mock.patch("index.torch.cuda", cuda),
+            mock.patch("index.log"),
+            self.assertRaises(click.ClickException),
+        ):
+            enforce_vram_headroom("janus batch 1/281")
 
     def test_prepare_staging_copies_from_the_working_db_when_absent(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -1991,9 +2000,11 @@ class TestCli(UsesTestexistsFixture, unittest.TestCase):
             db.setup_tables()
             db.con.close()
 
-            with mock.patch("index.shutil.copyfile", side_effect=interrupted_copy):
-                with self.assertRaises(OSError):
-                    prepare_staging_database(source, staging)
+            with (
+                mock.patch("index.shutil.copyfile", side_effect=interrupted_copy),
+                self.assertRaises(OSError),
+            ):
+                prepare_staging_database(source, staging)
 
             self.assertFalse(os.path.exists(staging))
             self.assertFalse(os.path.exists(staging + ".partial"))
@@ -2496,7 +2507,7 @@ class TestDb(UsesTestexistsFixture, unittest.TestCase):
             )
             # Bump only the prompt-version prefix (first ':'-separated segment),
             # keeping the ':default@external:' marker intact.
-            first_segment, rest = legacy_version.split(":", 1)
+            _first_segment, rest = legacy_version.split(":", 1)
             stale_version = f"v999-deadbeefcafe:{rest}"
             self.assertIn(":default@external:", stale_version)
             con = sqlite3.connect(dbpath)
@@ -3101,7 +3112,7 @@ class TestDb(UsesTestexistsFixture, unittest.TestCase):
                 with open(output, "wb") as fh:
                     fh.write(b"live-database")
 
-            with self.assertRaises(Exception):
+            with self.assertRaises(sqlite3.OperationalError):
                 publish_index_databases(dbpath, embeddings_output, core_output)
 
             for output in (core_output, embeddings_output):
@@ -3216,7 +3227,7 @@ class TestDb(UsesTestexistsFixture, unittest.TestCase):
         # loads both, so the pair must move together or not at all.
         path = "../src/test/fixtures/monkey.jpg"
         with tempfile.TemporaryDirectory() as tmpdir:
-            source_dir, dbpath, core_output, embeddings_output = self._published_pair(
+            _source_dir, dbpath, core_output, embeddings_output = self._published_pair(
                 tmpdir
             )
             self._seed_validatable_db(dbpath, path)
@@ -3241,13 +3252,15 @@ class TestDb(UsesTestexistsFixture, unittest.TestCase):
                         raise OSError("interrupted between renames")
                 source.replace(destination)
 
-            with mock.patch(
-                "index.replace_atomically", side_effect=fail_after_first_output
+            with (
+                mock.patch(
+                    "index.replace_atomically", side_effect=fail_after_first_output
+                ),
+                self.assertRaises(OSError),
             ):
-                with self.assertRaises(OSError):
-                    publish_index_databases(
-                        dbpath, embeddings_output, core_output, allow_shrink=True
-                    )
+                publish_index_databases(
+                    dbpath, embeddings_output, core_output, allow_shrink=True
+                )
 
             # The first output really was replaced before the second failed, so the
             # pair below is only consistent because it was rolled back.

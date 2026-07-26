@@ -356,12 +356,13 @@ self.addEventListener("fetch", (event) => {
   // The SQLite databases are the slideshow's application data. Keep the last
   // successfully fetched copies available so an installed photo-frame PWA can
   // restart offline; online requests still revalidate before using the cache.
-  // The only scripts we serve from a stable, unhashed URL, paired with a main
-  // bundle that *is* hashed. Stale-while-revalidate would keep handing out a
-  // cached copy — stale after a MapLibre upgrade, or truncated by a bad moment
-  // on the network — and the failure is quiet and total: the worker fetches the
-  // tiles, so a worker that does not come up leaves the map at "ready" with a
-  // blank basemap. Network first, with the cache kept for offline.
+  // The worker modules live beneath the installed MapLibre version so even an
+  // older controlling service worker misses its cache after an upgrade. Keep
+  // all vendor paths network-first as a second defence: it repairs a truncated
+  // cached copy and protects readers whose older bundle still requests the
+  // legacy stable paths. The failure is quiet and total — the worker fetches
+  // the tiles, so a worker that does not come up leaves the map at "ready" with
+  // a blank basemap. Keep the cache as the offline fallback.
   if (isVendoredWorker(url)) {
     event.respondWith(
       networkFirst(event.request, RUNTIME_CACHE, {
