@@ -128,6 +128,7 @@ describe("MapRouteOverlay", () => {
       "routeOverlayPathAnimated",
     );
     expect(document.querySelectorAll(".routeEndpointPingAnimated")).toHaveLength(4);
+    expect(screen.queryByTestId("journey-line-tracer")).toBeNull();
     expect(screen.getByTestId("journey-line-ghost-route")).toHaveStyle({
       strokeWidth: "2.5",
       strokeDasharray: "2 8",
@@ -170,6 +171,9 @@ describe("MapRouteOverlay", () => {
       "routeOverlayPathAnimated",
     );
     expect(document.querySelectorAll(".routeEndpointPingAnimated")).toHaveLength(0);
+    const tracers = screen.getAllByTestId("journey-line-tracer");
+    expect(tracers).toHaveLength(2);
+    expect(tracers[0]?.querySelector("animateMotion")).toHaveAttribute("path", "M 1 2 L 3 4");
   });
 
   it("updates projection on map movement and unsubscribes on cleanup", () => {

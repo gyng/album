@@ -216,6 +216,12 @@
   shape-rendering: geometricPrecision;
 }
 
+.routeOverlayTracer {
+  stroke: var(--c-white);
+  stroke-width: var(--size-1-25);
+  vector-effect: non-scaling-stroke;
+}
+
 .routeOverlayGhost {
   fill: none;
   stroke: var(--c-route-ghost);
@@ -281,6 +287,10 @@
   .routeOverlayPathAnimated,
   .routeEndpointPingAnimated {
     animation: none;
+  }
+
+  .routeOverlayTracer {
+    display: none;
   }
 }
 

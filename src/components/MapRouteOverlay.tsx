@@ -146,11 +146,12 @@ export const MapRouteOverlay = ({
   // length. Once the thumbnail marker zoom is reached, a long journey can be
   // thousands of pixels wide even after off-screen legs are culled. The
   // static dashes, gradient, labels and endpoint flags still communicate the
-  // route; reserve marching motion for the overview where it stays cheap.
-  const animateRoute = map ? map.getZoom() < THUMBNAIL_HIDE_ZOOM : false;
+  // route. Reserve marching motion for the overview where it stays cheap; at
+  // thumbnail zoom, animate one small tracer per clipped on-screen leg instead.
+  const animateMarchingDashes = map ? map.getZoom() < THUMBNAIL_HIDE_ZOOM : false;
   const endpointPingClass = [
     styles.routeEndpointPing,
-    animateRoute ? styles.routeEndpointPingAnimated : "",
+    animateMarchingDashes ? styles.routeEndpointPingAnimated : "",
   ]
     .filter(Boolean)
     .join(" ");
@@ -231,7 +232,7 @@ export const MapRouteOverlay = ({
                   d={segment.d}
                   className={[
                     styles.routeOverlayPath,
-                    animateRoute ? styles.routeOverlayPathAnimated : "",
+                    animateMarchingDashes ? styles.routeOverlayPathAnimated : "",
                   ]
                     .filter(Boolean)
                     .join(" ")}
@@ -272,6 +273,20 @@ export const MapRouteOverlay = ({
                       {`${segment.approxSpeedKmh}km/h · ${formatDistanceKm(segment.distanceKm)}`}
                     </text>
                   </g>
+                ) : null}
+                {!animateMarchingDashes ? (
+                  <circle
+                    r="3"
+                    className={styles.routeOverlayTracer}
+                    data-testid="journey-line-tracer"
+                    style={{ fill: segment.color }}
+                  >
+                    <animateMotion
+                      path={segment.d}
+                      dur={`${getAnimationSecondsFromSpeed(segment.approxSpeedKmh)}s`}
+                      repeatCount="indefinite"
+                    />
+                  </circle>
                 ) : null}
               </>
             );
