@@ -436,15 +436,14 @@ test.describe("Responsive UI", () => {
 
     await summary.click();
     const disclosure = summary.locator("xpath=..");
-    const scrollLayout = await disclosure.evaluate((element) => {
-      const content = element.querySelector<HTMLElement>(":scope > div");
-      if (!content) throw new Error("Expected photo details content");
-
+    const content = disclosure.locator(":scope > div");
+    await expect(content).toBeVisible();
+    const scrollLayout = await content.evaluate((element) => {
       return {
-        contentClientHeight: content.clientHeight,
-        contentOverflowY: getComputedStyle(content).overflowY,
-        contentScrollHeight: content.scrollHeight,
-        disclosureOverflowY: getComputedStyle(element).overflowY,
+        contentClientHeight: element.clientHeight,
+        contentOverflowY: getComputedStyle(element).overflowY,
+        contentScrollHeight: element.scrollHeight,
+        disclosureOverflowY: getComputedStyle(element.parentElement!).overflowY,
       };
     });
 
@@ -453,8 +452,8 @@ test.describe("Responsive UI", () => {
     expect(scrollLayout.contentScrollHeight).toBeGreaterThan(scrollLayout.contentClientHeight);
 
     const triggerYBeforeScroll = (await summary.boundingBox())!.y;
-    await disclosure.locator(":scope > div").evaluate((content) => {
-      content.scrollTop = content.scrollHeight;
+    await content.evaluate((element) => {
+      element.scrollTop = element.scrollHeight;
     });
     expect((await summary.boundingBox())!.y).toBeCloseTo(triggerYBeforeScroll, 0);
   });
