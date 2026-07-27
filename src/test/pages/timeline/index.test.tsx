@@ -33,6 +33,69 @@ describe("timeline page data fetching", () => {
     getAlbums.mockReset();
   });
 
+  // A clip carries the same three things a photo does — a moment, a frame and a
+  // place — once its poster has been extracted, so it belongs on the timeline
+  // beside the photos taken at the same time rather than only on its album page.
+  it("places videos on the timeline using their poster frame and recorded time", async () => {
+    getAlbums.mockResolvedValue([
+      {
+        name: "kansai",
+        title: "Kansai",
+        blocks: [
+          {
+            kind: "video",
+            id: "clip.mov",
+            data: { type: "local", href: "/data/albums/kansai/.resized_videos/clip.mov@1920.mp4" },
+            _build: {
+              src: "/data/albums/kansai/.resized_videos/clip.mov@1920.mp4",
+              originalSrc: "clip.mov",
+              mimeType: "video/mp4",
+              capturedAtLocal: "2024-01-02T03:04:05",
+              latDeg: 35.6,
+              lngDeg: 139.7,
+              durationSeconds: 13.013,
+              poster: {
+                srcset: [{ src: "/clip.mov@800.avif", width: 300, height: 200 }],
+              },
+            },
+          },
+          {
+            kind: "video",
+            id: "unprepared.mov",
+            data: {
+              type: "local",
+              href: "/data/albums/kansai/.resized_videos/unprepared.mov@1920.mp4",
+            },
+            _build: {
+              src: "/data/albums/kansai/.resized_videos/unprepared.mov@1920.mp4",
+              mimeType: "video/mp4",
+              capturedAtLocal: "2024-01-02T03:04:05",
+            },
+          },
+        ],
+        formatting: {},
+        _build: { slug: "kansai", srcdir: "../albums/kansai" },
+      },
+    ]);
+
+    const entries = (await loadTimelinePageData()).entryRows.map(unpackTimelineEntry);
+
+    // Only the clip with an extracted poster: without a frame there is nothing
+    // to show in a day grid.
+    expect(entries).toHaveLength(1);
+    expect(entries[0]).toMatchObject({
+      album: "kansai",
+      date: "2024-01-02",
+      dateTimeOriginal: "2024-01-02T03:04:05",
+      decLat: 35.6,
+      decLng: 139.7,
+      href: "/album/kansai#clip.mov",
+      path: "/data/albums/kansai/clip.mov",
+      mediaKind: "video",
+      src: { src: "/clip.mov@800.avif", width: 300, height: 200 },
+    });
+  });
+
   it("builds dated timeline entries from photo blocks and skips undated photos", async () => {
     getAlbums.mockResolvedValue([
       {

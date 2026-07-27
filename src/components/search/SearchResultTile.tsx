@@ -6,6 +6,8 @@ import { extractDateFromExifString } from "../../util/extractExifFromDb";
 import { SearchResultRow } from "./searchTypes";
 import { RGB, rgbToString, parseColorPalette } from "../../util/colorDistance";
 import { getResizedAlbumImageSrc } from "../../util/getResizedAlbumImageSrc";
+import { formatDuration } from "../../util/formatDuration";
+import { sceneSecondsOf } from "../../util/videoScenePath";
 
 const stripHtml = (value?: string): string => {
   if (!value) {
@@ -68,8 +70,34 @@ export const SearchResultTile = (props: {
         ? result.similarity.toFixed(3)
         : undefined;
 
+  // A video's thumbnail is the frame extracted from it, so nothing about the
+  // tile would otherwise say that clicking through gets you something that
+  // plays. A scene result is a moment inside a clip, and the moment — not the
+  // clip's full length — is what explains why this frame came back.
+  const isVideo = result.mediaKind === "video";
+  const sceneSeconds = sceneSecondsOf(result.path);
+  const momentLabel = formatDuration(sceneSeconds);
+  const durationLabel = momentLabel ?? formatDuration(result.durationSeconds);
+  const videoLabel = momentLabel
+    ? `Video at ${momentLabel}`
+    : durationLabel
+      ? `Video, ${durationLabel}`
+      : "Video";
+
   return (
     <div className={styles.card}>
+      {isVideo ? (
+        <div
+          className={`${styles.overlayBadge} ${styles.videoBadge}`}
+          role="img"
+          aria-label={videoLabel}
+        >
+          <span className={styles.videoBadgeIcon} aria-hidden="true">
+            ▶
+          </span>
+          {durationLabel ? <span>{durationLabel}</span> : null}
+        </div>
+      ) : null}
       {similarityLabel ? (
         <div className={`${styles.overlayBadge} ${styles.similarityBadge}`} title={scoreTitle}>
           {similarityLabel}

@@ -16,10 +16,12 @@ from index import (
     CAPTION_STAGE,
     CLASSIFIER_BACKEND_GEMMA4_GGUF,
     CLASSIFIER_BACKEND_JANUS,
+    CORE_PIPELINE_VERSION,
     CORE_STAGE,
     DEFAULT_GEMMA4_GGUF_MODEL_ID,
     DEFAULT_LLAMA_SERVER_PATHS,
     JANUS_MODEL_ID,
+    MODEL_PROFILE_JANUS,
     SIGLIP_V1_STAGE,
     Gemma4Classifier,
     Gemma4GgufClassifier,
@@ -42,6 +44,7 @@ from index import (
     complete_classifier_json_prefix,
     complete_json_object_end,
     compute_reindex_plan,
+    configured_media_root,
     create_classifier,
     decode_embedding,
     effective_free_vram_gb,
@@ -57,6 +60,7 @@ from index import (
     format_mapping,
     format_mapping_values,
     geocode_columns,
+    get_album_relative_path,
     get_exif,
     has_repeated_open_classifier_tags,
     heartbeat,
@@ -64,10 +68,13 @@ from index import (
     insert_analysed_images_batch,
     log_vram,
     log_vram_peak,
+    media_kind_for,
+    needs_caption_for,
     normalise_classifier_tags,
     parse_caption_with_retry,
     parse_classifier_response,
     parse_janus_response,
+    pixel_source_for,
     predict_caption_batch_resilient,
     prepare_colour_thumbnail,
     prepare_staging_database,
@@ -84,6 +91,8 @@ from index import (
     search,
     search_similar_path,
     search_tags,
+    source_digests_for,
+    split_scene_path,
     update_gps,
     validate_command,
     validate_index_database,
@@ -133,8 +142,13 @@ class FakeTensor:
 
 class TestMain(unittest.TestCase):
     def test_find_files(self):
+        # Five photos plus the album's video: a photo glob reports the videos
+        # beside it, because both are indexed and both must be seen by prune.
         res = find_files(".", "../albums/test-simple/*.jpg")
-        self.assertEqual(len(res), 5)
+        self.assertEqual(len(res), 6)
+        self.assertEqual(
+            1, len([path for path in res if path.lower().endswith(".mov")])
+        )
 
     def test_format_mapping(self):
         actual = format_mapping({"foo": "bar", "bar": "baz"})
@@ -304,6 +318,477 @@ class TestMain(unittest.TestCase):
             sorted(os.path.basename(path) for path in with_tests),
             ["fixture.jpg", "real.jpg"],
         )
+
+    def _make_media_album(self, root, album="trip"):
+        """Album directory plus the public poster cache the prepass writes."""
+        album_dir = os.path.join(root, "albums", album)
+        poster_dir = os.path.join(
+            root, "src", "public", "data", "albums", album, ".resized_videos"
+        )
+        os.makedirs(album_dir, exist_ok=True)
+        os.makedirs(poster_dir, exist_ok=True)
+        return album_dir, poster_dir
+
+    def test_find_files_includes_videos_beside_the_photos(self):
+        # The photo glob is what every caller passes; videos live in the same
+        # album directories and must come back from the same call so that index
+        # and prune keep seeing the same set.
+        with tempfile.TemporaryDirectory(dir=".") as root:
+            album_dir, _ = self._make_media_album(root)
+            for name in ["a.jpg", "clip.mov", "reel.MP4", "notes.txt"]:
+                open(os.path.join(album_dir, name), "w").close()
+
+            rel = os.path.basename(root)
+            found = find_files(".", f"./{rel}/albums/**/*.jpg")
+
+        self.assertEqual(
+            sorted(os.path.basename(p) for p in found),
+            ["a.jpg", "clip.mov", "reel.MP4"],
+        )
+
+    def test_find_files_discovers_externals_from_the_poster_cache(self):
+        # A YouTube external has no file on disk; the sidecar written for it by
+        # the poster prepass is what proves it exists.
+        with tempfile.TemporaryDirectory(dir=".") as root:
+            album_dir, poster_dir = self._make_media_album(root)
+            open(os.path.join(album_dir, "a.jpg"), "w").close()
+            with open(
+                os.path.join(poster_dir, "ycyUWULJxdU.youtube@poster.json"), "w"
+            ) as fh:
+                json.dump({"mediaKind": "video", "provider": "youtube"}, fh)
+
+            rel = os.path.basename(root)
+            media_root = os.path.join(".", rel, "src", "public", "data", "albums")
+            found = find_files(".", f"./{rel}/albums/**/*.jpg", media_root=media_root)
+
+        self.assertEqual(
+            sorted(os.path.basename(p) for p in found),
+            ["a.jpg", "ycyUWULJxdU.youtube"],
+        )
+        self.assertTrue(
+            any(
+                os.path.join("albums", "trip", "ycyUWULJxdU.youtube") in p
+                for p in found
+            )
+        )
+
+    def test_pixel_source_maps_media_to_its_poster_frame(self):
+        with tempfile.TemporaryDirectory(dir=".") as root:
+            album_dir, poster_dir = self._make_media_album(root)
+            media_root = os.path.join(root, "src", "public", "data", "albums")
+            photo = os.path.join(album_dir, "a.jpg")
+            video = os.path.join(album_dir, "clip.mov")
+            external = os.path.join(album_dir, "ycyUWULJxdU.youtube")
+
+            # A photo is its own pixels.
+            self.assertEqual(photo, pixel_source_for(photo, media_root))
+            self.assertEqual(
+                os.path.join(poster_dir, "clip.mov@poster.jpg"),
+                pixel_source_for(video, media_root),
+            )
+            self.assertEqual(
+                os.path.join(poster_dir, "ycyUWULJxdU.youtube@poster.jpg"),
+                pixel_source_for(external, media_root),
+            )
+
+    def test_media_kind_distinguishes_videos_from_photos(self):
+        self.assertEqual("photo", media_kind_for("../albums/trip/a.jpg"))
+        self.assertEqual("video", media_kind_for("../albums/trip/clip.MOV"))
+        self.assertEqual("video", media_kind_for("../albums/trip/abc.youtube"))
+
+    def test_analyse_image_reads_place_and_time_from_a_video_sidecar(self):
+        # A poster frame carries no EXIF, so the sidecar the prepass wrote is
+        # the only source of the clip's wall-clock time and coordinates.
+        with tempfile.TemporaryDirectory(dir=".") as root:
+            album_dir, poster_dir = self._make_media_album(root)
+            media_root = os.path.join(root, "src", "public", "data", "albums")
+            video = os.path.join(album_dir, "clip.mov")
+            open(video, "w").close()
+            poster = os.path.join(poster_dir, "clip.mov@poster.jpg")
+            shutil.copyfile("../albums/test-simple/DSCF0593.jpg", poster)
+            with open(os.path.join(poster_dir, "clip.mov@poster.json"), "w") as fh:
+                json.dump(
+                    {
+                        "mediaKind": "video",
+                        "capturedAtLocal": "2026-02-27T10:52:10",
+                        "latDeg": 35.6895,
+                        "lngDeg": 139.6917,
+                        "durationSeconds": 13.013,
+                    },
+                    fh,
+                )
+
+            with open(poster, "rb") as fh:
+                analysed = analyse_image(
+                    fh,
+                    path=video,
+                    pixel_path=poster,
+                    media_root=media_root,
+                    needs_core=True,
+                    precomputed_colors=[],
+                )
+
+        self.assertEqual("2026-02-27T10:52:10", analysed["iso8601"])
+        self.assertAlmostEqual(35.6895, analysed["lat_deg"], places=4)
+        self.assertAlmostEqual(139.6917, analysed["lng_deg"], places=4)
+        self.assertEqual("video", analysed["media_kind"])
+        self.assertAlmostEqual(13.013, analysed["duration_seconds"], places=3)
+        # The clip is placed, so it is geocoded like any photo with coordinates.
+        self.assertTrue(analysed["geocode"])
+
+    def test_insert_metadata_records_media_kind_and_duration(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            dbpath = os.path.join(tmpdir, "media-kind.sqlite")
+            db = Sqlite3Client(dbpath)
+            db.setup_tables()
+            db.insert_metadata(
+                "../albums/trip/clip.mov",
+                lat_lng_deg=(1.0, 2.0),
+                iso8601="2026-02-27T10:52:10",
+                media_kind="video",
+                duration_seconds=13.013,
+            )
+            db.insert_metadata(
+                "../albums/trip/a.jpg",
+                lat_lng_deg=(1.0, 2.0),
+                iso8601="2026-02-27T10:52:10",
+            )
+
+            with db.transaction() as cur:
+                rows = dict(
+                    cur.execute("SELECT path, media_kind FROM metadata").fetchall()
+                )
+                duration = cur.execute(
+                    "SELECT duration_seconds FROM metadata WHERE path = ?",
+                    ("../albums/trip/clip.mov",),
+                ).fetchone()[0]
+
+        self.assertEqual("video", rows["../albums/trip/clip.mov"])
+        # Photos keep the default so that existing readers see one consistent value.
+        self.assertEqual("photo", rows["../albums/trip/a.jpg"])
+        self.assertAlmostEqual(13.013, duration, places=3)
+
+    def test_prune_keeps_videos_and_externals_it_can_still_see(self):
+        # Prune deletes rows whose source is gone. A video's source is its own
+        # file; an external's is the sidecar in the poster cache. Neither may be
+        # mistaken for an orphan, or every index run would delete its own work.
+        with tempfile.TemporaryDirectory(dir=".") as root:
+            album_dir, poster_dir = self._make_media_album(root)
+            media_root = os.path.join(root, "src", "public", "data", "albums")
+            open(os.path.join(album_dir, "a.jpg"), "w").close()
+            open(os.path.join(album_dir, "clip.mov"), "w").close()
+            with open(
+                os.path.join(poster_dir, "ycyUWULJxdU.youtube@poster.json"), "w"
+            ) as fh:
+                json.dump({"mediaKind": "video", "provider": "youtube"}, fh)
+
+            rel = os.path.basename(root)
+            glob = f"./{rel}/albums/**/*.jpg"
+            # Seed the database with exactly what discovery reports, so the test
+            # asserts prune's decision rather than path-string formatting.
+            kept = find_files(".", glob, media_root=media_root)
+            orphan = os.path.join(rel, "albums", "trip", "deleted.jpg")
+
+            with tempfile.TemporaryDirectory() as dbdir:
+                dbpath = os.path.join(dbdir, "prune.sqlite")
+                db = Sqlite3Client(dbpath)
+                db.setup_tables()
+                with db.transaction() as cur:
+                    for path in [*kept, orphan]:
+                        db.upsert_image_fields(
+                            path, {"filename": os.path.basename(path)}, cur=cur
+                        )
+
+                result = CliRunner().invoke(
+                    prune,
+                    [
+                        "--glob",
+                        glob,
+                        "--dbpath",
+                        dbpath,
+                        "--media-root",
+                        media_root,
+                        # The fixture is small enough that one orphan trips the
+                        # large-partial-prune guard; the guard is not what this
+                        # test is about.
+                        "--force",
+                    ],
+                )
+                self.assertEqual(0, result.exit_code, result.output)
+
+                remaining = Sqlite3Client(dbpath, read_only=True).list_paths()
+
+        self.assertEqual(sorted(kept), sorted(remaining))
+        self.assertEqual(3, len(kept))
+
+    def test_find_files_expands_a_video_into_its_scenes(self):
+        # A long clip is indexed as its own row plus one row per extracted
+        # scene, so that a moment inside it can be ranked and linked to. The
+        # sidecar written by the poster prepass is the list of scenes that exist.
+        with tempfile.TemporaryDirectory(dir=".") as root:
+            album_dir, poster_dir = self._make_media_album(root)
+            media_root = os.path.join(root, "src", "public", "data", "albums")
+            open(os.path.join(album_dir, "a.jpg"), "w").close()
+            open(os.path.join(album_dir, "clip.mov"), "w").close()
+            with open(os.path.join(poster_dir, "clip.mov@poster.json"), "w") as fh:
+                json.dump({"mediaKind": "video", "scenes": [60, 120]}, fh)
+
+            rel = os.path.basename(root)
+            found = find_files(".", f"./{rel}/albums/**/*.jpg", media_root=media_root)
+
+        self.assertEqual(
+            sorted(os.path.basename(p) for p in found),
+            ["a.jpg", "clip.mov", "clip.mov@t120", "clip.mov@t60"],
+        )
+
+    def test_scene_paths_resolve_to_their_own_frame(self):
+        with tempfile.TemporaryDirectory(dir=".") as root:
+            album_dir, poster_dir = self._make_media_album(root)
+            media_root = os.path.join(root, "src", "public", "data", "albums")
+            scene = os.path.join(album_dir, "clip.mov@t60")
+
+            self.assertEqual("video", media_kind_for(scene))
+            self.assertEqual(
+                os.path.join(poster_dir, "clip.mov@t60@poster.jpg"),
+                pixel_source_for(scene, media_root),
+            )
+            self.assertEqual(
+                (os.path.join(album_dir, "clip.mov"), 60.0), split_scene_path(scene)
+            )
+            self.assertEqual(
+                (os.path.join(album_dir, "clip.mov"), None),
+                split_scene_path(os.path.join(album_dir, "clip.mov")),
+            )
+
+    def test_analyse_image_dates_a_scene_from_its_offset_into_the_clip(self):
+        # A scene is a moment of the clip, so it carries the clip's place and
+        # the clip's start time plus its own offset — that is what puts it in
+        # the right order against the photos taken around it.
+        with tempfile.TemporaryDirectory(dir=".") as root:
+            album_dir, poster_dir = self._make_media_album(root)
+            media_root = os.path.join(root, "src", "public", "data", "albums")
+            scene = os.path.join(album_dir, "clip.mov@t90")
+            poster = os.path.join(poster_dir, "clip.mov@t90@poster.jpg")
+            shutil.copyfile("../albums/test-simple/DSCF0593.jpg", poster)
+            with open(os.path.join(poster_dir, "clip.mov@poster.json"), "w") as fh:
+                json.dump(
+                    {
+                        "mediaKind": "video",
+                        "capturedAtLocal": "2026-02-27T10:52:10",
+                        "latDeg": 35.6895,
+                        "lngDeg": 139.6917,
+                        "durationSeconds": 600.0,
+                        "scenes": [90],
+                    },
+                    fh,
+                )
+
+            with open(poster, "rb") as fh:
+                analysed = analyse_image(
+                    fh,
+                    path=scene,
+                    pixel_path=poster,
+                    media_root=media_root,
+                    needs_core=True,
+                    precomputed_colors=[],
+                )
+
+        self.assertEqual("2026-02-27T10:53:40", analysed["iso8601"])
+        self.assertEqual("video", analysed["media_kind"])
+        self.assertEqual(90.0, analysed["scene_seconds"])
+        self.assertAlmostEqual(35.6895, analysed["lat_deg"], places=4)
+
+    def test_scene_rows_link_into_the_clip_at_their_moment(self):
+        self.assertEqual(
+            "/album/trip?t=90#clip.mov",
+            get_album_relative_path("../albums/trip/clip.mov@t90"),
+        )
+        self.assertEqual(
+            "/album/trip#clip.mov", get_album_relative_path("../albums/trip/clip.mov")
+        )
+
+    def test_scenes_are_planned_for_embeddings_only(self):
+        # Captioning every minute of a long clip would cost as much as the whole
+        # photo library; the frame's embedding is what makes it findable, and the
+        # clip's own row carries the caption.
+        self.assertFalse(needs_caption_for("../albums/trip/clip.mov@t60"))
+        self.assertTrue(needs_caption_for("../albums/trip/clip.mov"))
+        self.assertTrue(needs_caption_for("../albums/trip/a.jpg"))
+
+    def test_update_gps_leaves_videos_alone(self):
+        # update-gps re-reads EXIF from each indexed file. A video has none: its
+        # time and place come from the sidecar the poster prepass wrote, so
+        # re-reading it would blank exactly the fields this command exists to
+        # maintain.
+        with tempfile.TemporaryDirectory(dir=".") as root:
+            album_dir, _poster_dir = self._make_media_album(root)
+            video = os.path.join(album_dir, "clip.mov")
+            shutil.copyfile("../albums/test-simple/DSCF0159.MOV", video)
+
+            with tempfile.TemporaryDirectory() as dbdir:
+                dbpath = os.path.join(dbdir, "update-gps-video.sqlite")
+                db = Sqlite3Client(dbpath)
+                db.setup_tables()
+                with db.transaction() as cur:
+                    db.upsert_image_fields(video, {"filename": "clip.mov"}, cur=cur)
+                    db.insert_metadata(
+                        video,
+                        lat_lng_deg=(35.6895, 139.6917),
+                        iso8601="2026-02-27T10:52:10",
+                        cur=cur,
+                        media_kind="video",
+                        duration_seconds=13.013,
+                    )
+
+                result = CliRunner().invoke(update_gps, ["--dbpath", dbpath])
+                self.assertEqual(0, result.exit_code, result.output)
+
+                with Sqlite3Client(dbpath, read_only=True).transaction() as cur:
+                    row = cur.execute(
+                        "SELECT iso8601, lat_deg, media_kind, duration_seconds "
+                        "FROM metadata WHERE path = ?",
+                        (video,),
+                    ).fetchone()
+
+        self.assertEqual("2026-02-27T10:52:10", row[0])
+        self.assertAlmostEqual(35.6895, row[1], places=4)
+        self.assertEqual("video", row[2])
+        self.assertAlmostEqual(13.013, row[3], places=3)
+
+    def test_insert_metadata_keeps_a_duration_a_later_write_does_not_carry(self):
+        # Other writers (update-gps, backfills) call insert_metadata with only
+        # the fields they know about; a clip's length must survive them.
+        with tempfile.TemporaryDirectory() as tmpdir:
+            dbpath = os.path.join(tmpdir, "duration.sqlite")
+            db = Sqlite3Client(dbpath)
+            db.setup_tables()
+            db.insert_metadata(
+                "../albums/trip/clip.mov",
+                lat_lng_deg=(1.0, 2.0),
+                iso8601="2026-02-27T10:52:10",
+                media_kind="video",
+                duration_seconds=13.013,
+            )
+            db.insert_metadata(
+                "../albums/trip/clip.mov",
+                lat_lng_deg=(3.0, 4.0),
+                iso8601="2026-02-27T10:52:10",
+            )
+
+            with db.transaction() as cur:
+                row = cur.execute(
+                    "SELECT lat_deg, duration_seconds, media_kind FROM metadata WHERE path = ?",
+                    ("../albums/trip/clip.mov",),
+                ).fetchone()
+
+        self.assertAlmostEqual(3.0, row[0])
+        self.assertAlmostEqual(13.013, row[1], places=3)
+        self.assertEqual("video", row[2])
+
+    def test_pixel_reads_follow_the_configured_media_root(self):
+        # --media-root moves the poster cache; the models, the colour extractor
+        # and the digests all have to read from the same place discovery does.
+        with tempfile.TemporaryDirectory(dir=".") as root:
+            _album_dir, poster_dir = self._make_media_album(root)
+            media_root = os.path.join(root, "src", "public", "data", "albums")
+            scene = os.path.join(root, "albums", "trip", "clip.mov@t60")
+
+            with configured_media_root(media_root):
+                self.assertEqual(
+                    os.path.join(poster_dir, "clip.mov@t60@poster.jpg"),
+                    pixel_source_for(scene),
+                )
+
+            # Restored afterwards, so one run cannot leak into the next.
+            self.assertNotEqual(
+                os.path.join(poster_dir, "clip.mov@t60@poster.jpg"),
+                pixel_source_for(scene),
+            )
+
+    def test_validate_accepts_a_clip_whose_scenes_have_no_captions(self):
+        # Scenes hold a row and a vector but never a caption, so the caption
+        # coverage check has to expect them to be absent. A live validate run is
+        # what caught this: the provenance loop and the coverage check are two
+        # separate gates over the same paths.
+        with tempfile.TemporaryDirectory(dir=".") as root:
+            album_dir, poster_dir = self._make_media_album(root)
+            media_root = os.path.join(root, "src", "public", "data", "albums")
+            video = os.path.join(album_dir, "clip.mov")
+            shutil.copyfile("../albums/test-simple/DSCF0159.MOV", video)
+            for name in ["clip.mov@poster.jpg", "clip.mov@t60@poster.jpg"]:
+                shutil.copyfile(
+                    "../albums/test-simple/DSCF0593.jpg", os.path.join(poster_dir, name)
+                )
+            with open(os.path.join(poster_dir, "clip.mov@poster.json"), "w") as fh:
+                json.dump(
+                    {
+                        "mediaKind": "video",
+                        "capturedAtLocal": "2026-02-27T10:52:10",
+                        "durationSeconds": 200.0,
+                        "scenes": [60],
+                    },
+                    fh,
+                )
+
+            rel = os.path.basename(root)
+            glob = f"./{rel}/albums/**/*.jpg"
+            with configured_media_root(media_root):
+                paths = find_files(".", glob, media_root=media_root)
+                digests = source_digests_for(paths, media_root)
+
+                with tempfile.TemporaryDirectory() as dbdir:
+                    dbpath = os.path.join(dbdir, "validate-scenes.sqlite")
+                    db = Sqlite3Client(dbpath)
+                    db.setup_tables()
+                    with db.transaction() as cur:
+                        for path in paths:
+                            fields = {"filename": os.path.basename(path)}
+                            # Only the clip is captioned, exactly as an index run
+                            # would leave it.
+                            if needs_caption_for(path):
+                                fields.update(
+                                    {
+                                        "tags": "harbour, market",
+                                        "alt_text": "A harbour clip.",
+                                    }
+                                )
+                            db.upsert_image_fields(path, fields, cur=cur)
+                            db.insert_metadata(
+                                path,
+                                lat_lng_deg=(None, None),
+                                iso8601="2026-02-27T10:52:10",
+                                cur=cur,
+                            )
+                            db.upsert_pipeline_state(
+                                path,
+                                CORE_STAGE,
+                                digests[path],
+                                CORE_PIPELINE_VERSION,
+                                cur=cur,
+                            )
+                            if needs_caption_for(path):
+                                db.upsert_pipeline_state(
+                                    path,
+                                    CAPTION_STAGE,
+                                    digests[path],
+                                    caption_pipeline_version(CLASSIFIER_BACKEND_JANUS),
+                                    JANUS_MODEL_ID,
+                                    cur,
+                                )
+                        db.replace_tags_for_source(
+                            paths[0], ["harbour", "market"], "classifier", cur
+                        )
+                        db.rebuild_tag_counts(cur)
+
+                    summary = validate_index_database(
+                        dbpath,
+                        glob,
+                        MODEL_PROFILE_JANUS,
+                        CLASSIFIER_BACKEND_JANUS,
+                        media_root=media_root,
+                    )
+
+        self.assertEqual(2, summary["paths"])
 
     def test_run_embedding_pass_skips_unreadable_images(self):
         # A None embedding (unreadable/corrupt image) must be skipped, not stored,
@@ -1224,14 +1709,42 @@ class TestCli(UsesTestexistsFixture, unittest.TestCase):
             runner = CliRunner()
             glob = "../albums/test-simple/*.[jJ][pP][gG]"
             dbpath = os.path.join(tmpdir, "test-simple.sqlite")
+            # An empty media root: the album's video has no poster frame here,
+            # so it is reported and left alone rather than indexed blind.
+            media_root = os.path.join(tmpdir, "media")
+            os.makedirs(media_root)
             result = runner.invoke(
                 index,
-                f"--glob {glob} --dbpath {dbpath} --dry-run --model-profile siglip2".split(),
+                f"--glob {glob} --dbpath {dbpath} --dry-run --model-profile siglip2 "
+                f"--media-root {media_root}".split(),
             )
             self.assertEqual(0, result.exit_code)
             self.assertTrue("Using model profile: siglip2" in result.output)
             self.assertTrue("Found 5 files" in result.output)
+            self.assertIn("no extracted poster frame", result.output)
             self.assertFalse(os.path.exists(dbpath))
+
+    def test_index_dry_run_plans_a_video_once_its_poster_exists(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            runner = CliRunner()
+            glob = "../albums/test-simple/*.[jJ][pP][gG]"
+            dbpath = os.path.join(tmpdir, "test-simple.sqlite")
+            poster_dir = os.path.join(tmpdir, "media", "test-simple", ".resized_videos")
+            os.makedirs(poster_dir)
+            shutil.copyfile(
+                "../albums/test-simple/DSCF0593.jpg",
+                os.path.join(poster_dir, "DSCF0159.MOV@poster.jpg"),
+            )
+
+            result = runner.invoke(
+                index,
+                f"--glob {glob} --dbpath {dbpath} --dry-run --model-profile siglip2 "
+                f"--media-root {os.path.join(tmpdir, 'media')}".split(),
+            )
+
+            self.assertEqual(0, result.exit_code)
+            self.assertTrue("Found 6 files" in result.output)
+            self.assertNotIn("no extracted poster frame", result.output)
 
     def test_update_gps_refreshes_coords_from_exif_without_models(self):
         # A row seeded with deliberately wrong coords/date/geocode should be

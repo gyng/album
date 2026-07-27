@@ -3,6 +3,7 @@ import { formatExifWallClockIso, parseExifLocalDateTime } from "../../util/exifT
 import { packTimelineEntry, type TimelineEntryRow } from "../../util/pageDataRows";
 import type { TimelineEntry } from "../../util/pageDataTypes";
 import { getAlbums } from "../album";
+import { toVideoBlockEntry } from "../../util/videoBlockEntry";
 import type { Block, PhotoBlock } from "../types";
 
 export type TimelinePageData = { entryRows: TimelineEntryRow[] };
@@ -10,11 +11,45 @@ export type TimelinePageData = { entryRows: TimelineEntryRow[] };
 const isTimelinePhoto = (block: Block): block is PhotoBlock =>
   block.kind === "photo" && Boolean(block._build.exif.DateTimeOriginal);
 
+const videoTimelineEntries = (album: Awaited<ReturnType<typeof getAlbums>>[number]) =>
+  album.blocks.flatMap((block): TimelineEntry[] => {
+    const video = toVideoBlockEntry(block);
+    if (!video) return [];
+
+    const wallClock = parseExifLocalDateTime(video.capturedAtLocal);
+    if (!wallClock) return [];
+    const wallClockIso = formatExifWallClockIso(wallClock);
+
+    return [
+      {
+        album: album._build.slug,
+        mediaKind: "video",
+        date: wallClockIso.slice(0, 10),
+        dateTimeOriginal: wallClockIso,
+        decLat: video.decLat,
+        decLng: video.decLng,
+        geocode: null,
+        src: video.poster,
+        href: `/album/${album._build.slug}#${encodeURIComponent(video.anchor)}`,
+        // The same shape a photo's path takes here: a public media path, which
+        // the "find similar" link maps back to the source path the database
+        // indexed this clip under.
+        path: `/data/albums/${album._build.slug}/${video.anchor}`,
+        // A poster's own palette is not extracted at build time, so the tile
+        // falls back to the neutral placeholder photos use when uncoloured.
+        placeholderColor: "transparent",
+        placeholderWidth: video.poster.width,
+        placeholderHeight: video.poster.height,
+      },
+    ];
+  });
+
 export const loadTimelinePageData = async (): Promise<TimelinePageData> => {
   const albums = await getAlbums();
   const entries = albums
-    .flatMap((album) =>
-      album.blocks.filter(isTimelinePhoto).flatMap((photo) => {
+    .flatMap((album) => [
+      ...videoTimelineEntries(album),
+      ...album.blocks.filter(isTimelinePhoto).flatMap((photo) => {
         const dateTimeOriginal = photo._build.exif.DateTimeOriginal;
         const src = photo._build.srcset?.[0];
         if (!src) return [] as TimelineEntry[];
@@ -56,7 +91,7 @@ export const loadTimelinePageData = async (): Promise<TimelinePageData> => {
           },
         ];
       }),
-    )
+    ])
     .sort((left, right) => {
       if (left.date !== right.date) return right.date.localeCompare(left.date);
       if (left.dateTimeOriginal !== right.dateTimeOriginal) {

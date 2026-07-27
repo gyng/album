@@ -1093,6 +1093,179 @@ describe("fetchResults pagination", () => {
   });
 });
 
+describe("video results", () => {
+  // A clip is indexed through its poster frame and is otherwise shaped exactly
+  // like a photo row, so the kind has to travel with the row for the tile to be
+  // able to mark it as playable.
+  it("carries the media kind and duration when the database records them", async () => {
+    const database = {
+      exec: ({ sql, callback }: ExecArgs) => {
+        if (sql.includes("pragma_table_info('metadata')") && sql.includes("media_kind")) {
+          callback([1]);
+          return;
+        }
+        if (sql.includes("SELECT path, media_kind, duration_seconds FROM metadata")) {
+          callback(["../albums/test-simple/clip.mov", "video", 13.013]);
+          callback(["../albums/test-simple/a.jpg", "photo", null]);
+          return;
+        }
+        if (sql.includes("FROM images") && sql.includes("ORDER BY rank")) {
+          callback(imageRow("../albums/test-simple/clip.mov"));
+          callback(imageRow("../albums/test-simple/a.jpg"));
+        }
+      },
+    };
+
+    const results = await fetchResults({
+      database: database as any,
+      query: "harbour",
+      page: 0,
+      pageSize: 4,
+    });
+
+    expect(results.data[0]?.mediaKind).toBe("video");
+    expect(results.data[0]?.durationSeconds).toBeCloseTo(13.013, 3);
+    expect(results.data[1]?.mediaKind).toBeUndefined();
+    expect(results.data[1]?.durationSeconds).toBeUndefined();
+  });
+
+  // Databases built before videos existed have no such columns; asking for them
+  // would make every query fail rather than simply showing photos.
+  it("reads a database without the media columns as photos", async () => {
+    const database = {
+      exec: ({ sql, callback }: ExecArgs) => {
+        if (sql.includes("pragma_table_info('metadata')")) {
+          return;
+        }
+        if (sql.includes("FROM images") && sql.includes("ORDER BY rank")) {
+          callback(imageRow("../albums/test-simple/a.jpg"));
+        }
+      },
+    };
+
+    const results = await fetchResults({
+      database: database as any,
+      query: "harbour",
+      page: 0,
+      pageSize: 4,
+    });
+
+    expect(results.data[0]?.mediaKind).toBeUndefined();
+    expect(results.data[0]?.path).toBe("../albums/test-simple/a.jpg");
+  });
+});
+
+describe("video scenes in semantic ranking", () => {
+  // Each extracted minute of a clip has its own embedding, so a long video
+  // would otherwise answer a semantic search with a page of itself.
+  const sceneDatabase = () => ({
+    exec: ({ sql, callback }: ExecArgs) => {
+      if (sql.includes("FROM embeddings") && sql.includes("WHERE model_id = ?")) {
+        callback(["../albums/trip/clip.mov@t180", "m", 3, JSON.stringify([1, 0, 0])]);
+        callback(["../albums/trip/clip.mov@t60", "m", 3, JSON.stringify([0.99, 0.1, 0])]);
+        callback(["../albums/trip/clip.mov", "m", 3, JSON.stringify([0.98, 0.1, 0])]);
+        callback(["../albums/trip/a.jpg", "m", 3, JSON.stringify([0.5, 0.8, 0])]);
+        return;
+      }
+      if (sql.includes("FROM images") && sql.includes("WHERE path IN")) {
+        callback(imageRow("../albums/trip/clip.mov@t180"));
+        callback(imageRow("../albums/trip/a.jpg"));
+      }
+    },
+  });
+
+  it("answers with a clip's best moment, once", async () => {
+    const results = await fetchSemanticResults({
+      database: sceneDatabase() as any,
+      textQuery: "fireworks",
+      textVector: [1, 0, 0],
+      page: 0,
+      pageSize: 10,
+      modelId: "m",
+    });
+
+    expect(results.data.map((row) => row.path)).toEqual([
+      "../albums/trip/clip.mov@t180",
+      "../albums/trip/a.jpg",
+    ]);
+  });
+
+  // "More like this clip" answering with more minutes of that same clip is the
+  // least useful answer available.
+  it("does not answer a clip with its own moments", async () => {
+    const results = await fetchSimilarResults({
+      database: sceneDatabase() as any,
+      path: "../albums/trip/clip.mov",
+      page: 0,
+      pageSize: 10,
+      modelId: "m",
+    });
+
+    expect(results.data.map((row) => row.path)).not.toContain("../albums/trip/clip.mov@t60");
+    expect(results.data.map((row) => row.path)).not.toContain("../albums/trip/clip.mov@t180");
+  });
+});
+
+describe("scenes stay out of the pools that are not searches", () => {
+  // Scene rows exist so that semantic ranking can find a moment inside a clip.
+  // They are not photos: a twenty-minute clip must not put twenty near-identical
+  // stills into the slideshow's shuffle, the random pool or a memory strip.
+  const poolDatabase = () => ({
+    exec: ({ sql, callback }: ExecArgs) => {
+      if (sql.includes("pragma_table_info")) {
+        return;
+      }
+      if (sql.includes("FROM images")) {
+        callback(["../albums/trip/a.jpg", "exif", "geo", "[(1,2,3)]"]);
+        callback(["../albums/trip/clip.mov", "exif", "geo", "[(1,2,3)]"]);
+        callback(["../albums/trip/clip.mov@t60", "", "", ""]);
+        callback(["../albums/trip/clip.mov@t120", "", "", ""]);
+      }
+    },
+  });
+
+  it("keeps them out of the slideshow pool", async () => {
+    const photos = await fetchSlideshowPhotos({ database: poolDatabase() as any });
+
+    expect(photos.map((photo) => photo.path)).toEqual([
+      "../albums/trip/a.jpg",
+      "../albums/trip/clip.mov",
+    ]);
+  });
+
+  it("keeps them out of a random starting photo", async () => {
+    const photos = await fetchRandomPhoto({ database: poolDatabase() as any });
+
+    expect(photos.every((photo) => !photo.path.includes("@t"))).toBe(true);
+  });
+
+  it("keeps them out of recent, random and memory strips", async () => {
+    const rowDatabase = {
+      exec: ({ sql, callback }: ExecArgs) => {
+        if (sql.includes("pragma_table_info")) {
+          return;
+        }
+        if (sql.includes("FROM images")) {
+          callback([...imageRow("../albums/trip/a.jpg"), "2024-01-02T03:04:05"]);
+          callback([...imageRow("../albums/trip/clip.mov@t60"), "2024-01-02T03:05:05"]);
+        }
+      },
+    };
+
+    const recent = await fetchRecentResults({ database: rowDatabase as any, pageSize: 10 });
+    expect(recent.map((row) => row.path)).toEqual(["../albums/trip/a.jpg"]);
+
+    const random = await fetchRandomResults({ database: rowDatabase as any, pageSize: 10 });
+    expect(random.map((row) => row.path)).toEqual(["../albums/trip/a.jpg"]);
+
+    const memories = await fetchMemoryCandidates({
+      database: rowDatabase as any,
+      todayDate: "2026-01-02",
+    });
+    expect(memories.map((row) => row.path)).toEqual(["../albums/trip/a.jpg"]);
+  });
+});
+
 describe("fetchColorSimilarResults scoring", () => {
   it("reports the colour match in colorMatchScore, not similarity", async () => {
     const database = {

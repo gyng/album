@@ -59,6 +59,12 @@ export const MapPhotoPopup = ({
             alt={photo.album}
           />
           <div className={styles.details}>
+            {photo.mediaKind === "video" ? (
+              <>
+                <span className={styles.mediaKind}>▶ Video</span>
+                <br />
+              </>
+            ) : null}
             {photo.album}
             {formattedDate && timestamp !== null ? (
               <>

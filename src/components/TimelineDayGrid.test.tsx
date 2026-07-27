@@ -16,6 +16,40 @@ jest.mock("./MapWorldDeferred", () => ({
 }));
 
 describe("TimelineDayGrid", () => {
+  // A clip's tile is the frame extracted from it, so nothing in a day grid
+  // distinguishes it from a photo unless the tile says so.
+  it("marks a video's tile and names it as one", () => {
+    render(
+      <TimelineDayGrid
+        date="2024-01-02"
+        entries={[
+          {
+            album: "kansai",
+            mediaKind: "video",
+            date: "2024-01-02",
+            dateTimeOriginal: "2024-01-02T03:04:05",
+            decLat: null,
+            decLng: null,
+            geocode: null,
+            src: { src: "/clip.mov@800.avif", width: 20, height: 10 },
+            href: "/album/kansai#clip.mov",
+            path: "/data/albums/kansai/clip.mov",
+            placeholderColor: "transparent",
+            placeholderWidth: 20,
+            placeholderHeight: 10,
+          },
+        ]}
+      />,
+    );
+
+    expect(screen.getByRole("link", { name: /^Video, kansai/ })).toBeInTheDocument();
+    // "Find similar" seeds a search with the path the database indexed the clip
+    // under, which is the album-qualified source path — not the page anchor.
+    expect(screen.getByRole("link", { name: "Find similar photos" })).toHaveAttribute(
+      "href",
+      `/search?similar=${encodeURIComponent("../albums/kansai/clip.mov")}`,
+    );
+  });
   beforeEach(() => {
     jest.spyOn(Date, "now").mockReturnValue(new Date("2024-01-03T12:00:00.000Z").getTime());
   });

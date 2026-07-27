@@ -1,6 +1,7 @@
 import { Database } from "@sqlite.org/sqlite-wasm";
 import { SearchResultRow } from "./searchTypes";
 import { RGB, deltaE, rgbToLab, parseColorPalette } from "../../util/colorDistance";
+import { clipPathOf, collapseSceneRanking, sceneSecondsOf } from "../../util/videoScenePath";
 import { SearchFacetSelection } from "../../util/searchFacets";
 import { SimilarityOrder } from "./searchUtils";
 import {
@@ -90,6 +91,94 @@ const IMAGE_COLUMNS = [
 ] as const;
 
 const IMAGE_COLUMN_SELECTS = IMAGE_COLUMNS.map((column) => `images.${column}`);
+
+// Videos are indexed through an extracted poster frame, so their rows are shaped
+// exactly like a photo's and every existing query returns them unchanged. Only
+// `metadata.media_kind` tells the two apart, and it is looked up separately
+// rather than joined into each result query: the columns are absent from
+// databases built before videos were indexed, and a missing column fails the
+// whole query — which would take the search page down rather than merely drop a
+// badge. One indexed lookup per page of results is not measurable next to the
+// FTS query it follows.
+const MEDIA_KIND_VIDEO = "video";
+const mediaColumnsCache = new WeakMap<object, boolean>();
+
+const hasMediaColumns = (db: Database): boolean => {
+  const cached = mediaColumnsCache.get(db);
+  if (cached !== undefined) {
+    return cached;
+  }
+  let has = false;
+  try {
+    db.exec({
+      sql: "SELECT 1 FROM pragma_table_info('metadata') WHERE name = 'media_kind' LIMIT 1",
+      returnValue: "resultRows",
+      callback: () => {
+        has = true;
+      },
+    });
+  } catch {
+    has = false;
+  }
+  mediaColumnsCache.set(db, has);
+  return has;
+};
+
+/**
+ * Drop the per-minute scene rows of a clip.
+ *
+ * Scenes are in `images` so that a semantic hit on a moment can be hydrated into
+ * a result, but they are not photographs: a twenty-minute clip would otherwise
+ * put twenty near-identical stills into the slideshow's shuffle, a memory strip
+ * or the random pool. Searches keep them (collapsed to one per clip); everything
+ * that presents pictures for their own sake does not.
+ */
+const withoutScenes = <T extends { path: string }>(rows: T[]): T[] =>
+  rows.filter((row) => sceneSecondsOf(row.path) === undefined);
+
+/** Mark the rows that are videos, leaving photos exactly as they were. */
+const attachMediaMetadata = async <T extends { path: string }>(
+  database: Database,
+  rows: T[],
+): Promise<T[]> => {
+  if (rows.length === 0 || !hasMediaColumns(database)) {
+    return rows;
+  }
+
+  try {
+    const result = await exec(
+      database,
+      `SELECT path, media_kind, duration_seconds FROM metadata
+        WHERE path IN (${rows.map(() => "?").join(", ")})`,
+      rows.map((row) => row.path),
+    );
+
+    const byPath = new Map(
+      (result.data as unknown as any[][]).map((row) => [
+        String(row[0]),
+        { mediaKind: row[1] as string | null, durationSeconds: row[2] as number | null },
+      ]),
+    );
+
+    return rows.map((row) => {
+      const media = byPath.get(row.path);
+      if (!media || media.mediaKind !== MEDIA_KIND_VIDEO) {
+        return row;
+      }
+      return {
+        ...row,
+        mediaKind: media.mediaKind,
+        ...(typeof media.durationSeconds === "number"
+          ? { durationSeconds: media.durationSeconds }
+          : {}),
+      };
+    });
+  } catch (err) {
+    // A badge is not worth failing a search over.
+    console.error("Failed to read media kinds", err);
+    return rows;
+  }
+};
 
 const EXIF_DATE_SQL = `CASE
   WHEN instr(images.exif, 'DateTimeOriginal:') > 0 THEN replace(
@@ -538,19 +627,26 @@ const rankEmbeddingsByVector = async (opts: {
   excludePaths?: string[];
 }): Promise<RankedVectorResult[]> => {
   const { database, queryVector, modelId, excludePaths = [] } = opts;
-  const excluded = new Set(excludePaths);
+  // Excluding by clip, not by path: asking what a clip resembles should not
+  // answer with more minutes of the same clip.
+  const excludedClips = new Set(excludePaths.map(clipPathOf));
   // All embeddings must be loaded — cosine similarity requires an exhaustive
   // scan against every vector. There is no index structure that avoids this.
   // excludePaths is a small set (typically just the query image itself).
   const candidates = await fetchEmbeddingsByModel(database, modelId);
 
-  return candidates
-    .filter((candidate) => !excluded.has(candidate.path))
+  const ranked = candidates
+    .filter((candidate) => !excludedClips.has(clipPathOf(candidate.path)))
     .map((candidate) => ({
       path: candidate.path,
       similarity: cosineSimilarity(queryVector, candidate.embedding),
     }))
     .sort((left, right) => right.similarity - left.similarity);
+
+  // Every vector-ranked path — semantic, similar, and the vector half of hybrid
+  // — funnels through here, so one clip's per-minute scenes are collapsed to
+  // their best-matching moment once, before any filtering or paging sees them.
+  return collapseSceneRanking(ranked);
 };
 
 const fetchKeywordRanking = async (opts: {
@@ -637,7 +733,10 @@ const fetchResultsByPaths = async (
     paths,
   );
 
-  const resolved = mapImageRows(result.data as unknown as any[][]);
+  const resolved = await attachMediaMetadata(
+    database,
+    mapImageRows(result.data as unknown as any[][]),
+  );
   const byPath = new Map(resolved.map((row) => [row.path, row]));
   return paths
     .map((candidatePath) => byPath.get(candidatePath))
@@ -1022,7 +1121,11 @@ export const fetchResults = async (opts: {
       },
     );
 
-    result.data = mapImageRows(result.data as unknown as any[][]).map((row) => {
+    const withMedia = await attachMediaMetadata(
+      database,
+      mapImageRows(result.data as unknown as any[][]),
+    );
+    result.data = withMedia.map((row) => {
       const colorData = colorMap?.get(row.path);
       return {
         ...row,
@@ -1484,7 +1587,10 @@ export const fetchRecentResults = async (opts: {
       [pageSize],
     );
 
-    const rows = mapImageRows(recentResults.data as unknown as any[][]);
+    const rows = await attachMediaMetadata(
+      database,
+      withoutScenes(mapImageRows(recentResults.data as unknown as any[][])),
+    );
 
     return rows.map((row) => ({
       ...row,
@@ -1515,20 +1621,22 @@ export const fetchMemoryCandidates = async (opts: {
       [excludeYear],
     );
 
-    return (result.data as unknown as any[][]).map((row) => {
-      const imageValues = row.slice(0, IMAGE_COLUMNS.length);
-      const resolved: Record<string, any> = {};
-      IMAGE_COLUMNS.forEach((column, index) => {
-        resolved[column] = imageValues[index];
-      });
+    return withoutScenes(
+      (result.data as unknown as any[][]).map((row) => {
+        const imageValues = row.slice(0, IMAGE_COLUMNS.length);
+        const resolved: Record<string, any> = {};
+        IMAGE_COLUMNS.forEach((column, index) => {
+          resolved[column] = imageValues[index];
+        });
 
-      const isoDate = String(row[IMAGE_COLUMNS.length] ?? "");
-      return {
-        ...(resolved as SearchResultRow),
-        isoDate,
-        snippet: resolved.alt_text || resolved.subject || resolved.tags || resolved.filename,
-      };
-    });
+        const isoDate = String(row[IMAGE_COLUMNS.length] ?? "");
+        return {
+          ...(resolved as SearchResultRow),
+          isoDate,
+          snippet: resolved.alt_text || resolved.subject || resolved.tags || resolved.filename,
+        };
+      }),
+    );
   } catch (err) {
     console.error("Failed to fetch memory candidates", err);
     throw err;
@@ -1555,7 +1663,10 @@ export const fetchRandomResults = async (opts: {
       [...excludePaths, pageSize],
     );
 
-    const rows = mapImageRows(randomResults.data as unknown as any[][]);
+    const rows = await attachMediaMetadata(
+      database,
+      withoutScenes(mapImageRows(randomResults.data as unknown as any[][])),
+    );
 
     return rows.map((row) => ({
       ...row,
@@ -1572,6 +1683,9 @@ export type RandomPhotoRow = {
   exif: string;
   geocode: string;
   colors?: string;
+  /** "video" for a clip, whose slide is the poster frame extracted from it. */
+  mediaKind?: string | undefined;
+  durationSeconds?: number | undefined;
 };
 
 export const fetchSlideshowPhotos = async (opts: {
@@ -1589,12 +1703,17 @@ export const fetchSlideshowPhotos = async (opts: {
       [`../albums/${filter}/%`],
     );
 
-    return (result.data as unknown as string[][]).map((row) => ({
-      path: row[0] ?? "",
-      exif: row[1] ?? "",
-      geocode: row[2] ?? "",
-      colors: row[3] ?? "",
-    }));
+    return attachMediaMetadata(
+      database,
+      withoutScenes(
+        (result.data as unknown as string[][]).map((row) => ({
+          path: row[0] ?? "",
+          exif: row[1] ?? "",
+          geocode: row[2] ?? "",
+          colors: row[3] ?? "",
+        })),
+      ),
+    );
   } catch (err) {
     console.error(`Failed to fetch slideshow photos`, err);
     throw err;
@@ -1610,14 +1729,19 @@ export const fetchRandomPhoto = async (opts: {
   try {
     const result = await exec(
       database,
+      // A handful of rows rather than one, so that a scene landing on the draw
+      // does not turn into an empty result.
       `SELECT path, exif, geocode
       FROM images
       WHERE path LIKE ?
       ORDER BY RANDOM()
-      LIMIT 1`,
+      LIMIT 8`,
       [`../albums/${filter}/%`],
     );
-    const row = result.data[0] as unknown as string[] | undefined;
+    const rows = withoutScenes(
+      (result.data as unknown as string[][]).map((values) => ({ path: values[0] ?? "", values })),
+    );
+    const row = rows[0]?.values;
     if (!row) {
       return [];
     }

@@ -243,6 +243,8 @@ export const YoutubeBlockEl: React.FC<YoutubeBlockElProps> = (props) => {
 export type LocalVideoBlockElProps = {
   id?: string | undefined;
   src: string;
+  /** Extracted frame shown before playback; absent until the poster prepass has run. */
+  posterSrc?: string | undefined;
   originalSrc?: string | undefined;
   date?: string | undefined;
   mimeType?: string | undefined;
@@ -328,7 +330,9 @@ export const LocalVideoBlockEl: React.FC<LocalVideoBlockElProps> = (props) => {
   }, []);
 
   return (
-    <div className={styles.block} data-testid="videoblockel">
+    // The id is on the details panel below (it is the page anchor), so the block
+    // carries it too — that is how a "?t=" deep link finds the element to seek.
+    <div className={styles.block} data-testid="videoblockel" data-media-id={props.id}>
       <div className={styles.youtubeWrapper}>
         <video
           ref={videoRef}
@@ -339,6 +343,7 @@ export const LocalVideoBlockEl: React.FC<LocalVideoBlockElProps> = (props) => {
           loop
           preload="metadata"
           src={props.src}
+          {...(props.posterSrc ? { poster: props.posterSrc } : {})}
         />
       </div>
 

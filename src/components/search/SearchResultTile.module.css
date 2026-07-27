@@ -55,6 +55,20 @@
   padding: var(--m-xs) var(--m-s);
 }
 
+.videoBadge {
+  position: absolute;
+  inset-block-start: var(--m);
+  inset-inline-start: var(--m);
+  z-index: var(--z-raised);
+  display: flex;
+  align-items: center;
+  gap: var(--m-xs);
+}
+
+.videoBadgeIcon {
+  font-size: var(--fs-xs);
+}
+
 .similarityBadge {
   position: absolute;
   inset-block-end: calc(var(--m) + var(--m-l));

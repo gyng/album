@@ -55,6 +55,7 @@ export const TimelineDayGrid = ({
   );
   const mapPhotos: MapWorldEntry[] = mappableEntries.map((entry) => ({
     album: entry.album,
+    ...(entry.mediaKind ? { mediaKind: entry.mediaKind } : {}),
     src: entry.src,
     decLat: entry.decLat,
     decLng: entry.decLng,
@@ -191,7 +192,16 @@ export const TimelineDayGrid = ({
           <li key={entry.href} className={styles.item}>
             <div className={styles.card}>
               <div className={styles.thumbnailWrap}>
-                <Link href={entry.href} aria-label={`${entry.album} ${formattedDate}`}>
+                <Link
+                  href={entry.href}
+                  // Only a video says so: a photo's name is the existing
+                  // "<album> <date>" that the rest of the page reads by.
+                  aria-label={
+                    entry.mediaKind === "video"
+                      ? `Video, ${entry.album} ${formattedDate}`
+                      : `${entry.album} ${formattedDate}`
+                  }
+                >
                   <Thumb
                     src={entry.src.src}
                     width={entry.placeholderWidth}
@@ -200,6 +210,11 @@ export const TimelineDayGrid = ({
                     className={styles.image}
                     alt=""
                   />
+                  {entry.mediaKind === "video" ? (
+                    <span className={styles.videoBadge} aria-hidden="true">
+                      ▶
+                    </span>
+                  ) : null}
                 </Link>
                 <Link
                   href={`/search?similar=${encodeURIComponent(toSimilarSearchPath(entry.path))}`}

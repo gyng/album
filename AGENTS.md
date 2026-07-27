@@ -56,6 +56,7 @@ Data-backed display pages use `getStaticProps`; client-only pages are statically
 - `src/components/platform/boundary.test.ts` enforces the allowed Next.js runtime imports and dependency direction. `next/link`, `next/head`, and `next/router` belong together in `platform/next/NextPlatformProvider.tsx`; `next/dynamic` belongs in `platform/next/nextClientComponents.tsx`. Update the allowlist only when adding a deliberate renderer adapter
 - `exifr` must remain in `serverExternalPackages` in `next.config.js`; bundling it into the App route selects the wrong runtime branch and produces an empty map index
 - `robots.txt`, feeds, and sitemaps are generated static assets via `src/bin/generate-feeds.cjs`, not framework routes
+- Videos and YouTube externals reach search, the map and the timeline through the poster frames written by `prepare-video-posters.cjs`; run `npm run prepare:posters` before indexing. `services/videoPoster.ts` and `services/youtubeExternal.ts` are loaded directly by that CJS script through Node's TypeScript stripping, so neither may gain a runtime relative import — `youtubeExternal.ts` takes `posterPathsFor` as an injected `resolvePaths` for exactly this reason
 - `prepare-optimised-images.cjs` reads every variant back and compares a 4×4 reduction against its source before renaming it into place, retrying once. An encoder returning success while writing a complete, decodable, *garbage* file is a failure mode that has happened and shipped; nothing else in the pipeline can see it. Tolerance is 20 per channel — a good encode measures 0–5 even when upscaling, the corrupt one measured ~90
 - Keep `tsconfig.json` framework-neutral. Normal and E2E Next builds use `tsconfig.next.json` and `tsconfig.e2e.json` respectively; put Next's TypeScript plugin and generated-route includes there so builds do not rewrite the shared config
 - `tsconfig.portable.json` compiles the screen/component graph without Next, Node, or build-time service types. Keep it passing and keep its exclusions narrow; `components/platform/next/` and the explicitly Node-only embedding stats utility do not belong in the portable graph
@@ -187,10 +188,37 @@ Note: `janus` is installed from the `deepseek-ai/Janus` git repo, not PyPI — t
 
 **Run** (use the shell scripts, which handle the DB split and copy):
 ```
+cd src && npm run prepare:posters   # FIRST: extract video poster frames
 cd index
 ./do-full-index.sh          # full hybrid index → produces both DBs
 ./do-embeddings-index.sh    # refresh embeddings only, keep existing search.sqlite
 ```
+
+**Videos are indexed through a poster frame.** `npm run prepare:posters` (also run
+by `predev` and `build:prepare`) extracts one frame per local clip into the
+album's own `.resized_images` cache under the *video's* filename — so every
+existing `@<size>.avif` URL builder addresses it without knowing videos exist —
+plus a full-size JPEG and a sidecar in `.resized_videos`. The sidecar carries the
+clip's camera-local wall clock, ISO 6709 coordinates and duration, because a
+poster has no EXIF of its own. YouTube externals get the same treatment from
+their oEmbed title and thumbnail, under the synthetic name `<video id>.youtube`;
+the network is only touched when that cache is cold. A video with no poster yet
+is reported by `index` and skipped, never indexed blind — run the prepass and
+index again. `metadata.media_kind` and `metadata.duration_seconds` are what the
+search tiles, map popup and timeline read to mark a result as playable.
+
+**A long clip is also indexed a minute at a time.** The prepass extracts a frame
+per minute (capped at 60 per clip, stretching the interval beyond that) and lists
+the offsets in the sidecar; the indexer turns each into a scene row named
+`clip.mov@t120`. Scenes are deliberately **embedding-only**: SigLIP vectors and a
+locatable row, but no caption, no colours and no searchable text, so captioning
+an hour of footage never costs an hour of GPU and scenes cannot flood keyword,
+facet or colour results. `rankEmbeddingsByVector` collapses a clip's scenes to
+its best-matching moment, and `withoutScenes` keeps them out of the slideshow
+pool, memories and the random draws — they are moments, not photographs. A scene
+result links to `/album/<album>?t=<seconds>#<clip>`, which `seekLinkedMoment`
+uses to seek the video. `metadata.scene_seconds`/`scene_of` record where a scene
+sits and which clip it belongs to.
 
 **Output databases** (both copied to `src/public/` after indexing):
 - `search.sqlite` — FTS5 content, tags, metadata, colours; loaded on first search use
@@ -212,7 +240,7 @@ cd index
 
 **Database schema** (FTS5 + plain tables):
 - `images` — FTS5 virtual table: `path`, `geocode`, `exif`, `tags`, `colors`, `alt_text`, `subject`
-- `metadata` — `path`, `lat_deg`, `lng_deg`, `iso8601`
+- `metadata` — `path`, `lat_deg`, `lng_deg`, `iso8601`, `media_kind` ("photo"/"video"), `duration_seconds`
 - `embeddings` — `path`, `model_id`, `embedding_dim`, `embedding_blob` (int8-quantised), `embedding_scale` (per-vector dequantisation factor); readers (`api.ts`, `computeEmbeddingStats.ts`) also accept the legacy `embedding_json` format from older DBs
 - `tags` — denormalised tag frequency counts
 - `image_tags` — `path`, `tag`, `source`; the authoritative per-image tags (`tags` counts are rebuilt from this, never from the lossy `images.tags` column)

@@ -13,6 +13,7 @@ jest.mock("./photo", () => ({
 jest.mock("./video", () => ({
   getOriginalVideoTechnicalData: jest.fn(),
   optimiseVideo: jest.fn(),
+  readVideoPoster: jest.fn(() => null),
 }));
 jest.mock("./buildTiming", () => ({
   incrementBuildCounter: jest.fn(),

@@ -31,6 +31,34 @@ const photo: MapWorldEntry = {
 describe("MapPhotoPopup", () => {
   beforeEach(() => popupProps.mockClear());
 
+  // The pin itself is drawn on the GPU layer and cannot carry a label, so the
+  // popup is where a viewer learns that this one plays.
+  it("says when the pin is a video", () => {
+    render(
+      <MapPhotoPopup
+        photo={{ ...photo, mediaKind: "video" }}
+        selected={false}
+        onClose={() => {}}
+        onInteractionStart={() => {}}
+      />,
+    );
+
+    expect(screen.getByText(/video/i)).toBeInTheDocument();
+  });
+
+  it("says nothing of the sort for a photo", () => {
+    render(
+      <MapPhotoPopup
+        photo={photo}
+        selected={false}
+        onClose={() => {}}
+        onInteractionStart={() => {}}
+      />,
+    );
+
+    expect(screen.queryByText(/video/i)).toBeNull();
+  });
+
   it("points at the photo without taking the map's click-away for itself", () => {
     const onClose = jest.fn();
     render(

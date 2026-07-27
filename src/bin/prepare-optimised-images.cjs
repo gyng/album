@@ -81,7 +81,10 @@ const isFileEntry = (dir, entry) => {
   }
 };
 
-const listPhotos = ({ albumsDir, includeTestAlbums }) => {
+// Album traversal shared with the poster pass (prepare-video-posters.cjs), so
+// that both agree on symlinked albums/files and on the test-album rule rather
+// than growing two subtly different walks.
+const listAlbumFiles = ({ albumsDir, includeTestAlbums, matches }) => {
   if (!fs.existsSync(albumsDir)) {
     return [];
   }
@@ -96,7 +99,7 @@ const listPhotos = ({ albumsDir, includeTestAlbums }) => {
       return fs
         .readdirSync(albumDir, { withFileTypes: true })
         .filter((entry) => isFileEntry(albumDir, entry))
-        .filter((entry) => isPhotoFile(entry.name))
+        .filter((entry) => matches(entry.name))
         .sort((a, b) => a.name.localeCompare(b.name))
         .map((entry) => ({
           albumName: album.name,
@@ -105,6 +108,9 @@ const listPhotos = ({ albumsDir, includeTestAlbums }) => {
         }));
     });
 };
+
+const listPhotos = ({ albumsDir, includeTestAlbums }) =>
+  listAlbumFiles({ albumsDir, includeTestAlbums, matches: isPhotoFile });
 
 // Encode-then-rename (see encodeVariant) means an interrupted encode can no
 // longer leave a truncated file at the final path going forward, but a
@@ -401,6 +407,8 @@ const prepareOptimisedImages = async ({
 
 module.exports = {
   prepareOptimisedImages,
+  listAlbumFiles,
+  runPool,
   PHOTO_EXTENSIONS,
   TEMP_FILE_SEPARATOR,
   STALE_TEMP_FILE_THRESHOLD_MS,

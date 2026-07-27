@@ -221,6 +221,58 @@ describe("map page boundaries", () => {
     expect(screen.getByRole("button", { name: "Choose dates" })).toBeInTheDocument();
   });
 
+  // A geotagged clip is a place you were, exactly like a photo taken next to it,
+  // and its poster frame is what the map already knows how to draw.
+  it("puts geotagged videos on the map through their poster frame", async () => {
+    getAlbums.mockResolvedValue([
+      {
+        _build: { slug: "trip" },
+        blocks: [
+          {
+            kind: "video",
+            id: "clip.mov",
+            data: { type: "local", href: "/clip@1920.mp4" },
+            _build: {
+              src: "/clip@1920.mp4",
+              mimeType: "video/mp4",
+              capturedAtLocal: "2024-01-02T03:04:05",
+              latDeg: 35.6,
+              lngDeg: 139.7,
+              poster: { srcset: [{ src: "/clip.mov@800.avif", width: 20, height: 10 }] },
+            },
+          },
+          {
+            kind: "video",
+            id: "unplaced.mov",
+            data: { type: "local", href: "/unplaced@1920.mp4" },
+            _build: {
+              src: "/unplaced@1920.mp4",
+              mimeType: "video/mp4",
+              capturedAtLocal: "2024-01-02T03:04:05",
+              poster: { srcset: [{ src: "/unplaced.mov@800.avif", width: 20, height: 10 }] },
+            },
+          },
+        ],
+      },
+    ]);
+
+    const { photoRows } = await loadMapPageData();
+
+    // The clip with no coordinates is left off, exactly as an ungeotagged photo is.
+    expect(photoRows).toHaveLength(1);
+    expect(unpackMapWorldEntry(photoRows[0]!)).toEqual(
+      expect.objectContaining({
+        album: "trip",
+        mediaKind: "video",
+        src: { src: "/clip.mov@800.avif", width: 20, height: 10 },
+        decLat: 35.6,
+        decLng: 139.7,
+        date: "2024-01-02T03:04:05",
+        href: "/album/trip#clip.mov",
+      }),
+    );
+  });
+
   it("serialises map photo data at build time", async () => {
     getAlbums.mockResolvedValue([
       {

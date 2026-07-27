@@ -11,6 +11,7 @@ import {
   buildOriginalVideoTechnicalData,
   isVideoFile,
   optimiseVideo,
+  readVideoPoster,
 } from "./video";
 
 describe("video utilities", () => {
@@ -91,5 +92,72 @@ describe("video utilities", () => {
     // isSerializableProps rejects any explicit `undefined`).
     expect(Object.values(data).some((v) => v === undefined)).toBe(false);
     expect(JSON.parse(JSON.stringify(data))).toEqual(data);
+  });
+});
+
+describe("readVideoPoster", () => {
+  const buildAlbum = () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "album-video-poster-"));
+    const albumDir = path.join(root, "albums", "trip");
+    const publicAlbumsDir = path.join(root, "public", "data", "albums");
+    const videoCacheDir = path.join(publicAlbumsDir, "trip", ".resized_videos");
+    const imageCacheDir = path.join(publicAlbumsDir, "trip", ".resized_images");
+    fs.mkdirSync(albumDir, { recursive: true });
+    fs.mkdirSync(videoCacheDir, { recursive: true });
+    fs.mkdirSync(imageCacheDir, { recursive: true });
+    const video = path.join(albumDir, "clip.mov");
+    fs.writeFileSync(video, "video");
+    return { root, video, publicAlbumsDir, videoCacheDir, imageCacheDir };
+  };
+
+  it("returns the variants that exist alongside the clip's recorded metadata", () => {
+    const { video, publicAlbumsDir, videoCacheDir, imageCacheDir } = buildAlbum();
+    fs.writeFileSync(
+      path.join(videoCacheDir, "clip.mov@poster.json"),
+      JSON.stringify({
+        mediaKind: "video",
+        capturedAtLocal: "2026-02-27T10:52:10",
+        latDeg: 35.6895,
+        lngDeg: 139.6917,
+        durationSeconds: 13.013,
+        width: 3840,
+        height: 2160,
+      }),
+    );
+    // Only two of the three configured sizes were encoded; a poster must
+    // never advertise a variant that is not on disk.
+    fs.writeFileSync(path.join(imageCacheDir, "clip.mov@800.avif"), "avif");
+    fs.writeFileSync(path.join(imageCacheDir, "clip.mov@1600.avif"), "avif");
+
+    const poster = readVideoPoster(video, publicAlbumsDir);
+
+    expect(poster?.capturedAtLocal).toBe("2026-02-27T10:52:10");
+    expect(poster?.latDeg).toBeCloseTo(35.6895, 4);
+    expect(poster?.durationSeconds).toBeCloseTo(13.013, 3);
+    expect(poster?.srcset.map((variant) => variant.src)).toEqual([
+      "/data/albums/trip/.resized_images/clip.mov%40800.avif",
+      "/data/albums/trip/.resized_images/clip.mov%401600.avif",
+    ]);
+    // Variant dimensions come from the poster's own aspect ratio, scaled to
+    // the encoded width, so layout placeholders do not jump.
+    expect(poster?.srcset[0]).toEqual({
+      src: "/data/albums/trip/.resized_images/clip.mov%40800.avif",
+      width: 800,
+      height: 450,
+    });
+  });
+
+  it("returns null when the clip has no poster yet", () => {
+    const { video, publicAlbumsDir } = buildAlbum();
+    expect(readVideoPoster(video, publicAlbumsDir)).toBeNull();
+  });
+
+  it("returns null when a sidecar exists but no variant was encoded", () => {
+    const { video, publicAlbumsDir, videoCacheDir } = buildAlbum();
+    fs.writeFileSync(
+      path.join(videoCacheDir, "clip.mov@poster.json"),
+      JSON.stringify({ mediaKind: "video" }),
+    );
+    expect(readVideoPoster(video, publicAlbumsDir)).toBeNull();
   });
 });

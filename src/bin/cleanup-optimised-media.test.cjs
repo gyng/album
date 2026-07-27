@@ -59,6 +59,146 @@ describe("cleanupOptimisedMedia", () => {
     expect(fs.existsSync(keptVideo)).toBe(true);
   });
 
+  // A poster frame and its sidecar are named "<video>@poster.jpg"/".json", so
+  // the size segment parses as NaN — the same shape the video sweep deletes as
+  // an outdated transcode width. They belong to a video that still exists and
+  // are what the indexer reads, so they have to survive.
+  it("keeps a video's poster frame and sidecar while still removing outdated transcodes", async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "album-media-cleanup-"));
+    const albumsDir = path.join(root, "albums");
+    const publicAlbumsDir = path.join(root, "public", "data", "albums");
+    const albumDir = path.join(albumsDir, "trip");
+    const videoCacheDir = path.join(publicAlbumsDir, "trip", ".resized_videos");
+
+    fs.mkdirSync(albumDir, { recursive: true });
+    fs.mkdirSync(videoCacheDir, { recursive: true });
+    markImageCacheCurrent(publicAlbumsDir);
+
+    fs.writeFileSync(path.join(albumDir, "kept.jpg"), "image");
+    fs.writeFileSync(path.join(albumDir, "clip.mp4"), "video");
+
+    const poster = path.join(videoCacheDir, "clip.mp4@poster.jpg");
+    const sidecar = path.join(videoCacheDir, "clip.mp4@poster.json");
+    const orphanPoster = path.join(videoCacheDir, "gone.mp4@poster.jpg");
+    const oldVideoSize = path.join(videoCacheDir, "clip.mp4@1280.mp4");
+
+    for (const file of [poster, sidecar, orphanPoster, oldVideoSize]) {
+      fs.writeFileSync(file, "cached");
+    }
+
+    await cleanupOptimisedMedia({ albumsDir, publicAlbumsDir });
+
+    expect(fs.existsSync(poster)).toBe(true);
+    expect(fs.existsSync(sidecar)).toBe(true);
+    expect(fs.existsSync(orphanPoster)).toBe(false);
+    expect(fs.existsSync(oldVideoSize)).toBe(false);
+  });
+
+  // Poster display variants deliberately live in the photo cache under the
+  // video's filename so that every "@<size>.avif" URL builder addresses them
+  // without knowing about videos. The image sweep must read them as legitimate.
+  it("keeps a video's poster variants in the image cache", async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "album-media-cleanup-"));
+    const albumsDir = path.join(root, "albums");
+    const publicAlbumsDir = path.join(root, "public", "data", "albums");
+    const albumDir = path.join(albumsDir, "trip");
+    const imageCacheDir = path.join(publicAlbumsDir, "trip", ".resized_images");
+
+    fs.mkdirSync(albumDir, { recursive: true });
+    fs.mkdirSync(imageCacheDir, { recursive: true });
+    markImageCacheCurrent(publicAlbumsDir);
+
+    fs.writeFileSync(path.join(albumDir, "clip.mp4"), "video");
+
+    const posterVariant = path.join(imageCacheDir, "clip.mp4@800.avif");
+    const orphanVariant = path.join(imageCacheDir, "gone.mp4@800.avif");
+    fs.writeFileSync(posterVariant, "cached");
+    fs.writeFileSync(orphanVariant, "cached");
+
+    await cleanupOptimisedMedia({ albumsDir, publicAlbumsDir });
+
+    expect(fs.existsSync(posterVariant)).toBe(true);
+    expect(fs.existsSync(orphanVariant)).toBe(false);
+  });
+
+  // A YouTube external has no file in the album directory — its cache entries
+  // are keyed by "<video id>.youtube" — so the manifest is what says whether
+  // they are still wanted.
+  it("keeps cached externals still declared in the manifest and drops the rest", async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "album-media-cleanup-"));
+    const albumsDir = path.join(root, "albums");
+    const publicAlbumsDir = path.join(root, "public", "data", "albums");
+    const albumDir = path.join(albumsDir, "trip");
+    const imageCacheDir = path.join(publicAlbumsDir, "trip", ".resized_images");
+    const videoCacheDir = path.join(publicAlbumsDir, "trip", ".resized_videos");
+
+    fs.mkdirSync(albumDir, { recursive: true });
+    fs.mkdirSync(imageCacheDir, { recursive: true });
+    fs.mkdirSync(videoCacheDir, { recursive: true });
+    markImageCacheCurrent(publicAlbumsDir);
+
+    fs.writeFileSync(path.join(albumDir, "kept.jpg"), "image");
+    fs.writeFileSync(
+      path.join(albumDir, "album.json"),
+      JSON.stringify({
+        externals: [{ type: "youtube", href: "https://www.youtube.com/embed/ycyUWULJxdU" }],
+      }),
+    );
+
+    const keptPoster = path.join(videoCacheDir, "ycyUWULJxdU.youtube@poster.jpg");
+    const keptSidecar = path.join(videoCacheDir, "ycyUWULJxdU.youtube@poster.json");
+    const keptVariant = path.join(imageCacheDir, "ycyUWULJxdU.youtube@800.avif");
+    const removedPoster = path.join(videoCacheDir, "9bw3IL444Uo.youtube@poster.jpg");
+    const removedVariant = path.join(imageCacheDir, "9bw3IL444Uo.youtube@800.avif");
+
+    for (const file of [keptPoster, keptSidecar, keptVariant, removedPoster, removedVariant]) {
+      fs.writeFileSync(file, "cached");
+    }
+
+    await cleanupOptimisedMedia({ albumsDir, publicAlbumsDir });
+
+    expect(fs.existsSync(keptPoster)).toBe(true);
+    expect(fs.existsSync(keptSidecar)).toBe(true);
+    expect(fs.existsSync(keptVariant)).toBe(true);
+    expect(fs.existsSync(removedPoster)).toBe(false);
+    expect(fs.existsSync(removedVariant)).toBe(false);
+  });
+
+  // Per-minute scene frames are named "<video>@t<seconds>", so their cache
+  // entries have to be traced back to the clip rather than looked up as files
+  // that were never on disk.
+  it("keeps a video's scene frames and variants, and drops an orphan clip's", async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "album-media-cleanup-"));
+    const albumsDir = path.join(root, "albums");
+    const publicAlbumsDir = path.join(root, "public", "data", "albums");
+    const albumDir = path.join(albumsDir, "trip");
+    const imageCacheDir = path.join(publicAlbumsDir, "trip", ".resized_images");
+    const videoCacheDir = path.join(publicAlbumsDir, "trip", ".resized_videos");
+
+    fs.mkdirSync(albumDir, { recursive: true });
+    fs.mkdirSync(imageCacheDir, { recursive: true });
+    fs.mkdirSync(videoCacheDir, { recursive: true });
+    markImageCacheCurrent(publicAlbumsDir);
+
+    fs.writeFileSync(path.join(albumDir, "clip.mp4"), "video");
+
+    const scenePoster = path.join(videoCacheDir, "clip.mp4@t120@poster.jpg");
+    const sceneVariant = path.join(imageCacheDir, "clip.mp4@t120@800.avif");
+    const orphanScenePoster = path.join(videoCacheDir, "gone.mp4@t120@poster.jpg");
+    const orphanSceneVariant = path.join(imageCacheDir, "gone.mp4@t120@800.avif");
+
+    for (const file of [scenePoster, sceneVariant, orphanScenePoster, orphanSceneVariant]) {
+      fs.writeFileSync(file, "cached");
+    }
+
+    await cleanupOptimisedMedia({ albumsDir, publicAlbumsDir });
+
+    expect(fs.existsSync(scenePoster)).toBe(true);
+    expect(fs.existsSync(sceneVariant)).toBe(true);
+    expect(fs.existsSync(orphanScenePoster)).toBe(false);
+    expect(fs.existsSync(orphanSceneVariant)).toBe(false);
+  });
+
   it("removes cached variants when the source file was edited in place", async () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "album-media-edited-"));
     const albumsDir = path.join(root, "albums");

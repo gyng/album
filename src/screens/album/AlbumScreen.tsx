@@ -1,4 +1,10 @@
-import { AppLink as Link, useAfterNavigation, usePublicConfig } from "../../components/platform";
+import {
+  AppLink as Link,
+  useAfterNavigation,
+  usePublicConfig,
+  useUrlSearchParams,
+} from "../../components/platform";
+import { seekLinkedMoment } from "../../util/seekLinkedMoment";
 import React from "react";
 import type { PhotoBlock } from "../../services/types";
 import { GlobalNav } from "../../components/GlobalNav";
@@ -18,6 +24,7 @@ export type AlbumScreenProps = AlbumPageData;
 
 const AlbumScreen = ({ album }: AlbumScreenProps) => {
   const { siteOrigin } = usePublicConfig();
+  const { getSearchParam } = useUrlSearchParams();
   // Re-run the hash scroll after client-side navigation. Photo ids contain
   // dots and other characters, so decode the hash before looking up the node.
   const scrollToHash = React.useCallback(() => {
@@ -36,9 +43,18 @@ const AlbumScreen = ({ album }: AlbumScreenProps) => {
       }
       const target = document.getElementById(id);
       target?.scrollIntoView();
+      seekLinkedMoment(getSearchParam);
     });
-  }, []);
+  }, [getSearchParam]);
   useAfterNavigation(scrollToHash);
+
+  // On first load the browser scrolls to the anchor itself, but nothing seeks
+  // the clip — so only that half runs on mount, deferred a frame so the video
+  // element exists to be seeked.
+  React.useEffect(() => {
+    const frame = requestAnimationFrame(() => seekLinkedMoment(getSearchParam));
+    return () => cancelAnimationFrame(frame);
+  }, [getSearchParam]);
 
   // SEO/Meta tag generation
   const title = album.title ?? album.name ?? album._build.slug;

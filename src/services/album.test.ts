@@ -209,6 +209,37 @@ describe("getAlbum", () => {
     }
   });
 
+  // A random id per build means nothing can address an external: not a search
+  // result's "#<name>" deep link, not a shared URL, not the page's own permalink.
+  it("gives external blocks ids that survive a rebuild", async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "album-external-id-"));
+    const albumDir = path.join(root, "trip");
+    fs.mkdirSync(albumDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(albumDir, "album.json"),
+      JSON.stringify({
+        externals: [
+          { type: "youtube", href: "https://www.youtube.com/embed/ycyUWULJxdU" },
+          { type: "local", href: "clip.mov" },
+        ],
+      }),
+    );
+
+    try {
+      const first = await getAlbum(albumDir);
+      const second = await getAlbum(albumDir);
+      const ids = (album: Awaited<ReturnType<typeof getAlbum>>) =>
+        album.blocks.filter((block) => block.kind === "video").map((block) => block.id);
+
+      expect(ids(first)).toEqual(ids(second));
+      // The ids match the names the search index stores for the same media, so
+      // "/album/trip#<id>" resolves for both kinds of video.
+      expect(ids(first)).toEqual(["ycyUWULJxdU.youtube", "clip.mov"]);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it("defaults external blocks to oldest first when no sort order is provided", async () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "album-sort-test-"));
     const albumDir = path.join(root, "trip");

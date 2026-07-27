@@ -2352,7 +2352,13 @@ export const Slideshow: React.FC<{
     },
   };
 
-  const photoAltText = getPhotoAltText(photoBlock, "Slideshow photo");
+  // A clip's slide is the poster frame extracted from it. It is shown as a still
+  // — the kiosk has no controls and no sound — so the only honest cue that this
+  // one is a video is its accessible name.
+  const photoAltText = getPhotoAltText(
+    photoBlock,
+    currentPhotoPath?.mediaKind === "video" ? "Slideshow video" : "Slideshow photo",
+  );
 
   // Seed photo plus any remix companions, in render order. Consumed by
   // both the bottom-bar overlay and the image layer below.

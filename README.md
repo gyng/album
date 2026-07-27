@@ -20,6 +20,9 @@ Photos are dropped into directories, indexed via a Python pipeline (Janus-Pro-1B
 - EXIF support
 - YouTube video support
 - Local video support (FFmpeg web-optimised transcode)
+- Videos are searchable, mapped and on the timeline: one frame is extracted per clip and indexed like a photo
+- Long videos are searchable by moment: a frame a minute is embedded, and a hit seeks the clip to that point
+- YouTube externals carry their real title and thumbnail, fetched once at build via oEmbed
 - Video technical metadata details panel (codec/profile/fps/bitrate/filesize/date)
 - Viewport-based local video autoplay/pause
 - Next.JS static build, deployed on Vercel

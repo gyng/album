@@ -3,6 +3,7 @@ from __future__ import annotations
 import base64
 import concurrent.futures
 import fcntl
+import fnmatch
 import gc
 import hashlib
 import io
@@ -25,7 +26,7 @@ import typing
 import urllib.request
 from collections.abc import Mapping
 from contextlib import contextmanager
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import IO
 
@@ -399,6 +400,232 @@ COLOUR_THUMBNAIL_MAX_DIMENSION = 512
 COLOUR_THUMBNAIL_QUALITY = 10
 FILE_HASH_WORKERS = 8
 INSERT_CHUNK_SIZE = 64
+# --- Video and external media -------------------------------------------------
+#
+# A video has no pixels this pipeline can read, so `npm run prepare:posters`
+# extracts one frame per clip into the public album cache before indexing and
+# writes a sidecar describing the clip. Everything here maps between a media
+# file's identity (the path stored in the database, and the path the site's URLs
+# are built from) and the poster frame that stands in for its pixels.
+#
+# YouTube externals have no file in the album directory whatsoever. They are
+# given the synthetic name "<video id>.youtube" in the same album, so that one
+# set of rules covers both kinds of video.
+
+VIDEO_EXTENSIONS = [".mp4", ".mov", ".m4v", ".webm", ".mkv", ".avi"]
+EXTERNAL_MEDIA_EXTENSION = ".youtube"
+RESIZED_VIDEO_DIR = ".resized_videos"
+POSTER_SOURCE_SUFFIX = "@poster.jpg"
+POSTER_SIDECAR_SUFFIX = "@poster.json"
+DEFAULT_MEDIA_ROOT = "../src/public/data/albums"
+# Where the poster cache lives for this run. Pixel reads happen deep inside the
+# model classes, the colour extractor and the digest pass, all of which only ever
+# see a path — so the location is process-wide state set once from --media-root
+# rather than threaded through every batch.
+_MEDIA_ROOT = DEFAULT_MEDIA_ROOT
+
+
+def resolve_media_root(media_root: str | None = None) -> str:
+    return media_root or _MEDIA_ROOT
+
+
+def set_media_root(media_root: str) -> None:
+    global _MEDIA_ROOT
+    _MEDIA_ROOT = media_root
+
+
+@contextmanager
+def configured_media_root(media_root: str):
+    """Point pixel reads at a poster cache for the duration of a block."""
+    global _MEDIA_ROOT
+    previous = _MEDIA_ROOT
+    _MEDIA_ROOT = media_root
+    try:
+        yield
+    finally:
+        _MEDIA_ROOT = previous
+
+
+MEDIA_KIND_PHOTO = "photo"
+MEDIA_KIND_VIDEO = "video"
+
+
+# A scene row is one extracted minute of a clip, named after the clip and the
+# offset it came from: "clip.mov@t120". One naming convention covers the DB path,
+# the cached frame and the site's own "@<size>.avif" URLs.
+SCENE_SUFFIX_PATTERN = re.compile(r"@t(\d+(?:\.\d+)?)$")
+
+
+def split_scene_path(path: str) -> tuple[str, float | None]:
+    """(clip path, offset seconds) — offset is None for anything but a scene."""
+    match = SCENE_SUFFIX_PATTERN.search(path)
+    if match is None:
+        return path, None
+    return path[: match.start()], float(match.group(1))
+
+
+def is_scene_path(path: str) -> bool:
+    return split_scene_path(path)[1] is not None
+
+
+def is_video_path(path: str) -> bool:
+    base, _seconds = split_scene_path(path)
+    return os.path.splitext(base)[1].lower() in VIDEO_EXTENSIONS
+
+
+def is_external_media_path(path: str) -> bool:
+    base, _seconds = split_scene_path(path)
+    return os.path.splitext(base)[1].lower() == EXTERNAL_MEDIA_EXTENSION
+
+
+def needs_caption_for(path: str) -> bool:
+    """Scenes are embedding-only.
+
+    Captioning every extracted minute of a long clip would cost as much as the
+    whole photo library, and would mostly restate the clip's own caption. The
+    frame's embedding is what makes the moment findable; the clip's own row
+    carries the words."""
+    return not is_scene_path(path)
+
+
+def is_media_path(path: str) -> bool:
+    """True for anything indexed through a poster frame rather than directly."""
+    return is_video_path(path) or is_external_media_path(path)
+
+
+def media_kind_for(path: str) -> str:
+    return MEDIA_KIND_VIDEO if is_media_path(path) else MEDIA_KIND_PHOTO
+
+
+def poster_paths_for(path: str, media_root: str | None = None) -> tuple[str, str]:
+    """(poster frame, sidecar) for a video, external or scene.
+
+    A scene has its own extracted frame but no sidecar of its own: its time,
+    place and duration all come from the clip it was taken from."""
+    album = os.path.basename(os.path.dirname(path))
+    filename = os.path.basename(path)
+    clip_filename = os.path.basename(split_scene_path(path)[0])
+    cache_dir = os.path.join(resolve_media_root(media_root), album, RESIZED_VIDEO_DIR)
+    return (
+        os.path.join(cache_dir, filename + POSTER_SOURCE_SUFFIX),
+        os.path.join(cache_dir, clip_filename + POSTER_SIDECAR_SUFFIX),
+    )
+
+
+def pixel_source_for(path: str, media_root: str | None = None) -> str:
+    """The image bytes that represent this path: a photo is its own pixels."""
+    if not is_media_path(path):
+        return path
+    return poster_paths_for(path, media_root)[0]
+
+
+def read_poster_sidecar(
+    path: str, media_root: str | None = None
+) -> Mapping[str, typing.Any] | None:
+    if not is_media_path(path):
+        return None
+    _poster, sidecar = poster_paths_for(path, media_root)
+    try:
+        with open(sidecar, "r", encoding="utf-8") as fh:
+            return json.load(fh)
+    except (OSError, ValueError):
+        return None
+
+
+def source_digests_for(
+    paths: list[str], media_root: str | None = None
+) -> dict[str, str | None]:
+    """Content digest per path, taken from whatever pixels represent it.
+
+    A video is identified by its own path but indexed through its poster frame,
+    and the frame is what the models actually saw — so the frame is what the
+    stage provenance is pinned to. Re-extracting a poster (because the clip
+    changed) is therefore what marks the clip for re-indexing."""
+    pixel_by_path = {path: pixel_source_for(path, media_root) for path in paths}
+    digests = file_content_sha256_many(list(dict.fromkeys(pixel_by_path.values())))
+    return {path: digests.get(pixels) for path, pixels in pixel_by_path.items()}
+
+
+def partition_indexable(
+    paths: list[str], media_root: str | None = None
+) -> tuple[list[str], list[str]]:
+    """Split paths into those with readable pixels and those still waiting.
+
+    A video whose poster has not been extracted yet has nothing to index. It is
+    reported rather than indexed, and deliberately not dropped from the database
+    if it is already there — running the poster prepass is all it needs."""
+    indexable = []
+    missing_poster = []
+    for path in paths:
+        if is_media_path(path) and not os.path.exists(
+            pixel_source_for(path, media_root)
+        ):
+            missing_poster.append(path)
+        else:
+            indexable.append(path)
+    return indexable, missing_poster
+
+
+def shift_naive_iso(value: str | None, seconds: float | None) -> str | None:
+    """Advance a naive camera-local timestamp by an offset, staying naive.
+
+    No zone is involved on either side: this moves a wall clock forward by the
+    seconds elapsed inside a clip, which is exactly what a scene is."""
+    if not value or seconds is None:
+        return value
+    try:
+        # Deliberately naive: this is camera-local wall clock, the same reading
+        # EXIF timestamps keep end to end. Attaching a zone here would be a claim
+        # the source never made.
+        parsed = datetime.strptime(value[:19], "%Y-%m-%dT%H:%M:%S")  # noqa: DTZ007
+    except ValueError:
+        return value
+    return (parsed + timedelta(seconds=seconds)).strftime("%Y-%m-%dT%H:%M:%S")
+
+
+def scene_offsets_for(path: str, media_root: str | None = None) -> list[float]:
+    """Offsets of the per-minute frames extracted for a clip, if any."""
+    if not is_media_path(path) or is_scene_path(path):
+        return []
+    sidecar = read_poster_sidecar(path, media_root)
+    scenes = (sidecar or {}).get("scenes") or []
+    return [float(value) for value in scenes if isinstance(value, (int, float))]
+
+
+def album_scope_for_pattern(pattern: str) -> tuple[str, str]:
+    """(albums root, album-name pattern) a photo glob addresses.
+
+    ``../albums/**/*.jpg`` covers every album; ``../albums/trip/*.jpg`` covers
+    one. Externals are discovered from the poster cache rather than from the
+    glob, so they need the same scope applied to them by hand — otherwise a
+    single-album run would pull in every other album's externals."""
+    scope_dir = os.path.dirname(pattern)
+    albums_root = os.path.dirname(scope_dir)
+    album_pattern = os.path.basename(scope_dir).replace("**", "*") or "*"
+    return albums_root, album_pattern
+
+
+def find_external_media(media_root: str, pattern: str) -> list[str]:
+    """Album paths for every external with a poster sidecar in the cache."""
+    root = Path(media_root)
+    if not root.is_dir():
+        return []
+
+    albums_root, album_pattern = album_scope_for_pattern(pattern)
+    found = []
+    for sidecar in root.glob(
+        os.path.join("*", RESIZED_VIDEO_DIR, "*" + POSTER_SIDECAR_SUFFIX)
+    ):
+        filename = sidecar.name[: -len(POSTER_SIDECAR_SUFFIX)]
+        if not is_external_media_path(filename):
+            continue
+        album = sidecar.parent.parent.name
+        if not fnmatch.fnmatch(album, album_pattern):
+            continue
+        found.append(os.path.join(albums_root, album, filename))
+    return found
+
+
 CORE_STAGE = "core"
 CAPTION_STAGE = "caption"
 SIGLIP_V1_STAGE = "embedding:siglip-v1"
@@ -1189,7 +1416,9 @@ class JanusClassifier(BaseCaptionClassifier):
 
     @staticmethod
     def _decode_image(path: str) -> Image.Image:
-        with Image.open(path) as image:
+        # A video's pixels are the poster frame extracted for it; a photo
+        # resolves to itself.
+        with Image.open(pixel_source_for(path)) as image:
             return image.convert("RGB")
 
     def _decode_images_parallel(
@@ -1325,7 +1554,7 @@ class JanusClassifier(BaseCaptionClassifier):
         """
         path, geocode = item
         decode_started_at = time.perf_counter()
-        with Image.open(path) as image:
+        with Image.open(pixel_source_for(path)) as image:
             pil_image = image.convert("RGB")
         decode_ms = (time.perf_counter() - decode_started_at) * 1000
         processor_started_at = time.perf_counter()
@@ -1530,7 +1759,7 @@ class Gemma4Classifier(BaseCaptionClassifier):
         self, path: str, geocode: Mapping | None
     ) -> dict[str, torch.Tensor]:
         prompt = self._build_prompt(geocode)
-        with Image.open(path) as raw_image:
+        with Image.open(pixel_source_for(path)) as raw_image:
             image = raw_image.convert("RGB")
 
         messages = [
@@ -1733,7 +1962,7 @@ class Gemma4GgufClassifier(BaseCaptionClassifier):
 
     @staticmethod
     def _encode_image(path: str) -> str:
-        with Image.open(path) as raw:
+        with Image.open(pixel_source_for(path)) as raw:
             image = ImageOps.exif_transpose(raw).convert("RGB")
         image.thumbnail(
             (GEMMA4_GGUF_IMAGE_MAX_EDGE, GEMMA4_GGUF_IMAGE_MAX_EDGE), Image.LANCZOS
@@ -1935,7 +2164,7 @@ class BaseImageEmbedder:
         # raising; the caller skips None entries.
         def _open(path: str) -> Image.Image | None:
             try:
-                return Image.open(path).convert("RGB")
+                return Image.open(pixel_source_for(path)).convert("RGB")
             except (OSError, ValueError) as err:
                 log(f"Skipping unreadable image {path}: {err}")
                 return None
@@ -2058,7 +2287,7 @@ def prepare_colour_thumbnail(
     materialised; ``thumbnail`` then bounds non-JPEG inputs too. Median-cut colour
     clustering does not need the source's multi-megapixel spatial resolution.
     """
-    with Image.open(path) as image:
+    with Image.open(pixel_source_for(path)) as image:
         image.draft("RGB", (max_dimension, max_dimension))
         image.thumbnail((max_dimension, max_dimension), resample=Image.Resampling.BOX)
         return np.array(image.convert("RGBA"), dtype=np.uint8)
@@ -2076,7 +2305,7 @@ def extract_colour_palette(path: str) -> list[tuple[int, int, int]]:
     the speedup buys no measurable wall-clock on a full index. See
     ``benchmark-colours`` for the comparison.
     """
-    return fast_colorthief.get_palette(path)
+    return fast_colorthief.get_palette(pixel_source_for(path))
 
 
 def extract_thumbnail_colour_palette(
@@ -2092,8 +2321,13 @@ def extract_thumbnail_colour_palette(
 def get_album_relative_path(path: str) -> str:
     # Specific hack for album project
     # album-relative is /myalbum/asdf.jpg
-    p = Path(path)
+    clip, seconds = split_scene_path(path)
+    p = Path(clip)
     try:
+        # A scene links into the clip at the moment it was taken from; the album
+        # page seeks there rather than starting the video from the top.
+        if seconds is not None:
+            return f"/album/{p.parts[-2]}?t={int(seconds)}#{p.parts[-1]}"
         return f"/album/{p.parts[-2]}#{p.parts[-1]}"
     except IndexError:
         return str(p)
@@ -2258,6 +2492,27 @@ class Sqlite3Client:
         for column in ("geo_city", "geo_region", "geo_subregion", "geo_country"):
             if column not in metadata_columns:
                 cur.execute(f"ALTER TABLE metadata ADD COLUMN {column} TEXT")
+        # Videos are indexed through an extracted poster frame and are otherwise
+        # indistinguishable from photos in this table. Readers need to tell them
+        # apart to render a play badge and a duration, so the kind is stored
+        # rather than re-derived from the path extension in every consumer.
+        # Existing rows default to "photo": before this column existed, that is
+        # the only thing the indexer could write.
+        if "media_kind" not in metadata_columns:
+            cur.execute(
+                "ALTER TABLE metadata ADD COLUMN media_kind TEXT NOT NULL DEFAULT "
+                f"'{MEDIA_KIND_PHOTO}'"
+            )
+        if "duration_seconds" not in metadata_columns:
+            cur.execute("ALTER TABLE metadata ADD COLUMN duration_seconds REAL")
+        # A scene is one extracted minute of a clip. `scene_seconds` is where it
+        # sits inside the clip and `scene_of` names the clip, so that readers can
+        # collapse a clip's moments to its best match instead of listing every
+        # minute of it as a separate result.
+        if "scene_seconds" not in metadata_columns:
+            cur.execute("ALTER TABLE metadata ADD COLUMN scene_seconds REAL")
+        if "scene_of" not in metadata_columns:
+            cur.execute("ALTER TABLE metadata ADD COLUMN scene_of TEXT")
         # Per-file fingerprint (mtime + size) so a photo re-exported under the
         # same filename is detected as changed and re-indexed, instead of being
         # skipped forever by the path-presence check. Added IF NOT EXISTS so an
@@ -2967,15 +3222,29 @@ class Sqlite3Client:
         iso8601: str,
         geocode: Mapping[str, str | None] | None = None,
         cur: sqlite3.Cursor | None = None,
+        media_kind: str | None = None,
+        duration_seconds: float | None = None,
+        scene_seconds: float | None = None,
     ):
         if cur is None:
             with self.transaction() as transactional_cur:
                 self.insert_metadata(
-                    path, lat_lng_deg, iso8601, geocode, transactional_cur
+                    path,
+                    lat_lng_deg,
+                    iso8601,
+                    geocode,
+                    transactional_cur,
+                    media_kind,
+                    duration_seconds,
+                    scene_seconds,
                 )
                 return
 
         geo = geocode or {}
+        resolved_media_kind = media_kind or media_kind_for(path)
+        clip_path, offset = split_scene_path(path)
+        resolved_scene_seconds = scene_seconds if scene_seconds is not None else offset
+        scene_of = clip_path if resolved_scene_seconds is not None else None
         cur.execute(
             "INSERT OR IGNORE INTO metadata (path, lat_deg, lng_deg, iso8601) VALUES (?, ?, ?, ?);",
             (
@@ -2987,7 +3256,11 @@ class Sqlite3Client:
         )
         cur.execute(
             "UPDATE metadata SET lat_deg = ?, lng_deg = ?, iso8601 = ?, "
-            "geo_city = ?, geo_region = ?, geo_subregion = ?, geo_country = ? "
+            "geo_city = ?, geo_region = ?, geo_subregion = ?, geo_country = ?, "
+            # A writer that knows nothing about clip lengths (update-gps, a
+            # backfill) must not blank one it never had.
+            "media_kind = ?, duration_seconds = COALESCE(?, duration_seconds), "
+            "scene_seconds = ?, scene_of = ? "
             "WHERE path = ?",
             (
                 lat_lng_deg[0],
@@ -2997,6 +3270,10 @@ class Sqlite3Client:
                 geo.get("geo_region"),
                 geo.get("geo_subregion"),
                 geo.get("geo_country"),
+                resolved_media_kind,
+                duration_seconds,
+                resolved_scene_seconds,
+                scene_of,
                 path,
             ),
         )
@@ -3233,6 +3510,12 @@ def run_embedding_pass(
     default=False,
     help="Low-impact Gemma mode: keep some GPU memory free and prefer CPU offload for background runs.",
 )
+@click.option(
+    "--media-root",
+    default=DEFAULT_MEDIA_ROOT,
+    show_default=True,
+    help="Public album cache holding video poster frames and their sidecars.",
+)
 def index(
     glob: str,
     dbpath: str,
@@ -3249,6 +3532,7 @@ def index(
     allow_experimental_classifier_batch_size: bool,
     classifier_gpu_headroom_gb: float | None,
     classifier_low_impact: bool,
+    media_root: str,
 ):
     started_at = time.perf_counter()
     setup_started_at = time.perf_counter()
@@ -3294,8 +3578,16 @@ def index(
         )
 
     planning_started_at = time.perf_counter()
-    files = find_files(".", glob)
-    current_digests = file_content_sha256_many(files)
+    set_media_root(media_root)
+    files = find_files(".", glob, media_root=media_root)
+    files, missing_posters = partition_indexable(files, media_root)
+    if missing_posters:
+        log(
+            f"Skipping {len(missing_posters)} video(s) with no extracted poster frame "
+            f"(first: {missing_posters[0]}). Run `npm run prepare:posters` from src/ "
+            "and index again."
+        )
+    current_digests = source_digests_for(files, media_root)
     unreadable = [path for path, digest in current_digests.items() if digest is None]
     if unreadable:
         raise click.ClickException(
@@ -3323,7 +3615,7 @@ def index(
     file_set = set(files)
     current_signatures = {}
     for path in indexed_paths & file_set:
-        sig = file_signature(path)
+        sig = file_signature(pixel_source_for(path, media_root))
         if sig is not None:
             current_signatures[path] = sig
     changed_paths, signatures_to_backfill = compute_reindex_plan(
@@ -3396,8 +3688,12 @@ def index(
         needs_core = uses_classifier and stage_needs_refresh(
             file_path, CORE_STAGE, CORE_PIPELINE_VERSION, has_core
         )
-        needs_classifier = uses_classifier and stage_needs_refresh(
-            file_path, CAPTION_STAGE, desired_caption_version, has_caption
+        needs_classifier = (
+            uses_classifier
+            and needs_caption_for(file_path)
+            and stage_needs_refresh(
+                file_path, CAPTION_STAGE, desired_caption_version, has_caption
+            )
         )
         needs_embedding_v2 = uses_embeddings and stage_needs_refresh(
             file_path,
@@ -3508,7 +3804,14 @@ def index(
         # futex_wait forever, looking like a frozen "Loading…" with an idle GPU.
         # Warming them single-threaded means worker threads only hit the import
         # fast-path and never block. (This is an import-lock hang, not GPU/VRAM.)
-        all_paths = [item["path"] for item in work_items if item["needs_core"]]
+        # Scenes are embedding-only: no caption, and no palette either. A clip's
+        # colours are its own row's, and a per-minute palette would only pad the
+        # colour index with near-duplicates of it.
+        all_paths = [
+            item["path"]
+            for item in work_items
+            if item["needs_core"] and not is_scene_path(item["path"])
+        ]
         colors_executor = concurrent.futures.ThreadPoolExecutor(
             max_workers=COLORTHIEF_WORKERS
         )
@@ -3830,7 +4133,11 @@ def index(
                 item["path"] in fallback_caption_paths,
                 None,
                 precomputed_embeddings.get(item["path"]),
-                precomputed_colors_by_path.get(item["path"]),
+                # A scene has no palette of its own; an empty list keeps the
+                # assembly from falling back to extracting one.
+                []
+                if is_scene_path(item["path"])
+                else precomputed_colors_by_path.get(item["path"]),
                 item["source_sha256"],
                 item["caption_version"],
                 item["caption_model_id"],
@@ -5328,11 +5635,20 @@ def detect_vanished_albums(
     "was removed). Without this, an empty glob is treated as a mistake — an "
     "unmounted albums directory or wrong cwd — and prune refuses to wipe the DB.",
 )
-def prune(glob: str, dbpath: str, dry_run: bool, force: bool):
+@click.option(
+    "--media-root",
+    default=DEFAULT_MEDIA_ROOT,
+    show_default=True,
+    help="Public album cache holding video poster frames and their sidecars.",
+)
+def prune(glob: str, dbpath: str, dry_run: bool, force: bool, media_root: str):
+    set_media_root(media_root)
     db = Sqlite3Client(dbpath, read_only=dry_run)
     if not dry_run:
         db.setup_tables()
-    files = find_files(".", glob)
+    # Same media root as index, so prune sees the externals index writes and
+    # never mistakes one for a row whose source has disappeared.
+    files = find_files(".", glob, media_root=media_root)
     paths = db.list_paths()
     to_delete = [p for p in paths if p not in files]
 
@@ -5391,9 +5707,16 @@ def validate_index_database(
     classifier_batch_size: int | None = None,
     classifier_max_new_tokens: int | None = None,
     classifier_batch_max_new_tokens: int | None = None,
+    media_root: str = DEFAULT_MEDIA_ROOT,
 ) -> dict:
     """Validate exact source coverage and all published cross-table contracts."""
-    expected = set(find_files(".", glob))
+    set_media_root(media_root)
+    # Videos without an extracted poster were never indexable, so they are not
+    # part of the coverage this asserts — the index run reported them instead.
+    expected, _missing_posters = partition_indexable(
+        find_files(".", glob, media_root=media_root), media_root
+    )
+    expected = set(expected)
     if not expected:
         raise click.ClickException(f"validate: glob {glob!r} matched 0 files")
 
@@ -5430,15 +5753,19 @@ def validate_index_database(
                     "OR COALESCE(alt_text, '') <> '' OR COALESCE(subject, '') <> ''"
                 )
             }
-            for label, actual in (
-                ("images", images),
-                ("metadata", metadata),
-                ("captions", captions),
+            # Scenes are embedding-only by design: they hold a row and a vector
+            # so a moment inside a clip can be found and hydrated, but never a
+            # caption. Captions are therefore expected of everything else.
+            expected_captions = {path for path in expected if needs_caption_for(path)}
+            for label, actual, wanted in (
+                ("images", images, expected),
+                ("metadata", metadata, expected),
+                ("captions", captions, expected_captions),
             ):
-                if actual != expected:
+                if actual != wanted:
                     raise click.ClickException(
                         f"validate: {label} coverage mismatch "
-                        f"(missing={len(expected - actual)}, extra={len(actual - expected)})"
+                        f"(missing={len(wanted - actual)}, extra={len(actual - wanted)})"
                     )
 
             stored_counts = dict(con.execute("SELECT tag, count FROM tags"))
@@ -5535,9 +5862,15 @@ def validate_index_database(
                 "SELECT path, stage, source_sha256, pipeline_version, model_id FROM pipeline_state"
             )
         }
-        digests = file_content_sha256_many(sorted(expected))
+        # Provenance is pinned to the pixels the models saw, which for a video
+        # is its poster frame — the same rule the index run applies.
+        digests = source_digests_for(sorted(expected), media_root)
         for stage, version, model_id in stages:
             for path in expected:
+                # Scenes are embedding-only by design, so a caption stage they
+                # were never meant to have is not a gap in coverage.
+                if stage == CAPTION_STAGE and not needs_caption_for(path):
+                    continue
                 state = state_rows.get((path, stage))
                 if state is None or state[0] != digests[path]:
                     raise click.ClickException(
@@ -5600,6 +5933,12 @@ def validate_index_database(
 @click.option(
     "--classifier-batch-max-new-tokens", default=None, type=click.IntRange(min=32)
 )
+@click.option(
+    "--media-root",
+    default=DEFAULT_MEDIA_ROOT,
+    show_default=True,
+    help="Public album cache holding video poster frames and their sidecars.",
+)
 def validate_command(
     glob_pattern: str,
     dbpath: str,
@@ -5610,6 +5949,7 @@ def validate_command(
     classifier_batch_size: int | None,
     classifier_max_new_tokens: int | None,
     classifier_batch_max_new_tokens: int | None,
+    media_root: str,
 ):
     summary = validate_index_database(
         dbpath,
@@ -5621,6 +5961,7 @@ def validate_command(
         classifier_batch_size,
         classifier_max_new_tokens,
         classifier_batch_max_new_tokens,
+        media_root,
     )
     log(f"Validated {summary['paths']} path(s) across {summary['stages']} stage(s)")
 
@@ -6036,9 +6377,17 @@ def update_gps(dbpath: str, match: str | None, dry_run: bool):
     geotagged = 0
     updated = 0
     missing = 0
+    skipped_media = 0
     with db.transaction() as cur:
         tags_changed = False
         for path in paths:
+            if is_media_path(path):
+                # A video carries no EXIF: its time and place come from the
+                # sidecar the poster prepass wrote. Re-reading it here would
+                # blank exactly the fields this command exists to maintain.
+                skipped_media += 1
+                continue
+
             if not os.path.exists(path):
                 missing += 1
                 continue
@@ -6153,8 +6502,9 @@ def update_gps(dbpath: str, match: str | None, dry_run: bool):
 
     log(
         f"update-gps: {'would refresh' if dry_run else 'refreshed'} "
-        f"{len(paths) - missing if dry_run else updated} path(s), "
-        f"{geotagged} with GPS, {missing} missing (match={match!r}), in {dbpath}"
+        f"{len(paths) - missing - skipped_media if dry_run else updated} path(s), "
+        f"{geotagged} with GPS, {missing} missing, {skipped_media} video(s) left to "
+        f"their sidecars (match={match!r}), in {dbpath}"
     )
     if not dry_run:
         os.close(lock_fd)
@@ -6525,19 +6875,40 @@ def compute_reindex_plan(
     return changed, backfill
 
 
-def find_files(directory: str, pattern: str) -> list[str]:
+def find_files(
+    directory: str, pattern: str, media_root: str | None = None
+) -> list[str]:
     """Find files from a glob pattern in a directory, ignoring case.
 
     ``.jpg`` and ``.jpeg`` are treated as equivalent: a pattern ending in either
     extension also matches the other. Both index and prune call this with the same
     glob, so the two stay consistent — prune sees exactly the set index writes and
-    never deletes freshly-indexed ``.jpeg`` rows."""
+    never deletes freshly-indexed ``.jpeg`` rows.
+
+    Videos in the same album directories come back from the same call, for the
+    same reason: they are indexed through the poster frame extracted for them by
+    ``npm run prepare:posters``, and prune must see everything index writes.
+
+    ``media_root`` points at the public album cache (``src/public/data/albums``).
+    When given, YouTube externals are discovered there too: an external has no
+    file in the album directory at all, so the sidecar written beside its
+    downloaded thumbnail is the only evidence it exists. They are reported under
+    the synthetic album path ``<album>/<video id>.youtube`` that the rest of the
+    pipeline — and the site's own URLs — key off."""
     patterns = [pattern]
     lowered = pattern.lower()
     if lowered.endswith(".jpg"):
         patterns.append(pattern[:-4] + ".jpeg")
     elif lowered.endswith(".jpeg"):
         patterns.append(pattern[:-5] + ".jpg")
+
+    # A photo glob is what every caller passes, so derive the video globs from
+    # it rather than requiring each call site to list them. The extension is
+    # swapped rather than matched, so a character-class pattern such as
+    # ``*.[jJ][pP][gG]`` finds videos too instead of silently dropping them.
+    stem, extension = os.path.splitext(pattern)
+    if extension and extension.lower() not in VIDEO_EXTENSIONS:
+        patterns.extend(stem + video_extension for video_extension in VIDEO_EXTENSIONS)
 
     paths: list[str] = []
     seen: set[str] = set()
@@ -6561,6 +6932,24 @@ def find_files(directory: str, pattern: str) -> list[str]:
             if resolved not in seen:
                 seen.add(resolved)
                 paths.append(resolved)
+
+    if media_root is not None:
+        # Scenes exist only where the poster prepass extracted them, and the
+        # sidecar it wrote is the record of that. Both index and prune expand
+        # them here so the two keep seeing the same set.
+        for media_path in list(paths):
+            for seconds in scene_offsets_for(media_path, media_root):
+                scene = f"{media_path}@t{int(seconds)}"
+                if scene not in seen:
+                    seen.add(scene)
+                    paths.append(scene)
+
+        for external in find_external_media(media_root, pattern):
+            if not include_test_albums and is_test_album_path(Path(external)):
+                continue
+            if external not in seen:
+                seen.add(external)
+                paths.append(external)
 
     if len(paths) == 0 and Path(pattern).exists():
         return [str(Path(pattern))]
@@ -6883,8 +7272,13 @@ def analyse_image(
     precomputed_caption: Mapping | None = None,
     precomputed_embeddings: dict[str, list[float]] | None = None,
     precomputed_colors: list | None = None,
+    pixel_path: str | None = None,
+    media_root: str = DEFAULT_MEDIA_ROOT,
 ) -> Mapping:
     start_time = time.perf_counter()
+    # For a video, `path` is the clip (its identity everywhere downstream) while
+    # the pixels come from the poster frame extracted for it.
+    pixels = pixel_path or path
 
     # A metadata-only caption fallback (needs_classifier with no precomputed
     # caption) also needs EXIF/GPS to name the place and year, so read it here too
@@ -6933,7 +7327,7 @@ def analyse_image(
         colors = (
             precomputed_colors
             if precomputed_colors is not None
-            else extract_colour_palette(path)
+            else extract_colour_palette(pixels)
         )
 
     # Captions are parsed (with model retry) during the Janus pass while the model
@@ -6955,6 +7349,21 @@ def analyse_image(
         for model_id, embedding in (precomputed_embeddings or {}).items()
     ]
 
+    # A poster frame carries no EXIF of its own, so a video's time and place come
+    # from the sidecar the poster prepass wrote from the container's metadata (or,
+    # for an external, from its manifest entry).
+    sidecar = read_poster_sidecar(path, media_root) if is_media_path(path) else None
+    duration_seconds = None
+    scene_seconds = split_scene_path(path)[1]
+    if sidecar is not None:
+        duration_seconds = sidecar.get("durationSeconds")
+        sidecar_lat = sidecar.get("latDeg")
+        sidecar_lng = sidecar.get("lngDeg")
+        if sidecar_lat is not None and sidecar_lng is not None:
+            lat_deg = float(sidecar_lat)
+            lng_deg = float(sidecar_lng)
+            geo = get_image_geocode(lat_deg, lng_deg)
+
     # EXIF DateTimeOriginal is "YYYY:MM:DD HH:MM:SS" — the camera's LOCAL wall-clock
     # time, with no timezone. Convert to ISO "YYYY-MM-DDTHH:MM:SS" and store it as
     # naive camera-local wall time with NO zone suffix (do not append "Z"): a "Z"
@@ -6969,12 +7378,27 @@ def analyse_image(
 
     normalised_tags = normalise_classifier_tags(result)
 
+    if sidecar is not None:
+        # The sidecar's reading is already camera-local wall time, written by the
+        # same rule EXIF follows: the zone marker names the clock, never shifts it.
+        clip_start = sidecar.get("capturedAtLocal") or iso8601_local
+        # A scene happened `scene_seconds` into the clip, so that is where it
+        # belongs against the photos taken around it.
+        iso8601_local = (
+            shift_naive_iso(clip_start, scene_seconds)
+            if scene_seconds is not None
+            else clip_start
+        )
+
     end_time = time.perf_counter()
 
     return {
         # Camera-local wall time, no zone suffix (see comment above). This key is
         # read as ``iso8601`` by both insert paths and written to metadata.iso8601.
         "iso8601": iso8601_local or None,
+        "media_kind": media_kind_for(path),
+        "duration_seconds": duration_seconds,
+        "scene_seconds": scene_seconds,
         "exif": exif,
         "geocode": geo,
         "lat_deg": lat_deg,
@@ -7024,10 +7448,13 @@ def analyse_image_worker(
     core_complete = input[10] if len(input) > 10 else True
 
     print(f"[{idx + 1}] {os.path.basename(path)}...")
-    with open(path, "rb") as fh:
+    # A video is opened through its poster frame; a photo resolves to itself.
+    pixels = pixel_source_for(path)
+    with open(pixels, "rb") as fh:
         analysed = analyse_image(
             fh,
             path=path,
+            pixel_path=pixels,
             needs_core=needs_core,
             needs_classifier=needs_caption_fallback,
             precomputed_caption=precomputed_caption,
@@ -7081,7 +7508,20 @@ def insert_analysed_images_batch(db, results: list[Mapping]):
             geocode = analysed.get("geocode")
             geocode_blob, geocode_structured = build_geocode_fields(geocode)
             image_fields = {}
-            if write_core:
+            scene_row = is_scene_path(path)
+            if write_core and scene_row:
+                # A scene exists so that semantic and similar-image search can
+                # rank a moment inside a clip and hydrate a row for it. It is
+                # deliberately not searchable text: giving every minute of a clip
+                # the clip's place and tags would flood keyword results and
+                # double-count the same footage in the facet counts.
+                image_fields.update(
+                    {
+                        "filename": get_filename(path),
+                        "album_relative_path": get_album_relative_path(path),
+                    }
+                )
+            elif write_core:
                 image_fields.update(
                     {
                         "filename": get_filename(path),
@@ -7120,7 +7560,7 @@ def insert_analysed_images_batch(db, results: list[Mapping]):
                         cur,
                     )
 
-            if write_core:
+            if write_core and not scene_row:
                 geocode_tags = []
                 if geocode:
                     geocode_tags = [
@@ -7134,12 +7574,17 @@ def insert_analysed_images_batch(db, results: list[Mapping]):
                     ]
                 db.replace_tags_for_source(path, geocode_tags, "geocode", cur)
                 tags_changed = True
+
+            if write_core:
                 db.insert_metadata(
                     path,
                     lat_lng_deg=(analysed.get("lat_deg"), analysed.get("lng_deg")),
                     iso8601=analysed.get("iso8601"),
                     geocode=geocode_structured,
                     cur=cur,
+                    media_kind=analysed.get("media_kind"),
+                    duration_seconds=analysed.get("duration_seconds"),
+                    scene_seconds=analysed.get("scene_seconds"),
                 )
                 if source_sha256 and item.get("core_complete", True):
                     db.upsert_pipeline_state(

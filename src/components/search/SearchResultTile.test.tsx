@@ -33,6 +33,66 @@ describe("SearchResultTile", () => {
     expect(screen.queryByText("Harbor skyline")).toBeNull();
   });
 
+  // A video result looks exactly like a photo — its thumbnail is the frame
+  // extracted from it — so without a marker there is nothing to tell a viewer
+  // that clicking through gets them something that plays.
+  it("marks a video result as playable and gives its length", () => {
+    render(
+      <SearchResultTile
+        result={makeResult({
+          path: "../albums/test-simple/DSCF0159.MOV",
+          album_relative_path: "/album/test-simple#DSCF0159.MOV",
+          filename: "DSCF0159.MOV",
+          mediaKind: "video",
+          durationSeconds: 73.4,
+        })}
+      />,
+    );
+
+    expect(screen.getByLabelText("Video, 1:13")).toBeTruthy();
+    expect(screen.getByText("1:13")).toBeTruthy();
+  });
+
+  it("still marks a video whose length is unknown", () => {
+    render(
+      <SearchResultTile
+        result={makeResult({
+          path: "../albums/test-simple/clip.mov",
+          mediaKind: "video",
+        })}
+      />,
+    );
+
+    expect(screen.getByLabelText("Video")).toBeTruthy();
+  });
+
+  // A hit on a moment inside a clip has to say which moment, or the viewer has
+  // no idea why this frame came back or where to find it.
+  it("names the moment a scene result came from", () => {
+    render(
+      <SearchResultTile
+        result={makeResult({
+          path: "../albums/test-simple/clip.mov@t180",
+          album_relative_path: "/album/test-simple?t=180#clip.mov",
+          filename: "clip.mov@t180",
+          mediaKind: "video",
+          durationSeconds: 600,
+        })}
+      />,
+    );
+
+    // The moment, not the clip's full length.
+    expect(screen.getByLabelText("Video at 3:00")).toBeTruthy();
+    expect(screen.getByText("3:00")).toBeTruthy();
+    expect(screen.getByRole("link")).toHaveAttribute("href", "/album/test-simple?t=180#clip.mov");
+  });
+
+  it("leaves a photo result unmarked", () => {
+    render(<SearchResultTile result={makeResult()} />);
+
+    expect(screen.queryByLabelText(/^Video/)).toBeNull();
+  });
+
   it("calls onFindSimilar when the similar button is clicked", () => {
     const onFindSimilar = jest.fn();
 

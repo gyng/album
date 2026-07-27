@@ -133,6 +133,34 @@ describe("LocalVideoBlockEl viewport auto-play", () => {
     });
   };
 
+  // Without a poster a local clip is a black rectangle until it plays, and the
+  // extracted frame is already on disk for the indexer and the search tiles.
+  it("shows the extracted poster frame before the clip plays", () => {
+    const { container } = render(
+      <LocalVideoBlockEl
+        id="video-local-1"
+        src="/data/albums/foo/.resized_videos/clip.mp4@1920.mp4"
+        posterSrc="/data/albums/foo/.resized_images/clip.mp4%401600.avif"
+      />,
+    );
+
+    expect(container.querySelector("video")).toHaveAttribute(
+      "poster",
+      "/data/albums/foo/.resized_images/clip.mp4%401600.avif",
+    );
+  });
+
+  it("omits the poster attribute when no frame was extracted", () => {
+    const { container } = render(
+      <LocalVideoBlockEl
+        id="video-local-1"
+        src="/data/albums/foo/.resized_videos/clip.mp4@1920.mp4"
+      />,
+    );
+
+    expect(container.querySelector("video")).not.toHaveAttribute("poster");
+  });
+
   it("does not auto-resume a video the viewer paused when it re-enters view", () => {
     render(<LocalVideoBlockEl id="v1" src="/clip.mp4" />);
     const video = document.querySelector("video");

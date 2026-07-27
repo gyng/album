@@ -11,6 +11,7 @@ import {
   V2AlbumMetadata,
 } from "./types";
 import { isVideoFile } from "./video";
+import { parseYoutubeVideoId, youtubeMediaFilename } from "./youtubeExternal";
 import { incrementBuildCounter, measureBuild } from "./buildTiming";
 import {
   exifWallClockTimestamp,
@@ -217,9 +218,15 @@ const appendExternalBlocks = (
     // Omit `date` when absent — an explicit `undefined` in a block's data
     // aborts the static build via Next's isSerializableProps check.
     if (ext.type === "youtube") {
+      // Ids are the block's DOM anchor, so a fresh uuid per build would leave
+      // every external unaddressable — a search result's "/album/x#<name>" link,
+      // a shared URL and the page's own permalink would all point at nothing.
+      // The video id is the same name the poster cache and the search index use
+      // for this external, so one name resolves everywhere.
+      const videoId = parseYoutubeVideoId(ext.href);
       manifest.blocks.push({
         kind: "video",
-        id: v4(),
+        id: videoId ? youtubeMediaFilename(videoId) : ext.href,
         data: {
           type: "youtube",
           href: ext.href,
@@ -236,7 +243,10 @@ const appendExternalBlocks = (
 
     manifest.blocks.push({
       kind: "video",
-      id: v4(),
+      // A local external is a file in the album, and files discovered on disk
+      // are keyed by their filename — declaring one in the manifest must not
+      // give it a different anchor.
+      id: path.basename(ext.href),
       data: {
         type: "local",
         href: ext.href,

@@ -1,7 +1,7 @@
 import fs from "fs";
 import path from "path";
 import { getNextJsSafeExif, getPhotoSize, optimiseImages, stripPublicFromPath } from "./photo";
-import { getOriginalVideoTechnicalData, optimiseVideo } from "./video";
+import { getOriginalVideoTechnicalData, optimiseVideo, readVideoPoster } from "./video";
 import {
   Block,
   Content,
@@ -108,7 +108,13 @@ export const deserializeVideoBlock = async (
     const localFilepath = path.join(options.dirname, serialized.data.href);
     const optimised = await optimiseVideo(localFilepath, "public/data/albums");
     const originalTechnicalData = await getOriginalVideoTechnicalData(localFilepath);
-    const resolvedDate = serialized.data.date ?? originalTechnicalData.originalDate;
+    const poster = readVideoPoster(localFilepath);
+    // The poster sidecar's reading is camera-local wall clock, the same as
+    // every EXIF timestamp in the pipeline; originalTechnicalData.originalDate
+    // is a UTC instant kept for the technical panel, so it is only the last
+    // resort here.
+    const resolvedDate =
+      serialized.data.date ?? poster?.capturedAtLocal ?? originalTechnicalData.originalDate;
 
     const copy: VideoBlock = {
       ...serialized,
@@ -124,6 +130,19 @@ export const deserializeVideoBlock = async (
         originalSrc: serialized.data.href,
         mimeType: optimised.mimeType,
         originalTechnicalData,
+        ...(poster
+          ? {
+              poster: { srcset: poster.srcset },
+              ...(poster.capturedAtLocal !== undefined
+                ? { capturedAtLocal: poster.capturedAtLocal }
+                : {}),
+              ...(poster.latDeg !== undefined ? { latDeg: poster.latDeg } : {}),
+              ...(poster.lngDeg !== undefined ? { lngDeg: poster.lngDeg } : {}),
+              ...(poster.durationSeconds !== undefined
+                ? { durationSeconds: poster.durationSeconds }
+                : {}),
+            }
+          : {}),
       },
     };
 

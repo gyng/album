@@ -6,6 +6,9 @@ import ffmpegPath from "ffmpeg-static";
 import ffprobePath from "ffprobe-static";
 import { stripPublicFromPath } from "./photo";
 import { encodePublicAssetPath } from "../util/encodePublicAssetPath";
+import imageOptimisationConfig from "./imageOptimisationConfig.json";
+import { posterPathsFor, readVideoPosterSidecar } from "./videoPoster";
+import type { OptimisedPhoto } from "./types";
 
 export const OPTIMISED_VIDEO_MAX_WIDTH = 1920;
 export const OPTIMISED_VIDEO_PRESET = "medium";
@@ -236,6 +239,74 @@ export const getOriginalVideoTechnicalData = async (
       }
     });
   });
+};
+
+// stripPublicFromPath drops the first path segment, which is only correct for
+// the build's own relative "public/data/..." paths. Poster variants are located
+// from an injectable public directory (absolute in tests, and potentially
+// absolute for a caller outside src/), so anchor on the "public" segment
+// itself. Encoding stays a single pass, as every asset URL builder must.
+const toPublicAssetUrl = (filePath: string): string => {
+  const parts = filePath.split(path.sep);
+  const publicIndex = parts.lastIndexOf("public");
+  const relative = publicIndex === -1 ? parts.slice(1) : parts.slice(publicIndex + 1);
+  return encodePublicAssetPath(`/${relative.join("/")}`);
+};
+
+export type VideoPoster = {
+  srcset: OptimisedPhoto[];
+  capturedAtLocal?: string;
+  latDeg?: number;
+  lngDeg?: number;
+  durationSeconds?: number;
+};
+
+/**
+ * Read the poster `npm run prepare:posters` extracted for a clip. Read-only by
+ * design: extraction is a prepass so that the indexer (which runs before the
+ * build) sees the same frames the site does, and so one missing poster cannot
+ * turn a page build into an ffmpeg run.
+ */
+export const readVideoPoster = (
+  videoPath: string,
+  publicAlbumsDir = "public/data/albums",
+): VideoPoster | null => {
+  const paths = posterPathsFor(videoPath, publicAlbumsDir);
+  const sidecar = readVideoPosterSidecar(paths.sidecar);
+  if (!sidecar) {
+    return null;
+  }
+
+  const aspectRatio = sidecar.width && sidecar.height ? sidecar.height / sidecar.width : undefined;
+
+  const srcset = imageOptimisationConfig.sizes
+    .slice()
+    .sort((a, b) => a - b)
+    .flatMap((size): OptimisedPhoto[] => {
+      const variant = paths.variantFor(size);
+      if (!fs.existsSync(variant)) {
+        return [];
+      }
+      return [
+        {
+          src: toPublicAssetUrl(variant),
+          width: size,
+          height: aspectRatio ? Math.round(size * aspectRatio) : size,
+        },
+      ];
+    });
+
+  if (srcset.length === 0) {
+    return null;
+  }
+
+  return omitUndefined({
+    srcset,
+    capturedAtLocal: sidecar.capturedAtLocal,
+    latDeg: sidecar.latDeg,
+    lngDeg: sidecar.lngDeg,
+    durationSeconds: sidecar.durationSeconds,
+  }) as VideoPoster;
 };
 
 export const optimiseVideo = async (

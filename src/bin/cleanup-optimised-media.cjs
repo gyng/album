@@ -159,6 +159,79 @@ const hasSourceChangedSinceCache = (sourcePath, cachedPath) => {
 const TEMP_FILE_PATTERN = /\.tmp-\d+(-\d+)?$/;
 const isTempFile = (file) => TEMP_FILE_PATTERN.test(file);
 
+// Poster outputs of services/videoPoster.ts, keyed by the video's own filename.
+const POSTER_CACHE_PATTERN = /@poster\.(jpg|json)$/i;
+const isPosterCacheFile = (file) => POSTER_CACHE_PATTERN.test(file);
+
+// A YouTube external has no file in the album directory: its cache entries are
+// keyed by the synthetic "<video id>.youtube" name that services/youtubeExternal.ts
+// writes. The v2 manifest is therefore the only thing that can say whether such
+// an entry is still wanted, so an external dropped from the manifest is what
+// makes its poster collectable.
+const MANIFEST_V2_NAME = "album.json";
+const YOUTUBE_MEDIA_EXTENSION = ".youtube";
+
+const listDeclaredExternalNames = (albumDir) => {
+  const manifestPath = path.join(albumDir, MANIFEST_V2_NAME);
+  if (!fs.existsSync(manifestPath)) {
+    return new Set();
+  }
+
+  let manifest;
+  try {
+    manifest = JSON.parse(fs.readFileSync(manifestPath, "utf-8"));
+  } catch {
+    // An unreadable manifest is not evidence that anything is orphaned, so
+    // keep every external cache entry rather than deleting work that a fixed
+    // manifest would immediately need re-fetched.
+    return null;
+  }
+
+  const externals = Array.isArray(manifest?.externals) ? manifest.externals : [];
+  const names = new Set();
+  for (const external of externals) {
+    if (external?.type !== "youtube" || typeof external.href !== "string") {
+      continue;
+    }
+    const id = readYoutubeVideoId(external.href);
+    if (id) {
+      names.add(`${id}${YOUTUBE_MEDIA_EXTENSION}`);
+    }
+  }
+  return names;
+};
+
+// Deliberately duplicated from services/youtubeExternal.ts rather than imported:
+// this sweep runs before (and independently of) any TypeScript loading, and the
+// two only have to agree on the id, not on the whole module.
+const readYoutubeVideoId = (href) => {
+  try {
+    const url = new URL(href);
+    const host = url.hostname.replace(/^www\./, "");
+    const candidate =
+      host === "youtu.be"
+        ? url.pathname.slice(1)
+        : host.endsWith("youtube.com")
+          ? url.pathname.startsWith("/embed/")
+            ? url.pathname.slice("/embed/".length)
+            : (url.searchParams.get("v") ?? "")
+          : "";
+    const id = candidate.split("/")[0] ?? "";
+    return /^[\w-]{8,16}$/.test(id) ? id : null;
+  } catch {
+    return null;
+  }
+};
+
+const isExternalCacheName = (originalName) =>
+  originalName.toLowerCase().endsWith(YOUTUBE_MEDIA_EXTENSION);
+
+// Per-minute scene frames are cached as "<video>@t<seconds>@…", so the name in
+// front of the size segment is not itself a file. Trace it back to the clip it
+// was taken from before deciding whether its source still exists.
+const SCENE_SUFFIX_PATTERN = /@t\d+(?:\.\d+)?$/;
+const baseMediaName = (originalName) => originalName.replace(SCENE_SUFFIX_PATTERN, "");
+
 const isFreshTempFile = (targetPath) => {
   let stat;
   try {
@@ -187,6 +260,7 @@ const cleanupImageCache = ({ albumDir, publicAlbumDir, invalidateOptimisedImages
     };
   }
 
+  const declaredExternals = listDeclaredExternalNames(albumDir);
   let removedStale = 0;
   let removedUnneeded = 0;
   let removedChanged = 0;
@@ -209,7 +283,19 @@ const cleanupImageCache = ({ albumDir, publicAlbumDir, invalidateOptimisedImages
     }
 
     const { originalName, size } = parseCacheFileName(file);
-    const originalFile = path.join(albumDir, originalName);
+    const sourceName = baseMediaName(originalName);
+    const originalFile = path.join(albumDir, sourceName);
+
+    if (isExternalCacheName(sourceName)) {
+      if (declaredExternals && !declaredExternals.has(sourceName)) {
+        removedStale += removeFileIfExists(cachedFile) ? 1 : 0;
+        continue;
+      }
+      if (!OPTIMISED_IMAGE_SIZES.has(size)) {
+        removedUnneeded += removeFileIfExists(cachedFile) ? 1 : 0;
+      }
+      continue;
+    }
 
     if (!fs.existsSync(originalFile)) {
       removedStale += removeFileIfExists(cachedFile) ? 1 : 0;
@@ -236,6 +322,7 @@ const cleanupVideoCache = ({ albumDir, publicAlbumDir }) => {
     return { removedStale: 0, removedUnneeded: 0, removedChanged: 0, removedStaleTemp: 0 };
   }
 
+  const declaredExternals = listDeclaredExternalNames(albumDir);
   let removedStale = 0;
   let removedUnneeded = 0;
   let removedChanged = 0;
@@ -252,7 +339,15 @@ const cleanupVideoCache = ({ albumDir, publicAlbumDir }) => {
     }
 
     const { originalName, size } = parseCacheFileName(file);
-    const originalFile = path.join(albumDir, originalName);
+    const sourceName = baseMediaName(originalName);
+    const originalFile = path.join(albumDir, sourceName);
+
+    if (isExternalCacheName(sourceName)) {
+      if (declaredExternals && !declaredExternals.has(sourceName)) {
+        removedStale += removeFileIfExists(cachedFile) ? 1 : 0;
+      }
+      continue;
+    }
 
     if (!fs.existsSync(originalFile)) {
       removedStale += removeFileIfExists(cachedFile) ? 1 : 0;
@@ -261,6 +356,15 @@ const cleanupVideoCache = ({ albumDir, publicAlbumDir }) => {
 
     if (hasSourceChangedSinceCache(originalFile, cachedFile)) {
       removedChanged += removeFileIfExists(cachedFile) ? 1 : 0;
+      continue;
+    }
+
+    // "<video>@poster.jpg" / "<video>@poster.json" are the extracted frame the
+    // indexer reads and the sidecar describing the clip, not a transcode at
+    // some retired width. They parse to a NaN size like any other non-numeric
+    // segment, so without this they would be swept every run and re-extracted
+    // on the next build.
+    if (isPosterCacheFile(file)) {
       continue;
     }
 

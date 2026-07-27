@@ -132,3 +132,18 @@
     opacity: 1;
   }
 }
+
+/* A clip's tile is its poster frame, which is indistinguishable from a photo
+   without this. */
+.videoBadge {
+  position: absolute;
+  inset-block-start: var(--m);
+  inset-inline-start: var(--m);
+  z-index: var(--z-raised);
+  border-radius: var(--radius-pill);
+  background-color: var(--c-overlay-dark);
+  color: var(--c-white);
+  font-size: var(--fs-xs);
+  line-height: 1;
+  padding: var(--m-xs) var(--m-s);
+}

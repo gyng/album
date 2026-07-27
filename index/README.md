@@ -17,6 +17,10 @@ Indexes images for search with the following fields
 | metadata     | lat_deg             | map          |                                   |
 | metadata     | lng_deg             | map          |                                   |
 | metadata     | iso8601             |              | camera-local naive ISO timestamp  |
+| metadata     | media_kind          | play badge   | `photo` or `video`                |
+| metadata     | duration_seconds    | play badge   | clip length, videos only          |
+| metadata     | scene_seconds       | moment badge | offset of a scene into its clip   |
+| metadata     | scene_of            | collapsing   | the clip a scene belongs to       |
 | embeddings   | path                | similarity   | composite key with `model_id`     |
 | embeddings   | model_id            | similarity   | embedding model identifier        |
 | embeddings   | embedding_dim       | similarity   | vector dimensionality             |
@@ -26,6 +30,21 @@ Indexes images for search with the following fields
 | pipeline_state | path, stage        | indexing     | digest, version, model provenance  |
 
 The [FTS5 SQLite extension](https://www.sqlite.org/fts5.html) requires sqlite3 >= 3.34.0 and creates a virtual table.
+
+Videos are indexed too, through a poster frame. `npm run prepare:posters` (from
+`src/`) extracts one frame per clip and downloads a thumbnail for each YouTube
+external, writing both a full-size JPEG and a sidecar of the clip's wall-clock
+time, coordinates and duration into the album's `.resized_videos` cache. Run it
+before indexing: the frame is what the captioner, the embedders and the colour
+extractor all read, and a clip without one is reported and skipped rather than
+indexed blind. `--media-root` points at that cache (default
+`../src/public/data/albums`) and is shared by `index`, `prune` and `validate`.
+
+A clip longer than a minute also gets a frame per minute, indexed as scene rows
+named `clip.mov@t120`. Those are embedding-only — vectors and a locatable row,
+never a caption or a palette — so a long video becomes findable at the moment it
+happens without costing a caption per minute. `validate` does not expect caption
+provenance for them.
 
 The first inference run downloads pinned model snapshots. Later runs process only
 missing, changed, or pipeline-version-stale stages. Source freshness uses SHA-256,

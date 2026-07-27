@@ -25,6 +25,7 @@ jest.mock("./video", () => ({
     audioCodec: "aac",
     container: "mov,mp4,m4a,3gp,3g2,mj2",
   })),
+  readVideoPoster: jest.fn(() => null),
 }));
 
 describe("serialization", () => {

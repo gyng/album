@@ -3,6 +3,11 @@ import { PhotoBlockEl } from "./Photo";
 import styles from "./PhotoAlbum.module.css";
 import { TextBlockEl } from "./TextBlock";
 import { LocalVideoBlockEl, YoutubeBlockEl } from "./VideoBlock";
+import { pickPosterVariant } from "../util/videoPoster";
+
+// Album pages present a clip at roughly full column width; the poster is
+// replaced by the first decoded frame as soon as playback starts.
+const POSTER_DISPLAY_WIDTH = 1600;
 
 export const Block: React.FC<{
   b: IBlock;
@@ -23,10 +28,15 @@ export const Block: React.FC<{
           />
         );
       } else if ((props.b as VideoBlock).data.type === "local") {
+        const poster = pickPosterVariant(
+          (props.b as VideoBlock)._build?.poster?.srcset,
+          POSTER_DISPLAY_WIDTH,
+        );
         return (
           <LocalVideoBlockEl
             id={(props.b as VideoBlock).id}
             src={(props.b as VideoBlock).data.href}
+            {...(poster ? { posterSrc: poster.src } : {})}
             originalSrc={(props.b as VideoBlock)._build?.originalSrc}
             date={(props.b as VideoBlock).data.date}
             mimeType={(props.b as VideoBlock)._build?.mimeType}

@@ -99,6 +99,21 @@ export interface VideoBlock extends IBlock {
     src: string;
     originalSrc?: string;
     mimeType: string;
+    /**
+     * The extracted frame that stands in for the clip wherever pixels are
+     * needed but a `<video>` is not — the album page's `poster`, search tiles,
+     * map markers. Written by services/videoPoster.ts into the album's own
+     * `.resized_images` cache under the video's filename, so it is addressed by
+     * exactly the same URLs as a photo's variants.
+     */
+    poster?: {
+      srcset: OptimisedPhoto[];
+    };
+    /** Camera-local wall clock, no zone — the same reading EXIF dates use. */
+    capturedAtLocal?: string;
+    latDeg?: number;
+    lngDeg?: number;
+    durationSeconds?: number;
     originalTechnicalData?: {
       originalDate?: string;
       codec?: string;

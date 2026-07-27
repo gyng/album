@@ -43,6 +43,25 @@ test.describe("Smoke Tests", () => {
     expect(await photos.count()).toBeGreaterThan(0);
   });
 
+  // The poster is produced by a build prepass, from a real ffmpeg extraction of
+  // the committed fixture clip. Without it the clip is a black rectangle until
+  // it plays, and nothing downstream (search, map, timeline) has any pixels for
+  // it either — so a missing poster here is the signal that the prepass did not
+  // run or did not survive the build.
+  test("a local video shows the poster frame extracted for it", async ({ page }) => {
+    await page.goto("/album/test-simple#DSCF0159.MOV", { waitUntil: "domcontentloaded" });
+
+    const video = page.locator("video").first();
+    await expect(video).toHaveAttribute(
+      "poster",
+      /\/data\/albums\/test-simple\/\.resized_images\/DSCF0159\.MOV%40\d+\.avif/,
+    );
+
+    const posterUrl = await video.getAttribute("poster");
+    const response = await page.request.get(posterUrl!);
+    expect(response.status()).toBe(200);
+  });
+
   test("map page loads a map that really rendered", async ({ page }) => {
     await page.goto("/map", { waitUntil: "domcontentloaded" });
     await expect(page).toHaveTitle("Map | Snapshots");
