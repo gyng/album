@@ -753,6 +753,55 @@ const loadDbState = async (dbPath, embeddingsDbPath = null) => {
   }
 };
 
+// A YouTube external is indexed under the synthetic "<video id>.youtube" name
+// that services/youtubeExternal.ts gives it, and has no file in the album
+// directory at all. The manifest is what says whether one is still wanted, so
+// reading them here keeps a perfectly-indexed external from being reported as a
+// photo that has gone missing on every single publish.
+const YOUTUBE_MEDIA_EXTENSION = ".youtube";
+
+const readYoutubeVideoId = (href) => {
+  try {
+    const url = new URL(href);
+    const host = url.hostname.replace(/^www\./, "");
+    const candidate =
+      host === "youtu.be"
+        ? url.pathname.slice(1)
+        : host.endsWith("youtube.com")
+          ? url.pathname.startsWith("/embed/")
+            ? url.pathname.slice("/embed/".length)
+            : (url.searchParams.get("v") ?? "")
+          : "";
+    const id = candidate.split("/")[0] ?? "";
+    return /^[\w-]{8,16}$/.test(id) ? id : null;
+  } catch {
+    return null;
+  }
+};
+
+const readDeclaredExternalNames = (albumDir) => {
+  const manifestPath = path.join(albumDir, ALBUM_CONFIG_FILENAME);
+  if (!fileExists(manifestPath)) {
+    return [];
+  }
+
+  let manifest;
+  try {
+    manifest = JSON.parse(fs.readFileSync(manifestPath, "utf-8"));
+  } catch {
+    // An unreadable manifest is reported separately; it is not evidence that
+    // anything is orphaned.
+    return [];
+  }
+
+  const externals = Array.isArray(manifest?.externals) ? manifest.externals : [];
+  return externals
+    .filter((external) => external?.type === "youtube" && typeof external.href === "string")
+    .map((external) => readYoutubeVideoId(external.href))
+    .filter(Boolean)
+    .map((id) => `${id}${YOUTUBE_MEDIA_EXTENSION}`);
+};
+
 const readAlbumManifestStatus = (albumDir) => {
   const manifestPath = path.join(albumDir, ALBUM_CONFIG_FILENAME);
   if (!fileExists(manifestPath)) {
@@ -946,9 +995,16 @@ const createAlbumReport = async ({ albumDir, albumName, dbState }) => {
     return !dbState.indexedPhotoPaths.has(relativePath);
   });
 
+  // Externals are indexed but never on disk, so the set of paths that legitimately
+  // exist for this album is its photos plus whatever the manifest declares.
+  const externalPaths = readDeclaredExternalNames(albumDir).map((filename) =>
+    toPosixPath(path.join("../albums", albumName, filename)),
+  );
+  const indexablePaths = [...photoPaths, ...externalPaths];
+
   const removedPhotos = Array.from(dbState.indexedPhotoPaths)
     .filter((indexedPath) => indexedPath.startsWith(`../albums/${albumName}/`))
-    .filter((indexedPath) => !photoPaths.includes(indexedPath));
+    .filter((indexedPath) => !indexablePaths.includes(indexedPath));
 
   const newPhotos = [];
   for (const filename of newPhotoNames) {

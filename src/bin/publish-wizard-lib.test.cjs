@@ -19,7 +19,60 @@ const {
   resolveDeploymentDelta,
   resolveExecutionPlan,
 } = require("./publish-wizard-lib.cjs");
+const lib = require("./publish-wizard-lib.cjs");
 
+describe("createAlbumReport with externals", () => {
+  // A YouTube external is indexed under a synthetic "<video id>.youtube" name
+  // and has no file in the album directory. Reading it as a photo that has gone
+  // missing would report every publish as needing reconciliation, and invite
+  // pruning rows that are exactly where they should be.
+  it("does not read an indexed external as a removed photo", async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "album-wizard-externals-"));
+    const albumDir = path.join(root, "trip");
+    fs.mkdirSync(albumDir, { recursive: true });
+    fs.writeFileSync(path.join(albumDir, "a.jpg"), "photo");
+    fs.writeFileSync(
+      path.join(albumDir, "album.json"),
+      JSON.stringify({
+        externals: [{ type: "youtube", href: "https://www.youtube.com/embed/ycyUWULJxdU" }],
+      }),
+    );
+
+    const report = await lib.createAlbumReport({
+      albumDir,
+      albumName: "trip",
+      dbState: {
+        indexedPhotoPaths: new Set([
+          "../albums/trip/a.jpg",
+          "../albums/trip/ycyUWULJxdU.youtube",
+          "../albums/trip/deleted.jpg",
+        ]),
+        hasEmbeddingsTable: true,
+      },
+    });
+
+    expect(report.removedPhotos).toEqual(["../albums/trip/deleted.jpg"]);
+  });
+
+  it("still reports an external that the manifest no longer declares", async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "album-wizard-externals-"));
+    const albumDir = path.join(root, "trip");
+    fs.mkdirSync(albumDir, { recursive: true });
+    fs.writeFileSync(path.join(albumDir, "a.jpg"), "photo");
+    fs.writeFileSync(path.join(albumDir, "album.json"), JSON.stringify({ externals: [] }));
+
+    const report = await lib.createAlbumReport({
+      albumDir,
+      albumName: "trip",
+      dbState: {
+        indexedPhotoPaths: new Set(["../albums/trip/a.jpg", "../albums/trip/ycyUWULJxdU.youtube"]),
+        hasEmbeddingsTable: true,
+      },
+    });
+
+    expect(report.removedPhotos).toEqual(["../albums/trip/ycyUWULJxdU.youtube"]);
+  });
+});
 describe("publish-wizard-lib", () => {
   it("parses the supported CLI flags", () => {
     expect(parseArgs(["--dry-run", "--yes", "--deploy", "--index-only", "--json"])).toEqual({
