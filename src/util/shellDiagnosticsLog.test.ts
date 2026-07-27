@@ -44,13 +44,28 @@ describe("shellDiagnosticsLog", () => {
   it("appends events across categories in order and reads them back", () => {
     const storage = makeStorage();
     appendShellEvent({ category: "wake", type: "lost" }, 1000, storage);
-    appendShellEvent({ category: "code", type: "reload", version: "abcdef1234" }, 2000, storage);
+    appendShellEvent(
+      {
+        category: "code",
+        type: "reload",
+        version: "abcdef1234",
+        reason: "service-worker-update",
+      },
+      2000,
+      storage,
+    );
     appendShellEvent({ category: "network", type: "offline" }, 3000, storage);
     appendShellEvent({ category: "visibility", type: "hidden" }, 4000, storage);
     appendShellEvent({ category: "gap", type: "gap", durationMs: 120000 }, 5000, storage);
     expect(readShellLog(storage)).toEqual([
       { at: 1000, category: "wake", type: "lost" },
-      { at: 2000, category: "code", type: "reload", version: "abcdef1234" },
+      {
+        at: 2000,
+        category: "code",
+        type: "reload",
+        version: "abcdef1234",
+        reason: "service-worker-update",
+      },
       { at: 3000, category: "network", type: "offline" },
       { at: 4000, category: "visibility", type: "hidden" },
       { at: 5000, category: "gap", type: "gap", durationMs: 120000 },
@@ -135,7 +150,13 @@ describe("shellDiagnosticsLog", () => {
       { at: 0, category: "wake", type: "reacquire-failed" },
       { at: 0, category: "wake", type: "cap-reached" },
       { at: 0, category: "wake", type: "cap-decayed" },
-      { at: 0, category: "code", type: "reload", version: "abcdef1234" },
+      {
+        at: 0,
+        category: "code",
+        type: "reload",
+        version: "abcdef1234",
+        reason: "service-worker-update",
+      },
       { at: 0, category: "code", type: "reload" },
       { at: 0, category: "code", type: "retry-cap-reached" },
       { at: 0, category: "code", type: "version-skew", version: "abcdef1234" },
@@ -150,8 +171,22 @@ describe("shellDiagnosticsLog", () => {
     }
     // The reload label carries the short target version.
     expect(
-      describeShellEvent({ at: 0, category: "code", type: "reload", version: "abcdef1234" }),
+      describeShellEvent({
+        at: 0,
+        category: "code",
+        type: "reload",
+        version: "abcdef1234",
+        reason: "service-worker-update",
+      }),
     ).toContain("abcdef12");
+    expect(
+      describeShellEvent({
+        at: 0,
+        category: "code",
+        type: "reload",
+        reason: "service-worker-update",
+      }),
+    ).toContain("service worker update");
     // The gap label carries the humanised duration.
     expect(describeShellEvent({ at: 0, category: "gap", type: "gap", durationMs: 8100000 })).toBe(
       "Page was not running for 2 hours 15 minutes",
@@ -302,14 +337,19 @@ describe("coalescing repeated events", () => {
     expect(entry.lastAt).toBe(121000);
   });
 
-  it("does not coalesce across different types, categories, or code versions", () => {
+  it("does not coalesce across different types, categories, code versions, or reload reasons", () => {
     const storage = makeStorage();
     appendShellEvent({ category: "wake", type: "lost" }, 1000, storage);
     appendShellEvent({ category: "wake", type: "acquired" }, 2000, storage);
     appendShellEvent({ category: "code", type: "reload", version: "a" }, 3000, storage);
     appendShellEvent({ category: "code", type: "reload", version: "b" }, 4000, storage);
+    appendShellEvent(
+      { category: "code", type: "reload", version: "b", reason: "manual" },
+      5000,
+      storage,
+    );
 
-    expect(readShellLog(storage)).toHaveLength(4);
+    expect(readShellLog(storage)).toHaveLength(5);
   });
 
   it("never coalesces gap events so each freeze keeps its own duration", () => {

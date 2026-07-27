@@ -27,6 +27,12 @@ export type CodeEventType =
   | "retry-cap-reached" // the runtime reload retry budget was exhausted
   | "version-skew"; // the running frame reported a build behind the target
 
+export type CodeReloadReason =
+  | "build-update"
+  | "service-worker-update"
+  | "runtime-timeout"
+  | "manual";
+
 export type NetworkEventType = "online" | "offline";
 
 export type VisibilityEventType = "visible" | "hidden";
@@ -41,7 +47,13 @@ type Coalesced = { count?: number; lastAt?: number };
 
 export type ShellLogEntry =
   | ({ at: number; category: "wake"; type: WakeEventType } & Coalesced)
-  | ({ at: number; category: "code"; type: CodeEventType; version?: string } & Coalesced)
+  | ({
+      at: number;
+      category: "code";
+      type: CodeEventType;
+      version?: string;
+      reason?: CodeReloadReason;
+    } & Coalesced)
   | ({ at: number; category: "network"; type: NetworkEventType } & Coalesced)
   | ({ at: number; category: "visibility"; type: VisibilityEventType } & Coalesced)
   | { at: number; category: "gap"; type: GapEventType; durationMs: number };
@@ -49,7 +61,7 @@ export type ShellLogEntry =
 // The input to a record call: an entry minus its timestamp (the log stamps it).
 export type ShellLogInput =
   | { category: "wake"; type: WakeEventType }
-  | { category: "code"; type: CodeEventType; version?: string }
+  | { category: "code"; type: CodeEventType; version?: string; reason?: CodeReloadReason }
   | { category: "network"; type: NetworkEventType }
   | { category: "visibility"; type: VisibilityEventType }
   | { category: "gap"; type: GapEventType; durationMs: number };
@@ -82,6 +94,12 @@ const KNOWN_TYPES: Record<ShellLogEntry["category"], ReadonlySet<string>> = {
   visibility: new Set<VisibilityEventType>(["visible", "hidden"]),
   gap: new Set<GapEventType>(["gap"]),
 };
+const KNOWN_RELOAD_REASONS = new Set<CodeReloadReason>([
+  "build-update",
+  "service-worker-update",
+  "runtime-timeout",
+  "manual",
+]);
 
 const isShellLogEntry = (value: unknown): value is ShellLogEntry => {
   if (typeof value !== "object" || value === null) {
@@ -102,6 +120,15 @@ const isShellLogEntry = (value: unknown): value is ShellLogEntry => {
   if (
     category === "gap" &&
     (typeof entry.durationMs !== "number" || !Number.isFinite(entry.durationMs))
+  ) {
+    return false;
+  }
+  if (
+    category === "code" &&
+    entry.type === "reload" &&
+    entry.reason !== undefined &&
+    (typeof entry.reason !== "string" ||
+      !KNOWN_RELOAD_REASONS.has(entry.reason as CodeReloadReason))
   ) {
     return false;
   }
@@ -161,14 +188,16 @@ export const appendShellEvent = (
     candidate.category === input.category &&
     candidate.type === input.type &&
     (candidate.category !== "code" ||
-      (candidate as { version?: string }).version === (input as { version?: string }).version);
-  // Coalesce a repeat of the newest entry (same category, type, and version)
-  // rather than appending — gap entries always stand alone so each freeze
-  // keeps its own duration. The wake retry CYCLE (failed attempts, cap, decay,
-  // repeat) additionally coalesces through its own siblings: a pure-rejection
-  // night otherwise appends one alternating triple per decay cycle and evicts
-  // the onset evidence after ~6 hours; looking back through cycle-type entries
-  // keeps a whole night at one entry per cycle type.
+      ((candidate as { version?: string }).version === (input as { version?: string }).version &&
+        (candidate as { reason?: CodeReloadReason }).reason ===
+          (input as { reason?: CodeReloadReason }).reason));
+  // Coalesce a repeat of the newest entry (same category, type, version, and
+  // reload reason) rather than appending — gap entries always stand alone so
+  // each freeze keeps its own duration. The wake retry CYCLE (failed attempts,
+  // cap, decay, repeat) additionally coalesces through its own siblings: a
+  // pure-rejection night otherwise appends one alternating triple per decay
+  // cycle and evicts the onset evidence after ~6 hours; looking back through
+  // cycle-type entries keeps a whole night at one entry per cycle type.
   const isWakeCycleType = (candidate: ShellLogEntry): boolean =>
     candidate.category === "wake" &&
     (candidate.type === "reacquire-failed" ||
@@ -367,6 +396,19 @@ export const writeStatusPillVisible = (
 
 const shortVersion = (version: string): string => version.slice(0, 8);
 
+const reloadReasonLabel = (reason: CodeReloadReason): string => {
+  switch (reason) {
+    case "build-update":
+      return "new build detected";
+    case "service-worker-update":
+      return "service worker update";
+    case "runtime-timeout":
+      return "runtime did not become ready";
+    case "manual":
+      return "manual request";
+  }
+};
+
 // Plain en-GB duration phrasing for a heartbeat gap, e.g. "2 hours 14 minutes".
 export const formatGapDuration = (ms: number): string => {
   const safeMs = Math.max(0, ms);
@@ -412,9 +454,12 @@ const describeShellEventBase = (entry: ShellLogEntry): string => {
     case "code":
       switch (entry.type) {
         case "reload":
-          return entry.version
+          const reloadDescription = entry.version
             ? `Reloaded code to ${shortVersion(entry.version)}`
             : "Reloaded code";
+          return entry.reason
+            ? `${reloadDescription} (${reloadReasonLabel(entry.reason)})`
+            : reloadDescription;
         case "retry-cap-reached":
           return "Update retries exhausted";
         case "version-skew":

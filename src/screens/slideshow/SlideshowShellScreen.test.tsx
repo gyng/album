@@ -141,7 +141,48 @@ describe("slideshow code shell", () => {
       ),
     );
     expect(screen.getAllByText("Reloading code")).not.toHaveLength(0);
+    expect(
+      readShellLog(window.localStorage).find(
+        (entry) => entry.category === "code" && entry.type === "reload",
+      ),
+    ).toMatchObject({ version: "build-next", reason: "build-update" });
     expect(releaseWakeLock).not.toHaveBeenCalled();
+  });
+
+  it("attributes a build reload to an activating service worker when it triggered the check", async () => {
+    const serviceWorker = new EventTarget();
+    Object.defineProperty(navigator, "serviceWorker", {
+      configurable: true,
+      value: serviceWorker,
+    });
+    const fetchMock = jest
+      .fn()
+      .mockImplementationOnce(() => versionResponse("build-current"))
+      .mockImplementationOnce(() => versionResponse("build-next"));
+    global.fetch = fetchMock;
+
+    try {
+      render(<SlideshowShellScreen />);
+      await waitFor(() => expect(screen.getByText(/checked /)).toBeInTheDocument());
+
+      act(() => {
+        serviceWorker.dispatchEvent(new Event("controllerchange"));
+      });
+
+      await waitFor(() =>
+        expect(screen.getByTitle("Slideshow")).toHaveAttribute(
+          "src",
+          "/slideshow?filter=test-simple&delay=60&shell=1&shellVersion=build-next",
+        ),
+      );
+      expect(
+        readShellLog(window.localStorage).find(
+          (entry) => entry.category === "code" && entry.type === "reload",
+        ),
+      ).toMatchObject({ version: "build-next", reason: "service-worker-update" });
+    } finally {
+      Reflect.deleteProperty(navigator, "serviceWorker");
+    }
   });
 
   it("stops rebooting the frame once a stuck build exhausts its retry budget", async () => {
@@ -389,6 +430,11 @@ describe("slideshow code shell", () => {
         await Promise.resolve();
       });
       expect(screen.getByTitle("Slideshow").getAttribute("data-runtime-generation")).toBe("2");
+      expect(
+        readShellLog(window.localStorage)
+          .filter((entry) => entry.category === "code" && entry.type === "reload")
+          .at(-1),
+      ).toMatchObject({ reason: "manual" });
 
       // The now-cancelled backoff timer must not fire a second, back-to-back
       // reload once its original delay elapses. Advance past that delay but
@@ -423,6 +469,11 @@ describe("slideshow code shell", () => {
       });
 
       expect(screen.getByTitle("Slideshow").getAttribute("data-runtime-generation")).toBe("1");
+      expect(
+        readShellLog(window.localStorage).find(
+          (entry) => entry.category === "code" && entry.type === "reload",
+        ),
+      ).toMatchObject({ reason: "runtime-timeout" });
     } finally {
       jest.useRealTimers();
     }

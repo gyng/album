@@ -16,6 +16,7 @@ import {
   STATUS_PILL_STORAGE_KEY,
   writeHeartbeat,
   writeShellStatus,
+  type CodeReloadReason,
   type ShellLogEntry,
   type ShellStatusSnapshot,
 } from "../../util/shellDiagnosticsLog";
@@ -87,6 +88,10 @@ export const SlideshowShellScreen = () => {
   const latestVersionRef = React.useRef<string>(BUILD_VERSION);
   const runtimeSearchRef = React.useRef("");
   const checkInFlightRef = React.useRef(false);
+  // A controller change can land while a normal version check is already in
+  // flight. Keep the signal until a valid manifest is observed so that check
+  // can still attribute any resulting reload to the service worker.
+  const serviceWorkerUpdatePendingRef = React.useRef(false);
   const runtimeReadyRef = React.useRef(false);
   const reloadTrackerRef = React.useRef<RuntimeReloadTracker | null>(null);
   const reloadTimerRef = React.useRef<number | null>(null);
@@ -317,10 +322,12 @@ export const SlideshowShellScreen = () => {
     pendingReloadTargetRef.current = null;
   }, []);
 
-  const reloadRuntime = React.useCallback((buildVersion: string) => {
+  const reloadRuntime = React.useCallback((buildVersion: string, reason: CodeReloadReason) => {
     runtimeReadyRef.current = false;
     setCodeStatus("reloading");
-    setEventHistory(appendShellEvent({ category: "code", type: "reload", version: buildVersion }));
+    setEventHistory(
+      appendShellEvent({ category: "code", type: "reload", version: buildVersion, reason }),
+    );
     setRuntimeFrame((current) => ({
       src: buildSlideshowRuntimeUrl(runtimeSearchRef.current, buildVersion),
       generation: (current?.generation ?? -1) + 1,
@@ -337,7 +344,7 @@ export const SlideshowShellScreen = () => {
   // several times inside one backoff window would burn the whole budget without
   // a single frame ever reloading.
   const attemptRuntimeReload = React.useCallback(
-    (targetVersion: string) => {
+    (targetVersion: string, reason: CodeReloadReason) => {
       const plan = planRuntimeReload(targetVersion, reloadTrackerRef.current);
       if (!plan.shouldReload) {
         // Budget exhausted — hold until the target version changes again. Record
@@ -356,7 +363,7 @@ export const SlideshowShellScreen = () => {
         // Immediate reload: cancel any pending timer and count this execution.
         clearPendingReload();
         reloadTrackerRef.current = recordRuntimeReload(targetVersion, reloadTrackerRef.current);
-        reloadRuntime(targetVersion);
+        reloadRuntime(targetVersion, reason);
         return;
       }
       // Backoff. Keep an existing timer toward the same target untouched so
@@ -376,7 +383,7 @@ export const SlideshowShellScreen = () => {
         pendingReloadTargetRef.current = null;
         // The attempt is counted here, at actual execution, not when planned.
         reloadTrackerRef.current = recordRuntimeReload(targetVersion, reloadTrackerRef.current);
-        reloadRuntime(targetVersion);
+        reloadRuntime(targetVersion, reason);
       }, plan.delayMs);
     },
     [clearPendingReload, reloadRuntime],
@@ -399,7 +406,7 @@ export const SlideshowShellScreen = () => {
     const targetVersion = latestVersionRef.current;
     clearPendingReload();
     reloadTrackerRef.current = recordRuntimeReload(targetVersion, reloadTrackerRef.current);
-    reloadRuntime(targetVersion);
+    reloadRuntime(targetVersion, "manual");
   }, [clearPendingReload, reloadRuntime]);
 
   // Serialise a full diagnostics report ON DEMAND (built only here, retained
@@ -475,7 +482,7 @@ export const SlideshowShellScreen = () => {
       if (runtimeReadyRef.current) {
         return;
       }
-      attemptRuntimeReload(latestVersionRef.current);
+      attemptRuntimeReload(latestVersionRef.current, "runtime-timeout");
     }, RUNTIME_READY_TIMEOUT_MS);
     return () => window.clearTimeout(timer);
   }, [generation, attemptRuntimeReload]);
@@ -508,9 +515,13 @@ export const SlideshowShellScreen = () => {
         return;
       }
 
+      const reason: CodeReloadReason = serviceWorkerUpdatePendingRef.current
+        ? "service-worker-update"
+        : "build-update";
+      serviceWorkerUpdatePendingRef.current = false;
       latestVersionRef.current = latestVersion;
       if (decideBuildUpdate(latestVersion, runtimeVersionRef.current)) {
-        attemptRuntimeReload(latestVersion);
+        attemptRuntimeReload(latestVersion, reason);
         return;
       }
       if (runtimeReadyRef.current) {
@@ -558,15 +569,27 @@ export const SlideshowShellScreen = () => {
       setCodeStatus("offline");
       setEventHistory(appendShellEvent({ category: "network", type: "offline" }));
     };
+    const handleServiceWorkerControllerChange = () => {
+      serviceWorkerUpdatePendingRef.current = true;
+      void checkForCodeUpdate();
+    };
 
     document.addEventListener("visibilitychange", handleVisibilityChange);
     window.addEventListener("online", handleOnline);
     window.addEventListener("offline", handleOffline);
+    navigator.serviceWorker?.addEventListener(
+      "controllerchange",
+      handleServiceWorkerControllerChange,
+    );
     return () => {
       window.clearInterval(interval);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
       window.removeEventListener("online", handleOnline);
       window.removeEventListener("offline", handleOffline);
+      navigator.serviceWorker?.removeEventListener(
+        "controllerchange",
+        handleServiceWorkerControllerChange,
+      );
     };
   }, [checkForCodeUpdate]);
 
