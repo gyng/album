@@ -187,7 +187,7 @@
   inline-size: 100%;
   block-size: 100%;
   pointer-events: none;
-  overflow: visible;
+  overflow: hidden;
   z-index: var(--z-map-route);
 }
 
@@ -198,10 +198,13 @@
   stroke-linecap: round;
   stroke-linejoin: round;
   stroke-dasharray: var(--size-8) var(--size-8);
-  animation: routeMarch var(--route-speed, var(--t-route)) linear infinite;
-  will-change: stroke-dashoffset;
   vector-effect: non-scaling-stroke;
   shape-rendering: geometricPrecision;
+}
+
+.routeOverlayPathAnimated {
+  animation: routeMarch var(--route-speed, var(--t-route)) linear infinite;
+  will-change: stroke-dashoffset;
 }
 
 .routeOverlayPathCasing {
@@ -232,6 +235,10 @@
 }
 
 .routeEndpointPing {
+  opacity: 0.65;
+}
+
+.routeEndpointPingAnimated {
   animation: routeEndpointPing var(--t-hint) var(--ease-out) infinite;
 }
 
@@ -271,8 +278,8 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .routeOverlayPath,
-  .routeEndpointPing {
+  .routeOverlayPathAnimated,
+  .routeEndpointPingAnimated {
     animation: none;
   }
 }

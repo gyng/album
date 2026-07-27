@@ -51,6 +51,7 @@ const mapInstance = {
   jumpTo: jest.fn(),
   getBearing: jest.fn(() => 10),
   getPitch: jest.fn(() => 20),
+  getZoom: jest.fn(() => 7),
   getCanvasContainer: jest.fn(() => mapCanvas),
   getContainer: jest.fn(() => mapCanvas),
   dragPan: {

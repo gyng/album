@@ -73,6 +73,7 @@ const props = () => ({
 describe("MapRouteOverlay", () => {
   const on = jest.fn();
   const project = jest.fn();
+  const mapContainer = document.createElement("div");
   // The port hands back an unsubscribe rather than taking an `off` pair.
   const unsubscribed: string[] = [];
   const callbacks = new Map<string, () => void>();
@@ -103,7 +104,11 @@ describe("MapRouteOverlay", () => {
       x: lng,
       y: lat,
     }));
-    currentMap = { on, project };
+    Object.defineProperties(mapContainer, {
+      clientWidth: { configurable: true, value: 100 },
+      clientHeight: { configurable: true, value: 80 },
+    });
+    currentMap = { on, project, getContainer: () => mapContainer, getZoom: () => 7 };
     projectSegments.mockImplementation((_points, projectPoint) => {
       projectPoint([1, 2]);
       return segments;
@@ -119,6 +124,10 @@ describe("MapRouteOverlay", () => {
     render(<MapRouteOverlay {...props()} />);
 
     expect(screen.getAllByTestId("journey-line-segment")).toHaveLength(2);
+    expect(screen.getAllByTestId("journey-line-segment")[0]).toHaveClass(
+      "routeOverlayPathAnimated",
+    );
+    expect(document.querySelectorAll(".routeEndpointPingAnimated")).toHaveLength(4);
     expect(screen.getByTestId("journey-line-ghost-route")).toHaveStyle({
       strokeWidth: "2.5",
       strokeDasharray: "2 8",
@@ -130,7 +139,35 @@ describe("MapRouteOverlay", () => {
     );
     expect(screen.getByTestId("journey-line-end")).toHaveAttribute("transform", "translate(5, 6)");
     expect(document.querySelectorAll("linearGradient stop")).toHaveLength(3);
+    expect(screen.getByTestId("journey-line-overlay")).toHaveAttribute("overflow", "hidden");
     expect(on.mock.calls.map(([event]) => event)).toEqual(["move", "zoom", "resize"]);
+  });
+
+  it("does not mount off-screen animated route legs", () => {
+    projectSegments.mockReturnValue([
+      segment("visible", { startX: 10, startY: 10, endX: 40, endY: 40 }),
+      segment("offscreen", {
+        startX: 1_000,
+        startY: 1_000,
+        endX: 1_100,
+        endY: 1_100,
+      }),
+    ]);
+
+    render(<MapRouteOverlay {...props()} />);
+
+    expect(screen.getAllByTestId("journey-line-segment")).toHaveLength(1);
+  });
+
+  it("keeps journey dashes static at the rich-thumbnail zoom", () => {
+    currentMap = { ...currentMap, getZoom: () => 10 };
+
+    render(<MapRouteOverlay {...props()} />);
+
+    expect(screen.getAllByTestId("journey-line-segment")[0]).not.toHaveClass(
+      "routeOverlayPathAnimated",
+    );
+    expect(document.querySelectorAll(".routeEndpointPingAnimated")).toHaveLength(0);
   });
 
   it("updates projection on map movement and unsubscribes on cleanup", () => {
@@ -190,7 +227,9 @@ describe("MapRouteOverlay", () => {
     [true, null],
     [true, [routePoints[0]]],
   ])("renders nothing without a projectable route", (hasMap, points) => {
-    currentMap = hasMap ? { on, project } : null;
+    currentMap = hasMap
+      ? { on, project, getContainer: () => mapContainer, getZoom: () => 7 }
+      : null;
     projectSegments.mockReturnValue([]);
     const { container } = render(
       <MapRouteOverlay {...props()} routePoints={points as RoutePoint[] | null} />,

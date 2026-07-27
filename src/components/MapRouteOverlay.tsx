@@ -2,6 +2,7 @@ import React from "react";
 import { useMap } from "./map";
 import type { RouteMode, RoutePoint } from "./mapRoute";
 import {
+  clipRouteSegmentsToViewport,
   formatDistanceKm,
   getAnimationSecondsFromSpeed,
   getDirectionalGradientStops,
@@ -10,6 +11,7 @@ import {
   projectRouteSegments,
   selectPreferredLabelSegmentIds,
 } from "./mapRouteOverlayModel";
+import { THUMBNAIL_HIDE_ZOOM } from "./mapWorldViewModel";
 import styles from "./MapWorld.module.css";
 
 const useMapOverlayVersion = () => {
@@ -106,6 +108,20 @@ export const MapRouteOverlay = ({
     };
   }, [getPointColor, projectedSegments, routePoints]);
 
+  const visibleProjectedSegments = React.useMemo(() => {
+    void version;
+
+    if (!map) {
+      return [];
+    }
+
+    const container = map.getContainer();
+    return clipRouteSegmentsToViewport(projectedSegments, {
+      width: container.clientWidth,
+      height: container.clientHeight,
+    });
+  }, [map, projectedSegments, version]);
+
   const projectedGhostPath = React.useMemo(() => {
     void version;
 
@@ -117,11 +133,24 @@ export const MapRouteOverlay = ({
   }, [ghostRoutePoints, map, version]);
 
   const preferredLabelSegmentIds = React.useMemo(
-    () => selectPreferredLabelSegmentIds(projectedSegments),
-    [projectedSegments],
+    () => selectPreferredLabelSegmentIds(visibleProjectedSegments),
+    [visibleProjectedSegments],
   );
+  // Firefox repaints every animated dash across the route's screen-space
+  // length. Once the thumbnail marker zoom is reached, a long journey can be
+  // thousands of pixels wide even after off-screen legs are culled. The
+  // static dashes, gradient, labels and endpoint flags still communicate the
+  // route; reserve marching motion for the overview where it stays cheap.
+  const animateRoute = map ? map.getZoom() < THUMBNAIL_HIDE_ZOOM : false;
+  const endpointPingClass = [
+    styles.routeEndpointPing,
+    animateRoute ? styles.routeEndpointPingAnimated : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+  const delayedEndpointPingClass = [endpointPingClass, styles.routeEndpointPingDelay].join(" ");
 
-  if (projectedSegments.length === 0) {
+  if (projectedSegments.length === 0 || visibleProjectedSegments.length === 0) {
     return null;
   }
 
@@ -133,7 +162,12 @@ export const MapRouteOverlay = ({
   const endRoutePoint = routePoints!.at(-1)!;
 
   return (
-    <svg className={styles.routeOverlay} data-testid="journey-line-overlay" aria-hidden="true">
+    <svg
+      className={styles.routeOverlay}
+      data-testid="journey-line-overlay"
+      aria-hidden="true"
+      overflow="hidden"
+    >
       <defs>
         <linearGradient
           id={routeGradient!.id}
@@ -163,7 +197,7 @@ export const MapRouteOverlay = ({
           }}
         />
       ) : null}
-      {projectedSegments.map((segment) => (
+      {visibleProjectedSegments.map((segment) => (
         <React.Fragment key={segment.id}>
           {(() => {
             const transferLeg = isTransferLeg(segment.distanceKm, segment.durationSeconds);
@@ -181,7 +215,12 @@ export const MapRouteOverlay = ({
                 />
                 <path
                   d={segment.d}
-                  className={styles.routeOverlayPath}
+                  className={[
+                    styles.routeOverlayPath,
+                    animateRoute ? styles.routeOverlayPathAnimated : "",
+                  ]
+                    .filter(Boolean)
+                    .join(" ")}
                   data-testid="journey-line-segment"
                   style={{
                     stroke: `url(#${routeGradient!.id})`,
@@ -240,14 +279,14 @@ export const MapRouteOverlay = ({
                   cy="0"
                   r="3.5"
                   style={{ fill: startColor }}
-                  className={styles.routeEndpointPing}
+                  className={endpointPingClass}
                 />
                 <circle
                   cx="0"
                   cy="0"
                   r="3.5"
                   style={{ fill: startColor }}
-                  className={`${styles.routeEndpointPing} ${styles.routeEndpointPingDelay}`}
+                  className={delayedEndpointPingClass}
                 />
               </g>
               <g
@@ -258,14 +297,14 @@ export const MapRouteOverlay = ({
                   cy="0"
                   r="3.5"
                   style={{ fill: endColor }}
-                  className={styles.routeEndpointPing}
+                  className={endpointPingClass}
                 />
                 <circle
                   cx="0"
                   cy="0"
                   r="3.5"
                   style={{ fill: endColor }}
-                  className={`${styles.routeEndpointPing} ${styles.routeEndpointPingDelay}`}
+                  className={delayedEndpointPingClass}
                 />
               </g>
             </>

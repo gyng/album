@@ -23,6 +23,102 @@ export type ProjectedRouteSegment = {
   lengthPx: number;
 };
 
+type RouteViewport = { width: number; height: number };
+
+/**
+ * Keep the SVG detail layer proportional to what the reader can see.
+ *
+ * At a city zoom, a multi-country journey can project tens of thousands of
+ * pixels beyond the map. Drawing and animating every off-screen leg makes the
+ * browser repaint that enormous SVG even though MapLibre already carries the
+ * complete journey on the GPU underneath. Clip crossing legs at the padded
+ * viewport too: hiding their overflow does not stop Firefox animating the full
+ * off-screen stroke.
+ */
+export const clipRouteSegmentsToViewport = (
+  segments: ProjectedRouteSegment[],
+  viewport: RouteViewport,
+  padding = 64,
+): ProjectedRouteSegment[] => {
+  if (
+    !Number.isFinite(viewport.width) ||
+    !Number.isFinite(viewport.height) ||
+    viewport.width <= 0 ||
+    viewport.height <= 0
+  ) {
+    return segments;
+  }
+
+  const left = -padding;
+  const top = -padding;
+  const right = viewport.width + padding;
+  const bottom = viewport.height + padding;
+
+  return segments.flatMap((segment) => {
+    const dx = segment.endX - segment.startX;
+    const dy = segment.endY - segment.startY;
+    let startRatio = 0;
+    let endRatio = 1;
+    const edges: Array<[number, number]> = [
+      [-dx, segment.startX - left],
+      [dx, right - segment.startX],
+      [-dy, segment.startY - top],
+      [dy, bottom - segment.startY],
+    ];
+
+    for (const [direction, distance] of edges) {
+      if (direction === 0) {
+        if (distance < 0) {
+          return [];
+        }
+        continue;
+      }
+
+      const ratio = distance / direction;
+      if (direction < 0) {
+        startRatio = Math.max(startRatio, ratio);
+      } else {
+        endRatio = Math.min(endRatio, ratio);
+      }
+      if (startRatio > endRatio) {
+        return [];
+      }
+    }
+
+    if (startRatio === 0 && endRatio === 1) {
+      return [segment];
+    }
+
+    const startX = segment.startX + startRatio * dx;
+    const startY = segment.startY + startRatio * dy;
+    const endX = segment.startX + endRatio * dx;
+    const endY = segment.startY + endRatio * dy;
+    const clippedDx = endX - startX;
+    const clippedDy = endY - startY;
+    const length = Math.hypot(clippedDx, clippedDy);
+    const normalX = length > 0 ? -clippedDy / length : 0;
+    const normalY = length > 0 ? clippedDx / length : 0;
+    const roundedStartX = Number(startX.toFixed(2));
+    const roundedStartY = Number(startY.toFixed(2));
+    const roundedEndX = Number(endX.toFixed(2));
+    const roundedEndY = Number(endY.toFixed(2));
+
+    return [
+      {
+        ...segment,
+        d: `M ${roundedStartX.toFixed(2)} ${roundedStartY.toFixed(2)} L ${roundedEndX.toFixed(2)} ${roundedEndY.toFixed(2)}`,
+        startX: roundedStartX,
+        startY: roundedStartY,
+        endX: roundedEndX,
+        endY: roundedEndY,
+        midX: Number(((startX + endX) / 2 + normalX * 10).toFixed(2)),
+        midY: Number(((startY + endY) / 2 + normalY * 10).toFixed(2)),
+        lengthPx: length,
+      },
+    ];
+  });
+};
+
 export const getDirectionalGradientStops = (fromColor: string, toColor: string) => [
   { offset: "0%", color: fromColor },
   { offset: "50%", color: mixHsl(fromColor, toColor, 0.5) },

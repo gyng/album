@@ -1,6 +1,7 @@
 import type { RoutePoint } from "./mapRoute";
 import {
   formatDistanceKm,
+  clipRouteSegmentsToViewport,
   getAnimationSecondsFromSpeed,
   getDirectionalGradientStops,
   isTransferLeg,
@@ -148,6 +149,50 @@ describe("mapRouteOverlayModel", () => {
     ]);
 
     expect(Array.from(selected)).toEqual(["longest", "distant"]);
+  });
+
+  it("keeps only route legs whose screen-space bounds meet the padded viewport", () => {
+    const visible = segment({
+      id: "visible",
+      startX: 20,
+      startY: 30,
+      endX: 80,
+      endY: 40,
+    });
+    const crossing = segment({
+      id: "crossing",
+      startX: -1_000,
+      startY: 50,
+      endX: 1_000,
+      endY: 50,
+    });
+    const padded = segment({
+      id: "padded",
+      startX: 110,
+      startY: 30,
+      endX: 120,
+      endY: 40,
+    });
+    const outside = segment({
+      id: "outside",
+      startX: 500,
+      startY: 500,
+      endX: 600,
+      endY: 600,
+    });
+
+    const clipped = clipRouteSegmentsToViewport(
+      [visible, crossing, padded, outside],
+      { width: 100, height: 80 },
+      24,
+    );
+
+    expect(clipped.map(({ id }) => id)).toEqual(["visible", "crossing", "padded"]);
+    expect(clipped.find(({ id }) => id === "crossing")).toMatchObject({
+      startX: -24,
+      endX: 124,
+      d: "M -24.00 50.00 L 124.00 50.00",
+    });
   });
 
   it("keeps zero-length and backwards labels geometrically stable and readable", () => {
