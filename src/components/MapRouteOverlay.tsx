@@ -142,16 +142,14 @@ export const MapRouteOverlay = ({
     () => selectPreferredLabelSegmentIds(visibleProjectedSegments),
     [visibleProjectedSegments],
   );
-  // Firefox repaints every animated dash across the route's screen-space
-  // length. Once the thumbnail marker zoom is reached, a long journey can be
-  // thousands of pixels wide even after off-screen legs are culled. The
-  // static dashes, gradient, labels and endpoint flags still communicate the
-  // route. Reserve marching motion for the overview where it stays cheap; at
-  // thumbnail zoom, animate one small tracer per clipped on-screen leg instead.
-  const animateMarchingDashes = map ? map.getZoom() < THUMBNAIL_HIDE_ZOOM : false;
+  // Crossing route legs are clipped to the padded viewport above, so their
+  // marching dashes never repaint the journey's potentially enormous
+  // off-screen projection. Endpoint pings are extra animations rather than
+  // directional information, so keep those static at the thumbnail zoom.
+  const animateEndpointPings = map ? map.getZoom() < THUMBNAIL_HIDE_ZOOM : false;
   const endpointPingClass = [
     styles.routeEndpointPing,
-    animateMarchingDashes ? styles.routeEndpointPingAnimated : "",
+    animateEndpointPings ? styles.routeEndpointPingAnimated : "",
   ]
     .filter(Boolean)
     .join(" ");
@@ -230,12 +228,7 @@ export const MapRouteOverlay = ({
                 />
                 <path
                   d={segment.d}
-                  className={[
-                    styles.routeOverlayPath,
-                    animateMarchingDashes ? styles.routeOverlayPathAnimated : "",
-                  ]
-                    .filter(Boolean)
-                    .join(" ")}
+                  className={[styles.routeOverlayPath, styles.routeOverlayPathAnimated].join(" ")}
                   data-testid="journey-line-segment"
                   style={{
                     stroke: `url(#${routeGradient!.id})`,
@@ -273,20 +266,6 @@ export const MapRouteOverlay = ({
                       {`${segment.approxSpeedKmh}km/h · ${formatDistanceKm(segment.distanceKm)}`}
                     </text>
                   </g>
-                ) : null}
-                {!animateMarchingDashes ? (
-                  <circle
-                    r="3"
-                    className={styles.routeOverlayTracer}
-                    data-testid="journey-line-tracer"
-                    style={{ fill: segment.color }}
-                  >
-                    <animateMotion
-                      path={segment.d}
-                      dur={`${getAnimationSecondsFromSpeed(segment.approxSpeedKmh)}s`}
-                      repeatCount="indefinite"
-                    />
-                  </circle>
                 ) : null}
               </>
             );

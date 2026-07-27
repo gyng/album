@@ -162,18 +162,16 @@ describe("MapRouteOverlay", () => {
     expect(screen.queryByTestId("journey-line-end")).toBeNull();
   });
 
-  it("keeps journey dashes static at the rich-thumbnail zoom", () => {
+  it("keeps marching journey dashes at the rich-thumbnail zoom without dot tracers", () => {
     currentMap = { ...currentMap, getZoom: () => 10 };
 
     render(<MapRouteOverlay {...props()} />);
 
-    expect(screen.getAllByTestId("journey-line-segment")[0]).not.toHaveClass(
+    expect(screen.getAllByTestId("journey-line-segment")[0]).toHaveClass(
       "routeOverlayPathAnimated",
     );
     expect(document.querySelectorAll(".routeEndpointPingAnimated")).toHaveLength(0);
-    const tracers = screen.getAllByTestId("journey-line-tracer");
-    expect(tracers).toHaveLength(2);
-    expect(tracers[0]?.querySelector("animateMotion")).toHaveAttribute("path", "M 1 2 L 3 4");
+    expect(screen.queryByTestId("journey-line-tracer")).toBeNull();
   });
 
   it("updates projection on map movement and unsubscribes on cleanup", () => {
