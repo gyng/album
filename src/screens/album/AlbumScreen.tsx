@@ -94,7 +94,6 @@ const AlbumScreen = ({ album }: AlbumScreenProps) => {
       <GlobalNav
         extraItems={
           <>
-            <li aria-hidden="true" className={commonStyles.navDivider} />
             <li>
               <Link
                 href={`/map?filter_album=${albumName}`}
