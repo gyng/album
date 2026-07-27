@@ -3,7 +3,7 @@ import { expect, test } from "@playwright/test";
 const photoPath = "../albums/test-simple/DSCF0506.jpg";
 const slideshowImage = 'img[alt]:not([aria-hidden="true"])';
 
-test("the installed slideshow shell restarts offline with its configured URL", async ({
+test("the installed slideshow shell and runtime restart offline with its configured URL", async ({
   context,
   page,
 }) => {
@@ -24,17 +24,23 @@ test("the installed slideshow shell restarts offline with its configured URL", a
     });
   });
 
-  // Reload once under worker control so the configured E2E database and the
-  // selected photo are both stored by the same paths production uses.
+  // Reload once under worker control so the configured E2E database and shell
+  // runtime are stored by the same paths production uses. Album media
+  // deliberately stays in the browser HTTP cache rather than Cache Storage.
   await page.goto(configuredUrl, { waitUntil: "domcontentloaded" });
   await expect(page).toHaveTitle("Slideshow | Snapshots", { timeout: 15_000 });
   await expect(runtime.locator(slideshowImage).first()).toBeVisible({ timeout: 15_000 });
+  await expect.poll(() => page.evaluate(() => caches.has("snapshots-pwa-images"))).toBe(false);
 
   await context.setOffline(true);
   try {
     await page.reload({ waitUntil: "domcontentloaded" });
     await expect(page).toHaveTitle("Slideshow | Snapshots", { timeout: 15_000 });
-    await expect(runtime.locator(slideshowImage).first()).toBeVisible({ timeout: 15_000 });
+    // The application and controls remain usable offline. Individual photos
+    // are now best-effort browser-cache hits, not part of the PWA guarantee.
+    await expect(runtime.getByRole("group", { name: "Playback mode" })).toBeVisible({
+      timeout: 15_000,
+    });
   } finally {
     await context.setOffline(false);
   }

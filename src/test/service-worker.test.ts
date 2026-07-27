@@ -128,20 +128,15 @@ const loadFetchHandler = (options: {
   networkFetch?: (input: unknown, init?: unknown) => Promise<Response>;
   cachePut?: () => Promise<void>;
   cacheMatch?: (request: unknown) => Promise<Response | undefined>;
-  cacheKeys?: () => Promise<unknown[]>;
-  cacheDelete?: (key: unknown) => Promise<boolean>;
 }): ((event: FetchEvent) => void) => {
   const handlers = new Map<string, (event: FetchEvent) => void>();
   const cache = {
     addAll: jest.fn(),
     match: jest.fn(options.cacheMatch ?? (() => Promise.resolve(options.cachedResponse))),
     put: jest.fn(options.cachePut ?? (() => Promise.resolve())),
-    keys: jest.fn(options.cacheKeys ?? (() => Promise.resolve([]))),
-    delete: jest.fn(options.cacheDelete ?? (() => Promise.resolve(true))),
   };
   const context = {
     URL,
-    Headers,
     Response,
     caches: {
       open: jest.fn().mockResolvedValue(cache),
@@ -220,6 +215,11 @@ describe("service worker data caching", () => {
       "https://photos.example.com/assets/slideshow.js",
       expect.any(Response),
     );
+    expect(cacheByName.get("snapshots-pwa-test-build-runtime")?.put).toHaveBeenCalledWith(
+      "/pwa-icon.svg",
+      expect.any(Response),
+    );
+    expect(cacheByName.has("snapshots-pwa-images")).toBe(false);
     expect(fetchMock).toHaveBeenCalledWith("/search.sqlite");
     expect(fetchMock).toHaveBeenCalledWith("/search-embeddings.sqlite");
   });
@@ -250,17 +250,17 @@ describe("service worker data caching", () => {
     expect(deleted).toEqual([]);
   });
 
-  it("keeps cached album media across build generations", async () => {
-    // Album media live at content URLs, not hashed build chunks, so a new
-    // generation cannot orphan them. Scoping their cache to the build would make
-    // every code deploy evict an installed photo frame's whole offline library.
+  it("deletes the retired persistent media cache on activation", async () => {
+    // The browser HTTP cache now owns album media. Leaving the old Cache
+    // Storage library behind would retain up to thousands of large variants
+    // forever despite no request path reading them.
     const deleted = await runActivate([
       "snapshots-pwa-images",
       "snapshots-pwa-oldsha-shell",
       "snapshots-pwa-test-build-shell",
     ]);
 
-    expect(deleted).toEqual(["snapshots-pwa-oldsha-shell"]);
+    expect(deleted).toEqual(["snapshots-pwa-images", "snapshots-pwa-oldsha-shell"]);
   });
 
   it("stores a document only once its generated assets are cached", async () => {
@@ -528,50 +528,6 @@ describe("service worker data caching", () => {
     await expect(lifetimePromise).resolves.toBeDefined();
   });
 
-  it("settles a newly fetched image response without waiting for it to be cached", async () => {
-    // A full cache.keys() scan under trimCache (up to 4000 entries) must not
-    // delay first paint of a cold image. The response resolves as soon as the
-    // network responds; storing it and trimming the cache happen afterwards,
-    // kept alive separately via waitUntil.
-    let finishCaching!: () => void;
-    const caching = new Promise<void>((resolve) => {
-      finishCaching = resolve;
-    });
-    const network = new Response("new image");
-    const fetchHandler = loadFetchHandler({
-      cachedResponse: new Response("unused"),
-      networkResponse: network,
-      cachePut: () => caching,
-      cacheMatch: async () => undefined,
-    });
-    let responsePromise: Promise<Response> | undefined;
-    let lifetimePromise: Promise<unknown> | undefined;
-
-    fetchHandler({
-      request: request("/data/albums/trip/photo.avif", "image"),
-      respondWith: (response) => {
-        responsePromise = response;
-      },
-      waitUntil: (promise) => {
-        lifetimePromise = promise;
-      },
-    });
-
-    // The mocked cache.put hangs on `caching`, which is never resolved before
-    // this assertion — the response must still settle.
-    await expect(responsePromise).resolves.toBe(network);
-    expect(lifetimePromise).toBeDefined();
-
-    let stored = false;
-    void lifetimePromise?.then(() => {
-      stored = true;
-    });
-    await Promise.resolve();
-    expect(stored).toBe(false);
-    finishCaching();
-    await expect(lifetimePromise).resolves.toBeUndefined();
-  });
-
   it("revalidates the map search index while retaining an offline fallback", async () => {
     const cached = new Response("stale index");
     const network = new Response("current index");
@@ -606,328 +562,49 @@ describe("service worker data caching", () => {
     await expect(responsePromise).resolves.toBe(cached);
   });
 
-  it("serves cached media immediately while revalidating it in the background", async () => {
-    // Album media are keyed by original filename, not a content hash, so a
-    // re-edited photo reuses its URL. Cache-first would pin the first bytes
-    // forever; stale-while-revalidate serves them at once yet refreshes them.
-    const cached = new Response("cached image");
-    const network = new Response("network image");
-    const put = jest.fn().mockResolvedValue(undefined);
+  it.each([
+    ["/data/albums/trip/photo.avif", "image"],
+    ["/data/albums/trip/clip.mp4", "video"],
+    ["/data/albums/trip/sound.m4a", "audio"],
+    ["/data/albums/trip/metadata.json", ""],
+  ])("leaves browser media caching outside the service worker for %s", (pathname, destination) => {
     const fetchHandler = loadFetchHandler({
-      cachedResponse: cached,
-      networkResponse: network,
-      cachePut: put,
+      cachedResponse: new Response("retired cache entry"),
+      networkResponse: new Response("network media"),
     });
-    let responsePromise: Promise<Response> | undefined;
-    let lifetimePromise: Promise<unknown> | undefined;
+    const respondWith = jest.fn();
+    const waitUntil = jest.fn();
 
     fetchHandler({
-      request: request("/data/albums/trip/photo.avif"),
-      respondWith: (response) => {
-        responsePromise = response;
-      },
-      waitUntil: (promise) => {
-        lifetimePromise = promise;
-      },
+      request: request(pathname, destination),
+      respondWith,
+      waitUntil,
     });
 
-    await expect(responsePromise).resolves.toBe(cached);
-    expect(lifetimePromise).toBeDefined();
-    await lifetimePromise;
-    expect(put).toHaveBeenCalled();
+    expect(respondWith).not.toHaveBeenCalled();
+    expect(waitUntil).not.toHaveBeenCalled();
+    expect(fetchMockOf(fetchHandler)).not.toHaveBeenCalled();
   });
 
-  it("revalidates cached media conditionally so long-lived caches cannot skip it", async () => {
-    // Cache Storage is separate from Firefox's HTTP cache, so `no-cache` alone
-    // does not give fetch() the validator stored on our cached Response. Carry
-    // the ETag over explicitly; unchanged media can then answer 304 without
-    // retransmitting the image body seen in the reload HAR.
-    const cached = new Response("cached image", {
-      headers: { ETag: '"photo-version-1"' },
-    });
+  it("does not turn album media opened in a tab into a cached shell document", () => {
     const fetchHandler = loadFetchHandler({
-      cachedResponse: cached,
-      networkResponse: new Response(null, { status: 304 }),
+      cachedResponse: new Response("retired cache entry"),
+      networkResponse: new Response("network media"),
     });
-    let responsePromise: Promise<Response> | undefined;
-    let lifetimePromise: Promise<unknown> | undefined;
+    const respondWith = jest.fn();
 
     fetchHandler({
-      request: request("/data/albums/trip/photo.avif", "image"),
-      respondWith: (promise) => {
-        responsePromise = promise;
+      request: {
+        ...request("/data/albums/trip/photo.avif"),
+        destination: "document",
+        mode: "navigate",
       },
-      waitUntil: (promise) => {
-        lifetimePromise = promise;
-      },
+      respondWith,
+      waitUntil: jest.fn(),
     });
 
-    await responsePromise;
-    await lifetimePromise;
-    const init = fetchMockOf(fetchHandler).mock.calls[0]?.[1] as {
-      cache?: string;
-      headers?: Headers;
-    };
-    expect(init.cache).toBe("no-cache");
-    expect(init.headers?.get("If-None-Match")).toBe('"photo-version-1"');
-  });
-
-  it("revalidates a given media URL at most once per worker lifetime", async () => {
-    // Without a per-lifetime cap a kiosk re-downloads full image bytes on every
-    // hit. The second hit of the same URL must serve from cache without a
-    // background refetch; put() is a proxy for a revalidation having happened.
-    const put = jest.fn().mockResolvedValue(undefined);
-    const fetchHandler = loadFetchHandler({
-      cachedResponse: new Response("cached image"),
-      networkResponse: new Response("network image"),
-      cachePut: put,
-    });
-    const lifetimes: Promise<unknown>[] = [];
-    const hit = async () => {
-      let responsePromise: Promise<Response> | undefined;
-      fetchHandler({
-        request: request("/data/albums/trip/photo.avif", "image"),
-        respondWith: (promise) => {
-          responsePromise = promise;
-        },
-        waitUntil: (promise) => {
-          lifetimes.push(promise);
-        },
-      });
-      await responsePromise;
-    };
-
-    await hit();
-    await hit();
-    await Promise.all(lifetimes);
-
-    // Only the first hit scheduled a revalidation; the second was throttled.
-    expect(lifetimes).toHaveLength(1);
-    expect(put).toHaveBeenCalledTimes(1);
-    expect(fetchMockOf(fetchHandler)).toHaveBeenCalledTimes(1);
-  });
-
-  it("bounds concurrent cached-media revalidations", async () => {
-    // Crossing the thumbnail zoom can expose well over a hundred cached
-    // photos. Starting every revalidation together downloads all of those
-    // bodies and runs a full cache.keys() trim for each one, competing with the
-    // map worker and exhausting Firefox under a rapid reload.
-    const releases: Array<() => void> = [];
-    let active = 0;
-    let peak = 0;
-    const fetchHandler = loadFetchHandler({
-      cachedResponse: new Response("cached image"),
-      networkFetch: () =>
-        new Promise<Response>((resolve) => {
-          active += 1;
-          peak = Math.max(peak, active);
-          releases.push(() => {
-            active -= 1;
-            resolve(new Response("network image"));
-          });
-        }),
-    });
-    const lifetimes: Promise<unknown>[] = [];
-
-    for (let index = 0; index < 8; index += 1) {
-      let responsePromise: Promise<Response> | undefined;
-      fetchHandler({
-        request: request(`/data/albums/trip/photo-${index}.avif`, "image"),
-        respondWith: (promise) => {
-          responsePromise = promise;
-        },
-        waitUntil: (promise) => {
-          lifetimes.push(promise);
-        },
-      });
-      await expect(responsePromise).resolves.toBeDefined();
-    }
-    await Promise.resolve();
-    await Promise.resolve();
-
-    expect(peak).toBe(4);
-    expect(fetchMockOf(fetchHandler)).toHaveBeenCalledTimes(4);
-
-    releases.shift()?.();
-    await new Promise((resolve) => setImmediate(resolve));
-    expect(fetchMockOf(fetchHandler)).toHaveBeenCalledTimes(5);
-
-    while (fetchMockOf(fetchHandler).mock.calls.length < 8) {
-      releases.splice(0).forEach((release) => {
-        release();
-      });
-      await new Promise((resolve) => setImmediate(resolve));
-    }
-    releases.splice(0).forEach((release) => {
-      release();
-    });
-    await Promise.all(lifetimes);
-  });
-
-  it("retries a background image revalidation after a failed attempt", async () => {
-    // A failed revalidation (network error) must not permanently mark the URL
-    // as done for the worker's lifetime, or a kiosk that briefly drops offline
-    // during a background refresh would never revalidate that image again.
-    const cached = new Response("cached image");
-    const fetchHandler = loadFetchHandler({
-      cachedResponse: cached,
-      networkError: new Error("offline"),
-    });
-    const lifetimes: Promise<unknown>[] = [];
-    const hit = async () => {
-      let responsePromise: Promise<Response> | undefined;
-      fetchHandler({
-        request: request("/data/albums/trip/photo.avif", "image"),
-        respondWith: (promise) => {
-          responsePromise = promise;
-        },
-        waitUntil: (promise) => {
-          lifetimes.push(promise);
-        },
-      });
-      await responsePromise;
-    };
-
-    await hit();
-    await Promise.all(lifetimes);
-    await hit();
-    await Promise.all(lifetimes);
-
-    // Both hits scheduled a background revalidation attempt because the first
-    // one failed and must not have been left marked as done.
-    expect(lifetimes).toHaveLength(2);
-    expect(fetchMockOf(fetchHandler)).toHaveBeenCalledTimes(2);
-  });
-
-  it("marks a cold download as fresh so its first hit does not immediately revalidate", async () => {
-    // The miss path just fetched the full bytes; treating the URL as still
-    // needing revalidation would re-fetch it on the very next hit, roughly
-    // doubling first-cycle bandwidth on a kiosk looping a cold album.
-    const cached = new Response("cached image");
-    let missed = false;
-    const fetchHandler = loadFetchHandler({
-      cachedResponse: cached,
-      networkResponse: new Response("network image"),
-      cacheMatch: () => {
-        if (!missed) {
-          missed = true;
-          return Promise.resolve(undefined);
-        }
-        return Promise.resolve(cached);
-      },
-    });
-    const lifetimes: Promise<unknown>[] = [];
-    const hit = async () => {
-      let responsePromise: Promise<Response> | undefined;
-      fetchHandler({
-        request: request("/data/albums/trip/photo.avif", "image"),
-        respondWith: (promise) => {
-          responsePromise = promise;
-        },
-        waitUntil: (promise) => {
-          lifetimes.push(promise);
-        },
-      });
-      await responsePromise;
-    };
-
-    await hit();
-    await Promise.all(lifetimes);
-    await hit();
-    await Promise.all(lifetimes);
-
-    // One network fetch total: the cold download. The following cache hit must
-    // not schedule a background revalidation of bytes fetched moments earlier.
-    expect(fetchMockOf(fetchHandler)).toHaveBeenCalledTimes(1);
-  });
-
-  it("keeps a URL marked done after a revalidation that answered non-ok", async () => {
-    // A server-side deletion (404 while the stale copy stays cached) must not
-    // turn into an unbounded refetch-per-hit loop for the worker's lifetime;
-    // only thrown network errors (offline) unmark the URL for retry.
-    const cached = new Response("cached image");
-    const fetchHandler = loadFetchHandler({
-      cachedResponse: cached,
-      networkResponse: new Response(null, { status: 404 }),
-    });
-    const lifetimes: Promise<unknown>[] = [];
-    const hit = async () => {
-      let responsePromise: Promise<Response> | undefined;
-      fetchHandler({
-        request: request("/data/albums/trip/photo.avif", "image"),
-        respondWith: (promise) => {
-          responsePromise = promise;
-        },
-        waitUntil: (promise) => {
-          lifetimes.push(promise);
-        },
-      });
-      await responsePromise;
-    };
-
-    await hit();
-    await Promise.all(lifetimes);
-    await hit();
-    await Promise.all(lifetimes);
-
-    expect(lifetimes).toHaveLength(1);
-    expect(fetchMockOf(fetchHandler)).toHaveBeenCalledTimes(1);
-  });
-
-  it("ignores a failed image revalidation so the cached copy still serves offline", async () => {
-    const cached = new Response("cached image");
-    const fetchHandler = loadFetchHandler({
-      cachedResponse: cached,
-      networkError: new Error("offline"),
-    });
-    let responsePromise: Promise<Response> | undefined;
-
-    fetchHandler({
-      request: request("/data/albums/trip/photo.avif", "image"),
-      respondWith: (response) => {
-        responsePromise = response;
-      },
-      waitUntil: () => {},
-    });
-
-    await expect(responsePromise).resolves.toBe(cached);
-  });
-
-  it("evicts the oldest image entries once the cache exceeds its cap", async () => {
-    // Without a bound the unversioned media cache grows forever. keys() is in
-    // insertion order, so the two entries past the 4000 cap here are the oldest.
-    const network = new Response("fresh image");
-    const keys = Array.from(
-      { length: 4002 },
-      (_, index) => `https://photos.example.com/data/albums/trip/photo-${index}.avif`,
-    );
-    const del = jest.fn().mockResolvedValue(true);
-    const fetchHandler = loadFetchHandler({
-      cachedResponse: undefined as unknown as Response,
-      networkResponse: network,
-      cacheMatch: async () => undefined,
-      cacheKeys: async () => keys,
-      cacheDelete: del,
-    });
-    let responsePromise: Promise<Response> | undefined;
-    let lifetimePromise: Promise<unknown> | undefined;
-
-    fetchHandler({
-      request: request("/data/albums/trip/new.avif", "image"),
-      respondWith: (response) => {
-        responsePromise = response;
-      },
-      waitUntil: (promise) => {
-        lifetimePromise = promise;
-      },
-    });
-
-    await expect(responsePromise).resolves.toBe(network);
-    // Trimming happens in the background store, not before the response settles.
-    await lifetimePromise;
-    expect(del).toHaveBeenCalledTimes(2);
-    expect(del).toHaveBeenCalledWith(keys[0]);
-    expect(del).toHaveBeenCalledWith(keys[1]);
+    expect(respondWith).not.toHaveBeenCalled();
+    expect(fetchMockOf(fetchHandler)).not.toHaveBeenCalled();
   });
 
   it("uses the latest cached index when the network fails or returns an error", async () => {
