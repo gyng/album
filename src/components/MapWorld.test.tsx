@@ -40,6 +40,7 @@ const mapHandlers: {
     | undefined;
 } = {};
 const mapProps = jest.fn();
+const mockMarkerRender = jest.fn();
 const layerProps = new Map<string, { paint?: Record<string, unknown> }>();
 /** The popups the provider would close on the next map click. */
 const popupCloseOnMapClick = new Set<() => void>();
@@ -145,17 +146,21 @@ jest.mock("./map/adapters/maplibre", () => {
     }: {
       children?: ReactNode;
       onClick?: (event: { originalEvent: { stopPropagation: () => void } }) => void;
-    }) => (
-      <button
-        type="button"
-        data-testid="marker"
-        onClick={() => {
-          onClick?.({ originalEvent: { stopPropagation: jest.fn() } });
-        }}
-      >
-        {children}
-      </button>
-    ),
+    }) => {
+      mockMarkerRender();
+
+      return (
+        <button
+          type="button"
+          data-testid="marker"
+          onClick={() => {
+            onClick?.({ originalEvent: { stopPropagation: jest.fn() } });
+          }}
+        >
+          {children}
+        </button>
+      );
+    },
     Popup: ({
       children,
       className,
@@ -391,6 +396,7 @@ describe("MapWorld", () => {
     mapHandlers.onWheel = undefined;
     mapHandlers.onContextMenu = undefined;
     mapProps.mockClear();
+    mockMarkerRender.mockClear();
     layerProps.clear();
     mapInstance.flyTo.mockClear();
     mapInstance.stop.mockClear();
@@ -640,6 +646,39 @@ describe("MapWorld", () => {
       mapHandlers.onZoom?.({ viewState: { zoom: 7 } });
     });
     expect(onRender).toHaveBeenCalledTimes(afterHide);
+  });
+
+  it("does not rerender every rich marker when hover opens a journey", () => {
+    const secondPhoto = {
+      ...photo,
+      href: "/album/kansai#second.jpg",
+      src: { src: "/second.jpg", width: 100, height: 100 },
+      decLat: 35.8,
+      decLng: 139.8,
+      date: "2024-01-03T03:04:05.000Z",
+    };
+    render(<MMap photos={[photo, secondPhoto]} className="map" />);
+
+    act(() => {
+      mapHandlers.onZoom?.({ viewState: { zoom: 10 } });
+    });
+    const rendersAfterReveal = mockMarkerRender.mock.calls.length;
+    const pin = document.querySelector<HTMLElement>("[data-map-pin]");
+    expect(pin).not.toBeNull();
+
+    fireEvent.mouseOver(pin!);
+
+    expect(screen.getByTestId("journey-line-overlay")).toBeInTheDocument();
+    expect(screen.queryByTestId(JOURNEY_SOURCE_ID)).toBeNull();
+    expect(mockMarkerRender).toHaveBeenCalledTimes(rendersAfterReveal);
+
+    fireEvent.mouseOut(pin!);
+    fireEvent.click(pin!);
+    expect(screen.getByTestId(JOURNEY_SOURCE_ID)).toBeInTheDocument();
+
+    act(() => {
+      jest.runOnlyPendingTimers();
+    });
   });
 
   it("draws the basemap the reader picked, from the same provider as the default", () => {

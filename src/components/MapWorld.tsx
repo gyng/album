@@ -129,6 +129,7 @@ const taperFallbackWidth = (taper: readonly LineWidthStop[]): number => taper[1]
 const JOURNEY_GLOW_FALLBACK_COLOR = "#b7eef5";
 const JOURNEY_LINE_FALLBACK_COLOR = "#12bcd4";
 const SINGLE_JOURNEY_GLOW_COLOR = "#dbfbff";
+const EMPTY_ACTIVE_ROUTE_HREFS: ReadonlySet<string> = new Set();
 
 const readStringProperty = (
   properties: Record<string, unknown>,
@@ -306,27 +307,30 @@ export const MMap: React.FC<MapWorldProps> = ({
   // on a stacked location cycle through every co-located photo so occluded
   // ones are still reachable. Uses the functional updater so it reads the
   // current selection without capturing it.
-  const selectMarker = (photo: MapWorldEntry) => {
-    pinClickedRef.current = true;
-    stopDirector();
-    setClickInfo((current) => {
-      const coLocated = visiblePhotos.filter(
-        (candidate) => candidate.decLat === photo.decLat && candidate.decLng === photo.decLng,
-      );
+  const selectMarker = React.useCallback(
+    (photo: MapWorldEntry) => {
+      pinClickedRef.current = true;
+      stopDirector();
+      setClickInfo((current) => {
+        const coLocated = visiblePhotos.filter(
+          (candidate) => candidate.decLat === photo.decLat && candidate.decLng === photo.decLng,
+        );
 
-      if (coLocated.length <= 1 || !current) {
-        return photo;
-      }
+        if (coLocated.length <= 1 || !current) {
+          return photo;
+        }
 
-      const currentIndex = coLocated.findIndex((candidate) => candidate.href === current.href);
+        const currentIndex = coLocated.findIndex((candidate) => candidate.href === current.href);
 
-      if (currentIndex === -1) {
-        return photo;
-      }
+        if (currentIndex === -1) {
+          return photo;
+        }
 
-      return coLocated[(currentIndex + 1) % coLocated.length]!;
-    });
-  };
+        return coLocated[(currentIndex + 1) % coLocated.length]!;
+      });
+    },
+    [stopDirector, visiblePhotos],
+  );
   const routeDataByAlbum = React.useMemo(() => {
     const albums = new globalThis.Map<string, MapWorldEntry[]>();
     timeFilteredPhotos.forEach((photo) => {
@@ -470,6 +474,9 @@ export const MMap: React.FC<MapWorldProps> = ({
     [overlayRoutePoints],
   );
   const shouldEmphasizeRouteMarkers = clickInfo !== null;
+  const markerActiveRouteHrefSet = shouldEmphasizeRouteMarkers
+    ? activeRouteHrefSet
+    : EMPTY_ACTIVE_ROUTE_HREFS;
   const getRoutePointColor = React.useCallback(
     (point: RoutePoint, _index: number) => {
       const memberHref = point.memberHrefs.at(-1)!;
@@ -545,6 +552,20 @@ export const MMap: React.FC<MapWorldProps> = ({
     routeLineWidth,
     routeMode,
   ]);
+  // At thumbnail zoom the SVG overlay is already clipped to the viewport and
+  // carries the visible hover route. Sending the same long route through
+  // MapLibre as two new sources/layers makes Chrome rebuild and composite the
+  // canvas for several frames. Keep the GPU copy for persistent selections and
+  // always-visible journeys; the transient rich-marker hover path does not need
+  // to draw it twice.
+  const shouldRenderJourneyLines =
+    journeyLines !== null &&
+    !(
+      showMarkerImages &&
+      hoverInfo !== null &&
+      clickInfo === null &&
+      alwaysVisibleRouteGeoJson === null
+    );
 
   const legendYears = React.useMemo(() => getLegendYears(dateStats), [dateStats]);
   const shouldShowLegend = showLegend && dateStats.range > 0 && timeFilteredPhotos.length > 1;
@@ -680,7 +701,7 @@ export const MMap: React.FC<MapWorldProps> = ({
             sequence={directorSequence}
             onVisit={visitDirectorPhoto}
           />
-          {journeyLines ? (
+          {shouldRenderJourneyLines ? (
             <>
               <DataLayer
                 id="journey-line-glow"
@@ -730,7 +751,7 @@ export const MMap: React.FC<MapWorldProps> = ({
             showMarkerImages={showMarkerImages}
             previewMarkers={previewMarkers}
             emphasiseRoute={shouldEmphasizeRouteMarkers}
-            activeRouteHrefSet={activeRouteHrefSet}
+            activeRouteHrefSet={markerActiveRouteHrefSet}
             order={LAYER_ORDER.photoMarkers}
             onSelect={selectMarker}
             onHover={setHoverInfo}

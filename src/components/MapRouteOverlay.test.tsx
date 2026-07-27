@@ -157,6 +157,8 @@ describe("MapRouteOverlay", () => {
     render(<MapRouteOverlay {...props()} />);
 
     expect(screen.getAllByTestId("journey-line-segment")).toHaveLength(1);
+    expect(screen.getByTestId("journey-line-start")).toBeInTheDocument();
+    expect(screen.queryByTestId("journey-line-end")).toBeNull();
   });
 
   it("keeps journey dashes static at the rich-thumbnail zoom", () => {

@@ -25,6 +25,28 @@ export type ProjectedRouteSegment = {
 
 type RouteViewport = { width: number; height: number };
 
+export const isRoutePointInViewport = (
+  point: { x: number; y: number },
+  viewport: RouteViewport,
+  padding = 64,
+): boolean => {
+  if (
+    !Number.isFinite(viewport.width) ||
+    !Number.isFinite(viewport.height) ||
+    viewport.width <= 0 ||
+    viewport.height <= 0
+  ) {
+    return true;
+  }
+
+  return (
+    point.x >= -padding &&
+    point.x <= viewport.width + padding &&
+    point.y >= -padding &&
+    point.y <= viewport.height + padding
+  );
+};
+
 /**
  * Keep the SVG detail layer proportional to what the reader can see.
  *

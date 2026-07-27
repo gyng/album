@@ -5,6 +5,7 @@ import {
   getAnimationSecondsFromSpeed,
   getDirectionalGradientStops,
   isTransferLeg,
+  isRoutePointInViewport,
   projectGhostRoutePath,
   projectRouteSegments,
   selectPreferredLabelSegmentIds,
@@ -193,6 +194,15 @@ describe("mapRouteOverlayModel", () => {
       endX: 124,
       d: "M -24.00 50.00 L 124.00 50.00",
     });
+  });
+
+  it("recognises only endpoint decorations inside the padded viewport", () => {
+    const viewport = { width: 100, height: 80 };
+
+    expect(isRoutePointInViewport({ x: -24, y: 40 }, viewport, 24)).toBe(true);
+    expect(isRoutePointInViewport({ x: 124, y: 40 }, viewport, 24)).toBe(true);
+    expect(isRoutePointInViewport({ x: -25, y: 40 }, viewport, 24)).toBe(false);
+    expect(isRoutePointInViewport({ x: 50, y: 105 }, viewport, 24)).toBe(false);
   });
 
   it("keeps zero-length and backwards labels geometrically stable and readable", () => {

@@ -322,7 +322,7 @@ const MapPhotoKeyboardList = ({
 /* Rich pins — one DOM marker each                                             */
 /* -------------------------------------------------------------------------- */
 
-const MapPhotoMarker = ({
+const MapPhotoMarker = React.memo(function MapPhotoMarker({
   photo,
   showMarkerImages,
   previewMarkers = false,
@@ -338,7 +338,7 @@ const MapPhotoMarker = ({
   activeRouteHrefSet: ReadonlySet<string>;
   onSelect: (photo: PhotoWithStyle) => void;
   onHover: (photo: PhotoWithStyle | null) => void;
-}) => {
+}) {
   const formattedDate = formatMapPhotoDate(photo.date);
   const routeClass =
     emphasiseRoute && activeRouteHrefSet.size > 0
@@ -393,7 +393,7 @@ const MapPhotoMarker = ({
       </div>
     </Marker>
   );
-};
+});
 
 /**
  * Photo pins take one of two forms, and the choice is what keeps the map fast.
@@ -415,7 +415,7 @@ const MapPhotoMarker = ({
  * Both are added back here rather than left to the DOM path, which only appears
  * once the map is zoomed well in.
  */
-export const MapPhotoMarkers = ({
+export const MapPhotoMarkers = React.memo(function MapPhotoMarkers({
   photos,
   visiblePhotos,
   renderPhotos,
@@ -426,7 +426,7 @@ export const MapPhotoMarkers = ({
   order,
   onSelect,
   onHover,
-}: MapPhotoMarkersProps) => {
+}: MapPhotoMarkersProps) {
   const isCoarsePointer = useCoarsePointer();
   const locatedPhotos = React.useMemo(() => photos.filter(hasCoordinates), [photos]);
   const locatedVisiblePhotos = React.useMemo(
@@ -565,4 +565,4 @@ export const MapPhotoMarkers = ({
       ))}
     </>
   );
-};
+});
