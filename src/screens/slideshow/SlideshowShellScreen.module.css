@@ -1,3 +1,9 @@
+:global(html[data-slideshow-shell]),
+:global(html[data-slideshow-shell] body) {
+  background-color: var(--c-black);
+  background-image: none;
+}
+
 .shell {
   position: fixed;
   inset: 0;

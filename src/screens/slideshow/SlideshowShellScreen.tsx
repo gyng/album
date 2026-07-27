@@ -33,6 +33,8 @@ import {
 } from "../../util/slideshowShell";
 import styles from "./SlideshowShellScreen.module.css";
 
+const useSafeLayoutEffect = typeof window === "undefined" ? React.useEffect : React.useLayoutEffect;
+
 const VERSION_POLL_MS = 300000;
 // How long a freshly mounted runtime frame has to report it is ready before the
 // shell treats it as a failed load and attempts a capped recovery reload. This
@@ -121,6 +123,15 @@ export const SlideshowShellScreen = () => {
   const [eventHistory, setEventHistory] = React.useState<ShellLogEntry[]>([]);
   const [copiedDiagnostics, setCopiedDiagnostics] = React.useState(false);
   const copiedTimerRef = React.useRef<number | null>(null);
+  // iPadOS can repaint its opaque PWA status-bar backing from the root
+  // document when a screen wake lock is acquired. Mark the document before
+  // paint so the shell's black canvas reaches that system-owned edge too.
+  useSafeLayoutEffect(() => {
+    document.documentElement.dataset.slideshowShell = "";
+    return () => {
+      delete document.documentElement.dataset.slideshowShell;
+    };
+  }, []);
   React.useEffect(
     () => () => {
       if (copiedTimerRef.current !== null) {

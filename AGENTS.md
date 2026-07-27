@@ -12,6 +12,7 @@ Personal photo gallery — Next.js 16, TypeScript, CSS Modules, MapLibre GL. Pho
 - Subset: `npx jest --testPathPatterns="MapWorld"` (plural flag)
 - **Dev:** `npm run dev` from `src/`
 - **Lint/typecheck:** `npm run lint` from `src/` — runs oxlint, biome, both `tsc` configs (including the framework-neutral screen graph via `tsconfig.portable.json`), and the formatting check (`oxfmt --check` via `format:check`). Note `npm run lint:fix` only fixes oxlint/biome findings — run `npm run format:write` separately to fix formatting failures
+- **GitHub authentication:** sandboxed `gh` commands may falsely report that the configured token is invalid. Retry the same read-only authentication check with sandbox escalation before asking the user to re-authenticate.
 
 ## Structure
 - `src/components/` — React components with co-located `.module.css`; complex components have `.test.tsx`, not all

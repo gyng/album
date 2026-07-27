@@ -52,6 +52,8 @@ const versionResponse = (buildVersion: string) =>
     json: async () => ({ buildVersion }),
   } as Response);
 
+const pendingVersionResponse = () => new Promise<Response>(() => {});
+
 describe("slideshow code shell", () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -80,6 +82,20 @@ describe("slideshow code shell", () => {
     // they turn it on; the default-off behaviour has its own case below.
     writeStatusPillVisible(true);
     window.history.replaceState({}, "", "/slideshow/shell?filter=test-simple&delay=60");
+  });
+
+  it("keeps the document canvas black only while the slideshow shell is mounted", () => {
+    global.fetch = jest.fn(pendingVersionResponse);
+
+    expect(document.documentElement).not.toHaveAttribute("data-slideshow-shell");
+
+    const { unmount } = render(<SlideshowShellScreen />);
+
+    expect(document.documentElement).toHaveAttribute("data-slideshow-shell");
+
+    unmount();
+
+    expect(document.documentElement).not.toHaveAttribute("data-slideshow-shell");
   });
 
   it("keeps the status pill off the slideshow until diagnostics asks for it", async () => {
@@ -498,7 +514,7 @@ describe("slideshow code shell", () => {
   });
 
   it("links from the diagnostics panel to the full report page", () => {
-    global.fetch = jest.fn(() => versionResponse("build-current")) as jest.Mock;
+    global.fetch = jest.fn(pendingVersionResponse);
 
     render(<SlideshowShellScreen />);
     fireEvent.click(screen.getByRole("button", { name: "Slideshow diagnostics" }));
@@ -819,7 +835,7 @@ describe("slideshow code shell", () => {
     // A pre-relaunch heartbeat left far in the past means the JS loop was frozen /
     // the device slept in between: the mount check must record a "not running"
     // gap event, distinguishing a freeze from a merely refused wake lock.
-    global.fetch = jest.fn(() => versionResponse("build-current")) as jest.Mock;
+    global.fetch = jest.fn(pendingVersionResponse);
     const threeHoursAgo = Date.now() - 3 * 60 * 60 * 1000;
     window.localStorage.setItem(HEARTBEAT_STORAGE_KEY, String(threeHoursAgo));
 
@@ -832,7 +848,7 @@ describe("slideshow code shell", () => {
   });
 
   it("does not record a gap event for a heartbeat within the threshold", () => {
-    global.fetch = jest.fn(() => versionResponse("build-current")) as jest.Mock;
+    global.fetch = jest.fn(pendingVersionResponse);
     window.localStorage.setItem(HEARTBEAT_STORAGE_KEY, String(Date.now() - 30_000));
 
     render(<SlideshowShellScreen />);
