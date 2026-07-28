@@ -61,7 +61,12 @@ export const MapPhotoPopup = ({
           <div className={styles.details}>
             {photo.mediaKind === "video" ? (
               <>
-                <span className={styles.mediaKind}>▶ Video</span>
+                <span className={styles.mediaKind}>
+                  {/* The glyph is decoration; the word is what carries meaning,
+                      and a screen reader announcing "black right-pointing
+                      triangle" carries none. */}
+                  <span aria-hidden="true">▶</span> Video
+                </span>
                 <br />
               </>
             ) : null}

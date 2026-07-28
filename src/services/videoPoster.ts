@@ -484,6 +484,43 @@ export type EnsurePosterResult = {
   scenes: number[];
 };
 
+/**
+ * Delete the frames of scenes this clip no longer has.
+ *
+ * A clip re-exported shorter, or a change to the interval or the cap, leaves
+ * frames on disk for moments that do not exist any more. Nothing else can
+ * collect them: the cache sweep traces each back to a clip that is still there
+ * and keeps it, and every orphan ships in the deploy. The clip's own poster is
+ * never a scene, so it is never in scope here.
+ */
+const collectRetiredScenes = (paths: VideoPosterPaths, scenes: number[], sizes: number[]): void => {
+  const wanted = new Set(scenes.map((seconds) => sceneFilename(paths.filename, seconds)));
+  const scenePattern = new RegExp(`^${escapeForRegExp(paths.filename)}@t\\d+(?:\\.\\d+)?(?=@)`);
+
+  const sweep = (directory: string) => {
+    let entries: string[];
+    try {
+      entries = fs.readdirSync(directory);
+    } catch {
+      return;
+    }
+    for (const entry of entries) {
+      const match = scenePattern.exec(entry);
+      if (!match || wanted.has(match[0])) {
+        continue;
+      }
+      fs.rmSync(path.join(directory, entry), { force: true });
+    }
+  };
+
+  sweep(path.dirname(paths.posterSource));
+  if (sizes.length > 0) {
+    sweep(paths.variantDirectory);
+  }
+};
+
+const escapeForRegExp = (value: string): string => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
 const arraysMatch = (left: number[] | undefined, right: number[]): boolean =>
   (left ?? []).length === right.length && (left ?? []).every((value, i) => value === right[i]);
 
@@ -572,7 +609,11 @@ export const ensureVideoPoster = async (
 
     sidecar = {
       mediaKind: "video",
-      sourcePath: videoPath,
+      // Album-relative, never the build machine's path: this file lives inside
+      // public/ and is served at a guessable URL, so an absolute path would
+      // publish the operator's username and directory layout to anyone who
+      // asked for it.
+      sourcePath: `${paths.albumName}/${paths.filename}`,
       source: { mtimeMs: Math.round(stat.mtimeMs), size: stat.size },
       ...metadata,
     };
@@ -599,6 +640,8 @@ export const ensureVideoPoster = async (
     scenes.push(seconds);
     variantsEncoded += await encodeVariants(scenePaths, options, !cached);
   }
+
+  collectRetiredScenes(paths, scenes, options.sizes);
 
   if (sidecar && (extracted || !arraysMatch(sidecar.scenes, scenes))) {
     sidecar = { ...sidecar, ...(scenes.length > 0 ? { scenes } : {}) };

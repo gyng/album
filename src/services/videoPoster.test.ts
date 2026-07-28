@@ -344,6 +344,11 @@ describe("ensureVideoPoster", () => {
     expect(first.sidecar.capturedAtLocal).toBe("2026-02-27T10:52:10");
     expect(first.sidecar.width).toBe(3840);
     expect(first.sidecar.height).toBe(2160);
+    // The sidecar sits inside public/ and is served at a guessable URL, so it
+    // records where the clip lives inside the gallery and nothing about the
+    // machine that built it.
+    expect(first.sidecar.sourcePath).toBe("trip/clip.mov");
+    expect(JSON.stringify(first.sidecar)).not.toContain(root);
 
     const second = await ensureVideoPoster(video, options);
     expect(second.extracted).toBe(false);
@@ -383,6 +388,40 @@ describe("ensureVideoPoster", () => {
     const second = await ensureVideoPoster(video, options);
     expect(second.scenes).toEqual([6, 12, 18]);
     expect(second.variantsEncoded).toBe(0);
+  }, 120_000);
+
+  // A clip re-exported shorter, or a change to the interval, leaves frames on
+  // disk for moments that no longer exist. Nothing else can collect them: the
+  // cache sweep traces them to a clip that is still there, and every one of them
+  // ships in the deploy.
+  it("collects the frames of scenes a clip no longer has", async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "album-poster-scenes-"));
+    const albumDir = path.join(root, "albums", "trip");
+    fs.mkdirSync(albumDir, { recursive: true });
+    const video = path.join(albumDir, "clip.mp4");
+    makeSyntheticVideo(video, 24);
+
+    const options = {
+      publicAlbumsDir: path.join(root, "public", "data", "albums"),
+      sizes: [800],
+      avif: { quality: 60, effort: 0 },
+      candidateFractions: [0.5],
+      sceneInterval: 6,
+    };
+
+    const first = await ensureVideoPoster(video, options);
+    expect(first.scenes).toEqual([6, 12, 18]);
+    const dropped = scenePosterPathsFor(video, 18, options.publicAlbumsDir);
+
+    // The same filename, re-exported to a third of the length.
+    makeSyntheticVideo(video, 8);
+    const second = await ensureVideoPoster(video, options);
+
+    expect(second.scenes).toEqual([]);
+    expect(fs.existsSync(dropped.posterSource)).toBe(false);
+    expect(fs.existsSync(dropped.variantFor(800))).toBe(false);
+    // The clip's own poster is untouched.
+    expect(fs.existsSync(second.paths.posterSource)).toBe(true);
   }, 120_000);
 
   it("takes no scenes from a clip shorter than the interval", async () => {

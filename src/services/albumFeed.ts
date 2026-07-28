@@ -2,6 +2,7 @@ import fs from "fs";
 import path from "path";
 import { ALBUMS_DIR, MANIFEST_NAME, MANIFEST_V2_NAME } from "./album";
 import { measureBuild } from "./buildTiming";
+import { parseYoutubeVideoId, youtubeMediaFilename } from "./youtubeExternal";
 
 type AlbumDirectoryEntry = {
   slug: string;
@@ -93,6 +94,11 @@ const readAlbumFeedMetadata = (
       description: `${slug} photo album`,
     };
   }
+};
+
+const youtubeAnchorLink = (slug: string, href: string): string => {
+  const videoId = parseYoutubeVideoId(href);
+  return videoId ? `/album/${slug}#${youtubeMediaFilename(videoId)}` : `/album/${slug}`;
 };
 
 const humanizeAlbumFeedName = (value: string): string => {
@@ -247,7 +253,10 @@ export const getAlbumFeedItems = async (
               block.kind === "photo"
                 ? `/album/${slug}#${source.split("/").at(-1)}`
                 : block.data?.type === "youtube"
-                  ? `/album/${slug}`
+                  ? // Externals are addressable now: the block's id is the
+                    // synthetic "<video id>.youtube" name, which is also what the
+                    // search index and the poster cache call it.
+                    youtubeAnchorLink(slug, source)
                   : `/album/${slug}#${source.split("/").at(-1)}`,
             pubDate: sortDate,
             sortDate,

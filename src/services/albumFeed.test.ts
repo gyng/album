@@ -208,7 +208,15 @@ describe("albumFeed", () => {
         },
         {
           kind: "video",
-          data: { type: "youtube", href: "https://youtu.be/example", title: "YouTube clip" },
+          data: {
+            type: "youtube",
+            href: "https://youtu.be/dQw4w9WgXcQ",
+            title: "YouTube clip",
+          },
+        },
+        {
+          kind: "video",
+          data: { type: "youtube", href: "https://example.com/not-a-video", title: "Elsewhere" },
         },
       ],
     });
@@ -231,6 +239,13 @@ describe("albumFeed", () => {
         }),
         expect.objectContaining({
           title: "YouTube clip",
+          // Externals have stable ids now, so a reader following the feed lands
+          // on the clip rather than the top of the album.
+          link: "/album/mixed#dQw4w9WgXcQ.youtube",
+        }),
+        expect.objectContaining({
+          // Nothing recognisable to anchor to, so the album itself is the link.
+          title: "Elsewhere",
           link: "/album/mixed",
         }),
       ]),
