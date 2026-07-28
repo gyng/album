@@ -147,6 +147,44 @@ describe("readVideoPoster", () => {
     });
   });
 
+  // Sidecars are written by the poster prepass, so anything malformed means a
+  // truncated write or a tampered file. These values are typed as numbers and
+  // travel into page props: a string latitude becomes a map pin at "north".
+  it("ignores sidecar fields that are not what they claim to be", () => {
+    const { video, publicAlbumsDir, videoCacheDir, imageCacheDir } = buildAlbum();
+    fs.writeFileSync(path.join(imageCacheDir, "clip.mov@800.avif"), "avif");
+    fs.writeFileSync(
+      path.join(videoCacheDir, "clip.mov@poster.json"),
+      JSON.stringify({
+        mediaKind: "video",
+        capturedAtLocal: 20260227,
+        latDeg: "north",
+        lngDeg: "east",
+        durationSeconds: "long",
+        width: "wide",
+        height: null,
+      }),
+    );
+
+    const poster = readVideoPoster(video, publicAlbumsDir);
+
+    expect(poster?.srcset).toHaveLength(1);
+    expect(poster?.latDeg).toBeUndefined();
+    expect(poster?.lngDeg).toBeUndefined();
+    expect(poster?.durationSeconds).toBeUndefined();
+    expect(poster?.capturedAtLocal).toBeUndefined();
+  });
+
+  it("reads a sidecar that is valid JSON but not an object as no sidecar", () => {
+    const { video, publicAlbumsDir, videoCacheDir, imageCacheDir } = buildAlbum();
+    fs.writeFileSync(path.join(imageCacheDir, "clip.mov@800.avif"), "avif");
+
+    for (const payload of ["[]", '"a string"', "42"]) {
+      fs.writeFileSync(path.join(videoCacheDir, "clip.mov@poster.json"), payload);
+      expect(readVideoPoster(video, publicAlbumsDir)).toBeNull();
+    }
+  });
+
   it("returns null when the clip has no poster yet", () => {
     const { video, publicAlbumsDir } = buildAlbum();
     expect(readVideoPoster(video, publicAlbumsDir)).toBeNull();

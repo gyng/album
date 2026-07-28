@@ -277,7 +277,19 @@ export const readVideoPoster = (
     return null;
   }
 
-  const aspectRatio = sidecar.width && sidecar.height ? sidecar.height / sidecar.width : undefined;
+  // Every field is read defensively: these values are typed as numbers here and
+  // travel into page props, where a string latitude becomes a map pin at
+  // "north" and a string duration becomes a badge that reads as one.
+  const finiteNumber = (value: unknown): number | undefined =>
+    typeof value === "number" && Number.isFinite(value) ? value : undefined;
+  const naiveWallClock = (value: unknown): string | undefined =>
+    typeof value === "string" && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/.test(value)
+      ? value
+      : undefined;
+
+  const width = finiteNumber(sidecar.width);
+  const height = finiteNumber(sidecar.height);
+  const aspectRatio = width && height ? height / width : undefined;
 
   const srcset = imageOptimisationConfig.sizes
     .slice()
@@ -300,12 +312,16 @@ export const readVideoPoster = (
     return null;
   }
 
+  const latDeg = finiteNumber(sidecar.latDeg);
+  const lngDeg = finiteNumber(sidecar.lngDeg);
+
   return omitUndefined({
     srcset,
-    capturedAtLocal: sidecar.capturedAtLocal,
-    latDeg: sidecar.latDeg,
-    lngDeg: sidecar.lngDeg,
-    durationSeconds: sidecar.durationSeconds,
+    capturedAtLocal: naiveWallClock(sidecar.capturedAtLocal),
+    // A coordinate is only a place with both halves of it.
+    latDeg: lngDeg === undefined ? undefined : latDeg,
+    lngDeg: latDeg === undefined ? undefined : lngDeg,
+    durationSeconds: finiteNumber(sidecar.durationSeconds),
   }) as VideoPoster;
 };
 

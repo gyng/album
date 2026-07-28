@@ -98,6 +98,9 @@ from index import (
     validate_index_database,
     write_publish_journal,
 )
+from index import (
+    scene_offsets_for as ix_scene_offsets,
+)
 
 RUN_MODEL_INFERENCE = os.environ.get("INDEX_RUN_MODEL_INFERENCE") == "1"
 
@@ -854,6 +857,69 @@ class TestMain(unittest.TestCase):
         self.assertFalse(any(scene[index] for index in (0, 2, 3, 4, 5)))
         # The clip answers for itself; its minutes do not answer alongside it.
         self.assertEqual(["../albums/trip/clip.mov"], matched)
+
+    def test_a_corrupt_sidecar_cannot_take_down_an_index_run(self):
+        # Sidecars are written by the poster prepass, so garbage means a
+        # truncated write or a tampered file — and one of those must not abort a
+        # run over thousands of photos. Everything unreadable is ignored the way
+        # malformed GPS already is.
+        with tempfile.TemporaryDirectory(dir=".") as root:
+            album_dir, poster_dir = self._make_media_album(root)
+            media_root = os.path.join(root, "src", "public", "data", "albums")
+            video = os.path.join(album_dir, "clip.mov")
+            open(video, "w").close()
+            sidecar_path = os.path.join(poster_dir, "clip.mov@poster.json")
+
+            hostile = [
+                "{oops",
+                json.dumps([]),
+                json.dumps("a string"),
+                json.dumps({"scenes": "60"}),
+                json.dumps({"scenes": {"a": 1}}),
+                json.dumps(
+                    {
+                        "capturedAtLocal": "not a date",
+                        "latDeg": "north",
+                        "lngDeg": "east",
+                        "durationSeconds": "long",
+                    }
+                ),
+            ]
+
+            for payload in hostile:
+                with open(sidecar_path, "w") as fh:
+                    fh.write(payload)
+
+                self.assertEqual([], ix_scene_offsets(video, media_root))
+
+                with open("../albums/test-simple/DSCF0593.jpg", "rb") as fh:
+                    analysed = analyse_image(
+                        fh,
+                        path=video,
+                        pixel_path="../albums/test-simple/DSCF0593.jpg",
+                        media_root=media_root,
+                        needs_core=True,
+                        precomputed_colors=[],
+                    )
+
+                # Nothing unusable reaches the database: a bad duration is no
+                # duration, and a bad timestamp leaves the photo's own reading.
+                self.assertIsNone(analysed["duration_seconds"])
+                self.assertNotEqual("not a date", analysed["iso8601"])
+                self.assertIsInstance(analysed["lat_deg"], (float, type(None)))
+
+    def test_sidecar_scene_offsets_ignore_unusable_entries(self):
+        with tempfile.TemporaryDirectory(dir=".") as root:
+            album_dir, poster_dir = self._make_media_album(root)
+            media_root = os.path.join(root, "src", "public", "data", "albums")
+            video = os.path.join(album_dir, "clip.mov")
+            open(video, "w").close()
+            with open(os.path.join(poster_dir, "clip.mov@poster.json"), "w") as fh:
+                json.dump({"scenes": [None, "x", 60, 120.5, True]}, fh)
+
+            # Booleans are integers in Python; a scene at "1 second" invented by
+            # a `true` in the list would be indexed as a real moment.
+            self.assertEqual([60.0, 120.5], ix_scene_offsets(video, media_root))
 
     def test_run_embedding_pass_skips_unreadable_images(self):
         # A None embedding (unreadable/corrupt image) must be skipped, not stored,

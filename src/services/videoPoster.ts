@@ -13,9 +13,9 @@
  * JPEG the indexer reads, and the sidecar describing the clip, live with the
  * transcoded MP4 in `.resized_videos` because nothing serves them to a browser.
  *
- * This module is required directly from `bin/prepare-optimised-images.cjs`
- * through Node's TypeScript stripping, so it must keep no relative imports and
- * no JSON imports — encoder settings are injected by the caller instead.
+ * This module is required directly from `bin/prepare-video-posters.cjs` through
+ * Node's TypeScript stripping, so it must keep no relative imports and no JSON
+ * imports — encoder settings are injected by the caller instead.
  */
 
 import fs from "node:fs";
@@ -54,7 +54,10 @@ export type VideoPosterSidecar = VideoPosterMetadata & {
   mediaKind: "video";
   /** Offsets, in seconds, of the per-minute frames extracted from this clip. */
   scenes?: number[];
-  /** Album-relative source path, matching the indexer's `../albums/...` keys. */
+  /**
+   * Where the clip sits in the gallery, as "<album>/<filename>". Deliberately
+   * not an absolute path: this file is served from public/ at a guessable URL.
+   */
   sourcePath?: string;
   source?: { mtimeMs: number; size: number };
 };
@@ -315,12 +318,25 @@ export const scenePosterPathsFor = (
   };
 };
 
+/**
+ * The sidecar for a clip, or null when there is nothing usable to read.
+ *
+ * A sidecar is written by this module, so anything malformed means a truncated
+ * write or a tampered file. A payload that is valid JSON but not an object — a
+ * bare list, a string — would pass a naive read and then quietly answer every
+ * field with `undefined`.
+ */
 export const readVideoPosterSidecar = (sidecarPath: string): VideoPosterSidecar | null => {
+  let payload: unknown;
   try {
-    return JSON.parse(fs.readFileSync(sidecarPath, "utf-8")) as VideoPosterSidecar;
+    payload = JSON.parse(fs.readFileSync(sidecarPath, "utf-8"));
   } catch {
     return null;
   }
+  if (typeof payload !== "object" || payload === null || Array.isArray(payload)) {
+    return null;
+  }
+  return payload as VideoPosterSidecar;
 };
 
 export const probeVideo = async (videoPath: string): Promise<FfprobePayload> => {

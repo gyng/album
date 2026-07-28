@@ -522,14 +522,32 @@ def pixel_source_for(path: str, media_root: str | None = None) -> str:
 def read_poster_sidecar(
     path: str, media_root: str | None = None
 ) -> Mapping[str, typing.Any] | None:
+    """The clip's sidecar, or None if there is nothing usable to read.
+
+    A sidecar is written by the poster prepass, so anything malformed means a
+    truncated write or a tampered file — and neither may abort a run over
+    thousands of photos. A payload that is valid JSON but not an object (a bare
+    list, a string) would pass a naive read and then fail on the first `.get`."""
     if not is_media_path(path):
         return None
     _poster, sidecar = poster_paths_for(path, media_root)
     try:
         with open(sidecar, "r", encoding="utf-8") as fh:
-            return json.load(fh)
+            payload = json.load(fh)
     except (OSError, ValueError):
         return None
+    return payload if isinstance(payload, dict) else None
+
+
+def sidecar_number(value: typing.Any) -> float | None:
+    """A finite number from a sidecar field, or None for anything else.
+
+    `True` is an `int` in Python, so a stray `true` in a scene list would
+    otherwise be read as a moment one second into the clip."""
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    number = float(value)
+    return number if math.isfinite(number) else None
 
 
 def source_digests_for(
@@ -566,6 +584,20 @@ def partition_indexable(
     return indexable, missing_poster
 
 
+NAIVE_ISO_PATTERN = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$")
+
+
+def sidecar_wall_clock(value: typing.Any) -> str | None:
+    """A naive camera-local timestamp from a sidecar field, or None.
+
+    Anything else — a zone-carrying string, free text, a number — is ignored
+    rather than written into metadata.iso8601, where every calendar view and
+    date facet would then have to cope with it."""
+    if not isinstance(value, str) or not NAIVE_ISO_PATTERN.match(value):
+        return None
+    return value
+
+
 def shift_naive_iso(value: str | None, seconds: float | None) -> str | None:
     """Advance a naive camera-local timestamp by an offset, staying naive.
 
@@ -588,8 +620,11 @@ def scene_offsets_for(path: str, media_root: str | None = None) -> list[float]:
     if not is_media_path(path) or is_scene_path(path):
         return []
     sidecar = read_poster_sidecar(path, media_root)
-    scenes = (sidecar or {}).get("scenes") or []
-    return [float(value) for value in scenes if isinstance(value, (int, float))]
+    scenes = (sidecar or {}).get("scenes")
+    if not isinstance(scenes, list):
+        return []
+    offsets = [sidecar_number(value) for value in scenes]
+    return [offset for offset in offsets if offset is not None and offset > 0]
 
 
 def album_scope_for_pattern(pattern: str) -> tuple[str, str]:
@@ -7356,12 +7391,14 @@ def analyse_image(
     duration_seconds = None
     scene_seconds = split_scene_path(path)[1]
     if sidecar is not None:
-        duration_seconds = sidecar.get("durationSeconds")
-        sidecar_lat = sidecar.get("latDeg")
-        sidecar_lng = sidecar.get("lngDeg")
+        # Every field is read defensively: a corrupt sidecar must cost this one
+        # clip its metadata, never the run.
+        duration_seconds = sidecar_number(sidecar.get("durationSeconds"))
+        sidecar_lat = sidecar_number(sidecar.get("latDeg"))
+        sidecar_lng = sidecar_number(sidecar.get("lngDeg"))
         if sidecar_lat is not None and sidecar_lng is not None:
-            lat_deg = float(sidecar_lat)
-            lng_deg = float(sidecar_lng)
+            lat_deg = sidecar_lat
+            lng_deg = sidecar_lng
             geo = get_image_geocode(lat_deg, lng_deg)
 
     # EXIF DateTimeOriginal is "YYYY:MM:DD HH:MM:SS" — the camera's LOCAL wall-clock
@@ -7381,7 +7418,7 @@ def analyse_image(
     if sidecar is not None:
         # The sidecar's reading is already camera-local wall time, written by the
         # same rule EXIF follows: the zone marker names the clock, never shifts it.
-        clip_start = sidecar.get("capturedAtLocal") or iso8601_local
+        clip_start = sidecar_wall_clock(sidecar.get("capturedAtLocal")) or iso8601_local
         # A scene happened `scene_seconds` into the clip, so that is where it
         # belongs against the photos taken around it.
         iso8601_local = (
