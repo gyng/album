@@ -790,6 +790,71 @@ class TestMain(unittest.TestCase):
 
         self.assertEqual(2, summary["paths"])
 
+    def test_scene_rows_carry_no_searchable_text(self):
+        # The FTS table indexes `filename`, and the browser searches it, so a
+        # scene row named "clip.mov@t60" would answer a keyword search for the
+        # clip by name with every minute of it — the flooding scenes exist to
+        # avoid. A scene is reachable by vector ranking alone.
+        with tempfile.TemporaryDirectory() as tmpdir:
+            dbpath = os.path.join(tmpdir, "scene-text.sqlite")
+            db = Sqlite3Client(dbpath)
+            db.setup_tables()
+            insert_analysed_images_batch(
+                db,
+                [
+                    {
+                        "path": "../albums/trip/clip.mov",
+                        "analysed": {
+                            "exif": {},
+                            "geocode": {},
+                            "colors": [],
+                            "tags": ["harbour"],
+                            "alt_text": "A harbour clip.",
+                            "iso8601": "2026-02-27T10:52:10",
+                            "media_kind": "video",
+                        },
+                        "write_core": True,
+                        "write_caption": True,
+                    },
+                    {
+                        "path": "../albums/trip/clip.mov@t60",
+                        "analysed": {
+                            "exif": {},
+                            "geocode": {},
+                            "colors": [],
+                            "tags": [],
+                            "alt_text": None,
+                            "iso8601": "2026-02-27T10:53:10",
+                            "media_kind": "video",
+                            "scene_seconds": 60.0,
+                        },
+                        "write_core": True,
+                        "write_caption": False,
+                    },
+                ],
+            )
+
+            with db.transaction() as cur:
+                scene = cur.execute(
+                    "SELECT filename, album_relative_path, tags, alt_text, colors, geocode "
+                    "FROM images WHERE path = ?",
+                    ("../albums/trip/clip.mov@t60",),
+                ).fetchone()
+                # The same query shape the browser sends.
+                matched = [
+                    row[0]
+                    for row in cur.execute(
+                        "SELECT path FROM images WHERE images MATCH ?",
+                        ('- {path album_relative_path exif colors} : "clip"',),
+                    )
+                ]
+
+        # Only the link survives, because a tile needs somewhere to go.
+        self.assertEqual("/album/trip?t=60#clip.mov", scene[1])
+        self.assertFalse(any(scene[index] for index in (0, 2, 3, 4, 5)))
+        # The clip answers for itself; its minutes do not answer alongside it.
+        self.assertEqual(["../albums/trip/clip.mov"], matched)
+
     def test_run_embedding_pass_skips_unreadable_images(self):
         # A None embedding (unreadable/corrupt image) must be skipped, not stored,
         # and must not abort the pass.

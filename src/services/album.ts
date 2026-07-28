@@ -214,6 +214,9 @@ const appendExternalBlocks = (
   albumPath: string,
   externals?: V2AlbumMetadata["externals"],
 ): void => {
+  const hasBlockId = (id: string): boolean =>
+    manifest.blocks.some((block) => block.kind === "video" && block.id === id);
+
   externals?.forEach((ext) => {
     // Omit `date` when absent — an explicit `undefined` in a block's data
     // aborts the static build via Next's isSerializableProps check.
@@ -224,9 +227,16 @@ const appendExternalBlocks = (
       // The video id is the same name the poster cache and the search index use
       // for this external, so one name resolves everywhere.
       const videoId = parseYoutubeVideoId(ext.href);
+      const youtubeId = videoId ? youtubeMediaFilename(videoId) : ext.href;
+      // The same video declared twice — as an embed URL and a short link, say —
+      // is one video, and two blocks sharing an id make its anchor ambiguous.
+      if (hasBlockId(youtubeId)) {
+        return;
+      }
+
       manifest.blocks.push({
         kind: "video",
-        id: videoId ? youtubeMediaFilename(videoId) : ext.href,
+        id: youtubeId,
         data: {
           type: "youtube",
           href: ext.href,
@@ -241,12 +251,19 @@ const appendExternalBlocks = (
       return;
     }
 
+    // A local external is a file in the album, and files discovered on disk are
+    // keyed by their filename — declaring one in the manifest must not give it a
+    // different anchor, nor a second block under the same one. Ids are the
+    // page's DOM anchors: two blocks sharing one means a deep link lands on
+    // whichever the browser happens to find first.
+    const id = path.basename(ext.href);
+    if (hasBlockId(id)) {
+      return;
+    }
+
     manifest.blocks.push({
       kind: "video",
-      // A local external is a file in the album, and files discovered on disk
-      // are keyed by their filename — declaring one in the manifest must not
-      // give it a different anchor.
-      id: path.basename(ext.href),
+      id,
       data: {
         type: "local",
         href: ext.href,

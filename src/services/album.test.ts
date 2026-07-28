@@ -211,6 +211,55 @@ describe("getAlbum", () => {
 
   // A random id per build means nothing can address an external: not a search
   // result's "#<name>" deep link, not a shared URL, not the page's own permalink.
+  // Declaring a clip that is also sitting in the album directory is an easy
+  // mistake, and since ids are the page's DOM anchors, two blocks under one id
+  // means a deep link lands on whichever the browser finds first.
+  it("does not add a second block for a local clip already discovered on disk", async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "album-external-dupe-"));
+    const albumDir = path.join(root, "trip");
+    fs.mkdirSync(albumDir, { recursive: true });
+    fs.writeFileSync(path.join(albumDir, "clip.mov"), "video");
+    fs.writeFileSync(
+      path.join(albumDir, "album.json"),
+      JSON.stringify({ externals: [{ type: "local", href: "clip.mov" }] }),
+    );
+
+    try {
+      const album = await getAlbum(albumDir);
+      const videoIds = album.blocks.filter((block) => block.kind === "video").map((b) => b.id);
+
+      expect(videoIds).toEqual(["clip.mov"]);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  // The same guard for externals: a manifest that lists one video twice must not
+  // produce two blocks under a single id.
+  it("does not add the same YouTube external twice", async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "album-external-dupe-"));
+    const albumDir = path.join(root, "trip");
+    fs.mkdirSync(albumDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(albumDir, "album.json"),
+      JSON.stringify({
+        externals: [
+          { type: "youtube", href: "https://www.youtube.com/embed/ycyUWULJxdU" },
+          { type: "youtube", href: "https://youtu.be/ycyUWULJxdU" },
+        ],
+      }),
+    );
+
+    try {
+      const album = await getAlbum(albumDir);
+      const videoIds = album.blocks.filter((block) => block.kind === "video").map((b) => b.id);
+
+      expect(videoIds).toEqual(["ycyUWULJxdU.youtube"]);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it("gives external blocks ids that survive a rebuild", async () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "album-external-id-"));
     const albumDir = path.join(root, "trip");

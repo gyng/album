@@ -7515,11 +7515,13 @@ def insert_analysed_images_batch(db, results: list[Mapping]):
                 # deliberately not searchable text: giving every minute of a clip
                 # the clip's place and tags would flood keyword results and
                 # double-count the same footage in the facet counts.
+                # Only the link. `filename` is an FTS column the browser
+                # searches, so a scene named "clip.mov@t60" would answer a
+                # keyword search for the clip by name with every minute of it —
+                # exactly the flooding that keeping scenes out of the text index
+                # is meant to prevent.
                 image_fields.update(
-                    {
-                        "filename": get_filename(path),
-                        "album_relative_path": get_album_relative_path(path),
-                    }
+                    {"album_relative_path": get_album_relative_path(path)}
                 )
             elif write_core:
                 image_fields.update(
