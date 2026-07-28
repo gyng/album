@@ -71,7 +71,11 @@ const createE2eSearchDatabases = ({ outputPath, embeddingsOutputPath, force = fa
     geo_city TEXT,
     geo_region TEXT,
     geo_subregion TEXT,
-    geo_country TEXT
+    geo_country TEXT,
+    media_kind TEXT NOT NULL DEFAULT 'photo',
+    duration_seconds REAL,
+    scene_seconds REAL,
+    scene_of TEXT
   );
 `);
   embeddingsDb.exec(`
@@ -128,6 +132,19 @@ const createE2eSearchDatabases = ({ outputPath, embeddingsOutputPath, force = fa
       alt: "Trees in a Singapore garden.",
       subject: "garden trees",
     },
+    // The album's committed clip, indexed through the poster frame the prepass
+    // extracts from it — this is what gives the e2e suite a real video result to
+    // assert a play badge on.
+    {
+      filename: "DSCF0159.MOV",
+      date: "2026-02-27T10:52:10",
+      location: [36.567263, 137.666282, "Ōmachi", "Nagano", "Ōmachi-shi", "Japan"],
+      tags: "japan, night, lights",
+      alt: "Night lights, out of focus.",
+      subject: "night lights",
+      mediaKind: "video",
+      durationSeconds: 13.013,
+    },
   ];
 
   const insertImage = db.prepare(`
@@ -137,8 +154,9 @@ const createE2eSearchDatabases = ({ outputPath, embeddingsOutputPath, force = fa
 `);
   const insertMetadata = db.prepare(`
   INSERT INTO metadata (
-    path, lat_deg, lng_deg, iso8601, geo_city, geo_region, geo_subregion, geo_country
-  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    path, lat_deg, lng_deg, iso8601, geo_city, geo_region, geo_subregion, geo_country,
+    media_kind, duration_seconds
+  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 `);
   const insertEmbedding = embeddingsDb.prepare(`
   INSERT INTO embeddings (path, model_id, embedding_dim, embedding_blob, embedding_scale)
@@ -151,6 +169,7 @@ const createE2eSearchDatabases = ({ outputPath, embeddingsOutputPath, force = fa
     [0.25, 0.75, 0],
     [-0.5, 0.5, 0],
     [0.9, 0.1, 0],
+    [0.1, 0.2, 0.9],
   ];
 
   db.exec("BEGIN");
@@ -189,7 +208,18 @@ const createE2eSearchDatabases = ({ outputPath, embeddingsOutputPath, force = fa
       photo.alt,
       photo.subject,
     );
-    insertMetadata.run(photoPath, lat, lng, photo.date, city, region, subregion, country);
+    insertMetadata.run(
+      photoPath,
+      lat,
+      lng,
+      photo.date,
+      city,
+      region,
+      subregion,
+      country,
+      photo.mediaKind ?? "photo",
+      photo.durationSeconds ?? null,
+    );
     const encodedEmbedding = encodeEmbedding(embeddingVectors[index]);
     insertEmbedding.run(
       photoPath,

@@ -1,13 +1,16 @@
 import { test, expect } from "@playwright/test";
 
 const expectedJapanResultHrefs = [
+  // The album's committed clip is tagged japan too: it is indexed through the
+  // poster frame the prepass extracts from it.
+  "/album/test-simple#DSCF0159.MOV",
   "/album/test-simple#DSCF0506-2.jpg",
   "/album/test-simple#DSCF0593.jpg",
 ];
 
 const expectJapanResults = async (page: import("@playwright/test").Page) => {
   const resultPictures = page.getByTestId("result-picture");
-  await expect(resultPictures).toHaveCount(2, { timeout: 15_000 });
+  await expect(resultPictures).toHaveCount(3, { timeout: 15_000 });
   const resultHrefs = await resultPictures.evaluateAll((pictures) =>
     pictures
       .map((picture) => picture.closest("a")?.getAttribute("href"))
@@ -52,6 +55,25 @@ test.describe("Search", () => {
 
     await expectJapanResults(page);
     await expect(input).toHaveAttribute("aria-busy", "false");
+  });
+
+  // The whole chain in one assertion: a poster frame extracted at build time, a
+  // media_kind the database carries, the capability probe that reads it, and the
+  // badge that tells a viewer this result plays.
+  test("a video result is marked as playable with its length", async ({ page }) => {
+    await page.goto("/search", { waitUntil: "domcontentloaded" });
+    // Keyword mode, like the other searches here: semantic would block on a
+    // 147MB model download that has nothing to do with what this asserts.
+    await page.getByLabel("Search mode", { exact: true }).selectOption("keyword");
+    await page.getByRole("textbox", { name: "Search photos" }).fill("japan");
+
+    const badge = page.getByLabel("Video, 0:13");
+    await expect(badge).toBeVisible({ timeout: 15_000 });
+
+    const videoResult = page.locator('a[href="/album/test-simple#DSCF0159.MOV"]').first();
+    await expect(videoResult).toBeVisible();
+    const thumbnail = videoResult.locator("img").first();
+    await expect(thumbnail).toHaveAttribute("src", /DSCF0159\.MOV%40\d+\.avif/);
   });
 
   test("tag facet filters results", async ({ page }) => {
@@ -103,7 +125,8 @@ test.describe("Search", () => {
     await expect(page.getByText("DSCF0506-2.jpg")).toBeVisible();
 
     const resultPictures = page.getByTestId("result-picture");
-    await expect(resultPictures).toHaveCount(4, { timeout: 15_000 });
+    // Every fixture row but the seed, which now includes the album's clip.
+    await expect(resultPictures).toHaveCount(5, { timeout: 15_000 });
     const firstResultHref = await resultPictures
       .first()
       .evaluate((picture) => picture.closest("a")?.getAttribute("href"));

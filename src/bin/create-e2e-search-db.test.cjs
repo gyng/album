@@ -31,7 +31,13 @@ describe("create-e2e-search-db", () => {
       expect(result.created).toBe(true);
 
       const database = new DatabaseSync(databasePath, { readOnly: true });
-      expect(database.prepare("SELECT COUNT(*) AS count FROM images").get().count).toBe(5);
+      // Five photos plus the album's committed clip, indexed through its poster.
+      expect(database.prepare("SELECT COUNT(*) AS count FROM images").get().count).toBe(6);
+      expect(
+        database
+          .prepare("SELECT media_kind, duration_seconds FROM metadata WHERE path LIKE '%.MOV'")
+          .get(),
+      ).toEqual({ media_kind: "video", duration_seconds: 13.013 });
       expect(
         database
           .prepare("SELECT COUNT(*) AS count FROM sqlite_master WHERE name = 'embeddings'")
@@ -40,19 +46,19 @@ describe("create-e2e-search-db", () => {
       expect(
         database.prepare("SELECT COUNT(*) AS count FROM images WHERE images MATCH 'japan'").get()
           .count,
-      ).toBe(2);
-      expect(database.prepare("SELECT count FROM tags WHERE tag = 'japan'").get().count).toBe(2);
+      ).toBe(3);
+      expect(database.prepare("SELECT count FROM tags WHERE tag = 'japan'").get().count).toBe(3);
       expect(
         database
           .prepare("SELECT COUNT(*) AS count FROM images WHERE exif LIKE '%GPSLatitude%'")
           .get().count,
-      ).toBe(5);
+      ).toBe(6);
       database.close();
 
       const embeddingsDatabase = new DatabaseSync(embeddingsDatabasePath, { readOnly: true });
       expect(
         embeddingsDatabase.prepare("SELECT COUNT(*) AS count FROM embeddings").get().count,
-      ).toBe(5);
+      ).toBe(6);
       expect(
         embeddingsDatabase
           .prepare("SELECT name FROM pragma_table_info('embeddings') ORDER BY cid")

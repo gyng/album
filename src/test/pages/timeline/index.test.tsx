@@ -96,6 +96,49 @@ describe("timeline page data fetching", () => {
     });
   });
 
+  // An external is a video in the album with a date and, since the poster
+  // prepass downloads its thumbnail, a frame — so it belongs beside the photos
+  // shot the same day rather than only inside its album page.
+  it("places a YouTube external on the timeline through its downloaded thumbnail", async () => {
+    getAlbums.mockResolvedValue([
+      {
+        name: "kansai",
+        title: "Kansai",
+        blocks: [
+          {
+            kind: "video",
+            id: "ycyUWULJxdU.youtube",
+            data: {
+              type: "youtube",
+              href: "https://www.youtube.com/embed/ycyUWULJxdU",
+              date: "2025-12-01T22:00:00+09:00",
+            },
+            _build: {
+              src: "https://www.youtube.com/embed/ycyUWULJxdU",
+              mimeType: "video/youtube",
+              capturedAtLocal: "2025-12-01T22:00:00",
+              poster: {
+                srcset: [{ src: "/ycyUWULJxdU.youtube@800.avif", width: 800, height: 450 }],
+              },
+            },
+          },
+        ],
+        formatting: {},
+        _build: { slug: "kansai", srcdir: "../albums/kansai" },
+      },
+    ]);
+
+    const entries = (await loadTimelinePageData()).entryRows.map(unpackTimelineEntry);
+
+    expect(entries).toHaveLength(1);
+    expect(entries[0]).toMatchObject({
+      mediaKind: "video",
+      dateTimeOriginal: "2025-12-01T22:00:00",
+      href: "/album/kansai#ycyUWULJxdU.youtube",
+      src: { src: "/ycyUWULJxdU.youtube@800.avif", width: 800, height: 450 },
+    });
+  });
+
   it("builds dated timeline entries from photo blocks and skips undated photos", async () => {
     getAlbums.mockResolvedValue([
       {

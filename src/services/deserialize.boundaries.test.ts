@@ -31,7 +31,7 @@ jest.mock("sqlite3", () => {
 });
 
 import { getNextJsSafeExif, getPhotoSize, optimiseImages } from "./photo";
-import { getOriginalVideoTechnicalData, optimiseVideo } from "./video";
+import { getOriginalVideoTechnicalData, optimiseVideo, readVideoPoster } from "./video";
 import {
   deserializeBlock,
   deserializeContentBlock,
@@ -99,6 +99,35 @@ describe("deserialisation adapter boundaries", () => {
       youtube,
     );
     await expect(deserializeBlock(text)).resolves.toEqual(text);
+  });
+
+  // An external has no file in the album, but the poster prepass downloads its
+  // thumbnail and writes a sidecar for it — the same shape a local clip gets.
+  // Without that on the block, an external is invisible to the timeline.
+  it("carries the poster and recorded time of a YouTube external", async () => {
+    (readVideoPoster as jest.Mock).mockReturnValue({
+      srcset: [{ src: "/ycyUWULJxdU.youtube@800.avif", width: 800, height: 450 }],
+      capturedAtLocal: "2025-12-01T22:00:00",
+    });
+
+    const block = await deserializeVideoBlock(
+      {
+        kind: "video",
+        id: "ycyUWULJxdU.youtube",
+        data: {
+          type: "youtube",
+          href: "https://www.youtube.com/embed/ycyUWULJxdU",
+          date: "2025-12-01T22:00:00+09:00",
+        },
+      },
+      { dirname: "public/data/albums/kansai" },
+    );
+
+    expect(block._build?.poster?.srcset?.[0]?.src).toBe("/ycyUWULJxdU.youtube@800.avif");
+    expect(block._build?.capturedAtLocal).toBe("2025-12-01T22:00:00");
+    // The embed URL is untouched: it is what the page renders.
+    expect(block.data.href).toBe("https://www.youtube.com/embed/ycyUWULJxdU");
+    (readVideoPoster as jest.Mock).mockReturnValue(null);
   });
 
   it("builds local video metadata and omits an unavailable date", async () => {

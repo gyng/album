@@ -2,6 +2,7 @@ import fs from "fs";
 import path from "path";
 import { getNextJsSafeExif, getPhotoSize, optimiseImages, stripPublicFromPath } from "./photo";
 import { getOriginalVideoTechnicalData, optimiseVideo, readVideoPoster } from "./video";
+import { parseYoutubeVideoId, youtubeMediaFilename } from "./youtubeExternal";
 import {
   Block,
   Content,
@@ -102,7 +103,30 @@ export const deserializeVideoBlock = async (
 ): Promise<VideoBlock> => {
   return measureBuild("deserialize.videoBlock", async () => {
     if (serialized.data.type === "youtube") {
-      return { ...serialized };
+      // An external has no file in the album directory, but the poster prepass
+      // downloads its thumbnail under the synthetic "<video id>.youtube" name
+      // and writes the same sidecar a local clip gets. Without that on the
+      // block, an external is invisible to everything outside its album page.
+      const videoId = parseYoutubeVideoId(serialized.data.href);
+      const poster = videoId
+        ? readVideoPoster(path.join(options.dirname, youtubeMediaFilename(videoId)))
+        : null;
+
+      return {
+        ...serialized,
+        ...(poster
+          ? {
+              _build: {
+                src: serialized.data.href,
+                mimeType: "video/youtube",
+                poster: { srcset: poster.srcset },
+                ...(poster.capturedAtLocal !== undefined
+                  ? { capturedAtLocal: poster.capturedAtLocal }
+                  : {}),
+              },
+            }
+          : {}),
+      };
     }
 
     const localFilepath = path.join(options.dirname, serialized.data.href);
