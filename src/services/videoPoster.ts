@@ -537,8 +537,13 @@ const collectRetiredScenes = (paths: VideoPosterPaths, scenes: number[], sizes: 
 
 const escapeForRegExp = (value: string): string => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
-const arraysMatch = (left: number[] | undefined, right: number[]): boolean =>
-  (left ?? []).length === right.length && (left ?? []).every((value, i) => value === right[i]);
+// `left` comes from a file on disk, so it is whatever that file held: a string
+// of the right length would reach `.every` and throw, taking the prepass down
+// over a tampered sidecar.
+const arraysMatch = (left: unknown, right: number[]): boolean =>
+  Array.isArray(left) &&
+  left.length === right.length &&
+  left.every((value, index) => value === right[index]);
 
 /**
  * Extract (or reuse) a video's poster frame, encode the display variants, and
@@ -660,7 +665,12 @@ export const ensureVideoPoster = async (
   collectRetiredScenes(paths, scenes, options.sizes);
 
   if (sidecar && (extracted || !arraysMatch(sidecar.scenes, scenes))) {
-    sidecar = { ...sidecar, ...(scenes.length > 0 ? { scenes } : {}) };
+    // Spreading the old sidecar keeps its `scenes` key, so a clip that has just
+    // lost every scene would go on advertising moments whose frames were
+    // collected moments ago — and the indexer reads exactly this list to decide
+    // what to index.
+    const { scenes: _retired, ...rest } = sidecar;
+    sidecar = { ...rest, ...(scenes.length > 0 ? { scenes } : {}) };
     fs.writeFileSync(paths.sidecar, `${JSON.stringify(sidecar, null, 2)}\n`);
   }
 

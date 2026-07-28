@@ -422,6 +422,67 @@ describe("ensureVideoPoster", () => {
     expect(fs.existsSync(dropped.variantFor(800))).toBe(false);
     // The clip's own poster is untouched.
     expect(fs.existsSync(second.paths.posterSource)).toBe(true);
+    // And the sidecar stops claiming moments whose frames have just been
+    // collected — the indexer reads that list to decide what to index.
+    expect(readVideoPosterSidecar(second.paths.sidecar)?.scenes).toBeUndefined();
+  }, 120_000);
+
+  // A tampered or truncated sidecar must not take the prepass down: the scene
+  // list it holds is compared against the one just computed, and a string of the
+  // right length would reach `.every` and throw.
+  it("survives a sidecar whose scene list is not a list", async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "album-poster-hostile-"));
+    const albumDir = path.join(root, "albums", "trip");
+    fs.mkdirSync(albumDir, { recursive: true });
+    const video = path.join(albumDir, "clip.mp4");
+    makeSyntheticVideo(video, 20);
+
+    const options = {
+      publicAlbumsDir: path.join(root, "public", "data", "albums"),
+      sizes: [800],
+      avif: { quality: 60, effort: 0 },
+      candidateFractions: [0.5],
+      sceneInterval: 6,
+    };
+
+    const first = await ensureVideoPoster(video, options);
+    expect(first.scenes.length).toBeGreaterThan(0);
+
+    const sidecarPath = first.paths.sidecar;
+    for (const scenes of ['"6"', "6", '{"a":1}', "null"]) {
+      const sidecar = JSON.parse(fs.readFileSync(sidecarPath, "utf-8"));
+      fs.writeFileSync(sidecarPath, JSON.stringify({ ...sidecar, scenes: JSON.parse(scenes) }));
+
+      const rerun = await ensureVideoPoster(video, options);
+      expect(rerun.scenes).toEqual(first.scenes);
+      // Whatever it held, the sidecar is left describing what actually exists.
+      expect(readVideoPosterSidecar(sidecarPath)?.scenes).toEqual(first.scenes);
+    }
+  }, 120_000);
+
+  // The clip is untouched here, so its poster is never re-extracted and the
+  // sidecar is only patched — the path where a stale list survives a spread.
+  it("stops claiming scenes when the interval leaves the clip with none", async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "album-poster-scenes-"));
+    const albumDir = path.join(root, "albums", "trip");
+    fs.mkdirSync(albumDir, { recursive: true });
+    const video = path.join(albumDir, "clip.mp4");
+    makeSyntheticVideo(video, 20);
+
+    const base = {
+      publicAlbumsDir: path.join(root, "public", "data", "albums"),
+      sizes: [800],
+      avif: { quality: 60, effort: 0 },
+      candidateFractions: [0.5],
+    };
+
+    const withScenes = await ensureVideoPoster(video, { ...base, sceneInterval: 6 });
+    expect(withScenes.scenes).toEqual([6, 12]);
+
+    const withNone = await ensureVideoPoster(video, { ...base, sceneInterval: 600 });
+    expect(withNone.scenes).toEqual([]);
+    expect(withNone.extracted).toBe(false);
+    expect(readVideoPosterSidecar(withNone.paths.sidecar)?.scenes).toBeUndefined();
   }, 120_000);
 
   it("takes no scenes from a clip shorter than the interval", async () => {
