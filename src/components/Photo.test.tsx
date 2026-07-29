@@ -2,7 +2,7 @@
  * @jest-environment jsdom
  */
 
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { PhotoBlock } from "../services/types";
 import { ExifRow, ExifTable, Picture, PhotoBlockEl, PhotoDescription } from "./Photo";
 
@@ -386,8 +386,8 @@ describe("Picture", () => {
   });
 
   it.each(["Rotate 90 CW", "Rotate 270 CW"])(
-    "swaps dimensions for the EXIF orientation %s and clears the colour placeholder on load",
-    (orientation) => {
+    "swaps dimensions for the EXIF orientation %s and clears the colour placeholder after decode",
+    async (orientation) => {
       const portraitBlock = createBlock({
         width: 600,
         height: 400,
@@ -412,8 +412,46 @@ describe("Picture", () => {
       expect(img.style.backgroundImage).toContain("data:image/svg+xml;base64");
       expect(img.style.backgroundSize).toBe("cover");
 
+      let resolveDecode: () => void = () => {};
+      img.decode = jest.fn(
+        () =>
+          new Promise<void>((resolve) => {
+            resolveDecode = resolve;
+          }),
+      );
+
       fireEvent.load(img);
-      expect(img.style.backgroundImage).toBe("unset");
+      // The backdrop must stay up until the browser has decoded the photo,
+      // otherwise the swap flashes the page background for a frame.
+      expect(img.style.backgroundImage).toContain("data:image/svg+xml;base64");
+
+      resolveDecode();
+      await waitFor(() => expect(img.style.backgroundImage).toBe("unset"));
     },
   );
+
+  it("clears a rotated photo's placeholder on load when decode is unavailable", () => {
+    const portraitBlock = createBlock({
+      width: 600,
+      height: 400,
+      exif: { Orientation: "Rotate 90 CW" },
+      tags: { colors: [[12, 34, 56]] },
+    });
+    render(<Picture block={portraitBlock} thumb useColourPlaceholder />);
+
+    const img: HTMLImageElement = screen.getByTestId("picture");
+    fireEvent.load(img);
+    expect(img.style.backgroundImage).toBe("unset");
+  });
+
+  it("keeps the colour placeholder as a permanent backdrop for unrotated photos", () => {
+    const colourBlock = createBlock({ tags: { colors: [[12, 34, 56]] } });
+    render(<Picture block={colourBlock} thumb useColourPlaceholder />);
+
+    const img: HTMLImageElement = screen.getByTestId("picture");
+    expect(img.style.backgroundImage).toContain("data:image/svg+xml;base64");
+
+    fireEvent.load(img);
+    expect(img.style.backgroundImage).toContain("data:image/svg+xml;base64");
+  });
 });

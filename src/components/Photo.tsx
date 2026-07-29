@@ -48,11 +48,13 @@ type ExifCoordinatesRowProps = {
   };
 };
 
-const getDisplayDimensions = (block: PhotoBlock): { width: number; height: number } => {
-  const isExifPortrait =
-    block._build.exif.Orientation?.includes("270") || block._build.exif.Orientation?.includes("90");
+const isExifRotated = (block: PhotoBlock): boolean =>
+  Boolean(
+    block._build.exif.Orientation?.includes("270") || block._build.exif.Orientation?.includes("90"),
+  );
 
-  return isExifPortrait
+const getDisplayDimensions = (block: PhotoBlock): { width: number; height: number } => {
+  return isExifRotated(block)
     ? { width: block._build.height, height: block._build.width }
     : { width: block._build.width, height: block._build.height };
 };
@@ -283,6 +285,23 @@ export const Picture: React.FC<{
 </svg>`;
   const b64Placeholder = btoa(placeholderSvg);
 
+  // The placeholder bleeds outside EXIF-rotated vertical images in some
+  // browsers, so those still clear it — but only once decode() resolves, so no
+  // frame composites with neither placeholder nor photo (a brief page-background
+  // flash otherwise). Unrotated photos keep the placeholder as a permanent
+  // backdrop: the photo covers it exactly, and it fills the gap when the
+  // browser re-decodes an evicted image while scrolling.
+  const clearPlaceholderAfterDecode = (img: HTMLImageElement) => {
+    const clear = () => {
+      img.style.backgroundImage = "unset";
+    };
+    if (typeof img.decode === "function") {
+      img.decode().then(clear, clear);
+    } else {
+      clear();
+    }
+  };
+
   return (
     // picture is needed for index page, aspect ratio goes all wonky without
     <picture className={styles.imageWrapper}>
@@ -303,9 +322,18 @@ export const Picture: React.FC<{
           backgroundPosition: "center",
           backgroundSize: props.thumb ? "cover" : "contain",
         }}
-        onLoad={(evt) => {
-          evt.currentTarget.style.backgroundImage = "unset";
-        }}
+        {...(isExifRotated(props.block)
+          ? {
+              onLoad: (evt: React.SyntheticEvent<HTMLImageElement>) =>
+                clearPlaceholderAfterDecode(evt.currentTarget),
+              // Photos that finish loading before hydration never fire onLoad.
+              ref: (img: HTMLImageElement | null) => {
+                if (img && img.complete && img.naturalWidth > 0) {
+                  clearPlaceholderAfterDecode(img);
+                }
+              },
+            }
+          : {})}
         // placeholder image sizes
         width={actualWidth}
         height={actualHeight}
