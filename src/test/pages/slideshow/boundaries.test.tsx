@@ -126,6 +126,7 @@ jest.mock("../../../util/slideshowAmbient", () => ({
   }),
 }));
 jest.mock("../../../util/slideshowGesture", () => ({
+  ...jest.requireActual("../../../util/slideshowGesture"),
   resolvePointerMove: () => pointerMoveResult,
   resolvePointerUpAction: (input: any) => {
     input.tap.getBounds();

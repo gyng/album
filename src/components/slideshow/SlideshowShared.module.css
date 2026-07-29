@@ -7,9 +7,11 @@
   cursor: pointer;
   opacity: 1;
   filter: grayscale(0);
+  scale: 1;
   transition:
     opacity var(--fade-duration) var(--ease-out),
-    filter var(--t-base) var(--ease-out);
+    filter var(--t-base) var(--ease-out),
+    scale var(--t-base) var(--ease-out);
   z-index: var(--z-media);
   touch-action: manipulation;
   user-select: none;
@@ -38,6 +40,61 @@
   pointer-events: none;
 }
 
+/* Follow-the-finger drag. The base layers deliberately do NOT transition
+   transform, so the inline translate tracks the finger 1:1; this class is
+   added on release so the settle (spring back to rest, or glide off-screen
+   under the incoming fade) animates instead of snapping. The slight
+   overshoot in the ease makes the spring-back read as physical. */
+.image.layerSettling,
+.remixGrid.layerSettling {
+  transition:
+    opacity var(--fade-duration) var(--ease-out),
+    filter var(--t-base) var(--ease-out),
+    transform 280ms cubic-bezier(0.22, 1.2, 0.36, 1);
+}
+
+/* Immediate tap acknowledgement: a quick press-in dip on the outgoing slide,
+   so a tap answers instantly even while the next photo is still decoding.
+   Animates `scale` (not transform) so it composes with the drag translate. */
+.image[data-tap-ack="true"],
+.remixGrid[data-tap-ack="true"] {
+  animation: slideTapAck 200ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+@keyframes slideTapAck {
+  0% {
+    scale: 1;
+  }
+  35% {
+    scale: 0.982;
+  }
+  100% {
+    scale: 1;
+  }
+}
+
+/* Hold-to-pause: while the finger rests, the photo eases back a touch — the
+   card is "held" — and recovers on release. Scoped to the container flag so
+   every stacked layer responds together; the scale/filter transitions live on
+   the base layer rules so the recovery animates too. */
+.container[data-touch-hold="true"] .image,
+.container[data-touch-hold="true"] .remixGrid {
+  filter: brightness(0.92);
+  scale: 0.99;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .image[data-tap-ack="true"],
+  .remixGrid[data-tap-ack="true"] {
+    animation: none;
+  }
+
+  .container[data-touch-hold="true"] .image,
+  .container[data-touch-hold="true"] .remixGrid {
+    scale: 1;
+  }
+}
+
 .remixGrid {
   position: absolute;
   inset: 0;
@@ -47,7 +104,11 @@
   z-index: var(--z-media);
   cursor: pointer;
   opacity: 1;
-  transition: opacity var(--fade-duration) var(--ease-out);
+  scale: 1;
+  transition:
+    opacity var(--fade-duration) var(--ease-out),
+    filter var(--t-base) var(--ease-out),
+    scale var(--t-base) var(--ease-out);
   user-select: none;
   -webkit-touch-callout: none;
 }
@@ -422,6 +483,46 @@
 .touchPullChevron svg,
 .touchSideAffordanceLeft svg,
 .touchSideAffordanceRight svg {
+  display: block;
+}
+
+/* Hold-to-pause pill: rises in over the lower edge while the finger rests,
+   sinks away on release. Mirrors the affordance label's glass styling. */
+.touchHoldPill {
+  position: fixed;
+  inset-block-end: calc(env(safe-area-inset-bottom, 0) + var(--m-xl));
+  inset-inline-start: 50%;
+  transform: translateX(-50%) translateY(var(--m-s));
+  opacity: 0;
+  transition:
+    opacity var(--t-base) var(--touch-juice-ease),
+    transform var(--t-base) var(--touch-juice-ease);
+}
+
+.touchAffordances[data-touch-hold="true"] .touchHoldPill {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+.touchHoldPillLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--m-s);
+  padding: calc(var(--m-s) * 0.65) var(--m-l);
+  border-radius: var(--radius-pill);
+  border: var(--size-1) solid color-mix(in oklch, var(--c-white) 21%, transparent);
+  background: color-mix(in oklch, var(--c-bg) 97%, var(--c-bg-contrast-dark));
+  color: var(--c-bg-contrast-light);
+  font-size: var(--fs-s);
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  box-shadow:
+    0 var(--size-8) var(--size-20) color-mix(in oklch, var(--c-black) 22%, transparent),
+    inset 0 var(--size-1) 0 color-mix(in oklch, var(--c-white) 8%, transparent);
+  backdrop-filter: blur(var(--glass-blur-control));
+}
+
+.touchHoldPillLabel svg {
   display: block;
 }
 

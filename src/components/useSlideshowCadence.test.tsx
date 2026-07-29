@@ -73,6 +73,24 @@ describe("useSlideshowCadence", () => {
     expect(result.current.isPaused).toBe(false);
   });
 
+  it("setPaused sets the paused state explicitly and is idempotent", () => {
+    const onAdvance = jest.fn();
+    const { result } = renderHook(() => useSlideshowCadence({ ...baseInput, onAdvance }));
+
+    act(() => result.current.setPaused(true));
+    expect(result.current.isPaused).toBe(true);
+    act(() => result.current.setPaused(true));
+    expect(result.current.isPaused).toBe(true);
+
+    act(() => {
+      jest.advanceTimersByTime(300000);
+    });
+    expect(onAdvance).not.toHaveBeenCalled();
+
+    act(() => result.current.setPaused(false));
+    expect(result.current.isPaused).toBe(false);
+  });
+
   it("does not snap the first slide to a wall-clock boundary when alignCadence is off", () => {
     // 10:29:58 local with a 15-minute cadence: a boundary-snapped first slide
     // would end at 10:30:00 — a 2-second first slide. With alignment off it must

@@ -25,8 +25,21 @@ export const DEFAULT_GESTURE_THRESHOLDS: GestureThresholds = {
 };
 
 // Below this drift a touch release counts as a tap (tap-zone navigation)
-// rather than a swipe.
-const TAP_MAX_DRIFT_PX = 12;
+// rather than a swipe. Exported so the page can cancel a pending
+// hold-to-pause timer once the finger has clearly started moving.
+export const TAP_MAX_DRIFT_PX = 12;
+
+// How long a still touch must rest before it becomes a hold-to-pause.
+export const HOLD_TO_PAUSE_MS = 450;
+
+// The horizontal drag offset the top slide layer should follow. Zero until a
+// horizontal direction commits, so taps and vertical pulls never nudge the
+// photo sideways.
+export const resolveDragOffset = (input: {
+  deltaX: number;
+  committedHorizontal?: HorizontalDirection;
+  committedVertical?: VerticalDirection;
+}): number => (input.committedHorizontal ? input.deltaX : 0);
 
 const progressFromDistance = (distance: number, hintPx: number, commitPx: number): number =>
   Math.max(0, Math.min(1, (distance - hintPx) / (commitPx - hintPx)));
@@ -156,6 +169,9 @@ export const resolvePointerUpAction = (
     deltaX: number;
     deltaY: number;
     isTouchLike: boolean;
+    // A hold-to-pause fired during this gesture: the release only resumes the
+    // cadence, so it must never navigate regardless of drift.
+    held?: boolean;
     committedHorizontal?: HorizontalDirection;
     committedVertical?: VerticalDirection;
     controlsWereVisible: boolean;
@@ -169,6 +185,10 @@ export const resolvePointerUpAction = (
   },
   thresholds: GestureThresholds = DEFAULT_GESTURE_THRESHOLDS,
 ): { action: GestureAction; suppressClick: boolean } => {
+  if (input.held) {
+    return { action: "none", suppressClick: true };
+  }
+
   const horizontalDistance = Math.abs(input.deltaX);
   const verticalDistance = Math.abs(input.deltaY);
   const horizontalCommitted = !!input.committedHorizontal;

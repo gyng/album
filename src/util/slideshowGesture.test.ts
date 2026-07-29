@@ -1,5 +1,6 @@
 import {
   DEFAULT_GESTURE_THRESHOLDS,
+  resolveDragOffset,
   resolvePointerMove,
   resolvePointerUpAction,
 } from "./slideshowGesture";
@@ -280,6 +281,28 @@ describe("resolvePointerUpAction", () => {
       action: "none",
       suppressClick: false,
     });
+  });
+
+  it("a held release does nothing and swallows the click, even past a commit distance", () => {
+    // Hold-to-pause: releasing the hold must never navigate — not even when
+    // the finger drifted past a swipe commit while holding.
+    expect(up({ held: true })).toEqual({ action: "none", suppressClick: true });
+    expect(up({ held: true, deltaX: -60, committedHorizontal: "next" })).toEqual({
+      action: "none",
+      suppressClick: true,
+    });
+  });
+});
+
+describe("resolveDragOffset", () => {
+  it("returns 0 until a horizontal direction is committed", () => {
+    expect(resolveDragOffset({ deltaX: -40 })).toBe(0);
+    expect(resolveDragOffset({ deltaX: -40, committedVertical: "up" })).toBe(0);
+  });
+
+  it("follows the finger once horizontal is committed", () => {
+    expect(resolveDragOffset({ deltaX: -40, committedHorizontal: "next" })).toBe(-40);
+    expect(resolveDragOffset({ deltaX: 72, committedHorizontal: "previous" })).toBe(72);
   });
 });
 

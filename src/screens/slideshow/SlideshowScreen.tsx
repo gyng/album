@@ -73,7 +73,13 @@ import { SlideshowToolbar } from "../../components/slideshow/SlideshowToolbar";
 import { SlideshowBottomBar } from "../../components/slideshow/SlideshowBottomBar";
 import { decideBuildUpdate, decideDbUpdateAction } from "../../util/kioskRefresh";
 import { decideRemixPlan, mapVectorRemixResult } from "../../util/slideshowRemix";
-import { resolvePointerMove, resolvePointerUpAction } from "../../util/slideshowGesture";
+import {
+  HOLD_TO_PAUSE_MS,
+  TAP_MAX_DRIFT_PX,
+  resolveDragOffset,
+  resolvePointerMove,
+  resolvePointerUpAction,
+} from "../../util/slideshowGesture";
 import { decidePoolReloadAction } from "../../util/slideshowPoolReload";
 import {
   applySlideshowUrlState,
@@ -655,6 +661,20 @@ export const Slideshow: React.FC<{
   const [touchSwipeProgress, setTouchSwipeProgress] = React.useState(0);
   const [touchPointerActive, setTouchPointerActive] = React.useState(false);
   const [touchArmed, setTouchArmed] = React.useState(false);
+  // A hold-to-pause is in progress (finger still down): drives the paused pill.
+  const [touchHoldActive, setTouchHoldActive] = React.useState(false);
+  // Follow-the-finger horizontal drag on the top slide layer. While the finger
+  // is down (settling=false) the offset tracks the live top layer; on release
+  // it freezes onto the layer that was dragged (key) and transitions to its
+  // target — 0 for a spring-back, off-screen for a committed swipe.
+  const [layerDrag, setLayerDrag] = React.useState<{
+    x: number;
+    key?: string;
+    settling: boolean;
+  } | null>(null);
+  // The layer that should play the tap-acknowledgement dip (set on tap-zone
+  // navigation, cleared when its animation ends).
+  const [tapAckLayerKey, setTapAckLayerKey] = React.useState<string | null>(null);
   // The chevron handle leads the pull; the toolbar/edge peek only enters in the last 35%
   // so the two indicators don't compete. Below 0.65 only the chevron is visible.
   const touchToolbarShowPreviewProgress =
@@ -694,6 +714,12 @@ export const Slideshow: React.FC<{
     // True once the gesture has crossed the commit threshold on its primary axis,
     // so we can fire the haptic exactly once per gesture.
     hapticFired?: boolean;
+    // Hold-to-pause: the pending timer, whether it fired, and whether it was
+    // this gesture (rather than the toolbar) that paused the cadence — release
+    // must only resume what the hold itself paused.
+    holdTimerId?: number | undefined;
+    held?: boolean;
+    holdPausedCadence?: boolean;
   } | null>(null);
   const suppressImageClickRef = React.useRef(false);
   const [bufferedPhotoSrc, setBufferedPhotoSrc] = React.useState<string | null>(null);
@@ -851,6 +877,7 @@ export const Slideshow: React.FC<{
     time,
     isPaused,
     togglePaused,
+    setPaused,
     scheduleNextChange,
     alignNextChangeToCadence,
   } = useSlideshowCadence({
@@ -861,6 +888,11 @@ export const Slideshow: React.FC<{
     hasCurrentPhoto: currentPhotoPath !== null,
     onAdvance: advanceFromCadence,
   });
+
+  // The hold-to-pause timer callback fires outside the render cycle and must
+  // see the live paused state, not the one captured at pointerdown.
+  const isPausedRef = React.useRef(isPaused);
+  isPausedRef.current = isPaused;
 
   const commitNextPhoto = useCallback(
     (candidatePhoto: RandomPhotoRow, opts?: { trackRecent?: boolean; allowRemix?: boolean }) => {
@@ -1942,35 +1974,79 @@ export const Slideshow: React.FC<{
       setTouchPullProgress(0);
       setTouchSwipeProgress(0);
       setTouchArmed(false);
+      // A fresh gesture takes over any leftover settle animation.
+      setLayerDrag(null);
       if (isTouchOrPen(event.pointerType)) {
         setTouchPointerActive(true);
+        // Arm hold-to-pause: a still touch that rests becomes a hold, pausing
+        // the cadence until release. The timer is cancelled by drift (move
+        // handler) and by release/cancel (clearImagePointerGesture).
+        const gesture = pointerGestureRef.current;
+        if (gesture) {
+          gesture.holdTimerId = window.setTimeout(() => {
+            const current = pointerGestureRef.current;
+            if (
+              current !== gesture ||
+              !current ||
+              current.committedHorizontalDirection ||
+              current.committedVerticalDirection
+            ) {
+              return;
+            }
+            current.holdTimerId = undefined;
+            current.held = true;
+            if (!isPausedRef.current) {
+              current.holdPausedCadence = true;
+              setPaused(true);
+            }
+            setTouchHoldActive(true);
+            // Same tiny pulse as the swipe arm cue (no-op where unsupported).
+            if (navigator.vibrate) {
+              navigator.vibrate(8);
+            }
+          }, HOLD_TO_PAUSE_MS);
+        }
       }
     },
-    [controlsVisible, isSessionWakeLockActive, props.disabled, requestSessionWakeLock],
+    [controlsVisible, isSessionWakeLockActive, props.disabled, requestSessionWakeLock, setPaused],
   );
 
-  const clearImagePointerGesture = useCallback((event: React.PointerEvent<HTMLElement>) => {
-    try {
-      if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-        event.currentTarget.releasePointerCapture(event.pointerId);
+  const clearImagePointerGesture = useCallback(
+    (event: React.PointerEvent<HTMLElement>) => {
+      try {
+        if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+          event.currentTarget.releasePointerCapture(event.pointerId);
+        }
+      } catch (error) {
+        console.debug("Ignoring stale slideshow pointer capture", error);
       }
-    } catch (error) {
-      console.debug("Ignoring stale slideshow pointer capture", error);
-    }
 
-    pointerGestureRef.current = null;
-    // On pointercancel the gesture ends without a follow-up click, so any
-    // suppress flag from a prior pointerup-set commit branch must be cleared
-    // — otherwise the next legitimate click could be swallowed. On pointerup
-    // this resets to false too, but the up handler immediately re-sets it
-    // for touch/pen so suppression still works there.
-    suppressImageClickRef.current = false;
-    setTouchGestureHint(null);
-    setTouchPullProgress(0);
-    setTouchSwipeProgress(0);
-    setTouchPointerActive(false);
-    setTouchArmed(false);
-  }, []);
+      // End any hold-to-pause: cancel a pending timer, and resume the cadence
+      // only if this gesture's hold was what paused it (never undo the toolbar).
+      const endingGesture = pointerGestureRef.current;
+      if (endingGesture?.holdTimerId !== undefined) {
+        window.clearTimeout(endingGesture.holdTimerId);
+      }
+      if (endingGesture?.held && endingGesture.holdPausedCadence) {
+        setPaused(false);
+      }
+      setTouchHoldActive(false);
+
+      pointerGestureRef.current = null;
+      // On pointercancel the gesture ends without a follow-up click, so any
+      // suppress flag from a prior pointerup-set commit branch must be cleared
+      // — otherwise the next legitimate click could be swallowed. On pointerup
+      // this resets to false too, but the up handler immediately re-sets it
+      // for touch/pen so suppression still works there.
+      suppressImageClickRef.current = false;
+      setTouchGestureHint(null);
+      setTouchPullProgress(0);
+      setTouchSwipeProgress(0);
+      setTouchPointerActive(false);
+      setTouchArmed(false);
+    },
+    [setPaused],
+  );
 
   const handleImagePointerMove = useCallback((event: React.PointerEvent<HTMLElement>) => {
     const gesture = pointerGestureRef.current;
@@ -1978,9 +2054,28 @@ export const Slideshow: React.FC<{
       return;
     }
 
+    const deltaX = event.clientX - gesture.startX;
+    const deltaY = event.clientY - gesture.startY;
+
+    // While held (paused), the gesture is inert: no hints, no drag, and the
+    // release resolves to nothing. The finger resting or drifting must not
+    // start navigation out of a pause.
+    if (gesture.held) {
+      return;
+    }
+
+    // Clear drift cancels a pending hold — it is becoming a swipe or pull.
+    if (
+      gesture.holdTimerId !== undefined &&
+      (Math.abs(deltaX) > TAP_MAX_DRIFT_PX || Math.abs(deltaY) > TAP_MAX_DRIFT_PX)
+    ) {
+      window.clearTimeout(gesture.holdTimerId);
+      gesture.holdTimerId = undefined;
+    }
+
     const result = resolvePointerMove({
-      deltaX: event.clientX - gesture.startX,
-      deltaY: event.clientY - gesture.startY,
+      deltaX,
+      deltaY,
       ...(gesture.committedHorizontalDirection
         ? { committedHorizontal: gesture.committedHorizontalDirection }
         : {}),
@@ -2006,6 +2101,19 @@ export const Slideshow: React.FC<{
     setTouchGestureHint(result.hint);
     setTouchPullProgress(result.pullProgress);
     setTouchSwipeProgress(result.swipeProgress);
+
+    // Follow-the-finger: once horizontal commits, the live top layer tracks
+    // the drag 1:1 (transform is untransitioned outside the settle class).
+    const dragOffset = resolveDragOffset({
+      deltaX,
+      ...(gesture.committedHorizontalDirection
+        ? { committedHorizontal: gesture.committedHorizontalDirection }
+        : {}),
+      ...(gesture.committedVerticalDirection
+        ? { committedVertical: gesture.committedVerticalDirection }
+        : {}),
+    });
+    setLayerDrag(dragOffset === 0 ? null : { x: dragOffset, settling: false });
 
     if (result.armed) {
       setTouchArmed(true);
@@ -2035,6 +2143,7 @@ export const Slideshow: React.FC<{
         deltaX: event.clientX - gesture.startX,
         deltaY: event.clientY - gesture.startY,
         isTouchLike: isTouchOrPen(gesture.pointerType),
+        ...(gesture.held ? { held: true } : {}),
         ...(gesture.committedHorizontalDirection
           ? { committedHorizontal: gesture.committedHorizontalDirection }
           : {}),
@@ -2059,6 +2168,43 @@ export const Slideshow: React.FC<{
       // fall through to the image's onClick and silently advance.
       if (suppressClick) {
         suppressImageClickRef.current = true;
+      }
+
+      // Settle the drag: freeze the offset onto the layer that was dragged
+      // (the still-current top), then transition it to its target — off-screen
+      // for a committed swipe (it glides out under the incoming fade), back to
+      // rest for anything else.
+      const topLayerKey = layersRef.current[layersRef.current.length - 1]?.key;
+      const releaseDragOffset = resolveDragOffset({
+        deltaX: event.clientX - gesture.startX,
+        ...(gesture.committedHorizontalDirection
+          ? { committedHorizontal: gesture.committedHorizontalDirection }
+          : {}),
+        ...(gesture.committedVerticalDirection
+          ? { committedVertical: gesture.committedVerticalDirection }
+          : {}),
+      });
+      if (releaseDragOffset !== 0 && topLayerKey !== undefined) {
+        const exiting = action === "next" || action === "previous";
+        const exitDistance = Math.max(window.innerWidth * 0.6, Math.abs(releaseDragOffset) + 160);
+        setLayerDrag({
+          key: topLayerKey,
+          x: exiting ? Math.sign(releaseDragOffset) * exitDistance : 0,
+          settling: true,
+        });
+      } else {
+        setLayerDrag(null);
+      }
+
+      // Tap acknowledgement: only the tap-zone path (no committed axis) — a
+      // swipe already answers with the follow-drag and exit glide.
+      if (
+        (action === "next" || action === "previous") &&
+        !gesture.committedHorizontalDirection &&
+        !gesture.committedVerticalDirection &&
+        topLayerKey !== undefined
+      ) {
+        setTapAckLayerKey(topLayerKey);
       }
 
       switch (action) {
@@ -2270,6 +2416,18 @@ export const Slideshow: React.FC<{
   // images otherwise lack.
   const layersRef = React.useRef(layers);
   layersRef.current = layers;
+  // A dragged layer can be removed by its opacity fade before its transform
+  // transition reports completion; drop the stale offset so a later layer
+  // with a recycled position cannot inherit it.
+  useEffect(() => {
+    if (
+      layerDrag?.settling &&
+      layerDrag.key !== undefined &&
+      !layers.some((l) => l.key === layerDrag.key)
+    ) {
+      setLayerDrag(null);
+    }
+  }, [layers, layerDrag]);
   useEffect(() => {
     if (!slideKey) return;
     const top = layersRef.current[layersRef.current.length - 1];
@@ -2388,6 +2546,7 @@ export const Slideshow: React.FC<{
         data-paused={String(isPaused)}
         data-touch-active={String(touchPointerActive)}
         data-touch-armed={String(touchArmed)}
+        data-touch-hold={String(touchHoldActive)}
         onPointerDownCapture={extendControlsHideDeadline}
         onPointerMoveCapture={extendControlsHideDeadline}
         onTouchStartCapture={handleAnyTouchStartCapture}
@@ -2448,6 +2607,7 @@ export const Slideshow: React.FC<{
             data-controls-visible={String(controlsVisible)}
             data-touch-active={String(touchPointerActive)}
             data-touch-armed={String(touchArmed)}
+            data-touch-hold={String(touchHoldActive)}
             aria-hidden="true"
             style={
               {
@@ -2495,6 +2655,15 @@ export const Slideshow: React.FC<{
                   strokeLinejoin="round"
                 />
               </svg>
+            </div>
+            <div className={styles.touchHoldPill}>
+              <span className={styles.touchHoldPillLabel}>
+                <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true">
+                  <rect x="2" y="1.5" width="3" height="9" rx="1" fill="currentColor" />
+                  <rect x="7" y="1.5" width="3" height="9" rx="1" fill="currentColor" />
+                </svg>
+                Paused
+              </span>
             </div>
           </div>
         ) : null}
@@ -2661,9 +2830,37 @@ export const Slideshow: React.FC<{
             if (e.propertyName === "opacity" && !layer.loaded) {
               setLayers((prev) => removeLayer(prev, layer.key));
             }
+            // A settled drag (spring-back or exit glide) has reached its
+            // target; drop the frozen offset so the layer's inline transform
+            // clears.
+            if (
+              e.propertyName === "transform" &&
+              layerDrag?.settling &&
+              layerDrag.key === layer.key
+            ) {
+              setLayerDrag(null);
+            }
           };
+          // Follow-the-finger drag: while live (settling=false) the offset
+          // rides the top layer; once settling it stays pinned to the layer
+          // that was dragged, which may no longer be top after an advance.
+          const dragsThisLayer =
+            layerDrag !== null && (layerDrag.settling ? layerDrag.key === layer.key : isTop);
+          const settlingClass = dragsThisLayer && layerDrag.settling ? styles.layerSettling : "";
+          const motionStyle = {
+            ...(isTop ? { touchAction: "none" as const } : {}),
+            ...(dragsThisLayer ? { transform: `translateX(${layerDrag.x}px)` } : {}),
+          };
+          // The tap-ack dip animates the `scale` property so it composes with
+          // the drag translate; cleared when the animation ends.
+          const tapAckProps =
+            tapAckLayerKey === layer.key
+              ? {
+                  "data-tap-ack": "true",
+                  onAnimationEnd: () => setTapAckLayerKey(null),
+                }
+              : {};
           const topImageHandlers = {
-            style: { touchAction: "none" as const },
             onPointerDown: handleImagePointerDown,
             onPointerMove: handleImagePointerMove,
             onPointerCancel: clearImagePointerGesture,
@@ -2673,6 +2870,12 @@ export const Slideshow: React.FC<{
                 suppressImageClickRef.current = false;
                 return;
               }
+              // Mouse tap acknowledgement (touch taps ack in the pointerup
+              // resolver before their synthetic click is swallowed).
+              const topKey = layersRef.current[layersRef.current.length - 1]?.key;
+              if (topKey !== undefined) {
+                setTapAckLayerKey(topKey);
+              }
               advanceToNextPhoto();
             },
           };
@@ -2681,11 +2884,18 @@ export const Slideshow: React.FC<{
             return (
               <div
                 key={layer.key}
-                className={[styles.remixGrid, hidden, isTop ? "" : styles.backdropLayer]
+                className={[
+                  styles.remixGrid,
+                  hidden,
+                  settlingClass,
+                  isTop ? "" : styles.backdropLayer,
+                ]
                   .filter(Boolean)
                   .join(" ")}
                 data-count={layer.slide.cells.length}
+                style={motionStyle}
                 onTransitionEnd={onFadeEnd}
+                {...tapAckProps}
                 {...(isTop ? topImageHandlers : { "aria-hidden": true })}
               >
                 {layer.slide.cells.map((cell, cellIdx) => {
@@ -2739,6 +2949,7 @@ export const Slideshow: React.FC<{
               className={[
                 styles.image,
                 hidden,
+                settlingClass,
                 showCover ? styles.cover : "",
                 isTop ? "" : styles.backdropLayer,
               ]
@@ -2748,7 +2959,9 @@ export const Slideshow: React.FC<{
               src={layer.slide.cells[0]!.src}
               alt={isTop ? photoAltText : ""}
               decoding="async"
+              style={motionStyle}
               onTransitionEnd={onFadeEnd}
+              {...tapAckProps}
               {...(isTop
                 ? {
                     ...topImageHandlers,

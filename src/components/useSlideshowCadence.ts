@@ -6,6 +6,9 @@ export type UseSlideshowCadence = {
   time: Date | null;
   isPaused: boolean;
   togglePaused: () => void;
+  // Explicit form for gesture-driven pausing (hold-to-pause), where a toggle
+  // could race the toolbar button and end up inverted.
+  setPaused: (paused: boolean) => void;
   // Reschedule the next change to now + delay (honouring the alignment toggle).
   // Called on every new slide (forward advance + history navigation).
   scheduleNextChange: () => void;
@@ -57,6 +60,10 @@ export const useSlideshowCadence = (input: {
 
   const togglePaused = useCallback(() => {
     setIsPaused((prev) => !prev);
+  }, []);
+
+  const setPaused = useCallback((paused: boolean) => {
+    setIsPaused(paused);
   }, []);
 
   const alignNextChangeToCadence = useCallback(() => {
@@ -151,6 +158,7 @@ export const useSlideshowCadence = (input: {
     time,
     isPaused,
     togglePaused,
+    setPaused,
     scheduleNextChange,
     alignNextChangeToCadence,
   };
