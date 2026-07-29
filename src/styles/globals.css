@@ -47,6 +47,11 @@ p {
 
 html {
   block-size: 100%;
+  /* iOS paints its default grey-black tap highlight over any tapped click
+     target; on full-viewport targets (the slideshow slide) and large image
+     tiles that reads as a brief black flash. Interactive elements carry their
+     own hover/active/focus styling instead. */
+  -webkit-tap-highlight-color: transparent;
 }
 
 body {
