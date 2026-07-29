@@ -118,7 +118,11 @@ describe("Explore story sections", () => {
             spanYears: 4,
             photoCount: 1_234,
             timeline: [
-              { year: 2020, count: 1, photos: [{ src: "/2020.jpg", label: "Marina" }] },
+              {
+                year: 2020,
+                count: 1,
+                photos: [{ src: "/2020.jpg", label: "Marina", swatch: "rgb(20, 40, 60)" }],
+              },
               { year: 2023, count: 2, photos: [{ src: "/2023.jpg", label: "Gardens" }] },
               {
                 year: 2024,
@@ -138,6 +142,13 @@ describe("Explore story sections", () => {
     expect(screen.getByText("1 year")).toBeInTheDocument();
     expect(screen.getByText("3 years")).toBeInTheDocument();
     expect(screen.getByRole("img", { name: "River (2024)" })).toHaveAttribute("src", "/2024-a.jpg");
+    // The dominant-colour swatch backs the thumbnail while it loads.
+    expect(screen.getByRole("img", { name: "Marina (2020)" })).toHaveStyle({
+      backgroundColor: "rgb(20, 40, 60)",
+    });
+    expect(screen.getByRole("img", { name: "River (2024)" })).not.toHaveStyle({
+      backgroundColor: "rgb(20, 40, 60)",
+    });
     expect(screen.getByRole("link", { name: "River (2024)" })).toHaveAttribute(
       "href",
       "/search?facet=location%3ASingapore&facet=year%3A2024",

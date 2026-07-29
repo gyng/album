@@ -1,4 +1,5 @@
 import type { Content, PhotoBlock } from "../services/types";
+import { rgbToString } from "./colorDistance";
 import { encodePublicAssetPath } from "./encodePublicAssetPath";
 import {
   APERTURE_FACET,
@@ -76,6 +77,7 @@ export type PhotoStats = {
       src: string;
       href: string;
       label: string;
+      swatch?: string;
     }>;
   }>;
   colorYearStats: BucketedStatGroup[];
@@ -123,12 +125,14 @@ export type PhotoStats = {
       photos: Array<{
         src: string;
         label: string;
+        swatch?: string;
       }>;
     }>;
     examples: Array<{
       year: number;
       src: string;
       label: string;
+      swatch?: string;
     }>;
   }>;
 };
@@ -889,9 +893,10 @@ function computeRichColorStats(albums: Content[]): {
   );
   const photos = photoEntries.map(({ photo }) => photo);
   const base = computeColorStats(photos);
-  const exampleBuckets = new Map<string, Array<{ src: string; href: string; label: string }>>(
-    COLOR_FAMILY_LABELS.map((label) => [label, []]),
-  );
+  const exampleBuckets = new Map<
+    string,
+    Array<{ src: string; href: string; label: string; swatch?: string }>
+  >(COLOR_FAMILY_LABELS.map((label) => [label, []]));
   const yearCounts = new Map<string, Map<string, number>>();
   const yearPhotoColors = new Map<
     string,
@@ -922,6 +927,7 @@ function computeRichColorStats(albums: Content[]): {
         src,
         href: `/album/${album._build.slug}#${photo.id}`,
         label: photo.data.title ?? photo.data.src.split("/").at(-1)!,
+        swatch: rgbToString(dominant),
       });
     }
 
@@ -1132,6 +1138,7 @@ function computeRevisitedPlace(photos: PhotoBlock[]): PhotoStats["revisitedPlace
         year: number;
         src: string;
         label: string;
+        swatch?: string;
       }>;
     }
   >();
@@ -1166,10 +1173,12 @@ function computeRevisitedPlace(photos: PhotoBlock[]): PhotoStats["revisitedPlace
     };
     existing.years.add(parsed.year);
     existing.photoCount += 1;
+    const dominant = photo._build.tags?.colors?.[0] as [number, number, number] | undefined;
     existing.photos.push({
       year: parsed.year,
       src: thumbSrc,
       label: photo.data.title ?? place.value,
+      ...(dominant ? { swatch: rgbToString(dominant) } : {}),
     });
     placeYears.set(key, existing);
   }
@@ -1223,6 +1232,7 @@ function computeRevisitedPlace(photos: PhotoBlock[]): PhotoStats["revisitedPlace
           photos: photos.slice(0, 3).map((photo) => ({
             src: photo.src,
             label: photo.label,
+            ...(photo.swatch ? { swatch: photo.swatch } : {}),
           })),
         })),
       examples: place.photos

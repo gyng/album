@@ -141,6 +141,7 @@ export const VisualSimilarityThumb: React.FC<{
     src: string;
     href: string;
     label: string;
+    swatch?: string;
   };
   className?: string;
   imageClassName?: string;
@@ -152,6 +153,7 @@ export const VisualSimilarityThumb: React.FC<{
         alt={photo.label}
         loading="lazy"
         className={`${styles.visualThumb} ${imageClassName ?? ""}`.trim()}
+        {...(photo.swatch ? { style: { backgroundColor: photo.swatch } } : {})}
       />
     </Link>
     <OverlayButtonLink

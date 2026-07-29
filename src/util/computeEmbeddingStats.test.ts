@@ -40,7 +40,11 @@ const makeAlbum = (
       id: `photo-${index}`,
       data: { src: photoPath, title: `Photo ${index}` },
       _build: {
-        tags: { path: photoPath, tags: tagsForPath?.(index) },
+        tags: {
+          path: photoPath,
+          tags: tagsForPath?.(index),
+          ...(index === 0 ? {} : { colors: [[40, 80, 120]] }),
+        },
         srcset: [{ src: photoPath }],
         exif: dateForPath?.(index) ? { DateTimeOriginal: dateForPath(index) } : {},
       },
@@ -394,6 +398,17 @@ describe("computeVisualSamenessStats derived views", () => {
     expect(stats?.lookDrift).toEqual(expect.objectContaining({ firstYear: 2020, lastYear: 2024 }));
     expect(stats?.averageExamples).toHaveLength(12);
     expect(stats?.outlierExamples).toHaveLength(12);
+    // Dominant colours ride along as swatches; photos without a palette omit
+    // the field entirely.
+    expect(
+      stats?.averageExamples.every(
+        (example) =>
+          example.photo.swatch === "rgb(40, 80, 120)" || example.photo.swatch === undefined,
+      ),
+    ).toBe(true);
+    expect(
+      stats?.averageExamples.some((example) => example.photo.swatch === "rgb(40, 80, 120)"),
+    ).toBe(true);
   });
 
   it("keeps one populated era when degenerate vectors leave other clusters empty", async () => {

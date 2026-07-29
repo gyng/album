@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import type { Content, PhotoBlock } from "../services/types";
 import { measureBuild } from "../services/buildTiming";
+import { rgbToString } from "./colorDistance";
 import { parseExifLocalDateTime } from "./exifTime";
 
 const sqlite3 = require("sqlite3");
@@ -88,6 +89,8 @@ export type VisualSamenessPhoto = {
   src: string;
   href: string;
   label: string;
+  /** Dominant palette colour as a CSS rgb() string, for tile backdrops. */
+  swatch?: string;
 };
 
 type EmbeddingRow = {
@@ -234,11 +237,13 @@ const buildPhotoLookup = (albums: Content[]): PhotoLookup => {
         return;
       }
 
+      const dominant = photo._build.tags?.colors?.[0] as [number, number, number] | undefined;
       lookup.set(indexedPath, {
         path: indexedPath,
         src: thumbSrc,
         href: `/album/${album._build.slug}#${photo.id}`,
         label: photo.data.title ?? path.basename(photo.data.src),
+        ...(dominant ? { swatch: rgbToString(dominant) } : {}),
       });
     });
   });

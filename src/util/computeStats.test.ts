@@ -426,7 +426,10 @@ describe("computePhotoStats", () => {
       makeAlbum([
         makePhoto({
           exif: { DateTimeOriginal: "2020:03:22 17:45:00" },
-          tags: { geocode: "36.3286\n138.8951\nAnnaka\nGunma\nAnnaka Shi\nJP\nJapan" } as any,
+          tags: {
+            geocode: "36.3286\n138.8951\nAnnaka\nGunma\nAnnaka Shi\nJP\nJapan",
+            colors: [[64, 96, 128]],
+          } as any,
         }),
         makePhoto({
           exif: { DateTimeOriginal: "2024:03:22 17:45:00" },
@@ -446,7 +449,9 @@ describe("computePhotoStats", () => {
           expect.objectContaining({
             year: 2020,
             count: 1,
-            photos: [expect.objectContaining({ src: "/test.jpg" })],
+            // The dominant colour rides along so tiles can show a backdrop;
+            // photos without a palette simply omit it.
+            photos: [expect.objectContaining({ src: "/test.jpg", swatch: "rgb(64, 96, 128)" })],
           }),
           expect.objectContaining({
             year: 2024,
@@ -534,6 +539,7 @@ describe("computePhotoStats", () => {
     expect(stats.colorFamilyExamples.find((bucket) => bucket.label === "Red")?.photos[0]).toEqual(
       expect.objectContaining({
         href: "/album/test-album#test.jpg",
+        swatch: "rgb(210, 70, 80)",
       }),
     );
     expect(stats.colorYearStats).toEqual([

@@ -31,6 +31,7 @@ describe("ExploreColourSection", () => {
       src: `/blue-${index}.jpg`,
       href: `/album/test#blue-${index}.jpg`,
       label: `Blue example ${index}`,
+      swatch: `rgb(${index}, 132, 214)`,
     }));
     const stats = {
       colorCoverage: 0.5,
@@ -57,6 +58,13 @@ describe("ExploreColourSection", () => {
     ).toBeInTheDocument();
     expect(screen.getAllByRole("img", { name: /Blue example/ })).toHaveLength(6);
     expect(screen.getByRole("img", { name: "Blue example 0" })).toHaveAttribute("loading", "lazy");
+    // The dominant-colour swatch backs the thumbnail while it loads.
+    expect(screen.getByRole("img", { name: "Blue example 0" })).toHaveStyle({
+      backgroundColor: "rgb(0, 132, 214)",
+    });
+    expect(screen.getByRole("img", { name: "Unknown look" })).not.toHaveStyle({
+      backgroundColor: "rgb(0, 132, 214)",
+    });
     expect(screen.queryByRole("img", { name: "Blue example 6" })).toBeNull();
     expect(screen.getByRole("img", { name: "Unknown look" })).toBeInTheDocument();
     const searchLinks = screen.getAllByRole("link", { name: "Search" });

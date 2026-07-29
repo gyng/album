@@ -209,6 +209,9 @@ export const ExploreRevisitedPlacesSection = ({
                               alt={`${photo.label} (${entry.year})`}
                               loading="lazy"
                               className={`${styles.visualThumb} ${styles.visualEraThumb} ${styles.revisitThumb}`}
+                              {...(photo.swatch
+                                ? { style: { backgroundColor: photo.swatch } }
+                                : {})}
                             />
                           </Link>
                         ))}

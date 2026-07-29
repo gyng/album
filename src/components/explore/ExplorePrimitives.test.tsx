@@ -135,9 +135,29 @@ describe("Explore primitives", () => {
       "href",
       "/album/test-simple#photo-one",
     );
+    expect(screen.getByRole("img", { name: "Lantern street" })).not.toHaveStyle({
+      backgroundColor: "rgb(10, 20, 30)",
+    });
     expect(screen.getByRole("link", { name: /Find photos semantically similar/ })).toHaveAttribute(
       "href",
       "/search?similar=..%2Falbums%2Ftest-simple%2Fphoto+one.jpg",
     );
+  });
+
+  it("backs the thumbnail with the photo's dominant colour swatch", () => {
+    render(
+      <VisualSimilarityThumb
+        photo={{
+          path: "../albums/test-simple/photo one.jpg",
+          src: "/photo.jpg",
+          href: "/album/test-simple#photo-one",
+          label: "Lantern street",
+          swatch: "rgb(10, 20, 30)",
+        }}
+      />,
+    );
+    expect(screen.getByRole("img", { name: "Lantern street" })).toHaveStyle({
+      backgroundColor: "rgb(10, 20, 30)",
+    });
   });
 });

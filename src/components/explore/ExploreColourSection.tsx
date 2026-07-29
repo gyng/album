@@ -158,7 +158,15 @@ export const ExploreColourSection = ({
                             href={photo.href}
                             className={styles.colorFamilyThumbLink}
                           >
-                            <Thumb src={photo.src} alt={photo.label} size="small" loading="lazy" />
+                            <Thumb
+                              src={photo.src}
+                              alt={photo.label}
+                              size="small"
+                              loading="lazy"
+                              {...(photo.swatch
+                                ? { style: { backgroundColor: photo.swatch } }
+                                : {})}
+                            />
                           </Link>
                         ))}
                       </div>
@@ -223,6 +231,7 @@ export const ExploreColourSection = ({
                                 alt={slice.photoLabel}
                                 loading="lazy"
                                 className={styles.colorTimeTooltipImage}
+                                style={{ backgroundColor: slice.rgb }}
                               />
                               <span className={styles.colorTimeTooltipBody}>
                                 <span
