@@ -52,6 +52,22 @@ const nextConfig = {
       source: "/sitemap.xml",
       headers: [{ key: "Content-Type", value: "application/xml; charset=utf-8" }],
     },
+    {
+      // Resized variants are derived artifacts under size-versioned (not
+      // content-versioned) URLs. Without this, Vercel's default
+      // `max-age=0, must-revalidate` blocks every image paint on a
+      // conditional request even when the file is in the browser cache, so
+      // whole grids visibly re-load on each visit. Serve-stale keeps repeat
+      // visits painting from cache; a regenerated variant under the same name
+      // converges within a week or one background revalidation.
+      source: "/data/albums/:album/.resized_images/:file",
+      headers: [
+        {
+          key: "Cache-Control",
+          value: "public, max-age=604800, stale-while-revalidate=2592000",
+        },
+      ],
+    },
   ],
   experimental: {
     scrollRestoration: true,
