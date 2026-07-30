@@ -2,9 +2,13 @@
   "name": "album",
   "version": "0.1.0",
   "private": true,
+  "bin": {
+    "album": "./bin/album.cjs"
+  },
   "scripts": {
     "index:update": "(cd ../index; bash ./do-full-index.sh)",
     "index:embeddings:update": "(cd ../index; bash ./do-embeddings-index.sh)",
+    "index:retag": "(cd ../index; bash ./do-retag.sh)",
     "publish:wizard": "node ./bin/publish-wizard.cjs",
     "backup:publish": "node ./bin/backup-publish-assets.cjs",
     "backup:publish:with-albums": "node ./bin/backup-publish-assets.cjs --with-albums",
