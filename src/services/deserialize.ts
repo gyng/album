@@ -174,6 +174,42 @@ export const deserializeVideoBlock = async (
   });
 };
 
+// The search database keys photos by their repo-relative path (for example
+// `../albums/kanto/DSCF3871.jpg`). A populated database that matches nothing is
+// therefore the signature of a path mismatch — usually paths.albumsDir having
+// been changed after indexing — and it is otherwise completely silent: every
+// lookup returns no row, `_build.tags` normalises to `{}`, and the build
+// succeeds with no alt text, tags, geocodes or colour placeholders anywhere.
+//
+// Reported once per build, with a sample of what the indexed keys actually look
+// like, because the difference between the two prefixes is the whole diagnosis.
+let warnedAboutKeyMismatch = false;
+
+export const resetSearchIndexKeyMismatchWarning = (): void => {
+  warnedAboutKeyMismatch = false;
+};
+
+const reportSearchIndexKeyMismatch = (db: import("sqlite3").Database, missedPath: string): void => {
+  if (warnedAboutKeyMismatch) {
+    return;
+  }
+  warnedAboutKeyMismatch = true;
+
+  db.get("SELECT path FROM images LIMIT 1;", [], (err: Error, row: { path?: string }) => {
+    if (err || !row?.path) {
+      // An empty index is the ordinary "not indexed yet" case, not a mismatch.
+      return;
+    }
+
+    console.warn(
+      `[album] Search index has entries but none matched "${missedPath}".\n` +
+        `[album] Indexed paths look like "${row.path}".\n` +
+        "[album] Alt text, tags, geocodes and colour placeholders will be missing. " +
+        "Check paths.albumsDir in site.config.json matches the path the indexer used.",
+    );
+  });
+};
+
 const getPhotoDetailsFromSearchIndex = async (
   path: string,
   dbPath = getConfiguredSearchDbPath(),
@@ -206,6 +242,10 @@ const getPhotoDetailsFromSearchIndex = async (
 
         if (row?.colors) {
           row.colors = parseColorPalette(row.colors);
+        }
+
+        if (!row) {
+          reportSearchIndexKeyMismatch(db, path);
         }
 
         resolve(result);
@@ -345,6 +385,7 @@ export const deserializeInternals = {
   getConfiguredSearchDbPath,
   resetForTesting: async () => {
     photoSearchIndexCache.clear();
+    resetSearchIndexKeyMismatchWarning();
     await closeSearchDb();
   },
 };

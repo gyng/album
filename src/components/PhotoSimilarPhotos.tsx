@@ -12,7 +12,7 @@ export const PhotoSimilarPhotos: React.FC<{
 }> = (props) => {
   const pageSize = props.pageSize ?? 8;
   const initialVisibleCount = Math.max(pageSize - 1, 1);
-  const [database, progress] = useDatabase();
+  const [database, progress, , databaseError] = useDatabase();
   const [embeddingsDatabase, embeddingsProgress] = useEmbeddingsDatabase(Boolean(props.path));
   const [results, setResults] = React.useState<SearchResultRow[]>([]);
   const [error, setError] = React.useState<string | null>(null);
@@ -93,7 +93,13 @@ export const PhotoSimilarPhotos: React.FC<{
         Similar photos
       </Heading>
 
-      {!database ? (
+      {/* This section appears on every photo detail view, so a missing index
+          used to leave "Loading search index…" on screen permanently. */}
+      {databaseError ? (
+        <p className={styles.similarPhotosStatus}>
+          Similar photos need a search index, which has not been built yet.
+        </p>
+      ) : !database ? (
         <p className={styles.similarPhotosStatus}>
           Loading search index
           {progress > 0 ? ` (${Math.round(progress)}%)` : ""}…

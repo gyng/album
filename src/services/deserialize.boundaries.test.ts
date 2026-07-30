@@ -251,3 +251,67 @@ describe("deserialisation adapter boundaries", () => {
     await expect(deserializeContentBlock(input, "albums/trip")).rejects.toBe("non-error failure");
   });
 });
+
+describe("search index key mismatch", () => {
+  let db: { get: jest.Mock; close: jest.Mock };
+  let warn: jest.SpyInstance;
+
+  // A populated index that matches nothing is the signature of paths.albumsDir
+  // having changed after indexing. Every lookup returns no row and the build
+  // still succeeds, so without this warning the only symptom is a gallery that
+  // quietly lost all its alt text, tags, geocodes and colours.
+  const withRows = (indexedPath: string | null) =>
+    jest.fn((sql: string, _params: unknown, callback: (err: Error | null, row: unknown) => void) =>
+      sql.includes("WHERE path")
+        ? callback(null, undefined)
+        : callback(null, indexedPath ? { path: indexedPath } : undefined),
+    );
+
+  beforeEach(() => {
+    db = { get: withRows("../albums/kanto/DSCF3871.jpg"), close: jest.fn((cb) => cb()) };
+    MockDatabase.mockReset().mockImplementation(() => db);
+    mockGetPhotoSize.mockReset().mockResolvedValue({ width: 1, height: 1 });
+    mockGetExif.mockReset().mockResolvedValue({});
+    mockOptimiseImages.mockReset().mockResolvedValue([{ src: "/p.avif", width: 1, height: 1 }]);
+    warn = jest.spyOn(console, "warn").mockImplementation(() => {});
+    jest.spyOn(fs, "existsSync").mockReturnValue(true);
+  });
+
+  afterEach(async () => {
+    await deserializeInternals.resetForTesting();
+    jest.restoreAllMocks();
+  });
+
+  it("reports the mismatch, naming both the missed key and an indexed one", async () => {
+    await deserializePhotoBlock(photo("a.jpg"), { dirname: "../photos/kanto" });
+
+    const message = warn.mock.calls.flat().join("\n");
+    expect(message).toContain("../photos/kanto/a.jpg");
+    expect(message).toContain("../albums/kanto/DSCF3871.jpg");
+    expect(message).toContain("paths.albumsDir");
+  });
+
+  it("reports once per build rather than once per photo", async () => {
+    await deserializePhotoBlock(photo("a.jpg"), { dirname: "../photos/kanto" });
+    await deserializePhotoBlock(photo("b.jpg"), { dirname: "../photos/kanto" });
+
+    expect(warn).toHaveBeenCalledTimes(1);
+  });
+
+  // "Not indexed yet" is the ordinary state of a fresh gallery, not a mistake.
+  it("stays quiet when the index is simply empty", async () => {
+    db.get = withRows(null);
+
+    await deserializePhotoBlock(photo("a.jpg"), { dirname: "../albums/kanto" });
+
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  it("stays quiet when the lookup finds its row", async () => {
+    db.get = jest.fn((_sql, _params, callback) => callback(null, { path: "x", colors: "p" }));
+
+    await deserializePhotoBlock(photo("a.jpg"), { dirname: "../albums/kanto" });
+
+    expect(warn).not.toHaveBeenCalled();
+  });
+});

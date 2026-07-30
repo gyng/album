@@ -31,6 +31,19 @@ describe("PhotoSimilarPhotos", () => {
     expect(fetchSimilarResults).not.toHaveBeenCalled();
   });
 
+  // Regression: this section renders on every photo detail view, and a gallery
+  // built without a search index left it on "Loading search index…" forever
+  // because the hook's error channel was dropped at the destructure.
+  it("explains the missing index instead of loading forever when the database fails", () => {
+    (useDatabase as jest.Mock).mockReturnValue([null, 0, null, new Error("404")]);
+    (useEmbeddingsDatabase as jest.Mock).mockReturnValue([null, 0]);
+
+    render(<PhotoSimilarPhotos path="photo.jpg" />);
+
+    expect(screen.getByText(/need a search index/i)).toBeInTheDocument();
+    expect(screen.queryByText(/Loading search index/i)).not.toBeInTheDocument();
+  });
+
   it("omits the progress suffix until either database reports progress", () => {
     (useDatabase as jest.Mock).mockReturnValue([null, 0]);
     (useEmbeddingsDatabase as jest.Mock).mockReturnValue([null, 0]);

@@ -11,6 +11,8 @@ import {
   V2AlbumMetadata,
 } from "./types";
 import { isVideoFile } from "./video";
+import { isSupportedMediaFile } from "./albumMedia";
+import { siteConfig } from "../lib/siteConfig";
 import { parseYoutubeVideoId, youtubeMediaFilename } from "./youtubeExternal";
 import { incrementBuildCounter, measureBuild } from "./buildTiming";
 import {
@@ -19,7 +21,26 @@ import {
   parseExifLocalDateTime,
 } from "../util/exifTime";
 
-export const ALBUMS_DIR = "../albums";
+/**
+ * Where album folders live, relative to `src/`.
+ *
+ * This is a data-format constant as much as a path: the search database keys
+ * every photo by this prefix (`../albums/<album>/<file>`), and
+ * `deserialize.ts` looks rows up by that exact string. An absolute path would
+ * still list albums correctly but would match nothing in the index, producing a
+ * clean build with no tags, alt text or colours — so it is rejected outright
+ * rather than accepted and silently half-working.
+ */
+export const ALBUMS_DIR = ((configured: string): string => {
+  if (path.isAbsolute(configured)) {
+    throw new Error(
+      `paths.albumsDir must be relative to src/ (got "${configured}"). ` +
+        "The search index keys photos by this prefix, so an absolute path matches no indexed row.",
+    );
+  }
+
+  return configured;
+})(siteConfig.paths.albumsDir);
 export const MANIFEST_NAME = "manifest.json";
 export const MANIFEST_V2_NAME = "album.json";
 
@@ -54,7 +75,7 @@ const removeZoneIdentifierSidecar = (sidecarPath: string): boolean => {
 };
 
 const listAlbumMediaFiles = (albumPath: string): string[] => {
-  return fs
+  const candidates = fs
     .readdirSync(albumPath)
     .filter((it) => !fs.lstatSync(path.join(albumPath, it)).isDirectory())
     .filter((it) => !it.match(/\.json$/))
@@ -65,6 +86,21 @@ const listAlbumMediaFiles = (albumPath: string): string[] => {
 
       return removeZoneIdentifierSidecar(path.join(albumPath, it));
     });
+
+  const supported = candidates.filter(isSupportedMediaFile);
+
+  // Without this filter a folder of iPhone exports (.HEIC alongside .AAE edit
+  // sidecars) reached sharp and failed the whole build. Report what was passed
+  // over rather than dropping it silently — a skipped photo looks like a bug.
+  const skipped = candidates.filter((it) => !isSupportedMediaFile(it));
+  if (skipped.length > 0) {
+    console.warn(
+      `[album] ${path.basename(albumPath)}: skipped ${skipped.length} unsupported file(s): ` +
+        `${skipped.slice(0, 10).join(", ")}${skipped.length > 10 ? ", …" : ""}`,
+    );
+  }
+
+  return supported;
 };
 
 export const getBlockDate = (block: Block): number => {
