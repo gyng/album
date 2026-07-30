@@ -4,7 +4,12 @@ import styles from "./ScreenLayout.module.css";
 import type { HomePageData } from "../util/pageDataTypes";
 // import DynamicSearchWithCoi from "../components/search/DynamicSearchWithCoi";
 import { Seo } from "../components/Seo";
-import { buildCollectionPageJsonLd, buildWebSiteJsonLd } from "../lib/seo";
+import {
+  SITE_NAME,
+  buildCollectionPageJsonLd,
+  buildWebSiteJsonLd,
+  getDefaultSeo,
+} from "../lib/seo";
 import { GlobalNav } from "../components/GlobalNav";
 import { usePublicConfig } from "../components/platform";
 
@@ -19,8 +24,8 @@ const HomeScreen = (context: HomeScreenProps) => {
           buildWebSiteJsonLd(siteOrigin),
           buildCollectionPageJsonLd(
             {
-              name: "Snapshots",
-              description: "Snapshots from a better era",
+              name: SITE_NAME,
+              description: getDefaultSeo().defaultDescription,
               pathname: "/",
             },
             siteOrigin,
@@ -31,7 +36,7 @@ const HomeScreen = (context: HomeScreenProps) => {
       <main id="main-content" className={styles.main}>
         <GlobalNav currentPage="home" hasPadding={false} />
         <Heading level={1} as="h1">
-          Snapshots
+          {SITE_NAME}
         </Heading>
         <Albums albums={context.albums} />
       </main>

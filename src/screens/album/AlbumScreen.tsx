@@ -14,8 +14,10 @@ import commonStyles from "../../styles/common.module.css";
 import type { AlbumPageData } from "../../util/pageDataTypes";
 import { Seo } from "../../components/Seo";
 import {
+  SITE_NAME,
   buildBreadcrumbJsonLd,
   buildCollectionPageJsonLd,
+  formatPageTitle,
   getCanonicalUrl,
   resolveAbsoluteUrl,
 } from "../../lib/seo";
@@ -73,7 +75,7 @@ const AlbumScreen = ({ album }: AlbumScreenProps) => {
   return (
     <>
       <Seo
-        title={`${title} | Snapshots`}
+        title={formatPageTitle(title)}
         description={album.kicker ?? `${title} photo album: ${imageCount} photos`}
         pathname={`/album/${album._build.slug}`}
         {...(coverImageSrc ? { image: coverImageSrc } : {})}
@@ -87,7 +89,7 @@ const AlbumScreen = ({ album }: AlbumScreenProps) => {
         jsonLd={[
           buildCollectionPageJsonLd(
             {
-              name: `${title} | Snapshots`,
+              name: formatPageTitle(title),
               description: album.kicker ?? `${title} photo album: ${imageCount} photos`,
               pathname: `/album/${album._build.slug}`,
               ...(coverImageAbsolute ? { image: coverImageAbsolute } : {}),
@@ -96,7 +98,7 @@ const AlbumScreen = ({ album }: AlbumScreenProps) => {
           ),
           buildBreadcrumbJsonLd(
             [
-              { name: "Snapshots", pathname: "/" },
+              { name: SITE_NAME, pathname: "/" },
               {
                 name: title,
                 pathname: `/album/${album._build.slug}`,

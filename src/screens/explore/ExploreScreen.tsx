@@ -48,6 +48,7 @@ import {
   ExploreRevisitedPlacesSection,
 } from "../../components/explore/ExploreStorySections";
 import { ExploreColourSection } from "../../components/explore/ExploreColourSection";
+import { formatPageTitle } from "../../lib/seo";
 
 export type ExploreScreenProps = {
   stats: PhotoStats;
@@ -290,7 +291,7 @@ const ExploreScreen = ({ stats, visualSameness }: ExploreScreenProps) => {
   return (
     <div className={styles.page}>
       <Seo
-        title="Explore | Snapshots"
+        title={formatPageTitle("Explore")}
         description="Explore the archive through time, place, gear, colour, and visual similarity."
         pathname="/explore"
         jsonLd={[]}

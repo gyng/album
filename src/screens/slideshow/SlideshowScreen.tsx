@@ -21,7 +21,7 @@ import commonStyles from "../../styles/common.module.css";
 import { ThemeToggle } from "../../components/ThemeToggle";
 import { useLocalStorage } from "usehooks-ts";
 import { Seo } from "../../components/Seo";
-import { buildCollectionPageJsonLd } from "../../lib/seo";
+import { buildCollectionPageJsonLd, formatPageTitle } from "../../lib/seo";
 import { getPhotoAltText } from "../../lib/alt";
 import { navigateTo, reloadCurrentPage } from "../../util/navigate";
 import { handleSlideshowKeyboardShortcut } from "../../util/slideshowKeyboard";
@@ -264,6 +264,7 @@ export const Slideshow: React.FC<{
       new URLSearchParams(window.location.search).get("shell") === "1");
   const databaseState = useDatabase();
   const [database, progress] = databaseState;
+  const databaseError = databaseState[3];
   const refreshDatabase = databaseState[4];
   const buildVersionRef = React.useRef<string>(BUILD_VERSION);
   // When this document started playing, used as the session age when no shell
@@ -1503,6 +1504,19 @@ export const Slideshow: React.FC<{
     [props.managedCodeReload],
   );
 
+  // The photo pool cannot load without a database, and this effect used to
+  // return silently when there was none — leaving the slideshow on its loading
+  // state forever. The "No photos available" toast below is only reachable
+  // *after* a successful load that returned zero rows, so it never covered
+  // this case.
+  useEffect(() => {
+    if (databaseError) {
+      setSlideshowError(
+        "Couldn't load the photo database. Build a search index with `album index`.",
+      );
+    }
+  }, [databaseError]);
+
   useEffect(() => {
     if (!database) {
       return;
@@ -2525,13 +2539,13 @@ export const Slideshow: React.FC<{
   return (
     <>
       <Seo
-        title="Slideshow | Snapshots"
+        title={formatPageTitle("Slideshow")}
         description="Play a fullscreen slideshow from the photo archive."
         pathname="/slideshow"
         noindex
         jsonLd={buildCollectionPageJsonLd(
           {
-            name: "Slideshow | Snapshots",
+            name: formatPageTitle("Slideshow"),
             description: "Play a fullscreen slideshow from the photo archive.",
             pathname: "/slideshow",
           },

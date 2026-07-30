@@ -7,7 +7,7 @@ import styles from "./MapScreen.module.css";
 import commonStyles from "../../styles/common.module.css";
 import { AppLink as Link, usePublicConfig, useUrlSearchParams } from "../../components/platform";
 import { Seo } from "../../components/Seo";
-import { buildCollectionPageJsonLd } from "../../lib/seo";
+import { buildCollectionPageJsonLd, formatPageTitle } from "../../lib/seo";
 import { getDefaultRouteMode, RouteMode } from "../../components/mapRoute";
 import { TimeRangeSlider } from "../../components/TimeRangeSlider";
 import { parseRangeParam, formatRangeDate } from "../../util/timeRange";
@@ -259,13 +259,13 @@ const MapScreen = (props: MapScreenProps) => {
         .join(" ")}
     >
       <Seo
-        title="Map | Snapshots"
+        title={formatPageTitle("Map")}
         description="Explore geotagged photos on a world map."
         pathname="/map"
         noindex={hasRouteState}
         jsonLd={buildCollectionPageJsonLd(
           {
-            name: "Map | Snapshots",
+            name: formatPageTitle("Map"),
             description: "Explore geotagged photos on a world map.",
             pathname: "/map",
           },

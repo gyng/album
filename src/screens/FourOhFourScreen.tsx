@@ -2,7 +2,7 @@ import { AppLink as Link } from "../components/platform";
 import { GlobalNav } from "../components/GlobalNav";
 import { Seo } from "../components/Seo";
 import { Heading } from "../components/ui";
-import { buildCollectionPageJsonLd } from "../lib/seo";
+import { buildCollectionPageJsonLd, formatPageTitle } from "../lib/seo";
 import { usePublicConfig } from "../components/platform";
 
 import styles from "./FourOhFourScreen.module.css";
@@ -12,13 +12,13 @@ export default function FourOhFourScreen() {
   return (
     <div className={styles.page}>
       <Seo
-        title="Page Not Found | Snapshots"
+        title={formatPageTitle("Page Not Found")}
         description="This page could not be found."
         pathname="/404"
         noindex
         jsonLd={buildCollectionPageJsonLd(
           {
-            name: "Page Not Found | Snapshots",
+            name: formatPageTitle("Page Not Found"),
             description: "This page could not be found.",
             pathname: "/404",
           },

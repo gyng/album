@@ -8,17 +8,32 @@
  * is loaded.
  *
  * Framework-neutral on purpose: the map screens are part of the portable graph,
- * so this reads `localStorage` defensively and imports nothing.
+ * so this reads `localStorage` defensively and imports only authored
+ * configuration.
  */
+
+import { siteConfig } from "../lib/siteConfig";
 
 /**
- * Public, domain-restricted MapTiler key — the one the map has always used. Not a
- * secret; restricted on MapTiler's side by referrer.
+ * Public, referrer-restricted MapTiler key. Not a secret, but it is restricted
+ * on MapTiler's side to one domain, so a fork must supply its own or the map
+ * fails silently on theirs. An empty key means "no provider configured", which
+ * degrades to a keyless basemap rather than to a blank map.
  */
-export const MAP_TILER_KEY = "iilC4hPY1594noPX9OQ2";
+export const MAP_TILER_KEY = siteConfig.map.apiKey;
 
-/** The gallery's own MapTiler style. */
-const GALLERY_STYLE_ID = "ffd8bd10-cd97-40a5-b1d6-d15f98fb3644";
+export const hasMapProvider = MAP_TILER_KEY.length > 0;
+
+/** Keyless public basemap used when no provider key is configured. */
+export const FALLBACK_STYLE_URL = "https://tiles.openfreemap.org/styles/liberty";
+
+/**
+ * The gallery's own MapTiler style, which is scoped to the account that created
+ * it. A fork with a perfectly valid key of its own still gets a 403 from
+ * someone else's style id, so when none is configured this falls back to a
+ * catalogue style and the choice disappears from the picker below.
+ */
+const GALLERY_STYLE_ID = siteConfig.map.galleryStyleId;
 
 export type MapStyleName =
   | "gallery"
@@ -37,10 +52,18 @@ export type MapStyleName =
  * switch — a plainer map, a topographic one, a dark one, imagery, or something
  * decorative.
  */
+const STREETS_STYLE_ID = "streets-v2";
+
+/**
+ * Kept a total `Record` even when the gallery style is unavailable: making it
+ * partial would ripple `Partial<>` through every consumer. An unconfigured
+ * gallery style therefore resolves to the streets id, so a stale stored
+ * preference renders a working map instead of a 403.
+ */
 export const MAP_STYLES: Record<MapStyleName, { id: string; label: string }> = {
   // The default first, then the rest.
-  gallery: { id: GALLERY_STYLE_ID, label: "Gallery" },
-  streets: { id: "streets-v2", label: "Streets" },
+  gallery: { id: GALLERY_STYLE_ID ?? STREETS_STYLE_ID, label: "Gallery" },
+  streets: { id: STREETS_STYLE_ID, label: "Streets" },
   outdoor: { id: "outdoor-v2", label: "Outdoor" },
   topographic: { id: "topo-v2", label: "Topographic" },
   dark: { id: "dataviz-dark", label: "Dark" },
@@ -49,9 +72,21 @@ export const MAP_STYLES: Record<MapStyleName, { id: string; label: string }> = {
   monochrome: { id: "toner-v2", label: "Monochrome" },
 };
 
-export const MAP_STYLE_NAMES = Object.keys(MAP_STYLES) as MapStyleName[];
+/**
+ * What the picker offers. The gallery style is hidden unless this fork actually
+ * owns one — eight labels that all render the same basemap is a worse control
+ * than seven that differ.
+ */
+export const MAP_STYLE_NAMES = (Object.keys(MAP_STYLES) as MapStyleName[]).filter(
+  (name) => name !== "gallery" || GALLERY_STYLE_ID !== null,
+);
 
-export const DEFAULT_MAP_STYLE: MapStyleName = "gallery";
+const isAvailableStyleName = (value: string): value is MapStyleName =>
+  (MAP_STYLE_NAMES as string[]).includes(value);
+
+export const DEFAULT_MAP_STYLE: MapStyleName = isAvailableStyleName(siteConfig.map.defaultStyle)
+  ? siteConfig.map.defaultStyle
+  : "streets";
 
 export const MAP_STYLE_STORAGE_KEY = "mapStyle";
 
@@ -64,11 +99,22 @@ export const resolveMapStyleName = (value: unknown): MapStyleName | null => {
   // when it was also the default. Readers who chose it deliberately keep it.
   const name = value === "default" ? "gallery" : value;
 
-  return name in MAP_STYLES ? (name as MapStyleName) : null;
+  // Checked against the available names, not the full record, so a stored
+  // "gallery" from before a fork removed its style id is rejected rather than
+  // silently resolving to something else.
+  return isAvailableStyleName(name) ? name : null;
 };
 
+/**
+ * Every MapTiler style URL in the application is built here — the one place the
+ * key and the provider's host appear. `styleId` is a raw provider style id, for
+ * callers that pick from the provider catalogue rather than the curated list.
+ */
+export const mapTilerStyleUrl = (styleId: string, key: string = MAP_TILER_KEY): string =>
+  key ? `https://api.maptiler.com/maps/${styleId}/style.json?key=${key}` : FALLBACK_STYLE_URL;
+
 export const mapStyleUrl = (name: MapStyleName, key: string = MAP_TILER_KEY): string =>
-  `https://api.maptiler.com/maps/${MAP_STYLES[name].id}/style.json?key=${key}`;
+  mapTilerStyleUrl(MAP_STYLES[name].id, key);
 
 const readStored = (): MapStyleName | null => {
   try {

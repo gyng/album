@@ -9,6 +9,7 @@ import { SlideshowMode, DetailsAlignment } from "../../util/slideshowUrl";
 import { PoolStats, formatNewestPhotoDate } from "../../util/slideshowQueue";
 import { getRelativeTimeString } from "../../util/time";
 import { isModifiedClick, SLIDESHOW_DIAGNOSTICS_HREF } from "../../util/slideshowShell";
+import { SITE_NAME } from "../../lib/seo";
 
 const styles = mergeCssModuleStyles(
   sharedStyles,
@@ -400,7 +401,7 @@ export const SlideshowToolbar: React.FC<SlideshowToolbarProps> = (props) => {
           🖼️
         </span>
         <span className={styles.brandCopy}>
-          <span className={styles.brandTitle}>Snapshots</span>
+          <span className={styles.brandTitle}>{SITE_NAME}</span>
           <span className={styles.brandSubtitle}>Slideshow</span>
         </span>
       </Link>

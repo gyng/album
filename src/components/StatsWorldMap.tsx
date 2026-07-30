@@ -7,6 +7,7 @@ import {
   type PointFeature,
 } from "./map";
 import styles from "./StatsWorldMap.module.css";
+import { mapStyleUrl } from "../util/mapStyles";
 import { MapLibreStyles } from "./MapLibreStyles";
 
 type Props = {
@@ -36,7 +37,7 @@ export const StatsWorldMap: React.FC<Props> = ({ points }) => {
           <div className={styles.map}>
             <MapView
               initialView={{ center: { lng: 15, lat: 20 }, zoom: 1.25 }}
-              styleUrl="https://api.maptiler.com/maps/toner-v2/style.json?key=iilC4hPY1594noPX9OQ2"
+              styleUrl={mapStyleUrl("monochrome")}
               attribution={false}
             >
               <DataLayer id="stats-photos" points={features} stroke={STATS_POINT_RING} cluster />

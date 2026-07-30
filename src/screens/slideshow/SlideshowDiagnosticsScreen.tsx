@@ -16,6 +16,7 @@ import {
   type ShellStatusSnapshot,
 } from "../../util/shellDiagnosticsLog";
 import styles from "./SlideshowDiagnosticsScreen.module.css";
+import { formatPageTitle } from "../../lib/seo";
 
 type Reading = {
   now: number;
@@ -156,7 +157,7 @@ export const SlideshowDiagnosticsScreen = () => {
   return (
     <main className={styles.page}>
       <DocumentHead>
-        <title>Slideshow diagnostics | Snapshots</title>
+        <title>{formatPageTitle("Slideshow diagnostics")}</title>
         <meta name="robots" content="noindex" />
       </DocumentHead>
 

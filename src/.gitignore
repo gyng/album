@@ -49,6 +49,9 @@ node_modules/
 /public/sitemap.xml
 /public/robots.txt
 /public/album/*/feed.xml
+# Branded from site.config.json; edit the configuration, not these.
+/public/manifest.webmanifest
+/public/social-preview.svg
 /public/vendor/
 /public/pwa-icon-192.png
 /public/pwa-icon-512.png

@@ -7,10 +7,12 @@ import Map, {
   type MapLayerMouseEvent,
 } from "react-map-gl/maplibre";
 import { computeWrapAwareBounds } from "@shared/mapBounds";
+import { mapStyleUrl } from "@shared/mapStyles";
 import type { Track } from "@shared/gpsTrack";
 import type { GeotagPhoto, PendingFix } from "../api.ts";
 
-const MAP_STYLE = "https://api.maptiler.com/maps/streets/style.json?key=mrjUpLh9Syjz9wcEY2Vb";
+// Shares the gallery's configured provider key, so a fork sets it once.
+const MAP_STYLE = mapStyleUrl("streets");
 
 export type PendingMarker = { filename: string } & PendingFix;
 

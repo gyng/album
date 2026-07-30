@@ -6,7 +6,7 @@ import baseStyles from "../ScreenLayout.module.css";
 import styles from "./SearchScreen.module.css";
 import React, { useCallback, useMemo, useState } from "react";
 import { Seo } from "../../components/Seo";
-import { buildCollectionPageJsonLd } from "../../lib/seo";
+import { buildCollectionPageJsonLd, formatPageTitle } from "../../lib/seo";
 import commonStyles from "../../styles/common.module.css";
 import { forceDocumentNavigation } from "../../components/search/searchUtils";
 import type { SearchNavState } from "../../components/search/Search";
@@ -68,13 +68,13 @@ const SearchPage = () => {
   return (
     <>
       <Seo
-        title="Search | Snapshots"
+        title={formatPageTitle("Search")}
         description="Search the photo archive by text, tags, and visual similarity."
         pathname="/search"
         noindex
         jsonLd={buildCollectionPageJsonLd(
           {
-            name: "Search | Snapshots",
+            name: formatPageTitle("Search"),
             description: "Search the photo archive by text, tags, and visual similarity.",
             pathname: "/search",
           },

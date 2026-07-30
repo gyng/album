@@ -6,6 +6,7 @@ import { encodePublicAssetPath } from "../../util/encodePublicAssetPath";
 import benchmarkJson from "./captionBenchmark.json";
 import { VendorIcon, type VendorKey } from "./VendorIcon";
 import styles from "./BenchmarkScreen.module.css";
+import { formatPageTitle } from "../../lib/seo";
 
 type Where = "local" | "cloud";
 
@@ -326,7 +327,7 @@ const BenchmarkScreen = () => {
   return (
     <>
       <Seo
-        title="Caption benchmark | Snapshots"
+        title={formatPageTitle("Caption benchmark")}
         description="Twelve vision models captioning the same eleven photos, scored on tag quality, speed, memory and cost."
         pathname="/benchmark"
       />

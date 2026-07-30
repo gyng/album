@@ -46,9 +46,16 @@ describe("custom application", () => {
   });
 
   it("enables analytics only away from local hosts", () => {
-    expect(shouldEnableAnalytics("localhost")).toBe(false);
-    expect(shouldEnableAnalytics("127.0.0.1")).toBe(false);
-    expect(shouldEnableAnalytics("photos.awoo.party")).toBe(true);
+    expect(shouldEnableAnalytics("localhost", true)).toBe(false);
+    expect(shouldEnableAnalytics("127.0.0.1", true)).toBe(false);
+    expect(shouldEnableAnalytics("photos.example", true)).toBe(true);
+  });
+
+  // Off Vercel the insights script 404s on every host, which is a real script
+  // load error rather than a missing metric.
+  it("stays off entirely when the fork has not configured Vercel analytics", () => {
+    expect(shouldEnableAnalytics("photos.example", false)).toBe(false);
+    expect(shouldEnableAnalytics("localhost", false)).toBe(false);
   });
 
   it("registers the application service worker when the browser supports it", async () => {

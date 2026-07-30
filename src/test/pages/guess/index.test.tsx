@@ -81,6 +81,24 @@ describe("GuessPage", () => {
     expect(screen.queryByTestId("guess-game")).not.toBeInTheDocument();
   });
 
+  // Regression: with no search index this page showed a 0% progress bar and no
+  // exit, because the destructure dropped the hook's error channel.
+  it("explains the missing index instead of loading forever when the database fails", () => {
+    useDatabaseMock.mockReturnValue([
+      null,
+      0,
+      null,
+      new Error("404"),
+      jest.fn(),
+    ] as unknown as ReturnType<typeof useDatabase>);
+
+    render(<GuessPage />);
+
+    expect(screen.getByText(/needs a search index/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /try again/i })).toBeInTheDocument();
+    expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
+  });
+
   it("waits for deep-link query state before mounting the game state machine", () => {
     setQuery({ daily: "" }, false);
     const { rerender } = render(<GuessPage />);

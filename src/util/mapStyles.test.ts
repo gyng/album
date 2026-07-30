@@ -2,12 +2,15 @@
  * @jest-environment jsdom
  */
 
+import { siteConfig } from "../lib/siteConfig";
 import {
   DEFAULT_MAP_STYLE,
+  FALLBACK_STYLE_URL,
   getMapStyleName,
   MAP_STYLE_NAMES,
   MAP_STYLE_STORAGE_KEY,
   mapStyleUrl,
+  mapTilerStyleUrl,
   resetMapStyleCache,
   resolveMapStyleName,
   setMapStyleName,
@@ -83,4 +86,39 @@ it("keeps working when storage is unavailable", () => {
   } finally {
     Object.defineProperty(window, "localStorage", { configurable: true, value: real });
   }
+});
+
+describe("provider configuration", () => {
+  it("degrades to a keyless basemap when no provider key is configured", () => {
+    expect(mapTilerStyleUrl("streets-v2", "")).toBe(FALLBACK_STYLE_URL);
+    expect(mapStyleUrl("streets", "")).toBe(FALLBACK_STYLE_URL);
+  });
+
+  it("builds a catalogue style id that is not one of the curated choices", () => {
+    expect(mapTilerStyleUrl("ocean", "abc123")).toBe(
+      "https://api.maptiler.com/maps/ocean/style.json?key=abc123",
+    );
+  });
+
+  // The gallery style is scoped to the account that made it, so a fork must
+  // never be offered a choice that would 403 against its own key.
+  it("offers the gallery style only when one is configured", () => {
+    const offersGallery = MAP_STYLE_NAMES.includes("gallery");
+    expect(offersGallery).toBe(siteConfig.map.galleryStyleId !== null);
+  });
+
+  it("defaults to a style it actually offers", () => {
+    expect(MAP_STYLE_NAMES).toContain(DEFAULT_MAP_STYLE);
+  });
+
+  it("rejects a stored preference naming a style this fork does not offer", () => {
+    for (const name of ["gallery", "default"]) {
+      const resolved = resolveMapStyleName(name);
+      if (siteConfig.map.galleryStyleId === null) {
+        expect(resolved).toBeNull();
+      } else {
+        expect(resolved).toBe("gallery");
+      }
+    }
+  });
 });

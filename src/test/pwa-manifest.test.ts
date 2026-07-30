@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import { siteConfig } from "../lib/siteConfig";
 
 type PwaManifest = {
   id?: string;
@@ -11,9 +12,14 @@ type PwaManifest = {
 };
 
 describe("PWA manifest", () => {
-  const manifest = JSON.parse(
-    fs.readFileSync("public/manifest.webmanifest", "utf8"),
-  ) as PwaManifest;
+  // Built from configuration rather than read from disk: the file is generated
+  // by `prepare:feeds` and gitignored, and CI does not run the prepare scripts
+  // before jest. This is the same "compare declarations, not the filesystem"
+  // strategy the icon cross-check below already relies on.
+  const { buildWebmanifest } = require("../bin/generate-feeds.cjs") as {
+    buildWebmanifest: () => PwaManifest;
+  };
+  const manifest = buildWebmanifest();
 
   it("launches the slideshow as one stable, chrome-free application", () => {
     expect(manifest).toMatchObject({
@@ -62,5 +68,19 @@ describe("PWA manifest", () => {
     for (const src of precachedPngs) {
       expect(generated).toContain(src);
     }
+  });
+
+  // sw.js is a static file and cannot read configuration, so a fork that
+  // renames its databases would leave the worker precaching two 404s and the
+  // slideshow unable to restart offline.
+  it("precaches the database URLs the application is configured to load", () => {
+    const worker = fs.readFileSync("public/sw.js", "utf8");
+    const precacheList = worker.match(/PRECACHE_DATA_PATHS = \[([\s\S]*?)\]/)?.[1] ?? "";
+    const precached = [...precacheList.matchAll(/"([^"]+)"/g)].map(([, src]) => src);
+
+    expect(precached).toEqual([
+      siteConfig.search.databaseUrl,
+      siteConfig.search.embeddingsDatabaseUrl,
+    ]);
   });
 });

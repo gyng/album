@@ -37,6 +37,35 @@ Goals
 - Photos are size-optimised for mobile viewing
 - Free hosting!
 
+## Running your own
+
+There is a CLI at the repo root. `./album --help` lists everything; the short version:
+
+```
+$ ./album init      # name, URL, albums directory, social links → src/site.config.json
+$ ./album doctor    # check this machine can build (add --indexing for the Python side)
+$ ./album dev       # run it locally
+$ ./album generate  # production build
+$ ./album deploy    # preflight, build and deploy (Vercel)
+```
+
+Everything that identifies an instance lives in `src/site.config.json`; `album init` writes it
+and nothing else needs editing. `npm run` scripts remain the layer underneath, so nothing here
+is a black box.
+
+**What works without indexing.** Albums, home, map, timeline, explore and album pages build
+from EXIF alone, so a fresh clone plus a folder of photos is a working gallery in minutes.
+Keyword search, semantic search, "guess where" and slideshow topics all need the search
+database, which is built offline by the Python pipeline in `index/` and wants a GPU. Those
+pages say so rather than spinning.
+
+**Two things to know before forking.** The MapTiler key in the default configuration is
+restricted to this site's domain — set `map.apiKey` to your own or the map falls back to a
+keyless basemap. And this repository's git history permanently contains the original author's
+photographs (the `albums/test-*` fixtures the e2e suite depends on) and two search databases
+built from them; `.git` is around 126&nbsp;MB for that reason. No CLI can remove data from
+history, so a fork inherits it.
+
 ## Usage
 
 You will need Node 24 or 26. The root `.nvmrc` selects Node 24 as the tested default; use `nvm use 26` explicitly when you want Node 26. The following steps are for deployment on Vercel, but you can deploy elsewhere &mdash; this is a standard Next.js application.

@@ -6,23 +6,16 @@
 const fs = require("fs");
 const path = require("path");
 
+const { resolveAlbumsDir, resolveSiteOrigin, siteConfig } = require("./siteConfig.cjs");
+
 const appRoot = path.resolve(__dirname, "..");
-const albumsDir = path.resolve(appRoot, "..", "albums");
+const albumsDir = resolveAlbumsDir(appRoot);
 const publicDir = path.join(appRoot, "public");
 
 const MANIFEST_NAME = "manifest.json";
 const MANIFEST_V2_NAME = "album.json";
 
-const getSiteOrigin = () => {
-  const envOrigin =
-    process.env.NEXT_PUBLIC_SITE_URL ??
-    process.env.SITE_URL ??
-    process.env.VERCEL_PROJECT_PRODUCTION_URL;
-  if (!envOrigin) return "https://photos.awoo.party";
-  if (envOrigin.startsWith("http://") || envOrigin.startsWith("https://"))
-    return envOrigin.replace(/\/$/, "");
-  return `https://${envOrigin.replace(/\/$/, "")}`;
-};
+const getSiteOrigin = () => resolveSiteOrigin();
 
 const getCanonicalUrl = (pathname = "/") => {
   const normalised = pathname.startsWith("/") ? pathname : `/${pathname}`;
@@ -164,9 +157,9 @@ const generateMainFeed = (entries) => {
   const feedUrl = getCanonicalUrl("/feed.xml");
 
   return buildRssXml({
-    title: "Snapshots",
+    title: siteConfig.site.name,
     link: siteUrl,
-    description: "Snapshots from a better era",
+    description: siteConfig.site.description,
     selfUrl: feedUrl,
     lastBuildDate: entries[0]?.lastmod ? toRssDate(entries[0].lastmod) : undefined,
     items: entries.map((entry) => ({
@@ -184,7 +177,7 @@ const generateAlbumFeed = (entry, items) => {
   const feedUrl = getCanonicalUrl(`/album/${entry.slug}/feed.xml`);
 
   return buildRssXml({
-    title: `${entry.title} | Snapshots`,
+    title: `${entry.title} | ${siteConfig.site.name}`,
     link: albumUrl,
     description: entry.description,
     selfUrl: feedUrl,
@@ -345,6 +338,69 @@ const buildRobotsTxt = () =>
     "",
   ].join("\n");
 
+// --- Branded assets ---
+//
+// The manifest and the social preview both embed the site's name, and the
+// preview embeds its hostname too. Generating them from configuration keeps a
+// fork from shipping the previous owner's identity in its install prompt and
+// in every link preview.
+
+const PWA_ICONS = [
+  { src: "/pwa-icon-192.png", sizes: "192x192", type: "image/png", purpose: "any maskable" },
+  { src: "/pwa-icon-512.png", sizes: "512x512", type: "image/png", purpose: "any maskable" },
+  { src: "/pwa-icon.svg", sizes: "any", type: "image/svg+xml", purpose: "any maskable" },
+];
+
+const buildWebmanifest = (config = siteConfig) => ({
+  name: config.site.name,
+  short_name: config.site.shortName,
+  description: config.pwa.description,
+  id: "/",
+  start_url: config.pwa.startUrl,
+  scope: "/",
+  display: "standalone",
+  display_override: ["fullscreen", "standalone"],
+  launch_handler: {
+    // Reuses an installed window but always returns it to the launch URL.
+    // `focus-existing` would need launchQueue handling as well.
+    client_mode: "navigate-existing",
+  },
+  theme_color: config.branding.themeColor,
+  background_color: config.branding.backgroundColor,
+  icons: PWA_ICONS,
+});
+
+const escapeXmlText = (value) =>
+  value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+
+/** Hostname only: a scheme in a share card reads as clutter. */
+const displayHost = (origin) => {
+  try {
+    return new URL(origin).host;
+  } catch {
+    return origin;
+  }
+};
+
+const buildSocialPreviewSvg = (config = siteConfig, origin = resolveSiteOrigin()) => {
+  const font = "Helvetica Neue, Arial, sans-serif";
+  return `<svg width="1200" height="630" viewBox="0 0 1200 630" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1200" height="630" fill="#2c2c2c"/>
+  <circle cx="942" cy="146" r="208" fill="#e62065" fill-opacity="0.16"/>
+  <circle cx="214" cy="520" r="180" fill="#ffffff" fill-opacity="0.08"/>
+  <rect x="80" y="84" width="1040" height="462" rx="36" fill="url(#panel)"/>
+  <text x="128" y="240" fill="white" font-family="${font}" font-size="96" font-weight="700">${escapeXmlText(config.site.name)}</text>
+  <text x="128" y="322" fill="#d2d2d2" font-family="${font}" font-size="38">${escapeXmlText(config.branding.socialPreviewSubtitle)}</text>
+  <text x="128" y="440" fill="#f3f3f3" font-family="${font}" font-size="30">${escapeXmlText(displayHost(origin))}</text>
+  <defs>
+    <linearGradient id="panel" x1="80" y1="84" x2="1120" y2="546" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#1f1f1f"/>
+      <stop offset="1" stop-color="#3a3a3a"/>
+    </linearGradient>
+  </defs>
+</svg>`;
+};
+
 // --- Main ---
 
 const ensureDir = (dirPath) => fs.mkdirSync(dirPath, { recursive: true });
@@ -388,9 +444,19 @@ const cleanupStaleAlbumFeeds = (validSlugs, outputDirectory) => {
 const run = ({ albumsDirectory, outputDirectory, log = console.log }) => {
   const albumEntries = getAlbumDirectoryEntries(albumsDirectory);
 
-  // robots.txt does not depend on album discovery, so generate it even when a
+  // These do not depend on album discovery, so generate them even when a
   // checkout has no local album source directories.
   writeFile(path.join(outputDirectory, "robots.txt"), buildRobotsTxt());
+  writeFile(
+    path.join(outputDirectory, "manifest.webmanifest"),
+    `${JSON.stringify(buildWebmanifest(), null, 2)}\n`,
+  );
+
+  // Only when the fork still points at the generated file: a fork that supplies
+  // its own artwork keeps it.
+  if (siteConfig.branding.socialPreviewImage === "/social-preview.svg") {
+    writeFile(path.join(outputDirectory, "social-preview.svg"), buildSocialPreviewSvg());
+  }
 
   if (albumEntries.length === 0) {
     log("No albums found — skipping feed generation");
@@ -442,6 +508,8 @@ module.exports = {
   buildRobotsTxt,
   buildRssXml,
   buildSitemapXml,
+  buildSocialPreviewSvg,
+  buildWebmanifest,
   cleanupStaleAlbumFeeds,
   generateAlbumFeed,
   generateMainFeed,

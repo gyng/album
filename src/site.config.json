@@ -1,0 +1,48 @@
+{
+  "site": {
+    "name": "Snapshots",
+    "shortName": "Snapshots",
+    "description": "Snapshots from a better era",
+    "origin": "https://photos.awoo.party",
+    "language": "en-GB"
+  },
+  "branding": {
+    "themeColor": "#000000",
+    "backgroundColor": "#000000",
+    "socialPreviewImage": "/social-preview.svg",
+    "socialPreviewSubtitle": "Photos, albums, map views, and timelines"
+  },
+  "social": [
+    {
+      "label": "GitHub",
+      "href": "https://www.github.com/gyng/album"
+    },
+    {
+      "label": "Fediverse",
+      "href": "https://mastodon.yshi.org/@f"
+    },
+    {
+      "label": "Bluesky",
+      "href": "https://bsky.app/profile/gyng.bsky.social"
+    }
+  ],
+  "map": {
+    "apiKey": "iilC4hPY1594noPX9OQ2",
+    "galleryStyleId": "ffd8bd10-cd97-40a5-b1d6-d15f98fb3644",
+    "defaultStyle": "gallery"
+  },
+  "search": {
+    "databaseUrl": "/search.sqlite",
+    "embeddingsDatabaseUrl": "/search-embeddings.sqlite"
+  },
+  "paths": {
+    "albumsDir": "../albums"
+  },
+  "analytics": {
+    "vercel": true
+  },
+  "pwa": {
+    "description": "Fullscreen photo frame for the photo archive.",
+    "startUrl": "/slideshow/shell"
+  }
+}

@@ -6,6 +6,7 @@ import pinStyles from "./mapPin.module.css";
 import { type Bounds, MapView, Marker, useMap } from "./map";
 import { AppLink as Link } from "./platform";
 import { computeWrapAwareBounds } from "../util/mapBounds";
+import { mapTilerStyleUrl } from "../util/mapStyles";
 import { MapLibreStyles } from "./MapLibreStyles";
 
 type MapTilerMapStyle =
@@ -115,8 +116,7 @@ const MMapComponent: React.FC<MapProps> = (props) => {
       <div className={styles.map}>
         <MapView
           {...(props.style !== undefined ? { style: props.style } : {})}
-          // styleUrl="https://tiles.openfreemap.org/styles/liberty"
-          styleUrl={`https://api.maptiler.com/maps/${mapStyle}/style.json?key=mrjUpLh9Syjz9wcEY2Vb`}
+          styleUrl={mapTilerStyleUrl(mapStyle)}
           initialView={{
             center: { lng: primary[1], lat: primary[0] },
             zoom: ZOOM,
