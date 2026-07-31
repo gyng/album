@@ -37,27 +37,63 @@ Goals
 - Photos are size-optimised for mobile viewing
 - Free hosting!
 
+## Requirements
+
+**To build and run the site**
+
+| | |
+|---|---|
+| Node | 24 or 26. `.nvmrc` pins 24 as the tested default; `nvm use 26` for the other. |
+| Shell | POSIX. The indexing scripts use `bash` and `flock`, so Windows needs WSL. |
+| Disk | The clone is ~126&nbsp;MB. Optimised image variants add roughly the size of your library again, cached under `src/public/data/albums`. |
+
+No system libraries to install: image optimisation (sharp/libvips), video transcoding
+(ffmpeg and ffprobe) and SQLite all ship as npm dependencies.
+
+**To build the search index** — optional, and the heaviest requirement by far
+
+| | |
+|---|---|
+| Python | 3.12, managed by [uv](https://docs.astral.sh/uv/) |
+| GPU | NVIDIA with CUDA. The default captioner peaks around 6.2&nbsp;GB VRAM on `UD-Q4_K_XL`; a 10&nbsp;GB card runs the hybrid profile comfortably. There is no CPU path worth the wait. |
+| Captioner | a `llama-server` binary built from llama.cpp — see [index/README.md](index/README.md). `--classifier-backend janus` is the rollback and needs no separate build. |
+
+**To deploy** a Vercel account; the CLI shells out to `npx vercel@latest`, nothing to install.
+
+**To run the e2e suite** Playwright browsers, via `npx playwright install`.
+
+`./album doctor --indexing` checks all of the above and tells you what is missing.
+
 ## Running your own
 
-There is a CLI at the repo root. `./album --help` lists everything; the short version:
+There is a CLI at the repo root — `./album --help` lists everything:
 
-```
-$ ./album init      # name, URL, albums directory, social links → src/site.config.json
-$ ./album doctor    # check this machine can build (add --indexing for the Python side)
-$ ./album dev       # run it locally
-$ ./album generate  # production build
-$ ./album deploy    # preflight, build and deploy (Vercel)
-```
+| Command | |
+|---|---|
+| `./album init` | name, URL, albums directory, social links → `src/site.config.json` |
+| `./album doctor` | check this machine can build; `--indexing` adds the Python toolchain |
+| `./album dev` | development server |
+| `./album generate` | production build (alias: `build`); `--profile` for build profiling |
+| `./album index [mode]` | `full`, `embeddings`, `retag`, `status`, `validate`, `prune`, `publish` |
+| `./album deploy` | preflight, build and deploy; `--dry-run` prints the plan |
+| `./album publish` | the interactive publish wizard |
 
-Everything that identifies an instance lives in `src/site.config.json`; `album init` writes it
-and nothing else needs editing. `npm run` scripts remain the layer underneath, so nothing here
-is a black box.
+A first run is `./album init`, photos into your albums directory, then `./album dev`.
+
+Everything identifying an instance lives in `src/site.config.json`; `album init` writes it and
+nothing else needs editing. The CLI is a thin layer — `npm run` scripts remain underneath and
+`make` targets delegate to it, so nothing here is a black box.
+
+Two flags worth knowing. `./album index --check` reports whether `uv`, the Python environment,
+`llama-server` and a GPU are present *before* starting work, rather than failing hours in. And
+anything after `--` is forwarded verbatim to the underlying tool, so
+`./album index retag -- --match kanto` works without the CLI knowing every Python flag.
 
 **What works without indexing.** Albums, home, map, timeline, explore and album pages build
 from EXIF alone, so a fresh clone plus a folder of photos is a working gallery in minutes.
 Keyword search, semantic search, "guess where" and slideshow topics all need the search
-database, which is built offline by the Python pipeline in `index/` and wants a GPU. Those
-pages say so rather than spinning.
+database, which is built offline by the Python pipeline in `index/`. Those pages say so rather
+than spinning.
 
 **Two things to know before forking.** The MapTiler key in the default configuration is
 restricted to this site's domain — set `map.apiKey` to your own or the map falls back to a
@@ -68,16 +104,21 @@ history, so a fork inherits it.
 
 ## Usage
 
-You will need Node 24 or 26. The root `.nvmrc` selects Node 24 as the tested default; use `nvm use 26` explicitly when you want Node 26. The following steps are for deployment on Vercel, but you can deploy elsewhere &mdash; this is a standard Next.js application.
+The detail behind each CLI command, for when you want to run the underlying steps yourself.
+See [Requirements](#requirements) first. These steps deploy to Vercel, but you can deploy
+elsewhere &mdash; this is a standard Next.js application.
 
-0. Clone the repo
+0. Clone the repo and install
 
    ```
    $ git clone https://github.com/gyng/album.git
-   $ cd album/src/public/data/albums
+   $ cd album/src && npm ci && cd ..
+   $ ./album init
    ```
 
-1. Add your photos/videos in a directory! Each album is a directory in `src/public/data/albums`.
+1. Add your photos/videos in a directory! Each album is a directory in `albums/` at the repo
+   root. (`src/public/data/albums` is where optimised variants are cached — nothing goes there
+   by hand.)
 
    ```diff
      ├ /albums
@@ -147,51 +188,60 @@ You will need Node 24 or 26. The root `.nvmrc` selects Node 24 as the tested def
    ```
    $ npx vercel@latest login
 
-   # Recommended guided workflow
-   $ ./publish-wizard
+   # Recommended
+   $ ./album deploy
+   $ ./album deploy --dry-run          # preflight and print the plan, run nothing
+   $ ./album deploy --archive          # if you hit the file limit
+   $ ./album deploy --skip-build       # deploy the existing build output
 
-   # Default mode: ask all decisions up front, then run unattended
-   $ ./publish-wizard --fast-track
+   # Interactive wizard, with index/build/deploy decisions up front
+   $ ./album publish
 
-   # Optional old step-by-step prompts
-   $ ./publish-wizard --interactive
+   # Wizard flags are forwarded after `--`
+   $ ./album publish -- --interactive   # older step-by-step prompting
+   $ ./album publish -- --dry-run       # preflight only
 
-   # Dry-run preflight only
-   $ ./publish-wizard --dry-run
-
-   # Legacy manual flow
+   # Underneath, unchanged
    $ npx vercel@latest build --prod
    $ npx vercel@latest deploy --prebuilt --prod
 
-   # If you hit the file limit
-   $ npx vercel@latest deploy --prebuilt --prod --archive=tgz
-
    # Everything together without prompts
-   $ npx vercel@latest pull && npm run index:update && npx vercel@latest build --prod && npx vercel@latest deploy --prebuilt --prod
+   $ ./album index && ./album deploy
    ```
 
    If the build fails, try removing `.vercel` and reinitialising the project. Somehow this seems to happen a lot.
 
-3. Index images by running the script at `/index/index.py` and copying the result to `/src/public`. You need CUDA installed: see [index/README.md](index/README.md). Indexing is incremental, to reset delete `search.sqlite` (or whatever file the DB is in)
+3. Index images. Needs CUDA and the Python toolchain: see [index/README.md](index/README.md).
+   Indexing is incremental; to reset, delete `search.sqlite` (or whatever file the DB is in).
+
+   ```sh
+   $ ./album index --check        # is this machine ready? no work started
+   $ ./album index                # full hybrid index
+   $ ./album index embeddings     # embeddings-only refresh into the active public DB
+   $ ./album index status         # what the last run did, no Python needed
+   ```
+
+   Those wrap the shell scripts in `index/`, which own the staging swap and the lockfile:
 
    ```sh
    $ cd index
    $ uv sync
+   $ ./do-full-index.sh
+   $ ./do-embeddings-index.sh
+
+   # or a single stage by hand
    $ uv run python index.py index --glob "../albums/**/*.jpg" --dbpath "search.sqlite" --model-profile hybrid
    $ cp search.sqlite ../src/public/search.sqlite
-
-   # or
-   $ ./do-full-index.sh
-
-   # embeddings-only refresh merged into the active public DB
-   $ ./do-embeddings-index.sh
    ```
 
-   This can be done from the Next.js app for convenience as well with `npm run index:update`, `npm run index:embeddings:update`, or the guided `npm run publish:wizard`
+   The equivalent npm scripts are `npm run index:update`, `npm run index:embeddings:update` and
+   `npm run index:retag`.
 
-   The wizard now uses fast-track mode by default: it asks the index/build/deploy questions before the long-running work starts, then continues without further prompts. Use `--interactive` if you want the older step-by-step prompting instead.
+   The wizard uses fast-track mode by default: it asks the index/build/deploy questions before
+   the long-running work starts, then continues without further prompts.
 
-   The publish wizard writes a report to `src/.publish-report.json` and currently checks:
+   Both `./album deploy` and `./album publish` run the same preflight, which writes a report to
+   `src/.publish-report.json` and checks:
 
    - newly discovered photos versus the current `search.sqlite`
    - missing GPS coordinates on new photos
@@ -200,7 +250,7 @@ You will need Node 24 or 26. The root `.nvmrc` selects Node 24 as the tested def
    - invalid `album.json`
    - whether all discovered photos are present in the index after indexing
 
-4. To use the manifest creator, run `npm run dev` or `yarn dev` and visit your album's page. Click the `Edit` link at the top.
+4. To use the manifest creator, run `./album dev` and visit your album's page. Click the `Edit` link at the top.
 
 ## Search Modes
 
