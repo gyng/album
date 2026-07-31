@@ -258,6 +258,16 @@
   flex-direction: column;
   min-block-size: 0;
   max-block-size: calc(90svh - var(--tap-target) - var(--m-s));
+  /* The panel is sized by its content, and the raw-EXIF <pre> below is one long
+     unwrapped line — without a ceiling it stretched the panel past the viewport
+     on a phone (450px inside a 375px layout width).
+
+     The ceiling is in viewport units rather than `100%` on purpose: every
+     ancestor here is shrink-to-fit, so a percentage has no definite containing
+     block to resolve against and is simply ignored. `.mediaDetails` above
+     already anchors to `100svw` for the same reason. */
+  min-inline-size: 0;
+  max-inline-size: calc(100svw - var(--m-l) * 2);
   margin-block-start: var(--m-s);
   padding: var(--m-m);
   overflow-y: auto;
@@ -266,6 +276,12 @@
   border-radius: var(--m);
   background-color: var(--glass-surface);
   backdrop-filter: blur(var(--glass-blur-surface));
+}
+
+/* Every direct child is likewise kept from widening the panel. */
+.mediaDetailsContent > * {
+  max-inline-size: 100%;
+  min-inline-size: 0;
 }
 
 .mediaDetailsTable {
@@ -284,6 +300,18 @@
 
 .mediaDetailsRaw {
   margin-block-start: var(--m-m);
+  max-inline-size: 100%;
+}
+
+/* Pretty-printed EXIF is deliberately left unwrapped — reflowing JSON makes it
+   harder to read, not easier — so it scrolls within the panel instead of
+   widening it. */
+.mediaDetailsRaw pre {
+  max-inline-size: 100%;
+  margin-block: var(--m-s) 0;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  font-size: var(--fs-xs);
 }
 
 .caption {

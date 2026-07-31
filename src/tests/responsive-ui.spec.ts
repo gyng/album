@@ -312,6 +312,53 @@ test.describe("Responsive UI", () => {
     expect(yearScroll.scrollWidth).toBeLessThanOrEqual(yearScroll.clientWidth);
   });
 
+  // The details panel is sized by its content, and the raw-EXIF block inside it
+  // is one long unwrapped line. On a phone that used to stretch the panel to
+  // 450px inside a 375px layout width. The document itself never overflowed —
+  // the panel simply hung off the side — so expectNoDocumentOverflow cannot see
+  // this and the panel has to be measured directly.
+  test("photo details panel stays within a phone viewport when raw EXIF is open", async ({
+    page,
+  }) => {
+    await page.goto("/album/test-simple", { waitUntil: "domcontentloaded" });
+
+    // Targets the summary's accessible name, which the control's contract
+    // guarantees; <summary>'s implicit role differs between engines.
+    await page.locator('summary[aria-label="Photo details"]').first().click();
+    const panel = page.locator('[class*="mediaDetailsContent"]').first();
+    await expect(panel).toBeVisible();
+
+    const measurement = await panel.evaluate((element) => {
+      const raw = [...element.querySelectorAll("details")].find((candidate) =>
+        candidate.querySelector("summary")?.textContent?.includes("Raw EXIF"),
+      );
+      const pre = raw?.querySelector("pre");
+      if (!raw || !pre) {
+        return null;
+      }
+
+      raw.open = true;
+      // The fixture album's EXIF is short, so the condition that caused the
+      // overflow is created explicitly rather than left to the fixture.
+      pre.textContent = `${"x".repeat(400)}\n${pre.textContent ?? ""}`;
+
+      const box = element.getBoundingClientRect();
+      return {
+        left: box.left,
+        right: box.right,
+        viewportWidth: document.documentElement.clientWidth,
+        preOverflows: pre.scrollWidth > pre.clientWidth,
+      };
+    });
+
+    expect(measurement).not.toBeNull();
+    expect(measurement!.left).toBeGreaterThanOrEqual(0);
+    expect(measurement!.right).toBeLessThanOrEqual(measurement!.viewportWidth);
+    // Non-vacuity: the long line must actually be contained, not merely fitting.
+    expect(measurement!.preOverflows).toBe(true);
+    await expectNoDocumentOverflow(page);
+  });
+
   test("design catalogue contains wide token previews locally", async ({ page }) => {
     await page.goto("/design", { waitUntil: "domcontentloaded" });
 
