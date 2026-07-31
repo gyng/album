@@ -129,6 +129,18 @@ describe("slideshow page", () => {
     expect(screen.getByText("Loading... 42%")).toBeTruthy();
   });
 
+  // Regression: the photo-pool effect returned silently with no database, so a
+  // gallery built without a search index sat on "Loading..." forever. The
+  // "No photos available" toast could not cover this — it is only reachable
+  // after a load that succeeded and returned nothing.
+  it("surfaces a database failure instead of loading forever", async () => {
+    mockUseDatabase.mockReturnValue([null, 0, null, new Error("404"), mockRefreshDatabase]);
+
+    render(<SlideshowPage />);
+
+    expect(await screen.findByText(/Couldn't load the photo database/i)).toBeTruthy();
+  });
+
   it("requests a screen wake lock while the slideshow is mounted", async () => {
     const wakeLockSentinel = Object.assign(new EventTarget(), {
       release: jest.fn().mockResolvedValue(undefined),

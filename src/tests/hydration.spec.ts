@@ -17,6 +17,25 @@ const routes = [
   "/404",
 ] as const;
 
+/**
+ * `/search` starts downloading the SigLIP text model from Hugging Face's CDN as
+ * soon as it mounts, which is several megabytes over the public internet. That
+ * keeps the page from ever reaching `networkidle`, so this spec's hydration
+ * wait times out on a slow link while passing on a fast one — a real
+ * flake whose outcome depends on bandwidth rather than on the code.
+ *
+ * Aborted rather than held open (the approach in search-image.spec.ts, which
+ * asserts a pending state and wants the request to hang): here the network must
+ * genuinely fall idle. A failed model fetch raises no hydration diagnostic, and
+ * hydration finishes long before any embedding work would begin.
+ */
+const blockModelDownloads = async (page: Page) => {
+  await page.route(
+    (url) => /huggingface\.co|hf\.co|jsdelivr\.net/.test(url.href),
+    (route) => route.abort(),
+  );
+};
+
 const isHydrationDiagnostic = (message: string) =>
   /hydration|server rendered html|did not match|minified react error #(41[89]|42[0-5])|cannot be (?:a descendant|a child) of/i.test(
     message,
@@ -56,6 +75,8 @@ const waitForHydrationSettled = async (
 test.describe("server hydration", () => {
   for (const route of routes) {
     test(`${route} hydrates without recovering client content`, async ({ page }) => {
+      await blockModelDownloads(page);
+
       const diagnostics: string[] = [];
       page.on("console", (message) => {
         if (isHydrationDiagnostic(message.text())) {

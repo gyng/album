@@ -7,7 +7,7 @@ import { TimelineDayGrid } from "../../components/TimelineDayGrid";
 import type { TimelineEntry } from "../../util/pageDataTypes";
 import commonStyles from "../../styles/common.module.css";
 import { Seo } from "../../components/Seo";
-import { buildCollectionPageJsonLd } from "../../lib/seo";
+import { buildCollectionPageJsonLd, formatPageTitle } from "../../lib/seo";
 import { formatMemoryDateRange, getMemoryClusters } from "../../util/clusterByDate";
 import styles from "./TimelineScreen.module.css";
 import { unpackTimelineEntry, type TimelineEntryRow } from "../../util/pageDataRows";
@@ -371,13 +371,13 @@ const TimelineScreen = ({ entries: suppliedEntries, entryRows }: TimelineScreenP
   return (
     <div className={styles.page}>
       <Seo
-        title="Timeline | Snapshots"
+        title={formatPageTitle("Timeline")}
         description="Explore dated photos across the archive timeline."
         pathname="/timeline"
         noindex={hasRouteState}
         jsonLd={buildCollectionPageJsonLd(
           {
-            name: "Timeline | Snapshots",
+            name: formatPageTitle("Timeline"),
             description: "Explore dated photos across the archive timeline.",
             pathname: "/timeline",
           },

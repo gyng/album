@@ -1,21 +1,15 @@
 const path = require("path");
+const { resolveSiteOrigin, siteConfig } = require("./bin/siteConfig.cjs");
 
 const isVercelBuild = process.env.VERCEL === "1";
 const hasExternalTypecheck = process.env.ALBUM_SKIP_NEXT_TYPECHECK === "1";
 const distDir = process.env.NEXT_DIST_DIR ?? ".next";
 const isE2eBuild = distDir === ".next-e2e";
-const searchDatabaseUrl = process.env.NEXT_PUBLIC_SEARCH_DATABASE_URL ?? "/search.sqlite";
+const searchDatabaseUrl =
+  process.env.NEXT_PUBLIC_SEARCH_DATABASE_URL ?? siteConfig.search.databaseUrl;
 const searchEmbeddingsDatabaseUrl =
-  process.env.NEXT_PUBLIC_SEARCH_EMBEDDINGS_DATABASE_URL ?? "/search-embeddings.sqlite";
-const configuredSiteOrigin =
-  process.env.NEXT_PUBLIC_SITE_URL ??
-  process.env.SITE_URL ??
-  process.env.VERCEL_PROJECT_PRODUCTION_URL ??
-  "https://photos.awoo.party";
-const siteOrigin =
-  configuredSiteOrigin.startsWith("http://") || configuredSiteOrigin.startsWith("https://")
-    ? configuredSiteOrigin.replace(/\/$/, "")
-    : `https://${configuredSiteOrigin.replace(/\/$/, "")}`;
+  process.env.NEXT_PUBLIC_SEARCH_EMBEDDINGS_DATABASE_URL ?? siteConfig.search.embeddingsDatabaseUrl;
+const siteOrigin = resolveSiteOrigin();
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {

@@ -24,3 +24,6 @@ src/public/search-embeddings.sqlite
 
 # Record of in-place EXIF corrections to the (untracked) album originals.
 exif-corrections.log
+
+# Local database backups written by src/bin/backup-publish-assets.cjs.
+/backups/

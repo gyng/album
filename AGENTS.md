@@ -6,7 +6,9 @@ Personal photo gallery — Next.js 16, TypeScript, CSS Modules, MapLibre GL. Pho
 
 ## Commands
 
-> A root `Makefile` exists for human convenience — agents should use the direct commands below.
+> A root `./album` CLI and a `Makefile` exist for human convenience — agents should use the direct commands below.
+>
+> `./album <command>` is the front door: `init`, `doctor`, `dev`, `generate`, `index`, `deploy`, `publish`. It is a thin layer over these same npm scripts and the `index/*.sh` scripts, adding preflight checks and help. Its dispatcher lives in `src/bin/album.cjs` with commands under `src/bin/album/`.
 
 - **Tests:** `npx jest` from `src/` (not the repo root)
 - Subset: `npx jest --testPathPatterns="MapWorld"` (plural flag)
@@ -40,7 +42,7 @@ Data-backed display pages use `getStaticProps`; client-only pages are statically
 ## Framework boundary
 - Application components must not import `next/link`, `next/head`, or `next/router` directly. Use `AppLink`, `DocumentHead`, and the navigation hooks exported by `src/components/platform/`; `_app.tsx` installs `NextPlatformProvider`
 - Renderer integrations implement `PlatformAdapter` and install it with `PlatformProvider`; the contract includes links, head rendering, reactive navigation, public database URLs, and deferred client components. `BrowserPlatformProvider` from `components/platform/browser` supplies the native History API plus client-gated `React.lazy` registry; Next installs its own provider. Lightweight links/navigation/head have unprovided browser fallbacks, but any screen using deferred components requires a provider
-- Browser-portable screens and their runtime dependency graph must not reference Next, Node built-ins, `process`, `Buffer`, `__dirname`, or `__filename`. Site origins and public asset/database URLs come from `usePublicConfig`, never directly from environment variables
+- Browser-portable screens and their runtime dependency graph must not reference Next, Node built-ins, `process`, `Buffer`, `__dirname`, or `__filename`. Values that vary *per host* — site origin and the public database URLs, which differ between a Vercel preview, production and the E2E build — come from `usePublicConfig`, never directly from environment variables. Values that are *authored once per fork* — site name, description, social links, map provider key, theme colour — come from `lib/siteConfig`, which imports `site.config.json` and touches no environment. `PublicConfig` deliberately carries only the three host-varying fields; do not grow it with branding
 - Keep `getStaticProps`, `getStaticPaths`, `_app`, and `_document` confined to `src/pages/`. Rendered implementations live in `src/screens/` and use ordinary typed functions rather than `NextPage`. Put data construction in `src/services/pageData/` so it can be called without Next.js
 - Co-locate CSS Modules with their screen or component. Renderer entries import the reusable global `styles/globals.css` and `styles/maplibre-overrides.css`; the `pages/` route tree must not own application styles
 - `components/AppRuntime.tsx` owns the renderer-neutral application shell (error boundary, query client, viewport metadata, and service-worker registration). Renderer entry points install a `PlatformProvider` outside it and inject renderer-specific telemetry explicitly
@@ -141,6 +143,15 @@ npm run test:e2e:reuse -- ./tests/smoke.spec.ts                # reuse already-r
 - Route overlay is SVG (screen-space), projected via the port's `project()`
 - The basemap is the reader's choice: `util/mapStyles.ts` holds the curated MapTiler styles, the shared public key and the preference (a small external store, because a `localStorage` write raises no event in its own tab). `MapStyleToggle` picks — in the nav, between the map's search field and the site theme picker (`themeAdjacentItem`) — and `MapWorld` reads it through `useMapStyleName`. Note the cost of that placement: on a ~390px viewport the two selects together are wider than the nav row, so they wrap to a band of their own and the map carries three bands of chrome. Every option is the same provider and key as the default, so no option adds a credential or an attribution obligation — the map renders whatever attribution the loaded style declares. `Map.tsx` and `StatsWorldMap` keep their own deliberate styles
 - Map search metadata is build-generated at `/data/map-search-index.json`. Fetch it with `fetchMapSearchIndex`; preserve `cache: "no-store"`, the response's `must-revalidate` header, and the service worker's network-first handling so deployments cannot leave a stale index cached indefinitely
+
+## Site configuration (src/site.config.json)
+Everything that identifies *this* instance lives in one committed JSON file, read by two thin modules: `src/lib/siteConfig.ts` for TypeScript and `src/bin/siteConfig.cjs` for `next.config.js` and the bin scripts, which cannot import `.ts`.
+- The TypeScript reader uses an **annotated** assignment (`const siteConfig: SiteConfig = raw`), so a missing or mistyped key fails `npm run typecheck`. Never weaken it to `as SiteConfig`
+- `test/branding.test.ts` walks the AST and fails if the configured site name, or `api.maptiler.com`, appears in a source literal outside `lib/siteConfig.ts` / `util/mapStyles.ts`. Because the needle comes from configuration, it guards forks too
+- Page titles go through `formatPageTitle()` in `lib/seo.ts` — never write the site name into a screen
+- `manifest.webmanifest` and `social-preview.svg` are **generated** from this file by `prepare:feeds` and gitignored; edit the configuration, not the output. `sw.js` stays static and is cross-checked against the config by `test/pwa-manifest.test.ts`
+- `map.apiKey` is referrer-restricted at the provider; an empty key degrades every style to a keyless OpenFreeMap basemap. `map.galleryStyleId` is scoped to the account that created it, so when it is null the gallery style is dropped from the picker and the default falls back to `streets`
+- **`paths.albumsDir` is a data-format constant, not a free choice.** The search database keys photos by that prefix (`../albums/<album>/<file>`) and `deserialize.ts` looks rows up by that exact string. An absolute value is rejected at load; a mismatched relative one is reported once per build with a sample indexed path, because it is otherwise completely silent — every lookup misses and the build succeeds with no tags, alt text, geocodes or colours
 
 ## Design tokens (src/styles/globals.css)
 Always use tokens — never raw px values or colours.

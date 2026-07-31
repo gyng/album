@@ -32,6 +32,7 @@ import {
   SLIDESHOW_WAKE_REQUEST_MESSAGE,
 } from "../../util/slideshowShell";
 import styles from "./SlideshowShellScreen.module.css";
+import { formatPageTitle } from "../../lib/seo";
 
 const useSafeLayoutEffect = typeof window === "undefined" ? React.useEffect : React.useLayoutEffect;
 
@@ -730,7 +731,7 @@ export const SlideshowShellScreen = () => {
   return (
     <main className={styles.shell}>
       <DocumentHead>
-        <title>Slideshow | Snapshots</title>
+        <title>{formatPageTitle("Slideshow")}</title>
         <meta name="theme-color" content="#000000" />
       </DocumentHead>
 

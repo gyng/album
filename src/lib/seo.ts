@@ -1,4 +1,17 @@
-export const DEFAULT_SITE_ORIGIN = "https://photos.awoo.party";
+import { siteConfig } from "./siteConfig";
+
+export const DEFAULT_SITE_ORIGIN = siteConfig.site.origin;
+
+export const SITE_NAME = siteConfig.site.name;
+
+const TITLE_SEPARATOR = " | ";
+
+/**
+ * "Map" becomes "Map | Snapshots"; nothing becomes "Snapshots". The single
+ * place a page title is joined to the site's name, so a fork renames once.
+ */
+export const formatPageTitle = (pageTitle?: string): string =>
+  pageTitle && pageTitle !== SITE_NAME ? `${pageTitle}${TITLE_SEPARATOR}${SITE_NAME}` : SITE_NAME;
 
 export type JsonLd = Record<string, unknown>;
 
@@ -40,15 +53,15 @@ export const resolveAbsoluteUrl = (
 };
 
 export const getDefaultSocialImageUrl = (siteOrigin = DEFAULT_SITE_ORIGIN): string =>
-  getCanonicalUrl("/social-preview.svg", siteOrigin);
+  getCanonicalUrl(siteConfig.branding.socialPreviewImage, siteOrigin);
 
 export const getDefaultSeo = () => ({
-  siteName: "Snapshots",
-  defaultTitle: "Snapshots",
-  defaultDescription: "Snapshots from a better era",
+  siteName: siteConfig.site.name,
+  defaultTitle: siteConfig.site.name,
+  defaultDescription: siteConfig.site.description,
   // Black to match the manifest/_document theme-color and the always-dark
   // slideshow chrome; a grey value tinted the iPad PWA status bar grey.
-  themeColor: "#000000",
+  themeColor: siteConfig.branding.themeColor,
 });
 
 export const buildWebSiteJsonLd = (siteOrigin = DEFAULT_SITE_ORIGIN): JsonLd => ({
