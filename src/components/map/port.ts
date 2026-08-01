@@ -209,6 +209,15 @@ export type PointFeature = {
    * set — fading everything off a route, say — without splitting it in two.
    */
   opacity?: number;
+  /**
+   * Draw order among overlapping points in the same layer: higher draws on
+   * top. Defaults to 0, which leaves every point tied and the winner arbitrary.
+   *
+   * Needed because feature array order carries no such promise — a provider is
+   * free to draw a collection in whatever order suits it, so overlap has to be
+   * resolved by a value rather than by position.
+   */
+  sortKey?: number;
 };
 
 /** The colour a point is drawn in when it carries none of its own. */

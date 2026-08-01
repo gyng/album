@@ -561,7 +561,13 @@ type LayerSpec = {
  */
 const StyleLayer = Layer as unknown as React.ComponentType<LayerSpec>;
 
-type PointProperties = { id: string; color?: string; radius?: number; opacity?: number };
+type PointProperties = {
+  id: string;
+  color?: string;
+  radius?: number;
+  opacity?: number;
+  sortKey?: number;
+};
 type LineProperties = {
   id: string;
   color: string;
@@ -585,6 +591,7 @@ const toPointCollection = (
         ...(point.color !== undefined ? { color: point.color } : {}),
         ...(point.radius !== undefined ? { radius: point.radius } : {}),
         ...(point.opacity !== undefined ? { opacity: point.opacity } : {}),
+        ...(point.sortKey !== undefined ? { sortKey: point.sortKey } : {}),
       },
       geometry: { type: "Point", coordinates: [point.at.lng, point.at.lat] },
     }),
@@ -638,17 +645,26 @@ const circlePaint = (stroke: PointStroke | undefined): StyleProperties => ({
     : {}),
 });
 
+// Overlap within one layer is resolved by `sortKey`, not by feature order:
+// nothing promises a provider draws a collection in the order it was handed,
+// so a point that must sit on top has to say so with a value.
+const circleLayout = (): StyleProperties => ({
+  "circle-sort-key": ["coalesce", ["get", "sortKey"], 0],
+});
+
 const circleLayer = (id: string, clustered: boolean, stroke: PointStroke | undefined): LayerSpec =>
   clustered
     ? {
         id: `${id}-point-circles`,
         type: "circle",
         filter: ["!", ["has", "point_count"]],
+        layout: circleLayout(),
         paint: circlePaint(stroke),
       }
     : {
         id: `${id}-point-circles`,
         type: "circle",
+        layout: circleLayout(),
         paint: circlePaint(stroke),
       };
 

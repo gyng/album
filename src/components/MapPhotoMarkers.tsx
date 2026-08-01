@@ -124,6 +124,46 @@ const pinOpacity = (photo: LocatedPhoto, emphasisedHrefs: ReadonlySet<string> | 
 };
 
 /**
+ * Ranks located photos oldest-first, so a newer photo draws over an older one
+ * where they overlap. Ranks rather than raw timestamps because the same number
+ * also drives the DOM markers' `z-index`, which is a 32-bit integer — epoch
+ * milliseconds overflow it, and an undated photo has no timestamp at all.
+ *
+ * Only relative order matters here, so the naive-ISO capture strings are
+ * compared as-is: they are already camera-local wall clock, and parsing them
+ * consistently orders them correctly even though the absolute instant is not
+ * meaningful.
+ */
+const buildDateRanks = (photos: readonly LocatedPhoto[]): ReadonlyMap<string, number> => {
+  const undated = -1;
+  const ordered = [...photos].sort((left, right) => {
+    const leftTime = left.date ? new Date(left.date).valueOf() : undated;
+    const rightTime = right.date ? new Date(right.date).valueOf() : undated;
+    const leftSafe = Number.isNaN(leftTime) ? undated : leftTime;
+    const rightSafe = Number.isNaN(rightTime) ? undated : rightTime;
+    return leftSafe === rightSafe ? left.href.localeCompare(right.href) : leftSafe - rightSafe;
+  });
+
+  return new Map(ordered.map((photo, index) => [photo.href, index]));
+};
+
+/**
+ * Draw order for one pin: recency, with anything on an emphasised route lifted
+ * above the whole set. A faded off-route pin drawing over the highlighted one
+ * is the more visible fault, so emphasis outranks date rather than tying with
+ * it.
+ */
+const pinSortKey = (
+  photo: LocatedPhoto,
+  dateRanks: ReadonlyMap<string, number>,
+  emphasisedHrefs: ReadonlySet<string> | null,
+  total: number,
+): number => {
+  const rank = dateRanks.get(photo.href) ?? 0;
+  return emphasisedHrefs?.has(photo.href) ? total + rank : rank;
+};
+
+/**
  * Whether the reader is pointing at the map with something blunt. Read on the
  * client only — the server has no pointer, and guessing one would render a
  * layer the first paint then has to take away.
@@ -328,6 +368,7 @@ const MapPhotoMarker = React.memo(function MapPhotoMarker({
   previewMarkers = false,
   emphasiseRoute,
   activeRouteHrefSet,
+  sortKey,
   onSelect,
   onHover,
 }: {
@@ -336,6 +377,7 @@ const MapPhotoMarker = React.memo(function MapPhotoMarker({
   previewMarkers?: boolean;
   emphasiseRoute: boolean;
   activeRouteHrefSet: ReadonlySet<string>;
+  sortKey: number;
   onSelect: (photo: PhotoWithStyle) => void;
   onHover: (photo: PhotoWithStyle | null) => void;
 }) {
@@ -351,6 +393,10 @@ const MapPhotoMarker = React.memo(function MapPhotoMarker({
     <Marker
       at={{ lng: photo.decLng, lat: photo.decLat }}
       anchor="center"
+      // Applied to MapLibre's own marker element, not a child: each marker sets
+      // `will-change: transform`, which makes it a stacking context, so a
+      // z-index on anything inside it cannot lift it past a sibling.
+      style={{ zIndex: sortKey }}
       onClick={(event) => {
         event.originalEvent.stopPropagation();
         onSelect(photo);
@@ -452,6 +498,10 @@ export const MapPhotoMarkers = React.memo(function MapPhotoMarkers({
   // it changes on every hover, and rebuilding the whole feature collection for
   // an emphasis nobody is drawing would give the cost straight back.
   const emphasisedHrefs = emphasiseRoute && activeRouteHrefSet.size > 0 ? activeRouteHrefSet : null;
+  // Ranked once per photo set, not per emphasis change: hovering a route
+  // reorders nothing, it only lifts a subset, so the sort stays out of the
+  // hover path.
+  const dateRanks = React.useMemo(() => buildDateRanks(locatedPhotos), [locatedPhotos]);
   const points = React.useMemo(
     (): PointFeature[] =>
       locatedPhotos.map((photo) => ({
@@ -460,8 +510,9 @@ export const MapPhotoMarkers = React.memo(function MapPhotoMarkers({
         color: photo.markerColor,
         radius: PIN_RADIUS,
         opacity: pinOpacity(photo, emphasisedHrefs),
+        sortKey: pinSortKey(photo, dateRanks, emphasisedHrefs, locatedPhotos.length),
       })),
-    [locatedPhotos, emphasisedHrefs],
+    [locatedPhotos, emphasisedHrefs, dateRanks],
   );
   // Invisible, and deliberately independent of the drawn pins: nothing about a
   // tap target changes when a route is emphasised, so it is not rebuilt then.
@@ -559,6 +610,7 @@ export const MapPhotoMarkers = React.memo(function MapPhotoMarkers({
           previewMarkers={previewMarkers}
           emphasiseRoute={emphasiseRoute}
           activeRouteHrefSet={activeRouteHrefSet}
+          sortKey={pinSortKey(photo, dateRanks, emphasisedHrefs, locatedPhotos.length)}
           onSelect={onSelect}
           onHover={onHover}
         />

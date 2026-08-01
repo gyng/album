@@ -25,6 +25,7 @@ type DataLayerCall = {
     color?: string;
     radius?: number;
     opacity?: number;
+    sortKey?: number;
   }[];
   stroke?: { color: string; width: number };
   onPointClick?: (point: PointHit) => void;
@@ -277,6 +278,7 @@ describe("MapPhotoMarkers", () => {
           color: "red",
           radius: 7,
           opacity: 0.9,
+          sortKey: 0,
         },
         {
           id: "two",
@@ -284,12 +286,59 @@ describe("MapPhotoMarkers", () => {
           color: "red",
           radius: 7,
           opacity: 0.9,
+          sortKey: 1,
         },
       ]);
       // The DOM pin's white ring, kept so pale markers stay legible on a light
       // basemap.
       expect(lastDataLayer().stroke).toEqual({ color: "rgba(255, 255, 255, 0.84)", width: 2 });
       expect(IntersectionObserver).not.toHaveBeenCalled();
+    });
+
+    // Which of two overlapping pins wins used to fall out of album iteration
+    // order, so it shifted when an album was added or renamed.
+    it("stacks newer photos over older ones regardless of the order supplied", () => {
+      render(
+        <MapPhotoMarkers
+          photos={[
+            photo({ href: "middle", date: "2024-06-01T00:00:00" }),
+            photo({ href: "newest", date: "2025-01-01T00:00:00" }),
+            photo({ href: "oldest", date: "2020-01-01T00:00:00" }),
+          ]}
+          visiblePhotos={[]}
+          showMarkerImages={false}
+          emphasiseRoute={false}
+          activeRouteHrefSet={new Set()}
+          onSelect={jest.fn()}
+          onHover={jest.fn()}
+        />,
+      );
+
+      const byId = new Map(lastDataLayer().points.map((p) => [p.id, p.sortKey]));
+      expect(byId.get("oldest")).toBeLessThan(byId.get("middle")!);
+      expect(byId.get("middle")).toBeLessThan(byId.get("newest")!);
+    });
+
+    // A faded off-route pin drawing over the highlighted one is the more
+    // visible fault, so emphasis outranks recency rather than tying with it.
+    it("lifts emphasised photos above every unemphasised one, newest or not", () => {
+      render(
+        <MapPhotoMarkers
+          photos={[
+            photo({ href: "newest-off-route", date: "2025-01-01T00:00:00" }),
+            photo({ href: "old-on-route", date: "2020-01-01T00:00:00" }),
+          ]}
+          visiblePhotos={[]}
+          showMarkerImages={false}
+          emphasiseRoute
+          activeRouteHrefSet={new Set(["old-on-route"])}
+          onSelect={jest.fn()}
+          onHover={jest.fn()}
+        />,
+      );
+
+      const byId = new Map(lastDataLayer().points.map((p) => [p.id, p.sortKey]));
+      expect(byId.get("old-on-route")).toBeGreaterThan(byId.get("newest-off-route")!);
     });
 
     it("keeps photos selectable and hoverable through the layer", () => {

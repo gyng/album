@@ -594,12 +594,40 @@ describe("DataLayer", () => {
     expect(layerProps).toHaveBeenCalledWith({
       id: "photos-point-circles",
       type: "circle",
+      layout: {
+        "circle-sort-key": ["coalesce", ["get", "sortKey"], 0],
+      },
       paint: {
         "circle-color": ["coalesce", ["get", "color"], "rgb(230, 32, 101)"],
         "circle-radius": ["coalesce", ["get", "radius"], 5],
         "circle-opacity": ["coalesce", ["get", "opacity"], 1],
       },
     });
+  });
+
+  // Overlap has to be settled by a value: nothing promises a provider draws a
+  // feature collection in the order it was handed.
+  it("carries per-feature draw order so overlapping points stack deliberately", () => {
+    render(
+      <MapView styleUrl="style.json">
+        {
+          <DataLayer
+            id="photos"
+            points={[
+              { id: "older", at: { lng: 1, lat: 2 }, sortKey: 4 },
+              { id: "newer", at: { lng: 1, lat: 2 }, sortKey: 9 },
+            ]}
+          />
+        }
+      </MapView>,
+    );
+
+    const source = sourceProps.mock.calls.at(-1)?.[0];
+    expect(
+      source.data.features.map(
+        (feature: { properties: { sortKey?: number } }) => feature.properties.sortKey,
+      ),
+    ).toEqual([4, 9]);
   });
 
   it("carries per-feature opacity and draws a halo when one is asked for", () => {
