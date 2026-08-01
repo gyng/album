@@ -5,7 +5,6 @@ test.use({ locale: "fr-FR", timezoneId: "America/New_York" });
 const routes = [
   "/?theme=bling",
   "/album/test-simple#DSCF0506-2.jpg",
-  "/benchmark",
   "/design",
   "/explore",
   "/guess?seed=shared-challenge&rounds=3&timer=15",

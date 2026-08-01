@@ -1,29 +1,42 @@
+import { Fragment } from "react";
 import { AppLink as Link } from "../platform";
 import { siteConfig } from "../../lib/siteConfig";
 import styles from "./Footer.module.css";
 
-const separator = <span className={styles.separator}>&middot;</span>;
-
 /**
  * External links come from configuration, so a fork ships its own accounts (or
  * none at all). The internal routes below are part of the site, not identity.
+ *
+ * Items and separators are rendered as siblings on purpose: `.footer` is a flex
+ * row whose `gap` spaces its direct children, so wrapping a link and its dot in
+ * a shared element collapses the space between them.
  */
+const items = [
+  ...siteConfig.social.map((link) => ({
+    key: link.href,
+    node: (
+      <a href={link.href} target="_blank" rel="noreferrer" className={styles.link}>
+        {link.label}
+      </a>
+    ),
+  })),
+  {
+    key: "design",
+    node: (
+      <Link href="/design" className={styles.link}>
+        Design
+      </Link>
+    ),
+  },
+];
+
 export const Footer = () => (
   <footer className={styles.footer}>
-    {siteConfig.social.map((link) => (
-      <span key={link.href}>
-        <a href={link.href} target="_blank" rel="noreferrer" className={styles.link}>
-          {link.label}
-        </a>
-        {separator}
-      </span>
+    {items.map((item, index) => (
+      <Fragment key={item.key}>
+        {item.node}
+        {index < items.length - 1 ? <span className={styles.separator}>&middot;</span> : null}
+      </Fragment>
     ))}
-    <Link href="/design" className={styles.link}>
-      Design
-    </Link>
-    {separator}
-    <Link href="/benchmark" className={styles.link}>
-      Benchmark
-    </Link>
   </footer>
 );

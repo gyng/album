@@ -49,6 +49,118 @@ Gemma quants (5.2-5.7s) because each photo paid a fresh model load; Janus (1.31s
 and Qwen (9.08s, big model, inference-bound) barely moved. VRAM is peak above a 688 MiB idle
 baseline.
 
+## The fixture photographs
+
+The five fixture frames and the sentence each model wrote for them — the evidence behind
+the scores above. These are the `test-simple` cases, which ship with the repository; the
+other six frames come from unpublished albums, so only their aggregate scores appear in
+*Results*.
+
+### snowy landscape — `DSCF0506-2.jpg`
+
+<img src="images/caption-benchmark/DSCF0506-2.jpg" width="480" alt="snowy landscape">
+
+Passes on any of `mountain`, `snow`, `peak`; fails on `beach`, `ocean`.
+
+| | model | wrote | |
+|---|---|---|---|
+| local | Janus-Pro-1B | A scenic mountain path with snow-covered peaks and a clear blue sky. | ✓ |
+| local | Gemma 4 E4B · Q8_0 | A solitary hiking trail winds through rocky, snowy mountains under a clear blue sky. | ✓ |
+| local | Gemma 4 E4B · UD-Q5_K_XL | A winding dirt road traverses a remote, snowy mountain pass under a clear blue sky, showing sparse alpine vegetation. | ✓ |
+| local | Gemma 4 E4B · UD-Q4_K_XL | A dirt road winds through an alpine landscape beneath snow-covered mountains under a bright blue sky. | ✓ |
+| local | Qwen3-VL-8B · UD-Q5_K_XL | A snowy mountain road with stone pathway, wooden fence, and clear blue sky in a winter landscape. | ✓ |
+| cloud | Claude Haiku 4.5 | Snow-covered mountain with wooden fence and poles near geothermal steam area. | ✓ |
+| cloud | GPT-5.6 Luna | A stone path leads towards a rugged, snow-covered mountain beneath a broad blue sky with wispy clouds. | ✓ |
+| cloud | Claude Sonnet 5 | A paved stone path lined with a wooden rope fence leads toward a snow-streaked mountain peak under a clear blue sky. | ✓ |
+| cloud | GPT-5.6 Terra | A stone path curves through dry alpine grass towards a rugged, snow-covered mountain beneath a clear blue sky. | ✓ |
+| cloud | Claude Opus 4.8 | A cobbled path lined with wooden fence posts and tall bamboo poles curves through dry golden grassland towards a snow-covered mountain ridge under a clear blue sky. | ✓ |
+| cloud | GPT-5.6 Sol | A stone path curves towards a rugged, snow-covered mountain beneath a clear blue sky. | ✓ |
+| cloud | Claude Fable 5 | A cobblestone trail lined with rope fencing and bamboo poles crosses dry alpine grassland towards a snow-dusted mountain under a clear blue sky. | ✓ |
+
+### infrastructure — `DSCF0593.jpg`
+
+<img src="images/caption-benchmark/DSCF0593.jpg" width="480" alt="infrastructure">
+
+Passes on any of `dam`, `reservoir`; fails on `skyscraper`, `airport`.
+
+| | model | wrote | |
+|---|---|---|---|
+| local | Janus-Pro-1B | A large dam stands majestically in a forested mountain range, with a bridge crossing over it. | ✓ |
+| local | Gemma 4 E4B · Q8_0 | A large dam structure is visible at the base of a steep, densely forested mountain hillside overlooking the reservoir. | ✓ |
+| local | Gemma 4 E4B · UD-Q5_K_XL | A massive concrete dam spans a river gorge, with dense, autumnal forests covering the steep mountain slopes behind it. | ✓ |
+| local | Gemma 4 E4B · UD-Q4_K_XL | A large hydroelectric dam is visible, stretching across the foreground with dense, forested mountains and a reservoir in the background. | ✓ |
+| local | Qwen3-VL-8B · UD-Q5_K_XL | A large concrete dam spans a reservoir, surrounded by autumn-colored forests and steep mountain slopes under bright sunlight. | ✓ |
+| cloud | Claude Haiku 4.5 | Large concrete dam spanning a mountain valley surrounded by autumn forest. | ✓ |
+| cloud | GPT-5.6 Luna | A massive concrete dam spans a turquoise reservoir below forested mountains dotted with autumn foliage. | ✓ |
+| cloud | Claude Sonnet 5 | A large curved concrete dam holds back a turquoise reservoir in a steep mountain valley covered with autumn-coloured trees. | ✓ |
+| cloud | GPT-5.6 Terra | A large concrete dam spans a turquoise reservoir below forested mountains covered in autumn foliage. | ✓ |
+| cloud | Claude Opus 4.8 | An elevated view of a curved concrete dam holding back a turquoise reservoir, with a walkway along its crest and autumn-coloured forested mountains rising on either side. | ✓ |
+| cloud | GPT-5.6 Sol | A large concrete dam spans a turquoise reservoir below forested mountains dotted with autumn foliage. | ✓ |
+| cloud | Claude Fable 5 | A large curved concrete arch dam holds back a turquoise reservoir among steep forested mountains with golden autumn larches. | ✓ |
+
+### water wildlife — `DSCF2485-2.jpg`
+
+<img src="images/caption-benchmark/DSCF2485-2.jpg" width="480" alt="water wildlife">
+
+Passes on any of `lizard`, `monitor`, `varanus`, `reptile`; fails on `otter`, `turtle`, `duck`, `snake`, `alligator`, `crocodile`.
+
+| | model | wrote | |
+|---|---|---|---|
+| local | Janus-Pro-1B | A small duck swims in a calm waterfall surrounded by clear water and ripples. | ✗ |
+| local | Gemma 4 E4B · Q8_0 | A dark-colored fish is submerged near a fishing lure in clear, shallow water during the daytime. | ✗ |
+| local | Gemma 4 E4B · UD-Q5_K_XL | A dark fish is visible under the calm, clear water of a pond, with ripples spreading from the spot. | ✗ |
+| local | Gemma 4 E4B · UD-Q4_K_XL | A dark fish swims beneath the surface of calm, shallow bay water covered in algae and reflecting the sky. | ✗ |
+| local | Qwen3-VL-8B · UD-Q5_K_XL | An alligator swims in shallow water with algae patches and ripples visible on the surface. | ✗ |
+| cloud | Claude Haiku 4.5 | Seal swimming in shallow coastal water with rocky seabed and seaweed. | ✗ |
+| cloud | GPT-5.6 Luna | A dark turtle swims through shallow pond water, leaving ripples behind its partially submerged shell among floating leaves and aquatic vegetation. | ✗ |
+| cloud | Claude Sonnet 5 | A reptile with a long tail swims just below the surface of shallow, plant-strewn water, its head poking above the ripples. | ✓ |
+| cloud | GPT-5.6 Terra | A turtle swims through shallow pond water, leaving ripples among submerged plants and scattered floating leaves. | ✗ |
+| cloud | Claude Opus 4.8 | A monitor lizard swims just below the surface of shallow murky water, its head raised above the ripples and long tail trailing behind over a sandy, algae-strewn bottom. | ✓ |
+| cloud | GPT-5.6 Sol | A dark turtle swims through shallow pond water, leaving ripples among submerged plants and scattered leaves. | ✗ |
+| cloud | Claude Fable 5 | A dark monitor lizard swims through calm shallow water, its long tail trailing behind and ripples spreading around patches of aquatic weed. | ✓ |
+
+### wildlife portrait — `DSCF2581-2_2.jpg`
+
+<img src="images/caption-benchmark/DSCF2581-2_2.jpg" width="480" alt="wildlife portrait">
+
+Passes on any of `macaque`, `monkey`, `primate`; fails on `dog`, `cat`, `baboon`, `african`.
+
+| | model | wrote | |
+|---|---|---|---|
+| local | Janus-Pro-1B | A monkey sits on a tree branch surrounded by lush green foliage. | ✓ |
+| local | Gemma 4 E4B · Q8_0 | A baboon monkey is perched on a mossy tree branch, looking directly at the camera in a dense forest environment. | ✗ |
+| local | Gemma 4 E4B · UD-Q5_K_XL | A baboon sits on a mossy log in a dense, green forest environment, looking directly at the viewer. | ✗ |
+| local | Gemma 4 E4B · UD-Q4_K_XL | A small baboon primate sits on a moss-covered branch in a dense, humid tropical forest. | ✗ |
+| local | Qwen3-VL-8B · UD-Q5_K_XL | A monkey sits on a mossy rock in a dense forest, surrounded by green foliage and dappled sunlight. | ✓ |
+| cloud | Claude Haiku 4.5 | Primate sitting on moss-covered rock within dense tropical jungle environment. | ✓ |
+| cloud | GPT-5.6 Luna | A long-tailed macaque sits on a mossy branch and looks towards the camera amid dense green tropical foliage. | ✓ |
+| cloud | Claude Sonnet 5 | A long-tailed macaque sits alert on a fallen log amid dense green jungle foliage and hanging vines, staring at the camera. | ✓ |
+| cloud | GPT-5.6 Terra | A macaque sits alert on a low tree branch amid dense green tropical forest foliage. | ✓ |
+| cloud | Claude Opus 4.8 | A long-tailed macaque sits upright on a mossy log in dense green rainforest, looking towards the camera while a second monkey is visible blurred in the background. | ✓ |
+| cloud | GPT-5.6 Sol | A macaque sits alert on a fallen log amid dense green foliage in a sun-dappled tropical forest. | ✓ |
+| cloud | Claude Fable 5 | A long-tailed macaque sits upright on a mossy fallen log in dense tropical forest, staring ahead while another monkey forages in the background. | ✓ |
+
+### macro wildlife — `DSCF2768.JPG`
+
+<img src="images/caption-benchmark/DSCF2768.jpg" width="480" alt="macro wildlife">
+
+Passes on any of `spider`, `arachnid`, `insect`; fails on `bird`, `fish`.
+
+| | model | wrote | |
+|---|---|---|---|
+| local | Janus-Pro-1B | A close-up of a green leafy plant with a small insect on one of its leaves. | ✓ |
+| local | Gemma 4 E4B · Q8_0 | A tiny leafhopper insect rests on a vibrant, glossy green leaf surrounded by lush, textured foliage. | ✓ |
+| local | Gemma 4 E4B · UD-Q5_K_XL | A tiny red spider rests on a glossy, bright green leaf surrounded by large, variegated foliage. | ✓ |
+| local | Gemma 4 E4B · UD-Q4_K_XL | A tiny insect rests on the bright green, textured surface of a mint leaf in a lush garden setting. | ✓ |
+| local | Qwen3-VL-8B · UD-Q5_K_XL | A small spider rests on a glossy green leaf among other leaves in a close-up nature photo. | ✓ |
+| cloud | Claude Haiku 4.5 | Small reddish-brown insect perched on green plant seedpod in nature. | ✓ |
+| cloud | GPT-5.6 Luna | A tiny orange spider stands on a glossy green leaf beside faint strands of web in a softly blurred setting. | ✓ |
+| cloud | Claude Sonnet 5 | A tiny orange spider with long legs perches on a variegated green leaf in an extreme macro close-up. | ✓ |
+| cloud | GPT-5.6 Terra | A tiny orange spider stands on a glossy green leaf surrounded by faint strands of web. | ✓ |
+| cloud | Claude Opus 4.8 | A tiny orange spider rests on the curled edge of a variegated green and silver leaf, with fine web strands crossing the surrounding foliage in this macro close-up. | ✓ |
+| cloud | GPT-5.6 Sol | A tiny orange spider rests on a glossy green leaf beside faint strands of web. | ✓ |
+| cloud | Claude Fable 5 | A tiny orange spider with long thin legs sits on the edge of a glossy green succulent leaf in a close-up shot. | ✓ |
+
 ## Findings
 
 ### 1. Quantisation is quality-neutral; the Q8_0 default buys nothing
