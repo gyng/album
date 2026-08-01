@@ -26,7 +26,7 @@ import {
   FOCAL_LENGTH_ACTUAL_FACET,
   ISO_FACET,
 } from "../util/photoBuckets";
-import { exifWallClockTimestamp, normaliseExifWallClockIso } from "../util/exifTime";
+import { exifRelativeTimestamp, normaliseExifWallClockIso } from "../util/exifTime";
 import { PhotoSimilarPhotosDeferred } from "./PhotoSimilarPhotosDeferred";
 import { MediaDetailsIcon } from "./MediaDetailsIcon";
 
@@ -361,7 +361,7 @@ export const PhotoBlockEl: React.FC<{
     getBucketFacetSelection(FOCAL_LENGTH_35MM_FACET.id, exif.FocalLengthIn35mmFormat) ??
     getBucketFacetSelection(FOCAL_LENGTH_ACTUAL_FACET.id, exif.FocalLength);
   const displayDimensions = getDisplayDimensions(props.block);
-  const cameraDateTimestamp = exifWallClockTimestamp(exif.DateTimeOriginal);
+  const cameraDateTimestamp = exifRelativeTimestamp(exif.DateTimeOriginal, exif.OffsetTime);
   return (
     <div
       className={`${styles.block} ${props.block.formatting?.immersive ? styles.immersive : ""}`}

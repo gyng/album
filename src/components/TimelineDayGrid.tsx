@@ -6,7 +6,7 @@ import { HydratedRelativeTime } from "./HydratedRelativeTime";
 import { Caption, Heading, Thumb, buttonStyles, overlayButtonStyles } from "./ui";
 import styles from "./TimelineDayGrid.module.css";
 import {
-  exifWallClockTimestamp,
+  exifRelativeTimestamp,
   formatExifWallClockDate,
   formatExifWallClockDateTime,
 } from "../util/exifTime";
@@ -60,6 +60,7 @@ export const TimelineDayGrid = ({
     decLat: entry.decLat,
     decLng: entry.decLng,
     date: entry.dateTimeOriginal,
+    dateOffset: entry.dateOffset ?? null,
     href: entry.href,
     placeholderColor: entry.placeholderColor,
     placeholderWidth: entry.placeholderWidth,
@@ -232,13 +233,13 @@ export const TimelineDayGrid = ({
               <div className={styles.details}>
                 <div className={styles.source}>
                   <strong className={styles.sourceText}>{entry.album}</strong>
-                  {exifWallClockTimestamp(entry.dateTimeOriginal) !== null ? (
+                  {exifRelativeTimestamp(entry.dateTimeOriginal, entry.dateOffset) !== null ? (
                     <span
                       className={styles.secondaryMeta}
                       title={formatDateTimeTitle(entry.dateTimeOriginal)!}
                     >
                       <HydratedRelativeTime
-                        date={exifWallClockTimestamp(entry.dateTimeOriginal)!}
+                        date={exifRelativeTimestamp(entry.dateTimeOriginal, entry.dateOffset)!}
                       />
                     </span>
                   ) : null}

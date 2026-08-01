@@ -1,6 +1,6 @@
 import { AppLink as Link } from "./platform";
 import { Popup } from "./map";
-import { exifWallClockTimestamp } from "../util/exifTime";
+import { exifRelativeTimestamp } from "../util/exifTime";
 import { getRelativeTimeString } from "../util/time";
 import type { MapWorldEntry } from "../util/pageDataTypes";
 import { formatMapPhotoDateTime } from "./mapWorldViewModel";
@@ -25,7 +25,7 @@ export const MapPhotoPopup = ({
   }
 
   const formattedDate = formatMapPhotoDateTime(photo.date);
-  const timestamp = exifWallClockTimestamp(photo.date);
+  const timestamp = exifRelativeTimestamp(photo.date, photo.dateOffset);
   const relative = timestamp === null ? null : getRelativeTimeString(new Date(timestamp));
   const mapLinks = buildExternalMapLinks(photo.decLat, photo.decLng);
 

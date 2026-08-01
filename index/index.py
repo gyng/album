@@ -6531,6 +6531,11 @@ def update_gps(dbpath: str, match: str | None, dry_run: bool):
             db.rebuild_tag_counts(cur)
 
     if not dry_run:
+        # Rewriting the searchable geocode for every row leaves FTS5 holding a
+        # segment per update. Left unmerged they nearly doubled the published
+        # database (6.2MB to 11MB) — which every visitor downloads before they
+        # can search. `index` optimises for the same reason; so must this.
+        db.optimize(vacuum=True)
         # Match prune/index: leave the published copy in delete journal mode with
         # no dangling -wal so a straight file copy ships a consistent DB.
         db.finalize_journal_mode()

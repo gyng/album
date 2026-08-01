@@ -13,6 +13,8 @@ export type MapWorldEntry = {
   decLat: number | null;
   decLng: number | null;
   date: string | null;
+  /** EXIF OffsetTime naming the zone `date` is expressed in, when recorded. */
+  dateOffset?: string | null;
   href: string;
   placeholderColor?: string;
   placeholderWidth?: number;
@@ -28,6 +30,8 @@ export type TimelineEntry = {
   mediaKind?: "video";
   date: string;
   dateTimeOriginal: string;
+  /** EXIF OffsetTime naming the zone `dateTimeOriginal` is expressed in. */
+  dateOffset?: string | null;
   decLat?: number | null;
   decLng?: number | null;
   geocode?: string | null;

@@ -1,7 +1,11 @@
 import {
   dateToNaiveIso,
   exifDayKey,
+  exifInstantTimestamp,
+  exifRelativeTimestamp,
+  exifViewerLocalTimestamp,
   exifWallClockTimestamp,
+  parseExifOffsetMinutes,
   formatExifWallClockDate,
   formatExifWallClockDateTime,
   formatExifWallClockIso,
@@ -169,5 +173,115 @@ describe("dateToNaiveIso", () => {
       minute: 59,
       second: 59,
     });
+  });
+});
+
+describe("exifViewerLocalTimestamp", () => {
+  // Written to hold in any zone: locally these tests run in Asia/Singapore, CI
+  // runs in UTC, and in UTC the two helpers coincide — so asserting a numeric
+  // gap between them would pass vacuously on CI.
+  it("places the wall clock in the viewer's zone, so local getters read it back", () => {
+    const ms = exifViewerLocalTimestamp("2026:08:01 16:55:08")!;
+    const asDate = new Date(ms);
+
+    expect(asDate.getFullYear()).toBe(2026);
+    expect(asDate.getMonth()).toBe(7);
+    expect(asDate.getDate()).toBe(1);
+    expect(asDate.getHours()).toBe(16);
+    expect(asDate.getMinutes()).toBe(55);
+  });
+
+  it("leaves the ordering helper anchored to UTC, where UTC getters read it back", () => {
+    const asDate = new Date(exifWallClockTimestamp("2026:08:01 16:55:08")!);
+
+    expect(asDate.getUTCHours()).toBe(16);
+    expect(asDate.getUTCDate()).toBe(1);
+  });
+
+  // The bug: a photo taken three hours ago read as taken in the future,
+  // because a UTC-anchored wall clock was compared against a real Date.now().
+  it("reports a photo taken earlier today as past, not future", () => {
+    const threeHoursAgo = new Date(Date.now() - 3 * 60 * 60 * 1000);
+    const pad = (value: number) => String(value).padStart(2, "0");
+    const wallClock =
+      `${threeHoursAgo.getFullYear()}:${pad(threeHoursAgo.getMonth() + 1)}:` +
+      `${pad(threeHoursAgo.getDate())} ${pad(threeHoursAgo.getHours())}:` +
+      `${pad(threeHoursAgo.getMinutes())}:${pad(threeHoursAgo.getSeconds())}`;
+
+    const ms = exifViewerLocalTimestamp(wallClock)!;
+    expect(ms).toBeLessThan(Date.now());
+    expect(Date.now() - ms).toBeGreaterThan(2.5 * 60 * 60 * 1000);
+  });
+
+  it("returns null for an unparseable value", () => {
+    expect(exifViewerLocalTimestamp("not a date")).toBeNull();
+    expect(exifViewerLocalTimestamp(null)).toBeNull();
+  });
+});
+
+describe("parseExifOffsetMinutes", () => {
+  it.each([
+    ["+08:00", 480],
+    ["+09:00", 540],
+    ["-05:00", -300],
+    ["+05:30", 330],
+    ["+0800", 480],
+  ])("reads %s as %i minutes east of UTC", (raw, expected) => {
+    expect(parseExifOffsetMinutes(raw)).toBe(expected);
+  });
+
+  it.each([[""], ["Z"], ["+8"], ["nonsense"], [null], [undefined]])(
+    "returns null for %j",
+    (raw) => {
+      expect(parseExifOffsetMinutes(raw)).toBeNull();
+    },
+  );
+});
+
+describe("exifInstantTimestamp", () => {
+  // The one place OffsetTime is applied: turning a wall clock plus its zone
+  // into the real instant, for measuring elapsed time.
+  it("recovers the real instant from a wall clock and its offset", () => {
+    expect(exifInstantTimestamp("2026:08:01 16:55:08", "+08:00")).toBe(
+      Date.parse("2026-08-01T08:55:08Z"),
+    );
+    expect(exifInstantTimestamp("2026:08:01 16:55:08", "-05:00")).toBe(
+      Date.parse("2026-08-01T21:55:08Z"),
+    );
+  });
+
+  it("is null when the zone is unknown, so callers fall back", () => {
+    expect(exifInstantTimestamp("2026:08:01 16:55:08", null)).toBeNull();
+    expect(exifInstantTimestamp(null, "+08:00")).toBeNull();
+  });
+});
+
+describe("exifRelativeTimestamp", () => {
+  it("prefers the true instant when the photo records its zone", () => {
+    expect(exifRelativeTimestamp("2026:08:01 16:55:08", "+09:00")).toBe(
+      exifInstantTimestamp("2026:08:01 16:55:08", "+09:00"),
+    );
+  });
+
+  it("falls back to the viewer's zone when it does not", () => {
+    expect(exifRelativeTimestamp("2026:08:01 16:55:08")).toBe(
+      exifViewerLocalTimestamp("2026:08:01 16:55:08"),
+    );
+  });
+
+  // A photo taken an hour ago in another zone should read as an hour ago,
+  // not as an hour plus the difference between the two zones.
+  it("measures elapsed time correctly across zones", () => {
+    const anHourAgoUtc = new Date(Date.now() - 60 * 60 * 1000);
+    const pad = (value: number) => String(value).padStart(2, "0");
+    // The same instant, written as a Tokyo wall clock with its offset.
+    const tokyo = new Date(anHourAgoUtc.getTime() + 9 * 60 * 60 * 1000);
+    const wallClock =
+      `${tokyo.getUTCFullYear()}:${pad(tokyo.getUTCMonth() + 1)}:${pad(tokyo.getUTCDate())} ` +
+      `${pad(tokyo.getUTCHours())}:${pad(tokyo.getUTCMinutes())}:${pad(tokyo.getUTCSeconds())}`;
+
+    const elapsedMinutes = (Date.now() - exifRelativeTimestamp(wallClock, "+09:00")!) / 60000;
+    expect(elapsedMinutes).toBeGreaterThan(59);
+    expect(elapsedMinutes).toBeLessThan(61);
   });
 });

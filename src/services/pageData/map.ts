@@ -38,8 +38,14 @@ export const loadMapPageData = async (): Promise<MapPageData> => {
     ...album.blocks.filter(hasMapCoordinates).flatMap((photo) => {
       const src = photo._build.srcset?.[0];
       if (!src) return [];
-      const { GPSLongitude, GPSLatitude, GPSLongitudeRef, GPSLatitudeRef, DateTimeOriginal } =
-        photo._build.exif;
+      const {
+        GPSLongitude,
+        GPSLatitude,
+        GPSLongitudeRef,
+        GPSLatitudeRef,
+        DateTimeOriginal,
+        OffsetTime,
+      } = photo._build.exif;
       const { decLng, decLat } = getDegLatLngFromExif({
         ...(GPSLongitude !== undefined ? { GPSLongitude } : {}),
         ...(GPSLatitude !== undefined ? { GPSLatitude } : {}),
@@ -53,6 +59,7 @@ export const loadMapPageData = async (): Promise<MapPageData> => {
         decLng,
         decLat,
         date: DateTimeOriginal ?? null,
+        dateOffset: OffsetTime ?? null,
         href: getMapPhotoHref(album._build.slug, photo),
         placeholderColor: color ? `rgba(${color[0]}, ${color[1]}, ${color[2]}, 1)` : "transparent",
         placeholderHeight: photo._build.height,

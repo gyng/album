@@ -12,6 +12,9 @@ export type MapWorldEntryRow = [
   placeholderColor: string | null,
   // Packed last so that a row written before videos existed still unpacks.
   mediaKind?: "video" | null,
+  // Likewise: EXIF OffsetTime, present on about half the library, used only to
+  // date relative labels against the real present.
+  dateOffset?: string | null,
 ];
 
 export type TimelineEntryRow = [
@@ -27,6 +30,7 @@ export type TimelineEntryRow = [
   path: string,
   placeholderColor: string,
   mediaKind?: "video" | null,
+  dateOffset?: string | null,
 ];
 
 const isGeocodeCoordinate = (line: string) => /^-?\d+(?:\.\d+)?$/.test(line);
@@ -72,6 +76,7 @@ export const packMapWorldEntry = (entry: MapWorldEntry): MapWorldEntryRow => [
   entry.href,
   entry.placeholderColor ?? null,
   entry.mediaKind ?? null,
+  entry.dateOffset ?? null,
 ];
 
 export const unpackMapWorldEntry = (row: MapWorldEntryRow): MapWorldEntry => ({
@@ -83,6 +88,7 @@ export const unpackMapWorldEntry = (row: MapWorldEntryRow): MapWorldEntry => ({
   href: row[7],
   ...(row[8] === null ? {} : { placeholderColor: row[8] }),
   ...(row[9] ? { mediaKind: row[9] } : {}),
+  ...(row[10] ? { dateOffset: row[10] } : {}),
   placeholderWidth: row[2],
   placeholderHeight: row[3],
 });
@@ -100,6 +106,7 @@ export const packTimelineEntry = (entry: TimelineEntry): TimelineEntryRow => [
   entry.path,
   entry.placeholderColor,
   entry.mediaKind ?? null,
+  entry.dateOffset ?? null,
 ];
 
 export const unpackTimelineEntry = (row: TimelineEntryRow): TimelineEntry => ({
@@ -114,6 +121,7 @@ export const unpackTimelineEntry = (row: TimelineEntryRow): TimelineEntry => ({
   path: row[9],
   placeholderColor: row[10],
   ...(row[11] ? { mediaKind: row[11] } : {}),
+  ...(row[12] ? { dateOffset: row[12] } : {}),
   placeholderWidth: row[6],
   placeholderHeight: row[7],
 });

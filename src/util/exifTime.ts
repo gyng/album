@@ -81,14 +81,87 @@ export function normaliseExifWallClockIso(raw: string | undefined | null): strin
   return dt ? formatExifWallClockIso(dt) : null;
 }
 
-// A nominal numeric value for comparisons and relative-time labels. Date.UTC
-// is used only as a stable coordinate system for the already-parsed wall-clock
-// components: it does not convert the camera time or apply OffsetTime.
+// A nominal numeric value for ordering photos and measuring the span between
+// two of them. Date.UTC is used only as a stable coordinate system for the
+// already-parsed wall-clock components: it does not convert the camera time or
+// apply OffsetTime, and the choice of zone cancels out when two of these are
+// subtracted.
+//
+// Not comparable with `Date.now()`. Use `exifViewerLocalTimestamp` for that.
 export function exifWallClockTimestamp(raw: string | undefined | null): number | null {
   const dt = parseExifLocalDateTime(raw);
   if (!dt) return null;
 
   return Date.UTC(dt.year, dt.month - 1, dt.day, dt.hour, dt.minute, dt.second);
+}
+
+/**
+ * The same wall clock, placed in the *viewer's* zone. The fallback for relative
+ * labels when the photo's own zone is unknown — exact when the reader is in the
+ * zone the photo was taken in, and out by the difference otherwise.
+ *
+ * `exifWallClockTimestamp` anchors to UTC, which is right for ordering and for
+ * differences between two photos but wrong here — mixing a UTC-anchored wall
+ * clock with `Date.now()` shifts the result by the viewer's own offset, so a
+ * photo taken at 16:55 in UTC+8 read as taken nine minutes in the future.
+ *
+ * Only relative labels should use this. Anything that buckets or sorts must
+ * keep the fixed zone, or the same photo lands on different days for different
+ * readers.
+ */
+export function exifViewerLocalTimestamp(raw: string | undefined | null): number | null {
+  const dt = parseExifLocalDateTime(raw);
+  if (!dt) return null;
+
+  return new Date(dt.year, dt.month - 1, dt.day, dt.hour, dt.minute, dt.second).getTime();
+}
+
+/** Minutes east of UTC from an EXIF `OffsetTime` such as "+08:00" or "-05:00". */
+export function parseExifOffsetMinutes(raw: string | undefined | null): number | null {
+  if (!raw) return null;
+
+  const match = raw.trim().match(/^([+-])(\d{2}):?(\d{2})$/);
+  if (!match) return null;
+
+  const [, sign, hours, minutes] = match;
+  const total = Number(hours) * 60 + Number(minutes);
+  return Number.isNaN(total) ? null : sign === "-" ? -total : total;
+}
+
+/**
+ * The real instant the shutter fired, for the one case that needs it: measuring
+ * elapsed time against `Date.now()`.
+ *
+ * This is the sole place `OffsetTime` is applied. Everywhere else it is only a
+ * label naming the zone the wall clock is already in — shifting a *displayed*
+ * time by it would move a photo off the hour it was actually taken. Converting
+ * to an instant is the opposite operation and changes no displayed clock.
+ *
+ * Null when either the wall clock or the offset is missing; around 44% of this
+ * library has no `OffsetTime`, so callers need the viewer-local fallback.
+ */
+export function exifInstantTimestamp(
+  raw: string | undefined | null,
+  offsetRaw: string | undefined | null,
+): number | null {
+  const dt = parseExifLocalDateTime(raw);
+  const offsetMinutes = parseExifOffsetMinutes(offsetRaw);
+  if (!dt || offsetMinutes === null) return null;
+
+  const asIfUtc = Date.UTC(dt.year, dt.month - 1, dt.day, dt.hour, dt.minute, dt.second);
+  return asIfUtc - offsetMinutes * 60_000;
+}
+
+/**
+ * Best available basis for "3 hours ago": the true instant where the photo
+ * records its zone, the viewer's own zone otherwise. The single entry point for
+ * relative labels — nothing else should choose between the two.
+ */
+export function exifRelativeTimestamp(
+  raw: string | undefined | null,
+  offsetRaw?: string | null,
+): number | null {
+  return exifInstantTimestamp(raw, offsetRaw) ?? exifViewerLocalTimestamp(raw);
 }
 
 export function formatExifWallClockDate(raw: string | undefined | null): string | null {

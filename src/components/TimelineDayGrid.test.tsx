@@ -51,7 +51,10 @@ describe("TimelineDayGrid", () => {
     );
   });
   beforeEach(() => {
-    jest.spyOn(Date, "now").mockReturnValue(new Date("2024-01-03T12:00:00.000Z").getTime());
+    // Constructed locally, to match how an EXIF wall clock is now placed in the
+    // viewer's zone for relative labels. A Z-anchored "now" against a local
+    // wall clock would make the expected labels depend on the runner's timezone.
+    jest.spyOn(Date, "now").mockReturnValue(new Date(2024, 0, 3, 12, 0, 0).getTime());
   });
 
   afterEach(() => {
@@ -62,7 +65,7 @@ describe("TimelineDayGrid", () => {
     {
       album: "kansai",
       date: "2024-01-02",
-      dateTimeOriginal: "2024-01-02T12:00:00.000Z",
+      dateTimeOriginal: "2024-01-02T12:00:00",
       decLat: 35.6,
       decLng: 139.7,
       geocode: "JP\nAkihabara\n35.6\n139.7\n77200\nTokyo\nChiyoda-ku\nJapan",
@@ -76,7 +79,7 @@ describe("TimelineDayGrid", () => {
     {
       album: "tokyo",
       date: "2024-01-02",
-      dateTimeOriginal: "2024-01-02T16:00:00.000Z",
+      dateTimeOriginal: "2024-01-02T16:00:00",
       decLat: null,
       decLng: null,
       geocode: "JP\nŌme\n35.7\n139.2\n131895\nTokyo\nJapan",
