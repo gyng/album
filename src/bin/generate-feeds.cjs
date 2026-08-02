@@ -317,6 +317,7 @@ const generateSitemap = (albumEntries) => {
     { url: getCanonicalUrl("/"), lastmod: latestLastmod },
     { url: getCanonicalUrl("/map"), lastmod: latestLastmod },
     { url: getCanonicalUrl("/timeline"), lastmod: latestLastmod },
+    { url: getCanonicalUrl("/trips"), lastmod: latestLastmod },
     { url: getCanonicalUrl("/explore"), lastmod: latestLastmod },
     ...albumEntries.map((e) => ({
       url: getCanonicalUrl(`/album/${e.slug}`),

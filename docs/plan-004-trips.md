@@ -136,6 +136,8 @@ usual 3" is a fact; "8.5 photos a day" is a number.
   longest ran, linking to the timeline. Trips are content; explore is a report.
 - **Album pages** — the grid stays default, a Trips toggle in the nav switches, `?view=trips`
   makes it linkable.
+- **`/trips`** — every journey across albums, which is the one view an album page cannot give:
+  12 of 94 are split across two albums, `hyouka` + `kansai` being one November fortnight.
 
 Timeline was not renamed. The page is heatmap + trips + days, which "Timeline" describes
 accurately; "Journeys" would overstate a page where 58 of 94 clusters are single days, and the
@@ -146,9 +148,19 @@ suite to buy a less accurate word.
 
 Done in `b1202b9` and the commit that follows it.
 
-- `computeTrips` runs three times over the same rule: at build for explore's counts, and in the
-  browser on both the timeline and album pages, from data those pages already hold. Only
-  explore's version costs payload, and only 5.5KB gzipped now it ships no thumbnails.
+- `computeTrips` runs over the same rule everywhere: at build for explore's counts and for
+  `/trips`, and in the browser on the timeline and album pages from data those pages already
+  hold. `TripDetail` is shared by `/trips` and the album view so the two cannot drift.
+- **A tied day used to group differently depending on who asked.** 2015-10-18 holds exactly two
+  photographs, one in Hong Kong and one in Taiwan, so "dominant country" was a 1-1 tie decided
+  by input order — the timeline found 94 clusters where explore found 95. A tie now settles on
+  the country the day *ended* in, which is also the one that connects to the next day, and the
+  photographs are sorted before anything derives from them.
+- The screen may not import its props from `services/`: that drags `getAlbums` and the Node-only
+  video helpers into the portable graph. Page-data types belong with the screen or in
+  `util/pageDataTypes.ts`.
+- `pages/trips/index.tsx` needed adding to the allowlist in `components/platform/boundary.test.ts`,
+  which is the deliberate-adapter case that file exists to police.
 - **Timeline entries carry an already-summarised geocode** — `"city, region, country"` joined
   with commas, not the newline blob `util/geocode` parses. Reading it with those helpers made
   every place look like its own country and broke a journey on every single day: 234 outings
@@ -168,7 +180,7 @@ Done in `b1202b9` and the commit that follows it.
 
 - **Forcing collections into a trip shape** is the main failure mode. `snapshots` is 56
   clusters over ten years; rendering it as a journey would be nonsense. Classification must
-  gate the view, and Stage 1 exists partly to prove the classifier before Stage 3 uses it.
+  gate the view — which the toggle decision above removed the need for entirely.
 - **Local clusters crowding the list.** Deliberately included, so the list is 94 entries of
   which 58 are single days. Ordering and an explicit "outing" label carry that weight; if they
   do not, the fallback is collapsing outings behind a count rather than reintroducing a

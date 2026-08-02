@@ -35,6 +35,7 @@ const NEXT_RUNTIME_ADAPTERS = new Map<string, Set<string>>([
   ["pages/index.tsx", new Set(["next"])],
   ["pages/map/index.tsx", new Set(["next"])],
   ["pages/timeline/index.tsx", new Set(["next"])],
+  ["pages/trips/index.tsx", new Set(["next"])],
 ]);
 
 type ModuleImport = { name: string; typeOnly: boolean };

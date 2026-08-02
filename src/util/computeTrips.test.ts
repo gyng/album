@@ -1,4 +1,4 @@
-import { computeTrips, type TripPhoto } from "./computeTrips";
+import { computeTrips, markFirstVisits, type TripPhoto } from "./computeTrips";
 
 const photo = (date: string | null, over: Partial<TripPhoto> = {}): TripPhoto => ({
   date,
@@ -42,6 +42,25 @@ describe("computeTrips", () => {
     expect(trips).toHaveLength(2);
     // Newest first, as everywhere else here.
     expect(trips.map((trip) => trip.country)).toEqual(["Singapore", "Japan"]);
+  });
+
+  // A travel day can hold two countries in equal number. Whichever the input
+  // order happened to present first used to win, so the same archive grouped
+  // differently depending on which page asked. The day ends where it ends, and
+  // that is what connects to tomorrow.
+  it("settles a tied day on the country it ended in, whatever the input order", () => {
+    const day = [
+      photo("2015-10-18T16:10:00", { country: "Hong Kong" }),
+      photo("2015-10-18T20:13:00", { country: "Taiwan" }),
+    ];
+    const next = photo("2015-10-19T11:00:00", { country: "Taiwan" });
+
+    const forwards = computeTrips([...day, next]);
+    const backwards = computeTrips([next, ...day.toReversed()]);
+
+    expect(forwards).toHaveLength(1);
+    expect(forwards[0]?.dayCount).toBe(2);
+    expect(backwards.map((trip) => trip.dayCount)).toEqual(forwards.map((trip) => trip.dayCount));
   });
 
   it("marks a single day as an outing and a longer run as a trip", () => {
@@ -114,6 +133,39 @@ describe("computeTrips", () => {
     expect(trips[0]?.days[0]?.coveredKm).toBeCloseTo(1.1, 0);
     expect(trips[0]?.days[0]?.movedKm).toBeNull();
     expect(trips[0]?.days[1]?.movedKm).toBeCloseTo(78, -1);
+  });
+
+  it("averages each day's colour and records the hours it was shot in", () => {
+    const trips = computeTrips([
+      photo("2024-05-01T09:00:00", { swatch: "rgb(200, 100, 0)" }),
+      photo("2024-05-01T09:30:00", { swatch: "rgb(100, 100, 100)" }),
+      photo("2024-05-01T18:00:00", { swatch: "rgb(0, 100, 200)" }),
+    ]);
+
+    expect(trips[0]?.days[0]?.colour).toBe("rgb(100, 100, 100)");
+    expect(trips[0]?.days[0]?.hours).toEqual([9, 18]);
+  });
+
+  it("leaves the colour null when nothing on the day carries one", () => {
+    const trips = computeTrips([photo("2024-05-01T09:00:00")]);
+
+    expect(trips[0]?.days[0]?.colour).toBeNull();
+  });
+
+  // "First time here" is only true relative to everything that came before, so
+  // it can only be decided once every trip is known.
+  it("marks places not seen on any earlier trip as first visits", () => {
+    const trips = markFirstVisits(
+      computeTrips([
+        photo("2015-05-01T09:00:00", { city: "Kyoto" }),
+        photo("2024-05-01T09:00:00", { city: "Kyoto" }),
+        photo("2024-05-01T10:00:00", { city: "Nara" }),
+      ]),
+    );
+
+    const [recent, earlier] = trips;
+    expect(earlier?.firstVisits).toEqual(["Kyoto"]);
+    expect(recent?.firstVisits).toEqual(["Nara"]);
   });
 
   it("keeps a representative photo per day for a summary to show", () => {

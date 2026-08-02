@@ -99,6 +99,15 @@ export const GlobalNav: React.FC<Props> = ({
             </Link>
           </li>
           <li>
+            <Link
+              href="/trips"
+              className={cx(buttonStyles.base, current("timeline"))}
+              aria-current={ariaCurrent("timeline")}
+            >
+              Timeline
+            </Link>
+          </li>
+          <li>
             <div className={commonStyles.splitButton}>
               <Link
                 href="/slideshow"

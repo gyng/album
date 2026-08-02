@@ -1,0 +1,19 @@
+.page {
+  max-inline-size: var(--content-width-gallery);
+  margin-inline: auto;
+  padding: var(--m-l) var(--m-m) var(--m-2xl);
+  display: grid;
+  gap: var(--m-xl);
+  justify-items: start;
+}
+
+.header {
+  display: grid;
+  gap: var(--m-s);
+}
+
+.trips {
+  display: grid;
+  gap: var(--m-2xl);
+  inline-size: 100%;
+}

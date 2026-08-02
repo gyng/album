@@ -47,8 +47,8 @@ export const ExploreTripsSection = ({ trips }: { trips: TripSummary[] }) => {
           The longest ran {longest.dayCount} days across {longest.places.slice(0, 3).join(", ")}.
         </p>
       ) : null}
-      <Link href="/timeline" className={`${pillStyles.base} ${pillStyles.ghost}`}>
-        <span>Browse trips on the timeline</span>
+      <Link href="/trips" className={`${pillStyles.base} ${pillStyles.ghost}`}>
+        <span>Browse every trip</span>
         <span aria-hidden="true">↗</span>
       </Link>
     </section>

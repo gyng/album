@@ -57,7 +57,16 @@ export const TimelineTripsSection = ({
   onSelectDate: (date: string) => void;
 }) => {
   const [visible, setVisible] = React.useState(INITIAL_TRIPS);
-  const trips = React.useMemo(() => computeTrips(entries.map(toTripPhoto)), [entries]);
+  const trips = React.useMemo(
+    () =>
+      computeTrips(
+        // Videos carry no geocode, so they cannot take part in the country rule
+        // and would make this page's counts disagree with /trips and explore,
+        // which group photographs.
+        entries.filter((entry) => entry.mediaKind !== "video").map(toTripPhoto),
+      ),
+    [entries],
+  );
 
   if (trips.length === 0) return null;
 

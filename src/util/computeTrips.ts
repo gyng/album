@@ -30,6 +30,10 @@ export type TripDay = {
   to: string;
   places: string[];
   photos: TripPhoto[];
+  /** The day's average dominant colour, or null if nothing carries one. */
+  colour: string | null;
+  /** Distinct wall-clock hours the day was photographed in, ascending. */
+  hours: number[];
   /** Ground covered between the day's own frames. */
   coveredKm: number | null;
   /** How far the day's centre of gravity moved from the previous day's. */
@@ -48,6 +52,12 @@ export type Trip = {
   days: TripDay[];
   /** A single day is an outing, not a journey; the two want different treatment. */
   isOuting: boolean;
+  /**
+   * Places this trip reached that no earlier trip had. Empty until
+   * `markFirstVisits` has seen every trip, since "first" is relative to all of
+   * them.
+   */
+  firstVisits: string[];
   totalKm: number | null;
 };
 
@@ -108,6 +118,15 @@ const placeSequence = (photos: TripPhoto[]): string[] => {
   return sequence;
 };
 
+/**
+ * The country a set of photographs is mostly in.
+ *
+ * A travel day can be a tie — one frame in Hong Kong, one in Taiwan — and the
+ * winner must not depend on the order the caller happened to supply. Photos are
+ * time-ordered by the time this runs, and `>=` lets the later country take a
+ * tie, so a tied day settles on the one it *ended* in. That is also the one
+ * that connects to the next day, which is what the run rule is asking about.
+ */
 const dominantCountry = (photos: TripPhoto[]): string | null => {
   const counts = new Map<string, number>();
   for (const photo of photos) {
@@ -115,13 +134,38 @@ const dominantCountry = (photos: TripPhoto[]): string | null => {
   }
   let best: string | null = null;
   let bestCount = 0;
-  for (const [country, count] of counts) {
-    if (count > bestCount) {
-      best = country;
+  for (const photo of photos) {
+    if (!photo.country) continue;
+    const count = counts.get(photo.country)!;
+    if (count >= bestCount) {
+      best = photo.country;
       bestCount = count;
     }
   }
   return best;
+};
+
+const RGB_PATTERN = /(\d+(?:\.\d+)?)\D+(\d+(?:\.\d+)?)\D+(\d+(?:\.\d+)?)/;
+
+/** The mean of a day's dominant colours — a legible signature for the day. */
+const averageColour = (photos: TripPhoto[]): string | null => {
+  const channels = photos.flatMap((photo) => {
+    const match = photo.swatch ? RGB_PATTERN.exec(photo.swatch) : null;
+    return match ? [[Number(match[1]), Number(match[2]), Number(match[3])] as const] : [];
+  });
+  if (channels.length === 0) return null;
+  const mean = (index: 0 | 1 | 2) =>
+    Math.round(channels.reduce((total, rgb) => total + rgb[index], 0) / channels.length);
+  return `rgb(${mean(0)}, ${mean(1)}, ${mean(2)})`;
+};
+
+const shootingHours = (photos: TripPhoto[]): number[] => {
+  const hours = new Set<number>();
+  for (const photo of photos) {
+    const parsed = parseExifLocalDateTime(photo.date);
+    if (parsed) hours.add(parsed.hour);
+  }
+  return Array.from(hours).sort((left, right) => left - right);
 };
 
 const clockTime = (raw: string): string => {
@@ -142,8 +186,13 @@ const clockTime = (raw: string): string => {
  * taken at 23:30 belongs to the day it was taken on rather than the next one.
  */
 export function computeTrips(photos: TripPhoto[]): Trip[] {
+  // Sorted up front so nothing downstream depends on the caller's order: the
+  // same archive must group identically whichever page asks.
+  const ordered = [...photos].sort((left, right) =>
+    (left.date ?? "").localeCompare(right.date ?? ""),
+  );
   const byDay = new Map<string, TripPhoto[]>();
-  for (const photo of photos) {
+  for (const photo of ordered) {
     const key = exifDayKey(photo.date);
     if (!key) continue;
     const existing = byDay.get(key);
@@ -173,9 +222,7 @@ export function computeTrips(photos: TripPhoto[]): Trip[] {
   runs.push(run);
 
   const trips = runs.map((keys): Trip => {
-    const dayPhotos = keys.map((key) =>
-      [...byDay.get(key)!].sort((left, right) => (left.date ?? "").localeCompare(right.date ?? "")),
-    );
+    const dayPhotos = keys.map((key) => byDay.get(key)!);
     const all = dayPhotos.flat();
 
     let previousCentre: { lat: number; lng: number } | null = null;
@@ -200,6 +247,8 @@ export function computeTrips(photos: TripPhoto[]): Trip[] {
         to: clockTime(items[items.length - 1]?.date ?? ""),
         places: placeSequence(items),
         photos: items,
+        colour: averageColour(items),
+        hours: shootingHours(items),
         coveredKm,
         movedKm,
       };
@@ -221,6 +270,7 @@ export function computeTrips(photos: TripPhoto[]): Trip[] {
       albums: Array.from(new Set(all.map((photo) => photo.album))).sort(),
       days,
       isOuting: keys.length === 1,
+      firstVisits: [],
       totalKm: totalKm > 0 ? totalKm : null,
     };
   });
@@ -234,4 +284,22 @@ export function summariseTrips(trips: Trip[], photoLimit: number): TripSummary[]
     ...trip,
     photos: days.flatMap((day) => day.photos).slice(0, photoLimit),
   }));
+}
+
+/**
+ * Annotate each trip with the places no earlier trip had reached.
+ *
+ * Separate from `computeTrips` because "first visit" is a fact about the whole
+ * archive, not about one journey: it can only be decided once every trip is
+ * known, and walking them oldest-first is the only way to decide it.
+ */
+export function markFirstVisits(trips: Trip[]): Trip[] {
+  const seen = new Set<string>();
+  const annotated = new Map<string, string[]>();
+  for (const trip of [...trips].reverse()) {
+    const firstVisits = trip.places.filter((place) => !seen.has(place));
+    firstVisits.forEach((place) => seen.add(place));
+    annotated.set(trip.id, firstVisits);
+  }
+  return trips.map((trip) => ({ ...trip, firstVisits: annotated.get(trip.id) ?? [] }));
 }

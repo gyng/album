@@ -41,9 +41,9 @@ describe("ExploreTripsSection", () => {
   it("links to where trips can actually be browsed", () => {
     render(<ExploreTripsSection trips={[trip()]} />);
 
-    expect(screen.getByRole("link", { name: /browse trips/i })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: /browse every trip/i })).toHaveAttribute(
       "href",
-      "/timeline",
+      "/trips",
     );
   });
 
