@@ -171,11 +171,28 @@ export function formatExifWallClockDate(raw: string | undefined | null): string 
   return `${dt.day} ${MONTH_NAMES[dt.month - 1]} ${dt.year}`;
 }
 
-export function formatExifWallClockDateTime(raw: string | undefined | null): string | null {
+/**
+ * The offset as a display suffix, or "" when the photo did not record one.
+ *
+ * Shown rather than applied. A wall clock without its zone is ambiguous across
+ * a library that spans several — 15:44 in Tokyo and 15:44 in Istanbul read
+ * identically — so the zone is named beside the time it belongs to.
+ */
+export function formatExifOffsetSuffix(offsetRaw: string | undefined | null): string {
+  return parseExifOffsetMinutes(offsetRaw) === null ? "" : ` (${offsetRaw!.trim()})`;
+}
+
+export function formatExifWallClockDateTime(
+  raw: string | undefined | null,
+  offsetRaw?: string | null,
+): string | null {
   const dt = parseExifLocalDateTime(raw);
   if (!dt) return null;
 
-  return `${dt.day} ${MONTH_NAMES[dt.month - 1]} ${dt.year} at ${pad2(dt.hour)}:${pad2(dt.minute)}`;
+  return (
+    `${dt.day} ${MONTH_NAMES[dt.month - 1]} ${dt.year} at ${pad2(dt.hour)}:${pad2(dt.minute)}` +
+    formatExifOffsetSuffix(offsetRaw)
+  );
 }
 
 // Wall-clock calendar day ("YYYY-MM-DD") from any EXIF-ish timestamp string.

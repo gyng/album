@@ -1,4 +1,8 @@
-import { exifWallClockTimestamp, parseExifLocalDateTime } from "../util/exifTime";
+import {
+  exifWallClockTimestamp,
+  formatExifOffsetSuffix,
+  parseExifLocalDateTime,
+} from "../util/exifTime";
 import { recencyColor } from "../util/mapColor";
 import type { MapWorldEntry, TimeRange } from "../util/pageDataTypes";
 
@@ -43,10 +47,14 @@ export const formatMapPhotoDate = (value: string | null): string | null => {
   return date ? `${date.day} ${SHORT_MONTH_NAMES[date.month - 1]} ${date.year}` : null;
 };
 
-export const formatMapPhotoDateTime = (value: string | null): string | null => {
+export const formatMapPhotoDateTime = (
+  value: string | null,
+  offset?: string | null,
+): string | null => {
   const date = parseExifLocalDateTime(value);
   return date
-    ? `${date.day} ${SHORT_MONTH_NAMES[date.month - 1]} ${date.year}, ${pad2(date.hour)}:${pad2(date.minute)}`
+    ? `${date.day} ${SHORT_MONTH_NAMES[date.month - 1]} ${date.year}, ` +
+        `${pad2(date.hour)}:${pad2(date.minute)}${formatExifOffsetSuffix(offset)}`
     : null;
 };
 

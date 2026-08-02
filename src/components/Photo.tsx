@@ -26,7 +26,7 @@ import {
   FOCAL_LENGTH_ACTUAL_FACET,
   ISO_FACET,
 } from "../util/photoBuckets";
-import { exifRelativeTimestamp, normaliseExifWallClockIso } from "../util/exifTime";
+import { exifRelativeTimestamp, formatExifWallClockDateTime } from "../util/exifTime";
 import { PhotoSimilarPhotosDeferred } from "./PhotoSimilarPhotosDeferred";
 import { MediaDetailsIcon } from "./MediaDetailsIcon";
 
@@ -535,14 +535,13 @@ export const PhotoBlockEl: React.FC<{
                       kind: "kv",
                       k: "Camera datetime",
                       v: [
-                        (() => {
-                          const local = normaliseExifWallClockIso(
-                            props.block._build.exif.DateTimeOriginal,
-                          );
-                          return props.block._build.exif.OffsetTime
-                            ? `${local} (local @ ${props.block._build.exif.OffsetTime})`
-                            : local;
-                        })(),
+                        // Camera-local wall clock, with the zone it belongs to
+                        // named beside it — 15:44 in Tokyo and 15:44 in
+                        // Istanbul are indistinguishable otherwise.
+                        formatExifWallClockDateTime(
+                          props.block._build.exif.DateTimeOriginal,
+                          props.block._build.exif.OffsetTime,
+                        ),
                         cameraDateTimestamp != null ? (
                           <HydratedRelativeTime
                             key="relative-camera-datetime"

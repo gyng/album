@@ -14,8 +14,8 @@ import { summariseTimelineGeocode } from "../util/pageDataRows";
 
 const formatLongDate = (date: string) => formatExifWallClockDate(`${date}T00:00:00`) ?? date;
 
-const formatDateTimeTitle = (dateTimeOriginal: string) =>
-  formatExifWallClockDateTime(dateTimeOriginal);
+const formatDateTimeTitle = (dateTimeOriginal: string, offset?: string | null) =>
+  formatExifWallClockDateTime(dateTimeOriginal, offset);
 
 const toSimilarSearchPath = (path: string) => {
   if (path.startsWith("/data/albums/")) {
@@ -236,7 +236,7 @@ export const TimelineDayGrid = ({
                   {exifRelativeTimestamp(entry.dateTimeOriginal, entry.dateOffset) !== null ? (
                     <span
                       className={styles.secondaryMeta}
-                      title={formatDateTimeTitle(entry.dateTimeOriginal)!}
+                      title={formatDateTimeTitle(entry.dateTimeOriginal, entry.dateOffset)!}
                     >
                       <HydratedRelativeTime
                         date={exifRelativeTimestamp(entry.dateTimeOriginal, entry.dateOffset)!}

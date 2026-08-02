@@ -154,7 +154,7 @@ describe("PhotoBlockEl", () => {
       screen.getByText(
         (_, element) =>
           element?.tagName === "TD" &&
-          element.textContent?.startsWith("2024-04-05T18:30:00 (local @ +09:00)") === true,
+          element.textContent?.startsWith("5 April 2024 at 18:30 (+09:00)") === true,
       ),
     ).toBeTruthy();
     expect(screen.getByText("Japan, Chiyoda, Kanto")).toBeTruthy();
@@ -208,7 +208,7 @@ describe("PhotoBlockEl", () => {
       screen.getByText(
         (_, element) =>
           element?.tagName === "TD" &&
-          element.textContent?.startsWith("2023-02-03T04:05:06") === true,
+          element.textContent?.startsWith("3 February 2023 at 04:05") === true,
       ),
     ).toBeTruthy();
     expect(screen.queryByRole("link", { name: "Find photos at this ISO" })).toBeNull();

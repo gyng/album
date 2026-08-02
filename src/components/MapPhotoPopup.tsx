@@ -24,7 +24,7 @@ export const MapPhotoPopup = ({
     return null;
   }
 
-  const formattedDate = formatMapPhotoDateTime(photo.date);
+  const formattedDate = formatMapPhotoDateTime(photo.date, photo.dateOffset);
   const timestamp = exifRelativeTimestamp(photo.date, photo.dateOffset);
   const relative = timestamp === null ? null : getRelativeTimeString(new Date(timestamp));
   const mapLinks = buildExternalMapLinks(photo.decLat, photo.decLng);

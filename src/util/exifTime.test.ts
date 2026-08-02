@@ -5,6 +5,7 @@ import {
   exifRelativeTimestamp,
   exifViewerLocalTimestamp,
   exifWallClockTimestamp,
+  formatExifOffsetSuffix,
   parseExifOffsetMinutes,
   formatExifWallClockDate,
   formatExifWallClockDateTime,
@@ -283,5 +284,35 @@ describe("exifRelativeTimestamp", () => {
     const elapsedMinutes = (Date.now() - exifRelativeTimestamp(wallClock, "+09:00")!) / 60000;
     expect(elapsedMinutes).toBeGreaterThan(59);
     expect(elapsedMinutes).toBeLessThan(61);
+  });
+});
+
+describe("formatExifOffsetSuffix", () => {
+  // Displayed, never applied: a wall clock without its zone is ambiguous across
+  // a library spanning several — 15:44 in Tokyo and 15:44 in Istanbul read the
+  // same — but shifting the clock by it would move the photo off the hour it
+  // was actually taken.
+  it.each([
+    ["+08:00", " (+08:00)"],
+    ["-05:00", " (-05:00)"],
+    ["+05:30", " (+05:30)"],
+  ])("renders %s as %j", (raw, expected) => {
+    expect(formatExifOffsetSuffix(raw)).toBe(expected);
+  });
+
+  it.each([[null], [undefined], [""], ["Z"], ["garbage"]])("renders nothing for %j", (raw) => {
+    expect(formatExifOffsetSuffix(raw)).toBe("");
+  });
+});
+
+describe("formatExifWallClockDateTime with a zone", () => {
+  it("names the zone beside the time without moving it", () => {
+    expect(formatExifWallClockDateTime("2026:08:01 16:55:08", "+08:00")).toBe(
+      "1 August 2026 at 16:55 (+08:00)",
+    );
+  });
+
+  it("shows the same clock unqualified when the zone is unknown", () => {
+    expect(formatExifWallClockDateTime("2026:08:01 16:55:08")).toBe("1 August 2026 at 16:55");
   });
 });
