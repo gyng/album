@@ -1,3 +1,4 @@
+import React from "react";
 import { mergeCssModuleStyles } from "../../util/mergeCssModuleStyles";
 import { AppLink as Link } from "../platform";
 import type { PhotoStats } from "../../util/computeStats";
@@ -55,6 +56,9 @@ export const ExploreColourSection = ({
   stats: PhotoStats;
   deferContent?: boolean;
 }) => {
+  // Which colour-over-time segment is pointed at, if any. Only that one's photo
+  // is fetched; see the tooltip below for why.
+  const [activePreview, setActivePreview] = React.useState<string | null>(null);
   const maxColorCount = Math.max(...stats.colorStats.map((item) => item.count), 1);
   const leadingColourFamily = stats.colorStats[0];
   const deferredSummary = [
@@ -210,12 +214,13 @@ export const ExploreColourSection = ({
                     </div>
                     <div className={styles.colorTimeBar}>
                       {year.slices.map((slice, index) => {
+                        const sliceKey = `${year.label}-${slice.family}-${index}`;
                         const share = year.total > 0 ? (slice.count / year.total) * 100 : 0;
                         const segmentWidth = 100 / Math.max(year.total, 1);
                         const segmentPosition = slice.position * 100;
                         return (
                           <Link
-                            key={`${year.label}-${slice.family}-${index}`}
+                            key={sliceKey}
                             href={buildColorSearchHref(slice.family, year.label) ?? "/search"}
                             className={styles.colorTimeSegment}
                             title={`${slice.family} around ${year.label}: ${slice.count} photos (${Math.round(share)}%)`}
@@ -224,15 +229,31 @@ export const ExploreColourSection = ({
                               inlineSize: `max(var(--size-3), ${segmentWidth}%)`,
                               backgroundColor: slice.rgb,
                             }}
+                            onMouseEnter={() => setActivePreview(sliceKey)}
+                            onFocus={() => setActivePreview(sliceKey)}
                           >
                             <span className={styles.colorTimeTooltip} aria-hidden="true">
-                              <img
-                                src={slice.thumbSrc}
-                                alt={slice.photoLabel}
-                                loading="lazy"
-                                className={styles.colorTimeTooltipImage}
-                                style={{ backgroundColor: slice.rgb }}
-                              />
+                              {/* The tooltip is hover-revealed, but `loading="lazy"`
+                                  only defers until near the viewport — and the
+                                  container occupies layout, so scrolling the page
+                                  fetched all ~900 previews: 81MB of the page's
+                                  86.9MB of images, none of it visible. The colour
+                                  the photo resolves to stands in until then, which
+                                  also keeps the tooltip from resizing on reveal. */}
+                              {activePreview === sliceKey ? (
+                                <img
+                                  src={slice.thumbSrc}
+                                  alt={slice.photoLabel}
+                                  loading="lazy"
+                                  className={styles.colorTimeTooltipImage}
+                                  style={{ backgroundColor: slice.rgb }}
+                                />
+                              ) : (
+                                <span
+                                  className={styles.colorTimeTooltipImage}
+                                  style={{ backgroundColor: slice.rgb }}
+                                />
+                              )}
                               <span className={styles.colorTimeTooltipBody}>
                                 <span
                                   data-colour-swatch

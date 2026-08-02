@@ -77,6 +77,12 @@
   line-height: 1.55;
 }
 
+/* Only rendered on narrow viewports, where each group starts collapsed. */
+.groupToggle {
+  justify-self: start;
+  margin-block-start: var(--m-s);
+}
+
 .groupDeferredPlaceholder {
   min-block-size: var(--size-320);
   border-radius: var(--radius-card);

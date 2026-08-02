@@ -277,7 +277,10 @@ export const SankeyChart: React.FC<SankeyChartProps> = ({
   const labelOffset = readCssLength("--m-m", FALLBACK_LABEL_OFFSET);
   const nodeThickness = readCssLength("--size-18", FALLBACK_NODE_THICKNESS);
   const shellRef = React.useRef<HTMLDivElement | null>(null);
-  const [shellWidth, setShellWidth] = React.useState(0);
+  // null means "never measured" (server render, or no ResizeObserver), which is
+  // different from a measured zero — the latter means the shell is genuinely
+  // not being laid out, e.g. under the `desktopOnly` wrapper's `display: none`.
+  const [shellWidth, setShellWidth] = React.useState<number | null>(null);
 
   React.useEffect(() => {
     const node = shellRef.current;
@@ -317,9 +320,16 @@ export const SankeyChart: React.FC<SankeyChartProps> = ({
   // width so the chart always keeps a positive drawing area.
   const desiredHorizontalMargin = spacing * 7;
   const horizontalMargin =
-    shellWidth > 0
+    shellWidth !== null && shellWidth > 0
       ? Math.max(0, Math.min(desiredHorizontalMargin, (shellWidth * 0.6) / 2))
       : desiredHorizontalMargin;
+
+  // A measured zero means nothing is on screen to draw into. Nivo still sizes
+  // its SVG from that measurement and emits negative width/height attributes,
+  // which the browser rejects with a console error on every mobile load — the
+  // chart lives under `desktopOnly`, which is `display: none` below the
+  // breakpoint. Skipping the render also avoids laying out a chart nobody sees.
+  const shellIsCollapsed = shellWidth === 0;
 
   return (
     <div className={styles.wrapper}>
@@ -328,63 +338,65 @@ export const SankeyChart: React.FC<SankeyChartProps> = ({
         className={styles.chartShell}
         style={{ ["--sankey-height" as string]: `${safeHeight}px` }}
       >
-        <ResponsiveSankey<SankeyChartNode, SankeyChartLink>
-          data={chartData}
-          margin={{
-            top: spacing,
-            right: horizontalMargin,
-            bottom: spacing,
-            left: horizontalMargin,
-          }}
-          align="justify"
-          sort="descending"
-          colors={(node) =>
-            (node as { data?: { color?: string }; color?: string }).data?.color ??
-            (node as { data?: { color?: string }; color?: string }).color ??
-            SANKEY_PALETTE[0]
-          }
-          nodeOpacity={0.9}
-          nodeThickness={nodeThickness}
-          nodeSpacing={0}
-          nodeBorderWidth={0}
-          linkOpacity={0.28}
-          nodeHoverOpacity={1}
-          nodeHoverOthersOpacity={0.25}
-          linkHoverOpacity={0.45}
-          linkHoverOthersOpacity={0.08}
-          enableLinkGradient
-          enableLabels={false}
-          animate={false}
-          isInteractive
-          layers={[
-            "links",
-            "nodes",
-            (props) => (
-              <ClickableLabelLayer
-                {...props}
-                labelMaxLength={labelMaxLength}
-                minLabelHeight={minLabelHeight}
-                labelOffset={labelOffset}
-              />
-            ),
-          ]}
-          theme={chartTheme}
-          valueFormat={(value) => `${Number(value).toLocaleString("en-GB")} photos`}
-          nodeTooltip={({ node }) => (
-            <div className={styles.tooltip}>
-              <strong>{getNodeLabel(node)}</strong>
-              <div>{Number(node.value).toLocaleString("en-GB")} photos</div>
-            </div>
-          )}
-          linkTooltip={({ link }) => (
-            <div className={styles.tooltip}>
-              <strong>
-                {getNodeLabel(link.source)} to {getNodeLabel(link.target)}
-              </strong>
-              <div>{Number(link.value).toLocaleString("en-GB")} photos</div>
-            </div>
-          )}
-        />
+        {shellIsCollapsed ? null : (
+          <ResponsiveSankey<SankeyChartNode, SankeyChartLink>
+            data={chartData}
+            margin={{
+              top: spacing,
+              right: horizontalMargin,
+              bottom: spacing,
+              left: horizontalMargin,
+            }}
+            align="justify"
+            sort="descending"
+            colors={(node) =>
+              (node as { data?: { color?: string }; color?: string }).data?.color ??
+              (node as { data?: { color?: string }; color?: string }).color ??
+              SANKEY_PALETTE[0]
+            }
+            nodeOpacity={0.9}
+            nodeThickness={nodeThickness}
+            nodeSpacing={0}
+            nodeBorderWidth={0}
+            linkOpacity={0.28}
+            nodeHoverOpacity={1}
+            nodeHoverOthersOpacity={0.25}
+            linkHoverOpacity={0.45}
+            linkHoverOthersOpacity={0.08}
+            enableLinkGradient
+            enableLabels={false}
+            animate={false}
+            isInteractive
+            layers={[
+              "links",
+              "nodes",
+              (props) => (
+                <ClickableLabelLayer
+                  {...props}
+                  labelMaxLength={labelMaxLength}
+                  minLabelHeight={minLabelHeight}
+                  labelOffset={labelOffset}
+                />
+              ),
+            ]}
+            theme={chartTheme}
+            valueFormat={(value) => `${Number(value).toLocaleString("en-GB")} photos`}
+            nodeTooltip={({ node }) => (
+              <div className={styles.tooltip}>
+                <strong>{getNodeLabel(node)}</strong>
+                <div>{Number(node.value).toLocaleString("en-GB")} photos</div>
+              </div>
+            )}
+            linkTooltip={({ link }) => (
+              <div className={styles.tooltip}>
+                <strong>
+                  {getNodeLabel(link.source)} to {getNodeLabel(link.target)}
+                </strong>
+                <div>{Number(link.value).toLocaleString("en-GB")} photos</div>
+              </div>
+            )}
+          />
+        )}
       </div>
     </div>
   );

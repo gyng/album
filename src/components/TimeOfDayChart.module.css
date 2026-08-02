@@ -40,6 +40,18 @@
   align-items: end;
 }
 
+@media (max-width: 720px) {
+  /* Twenty-four columns across a phone leaves each about 13px, while `.count`
+     centres a label like "00:00" that is nearer 25px. The midnight and 23:00
+     labels therefore hang ~6px past the grid and widen every ancestor up to
+     the stat group. Page padding happens to absorb it today, so nothing
+     scrolls — this keeps a slightly wider label from being the change that
+     makes the whole page scroll sideways. */
+  .bars {
+    padding-inline: var(--m-s);
+  }
+}
+
 .column {
   display: grid;
   gap: var(--m-xs);

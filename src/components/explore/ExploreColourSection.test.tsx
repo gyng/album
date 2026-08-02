@@ -2,7 +2,7 @@
  * @jest-environment jsdom
  */
 
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import type { PhotoStats } from "../../util/computeStats";
 import { ExploreColourSection } from "./ExploreColourSection";
 
@@ -134,7 +134,24 @@ describe("ExploreColourSection", () => {
       "href",
       "/search?color=93%2C132%2C214&facet=year%3A2024",
     );
-    expect(document.querySelector('img[alt="Blue harbour"]')).toHaveAttribute("loading", "lazy");
+    // The archive renders ~900 of these segments. Fetching every preview up
+    // front cost 81MB of images nobody had asked to see, so a segment's photo
+    // is only requested once it is actually hovered or focused.
+    expect(document.querySelector('img[alt="Blue harbour"]')).toBeNull();
+
+    const blueSegment = screen.getByTitle("Blue around 2024: 4 photos (40%)");
+    fireEvent.mouseEnter(blueSegment);
+    expect(document.querySelector('img[alt="Blue harbour"]')).toHaveAttribute("src", "/blue.jpg");
+
+    // Moving to another segment releases the first, so at most one preview is
+    // ever in flight.
+    fireEvent.mouseEnter(screen.getByTitle("Unknown around 2024: 1 photos (10%)"));
+    expect(document.querySelector('img[alt="Blue harbour"]')).toBeNull();
+    expect(document.querySelector('img[alt="Unknown colour"]')).not.toBeNull();
+
+    // Keyboard users reach the same preview.
+    fireEvent.focus(blueSegment);
+    expect(document.querySelector('img[alt="Blue harbour"]')).not.toBeNull();
     expect(screen.getByTitle("Unknown around 2024: 1 photos (10%)")).toHaveAttribute(
       "href",
       "/search",
