@@ -156,10 +156,13 @@ Done in `b1202b9` and the commit that follows it.
 - `label` must never be `undefined` or `getStaticProps` refuses to serialise it.
 - The album toggle belongs in the nav, not above the photographs: placed there it pushed the
   opening frame below the fold on a split-screen tablet, which an existing test guards.
-- Pre-existing, found while testing and left alone: the timeline's URL-sync effect refuses to
-  update `?date=` once a valid one is present, so *no* in-page selection updates the URL —
-  the heatmap included. Selection itself works. The guard exists to stop hydration clobbering
-  a deep link, so it wants fixing deliberately rather than in passing.
+- Pre-existing, found while testing and since fixed: the timeline's URL-sync effect refused to
+  update `?date=` once a valid one was present, so *no* in-page selection reached the URL — the
+  heatmap included, long before trips existed. The guard was inferring intent from "the URL
+  disagrees", which cannot tell a deep link waiting to be applied from a day the reader just
+  picked. Selections now record intent explicitly through a `chooseDate` helper, and adopting a
+  date from the URL counts as intent too, which closes the window where both effects run in the
+  same pass and the sync still sees the previous date.
 
 ## Risks
 

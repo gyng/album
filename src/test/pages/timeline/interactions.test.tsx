@@ -192,6 +192,24 @@ describe("timeline interactions", () => {
     expect(router.replace).not.toHaveBeenCalled();
   });
 
+  // The URL is how a day is shared and how the back button works. Once a deep
+  // link has been applied, picking another day has to move ?date= with it —
+  // the guard that protects hydration was refusing every later selection too,
+  // so the URL froze on whichever day was first opened.
+  it("keeps ?date= in step with later selections after a deep link", () => {
+    router.query = { date: "2026-07-13" };
+    render(<TimelinePage entries={entries as never} />);
+    expect(screen.getByTestId("selected-date")).toHaveTextContent("2026-07-13");
+
+    router.replace.mockClear();
+    fireEvent.click(screen.getByRole("button", { name: "newer date" }));
+
+    expect(screen.getByTestId("selected-date")).toHaveTextContent("2026-07-14");
+    expect(router.replace).toHaveBeenCalled();
+    const target = String(router.replace.mock.calls.at(-1)?.[0] ?? "");
+    expect(target).toContain("date=2026-07-14");
+  });
+
   it("renders memories, highlights their heatmap dates, and loads more", () => {
     clusters = [
       {

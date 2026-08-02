@@ -261,9 +261,25 @@ const TimelineScreen = ({ entries: suppliedEntries, entryRows }: TimelineScreenP
     }
   }, [selectableDates, selectedDate]);
 
+  // The date the URL and the selection are agreed on — either because the
+  // reader just picked it, or because it arrived in the URL and was adopted.
+  // Only a reader's pick should be written back: echoing an incoming date, or
+  // writing the hydration default, would clobber a real deep link.
+  const chosenDateRef = React.useRef<string | null>(null);
+  const chooseDate = React.useCallback((date: string | null) => {
+    chosenDateRef.current = date;
+    setSelectedDate(date);
+  }, []);
+
   // On mount or when router.query.date changes, update selectedDate if needed
   React.useEffect(() => {
-    if (routeReady && routeDateQuery && availableDates.includes(routeDateQuery)) {
+    if (!routeReady) return;
+    if (routeDateQuery && availableDates.includes(routeDateQuery)) {
+      // Adopting the URL's date counts as the current intent: the two now agree,
+      // so there is nothing to write back. Claiming it here rather than after
+      // the state lands also closes the window where this effect and the sync
+      // effect run in the same pass and the sync still sees the previous date.
+      chosenDateRef.current = routeDateQuery;
       setSelectedDate((current) => (current === routeDateQuery ? current : routeDateQuery));
     }
   }, [availableDates, routeDateQuery, routeReady]);
@@ -274,13 +290,11 @@ const TimelineScreen = ({ entries: suppliedEntries, entryRows }: TimelineScreenP
   React.useEffect(() => {
     if (!routeReady || !selectedDate) return;
     if (!availableDates.includes(selectedDate)) return;
-    if (
-      routeDateQuery &&
-      availableDates.includes(routeDateQuery) &&
-      routeDateQuery !== selectedDate
-    ) {
-      return;
-    }
+    // Write the URL only for a date the reader picked. Anything else is either
+    // the deep link being applied or the hydration default, and echoing those
+    // back would clobber a real ?date=. Inferring this from "the URL disagrees"
+    // instead froze ?date= on whichever day was opened first.
+    if (chosenDateRef.current !== selectedDate) return;
     if (routeDateQuery !== selectedDate) {
       const next = new URLSearchParams(searchParams);
       next.set("date", selectedDate);
@@ -303,8 +317,8 @@ const TimelineScreen = ({ entries: suppliedEntries, entryRows }: TimelineScreenP
     }
     const randomIndex = Math.floor(Math.random() * selectableDates.length);
     // invariant: randomIndex is within bounds (length checked above)
-    setSelectedDate(selectableDates[randomIndex]!);
-  }, [selectableDates]);
+    chooseDate(selectableDates[randomIndex]!);
+  }, [chooseDate, selectableDates]);
 
   const handleSelectOlderDate = React.useCallback(() => {
     if (!selectedDate) return;
@@ -312,9 +326,9 @@ const TimelineScreen = ({ entries: suppliedEntries, entryRows }: TimelineScreenP
     // Older = higher index (dates sorted newest first)
     if (idx >= 0 && idx < selectableDates.length - 1) {
       // invariant: idx + 1 is within bounds (checked above)
-      setSelectedDate(selectableDates[idx + 1]!);
+      chooseDate(selectableDates[idx + 1]!);
     }
-  }, [selectableDates, selectedDate]);
+  }, [chooseDate, selectableDates, selectedDate]);
 
   const handleSelectNewerDate = React.useCallback(() => {
     if (!selectedDate) return;
@@ -322,9 +336,9 @@ const TimelineScreen = ({ entries: suppliedEntries, entryRows }: TimelineScreenP
     // Newer = lower index (dates sorted newest first)
     if (idx > 0) {
       // invariant: idx - 1 is within bounds (idx > 0 checked above)
-      setSelectedDate(selectableDates[idx - 1]!);
+      chooseDate(selectableDates[idx - 1]!);
     }
-  }, [selectableDates, selectedDate]);
+  }, [chooseDate, selectableDates, selectedDate]);
 
   React.useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -425,7 +439,7 @@ const TimelineScreen = ({ entries: suppliedEntries, entryRows }: TimelineScreenP
                   <CalendarHeatmap
                     entries={filteredEntries}
                     selectedDate={selectedDate}
-                    onSelectDate={setSelectedDate}
+                    onSelectDate={chooseDate}
                     {...(todayDate ? { todayDate } : {})}
                     highlightedDates={memoryHighlight?.dates ?? []}
                     highlightedYears={memoryHighlight ? [memoryHighlight.year] : []}
@@ -435,7 +449,7 @@ const TimelineScreen = ({ entries: suppliedEntries, entryRows }: TimelineScreenP
 
                 {/* The rung between the heatmap and a single day: these days
                     were one journey, which neither of the other two can say. */}
-                <TimelineTripsSection entries={filteredEntries} onSelectDate={setSelectedDate} />
+                <TimelineTripsSection entries={filteredEntries} onSelectDate={chooseDate} />
 
                 {visibleMemories.length > 0 ? (
                   <section className={styles.memories} aria-label="Memories">
@@ -492,7 +506,7 @@ const TimelineScreen = ({ entries: suppliedEntries, entryRows }: TimelineScreenP
                                 type="button"
                                 className={styles.memoryClusterLabelButton}
                                 onClick={() => {
-                                  setSelectedDate(cluster.startDate);
+                                  chooseDate(cluster.startDate);
                                   setMemoryScrollTargetDate(cluster.startDate);
                                 }}
                                 aria-label={label}
@@ -522,7 +536,7 @@ const TimelineScreen = ({ entries: suppliedEntries, entryRows }: TimelineScreenP
                                     type="button"
                                     className={styles.memoryButton}
                                     onClick={() => {
-                                      setSelectedDate(entry.date);
+                                      chooseDate(entry.date);
                                     }}
                                     aria-label={`Jump to ${entry.album} on ${entry.date}`}
                                     title={`Jump to ${entry.date}`}
