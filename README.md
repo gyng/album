@@ -335,4 +335,4 @@ cd src
 npm run screenshot
 ```
 
-This captures `screenshot.html` at a fixed 3840×2160 viewport (iframes load from production) and writes `screenshot.jpg` to the repo root.
+This builds a four-pane page at a fixed 3840×2160 viewport, whose iframes load the deployed site at `site.origin`, and writes `screenshot.jpg` to the repo root. The panes and the photo whose details are opened are declared at the top of `src/tests/screenshot.spec.ts`.

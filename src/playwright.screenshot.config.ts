@@ -1,12 +1,12 @@
 import { defineConfig, devices } from "@playwright/test";
 
-const port = 3001;
-const baseURL = `http://localhost:${port}`;
-
 /**
  * Playwright config for the README screenshot capture only.
- * Serves the public/ directory with a simple static server —
- * no Next.js build needed since iframes point at production.
+ *
+ * No web server and no Next.js build: the spec builds its own page with
+ * `setContent` and the iframes load the deployed site directly. It used to
+ * serve `public/`, which is why the fixture lived there — and why the deployed
+ * site answered /screenshot.html.
  *
  * Used by: npm run screenshot
  */
@@ -14,9 +14,6 @@ export default defineConfig({
   testDir: "./tests",
   testMatch: "screenshot.spec.ts",
   timeout: 120 * 1000,
-  use: {
-    baseURL,
-  },
   projects: [
     {
       name: "chromium",
@@ -24,10 +21,4 @@ export default defineConfig({
     },
   ],
   reporter: [["list"]],
-  webServer: {
-    command: `npx serve public -l ${port}`,
-    url: baseURL,
-    reuseExistingServer: true,
-    timeout: 15 * 1000,
-  },
 });
