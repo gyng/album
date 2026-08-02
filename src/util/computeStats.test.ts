@@ -1053,3 +1053,128 @@ describe("computePhotoStats", () => {
     expect(stats.dateRange).toEqual([2020, 2020]);
   });
 });
+
+describe("timezone stats", () => {
+  // The zone is derived from each photo's coordinates by the indexer, so it is
+  // the only trustworthy record of where the clock was — the camera's own
+  // OffsetTime is wrong on most of this archive.
+  const zoned = (tz_name: string, tz_offset: string, date = "2024:03:22 18:30:00") =>
+    makePhoto({
+      exif: { DateTimeOriginal: date },
+      tags: { tz_name, tz_offset } as PhotoBlock["_build"]["tags"],
+    });
+
+  it("counts distinct zones and ranks them by photo count", () => {
+    const stats = computePhotoStats([
+      makeAlbum([
+        zoned("Asia/Tokyo", "+09:00"),
+        zoned("Asia/Tokyo", "+09:00"),
+        zoned("Asia/Singapore", "+08:00"),
+      ]),
+    ]);
+
+    expect(stats.timezoneStats.zoneCount).toBe(2);
+    expect(stats.timezoneStats.zones[0]).toMatchObject({ name: "Asia/Tokyo", count: 2 });
+    expect(stats.timezoneStats.zones[1]).toMatchObject({ name: "Asia/Singapore", count: 1 });
+  });
+
+  // Melbourne indexes as both +11:00 and +10:00 across the year. That is one
+  // place, not two, so the zone is the identity and the offsets are detail.
+  it("keeps a zone whole across its daylight-saving offsets", () => {
+    const stats = computePhotoStats([
+      makeAlbum([
+        zoned("Australia/Melbourne", "+11:00", "2024:01:10 09:00:00"),
+        zoned("Australia/Melbourne", "+10:00", "2024:07:10 09:00:00"),
+      ]),
+    ]);
+
+    expect(stats.timezoneStats.zoneCount).toBe(1);
+    expect(stats.timezoneStats.zones[0]?.offsets).toEqual(["+10:00", "+11:00"]);
+  });
+
+  // Coverage is measured against dated photos: an undated one could never carry
+  // a zone, so counting it would understate the derivation.
+  it("reports coverage against dated photos and ignores undated ones", () => {
+    const stats = computePhotoStats([
+      makeAlbum([
+        zoned("Asia/Tokyo", "+09:00"),
+        makePhoto({ exif: { DateTimeOriginal: "2024:03:22 18:30:00" } }),
+        makePhoto({ exif: {} }),
+      ]),
+    ]);
+
+    expect(stats.timezoneStats.zoneCount).toBe(1);
+    expect(stats.timezoneStats.coverage).toBeCloseTo(0.5);
+  });
+});
+
+describe("archive gaps", () => {
+  const onDate = (date: string) => makePhoto({ exif: { DateTimeOriginal: date } });
+
+  // An archive's silences characterise it as much as its peaks: this one has a
+  // four-year opening gap and a two-year one over the pandemic.
+  it("finds the longest silences between shooting days, longest first", () => {
+    const stats = computePhotoStats([
+      makeAlbum([
+        onDate("2011:04:05 10:00:00"),
+        onDate("2015:05:18 10:00:00"),
+        onDate("2015:05:19 10:00:00"),
+        onDate("2016:01:01 10:00:00"),
+      ]),
+    ]);
+
+    expect(stats.archiveGaps[0]).toMatchObject({
+      days: 1504,
+      fromDate: "2011-04-05",
+      toDate: "2015-05-18",
+    });
+    expect(stats.archiveGaps[1]?.days).toBe(227);
+  });
+
+  it("reports no gaps when every photo lands on one day", () => {
+    const stats = computePhotoStats([
+      makeAlbum([onDate("2024:03:22 10:00:00"), onDate("2024:03:22 18:00:00")]),
+    ]);
+
+    expect(stats.archiveGaps).toEqual([]);
+  });
+});
+
+describe("day of year memories", () => {
+  const onDate = (date: string, src: string) => ({
+    ...makePhoto({ exif: { DateTimeOriginal: date }, srcset: [{ src, width: 1, height: 1 }] }),
+    data: { src },
+  });
+
+  // The build cannot know what "today" is, so it indexes every calendar day and
+  // the browser picks the one it is.
+  it("indexes photos by calendar day so the browser can pick today", () => {
+    const stats = computePhotoStats([
+      makeAlbum([
+        onDate("2019:03:22 10:00:00", "/a.jpg"),
+        onDate("2024:03:22 10:00:00", "/b.jpg"),
+        onDate("2024:07:01 10:00:00", "/c.jpg"),
+      ]),
+    ]);
+
+    const march22 = stats.dayOfYearMemories.find((entry) => entry.monthDay === "03-22");
+    expect(march22?.photos.map((photo) => photo.year)).toEqual([2024, 2019]);
+    expect(stats.dayOfYearMemories.find((entry) => entry.monthDay === "07-01")).toBeTruthy();
+  });
+
+  // One photo per year, so a single busy day cannot crowd out the other years.
+  it("keeps one photo per year and caps how many years it carries", () => {
+    const photos = [];
+    for (let year = 2015; year <= 2024; year += 1) {
+      photos.push(onDate(`${year}:03:22 10:00:00`, `/${year}-a.jpg`));
+      photos.push(onDate(`${year}:03:22 12:00:00`, `/${year}-b.jpg`));
+    }
+    const stats = computePhotoStats([makeAlbum(photos)]);
+
+    const march22 = stats.dayOfYearMemories.find((entry) => entry.monthDay === "03-22")!;
+    const years = march22.photos.map((photo) => photo.year);
+    expect(new Set(years).size).toBe(years.length);
+    expect(years.length).toBeLessThanOrEqual(4);
+    expect(years[0]).toBe(2024);
+  });
+});

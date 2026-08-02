@@ -190,6 +190,9 @@ const makeStats = () => ({
   calendarCoverage: 1,
   recentYearStats: [],
   revisitedPlaces: [],
+  timezoneStats: { zoneCount: 0, coverage: 0, zones: [] },
+  archiveGaps: [],
+  dayOfYearMemories: [],
   mapPoints: [],
   locationFlow: {
     nodes: [

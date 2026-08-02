@@ -47,6 +47,11 @@ import {
   ExploreRecentTrendsSection,
   ExploreRevisitedPlacesSection,
 } from "../../components/explore/ExploreStorySections";
+import {
+  ExploreArchiveGaps,
+  ExploreThisDaySection,
+  ExploreTimezones,
+} from "../../components/explore/ExploreTimeSections";
 import { ExploreColourSection } from "../../components/explore/ExploreColourSection";
 import { formatPageTitle } from "../../lib/seo";
 
@@ -598,6 +603,8 @@ const ExploreScreen = ({ stats, visualSameness }: ExploreScreenProps) => {
             </StatGroup>
           ) : null}
 
+          <ExploreThisDaySection memories={stats.dayOfYearMemories} />
+
           <ExploreFunStatsSection cards={funStats} deferContent />
           <ExploreRecentTrendsSection data={stats.recentYearStats} deferContent />
           <ExploreRevisitedPlacesSection places={stats.revisitedPlaces} deferContent />
@@ -636,6 +643,8 @@ const ExploreScreen = ({ stats, visualSameness }: ExploreScreenProps) => {
                 </div>
               </section>
             ) : null}
+            <ExploreTimezones stats={stats.timezoneStats} />
+            <ExploreArchiveGaps gaps={stats.archiveGaps} />
           </StatGroup>
 
           <StatGroup

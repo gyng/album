@@ -135,11 +135,38 @@ export type PhotoStats = {
       swatch?: string;
     }>;
   }>;
+  timezoneStats: {
+    zoneCount: number;
+    coverage: number;
+    zones: Array<{
+      name: string;
+      offsets: string[];
+      count: number;
+      sharePercent: number;
+    }>;
+  };
+  archiveGaps: Array<{
+    days: number;
+    fromDate: string;
+    toDate: string;
+  }>;
+  dayOfYearMemories: Array<{
+    monthDay: string;
+    photos: Array<{
+      year: number;
+      date: string;
+      src: string;
+      label: string;
+      swatch?: string;
+    }>;
+  }>;
 };
 
 const TOP_N_STRING = 20;
 const GEAR_FALLBACK_LENS_LABEL = "Unknown / built-in lens";
 const MAX_REVISITED_PLACES = 4;
+const MAX_ARCHIVE_GAPS = 5;
+const MAX_MEMORY_YEARS = 4;
 const WEEKDAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const MONTH_LABELS = [
   "Jan",
@@ -1245,6 +1272,135 @@ function computeRevisitedPlace(photos: PhotoBlock[]): PhotoStats["revisitedPlace
     }));
 }
 
+const pad2 = (value: number) => String(value).padStart(2, "0");
+
+const photoThumbSrc = (photo: PhotoBlock) =>
+  photo._build.srcset[0]?.src ?? encodePublicAssetPath(photo.data.src);
+
+const photoSwatch = (photo: PhotoBlock) => {
+  const dominant = photo._build.tags?.colors?.[0] as [number, number, number] | undefined;
+  return dominant ? { swatch: rgbToString(dominant) } : {};
+};
+
+/**
+ * Which timezones the archive was shot in.
+ *
+ * Keyed on the IANA zone rather than the offset, because one place can report
+ * several offsets across the year — Melbourne indexes as both +11:00 and +10:00
+ * — and that is one place, not two. The offsets ride along as detail.
+ *
+ * The zone comes from `derive_zone` in the indexer, which resolves it from the
+ * photo's coordinates. The camera's own `OffsetTime` is not used: it is wrong on
+ * every X100T frame and 18% of X-T5 frames in this archive.
+ */
+function computeTimezoneStats(photos: PhotoBlock[]): PhotoStats["timezoneStats"] {
+  const byZone = new Map<string, { count: number; offsets: Set<string> }>();
+  let dated = 0;
+
+  for (const photo of photos) {
+    if (!parseExifLocalDateTime(photo._build.exif?.DateTimeOriginal)) continue;
+    dated += 1;
+
+    const name = photo._build.tags?.tz_name;
+    if (!name) continue;
+
+    const entry = byZone.get(name) ?? { count: 0, offsets: new Set<string>() };
+    entry.count += 1;
+    const offset = photo._build.tags?.tz_offset;
+    if (offset) entry.offsets.add(offset);
+    byZone.set(name, entry);
+  }
+
+  const zonedPhotos = Array.from(byZone.values()).reduce((total, zone) => total + zone.count, 0);
+
+  return {
+    zoneCount: byZone.size,
+    coverage: dated > 0 ? zonedPhotos / dated : 0,
+    zones: Array.from(byZone.entries())
+      .map(([name, zone]) => ({
+        name,
+        offsets: Array.from(zone.offsets).sort(),
+        count: zone.count,
+        sharePercent: zonedPhotos > 0 ? Math.round((zone.count / zonedPhotos) * 100) : 0,
+      }))
+      .sort((left, right) => right.count - left.count || left.name.localeCompare(right.name)),
+  };
+}
+
+/**
+ * The longest stretches with no photograph at all.
+ *
+ * Measured between consecutive *shooting days*, not photos, so a busy day does
+ * not register as a gap of zero. The silences are as characteristic of an
+ * archive as its peaks — this one stops for four years, then for two.
+ */
+function computeArchiveGaps(photos: PhotoBlock[]): PhotoStats["archiveGaps"] {
+  const days = new Set<string>();
+  for (const photo of photos) {
+    const parsed = parseExifLocalDateTime(photo._build.exif?.DateTimeOriginal);
+    if (!parsed) continue;
+    days.add(`${parsed.year}-${pad2(parsed.month)}-${pad2(parsed.day)}`);
+  }
+
+  const sorted = Array.from(days).sort();
+  const gaps: PhotoStats["archiveGaps"] = [];
+  for (let index = 1; index < sorted.length; index += 1) {
+    const fromDate = sorted[index - 1]!;
+    const toDate = sorted[index]!;
+    // Date.UTC on already-parsed wall-clock parts: both ends share the zone, so
+    // it cancels out of the difference.
+    const elapsed = Date.parse(`${toDate}T00:00:00Z`) - Date.parse(`${fromDate}T00:00:00Z`);
+    gaps.push({ days: Math.round(elapsed / 86_400_000), fromDate, toDate });
+  }
+
+  return gaps
+    .sort((left, right) => right.days - left.days || left.fromDate.localeCompare(right.fromDate))
+    .slice(0, MAX_ARCHIVE_GAPS);
+}
+
+/**
+ * Photos indexed by calendar day, so the browser can show "this day in other
+ * years".
+ *
+ * The index covers every day rather than today's, because the page is
+ * statically built and the build has no idea what day it will be read on.
+ * One photo per year keeps a single busy day from crowding out the other years,
+ * and caps what the payload carries.
+ */
+function computeDayOfYearMemories(photos: PhotoBlock[]): PhotoStats["dayOfYearMemories"] {
+  const byMonthDay = new Map<string, Map<number, { date: string; photo: PhotoBlock }>>();
+
+  for (const photo of photos) {
+    const parsed = parseExifLocalDateTime(photo._build.exif?.DateTimeOriginal);
+    if (!parsed) continue;
+
+    const monthDay = `${pad2(parsed.month)}-${pad2(parsed.day)}`;
+    const date = `${parsed.year}-${monthDay}`;
+    const byYear =
+      byMonthDay.get(monthDay) ?? new Map<number, { date: string; photo: PhotoBlock }>();
+    if (!byYear.has(parsed.year)) {
+      byYear.set(parsed.year, { date, photo });
+    }
+    byMonthDay.set(monthDay, byYear);
+  }
+
+  return Array.from(byMonthDay.entries())
+    .map(([monthDay, byYear]) => ({
+      monthDay,
+      photos: Array.from(byYear.entries())
+        .sort(([leftYear], [rightYear]) => rightYear - leftYear)
+        .slice(0, MAX_MEMORY_YEARS)
+        .map(([year, { date, photo }]) => ({
+          year,
+          date,
+          src: photoThumbSrc(photo),
+          label: photo.data.title ?? photo.id,
+          ...photoSwatch(photo),
+        })),
+    }))
+    .sort((left, right) => left.monthDay.localeCompare(right.monthDay));
+}
+
 export function computePhotoStats(albums: Content[]): PhotoStats {
   const photos = albums.flatMap((album) =>
     album.blocks.filter((b): b is PhotoBlock => b.kind === "photo"),
@@ -1279,6 +1435,9 @@ export function computePhotoStats(albums: Content[]): PhotoStats {
   });
 
   return {
+    timezoneStats: computeTimezoneStats(photos),
+    archiveGaps: computeArchiveGaps(photos),
+    dayOfYearMemories: computeDayOfYearMemories(photos),
     totalPhotos: photos.length,
     totalAlbums: albums.length,
     dateRange,

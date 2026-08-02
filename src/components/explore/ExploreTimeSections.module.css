@@ -1,0 +1,95 @@
+.zoneTotal {
+  display: flex;
+  align-items: baseline;
+  gap: var(--m-s);
+}
+
+.zoneCount {
+  font-size: var(--fs-l);
+  font-variant-numeric: tabular-nums;
+}
+
+.zoneCountLabel {
+  color: var(--c-bg-contrast-light);
+  font-size: var(--fs-sm);
+}
+
+.zoneList,
+.gapList {
+  display: grid;
+  gap: var(--m-s);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.zoneRow {
+  display: grid;
+  /* The offset column is fixed so the times line up down the list; a zone that
+     changes offset across the year carries two, which is the widest case. */
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--m) var(--m-s);
+  align-items: baseline;
+  font-size: var(--fs-sm);
+}
+
+.zoneName {
+  min-inline-size: 0;
+  overflow-wrap: anywhere;
+}
+
+.zoneOffsets {
+  color: var(--c-bg-contrast-light);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.zoneShare {
+  grid-column: 1 / -1;
+  color: var(--c-bg-contrast-light);
+  font-size: var(--fs-s);
+}
+
+.gapRow {
+  display: grid;
+  gap: var(--m);
+  font-size: var(--fs-sm);
+}
+
+.gapSpan {
+  font-variant-numeric: tabular-nums;
+}
+
+.gapEnds {
+  color: var(--c-bg-contrast-light);
+  font-size: var(--fs-s);
+  overflow-wrap: anywhere;
+}
+
+.memoryGrid {
+  display: grid;
+  /* Sized to the thumb, not to a fraction of the row: `Thumb` is a fixed
+     --thumb-size square, so 1fr columns end up narrower than their own image
+     and each one overlaps the next, swallowing the gap. */
+  grid-template-columns: repeat(auto-fill, var(--thumb-size));
+  gap: var(--m-m);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.memoryItem {
+  display: grid;
+  gap: var(--m-xs);
+  justify-items: start;
+}
+
+.memoryYear {
+  font-size: var(--fs-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.memoryAgo {
+  color: var(--c-bg-contrast-light);
+  font-size: var(--fs-s);
+}
