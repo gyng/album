@@ -10,7 +10,7 @@ import type { PhotoBlock } from "../../services/types";
 import { GlobalNav } from "../../components/GlobalNav";
 import { PhotoAlbum } from "../../components/PhotoAlbum";
 import { AlbumTripsView } from "../../components/AlbumTripsView";
-import { Footer, SegmentedToggle, buttonStyles } from "../../components/ui";
+import { Footer, buttonStyles } from "../../components/ui";
 import commonStyles from "../../styles/common.module.css";
 import type { AlbumPageData } from "../../util/pageDataTypes";
 import { Seo } from "../../components/Seo";
@@ -27,16 +27,10 @@ export type AlbumScreenProps = AlbumPageData;
 
 const AlbumScreen = ({ album }: AlbumScreenProps) => {
   const { siteOrigin } = usePublicConfig();
-  const { getSearchParam, ready, searchParams, replaceSearchParams } = useUrlSearchParams();
+  const { getSearchParam, ready } = useUrlSearchParams();
   // The grid stays the default. Trips is a second reading of the same photos,
   // and it is a URL so a particular album's journeys can be linked to.
   const view = ready && getSearchParam("view") === "trips" ? "trips" : "grid";
-  const setView = (next: "grid" | "trips") => {
-    const params = new URLSearchParams(searchParams);
-    if (next === "trips") params.set("view", "trips");
-    else params.delete("view");
-    replaceSearchParams(params);
-  };
   // Re-run the hash scroll after client-side navigation. Photo ids contain
   // dots and other characters, so decode the hash before looking up the node.
   const scrollToHash = React.useCallback(() => {
@@ -123,18 +117,16 @@ const AlbumScreen = ({ album }: AlbumScreenProps) => {
         extraItems={
           <>
             <li>
-              {/* Album-level views live in the nav beside the map and timeline
-                  links; putting this above the photographs pushed the first one
-                  below the fold on a split-screen tablet. */}
-              <SegmentedToggle
-                ariaLabel="Album view"
-                value={view}
-                onChange={setView}
-                options={[
-                  { value: "grid", label: "Grid" },
-                  { value: "trips", label: "Trips" },
-                ]}
-              />
+              {/* One of the album's views, named like its siblings here rather
+                  than shaped as a switch — and a link, so it survives without
+                  JavaScript and can be shared. Putting it above the photographs
+                  pushed the first one below the fold on a split-screen tablet. */}
+              <Link
+                href={view === "trips" ? `/album/${albumName}` : `/album/${albumName}?view=trips`}
+                className={`${buttonStyles.base} ${commonStyles.navContext}`}
+              >
+                {view === "trips" ? "Album grid" : "Album trips"}
+              </Link>
             </li>
             <li>
               <Link

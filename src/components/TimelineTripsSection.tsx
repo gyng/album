@@ -2,13 +2,11 @@ import React from "react";
 import type { TimelineEntry } from "../util/pageDataTypes";
 import { computeTrips, type TripPhoto } from "../util/computeTrips";
 import { formatExifWallClockDate } from "../util/exifTime";
-import { Caption, Heading, PillButton, Thumb } from "./ui";
+import { Caption, Heading, PillButton } from "./ui";
 import styles from "./TimelineTripsSection.module.css";
 
-const INITIAL_TRIPS = 5;
-const LOAD_MORE_TRIPS = 5;
-/** Enough to recognise the journey; the day view is where you actually look. */
-const STRIP_PHOTOS = 10;
+const INITIAL_TRIPS = 4;
+const LOAD_MORE_TRIPS = 4;
 
 /**
  * Timeline entries carry an already-summarised geocode — "city, region, country"
@@ -86,62 +84,59 @@ export const TimelineTripsSection = ({
       </div>
 
       <ul className={styles.list}>
-        {shown.map((trip) => (
-          <li key={trip.id} className={styles.trip}>
-            <div className={styles.meta}>
-              <span className={styles.span}>
-                {trip.isOuting
-                  ? longDate(trip.startDate)
-                  : `${longDate(trip.startDate)} – ${longDate(trip.endDate)}`}
-              </span>
-              <span className={styles.stats}>
-                {trip.isOuting
-                  ? `outing · ${trip.photoCount.toLocaleString("en")} photos`
-                  : `${trip.dayCount} days · ${trip.photoCount.toLocaleString("en")} photos`}
-                {trip.totalKm && trip.totalKm >= 1
-                  ? ` · ${Math.round(trip.totalKm).toLocaleString("en")} km`
-                  : ""}
-              </span>
-              {trip.places.length > 0 ? (
-                <span className={styles.places}>{trip.places.slice(0, 6).join(" → ")}</span>
-              ) : null}
-            </div>
+        {shown.map((trip) => {
+          const swatches = Array.from(
+            new Set(trip.days.map((day) => day.colour).filter(Boolean) as string[]),
+          ).slice(0, 4);
+          return (
+            <li key={trip.id} className={styles.trip}>
+              <div className={styles.meta}>
+                <span className={styles.span}>
+                  {trip.isOuting
+                    ? longDate(trip.startDate)
+                    : `${longDate(trip.startDate)} – ${longDate(trip.endDate)}`}
+                </span>
+                <span className={styles.stats}>
+                  {trip.isOuting
+                    ? `outing · ${trip.photoCount.toLocaleString("en")} photos`
+                    : `${trip.dayCount} days · ${trip.photoCount.toLocaleString("en")} photos`}
+                  {trip.totalKm && trip.totalKm >= 1
+                    ? ` · ${Math.round(trip.totalKm).toLocaleString("en")} km`
+                    : ""}
+                </span>
+                {swatches.length > 0 ? (
+                  <span className={styles.swatches} aria-hidden="true">
+                    {swatches.map((colour) => (
+                      <span key={colour} className={styles.swatch} style={{ background: colour }} />
+                    ))}
+                  </span>
+                ) : null}
+                {trip.places.length > 0 ? (
+                  <span className={styles.places}>{trip.places.slice(0, 6).join(" → ")}</span>
+                ) : null}
+              </div>
 
-            <div className={styles.days}>
-              {trip.days.map((day) => (
-                <button
-                  key={day.date}
-                  type="button"
-                  className={styles.day}
-                  onClick={() => onSelectDate(day.date)}
-                >
-                  <span className={styles.dayDate}>{longDate(day.date)}</span>
-                  <span className={styles.dayCount}>{day.count}</span>
-                </button>
-              ))}
-            </div>
-
-            <div className={styles.strip}>
-              {trip.days
-                .flatMap((day) => day.photos)
-                .slice(0, STRIP_PHOTOS)
-                .map((photo) => (
-                  <Thumb
-                    key={photo.href + photo.src}
-                    src={photo.src}
-                    alt=""
-                    size="small"
-                    loading="lazy"
-                    {...(photo.swatch ? { style: { backgroundColor: photo.swatch } } : {})}
-                  />
+              <div className={styles.days}>
+                {trip.days.map((day) => (
+                  <button
+                    key={day.date}
+                    type="button"
+                    className={styles.day}
+                    onClick={() => onSelectDate(day.date)}
+                  >
+                    <span className={styles.dayDate}>{longDate(day.date)}</span>
+                    <span className={styles.dayCount}>{day.count}</span>
+                  </button>
                 ))}
-            </div>
-          </li>
-        ))}
+              </div>
+            </li>
+          );
+        })}
       </ul>
 
       {visible < trips.length ? (
         <PillButton
+          className={styles.loadMore}
           onClick={() => setVisible((count) => Math.min(count + LOAD_MORE_TRIPS, trips.length))}
         >
           <span>Load more trips</span>

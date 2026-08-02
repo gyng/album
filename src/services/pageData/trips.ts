@@ -15,7 +15,7 @@ export type TripsPageData = { trips: Trip[] };
  * colour and hours are computed before this trim, so the trim costs nothing but
  * thumbnails.
  */
-const PHOTOS_PER_DAY = 2;
+const PHOTOS_PER_DAY = 3;
 
 const toTripPhoto = (album: Content, photo: PhotoBlock): TripPhoto => {
   const exif = photo._build.exif;

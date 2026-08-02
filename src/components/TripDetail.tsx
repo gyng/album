@@ -18,10 +18,10 @@ const roundKm = (km: number) => (km >= 10 ? Math.round(km) : Math.round(km * 10)
  * One journey, day by day.
  *
  * Shared by the album's Trips view and the /trips page so the two cannot drift.
- * Everything shown is derived from the photographs themselves: the colour bar
- * is the day's average dominant colour, the sparkline the hours it was shot in,
- * and the two distances answer different questions — how far the day's centre
- * of gravity moved overnight, and how much ground was covered once there.
+ * Everything shown is derived from the photographs themselves: the dot is the
+ * day's average dominant colour, the sparkline the hours it was shot in, and
+ * the two distances answer different questions — how far the day's centre of
+ * gravity moved overnight, and how much ground was covered once there.
  */
 export const TripDetail = ({ trip, headingLevel = 2 }: { trip: Trip; headingLevel?: 2 | 3 }) => (
   <section className={styles.trip}>
@@ -65,6 +65,14 @@ export const TripDetail = ({ trip, headingLevel = 2 }: { trip: Trip; headingLeve
             <p className={styles.places}>{day.places.slice(0, 5).join(" → ")}</p>
           ) : null}
           <p className={styles.stat}>
+            {day.colour ? (
+              <span
+                className={styles.swatch}
+                style={{ background: day.colour }}
+                title="The day's average colour"
+                aria-hidden="true"
+              />
+            ) : null}
             {day.count.toLocaleString("en")} {day.count === 1 ? "photo" : "photos"}
             {day.from ? ` · ${day.from}–${day.to}` : ""}
             {day.coveredKm && day.coveredKm >= 1 ? ` · ${roundKm(day.coveredKm)} km covered` : ""}
@@ -83,14 +91,6 @@ export const TripDetail = ({ trip, headingLevel = 2 }: { trip: Trip; headingLeve
               ))}
             </div>
           ) : null}
-          {day.colour ? (
-            <div
-              className={styles.colour}
-              style={{ backgroundColor: day.colour }}
-              title="The day's average colour"
-              aria-hidden="true"
-            />
-          ) : null}
         </div>
 
         <div className={styles.strip}>
@@ -99,7 +99,6 @@ export const TripDetail = ({ trip, headingLevel = 2 }: { trip: Trip; headingLeve
               <Thumb
                 src={photo.src}
                 alt={photo.label}
-                size="small"
                 loading="lazy"
                 {...(photo.swatch ? { style: { backgroundColor: photo.swatch } } : {})}
               />

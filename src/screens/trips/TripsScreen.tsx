@@ -31,7 +31,7 @@ const TripsScreen = ({ trips }: TripsScreenProps) => {
         description={`${journeys.length} journeys and ${trips.length - journeys.length} single-day outings, grouped from the photographs themselves.`}
         pathname="/trips"
       />
-      <GlobalNav />
+      <GlobalNav currentPage="trips" />
       <main id="main-content" className={styles.page}>
         <header className={styles.header}>
           <Heading level={1} as="h1">
@@ -55,6 +55,7 @@ const TripsScreen = ({ trips }: TripsScreenProps) => {
 
         {visible < trips.length ? (
           <PillButton
+            className={styles.loadMore}
             onClick={() => setVisible((count) => Math.min(count + LOAD_MORE_TRIPS, trips.length))}
           >
             <span>Load more trips</span>

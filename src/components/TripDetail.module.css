@@ -1,6 +1,9 @@
 .trip {
   display: grid;
   gap: var(--m-m);
+  padding-block-end: var(--m-l);
+  border-block-end: var(--size-1) solid
+    color-mix(in oklch, var(--c-bg-contrast-light) 25%, transparent);
 }
 
 .head {
@@ -23,7 +26,7 @@
 
 .day {
   display: grid;
-  grid-template-columns: var(--m-l) minmax(0, 12rem) minmax(0, 1fr);
+  grid-template-columns: var(--m-l) minmax(0, 14rem) minmax(0, 1fr);
   gap: var(--m-m);
   padding-block: var(--m-s);
 }
@@ -88,6 +91,8 @@
 }
 
 .stat {
+  display: flex;
+  align-items: center;
   margin: 0;
   font-size: var(--fs-s);
   color: var(--c-bg-contrast-light);
@@ -95,14 +100,18 @@
 }
 
 /* When the day was photographed, one block per hour from 05:00 to 23:00. */
+/* One block per hour from 05:00 to 23:00 — the shape of the day, sized to the
+   meta column so it reads as a chart rather than a barcode. */
 .hours {
   display: flex;
   gap: var(--size-1);
+  max-inline-size: var(--size-180);
 }
 
 .hours span {
-  inline-size: var(--m);
+  flex: 1 1 auto;
   block-size: var(--m-s);
+  border-radius: var(--size-1);
 }
 
 .on {
@@ -113,16 +122,24 @@
   background: color-mix(in oklch, var(--c-bg-contrast-light) 18%, transparent);
 }
 
-.colour {
-  block-size: var(--size-3);
-  border-radius: var(--size-2);
+/* The day's colour as a dot beside its numbers, the way this site previews a
+   set's colours everywhere else. At full width it read as a rule or a progress
+   bar rather than a signature. */
+.swatch {
+  display: inline-block;
+  inline-size: var(--size-8);
+  block-size: var(--size-8);
+  margin-inline-end: var(--m);
+  border-radius: var(--radius-pill);
+  box-shadow: 0 0 0 var(--size-1) color-mix(in oklch, var(--c-bg) 60%, transparent);
+  vertical-align: baseline;
 }
 
 .strip {
   display: grid;
   /* Sized to the thumbnail: a fractional column is narrower than a fixed-size
      `Thumb`, so each image would overflow into its neighbour. */
-  grid-template-columns: repeat(auto-fill, var(--thumb-size-small));
+  grid-template-columns: repeat(auto-fill, var(--thumb-size));
   gap: var(--m-s);
 }
 

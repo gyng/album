@@ -10,6 +10,7 @@ export type GlobalNavPage =
   | "map"
   | "slideshow"
   | "explore"
+  | "trips"
   | "guess";
 
 type Props = {
@@ -101,10 +102,10 @@ export const GlobalNav: React.FC<Props> = ({
           <li>
             <Link
               href="/trips"
-              className={cx(buttonStyles.base, current("timeline"))}
-              aria-current={ariaCurrent("timeline")}
+              className={cx(buttonStyles.base, current("trips"))}
+              aria-current={ariaCurrent("trips")}
             >
-              Timeline
+              Trips
             </Link>
           </li>
           <li>

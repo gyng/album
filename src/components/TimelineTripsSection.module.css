@@ -1,13 +1,18 @@
+/* Matches the Memories block directly below it: the same hairline separator,
+   the same header shape, the same strip. The two are siblings in one column
+   and should not look like they came from different pages. */
 .section {
   display: grid;
-  gap: var(--m-m);
-  justify-items: start;
-  padding-block: var(--m-l);
+  gap: var(--m);
+  padding-block-start: var(--m);
+  border-top: solid var(--size-1) color-mix(in oklch, var(--c-bg-contrast-light) 35%, transparent);
 }
 
 .head {
-  display: grid;
-  gap: var(--m);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--m-s);
 }
 
 .list {
@@ -16,38 +21,54 @@
   margin: 0;
   padding: 0;
   list-style: none;
-  inline-size: 100%;
 }
 
 .trip {
   display: grid;
   gap: var(--m-s);
-  padding-block-end: var(--m-m);
-  border-block-end: var(--size-1) solid
-    color-mix(in oklch, var(--c-bg-contrast-light) 25%, transparent);
+  min-inline-size: 0;
 }
 
 .meta {
   display: flex;
   flex-wrap: wrap;
-  align-items: baseline;
-  gap: var(--m) var(--m-m);
+  align-items: center;
+  gap: var(--m) var(--m-s);
+  min-inline-size: 0;
 }
 
 .span {
-  font-size: var(--fs-sm);
+  font-size: var(--fs-s);
+  line-height: 1.2;
 }
 
-.stats,
-.places {
+.stats {
   color: var(--c-bg-contrast-light);
   font-size: var(--fs-s);
+  line-height: 1.2;
   font-variant-numeric: tabular-nums;
 }
 
 .places {
   flex-basis: 100%;
+  margin: 0;
+  color: var(--c-bg-contrast-light);
+  font-size: var(--fs-s);
+  line-height: 1.4;
   overflow-wrap: anywhere;
+}
+
+/* The same dots Memories uses to preview a cluster's colours. */
+.swatches {
+  display: inline-flex;
+  gap: var(--m);
+}
+
+.swatch {
+  inline-size: var(--size-8);
+  block-size: var(--size-8);
+  border-radius: var(--radius-pill);
+  box-shadow: 0 0 0 var(--size-1) color-mix(in oklch, var(--c-bg) 60%, transparent);
 }
 
 .days {
@@ -60,14 +81,15 @@
 .day {
   display: inline-flex;
   align-items: baseline;
-  gap: var(--m);
+  gap: var(--m-s);
   padding: var(--m) var(--m-s);
-  border: var(--size-1) solid var(--c-bg-contrast-light);
+  border: var(--size-1) solid color-mix(in oklch, var(--c-bg-contrast-light) 45%, transparent);
   border-radius: var(--radius-pill);
   background: transparent;
   color: inherit;
   font: inherit;
   font-size: var(--fs-s);
+  line-height: 1.2;
   cursor: pointer;
 }
 
@@ -80,10 +102,9 @@
   font-variant-numeric: tabular-nums;
 }
 
-.strip {
-  display: grid;
-  /* Sized to the thumbnail: a fractional column is narrower than a fixed-size
-     `Thumb`, so each image would overflow into its neighbour. */
-  grid-template-columns: repeat(auto-fill, var(--thumb-size-small));
-  gap: var(--m-s);
+/* Matches the Memories load-more beside it: sized to its label, not the column. */
+.loadMore {
+  justify-self: start;
+  align-self: start;
+  margin-block-start: var(--m-s);
 }

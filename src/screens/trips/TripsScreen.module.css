@@ -1,5 +1,7 @@
 .page {
-  max-inline-size: var(--content-width-gallery);
+  /* Sized to what a trip actually occupies — rail, meta column and three
+     frames — so the page reads as composed rather than half empty. */
+  max-inline-size: var(--content-width-section);
   margin-inline: auto;
   padding: var(--m-l) var(--m-m) var(--m-2xl);
   display: grid;
@@ -12,8 +14,17 @@
   gap: var(--m-s);
 }
 
+/* Kept to a readable measure rather than the full page width. */
+.header p {
+  max-inline-size: var(--content-width-reading);
+}
+
 .trips {
   display: grid;
-  gap: var(--m-2xl);
+  gap: var(--m-xl);
   inline-size: 100%;
+}
+
+.loadMore {
+  justify-self: start;
 }
