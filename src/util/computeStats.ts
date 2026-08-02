@@ -20,6 +20,8 @@ import {
   getGeocodeSubregion,
 } from "./geocode";
 import { parseExifLocalDateTime } from "./exifTime";
+import { computeTrips, summariseTrips, type TripSummary } from "./computeTrips";
+import { getMapPhotoHref } from "./mapSearchIndex";
 import { getDegLatLngFromExif } from "./dms2deg";
 
 export type BucketedStat = {
@@ -150,6 +152,13 @@ export type PhotoStats = {
     fromDate: string;
     toDate: string;
   }>;
+  /**
+   * Journeys detected from the photographs themselves. Summaries only — each day
+   * keeps a few frames, not all of them, because explore ships this to every
+   * reader. Album pages recompute the full thing client-side from photos they
+   * already hold.
+   */
+  trips: TripSummary[];
   dayOfYearMemories: Array<{
     monthDay: string;
     photos: Array<{
@@ -1401,6 +1410,41 @@ function computeDayOfYearMemories(photos: PhotoBlock[]): PhotoStats["dayOfYearMe
     .sort((left, right) => left.monthDay.localeCompare(right.monthDay));
 }
 
+/** Matches what the explore trips list renders; more is payload nobody sees. */
+const TRIP_SUMMARY_PHOTOS = 8;
+
+function computeTripSummaries(albums: Content[]): TripSummary[] {
+  const trips = computeTrips(
+    albums.flatMap((album) =>
+      album.blocks
+        .filter((block): block is PhotoBlock => block.kind === "photo")
+        .map((photo) => {
+          const exif = photo._build.exif;
+          const { decLat, decLng } = getDegLatLngFromExif(exif);
+          const geocode = photo._build.tags?.geocode;
+          const dominant = photo._build.tags?.colors?.[0] as [number, number, number] | undefined;
+          return {
+            date: exif.DateTimeOriginal ?? null,
+            album: album._build.slug,
+            src: photoThumbSrc(photo),
+            href: getMapPhotoHref(album._build.slug, photo),
+            // Must not be undefined: getStaticProps cannot serialise it.
+            label: photo.data.title ?? photo.id ?? "",
+            city: getGeocodeCity(geocode),
+            country: getGeocodeCountry(geocode),
+            lat: typeof decLat === "number" ? decLat : null,
+            lng: typeof decLng === "number" ? decLng : null,
+            ...(dominant ? { swatch: rgbToString(dominant) } : {}),
+          };
+        }),
+    ),
+  );
+
+  // Trim before this leaves the build: the day-by-day structure would ship every
+  // photograph in the archive a second time, for a list that shows eight.
+  return summariseTrips(trips, TRIP_SUMMARY_PHOTOS);
+}
+
 export function computePhotoStats(albums: Content[]): PhotoStats {
   const photos = albums.flatMap((album) =>
     album.blocks.filter((b): b is PhotoBlock => b.kind === "photo"),
@@ -1435,6 +1479,7 @@ export function computePhotoStats(albums: Content[]): PhotoStats {
   });
 
   return {
+    trips: computeTripSummaries(albums),
     timezoneStats: computeTimezoneStats(photos),
     archiveGaps: computeArchiveGaps(photos),
     dayOfYearMemories: computeDayOfYearMemories(photos),

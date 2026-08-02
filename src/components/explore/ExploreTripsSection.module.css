@@ -1,0 +1,54 @@
+.tripList {
+  display: grid;
+  gap: var(--m-l);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tripItem {
+  display: grid;
+  gap: var(--m);
+  padding-block-end: var(--m-m);
+  border-block-end: var(--size-1) solid
+    color-mix(in oklch, var(--c-bg-contrast-light) 25%, transparent);
+}
+
+.tripHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--m) var(--m-m);
+}
+
+.tripSpan {
+  font-size: var(--fs-sm);
+}
+
+.tripStats {
+  color: var(--c-bg-contrast-light);
+  font-size: var(--fs-s);
+  font-variant-numeric: tabular-nums;
+}
+
+.tripPlaces {
+  margin: 0;
+  font-size: var(--fs-s);
+  overflow-wrap: anywhere;
+}
+
+.tripAlbums {
+  margin: 0;
+  font-size: var(--fs-s);
+  color: var(--c-bg-contrast-light);
+}
+
+.tripStrip {
+  display: grid;
+  /* Sized to the thumbnail, not to a fraction of the row: a fractional column
+     is narrower than a fixed-size `Thumb`, and each image then overflows into
+     its neighbour and swallows the gap. */
+  grid-template-columns: repeat(auto-fill, var(--thumb-size-small));
+  gap: var(--m-s);
+  margin-block-start: var(--m);
+}

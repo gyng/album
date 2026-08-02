@@ -47,6 +47,7 @@ import {
   ExploreRecentTrendsSection,
   ExploreRevisitedPlacesSection,
 } from "../../components/explore/ExploreStorySections";
+import { ExploreTripsSection } from "../../components/explore/ExploreTripsSection";
 import {
   ExploreArchiveGaps,
   ExploreThisDaySection,
@@ -604,6 +605,19 @@ const ExploreScreen = ({ stats, visualSameness }: ExploreScreenProps) => {
           ) : null}
 
           <ExploreThisDaySection memories={stats.dayOfYearMemories} />
+
+          <StatGroup
+            id="trips"
+            title="Trips"
+            deferContent
+            deferredSummary={
+              stats.trips.length > 0
+                ? `${stats.trips.filter((trip) => !trip.isOuting).length} journeys detected from the photographs, the longest ${Math.max(...stats.trips.map((trip) => trip.dayCount))} days.`
+                : "No trips detected yet."
+            }
+          >
+            <ExploreTripsSection trips={stats.trips} />
+          </StatGroup>
 
           <ExploreFunStatsSection cards={funStats} deferContent />
           <ExploreRecentTrendsSection data={stats.recentYearStats} deferContent />

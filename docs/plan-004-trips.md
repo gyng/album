@@ -51,14 +51,8 @@ Trips are **derived, never authored**. Nothing is written into `album.json` to b
 the archive already contains the answer, and an authored field would immediately drift from
 the photos. An override can be added later if a specific trip needs pinning.
 
-Albums stay the unit of publication. Trips are a *view* computed over them, and detection
-tells the three album kinds apart rather than assuming one:
-
-| kind | count | album page becomes |
-| --- | --- | --- |
-| trip album | 19 | the trip view — days, route, places, span |
-| place album | 2 | a list of visits, each a trip view |
-| collection | 5 | unchanged |
+Albums stay the unit of publication. Trips are a *view* computed over them — see the toggle
+decision below, which replaced an earlier plan to classify albums by kind.
 
 ## Decided: a trip is any cluster, local included
 
@@ -74,44 +68,77 @@ that readable without inventing a home.
 
 ## Albums carry most of this already
 
-Worth stating plainly, because it bounds the work: 19 of 26 albums are exactly one trip, so
-for the large majority "make trips first-class" means *rendering the album that already
-exists* as a journey. Detection earns its keep on the remaining 7 — telling a collection from
-a place album from a trip — and on the cross-album cases. It is a classifier and a view, not a
-new content model, and no album has to be reorganised for it.
+19 of 26 albums are exactly one trip, so for the large majority "make trips first-class" means
+*rendering the album that already exists* as a journey. No album has to be reorganised.
+
+## Decided: a view toggle, not a classification
+
+The album grid stays the default and gains a **Trips** toggle, rather than trips replacing the
+layout for albums a classifier judges to be journeys. This removes the plan's single biggest
+risk. There is no longer any need to decide what an album "is":
+
+- `snapshots` — 56 clusters over ten years. Absurd as one journey; genuinely useful as a view
+  that breaks a decade of snapshots into 56 outings.
+- `hokkaido`, `taiwan` — show their 3 and 2 separate visits.
+- the other 19 — show the single journey.
+
+`SegmentedToggle` already exists in `components/ui`, explore already switches views this way
+(Map / Sankey / Bars), and `useUrlSearchParams` makes `?view=trips` linkable.
+
+## What a trip shows
+
+Settled against the real November 2016 journey (14 days, 167 photographs, 979 km). Everything
+here comes from data already indexed — no new pipeline, no new model.
+
+**Summary.** Span, photo count, distance, the albums it draws from, and three panels:
+
+- *What you photographed here that you rarely do* — tag frequency against the archive baseline.
+  Must filter to `source='classifier'`; including geocode tags just reports that a Japan trip
+  is in Japan at 8.5×. Real output: autumn 5.8×, moss 6.3×, shinto_shrine 6.1×.
+- *Places* — 17 of 21 were first visits, with the list.
+- *What you carried* — bodies and lenses by share. Not one answer even with one camera: this
+  trip is 153 X100T against 14 phone frames, which is a different kind of moment.
+
+**Route map** with one photograph per day, numbered along the line. Note this is *not* what
+`MapWorld` does: it gates thumbnails on zoom, and a trip opens fitted to its whole extent, so
+inheriting that behaviour would show dots. One-per-day is a deliberate choice for a journey.
+
+**Per day**: place sequence, first visits, later returns ("came back: Kyoto in 2022"), photo
+count, time span, ground covered, an hours-of-the-day sparkline, and a bar of the day's average
+colour. Between days, on the rail, how far the day's centre of gravity moved overnight where it
+exceeds 20 km.
+
+The two distances answer different questions and both are needed: day 6 *moved* 203 km
+overnight but covered 6.5 km once there; day 4 stayed put and covered 171 km wandering.
+
+Every statistic is stated against the archive's own baseline — "8.5 photos a day against your
+usual 3" is a fact; "8.5 photos a day" is a number.
 
 ## Architecture
 
-- `src/util/computeTrips.ts` — pure and framework-neutral, so it stays in the portable graph
-  and is unit-testable without Node or React. Input: photos with wall-clock date, coordinates,
-  geocode and album. Output: `Trip[]` with span, day breakdown, places, photo count and
-  representative frames. Day boundaries come from `exifDayKey` — camera-local wall clock,
-  never UTC, or a 23:00 photo lands on the wrong day of the trip.
-- `PhotoStats` gains `trips`, computed in `computePhotoStats` alongside the existing stats, so
-  explore gets them with no new plumbing.
-- The trip view reuses `buildMapRoute` for the route and the existing day-grid pattern for
-  each day's photos. If `splitRouteByDay` is wanted, write it in `mapRoute.ts` where the docs
-  already say it lives.
+- `src/util/computeTrips.ts` — pure and framework-neutral, so it stays in the portable graph and
+  is unit-testable without Node or React. It takes a minimal photo shape, which is what lets one
+  implementation serve both consumers.
+- **Explore** calls it at build time over every album and ships trip *summaries* — a few
+  thumbnails each, not every frame.
+- **Album pages** call the same function in the browser over the photos the page already has, so
+  the Trips view costs no extra payload at all.
+- Day boundaries come from `exifDayKey` — camera-local wall clock, never UTC, or a 23:00 frame
+  lands on the wrong day of the trip.
 
 ## Implementation
 
-**Stage 1 — detection, surfaced cheaply.** `computeTrips.ts` plus tests, wired into
-`PhotoStats`, rendered on explore as a "Trips" panel: span, place, photo count, a few frames.
-Ships alone and is immediately useful; validates the rule against the real archive before
-anything is restructured.
+**Stage 1 — detection and the explore panel.** `computeTrips.ts` plus tests, wired into
+`PhotoStats`, rendered on explore as a Trips section with a "Load more trips" control matching
+the five that already exist there. Ships alone.
 
-**Stage 2 — the trip view component.** Day-by-day sections with the route map above them.
-Framework-neutral, in `components/`, driven by a `Trip`.
+**Stage 2 — the album Trips view.** The `SegmentedToggle`, `?view=trips`, and the day-by-day
+rendering, grouped client-side from the album's own photos.
 
-**Stage 3 — album pages adopt it.** A single-trip album renders the trip view; a place album
-renders its visits; a collection album is untouched. This is where the classification earns
-its keep.
+**Stage 3 — enrichment.** The panels, colour bars, sparklines and distances above.
 
-**Stage 4 — `/trips`.** A route listing every detected journey, newest first, plus feeds and
-sitemap entries the way the other generated routes work.
-
-**Stage 5 — optional overrides.** Only if the derived answer turns out wrong somewhere: an
-`album.json` key to pin or split a trip.
+**Stage 4 — `/trips`.** A route across all albums, which is also what reunites the 12 journeys
+split across two albums (`hyouka` + `kansai` is one fortnight).
 
 ## Risks
 

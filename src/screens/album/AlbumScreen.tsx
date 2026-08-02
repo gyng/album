@@ -9,7 +9,8 @@ import React from "react";
 import type { PhotoBlock } from "../../services/types";
 import { GlobalNav } from "../../components/GlobalNav";
 import { PhotoAlbum } from "../../components/PhotoAlbum";
-import { Footer, buttonStyles } from "../../components/ui";
+import { AlbumTripsView } from "../../components/AlbumTripsView";
+import { Footer, SegmentedToggle, buttonStyles } from "../../components/ui";
 import commonStyles from "../../styles/common.module.css";
 import type { AlbumPageData } from "../../util/pageDataTypes";
 import { Seo } from "../../components/Seo";
@@ -26,7 +27,16 @@ export type AlbumScreenProps = AlbumPageData;
 
 const AlbumScreen = ({ album }: AlbumScreenProps) => {
   const { siteOrigin } = usePublicConfig();
-  const { getSearchParam } = useUrlSearchParams();
+  const { getSearchParam, ready, searchParams, replaceSearchParams } = useUrlSearchParams();
+  // The grid stays the default. Trips is a second reading of the same photos,
+  // and it is a URL so a particular album's journeys can be linked to.
+  const view = ready && getSearchParam("view") === "trips" ? "trips" : "grid";
+  const setView = (next: "grid" | "trips") => {
+    const params = new URLSearchParams(searchParams);
+    if (next === "trips") params.set("view", "trips");
+    else params.delete("view");
+    replaceSearchParams(params);
+  };
   // Re-run the hash scroll after client-side navigation. Photo ids contain
   // dots and other characters, so decode the hash before looking up the node.
   const scrollToHash = React.useCallback(() => {
@@ -113,6 +123,20 @@ const AlbumScreen = ({ album }: AlbumScreenProps) => {
         extraItems={
           <>
             <li>
+              {/* Album-level views live in the nav beside the map and timeline
+                  links; putting this above the photographs pushed the first one
+                  below the fold on a split-screen tablet. */}
+              <SegmentedToggle
+                ariaLabel="Album view"
+                value={view}
+                onChange={setView}
+                options={[
+                  { value: "grid", label: "Grid" },
+                  { value: "trips", label: "Trips" },
+                ]}
+              />
+            </li>
+            <li>
               <Link
                 href={`/map?filter_album=${albumName}`}
                 className={`${buttonStyles.base} ${commonStyles.navContext}`}
@@ -140,7 +164,7 @@ const AlbumScreen = ({ album }: AlbumScreenProps) => {
         }
       />
       <main id="main-content">
-        <PhotoAlbum album={album} />
+        {view === "trips" ? <AlbumTripsView album={album} /> : <PhotoAlbum album={album} />}
       </main>
       <Footer />
     </>

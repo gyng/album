@@ -30,6 +30,30 @@ jest.mock("../../../components/PhotoAlbum", () => ({
 jest.mock("../../../components/ui", () => ({
   Footer: () => <footer />,
   buttonStyles: { base: "button" },
+  SegmentedToggle: ({
+    options,
+    value,
+    onChange,
+    ariaLabel,
+  }: {
+    options: { value: string; label: string }[];
+    value: string;
+    onChange: (next: string) => void;
+    ariaLabel: string;
+  }) => (
+    <div role="group" aria-label={ariaLabel}>
+      {options.map((option) => (
+        <button
+          key={option.value}
+          type="button"
+          aria-pressed={option.value === value}
+          onClick={() => onChange(option.value)}
+        >
+          {option.label}
+        </button>
+      ))}
+    </div>
+  ),
 }));
 
 import AlbumPage from "../../../screens/album/AlbumScreen";
