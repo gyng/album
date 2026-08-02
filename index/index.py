@@ -3720,7 +3720,13 @@ def index(
         has_embedding_v2 = file_path in existing_embedding_paths_v2
         has_embedding_v1 = file_path in existing_embedding_paths_v1
         uses_classifier = model_profile in [MODEL_PROFILE_JANUS, MODEL_PROFILE_HYBRID]
-        needs_core = uses_classifier and stage_needs_refresh(
+        # Core is EXIF, GPS, geocode and colours — pure CPU work that no model
+        # produces, so it is deliberately NOT gated on the classifier. It used to
+        # be, which meant an embeddings-only refresh parsed a photo's EXIF and
+        # then threw it away: 1049 rows ended up with a date in `images.exif` and
+        # nothing in `metadata.iso8601`. `read_exif` at the analysis step follows
+        # this flag, so gating it also switched off its own input.
+        needs_core = stage_needs_refresh(
             file_path, CORE_STAGE, CORE_PIPELINE_VERSION, has_core
         )
         needs_classifier = (

@@ -3181,6 +3181,71 @@ class TestDb(UsesTestexistsFixture, unittest.TestCase):
                 validate_index_database(dbpath, path, "janus")
             self.assertIn("caption pipeline version", str(raised.exception))
 
+    def test_embeddings_only_profile_still_writes_core_metadata(self):
+        # The regression this guards: `needs_core` used to be gated on the
+        # profile using a classifier, so an embeddings-only refresh parsed a
+        # photo's EXIF and discarded it. 1049 rows ended up with a date in
+        # `images.exif` and NULL in `metadata.iso8601`.
+        #
+        # Set up a row whose embeddings are already current, so the only work
+        # left is core. Before the fix this planned nothing at all.
+        with tempfile.TemporaryDirectory() as tmpdir:
+            dbpath = os.path.join(tmpdir, "core.sqlite")
+            db = Sqlite3Client(dbpath)
+            db.setup_tables()
+            existing_path = "../albums/test-simple/DSCF0506-2.jpg"
+            db.insert_field(existing_path, field="filename", value="DSCF0506-2.jpg")
+            for model_id in (
+                "google/siglip-base-patch16-224",
+                "google/siglip2-base-patch16-224",
+            ):
+                db.insert_embedding(existing_path, model_id, [0.1, 0.2, 0.3])
+            # No metadata row, so core is the only outstanding stage.
+            self.assertNotIn(existing_path, db.list_metadata_paths())
+
+            runner = CliRunner()
+            result = runner.invoke(
+                index,
+                f"--glob {existing_path} --dbpath {dbpath} --dry-run "
+                "--model-profile siglip2".split(),
+            )
+
+            self.assertEqual(0, result.exit_code)
+            self.assertIn("Analysing 1 files needing work", result.output)
+
+    def test_analyse_reads_exif_only_when_core_is_wanted(self):
+        # `read_exif` follows `needs_core`, so gating that flag also switched off
+        # its own input — which is why the old behaviour lost the timestamp
+        # rather than merely failing to store it.
+        path = "../src/test/fixtures/monkey.jpg"
+
+        with open(path, "rb") as fh:
+            with_core = analyse_image(
+                fh,
+                path=path,
+                needs_core=True,
+                needs_classifier=False,
+                precomputed_caption=None,
+                precomputed_embeddings={"google/siglip2-base-patch16-224": [0.5]},
+                precomputed_colors=[(0, 0, 0)],
+            )
+        with open(path, "rb") as fh:
+            without_core = analyse_image(
+                fh,
+                path=path,
+                needs_core=False,
+                needs_classifier=False,
+                precomputed_caption=None,
+                precomputed_embeddings={"google/siglip2-base-patch16-224": [0.5]},
+                precomputed_colors=[(0, 0, 0)],
+            )
+
+        self.assertTrue(with_core["iso8601"])
+        self.assertIsNone(without_core["iso8601"])
+        # Both still produce the embedding that the profile actually asked for.
+        self.assertEqual(len(with_core["embeddings"]), 1)
+        self.assertEqual(len(without_core["embeddings"]), 1)
+
     def test_siglip2_dry_run_backfills_missing_embeddings_for_existing_rows(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             dbpath = os.path.join(tmpdir, "test-simple.sqlite")
