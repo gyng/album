@@ -4,6 +4,7 @@ import { CalendarHeatmap } from "../../components/CalendarHeatmap";
 import { GlobalNav } from "../../components/GlobalNav";
 import { Caption, Footer, Heading, PillButton } from "../../components/ui";
 import { TimelineDayGrid } from "../../components/TimelineDayGrid";
+import { TimelineTripsSection } from "../../components/TimelineTripsSection";
 import type { TimelineEntry } from "../../util/pageDataTypes";
 import commonStyles from "../../styles/common.module.css";
 import { Seo } from "../../components/Seo";
@@ -431,6 +432,10 @@ const TimelineScreen = ({ entries: suppliedEntries, entryRows }: TimelineScreenP
                     scrollToDate={memoryScrollTargetDate}
                   />
                 </section>
+
+                {/* The rung between the heatmap and a single day: these days
+                    were one journey, which neither of the other two can say. */}
+                <TimelineTripsSection entries={filteredEntries} onSelectDate={setSelectedDate} />
 
                 {visibleMemories.length > 0 ? (
                   <section className={styles.memories} aria-label="Memories">

@@ -1410,8 +1410,12 @@ function computeDayOfYearMemories(photos: PhotoBlock[]): PhotoStats["dayOfYearMe
     .sort((left, right) => left.monthDay.localeCompare(right.monthDay));
 }
 
-/** Matches what the explore trips list renders; more is payload nobody sees. */
-const TRIP_SUMMARY_PHOTOS = 8;
+/**
+ * Explore states how many journeys exist and links to the timeline to browse
+ * them; it renders no thumbnails, so it ships none. The timeline and album
+ * views recompute trips in the browser from photos they already hold.
+ */
+const TRIP_SUMMARY_PHOTOS = 0;
 
 function computeTripSummaries(albums: Content[]): TripSummary[] {
   const trips = computeTrips(

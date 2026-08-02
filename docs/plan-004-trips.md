@@ -126,19 +126,40 @@ usual 3" is a fact; "8.5 photos a day" is a number.
 - Day boundaries come from `exifDayKey` — camera-local wall clock, never UTC, or a 23:00 frame
   lands on the wrong day of the trip.
 
-## Implementation
+## Where it lives
 
-**Stage 1 — detection and the explore panel.** `computeTrips.ts` plus tests, wired into
-`PhotoStats`, rendered on explore as a Trips section with a "Load more trips" control matching
-the five that already exist there. Ships alone.
+- **`/timeline`** — the browsable list, between the heatmap and the day view. That is the rung
+  that was missing: the heatmap shows a fortnight was busy, the day view shows one of its days,
+  and nothing said those days were one journey. Each day is a chip that selects it in the day
+  view the page already has.
+- **`/explore`** — the *fact*, not the browsing: how many journeys exist and how long the
+  longest ran, linking to the timeline. Trips are content; explore is a report.
+- **Album pages** — the grid stays default, a Trips toggle in the nav switches, `?view=trips`
+  makes it linkable.
 
-**Stage 2 — the album Trips view.** The `SegmentedToggle`, `?view=trips`, and the day-by-day
-rendering, grouped client-side from the album's own photos.
+Timeline was not renamed. The page is heatmap + trips + days, which "Timeline" describes
+accurately; "Journeys" would overstate a page where 58 of 94 clusters are single days, and the
+rename would touch the nav, sitemap, feeds, every album's "Album timeline" link and the e2e
+suite to buy a less accurate word.
 
-**Stage 3 — enrichment.** The panels, colour bars, sparklines and distances above.
+## Implementation notes
 
-**Stage 4 — `/trips`.** A route across all albums, which is also what reunites the 12 journeys
-split across two albums (`hyouka` + `kansai` is one fortnight).
+Done in `b1202b9` and the commit that follows it.
+
+- `computeTrips` runs three times over the same rule: at build for explore's counts, and in the
+  browser on both the timeline and album pages, from data those pages already hold. Only
+  explore's version costs payload, and only 5.5KB gzipped now it ships no thumbnails.
+- **Timeline entries carry an already-summarised geocode** — `"city, region, country"` joined
+  with commas, not the newline blob `util/geocode` parses. Reading it with those helpers made
+  every place look like its own country and broke a journey on every single day: 234 outings
+  instead of 58. The timeline adapter parses the summarised form.
+- `label` must never be `undefined` or `getStaticProps` refuses to serialise it.
+- The album toggle belongs in the nav, not above the photographs: placed there it pushed the
+  opening frame below the fold on a split-screen tablet, which an existing test guards.
+- Pre-existing, found while testing and left alone: the timeline's URL-sync effect refuses to
+  update `?date=` once a valid one is present, so *no* in-page selection updates the URL —
+  the heatmap included. Selection itself works. The guard exists to stop hydration clobbering
+  a deep link, so it wants fixing deliberately rather than in passing.
 
 ## Risks
 

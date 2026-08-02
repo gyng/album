@@ -1,0 +1,89 @@
+.section {
+  display: grid;
+  gap: var(--m-m);
+  justify-items: start;
+  padding-block: var(--m-l);
+}
+
+.head {
+  display: grid;
+  gap: var(--m);
+}
+
+.list {
+  display: grid;
+  gap: var(--m-l);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  inline-size: 100%;
+}
+
+.trip {
+  display: grid;
+  gap: var(--m-s);
+  padding-block-end: var(--m-m);
+  border-block-end: var(--size-1) solid
+    color-mix(in oklch, var(--c-bg-contrast-light) 25%, transparent);
+}
+
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--m) var(--m-m);
+}
+
+.span {
+  font-size: var(--fs-sm);
+}
+
+.stats,
+.places {
+  color: var(--c-bg-contrast-light);
+  font-size: var(--fs-s);
+  font-variant-numeric: tabular-nums;
+}
+
+.places {
+  flex-basis: 100%;
+  overflow-wrap: anywhere;
+}
+
+.days {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--m);
+}
+
+/* Each day is a way into the day view this page already has. */
+.day {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--m);
+  padding: var(--m) var(--m-s);
+  border: var(--size-1) solid var(--c-bg-contrast-light);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: var(--fs-s);
+  cursor: pointer;
+}
+
+.day:hover {
+  border-color: var(--c-accent);
+}
+
+.dayCount {
+  color: var(--c-bg-contrast-light);
+  font-variant-numeric: tabular-nums;
+}
+
+.strip {
+  display: grid;
+  /* Sized to the thumbnail: a fractional column is narrower than a fixed-size
+     `Thumb`, so each image would overflow into its neighbour. */
+  grid-template-columns: repeat(auto-fill, var(--thumb-size-small));
+  gap: var(--m-s);
+}

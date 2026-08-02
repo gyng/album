@@ -31,6 +31,7 @@ jest.mock("../../../components/ui", () => ({
   Footer: () => <footer />,
   Heading: ({ children }: React.PropsWithChildren) => <h2>{children}</h2>,
   PillButton: (props: React.ButtonHTMLAttributes<HTMLButtonElement>) => <button {...props} />,
+  Thumb: (props: React.ImgHTMLAttributes<HTMLImageElement>) => <img alt="" {...props} />,
 }));
 jest.mock("../../../util/clusterByDate", () => ({
   getMemoryClusters: () => clusters,
