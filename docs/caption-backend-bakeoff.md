@@ -4,6 +4,12 @@
 > resident `llama-server`, tags reshaped for facets, visible-text capture added, and the full
 > library reindexed and published on 18 Jul. See *Decision and outcome* below for the result and
 > the one bug the pipeline caught before publish.
+>
+> **Update, 3 August 2026:** the Janus backend was removed outright. It had been
+> kept as a rollback, but the library was re-captioned with Gemma in July and the
+> measurements below are why nobody would go back. Commands and flags named after
+> it in this document no longer exist; they are preserved as a record of what was
+> run at the time.
 
 Twelve models captioning the same eleven photos. Five run locally on a 10GB RTX 3080;
 seven are remote (Anthropic and OpenAI) and are **marked cloud throughout** — they are not a

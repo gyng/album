@@ -15,17 +15,14 @@ from click.testing import CliRunner
 from index import (
     CAPTION_STAGE,
     CLASSIFIER_BACKEND_GEMMA4_GGUF,
-    CLASSIFIER_BACKEND_JANUS,
     CORE_PIPELINE_VERSION,
     CORE_STAGE,
     DEFAULT_GEMMA4_GGUF_MODEL_ID,
     DEFAULT_LLAMA_SERVER_PATHS,
-    JANUS_MODEL_ID,
-    MODEL_PROFILE_JANUS,
+    MODEL_PROFILE_CAPTIONS,
     SIGLIP_V1_STAGE,
     Gemma4Classifier,
     Gemma4GgufClassifier,
-    JanusClassifier,
     JsonCompletionLogitsProcessor,
     SiglipEmbedder,
     Sqlite3Client,
@@ -35,7 +32,6 @@ from index import (
     benchmark_caption_quality,
     build_classifier_prompt,
     build_geocode_fields,
-    build_janus_prompt,
     build_metadata_fallback_caption,
     cache_tokenizer_vocab,
     caption_pipeline_version,
@@ -74,7 +70,6 @@ from index import (
     normalise_classifier_tags,
     parse_caption_with_retry,
     parse_classifier_response,
-    parse_janus_response,
     pixel_source_for,
     predict_caption_batch_resilient,
     prepare_colour_thumbnail,
@@ -165,48 +160,24 @@ class TestMain(unittest.TestCase):
         expected = "bar\nbaz"
         self.assertEqual(actual, expected)
 
-    def test_build_janus_prompt_only_requests_used_fields(self):
-        actual = build_janus_prompt({"city": "Tokyo", "country": "Japan"})
-
-        self.assertTrue("tags" in actual)
-        self.assertTrue("alt_text" in actual)
-        self.assertFalse("identified_objects" in actual)
-        self.assertFalse('"themes"' in actual)
-        self.assertFalse('"subject"' in actual)
-        self.assertFalse("critique" in actual)
-        self.assertFalse("suggested_title" in actual)
-        self.assertFalse("composition_critique" in actual)
-
-    def test_build_classifier_prompt_matches_janus_prompt_contract(self):
+    # The prompt asks for exactly the two fields the schema and the DB keep. The
+    # retired four-field shape (identified_objects/themes/subject/critique) is
+    # what the v1 caption rows carry, and asking for it again would reintroduce
+    # output nothing downstream reads.
+    def test_build_classifier_prompt_only_requests_used_fields(self):
         actual = build_classifier_prompt({"city": "Tokyo", "country": "Japan"})
-        janus = build_janus_prompt({"city": "Tokyo", "country": "Japan"})
 
-        self.assertEqual(janus, f"<image_placeholder>{actual}")
-        self.assertTrue("strict JSON only" in actual)
-
-    def test_parse_janus_response_falls_back_to_plain_text(self):
-        actual = parse_janus_response(
-            "The photo depicts a serene sky with a bird in flight and a flock of birds."
-        )
-
-        self.assertEqual(
-            actual["alt_text"],
-            "The photo depicts a serene sky with a bird in flight and a flock of birds.",
-        )
-        self.assertTrue("serene" in actual["tags"])
-        self.assertTrue("bird" in actual["tags"])
-
-    def test_parse_janus_response_plain_text_keeps_first_complete_sentence(self):
-        actual = parse_janus_response(
-            "A red insect rests on a green leaf. The plant has glossy patterned leaves."
-        )
-
-        self.assertEqual(actual["alt_text"], "A red insect rests on a green leaf.")
-        self.assertIn("insect", actual["tags"])
-
-    def test_parse_janus_response_rejects_incomplete_plain_text(self):
-        with self.assertRaises(ValueError):
-            parse_janus_response("A red insect rests on a green")
+        self.assertIn("tags", actual)
+        self.assertIn("alt_text", actual)
+        for retired in (
+            "identified_objects",
+            '"themes"',
+            '"subject"',
+            "critique",
+            "suggested_title",
+            "composition_critique",
+        ):
+            self.assertNotIn(retired, actual)
 
     def test_parse_classifier_response_accepts_embedded_json(self):
         actual = parse_classifier_response(
@@ -776,8 +747,10 @@ class TestMain(unittest.TestCase):
                                     path,
                                     CAPTION_STAGE,
                                     digests[path],
-                                    caption_pipeline_version(CLASSIFIER_BACKEND_JANUS),
-                                    JANUS_MODEL_ID,
+                                    caption_pipeline_version(
+                                        CLASSIFIER_BACKEND_GEMMA4_GGUF
+                                    ),
+                                    DEFAULT_GEMMA4_GGUF_MODEL_ID,
                                     cur,
                                 )
                         db.replace_tags_for_source(
@@ -788,8 +761,8 @@ class TestMain(unittest.TestCase):
                     summary = validate_index_database(
                         dbpath,
                         glob,
-                        MODEL_PROFILE_JANUS,
-                        CLASSIFIER_BACKEND_JANUS,
+                        MODEL_PROFILE_CAPTIONS,
+                        CLASSIFIER_BACKEND_GEMMA4_GGUF,
                         media_root=media_root,
                     )
 
@@ -966,41 +939,6 @@ class TestMain(unittest.TestCase):
         self.assertEqual(classifier.batch_sizes, [4, 2, 1, 1, 2, 1, 1])
         self.assertTrue(all(metric["oomFallback"] for metric in metrics))
 
-    def test_janus_metrics_ignore_eos_padding_and_flag_only_straggler(self):
-        classifier = JanusClassifier(max_new_tokens=5)
-        classifier.tokenizer = mock.Mock(eos_token_id=2)
-        classifier.tokenizer.decode.side_effect = [
-            '{"done": true}',
-            "unfinished",
-        ]
-        classifier._record_generation_metrics(
-            FakeTensor(
-                [
-                    [10, 11, 2, 2, 2],
-                    [20, 21, 22, 23, 24],
-                ]
-            )
-        )
-        self.assertEqual(
-            classifier.last_generation_metrics,
-            [
-                {
-                    "tokenCount": 3,
-                    "completedWithEos": True,
-                    "completedWithJson": True,
-                    "completedWithSchema": True,
-                    "hitTokenLimit": False,
-                },
-                {
-                    "tokenCount": 5,
-                    "completedWithEos": False,
-                    "completedWithJson": False,
-                    "completedWithSchema": False,
-                    "hitTokenLimit": True,
-                },
-            ],
-        )
-
     def test_complete_json_object_end_ignores_braces_inside_strings(self):
         value = 'preface {"alt_text": "A {brace} and \\"quote\\""} trailing'
 
@@ -1126,8 +1064,7 @@ class TestMain(unittest.TestCase):
         self.assertEqual(thumbnail.shape[2], 4)
         self.assertGreater(len(palette), 0)
 
-    def test_create_classifier_supports_janus_gemma_and_gguf(self):
-        janus = create_classifier("janus")
+    def test_create_classifier_supports_gemma_and_gguf(self):
         gemma = create_classifier(
             "gemma4",
             model_id="google/gemma-4-E2B-it",
@@ -1141,7 +1078,6 @@ class TestMain(unittest.TestCase):
             model_id="unsloth/gemma-4-E4B-it-GGUF:Q8_0",
         )
 
-        self.assertEqual(type(janus), JanusClassifier)
         self.assertEqual(type(gemma), Gemma4Classifier)
         self.assertEqual(type(gemma_gguf), Gemma4GgufClassifier)
         self.assertEqual(gemma.model_id, "google/gemma-4-E2B-it")
@@ -1153,7 +1089,7 @@ class TestMain(unittest.TestCase):
     def test_evaluate_tag_quality_scores_tags_without_the_alt_sentence(self):
         """Tags carry the FTS index, so a good sentence must not mask bad tags."""
         cases = [{"path": "a.jpg", "requiredAny": ["ramen"]}]
-        # Real Janus output shape: the concept only exists in the sentence, and
+        # A measured degenerate output shape: the concept exists only in the
         # the tags are bare words lifted out of it, including a junk head verb.
         captions = {
             "a.jpg": {
@@ -1190,7 +1126,8 @@ class TestMain(unittest.TestCase):
         # Provenance must name the model that actually ran; an unset CLI id
         # resolves to each backend's effective default, not None.
         self.assertEqual(
-            resolve_classifier_model_id(CLASSIFIER_BACKEND_JANUS), JANUS_MODEL_ID
+            resolve_classifier_model_id(CLASSIFIER_BACKEND_GEMMA4_GGUF),
+            DEFAULT_GEMMA4_GGUF_MODEL_ID,
         )
         self.assertEqual(
             resolve_classifier_model_id(CLASSIFIER_BACKEND_GEMMA4_GGUF),
@@ -1470,46 +1407,6 @@ class TestMain(unittest.TestCase):
         RUN_MODEL_INFERENCE,
         "Set INDEX_RUN_MODEL_INFERENCE=1 to run live model inference tests",
     )
-    def test_analyse_image_worker_with_janus(self):
-        import torch
-
-        if not torch.cuda.is_available():
-            self.skipTest("Janus inference requires CUDA")
-
-        classifier = JanusClassifier()
-        classifier.init_model()
-        idx = 0
-        path = "../src/test/fixtures/monkey.jpg"
-        # Mirror the production Janus pass: predict + parse while the model is
-        # loaded, then assemble from the precomputed result (no live model).
-        raw = classifier.predict(path=path, geocode=None)
-        precomputed_caption = parse_caption_with_retry(classifier, path, None, raw)
-        input_tuple = (
-            idx,
-            path,
-            True,
-            True,
-            precomputed_caption,
-            None,
-            None,
-            file_content_sha256(path),
-            "test-caption-v1",
-            "test-model",
-        )
-
-        actual = analyse_image_worker(input_tuple)
-        analysed = actual.get("analysed")
-
-        self.assertGreater(len(analysed.get("tags")), 0)
-        self.assertGreater(len(analysed.get("alt_text")), 0)
-        self.assertGreater(len(analysed.get("subject")), 0)
-        self.assertGreater(len(analysed.get("geocode").get("city")), 0)
-        self.assertEqual(isinstance(analysed.get("exif"), dict), True)
-        self.assertGreater(len(analysed.get("iso8601")), 0)
-        self.assertEqual(len(analysed.get("colors")), 9)
-        self.assertEqual(analysed.get("lat_deg"), 1.3714833333333334)
-        self.assertEqual(analysed.get("lng_deg"), 103.7822)
-
     def test_single_instance_lock_blocks_second_run(self):
         with tempfile.TemporaryDirectory() as d:
             dbpath = os.path.join(d, "x.sqlite")
@@ -1582,10 +1479,10 @@ class TestMain(unittest.TestCase):
             ),
             mock.patch("index.log") as mock_log,
         ):
-            log_vram("Janus load")
+            log_vram("captioner load")
         self.assertEqual(len(mock_log.call_args_list), 1)
         message = mock_log.call_args_list[0].args[0]
-        self.assertIn("Janus load", message)
+        self.assertIn("captioner load", message)
         self.assertIn("2.00 GB tensors", message)
         self.assertIn("9.00/10.00 GB used", message)
 
@@ -1924,7 +1821,7 @@ class TestCli(UsesTestexistsFixture, unittest.TestCase):
     def test_update_gps_preserves_the_caption_backend_that_actually_ran(self):
         # update-gps re-stamps caption provenance so a metadata-only refresh does
         # not look like stale model output. It must re-stamp with the backend
-        # already recorded, not a hardcoded one: asserting Janus over a gemma
+        # already recorded, not a hardcoded one: asserting one backend over a
         # caption makes every row disagree with the resolver, and the next index
         # run then re-captions the whole library for byte-identical output.
         photo = "../albums/test-simple/DSCF0506-2.jpg"
@@ -2048,7 +1945,7 @@ class TestCli(UsesTestexistsFixture, unittest.TestCase):
                 index,
                 (
                     f"--glob {glob} --dbpath {dbpath} --dry-run "
-                    "--model-profile janus "
+                    "--model-profile captions "
                     "--classifier-backend gemma4 "
                     "--classifier-model-id google/gemma-4-E2B-it "
                     "--classifier-gpu-headroom-gb 3 "
@@ -2068,7 +1965,7 @@ class TestCli(UsesTestexistsFixture, unittest.TestCase):
                 index,
                 (
                     f"--glob {glob} --dbpath {dbpath} --dry-run "
-                    "--model-profile janus "
+                    "--model-profile captions "
                     "--classifier-backend gemma4-gguf "
                     "--classifier-model-id unsloth/gemma-4-E4B-it-GGUF:Q8_0 "
                     "--classifier-batch-size 1"
@@ -2076,37 +1973,6 @@ class TestCli(UsesTestexistsFixture, unittest.TestCase):
             )
             self.assertEqual(0, result.exit_code)
             self.assertTrue("Classifier backend: gemma4-gguf" in result.output)
-
-    def test_index_refuses_experimental_janus_batch_without_override(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
-            dbpath = os.path.join(tmpdir, "unsafe.sqlite")
-            result = CliRunner().invoke(
-                index,
-                [
-                    "--glob",
-                    "../albums/test-simple/*.jpg",
-                    "--dbpath",
-                    dbpath,
-                    "--dry-run",
-                    # This guard is a Janus production limit, so name the backend
-                    # rather than inherit whatever the default happens to be.
-                    "--classifier-backend",
-                    "janus",
-                    "--classifier-batch-size",
-                    "5",
-                ],
-            )
-            self.assertNotEqual(result.exit_code, 0)
-            self.assertIn("production limit 4", result.output)
-            self.assertFalse(os.path.exists(dbpath))
-
-    def test_janus_batch_benchmark_refuses_experimental_default(self):
-        result = CliRunner().invoke(
-            cli,
-            ["benchmark-janus-batch", "--batch-sizes", "5"],
-        )
-        self.assertNotEqual(result.exit_code, 0)
-        self.assertIn("production limit 4", result.output)
 
     def test_legacy_captions_without_provenance_are_recaptioned(self):
         # A caption row with no pipeline_state may have come from the retired
@@ -2149,22 +2015,22 @@ class TestCli(UsesTestexistsFixture, unittest.TestCase):
                         "write_core": True,
                         "write_caption": True,
                         "source_sha256": file_content_sha256(path),
-                        "caption_version": caption_pipeline_version("janus"),
-                        "caption_model_id": JANUS_MODEL_ID,
+                        "caption_version": caption_pipeline_version("gemma4-gguf"),
+                        "caption_model_id": DEFAULT_GEMMA4_GGUF_MODEL_ID,
                     }
                 ],
             )
             db.con.close()
 
-            # The row above is stamped with Janus provenance, so index must be told
-            # to use Janus too — provenance is per backend, and the default is no
-            # longer Janus. Inheriting the default here would silently test
+            # The row above is stamped with this backend's provenance, so index
+            # must be told to use it — provenance is per backend. Inheriting the
+            # default here would silently test
             # "backend changed, so reindex", which is a different behaviour.
             result = CliRunner().invoke(
                 index,
                 (
-                    f"--glob {path} --dbpath {dbpath} --model-profile janus "
-                    "--classifier-backend janus --dry-run"
+                    f"--glob {path} --dbpath {dbpath} --model-profile captions "
+                    "--classifier-backend gemma4-gguf --dry-run"
                 ).split(),
             )
             self.assertEqual(0, result.exit_code)
@@ -2249,7 +2115,7 @@ class TestCli(UsesTestexistsFixture, unittest.TestCase):
                         "--dbpath",
                         dbpath,
                         "--model-profile",
-                        "janus",
+                        "captions",
                         "--classifier-backend",
                         "gemma4-gguf",
                     ],
@@ -2275,7 +2141,7 @@ class TestCli(UsesTestexistsFixture, unittest.TestCase):
             # Validation — the gate that previously blocked publication forever —
             # now passes because every photo has a caption with fresh provenance.
             summary = validate_index_database(
-                dbpath, glob, "janus", classifier_backend="gemma4-gguf"
+                dbpath, glob, "captions", classifier_backend="gemma4-gguf"
             )
             self.assertEqual(summary["paths"], 2)
 
@@ -2326,7 +2192,7 @@ class TestCli(UsesTestexistsFixture, unittest.TestCase):
                         "--dbpath",
                         dbpath,
                         "--model-profile",
-                        "janus",
+                        "captions",
                         "--classifier-backend",
                         "gemma4-gguf",
                     ],
@@ -2548,7 +2414,7 @@ class TestCli(UsesTestexistsFixture, unittest.TestCase):
         )
 
     def test_tags_that_each_extend_the_previous_are_rejected(self):
-        # The measured Janus loop. Truncating would keep its degenerate head, so
+        # A measured captioner loop. Truncating keeps its degenerate head, so
         # it has to be caught before the list is cut — dedup cannot see it
         # because every string differs.
         response = json.dumps(
@@ -2627,7 +2493,7 @@ class TestCli(UsesTestexistsFixture, unittest.TestCase):
     def test_vram_guard_continues_when_only_device_free_is_exhausted(self):
         cuda = self._fake_cuda(free_gb=0.03, reserved_gb=7.10, allocated_gb=4.84)
         with mock.patch("index.torch.cuda", cuda), mock.patch("index.log"):
-            headroom = enforce_vram_headroom("janus batch 10/281")
+            headroom = enforce_vram_headroom("caption batch 10/281")
 
         # 0.03 device-free plus 2.26 reusable: the next batch has room.
         self.assertAlmostEqual(headroom, 2.29, places=1)
@@ -2642,7 +2508,7 @@ class TestCli(UsesTestexistsFixture, unittest.TestCase):
             mock.patch("index.log"),
             self.assertRaises(click.ClickException),
         ):
-            enforce_vram_headroom("janus batch 1/281")
+            enforce_vram_headroom("caption batch 1/281")
 
     def test_prepare_staging_copies_from_the_working_db_when_absent(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -3107,7 +2973,7 @@ class TestDb(UsesTestexistsFixture, unittest.TestCase):
             self.assertEqual(stored_model_id, resolved)
 
             # validate now accepts it for the default gemma4-gguf backend.
-            summary = validate_index_database(dbpath, path, "janus")
+            summary = validate_index_database(dbpath, path, "captions")
             self.assertEqual(summary["paths"], 1)
 
             # stage_needs_refresh is False through the real planner: a dry-run
@@ -3121,7 +2987,7 @@ class TestDb(UsesTestexistsFixture, unittest.TestCase):
                     dbpath,
                     "--dry-run",
                     "--model-profile",
-                    "janus",
+                    "captions",
                 ],
             )
             self.assertEqual(0, result.exit_code, result.output)
@@ -3158,7 +3024,7 @@ class TestDb(UsesTestexistsFixture, unittest.TestCase):
                     dbpath,
                     "--dry-run",
                     "--model-profile",
-                    "janus",
+                    "captions",
                 ],
             )
             self.assertEqual(0, result.exit_code, result.output)
@@ -3183,7 +3049,7 @@ class TestDb(UsesTestexistsFixture, unittest.TestCase):
             dbpath = os.path.join(tmpdir, "default-caption.sqlite")
             self._seed_default_stamped_caption_db(dbpath, path)
 
-            summary = validate_index_database(dbpath, path, "janus")
+            summary = validate_index_database(dbpath, path, "captions")
             self.assertEqual(summary["paths"], 1)
 
     def test_stale_default_marked_caption_still_reported_through_readonly_path(self):
@@ -3219,14 +3085,14 @@ class TestDb(UsesTestexistsFixture, unittest.TestCase):
                     dbpath,
                     "--dry-run",
                     "--model-profile",
-                    "janus",
+                    "captions",
                 ],
             )
             self.assertEqual(0, result.exit_code, result.output)
             self.assertIn("(1 to index", result.output)
 
             with self.assertRaises(click.ClickException) as raised:
-                validate_index_database(dbpath, path, "janus")
+                validate_index_database(dbpath, path, "captions")
             self.assertIn("caption pipeline version", str(raised.exception))
 
     def test_embeddings_only_profile_still_writes_core_metadata(self):
@@ -3651,15 +3517,15 @@ class TestDb(UsesTestexistsFixture, unittest.TestCase):
                         "write_core": True,
                         "write_caption": True,
                         "source_sha256": digest,
-                        "caption_version": caption_pipeline_version("janus"),
-                        "caption_model_id": "deepseek-ai/Janus-Pro-1B",
+                        "caption_version": caption_pipeline_version("gemma4-gguf"),
+                        "caption_model_id": DEFAULT_GEMMA4_GGUF_MODEL_ID,
                     }
                 ],
             )
             db.con.close()
 
             summary = validate_index_database(
-                dbpath, path, "janus", classifier_backend="janus"
+                dbpath, path, "captions", classifier_backend="gemma4-gguf"
             )
             self.assertEqual(summary["paths"], 1)
             self.assertEqual(summary["quickCheck"], "ok")
@@ -3720,8 +3586,8 @@ class TestDb(UsesTestexistsFixture, unittest.TestCase):
                     "write_core": True,
                     "write_caption": True,
                     "source_sha256": file_content_sha256(path),
-                    "caption_version": caption_pipeline_version("janus"),
-                    "caption_model_id": JANUS_MODEL_ID,
+                    "caption_version": caption_pipeline_version("gemma4-gguf"),
+                    "caption_model_id": DEFAULT_GEMMA4_GGUF_MODEL_ID,
                 }
             ],
         )
@@ -3743,7 +3609,7 @@ class TestDb(UsesTestexistsFixture, unittest.TestCase):
 
             with self.assertRaises(click.ClickException):
                 validate_index_database(
-                    dbpath, path, "janus", classifier_backend="janus"
+                    dbpath, path, "captions", classifier_backend="gemma4-gguf"
                 )
 
     def test_validate_rejects_stale_source_provenance(self):
@@ -3761,7 +3627,7 @@ class TestDb(UsesTestexistsFixture, unittest.TestCase):
 
             with self.assertRaises(click.ClickException):
                 validate_index_database(
-                    dbpath, path, "janus", classifier_backend="janus"
+                    dbpath, path, "captions", classifier_backend="gemma4-gguf"
                 )
 
     def test_validate_rejects_unexpected_caption_pipeline_version(self):
@@ -3772,14 +3638,14 @@ class TestDb(UsesTestexistsFixture, unittest.TestCase):
             con = sqlite3.connect(dbpath)
             con.execute(
                 "UPDATE pipeline_state SET pipeline_version = ? WHERE stage = ?",
-                ("caption-search-json-v1-deadbeef:janus", CAPTION_STAGE),
+                ("caption-search-json-v1-deadbeef:retired-backend", CAPTION_STAGE),
             )
             con.commit()
             con.close()
 
             with self.assertRaises(click.ClickException):
                 validate_index_database(
-                    dbpath, path, "janus", classifier_backend="janus"
+                    dbpath, path, "captions", classifier_backend="gemma4-gguf"
                 )
 
     def test_validate_rejects_tag_counts_diverging_from_image_tags(self):
@@ -3794,7 +3660,7 @@ class TestDb(UsesTestexistsFixture, unittest.TestCase):
 
             with self.assertRaises(click.ClickException):
                 validate_index_database(
-                    dbpath, path, "janus", classifier_backend="janus"
+                    dbpath, path, "captions", classifier_backend="gemma4-gguf"
                 )
 
     def test_publish_copies_embedding_rows_to_their_own_paths(self):

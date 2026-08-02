@@ -28,7 +28,7 @@ Personal photo gallery — Next.js 16, TypeScript, CSS Modules, MapLibre GL. Pho
 - `../albums/` — album source directories (sibling to `src/`); each album is a folder of images with an optional `album.json` (v2 manifest)
 - `src/components/search/` — search page, SQLite API layer, facet panel, result tiles
 - `src/components/mapRoute.ts` — all route/journey logic
-- `index/` — Python indexing pipeline (Janus, SigLIP, EXIF, geocoding → SQLite)
+- `index/` — Python indexing pipeline (Gemma 4 captions, SigLIP, EXIF, geocoding → SQLite)
 
 Data-backed display pages use `getStaticProps`; client-only pages are statically optimised without it. The App Router is used only for build-generated payloads at stable URLs, currently `/data/map-search-index.json`; it is not a runtime application API. Client state is UI-only (filters, view toggles).
 
@@ -89,7 +89,6 @@ npm run test:e2e:reuse -- ./tests/smoke.spec.ts                # reuse already-r
 **Python (indexer)** — unittest, run from `index/`:
 ```
 ./do-test-index.sh          # runs index.test.py via uv
-./do-test-index-inference.sh # explicitly opt into the live Janus/CUDA check
 ./create-test-db.sh         # rebuild committed fixture DBs; requires inference deps
 ```
 - Tests live in `index/index.test.py`; uses `unittest` + Click's `CliRunner`
@@ -193,11 +192,10 @@ The search database (`src/public/search.sqlite`) is built offline by a Python CL
 ```
 cd index
 uv sync                 # install lightweight indexing/test dependencies
-uv sync --extra inference # add Torch, Transformers, and Janus for model runs
+uv sync --extra inference # add Torch and Transformers for model runs
 uv run ruff check --fix . # lint
 uv run ruff format .      # format
 ```
-Note: `janus` is installed from the `deepseek-ai/Janus` git repo, not PyPI — the first inference sync will clone it.
 
 **Run** (use the shell scripts, which handle the DB split and copy):
 ```
@@ -240,14 +238,14 @@ sits and which clip it belongs to.
 **What it does per image:**
 1. Reads EXIF (via `exifread`) — camera make/model, lens, focal length, GPS, timestamp
 2. Reverse-geocodes GPS coords to city/country (in-process k-d tree, no API)
-3. Runs the configured caption backend (default **Gemma 4 E4B GGUF** via a resident `llama-server`; **Janus-Pro-1B** is the rollback via `--classifier-backend janus`) — produces `tags` and `alt_text` as JSON (see `index/README.md` for backends; the retired `identified_objects`/`themes`/`subject` fields are parsed only for legacy DBs)
+3. Runs the configured caption backend (**Gemma 4 E4B GGUF** via a resident `llama-server`) — produces `tags` and `alt_text` as JSON (see `index/README.md` for backends; the retired `identified_objects`/`themes`/`subject` fields are parsed only for legacy DBs)
 4. Runs **SigLIP v1** (`google/siglip-base-patch16-224`, GPU) — embeddings compatible with the browser text encoder; required for semantic search
 5. Optionally runs **SigLIP v2** (`google/siglip2-base-patch16-224`, GPU) — higher-quality embeddings for image-to-image similarity only (incompatible with the browser text encoder)
 6. Extracts dominant colour palette via `fast_colorthief` (Rust, runs concurrently with GPU work)
 7. Writes everything into `search.sqlite` in a single batch transaction; `do-full-index.sh` then splits out the embeddings table into `search-embeddings.sqlite`
 
 **Model profiles:**
-- `janus` — tags/text only (Janus VLM, no embeddings)
+- `captions` — tags/alt text only (no embeddings)
 - `siglip2` — both SigLIP v1 + v2 embeddings, no VLM tags
 - `hybrid` — both (default for production)
 
@@ -271,7 +269,7 @@ Runs on PRs to `main`, pushes to `main` and `release/*`, and manual dispatch.
 **Jobs:**
 - `test` — `npm ci` + `npm run test:ci` from `src/` (Node 24, ubuntu-latest)
 - `test-geotag` — geotag Vitest suite + typecheck from `tools/geotag/`
-- `test-index` — model-free Python index suite; live Janus/CUDA inference stays opt-in locally
+- `test-index` — model-free Python index suite
 - `playwright` — full Chromium suite plus Firefox/WebKit smoke tests with artifact upload (`playwright-report/`, 30-day retention)
 
 **Notes:**

@@ -60,9 +60,7 @@ const buildIndexProbes = ({ context, env, commandExists, fileExists, homedir }) 
     label: "llama-server",
     level: llamaServer ? "ok" : "warn",
     value: llamaServer ?? "not found",
-    hint: llamaServer
-      ? null
-      : "Default captioner needs it; fall back with `--classifier-backend janus`",
+    hint: llamaServer ? null : "Captioning needs it — see index/README.md for the llama.cpp build",
   });
 
   const hasGpu = commandExists("nvidia-smi");

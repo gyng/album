@@ -68,7 +68,6 @@ $ uv run --extra inference python index.py index --glob "../albums/test-simple/*
 $ uv run --extra inference python index.py index --glob "../albums/**/*.jpg" --dbpath "search.sqlite" --dry-run --model-profile hybrid
 $ uv run python index.py validate --glob "../albums/**/*.jpg" --dbpath "search.sqlite" --model-profile hybrid
 $ uv run python index.py benchmark-index --rows 200 --repeat 3 --output ".index-benchmark.json"
-$ uv run --extra inference python index.py benchmark-janus-batch --glob "../albums/**/*.jpg" --batch-sizes 1,2,4 --repeat 2 --output ".janus-batch-benchmark.json"
 $ uv run --extra inference python index.py benchmark-classifier --backend gemma4-gguf --model-id "/tmp/gemma4-e4b-gguf/gemma-4-E4B-it-Q8_0.gguf" --quantization "/tmp/gemma4-e4b-gguf/mmproj-BF16.gguf" --path "../albums/test-simple/DSCF0506-2.jpg" --repeat 1 --output ".gemma4-gguf-benchmark.json"
 $ uv run --extra inference python index.py compare-captioners --glob "../albums/test-simple/*.[jJ][pP][gG]" --baseline-dbpath "./test-simple.sqlite" --sample-size 5 --candidate-backend gemma4-gguf --candidate-model-id "/tmp/gemma4-e4b-gguf/gemma-4-E4B-it-Q8_0.gguf" --candidate-quantization "/tmp/gemma4-e4b-gguf/mmproj-BF16.gguf" --output-json ".caption-comparison.json" --output-md ".caption-comparison.md"
 $ uv run index.py search --query "singapore"
@@ -83,7 +82,6 @@ $ uv run index.py prune --glob "../src/public/data/albums/**/*.jpg" --dbpath "se
 # Test
 $ ./create-test-db.sh              # rebuild committed fixtures; installs inference extra
 $ ./do-test-index.sh              # model-free default; suitable for CI
-$ ./do-test-index-inference.sh    # opt-in Janus/CUDA integration check
 
 # Perform a full index and copy split core + embeddings DBs to /public in the Next.js app
 $ ./do-full-index.sh
@@ -93,7 +91,7 @@ $ ./do-embeddings-index.sh
 ```
 
 Live model inference is deliberately excluded from the default suite. Set
-`INDEX_RUN_MODEL_INFERENCE=1` only through `do-test-index-inference.sh`; normal CI
+`INDEX_RUN_MODEL_INFERENCE=1` explicitly; normal CI
 must remain deterministic and must not download or execute model weights.
 
 ## Benchmarking
@@ -132,12 +130,6 @@ Content hashing uses eight I/O workers; EXIF parsing skips MakerNote/thumbnail
 details because none of those fields are kept (verified byte-identical on the
 retained fields across real photos).
 
-To benchmark the Janus classifier path directly on a sample image:
-
-```sh
-$ uv run python index.py benchmark-janus --path "../src/test/fixtures/monkey.jpg" --repeat 3 --output ".janus-benchmark.json"
-```
-
 To benchmark the working `llama.cpp` GGUF path locally:
 
 ```sh
@@ -154,7 +146,7 @@ The JSON artifact stores the side-by-side rows. The Markdown report is the first
 
 ## Model profiles
 
-- `janus`: generate search tags, short alt text, and metadata only.
+- `captions`: generate search tags, short alt text, and metadata only.
 - `siglip2`: generate both browser-compatible SigLIP v1 and visual-similarity
   SigLIP v2 embeddings only; it does not parse EXIF, extract colours, or touch
   caption rows.
@@ -171,10 +163,7 @@ preserving distinct behaviour.
 - `gemma4-gguf`: **current default**. Runs Gemma 4 E4B `UD-Q4_K_XL` against one resident
   `llama-server` (started on init, torn down on release). 2.09s/image, 9/11 concept-in-tags
   on the local fixture, 6.2 GB peak.
-- `janus`: previous default and the rollback path — `--classifier-backend janus`. Faster
-  (1.67s/image) but its tags are bare words lifted from its own alt text: 7/11 in tags, 6%
-  concrete phrases, 11% junk. See docs/caption-backend-bakeoff.md.
-- `gemma4`: retained experimental backend for future work. In practice, this needs a newer `transformers` runtime than the default Janus environment.
+- `gemma4`: retained experimental backend for future work. In practice, this needs a newer `transformers` runtime than the pinned one.
 The default quant is `unsloth/gemma-4-E4B-it-GGUF:UD-Q4_K_XL`. `Q8_0` scores identically and
 needs 3 GB more, which does not fit alongside `mmproj-BF16` on a 10 GB card.
 
@@ -208,17 +197,15 @@ Quantisation choice is VRAM-bound. On a 10GB card, `Q8_0` (8.19GB) plus
 compare them before changing any default.
 
 Current compatibility note:
-Gemma 4 E4B GGUF is the default production path. Janus-Pro-1B is retained as the rollback. The full-precision `transformers` Gemma path is also retained in code, but it is not the normal runtime and should be treated as separate experimental work.
+Gemma 4 E4B GGUF is the default production path. The full-precision `transformers` Gemma path is also retained in code, but it is not the normal runtime and should be treated as separate experimental work.
 
 Current local-debugging note:
 In local testing, the `transformers` `bnb-4bit` Gemma path repeatedly hallucinated placeholder-like "gray image" descriptions for normal photos. Keep the GGUF path as the preferred quantised experiment instead.
 
-Recommended local rollout:
-
-1. Keep Janus-Pro-1B as the default captioner.
-2. Use the GGUF Gemma path for focused evaluation and future roadmap work.
-3. Compare outputs on a balanced sample before changing any production DB build.
-4. If video work starts, build it first as sampled-frame processing on top of the retained Gemma groundwork.
+Historical note: Janus-Pro-1B was the original captioner and was kept as a
+rollback until August 2026, when it was removed — the whole library had long
+since been re-captioned with Gemma, and the bake-off measured Janus tags as
+substantially worse, so the rollback led somewhere nobody wanted to go.
 
 `do-full-index.sh` uses `hybrid`. `do-embeddings-index.sh` is useful when you want
 to preserve the current metadata-backed `search.sqlite` and only refresh the
@@ -314,12 +301,7 @@ core DB; browsers receive only the runtime search, tag, and metadata tables.
 
 ## Generation guardrails
 
-- Janus defaults to the measured production batch size of 4. Representative
-  profiling showed 3.28× single-image throughput and about 5.53 GB peak reserved
-  VRAM. Batch 6 reserved about 6.36 GB but was slower because decoder stragglers
-  held the larger batch open; larger batches therefore require
-  `--allow-experimental-classifier-batch-size`.
-- The Transformers runtime and model revisions are locked. Janus retains its
+- The Transformers runtime and model revisions are locked. The captioner retains its
   model-defined composite processor settings; forcing `use_fast=False` also
   selects an incompatible slow Llama tokenizer for this checkpoint.
 - A CUDA OOM automatically bisects the failed caption batch down to single

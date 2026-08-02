@@ -56,7 +56,7 @@ No system libraries to install: image optimisation (sharp/libvips), video transc
 |---|---|
 | Python | 3.12, managed by [uv](https://docs.astral.sh/uv/) |
 | GPU | NVIDIA with CUDA. The default captioner peaks around 6.2&nbsp;GB VRAM on `UD-Q4_K_XL`; a 10&nbsp;GB card runs the hybrid profile comfortably. There is no CPU path worth the wait. |
-| Captioner | a `llama-server` binary built from llama.cpp — see [index/README.md](index/README.md). `--classifier-backend janus` is the rollback and needs no separate build. |
+| Captioner | a `llama-server` binary built from llama.cpp — see [index/README.md](index/README.md). Only needed to generate captions; indexing without it still produces EXIF, geocodes, colours and embeddings. |
 
 **To deploy** a Vercel account; the CLI shells out to `npx vercel@latest`, nothing to install.
 

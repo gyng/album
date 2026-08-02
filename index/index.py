@@ -308,7 +308,7 @@ def effective_free_vram_gb() -> float:
     Device-free alone is the wrong signal. The caching allocator reserves memory
     and reuses it across batches without returning it, so a perfectly healthy run
     settles at roughly zero device-free while allocating nothing new. Measured
-    over ten identical Janus batches: device-free fell 5.1 GB to zero while live
+    over ten identical caption batches: device-free fell 5.1 GB to zero while live
     tensors stayed flat at 4.84 GB, reserved plateaued, and batch time did not
     move. Aborting on device-free stopped runs that were fine, which is why a
     294-batch job never finished and looked like a leak.
@@ -328,19 +328,19 @@ def enforce_vram_headroom(label: str) -> float:
     if not torch.cuda.is_available():
         return math.inf
     free_gb = effective_free_vram_gb()
-    if free_gb < JANUS_WARN_FREE_VRAM_GB and not getattr(
+    if free_gb < CAPTION_WARN_FREE_VRAM_GB and not getattr(
         enforce_vram_headroom, "_warning_emitted", False
     ):
         log(f"WARNING: only {free_gb:.2f} GB VRAM free after {label}")
         enforce_vram_headroom._warning_emitted = True
-    if free_gb < JANUS_MIN_FREE_VRAM_GB:
+    if free_gb < CAPTION_MIN_FREE_VRAM_GB:
         # Hand the allocator's cache back so another process on the card can use
         # it. This does not change the verdict — the same bytes simply move from
         # reusable to device-free — but it is the neighbourly thing to do before
         # giving up, and it lets the retry land in a cleaner state.
         torch.cuda.empty_cache()
         free_gb = effective_free_vram_gb()
-        if free_gb < JANUS_MIN_FREE_VRAM_GB:
+        if free_gb < CAPTION_MIN_FREE_VRAM_GB:
             raise click.ClickException(
                 f"Only {free_gb:.2f} GB VRAM remains after {label}; "
                 "stopping with completed batches preserved"
@@ -348,10 +348,9 @@ def enforce_vram_headroom(label: str) -> float:
     return free_gb
 
 
-MODEL_PROFILE_JANUS = "janus"
+MODEL_PROFILE_CAPTIONS = "captions"
 MODEL_PROFILE_SIGLIP2 = "siglip2"
 MODEL_PROFILE_HYBRID = "hybrid"
-CLASSIFIER_BACKEND_JANUS = "janus"
 CLASSIFIER_BACKEND_GEMMA4 = "gemma4"
 CLASSIFIER_BACKEND_GEMMA4_GGUF = "gemma4-gguf"
 DEFAULT_GEMMA4_MODEL_ID = "google/gemma-4-E2B-it"
@@ -376,23 +375,23 @@ DEFAULT_LLAMA_SERVER_PATHS = (
     os.path.expanduser("~/.local/opt/llama.cpp/build/bin/llama-server"),
     "/usr/local/bin/llama-server",
 )
-JANUS_RESPONSE_FIELDS = (
+CAPTION_RESPONSE_FIELDS = (
     "tags",
     "alt_text",
 )
-JANUS_MAX_NEW_TOKENS = 192
-JANUS_BATCH_MAX_NEW_TOKENS = 128
-JANUS_BATCH_SIZE = 4
-JANUS_MAX_PRODUCTION_BATCH_SIZE = 4
-JANUS_MAX_GENERATION_SECONDS = 120.0
-JANUS_WARN_FREE_VRAM_GB = 0.75
-JANUS_MIN_FREE_VRAM_GB = 0.25
+CAPTION_MAX_NEW_TOKENS = 192
+CAPTION_BATCH_MAX_NEW_TOKENS = 128
+# Frozen: this is the baseline `caption_pipeline_version` compares an explicit
+# batch size against, not a runtime default. Changing the number rewrites every
+# caption version string and restamps the entire archive as stale.
+CAPTION_VERSION_BASELINE_BATCH_SIZE = 4
+CAPTION_WARN_FREE_VRAM_GB = 0.75
+CAPTION_MIN_FREE_VRAM_GB = 0.25
 MAX_CLASSIFIER_TAGS = 10
 MAX_CLASSIFIER_TAG_WORDS = 4
 MAX_CLASSIFIER_TAG_LENGTH = 60
 MAX_CLASSIFIER_ALT_TEXT_WORDS = 35
 MAX_CLASSIFIER_ALT_TEXT_LENGTH = 320
-JANUS_IMAGE_DECODE_WORKERS = 4
 GEMMA4_MAX_NEW_TOKENS = 192
 EMBEDDER_BATCH_SIZE = 16
 COLORTHIEF_WORKERS = 4
@@ -672,8 +671,6 @@ SIGLIP_V2_STAGE = "embedding:siglip-v2"
 # retained. Bumping this would force a needless recompute of every existing row.
 CORE_PIPELINE_VERSION = "core-exif-geocode-colour-v1"
 CAPTION_PROMPT_VERSION = "caption-search-json-v2"
-JANUS_MODEL_ID = "deepseek-ai/Janus-Pro-1B"
-JANUS_MODEL_REVISION = "960ab33191f61342a4c60ae74d8dc356a39fafcb"
 SIGLIP_V1_MODEL_REVISION = "7fd15f0689c79d79e38b1c2e2e2370a7bf2761ed"
 SIGLIP_V2_MODEL_REVISION = "75de2d55ec2d0b4efc50b3e9ad70dba96a7b2fa2"
 # Caption provenance written before default model ids were resolved (pre-commit
@@ -702,7 +699,7 @@ EXIF_SEARCH_FIELDS = (
     "GPS GPSLongitude",
     "GPS GPSLongitudeRef",
 )
-JANUS_FALLBACK_STOPWORDS = {
+CAPTION_FALLBACK_STOPWORDS = {
     "a",
     "an",
     "and",
@@ -766,14 +763,10 @@ def build_classifier_prompt(_geocode: Mapping | None) -> str:
     )
 
 
-def build_janus_prompt(geocode: Mapping | None) -> str:
-    return f"<image_placeholder>{build_classifier_prompt(geocode)}"
-
-
 def keywordise_text(text: str, limit: int = 6) -> list[str]:
     keywords = []
     for word in re.findall(r"[A-Za-z][A-Za-z0-9_-]+", text.lower()):
-        if len(word) < 4 or word in JANUS_FALLBACK_STOPWORDS:
+        if len(word) < 4 or word in CAPTION_FALLBACK_STOPWORDS:
             continue
         normalised = word.replace("-", "_")
         if normalised in keywords:
@@ -834,7 +827,7 @@ def normalise_classifier_tags(result: Mapping[str, typing.Any]) -> list[str]:
 
 
 def repair_classifier_json_syntax(value: str) -> str:
-    """Repair only two observed, unambiguous Janus JSON punctuation errors."""
+    """Repair only two observed, unambiguous caption JSON punctuation errors."""
     repaired = re.sub(r",\s*([}\]])", r"\1", value)
     repaired = re.sub(r"\]\s*(\"alt_text\"\s*:)", r"], \1", repaired, flags=re.DOTALL)
     repaired = re.sub(
@@ -849,7 +842,7 @@ def repair_classifier_json_syntax(value: str) -> str:
 def close_truncated_json_object(value: str) -> str | None:
     """Close a top-level object that the token limit cut off, if it still parses.
 
-    Generation stops at a hard token cap, so Janus regularly emits a
+    Generation stops at a hard token cap, so a captioner regularly emits a
     schema-complete caption whose closing brace never arrives. The block pattern
     below needs that brace, so those responses matched nothing and fell through
     to the plain-text branch, which rejected them outright — photos left
@@ -907,7 +900,7 @@ def parse_classifier_response(raw_result: str) -> Mapping[str, typing.Any]:
     else:
         cleaned = " ".join(raw_result.split()).strip()
         if not cleaned:
-            raise ValueError("Empty Janus response")
+            raise ValueError("Empty caption response")
         sentence_match = re.match(r"(.+?[.!?])(?:\s|$)", cleaned)
         if sentence_match is None:
             raise ValueError("Plain-text classifier response had no complete sentence")
@@ -919,7 +912,7 @@ def parse_classifier_response(raw_result: str) -> Mapping[str, typing.Any]:
         }
 
     if not isinstance(result, dict):
-        raise TypeError("Janus response was not an object")
+        raise TypeError("Caption response was not an object")
     # A JSON block missing a required key is treated as malformed so the caller
     # (parse_caption_with_retry) can re-run the model rather than silently writing
     # an empty caption. Present-but-wrong-typed values are coerced below so a
@@ -959,7 +952,7 @@ def parse_classifier_response(raw_result: str) -> Mapping[str, typing.Any]:
     # uncaptioned — responses like ["side mirror", "traffic", "city", "street",
     # …] at 13 tags, with sound alt text — and because `validate` demands full
     # coverage, that blocked publication outright rather than costing a tag.
-    # Janus emits tags in descending confidence, so the head is the useful part.
+    # Captioners emit tags in descending confidence, so the head is the useful part.
     del result["tags"][MAX_CLASSIFIER_TAGS:]
     if any(
         len(tag) > MAX_CLASSIFIER_TAG_LENGTH
@@ -984,10 +977,6 @@ def parse_classifier_response(raw_result: str) -> Mapping[str, typing.Any]:
     return result
 
 
-def parse_janus_response(raw_result: str) -> Mapping[str, typing.Any]:
-    return parse_classifier_response(raw_result)
-
-
 def parse_caption_with_retry(
     classifier: BaseCaptionClassifier,
     path: str,
@@ -995,16 +984,16 @@ def parse_caption_with_retry(
     raw_caption: str,
     max_attempts: int = 2,
 ) -> Mapping[str, typing.Any] | None:
-    """Parse a batched Janus caption, re-running the live model on parse failure.
+    """Parse a batched caption, re-running the live model on parse failure.
 
-    Janus occasionally emits malformed JSON. Generation is deterministic
+    A captioner occasionally emits malformed JSON. Generation is deterministic
     (``do_sample=False``), so re-running the model on the same image yields a
     byte-identical caption — there is no point retrying more than once. We cap at
     ``max_attempts=2``: attempt 1 re-parses the batched ``raw_caption``, attempt 2
     runs a single-image ``classifier.predict`` (which can differ from the batched
     decode because batching/padding changes the numerics). This must run while the
     classifier is still loaded — the one-model-per-pass design releases it before
-    per-image assembly — so it lives here in the Janus pass rather than in
+    per-image assembly — so it lives here in the caption pass rather than in
     analyse_image. Returns the parsed result dict, or ``None`` once attempts are
     exhausted."""
     raw_result = raw_caption
@@ -1127,7 +1116,7 @@ def complete_json_object_end(value: str) -> int | None:
 def complete_classifier_json_prefix(value: str) -> str | None:
     """Repair only a schema-complete top-level object missing its final brace.
 
-    Janus occasionally starts repeating fields after producing all four valid
+    A captioner occasionally starts repeating fields after producing all valid
     values. Appending one brace to the current prefix is safe only when the result
     is valid JSON and passes the full bounded classifier response contract.
     """
@@ -1145,7 +1134,7 @@ def complete_classifier_json_prefix(value: str) -> str | None:
     else:
         return candidate
 
-    # Janus can loop inside the final tags array. Because alt_text is generated
+    # A captioner can loop inside the final tags array. Because alt_text is generated
     # first, salvage only after observing at least four distinct tags and then a
     # duplicate — evidence of the measured repetition failure, not ordinary
     # in-progress generation. json.loads decodes quoted strings safely.
@@ -1188,7 +1177,7 @@ def build_metadata_fallback_caption(
 ) -> dict[str, typing.Any]:
     """A minimal caption for a photo the model cannot describe.
 
-    A few photos send Janus into a loop it never escapes — "folding tablecloths
+    A few photos send a captioner into a loop it never escapes — "folding tablecloths
     hanging on folding tablecloths hanging on…" — and rejecting that output is
     correct. But `validate` demands a caption for every photo, so a handful of
     correct rejections blocked publication of the whole index, permanently: every
@@ -1258,7 +1247,7 @@ def clamp_classifier_alt_text(value: str) -> str:
 
 
 def looks_like_runaway_tags(tags: list[str]) -> bool:
-    """Detect the measured Janus loop where each tag extends the one before it.
+    """Detect the measured caption loop where each tag extends the one before it.
 
     The model degenerates into "folding", "folding table", "folding tablecloth",
     "folding tablecloths", "folding tablecloths hanging", "folding tablecloths
@@ -1282,7 +1271,7 @@ def looks_like_runaway_tags(tags: list[str]) -> bool:
 
 
 def has_repeated_open_classifier_tags(value: str) -> bool:
-    """Detect the measured Janus loop inside an as-yet-unclosed tags array."""
+    """Detect the measured caption loop inside an as-yet-unclosed tags array."""
     tags_match = re.search(r'"tags"\s*:\s*\[(.*)$', value, re.DOTALL)
     if not tags_match or "]" in tags_match.group(1):
         return False
@@ -1383,310 +1372,6 @@ class BaseCaptionClassifier:
         gc.collect()
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
-
-
-class JanusClassifier(BaseCaptionClassifier):
-    backend = CLASSIFIER_BACKEND_JANUS
-    batch_size = JANUS_BATCH_SIZE
-
-    def __init__(
-        self,
-        batch_size: int = JANUS_BATCH_SIZE,
-        max_new_tokens: int = JANUS_MAX_NEW_TOKENS,
-        batch_max_new_tokens: int = JANUS_BATCH_MAX_NEW_TOKENS,
-        max_generation_seconds: float = JANUS_MAX_GENERATION_SECONDS,
-    ) -> None:
-        super().__init__()
-        self.batch_size = batch_size
-        self.max_new_tokens = max_new_tokens
-        self.batch_max_new_tokens = min(batch_max_new_tokens, max_new_tokens)
-        self.max_generation_seconds = max_generation_seconds
-        self._decode_executor = concurrent.futures.ThreadPoolExecutor(
-            max_workers=JANUS_IMAGE_DECODE_WORKERS
-        )
-
-    def _record_generation_metrics(
-        self,
-        outputs,
-        max_new_tokens: int | None = None,
-        per_item_metrics: list[Mapping[str, typing.Any]] | None = None,
-    ) -> None:
-        token_limit = max_new_tokens or self.max_new_tokens
-        eos_token_id = self.tokenizer.eos_token_id
-        self.last_generation_metrics = []
-        for position, output in enumerate(outputs):
-            tokens = output.detach().cpu().tolist()
-            decoded = self.tokenizer.decode(tokens, skip_special_tokens=True)
-            completed_with_json = complete_json_object_end(decoded) is not None
-            completed_with_schema = (
-                completed_with_json
-                or complete_classifier_json_prefix(decoded) is not None
-            )
-            try:
-                token_count = tokens.index(eos_token_id) + 1
-                completed_with_eos = True
-            except ValueError:
-                token_count = len(tokens)
-                completed_with_eos = False
-            metric = {
-                "tokenCount": token_count,
-                "completedWithEos": completed_with_eos,
-                "completedWithJson": completed_with_json,
-                "completedWithSchema": completed_with_schema,
-                "hitTokenLimit": token_count >= token_limit and not completed_with_eos,
-            }
-            if per_item_metrics and position < len(per_item_metrics):
-                metric.update(per_item_metrics[position])
-            self.last_generation_metrics.append(metric)
-
-    @staticmethod
-    def _conversation(path: str, geocode: Mapping | None):
-        return [
-            {
-                "role": "User",
-                "content": build_janus_prompt(geocode),
-                "images": [path],
-            },
-            {"role": "Assistant", "content": ""},
-        ]
-
-    @staticmethod
-    def _decode_image(path: str) -> Image.Image:
-        # A video's pixels are the poster frame extracted for it; a photo
-        # resolves to itself.
-        with Image.open(pixel_source_for(path)) as image:
-            return image.convert("RGB")
-
-    def _decode_images_parallel(
-        self, paths: list[str]
-    ) -> tuple[list[Image.Image], float]:
-        started_at = time.perf_counter()
-        if len(paths) == 1:
-            images = [self._decode_image(paths[0])]
-        else:
-            images = list(self._decode_executor.map(self._decode_image, paths))
-        return images, (time.perf_counter() - started_at) * 1000
-
-    def release(self) -> None:
-        executor = getattr(self, "_decode_executor", None)
-        if executor is not None:
-            executor.shutdown(wait=True, cancel_futures=True)
-            self._decode_executor = None
-        super().release()
-
-    def _generation_kwargs(self, max_new_tokens: int):
-        return {
-            "pad_token_id": self.tokenizer.eos_token_id,
-            "bos_token_id": self.tokenizer.bos_token_id,
-            "eos_token_id": self.tokenizer.eos_token_id,
-            "max_new_tokens": max_new_tokens,
-            "max_time": self.max_generation_seconds,
-            "do_sample": False,
-            "use_cache": True,
-            "logits_processor": [
-                JsonCompletionLogitsProcessor(
-                    self.tokenizer, self.tokenizer.eos_token_id
-                )
-            ],
-        }
-
-    def _import_janus_modules(self):
-        # Janus currently expects pre-Transformers-5 PretrainedConfig subclass behaviour.
-        # The temporary shim keeps Janus importable while the rest of the process uses the
-        # newer Gemma-capable transformers build.
-        from transformers import PretrainedConfig
-
-        original_init_subclass = PretrainedConfig.__init_subclass__
-
-        def compat_init_subclass(cls, **kwargs):
-            return super(PretrainedConfig, cls).__init_subclass__(**kwargs)
-
-        PretrainedConfig.__init_subclass__ = classmethod(compat_init_subclass)
-        try:
-            from janus.models import MultiModalityCausalLM, VLChatProcessor
-            from janus.utils.io import load_pil_images
-        finally:
-            PretrainedConfig.__init_subclass__ = original_init_subclass
-
-        return MultiModalityCausalLM, VLChatProcessor, load_pil_images
-
-    def init_model(self) -> None:
-        if not torch.cuda.is_available():
-            raise RuntimeError("Janus indexing requires a CUDA-capable GPU")
-        log("Loading Janus-Pro-1B...")
-        # use 1B for speed/lower requirements
-        model_path = JANUS_MODEL_ID
-        _MultiModalityCausalLM, VLChatProcessor, load_pil_images = (
-            self._import_janus_modules()
-        )
-        self._load_pil_images = load_pil_images
-        self.vl_chat_processor = VLChatProcessor.from_pretrained(
-            model_path, revision=JANUS_MODEL_REVISION
-        )
-        self.tokenizer = self.vl_chat_processor.tokenizer
-
-        cache_tokenizer_vocab(self.tokenizer)
-
-        vl_gpt = AutoModelForCausalLM.from_pretrained(
-            model_path, revision=JANUS_MODEL_REVISION, trust_remote_code=True
-        )
-        self.vl_gpt = vl_gpt.to(torch.bfloat16).cuda().eval()
-        log("Loaded Janus-Pro-1B.")
-
-    @torch.inference_mode()
-    def predict(self, path: str, geocode: Mapping | None) -> str:
-        conversation = self._conversation(path, geocode)
-        pil_images, decode_ms = self._decode_images_parallel([path])
-        processor_started_at = time.perf_counter()
-        prepare_inputs = self.vl_chat_processor(
-            conversations=conversation, images=pil_images, force_batchify=True
-        ).to(self.vl_gpt.device)
-        processor_ms = (time.perf_counter() - processor_started_at) * 1000
-        vision_started_at = time.perf_counter()
-        inputs_embeds = self.vl_gpt.prepare_inputs_embeds(**prepare_inputs)
-        vision_ms = (time.perf_counter() - vision_started_at) * 1000
-        generate_started_at = time.perf_counter()
-        outputs = self.vl_gpt.language_model.generate(
-            inputs_embeds=inputs_embeds,
-            attention_mask=prepare_inputs.attention_mask,
-            **self._generation_kwargs(self.max_new_tokens),
-        )
-        generate_ms = (time.perf_counter() - generate_started_at) * 1000
-
-        answer = self.tokenizer.decode(
-            outputs[0].cpu().tolist(), skip_special_tokens=True
-        )
-        self._record_generation_metrics(
-            outputs,
-            self.max_new_tokens,
-            [
-                {
-                    "attempt": "single",
-                    "batchSize": 1,
-                    "maxNewTokens": self.max_new_tokens,
-                    "decodeMs": round(decode_ms, 2),
-                    "processorMs": round(processor_ms, 2),
-                    "visionPreparationMs": round(vision_ms, 2),
-                    "generateBatchMs": round(generate_ms, 2),
-                }
-            ],
-        )
-        return answer
-
-    def _prepare_inputs_cpu(
-        self, item: tuple[str, Mapping | None]
-    ) -> tuple[typing.Any, float, float]:
-        """The CPU half of preparation: decode, resize, normalise, tokenise.
-
-        Split out so it can run on a worker thread. PIL, torchvision and numpy
-        all release the GIL, so this parallelises: measured over 16 real photos,
-        decode+resize goes from 457 ms/image serially to 148 at 4 workers and 110
-        at 16 (32 is slower again — those libraries thread internally and
-        oversubscribe the cores).
-
-        The GPU half deliberately stays on the calling thread: the host copy and
-        the vision tower touch the CUDA context from one place, and the embeds
-        keep item order.
-        """
-        path, geocode = item
-        decode_started_at = time.perf_counter()
-        with Image.open(pixel_source_for(path)) as image:
-            pil_image = image.convert("RGB")
-        decode_ms = (time.perf_counter() - decode_started_at) * 1000
-        processor_started_at = time.perf_counter()
-        prepare_inputs = self.vl_chat_processor(
-            conversations=self._conversation(path, geocode),
-            images=[pil_image],
-            force_batchify=True,
-        )
-        processor_ms = (time.perf_counter() - processor_started_at) * 1000
-        return prepare_inputs, decode_ms, processor_ms
-
-    @torch.inference_mode()
-    def predict_batch(self, items: list[tuple[str, Mapping | None]]) -> list[str]:
-        """Run Janus inference on a batch of images in one GPU forward pass."""
-        if not items:
-            return []
-        if len(items) == 1:
-            return [self.predict(items[0][0], items[0][1])]
-
-        all_embeds = []
-        all_masks = []
-        preparation_metrics: list[dict[str, typing.Any]] = []
-
-        # Preparation cost more than the inference it feeds: ~4.5 s of serial CPU
-        # per batch against ~4.1 s of batched GPU. `map` preserves order, so the
-        # embeds still line up with `items`.
-        prep_started_at = time.perf_counter()
-        prepared = list(self._decode_executor.map(self._prepare_inputs_cpu, items))
-        prep_wall_ms = (time.perf_counter() - prep_started_at) * 1000
-        log(
-            f"    prepped {len(items)} image(s) in {prep_wall_ms:.0f}ms "
-            f"({JANUS_IMAGE_DECODE_WORKERS} threads)"
-        )
-
-        for (_path, _geocode), (prepare_inputs, decode_ms, processor_ms) in zip(
-            items, prepared
-        ):
-            vision_started_at = time.perf_counter()
-            gpu_inputs = prepare_inputs.to(self.vl_gpt.device)
-            embeds = self.vl_gpt.prepare_inputs_embeds(**gpu_inputs)
-            vision_ms = (time.perf_counter() - vision_started_at) * 1000
-            all_embeds.append(embeds)
-            all_masks.append(gpu_inputs.attention_mask)
-            preparation_metrics.append(
-                {
-                    "attempt": "batch",
-                    "batchSize": len(items),
-                    "maxNewTokens": self.batch_max_new_tokens,
-                    "decodeMs": round(decode_ms, 2),
-                    "processorMs": round(processor_ms, 2),
-                    "visionPreparationMs": round(vision_ms, 2),
-                }
-            )
-
-        log(f"    generating {len(items)} caption(s)...")
-        generate_started_at = time.perf_counter()
-
-        # Left-pad to the longest sequence (standard for decoder-only batch generation)
-        max_len = max(e.shape[1] for e in all_embeds)
-        embed_dim = all_embeds[0].shape[2]
-        device = all_embeds[0].device
-        dtype = all_embeds[0].dtype
-
-        padded_embeds = []
-        padded_masks = []
-        for embeds, mask in zip(all_embeds, all_masks):
-            pad_len = max_len - embeds.shape[1]
-            if pad_len > 0:
-                pad = torch.zeros(1, pad_len, embed_dim, device=device, dtype=dtype)
-                embeds = torch.cat([pad, embeds], dim=1)
-                mask_pad = torch.zeros(1, pad_len, device=device, dtype=mask.dtype)
-                mask = torch.cat([mask_pad, mask], dim=1)
-            padded_embeds.append(embeds)
-            padded_masks.append(mask)
-
-        batched_embeds = torch.cat(padded_embeds, dim=0)
-        batched_masks = torch.cat(padded_masks, dim=0)
-
-        outputs = self.vl_gpt.language_model.generate(
-            inputs_embeds=batched_embeds,
-            attention_mask=batched_masks,
-            **self._generation_kwargs(self.batch_max_new_tokens),
-        )
-        generate_ms = (time.perf_counter() - generate_started_at) * 1000
-        log(f"    generated {len(items)} caption(s) in {generate_ms:.0f}ms")
-
-        for metric in preparation_metrics:
-            metric["generateBatchMs"] = round(generate_ms, 2)
-        self._record_generation_metrics(
-            outputs, self.batch_max_new_tokens, preparation_metrics
-        )
-
-        return [
-            self.tokenizer.decode(output.cpu().tolist(), skip_special_tokens=True)
-            for output in outputs
-        ]
 
 
 class Gemma4Classifier(BaseCaptionClassifier):
@@ -1941,7 +1626,7 @@ class Gemma4GgufClassifier(BaseCaptionClassifier):
                 "tags": {"type": "array", "items": {"type": "string"}},
                 "alt_text": {"type": "string"},
             },
-            "required": list(JANUS_RESPONSE_FIELDS),
+            "required": list(CAPTION_RESPONSE_FIELDS),
             "additionalProperties": False,
         }
 
@@ -2252,13 +1937,6 @@ def create_classifier(
     gpu_headroom_gb: float | None = None,
     low_impact: bool = False,
 ) -> BaseCaptionClassifier:
-    if backend == CLASSIFIER_BACKEND_JANUS:
-        return JanusClassifier(
-            batch_size=batch_size or JANUS_BATCH_SIZE,
-            max_new_tokens=max_new_tokens or JANUS_MAX_NEW_TOKENS,
-            batch_max_new_tokens=(batch_max_new_tokens or JANUS_BATCH_MAX_NEW_TOKENS),
-        )
-
     if backend == CLASSIFIER_BACKEND_GEMMA4:
         return Gemma4Classifier(
             model_id=model_id or DEFAULT_GEMMA4_MODEL_ID,
@@ -3578,11 +3256,11 @@ def run_embedding_pass(
 @click.option(
     "--model-profile",
     type=click.Choice(
-        [MODEL_PROFILE_JANUS, MODEL_PROFILE_SIGLIP2, MODEL_PROFILE_HYBRID],
+        [MODEL_PROFILE_CAPTIONS, MODEL_PROFILE_SIGLIP2, MODEL_PROFILE_HYBRID],
         case_sensitive=False,
     ),
-    default=MODEL_PROFILE_JANUS,
-    help="Indexing profile: janus (captions/core), siglip2 (embeddings), hybrid (both).",
+    default=MODEL_PROFILE_CAPTIONS,
+    help="Indexing profile: captions (captions/core), siglip2 (embeddings), hybrid (both).",
 )
 @click.option(
     "--benchmark-output",
@@ -3600,7 +3278,6 @@ def run_embedding_pass(
     "--classifier-backend",
     type=click.Choice(
         [
-            CLASSIFIER_BACKEND_JANUS,
             CLASSIFIER_BACKEND_GEMMA4,
             CLASSIFIER_BACKEND_GEMMA4_GGUF,
         ],
@@ -3627,25 +3304,19 @@ def run_embedding_pass(
     "--classifier-batch-size",
     default=None,
     type=click.IntRange(min=1),
-    help="Optional caption batch size override. Janus defaults to 4; Gemma defaults to 1.",
+    help="Optional caption batch size override. Defaults to 1.",
 )
 @click.option(
     "--classifier-max-new-tokens",
     default=None,
     type=click.IntRange(min=32),
-    help="Optional single/retry generation-token cap. Janus defaults to 192.",
+    help="Optional single/retry generation-token cap. Defaults to 192.",
 )
 @click.option(
     "--classifier-batch-max-new-tokens",
     default=None,
     type=click.IntRange(min=32),
-    help="Optional Janus batched generation-token cap. Defaults to 128; incomplete rows retry singly at the single cap.",
-)
-@click.option(
-    "--allow-experimental-classifier-batch-size",
-    is_flag=True,
-    default=False,
-    help="Allow a Janus batch above the profiled production limit of 4.",
+    help="Optional batched generation-token cap. Defaults to 128; incomplete rows retry singly at the single cap.",
 )
 @click.option(
     "--classifier-gpu-headroom-gb",
@@ -3678,7 +3349,6 @@ def index(
     classifier_batch_size: int | None,
     classifier_max_new_tokens: int | None,
     classifier_batch_max_new_tokens: int | None,
-    allow_experimental_classifier_batch_size: bool,
     classifier_gpu_headroom_gb: float | None,
     classifier_low_impact: bool,
     media_root: str,
@@ -3706,25 +3376,8 @@ def index(
     log(f"Database: {db_info['entries']} entries (SQLite {db_info['version']})")
     log(f"Using model profile: {model_profile}")
     resolved_classifier_batch_size = max(
-        1,
-        classifier_batch_size
-        or (
-            JANUS_BATCH_SIZE
-            if classifier_backend == CLASSIFIER_BACKEND_JANUS
-            else DEFAULT_GEMMA4_BATCH_SIZE
-        ),
+        1, classifier_batch_size or DEFAULT_GEMMA4_BATCH_SIZE
     )
-    if (
-        classifier_backend == CLASSIFIER_BACKEND_JANUS
-        and resolved_classifier_batch_size > JANUS_MAX_PRODUCTION_BATCH_SIZE
-        and not allow_experimental_classifier_batch_size
-    ):
-        raise click.ClickException(
-            f"Janus batch size {resolved_classifier_batch_size} exceeds the profiled "
-            f"production limit {JANUS_MAX_PRODUCTION_BATCH_SIZE}. Larger batches "
-            "were slower on representative photos due to decoder stragglers. Use "
-            "--allow-experimental-classifier-batch-size to override."
-        )
 
     planning_started_at = time.perf_counter()
     set_media_root(media_root)
@@ -3833,7 +3486,10 @@ def index(
         has_caption = file_path in existing_caption_paths
         has_embedding_v2 = file_path in existing_embedding_paths_v2
         has_embedding_v1 = file_path in existing_embedding_paths_v1
-        uses_classifier = model_profile in [MODEL_PROFILE_JANUS, MODEL_PROFILE_HYBRID]
+        uses_classifier = model_profile in [
+            MODEL_PROFILE_CAPTIONS,
+            MODEL_PROFILE_HYBRID,
+        ]
         # Core is EXIF, GPS, geocode and colours — pure CPU work that no model
         # produces, so it is deliberately NOT gated on the classifier. It used to
         # be, which meant an embeddings-only refresh parsed a photo's EXIF and
@@ -3931,7 +3587,7 @@ def index(
     )
     log(f"(skipping {skipped} already-indexed)")
     log(f"Analysing {len(work_items)} files needing work")
-    if model_profile in [MODEL_PROFILE_JANUS, MODEL_PROFILE_HYBRID]:
+    if model_profile in [MODEL_PROFILE_CAPTIONS, MODEL_PROFILE_HYBRID]:
         log(f"Classifier backend: {classifier_backend}")
 
     if not dry_run and len(work_items) > 0:
@@ -3941,7 +3597,7 @@ def index(
         # GPU work runs ONE model at a time: each pass loads its model, runs all its
         # batches, then releases the weights before the next pass loads. On a 10GB
         # card this keeps peak VRAM at ~one model instead of all three (which spills
-        # to slow shared system memory under WSL2). Order: Janus → SigLIP v1 → v2.
+        # to slow shared system memory under WSL2). Order: captions → SigLIP v1 → v2.
         classifier = None
         model_init_ms = 0.0
         inference_stage_durations: dict[str, typing.Any] = {}
@@ -3953,7 +3609,7 @@ def index(
         # The first palette is computed synchronously on THIS (main) thread to warm
         # fast_colorthief's first-call lazy imports — PIL's JPEG plugin, numpy's
         # C-API, and the Rust backend extension. Done inside a worker thread, those
-        # imports race against the main thread's own runtime imports (the Janus
+        # imports race against the main thread's own runtime imports (the caption
         # modules and the trust_remote_code modeling code loaded by init_model) and
         # deadlock CPython's per-module import locks: every thread parks in
         # futex_wait forever, looking like a frozen "Loading…" with an idle GPU.
@@ -3998,7 +3654,7 @@ def index(
             f"Colour extraction started in background ({len(all_paths)} images, {COLORTHIEF_WORKERS} threads)"
         )
 
-        # ---- Pass 1: Janus captions ----
+        # ---- Pass 1: captions ----
         # Parsed captions are committed after each inference batch. A later model
         # failure can therefore resume without retaining every caption in memory.
         precomputed_captions: dict[str, Mapping] = {}
@@ -4840,273 +4496,6 @@ def benchmark_cpu(
         print(f"Benchmark written to {output}")
 
 
-@cli.command("benchmark-janus")
-@click.option(
-    "--path",
-    "image_path",
-    default="../src/test/fixtures/monkey.jpg",
-    help="Image path to run through Janus.",
-)
-@click.option("--repeat", default=3, help="How many predict runs to measure.")
-@click.option(
-    "--output",
-    default=None,
-    help="Optional JSON output file for the benchmark summary.",
-)
-def benchmark_janus(image_path: str, repeat: int, output: str | None):
-    classifier = JanusClassifier()
-
-    init_started_at = time.perf_counter()
-    classifier.init_model()
-    init_ms = (time.perf_counter() - init_started_at) * 1000
-
-    geocode = {
-        "city": "Singapore",
-        "country": "Singapore",
-    }
-    runs = []
-
-    for run_index in range(repeat):
-        started_at = time.perf_counter()
-        raw_output = classifier.predict(image_path, geocode)
-        duration_ms = (time.perf_counter() - started_at) * 1000
-        runs.append(
-            {
-                "run": run_index + 1,
-                "durationMs": round(duration_ms, 2),
-                "outputChars": len(raw_output),
-            }
-        )
-
-    summary = {
-        "generatedAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-        "path": image_path,
-        "repeat": repeat,
-        "initMs": round(init_ms, 2),
-        "medianPredictMs": round(
-            statistics.median([run["durationMs"] for run in runs]),
-            2,
-        ),
-        "medianOutputChars": round(
-            statistics.median([run["outputChars"] for run in runs]),
-            2,
-        ),
-        "runs": runs,
-    }
-
-    pprint.pprint(summary)
-
-    if output:
-        with open(output, "w", encoding="utf-8") as fh:
-            json.dump(summary, fh, indent=2)
-        print(f"Benchmark written to {output}")
-
-
-@cli.command("benchmark-janus-batch")
-@click.option(
-    "--path",
-    "image_path",
-    default="../src/test/fixtures/monkey.jpg",
-    help="Image path to use (same image repeated to fill each batch).",
-)
-@click.option(
-    "--batch-sizes",
-    default="1,2,4",
-    help="Comma-separated list of batch sizes to benchmark.",
-)
-@click.option("--repeat", default=1, help="How many runs per batch size.")
-@click.option(
-    "--glob",
-    "glob_pattern",
-    default=None,
-    help="Optional representative image glob; otherwise --path is repeated.",
-)
-@click.option(
-    "--max-new-tokens",
-    default=JANUS_MAX_NEW_TOKENS,
-    type=click.IntRange(min=32),
-    show_default=True,
-)
-@click.option(
-    "--batch-max-new-tokens",
-    default=JANUS_BATCH_MAX_NEW_TOKENS,
-    type=click.IntRange(min=32),
-    show_default=True,
-)
-@click.option("--allow-experimental-batch-size", is_flag=True, default=False)
-@click.option(
-    "--output",
-    default=None,
-    help="Optional JSON output file for the benchmark summary.",
-)
-def benchmark_janus_batch(
-    image_path: str,
-    batch_sizes: str,
-    repeat: int,
-    glob_pattern: str | None,
-    max_new_tokens: int,
-    batch_max_new_tokens: int,
-    allow_experimental_batch_size: bool,
-    output: str | None,
-):
-    """Profile safe Janus batch sizes on representative images."""
-    sizes = [int(s.strip()) for s in batch_sizes.split(",")]
-    if any(size < 1 for size in sizes):
-        raise click.ClickException("Batch sizes must be positive")
-    experimental = [size for size in sizes if size > JANUS_MAX_PRODUCTION_BATCH_SIZE]
-    if experimental and not allow_experimental_batch_size:
-        raise click.ClickException(
-            f"Batch size(s) {experimental} exceed the profiled production limit "
-            f"{JANUS_MAX_PRODUCTION_BATCH_SIZE}; use "
-            "--allow-experimental-batch-size to override"
-        )
-
-    paths = find_files(".", glob_pattern) if glob_pattern else [image_path]
-    if not paths:
-        raise click.ClickException("No benchmark images matched")
-    if glob_pattern:
-        paths = sample_balanced_paths(paths, max(sizes) * max(1, repeat), seed=17)
-
-    lock_fd = acquire_single_instance_lock("janus-benchmark", global_lock=True)
-    classifier = JanusClassifier(
-        max_new_tokens=max_new_tokens,
-        batch_max_new_tokens=batch_max_new_tokens,
-    )
-
-    init_started_at = time.perf_counter()
-    try:
-        classifier.init_model()
-    except BaseException:
-        os.close(lock_fd)
-        raise
-    init_ms = (time.perf_counter() - init_started_at) * 1000
-
-    results_by_size = {}
-    for batch_size in sizes:
-        runs = []
-        for run_index in range(repeat):
-            selected_paths = [
-                paths[(run_index * batch_size + index) % len(paths)]
-                for index in range(batch_size)
-            ]
-            items = [(path, None) for path in selected_paths]
-            if torch.cuda.is_available():
-                torch.cuda.reset_peak_memory_stats()
-            started_at = time.perf_counter()
-            try:
-                outputs = classifier.predict_batch(items)
-                error = None
-            except BaseException as err:
-                if not is_cuda_oom(err):
-                    classifier.release()
-                    os.close(lock_fd)
-                    raise
-                outputs = []
-                error = str(err)
-                torch.cuda.empty_cache()
-            duration_ms = (time.perf_counter() - started_at) * 1000
-            ms_per_image = duration_ms / batch_size
-            metrics = list(classifier.last_generation_metrics) if error is None else []
-            parsed = 0
-            output_details = []
-            for position, raw in enumerate(outputs):
-                parse_error = None
-                try:
-                    parse_classifier_response(raw)
-                    parsed += 1
-                    parse_success = True
-                except (ValueError, KeyError, json.JSONDecodeError) as err:
-                    parse_success = False
-                    parse_error = str(err)
-                output_details.append(
-                    {
-                        "path": selected_paths[position],
-                        "outputChars": len(raw),
-                        "parseSuccess": parse_success,
-                        "parseError": parse_error,
-                        **(metrics[position] if position < len(metrics) else {}),
-                    }
-                )
-            runs.append(
-                {
-                    "run": run_index + 1,
-                    "batchSize": batch_size,
-                    "paths": selected_paths,
-                    "totalMs": round(duration_ms, 2),
-                    "msPerImage": round(ms_per_image, 2),
-                    "outputChars": sum(len(o) for o in outputs),
-                    "parseSuccess": parsed,
-                    "tokenCounts": [metric.get("tokenCount") for metric in metrics],
-                    "hitTokenLimit": sum(
-                        bool(metric.get("hitTokenLimit")) for metric in metrics
-                    ),
-                    "withoutEos": sum(
-                        metric.get("completedWithEos") is False for metric in metrics
-                    ),
-                    "outputs": output_details,
-                    "peakAllocatedGb": (
-                        round(torch.cuda.max_memory_allocated() / 1e9, 3)
-                        if torch.cuda.is_available()
-                        else None
-                    ),
-                    "peakReservedGb": (
-                        round(torch.cuda.max_memory_reserved() / 1e9, 3)
-                        if torch.cuda.is_available()
-                        else None
-                    ),
-                    "error": error,
-                }
-            )
-        successful_runs = [run for run in runs if run["error"] is None]
-        median_ms_per_image = (
-            statistics.median(run["msPerImage"] for run in successful_runs)
-            if successful_runs
-            else math.inf
-        )
-        results_by_size[batch_size] = {
-            "runs": runs,
-            "medianMsPerImage": (
-                round(median_ms_per_image, 2)
-                if math.isfinite(median_ms_per_image)
-                else None
-            ),
-        }
-        if math.isfinite(median_ms_per_image):
-            print(f"batch={batch_size}: median {median_ms_per_image:.0f}ms/image")
-        else:
-            print(f"batch={batch_size}: no successful runs")
-
-    single_median = (
-        results_by_size[1]["medianMsPerImage"] if 1 in results_by_size else None
-    )
-    speedups = {}
-    if single_median:
-        for size, data in results_by_size.items():
-            if data["medianMsPerImage"]:
-                speedups[size] = round(single_median / data["medianMsPerImage"], 2)
-
-    summary = {
-        "generatedAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-        "path": image_path,
-        "glob": glob_pattern,
-        "repeat": repeat,
-        "maxNewTokens": max_new_tokens,
-        "batchMaxNewTokens": batch_max_new_tokens,
-        "initMs": round(init_ms, 2),
-        "resultsByBatchSize": results_by_size,
-        "speedupVsSingle": speedups,
-    }
-
-    pprint.pprint(summary)
-
-    if output:
-        with open(output, "w", encoding="utf-8") as fh:
-            json.dump(summary, fh, indent=2)
-        print(f"Benchmark written to {output}")
-    classifier.release()
-    os.close(lock_fd)
-
-
 @cli.command("benchmark-caption-quality")
 @click.option(
     "--fixture",
@@ -5118,13 +4507,12 @@ def benchmark_janus_batch(
     "--backend",
     type=click.Choice(
         [
-            CLASSIFIER_BACKEND_JANUS,
             CLASSIFIER_BACKEND_GEMMA4,
             CLASSIFIER_BACKEND_GEMMA4_GGUF,
         ],
         case_sensitive=False,
     ),
-    default=CLASSIFIER_BACKEND_JANUS,
+    default=CLASSIFIER_BACKEND_GEMMA4_GGUF,
     show_default=True,
     help="Caption classifier backend to score.",
 )
@@ -5175,16 +4563,6 @@ def benchmark_caption_quality(
         raise click.ClickException(
             f"Caption quality fixture path does not exist: {missing[0]}"
         )
-    if (
-        backend == CLASSIFIER_BACKEND_JANUS
-        and batch_size is not None
-        and batch_size > JANUS_MAX_PRODUCTION_BATCH_SIZE
-    ):
-        raise click.ClickException(
-            f"Quality benchmark batch size exceeds production limit "
-            f"{JANUS_MAX_PRODUCTION_BATCH_SIZE}"
-        )
-
     lock_fd = acquire_single_instance_lock("caption-quality", global_lock=True)
     classifier = create_classifier(
         backend=backend,
@@ -5332,13 +4710,12 @@ def caption_metrics(
     "--backend",
     type=click.Choice(
         [
-            CLASSIFIER_BACKEND_JANUS,
             CLASSIFIER_BACKEND_GEMMA4,
             CLASSIFIER_BACKEND_GEMMA4_GGUF,
         ],
         case_sensitive=False,
     ),
-    default=CLASSIFIER_BACKEND_JANUS,
+    default=CLASSIFIER_BACKEND_GEMMA4_GGUF,
     help="Caption classifier backend to benchmark.",
 )
 @click.option(
@@ -5458,7 +4835,6 @@ def benchmark_classifier(
     "--candidate-backend",
     type=click.Choice(
         [
-            CLASSIFIER_BACKEND_JANUS,
             CLASSIFIER_BACKEND_GEMMA4,
             CLASSIFIER_BACKEND_GEMMA4_GGUF,
         ],
@@ -5889,7 +5265,7 @@ def validate_index_database(
             )
         }
         required_tables = {"pipeline_state"}
-        if model_profile in (MODEL_PROFILE_JANUS, MODEL_PROFILE_HYBRID):
+        if model_profile in (MODEL_PROFILE_CAPTIONS, MODEL_PROFILE_HYBRID):
             required_tables.update({"images", "metadata", "image_tags", "tags"})
         missing_tables = required_tables - tables
         if missing_tables:
@@ -5898,7 +5274,7 @@ def validate_index_database(
             )
 
         stages: list[tuple[str, str, str | None]] = []
-        if model_profile in (MODEL_PROFILE_JANUS, MODEL_PROFILE_HYBRID):
+        if model_profile in (MODEL_PROFILE_CAPTIONS, MODEL_PROFILE_HYBRID):
             images = {row[0] for row in con.execute("SELECT path FROM images")}
             metadata = {row[0] for row in con.execute("SELECT path FROM metadata")}
             captions = {
@@ -6063,7 +5439,7 @@ def validate_index_database(
 @click.option(
     "--model-profile",
     type=click.Choice(
-        [MODEL_PROFILE_JANUS, MODEL_PROFILE_SIGLIP2, MODEL_PROFILE_HYBRID]
+        [MODEL_PROFILE_CAPTIONS, MODEL_PROFILE_SIGLIP2, MODEL_PROFILE_HYBRID]
     ),
     required=True,
 )
@@ -6071,7 +5447,6 @@ def validate_index_database(
     "--classifier-backend",
     type=click.Choice(
         [
-            CLASSIFIER_BACKEND_JANUS,
             CLASSIFIER_BACKEND_GEMMA4,
             CLASSIFIER_BACKEND_GEMMA4_GGUF,
         ]
@@ -6503,7 +5878,7 @@ def backfill(dbpath: str, dry_run: bool):
 )
 def update_gps(dbpath: str, match: str | None, dry_run: bool):
     """Refresh GPS coordinates, timestamp and geocode for already-indexed photos
-    from their CURRENT EXIF, without re-running the Janus/SigLIP models.
+    from their CURRENT EXIF, without re-running the caption/SigLIP models.
 
     Use this after the geotag companion tool writes GPS into originals: it reads
     each indexed file's EXIF and updates metadata (lat/lng/iso8601/geo_*) plus the
@@ -6925,8 +6300,6 @@ def resolve_classifier_model_id(
     """
     if model_id:
         return model_id
-    if backend == CLASSIFIER_BACKEND_JANUS:
-        return JANUS_MODEL_ID
     if backend == CLASSIFIER_BACKEND_GEMMA4:
         return DEFAULT_GEMMA4_MODEL_ID
     if backend == CLASSIFIER_BACKEND_GEMMA4_GGUF:
@@ -6979,17 +6352,15 @@ def caption_pipeline_version(
     batch_max_new_tokens: int | None = None,
 ) -> str:
     resolved_model = resolve_classifier_model_id(backend, model_id) or "default"
-    revision = (
-        JANUS_MODEL_REVISION if backend == CLASSIFIER_BACKEND_JANUS else "external"
-    )
+    revision = "external"
     prompt_digest = hashlib.sha256(
         (build_classifier_prompt(None)).encode("utf-8")
     ).hexdigest()[:12]
     non_default_generation = ""
-    if batch_size is not None and batch_size != JANUS_BATCH_SIZE:
+    if batch_size is not None and batch_size != CAPTION_VERSION_BASELINE_BATCH_SIZE:
         non_default_generation += f":batch={batch_size}"
-    resolved_single_tokens = max_new_tokens or JANUS_MAX_NEW_TOKENS
-    resolved_batch_tokens = batch_max_new_tokens or JANUS_BATCH_MAX_NEW_TOKENS
+    resolved_single_tokens = max_new_tokens or CAPTION_MAX_NEW_TOKENS
+    resolved_batch_tokens = batch_max_new_tokens or CAPTION_BATCH_MAX_NEW_TOKENS
     non_default_generation += (
         f":batchTokens={resolved_batch_tokens}:singleTokens={resolved_single_tokens}"
         ":jsonStop=v2"
@@ -7334,7 +6705,8 @@ def evaluate_tag_quality(
 
     ``evaluate_caption_quality_cases`` searches tags and alt_text joined
     together, so a model can pass every concept on the strength of its sentence
-    while its tags are unusable. Janus does exactly this: it lifts bare words out
+    while its tags are unusable. Janus-Pro-1B, the retired backend, did exactly
+    this: it lifted bare words out
     of its own alt_text ("depicts", "under", "image") and still scores 10/11.
     Tags are what the FTS index and any tag facet actually store, so they are
     measured here alone: concept coverage from tags only, plus hygiene.
@@ -7507,7 +6879,7 @@ def analyse_image(
             else extract_colour_palette(pixels)
         )
 
-    # Captions are parsed (with model retry) during the Janus pass while the model
+    # Captions are parsed (with model retry) during the caption pass while the model
     # is still resident; here we only consume the precomputed parsed result. The
     # per-image needs_classifier flag — not the presence of a live model — gates
     # whether classifier fields are written, so embeddings-only re-indexes of
@@ -7741,8 +7113,10 @@ def insert_analysed_images_batch(db, results: list[Mapping]):
                         path,
                         CAPTION_STAGE,
                         source_sha256,
+                        # Falls back to the backend actually in use; naming a
+                        # fixed one here is what made every row read as stale.
                         item.get("caption_version")
-                        or caption_pipeline_version(CLASSIFIER_BACKEND_JANUS),
+                        or caption_pipeline_version(CLASSIFIER_BACKEND_GEMMA4_GGUF),
                         item.get("caption_model_id"),
                         cur,
                     )
