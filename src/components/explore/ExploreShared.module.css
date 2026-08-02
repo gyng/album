@@ -369,6 +369,17 @@
   flex: 0 0 var(--visual-timeline-thumb-size);
 }
 
+/* `.visualThumbLink .visualThumb` sizes both axes to `--thumb-size` (150px) and
+   outranks a lone class, so these tiles rendered 108×150 — the only portrait
+   grid on a page whose every other thumb row is square. The width looked right
+   purely because `max-inline-size` clamped it; nothing clamped the height.
+   Scoped to the row to match that specificity, as `.visualEraThumbs` already
+   does for era thumbs. */
+.visualTimelineThumbs .visualTimelineThumb {
+  block-size: auto;
+  aspect-ratio: 1;
+}
+
 .visualTimelineThumbWrap {
   inline-size: var(--visual-timeline-thumb-size);
 }
