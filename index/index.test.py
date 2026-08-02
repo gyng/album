@@ -1921,6 +1921,52 @@ class TestCli(UsesTestexistsFixture, unittest.TestCase):
             self.assertNotIn(geocode, (None, "WRONGPLACE"))
             self.assertIsNotNone(signature)
 
+    def test_update_gps_preserves_the_caption_backend_that_actually_ran(self):
+        # update-gps re-stamps caption provenance so a metadata-only refresh does
+        # not look like stale model output. It must re-stamp with the backend
+        # already recorded, not a hardcoded one: asserting Janus over a gemma
+        # caption makes every row disagree with the resolver, and the next index
+        # run then re-captions the whole library for byte-identical output.
+        photo = "../albums/test-simple/DSCF0506-2.jpg"
+        gemma_version = (
+            "caption-search-json-v2-abc:gemma4-gguf:some/model@external:default"
+        )
+        gemma_model = "some/model"
+        with tempfile.TemporaryDirectory() as tmpdir:
+            dbpath = os.path.join(tmpdir, "update-gps-provenance.sqlite")
+            db = Sqlite3Client(dbpath)
+            db.setup_tables()
+            with db.transaction() as cur:
+                db.upsert_image_fields(
+                    photo,
+                    {"filename": "DSCF0506-2.jpg", "alt_text": "a caption gemma wrote"},
+                    cur=cur,
+                )
+                db.insert_metadata(
+                    photo, (0.0, 0.0), "1999-01-01T00:00:00", {}, cur=cur
+                )
+                db.upsert_pipeline_state(
+                    photo, "caption", "olddigest", gemma_version, gemma_model, cur
+                )
+            db.con.close()
+
+            result = CliRunner().invoke(update_gps, f"--dbpath {dbpath}".split())
+            self.assertEqual(0, result.exit_code, result.output)
+
+            con = sqlite3.connect(dbpath)
+            version, model_id, digest = con.execute(
+                "SELECT pipeline_version, model_id, source_sha256 FROM pipeline_state"
+                " WHERE path=? AND stage='caption'",
+                (photo,),
+            ).fetchone()
+            con.close()
+
+            self.assertEqual(gemma_version, version)
+            self.assertEqual(gemma_model, model_id)
+            # The digest must still move to the file's current one, which is the
+            # whole point of re-stamping.
+            self.assertNotEqual("olddigest", digest)
+
     def test_update_gps_dry_run_makes_no_changes(self):
         photo = "../albums/test-simple/DSCF0506-2.jpg"
         with tempfile.TemporaryDirectory() as tmpdir:

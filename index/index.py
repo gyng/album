@@ -6524,6 +6524,12 @@ def update_gps(dbpath: str, match: str | None, dry_run: bool):
 
     paths = [p for p in db.list_image_paths() if match is None or match in p]
     caption_paths = db.list_caption_paths()
+    # Re-stamping caption provenance keeps a metadata-only refresh from looking
+    # like stale model output, but the backend must be read back rather than
+    # assumed: hardcoding one asserts a caption came from a model that never saw
+    # the photo, and every row then disagrees with the resolver, so the next
+    # index run re-captions the whole library for byte-identical output.
+    existing_states = db.get_pipeline_states()
     embedding_paths = {
         SiglipEmbedder.MODEL_ID: db.list_embedding_paths(SiglipEmbedder.MODEL_ID),
         Siglip2Embedder.MODEL_ID: db.list_embedding_paths(Siglip2Embedder.MODEL_ID),
@@ -6627,13 +6633,17 @@ def update_gps(dbpath: str, match: str | None, dry_run: bool):
                     CORE_PIPELINE_VERSION,
                     cur=cur,
                 )
-                if path in caption_paths:
+                caption_state = existing_states.get((path, CAPTION_STAGE))
+                # No recorded provenance means nothing to preserve; inventing one
+                # would claim knowledge this command does not have.
+                if path in caption_paths and caption_state is not None:
+                    _, caption_version, caption_model = caption_state
                     db.upsert_pipeline_state(
                         path,
                         CAPTION_STAGE,
                         digest,
-                        caption_pipeline_version(CLASSIFIER_BACKEND_JANUS),
-                        JANUS_MODEL_ID,
+                        caption_version,
+                        caption_model,
                         cur,
                     )
                 for stage, model_id in (
