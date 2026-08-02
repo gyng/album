@@ -385,6 +385,49 @@ describe("Picture", () => {
     expect(img.getAttribute("src")).toBe("small@400.avif");
   });
 
+  // The camera's own OffsetTime is unreliable in this library — wrong on every
+  // X100T frame and 18% of X-T5 frames — while the wall clock is correct. The
+  // zone derived from the coordinates therefore wins where both exist.
+  it("prefers the zone derived from location over the one the camera recorded", () => {
+    const { container } = render(
+      <PhotoBlockEl
+        block={createBlock({
+          exif: { DateTimeOriginal: "2023:11:13 16:47:45", OffsetTime: "+08:00" },
+          tags: { tz_offset: "+03:00", tz_name: "Europe/Istanbul" },
+        })}
+      />,
+    );
+    openPhotoDetails(container);
+
+    expect(
+      screen.getByText(
+        (_, element) =>
+          element?.tagName === "TD" &&
+          element.textContent?.startsWith("13 November 2023 at 16:47 (+03:00)") === true,
+      ),
+    ).toBeTruthy();
+  });
+
+  it("falls back to the camera's offset when the location yields no zone", () => {
+    const { container } = render(
+      <PhotoBlockEl
+        block={createBlock({
+          exif: { DateTimeOriginal: "2023:11:13 16:47:45", OffsetTime: "+08:00" },
+          tags: {},
+        })}
+      />,
+    );
+    openPhotoDetails(container);
+
+    expect(
+      screen.getByText(
+        (_, element) =>
+          element?.tagName === "TD" &&
+          element.textContent?.startsWith("13 November 2023 at 16:47 (+08:00)") === true,
+      ),
+    ).toBeTruthy();
+  });
+
   it.each(["Rotate 90 CW", "Rotate 270 CW"])(
     "swaps dimensions for the EXIF orientation %s and clears the colour placeholder after decode",
     async (orientation) => {

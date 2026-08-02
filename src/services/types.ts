@@ -38,6 +38,10 @@ export interface Tags {
   alt_text?: string;
   path?: string;
   geocode?: string;
+  /** IANA zone derived from the photo's coordinates by the indexer. */
+  tz_name?: string;
+  /** UTC offset for that zone at the photo's own date, e.g. "+09:00". */
+  tz_offset?: string;
 }
 
 export type SerializedTextBlock = TextBlock;

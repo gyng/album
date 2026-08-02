@@ -75,7 +75,9 @@ const createE2eSearchDatabases = ({ outputPath, embeddingsOutputPath, force = fa
     media_kind TEXT NOT NULL DEFAULT 'photo',
     duration_seconds REAL,
     scene_seconds REAL,
-    scene_of TEXT
+    scene_of TEXT,
+    tz_name TEXT,
+    tz_offset TEXT
   );
 `);
   embeddingsDb.exec(`
@@ -155,8 +157,8 @@ const createE2eSearchDatabases = ({ outputPath, embeddingsOutputPath, force = fa
   const insertMetadata = db.prepare(`
   INSERT INTO metadata (
     path, lat_deg, lng_deg, iso8601, geo_city, geo_region, geo_subregion, geo_country,
-    media_kind, duration_seconds
-  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    media_kind, duration_seconds, tz_name, tz_offset
+  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 `);
   const insertEmbedding = embeddingsDb.prepare(`
   INSERT INTO embeddings (path, model_id, embedding_dim, embedding_blob, embedding_scale)
@@ -219,6 +221,10 @@ const createE2eSearchDatabases = ({ outputPath, embeddingsOutputPath, force = fa
       country,
       photo.mediaKind ?? "photo",
       photo.durationSeconds ?? null,
+      // The indexer derives these from the coordinates; the fixture states them
+      // directly so the join has something real to return.
+      country === "Japan" ? "Asia/Tokyo" : "Asia/Singapore",
+      country === "Japan" ? "+09:00" : "+08:00",
     );
     const encodedEmbedding = encodeEmbedding(embeddingVectors[index]);
     insertEmbedding.run(

@@ -59,7 +59,8 @@ export const loadMapPageData = async (): Promise<MapPageData> => {
         decLng,
         decLat,
         date: DateTimeOriginal ?? null,
-        dateOffset: OffsetTime ?? null,
+        // Derived-from-location wins over the camera's own tag; see Photo.tsx.
+        dateOffset: photo._build.tags?.tz_offset ?? OffsetTime ?? null,
         href: getMapPhotoHref(album._build.slug, photo),
         placeholderColor: color ? `rgba(${color[0]}, ${color[1]}, ${color[2]}, 1)` : "transparent",
         placeholderHeight: photo._build.height,

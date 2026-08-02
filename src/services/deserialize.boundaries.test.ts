@@ -262,7 +262,7 @@ describe("search index key mismatch", () => {
   // quietly lost all its alt text, tags, geocodes and colours.
   const withRows = (indexedPath: string | null) =>
     jest.fn((sql: string, _params: unknown, callback: (err: Error | null, row: unknown) => void) =>
-      sql.includes("WHERE path")
+      sql.includes("LEFT JOIN")
         ? callback(null, undefined)
         : callback(null, indexedPath ? { path: indexedPath } : undefined),
     );
@@ -305,6 +305,23 @@ describe("search index key mismatch", () => {
     await deserializePhotoBlock(photo("a.jpg"), { dirname: "../albums/kanto" });
 
     expect(warn).not.toHaveBeenCalled();
+  });
+
+  // A database indexed before the zone columns existed is the ordinary state of
+  // any fork that has not re-run the indexer. Joining them unconditionally made
+  // every lookup throw "no such column", and deserialize swallows that — so the
+  // whole gallery silently lost its alt text, tags, geocodes and colours.
+  it("still reads details from a database with no zone columns", async () => {
+    db.get = jest.fn(
+      (sql: string, _params: unknown, callback: (e: Error | null, r?: unknown) => void) =>
+        sql.includes("metadata.tz_name")
+          ? callback(new Error("SQLITE_ERROR: no such column: metadata.tz_name"))
+          : callback(null, { path: "../albums/kanto/a.jpg", alt_text: "a cat" }),
+    );
+
+    const block = await deserializePhotoBlock(photo("a.jpg"), { dirname: "../albums/kanto" });
+
+    expect(block._build.tags.alt_text).toBe("a cat");
   });
 
   it("stays quiet when the lookup finds its row", async () => {

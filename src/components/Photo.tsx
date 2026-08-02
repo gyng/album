@@ -361,7 +361,11 @@ export const PhotoBlockEl: React.FC<{
     getBucketFacetSelection(FOCAL_LENGTH_35MM_FACET.id, exif.FocalLengthIn35mmFormat) ??
     getBucketFacetSelection(FOCAL_LENGTH_ACTUAL_FACET.id, exif.FocalLength);
   const displayDimensions = getDisplayDimensions(props.block);
-  const cameraDateTimestamp = exifRelativeTimestamp(exif.DateTimeOriginal, exif.OffsetTime);
+  // Derived-from-location wins over the camera's own tag: measured against the
+  // zone its coordinates imply, the X100T is wrong on every frame and the X-T5
+  // on 18% of them, while the wall clocks are demonstrably right.
+  const zoneOffset = props.block._build.tags.tz_offset ?? exif.OffsetTime;
+  const cameraDateTimestamp = exifRelativeTimestamp(exif.DateTimeOriginal, zoneOffset);
   return (
     <div
       className={`${styles.block} ${props.block.formatting?.immersive ? styles.immersive : ""}`}
@@ -540,7 +544,7 @@ export const PhotoBlockEl: React.FC<{
                         // Istanbul are indistinguishable otherwise.
                         formatExifWallClockDateTime(
                           props.block._build.exif.DateTimeOriginal,
-                          props.block._build.exif.OffsetTime,
+                          zoneOffset,
                         ),
                         cameraDateTimestamp != null ? (
                           <HydratedRelativeTime

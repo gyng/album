@@ -77,7 +77,7 @@ export const loadTimelinePageData = async (): Promise<TimelinePageData> => {
             album: album._build.slug,
             date: wallClockIso.slice(0, 10),
             dateTimeOriginal: wallClockIso,
-            dateOffset: photo._build.exif.OffsetTime ?? null,
+            dateOffset: photo._build.tags?.tz_offset ?? photo._build.exif.OffsetTime ?? null,
             decLat,
             decLng,
             geocode,

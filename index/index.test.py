@@ -47,6 +47,7 @@ from index import (
     configured_media_root,
     create_classifier,
     decode_embedding,
+    derive_zone,
     effective_free_vram_gb,
     encode_embedding,
     enforce_vram_headroom,
@@ -4473,6 +4474,142 @@ class SplitEmbeddingsDatabaseTest(unittest.TestCase):
                 core.list_embedding_paths("google/siglip-base-patch16-224"),
                 {"../albums/trip/own.jpg"},
             )
+
+
+class TestZoneIsPopulatedByThePipeline(unittest.TestCase):
+    def test_update_gps_fills_the_zone_from_coordinates(self):
+        # update-gps is the CPU-only repair path: it must derive the zone for
+        # rows indexed before this existed, without touching a model.
+        path = "../albums/test-simple/DSCF0506-2.jpg"
+        with tempfile.TemporaryDirectory() as tmpdir:
+            dbpath = os.path.join(tmpdir, "gps.sqlite")
+            db = Sqlite3Client(dbpath)
+            db.setup_tables()
+            db.insert_field(path, field="filename", value="DSCF0506-2.jpg")
+
+            result = CliRunner().invoke(cli, f"update-gps --dbpath {dbpath}".split())
+            self.assertEqual(0, result.exit_code, result.output)
+
+            row = db.con.execute(
+                "SELECT tz_name, tz_offset, iso8601 FROM metadata WHERE path = ?",
+                (path,),
+            ).fetchone()
+            self.assertIsNotNone(row, "update-gps wrote no metadata row")
+            self.assertEqual(row[0], "Asia/Tokyo")
+            self.assertEqual(row[1], "+09:00")
+            # The wall clock is untouched: deriving a zone never moves a time.
+            self.assertTrue(row[2].startswith("2019-11-06T"))
+
+    def test_analysis_reports_the_zone_alongside_the_wall_clock(self):
+        path = "../albums/test-simple/DSCF0506-2.jpg"
+        with open(path, "rb") as fh:
+            analysed = analyse_image(
+                fh,
+                path=path,
+                needs_core=True,
+                needs_classifier=False,
+                precomputed_caption=None,
+                precomputed_embeddings=None,
+                precomputed_colors=[(0, 0, 0)],
+            )
+        self.assertEqual(analysed["tz_name"], "Asia/Tokyo")
+        self.assertEqual(analysed["tz_offset"], "+09:00")
+
+
+class TestZoneStorage(unittest.TestCase):
+    def test_metadata_carries_the_derived_zone(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            dbpath = os.path.join(tmpdir, "tz.sqlite")
+            db = Sqlite3Client(dbpath)
+            db.setup_tables()
+            path = "../albums/x/a.jpg"
+            db.insert_metadata(
+                path,
+                (35.6762, 139.6503),
+                "2024-11-07T16:50:36",
+                tz_name="Asia/Tokyo",
+                tz_offset="+09:00",
+            )
+            row = db.con.execute(
+                "SELECT tz_name, tz_offset FROM metadata WHERE path = ?", (path,)
+            ).fetchone()
+            self.assertEqual(row, ("Asia/Tokyo", "+09:00"))
+
+    def test_zone_columns_are_added_to_an_existing_database(self):
+        # The migration must work on a database written before these existed.
+        with tempfile.TemporaryDirectory() as tmpdir:
+            dbpath = os.path.join(tmpdir, "old.sqlite")
+            con = sqlite3.connect(dbpath)
+            con.execute(
+                "CREATE TABLE metadata (path VARCHAR PRIMARY KEY, lat_deg REAL, "
+                "lng_deg REAL, iso8601 TEXT)"
+            )
+            con.commit()
+            con.close()
+
+            db = Sqlite3Client(dbpath)
+            db.setup_tables()
+            cols = {r[1] for r in db.con.execute("PRAGMA table_info(metadata)")}
+            self.assertIn("tz_name", cols)
+            self.assertIn("tz_offset", cols)
+
+
+class TestDeriveZone(unittest.TestCase):
+    """Timezone from coordinates, resolved at the photo's own date.
+
+    The camera's own OffsetTime is unreliable in this library — the X100T never
+    once wrote a correct one and the X-T5 is wrong 18% of the time — so the zone
+    is derived from where the photo was taken instead.
+    """
+
+    def test_derives_offset_from_coordinates(self):
+        self.assertEqual(
+            derive_zone(35.6762, 139.6503, "2024-11-07T16:50:36"),
+            ("Asia/Tokyo", "+09:00"),
+        )
+        self.assertEqual(
+            derive_zone(1.3521, 103.8198, "2026-08-01T16:55:08"),
+            ("Asia/Singapore", "+08:00"),
+        )
+        self.assertEqual(
+            derive_zone(38.6431, 34.8283, "2023-11-13T16:47:45"),
+            ("Europe/Istanbul", "+03:00"),
+        )
+
+    def test_resolves_dst_at_the_photos_own_date(self):
+        # Same place, two dates: the offset must follow the calendar, not today.
+        _, winter = derive_zone(51.5074, -0.1278, "2024-01-15T12:00:00")
+        _, summer = derive_zone(51.5074, -0.1278, "2024-07-15T12:00:00")
+        self.assertEqual(winter, "+00:00")
+        self.assertEqual(summer, "+01:00")
+
+    def test_distinguishes_zones_within_one_country(self):
+        # A country-level lookup would get these wrong; boundaries are needed.
+        self.assertEqual(
+            derive_zone(39.7392, -104.9903, "2024-07-01T12:00:00")[0], "America/Denver"
+        )
+        self.assertEqual(
+            derive_zone(33.4484, -112.0740, "2024-07-01T12:00:00")[0], "America/Phoenix"
+        )
+        # Arizona does not observe DST, Colorado does.
+        self.assertEqual(
+            derive_zone(39.7392, -104.9903, "2024-07-01T12:00:00")[1], "-06:00"
+        )
+        self.assertEqual(
+            derive_zone(33.4484, -112.0740, "2024-07-01T12:00:00")[1], "-07:00"
+        )
+
+    def test_falls_back_to_nautical_time_at_sea(self):
+        # Open ocean has no civil zone, so the lookup answers with the nautical
+        # one. That is a real offset, so it is kept rather than discarded.
+        name, offset = derive_zone(0.0, -140.0, "2024-01-01T12:00:00")
+        self.assertTrue(name.startswith("Etc/"))
+        self.assertEqual(offset, "-09:00")
+
+    def test_returns_nothing_when_the_zone_cannot_be_known(self):
+        self.assertEqual(derive_zone(None, None, "2024-01-01T12:00:00"), (None, None))
+        self.assertEqual(derive_zone(35.6762, 139.6503, None), (None, None))
+        self.assertEqual(derive_zone(35.6762, 139.6503, "not a date"), (None, None))
 
 
 if __name__ == "__main__":

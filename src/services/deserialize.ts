@@ -210,6 +210,17 @@ const reportSearchIndexKeyMismatch = (db: import("sqlite3").Database, missedPath
   });
 };
 
+const PHOTO_DETAILS_SQL_WITH_ZONE =
+  "SELECT images.*, metadata.tz_name, metadata.tz_offset " +
+  "FROM images LEFT JOIN metadata ON metadata.path = images.path " +
+  "WHERE images.path = ? LIMIT 1;";
+
+const PHOTO_DETAILS_SQL_WITHOUT_ZONE = "SELECT * FROM images WHERE path = ? LIMIT 1;";
+
+let zoneColumnsMissing = false;
+
+const isMissingZoneColumns = (err: Error) => /no such column/i.test(err?.message ?? "");
+
 const getPhotoDetailsFromSearchIndex = async (
   path: string,
   dbPath = getConfiguredSearchDbPath(),
@@ -223,34 +234,50 @@ const getPhotoDetailsFromSearchIndex = async (
 
   return measureBuild("deserialize.searchIndexLookup", async () => {
     incrementBuildCounter("deserialize.searchIndexLookup.calls");
-    const promise = new Promise<any[]>((resolve, reject) => {
-      const db = getSearchDb(dbPath);
-      if (!db) {
-        resolve([]);
-        return;
-      }
-      const sql = "SELECT * FROM images WHERE path = ? LIMIT 1;";
-      // In index
-      // ../src/public/data/albums/kanto/DSCF3871_2.jpg
-      const result: any[] = [];
-      db.get(sql, [path], (err: Error, row: any) => {
-        if (err) {
-          reject(err);
+    // The derived timezone lives in `metadata`, not the FTS table, so it is
+    // joined in here rather than surfaced through a second lookup. A database
+    // indexed before those columns existed rejects the join outright, and this
+    // lookup's failure is swallowed upstream — so an unconditional join would
+    // cost such a fork every photo's alt text, tags, geocodes and colours
+    // rather than just its zones. The first row that proves the columns absent
+    // switches the whole build to the plain query.
+    const lookup = (sql: string): Promise<any[]> =>
+      new Promise<any[]>((resolve, reject) => {
+        const db = getSearchDb(dbPath);
+        if (!db) {
+          resolve([]);
           return;
         }
-        result.push(row);
+        // In index
+        // ../src/public/data/albums/kanto/DSCF3871_2.jpg
+        const result: any[] = [];
+        db.get(sql, [path], (err: Error, row: any) => {
+          if (err) {
+            if (sql === PHOTO_DETAILS_SQL_WITH_ZONE && isMissingZoneColumns(err)) {
+              zoneColumnsMissing = true;
+              resolve(lookup(PHOTO_DETAILS_SQL_WITHOUT_ZONE));
+              return;
+            }
+            reject(err);
+            return;
+          }
+          result.push(row);
 
-        if (row?.colors) {
-          row.colors = parseColorPalette(row.colors);
-        }
+          if (row?.colors) {
+            row.colors = parseColorPalette(row.colors);
+          }
 
-        if (!row) {
-          reportSearchIndexKeyMismatch(db, path);
-        }
+          if (!row) {
+            reportSearchIndexKeyMismatch(db, path);
+          }
 
-        resolve(result);
+          resolve(result);
+        });
       });
-    });
+
+    const promise = lookup(
+      zoneColumnsMissing ? PHOTO_DETAILS_SQL_WITHOUT_ZONE : PHOTO_DETAILS_SQL_WITH_ZONE,
+    );
 
     photoSearchIndexCache.set(path, promise);
 
@@ -385,6 +412,7 @@ export const deserializeInternals = {
   getConfiguredSearchDbPath,
   resetForTesting: async () => {
     photoSearchIndexCache.clear();
+    zoneColumnsMissing = false;
     resetSearchIndexKeyMismatchWarning();
     await closeSearchDb();
   },

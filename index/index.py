@@ -24,6 +24,7 @@ import threading
 import time
 import typing
 import urllib.request
+import zoneinfo
 from collections.abc import Mapping
 from contextlib import contextmanager
 from datetime import datetime, timedelta
@@ -2294,6 +2295,63 @@ def convert_to_degress(value: exifread.utils.Ratio, lat_or_lng_ref: str) -> floa
     return sign * (d + (m / 60.0) + (s / 3600.0))
 
 
+_TIMEZONE_FINDER = None
+
+
+def _timezone_finder():
+    """Built once. The constructor loads the boundary data, not the lookup."""
+    global _TIMEZONE_FINDER
+    if _TIMEZONE_FINDER is None:
+        from timezonefinder import TimezoneFinder
+
+        _TIMEZONE_FINDER = TimezoneFinder()
+    return _TIMEZONE_FINDER
+
+
+def derive_zone(
+    lat_deg: float | None, lng_deg: float | None, naive_iso: str | None
+) -> tuple[str | None, str | None]:
+    """The IANA zone and UTC offset for where a photo was taken, or (None, None).
+
+    Derived rather than read from EXIF because the camera's own ``OffsetTime`` is
+    not trustworthy here: measured against the zone its coordinates imply, the
+    X100T is wrong on every frame and the X-T5 on 18% of them, while the wall
+    clocks themselves are demonstrably correct.
+
+    Resolved at the photo's *own* date, so a July and a December photo in the
+    same place get the offsets that actually applied. A wall clock inside a DST
+    repeat hour is ambiguous by construction; ``fold=0`` picks the first pass.
+    """
+    if lat_deg is None or lng_deg is None or not naive_iso:
+        return (None, None)
+
+    try:
+        taken = datetime.fromisoformat(naive_iso)
+    except (TypeError, ValueError):
+        return (None, None)
+
+    try:
+        tz_name = _timezone_finder().timezone_at(lat=lat_deg, lng=lng_deg)
+    except (ValueError, TypeError):
+        return (None, None)
+    if not tz_name:
+        return (None, None)
+
+    try:
+        offset = taken.replace(fold=0, tzinfo=zoneinfo.ZoneInfo(tz_name)).utcoffset()
+    # ZoneInfoNotFoundError subclasses KeyError; a malformed key raises ValueError.
+    # An unknown zone means an unlabelled photo, never a failed index run.
+    except (KeyError, ValueError):
+        return (None, None)
+    if offset is None:
+        return (None, None)
+
+    minutes = int(offset.total_seconds() // 60)
+    sign = "+" if minutes >= 0 else "-"
+    minutes = abs(minutes)
+    return (tz_name, f"{sign}{minutes // 60:02d}:{minutes % 60:02d}")
+
+
 def get_image_geocode(lat_deg: float, lng_deg: float) -> Mapping:
     # No cache: reverse_geocode.search is an in-process k-d tree lookup (~0ms).
     # A coordinate cache would rarely hit anyway — GPS precision means two photos
@@ -2525,6 +2583,13 @@ class Sqlite3Client:
             row[1] for row in cur.execute("PRAGMA table_info(metadata)").fetchall()
         }
         for column in ("geo_city", "geo_region", "geo_subregion", "geo_country"):
+            if column not in metadata_columns:
+                cur.execute(f"ALTER TABLE metadata ADD COLUMN {column} TEXT")
+        # The zone the wall clock belongs to, derived from the coordinates
+        # rather than read from EXIF: the camera's own OffsetTime is wrong on
+        # every X100T frame and 18% of X-T5 frames, while the clocks themselves
+        # are correct. Stored, never applied — nothing shifts a displayed time.
+        for column in ("tz_name", "tz_offset"):
             if column not in metadata_columns:
                 cur.execute(f"ALTER TABLE metadata ADD COLUMN {column} TEXT")
         # Videos are indexed through an extracted poster frame and are otherwise
@@ -3260,6 +3325,8 @@ class Sqlite3Client:
         media_kind: str | None = None,
         duration_seconds: float | None = None,
         scene_seconds: float | None = None,
+        tz_name: str | None = None,
+        tz_offset: str | None = None,
     ):
         if cur is None:
             with self.transaction() as transactional_cur:
@@ -3272,6 +3339,8 @@ class Sqlite3Client:
                     media_kind,
                     duration_seconds,
                     scene_seconds,
+                    tz_name,
+                    tz_offset,
                 )
                 return
 
@@ -3295,7 +3364,10 @@ class Sqlite3Client:
             # A writer that knows nothing about clip lengths (update-gps, a
             # backfill) must not blank one it never had.
             "media_kind = ?, duration_seconds = COALESCE(?, duration_seconds), "
-            "scene_seconds = ?, scene_of = ? "
+            "scene_seconds = ?, scene_of = ?, "
+            # A writer with no coordinates to derive from must not blank a zone
+            # another pass already worked out.
+            "tz_name = COALESCE(?, tz_name), tz_offset = COALESCE(?, tz_offset) "
             "WHERE path = ?",
             (
                 lat_lng_deg[0],
@@ -3309,6 +3381,8 @@ class Sqlite3Client:
                 duration_seconds,
                 resolved_scene_seconds,
                 scene_of,
+                tz_name,
+                tz_offset,
                 path,
             ),
         )
@@ -6475,8 +6549,15 @@ def update_gps(dbpath: str, match: str | None, dry_run: bool):
             if dry_run:
                 continue
 
+            tz_name, tz_offset = derive_zone(lat_deg, lng_deg, iso8601_local)
             db.insert_metadata(
-                path, (lat_deg, lng_deg), iso8601_local, geo_cols, cur=cur
+                path,
+                (lat_deg, lng_deg),
+                iso8601_local,
+                geo_cols,
+                cur=cur,
+                tz_name=tz_name,
+                tz_offset=tz_offset,
             )
             if blob is not None:
                 db.upsert_image_fields(path, {"geocode": blob}, cur=cur)
@@ -7438,12 +7519,18 @@ def analyse_image(
             else clip_start
         )
 
+    _zone = derive_zone(lat_deg, lng_deg, iso8601_local or None)
+
     end_time = time.perf_counter()
 
     return {
         # Camera-local wall time, no zone suffix (see comment above). This key is
         # read as ``iso8601`` by both insert paths and written to metadata.iso8601.
         "iso8601": iso8601_local or None,
+        # The zone that wall clock belongs to, from where the photo was taken.
+        # Never applied to the clock — only recorded beside it.
+        "tz_name": _zone[0],
+        "tz_offset": _zone[1],
         "media_kind": media_kind_for(path),
         "duration_seconds": duration_seconds,
         "scene_seconds": scene_seconds,
@@ -7630,6 +7717,8 @@ def insert_analysed_images_batch(db, results: list[Mapping]):
                     path,
                     lat_lng_deg=(analysed.get("lat_deg"), analysed.get("lng_deg")),
                     iso8601=analysed.get("iso8601"),
+                    tz_name=analysed.get("tz_name"),
+                    tz_offset=analysed.get("tz_offset"),
                     geocode=geocode_structured,
                     cur=cur,
                     media_kind=analysed.get("media_kind"),
