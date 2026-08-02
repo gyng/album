@@ -2296,16 +2296,52 @@ def convert_to_degress(value: exifread.utils.Ratio, lat_or_lng_ref: str) -> floa
 
 
 _TIMEZONE_FINDER = None
+_TIMEZONE_FINDER_UNAVAILABLE = False
+# analyse_image runs on a thread pool, so the one-time build and its one-time
+# warning are both racy without this.
+_TIMEZONE_FINDER_LOCK = threading.Lock()
+
+
+def _build_timezone_finder():
+    """Construct the finder. Split out so tests can make it fail."""
+    from timezonefinder import TimezoneFinder
+
+    return TimezoneFinder()
+
+
+def reset_timezone_finder_for_testing() -> None:
+    global _TIMEZONE_FINDER, _TIMEZONE_FINDER_UNAVAILABLE
+    with _TIMEZONE_FINDER_LOCK:
+        _TIMEZONE_FINDER = None
+        _TIMEZONE_FINDER_UNAVAILABLE = False
 
 
 def _timezone_finder():
-    """Built once. The constructor loads the boundary data, not the lookup."""
-    global _TIMEZONE_FINDER
-    if _TIMEZONE_FINDER is None:
-        from timezonefinder import TimezoneFinder
+    """Built once, or None if it cannot be built.
 
-        _TIMEZONE_FINDER = TimezoneFinder()
-    return _TIMEZONE_FINDER
+    Returning None rather than raising is deliberate. The zone is a label on top
+    of an index that was already correct without it, so a missing or broken
+    timezonefinder must cost the labels and nothing else — captions and
+    embeddings are hours of GPU time and are not discarded over an offset. The
+    warning is emitted once per run; per photo it would bury the run's real
+    output under a thousand identical lines.
+    """
+    global _TIMEZONE_FINDER, _TIMEZONE_FINDER_UNAVAILABLE
+    with _TIMEZONE_FINDER_LOCK:
+        if _TIMEZONE_FINDER_UNAVAILABLE:
+            return None
+        if _TIMEZONE_FINDER is None:
+            try:
+                _TIMEZONE_FINDER = _build_timezone_finder()
+            except Exception as exc:  # noqa: BLE001 - any failure here is non-fatal
+                _TIMEZONE_FINDER_UNAVAILABLE = True
+                log(
+                    f"[warn] Cannot derive timezones ({type(exc).__name__}: {exc}). "
+                    "Photos will be indexed without tz_name/tz_offset; "
+                    "run `uv sync` and re-run `update-gps` to add them."
+                )
+                return None
+        return _TIMEZONE_FINDER
 
 
 def derive_zone(
@@ -2330,8 +2366,12 @@ def derive_zone(
     except (TypeError, ValueError):
         return (None, None)
 
+    finder = _timezone_finder()
+    if finder is None:
+        return (None, None)
+
     try:
-        tz_name = _timezone_finder().timezone_at(lat=lat_deg, lng=lng_deg)
+        tz_name = finder.timezone_at(lat=lat_deg, lng=lng_deg)
     except (ValueError, TypeError):
         return (None, None)
     if not tz_name:

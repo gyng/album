@@ -82,6 +82,7 @@ from index import (
     prune,
     publish_index_databases,
     repair_classifier_json_syntax,
+    reset_timezone_finder_for_testing,
     resolve_caption_result,
     resolve_classifier_model_id,
     resolve_llama_server_command,
@@ -4552,6 +4553,59 @@ class TestZoneStorage(unittest.TestCase):
             cols = {r[1] for r in db.con.execute("PRAGMA table_info(metadata)")}
             self.assertIn("tz_name", cols)
             self.assertIn("tz_offset", cols)
+
+
+class TestDeriveZoneDegradesWhenUnavailable(unittest.TestCase):
+    """A zone is a label. Failing to derive one must never fail a run.
+
+    The zone is enrichment layered on top of an index that was already correct
+    without it, so an unimportable or broken timezonefinder costs the labels and
+    nothing else — captions, embeddings and colours are hours of work and are
+    not thrown away over it.
+    """
+
+    def setUp(self):
+        reset_timezone_finder_for_testing()
+        self.addCleanup(reset_timezone_finder_for_testing)
+
+    def test_returns_no_zone_instead_of_raising_when_the_library_is_absent(self):
+        with (
+            mock.patch(
+                "index._build_timezone_finder",
+                side_effect=ImportError("No module named 'timezonefinder'"),
+            ),
+            mock.patch("index.log") as logged,
+        ):
+            self.assertEqual(
+                derive_zone(35.6762, 139.6503, "2024-11-07T16:50:36"), (None, None)
+            )
+
+        self.assertTrue(
+            any("timezone" in str(call).lower() for call in logged.call_args_list),
+            f"expected a warning naming the cause, got {logged.call_args_list}",
+        )
+
+    def test_warns_once_per_run_rather_than_once_per_photo(self):
+        with (
+            mock.patch("index._build_timezone_finder", side_effect=ImportError("boom")),
+            mock.patch("index.log") as logged,
+        ):
+            for _ in range(5):
+                derive_zone(35.6762, 139.6503, "2024-11-07T16:50:36")
+
+        self.assertEqual(len(logged.call_args_list), 1, logged.call_args_list)
+
+    def test_a_broken_boundary_dataset_is_also_survivable(self):
+        with (
+            mock.patch(
+                "index._build_timezone_finder",
+                side_effect=OSError("truncated data file"),
+            ),
+            mock.patch("index.log"),
+        ):
+            self.assertEqual(
+                derive_zone(1.3521, 103.8198, "2026-08-01T16:55:08"), (None, None)
+            )
 
 
 class TestDeriveZone(unittest.TestCase):
