@@ -5,6 +5,7 @@ import { Caption, Heading, Thumb } from "../ui";
 import sharedStyles from "./ExploreShared.module.css";
 import localStyles from "./ExploreTimeSections.module.css";
 import { formatExifWallClockDate } from "../../util/exifTime";
+import { buildSilenceBands, buildZoneAxis } from "../../util/exploreTimeViz";
 
 const styles = mergeCssModuleStyles(
   sharedStyles,
@@ -18,15 +19,22 @@ const styles = mergeCssModuleStyles(
     "memoryItem",
     "memoryYear",
     "memoryAgo",
-    "section",
-    "sectionHeader",
-    "sectionWide",
+    "zoneClock",
+    "zoneAxis",
+    "zoneStack",
+    "zoneTick",
+    "zoneStackList",
+    "zoneChip",
+    "zoneNote",
+    "silenceTrack",
+    "silenceLine",
+    "silenceBand",
+    "silenceStart",
+    "silenceEnd",
     "zoneCount",
     "zoneCountLabel",
-    "zoneList",
     "zoneName",
     "zoneOffsets",
-    "zoneRow",
     "zoneShare",
     "zoneTotal",
   ],
@@ -57,9 +65,22 @@ const formatYears = (days: number) => {
  * year shows both, which is the visible proof that it was resolved per photo
  * rather than assumed once.
  */
-export const ExploreTimezones = ({ stats }: { stats: PhotoStats["timezoneStats"] }) =>
-  stats.zoneCount > 0 ? (
-    <section className={styles.section}>
+export const ExploreTimezones = ({ stats }: { stats: PhotoStats["timezoneStats"] }) => {
+  const columns = buildZoneAxis(stats.zones);
+  if (stats.zoneCount === 0 || columns.length === 0) return null;
+
+  const seasonal = Array.from(
+    new Set(
+      columns.flatMap((column) =>
+        column.zones.filter((zone) => zone.seasonal).map((zone) => zoneCity(zone.name)),
+      ),
+    ),
+  );
+
+  return (
+    // The full row: sixteen offsets in a single column showed five of them, and
+    // the span from -07:00 to +11:00 is the whole point of drawing it.
+    <section className={`${styles.section} ${styles.sectionWide}`}>
       <div className={styles.sectionHeader}>
         <Heading level={2} as="h2">
           Timezones
@@ -69,32 +90,73 @@ export const ExploreTimezones = ({ stats }: { stats: PhotoStats["timezoneStats"]
       <div className={styles.zoneTotal}>
         <span className={styles.zoneCount}>{stats.zoneCount}</span>
         <span className={styles.zoneCountLabel}>
-          {stats.zoneCount === 1 ? "timezone" : "timezones"}
+          {stats.zoneCount === 1 ? "timezone" : "timezones"}, {columns[0]?.label} to{" "}
+          {columns[columns.length - 1]?.label}
         </span>
       </div>
-      <ul className={styles.zoneList}>
-        {stats.zones.map((zone) => (
-          <li key={zone.name} className={styles.zoneRow}>
-            <span className={styles.zoneName}>{zoneCity(zone.name)}</span>
-            <span className={styles.zoneOffsets}>{zone.offsets.join(" / ")}</span>
-            <span className={styles.zoneShare}>
-              {zone.count.toLocaleString("en")} {zone.count === 1 ? "photo" : "photos"} ·{" "}
-              {/* The tail of a 16-zone list rounds to nothing; "0%" would read
-                  as none at all. */}
-              {zone.sharePercent === 0 ? "<1%" : `${zone.sharePercent}%`}
-            </span>
-          </li>
-        ))}
-      </ul>
+
+      {/* Placed on the world's clock rather than ranked: a list of sixteen
+          offsets says how many, and this says how far apart. */}
+      <div className={styles.zoneClock}>
+        <ol className={styles.zoneAxis}>
+          {columns.map((column) => (
+            <li key={column.hours} className={styles.zoneStack}>
+              <span className={styles.zoneOffsets}>{column.label}</span>
+              <span className={styles.zoneTick} aria-hidden="true" />
+              <span className={styles.zoneStackList}>
+                {column.zones.map((zone) => (
+                  <span
+                    key={zone.name}
+                    className={styles.zoneChip}
+                    // Weighted by how much of the archive stood on this clock,
+                    // so Tokyo's 63% does not read like Macau's three frames.
+                    // The weight is only visible, so the share is also said in
+                    // words — the tail of a 16-zone list rounds to nothing, and
+                    // "0%" would read as none at all.
+                    style={{ opacity: 0.45 + Math.min(0.55, zone.sharePercent / 100) }}
+                    title={`${zoneCity(zone.name)} ${column.label}: ${zone.count.toLocaleString("en")} ${
+                      zone.count === 1 ? "photo" : "photos"
+                    }, ${zone.sharePercent === 0 ? "<1%" : `${zone.sharePercent}%`} of the archive`}
+                  >
+                    <span className={styles.zoneName}>{zoneCity(zone.name)}</span>
+                    <span className={styles.zoneShare}>
+                      {zone.count.toLocaleString("en")}
+                      {zone.seasonal ? "*" : ""}
+                    </span>
+                  </span>
+                ))}
+              </span>
+            </li>
+          ))}
+        </ol>
+      </div>
+
+      {seasonal.length > 0 ? (
+        <p className={styles.zoneNote}>
+          * {Array.from(new Set(seasonal)).join(", ")} {seasonal.length === 1 ? "stands" : "stand"}{" "}
+          in two columns: the offset comes from the photograph&rsquo;s own date, so summer time is a
+          different clock.
+        </p>
+      ) : null}
     </section>
-  ) : null;
+  );
+};
 
 /**
  * The longest stretches the archive records nothing at all. An archive's
  * silences describe it as much as its peaks.
  */
-export const ExploreArchiveGaps = ({ gaps }: { gaps: PhotoStats["archiveGaps"] }) =>
-  gaps.length > 0 ? (
+export const ExploreArchiveGaps = ({
+  gaps,
+  dateRange,
+}: {
+  gaps: PhotoStats["archiveGaps"];
+  dateRange: PhotoStats["dateRange"];
+}) => {
+  const bands = buildSilenceBands(gaps, dateRange);
+  if (gaps.length === 0) return null;
+
+  return (
     <section className={styles.section}>
       <div className={styles.sectionHeader}>
         <Heading level={2} as="h2">
@@ -102,6 +164,25 @@ export const ExploreArchiveGaps = ({ gaps }: { gaps: PhotoStats["archiveGaps"] }
         </Heading>
         <Caption as="span">Stretches with no photograph</Caption>
       </div>
+
+      {/* Drawn on the archive's own life rather than ranked by length: how long
+          is the number, and where it falls is the part a list cannot say. */}
+      {bands.length > 0 && dateRange ? (
+        <div className={styles.silenceTrack}>
+          <span className={styles.silenceLine} aria-hidden="true" />
+          {bands.map((band) => (
+            <span
+              key={`${band.fromDate}-${band.toDate}`}
+              className={styles.silenceBand}
+              style={{ insetInlineStart: `${band.start}%`, inlineSize: `${band.width}%` }}
+              title={`${formatYears(band.days)} with no photograph, ${formatDayLabel(band.fromDate)} to ${formatDayLabel(band.toDate)}`}
+            />
+          ))}
+          <span className={styles.silenceStart}>{dateRange[0]}</span>
+          <span className={styles.silenceEnd}>{dateRange[1]}</span>
+        </div>
+      ) : null}
+
       <ul className={styles.gapList}>
         {gaps.map((gap) => (
           <li key={`${gap.fromDate}-${gap.toDate}`} className={styles.gapRow}>
@@ -113,7 +194,8 @@ export const ExploreArchiveGaps = ({ gaps }: { gaps: PhotoStats["archiveGaps"] }
         ))}
       </ul>
     </section>
-  ) : null;
+  );
+};
 
 /**
  * The same calendar day in previous years.

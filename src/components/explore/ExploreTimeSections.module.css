@@ -14,23 +14,12 @@
   font-size: var(--fs-sm);
 }
 
-.zoneList,
 .gapList {
   display: grid;
   gap: var(--m-s);
   margin: 0;
   padding: 0;
   list-style: none;
-}
-
-.zoneRow {
-  display: grid;
-  /* The offset column is fixed so the times line up down the list; a zone that
-     changes offset across the year carries two, which is the widest case. */
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: var(--m) var(--m-s);
-  align-items: baseline;
-  font-size: var(--fs-sm);
 }
 
 .zoneName {
@@ -92,4 +81,120 @@
 .memoryAgo {
   color: var(--c-bg-contrast-light);
   font-size: var(--fs-s);
+}
+
+/* The archive's zones on one clock: a column per offset the photographs were
+   actually taken on, west to east, so sixteen zones read as a span rather than
+   as a ranked list of sixteen numbers. */
+.zoneClock {
+  /* Nineteen hours of clock does not fit a phone; it scrolls inside its own
+     container rather than taking the page sideways with it. */
+  overflow-x: auto;
+  padding-block-end: var(--m-s);
+}
+
+.zoneAxis {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--m-m);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  min-inline-size: min-content;
+}
+
+.zoneStack {
+  display: grid;
+  justify-items: center;
+  gap: var(--m);
+  /* Wide enough for a city name; the names are what makes the column legible,
+     and cramped ones collided with their neighbours. */
+  inline-size: var(--size-96);
+}
+
+.zoneTick {
+  inline-size: var(--size-1);
+  block-size: var(--m-s);
+  background: color-mix(in oklch, var(--c-bg-contrast-light) 45%, transparent);
+}
+
+.zoneStackList {
+  display: grid;
+  gap: var(--m);
+  justify-items: center;
+}
+
+.zoneChip {
+  display: grid;
+  justify-items: center;
+  gap: 0;
+  inline-size: 100%;
+  min-inline-size: 0;
+  padding: var(--m-xs) var(--m);
+  border: var(--size-1) solid color-mix(in oklch, var(--c-accent) 40%, transparent);
+  border-radius: var(--m-s);
+  background: color-mix(in oklch, var(--c-accent) 10%, transparent);
+}
+
+/* Wrapped rather than clipped: the city is what makes the column legible, and
+   "Hong …" identifies nothing. */
+.zoneChip .zoneName {
+  inline-size: 100%;
+  text-align: center;
+  /* break-word, not anywhere: only a name that cannot fit at all should be
+     split, or "Shanghai" comes out as "Shangha / i". */
+  overflow-wrap: break-word;
+  line-height: 1.2;
+}
+
+.zoneNote {
+  margin: 0;
+  color: var(--c-bg-contrast-light);
+  font-size: var(--fs-xs);
+  line-height: 1.4;
+}
+
+/* The silences on the archive's own life: the track is every year it holds,
+   and each band is a stretch it recorded nothing. */
+.silenceTrack {
+  position: relative;
+  block-size: var(--size-48);
+  margin-block: var(--m-s) var(--m-m);
+}
+
+.silenceLine {
+  position: absolute;
+  inset-inline: 0;
+  inset-block-start: var(--m-m);
+  block-size: var(--size-8);
+  border-radius: var(--radius-pill);
+  background: color-mix(in oklch, var(--c-accent) 55%, transparent);
+}
+
+.silenceBand {
+  position: absolute;
+  inset-block-start: var(--m-m);
+  block-size: var(--size-8);
+  border-radius: var(--radius-pill);
+  /* Cut out of the track rather than drawn on it — a silence is an absence. */
+  background: var(--c-bg);
+  box-shadow: inset 0 0 0 var(--size-1)
+    color-mix(in oklch, var(--c-bg-contrast-light) 45%, transparent);
+}
+
+.silenceStart,
+.silenceEnd {
+  position: absolute;
+  inset-block-end: 0;
+  color: var(--c-bg-contrast-light);
+  font-size: var(--fs-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.silenceStart {
+  inset-inline-start: 0;
+}
+
+.silenceEnd {
+  inset-inline-end: 0;
 }

@@ -25,7 +25,14 @@ export function mergeCssModuleStyles(
         return [sharedStyles[property], localStyles[property]].filter(Boolean).join(" ");
       }
 
-      return localClasses.has(property) ? localStyles[property] : sharedStyles[property];
+      // A name can be declared local and not actually be defined there — the
+      // trips and time sections both claimed `section` and `sectionHeader`,
+      // which resolved to undefined and rendered those panels with no layout at
+      // all. Falling back to the shared module makes that a missing override
+      // rather than a missing class.
+      return localClasses.has(property)
+        ? (localStyles[property] ?? sharedStyles[property])
+        : sharedStyles[property];
     },
   });
 }

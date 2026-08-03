@@ -32,6 +32,20 @@ const summarisedCountry = (geocode: string | null | undefined) =>
 
 const longDate = (iso: string) => formatExifWallClockDate(`${iso}T00:00:00`) ?? iso;
 
+/** "18 Jul" — the year is already on the trip this day belongs to. */
+const chipDate = (iso: string) => {
+  const full = formatExifWallClockDate(`${iso}T00:00:00`);
+  if (!full) return iso;
+  const [day, month] = full.split(" ");
+  return `${day} ${month?.slice(0, 3) ?? ""}`.trim();
+};
+
+/** A journey's span, or just the day for an outing. */
+const tripDates = (trip: { isOuting: boolean; startDate: string; endDate: string }) =>
+  trip.isOuting
+    ? longDate(trip.startDate)
+    : `${longDate(trip.startDate)} – ${longDate(trip.endDate)}`;
+
 const toTripPhoto = (entry: TimelineEntry): TripPhoto => ({
   date: entry.dateTimeOriginal,
   album: entry.album,
@@ -127,15 +141,16 @@ export const TimelineTripsSection = ({
           ).slice(0, 4);
           return (
             <li key={trip.id} className={styles.trip}>
-              <div className={styles.meta}>
-                <span className={styles.span}>
-                  {trip.isOuting
-                    ? longDate(trip.startDate)
-                    : `${longDate(trip.startDate)} – ${longDate(trip.endDate)}`}
-                </span>
+              {/* The dates are the trip, so they carry the link to it; a row of
+                  its own saying "see the whole trip" was a fourth line for
+                  something the title already means. */}
+              <p className={styles.meta}>
+                <Link className={styles.title} href={`/trips#trip-${trip.id}`}>
+                  {tripDates(trip)}
+                </Link>
                 <span className={styles.stats}>
                   {trip.isOuting
-                    ? `outing · ${trip.photoCount.toLocaleString("en")} photos`
+                    ? `${trip.photoCount.toLocaleString("en")} photos`
                     : `${trip.dayCount} days · ${trip.photoCount.toLocaleString("en")} photos`}
                   {trip.totalKm && trip.totalKm >= 1
                     ? ` · ${Math.round(trip.totalKm).toLocaleString("en")} km`
@@ -148,29 +163,30 @@ export const TimelineTripsSection = ({
                     ))}
                   </span>
                 ) : null}
-                {trip.places.length > 0 ? (
-                  <span className={styles.places}>{trip.places.slice(0, 6).join(" → ")}</span>
-                ) : null}
-                {trip.firstVisits.length > 0 ? (
-                  <span className={styles.firsts}>
-                    First time in {trip.firstVisits.slice(0, 4).join(", ")}
-                  </span>
-                ) : null}
-                {trip.laterReturns.length > 0 ? (
-                  <span className={styles.returns}>
-                    Came back:{" "}
-                    {trip.laterReturns
-                      .slice(0, 3)
-                      .map((entry) => `${entry.place} in ${entry.year}`)
-                      .join(", ")}
-                  </span>
-                ) : null}
-                {/* Its route, gear and unusual subjects live on the trips page;
-                    this list is a way into the day view beside it. */}
-                <Link className={styles.whole} href={`/trips#trip-${trip.id}`}>
-                  See the whole trip
-                </Link>
-              </div>
+              </p>
+
+              {trip.places.length > 0 ? (
+                <p className={styles.places}>{trip.places.slice(0, 6).join(" → ")}</p>
+              ) : null}
+
+              {trip.firstVisits.length > 0 || trip.laterReturns.length > 0 ? (
+                <p className={styles.visits}>
+                  {trip.firstVisits.length > 0 ? (
+                    <span className={styles.firsts}>
+                      First time in {trip.firstVisits.slice(0, 4).join(", ")}
+                    </span>
+                  ) : null}
+                  {trip.laterReturns.length > 0 ? (
+                    <span className={styles.returns}>
+                      Back:{" "}
+                      {trip.laterReturns
+                        .slice(0, 3)
+                        .map((entry) => `${entry.place} ${entry.year}`)
+                        .join(", ")}
+                    </span>
+                  ) : null}
+                </p>
+              ) : null}
 
               <div className={styles.days}>
                 {trip.days.map((day) => (
@@ -183,7 +199,7 @@ export const TimelineTripsSection = ({
                     {...(day.date === selectedDate ? { "aria-current": "date" as const } : {})}
                     onClick={() => onSelectDate(day.date)}
                   >
-                    <span className={styles.dayDate}>{longDate(day.date)}</span>
+                    <span className={styles.dayDate}>{chipDate(day.date)}</span>
                     <span className={styles.dayCount}>{day.count}</span>
                   </button>
                 ))}

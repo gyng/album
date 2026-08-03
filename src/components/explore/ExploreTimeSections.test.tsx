@@ -25,17 +25,20 @@ describe("ExploreTimezones", () => {
     expect(screen.getByText(/932/)).toBeInTheDocument();
   });
 
-  // Melbourne is one place that reports two offsets across the year. Showing
-  // both is the point: it is what proves the zone was resolved per photo.
-  it("shows every offset a zone reported", () => {
+  // Melbourne is one place that reports two offsets across the year. Standing
+  // it in both columns is the point: it is what proves the zone was resolved
+  // per photograph rather than assumed once for the place.
+  it("stands a zone in every offset it reported", () => {
     render(<ExploreTimezones stats={zones} />);
 
-    expect(screen.getByText("+10:00 / +11:00")).toBeInTheDocument();
-    expect(screen.getByText("+09:00")).toBeInTheDocument();
+    expect(screen.getByText("+10:00")).toBeInTheDocument();
+    expect(screen.getByText("+11:00")).toBeInTheDocument();
+    expect(screen.getAllByText("Melbourne")).toHaveLength(2);
   });
 
   // A zone with a single photo, and one too small to round to a whole percent,
-  // are both ordinary at the tail of a 16-zone list.
+  // are both ordinary at the tail of a 16-zone list. The chart carries weight
+  // as opacity, which is visible only — so the share is still said in words.
   it("counts one photo as singular and never claims a zone is 0%", () => {
     render(
       <ExploreTimezones
@@ -47,7 +50,7 @@ describe("ExploreTimezones", () => {
       />,
     );
 
-    expect(screen.getByText("1 photo · <1%")).toBeInTheDocument();
+    expect(screen.getByTitle(/1 photo, <1% of the archive/)).toBeInTheDocument();
   });
 
   it("renders nothing when no photo carries a zone", () => {

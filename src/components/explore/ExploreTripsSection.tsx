@@ -5,12 +5,7 @@ import { Caption, Heading, pillStyles } from "../ui";
 import sharedStyles from "./ExploreShared.module.css";
 import localStyles from "./ExploreTripsSection.module.css";
 
-const styles = mergeCssModuleStyles(
-  sharedStyles,
-  localStyles,
-  ["section", "sectionHeader", "tripBig", "tripLead"],
-  [],
-);
+const styles = mergeCssModuleStyles(sharedStyles, localStyles, ["tripBig", "tripLead"], []);
 
 /**
  * That the archive contains journeys is a fact about it, so it belongs here.

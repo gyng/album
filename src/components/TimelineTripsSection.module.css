@@ -23,22 +23,26 @@
   list-style: none;
 }
 
+/* Four tight rows rather than seven loose ones: dates, route, what the trip
+   did to the map, and the days themselves. */
 .trip {
   display: grid;
-  gap: var(--m-s);
+  gap: var(--m);
   min-inline-size: 0;
 }
 
 .meta {
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
+  align-items: baseline;
   gap: var(--m) var(--m-s);
+  margin: 0;
   min-inline-size: 0;
 }
 
-.span {
-  font-size: var(--fs-s);
+/* The strongest thing in the row, and the way through to the whole trip. */
+.title {
+  font-size: var(--fs-sm);
   line-height: 1.2;
 }
 
@@ -50,7 +54,6 @@
 }
 
 .places {
-  flex-basis: 100%;
   margin: 0;
   color: var(--c-bg-contrast-light);
   font-size: var(--fs-s);
@@ -81,8 +84,8 @@
 .day {
   display: inline-flex;
   align-items: baseline;
-  gap: var(--m-s);
-  padding: var(--m) var(--m-s);
+  gap: var(--m);
+  padding: var(--m-xs) var(--m-s);
   border: var(--size-1) solid color-mix(in oklch, var(--c-bg-contrast-light) 45%, transparent);
   border-radius: var(--radius-pill);
   background: transparent;
@@ -112,12 +115,20 @@
 
 /* Most of this list is single-day outings; the filter lets a reader looking
    for a journey say so. Sits with the heading, not above the list. */
+/* Sized to its own buttons: given a full-width basis it stretched to 1265px
+   around 101px of content. */
 .filter {
-  flex-basis: 100%;
+  flex: none;
+}
+
+.visits {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--m) var(--m-m);
+  margin: 0;
 }
 
 .firsts {
-  flex-basis: 100%;
   color: var(--c-accent);
   font-size: var(--fs-s);
   line-height: 1.4;
@@ -125,18 +136,10 @@
 }
 
 .returns {
-  flex-basis: 100%;
   color: var(--c-bg-contrast-light);
   font-size: var(--fs-s);
   line-height: 1.4;
   overflow-wrap: anywhere;
-}
-
-/* The route, gear and unusual subjects live on the trips page; this list is a
-   way into the day view beside it. */
-.whole {
-  font-size: var(--fs-s);
-  line-height: 1.2;
 }
 
 /* The day the timeline is showing, so the reader can see where they are in the

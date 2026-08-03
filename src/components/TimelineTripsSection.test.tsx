@@ -44,7 +44,7 @@ describe("TimelineTripsSection", () => {
     render(<TimelineTripsSection entries={journey} onSelectDate={onSelectDate} />);
 
     act(() => {
-      screen.getByRole("button", { name: /14 November 2016/ }).click();
+      screen.getByRole("button", { name: /14 Nov/ }).click();
     });
 
     expect(onSelectDate).toHaveBeenCalledWith("2016-11-14");
@@ -106,7 +106,7 @@ describe("the trip the reader is looking at", () => {
     );
 
     const marked = screen.getByRole("button", { current: "date" });
-    expect(marked).toHaveTextContent(/14 November 2016/);
+    expect(marked).toHaveTextContent(/14 Nov/);
   });
 
   // Newest first means an older trip can sit past the fold; the selected day
@@ -142,16 +142,15 @@ describe("what the timeline says about a trip", () => {
     render(<TimelineTripsSection entries={archive} onSelectDate={() => {}} />);
 
     expect(screen.getByText(/First time in Takayama/)).toBeInTheDocument();
-    expect(screen.getByText(/Kyoto in 2022/)).toBeInTheDocument();
+    expect(screen.getByText(/Kyoto 2022/)).toBeInTheDocument();
   });
 
+  // The dates are the link now: a row of its own saying "see the whole trip"
+  // was a fourth line for something the title already means.
   it("offers the whole trip on the trips page", () => {
     render(<TimelineTripsSection entries={archive} onSelectDate={() => {}} />);
 
-    // Newest first, so the 2016 journey is not the first entry in the list.
-    const links = screen
-      .getAllByRole("link", { name: /whole trip/i })
-      .map((link) => link.getAttribute("href"));
+    const links = screen.getAllByRole("link").map((link) => link.getAttribute("href"));
     expect(links).toContain("/trips#trip-2016-11-13");
   });
 

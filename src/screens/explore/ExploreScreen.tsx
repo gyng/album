@@ -645,7 +645,7 @@ const ExploreScreen = ({ stats, visualSameness }: ExploreScreenProps) => {
               </section>
             ) : null}
             <ExploreTimezones stats={stats.timezoneStats} />
-            <ExploreArchiveGaps gaps={stats.archiveGaps} />
+            <ExploreArchiveGaps gaps={stats.archiveGaps} dateRange={stats.dateRange} />
           </StatGroup>
 
           <StatGroup
