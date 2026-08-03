@@ -1,4 +1,4 @@
-import { computeTrips, markFirstVisits, type TripPhoto } from "./computeTrips";
+import { computeTrips, markFirstVisits, markLaterReturns, type TripPhoto } from "./computeTrips";
 
 const photo = (date: string | null, over: Partial<TripPhoto> = {}): TripPhoto => ({
   date,
@@ -176,5 +176,150 @@ describe("computeTrips", () => {
 
     expect(trips[0]?.days[0]?.photos[0]?.src).toBe("/one.avif");
     expect(trips[0]?.days[0]?.photos).toHaveLength(2);
+  });
+});
+
+describe("what you carried", () => {
+  it("ranks bodies and lenses by share, and says how much of the trip recorded a lens", () => {
+    const trips = computeTrips([
+      photo("2024-05-01T09:00:00", { camera: "X-T5", lens: "XF16-80mmF4 R OIS WR" }),
+      photo("2024-05-01T10:00:00", { camera: "X-T5", lens: "XF16-80mmF4 R OIS WR" }),
+      photo("2024-05-01T11:00:00", { camera: "X-T5", lens: "XF23mmF1.4 R LM WR" }),
+      // A fixed-lens body records no LensModel at all, which is the ordinary
+      // case for half this archive — it must not be counted as a lens.
+      photo("2024-05-01T12:00:00", { camera: "X100T" }),
+    ]);
+
+    expect(trips[0]?.gear).toEqual({
+      cameras: [
+        { name: "X-T5", count: 3 },
+        { name: "X100T", count: 1 },
+      ],
+      lenses: [
+        { name: "XF16-80mmF4 R OIS WR", count: 2 },
+        { name: "XF23mmF1.4 R LM WR", count: 1 },
+      ],
+      photosWithCamera: 4,
+      photosWithLens: 3,
+    });
+  });
+
+  it("reports no gear when nothing recorded any", () => {
+    expect(computeTrips([photo("2024-05-01T09:00:00")])[0]?.gear).toEqual({
+      cameras: [],
+      lenses: [],
+      photosWithCamera: 0,
+      photosWithLens: 0,
+    });
+  });
+});
+
+describe("what you photographed here that you rarely do", () => {
+  // The point is rarity, not frequency: a tag on every photo in the archive
+  // says nothing about this trip even if it is the trip's commonest tag.
+  it("ranks tags by how much commoner they are here than across the archive", () => {
+    const everywhere = Array.from({ length: 20 }, (_, index) =>
+      photo(`2020-0${1 + (index % 3)}-1${index % 8}T10:00:00`, { tags: ["sky"] }),
+    );
+    const trips = computeTrips([
+      ...everywhere,
+      photo("2024-05-01T09:00:00", { tags: ["sky", "moss"] }),
+      photo("2024-05-01T10:00:00", { tags: ["sky", "moss"] }),
+    ]);
+
+    const trip = trips.find((candidate) => candidate.startDate === "2024-05-01");
+    expect(trip?.distinctiveTags[0]?.tag).toBe("moss");
+    expect(trip?.distinctiveTags.map((entry) => entry.tag)).not.toContain("sky");
+  });
+
+  // A tag seen nowhere else scores at the ceiling however rare it is, so
+  // without smoothing every one-trip-only tag ties on the same number and the
+  // ranking falls back to the alphabet. Six tags at "8.9×" is not a finding.
+  it("ranks a subject that recurs above one that appeared twice, when neither occurs elsewhere", () => {
+    // Sized like the real archive relative to one trip: with only a few dozen
+    // photographs behind it the smoothing prior would dominate, which says
+    // nothing about the rule.
+    const elsewhere = Array.from({ length: 400 }, (_, index) =>
+      photo(`20${10 + (index % 9)}-0${1 + (index % 3)}-1${index % 8}T10:00:00`, { tags: ["sky"] }),
+    );
+    const trip = Array.from({ length: 20 }, (_, index) =>
+      photo(`2024-05-01T${String(9 + index).padStart(2, "0")}:00:00`, {
+        tags: index < 12 ? ["moss"] : index < 14 ? ["graveyard"] : [],
+      }),
+    );
+
+    const found = computeTrips([...elsewhere, ...trip]).find(
+      (candidate) => candidate.startDate === "2024-05-01",
+    );
+
+    expect(found?.distinctiveTags.map((entry) => entry.tag)).toEqual(["moss", "graveyard"]);
+    expect(found?.distinctiveTags[0]?.times).toBeGreaterThan(found?.distinctiveTags[1]?.times ?? 0);
+  });
+
+  // Otherwise every Japan trip reports, at great length, that it is in Japan.
+  it("drops tags that merely repeat where the photograph was taken", () => {
+    // "kyoto" and "japan" are on every frame of this trip, so by rate alone
+    // they would outrank moss — the place words have to go before the ranking.
+    const elsewhere = Array.from({ length: 20 }, (_, index) =>
+      photo(`2020-0${1 + (index % 3)}-1${index % 8}T10:00:00`, {
+        city: "Singapore",
+        tags: ["sky"],
+      }),
+    );
+    const trips = computeTrips([
+      ...elsewhere,
+      photo("2024-05-01T09:00:00", { city: "Kyoto", country: "Japan", tags: ["kyoto", "moss"] }),
+      photo("2024-05-01T10:00:00", { city: "Kyoto", country: "Japan", tags: ["japan", "moss"] }),
+    ]);
+
+    const trip = trips.find((candidate) => candidate.startDate === "2024-05-01");
+    expect(trip?.distinctiveTags.map((entry) => entry.tag)).toEqual(["moss"]);
+  });
+});
+
+describe("the route", () => {
+  it("gives each day one point, taken from a photograph that has coordinates", () => {
+    const trips = computeTrips([
+      photo("2024-05-01T09:00:00", {}),
+      photo("2024-05-01T10:00:00", { lat: 35.01, lng: 135.76 }),
+      photo("2024-05-02T10:00:00", { lat: 34.67, lng: 135.5 }),
+    ]);
+
+    expect(trips[0]?.days.map((day) => day.point)).toEqual([
+      { lat: 35.01, lng: 135.76 },
+      { lat: 34.67, lng: 135.5 },
+    ]);
+  });
+
+  it("leaves a day with no located photograph without a point", () => {
+    expect(computeTrips([photo("2024-05-01T09:00:00")])[0]?.days[0]?.point).toBeNull();
+  });
+});
+
+describe("markLaterReturns", () => {
+  // The mirror of firstVisits: that one says "you had never been here", this
+  // one says "and you came back".
+  it("names the next trip that reached the same place, and the year it did", () => {
+    const trips = markLaterReturns(
+      computeTrips([
+        photo("2018-04-01T10:00:00", { city: "Kyoto" }),
+        photo("2022-11-02T10:00:00", { city: "Kyoto" }),
+        photo("2024-03-03T10:00:00", { city: "Kyoto" }),
+      ]),
+    );
+
+    const first = trips.find((trip) => trip.startDate === "2018-04-01");
+    expect(first?.laterReturns).toEqual([{ place: "Kyoto", year: 2022 }]);
+  });
+
+  it("says nothing about a place never returned to, or about the last visit", () => {
+    const trips = markLaterReturns(
+      computeTrips([
+        photo("2018-04-01T10:00:00", { city: "Kyoto" }),
+        photo("2022-11-02T10:00:00", { city: "Osaka" }),
+      ]),
+    );
+
+    expect(trips.every((trip) => trip.laterReturns.length === 0)).toBe(true);
   });
 });

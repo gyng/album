@@ -1,0 +1,45 @@
+.map {
+  inline-size: 100%;
+  block-size: var(--size-320);
+  overflow: hidden;
+}
+
+.empty {
+  margin: 0;
+  font-size: var(--fs-s);
+  color: var(--c-bg-contrast-light);
+}
+
+/* The pin is the thumbnail: a numbered frame standing on the point it was
+   taken at, rather than a dot with a picture somewhere near it. */
+.stop {
+  position: relative;
+  display: block;
+  inline-size: var(--size-48);
+  block-size: var(--size-48);
+  border: var(--size-2) solid var(--c-bg);
+  background: var(--c-bg-contrast-dark);
+  box-shadow: 0 var(--size-1) var(--size-4) var(--c-overlay-dark);
+}
+
+.thumb {
+  inline-size: 100%;
+  block-size: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.number {
+  position: absolute;
+  inset-block-start: calc(var(--size-8) * -1);
+  inset-inline-start: calc(var(--size-8) * -1);
+  min-inline-size: var(--size-20);
+  padding: 0 var(--m);
+  border-radius: var(--radius-pill);
+  background: var(--c-accent);
+  color: var(--c-bg);
+  font-size: var(--fs-xs);
+  line-height: var(--size-20);
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}

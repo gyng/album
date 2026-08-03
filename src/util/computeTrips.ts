@@ -20,6 +20,34 @@ export type TripPhoto = {
   lat?: number | null;
   lng?: number | null;
   swatch?: string;
+  /** Body as the camera recorded it, e.g. "X-T5". */
+  camera?: string | null;
+  /**
+   * Lens as the camera recorded it. Absent on a fixed-lens body, which is half
+   * this archive — treat missing as unrecorded, never as "no lens".
+   */
+  lens?: string | null;
+  /** Classifier tags for this photograph. */
+  tags?: string[];
+};
+
+/** One piece of equipment and how many of a trip's frames it took. */
+export type GearShare = { name: string; count: number };
+
+export type TripGear = {
+  cameras: GearShare[];
+  lenses: GearShare[];
+  photosWithCamera: number;
+  /** Denominator for the lens shares: a share of the whole trip would mislead. */
+  photosWithLens: number;
+};
+
+/** A tag this trip carries far more often than the archive around it does. */
+export type DistinctiveTag = {
+  tag: string;
+  count: number;
+  /** How many times commoner here than across every photo given. */
+  times: number;
 };
 
 export type TripDay = {
@@ -38,6 +66,12 @@ export type TripDay = {
   coveredKm: number | null;
   /** How far the day's centre of gravity moved from the previous day's. */
   movedKm: number | null;
+  /**
+   * Where to draw this day on a route: the first photograph of the day that
+   * knows where it was. Not the day's centroid — an average of two cities is a
+   * point in neither, and often at sea.
+   */
+  point: { lat: number; lng: number } | null;
 };
 
 export type Trip = {
@@ -58,7 +92,15 @@ export type Trip = {
    * them.
    */
   firstVisits: string[];
+  /**
+   * Places this trip reached that a *later* trip reached again, with the year
+   * of that return. The mirror of `firstVisits`, and empty until
+   * `markLaterReturns` has seen every trip.
+   */
+  laterReturns: Array<{ place: string; year: number }>;
   totalKm: number | null;
+  gear: TripGear;
+  distinctiveTags: DistinctiveTag[];
 };
 
 /**
@@ -174,6 +216,95 @@ const clockTime = (raw: string): string => {
   return `${String(parsed.hour).padStart(2, "0")}:${String(parsed.minute).padStart(2, "0")}`;
 };
 
+const countBy = (values: Array<string | null | undefined>): GearShare[] => {
+  const counts = new Map<string, number>();
+  for (const value of values) {
+    if (value) counts.set(value, (counts.get(value) ?? 0) + 1);
+  }
+  return Array.from(counts, ([name, count]) => ({ name, count })).sort(
+    (left, right) => right.count - left.count || left.name.localeCompare(right.name),
+  );
+};
+
+const summariseGear = (photos: TripPhoto[]): TripGear => ({
+  cameras: countBy(photos.map((photo) => photo.camera)),
+  lenses: countBy(photos.map((photo) => photo.lens)),
+  photosWithCamera: photos.filter((photo) => photo.camera).length,
+  photosWithLens: photos.filter((photo) => photo.lens).length,
+});
+
+/** Tags worth reporting: enough of the trip to be a theme rather than a frame. */
+const MIN_DISTINCTIVE_COUNT = 2;
+/** Below this it is not unusual, just present. */
+const MIN_DISTINCTIVE_TIMES = 1.5;
+/**
+ * Pseudo-occurrences added to the archive's own rate.
+ *
+ * A tag seen nowhere but this trip has an archive rate equal to its trip rate,
+ * so it scores at the ceiling — and *every* such tag scores the same ceiling,
+ * whether it names twelve frames or two. The ranking then falls back to the
+ * alphabet, which is how six unrelated subjects come to be reported as equally
+ * distinctive. Smoothing pulls a barely-seen tag towards the archive mean, so
+ * what survives is a subject that actually recurs here.
+ */
+const BASELINE_SMOOTHING = 5;
+const MAX_DISTINCTIVE_TAGS = 6;
+
+const normaliseTag = (tag: string) => tag.trim().toLowerCase().replace(/_/g, " ");
+
+/**
+ * The words a photograph's own geocode already says.
+ *
+ * A classifier that tags a Kyoto photograph "kyoto" is right and useless: left
+ * in, every trip's most distinctive tags are the places it went, which the
+ * places list has already said.
+ */
+const placeWords = (photo: TripPhoto): string[] =>
+  [photo.city, photo.country].filter((value): value is string => Boolean(value)).map(normaliseTag);
+
+const tagCounts = (photos: TripPhoto[]): Map<string, number> => {
+  const counts = new Map<string, number>();
+  for (const photo of photos) {
+    const here = new Set(placeWords(photo));
+    for (const tag of new Set((photo.tags ?? []).map(normaliseTag))) {
+      if (!tag || here.has(tag)) continue;
+      counts.set(tag, (counts.get(tag) ?? 0) + 1);
+    }
+  }
+  return counts;
+};
+
+/**
+ * Tags this trip carries disproportionately, against the baseline of every
+ * photograph the caller supplied.
+ *
+ * Rate against rate, not count against count: the commonest tag on a trip is
+ * usually the commonest tag everywhere, and says nothing about the trip.
+ */
+const distinctiveTags = (
+  photos: TripPhoto[],
+  baseline: Map<string, number>,
+  baselineSize: number,
+): DistinctiveTag[] => {
+  if (photos.length === 0 || baselineSize === 0) return [];
+  const here = tagCounts(photos);
+  return Array.from(here, ([tag, count]) => {
+    const overall = baseline.get(tag) ?? count;
+    const archiveRate = (overall + BASELINE_SMOOTHING) / (baselineSize + BASELINE_SMOOTHING);
+    const times = count / photos.length / archiveRate;
+    return { tag, count, times: Math.round(times * 10) / 10 };
+  })
+    .filter((entry) => entry.count >= MIN_DISTINCTIVE_COUNT && entry.times >= MIN_DISTINCTIVE_TIMES)
+    .sort(
+      (left, right) =>
+        right.times - left.times ||
+        // A subject on twenty frames outranks one on two at the same rate.
+        right.count - left.count ||
+        left.tag.localeCompare(right.tag),
+    )
+    .slice(0, MAX_DISTINCTIVE_TAGS);
+};
+
 /**
  * Group photographs into the journeys they were taken on.
  *
@@ -202,6 +333,10 @@ export function computeTrips(photos: TripPhoto[]): Trip[] {
 
   const dayKeys = Array.from(byDay.keys()).sort();
   if (dayKeys.length === 0) return [];
+
+  // The baseline for "unusual" is every photograph the caller supplied, which
+  // is the archive on /trips and one album in the album view. Computed once.
+  const baseline = tagCounts(ordered);
 
   const runs: string[][] = [];
   let run: string[] = [];
@@ -251,6 +386,7 @@ export function computeTrips(photos: TripPhoto[]): Trip[] {
         hours: shootingHours(items),
         coveredKm,
         movedKm,
+        point: points[0] ? { lat: points[0].lat, lng: points[0].lng } : null,
       };
     });
 
@@ -271,7 +407,10 @@ export function computeTrips(photos: TripPhoto[]): Trip[] {
       days,
       isOuting: keys.length === 1,
       firstVisits: [],
+      laterReturns: [],
       totalKm: totalKm > 0 ? totalKm : null,
+      gear: summariseGear(all),
+      distinctiveTags: distinctiveTags(all, baseline, ordered.length),
     };
   });
 
@@ -302,4 +441,32 @@ export function markFirstVisits(trips: Trip[]): Trip[] {
     annotated.set(trip.id, firstVisits);
   }
   return trips.map((trip) => ({ ...trip, firstVisits: annotated.get(trip.id) ?? [] }));
+}
+
+/**
+ * Annotate each trip with the places a *later* trip reached again.
+ *
+ * The mirror of `markFirstVisits`, and the other half of a place's story: that
+ * one says a journey was the first time somewhere, this one says it was not the
+ * last. Same constraint — it can only be decided once every trip is known, and
+ * the year reported is the next return, not the most recent one.
+ */
+export function markLaterReturns(trips: Trip[]): Trip[] {
+  // Oldest first, so "the next return" is the first one encountered after a
+  // trip rather than whichever the sort happened to reach.
+  const oldestFirst = [...trips].reverse();
+  const returns = new Map<string, Array<{ place: string; year: number }>>();
+
+  oldestFirst.forEach((trip, index) => {
+    const found: Array<{ place: string; year: number }> = [];
+    for (const place of trip.places) {
+      const next = oldestFirst
+        .slice(index + 1)
+        .find((candidate) => candidate.places.includes(place));
+      if (next) found.push({ place, year: Number(next.startDate.slice(0, 4)) });
+    }
+    returns.set(trip.id, found);
+  });
+
+  return trips.map((trip) => ({ ...trip, laterReturns: returns.get(trip.id) ?? [] }));
 }

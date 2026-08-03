@@ -191,3 +191,95 @@
     grid-column: 2;
   }
 }
+
+.returns {
+  margin: 0;
+  font-size: var(--fs-s);
+  color: var(--c-bg-contrast-light);
+  overflow-wrap: anywhere;
+}
+
+/* A quiet block, not a card: these sit inside the trip header, and a border
+   around each would compete with the trip's own separator. */
+.panel {
+  display: grid;
+  gap: var(--m);
+  margin-block-start: var(--m);
+}
+
+.panelTitle {
+  margin: 0;
+  font-size: var(--fs-xs);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--c-bg-contrast-light);
+}
+
+.tagList,
+.gearList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--m) var(--m-s);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tag,
+.gearItem {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--m);
+  font-size: var(--fs-s);
+  line-height: 1.2;
+}
+
+.tagName,
+.gearName {
+  overflow-wrap: anywhere;
+}
+
+.tagTimes {
+  color: var(--c-accent);
+  font-variant-numeric: tabular-nums;
+}
+
+.gearShare {
+  color: var(--c-bg-contrast-light);
+  font-variant-numeric: tabular-nums;
+}
+
+.gear {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--m-m) var(--m-xl);
+}
+
+.gearGroup {
+  display: grid;
+  gap: var(--m);
+  min-inline-size: 0;
+}
+
+.gearTitle {
+  margin: 0;
+  font-size: var(--fs-s);
+  color: var(--c-bg-contrast-light);
+}
+
+/* The lens denominator is smaller than the trip, and saying so is the point. */
+.gearNote {
+  margin: 0;
+  font-size: var(--fs-xs);
+  color: var(--c-bg-contrast-light);
+}
+
+/* The map is opened, not laid out: a trip list would otherwise build one WebGL
+   context per journey. */
+.route {
+  display: grid;
+  gap: var(--m-s);
+  justify-items: start;
+  margin-block-start: var(--m-s);
+  inline-size: 100%;
+}

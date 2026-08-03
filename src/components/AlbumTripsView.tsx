@@ -1,33 +1,10 @@
 import React from "react";
 import type { Content, PhotoBlock } from "../services/types";
-import { computeTrips, markFirstVisits, type TripPhoto } from "../util/computeTrips";
-import { getGeocodeCity, getGeocodeCountry } from "../util/geocode";
-import { getDegLatLngFromExif } from "../util/dms2deg";
-import { getMapPhotoHref } from "../util/mapSearchIndex";
-import { encodePublicAssetPath } from "../util/encodePublicAssetPath";
-import { rgbToString } from "../util/colorDistance";
+import { computeTrips, markFirstVisits, markLaterReturns } from "../util/computeTrips";
+import { tripPhotoFromBlock } from "../util/tripPhotoFromBlock";
 import { Caption } from "./ui";
 import { TripDetail } from "./TripDetail";
 import styles from "./AlbumTripsView.module.css";
-
-const toTripPhoto = (album: Content, photo: PhotoBlock): TripPhoto => {
-  const exif = photo._build.exif;
-  const { decLat, decLng } = getDegLatLngFromExif(exif);
-  const geocode = photo._build.tags?.geocode;
-  const dominant = photo._build.tags?.colors?.[0] as [number, number, number] | undefined;
-  return {
-    date: exif.DateTimeOriginal ?? null,
-    album: album._build.slug,
-    src: photo._build.srcset?.[0]?.src ?? encodePublicAssetPath(photo.data.src),
-    href: getMapPhotoHref(album._build.slug, photo),
-    label: photo.data.title ?? photo.id ?? "",
-    city: getGeocodeCity(geocode),
-    country: getGeocodeCountry(geocode),
-    lat: typeof decLat === "number" ? decLat : null,
-    lng: typeof decLng === "number" ? decLng : null,
-    ...(dominant ? { swatch: rgbToString(dominant) } : {}),
-  };
-};
 
 /**
  * The album's own photographs, grouped into the journeys they were taken on.
@@ -40,8 +17,8 @@ export const AlbumTripsView = ({ album }: { album: Content }) => {
   const trips = React.useMemo(() => {
     const photos = album.blocks
       .filter((block): block is PhotoBlock => block.kind === "photo")
-      .map((photo) => toTripPhoto(album, photo));
-    return markFirstVisits(computeTrips(photos));
+      .map((photo) => tripPhotoFromBlock(album, photo));
+    return markLaterReturns(markFirstVisits(computeTrips(photos)));
   }, [album]);
 
   if (trips.length === 0) {

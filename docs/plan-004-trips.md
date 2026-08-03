@@ -200,3 +200,35 @@ Done in `b1202b9` and the commit that follows it.
   current rule, so a change to the rule is visible rather than silent.
 - `npx jest`, `npm run lint`, and a production build per stage; browser checks at 390px and
   1280px, since the recent explore work found three layout defects that only appeared there.
+
+## The summary panels and the route map, as built
+
+The trip-summary half of this plan shipped a release after the list itself, and the shape it
+took is worth recording.
+
+- **The route map is a disclosure, not part of the layout.** `/trips` renders every journey in
+  the archive, so a map per trip would build scores of WebGL contexts on one page; nothing
+  about MapLibre is fetched until a reader opens a route. `useClientComponents` is consulted
+  only inside the opened branch, so a renderer that installs no provider still renders trips.
+- **The fit has to run on `onLoad`, not on mount.** Children mount as soon as the map object
+  exists, which is before the style and canvas are up: a fit requested then is silently
+  ignored, and the route opens at world view with its markers scattered off-screen. The pure
+  half lives in `components/tripRoute.ts`, apart from the component, so it can be tested
+  without resolving MapLibre — the same split `mapRoute.ts` uses.
+- **`MapLibreStyles` is not optional.** Without it the canvas mounts, reports itself ready and
+  draws nothing at all. `data-map-status` reaching `ready` but never `loaded` is the signature.
+- **Distinctive tags needed a smoothed baseline.** A tag seen nowhere but this trip scores at
+  the ceiling, and *every* such tag scores the same ceiling whether it names twelve frames or
+  two — the first attempt reported six unrelated subjects at "8.9×" each, ranked alphabetically.
+  Five pseudo-occurrences added to the archive rate, and a count tiebreak, turn that into
+  autumn 5.5×, moss 4.7×, shinto shrine 4.5× — which is the measurement this plan predicted.
+  Tags that merely repeat the photograph's own geocode are dropped first, or every Japan trip
+  reports at length that it is in Japan.
+- **Lens shares are measured against the frames that recorded a lens**, and say so. A
+  fixed-lens body writes no `LensModel` and half this archive is one: bodies cover 98% of
+  photographs, lenses 52%. Measuring lenses against the whole trip would claim frames nothing
+  can account for.
+- **Payload went down, not up.** The trip-level summaries cost ~48 KB across 94 trips, but the
+  retained thumbnails were still carrying coordinates, city, country and now gear and tags that
+  nothing on that page reads. Shipping only what a thumbnail needs took `/trips` from 303.7 KB
+  to 291.9 KB with all four features added.

@@ -24,6 +24,10 @@ export const nextClientComponents: ClientComponents = {
   SankeyChart: dynamic(() => import("../../SankeyChart").then((module) => module.SankeyChart), {
     ssr: false,
   }),
+  TripRouteMap: dynamic(() => import("../../TripRouteMap"), {
+    loading: () => <p className={mapWorldStyles.loadingPlaceholder}>Loading map…</p>,
+    ssr: false,
+  }),
   GuessMap: dynamic(() => import("../../guess/GuessMapExport"), {
     loading: () => <div className={guessStyles.mapLoading} />,
     ssr: false,

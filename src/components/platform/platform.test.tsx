@@ -255,6 +255,7 @@ describe("platform navigation adapter", () => {
       "PhotoSimilarPhotos",
       "SankeyChart",
       "SearchWithCoi",
+      "TripRouteMap",
     ]);
   });
 
