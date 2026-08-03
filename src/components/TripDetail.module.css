@@ -24,11 +24,19 @@
   overflow-wrap: anywhere;
 }
 
+/* No gap between days: the rail is one continuous line down the trip, and a gap
+   here would break it into disconnected segments. The rhythm comes from each
+   day's own padding instead, which the rail's line then spans. */
+.days {
+  display: grid;
+  gap: 0;
+}
+
 .day {
   display: grid;
   grid-template-columns: var(--m-l) minmax(0, 14rem) minmax(0, 1fr);
   gap: var(--m-m);
-  padding-block: var(--m-s);
+  padding-block: var(--m-m);
 }
 
 .rail {
@@ -38,11 +46,22 @@
 .rail::before {
   content: "";
   position: absolute;
-  inset-block: 0;
+  /* Reaches through this day's padding to meet the next day's line. */
+  inset-block: calc(var(--m-m) * -1);
   inset-inline-start: 50%;
   inline-size: var(--size-1);
   background: var(--c-bg-contrast-light);
   opacity: 0.35;
+}
+
+/* The line runs between the dots, not past them. */
+.day:first-child .rail::before {
+  inset-block-start: calc(var(--m-s) + var(--m));
+}
+
+.day:last-child .rail::before {
+  inset-block-end: auto;
+  block-size: calc(var(--m-m) + var(--m-s) + var(--m));
 }
 
 .dot {
@@ -146,6 +165,14 @@
 @media (max-width: 720px) {
   .day {
     grid-template-columns: var(--m-m) minmax(0, 1fr);
+  }
+
+  /* The strip wraps onto its own row here, so the rail has to span both or the
+     line only covers the meta and breaks above every set of photographs.
+     `span 2` rather than `1 / -1`: these rows are implicit, and -1 resolves to
+     the last *explicit* line, which leaves the rail on row one. */
+  .rail {
+    grid-row: 1 / span 2;
   }
 
   .strip {

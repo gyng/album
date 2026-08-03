@@ -49,63 +49,65 @@ export const TripDetail = ({ trip, headingLevel = 2 }: { trip: Trip; headingLeve
       ) : null}
     </div>
 
-    {trip.days.map((day, index) => (
-      <div key={day.date} className={styles.day}>
-        <div className={styles.rail} aria-hidden="true">
-          <span className={styles.dot} />
-          {day.movedKm && day.movedKm >= NOTABLE_MOVE_KM ? (
-            <span className={styles.moved}>{Math.round(day.movedKm)} km</span>
-          ) : null}
-        </div>
-
-        <div className={styles.meta}>
-          {trip.isOuting ? null : <p className={styles.dayno}>Day {index + 1}</p>}
-          <p className={styles.date}>{longDate(day.date)}</p>
-          {day.places.length > 0 ? (
-            <p className={styles.places}>{day.places.slice(0, 5).join(" → ")}</p>
-          ) : null}
-          <p className={styles.stat}>
-            {day.colour ? (
-              <span
-                className={styles.swatch}
-                style={{ background: day.colour }}
-                title="The day's average colour"
-                aria-hidden="true"
-              />
+    <div className={styles.days}>
+      {trip.days.map((day, index) => (
+        <div key={day.date} className={styles.day}>
+          <div className={styles.rail} aria-hidden="true">
+            <span className={styles.dot} />
+            {day.movedKm && day.movedKm >= NOTABLE_MOVE_KM ? (
+              <span className={styles.moved}>{Math.round(day.movedKm)} km</span>
             ) : null}
-            {day.count.toLocaleString("en")} {day.count === 1 ? "photo" : "photos"}
-            {day.from ? ` · ${day.from}–${day.to}` : ""}
-            {day.coveredKm && day.coveredKm >= 1 ? ` · ${roundKm(day.coveredKm)} km covered` : ""}
-          </p>
-          {day.hours.length > 0 ? (
-            <div
-              className={styles.hours}
-              aria-hidden="true"
-              title={`Photographed between ${day.from} and ${day.to}`}
-            >
-              {Array.from({ length: LAST_HOUR - FIRST_HOUR + 1 }, (_, offset) => (
-                <span
-                  key={offset}
-                  className={day.hours.includes(FIRST_HOUR + offset) ? styles.on : styles.off}
-                />
-              ))}
-            </div>
-          ) : null}
-        </div>
+          </div>
 
-        <div className={styles.strip}>
-          {day.photos.map((photo) => (
-            <Link key={photo.href + photo.src} href={photo.href}>
-              <Thumb
-                src={photo.src}
-                alt={photo.label}
-                loading="lazy"
-                {...(photo.swatch ? { style: { backgroundColor: photo.swatch } } : {})}
-              />
-            </Link>
-          ))}
+          <div className={styles.meta}>
+            {trip.isOuting ? null : <p className={styles.dayno}>Day {index + 1}</p>}
+            <p className={styles.date}>{longDate(day.date)}</p>
+            {day.places.length > 0 ? (
+              <p className={styles.places}>{day.places.slice(0, 5).join(" → ")}</p>
+            ) : null}
+            <p className={styles.stat}>
+              {day.colour ? (
+                <span
+                  className={styles.swatch}
+                  style={{ background: day.colour }}
+                  title="The day's average colour"
+                  aria-hidden="true"
+                />
+              ) : null}
+              {day.count.toLocaleString("en")} {day.count === 1 ? "photo" : "photos"}
+              {day.from ? ` · ${day.from}–${day.to}` : ""}
+              {day.coveredKm && day.coveredKm >= 1 ? ` · ${roundKm(day.coveredKm)} km covered` : ""}
+            </p>
+            {day.hours.length > 0 ? (
+              <div
+                className={styles.hours}
+                aria-hidden="true"
+                title={`Photographed between ${day.from} and ${day.to}`}
+              >
+                {Array.from({ length: LAST_HOUR - FIRST_HOUR + 1 }, (_, offset) => (
+                  <span
+                    key={offset}
+                    className={day.hours.includes(FIRST_HOUR + offset) ? styles.on : styles.off}
+                  />
+                ))}
+              </div>
+            ) : null}
+          </div>
+
+          <div className={styles.strip}>
+            {day.photos.map((photo) => (
+              <Link key={photo.href + photo.src} href={photo.href}>
+                <Thumb
+                  src={photo.src}
+                  alt={photo.label}
+                  loading="lazy"
+                  {...(photo.swatch ? { style: { backgroundColor: photo.swatch } } : {})}
+                />
+              </Link>
+            ))}
+          </div>
         </div>
-      </div>
-    ))}
+      ))}
+    </div>
   </section>
 );
