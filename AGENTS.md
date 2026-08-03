@@ -9,6 +9,8 @@ Personal photo gallery — Next.js 16, TypeScript, CSS Modules, MapLibre GL. Pho
 > A root `./album` CLI and a `Makefile` exist for human convenience — agents should use the direct commands below.
 >
 > `./album <command>` is the front door: `init`, `doctor`, `dev`, `generate`, `index`, `deploy`, `publish`. It is a thin layer over these same npm scripts and the `index/*.sh` scripts, adding preflight checks and help. Its dispatcher lives in `src/bin/album.cjs` with commands under `src/bin/album/`.
+>
+> **Deploys are prebuilt — `./album deploy` (or `publish`), never plain `vercel deploy`.** The build runs here and uploads with `--prebuilt`, because building in Vercel's container cannot work: `sqlite3` ships a prebuilt binary linked against GLIBC 2.38 and the image's libm is older, so `next build` dies collecting page data for `/album/[[...slug]]`. `src/vercel.json` blocks both routes into that failure — Git deployments are disabled, and the build command runs `bin/assert-local-build.cjs` first, which exits non-zero under `/vercel/`.
 
 - **Tests:** `npx jest` from `src/` (not the repo root)
 - Subset: `npx jest --testPathPatterns="MapWorld"` (plural flag)
