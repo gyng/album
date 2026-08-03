@@ -1,6 +1,16 @@
+/* Fills the column the trip gives it. It used to set its own 420px, which was
+   right when it was a block of its own and wrong the moment the trip started
+   capping the column: the canvas stayed 420px tall inside a 242px box, so a
+   short outing's map spilled into the next trip and every marker was thrown to
+   the container's edge. */
 .map {
   inline-size: 100%;
-  block-size: var(--size-420);
+  block-size: 100%;
+  /* A floor, because the column it fills is sized by its grid row: at first
+     paint that can be zero, and a GL context created at zero size comes up
+     dead — the map reports itself ready, never loaded, and draws no basemap at
+     all while its markers pile against the edge. */
+  min-block-size: var(--size-180);
   overflow: hidden;
 }
 
