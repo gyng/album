@@ -195,3 +195,86 @@ describe("a base returned to again and again", () => {
     expect(formatDayNumbers([1, 6, 7, 8, 11, 14])).toBe("6 days");
   });
 });
+
+describe("every photograph on the route", () => {
+  const dayWith = (date: string, photos: Array<{ lat?: number; lng?: number; src?: string }>) =>
+    ({
+      date,
+      count: photos.length,
+      from: "09:00",
+      to: "10:00",
+      places: [],
+      colour: null,
+      hours: [],
+      coveredKm: null,
+      movedKm: null,
+      point:
+        photos[0] && photos[0].lat !== undefined
+          ? { lat: photos[0].lat, lng: photos[0].lng }
+          : null,
+      photos: photos.map((p, i) => ({
+        date,
+        album: "a",
+        src: p.src ?? `/${i}.avif`,
+        href: "#",
+        label: "",
+        ...(p.lat !== undefined ? { lat: p.lat, lng: p.lng } : {}),
+      })),
+    }) as unknown as Trip["days"][number];
+
+  // A day used to put one pin on the map however many frames it held, so a
+  // six-photograph afternoon showed a single marker.
+  it("gives every located photograph a stop, not every day", () => {
+    const stops = routeStops(
+      trip([
+        dayWith("2016-11-13", [
+          { lat: 35, lng: 135 },
+          { lat: 35.2, lng: 135.2 },
+          { lat: 35.4, lng: 135.4 },
+        ]),
+      ]),
+    );
+
+    expect(stops).toHaveLength(3);
+  });
+
+  it("labels each stop with the day it belongs to, so the numbering stays the journey's", () => {
+    const stops = routeStops(
+      trip([
+        dayWith("2016-11-13", [
+          { lat: 35, lng: 135 },
+          { lat: 35.2, lng: 135.2 },
+        ]),
+        dayWith("2016-11-14", [{ lat: 36, lng: 136 }]),
+      ]),
+    );
+
+    expect(stops.map((stop) => stop.number)).toEqual([1, 1, 2]);
+  });
+
+  it("skips photographs that never recorded where they were", () => {
+    const stops = routeStops(trip([dayWith("2016-11-13", [{}, { lat: 35, lng: 135 }])]));
+
+    expect(stops).toHaveLength(1);
+  });
+
+  // A cluster covering eight frames of one day should say "day 1", not "1" over
+  // and over.
+  it("names each day once however many of its frames a marker covers", () => {
+    const markers = clusterStops(
+      routeStops(
+        trip([
+          dayWith("2016-11-13", [
+            { lat: 35, lng: 135 },
+            { lat: 35.001, lng: 135.001 },
+            { lat: 35.002, lng: 135 },
+          ]),
+          dayWith("2016-11-14", [{ lat: 40, lng: 135 }]),
+        ]),
+      ),
+    );
+
+    expect(markers[0]?.numbers).toEqual([1]);
+    expect(markers[1]?.numbers).toEqual([2]);
+  });
+});

@@ -25,17 +25,18 @@ const roundKm = (km: number) => (km >= 10 ? Math.round(km) : Math.round(km * 10)
 const MAX_GEAR_ENTRIES = 5;
 
 /**
- * How tall a trip's map is, in the column beside it.
+ * How tall a trip's map is allowed to be, in the column beside it.
  *
- * A fortnight and an afternoon are not the same amount of map: a fixed height
- * left a hundred and thirty-eight pixels of empty column under the short ones
- * while a fourteen-day route was cramped.
+ * A *cap*, not a height: the map stretches to its own row and stops there, so a
+ * short trip's map cannot run past the trip it belongs to and into the next
+ * one. A fortnight and an afternoon are still not the same amount of map, which
+ * is what the per-day term is for.
  */
 const MAP_HEIGHT_BASE_PX = 220;
 const MAP_HEIGHT_PER_DAY_PX = 22;
 const MAP_HEIGHT_MAX_PX = 460;
 
-const mapHeightPx = (trip: Trip) =>
+const mapMaxHeightPx = (trip: Trip) =>
   Math.min(MAP_HEIGHT_MAX_PX, MAP_HEIGHT_BASE_PX + trip.dayCount * MAP_HEIGHT_PER_DAY_PX);
 
 const share = (count: number, total: number) => Math.round((count / total) * 100);
@@ -149,7 +150,7 @@ const RouteColumn = ({ trip, activeDate }: { trip: Trip; activeDate: string | nu
   const { TripRouteMap } = useClientComponents();
 
   return (
-    <div ref={ref} className={styles.side} style={{ blockSize: `${mapHeightPx(trip)}px` }}>
+    <div ref={ref} className={styles.side} style={{ maxBlockSize: `${mapMaxHeightPx(trip)}px` }}>
       {near ? <TripRouteMap trip={trip} activeDate={activeDate} /> : null}
     </div>
   );

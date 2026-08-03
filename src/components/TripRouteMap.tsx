@@ -55,6 +55,9 @@ export const TripRouteMap = ({ trip, activeDate }: TripRouteMapProps) => {
   // The line runs through every day; the pictures group, so that days spent in
   // one city are all still accounted for instead of hidden behind each other.
   const markers = React.useMemo(() => clusterStops(stops), [stops]);
+  // A single day has nothing to number: every marker on an outing would read
+  // "1", which is a label that distinguishes nothing from nothing.
+  const numbered = React.useMemo(() => new Set(stops.map((stop) => stop.number)).size > 1, [stops]);
 
   const lines = React.useMemo<LineFeature[]>(
     () =>
@@ -105,9 +108,9 @@ export const TripRouteMap = ({ trip, activeDate }: TripRouteMapProps) => {
             >
               {/* The pin carries the day, so the picture above it is only the
                   picture — a badge on the photograph competed with it. */}
-              <span className={styles.pin} data-active={isActive}>
+              <span className={numbered ? styles.pin : styles.pinPlain} data-active={isActive}>
                 {marker.src ? <StopImage src={marker.src} /> : null}
-                {formatDayNumbers(marker.numbers)}
+                {numbered ? formatDayNumbers(marker.numbers) : null}
               </span>
             </Marker>
           );

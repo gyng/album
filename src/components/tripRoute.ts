@@ -33,25 +33,51 @@ const SINGLE_STOP_ZOOM = 11;
 const FIT_MAX_ZOOM = 12;
 
 /**
- * The days of a trip that can be placed, numbered in order.
+ * Every photograph of a trip that knows where it was taken.
  *
- * A day with no located photograph is skipped rather than guessed at, so the
- * numbers are positions in the *route*, not day numbers — a trip whose third
- * day carries no coordinates draws two stops, not a gap.
+ * One stop per *photograph*, not per day: a day put a single pin on the map
+ * however many frames it held, so a six-photograph afternoon showed one marker
+ * and said nothing about where the other five were. Each stop still carries its
+ * day's number, so the numbering along the route stays the journey's rather
+ * than becoming a count of frames.
+ *
+ * A day with no located photograph takes no number, so the numbers are
+ * positions in the *route* — a trip whose third day carries no coordinates
+ * draws two, not a gap.
  */
-export const routeStops = (trip: Trip): RouteStop[] =>
-  trip.days
-    .filter(
-      (day): day is typeof day & { point: { lat: number; lng: number } } => day.point !== null,
-    )
-    .map((day, index) => ({
-      date: day.date,
-      number: index + 1,
-      lat: day.point.lat,
-      lng: day.point.lng,
-      ...(day.photos[0]?.src ? { src: day.photos[0].src } : {}),
-      label: day.places[0] ?? day.date,
-    }));
+export const routeStops = (trip: Trip): RouteStop[] => {
+  const stops: RouteStop[] = [];
+  let number = 0;
+
+  for (const day of trip.days) {
+    const located = day.photos.filter(
+      (photo): photo is typeof photo & { lat: number; lng: number } =>
+        typeof photo.lat === "number" && typeof photo.lng === "number",
+    );
+    if (located.length === 0 && !day.point) continue;
+    number += 1;
+
+    // A day whose frames arrived without coordinates can still be placed by the
+    // day's own point.
+    const points =
+      located.length > 0
+        ? located.map((photo) => ({ lat: photo.lat, lng: photo.lng, src: photo.src }))
+        : [{ lat: day.point!.lat, lng: day.point!.lng, src: day.photos[0]?.src }];
+
+    for (const photo of points) {
+      stops.push({
+        date: day.date,
+        number,
+        lat: photo.lat,
+        lng: photo.lng,
+        ...(photo.src ? { src: photo.src } : {}),
+        label: day.places[0] ?? day.date,
+      });
+    }
+  }
+
+  return stops;
+};
 
 /** The rectangle enclosing every stop, or null when there is nothing to frame. */
 export const routeBounds = (stops: RouteStop[]): Bounds | null => {
@@ -115,7 +141,7 @@ export type RouteMarker = {
  * marker takes. A thumbnail is 80px in a ~320px frame, so stops within roughly
  * a tenth of the span would overlap.
  */
-const CLUSTER_FRACTION_OF_SPAN = 0.12;
+const CLUSTER_FRACTION_OF_SPAN = 0.04;
 /** A trip that never moved still needs one marker, not a division by zero. */
 const MIN_CLUSTER_TOLERANCE_DEG = 0.0005;
 
@@ -136,8 +162,9 @@ export const clusterStops = (stops: RouteStop[]): RouteMarker[] => {
         Math.abs(marker.lng - stop.lng) <= tolerance,
     );
     if (near) {
-      near.numbers.push(stop.number);
-      near.dates.push(stop.date);
+      // A marker covering eight frames of one day names that day once.
+      if (!near.numbers.includes(stop.number)) near.numbers.push(stop.number);
+      if (!near.dates.includes(stop.date)) near.dates.push(stop.date);
       // The picture stays the first day's: a marker should not change what it
       // shows depending on how many days happened to join it.
       if (!near.src && stop.src) near.src = stop.src;

@@ -13,7 +13,8 @@
 /* The pin is the day: same accent fill, white ring and shadow as the pin every
    other map on this site drops, but sized to carry its number rather than
    hanging a badge off the photograph above it. */
-.pin {
+.pin,
+.pinPlain {
   position: relative;
   display: block;
   min-inline-size: var(--size-20);
@@ -59,6 +60,15 @@
 }
 
 /* The day being pointed at in the trip beside this map. */
-.pin[data-active="true"] .thumb {
+/* Nothing to letter, so the pin is just the dot the rest of the site drops. */
+.pinPlain {
+  min-inline-size: var(--size-14);
+  inline-size: var(--size-14);
+  block-size: var(--size-14);
+  padding: 0;
+}
+
+.pin[data-active="true"] .thumb,
+.pinPlain[data-active="true"] .thumb {
   border-color: var(--c-accent);
 }

@@ -24,16 +24,18 @@ export const loadTripsPageData = async (): Promise<TripsPageData> => {
       ...day,
       // Every frame of every day: a day showing three of its forty-one, with a
       // chip standing in for the rest, is not the day. A frame ships as a
-      // thumbnail and a link and nothing else — everything else it arrived with
-      // has already been folded into the trip or the day (gear and tags into
-      // the summary, coordinates into `point`, places into `places`), which is
-      // what keeps 1,470 of them affordable.
+      // thumbnail, a link and where it was taken — the route map draws a marker
+      // per photograph, so dropping the coordinates left a six-photograph
+      // afternoon with a single pin. Gear and tags are already folded into the
+      // trip's own summary and do not ride along.
       photos: day.photos.map((photo) => ({
         date: photo.date,
         album: photo.album,
         src: photo.src,
         href: photo.href,
         label: photo.label,
+        ...(typeof photo.lat === "number" ? { lat: photo.lat } : {}),
+        ...(typeof photo.lng === "number" ? { lng: photo.lng } : {}),
         ...(photo.swatch ? { swatch: photo.swatch } : {}),
       })),
     })),

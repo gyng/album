@@ -34,9 +34,15 @@
   grid-column: 1;
 }
 
+/* Stretched to its own row and capped by the component, so the map is never
+   taller than the trip it belongs to: given a fixed height it ran past a short
+   trip's separator and abutted the next trip's map, and appeared to start above
+   that trip's own heading. */
 .side {
   grid-column: 2;
   grid-row: 1 / span 2;
+  align-self: stretch;
+  min-block-size: var(--size-180);
   position: sticky;
   inset-block-start: var(--m-l);
   min-inline-size: 0;
@@ -47,7 +53,8 @@
    Overrides the per-trip height the component sets inline. */
 @media (max-width: 900px) {
   .side {
-    block-size: var(--size-220) !important;
+    block-size: var(--size-220);
+    align-self: start;
   }
 }
 
