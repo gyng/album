@@ -40,6 +40,13 @@ export type FitBoundsOptions = {
    */
   padding?: number | { top: number; right: number; bottom: number; left: number };
   maxZoom?: number;
+  /**
+   * The tilt to arrive at. Worth naming because the provider's own default is
+   * flat: a fit issued after load levels a pitched camera, so a basemap that
+   * draws its buildings with height loses them the moment the map frames
+   * anything.
+   */
+  pitch?: number;
   /** `false` jumps straight to the destination. */
   animate?: boolean;
   /** Animation length in milliseconds; `0` arrives immediately. */

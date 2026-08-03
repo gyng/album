@@ -6,9 +6,11 @@ import { siteConfig } from "../lib/siteConfig";
 import {
   DEFAULT_MAP_STYLE,
   FALLBACK_STYLE_URL,
-  getMapStyleName,
   MAP_STYLE_NAMES,
   MAP_STYLE_STORAGE_KEY,
+  getMapStyleName,
+  isFreeMapStyle,
+  isPitchedMapStyle,
   mapStyleUrl,
   mapTilerStyleUrl,
   resetMapStyleCache,
@@ -22,13 +24,28 @@ beforeEach(() => {
   resetMapStyleCache();
 });
 
-it("builds every choice's URL against the same provider and key", () => {
+// Two providers now: the free one wherever it has a style that does the job,
+// and the metered one only for what it does not — imagery, terrain, and this
+// fork's own design. Every URL must belong to one of them, and no two choices
+// may resolve to the same basemap or the picker offers the same map twice.
+it("builds every choice's URL against one of the two providers", () => {
   const urls = MAP_STYLE_NAMES.map((name) => mapStyleUrl(name));
+
   urls.forEach((url) => {
-    expect(url).toMatch(/^https:\/\/api\.maptiler\.com\/maps\/[\w-]+\/style\.json\?key=\w+$/);
+    expect(url).toMatch(
+      /^(https:\/\/api\.maptiler\.com\/maps\/[\w-]+\/style\.json\?key=\w+|https:\/\/tiles\.openfreemap\.org\/styles\/[\w-]+)$/,
+    );
   });
-  // Distinct styles, or the picker would be offering the same map twice.
   expect(new Set(urls).size).toBe(MAP_STYLE_NAMES.length);
+});
+
+// The point of the split: a rate limit on the metered provider cannot take the
+// whole picker down with it.
+it("keeps most of the picker on the free provider", () => {
+  const free = MAP_STYLE_NAMES.filter(isFreeMapStyle);
+
+  expect(free.length).toBeGreaterThanOrEqual(4);
+  expect(free).toContain("3d");
 });
 
 it("falls back to the default for anything it does not recognise", () => {
@@ -91,7 +108,23 @@ it("keeps working when storage is unavailable", () => {
 describe("provider configuration", () => {
   it("degrades to a keyless basemap when no provider key is configured", () => {
     expect(mapTilerStyleUrl("streets-v2", "")).toBe(FALLBACK_STYLE_URL);
-    expect(mapStyleUrl("streets", "")).toBe(FALLBACK_STYLE_URL);
+    // Satellite is the metered provider's; with no key it has nothing to load.
+    expect(mapStyleUrl("satellite", "")).toBe(FALLBACK_STYLE_URL);
+  });
+
+  // The free styles are the point of the split: they need no key, so they are
+  // unaffected by whether one is configured and cannot be rate-limited away.
+  it("serves the free styles from OpenFreeMap whether or not a key exists", () => {
+    expect(mapStyleUrl("dark", "")).toBe("https://tiles.openfreemap.org/styles/dark");
+    expect(mapStyleUrl("dark", "a-key")).toBe("https://tiles.openfreemap.org/styles/dark");
+    expect(mapStyleUrl("3d", "a-key")).toBe("https://tiles.openfreemap.org/styles/liberty");
+  });
+
+  // OpenFreeMap's own "3D" is the liberty style with the camera pitched — their
+  // demo strips the suffix and calls setPitch. Ours is the same thing.
+  it("marks the 3D style as the pitched one", () => {
+    expect(isPitchedMapStyle("3d")).toBe(true);
+    expect(isPitchedMapStyle("dark")).toBe(false);
   });
 
   it("builds a catalogue style id that is not one of the curated choices", () => {

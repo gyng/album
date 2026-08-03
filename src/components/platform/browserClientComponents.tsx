@@ -39,6 +39,7 @@ export const browserClientComponents: ClientComponents = {
   SankeyChart: clientOnly(() =>
     import("../SankeyChart").then((module) => ({ default: module.SankeyChart })),
   ),
+  TripRouteMap: clientOnly(() => import("../TripRouteMap")),
   GuessMap: clientOnly(
     () => import("../guess/GuessMapExport"),
     <div className={guessStyles.mapLoading} />,

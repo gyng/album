@@ -1,9 +1,10 @@
 import React from "react";
-import { AppLink as Link } from "./platform";
+import { AppLink as Link, useClientComponents } from "./platform";
 import type { Trip, TripDay } from "../util/computeTrips";
 import { formatExifWallClockDate } from "../util/exifTime";
 import { Caption, Heading, Thumb } from "./ui";
 import { TripRoutePath } from "./TripRoutePath";
+import { useNearViewport } from "./useNearViewport";
 import styles from "./TripDetail.module.css";
 
 /** The shooting-window sparkline spans a waking day; earlier hours are rare. */
@@ -115,19 +116,44 @@ const TripFacts = ({ trip }: { trip: Trip }) => {
 };
 
 /**
- * A trip's route, drawn beside it.
- *
- * No basemap and no map instance: this is SVG that renders with the page. A
- * live map per trip cost a WebGL context and a tile request each on a list of
- * ninety-four, which is enough to exhaust the tile provider's quota and take
- * every map on the site down with it.
+ * Far enough ahead that the basemap is up before the trip is on screen.
  */
-const TripRoute = ({ trip, activeDate }: { trip: Trip; activeDate: string | null }) =>
-  trip.days.some((day) => day.point) ? (
-    <div className={styles.side}>
-      <TripRoutePath trip={trip} activeDate={activeDate} />
+const ROUTE_PREFETCH_MARGIN = "1000px 0px";
+
+/**
+ * A trip's route: drawn immediately, mapped once the reader is near it.
+ *
+ * The drawing costs nothing and renders with the page, so a trip is never a
+ * blank column. The map replaces it as the trip approaches the viewport, and
+ * gives it up again when it leaves — a page listing ninety-four journeys cannot
+ * hold ninety-four WebGL contexts. Its basemap is the keyless one, so the
+ * number of trips a reader scrolls past is not a bill.
+ */
+const MappedRoute = ({ trip, activeDate }: { trip: Trip; activeDate: string | null }) => {
+  const { TripRouteMap } = useClientComponents();
+  return <TripRouteMap trip={trip} activeDate={activeDate} />;
+};
+
+const TripRoute = ({ trip, activeDate }: { trip: Trip; activeDate: string | null }) => {
+  const ref = React.useRef<HTMLDivElement>(null);
+  // False where the browser cannot observe: with no way to tell which trips are
+  // on screen, ninety-four maps at once is worse than the drawing everywhere.
+  const near = useNearViewport(ref, ROUTE_PREFETCH_MARGIN, false);
+
+  if (!trip.days.some((day) => day.point)) return null;
+
+  return (
+    <div ref={ref} className={styles.side}>
+      {/* The registry is consulted only once a map is actually wanted, so a
+          renderer that installs no provider still draws the trip. */}
+      {near ? (
+        <MappedRoute trip={trip} activeDate={activeDate} />
+      ) : (
+        <TripRoutePath trip={trip} activeDate={activeDate} />
+      )}
     </div>
-  ) : null;
+  );
+};
 
 /** Every frame of a day. */
 const DayStrip = ({

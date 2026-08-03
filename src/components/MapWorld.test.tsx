@@ -340,7 +340,7 @@ jest.mock("../util/time", () => ({
   getRelativeTimeString: () => "just now",
 }));
 
-const { mapStyleUrl, resetMapStyleCache, setMapStyleName } =
+const { DEFAULT_MAP_STYLE, mapStyleUrl, resetMapStyleCache, setMapStyleName } =
   require("../util/mapStyles") as typeof import("../util/mapStyles");
 
 const mapWorldModule = require("./MapWorld");
@@ -681,7 +681,7 @@ describe("MapWorld", () => {
     });
   });
 
-  it("draws the basemap the reader picked, from the same provider as the default", () => {
+  it("draws the basemap the reader picked, from whichever provider serves it", () => {
     // The picker writes the preference; the map is a different subtree, and a
     // localStorage write raises no event in its own tab — so the store has to
     // tell it directly or the choice does nothing until a reload.
@@ -689,8 +689,11 @@ describe("MapWorld", () => {
     expect(mapProps).toHaveBeenLastCalledWith(
       // The port hands the adapter its own `mapStyle`; `styleUrl` is the neutral
       // name on the way in.
-      expect.objectContaining({ mapStyle: mapStyleUrl("gallery") }),
+      expect.objectContaining({ mapStyle: mapStyleUrl(DEFAULT_MAP_STYLE) }),
     );
+    // The default costs nothing to serve, so a rate limit on the metered
+    // provider cannot leave the site without a basemap.
+    expect(mapStyleUrl(DEFAULT_MAP_STYLE)).toContain("tiles.openfreemap.org");
 
     act(() => {
       setMapStyleName("watercolour");
@@ -699,6 +702,20 @@ describe("MapWorld", () => {
       expect.objectContaining({ mapStyle: mapStyleUrl("watercolour") }),
     );
     expect(mapStyleUrl("watercolour")).toContain("api.maptiler.com");
+  });
+
+  // A basemap that draws its buildings with height says nothing to a camera
+  // pointing straight down.
+  it("tilts the camera for the 3D basemap and leaves the others flat", () => {
+    render(<MMap photos={[photo]} className="map" />);
+    expect(mapProps).toHaveBeenLastCalledWith(
+      expect.objectContaining({ initialViewState: expect.objectContaining({ pitch: 50 }) }),
+    );
+
+    act(() => {
+      setMapStyleName("dark");
+    });
+    expect(mapProps.mock.calls.at(-1)?.[0].initialViewState.pitch).toBeUndefined();
   });
 
   it("keeps the thumbnails through a wobble back below the reveal zoom", () => {
@@ -912,7 +929,11 @@ describe("MapWorld", () => {
     expect(mapWorldModule.default).toBe(MMap);
     expect(mapProps).toHaveBeenLastCalledWith(
       expect.objectContaining({
-        initialViewState: { longitude: 12.5, latitude: -3.25, zoom: 9.5 },
+        initialViewState: expect.objectContaining({
+          longitude: 12.5,
+          latitude: -3.25,
+          zoom: 9.5,
+        }),
       }),
     );
     expect(screen.getByTestId("map").parentElement).toHaveStyle({ minHeight: "240px" });
@@ -923,11 +944,12 @@ describe("MapWorld", () => {
   it("ignores camera and popup sync when route synchronisation is disabled", () => {
     window.history.pushState({}, "", "/?lon=12.5&lat=-3.25&zoom=9.5");
     render(<MMap photos={[photo]} className="map" syncRoute={false} />);
-    expect(mapProps).toHaveBeenLastCalledWith(
-      expect.objectContaining({
-        initialViewState: { longitude: undefined, latitude: undefined, zoom: undefined },
-      }),
-    );
+    // The style's own pitch still applies; it is the URL's camera that is
+    // ignored here.
+    const camera = mapProps.mock.calls.at(-1)?.[0].initialViewState;
+    expect(camera.longitude).toBeUndefined();
+    expect(camera.latitude).toBeUndefined();
+    expect(camera.zoom).toBeUndefined();
 
     clickPin(photo);
     fireEvent.mouseDown(screen.getByRole("link", { name: /kansai/i }));

@@ -55,16 +55,14 @@ test.describe("World map interactions", () => {
     expect(await count.boundingBox()).toEqual(countBox);
   });
 
-  test("switches the basemap to another of the provider's styles, and remembers it", async ({
-    page,
-  }) => {
+  test("switches the basemap to another provider's style, and remembers it", async ({ page }) => {
     // The picker sits in the nav between the search field and the site theme —
-    // the two appearance choices together. Every option is the same provider and
-    // key as the default, so the swap needs no new credential and carries its own
-    // attribution, and the port applies it with `setStyle` and re-adds our
-    // layers, so the pins survive the change.
+    // the two appearance choices together. The default is the keyless provider's
+    // 3D basemap, so an ordinary page view costs no quota; the metered provider
+    // is kept for what the free one has no answer to, and the port applies a
+    // change with `setStyle` and re-adds our layers, so the pins survive it.
     const picker = page.getByRole("combobox", { name: "Map style" });
-    await expect(picker).toHaveValue("gallery");
+    await expect(picker).toHaveValue("3d");
 
     const styleRequest = page.waitForRequest((request) =>
       request.url().includes("/maps/aquarelle"),

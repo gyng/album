@@ -163,6 +163,7 @@ const createMapInstance = (map: MapRef): MapInstance => ({
       {
         ...(options?.padding !== undefined ? { padding: options.padding } : {}),
         ...(options?.maxZoom !== undefined ? { maxZoom: options.maxZoom } : {}),
+        ...(options?.pitch !== undefined ? { pitch: options.pitch } : {}),
         ...(options?.animate !== undefined ? { animate: options.animate } : {}),
         ...(options?.duration !== undefined ? { duration: options.duration } : {}),
       },
@@ -259,7 +260,12 @@ export type MapViewProps = {
   /** A style document URL the provider can load. */
   styleUrl: string;
   /** Read once, at construction — the camera is uncontrolled after that. */
-  initialView?: { center?: LngLat; zoom?: number };
+  /**
+   * `pitch` and `bearing` are what make a style with building extrusions look
+   * like anything: a pitched camera is the whole of what "3D" means for a
+   * basemap that draws its buildings with height.
+   */
+  initialView?: { center?: LngLat; zoom?: number; pitch?: number; bearing?: number };
   /** Defaults to the provider's own choice, in practice Web Mercator. */
   projection?: MapProjectionMode;
   attribution?: MapAttribution;
@@ -305,6 +311,8 @@ export const MapView = ({
 }: MapViewProps): React.JSX.Element => {
   const center = initialView?.center;
   const zoom = initialView?.zoom;
+  const pitch = initialView?.pitch;
+  const bearing = initialView?.bearing;
 
   return (
     <AdapterMap
@@ -312,6 +320,8 @@ export const MapView = ({
       initialViewState={{
         ...(center ? { longitude: center.lng, latitude: center.lat } : {}),
         ...(zoom !== undefined ? { zoom } : {}),
+        ...(pitch !== undefined ? { pitch } : {}),
+        ...(bearing !== undefined ? { bearing } : {}),
       }}
       {...(projection !== undefined ? { projection: toAdapterProjection(projection) } : {})}
       {...(attribution !== undefined

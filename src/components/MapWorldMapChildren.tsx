@@ -9,7 +9,7 @@ import styles from "./MapWorld.module.css";
 // Frames the map on a set of photos: flyTo a single point, or fitBounds the
 // enclosing rectangle. Shared by the initial auto-fit and the on-demand
 // "Fit to results" control.
-const fitMapToPhotos = (map: MapCamera, photos: MapWorldEntry[]) => {
+const fitMapToPhotos = (map: MapCamera, photos: MapWorldEntry[], pitch?: number) => {
   const coordinates = photos
     .filter((photo) => photo.decLat !== null && photo.decLng !== null)
     .map((photo) => [photo.decLng as number, photo.decLat as number] as [number, number]);
@@ -24,7 +24,12 @@ const fitMapToPhotos = (map: MapCamera, photos: MapWorldEntry[]) => {
       return;
     }
     const [longitude, latitude] = first;
-    map.flyTo({ center: { lng: longitude, lat: latitude }, zoom: 10.5, speed: 2.2 });
+    map.flyTo({
+      center: { lng: longitude, lat: latitude },
+      zoom: 10.5,
+      speed: 2.2,
+      ...(pitch !== undefined ? { pitch } : {}),
+    });
     return;
   }
 
@@ -39,18 +44,29 @@ const fitMapToPhotos = (map: MapCamera, photos: MapWorldEntry[]) => {
     padding: 36,
     duration: 0,
     maxZoom: 11,
+    // Named, because the provider's own default is flat: without this the fit
+    // levels the camera and a 3D basemap loses its buildings.
+    ...(pitch !== undefined ? { pitch } : {}),
   });
 };
 
-export const MapAutoFit = ({ enabled, photos }: { enabled: boolean; photos: MapWorldEntry[] }) => {
+export const MapAutoFit = ({
+  enabled,
+  photos,
+  pitch,
+}: {
+  enabled: boolean;
+  photos: MapWorldEntry[];
+  pitch?: number;
+}) => {
   const map = useMap();
 
   React.useEffect(() => {
     if (!enabled || !map) {
       return;
     }
-    fitMapToPhotos(map, photos);
-  }, [enabled, map, photos]);
+    fitMapToPhotos(map, photos, pitch);
+  }, [enabled, map, photos, pitch]);
 
   return null;
 };
@@ -61,9 +77,11 @@ export const MapAutoFit = ({ enabled, photos }: { enabled: boolean; photos: MapW
 export const MapFitOnRequest = ({
   requestId,
   photos,
+  pitch,
 }: {
   requestId: number;
   photos: MapWorldEntry[];
+  pitch?: number;
 }) => {
   const map = useMap();
   const handledRef = React.useRef(requestId);
@@ -73,8 +91,8 @@ export const MapFitOnRequest = ({
       return;
     }
     handledRef.current = requestId;
-    fitMapToPhotos(map, photos);
-  }, [map, requestId, photos]);
+    fitMapToPhotos(map, photos, pitch);
+  }, [map, requestId, photos, pitch]);
 
   return null;
 };

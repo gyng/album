@@ -24,8 +24,20 @@ export const MAP_TILER_KEY = siteConfig.map.apiKey;
 
 export const hasMapProvider = MAP_TILER_KEY.length > 0;
 
+/**
+ * OpenFreeMap: keyless, unmetered, and the same OpenMapTiles schema the paid
+ * provider serves. Where it has a style that does the job, it is the one used —
+ * a metered key is worth spending only on what nobody gives away.
+ */
+const OPEN_FREE_MAP_HOST = "https://tiles.openfreemap.org/styles";
+
+export type OpenFreeMapStyleId = "liberty" | "bright" | "positron" | "dark" | "fiord";
+
+export const openFreeMapStyleUrl = (id: OpenFreeMapStyleId): string =>
+  `${OPEN_FREE_MAP_HOST}/${id}`;
+
 /** Keyless public basemap used when no provider key is configured. */
-export const FALLBACK_STYLE_URL = "https://tiles.openfreemap.org/styles/liberty";
+export const FALLBACK_STYLE_URL = openFreeMapStyleUrl("liberty");
 
 /**
  * The gallery's own MapTiler style, which is scoped to the account that created
@@ -36,6 +48,7 @@ export const FALLBACK_STYLE_URL = "https://tiles.openfreemap.org/styles/liberty"
 const GALLERY_STYLE_ID = siteConfig.map.galleryStyleId;
 
 export type MapStyleName =
+  | "3d"
   | "gallery"
   | "streets"
   | "outdoor"
@@ -44,6 +57,15 @@ export type MapStyleName =
   | "satellite"
   | "watercolour"
   | "monochrome";
+
+/**
+ * Where a style's tiles come from.
+ *
+ * `free` styles cost nothing and cannot be rate-limited out from under the
+ * site; `keyed` ones are the metered provider's, kept for what the free one
+ * does not offer — imagery, terrain, and the fork's own design.
+ */
+type StyleSource = { provider: "free"; id: OpenFreeMapStyleId } | { provider: "keyed"; id: string };
 
 /**
  * Each choice's MapTiler style id and the label the picker shows. Curated rather
@@ -60,17 +82,27 @@ const STREETS_STYLE_ID = "streets-v2";
  * gallery style therefore resolves to the streets id, so a stale stored
  * preference renders a working map instead of a 403.
  */
-export const MAP_STYLES: Record<MapStyleName, { id: string; label: string }> = {
-  // The default first, then the rest.
-  gallery: { id: GALLERY_STYLE_ID ?? STREETS_STYLE_ID, label: "Gallery" },
-  streets: { id: STREETS_STYLE_ID, label: "Streets" },
-  outdoor: { id: "outdoor-v2", label: "Outdoor" },
-  topographic: { id: "topo-v2", label: "Topographic" },
-  dark: { id: "dataviz-dark", label: "Dark" },
-  satellite: { id: "satellite", label: "Satellite" },
-  watercolour: { id: "aquarelle", label: "Watercolour" },
-  monochrome: { id: "toner-v2", label: "Monochrome" },
+export const MAP_STYLES: Record<MapStyleName, { source: StyleSource; label: string }> = {
+  // The default first, then the rest. `liberty` is the one OpenFreeMap style
+  // that carries a fill-extrusion layer, so a pitched camera over it stands the
+  // buildings up — which is the whole of what "3D" means here.
+  "3d": { source: { provider: "free", id: "liberty" }, label: "3D" },
+  gallery: {
+    source: { provider: "keyed", id: GALLERY_STYLE_ID ?? STREETS_STYLE_ID },
+    label: "Gallery",
+  },
+  streets: { source: { provider: "free", id: "bright" }, label: "Streets" },
+  outdoor: { source: { provider: "keyed", id: "outdoor-v2" }, label: "Outdoor" },
+  topographic: { source: { provider: "keyed", id: "topo-v2" }, label: "Topographic" },
+  dark: { source: { provider: "free", id: "dark" }, label: "Dark" },
+  satellite: { source: { provider: "keyed", id: "satellite" }, label: "Satellite" },
+  watercolour: { source: { provider: "keyed", id: "aquarelle" }, label: "Watercolour" },
+  monochrome: { source: { provider: "free", id: "positron" }, label: "Monochrome" },
 };
+
+/** True where a style needs no key and no quota. */
+export const isFreeMapStyle = (name: MapStyleName): boolean =>
+  MAP_STYLES[name].source.provider === "free";
 
 /**
  * What the picker offers. The gallery style is hidden unless this fork actually
@@ -78,7 +110,11 @@ export const MAP_STYLES: Record<MapStyleName, { id: string; label: string }> = {
  * than seven that differ.
  */
 export const MAP_STYLE_NAMES = (Object.keys(MAP_STYLES) as MapStyleName[]).filter(
-  (name) => name !== "gallery" || GALLERY_STYLE_ID !== null,
+  (name) =>
+    (name !== "gallery" || GALLERY_STYLE_ID !== null) &&
+    // A keyed style with no key renders the keyless fallback, so offering it
+    // would be several labels for one basemap.
+    (isFreeMapStyle(name) || hasMapProvider),
 );
 
 const isAvailableStyleName = (value: string): value is MapStyleName =>
@@ -86,7 +122,7 @@ const isAvailableStyleName = (value: string): value is MapStyleName =>
 
 export const DEFAULT_MAP_STYLE: MapStyleName = isAvailableStyleName(siteConfig.map.defaultStyle)
   ? siteConfig.map.defaultStyle
-  : "streets";
+  : "3d";
 
 export const MAP_STYLE_STORAGE_KEY = "mapStyle";
 
@@ -113,8 +149,18 @@ export const resolveMapStyleName = (value: unknown): MapStyleName | null => {
 export const mapTilerStyleUrl = (styleId: string, key: string = MAP_TILER_KEY): string =>
   key ? `https://api.maptiler.com/maps/${styleId}/style.json?key=${key}` : FALLBACK_STYLE_URL;
 
-export const mapStyleUrl = (name: MapStyleName, key: string = MAP_TILER_KEY): string =>
-  mapTilerStyleUrl(MAP_STYLES[name].id, key);
+export const mapStyleUrl = (name: MapStyleName, key: string = MAP_TILER_KEY): string => {
+  const { source } = MAP_STYLES[name];
+  return source.provider === "free"
+    ? openFreeMapStyleUrl(source.id)
+    : mapTilerStyleUrl(source.id, key);
+};
+
+/**
+ * Whether this style stands its buildings up, which is only worth pitching the
+ * camera for where the style actually draws them.
+ */
+export const isPitchedMapStyle = (name: MapStyleName): boolean => name === "3d";
 
 const readStored = (): MapStyleName | null => {
   try {
