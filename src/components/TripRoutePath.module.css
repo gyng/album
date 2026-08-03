@@ -1,0 +1,49 @@
+.figure {
+  display: grid;
+  gap: var(--m);
+  margin: 0;
+  min-inline-size: 0;
+}
+
+.svg {
+  inline-size: 100%;
+  block-size: auto;
+  /* A quiet ground so the line reads as a drawing rather than as an image that
+     failed to load. */
+  background: color-mix(in oklch, var(--c-bg-contrast-dark) 22%, transparent);
+  border: var(--size-1) solid color-mix(in oklch, var(--c-bg-contrast-light) 22%, transparent);
+}
+
+.line {
+  stroke: color-mix(in oklch, var(--c-accent) 70%, transparent);
+  stroke-width: var(--size-2);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.dot {
+  fill: var(--c-accent);
+  stroke: var(--c-bg);
+  stroke-width: var(--size-2);
+  transition: r var(--t-fast) var(--ease-out);
+}
+
+/* The day being pointed at in the trip beside this drawing. */
+.stopActive .dot {
+  fill: var(--c-font);
+}
+
+.label {
+  fill: var(--c-bg-contrast-light);
+  font-size: var(--fs-xs);
+}
+
+.stopActive .label {
+  fill: var(--c-font);
+}
+
+.caption {
+  color: var(--c-bg-contrast-light);
+  font-size: var(--fs-xs);
+  font-variant-numeric: tabular-nums;
+}

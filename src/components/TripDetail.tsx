@@ -1,9 +1,9 @@
 import React from "react";
-import { AppLink as Link, useClientComponents } from "./platform";
+import { AppLink as Link } from "./platform";
 import type { Trip, TripDay } from "../util/computeTrips";
 import { formatExifWallClockDate } from "../util/exifTime";
 import { Caption, Heading, Thumb } from "./ui";
-import { useNearViewport } from "./useNearViewport";
+import { TripRoutePath } from "./TripRoutePath";
 import styles from "./TripDetail.module.css";
 
 /** The shooting-window sparkline spans a waking day; earlier hours are rare. */
@@ -23,21 +23,6 @@ const roundKm = (km: number) => (km >= 10 ? Math.round(km) : Math.round(km * 10)
  * the kit is short enough to list — this is not a long tail that needs cutting.
  */
 const MAX_GEAR_ENTRIES = 5;
-
-/**
- * How tall a trip's map is allowed to be, in the column beside it.
- *
- * A *cap*, not a height: the map stretches to its own row and stops there, so a
- * short trip's map cannot run past the trip it belongs to and into the next
- * one. A fortnight and an afternoon are still not the same amount of map, which
- * is what the per-day term is for.
- */
-const MAP_HEIGHT_BASE_PX = 220;
-const MAP_HEIGHT_PER_DAY_PX = 22;
-const MAP_HEIGHT_MAX_PX = 460;
-
-const mapMaxHeightPx = (trip: Trip) =>
-  Math.min(MAP_HEIGHT_MAX_PX, MAP_HEIGHT_BASE_PX + trip.dayCount * MAP_HEIGHT_PER_DAY_PX);
 
 const share = (count: number, total: number) => Math.round((count / total) * 100);
 
@@ -130,39 +115,19 @@ const TripFacts = ({ trip }: { trip: Trip }) => {
 };
 
 /**
- * Far enough ahead that the map has fetched its script, style and first tiles
- * before the trip is on screen. A map that starts loading as it arrives lands
- * mid-scroll, which is exactly when the jank shows.
- */
-const ROUTE_PREFETCH_MARGIN = "1400px 0px";
-
-/**
- * A trip's route, alongside the trip.
+ * A trip's route, drawn beside it.
  *
- * Mounted only while the trip is near the viewport, and unmounted again when it
- * leaves. That gate is what makes a map per trip affordable at all: the list
- * grows to every journey in the archive, and each live map holds a WebGL
- * context the browser will not hand out indefinitely.
- */
-const RouteColumn = ({ trip, activeDate }: { trip: Trip; activeDate: string | null }) => {
-  const ref = React.useRef<HTMLDivElement>(null);
-  const near = useNearViewport(ref, ROUTE_PREFETCH_MARGIN);
-  const { TripRouteMap } = useClientComponents();
-
-  return (
-    <div ref={ref} className={styles.side} style={{ maxBlockSize: `${mapMaxHeightPx(trip)}px` }}>
-      {near ? <TripRouteMap trip={trip} activeDate={activeDate} /> : null}
-    </div>
-  );
-};
-
-/**
- * Only trips that can be drawn get a map, so a trip whose photographs never
- * recorded where they were keeps the full width for its frames. An outing gets
- * one too — shorter, since a single day needs less of it.
+ * No basemap and no map instance: this is SVG that renders with the page. A
+ * live map per trip cost a WebGL context and a tile request each on a list of
+ * ninety-four, which is enough to exhaust the tile provider's quota and take
+ * every map on the site down with it.
  */
 const TripRoute = ({ trip, activeDate }: { trip: Trip; activeDate: string | null }) =>
-  trip.days.some((day) => day.point) ? <RouteColumn trip={trip} activeDate={activeDate} /> : null;
+  trip.days.some((day) => day.point) ? (
+    <div className={styles.side}>
+      <TripRoutePath trip={trip} activeDate={activeDate} />
+    </div>
+  ) : null;
 
 /** Every frame of a day. */
 const DayStrip = ({

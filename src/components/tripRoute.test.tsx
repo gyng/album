@@ -3,7 +3,13 @@
  */
 
 import type { Trip } from "../util/computeTrips";
-import { clusterStops, fitToRoute, formatDayNumbers, routeBounds, routeStops } from "./tripRoute";
+import {
+  clusterStops,
+  formatDayNumbers,
+  projectRoute,
+  routeFrameHeight,
+  routeStops,
+} from "./tripRoute";
 
 const day = (over: Partial<Trip["days"][number]>): Trip["days"][number] => ({
   date: "2016-11-13",
@@ -55,136 +61,51 @@ describe("routeStops", () => {
   });
 });
 
-describe("routeBounds", () => {
-  it("encloses every stop", () => {
-    expect(
-      routeBounds([
-        { date: "a", number: 1, lat: 35, lng: 139, label: "" },
-        { date: "b", number: 2, lat: 34, lng: 135, label: "" },
-      ]),
-    ).toEqual([
-      { lng: 135, lat: 34 },
-      { lng: 139, lat: 35 },
-    ]);
+describe("projectRoute", () => {
+  const stop = (lat: number, lng: number) => ({ date: "d", number: 1, lat, lng, label: "" });
+
+  it("fits the journey inside the frame, padding included", () => {
+    const route = projectRoute([stop(35, 135), stop(34, 139)], 320, 240, 20);
+
+    for (const point of route.points) {
+      expect(point.x).toBeGreaterThanOrEqual(20);
+      expect(point.x).toBeLessThanOrEqual(300);
+      expect(point.y).toBeGreaterThanOrEqual(20);
+      expect(point.y).toBeLessThanOrEqual(220);
+    }
   });
 
-  it("has nothing to enclose when the trip was never located", () => {
-    expect(routeBounds([])).toBeNull();
-  });
-});
+  // One scale for both axes, or a north-south journey comes out looking like an
+  // east-west one. North is up, as on any map.
+  it("keeps the journey's own proportions, north upward", () => {
+    const wide = projectRoute([stop(35, 130), stop(35, 140)], 320, 240, 0);
+    const northward = projectRoute([stop(30, 135), stop(40, 135)], 320, 240, 0);
 
-describe("fitToRoute", () => {
-  const camera = () => ({ fitBounds: jest.fn(), jumpTo: jest.fn() });
-
-  it("frames the whole journey when there is more than one stop", () => {
-    const map = camera();
-
-    fitToRoute(map as never, [
-      { date: "a", number: 1, lat: 35, lng: 139, label: "" },
-      { date: "b", number: 2, lat: 34, lng: 135, label: "" },
-    ]);
-
-    expect(map.fitBounds).toHaveBeenCalledWith(
-      [
-        { lng: 135, lat: 34 },
-        { lng: 139, lat: 35 },
-      ],
-      expect.objectContaining({
-        // The picture stands above its pin, so the top needs room the bottom
-        // does not — a stop near the top edge otherwise loses its photograph.
-        padding: expect.objectContaining({ top: expect.any(Number), bottom: expect.any(Number) }),
-      }),
-    );
-    const { padding } = map.fitBounds.mock.calls[0][1];
-    expect(padding.top).toBeGreaterThan(padding.bottom);
-    expect(map.jumpTo).not.toHaveBeenCalled();
+    expect(wide.points[1]!.x - wide.points[0]!.x).toBeCloseTo(320, 0);
+    expect(northward.points[0]!.y - northward.points[1]!.y).toBeCloseTo(240, 0);
+    expect(northward.points[1]!.y).toBeLessThan(northward.points[0]!.y);
   });
 
-  // Bounds enclosing one point are a point, which fits at maximum zoom.
-  it("jumps to a readable zoom when a trip never left one place", () => {
-    const map = camera();
+  it("draws a line through the stops in order", () => {
+    const route = projectRoute([stop(35, 135), stop(34, 136), stop(33, 137)], 320, 240, 10);
 
-    fitToRoute(map as never, [{ date: "a", number: 1, lat: 35, lng: 139, label: "" }]);
-
-    expect(map.jumpTo).toHaveBeenCalledWith(
-      expect.objectContaining({ center: { lng: 139, lat: 35 } }),
-    );
-    expect(map.fitBounds).not.toHaveBeenCalled();
+    expect(route.path.startsWith("M")).toBe(true);
+    expect(route.path.match(/L/g)).toHaveLength(2);
   });
 
-  it("does nothing at all when there is no stop to frame", () => {
-    const map = camera();
+  // Everything taken in one spot has no extent to divide by.
+  it("centres a trip that never moved instead of dividing by nothing", () => {
+    const route = projectRoute([stop(35, 135), stop(35, 135)], 320, 240, 10);
 
-    fitToRoute(map as never, []);
-
-    expect(map.fitBounds).not.toHaveBeenCalled();
-    expect(map.jumpTo).not.toHaveBeenCalled();
-  });
-});
-
-describe("clusterStops", () => {
-  const stop = (number: number, lat: number, lng: number, src?: string) => ({
-    date: `2016-11-${String(12 + number).padStart(2, "0")}`,
-    number,
-    lat,
-    lng,
-    label: "",
-    ...(src ? { src } : {}),
+    expect(route.points[0]).toEqual({ x: 160, y: 120 });
   });
 
-  // Nine of one real trip's fourteen markers sat on top of another, so only
-  // five days were visible at all.
-  it("gathers days that would land on the same pixel into one marker", () => {
-    const markers = clusterStops([
-      stop(1, 35.0, 135.0),
-      stop(2, 35.001, 135.001),
-      stop(3, 35.002, 135.0),
-      stop(4, 36.5, 137.0),
-    ]);
+  // The markers are a clustered subset, so they have to be placed in the same
+  // space as the line or they float off it.
+  it("offers its own projection for anything else drawn in the frame", () => {
+    const route = projectRoute([stop(35, 135), stop(34, 139)], 320, 240, 20);
 
-    expect(markers).toHaveLength(2);
-    expect(markers[0]?.numbers).toEqual([1, 2, 3]);
-    expect(markers[1]?.numbers).toEqual([4]);
-  });
-
-  // The tolerance is a fraction of the trip's own extent because the map is
-  // fitted to that extent: the same two coordinates overlap on a city map and
-  // are far apart on a country one.
-  it("keeps the same two stops apart when the trip they belong to is small", () => {
-    const wide = clusterStops([stop(1, 35.0, 135.0), stop(2, 35.05, 135.0), stop(3, 40.0, 135.0)]);
-    const tight = clusterStops([stop(1, 35.0, 135.0), stop(2, 35.05, 135.0)]);
-
-    expect(wide[0]?.numbers).toEqual([1, 2]);
-    expect(tight).toHaveLength(2);
-  });
-
-  it("takes its picture from the first day in the group that has one", () => {
-    // A third stop well away gives the trip an extent, which is what the
-    // tolerance is measured against.
-    const markers = clusterStops([
-      stop(1, 35, 135),
-      stop(2, 35.001, 135, "/two.avif"),
-      stop(3, 40, 135, "/three.avif"),
-    ]);
-
-    expect(markers[0]?.numbers).toEqual([1, 2]);
-    expect(markers[0]?.src).toBe("/two.avif");
-  });
-
-  it("has nothing to cluster when the trip was never located", () => {
-    expect(clusterStops([])).toEqual([]);
-  });
-});
-
-describe("formatDayNumbers", () => {
-  it("reads a run as a range and a gap as a list", () => {
-    expect(formatDayNumbers([6])).toBe("6");
-    expect(formatDayNumbers([6, 7, 8])).toBe("6–8");
-    expect(formatDayNumbers([6, 8])).toBe("6, 8");
-  });
-
-  it("does not depend on the order they arrived in", () => {
-    expect(formatDayNumbers([8, 6, 7])).toBe("6–8");
+    expect(route.project({ lat: 35, lng: 135 })).toEqual(route.points[0]);
   });
 });
 
@@ -276,5 +197,27 @@ describe("every photograph on the route", () => {
 
     expect(markers[0]?.numbers).toEqual([1]);
     expect(markers[1]?.numbers).toEqual([2]);
+  });
+});
+
+describe("routeFrameHeight", () => {
+  const stop = (lat: number, lng: number) => ({ date: "d", number: 1, lat, lng, label: "" });
+
+  // An east–west journey in a square frame is a thin line adrift in empty space.
+  it("takes the journey's proportions rather than a fixed box", () => {
+    const wide = routeFrameHeight([stop(35, 130), stop(35.2, 140)], 320, 20, 110, 280);
+    const tall = routeFrameHeight([stop(30, 135), stop(40, 135.2)], 320, 20, 110, 280);
+
+    expect(wide).toBeLessThan(tall);
+  });
+
+  it("stays within its limits however extreme the journey", () => {
+    expect(routeFrameHeight([stop(35, 130), stop(35.001, 150)], 320, 20, 110, 280)).toBe(110);
+    expect(routeFrameHeight([stop(10, 135), stop(60, 135.001)], 320, 20, 110, 280)).toBe(280);
+  });
+
+  it("falls back to the shortest frame for a journey with no extent at all", () => {
+    expect(routeFrameHeight([stop(35, 135), stop(35, 135)], 320, 20, 110, 280)).toBe(110);
+    expect(routeFrameHeight([], 320, 20, 110, 280)).toBe(110);
   });
 });

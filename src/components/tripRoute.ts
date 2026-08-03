@@ -1,13 +1,13 @@
 import type { Trip } from "../util/computeTrips";
-import type { Bounds, MapCamera } from "./map";
 
 /**
- * A trip's route as data: which days can be placed, where, and how the map
- * should be framed to show them.
+ * A trip's route as data: which days can be placed, where, and how to draw the
+ * line between them.
  *
- * Kept apart from the component the way `mapRoute.ts` is, so the logic can be
- * tested without resolving MapLibre — the adapter is a browser package and a
- * node test cannot load it.
+ * Drawn on its own rather than over a basemap. A map per trip meant a WebGL
+ * context and a tile request each, on a page that lists ninety-four of them —
+ * enough to exhaust the tile provider's quota, at which point every map on the
+ * site goes blank. The shape of a journey needs neither.
  */
 /** A day that knows where it was, with its position in the journey. */
 export type RouteStop = {
@@ -18,19 +18,6 @@ export type RouteStop = {
   src?: string;
   label: string;
 };
-
-/**
- * Room kept around the fitted route.
- *
- * Asymmetric because a marker is asymmetric: the picture stands ~92px above its
- * pin, so a stop near the top of the frame has its photograph cut off by the
- * map's own edge while the bottom has room to spare. Same failure the world
- * map's render padding exists to avoid.
- */
-const FIT_PADDING = { top: 84, right: 40, bottom: 32, left: 40 };
-/** A trip that never left one place still needs a readable frame. */
-const SINGLE_STOP_ZOOM = 11;
-const FIT_MAX_ZOOM = 12;
 
 /**
  * Every photograph of a trip that knows where it was taken.
@@ -79,36 +66,113 @@ export const routeStops = (trip: Trip): RouteStop[] => {
   return stops;
 };
 
-/** The rectangle enclosing every stop, or null when there is nothing to frame. */
-export const routeBounds = (stops: RouteStop[]): Bounds | null => {
-  if (stops.length === 0) return null;
-  const lats = stops.map((stop) => stop.lat);
-  const lngs = stops.map((stop) => stop.lng);
-  return [
-    { lng: Math.min(...lngs), lat: Math.min(...lats) },
-    { lng: Math.max(...lngs), lat: Math.max(...lats) },
-  ];
+export type ProjectedPoint = { x: number; y: number };
+
+export type ProjectedRoute = {
+  /** The line through the stops, in order, as SVG path data. */
+  path: string;
+  /** Where each stop landed, in the same order it was given. */
+  points: ProjectedPoint[];
+  /**
+   * The same projection, for anything else drawn in this space — the markers
+   * are a clustered subset of the stops, and projecting them separately would
+   * fit them to their own extent and pull them off the line.
+   */
+  project: (place: { lat: number; lng: number }) => ProjectedPoint;
+  width: number;
+  height: number;
+};
+
+/** Web Mercator's y, so a route keeps the shape a map would have given it. */
+const mercatorY = (lat: number) => {
+  const clamped = Math.max(-85.05, Math.min(85.05, lat));
+  const radians = (clamped * Math.PI) / 180;
+  return Math.log(Math.tan(Math.PI / 4 + radians / 2));
 };
 
 /**
- * Frames the whole journey.
+ * How tall the route wants to be drawn, for a given width.
  *
- * Run from `onLoad` rather than a child effect: a child mounts as soon as the
- * map object exists, which is before the style and the canvas are up, and a fit
- * requested then is computed against a map that cannot yet honour it — the
- * route opened at world view with fourteen markers scattered off-screen.
+ * A journey that ran east–west is a wide, shallow shape; given a square frame
+ * it becomes a thin line adrift in empty space. The frame takes the journey's
+ * proportions instead, within limits — a route that ran due north still needs
+ * width enough to read, and one that barely moved should not become a stripe.
  */
-export const fitToRoute = (map: MapCamera, stops: RouteStop[]): void => {
-  const first = stops[0];
-  if (!first) return;
+export const routeFrameHeight = (
+  stops: RouteStop[],
+  width: number,
+  padding: number,
+  min: number,
+  max: number,
+): number => {
+  if (stops.length === 0) return min;
+  const xs = stops.map((stop) => stop.lng);
+  const ys = stops.map((stop) => mercatorY(stop.lat));
+  const spanX = Math.max(...xs) - Math.min(...xs);
+  const spanY = Math.max(...ys) - Math.min(...ys);
+  if (spanX === 0 || spanY === 0) return min;
+  const inner = Math.max(1, width - padding * 2);
+  return Math.round(Math.min(max, Math.max(min, (spanY / spanX) * inner + padding * 2)));
+};
 
-  if (stops.length === 1) {
-    map.jumpTo({ center: { lng: first.lng, lat: first.lat }, zoom: SINGLE_STOP_ZOOM });
-    return;
-  }
+/**
+ * The route drawn on its own, without a basemap under it.
+ *
+ * Scaled to fit the box and centred, with one scale for both axes so the shape
+ * is the journey's rather than the box's. A trip that never moved collapses to
+ * a single point in the middle rather than dividing by a zero extent.
+ */
+export const projectRoute = (
+  stops: RouteStop[],
+  width: number,
+  height: number,
+  padding: number,
+): ProjectedRoute => {
+  const inner = {
+    width: Math.max(1, width - padding * 2),
+    height: Math.max(1, height - padding * 2),
+  };
+  const xs = stops.map((stop) => stop.lng);
+  const ys = stops.map((stop) => mercatorY(stop.lat));
+  const minX = Math.min(...xs);
+  const maxX = Math.max(...xs);
+  const minY = Math.min(...ys);
+  const maxY = Math.max(...ys);
+  const spanX = maxX - minX;
+  const spanY = maxY - minY;
 
-  const bounds = routeBounds(stops);
-  if (bounds) map.fitBounds(bounds, { padding: FIT_PADDING, maxZoom: FIT_MAX_ZOOM });
+  const scale =
+    spanX === 0 && spanY === 0
+      ? 1
+      : Math.min(
+          spanX === 0 ? Infinity : inner.width / spanX,
+          spanY === 0 ? Infinity : inner.height / spanY,
+        );
+
+  const drawnWidth = spanX * scale;
+  const drawnHeight = spanY * scale;
+  const offsetX = padding + (inner.width - drawnWidth) / 2;
+  const offsetY = padding + (inner.height - drawnHeight) / 2;
+
+  const project = (place: { lat: number; lng: number }): ProjectedPoint => ({
+    x: spanX === 0 ? width / 2 : offsetX + (place.lng - minX) * scale,
+    // Mercator y grows northward; SVG grows downward.
+    y: spanY === 0 ? height / 2 : offsetY + (maxY - mercatorY(place.lat)) * scale,
+  });
+
+  const points = stops.map(project);
+
+  return {
+    project,
+    path: points
+      .map(
+        (point, index) => `${index === 0 ? "M" : "L"}${point.x.toFixed(1)} ${point.y.toFixed(1)}`,
+      )
+      .join(" "),
+    points,
+    width,
+    height,
+  };
 };
 
 /**

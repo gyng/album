@@ -2,7 +2,6 @@ import type React from "react";
 import type { MapProps } from "../Map";
 import type { MapWorldProps } from "../MapWorld";
 import type { SankeyChartProps } from "../SankeyChart";
-import type { TripRouteMapProps } from "../TripRouteMap";
 import type { GuessMapProps } from "../guess/GuessMap";
 import type { SearchNavState } from "../search/Search";
 
@@ -20,7 +19,6 @@ export type ClientComponents = {
   MapWorld: React.ComponentType<MapWorldProps>;
   PhotoSimilarPhotos: React.ComponentType<PhotoSimilarPhotosProps>;
   SankeyChart: React.ComponentType<SankeyChartProps>;
-  TripRouteMap: React.ComponentType<TripRouteMapProps>;
   GuessMap: React.ComponentType<GuessMapProps>;
   SearchWithCoi: React.ComponentType<SearchWithCoiProps>;
 };

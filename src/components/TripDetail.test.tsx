@@ -6,17 +6,6 @@ import { act, fireEvent, render, screen } from "@testing-library/react";
 import type { Trip } from "../util/computeTrips";
 import { TripDetail } from "./TripDetail";
 
-const routeMap = jest.fn();
-jest.mock("./platform", () => ({
-  ...jest.requireActual("./platform"),
-  useClientComponents: () => ({
-    TripRouteMap: (props: unknown) => {
-      routeMap(props);
-      return <div data-testid="route-map" />;
-    },
-  }),
-}));
-
 const day = (over: Partial<Trip["days"][number]> = {}): Trip["days"][number] => ({
   date: "2016-11-16",
   count: 41,
@@ -177,72 +166,7 @@ describe("what the trip says about itself", () => {
   });
 });
 
-describe("the route map", () => {
-  const located = () =>
-    trip({
-      days: [
-        day({ date: "2016-11-13", point: { lat: 35.0, lng: 135.7 } }),
-        day({ date: "2016-11-14", point: { lat: 34.6, lng: 135.5 } }),
-      ],
-    });
-
-  let observed: Array<(entries: Array<{ isIntersecting: boolean }>) => void>;
-
-  beforeEach(() => {
-    routeMap.mockClear();
-    observed = [];
-    class FakeObserver {
-      constructor(handler: (entries: Array<{ isIntersecting: boolean }>) => void) {
-        observed.push(handler);
-      }
-      observe = jest.fn();
-      disconnect = jest.fn();
-    }
-    (globalThis as { IntersectionObserver?: unknown }).IntersectionObserver = FakeObserver;
-  });
-
-  afterEach(() => {
-    delete (globalThis as { IntersectionObserver?: unknown }).IntersectionObserver;
-  });
-
-  // The trip list runs to every journey in the archive, and each live map holds
-  // a WebGL context — so a trip the reader has not reached builds nothing.
-  it("builds no map for a trip that is nowhere near the viewport", () => {
-    render(<TripDetail trip={located()} />);
-
-    expect(screen.queryByTestId("route-map")).not.toBeInTheDocument();
-    expect(routeMap).not.toHaveBeenCalled();
-  });
-
-  it("shows the route beside the trip once it comes into view", () => {
-    render(<TripDetail trip={located()} />);
-
-    act(() => observed.forEach((notify) => notify([{ isIntersecting: true }])));
-
-    expect(screen.getByTestId("route-map")).toBeInTheDocument();
-    expect(routeMap).toHaveBeenCalledWith(expect.objectContaining({ trip: expect.any(Object) }));
-  });
-
-  it("lets the map go again when the trip is scrolled well past", () => {
-    render(<TripDetail trip={located()} />);
-    act(() => observed.forEach((notify) => notify([{ isIntersecting: true }])));
-    act(() => observed.forEach((notify) => notify([{ isIntersecting: false }])));
-
-    expect(screen.queryByTestId("route-map")).not.toBeInTheDocument();
-  });
-
-  // A trip with no coordinates anywhere has no route, and an empty map beside
-  // it would take a third of the row to say so.
-  it("gives the whole width to a trip that never recorded where it was", () => {
-    render(<TripDetail trip={trip()} />);
-
-    act(() => observed.forEach((notify) => notify([{ isIntersecting: true }])));
-
-    expect(screen.queryByTestId("route-map")).not.toBeInTheDocument();
-  });
-});
-
-describe("pointing at a day", () => {
+describe("the route", () => {
   const located = () =>
     trip({
       days: [
@@ -250,50 +174,32 @@ describe("pointing at a day", () => {
           date: "2016-11-13",
           point: { lat: 35.0, lng: 135.7 },
           photos: [
-            { src: "/one.avif", href: "/album/a#one", label: "one" },
+            { src: "/one.avif", href: "/album/a#one", label: "one", lat: 35.0, lng: 135.7 },
           ] as Trip["days"][number]["photos"],
         }),
-        day({ date: "2016-11-14", point: { lat: 34.6, lng: 135.5 } }),
+        day({
+          date: "2016-11-14",
+          point: { lat: 34.6, lng: 135.5 },
+          photos: [
+            { src: "/two.avif", href: "/album/a#two", label: "two", lat: 34.6, lng: 135.5 },
+          ] as Trip["days"][number]["photos"],
+        }),
       ],
     });
 
-  let observed: Array<(entries: Array<{ isIntersecting: boolean }>) => void>;
+  // Drawn rather than mapped: a live map per trip cost a WebGL context and a
+  // tile request each on a list of ninety-four.
+  it("draws the journey beside the trip, with no map at all", () => {
+    const { container } = render(<TripDetail trip={located()} />);
 
-  beforeEach(() => {
-    routeMap.mockClear();
-    observed = [];
-    class FakeObserver {
-      constructor(handler: (entries: Array<{ isIntersecting: boolean }>) => void) {
-        observed.push(handler);
-      }
-      observe = jest.fn();
-      disconnect = jest.fn();
-    }
-    (globalThis as { IntersectionObserver?: unknown }).IntersectionObserver = FakeObserver;
+    expect(screen.getByRole("img", { name: /route of this trip/i })).toBeInTheDocument();
+    expect(container.querySelector("canvas")).toBeNull();
   });
 
-  afterEach(() => {
-    delete (globalThis as { IntersectionObserver?: unknown }).IntersectionObserver;
-  });
+  it("gives the whole width to a trip that never recorded where it was", () => {
+    const { container } = render(<TripDetail trip={trip()} />);
 
-  // Markers on a narrow map overlap, so the one you are asking about has to be
-  // able to come out from under its neighbours.
-  it("tells the map which day is being pointed at, and stops when the pointer leaves", () => {
-    render(<TripDetail trip={located()} />);
-    act(() => observed.forEach((notify) => notify([{ isIntersecting: true }])));
-
-    const tiles = screen.getByRole("img", { name: "one" }).closest("div");
-    act(() => {
-      fireEvent.mouseEnter(tiles as HTMLElement);
-    });
-    expect(routeMap).toHaveBeenLastCalledWith(
-      expect.objectContaining({ activeDate: "2016-11-13" }),
-    );
-
-    act(() => {
-      fireEvent.mouseLeave(tiles as HTMLElement);
-    });
-    expect(routeMap).toHaveBeenLastCalledWith(expect.objectContaining({ activeDate: null }));
+    expect(container.querySelector("svg")).toBeNull();
   });
 });
 
@@ -412,130 +318,36 @@ describe("pointing at a day", () => {
           date: "2016-11-13",
           point: { lat: 35.0, lng: 135.7 },
           photos: [
-            { src: "/one.avif", href: "/album/a#one", label: "one" },
+            { src: "/one.avif", href: "/album/a#one", label: "one", lat: 35.0, lng: 135.7 },
           ] as Trip["days"][number]["photos"],
         }),
-        day({ date: "2016-11-14", point: { lat: 34.6, lng: 135.5 } }),
-      ],
-    });
-
-  let observed: Array<(entries: Array<{ isIntersecting: boolean }>) => void>;
-
-  beforeEach(() => {
-    routeMap.mockClear();
-    observed = [];
-    class FakeObserver {
-      constructor(handler: (entries: Array<{ isIntersecting: boolean }>) => void) {
-        observed.push(handler);
-      }
-      observe = jest.fn();
-      disconnect = jest.fn();
-    }
-    (globalThis as { IntersectionObserver?: unknown }).IntersectionObserver = FakeObserver;
-  });
-
-  afterEach(() => {
-    delete (globalThis as { IntersectionObserver?: unknown }).IntersectionObserver;
-  });
-
-  // Markers on a narrow map overlap, so the one you are asking about has to be
-  // able to come out from under its neighbours.
-  it("tells the map which day is being pointed at, and stops when the pointer leaves", () => {
-    render(<TripDetail trip={located()} />);
-    act(() => observed.forEach((notify) => notify([{ isIntersecting: true }])));
-
-    const tiles = screen.getByRole("img", { name: "one" }).closest("div");
-    act(() => {
-      fireEvent.mouseEnter(tiles as HTMLElement);
-    });
-    expect(routeMap).toHaveBeenLastCalledWith(
-      expect.objectContaining({ activeDate: "2016-11-13" }),
-    );
-
-    act(() => {
-      fireEvent.mouseLeave(tiles as HTMLElement);
-    });
-    expect(routeMap).toHaveBeenLastCalledWith(expect.objectContaining({ activeDate: null }));
-  });
-});
-
-describe("an outing is not a journey", () => {
-  const outing = (over: Partial<Trip> = {}) =>
-    trip({
-      isOuting: true,
-      dayCount: 1,
-      photoCount: 2,
-      startDate: "2026-08-01",
-      endDate: "2026-08-01",
-      days: [
         day({
-          date: "2026-08-01",
-          count: 2,
-          point: { lat: 1.3, lng: 103.8 },
+          date: "2016-11-14",
+          point: { lat: 34.6, lng: 135.5 },
           photos: [
-            { src: "/a.avif", href: "/album/x#a", label: "a" },
+            { src: "/two.avif", href: "/album/a#two", label: "two", lat: 34.6, lng: 135.5 },
           ] as Trip["days"][number]["photos"],
         }),
       ],
-      ...over,
     });
 
-  // 58 of the 94 entries are single days. Given the full apparatus they repeat
-  // their own date, draw a rail with one dot and open a map on one pin.
-  it("states its date once, not twice", () => {
-    render(<TripDetail trip={outing()} />);
+  // Two dots in the same drawing look alike; pointing at a day's frames is how
+  // a reader tells which one is which.
+  it("marks the day being pointed at, and unmarks it when the pointer leaves", () => {
+    const { container } = render(<TripDetail trip={located()} />);
+    const marked = () => container.querySelectorAll("[class*='stopActive']").length;
 
-    expect(screen.getAllByText(/1 August 2026/)).toHaveLength(1);
-  });
+    expect(marked()).toBe(0);
 
-  // It loses the rail and the day row, not its map: where an afternoon went is
-  // as much the point for an outing as for a fortnight.
-  it("still draws where the afternoon went", () => {
-    render(<TripDetail trip={outing()} />);
+    const strip = screen.getByRole("img", { name: "one" }).closest("div");
     act(() => {
-      const notify = (globalThis as { __observers?: Array<(e: unknown) => void> }).__observers;
-      void notify;
+      fireEvent.mouseEnter(strip as HTMLElement);
     });
+    expect(marked()).toBe(1);
 
-    expect(screen.queryByText(/^Day 1$/)).toBeNull();
-  });
-
-  it("still shows where it went and what it saw", () => {
-    render(<TripDetail trip={outing({ places: ["Dover", "Brickworks Estate"] })} />);
-
-    expect(screen.getByText(/Dover/)).toBeInTheDocument();
-    expect(screen.getByRole("img", { name: "a" })).toBeInTheDocument();
-  });
-
-  it("keeps the day-by-day rail for a journey", () => {
-    render(<TripDetail trip={trip()} />);
-
-    expect(screen.getByText(/Day 1/)).toBeInTheDocument();
-  });
-});
-
-describe("the derived facts", () => {
-  const rich = () =>
-    trip({
-      gear: {
-        cameras: [{ name: "X100T", count: 153 }],
-        lenses: [],
-        photosWithCamera: 153,
-        photosWithLens: 0,
-      },
-      distinctiveTags: [{ tag: "moss", count: 12, times: 6.3 }],
+    act(() => {
+      fireEvent.mouseLeave(strip as HTMLElement);
     });
-
-  it("shows what the trip was carried and what it was full of", () => {
-    render(<TripDetail trip={rich()} />);
-
-    expect(screen.getByText("X100T")).toBeVisible();
-    expect(screen.getByText("moss")).toBeVisible();
-  });
-
-  it("shows nothing at all when the trip recorded neither", () => {
-    const { container } = render(<TripDetail trip={trip()} />);
-
-    expect(container.querySelector("[class*='factsBody']")).toBeNull();
+    expect(marked()).toBe(0);
   });
 });
