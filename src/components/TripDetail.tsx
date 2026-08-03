@@ -78,14 +78,21 @@ const GearList = ({
  * grows to every journey in the archive, and each live map holds a WebGL
  * context the browser will not hand out indefinitely.
  */
-const RouteColumn = ({ trip }: { trip: Trip }) => {
+/**
+ * Far enough ahead that the map has fetched its script, style and first tiles
+ * before the trip is on screen. A map that starts loading as it arrives lands
+ * mid-scroll, which is exactly when the jank shows.
+ */
+const ROUTE_PREFETCH_MARGIN = "1400px 0px";
+
+const RouteColumn = ({ trip, activeDate }: { trip: Trip; activeDate: string | null }) => {
   const ref = React.useRef<HTMLDivElement>(null);
-  const near = useNearViewport(ref);
+  const near = useNearViewport(ref, ROUTE_PREFETCH_MARGIN);
   const { TripRouteMap } = useClientComponents();
 
   return (
     <div ref={ref} className={styles.side}>
-      {near ? <TripRouteMap trip={trip} /> : null}
+      {near ? <TripRouteMap trip={trip} activeDate={activeDate} /> : null}
     </div>
   );
 };
@@ -94,146 +101,162 @@ const RouteColumn = ({ trip }: { trip: Trip }) => {
  * Only trips that can be drawn get a map column, so a trip whose photographs
  * never recorded where they were keeps the full width for its days.
  */
-const TripRoute = ({ trip }: { trip: Trip }) =>
-  trip.days.some((day) => day.point) ? <RouteColumn trip={trip} /> : null;
+const TripRoute = ({ trip, activeDate }: { trip: Trip; activeDate: string | null }) =>
+  trip.days.some((day) => day.point) ? <RouteColumn trip={trip} activeDate={activeDate} /> : null;
 
-export const TripDetail = ({ trip, headingLevel = 2 }: { trip: Trip; headingLevel?: 2 | 3 }) => (
-  <section className={styles.trip}>
-    <div className={styles.head}>
-      {/* Heading beside its caption on one baseline, as every other section
+export const TripDetail = ({ trip, headingLevel = 2 }: { trip: Trip; headingLevel?: 2 | 3 }) => {
+  // Which day the reader is pointing at, so its marker can come to the front of
+  // a map where markers necessarily overlap.
+  const [activeDate, setActiveDate] = React.useState<string | null>(null);
+
+  return (
+    <section className={styles.trip}>
+      <div className={styles.head}>
+        {/* Heading beside its caption on one baseline, as every other section
           header on this site is set. */}
-      <div className={styles.headRow}>
-        <Heading level={headingLevel} as={headingLevel === 2 ? "h2" : "h3"}>
-          {trip.isOuting
-            ? longDate(trip.startDate)
-            : `${longDate(trip.startDate)} – ${longDate(trip.endDate)}`}
-        </Heading>
-        <Caption as="span">
-          {trip.isOuting
-            ? `outing · ${trip.photoCount.toLocaleString("en")} photos`
-            : `${trip.dayCount} days · ${trip.photoCount.toLocaleString("en")} photos`}
-          {trip.totalKm && trip.totalKm >= 1 ? ` · ${roundKm(trip.totalKm)} km` : ""}
-          {trip.albums.length > 1 ? ` · from ${trip.albums.join(" and ")}` : ""}
-        </Caption>
-      </div>
-      {trip.places.length > 0 ? (
-        <p className={styles.places}>{trip.places.slice(0, 8).join(" → ")}</p>
-      ) : null}
-      {trip.firstVisits.length > 0 ? (
-        <p className={styles.firsts}>
-          First time in {trip.firstVisits.slice(0, 6).join(", ")}
-          {trip.firstVisits.length > 6 ? ` and ${trip.firstVisits.length - 6} more` : ""}
-        </p>
-      ) : null}
-      {trip.laterReturns.length > 0 ? (
-        <p className={styles.returns}>
-          Came back:{" "}
-          {trip.laterReturns
-            .slice(0, 4)
-            .map((entry) => `${entry.place} in ${entry.year}`)
-            .join(", ")}
-          {trip.laterReturns.length > 4 ? ` and ${trip.laterReturns.length - 4} more` : ""}
-        </p>
-      ) : null}
+        <div className={styles.headRow}>
+          <Heading level={headingLevel} as={headingLevel === 2 ? "h2" : "h3"}>
+            {trip.isOuting
+              ? longDate(trip.startDate)
+              : `${longDate(trip.startDate)} – ${longDate(trip.endDate)}`}
+          </Heading>
+          <Caption as="span">
+            {trip.isOuting
+              ? `outing · ${trip.photoCount.toLocaleString("en")} photos`
+              : `${trip.dayCount} days · ${trip.photoCount.toLocaleString("en")} photos`}
+            {trip.totalKm && trip.totalKm >= 1 ? ` · ${roundKm(trip.totalKm)} km` : ""}
+            {trip.albums.length > 1 ? ` · from ${trip.albums.join(" and ")}` : ""}
+          </Caption>
+        </div>
+        {trip.places.length > 0 ? (
+          <p className={styles.places}>{trip.places.slice(0, 8).join(" → ")}</p>
+        ) : null}
+        {trip.firstVisits.length > 0 ? (
+          <p className={styles.firsts}>
+            First time in {trip.firstVisits.slice(0, 6).join(", ")}
+            {trip.firstVisits.length > 6 ? ` and ${trip.firstVisits.length - 6} more` : ""}
+          </p>
+        ) : null}
+        {trip.laterReturns.length > 0 ? (
+          <p className={styles.returns}>
+            Came back:{" "}
+            {trip.laterReturns
+              .slice(0, 4)
+              .map((entry) => `${entry.place} in ${entry.year}`)
+              .join(", ")}
+            {trip.laterReturns.length > 4 ? ` and ${trip.laterReturns.length - 4} more` : ""}
+          </p>
+        ) : null}
 
-      {trip.distinctiveTags.length > 0 ? (
-        <div className={styles.panel}>
-          {/* A count would only report that a long trip is long. The multiplier
+        {trip.distinctiveTags.length > 0 ? (
+          <div className={styles.panel}>
+            {/* A count would only report that a long trip is long. The multiplier
               is the fact: how much likelier this subject was here than in the
               archive around it. */}
-          <p className={styles.panelTitle}>Shot here more than you usually do</p>
-          <ul className={styles.tagList}>
-            {trip.distinctiveTags.map((entry) => (
-              <li key={entry.tag} className={styles.tag}>
-                <span className={styles.tagName}>{entry.tag}</span>
-                <span className={styles.tagTimes}>{entry.times}×</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
-
-      {trip.gear.photosWithCamera > 0 ? (
-        <div className={styles.panel}>
-          <p className={styles.panelTitle}>What you carried</p>
-          <div className={styles.gear}>
-            <GearList title="Bodies" items={trip.gear.cameras} total={trip.gear.photosWithCamera} />
-            <GearList
-              title="Lenses"
-              items={trip.gear.lenses}
-              total={trip.gear.photosWithLens}
-              {...(trip.gear.photosWithLens < trip.photoCount
-                ? {
-                    note: `of the ${trip.gear.photosWithLens} of ${trip.photoCount} frames that recorded one`,
-                  }
-                : {})}
-            />
+            <p className={styles.panelTitle}>Shot here more than you usually do</p>
+            <ul className={styles.tagList}>
+              {trip.distinctiveTags.map((entry) => (
+                <li key={entry.tag} className={styles.tag}>
+                  <span className={styles.tagName}>{entry.tag}</span>
+                  <span className={styles.tagTimes}>{entry.times}×</span>
+                </li>
+              ))}
+            </ul>
           </div>
-        </div>
-      ) : null}
-    </div>
+        ) : null}
 
-    <div className={styles.days}>
-      {trip.days.map((day, index) => (
-        <div key={day.date} className={styles.day}>
-          <div className={styles.rail} aria-hidden="true">
-            <span className={styles.dot} />
-            {day.movedKm && day.movedKm >= NOTABLE_MOVE_KM ? (
-              <span className={styles.moved}>{Math.round(day.movedKm)} km</span>
-            ) : null}
+        {trip.gear.photosWithCamera > 0 ? (
+          <div className={styles.panel}>
+            <p className={styles.panelTitle}>What you carried</p>
+            <div className={styles.gear}>
+              <GearList
+                title="Bodies"
+                items={trip.gear.cameras}
+                total={trip.gear.photosWithCamera}
+              />
+              <GearList
+                title="Lenses"
+                items={trip.gear.lenses}
+                total={trip.gear.photosWithLens}
+                {...(trip.gear.photosWithLens < trip.photoCount
+                  ? {
+                      note: `of the ${trip.gear.photosWithLens} of ${trip.photoCount} frames that recorded one`,
+                    }
+                  : {})}
+              />
+            </div>
           </div>
+        ) : null}
+      </div>
 
-          <div className={styles.meta}>
-            {trip.isOuting ? null : <p className={styles.dayno}>Day {index + 1}</p>}
-            <p className={styles.date}>{longDate(day.date)}</p>
-            {day.places.length > 0 ? (
-              <p className={styles.places}>{day.places.slice(0, 5).join(" → ")}</p>
-            ) : null}
-            <p className={styles.stat}>
-              {day.colour ? (
-                <span
-                  className={styles.swatch}
-                  style={{ background: day.colour }}
-                  title="The day's average colour"
-                  aria-hidden="true"
-                />
+      <div className={styles.days}>
+        {trip.days.map((day, index) => (
+          <div key={day.date} className={styles.day}>
+            <div className={styles.rail} aria-hidden="true">
+              <span className={styles.dot} />
+              {day.movedKm && day.movedKm >= NOTABLE_MOVE_KM ? (
+                <span className={styles.moved}>{Math.round(day.movedKm)} km</span>
               ) : null}
-              {day.count.toLocaleString("en")} {day.count === 1 ? "photo" : "photos"}
-              {day.from ? ` · ${day.from}–${day.to}` : ""}
-              {day.coveredKm && day.coveredKm >= 1 ? ` · ${roundKm(day.coveredKm)} km covered` : ""}
-            </p>
-            {day.hours.length > 0 ? (
-              <div
-                className={styles.hours}
-                aria-hidden="true"
-                title={`Photographed between ${day.from} and ${day.to}`}
-              >
-                {Array.from({ length: LAST_HOUR - FIRST_HOUR + 1 }, (_, offset) => (
+            </div>
+
+            <div className={styles.meta}>
+              {trip.isOuting ? null : <p className={styles.dayno}>Day {index + 1}</p>}
+              <p className={styles.date}>{longDate(day.date)}</p>
+              {day.places.length > 0 ? (
+                <p className={styles.places}>{day.places.slice(0, 5).join(" → ")}</p>
+              ) : null}
+              <p className={styles.stat}>
+                {day.colour ? (
                   <span
-                    key={offset}
-                    className={day.hours.includes(FIRST_HOUR + offset) ? styles.on : styles.off}
+                    className={styles.swatch}
+                    style={{ background: day.colour }}
+                    title="The day's average colour"
+                    aria-hidden="true"
                   />
-                ))}
-              </div>
-            ) : null}
-          </div>
+                ) : null}
+                {day.count.toLocaleString("en")} {day.count === 1 ? "photo" : "photos"}
+                {day.from ? ` · ${day.from}–${day.to}` : ""}
+                {day.coveredKm && day.coveredKm >= 1
+                  ? ` · ${roundKm(day.coveredKm)} km covered`
+                  : ""}
+              </p>
+              {day.hours.length > 0 ? (
+                <div
+                  className={styles.hours}
+                  aria-hidden="true"
+                  title={`Photographed between ${day.from} and ${day.to}`}
+                >
+                  {Array.from({ length: LAST_HOUR - FIRST_HOUR + 1 }, (_, offset) => (
+                    <span
+                      key={offset}
+                      className={day.hours.includes(FIRST_HOUR + offset) ? styles.on : styles.off}
+                    />
+                  ))}
+                </div>
+              ) : null}
+            </div>
 
-          <div className={styles.strip}>
-            {day.photos.map((photo) => (
-              <Link key={photo.href + photo.src} href={photo.href}>
-                <Thumb
-                  src={photo.src}
-                  alt={photo.label}
-                  loading="lazy"
-                  {...(photo.swatch ? { style: { backgroundColor: photo.swatch } } : {})}
-                />
-              </Link>
-            ))}
+            <div
+              className={styles.strip}
+              onMouseEnter={() => setActiveDate(day.date)}
+              onMouseLeave={() => setActiveDate(null)}
+            >
+              {day.photos.map((photo) => (
+                <Link key={photo.href + photo.src} href={photo.href}>
+                  <Thumb
+                    src={photo.src}
+                    alt={photo.label}
+                    loading="lazy"
+                    {...(photo.swatch ? { style: { backgroundColor: photo.swatch } } : {})}
+                  />
+                </Link>
+              ))}
+            </div>
           </div>
-        </div>
-      ))}
-    </div>
+        ))}
+      </div>
 
-    <TripRoute trip={trip} />
-  </section>
-);
+      <TripRoute trip={trip} activeDate={activeDate} />
+    </section>
+  );
+};

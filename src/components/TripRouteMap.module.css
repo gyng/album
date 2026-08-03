@@ -10,6 +10,27 @@
   color: var(--c-bg-contrast-light);
 }
 
+/* The pin is the day: same accent fill, white ring and shadow as the pin every
+   other map on this site drops, but sized to carry its number rather than
+   hanging a badge off the photograph above it. */
+.pin {
+  position: relative;
+  display: block;
+  min-inline-size: var(--size-20);
+  block-size: var(--size-20);
+  padding: 0 var(--m);
+  border-radius: var(--radius-pill);
+  background: var(--c-accent);
+  color: var(--c-bg);
+  font-size: var(--fs-xs);
+  line-height: var(--size-20);
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  box-shadow:
+    0 0 0 var(--size-2) color-mix(in oklch, var(--c-white) 84%, transparent),
+    0 var(--size-1) var(--size-2) color-mix(in oklch, var(--c-black) 18%, transparent);
+}
+
 /* Matches MapWorld's photo markers: the thumbnail stands above the pin rather
    than replacing it, and only appears once the picture itself has decoded, so
    what fades in is never an empty rectangle. */
@@ -28,25 +49,16 @@
   border: solid var(--size-1) color-mix(in oklch, var(--c-white) 50%, transparent);
   isolation: isolate;
   opacity: 0;
-  transition: opacity var(--t-medium) var(--ease-out);
+  transition:
+    opacity var(--t-medium) var(--ease-out),
+    border-color var(--t-fast) var(--ease-out);
 }
 
 .thumb[data-loaded="true"] {
   opacity: 1;
 }
 
-/* The day's place in the journey, on the corner of its picture. */
-.number {
-  position: absolute;
-  inset-block-end: calc(100% + var(--m-m) + var(--size-56) - var(--size-20));
-  inset-inline-start: calc(50% - var(--size-28));
-  min-inline-size: var(--size-20);
-  padding: 0 var(--m);
-  border-radius: var(--radius-pill);
-  background: var(--c-accent);
-  color: var(--c-bg);
-  font-size: var(--fs-xs);
-  line-height: var(--size-20);
-  text-align: center;
-  font-variant-numeric: tabular-nums;
+/* The day being pointed at in the trip beside this map. */
+.pin[data-active="true"] .thumb {
+  border-color: var(--c-accent);
 }

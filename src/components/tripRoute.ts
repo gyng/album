@@ -100,6 +100,8 @@ export type RouteMarker = {
   src?: string;
   /** Positions in the route this marker stands for, ascending. */
   numbers: number[];
+  /** The days themselves, so hovering one in the list can raise its marker. */
+  dates: string[];
   label: string;
 };
 
@@ -135,6 +137,7 @@ export const clusterStops = (stops: RouteStop[]): RouteMarker[] => {
     );
     if (near) {
       near.numbers.push(stop.number);
+      near.dates.push(stop.date);
       // The picture stays the first day's: a marker should not change what it
       // shows depending on how many days happened to join it.
       if (!near.src && stop.src) near.src = stop.src;
@@ -146,6 +149,7 @@ export const clusterStops = (stops: RouteStop[]): RouteMarker[] => {
       lng: stop.lng,
       ...(stop.src ? { src: stop.src } : {}),
       numbers: [stop.number],
+      dates: [stop.date],
       label: stop.label,
     });
   }

@@ -117,6 +117,12 @@ test.describe("Smoke Tests", () => {
     const photo = page.locator('[id="DSCF0506-2.jpg"]');
     await expect(photo).toBeVisible();
     await expect(photo).toBeInViewport();
+
+    // ...and not jammed against the top edge: the photograph it anchors should
+    // have room above it rather than starting at pixel zero.
+    const image = photo.locator("xpath=ancestor::*[contains(@class,'block')][1]//img").first();
+    const top = await image.evaluate((element) => element.getBoundingClientRect().top);
+    expect(top).toBeGreaterThan(8);
   });
 
   test("slideshow page loads", async ({ page, browserName }) => {

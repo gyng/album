@@ -190,6 +190,10 @@
 }
 
 .mediaDetails {
+  /* This carries the block's id, so it is what a hash link scrolls to. Without
+     a scroll margin the browser puts it flush against the top edge and the
+     photograph it belongs to touches the very top of the window. */
+  scroll-margin-block-start: var(--m-l);
   grid-column: 1;
   grid-row: 1;
   position: sticky;
@@ -200,6 +204,12 @@
   max-block-size: 90svh;
   margin-block-start: calc(var(--m-xl) * -1);
   z-index: var(--z-details);
+}
+
+@media (min-width: 900px) {
+  .mediaDetails {
+    scroll-margin-block-start: var(--m-2xl);
+  }
 }
 
 .mediaDetails summary {

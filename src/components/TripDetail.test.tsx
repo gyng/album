@@ -2,7 +2,7 @@
  * @jest-environment jsdom
  */
 
-import { act, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import type { Trip } from "../util/computeTrips";
 import { TripDetail } from "./TripDetail";
 
@@ -235,5 +235,60 @@ describe("the route map", () => {
     act(() => observed.forEach((notify) => notify([{ isIntersecting: true }])));
 
     expect(screen.queryByTestId("route-map")).not.toBeInTheDocument();
+  });
+});
+
+describe("pointing at a day", () => {
+  const located = () =>
+    trip({
+      days: [
+        day({
+          date: "2016-11-13",
+          point: { lat: 35.0, lng: 135.7 },
+          photos: [
+            { src: "/one.avif", href: "/album/a#one", label: "one" },
+          ] as Trip["days"][number]["photos"],
+        }),
+        day({ date: "2016-11-14", point: { lat: 34.6, lng: 135.5 } }),
+      ],
+    });
+
+  let observed: Array<(entries: Array<{ isIntersecting: boolean }>) => void>;
+
+  beforeEach(() => {
+    routeMap.mockClear();
+    observed = [];
+    class FakeObserver {
+      constructor(handler: (entries: Array<{ isIntersecting: boolean }>) => void) {
+        observed.push(handler);
+      }
+      observe = jest.fn();
+      disconnect = jest.fn();
+    }
+    (globalThis as { IntersectionObserver?: unknown }).IntersectionObserver = FakeObserver;
+  });
+
+  afterEach(() => {
+    delete (globalThis as { IntersectionObserver?: unknown }).IntersectionObserver;
+  });
+
+  // Markers on a narrow map overlap, so the one you are asking about has to be
+  // able to come out from under its neighbours.
+  it("tells the map which day is being pointed at, and stops when the pointer leaves", () => {
+    render(<TripDetail trip={located()} />);
+    act(() => observed.forEach((notify) => notify([{ isIntersecting: true }])));
+
+    const tiles = screen.getByRole("img", { name: "one" }).closest("div");
+    act(() => {
+      fireEvent.mouseEnter(tiles as HTMLElement);
+    });
+    expect(routeMap).toHaveBeenLastCalledWith(
+      expect.objectContaining({ activeDate: "2016-11-13" }),
+    );
+
+    act(() => {
+      fireEvent.mouseLeave(tiles as HTMLElement);
+    });
+    expect(routeMap).toHaveBeenLastCalledWith(expect.objectContaining({ activeDate: null }));
   });
 });

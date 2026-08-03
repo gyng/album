@@ -3,7 +3,6 @@ import type { Trip } from "../util/computeTrips";
 import { DataLayer, type LineFeature, MapView, Marker } from "./map";
 import { clusterStops, fitToRoute, formatDayNumbers, routeStops } from "./tripRoute";
 import { MapLibreStyles } from "./MapLibreStyles";
-import pinStyles from "./mapPin.module.css";
 import { useMapStyleName } from "./MapStyleToggle";
 import { mapStyleUrl } from "../util/mapStyles";
 import styles from "./TripRouteMap.module.css";
@@ -44,9 +43,13 @@ const StopImage = ({ src }: { src: string }) => {
  * extent — inheriting it would show a journey as a handful of dots. One frame
  * per day is the point: it is what makes the line a story rather than a shape.
  */
-export type TripRouteMapProps = { trip: Trip };
+export type TripRouteMapProps = {
+  trip: Trip;
+  /** The day the reader is pointing at in the trip, if any. */
+  activeDate?: string | null;
+};
 
-export const TripRouteMap = ({ trip }: TripRouteMapProps) => {
+export const TripRouteMap = ({ trip, activeDate }: TripRouteMapProps) => {
   const styleName = useMapStyleName();
   const stops = React.useMemo(() => routeStops(trip), [trip]);
   // The line runs through every day; the pictures group, so that days spent in
@@ -89,16 +92,26 @@ export const TripRouteMap = ({ trip }: TripRouteMapProps) => {
         onLoad={(map) => fitToRoute(map, stops)}
       >
         <DataLayer id={`trip-route-${trip.id}`} lines={lines} order={1} />
-        {markers.map((marker) => (
-          <Marker key={marker.key} at={{ lng: marker.lng, lat: marker.lat }} anchor="bottom">
-            {/* The same shape every other map on this site uses: a pin on the
-                point, its picture standing above it. */}
-            <span className={pinStyles.pin} style={{ color: "var(--c-accent)" }}>
-              {marker.src ? <StopImage src={marker.src} /> : null}
-              <span className={styles.number}>{formatDayNumbers(marker.numbers)}</span>
-            </span>
-          </Marker>
-        ))}
+        {markers.map((marker) => {
+          const isActive = Boolean(activeDate && marker.dates.includes(activeDate));
+          return (
+            <Marker
+              key={marker.key}
+              at={{ lng: marker.lng, lat: marker.lat }}
+              anchor="bottom"
+              // Markers on a 320px map overlap; the one being pointed at comes
+              // out from under its neighbours rather than staying buried.
+              style={{ zIndex: isActive ? 2 : 1 }}
+            >
+              {/* The pin carries the day, so the picture above it is only the
+                  picture — a badge on the photograph competed with it. */}
+              <span className={styles.pin} data-active={isActive}>
+                {marker.src ? <StopImage src={marker.src} /> : null}
+                {formatDayNumbers(marker.numbers)}
+              </span>
+            </Marker>
+          );
+        })}
       </MapView>
     </div>
   );
