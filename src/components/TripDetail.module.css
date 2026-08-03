@@ -19,13 +19,19 @@
   grid-column: 1;
 }
 
-/* An outing is one row — a header and its frames. Given the full apparatus,
-   each of the fifty-eight repeated its own date, drew a rail with a single dot
-   and opened a map on one pin. */
+/* An outing is a header, its frames and its map — no rail and no day row,
+   since given the full apparatus each of the fifty-eight repeated its own date
+   and drew a rail with a single dot. It keeps the two-column shape so the map
+   still sits beside it. */
 .outing {
-  grid-template-columns: minmax(0, 1fr);
-  gap: var(--m-s);
+  gap: var(--m-s) var(--m-l);
   padding-block-end: var(--m-m);
+}
+
+/* The frames share the header's column; without this they auto-place into the
+   map's cell. */
+.outing .strip {
+  grid-column: 1;
 }
 
 .side {

@@ -88,53 +88,43 @@ const TripFacts = ({ trip }: { trip: Trip }) => {
   if (!hasGear && !hasTags) return null;
 
   return (
-    <details className={styles.facts}>
-      <summary className={styles.factsSummary}>
-        {[hasGear ? "Kit" : null, hasTags ? "subjects" : null].filter(Boolean).join(" and ")}
-      </summary>
-
-      <div className={styles.factsBody}>
-        {hasTags ? (
-          <div className={styles.panel}>
-            {/* A count would only report that a long trip is long. The multiplier
+    <div className={styles.factsBody}>
+      {hasTags ? (
+        <div className={styles.panel}>
+          {/* A count would only report that a long trip is long. The multiplier
                 is the fact: how much likelier this subject was here than in the
                 archive around it. */}
-            <p className={styles.panelTitle}>Unusual here</p>
-            <ul className={styles.tagList}>
-              {trip.distinctiveTags.map((entry) => (
-                <li key={entry.tag} className={styles.tag}>
-                  <span className={styles.tagName}>{entry.tag}</span>
-                  <span className={styles.tagTimes}>{entry.times}×</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        ) : null}
+          <p className={styles.panelTitle}>Unusual here</p>
+          <ul className={styles.tagList}>
+            {trip.distinctiveTags.map((entry) => (
+              <li key={entry.tag} className={styles.tag}>
+                <span className={styles.tagName}>{entry.tag}</span>
+                <span className={styles.tagTimes}>{entry.times}×</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
 
-        {hasGear ? (
-          <div className={styles.panel}>
-            <p className={styles.panelTitle}>Kit</p>
-            <div className={styles.gear}>
-              <GearList
-                title="Bodies"
-                items={trip.gear.cameras}
-                total={trip.gear.photosWithCamera}
-              />
-              <GearList
-                title="Lenses"
-                items={trip.gear.lenses}
-                total={trip.gear.photosWithLens}
-                {...(trip.gear.photosWithLens < trip.photoCount
-                  ? {
-                      note: `of the ${trip.gear.photosWithLens} of ${trip.photoCount} frames that recorded one`,
-                    }
-                  : {})}
-              />
-            </div>
+      {hasGear ? (
+        <div className={styles.panel}>
+          <p className={styles.panelTitle}>Kit</p>
+          <div className={styles.gear}>
+            <GearList title="Bodies" items={trip.gear.cameras} total={trip.gear.photosWithCamera} />
+            <GearList
+              title="Lenses"
+              items={trip.gear.lenses}
+              total={trip.gear.photosWithLens}
+              {...(trip.gear.photosWithLens < trip.photoCount
+                ? {
+                    note: `of the ${trip.gear.photosWithLens} of ${trip.photoCount} frames that recorded one`,
+                  }
+                : {})}
+            />
           </div>
-        ) : null}
-      </div>
-    </details>
+        </div>
+      ) : null}
+    </div>
   );
 };
 
@@ -166,19 +156,14 @@ const RouteColumn = ({ trip, activeDate }: { trip: Trip; activeDate: string | nu
 };
 
 /**
- * A map belongs to a journey, not to an afternoon.
- *
- * Only trips that can be drawn get one, so a trip whose photographs never
- * recorded where they were keeps the full width for its days — and a single-day
- * outing does without, since a lone pin costs a WebGL context to say what its
- * one line of places already said.
+ * Only trips that can be drawn get a map, so a trip whose photographs never
+ * recorded where they were keeps the full width for its frames. An outing gets
+ * one too — shorter, since a single day needs less of it.
  */
 const TripRoute = ({ trip, activeDate }: { trip: Trip; activeDate: string | null }) =>
-  !trip.isOuting && trip.days.some((day) => day.point) ? (
-    <RouteColumn trip={trip} activeDate={activeDate} />
-  ) : null;
+  trip.days.some((day) => day.point) ? <RouteColumn trip={trip} activeDate={activeDate} /> : null;
 
-/** The frames of a day, and a way through to the rest of them. */
+/** Every frame of a day. */
 const DayStrip = ({
   day,
   onPoint,
@@ -186,9 +171,6 @@ const DayStrip = ({
   day: TripDay;
   onPoint?: { enter: () => void; leave: () => void };
 }) => {
-  const hidden = day.count - day.photos.length;
-  const first = day.photos[0];
-
   return (
     <div
       className={styles.strip}
@@ -204,13 +186,6 @@ const DayStrip = ({
           />
         </Link>
       ))}
-      {hidden > 0 && first ? (
-        // The page ships three frames a day; the day itself had more, and the
-        // album is where the rest of them are.
-        <Link className={styles.more} href={first.href}>
-          {hidden.toLocaleString("en")} more
-        </Link>
-      ) : null}
     </div>
   );
 };
@@ -259,6 +234,8 @@ export const TripDetail = ({ trip, headingLevel = 2 }: { trip: Trip; headingLeve
         </div>
 
         <DayStrip day={only} />
+
+        <TripRoute trip={trip} activeDate={activeDate} />
       </section>
     );
   }

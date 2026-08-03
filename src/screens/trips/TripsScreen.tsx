@@ -105,35 +105,31 @@ const TripsScreen = ({ trips }: TripsScreenProps) => {
                 { value: "outings", label: "Outings" },
               ]}
             />
-            <label className={styles.control} htmlFor="trips-sort">
-              <span className={styles.controlLabel}>Sort</span>
-              <Select
-                id="trips-sort"
-                variant="compact"
-                value={order}
-                onChange={(event) => reset<Order>(setOrder)(event.target.value as Order)}
-              >
-                <option value="date">Most recent</option>
-                <option value="days">Longest</option>
-                <option value="distance">Furthest</option>
-              </Select>
-            </label>
-            <label className={styles.control} htmlFor="trips-year">
-              <span className={styles.controlLabel}>Year</span>
-              <Select
-                id="trips-year"
-                variant="compact"
-                value={year}
-                onChange={(event) => reset<string>(setYear)(event.target.value)}
-              >
-                <option value={ALL_YEARS}>Any</option>
-                {years.map((value) => (
-                  <option key={value} value={value}>
-                    {value}
-                  </option>
-                ))}
-              </Select>
-            </label>
+            {/* Compact selects that name their own dimension, as the explore
+                page's filters do — no separate label beside them. */}
+            <Select
+              variant="compact"
+              aria-label="Sort trips"
+              value={order}
+              onChange={(event) => reset<Order>(setOrder)(event.target.value as Order)}
+            >
+              <option value="date">Most recent</option>
+              <option value="days">Longest first</option>
+              <option value="distance">Furthest first</option>
+            </Select>
+            <Select
+              variant="compact"
+              aria-label="Year"
+              value={year}
+              onChange={(event) => reset<string>(setYear)(event.target.value)}
+            >
+              <option value={ALL_YEARS}>Any year</option>
+              {years.map((value) => (
+                <option key={value} value={value}>
+                  {value}
+                </option>
+              ))}
+            </Select>
           </div>
         </header>
 
