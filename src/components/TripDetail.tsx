@@ -1,6 +1,6 @@
 import React from "react";
 import { AppLink as Link, useClientComponents } from "./platform";
-import type { Trip } from "../util/computeTrips";
+import type { Trip, TripDay } from "../util/computeTrips";
 import { formatExifWallClockDate } from "../util/exifTime";
 import { Caption, Heading, Thumb } from "./ui";
 import { useNearViewport } from "./useNearViewport";
@@ -23,6 +23,20 @@ const roundKm = (km: number) => (km >= 10 ? Math.round(km) : Math.round(km * 10)
  * the kit is short enough to list — this is not a long tail that needs cutting.
  */
 const MAX_GEAR_ENTRIES = 5;
+
+/**
+ * How tall a trip's map is, in the column beside it.
+ *
+ * A fortnight and an afternoon are not the same amount of map: a fixed height
+ * left a hundred and thirty-eight pixels of empty column under the short ones
+ * while a fourteen-day route was cramped.
+ */
+const MAP_HEIGHT_BASE_PX = 220;
+const MAP_HEIGHT_PER_DAY_PX = 22;
+const MAP_HEIGHT_MAX_PX = 460;
+
+const mapHeightPx = (trip: Trip) =>
+  Math.min(MAP_HEIGHT_MAX_PX, MAP_HEIGHT_BASE_PX + trip.dayCount * MAP_HEIGHT_PER_DAY_PX);
 
 const share = (count: number, total: number) => Math.round((count / total) * 100);
 
@@ -62,98 +76,30 @@ const GearList = ({
   );
 
 /**
- * One journey, day by day.
+ * What the trip was shot with, and what it was unusually full of.
  *
- * Shared by the album's Trips view and the /trips page so the two cannot drift.
- * Everything shown is derived from the photographs themselves: the dot is the
- * day's average dominant colour, the sparkline the hours it was shot in, and
- * the two distances answer different questions — how far the day's centre of
- * gravity moved overnight, and how much ground was covered once there.
+ * Folded away by default. Open, these were two more rows in a header that
+ * already carried five at the same weight, and a reader looking for the
+ * journey had to read past its equipment list to reach it.
  */
-/**
- * A trip's route, alongside the trip.
- *
- * Mounted only while the trip is near the viewport, and unmounted again when it
- * leaves. That gate is what makes a map per trip affordable at all: the list
- * grows to every journey in the archive, and each live map holds a WebGL
- * context the browser will not hand out indefinitely.
- */
-/**
- * Far enough ahead that the map has fetched its script, style and first tiles
- * before the trip is on screen. A map that starts loading as it arrives lands
- * mid-scroll, which is exactly when the jank shows.
- */
-const ROUTE_PREFETCH_MARGIN = "1400px 0px";
-
-const RouteColumn = ({ trip, activeDate }: { trip: Trip; activeDate: string | null }) => {
-  const ref = React.useRef<HTMLDivElement>(null);
-  const near = useNearViewport(ref, ROUTE_PREFETCH_MARGIN);
-  const { TripRouteMap } = useClientComponents();
+const TripFacts = ({ trip }: { trip: Trip }) => {
+  const hasGear = trip.gear.photosWithCamera > 0;
+  const hasTags = trip.distinctiveTags.length > 0;
+  if (!hasGear && !hasTags) return null;
 
   return (
-    <div ref={ref} className={styles.side}>
-      {near ? <TripRouteMap trip={trip} activeDate={activeDate} /> : null}
-    </div>
-  );
-};
+    <details className={styles.facts}>
+      <summary className={styles.factsSummary}>
+        {[hasGear ? "Kit" : null, hasTags ? "subjects" : null].filter(Boolean).join(" and ")}
+      </summary>
 
-/**
- * Only trips that can be drawn get a map column, so a trip whose photographs
- * never recorded where they were keeps the full width for its days.
- */
-const TripRoute = ({ trip, activeDate }: { trip: Trip; activeDate: string | null }) =>
-  trip.days.some((day) => day.point) ? <RouteColumn trip={trip} activeDate={activeDate} /> : null;
-
-export const TripDetail = ({ trip, headingLevel = 2 }: { trip: Trip; headingLevel?: 2 | 3 }) => {
-  // Which day the reader is pointing at, so its marker can come to the front of
-  // a map where markers necessarily overlap.
-  const [activeDate, setActiveDate] = React.useState<string | null>(null);
-
-  return (
-    <section className={styles.trip}>
-      <div className={styles.head}>
-        {/* Heading beside its caption on one baseline, as every other section
-          header on this site is set. */}
-        <div className={styles.headRow}>
-          <Heading level={headingLevel} as={headingLevel === 2 ? "h2" : "h3"}>
-            {trip.isOuting
-              ? longDate(trip.startDate)
-              : `${longDate(trip.startDate)} – ${longDate(trip.endDate)}`}
-          </Heading>
-          <Caption as="span">
-            {trip.isOuting
-              ? `outing · ${trip.photoCount.toLocaleString("en")} photos`
-              : `${trip.dayCount} days · ${trip.photoCount.toLocaleString("en")} photos`}
-            {trip.totalKm && trip.totalKm >= 1 ? ` · ${roundKm(trip.totalKm)} km` : ""}
-            {trip.albums.length > 1 ? ` · from ${trip.albums.join(" and ")}` : ""}
-          </Caption>
-        </div>
-        {trip.places.length > 0 ? (
-          <p className={styles.places}>{trip.places.slice(0, 8).join(" → ")}</p>
-        ) : null}
-        {trip.firstVisits.length > 0 ? (
-          <p className={styles.firsts}>
-            First time in {trip.firstVisits.slice(0, 6).join(", ")}
-            {trip.firstVisits.length > 6 ? ` and ${trip.firstVisits.length - 6} more` : ""}
-          </p>
-        ) : null}
-        {trip.laterReturns.length > 0 ? (
-          <p className={styles.returns}>
-            Came back:{" "}
-            {trip.laterReturns
-              .slice(0, 4)
-              .map((entry) => `${entry.place} in ${entry.year}`)
-              .join(", ")}
-            {trip.laterReturns.length > 4 ? ` and ${trip.laterReturns.length - 4} more` : ""}
-          </p>
-        ) : null}
-
-        {trip.distinctiveTags.length > 0 ? (
+      <div className={styles.factsBody}>
+        {hasTags ? (
           <div className={styles.panel}>
             {/* A count would only report that a long trip is long. The multiplier
-              is the fact: how much likelier this subject was here than in the
-              archive around it. */}
-            <p className={styles.panelTitle}>Shot here more than you usually do</p>
+                is the fact: how much likelier this subject was here than in the
+                archive around it. */}
+            <p className={styles.panelTitle}>Unusual here</p>
             <ul className={styles.tagList}>
               {trip.distinctiveTags.map((entry) => (
                 <li key={entry.tag} className={styles.tag}>
@@ -165,9 +111,9 @@ export const TripDetail = ({ trip, headingLevel = 2 }: { trip: Trip; headingLeve
           </div>
         ) : null}
 
-        {trip.gear.photosWithCamera > 0 ? (
+        {hasGear ? (
           <div className={styles.panel}>
-            <p className={styles.panelTitle}>What you carried</p>
+            <p className={styles.panelTitle}>Kit</p>
             <div className={styles.gear}>
               <GearList
                 title="Bodies"
@@ -188,6 +134,176 @@ export const TripDetail = ({ trip, headingLevel = 2 }: { trip: Trip; headingLeve
           </div>
         ) : null}
       </div>
+    </details>
+  );
+};
+
+/**
+ * Far enough ahead that the map has fetched its script, style and first tiles
+ * before the trip is on screen. A map that starts loading as it arrives lands
+ * mid-scroll, which is exactly when the jank shows.
+ */
+const ROUTE_PREFETCH_MARGIN = "1400px 0px";
+
+/**
+ * A trip's route, alongside the trip.
+ *
+ * Mounted only while the trip is near the viewport, and unmounted again when it
+ * leaves. That gate is what makes a map per trip affordable at all: the list
+ * grows to every journey in the archive, and each live map holds a WebGL
+ * context the browser will not hand out indefinitely.
+ */
+const RouteColumn = ({ trip, activeDate }: { trip: Trip; activeDate: string | null }) => {
+  const ref = React.useRef<HTMLDivElement>(null);
+  const near = useNearViewport(ref, ROUTE_PREFETCH_MARGIN);
+  const { TripRouteMap } = useClientComponents();
+
+  return (
+    <div ref={ref} className={styles.side} style={{ blockSize: `${mapHeightPx(trip)}px` }}>
+      {near ? <TripRouteMap trip={trip} activeDate={activeDate} /> : null}
+    </div>
+  );
+};
+
+/**
+ * A map belongs to a journey, not to an afternoon.
+ *
+ * Only trips that can be drawn get one, so a trip whose photographs never
+ * recorded where they were keeps the full width for its days — and a single-day
+ * outing does without, since a lone pin costs a WebGL context to say what its
+ * one line of places already said.
+ */
+const TripRoute = ({ trip, activeDate }: { trip: Trip; activeDate: string | null }) =>
+  !trip.isOuting && trip.days.some((day) => day.point) ? (
+    <RouteColumn trip={trip} activeDate={activeDate} />
+  ) : null;
+
+/** The frames of a day, and a way through to the rest of them. */
+const DayStrip = ({
+  day,
+  onPoint,
+}: {
+  day: TripDay;
+  onPoint?: { enter: () => void; leave: () => void };
+}) => {
+  const hidden = day.count - day.photos.length;
+  const first = day.photos[0];
+
+  return (
+    <div
+      className={styles.strip}
+      {...(onPoint ? { onMouseEnter: onPoint.enter, onMouseLeave: onPoint.leave } : {})}
+    >
+      {day.photos.map((photo) => (
+        <Link key={photo.href + photo.src} className={styles.frame} href={photo.href}>
+          <Thumb
+            src={photo.src}
+            alt={photo.label}
+            loading="lazy"
+            {...(photo.swatch ? { style: { backgroundColor: photo.swatch } } : {})}
+          />
+        </Link>
+      ))}
+      {hidden > 0 && first ? (
+        // The page ships three frames a day; the day itself had more, and the
+        // album is where the rest of them are.
+        <Link className={styles.more} href={first.href}>
+          {hidden.toLocaleString("en")} more
+        </Link>
+      ) : null}
+    </div>
+  );
+};
+
+/**
+ * One journey, day by day.
+ *
+ * Shared by the album's Trips view and the /trips page so the two cannot drift.
+ * Everything shown is derived from the photographs themselves: the dot is the
+ * day's average dominant colour, the sparkline the hours it was shot in, and
+ * the two distances answer different questions — how far the day's centre of
+ * gravity moved overnight, and how much ground was covered once there.
+ *
+ * A single-day outing is rendered as one compact row instead. There are 58 of
+ * them against 36 journeys, and given the full apparatus each one repeated its
+ * own date twice, drew a rail with a single dot and opened a map on one pin.
+ */
+export const TripDetail = ({ trip, headingLevel = 2 }: { trip: Trip; headingLevel?: 2 | 3 }) => {
+  // Which day the reader is pointing at, so its marker can come to the front of
+  // a map where markers necessarily overlap.
+  const [activeDate, setActiveDate] = React.useState<string | null>(null);
+  const only = trip.days[0];
+
+  if (trip.isOuting && only) {
+    return (
+      <section className={[styles.trip, styles.outing].filter(Boolean).join(" ")}>
+        <div className={styles.head}>
+          <div className={styles.headRow}>
+            <Heading level={headingLevel} as={headingLevel === 2 ? "h2" : "h3"}>
+              {longDate(trip.startDate)}
+            </Heading>
+            <Caption as="span">
+              {trip.photoCount.toLocaleString("en")} photos
+              {only.from ? ` · ${only.from}–${only.to}` : ""}
+              {trip.totalKm && trip.totalKm >= 1 ? ` · ${roundKm(trip.totalKm)} km` : ""}
+              {trip.albums.length > 1 ? ` · from ${trip.albums.join(" and ")}` : ""}
+            </Caption>
+          </div>
+          {trip.places.length > 0 ? (
+            <p className={styles.places}>{trip.places.slice(0, 8).join(" → ")}</p>
+          ) : null}
+          {trip.firstVisits.length > 0 ? (
+            <p className={styles.firsts}>First time in {trip.firstVisits.slice(0, 6).join(", ")}</p>
+          ) : null}
+          <TripFacts trip={trip} />
+        </div>
+
+        <DayStrip day={only} />
+      </section>
+    );
+  }
+
+  return (
+    <section className={styles.trip}>
+      <div className={styles.head}>
+        {/* Heading beside its caption on one baseline, as every other section
+          header on this site is set. */}
+        <div className={styles.headRow}>
+          <Heading level={headingLevel} as={headingLevel === 2 ? "h2" : "h3"}>
+            {`${longDate(trip.startDate)} – ${longDate(trip.endDate)}`}
+          </Heading>
+          <Caption as="span">
+            {`${trip.dayCount} days · ${trip.photoCount.toLocaleString("en")} photos`}
+            {trip.totalKm && trip.totalKm >= 1 ? ` · ${roundKm(trip.totalKm)} km` : ""}
+            {trip.albums.length > 1 ? ` · from ${trip.albums.join(" and ")}` : ""}
+          </Caption>
+        </div>
+        {trip.places.length > 0 ? (
+          <p className={styles.places}>{trip.places.slice(0, 8).join(" → ")}</p>
+        ) : null}
+        {trip.firstVisits.length > 0 || trip.laterReturns.length > 0 ? (
+          <p className={styles.visits}>
+            {trip.firstVisits.length > 0 ? (
+              <span className={styles.firsts}>
+                First time in {trip.firstVisits.slice(0, 6).join(", ")}
+                {trip.firstVisits.length > 6 ? ` and ${trip.firstVisits.length - 6} more` : ""}
+              </span>
+            ) : null}
+            {trip.laterReturns.length > 0 ? (
+              <span className={styles.returns}>
+                Came back:{" "}
+                {trip.laterReturns
+                  .slice(0, 4)
+                  .map((entry) => `${entry.place} in ${entry.year}`)
+                  .join(", ")}
+                {trip.laterReturns.length > 4 ? ` and ${trip.laterReturns.length - 4} more` : ""}
+              </span>
+            ) : null}
+          </p>
+        ) : null}
+
+        <TripFacts trip={trip} />
+      </div>
 
       <div className={styles.days}>
         {trip.days.map((day, index) => (
@@ -200,7 +316,7 @@ export const TripDetail = ({ trip, headingLevel = 2 }: { trip: Trip; headingLeve
             </div>
 
             <div className={styles.meta}>
-              {trip.isOuting ? null : <p className={styles.dayno}>Day {index + 1}</p>}
+              <p className={styles.dayno}>Day {index + 1}</p>
               <p className={styles.date}>{longDate(day.date)}</p>
               {day.places.length > 0 ? (
                 <p className={styles.places}>{day.places.slice(0, 5).join(" → ")}</p>
@@ -236,22 +352,10 @@ export const TripDetail = ({ trip, headingLevel = 2 }: { trip: Trip; headingLeve
               ) : null}
             </div>
 
-            <div
-              className={styles.strip}
-              onMouseEnter={() => setActiveDate(day.date)}
-              onMouseLeave={() => setActiveDate(null)}
-            >
-              {day.photos.map((photo) => (
-                <Link key={photo.href + photo.src} href={photo.href}>
-                  <Thumb
-                    src={photo.src}
-                    alt={photo.label}
-                    loading="lazy"
-                    {...(photo.swatch ? { style: { backgroundColor: photo.swatch } } : {})}
-                  />
-                </Link>
-              ))}
-            </div>
+            <DayStrip
+              day={day}
+              onPoint={{ enter: () => setActiveDate(day.date), leave: () => setActiveDate(null) }}
+            />
           </div>
         ))}
       </div>

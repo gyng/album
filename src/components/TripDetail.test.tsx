@@ -90,11 +90,15 @@ describe("TripDetail", () => {
     expect(screen.queryByText(/3 km$/)).toBeNull();
   });
 
-  it("drops the day numbering for a single-day outing", () => {
-    render(<TripDetail trip={trip({ isOuting: true, dayCount: 1, days: [day()] })} />);
+  // An outing is told apart by its shape now rather than by a label: one
+  // compact row, no day numbering and no rail to hang it from.
+  it("drops the day numbering and the rail for a single-day outing", () => {
+    const { container } = render(
+      <TripDetail trip={trip({ isOuting: true, dayCount: 1, days: [day()] })} />,
+    );
 
     expect(screen.queryByText(/^Day 1$/)).toBeNull();
-    expect(screen.getByText(/outing/)).toBeInTheDocument();
+    expect(container.querySelector("[class*='rail']")).toBeNull();
   });
 });
 
@@ -290,5 +294,136 @@ describe("pointing at a day", () => {
       fireEvent.mouseLeave(tiles as HTMLElement);
     });
     expect(routeMap).toHaveBeenLastCalledWith(expect.objectContaining({ activeDate: null }));
+  });
+});
+
+describe("an outing is not a journey", () => {
+  const outing = (over: Partial<Trip> = {}) =>
+    trip({
+      isOuting: true,
+      dayCount: 1,
+      photoCount: 2,
+      startDate: "2026-08-01",
+      endDate: "2026-08-01",
+      days: [
+        day({
+          date: "2026-08-01",
+          count: 2,
+          point: { lat: 1.3, lng: 103.8 },
+          photos: [
+            { src: "/a.avif", href: "/album/x#a", label: "a" },
+          ] as Trip["days"][number]["photos"],
+        }),
+      ],
+      ...over,
+    });
+
+  // 58 of the 94 entries are single days. Given the full apparatus they repeat
+  // their own date, draw a rail with one dot and open a map on one pin.
+  it("states its date once, not twice", () => {
+    render(<TripDetail trip={outing()} />);
+
+    expect(screen.getAllByText(/1 August 2026/)).toHaveLength(1);
+  });
+
+  it("opens no map for a single afternoon", () => {
+    render(<TripDetail trip={outing()} />);
+
+    expect(screen.queryByTestId("route-map")).not.toBeInTheDocument();
+  });
+
+  it("still shows where it went and what it saw", () => {
+    render(<TripDetail trip={outing({ places: ["Dover", "Brickworks Estate"] })} />);
+
+    expect(screen.getByText(/Dover/)).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: "a" })).toBeInTheDocument();
+  });
+
+  it("keeps the day-by-day rail for a journey", () => {
+    render(<TripDetail trip={trip()} />);
+
+    expect(screen.getByText(/Day 1/)).toBeInTheDocument();
+  });
+});
+
+describe("the derived facts", () => {
+  const rich = () =>
+    trip({
+      gear: {
+        cameras: [{ name: "X100T", count: 153 }],
+        lenses: [],
+        photosWithCamera: 153,
+        photosWithLens: 0,
+      },
+      distinctiveTags: [{ tag: "moss", count: 12, times: 6.3 }],
+    });
+
+  // Five stacked rows of near-identical weight is a wall, not a hierarchy. The
+  // trip's own facts lead; what it was shot with is one fold away.
+  it("keeps gear and unusual subjects behind a disclosure", () => {
+    render(<TripDetail trip={rich()} />);
+
+    expect(screen.queryByText("X100T")).not.toBeVisible();
+    expect(screen.getByRole("group")).toBeInTheDocument();
+  });
+
+  it("opens them on request", () => {
+    render(<TripDetail trip={rich()} />);
+
+    act(() => {
+      // The summary is the disclosure's own control, whatever it is labelled.
+      screen.getByRole("group").querySelector("summary")?.click();
+    });
+
+    expect(screen.getByText("X100T")).toBeVisible();
+  });
+
+  it("offers no disclosure when there is nothing behind it", () => {
+    render(<TripDetail trip={trip()} />);
+
+    expect(screen.queryByRole("group")).not.toBeInTheDocument();
+  });
+});
+
+describe("a day with more frames than it shows", () => {
+  it("says how many more, and links into the album", () => {
+    render(
+      <TripDetail
+        trip={trip({
+          days: [
+            day({
+              count: 41,
+              photos: [
+                { src: "/a.avif", href: "/album/kansai#a", label: "a" },
+                { src: "/b.avif", href: "/album/kansai#b", label: "b" },
+                { src: "/c.avif", href: "/album/kansai#c", label: "c" },
+              ] as Trip["days"][number]["photos"],
+            }),
+          ],
+        })}
+      />,
+    );
+
+    const more = screen.getByRole("link", { name: /38 more/ });
+    expect(more).toHaveAttribute("href", "/album/kansai#a");
+  });
+
+  it("says nothing when the day is shown whole", () => {
+    render(
+      <TripDetail
+        trip={trip({
+          days: [
+            day({
+              count: 1,
+              photos: [
+                { src: "/a.avif", href: "/album/kansai#a", label: "a" },
+              ] as Trip["days"][number]["photos"],
+            }),
+          ],
+        })}
+      />,
+    );
+
+    expect(screen.queryByText(/more/)).not.toBeInTheDocument();
   });
 });
