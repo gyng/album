@@ -1,9 +1,59 @@
+/* The journey and its map, side by side where there is room for both. Below
+   that width the map follows the trip's header instead, which keeps it above
+   the day-by-day list rather than stranded at the end of it. */
 .trip {
   display: grid;
-  gap: var(--m-m);
+  grid-template-columns: minmax(0, 1fr) var(--trip-map-width);
+  gap: var(--m-m) var(--m-l);
+  align-items: start;
   padding-block-end: var(--m-l);
   border-block-end: var(--size-1) solid
     color-mix(in oklch, var(--c-bg-contrast-light) 25%, transparent);
+}
+
+/* The header and the days share the left column; the map holds the right one
+   for the trip's whole height, and follows it down rather than scrolling away
+   at the first day. */
+.head,
+.days {
+  grid-column: 1;
+}
+
+.side {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  position: sticky;
+  inset-block-start: var(--m-l);
+  min-inline-size: 0;
+}
+
+@media (max-width: 900px) {
+  .trip {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  /* One column, and the map sits between the trip's name and its days — a map
+     above the heading would be a route to somewhere the reader cannot yet
+     name. */
+  .head,
+  .days,
+  .side {
+    grid-column: 1;
+    grid-row: auto;
+  }
+
+  .head {
+    order: 0;
+  }
+
+  .side {
+    order: 1;
+    position: static;
+  }
+
+  .days {
+    order: 2;
+  }
 }
 
 .head {
@@ -272,14 +322,4 @@
   margin: 0;
   font-size: var(--fs-xs);
   color: var(--c-bg-contrast-light);
-}
-
-/* The map is opened, not laid out: a trip list would otherwise build one WebGL
-   context per journey. */
-.route {
-  display: grid;
-  gap: var(--m-s);
-  justify-items: start;
-  margin-block-start: var(--m-s);
-  inline-size: 100%;
 }

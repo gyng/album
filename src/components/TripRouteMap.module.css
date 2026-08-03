@@ -10,29 +10,34 @@
   color: var(--c-bg-contrast-light);
 }
 
-/* The pin is the thumbnail: a numbered frame standing on the point it was
-   taken at, rather than a dot with a picture somewhere near it. */
-.stop {
-  position: relative;
-  display: block;
-  inline-size: var(--size-48);
-  block-size: var(--size-48);
-  border: var(--size-2) solid var(--c-bg);
-  background: var(--c-bg-contrast-dark);
-  box-shadow: 0 var(--size-1) var(--size-4) var(--c-overlay-dark);
-}
-
+/* Matches MapWorld's photo markers: the thumbnail stands above the pin rather
+   than replacing it, and only appears once the picture itself has decoded, so
+   what fades in is never an empty rectangle. */
 .thumb {
-  inline-size: 100%;
-  block-size: 100%;
+  position: absolute;
+  inset-inline-start: 50%;
+  inset-block-end: calc(100% + var(--m-m));
+  transform: translateX(-50%);
+  inline-size: var(--size-80);
+  block-size: var(--size-80);
   object-fit: cover;
-  display: block;
+  object-position: bottom;
+  border-radius: var(--m-s);
+  border: solid var(--size-1) color-mix(in oklch, var(--c-white) 50%, transparent);
+  isolation: isolate;
+  opacity: 0;
+  transition: opacity var(--t-medium) var(--ease-out);
 }
 
+.thumb[data-loaded="true"] {
+  opacity: 1;
+}
+
+/* The day's place in the journey, on the corner of its picture. */
 .number {
   position: absolute;
-  inset-block-start: calc(var(--size-8) * -1);
-  inset-inline-start: calc(var(--size-8) * -1);
+  inset-block-end: calc(100% + var(--m-m) + var(--size-80) - var(--size-20));
+  inset-inline-start: calc(50% - var(--size-40));
   min-inline-size: var(--size-20);
   padding: 0 var(--m);
   border-radius: var(--radius-pill);

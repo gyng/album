@@ -2,7 +2,7 @@
  * @jest-environment jsdom
  */
 
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, render, screen } from "@testing-library/react";
 import type { Trip } from "../util/computeTrips";
 import { TripDetail } from "./TripDetail";
 
@@ -182,31 +182,58 @@ describe("the route map", () => {
       ],
     });
 
-  beforeEach(() => routeMap.mockClear());
+  let observed: Array<(entries: Array<{ isIntersecting: boolean }>) => void>;
 
-  // /trips lists every journey in the archive. Mounting a map per trip would
-  // build ~90 WebGL contexts on one page, so nothing loads until asked.
-  it("does not mount a map until the reader asks for one", () => {
+  beforeEach(() => {
+    routeMap.mockClear();
+    observed = [];
+    class FakeObserver {
+      constructor(handler: (entries: Array<{ isIntersecting: boolean }>) => void) {
+        observed.push(handler);
+      }
+      observe = jest.fn();
+      disconnect = jest.fn();
+    }
+    (globalThis as { IntersectionObserver?: unknown }).IntersectionObserver = FakeObserver;
+  });
+
+  afterEach(() => {
+    delete (globalThis as { IntersectionObserver?: unknown }).IntersectionObserver;
+  });
+
+  // The trip list runs to every journey in the archive, and each live map holds
+  // a WebGL context — so a trip the reader has not reached builds nothing.
+  it("builds no map for a trip that is nowhere near the viewport", () => {
     render(<TripDetail trip={located()} />);
 
     expect(screen.queryByTestId("route-map")).not.toBeInTheDocument();
     expect(routeMap).not.toHaveBeenCalled();
   });
 
-  it("mounts the map when the reader asks, and hands it the trip", async () => {
+  it("shows the route beside the trip once it comes into view", () => {
     render(<TripDetail trip={located()} />);
 
-    fireEvent.click(screen.getByRole("button", { name: /route/i }));
+    act(() => observed.forEach((notify) => notify([{ isIntersecting: true }])));
 
-    expect(await screen.findByTestId("route-map")).toBeInTheDocument();
+    expect(screen.getByTestId("route-map")).toBeInTheDocument();
     expect(routeMap).toHaveBeenCalledWith(expect.objectContaining({ trip: expect.any(Object) }));
   });
 
-  // A trip with no coordinates anywhere has no route; offering one would open
-  // an empty map.
-  it("offers nothing when no day on the trip knows where it was", () => {
+  it("lets the map go again when the trip is scrolled well past", () => {
+    render(<TripDetail trip={located()} />);
+    act(() => observed.forEach((notify) => notify([{ isIntersecting: true }])));
+    act(() => observed.forEach((notify) => notify([{ isIntersecting: false }])));
+
+    expect(screen.queryByTestId("route-map")).not.toBeInTheDocument();
+  });
+
+  // A trip with no coordinates anywhere has no route, and an empty map beside
+  // it would take a third of the row to say so.
+  it("gives the whole width to a trip that never recorded where it was", () => {
     render(<TripDetail trip={trip()} />);
 
-    expect(screen.queryByRole("button", { name: /route/i })).not.toBeInTheDocument();
+    act(() => observed.forEach((notify) => notify([{ isIntersecting: true }])));
+
+    expect(screen.queryByTestId("route-map")).not.toBeInTheDocument();
   });
 });

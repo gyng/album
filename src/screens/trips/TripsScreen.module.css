@@ -16,9 +16,15 @@
 /* The content keeps its own narrower measure: a trip is a rail, a meta column
    and three frames, and stretching that across 1400px would leave most of the
    row empty. */
-.header,
-.trips {
+.header {
   max-inline-size: var(--content-width-section);
+}
+
+/* The trip's own measure plus the route map beside it, so adding the map takes
+   nothing away from the day-by-day column. */
+.trips {
+  inline-size: 100%;
+  max-inline-size: calc(var(--content-width-section) + var(--trip-map-width) + var(--m-l));
 }
 
 .header {

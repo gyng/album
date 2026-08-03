@@ -2,7 +2,8 @@ import React from "react";
 import { AppLink as Link, useClientComponents } from "./platform";
 import type { Trip } from "../util/computeTrips";
 import { formatExifWallClockDate } from "../util/exifTime";
-import { Caption, Heading, PillButton, Thumb } from "./ui";
+import { Caption, Heading, Thumb } from "./ui";
+import { useNearViewport } from "./useNearViewport";
 import styles from "./TripDetail.module.css";
 
 /** The shooting-window sparkline spans a waking day; earlier hours are rare. */
@@ -15,9 +16,13 @@ const longDate = (iso: string) => formatExifWallClockDate(`${iso}T00:00:00`) ?? 
 
 const roundKm = (km: number) => (km >= 10 ? Math.round(km) : Math.round(km * 10) / 10);
 
-/** Enough of a trip to be worth naming; below it, a stray frame. */
-const MIN_GEAR_SHARE = 0.02;
-const MAX_GEAR_ENTRIES = 4;
+/**
+ * Every body and lens a trip used, to a limit.
+ *
+ * No minimum share: one frame on a borrowed lens is a fact about the trip, and
+ * the kit is short enough to list — this is not a long tail that needs cutting.
+ */
+const MAX_GEAR_ENTRIES = 5;
 
 const share = (count: number, total: number) => Math.round((count / total) * 100);
 
@@ -45,15 +50,12 @@ const GearList = ({
     <div className={styles.gearGroup}>
       <p className={styles.gearTitle}>{title}</p>
       <ul className={styles.gearList}>
-        {items
-          .filter((item) => item.count / total >= MIN_GEAR_SHARE)
-          .slice(0, MAX_GEAR_ENTRIES)
-          .map((item) => (
-            <li key={item.name} className={styles.gearItem}>
-              <span className={styles.gearName}>{item.name}</span>
-              <span className={styles.gearShare}>{share(item.count, total)}%</span>
-            </li>
-          ))}
+        {items.slice(0, MAX_GEAR_ENTRIES).map((item) => (
+          <li key={item.name} className={styles.gearItem}>
+            <span className={styles.gearName}>{item.name}</span>
+            <span className={styles.gearShare}>{share(item.count, total)}%</span>
+          </li>
+        ))}
       </ul>
       {note ? <p className={styles.gearNote}>{note}</p> : null}
     </div>
@@ -69,41 +71,31 @@ const GearList = ({
  * gravity moved overnight, and how much ground was covered once there.
  */
 /**
- * A trip's route, loaded only when asked for.
+ * A trip's route, alongside the trip.
  *
- * /trips lists every journey in the archive, and a map per trip would build
- * scores of WebGL contexts on one page — so the map is a disclosure, not part
- * of the layout. Nothing about MapLibre is even fetched until a reader opens
- * one.
+ * Mounted only while the trip is near the viewport, and unmounted again when it
+ * leaves. That gate is what makes a map per trip affordable at all: the list
+ * grows to every journey in the archive, and each live map holds a WebGL
+ * context the browser will not hand out indefinitely.
  */
-const OpenedRoute = ({ trip }: { trip: Trip }) => {
+const RouteColumn = ({ trip }: { trip: Trip }) => {
+  const ref = React.useRef<HTMLDivElement>(null);
+  const near = useNearViewport(ref);
   const { TripRouteMap } = useClientComponents();
-  return <TripRouteMap trip={trip} />;
-};
-
-const RouteDisclosure = ({ trip }: { trip: Trip }) => {
-  const [open, setOpen] = React.useState(false);
-
-  if (!trip.days.some((day) => day.point)) {
-    return null;
-  }
 
   return (
-    <div className={styles.route}>
-      <PillButton
-        variant="ghost"
-        onClick={() => setOpen((wasOpen) => !wasOpen)}
-        aria-expanded={open}
-      >
-        {open ? "Hide route" : "Show route"}
-      </PillButton>
-      {/* The deferred-component registry is only consulted once a reader opens
-          a route, so a renderer that installs no provider — an album page in a
-          bare test, say — still renders the trip. */}
-      {open ? <OpenedRoute trip={trip} /> : null}
+    <div ref={ref} className={styles.side}>
+      {near ? <TripRouteMap trip={trip} /> : null}
     </div>
   );
 };
+
+/**
+ * Only trips that can be drawn get a map column, so a trip whose photographs
+ * never recorded where they were keeps the full width for its days.
+ */
+const TripRoute = ({ trip }: { trip: Trip }) =>
+  trip.days.some((day) => day.point) ? <RouteColumn trip={trip} /> : null;
 
 export const TripDetail = ({ trip, headingLevel = 2 }: { trip: Trip; headingLevel?: 2 | 3 }) => (
   <section className={styles.trip}>
@@ -179,7 +171,6 @@ export const TripDetail = ({ trip, headingLevel = 2 }: { trip: Trip; headingLeve
           </div>
         </div>
       ) : null}
-      <RouteDisclosure trip={trip} />
     </div>
 
     <div className={styles.days}>
@@ -242,5 +233,7 @@ export const TripDetail = ({ trip, headingLevel = 2 }: { trip: Trip; headingLeve
         </div>
       ))}
     </div>
+
+    <TripRoute trip={trip} />
   </section>
 );
