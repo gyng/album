@@ -1,11 +1,10 @@
 import fs from "node:fs";
 import path from "node:path";
+import { DatabaseSync } from "node:sqlite";
 import type { Content, PhotoBlock } from "../services/types";
 import { measureBuild } from "../services/buildTiming";
 import { rgbToString } from "./colorDistance";
 import { parseExifLocalDateTime } from "./exifTime";
-
-const sqlite3 = require("sqlite3");
 
 // The shipped search-embeddings DB holds two embedding spaces (SigLIP v1 and
 // v2), one row per photo per model. These stats must run against a single space
@@ -96,7 +95,7 @@ export type VisualSamenessPhoto = {
 type EmbeddingRow = {
   path: string;
   embedding_json?: string | null;
-  embedding_blob?: Buffer;
+  embedding_blob?: Uint8Array;
   embedding_scale?: number;
 };
 
@@ -325,38 +324,23 @@ const buildPhotoDateLookup = (albums: Content[]): PhotoDateLookup => {
   return lookup;
 };
 
-const openReadonlyDatabase = (dbPath: string) =>
-  new Promise<any>((resolve, reject) => {
-    const db = new sqlite3.Database(dbPath, sqlite3.OPEN_READONLY, (err: Error | null) => {
-      if (err) {
-        reject(err);
-        return;
-      }
-      resolve(db);
-    });
-  });
+// Node's built-in SQLite is synchronous; these keep their promise shape so the
+// call sites read unchanged.
+const openReadonlyDatabase = async (dbPath: string): Promise<DatabaseSync> =>
+  new DatabaseSync(dbPath, { readOnly: true });
 
-const closeDatabase = (db: any) =>
-  new Promise<void>((resolve) => {
-    db.close(() => resolve());
-  });
+const closeDatabase = async (db: DatabaseSync): Promise<void> => {
+  db.close();
+};
 
-const getRows = <Row>(db: any, sql: string, bind: unknown[]) =>
-  new Promise<Row[]>((resolve, reject) => {
-    db.all(sql, bind, (err: Error | null, rows: Row[]) => {
-      if (err) {
-        reject(err);
-        return;
-      }
-      resolve(rows);
-    });
-  });
+const getRows = async <Row>(db: DatabaseSync, sql: string, bind: unknown[]): Promise<Row[]> =>
+  db.prepare(sql).all(...(bind as any[])) as Row[];
 
 // The embeddings table exists in two on-disk formats: int8 blobs with a
 // per-vector scale (current) and JSON text (DBs written before the format
 // change). Both must stay readable — the stats can run against an older
 // canonical DB that has not been re-indexed yet.
-const embeddingsTableHasBlobColumn = async (db: any): Promise<boolean> => {
+const embeddingsTableHasBlobColumn = async (db: DatabaseSync): Promise<boolean> => {
   const columns = await getRows<{ name: string }>(db, "PRAGMA table_info(embeddings)", []);
   return columns.some((column) => column.name === "embedding_blob");
 };
@@ -364,11 +348,14 @@ const embeddingsTableHasBlobColumn = async (db: any): Promise<boolean> => {
 const decodeEmbeddingRow = (row: EmbeddingRow): number[] | null => {
   if (row.embedding_blob !== undefined) {
     const scale = row.embedding_scale ?? 1;
-    const vector = Array.from({ length: row.embedding_blob.length }, () => 0);
-    for (let index = 0; index < row.embedding_blob.length; index += 1) {
-      vector[index] = row.embedding_blob.readInt8(index) * scale;
-    }
-    return vector;
+    // The blob is int8; the driver hands back an unsigned view of those bytes,
+    // so reinterpret rather than reading each byte through a Buffer method.
+    const signed = new Int8Array(
+      row.embedding_blob.buffer,
+      row.embedding_blob.byteOffset,
+      row.embedding_blob.length,
+    );
+    return Array.from(signed, (value) => value * scale);
   }
   try {
     const parsed = JSON.parse(row.embedding_json ?? "");

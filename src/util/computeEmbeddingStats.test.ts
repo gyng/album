@@ -1,14 +1,13 @@
 import fs from "node:fs";
 import os from "node:os";
 import nodePath from "node:path";
+import { DatabaseSync } from "node:sqlite";
 import {
   computeVisualSamenessFromVectors,
   computeVisualSamenessStats,
   deriveEraLabel,
   selectEmbeddingModelId,
 } from "./computeEmbeddingStats";
-
-const sqlite3 = require("sqlite3");
 
 const V1_MODEL_ID = "google/siglip-base-patch16-224";
 const V2_MODEL_ID = "google/siglip2-base-patch16-224";
@@ -51,128 +50,74 @@ const makeAlbum = (
     })),
   }) as any;
 
-const createEmbeddingsDb = (
+const newDbPath = (prefix: string): string =>
+  nodePath.join(fs.mkdtempSync(nodePath.join(os.tmpdir(), prefix)), "search-embeddings.sqlite");
+
+const createEmbeddingsDb = async (
   rows: Array<{ path: string; model_id: string; json: string | null }>,
 ): Promise<string> => {
-  const dir = fs.mkdtempSync(nodePath.join(os.tmpdir(), "embstats-"));
-  const dbPath = nodePath.join(dir, "search-embeddings.sqlite");
-  return new Promise((resolve, reject) => {
-    const db = new sqlite3.Database(dbPath, (err: Error | null) => {
-      if (err) {
-        reject(err);
-        return;
-      }
-      db.serialize(() => {
-        db.run(
-          "CREATE TABLE embeddings (path TEXT, model_id TEXT, embedding_dim INTEGER, embedding_json TEXT)",
-        );
-        const stmt = db.prepare(
-          "INSERT INTO embeddings (path, model_id, embedding_dim, embedding_json) VALUES (?, ?, ?, ?)",
-        );
-        rows.forEach((row) => {
-          let parsed: unknown;
-          try {
-            parsed = typeof row.json === "string" ? JSON.parse(row.json) : null;
-          } catch {
-            parsed = null;
-          }
-          const dim = Array.isArray(parsed) ? parsed.length : 0;
-          stmt.run(row.path, row.model_id, dim, row.json);
-        });
-        stmt.finalize((finalizeErr: Error | null) => {
-          if (finalizeErr) {
-            reject(finalizeErr);
-            return;
-          }
-          db.close((closeErr: Error | null) => {
-            if (closeErr) {
-              reject(closeErr);
-              return;
-            }
-            resolve(dbPath);
-          });
-        });
-      });
-    });
+  const dbPath = newDbPath("embstats-");
+  const db = new DatabaseSync(dbPath);
+  db.exec(
+    "CREATE TABLE embeddings (path TEXT, model_id TEXT, embedding_dim INTEGER, embedding_json TEXT)",
+  );
+  const insert = db.prepare(
+    "INSERT INTO embeddings (path, model_id, embedding_dim, embedding_json) VALUES (?, ?, ?, ?)",
+  );
+  rows.forEach((row) => {
+    let parsed: unknown;
+    try {
+      parsed = typeof row.json === "string" ? JSON.parse(row.json) : null;
+    } catch {
+      parsed = null;
+    }
+    const dim = Array.isArray(parsed) ? parsed.length : 0;
+    insert.run(row.path, row.model_id, dim, row.json);
   });
+  db.close();
+  return dbPath;
 };
 
-const quantiseToInt8 = (vector: number[]): { blob: Buffer; scale: number } => {
+const quantiseToInt8 = (vector: number[]): { blob: Uint8Array; scale: number } => {
   const scale = Math.max(...vector.map(Math.abs)) / 127 || 1;
   const bytes = Int8Array.from(
     vector.map((value) => Math.max(-127, Math.min(127, Math.round(value / scale)))),
   );
-  return { blob: Buffer.from(bytes.buffer), scale };
+  return { blob: new Uint8Array(bytes.buffer), scale };
 };
 
-const createBlobEmbeddingsDb = (
+const createBlobEmbeddingsDb = async (
   rows: Array<{ path: string; model_id: string; json: string; scale?: number | null }>,
 ): Promise<string> => {
-  const dir = fs.mkdtempSync(nodePath.join(os.tmpdir(), "embstats-blob-"));
-  const dbPath = nodePath.join(dir, "search-embeddings.sqlite");
-  return new Promise((resolve, reject) => {
-    const db = new sqlite3.Database(dbPath, (err: Error | null) => {
-      if (err) {
-        reject(err);
-        return;
-      }
-      db.serialize(() => {
-        db.run(
-          "CREATE TABLE embeddings (path TEXT, model_id TEXT, embedding_dim INTEGER, embedding_blob BLOB, embedding_scale REAL)",
-        );
-        const stmt = db.prepare(
-          "INSERT INTO embeddings (path, model_id, embedding_dim, embedding_blob, embedding_scale) VALUES (?, ?, ?, ?, ?)",
-        );
-        rows.forEach((row) => {
-          const vector = JSON.parse(row.json) as number[];
-          const { blob, scale } = quantiseToInt8(vector);
-          stmt.run(
-            row.path,
-            row.model_id,
-            vector.length,
-            blob,
-            row.scale === undefined ? scale : row.scale,
-          );
-        });
-        stmt.finalize((finalizeErr: Error | null) => {
-          if (finalizeErr) {
-            reject(finalizeErr);
-            return;
-          }
-          db.close((closeErr: Error | null) => {
-            if (closeErr) {
-              reject(closeErr);
-              return;
-            }
-            resolve(dbPath);
-          });
-        });
-      });
-    });
+  const dbPath = newDbPath("embstats-blob-");
+  const db = new DatabaseSync(dbPath);
+  db.exec(
+    "CREATE TABLE embeddings (path TEXT, model_id TEXT, embedding_dim INTEGER, embedding_blob BLOB, embedding_scale REAL)",
+  );
+  const insert = db.prepare(
+    "INSERT INTO embeddings (path, model_id, embedding_dim, embedding_blob, embedding_scale) VALUES (?, ?, ?, ?, ?)",
+  );
+  rows.forEach((row) => {
+    const vector = JSON.parse(row.json) as number[];
+    const { blob, scale } = quantiseToInt8(vector);
+    insert.run(
+      row.path,
+      row.model_id,
+      vector.length,
+      blob,
+      row.scale === undefined ? scale : row.scale,
+    );
   });
+  db.close();
+  return dbPath;
 };
 
-const createDatabaseWithStatements = (statements: string[]): Promise<string> => {
-  const dir = fs.mkdtempSync(nodePath.join(os.tmpdir(), "embstats-schema-"));
-  const dbPath = nodePath.join(dir, "search-embeddings.sqlite");
-  return new Promise((resolve, reject) => {
-    const db = new sqlite3.Database(dbPath, (err: Error | null) => {
-      if (err) {
-        reject(err);
-        return;
-      }
-      db.serialize(() => {
-        statements.forEach((statement) => db.run(statement));
-        db.close((closeErr: Error | null) => {
-          if (closeErr) {
-            reject(closeErr);
-            return;
-          }
-          resolve(dbPath);
-        });
-      });
-    });
-  });
+const createDatabaseWithStatements = async (statements: string[]): Promise<string> => {
+  const dbPath = newDbPath("embstats-schema-");
+  const db = new DatabaseSync(dbPath);
+  statements.forEach((statement) => db.exec(statement));
+  db.close();
+  return dbPath;
 };
 
 describe("selectEmbeddingModelId", () => {

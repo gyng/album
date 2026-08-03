@@ -22,12 +22,9 @@ jest.mock("./buildTiming", () => ({
 jest.mock("../util/colorDistance", () => ({
   parseColorPalette: jest.fn(() => [[1, 2, 3]]),
 }));
-jest.mock("sqlite3", () => {
-  const Database = jest.fn();
-  return {
-    __Database: Database,
-    verbose: () => ({ Database }),
-  };
+jest.mock("node:sqlite", () => {
+  const DatabaseSync = jest.fn();
+  return { __DatabaseSync: DatabaseSync, DatabaseSync };
 });
 
 import { getNextJsSafeExif, getPhotoSize, optimiseImages } from "./photo";
@@ -47,9 +44,20 @@ const mockGetPhotoSize = jest.mocked(getPhotoSize);
 const mockOptimiseImages = jest.mocked(optimiseImages);
 const mockGetVideoData = jest.mocked(getOriginalVideoTechnicalData);
 const mockOptimiseVideo = jest.mocked(optimiseVideo);
-const { __Database: MockDatabase } = jest.requireMock("sqlite3") as {
-  __Database: jest.Mock;
+const { __DatabaseSync: MockDatabase } = jest.requireMock("node:sqlite") as {
+  __DatabaseSync: jest.Mock;
 };
+
+/**
+ * The driver is synchronous: a lookup is `prepare(sql).get(...params)`, and a
+ * failure throws rather than arriving in a callback. `rows` stands in for the
+ * statement, receiving the SQL so a test can answer differently per query.
+ */
+const stubDb = (rows: jest.Mock) => ({
+  prepare: jest.fn((sql: string) => ({ get: (...params: unknown[]) => rows(sql, params) })),
+  close: jest.fn(),
+  rows,
+});
 
 const photo = (src = "photo.jpg"): SerializedPhotoBlock => ({
   kind: "photo",
@@ -64,13 +72,10 @@ const localVideo = (href = "clip.mp4"): SerializedVideoBlock => ({
 });
 
 describe("deserialisation adapter boundaries", () => {
-  let db: { get: jest.Mock; close: jest.Mock };
+  let db: ReturnType<typeof stubDb>;
 
   beforeEach(() => {
-    db = {
-      get: jest.fn((_sql, _params, callback) => callback(null, { colors: "palette" })),
-      close: jest.fn((callback) => callback()),
-    };
+    db = stubDb(jest.fn(() => ({ colors: "palette" })));
     MockDatabase.mockReset().mockImplementation(() => db);
     mockGetPhotoSize.mockReset().mockResolvedValue({ width: 1200, height: 800 });
     mockGetExif.mockReset().mockResolvedValue({ Model: "X-T5" });
@@ -198,14 +203,12 @@ describe("deserialisation adapter boundaries", () => {
     expect(first._build.tags).toEqual({ colors: [[1, 2, 3]] });
     expect(cached._build.tags).toEqual(first._build.tags);
     expect(MockDatabase).toHaveBeenCalledTimes(1);
-    expect(db.get).toHaveBeenCalledTimes(2);
+    expect(db.rows).toHaveBeenCalledTimes(2);
   });
 
   it("keeps rows without colour metadata unchanged", async () => {
     jest.spyOn(fs, "existsSync").mockReturnValue(true);
-    db.get.mockImplementationOnce((_sql, _params, callback) =>
-      callback(null, { geocode: "Tokyo" }),
-    );
+    db.rows.mockImplementationOnce(() => ({ geocode: "Tokyo" }));
 
     const result = await deserializePhotoBlock(photo(), { dirname: "albums/trip" });
 
@@ -215,7 +218,9 @@ describe("deserialisation adapter boundaries", () => {
   it("drops failed index lookups from the cache and continues with empty tags", async () => {
     jest.spyOn(fs, "existsSync").mockReturnValue(true);
     const databaseFailure = new Error("database read failed");
-    db.get.mockImplementation((_sql, _params, callback) => callback(databaseFailure));
+    db.rows.mockImplementation(() => {
+      throw databaseFailure;
+    });
     const info = jest.spyOn(console, "info").mockImplementation(() => undefined);
 
     const first = await deserializePhotoBlock(photo(), { dirname: "albums/trip" });
@@ -224,7 +229,7 @@ describe("deserialisation adapter boundaries", () => {
 
     expect(first._build.tags).toEqual({});
     expect(second._build.tags).toEqual({});
-    expect(db.get).toHaveBeenCalledTimes(2);
+    expect(db.rows).toHaveBeenCalledTimes(2);
     expect(info).toHaveBeenCalledWith(
       "Failed to get details from index, skipping",
       databaseFailure,
@@ -253,22 +258,20 @@ describe("deserialisation adapter boundaries", () => {
 });
 
 describe("search index key mismatch", () => {
-  let db: { get: jest.Mock; close: jest.Mock };
+  let db: ReturnType<typeof stubDb>;
   let warn: jest.SpyInstance;
 
   // A populated index that matches nothing is the signature of paths.albumsDir
   // having changed after indexing. Every lookup returns no row and the build
   // still succeeds, so without this warning the only symptom is a gallery that
   // quietly lost all its alt text, tags, geocodes and colours.
-  const withRows = (indexedPath: string | null) =>
-    jest.fn((sql: string, _params: unknown, callback: (err: Error | null, row: unknown) => void) =>
-      sql.includes("LEFT JOIN")
-        ? callback(null, undefined)
-        : callback(null, indexedPath ? { path: indexedPath } : undefined),
-    );
+  const withRows =
+    (indexedPath: string | null) =>
+    (sql: string): unknown =>
+      sql.includes("LEFT JOIN") ? undefined : indexedPath ? { path: indexedPath } : undefined;
 
   beforeEach(() => {
-    db = { get: withRows("../albums/kanto/DSCF3871.jpg"), close: jest.fn((cb) => cb()) };
+    db = stubDb(jest.fn(withRows("../albums/kanto/DSCF3871.jpg")));
     MockDatabase.mockReset().mockImplementation(() => db);
     mockGetPhotoSize.mockReset().mockResolvedValue({ width: 1, height: 1 });
     mockGetExif.mockReset().mockResolvedValue({});
@@ -300,7 +303,7 @@ describe("search index key mismatch", () => {
 
   // "Not indexed yet" is the ordinary state of a fresh gallery, not a mistake.
   it("stays quiet when the index is simply empty", async () => {
-    db.get = withRows(null);
+    db.rows.mockImplementation(withRows(null));
 
     await deserializePhotoBlock(photo("a.jpg"), { dirname: "../albums/kanto" });
 
@@ -312,12 +315,12 @@ describe("search index key mismatch", () => {
   // every lookup throw "no such column", and deserialize swallows that — so the
   // whole gallery silently lost its alt text, tags, geocodes and colours.
   it("still reads details from a database with no zone columns", async () => {
-    db.get = jest.fn(
-      (sql: string, _params: unknown, callback: (e: Error | null, r?: unknown) => void) =>
-        sql.includes("metadata.tz_name")
-          ? callback(new Error("SQLITE_ERROR: no such column: metadata.tz_name"))
-          : callback(null, { path: "../albums/kanto/a.jpg", alt_text: "a cat" }),
-    );
+    db.rows.mockImplementation((sql: string) => {
+      if (sql.includes("metadata.tz_name")) {
+        throw new Error("no such column: metadata.tz_name");
+      }
+      return { path: "../albums/kanto/a.jpg", alt_text: "a cat" };
+    });
 
     const block = await deserializePhotoBlock(photo("a.jpg"), { dirname: "../albums/kanto" });
 
@@ -325,7 +328,7 @@ describe("search index key mismatch", () => {
   });
 
   it("stays quiet when the lookup finds its row", async () => {
-    db.get = jest.fn((_sql, _params, callback) => callback(null, { path: "x", colors: "p" }));
+    db.rows.mockImplementation(() => ({ path: "x", colors: "p" }));
 
     await deserializePhotoBlock(photo("a.jpg"), { dirname: "../albums/kanto" });
 

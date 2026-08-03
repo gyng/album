@@ -4,7 +4,7 @@ const readline = require("readline/promises");
 const { stdin, stdout } = require("process");
 const { spawn, execSync, execFileSync } = require("child_process");
 const exifr = require("exifr");
-const sqlite3 = require("sqlite3");
+const { DatabaseSync } = require("node:sqlite");
 
 const PHOTO_EXTENSIONS = new Set([".jpg", ".jpeg"]);
 const VIDEO_EXTENSIONS = new Set([".mp4", ".mov", ".m4v", ".webm", ".mkv", ".avi"]);
@@ -618,52 +618,18 @@ const getVercelPreflightCommand = ({ args, plan }) => {
   return buildOrDeployCouldFollow ? `${VERCEL_CLI} whoami` : null;
 };
 
-const openDatabase = (dbPath, Database = sqlite3.Database) => {
-  return new Promise((resolve, reject) => {
-    const db = new Database(dbPath, sqlite3.OPEN_READONLY, (err) => {
-      if (err) {
-        reject(err);
-        return;
-      }
-      resolve(db);
-    });
-  });
-};
+// Node's built-in SQLite: synchronous, and compiled into the runtime rather
+// than fetched as a per-platform binary. These keep their promise shape so
+// every call site reads unchanged.
+const openDatabase = async (dbPath, Database = DatabaseSync) =>
+  new Database(dbPath, { readOnly: true });
 
-const dbGet = (db, sql, params = []) => {
-  return new Promise((resolve, reject) => {
-    db.get(sql, params, (err, row) => {
-      if (err) {
-        reject(err);
-        return;
-      }
-      resolve(row ?? null);
-    });
-  });
-};
+const dbGet = async (db, sql, params = []) => db.prepare(sql).get(...params) ?? null;
 
-const dbAll = (db, sql, params = []) => {
-  return new Promise((resolve, reject) => {
-    db.all(sql, params, (err, rows) => {
-      if (err) {
-        reject(err);
-        return;
-      }
-      resolve(rows ?? []);
-    });
-  });
-};
+const dbAll = async (db, sql, params = []) => db.prepare(sql).all(...params) ?? [];
 
-const dbClose = (db) => {
-  return new Promise((resolve, reject) => {
-    db.close((err) => {
-      if (err) {
-        reject(err);
-        return;
-      }
-      resolve();
-    });
-  });
+const dbClose = async (db) => {
+  db.close();
 };
 
 const loadEmbeddingsFromDb = async (embeddingsDbPath) => {

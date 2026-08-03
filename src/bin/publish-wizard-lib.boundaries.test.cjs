@@ -359,29 +359,32 @@ describe("publish wizard boundary adapters", () => {
     expect(runGit(["rev-parse", "--is-inside-work-tree"]).trim()).toBe("true");
   });
 
-  it("exercises database callback success and failure adapters", async () => {
+  it("exercises database success and failure adapters", async () => {
+    const stub = (result) => ({ prepare: () => result, close: () => {} });
+    const throwing = (message) => ({
+      prepare: () => {
+        throw new Error(message);
+      },
+    });
+
+    await expect(dbGet(stub({ get: () => undefined }), "select")).resolves.toBeNull();
+    await expect(dbGet(throwing("get failed"), "select")).rejects.toThrow("get failed");
+    await expect(dbAll(stub({ all: () => undefined }), "select")).resolves.toEqual([]);
+    await expect(dbAll(throwing("all failed"), "select")).rejects.toThrow("all failed");
+    await expect(dbClose({ close: () => {} })).resolves.toBeUndefined();
     await expect(
-      dbGet({ get: (_sql, _params, callback) => callback(null, undefined) }, "select"),
-    ).resolves.toBeNull();
-    await expect(
-      dbGet({ get: (_sql, _params, callback) => callback(new Error("get failed")) }, "select"),
-    ).rejects.toThrow("get failed");
-    await expect(
-      dbAll({ all: (_sql, _params, callback) => callback(null, undefined) }, "select"),
-    ).resolves.toEqual([]);
-    await expect(
-      dbAll({ all: (_sql, _params, callback) => callback(new Error("all failed")) }, "select"),
-    ).rejects.toThrow("all failed");
-    await expect(dbClose({ close: (callback) => callback() })).resolves.toBeUndefined();
-    await expect(
-      dbClose({ close: (callback) => callback(new Error("close failed")) }),
+      dbClose({
+        close: () => {
+          throw new Error("close failed");
+        },
+      }),
     ).rejects.toThrow("close failed");
     await expect(
       openDatabase(
         "bad.sqlite",
         class BadDatabase {
-          constructor(_path, _mode, callback) {
-            callback(new Error("open failed"));
+          constructor() {
+            throw new Error("open failed");
           }
         },
       ),

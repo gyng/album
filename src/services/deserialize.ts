@@ -1,5 +1,6 @@
 import fs from "fs";
 import path from "path";
+import { DatabaseSync } from "node:sqlite";
 import { getNextJsSafeExif, getPhotoSize, optimiseImages, stripPublicFromPath } from "./photo";
 import { getOriginalVideoTechnicalData, optimiseVideo, readVideoPoster } from "./video";
 import { parseYoutubeVideoId, youtubeMediaFilename } from "./youtubeExternal";
@@ -17,9 +18,12 @@ import {
 } from "./types";
 import { incrementBuildCounter, measureBuild } from "./buildTiming";
 import { parseColorPalette } from "../util/colorDistance";
-const sqlite3: typeof import("sqlite3") = require("sqlite3").verbose();
-
-let searchDb: import("sqlite3").Database | null = null;
+// Node's own SQLite, not the native `sqlite3` addon: the driver is compiled
+// into the runtime, so there is no per-platform binary to fetch, no ABI to
+// track, and nothing linked against a glibc other than this machine's. It is
+// synchronous, which suits a build: every lookup here was already serialised
+// behind a promise.
+let searchDb: DatabaseSync | null = null;
 const photoSearchIndexCache = new Map<string, Promise<any[]>>();
 const DEFAULT_SEARCH_DB_PATH = "public/search.sqlite";
 
@@ -48,12 +52,7 @@ const closeSearchDb = async (): Promise<void> => {
 
   const dbToClose = searchDb;
   searchDb = null;
-
-  await new Promise<void>((resolve) => {
-    dbToClose.close(() => {
-      resolve();
-    });
-  });
+  dbToClose.close();
 };
 
 const getSearchDb = (dbPath: string) => {
@@ -67,7 +66,7 @@ const getSearchDb = (dbPath: string) => {
   }
 
   incrementBuildCounter("deserialize.searchIndexLookup.dbCacheMisses");
-  searchDb = new sqlite3.Database(dbPath);
+  searchDb = new DatabaseSync(dbPath, { readOnly: true });
   return searchDb;
 };
 
@@ -189,25 +188,29 @@ export const resetSearchIndexKeyMismatchWarning = (): void => {
   warnedAboutKeyMismatch = false;
 };
 
-const reportSearchIndexKeyMismatch = (db: import("sqlite3").Database, missedPath: string): void => {
+const reportSearchIndexKeyMismatch = (db: DatabaseSync, missedPath: string): void => {
   if (warnedAboutKeyMismatch) {
     return;
   }
   warnedAboutKeyMismatch = true;
 
-  db.get("SELECT path FROM images LIMIT 1;", [], (err: Error, row: { path?: string }) => {
-    if (err || !row?.path) {
-      // An empty index is the ordinary "not indexed yet" case, not a mismatch.
-      return;
-    }
+  let row: { path?: string } | undefined;
+  try {
+    row = db.prepare("SELECT path FROM images LIMIT 1;").get() as { path?: string } | undefined;
+  } catch {
+    // An unreadable index is reported by the lookup itself, not here.
+    return;
+  }
 
+  if (row?.path) {
     console.warn(
       `[album] Search index has entries but none matched "${missedPath}".\n` +
         `[album] Indexed paths look like "${row.path}".\n` +
         "[album] Alt text, tags, geocodes and colour placeholders will be missing. " +
         "Check paths.albumsDir in site.config.json matches the path the indexer used.",
     );
-  });
+  }
+  // An empty index is the ordinary "not indexed yet" case, not a mismatch.
 };
 
 const PHOTO_DETAILS_SQL_WITH_ZONE =
@@ -219,7 +222,8 @@ const PHOTO_DETAILS_SQL_WITHOUT_ZONE = "SELECT * FROM images WHERE path = ? LIMI
 
 let zoneColumnsMissing = false;
 
-const isMissingZoneColumns = (err: Error) => /no such column/i.test(err?.message ?? "");
+const isMissingZoneColumns = (err: unknown) =>
+  err instanceof Error && /no such column/i.test(err.message);
 
 const getPhotoDetailsFromSearchIndex = async (
   path: string,
@@ -241,43 +245,40 @@ const getPhotoDetailsFromSearchIndex = async (
     // cost such a fork every photo's alt text, tags, geocodes and colours
     // rather than just its zones. The first row that proves the columns absent
     // switches the whole build to the plain query.
-    const lookup = (sql: string): Promise<any[]> =>
-      new Promise<any[]>((resolve, reject) => {
-        const db = getSearchDb(dbPath);
-        if (!db) {
-          resolve([]);
-          return;
+    const lookup = (sql: string): any[] => {
+      const db = getSearchDb(dbPath);
+      if (!db) {
+        return [];
+      }
+
+      // In index
+      // ../src/public/data/albums/kanto/DSCF3871_2.jpg
+      let row: any;
+      try {
+        row = db.prepare(sql).get(path);
+      } catch (err) {
+        if (sql === PHOTO_DETAILS_SQL_WITH_ZONE && isMissingZoneColumns(err)) {
+          zoneColumnsMissing = true;
+          return lookup(PHOTO_DETAILS_SQL_WITHOUT_ZONE);
         }
-        // In index
-        // ../src/public/data/albums/kanto/DSCF3871_2.jpg
-        const result: any[] = [];
-        db.get(sql, [path], (err: Error, row: any) => {
-          if (err) {
-            if (sql === PHOTO_DETAILS_SQL_WITH_ZONE && isMissingZoneColumns(err)) {
-              zoneColumnsMissing = true;
-              resolve(lookup(PHOTO_DETAILS_SQL_WITHOUT_ZONE));
-              return;
-            }
-            reject(err);
-            return;
-          }
-          result.push(row);
+        throw err;
+      }
 
-          if (row?.colors) {
-            row.colors = parseColorPalette(row.colors);
-          }
+      if (row?.colors) {
+        row.colors = parseColorPalette(row.colors);
+      }
 
-          if (!row) {
-            reportSearchIndexKeyMismatch(db, path);
-          }
+      if (!row) {
+        reportSearchIndexKeyMismatch(db, path);
+      }
 
-          resolve(result);
-        });
-      });
+      return [row];
+    };
 
-    const promise = lookup(
-      zoneColumnsMissing ? PHOTO_DETAILS_SQL_WITHOUT_ZONE : PHOTO_DETAILS_SQL_WITH_ZONE,
-    );
+    // Kept promise-shaped: the cache dedupes concurrent lookups for one path,
+    // and callers await it.
+    const promise = (async () =>
+      lookup(zoneColumnsMissing ? PHOTO_DETAILS_SQL_WITHOUT_ZONE : PHOTO_DETAILS_SQL_WITH_ZONE))();
 
     photoSearchIndexCache.set(path, promise);
 
