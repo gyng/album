@@ -105,10 +105,10 @@ const TripsScreen = ({ trips }: TripsScreenProps) => {
                 { value: "outings", label: "Outings" },
               ]}
             />
-            {/* Compact selects that name their own dimension, as the explore
-                page's filters do — no separate label beside them. */}
+            {/* The app's own select: same shape as the theme and map-style
+                pickers, named by aria-label and by its options rather than by a
+                label bolted alongside. */}
             <Select
-              variant="compact"
               aria-label="Sort trips"
               value={order}
               onChange={(event) => reset<Order>(setOrder)(event.target.value as Order)}
@@ -118,7 +118,6 @@ const TripsScreen = ({ trips }: TripsScreenProps) => {
               <option value="distance">Furthest first</option>
             </Select>
             <Select
-              variant="compact"
               aria-label="Year"
               value={year}
               onChange={(event) => reset<string>(setYear)(event.target.value)}

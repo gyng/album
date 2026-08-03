@@ -1,24 +1,38 @@
+/* Shaped like the site's selects — same border, radius and height — because
+   the two sit side by side in filter rows and a pill beside a rounded rect
+   reads as two different kinds of control. */
 .toggle {
   display: inline-flex;
+  align-items: center;
   padding: calc(var(--line-hairline) * 2);
-  border: var(--line-hairline) solid var(--c-bg-contrast-dark);
-  border-radius: var(--radius-pill);
-  background: color-mix(in oklch, var(--c-bg) 98%, var(--c-bg-contrast-dark));
+  min-block-size: var(--tap-target);
+  border: solid var(--line-strong) var(--c-bg-contrast-light);
+  border-radius: var(--m-s);
+  background: var(--c-bg);
   transition:
     background-color var(--t-theme),
     color var(--t-theme),
     border-color var(--t-theme);
 }
 
+.toggle:hover {
+  border-color: color-mix(in oklch, var(--c-accent) 72%, var(--c-bg-contrast-light));
+}
+
+.toggle:focus-within {
+  border-color: var(--c-accent);
+}
+
 .button {
   appearance: none;
   border: 0;
-  min-block-size: calc(var(--tap-target) - var(--m));
+  min-block-size: calc(var(--tap-target) - var(--m-s));
   background: transparent;
   color: var(--c-bg-contrast-light);
-  font-size: var(--fs-s);
+  font-size: var(--fs-sm);
   padding: var(--m-xs) var(--m-m);
-  border-radius: var(--radius-pill);
+  /* Nested inside the container's own corner, not a pill of its own. */
+  border-radius: calc(var(--m-s) - var(--line-strong));
   cursor: pointer;
   transition:
     background-color var(--t-fast),

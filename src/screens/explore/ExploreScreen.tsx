@@ -148,7 +148,6 @@ const ExploreScreen = ({ stats, visualSameness }: ExploreScreenProps) => {
     <div className={styles.sectionFilters}>
       <label className={styles.sectionFilter}>
         <Select
-          variant="compact"
           value={selectedTechnicalCamera}
           onChange={(event) => {
             setSelectedTechnicalCamera(event.target.value);
@@ -164,7 +163,6 @@ const ExploreScreen = ({ stats, visualSameness }: ExploreScreenProps) => {
       </label>
       <label className={styles.sectionFilter}>
         <Select
-          variant="compact"
           value={activeTechnicalLens}
           onChange={(event) => {
             setSelectedTechnicalLens(event.target.value);
