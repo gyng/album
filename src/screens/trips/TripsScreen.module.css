@@ -1,12 +1,24 @@
 .page {
-  /* Sized to what a trip actually occupies — rail, meta column and three
-     frames — so the page reads as composed rather than half empty. */
-  max-inline-size: var(--content-width-section);
-  margin-inline: auto;
-  padding: var(--m-l) var(--m-m) var(--m-2xl);
+  min-block-size: 100dvh;
+}
+
+/* The same shell as the timeline and explore, so the nav starts on the same
+   line on every page. */
+.main {
+  max-inline-size: var(--size-1400);
+  margin: 0 auto;
+  padding: var(--m-xl);
   display: grid;
   gap: var(--m-xl);
   justify-items: start;
+}
+
+/* The content keeps its own narrower measure: a trip is a rail, a meta column
+   and three frames, and stretching that across 1400px would leave most of the
+   row empty. */
+.header,
+.trips {
+  max-inline-size: var(--content-width-section);
 }
 
 .header {

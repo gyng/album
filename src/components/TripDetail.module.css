@@ -42,7 +42,7 @@
 
 .day {
   display: grid;
-  grid-template-columns: var(--size-24) minmax(0, 14rem) minmax(0, 1fr);
+  grid-template-columns: var(--timeline-rail-width) minmax(0, 14rem) minmax(0, 1fr);
   gap: var(--m-m);
   padding-block: var(--m-m);
 }
@@ -58,17 +58,17 @@
   inset-block: calc(var(--m-m) * -1);
   inset-inline-start: 50%;
   inline-size: var(--size-1);
-  background: color-mix(in oklch, var(--c-accent) 42%, var(--c-bg-contrast-dark));
+  background: var(--timeline-line-color);
 }
 
 /* The line runs between the dots, not past them. */
 .day:first-child .rail::before {
-  inset-block-start: calc(var(--m-s) + (var(--size-14) / 2));
+  inset-block-start: calc(var(--m-s) + (var(--timeline-dot-size) / 2));
 }
 
 .day:last-child .rail::before {
   inset-block-end: auto;
-  block-size: calc(var(--m-m) + var(--m-s) + (var(--size-14) / 2));
+  block-size: calc(var(--m-m) + var(--m-s) + (var(--timeline-dot-size) / 2));
 }
 
 .dot {
@@ -77,8 +77,8 @@
   inset-block-start: var(--m-s);
   inset-inline-start: 50%;
   translate: -50% 0;
-  inline-size: var(--size-14);
-  block-size: var(--size-14);
+  inline-size: var(--timeline-dot-size);
+  block-size: var(--timeline-dot-size);
   border-radius: var(--radius-pill);
   border: var(--size-2) solid var(--c-bg);
   background: var(--c-accent);
@@ -176,7 +176,7 @@
 
 @media (max-width: 720px) {
   .day {
-    grid-template-columns: var(--size-24) minmax(0, 1fr);
+    grid-template-columns: var(--timeline-rail-width) minmax(0, 1fr);
   }
 
   /* The strip wraps onto its own row here, so the rail has to span both or the

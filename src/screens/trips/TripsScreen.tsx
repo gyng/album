@@ -25,14 +25,16 @@ const TripsScreen = ({ trips }: TripsScreenProps) => {
   const acrossAlbums = trips.filter((trip) => trip.albums.length > 1).length;
 
   return (
-    <>
+    <div className={styles.page}>
       <Seo
         title={formatPageTitle("Trips")}
         description={`${journeys.length} journeys and ${trips.length - journeys.length} single-day outings, grouped from the photographs themselves.`}
         pathname="/trips"
       />
-      <GlobalNav currentPage="trips" />
-      <main id="main-content" className={styles.page}>
+      {/* Same shell as the timeline and explore: the nav sits inside main and
+          brings no padding of its own, so it lines up across pages. */}
+      <main id="main-content" className={styles.main}>
+        <GlobalNav currentPage="trips" hasPadding={false} />
         <header className={styles.header}>
           <Heading level={1} as="h1">
             Trips
@@ -63,7 +65,7 @@ const TripsScreen = ({ trips }: TripsScreenProps) => {
         ) : null}
       </main>
       <Footer />
-    </>
+    </div>
   );
 };
 

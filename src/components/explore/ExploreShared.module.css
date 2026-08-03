@@ -242,7 +242,7 @@
 
 .visualTimeline {
   --visual-timeline-meta-width: calc(var(--size-96) + var(--size-3));
-  --visual-timeline-rail-width: var(--size-24);
+  --visual-timeline-rail-width: var(--timeline-rail-width);
   position: relative;
   display: grid;
   gap: var(--m-l);
@@ -269,7 +269,7 @@
     var(--visual-timeline-meta-width) + var(--m-s) + (var(--visual-timeline-rail-width) / 2)
   );
   inline-size: var(--size-1);
-  background: color-mix(in oklch, var(--c-accent) 42%, var(--c-bg-contrast-dark));
+  background: var(--timeline-line-color);
 }
 
 .visualTimelineRowLast::after {
@@ -305,8 +305,8 @@
 .visualTimelineDot {
   position: relative;
   z-index: var(--z-raised);
-  inline-size: var(--size-14);
-  block-size: var(--size-14);
+  inline-size: var(--timeline-dot-size);
+  block-size: var(--timeline-dot-size);
   border-radius: var(--radius-pill);
   border: var(--size-2) solid var(--c-bg);
   background: var(--c-accent);
@@ -349,8 +349,8 @@
 .visualTimelineRowContinues::after {
   background: linear-gradient(
     to bottom,
-    color-mix(in oklch, var(--c-accent) 42%, var(--c-bg-contrast-dark)) 0%,
-    color-mix(in oklch, var(--c-accent) 42%, var(--c-bg-contrast-dark)) 45%,
+    var(--timeline-line-color) 0%,
+    var(--timeline-line-color) 45%,
     transparent 100%
   );
 }
@@ -391,7 +391,7 @@
 
 .revisitRow {
   display: grid;
-  grid-template-columns: var(--size-180) var(--size-24) minmax(0, 1fr);
+  grid-template-columns: var(--size-180) var(--timeline-rail-width) minmax(0, 1fr);
   gap: var(--m);
   align-items: start;
 }

@@ -266,6 +266,16 @@ textarea {
   --explore-mobile-thumb-size: 136px;
   --design-input-min-width: 240px;
   --timeline-day-panel-min-width: 440px;
+
+  /* Timeline rails. Two of them exist — explore's "changed look over time" and
+     "revisited places", and a trip's day-by-day — and they lay out differently
+     on purpose: explore hides its rail on narrow screens and fades the line
+     when more rows are loadable, a trip keeps its line joined throughout. What
+     they must not do is *look* different, which is what happened while these
+     values lived in two stylesheets. */
+  --timeline-rail-width: var(--size-24);
+  --timeline-dot-size: var(--size-14);
+  --timeline-line-color: color-mix(in oklch, var(--c-accent) 42%, var(--c-bg-contrast-dark));
   --photo-description-measure: 900px;
   --immersive-title-offset-max: 400px;
 
