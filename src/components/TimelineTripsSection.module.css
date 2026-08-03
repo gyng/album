@@ -106,5 +106,6 @@
 .loadMore {
   justify-self: start;
   align-self: start;
+  inline-size: fit-content;
   margin-block-start: var(--m-s);
 }

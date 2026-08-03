@@ -11,6 +11,14 @@
   gap: var(--m);
 }
 
+/* The same shape as ExploreShared's sectionHeader. */
+.headRow {
+  display: flex;
+  align-items: baseline;
+  gap: var(--m-s);
+  flex-wrap: wrap;
+}
+
 .places {
   margin: 0;
   font-size: var(--fs-sm);
@@ -34,7 +42,7 @@
 
 .day {
   display: grid;
-  grid-template-columns: var(--m-l) minmax(0, 14rem) minmax(0, 1fr);
+  grid-template-columns: var(--size-24) minmax(0, 14rem) minmax(0, 1fr);
   gap: var(--m-m);
   padding-block: var(--m-m);
 }
@@ -50,29 +58,31 @@
   inset-block: calc(var(--m-m) * -1);
   inset-inline-start: 50%;
   inline-size: var(--size-1);
-  background: var(--c-bg-contrast-light);
-  opacity: 0.35;
+  background: color-mix(in oklch, var(--c-accent) 42%, var(--c-bg-contrast-dark));
 }
 
 /* The line runs between the dots, not past them. */
 .day:first-child .rail::before {
-  inset-block-start: calc(var(--m-s) + var(--m));
+  inset-block-start: calc(var(--m-s) + (var(--size-14) / 2));
 }
 
 .day:last-child .rail::before {
   inset-block-end: auto;
-  block-size: calc(var(--m-m) + var(--m-s) + var(--m));
+  block-size: calc(var(--m-m) + var(--m-s) + (var(--size-14) / 2));
 }
 
 .dot {
   position: absolute;
+  z-index: var(--z-raised);
   inset-block-start: var(--m-s);
   inset-inline-start: 50%;
   translate: -50% 0;
-  inline-size: var(--m-s);
-  block-size: var(--m-s);
-  border-radius: 50%;
+  inline-size: var(--size-14);
+  block-size: var(--size-14);
+  border-radius: var(--radius-pill);
+  border: var(--size-2) solid var(--c-bg);
   background: var(--c-accent);
+  box-shadow: 0 0 0 var(--size-1) color-mix(in oklch, var(--c-accent) 50%, transparent);
 }
 
 /* Sits between two days, because that is what it measures. */
@@ -81,10 +91,12 @@
   inset-block-start: calc(var(--m-l) * -1);
   inset-inline-start: 50%;
   translate: -50% 0;
-  padding-block: var(--m);
-  background: var(--c-bg);
+  padding: var(--size-3) var(--m-s);
+  border-radius: var(--radius-pill);
+  background: color-mix(in oklch, var(--c-bg) 94%, var(--c-bg-contrast-dark));
   color: var(--c-bg-contrast-light);
   font-size: var(--fs-xs);
+  line-height: 1;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
@@ -164,7 +176,7 @@
 
 @media (max-width: 720px) {
   .day {
-    grid-template-columns: var(--m-m) minmax(0, 1fr);
+    grid-template-columns: var(--size-24) minmax(0, 1fr);
   }
 
   /* The strip wraps onto its own row here, so the rail has to span both or the

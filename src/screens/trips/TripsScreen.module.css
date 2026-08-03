@@ -27,4 +27,5 @@
 
 .loadMore {
   justify-self: start;
+  inline-size: fit-content;
 }

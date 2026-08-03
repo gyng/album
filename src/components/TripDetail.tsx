@@ -26,18 +26,22 @@ const roundKm = (km: number) => (km >= 10 ? Math.round(km) : Math.round(km * 10)
 export const TripDetail = ({ trip, headingLevel = 2 }: { trip: Trip; headingLevel?: 2 | 3 }) => (
   <section className={styles.trip}>
     <div className={styles.head}>
-      <Heading level={headingLevel} as={headingLevel === 2 ? "h2" : "h3"}>
-        {trip.isOuting
-          ? longDate(trip.startDate)
-          : `${longDate(trip.startDate)} – ${longDate(trip.endDate)}`}
-      </Heading>
-      <Caption as="span">
-        {trip.isOuting
-          ? `outing · ${trip.photoCount.toLocaleString("en")} photos`
-          : `${trip.dayCount} days · ${trip.photoCount.toLocaleString("en")} photos`}
-        {trip.totalKm && trip.totalKm >= 1 ? ` · ${roundKm(trip.totalKm)} km` : ""}
-        {trip.albums.length > 1 ? ` · from ${trip.albums.join(" and ")}` : ""}
-      </Caption>
+      {/* Heading beside its caption on one baseline, as every other section
+          header on this site is set. */}
+      <div className={styles.headRow}>
+        <Heading level={headingLevel} as={headingLevel === 2 ? "h2" : "h3"}>
+          {trip.isOuting
+            ? longDate(trip.startDate)
+            : `${longDate(trip.startDate)} – ${longDate(trip.endDate)}`}
+        </Heading>
+        <Caption as="span">
+          {trip.isOuting
+            ? `outing · ${trip.photoCount.toLocaleString("en")} photos`
+            : `${trip.dayCount} days · ${trip.photoCount.toLocaleString("en")} photos`}
+          {trip.totalKm && trip.totalKm >= 1 ? ` · ${roundKm(trip.totalKm)} km` : ""}
+          {trip.albums.length > 1 ? ` · from ${trip.albums.join(" and ")}` : ""}
+        </Caption>
+      </div>
       {trip.places.length > 0 ? (
         <p className={styles.places}>{trip.places.slice(0, 8).join(" → ")}</p>
       ) : null}
