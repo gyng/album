@@ -221,3 +221,31 @@ describe("routeFrameHeight", () => {
     expect(routeFrameHeight([], 320, 20, 110, 280)).toBe(110);
   });
 });
+
+describe("the projection's units", () => {
+  const stop = (lat: number, lng: number) => ({ date: "d", number: 1, lat, lng, label: "" });
+
+  // Mercator's y is in radians while longitude arrived in degrees, so vertical
+  // extent came out about fifty-seven times too small and every route was drawn
+  // as a nearly flat line.
+  it("gives a square degree near the equator a square drawing", () => {
+    const route = projectRoute([stop(0, 0), stop(1, 1)], 400, 400, 0);
+
+    const dx = Math.abs(route.points[1]!.x - route.points[0]!.x);
+    const dy = Math.abs(route.points[1]!.y - route.points[0]!.y);
+    expect(dy / dx).toBeCloseTo(1, 1);
+  });
+
+  it("asks for a square frame for that same square degree", () => {
+    expect(routeFrameHeight([stop(0, 0), stop(1, 1)], 320, 0, 60, 400)).toBeCloseTo(320, -1);
+  });
+
+  // Mercator stretches the poles: the same degree of latitude is taller far
+  // from the equator, which is the projection doing its job.
+  it("keeps Mercator's own stretch away from the equator", () => {
+    const near = routeFrameHeight([stop(0, 0), stop(1, 1)], 320, 0, 10, 4000);
+    const far = routeFrameHeight([stop(60, 0), stop(61, 1)], 320, 0, 10, 4000);
+
+    expect(far).toBeGreaterThan(near);
+  });
+});

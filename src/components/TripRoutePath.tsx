@@ -78,9 +78,12 @@ export const TripRoutePath = ({ trip, activeDate }: TripRoutePathProps) => {
             <g key={marker.key} className={isActive ? styles.stopActive : styles.stop}>
               <circle cx={point.x} cy={point.y} r={isActive ? 7 : 5} className={styles.dot} />
               {ends && (marker === ends.first || marker === ends.last) ? (
+                // Start above its dot, end below it: a journey that comes home
+                // finishes where it began, and two labels on the same line
+                // there read as "stastnd".
                 <text
                   x={point.x}
-                  y={point.y - 11}
+                  y={marker === ends.first ? point.y - 11 : point.y + 18}
                   className={styles.label}
                   textAnchor={point.x > VIEW_WIDTH / 2 ? "end" : "start"}
                 >

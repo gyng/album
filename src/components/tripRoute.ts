@@ -83,7 +83,15 @@ export type ProjectedRoute = {
   height: number;
 };
 
-/** Web Mercator's y, so a route keeps the shape a map would have given it. */
+/**
+ * Web Mercator, so a route keeps the shape a map would have given it.
+ *
+ * Both axes in radians. Taking x in degrees and y from the Mercator formula —
+ * which is in radians — squashed every route by a factor of 180/π: a journey
+ * with real north-south extent came out as a nearly flat line.
+ */
+const mercatorX = (lng: number) => (lng * Math.PI) / 180;
+
 const mercatorY = (lat: number) => {
   const clamped = Math.max(-85.05, Math.min(85.05, lat));
   const radians = (clamped * Math.PI) / 180;
@@ -106,7 +114,7 @@ export const routeFrameHeight = (
   max: number,
 ): number => {
   if (stops.length === 0) return min;
-  const xs = stops.map((stop) => stop.lng);
+  const xs = stops.map((stop) => mercatorX(stop.lng));
   const ys = stops.map((stop) => mercatorY(stop.lat));
   const spanX = Math.max(...xs) - Math.min(...xs);
   const spanY = Math.max(...ys) - Math.min(...ys);
@@ -132,7 +140,7 @@ export const projectRoute = (
     width: Math.max(1, width - padding * 2),
     height: Math.max(1, height - padding * 2),
   };
-  const xs = stops.map((stop) => stop.lng);
+  const xs = stops.map((stop) => mercatorX(stop.lng));
   const ys = stops.map((stop) => mercatorY(stop.lat));
   const minX = Math.min(...xs);
   const maxX = Math.max(...xs);
@@ -155,7 +163,7 @@ export const projectRoute = (
   const offsetY = padding + (inner.height - drawnHeight) / 2;
 
   const project = (place: { lat: number; lng: number }): ProjectedPoint => ({
-    x: spanX === 0 ? width / 2 : offsetX + (place.lng - minX) * scale,
+    x: spanX === 0 ? width / 2 : offsetX + (mercatorX(place.lng) - minX) * scale,
     // Mercator y grows northward; SVG grows downward.
     y: spanY === 0 ? height / 2 : offsetY + (maxY - mercatorY(place.lat)) * scale,
   });
