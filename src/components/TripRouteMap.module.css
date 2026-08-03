@@ -1,6 +1,6 @@
 .map {
   inline-size: 100%;
-  block-size: var(--size-320);
+  block-size: var(--size-420);
   overflow: hidden;
 }
 
@@ -18,8 +18,10 @@
   inset-inline-start: 50%;
   inset-block-end: calc(100% + var(--m-m));
   transform: translateX(-50%);
-  inline-size: var(--size-80);
-  block-size: var(--size-80);
+  /* Smaller than the world map's 80px: this map is a 320px column, and a
+     fourteen-day route at that size is a pile of thumbnails otherwise. */
+  inline-size: var(--size-56);
+  block-size: var(--size-56);
   object-fit: cover;
   object-position: bottom;
   border-radius: var(--m-s);
@@ -36,8 +38,8 @@
 /* The day's place in the journey, on the corner of its picture. */
 .number {
   position: absolute;
-  inset-block-end: calc(100% + var(--m-m) + var(--size-80) - var(--size-20));
-  inset-inline-start: calc(50% - var(--size-40));
+  inset-block-end: calc(100% + var(--m-m) + var(--size-56) - var(--size-20));
+  inset-inline-start: calc(50% - var(--size-28));
   min-inline-size: var(--size-20);
   padding: 0 var(--m);
   border-radius: var(--radius-pill);

@@ -51,7 +51,11 @@ const TripsScreen = ({ trips }: TripsScreenProps) => {
 
         <div className={styles.trips}>
           {trips.slice(0, visible).map((trip) => (
-            <TripDetail key={trip.id} trip={trip} />
+            // Anchored so the timeline's trip list can link straight to the
+            // whole journey rather than to the top of the page.
+            <div key={trip.id} id={`trip-${trip.id}`}>
+              <TripDetail trip={trip} />
+            </div>
           ))}
         </div>
 

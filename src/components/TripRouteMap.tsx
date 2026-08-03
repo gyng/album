@@ -1,7 +1,7 @@
 import React from "react";
 import type { Trip } from "../util/computeTrips";
 import { DataLayer, type LineFeature, MapView, Marker } from "./map";
-import { fitToRoute, routeStops } from "./tripRoute";
+import { clusterStops, fitToRoute, formatDayNumbers, routeStops } from "./tripRoute";
 import { MapLibreStyles } from "./MapLibreStyles";
 import pinStyles from "./mapPin.module.css";
 import { useMapStyleName } from "./MapStyleToggle";
@@ -49,6 +49,9 @@ export type TripRouteMapProps = { trip: Trip };
 export const TripRouteMap = ({ trip }: TripRouteMapProps) => {
   const styleName = useMapStyleName();
   const stops = React.useMemo(() => routeStops(trip), [trip]);
+  // The line runs through every day; the pictures group, so that days spent in
+  // one city are all still accounted for instead of hidden behind each other.
+  const markers = React.useMemo(() => clusterStops(stops), [stops]);
 
   const lines = React.useMemo<LineFeature[]>(
     () =>
@@ -86,13 +89,13 @@ export const TripRouteMap = ({ trip }: TripRouteMapProps) => {
         onLoad={(map) => fitToRoute(map, stops)}
       >
         <DataLayer id={`trip-route-${trip.id}`} lines={lines} order={1} />
-        {stops.map((stop) => (
-          <Marker key={stop.date} at={{ lng: stop.lng, lat: stop.lat }} anchor="bottom">
+        {markers.map((marker) => (
+          <Marker key={marker.key} at={{ lng: marker.lng, lat: marker.lat }} anchor="bottom">
             {/* The same shape every other map on this site uses: a pin on the
                 point, its picture standing above it. */}
             <span className={pinStyles.pin} style={{ color: "var(--c-accent)" }}>
-              {stop.src ? <StopImage src={stop.src} /> : null}
-              <span className={styles.number}>{stop.number}</span>
+              {marker.src ? <StopImage src={marker.src} /> : null}
+              <span className={styles.number}>{formatDayNumbers(marker.numbers)}</span>
             </span>
           </Marker>
         ))}

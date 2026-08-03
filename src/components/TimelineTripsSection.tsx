@@ -1,8 +1,14 @@
 import React from "react";
 import type { TimelineEntry } from "../util/pageDataTypes";
-import { computeTrips, type TripPhoto } from "../util/computeTrips";
+import {
+  computeTrips,
+  markFirstVisits,
+  markLaterReturns,
+  type TripPhoto,
+} from "../util/computeTrips";
 import { formatExifWallClockDate } from "../util/exifTime";
-import { Caption, Heading, PillButton } from "./ui";
+import { AppLink as Link } from "./platform";
+import { Caption, Heading, PillButton, SegmentedToggle } from "./ui";
 import styles from "./TimelineTripsSection.module.css";
 
 const INITIAL_TRIPS = 4;
@@ -47,29 +53,47 @@ const toTripPhoto = (entry: TimelineEntry): TripPhoto => ({
  * says those days were one trip. Computed from entries the page already holds,
  * so it costs no payload.
  */
+type TripFilter = "all" | "journeys";
+
 export const TimelineTripsSection = ({
   entries,
   onSelectDate,
+  selectedDate,
 }: {
   entries: TimelineEntry[];
   onSelectDate: (date: string) => void;
+  /** The day the timeline is showing, so this list can point at it. */
+  selectedDate?: string | null;
 }) => {
   const [visible, setVisible] = React.useState(INITIAL_TRIPS);
+  const [filter, setFilter] = React.useState<TripFilter>("all");
   const trips = React.useMemo(
     () =>
-      computeTrips(
-        // Videos carry no geocode, so they cannot take part in the country rule
-        // and would make this page's counts disagree with /trips and explore,
-        // which group photographs.
-        entries.filter((entry) => entry.mediaKind !== "video").map(toTripPhoto),
+      markLaterReturns(
+        markFirstVisits(
+          computeTrips(
+            // Videos carry no geocode, so they cannot take part in the country
+            // rule and would make this page's counts disagree with /trips and
+            // explore, which group photographs.
+            entries.filter((entry) => entry.mediaKind !== "video").map(toTripPhoto),
+          ),
+        ),
       ),
     [entries],
   );
 
+  const journeys = React.useMemo(() => trips.filter((trip) => !trip.isOuting), [trips]);
+  const listed = filter === "journeys" ? journeys : trips;
+
+  // The page already knows which day is open, and this list is newest-first, so
+  // the trip holding it can easily sit past the fold. It comes along.
+  const selectedIndex = selectedDate
+    ? listed.findIndex((trip) => trip.days.some((day) => day.date === selectedDate))
+    : -1;
+
   if (trips.length === 0) return null;
 
-  const journeys = trips.filter((trip) => !trip.isOuting);
-  const shown = trips.slice(0, visible);
+  const shown = listed.slice(0, Math.max(visible, selectedIndex + 1));
 
   return (
     <section className={styles.section} aria-label="Trips">
@@ -81,6 +105,19 @@ export const TimelineTripsSection = ({
           {journeys.length} {journeys.length === 1 ? "journey" : "journeys"} and{" "}
           {trips.length - journeys.length} single-day outings, detected from the photographs
         </Caption>
+        {/* Most of the list is outings, so a reader after a journey can say so. */}
+        {journeys.length > 0 && journeys.length < trips.length ? (
+          <SegmentedToggle
+            className={styles.filter}
+            ariaLabel="Which trips to list"
+            value={filter}
+            onChange={setFilter}
+            options={[
+              { value: "all", label: "All" },
+              { value: "journeys", label: "Journeys" },
+            ]}
+          />
+        ) : null}
       </div>
 
       <ul className={styles.list}>
@@ -114,6 +151,25 @@ export const TimelineTripsSection = ({
                 {trip.places.length > 0 ? (
                   <span className={styles.places}>{trip.places.slice(0, 6).join(" → ")}</span>
                 ) : null}
+                {trip.firstVisits.length > 0 ? (
+                  <span className={styles.firsts}>
+                    First time in {trip.firstVisits.slice(0, 4).join(", ")}
+                  </span>
+                ) : null}
+                {trip.laterReturns.length > 0 ? (
+                  <span className={styles.returns}>
+                    Came back:{" "}
+                    {trip.laterReturns
+                      .slice(0, 3)
+                      .map((entry) => `${entry.place} in ${entry.year}`)
+                      .join(", ")}
+                  </span>
+                ) : null}
+                {/* Its route, gear and unusual subjects live on the trips page;
+                    this list is a way into the day view beside it. */}
+                <Link className={styles.whole} href={`/trips#trip-${trip.id}`}>
+                  See the whole trip
+                </Link>
               </div>
 
               <div className={styles.days}>
@@ -121,7 +177,10 @@ export const TimelineTripsSection = ({
                   <button
                     key={day.date}
                     type="button"
-                    className={styles.day}
+                    className={[styles.day, day.date === selectedDate ? styles.dayCurrent : null]
+                      .filter(Boolean)
+                      .join(" ")}
+                    {...(day.date === selectedDate ? { "aria-current": "date" as const } : {})}
                     onClick={() => onSelectDate(day.date)}
                   >
                     <span className={styles.dayDate}>{longDate(day.date)}</span>
@@ -134,10 +193,10 @@ export const TimelineTripsSection = ({
         })}
       </ul>
 
-      {visible < trips.length ? (
+      {shown.length < listed.length ? (
         <PillButton
           className={styles.loadMore}
-          onClick={() => setVisible((count) => Math.min(count + LOAD_MORE_TRIPS, trips.length))}
+          onClick={() => setVisible((count) => Math.min(count + LOAD_MORE_TRIPS, listed.length))}
         >
           <span>Load more trips</span>
         </PillButton>

@@ -449,7 +449,11 @@ const TimelineScreen = ({ entries: suppliedEntries, entryRows }: TimelineScreenP
 
                 {/* The rung between the heatmap and a single day: these days
                     were one journey, which neither of the other two can say. */}
-                <TimelineTripsSection entries={filteredEntries} onSelectDate={chooseDate} />
+                <TimelineTripsSection
+                  entries={filteredEntries}
+                  onSelectDate={chooseDate}
+                  selectedDate={selectedDate}
+                />
 
                 {visibleMemories.length > 0 ? (
                   <section className={styles.memories} aria-label="Memories">

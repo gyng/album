@@ -33,8 +33,12 @@ export type FlyToOptions = {
 };
 
 export type FitBoundsOptions = {
-  /** Pixels of breathing room kept on every side. */
-  padding?: number;
+  /**
+   * Pixels of breathing room. A number keeps the same on every side; name the
+   * sides where they differ — a marker whose picture stands above its pin needs
+   * room at the top that the bottom would only waste.
+   */
+  padding?: number | { top: number; right: number; bottom: number; left: number };
   maxZoom?: number;
   /** `false` jumps straight to the destination. */
   animate?: boolean;

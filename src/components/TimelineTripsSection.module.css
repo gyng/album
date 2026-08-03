@@ -109,3 +109,39 @@
   inline-size: fit-content;
   margin-block-start: var(--m-s);
 }
+
+/* Most of this list is single-day outings; the filter lets a reader looking
+   for a journey say so. Sits with the heading, not above the list. */
+.filter {
+  flex-basis: 100%;
+}
+
+.firsts {
+  flex-basis: 100%;
+  color: var(--c-accent);
+  font-size: var(--fs-s);
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.returns {
+  flex-basis: 100%;
+  color: var(--c-bg-contrast-light);
+  font-size: var(--fs-s);
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+/* The route, gear and unusual subjects live on the trips page; this list is a
+   way into the day view beside it. */
+.whole {
+  font-size: var(--fs-s);
+  line-height: 1.2;
+}
+
+/* The day the timeline is showing, so the reader can see where they are in the
+   journey rather than having to find it again. */
+.dayCurrent {
+  border-color: var(--c-accent);
+  background: color-mix(in oklch, var(--c-accent) 18%, transparent);
+}
