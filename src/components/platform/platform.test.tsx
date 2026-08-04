@@ -249,6 +249,7 @@ describe("platform navigation adapter", () => {
     expect(result.current.config.searchDatabaseUrl).toBe("/native-search.sqlite");
     expect(result.current.navigation.ready).toBe(true);
     expect(Object.keys(result.current.components).sort()).toEqual([
+      "EmbeddingSpace",
       "GuessMap",
       "Map",
       "MapWorld",

@@ -6,6 +6,10 @@ import guessStyles from "../../guess/GuessGame.module.css";
 import type { ClientComponents } from "../clientComponents";
 
 export const nextClientComponents: ClientComponents = {
+  EmbeddingSpace: dynamic(
+    () => import("../../EmbeddingSpace").then((module) => module.EmbeddingSpace),
+    { ssr: false },
+  ),
   Map: dynamic(() => import("../../Map"), {
     loading: () => <p className={mapStyles.loadingPlaceholder}>Loading map…</p>,
     ssr: false,

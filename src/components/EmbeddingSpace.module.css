@@ -1,0 +1,118 @@
+.space {
+  display: grid;
+  gap: var(--m-s);
+}
+
+/* The cloud is drawn in the photographs' own colours, so it wants a ground
+   darker than the page to sit on — the same reason a contact sheet is black. */
+.stage {
+  position: relative;
+  border: solid var(--line-hairline) var(--c-bg-contrast-light);
+  border-radius: var(--m-s);
+  background:
+    radial-gradient(
+      circle at 50% 45%,
+      color-mix(in oklch, var(--c-accent) 8%, transparent),
+      transparent 70%
+    ),
+    color-mix(in oklch, var(--c-bg-contrast-dark) 92%, var(--c-bg));
+  overflow: hidden;
+}
+
+.canvas {
+  inline-size: 100%;
+  block-size: 100%;
+  display: block;
+  cursor: grab;
+  touch-action: none;
+}
+
+.canvas:active {
+  cursor: grabbing;
+}
+
+.status,
+.caption {
+  position: absolute;
+  inset-inline: 0;
+  margin: 0;
+  padding: var(--m-s) var(--m-m);
+  text-align: center;
+  font-size: var(--fs-s);
+  color: var(--c-bg-contrast-light);
+  pointer-events: none;
+}
+
+.status {
+  inset-block-start: 50%;
+  transform: translateY(-50%);
+}
+
+.caption {
+  inset-block-end: 0;
+  display: flex;
+  justify-content: center;
+  gap: var(--m-s);
+  background: linear-gradient(to top, var(--c-overlay-dark), transparent);
+  color: var(--c-white);
+}
+
+.captionLabel {
+  font-size: var(--fs-sm);
+}
+
+.captionTag {
+  color: var(--c-accent);
+}
+
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--m-s);
+}
+
+.hint {
+  margin: 0;
+  font-size: var(--fs-s);
+  color: var(--c-bg-contrast-light);
+}
+
+.toggle {
+  border: solid var(--line-hairline) var(--c-bg-contrast-light);
+  border-radius: var(--radius-pill);
+  padding: var(--m-xs) var(--m-m);
+  min-block-size: var(--tap-target);
+  background: var(--c-bg);
+  color: inherit;
+  font-size: var(--fs-s);
+  cursor: pointer;
+}
+
+.toggle:hover {
+  border-color: var(--c-accent);
+}
+
+/* Reachable by keyboard and by a screen reader, invisible to everyone else:
+   the canvas itself carries no photographs anybody can tab to. */
+.hiddenList {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.hiddenList a:focus-visible {
+  position: fixed;
+  inset-block-start: var(--m-s);
+  inset-inline-start: var(--m-s);
+  z-index: 10;
+  padding: var(--m-s);
+  background: var(--c-bg);
+  clip-path: none;
+}

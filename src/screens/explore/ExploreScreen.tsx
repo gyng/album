@@ -54,6 +54,7 @@ import {
   ExploreTimezones,
 } from "../../components/explore/ExploreTimeSections";
 import { ExploreColourSection } from "../../components/explore/ExploreColourSection";
+import { EmbeddingSpaceDeferred } from "../../components/EmbeddingSpaceDeferred";
 import { formatPageTitle } from "../../lib/seo";
 
 export type ExploreScreenProps = {
@@ -601,6 +602,21 @@ const ExploreScreen = ({ stats, visualSameness }: ExploreScreenProps) => {
               </section>
             </StatGroup>
           ) : null}
+
+          {/* Everything else on this page counts something. This one does not:
+              it is the collection arranged by what the photographs are of, and
+              the only way to read it is to turn it around. */}
+          <StatGroup
+            id="embedding-space"
+            title="The collection as a cloud"
+            description="Every photograph placed by what it is of, along the three directions this collection varies along most. Nearby means the model reads them as alike; the clumps are your own recurring subjects."
+            deferContent
+            deferredSummary="A turnable cloud of every embedded photograph, arranged by subject rather than by time or place."
+          >
+            <section className={`${styles.section} ${styles.sectionWide}`}>
+              <EmbeddingSpaceDeferred />
+            </section>
+          </StatGroup>
 
           <ExploreThisDaySection memories={stats.dayOfYearMemories} />
 

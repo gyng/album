@@ -5,6 +5,7 @@ import type { Content, PhotoBlock } from "../services/types";
 import { measureBuild } from "../services/buildTiming";
 import { rgbToString } from "./colorDistance";
 import { parseExifLocalDateTime } from "./exifTime";
+import { projectToThreeDimensions } from "./embeddingSpace";
 
 // The shipped search-embeddings DB holds two embedding spaces (SigLIP v1 and
 // v2), one row per photo per model. These stats must run against a single space
@@ -365,18 +366,41 @@ const decodeEmbeddingRow = (row: EmbeddingRow): number[] | null => {
   }
 };
 
+/** Which album each indexed photograph came from, by its indexed path. */
+const buildPhotoAlbumLookup = (albums: Content[]): Map<string, string> => {
+  const lookup = new Map<string, string>();
+
+  albums.forEach((album) => {
+    if (isTestAlbum(album)) return;
+    const name = album.title ?? album._build.slug;
+    album.blocks.forEach((block) => {
+      if (block.kind !== "photo") return;
+      const indexedPath = (block as PhotoBlock)._build.tags?.path;
+      if (indexedPath) lookup.set(indexedPath, name);
+    });
+  });
+
+  return lookup;
+};
+
+/** The embeddings database, or the canonical one it was split out of, or neither. */
+const resolveEmbeddingsDbPath = (dbPath: string): string | null => {
+  if (fs.existsSync(dbPath) && fs.statSync(dbPath).size > 0) return dbPath;
+  if (
+    fs.existsSync(FALLBACK_EMBEDDINGS_DB_PATH) &&
+    fs.statSync(FALLBACK_EMBEDDINGS_DB_PATH).size > 0
+  ) {
+    return FALLBACK_EMBEDDINGS_DB_PATH;
+  }
+  return null;
+};
+
 export const computeVisualSamenessStats = async (
   albums: Content[],
   dbPath = DEFAULT_EMBEDDINGS_DB_PATH,
 ): Promise<VisualSamenessStats | null> => {
   return measureBuild("stats.visualSameness", async () => {
-    const resolvedDbPath =
-      fs.existsSync(dbPath) && fs.statSync(dbPath).size > 0
-        ? dbPath
-        : fs.existsSync(FALLBACK_EMBEDDINGS_DB_PATH) &&
-            fs.statSync(FALLBACK_EMBEDDINGS_DB_PATH).size > 0
-          ? FALLBACK_EMBEDDINGS_DB_PATH
-          : null;
+    const resolvedDbPath = resolveEmbeddingsDbPath(dbPath);
 
     if (!resolvedDbPath) {
       return null;
@@ -782,3 +806,111 @@ export const computeVisualSamenessStats = async (
     }
   });
 };
+
+/* -------------------------------------------------------------------------- */
+/* The cloud                                                                   */
+/* -------------------------------------------------------------------------- */
+
+/** One photograph as a position in the collection's own embedding space. */
+export type EmbeddingSpacePoint = {
+  src: string;
+  href: string;
+  label: string;
+  /** Which album it came from: a filename says nothing, and most labels are filenames. */
+  album?: string;
+  /** Its dominant colour, so the cloud is coloured by the photographs themselves. */
+  swatch?: string;
+  /** The photograph's most distinctive tag, for naming what a cluster turned out to be. */
+  tag?: string;
+  x: number;
+  y: number;
+  z: number;
+};
+
+/**
+ * The whole collection projected into three dimensions, at build time.
+ *
+ * Done here rather than in the browser because the vectors are the expensive
+ * part: 1,500 × 768 numbers is several megabytes of database and a second of
+ * arithmetic, and the answer is the same for every reader. What ships is the
+ * cloud — three numbers and a thumbnail per photograph.
+ */
+export const loadEmbeddingSpacePoints = async (
+  albums: Content[],
+  dbPath = DEFAULT_EMBEDDINGS_DB_PATH,
+): Promise<EmbeddingSpacePoint[]> =>
+  measureBuild("stats.embeddingSpace", async () => {
+    const resolvedDbPath = resolveEmbeddingsDbPath(dbPath);
+    if (!resolvedDbPath) {
+      return [];
+    }
+
+    const photoLookup = buildPhotoLookup(albums);
+    const tagLookup = buildPhotoTagLookup(albums);
+    const albumLookup = buildPhotoAlbumLookup(albums);
+    const selectedPaths = [...photoLookup.keys()];
+    if (selectedPaths.length < MIN_EMBEDDING_SAMPLE) {
+      return [];
+    }
+
+    const db = await openReadonlyDatabase(resolvedDbPath);
+    try {
+      const tables = await getRows<{ path: string }>(
+        db,
+        "SELECT name as path FROM sqlite_master WHERE type = 'table' AND name = 'embeddings'",
+        [],
+      );
+      if (tables.length === 0) {
+        return [];
+      }
+
+      const modelRows = await getRows<{ path: string }>(
+        db,
+        "SELECT DISTINCT model_id AS path FROM embeddings",
+        [],
+      );
+      const selectedModelId = selectEmbeddingModelId(modelRows.map((row) => row.path));
+      if (!selectedModelId) {
+        return [];
+      }
+
+      const hasBlobColumn = await embeddingsTableHasBlobColumn(db);
+      const embeddingColumns = hasBlobColumn ? "embedding_blob, embedding_scale" : "embedding_json";
+      const placeholders = selectedPaths.map(() => "?").join(", ");
+      const rows = await getRows<EmbeddingRow>(
+        db,
+        `SELECT path, ${embeddingColumns} FROM embeddings WHERE model_id = ? AND path IN (${placeholders})`,
+        [selectedModelId, ...selectedPaths],
+      );
+
+      const decoded = rows.flatMap((row) => {
+        const vector = decodeEmbeddingRow(row);
+        const photo = photoLookup.get(row.path);
+        return vector && photo ? [{ photo, path: row.path, vector }] : [];
+      });
+      if (decoded.length < MIN_EMBEDDING_SAMPLE) {
+        return [];
+      }
+
+      const positions = projectToThreeDimensions(decoded.map((entry) => entry.vector));
+
+      return decoded.map((entry, index) => {
+        const position = positions[index] ?? { x: 0, y: 0, z: 0 };
+        const tag = tagLookup.get(entry.path)?.[0];
+        const album = albumLookup.get(entry.path);
+        return {
+          src: entry.photo.src,
+          href: entry.photo.href,
+          label: entry.photo.label,
+          ...(album ? { album } : {}),
+          ...(entry.photo.swatch ? { swatch: entry.photo.swatch } : {}),
+          ...(tag ? { tag } : {}),
+          x: Number(position.x.toFixed(4)),
+          y: Number(position.y.toFixed(4)),
+          z: Number(position.z.toFixed(4)),
+        };
+      });
+    } finally {
+      await closeDatabase(db);
+    }
+  });

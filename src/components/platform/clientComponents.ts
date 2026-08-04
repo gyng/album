@@ -1,4 +1,5 @@
 import type React from "react";
+import type { EmbeddingSpaceProps } from "../EmbeddingSpace";
 import type { MapProps } from "../Map";
 import type { MapWorldProps } from "../MapWorld";
 import type { SankeyChartProps } from "../SankeyChart";
@@ -16,6 +17,7 @@ export type SearchWithCoiProps = {
 };
 
 export type ClientComponents = {
+  EmbeddingSpace: React.ComponentType<EmbeddingSpaceProps>;
   Map: React.ComponentType<MapProps>;
   MapWorld: React.ComponentType<MapWorldProps>;
   PhotoSimilarPhotos: React.ComponentType<PhotoSimilarPhotosProps>;

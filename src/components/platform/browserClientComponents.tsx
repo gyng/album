@@ -23,6 +23,9 @@ const clientOnly = <Props extends object>(
 };
 
 export const browserClientComponents: ClientComponents = {
+  EmbeddingSpace: clientOnly(() =>
+    import("../EmbeddingSpace").then((module) => ({ default: module.EmbeddingSpace })),
+  ),
   Map: clientOnly(
     () => import("../Map"),
     <p className={mapStyles.loadingPlaceholder}>Loading map…</p>,
