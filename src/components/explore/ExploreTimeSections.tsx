@@ -5,7 +5,7 @@ import { Caption, Heading, Thumb } from "../ui";
 import sharedStyles from "./ExploreShared.module.css";
 import localStyles from "./ExploreTimeSections.module.css";
 import { formatExifWallClockDate } from "../../util/exifTime";
-import { buildSilenceBands, buildZoneAxis } from "../../util/exploreTimeViz";
+import { buildSilenceBands } from "../../util/exploreTimeViz";
 
 const styles = mergeCssModuleStyles(
   sharedStyles,
@@ -42,8 +42,6 @@ const styles = mergeCssModuleStyles(
 );
 
 /** "Asia/Tokyo" reads as a path; the city is the part a reader recognises. */
-const zoneCity = (name: string) => name.split("/").pop()?.replace(/_/g, " ") ?? name;
-
 const formatDayLabel = (isoDate: string) =>
   formatExifWallClockDate(`${isoDate}T00:00:00`) ?? isoDate;
 
@@ -57,95 +55,6 @@ const formatYears = (days: number) => {
   return `${Number.isInteger(rounded) ? rounded : rounded.toFixed(1)} years`;
 };
 
-/**
- * Which timezones the archive was shot in.
- *
- * Worth its own panel because the zone is derived per photo from where it was
- * taken, not read from the camera — so a place that changes offset across the
- * year shows both, which is the visible proof that it was resolved per photo
- * rather than assumed once.
- */
-export const ExploreTimezones = ({ stats }: { stats: PhotoStats["timezoneStats"] }) => {
-  const columns = buildZoneAxis(stats.zones);
-  if (stats.zoneCount === 0 || columns.length === 0) return null;
-
-  const seasonal = Array.from(
-    new Set(
-      columns.flatMap((column) =>
-        column.zones.filter((zone) => zone.seasonal).map((zone) => zoneCity(zone.name)),
-      ),
-    ),
-  );
-
-  return (
-    // The full row: sixteen offsets in a single column showed five of them, and
-    // the span from -07:00 to +11:00 is the whole point of drawing it.
-    <section className={`${styles.section} ${styles.sectionWide}`}>
-      <div className={styles.sectionHeader}>
-        <Heading level={2} as="h2">
-          Timezones
-        </Heading>
-        <Caption as="span">Resolved from each photo&rsquo;s own location</Caption>
-      </div>
-      <div className={styles.zoneTotal}>
-        <span className={styles.zoneCount}>{stats.zoneCount}</span>
-        <span className={styles.zoneCountLabel}>
-          {stats.zoneCount === 1 ? "timezone" : "timezones"}, {columns[0]?.label} to{" "}
-          {columns[columns.length - 1]?.label}
-        </span>
-      </div>
-
-      {/* Placed on the world's clock rather than ranked: a list of sixteen
-          offsets says how many, and this says how far apart. */}
-      <div className={styles.zoneClock}>
-        <ol className={styles.zoneAxis}>
-          {columns.map((column) => (
-            <li key={column.hours} className={styles.zoneStack}>
-              <span className={styles.zoneOffsets}>{column.label}</span>
-              <span className={styles.zoneTick} aria-hidden="true" />
-              <span className={styles.zoneStackList}>
-                {column.zones.map((zone) => (
-                  <span
-                    key={zone.name}
-                    className={styles.zoneChip}
-                    // Weighted by how much of the archive stood on this clock,
-                    // so Tokyo's 63% does not read like Macau's three frames.
-                    // The weight is only visible, so the share is also said in
-                    // words — the tail of a 16-zone list rounds to nothing, and
-                    // "0%" would read as none at all.
-                    style={{ opacity: 0.45 + Math.min(0.55, zone.sharePercent / 100) }}
-                    title={`${zoneCity(zone.name)} ${column.label}: ${zone.count.toLocaleString("en")} ${
-                      zone.count === 1 ? "photo" : "photos"
-                    }, ${zone.sharePercent === 0 ? "<1%" : `${zone.sharePercent}%`} of the archive`}
-                  >
-                    <span className={styles.zoneName}>{zoneCity(zone.name)}</span>
-                    <span className={styles.zoneShare}>
-                      {zone.count.toLocaleString("en")}
-                      {zone.seasonal ? "*" : ""}
-                    </span>
-                  </span>
-                ))}
-              </span>
-            </li>
-          ))}
-        </ol>
-      </div>
-
-      {seasonal.length > 0 ? (
-        <p className={styles.zoneNote}>
-          * {Array.from(new Set(seasonal)).join(", ")} {seasonal.length === 1 ? "stands" : "stand"}{" "}
-          in two columns: the offset comes from the photograph&rsquo;s own date, so summer time is a
-          different clock.
-        </p>
-      ) : null}
-    </section>
-  );
-};
-
-/**
- * The longest stretches the archive records nothing at all. An archive's
- * silences describe it as much as its peaks.
- */
 export const ExploreArchiveGaps = ({
   gaps,
   dateRange,

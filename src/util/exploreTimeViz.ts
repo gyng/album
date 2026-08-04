@@ -1,88 +1,12 @@
 import type { PhotoStats } from "./computeStats";
 
 /**
- * Geometry for the two time panels on explore.
+ * Geometry for the silences panel on explore.
  *
- * Both were ranked lists of numbers, and both have a dimension a list throws
- * away: a timezone sits somewhere on the world's clock, and a silence sits
- * somewhere in the archive's own life. These turn the numbers into positions.
+ * It was a ranked list of numbers, and a silence has a dimension a list throws
+ * away: it sits somewhere in the archive's own life. This turns the numbers
+ * into positions.
  */
-
-/** "+09:00" → 9, "-07:00" → -7, "+05:30" → 5.5. Null when it is not an offset. */
-export const parseUtcOffsetHours = (raw: string | null | undefined): number | null => {
-  const match = /^([+-])(\d{2}):(\d{2})$/.exec((raw ?? "").trim());
-  if (!match) return null;
-  const [, sign, hours, minutes] = match;
-  const magnitude = Number(hours) + Number(minutes) / 60;
-  return sign === "-" ? -magnitude : magnitude;
-};
-
-export type ZoneAtOffset = {
-  name: string;
-  count: number;
-  sharePercent: number;
-  /** True where this zone also keeps a different offset at another time of year. */
-  seasonal: boolean;
-};
-
-export type OffsetColumn = {
-  hours: number;
-  label: string;
-  /** 0–100 across the span of offsets the archive actually covers. */
-  position: number;
-  zones: ZoneAtOffset[];
-  count: number;
-};
-
-/**
- * The archive's zones laid out along the world's clock.
- *
- * A zone is placed at every offset it keeps, so Melbourne stands in two columns
- * — which is the visible proof that the offset was resolved per photograph from
- * where it was taken rather than assumed once for the place.
- */
-export const buildZoneAxis = (zones: PhotoStats["timezoneStats"]["zones"]): OffsetColumn[] => {
-  const byOffset = new Map<number, { label: string; zones: ZoneAtOffset[]; count: number }>();
-
-  for (const zone of zones) {
-    const offsets = zone.offsets
-      .map((offset) => ({ hours: parseUtcOffsetHours(offset), label: offset }))
-      .filter((entry): entry is { hours: number; label: string } => entry.hours !== null);
-
-    for (const offset of offsets) {
-      const column = byOffset.get(offset.hours) ?? { label: offset.label, zones: [], count: 0 };
-      column.zones.push({
-        name: zone.name,
-        count: zone.count,
-        sharePercent: zone.sharePercent,
-        seasonal: offsets.length > 1,
-      });
-      // A zone kept in two offsets is one population of photographs, so its
-      // count is not split between them; the column totals are "photographs
-      // that were ever on this clock", not a partition of the archive.
-      column.count += zone.count;
-      byOffset.set(offset.hours, column);
-    }
-  }
-
-  const hours = Array.from(byOffset.keys()).sort((left, right) => left - right);
-  const min = hours[0] ?? 0;
-  const max = hours[hours.length - 1] ?? 0;
-  const span = max - min;
-
-  return hours.map((hour) => {
-    const column = byOffset.get(hour)!;
-    return {
-      hours: hour,
-      label: column.label,
-      position: span === 0 ? 50 : ((hour - min) / span) * 100,
-      zones: [...column.zones].sort(
-        (left, right) => right.count - left.count || left.name.localeCompare(right.name),
-      ),
-      count: column.count,
-    };
-  });
-};
 
 /** A calendar day as a fractional year, so a silence can be placed to the day. */
 export const fractionalYear = (iso: string): number | null => {

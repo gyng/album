@@ -59,10 +59,13 @@
   stroke-linecap: round;
 }
 
+/* Sections are told apart by the space between them, the way explore's groups
+   are — the hairline rules that used to divide them read as a different page's
+   furniture in the same column. */
 .leftColumn {
   position: relative;
   display: grid;
-  gap: var(--m-l);
+  gap: calc(var(--m-xl) * 1.35);
   min-inline-size: 0;
   z-index: var(--z-raised);
 }
@@ -70,8 +73,6 @@
 .memories {
   display: grid;
   gap: var(--m);
-  padding-block-start: var(--m);
-  border-top: solid var(--size-1) color-mix(in oklch, var(--c-bg-contrast-light) 35%, transparent);
 }
 
 .memoriesHeader {

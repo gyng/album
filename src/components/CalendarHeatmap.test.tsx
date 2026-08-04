@@ -72,7 +72,10 @@ describe("CalendarHeatmap", () => {
     expect(onSelectDate).toHaveBeenCalledWith("2024-01-02");
   });
 
-  it("renders recent years first and progressively reveals older years", () => {
+  // Every year the archive covers is drawn. Opening on the two most recent and
+  // asking for the rest a few at a time put the shape of the archive — which
+  // years are thin, which are not — behind a control.
+  it("draws every year the entries cover", () => {
     const manyYears = [2025, 2024, 2023, 2022].map((year, index) => ({
       // invariant: entries fixture is a non-empty literal
       ...entries[0]!,
@@ -88,15 +91,9 @@ describe("CalendarHeatmap", () => {
       <CalendarHeatmap entries={manyYears} selectedDate="2025-01-02" onSelectDate={jest.fn()} />,
     );
 
-    expect(screen.getByRole("heading", { name: "2025" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "2024" })).toBeInTheDocument();
-    expect(screen.queryByRole("heading", { name: "2023" })).toBeNull();
-    expect(screen.getByRole("button", { name: "Show 2 earlier years" })).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("button", { name: "Show 2 earlier years" }));
-
-    expect(screen.getByRole("heading", { name: "2023" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "2022" })).toBeInTheDocument();
+    for (const year of ["2025", "2024", "2023", "2022"]) {
+      expect(screen.getByRole("heading", { name: year })).toBeInTheDocument();
+    }
     expect(screen.queryByRole("button", { name: /earlier years/i })).toBeNull();
   });
 

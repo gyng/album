@@ -269,6 +269,15 @@ export type MapViewProps = {
   /** Defaults to the provider's own choice, in practice Web Mercator. */
   projection?: MapProjectionMode;
   attribution?: MapAttribution;
+  /**
+   * Whether the reader can move the map at all.
+   *
+   * `false` is for a map that is an illustration rather than an instrument —
+   * a route drawn beside the trip it belongs to, in a list the reader is
+   * scrolling past. It takes no wheel, no drag and no keys, which is what
+   * keeps scrolling the page over one from zooming it instead.
+   */
+  interactive?: boolean;
   /** CSS cursor shown over the map surface. */
   cursor?: string;
   onLoad?: (map: MapInstance) => void;
@@ -294,6 +303,7 @@ export const MapView = ({
   initialView,
   projection,
   attribution,
+  interactive,
   cursor,
   onLoad,
   onMoveStart,
@@ -327,6 +337,7 @@ export const MapView = ({
       {...(attribution !== undefined
         ? { attributionControl: toAdapterAttribution(attribution) }
         : {})}
+      {...(interactive !== undefined ? { interactive } : {})}
       {...(cursor !== undefined ? { cursor } : {})}
       {...(className !== undefined ? { className } : {})}
       {...(style !== undefined ? { style } : {})}

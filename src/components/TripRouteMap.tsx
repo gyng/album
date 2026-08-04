@@ -54,7 +54,15 @@ const fitToStops = (
       { lng: Math.min(...lngs), lat: Math.min(...lats) },
       { lng: Math.max(...lngs), lat: Math.max(...lats) },
     ],
-    { padding: FIT_PADDING, maxZoom: FIT_MAX_ZOOM, ...(pitch !== undefined ? { pitch } : {}) },
+    {
+      padding: FIT_PADDING,
+      maxZoom: FIT_MAX_ZOOM,
+      // Arrives framed rather than flying in from the whole world: a list of
+      // ninety-four trips would otherwise zoom at the reader all the way down
+      // the page as each map loads.
+      animate: false,
+      ...(pitch !== undefined ? { pitch } : {}),
+    },
   );
 };
 
@@ -159,6 +167,9 @@ export const TripRouteMap = ({ trip, activeDate }: TripRouteMapProps) => {
       <MapView
         styleUrl={mapStyleUrl(styleName, undefined, activeTheme)}
         attribution={{ compact: true, collapsed: true }}
+        // An illustration of a route, not an instrument: scrolling the page
+        // over one should scroll the page.
+        interactive={false}
         onLoad={(map) => fitToStops(map as never, stops)}
       >
         <DataLayer id={`trip-route-${trip.id}`} lines={lines} order={1} />

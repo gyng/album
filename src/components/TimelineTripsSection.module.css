@@ -1,11 +1,10 @@
-/* Matches the Memories block directly below it: the same hairline separator,
-   the same header shape, the same strip. The two are siblings in one column
-   and should not look like they came from different pages. */
+/* Matches the Memories block directly below it: the same header shape and the
+   same strip. The two are siblings in one column and should not look like they
+   came from different pages — and like explore's groups, they are separated by
+   space rather than by a rule. */
 .section {
   display: grid;
   gap: var(--m);
-  padding-block-start: var(--m);
-  border-top: solid var(--size-1) color-mix(in oklch, var(--c-bg-contrast-light) 35%, transparent);
 }
 
 .head {

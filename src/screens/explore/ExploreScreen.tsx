@@ -51,7 +51,6 @@ import { ExploreTripsSection } from "../../components/explore/ExploreTripsSectio
 import {
   ExploreArchiveGaps,
   ExploreThisDaySection,
-  ExploreTimezones,
 } from "../../components/explore/ExploreTimeSections";
 import { ExploreColourSection } from "../../components/explore/ExploreColourSection";
 import { EmbeddingSpaceDeferred } from "../../components/EmbeddingSpaceDeferred";
@@ -660,7 +659,6 @@ const ExploreScreen = ({ stats, visualSameness }: ExploreScreenProps) => {
                 </div>
               </section>
             ) : null}
-            <ExploreTimezones stats={stats.timezoneStats} />
             <ExploreArchiveGaps gaps={stats.archiveGaps} dateRange={stats.dateRange} />
           </StatGroup>
 

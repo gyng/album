@@ -217,6 +217,29 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
   const cameraRef = React.useRef<Camera>({ ...INITIAL_CAMERA });
   const placedRef = React.useRef<Placed[]>([]);
   const thumbnailsRef = React.useRef(new Map<string, HTMLImageElement>());
+  /**
+   * The full-size picture for a photograph, started on first use.
+   *
+   * A handful are ever wanted at once — one under the pointer or in the
+   * showcase, and its three kin — so this never becomes the request storm the
+   * contact sheet exists to prevent.
+   */
+  /**
+   * The sheet's cells are 48px, which is right for a cloud and soft the moment
+   * one photograph is brought up to three times that. Whatever is active —
+   * pointed at, shown off, or kin to either — is fetched at the size the rest
+   * of the site publishes and drawn from that instead, once it arrives.
+   */
+  const fullResolution = React.useCallback((src: string): HTMLImageElement => {
+    const held = thumbnailsRef.current.get(src);
+    if (held) return held;
+
+    const image = new Image();
+    image.decoding = "async";
+    image.src = src;
+    thumbnailsRef.current.set(src, image);
+    return image;
+  }, []);
   const sheetsRef = React.useRef<HTMLImageElement[]>([]);
   const pointerRef = React.useRef<{ x: number; y: number } | null>(null);
   const draggingRef = React.useRef<{ x: number; y: number } | null>(null);
@@ -448,8 +471,12 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
         const fade = Math.min(1, 1.7 / point.depth);
         const depthAlpha = Math.max(0.08, fade * fade);
 
+        // Resolved from how much of a photograph it currently is rather than
+        // from whether it still wants to be one: taking the sheet away at the
+        // moment a point leaves the near set left the fade-out with nothing to
+        // draw, so it vanished instead of going.
         const cell =
-          atlas && wantsThumbnail && point.entry.slot !== undefined
+          atlas && grown > 0.02 && point.entry.slot !== undefined
             ? sheetsRef.current[Math.floor(point.entry.slot / atlas.perSheet)]
             : undefined;
 
@@ -826,9 +853,13 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
             atlas && point.entry.slot !== undefined
               ? sheetsRef.current[Math.floor(point.entry.slot / atlas.perSheet)]
               : undefined;
-          const own = thumbnailsRef.current.get(point.entry.src);
+          // Asked for at full size the moment it matters; the sheet's cell holds
+          // the place until it arrives.
+          const own = fullResolution(point.entry.src);
 
-          if (
+          if (own.complete && own.naturalWidth > 0) {
+            drawSquare(context, own, point.x, point.y, size);
+          } else if (
             sheet?.complete &&
             sheet.naturalWidth > 0 &&
             atlas &&
@@ -846,8 +877,6 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
               size,
               size,
             );
-          } else if (own?.complete && own.naturalWidth > 0) {
-            drawSquare(context, own, point.x, point.y, size);
           } else {
             context.fillStyle = point.entry.swatch ?? "#8899aa";
             context.fillRect(point.x - size / 2, point.y - size / 2, size, size);
@@ -865,13 +894,7 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
         }
 
         // And the photograph under the pointer, largest and last.
-        let image = thumbnailsRef.current.get(under.entry.src);
-        if (!image) {
-          image = new Image();
-          image.decoding = "async";
-          image.src = under.entry.src;
-          thumbnailsRef.current.set(under.entry.src, image);
-        }
+        const image = fullResolution(under.entry.src);
 
         // Growing a little as it comes up, so it arrives rather than appears.
         const size = thumbnail * (2.4 + 0.6 * focus) * Math.max(0.8, under.scale);
@@ -904,7 +927,7 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
 
     frame = requestAnimationFrame(draw);
     return () => cancelAnimationFrame(frame);
-  }, [atlas, clusters, entries, theme]);
+  }, [atlas, clusters, entries, fullResolution, theme]);
 
   const onPointerDown = (event: React.PointerEvent<HTMLCanvasElement>) => {
     event.currentTarget.setPointerCapture(event.pointerId);
