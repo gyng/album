@@ -1,6 +1,6 @@
 import React from "react";
 import { AppLink } from "./platform";
-import { Caption, OverlayButton, pillStyles } from "./ui";
+import { Caption, OverlayButton, overlayButtonStyles, pillStyles } from "./ui";
 import { useActiveTheme } from "./useActiveTheme";
 import {
   backToFront,
@@ -241,7 +241,11 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
 
       // Not while a ring is being drawn: a cloud that turns under the pointer
       // catches whatever drifted into the loop rather than what was aimed at.
-      if (driftingRef.current && !reduced && !draggingRef.current) {
+      // It turns on its own until somebody engages with it. A name that keeps
+      // moving is a name you have to chase to click, and a photograph under the
+      // pointer should stay under the pointer.
+      const engaged = pointerRef.current !== null || draggingRef.current !== null;
+      if (driftingRef.current && !reduced && !engaged) {
         cameraRef.current.yaw += DRIFT * elapsed;
       }
 
@@ -444,6 +448,18 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
       // render sixty times a second to move eight labels is not a trade worth
       // making.
       const placedLabels: { x: number; y: number; width: number; height: number }[] = [];
+
+      // Every name is put away first. A label this frame never reaches — one
+      // whose clump is behind the camera, or one a small frame has no room for
+      // — would otherwise keep whatever it was left with, which is fully opaque
+      // in the corner it was born in.
+      for (const element of labelRefs.current) {
+        if (element) {
+          element.style.opacity = "0";
+          element.style.pointerEvents = "none";
+        }
+      }
+
       labels.forEach(({ cluster, at }, index) => {
         const element = labelRefs.current[cluster.index];
         if (!element) return;
@@ -677,7 +693,6 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
             the picture is the subject and the chrome should cost it no room. */}
         <div className={styles.tools}>
           <OverlayButton
-            size="small"
             aria-pressed={!drifting}
             className={drifting ? "" : styles.toolActive}
             onClick={() => setDrifting((current) => !current)}
@@ -693,7 +708,13 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
             ref={(element) => {
               labelRefs.current[index] = element;
             }}
-            className={[styles.clusterName, chosen === index ? styles.clusterNameChosen : ""]
+            // The same glass button the media overlays use, positioned over the
+            // cloud: a name is a control, and it should look like the app's.
+            className={[
+              overlayButtonStyles.base,
+              styles.clusterName,
+              chosen === index ? styles.clusterNameChosen : "",
+            ]
               .filter(Boolean)
               .join(" ")}
             aria-pressed={chosen === index}
@@ -758,8 +779,8 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
         </div>
       ) : (
         <Caption as="p" size="sm" className={styles.hint}>
-          Drag to turn it, scroll to move closer, click a name to keep just that clump, click a
-          photograph to open it.
+          It turns by itself until you touch it. Drag to turn it yourself, click a name to keep just
+          that clump, click a photograph to open it.
         </Caption>
       )}
 

@@ -605,13 +605,13 @@ const ExploreScreen = ({ stats, visualSameness }: ExploreScreenProps) => {
 
           {/* Everything else on this page counts something. This one does not:
               it is the collection arranged by what the photographs are of, and
-              the only way to read it is to turn it around. */}
+              the only way to read it is to turn it around — so it is left to
+              speak for itself rather than introduced. */}
           <StatGroup
             id="embedding-space"
-            title="The collection as a cloud"
-            description="Every photograph placed by what it is of, along the three directions this collection varies along most. Nearby means the model reads them as alike; the clumps are your own recurring subjects."
+            title="Cloud"
             deferContent
-            deferredSummary="A turnable cloud of every embedded photograph, arranged by subject rather than by time or place."
+            deferredSummary="Every photograph, placed by what it is of."
           >
             <section className={`${styles.section} ${styles.sectionWide}`}>
               <EmbeddingSpaceDeferred />

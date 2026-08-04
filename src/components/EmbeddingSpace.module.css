@@ -28,7 +28,10 @@
   inline-size: 100%;
   block-size: 100%;
   cursor: grab;
-  touch-action: none;
+  /* A drag across it turns the cloud, but a swipe down it still scrolls the
+     page: `none` here would trap a phone reader inside a canvas half a screen
+     tall with no way past it. */
+  touch-action: pan-y;
 }
 
 .canvas:active {
@@ -50,28 +53,24 @@
   color: var(--c-accent);
 }
 
-/* A clump's name: a control the reader can click, tab to and hear read out,
-   positioned over the canvas from the draw loop. */
+/* The name of whatever is under the pointer, in the same glass the buttons
+   use so the chrome over the cloud is all one material. */
+
+/* A clump's name is an overlay button (see OverlayButton) that the draw loop
+   positions over the canvas; only where it sits and how it reads when chosen
+   belong here. */
 .clusterName {
   position: absolute;
   inset-block-start: 0;
   inset-inline-start: 0;
-  display: flex;
-  align-items: baseline;
   gap: var(--m-xs);
-  padding: var(--m-xs) var(--m-s);
-  border: solid var(--line-hairline) transparent;
-  border-radius: var(--radius-pill);
-  background: var(--c-overlay-dark);
-  color: var(--c-white);
-  font-size: var(--fs-sm);
   font-weight: 600;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.03em;
   white-space: nowrap;
-  cursor: pointer;
   transition:
     opacity var(--t-fast) var(--ease-out),
-    background-color var(--t-fast) var(--ease-out);
+    background-color var(--t-fast) var(--ease-out),
+    color var(--t-fast) var(--ease-out);
 }
 
 .clusterName:hover,
@@ -79,15 +78,26 @@
   border-color: var(--c-accent);
 }
 
-.clusterNameChosen {
-  background: var(--c-white);
-  color: var(--c-black);
+/* A name the frame had no room for is still a control a keyboard can reach, so
+   it shows itself when focused. The draw loop writes opacity inline, which is
+   why this has to insist. */
+.clusterName:focus-visible {
+  opacity: 1 !important;
+  pointer-events: auto !important;
+}
+
+/* Doubled up so it beats the overlay button's own background, whichever order
+   the two modules land in. */
+.clusterName.clusterNameChosen {
+  background-color: var(--c-accent);
+  border-color: var(--c-accent);
+  color: var(--c-white);
 }
 
 .clusterCount {
   font-size: var(--fs-xs);
   font-weight: 400;
-  opacity: 0.7;
+  opacity: 0.75;
 }
 
 .status {
