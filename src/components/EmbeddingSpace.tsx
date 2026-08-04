@@ -132,6 +132,9 @@ const DRAG_SLOP = 5;
 /** How many of a selection's tags are worth naming. */
 const SELECTION_TAGS = 3;
 
+/** How many of a photograph's own tags are shown while a reader is on it. */
+const CAPTION_TAGS = 3;
+
 /**
  * Left alone, the cloud shows itself: every few seconds it brings one
  * photograph up out of the drift, with its kin beside it, and lets them go
@@ -678,8 +681,7 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
         ]);
         const candidates = ordered.filter(
           (point) =>
-            point.entry.tag !== undefined &&
-            !taken.has(point.entry.tag) &&
+            (point.entry.tags ?? []).some((tag) => !taken.has(tag)) &&
             nearest.has(point.index) &&
             point.x > thumbnail * 2 &&
             point.x < width - thumbnail * 2 &&
@@ -687,10 +689,11 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
             point.y < viewHeight - thumbnail,
         );
         const pick = candidates[Math.floor(Math.random() * candidates.length)];
-        driftingTagsRef.current[slot] = pick?.entry.tag
+        const word = (pick?.entry.tags ?? []).find((tag) => !taken.has(tag));
+        driftingTagsRef.current[slot] = word
           ? {
-              index: pick.index,
-              tag: pick.entry.tag,
+              index: pick?.index ?? 0,
+              tag: word,
               start: time + slot * (DRIFTING_TAG_PERIOD / DRIFTING_TAGS),
             }
           : null;
@@ -945,11 +948,13 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
   // labels are: the tags that are commoner in here than in the collection.
   const overallTags = new Map<string, number>();
   for (const entry of entries ?? []) {
-    if (entry.tag) overallTags.set(entry.tag, (overallTags.get(entry.tag) ?? 0) + 1);
+    for (const tag of entry.tags ?? []) {
+      overallTags.set(tag, (overallTags.get(tag) ?? 0) + 1);
+    }
   }
 
   const selectionTags: string[] = [];
-  const remaining = selected.map((entry) => (entry.tag ? [entry.tag] : []));
+  const remaining = selected.map((entry) => entry.tags ?? []);
   // The clump's own name is what the reader just clicked; repeating it back as
   // "also autumn" says nothing.
   const taken = new Set<string>(chosenLabel ? [chosenLabel] : []);
@@ -1060,9 +1065,11 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
           aria-hidden={named ? undefined : true}
         >
           <span>{lastNamed?.album ?? lastNamed?.label ?? ""}</span>
-          {lastNamed?.tag ? (
-            <span className={styles.captionTag}>{lastNamed.tag.replaceAll("_", " ")}</span>
-          ) : null}
+          {(lastNamed?.tags ?? []).slice(0, CAPTION_TAGS).map((tag) => (
+            <span key={tag} className={styles.captionTag}>
+              {tag.replaceAll("_", " ")}
+            </span>
+          ))}
         </figcaption>
       </div>
 

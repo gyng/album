@@ -835,6 +835,14 @@ const CLUSTERS = 8;
 /** A clump smaller than this is a handful of photographs, not a subject. */
 const MIN_CLUSTER_SIZE = 25;
 
+/**
+ * How many of a photograph's tags travel with it.
+ *
+ * Enough to say what it is when a reader is looking at it, few enough that
+ * fifteen hundred of them stay a payload rather than a download.
+ */
+const TAGS_PER_PHOTO = 4;
+
 /** What one clump of the cloud turned out to be about. */
 export type EmbeddingSpaceCluster = {
   x: number;
@@ -853,8 +861,8 @@ export type EmbeddingSpacePoint = {
   album?: string;
   /** Its dominant colour, so the cloud is coloured by the photographs themselves. */
   swatch?: string;
-  /** The photograph's most distinctive tag, for naming what a cluster turned out to be. */
-  tag?: string;
+  /** What the captioner said is in it, most telling first, at most a handful. */
+  tags?: string[];
   /** Its cell on the contact sheet, when one was built. */
   slot?: number;
   /**
@@ -974,7 +982,7 @@ export const loadEmbeddingSpacePoints = async (
 
       const points = decoded.map((entry, index) => {
         const position = positions[index] ?? { x: 0, y: 0, z: 0 };
-        const tag = tagLookup.get(entry.path)?.[0];
+        const tags = (tagLookup.get(entry.path) ?? []).slice(0, TAGS_PER_PHOTO);
         const album = albumLookup.get(entry.path);
         const slot = slots[entry.path];
         return {
@@ -983,7 +991,7 @@ export const loadEmbeddingSpacePoints = async (
           label: entry.photo.label,
           ...(album ? { album } : {}),
           ...(entry.photo.swatch ? { swatch: entry.photo.swatch } : {}),
-          ...(tag ? { tag } : {}),
+          ...(tags.length > 0 ? { tags } : {}),
           ...(slot === undefined ? {} : { slot }),
           ...((neighbours[index]?.length ?? 0) > 0 ? { near: neighbours[index] } : {}),
           ...(clusterOf.has(index) ? { cluster: clusterOf.get(index) } : {}),

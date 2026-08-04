@@ -11,7 +11,8 @@ export type EmbeddingSpaceEntry = {
   label: string;
   album?: string;
   swatch?: string;
-  tag?: string;
+  /** What the captioner said is in it, most telling first. */
+  tags?: string[];
   /** Its cell on the contact sheet, when the build made one. */
   slot?: number;
   /** The photographs the model reads as most like this one, by index. */
