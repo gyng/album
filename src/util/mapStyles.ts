@@ -52,7 +52,12 @@ export type MapStyleName =
   | "dark"
   | "satellite"
   | "watercolour"
-  | "monochrome";
+  | "monochrome"
+  | "neon"
+  | "halftone"
+  | "paper"
+  | "crt"
+  | "globe";
 
 /**
  * Where a style's tiles come from.
@@ -133,6 +138,42 @@ export const MAP_STYLES: Record<
     source: { provider: "free", id: "positron" },
     label: "Monochrome",
     swatch: "#ededed",
+  },
+  // The rest are made rather than chosen: each one is a different answer to
+  // what a map could be made of.
+  //
+  // Light. The roads are the only lit thing on it — a wide blurred copy under a
+  // thin bright core, which is how a light reads on a photograph.
+  neon: {
+    source: { provider: "self", path: "/map-styles/neon.json" },
+    label: "Neon",
+    swatch: "#05060b",
+  },
+  // Ink. Tone comes from the size of a dot, the way an offset press shades an
+  // area, with grain over the whole sheet.
+  halftone: {
+    source: { provider: "self", path: "/map-styles/halftone.json" },
+    label: "Halftone",
+    swatch: "#f2e4c4",
+  },
+  // Card. Every fill drops a shadow, so the map stacks instead of printing.
+  paper: {
+    source: { provider: "self", path: "/map-styles/paper.json" },
+    label: "Paper",
+    swatch: "#f6f1e4",
+  },
+  // Phosphor. Linework only, scanlines over everything.
+  crt: {
+    source: { provider: "self", path: "/map-styles/crt.json" },
+    label: "CRT",
+    swatch: "#020604",
+  },
+  // A sphere. The projection is the style: MapLibre reads it from the document,
+  // so choosing this basemap is what puts the photographs on a planet.
+  globe: {
+    source: { provider: "self", path: "/map-styles/globe.json" },
+    label: "Globe",
+    swatch: "#1b2430",
   },
 };
 

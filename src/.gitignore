@@ -57,4 +57,5 @@ node_modules/
 /public/pwa-icon-512.png
 /public/apple-touch-icon.png
 public/map-styles/*.json
+public/map-styles/patterns/
 !public/map-styles/*.template.json

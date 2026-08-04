@@ -52,6 +52,111 @@ describe("what a basemap leaves out", () => {
   });
 });
 
+describe("styles that are about more than colour", () => {
+  // A road looks lit rather than drawn when a wide blurred copy sits under it,
+  // which is a paint property rather than a post-processing pass.
+  it("lays a blurred copy of the roads under the roads for a neon map", () => {
+    const style = composeMapStyle({ options: { glow: { colour: "#00e5ff", blur: 8 } } });
+    const ids = layerIds(style);
+    const glow = style.layers.find((layer) => layer.id === "road-glow");
+
+    expect(glow.paint["line-color"]).toBe("#00e5ff");
+    expect(glow.paint["line-blur"]).toBe(8);
+    expect(ids.indexOf("road-glow")).toBeLessThan(ids.indexOf("roads"));
+  });
+
+  it("draws no glow at all by default", () => {
+    expect(layerIds(composeMapStyle({}))).not.toContain("road-glow");
+  });
+
+  // A glow with nothing specified still has to be a glow: the road's own colour,
+  // wide and soft.
+  it("gives a glow sensible proportions when it is only asked for", () => {
+    const glow = composeMapStyle({
+      palette: { road: "#ff00aa" },
+      options: { glow: {} },
+    }).layers.find((layer) => layer.id === "road-glow");
+
+    expect(glow.paint["line-color"]).toBe("#ff00aa");
+    expect(glow.paint["line-blur"]).toBeGreaterThan(0);
+    expect(glow.paint["line-opacity"]).toBeGreaterThan(0);
+    expect(glow.paint["line-width"]).toBeDefined();
+  });
+
+  // Patterns come out of a sprite, and a style naming one without a sprite URL
+  // draws nothing at all.
+  it("prints a screen into the ground and the water, and an overlay over both", () => {
+    const style = composeMapStyle({
+      options: {
+        spriteUrl: "https://example.test/patterns/sprite",
+        screen: { land: "dot-coarse", water: "dot-fine" },
+        overlay: { id: "grain", opacity: 0.3 },
+      },
+    });
+
+    expect(style.sprite).toBe("https://example.test/patterns/sprite");
+    expect(
+      style.layers.find((layer) => layer.id === "land-screen").paint["background-pattern"],
+    ).toBe("dot-coarse");
+    expect(style.layers.find((layer) => layer.id === "water-screen").paint["fill-pattern"]).toBe(
+      "dot-fine",
+    );
+    // The overlay is the last thing drawn, or it is not over anything.
+    expect(layerIds(style).at(-1)).toBe("overlay");
+    expect(style.layers.at(-1).paint["background-opacity"]).toBe(0.3);
+  });
+
+  it("leaves an overlay at full strength when no opacity is given", () => {
+    const style = composeMapStyle({ options: { overlay: { id: "scanline" } } });
+
+    expect(style.layers.at(-1).paint["background-opacity"]).toBe(1);
+  });
+
+  it("stacks a shadow under each fill when the map is cut card", () => {
+    const style = composeMapStyle({ options: { shadow: 3 } });
+    const ids = layerIds(style);
+    const shadow = style.layers.find((layer) => layer.id === "water-shadow");
+
+    expect(shadow.paint["fill-translate"]).toEqual([3, 3]);
+    expect(ids.indexOf("water-shadow")).toBeLessThan(ids.indexOf("water"));
+    expect(ids.indexOf("buildings-shadow")).toBeLessThan(ids.indexOf("buildings"));
+  });
+
+  // On a globe the sky layer is the halo around the planet, so a globe without
+  // one is a flat disc cut out of the background.
+  // The atmosphere is a document property, not a layer — a "sky" layer is not
+  // a thing the style spec has, and one invalidates the whole style, which
+  // takes the map down rather than the halo.
+  it("gives the planet an atmosphere when asked for one", () => {
+    const style = composeMapStyle({ options: { sky: { horizon: "#4488cc" } } });
+
+    expect(style.sky["horizon-color"]).toBe("#4488cc");
+    expect(style.sky["atmosphere-blend"]).toBeGreaterThan(0);
+    expect(style.layers.some((layer) => layer.type === "sky")).toBe(false);
+    expect(composeMapStyle({}).sky).toBeUndefined();
+  });
+
+  it("puts the map on a sphere when asked, and leaves it flat otherwise", () => {
+    expect(composeMapStyle({ options: { projection: "globe" } }).projection).toEqual({
+      type: "globe",
+    });
+    expect(composeMapStyle({}).projection).toBeUndefined();
+    expect(composeMapStyle({}).sprite).toBeUndefined();
+  });
+
+  // Linework has no fills to cast shadows or hold a screen.
+  it("keeps a sketch free of shadows and screens", () => {
+    const ids = layerIds(
+      composeMapStyle({
+        options: { outlineOnly: true, shadow: 3, screen: { water: "dot-fine" } },
+      }),
+    );
+
+    expect(ids).not.toContain("water-shadow");
+    expect(ids).not.toContain("water-screen");
+  });
+});
+
 describe("a drawing rather than a map", () => {
   // Sketch is watercolour's sibling: linework, no fills, so the ground shows
   // through everything.

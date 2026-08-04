@@ -54,6 +54,29 @@ const optionDefaults = {
   /** Draws linework only: no fills except the ground itself. */
   outlineOnly: false,
   lineWidthScale: 1,
+  /**
+   * A wide, blurred copy of the roads beneath the roads: what makes a road look
+   * lit rather than drawn. `{ colour, width, blur }`, or null for a flat map.
+   */
+  glow: null,
+  /** A pattern laid over the whole map — grain, scanlines — as `{ id, opacity }`. */
+  overlay: null,
+  /** A pattern printed into the land and water fills, as `{ land, water }`. */
+  screen: null,
+  /**
+   * Pixels to offset a dark copy of each fill by, so the map reads as cut card
+   * stacked on card rather than as ink on paper.
+   */
+  shadow: 0,
+  /** "globe" puts the map on a sphere; the default leaves it flat. */
+  projection: null,
+  /**
+   * Atmosphere: a sky layer, which on a globe is the halo around the planet and
+   * on a tilted flat map is the horizon. `{ sky, horizon, atmosphere }`.
+   */
+  sky: null,
+  /** Where the pattern images come from; required by `overlay` and `screen`. */
+  spriteUrl: null,
 };
 
 const ROAD_CLASSES = {
@@ -71,11 +94,47 @@ const interpolate = (stops) => [
   ...stops.flatMap(([zoom, value]) => [zoom, value]),
 ];
 
+/**
+ * The atmosphere, which is a document property rather than a layer: MapLibre
+ * draws the halo around a globe and the horizon on a tilted map from this, and
+ * a `sky` *layer* is not a thing the style spec has.
+ */
+const skyFor = (sky) => ({
+  "sky-color": sky.sky ?? "#0a1622",
+  "horizon-color": sky.horizon ?? "#3f6f9c",
+  "fog-color": sky.fog ?? "#0a1622",
+  "sky-horizon-blend": 0.6,
+  "horizon-fog-blend": 0.5,
+  "fog-ground-blend": 0.5,
+  "atmosphere-blend": sky.atmosphere ?? 0.8,
+});
+
+/** A fill's own shadow: the same geometry, nudged, in the theme's ink. */
+const shadowLayer = (id, sourceLayer, palette, options) => ({
+  id: `${id}-shadow`,
+  type: "fill",
+  source: SOURCE,
+  "source-layer": sourceLayer,
+  paint: {
+    "fill-color": palette.label,
+    "fill-opacity": 0.28,
+    "fill-translate": [options.shadow, options.shadow],
+  },
+});
+
 /** Every layer this composer can draw, in the order a map wants them. */
 const buildLayers = (palette, options) => {
   const layers = [
     { id: "ground", type: "background", paint: { "background-color": palette.land } },
   ];
+
+  if (options.screen?.land) {
+    layers.push({
+      id: "land-screen",
+      type: "background",
+      paint: { "background-pattern": options.screen.land },
+    });
+  }
 
   if (options.landcover && !options.outlineOnly) {
     layers.push(
@@ -98,6 +157,10 @@ const buildLayers = (palette, options) => {
     );
   }
 
+  if (options.shadow && !options.outlineOnly) {
+    layers.push(shadowLayer("water", "water", palette, options));
+  }
+
   layers.push({
     id: "water",
     type: options.outlineOnly ? "line" : "fill",
@@ -107,6 +170,16 @@ const buildLayers = (palette, options) => {
       ? { "line-color": palette.water, "line-width": 1.2 * options.lineWidthScale }
       : { "fill-color": palette.water },
   });
+
+  if (options.screen?.water && !options.outlineOnly) {
+    layers.push({
+      id: "water-screen",
+      type: "fill",
+      source: SOURCE,
+      "source-layer": "water",
+      paint: { "fill-pattern": options.screen.water },
+    });
+  }
 
   layers.push({
     id: "waterway",
@@ -126,6 +199,13 @@ const buildLayers = (palette, options) => {
       ),
     },
   });
+
+  if (options.buildings && options.shadow && !options.outlineOnly) {
+    layers.push({
+      ...shadowLayer("buildings", "building", palette, options),
+      minzoom: 13,
+    });
+  }
 
   if (options.buildings && !options.outlineOnly) {
     layers.push({
@@ -168,6 +248,31 @@ const buildLayers = (palette, options) => {
               [16, 9],
             ],
             options.lineWidthScale,
+          ),
+        ),
+      },
+    });
+  }
+
+  if (options.glow) {
+    layers.push({
+      id: "road-glow",
+      type: "line",
+      source: SOURCE,
+      "source-layer": "transportation",
+      filter: ["in", "class", ...classes],
+      paint: {
+        "line-color": options.glow.colour ?? palette.road,
+        "line-blur": options.glow.blur ?? 6,
+        "line-opacity": options.glow.opacity ?? 0.55,
+        "line-width": interpolate(
+          scaled(
+            [
+              [6, 2],
+              [12, 8],
+              [16, 22],
+            ],
+            (options.glow.width ?? 1) * options.lineWidthScale,
           ),
         ),
       },
@@ -253,6 +358,17 @@ const buildLayers = (palette, options) => {
     });
   }
 
+  if (options.overlay) {
+    layers.push({
+      id: "overlay",
+      type: "background",
+      paint: {
+        "background-pattern": options.overlay.id,
+        "background-opacity": options.overlay.opacity ?? 1,
+      },
+    });
+  }
+
   return layers;
 };
 
@@ -267,10 +383,13 @@ const composeMapStyle = ({ name, palette = {}, options = {} } = {}) => {
   return {
     version: 8,
     name: name ?? "Composed",
+    ...(resolvedOptions.projection ? { projection: { type: resolvedOptions.projection } } : {}),
+    ...(resolvedOptions.sky ? { sky: skyFor(resolvedOptions.sky) } : {}),
     sources: {
       [SOURCE]: { type: "vector", url: OPEN_FREE_MAP.tiles, attribution: ATTRIBUTION },
     },
     glyphs: OPEN_FREE_MAP.fonts,
+    ...(resolvedOptions.spriteUrl ? { sprite: resolvedOptions.spriteUrl } : {}),
     layers: buildLayers(resolvedPalette, resolvedOptions),
   };
 };
