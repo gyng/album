@@ -35,7 +35,7 @@ import {
 } from "./mapWorldViewModel";
 import { useMapThumbnailPrefetch } from "./useMapThumbnailPrefetch";
 import { useMapStyleName } from "./MapStyleToggle";
-import { isPitchedMapStyle, mapStyleUrl } from "../util/mapStyles";
+import { mapStyleUrl } from "../util/mapStyles";
 import {
   MapAutoFit,
   MapBoundsTracker,
@@ -146,9 +146,6 @@ const readStringProperty = (
  * journey lines, and without an order that remount would put them over the pins
  * the reader is aiming at.
  */
-/** Enough tilt to stand the buildings up without losing the plan view. */
-const PITCHED_MAP_PITCH = 50;
-
 const LAYER_ORDER = {
   journeyGlow: 10,
   journeyLine: 20,
@@ -660,10 +657,6 @@ export const MMap: React.FC<MapWorldProps> = ({
           initialView={{
             ...(initialCenter ? { center: initialCenter } : {}),
             ...(initialZoom ? { zoom: Number.parseFloat(initialZoom) } : {}),
-            // The 3D basemap draws its buildings with height, which a
-            // straight-down camera cannot show. OpenFreeMap's own 3D demo is
-            // this same style with the camera tilted.
-            ...(isPitchedMapStyle(mapStyleName) ? { pitch: PITCHED_MAP_PITCH } : {}),
           }}
           onMoveStart={() => {
             setContextPoint(null);
@@ -694,16 +687,8 @@ export const MMap: React.FC<MapWorldProps> = ({
             updateParams(view);
           }}
         >
-          <MapAutoFit
-            {...(isPitchedMapStyle(mapStyleName) ? { pitch: PITCHED_MAP_PITCH } : {})}
-            enabled={fitToPhotos}
-            photos={photos}
-          />
-          <MapFitOnRequest
-            {...(isPitchedMapStyle(mapStyleName) ? { pitch: PITCHED_MAP_PITCH } : {})}
-            requestId={fitRequestId}
-            photos={photos}
-          />
+          <MapAutoFit enabled={fitToPhotos} photos={photos} />
+          <MapFitOnRequest requestId={fitRequestId} photos={photos} />
           <MapBoundsTracker
             onBoundsChange={setBounds}
             onRenderBoundsChange={setRenderBounds}

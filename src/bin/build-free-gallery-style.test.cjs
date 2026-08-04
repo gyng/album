@@ -112,3 +112,33 @@ describe("buildFreeStyle", () => {
     expect(free.layers.map((layer) => layer.id)).toEqual(["background", "roads"]);
   });
 });
+
+describe("a style whose landmass comes from elsewhere", () => {
+  // The watercolour style fills its land from a separate MapTiler tileset the
+  // free provider does not have. OpenFreeMap's own styles get the same result
+  // from a background colour with the water drawn over it.
+  it("turns a land fill into a background of the same colour", () => {
+    const layer = rewriteLayer(
+      {
+        id: "Land",
+        type: "fill",
+        source: "land",
+        "source-layer": "land",
+        paint: { "fill-color": "hsl(46, 65%, 91%)" },
+      },
+      "openmaptiles",
+    );
+
+    expect(layer).toEqual({
+      id: "Land",
+      type: "background",
+      paint: { "background-color": "hsl(46, 65%, 91%)" },
+    });
+  });
+
+  it("drops the terrain layers no free tiles carry", () => {
+    for (const sourceLayer of ["contour", "trail", "outdoor_poi"]) {
+      expect(rewriteLayer({ id: sourceLayer, "source-layer": sourceLayer }, "x")).toBeNull();
+    }
+  });
+});

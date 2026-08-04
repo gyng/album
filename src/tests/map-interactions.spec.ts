@@ -64,15 +64,17 @@ test.describe("World map interactions", () => {
     const picker = page.getByRole("combobox", { name: "Map style" });
     await expect(picker).toHaveValue("3d");
 
+    // Satellite is imagery, which no free source serves — one of the few
+    // choices still worth spending the metered key on.
     const styleRequest = page.waitForRequest((request) =>
-      request.url().includes("/maps/aquarelle"),
+      request.url().includes("/maps/satellite"),
     );
-    await picker.selectOption("watercolour");
+    await picker.selectOption("satellite");
     await styleRequest;
     await expect(page.locator('[data-map-status="loaded"]')).toBeVisible();
 
     await page.reload({ waitUntil: "domcontentloaded" });
-    await expect(page.getByRole("combobox", { name: "Map style" })).toHaveValue("watercolour");
+    await expect(page.getByRole("combobox", { name: "Map style" })).toHaveValue("satellite");
   });
 
   test("filters mapped photos with the lightweight index", async ({ page }) => {

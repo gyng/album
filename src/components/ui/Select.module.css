@@ -83,3 +83,63 @@
     font-size: var(--fs-touch);
   }
 }
+
+/* `base-select` opts a native select into being styleable — the button, the
+   dropdown, and the options inside it, which no amount of CSS could reach
+   before. Browsers without it keep everything above: `appearance: none` and the
+   arrow drawn as a background image. */
+@supports (appearance: base-select) {
+  .base {
+    appearance: base-select;
+  }
+
+  .base::picker(select) {
+    appearance: base-select;
+    margin-block-start: var(--m);
+    padding: var(--m);
+    border: solid var(--line-hairline) var(--c-bg-contrast-light);
+    border-radius: var(--m-s);
+    background: var(--c-bg);
+    color: var(--c-font);
+    box-shadow: 0 var(--size-4) var(--size-16) var(--c-overlay-dark);
+  }
+
+  .base option {
+    padding: var(--m) var(--m-s);
+    border-radius: var(--m);
+    background: transparent;
+    color: inherit;
+    font-size: var(--fs-sm);
+  }
+
+  .base option:hover,
+  .base option:focus {
+    background: color-mix(in oklch, var(--c-bg-contrast-light) 16%, transparent);
+  }
+
+  .base option:checked {
+    background: color-mix(in oklch, var(--c-accent) 20%, transparent);
+  }
+
+  /* The tick the browser adds for the selected option; the accent already says
+     which one it is. */
+  .base option::checkmark {
+    display: none;
+  }
+
+  /* The select's own arrow comes back as a real element, so the background
+     images the fallback draws are no longer needed. */
+  .select,
+  .compact {
+    background-image: none;
+  }
+
+  .base::picker-icon {
+    color: var(--c-bg-contrast-light);
+    transition: transform var(--t-fast) var(--ease-out);
+  }
+
+  .base:open::picker-icon {
+    transform: rotate(180deg);
+  }
+}

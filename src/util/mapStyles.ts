@@ -71,8 +71,8 @@ type StyleSource =
  */
 export const MAP_STYLES: Record<MapStyleName, { source: StyleSource; label: string }> = {
   // The default first, then the rest. `liberty` is the one OpenFreeMap style
-  // that carries a fill-extrusion layer, so a pitched camera over it stands the
-  // buildings up — which is the whole of what "3D" means here.
+  // that carries a fill-extrusion layer: it opens flat, like every other
+  // basemap here, and stands its buildings up as soon as a reader tilts it.
   "3d": { source: { provider: "free", id: "liberty" }, label: "3D" },
   // The fork's own design, lifted off the metered tiles onto the free ones and
   // served from here: same layers, same paint, same sprite, no key and no
@@ -83,7 +83,13 @@ export const MAP_STYLES: Record<MapStyleName, { source: StyleSource; label: stri
   topographic: { source: { provider: "keyed", id: "topo-v2" }, label: "Topographic" },
   dark: { source: { provider: "free", id: "dark" }, label: "Dark" },
   satellite: { source: { provider: "keyed", id: "satellite" }, label: "Satellite" },
-  watercolour: { source: { provider: "keyed", id: "aquarelle" }, label: "Watercolour" },
+  // Also lifted onto the free tiles: its landmass came from a tileset of its
+  // own, which becomes a background of the same colour, the way OpenFreeMap's
+  // own styles draw land.
+  watercolour: {
+    source: { provider: "self", path: "/map-styles/watercolour.json" },
+    label: "Watercolour",
+  },
   monochrome: { source: { provider: "free", id: "positron" }, label: "Monochrome" },
 };
 
@@ -141,12 +147,6 @@ export const mapStyleUrl = (name: MapStyleName, key: string = MAP_TILER_KEY): st
   if (source.provider === "self") return source.path;
   return mapTilerStyleUrl(source.id, key);
 };
-
-/**
- * Whether this style stands its buildings up, which is only worth pitching the
- * camera for where the style actually draws them.
- */
-export const isPitchedMapStyle = (name: MapStyleName): boolean => name === "3d";
 
 const readStored = (): MapStyleName | null => {
   try {

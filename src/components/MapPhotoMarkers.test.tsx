@@ -61,6 +61,9 @@ jest.mock("./map", () => ({
     dataLayer(props);
     return <div data-testid={props.id} />;
   },
+  // No map object in these tests, so the depth ordering stays off and the pins
+  // keep the recency order the assertions below are about.
+  useMap: () => null,
 }));
 
 /**

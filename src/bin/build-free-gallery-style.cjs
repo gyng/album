@@ -83,11 +83,32 @@ const remapFonts = (value) => {
  * ships `landcover` and `landuse` but not that one, so those layers would draw
  * nothing and are dropped rather than left to fail quietly.
  */
-const UNAVAILABLE_SOURCE_LAYERS = new Set(["globallandcover"]);
+const UNAVAILABLE_SOURCE_LAYERS = new Set(["globallandcover", "contour", "trail", "outdoor_poi"]);
+
+/**
+ * A style may draw its landmass from a separate tileset the free provider does
+ * not have. OpenFreeMap's own styles get the same result from a background
+ * colour with water drawn over it, so a land fill becomes exactly that.
+ */
+const LAND_SOURCE_LAYER = "land";
+
+const asBackground = (layer) => ({
+  id: layer.id,
+  type: "background",
+  ...(layer.minzoom !== undefined ? { minzoom: layer.minzoom } : {}),
+  ...(layer.maxzoom !== undefined ? { maxzoom: layer.maxzoom } : {}),
+  paint: {
+    ...(layer.paint?.["fill-color"] ? { "background-color": layer.paint["fill-color"] } : {}),
+    ...(layer.paint?.["fill-pattern"] ? { "background-pattern": layer.paint["fill-pattern"] } : {}),
+  },
+});
 
 /** Rewrites one layer onto the free source, or drops it where it cannot work. */
 const rewriteLayer = (layer, sourceName) => {
   if (UNAVAILABLE_SOURCE_LAYERS.has(layer["source-layer"])) return null;
+  if (layer["source-layer"] === LAND_SOURCE_LAYER && layer.type === "fill") {
+    return asBackground(layer);
+  }
 
   const next = { ...layer };
   if (next.source) next.source = sourceName;
@@ -104,7 +125,7 @@ const rewriteLayer = (layer, sourceName) => {
  * source-less carrier for their attribution, which no longer applies to tiles
  * they are not serving.
  */
-const buildFreeStyle = (style, { sourceName = "openmaptiles" } = {}) => {
+const buildFreeStyle = (style, { sourceName = "openmaptiles", spritePath = SPRITE_PATH } = {}) => {
   const layers = style.layers.map((layer) => rewriteLayer(layer, sourceName)).filter(Boolean);
 
   return {
@@ -118,7 +139,7 @@ const buildFreeStyle = (style, { sourceName = "openmaptiles" } = {}) => {
       },
     },
     glyphs: OPEN_FREE_MAP.fonts,
-    sprite: SPRITE_PATH,
+    sprite: spritePath,
     ...(style.light ? { light: style.light } : {}),
     ...(style.sky ? { sky: style.sky } : {}),
     layers,
@@ -133,15 +154,18 @@ const fetchJson = async (url) => {
 };
 
 /* istanbul ignore next -- network and disk */
-const run = async (log = console.log) => {
+const run = async (log = console.log, argv = process.argv.slice(2)) => {
   const key = siteConfig.map.apiKey;
-  const id = siteConfig.map.galleryStyleId;
-  if (!key || !id) throw new Error("No gallery style is configured to copy.");
+  // Defaults to the fork's own style; any provider style id can be copied, so
+  // long as it draws from tiles the free provider also serves.
+  const [styleId = siteConfig.map.galleryStyleId, name = "gallery"] = argv;
+  if (!key || !styleId) throw new Error("No style is configured to copy.");
 
+  const id = styleId;
   const base = `https://api.maptiler.com/maps/${id}`;
   const style = await fetchJson(`${base}/style.json?key=${key}`);
   const outDir = path.join(__dirname, "..", "public", "map-styles");
-  const spriteDir = path.join(outDir, "gallery");
+  const spriteDir = path.join(outDir, name);
   fs.mkdirSync(spriteDir, { recursive: true });
 
   // The sprite is the style's own icons; served from here it costs the metered
@@ -159,10 +183,10 @@ const run = async (log = console.log) => {
     fs.writeFileSync(path.join(spriteDir, name), body);
   }
 
-  const free = buildFreeStyle(style);
-  fs.writeFileSync(path.join(outDir, "gallery.template.json"), `${JSON.stringify(free)}\n`);
+  const free = buildFreeStyle(style, { spritePath: `{{origin}}/map-styles/${name}/sprite` });
+  fs.writeFileSync(path.join(outDir, `${name}.template.json`), `${JSON.stringify(free)}\n`);
   log(
-    `Wrote ${free.layers.length} layers (from ${style.layers.length}) to public/map-styles/gallery.template.json`,
+    `Wrote ${free.layers.length} layers (from ${style.layers.length}) to public/map-styles/${name}.template.json`,
   );
   return free;
 };

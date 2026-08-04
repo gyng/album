@@ -695,27 +695,15 @@ describe("MapWorld", () => {
     // provider cannot leave the site without a basemap.
     expect(mapStyleUrl(DEFAULT_MAP_STYLE)).toContain("tiles.openfreemap.org");
 
+    // Satellite is imagery, which no free source serves, so it is one of the
+    // few choices still worth spending the metered key on.
     act(() => {
-      setMapStyleName("watercolour");
+      setMapStyleName("satellite");
     });
     expect(mapProps).toHaveBeenLastCalledWith(
-      expect.objectContaining({ mapStyle: mapStyleUrl("watercolour") }),
+      expect.objectContaining({ mapStyle: mapStyleUrl("satellite") }),
     );
-    expect(mapStyleUrl("watercolour")).toContain("api.maptiler.com");
-  });
-
-  // A basemap that draws its buildings with height says nothing to a camera
-  // pointing straight down.
-  it("tilts the camera for the 3D basemap and leaves the others flat", () => {
-    render(<MMap photos={[photo]} className="map" />);
-    expect(mapProps).toHaveBeenLastCalledWith(
-      expect.objectContaining({ initialViewState: expect.objectContaining({ pitch: 50 }) }),
-    );
-
-    act(() => {
-      setMapStyleName("dark");
-    });
-    expect(mapProps.mock.calls.at(-1)?.[0].initialViewState.pitch).toBeUndefined();
+    expect(mapStyleUrl("satellite")).toContain("api.maptiler.com");
   });
 
   it("keeps the thumbnails through a wobble back below the reveal zoom", () => {

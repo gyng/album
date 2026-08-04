@@ -1,4 +1,5 @@
-import { DataLayer, Marker, type PointFeature } from "./map";
+import { DataLayer, Marker, type PointFeature, useMap } from "./map";
+import { useMarkerDepth } from "./mapDepth";
 import type { PhotoWithStyle } from "./mapWorldViewModel";
 import { formatMapPhotoDate } from "./mapWorldViewModel";
 import { LazyMapMarkerImage } from "./MapWorldMapChildren";
@@ -369,6 +370,7 @@ const MapPhotoMarker = React.memo(function MapPhotoMarker({
   emphasiseRoute,
   activeRouteHrefSet,
   sortKey,
+  depthKey,
   onSelect,
   onHover,
 }: {
@@ -378,6 +380,8 @@ const MapPhotoMarker = React.memo(function MapPhotoMarker({
   emphasiseRoute: boolean;
   activeRouteHrefSet: ReadonlySet<string>;
   sortKey: number;
+  /** Screen depth on a tilted map, where a far pin must not draw over a near one. */
+  depthKey: number | null;
   onSelect: (photo: PhotoWithStyle) => void;
   onHover: (photo: PhotoWithStyle | null) => void;
 }) {
@@ -396,7 +400,7 @@ const MapPhotoMarker = React.memo(function MapPhotoMarker({
       // Applied to MapLibre's own marker element, not a child: each marker sets
       // `will-change: transform`, which makes it a stacking context, so a
       // z-index on anything inside it cannot lift it past a sibling.
-      style={{ zIndex: sortKey }}
+      style={{ zIndex: depthKey ?? sortKey }}
       onClick={(event) => {
         event.originalEvent.stopPropagation();
         onSelect(photo);
@@ -474,6 +478,9 @@ export const MapPhotoMarkers = React.memo(function MapPhotoMarkers({
   onHover,
 }: MapPhotoMarkersProps) {
   const isCoarsePointer = useCoarsePointer();
+  // Tilted, the ground recedes up the screen, so a pin drawn over another is
+  // claiming to be nearer than it is.
+  const { keyFor: depthKeyFor } = useMarkerDepth(useMap());
   const locatedPhotos = React.useMemo(() => photos.filter(hasCoordinates), [photos]);
   const locatedVisiblePhotos = React.useMemo(
     () => visiblePhotos.filter(hasCoordinates),
@@ -611,6 +618,7 @@ export const MapPhotoMarkers = React.memo(function MapPhotoMarkers({
           emphasiseRoute={emphasiseRoute}
           activeRouteHrefSet={activeRouteHrefSet}
           sortKey={pinSortKey(photo, dateRanks, emphasisedHrefs, locatedPhotos.length)}
+          depthKey={depthKeyFor({ lng: photo.decLng, lat: photo.decLat })}
           onSelect={onSelect}
           onHover={onHover}
         />

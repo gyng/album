@@ -10,7 +10,6 @@ import {
   MAP_STYLE_STORAGE_KEY,
   getMapStyleName,
   isFreeMapStyle,
-  isPitchedMapStyle,
   mapStyleUrl,
   mapTilerStyleUrl,
   resetMapStyleCache,
@@ -118,13 +117,6 @@ describe("provider configuration", () => {
     expect(mapStyleUrl("dark", "")).toBe("https://tiles.openfreemap.org/styles/dark");
     expect(mapStyleUrl("dark", "a-key")).toBe("https://tiles.openfreemap.org/styles/dark");
     expect(mapStyleUrl("3d", "a-key")).toBe("https://tiles.openfreemap.org/styles/liberty");
-  });
-
-  // OpenFreeMap's own "3D" is the liberty style with the camera pitched — their
-  // demo strips the suffix and calls setPitch. Ours is the same thing.
-  it("marks the 3D style as the pitched one", () => {
-    expect(isPitchedMapStyle("3d")).toBe(true);
-    expect(isPitchedMapStyle("dark")).toBe(false);
   });
 
   it("builds a catalogue style id that is not one of the curated choices", () => {

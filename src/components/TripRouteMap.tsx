@@ -1,9 +1,10 @@
 import React from "react";
 import type { Trip } from "../util/computeTrips";
-import { DataLayer, type LineFeature, MapView, Marker } from "./map";
+import { DataLayer, type LineFeature, MapView, Marker, useMap } from "./map";
+import { useMarkerDepth } from "./mapDepth";
 import { MapLibreStyles } from "./MapLibreStyles";
 import { clusterStops, routeStops } from "./tripRoute";
-import { isPitchedMapStyle, mapStyleUrl } from "../util/mapStyles";
+import { mapStyleUrl } from "../util/mapStyles";
 import { useMapStyleName } from "./MapStyleToggle";
 import styles from "./TripRouteMap.module.css";
 
@@ -12,8 +13,9 @@ const FIT_PADDING = { top: 84, right: 40, bottom: 32, left: 40 };
 const FIT_MAX_ZOOM = 12;
 /** A trip that never left one place still needs a readable frame. */
 const SINGLE_STOP_ZOOM = 12;
-/** Enough tilt to stand the buildings up without losing the plan view. */
-const PITCH = 45;
+
+/** Above any depth a projected marker can produce, so the pointed-at pin wins. */
+const ACTIVE_MARKER_Z = 100000;
 
 export type TripRouteMapProps = {
   trip: Trip;
@@ -77,6 +79,46 @@ const StopImage = ({ src }: { src: string }) => {
 };
 
 /**
+ * The stops, drawn in the order the ground says.
+ *
+ * Flat, the one being pointed at comes out from under its neighbours and the
+ * rest keep mount order. Tilted, the ground recedes up the screen and a far pin
+ * drawn over a near one is claiming to be in front of it, so screen depth takes
+ * over — with the pointed-at pin still lifted clear above all of them.
+ */
+const RouteMarkers = ({
+  markers,
+  activeDate,
+}: {
+  markers: ReturnType<typeof clusterStops>;
+  activeDate: string | null;
+}) => {
+  const { pitched, keyFor } = useMarkerDepth(useMap());
+
+  return (
+    <>
+      {markers.map((marker) => {
+        const isActive = Boolean(activeDate && marker.dates.includes(activeDate));
+        const depth = keyFor({ lng: marker.lng, lat: marker.lat });
+        const base = pitched && depth !== null ? depth : 1;
+        return (
+          <Marker
+            key={marker.key}
+            at={{ lng: marker.lng, lat: marker.lat }}
+            anchor="bottom"
+            style={{ zIndex: isActive ? ACTIVE_MARKER_Z : base }}
+          >
+            <span className={styles.pin} data-active={isActive}>
+              {marker.src ? <StopImage src={marker.src} /> : null}
+            </span>
+          </Marker>
+        );
+      })}
+    </>
+  );
+};
+
+/**
  * A trip's route over a basemap.
  *
  * The basemap is OpenFreeMap: keyless and unmetered, which is what makes a map
@@ -115,29 +157,10 @@ export const TripRouteMap = ({ trip, activeDate }: TripRouteMapProps) => {
       <MapView
         styleUrl={mapStyleUrl(styleName)}
         attribution={{ compact: true, collapsed: true }}
-        initialView={isPitchedMapStyle(styleName) ? { pitch: PITCH } : {}}
-        onLoad={(map) =>
-          fitToStops(map as never, stops, isPitchedMapStyle(styleName) ? PITCH : undefined)
-        }
+        onLoad={(map) => fitToStops(map as never, stops)}
       >
         <DataLayer id={`trip-route-${trip.id}`} lines={lines} order={1} />
-        {markers.map((marker) => {
-          const isActive = Boolean(activeDate && marker.dates.includes(activeDate));
-          return (
-            <Marker
-              key={marker.key}
-              at={{ lng: marker.lng, lat: marker.lat }}
-              anchor="bottom"
-              // Markers on a narrow map overlap; the one being pointed at comes
-              // out from under its neighbours.
-              style={{ zIndex: isActive ? 2 : 1 }}
-            >
-              <span className={styles.pin} data-active={isActive}>
-                {marker.src ? <StopImage src={marker.src} /> : null}
-              </span>
-            </Marker>
-          );
-        })}
+        <RouteMarkers markers={markers} activeDate={activeDate ?? null} />
       </MapView>
     </div>
   );

@@ -17,17 +17,25 @@ const applyOrigin = (template, origin) => template.split(ORIGIN_TOKEN).join(orig
 /* istanbul ignore next -- disk; applyOrigin is what is tested */
 const run = (log = console.log, env = process.env) => {
   const dir = path.join(__dirname, "..", "public", "map-styles");
-  const source = path.join(dir, "gallery.template.json");
-  if (!fs.existsSync(source)) {
-    log("No self-hosted map style template; nothing to prepare.");
-    return null;
+  if (!fs.existsSync(dir)) {
+    log("No self-hosted map styles; nothing to prepare.");
+    return [];
   }
 
   const origin = resolveSiteOrigin(env);
-  const output = path.join(dir, "gallery.json");
-  fs.writeFileSync(output, applyOrigin(fs.readFileSync(source, "utf8"), origin));
-  log(`Wrote public/map-styles/gallery.json for ${origin}`);
-  return output;
+  const templates = fs.readdirSync(dir).filter((name) => name.endsWith(".template.json"));
+
+  const written = templates.map((template) => {
+    const output = template.replace(".template.json", ".json");
+    fs.writeFileSync(
+      path.join(dir, output),
+      applyOrigin(fs.readFileSync(path.join(dir, template), "utf8"), origin),
+    );
+    return output;
+  });
+
+  log(`Wrote ${written.join(", ") || "no map styles"} for ${origin}`);
+  return written;
 };
 
 module.exports = { applyOrigin, run };
