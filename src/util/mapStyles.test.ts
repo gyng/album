@@ -147,3 +147,19 @@ describe("provider configuration", () => {
     }
   });
 });
+
+describe("the basemap that follows the page", () => {
+  // The map has as many documents as the site has themes, and picks the one
+  // the page is wearing.
+  it("resolves to the style composed for the active theme", () => {
+    expect(mapStyleUrl("theme", "", "slate")).toBe("/map-styles/theme-slate.json");
+    expect(mapStyleUrl("theme", "", "ember")).toBe("/map-styles/theme-ember.json");
+  });
+
+  it("costs nothing, like the rest of the composed styles", () => {
+    for (const name of ["theme", "minimal", "sketch"] as const) {
+      expect(isFreeMapStyle(name)).toBe(true);
+      expect(mapStyleUrl(name, "a-key")).not.toContain("maptiler");
+    }
+  });
+});

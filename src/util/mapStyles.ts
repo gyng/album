@@ -13,6 +13,7 @@
  */
 
 import { siteConfig } from "../lib/siteConfig";
+import type { ThemeName } from "./theme";
 
 /**
  * Public, referrer-restricted MapTiler key. Not a secret, but it is restricted
@@ -40,8 +41,11 @@ export const openFreeMapStyleUrl = (id: OpenFreeMapStyleId): string =>
 export const FALLBACK_STYLE_URL = openFreeMapStyleUrl("liberty");
 
 export type MapStyleName =
+  | "theme"
   | "3d"
   | "gallery"
+  | "minimal"
+  | "sketch"
   | "streets"
   | "outdoor"
   | "topographic"
@@ -61,6 +65,8 @@ export type MapStyleName =
 type StyleSource =
   | { provider: "free"; id: OpenFreeMapStyleId }
   | { provider: "self"; path: string }
+  /** One document per theme, chosen by whichever the page is wearing. */
+  | { provider: "themed" }
   | { provider: "keyed"; id: string };
 
 /**
@@ -73,7 +79,16 @@ export const MAP_STYLES: Record<MapStyleName, { source: StyleSource; label: stri
   // The default first, then the rest. `liberty` is the one OpenFreeMap style
   // that carries a fill-extrusion layer: it opens flat, like every other
   // basemap here, and stands its buildings up as soon as a reader tilts it.
+  // Composed from the same palette the page is using, so the map belongs to
+  // the theme rather than sitting on it.
+  theme: { source: { provider: "themed" }, label: "Match theme" },
   "3d": { source: { provider: "free", id: "liberty" }, label: "3D" },
+  // Ground, water and the roads that matter, with nothing written on it: the
+  // world map draws fourteen hundred pins, and the basemap under them is
+  // competing with its own subject.
+  minimal: { source: { provider: "self", path: "/map-styles/minimal.json" }, label: "Minimal" },
+  // Watercolour's sibling: linework on paper, no fills.
+  sketch: { source: { provider: "self", path: "/map-styles/sketch.json" }, label: "Sketch" },
   // The fork's own design, lifted off the metered tiles onto the free ones and
   // served from here: same layers, same paint, same sprite, no key and no
   // quota. `bin/build-free-gallery-style.cjs` regenerates it.
@@ -141,10 +156,15 @@ export const resolveMapStyleName = (value: unknown): MapStyleName | null => {
 export const mapTilerStyleUrl = (styleId: string, key: string = MAP_TILER_KEY): string =>
   key ? `https://api.maptiler.com/maps/${styleId}/style.json?key=${key}` : FALLBACK_STYLE_URL;
 
-export const mapStyleUrl = (name: MapStyleName, key: string = MAP_TILER_KEY): string => {
+export const mapStyleUrl = (
+  name: MapStyleName,
+  key: string = MAP_TILER_KEY,
+  theme: ThemeName = "light",
+): string => {
   const { source } = MAP_STYLES[name];
   if (source.provider === "free") return openFreeMapStyleUrl(source.id);
   if (source.provider === "self") return source.path;
+  if (source.provider === "themed") return `/map-styles/theme-${theme}.json`;
   return mapTilerStyleUrl(source.id, key);
 };
 

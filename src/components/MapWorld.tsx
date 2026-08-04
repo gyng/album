@@ -35,6 +35,7 @@ import {
 } from "./mapWorldViewModel";
 import { useMapThumbnailPrefetch } from "./useMapThumbnailPrefetch";
 import { useMapStyleName } from "./MapStyleToggle";
+import { useActiveTheme } from "./useActiveTheme";
 import { mapStyleUrl } from "../util/mapStyles";
 import {
   MapAutoFit,
@@ -221,6 +222,7 @@ export const MMap: React.FC<MapWorldProps> = ({
   onDirectorSequenceLengthChange,
 }) => {
   const mapStyleName = useMapStyleName();
+  const activeTheme = useActiveTheme();
   const url = typeof window === "undefined" ? null : new URL(window.location.toString());
   const initialLon = syncRoute ? (url?.searchParams.get("lon") ?? null) : null;
   const initialLat = syncRoute ? (url?.searchParams.get("lat") ?? null) : null;
@@ -649,7 +651,7 @@ export const MMap: React.FC<MapWorldProps> = ({
           // Other providers, kept for reference:
           // styleUrl="https://tiles.openfreemap.org/styles/liberty"
           // styleUrl="https://vector.openstreetmap.org/shortbread_v1/tilejson.json"
-          styleUrl={mapStyleUrl(mapStyleName)}
+          styleUrl={mapStyleUrl(mapStyleName, undefined, activeTheme)}
           // Collapsed to an "i" the reader can expand, as Map.tsx already does.
           // The full credit line is wide enough to crowd the bottom of a phone
           // screen, and the attribution stays one tap away either way.

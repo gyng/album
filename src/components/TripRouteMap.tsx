@@ -6,6 +6,7 @@ import { MapLibreStyles } from "./MapLibreStyles";
 import { clusterStops, routeStops } from "./tripRoute";
 import { mapStyleUrl } from "../util/mapStyles";
 import { useMapStyleName } from "./MapStyleToggle";
+import { useActiveTheme } from "./useActiveTheme";
 import styles from "./TripRouteMap.module.css";
 
 /** Room for a marker's picture, which stands above its pin. */
@@ -128,6 +129,7 @@ const RouteMarkers = ({
  */
 export const TripRouteMap = ({ trip, activeDate }: TripRouteMapProps) => {
   const styleName = useMapStyleName();
+  const activeTheme = useActiveTheme();
   const stops = React.useMemo(() => routeStops(trip), [trip]);
   const markers = React.useMemo(() => clusterStops(stops), [stops]);
 
@@ -155,7 +157,7 @@ export const TripRouteMap = ({ trip, activeDate }: TripRouteMapProps) => {
           ready and draws nothing at all. */}
       <MapLibreStyles />
       <MapView
-        styleUrl={mapStyleUrl(styleName)}
+        styleUrl={mapStyleUrl(styleName, undefined, activeTheme)}
         attribution={{ compact: true, collapsed: true }}
         onLoad={(map) => fitToStops(map as never, stops)}
       >
