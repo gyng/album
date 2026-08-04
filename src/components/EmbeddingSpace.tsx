@@ -1,5 +1,6 @@
 import React from "react";
 import { AppLink } from "./platform";
+import { Caption, OverlayButton, pillStyles } from "./ui";
 import { useActiveTheme } from "./useActiveTheme";
 import {
   backToFront,
@@ -156,8 +157,8 @@ const drawSquare = (
   );
 };
 
-const radiusOf = (point: Placed, withThumbnail: boolean): number =>
-  (withThumbnail ? THUMBNAIL_SIZE / 2 : DOT_RADIUS + 3) * point.scale;
+const radiusOf = (point: Placed, withThumbnail: boolean, thumbnail: number): number =>
+  (withThumbnail ? thumbnail / 2 : DOT_RADIUS + 3) * point.scale;
 
 export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, height = 520 }) => {
   // The wash has to be the page's own ground, and the reader can change it
@@ -261,9 +262,17 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
       context.clearRect(0, 0, width, viewHeight);
 
       const viewport = { width, height: viewHeight };
+
+      // On a phone the canvas is a third of the area it is on a laptop, and a
+      // thumbnail that stays 22px there closes the cloud into a mosaic again.
+      // Everything drawn scales with the room there is to draw it in.
+      const room = Math.min(1, Math.min(width, viewHeight) / 460);
+      const thumbnail = THUMBNAIL_SIZE * (0.62 + room * 0.38);
+
+      const camera = cameraRef.current;
       const placed: Placed[] = [];
       entries.forEach((entry, index) => {
-        const projected = projectPoint(entry, cameraRef.current, viewport);
+        const projected = projectPoint(entry, camera, viewport);
         if (projected) placed.push({ ...projected, entry, index });
       });
 
@@ -275,7 +284,10 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
       const nearest = new Set(
         [...ordered]
           .sort((a, b) => a.depth - b.depth)
-          .slice(0, atlas ? ATLAS_THUMBNAIL_BUDGET : THUMBNAIL_BUDGET)
+          .slice(
+            0,
+            atlas ? Math.round(ATLAS_THUMBNAIL_BUDGET * (0.35 + room * 0.65)) : THUMBNAIL_BUDGET,
+          )
           .map((point) => point.index),
       );
 
@@ -335,7 +347,7 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
 
         if (cell?.complete && cell.naturalWidth > 0 && atlas && point.entry.slot !== undefined) {
           const within = point.entry.slot % atlas.perSheet;
-          const size = THUMBNAIL_SIZE * point.scale;
+          const size = thumbnail * point.scale;
           context.drawImage(
             cell,
             (within % perRow) * atlas.cell,
@@ -353,7 +365,7 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
           context.lineWidth = 0.75;
           context.strokeRect(point.x - size / 2, point.y - size / 2, size, size);
         } else if (wantsThumbnail && image?.complete && image.naturalWidth > 0) {
-          drawSquare(context, image, point.x, point.y, THUMBNAIL_SIZE * point.scale);
+          drawSquare(context, image, point.x, point.y, thumbnail * point.scale);
         } else {
           context.beginPath();
           context.arc(point.x, point.y, DOT_RADIUS * point.scale, 0, Math.PI * 2);
@@ -366,8 +378,12 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
       // after the photographs so the words are legible, and dropped entirely
       // while the reader is looking at one photograph — a legend is for reading
       // the whole, and this is the moment they stopped.
-      const labels = clusters
-        .map((cluster) => ({ cluster, at: projectPoint(cluster, cameraRef.current, viewport) }))
+      // Every clump is named where there is room for eight names; a phone gets
+      // the biggest few, which is a legend rather than a wall of words.
+      const labels = [...clusters]
+        .sort((a, b) => b.count - a.count)
+        .slice(0, room < 0.8 ? 4 : clusters.length)
+        .map((cluster) => ({ cluster, at: projectPoint(cluster, camera, viewport) }))
         .filter((entry): entry is { cluster: EmbeddingSpaceCluster; at: ProjectedPoint } =>
           Boolean(entry.at),
         );
@@ -378,7 +394,9 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
       // about one photograph.
       const pointer = selectingRef.current ? null : pointerRef.current;
       const under = pointer
-        ? pickPoint(ordered, pointer, (point) => radiusOf(point, nearest.has(point.index)))
+        ? pickPoint(ordered, pointer, (point) =>
+            radiusOf(point, nearest.has(point.index), thumbnail),
+          )
         : null;
 
       // A selection puts the same lens on a group: everything outside the ring
@@ -391,7 +409,7 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
         context.globalAlpha = 1;
         for (const point of ordered) {
           if (!selectedRef.current.has(point.index)) continue;
-          const size = THUMBNAIL_SIZE * 1.2 * Math.max(0.7, point.scale);
+          const size = thumbnail * 1.2 * Math.max(0.7, point.scale);
           const sheet =
             atlas && point.entry.slot !== undefined
               ? sheetsRef.current[Math.floor(point.entry.slot / atlas.perSheet)]
@@ -441,8 +459,13 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
       if (!under && selectedRef.current.size === 0) {
         context.textAlign = "center";
         context.textBaseline = "middle";
+        // Names already written, so a smaller clump gives way rather than
+        // printing itself over a bigger one. Sorted by size above, so what
+        // survives a collision is the one worth reading.
+        const written: { x: number; y: number; width: number; height: number }[] = [];
+
         for (const { cluster, at } of labels) {
-          const size = Math.max(12, Math.min(20, 15 * at.scale));
+          const size = Math.max(11, Math.min(20, 15 * at.scale * (0.75 + room * 0.25)));
           // A literal stack: a canvas font string is not CSS and silently
           // rejects `var(...)`, which leaves every label at the 10px default.
           context.font = `600 ${size}px system-ui, -apple-system, "Segoe UI", sans-serif`;
@@ -450,22 +473,39 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
           context.globalAlpha = Math.max(0.45, Math.min(1, 1.5 / at.depth));
 
           const text = cluster.label.replaceAll("_", " ");
-          const width = context.measureText(text).width;
+          const textWidth = context.measureText(text).width;
+          // Held inside the frame: a name clipped in half by the edge is worse
+          // than a name a few pixels off the clump it belongs to.
+          const margin = textWidth / 2 + 12;
+          const at2 = {
+            x: Math.max(margin, Math.min(width - margin, at.x)),
+            y: Math.max(size, Math.min(viewHeight - size, at.y)),
+          };
           // A plate behind the words, or a label over a bright photograph is
           // unreadable exactly where the cloud is densest.
+          const plate = {
+            x: at2.x - textWidth / 2 - 7,
+            y: at2.y - size * 0.75,
+            width: textWidth + 14,
+            height: size * 1.5,
+          };
+          const collides = written.some(
+            (other) =>
+              plate.x < other.x + other.width &&
+              plate.x + plate.width > other.x &&
+              plate.y < other.y + other.height &&
+              plate.y + plate.height > other.y,
+          );
+          if (collides) continue;
+          written.push(plate);
+
           context.fillStyle = "rgba(0, 0, 0, 0.62)";
           context.beginPath();
-          context.roundRect(
-            at.x - width / 2 - 7,
-            at.y - size * 0.75,
-            width + 14,
-            size * 1.5,
-            size * 0.75,
-          );
+          context.roundRect(plate.x, plate.y, plate.width, plate.height, size * 0.75);
           context.fill();
 
           context.fillStyle = "rgba(255, 255, 255, 0.94)";
-          context.fillText(text, at.x, at.y);
+          context.fillText(text, at2.x, at2.y);
         }
         context.letterSpacing = "0px";
       }
@@ -533,7 +573,7 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
         // The kin, in the same frame the photograph itself gets, one size down.
         context.globalAlpha = 1;
         for (const point of kin) {
-          drawFramed(point, THUMBNAIL_SIZE * 1.7 * Math.max(0.7, point.scale), 1);
+          drawFramed(point, thumbnail * 1.7 * Math.max(0.7, point.scale), 1);
         }
 
         // And the photograph under the pointer, largest and last.
@@ -545,7 +585,7 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
           thumbnailsRef.current.set(under.entry.src, image);
         }
 
-        const size = THUMBNAIL_SIZE * 3 * Math.max(0.8, under.scale);
+        const size = thumbnail * 3 * Math.max(0.8, under.scale);
         context.save();
         context.shadowColor = "rgba(0, 0, 0, 0.5)";
         context.shadowBlur = 20;
@@ -673,7 +713,7 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
   const medoidPath = medoid ? indexedPathFromSrc(medoid.src) : null;
 
   return (
-    <div className={[styles.space, className].filter(Boolean).join(" ")}>
+    <figure className={[styles.space, className].filter(Boolean).join(" ")}>
       <div className={styles.stage} style={{ blockSize: `${height}px` }}>
         <canvas
           ref={canvasRef}
@@ -696,46 +736,40 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
           }}
         />
 
-        {count === 0 ? <p className={styles.status}>Arranging the collection…</p> : null}
-
-        {hovered ? (
-          <figcaption className={styles.caption}>
-            <span className={styles.captionLabel}>
-              {hovered.entry.album ?? hovered.entry.label}
-            </span>
-            {hovered.entry.tag ? (
-              <span className={styles.captionTag}>{hovered.entry.tag.replaceAll("_", " ")}</span>
-            ) : null}
-          </figcaption>
-        ) : null}
-      </div>
-
-      <div className={styles.controls}>
-        <p className={styles.hint}>
-          {selecting
-            ? "Draw a ring around a group of photographs"
-            : "Drag to turn · scroll to move closer · click a photograph to open it"}
-        </p>
-        <div className={styles.buttons}>
-          <button
-            type="button"
-            className={styles.toggle}
+        {/* Over the cloud rather than under it, the way the map's controls sit:
+            the picture is the subject and the chrome should cost it no room. */}
+        <div className={styles.tools}>
+          <OverlayButton
+            size="small"
             aria-pressed={selecting}
+            className={selecting ? styles.toolActive : ""}
             onClick={() => {
               setSelecting((current) => !current);
               if (selecting) clearSelection();
             }}
           >
-            {selecting ? "Done selecting" : "Select a group"}
-          </button>
-          <button
-            type="button"
-            className={styles.toggle}
+            {selecting ? "Done" : "Select"}
+          </OverlayButton>
+          <OverlayButton
+            size="small"
+            aria-pressed={!drifting}
+            className={drifting ? "" : styles.toolActive}
             onClick={() => setDrifting((current) => !current)}
           >
-            {drifting ? "Hold still" : "Turn again"}
-          </button>
+            {drifting ? "Pause" : "Turn"}
+          </OverlayButton>
         </div>
+
+        {count === 0 ? <p className={styles.status}>Arranging the collection…</p> : null}
+
+        {hovered && !selecting ? (
+          <figcaption className={styles.caption}>
+            <span>{hovered.entry.album ?? hovered.entry.label}</span>
+            {hovered.entry.tag ? (
+              <span className={styles.captionTag}>{hovered.entry.tag.replaceAll("_", " ")}</span>
+            ) : null}
+          </figcaption>
+        ) : null}
       </div>
 
       {selected.length > 0 ? (
@@ -751,26 +785,39 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
               </>
             ) : null}
           </p>
-          <div className={styles.buttons}>
+          <div className={styles.actions}>
             {selectionTags[0] ? (
               <AppLink
-                className={styles.toggle}
+                className={pillStyles.base + " " + pillStyles.surface}
                 href={buildSearchHref({ query: [selectionTags[0]] })}
               >
                 {`Search “${selectionTags[0].replaceAll("_", " ")}”`}
               </AppLink>
             ) : null}
             {medoidPath ? (
-              <AppLink className={styles.toggle} href={buildSimilaritySearchHref(medoidPath)}>
+              <AppLink
+                className={pillStyles.base + " " + pillStyles.surface}
+                href={buildSimilaritySearchHref(medoidPath)}
+              >
                 Find more like these
               </AppLink>
             ) : null}
-            <button type="button" className={styles.toggle} onClick={clearSelection}>
+            <button
+              type="button"
+              className={[pillStyles.base, pillStyles.ghost].join(" ")}
+              onClick={clearSelection}
+            >
               Clear
             </button>
           </div>
         </div>
-      ) : null}
+      ) : (
+        <Caption as="p" size="sm" className={styles.hint}>
+          {selecting
+            ? "Draw a ring around a group of photographs."
+            : "Drag to turn it, scroll to move closer, click a photograph to open it."}
+        </Caption>
+      )}
 
       {/* A canvas has no children, so the photographs in it are unreachable
           without this: the same compensation the map makes for its GPU pins. */}
@@ -781,7 +828,7 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
           </li>
         ))}
       </ul>
-    </div>
+    </figure>
   );
 };
 

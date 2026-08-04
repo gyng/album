@@ -216,6 +216,17 @@ export type ProjectedPoint = {
 const FOCAL_LENGTH = 1.6;
 
 /**
+ * How much of the frame the cloud is allowed to fill at rest.
+ *
+ * The projection is scaled so the edge of the cube lands just inside the
+ * shorter side. Without this the cloud is drawn wider than the canvas and its
+ * edges are simply missing — and moving the camera back does not help, because
+ * at the middle of the cloud the scale is the focal length whatever the
+ * distance is.
+ */
+const FRAME_FILL = 0.95;
+
+/**
  * One point of the cloud on the screen, or nothing when it is behind the eye.
  *
  * A plain perspective divide rather than a matrix stack: there is one camera,
@@ -239,7 +250,7 @@ export const projectPoint = (
 
   if (depth <= 0.05) return null;
 
-  const size = Math.min(viewport.width, viewport.height) / 2;
+  const size = ((Math.min(viewport.width, viewport.height) / 2) * FRAME_FILL) / FOCAL_LENGTH;
   const scale = (FOCAL_LENGTH * camera.distance) / depth;
 
   return {

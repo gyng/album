@@ -1,6 +1,7 @@
 .space {
   display: grid;
   gap: var(--m-s);
+  margin: 0;
 }
 
 /* The cloud is drawn in the photographs' own colours, so it wants a ground
@@ -23,9 +24,9 @@
 }
 
 .canvas {
+  display: block;
   inline-size: 100%;
   block-size: 100%;
-  display: block;
   cursor: grab;
   touch-action: none;
 }
@@ -40,82 +41,57 @@
   cursor: crosshair;
 }
 
-.status,
-.caption {
+/* The controls sit over the cloud rather than under it: the picture is the
+   subject, and chrome beneath it costs the picture height on every viewport. */
+.tools {
   position: absolute;
+  inset-block-start: var(--m-s);
+  inset-inline-end: var(--m-s);
+  display: flex;
+  gap: var(--m-xs);
+}
+
+.toolActive {
+  border-color: var(--c-accent);
+  color: var(--c-accent);
+}
+
+.status {
+  position: absolute;
+  inset-block-start: 50%;
   inset-inline: 0;
   margin: 0;
-  padding: var(--m-s) var(--m-m);
+  transform: translateY(-50%);
   text-align: center;
   font-size: var(--fs-s);
   color: var(--c-bg-contrast-light);
   pointer-events: none;
 }
 
-.status {
-  inset-block-start: 50%;
-  transform: translateY(-50%);
-}
-
+/* What the pointer is on, named in the corner rather than across the width:
+   the words belong to one photograph, so they sit beside it. */
 .caption {
-  inset-block-end: 0;
+  position: absolute;
+  inset-block-end: var(--m-s);
+  inset-inline-start: var(--m-s);
   display: flex;
-  justify-content: center;
+  align-items: baseline;
   gap: var(--m-s);
-  background: linear-gradient(to top, var(--c-overlay-dark), transparent);
+  margin: 0;
+  padding: var(--m-xs) var(--m-m);
+  border-radius: var(--radius-pill);
+  background: var(--c-overlay-dark);
   color: var(--c-white);
-}
-
-.captionLabel {
-  font-size: var(--fs-sm);
+  font-size: var(--fs-s);
+  pointer-events: none;
 }
 
 .captionTag {
   color: var(--c-accent);
 }
 
-.controls {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--m-s);
-}
-
 .hint {
   margin: 0;
-  font-size: var(--fs-s);
-  color: var(--c-bg-contrast-light);
-}
-
-.toggle {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  text-decoration: none;
-  border: solid var(--line-hairline) var(--c-bg-contrast-light);
-  border-radius: var(--radius-pill);
-  padding: var(--m-xs) var(--m-m);
-  min-block-size: var(--tap-target);
-  background: var(--c-bg);
-  color: inherit;
-  font-size: var(--fs-s);
-  cursor: pointer;
-}
-
-.toggle:hover {
-  border-color: var(--c-accent);
-}
-
-.toggle[aria-pressed="true"] {
-  border-color: var(--c-accent);
-  background: color-mix(in oklch, var(--c-accent) 16%, var(--c-bg));
-}
-
-.buttons {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--m-s);
 }
 
 /* What a ring caught, and where a reader can take it. */
@@ -125,10 +101,6 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--m-s);
-  padding: var(--m-s) var(--m-m);
-  border: solid var(--line-hairline) var(--c-bg-contrast-light);
-  border-radius: var(--m-s);
-  background: color-mix(in oklch, var(--c-accent) 7%, var(--c-bg));
 }
 
 .selectionSummary {
@@ -138,6 +110,12 @@
 
 .selectionTags {
   color: var(--c-accent);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--m-xs);
 }
 
 /* Reachable by keyboard and by a screen reader, invisible to everyone else:
