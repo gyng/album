@@ -15,6 +15,7 @@ import AdapterMap, {
   type MapRef,
   Marker as AdapterMarker,
   NavigationControl as AdapterNavigationControl,
+  PointRelief as AdapterPointRelief,
   Popup as AdapterPopup,
   ScaleControl as AdapterScaleControl,
   Source,
@@ -44,6 +45,7 @@ import type {
   PointFeature,
   PointFeatureHit,
   PointStroke,
+  ReliefField,
   ScreenPoint,
 } from "./port";
 
@@ -1161,3 +1163,35 @@ export const DataLayer = ({
     </>
   );
 };
+
+/* -------------------------------------------------------------------------- */
+/* Relief                                                                      */
+/* -------------------------------------------------------------------------- */
+
+export type ReliefProps = ReliefField & { id?: string };
+
+/**
+ * Ground that rises around the data on it.
+ *
+ * The map is given points and how tall they should stand; whether that becomes
+ * real terrain, a shaded relief or nothing at all is the renderer's business.
+ * MapLibre's answer is elevation tiles synthesised in the browser — see the
+ * adapter — but nothing above this line knows that.
+ */
+export const Relief = ({
+  id,
+  points,
+  radiusMetres,
+  peakMetres,
+  ceilingMetres,
+  exaggeration,
+}: ReliefProps): React.JSX.Element => (
+  <AdapterPointRelief
+    {...(id === undefined ? {} : { id })}
+    points={points}
+    {...(radiusMetres === undefined ? {} : { radiusMetres })}
+    {...(peakMetres === undefined ? {} : { peakMetres })}
+    {...(ceilingMetres === undefined ? {} : { ceilingMetres })}
+    {...(exaggeration === undefined ? {} : { exaggeration })}
+  />
+);

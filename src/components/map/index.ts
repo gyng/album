@@ -15,6 +15,8 @@ export {
   NavigationControl,
   Popup,
   type PopupProps,
+  Relief,
+  type ReliefProps,
   ScaleControl,
   useMap,
 } from "./react";
@@ -48,5 +50,6 @@ export {
   type PointFeature,
   type PointFeatureHit,
   type PointStroke,
+  type ReliefField,
   type ScreenPoint,
 } from "./port";

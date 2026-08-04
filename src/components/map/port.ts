@@ -173,6 +173,25 @@ export interface MapInstance extends MapCamera, MapProjection {
 /** How the globe is flattened onto the screen. */
 export type MapProjectionMode = "mercator" | "globe" | "vertical-perspective";
 
+/**
+ * Ground raised around data rather than around real elevation.
+ *
+ * The port's vocabulary is deliberately "these points, this tall, this wide" —
+ * a renderer that draws relief some other way should be able to satisfy it
+ * without learning what an elevation tile is.
+ */
+export type ReliefField = {
+  points: readonly (LngLat & { weight?: number })[];
+  /** How far one point's hill reaches, in metres. */
+  radiusMetres?: number;
+  /** How tall one point's hill is, in metres. Hills add up. */
+  peakMetres?: number;
+  /** Nothing rises above this, however much data piles up. */
+  ceilingMetres?: number;
+  /** Vertical stretch. 1 is life size, which on a city is invisible. */
+  exaggeration?: number;
+};
+
 /** The attribution notice: hidden outright, or shown with these options. */
 export type MapAttribution =
   | false
