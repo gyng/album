@@ -34,6 +34,12 @@
   cursor: grabbing;
 }
 
+/* While selecting, a drag draws rather than turns, and the pointer says so. */
+.selectingCanvas,
+.selectingCanvas:active {
+  cursor: crosshair;
+}
+
 .status,
 .caption {
   position: absolute;
@@ -83,6 +89,10 @@
 }
 
 .toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
   border: solid var(--line-hairline) var(--c-bg-contrast-light);
   border-radius: var(--radius-pill);
   padding: var(--m-xs) var(--m-m);
@@ -95,6 +105,39 @@
 
 .toggle:hover {
   border-color: var(--c-accent);
+}
+
+.toggle[aria-pressed="true"] {
+  border-color: var(--c-accent);
+  background: color-mix(in oklch, var(--c-accent) 16%, var(--c-bg));
+}
+
+.buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--m-s);
+}
+
+/* What a ring caught, and where a reader can take it. */
+.selection {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--m-s);
+  padding: var(--m-s) var(--m-m);
+  border: solid var(--line-hairline) var(--c-bg-contrast-light);
+  border-radius: var(--m-s);
+  background: color-mix(in oklch, var(--c-accent) 7%, var(--c-bg));
+}
+
+.selectionSummary {
+  margin: 0;
+  font-size: var(--fs-sm);
+}
+
+.selectionTags {
+  color: var(--c-accent);
 }
 
 /* Reachable by keyboard and by a screen reader, invisible to everyone else:

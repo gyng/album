@@ -1,4 +1,4 @@
-import { EMBEDDING_SPACE_URL, fetchEmbeddingSpace } from "./embeddingSpaceData";
+import { EMBEDDING_SPACE_URL, fetchEmbeddingSpace, indexedPathFromSrc } from "./embeddingSpaceData";
 
 const point = { src: "/a.avif", href: "/album/a#1", label: "A", x: 0.1, y: 0.2, z: 0.3 };
 
@@ -59,5 +59,40 @@ describe("fetchEmbeddingSpace", () => {
 
   it("reports a response that never arrived", async () => {
     await expect(fetchEmbeddingSpace(respond(null, false, 404))).rejects.toThrow(/404/);
+  });
+});
+
+describe("indexedPathFromSrc", () => {
+  // The payload carries what the browser needs to draw a photograph; search
+  // identifies one by the path the indexer keyed it under, and shipping both
+  // for fifteen hundred photographs is sixty kilobytes to say it twice.
+  it("recovers the key search uses from the URL the cloud draws", () => {
+    expect(
+      indexedPathFromSrc("/data/albums/15japan/.resized_images/20150518_161258.jpg%40800.avif"),
+    ).toBe("../albums/15japan/20150518_161258.jpg");
+  });
+
+  it("reads an unescaped @ too, and any variant size", () => {
+    expect(indexedPathFromSrc("/data/albums/a/.resized_images/b.jpg@1600.avif")).toBe(
+      "../albums/a/b.jpg",
+    );
+  });
+
+  it("puts back the characters the URL escaped", () => {
+    expect(
+      indexedPathFromSrc("/data/albums/24okinawa/.resized_images/caf%C3%A9%20one.jpg%40800.avif"),
+    ).toBe("../albums/24okinawa/café one.jpg");
+  });
+
+  it("follows a fork's own albums directory", () => {
+    expect(indexedPathFromSrc("/data/albums/a/.resized_images/b.jpg@800.avif", "../pics")).toBe(
+      "../pics/a/b.jpg",
+    );
+  });
+
+  it("has no answer for a URL that is not one of these", () => {
+    expect(indexedPathFromSrc("/data/benchmark/whatever.avif")).toBeNull();
+    expect(indexedPathFromSrc("")).toBeNull();
+    expect(indexedPathFromSrc("/data/albums/a/.resized_images/%E0%A4%A.jpg@800.avif")).toBeNull();
   });
 });

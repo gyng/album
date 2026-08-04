@@ -120,3 +120,26 @@ export const fetchEmbeddingSpace = async (
     atlas: isAtlas(payload.atlas) ? payload.atlas : null,
   };
 };
+
+/**
+ * The database's own key for a photograph, recovered from the URL of its
+ * optimised variant.
+ *
+ * The cloud's payload carries what the browser needs to *draw* a photograph;
+ * search identifies one by the path the indexer keyed it under. Rather than
+ * ship both for fifteen hundred photographs — sixty kilobytes to say the same
+ * thing twice — the key is derived, because the URL is built from it.
+ */
+export const indexedPathFromSrc = (src: string, albumsDir = "../albums"): string | null => {
+  const match = /\/data\/albums\/([^/]+)\/\.resized_images\/(.+?)(?:%40|@)\d+\.[a-z0-9]+$/i.exec(
+    src,
+  );
+  if (!match) return null;
+
+  try {
+    return `${albumsDir}/${decodeURIComponent(match[1] ?? "")}/${decodeURIComponent(match[2] ?? "")}`;
+  } catch {
+    // A malformed escape is not worth taking a selection down for.
+    return null;
+  }
+};

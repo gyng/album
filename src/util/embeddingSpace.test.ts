@@ -2,6 +2,7 @@ import {
   backToFront,
   clusterPoints,
   distinctiveTag,
+  isInsidePolygon,
   nearestNeighbours,
   type Camera,
   pickPoint,
@@ -348,5 +349,57 @@ describe("distinctiveTag", () => {
 
   it("has nothing to say about a cluster with no tags", () => {
     expect(distinctiveTag([], new Map())).toBeNull();
+  });
+});
+
+describe("isInsidePolygon", () => {
+  const square = [
+    { x: 0, y: 0 },
+    { x: 100, y: 0 },
+    { x: 100, y: 100 },
+    { x: 0, y: 100 },
+  ];
+
+  it("knows what a hand-drawn ring caught", () => {
+    expect(isInsidePolygon({ x: 50, y: 50 }, square)).toBe(true);
+    expect(isInsidePolygon({ x: 150, y: 50 }, square)).toBe(false);
+  });
+
+  // A reader who does not quite close the loop still means the loop.
+  it("closes the path the pointer took", () => {
+    const open = [
+      { x: 0, y: 0 },
+      { x: 100, y: 0 },
+      { x: 100, y: 100 },
+      { x: 10, y: 90 },
+    ];
+
+    expect(isInsidePolygon({ x: 50, y: 50 }, open)).toBe(true);
+  });
+
+  it("handles a ring that doubles back on itself", () => {
+    const horseshoe = [
+      { x: 0, y: 0 },
+      { x: 100, y: 0 },
+      { x: 100, y: 100 },
+      { x: 60, y: 100 },
+      { x: 60, y: 40 },
+      { x: 40, y: 40 },
+      { x: 40, y: 100 },
+      { x: 0, y: 100 },
+    ];
+
+    expect(isInsidePolygon({ x: 20, y: 70 }, horseshoe)).toBe(true);
+    expect(isInsidePolygon({ x: 50, y: 70 }, horseshoe)).toBe(false);
+  });
+
+  it("catches nothing at all with no ring to speak of", () => {
+    expect(isInsidePolygon({ x: 1, y: 1 }, [])).toBe(false);
+    expect(
+      isInsidePolygon({ x: 1, y: 1 }, [
+        { x: 0, y: 0 },
+        { x: 2, y: 2 },
+      ]),
+    ).toBe(false);
   });
 });

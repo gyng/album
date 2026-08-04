@@ -4,15 +4,20 @@ import { useActiveTheme } from "./useActiveTheme";
 import {
   backToFront,
   type Camera,
+  distinctiveTag,
+  isInsidePolygon,
   pickPoint,
   projectPoint,
   type ProjectedPoint,
+  type ScreenPosition,
 } from "../util/embeddingSpace";
+import { buildSearchHref, buildSimilaritySearchHref } from "../util/searchFacets";
 import {
   type EmbeddingSpaceAtlas,
   type EmbeddingSpaceCluster,
   type EmbeddingSpaceEntry,
   fetchEmbeddingSpace,
+  indexedPathFromSrc,
 } from "../util/embeddingSpaceData";
 import styles from "./EmbeddingSpace.module.css";
 
@@ -118,6 +123,12 @@ const WEB_MAX_SPAN = 0.42;
  */
 const FOCUS_WASH = 0.66;
 
+/** Below this many pointer positions, a ring is a click that wobbled. */
+const MIN_LASSO_POINTS = 6;
+
+/** How many of a selection's tags are worth naming. */
+const SELECTION_TAGS = 3;
+
 type Placed = ProjectedPoint & { entry: EmbeddingSpaceEntry; index: number };
 
 /**
@@ -158,6 +169,8 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
   const [failed, setFailed] = React.useState(false);
   const [hovered, setHovered] = React.useState<Placed | null>(null);
   const [drifting, setDrifting] = React.useState(true);
+  const [selecting, setSelecting] = React.useState(false);
+  const [selected, setSelected] = React.useState<EmbeddingSpaceEntry[]>([]);
 
   const canvasRef = React.useRef<HTMLCanvasElement | null>(null);
   const cameraRef = React.useRef<Camera>({ ...INITIAL_CAMERA });
@@ -166,9 +179,13 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
   const sheetsRef = React.useRef<HTMLImageElement[]>([]);
   const pointerRef = React.useRef<{ x: number; y: number } | null>(null);
   const draggingRef = React.useRef<{ x: number; y: number } | null>(null);
+  const selectingRef = React.useRef(false);
+  const lassoRef = React.useRef<ScreenPosition[]>([]);
+  const selectedRef = React.useRef<Set<number>>(new Set());
   const driftingRef = React.useRef(true);
 
   driftingRef.current = drifting;
+  selectingRef.current = selecting;
 
   React.useEffect(() => {
     let cancelled = false;
@@ -226,7 +243,9 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
       const elapsed = previous === 0 ? 0 : Math.min(0.05, (time - previous) / 1000);
       previous = time;
 
-      if (driftingRef.current && !reduced && !draggingRef.current) {
+      // Not while a ring is being drawn: a cloud that turns under the pointer
+      // catches whatever drifted into the loop rather than what was aimed at.
+      if (driftingRef.current && !reduced && !draggingRef.current && !selectingRef.current) {
         cameraRef.current.yaw += DRIFT * elapsed;
       }
 
@@ -354,13 +373,72 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
         );
 
       // Whatever the pointer is over is worth a photograph even when it is deep
-      // in the cloud: that is what hovering is for.
-      const pointer = pointerRef.current;
+      // in the cloud: that is what hovering is for. Not while a ring is being
+      // drawn, though — then the pointer is describing a group, not asking
+      // about one photograph.
+      const pointer = selectingRef.current ? null : pointerRef.current;
       const under = pointer
         ? pickPoint(ordered, pointer, (point) => radiusOf(point, nearest.has(point.index)))
         : null;
 
-      if (!under) {
+      // A selection puts the same lens on a group: everything outside the ring
+      // goes back into the page and what was caught stays where it was.
+      if (selectedRef.current.size > 0) {
+        context.globalAlpha = FOCUS_WASH;
+        context.fillStyle = wash;
+        context.fillRect(0, 0, width, viewHeight);
+
+        context.globalAlpha = 1;
+        for (const point of ordered) {
+          if (!selectedRef.current.has(point.index)) continue;
+          const size = THUMBNAIL_SIZE * 1.2 * Math.max(0.7, point.scale);
+          const sheet =
+            atlas && point.entry.slot !== undefined
+              ? sheetsRef.current[Math.floor(point.entry.slot / atlas.perSheet)]
+              : undefined;
+
+          if (
+            sheet?.complete &&
+            sheet.naturalWidth > 0 &&
+            atlas &&
+            point.entry.slot !== undefined
+          ) {
+            const within = point.entry.slot % atlas.perSheet;
+            context.drawImage(
+              sheet,
+              (within % perRow) * atlas.cell,
+              Math.floor(within / perRow) * atlas.cell,
+              atlas.cell,
+              atlas.cell,
+              point.x - size / 2,
+              point.y - size / 2,
+              size,
+              size,
+            );
+          } else {
+            context.fillStyle = point.entry.swatch ?? "#8899aa";
+            context.fillRect(point.x - size / 2, point.y - size / 2, size, size);
+          }
+        }
+      }
+
+      // The ring itself, while it is being drawn.
+      if (lassoRef.current.length > 1) {
+        context.globalAlpha = 1;
+        context.strokeStyle = "rgba(255, 255, 255, 0.9)";
+        context.lineWidth = 1.5;
+        context.setLineDash([6, 4]);
+        context.beginPath();
+        lassoRef.current.forEach((position, index) => {
+          if (index === 0) context.moveTo(position.x, position.y);
+          else context.lineTo(position.x, position.y);
+        });
+        context.closePath();
+        context.stroke();
+        context.setLineDash([]);
+      }
+
+      if (!under && selectedRef.current.size === 0) {
         context.textAlign = "center";
         context.textBaseline = "middle";
         for (const { cluster, at } of labels) {
@@ -494,13 +572,28 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
   }, [atlas, clusters, entries, theme]);
 
   const onPointerDown = (event: React.PointerEvent<HTMLCanvasElement>) => {
-    draggingRef.current = { x: event.clientX, y: event.clientY };
     event.currentTarget.setPointerCapture(event.pointerId);
+
+    // Modal on purpose: a drag means one thing at a time. Outside selecting it
+    // always turns the cloud, and inside it always draws a ring, so nobody has
+    // to hold a key down to find out which they are doing.
+    if (selectingRef.current) {
+      const bounds = event.currentTarget.getBoundingClientRect();
+      lassoRef.current = [{ x: event.clientX - bounds.left, y: event.clientY - bounds.top }];
+      return;
+    }
+
+    draggingRef.current = { x: event.clientX, y: event.clientY };
   };
 
   const onPointerMove = (event: React.PointerEvent<HTMLCanvasElement>) => {
     const bounds = event.currentTarget.getBoundingClientRect();
     pointerRef.current = { x: event.clientX - bounds.left, y: event.clientY - bounds.top };
+
+    if (lassoRef.current.length > 0) {
+      lassoRef.current.push(pointerRef.current);
+      return;
+    }
 
     const dragging = draggingRef.current;
     if (!dragging) return;
@@ -514,11 +607,28 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
     draggingRef.current = { x: event.clientX, y: event.clientY };
   };
 
+  /** What the ring caught, in the pose it was drawn around. */
+  const closeLasso = () => {
+    const ring = lassoRef.current;
+    lassoRef.current = [];
+    if (ring.length < MIN_LASSO_POINTS) return;
+
+    const caught = placedRef.current.filter((point) => isInsidePolygon(point, ring));
+    selectedRef.current = new Set(caught.map((point) => point.index));
+    setSelected(caught.map((point) => point.entry));
+  };
+
   const endDrag = (event: React.PointerEvent<HTMLCanvasElement>) => {
+    if (lassoRef.current.length > 0) closeLasso();
     draggingRef.current = null;
     if (event.currentTarget.hasPointerCapture(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId);
     }
+  };
+
+  const clearSelection = () => {
+    selectedRef.current = new Set();
+    setSelected([]);
   };
 
   const onWheel = (event: React.WheelEvent<HTMLCanvasElement>) => {
@@ -535,12 +645,41 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
 
   const count = entries?.length ?? 0;
 
+  // What the selection turned out to be about, asked the same way the cluster
+  // labels are: the tags that are commoner in here than in the collection.
+  const overallTags = new Map<string, number>();
+  for (const entry of entries ?? []) {
+    if (entry.tag) overallTags.set(entry.tag, (overallTags.get(entry.tag) ?? 0) + 1);
+  }
+
+  const selectionTags: string[] = [];
+  const remaining = selected.map((entry) => (entry.tag ? [entry.tag] : []));
+  const taken = new Set<string>();
+  while (selectionTags.length < SELECTION_TAGS) {
+    const tag = distinctiveTag(
+      remaining.map((tags) => tags.filter((value) => !taken.has(value))),
+      overallTags,
+      2,
+    );
+    if (!tag) break;
+    taken.add(tag);
+    selectionTags.push(tag);
+  }
+
+  // Somewhere to go from a selection: the photographs it is mostly of, and more
+  // like the one nearest the middle of it.
+  const medoid =
+    selected.length > 0 ? (selected[Math.floor(selected.length / 2)] as EmbeddingSpaceEntry) : null;
+  const medoidPath = medoid ? indexedPathFromSrc(medoid.src) : null;
+
   return (
     <div className={[styles.space, className].filter(Boolean).join(" ")}>
       <div className={styles.stage} style={{ blockSize: `${height}px` }}>
         <canvas
           ref={canvasRef}
-          className={styles.canvas}
+          className={[styles.canvas, selecting ? styles.selectingCanvas : ""]
+            .filter(Boolean)
+            .join(" ")}
           role="img"
           aria-label={`${count} photographs arranged by what they are of. Drag to turn the cloud.`}
           onPointerDown={onPointerDown}
@@ -553,7 +692,7 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
           }}
           onWheel={onWheel}
           onClick={() => {
-            if (hovered) globalThis.location.assign(hovered.entry.href);
+            if (hovered && !selecting) globalThis.location.assign(hovered.entry.href);
           }}
         />
 
@@ -573,16 +712,65 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
 
       <div className={styles.controls}>
         <p className={styles.hint}>
-          Drag to turn · scroll to move closer · click a photograph to open it
+          {selecting
+            ? "Draw a ring around a group of photographs"
+            : "Drag to turn · scroll to move closer · click a photograph to open it"}
         </p>
-        <button
-          type="button"
-          className={styles.toggle}
-          onClick={() => setDrifting((current) => !current)}
-        >
-          {drifting ? "Hold still" : "Turn again"}
-        </button>
+        <div className={styles.buttons}>
+          <button
+            type="button"
+            className={styles.toggle}
+            aria-pressed={selecting}
+            onClick={() => {
+              setSelecting((current) => !current);
+              if (selecting) clearSelection();
+            }}
+          >
+            {selecting ? "Done selecting" : "Select a group"}
+          </button>
+          <button
+            type="button"
+            className={styles.toggle}
+            onClick={() => setDrifting((current) => !current)}
+          >
+            {drifting ? "Hold still" : "Turn again"}
+          </button>
+        </div>
       </div>
+
+      {selected.length > 0 ? (
+        <div className={styles.selection}>
+          <p className={styles.selectionSummary}>
+            <strong>{selected.length.toLocaleString("en")}</strong> photographs
+            {selectionTags.length > 0 ? (
+              <>
+                {" · mostly "}
+                <span className={styles.selectionTags}>
+                  {selectionTags.map((tag) => tag.replaceAll("_", " ")).join(", ")}
+                </span>
+              </>
+            ) : null}
+          </p>
+          <div className={styles.buttons}>
+            {selectionTags[0] ? (
+              <AppLink
+                className={styles.toggle}
+                href={buildSearchHref({ query: [selectionTags[0]] })}
+              >
+                {`Search “${selectionTags[0].replaceAll("_", " ")}”`}
+              </AppLink>
+            ) : null}
+            {medoidPath ? (
+              <AppLink className={styles.toggle} href={buildSimilaritySearchHref(medoidPath)}>
+                Find more like these
+              </AppLink>
+            ) : null}
+            <button type="button" className={styles.toggle} onClick={clearSelection}>
+              Clear
+            </button>
+          </div>
+        </div>
+      ) : null}
 
       {/* A canvas has no children, so the photographs in it are unreachable
           without this: the same compensation the map makes for its GPU pins. */}
