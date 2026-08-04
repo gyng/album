@@ -179,7 +179,7 @@ export const SlideshowBottomBar: React.FC<SlideshowBottomBarProps> = (props) => 
             attribution={false}
             details={false}
             style={SLIDE_MAP_STYLE}
-            mapStyle="toner-v2"
+            mapStyle="monochrome"
             projection="vertical-perspective"
             markerStyle={SLIDE_MARKER_STYLE}
           />

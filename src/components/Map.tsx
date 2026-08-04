@@ -6,24 +6,8 @@ import pinStyles from "./mapPin.module.css";
 import { type Bounds, MapView, Marker, useMap } from "./map";
 import { AppLink as Link } from "./platform";
 import { computeWrapAwareBounds } from "../util/mapBounds";
-import { mapTilerStyleUrl } from "../util/mapStyles";
+import { type MapStyleName, mapStyleUrl } from "../util/mapStyles";
 import { MapLibreStyles } from "./MapLibreStyles";
-
-type MapTilerMapStyle =
-  | "aquarelle"
-  | "bright"
-  | "backdrop"
-  | "basic"
-  | "toner-v2"
-  | "streets"
-  | "dataviz"
-  | "landscape"
-  | "ocean"
-  | "openstreetmap"
-  | "outdoor"
-  | "satellite"
-  | "topo"
-  | "winter";
 
 export type MapProps = {
   // Single coord (legacy) or an array (e.g. remix slides plotting all photos
@@ -34,7 +18,13 @@ export type MapProps = {
   style?: CSSProperties;
   attribution?: boolean;
   details?: boolean;
-  mapStyle?: MapTilerMapStyle;
+  /**
+   * One of the site's own basemap names rather than a provider style id, so
+   * these small maps follow the same free-where-possible split as the big ones:
+   * a photograph's location map used to name a metered style directly and was
+   * the last thing on an ordinary page view that could be rate-limited away.
+   */
+  mapStyle?: MapStyleName;
   markerStyle?: CSSProperties;
   projection?: "vertical-perspective" | "mercator";
 };
@@ -97,7 +87,7 @@ const MapFlyer = (props: { coordinates: [number, number][] }) => {
 };
 
 const MMapComponent: React.FC<MapProps> = (props) => {
-  const mapStyle: MapTilerMapStyle = props.mapStyle ?? "streets";
+  const mapStyle: MapStyleName = props.mapStyle ?? "streets";
   const projection = props.projection ?? "mercator";
 
   const coords = normaliseCoords(props.coordinates);
@@ -116,7 +106,7 @@ const MMapComponent: React.FC<MapProps> = (props) => {
       <div className={styles.map}>
         <MapView
           {...(props.style !== undefined ? { style: props.style } : {})}
-          styleUrl={mapTilerStyleUrl(mapStyle)}
+          styleUrl={mapStyleUrl(mapStyle)}
           initialView={{
             center: { lng: primary[1], lat: primary[0] },
             zoom: ZOOM,

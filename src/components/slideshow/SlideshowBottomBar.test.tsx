@@ -84,7 +84,7 @@ describe("SlideshowBottomBar", () => {
         coordinates: [1, 103],
         attribution: false,
         details: false,
-        mapStyle: "toner-v2",
+        mapStyle: "monochrome",
         projection: "vertical-perspective",
         markerStyle: { color: "var(--c-danger)" },
       }),
