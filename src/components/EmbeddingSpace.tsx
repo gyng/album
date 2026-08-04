@@ -213,6 +213,7 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
   const [driftingTags, setDriftingTags] = React.useState<string[]>([]);
 
   const canvasRef = React.useRef<HTMLCanvasElement | null>(null);
+  const stageRef = React.useRef<HTMLDivElement | null>(null);
   const cameraRef = React.useRef<Camera>({ ...INITIAL_CAMERA });
   const placedRef = React.useRef<Placed[]>([]);
   const thumbnailsRef = React.useRef(new Map<string, HTMLImageElement>());
@@ -221,6 +222,11 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
   const draggingRef = React.useRef<{ x: number; y: number } | null>(null);
   /** How far the pointer travelled while held down, so a turn is not a click. */
   const travelledRef = React.useRef(0);
+  /** A finger has no hover, so what it last tapped has to be remembered. */
+  const pointerTypeRef = React.useRef<string>("mouse");
+  const tappedRef = React.useRef<string | null>(null);
+  /** Hit testing against the pose actually on screen, as the draw loop last left it. */
+  const pickRef = React.useRef<((at: { x: number; y: number }) => Placed | null) | null>(null);
   const chosenRef = React.useRef<number | null>(null);
   /** The name elements, positioned from the draw loop. */
   const labelRefs = React.useRef<(HTMLButtonElement | null)[]>([]);
@@ -267,8 +273,11 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
    * keeps a canvas half a screen tall from being a hole a reader falls into.
    */
   React.useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
+    // On the stage rather than the canvas: the names and the caption sit over
+    // it, and a wheel over one of those would otherwise scroll the page out
+    // from under the reader mid-zoom.
+    const stage = stageRef.current;
+    if (!stage) return;
 
     const onWheel = (event: WheelEvent) => {
       const camera = cameraRef.current;
@@ -282,8 +291,8 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
       event.preventDefault();
     };
 
-    canvas.addEventListener("wheel", onWheel, { passive: false });
-    return () => canvas.removeEventListener("wheel", onWheel);
+    stage.addEventListener("wheel", onWheel, { passive: false });
+    return () => stage.removeEventListener("wheel", onWheel);
   }, []);
 
   // The sheets, fetched once. Every photograph in the cloud is a cell of one.
@@ -509,11 +518,9 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
       // Whatever the pointer is over is worth a photograph even when it is deep
       // in the cloud: that is what hovering is for.
       const pointer = pointerRef.current;
-      const under = pointer
-        ? pickPoint(ordered, pointer, (point) =>
-            radiusOf(point, nearest.has(point.index), thumbnail),
-          )
-        : null;
+      pickRef.current = (at) =>
+        pickPoint(ordered, at, (point) => radiusOf(point, nearest.has(point.index), thumbnail));
+      const under = pointer ? pickRef.current(pointer) : null;
 
       // A chosen clump puts the same lens on a group: everything else goes back
       // into the page and the group stays where it is.
@@ -901,6 +908,11 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
 
   const onPointerDown = (event: React.PointerEvent<HTMLCanvasElement>) => {
     event.currentTarget.setPointerCapture(event.pointerId);
+    const bounds = event.currentTarget.getBoundingClientRect();
+    // A finger arrives without ever having moved, so the position has to be
+    // taken here or a tap is a gesture with no place.
+    pointerRef.current = { x: event.clientX - bounds.left, y: event.clientY - bounds.top };
+    pointerTypeRef.current = event.pointerType;
     draggingRef.current = { x: event.clientX, y: event.clientY };
     travelledRef.current = 0;
   };
@@ -922,11 +934,49 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
     draggingRef.current = { x: event.clientX, y: event.clientY };
   };
 
-  const endDrag = (event: React.PointerEvent<HTMLCanvasElement>) => {
+  const endDrag = (event: React.PointerEvent<HTMLCanvasElement>, pressed = false) => {
     draggingRef.current = null;
     if (event.currentTarget.hasPointerCapture(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId);
     }
+    if (pressed && isTouch()) resolvePress();
+  };
+
+  /** True where the pointer cannot hover, so looking and opening are two taps. */
+  const isTouch = () => pointerTypeRef.current !== "mouse";
+
+  /**
+   * What a press meant, once it turns out not to have been a turn.
+   *
+   * Called from `pointerup` on a touch screen and from `click` with a mouse:
+   * a tap does not reliably produce a click, and a click is the only thing a
+   * keyboard or an assistive pointer produces.
+   */
+  const resolvePress = () => {
+    if (travelledRef.current > DRAG_SLOP) return;
+
+    // Asked of the pose on screen rather than of React's last render, because
+    // a press resolves before the next frame has run.
+    const at = pointerRef.current;
+    const hit = at ? (pickRef.current?.(at) ?? null) : null;
+
+    if (!hit) {
+      // Pressing the empty ground puts the cloud back to turning.
+      if (isTouch()) {
+        pointerRef.current = null;
+        tappedRef.current = null;
+      }
+      return;
+    }
+
+    // A finger gets to look before it opens: the first tap brings the
+    // photograph and its kin up, the second one opens it.
+    if (!isTouch() || tappedRef.current === hit.entry.href) {
+      globalThis.location.assign(hit.entry.href);
+      return;
+    }
+
+    tappedRef.current = hit.entry.href;
   };
 
   if (failed) {
@@ -978,6 +1028,7 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
   return (
     <figure className={[styles.space, className].filter(Boolean).join(" ")}>
       <div
+        ref={stageRef}
         className={styles.stage}
         {...(height === undefined ? {} : { style: { blockSize: `${height}px` } })}
       >
@@ -988,17 +1039,16 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
           aria-label={`${count} photographs arranged by what they are of. Drag to turn the cloud.`}
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}
-          onPointerUp={endDrag}
+          onPointerUp={(event) => endDrag(event, true)}
           onPointerCancel={endDrag}
           onPointerLeave={(event) => {
-            pointerRef.current = null;
+            // A finger's pointer is destroyed the moment it lifts, and clearing
+            // the position then would take the tapped photograph away with it.
+            if (!isTouch()) pointerRef.current = null;
             endDrag(event);
           }}
           onClick={() => {
-            // Letting go after turning the cloud is not a click on whatever
-            // happened to be under the pointer when it stopped.
-            if (travelledRef.current > DRAG_SLOP) return;
-            if (hovered) globalThis.location.assign(hovered.entry.href);
+            if (!isTouch()) resolvePress();
           }}
         />
 

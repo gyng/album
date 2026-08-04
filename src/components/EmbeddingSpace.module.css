@@ -97,6 +97,16 @@
   color: var(--c-white);
 }
 
+/* A finger has the whole cloud to aim at and the names are over it, so they
+   give a little height back where every pixel of picture counts. They stay
+   well past the smallest comfortable target. */
+@media (hover: none), (pointer: coarse) {
+  .clusterName {
+    min-block-size: calc(var(--tap-target) * 0.78);
+    font-size: var(--fs-s);
+  }
+}
+
 .clusterCount {
   font-size: var(--fs-xs);
   font-weight: 400;
@@ -174,6 +184,22 @@
 
 .hint {
   margin: 0;
+}
+
+/* Looking and opening are one gesture with a mouse and two with a finger, so
+   the instructions differ too. */
+.coarseOnly {
+  display: none;
+}
+
+@media (hover: none), (pointer: coarse) {
+  .fineOnly {
+    display: none;
+  }
+
+  .coarseOnly {
+    display: inline;
+  }
 }
 
 /* What a ring caught, and where a reader can take it. */
