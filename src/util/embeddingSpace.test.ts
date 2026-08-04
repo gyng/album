@@ -1,5 +1,6 @@
 import {
   backToFront,
+  nearestNeighbours,
   type Camera,
   pickPoint,
   projectPoint,
@@ -182,5 +183,79 @@ describe("pickPoint", () => {
   it("uses each point's own drawn size, so a big one is easier to hit", () => {
     expect(pickPoint(points, { x: 130, y: 100 }, () => 8)).toBeNull();
     expect(pickPoint(points, { x: 130, y: 100 }, () => 40)).not.toBeNull();
+  });
+});
+
+describe("nearestNeighbours", () => {
+  // The lines have to be about the photographs, not about the projection: two
+  // can land beside each other in three dimensions and be nothing alike.
+  it("ranks by similarity in the full space", () => {
+    const vectors = [
+      [1, 0, 0, 0],
+      [0.99, 0.1, 0, 0], // almost the first
+      [0.7, 0.7, 0, 0],
+      [0, 0, 1, 0], // nothing like it
+    ];
+
+    expect(nearestNeighbours(vectors, 2)[0]).toEqual([1, 2]);
+    expect(nearestNeighbours(vectors, 3)[0]).toEqual([1, 2, 3]);
+  });
+
+  it("never makes a photograph its own neighbour", () => {
+    const vectors = Array.from({ length: 6 }, (_, index) => spike(8, index % 3, 1 + index));
+
+    nearestNeighbours(vectors, 3).forEach((row, index) => {
+      expect(row).not.toContain(index);
+      expect(new Set(row).size).toBe(row.length);
+    });
+  });
+
+  it("cares about direction rather than length", () => {
+    const vectors = [
+      [1, 0, 0],
+      [8, 0, 0], // the same photograph, louder
+      [0, 1, 0],
+    ];
+
+    expect(nearestNeighbours(vectors, 1)[0]).toEqual([1]);
+  });
+
+  it("asks for no more neighbours than there are photographs", () => {
+    expect(
+      nearestNeighbours(
+        [
+          [1, 0],
+          [0, 1],
+        ],
+        5,
+      )[0],
+    ).toHaveLength(1);
+  });
+
+  it("has nothing to join when there is nothing, or nobody to join to", () => {
+    expect(nearestNeighbours([])).toEqual([]);
+    expect(nearestNeighbours([[1, 2, 3]])).toEqual([[]]);
+    expect(
+      nearestNeighbours(
+        [
+          [1, 0],
+          [0, 1],
+        ],
+        0,
+      ),
+    ).toEqual([[], []]);
+  });
+
+  it("survives a photograph with no vector at all", () => {
+    expect(
+      nearestNeighbours(
+        [
+          [0, 0],
+          [1, 0],
+          [0, 1],
+        ],
+        1,
+      ),
+    ).toHaveLength(3);
   });
 });

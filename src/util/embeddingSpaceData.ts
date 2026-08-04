@@ -14,6 +14,8 @@ export type EmbeddingSpaceEntry = {
   tag?: string;
   /** Its cell on the contact sheet, when the build made one. */
   slot?: number;
+  /** The photographs the model reads as most like this one, by index. */
+  near?: number[];
   x: number;
   y: number;
   z: number;

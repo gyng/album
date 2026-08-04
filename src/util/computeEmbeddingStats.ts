@@ -5,7 +5,7 @@ import type { Content, PhotoBlock } from "../services/types";
 import { measureBuild } from "../services/buildTiming";
 import { rgbToString } from "./colorDistance";
 import { parseExifLocalDateTime } from "./exifTime";
-import { projectToThreeDimensions } from "./embeddingSpace";
+import { nearestNeighbours, projectToThreeDimensions } from "./embeddingSpace";
 
 // The shipped search-embeddings DB holds two embedding spaces (SigLIP v1 and
 // v2), one row per photo per model. These stats must run against a single space
@@ -811,6 +811,14 @@ export const computeVisualSamenessStats = async (
 /* The cloud                                                                   */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * How many neighbours each photograph is joined to.
+ *
+ * Three is a web with structure; five is a fog. The payload grows by an integer
+ * per edge, so this is a legibility decision rather than a size one.
+ */
+const NEIGHBOURS_PER_PHOTO = 3;
+
 /** One photograph as a position in the collection's own embedding space. */
 export type EmbeddingSpacePoint = {
   src: string;
@@ -824,6 +832,11 @@ export type EmbeddingSpacePoint = {
   tag?: string;
   /** Its cell on the contact sheet, when one was built. */
   slot?: number;
+  /**
+   * The photographs the model reads as most like this one, as indices into this
+   * same list. Computed in the full space, before the projection flattened it.
+   */
+  near?: number[];
   x: number;
   y: number;
   z: number;
@@ -895,7 +908,9 @@ export const loadEmbeddingSpacePoints = async (
         return [];
       }
 
-      const positions = projectToThreeDimensions(decoded.map((entry) => entry.vector));
+      const vectors = decoded.map((entry) => entry.vector);
+      const positions = projectToThreeDimensions(vectors);
+      const neighbours = nearestNeighbours(vectors, NEIGHBOURS_PER_PHOTO);
 
       return decoded.map((entry, index) => {
         const position = positions[index] ?? { x: 0, y: 0, z: 0 };
@@ -910,6 +925,7 @@ export const loadEmbeddingSpacePoints = async (
           ...(entry.photo.swatch ? { swatch: entry.photo.swatch } : {}),
           ...(tag ? { tag } : {}),
           ...(slot === undefined ? {} : { slot }),
+          ...((neighbours[index]?.length ?? 0) > 0 ? { near: neighbours[index] } : {}),
           x: Number(position.x.toFixed(4)),
           y: Number(position.y.toFixed(4)),
           z: Number(position.z.toFixed(4)),

@@ -80,6 +80,30 @@ const THUMBNAIL_SIZE = 22;
 /** New images started per frame, so a turn does not fire a hundred requests. */
 const LOADS_PER_FRAME = 3;
 
+/**
+ * The web between photographs the model reads as alike.
+ *
+ * Faint, and drawn only where both ends are in the front of the cloud: every
+ * edge everywhere is a fog that hides the thing it describes, and an edge whose
+ * far end is behind three hundred photographs explains nothing. Under the
+ * pointer the same relationships come up bright, which is when a line is
+ * actually being read.
+ */
+const WEB_ALPHA = 0.16;
+const WEB_HOVER_ALPHA = 0.85;
+
+/**
+ * How far apart two photographs may be, in the cloud's own units, before the
+ * ambient web stops joining them.
+ *
+ * Some of a photograph's nearest kin land a long way off once 768 dimensions
+ * are squeezed into three — that is the projection's fault, and it is worth
+ * knowing, but as a permanent line across the whole view it is a stray thread.
+ * So the quiet web shows local texture and the long relationships appear under
+ * the pointer, where they are being read rather than merely seen.
+ */
+const WEB_MAX_SPAN = 0.42;
+
 type Placed = ProjectedPoint & { entry: EmbeddingSpaceEntry; index: number };
 
 /**
@@ -210,6 +234,32 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
 
       const perRow = atlas ? Math.floor(atlas.sheet / atlas.cell) : 0;
 
+      // The web first, so every photograph sits on top of its own lines.
+      const onScreen = new Map(ordered.map((point) => [point.index, point]));
+      context.globalAlpha = 1;
+      context.strokeStyle = "rgba(255, 255, 255, 1)";
+      context.lineWidth = 0.6;
+      context.beginPath();
+      for (const point of ordered) {
+        if (!nearest.has(point.index)) continue;
+        for (const neighbour of point.entry.near ?? []) {
+          // Once per pair, and only between two photographs a reader can see.
+          if (neighbour <= point.index || !nearest.has(neighbour)) continue;
+          const other = onScreen.get(neighbour);
+          if (!other) continue;
+          const span = Math.hypot(
+            point.entry.x - other.entry.x,
+            point.entry.y - other.entry.y,
+            point.entry.z - other.entry.z,
+          );
+          if (span > WEB_MAX_SPAN) continue;
+          context.moveTo(point.x, point.y);
+          context.lineTo(other.x, other.y);
+        }
+      }
+      context.globalAlpha = WEB_ALPHA;
+      context.stroke();
+
       let started = 0;
       for (const point of ordered) {
         const wantsThumbnail = nearest.has(point.index);
@@ -269,6 +319,30 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
         : null;
 
       if (under) {
+        // What the model says this one is like, whether or not those are near
+        // enough to have been drawn as photographs.
+        context.globalAlpha = WEB_HOVER_ALPHA;
+        context.strokeStyle = "rgba(255, 255, 255, 1)";
+        context.lineWidth = 1.1;
+        context.beginPath();
+        for (const neighbour of under.entry.near ?? []) {
+          const other = onScreen.get(neighbour);
+          if (!other) continue;
+          context.moveTo(under.x, under.y);
+          context.lineTo(other.x, other.y);
+        }
+        context.stroke();
+
+        // And a ring on each of them, so the eye lands where the line does.
+        for (const neighbour of under.entry.near ?? []) {
+          const other = onScreen.get(neighbour);
+          if (!other) continue;
+          const ring = (THUMBNAIL_SIZE / 2 + 3) * other.scale;
+          context.beginPath();
+          context.arc(other.x, other.y, ring, 0, Math.PI * 2);
+          context.stroke();
+        }
+
         const size = THUMBNAIL_SIZE * 2.4 * Math.max(0.8, under.scale);
         let image = thumbnailsRef.current.get(under.entry.src);
         if (!image) {

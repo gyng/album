@@ -272,3 +272,74 @@ export const pickPoint = <T extends ProjectedPoint>(
   }
   return best;
 };
+
+/* -------------------------------------------------------------------------- */
+/* Who is next to whom                                                         */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Each photograph's nearest neighbours, by cosine similarity in the full space.
+ *
+ * In the *full* space deliberately. Two photographs can land beside each other
+ * in three dimensions and be nothing alike — that is what a projection down
+ * from 768 costs — so a line drawn from where things ended up on screen would
+ * be a line about the projection rather than about the photographs. These are
+ * computed before the projection and survive it.
+ *
+ * Brute force, because it runs once at build time: fifteen hundred photographs
+ * is a million pairs, which is a second or two and no dependency.
+ */
+export const nearestNeighbours = (
+  vectors: readonly (readonly number[])[],
+  count = 4,
+): number[][] => {
+  const total = vectors.length;
+  const dimensions = vectors[0]?.length ?? 0;
+  if (total < 2 || dimensions === 0 || count < 1) {
+    return vectors.map(() => []);
+  }
+
+  // Normalised once, so a similarity is a dot product and nothing else.
+  const unit = new Float32Array(total * dimensions);
+  for (let row = 0; row < total; row += 1) {
+    const vector = vectors[row] as readonly number[];
+    let length = 0;
+    for (let index = 0; index < dimensions; index += 1) {
+      length += (vector[index] as number) ** 2;
+    }
+    const scale = length > 0 ? 1 / Math.sqrt(length) : 0;
+    for (let index = 0; index < dimensions; index += 1) {
+      unit[row * dimensions + index] = (vector[index] as number) * scale;
+    }
+  }
+
+  const wanted = Math.min(count, total - 1);
+  const neighbours: number[][] = [];
+
+  for (let row = 0; row < total; row += 1) {
+    // A short list kept sorted beats sorting a thousand similarities per row.
+    const best: { index: number; similarity: number }[] = [];
+
+    for (let other = 0; other < total; other += 1) {
+      if (other === row) continue;
+
+      let similarity = 0;
+      for (let index = 0; index < dimensions; index += 1) {
+        similarity +=
+          (unit[row * dimensions + index] as number) * (unit[other * dimensions + index] as number);
+      }
+
+      if (best.length < wanted) {
+        best.push({ index: other, similarity });
+        best.sort((a, b) => b.similarity - a.similarity);
+      } else if (similarity > (best.at(-1)?.similarity ?? 0)) {
+        best[best.length - 1] = { index: other, similarity };
+        best.sort((a, b) => b.similarity - a.similarity);
+      }
+    }
+
+    neighbours.push(best.map((entry) => entry.index));
+  }
+
+  return neighbours;
+};
