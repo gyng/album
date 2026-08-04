@@ -480,37 +480,3 @@ export const distinctiveTag = (
 
   return best;
 };
-
-/* -------------------------------------------------------------------------- */
-/* Drawing a ring around part of it                                            */
-/* -------------------------------------------------------------------------- */
-
-export type ScreenPosition = { x: number; y: number };
-
-/**
- * Whether a point falls inside a hand-drawn ring, by ray casting.
- *
- * The ring is whatever path the pointer took, closed by joining its last point
- * to its first — so a reader who does not quite close the loop still selects
- * what they clearly meant to.
- */
-export const isInsidePolygon = (
-  point: ScreenPosition,
-  polygon: readonly ScreenPosition[],
-): boolean => {
-  if (polygon.length < 3) return false;
-
-  let inside = false;
-  for (let index = 0, previous = polygon.length - 1; index < polygon.length; previous = index++) {
-    const a = polygon[index] as ScreenPosition;
-    const b = polygon[previous] as ScreenPosition;
-    const straddles = a.y > point.y !== b.y > point.y;
-    if (!straddles) continue;
-    // Where the edge crosses the ray, compared with the point itself.
-    if (point.x < ((b.x - a.x) * (point.y - a.y)) / (b.y - a.y) + a.x) {
-      inside = !inside;
-    }
-  }
-
-  return inside;
-};

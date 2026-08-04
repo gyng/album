@@ -6,11 +6,9 @@ import {
   backToFront,
   type Camera,
   distinctiveTag,
-  isInsidePolygon,
   pickPoint,
   projectPoint,
   type ProjectedPoint,
-  type ScreenPosition,
 } from "../util/embeddingSpace";
 import { buildSearchHref, buildSimilaritySearchHref } from "../util/searchFacets";
 import {
@@ -124,9 +122,6 @@ const WEB_MAX_SPAN = 0.42;
  */
 const FOCUS_WASH = 0.66;
 
-/** Below this many pointer positions, a ring is a click that wobbled. */
-const MIN_LASSO_POINTS = 6;
-
 /** How many of a selection's tags are worth naming. */
 const SELECTION_TAGS = 3;
 
@@ -170,8 +165,8 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
   const [failed, setFailed] = React.useState(false);
   const [hovered, setHovered] = React.useState<Placed | null>(null);
   const [drifting, setDrifting] = React.useState(true);
-  const [selecting, setSelecting] = React.useState(false);
-  const [selected, setSelected] = React.useState<EmbeddingSpaceEntry[]>([]);
+  /** Which named clump the reader has chosen, if any. */
+  const [chosen, setChosen] = React.useState<number | null>(null);
 
   const canvasRef = React.useRef<HTMLCanvasElement | null>(null);
   const cameraRef = React.useRef<Camera>({ ...INITIAL_CAMERA });
@@ -180,13 +175,13 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
   const sheetsRef = React.useRef<HTMLImageElement[]>([]);
   const pointerRef = React.useRef<{ x: number; y: number } | null>(null);
   const draggingRef = React.useRef<{ x: number; y: number } | null>(null);
-  const selectingRef = React.useRef(false);
-  const lassoRef = React.useRef<ScreenPosition[]>([]);
-  const selectedRef = React.useRef<Set<number>>(new Set());
+  const chosenRef = React.useRef<number | null>(null);
+  /** The name elements, positioned from the draw loop. */
+  const labelRefs = React.useRef<(HTMLButtonElement | null)[]>([]);
   const driftingRef = React.useRef(true);
 
   driftingRef.current = drifting;
-  selectingRef.current = selecting;
+  chosenRef.current = chosen;
 
   React.useEffect(() => {
     let cancelled = false;
@@ -246,7 +241,7 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
 
       // Not while a ring is being drawn: a cloud that turns under the pointer
       // catches whatever drifted into the loop rather than what was aimed at.
-      if (driftingRef.current && !reduced && !draggingRef.current && !selectingRef.current) {
+      if (driftingRef.current && !reduced && !draggingRef.current) {
         cameraRef.current.yaw += DRIFT * elapsed;
       }
 
@@ -380,35 +375,37 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
       // the whole, and this is the moment they stopped.
       // Every clump is named where there is room for eight names; a phone gets
       // the biggest few, which is a legend rather than a wall of words.
-      const labels = [...clusters]
+      const labels = clusters
+        .map((cluster, index) => ({ ...cluster, index }))
         .sort((a, b) => b.count - a.count)
         .slice(0, room < 0.8 ? 4 : clusters.length)
         .map((cluster) => ({ cluster, at: projectPoint(cluster, camera, viewport) }))
-        .filter((entry): entry is { cluster: EmbeddingSpaceCluster; at: ProjectedPoint } =>
-          Boolean(entry.at),
+        .filter(
+          (
+            entry,
+          ): entry is { cluster: EmbeddingSpaceCluster & { index: number }; at: ProjectedPoint } =>
+            Boolean(entry.at),
         );
 
       // Whatever the pointer is over is worth a photograph even when it is deep
-      // in the cloud: that is what hovering is for. Not while a ring is being
-      // drawn, though — then the pointer is describing a group, not asking
-      // about one photograph.
-      const pointer = selectingRef.current ? null : pointerRef.current;
+      // in the cloud: that is what hovering is for.
+      const pointer = pointerRef.current;
       const under = pointer
         ? pickPoint(ordered, pointer, (point) =>
             radiusOf(point, nearest.has(point.index), thumbnail),
           )
         : null;
 
-      // A selection puts the same lens on a group: everything outside the ring
-      // goes back into the page and what was caught stays where it was.
-      if (selectedRef.current.size > 0) {
+      // A chosen clump puts the same lens on a group: everything else goes back
+      // into the page and the group stays where it is.
+      if (chosenRef.current !== null) {
         context.globalAlpha = FOCUS_WASH;
         context.fillStyle = wash;
         context.fillRect(0, 0, width, viewHeight);
 
         context.globalAlpha = 1;
         for (const point of ordered) {
-          if (!selectedRef.current.has(point.index)) continue;
+          if (point.entry.cluster !== chosenRef.current) continue;
           const size = thumbnail * 1.2 * Math.max(0.7, point.scale);
           const sheet =
             atlas && point.entry.slot !== undefined
@@ -440,75 +437,44 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
         }
       }
 
-      // The ring itself, while it is being drawn.
-      if (lassoRef.current.length > 1) {
-        context.globalAlpha = 1;
-        context.strokeStyle = "rgba(255, 255, 255, 0.9)";
-        context.lineWidth = 1.5;
-        context.setLineDash([6, 4]);
-        context.beginPath();
-        lassoRef.current.forEach((position, index) => {
-          if (index === 0) context.moveTo(position.x, position.y);
-          else context.lineTo(position.x, position.y);
-        });
-        context.closePath();
-        context.stroke();
-        context.setLineDash([]);
-      }
+      // The names are real buttons over the canvas rather than text painted
+      // into it: a name is a control — it can be clicked, tabbed to and read
+      // aloud — and a canvas can offer none of that. They are positioned from
+      // here, by writing transforms straight onto the elements, because a React
+      // render sixty times a second to move eight labels is not a trade worth
+      // making.
+      const placedLabels: { x: number; y: number; width: number; height: number }[] = [];
+      labels.forEach(({ cluster, at }, index) => {
+        const element = labelRefs.current[cluster.index];
+        if (!element) return;
 
-      if (!under && selectedRef.current.size === 0) {
-        context.textAlign = "center";
-        context.textBaseline = "middle";
-        // Names already written, so a smaller clump gives way rather than
-        // printing itself over a bigger one. Sorted by size above, so what
-        // survives a collision is the one worth reading.
-        const written: { x: number; y: number; width: number; height: number }[] = [];
+        const half = element.offsetWidth / 2;
+        const box = {
+          x: Math.max(0, Math.min(width - element.offsetWidth, at.x - half)),
+          y: Math.max(
+            0,
+            Math.min(viewHeight - element.offsetHeight, at.y - element.offsetHeight / 2),
+          ),
+          width: element.offsetWidth,
+          height: element.offsetHeight,
+        };
 
-        for (const { cluster, at } of labels) {
-          const size = Math.max(11, Math.min(20, 15 * at.scale * (0.75 + room * 0.25)));
-          // A literal stack: a canvas font string is not CSS and silently
-          // rejects `var(...)`, which leaves every label at the 10px default.
-          context.font = `600 ${size}px system-ui, -apple-system, "Segoe UI", sans-serif`;
-          context.letterSpacing = "0.06em";
-          context.globalAlpha = Math.max(0.45, Math.min(1, 1.5 / at.depth));
+        // Biggest clump first, and a smaller name gives way rather than
+        // printing itself over one already placed.
+        const collides = placedLabels.some(
+          (other) =>
+            box.x < other.x + other.width &&
+            box.x + box.width > other.x &&
+            box.y < other.y + other.height &&
+            box.y + box.height > other.y,
+        );
+        const shown = !under && !collides && index < (room < 0.8 ? 4 : labels.length);
+        if (shown) placedLabels.push(box);
 
-          const text = cluster.label.replaceAll("_", " ");
-          const textWidth = context.measureText(text).width;
-          // Held inside the frame: a name clipped in half by the edge is worse
-          // than a name a few pixels off the clump it belongs to.
-          const margin = textWidth / 2 + 12;
-          const at2 = {
-            x: Math.max(margin, Math.min(width - margin, at.x)),
-            y: Math.max(size, Math.min(viewHeight - size, at.y)),
-          };
-          // A plate behind the words, or a label over a bright photograph is
-          // unreadable exactly where the cloud is densest.
-          const plate = {
-            x: at2.x - textWidth / 2 - 7,
-            y: at2.y - size * 0.75,
-            width: textWidth + 14,
-            height: size * 1.5,
-          };
-          const collides = written.some(
-            (other) =>
-              plate.x < other.x + other.width &&
-              plate.x + plate.width > other.x &&
-              plate.y < other.y + other.height &&
-              plate.y + plate.height > other.y,
-          );
-          if (collides) continue;
-          written.push(plate);
-
-          context.fillStyle = "rgba(0, 0, 0, 0.62)";
-          context.beginPath();
-          context.roundRect(plate.x, plate.y, plate.width, plate.height, size * 0.75);
-          context.fill();
-
-          context.fillStyle = "rgba(255, 255, 255, 0.94)";
-          context.fillText(text, at2.x, at2.y);
-        }
-        context.letterSpacing = "0px";
-      }
+        element.style.transform = `translate(${Math.round(box.x)}px, ${Math.round(box.y)}px)`;
+        element.style.opacity = shown ? String(Math.max(0.55, Math.min(1, 1.5 / at.depth))) : "0";
+        element.style.pointerEvents = shown ? "auto" : "none";
+      });
 
       if (under) {
         // Everything else goes back into the page, and what matters is drawn
@@ -613,27 +579,12 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
 
   const onPointerDown = (event: React.PointerEvent<HTMLCanvasElement>) => {
     event.currentTarget.setPointerCapture(event.pointerId);
-
-    // Modal on purpose: a drag means one thing at a time. Outside selecting it
-    // always turns the cloud, and inside it always draws a ring, so nobody has
-    // to hold a key down to find out which they are doing.
-    if (selectingRef.current) {
-      const bounds = event.currentTarget.getBoundingClientRect();
-      lassoRef.current = [{ x: event.clientX - bounds.left, y: event.clientY - bounds.top }];
-      return;
-    }
-
     draggingRef.current = { x: event.clientX, y: event.clientY };
   };
 
   const onPointerMove = (event: React.PointerEvent<HTMLCanvasElement>) => {
     const bounds = event.currentTarget.getBoundingClientRect();
     pointerRef.current = { x: event.clientX - bounds.left, y: event.clientY - bounds.top };
-
-    if (lassoRef.current.length > 0) {
-      lassoRef.current.push(pointerRef.current);
-      return;
-    }
 
     const dragging = draggingRef.current;
     if (!dragging) return;
@@ -647,28 +598,11 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
     draggingRef.current = { x: event.clientX, y: event.clientY };
   };
 
-  /** What the ring caught, in the pose it was drawn around. */
-  const closeLasso = () => {
-    const ring = lassoRef.current;
-    lassoRef.current = [];
-    if (ring.length < MIN_LASSO_POINTS) return;
-
-    const caught = placedRef.current.filter((point) => isInsidePolygon(point, ring));
-    selectedRef.current = new Set(caught.map((point) => point.index));
-    setSelected(caught.map((point) => point.entry));
-  };
-
   const endDrag = (event: React.PointerEvent<HTMLCanvasElement>) => {
-    if (lassoRef.current.length > 0) closeLasso();
     draggingRef.current = null;
     if (event.currentTarget.hasPointerCapture(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId);
     }
-  };
-
-  const clearSelection = () => {
-    selectedRef.current = new Set();
-    setSelected([]);
   };
 
   const onWheel = (event: React.WheelEvent<HTMLCanvasElement>) => {
@@ -684,6 +618,9 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
   }
 
   const count = entries?.length ?? 0;
+  const selected =
+    chosen === null ? [] : (entries ?? []).filter((entry) => entry.cluster === chosen);
+  const chosenLabel = chosen === null ? null : (clusters[chosen]?.label ?? null);
 
   // What the selection turned out to be about, asked the same way the cluster
   // labels are: the tags that are commoner in here than in the collection.
@@ -694,7 +631,9 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
 
   const selectionTags: string[] = [];
   const remaining = selected.map((entry) => (entry.tag ? [entry.tag] : []));
-  const taken = new Set<string>();
+  // The clump's own name is what the reader just clicked; repeating it back as
+  // "also autumn" says nothing.
+  const taken = new Set<string>(chosenLabel ? [chosenLabel] : []);
   while (selectionTags.length < SELECTION_TAGS) {
     const tag = distinctiveTag(
       remaining.map((tags) => tags.filter((value) => !taken.has(value))),
@@ -717,9 +656,7 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
       <div className={styles.stage} style={{ blockSize: `${height}px` }}>
         <canvas
           ref={canvasRef}
-          className={[styles.canvas, selecting ? styles.selectingCanvas : ""]
-            .filter(Boolean)
-            .join(" ")}
+          className={styles.canvas}
           role="img"
           aria-label={`${count} photographs arranged by what they are of. Drag to turn the cloud.`}
           onPointerDown={onPointerDown}
@@ -732,24 +669,13 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
           }}
           onWheel={onWheel}
           onClick={() => {
-            if (hovered && !selecting) globalThis.location.assign(hovered.entry.href);
+            if (hovered) globalThis.location.assign(hovered.entry.href);
           }}
         />
 
         {/* Over the cloud rather than under it, the way the map's controls sit:
             the picture is the subject and the chrome should cost it no room. */}
         <div className={styles.tools}>
-          <OverlayButton
-            size="small"
-            aria-pressed={selecting}
-            className={selecting ? styles.toolActive : ""}
-            onClick={() => {
-              setSelecting((current) => !current);
-              if (selecting) clearSelection();
-            }}
-          >
-            {selecting ? "Done" : "Select"}
-          </OverlayButton>
           <OverlayButton
             size="small"
             aria-pressed={!drifting}
@@ -760,9 +686,27 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
           </OverlayButton>
         </div>
 
+        {clusters.map((cluster, index) => (
+          <button
+            key={cluster.label}
+            type="button"
+            ref={(element) => {
+              labelRefs.current[index] = element;
+            }}
+            className={[styles.clusterName, chosen === index ? styles.clusterNameChosen : ""]
+              .filter(Boolean)
+              .join(" ")}
+            aria-pressed={chosen === index}
+            onClick={() => setChosen((current) => (current === index ? null : index))}
+          >
+            {cluster.label.replaceAll("_", " ")}
+            <span className={styles.clusterCount}>{cluster.count}</span>
+          </button>
+        ))}
+
         {count === 0 ? <p className={styles.status}>Arranging the collection…</p> : null}
 
-        {hovered && !selecting ? (
+        {hovered ? (
           <figcaption className={styles.caption}>
             <span>{hovered.entry.album ?? hovered.entry.label}</span>
             {hovered.entry.tag ? (
@@ -775,13 +719,14 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
       {selected.length > 0 ? (
         <div className={styles.selection}>
           <p className={styles.selectionSummary}>
-            <strong>{selected.length.toLocaleString("en")}</strong> photographs
+            <strong>{selected.length.toLocaleString("en")}</strong> photographs in{" "}
+            <span className={styles.selectionTags}>
+              {(chosenLabel ?? "this clump").replaceAll("_", " ")}
+            </span>
             {selectionTags.length > 0 ? (
               <>
-                {" · mostly "}
-                <span className={styles.selectionTags}>
-                  {selectionTags.map((tag) => tag.replaceAll("_", " ")).join(", ")}
-                </span>
+                {" · also "}
+                {selectionTags.map((tag) => tag.replaceAll("_", " ")).join(", ")}
               </>
             ) : null}
           </p>
@@ -805,7 +750,7 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
             <button
               type="button"
               className={[pillStyles.base, pillStyles.ghost].join(" ")}
-              onClick={clearSelection}
+              onClick={() => setChosen(null)}
             >
               Clear
             </button>
@@ -813,9 +758,8 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
         </div>
       ) : (
         <Caption as="p" size="sm" className={styles.hint}>
-          {selecting
-            ? "Draw a ring around a group of photographs."
-            : "Drag to turn it, scroll to move closer, click a photograph to open it."}
+          Drag to turn it, scroll to move closer, click a name to keep just that clump, click a
+          photograph to open it.
         </Caption>
       )}
 

@@ -16,6 +16,8 @@ export type EmbeddingSpaceEntry = {
   slot?: number;
   /** The photographs the model reads as most like this one, by index. */
   near?: number[];
+  /** Which named clump it fell in, as an index into the clusters. */
+  cluster?: number;
   x: number;
   y: number;
   z: number;

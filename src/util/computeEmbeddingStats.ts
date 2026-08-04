@@ -947,25 +947,30 @@ export const loadEmbeddingSpacePoints = async (
         }
       }
 
-      const clusters = clusterPoints(positions, CLUSTERS)
+      const named = clusterPoints(positions, CLUSTERS)
         .filter((cluster) => cluster.members.length >= MIN_CLUSTER_SIZE)
         .flatMap((cluster) => {
           const label = distinctiveTag(
             cluster.members.map((member) => tagLookup.get(decoded[member]?.path ?? "") ?? []),
             overallTags,
           );
-          return label
-            ? [
-                {
-                  x: Number(cluster.centre.x.toFixed(4)),
-                  y: Number(cluster.centre.y.toFixed(4)),
-                  z: Number(cluster.centre.z.toFixed(4)),
-                  label,
-                  count: cluster.members.length,
-                },
-              ]
-            : [];
+          return label ? [{ cluster, label }] : [];
         });
+
+      // Which clump each photograph fell in, so choosing a name chooses the
+      // photographs rather than whatever happened to be on screen behind it.
+      const clusterOf = new Map<number, number>();
+      named.forEach(({ cluster }, index) => {
+        for (const member of cluster.members) clusterOf.set(member, index);
+      });
+
+      const clusters = named.map(({ cluster, label }) => ({
+        x: Number(cluster.centre.x.toFixed(4)),
+        y: Number(cluster.centre.y.toFixed(4)),
+        z: Number(cluster.centre.z.toFixed(4)),
+        label,
+        count: cluster.members.length,
+      }));
 
       const points = decoded.map((entry, index) => {
         const position = positions[index] ?? { x: 0, y: 0, z: 0 };
@@ -981,6 +986,7 @@ export const loadEmbeddingSpacePoints = async (
           ...(tag ? { tag } : {}),
           ...(slot === undefined ? {} : { slot }),
           ...((neighbours[index]?.length ?? 0) > 0 ? { near: neighbours[index] } : {}),
+          ...(clusterOf.has(index) ? { cluster: clusterOf.get(index) } : {}),
           x: Number(position.x.toFixed(4)),
           y: Number(position.y.toFixed(4)),
           z: Number(position.z.toFixed(4)),

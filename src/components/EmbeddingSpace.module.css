@@ -35,12 +35,6 @@
   cursor: grabbing;
 }
 
-/* While selecting, a drag draws rather than turns, and the pointer says so. */
-.selectingCanvas,
-.selectingCanvas:active {
-  cursor: crosshair;
-}
-
 /* The controls sit over the cloud rather than under it: the picture is the
    subject, and chrome beneath it costs the picture height on every viewport. */
 .tools {
@@ -54,6 +48,46 @@
 .toolActive {
   border-color: var(--c-accent);
   color: var(--c-accent);
+}
+
+/* A clump's name: a control the reader can click, tab to and hear read out,
+   positioned over the canvas from the draw loop. */
+.clusterName {
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline-start: 0;
+  display: flex;
+  align-items: baseline;
+  gap: var(--m-xs);
+  padding: var(--m-xs) var(--m-s);
+  border: solid var(--line-hairline) transparent;
+  border-radius: var(--radius-pill);
+  background: var(--c-overlay-dark);
+  color: var(--c-white);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    opacity var(--t-fast) var(--ease-out),
+    background-color var(--t-fast) var(--ease-out);
+}
+
+.clusterName:hover,
+.clusterName:focus-visible {
+  border-color: var(--c-accent);
+}
+
+.clusterNameChosen {
+  background: var(--c-white);
+  color: var(--c-black);
+}
+
+.clusterCount {
+  font-size: var(--fs-xs);
+  font-weight: 400;
+  opacity: 0.7;
 }
 
 .status {
