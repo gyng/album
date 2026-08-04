@@ -182,27 +182,7 @@
   color: var(--c-accent);
 }
 
-.hint {
-  margin: 0;
-}
-
-/* Looking and opening are one gesture with a mouse and two with a finger, so
-   the instructions differ too. */
-.coarseOnly {
-  display: none;
-}
-
-@media (hover: none), (pointer: coarse) {
-  .fineOnly {
-    display: none;
-  }
-
-  .coarseOnly {
-    display: inline;
-  }
-}
-
-/* What a ring caught, and where a reader can take it. */
+/* What a chosen clump is, and where a reader can take it. */
 .selection {
   display: flex;
   flex-wrap: wrap;

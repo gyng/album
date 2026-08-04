@@ -1,6 +1,6 @@
 import React from "react";
 import { AppLink } from "./platform";
-import { Caption, OverlayButton, overlayButtonStyles, pillStyles } from "./ui";
+import { OverlayButton, overlayButtonStyles, pillStyles } from "./ui";
 import { useActiveTheme } from "./useActiveTheme";
 import {
   backToFront,
@@ -1163,12 +1163,7 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
             </button>
           </div>
         </div>
-      ) : (
-        <Caption as="p" size="sm" className={styles.hint}>
-          It turns by itself until you touch it. Drag to turn it yourself, click a name to keep just
-          that clump, click a photograph to open it.
-        </Caption>
-      )}
+      ) : null}
 
       {/* A canvas has no children, so the photographs in it are unreachable
           without this: the same compensation the map makes for its GPU pins. */}
