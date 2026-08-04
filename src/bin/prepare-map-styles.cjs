@@ -12,6 +12,7 @@ const { composeMapStyle } = require("./composeMapStyle.cjs");
 const { tintMapStyle } = require("./tintMapStyle.cjs");
 const { THEME_PALETTES } = require("./mapStylePalettes.cjs");
 const { buildPatternSheet } = require("./mapPatternSprite.cjs");
+const { coloursFromPaletteStrings, paletteFromColours } = require("./photoPalette.cjs");
 
 const ORIGIN_TOKEN = "{{origin}}";
 
@@ -217,6 +218,33 @@ const composedStyles = (spriteUrl) => {
   return styles;
 };
 
+/**
+ * The palette of the photographs themselves, out of the search database.
+ *
+ * Best-effort by construction: a fork with no index yet, and the E2E build with
+ * its fixture databases, both get null and the basemap keeps a default palette
+ * rather than the build failing over a colour scheme.
+ */
+/* istanbul ignore next -- disk and SQLite; paletteFromColours is what is tested */
+const photographPalette = (log) => {
+  const dbPath = path.join(__dirname, "..", "public", "search.sqlite");
+  if (!fs.existsSync(dbPath)) return null;
+
+  try {
+    const { DatabaseSync } = require("node:sqlite");
+    const db = new DatabaseSync(dbPath, { readOnly: true });
+    const rows = db
+      .prepare("SELECT colors FROM images WHERE colors IS NOT NULL")
+      .all()
+      .map((row) => row.colors);
+    db.close();
+    return paletteFromColours(coloursFromPaletteStrings(rows));
+  } catch (error) {
+    log(`Could not read photograph colours (${error.message}); using the default palette.`);
+    return null;
+  }
+};
+
 /** Replaces every origin token; returns the document untouched when there is none. */
 const applyOrigin = (template, origin) => template.split(ORIGIN_TOKEN).join(origin);
 
@@ -263,6 +291,29 @@ const run = async (log = console.log, env = process.env) => {
     );
   }
 
+  // The basemap that wears the colours of the photographs on it. Falls back to
+  // the paper palette, so the style always exists and the picker never offers a
+  // choice that 404s.
+  const photographs = photographPalette(log);
+  fs.writeFileSync(
+    path.join(dir, "photos.json"),
+    `${applyOrigin(
+      JSON.stringify(
+        tintMapStyle(
+          gallery,
+          photographs ?? { land: "#f4efe2", water: "#cfdfe0", label: "#4a4030" },
+          "From the photographs",
+        ),
+      ),
+      origin,
+    )}\n`,
+  );
+  if (photographs) {
+    log(
+      `Photograph palette: ground ${photographs.land}, water ${photographs.water}, ink ${photographs.label}`,
+    );
+  }
+
   const spriteUrl = await writePatternSprite(dir, origin);
 
   // Composed styles have no template to fill in: they are built from a palette
@@ -283,6 +334,7 @@ const run = async (log = console.log, env = process.env) => {
   });
 
   const generated = [
+    "photos.json",
     ...themedStyles(gallery).map(([name]) => `${name}.json`),
     ...composedStyles(spriteUrl).map(([name]) => `${name}.json`),
   ];

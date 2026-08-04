@@ -57,7 +57,8 @@ export type MapStyleName =
   | "halftone"
   | "paper"
   | "crt"
-  | "globe";
+  | "globe"
+  | "photos";
 
 /**
  * Where a style's tiles come from.
@@ -167,6 +168,15 @@ export const MAP_STYLES: Record<
     source: { provider: "self", path: "/map-styles/crt.json" },
     label: "CRT",
     swatch: "#020604",
+  },
+  // The colours of the photographs themselves. The indexer stores a dominant
+  // palette per photograph, so the site already knows what its own pictures
+  // look like; `photoPalette.cjs` reduces the corpus to a ground, a water and
+  // an ink, and the gallery's cartography wears them.
+  photos: {
+    source: { provider: "self", path: "/map-styles/photos.json" },
+    label: "From the photographs",
+    swatch: "conic-gradient(from 210deg, #b3b3b3, #7f8ea6, #1c1b19, #d5c1b2, #b3b3b3)",
   },
   // A sphere. The projection is the style: MapLibre reads it from the document,
   // so choosing this basemap is what puts the photographs on a planet.
