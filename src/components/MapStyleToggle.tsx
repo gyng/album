@@ -9,6 +9,7 @@ import {
   subscribeMapStyleName,
 } from "../util/mapStyles";
 import { Select } from "./ui";
+import styles from "./MapStyleToggle.module.css";
 
 /**
  * Reads the chosen basemap, and re-renders whoever asks when it changes.
@@ -29,6 +30,7 @@ export const MapStyleToggle: React.FC = () => {
 
   return (
     <Select
+      className={styles.picker}
       aria-label="Map style"
       value={style}
       onChange={(event) => {
@@ -39,7 +41,13 @@ export const MapStyleToggle: React.FC = () => {
       }}
     >
       {MAP_STYLE_NAMES.map((name) => (
-        <option key={name} value={name}>
+        <option
+          key={name}
+          value={name}
+          // The style's own ground colour, so the menu shows what it looks
+          // like rather than only what it is called.
+          style={{ "--swatch": MAP_STYLES[name].swatch } as React.CSSProperties}
+        >
           {MAP_STYLES[name].label}
         </option>
       ))}

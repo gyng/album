@@ -84,10 +84,10 @@
   }
 }
 
-/* `base-select` opts a native select into being styleable — the button, the
-   dropdown, and the options inside it, which no amount of CSS could reach
-   before. Browsers without it keep everything above: `appearance: none` and the
-   arrow drawn as a background image. */
+/* `base-select` opts a native select into being styleable. The frame and the
+   option rows are set here, once, so every picker in the app reads the same;
+   a control that previews its choices (the theme and basemap pickers) adds a
+   swatch to the row and nothing else. */
 @supports (appearance: base-select) {
   .base {
     appearance: base-select;
@@ -105,30 +105,33 @@
   }
 
   .base option {
-    padding: var(--m) var(--m-s);
+    display: flex;
+    align-items: center;
+    gap: var(--m-s);
+    padding: var(--m-s) var(--m-m);
     border-radius: var(--m);
-    background: transparent;
-    color: inherit;
+    font-family: var(--font-sans);
     font-size: var(--fs-sm);
   }
 
   .base option:hover,
-  .base option:focus {
-    background: color-mix(in oklch, var(--c-bg-contrast-light) 16%, transparent);
+  .base option:focus-visible {
+    background: color-mix(in oklch, var(--c-bg-contrast-light) 18%, transparent);
   }
 
   .base option:checked {
-    background: color-mix(in oklch, var(--c-accent) 20%, transparent);
+    background: color-mix(in oklch, var(--c-accent) 14%, transparent);
   }
 
-  /* The tick the browser adds for the selected option; the accent already says
-     which one it is. */
+  /* Selection is the row highlight. The platform's tick would sit beside a
+     swatch and read as clutter, and it moves the label left of the rows above
+     it in the pickers that have no swatch. */
   .base option::checkmark {
     display: none;
   }
 
   /* The select's own arrow comes back as a real element, so the background
-     images the fallback draws are no longer needed. */
+     image the fallback draws is no longer needed. */
   .select,
   .compact {
     background-image: none;

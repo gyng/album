@@ -1,0 +1,15 @@
+/* One swatch per basemap, drawn exactly like the theme picker's: the rows
+   themselves come from Select, so the two pickers match by construction. Only
+   browsers with a styleable select see it; the rest keep the plain text menu,
+   which says the same thing in words. */
+@supports selector(::picker(select)) {
+  .picker option::before {
+    content: "";
+    flex: none;
+    inline-size: var(--size-16);
+    block-size: var(--size-16);
+    border: solid var(--line-hairline) color-mix(in oklch, var(--c-font) 35%, transparent);
+    border-radius: var(--m);
+    background: var(--swatch, var(--c-bg));
+  }
+}

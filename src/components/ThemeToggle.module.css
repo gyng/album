@@ -19,55 +19,12 @@
   color-scheme: dark;
 }
 
-/* Swatch previews in the dropdown via the customizable-select API. Progressive:
-   browsers without ::picker support keep the native text-only menu. */
+/* One swatch per theme. The rows themselves — padding, highlight, hidden tick —
+   come from Select, so every picker in the app matches. Browsers without
+   ::picker support keep the native text-only menu. */
 @supports selector(::picker(select)) {
-  .picker,
-  .picker::picker(select) {
-    appearance: base-select;
-  }
-
-  .picker::picker(select) {
-    padding: var(--m);
-    border: var(--popup-border);
-    border-radius: var(--popup-radius);
-    background: var(--c-bg);
-    color: var(--c-font);
-    box-shadow: var(--popup-shadow);
-  }
-
-  /* Select.module.css already draws the dropdown arrow; drop base-select's. */
-  .picker::picker-icon {
-    display: none;
-  }
-
-  .picker option {
-    display: flex;
-    align-items: center;
-    gap: var(--m-s);
-    padding: var(--m-s) var(--m-m);
-    border-radius: var(--m);
-    font-family: var(--font-sans);
-    font-size: var(--fs-sm);
-  }
-
-  .picker option:hover,
-  .picker option:focus-visible {
-    background: color-mix(in oklch, var(--c-bg-contrast-light) 18%, transparent);
-  }
-
-  .picker option:checked {
-    background: color-mix(in oklch, var(--c-accent) 14%, transparent);
-  }
-
-  /* Selection is shown by the row highlight; the default tick would sit
-     beside the swatch and read as clutter. */
-  .picker option::checkmark {
-    display: none;
-  }
-
-  /* The swatch: each option scopes its own theme's tokens (via its theme-*
-     class or scheme island above), so bg and accent are that theme's own. */
+  /* Each option scopes its own theme's tokens (via its theme-* class or the
+     scheme islands above), so bg and accent are that theme's own. */
   .picker option::before {
     content: "";
     flex: none;

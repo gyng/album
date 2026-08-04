@@ -75,37 +75,65 @@ type StyleSource =
  * covers the actual reasons to switch — a plainer map, a topographic one, a
  * dark one, imagery, or something decorative.
  */
-export const MAP_STYLES: Record<MapStyleName, { source: StyleSource; label: string }> = {
+export const MAP_STYLES: Record<
+  MapStyleName,
+  { source: StyleSource; label: string; swatch: string }
+> = {
   // The default first, then the rest. `liberty` is the one OpenFreeMap style
   // that carries a fill-extrusion layer: it opens flat, like every other
   // basemap here, and stands its buildings up as soon as a reader tilts it.
   // Composed from the same palette the page is using, so the map belongs to
   // the theme rather than sitting on it.
-  theme: { source: { provider: "themed" }, label: "Match theme" },
-  "3d": { source: { provider: "free", id: "liberty" }, label: "3D" },
+  theme: { source: { provider: "themed" }, label: "Match theme", swatch: "var(--c-bg)" },
+  "3d": { source: { provider: "free", id: "liberty" }, label: "3D", swatch: "#e8e3d8" },
   // Ground, water and the roads that matter, with nothing written on it: the
   // world map draws fourteen hundred pins, and the basemap under them is
   // competing with its own subject.
-  minimal: { source: { provider: "self", path: "/map-styles/minimal.json" }, label: "Minimal" },
+  minimal: {
+    source: { provider: "self", path: "/map-styles/minimal.json" },
+    label: "Minimal",
+    swatch: "#f7f6f3",
+  },
   // Watercolour's sibling: linework on paper, no fills.
-  sketch: { source: { provider: "self", path: "/map-styles/sketch.json" }, label: "Sketch" },
+  sketch: {
+    source: { provider: "self", path: "/map-styles/sketch.json" },
+    label: "Sketch",
+    swatch: "#f4efe2",
+  },
   // The fork's own design, lifted off the metered tiles onto the free ones and
   // served from here: same layers, same paint, same sprite, no key and no
   // quota. `bin/build-free-gallery-style.cjs` regenerates it.
-  gallery: { source: { provider: "self", path: "/map-styles/gallery.json" }, label: "Gallery" },
-  streets: { source: { provider: "free", id: "bright" }, label: "Streets" },
-  outdoor: { source: { provider: "keyed", id: "outdoor-v2" }, label: "Outdoor" },
-  topographic: { source: { provider: "keyed", id: "topo-v2" }, label: "Topographic" },
-  dark: { source: { provider: "free", id: "dark" }, label: "Dark" },
-  satellite: { source: { provider: "keyed", id: "satellite" }, label: "Satellite" },
+  gallery: {
+    source: { provider: "self", path: "/map-styles/gallery.json" },
+    label: "Gallery",
+    swatch: "#f0ece1",
+  },
+  streets: { source: { provider: "free", id: "bright" }, label: "Streets", swatch: "#f8f4f0" },
+  outdoor: { source: { provider: "keyed", id: "outdoor-v2" }, label: "Outdoor", swatch: "#e8efdc" },
+  topographic: {
+    source: { provider: "keyed", id: "topo-v2" },
+    label: "Topographic",
+    swatch: "#e6e0cf",
+  },
+  dark: { source: { provider: "free", id: "dark" }, label: "Dark", swatch: "#1b1f24" },
+  satellite: {
+    source: { provider: "keyed", id: "satellite" },
+    label: "Satellite",
+    swatch: "#4a5a46",
+  },
   // Also lifted onto the free tiles: its landmass came from a tileset of its
   // own, which becomes a background of the same colour, the way OpenFreeMap's
   // own styles draw land.
   watercolour: {
     source: { provider: "self", path: "/map-styles/watercolour.json" },
     label: "Watercolour",
+    swatch: "#f7f2e6",
   },
-  monochrome: { source: { provider: "free", id: "positron" }, label: "Monochrome" },
+  monochrome: {
+    source: { provider: "free", id: "positron" },
+    label: "Monochrome",
+    swatch: "#ededed",
+  },
 };
 
 /** True where a style needs no key and no quota. */

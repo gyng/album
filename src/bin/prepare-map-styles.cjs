@@ -9,29 +9,41 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { resolveSiteOrigin } = require("./siteConfig.cjs");
 const { composeMapStyle } = require("./composeMapStyle.cjs");
+const { tintMapStyle } = require("./tintMapStyle.cjs");
 const { THEME_PALETTES } = require("./mapStylePalettes.cjs");
 
 const ORIGIN_TOKEN = "{{origin}}";
 
 /**
+ * The theme basemaps: the gallery style, wearing each theme's palette.
+ *
+ * Composing a basemap from a table gets the colours right and the cartography
+ * approximately — the gallery style has seventy-five layers of casings, shields
+ * and icons that a palette table will not reproduce. So the theme styles are
+ * that style retinted, which keeps its map and changes its colours.
+ *
+ * @param {object} gallery the gallery style document, already parsed.
+ * @returns {Array<[string, object]>} each style's file name and document.
+ */
+const themedStyles = (gallery) =>
+  Object.entries(THEME_PALETTES).map(
+    /** @returns {[string, object]} */
+    ([theme, palette]) => [`theme-${theme}`, tintMapStyle(gallery, palette, `Theme (${theme})`)],
+  );
+
+/**
  * The basemaps this site composes rather than copies.
  *
- * One per theme, so the map can follow the page, plus two that are about how
- * much to draw rather than what colour to draw it: a basemap with nothing on it
- * but ground, water and the roads that matter, for the map carrying fourteen
- * hundred pins; and linework on paper, watercolour's sibling.
+ * Not about colour — the themes cover that — but about how much is drawn: a
+ * basemap with nothing on it but ground, water and the roads that matter, for
+ * the map carrying fourteen hundred pins; and linework on paper, watercolour's
+ * sibling.
  *
  * @returns {Array<[string, object]>} each style's file name and document.
  */
 const composedStyles = () => {
   /** @type {Array<[string, object]>} */
-  const styles = Object.entries(THEME_PALETTES).map(
-    /** @returns {[string, object]} */
-    ([theme, palette]) => [
-      `theme-${theme}`,
-      composeMapStyle({ name: `Theme (${theme})`, palette }),
-    ],
-  );
+  const styles = [];
 
   styles.push([
     "minimal",
@@ -74,8 +86,19 @@ const run = (log = console.log, env = process.env) => {
 
   const origin = resolveSiteOrigin(env);
 
+  // The theme basemaps are the gallery style retinted. They are generated, not
+  // committed, so the origin is filled in here rather than by leaving twelve
+  // more templates on disk.
+  const gallery = JSON.parse(fs.readFileSync(path.join(dir, "gallery.template.json"), "utf8"));
+  for (const [name, style] of themedStyles(gallery)) {
+    fs.writeFileSync(
+      path.join(dir, `${name}.json`),
+      `${applyOrigin(JSON.stringify(style), origin)}\n`,
+    );
+  }
+
   // Composed styles have no template to fill in: they are built from a palette
-  // here, so a theme is a table entry rather than a committed document.
+  // here, so a basemap is a table entry rather than a committed document.
   for (const [name, style] of composedStyles()) {
     fs.writeFileSync(path.join(dir, `${name}.json`), `${JSON.stringify(style)}\n`);
   }
@@ -91,9 +114,12 @@ const run = (log = console.log, env = process.env) => {
     return output;
   });
 
-  const composed = composedStyles().map(([name]) => `${name}.json`);
-  log(`Wrote ${[...composed, ...written].length} map styles for ${origin}`);
-  return [...composed, ...written];
+  const generated = [
+    ...themedStyles(gallery).map(([name]) => `${name}.json`),
+    ...composedStyles().map(([name]) => `${name}.json`),
+  ];
+  log(`Wrote ${[...generated, ...written].length} map styles for ${origin}`);
+  return [...generated, ...written];
 };
 
 module.exports = { applyOrigin, run };
