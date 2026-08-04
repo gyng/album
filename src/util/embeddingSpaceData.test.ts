@@ -15,17 +15,36 @@ describe("fetchEmbeddingSpace", () => {
   });
 
   it("returns the points it was given", async () => {
-    await expect(fetchEmbeddingSpace(respond({ points: [point] }))).resolves.toEqual([point]);
+    await expect(fetchEmbeddingSpace(respond({ points: [point] }))).resolves.toEqual({
+      points: [point],
+      atlas: null,
+    });
+  });
+
+  // Without a sheet the cloud still draws — in dominant colours — so a payload
+  // that has none is not an error.
+  it("takes the contact sheet when there is one, and copes when there is not", async () => {
+    const atlas = { cell: 48, sheet: 2048, perSheet: 1764, files: ["/data/a-0.avif"] };
+
+    await expect(fetchEmbeddingSpace(respond({ points: [point], atlas }))).resolves.toMatchObject({
+      atlas,
+    });
+    await expect(
+      fetchEmbeddingSpace(respond({ points: [point], atlas: { cell: 48 } })),
+    ).resolves.toMatchObject({ atlas: null });
   });
 
   // A build with no embeddings database publishes an empty cloud rather than
   // failing, so the reader gets a section that says so rather than a crash.
   it("reads an empty or malformed payload as an empty cloud", async () => {
-    await expect(fetchEmbeddingSpace(respond({ points: [] }))).resolves.toEqual([]);
-    await expect(fetchEmbeddingSpace(respond({}))).resolves.toEqual([]);
+    await expect(fetchEmbeddingSpace(respond({ points: [] }))).resolves.toEqual({
+      points: [],
+      atlas: null,
+    });
+    await expect(fetchEmbeddingSpace(respond({}))).resolves.toMatchObject({ points: [] });
     await expect(
       fetchEmbeddingSpace(respond({ points: [{ src: "/a.avif" }, null, 4] })),
-    ).resolves.toEqual([]);
+    ).resolves.toMatchObject({ points: [] });
   });
 
   it("reports a response that never arrived", async () => {

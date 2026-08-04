@@ -16,6 +16,15 @@
 
 export type SpacePoint = { x: number; y: number; z: number };
 
+/**
+ * How much a thin axis may be stretched to fill the view.
+ *
+ * Three is enough to turn the usual pancake into something with depth, and
+ * little enough that an axis carrying almost nothing stays visibly thin rather
+ * than becoming a cloud of amplified noise.
+ */
+const MAX_AXIS_STRETCH = 3;
+
 /** How many times a component is refined. Ten is past convergence for this data. */
 const POWER_ITERATIONS = 24;
 
@@ -151,16 +160,30 @@ export const projectToThreeDimensions = (vectors: readonly (readonly number[])[]
     z: dot(row, axes[2] as number[]),
   }));
 
-  const extent = projected.reduce(
-    (widest, point) => Math.max(widest, Math.abs(point.x), Math.abs(point.y), Math.abs(point.z)),
-    0,
-  );
-  if (extent === 0) return projected;
+  // Each axis is scaled towards filling the cube on its own rather than all
+  // three by the widest. The components are ordered by variance, so a shared
+  // scale draws most collections as an almost flat slab — true to the numbers,
+  // and useless to turn around, since the third axis is the one that reads as
+  // depth. Neighbour relationships and clusters survive a stretch; only the
+  // aspect ratio changes.
+  //
+  // But the stretch is capped, because an axis with almost no variance is
+  // numerical noise, and filling the cube with it would invent a depth this
+  // collection does not have.
+  const extent = {
+    x: Math.max(...projected.map((point) => Math.abs(point.x))),
+    y: Math.max(...projected.map((point) => Math.abs(point.y))),
+    z: Math.max(...projected.map((point) => Math.abs(point.z))),
+  };
+  const widest = Math.max(extent.x, extent.y, extent.z);
+  if (widest === 0) return projected;
+
+  const divisor = (own: number) => Math.max(own, widest / MAX_AXIS_STRETCH);
 
   return projected.map((point) => ({
-    x: point.x / extent,
-    y: point.y / extent,
-    z: point.z / extent,
+    x: point.x / divisor(extent.x),
+    y: point.y / divisor(extent.y),
+    z: point.z / divisor(extent.z),
   }));
 };
 

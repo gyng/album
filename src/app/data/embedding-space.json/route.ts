@@ -6,13 +6,10 @@ import { loadEmbeddingSpace } from "../../../services/embeddingSpace";
 export const dynamic = "force-static";
 
 export const GET = async (): Promise<Response> => {
-  const points = await loadEmbeddingSpace();
-  return Response.json(
-    { points },
-    {
-      headers: {
-        "Cache-Control": "public, max-age=0, must-revalidate",
-      },
+  const payload = await loadEmbeddingSpace();
+  return Response.json(payload, {
+    headers: {
+      "Cache-Control": "public, max-age=0, must-revalidate",
     },
-  );
+  });
 };

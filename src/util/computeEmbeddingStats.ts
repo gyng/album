@@ -822,6 +822,8 @@ export type EmbeddingSpacePoint = {
   swatch?: string;
   /** The photograph's most distinctive tag, for naming what a cluster turned out to be. */
   tag?: string;
+  /** Its cell on the contact sheet, when one was built. */
+  slot?: number;
   x: number;
   y: number;
   z: number;
@@ -838,6 +840,7 @@ export type EmbeddingSpacePoint = {
 export const loadEmbeddingSpacePoints = async (
   albums: Content[],
   dbPath = DEFAULT_EMBEDDINGS_DB_PATH,
+  slots: Record<string, number> = {},
 ): Promise<EmbeddingSpacePoint[]> =>
   measureBuild("stats.embeddingSpace", async () => {
     const resolvedDbPath = resolveEmbeddingsDbPath(dbPath);
@@ -898,6 +901,7 @@ export const loadEmbeddingSpacePoints = async (
         const position = positions[index] ?? { x: 0, y: 0, z: 0 };
         const tag = tagLookup.get(entry.path)?.[0];
         const album = albumLookup.get(entry.path);
+        const slot = slots[entry.path];
         return {
           src: entry.photo.src,
           href: entry.photo.href,
@@ -905,6 +909,7 @@ export const loadEmbeddingSpacePoints = async (
           ...(album ? { album } : {}),
           ...(entry.photo.swatch ? { swatch: entry.photo.swatch } : {}),
           ...(tag ? { tag } : {}),
+          ...(slot === undefined ? {} : { slot }),
           x: Number(position.x.toFixed(4)),
           y: Number(position.y.toFixed(4)),
           z: Number(position.z.toFixed(4)),

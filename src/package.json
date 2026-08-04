@@ -26,7 +26,7 @@
     "prepare:posters": "node ./bin/prepare-video-posters.cjs",
     "prepare:vendor-maplibre": "node ./bin/prepare-maplibre-vendor.cjs",
     "prepare:e2e-fixtures": "node ./bin/create-e2e-search-db.cjs --output ./public/e2e-search.sqlite --embeddings-output ./public/e2e-search-embeddings.sqlite --force",
-    "build:prepare": "npm run prepare:build-manifest && npm run typecheck && npm run prepare:images && npm run prepare:posters && npm run prepare:feeds && npm run prepare:map-styles && npm run prepare:pwa-icons && npm run prepare:vendor-maplibre",
+    "build:prepare": "npm run prepare:build-manifest && npm run typecheck && npm run prepare:images && npm run prepare:posters && npm run prepare:embedding-atlas && npm run prepare:feeds && npm run prepare:map-styles && npm run prepare:pwa-icons && npm run prepare:vendor-maplibre",
     "build:e2e": "npm run prepare:e2e-fixtures && ALBUM_INCLUDE_TEST_ALBUMS=1 npm run build:prepare && MALLOC_ARENA_MAX=${MALLOC_ARENA_MAX:-2} VIPS_CONCURRENCY=${VIPS_CONCURRENCY:-4} NEXT_DIST_DIR=.next-e2e NEXT_PUBLIC_SEARCH_DATABASE_URL=/e2e-search.sqlite NEXT_PUBLIC_SEARCH_EMBEDDINGS_DATABASE_URL=/e2e-search-embeddings.sqlite ALBUM_INCLUDE_TEST_ALBUMS=1 ALBUM_SKIP_NEXT_TYPECHECK=1 next build && echo 'build done'",
     "build": "npm run build:prepare && MALLOC_ARENA_MAX=${MALLOC_ARENA_MAX:-2} VIPS_CONCURRENCY=${VIPS_CONCURRENCY:-4} ALBUM_SKIP_NEXT_TYPECHECK=1 next build && echo 'build done'",
     "build:profile": "npm run build:prepare && MALLOC_ARENA_MAX=${MALLOC_ARENA_MAX:-2} VIPS_CONCURRENCY=${VIPS_CONCURRENCY:-4} ALBUM_BUILD_PROFILE=1 ALBUM_SKIP_NEXT_TYPECHECK=1 next build && echo 'build done'",
@@ -44,7 +44,8 @@
     "test:e2e:reuse": "PLAYWRIGHT_SKIP_WEBSERVER=1 playwright test",
     "test:e2e:headed": "npm run build:e2e && playwright test --headed",
     "screenshot": "playwright test --config=playwright.screenshot.config.ts",
-    "prepare:map-styles": "node ./bin/prepare-map-styles.cjs"
+    "prepare:map-styles": "node ./bin/prepare-map-styles.cjs",
+    "prepare:embedding-atlas": "node ./bin/prepare-embedding-atlas.cjs"
   },
   "dependencies": {
     "@fontsource/alegreya": "^5.3.0",

@@ -60,6 +60,19 @@ describe("projectToThreeDimensions", () => {
     expect(Math.max(...points.map((point) => Math.abs(point.x)))).toBeCloseTo(1, 5);
   });
 
+  // The components are ordered by variance, so a shared scale would draw this
+  // as an almost flat slab — true, and useless to turn around, since the third
+  // axis is the one that reads as depth.
+  it("gives each axis the whole cube, so the depth axis can be seen", () => {
+    const points = projectToThreeDimensions(
+      Array.from({ length: 40 }, (_, index) => spike(24, index % 24, 1 + index)),
+    );
+
+    for (const axis of ["x", "y", "z"] as const) {
+      expect(Math.max(...points.map((point) => Math.abs(point[axis])))).toBeCloseTo(1, 5);
+    }
+  });
+
   // Data that genuinely lies in a plane should come out as a plane rather than
   // as a cloud with a made-up third axis.
   it("reports a flat collection as flat", () => {

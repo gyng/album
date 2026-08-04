@@ -7,7 +7,11 @@ import {
   projectPoint,
   type ProjectedPoint,
 } from "../util/embeddingSpace";
-import { type EmbeddingSpaceEntry, fetchEmbeddingSpace } from "../util/embeddingSpaceData";
+import {
+  type EmbeddingSpaceAtlas,
+  type EmbeddingSpaceEntry,
+  fetchEmbeddingSpace,
+} from "../util/embeddingSpaceData";
 import styles from "./EmbeddingSpace.module.css";
 
 /**
@@ -30,7 +34,7 @@ export type EmbeddingSpaceProps = {
   height?: number;
 };
 
-const INITIAL_CAMERA: Camera = { yaw: 0.7, pitch: 0.22, distance: 2.9 };
+const INITIAL_CAMERA: Camera = { yaw: 0.7, pitch: 0.22, distance: 3.8 };
 
 /** Radians per second while nobody is holding it. Slow enough to read. */
 const DRIFT = 0.11;
@@ -43,17 +47,35 @@ const MAX_PITCH = Math.PI / 2.4;
 const DOT_RADIUS = 3.4;
 
 /**
- * How many of the nearest photographs are drawn as photographs.
+ * How many of the nearest photographs are drawn from their own file when there
+ * is no contact sheet.
  *
  * Small because the smallest variant this site publishes is 800px and about
- * 100KB: a cloud that drew a hundred of them would cost ten megabytes to look
- * at. The rest are their own dominant colour, which is what the collection
- * looks like from a distance anyway.
+ * 100KB: a cloud that drew a hundred of them that way would cost ten megabytes
+ * to look at. With a sheet — the normal case — every photograph is a
+ * photograph and this does not apply.
  */
 const THUMBNAIL_BUDGET = 24;
 
-/** Thumbnail size at the centre of the cloud, in pixels. */
-const THUMBNAIL_SIZE = 34;
+/**
+ * How many are drawn as photographs when there *is* a sheet.
+ *
+ * Not all of them, even though the sheet makes that free: fifteen hundred
+ * thumbnails at any legible size cover the view completely and the cloud stops
+ * having a shape. The nearest few hundred are photographs and everything behind
+ * them is its own dominant colour, which is also the depth cue — a photograph
+ * is near, a dot is far.
+ */
+const ATLAS_THUMBNAIL_BUDGET = 420;
+
+/**
+ * Thumbnail size at the centre of the cloud, in pixels.
+ *
+ * Deliberately smaller than it could be: at forty pixels fifteen hundred
+ * photographs close up into a mosaic and the shape of the cloud — which is the
+ * only thing it has to say — disappears behind them.
+ */
+const THUMBNAIL_SIZE = 22;
 
 /** New images started per frame, so a turn does not fire a hundred requests. */
 const LOADS_PER_FRAME = 3;
@@ -90,6 +112,7 @@ const radiusOf = (point: Placed, withThumbnail: boolean): number =>
 
 export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, height = 520 }) => {
   const [entries, setEntries] = React.useState<EmbeddingSpaceEntry[] | null>(null);
+  const [atlas, setAtlas] = React.useState<EmbeddingSpaceAtlas | null>(null);
   const [failed, setFailed] = React.useState(false);
   const [hovered, setHovered] = React.useState<Placed | null>(null);
   const [drifting, setDrifting] = React.useState(true);
@@ -98,6 +121,7 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
   const cameraRef = React.useRef<Camera>({ ...INITIAL_CAMERA });
   const placedRef = React.useRef<Placed[]>([]);
   const thumbnailsRef = React.useRef(new Map<string, HTMLImageElement>());
+  const sheetsRef = React.useRef<HTMLImageElement[]>([]);
   const pointerRef = React.useRef<{ x: number; y: number } | null>(null);
   const draggingRef = React.useRef<{ x: number; y: number } | null>(null);
   const driftingRef = React.useRef(true);
@@ -107,8 +131,10 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
   React.useEffect(() => {
     let cancelled = false;
     fetchEmbeddingSpace()
-      .then((points) => {
-        if (!cancelled) setEntries(points);
+      .then((space) => {
+        if (cancelled) return;
+        setEntries(space.points);
+        setAtlas(space.atlas);
       })
       .catch(() => {
         if (!cancelled) setFailed(true);
@@ -117,6 +143,18 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
       cancelled = true;
     };
   }, []);
+
+  // The sheets, fetched once. Every photograph in the cloud is a cell of one.
+  React.useEffect(() => {
+    if (!atlas) return;
+
+    sheetsRef.current = atlas.files.map((file) => {
+      const sheet = new Image();
+      sheet.decoding = "async";
+      sheet.src = file;
+      return sheet;
+    });
+  }, [atlas]);
 
   // One pass: turn the cloud, project it, draw the far ones first.
   React.useEffect(() => {
@@ -166,16 +204,18 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
       const nearest = new Set(
         [...ordered]
           .sort((a, b) => a.depth - b.depth)
-          .slice(0, THUMBNAIL_BUDGET)
+          .slice(0, atlas ? ATLAS_THUMBNAIL_BUDGET : THUMBNAIL_BUDGET)
           .map((point) => point.index),
       );
+
+      const perRow = atlas ? Math.floor(atlas.sheet / atlas.cell) : 0;
 
       let started = 0;
       for (const point of ordered) {
         const wantsThumbnail = nearest.has(point.index);
         const image = thumbnailsRef.current.get(point.entry.src);
 
-        if (wantsThumbnail && !image && started < LOADS_PER_FRAME) {
+        if (!atlas && wantsThumbnail && !image && started < LOADS_PER_FRAME) {
           started += 1;
           const loading = new Image();
           loading.decoding = "async";
@@ -187,7 +227,31 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
         // where the colours do not.
         context.globalAlpha = Math.max(0.18, Math.min(1, 1.6 / point.depth));
 
-        if (wantsThumbnail && image?.complete && image.naturalWidth > 0) {
+        const cell =
+          atlas && wantsThumbnail && point.entry.slot !== undefined
+            ? sheetsRef.current[Math.floor(point.entry.slot / atlas.perSheet)]
+            : undefined;
+
+        if (cell?.complete && cell.naturalWidth > 0 && atlas && point.entry.slot !== undefined) {
+          const within = point.entry.slot % atlas.perSheet;
+          const size = THUMBNAIL_SIZE * point.scale;
+          context.drawImage(
+            cell,
+            (within % perRow) * atlas.cell,
+            Math.floor(within / perRow) * atlas.cell,
+            atlas.cell,
+            atlas.cell,
+            point.x - size / 2,
+            point.y - size / 2,
+            size,
+            size,
+          );
+          // A hairline of the ground between frames, or a dense pose reads as
+          // one mosaic rather than as many photographs.
+          context.strokeStyle = "rgba(0, 0, 0, 0.55)";
+          context.lineWidth = 0.75;
+          context.strokeRect(point.x - size / 2, point.y - size / 2, size, size);
+        } else if (wantsThumbnail && image?.complete && image.naturalWidth > 0) {
           drawSquare(context, image, point.x, point.y, THUMBNAIL_SIZE * point.scale);
         } else {
           context.beginPath();
@@ -238,7 +302,7 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
 
     frame = requestAnimationFrame(draw);
     return () => cancelAnimationFrame(frame);
-  }, [entries]);
+  }, [atlas, entries]);
 
   const onPointerDown = (event: React.PointerEvent<HTMLCanvasElement>) => {
     draggingRef.current = { x: event.clientX, y: event.clientY };
