@@ -126,6 +126,9 @@ const WEB_MAX_SPAN = 0.42;
  */
 const FOCUS_WASH = 0.66;
 
+/** Movement past this, in pixels, makes a press a turn rather than a click. */
+const DRAG_SLOP = 5;
+
 /** How many of a selection's tags are worth naming. */
 const SELECTION_TAGS = 3;
 
@@ -137,6 +140,16 @@ const SELECTION_TAGS = 3;
  */
 const SHOWCASE_PERIOD = 5600;
 const SHOWCASE_FADE = 1100;
+
+/**
+ * The clumps have eight names between them, and the collection has hundreds of
+ * words in it. So while nobody is touching the cloud, a few of the ones nothing
+ * is naming drift up beside the photographs they belong to and fade away
+ * again — the vocabulary of the archive, shown a little at a time.
+ */
+const DRIFTING_TAGS = 3;
+const DRIFTING_TAG_PERIOD = 7200;
+const DRIFTING_TAG_FADE = 1300;
 
 type Placed = ProjectedPoint & { entry: EmbeddingSpaceEntry; index: number };
 
@@ -193,6 +206,8 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
   const [chosen, setChosen] = React.useState<number | null>(null);
   /** Whichever photograph the cloud is showing off, while nobody is looking at it. */
   const [showcased, setShowcased] = React.useState<EmbeddingSpaceEntry | null>(null);
+  /** The words currently drifting, mirrored into React only when one is replaced. */
+  const [driftingTags, setDriftingTags] = React.useState<string[]>([]);
 
   const canvasRef = React.useRef<HTMLCanvasElement | null>(null);
   const cameraRef = React.useRef<Camera>({ ...INITIAL_CAMERA });
@@ -201,6 +216,8 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
   const sheetsRef = React.useRef<HTMLImageElement[]>([]);
   const pointerRef = React.useRef<{ x: number; y: number } | null>(null);
   const draggingRef = React.useRef<{ x: number; y: number } | null>(null);
+  /** How far the pointer travelled while held down, so a turn is not a click. */
+  const travelledRef = React.useRef(0);
   const chosenRef = React.useRef<number | null>(null);
   /** The name elements, positioned from the draw loop. */
   const labelRefs = React.useRef<(HTMLButtonElement | null)[]>([]);
@@ -211,6 +228,11 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
   /** Per photograph: how much of a photograph it currently is, rather than a dot. */
   const photonessRef = React.useRef<Float32Array | null>(null);
   const lastNamedRef = React.useRef<EmbeddingSpaceEntry | null>(null);
+  /** The words drifting through the cloud: which photograph each belongs to, and since when. */
+  const driftingRefs = React.useRef<(HTMLSpanElement | null)[]>([]);
+  const driftingTagsRef = React.useRef<({ index: number; tag: string; start: number } | null)[]>(
+    Array.from({ length: DRIFTING_TAGS }, () => null),
+  );
   const driftingRef = React.useRef(true);
 
   driftingRef.current = drifting;
@@ -635,6 +657,72 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
         drawFramed(star, thumbnail * 2.6 * Math.max(0.8, star.scale), 1.5, showcaseStrength);
       }
 
+      // Words from the collection that nothing else is naming, drifting beside
+      // the photographs they belong to.
+      const clumpNames = new Set(clusters.map((cluster) => cluster.label));
+      let tagsChanged = false;
+
+      driftingTagsRef.current.forEach((current, slot) => {
+        if (!idle) {
+          driftingTagsRef.current[slot] = null;
+          if (current) tagsChanged = true;
+          return;
+        }
+
+        if (current && time - current.start <= DRIFTING_TAG_PERIOD) return;
+
+        // Staggered by slot, so three words never arrive together.
+        const taken = new Set([
+          ...clumpNames,
+          ...driftingTagsRef.current.flatMap((entry) => (entry ? [entry.tag] : [])),
+        ]);
+        const candidates = ordered.filter(
+          (point) =>
+            point.entry.tag !== undefined &&
+            !taken.has(point.entry.tag) &&
+            nearest.has(point.index) &&
+            point.x > thumbnail * 2 &&
+            point.x < width - thumbnail * 2 &&
+            point.y > thumbnail &&
+            point.y < viewHeight - thumbnail,
+        );
+        const pick = candidates[Math.floor(Math.random() * candidates.length)];
+        driftingTagsRef.current[slot] = pick?.entry.tag
+          ? {
+              index: pick.index,
+              tag: pick.entry.tag,
+              start: time + slot * (DRIFTING_TAG_PERIOD / DRIFTING_TAGS),
+            }
+          : null;
+        tagsChanged = true;
+      });
+
+      if (tagsChanged) {
+        setDriftingTags(driftingTagsRef.current.map((entry) => entry?.tag ?? ""));
+      }
+
+      driftingTagsRef.current.forEach((current, slot) => {
+        const element = driftingRefs.current[slot];
+        if (!element) return;
+
+        const point = current ? onScreen.get(current.index) : undefined;
+        if (!current || !point) {
+          element.style.opacity = "0";
+          return;
+        }
+
+        const age = time - current.start;
+        const strength = Math.max(
+          0,
+          Math.min(1, Math.min(age, DRIFTING_TAG_PERIOD - age) / DRIFTING_TAG_FADE),
+        );
+
+        element.style.transform = `translate(${Math.round(point.x + thumbnail * 0.8)}px, ${Math.round(
+          point.y - element.offsetHeight / 2,
+        )}px)`;
+        element.style.opacity = String(strength * 0.85 * (1 - focusRef.current));
+      });
+
       // The names are real buttons over the canvas rather than text painted
       // into it: a name is a control — it can be clicked, tabbed to and read
       // aloud — and a canvas can offer none of that. They are positioned from
@@ -811,6 +899,7 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
   const onPointerDown = (event: React.PointerEvent<HTMLCanvasElement>) => {
     event.currentTarget.setPointerCapture(event.pointerId);
     draggingRef.current = { x: event.clientX, y: event.clientY };
+    travelledRef.current = 0;
   };
 
   const onPointerMove = (event: React.PointerEvent<HTMLCanvasElement>) => {
@@ -821,6 +910,7 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
     if (!dragging) return;
 
     const camera = cameraRef.current;
+    travelledRef.current += Math.hypot(event.clientX - dragging.x, event.clientY - dragging.y);
     camera.yaw += (event.clientX - dragging.x) * 0.006;
     camera.pitch = Math.max(
       -MAX_PITCH,
@@ -900,6 +990,9 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
             endDrag(event);
           }}
           onClick={() => {
+            // Letting go after turning the cloud is not a click on whatever
+            // happened to be under the pointer when it stopped.
+            if (travelledRef.current > DRAG_SLOP) return;
             if (hovered) globalThis.location.assign(hovered.entry.href);
           }}
         />
@@ -938,6 +1031,19 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
             {cluster.label.replaceAll("_", " ")}
             <span className={styles.clusterCount}>{cluster.count}</span>
           </button>
+        ))}
+
+        {Array.from({ length: DRIFTING_TAGS }, (_, slot) => (
+          <span
+            key={slot}
+            ref={(element) => {
+              driftingRefs.current[slot] = element;
+            }}
+            className={styles.driftingTag}
+            aria-hidden="true"
+          >
+            {(driftingTags[slot] ?? "").replaceAll("_", " ")}
+          </span>
         ))}
 
         {count === 0 ? <p className={styles.status}>Arranging the collection…</p> : null}

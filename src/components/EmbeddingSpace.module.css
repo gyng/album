@@ -103,6 +103,24 @@
   opacity: 0.75;
 }
 
+/* A word from the collection, drifting beside the photograph it belongs to.
+   Decorative — the names are the controls, this is the vocabulary — so it is
+   hidden from assistive technology and takes no pointer. */
+.driftingTag {
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline-start: 0;
+  opacity: 0;
+  padding: calc(var(--m-xs) / 2) var(--m-s);
+  border-radius: var(--radius-pill);
+  background: color-mix(in oklch, var(--c-overlay-dark) 60%, transparent);
+  color: var(--c-white);
+  font-size: var(--fs-s);
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
 .status {
   position: absolute;
   inset-block-start: 50%;
