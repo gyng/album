@@ -10,7 +10,6 @@ import {
   type LineFeature,
   type LineWidthStop,
   MapView,
-  Relief,
   NavigationControl,
   ScaleControl,
   useMap,
@@ -71,11 +70,6 @@ export type MapWorldProps = {
   timeRange?: TimeRange | null;
   /** Show the colour-recency legend (defaults to true). */
   showLegend?: boolean;
-  /**
-   * Raise the ground where the photographs are, so the landscape is made of
-   * how much was shot where. Tilt the map to see it at all.
-   */
-  photoRelief?: boolean;
   /**
    * Name each marker in place with its album, date and thumbnail. Meant for a
    * narrowed-down result set: on the full map this would bury it under labels.
@@ -222,7 +216,6 @@ export const MMap: React.FC<MapWorldProps> = ({
   routeDisplayMode = "active-only",
   timeRange,
   showLegend = true,
-  photoRelief = false,
   previewMarkers = false,
   directorEnabled = false,
   onDirectorEnabledChange,
@@ -267,18 +260,6 @@ export const MMap: React.FC<MapWorldProps> = ({
   const photosWithStyles = React.useMemo(
     () => stylePhotosByRecency(timeFilteredPhotos, dateStats),
     [dateStats, timeFilteredPhotos],
-  );
-  // One hill per photograph, so the ground reads as where the shooting was.
-  const reliefPoints = React.useMemo(
-    () =>
-      photoRelief
-        ? timeFilteredPhotos.flatMap((photo) =>
-            photo.decLng === null || photo.decLat === null
-              ? []
-              : [{ lng: photo.decLng, lat: photo.decLat }],
-          )
-        : [],
-    [photoRelief, timeFilteredPhotos],
   );
   const visiblePhotos = React.useMemo(
     () => filterPhotosByBounds(photosWithStyles, bounds),
@@ -708,7 +689,6 @@ export const MMap: React.FC<MapWorldProps> = ({
             updateParams(view);
           }}
         >
-          {photoRelief ? <Relief points={reliefPoints} /> : null}
           <MapAutoFit enabled={fitToPhotos} photos={photos} />
           <MapFitOnRequest requestId={fitRequestId} photos={photos} />
           <MapBoundsTracker

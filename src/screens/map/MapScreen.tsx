@@ -46,7 +46,6 @@ const MapScreen = (props: MapScreenProps) => {
   // Keep the first client render identical, then apply URL state once the
   // renderer says navigation is ready.
   const filterAlbum = routeReady ? getSearchParam("filter_album") : null;
-  const photoRelief = (routeReady ? getSearchParam("relief") : null) === "photos";
   const hasCameraParams =
     routeReady &&
     (getSearchParam("lat") != null ||
@@ -449,10 +448,6 @@ const MapScreen = (props: MapScreenProps) => {
         routeMode={filterAlbum ? defaultRouteMode : "simplified"}
         routeDisplayMode={!filterAlbum && showAllRoutes ? "always" : "active-only"}
         timeRange={timeRange}
-        // A landscape made of where the shooting happened. Behind a parameter
-        // while it is being looked at: it only shows on a tilted map, and it
-        // makes the ground under the photographs a claim about them.
-        photoRelief={photoRelief}
         previewMarkers={isPreviewableResultSet}
         directorEnabled={directorEnabled}
         onDirectorEnabledChange={setDirectorEnabled}
