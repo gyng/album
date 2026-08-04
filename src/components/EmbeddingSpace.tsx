@@ -1,5 +1,6 @@
 import React from "react";
 import { AppLink } from "./platform";
+import { useActiveTheme } from "./useActiveTheme";
 import {
   backToFront,
   type Camera,
@@ -9,6 +10,7 @@ import {
 } from "../util/embeddingSpace";
 import {
   type EmbeddingSpaceAtlas,
+  type EmbeddingSpaceCluster,
   type EmbeddingSpaceEntry,
   fetchEmbeddingSpace,
 } from "../util/embeddingSpaceData";
@@ -104,6 +106,18 @@ const WEB_HOVER_ALPHA = 0.85;
  */
 const WEB_MAX_SPAN = 0.42;
 
+/**
+ * How far the rest of the cloud recedes while a photograph is under the
+ * pointer.
+ *
+ * A focus pull rather than a highlight: making one photograph brighter inside a
+ * dense cloud barely reads, and fading it *out* with distance would hide the
+ * thing being pointed at. Washing everything else back towards the page's own
+ * background leaves the photograph and its kin standing in front of it, which is
+ * what a lens does and what the eye already understands.
+ */
+const FOCUS_WASH = 0.66;
+
 type Placed = ProjectedPoint & { entry: EmbeddingSpaceEntry; index: number };
 
 /**
@@ -135,8 +149,12 @@ const radiusOf = (point: Placed, withThumbnail: boolean): number =>
   (withThumbnail ? THUMBNAIL_SIZE / 2 : DOT_RADIUS + 3) * point.scale;
 
 export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, height = 520 }) => {
+  // The wash has to be the page's own ground, and the reader can change it
+  // without reloading.
+  const theme = useActiveTheme();
   const [entries, setEntries] = React.useState<EmbeddingSpaceEntry[] | null>(null);
   const [atlas, setAtlas] = React.useState<EmbeddingSpaceAtlas | null>(null);
+  const [clusters, setClusters] = React.useState<EmbeddingSpaceCluster[]>([]);
   const [failed, setFailed] = React.useState(false);
   const [hovered, setHovered] = React.useState<Placed | null>(null);
   const [drifting, setDrifting] = React.useState(true);
@@ -159,6 +177,7 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
         if (cancelled) return;
         setEntries(space.points);
         setAtlas(space.atlas);
+        setClusters(space.clusters);
       })
       .catch(() => {
         if (!cancelled) setFailed(true);
@@ -190,6 +209,15 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
 
     const reduced =
       typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+    // The ground the cloud is drawn on, read back from the stage rather than
+    // from a token: `--c-bg` is `light-dark(...)`, which a canvas cannot parse,
+    // and an unparsable `fillStyle` is silently ignored — the wash came out in
+    // whatever colour had been used last, which was a photograph's.
+    const stage = canvas.parentElement;
+    const stageBackground = stage ? getComputedStyle(stage).backgroundColor : "";
+    const wash =
+      stageBackground && stageBackground !== "rgba(0, 0, 0, 0)" ? stageBackground : "#111";
 
     let frame = 0;
     let previous = 0;
@@ -273,9 +301,13 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
           thumbnailsRef.current.set(point.entry.src, loading);
         }
 
-        // Further away is fainter: depth carries the shape of the cloud even
-        // where the colours do not.
-        context.globalAlpha = Math.max(0.18, Math.min(1, 1.6 / point.depth));
+        // Further away is fainter, and the far field is *much* fainter than a
+        // linear fade would make it: a thousand translucent dots behind each
+        // other stack into a haze, and the haze is what buries the cloud's
+        // shape. Squaring the falloff keeps the front legible and lets the back
+        // recede into the ground instead of milking it up.
+        const fade = Math.min(1, 1.7 / point.depth);
+        context.globalAlpha = Math.max(0.08, fade * fade);
 
         const cell =
           atlas && wantsThumbnail && point.entry.slot !== undefined
@@ -311,6 +343,16 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
         }
       }
 
+      // What each clump turned out to be about, written where it is. Drawn
+      // after the photographs so the words are legible, and dropped entirely
+      // while the reader is looking at one photograph — a legend is for reading
+      // the whole, and this is the moment they stopped.
+      const labels = clusters
+        .map((cluster) => ({ cluster, at: projectPoint(cluster, cameraRef.current, viewport) }))
+        .filter((entry): entry is { cluster: EmbeddingSpaceCluster; at: ProjectedPoint } =>
+          Boolean(entry.at),
+        );
+
       // Whatever the pointer is over is worth a photograph even when it is deep
       // in the cloud: that is what hovering is for.
       const pointer = pointerRef.current;
@@ -318,32 +360,105 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
         ? pickPoint(ordered, pointer, (point) => radiusOf(point, nearest.has(point.index)))
         : null;
 
+      if (!under) {
+        context.textAlign = "center";
+        context.textBaseline = "middle";
+        for (const { cluster, at } of labels) {
+          const size = Math.max(12, Math.min(20, 15 * at.scale));
+          // A literal stack: a canvas font string is not CSS and silently
+          // rejects `var(...)`, which leaves every label at the 10px default.
+          context.font = `600 ${size}px system-ui, -apple-system, "Segoe UI", sans-serif`;
+          context.letterSpacing = "0.06em";
+          context.globalAlpha = Math.max(0.45, Math.min(1, 1.5 / at.depth));
+
+          const text = cluster.label.replaceAll("_", " ");
+          const width = context.measureText(text).width;
+          // A plate behind the words, or a label over a bright photograph is
+          // unreadable exactly where the cloud is densest.
+          context.fillStyle = "rgba(0, 0, 0, 0.62)";
+          context.beginPath();
+          context.roundRect(
+            at.x - width / 2 - 7,
+            at.y - size * 0.75,
+            width + 14,
+            size * 1.5,
+            size * 0.75,
+          );
+          context.fill();
+
+          context.fillStyle = "rgba(255, 255, 255, 0.94)";
+          context.fillText(text, at.x, at.y);
+        }
+        context.letterSpacing = "0px";
+      }
+
       if (under) {
-        // What the model says this one is like, whether or not those are near
-        // enough to have been drawn as photographs.
+        // Everything else goes back into the page, and what matters is drawn
+        // again on top of the wash.
+        context.globalAlpha = FOCUS_WASH;
+        context.fillStyle = wash;
+        context.fillRect(0, 0, width, viewHeight);
+
+        const kin = (under.entry.near ?? [])
+          .map((neighbour) => onScreen.get(neighbour))
+          .filter((point): point is Placed => Boolean(point));
+
+        // The lines first, so each one ends at the edge of the photograph it
+        // joins rather than crossing it.
         context.globalAlpha = WEB_HOVER_ALPHA;
         context.strokeStyle = "rgba(255, 255, 255, 1)";
         context.lineWidth = 1.1;
         context.beginPath();
-        for (const neighbour of under.entry.near ?? []) {
-          const other = onScreen.get(neighbour);
-          if (!other) continue;
+        for (const point of kin) {
           context.moveTo(under.x, under.y);
-          context.lineTo(other.x, other.y);
+          context.lineTo(point.x, point.y);
         }
         context.stroke();
 
-        // And a ring on each of them, so the eye lands where the line does.
-        for (const neighbour of under.entry.near ?? []) {
-          const other = onScreen.get(neighbour);
-          if (!other) continue;
-          const ring = (THUMBNAIL_SIZE / 2 + 3) * other.scale;
-          context.beginPath();
-          context.arc(other.x, other.y, ring, 0, Math.PI * 2);
-          context.stroke();
+        const drawFramed = (point: Placed, size: number, border: number) => {
+          const sheet =
+            atlas && point.entry.slot !== undefined
+              ? sheetsRef.current[Math.floor(point.entry.slot / atlas.perSheet)]
+              : undefined;
+          const own = thumbnailsRef.current.get(point.entry.src);
+
+          if (
+            sheet?.complete &&
+            sheet.naturalWidth > 0 &&
+            atlas &&
+            point.entry.slot !== undefined
+          ) {
+            const within = point.entry.slot % atlas.perSheet;
+            context.drawImage(
+              sheet,
+              (within % perRow) * atlas.cell,
+              Math.floor(within / perRow) * atlas.cell,
+              atlas.cell,
+              atlas.cell,
+              point.x - size / 2,
+              point.y - size / 2,
+              size,
+              size,
+            );
+          } else if (own?.complete && own.naturalWidth > 0) {
+            drawSquare(context, own, point.x, point.y, size);
+          } else {
+            context.fillStyle = point.entry.swatch ?? "#8899aa";
+            context.fillRect(point.x - size / 2, point.y - size / 2, size, size);
+          }
+
+          context.strokeStyle = "rgba(255, 255, 255, 0.92)";
+          context.lineWidth = border;
+          context.strokeRect(point.x - size / 2, point.y - size / 2, size, size);
+        };
+
+        // The kin, in the same frame the photograph itself gets, one size down.
+        context.globalAlpha = 1;
+        for (const point of kin) {
+          drawFramed(point, THUMBNAIL_SIZE * 1.7 * Math.max(0.7, point.scale), 1);
         }
 
-        const size = THUMBNAIL_SIZE * 2.4 * Math.max(0.8, under.scale);
+        // And the photograph under the pointer, largest and last.
         let image = thumbnailsRef.current.get(under.entry.src);
         if (!image) {
           image = new Image();
@@ -351,18 +466,18 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
           image.src = under.entry.src;
           thumbnailsRef.current.set(under.entry.src, image);
         }
-        context.globalAlpha = 1;
+
+        const size = THUMBNAIL_SIZE * 3 * Math.max(0.8, under.scale);
         context.save();
-        context.shadowColor = "rgba(0, 0, 0, 0.45)";
-        context.shadowBlur = 18;
+        context.shadowColor = "rgba(0, 0, 0, 0.5)";
+        context.shadowBlur = 20;
         if (image.complete && image.naturalWidth > 0) {
           drawSquare(context, image, under.x, under.y, size);
         } else {
-          context.fillStyle = under.entry.swatch ?? "#8899aa";
-          context.fillRect(under.x - size / 2, under.y - size / 2, size, size);
+          drawFramed(under, size, 0);
         }
         context.restore();
-        context.strokeStyle = "rgba(255, 255, 255, 0.9)";
+        context.strokeStyle = "rgba(255, 255, 255, 0.95)";
         context.lineWidth = 1.5;
         context.strokeRect(under.x - size / 2, under.y - size / 2, size, size);
       }
@@ -376,7 +491,7 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
 
     frame = requestAnimationFrame(draw);
     return () => cancelAnimationFrame(frame);
-  }, [atlas, entries]);
+  }, [atlas, clusters, entries, theme]);
 
   const onPointerDown = (event: React.PointerEvent<HTMLCanvasElement>) => {
     draggingRef.current = { x: event.clientX, y: event.clientY };

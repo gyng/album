@@ -17,8 +17,17 @@ describe("fetchEmbeddingSpace", () => {
   it("returns the points it was given", async () => {
     await expect(fetchEmbeddingSpace(respond({ points: [point] }))).resolves.toEqual({
       points: [point],
+      clusters: [],
       atlas: null,
     });
+  });
+
+  it("takes the cluster labels, and drops any that are not labels", () => {
+    const cluster = { x: 0.1, y: 0, z: 0, label: "waterfall", count: 40 };
+
+    return expect(
+      fetchEmbeddingSpace(respond({ points: [point], clusters: [cluster, { x: 1 }, null] })),
+    ).resolves.toMatchObject({ clusters: [cluster] });
   });
 
   // Without a sheet the cloud still draws — in dominant colours — so a payload
@@ -39,6 +48,7 @@ describe("fetchEmbeddingSpace", () => {
   it("reads an empty or malformed payload as an empty cloud", async () => {
     await expect(fetchEmbeddingSpace(respond({ points: [] }))).resolves.toEqual({
       points: [],
+      clusters: [],
       atlas: null,
     });
     await expect(fetchEmbeddingSpace(respond({}))).resolves.toMatchObject({ points: [] });

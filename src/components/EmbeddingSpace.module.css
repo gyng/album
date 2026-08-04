@@ -4,7 +4,10 @@
 }
 
 /* The cloud is drawn in the photographs' own colours, so it wants a ground
-   darker than the page to sit on — the same reason a contact sheet is black. */
+   darker than the page to sit on — the same reason a contact sheet is black.
+   The canvas reads this ground back to know what to fade the cloud into while
+   the reader is looking at one photograph, so the last layer here has to stay a
+   solid colour rather than a gradient. */
 .stage {
   position: relative;
   border: solid var(--line-hairline) var(--c-bg-contrast-light);

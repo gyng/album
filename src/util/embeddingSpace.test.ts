@@ -1,5 +1,7 @@
 import {
   backToFront,
+  clusterPoints,
+  distinctiveTag,
   nearestNeighbours,
   type Camera,
   pickPoint,
@@ -257,5 +259,94 @@ describe("nearestNeighbours", () => {
         1,
       ),
     ).toHaveLength(3);
+  });
+});
+
+describe("clusterPoints", () => {
+  const around = (centre: SpacePoint, count: number, spread = 0.02): SpacePoint[] =>
+    Array.from({ length: count }, (_, index) => ({
+      x: centre.x + Math.sin(index) * spread,
+      y: centre.y + Math.cos(index) * spread,
+      z: centre.z + Math.sin(index * 2) * spread,
+    }));
+
+  const corners: SpacePoint[] = [
+    { x: -0.8, y: -0.8, z: -0.8 },
+    { x: 0.8, y: 0.8, z: -0.8 },
+    { x: 0.8, y: -0.8, z: 0.8 },
+  ];
+
+  it("finds the clumps that are actually there", () => {
+    const points = corners.flatMap((corner) => around(corner, 12));
+    const clusters = clusterPoints(points, 3);
+
+    expect(clusters).toHaveLength(3);
+    for (const cluster of clusters) {
+      // Every member of a cluster came from the same corner.
+      const corner = Math.floor((cluster.members[0] as number) / 12);
+      expect(cluster.members.every((index) => Math.floor(index / 12) === corner)).toBe(true);
+    }
+  });
+
+  // A build that seeded its clusters randomly would label the same collection
+  // differently every time.
+  it("is the same on every build", () => {
+    const points = corners.flatMap((corner) => around(corner, 8));
+
+    expect(clusterPoints(points, 3)).toEqual(clusterPoints(points, 3));
+  });
+
+  it("asks for no more clusters than there are photographs", () => {
+    expect(clusterPoints(around({ x: 0, y: 0, z: 0 }, 2), 9)).toHaveLength(2);
+  });
+
+  it("has nothing to cluster when there is nothing", () => {
+    expect(clusterPoints([], 4)).toEqual([]);
+    expect(clusterPoints(around({ x: 0, y: 0, z: 0 }, 4), 0)).toEqual([]);
+  });
+});
+
+describe("distinctiveTag", () => {
+  // Frequency alone labels every cluster with whatever the collection is mostly
+  // about; the question worth asking is what this group is about that the rest
+  // is not.
+  it("prefers the tag that is unusual here rather than the one that is common everywhere", () => {
+    const overall = new Map([
+      ["japan", 900],
+      ["waterfall", 30],
+    ]);
+    const members = Array.from({ length: 20 }, () => ["japan", "waterfall"]);
+
+    expect(distinctiveTag(members, overall)).toBe("waterfall");
+  });
+
+  it("ignores a tag that barely appears in the cluster", () => {
+    const overall = new Map([["heron", 2]]);
+
+    expect(distinctiveTag([["heron"], ["heron"]], overall)).toBeNull();
+  });
+
+  // Smoothing: a tag seen twice in the whole archive would otherwise win on a
+  // ratio of two.
+  it("does not let a rarity win on a ratio alone", () => {
+    const overall = new Map([
+      ["oddity", 3],
+      ["forest", 60],
+    ]);
+    const members = Array.from({ length: 40 }, (_, index) =>
+      index < 3 ? ["oddity", "forest"] : ["forest"],
+    );
+
+    expect(distinctiveTag(members, overall)).toBe("forest");
+  });
+
+  it("counts a photograph once however many times it repeats a tag", () => {
+    const overall = new Map([["shrine", 10]]);
+
+    expect(distinctiveTag([["shrine", "shrine", "shrine"]], overall, 2)).toBeNull();
+  });
+
+  it("has nothing to say about a cluster with no tags", () => {
+    expect(distinctiveTag([], new Map())).toBeNull();
   });
 });

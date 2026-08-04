@@ -343,3 +343,129 @@ export const nearestNeighbours = (
 
   return neighbours;
 };
+
+/* -------------------------------------------------------------------------- */
+/* What the clumps turned out to be                                            */
+/* -------------------------------------------------------------------------- */
+
+export type Cluster = { centre: SpacePoint; members: number[] };
+
+const distanceSquared = (a: SpacePoint, b: SpacePoint): number =>
+  (a.x - b.x) ** 2 + (a.y - b.y) ** 2 + (a.z - b.z) ** 2;
+
+/**
+ * Seeds spread out across the cloud, chosen without randomness.
+ *
+ * Farthest-point sampling: start at the first photograph and repeatedly take
+ * whichever is furthest from everything chosen so far. k-means++ would do the
+ * same job with a random number generator, and a build that seeds its clusters
+ * randomly labels the same collection differently every time.
+ */
+const spreadSeeds = (points: readonly SpacePoint[], k: number): SpacePoint[] => {
+  const seeds: SpacePoint[] = [points[0] as SpacePoint];
+
+  while (seeds.length < k) {
+    let furthest = points[0] as SpacePoint;
+    let record = -1;
+    for (const point of points) {
+      const nearest = Math.min(...seeds.map((seed) => distanceSquared(point, seed)));
+      if (nearest > record) {
+        record = nearest;
+        furthest = point;
+      }
+    }
+    seeds.push(furthest);
+  }
+
+  return seeds;
+};
+
+/**
+ * The cloud's own clumps, by k-means over the three dimensions on screen.
+ *
+ * Over the projected positions rather than the full space on purpose: these
+ * exist to label what a reader can actually see grouped together. A cluster in
+ * 768 dimensions that the projection has scattered across the view would be a
+ * label pointing at nothing.
+ */
+export const clusterPoints = (
+  points: readonly SpacePoint[],
+  k: number,
+  iterations = 12,
+): Cluster[] => {
+  if (points.length === 0 || k < 1) return [];
+
+  const wanted = Math.min(k, points.length);
+  let centres = spreadSeeds(points, wanted);
+  let members: number[][] = [];
+
+  for (let step = 0; step < iterations; step += 1) {
+    members = centres.map(() => []);
+
+    points.forEach((point, index) => {
+      let best = 0;
+      let record = Number.POSITIVE_INFINITY;
+      centres.forEach((centre, cluster) => {
+        const distance = distanceSquared(point, centre);
+        if (distance < record) {
+          record = distance;
+          best = cluster;
+        }
+      });
+      (members[best] as number[]).push(index);
+    });
+
+    centres = centres.map((centre, cluster) => {
+      const owned = members[cluster] as number[];
+      if (owned.length === 0) return centre;
+
+      return {
+        x: owned.reduce((sum, index) => sum + (points[index] as SpacePoint).x, 0) / owned.length,
+        y: owned.reduce((sum, index) => sum + (points[index] as SpacePoint).y, 0) / owned.length,
+        z: owned.reduce((sum, index) => sum + (points[index] as SpacePoint).z, 0) / owned.length,
+      };
+    });
+  }
+
+  return centres
+    .map((centre, cluster) => ({ centre, members: members[cluster] ?? [] }))
+    .filter((cluster) => cluster.members.length > 0);
+};
+
+/**
+ * What to call a clump: the tag that is far commoner inside it than outside.
+ *
+ * Frequency alone would label every cluster "japan", because most of the
+ * collection is. Dividing by how common a tag is everywhere asks a better
+ * question — what is this group *about* that the collection as a whole is not —
+ * and the smoothing keeps a tag that appears twice in the whole archive from
+ * winning on a ratio of two.
+ */
+export const distinctiveTag = (
+  memberTags: readonly (readonly string[])[],
+  overall: ReadonlyMap<string, number>,
+  minimum = 3,
+  smoothing = 12,
+): string | null => {
+  const counts = new Map<string, number>();
+  for (const tags of memberTags) {
+    for (const tag of new Set(tags)) {
+      counts.set(tag, (counts.get(tag) ?? 0) + 1);
+    }
+  }
+
+  let best: string | null = null;
+  let bestScore = 0;
+  for (const [tag, count] of counts) {
+    if (count < minimum) continue;
+    const score = count / ((overall.get(tag) ?? count) + smoothing);
+    // Ties go to the commoner tag inside the cluster, then to the earlier name,
+    // so the same collection always gets the same labels.
+    if (score > bestScore || (score === bestScore && best !== null && tag < best)) {
+      bestScore = score;
+      best = tag;
+    }
+  }
+
+  return best;
+};

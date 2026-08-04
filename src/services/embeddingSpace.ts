@@ -1,6 +1,10 @@
 import fs from "node:fs";
 import path from "node:path";
-import { loadEmbeddingSpacePoints, type EmbeddingSpacePoint } from "../util/computeEmbeddingStats";
+import {
+  type EmbeddingSpaceCluster,
+  loadEmbeddingSpacePoints,
+  type EmbeddingSpacePoint,
+} from "../util/computeEmbeddingStats";
 import { getAlbums } from "./album";
 
 export type EmbeddingSpaceAtlas = {
@@ -16,6 +20,7 @@ export type EmbeddingSpaceAtlas = {
 
 export type EmbeddingSpacePayload = {
   points: EmbeddingSpacePoint[];
+  clusters: EmbeddingSpaceCluster[];
   atlas: EmbeddingSpaceAtlas | null;
 };
 
@@ -64,7 +69,11 @@ const readAtlas = (): { atlas: EmbeddingSpaceAtlas; slots: Record<string, number
  */
 export const loadEmbeddingSpace = async (): Promise<EmbeddingSpacePayload> => {
   const sheet = readAtlas();
-  const points = await loadEmbeddingSpacePoints(await getAlbums(), undefined, sheet?.slots ?? {});
+  const { points, clusters } = await loadEmbeddingSpacePoints(
+    await getAlbums(),
+    undefined,
+    sheet?.slots ?? {},
+  );
 
-  return { points, atlas: sheet?.atlas ?? null };
+  return { points, clusters, atlas: sheet?.atlas ?? null };
 };

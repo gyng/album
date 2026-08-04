@@ -5,7 +5,12 @@ import type { Content, PhotoBlock } from "../services/types";
 import { measureBuild } from "../services/buildTiming";
 import { rgbToString } from "./colorDistance";
 import { parseExifLocalDateTime } from "./exifTime";
-import { nearestNeighbours, projectToThreeDimensions } from "./embeddingSpace";
+import {
+  clusterPoints,
+  distinctiveTag,
+  nearestNeighbours,
+  projectToThreeDimensions,
+} from "./embeddingSpace";
 
 // The shipped search-embeddings DB holds two embedding spaces (SigLIP v1 and
 // v2), one row per photo per model. These stats must run against a single space
@@ -819,6 +824,26 @@ export const computeVisualSamenessStats = async (
  */
 const NEIGHBOURS_PER_PHOTO = 3;
 
+/**
+ * How many clumps the cloud is named in.
+ *
+ * Eight labels is a legend a reader takes in at a glance; twenty is a page of
+ * text laid over the photographs it is describing.
+ */
+const CLUSTERS = 8;
+
+/** A clump smaller than this is a handful of photographs, not a subject. */
+const MIN_CLUSTER_SIZE = 25;
+
+/** What one clump of the cloud turned out to be about. */
+export type EmbeddingSpaceCluster = {
+  x: number;
+  y: number;
+  z: number;
+  label: string;
+  count: number;
+};
+
 /** One photograph as a position in the collection's own embedding space. */
 export type EmbeddingSpacePoint = {
   src: string;
@@ -854,11 +879,12 @@ export const loadEmbeddingSpacePoints = async (
   albums: Content[],
   dbPath = DEFAULT_EMBEDDINGS_DB_PATH,
   slots: Record<string, number> = {},
-): Promise<EmbeddingSpacePoint[]> =>
+): Promise<{ points: EmbeddingSpacePoint[]; clusters: EmbeddingSpaceCluster[] }> =>
   measureBuild("stats.embeddingSpace", async () => {
+    const empty = { points: [], clusters: [] };
     const resolvedDbPath = resolveEmbeddingsDbPath(dbPath);
     if (!resolvedDbPath) {
-      return [];
+      return empty;
     }
 
     const photoLookup = buildPhotoLookup(albums);
@@ -866,7 +892,7 @@ export const loadEmbeddingSpacePoints = async (
     const albumLookup = buildPhotoAlbumLookup(albums);
     const selectedPaths = [...photoLookup.keys()];
     if (selectedPaths.length < MIN_EMBEDDING_SAMPLE) {
-      return [];
+      return empty;
     }
 
     const db = await openReadonlyDatabase(resolvedDbPath);
@@ -877,7 +903,7 @@ export const loadEmbeddingSpacePoints = async (
         [],
       );
       if (tables.length === 0) {
-        return [];
+        return empty;
       }
 
       const modelRows = await getRows<{ path: string }>(
@@ -887,7 +913,7 @@ export const loadEmbeddingSpacePoints = async (
       );
       const selectedModelId = selectEmbeddingModelId(modelRows.map((row) => row.path));
       if (!selectedModelId) {
-        return [];
+        return empty;
       }
 
       const hasBlobColumn = await embeddingsTableHasBlobColumn(db);
@@ -905,14 +931,43 @@ export const loadEmbeddingSpacePoints = async (
         return vector && photo ? [{ photo, path: row.path, vector }] : [];
       });
       if (decoded.length < MIN_EMBEDDING_SAMPLE) {
-        return [];
+        return empty;
       }
 
       const vectors = decoded.map((entry) => entry.vector);
       const positions = projectToThreeDimensions(vectors);
       const neighbours = nearestNeighbours(vectors, NEIGHBOURS_PER_PHOTO);
 
-      return decoded.map((entry, index) => {
+      // What each clump turned out to be about, from the tags of whatever
+      // landed in it.
+      const overallTags = new Map<string, number>();
+      for (const entry of decoded) {
+        for (const tag of new Set(tagLookup.get(entry.path) ?? [])) {
+          overallTags.set(tag, (overallTags.get(tag) ?? 0) + 1);
+        }
+      }
+
+      const clusters = clusterPoints(positions, CLUSTERS)
+        .filter((cluster) => cluster.members.length >= MIN_CLUSTER_SIZE)
+        .flatMap((cluster) => {
+          const label = distinctiveTag(
+            cluster.members.map((member) => tagLookup.get(decoded[member]?.path ?? "") ?? []),
+            overallTags,
+          );
+          return label
+            ? [
+                {
+                  x: Number(cluster.centre.x.toFixed(4)),
+                  y: Number(cluster.centre.y.toFixed(4)),
+                  z: Number(cluster.centre.z.toFixed(4)),
+                  label,
+                  count: cluster.members.length,
+                },
+              ]
+            : [];
+        });
+
+      const points = decoded.map((entry, index) => {
         const position = positions[index] ?? { x: 0, y: 0, z: 0 };
         const tag = tagLookup.get(entry.path)?.[0];
         const album = albumLookup.get(entry.path);
@@ -931,6 +986,8 @@ export const loadEmbeddingSpacePoints = async (
           z: Number(position.z.toFixed(4)),
         };
       });
+
+      return { points, clusters };
     } finally {
       await closeDatabase(db);
     }

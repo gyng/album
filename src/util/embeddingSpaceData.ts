@@ -35,8 +35,18 @@ export type EmbeddingSpaceAtlas = {
   files: string[];
 };
 
+/** What one clump of the cloud turned out to be about. */
+export type EmbeddingSpaceCluster = {
+  x: number;
+  y: number;
+  z: number;
+  label: string;
+  count: number;
+};
+
 export type EmbeddingSpace = {
   points: EmbeddingSpaceEntry[];
+  clusters: EmbeddingSpaceCluster[];
   atlas: EmbeddingSpaceAtlas | null;
 };
 
@@ -68,6 +78,17 @@ const isEntry = (value: unknown): value is EmbeddingSpaceEntry => {
  * regenerated on every deploy and a stale copy is a cloud of photographs that
  * are no longer there.
  */
+const isCluster = (value: unknown): value is EmbeddingSpaceCluster => {
+  if (typeof value !== "object" || value === null) return false;
+  const cluster = value as Record<string, unknown>;
+  return (
+    typeof cluster.x === "number" &&
+    typeof cluster.y === "number" &&
+    typeof cluster.z === "number" &&
+    typeof cluster.label === "string"
+  );
+};
+
 const isAtlas = (value: unknown): value is EmbeddingSpaceAtlas => {
   if (typeof value !== "object" || value === null) return false;
   const atlas = value as Record<string, unknown>;
@@ -88,9 +109,14 @@ export const fetchEmbeddingSpace = async (
     throw new Error(`Failed to load the embedding space (${response.status ?? "unknown"})`);
   }
 
-  const payload = (await response.json()) as { points?: unknown; atlas?: unknown };
+  const payload = (await response.json()) as {
+    points?: unknown;
+    clusters?: unknown;
+    atlas?: unknown;
+  };
   return {
     points: Array.isArray(payload.points) ? payload.points.filter(isEntry) : [],
+    clusters: Array.isArray(payload.clusters) ? payload.clusters.filter(isCluster) : [],
     atlas: isAtlas(payload.atlas) ? payload.atlas : null,
   };
 };
