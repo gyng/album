@@ -24,16 +24,16 @@ beforeEach(() => {
   resetMapStyleCache();
 });
 
-// Two providers now: the free one wherever it has a style that does the job,
-// and the metered one only for what it does not — imagery, terrain, and this
-// fork's own design. Every URL must belong to one of them, and no two choices
-// may resolve to the same basemap or the picker offers the same map twice.
-it("builds every choice's URL against one of the two providers", () => {
+// Three sources now: OpenFreeMap's catalogue, a style this site serves itself,
+// and the metered provider for what neither offers. Every URL must belong to
+// one of them, and no two choices may resolve to the same basemap or the picker
+// offers the same map twice.
+it("builds every choice's URL against one of its three sources", () => {
   const urls = MAP_STYLE_NAMES.map((name) => mapStyleUrl(name));
 
   urls.forEach((url) => {
     expect(url).toMatch(
-      /^(https:\/\/api\.maptiler\.com\/maps\/[\w-]+\/style\.json\?key=\w+|https:\/\/tiles\.openfreemap\.org\/styles\/[\w-]+)$/,
+      /^(https:\/\/api\.maptiler\.com\/maps\/[\w-]+\/style\.json\?key=\w+|https:\/\/tiles\.openfreemap\.org\/styles\/[\w-]+|\/map-styles\/[\w-]+\.json)$/,
     );
   });
   expect(new Set(urls).size).toBe(MAP_STYLE_NAMES.length);
