@@ -235,6 +235,7 @@ textarea {
   --size-420: 420px;
   --size-460: 460px;
   --size-560: 560px;
+  --size-760: 760px;
   --size-1400: 1400px;
 
   /* Shared glass surfaces. Blur tiers describe visual weight rather than a

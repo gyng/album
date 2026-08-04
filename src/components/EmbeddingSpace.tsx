@@ -36,7 +36,11 @@ import styles from "./EmbeddingSpace.module.css";
 
 export type EmbeddingSpaceProps = {
   className?: string;
-  /** Height of the viewer. A cloud wants room; the caller decides how much. */
+  /**
+   * Height of the viewer, in pixels. Left unset the stylesheet decides, which
+   * gives a desktop most of the window and a phone a sensible fraction of it —
+   * a cloud wants room, and how much room there is is a CSS question.
+   */
   height?: number;
 };
 
@@ -125,7 +129,27 @@ const FOCUS_WASH = 0.66;
 /** How many of a selection's tags are worth naming. */
 const SELECTION_TAGS = 3;
 
+/**
+ * Left alone, the cloud shows itself: every few seconds it brings one
+ * photograph up out of the drift, with its kin beside it, and lets them go
+ * again. The same lens the pointer uses, moved by the clock instead — so a
+ * reader who does nothing still learns what the thing is for.
+ */
+const SHOWCASE_PERIOD = 5600;
+const SHOWCASE_FADE = 1100;
+
 type Placed = ProjectedPoint & { entry: EmbeddingSpaceEntry; index: number };
+
+/**
+ * Eases a value towards a target, framerate-independently.
+ *
+ * Everything in the cloud that appears — a thumbnail taking over from its dot,
+ * the focus coming up under the pointer — moves through this rather than
+ * switching, because a cloud that is always drifting cannot also be always
+ * snapping.
+ */
+const ease = (from: number, to: number, elapsed: number, seconds: number): number =>
+  from + (to - from) * (1 - Math.exp(-elapsed / Math.max(0.001, seconds)));
 
 /**
  * A photograph drawn square without being squashed into square: the middle of
@@ -155,7 +179,7 @@ const drawSquare = (
 const radiusOf = (point: Placed, withThumbnail: boolean, thumbnail: number): number =>
   (withThumbnail ? thumbnail / 2 : DOT_RADIUS + 3) * point.scale;
 
-export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, height = 520 }) => {
+export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, height }) => {
   // The wash has to be the page's own ground, and the reader can change it
   // without reloading.
   const theme = useActiveTheme();
@@ -167,6 +191,8 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
   const [drifting, setDrifting] = React.useState(true);
   /** Which named clump the reader has chosen, if any. */
   const [chosen, setChosen] = React.useState<number | null>(null);
+  /** Whichever photograph the cloud is showing off, while nobody is looking at it. */
+  const [showcased, setShowcased] = React.useState<EmbeddingSpaceEntry | null>(null);
 
   const canvasRef = React.useRef<HTMLCanvasElement | null>(null);
   const cameraRef = React.useRef<Camera>({ ...INITIAL_CAMERA });
@@ -178,6 +204,13 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
   const chosenRef = React.useRef<number | null>(null);
   /** The name elements, positioned from the draw loop. */
   const labelRefs = React.useRef<(HTMLButtonElement | null)[]>([]);
+  const showcaseRef = React.useRef<{ index: number; start: number } | null>(null);
+  /** How far the pointer's focus has come up, 0 to 1, so it fades rather than snaps. */
+  const focusRef = React.useRef(0);
+  const lastUnderRef = React.useRef<Placed | null>(null);
+  /** Per photograph: how much of a photograph it currently is, rather than a dot. */
+  const photonessRef = React.useRef<Float32Array | null>(null);
+  const lastNamedRef = React.useRef<EmbeddingSpaceEntry | null>(null);
   const driftingRef = React.useRef(true);
 
   driftingRef.current = drifting;
@@ -198,6 +231,34 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
     return () => {
       cancelled = true;
     };
+  }, []);
+
+  /**
+   * Scrolling over the cloud moves the eye in and out.
+   *
+   * Attached by hand because React's `onWheel` is registered passively, so it
+   * cannot take the gesture from the page. It only takes it while there is room
+   * to move: at either limit the wheel goes back to scrolling, which is what
+   * keeps a canvas half a screen tall from being a hole a reader falls into.
+   */
+  React.useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const onWheel = (event: WheelEvent) => {
+      const camera = cameraRef.current;
+      const next = Math.max(
+        MIN_DISTANCE,
+        Math.min(MAX_DISTANCE, camera.distance + event.deltaY * 0.0016),
+      );
+      if (next === camera.distance) return;
+
+      camera.distance = next;
+      event.preventDefault();
+    };
+
+    canvas.addEventListener("wheel", onWheel, { passive: false });
+    return () => canvas.removeEventListener("wheel", onWheel);
   }, []);
 
   // The sheets, fetched once. Every photograph in the cloud is a cell of one.
@@ -318,9 +379,23 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
       context.globalAlpha = WEB_ALPHA;
       context.stroke();
 
+      // How much of a photograph each point is right now. A point that has just
+      // come near enough grows into its thumbnail instead of appearing as one.
+      if (photonessRef.current?.length !== entries.length) {
+        photonessRef.current = new Float32Array(entries.length);
+      }
+      const photoness = photonessRef.current;
+
       let started = 0;
       for (const point of ordered) {
         const wantsThumbnail = nearest.has(point.index);
+        const grown = ease(
+          photoness[point.index] ?? 0,
+          wantsThumbnail ? 1 : 0,
+          elapsed,
+          wantsThumbnail ? 0.28 : 0.45,
+        );
+        photoness[point.index] = grown;
         const image = thumbnailsRef.current.get(point.entry.src);
 
         if (!atlas && wantsThumbnail && !image && started < LOADS_PER_FRAME) {
@@ -337,39 +412,54 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
         // shape. Squaring the falloff keeps the front legible and lets the back
         // recede into the ground instead of milking it up.
         const fade = Math.min(1, 1.7 / point.depth);
-        context.globalAlpha = Math.max(0.08, fade * fade);
+        const depthAlpha = Math.max(0.08, fade * fade);
 
         const cell =
           atlas && wantsThumbnail && point.entry.slot !== undefined
             ? sheetsRef.current[Math.floor(point.entry.slot / atlas.perSheet)]
             : undefined;
 
-        if (cell?.complete && cell.naturalWidth > 0 && atlas && point.entry.slot !== undefined) {
-          const within = point.entry.slot % atlas.perSheet;
-          const size = thumbnail * point.scale;
-          context.drawImage(
-            cell,
-            (within % perRow) * atlas.cell,
-            Math.floor(within / perRow) * atlas.cell,
-            atlas.cell,
-            atlas.cell,
-            point.x - size / 2,
-            point.y - size / 2,
-            size,
-            size,
-          );
-          // A hairline of the ground between frames, or a dense pose reads as
-          // one mosaic rather than as many photographs.
-          context.strokeStyle = "rgba(0, 0, 0, 0.55)";
-          context.lineWidth = 0.75;
-          context.strokeRect(point.x - size / 2, point.y - size / 2, size, size);
-        } else if (wantsThumbnail && image?.complete && image.naturalWidth > 0) {
-          drawSquare(context, image, point.x, point.y, thumbnail * point.scale);
-        } else {
+        const hasCell =
+          Boolean(cell?.complete) &&
+          (cell?.naturalWidth ?? 0) > 0 &&
+          Boolean(atlas) &&
+          point.entry.slot !== undefined;
+
+        // The dot beneath, fading out as the photograph fades in, so nothing
+        // ever arrives or leaves abruptly.
+        if (grown < 0.98) {
+          context.globalAlpha = depthAlpha * (1 - grown);
           context.beginPath();
           context.arc(point.x, point.y, DOT_RADIUS * point.scale, 0, Math.PI * 2);
           context.fillStyle = point.entry.swatch ?? "#8899aa";
           context.fill();
+        }
+
+        if (grown > 0.02) {
+          context.globalAlpha = depthAlpha * grown;
+          const size = thumbnail * point.scale * (0.7 + grown * 0.3);
+
+          if (hasCell && atlas && cell && point.entry.slot !== undefined) {
+            const within = point.entry.slot % atlas.perSheet;
+            context.drawImage(
+              cell,
+              (within % perRow) * atlas.cell,
+              Math.floor(within / perRow) * atlas.cell,
+              atlas.cell,
+              atlas.cell,
+              point.x - size / 2,
+              point.y - size / 2,
+              size,
+              size,
+            );
+            // A hairline of the ground between frames, or a dense pose reads as
+            // one mosaic rather than as many photographs.
+            context.strokeStyle = `rgba(0, 0, 0, ${0.55 * grown})`;
+            context.lineWidth = 0.75;
+            context.strokeRect(point.x - size / 2, point.y - size / 2, size, size);
+          } else if (image?.complete && image.naturalWidth > 0) {
+            drawSquare(context, image, point.x, point.y, size);
+          }
         }
       }
 
@@ -441,6 +531,110 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
         }
       }
 
+      // Left alone, the cloud shows itself: one photograph at a time comes up
+      // out of the drift with its kin beside it, and goes again. The same lens
+      // the pointer uses, moved by the clock.
+      const idle =
+        !engaged && driftingRef.current && !reduced && chosenRef.current === null && !under;
+      let showcaseStrength = 0;
+
+      if (!idle) {
+        showcaseRef.current = null;
+      } else {
+        const current = showcaseRef.current;
+        if (!current || time - current.start > SHOWCASE_PERIOD) {
+          // Only from what is in front and inside the frame: showing off a
+          // photograph nobody can see is not showing off.
+          const candidates = ordered.filter(
+            (point) =>
+              nearest.has(point.index) &&
+              point.x > thumbnail &&
+              point.x < width - thumbnail &&
+              point.y > thumbnail &&
+              point.y < viewHeight - thumbnail,
+          );
+          const pick = candidates[Math.floor(Math.random() * candidates.length)];
+          showcaseRef.current = pick ? { index: pick.index, start: time } : null;
+        }
+      }
+
+      const showing = showcaseRef.current;
+      const star = showing ? onScreen.get(showing.index) : undefined;
+      if (showing && star) {
+        const age = time - showing.start;
+        showcaseStrength = Math.max(
+          0,
+          Math.min(1, Math.min(age, SHOWCASE_PERIOD - age) / SHOWCASE_FADE),
+        );
+
+        const drawFramed = (point: Placed, size: number, border: number, alpha: number) => {
+          const sheet =
+            atlas && point.entry.slot !== undefined
+              ? sheetsRef.current[Math.floor(point.entry.slot / atlas.perSheet)]
+              : undefined;
+          context.globalAlpha = alpha;
+
+          if (
+            sheet?.complete &&
+            sheet.naturalWidth > 0 &&
+            atlas &&
+            point.entry.slot !== undefined
+          ) {
+            const within = point.entry.slot % atlas.perSheet;
+            context.drawImage(
+              sheet,
+              (within % perRow) * atlas.cell,
+              Math.floor(within / perRow) * atlas.cell,
+              atlas.cell,
+              atlas.cell,
+              point.x - size / 2,
+              point.y - size / 2,
+              size,
+              size,
+            );
+          } else {
+            context.fillStyle = point.entry.swatch ?? "#8899aa";
+            context.fillRect(point.x - size / 2, point.y - size / 2, size, size);
+          }
+
+          if (border > 0) {
+            context.strokeStyle = `rgba(255, 255, 255, ${0.9 * alpha})`;
+            context.lineWidth = border;
+            context.strokeRect(point.x - size / 2, point.y - size / 2, size, size);
+          }
+        };
+
+        // Softer than the pointer's focus: this is the cloud murmuring, not a
+        // reader asking.
+        context.globalAlpha = FOCUS_WASH * 0.72 * showcaseStrength;
+        context.fillStyle = wash;
+        context.fillRect(0, 0, width, viewHeight);
+
+        const kin = (star.entry.near ?? [])
+          .map((neighbour) => onScreen.get(neighbour))
+          .filter((point): point is Placed => Boolean(point));
+
+        context.globalAlpha = 0.7 * showcaseStrength;
+        context.strokeStyle = "rgba(255, 255, 255, 1)";
+        context.lineWidth = 1;
+        context.beginPath();
+        for (const point of kin) {
+          context.moveTo(star.x, star.y);
+          context.lineTo(point.x, point.y);
+        }
+        context.stroke();
+
+        for (const point of kin) {
+          drawFramed(
+            point,
+            thumbnail * 1.5 * Math.max(0.7, point.scale),
+            1,
+            0.8 * showcaseStrength,
+          );
+        }
+        drawFramed(star, thumbnail * 2.6 * Math.max(0.8, star.scale), 1.5, showcaseStrength);
+      }
+
       // The names are real buttons over the canvas rather than text painted
       // into it: a name is a control — it can be clicked, tabbed to and read
       // aloud — and a canvas can offer none of that. They are positioned from
@@ -484,18 +678,32 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
             box.y < other.y + other.height &&
             box.y + box.height > other.y,
         );
-        const shown = !under && !collides && index < (room < 0.8 ? 4 : labels.length);
+        const shown = !collides && index < (room < 0.8 ? 4 : labels.length);
         if (shown) placedLabels.push(box);
 
         element.style.transform = `translate(${Math.round(box.x)}px, ${Math.round(box.y)}px)`;
-        element.style.opacity = shown ? String(Math.max(0.55, Math.min(1, 1.5 / at.depth))) : "0";
-        element.style.pointerEvents = shown ? "auto" : "none";
+        element.style.opacity = shown
+          ? String(
+              Math.max(0.55, Math.min(1, 1.5 / at.depth)) *
+                (1 - 0.75 * showcaseStrength) *
+                (1 - focusRef.current),
+            )
+          : "0";
+        element.style.pointerEvents = shown && focusRef.current < 0.5 ? "auto" : "none";
       });
 
-      if (under) {
+      // The focus comes up and goes down rather than switching: `under` decides
+      // where it is going, and this decides how far along it is.
+      if (under) lastUnderRef.current = under;
+      focusRef.current = ease(focusRef.current, under ? 1 : 0, elapsed, 0.13);
+      const focus = focusRef.current;
+      const focused = under ?? (focus > 0.01 ? lastUnderRef.current : null);
+
+      if (focused) {
+        const under = focused;
         // Everything else goes back into the page, and what matters is drawn
         // again on top of the wash.
-        context.globalAlpha = FOCUS_WASH;
+        context.globalAlpha = FOCUS_WASH * focus;
         context.fillStyle = wash;
         context.fillRect(0, 0, width, viewHeight);
 
@@ -505,7 +713,7 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
 
         // The lines first, so each one ends at the edge of the photograph it
         // joins rather than crossing it.
-        context.globalAlpha = WEB_HOVER_ALPHA;
+        context.globalAlpha = WEB_HOVER_ALPHA * focus;
         context.strokeStyle = "rgba(255, 255, 255, 1)";
         context.lineWidth = 1.1;
         context.beginPath();
@@ -515,7 +723,7 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
         }
         context.stroke();
 
-        const drawFramed = (point: Placed, size: number, border: number) => {
+        const drawFramedLocal = (point: Placed, size: number, border: number) => {
           const sheet =
             atlas && point.entry.slot !== undefined
               ? sheetsRef.current[Math.floor(point.entry.slot / atlas.perSheet)]
@@ -547,15 +755,15 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
             context.fillRect(point.x - size / 2, point.y - size / 2, size, size);
           }
 
-          context.strokeStyle = "rgba(255, 255, 255, 0.92)";
+          context.strokeStyle = `rgba(255, 255, 255, ${0.92 * focus})`;
           context.lineWidth = border;
           context.strokeRect(point.x - size / 2, point.y - size / 2, size, size);
         };
 
         // The kin, in the same frame the photograph itself gets, one size down.
-        context.globalAlpha = 1;
+        context.globalAlpha = focus;
         for (const point of kin) {
-          drawFramed(point, thumbnail * 1.7 * Math.max(0.7, point.scale), 1);
+          drawFramedLocal(point, thumbnail * 1.7 * Math.max(0.7, point.scale), 1);
         }
 
         // And the photograph under the pointer, largest and last.
@@ -567,20 +775,27 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
           thumbnailsRef.current.set(under.entry.src, image);
         }
 
-        const size = thumbnail * 3 * Math.max(0.8, under.scale);
+        // Growing a little as it comes up, so it arrives rather than appears.
+        const size = thumbnail * (2.4 + 0.6 * focus) * Math.max(0.8, under.scale);
         context.save();
-        context.shadowColor = "rgba(0, 0, 0, 0.5)";
+        context.globalAlpha = focus;
+        context.shadowColor = `rgba(0, 0, 0, ${0.5 * focus})`;
         context.shadowBlur = 20;
         if (image.complete && image.naturalWidth > 0) {
           drawSquare(context, image, under.x, under.y, size);
         } else {
-          drawFramed(under, size, 0);
+          drawFramedLocal(under, size, 0);
         }
         context.restore();
-        context.strokeStyle = "rgba(255, 255, 255, 0.95)";
+        context.strokeStyle = `rgba(255, 255, 255, ${0.95 * focus})`;
         context.lineWidth = 1.5;
         context.strokeRect(under.x - size / 2, under.y - size / 2, size, size);
       }
+
+      setShowcased((current) => {
+        const next = showcaseStrength > 0.25 ? (star?.entry ?? null) : null;
+        return current?.href === next?.href ? current : next;
+      });
 
       // React state only when the answer changes: this runs sixty times a
       // second, and the label below the cloud is the only thing that needs it.
@@ -621,19 +836,17 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
     }
   };
 
-  const onWheel = (event: React.WheelEvent<HTMLCanvasElement>) => {
-    const camera = cameraRef.current;
-    camera.distance = Math.max(
-      MIN_DISTANCE,
-      Math.min(MAX_DISTANCE, camera.distance + event.deltaY * 0.0015),
-    );
-  };
-
   if (failed) {
     return null;
   }
 
   const count = entries?.length ?? 0;
+  // Whatever is being pointed at, or — when nobody is — whatever the cloud is
+  // showing off by itself.
+  const named = hovered?.entry ?? showcased;
+  // Kept while the chip fades out, or the words would vanish before it does.
+  if (named) lastNamedRef.current = named;
+  const lastNamed = named ?? lastNamedRef.current;
   const selected =
     chosen === null ? [] : (entries ?? []).filter((entry) => entry.cluster === chosen);
   const chosenLabel = chosen === null ? null : (clusters[chosen]?.label ?? null);
@@ -669,7 +882,10 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
 
   return (
     <figure className={[styles.space, className].filter(Boolean).join(" ")}>
-      <div className={styles.stage} style={{ blockSize: `${height}px` }}>
+      <div
+        className={styles.stage}
+        {...(height === undefined ? {} : { style: { blockSize: `${height}px` } })}
+      >
         <canvas
           ref={canvasRef}
           className={styles.canvas}
@@ -683,7 +899,6 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
             pointerRef.current = null;
             endDrag(event);
           }}
-          onWheel={onWheel}
           onClick={() => {
             if (hovered) globalThis.location.assign(hovered.entry.href);
           }}
@@ -727,14 +942,22 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
 
         {count === 0 ? <p className={styles.status}>Arranging the collection…</p> : null}
 
-        {hovered ? (
-          <figcaption className={styles.caption}>
-            <span>{hovered.entry.album ?? hovered.entry.label}</span>
-            {hovered.entry.tag ? (
-              <span className={styles.captionTag}>{hovered.entry.tag.replaceAll("_", " ")}</span>
-            ) : null}
-          </figcaption>
-        ) : null}
+        {/* Always mounted, so it fades rather than appears. */}
+        <figcaption
+          className={[
+            styles.caption,
+            named ? styles.captionShown : "",
+            hovered ? "" : styles.captionQuiet,
+          ]
+            .filter(Boolean)
+            .join(" ")}
+          aria-hidden={named ? undefined : true}
+        >
+          <span>{lastNamed?.album ?? lastNamed?.label ?? ""}</span>
+          {lastNamed?.tag ? (
+            <span className={styles.captionTag}>{lastNamed.tag.replaceAll("_", " ")}</span>
+          ) : null}
+        </figcaption>
       </div>
 
       {selected.length > 0 ? (

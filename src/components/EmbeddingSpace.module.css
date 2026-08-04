@@ -11,6 +11,9 @@
    solid colour rather than a gradient. */
 .stage {
   position: relative;
+  /* Tall enough on a desktop to be a place rather than a strip, and still a
+     sensible fraction of a phone. */
+  block-size: clamp(var(--size-420), 68vh, var(--size-760));
   border: solid var(--line-hairline) var(--c-bg-contrast-light);
   border-radius: var(--m-s);
   background:
@@ -128,6 +131,23 @@
   color: var(--c-white);
   font-size: var(--fs-s);
   pointer-events: none;
+  opacity: 0;
+  transform: translateY(var(--m-xs));
+  transition:
+    opacity var(--t-base) var(--ease-out),
+    transform var(--t-base) var(--ease-out),
+    background-color var(--t-base) var(--ease-out);
+}
+
+.captionShown {
+  opacity: 1;
+  transform: none;
+}
+
+/* While the cloud is showing itself off, the name is quieter than it is when a
+   reader is actually pointing at something. */
+.captionQuiet {
+  background: color-mix(in oklch, var(--c-overlay-dark) 72%, transparent);
 }
 
 .captionTag {
