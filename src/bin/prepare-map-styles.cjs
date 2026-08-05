@@ -475,39 +475,64 @@ const photographPalette = (log) => {
 };
 
 /**
- * Quietens the gallery style's ward and suburb names.
+ * Quietens the gallery style's ward, town and suburb names.
  *
- * They were set at city weight: over a photograph-covered map, 港区 across the
- * middle of Tokyo competes with the pictures it is supposed to sit under. The
- * layer keeps every name it had — this only takes the size and the strength
- * down, and the themed and photograph tints inherit it, since they are this
- * document recoloured.
- */
-const SUBDUED_LABEL_LAYERS = new Set(["Place labels"]);
-const SUBDUED_LABEL_OPACITY = 0.72;
-
-/**
- * A modest ramp of our own, rather than the provider's per-class sizing.
+ * A Tokyo ward is `place=city` in the data, so 港区 came off the "City labels"
+ * layer: Noto Sans **Bold**, 24px at z12 and 32px at z16, at a quarter
+ * lightness — the loudest thing on a map whose subject is the photographs
+ * pinned to it. The town layer was worse in one respect: its colour ramps to
+ * *pure black* from z12 up. Both are now grey, at regular weight, on a ramp
+ * this file states.
  *
- * Scaling what was there is not available: its size is an `interpolate` over
- * zoom with `match` expressions inside it, and the style spec forbids wrapping
- * a zoom expression in arithmetic — a zoom expression may only be the top-level
- * one. So the sizing is replaced outright, which also makes what a ward's name
- * does at each zoom something this file states rather than inherits.
+ * Sizes are replaced rather than scaled because the provider's are `interpolate`
+ * expressions over zoom with `case`/`match` inside them, and the spec forbids
+ * wrapping a zoom expression in arithmetic — a zoom expression may only be the
+ * top-level one. Each layer keeps every name it had; only its weight changes,
+ * and the themed and photograph tints inherit that, being this document
+ * recoloured.
  */
-const SUBDUED_LABEL_SIZE = ["interpolate", ["linear"], ["zoom"], 8, 10, 12, 11, 16, 12.5];
+const SUBDUED_LABELS = {
+  // Wards and cities. Bold at 24px was the problem, not the colour alone.
+  "City labels": {
+    colour: "hsl(0,0%,45%)",
+    opacity: 0.85,
+    font: ["Noto Sans Regular"],
+    size: ["interpolate", ["linear"], ["zoom"], 4, 11, 8, 13, 12, 15, 16, 17],
+  },
+  // Towns, which the provider takes to pure black.
+  "Town labels": {
+    colour: "hsl(0,0%,48%)",
+    opacity: 0.85,
+    size: ["interpolate", ["linear"], ["zoom"], 6, 10, 9, 11, 16, 14],
+  },
+  // Suburbs, quarters and villages: the layer under the wards.
+  "Place labels": {
+    colour: "hsl(0,0%,48%)",
+    opacity: 0.72,
+    size: ["interpolate", ["linear"], ["zoom"], 8, 10, 12, 11, 16, 12.5],
+  },
+};
 
 const subduePlaceLabels = (style) => ({
   ...style,
-  layers: style.layers.map((layer) =>
-    SUBDUED_LABEL_LAYERS.has(layer.id)
-      ? {
-          ...layer,
-          layout: { ...layer.layout, "text-size": SUBDUED_LABEL_SIZE },
-          paint: { ...layer.paint, "text-opacity": SUBDUED_LABEL_OPACITY },
-        }
-      : layer,
-  ),
+  layers: style.layers.map((layer) => {
+    const subdued = SUBDUED_LABELS[layer.id];
+    if (!subdued) return layer;
+
+    return {
+      ...layer,
+      layout: {
+        ...layer.layout,
+        "text-size": subdued.size,
+        ...(subdued.font ? { "text-font": subdued.font } : {}),
+      },
+      paint: {
+        ...layer.paint,
+        "text-color": subdued.colour,
+        "text-opacity": subdued.opacity,
+      },
+    };
+  }),
 });
 
 /**
