@@ -19,6 +19,30 @@ describe("composeMapStyle", () => {
     expect(labels.layout["text-font"]).toEqual(["Noto Sans Regular"]);
   });
 
+  // The free glyph server has Noto Sans and nothing else, so a terminal's
+  // typeface has to be made out of weight, spacing and case.
+  it("sets the names the way a style asks, in both label layers", () => {
+    const style = composeMapStyle({
+      options: {
+        labelStyle: { font: ["Noto Sans Bold"], transform: "uppercase", letterSpacing: 0.12 },
+      },
+    });
+
+    for (const id of ["place-labels", "place-labels-small"]) {
+      const layer = style.layers.find((entry) => entry.id === id);
+      expect(layer.layout["text-font"]).toEqual(["Noto Sans Bold"]);
+      expect(layer.layout["text-transform"]).toBe("uppercase");
+      expect(layer.layout["text-letter-spacing"]).toBe(0.12);
+    }
+  });
+
+  it("leaves the names alone when a style says nothing about them", () => {
+    const labels = composeMapStyle({}).layers.find((layer) => layer.id === "place-labels");
+
+    expect(labels.layout["text-transform"]).toBeUndefined();
+    expect(labels.layout["text-letter-spacing"]).toBeUndefined();
+  });
+
   it("paints the ground from the palette it was given", () => {
     const style = composeMapStyle({ palette: { land: "#101010", water: "#202020" } });
 

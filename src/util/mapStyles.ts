@@ -271,6 +271,28 @@ export const DEFAULT_MAP_STYLE: MapStyleName = isAvailableStyleName(siteConfig.m
   ? siteConfig.map.defaultStyle
   : "3d";
 
+/**
+ * The basemap a theme opens with, where one of them is obviously its map.
+ *
+ * Only a reader who has never chosen a basemap sees these: an explicit choice
+ * outranks the theme, and switching theme never overrides it. `light`, `dark`
+ * and the rest are deliberately absent — they are the schemes people read in,
+ * and a legible default matters more there than a matching one.
+ */
+const THEME_MAP_STYLES: Partial<Record<ThemeName, MapStyleName>> = {
+  terminal: "crt",
+  paper: "paper",
+  ink: "sketch",
+  watercolour: "watercolour",
+  herbarium: "watercolour",
+  bling: "neon",
+};
+
+export const defaultMapStyleForTheme = (theme: ThemeName | null | undefined): MapStyleName => {
+  const themed = theme ? THEME_MAP_STYLES[theme] : undefined;
+  return themed && MAP_STYLE_NAMES.includes(themed) ? themed : DEFAULT_MAP_STYLE;
+};
+
 export const MAP_STYLE_STORAGE_KEY = "mapStyle";
 
 export const resolveMapStyleName = (value: unknown): MapStyleName | null => {
@@ -335,13 +357,19 @@ const notify = () => {
   });
 };
 
-export const getMapStyleName = (): MapStyleName => {
+/**
+ * The reader's own choice, or null where they have never made one — which is
+ * what lets a theme supply the default without overriding a decision.
+ */
+export const getStoredMapStyleName = (): MapStyleName | null => {
   if (current === null) {
-    current = readStored() ?? DEFAULT_MAP_STYLE;
+    current = readStored();
   }
 
   return current;
 };
+
+export const getMapStyleName = (): MapStyleName => getStoredMapStyleName() ?? DEFAULT_MAP_STYLE;
 
 /** The server has no preference to read, and must render the default. */
 export const getServerMapStyleName = (): MapStyleName => DEFAULT_MAP_STYLE;

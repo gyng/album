@@ -1,24 +1,37 @@
 import React from "react";
 import {
-  getMapStyleName,
-  getServerMapStyleName,
+  defaultMapStyleForTheme,
+  getStoredMapStyleName,
   MAP_STYLE_GROUPS,
+  type MapStyleName,
   MAP_STYLES,
   resolveMapStyleName,
   setMapStyleName,
   subscribeMapStyleName,
 } from "../util/mapStyles";
+import { useActiveTheme } from "./useActiveTheme";
 import { Select } from "./ui";
 import styles from "./MapStyleToggle.module.css";
 
 /**
- * Reads the chosen basemap, and re-renders whoever asks when it changes.
+ * Reads the basemap in force, and re-renders whoever asks when it changes.
  *
- * The server has no preference to read, so it renders the default and hydration
- * matches — the choice arrives on the client's first snapshot instead.
+ * The server has no preference and no theme to read, so it renders the
+ * configured default and hydration matches — the reader's own choice, or the
+ * one their theme implies, arrives on the client's first snapshot instead.
  */
-export const useMapStyleName = () =>
-  React.useSyncExternalStore(subscribeMapStyleName, getMapStyleName, getServerMapStyleName);
+export const useMapStyleName = (): MapStyleName => {
+  const chosen = React.useSyncExternalStore(
+    subscribeMapStyleName,
+    getStoredMapStyleName,
+    () => null,
+  );
+  const theme = useActiveTheme();
+
+  // A theme with an obvious map of its own supplies the default; a reader who
+  // has chosen one keeps it, whatever they are wearing.
+  return chosen ?? defaultMapStyleForTheme(theme);
+};
 
 /**
  * Picks the basemap under the photos. Sits beside the site theme, because it is

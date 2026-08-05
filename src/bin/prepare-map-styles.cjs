@@ -67,7 +67,15 @@ const composedStyles = (spriteUrl) => {
         motorway: "#7d6a4a",
         boundary: "#9a8f7c",
       },
-      options: { outlineOnly: true, lineWidthScale: 1.4 },
+      options: {
+        outlineOnly: true,
+        lineWidthScale: 1.4,
+        spriteUrl,
+        // The tooth of the paper it is drawn on, and a coastline pressed
+        // harder than the rest — which is how anybody draws a coast.
+        overlay: { id: "grain", opacity: 0.55 },
+        coast: { colour: "#4a4133", width: 1.6, opacity: 0.8 },
+      },
     }),
   ]);
 
@@ -142,6 +150,11 @@ const composedStyles = (spriteUrl) => {
       },
       options: {
         roads: "all",
+        // The plate's key line: a printed map's coast is drawn, not merely
+        // where one fill stops and another starts.
+        coast: { colour: "#6d4a2f", width: 1.2, opacity: 0.65 },
+        labelStyle: { font: ["Noto Sans Bold"], letterSpacing: 0.08 },
+        minorRoad: "#e8dcc0",
         spriteUrl,
         // A finer screen on the water — the coarse one read as polka dots at
         // street zoom — and a visible one on the land, which is what makes the
@@ -177,6 +190,10 @@ const composedStyles = (spriteUrl) => {
       options: {
         roads: "all",
         shadow: 3,
+        // The cut edge of the water, which is what makes the sheet read as a
+        // sheet rather than as a fill.
+        coast: { colour: "#8fa8b3", width: 1, opacity: 0.7 },
+        minorRoad: "#efe7d6",
         spriteUrl,
         overlay: { id: "grain", opacity: 0.35 },
       },
@@ -209,6 +226,10 @@ const composedStyles = (spriteUrl) => {
         // A tube draws its beam brightest where the signal is strongest. Every
         // lane at full phosphor made a city a solid green field.
         minorRoad: "#0c6a47",
+        // A terminal's type: the glyph server has no monospace, so the reading
+        // comes from weight, spacing and case instead.
+        labelStyle: { font: ["Noto Sans Bold"], transform: "uppercase", letterSpacing: 0.14 },
+        coast: { colour: "#2bffa6", width: 1.4, opacity: 0.85 },
         spriteUrl,
         // Phosphor blooms: a tube's lines are never as sharp as their signal.
         glow: [
@@ -246,6 +267,9 @@ const composedStyles = (spriteUrl) => {
         buildings: true,
         roads: "all",
         lineWidthScale: 0.6,
+        minorRoad: "#2c3a47",
+        coast: { colour: "#6f93b5", width: 1.1, opacity: 0.75 },
+        labelStyle: { letterSpacing: 0.06 },
         sky: { sky: "#03070d", horizon: "#2f6ea8", atmosphere: 0.85 },
       },
     }),

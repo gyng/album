@@ -8,6 +8,7 @@ import {
   FALLBACK_STYLE_URL,
   MAP_STYLE_NAMES,
   MAP_STYLE_STORAGE_KEY,
+  defaultMapStyleForTheme,
   getMapStyleName,
   isFreeMapStyle,
   mapStyleUrl,
@@ -161,5 +162,23 @@ describe("the basemap that follows the page", () => {
       expect(isFreeMapStyle(name)).toBe(true);
       expect(mapStyleUrl(name, "a-key")).not.toContain("maptiler");
     }
+  });
+});
+
+describe("defaultMapStyleForTheme", () => {
+  // A theme with an obvious map of its own supplies it — but only as a default:
+  // a reader's own choice is read from storage and outranks this entirely.
+  it("gives a theme its own map where there is one", () => {
+    expect(defaultMapStyleForTheme("terminal")).toBe("crt");
+    expect(defaultMapStyleForTheme("paper")).toBe("paper");
+    expect(defaultMapStyleForTheme("ink")).toBe("sketch");
+  });
+
+  // Light and dark are the schemes people read in, and a legible default
+  // matters more there than a matching one.
+  it("leaves the reading schemes on the configured default", () => {
+    expect(defaultMapStyleForTheme("light")).toBe(DEFAULT_MAP_STYLE);
+    expect(defaultMapStyleForTheme("dark")).toBe(DEFAULT_MAP_STYLE);
+    expect(defaultMapStyleForTheme(null)).toBe(DEFAULT_MAP_STYLE);
   });
 });

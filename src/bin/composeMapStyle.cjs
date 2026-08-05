@@ -104,6 +104,15 @@ const optionDefaults = {
   sky: null,
   /** Where the pattern images come from; required by `overlay` and `screen`. */
   spriteUrl: null,
+  /**
+   * How the names are set, as `{ font, transform, letterSpacing }`.
+   *
+   * The free glyph server has Noto Sans in two weights and nothing else — no
+   * monospace, and self-hosting one would mean shipping CJK ranges to get a
+   * terminal's typeface. Bold, spaced and upper-cased reads as a terminal
+   * without any of that.
+   */
+  labelStyle: null,
 };
 
 const ROAD_CLASSES = {
@@ -451,7 +460,13 @@ const buildLayers = (palette, options) => {
       filter: ["in", "class", "village", "hamlet", "suburb", "quarter", "neighbourhood"],
       layout: {
         "text-field": ["coalesce", ["get", "name:latin"], ["get", "name"]],
-        "text-font": LABEL_FONT,
+        "text-font": options.labelStyle?.font ?? LABEL_FONT,
+        ...(options.labelStyle?.transform
+          ? { "text-transform": options.labelStyle.transform }
+          : {}),
+        ...(options.labelStyle?.letterSpacing === undefined
+          ? {}
+          : { "text-letter-spacing": options.labelStyle.letterSpacing }),
         "text-size": interpolate([
           [10, 10],
           [14, 12],
@@ -475,7 +490,13 @@ const buildLayers = (palette, options) => {
       filter: ["in", "class", "city", "town", "country", "state"],
       layout: {
         "text-field": ["coalesce", ["get", "name:latin"], ["get", "name"]],
-        "text-font": LABEL_FONT,
+        "text-font": options.labelStyle?.font ?? LABEL_FONT,
+        ...(options.labelStyle?.transform
+          ? { "text-transform": options.labelStyle.transform }
+          : {}),
+        ...(options.labelStyle?.letterSpacing === undefined
+          ? {}
+          : { "text-letter-spacing": options.labelStyle.letterSpacing }),
         "text-size": interpolate([
           [3, 10],
           [8, 13],
