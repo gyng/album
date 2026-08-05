@@ -1,0 +1,23 @@
+{
+  // The test files, which nothing else typechecks.
+  //
+  // `tsconfig.typecheck.json` excludes them deliberately (a test's types are not
+  // the shipped product's), and the Next builds only see what they import — so
+  // nine type errors had accumulated in tests, two of them naming things that no
+  // longer exist: a `galleryStyleId` that left with the metered provider, and a
+  // `modelId` parameter that moved. A test asserting a removed key is a test
+  // asserting nothing.
+  "extends": "./tsconfig.json",
+  // The ambient declarations come first: an `include` replaces the base's, and
+  // without them the untyped modules those declarations exist for (ffprobe) fail
+  // here while passing everywhere else.
+  "include": [
+    "*.d.ts",
+    "**/*.test.ts",
+    "**/*.test.tsx",
+    "test/**/*.ts",
+    "test/**/*.tsx",
+    "tests/**/*.ts"
+  ],
+  "exclude": ["node_modules", ".next", ".next-e2e"]
+}

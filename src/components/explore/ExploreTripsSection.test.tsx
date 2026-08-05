@@ -18,6 +18,12 @@ const trip = (over: Partial<TripSummary> = {}): TripSummary => ({
   isOuting: false,
   totalKm: 1255,
   photos: [],
+  // Required on a trip, and empty here: this suite is about the section's
+  // summary counts, not about what a journey was the first sight of.
+  firstVisits: [],
+  laterReturns: [],
+  gear: { cameras: [], lenses: [], photosWithCamera: 0, photosWithLens: 0 },
+  distinctiveTags: [],
   ...over,
 });
 

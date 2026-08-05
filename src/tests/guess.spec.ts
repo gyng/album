@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { gotoHydrated } from "./hydrated";
 import { expectMapLoaded } from "./map-loaded";
 import { stubExternalMapAssets } from "./map-network";
 
@@ -12,9 +13,7 @@ test.describe("guess game layout", () => {
   test("round fits the viewport — photo and map do not overflow vertically", async ({ page }) => {
     await stubExternalMapAssets(page);
     await page.setViewportSize({ width: 1280, height: 520 });
-    await page.goto("/guess?seed=layout-regression&rounds=1", {
-      waitUntil: "domcontentloaded",
-    });
+    await gotoHydrated(page, "/guess?seed=layout-regression&rounds=1");
 
     // The overflow only manifests once the image has real intrinsic dimensions.
     // Missing generated media is a fixture failure, not a reason to skip coverage.

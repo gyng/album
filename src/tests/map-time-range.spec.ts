@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { gotoHydrated } from "./hydrated";
 import { expectMapLoaded } from "./map-loaded";
 import { stubExternalMapAssets } from "./map-network";
 
@@ -8,9 +9,7 @@ test.describe("Map time range slider", () => {
   });
 
   test("clear dates removes the range and URL params", async ({ page }) => {
-    await page.goto("/map?from=2020-01-01&to=2025-01-01", {
-      waitUntil: "domcontentloaded",
-    });
+    await gotoHydrated(page, "/map?from=2020-01-01&to=2025-01-01");
 
     // The slider is page chrome: it renders, clears and rewrites the URL even
     // when the map beside it is a blank canvas. Filtering a map nobody can see

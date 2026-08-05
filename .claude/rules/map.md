@@ -66,7 +66,7 @@ globs:
   tileset this fork lacks; at city zoom it was a flat blob. It is built from the palette with a
   blurred `coast` — the bleed is what makes a wash read as paint — and its template and sprite are
   deleted. The `watercolour` theme opens on it again
-- **Gallery's names are quietened in `subduePlaceLabels`, and its shields are dropped.** A Tokyo
+- **Gallery's chrome is quietened in `quietenGalleryChrome`, and its shields are dropped.** A Tokyo
   ward is `place=city`, so 港区 comes off "City labels"; quietening "Place labels" alone does
   nothing for it. Shields rendered the raw OSM `ref` ("C1;409") in near-black and are gone
 - **Bottom chrome clears the date panel via `--map-bottom-chrome`.** MapLibre's control containers

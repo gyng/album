@@ -24,11 +24,17 @@ export const createPlatformAdapter = (
     searchEmbeddingsDatabaseUrl: "/search-embeddings.sqlite",
   },
   ...overrides,
+  // Every key the contract requires, then the caller's overrides. Two were
+  // missing (`EmbeddingSpace`, `TripRouteMap`), which left them optional in the
+  // result and so not a `ClientComponents` at all — invisible until something
+  // actually typechecked the test tree.
   clientComponents: {
+    EmbeddingSpace: NullComponent,
     Map: NullComponent,
     MapWorld: NullComponent,
     PhotoSimilarPhotos: NullComponent,
     SankeyChart: NullComponent,
+    TripRouteMap: NullComponent,
     GuessMap: NullComponent,
     SearchWithCoi: NullComponent,
     ...overrides.clientComponents,

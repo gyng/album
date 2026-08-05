@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { gotoHydrated } from "./hydrated";
 
 const expectedJapanResultHrefs = [
   // The album's committed clip is tagged japan too: it is indexed through the
@@ -33,7 +34,7 @@ test.describe("Search", () => {
   });
 
   test("search page loads with explore section", async ({ page }) => {
-    await page.goto("/search", { waitUntil: "domcontentloaded" });
+    await gotoHydrated(page, "/search");
 
     await expect(page.getByRole("heading", { name: /search/i })).toBeVisible();
 
@@ -42,7 +43,7 @@ test.describe("Search", () => {
   });
 
   test("keyword search returns only matching results", async ({ page }) => {
-    await page.goto("/search", { waitUntil: "domcontentloaded" });
+    await gotoHydrated(page, "/search");
 
     // Use keyword mode to avoid WebGPU dependency
     await page.getByLabel("Search mode", { exact: true }).selectOption("keyword");
@@ -61,7 +62,7 @@ test.describe("Search", () => {
   // media_kind the database carries, the capability probe that reads it, and the
   // badge that tells a viewer this result plays.
   test("a video result is marked as playable with its length", async ({ page }) => {
-    await page.goto("/search", { waitUntil: "domcontentloaded" });
+    await gotoHydrated(page, "/search");
     // Keyword mode, like the other searches here: semantic would block on a
     // 147MB model download that has nothing to do with what this asserts.
     await page.getByLabel("Search mode", { exact: true }).selectOption("keyword");
@@ -77,7 +78,7 @@ test.describe("Search", () => {
   });
 
   test("tag facet filters results", async ({ page }) => {
-    await page.goto("/search", { waitUntil: "domcontentloaded" });
+    await gotoHydrated(page, "/search");
     await page.getByLabel("Search mode", { exact: true }).selectOption("keyword");
 
     // Wait for the facet panel's "Tags" tab — needs DB to load via WASM first
@@ -97,7 +98,7 @@ test.describe("Search", () => {
 
   test("compact filters open as a native modal and restore focus", async ({ page }) => {
     await page.setViewportSize({ width: 700, height: 900 });
-    await page.goto("/search", { waitUntil: "domcontentloaded" });
+    await gotoHydrated(page, "/search");
 
     const trigger = page.getByRole("button", { name: "Filters" });
     await expect(trigger).toBeVisible();
@@ -115,9 +116,7 @@ test.describe("Search", () => {
   });
 
   test("similar mode queries the production-format embeddings database", async ({ page }) => {
-    await page.goto("/search?similar=../albums/test-simple/DSCF0506-2.jpg", {
-      waitUntil: "domcontentloaded",
-    });
+    await gotoHydrated(page, "/search?similar=../albums/test-simple/DSCF0506-2.jpg");
 
     await expect(page).toHaveURL(/similar=/);
     // The source context appears before the lazy embeddings DB finishes loading.

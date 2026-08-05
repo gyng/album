@@ -68,6 +68,20 @@ export const AppRuntime = ({ children, telemetry }: AppRuntimeProps) => {
   // dismissing one does not let the next failed chunk reopen it.
   const staleDetectedRef = React.useRef(false);
 
+  // The application says when it is live.
+  //
+  // Server-rendered markup is interactive-looking long before React attaches to
+  // it: a control driven in that window takes a value hydration then discards,
+  // which reads as a logic bug rather than a race (a picker set to "slate" that
+  // reports "dark"). Tests wait on this attribute instead of guessing; nothing
+  // in the application reads it, and its absence changes no behaviour.
+  React.useEffect(() => {
+    document.documentElement.dataset.appHydrated = "true";
+    return () => {
+      delete document.documentElement.dataset.appHydrated;
+    };
+  }, []);
+
   React.useEffect(() => {
     if (typeof window === "undefined") return;
 

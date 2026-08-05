@@ -81,13 +81,10 @@
   border-color: var(--c-accent);
 }
 
-/* A name the frame had no room for is still a control a keyboard can reach, so
-   it shows itself when focused. The draw loop writes opacity inline, which is
-   why this has to insist. */
-.clusterName:focus-visible {
-  opacity: 1 !important;
-  pointer-events: auto !important;
-}
+/* A name the frame had no room for is still a control a keyboard can reach, and
+   it shows itself when focused — but that is done by the draw loop, which owns
+   these properties inline. CSS cannot win against an inline style without
+   `!important`, so it does not try. */
 
 /* Doubled up so it beats the overlay button's own background, whichever order
    the two modules land in. */

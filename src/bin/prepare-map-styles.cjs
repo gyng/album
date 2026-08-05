@@ -574,7 +574,7 @@ const photographPalette = (log) => {
 };
 
 /**
- * Quietens the gallery style's ward, town and suburb names.
+ * Quietens the gallery style's own chrome: names, shields and points of interest.
  *
  * A Tokyo ward is `place=city` in the data, so 港区 came off the "City labels"
  * layer: Noto Sans **Bold**, 24px at z12 and 32px at z16, at a quarter
@@ -624,9 +624,24 @@ const SUBDUED_LABELS = {
   // Street names, which were the same near-black as the shields. Their sizing
   // was never the problem, so it is left alone.
   "Road labels": { colour: "hsl(0,0%,45%)", opacity: 0.9 },
+
+  // The points of interest, which arrive at full saturation from z13: a blue
+  // station, a green park, a red clinic. Red is the photograph pins' own colour
+  // and blue was the brightest thing on a Tokyo street view once the Metro line
+  // was drawn under it. Each keeps its hue — that is how a reader tells a park
+  // from a station — with the saturation taken out of it, and the icons stay
+  // legible at a lower opacity, since the icon is what carries the meaning.
+  Station: { colour: "hsl(215,30%,52%)", opacity: 0.9, iconOpacity: 0.65 },
+  Airport: { colour: "hsl(215,30%,52%)", opacity: 0.9, iconOpacity: 0.7 },
+  Park: { colour: "hsl(82,26%,36%)", opacity: 0.85, iconOpacity: 0.6 },
+  Healthcare: { colour: "hsl(6,32%,46%)", opacity: 0.85, iconOpacity: 0.6 },
+  Parking: { colour: "hsl(17,14%,46%)", opacity: 0.85, iconOpacity: 0.55 },
+  // Its colour was a `match` over half a dozen classes; the icons already say
+  // which is which, so one muted ink does for all of them.
+  "Other POI": { colour: "hsl(215,14%,48%)", opacity: 0.85, iconOpacity: 0.6 },
 };
 
-const subduePlaceLabels = (style) => ({
+const quietenGalleryChrome = (style) => ({
   ...style,
   layers: style.layers
     .filter((layer) => !DROPPED_LABEL_LAYERS.has(layer.id))
@@ -645,6 +660,7 @@ const subduePlaceLabels = (style) => ({
           ...layer.paint,
           "text-color": subdued.colour,
           "text-opacity": subdued.opacity,
+          ...(subdued.iconOpacity === undefined ? {} : { "icon-opacity": subdued.iconOpacity }),
         },
       };
     }),
@@ -727,7 +743,7 @@ const run = async (log = console.log, env = process.env) => {
   // more templates on disk.
   // No metro on this one: each style that comes off it adds its own, after its
   // own tint, so the line does not get pulled into the ground colour.
-  const gallery = subduePlaceLabels(
+  const gallery = quietenGalleryChrome(
     JSON.parse(fs.readFileSync(path.join(dir, "gallery.template.json"), "utf8")),
   );
   for (const [name, style] of themedStyles(gallery)) {
@@ -778,7 +794,7 @@ const run = async (log = console.log, env = process.env) => {
     let document = filled;
     if (template === "gallery.template.json") {
       document = `${JSON.stringify(
-        withTransit(subduePlaceLabels(JSON.parse(filled)), { colour: "#8a93b5" }),
+        withTransit(quietenGalleryChrome(JSON.parse(filled)), { colour: "#8a93b5" }),
       )}\n`;
     }
 
@@ -796,7 +812,7 @@ const run = async (log = console.log, env = process.env) => {
 };
 
 module.exports = {
-  subduePlaceLabels,
+  quietenGalleryChrome,
   withTransit,
   applyOrigin,
   composedStyles,

@@ -10,10 +10,42 @@ import { defineConfig, devices } from "@playwright/test";
  * `PLAYWRIGHT_PORT` overrides it; `PLAYWRIGHT_BASE_URL` still wins outright,
  * for pointing at a server this config did not start.
  */
-const configuredPort = Number.parseInt(process.env.PLAYWRIGHT_PORT ?? "", 10);
-const port = Number.isInteger(configuredPort) && configuredPort > 0 ? configuredPort : 43110;
-const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? `http://127.0.0.1:${port}`;
 const skipWebServer = process.env.PLAYWRIGHT_SKIP_WEBSERVER === "1";
+const configuredPort = Number.parseInt(process.env.PLAYWRIGHT_PORT ?? "", 10);
+const preferredPort =
+  Number.isInteger(configuredPort) && configuredPort > 0 ? configuredPort : 43110;
+/*
+ * When this config starts the server, a taken port becomes a different port
+ * rather than a stopped suite — a leftover server from the previous run that has
+ * not finished letting go was enough to refuse a whole run twice. When it does
+ * *not* start the server, the port is where the reader's own server already is,
+ * so it must be taken exactly as given.
+ */
+// `require` rather than `import`: a Playwright config is loaded as CommonJS and
+// cannot await, and the probe has to finish before the config object exists.
+const { pickFreePort } = require("./bin/pickFreePort.cjs") as {
+  pickFreePort: (preferred: number) => number;
+};
+/*
+ * Picked once, in the process that loads this config first, and handed to the
+ * workers through the environment they inherit. Every worker re-evaluates this
+ * file, so picking per process gave each one a *different* port while the server
+ * sat on the one the parent chose — seventy-seven connection-refused failures
+ * that looked nothing like a port conflict.
+ */
+const resolveManagedPort = (): number => {
+  const handed = Number.parseInt(process.env.PLAYWRIGHT_E2E_PORT ?? "", 10);
+  if (Number.isInteger(handed) && handed > 0) {
+    return handed;
+  }
+
+  const chosen = pickFreePort(preferredPort);
+  process.env.PLAYWRIGHT_E2E_PORT = String(chosen);
+  return chosen;
+};
+
+const port = skipWebServer ? preferredPort : resolveManagedPort();
+const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? `http://127.0.0.1:${port}`;
 const recordLocalVideo = process.env.PLAYWRIGHT_VIDEO === "1";
 const configuredWorkers = process.env.PLAYWRIGHT_WORKERS
   ? Number.parseInt(process.env.PLAYWRIGHT_WORKERS, 10)

@@ -1,4 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
+import { gotoHydrated, waitForHydration } from "./hydrated";
 
 /** Slideshow image — the only non-hidden img on the page. */
 const slideshowImg = 'img[alt]:not([aria-hidden="true"])';
@@ -54,7 +55,7 @@ test.beforeEach(async ({ page }) => {
 test.describe("Slideshow", () => {
   test("desktop controls auto-hide on idle and reveal on mouse-to-top", async ({ page }) => {
     await page.clock.install();
-    await page.goto("/slideshow", { waitUntil: "domcontentloaded" });
+    await gotoHydrated(page, "/slideshow");
     await waitForSlideshow(page);
 
     const container = page.locator("[data-paused]");
@@ -69,7 +70,7 @@ test.describe("Slideshow", () => {
   });
 
   test("next/previous navigation works", async ({ page }) => {
-    await page.goto("/slideshow", { waitUntil: "domcontentloaded" });
+    await gotoHydrated(page, "/slideshow");
     await waitForSlideshow(page);
 
     const image = page.locator(slideshowImg).first();
@@ -89,9 +90,7 @@ test.describe("Slideshow", () => {
   });
 
   test("switching playback mode keeps a photo on screen", async ({ page }) => {
-    await page.goto("/slideshow?mode=random&filter=test-simple", {
-      waitUntil: "domcontentloaded",
-    });
+    await gotoHydrated(page, "/slideshow?mode=random&filter=test-simple");
     await waitForSlideshow(page);
 
     const image = page.locator(slideshowImg).first();
@@ -120,9 +119,7 @@ test.describe("Slideshow", () => {
   });
 
   test("map display loads its route-scoped vendor stylesheet", async ({ page }) => {
-    await page.goto("/slideshow?mode=random&filter=test-simple&map=1&delay=86400", {
-      waitUntil: "domcontentloaded",
-    });
+    await gotoHydrated(page, "/slideshow?mode=random&filter=test-simple&map=1&delay=86400");
     await waitForSlideshow(page);
 
     await expect(page.locator('link[href="/vendor/maplibre-gl.css"]')).toHaveCount(1);
@@ -148,9 +145,10 @@ test.describe("Slideshow", () => {
     await page.addInitScript(() => {
       Math.random = () => 0.99;
     });
-    await page.goto("/slideshow?mode=random&filter=test-simple&details=1&remix=1&delay=86400", {
-      waitUntil: "domcontentloaded",
-    });
+    await gotoHydrated(
+      page,
+      "/slideshow?mode=random&filter=test-simple&details=1&remix=1&delay=86400",
+    );
     await waitForSlideshow(page);
 
     await revealControls(page);
@@ -189,9 +187,7 @@ test.describe("Slideshow", () => {
     // delay=1 → a 1-second cadence; align-cadence is off (beforeEach) so the
     // advance timer is a plain now+delay.
     await page.clock.install();
-    await page.goto("/slideshow?mode=random&filter=test-simple&delay=1", {
-      waitUntil: "domcontentloaded",
-    });
+    await gotoHydrated(page, "/slideshow?mode=random&filter=test-simple&delay=1");
     await waitForSlideshow(page);
 
     const image = page.locator(slideshowImg).first();
@@ -205,9 +201,7 @@ test.describe("Slideshow", () => {
 
   test("pausing stops the auto-advance", async ({ page }) => {
     await page.clock.install();
-    await page.goto("/slideshow?mode=random&filter=test-simple&delay=1", {
-      waitUntil: "domcontentloaded",
-    });
+    await gotoHydrated(page, "/slideshow?mode=random&filter=test-simple&delay=1");
     await waitForSlideshow(page);
 
     const image = page.locator(slideshowImg).first();
@@ -224,7 +218,7 @@ test.describe("Slideshow", () => {
   });
 
   test("alignment persists across reloads", async ({ page }) => {
-    await page.goto("/slideshow?details=1", { waitUntil: "domcontentloaded" });
+    await gotoHydrated(page, "/slideshow?details=1");
     await waitForSlideshow(page);
 
     const alignButton = page.locator('button:has-text("📍")');
@@ -232,6 +226,7 @@ test.describe("Slideshow", () => {
     await expect(alignButton).toContainText("Right");
 
     await page.reload({ waitUntil: "domcontentloaded" });
+    await waitForHydration(page);
 
     await expect(page.locator('button:has-text("📍")')).toContainText("Right");
   });
@@ -318,9 +313,7 @@ test.describe("Slideshow touch mode", () => {
   // Dragging the slide aside used to reveal the page behind it — a black void
   // the width of the gesture — rather than the photograph the swipe leads to.
   test("a drag uncovers the photograph it is heading towards", async ({ page }) => {
-    await page.goto("/slideshow?mode=random&filter=test-simple", {
-      waitUntil: "domcontentloaded",
-    });
+    await gotoHydrated(page, "/slideshow?mode=random&filter=test-simple");
     await waitForSlideshow(page);
 
     const image = page.locator(slideshowImg).first();
@@ -347,9 +340,7 @@ test.describe("Slideshow touch mode", () => {
   });
 
   test("horizontal swipe past commit advances to next photo", async ({ page }) => {
-    await page.goto("/slideshow?mode=random&filter=test-simple", {
-      waitUntil: "domcontentloaded",
-    });
+    await gotoHydrated(page, "/slideshow?mode=random&filter=test-simple");
     await waitForSlideshow(page);
 
     const image = page.locator(slideshowImg).first();
@@ -362,9 +353,7 @@ test.describe("Slideshow touch mode", () => {
   });
 
   test("pull up with controls hidden forces a remix advance", async ({ page }) => {
-    await page.goto("/slideshow?mode=random&filter=test-simple", {
-      waitUntil: "domcontentloaded",
-    });
+    await gotoHydrated(page, "/slideshow?mode=random&filter=test-simple");
     await waitForSlideshow(page);
 
     const container = page.locator("[data-paused]");
@@ -407,9 +396,7 @@ test.describe("Slideshow touch mode", () => {
   test("synthetic click after a mid-distance touch gesture does not advance the photo", async ({
     page,
   }) => {
-    await page.goto("/slideshow?mode=random&filter=test-simple", {
-      waitUntil: "domcontentloaded",
-    });
+    await gotoHydrated(page, "/slideshow?mode=random&filter=test-simple");
     await waitForSlideshow(page);
 
     const image = page.locator(slideshowImg).first();
@@ -428,9 +415,7 @@ test.describe("Slideshow touch mode", () => {
   });
 
   test("side affordances stay hidden during touch when controls are visible", async ({ page }) => {
-    await page.goto("/slideshow?mode=random&filter=test-simple", {
-      waitUntil: "domcontentloaded",
-    });
+    await gotoHydrated(page, "/slideshow?mode=random&filter=test-simple");
     await waitForSlideshow(page);
 
     const container = page.locator("[data-paused]");

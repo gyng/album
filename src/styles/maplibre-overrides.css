@@ -56,27 +56,33 @@
     background: color-mix(in oklch, var(--c-font) 10%, transparent);
   }
 
-  /* The glyphs are background images with a fixed dark fill, so a dark palette
-     needs them inverted. Colours resolve themselves; a bitmap cannot, and there
-     is no `light-dark()` for a filter. Both branches are needed: the class for an
-     explicit choice, the query for "system" — and `:not(.light)` so an explicit
-     light theme on a dark OS is left alone. */
-  :root.dark .maplibregl-ctrl-icon,
-  :root.dark .maplibregl-ctrl-attrib-button {
+  /* The zoom, compass and geolocate glyphs are background images with a fixed
+     dark fill, so a dark palette needs them inverted — they are sprites rather
+     than one shape, so the mask trick above does not extend to them. Both
+     branches are needed: the class for an explicit choice, the query for
+     "system" — and `:not(.light)` so an explicit light theme on a dark OS is
+     left alone. */
+  :root.dark .maplibregl-ctrl-icon {
     filter: invert(1);
   }
 
   @media (prefers-color-scheme: dark) {
-    :root:not(.light) .maplibregl-ctrl-icon,
-    :root:not(.light) .maplibregl-ctrl-attrib-button {
+    :root:not(.light) .maplibregl-ctrl-icon {
       filter: invert(1);
     }
   }
 
+  /* One height in both states. Opening the bar grew it from 20px to 24px and
+     lifted its top edge with it, so a click that should only reveal text also
+     moved the thing being clicked. The button is 24px, so the bar is too. */
   .maplibregl-ctrl-attrib,
   .maplibregl-ctrl-attrib.maplibregl-compact {
+    display: flex;
+    align-items: center;
+    min-block-size: var(--size-24);
     background: color-mix(in oklch, var(--c-bg) 88%, transparent);
     color: var(--c-font);
+    border-radius: var(--radius-pill);
   }
 
   .maplibregl-ctrl-attrib a {
@@ -100,4 +106,28 @@
   .maplibregl-popup-close-button {
     display: none;
   }
+}
+
+/* The attribution's (i), drawn in the theme's own ink.
+ *
+ * Deliberately outside `@layer overrides`, unlike every other rule in this file:
+ * something unlayered sets this button's background — a layered rule of ours,
+ * whatever its specificity, lost to it on every theme (a near-black disc under
+ * terminal, nothing at all under ember), while the same declaration injected
+ * unlayered won immediately. Unlayered author styles beat layered ones, and this
+ * is the one place that matters.
+ *
+ * Masking the shape and filling it with `currentColor` also replaces what used
+ * to be the vendor bitmap under `filter: invert(1)`: inverting turned the
+ * glyph's filled disc white, so the one piece of map chrome that ignored the
+ * palette was the one explaining where the map came from.
+ */
+.maplibregl-ctrl-attrib > .maplibregl-ctrl-attrib-button {
+  background-color: currentColor;
+  background-image: none;
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath fill-rule='evenodd' d='M4 10a6 6 0 1 0 12 0 6 6 0 1 0-12 0m5-3a1 1 0 1 0 2 0 1 1 0 1 0-2 0m0 3a1 1 0 1 1 2 0v3a1 1 0 1 1-2 0'/%3E%3C/svg%3E");
+  mask-size: var(--size-16) var(--size-16);
+  mask-position: center;
+  mask-repeat: no-repeat;
+  filter: none;
 }

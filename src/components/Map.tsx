@@ -109,9 +109,13 @@ const MMapComponent: React.FC<MapProps> = (props) => {
   return (
     <>
       <MapLibreStyles />
-      <div className={styles.map}>
+      {/* The caller's size goes on the wrapper, not on the MapLibre container
+          inside it: the wrapper is what carries this component's own 300px, so
+          a caller asking for 100%/100% was overruled by it and the slideshow's
+          square inset came out 200×300. The inner container fills the wrapper
+          through the stylesheet. */}
+      <div className={styles.map} {...(props.style === undefined ? {} : { style: props.style })}>
         <MapView
-          {...(props.style !== undefined ? { style: props.style } : {})}
           styleUrl={mapStyleUrl(mapStyle, theme)}
           initialView={{
             center: { lng: primary[1], lat: primary[0] },

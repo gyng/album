@@ -20,10 +20,15 @@
   --map-bottom-chrome: calc(var(--range-slider-clearance) + var(--m-s));
 }
 
-.containerWithSlider :global(.maplibregl-ctrl-bottom-left),
-.containerWithSlider :global(.maplibregl-ctrl-bottom-right) {
+/* The move is eased in both directions, which means the transition belongs on
+   the containers themselves rather than on the with-slider rule: declared there,
+   removing the class took the transition away with it and the scale snapped back
+   to the corner while the legend beside it eased. `inset-block-end` is also the
+   property being animated — `bottom` is a different longhand and never applied. */
+.container :global(.maplibregl-ctrl-bottom-left),
+.container :global(.maplibregl-ctrl-bottom-right) {
   inset-block-end: calc(var(--m-l) + var(--map-bottom-chrome));
-  transition: bottom var(--t-base);
+  transition: inset-block-end var(--t-base) var(--ease-out);
 }
 
 .map {

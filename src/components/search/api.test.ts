@@ -1198,7 +1198,6 @@ describe("video scenes in semantic ranking", () => {
       path: "../albums/trip/clip.mov",
       page: 0,
       pageSize: 10,
-      modelId: "m",
     });
 
     expect(results.data.map((row) => row.path)).not.toContain("../albums/trip/clip.mov@t60");

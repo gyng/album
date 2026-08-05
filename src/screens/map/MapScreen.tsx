@@ -252,11 +252,46 @@ const MapScreen = (props: MapScreenProps) => {
     }
   }, [routableAlbumCount]);
 
+  // How much of the bottom edge the date panel actually occupies, measured
+  // rather than assumed. `--range-slider-clearance` was a hardcoded 82px whose
+  // own comment said "roughly", and both the distance scale and the recency
+  // legend clear the panel by that number — so a panel that wrapped to two rows
+  // on a narrow viewport would have been under-cleared by both at once. The
+  // token stays as the value before the first measurement.
+  const [panelHeight, setPanelHeight] = React.useState<number | null>(null);
+  React.useEffect(() => {
+    if (!showTimeRangeSlider) {
+      setPanelHeight(null);
+      return;
+    }
+
+    const panel = document.getElementById("map-date-controls");
+    if (!panel || typeof ResizeObserver === "undefined") {
+      return;
+    }
+
+    const observer = new ResizeObserver(([entry]) => {
+      if (entry) {
+        setPanelHeight(entry.contentRect.height);
+      }
+    });
+    observer.observe(panel);
+    setPanelHeight(panel.getBoundingClientRect().height);
+    return () => observer.disconnect();
+  }, [showTimeRangeSlider]);
+
   return (
     <div
       className={[styles.container, showTimeRangeSlider ? styles.containerWithSlider : ""]
         .filter(Boolean)
         .join(" ")}
+      {...(panelHeight === null
+        ? {}
+        : {
+            style: {
+              "--range-slider-clearance": `${Math.round(panelHeight)}px`,
+            } as React.CSSProperties,
+          })}
     >
       <Seo
         title={formatPageTitle("Map")}

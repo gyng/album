@@ -391,6 +391,7 @@ describe("Picture", () => {
   it("prefers the zone derived from location over the one the camera recorded", () => {
     const { container } = render(
       <PhotoBlockEl
+        currentIndex={0}
         block={createBlock({
           exif: { DateTimeOriginal: "2023:11:13 16:47:45", OffsetTime: "+08:00" },
           tags: { tz_offset: "+03:00", tz_name: "Europe/Istanbul" },
@@ -411,6 +412,7 @@ describe("Picture", () => {
   it("falls back to the camera's offset when the location yields no zone", () => {
     const { container } = render(
       <PhotoBlockEl
+        currentIndex={0}
         block={createBlock({
           exif: { DateTimeOriginal: "2023:11:13 16:47:45", OffsetTime: "+08:00" },
           tags: {},

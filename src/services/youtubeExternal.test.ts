@@ -117,8 +117,9 @@ describe("fetchYoutubeOembed", () => {
     const result = await fetchYoutubeOembed("abcdefghijk", { fetchImpl: fetchImpl as never });
 
     expect(result?.title).toBe("A clip");
-    expect(String(fetchImpl.mock.calls[0]?.[0])).toContain("youtube.com/oembed");
-    expect(String(fetchImpl.mock.calls[0]?.[0])).toContain("abcdefghijk");
+    const requested = String((fetchImpl.mock.calls[0] as unknown[] | undefined)?.[0]);
+    expect(requested).toContain("youtube.com/oembed");
+    expect(requested).toContain("abcdefghijk");
   });
 
   // A build must not depend on YouTube being reachable: an unavailable lookup

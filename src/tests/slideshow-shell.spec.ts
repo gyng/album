@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { gotoHydrated } from "./hydrated";
 
 const slideshowImage = 'img[alt]:not([aria-hidden="true"])';
 
@@ -33,9 +34,7 @@ test("the slideshow shell swaps code without releasing its wake lock", async ({ 
     });
   });
 
-  await page.goto("/slideshow/shell?mode=random&delay=86400", {
-    waitUntil: "domcontentloaded",
-  });
+  await gotoHydrated(page, "/slideshow/shell?mode=random&delay=86400");
 
   const diagnostics = page.getByRole("group", { name: "Slideshow diagnostics" });
   await expect(diagnostics).toHaveAttribute("data-code-status", "current");
@@ -100,9 +99,7 @@ test("wake-lock failure never blocks the embedded slideshow", async ({ page }) =
     });
   });
 
-  await page.goto("/slideshow/shell?mode=random&delay=86400", {
-    waitUntil: "domcontentloaded",
-  });
+  await gotoHydrated(page, "/slideshow/shell?mode=random&delay=86400");
   const prompt = page.getByRole("button", {
     name: "Tap once to keep this slideshow awake through code updates",
   });
@@ -117,9 +114,7 @@ test("wake-lock failure never blocks the embedded slideshow", async ({ page }) =
 });
 
 test("slideshow exit controls leave the outer shell", async ({ page }) => {
-  await page.goto("/slideshow/shell?mode=random&delay=86400", {
-    waitUntil: "domcontentloaded",
-  });
+  await gotoHydrated(page, "/slideshow/shell?mode=random&delay=86400");
   const runtime = page.frameLocator('iframe[title="Slideshow"]');
   await expect(runtime.locator(slideshowImage).first()).toBeVisible({ timeout: 15_000 });
   const wakePrompt = page.getByRole("button", {
@@ -144,9 +139,7 @@ test("slideshow exit controls leave the outer shell", async ({ page }) => {
 });
 
 test("slideshow context links leave the outer shell", async ({ page }) => {
-  await page.goto("/slideshow/shell?mode=random&delay=86400", {
-    waitUntil: "domcontentloaded",
-  });
+  await gotoHydrated(page, "/slideshow/shell?mode=random&delay=86400");
   const runtime = page.frameLocator('iframe[title="Slideshow"]');
   await expect(runtime.locator(slideshowImage).first()).toBeVisible({ timeout: 15_000 });
   const wakePrompt = page.getByRole("button", {

@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { gotoHydrated } from "./hydrated";
 import { expectMapLoaded } from "./map-loaded";
 import { stubExternalMapAssets } from "./map-network";
 
@@ -138,9 +139,7 @@ test.describe("World map pin selection", () => {
     await stubExternalMapAssets(page);
     // Camera parameters, so the map frames the pin under test instead of
     // auto-fitting to every photo it was given.
-    await page.goto(`/map?lat=${PIN_LAT}&lon=${PIN_LNG}&zoom=${PIN_ZOOM}`, {
-      waitUntil: "domcontentloaded",
-    });
+    await gotoHydrated(page, `/map?lat=${PIN_LAT}&lon=${PIN_LNG}&zoom=${PIN_ZOOM}`);
     await expectMapLoaded(page);
 
     // The photos in view are announced by the keyboard list, which only the

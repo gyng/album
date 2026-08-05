@@ -20,6 +20,25 @@
   -webkit-touch-callout: none;
 }
 
+.remixGrid {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  gap: var(--size-2);
+  background: var(--c-black);
+  z-index: var(--z-media);
+  cursor: pointer;
+  opacity: 1;
+  scale: 1;
+  transition:
+    opacity var(--fade-duration) var(--ease-out),
+    filter var(--t-base) var(--ease-out),
+    /* Same release overshoot as a single photograph. */
+    scale 260ms cubic-bezier(0.22, 1.2, 0.36, 1);
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
 .image.cover {
   object-fit: cover;
 }
@@ -120,25 +139,6 @@
   .container[data-touch-hold="true"] .remixGrid {
     scale: 1;
   }
-}
-
-.remixGrid {
-  position: absolute;
-  inset: 0;
-  display: grid;
-  gap: var(--size-2);
-  background: var(--c-black);
-  z-index: var(--z-media);
-  cursor: pointer;
-  opacity: 1;
-  scale: 1;
-  transition:
-    opacity var(--fade-duration) var(--ease-out),
-    filter var(--t-base) var(--ease-out),
-    /* Same release overshoot as a single photograph. */
-    scale 260ms cubic-bezier(0.22, 1.2, 0.36, 1);
-  user-select: none;
-  -webkit-touch-callout: none;
 }
 
 /* Held until every cell's <img> has fired onLoad, so the user sees the

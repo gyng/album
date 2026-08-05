@@ -13,7 +13,7 @@ describe("ExploreArchiveGaps", () => {
   ];
 
   it("describes each silence in years and names the days either side", () => {
-    render(<ExploreArchiveGaps gaps={gaps} />);
+    render(<ExploreArchiveGaps gaps={gaps} dateRange={null} />);
 
     // 1504 days is over four years; the tenth is kept because "4 years" would
     // read as exact.
@@ -24,7 +24,7 @@ describe("ExploreArchiveGaps", () => {
   });
 
   it("renders nothing for an archive with no gap", () => {
-    const { container } = render(<ExploreArchiveGaps gaps={[]} />);
+    const { container } = render(<ExploreArchiveGaps gaps={[]} dateRange={null} />);
 
     expect(container).toBeEmptyDOMElement();
   });

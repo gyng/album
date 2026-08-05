@@ -100,9 +100,13 @@ describe("MMap", () => {
         styleUrl: mapStyleUrl("dark"),
         projection: "vertical-perspective",
         attribution: false,
-        style: expect.objectContaining({ minHeight: 200 }),
       }),
     );
+    // The caller's size lands on this component's own wrapper, which is what
+    // carries its default 300px — passed to the MapLibre container inside it
+    // instead, a caller asking for 100% was simply overruled, and the
+    // slideshow's square inset came out 200×300.
+    expect((screen.getByTestId("map").parentElement as HTMLElement).style.minHeight).toBe("200px");
     expect(screen.queryByText("View on", { exact: false })).toBeNull();
   });
 

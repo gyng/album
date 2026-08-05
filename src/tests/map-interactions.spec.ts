@@ -1,4 +1,5 @@
 import { expect, type Locator, type Page, test } from "@playwright/test";
+import { gotoHydrated, waitForHydration } from "./hydrated";
 import { stubExternalMapAssets } from "./map-network";
 
 /**
@@ -16,7 +17,7 @@ const mapPin = (page: Page, name: RegExp): Locator =>
 test.describe("World map interactions", () => {
   test.beforeEach(async ({ page }) => {
     await stubExternalMapAssets(page);
-    await page.goto("/map", { waitUntil: "domcontentloaded" });
+    await gotoHydrated(page, "/map");
     await expect(page.locator("canvas").first()).toBeVisible({ timeout: 10_000 });
   });
 
@@ -72,12 +73,14 @@ test.describe("World map interactions", () => {
     await expect(page.locator('[data-map-status="loaded"]')).toBeVisible();
 
     await page.reload({ waitUntil: "domcontentloaded" });
+    await waitForHydration(page);
     await expect(page.getByRole("combobox", { name: "Map style" })).toHaveValue("dark");
 
     // And back: following the theme is a choice of its own, so a pinned basemap
     // is reversible.
     await page.getByRole("combobox", { name: "Map style" }).selectOption("auto");
     await page.reload({ waitUntil: "domcontentloaded" });
+    await waitForHydration(page);
     await expect(page.getByRole("combobox", { name: "Map style" })).toHaveValue("auto");
   });
 

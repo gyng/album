@@ -357,6 +357,11 @@
   max-inline-size: 100%;
 }
 
+.topicInput {
+  min-inline-size: var(--size-180);
+  min-block-size: var(--size-44);
+}
+
 .topicForm .topicInput {
   flex: 1 1 var(--size-180);
   min-inline-size: 0;
@@ -367,11 +372,6 @@
    layout sizing and its fixed on-dark theming live here. The dark-glass
    overrides are scoped under .topicForm so they beat Input's single-class
    `.input` selector regardless of stylesheet order. */
-
-.topicInput {
-  min-inline-size: var(--size-180);
-  min-block-size: var(--size-44);
-}
 
 .topicForm .topicInput {
   /* The shared Input primitive sets no font-family; inherit the toolbar's so

@@ -840,10 +840,17 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
       // whose clump is behind the camera, or one a small frame has no room for
       // — would otherwise keep whatever it was left with, which is fully opaque
       // in the corner it was born in.
+      // The one exception is the name that currently has focus. This loop owns
+      // these two properties, and an inline style beats any selector, so CSS
+      // could only insist with `!important` — leaving the keyboard's view of the
+      // cloud dependent on a specificity fight. Whoever writes the style is who
+      // should honour the focus.
+      const focusedName = document.activeElement;
       for (const element of labelRefs.current) {
         if (element) {
-          element.style.opacity = "0";
-          element.style.pointerEvents = "none";
+          const hasFocus = element === focusedName;
+          element.style.opacity = hasFocus ? "1" : "0";
+          element.style.pointerEvents = hasFocus ? "auto" : "none";
         }
       }
 
@@ -874,15 +881,19 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
         const shown = !collides && index < (room < 0.8 ? 4 : labels.length);
         if (shown) placedLabels.push(box);
 
+        const hasFocus = element === focusedName;
         element.style.transform = `translate(${Math.round(box.x)}px, ${Math.round(box.y)}px)`;
-        element.style.opacity = shown
-          ? String(
-              Math.max(0.55, Math.min(1, 1.5 / at.depth)) *
-                (1 - 0.75 * showcaseStrength) *
-                (1 - focusRef.current),
-            )
-          : "0";
-        element.style.pointerEvents = shown && focusRef.current < 0.5 ? "auto" : "none";
+        element.style.opacity = hasFocus
+          ? "1"
+          : shown
+            ? String(
+                Math.max(0.55, Math.min(1, 1.5 / at.depth)) *
+                  (1 - 0.75 * showcaseStrength) *
+                  (1 - focusRef.current),
+              )
+            : "0";
+        element.style.pointerEvents =
+          hasFocus || (shown && focusRef.current < 0.5) ? "auto" : "none";
       });
 
       // The focus comes up and goes down rather than switching: `under` decides

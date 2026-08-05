@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { gotoHydrated } from "./hydrated";
 
 const expectNoDocumentOverflow = async (page: Page) => {
   const dimensions = await page.locator("html").evaluate((root) => ({
@@ -28,7 +29,7 @@ test.describe("Responsive UI", () => {
   });
 
   test("home navigation aligns with the page content on a cold load", async ({ page }) => {
-    await page.goto("/", { waitUntil: "domcontentloaded" });
+    await gotoHydrated(page, "/");
 
     const albums = page.getByRole("link", { name: "Albums", exact: true });
     const heading = page.getByRole("heading", { name: "Snapshots", exact: true });
@@ -43,7 +44,7 @@ test.describe("Responsive UI", () => {
   });
 
   test("theme picker hover stays visually quiet", async ({ page }) => {
-    await page.goto("/?theme=light", { waitUntil: "domcontentloaded" });
+    await gotoHydrated(page, "/?theme=light");
 
     const picker = page.getByLabel("Theme");
     const resting = await picker.evaluate((element) => {
@@ -84,7 +85,7 @@ test.describe("Responsive UI", () => {
     const tabletPage = await context.newPage();
 
     try {
-      await tabletPage.goto("/", { waitUntil: "domcontentloaded" });
+      await gotoHydrated(tabletPage, "/");
 
       const picker = tabletPage.getByLabel("Theme");
       await expect(picker).toBeInViewport();
@@ -117,7 +118,7 @@ test.describe("Responsive UI", () => {
     const tabletPage = await context.newPage();
 
     try {
-      await tabletPage.goto("/album/test-simple", { waitUntil: "domcontentloaded" });
+      await gotoHydrated(tabletPage, "/album/test-simple");
 
       const photograph = tabletPage.getByTestId("photoblockel").first().getByRole("img");
       const photographBox = await photograph.boundingBox();
@@ -143,7 +144,7 @@ test.describe("Responsive UI", () => {
     const tabletPage = await context.newPage();
 
     try {
-      await tabletPage.goto("/album/test-simple", { waitUntil: "domcontentloaded" });
+      await gotoHydrated(tabletPage, "/album/test-simple");
 
       const photograph = tabletPage.getByTestId("photoblockel").first().getByRole("img");
       const photographBox = await photograph.boundingBox();
@@ -282,7 +283,7 @@ test.describe("Responsive UI", () => {
 
   test("plain light and dark retain the original heading typography", async ({ page }) => {
     for (const theme of ["light", "dark"]) {
-      await page.goto(`/?theme=${theme}`, { waitUntil: "domcontentloaded" });
+      await gotoHydrated(page, `/?theme=${theme}`);
 
       const typography = await page
         .getByRole("heading", { name: "Snapshots", exact: true })
@@ -299,7 +300,7 @@ test.describe("Responsive UI", () => {
   });
 
   test("timeline shows each full year without nested horizontal scrolling", async ({ page }) => {
-    await page.goto("/timeline", { waitUntil: "domcontentloaded" });
+    await gotoHydrated(page, "/timeline");
 
     await expectNoDocumentOverflow(page);
 
@@ -320,7 +321,7 @@ test.describe("Responsive UI", () => {
   test("photo details panel stays within a phone viewport when raw EXIF is open", async ({
     page,
   }) => {
-    await page.goto("/album/test-simple", { waitUntil: "domcontentloaded" });
+    await gotoHydrated(page, "/album/test-simple");
 
     // Targets the summary's accessible name, which the control's contract
     // guarantees; <summary>'s implicit role differs between engines.
@@ -360,7 +361,7 @@ test.describe("Responsive UI", () => {
   });
 
   test("design catalogue contains wide token previews locally", async ({ page }) => {
-    await page.goto("/design", { waitUntil: "domcontentloaded" });
+    await gotoHydrated(page, "/design");
 
     await expect(page.getByRole("heading", { name: "Design", exact: true })).toBeVisible();
     await expectNoDocumentOverflow(page);
@@ -398,7 +399,7 @@ test.describe("Responsive UI", () => {
     const mobilePage = await context.newPage();
 
     try {
-      await mobilePage.goto("/explore", { waitUntil: "domcontentloaded" });
+      await gotoHydrated(mobilePage, "/explore");
       await expect(mobilePage.getByRole("heading", { name: "How you shoot" })).toBeVisible();
       await expectNoDocumentOverflow(mobilePage);
     } finally {
@@ -408,7 +409,7 @@ test.describe("Responsive UI", () => {
 
   test("timeline date cells retain a focus indicator in forced colours", async ({ page }) => {
     await page.emulateMedia({ forcedColors: "active" });
-    await page.goto("/timeline", { waitUntil: "domcontentloaded" });
+    await gotoHydrated(page, "/timeline");
 
     const cell = page.locator('button[data-date]:not([aria-disabled="true"])').first();
     await cell.focus();
@@ -424,7 +425,7 @@ test.describe("Responsive UI", () => {
   });
 
   test("timeline day controls reflow at 200% text size", async ({ page }) => {
-    await page.goto("/timeline", { waitUntil: "domcontentloaded" });
+    await gotoHydrated(page, "/timeline");
     await doubleRenderedTextSize(page);
 
     await expect(page.getByRole("button", { name: "Newer" })).toBeInViewport();
@@ -432,7 +433,7 @@ test.describe("Responsive UI", () => {
   });
 
   test("album detail disclosures have comfortable touch targets", async ({ page }) => {
-    await page.goto("/album/test-simple", { waitUntil: "domcontentloaded" });
+    await gotoHydrated(page, "/album/test-simple");
 
     const photo = page.getByTestId("photoblockel").first();
     const image = photo.getByRole("img");
@@ -458,7 +459,7 @@ test.describe("Responsive UI", () => {
 
   test("album detail disclosures sit beside wide photos", async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 900 });
-    await page.goto("/album/test-simple", { waitUntil: "domcontentloaded" });
+    await gotoHydrated(page, "/album/test-simple");
 
     const photo = page.getByTestId("photoblockel").first();
     const image = photo.getByRole("img");
@@ -506,7 +507,7 @@ test.describe("Responsive UI", () => {
   });
 
   test("guess lobby explains the daily challenge without mobile overflow", async ({ page }) => {
-    await page.goto("/guess", { waitUntil: "domcontentloaded" });
+    await gotoHydrated(page, "/guess");
 
     const description = page.getByText("Five rounds · same photos for everyone today");
     await expect(description).toBeVisible();

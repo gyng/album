@@ -1,4 +1,5 @@
 import { test, expect, Page } from "@playwright/test";
+import { gotoHydrated } from "./hydrated";
 import { join } from "path";
 
 const testImagePath = join(__dirname, "..", "..", "albums", "test-simple", "DSCF0506-2.jpg");
@@ -30,7 +31,7 @@ test.describe("Image search UI shell", () => {
 
   test("drawing enables Search and submits to a removable query chip", async ({ page }) => {
     await holdModelDownloads(page);
-    await page.goto("/search", { waitUntil: "domcontentloaded" });
+    await gotoHydrated(page, "/search");
 
     const drawButton = page.getByRole("button", { name: /draw to search/i });
     await expect(drawButton).toBeEnabled({ timeout: 15_000 });
@@ -79,7 +80,7 @@ test.describe("Image search UI shell", () => {
 
   test("uploading a photo starts an image query", async ({ page }) => {
     await holdModelDownloads(page);
-    await page.goto("/search", { waitUntil: "domcontentloaded" });
+    await gotoHydrated(page, "/search");
 
     const uploadButton = page.getByRole("button", {
       name: /search by image/i,

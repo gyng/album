@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { gotoHydrated } from "./hydrated";
 import { expectMapLoaded } from "./map-loaded";
 import { stubExternalMapAssets } from "./map-network";
 
@@ -16,7 +17,7 @@ test.describe("Smoke Tests", () => {
   });
 
   test("homepage loads with albums and navigation", async ({ page }) => {
-    await page.goto("/", { waitUntil: "domcontentloaded" });
+    await gotoHydrated(page, "/");
 
     await expect(page).toHaveTitle("Snapshots");
     await expect(page.locator("h1")).toContainText("Snapshots");
@@ -32,7 +33,7 @@ test.describe("Smoke Tests", () => {
   });
 
   test("album page loads with nav and photos", async ({ page }) => {
-    await page.goto("/album/test-simple", { waitUntil: "domcontentloaded" });
+    await gotoHydrated(page, "/album/test-simple");
 
     await expect(page.locator('a:has-text("Albums")')).toBeVisible();
     await expect(page.locator('a:has-text("Album map")')).toBeVisible();
@@ -49,7 +50,7 @@ test.describe("Smoke Tests", () => {
   // it either — so a missing poster here is the signal that the prepass did not
   // run or did not survive the build.
   test("a local video shows the poster frame extracted for it", async ({ page }) => {
-    await page.goto("/album/test-simple#DSCF0159.MOV", { waitUntil: "domcontentloaded" });
+    await gotoHydrated(page, "/album/test-simple#DSCF0159.MOV");
 
     const video = page.locator("video").first();
     await expect(video).toHaveAttribute(
@@ -63,7 +64,7 @@ test.describe("Smoke Tests", () => {
   });
 
   test("map page loads a map that really rendered", async ({ page }) => {
-    await page.goto("/map", { waitUntil: "domcontentloaded" });
+    await gotoHydrated(page, "/map");
     await expect(page).toHaveTitle("Map | Snapshots");
     await expect(page.locator("canvas").first()).toBeVisible();
 
@@ -77,12 +78,12 @@ test.describe("Smoke Tests", () => {
 
   test("search page loads", async ({ page, browserName }) => {
     test.skip(browserName === "chromium", "Covered by the full Chromium search suite");
-    await page.goto("/search", { waitUntil: "domcontentloaded" });
+    await gotoHydrated(page, "/search");
     await expect(page.getByRole("heading", { name: /search/i })).toBeVisible();
   });
 
   test("explore page loads with sections", async ({ page }) => {
-    await page.goto("/explore", { waitUntil: "domcontentloaded" });
+    await gotoHydrated(page, "/explore");
     await expect(page).toHaveTitle(/Explore/);
     await expect(page.getByRole("heading", { name: "Explore" })).toBeVisible();
 
@@ -92,12 +93,12 @@ test.describe("Smoke Tests", () => {
 
   test("timeline page loads", async ({ page, browserName }) => {
     test.skip(browserName === "chromium", "Covered by the full Chromium timeline suite");
-    await page.goto("/timeline", { waitUntil: "domcontentloaded" });
+    await gotoHydrated(page, "/timeline");
     await expect(page.getByRole("heading", { name: "Timeline" })).toBeVisible();
   });
 
   test("map album filter shows indicator", async ({ page }) => {
-    await page.goto("/map?filter_album=test-simple", { waitUntil: "domcontentloaded" });
+    await gotoHydrated(page, "/map?filter_album=test-simple");
     await expect(page).toHaveTitle("Map | Snapshots");
 
     // Filter indicator toast appears with album name
@@ -111,7 +112,7 @@ test.describe("Smoke Tests", () => {
   });
 
   test("photo deep-link scrolls to photo", async ({ page }) => {
-    await page.goto("/album/test-simple#DSCF0506-2.jpg", { waitUntil: "domcontentloaded" });
+    await gotoHydrated(page, "/album/test-simple#DSCF0506-2.jpg");
 
     // The photo element with matching ID should be in the viewport
     const photo = page.locator('[id="DSCF0506-2.jpg"]');
@@ -127,7 +128,7 @@ test.describe("Smoke Tests", () => {
 
   test("slideshow page loads", async ({ page, browserName }) => {
     test.skip(browserName === "chromium", "Covered by the full Chromium slideshow suite");
-    await page.goto("/slideshow", { waitUntil: "domcontentloaded" });
+    await gotoHydrated(page, "/slideshow");
     await expect(page).toHaveTitle("Slideshow | Snapshots");
     await expect(page.locator('img[alt]:not([aria-hidden="true"])').first()).toBeVisible({
       timeout: 15_000,
@@ -140,7 +141,7 @@ test.describe("Smoke Tests", () => {
     // signal that React has taken it over. Choosing before that sets a value
     // hydration then throws away, which is a real race under a busy suite and
     // fails as "picked slate, got dark".
-    await page.goto("/?theme=light", { waitUntil: "domcontentloaded" });
+    await gotoHydrated(page, "/?theme=light");
 
     const html = page.locator("html");
     const themePicker = page.getByRole("combobox", { name: "Theme" });

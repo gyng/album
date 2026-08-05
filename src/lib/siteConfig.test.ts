@@ -32,9 +32,12 @@ describe("siteConfig", () => {
     expect(siteConfig.paths.albumsDir.startsWith("/")).toBe(false);
   });
 
-  it("names a default map style that the configuration can supply", () => {
-    if (siteConfig.map.defaultStyle === "gallery") {
-      expect(siteConfig.map.galleryStyleId).not.toBeNull();
-    }
+  // There is no provider key or account-scoped style id left to check: every
+  // basemap is OpenFreeMap's or a document this site serves, so the only thing
+  // configuration can get wrong is naming a style that does not exist — which
+  // `util/mapStyles` guards by falling back to its own default.
+  it("names a default map style as a plain string", () => {
+    expect(typeof siteConfig.map.defaultStyle).toBe("string");
+    expect(siteConfig.map.defaultStyle.length).toBeGreaterThan(0);
   });
 });
