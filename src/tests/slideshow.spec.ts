@@ -315,6 +315,37 @@ test.describe("Slideshow touch mode", () => {
     await dispatchPointer(page, "up", x + dx, y + dy);
   };
 
+  // Dragging the slide aside used to reveal the page behind it — a black void
+  // the width of the gesture — rather than the photograph the swipe leads to.
+  test("a drag uncovers the photograph it is heading towards", async ({ page }) => {
+    await page.goto("/slideshow?mode=random&filter=test-simple", {
+      waitUntil: "domcontentloaded",
+    });
+    await waitForSlideshow(page);
+
+    const image = page.locator(slideshowImg).first();
+    const currentSrc = await image.getAttribute("src");
+    const peek = page.locator("[data-drag-peek]");
+    await expect(peek).toHaveCount(0);
+
+    // Hold the gesture open mid-drag rather than releasing it.
+    const { x, y } = await imageCentre(page);
+    await dispatchPointer(page, "down", x, y);
+    for (const dx of [-20, -60, -110]) {
+      await dispatchPointer(page, "move", x + dx, y);
+    }
+
+    await expect(peek).toHaveCount(1);
+    expect(await peek.getAttribute("src")).not.toBe(currentSrc);
+    // It comes up with the gesture rather than arriving at full strength.
+    expect(Number(await peek.evaluate((el) => getComputedStyle(el).opacity))).toBeGreaterThan(0);
+
+    // Once the swipe settles the incoming layer is the picture itself.
+    await dispatchPointer(page, "up", x - 110, y);
+    await waitForImageChange(page, String(currentSrc));
+    await expect(peek).toHaveCount(0);
+  });
+
   test("horizontal swipe past commit advances to next photo", async ({ page }) => {
     await page.goto("/slideshow?mode=random&filter=test-simple", {
       waitUntil: "domcontentloaded",

@@ -41,7 +41,7 @@
     "test:seo": "jest --runInBand test/seo.test.tsx test/alt.test.ts test/feed.test.ts services/albumFeed.test.ts",
     "test:ci": "timeout 240s jest --maxWorkers=50% && npm run lint && npm run format:check",
     "test:e2e": "npm run build:e2e && playwright test",
-    "test:e2e:reuse": "PLAYWRIGHT_SKIP_WEBSERVER=1 playwright test",
+    "test:e2e:reuse": "PLAYWRIGHT_SKIP_WEBSERVER=1 PLAYWRIGHT_PORT=${PLAYWRIGHT_PORT:-3000} playwright test",
     "test:e2e:headed": "npm run build:e2e && playwright test --headed",
     "screenshot": "playwright test --config=playwright.screenshot.config.ts",
     "prepare:map-styles": "node ./bin/prepare-map-styles.cjs",

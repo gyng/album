@@ -132,6 +132,9 @@ const ROAD_CLASSES = {
   major: ["motorway", "trunk", "primary", "secondary"],
 };
 
+/** What the `minorRoad` layer draws, and therefore what the ink layer skips. */
+const MINOR_ROAD_CLASSES = ["minor", "service", "track", "path"];
+
 const scaled = (stops, scale) =>
   stops.map(([zoom, width]) => [zoom, Math.max(0.1, Number((width * scale).toFixed(2)))]);
 
@@ -308,6 +311,17 @@ const buildLayers = (palette, options) => {
 
   const classes = ROAD_CLASSES[options.roads] ?? ROAD_CLASSES.all;
 
+  // A style that gives the small streets a weight of their own draws them
+  // *only* there. Painting a quieter line over the full-weight one cannot make
+  // them quieter — at 0.28 opacity the ink underneath still shows through — so
+  // on sketch a district at z12 came out as one mesh whatever the minor colour
+  // was. The casing below is deliberately left alone: it gives every street a
+  // pale body, and it is what carries the grid on the styles where the small
+  // streets are lighter than the ground they are on.
+  const inkClasses = options.minorRoad
+    ? classes.filter((name) => !MINOR_ROAD_CLASSES.includes(name))
+    : classes;
+
   if (!options.outlineOnly) {
     layers.push({
       id: "road-casing",
@@ -369,7 +383,7 @@ const buildLayers = (palette, options) => {
     type: "line",
     source: SOURCE,
     "source-layer": "transportation",
-    filter: ["in", "class", ...classes],
+    filter: ["in", "class", ...inkClasses],
     paint: {
       "line-color": palette.road,
       "line-width": interpolate(
@@ -389,8 +403,7 @@ const buildLayers = (palette, options) => {
     const minor =
       typeof options.minorRoad === "string" ? { colour: options.minorRoad } : options.minorRoad;
 
-    // Drawn over the roads layer rather than instead of it: the small streets
-    // keep their casing and lose only their weight.
+    // The only ink these classes get; the roads layer above skips them.
     layers.push({
       id: "minor-roads",
       type: "line",

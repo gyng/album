@@ -113,3 +113,7 @@ export const hasForwardEntry = (state: SlideshowHistoryState): boolean =>
 
 export const upcomingSeed = (state: SlideshowHistoryState): RandomPhotoRow | null =>
   hasForwardEntry(state) ? (state.history[state.index + 1]?.seed ?? null) : null;
+
+/** The photograph a backward drag is heading towards. */
+export const previousSeed = (state: SlideshowHistoryState): RandomPhotoRow | null =>
+  canGoBack(state) ? (state.history[state.index - 1]?.seed ?? null) : null;

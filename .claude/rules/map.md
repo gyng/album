@@ -72,6 +72,12 @@ globs:
 - **Bottom chrome clears the date panel via `--map-bottom-chrome`.** MapLibre's control containers
   and the hand-positioned recency legend both read it; the legend used not to, and ended up behind
   the histogram
+- **`minorRoad` replaces the small streets' ink, it does not overpaint it.** The roads layer drops
+  the minor classes whenever a style sets `minorRoad` — a quieter line over the full-weight one is
+  still the full-weight one showing through. The casing keeps them on purpose
+- **`trace` (group `internal`) is the slideshow inset's basemap**: white on pure black, screened
+  over the photograph. Internal styles are excluded from `MAP_STYLE_NAMES`, so they are neither
+  offered in the picker nor accepted from storage
 - **Pins may take the basemap's colours.** `recencyRampFor`/`pinHaloFor` in `util/mapColor.ts`
   override the spectral ramp for `crt`, `neon` and `blueprint` only. The encoding is untouched:
   older stays paler, lightness carries the order, and the legend is handed the same ramp the pins

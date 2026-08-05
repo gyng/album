@@ -67,6 +67,7 @@ import {
   currentEntry,
   hasForwardEntry,
   initialHistoryState,
+  previousSeed,
   upcomingSeed,
 } from "../../util/slideshowHistory";
 import { SlideshowToolbar } from "../../components/slideshow/SlideshowToolbar";
@@ -675,7 +676,14 @@ export const Slideshow: React.FC<{
   } | null>(null);
   // The layer that should play the tap-acknowledgement dip (set on tap-zone
   // navigation, cleared when its animation ends).
-  const [tapAckLayerKey, setTapAckLayerKey] = React.useState<string | null>(null);
+  // Which layer the finger is currently on. Held from the moment of contact
+  // until it lifts, so the press-in is the gesture rather than a replay of it:
+  // the photograph goes down when you touch it, stays down while you hold, and
+  // comes back when you let go — which is the moment the next one starts
+  // loading. The old dip fired *after* release and animated on its own clock,
+  // so a slow tap got no answer and a quick one got an answer that had already
+  // finished.
+  const [pressedLayerKey, setPressedLayerKey] = React.useState<string | null>(null);
   // The chevron handle leads the pull; the toolbar/edge peek only enters in the last 35%
   // so the two indicators don't compete. Below 0.65 only the chevron is visible.
   const touchToolbarShowPreviewProgress =
@@ -724,6 +732,10 @@ export const Slideshow: React.FC<{
   } | null>(null);
   const suppressImageClickRef = React.useRef(false);
   const [bufferedPhotoSrc, setBufferedPhotoSrc] = React.useState<string | null>(null);
+  // The photograph a backward drag is heading towards. Held beside the buffered
+  // next one so a drag can show where it is going in either direction without
+  // asking the history for it mid-gesture.
+  const [previousPhotoSrc, setPreviousPhotoSrc] = React.useState<string | null>(null);
 
   // `topic` is tri-state (see applySlideshowUrlState): undefined preserves any
   // existing topic param — the default for the frequent mode/delay writes — a
@@ -1746,6 +1758,17 @@ export const Slideshow: React.FC<{
     showHistoryPhoto(historyStateRef.current.index - 1, "user");
   }, [showHistoryPhoto]);
 
+  // Which neighbour a live drag is uncovering: dragging left goes forward, right
+  // goes back. Only while the gesture is live — once it settles, the incoming
+  // layer is the picture, and a peek under it would be the same photograph
+  // twice.
+  const dragPeekSrc =
+    layerDrag === null || layerDrag.settling
+      ? null
+      : layerDrag.x < 0
+        ? bufferedPhotoSrc
+        : previousPhotoSrc;
+
   const getUpcomingPhoto = useCallback((): RandomPhotoRow | null => {
     if (hasForwardEntry(historyStateRef.current)) {
       return upcomingSeed(historyStateRef.current);
@@ -1864,6 +1887,7 @@ export const Slideshow: React.FC<{
     const nextSrc = getSlideshowPhotoSrc(getUpcomingPhoto());
 
     setBufferedPhotoSrc(nextSrc);
+    setPreviousPhotoSrc(getSlideshowPhotoSrc(previousSeed(historyStateRef.current)));
   }, [currentPhotoPath?.path, getUpcomingPhoto, historyPosition.index, historyPosition.total]);
 
   useEffect(() => {
@@ -1978,6 +2002,7 @@ export const Slideshow: React.FC<{
         startY: event.clientY,
         controlsWereVisible: controlsVisible,
       };
+      setPressedLayerKey(layersRef.current[layersRef.current.length - 1]?.key ?? null);
       // Defensive reset: under normal flow the prior gesture's synthetic click
       // consumes (and self-clears) the suppress flag, but if that click never
       // reached this element (e.g. focus shift, navigation, browser quirk) the
@@ -2027,6 +2052,9 @@ export const Slideshow: React.FC<{
 
   const clearImagePointerGesture = useCallback(
     (event: React.PointerEvent<HTMLElement>) => {
+      // The press ends with the contact, however it ends — released, cancelled,
+      // or capture lost — so the photograph never stays pushed in.
+      setPressedLayerKey(null);
       try {
         if (event.currentTarget.hasPointerCapture(event.pointerId)) {
           event.currentTarget.releasePointerCapture(event.pointerId);
@@ -2208,17 +2236,6 @@ export const Slideshow: React.FC<{
         });
       } else {
         setLayerDrag(null);
-      }
-
-      // Tap acknowledgement: only the tap-zone path (no committed axis) — a
-      // swipe already answers with the follow-drag and exit glide.
-      if (
-        (action === "next" || action === "previous") &&
-        !gesture.committedHorizontalDirection &&
-        !gesture.committedVerticalDirection &&
-        topLayerKey !== undefined
-      ) {
-        setTapAckLayerKey(topLayerKey);
       }
 
       switch (action) {
@@ -2832,6 +2849,25 @@ export const Slideshow: React.FC<{
           time={time}
         />
 
+        {/* What the drag uncovers: the photograph it is heading towards, coming
+            up from under the stack as the finger travels. Without it a swipe
+            revealed the page behind the slide, which is a black void. Which way
+            the gesture is going is the sign of its offset — left for the next
+            photograph, right for the previous — and a remix slide peeks with its
+            seed frame, since one image is the hint and the real layout arrives a
+            moment later. */}
+        {dragPeekSrc ? (
+          <img
+            className={[styles.dragPeek, showCover ? styles.cover : ""].filter(Boolean).join(" ")}
+            src={dragPeekSrc}
+            alt=""
+            aria-hidden="true"
+            decoding="async"
+            data-drag-peek="true"
+            style={{ "--drag-peek-progress": String(touchSwipeProgress) } as React.CSSProperties}
+          />
+        ) : null}
+
         {/* Cross-fade layer stack: the newest (last) layer is the interactive
             current slide; it fades in once decoded while older layers fade out.
             Each layer is keyed by its slideKey so advancing mid-fade reverses
@@ -2865,15 +2901,11 @@ export const Slideshow: React.FC<{
             ...(isTop ? { touchAction: "none" as const } : {}),
             ...(dragsThisLayer ? { transform: `translateX(${layerDrag.x}px)` } : {}),
           };
-          // The tap-ack dip animates the `scale` property so it composes with
-          // the drag translate; cleared when the animation ends.
-          const tapAckProps =
-            tapAckLayerKey === layer.key
-              ? {
-                  "data-tap-ack": "true",
-                  onAnimationEnd: () => setTapAckLayerKey(null),
-                }
-              : {};
+          // Pressed while the finger is down, on the `scale` property so it
+          // composes with the drag translate. Both pointer types take this
+          // path: a mouse press pushes the photograph in exactly as a finger
+          // does, and the release is what advances.
+          const tapAckProps = pressedLayerKey === layer.key ? { "data-pressed": "true" } : {};
           const topImageHandlers = {
             onPointerDown: handleImagePointerDown,
             onPointerMove: handleImagePointerMove,
@@ -2883,12 +2915,6 @@ export const Slideshow: React.FC<{
               if (suppressImageClickRef.current) {
                 suppressImageClickRef.current = false;
                 return;
-              }
-              // Mouse tap acknowledgement (touch taps ack in the pointerup
-              // resolver before their synthetic click is swallowed).
-              const topKey = layersRef.current[layersRef.current.length - 1]?.key;
-              if (topKey !== undefined) {
-                setTapAckLayerKey(topKey);
               }
               advanceToNextPhoto();
             },

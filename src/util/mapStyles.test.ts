@@ -5,6 +5,7 @@
 import {
   AUTO_MAP_STYLE,
   DEFAULT_MAP_STYLE,
+  MAP_STYLE_GROUPS,
   MAP_STYLE_NAMES,
   MAP_STYLE_STORAGE_KEY,
   defaultMapStyleForTheme,
@@ -212,5 +213,20 @@ describe("matching the theme as a choice", () => {
 
     expect(getStoredMapStyleChoice()).toBeNull();
     unsubscribe();
+  });
+});
+
+// A style built for one embedded map is not a choice. The slideshow's inset is
+// white linework on pure black — over a photograph it is the picture's own map,
+// and on a page without one it is a black rectangle.
+describe("styles that are not choices", () => {
+  it("keeps an internal style out of the picker and out of the preference", () => {
+    expect(MAP_STYLE_NAMES).not.toContain("trace");
+    expect(resolveMapStyleName("trace")).toBeNull();
+    expect(MAP_STYLE_GROUPS.flatMap((group) => group.names)).not.toContain("trace");
+  });
+
+  it("still resolves its document, because an embedded map asks for it by name", () => {
+    expect(mapStyleUrl("trace")).toBe("/map-styles/trace.json");
   });
 });

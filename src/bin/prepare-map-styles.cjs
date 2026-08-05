@@ -191,6 +191,45 @@ const composedStyles = (spriteUrl) => {
     }),
   ]);
 
+  // Linework in white on black, for the slideshow's inset.
+  //
+  // Not a basemap anybody picks: it exists to be screened over a photograph,
+  // where `mix-blend-mode: screen` drops the black ground to nothing and leaves
+  // the lines glowing on the picture. It replaces a light provider style that
+  // was being inverted to fake this — inverting a near-white map turns its white
+  // roads black, and screening black over a photograph shows nothing at all.
+  styles.push([
+    "trace",
+    composeMapStyle({
+      name: "Trace",
+      palette: {
+        // Pure black, because screen blending makes exactly this transparent.
+        land: "#000000",
+        water: "#3c3c3c",
+        green: "#0d0d0d",
+        built: "#111111",
+        road: "#ffffff",
+        roadCasing: "#000000",
+        motorway: "#ffffff",
+        building: "#4a4a4a",
+        boundary: "#8f8f8f",
+        label: "#ffffff",
+        labelHalo: "#00000099",
+      },
+      options: {
+        // Linework only: a fill would screen as a flat veil over the photograph.
+        outlineOnly: true,
+        roads: "all",
+        lineWidthScale: 0.9,
+        // A grey screens to a dimmer white, which is the whole hierarchy here.
+        minorRoad: { colour: "#5e5e5e", width: 0.8 },
+        rail: { colour: "#8c8c8c", dash: [3, 2], metro: "#b4b4b4", width: 0.8 },
+        coast: { colour: "#ffffff", width: 1.2, opacity: 0.9 },
+        labelStyle: { letterSpacing: 0.06 },
+      },
+    }),
+  ]);
+
   // A wash, composed rather than transplanted.
   //
   // The old watercolour basemap was a copied document whose whole look came from

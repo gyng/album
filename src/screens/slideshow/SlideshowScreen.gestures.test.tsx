@@ -227,15 +227,64 @@ describe("SlideshowScreen touch gestures (screen-level)", () => {
     expect(mockSetPaused).not.toHaveBeenCalled();
   });
 
-  it("acknowledges a tap on the tapped layer immediately", async () => {
+  // The press used to be a dip fired *after* release, on its own clock: a slow
+  // press got no answer at all, and a quick one got an answer that had already
+  // finished. It is the contact now — down on touch, held while held, back on
+  // release, which is also when the next photograph starts loading.
+  it("presses the photograph in on contact and lets it go on release", async () => {
+    render(<SlideshowScreen />);
+    await flush();
+
+    const pressed = () => document.querySelector('[data-pressed="true"]');
+    const image = slideImage();
+    expect(pressed()).toBeNull();
+
+    pointer(image, "pointerdown", touchAt(300, 300));
+    expect(pressed()).toBe(image);
+
+    pointer(image, "pointerup", touchAt(300, 300));
+    expect(pressed()).toBeNull();
+  });
+
+  // A gesture the browser takes away (a system swipe, a call) must not leave the
+  // photograph pushed in for the rest of the session.
+  it("lets go when the gesture is cancelled rather than released", async () => {
     render(<SlideshowScreen />);
     await flush();
 
     const image = slideImage();
     pointer(image, "pointerdown", touchAt(300, 300));
-    pointer(image, "pointerup", touchAt(300, 300));
+    expect(document.querySelector('[data-pressed="true"]')).not.toBeNull();
 
-    expect(document.querySelector('[data-tap-ack="true"]')).not.toBeNull();
+    pointer(image, "pointercancel", touchAt(300, 300));
+    expect(document.querySelector('[data-pressed="true"]')).toBeNull();
+  });
+
+  // Dragging the slide aside used to reveal the page behind it — a black void
+  // the width of the gesture — rather than where the swipe was going.
+  it("uncovers the photograph the drag is heading towards, and only while it lasts", async () => {
+    render(<SlideshowScreen />);
+    await flush();
+
+    const peek = () => document.querySelector("[data-drag-peek]") as HTMLImageElement | null;
+    expect(peek()).toBeNull();
+
+    const image = slideImage();
+    pointer(image, "pointerdown", touchAt(300, 300));
+    pointer(image, "pointermove", touchAt(240, 300));
+
+    const uncovered = peek();
+    expect(uncovered).not.toBeNull();
+    // The buffered next photograph, not the one on screen.
+    expect(uncovered!.getAttribute("src")).not.toBe(image.getAttribute("src"));
+    // It comes up with the gesture rather than appearing at full strength.
+    expect(uncovered!.style.getPropertyValue("--drag-peek-progress")).not.toBe("0");
+
+    // Once the gesture settles the incoming layer is the picture, so a peek
+    // under it would be the same photograph twice.
+    pointer(image, "pointerup", touchAt(240, 300));
+    await flush();
+    expect(peek()).toBeNull();
   });
 
   it("drags the top layer with a committed horizontal swipe and settles it on release", async () => {

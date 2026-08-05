@@ -47,16 +47,18 @@ export type MapStyleName =
   | "globe"
   | "photos"
   | "blueprint"
-  | "herbarium";
+  | "herbarium"
+  | "trace";
 
 /**
  * Which half of the picker a style belongs to.
  *
  * Eighteen names in one list is a list nobody reads to the end of. The split is
  * the one that matters to a reader deciding: a basemap somebody else drew, or
- * one this site made.
+ * one this site made. `internal` is neither: a style built for one embedded map
+ * and never offered as a choice.
  */
-export type MapStyleGroup = "provider" | "made-here";
+export type MapStyleGroup = "provider" | "made-here" | "internal";
 
 /**
  * Where a style's tiles come from.
@@ -210,6 +212,16 @@ export const MAP_STYLES: Record<
     swatch: "#efe7d2",
     group: "made-here",
   },
+  // White linework on black, for the slideshow's inset, where
+  // `mix-blend-mode: screen` drops the ground and leaves the lines on the
+  // photograph. Never in the picker: on a page with no photograph under it, it
+  // is a black rectangle.
+  trace: {
+    source: { provider: "self", path: "/map-styles/trace.json" },
+    label: "Trace",
+    swatch: "#000000",
+    group: "internal",
+  },
   // A sphere. The projection is the style: MapLibre reads it from the document,
   // so choosing this basemap is what puts the photographs on a planet.
   globe: {
@@ -221,11 +233,16 @@ export const MAP_STYLES: Record<
 };
 
 /**
- * What the picker offers. The gallery style is hidden unless this fork actually
- * owns one — eight labels that all render the same basemap is a worse control
- * than seven that differ.
+ * The basemaps a reader can choose between.
+ *
+ * `internal` styles are left out: they are built for one embedded map, and a
+ * stored preference naming one has to be rejected rather than honoured — the
+ * slideshow's inset is white linework on pure black, which is a photograph away
+ * from being a black rectangle.
  */
-export const MAP_STYLE_NAMES = Object.keys(MAP_STYLES) as MapStyleName[];
+export const MAP_STYLE_NAMES = (Object.keys(MAP_STYLES) as MapStyleName[]).filter(
+  (name) => MAP_STYLES[name].group !== "internal",
+);
 
 /**
  * The picker's contents, in two groups. Order within each is the curated one.

@@ -1,6 +1,18 @@
 import { defineConfig, devices } from "@playwright/test";
 
-const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? "http://127.0.0.1:3000";
+/*
+ * The port the managed server listens on.
+ *
+ * Not 3000: that is where every other project's dev server lives, and on WSL a
+ * Windows listener on the same port collides through localhost forwarding — a
+ * conflict `ss` inside the distro cannot even see, so it surfaces as a bare
+ * EADDRINUSE with nothing to point at and the whole suite refuses to start.
+ * `PLAYWRIGHT_PORT` overrides it; `PLAYWRIGHT_BASE_URL` still wins outright,
+ * for pointing at a server this config did not start.
+ */
+const configuredPort = Number.parseInt(process.env.PLAYWRIGHT_PORT ?? "", 10);
+const port = Number.isInteger(configuredPort) && configuredPort > 0 ? configuredPort : 43110;
+const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? `http://127.0.0.1:${port}`;
 const skipWebServer = process.env.PLAYWRIGHT_SKIP_WEBSERVER === "1";
 const recordLocalVideo = process.env.PLAYWRIGHT_VIDEO === "1";
 const configuredWorkers = process.env.PLAYWRIGHT_WORKERS
@@ -125,9 +137,9 @@ export default defineConfig({
     ? {}
     : {
         webServer: {
-          command: "next start -H 127.0.0.1",
+          command: `next start -H 127.0.0.1 -p ${port}`,
           env: { NEXT_DIST_DIR: ".next-e2e" },
-          port: 3000,
+          port,
           reuseExistingServer: false,
           timeout: 120 * 1000,
         },

@@ -211,6 +211,25 @@ describe("styles that are about more than colour", () => {
     expect(layers.find((layer) => layer.id === "rail-glow").paint["line-color"]).toBe("#0f0");
   });
 
+  // Painting a quieter line over the full-weight one cannot make a street
+  // quieter: the ink underneath shows through whatever the opacity. So the ink
+  // layer gives up the classes the minor layer draws.
+  it("stops drawing the small streets twice when they have a weight of their own", () => {
+    const roadsFilter = (options) =>
+      composeMapStyle({ options }).layers.find((layer) => layer.id === "roads").filter;
+
+    expect(roadsFilter({ roads: "all" })).toContain("minor");
+    expect(roadsFilter({ roads: "all", minorRoad: "#334" })).not.toContain("minor");
+    expect(roadsFilter({ roads: "all", minorRoad: "#334" })).not.toContain("service");
+    // The arterials are untouched, and the casing still gives every street a body.
+    expect(roadsFilter({ roads: "all", minorRoad: "#334" })).toContain("primary");
+    expect(
+      composeMapStyle({ options: { roads: "all", minorRoad: "#334" } }).layers.find(
+        (layer) => layer.id === "road-casing",
+      ).filter,
+    ).toContain("minor");
+  });
+
   // A hairline is still clutter when there are a thousand of them in frame, so
   // a style can hold the small streets back until the reader is close enough
   // for one of them to be worth naming.

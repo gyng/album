@@ -241,12 +241,12 @@
   aspect-ratio: 1 / 1;
 }
 
-/* Keep the toner map luminous over the photo while leaving its location
-   marker in a recognisable red. Inverting the whole container also inverted
-   the marker, which is why it was previously hidden altogether. */
-.mapContainer :global(.maplibregl-canvas) {
-  filter: invert(1);
-}
+/* The basemap here is `trace`: white linework on pure black, so screen
+   blending alone drops the ground and leaves the lines on the photograph. It
+   used to be a light provider style inverted to fake that, which stopped
+   working the moment the style changed — inverting a near-white map turns its
+   white roads black, and black screens to nothing. The marker is DOM rather
+   than canvas, so it keeps its own red either way. */
 
 .slideMap .mapContainer {
   inline-size: var(--size-200);

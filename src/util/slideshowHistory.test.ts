@@ -6,6 +6,7 @@ import {
   type NavigationEntry,
   type SlideshowHistoryState,
   initialHistoryState,
+  previousSeed,
   upcomingSeed,
 } from "./slideshowHistory";
 import type { RandomPhotoRow } from "../components/search/api";
@@ -170,6 +171,23 @@ describe("derived helpers", () => {
     expect(canGoBack(s)).toBe(false);
     expect(hasForwardEntry(s)).toBe(true);
     expect(upcomingSeed(s)?.path).toBe("b");
+  });
+
+  // A backward drag reveals where it is going, so it needs the photograph
+  // behind the current one by name.
+  it("names the photograph a backward drag is heading towards", () => {
+    let s = initialHistoryState();
+    expect(previousSeed(s)).toBeNull();
+
+    s = advanceHistory(s, { type: "commit", entry: entry("a") });
+    expect(previousSeed(s)).toBeNull();
+
+    s = advanceHistory(s, { type: "commit", entry: entry("b") });
+    expect(previousSeed(s)?.path).toBe("a");
+
+    expect(
+      previousSeed({ history: [undefined] as unknown as NavigationEntry[], index: 1 }),
+    ).toBeNull();
   });
 
   it("returns null when a cursor points at a missing sparse entry", () => {
