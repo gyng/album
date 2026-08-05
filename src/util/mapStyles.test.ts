@@ -147,10 +147,8 @@ describe("defaultMapStyleForTheme", () => {
     expect(defaultMapStyleForTheme("ink")).toBe("sketch");
   });
 
-  // The watercolour basemap's defining texture came from a raster tileset this
-  // fork does not have, so the painterly themes get maps made here instead.
   it("sends the painterly themes to maps made here", () => {
-    expect(defaultMapStyleForTheme("watercolour")).toBe("sketch");
+    expect(defaultMapStyleForTheme("watercolour")).toBe("watercolour");
     expect(defaultMapStyleForTheme("herbarium")).toBe("herbarium");
     expect(defaultMapStyleForTheme("slate")).toBe("blueprint");
   });

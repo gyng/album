@@ -3,8 +3,11 @@
   /* Match MapLibre's own 10px control inset so this and the distance scale
      form one clean left edge. */
   inset-inline-start: var(--size-10);
-  /* Sits above the MapLibre scale control (bottom-left) without overlapping. */
-  inset-block-end: var(--m-xl);
+  /* Sits above the MapLibre scale control (bottom-left) without overlapping,
+     and clears whatever the map has along its bottom edge — the date-range
+     panel sets `--map-bottom-chrome` for exactly this. */
+  inset-block-end: calc(var(--m-xl) + var(--map-bottom-chrome, 0px));
+  transition: inset-block-end var(--t-base) var(--ease-out);
   z-index: var(--z-float);
   pointer-events: none;
   display: flex;

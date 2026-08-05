@@ -137,13 +137,13 @@ export const MAP_STYLES: Record<
     swatch: "#1b1f24",
     group: "provider",
   },
-  // Also lifted onto the free tiles: its landmass came from a tileset of its
-  // own, which becomes a background of the same colour, the way OpenFreeMap's
-  // own styles draw land.
+  // A wash, composed here rather than copied: the transplanted document's whole
+  // look came from a raster texture tileset this fork does not have, and what
+  // was left was a flat cream blob at city zoom.
   watercolour: {
     source: { provider: "self", path: "/map-styles/watercolour.json" },
     label: "Watercolour",
-    swatch: "#f7f2e6",
+    swatch: "#f6f0e2",
     group: "made-here",
   },
   monochrome: {
@@ -260,11 +260,7 @@ const THEME_MAP_STYLES: Partial<Record<ThemeName, MapStyleName>> = {
   terminal: "crt",
   paper: "paper",
   ink: "sketch",
-  // Not the watercolour basemap: its defining texture came from a raster
-  // tileset this fork does not have, so what is left is a pale map with a
-  // paper tint. Sketch is this site's own hand-made answer to a painterly
-  // theme, and herbarium has a sheet of its own.
-  watercolour: "sketch",
+  watercolour: "watercolour",
   herbarium: "herbarium",
   bling: "neon",
   // The plan and the palette are the same cool blue.

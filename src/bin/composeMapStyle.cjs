@@ -95,7 +95,7 @@ const optionDefaults = {
    */
   screen: null,
   /**
-   * A stroke along the water's edge, as `{ colour, width }`.
+   * A stroke along the water's edge, as `{ colour, width, opacity, blur }`.
    *
    * What a dark basemap needs at world scale: two near-blacks a shade apart are
    * one black from four thousand kilometres up, and the map opens as an empty
@@ -250,6 +250,10 @@ const buildLayers = (palette, options) => {
           ),
         ),
         "line-opacity": options.coast.opacity ?? 0.9,
+        // Paint pools where it meets a wet edge. A blurred coast is the one
+        // thing that makes a wash read as paint rather than as a fill with a
+        // stroke on it.
+        ...(options.coast.blur === undefined ? {} : { "line-blur": options.coast.blur }),
       },
     });
   }

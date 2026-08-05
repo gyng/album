@@ -191,6 +191,66 @@ const composedStyles = (spriteUrl) => {
     }),
   ]);
 
+  // A wash, composed rather than transplanted.
+  //
+  // The old watercolour basemap was a copied document whose whole look came from
+  // a raster texture tileset this fork does not have. What arrived was a flat
+  // cream blob at city zoom and a muddy pink one in the middle of Osaka, with no
+  // road hierarchy left to read. So it is built here now, from the things a wash
+  // actually is: pale washed ground, a sea that pools darker at the coast, the
+  // streets left as unpainted paper, and the tooth of the sheet over all of it.
+  styles.push([
+    "watercolour",
+    composeMapStyle({
+      name: "Watercolour",
+      palette: {
+        land: "#f6f0e2",
+        // Pigment settles in the middle of a wet area and dries lighter at the
+        // edges, so the sea is a real colour rather than a pale tint.
+        water: "#a8c4d4",
+        green: "#c3d3ae",
+        built: "#efe6d3",
+        // A watercolourist does not paint roads: they leave the paper.
+        road: "#fefcf5",
+        // The casing carries the street, since the street itself is the paper:
+        // at a wash's contrast the grid vanished entirely at z15.
+        roadCasing: "#d3c4a6",
+        motorway: "#e5bf90",
+        building: "#e6dac2",
+        boundary: "#b9a98d",
+        label: "#5a4a35",
+        labelHalo: "#f6f0e2cc",
+      },
+      options: {
+        roads: "all",
+        lineWidthScale: 1.05,
+        minorRoad: {
+          colour: "#efe7d5",
+          width: 0.7,
+          opacity: [
+            [11, 0.35],
+            [14, 0.7],
+            [16, 0.95],
+          ],
+        },
+        rail: { colour: "#8f8168", dash: [3, 2], metro: "#9aa7b4", width: 0.85 },
+        // The wet edge, and the bleed that makes it one.
+        coast: { colour: "#7d9fb5", width: 2.2, opacity: 0.85, blur: 2.5 },
+        // Paint bleeding out from under the streets, widest and faintest first,
+        // so a city reads as painted around its roads rather than drawn on.
+        glow: [
+          { colour: "#dfd2b8", blur: 8, opacity: 0.5, width: 2.2, roads: "major" },
+          { colour: "#efe4cd", blur: 3, opacity: 0.45, width: 1 },
+        ],
+        spriteUrl,
+        // The tooth of the paper, and pigment granulating into it.
+        overlay: { id: "grain", opacity: 0.5 },
+        screen: { land: "dot-faint", water: "dot-faint", minzoom: 6 },
+        labelStyle: { letterSpacing: 0.06 },
+      },
+    }),
+  ]);
+
   // A pressed sheet: paper, a herbarium's greens, and the specimen laid on it.
   styles.push([
     "herbarium",
@@ -491,6 +551,17 @@ const photographPalette = (log) => {
  * and the themed and photograph tints inherit that, being this document
  * recoloured.
  */
+/**
+ * Layers dropped outright rather than quietened.
+ *
+ * A motorway shield is a road sign, and this map's subject is the photographs
+ * pinned to it. They were also near-black at 10px, and in Tokyo they render the
+ * raw OSM `ref` — "C1;409", two route numbers and the semicolon between them,
+ * which is not a sign anybody has ever seen. The junction refs at z16 are the
+ * same idea one zoom later.
+ */
+const DROPPED_LABEL_LAYERS = new Set(["Highway shield", "Highway shield (US)", "Highway junction"]);
+
 const SUBDUED_LABELS = {
   // Wards and cities. Bold at 24px was the problem, not the colour alone.
   "City labels": {
@@ -511,43 +582,34 @@ const SUBDUED_LABELS = {
     opacity: 0.72,
     size: ["interpolate", ["linear"], ["zoom"], 8, 10, 12, 11, 16, 12.5],
   },
+  // Street names, which were the same near-black as the shields. Their sizing
+  // was never the problem, so it is left alone.
+  "Road labels": { colour: "hsl(0,0%,45%)", opacity: 0.9 },
 };
 
 const subduePlaceLabels = (style) => ({
   ...style,
-  layers: style.layers.map((layer) => {
-    const subdued = SUBDUED_LABELS[layer.id];
-    if (!subdued) return layer;
+  layers: style.layers
+    .filter((layer) => !DROPPED_LABEL_LAYERS.has(layer.id))
+    .map((layer) => {
+      const subdued = SUBDUED_LABELS[layer.id];
+      if (!subdued) return layer;
 
-    return {
-      ...layer,
-      layout: {
-        ...layer.layout,
-        "text-size": subdued.size,
-        ...(subdued.font ? { "text-font": subdued.font } : {}),
-      },
-      paint: {
-        ...layer.paint,
-        "text-color": subdued.colour,
-        "text-opacity": subdued.opacity,
-      },
-    };
-  }),
+      return {
+        ...layer,
+        layout: {
+          ...layer.layout,
+          ...(subdued.size ? { "text-size": subdued.size } : {}),
+          ...(subdued.font ? { "text-font": subdued.font } : {}),
+        },
+        paint: {
+          ...layer.paint,
+          "text-color": subdued.colour,
+          "text-opacity": subdued.opacity,
+        },
+      };
+    }),
 });
-
-/**
- * Gives a transplanted style its names back.
- *
- * The watercolour transplant arrived with nineteen layers and not one symbol
- * among them: a map with no place names at all. Its glyphs already point at the
- * free font server, so the composed label layers drop straight in.
- */
-const withPlaceLabels = (style, palette) => {
-  if (style.layers.some((layer) => layer.type === "symbol")) return style;
-
-  const labels = composeMapStyle({ palette }).layers.filter((layer) => layer.type === "symbol");
-  return { ...style, layers: [...style.layers, ...labels] };
-};
 
 /**
  * The metro, which the copied cartography does not draw at all.
@@ -675,11 +737,7 @@ const run = async (log = console.log, env = process.env) => {
     const output = template.replace(".template.json", ".json");
     const filled = applyOrigin(fs.readFileSync(path.join(dir, template), "utf8"), origin);
     let document = filled;
-    if (template === "watercolour.template.json") {
-      document = `${JSON.stringify(
-        withPlaceLabels(JSON.parse(filled), { label: "#5c4a33", labelHalo: "#fdf6e6cc" }),
-      )}\n`;
-    } else if (template === "gallery.template.json") {
+    if (template === "gallery.template.json") {
       document = `${JSON.stringify(
         withTransit(subduePlaceLabels(JSON.parse(filled)), { colour: "#8a93b5" }),
       )}\n`;
@@ -699,6 +757,7 @@ const run = async (log = console.log, env = process.env) => {
 };
 
 module.exports = {
+  subduePlaceLabels,
   withTransit,
   applyOrigin,
   composedStyles,

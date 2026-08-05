@@ -159,6 +159,16 @@ describe("styles that are about more than colour", () => {
     expect(layerIds(composeMapStyle({}))).not.toContain("minor-roads");
   });
 
+  // Paint pools where it meets a wet edge: a blurred coast is what makes a wash
+  // read as paint rather than a fill with a stroke on it.
+  it("lets the coast bleed where a style asks it to", () => {
+    const coastOf = (coast) =>
+      composeMapStyle({ options: { coast } }).layers.find((layer) => layer.id === "coast").paint;
+
+    expect(coastOf({ colour: "#123" })["line-blur"]).toBeUndefined();
+    expect(coastOf({ colour: "#123", blur: 3 })["line-blur"]).toBe(3);
+  });
+
   // In the cities these photographs are of, the railway is the plan a reader
   // navigates by — and the subways are a separate network from the mainline, so
   // they are allowed a separate colour.

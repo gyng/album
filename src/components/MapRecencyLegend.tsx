@@ -17,7 +17,13 @@ export const MapRecencyLegend = ({
   /** The same two ends the pins are drawn from, or the legend explains nothing. */
   ramp?: RecencyRamp;
 }) => (
-  <div className={`${styles.legend} maplibregl-ctrl maplibregl-ctrl-scale`}>
+  <div
+    className={`${styles.legend} maplibregl-ctrl maplibregl-ctrl-scale`}
+    // A hook for the one thing about this that is worth asserting: it is
+    // decorative chrome with no role of its own, and it has to stay clear of
+    // whatever the map puts along its bottom edge.
+    data-map-legend="recency"
+  >
     <div className={styles.scale}>
       <span className={styles.end}>{olderLabel}</span>
       <span

@@ -4,13 +4,25 @@
   isolation: isolate;
 }
 
-/* While the date-range slider is open it overlaps MapLibre's bottom
-   attribution/scale controls. Lift those controls above the slider panel
-   (slider sits at bottom: var(--m-l) and is roughly 82px tall) so the
-   attribution and scale bar stay readable. */
+/* How much of the bottom edge the date-range panel is using, as one number
+   every piece of bottom chrome reads: MapLibre's own control containers *and*
+   the recency legend, which positions itself by hand and so was the one thing
+   left under the panel — the years it explains were behind the histogram. A
+   custom property inherits through the map's DOM, which is what lets a legend
+   in another module follow this without either file knowing the other's
+   classes. */
+.container {
+  --map-bottom-chrome: 0px;
+}
+
+.containerWithSlider {
+  /* The panel sits at bottom: var(--m-l) and is about 82px tall. */
+  --map-bottom-chrome: calc(var(--range-slider-clearance) + var(--m-s));
+}
+
 .containerWithSlider :global(.maplibregl-ctrl-bottom-left),
 .containerWithSlider :global(.maplibregl-ctrl-bottom-right) {
-  inset-block-end: calc(var(--m-l) + var(--range-slider-clearance) + var(--m-s));
+  inset-block-end: calc(var(--m-l) + var(--map-bottom-chrome));
   transition: bottom var(--t-base);
 }
 

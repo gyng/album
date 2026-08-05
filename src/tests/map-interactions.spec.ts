@@ -81,6 +81,30 @@ test.describe("World map interactions", () => {
     await expect(page.getByRole("combobox", { name: "Map style" })).toHaveValue("auto");
   });
 
+  // The legend positions itself by hand rather than sitting in a MapLibre
+  // control container, so it did not follow when the date panel lifted the
+  // scale and attribution: the years it explains ended up behind the histogram.
+  test("the date panel clears the recency legend", async ({ page }) => {
+    const legend = page.locator("[data-map-legend='recency']");
+    const panel = page.locator("#map-date-controls");
+    await expect(legend).toBeVisible();
+
+    await page.getByRole("button", { name: "Choose dates" }).first().click();
+    await expect(panel).toBeVisible();
+
+    // Polled rather than measured once: the legend eases up to its new place,
+    // so a single read catches it mid-flight. What matters is where it settles —
+    // wholly above the panel, not merely not-centred on it.
+    await expect
+      .poll(async () => {
+        const legendBox = await legend.boundingBox();
+        const panelBox = await panel.boundingBox();
+        if (!legendBox || !panelBox) return null;
+        return Math.round(legendBox.y + legendBox.height - panelBox.y);
+      })
+      .toBeLessThanOrEqual(0);
+  });
+
   test("filters mapped photos with the lightweight index", async ({ page }) => {
     const input = page.getByRole("searchbox", { name: "Search photos on the map" });
     expect(
