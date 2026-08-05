@@ -45,6 +45,31 @@ describe("what a basemap leaves out", () => {
     ]);
   });
 
+  // Below city scale the only names OpenMapTiles has are wards, suburbs and
+  // villages; without them a composed basemap is anonymous exactly where a
+  // reader has zoomed in to find out where they are.
+  it("names the smaller places too, from the zoom they matter at", () => {
+    const small = composeMapStyle({}).layers.find((layer) => layer.id === "place-labels-small");
+
+    expect(small.filter).toEqual([
+      "in",
+      "class",
+      "village",
+      "hamlet",
+      "suburb",
+      "quarter",
+      "neighbourhood",
+    ]);
+    expect(small.minzoom).toBeGreaterThanOrEqual(9);
+    expect(small.paint["text-opacity"]).toBeLessThan(1);
+  });
+
+  it("drops the small names with the rest when a basemap wants none", () => {
+    expect(layerIds(composeMapStyle({ options: { labels: false } }))).not.toContain(
+      "place-labels-small",
+    );
+  });
+
   it("keeps everything by default", () => {
     const ids = layerIds(composeMapStyle({}));
 
@@ -110,6 +135,33 @@ describe("styles that are about more than colour", () => {
     const style = composeMapStyle({ options: { overlay: { id: "scanline" } } });
 
     expect(style.layers.at(-1).paint["background-opacity"]).toBe(1);
+  });
+
+  // Two near-blacks a shade apart are one black from four thousand kilometres
+  // up, so a night map opens as an empty screen unless its water has an edge.
+  it("draws an edge along the water when asked", () => {
+    const style = composeMapStyle({ options: { coast: { colour: "#00b7ff" } } });
+    const coast = style.layers.find((layer) => layer.id === "coast");
+    const ids = layerIds(style);
+
+    expect(coast).toMatchObject({ type: "line", "source-layer": "water" });
+    expect(coast.paint["line-color"]).toBe("#00b7ff");
+    expect(ids.indexOf("coast")).toBeGreaterThan(ids.indexOf("water"));
+    expect(layerIds(composeMapStyle({}))).not.toContain("coast");
+  });
+
+  // A dot screen is ink on paper; at world scale its dots are the size of
+  // countries, which is a pattern rather than a texture.
+  it("holds a screen back until the zoom it reads as texture at", () => {
+    const style = composeMapStyle({
+      options: {
+        spriteUrl: "https://example.test/sprite",
+        screen: { land: "dot-fine", water: "dot-fine", minzoom: 6 },
+      },
+    });
+
+    expect(style.layers.find((layer) => layer.id === "land-screen").minzoom).toBe(6);
+    expect(style.layers.find((layer) => layer.id === "water-screen").minzoom).toBe(6);
   });
 
   it("stacks a shadow under each fill when the map is cut card", () => {

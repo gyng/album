@@ -93,9 +93,15 @@ const composedStyles = (spriteUrl) => {
       },
       options: {
         landcover: false,
-        roads: "major",
-        lineWidthScale: 0.7,
-        glow: { colour: "#00b7ff", blur: 9, opacity: 0.5, width: 1.2 },
+        // Every road, not only the big ones: a night drive is the whole grid
+        // lit, and "major" left a city as five streets in the dark.
+        roads: "all",
+        lineWidthScale: 0.55,
+        glow: { colour: "#00b7ff", blur: 10, opacity: 0.42, width: 1.4 },
+        // The one thing a night map has to have from orbit: an edge where the
+        // land stops. Without it the world view was black with country names
+        // floating on it.
+        coast: { colour: "#1d4f6b", width: 1.6, opacity: 0.95 },
       },
     }),
   ]);
@@ -121,10 +127,15 @@ const composedStyles = (spriteUrl) => {
         labelHalo: "#f2e4c4cc",
       },
       options: {
-        roads: "major",
+        roads: "all",
         spriteUrl,
-        screen: { land: "dot-faint", water: "dot-coarse" },
-        overlay: { id: "grain", opacity: 0.5 },
+        // A finer screen on the water — the coarse one read as polka dots at
+        // street zoom — and a visible one on the land, which is what makes the
+        // ground look printed rather than filled.
+        // Held back to street scale: at world scale the dots are the size of
+        // countries and the sea reads as polka dots.
+        screen: { land: "dot-fine", water: "dot-fine", minzoom: 6 },
+        overlay: { id: "grain", opacity: 0.6 },
       },
     }),
   ]);
@@ -150,7 +161,7 @@ const composedStyles = (spriteUrl) => {
         labelHalo: "#f6f1e4cc",
       },
       options: {
-        roads: "major",
+        roads: "all",
         shadow: 3,
         spriteUrl,
         overlay: { id: "grain", opacity: 0.35 },
@@ -166,23 +177,23 @@ const composedStyles = (spriteUrl) => {
       name: "CRT",
       palette: {
         land: "#020604",
-        water: "#0bff9a",
-        green: "#0bff9a",
-        built: "#0bff9a",
-        road: "#25ff8f",
-        roadCasing: "#0bff9a",
-        motorway: "#9dff5e",
-        building: "#0d7d54",
-        boundary: "#0bff9a",
-        label: "#7dffbe",
-        labelHalo: "#02060499",
+        water: "#12c47a",
+        green: "#12c47a",
+        built: "#12c47a",
+        road: "#1fd987",
+        roadCasing: "#12c47a",
+        motorway: "#7bf06a",
+        building: "#0b6b48",
+        boundary: "#12c47a",
+        label: "#9dffcd",
+        labelHalo: "#020604cc",
       },
       options: {
         outlineOnly: true,
-        roads: "major",
-        lineWidthScale: 0.9,
+        roads: "all",
+        lineWidthScale: 0.8,
         spriteUrl,
-        overlay: { id: "scanline-soft", opacity: 0.55 },
+        overlay: { id: "scanline-soft", opacity: 0.6 },
       },
     }),
   ]);
@@ -206,9 +217,12 @@ const composedStyles = (spriteUrl) => {
       },
       options: {
         projection: "globe",
-        landcover: false,
-        buildings: false,
-        roads: "major",
+        // Drawn for the world it opens on, and still a map if a reader keeps
+        // going: from orbit these add nothing, and up close their absence was
+        // an empty screen.
+        landcover: true,
+        buildings: true,
+        roads: "all",
         lineWidthScale: 0.6,
         sky: { sky: "#03070d", horizon: "#2f6ea8", atmosphere: 0.85 },
       },

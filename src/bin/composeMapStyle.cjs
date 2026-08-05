@@ -61,8 +61,20 @@ const optionDefaults = {
   glow: null,
   /** A pattern laid over the whole map — grain, scanlines — as `{ id, opacity }`. */
   overlay: null,
-  /** A pattern printed into the land and water fills, as `{ land, water }`. */
+  /**
+   * A pattern printed into the land and water fills, as `{ land, water }`, and
+   * optionally `minzoom` — a screen is ink on paper, and at world scale its
+   * dots are the size of countries.
+   */
   screen: null,
+  /**
+   * A stroke along the water's edge, as `{ colour, width }`.
+   *
+   * What a dark basemap needs at world scale: two near-blacks a shade apart are
+   * one black from four thousand kilometres up, and the map opens as an empty
+   * screen with country names floating on it.
+   */
+  coast: null,
   /**
    * Pixels to offset a dark copy of each fill by, so the map reads as cut card
    * stacked on card rather than as ink on paper.
@@ -132,6 +144,7 @@ const buildLayers = (palette, options) => {
     layers.push({
       id: "land-screen",
       type: "background",
+      ...(options.screen.minzoom === undefined ? {} : { minzoom: options.screen.minzoom }),
       paint: { "background-pattern": options.screen.land },
     });
   }
@@ -177,7 +190,31 @@ const buildLayers = (palette, options) => {
       type: "fill",
       source: SOURCE,
       "source-layer": "water",
+      ...(options.screen.minzoom === undefined ? {} : { minzoom: options.screen.minzoom }),
       paint: { "fill-pattern": options.screen.water },
+    });
+  }
+
+  if (options.coast) {
+    layers.push({
+      id: "coast",
+      type: "line",
+      source: SOURCE,
+      "source-layer": "water",
+      paint: {
+        "line-color": options.coast.colour ?? palette.water,
+        "line-width": interpolate(
+          scaled(
+            [
+              [0, 0.6],
+              [6, 1],
+              [12, 1.6],
+            ],
+            (options.coast.width ?? 1) * options.lineWidthScale,
+          ),
+        ),
+        "line-opacity": options.coast.opacity ?? 0.9,
+      },
     });
   }
 
@@ -335,6 +372,35 @@ const buildLayers = (palette, options) => {
   });
 
   if (options.labels) {
+    // Wards, suburbs and villages, from the zoom where a reader has stopped
+    // looking at the country and started looking at a place. Without these a
+    // composed basemap has no names at all below city scale: the world map
+    // reads fine and a street corner is anonymous.
+    layers.push({
+      id: "place-labels-small",
+      type: "symbol",
+      source: SOURCE,
+      "source-layer": "place",
+      minzoom: 10,
+      filter: ["in", "class", "village", "hamlet", "suburb", "quarter", "neighbourhood"],
+      layout: {
+        "text-field": ["coalesce", ["get", "name:latin"], ["get", "name"]],
+        "text-font": LABEL_FONT,
+        "text-size": interpolate([
+          [10, 10],
+          [14, 12],
+          [16, 14],
+        ]),
+      },
+      paint: {
+        "text-color": palette.label,
+        "text-halo-color": palette.labelHalo,
+        "text-halo-width": 1.1,
+        // Quieter than the cities they sit inside, so the hierarchy survives.
+        "text-opacity": 0.78,
+      },
+    });
+
     layers.push({
       id: "place-labels",
       type: "symbol",
