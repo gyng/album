@@ -8,8 +8,8 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const { resolveSiteOrigin } = require("./siteConfig.cjs");
-const { composeMapStyle } = require("./composeMapStyle.cjs");
-const { tintMapStyle } = require("./tintMapStyle.cjs");
+const { composeMapStyle, skyFor } = require("./composeMapStyle.cjs");
+const { parseColour, toCssColour, tintMapStyle } = require("./tintMapStyle.cjs");
 const { THEME_PALETTES } = require("./mapStylePalettes.cjs");
 const { buildPatternSheet } = require("./mapPatternSprite.cjs");
 const { coloursFromPaletteStrings, paletteFromColours } = require("./photoPalette.cjs");
@@ -27,10 +27,38 @@ const ORIGIN_TOKEN = "{{origin}}";
  * @param {object} gallery the gallery style document, already parsed.
  * @returns {Array<[string, object]>} each style's file name and document.
  */
+/**
+ * A horizon in the theme's own colours.
+ *
+ * The gallery style carries no sky, so a tinted theme map tilted over a city
+ * ended at a hard edge with the page behind it. Derived from the palette rather
+ * than picked per theme: the sea's colour is the world's edge, and the sky
+ * above it takes the *ground's* value — towards the ink would lighten the sky
+ * of every dark theme, since on a dark theme the ink is the light colour.
+ */
+const themedSky = (palette) => {
+  const water = parseColour(palette.water);
+  const ground = parseColour(palette.land);
+  if (!water || !ground) return null;
+
+  const mix = (amount) =>
+    toCssColour({
+      r: water.r + (ground.r - water.r) * amount,
+      g: water.g + (ground.g - water.g) * amount,
+      b: water.b + (ground.b - water.b) * amount,
+    });
+
+  return skyFor({ sky: mix(0.75), horizon: palette.water, fog: mix(0.3), atmosphere: 0.7 });
+};
+
 const themedStyles = (gallery) =>
   Object.entries(THEME_PALETTES).map(
     /** @returns {[string, object]} */
-    ([theme, palette]) => [`theme-${theme}`, tintMapStyle(gallery, palette, `Theme (${theme})`)],
+    ([theme, palette]) => {
+      const tinted = tintMapStyle(gallery, palette, `Theme (${theme})`);
+      const sky = themedSky(palette);
+      return [`theme-${theme}`, sky ? { ...tinted, sky } : tinted];
+    },
   );
 
 /**
@@ -355,16 +383,15 @@ const run = async (log = console.log, env = process.env) => {
   // the paper palette, so the style always exists and the picker never offers a
   // choice that 404s.
   const photographs = photographPalette(log);
+  const photoPalette = photographs ?? { land: "#f4efe2", water: "#cfdfe0", label: "#4a4030" };
+  const photoSky = themedSky(photoPalette);
   fs.writeFileSync(
     path.join(dir, "photos.json"),
     `${applyOrigin(
-      JSON.stringify(
-        tintMapStyle(
-          gallery,
-          photographs ?? { land: "#f4efe2", water: "#cfdfe0", label: "#4a4030" },
-          "From the photographs",
-        ),
-      ),
+      JSON.stringify({
+        ...tintMapStyle(gallery, photoPalette, "From the photographs"),
+        ...(photoSky ? { sky: photoSky } : {}),
+      }),
       origin,
     )}\n`,
   );

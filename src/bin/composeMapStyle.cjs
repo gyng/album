@@ -547,4 +547,4 @@ const composeMapStyle = ({ name, palette = {}, options = {} } = {}) => {
   };
 };
 
-module.exports = { composeMapStyle, paletteDefaults, optionDefaults, ROAD_CLASSES };
+module.exports = { composeMapStyle, paletteDefaults, optionDefaults, ROAD_CLASSES, skyFor };

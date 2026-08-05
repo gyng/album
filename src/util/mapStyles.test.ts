@@ -174,6 +174,14 @@ describe("defaultMapStyleForTheme", () => {
     expect(defaultMapStyleForTheme("ink")).toBe("sketch");
   });
 
+  // A decorative theme with no map of its own opens on the basemap that wears
+  // its palette.
+  it("sends the rest of the decorative themes to the map wearing them", () => {
+    for (const theme of ["slate", "ember", "arcana", "desktop"] as const) {
+      expect(defaultMapStyleForTheme(theme)).toBe("theme");
+    }
+  });
+
   // Light and dark are the schemes people read in, and a legible default
   // matters more there than a matching one.
   it("leaves the reading schemes on the configured default", () => {

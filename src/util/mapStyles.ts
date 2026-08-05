@@ -286,6 +286,13 @@ const THEME_MAP_STYLES: Partial<Record<ThemeName, MapStyleName>> = {
   watercolour: "watercolour",
   herbarium: "watercolour",
   bling: "neon",
+  // The rest have no map of their own, but they do have a palette — and the
+  // themed basemap is the gallery's cartography wearing exactly that. A
+  // decorative theme opens on the map that is wearing it.
+  slate: "theme",
+  ember: "theme",
+  arcana: "theme",
+  desktop: "theme",
 };
 
 export const defaultMapStyleForTheme = (theme: ThemeName | null | undefined): MapStyleName => {
