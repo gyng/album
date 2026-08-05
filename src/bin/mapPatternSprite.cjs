@@ -4,10 +4,12 @@
 // sprite is the one thing a composed style cannot compose — so the patterns are
 // generated here as pixels: dot screens, paper grain, scanlines, hatching.
 //
-// Every pattern is black at some alpha over transparency, never a colour. That
-// is what makes them reusable: the colour comes from the fill underneath, and
-// the pattern only darkens it, so one dot screen serves an ochre tourist print
-// and a green phosphor terminal alike.
+// Every pattern is one tone at some alpha over transparency, never a colour.
+// That is what makes them reusable: the colour comes from the fill underneath,
+// and the pattern only darkens or lightens it, so one dot screen serves an
+// ochre tourist print and a green phosphor terminal alike. Black is the default
+// because most of them are ink; a blueprint's grid is the exception, and white
+// lines on cyanotype are the whole look.
 
 /** A deterministic bit of noise: a build that runs twice writes the same grain. */
 const noise = (seed) => {
@@ -20,9 +22,12 @@ const noise = (seed) => {
 
 const transparent = (size) => new Uint8ClampedArray(size * size * 4);
 
-const setPixel = (pixels, size, x, y, alpha) => {
+const setPixel = (pixels, size, x, y, alpha, tone = 0) => {
   const offset = (y * size + x) * 4;
-  // Black at the given alpha; the fill beneath supplies the colour.
+  // One tone at the given alpha; the fill beneath supplies the colour.
+  pixels[offset] = tone;
+  pixels[offset + 1] = tone;
+  pixels[offset + 2] = tone;
   pixels[offset + 3] = Math.round(clamp(alpha) * 255);
 };
 
@@ -76,6 +81,24 @@ const scanlines = ({ size = 4, alpha = 0.5, lineHeight = 1 } = {}) => {
   return { size, pixels };
 };
 
+/**
+ * A drawing grid: the ruled paper a plan is drafted on.
+ *
+ * White rather than black, because on cyanotype the grid is what the light got
+ * through, and a dark grid on blue reads as dirt.
+ */
+const grid = ({ size = 24, alpha = 0.5, tone = 255 } = {}) => {
+  const pixels = transparent(size);
+
+  // One cell: the top edge and the left edge. Tiled, those are the rules.
+  for (let along = 0; along < size; along += 1) {
+    setPixel(pixels, size, along, 0, alpha, tone);
+    setPixel(pixels, size, 0, along, alpha, tone);
+  }
+
+  return { size, pixels };
+};
+
 /** Diagonal hatching, for a coastline that looks engraved rather than filled. */
 const hatch = ({ size = 8, alpha = 0.5, spacing = 4 } = {}) => {
   const pixels = transparent(size);
@@ -105,6 +128,8 @@ const PATTERNS = {
   scanline: () => scanlines({}),
   "scanline-soft": () => scanlines({ size: 6, alpha: 0.28, lineHeight: 2 }),
   hatch: () => hatch({}),
+  grid: () => grid({ size: 24, alpha: 0.55 }),
+  "grid-fine": () => grid({ size: 8, alpha: 0.35 }),
 };
 
 /**
@@ -136,4 +161,4 @@ const buildPatternSheet = (patterns = PATTERNS) => {
   return { width, height, pixels: sheet, index };
 };
 
-module.exports = { PATTERNS, buildPatternSheet, dotScreen, grain, scanlines, hatch };
+module.exports = { PATTERNS, buildPatternSheet, dotScreen, grain, grid, scanlines, hatch };

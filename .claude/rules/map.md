@@ -44,10 +44,12 @@ globs:
 - Popups do not take focus on open (the adapter sets `focusAfterOpen: false`), because the port
   promises a popup its opener owns
 - Route overlay is SVG (screen-space), not a MapLibre layer — projected via the port's `project()`
-- The basemap is a reader preference, not a constant: the curated styles, the shared public key and
-  the store live in `util/mapStyles.ts`, `MapStyleToggle` sets it and `MapWorld` reads it through
-  `useMapStyleName`. The picker sits in the nav beside the theme picker by choice; on a ~390px
+- The basemap is a reader preference, not a constant: the curated styles and the store live in
+  `util/mapStyles.ts`, `MapStyleToggle` sets it and `MapWorld` reads it through `useMapStyleName`.
+  **There is no metered provider** — every style is OpenFreeMap's or a document served from
+  `public/map-styles/`, so no basemap needs a credential and none can be rate-limited away. A theme
+  with an obvious map of its own supplies the default; a stored choice outranks it. The picker sits in the nav beside the theme picker by choice; on a ~390px
   viewport the two selects are wider than the nav row, so they wrap to a band of their own — a
-  deliberate trade, not an oversight, and a map overlay is the alternative if it is ever revisited. Keep every option on the same provider and key — a style from elsewhere would
-  bring its own credential and its own attribution requirement
+  deliberate trade, not an oversight, and a map overlay is the alternative if it is ever revisited. Keep every option free — a keyed style would bring back a credential, a quota and its own
+  attribution requirement
 - `mapRoute.ts` owns all route/journey logic: `RoutePoint`, `buildMapRoute`, `splitRouteByDay`

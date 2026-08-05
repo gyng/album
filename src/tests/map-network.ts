@@ -1,10 +1,6 @@
 import type { Page } from "@playwright/test";
 
-const MAP_HOSTS = new Set([
-  "api.maptiler.com",
-  "tiles.openfreemap.org",
-  "vector.openstreetmap.org",
-]);
+const MAP_HOSTS = new Set(["tiles.openfreemap.org", "vector.openstreetmap.org"]);
 
 /** The slice of the style spec these stubs serve. */
 type StyleDocument = {
@@ -92,13 +88,23 @@ const VECTOR_TILE_MAP_STYLE: StyleDocument = {
   ],
 };
 
-/** Serve `style` for every third-party style request, and refuse the rest. */
+/** Where this site serves its own style documents from. */
+const OWN_STYLE_PATH = "/map-styles/";
+
+/**
+ * Serve `style` for every style request, third-party or our own, and refuse the
+ * rest.
+ *
+ * Our own documents have to be stubbed too: most basemaps here are served from
+ * this origin now, and the real ones point at a tile host the browser is not
+ * allowed to reach in a test — which reads exactly like a dead tile worker.
+ */
 const serveMapStyle = async (page: Page, style: StyleDocument): Promise<void> => {
   await page.route(
-    (url) => MAP_HOSTS.has(url.hostname),
+    (url) => MAP_HOSTS.has(url.hostname) || url.pathname.startsWith(OWN_STYLE_PATH),
     async (route) => {
       const url = route.request().url();
-      if (url.includes("style") || url.includes("/maps/")) {
+      if (url.includes("style") || url.includes("/maps/") || url.includes(OWN_STYLE_PATH)) {
         await route.fulfill({
           contentType: "application/json",
           body: JSON.stringify(style),

@@ -3,6 +3,7 @@ const {
   buildPatternSheet,
   dotScreen,
   grain,
+  grid,
   scanlines,
   hatch,
 } = require("./mapPatternSprite.cjs");
@@ -14,18 +15,32 @@ const colourAt = ({ pixels, size }, x, y) => {
 };
 
 describe("the patterns themselves", () => {
-  // A pattern that carried its own colour could serve one style only; black at
-  // an alpha darkens whatever is underneath, so an ochre print and a green
-  // terminal can share a dot screen.
-  it("draws in alpha alone, never in colour", () => {
+  // A pattern that carried its own colour could serve one style only; a single
+  // tone at an alpha only darkens or lightens whatever is underneath, so an
+  // ochre print and a green terminal can share a dot screen.
+  it("draws in one tone, never in colour", () => {
     for (const make of Object.values(PATTERNS)) {
       const pattern = make();
       for (let y = 0; y < pattern.size; y += 1) {
         for (let x = 0; x < pattern.size; x += 1) {
-          expect(colourAt(pattern, x, y)).toEqual([0, 0, 0]);
+          const [red, green, blue] = colourAt(pattern, x, y);
+          expect(green).toBe(red);
+          expect(blue).toBe(red);
         }
       }
     }
+  });
+
+  // On cyanotype the grid is what the light got through, so it is drawn in
+  // white; a dark grid on blue reads as dirt.
+  it("rules a grid in white, one cell of it", () => {
+    const ruled = grid({ size: 6, alpha: 1 });
+
+    expect(colourAt(ruled, 0, 0)).toEqual([255, 255, 255]);
+    expect(alphaAt(ruled, 3, 0)).toBeGreaterThan(200);
+    expect(alphaAt(ruled, 0, 3)).toBeGreaterThan(200);
+    // Everything inside the cell is the paper.
+    expect(alphaAt(ruled, 3, 3)).toBe(0);
   });
 
   it("draws something with no arguments at all", () => {

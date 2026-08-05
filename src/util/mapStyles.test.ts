@@ -2,17 +2,13 @@
  * @jest-environment jsdom
  */
 
-import { siteConfig } from "../lib/siteConfig";
 import {
   DEFAULT_MAP_STYLE,
-  FALLBACK_STYLE_URL,
   MAP_STYLE_NAMES,
   MAP_STYLE_STORAGE_KEY,
   defaultMapStyleForTheme,
   getMapStyleName,
-  isFreeMapStyle,
   mapStyleUrl,
-  mapTilerStyleUrl,
   resetMapStyleCache,
   resolveMapStyleName,
   setMapStyleName,
@@ -33,7 +29,7 @@ it("builds every choice's URL against one of its three sources", () => {
 
   urls.forEach((url) => {
     expect(url).toMatch(
-      /^(https:\/\/api\.maptiler\.com\/maps\/[\w-]+\/style\.json\?key=\w+|https:\/\/tiles\.openfreemap\.org\/styles\/[\w-]+|\/map-styles\/[\w-]+\.json)$/,
+      /^(https:\/\/tiles\.openfreemap\.org\/styles\/[\w-]+|\/map-styles\/[\w-]+\.json)$/,
     );
   });
   expect(new Set(urls).size).toBe(MAP_STYLE_NAMES.length);
@@ -42,7 +38,7 @@ it("builds every choice's URL against one of its three sources", () => {
 // The point of the split: a rate limit on the metered provider cannot take the
 // whole picker down with it.
 it("keeps most of the picker on the free provider", () => {
-  const free = MAP_STYLE_NAMES.filter(isFreeMapStyle);
+  const free = MAP_STYLE_NAMES;
 
   expect(free.length).toBeGreaterThanOrEqual(4);
   expect(free).toContain("3d");
@@ -77,10 +73,10 @@ it("picks up a choice made in another tab", () => {
   subscribeMapStyleName(listener);
   expect(getMapStyleName()).toBe(DEFAULT_MAP_STYLE);
 
-  window.localStorage.setItem(MAP_STYLE_STORAGE_KEY, "topographic");
+  window.localStorage.setItem(MAP_STYLE_STORAGE_KEY, "halftone");
   window.dispatchEvent(new StorageEvent("storage", { key: MAP_STYLE_STORAGE_KEY }));
 
-  expect(getMapStyleName()).toBe("topographic");
+  expect(getMapStyleName()).toBe("halftone");
   expect(listener).toHaveBeenCalled();
 });
 
@@ -105,47 +101,20 @@ it("keeps working when storage is unavailable", () => {
   }
 });
 
-describe("provider configuration", () => {
-  it("degrades to a keyless basemap when no provider key is configured", () => {
-    expect(mapTilerStyleUrl("streets-v2", "")).toBe(FALLBACK_STYLE_URL);
-    // Satellite is the metered provider's; with no key it has nothing to load.
-    expect(mapStyleUrl("satellite", "")).toBe(FALLBACK_STYLE_URL);
-  });
-
-  // The free styles are the point of the split: they need no key, so they are
-  // unaffected by whether one is configured and cannot be rate-limited away.
-  it("serves the free styles from OpenFreeMap whether or not a key exists", () => {
-    expect(mapStyleUrl("dark", "")).toBe("https://tiles.openfreemap.org/styles/dark");
-    expect(mapStyleUrl("dark", "a-key")).toBe("https://tiles.openfreemap.org/styles/dark");
-    expect(mapStyleUrl("3d", "a-key")).toBe("https://tiles.openfreemap.org/styles/liberty");
-  });
-
-  it("builds a catalogue style id that is not one of the curated choices", () => {
-    expect(mapTilerStyleUrl("ocean", "abc123")).toBe(
-      "https://api.maptiler.com/maps/ocean/style.json?key=abc123",
-    );
-  });
-
-  // The gallery style is scoped to the account that made it, so a fork must
-  // never be offered a choice that would 403 against its own key.
-  it("offers the gallery style only when one is configured", () => {
-    const offersGallery = MAP_STYLE_NAMES.includes("gallery");
-    expect(offersGallery).toBe(siteConfig.map.galleryStyleId !== null);
+describe("what the basemaps cost", () => {
+  // There is no metered provider here any more: every style is either
+  // OpenFreeMap's or a document this site serves itself, so no basemap can go
+  // dark because a quota ran out or a key was restricted to another domain.
+  it("serves every style from the free provider or from here", () => {
+    for (const name of MAP_STYLE_NAMES) {
+      const url = mapStyleUrl(name);
+      expect(url.startsWith("https://tiles.openfreemap.org/") || url.startsWith("/")).toBe(true);
+      expect(url).not.toContain("maptiler");
+    }
   });
 
   it("defaults to a style it actually offers", () => {
     expect(MAP_STYLE_NAMES).toContain(DEFAULT_MAP_STYLE);
-  });
-
-  it("rejects a stored preference naming a style this fork does not offer", () => {
-    for (const name of ["gallery", "default"]) {
-      const resolved = resolveMapStyleName(name);
-      if (siteConfig.map.galleryStyleId === null) {
-        expect(resolved).toBeNull();
-      } else {
-        expect(resolved).toBe("gallery");
-      }
-    }
   });
 });
 
@@ -153,14 +122,14 @@ describe("the basemap that follows the page", () => {
   // The map has as many documents as the site has themes, and picks the one
   // the page is wearing.
   it("resolves to the style composed for the active theme", () => {
-    expect(mapStyleUrl("theme", "", "slate")).toBe("/map-styles/theme-slate.json");
-    expect(mapStyleUrl("theme", "", "ember")).toBe("/map-styles/theme-ember.json");
+    expect(mapStyleUrl("theme", "slate")).toBe("/map-styles/theme-slate.json");
+    expect(mapStyleUrl("theme", "ember")).toBe("/map-styles/theme-ember.json");
   });
 
   it("costs nothing, like the rest of the composed styles", () => {
     for (const name of ["theme", "minimal", "sketch"] as const) {
-      expect(isFreeMapStyle(name)).toBe(true);
-      expect(mapStyleUrl(name, "a-key")).not.toContain("maptiler");
+      expect(mapStyleUrl(name)).not.toContain("maptiler");
+      expect(mapStyleUrl(name)).not.toContain("maptiler");
     }
   });
 });
@@ -175,17 +144,17 @@ describe("defaultMapStyleForTheme", () => {
   });
 
   // The watercolour basemap's defining texture came from a raster tileset this
-  // fork does not have, so a painterly theme gets this site's own cartography
-  // rather than the pale remains of somebody else's.
-  it("sends the painterly themes to the gallery rather than the watercolour map", () => {
-    expect(defaultMapStyleForTheme("watercolour")).toBe("gallery");
-    expect(defaultMapStyleForTheme("herbarium")).toBe("gallery");
+  // fork does not have, so the painterly themes get maps made here instead.
+  it("sends the painterly themes to maps made here", () => {
+    expect(defaultMapStyleForTheme("watercolour")).toBe("sketch");
+    expect(defaultMapStyleForTheme("herbarium")).toBe("herbarium");
+    expect(defaultMapStyleForTheme("slate")).toBe("blueprint");
   });
 
   // A decorative theme with no map of its own opens on the basemap that wears
   // its palette.
   it("sends the rest of the decorative themes to the map wearing them", () => {
-    for (const theme of ["slate", "ember", "arcana", "desktop"] as const) {
+    for (const theme of ["ember", "arcana", "desktop"] as const) {
       expect(defaultMapStyleForTheme(theme)).toBe("theme");
     }
   });

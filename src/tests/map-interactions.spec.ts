@@ -55,26 +55,24 @@ test.describe("World map interactions", () => {
     expect(await count.boundingBox()).toEqual(countBox);
   });
 
-  test("switches the basemap to another provider's style, and remembers it", async ({ page }) => {
+  test("switches the basemap and remembers it", async ({ page }) => {
     // The picker sits in the nav between the search field and the site theme —
-    // the two appearance choices together. The default is the keyless provider's
-    // 3D basemap, so an ordinary page view costs no quota; the metered provider
-    // is kept for what the free one has no answer to, and the port applies a
-    // change with `setStyle` and re-adds our layers, so the pins survive it.
+    // the two appearance choices together. The default is this site's own
+    // document, and every other choice is either ours or the free provider's,
+    // so no page view costs a quota. The port applies a change with `setStyle`
+    // and re-adds our layers, so the pins survive it.
     const picker = page.getByRole("combobox", { name: "Map style" });
-    await expect(picker).toHaveValue("3d");
+    await expect(picker).toHaveValue("gallery");
 
-    // Satellite is imagery, which no free source serves — one of the few
-    // choices still worth spending the metered key on.
     const styleRequest = page.waitForRequest((request) =>
-      request.url().includes("/maps/satellite"),
+      request.url().includes("tiles.openfreemap.org/styles/dark"),
     );
-    await picker.selectOption("satellite");
+    await picker.selectOption("dark");
     await styleRequest;
     await expect(page.locator('[data-map-status="loaded"]')).toBeVisible();
 
     await page.reload({ waitUntil: "domcontentloaded" });
-    await expect(page.getByRole("combobox", { name: "Map style" })).toHaveValue("satellite");
+    await expect(page.getByRole("combobox", { name: "Map style" })).toHaveValue("dark");
   });
 
   test("filters mapped photos with the lightweight index", async ({ page }) => {

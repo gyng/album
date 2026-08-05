@@ -5,6 +5,7 @@
 import { render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import DefaultMap, { MMap } from "./Map";
+import { mapStyleUrl } from "../util/mapStyles";
 
 const flyTo = jest.fn();
 const fitBounds = jest.fn();
@@ -70,7 +71,7 @@ describe("MMap", () => {
           [1, 103],
           [2, 104],
         ]}
-        mapStyle="satellite"
+        mapStyle="dark"
         projection="vertical-perspective"
         attribution={false}
         details={false}
@@ -96,7 +97,7 @@ describe("MMap", () => {
     );
     expect(mapProps).toHaveBeenCalledWith(
       expect.objectContaining({
-        styleUrl: expect.stringContaining("/satellite/style.json"),
+        styleUrl: mapStyleUrl("dark"),
         projection: "vertical-perspective",
         attribution: false,
         style: expect.objectContaining({ minHeight: 200 }),

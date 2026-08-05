@@ -94,15 +94,21 @@ const composedStyles = (spriteUrl) => {
         road: "#5f5648",
         motorway: "#7d6a4a",
         boundary: "#9a8f7c",
+        label: "#453c2e",
+        labelHalo: "#f4efe2cc",
       },
       options: {
         outlineOnly: true,
+        roads: "all",
         lineWidthScale: 1.4,
+        // The streets a hand would not press as hard on.
+        minorRoad: "#9a8f7c",
         spriteUrl,
         // The tooth of the paper it is drawn on, and a coastline pressed
         // harder than the rest — which is how anybody draws a coast.
         overlay: { id: "grain", opacity: 0.55 },
-        coast: { colour: "#4a4133", width: 1.6, opacity: 0.8 },
+        coast: { colour: "#4a4133", width: 1.8, opacity: 0.85 },
+        labelStyle: { letterSpacing: 0.08 },
       },
     }),
   ]);
@@ -110,6 +116,73 @@ const composedStyles = (spriteUrl) => {
   // Night drive. The roads are the only lit thing: a wide blurred copy under a
   // thin bright core, which is how a light reads on a photograph. Everything
   // else recedes to nearly black so the photo pins are the signage.
+  // Cyanotype: a plan of the place rather than a picture of it. Linework only,
+  // white on blue, ruled like the paper a draughtsman works on.
+  styles.push([
+    "blueprint",
+    composeMapStyle({
+      name: "Blueprint",
+      palette: {
+        land: "#0d2b4d",
+        water: "#0a2038",
+        green: "#123457",
+        built: "#102f52",
+        road: "#dbeaff",
+        roadCasing: "#0d2b4d",
+        motorway: "#ffffff",
+        building: "#8fc0e8",
+        boundary: "#9dc6ea",
+        label: "#e6f2ff",
+        labelHalo: "#0a2038cc",
+      },
+      options: {
+        outlineOnly: true,
+        roads: "all",
+        lineWidthScale: 0.85,
+        minorRoad: "#4d86b5",
+        coast: { colour: "#dbeaff", width: 1.8, opacity: 0.9 },
+        spriteUrl,
+        // The ruled paper, and only from the zoom where its cells are cells
+        // rather than a wash.
+        overlay: { id: "grid", opacity: 0.5 },
+        labelStyle: { font: ["Noto Sans Bold"], transform: "uppercase", letterSpacing: 0.16 },
+      },
+    }),
+  ]);
+
+  // A pressed sheet: paper, a herbarium's greens, and the specimen laid on it.
+  styles.push([
+    "herbarium",
+    composeMapStyle({
+      name: "Herbarium",
+      palette: {
+        land: "#efe7d2",
+        water: "#b9c9bd",
+        // The specimen: the only thing on the sheet allowed real colour.
+        green: "#93ab77",
+        built: "#e6dcc3",
+        road: "#f7f2e4",
+        roadCasing: "#cfc3a6",
+        motorway: "#d8c9a0",
+        building: "#ddd2b6",
+        boundary: "#a89a7c",
+        label: "#4c4a33",
+        labelHalo: "#efe7d2cc",
+      },
+      options: {
+        roads: "major",
+        lineWidthScale: 0.9,
+        minorRoad: "#e7dfca",
+        coast: { colour: "#7f9384", width: 1.1, opacity: 0.75 },
+        spriteUrl,
+        // The tooth of the mounting paper, and the plant pressed into it.
+        overlay: { id: "grain", opacity: 0.5 },
+        screen: { land: "dot-faint", minzoom: 5 },
+        labelStyle: { letterSpacing: 0.1 },
+      },
+    }),
+  ]);
+
   styles.push([
     "neon",
     composeMapStyle({

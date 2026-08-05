@@ -681,7 +681,7 @@ describe("MapWorld", () => {
     });
   });
 
-  it("draws the basemap the reader picked, from whichever provider serves it", () => {
+  it("draws the basemap the reader picked", () => {
     // The picker writes the preference; the map is a different subtree, and a
     // localStorage write raises no event in its own tab — so the store has to
     // tell it directly or the choice does nothing until a reload.
@@ -691,19 +691,17 @@ describe("MapWorld", () => {
       // name on the way in.
       expect.objectContaining({ mapStyle: mapStyleUrl(DEFAULT_MAP_STYLE) }),
     );
-    // The default costs nothing to serve, so a rate limit on the metered
-    // provider cannot leave the site without a basemap.
-    expect(mapStyleUrl(DEFAULT_MAP_STYLE)).toContain("tiles.openfreemap.org");
+    // The default is this site's own document, served from here: no provider
+    // can rate-limit the map that opens by default.
+    expect(mapStyleUrl(DEFAULT_MAP_STYLE)).toBe("/map-styles/gallery.json");
 
-    // Satellite is imagery, which no free source serves, so it is one of the
-    // few choices still worth spending the metered key on.
     act(() => {
-      setMapStyleName("satellite");
+      setMapStyleName("dark");
     });
     expect(mapProps).toHaveBeenLastCalledWith(
-      expect.objectContaining({ mapStyle: mapStyleUrl("satellite") }),
+      expect.objectContaining({ mapStyle: mapStyleUrl("dark") }),
     );
-    expect(mapStyleUrl("satellite")).toContain("api.maptiler.com");
+    expect(mapStyleUrl("dark")).toContain("tiles.openfreemap.org");
   });
 
   it("keeps the thumbnails through a wobble back below the reveal zoom", () => {

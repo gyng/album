@@ -27,9 +27,7 @@
     }
   ],
   "map": {
-    "apiKey": "iilC4hPY1594noPX9OQ2",
-    "galleryStyleId": "ffd8bd10-cd97-40a5-b1d6-d15f98fb3644",
-    "defaultStyle": "3d"
+    "defaultStyle": "gallery"
   },
   "search": {
     "databaseUrl": "/search.sqlite",

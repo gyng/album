@@ -78,21 +78,19 @@ describe("site branding stays in configuration", () => {
   });
 });
 
-// The map provider's host appeared in four places across two different API
-// keys, one of which was not the key the module documented. Pinning the host to
-// a single module means a fork changes its key exactly once.
-describe("map provider stays in one module", () => {
-  const MAP_PROVIDER_HOST = "api.maptiler.com";
-  const OWNER = path.join("util", "mapStyles.ts");
+// The metered provider is gone: every basemap is either OpenFreeMap's or a
+// document this site serves itself. This is the guard that keeps it that way —
+// a style URL pointing back at a keyed provider would reintroduce a credential,
+// a quota and an attribution obligation in one line.
+describe("no metered map provider", () => {
+  const METERED_HOSTS = ["api.maptiler.com", "api.mapbox.com"];
 
-  it("names the provider host in no source literal outside util/mapStyles.ts", () => {
-    const offenders = SOURCE_ROOTS.flatMap(sourceFilesBelow)
-      .filter((filename) => filename !== OWNER)
-      .filter((filename) =>
-        literalsIn(
-          parseSource(fs.readFileSync(path.join(process.cwd(), filename), "utf8"), filename),
-        ).some((literal) => literal.includes(MAP_PROVIDER_HOST)),
-      );
+  it("names no keyed provider host in any source literal", () => {
+    const offenders = SOURCE_ROOTS.flatMap(sourceFilesBelow).filter((filename) =>
+      literalsIn(
+        parseSource(fs.readFileSync(path.join(process.cwd(), filename), "utf8"), filename),
+      ).some((literal) => METERED_HOSTS.some((host) => literal.includes(host))),
+    );
 
     expect(offenders).toEqual([]);
   });

@@ -167,7 +167,7 @@ export const TripRouteMap = ({ trip, activeDate, onReady }: TripRouteMapProps) =
           ready and draws nothing at all. */}
       <MapLibreStyles />
       <MapView
-        styleUrl={mapStyleUrl(styleName, undefined, activeTheme)}
+        styleUrl={mapStyleUrl(styleName, activeTheme)}
         attribution={{ compact: true, collapsed: true }}
         // An illustration of a route, not an instrument: scrolling the page
         // over one should scroll the page.

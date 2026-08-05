@@ -24,10 +24,7 @@ export type SiteConfig = {
   };
   readonly social: readonly SiteLink[];
   readonly map: {
-    /** Public, referrer-restricted MapTiler key. Empty string means no provider. */
-    readonly apiKey: string;
-    /** Account-private custom style, or null when the fork has none. */
-    readonly galleryStyleId: string | null;
+    /** Which basemap a reader who has never chosen one opens on. */
     readonly defaultStyle: string;
   };
   readonly search: {
