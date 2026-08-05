@@ -159,6 +159,44 @@ describe("styles that are about more than colour", () => {
     expect(layerIds(composeMapStyle({}))).not.toContain("minor-roads");
   });
 
+  // A hairline is still clutter when there are a thousand of them in frame, so
+  // a style can hold the small streets back until the reader is close enough
+  // for one of them to be worth naming.
+  it("fades the small streets in with the zoom where a style asks", () => {
+    const paintOf = (options) =>
+      composeMapStyle({ options: { minorRoad: options } }).layers.find(
+        (layer) => layer.id === "minor-roads",
+      ).paint;
+
+    expect(paintOf("#334")["line-opacity"]).toBeUndefined();
+    expect(paintOf({ colour: "#334", opacity: 0.4 })["line-opacity"]).toBe(0.4);
+    expect(
+      paintOf({
+        colour: "#334",
+        opacity: [
+          [11, 0.2],
+          [16, 0.9],
+        ],
+      })["line-opacity"],
+    ).toEqual(["interpolate", ["linear"], ["zoom"], 11, 0.2, 16, 0.9]);
+  });
+
+  // On a hand-drawn map a lane at the same weight as a high street is the
+  // clutter, whatever colour it is.
+  it("draws the small streets thinner when asked, not only quieter", () => {
+    const widthOf = (options) =>
+      composeMapStyle({ options: { minorRoad: options } }).layers.find(
+        (layer) => layer.id === "minor-roads",
+      ).paint["line-width"];
+
+    const full = widthOf("#334");
+    const thin = widthOf({ colour: "#334", width: 0.5 });
+
+    // Same stop zooms, half the weight at each of them.
+    expect(thin.at(-1)).toBeCloseTo(full.at(-1) / 2, 5);
+    expect(thin.at(-3)).toBeCloseTo(full.at(-3) / 2, 5);
+  });
+
   // A wide blur on every lane merges into one lit field at street zoom, so a
   // pass can follow fewer roads than the map draws.
   it("lets a glow pass follow only the arterials", () => {

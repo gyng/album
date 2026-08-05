@@ -277,10 +277,20 @@ const THEME_MAP_STYLES: Partial<Record<ThemeName, MapStyleName>> = {
   desktop: "theme",
 };
 
-export const defaultMapStyleForTheme = (theme: ThemeName | null | undefined): MapStyleName => {
+/**
+ * The map this theme brings with it, or null where it brings none.
+ *
+ * Separate from the default below because the two questions differ: the world
+ * map wants "what do I open on", and a map embedded in a page wants "does this
+ * theme have a map of its own, or should I keep the one I chose".
+ */
+export const themeMapStyle = (theme: ThemeName | null | undefined): MapStyleName | null => {
   const themed = theme ? THEME_MAP_STYLES[theme] : undefined;
-  return themed && MAP_STYLE_NAMES.includes(themed) ? themed : DEFAULT_MAP_STYLE;
+  return themed && MAP_STYLE_NAMES.includes(themed) ? themed : null;
 };
+
+export const defaultMapStyleForTheme = (theme: ThemeName | null | undefined): MapStyleName =>
+  themeMapStyle(theme) ?? DEFAULT_MAP_STYLE;
 
 export const MAP_STYLE_STORAGE_KEY = "mapStyle";
 

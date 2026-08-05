@@ -132,3 +132,37 @@ describe("MMap", () => {
     expect(fitBounds).not.toHaveBeenCalled();
   });
 });
+
+describe("the basemap under a photograph", () => {
+  // A theme with a map of its own is wearing it everywhere, not only on the map
+  // page: a photograph shown under the terminal theme should not carry a street
+  // map in the middle of a green screen.
+  it("follows a theme that brings its own map", () => {
+    document.documentElement.classList.add("theme-terminal");
+    render(<DefaultMap coordinates={[[1, 103]]} />);
+
+    expect(mapProps).toHaveBeenLastCalledWith(
+      expect.objectContaining({ styleUrl: mapStyleUrl("crt") }),
+    );
+    document.documentElement.classList.remove("theme-terminal");
+  });
+
+  it("keeps its own choice under the reading schemes", () => {
+    render(<DefaultMap coordinates={[[1, 103]]} />);
+
+    expect(mapProps).toHaveBeenLastCalledWith(
+      expect.objectContaining({ styleUrl: mapStyleUrl("streets") }),
+    );
+  });
+
+  // A caller that names a style means it, whatever the page is wearing.
+  it("obeys a style it was given", () => {
+    document.documentElement.classList.add("theme-terminal");
+    render(<DefaultMap coordinates={[[1, 103]]} mapStyle="dark" />);
+
+    expect(mapProps).toHaveBeenLastCalledWith(
+      expect.objectContaining({ styleUrl: mapStyleUrl("dark") }),
+    );
+    document.documentElement.classList.remove("theme-terminal");
+  });
+});

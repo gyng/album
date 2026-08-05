@@ -6,7 +6,8 @@ import pinStyles from "./mapPin.module.css";
 import { type Bounds, MapView, Marker, useMap } from "./map";
 import { AppLink as Link } from "./platform";
 import { computeWrapAwareBounds } from "../util/mapBounds";
-import { type MapStyleName, mapStyleUrl } from "../util/mapStyles";
+import { type MapStyleName, mapStyleUrl, themeMapStyle } from "../util/mapStyles";
+import { useActiveTheme } from "./useActiveTheme";
 import { MapLibreStyles } from "./MapLibreStyles";
 
 export type MapProps = {
@@ -87,7 +88,12 @@ const MapFlyer = (props: { coordinates: [number, number][] }) => {
 };
 
 const MMapComponent: React.FC<MapProps> = (props) => {
-  const mapStyle: MapStyleName = props.mapStyle ?? "streets";
+  const theme = useActiveTheme();
+  // A theme with a map of its own is wearing it everywhere, not only on the
+  // map page: a photograph shown under the terminal theme should not carry a
+  // street map in the middle of a green screen. A caller that names a style
+  // means it, and light and dark keep this map's own deliberate choice.
+  const mapStyle: MapStyleName = props.mapStyle ?? themeMapStyle(theme) ?? "streets";
   const projection = props.projection ?? "mercator";
 
   const coords = normaliseCoords(props.coordinates);
@@ -106,7 +112,7 @@ const MMapComponent: React.FC<MapProps> = (props) => {
       <div className={styles.map}>
         <MapView
           {...(props.style !== undefined ? { style: props.style } : {})}
-          styleUrl={mapStyleUrl(mapStyle)}
+          styleUrl={mapStyleUrl(mapStyle, theme)}
           initialView={{
             center: { lng: primary[1], lat: primary[0] },
             zoom: ZOOM,

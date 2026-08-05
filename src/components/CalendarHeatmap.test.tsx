@@ -236,35 +236,23 @@ describe("CalendarHeatmap", () => {
     scrollSpy.mockRestore();
   });
 
-  it("caps unique colour pips and ignores transparent or repeated swatches", () => {
-    const colours = [
-      "rgb(1, 2, 3)",
-      "rgb(1, 2, 3)",
-      "transparent",
-      "",
-      "rgb(4, 5, 6)",
-      "rgb(7, 8, 9)",
-      "rgb(10, 11, 12)",
-      "rgb(13, 14, 15)",
-    ];
+  // The day is painted in its own colour and carries nothing inside it. It used
+  // to hold up to four pips of the individual photographs' colours — three more
+  // elements on every day of every year, which on a thirteen-year archive is
+  // tens of thousands of nodes for a detail two pixels across.
+  it("paints a day in its colour and puts nothing inside it", () => {
     render(
       <CalendarHeatmap
-        entries={colours.map((placeholderColor, index) => ({
-          // invariant: entries fixture is a non-empty literal
-          ...entries[0]!,
-          href: `/album/kansai#${index}.jpg`,
-          path: `../albums/kansai/${index}.jpg`,
-          placeholderColor,
-        }))}
+        entries={entries}
         selectedDate={null}
         onSelectDate={jest.fn()}
         highlightedDates={["2024-01-02"]}
       />,
     );
-    const cell = screen.getByRole("button", { name: /^2 Jan 2024: 8 photos/i });
-    expect(cell.className).toContain("level4");
-    expect(cell.querySelectorAll(".subpip")).toHaveLength(4);
-    expect(cell.querySelectorAll(".highlightedSubpip")).toHaveLength(4);
+
+    const cell = screen.getByRole("button", { name: /^2 Jan 2024:/i });
+    expect(cell.style.backgroundColor).not.toBe("");
+    expect(cell.children).toHaveLength(0);
   });
 
   it("handles popup focus, delayed close, re-entry, and unmount cleanup", () => {

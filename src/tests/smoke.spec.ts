@@ -135,10 +135,17 @@ test.describe("Smoke Tests", () => {
   });
 
   test("theme picker changes theme", async ({ page }) => {
-    await page.goto("/", { waitUntil: "domcontentloaded" });
+    // `?theme=` is what the client reads on its first render, and the server
+    // rendered the default instead — so the picker arriving at light is the
+    // signal that React has taken it over. Choosing before that sets a value
+    // hydration then throws away, which is a real race under a busy suite and
+    // fails as "picked slate, got dark".
+    await page.goto("/?theme=light", { waitUntil: "domcontentloaded" });
 
     const html = page.locator("html");
-    await page.getByRole("combobox", { name: "Theme" }).selectOption("slate");
+    const themePicker = page.getByRole("combobox", { name: "Theme" });
+    await expect(themePicker).toHaveValue("light");
+    await themePicker.selectOption("slate");
 
     // A named theme applies its palette class plus its base colour scheme.
     await expect(html).toHaveClass(/theme-slate/);

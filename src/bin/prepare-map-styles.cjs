@@ -101,8 +101,18 @@ const composedStyles = (spriteUrl) => {
         outlineOnly: true,
         roads: "all",
         lineWidthScale: 1.4,
-        // The streets a hand would not press as hard on.
-        minorRoad: "#9a8f7c",
+        // The streets a hand would not press as hard on — and would draw with
+        // a finer nib. At the same weight as a high street they were the
+        // clutter, whatever colour they were.
+        minorRoad: {
+          colour: "#a99e88",
+          width: 0.45,
+          opacity: [
+            [11, 0.18],
+            [14, 0.5],
+            [16, 0.85],
+          ],
+        },
         spriteUrl,
         // The tooth of the paper it is drawn on, and a coastline pressed
         // harder than the rest — which is how anybody draws a coast.
@@ -407,6 +417,42 @@ const photographPalette = (log) => {
 };
 
 /**
+ * Quietens the gallery style's ward and suburb names.
+ *
+ * They were set at city weight: over a photograph-covered map, 港区 across the
+ * middle of Tokyo competes with the pictures it is supposed to sit under. The
+ * layer keeps every name it had — this only takes the size and the strength
+ * down, and the themed and photograph tints inherit it, since they are this
+ * document recoloured.
+ */
+const SUBDUED_LABEL_LAYERS = new Set(["Place labels"]);
+const SUBDUED_LABEL_OPACITY = 0.72;
+
+/**
+ * A modest ramp of our own, rather than the provider's per-class sizing.
+ *
+ * Scaling what was there is not available: its size is an `interpolate` over
+ * zoom with `match` expressions inside it, and the style spec forbids wrapping
+ * a zoom expression in arithmetic — a zoom expression may only be the top-level
+ * one. So the sizing is replaced outright, which also makes what a ward's name
+ * does at each zoom something this file states rather than inherits.
+ */
+const SUBDUED_LABEL_SIZE = ["interpolate", ["linear"], ["zoom"], 8, 10, 12, 11, 16, 12.5];
+
+const subduePlaceLabels = (style) => ({
+  ...style,
+  layers: style.layers.map((layer) =>
+    SUBDUED_LABEL_LAYERS.has(layer.id)
+      ? {
+          ...layer,
+          layout: { ...layer.layout, "text-size": SUBDUED_LABEL_SIZE },
+          paint: { ...layer.paint, "text-opacity": SUBDUED_LABEL_OPACITY },
+        }
+      : layer,
+  ),
+});
+
+/**
  * Gives a transplanted style its names back.
  *
  * The watercolour transplant arrived with nineteen layers and not one symbol
@@ -458,7 +504,9 @@ const run = async (log = console.log, env = process.env) => {
   // The theme basemaps are the gallery style retinted. They are generated, not
   // committed, so the origin is filled in here rather than by leaving twelve
   // more templates on disk.
-  const gallery = JSON.parse(fs.readFileSync(path.join(dir, "gallery.template.json"), "utf8"));
+  const gallery = subduePlaceLabels(
+    JSON.parse(fs.readFileSync(path.join(dir, "gallery.template.json"), "utf8")),
+  );
   for (const [name, style] of themedStyles(gallery)) {
     fs.writeFileSync(
       path.join(dir, `${name}.json`),
@@ -501,15 +549,14 @@ const run = async (log = console.log, env = process.env) => {
   const written = templates.map((template) => {
     const output = template.replace(".template.json", ".json");
     const filled = applyOrigin(fs.readFileSync(path.join(dir, template), "utf8"), origin);
-    const document =
-      template === "watercolour.template.json"
-        ? `${JSON.stringify(
-            withPlaceLabels(JSON.parse(filled), {
-              label: "#5c4a33",
-              labelHalo: "#fdf6e6cc",
-            }),
-          )}\n`
-        : filled;
+    let document = filled;
+    if (template === "watercolour.template.json") {
+      document = `${JSON.stringify(
+        withPlaceLabels(JSON.parse(filled), { label: "#5c4a33", labelHalo: "#fdf6e6cc" }),
+      )}\n`;
+    } else if (template === "gallery.template.json") {
+      document = `${JSON.stringify(subduePlaceLabels(JSON.parse(filled)))}\n`;
+    }
 
     fs.writeFileSync(path.join(dir, output), document);
     return output;

@@ -70,8 +70,10 @@ const optionDefaults = {
    */
   extrusion: null,
   /**
-   * A colour for the small roads, so the grid has a hierarchy rather than one
-   * value everywhere. Falls back to the road colour.
+   * The small roads, so the grid has a hierarchy rather than one value
+   * everywhere: a colour, or `{ colour, width }` to draw them thinner as well
+   * as quieter. On a hand-drawn map especially, a lane at the same weight as a
+   * high street is the clutter, not the colour.
    */
   minorRoad: null,
   /** A pattern laid over the whole map — grain, scanlines — as `{ id, opacity }`. */
@@ -370,8 +372,11 @@ const buildLayers = (palette, options) => {
   });
 
   if (options.minorRoad) {
+    const minor =
+      typeof options.minorRoad === "string" ? { colour: options.minorRoad } : options.minorRoad;
+
     // Drawn over the roads layer rather than instead of it: the small streets
-    // keep their casing and lose only their brightness.
+    // keep their casing and lose only their weight.
     layers.push({
       id: "minor-roads",
       type: "line",
@@ -379,7 +384,7 @@ const buildLayers = (palette, options) => {
       "source-layer": "transportation",
       filter: ["in", "class", "minor", "service", "track", "path"],
       paint: {
-        "line-color": options.minorRoad,
+        "line-color": minor.colour,
         "line-width": interpolate(
           scaled(
             [
@@ -387,9 +392,19 @@ const buildLayers = (palette, options) => {
               [12, 1.6],
               [16, 4.5],
             ],
-            options.lineWidthScale,
+            (minor.width ?? 1) * options.lineWidthScale,
           ),
         ),
+        // Thinner is not enough on its own in a city that has an alley every
+        // thirty metres: at a district zoom a thousand hairlines still read as
+        // a mesh. A style can fade them in instead, so they arrive as the
+        // reader gets close enough for one of them to mean anything.
+        ...(minor.opacity === undefined
+          ? {}
+          : {
+              "line-opacity":
+                typeof minor.opacity === "number" ? minor.opacity : interpolate(minor.opacity),
+            }),
       },
     });
   }

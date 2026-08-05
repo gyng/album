@@ -114,19 +114,12 @@ const CalendarHeatmapYear = React.memo(
               const cellDate = new Date(`${date}T00:00:00Z`);
               const isInteractive = count > 0 && !isFuture;
 
-              // Calculate dominant color for the day (for cell background)
+              // The day's own colour, which the cell is painted in. It used to
+              // also carry up to four pips of the individual photographs'
+              // colours — three more elements on every day of every year, which
+              // on a thirteen-year archive is tens of thousands of nodes for a
+              // detail two pixels across.
               const dominantColor = getCalendarDominantColor(dateEntries, count);
-
-              // Gather up to 4 unique color swatches for the pips
-              let colorSwatches: string[] = [];
-              for (const entry of dateEntries) {
-                if (entry.placeholderColor && entry.placeholderColor !== "transparent") {
-                  if (!colorSwatches.includes(entry.placeholderColor)) {
-                    colorSwatches.push(entry.placeholderColor);
-                  }
-                }
-                if (colorSwatches.length >= 4) break;
-              }
 
               return (
                 <div
@@ -171,22 +164,7 @@ const CalendarHeatmapYear = React.memo(
                     onMouseLeave={closePopupSoon}
                     onFocus={(event) => openPopup(date, event.currentTarget)}
                     onBlur={closePopupSoon}
-                  >
-                    {colorSwatches.length > 0 ? (
-                      <span className={styles.subpips} aria-hidden="true">
-                        {colorSwatches.map((color, i) => (
-                          <span
-                            key={color + i}
-                            className={[
-                              styles.subpip,
-                              isHighlighted ? styles.highlightedSubpip : "",
-                            ].join(" ")}
-                            style={{ backgroundColor: color }}
-                          />
-                        ))}
-                      </span>
-                    ) : null}
-                  </button>
+                  />
                 </div>
               );
             })}
