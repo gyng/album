@@ -52,6 +52,36 @@
   min-inline-size: 0;
 }
 
+/* The drawing and the map occupy the same box, the map over the drawing, so
+   the swap between them is a fade rather than three states in a row. */
+.routeStack {
+  position: relative;
+  block-size: 100%;
+  min-block-size: inherit;
+}
+
+.routeDrawing,
+.routeMap {
+  position: absolute;
+  inset: 0;
+}
+
+.routeMap {
+  opacity: 0;
+  transition: opacity var(--t-medium) var(--ease-out);
+}
+
+.routeStack[data-mapped="true"] .routeMap {
+  opacity: 1;
+}
+
+/* Held until the map is up, then out of the way: a line showing through a
+   basemap's edges reads as a fault. */
+.routeStack[data-mapped="true"] .routeDrawing {
+  opacity: 0;
+  transition: opacity var(--t-medium) var(--ease-out);
+}
+
 /* On a phone the map was 420px of an 844px screen: the whole first screenful
    below the heading was basemap, and the photographs began below the fold.
    Overrides the per-trip height the component sets inline. */

@@ -117,8 +117,11 @@ const TripFacts = ({ trip }: { trip: Trip }) => {
 
 /**
  * Far enough ahead that the basemap is up before the trip is on screen.
+ *
+ * Roughly two screens on a laptop: a map that starts loading as its trip
+ * arrives is a map the reader watches load.
  */
-const ROUTE_PREFETCH_MARGIN = "1000px 0px";
+const ROUTE_PREFETCH_MARGIN = "1600px 0px";
 
 /**
  * A trip's route: drawn immediately, mapped once the reader is near it.
@@ -129,9 +132,17 @@ const ROUTE_PREFETCH_MARGIN = "1000px 0px";
  * hold ninety-four WebGL contexts. Its basemap is the keyless one, so the
  * number of trips a reader scrolls past is not a bill.
  */
-const MappedRoute = ({ trip, activeDate }: { trip: Trip; activeDate: string | null }) => {
+const MappedRoute = ({
+  trip,
+  activeDate,
+  onReady,
+}: {
+  trip: Trip;
+  activeDate: string | null;
+  onReady: () => void;
+}) => {
   const { TripRouteMap } = useClientComponents();
-  return <TripRouteMap trip={trip} activeDate={activeDate} />;
+  return <TripRouteMap trip={trip} activeDate={activeDate} onReady={onReady} />;
 };
 
 const TripRoute = ({ trip, activeDate }: { trip: Trip; activeDate: string | null }) => {
@@ -139,18 +150,41 @@ const TripRoute = ({ trip, activeDate }: { trip: Trip; activeDate: string | null
   // False where the browser cannot observe: with no way to tell which trips are
   // on screen, ninety-four maps at once is worse than the drawing everywhere.
   const near = useNearViewport(ref, ROUTE_PREFETCH_MARGIN, false);
+  const [mapped, setMapped] = React.useState(false);
+
+  // A map that has gone gives its place back to the drawing, so scrolling away
+  // and back does not leave an empty box behind.
+  React.useEffect(() => {
+    if (!near) setMapped(false);
+  }, [near]);
 
   if (!trip.days.some((day) => day.point)) return null;
 
   return (
     <div ref={ref} className={styles.side}>
-      {/* The registry is consulted only once a map is actually wanted, so a
-          renderer that installs no provider still draws the trip. */}
-      {near ? (
-        <MappedRoute trip={trip} activeDate={activeDate} />
-      ) : (
-        <TripRoutePath trip={trip} activeDate={activeDate} />
-      )}
+      {/* The drawing stays underneath until the map has actually drawn. The two
+          used to swap: the line vanished, a grey box took its place, and the
+          basemap faded up inside it — three states where the reader wanted
+          one. */}
+      <div className={styles.routeStack} data-mapped={mapped}>
+        <div className={styles.routeDrawing} aria-hidden={mapped ? true : undefined}>
+          <TripRoutePath trip={trip} activeDate={activeDate} />
+        </div>
+
+        {/* The registry is consulted only once a map is actually wanted, so a
+            renderer that installs no provider still draws the trip. */}
+        {near ? (
+          <div className={styles.routeMap}>
+            <MappedRoute
+              trip={trip}
+              activeDate={activeDate}
+              onReady={() => {
+                setMapped(true);
+              }}
+            />
+          </div>
+        ) : null}
+      </div>
     </div>
   );
 };

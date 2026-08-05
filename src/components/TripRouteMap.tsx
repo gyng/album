@@ -19,6 +19,8 @@ const SINGLE_STOP_ZOOM = 12;
 const ACTIVE_MARKER_Z = 100000;
 
 export type TripRouteMapProps = {
+  /** Called once the basemap has actually drawn, not merely mounted. */
+  onReady?: () => void;
   trip: Trip;
   activeDate?: string | null;
 };
@@ -135,7 +137,7 @@ const RouteMarkers = ({
  * provider is kept for what the free one has no answer to — imagery, terrain
  * and this fork's own design — so a rate limit there cannot take these down.
  */
-export const TripRouteMap = ({ trip, activeDate }: TripRouteMapProps) => {
+export const TripRouteMap = ({ trip, activeDate, onReady }: TripRouteMapProps) => {
   const styleName = useMapStyleName();
   const activeTheme = useActiveTheme();
   const stops = React.useMemo(() => routeStops(trip), [trip]);
@@ -170,7 +172,12 @@ export const TripRouteMap = ({ trip, activeDate }: TripRouteMapProps) => {
         // An illustration of a route, not an instrument: scrolling the page
         // over one should scroll the page.
         interactive={false}
-        onLoad={(map) => fitToStops(map as never, stops)}
+        onLoad={(map) => {
+          fitToStops(map as never, stops);
+          // `load` is the style and the first viewport's tiles, which is the
+          // moment there is something worth showing rather than a grey box.
+          onReady?.();
+        }}
       >
         <DataLayer id={`trip-route-${trip.id}`} lines={lines} order={1} />
         <RouteMarkers markers={markers} activeDate={activeDate ?? null} />
