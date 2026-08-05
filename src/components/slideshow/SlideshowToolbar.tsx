@@ -50,6 +50,7 @@ const styles = mergeCssModuleStyles(
     "poolStatsCount",
     "poolStatsLink",
     "poolStatsNewest",
+    "poolStatsSpan",
     "secondarySessionControl",
     "sessionActionCopy",
     "sessionActionIcon",
@@ -450,13 +451,23 @@ export const SlideshowToolbar: React.FC<SlideshowToolbarProps> = (props) => {
               ? "checking data"
               : (props.dataVersionLabel ?? "data unknown")}
           </span>
+          {/* Both spans count, and the card is as wide as its longest line, so
+              each tick used to resize the card and move the refresh button. The
+              floor goes on the values themselves — a floor on the card does not
+              bind, since its natural width already exceeds any sensible one. */}
           <span className={styles.poolStatsNewest}>
-            {[
-              sessionStarted ? `running ${sessionStarted}` : null,
-              codeBuilt ? `code ${codeBuilt} old` : null,
-            ]
-              .filter(Boolean)
-              .join(" · ") || "session age unknown"}
+            {sessionStarted === null && codeBuilt === null ? "session age unknown" : null}
+            {sessionStarted !== null ? (
+              <>
+                running <span className={styles.poolStatsSpan}>{sessionStarted}</span>
+              </>
+            ) : null}
+            {sessionStarted !== null && codeBuilt !== null ? " · " : null}
+            {codeBuilt !== null ? (
+              <>
+                code <span className={styles.poolStatsSpan}>{codeBuilt}</span> old
+              </>
+            ) : null}
           </span>
         </Link>
 

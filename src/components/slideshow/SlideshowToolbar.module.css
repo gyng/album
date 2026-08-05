@@ -145,6 +145,10 @@
   justify-content: center;
   color: inherit;
   text-decoration: none;
+  /* Figures line up column-wise, so the dates and counts in here do not jitter
+     as they change. What holds the *width* still is the floor on the counting
+     values themselves — see `.poolStatsSpan`. */
+  font-variant-numeric: tabular-nums;
 }
 
 .poolStatsCheck {
@@ -778,4 +782,14 @@
   .moreSettingsOpen {
     display: contents;
   }
+}
+
+/* A span of time that keeps counting: "8 sec", "45 sec", "2 min", "3 days".
+   Inline-block so a floor applies at all, and wide enough for the longest of
+   those, so the line's length — and with it the card's width and the position of
+   the refresh button beside it — stops changing every few seconds. */
+.poolStatsSpan {
+  display: inline-block;
+  min-inline-size: 7ch;
+  font-variant-numeric: tabular-nums;
 }
