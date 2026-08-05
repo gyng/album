@@ -3,15 +3,19 @@
  */
 
 import {
+  AUTO_MAP_STYLE,
   DEFAULT_MAP_STYLE,
   MAP_STYLE_NAMES,
   MAP_STYLE_STORAGE_KEY,
   defaultMapStyleForTheme,
   getMapStyleName,
+  mapStyleForChoice,
   mapStyleUrl,
   resetMapStyleCache,
+  resolveMapStyleChoice,
   resolveMapStyleName,
-  setMapStyleName,
+  getStoredMapStyleChoice,
+  setMapStyleChoice,
   subscribeMapStyleName,
 } from "./mapStyles";
 
@@ -58,13 +62,13 @@ it("remembers the choice and tells the map about it", () => {
   const listener = jest.fn();
   const unsubscribe = subscribeMapStyleName(listener);
 
-  setMapStyleName("watercolour");
+  setMapStyleChoice("watercolour");
   expect(listener).toHaveBeenCalledTimes(1);
   expect(getMapStyleName()).toBe("watercolour");
   expect(window.localStorage.getItem(MAP_STYLE_STORAGE_KEY)).toBe("watercolour");
 
   unsubscribe();
-  setMapStyleName("dark");
+  setMapStyleChoice("dark");
   expect(listener).toHaveBeenCalledTimes(1);
 });
 
@@ -93,7 +97,7 @@ it("keeps working when storage is unavailable", () => {
 
   try {
     expect(getMapStyleName()).toBe(DEFAULT_MAP_STYLE);
-    expect(() => setMapStyleName("streets")).not.toThrow();
+    expect(() => setMapStyleChoice("streets")).not.toThrow();
     // The choice still applies for this session, it just cannot be remembered.
     expect(getMapStyleName()).toBe("streets");
   } finally {
@@ -165,5 +169,50 @@ describe("defaultMapStyleForTheme", () => {
     expect(defaultMapStyleForTheme("light")).toBe(DEFAULT_MAP_STYLE);
     expect(defaultMapStyleForTheme("dark")).toBe(DEFAULT_MAP_STYLE);
     expect(defaultMapStyleForTheme(null)).toBe(DEFAULT_MAP_STYLE);
+  });
+});
+
+// Following the theme used to be the absence of a choice, which a reader could
+// leave but never return to. It is a choice of its own now.
+describe("matching the theme as a choice", () => {
+  it("starts there, and says so rather than naming a basemap", () => {
+    expect(getStoredMapStyleChoice()).toBeNull();
+    expect(resolveMapStyleChoice(AUTO_MAP_STYLE)).toBe(AUTO_MAP_STYLE);
+    expect(resolveMapStyleChoice("no-such-style")).toBeNull();
+  });
+
+  it("can be chosen back after a basemap was pinned", () => {
+    setMapStyleChoice("neon");
+    expect(getStoredMapStyleChoice()).toBe("neon");
+
+    setMapStyleChoice(AUTO_MAP_STYLE);
+    expect(getStoredMapStyleChoice()).toBe(AUTO_MAP_STYLE);
+    expect(window.localStorage.getItem(MAP_STYLE_STORAGE_KEY)).toBe(AUTO_MAP_STYLE);
+  });
+
+  it("loads the theme's own map, and a pinned one whatever the theme", () => {
+    expect(mapStyleForChoice(AUTO_MAP_STYLE, "terminal")).toBe("crt");
+    expect(mapStyleForChoice(AUTO_MAP_STYLE, "light")).toBe(DEFAULT_MAP_STYLE);
+    expect(mapStyleForChoice("halftone", "terminal")).toBe("halftone");
+  });
+
+  // A caller with no theme in hand — the server, or a non-React one — cannot
+  // resolve it, so it gets the configured default rather than a guess.
+  it("resolves to the configured default where there is no theme to read", () => {
+    setMapStyleChoice(AUTO_MAP_STYLE);
+    expect(getMapStyleName()).toBe(DEFAULT_MAP_STYLE);
+  });
+
+  // Another tab clearing the preference puts this one back on the theme's map,
+  // not on the configured default.
+  it("goes back to following the theme when another tab clears the choice", () => {
+    setMapStyleChoice("neon");
+    const unsubscribe = subscribeMapStyleName(() => {});
+
+    window.localStorage.removeItem(MAP_STYLE_STORAGE_KEY);
+    window.dispatchEvent(new StorageEvent("storage", { key: MAP_STYLE_STORAGE_KEY }));
+
+    expect(getStoredMapStyleChoice()).toBeNull();
+    unsubscribe();
   });
 });

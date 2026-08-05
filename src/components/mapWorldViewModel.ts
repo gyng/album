@@ -3,7 +3,7 @@ import {
   formatExifOffsetSuffix,
   parseExifLocalDateTime,
 } from "../util/exifTime";
-import { recencyColor } from "../util/mapColor";
+import { DEFAULT_RECENCY_RAMP, recencyColor, type RecencyRamp } from "../util/mapColor";
 import type { MapWorldEntry, TimeRange } from "../util/pageDataTypes";
 
 export type MapBounds = {
@@ -88,6 +88,8 @@ export const getPhotoDateStats = (photos: MapWorldEntry[]): PhotoDateStats => {
 export const stylePhotosByRecency = (
   photos: MapWorldEntry[],
   dateStats: PhotoDateStats,
+  /** The basemap's own two ends, where it has them. */
+  ramp: RecencyRamp = DEFAULT_RECENCY_RAMP,
 ): PhotoWithStyle[] =>
   photos
     .map((photo) => ({ photo, ms: exifWallClockTimestamp(photo.date) }))
@@ -105,7 +107,7 @@ export const stylePhotosByRecency = (
       return {
         ...photo,
         relative,
-        markerColor: recencyColor(relative),
+        markerColor: recencyColor(relative, ramp),
       };
     });
 

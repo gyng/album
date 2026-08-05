@@ -38,6 +38,8 @@ type MapPhotoMarkersProps = {
   previewMarkers?: boolean;
   emphasiseRoute: boolean;
   activeRouteHrefSet: ReadonlySet<string>;
+  /** The ring around each pin, where the basemap wants one of its own. */
+  pinHalo?: string;
   /** Where the pin layers draw relative to the map's other data layers. */
   order?: number;
   onSelect: (photo: PhotoWithStyle) => void;
@@ -61,8 +63,14 @@ const photoLabel = (photo: PhotoWithStyle): string => {
 
 /** Half of the 14px pin the DOM markers draw (see `mapPin.module.css`). */
 const PIN_RADIUS = 7;
-/** The pin's white ring, matching `.pin`'s outline shadow. */
-const PIN_HALO = { color: "rgba(255, 255, 255, 0.84)", width: 2 };
+/**
+ * The pin's ring, matching `.pin`'s outline shadow.
+ *
+ * White on any ground a map is normally drawn on; a basemap dark enough for
+ * white to be the brightest thing on it supplies its own, or the ring stops
+ * separating the pin from the ground and starts being the subject.
+ */
+const PIN_HALO_WIDTH = 2;
 /** `.pin`'s resting opacity. */
 const PIN_OPACITY = 0.9;
 /** `.pinActive` — the photo's own route. */
@@ -473,11 +481,13 @@ export const MapPhotoMarkers = React.memo(function MapPhotoMarkers({
   previewMarkers = false,
   emphasiseRoute,
   activeRouteHrefSet,
+  pinHalo = "rgba(255, 255, 255, 0.84)",
   order,
   onSelect,
   onHover,
 }: MapPhotoMarkersProps) {
   const isCoarsePointer = useCoarsePointer();
+  const pinStroke = React.useMemo(() => ({ color: pinHalo, width: PIN_HALO_WIDTH }), [pinHalo]);
   // Tilted, the ground recedes up the screen, so a pin drawn over another is
   // claiming to be nearer than it is.
   const { keyFor: depthKeyFor } = useMarkerDepth(useMap());
@@ -593,7 +603,7 @@ export const MapPhotoMarkers = React.memo(function MapPhotoMarkers({
         <DataLayer
           id="photo-markers"
           points={points}
-          stroke={PIN_HALO}
+          stroke={pinStroke}
           {...(order !== undefined ? { order } : {})}
           {...(touchTargets.length > 0 ? {} : interactions)}
         />

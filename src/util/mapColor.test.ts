@@ -1,4 +1,11 @@
-import { mixHsl, recencyColor, recencyGradientCss, recencyGradientStops } from "./mapColor";
+import {
+  mixHsl,
+  pinHaloFor,
+  recencyColor,
+  recencyGradientCss,
+  recencyGradientStops,
+  recencyRampFor,
+} from "./mapColor";
 
 const parseHsl = (color: string) => {
   const match = color.match(/hsl\(\s*([\d.]+),\s*([\d.]+)%,\s*([\d.]+)%\s*\)/);
@@ -104,5 +111,51 @@ describe("mixHsl", () => {
   it("falls back to the source colour when either HSL value is malformed", () => {
     expect(mixHsl("var(--c-accent)", red, 0.5)).toBe("var(--c-accent)");
     expect(mixHsl(blue, "not-a-colour", 0.5)).toBe(blue);
+  });
+});
+
+// A phosphor tube has one colour and a cyanotype one ink, so a spectral ramp on
+// either reads as a fault rather than as data. What must not be lost is the
+// encoding: lightness is the ordered channel, and it has to survive going
+// monochrome or the pins stop meaning anything.
+describe("a basemap's own ramp", () => {
+  it("keeps the spectral ramp for the maps that can carry it", () => {
+    expect(recencyRampFor("gallery")).toBe(recencyRampFor(null));
+    expect(recencyRampFor("sketch")).toBe(recencyRampFor(undefined));
+  });
+
+  it("gives the phosphor and cyanotype maps ramps of their own", () => {
+    for (const style of ["crt", "neon", "blueprint"] as const) {
+      expect(recencyRampFor(style)).not.toBe(recencyRampFor(null));
+    }
+  });
+
+  it("still says older with lightness, whatever the two ends are", () => {
+    for (const style of ["crt", "neon", "blueprint", "gallery"] as const) {
+      const ramp = recencyRampFor(style);
+      const older = recencyColor(0, ramp);
+      const newer = recencyColor(1, ramp);
+
+      expect(older).not.toBe(newer);
+      // Newest is the lighter end on a dark ground and the deeper one on paper;
+      // what matters is that the two ends are far enough apart to read.
+      const lightness = (colour: string) => Number.parseFloat(colour.split(",")[2]!);
+      expect(Math.abs(lightness(older) - lightness(newer))).toBeGreaterThan(10);
+    }
+  });
+
+  it("explains the pins with the same ramp it drew them from", () => {
+    const ramp = recencyRampFor("crt");
+
+    expect(recencyGradientCss("90deg", 3, ramp)).toContain(recencyColor(0, ramp));
+    expect(recencyGradientCss("90deg", 3, ramp)).toContain(recencyColor(1, ramp));
+  });
+
+  // A white ring is what separates a pin from paper; on a near-black map it is
+  // the brightest thing on the screen.
+  it("darkens the pin ring on the maps where white would shout", () => {
+    expect(pinHaloFor("gallery")).toContain("255, 255, 255");
+    expect(pinHaloFor("crt")).not.toContain("255, 255, 255");
+    expect(pinHaloFor(null)).toBe(pinHaloFor("gallery"));
   });
 });

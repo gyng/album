@@ -159,6 +159,48 @@ describe("styles that are about more than colour", () => {
     expect(layerIds(composeMapStyle({}))).not.toContain("minor-roads");
   });
 
+  // In the cities these photographs are of, the railway is the plan a reader
+  // navigates by — and the subways are a separate network from the mainline, so
+  // they are allowed a separate colour.
+  it("draws the railway and the metro as two networks", () => {
+    const layers = composeMapStyle({
+      options: { rail: { colour: "#333", metro: "#c0f", dash: [3, 2] } },
+    }).layers;
+    const rail = layers.find((layer) => layer.id === "rail");
+    const transit = layers.find((layer) => layer.id === "transit");
+
+    expect(rail.filter).toEqual(["==", "class", "rail"]);
+    expect(rail.paint["line-color"]).toBe("#333");
+    expect(rail.paint["line-dasharray"]).toEqual([3, 2]);
+    expect(transit.filter).toEqual(["==", "class", "transit"]);
+    expect(transit.paint["line-color"]).toBe("#c0f");
+    expect(layerIds(composeMapStyle({}))).not.toContain("rail");
+  });
+
+  // Checked against the tiles: a Tokyo z13 tile carries eleven railways and no
+  // subway, its z14 child eight. Drawing the metro on the railway's ramp made
+  // it a hairline at zooms where none of it existed and never grew.
+  it("starts the metro at the zoom its geometry exists at", () => {
+    const layers = composeMapStyle({ options: { rail: "#333" } }).layers;
+    const railStops = layers.find((layer) => layer.id === "rail").paint["line-width"];
+    const metroStops = layers.find((layer) => layer.id === "transit").paint["line-width"];
+
+    // The zoom each ramp begins at, which is the input of its first stop.
+    expect(railStops[3]).toBe(7);
+    expect(metroStops[3]).toBe(13);
+    expect(metroStops.at(-1)).toBeGreaterThan(railStops.at(-1));
+  });
+
+  it("takes a minzoom and a glow for the whole network", () => {
+    const layers = composeMapStyle({
+      options: { rail: { colour: "#333", minzoom: 11, glow: { colour: "#0f0" } } },
+    }).layers;
+
+    expect(layers.find((layer) => layer.id === "rail").minzoom).toBe(11);
+    expect(layers.find((layer) => layer.id === "transit").minzoom).toBe(11);
+    expect(layers.find((layer) => layer.id === "rail-glow").paint["line-color"]).toBe("#0f0");
+  });
+
   // A hairline is still clutter when there are a thousand of them in frame, so
   // a style can hold the small streets back until the reader is close enough
   // for one of them to be worth naming.

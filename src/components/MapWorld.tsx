@@ -1,6 +1,6 @@
 import React from "react";
 import type { MapWorldEntry, TimeRange } from "../util/pageDataTypes";
-import { mixHsl, recencyColor } from "../util/mapColor";
+import { mixHsl, pinHaloFor, recencyColor, recencyRampFor } from "../util/mapColor";
 import { MapRecencyLegend } from "./MapRecencyLegend";
 import {
   type CameraView,
@@ -257,9 +257,14 @@ export const MMap: React.FC<MapWorldProps> = ({
     [photos, timeRange],
   );
   const dateStats = React.useMemo(() => getPhotoDateStats(photos), [photos]);
+  // A phosphor tube and a cyanotype each have one colour, and fourteen hundred
+  // red-to-blue dots on either read as a fault rather than as data — so the
+  // basemap gets to supply the ramp's two ends. The encoding does not change:
+  // older is still paler, and lightness is the channel that carries the order.
+  const recencyRamp = React.useMemo(() => recencyRampFor(mapStyleName), [mapStyleName]);
   const photosWithStyles = React.useMemo(
-    () => stylePhotosByRecency(timeFilteredPhotos, dateStats),
-    [dateStats, timeFilteredPhotos],
+    () => stylePhotosByRecency(timeFilteredPhotos, dateStats, recencyRamp),
+    [dateStats, timeFilteredPhotos, recencyRamp],
   );
   const visiblePhotos = React.useMemo(
     () => filterPhotosByBounds(photosWithStyles, bounds),
@@ -754,6 +759,7 @@ export const MMap: React.FC<MapWorldProps> = ({
             previewMarkers={previewMarkers}
             emphasiseRoute={shouldEmphasizeRouteMarkers}
             activeRouteHrefSet={markerActiveRouteHrefSet}
+            pinHalo={pinHaloFor(mapStyleName)}
             order={LAYER_ORDER.photoMarkers}
             onSelect={selectMarker}
             onHover={setHoverInfo}
@@ -763,7 +769,11 @@ export const MMap: React.FC<MapWorldProps> = ({
           <GeolocateControl />
           <ScaleControl />
           {shouldShowLegend ? (
-            <MapRecencyLegend olderLabel={legendYears.older} newerLabel={legendYears.newer} />
+            <MapRecencyLegend
+              olderLabel={legendYears.older}
+              newerLabel={legendYears.newer}
+              ramp={recencyRamp}
+            />
           ) : null}
           <FullscreenControl />
         </MapView>

@@ -76,6 +76,16 @@ const optionDefaults = {
    * high street is the clutter, not the colour.
    */
   minorRoad: null,
+  /**
+   * The lines nobody drives on, as `{ colour, metro, width, dash, glow }`.
+   *
+   * Worth its own option because in the cities these photographs are of, the
+   * railway *is* the street plan a reader navigates by: a map of Tokyo or
+   * Singapore with no Metro or MRT on it is missing how anybody got anywhere.
+   * `metro` colours the subways, light rail, trams and monorails separately
+   * from heavy rail, since they are different networks to a reader.
+   */
+  rail: null,
   /** A pattern laid over the whole map — grain, scanlines — as `{ id, opacity }`. */
   overlay: null,
   /**
@@ -429,6 +439,90 @@ const buildLayers = (palette, options) => {
       ),
     },
   });
+
+  if (options.rail) {
+    const rail = typeof options.rail === "string" ? { colour: options.rail } : options.rail;
+    const railWidth = (scale) =>
+      interpolate(
+        scaled(
+          [
+            [7, 0.5],
+            [12, 1.3],
+            [16, 2.8],
+          ],
+          scale * options.lineWidthScale,
+        ),
+      );
+
+    // The metro has a ramp of its own because it has a different floor: the
+    // tiles carry heavy rail from about z10 and subways only from z14 — checked
+    // against the tiles themselves, where a Tokyo z13 tile has eleven railways
+    // and no subway and its z14 child has eight. There is no point drawing it
+    // hairline-thin at a zoom where none of it exists, so it arrives at a
+    // weight a reader can follow a line at.
+    const metroWidth = (scale) =>
+      interpolate(
+        scaled(
+          [
+            [13, 1],
+            [16, 2.8],
+            [18, 4.4],
+          ],
+          scale * options.lineWidthScale,
+        ),
+      );
+
+    // Above the roads rather than under them: a metro line that disappears
+    // wherever it runs beneath a main road is not a network a reader can
+    // follow. Tunnels are drawn too, for the same reason — the Tokyo Metro is
+    // almost entirely underground, and filtering brunnels erases it.
+    if (rail.glow) {
+      layers.push({
+        id: "rail-glow",
+        type: "line",
+        source: SOURCE,
+        "source-layer": "transportation",
+        ...(rail.minzoom === undefined ? {} : { minzoom: rail.minzoom }),
+        filter: ["in", "class", "rail", "transit"],
+        paint: {
+          "line-color": rail.glow.colour ?? rail.colour,
+          "line-blur": rail.glow.blur ?? 4,
+          "line-opacity": rail.glow.opacity ?? 0.5,
+          "line-width": railWidth((rail.glow.width ?? 5) * (rail.width ?? 1)),
+        },
+      });
+    }
+
+    layers.push({
+      id: "rail",
+      type: "line",
+      source: SOURCE,
+      "source-layer": "transportation",
+      ...(rail.minzoom === undefined ? {} : { minzoom: rail.minzoom }),
+      filter: ["==", "class", "rail"],
+      paint: {
+        "line-color": rail.colour,
+        "line-width": railWidth(rail.width ?? 1),
+        ...(rail.dash ? { "line-dasharray": rail.dash } : {}),
+      },
+    });
+
+    layers.push({
+      id: "transit",
+      type: "line",
+      source: SOURCE,
+      "source-layer": "transportation",
+      ...(rail.minzoom === undefined ? {} : { minzoom: rail.minzoom }),
+      // Everything that runs on rails but is not the mainline: subway, light
+      // rail, tram, monorail, funicular.
+      filter: ["==", "class", "transit"],
+      paint: {
+        "line-color": rail.metro ?? rail.colour,
+        "line-width": metroWidth(rail.metroWidth ?? rail.width ?? 1),
+        ...(rail.metroDash ? { "line-dasharray": rail.metroDash } : {}),
+      },
+    });
+  }
 
   layers.push({
     id: "boundaries",

@@ -52,4 +52,18 @@ globs:
   viewport the two selects are wider than the nav row, so they wrap to a band of their own — a
   deliberate trade, not an oversight, and a map overlay is the alternative if it is ever revisited. Keep every option free — a keyed style would bring back a credential, a quota and its own
   attribution requirement
+- **"Match theme" is a stored choice.** `AUTO_MAP_STYLE` sits in the preference like any basemap
+  and is what the picker opens on; `useMapStyleChoice` binds the control, `useMapStyleName`
+  resolves it through the theme. Nothing stored means the same thing — so pinning a basemap is
+  reversible, which it was not when following the theme was merely an empty slot
+- **Rail and metro are two layers.** `composeMapStyle`'s `rail` option draws `class=rail` and
+  `class=transit` separately, over the roads, tunnels included — the Tokyo Metro is underground
+  and filtering brunnels erases it. The metro's ramp starts at z14 because **the tiles have no
+  subway below z14**; that was measured, not assumed. The gallery cartography draws no subways at
+  all, so `withTransit` injects a Metro layer — after each tint, in that theme's ink, since
+  tinting a fixed colour dragged the line into the ground
+- **Pins may take the basemap's colours.** `recencyRampFor`/`pinHaloFor` in `util/mapColor.ts`
+  override the spectral ramp for `crt`, `neon` and `blueprint` only. The encoding is untouched:
+  older stays paler, lightness carries the order, and the legend is handed the same ramp the pins
+  were drawn from
 - `mapRoute.ts` owns all route/journey logic: `RoutePoint`, `buildMapRoute`, `splitRouteByDay`

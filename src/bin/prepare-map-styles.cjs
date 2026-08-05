@@ -55,7 +55,14 @@ const themedStyles = (gallery) =>
   Object.entries(THEME_PALETTES).map(
     /** @returns {[string, object]} */
     ([theme, palette]) => {
-      const tinted = tintMapStyle(gallery, palette, `Theme (${theme})`);
+      // The metro goes on after the tint, in the theme's own ink: tinting a
+      // fixed colour pulled it towards the ground, and on ember it came out
+      // dark brown on dark brown. Ink contrasts with the ground by
+      // construction — that is what makes it the ink.
+      const tinted = withTransit(tintMapStyle(gallery, palette, `Theme (${theme})`), {
+        colour: palette.label,
+        opacity: 0.55,
+      });
       const sky = themedSky(palette);
       return [`theme-${theme}`, sky ? { ...tinted, sky } : tinted];
     },
@@ -79,7 +86,15 @@ const composedStyles = (spriteUrl) => {
     composeMapStyle({
       name: "Minimal",
       palette: THEME_PALETTES.light,
-      options: { labels: false, buildings: false, landcover: false, roads: "major" },
+      options: {
+        labels: false,
+        buildings: false,
+        landcover: false,
+        roads: "major",
+        // Even the bare map carries the railway, from the zoom where a reader
+        // is looking at a city rather than at the world.
+        rail: { colour: "#c6c6c1", metro: "#a9adbe", width: 0.9, minzoom: 10 },
+      },
     }),
   ]);
 
@@ -117,6 +132,15 @@ const composedStyles = (spriteUrl) => {
         // The tooth of the paper it is drawn on, and a coastline pressed
         // harder than the rest — which is how anybody draws a coast.
         overlay: { id: "grain", opacity: 0.55 },
+        // Ruled with ties, the way a railway is drawn by hand; the metro is the
+        // finer dotted line.
+        rail: {
+          colour: "#6b6250",
+          dash: [3, 2],
+          metro: "#8a7f6a",
+          metroDash: [1, 1.6],
+          width: 0.9,
+        },
         coast: { colour: "#4a4133", width: 1.8, opacity: 0.85 },
         labelStyle: { letterSpacing: 0.08 },
       },
@@ -150,6 +174,13 @@ const composedStyles = (spriteUrl) => {
         roads: "all",
         lineWidthScale: 0.85,
         minorRoad: "#4d86b5",
+        rail: {
+          colour: "#f2f8ff",
+          dash: [4, 2],
+          metro: "#9dc6ea",
+          metroDash: [1, 1.6],
+          width: 0.9,
+        },
         coast: { colour: "#dbeaff", width: 1.8, opacity: 0.9 },
         spriteUrl,
         // The ruled paper, and only from the zoom where its cells are cells
@@ -183,6 +214,7 @@ const composedStyles = (spriteUrl) => {
         roads: "major",
         lineWidthScale: 0.9,
         minorRoad: "#e7dfca",
+        rail: { colour: "#8a7f62", dash: [3, 2], metro: "#a1957a", width: 0.85 },
         coast: { colour: "#7f9384", width: 1.1, opacity: 0.75 },
         spriteUrl,
         // The tooth of the mounting paper, and the plant pressed into it.
@@ -227,6 +259,14 @@ const composedStyles = (spriteUrl) => {
         ],
         // The small streets are lit, but they are not the arterials.
         minorRoad: "#2f7f96",
+        // A metro line is a lit line too, and a different colour of light from
+        // the traffic — which is what makes it readable as another network.
+        rail: {
+          colour: "#c56bff",
+          metro: "#ffd166",
+          width: 1.1,
+          glow: { colour: "#8b2bff", blur: 10, opacity: 0.45, width: 4 },
+        },
         // The light comes off the buildings, so they stand up once a reader is
         // close enough to see one.
         extrusion: { colour: "#1b2447", opacity: 0.9, minzoom: 14 },
@@ -266,6 +306,13 @@ const composedStyles = (spriteUrl) => {
         coast: { colour: "#6d4a2f", width: 1.2, opacity: 0.65 },
         labelStyle: { font: ["Noto Sans Bold"], letterSpacing: 0.08 },
         minorRoad: "#e8dcc0",
+        rail: {
+          colour: "#5a3a20",
+          dash: [3, 2],
+          metro: "#8c5a2b",
+          metroDash: [1, 1.6],
+          width: 0.9,
+        },
         spriteUrl,
         // A finer screen on the water — the coarse one read as polka dots at
         // street zoom — and a visible one on the land, which is what makes the
@@ -305,6 +352,7 @@ const composedStyles = (spriteUrl) => {
         // sheet rather than as a fill.
         coast: { colour: "#8fa8b3", width: 1, opacity: 0.7 },
         minorRoad: "#efe7d6",
+        rail: { colour: "#9b8f77", dash: [3, 2], metro: "#b0a58c", width: 0.9 },
         spriteUrl,
         overlay: { id: "grain", opacity: 0.35 },
       },
@@ -341,6 +389,15 @@ const composedStyles = (spriteUrl) => {
         // comes from weight, spacing and case instead.
         labelStyle: { font: ["Noto Sans Bold"], transform: "uppercase", letterSpacing: 0.14 },
         coast: { colour: "#2bffa6", width: 1.4, opacity: 0.85 },
+        // The network a terminal would actually be showing you.
+        rail: {
+          colour: "#7bf06a",
+          dash: [4, 2],
+          metro: "#2bffa6",
+          metroDash: [1, 1.6],
+          width: 0.9,
+          glow: { colour: "#0b7a4f", blur: 8, opacity: 0.4, width: 3 },
+        },
         spriteUrl,
         // Phosphor blooms: a tube's lines are never as sharp as their signal.
         glow: [
@@ -379,6 +436,7 @@ const composedStyles = (spriteUrl) => {
         roads: "all",
         lineWidthScale: 0.6,
         minorRoad: "#2c3a47",
+        rail: { colour: "#5c7085", metro: "#7d93a8", width: 0.8, minzoom: 9 },
         coast: { colour: "#6f93b5", width: 1.1, opacity: 0.75 },
         labelStyle: { letterSpacing: 0.06 },
         sky: { sky: "#03070d", horizon: "#2f6ea8", atmosphere: 0.85 },
@@ -466,6 +524,43 @@ const withPlaceLabels = (style, palette) => {
   return { ...style, layers: [...style.layers, ...labels] };
 };
 
+/**
+ * The metro, which the copied cartography does not draw at all.
+ *
+ * The gallery style has heavy rail, light rail and trams, and no subways: its
+ * "Minor rail" layer filters on `subclass`, so `class=transit, subclass=subway`
+ * is in the tiles and on no layer. In Tokyo that is most of the network, and in
+ * Singapore all of it — the two cities most of these photographs are from.
+ *
+ * Inserted under the first symbol layer so the names still read over it, and
+ * before the theme tints run, so a themed basemap gets it in its own colours.
+ */
+const TRANSIT_LAYER_ID = "Metro";
+
+const withTransit = (style, { colour, dash = [3, 2], opacity = 0.9 } = {}) => {
+  if (style.layers.some((layer) => layer.id === TRANSIT_LAYER_ID)) return style;
+
+  const layer = {
+    id: TRANSIT_LAYER_ID,
+    type: "line",
+    source: "openmaptiles",
+    "source-layer": "transportation",
+    filter: ["==", "class", "transit"],
+    layout: { "line-cap": "round" },
+    paint: {
+      "line-color": colour,
+      "line-dasharray": dash,
+      // Nothing below z14 to draw: the subways are not in the tiles until then.
+      "line-width": ["interpolate", ["linear"], ["zoom"], 13, 1, 16, 2.8, 18, 4.4],
+      "line-opacity": opacity,
+    },
+  };
+
+  const firstSymbol = style.layers.findIndex((existing) => existing.type === "symbol");
+  const at = firstSymbol === -1 ? style.layers.length : firstSymbol;
+  return { ...style, layers: [...style.layers.slice(0, at), layer, ...style.layers.slice(at)] };
+};
+
 /** Replaces every origin token; returns the document untouched when there is none. */
 const applyOrigin = (template, origin) => template.split(ORIGIN_TOKEN).join(origin);
 
@@ -504,6 +599,8 @@ const run = async (log = console.log, env = process.env) => {
   // The theme basemaps are the gallery style retinted. They are generated, not
   // committed, so the origin is filled in here rather than by leaving twelve
   // more templates on disk.
+  // No metro on this one: each style that comes off it adds its own, after its
+  // own tint, so the line does not get pulled into the ground colour.
   const gallery = subduePlaceLabels(
     JSON.parse(fs.readFileSync(path.join(dir, "gallery.template.json"), "utf8")),
   );
@@ -524,7 +621,10 @@ const run = async (log = console.log, env = process.env) => {
     path.join(dir, "photos.json"),
     `${applyOrigin(
       JSON.stringify({
-        ...tintMapStyle(gallery, photoPalette, "From the photographs"),
+        ...withTransit(tintMapStyle(gallery, photoPalette, "From the photographs"), {
+          colour: photoPalette.label,
+          opacity: 0.55,
+        }),
         ...(photoSky ? { sky: photoSky } : {}),
       }),
       origin,
@@ -555,7 +655,9 @@ const run = async (log = console.log, env = process.env) => {
         withPlaceLabels(JSON.parse(filled), { label: "#5c4a33", labelHalo: "#fdf6e6cc" }),
       )}\n`;
     } else if (template === "gallery.template.json") {
-      document = `${JSON.stringify(subduePlaceLabels(JSON.parse(filled)))}\n`;
+      document = `${JSON.stringify(
+        withTransit(subduePlaceLabels(JSON.parse(filled)), { colour: "#8a93b5" }),
+      )}\n`;
     }
 
     fs.writeFileSync(path.join(dir, output), document);
@@ -571,7 +673,13 @@ const run = async (log = console.log, env = process.env) => {
   return [...generated, ...written];
 };
 
-module.exports = { applyOrigin, composedStyles, themedStyles, run };
+module.exports = {
+  withTransit,
+  applyOrigin,
+  composedStyles,
+  themedStyles,
+  run,
+};
 
 /* istanbul ignore next -- direct CLI dispatch; run is tested through applyOrigin */
 if (require.main === module) {

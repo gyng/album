@@ -1,5 +1,5 @@
 import styles from "./MapRecencyLegend.module.css";
-import { recencyGradientCss } from "../util/mapColor";
+import { DEFAULT_RECENCY_RAMP, recencyGradientCss, type RecencyRamp } from "../util/mapColor";
 
 /**
  * Legend for the map's colour encoding: colour = photo age (recency), running
@@ -10,16 +10,19 @@ import { recencyGradientCss } from "../util/mapColor";
 export const MapRecencyLegend = ({
   olderLabel = "Older",
   newerLabel = "Newer",
+  ramp = DEFAULT_RECENCY_RAMP,
 }: {
   olderLabel?: string;
   newerLabel?: string;
+  /** The same two ends the pins are drawn from, or the legend explains nothing. */
+  ramp?: RecencyRamp;
 }) => (
   <div className={`${styles.legend} maplibregl-ctrl maplibregl-ctrl-scale`}>
     <div className={styles.scale}>
       <span className={styles.end}>{olderLabel}</span>
       <span
         className={styles.bar}
-        style={{ background: recencyGradientCss("90deg") }}
+        style={{ background: recencyGradientCss("90deg", 7, ramp) }}
         aria-hidden="true"
       />
       <span className={styles.end}>{newerLabel}</span>

@@ -340,7 +340,7 @@ jest.mock("../util/time", () => ({
   getRelativeTimeString: () => "just now",
 }));
 
-const { DEFAULT_MAP_STYLE, mapStyleUrl, resetMapStyleCache, setMapStyleName } =
+const { DEFAULT_MAP_STYLE, mapStyleUrl, resetMapStyleCache, setMapStyleChoice } =
   require("../util/mapStyles") as typeof import("../util/mapStyles");
 
 const mapWorldModule = require("./MapWorld");
@@ -696,7 +696,7 @@ describe("MapWorld", () => {
     expect(mapStyleUrl(DEFAULT_MAP_STYLE)).toBe("/map-styles/gallery.json");
 
     act(() => {
-      setMapStyleName("dark");
+      setMapStyleChoice("dark");
     });
     expect(mapProps).toHaveBeenLastCalledWith(
       expect.objectContaining({ mapStyle: mapStyleUrl("dark") }),

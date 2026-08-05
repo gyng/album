@@ -90,7 +90,7 @@ export const MAP_STYLES: Record<
   // the theme rather than sitting on it.
   theme: {
     source: { provider: "themed" },
-    label: "Match theme",
+    label: "Theme colours",
     swatch: "var(--c-bg)",
     group: "made-here",
   },
@@ -292,6 +292,18 @@ export const themeMapStyle = (theme: ThemeName | null | undefined): MapStyleName
 export const defaultMapStyleForTheme = (theme: ThemeName | null | undefined): MapStyleName =>
   themeMapStyle(theme) ?? DEFAULT_MAP_STYLE;
 
+/**
+ * The choice that is not a basemap: whatever the theme suggests.
+ *
+ * Nothing stored has always meant this, and a reader could see the theme's map
+ * but never ask for it back once they had picked something. So it is a choice of
+ * its own now — stored like any other, and the one the picker starts on.
+ */
+export const AUTO_MAP_STYLE = "auto";
+
+/** What the picker holds: a basemap, or the instruction to follow the theme. */
+export type MapStyleChoice = MapStyleName | typeof AUTO_MAP_STYLE;
+
 export const MAP_STYLE_STORAGE_KEY = "mapStyle";
 
 export const resolveMapStyleName = (value: unknown): MapStyleName | null => {
@@ -309,6 +321,15 @@ export const resolveMapStyleName = (value: unknown): MapStyleName | null => {
   return isAvailableStyleName(name) ? name : null;
 };
 
+export const resolveMapStyleChoice = (value: unknown): MapStyleChoice | null =>
+  value === AUTO_MAP_STYLE ? AUTO_MAP_STYLE : resolveMapStyleName(value);
+
+/** The basemap a choice actually loads, which for `auto` is the theme's. */
+export const mapStyleForChoice = (
+  choice: MapStyleChoice,
+  theme: ThemeName | null | undefined,
+): MapStyleName => (choice === AUTO_MAP_STYLE ? defaultMapStyleForTheme(theme) : choice);
+
 export const mapStyleUrl = (name: MapStyleName, theme: ThemeName = "light"): string => {
   const { source } = MAP_STYLES[name];
   if (source.provider === "free") return openFreeMapStyleUrl(source.id);
@@ -316,9 +337,9 @@ export const mapStyleUrl = (name: MapStyleName, theme: ThemeName = "light"): str
   return `/map-styles/theme-${theme}.json`;
 };
 
-const readStored = (): MapStyleName | null => {
+const readStored = (): MapStyleChoice | null => {
   try {
-    return resolveMapStyleName(localStorage.getItem(MAP_STYLE_STORAGE_KEY));
+    return resolveMapStyleChoice(localStorage.getItem(MAP_STYLE_STORAGE_KEY));
   } catch {
     // Private-mode or blocked storage: fall back to the default rather than
     // taking the map down.
@@ -334,7 +355,7 @@ const readStored = (): MapStyleName | null => {
 // a `localStorage` write fires no event in the tab that made it. So the
 // preference is a small external store: subscribers are notified directly, and
 // the `storage` event folds in changes made in another tab.
-let current: MapStyleName | null = null;
+let current: MapStyleChoice | null = null;
 const listeners = new Set<() => void>();
 
 const notify = () => {
@@ -344,10 +365,11 @@ const notify = () => {
 };
 
 /**
- * The reader's own choice, or null where they have never made one — which is
- * what lets a theme supply the default without overriding a decision.
+ * The reader's own choice, or null where they have never made one. Both nothing
+ * stored and a stored `auto` mean the same thing to a caller that knows the
+ * theme; the difference is only that one of them was asked for.
  */
-export const getStoredMapStyleName = (): MapStyleName | null => {
+export const getStoredMapStyleChoice = (): MapStyleChoice | null => {
   if (current === null) {
     current = readStored();
   }
@@ -355,15 +377,19 @@ export const getStoredMapStyleName = (): MapStyleName | null => {
   return current;
 };
 
-export const getMapStyleName = (): MapStyleName => getStoredMapStyleName() ?? DEFAULT_MAP_STYLE;
+/** For callers with no theme to consult: `auto` resolves to the default. */
+export const getMapStyleName = (): MapStyleName => {
+  const stored = getStoredMapStyleChoice();
+  return stored === null || stored === AUTO_MAP_STYLE ? DEFAULT_MAP_STYLE : stored;
+};
 
 /** The server has no preference to read, and must render the default. */
 export const getServerMapStyleName = (): MapStyleName => DEFAULT_MAP_STYLE;
 
-export const setMapStyleName = (name: MapStyleName): void => {
-  current = name;
+export const setMapStyleChoice = (choice: MapStyleChoice): void => {
+  current = choice;
   try {
-    localStorage.setItem(MAP_STYLE_STORAGE_KEY, name);
+    localStorage.setItem(MAP_STYLE_STORAGE_KEY, choice);
   } catch {
     // The choice still applies to this session even if it cannot be kept.
   }
@@ -377,7 +403,9 @@ export const subscribeMapStyleName = (listener: () => void): (() => void) => {
       return;
     }
 
-    const next = readStored() ?? DEFAULT_MAP_STYLE;
+    // Null stays null: another tab clearing the preference puts this one back
+    // on the theme's map, not on the configured default.
+    const next = readStored();
     if (next !== current) {
       current = next;
       notify();

@@ -57,12 +57,12 @@ test.describe("World map interactions", () => {
 
   test("switches the basemap and remembers it", async ({ page }) => {
     // The picker sits in the nav between the search field and the site theme —
-    // the two appearance choices together. The default is this site's own
-    // document, and every other choice is either ours or the free provider's,
-    // so no page view costs a quota. The port applies a change with `setStyle`
-    // and re-adds our layers, so the pins survive it.
+    // the two appearance choices together. It opens on matching the theme, and
+    // every choice is either ours or the free provider's, so no page view costs
+    // a quota. The port applies a change with `setStyle` and re-adds our
+    // layers, so the pins survive it.
     const picker = page.getByRole("combobox", { name: "Map style" });
-    await expect(picker).toHaveValue("gallery");
+    await expect(picker).toHaveValue("auto");
 
     const styleRequest = page.waitForRequest((request) =>
       request.url().includes("tiles.openfreemap.org/styles/dark"),
@@ -73,6 +73,12 @@ test.describe("World map interactions", () => {
 
     await page.reload({ waitUntil: "domcontentloaded" });
     await expect(page.getByRole("combobox", { name: "Map style" })).toHaveValue("dark");
+
+    // And back: following the theme is a choice of its own, so a pinned basemap
+    // is reversible.
+    await page.getByRole("combobox", { name: "Map style" }).selectOption("auto");
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await expect(page.getByRole("combobox", { name: "Map style" })).toHaveValue("auto");
   });
 
   test("filters mapped photos with the lightweight index", async ({ page }) => {
