@@ -81,12 +81,14 @@ const composedStyles = (spriteUrl) => {
       palette: {
         land: "#05060b",
         water: "#04070f",
-        green: "#070c12",
-        built: "#080910",
+        // Not black: a park at night is a hole in the light, and a hole has to
+        // be a colour to read as one.
+        green: "#0a0f1a",
+        built: "#0a0b14",
         road: "#7df9ff",
         roadCasing: "#0b1020",
         motorway: "#ff4ecd",
-        building: "#0c1020",
+        building: "#141a33",
         boundary: "#1d2b45",
         label: "#8bd6ff",
         labelHalo: "#02030699",
@@ -97,7 +99,19 @@ const composedStyles = (spriteUrl) => {
         // lit, and "major" left a city as five streets in the dark.
         roads: "all",
         lineWidthScale: 0.55,
-        glow: { colour: "#00b7ff", blur: 10, opacity: 0.42, width: 1.4 },
+        // Three passes: a wide wash of city light, a tighter halo, then the
+        // filament the roads layer draws on top. One pass was a smudge.
+        glow: [
+          { colour: "#0a3b7a", blur: 26, opacity: 0.5, width: 5, roads: "major" },
+          { colour: "#00b7ff", blur: 11, opacity: 0.4, width: 1.6 },
+          { colour: "#9ffcff", blur: 3, opacity: 0.3, width: 0.6 },
+        ],
+        // The small streets are lit, but they are not the arterials.
+        minorRoad: "#2f7f96",
+        // The light comes off the buildings, so they stand up once a reader is
+        // close enough to see one.
+        extrusion: { colour: "#1b2447", opacity: 0.9, minzoom: 14 },
+        sky: { sky: "#01020a", horizon: "#5b2a7a", fog: "#04070f", atmosphere: 0.7 },
         // The one thing a night map has to have from orbit: an edge where the
         // land stops. Without it the world view was black with country names
         // floating on it.
@@ -192,7 +206,15 @@ const composedStyles = (spriteUrl) => {
         outlineOnly: true,
         roads: "all",
         lineWidthScale: 0.8,
+        // A tube draws its beam brightest where the signal is strongest. Every
+        // lane at full phosphor made a city a solid green field.
+        minorRoad: "#0c6a47",
         spriteUrl,
+        // Phosphor blooms: a tube's lines are never as sharp as their signal.
+        glow: [
+          { colour: "#0b7a4f", blur: 18, opacity: 0.45, width: 3, roads: "major" },
+          { colour: "#1fd987", blur: 4, opacity: 0.3, width: 0.7 },
+        ],
         overlay: { id: "scanline-soft", opacity: 0.6 },
       },
     }),

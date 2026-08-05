@@ -55,10 +55,25 @@ const optionDefaults = {
   outlineOnly: false,
   lineWidthScale: 1,
   /**
-   * A wide, blurred copy of the roads beneath the roads: what makes a road look
-   * lit rather than drawn. `{ colour, width, blur }`, or null for a flat map.
+   * Blurred copies of the roads beneath the roads: what makes a road look lit
+   * rather than drawn. `{ colour, width, blur, opacity }`, or an array of them
+   * for real bloom — one pass is a smudge, three are a halo that falls off the
+   * way light does. Null for a flat map.
    */
   glow: null,
+  /**
+   * Buildings with height, as `{ colour, opacity, minzoom }`.
+   *
+   * A city is not flat, and a lit one least of all: the light comes off the
+   * buildings, so a night basemap that draws them as footprints has nothing in
+   * it above the road surface.
+   */
+  extrusion: null,
+  /**
+   * A colour for the small roads, so the grid has a hierarchy rather than one
+   * value everywhere. Falls back to the road colour.
+   */
+  minorRoad: null,
   /** A pattern laid over the whole map — grain, scanlines — as `{ id, opacity }`. */
   overlay: null,
   /**
@@ -291,17 +306,25 @@ const buildLayers = (palette, options) => {
     });
   }
 
-  if (options.glow) {
+  // Widest and faintest first, so the passes stack into a halo rather than
+  // fighting each other.
+  const glows = options.glow ? (Array.isArray(options.glow) ? options.glow : [options.glow]) : [];
+  glows.forEach((glow, pass) => {
+    // A pass may follow fewer roads than the map draws. At street zoom a wide
+    // blur on every lane merges into one lit field — the city stops being a
+    // grid and becomes a colour — so the broad wash follows the arterials and
+    // only the tight passes follow everything.
+    const glowClasses = ROAD_CLASSES[glow.roads] ?? classes;
     layers.push({
-      id: "road-glow",
+      id: pass === 0 ? "road-glow" : `road-glow-${pass}`,
       type: "line",
       source: SOURCE,
       "source-layer": "transportation",
-      filter: ["in", "class", ...classes],
+      filter: ["in", "class", ...glowClasses],
       paint: {
-        "line-color": options.glow.colour ?? palette.road,
-        "line-blur": options.glow.blur ?? 6,
-        "line-opacity": options.glow.opacity ?? 0.55,
+        "line-color": glow.colour ?? palette.road,
+        "line-blur": glow.blur ?? 6,
+        "line-opacity": glow.opacity ?? 0.55,
         "line-width": interpolate(
           scaled(
             [
@@ -309,12 +332,12 @@ const buildLayers = (palette, options) => {
               [12, 8],
               [16, 22],
             ],
-            (options.glow.width ?? 1) * options.lineWidthScale,
+            (glow.width ?? 1) * options.lineWidthScale,
           ),
         ),
       },
     });
-  }
+  });
 
   layers.push({
     id: "roads",
@@ -336,6 +359,31 @@ const buildLayers = (palette, options) => {
       ),
     },
   });
+
+  if (options.minorRoad) {
+    // Drawn over the roads layer rather than instead of it: the small streets
+    // keep their casing and lose only their brightness.
+    layers.push({
+      id: "minor-roads",
+      type: "line",
+      source: SOURCE,
+      "source-layer": "transportation",
+      filter: ["in", "class", "minor", "service", "track", "path"],
+      paint: {
+        "line-color": options.minorRoad,
+        "line-width": interpolate(
+          scaled(
+            [
+              [6, 0.4],
+              [12, 1.6],
+              [16, 4.5],
+            ],
+            options.lineWidthScale,
+          ),
+        ),
+      },
+    });
+  }
 
   layers.push({
     id: "motorways",
@@ -370,6 +418,24 @@ const buildLayers = (palette, options) => {
       "line-width": 0.8 * options.lineWidthScale,
     },
   });
+
+  if (options.extrusion) {
+    layers.push({
+      id: "building-extrusion",
+      type: "fill-extrusion",
+      source: SOURCE,
+      "source-layer": "building",
+      minzoom: options.extrusion.minzoom ?? 14,
+      paint: {
+        "fill-extrusion-color": options.extrusion.colour ?? palette.building,
+        "fill-extrusion-opacity": options.extrusion.opacity ?? 0.85,
+        "fill-extrusion-height": ["coalesce", ["get", "render_height"], 12],
+        "fill-extrusion-base": ["coalesce", ["get", "render_min_height"], 0],
+        // Lit from the ground up, which is where a city's light comes from.
+        "fill-extrusion-vertical-gradient": true,
+      },
+    });
+  }
 
   if (options.labels) {
     // Wards, suburbs and villages, from the zoom where a reader has stopped

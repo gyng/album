@@ -90,6 +90,70 @@ describe("styles that are about more than colour", () => {
     expect(ids.indexOf("road-glow")).toBeLessThan(ids.indexOf("roads"));
   });
 
+  // One blurred pass is a smudge. Three, widest and faintest first, fall off
+  // the way light does.
+  it("stacks glow passes into a halo, widest first", () => {
+    const style = composeMapStyle({
+      options: {
+        glow: [
+          { colour: "#003", blur: 24, width: 4, opacity: 0.25 },
+          { colour: "#0af", blur: 8, width: 1.6, opacity: 0.5 },
+        ],
+      },
+    });
+    const ids = layerIds(style);
+
+    expect(ids.filter((id) => id.startsWith("road-glow"))).toHaveLength(2);
+    expect(ids.indexOf("road-glow")).toBeLessThan(ids.indexOf("road-glow-1"));
+    expect(ids.indexOf("road-glow-1")).toBeLessThan(ids.indexOf("roads"));
+  });
+
+  // A lit city's light comes off its buildings, so a night basemap that draws
+  // them as footprints has nothing in it above the road surface.
+  it("stands the buildings up when asked", () => {
+    const extruded = composeMapStyle({
+      options: { extrusion: { colour: "#123", minzoom: 15 } },
+    }).layers.find((layer) => layer.id === "building-extrusion");
+
+    expect(extruded).toMatchObject({ type: "fill-extrusion", minzoom: 15 });
+    expect(extruded.paint["fill-extrusion-color"]).toBe("#123");
+    expect(extruded.paint["fill-extrusion-height"]).toEqual([
+      "coalesce",
+      ["get", "render_height"],
+      12,
+    ]);
+    expect(layerIds(composeMapStyle({}))).not.toContain("building-extrusion");
+  });
+
+  it("gives the small streets a value of their own where a style asks", () => {
+    const minor = composeMapStyle({ options: { minorRoad: "#334" } }).layers.find(
+      (layer) => layer.id === "minor-roads",
+    );
+
+    expect(minor.paint["line-color"]).toBe("#334");
+    expect(minor.filter).toEqual(["in", "class", "minor", "service", "track", "path"]);
+    expect(layerIds(composeMapStyle({}))).not.toContain("minor-roads");
+  });
+
+  // A wide blur on every lane merges into one lit field at street zoom, so a
+  // pass can follow fewer roads than the map draws.
+  it("lets a glow pass follow only the arterials", () => {
+    const style = composeMapStyle({
+      options: { roads: "all", glow: [{ blur: 20, roads: "major" }, { blur: 4 }] },
+    });
+
+    expect(style.layers.find((layer) => layer.id === "road-glow").filter).toEqual([
+      "in",
+      "class",
+      ...ROAD_CLASSES.major,
+    ]);
+    expect(style.layers.find((layer) => layer.id === "road-glow-1").filter).toEqual([
+      "in",
+      "class",
+      ...ROAD_CLASSES.all,
+    ]);
+  });
+
   it("draws no glow at all by default", () => {
     expect(layerIds(composeMapStyle({}))).not.toContain("road-glow");
   });
