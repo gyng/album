@@ -47,9 +47,20 @@ export type EmbeddingSpaceCluster = {
   count: number;
 };
 
+/**
+ * How much each axis was stretched to fill the cube.
+ *
+ * The turning view wants the stretch — the components come out ordered by
+ * variance, and a faithful cloud is a pancake. The flat view is a scatter plot
+ * of the first two components and wants their real proportions, which is what
+ * multiplying by these gives back.
+ */
+export type EmbeddingAxisScale = { x: number; y: number; z: number };
+
 export type EmbeddingSpace = {
   points: EmbeddingSpaceEntry[];
   clusters: EmbeddingSpaceCluster[];
+  axisScale: EmbeddingAxisScale;
   atlas: EmbeddingSpaceAtlas | null;
 };
 
@@ -115,9 +126,16 @@ export const fetchEmbeddingSpace = async (
   const payload = (await response.json()) as {
     points?: unknown;
     clusters?: unknown;
+    axisScale?: unknown;
     atlas?: unknown;
   };
+  const scale = payload.axisScale as Partial<EmbeddingAxisScale> | undefined;
   return {
+    axisScale: {
+      x: typeof scale?.x === "number" ? scale.x : 1,
+      y: typeof scale?.y === "number" ? scale.y : 1,
+      z: typeof scale?.z === "number" ? scale.z : 1,
+    },
     points: Array.isArray(payload.points) ? payload.points.filter(isEntry) : [],
     clusters: Array.isArray(payload.clusters) ? payload.clusters.filter(isCluster) : [],
     atlas: isAtlas(payload.atlas) ? payload.atlas : null,

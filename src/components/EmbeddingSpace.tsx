@@ -49,8 +49,15 @@ const INITIAL_CAMERA: Camera = { yaw: 0.7, pitch: 0.22, distance: 3.8 };
 /** Radians per second while nobody is holding it. Slow enough to read. */
 const DRIFT = 0.11;
 
-const MIN_DISTANCE = 1.4;
-const MAX_DISTANCE = 6;
+/**
+ * How near and how far the eye may get.
+ *
+ * Wide, because both ends are worth having: close enough to be inside the
+ * cloud with a handful of photographs around you, far enough that the whole
+ * thing is a speck of its own colours.
+ */
+const MIN_DISTANCE = 0.85;
+const MAX_DISTANCE = 16;
 const MAX_PITCH = Math.PI / 2.4;
 
 /** Dot size at the centre of the cloud, in pixels. */
@@ -201,6 +208,7 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
   const theme = useActiveTheme();
   const [entries, setEntries] = React.useState<EmbeddingSpaceEntry[] | null>(null);
   const [atlas, setAtlas] = React.useState<EmbeddingSpaceAtlas | null>(null);
+  const [axisScale, setAxisScale] = React.useState({ x: 1, y: 1, z: 1 });
   const [clusters, setClusters] = React.useState<EmbeddingSpaceCluster[]>([]);
   const [failed, setFailed] = React.useState(false);
   const [hovered, setHovered] = React.useState<Placed | null>(null);
@@ -211,6 +219,15 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
   const [showcased, setShowcased] = React.useState<EmbeddingSpaceEntry | null>(null);
   /** The words currently drifting, mirrored into React only when one is replaced. */
   const [driftingTags, setDriftingTags] = React.useState<string[]>([]);
+  /**
+   * Flat, the cloud is the first two components and nothing else — the same
+   * arrangement seen from directly in front, where a reader can compare
+   * distances rather than watch them foreshorten. Turning is meaningless there,
+   * so a drag pans instead.
+   */
+  const [flat, setFlat] = React.useState(false);
+  /** How far in the eye is, as a multiple of where it starts. */
+  const [zoom, setZoom] = React.useState(1);
 
   const canvasRef = React.useRef<HTMLCanvasElement | null>(null);
   const stageRef = React.useRef<HTMLDivElement | null>(null);
@@ -250,6 +267,9 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
   const tappedRef = React.useRef<string | null>(null);
   /** Hit testing against the pose actually on screen, as the draw loop last left it. */
   const pickRef = React.useRef<((at: { x: number; y: number }) => Placed | null) | null>(null);
+  const flatRef = React.useRef(false);
+  /** Screen-space offset, for panning a flat view that has been zoomed into. */
+  const panRef = React.useRef({ x: 0, y: 0 });
   const chosenRef = React.useRef<number | null>(null);
   /** The name elements, positioned from the draw loop. */
   const labelRefs = React.useRef<(HTMLButtonElement | null)[]>([]);
@@ -260,6 +280,8 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
   /** Per photograph: how much of a photograph it currently is, rather than a dot. */
   const photonessRef = React.useRef<Float32Array | null>(null);
   const lastNamedRef = React.useRef<EmbeddingSpaceEntry | null>(null);
+  /** The chip naming what is being looked at, moved to sit under it. */
+  const captionRef = React.useRef<HTMLElement | null>(null);
   /** The words drifting through the cloud: which photograph each belongs to, and since when. */
   const driftingRefs = React.useRef<(HTMLSpanElement | null)[]>([]);
   const driftingTagsRef = React.useRef<({ index: number; tag: string; start: number } | null)[]>(
@@ -269,6 +291,7 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
 
   driftingRef.current = drifting;
   chosenRef.current = chosen;
+  flatRef.current = flat;
 
   React.useEffect(() => {
     let cancelled = false;
@@ -278,6 +301,7 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
         setEntries(space.points);
         setAtlas(space.atlas);
         setClusters(space.clusters);
+        setAxisScale(space.axisScale);
       })
       .catch(() => {
         if (!cancelled) setFailed(true);
@@ -304,9 +328,12 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
 
     const onWheel = (event: WheelEvent) => {
       const camera = cameraRef.current;
+      // Proportional rather than fixed: a step that moves the eye a tenth of
+      // where it already is takes the same number of turns to cross the range
+      // from either end, where a fixed step crawls when near and leaps when far.
       const next = Math.max(
         MIN_DISTANCE,
-        Math.min(MAX_DISTANCE, camera.distance + event.deltaY * 0.0016),
+        Math.min(MAX_DISTANCE, camera.distance * Math.exp(event.deltaY * 0.0012)),
       );
       if (next === camera.distance) return;
 
@@ -363,7 +390,7 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
       // moving is a name you have to chase to click, and a photograph under the
       // pointer should stay under the pointer.
       const engaged = pointerRef.current !== null || draggingRef.current !== null;
-      if (driftingRef.current && !reduced && !engaged) {
+      if (driftingRef.current && !reduced && !engaged && !flatRef.current) {
         cameraRef.current.yaw += DRIFT * elapsed;
       }
 
@@ -379,6 +406,8 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
       context.clearRect(0, 0, width, viewHeight);
 
       const viewport = { width, height: viewHeight };
+      const isFlat = flatRef.current;
+      const pan = isFlat ? panRef.current : { x: 0, y: 0 };
 
       // On a phone the canvas is a third of the area it is on a laptop, and a
       // thumbnail that stays 22px there closes the cloud into a mosaic again.
@@ -389,18 +418,51 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
       const camera = cameraRef.current;
       const placed: Placed[] = [];
       entries.forEach((entry, index) => {
-        const projected = projectPoint(entry, camera, viewport);
-        if (projected) placed.push({ ...projected, entry, index });
+        // Flat is the same projection with the depth axis dropped — which is
+        // exactly the two-component projection, since the first two directions
+        // are the same whether three are solved for or two. The stretch that
+        // makes the cloud turnable is undone here, because a scatter plot of
+        // two components should show the proportions they actually have.
+        const projected = projectPoint(
+          isFlat ? { x: entry.x * axisScale.x, y: entry.y * axisScale.y, z: 0 } : entry,
+          camera,
+          viewport,
+        );
+        if (projected) {
+          placed.push({
+            ...projected,
+            x: projected.x + pan.x,
+            y: projected.y + pan.y,
+            entry,
+            index,
+          });
+        }
       });
 
       const ordered = backToFront(placed);
       placedRef.current = ordered;
 
+      // The cloud's own front and back this frame. Fading against these rather
+      // than against absolute distance is what makes the depth read the same at
+      // every zoom: tied to raw distance the whole cloud dimmed as it was
+      // pushed away, and tied to the camera alone it flattened as it was, since
+      // the spread between nearest and furthest shrinks with the perspective.
+      const backDepth = ordered[0]?.depth ?? 1;
+      const frontDepth = ordered.at(-1)?.depth ?? 0;
+      const depthSpan = Math.max(0.0001, backDepth - frontDepth);
+
       // The nearest handful become photographs; the rest stay as their own
       // dominant colour, which is what keeps fifteen hundred of them readable.
       const nearest = new Set(
         [...ordered]
-          .sort((a, b) => a.depth - b.depth)
+          // Depth decides which are photographs in the turning view. Flat, there
+          // is no depth to decide with, and picking by distance from the middle
+          // made a photographic core inside a halo of dots — so the detail is
+          // spread instead, by a stable golden-ratio shuffle that has no
+          // relationship to where anything sits.
+          .sort((a, b) =>
+            isFlat ? ((a.index * 0.618033) % 1) - ((b.index * 0.618033) % 1) : a.depth - b.depth,
+          )
           .slice(
             0,
             atlas ? Math.round(ATLAS_THUMBNAIL_BUDGET * (0.35 + room * 0.65)) : THUMBNAIL_BUDGET,
@@ -463,13 +525,12 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
           thumbnailsRef.current.set(point.entry.src, loading);
         }
 
-        // Further away is fainter, and the far field is *much* fainter than a
-        // linear fade would make it: a thousand translucent dots behind each
-        // other stack into a haze, and the haze is what buries the cloud's
-        // shape. Squaring the falloff keeps the front legible and lets the back
-        // recede into the ground instead of milking it up.
-        const fade = Math.min(1, 1.7 / point.depth);
-        const depthAlpha = Math.max(0.08, fade * fade);
+        // 0 at the front of the cloud, 1 at the back, whatever the zoom. The
+        // curve is steep because the far field has to be much fainter than a
+        // linear fade makes it: a thousand translucent photographs behind each
+        // other stack into a haze, and the haze is what buries the shape.
+        const behind = (point.depth - frontDepth) / depthSpan;
+        const depthAlpha = Math.max(0.08, 1 - 0.92 * behind ** 1.3);
 
         // Resolved from how much of a photograph it currently is rather than
         // from whether it still wants to be one: taking the sheet away at the
@@ -534,7 +595,14 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
         .map((cluster, index) => ({ ...cluster, index }))
         .sort((a, b) => b.count - a.count)
         .slice(0, room < 0.8 ? 4 : clusters.length)
-        .map((cluster) => ({ cluster, at: projectPoint(cluster, camera, viewport) }))
+        .map((cluster) => ({
+          cluster,
+          at: projectPoint(
+            isFlat ? { x: cluster.x * axisScale.x, y: cluster.y * axisScale.y, z: 0 } : cluster,
+            camera,
+            viewport,
+          ),
+        }))
         .filter(
           (
             entry,
@@ -913,6 +981,31 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
         context.strokeRect(under.x - size / 2, under.y - size / 2, size, size);
       }
 
+      // The words belong to one photograph, so they follow it rather than
+      // sitting in a corner the reader has to look away to read.
+      const named = focused ?? (showcaseStrength > 0.25 ? star : null);
+      const caption = captionRef.current;
+      if (caption && named) {
+        const size = thumbnail * (focused ? 2.4 + 0.6 * focus : 2.6) * Math.max(0.8, named.scale);
+        const half = caption.offsetWidth / 2;
+        caption.style.transform = `translate(${Math.round(
+          Math.max(0, Math.min(width - caption.offsetWidth, named.x - half)),
+        )}px, ${Math.round(
+          Math.max(
+            0,
+            Math.min(
+              viewHeight - caption.offsetHeight,
+              named.y + size / 2 + Number(THUMBNAIL_SIZE) * 0.35,
+            ),
+          ),
+        )}px)`;
+      }
+
+      setZoom((current) => {
+        const next = Math.round((INITIAL_CAMERA.distance / camera.distance) * 10) / 10;
+        return next === current ? current : next;
+      });
+
       setShowcased((current) => {
         const next = showcaseStrength > 0.25 ? (star?.entry ?? null) : null;
         return current?.href === next?.href ? current : next;
@@ -927,7 +1020,7 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
 
     frame = requestAnimationFrame(draw);
     return () => cancelAnimationFrame(frame);
-  }, [atlas, clusters, entries, fullResolution, theme]);
+  }, [atlas, axisScale, clusters, entries, fullResolution, theme]);
 
   const onPointerDown = (event: React.PointerEvent<HTMLCanvasElement>) => {
     event.currentTarget.setPointerCapture(event.pointerId);
@@ -949,11 +1042,21 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
 
     const camera = cameraRef.current;
     travelledRef.current += Math.hypot(event.clientX - dragging.x, event.clientY - dragging.y);
-    camera.yaw += (event.clientX - dragging.x) * 0.006;
-    camera.pitch = Math.max(
-      -MAX_PITCH,
-      Math.min(MAX_PITCH, camera.pitch + (event.clientY - dragging.y) * 0.004),
-    );
+
+    if (flatRef.current) {
+      // Nothing to turn: a flat view is dragged around instead.
+      panRef.current = {
+        x: panRef.current.x + (event.clientX - dragging.x),
+        y: panRef.current.y + (event.clientY - dragging.y),
+      };
+    } else {
+      camera.yaw += (event.clientX - dragging.x) * 0.006;
+      camera.pitch = Math.max(
+        -MAX_PITCH,
+        Math.min(MAX_PITCH, camera.pitch + (event.clientY - dragging.y) * 0.004),
+      );
+    }
+
     draggingRef.current = { x: event.clientX, y: event.clientY };
   };
 
@@ -1079,6 +1182,28 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
             the picture is the subject and the chrome should cost it no room. */}
         <div className={styles.tools}>
           <OverlayButton
+            aria-pressed={flat}
+            className={flat ? styles.toolActive : ""}
+            onClick={() => {
+              setFlat((current) => {
+                // Flat means straight on: a view left half-turned would be an
+                // oblique scatter plot, which is neither of the two things this
+                // control offers.
+                if (!current) {
+                  cameraRef.current.yaw = 0;
+                  cameraRef.current.pitch = 0;
+                } else {
+                  cameraRef.current.yaw = INITIAL_CAMERA.yaw;
+                  cameraRef.current.pitch = INITIAL_CAMERA.pitch;
+                }
+                panRef.current = { x: 0, y: 0 };
+                return !current;
+              });
+            }}
+          >
+            {flat ? "3D" : "2D"}
+          </OverlayButton>
+          <OverlayButton
             aria-pressed={!drifting}
             className={drifting ? "" : styles.toolActive}
             onClick={() => setDrifting((current) => !current)}
@@ -1124,10 +1249,17 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
           </span>
         ))}
 
+        {/* What the wheel has done, in one number: a cloud with no edges and no
+            grid gives a reader nothing else to judge it by. */}
+        <p className={styles.zoom} aria-live="off">
+          ×{zoom.toFixed(1)}
+        </p>
+
         {count === 0 ? <p className={styles.status}>Arranging the collection…</p> : null}
 
         {/* Always mounted, so it fades rather than appears. */}
         <figcaption
+          ref={captionRef}
           className={[
             styles.caption,
             named ? styles.captionShown : "",

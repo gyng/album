@@ -21,6 +21,8 @@ export type EmbeddingSpaceAtlas = {
 export type EmbeddingSpacePayload = {
   points: EmbeddingSpacePoint[];
   clusters: EmbeddingSpaceCluster[];
+  /** How much each axis was stretched to fill the cube; the flat view undoes it. */
+  axisScale: { x: number; y: number; z: number };
   atlas: EmbeddingSpaceAtlas | null;
 };
 
@@ -69,11 +71,11 @@ const readAtlas = (): { atlas: EmbeddingSpaceAtlas; slots: Record<string, number
  */
 export const loadEmbeddingSpace = async (): Promise<EmbeddingSpacePayload> => {
   const sheet = readAtlas();
-  const { points, clusters } = await loadEmbeddingSpacePoints(
+  const { points, clusters, axisScale } = await loadEmbeddingSpacePoints(
     await getAlbums(),
     undefined,
     sheet?.slots ?? {},
   );
 
-  return { points, clusters, atlas: sheet?.atlas ?? null };
+  return { points, clusters, axisScale, atlas: sheet?.atlas ?? null };
 };

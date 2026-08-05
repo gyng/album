@@ -15,7 +15,7 @@ describe("fetchEmbeddingSpace", () => {
   });
 
   it("returns the points it was given", async () => {
-    await expect(fetchEmbeddingSpace(respond({ points: [point] }))).resolves.toEqual({
+    await expect(fetchEmbeddingSpace(respond({ points: [point] }))).resolves.toMatchObject({
       points: [point],
       clusters: [],
       atlas: null,
@@ -46,7 +46,7 @@ describe("fetchEmbeddingSpace", () => {
   // A build with no embeddings database publishes an empty cloud rather than
   // failing, so the reader gets a section that says so rather than a crash.
   it("reads an empty or malformed payload as an empty cloud", async () => {
-    await expect(fetchEmbeddingSpace(respond({ points: [] }))).resolves.toEqual({
+    await expect(fetchEmbeddingSpace(respond({ points: [] }))).resolves.toMatchObject({
       points: [],
       clusters: [],
       atlas: null,
@@ -55,6 +55,18 @@ describe("fetchEmbeddingSpace", () => {
     await expect(
       fetchEmbeddingSpace(respond({ points: [{ src: "/a.avif" }, null, 4] })),
     ).resolves.toMatchObject({ points: [] });
+  });
+
+  // The turning view is stretched to be turnable; the flat view undoes that, so
+  // it has to be told by how much — and a payload from before this existed must
+  // read as "not stretched" rather than as zero.
+  it("takes the axis stretch, and reads a payload without one as unstretched", async () => {
+    await expect(
+      fetchEmbeddingSpace(respond({ points: [point], axisScale: { x: 1, y: 0.6, z: 0.33 } })),
+    ).resolves.toMatchObject({ axisScale: { x: 1, y: 0.6, z: 0.33 } });
+    await expect(fetchEmbeddingSpace(respond({ points: [point] }))).resolves.toMatchObject({
+      axisScale: { x: 1, y: 1, z: 1 },
+    });
   });
 
   it("reports a response that never arrived", async () => {

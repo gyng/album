@@ -43,10 +43,10 @@
   grid-row: 1 / span 2;
   align-self: stretch;
   min-block-size: var(--size-180);
-  /* Capped as well as floored, so a fortnight's journey and a single outing
-     are the same size on the page: stretching to the trip beside it made the
-     map a bar chart of how long each trip was. */
-  max-block-size: var(--size-360);
+  /* Square, and the same square for every trip: stretching to the trip beside
+     it made the map a bar chart of how long each trip was, and a route is not
+     wider than it is tall often enough to justify a letterbox. */
+  max-block-size: var(--trip-map-width);
   position: sticky;
   inset-block-start: var(--m-l);
   min-inline-size: 0;

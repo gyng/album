@@ -887,9 +887,14 @@ export const loadEmbeddingSpacePoints = async (
   albums: Content[],
   dbPath = DEFAULT_EMBEDDINGS_DB_PATH,
   slots: Record<string, number> = {},
-): Promise<{ points: EmbeddingSpacePoint[]; clusters: EmbeddingSpaceCluster[] }> =>
+): Promise<{
+  points: EmbeddingSpacePoint[];
+  clusters: EmbeddingSpaceCluster[];
+  /** How much each axis was stretched to fill the cube; the flat view undoes it. */
+  axisScale: { x: number; y: number; z: number };
+}> =>
   measureBuild("stats.embeddingSpace", async () => {
-    const empty = { points: [], clusters: [] };
+    const empty = { points: [], clusters: [], axisScale: { x: 1, y: 1, z: 1 } };
     const resolvedDbPath = resolveEmbeddingsDbPath(dbPath);
     if (!resolvedDbPath) {
       return empty;
@@ -943,7 +948,7 @@ export const loadEmbeddingSpacePoints = async (
       }
 
       const vectors = decoded.map((entry) => entry.vector);
-      const positions = projectToThreeDimensions(vectors);
+      const { points: positions, axisScale } = projectToThreeDimensions(vectors);
       const neighbours = nearestNeighbours(vectors, NEIGHBOURS_PER_PHOTO);
 
       // What each clump turned out to be about, from the tags of whatever
@@ -1001,7 +1006,7 @@ export const loadEmbeddingSpacePoints = async (
         };
       });
 
-      return { points, clusters };
+      return { points, clusters, axisScale };
     } finally {
       await closeDatabase(db);
     }

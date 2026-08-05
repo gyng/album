@@ -131,6 +131,21 @@
   pointer-events: none;
 }
 
+/* How far in the eye is, in the corner opposite the controls. */
+.zoom {
+  position: absolute;
+  inset-block-end: var(--m-s);
+  inset-inline-end: var(--m-s);
+  margin: 0;
+  padding: calc(var(--m-xs) / 2) var(--m-s);
+  border-radius: var(--radius-pill);
+  background: color-mix(in oklch, var(--c-overlay-dark) 60%, transparent);
+  color: var(--c-white);
+  font-size: var(--fs-s);
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+
 .status {
   position: absolute;
   inset-block-start: 50%;
@@ -143,12 +158,13 @@
   pointer-events: none;
 }
 
-/* What the pointer is on, named in the corner rather than across the width:
-   the words belong to one photograph, so they sit beside it. */
+/* What the pointer is on, named beneath it: the words belong to one
+   photograph, so the draw loop puts them under that photograph rather than in
+   a corner the reader has to look away to read. */
 .caption {
   position: absolute;
-  inset-block-end: var(--m-s);
-  inset-inline-start: var(--m-s);
+  inset-block-start: 0;
+  inset-inline-start: 0;
   display: flex;
   align-items: baseline;
   gap: var(--m-s);
@@ -160,10 +176,10 @@
   font-size: var(--fs-s);
   pointer-events: none;
   opacity: 0;
-  transform: translateY(var(--m-xs));
+  /* No transition on the transform: it is written every frame to follow the
+     photograph, and an eased transform would lag a frame behind it. */
   transition:
     opacity var(--t-base) var(--ease-out),
-    transform var(--t-base) var(--ease-out),
     background-color var(--t-base) var(--ease-out);
 }
 

@@ -121,13 +121,25 @@ const deflate = (rows: number[][], direction: readonly number[]): void => {
 };
 
 /**
+ * How much each axis was stretched to fill the cube, relative to the widest.
+ *
+ * The cloud is stretched so it can be turned; the flat view is a scatter plot
+ * and wants the proportions the data actually has. Multiplying a point's
+ * coordinate by its axis's figure here undoes the stretch exactly.
+ */
+export type AxisScale = { x: number; y: number; z: number };
+
+export type Projection = { points: SpacePoint[]; axisScale: AxisScale };
+
+/**
  * Vectors to a cloud: the three directions this collection varies along most,
  * scaled into a cube from -1 to 1 so a camera can be written once.
  */
-export const projectToThreeDimensions = (vectors: readonly (readonly number[])[]): SpacePoint[] => {
+export const projectToThreeDimensions = (vectors: readonly (readonly number[])[]): Projection => {
   const dimensions = vectors[0]?.length ?? 0;
+  const unscaled = { x: 1, y: 1, z: 1 };
   if (vectors.length < 2 || dimensions < 3) {
-    return vectors.map(() => ({ x: 0, y: 0, z: 0 }));
+    return { points: vectors.map(() => ({ x: 0, y: 0, z: 0 })), axisScale: unscaled };
   }
 
   // Centred first: principal components describe variation around the middle of
@@ -176,15 +188,26 @@ export const projectToThreeDimensions = (vectors: readonly (readonly number[])[]
     z: Math.max(...projected.map((point) => Math.abs(point.z))),
   };
   const widest = Math.max(extent.x, extent.y, extent.z);
-  if (widest === 0) return projected;
+  if (widest === 0) return { points: projected, axisScale: unscaled };
 
   const divisor = (own: number) => Math.max(own, widest / MAX_AXIS_STRETCH);
+  const divisors = { x: divisor(extent.x), y: divisor(extent.y), z: divisor(extent.z) };
+  const largest = Math.max(divisors.x, divisors.y, divisors.z);
 
-  return projected.map((point) => ({
-    x: point.x / divisor(extent.x),
-    y: point.y / divisor(extent.y),
-    z: point.z / divisor(extent.z),
-  }));
+  return {
+    points: projected.map((point) => ({
+      x: point.x / divisors.x,
+      y: point.y / divisors.y,
+      z: point.z / divisors.z,
+    })),
+    // Normalised so the widest axis is 1: the flat view multiplies by these to
+    // get back to the proportions the components actually have.
+    axisScale: {
+      x: divisors.x / largest,
+      y: divisors.y / largest,
+      z: divisors.z / largest,
+    },
+  };
 };
 
 /* -------------------------------------------------------------------------- */

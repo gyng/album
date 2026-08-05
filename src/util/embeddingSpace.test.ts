@@ -29,7 +29,7 @@ describe("projectToThreeDimensions", () => {
       ...Array.from({ length: 6 }, (_, i) => spike(32, 2, 5 + i * 0.01)),
     ];
 
-    const points = projectToThreeDimensions(vectors);
+    const { points } = projectToThreeDimensions(vectors);
     const centroid = (from: number) => {
       const group = points.slice(from, from + 6);
       return {
@@ -51,7 +51,7 @@ describe("projectToThreeDimensions", () => {
   });
 
   it("fits the cloud into a cube a camera can be written for", () => {
-    const points = projectToThreeDimensions(
+    const { points } = projectToThreeDimensions(
       Array.from({ length: 40 }, (_, index) => spike(24, index % 24, 1 + index)),
     );
 
@@ -67,7 +67,7 @@ describe("projectToThreeDimensions", () => {
   // as an almost flat slab — true, and useless to turn around, since the third
   // axis is the one that reads as depth.
   it("gives each axis the whole cube, so the depth axis can be seen", () => {
-    const points = projectToThreeDimensions(
+    const { points } = projectToThreeDimensions(
       Array.from({ length: 40 }, (_, index) => spike(24, index % 24, 1 + index)),
     );
 
@@ -87,7 +87,7 @@ describe("projectToThreeDimensions", () => {
       return flat;
     });
 
-    const points = projectToThreeDimensions(vectors);
+    const { points } = projectToThreeDimensions(vectors);
     const depth = Math.max(...points.map((point) => Math.abs(point.z)));
 
     expect(depth).toBeLessThan(0.01);
@@ -102,12 +102,12 @@ describe("projectToThreeDimensions", () => {
   });
 
   it("has nothing to say about one photograph, or none", () => {
-    expect(projectToThreeDimensions([])).toEqual([]);
-    expect(projectToThreeDimensions([[1, 2, 3]])).toEqual([{ x: 0, y: 0, z: 0 }]);
+    expect(projectToThreeDimensions([]).points).toEqual([]);
+    expect(projectToThreeDimensions([[1, 2, 3]]).points).toEqual([{ x: 0, y: 0, z: 0 }]);
   });
 
   it("survives a collection where every vector is identical", () => {
-    const points = projectToThreeDimensions(Array.from({ length: 5 }, () => [1, 1, 1, 1]));
+    const { points } = projectToThreeDimensions(Array.from({ length: 5 }, () => [1, 1, 1, 1]));
 
     for (const point of points) {
       expect(Number.isFinite(point.x)).toBe(true);
