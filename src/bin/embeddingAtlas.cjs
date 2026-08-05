@@ -66,4 +66,37 @@ const atlasManifest = (plan, files) => ({
   slots: plan.slots,
 });
 
-module.exports = { CELL, SHEET, PER_ROW, PER_SHEET, planAtlas, slotPosition, atlasManifest };
+/**
+ * What the sheet was made from, as one short string.
+ *
+ * The atlas is 113 seconds of every build — fifteen hundred resizes and an AVIF
+ * encode of a 2048px sheet — and it is *identical* between two builds that added
+ * no photographs. So the inputs are fingerprinted: every source path with its
+ * size and modification time, in the layout's own sorted order, plus the layout
+ * constants that decide where each cell lands. Any of those changing changes the
+ * sheet; none of them changing means the sheet on disk is already the answer.
+ *
+ * Deliberately not a content hash of fifteen hundred files: reading them all is
+ * most of the work this is trying to skip.
+ *
+ * @param {Array<{ path: string, size: number, mtimeMs: number }>} sources
+ * @param {{ cell: number, sheet: number }} layout
+ */
+const atlasFingerprint = (sources, layout) =>
+  [
+    `v1 cell=${layout.cell} sheet=${layout.sheet}`,
+    ...[...sources]
+      .sort((left, right) => (left.path < right.path ? -1 : left.path > right.path ? 1 : 0))
+      .map((source) => `${source.path} ${source.size} ${Math.round(source.mtimeMs)}`),
+  ].join("\n");
+
+module.exports = {
+  CELL,
+  SHEET,
+  PER_ROW,
+  PER_SHEET,
+  planAtlas,
+  slotPosition,
+  atlasManifest,
+  atlasFingerprint,
+};

@@ -12,6 +12,7 @@ Personal photo gallery — Next.js 16, TypeScript, CSS Modules, MapLibre GL. Pho
 >
 > **Deploys are prebuilt — `./album deploy` (or `publish`), never plain `vercel deploy`.** The build runs here and uploads with `--prebuilt`, because building in Vercel's container cannot work: `sqlite3` ships a prebuilt binary linked against GLIBC 2.38 and the image's libm is older, so `next build` dies collecting page data for `/album/[[...slug]]`. `src/vercel.json` blocks both routes into that failure — Git deployments are disabled, and the build command runs `bin/assert-local-build.cjs` first, which exits non-zero under `/vercel/`.
 
+- **Iterating quickly matters here.** A full build was ~3 minutes and is now ~21 seconds warm, because `prepare:embedding-atlas` — 1,512 resizes and an AVIF encode of a 2048px sheet, **108 seconds**, against ~4 for every other prepass combined — now skips when its inputs are unchanged. It fingerprints each source's path, size and mtime plus the layout constants into `public/data/embedding-atlas.inputs`; `node bin/prepare-embedding-atlas.cjs --force` rebuilds regardless. Two more fast paths worth knowing: **basemap style changes need no build at all** (`npm run prepare:map-styles`, ~0.3s, then reload — `public/` is served directly), and for CSS or component work `npm run dev` is seconds where build-and-start is minutes
 - **Tests:** `npx jest` from `src/` (not the repo root)
 - Subset: `npx jest --testPathPatterns="MapWorld"` (plural flag)
 - **Dev:** `npm run dev` from `src/`

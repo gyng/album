@@ -5,6 +5,7 @@ const {
   atlasManifest,
   planAtlas,
   slotPosition,
+  atlasFingerprint,
 } = require("./embeddingAtlas.cjs");
 
 const paths = (count) =>
@@ -71,5 +72,56 @@ describe("atlasManifest", () => {
       slots: plan.slots,
     });
     expect(manifest.placements).toBeUndefined();
+  });
+});
+
+// The atlas is the most expensive prepass by an order of magnitude — 108 seconds
+// against four for everything else — and on a build that added no photographs it
+// writes a byte-identical sheet. The fingerprint is what lets it not.
+describe("atlasFingerprint", () => {
+  const layout = { cell: 48, sheet: 2048 };
+  const sources = [
+    { path: "../albums/a/one.jpg", size: 100, mtimeMs: 1000 },
+    { path: "../albums/a/two.jpg", size: 200, mtimeMs: 2000 },
+  ];
+
+  it("is the same for the same inputs, whatever order they arrive in", () => {
+    expect(atlasFingerprint([...sources].reverse(), layout)).toBe(
+      atlasFingerprint(sources, layout),
+    );
+  });
+
+  it("changes when a photograph is added, removed, edited or replaced", () => {
+    const base = atlasFingerprint(sources, layout);
+
+    expect(atlasFingerprint(sources.slice(0, 1), layout)).not.toBe(base);
+    expect(
+      atlasFingerprint(
+        [...sources, { path: "../albums/a/three.jpg", size: 1, mtimeMs: 1 }],
+        layout,
+      ),
+    ).not.toBe(base);
+    // Same name, new bytes: the size and the modification time are what say so.
+    expect(atlasFingerprint([{ ...sources[0], size: 101 }, sources[1]], layout)).not.toBe(base);
+    expect(atlasFingerprint([{ ...sources[0], mtimeMs: 1001 }, sources[1]], layout)).not.toBe(base);
+  });
+
+  // The layout decides which cell a photograph lands in, so changing it changes
+  // the sheet even though no photograph did.
+  it("changes when the layout constants change", () => {
+    expect(atlasFingerprint(sources, { cell: 64, sheet: 2048 })).not.toBe(
+      atlasFingerprint(sources, layout),
+    );
+    expect(atlasFingerprint(sources, { cell: 48, sheet: 4096 })).not.toBe(
+      atlasFingerprint(sources, layout),
+    );
+  });
+
+  // A sub-millisecond mtime difference is a different file to the filesystem but
+  // must not be a different fingerprint every run.
+  it("does not churn on sub-millisecond timestamps", () => {
+    expect(atlasFingerprint([{ ...sources[0], mtimeMs: 1000.4 }], layout)).toBe(
+      atlasFingerprint([{ ...sources[0], mtimeMs: 1000 }], layout),
+    );
   });
 });

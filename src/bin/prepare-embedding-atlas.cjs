@@ -10,7 +10,7 @@
 
 const fs = require("node:fs");
 const path = require("node:path");
-const { atlasManifest, planAtlas } = require("./embeddingAtlas.cjs");
+const { atlasFingerprint, atlasManifest, planAtlas } = require("./embeddingAtlas.cjs");
 const { siteConfig } = require("./siteConfig.cjs");
 
 const RESIZED_DIR = ".resized_images";
@@ -19,6 +19,8 @@ const PUBLIC_ALBUMS_DIR = path.join(__dirname, "..", "public", "data", "albums")
 const SOURCE_SUFFIX = "@800.avif";
 const OUTPUT_DIR = path.join(__dirname, "..", "public", "data");
 const OUTPUT_PREFIX = "embedding-atlas";
+/** What the sheet on disk was made from, beside the sheet. */
+const FINGERPRINT_FILE = `${OUTPUT_PREFIX}.inputs`;
 
 /**
  * The photographs on disk, keyed the way the search database keys them.
@@ -49,7 +51,7 @@ const findOptimisedPhotos = (albumsDir) => {
 };
 
 /* istanbul ignore next -- disk and an encoder */
-const run = async (log = console.log) => {
+const run = async (log = console.log, { force = false } = {}) => {
   const sharp = require("sharp");
   const photos = findOptimisedPhotos(PUBLIC_ALBUMS_DIR);
 
@@ -59,6 +61,34 @@ const run = async (log = console.log) => {
   }
 
   const plan = planAtlas(photos.map((photo) => photo.path));
+
+  // Nothing to do when the inputs are the ones the sheet on disk was made from.
+  // This is the single most expensive prepass — fifteen hundred resizes and an
+  // AVIF encode, 113 seconds — and on a build that added no photographs it
+  // produces a byte-identical sheet. `--force` rebuilds anyway.
+  const fingerprint = atlasFingerprint(
+    photos.map((photo) => {
+      const stats = fs.statSync(photo.file);
+      return { path: photo.path, size: stats.size, mtimeMs: stats.mtimeMs };
+    }),
+    plan,
+  );
+  const fingerprintPath = path.join(OUTPUT_DIR, FINGERPRINT_FILE);
+  const manifestPath = path.join(OUTPUT_DIR, `${OUTPUT_PREFIX}.json`);
+  if (!force && fs.existsSync(manifestPath) && fs.existsSync(fingerprintPath)) {
+    const previous = fs.readFileSync(fingerprintPath, "utf8");
+    const previousManifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+    const sheetsPresent =
+      Array.isArray(previousManifest.files) &&
+      previousManifest.files.length > 0 &&
+      previousManifest.files.every((sheet) =>
+        fs.existsSync(path.join(OUTPUT_DIR, path.basename(sheet))),
+      );
+    if (previous === fingerprint && sheetsPresent) {
+      log(`Embedding atlas is current for ${photos.length} photographs; skipping.`);
+      return { plan, files: null, skipped: true };
+    }
+  }
   const byPath = new Map(photos.map((photo) => [photo.path, photo.file]));
   fs.mkdirSync(OUTPUT_DIR, { recursive: true });
 
@@ -99,10 +129,8 @@ const run = async (log = console.log) => {
     files.push(`/data/${name}`);
   }
 
-  fs.writeFileSync(
-    path.join(OUTPUT_DIR, `${OUTPUT_PREFIX}.json`),
-    `${JSON.stringify(atlasManifest(plan, files))}\n`,
-  );
+  fs.writeFileSync(manifestPath, `${JSON.stringify(atlasManifest(plan, files))}\n`);
+  fs.writeFileSync(fingerprintPath, fingerprint);
 
   const bytes = files.reduce(
     (total, file) => total + fs.statSync(path.join(OUTPUT_DIR, path.basename(file))).size,
@@ -119,7 +147,7 @@ module.exports = { findOptimisedPhotos, run };
 
 /* istanbul ignore next -- direct CLI dispatch */
 if (require.main === module) {
-  run().catch((error) => {
+  run(console.log, { force: process.argv.includes("--force") }).catch((error) => {
     console.error(error);
     process.exitCode = 1;
   });
