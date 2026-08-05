@@ -68,6 +68,15 @@ export type MapStyleName =
  * under the site. `keyed` is the metered provider's, kept for what neither of
  * the others offers — imagery, terrain, and decoration.
  */
+/**
+ * Which half of the picker a style belongs to.
+ *
+ * Eighteen names in one list is a list nobody reads to the end of. The split is
+ * the one that matters to a reader deciding: a basemap somebody else drew, or
+ * one this site made.
+ */
+export type MapStyleGroup = "provider" | "made-here";
+
 type StyleSource =
   | { provider: "free"; id: OpenFreeMapStyleId }
   | { provider: "self"; path: string }
@@ -83,15 +92,25 @@ type StyleSource =
  */
 export const MAP_STYLES: Record<
   MapStyleName,
-  { source: StyleSource; label: string; swatch: string }
+  { source: StyleSource; label: string; swatch: string; group: MapStyleGroup }
 > = {
   // The default first, then the rest. `liberty` is the one OpenFreeMap style
   // that carries a fill-extrusion layer: it opens flat, like every other
   // basemap here, and stands its buildings up as soon as a reader tilts it.
   // Composed from the same palette the page is using, so the map belongs to
   // the theme rather than sitting on it.
-  theme: { source: { provider: "themed" }, label: "Match theme", swatch: "var(--c-bg)" },
-  "3d": { source: { provider: "free", id: "liberty" }, label: "3D", swatch: "#e8e3d8" },
+  theme: {
+    source: { provider: "themed" },
+    label: "Match theme",
+    swatch: "var(--c-bg)",
+    group: "made-here",
+  },
+  "3d": {
+    source: { provider: "free", id: "liberty" },
+    label: "3D",
+    swatch: "#e8e3d8",
+    group: "provider",
+  },
   // Ground, water and the roads that matter, with nothing written on it: the
   // world map draws fourteen hundred pins, and the basemap under them is
   // competing with its own subject.
@@ -99,12 +118,14 @@ export const MAP_STYLES: Record<
     source: { provider: "self", path: "/map-styles/minimal.json" },
     label: "Minimal",
     swatch: "#f7f6f3",
+    group: "made-here",
   },
   // Watercolour's sibling: linework on paper, no fills.
   sketch: {
     source: { provider: "self", path: "/map-styles/sketch.json" },
     label: "Sketch",
     swatch: "#f4efe2",
+    group: "made-here",
   },
   // The fork's own design, lifted off the metered tiles onto the free ones and
   // served from here: same layers, same paint, same sprite, no key and no
@@ -113,19 +134,37 @@ export const MAP_STYLES: Record<
     source: { provider: "self", path: "/map-styles/gallery.json" },
     label: "Gallery",
     swatch: "#f0ece1",
+    group: "made-here",
   },
-  streets: { source: { provider: "free", id: "bright" }, label: "Streets", swatch: "#f8f4f0" },
-  outdoor: { source: { provider: "keyed", id: "outdoor-v2" }, label: "Outdoor", swatch: "#e8efdc" },
+  streets: {
+    source: { provider: "free", id: "bright" },
+    label: "Streets",
+    swatch: "#f8f4f0",
+    group: "provider",
+  },
+  outdoor: {
+    source: { provider: "keyed", id: "outdoor-v2" },
+    label: "Outdoor",
+    swatch: "#e8efdc",
+    group: "provider",
+  },
   topographic: {
     source: { provider: "keyed", id: "topo-v2" },
     label: "Topographic",
     swatch: "#e6e0cf",
+    group: "provider",
   },
-  dark: { source: { provider: "free", id: "dark" }, label: "Dark", swatch: "#1b1f24" },
+  dark: {
+    source: { provider: "free", id: "dark" },
+    label: "Dark",
+    swatch: "#1b1f24",
+    group: "provider",
+  },
   satellite: {
     source: { provider: "keyed", id: "satellite" },
     label: "Satellite",
     swatch: "#4a5a46",
+    group: "provider",
   },
   // Also lifted onto the free tiles: its landmass came from a tileset of its
   // own, which becomes a background of the same colour, the way OpenFreeMap's
@@ -134,11 +173,13 @@ export const MAP_STYLES: Record<
     source: { provider: "self", path: "/map-styles/watercolour.json" },
     label: "Watercolour",
     swatch: "#f7f2e6",
+    group: "made-here",
   },
   monochrome: {
     source: { provider: "free", id: "positron" },
     label: "Monochrome",
     swatch: "#ededed",
+    group: "provider",
   },
   // The rest are made rather than chosen: each one is a different answer to
   // what a map could be made of.
@@ -149,6 +190,7 @@ export const MAP_STYLES: Record<
     source: { provider: "self", path: "/map-styles/neon.json" },
     label: "Neon",
     swatch: "#05060b",
+    group: "made-here",
   },
   // Ink. Tone comes from the size of a dot, the way an offset press shades an
   // area, with grain over the whole sheet.
@@ -156,18 +198,21 @@ export const MAP_STYLES: Record<
     source: { provider: "self", path: "/map-styles/halftone.json" },
     label: "Halftone",
     swatch: "#f2e4c4",
+    group: "made-here",
   },
   // Card. Every fill drops a shadow, so the map stacks instead of printing.
   paper: {
     source: { provider: "self", path: "/map-styles/paper.json" },
     label: "Paper",
     swatch: "#f6f1e4",
+    group: "made-here",
   },
   // Phosphor. Linework only, scanlines over everything.
   crt: {
     source: { provider: "self", path: "/map-styles/crt.json" },
     label: "CRT",
     swatch: "#020604",
+    group: "made-here",
   },
   // The colours of the photographs themselves. The indexer stores a dominant
   // palette per photograph, so the site already knows what its own pictures
@@ -177,6 +222,7 @@ export const MAP_STYLES: Record<
     source: { provider: "self", path: "/map-styles/photos.json" },
     label: "From the photographs",
     swatch: "conic-gradient(from 210deg, #b3b3b3, #7f8ea6, #1c1b19, #d5c1b2, #b3b3b3)",
+    group: "made-here",
   },
   // A sphere. The projection is the style: MapLibre reads it from the document,
   // so choosing this basemap is what puts the photographs on a planet.
@@ -184,6 +230,7 @@ export const MAP_STYLES: Record<
     source: { provider: "self", path: "/map-styles/globe.json" },
     label: "Globe",
     swatch: "#1b2430",
+    group: "made-here",
   },
 };
 
@@ -202,6 +249,20 @@ export const MAP_STYLE_NAMES = (Object.keys(MAP_STYLES) as MapStyleName[]).filte
     // would be several labels for one basemap.
     isFreeMapStyle(name) || hasMapProvider,
 );
+
+/**
+ * The picker's contents, in two groups. Order within each is the curated one.
+ */
+export const MAP_STYLE_GROUPS: Array<{ label: string; names: MapStyleName[] }> = [
+  {
+    label: "Made here",
+    names: MAP_STYLE_NAMES.filter((name) => MAP_STYLES[name].group === "made-here"),
+  },
+  {
+    label: "From the provider",
+    names: MAP_STYLE_NAMES.filter((name) => MAP_STYLES[name].group === "provider"),
+  },
+].filter((group) => group.names.length > 0);
 
 const isAvailableStyleName = (value: string): value is MapStyleName =>
   (MAP_STYLE_NAMES as string[]).includes(value);

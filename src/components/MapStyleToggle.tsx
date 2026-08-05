@@ -2,7 +2,7 @@ import React from "react";
 import {
   getMapStyleName,
   getServerMapStyleName,
-  MAP_STYLE_NAMES,
+  MAP_STYLE_GROUPS,
   MAP_STYLES,
   resolveMapStyleName,
   setMapStyleName,
@@ -40,16 +40,23 @@ export const MapStyleToggle: React.FC = () => {
         }
       }}
     >
-      {MAP_STYLE_NAMES.map((name) => (
-        <option
-          key={name}
-          value={name}
-          // The style's own ground colour, so the menu shows what it looks
-          // like rather than only what it is called.
-          style={{ "--swatch": MAP_STYLES[name].swatch } as React.CSSProperties}
-        >
-          {MAP_STYLES[name].label}
-        </option>
+      {/* Grouped, because eighteen names in one list is a list nobody reads to
+          the end of — and the split is the one a reader is actually deciding
+          between: a basemap somebody else drew, or one this site made. */}
+      {MAP_STYLE_GROUPS.map((group) => (
+        <optgroup key={group.label} label={group.label}>
+          {group.names.map((name) => (
+            <option
+              key={name}
+              value={name}
+              // The style's own ground colour, so the menu shows what it looks
+              // like rather than only what it is called.
+              style={{ "--swatch": MAP_STYLES[name].swatch } as React.CSSProperties}
+            >
+              {MAP_STYLES[name].label}
+            </option>
+          ))}
+        </optgroup>
       ))}
     </Select>
   );

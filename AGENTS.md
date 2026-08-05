@@ -266,6 +266,20 @@ sits and which clip it belongs to.
 - FTS5 uses `porter trigram` tokeniser — supports both stemmed keyword and substring search
 - Page size 4096 (SQLite default) and journal mode `delete`; opening an old DB (JSON embeddings / 1024-byte pages) with any command that calls `setup_tables` — e.g. `backfill` — migrates and VACUUMs it in place
 
+## The explore cloud (`src/components/EmbeddingSpace.tsx`)
+Every embedded photograph, placed by its SigLIP vector and drawn on a canvas. Three pieces, all generated at build time:
+- **The projection.** `util/embeddingSpace.ts` takes the vectors to three dimensions by power iteration (no covariance matrix — 768×768 doubles to answer one question). Its seed is deterministic, so a build that runs twice publishes the same pose rather than a rotated one every reader downloads again; each axis is orthogonalised against those already taken, or the third component on a near-planar collection converges on noise pointing back into the first two. Axes are stretched towards filling the cube (capped at 3×) because the components come out ordered by variance and a faithful cloud is a pancake — the stretch is reported as `axisScale`, and the flat view undoes it, since a 2D scatter should show the proportions its components actually have. Dropping the third axis *is* the two-component projection
+- **The contact sheet.** `npm run prepare:embedding-atlas` (in `build:prepare`, after `prepare:posters`) packs every optimised variant into one 2048px sheet of 48px cells — 474KB and one request against roughly 150MB and fifteen hundred. It reads `public/data/albums/*/.resized_images/*@800.avif` but keys each cell by `paths.albumsDir`, the same data-format constant the search database uses, because that key is what the payload joins on. The layout is sorted by path: an atlas that reshuffled itself would invalidate half a megabyte of cache on every build. Output is gitignored
+- **The payload.** `app/data/embedding-space.json/route.ts` is a build adapter, like the map search index: points, clusters, `axisScale` and the atlas manifest at a stable URL, fetched with `no-store`, and read only through `util/embeddingSpaceData.ts`. Each point carries its cell, its four most telling tags, its three nearest neighbours *in the full 768 dimensions* (a projection puts unrelated photographs side by side, so a line drawn from screen positions would be about the projection), and which k-means clump it fell in
+
+Invariants worth keeping:
+- A canvas has no children, so the photographs in it get the same visually-hidden focusable list the map's GPU pins get, and a clump's name is a real `<button>` positioned over the canvas from the draw loop rather than text painted into it
+- Every name is reset to hidden at the start of each frame; one the frame never reaches keeps whatever style it was born with, fully opaque in the corner
+- The wheel listener is attached by hand to the stage (React registers `onWheel` passively, so it cannot take the gesture) and only claims it while there is room to zoom — at either limit the page scrolls again. `touch-action: pan-y` for the same reason
+- A finger has no hover: the pointer position is taken on `pointerdown` and kept after it lifts, the first tap looks and the second opens, and that decision runs on `pointerup` for touch and `click` for a mouse
+- A press that travelled more than a few pixels is a turn, not a click
+- Depth fades against the cloud's own front and back, not absolute distance, or the fade changes meaning with every zoom
+
 ## CI (`.github/workflows/ci.yml`)
 Runs on PRs to `main`, pushes to `main` and `release/*`, and manual dispatch.
 

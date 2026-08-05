@@ -112,6 +112,11 @@
     border-radius: var(--m);
     font-family: var(--font-sans);
     font-size: var(--fs-sm);
+    /* Reset what a group heading sets, or every option under one shouts. */
+    font-weight: 400;
+    letter-spacing: normal;
+    text-transform: none;
+    color: var(--c-font);
   }
 
   .base option:hover,
@@ -121,6 +126,17 @@
 
   .base option:checked {
     background: color-mix(in oklch, var(--c-accent) 14%, transparent);
+  }
+
+  /* A group's name is a heading inside the menu, not a choice in it. */
+  .base optgroup {
+    padding-block: var(--m-xs) 0;
+    padding-inline: var(--m-m);
+    font-size: var(--fs-xs);
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--c-bg-contrast-light);
   }
 
   /* Selection is the row highlight. The platform's tick would sit beside a

@@ -55,6 +55,32 @@ describe("paletteFromColours", () => {
     expect(hueOf(palette.land)).toBeLessThan(60);
   });
 
+  // Strictly by weight the ground is whatever tone is commonest, which in a
+  // photographic archive is concrete and overcast sky. A tone with actual
+  // chroma takes it instead when the collection has plenty of that tone.
+  it("prefers a ground with some colour in it over the commonest grey", () => {
+    const palette = paletteFromColours([
+      ...many([179, 179, 179], 40), // neutral grey: commonest
+      ...many([213, 193, 178], 14), // warm sand: a quarter as common, and a colour
+      ...many([28, 27, 25], 20),
+    ]);
+
+    expect(hueOf(palette.land)).toBeGreaterThan(10);
+    expect(hueOf(palette.land)).toBeLessThan(60);
+  });
+
+  // But not a colour the archive barely has: one warm frame in a thousand grey
+  // ones is not what the collection looks like.
+  it("keeps the grey when the colourful tone is rare", () => {
+    const palette = paletteFromColours([
+      ...many([179, 179, 179], 60),
+      ...many([213, 193, 178], 2),
+      ...many([28, 27, 25], 20),
+    ]);
+
+    expect(toHsl(parseColour(palette.land)).s).toBeLessThan(0.05);
+  });
+
   it("finds the sea in the photographs when there is one", () => {
     const palette = paletteFromColours([
       ...many([240, 236, 226], 30),

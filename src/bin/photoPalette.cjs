@@ -22,6 +22,20 @@ const DARK_ENOUGH_FOR_INK = 0.34;
 /** Below this the map has no contrast to read by, whatever the photographs say. */
 const MINIMUM_CONTRAST = 0.42;
 
+/**
+ * The ground prefers a colour with some life in it.
+ *
+ * Strictly by weight, this archive's commonest light tone is a neutral grey —
+ * concrete and overcast sky, which really are what most photographs are mostly
+ * made of. Faithful, and a grey card to look at. So a tone with actual chroma
+ * takes the ground as long as the collection has plenty of it: at least this
+ * saturated, and at least this much of the commonest tone's weight. Both bars
+ * matter — the first alone would pick a colour, the second alone would pick the
+ * grey again.
+ */
+const GROUND_SATURATION = 0.15;
+const GROUND_WEIGHT_SHARE = 0.2;
+
 /** Water is a hue as well as a tone; a corpus with no sea in it gets one made. */
 const WATER_HUE = { min: 165, max: 270 };
 
@@ -134,8 +148,14 @@ const paletteFromColours = (colours) => {
     .colour;
   const darkest = [...buckets].sort((a, b) => lightness(a.colour) - lightness(b.colour))[0].colour;
 
-  const land =
-    heaviest(buckets, (colour) => lightness(colour) >= LIGHT_ENOUGH_FOR_GROUND) ?? brightest;
+  const lightest = buckets.filter((bucket) => lightness(bucket.colour) >= LIGHT_ENOUGH_FOR_GROUND);
+  const heaviestLight = lightest[0];
+  const colourfulGround = lightest.find(
+    (bucket) =>
+      saturation(bucket.colour) >= GROUND_SATURATION &&
+      bucket.weight >= (heaviestLight?.weight ?? 0) * GROUND_WEIGHT_SHARE,
+  );
+  const land = (colourfulGround ?? heaviestLight)?.colour ?? brightest;
   const ink = heaviest(buckets, (colour) => lightness(colour) <= DARK_ENOUGH_FOR_INK) ?? darkest;
 
   // The sea, if the corpus has one: the commonest blue-ish mid tone. Failing
