@@ -462,7 +462,6 @@ export const GuessRound: React.FC<GuessRoundProps> = ({
               }
             />
           ) : null}
-          {!isZoomed ? <div className={styles.zoomHint}>Scroll or pinch to zoom</div> : null}
         </div>
 
         {/* Map panel */}

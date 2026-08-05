@@ -98,7 +98,6 @@ export const GuessMap: React.FC<GuessMapProps> = ({ guess, reveal, onGuess }) =>
           initialView={{ center: { lng: 0, lat: 20 }, zoom: 1.5 }}
           onClick={handleClick}
           cursor={reveal ? "default" : "crosshair"}
-          attribution={{ compact: true }}
         >
           {guess ? (
             <Marker at={{ lng: guess.lng, lat: guess.lat }} anchor="center">

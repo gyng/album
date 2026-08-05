@@ -20,10 +20,14 @@
   }
 }
 
-/* Top bar: progress dots + running score */
+/* Top bar: progress dots + running score, then the quit button pushed to the far
+   end by its own auto margin. The gap is what keeps "●●● 0 pts" from reading as
+   one glyph run — with the button absorbing the free space, nothing else
+   separated the dots from the score. */
 .topBar {
   display: flex;
   align-items: center;
+  gap: var(--m-s);
   justify-content: space-between;
   padding: var(--m) 0;
 }
@@ -193,19 +197,6 @@
   }
 }
 
-.zoomHint {
-  position: absolute;
-  inset-block-start: var(--m-m);
-  inset-inline-end: var(--m-m);
-  background-color: var(--c-overlay-dark);
-  color: var(--c-on-dark);
-  padding: calc(var(--line-hairline) * 2) var(--m-s);
-  border-radius: var(--m);
-  font-size: var(--fs-xs);
-  pointer-events: none;
-  opacity: 0.6;
-}
-
 /* Timer bar with pulsing glow at urgent. Driven by transform: scaleX so we
    animate the compositor-friendly transform instead of the layout `width`
    (matches the score bars' growBar). transform-origin: left so it drains
@@ -280,8 +271,12 @@
   transition-duration: var(--t-fast), var(--t-base), var(--t-base), var(--t-fast);
 }
 
-/* Confirm pinned to the right of the controls row; skip stays at flex-start. */
-.confirmButton {
+/* Both primary actions pinned to the end of their row, so the button a reader
+   is about to press does not change sides between guessing and the reveal —
+   on a narrow screen the reveal wrapped and left "Next" under the distance while
+   "Confirm" had been on the right. */
+.confirmButton,
+.nextButton {
   margin-inline-start: auto;
 }
 
@@ -351,6 +346,12 @@
   .revealPanel {
     gap: var(--m-s);
     flex-wrap: wrap;
+  }
+
+  /* Where the place name is what wraps, it takes the whole next line rather
+     than squeezing itself into whatever is left beside the distance. */
+  .revealPanel > :global(span) {
+    flex: 1 1 100%;
   }
 }
 

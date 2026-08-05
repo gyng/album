@@ -95,9 +95,13 @@
   }
 }
 
+/* The one thing a reader cannot work out by looking at an empty world map, so it
+   is worth saying — at the top, where the attribution bar cannot cover it. At the
+   bottom the two overlapped: on a phone the open bar wraps to three lines and sat
+   straight through the sentence. */
 .hint {
   position: absolute;
-  inset-block-end: var(--m-l);
+  inset-block-start: var(--m-l);
   inset-inline-start: 50%;
   transform: translateX(-50%);
   background-color: var(--c-overlay-dark);

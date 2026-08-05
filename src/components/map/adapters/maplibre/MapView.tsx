@@ -230,7 +230,21 @@ const MapViewImpl = (
         pick(propsRef.current)?.(toViewStateChangeEvent(type, map, event.originalEvent));
       };
 
+    // A compact attribution is born open, so a small map opens with a bar of
+    // credit across it — on a phone-width map it wraps to three lines and covers
+    // a third of the picture. Collapsed, it is MapLibre's own `(i)`, which is
+    // still the credit, one tap away. Only ever applied to a bar MapLibre itself
+    // decided to make compact, and only while it is still in its born state.
+    const collapseCompactAttribution = () => {
+      container
+        .querySelector<HTMLDetailsElement>(
+          "details.maplibregl-ctrl-attrib.maplibregl-compact[open]",
+        )
+        ?.removeAttribute("open");
+    };
+
     const onLoad = (event: MapLibreEvent) => {
+      collapseCompactAttribution();
       // Children no longer wait on this, but callers still need to be able to
       // tell a live basemap from a dead one — see `MapViewStatus`.
       setLoaded(true);

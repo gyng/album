@@ -45,7 +45,6 @@ const TripsScreen = ({ trips }: TripsScreenProps) => {
   const [order, setOrder] = React.useState<Order>("date");
   const [year, setYear] = React.useState<string>(ALL_YEARS);
   const journeys = trips.filter((trip) => !trip.isOuting);
-  const acrossAlbums = trips.filter((trip) => trip.albums.length > 1).length;
 
   const years = React.useMemo(
     () => Array.from(new Set(trips.map(yearOf))).sort((left, right) => right.localeCompare(left)),
@@ -86,13 +85,12 @@ const TripsScreen = ({ trips }: TripsScreenProps) => {
           <Heading level={1} as="h1">
             Trips
           </Heading>
+          {/* The count, and nothing else: how a trip was worked out from dates and
+              places is not something a reader of this page has to be told, and the
+              albums an itinerary crosses are visible on the itinerary itself. */}
           <Caption as="p">
             {journeys.length} {journeys.length === 1 ? "journey" : "journeys"} and{" "}
-            {trips.length - journeys.length} single-day outings, grouped from the photographs
-            themselves — the days they were taken on, and where.
-            {acrossAlbums > 0
-              ? ` ${acrossAlbums} span more than one album, so no album page can show them whole.`
-              : ""}
+            {trips.length - journeys.length} single-day outings
           </Caption>
           <div className={styles.controls}>
             <SegmentedToggle
