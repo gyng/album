@@ -174,6 +174,14 @@ describe("defaultMapStyleForTheme", () => {
     expect(defaultMapStyleForTheme("ink")).toBe("sketch");
   });
 
+  // The watercolour basemap's defining texture came from a raster tileset this
+  // fork does not have, so a painterly theme gets this site's own cartography
+  // rather than the pale remains of somebody else's.
+  it("sends the painterly themes to the gallery rather than the watercolour map", () => {
+    expect(defaultMapStyleForTheme("watercolour")).toBe("gallery");
+    expect(defaultMapStyleForTheme("herbarium")).toBe("gallery");
+  });
+
   // A decorative theme with no map of its own opens on the basemap that wears
   // its palette.
   it("sends the rest of the decorative themes to the map wearing them", () => {

@@ -283,8 +283,12 @@ const THEME_MAP_STYLES: Partial<Record<ThemeName, MapStyleName>> = {
   terminal: "crt",
   paper: "paper",
   ink: "sketch",
-  watercolour: "watercolour",
-  herbarium: "watercolour",
+  // Not the watercolour basemap: its defining texture came from a raster
+  // tileset this fork does not have, so what is left is a pale map with a
+  // paper tint. The gallery style is this site's own cartography, which is a
+  // better thing to hand somebody who picked a painterly theme.
+  watercolour: "gallery",
+  herbarium: "gallery",
   bling: "neon",
   // The rest have no map of their own, but they do have a palette — and the
   // themed basemap is the gallery's cartography wearing exactly that. A

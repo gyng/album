@@ -333,6 +333,20 @@ const photographPalette = (log) => {
   }
 };
 
+/**
+ * Gives a transplanted style its names back.
+ *
+ * The watercolour transplant arrived with nineteen layers and not one symbol
+ * among them: a map with no place names at all. Its glyphs already point at the
+ * free font server, so the composed label layers drop straight in.
+ */
+const withPlaceLabels = (style, palette) => {
+  if (style.layers.some((layer) => layer.type === "symbol")) return style;
+
+  const labels = composeMapStyle({ palette }).layers.filter((layer) => layer.type === "symbol");
+  return { ...style, layers: [...style.layers, ...labels] };
+};
+
 /** Replaces every origin token; returns the document untouched when there is none. */
 const applyOrigin = (template, origin) => template.split(ORIGIN_TOKEN).join(origin);
 
@@ -413,10 +427,18 @@ const run = async (log = console.log, env = process.env) => {
 
   const written = templates.map((template) => {
     const output = template.replace(".template.json", ".json");
-    fs.writeFileSync(
-      path.join(dir, output),
-      applyOrigin(fs.readFileSync(path.join(dir, template), "utf8"), origin),
-    );
+    const filled = applyOrigin(fs.readFileSync(path.join(dir, template), "utf8"), origin);
+    const document =
+      template === "watercolour.template.json"
+        ? `${JSON.stringify(
+            withPlaceLabels(JSON.parse(filled), {
+              label: "#5c4a33",
+              labelHalo: "#fdf6e6cc",
+            }),
+          )}\n`
+        : filled;
+
+    fs.writeFileSync(path.join(dir, output), document);
     return output;
   });
 
