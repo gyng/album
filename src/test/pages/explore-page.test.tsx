@@ -234,6 +234,11 @@ const makeVisualSameness = () =>
       right: photo(`right-${index}`),
       similarityPercent: 95,
     })),
+    travellingMotifs: Array.from({ length: 2 }, (_, index) => ({
+      left: { ...photo(`here-${index}`), place: "Kyoto, Japan" },
+      right: { ...photo(`there-${index}`), place: "Taipei, Taiwan" },
+      similarityPercent: 88,
+    })),
     visualEras: Array.from({ length: 5 }, (_, index) => ({
       label: `Era ${index}`,
       photos: [photo(`era-${index}`)],
@@ -299,6 +304,7 @@ describe("explore page", () => {
       averageExamples: [],
       distinctExamples: [],
       repeatedExamples: [],
+      travellingMotifs: [],
       visualEras: [],
       lookTimeline: [],
     };

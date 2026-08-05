@@ -40,6 +40,14 @@ const HIGH_SIMILARITY_THRESHOLD = 0.9;
 const LOW_SIMILARITY_THRESHOLD = 0.75;
 const IDENTICAL_SIMILARITY_THRESHOLD = 0.9999;
 const MAX_VISUAL_EXAMPLES = 24;
+/**
+ * How alike two photographs have to be before "the same look somewhere else" is
+ * a claim rather than a coincidence. Lower than the repeated-motif threshold on
+ * purpose: across a country the model rarely finds anything as close as it does
+ * across a street.
+ */
+const TRAVELLING_MOTIF_THRESHOLD = 0.82;
+const MAX_TRAVELLING_MOTIFS = 8;
 const MAX_AVERAGE_EXAMPLES = 12;
 const MAX_OUTLIER_EXAMPLES = 12;
 const MAX_VISUAL_ERAS = 6;
@@ -65,6 +73,15 @@ export type VisualSamenessStats = {
   repeatedExamples: Array<{
     left: VisualSamenessPhoto;
     right: VisualSamenessPhoto;
+    similarityPercent: number;
+  }>;
+  /**
+   * Photographs the model reads as near-identical that were taken in different
+   * places: the same look, found twice, a country apart.
+   */
+  travellingMotifs: Array<{
+    left: VisualSamenessPhoto & { place: string };
+    right: VisualSamenessPhoto & { place: string };
     similarityPercent: number;
   }>;
   distinctExamples: Array<{
@@ -215,6 +232,7 @@ export const computeVisualSamenessFromVectors = (
     highSimilarityThreshold: HIGH_SIMILARITY_THRESHOLD,
     lowSimilarityThreshold: LOW_SIMILARITY_THRESHOLD,
     repeatedExamples: [],
+    travellingMotifs: [],
     distinctExamples: [],
     visualEras: [],
     lookTimeline: [],
@@ -286,6 +304,42 @@ const buildPhotoTagLookup = (albums: Content[]): Map<string, string[]> => {
       if (indexedPath && tags.length > 0) {
         lookup.set(indexedPath, tags);
       }
+    });
+  });
+
+  return lookup;
+};
+
+/**
+ * Where each photograph was taken, as its town and country.
+ *
+ * The geocode is newline-separated from most specific to least, and a pair is
+ * "somewhere else" when their first lines differ — two frames in the same
+ * street are not a motif that travelled.
+ */
+const buildPhotoPlaceLookup = (albums: Content[]): Map<string, string> => {
+  const lookup = new Map<string, string>();
+
+  albums.forEach((album) => {
+    if (isTestAlbum(album)) return;
+
+    album.blocks.forEach((block) => {
+      if (block.kind !== "photo") return;
+
+      const photo = block as PhotoBlock;
+      const indexedPath = photo._build.tags?.path;
+      const geocode = photo._build.tags?.geocode;
+      if (!indexedPath || typeof geocode !== "string") return;
+
+      const lines = geocode
+        .split("\n")
+        .map((line) => line.trim())
+        .filter(Boolean);
+      const town = lines[0];
+      const country = lines.at(-1);
+      if (!town) return;
+
+      lookup.set(indexedPath, country && country !== town ? `${town}, ${country}` : town);
     });
   });
 
@@ -413,6 +467,7 @@ export const computeVisualSamenessStats = async (
 
     const photoLookup = buildPhotoLookup(albums);
     const photoDateLookup = buildPhotoDateLookup(albums);
+    const photoPlaceLookup = buildPhotoPlaceLookup(albums);
     const photoTagLookup = buildPhotoTagLookup(albums);
     const candidatePaths = albums
       .filter((album) => !isTestAlbum(album))
@@ -472,6 +527,12 @@ export const computeVisualSamenessStats = async (
       const nearest = parsedRows.map((source, sourceIndex) => {
         let bestScore = -1;
         let bestIndex = -1;
+        // The same question asked of everywhere else: the most alike photograph
+        // that was not taken in the same town. Found in the same pass, because
+        // the pass is the expensive part.
+        let elsewhereScore = -1;
+        let elsewhereIndex = -1;
+        const sourcePlace = photoPlaceLookup.get(source.path);
 
         for (let targetIndex = 0; targetIndex < parsedRows.length; targetIndex += 1) {
           if (targetIndex === sourceIndex) {
@@ -479,7 +540,8 @@ export const computeVisualSamenessStats = async (
           }
 
           // invariant: targetIndex < parsedRows.length, so the row is defined
-          const score = dotProduct(source.vector, parsedRows[targetIndex]!.vector);
+          const target = parsedRows[targetIndex]!;
+          const score = dotProduct(source.vector, target.vector);
           if (score >= IDENTICAL_SIMILARITY_THRESHOLD) {
             continue;
           }
@@ -488,12 +550,22 @@ export const computeVisualSamenessStats = async (
             bestScore = score;
             bestIndex = targetIndex;
           }
+
+          if (score > elsewhereScore && sourcePlace) {
+            const targetPlace = photoPlaceLookup.get(target.path);
+            if (targetPlace && targetPlace !== sourcePlace) {
+              elsewhereScore = score;
+              elsewhereIndex = targetIndex;
+            }
+          }
         }
 
         return {
           path: source.path,
           nearestIndex: bestIndex,
           nearestScore: Math.max(0, bestScore),
+          elsewhereIndex,
+          elsewhereScore: Math.max(0, elsewhereScore),
         };
       });
 
@@ -551,6 +623,51 @@ export const computeVisualSamenessStats = async (
       )
         .sort((left, right) => right.similarityPercent - left.similarityPercent)
         .slice(0, MAX_VISUAL_EXAMPLES);
+
+      // Same look, different place: pairs the model reads as near-identical
+      // whose two photographs were taken in towns that are not the same one.
+      const travellingMotifs = Array.from(
+        nearest
+          .reduce(
+            (pairs, item) => {
+              if (item.elsewhereIndex < 0 || item.elsewhereScore < TRAVELLING_MOTIF_THRESHOLD) {
+                return pairs;
+              }
+
+              // invariant: elsewhereIndex >= 0 guarded above
+              const rightPath = parsedRows[item.elsewhereIndex]!.path;
+              const left = photoLookup.get(item.path);
+              const right = photoLookup.get(rightPath);
+              const leftPlace = photoPlaceLookup.get(item.path);
+              const rightPlace = photoPlaceLookup.get(rightPath);
+              if (!left || !right || !leftPlace || !rightPlace) return pairs;
+
+              const dedupeKey = [item.path, rightPath].sort().join("::");
+              const existing = pairs.get(dedupeKey);
+              const similarityPercent = Math.round(item.elsewhereScore * 100);
+              if (!existing || similarityPercent > existing.similarityPercent) {
+                pairs.set(dedupeKey, {
+                  left: { ...left, place: leftPlace },
+                  right: { ...right, place: rightPlace },
+                  similarityPercent,
+                });
+              }
+
+              return pairs;
+            },
+            new Map<
+              string,
+              {
+                left: VisualSamenessPhoto & { place: string };
+                right: VisualSamenessPhoto & { place: string };
+                similarityPercent: number;
+              }
+            >(),
+          )
+          .values(),
+      )
+        .sort((left, right) => right.similarityPercent - left.similarityPercent)
+        .slice(0, MAX_TRAVELLING_MOTIFS);
 
       const distinctExamples = nearest
         .map((item) => ({
@@ -801,6 +918,7 @@ export const computeVisualSamenessStats = async (
         highSimilarityThreshold: HIGH_SIMILARITY_THRESHOLD,
         lowSimilarityThreshold: LOW_SIMILARITY_THRESHOLD,
         repeatedExamples,
+        travellingMotifs,
         distinctExamples,
         visualEras,
         lookTimeline,

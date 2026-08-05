@@ -3,7 +3,8 @@ import { mergeCssModuleStyles } from "../../util/mergeCssModuleStyles";
 import { AppLink as Link } from "../platform";
 import type { PhotoStats } from "../../util/computeStats";
 import { StatBar } from "../StatBar";
-import { Caption, Heading, Thumb, pillStyles } from "../ui";
+import { Caption, Heading, SegmentedToggle, Thumb, pillStyles } from "../ui";
+import { buildColourYearStacks } from "../../util/colourYearStacks";
 import sharedStyles from "./ExploreShared.module.css";
 import localStyles from "./ExploreColourSection.module.css";
 import { ExploreStatGroup } from "./ExplorePrimitives";
@@ -41,6 +42,9 @@ const styles = mergeCssModuleStyles(
     "colorTimeTooltipSwatch",
     "colorTimeTooltipText",
     "colorTimeYear",
+    "colourStackBar",
+    "colourStackSegment",
+    "colourStackLabel",
     "colourFamilyPanel",
     "colourFullRowPanel",
     "colourPanel",
@@ -59,6 +63,19 @@ export const ExploreColourSection = ({
   // Which colour-over-time segment is pointed at, if any. Only that one's photo
   // is fetched; see the tooltip below for why.
   const [activePreview, setActivePreview] = React.useState<string | null>(null);
+  // Every photograph as its own sliver, or every year as one stacked bar. The
+  // first is the archive as it happened; the second is the only one that
+  // answers whether a year was greener than the one before.
+  const [colourView, setColourView] = React.useState<"photos" | "families">("photos");
+  const colourStacks = React.useMemo(
+    () => buildColourYearStacks(stats.colorYearRibbons, COLOR_FAMILY_ORDER),
+    [stats.colorYearRibbons],
+  );
+  // The busiest year sets the full width, so a bar's length says how much was
+  // shot and its divisions say what colour it was. Stretched to full width,
+  // every year looked equally busy and 2011's twelve photographs read like
+  // 2025's three hundred.
+  const busiestYear = Math.max(...colourStacks.map((year) => year.total), 1);
   const maxColorCount = Math.max(...stats.colorStats.map((item) => item.count), 1);
   const leadingColourFamily = stats.colorStats[0];
   const deferredSummary = [
@@ -187,6 +204,15 @@ export const ExploreColourSection = ({
                 <Heading level={2} as="h2">
                   Colour over time
                 </Heading>
+                <SegmentedToggle
+                  ariaLabel="How to show colour over time"
+                  value={colourView}
+                  onChange={setColourView}
+                  options={[
+                    { value: "photos", label: "Every photo" },
+                    { value: "families", label: "By family" },
+                  ]}
+                />
               </div>
               <div className={styles.colorTimeLegend}>
                 {COLOR_FAMILY_ORDER.map((label) => (
@@ -203,94 +229,136 @@ export const ExploreColourSection = ({
                   </div>
                 ))}
               </div>
-              <div className={styles.colorTimeSeries}>
-                {stats.colorYearRibbons.map((year) => (
-                  <div key={year.label} className={styles.colorTimeRow}>
-                    <div className={styles.colorTimeMeta}>
-                      <span className={styles.colorTimeYear}>{year.label}</span>
-                      <span className={styles.colorTimeDetail}>
-                        {year.total.toLocaleString("en")}
-                      </span>
-                    </div>
-                    <div className={styles.colorTimeBar}>
-                      {year.slices.map((slice, index) => {
-                        const sliceKey = `${year.label}-${slice.family}-${index}`;
-                        const share = year.total > 0 ? (slice.count / year.total) * 100 : 0;
-                        const segmentWidth = 100 / Math.max(year.total, 1);
-                        const segmentPosition = slice.position * 100;
-                        return (
+              {colourView === "families" ? (
+                <div className={styles.colorTimeSeries}>
+                  {colourStacks.map((year) => (
+                    <div key={year.label} className={styles.colorTimeRow}>
+                      <div className={styles.colorTimeMeta}>
+                        <span className={styles.colorTimeYear}>{year.label}</span>
+                        <span className={styles.colorTimeDetail}>
+                          {year.total.toLocaleString("en")}
+                        </span>
+                      </div>
+                      <div
+                        className={styles.colourStackBar}
+                        style={{ inlineSize: `${(year.total / busiestYear) * 100}%` }}
+                      >
+                        {year.families.map((family) => (
                           <Link
-                            key={sliceKey}
-                            href={buildColorSearchHref(slice.family, year.label) ?? "/search"}
-                            className={styles.colorTimeSegment}
-                            title={`${slice.family} around ${year.label}: ${slice.count} photos (${Math.round(share)}%)`}
+                            key={`${year.label}-${family.family}`}
+                            href={buildColorSearchHref(family.family, year.label) ?? "/search"}
+                            className={styles.colourStackSegment}
+                            title={`${family.family} in ${year.label}: ${family.count.toLocaleString("en")} ${
+                              family.count === 1 ? "photo" : "photos"
+                            }, ${Math.round(family.share)}%`}
                             style={{
-                              left: `min(${segmentPosition}%, calc(100% - max(var(--size-3), ${segmentWidth}%)))`,
-                              inlineSize: `max(var(--size-3), ${segmentWidth}%)`,
-                              backgroundColor: slice.rgb,
+                              inlineSize: `${family.share}%`,
+                              backgroundColor:
+                                COLOR_SWATCHES[family.family] ?? "var(--c-bg-contrast-light)",
                             }}
-                            onMouseEnter={() => setActivePreview(sliceKey)}
-                            onFocus={() => setActivePreview(sliceKey)}
                           >
-                            <span className={styles.colorTimeTooltip} aria-hidden="true">
-                              {/* The tooltip is hover-revealed, but `loading="lazy"`
+                            {/* Named inside the bar where the share is wide
+                                enough to read it; the rest keep their tooltip. */}
+                            <span className={styles.colourStackLabel}>
+                              {Math.round(family.share)}%
+                            </span>
+                          </Link>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className={styles.colorTimeSeries}>
+                  {stats.colorYearRibbons.map((year) => (
+                    <div key={year.label} className={styles.colorTimeRow}>
+                      <div className={styles.colorTimeMeta}>
+                        <span className={styles.colorTimeYear}>{year.label}</span>
+                        <span className={styles.colorTimeDetail}>
+                          {year.total.toLocaleString("en")}
+                        </span>
+                      </div>
+                      <div className={styles.colorTimeBar}>
+                        {year.slices.map((slice, index) => {
+                          const sliceKey = `${year.label}-${slice.family}-${index}`;
+                          const share = year.total > 0 ? (slice.count / year.total) * 100 : 0;
+                          const segmentWidth = 100 / Math.max(year.total, 1);
+                          const segmentPosition = slice.position * 100;
+                          return (
+                            <Link
+                              key={sliceKey}
+                              href={buildColorSearchHref(slice.family, year.label) ?? "/search"}
+                              className={styles.colorTimeSegment}
+                              title={`${slice.family} around ${year.label}: ${slice.count} photos (${Math.round(share)}%)`}
+                              style={{
+                                left: `min(${segmentPosition}%, calc(100% - max(var(--size-3), ${segmentWidth}%)))`,
+                                inlineSize: `max(var(--size-3), ${segmentWidth}%)`,
+                                backgroundColor: slice.rgb,
+                              }}
+                              onMouseEnter={() => setActivePreview(sliceKey)}
+                              onFocus={() => setActivePreview(sliceKey)}
+                            >
+                              <span className={styles.colorTimeTooltip} aria-hidden="true">
+                                {/* The tooltip is hover-revealed, but `loading="lazy"`
                                   only defers until near the viewport — and the
                                   container occupies layout, so scrolling the page
                                   fetched all ~900 previews: 81MB of the page's
                                   86.9MB of images, none of it visible. The colour
                                   the photo resolves to stands in until then, which
                                   also keeps the tooltip from resizing on reveal. */}
-                              {activePreview === sliceKey ? (
-                                <img
-                                  src={slice.thumbSrc}
-                                  alt={slice.photoLabel}
-                                  loading="lazy"
-                                  className={styles.colorTimeTooltipImage}
-                                  style={{ backgroundColor: slice.rgb }}
-                                />
-                              ) : (
-                                <span
-                                  className={styles.colorTimeTooltipImage}
-                                  style={{ backgroundColor: slice.rgb }}
-                                />
-                              )}
-                              <span className={styles.colorTimeTooltipBody}>
-                                <span
-                                  data-colour-swatch
-                                  className={styles.colorTimeTooltipSwatch}
-                                  style={{ backgroundColor: slice.rgb }}
-                                />
-                                <span className={styles.colorTimeTooltipText}>
-                                  <span>{slice.family}</span>
-                                  <span>{slice.dateLabel}</span>
+                                {activePreview === sliceKey ? (
+                                  <img
+                                    src={slice.thumbSrc}
+                                    alt={slice.photoLabel}
+                                    loading="lazy"
+                                    className={styles.colorTimeTooltipImage}
+                                    style={{ backgroundColor: slice.rgb }}
+                                  />
+                                ) : (
+                                  <span
+                                    className={styles.colorTimeTooltipImage}
+                                    style={{ backgroundColor: slice.rgb }}
+                                  />
+                                )}
+                                <span className={styles.colorTimeTooltipBody}>
+                                  <span
+                                    data-colour-swatch
+                                    className={styles.colorTimeTooltipSwatch}
+                                    style={{ backgroundColor: slice.rgb }}
+                                  />
+                                  <span className={styles.colorTimeTooltipText}>
+                                    <span>{slice.family}</span>
+                                    <span>{slice.dateLabel}</span>
+                                  </span>
                                 </span>
                               </span>
-                            </span>
-                          </Link>
-                        );
-                      })}
+                            </Link>
+                          );
+                        })}
+                      </div>
+                      <div className={styles.colorTimeSummary}>
+                        {year.dominantFamily ? (
+                          <>
+                            <span
+                              data-colour-swatch
+                              className={styles.colorSwatch}
+                              style={{
+                                backgroundColor:
+                                  COLOR_SWATCHES[year.dominantFamily] ??
+                                  "var(--c-bg-contrast-light)",
+                              }}
+                              aria-hidden="true"
+                            />
+                            <span>{year.dominantFamily}</span>
+                          </>
+                        ) : (
+                          <span>—</span>
+                        )}
+                      </div>
                     </div>
-                    <div className={styles.colorTimeSummary}>
-                      {year.dominantFamily ? (
-                        <>
-                          <span
-                            data-colour-swatch
-                            className={styles.colorSwatch}
-                            style={{
-                              backgroundColor:
-                                COLOR_SWATCHES[year.dominantFamily] ?? "var(--c-bg-contrast-light)",
-                            }}
-                            aria-hidden="true"
-                          />
-                          <span>{year.dominantFamily}</span>
-                        </>
-                      ) : (
-                        <span>—</span>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
             </section>
           ) : null}
         </div>

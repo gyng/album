@@ -546,3 +546,10 @@
     max-inline-size: 100%;
   }
 }
+
+/* Where a travelling motif's two photographs were taken. The places are the
+   whole claim of that pair, so they are set apart from the match figure. */
+.travellingPlaces {
+  margin-inline-start: var(--m-s);
+  color: var(--c-bg-contrast-light);
+}

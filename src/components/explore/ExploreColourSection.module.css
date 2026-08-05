@@ -295,3 +295,45 @@
     display: none;
   }
 }
+
+/* The pivot: one bar per year, the families in a fixed order so a reader can
+   follow one down the page. Shares rather than counts, because the archive's
+   years are not the same size. */
+.colourStackBar {
+  display: flex;
+  block-size: var(--size-20);
+  /* The width is set per year from its own volume; this is only the ceiling. */
+  max-inline-size: 100%;
+  border-radius: var(--m-xs);
+  overflow: hidden;
+  background: color-mix(in oklch, var(--c-bg-contrast-light) 18%, transparent);
+}
+
+.colourStackSegment {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-inline-size: var(--size-2);
+  text-decoration: none;
+  transition: filter var(--t-fast) var(--ease-out);
+}
+
+.colourStackSegment:hover,
+.colourStackSegment:focus-visible {
+  filter: brightness(1.25);
+}
+
+/* Named where the share is wide enough to hold the words; the rest of the time
+   the segment keeps its tooltip and says nothing. */
+.colourStackLabel {
+  font-size: var(--fs-xs);
+  font-variant-numeric: tabular-nums;
+  color: var(--c-black);
+  mix-blend-mode: luminosity;
+  opacity: 0;
+}
+
+.colourStackSegment:hover .colourStackLabel,
+.colourStackSegment:focus-visible .colourStackLabel {
+  opacity: 0.75;
+}

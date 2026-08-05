@@ -375,6 +375,7 @@ const ExploreScreen = ({ stats, visualSameness }: ExploreScreenProps) => {
                 </div>
                 {visualSameness.averageExamples.length > 0 ||
                 visualSameness.repeatedExamples.length > 0 ||
+                visualSameness.travellingMotifs.length > 0 ||
                 visualSameness.distinctExamples.length > 0 ||
                 visualSameness.visualEras.length > 0 ||
                 visualSameness.lookTimeline.length > 0 ? (
@@ -486,6 +487,39 @@ const ExploreScreen = ({ stats, visualSameness }: ExploreScreenProps) => {
                             <span>Load more repeated motifs</span>
                           </PillButton>
                         ) : null}
+                      </section>
+                    ) : null}
+                    {visualSameness.travellingMotifs.length > 0 ? (
+                      <section
+                        className={`${styles.visualExampleSection} ${styles.visualFullRowSection}`}
+                      >
+                        <div className={styles.sectionHeader}>
+                          <Heading level={2}>Same look, different place</Heading>
+                          <Caption as="span">
+                            The closest match each of these found somewhere else
+                          </Caption>
+                        </div>
+                        <div className={styles.visualPairs}>
+                          {visualSameness.travellingMotifs.map((example) => (
+                            <div
+                              key={`${example.left.path}-${example.right.path}`}
+                              className={styles.visualPairCard}
+                            >
+                              <div className={styles.visualPairImages}>
+                                <VisualSimilarityThumb photo={example.left} />
+                                <VisualSimilarityThumb photo={example.right} />
+                              </div>
+                              <div className={styles.visualExampleMeta}>
+                                <span>{example.similarityPercent}% match</span>
+                                {/* The places are the point of this pair, so
+                                    they are what it says. */}
+                                <span className={styles.travellingPlaces}>
+                                  {example.left.place} → {example.right.place}
+                                </span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
                       </section>
                     ) : null}
                     {visualSameness.visualEras.length > 0 ? (
