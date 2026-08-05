@@ -3,7 +3,7 @@
  */
 
 import { fireEvent, render, screen, within } from "@testing-library/react";
-import { SlideshowToolbar, SlideshowToolbarProps } from "./SlideshowToolbar";
+import { SlideshowToolbar, SlideshowToolbarProps, formatCountdown } from "./SlideshowToolbar";
 import { EMPTY_POOL_STATS } from "../../util/slideshowQueue";
 
 const noop = () => {};
@@ -422,7 +422,7 @@ describe("SlideshowToolbar", () => {
     expect(callbacks.onSelectDelay).toHaveBeenCalledWith(10000);
     expect(callbacks.onToggleLongTimings).toHaveBeenCalled();
     expect(callbacks.onToggleAlign).toHaveBeenCalled();
-    expect(screen.getByText("🔁 1h 1m")).toBeTruthy();
+    expect(screen.getByText("1h 01m")).toBeTruthy();
 
     const context = screen.getByRole("group", { name: "Current photo context" });
     expect(within(context).getByRole("link", { name: "japan" }).getAttribute("href")).toBe(
@@ -450,7 +450,7 @@ describe("SlideshowToolbar", () => {
     expect(screen.getByRole("button", { name: "Hide longer cadences" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "3h" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "15m" })).toBeTruthy();
-    expect(screen.getByText("🔁 1m 1s")).toBeTruthy();
+    expect(screen.getByText("1m 01s")).toBeTruthy();
 
     rerender(
       <SlideshowToolbar
@@ -577,5 +577,25 @@ describe("SlideshowToolbar", () => {
     jest.runOnlyPendingTimers();
     expect(onInspectImage).toHaveBeenCalledTimes(1);
     jest.useRealTimers();
+  });
+});
+
+// The countdown shares a flex row with a button, so a string that changes length
+// every second moves that button every second. Padding the smaller unit is half
+// of what holds it still (the other half is a `ch` floor in the stylesheet).
+describe("formatCountdown", () => {
+  it("keeps one length while it counts down within a unit", () => {
+    const withinMinute = [59, 45, 9, 5, 0].map((seconds) => formatCountdown(60 + seconds));
+    expect(new Set(withinMinute.map((label) => label.length)).size).toBe(1);
+    expect(withinMinute).toContain("1m 05s");
+
+    const withinHour = [59, 9, 0].map((minutes) => formatCountdown(3600 + minutes * 60));
+    expect(new Set(withinHour.map((label) => label.length)).size).toBe(1);
+    expect(withinHour).toContain("1h 09m");
+  });
+
+  it("still says the plain seconds under a minute", () => {
+    expect(formatCountdown(45)).toBe("45s");
+    expect(formatCountdown(5)).toBe("5s");
   });
 });

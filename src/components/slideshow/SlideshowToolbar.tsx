@@ -27,6 +27,8 @@ const styles = mergeCssModuleStyles(
     "controlLogo",
     "controlMeta",
     "controlTitle",
+    "countdown",
+    "countdownTime",
     "hideProgress",
     "hideProgressRing",
     "moreSettings",
@@ -182,12 +184,24 @@ const spanSince = (at: number | string | null): string | null => {
   return getRelativeTimeString(ms, { short: true })?.replace(/\s*ago$/, "") ?? null;
 };
 
-const formatCountdown = (secondsLeft: number): string => {
+/**
+ * The cadence countdown, at a width that does not move.
+ *
+ * It sits in a flex row with a button after it, so every second it changed
+ * length it shoved that button sideways — "9m 45s" to "9m 5s" and back. Two
+ * halves to holding it still: the smaller unit is padded so counting within a
+ * minute cannot change the string's length, and the element it renders into is
+ * given a floor in `ch` with tabular figures, so crossing between formats
+ * ("59s" → "1m 00s") cannot either.
+ */
+export const formatCountdown = (secondsLeft: number): string => {
+  const pad = (value: number) => String(Math.floor(value)).padStart(2, "0");
+
   if (secondsLeft >= 3600) {
-    return `${Math.floor(secondsLeft / 3600)}h ${Math.floor((secondsLeft % 3600) / 60)}m`;
+    return `${Math.floor(secondsLeft / 3600)}h ${pad((secondsLeft % 3600) / 60)}m`;
   }
   if (secondsLeft >= 60) {
-    return `${Math.floor(secondsLeft / 60)}m ${Math.floor(secondsLeft % 60)}s`;
+    return `${Math.floor(secondsLeft / 60)}m ${pad(secondsLeft % 60)}s`;
   }
   return `${Math.floor(secondsLeft)}s`;
 };
@@ -657,7 +671,13 @@ export const SlideshowToolbar: React.FC<SlideshowToolbarProps> = (props) => {
         </div>
 
         <div className={styles.controlMeta}>
-          <div className={commonStyles.toast}>🔁 {formatCountdown(props.secondsLeft)}</div>
+          <div className={[commonStyles.toast, styles.countdown].join(" ")}>
+            <span aria-hidden="true">🔁</span>
+            {/* The digits get the fixed width, not the whole pill: a floor on the
+                pill does nothing, because the emoji and the padding already make
+                it wider than any floor worth setting. */}
+            <span className={styles.countdownTime}>{formatCountdown(props.secondsLeft)}</span>
+          </div>
           <button
             className={[props.alignCadence ? buttonStyles.active : "", buttonStyles.base].join(" ")}
             type="button"

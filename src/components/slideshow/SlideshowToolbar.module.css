@@ -326,6 +326,24 @@
 }
 
 .controlButtons,
+/* The cadence countdown, which shares a row with a button it used to shove
+   sideways once a second. The width is pinned on the *digits* rather than on the
+   pill: a floor on the pill does nothing, since the emoji and the padding
+   already exceed any sensible one. `7ch` covers the longest the countdown ever
+   reads ("24h 00m", "10m 45s") and, being the advance of a figure in whatever
+   font the theme is using, it holds under the mono themes too. */
+.countdown {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--m-xs);
+}
+
+.countdownTime {
+  min-inline-size: 7ch;
+  text-align: end;
+  font-variant-numeric: tabular-nums;
+}
+
 .controlMeta {
   display: inline-flex;
   flex-wrap: wrap;
