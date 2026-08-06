@@ -285,6 +285,44 @@ export const projectPoint = (
   };
 };
 
+/**
+ * How much larger the flat view draws the cloud than it does at rest.
+ *
+ * Flat drops the depth axis, and a projection with no depth is orthographic:
+ * `projectPoint`'s scale is `focal × distance ÷ depth`, and with every point at
+ * the eye's own distance that is the focal length whatever the distance is. So
+ * moving the eye moves nothing, and the wheel — which is only ever allowed to
+ * change the distance — did nothing at all in the flat view while still
+ * claiming a magnification. The same number the readout shows is applied by
+ * hand instead, on the screen positions.
+ */
+export const flatViewScale = (camera: Camera, restingDistance: number): number =>
+  restingDistance / camera.distance;
+
+/**
+ * A projected point placed in the flat view: dragged, then magnified about the
+ * middle of the frame.
+ *
+ * `pan` is in unmagnified pixels, which is what lets the two gestures compose —
+ * the middle of the frame stays put under a zoom however far the cloud has been
+ * dragged, and a drag divided by the same scale tracks the pointer exactly.
+ *
+ * Everything drawn in the flat view goes through here, points and clump names
+ * alike: they were two projections of the same cloud, and only one of them was
+ * being dragged, so the names sat where the photographs used to be.
+ */
+export const placeFlat = (
+  point: ProjectedPoint,
+  viewport: Viewport,
+  pan: { x: number; y: number },
+  scale: number,
+): ProjectedPoint => ({
+  x: viewport.width / 2 + (point.x - viewport.width / 2 + pan.x) * scale,
+  y: viewport.height / 2 + (point.y - viewport.height / 2 + pan.y) * scale,
+  scale: point.scale * scale,
+  depth: point.depth,
+});
+
 /** Far to near, so nearer photographs are drawn over the ones behind them. */
 export const backToFront = <T extends { depth: number }>(points: readonly T[]): T[] =>
   [...points].sort((a, b) => b.depth - a.depth);

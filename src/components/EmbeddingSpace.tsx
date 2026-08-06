@@ -6,7 +6,9 @@ import {
   backToFront,
   type Camera,
   distinctiveTag,
+  flatViewScale,
   pickPoint,
+  placeFlat,
   projectPoint,
   type ProjectedPoint,
 } from "../util/embeddingSpace";
@@ -407,7 +409,21 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
 
       const viewport = { width, height: viewHeight };
       const isFlat = flatRef.current;
-      const pan = isFlat ? panRef.current : { x: 0, y: 0 };
+      const camera = cameraRef.current;
+
+      // Flat has no depth for the eye's distance to act on, so the drag and the
+      // wheel are applied to the screen instead. Everything placed in the flat
+      // view goes through here — a name that took its own route from the same
+      // projection stayed where the photographs had been.
+      const inView = (projected: ProjectedPoint | null): ProjectedPoint | null =>
+        projected && isFlat
+          ? placeFlat(
+              projected,
+              viewport,
+              panRef.current,
+              flatViewScale(camera, INITIAL_CAMERA.distance),
+            )
+          : projected;
 
       // On a phone the canvas is a third of the area it is on a laptop, and a
       // thumbnail that stays 22px there closes the cloud into a mosaic again.
@@ -415,7 +431,6 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
       const room = Math.min(1, Math.min(width, viewHeight) / 460);
       const thumbnail = THUMBNAIL_SIZE * (0.62 + room * 0.38);
 
-      const camera = cameraRef.current;
       const placed: Placed[] = [];
       entries.forEach((entry, index) => {
         // Flat is the same projection with the depth axis dropped — which is
@@ -423,19 +438,15 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
         // are the same whether three are solved for or two. The stretch that
         // makes the cloud turnable is undone here, because a scatter plot of
         // two components should show the proportions they actually have.
-        const projected = projectPoint(
-          isFlat ? { x: entry.x * axisScale.x, y: entry.y * axisScale.y, z: 0 } : entry,
-          camera,
-          viewport,
+        const projected = inView(
+          projectPoint(
+            isFlat ? { x: entry.x * axisScale.x, y: entry.y * axisScale.y, z: 0 } : entry,
+            camera,
+            viewport,
+          ),
         );
         if (projected) {
-          placed.push({
-            ...projected,
-            x: projected.x + pan.x,
-            y: projected.y + pan.y,
-            entry,
-            index,
-          });
+          placed.push({ ...projected, entry, index });
         }
       });
 
@@ -597,10 +608,12 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
         .slice(0, room < 0.8 ? 4 : clusters.length)
         .map((cluster) => ({
           cluster,
-          at: projectPoint(
-            isFlat ? { x: cluster.x * axisScale.x, y: cluster.y * axisScale.y, z: 0 } : cluster,
-            camera,
-            viewport,
+          at: inView(
+            projectPoint(
+              isFlat ? { x: cluster.x * axisScale.x, y: cluster.y * axisScale.y, z: 0 } : cluster,
+              camera,
+              viewport,
+            ),
           ),
         }))
         .filter(
@@ -1055,10 +1068,14 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
     travelledRef.current += Math.hypot(event.clientX - dragging.x, event.clientY - dragging.y);
 
     if (flatRef.current) {
-      // Nothing to turn: a flat view is dragged around instead.
+      // Nothing to turn: a flat view is dragged around instead. Divided by the
+      // magnification the drawing applies, since the pan is held unmagnified —
+      // which is what keeps the cloud moving exactly with the pointer however
+      // far in the reader has zoomed.
+      const scale = flatViewScale(camera, INITIAL_CAMERA.distance);
       panRef.current = {
-        x: panRef.current.x + (event.clientX - dragging.x),
-        y: panRef.current.y + (event.clientY - dragging.y),
+        x: panRef.current.x + (event.clientX - dragging.x) / scale,
+        y: panRef.current.y + (event.clientY - dragging.y) / scale,
       };
     } else {
       camera.yaw += (event.clientX - dragging.x) * 0.006;

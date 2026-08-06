@@ -2,9 +2,11 @@ import {
   backToFront,
   clusterPoints,
   distinctiveTag,
+  flatViewScale,
   nearestNeighbours,
   type Camera,
   pickPoint,
+  placeFlat,
   projectPoint,
   projectToThreeDimensions,
   type SpacePoint,
@@ -149,6 +151,56 @@ describe("projectPoint", () => {
 
   it("drops a point that has gone behind the eye", () => {
     expect(projectPoint({ x: 0, y: 0, z: -1 }, { ...CAMERA, distance: 0.5 }, VIEWPORT)).toBeNull();
+  });
+});
+
+describe("the flat view's own transform", () => {
+  // Flat is orthographic, so the eye's distance changes nothing on its own and
+  // the wheel moved the readout while the cloud sat still.
+  it("magnifies where moving the eye cannot", () => {
+    const flat = { ...CAMERA, yaw: 0, pitch: 0 };
+    const point = projectPoint({ x: 0.5, y: 0, z: 0 }, flat, VIEWPORT)!;
+    const closer = projectPoint({ x: 0.5, y: 0, z: 0 }, { ...flat, distance: 1.3 }, VIEWPORT)!;
+
+    expect(closer.x).toBeCloseTo(point.x, 5);
+
+    const zoomed = placeFlat(
+      closer,
+      VIEWPORT,
+      { x: 0, y: 0 },
+      flatViewScale({ ...flat, distance: 1.3 }, CAMERA.distance),
+    );
+
+    expect(zoomed.x - 400).toBeCloseTo((point.x - 400) * 2, 5);
+    expect(zoomed.scale).toBeCloseTo(point.scale * 2, 5);
+  });
+
+  // The names are projected separately from the photographs they name, and only
+  // the photographs were being dragged.
+  it("moves a name exactly as far as the photograph beside it", () => {
+    const at = { x: 0.4, y: -0.2, z: 0 };
+    const flat = { ...CAMERA, yaw: 0, pitch: 0 };
+    const scale = flatViewScale(flat, CAMERA.distance);
+    const pan = { x: 90, y: -40 };
+
+    const still = placeFlat(projectPoint(at, flat, VIEWPORT)!, VIEWPORT, { x: 0, y: 0 }, scale);
+    const dragged = placeFlat(projectPoint(at, flat, VIEWPORT)!, VIEWPORT, pan, scale);
+
+    expect(dragged.x - still.x).toBeCloseTo(pan.x, 5);
+    expect(dragged.y - still.y).toBeCloseTo(pan.y, 5);
+  });
+
+  // Pan is held unmagnified so the two gestures compose: whatever the reader
+  // has dragged to the middle is what a zoom then closes in on.
+  it("holds the middle of the frame still through a zoom", () => {
+    const centred = { x: 400 - 120, y: 300 + 60, scale: 1, depth: CAMERA.distance };
+    const pan = { x: 120, y: -60 };
+
+    for (const scale of [1, 0.4, 3.2]) {
+      const placed = placeFlat(centred, VIEWPORT, pan, scale);
+      expect(placed.x).toBeCloseTo(400, 5);
+      expect(placed.y).toBeCloseTo(300, 5);
+    }
   });
 });
 
