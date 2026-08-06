@@ -234,7 +234,7 @@ const makeVisualSameness = () =>
       right: photo(`right-${index}`),
       similarityPercent: 95,
     })),
-    travellingMotifs: Array.from({ length: 2 }, (_, index) => ({
+    travellingMotifs: Array.from({ length: 3 }, (_, index) => ({
       left: { ...photo(`here-${index}`), place: "Kyoto, Japan" },
       right: { ...photo(`there-${index}`), place: "Taipei, Taiwan" },
       similarityPercent: 88,
@@ -261,6 +261,11 @@ describe("explore page", () => {
     fireEvent.click(screen.getByRole("button", { name: "Load more average photos" }));
     fireEvent.click(screen.getByRole("button", { name: "Load more distinct frames" }));
     fireEvent.click(screen.getByRole("button", { name: "Load more repeated motifs" }));
+    // The section opened with every pair it had, however long that made it.
+    fireEvent.click(screen.getByRole("button", { name: "Load more travelling looks" }));
+    expect(
+      screen.queryByRole("button", { name: "Load more travelling looks" }),
+    ).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Load more recurring looks" }));
     fireEvent.click(screen.getByRole("button", { name: "Load more years" }));
     expect(screen.queryByRole("button", { name: "Load more years" })).not.toBeInTheDocument();
