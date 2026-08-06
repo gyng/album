@@ -11,6 +11,7 @@ import {
   placeFlat,
   projectPoint,
   type ProjectedPoint,
+  withinFrame,
 } from "../util/embeddingSpace";
 import { buildSearchHref, buildSimilaritySearchHref } from "../util/searchFacets";
 import {
@@ -464,8 +465,16 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
 
       // The nearest handful become photographs; the rest stay as their own
       // dominant colour, which is what keeps fifteen hundred of them readable.
+      //
+      // Flat, the budget is spent on what is in the frame: closing in on a
+      // handful of dots brought no photographs up, because the same fixed share
+      // of the whole collection was showing itself and most of it was off
+      // screen. Spending it where the reader is looking turns nearly every dot
+      // in view into its photograph without drawing one more of them. The
+      // turning view keeps the whole cloud in play, since it has no pan and
+      // depth is what decides there.
       const nearest = new Set(
-        [...ordered]
+        (isFlat ? withinFrame(ordered, viewport, thumbnail) : [...ordered])
           // Depth decides which are photographs in the turning view. Flat, there
           // is no depth to decide with, and picking by distance from the middle
           // made a photographic core inside a halo of dots — so the detail is

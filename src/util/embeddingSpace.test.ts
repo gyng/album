@@ -10,6 +10,7 @@ import {
   projectPoint,
   projectToThreeDimensions,
   type SpacePoint,
+  withinFrame,
 } from "./embeddingSpace";
 
 const VIEWPORT = { width: 800, height: 600 };
@@ -172,7 +173,17 @@ describe("the flat view's own transform", () => {
     );
 
     expect(zoomed.x - 400).toBeCloseTo((point.x - 400) * 2, 5);
-    expect(zoomed.scale).toBeCloseTo(point.scale * 2, 5);
+  });
+
+  // Growing the marks as fast as the space between them magnifies the mosaic
+  // rather than opening it, and the photograph under the pointer ballooned.
+  it("opens the space between photographs faster than it grows them", () => {
+    const flat = { ...CAMERA, yaw: 0, pitch: 0 };
+    const at = projectPoint({ x: 0.5, y: 0, z: 0 }, flat, VIEWPORT)!;
+    const zoomed = placeFlat(at, VIEWPORT, { x: 0, y: 0 }, 4);
+
+    expect(zoomed.x - 400).toBeCloseTo((at.x - 400) * 4, 5);
+    expect(zoomed.scale).toBeCloseTo(at.scale * 2, 5);
   });
 
   // The names are projected separately from the photographs they name, and only
@@ -201,6 +212,31 @@ describe("the flat view's own transform", () => {
       expect(placed.x).toBeCloseTo(400, 5);
       expect(placed.y).toBeCloseTo(300, 5);
     }
+  });
+});
+
+describe("withinFrame", () => {
+  const at = (x: number, y: number) => ({ x, y, scale: 1, depth: 1 });
+
+  // Zooming in used to bring no photographs up: the budget was spent on the
+  // whole cloud, and at any magnification most of the cloud is off screen.
+  it("keeps what a reader can see, including a mark hanging over the edge", () => {
+    const kept = withinFrame(
+      [at(400, 300), at(-10, 300), at(815, 300), at(400, 615), at(400, -40), at(900, 300)],
+      VIEWPORT,
+      22,
+    );
+
+    expect(kept.map((point) => [point.x, point.y])).toEqual([
+      [400, 300],
+      [-10, 300],
+      [815, 300],
+      [400, 615],
+    ]);
+  });
+
+  it("has nothing to offer when the cloud has been dragged out of the frame", () => {
+    expect(withinFrame([at(-900, 300), at(2000, 300)], VIEWPORT, 22)).toEqual([]);
   });
 });
 

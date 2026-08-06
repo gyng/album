@@ -310,6 +310,13 @@ export const flatViewScale = (camera: Camera, restingDistance: number): number =
  * Everything drawn in the flat view goes through here, points and clump names
  * alike: they were two projections of the same cloud, and only one of them was
  * being dragged, so the names sat where the photographs used to be.
+ *
+ * The gap between two photographs takes the whole of the zoom; a photograph
+ * takes its square root. Growing the marks as fast as the space between them
+ * only magnifies the picture — the same mosaic, larger — where the point of
+ * zooming into a crowd is that the crowd opens up. At the far end that is a
+ * cloud spread four and a half times over with photographs about twice the
+ * size, which is room enough to see between them.
  */
 export const placeFlat = (
   point: ProjectedPoint,
@@ -319,9 +326,31 @@ export const placeFlat = (
 ): ProjectedPoint => ({
   x: viewport.width / 2 + (point.x - viewport.width / 2 + pan.x) * scale,
   y: viewport.height / 2 + (point.y - viewport.height / 2 + pan.y) * scale,
-  scale: point.scale * scale,
+  scale: point.scale * Math.sqrt(scale),
   depth: point.depth,
 });
+
+/**
+ * The points a reader can actually see, with room for a mark that overhangs the
+ * edge it is drawn at.
+ *
+ * What it is for is the budget: only so many points are drawn as photographs,
+ * and spending that on the whole cloud meant zooming into a corner left the
+ * same fixed share showing itself, most of it off screen — so closing in on a
+ * handful of dots brought no photographs up at all.
+ */
+export const withinFrame = <T extends ProjectedPoint>(
+  points: readonly T[],
+  viewport: Viewport,
+  margin: number,
+): T[] =>
+  points.filter(
+    (point) =>
+      point.x > -margin &&
+      point.x < viewport.width + margin &&
+      point.y > -margin &&
+      point.y < viewport.height + margin,
+  );
 
 /** Far to near, so nearer photographs are drawn over the ones behind them. */
 export const backToFront = <T extends { depth: number }>(points: readonly T[]): T[] =>
