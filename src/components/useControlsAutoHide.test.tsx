@@ -118,6 +118,22 @@ describe("useControlsAutoHide", () => {
     expect(result.current.controlsHideProgress).toBe(1);
   });
 
+  it("keeps counting down on a coarse pointer, which cannot leave the toolbar", () => {
+    // iPadOS synthesises a mouse enter on the tap that presses a toolbar
+    // button, and nothing sends the matching leave until a tap lands somewhere
+    // else. Holding the controls open for that latch left the toolbar on screen
+    // for the rest of the session after "Keep screen awake" was tapped.
+    mockMatchMedia(true);
+    const { result } = renderHook(() => useControlsAutoHide());
+
+    act(() => result.current.setIsPointerOverToolbar(true));
+    act(() => {
+      jest.advanceTimersByTime(31000);
+    });
+
+    expect(result.current.controlsVisible).toBe(false);
+  });
+
   it("extends the longer touch deadline after an interaction", () => {
     mockMatchMedia(true);
     const { result } = renderHook(() => useControlsAutoHide());

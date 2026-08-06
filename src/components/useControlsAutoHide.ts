@@ -68,7 +68,13 @@ export const useControlsAutoHide = (): UseControlsAutoHide => {
       return;
     }
 
-    if (isPointerOverToolbar) {
+    // A cursor resting on the toolbar is someone reading it, so the countdown
+    // waits. A finger cannot rest anywhere: iPadOS synthesises a mouse enter on
+    // the tap that presses a toolbar button and sends no leave until a tap
+    // lands elsewhere, so honouring the latch there stopped the clock for the
+    // rest of the session — tapping "Keep screen awake" left the controls up.
+    // Touch keeps the toolbar awake by extending the deadline instead.
+    if (isPointerOverToolbar && !isCoarsePointer) {
       controlsHideDeadlineRef.current = null;
       setControlsHideProgress(1);
       return;

@@ -235,12 +235,20 @@ const MapViewImpl = (
     // a third of the picture. Collapsed, it is MapLibre's own `(i)`, which is
     // still the credit, one tap away. Only ever applied to a bar MapLibre itself
     // decided to make compact, and only while it is still in its born state.
+    //
+    // The bar's state is two things that must move together: `open`, which the
+    // browser owns, and `maplibregl-compact-show`, which the control's own CSS
+    // reads. Taking only the attribute left the credit hidden by the `<details>`
+    // while the class still held the expanded bar's padding — a 36px stub with
+    // nothing in it — and inverted the control, since MapLibre's handler toggles
+    // the class while the browser toggles the attribute underneath it: the first
+    // tap shrank the stub and only the second opened the credit.
     const collapseCompactAttribution = () => {
-      container
-        .querySelector<HTMLDetailsElement>(
-          "details.maplibregl-ctrl-attrib.maplibregl-compact[open]",
-        )
-        ?.removeAttribute("open");
+      const notice = container.querySelector<HTMLDetailsElement>(
+        "details.maplibregl-ctrl-attrib.maplibregl-compact[open]",
+      );
+      notice?.classList.remove("maplibregl-compact-show");
+      notice?.removeAttribute("open");
     };
 
     const onLoad = (event: MapLibreEvent) => {

@@ -219,4 +219,34 @@ test.describe("Map chrome inside the photo details panel", () => {
     expect(geometry.height).toBe(geometry.barHeight);
     expect(geometry.offset).toBe(0);
   });
+
+  // The bar's state is `open` (the browser's) and `maplibregl-compact-show`
+  // (the control's CSS). Collapsing it by the attribute alone left the credit
+  // hidden inside a bar still padded to hold it, and inverted the control:
+  // MapLibre toggles the class while the browser toggles the attribute under
+  // it, so the first tap shrank the empty stub and only the second opened it.
+  test("opens the credit on the first tap and closes it on the next", async ({ page }) => {
+    await stubExternalMapAssets(page);
+    await gotoHydrated(page, "/album/test-simple");
+
+    await page.locator('summary[aria-label="Photo details"]').first().click();
+    const bar = page.locator(".maplibregl-ctrl-attrib").first();
+    const button = bar.locator(".maplibregl-ctrl-attrib-button");
+    const credit = bar.locator(".maplibregl-ctrl-attrib-inner");
+    await expect(button).toBeVisible();
+
+    // Collapsed is the button and nothing else — no room held for credit that
+    // is not being shown.
+    await expect(credit).toBeHidden();
+    const collapsed = await bar.boundingBox();
+    expect(collapsed!.width).toBe((await button.boundingBox())!.width);
+
+    await button.click();
+    await expect(credit).toBeVisible();
+    expect((await bar.boundingBox())!.width).toBeGreaterThan(collapsed!.width);
+
+    await button.click();
+    await expect(credit).toBeHidden();
+    expect((await bar.boundingBox())!.width).toBe(collapsed!.width);
+  });
 });
