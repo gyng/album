@@ -1,0 +1,235 @@
+/* One card per body. Wide enough to hold a frame and its settings side by side
+   where there is room, and to stack where there is not. */
+.gearBodies {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(var(--size-220), 1fr));
+  gap: var(--m-m);
+}
+
+.gearBodyCard {
+  display: grid;
+  gap: var(--m-s);
+  align-content: start;
+  padding: var(--m-m);
+  border: var(--size-1) solid color-mix(in oklch, var(--c-font) 12%, transparent);
+  border-radius: var(--m);
+  background: color-mix(in oklch, var(--c-font) 4%, transparent);
+}
+
+/* The body's own average frame, square so the cards line up whatever shape the
+   photograph is. */
+.gearBodyFrame {
+  display: block;
+  aspect-ratio: 1;
+  overflow: hidden;
+  border-radius: var(--m-xs);
+}
+
+.gearBodyFrame img {
+  inline-size: 100%;
+  block-size: 100%;
+  object-fit: cover;
+}
+
+.gearBodyHeader {
+  display: flex;
+  align-items: center;
+  gap: var(--m-s);
+}
+
+/* The same colour the timeline gives this body, so the two read as one key. */
+.gearBodyMark {
+  flex: 0 0 auto;
+  inline-size: var(--size-10);
+  block-size: var(--size-10);
+  border-radius: var(--radius-pill);
+}
+
+.gearBodyName {
+  color: var(--c-font);
+  font-size: var(--fs-sm);
+  text-decoration: none;
+}
+
+.gearBodyName:hover,
+.gearBodyName:focus-visible {
+  text-decoration: underline;
+}
+
+.gearBodyCount {
+  font-variant-numeric: tabular-nums;
+}
+
+.gearBodyTraits {
+  display: grid;
+  gap: var(--m);
+  margin: 0;
+}
+
+.gearBodyTrait {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--m-s);
+  font-size: var(--fs-s);
+}
+
+.gearBodyTraitLabel {
+  color: var(--c-bg-contrast-light);
+}
+
+.gearBodyTraitValue {
+  margin: 0;
+  color: var(--c-font);
+  font-variant-numeric: tabular-nums;
+  text-align: end;
+}
+
+.gearLegend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--m-s) var(--m-m);
+}
+
+.gearLegendItem {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--m);
+  color: var(--c-bg-contrast-light);
+  font-size: var(--fs-s);
+}
+
+.gearLegendSwatch {
+  inline-size: var(--size-10);
+  block-size: var(--size-10);
+  border-radius: var(--radius-pill);
+}
+
+.gearYears {
+  display: grid;
+  gap: var(--m-s);
+}
+
+.gearYearRow {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--m-s);
+  align-items: center;
+}
+
+.gearYearMeta {
+  display: grid;
+  gap: var(--m);
+  justify-items: start;
+}
+
+.gearYearLabel {
+  color: var(--c-font);
+  font-size: var(--fs-m);
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.gearYearDetail {
+  color: var(--c-bg-contrast-light);
+  font-size: var(--fs-s);
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.gearYearBar {
+  display: flex;
+  block-size: var(--size-20);
+  max-inline-size: 100%;
+  border-radius: var(--m-xs);
+  overflow: hidden;
+  background: color-mix(in oklch, var(--c-bg-contrast-light) 18%, transparent);
+}
+
+.gearYearSegment {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-inline-size: var(--size-2);
+  text-decoration: none;
+  transition: filter var(--t-fast) var(--ease-out);
+}
+
+.gearYearSegment:hover,
+.gearYearSegment:focus-visible {
+  filter: brightness(1.25);
+}
+
+/* Named only where a segment is wide enough to hold the number; the rest keep
+   their tooltip and say nothing. */
+.gearYearSegmentLabel {
+  font-size: var(--fs-xs);
+  font-variant-numeric: tabular-nums;
+  color: var(--c-black);
+  mix-blend-mode: luminosity;
+  opacity: 0;
+}
+
+.gearYearSegment:hover .gearYearSegmentLabel,
+.gearYearSegment:focus-visible .gearYearSegmentLabel {
+  opacity: 0.75;
+}
+
+.gearLenses {
+  display: grid;
+  /* Wider than the body cards: a distribution needs width to be a shape rather
+     than a row of ticks. */
+  grid-template-columns: repeat(auto-fit, minmax(var(--size-280), 1fr));
+  gap: var(--m-m) var(--m-l);
+}
+
+.gearLensRow {
+  display: grid;
+  gap: var(--m-s);
+  align-content: start;
+}
+
+.gearLensHeader {
+  display: grid;
+  gap: var(--m);
+}
+
+.gearLensName {
+  color: var(--c-font);
+  font-size: var(--fs-sm);
+  text-decoration: none;
+}
+
+.gearLensName:hover,
+.gearLensName:focus-visible {
+  text-decoration: underline;
+}
+
+.gearLensRange {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Bins across the lens's own range, tall where it is used. A gap in the middle
+   is the shape worth seeing: a zoom carried at both ends and nowhere between. */
+.gearLensBars {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--size-2);
+  block-size: var(--size-56);
+  padding-block-end: var(--size-1);
+  border-block-end: var(--size-1) solid color-mix(in oklch, var(--c-font) 20%, transparent);
+}
+
+.gearLensBar {
+  flex: 1 1 0;
+  display: flex;
+  align-items: flex-end;
+  block-size: 100%;
+}
+
+.gearLensBarFill {
+  inline-size: 100%;
+  min-block-size: var(--size-1);
+  border-radius: var(--size-1) var(--size-1) 0 0;
+  background: var(--c-accent);
+}

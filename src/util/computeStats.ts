@@ -1,4 +1,5 @@
 import type { Content, PhotoBlock } from "../services/types";
+import { computeGearStats, type GearStats } from "./computeGearStats";
 import { rgbToString } from "./colorDistance";
 import { encodePublicAssetPath } from "./encodePublicAssetPath";
 import {
@@ -58,6 +59,8 @@ export type PhotoStats = {
   numericFacets: NumericFacetStat[];
   stringFacets: StringFacetStat[];
   gearFlow: SankeyFlow;
+  /** What each body is used for, beyond how many frames it took. */
+  gear: GearStats;
   locationFlow: SankeyFlow;
   technicalRelationships: ParallelRelationshipData | null;
   technicalRelationshipFilters: TechnicalRelationshipFilters;
@@ -1493,6 +1496,7 @@ export function computePhotoStats(albums: Content[]): PhotoStats {
     numericFacets: NUMERIC_FACETS.map((f) => computeNumericFacet(photos, f as PhotoFacet<number>)),
     stringFacets: STRING_FACETS.map((f) => computeStringFacet(photos, f as PhotoFacet<string>)),
     gearFlow: computeGearFlow(photos),
+    gear: computeGearStats(albums),
     locationFlow: computeLocationFlow(photos),
     technicalRelationships: computeTechnicalRelationships(photos),
     technicalRelationshipFilters,

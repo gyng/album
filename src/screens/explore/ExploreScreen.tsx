@@ -53,6 +53,7 @@ import {
   ExploreThisDaySection,
 } from "../../components/explore/ExploreTimeSections";
 import { ExploreColourSection } from "../../components/explore/ExploreColourSection";
+import { ExploreGearSection } from "../../components/explore/ExploreGearSection";
 import { EmbeddingSpaceDeferred } from "../../components/EmbeddingSpaceDeferred";
 import { formatPageTitle } from "../../lib/seo";
 
@@ -820,6 +821,9 @@ const ExploreScreen = ({ stats, visualSameness }: ExploreScreenProps) => {
             >
               <div className={styles.stackedBarGroups}>{gearFacets.map(renderStringFacet)}</div>
             </div>
+            {/* The counts above are the inventory; these are what is done with
+                it. Both belong to the same question, so they share its group. */}
+            <ExploreGearSection gear={stats.gear} frames={visualSameness?.cameraFrames ?? []} />
           </StatGroup>
 
           <ExploreColourSection stats={stats} deferContent />

@@ -5,6 +5,7 @@ import type { Content, PhotoBlock } from "../services/types";
 import { measureBuild } from "../services/buildTiming";
 import { rgbToString } from "./colorDistance";
 import { parseExifLocalDateTime } from "./exifTime";
+import { CAMERA_FACET } from "./photoBuckets";
 import {
   clusterPoints,
   distinctiveTag,
@@ -51,6 +52,8 @@ const MAX_TRAVELLING_MOTIFS = 8;
 const MAX_AVERAGE_EXAMPLES = 12;
 const MAX_OUTLIER_EXAMPLES = 12;
 const MAX_VISUAL_ERAS = 6;
+/** Below this a body's "typical frame" is just one of the few frames it took. */
+const MIN_CAMERA_FRAMES = 12;
 const DEFAULT_EMBEDDINGS_DB_PATH = path.join(process.cwd(), "public", "search-embeddings.sqlite");
 const FALLBACK_EMBEDDINGS_DB_PATH = path.join(process.cwd(), "public", "search.sqlite");
 
@@ -104,6 +107,19 @@ export type VisualSamenessStats = {
     firstYear: number;
     lastYear: number;
   } | null;
+  /**
+   * The most typical frame each body took: the one nearest that camera's own
+   * centroid, rather than the archive's.
+   *
+   * Gear is otherwise the only part of this page with nothing to look at, and a
+   * body's own average frame is the shortest answer to what it is carried for.
+   */
+  cameraFrames: Array<{
+    camera: string;
+    photo: VisualSamenessPhoto;
+    count: number;
+    centroidSimilarityPercent: number;
+  }>;
 };
 
 export type VisualSamenessPhoto = {
@@ -237,6 +253,7 @@ export const computeVisualSamenessFromVectors = (
     visualEras: [],
     lookTimeline: [],
     lookDrift: null,
+    cameraFrames: [],
   };
 };
 
@@ -304,6 +321,30 @@ const buildPhotoTagLookup = (albums: Content[]): Map<string, string[]> => {
       if (indexedPath && tags.length > 0) {
         lookup.set(indexedPath, tags);
       }
+    });
+  });
+
+  return lookup;
+};
+
+/** Which body took each photograph, keyed the way the embeddings are. */
+const buildPhotoCameraLookup = (albums: Content[]): Map<string, string> => {
+  const lookup = new Map<string, string>();
+
+  albums.forEach((album) => {
+    if (isTestAlbum(album)) return;
+
+    album.blocks.forEach((block) => {
+      if (block.kind !== "photo") return;
+
+      const photo = block as PhotoBlock;
+      const indexedPath = photo._build.tags?.path;
+      const camera = photo._build.exif
+        ? CAMERA_FACET.extract(photo._build.exif, photo._build.tags ?? undefined)
+        : null;
+      if (!indexedPath || !camera) return;
+
+      lookup.set(indexedPath, camera);
     });
   });
 
@@ -468,6 +509,7 @@ export const computeVisualSamenessStats = async (
     const photoLookup = buildPhotoLookup(albums);
     const photoDateLookup = buildPhotoDateLookup(albums);
     const photoPlaceLookup = buildPhotoPlaceLookup(albums);
+    const photoCameraLookup = buildPhotoCameraLookup(albums);
     const photoTagLookup = buildPhotoTagLookup(albums);
     const candidatePaths = albums
       .filter((album) => !isTestAlbum(album))
@@ -907,6 +949,48 @@ export const computeVisualSamenessStats = async (
         }
       }
 
+      // Each body's own average frame. The archive's centroid answers "what does
+      // this collection look like"; a camera's answers "what is this one carried
+      // for", which is the question the gear section asks and cannot show.
+      const cameraFrames = (() => {
+        const byCamera = new Map<string, typeof parsedRows>();
+        for (const row of parsedRows) {
+          const camera = photoCameraLookup.get(row.path);
+          if (!camera) continue;
+          byCamera.set(camera, [...(byCamera.get(camera) ?? []), row]);
+        }
+
+        return [...byCamera.entries()]
+          .filter(([, rows]) => rows.length >= MIN_CAMERA_FRAMES)
+          .flatMap(([camera, rows]) => {
+            // invariant: the filter above guarantees a first row
+            const dimension = rows[0]!.vector.length;
+            const centre = Array.from({ length: dimension }, () => 0);
+            for (const row of rows) {
+              for (let index = 0; index < dimension; index += 1) {
+                centre[index] = (centre[index] ?? 0) + (row.vector[index] ?? 0);
+              }
+            }
+
+            const normalised = normalizeVector(centre);
+            const best = rows
+              .map((row) => ({ row, score: dotProduct(row.vector, normalised) }))
+              .sort((left, right) => right.score - left.score)[0];
+            const photo = best ? photoLookup.get(best.row.path) : undefined;
+            if (!best || !photo) return [];
+
+            return [
+              {
+                camera,
+                photo,
+                count: rows.length,
+                centroidSimilarityPercent: Math.round(best.score * 100),
+              },
+            ];
+          })
+          .sort((left, right) => right.count - left.count);
+      })();
+
       return {
         sampleSize: validNearest.length,
         samenessPercent: Math.round(averageNearestSimilarity * 100),
@@ -923,6 +1007,7 @@ export const computeVisualSamenessStats = async (
         visualEras,
         lookTimeline,
         lookDrift,
+        cameraFrames,
       };
     } finally {
       await closeDatabase(db);

@@ -208,6 +208,57 @@ const makeStats = () => ({
     links: [],
   },
   gearFlow: { nodes: [], links: [] },
+  gear: {
+    cameraYears: [
+      { label: "2023", total: 4, cameras: [{ camera: "Cam 1", count: 4, share: 100 }] },
+      {
+        label: "2024",
+        total: 4,
+        cameras: [
+          { camera: "Cam 2", count: 3, share: 75 },
+          { camera: "Cam 1", count: 1, share: 25 },
+        ],
+      },
+    ],
+    cameraProfiles: [
+      {
+        camera: "Cam 1",
+        count: 5,
+        share: 62,
+        years: [2023, 2024] as [number, number],
+        focalLength: { mm: 35, equivalent: true },
+        aperture: 2.8,
+        iso: 400,
+        busiestHours: { from: 21, to: 0 },
+        topLens: { label: "Lens 1", share: 90 },
+        topPlace: { label: "Kyoto, Japan", share: 40 },
+      },
+      {
+        camera: "Cam 2",
+        count: 3,
+        share: 38,
+        years: null,
+        focalLength: null,
+        aperture: null,
+        iso: null,
+        busiestHours: null,
+        topLens: null,
+        topPlace: null,
+      },
+    ],
+    lensFocalRanges: [
+      {
+        lens: "Lens 1",
+        count: 16,
+        shortest: 16,
+        longest: 80,
+        buckets: [
+          { from: 16, to: 48, count: 8, share: 50 },
+          { from: 48, to: 80, count: 8, share: 50 },
+        ],
+      },
+    ],
+  },
 });
 
 const photo = (id: string) => ({ path: id, src: `/${id}`, href: `/album/${id}`, label: id });
