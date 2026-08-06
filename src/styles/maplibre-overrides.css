@@ -121,10 +121,21 @@
  * to be the vendor bitmap under `filter: invert(1)`: inverting turned the
  * glyph's filled disc white, so the one piece of map chrome that ignored the
  * palette was the one explaining where the map came from.
+ *
+ * The button is a `<summary>`, and the photograph's details panel — which the
+ * mini-map sits inside — styles `summary` by descent for its own disclosures.
+ * That reached in here: a 44px tap target on a button pinned to the top of a
+ * 24px bar left the (i) hanging 10px below the bar's centre, in the panel's
+ * muted ink rather than the map chrome's. Restating both is what keeps the
+ * control's own geometry independent of whatever it is nested in.
  */
 .maplibregl-ctrl-attrib > .maplibregl-ctrl-attrib-button {
   background-color: currentColor;
   background-image: none;
+  block-size: var(--size-24);
+  min-block-size: var(--size-24);
+  inline-size: var(--size-24);
+  color: inherit;
   mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath fill-rule='evenodd' d='M4 10a6 6 0 1 0 12 0 6 6 0 1 0-12 0m5-3a1 1 0 1 0 2 0 1 1 0 1 0-2 0m0 3a1 1 0 1 1 2 0v3a1 1 0 1 1-2 0'/%3E%3C/svg%3E");
   mask-size: var(--size-16) var(--size-16);
   mask-position: center;

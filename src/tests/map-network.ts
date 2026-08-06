@@ -31,6 +31,11 @@ const LOCAL_MAP_STYLE: StyleDocument = {
   sources: {
     fixture: {
       type: "geojson",
+      // Every real style names its data, and the compact attribution collapses
+      // to its (i) only when there is something to attribute — without this the
+      // control renders empty and MapLibre hides it, so anything asserted about
+      // that button would be asserted about a box with no layout.
+      attribution: "Fixture data",
       data: {
         type: "FeatureCollection",
         features: [

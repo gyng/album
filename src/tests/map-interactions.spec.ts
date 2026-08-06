@@ -191,3 +191,32 @@ test.describe("World map interactions", () => {
     expect(typefaces.preview).toBe(typefaces.body);
   });
 });
+
+test.describe("Map chrome inside the photo details panel", () => {
+  // The attribution's (i) is a <summary>, and the details panel the mini-map
+  // sits inside styles `summary` by descent for its own disclosures. That
+  // reached into the map: a 44px tap target on a button pinned to the top of a
+  // 24px bar put the (i) 10px below the bar's centre. Measured in a browser
+  // because a cascade is the thing under test.
+  test("centres the attribution button in its bar", async ({ page }) => {
+    await stubExternalMapAssets(page);
+    await gotoHydrated(page, "/album/test-simple");
+
+    await page.locator('summary[aria-label="Photo details"]').first().click();
+    const button = page.locator(".maplibregl-ctrl-attrib-button").first();
+    await expect(button).toBeVisible();
+
+    const geometry = await button.evaluate((element) => {
+      const bar = element.closest(".maplibregl-ctrl-attrib")!.getBoundingClientRect();
+      const box = element.getBoundingClientRect();
+      return {
+        offset: box.top + box.height / 2 - (bar.top + bar.height / 2),
+        height: box.height,
+        barHeight: bar.height,
+      };
+    });
+
+    expect(geometry.height).toBe(geometry.barHeight);
+    expect(geometry.offset).toBe(0);
+  });
+});
