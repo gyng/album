@@ -2,9 +2,10 @@
  * @jest-environment jsdom
  */
 
-import { render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { Content, PhotoBlock, TextBlock } from "../services/types";
 import { Albums } from "./Albums";
+import { resetPrefetchedImages } from "../util/prefetchImage";
 
 jest.mock("./Photo", () => ({
   Picture: ({ block, label, lazy }: { block: PhotoBlock; label: string; lazy: boolean }) => (
@@ -113,5 +114,43 @@ describe("Albums", () => {
       "loading",
       "lazy",
     );
+  });
+
+  // The router prefetches the page; nothing prefetched the photograph the page
+  // is for, so the album's largest image began loading after the navigation.
+  it("fetches an album's first photograph once the pointer has stayed", () => {
+    jest.useFakeTimers();
+    resetPrefetchedImages();
+    const made: HTMLImageElement[] = [];
+    const RealImage = globalThis.Image;
+    globalThis.Image = class extends RealImage {
+      constructor() {
+        super();
+        made.push(this as unknown as HTMLImageElement);
+      }
+    } as unknown as typeof Image;
+
+    render(<Albums albums={[album("kyoto")]} />);
+    const link = screen.getByLabelText("View photo album: Album kyoto");
+
+    // A pointer passing through fetches nothing.
+    fireEvent.pointerEnter(link);
+    fireEvent.pointerLeave(link);
+    act(() => {
+      jest.advanceTimersByTime(400);
+    });
+    expect(made).toHaveLength(0);
+
+    fireEvent.pointerEnter(link);
+    act(() => {
+      jest.advanceTimersByTime(400);
+    });
+
+    expect(made).toHaveLength(1);
+    // The album page's own sizes for that image, so the browser picks the same
+    // candidate it is about to ask for.
+    expect(made[0]?.sizes).toBe("auto, 100vw");
+    globalThis.Image = RealImage;
+    jest.useRealTimers();
   });
 });

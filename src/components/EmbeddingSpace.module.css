@@ -43,6 +43,15 @@
 
 /* The controls sit over the cloud rather than under it: the picture is the
    subject, and chrome beneath it costs the picture height on every viewport. */
+/* Given the screen, the stage takes all of it: its own height is a fraction of
+   a window, which is not what a reader asked for by pressing Full. */
+.stage:fullscreen {
+  block-size: 100%;
+  inline-size: 100%;
+  border: none;
+  border-radius: 0;
+}
+
 .tools {
   position: absolute;
   inset-block-start: var(--m-s);

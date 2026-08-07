@@ -234,6 +234,14 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
 
   const canvasRef = React.useRef<HTMLCanvasElement | null>(null);
   const stageRef = React.useRef<HTMLDivElement | null>(null);
+  /**
+   * Whether the cloud has the screen to itself.
+   *
+   * Tracked from the browser's own event rather than from the press, because
+   * Escape and the system's own chrome leave it too, and a button that then
+   * says "Exit" is a button lying about where the reader is.
+   */
+  const [fullscreen, setFullscreen] = React.useState(false);
   const cameraRef = React.useRef<Camera>({ ...INITIAL_CAMERA });
   const placedRef = React.useRef<Placed[]>([]);
   const thumbnailsRef = React.useRef(new Map<string, HTMLImageElement>());
@@ -312,6 +320,12 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
     return () => {
       cancelled = true;
     };
+  }, []);
+
+  React.useEffect(() => {
+    const sync = () => setFullscreen(document.fullscreenElement === stageRef.current);
+    document.addEventListener("fullscreenchange", sync);
+    return () => document.removeEventListener("fullscreenchange", sync);
   }, []);
 
   /**
@@ -1226,6 +1240,28 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
         {/* Over the cloud rather than under it, the way the map's controls sit:
             the picture is the subject and the chrome should cost it no room. */}
         <div className={styles.tools}>
+          {/* A cloud of fifteen hundred photographs in a strip two thirds of a
+              window tall is a crowd; given the screen it becomes a room. The
+              canvas sizes itself from its container every frame, so there is
+              nothing to tell it — it simply has more to fill. */}
+          <OverlayButton
+            aria-pressed={fullscreen}
+            className={fullscreen ? styles.toolActive : ""}
+            onClick={() => {
+              const stage = stageRef.current;
+              if (!stage) return;
+              // Both sides can fail — a browser that refuses the request, a
+              // document that is not in fullscreen after all — and neither is
+              // worth more than staying where we are.
+              if (document.fullscreenElement === stage) {
+                document.exitFullscreen().catch(() => {});
+              } else {
+                stage.requestFullscreen?.().catch(() => {});
+              }
+            }}
+          >
+            {fullscreen ? "Exit" : "Full"}
+          </OverlayButton>
           <OverlayButton
             aria-pressed={flat}
             className={flat ? styles.toolActive : ""}
