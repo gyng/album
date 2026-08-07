@@ -36,6 +36,9 @@ jest.mock("../../components/Seo", () => ({ Seo: () => null }));
 jest.mock("../../components/MiniHistogram", () => ({
   MiniHistogram: ({ title }: { title: string }) => <div>{title}</div>,
 }));
+jest.mock("../../components/ContactSheetDeferred", () => ({
+  ContactSheetDeferred: () => <div data-testid="contact-sheet" />,
+}));
 jest.mock("../../components/EmbeddingSpaceDeferred", () => ({
   EmbeddingSpaceDeferred: () => <div data-testid="embedding-space" />,
 }));

@@ -1117,6 +1117,7 @@ export const loadEmbeddingSpacePoints = async (
     const photoLookup = buildPhotoLookup(albums);
     const tagLookup = buildPhotoTagLookup(albums);
     const albumLookup = buildPhotoAlbumLookup(albums);
+    const dateLookup = buildPhotoDateLookup(albums);
     const selectedPaths = [...photoLookup.keys()];
     if (selectedPaths.length < MIN_EMBEDDING_SAMPLE) {
       return empty;
@@ -1204,10 +1205,14 @@ export const loadEmbeddingSpacePoints = async (
         const tags = (tagLookup.get(entry.path) ?? []).slice(0, TAGS_PER_PHOTO);
         const album = albumLookup.get(entry.path);
         const slot = slots[entry.path];
+        // The wall-clock sort key, so a contact sheet can run in the order the
+        // photographs were taken rather than the order their files are named.
+        const taken = dateLookup.get(entry.path);
         return {
           src: entry.photo.src,
           href: entry.photo.href,
           label: entry.photo.label,
+          ...(taken ? { taken: taken.sortKey, year: taken.year } : {}),
           ...(album ? { album } : {}),
           ...(entry.photo.swatch ? { swatch: entry.photo.swatch } : {}),
           ...(tags.length > 0 ? { tags } : {}),

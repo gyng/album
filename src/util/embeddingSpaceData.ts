@@ -10,6 +10,9 @@ export type EmbeddingSpaceEntry = {
   href: string;
   label: string;
   album?: string;
+  /** Wall-clock sort key and year, where the photograph carries a date. */
+  taken?: number;
+  year?: number;
   swatch?: string;
   /** What the captioner said is in it, most telling first. */
   tags?: string[];
