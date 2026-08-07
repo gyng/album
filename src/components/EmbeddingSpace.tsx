@@ -1667,7 +1667,7 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
               was showing. */}
           <SegmentedToggle
             ariaLabel="How to arrange the photographs"
-            className={styles.arrangement}
+            variant="overlay"
             value={arrangement}
             onChange={(next) => {
               // Flat means straight on: a view left half-turned would be an

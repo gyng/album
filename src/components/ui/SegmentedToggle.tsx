@@ -7,8 +7,17 @@ export const SegmentedToggle = <T extends string>(props: {
   onChange: (value: T) => void;
   ariaLabel: string;
   className?: string | undefined;
+  /**
+   * `surface` sits on the page beside the selects it is shaped like.
+   * `overlay` sits over a photograph with the overlay buttons — dark glass, a
+   * pill, and the accent for what is chosen — because a control that keeps its
+   * page styling over a picture reads as a piece of another interface that
+   * happened to land there.
+   */
+  variant?: "surface" | "overlay";
 }) => {
-  const { options, value, onChange, ariaLabel, className } = props;
+  const { options, value, onChange, ariaLabel, className, variant = "surface" } = props;
+  const overlay = variant === "overlay";
   const groupRef = useRef<HTMLDivElement>(null);
 
   const move = (delta: number) => {
@@ -46,7 +55,9 @@ export const SegmentedToggle = <T extends string>(props: {
     // oxlint-disable-next-line jsx-a11y/interactive-supports-focus
     <div
       ref={groupRef}
-      className={[styles.toggle, className].filter(Boolean).join(" ")}
+      className={[styles.toggle, overlay ? styles.toggleOverlay : "", className]
+        .filter(Boolean)
+        .join(" ")}
       role="radiogroup"
       aria-label={ariaLabel}
       onKeyDown={onKeyDown}
@@ -60,7 +71,11 @@ export const SegmentedToggle = <T extends string>(props: {
             role="radio"
             aria-checked={selected}
             tabIndex={selected ? 0 : -1}
-            className={[styles.button, selected ? styles.buttonActive : ""]
+            className={[
+              styles.button,
+              overlay ? styles.buttonOverlay : "",
+              selected ? (overlay ? styles.buttonActiveOverlay : styles.buttonActive) : "",
+            ]
               .filter(Boolean)
               .join(" ")}
             onClick={() => onChange(option.value)}

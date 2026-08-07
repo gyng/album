@@ -90,6 +90,7 @@ const Code = ({ children }: { children: string }) => (
 
 const DesignPage = () => {
   const [toggleValue, setToggleValue] = useState("a");
+  const [overlayToggleValue, setOverlayToggleValue] = useState("a");
   const [inputValue, setInputValue] = useState("");
 
   return (
@@ -380,8 +381,22 @@ const DesignPage = () => {
             <OverlayButton size="small" aria-label="Close">
               <span aria-hidden="true">×</span>
             </OverlayButton>
+            {/* The segmented toggle's overlay variant belongs in this row
+                rather than beside the page controls: over a photograph it is
+                one of these, and it is here so the two can be compared. */}
+            <SegmentedToggle
+              variant="overlay"
+              options={[
+                { value: "a", label: "3D" },
+                { value: "b", label: "Sheet" },
+              ]}
+              value={overlayToggleValue}
+              onChange={setOverlayToggleValue}
+              ariaLabel="Arrangement"
+            />
           </div>
           <Code>{'<OverlayButton size="small">×</OverlayButton>'}</Code>
+          <Code>{'<SegmentedToggle variant="overlay" options={[...]} />'}</Code>
         </section>
 
         {/* Chart Tooltip */}

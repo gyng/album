@@ -60,17 +60,12 @@
   gap: var(--m-xs);
 }
 
-/* The arrangement control sits over the photographs with the rest of the
-   chrome, so it takes the same glass the overlay buttons wear rather than the
-   page's own surface. */
-.arrangement {
-  background: var(--c-overlay-dark);
-  backdrop-filter: blur(var(--glass-blur-surface));
-  border-radius: var(--radius-pill);
-}
-
+/* The same pressed state the arrangement control shows: accent ink, an accent
+   hairline and a wash of it behind. Two ways of saying "this one is on" in one
+   row of buttons is one way too many. */
 .toolActive {
   border-color: var(--c-accent);
+  background-color: color-mix(in oklch, var(--c-accent) 22%, var(--c-overlay-dark));
   color: var(--c-accent);
 }
 

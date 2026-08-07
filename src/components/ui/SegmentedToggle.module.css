@@ -48,3 +48,45 @@
   background: var(--c-font);
   color: var(--c-bg);
 }
+
+/* Over a photograph, the control wears what the overlay buttons wear: the same
+   glass, the same hairline, the same pill. A segmented control that kept its
+   page styling there read as a piece of another interface that had landed on
+   the picture — and its chosen segment, a white block with square corners,
+   overflowed the pill it was sitting in. */
+.toggleOverlay {
+  padding: var(--size-2);
+  min-block-size: auto;
+  border-color: var(--c-border-on-dark);
+  border-width: var(--line-hairline);
+  border-radius: var(--radius-pill);
+  background-color: var(--c-overlay-dark);
+  backdrop-filter: blur(var(--glass-blur-surface));
+}
+
+.toggleOverlay:hover,
+.toggleOverlay:focus-within {
+  border-color: var(--c-border-on-dark);
+}
+
+.buttonOverlay {
+  min-block-size: auto;
+  padding: var(--m-xs) var(--m-s);
+  border-radius: var(--radius-pill);
+  color: var(--c-on-dark);
+  font-size: var(--fs-s);
+  line-height: 1;
+}
+
+.buttonOverlay:not(.buttonActiveOverlay):hover {
+  color: var(--c-on-dark);
+  background: var(--c-overlay-dark-hover);
+}
+
+/* The accent, the way a pressed overlay button shows itself — not a white
+   block, which is a different vocabulary. */
+.buttonActiveOverlay {
+  background: color-mix(in oklch, var(--c-accent) 22%, transparent);
+  box-shadow: inset 0 0 0 var(--line-hairline) var(--c-accent);
+  color: var(--c-accent);
+}
