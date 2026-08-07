@@ -723,7 +723,15 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
               : undefined;
           context.globalAlpha = alpha;
 
-          if (
+          // The showcase draws a photograph at two and a half times thumbnail
+          // size, and the contact sheet's cell is 48px: the cloud's own idle
+          // moment was the blurriest picture on the page. Asked for at full
+          // size like the pointer's focus does, with the cell holding the place
+          // until it arrives — which is the only reason the cell is still here.
+          const own = fullResolution(point.entry.src);
+          if (own.complete && own.naturalWidth > 0) {
+            drawSquare(context, own, point.x, point.y, size);
+          } else if (
             sheet?.complete &&
             sheet.naturalWidth > 0 &&
             atlas &&

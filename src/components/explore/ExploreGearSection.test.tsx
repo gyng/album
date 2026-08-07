@@ -2,19 +2,28 @@
  * @jest-environment jsdom
  */
 
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import type { GearStats } from "../../util/computeGearStats";
 import { ExploreGearSection } from "./ExploreGearSection";
 
 const gear = (overrides: Partial<GearStats> = {}): GearStats => ({
   cameraYears: [
-    { label: "2023", total: 4, cameras: [{ camera: "X100T", count: 4, share: 100 }] },
+    {
+      label: "2023",
+      total: 4,
+      cameras: [{ camera: "X100T", count: 4, share: 100 }],
+      frames: [{ position: 0.1, camera: "X100T" }],
+    },
     {
       label: "2024",
       total: 4,
       cameras: [
         { camera: "X-T5", count: 3, share: 75 },
         { camera: "X100T", count: 1, share: 25 },
+      ],
+      frames: [
+        { position: 0.2, camera: "X100T" },
+        { position: 0.6, camera: "X-T5" },
       ],
     },
   ],
@@ -53,6 +62,25 @@ const gear = (overrides: Partial<GearStats> = {}): GearStats => ({
       buckets: [
         { from: 16, to: 48, count: 12, share: 75 },
         { from: 48, to: 80, count: 4, share: 25 },
+      ],
+      peak: { from: 16, to: 48, count: 12, share: 75 },
+      years: [
+        {
+          label: "2023",
+          total: 8,
+          bands: [
+            { from: 16, to: 48, count: 8, share: 100 },
+            { from: 48, to: 80, count: 0, share: 0 },
+          ],
+        },
+        {
+          label: "2024",
+          total: 8,
+          bands: [
+            { from: 16, to: 48, count: 0, share: 0 },
+            { from: 48, to: 80, count: 8, share: 100 },
+          ],
+        },
       ],
     },
   ],
@@ -102,7 +130,9 @@ describe("the gear section's own reporting", () => {
   it("divides each year between the bodies that shot it, and links each share", () => {
     render(<ExploreGearSection gear={gear()} frames={frames} />);
 
-    const shares = screen.getAllByTitle(/in 2024:/).map((segment) => segment.getAttribute("title"));
+    const shares = screen
+      .getAllByTitle(/ in 2024: \d+ photos?,/)
+      .map((segment) => segment.getAttribute("title"));
 
     expect(shares).toEqual(["X-T5 in 2024: 3 photos, 75%", "X100T in 2024: 1 photo, 25%"]);
   });
@@ -114,7 +144,12 @@ describe("the gear section's own reporting", () => {
       <ExploreGearSection
         gear={gear({
           cameraYears: [
-            { label: "2024", total: 4, cameras: [{ camera: "X100T", count: 4, share: 100 }] },
+            {
+              label: "2024",
+              total: 4,
+              cameras: [{ camera: "X100T", count: 4, share: 100 }],
+              frames: [],
+            },
           ],
         })}
         frames={[]}
@@ -130,6 +165,36 @@ describe("the gear section's own reporting", () => {
     expect(screen.getByText(/16–80mm/)).toBeInTheDocument();
     expect(screen.getByTitle("16–48mm: 12 photos, 75%")).toBeInTheDocument();
     expect(screen.getByTitle("48–80mm: 4 photos, 25%")).toBeInTheDocument();
+  });
+
+  // The bars are drawn against the tallest one, so without the axis their
+  // height is a shape with no scale and their position a range with no numbers.
+  it("puts numbers on the lens axis", () => {
+    render(<ExploreGearSection gear={gear()} frames={frames} />);
+
+    expect(screen.getByText("16mm")).toBeInTheDocument();
+    expect(screen.getByText("80mm")).toBeInTheDocument();
+    expect(screen.getByText("most at 16–48mm · 75%")).toBeInTheDocument();
+  });
+
+  it("follows a lens from year to year", () => {
+    render(<ExploreGearSection gear={gear()} frames={frames} />);
+
+    expect(screen.getByTitle("16–48mm in 2023: 8 of 8")).toBeInTheDocument();
+    expect(screen.getByTitle("48–80mm in 2024: 8 of 8")).toBeInTheDocument();
+  });
+
+  // A stacked bar cannot show a body arriving in June, which is what the frames
+  // are for.
+  it("switches the years between shares and every frame", () => {
+    render(<ExploreGearSection gear={gear()} frames={frames} />);
+
+    expect(screen.getByTitle("X-T5 in 2024: 3 photos, 75%")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("radio", { name: "Every photo" }));
+
+    expect(screen.queryByTitle("X-T5 in 2024: 3 photos, 75%")).not.toBeInTheDocument();
+    expect(document.querySelectorAll('[class*="gearYearSliver"]')).toHaveLength(3);
   });
 
   it("renders nothing at all when no photograph names its camera", () => {

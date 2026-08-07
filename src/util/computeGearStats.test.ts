@@ -53,11 +53,12 @@ describe("computeGearStats", () => {
       ]),
     ]);
 
-    expect(stats.cameraYears).toEqual([
+    expect(stats.cameraYears.map((year) => ({ ...year, frames: year.frames.length }))).toEqual([
       {
         label: "2023",
         total: 2,
         cameras: [{ camera: "FUJIFILM X100T", count: 2, share: 100 }],
+        frames: 2,
       },
       {
         label: "2024",
@@ -66,8 +67,32 @@ describe("computeGearStats", () => {
           { camera: "FUJIFILM X-T5", count: 3, share: 75 },
           { camera: "FUJIFILM X100T", count: 1, share: 25 },
         ],
+        frames: 4,
       },
     ]);
+  });
+
+  // A stacked bar says a year was two thirds one body; only the frames say the
+  // handover happened in June.
+  it("places every frame where it falls in its year", () => {
+    const stats = computeGearStats([
+      album([
+        photo("a", { camera: "X100T", taken: "2024-01-01T00:00:00" }),
+        photo("b", { camera: "X-T5", taken: "2024-07-01T12:00:00" }),
+        photo("c", { camera: "X-T5", taken: "2024-12-31T00:00:00" }),
+      ]),
+    ]);
+
+    const frames = stats.cameraYears[0]?.frames;
+
+    expect(frames?.map((frame) => frame.camera)).toEqual([
+      "FUJIFILM X100T",
+      "FUJIFILM X-T5",
+      "FUJIFILM X-T5",
+    ]);
+    expect(frames?.[0]?.position).toBeCloseTo(0, 5);
+    expect(frames?.[1]?.position).toBeCloseTo(0.5, 2);
+    expect(frames?.[2]?.position).toBeCloseTo(1, 2);
   });
 
   it("leaves out a photograph with no date, rather than inventing a year for it", () => {
@@ -201,6 +226,46 @@ describe("computeGearStats", () => {
       // The hole in the middle is the point: a zoom used at both ends only.
       expect(zoom.buckets.slice(1, 11).every((bucket) => bucket.count === 0)).toBe(true);
       expect(zoom.count).toBe(16);
+    });
+
+    // The chart's height is relative, so the axis has to say what the tallest
+    // bin actually is.
+    it("names its busiest bin", () => {
+      const frames = [...Array.from({ length: 12 }, () => 80), 12, 12, 12, 12];
+      const stats = computeGearStats([
+        album(
+          frames.map((mm, index) =>
+            photo(`p${index}`, { camera: "X-T5", lens: "XF16-80mm", focal: mm }),
+          ),
+        ),
+      ]);
+
+      expect(stats.lensFocalRanges[0]?.peak).toMatchObject({ from: 74, to: 80, count: 12 });
+    });
+
+    it("follows a zoom's use from year to year against its whole range", () => {
+      const early = Array.from({ length: 8 }, () => ({ mm: 16, year: "2023" }));
+      const late = Array.from({ length: 8 }, () => ({ mm: 80, year: "2024" }));
+      const stats = computeGearStats([
+        album(
+          [...early, ...late].map((frame, index) =>
+            photo(`p${index}`, {
+              camera: "X-T5",
+              lens: "XF16-80mm",
+              focal: frame.mm,
+              taken: `${frame.year}-05-04T13:00:00`,
+            }),
+          ),
+        ),
+      ]);
+
+      const years = stats.lensFocalRanges[0]?.years;
+
+      expect(years?.map((year) => year.label)).toEqual(["2023", "2024"]);
+      // Each year is banded against 16–80mm, not against its own frames, or
+      // both years would fill their bar and the move would vanish.
+      expect(years?.[0]?.bands.map((band) => band.count)).toEqual([8, 0, 0, 0]);
+      expect(years?.[1]?.bands.map((band) => band.count)).toEqual([0, 0, 0, 8]);
     });
 
     // A prime has one focal length, so a distribution over it says nothing at

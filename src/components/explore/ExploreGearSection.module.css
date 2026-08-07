@@ -233,3 +233,66 @@
   border-radius: var(--size-1) var(--size-1) 0 0;
   background: var(--c-accent);
 }
+
+/* The bars carry a relative height, so the axis carries the numbers: both ends
+   of the lens's range, and what the tallest bin actually holds. */
+.gearLensAxis {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--m-s);
+  color: var(--c-bg-contrast-light);
+  font-size: var(--fs-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.gearLensPeak {
+  text-align: center;
+}
+
+.gearLensYears {
+  display: grid;
+  gap: var(--m);
+  margin-block-start: var(--m);
+}
+
+.gearLensYearRow {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--m-s);
+  align-items: center;
+}
+
+.gearLensYearLabel {
+  color: var(--c-bg-contrast-light);
+  font-size: var(--fs-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.gearLensYearBar {
+  display: flex;
+  block-size: var(--size-10);
+  border-radius: var(--size-2);
+  overflow: hidden;
+  background: color-mix(in oklch, var(--c-bg-contrast-light) 18%, transparent);
+}
+
+.gearLensYearBand {
+  display: block;
+}
+
+/* Every frame as its own sliver, where it fell in the year. Full width, unlike
+   the stacked view: this one answers "when", so January must sit at the left
+   edge of every row. */
+.gearYearRibbon {
+  position: relative;
+  block-size: var(--size-20);
+  border-radius: var(--m-xs);
+  background: color-mix(in oklch, var(--c-bg-contrast-light) 18%, transparent);
+  overflow: hidden;
+}
+
+.gearYearSliver {
+  position: absolute;
+  inset-block: 0;
+  inline-size: var(--size-2);
+}

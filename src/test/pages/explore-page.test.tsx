@@ -210,7 +210,12 @@ const makeStats = () => ({
   gearFlow: { nodes: [], links: [] },
   gear: {
     cameraYears: [
-      { label: "2023", total: 4, cameras: [{ camera: "Cam 1", count: 4, share: 100 }] },
+      {
+        label: "2023",
+        total: 4,
+        cameras: [{ camera: "Cam 1", count: 4, share: 100 }],
+        frames: [{ position: 0.4, camera: "Cam 1" }],
+      },
       {
         label: "2024",
         total: 4,
@@ -218,6 +223,7 @@ const makeStats = () => ({
           { camera: "Cam 2", count: 3, share: 75 },
           { camera: "Cam 1", count: 1, share: 25 },
         ],
+        frames: [{ position: 0.7, camera: "Cam 2" }],
       },
     ],
     cameraProfiles: [
@@ -255,6 +261,17 @@ const makeStats = () => ({
         buckets: [
           { from: 16, to: 48, count: 8, share: 50 },
           { from: 48, to: 80, count: 8, share: 50 },
+        ],
+        peak: { from: 16, to: 48, count: 8, share: 50 },
+        years: [
+          {
+            label: "2024",
+            total: 16,
+            bands: [
+              { from: 16, to: 48, count: 8, share: 50 },
+              { from: 48, to: 80, count: 8, share: 50 },
+            ],
+          },
         ],
       },
     ],

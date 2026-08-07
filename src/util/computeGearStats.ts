@@ -17,6 +17,14 @@ export type CameraYearShare = {
   total: number;
   /** Busiest body first, so the handover reads down the page. */
   cameras: Array<{ camera: string; count: number; share: number }>;
+  /**
+   * Every frame of that year in the order it was taken, as a fraction of the
+   * way through it.
+   *
+   * The shares say a year was two thirds one body; only this says the change
+   * happened in June. A camera bought mid-year is invisible in a stacked bar.
+   */
+  frames: Array<{ position: number; camera: string }>;
 };
 
 export type CameraProfile = {
@@ -40,13 +48,24 @@ export type CameraProfile = {
   topPlace: { label: string; share: number } | null;
 };
 
+export type FocalBucket = { from: number; to: number; count: number; share: number };
+
 export type LensFocalRange = {
   lens: string;
   count: number;
   shortest: number;
   longest: number;
   /** Even bins across the lens's own range, so the shape is the lens's own. */
-  buckets: Array<{ from: number; to: number; count: number; share: number }>;
+  buckets: FocalBucket[];
+  /** The busiest bin, which is what the chart's height is measured against. */
+  peak: FocalBucket;
+  /**
+   * The same frames a year at a time, in four bands rather than twelve bins:
+   * a year holds a fraction of the frames, and twelve bins of a fraction is
+   * noise. This is where a zoom's use *moved* — the shape above is where it
+   * ended up.
+   */
+  years: Array<{ label: string; total: number; bands: FocalBucket[] }>;
 };
 
 export type GearStats = {
@@ -57,6 +76,8 @@ export type GearStats = {
 
 /** Bins per lens: enough to show a gap at the middle of a zoom, few enough to read. */
 const FOCAL_BINS = 12;
+/** Bands per year: a year is a fraction of a lens's frames and cannot carry twelve. */
+const FOCAL_YEAR_BANDS = 4;
 /** Below this a lens's shape is noise, and a prime has no shape at all. */
 const MIN_LENS_FRAMES = 12;
 const BUSIEST_HOURS_SPAN = 4;
@@ -104,6 +125,25 @@ const busiestSpan = (hours: number[]): { from: number; to: number } | null => {
   }
 
   return { from: best.from, to: (best.from + BUSIEST_HOURS_SPAN - 1) % 24 };
+};
+
+/**
+ * How far through its year a photograph was taken, 0 to 1.
+ *
+ * Wall clock throughout, like everything else read off EXIF here: both ends of
+ * the division are the same naive calendar, so no zone enters the arithmetic.
+ */
+const positionInYear = (taken: {
+  year: number;
+  month: number;
+  day: number;
+  hour: number;
+  minute: number;
+}): number => {
+  const start = Date.UTC(taken.year, 0, 1);
+  const end = Date.UTC(taken.year + 1, 0, 1);
+  const at = Date.UTC(taken.year, taken.month - 1, taken.day, taken.hour, taken.minute);
+  return (at - start) / (end - start);
 };
 
 const topOf = (counts: Map<string, number>, total: number) => {
@@ -164,17 +204,19 @@ export const computeGearStats = (albums: Content[]): GearStats => {
 
   const byCamera = new Map<string, CameraFrames>();
   const byYear = new Map<string, Map<string, number>>();
-  const byLens = new Map<string, number[]>();
+  const yearFrames = new Map<string, Array<{ position: number; camera: string }>>();
+  const byLens = new Map<string, Array<{ mm: number; year: number | null }>>();
   let identified = 0;
 
   for (const photo of photos) {
     const exif = photo._build?.exif;
     if (!exif) continue;
 
+    const taken = parseExifLocalDateTime(exif.DateTimeOriginal);
     const lens = LENS_FACET.extract(exif, photo._build.tags ?? undefined);
     const focal = exif.FocalLength ?? null;
     if (lens && measured(focal)) {
-      byLens.set(lens, [...(byLens.get(lens) ?? []), focal]);
+      byLens.set(lens, [...(byLens.get(lens) ?? []), { mm: focal, year: taken?.year ?? null }]);
     }
 
     const camera = CAMERA_FACET.extract(exif, photo._build.tags ?? undefined);
@@ -196,7 +238,6 @@ export const computeGearStats = (albums: Content[]): GearStats => {
     const place = placeOf(photo);
     if (place) frames.places.set(place, (frames.places.get(place) ?? 0) + 1);
 
-    const taken = parseExifLocalDateTime(exif.DateTimeOriginal);
     if (taken) {
       frames.hours.push(taken.hour);
       frames.firstYear = Math.min(frames.firstYear, taken.year);
@@ -206,6 +247,10 @@ export const computeGearStats = (albums: Content[]): GearStats => {
       const year = byYear.get(yearKey) ?? new Map<string, number>();
       year.set(camera, (year.get(camera) ?? 0) + 1);
       byYear.set(yearKey, year);
+      yearFrames.set(yearKey, [
+        ...(yearFrames.get(yearKey) ?? []),
+        { position: positionInYear(taken), camera },
+      ]);
     }
 
     byCamera.set(camera, frames);
@@ -225,6 +270,9 @@ export const computeGearStats = (albums: Content[]): GearStats => {
             count,
             share: total > 0 ? (count / total) * 100 : 0,
           })),
+        frames: (yearFrames.get(label) ?? [])
+          .slice()
+          .sort((left, right) => left.position - right.position),
       };
     });
 
@@ -250,20 +298,44 @@ export const computeGearStats = (albums: Content[]): GearStats => {
       };
     });
 
+  /** Frames spread across a range in even bins, as counts and shares. */
+  const distribute = (
+    lengths: number[],
+    shortest: number,
+    longest: number,
+    bins: number,
+  ): FocalBucket[] => {
+    const width = (longest - shortest) / bins;
+    const counts = Array.from({ length: bins }, () => 0);
+    for (const length of lengths) {
+      const bin = Math.min(bins - 1, Math.floor((length - shortest) / width));
+      counts[bin] = (counts[bin] ?? 0) + 1;
+    }
+
+    return counts.map((count, index) => ({
+      from: Math.round(shortest + index * width),
+      to: Math.round(shortest + (index + 1) * width),
+      count,
+      share: lengths.length > 0 ? (count / lengths.length) * 100 : 0,
+    }));
+  };
+
   const lensFocalRanges: LensFocalRange[] = [...byLens.entries()]
-    .filter(([, lengths]) => lengths.length >= MIN_LENS_FRAMES)
-    .flatMap(([lens, lengths]) => {
+    .filter(([, frames]) => frames.length >= MIN_LENS_FRAMES)
+    .flatMap(([lens, frames]): LensFocalRange[] => {
+      const lengths = frames.map((frame) => frame.mm);
       const shortest = Math.min(...lengths);
       const longest = Math.max(...lengths);
       // A prime is one number: a distribution across no range is a division by
       // zero dressed as a chart.
       if (longest <= shortest) return [];
 
-      const width = (longest - shortest) / FOCAL_BINS;
-      const counts = Array.from({ length: FOCAL_BINS }, () => 0);
-      for (const length of lengths) {
-        const bin = Math.min(FOCAL_BINS - 1, Math.floor((length - shortest) / width));
-        counts[bin] = (counts[bin] ?? 0) + 1;
+      const buckets = distribute(lengths, shortest, longest, FOCAL_BINS);
+      const byLensYear = new Map<string, number[]>();
+      for (const frame of frames) {
+        if (frame.year === null) continue;
+        const key = String(frame.year);
+        byLensYear.set(key, [...(byLensYear.get(key) ?? []), frame.mm]);
       }
 
       return [
@@ -272,12 +344,19 @@ export const computeGearStats = (albums: Content[]): GearStats => {
           count: lengths.length,
           shortest,
           longest,
-          buckets: counts.map((count, index) => ({
-            from: Math.round(shortest + index * width),
-            to: Math.round(shortest + (index + 1) * width),
-            count,
-            share: (count / lengths.length) * 100,
-          })),
+          buckets,
+          // invariant: FOCAL_BINS >= 1, so there is always a busiest bin
+          peak: [...buckets].sort((left, right) => right.count - left.count)[0]!,
+          years: [...byLensYear.entries()]
+            .sort((left, right) => Number(left[0]) - Number(right[0]))
+            .map(([label, yearLengths]) => ({
+              label,
+              total: yearLengths.length,
+              // Banded against the lens's whole range rather than that year's,
+              // or every year would fill its bar end to end and the drift —
+              // the only thing this chart is for — would be invisible.
+              bands: distribute(yearLengths, shortest, longest, FOCAL_YEAR_BANDS),
+            })),
         },
       ];
     })

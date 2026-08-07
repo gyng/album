@@ -1,9 +1,10 @@
+import React from "react";
 import { mergeCssModuleStyles } from "../../util/mergeCssModuleStyles";
 import { AppLink as Link } from "../platform";
 import type { CameraProfile, GearStats } from "../../util/computeGearStats";
 import type { VisualSamenessStats } from "../../util/computeEmbeddingStats";
 import { buildSearchFacetHref } from "../../util/searchFacets";
-import { Caption, Heading, Thumb } from "../ui";
+import { Caption, Heading, SegmentedToggle, Thumb } from "../ui";
 import sharedStyles from "./ExploreShared.module.css";
 import localStyles from "./ExploreGearSection.module.css";
 
@@ -40,6 +41,15 @@ const styles = mergeCssModuleStyles(
     "gearLensBars",
     "gearLensBar",
     "gearLensBarFill",
+    "gearLensAxis",
+    "gearLensPeak",
+    "gearLensYears",
+    "gearLensYearRow",
+    "gearLensYearLabel",
+    "gearLensYearBar",
+    "gearLensYearBand",
+    "gearYearRibbon",
+    "gearYearSliver",
     "gearLenses",
   ],
   ["gearBodyCard", "gearYearSegment"],
@@ -54,6 +64,16 @@ const styles = mergeCssModuleStyles(
  */
 const cameraColour = (index: number, total: number): string =>
   `oklch(72% 0.13 ${Math.round((index * 360) / Math.max(total, 1) + 25) % 360})`;
+
+/**
+ * A band's colour, from wide to long.
+ *
+ * Ordered data, so the ramp is ordered too: one hue getting darker rather than
+ * four unrelated colours a reader would have to look up. That direction is the
+ * legend, which is why there is not one.
+ */
+const bandColour = (index: number, total: number): string =>
+  `oklch(${Math.round(84 - (index * 38) / Math.max(total - 1, 1))}% 0.1 250)`;
 
 const HOUR_LABEL = (hour: number) => `${String(hour).padStart(2, "0")}:00`;
 
@@ -99,6 +119,10 @@ export const ExploreGearSection = ({
   gear: GearStats;
   frames: VisualSamenessStats["cameraFrames"];
 }) => {
+  // Every frame where it fell in its year, or each year as one bar of shares.
+  // The first shows a body arriving in June; the second is the only one that
+  // answers whether a year was mostly one camera.
+  const [yearView, setYearView] = React.useState<"frames" | "bodies">("bodies");
   const framesByCamera = new Map(frames.map((frame) => [frame.camera, frame.photo]));
   // The timeline and the cards key off the same order, so a body is the same
   // colour in both and the legend serves them together.
@@ -181,7 +205,15 @@ export const ExploreGearSection = ({
             <Heading level={2} as="h2">
               Bodies over time
             </Heading>
-            <Caption as="span">Which camera was being carried, year by year</Caption>
+            <SegmentedToggle
+              ariaLabel="How to show bodies over time"
+              value={yearView}
+              onChange={setYearView}
+              options={[
+                { value: "bodies" as const, label: "By body" },
+                { value: "frames" as const, label: "Every photo" },
+              ]}
+            />
           </div>
           <div className={styles.gearLegend}>
             {gear.cameraProfiles.map((profile) => (
@@ -205,32 +237,51 @@ export const ExploreGearSection = ({
                 {/* A year's bar is as long as the year was busy, and divided by
                     what shot it: stretched to full width, a year of twelve
                     photographs reads like a year of three hundred. */}
-                <div
-                  className={styles.gearYearBar}
-                  style={{ inlineSize: `${(year.total / busiestYear) * 100}%` }}
-                >
-                  {year.cameras.map((camera) => (
-                    <Link
-                      key={camera.camera}
-                      href={
-                        buildSearchFacetHref({ facetId: "camera", value: camera.camera }) ??
-                        "/search"
-                      }
-                      className={styles.gearYearSegment}
-                      title={`${camera.camera} in ${year.label}: ${camera.count.toLocaleString("en")} ${
-                        camera.count === 1 ? "photo" : "photos"
-                      }, ${Math.round(camera.share)}%`}
-                      style={{
-                        inlineSize: `${camera.share}%`,
-                        backgroundColor: colours.get(camera.camera),
-                      }}
-                    >
-                      <span className={styles.gearYearSegmentLabel}>
-                        {Math.round(camera.share)}%
-                      </span>
-                    </Link>
-                  ))}
-                </div>
+                {yearView === "bodies" ? (
+                  <div
+                    className={styles.gearYearBar}
+                    style={{ inlineSize: `${(year.total / busiestYear) * 100}%` }}
+                  >
+                    {year.cameras.map((camera) => (
+                      <Link
+                        key={camera.camera}
+                        href={
+                          buildSearchFacetHref({ facetId: "camera", value: camera.camera }) ??
+                          "/search"
+                        }
+                        className={styles.gearYearSegment}
+                        title={`${camera.camera} in ${year.label}: ${camera.count.toLocaleString("en")} ${
+                          camera.count === 1 ? "photo" : "photos"
+                        }, ${Math.round(camera.share)}%`}
+                        style={{
+                          inlineSize: `${camera.share}%`,
+                          backgroundColor: colours.get(camera.camera),
+                        }}
+                      >
+                        <span className={styles.gearYearSegmentLabel}>
+                          {Math.round(camera.share)}%
+                        </span>
+                      </Link>
+                    ))}
+                  </div>
+                ) : (
+                  /* Every frame where it fell in the year. Full width here, not
+                     scaled by volume: this one is about when inside the year,
+                     and January has to be January in every row. */
+                  <div className={styles.gearYearRibbon}>
+                    {year.frames.map((frame, index) => (
+                      <span
+                        key={`${frame.position}-${index}`}
+                        aria-hidden="true"
+                        className={styles.gearYearSliver}
+                        style={{
+                          insetInlineStart: `min(${frame.position * 100}%, calc(100% - var(--size-2)))`,
+                          backgroundColor: colours.get(frame.camera),
+                        }}
+                      />
+                    ))}
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -243,7 +294,9 @@ export const ExploreGearSection = ({
             <Heading level={2} as="h2">
               Where a zoom is used
             </Heading>
-            <Caption as="span">Frames across each lens's own range</Caption>
+            <Caption as="span">
+              Frames across each lens's own range, then year by year — wide to long
+            </Caption>
           </div>
           <div className={styles.gearLenses}>
             {gear.lensFocalRanges.map((lens) => {
@@ -280,6 +333,37 @@ export const ExploreGearSection = ({
                       </div>
                     ))}
                   </div>
+                  {/* The bars are drawn against the tallest, so the axis has to
+                      carry both ends of the range and what that height is. */}
+                  <div className={styles.gearLensAxis}>
+                    <span>{lens.shortest}mm</span>
+                    <span className={styles.gearLensPeak}>
+                      most at {lens.peak.from}–{lens.peak.to}mm · {Math.round(lens.peak.share)}%
+                    </span>
+                    <span>{lens.longest}mm</span>
+                  </div>
+                  {lens.years.length > 1 ? (
+                    <div className={styles.gearLensYears}>
+                      {lens.years.map((year) => (
+                        <div key={year.label} className={styles.gearLensYearRow}>
+                          <span className={styles.gearLensYearLabel}>{year.label}</span>
+                          <div className={styles.gearLensYearBar}>
+                            {year.bands.map((band, index) => (
+                              <span
+                                key={band.from}
+                                className={styles.gearLensYearBand}
+                                title={`${band.from}–${band.to}mm in ${year.label}: ${band.count.toLocaleString("en")} of ${year.total.toLocaleString("en")}`}
+                                style={{
+                                  inlineSize: `${band.share}%`,
+                                  backgroundColor: bandColour(index, year.bands.length),
+                                }}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
                 </div>
               );
             })}
