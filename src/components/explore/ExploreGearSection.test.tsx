@@ -328,6 +328,44 @@ describe("the gear section's own reporting", () => {
     expect(title).toHaveTextContent("Bodies and lenses");
   });
 
+  // The key is also the filter. A year's count follows it: the year's own total
+  // beside a chart showing one kit is a number about something else.
+  it("keeps one series when its legend entry is pressed, and all of them again", () => {
+    render(<ExploreGearSection gear={gear()} frames={frames} />);
+    const slivers = () => document.querySelectorAll('[class*="gearYearSliver"]').length;
+    const all = slivers();
+
+    fireEvent.click(screen.getByRole("button", { name: "X-T5" }));
+
+    expect(slivers()).toBeLessThan(all);
+    expect(screen.getByRole("button", { name: "X-T5" })).toHaveAttribute("aria-pressed", "true");
+
+    fireEvent.click(screen.getByRole("button", { name: "X-T5" }));
+
+    expect(slivers()).toBe(all);
+  });
+
+  it("filters the focal bands by their own legend", () => {
+    render(<ExploreGearSection gear={gear()} frames={frames} />);
+    fireEvent.click(screen.getAllByRole("radio", { name: "By band" })[0]!);
+    fireEvent.click(screen.getByRole("button", { name: "35–55mm · short tele" }));
+
+    expect(screen.getByTitle(/35–55mm · short tele in 2024/)).toBeInTheDocument();
+    expect(screen.queryByTitle(/23–34mm · normal in 2024/)).not.toBeInTheDocument();
+  });
+
+  // A kit named under one grouping need not exist under the next, and a filter
+  // for something that is not there shows an empty chart.
+  it("drops a kit filter when the grouping changes", () => {
+    render(<ExploreGearSection gear={gear()} frames={frames} />);
+    fireEvent.click(screen.getByRole("button", { name: "X-T5" }));
+    fireEvent.click(screen.getAllByRole("radio", { name: "With lenses" })[0]!);
+
+    for (const entry of screen.getAllByRole("button", { name: /X-T5/ })) {
+      expect(entry).not.toHaveAttribute("aria-pressed", "true");
+    }
+  });
+
   // A lens is the mirror of a body: the same summary, counted across whatever
   // it was mounted on.
   it("counts a lens on its own when asked to", () => {

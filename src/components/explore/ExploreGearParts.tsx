@@ -33,6 +33,7 @@ export const gearStyles = mergeCssModuleStyles(
     "gearBodyTraitValue",
     "gearLegend",
     "gearLegendItem",
+    "gearLegendOn",
     "gearLegendSwatch",
     "gearYearRow",
     "gearYearMeta",
@@ -125,25 +126,42 @@ const traitsOf = (
 };
 
 /**
+ * The key, and the filter: a press keeps one series and takes the rest away,
+ * and a press on the same one puts them back.
+ *
  * `colour` is a background rather than a colour throughout these parts: a kit
  * with a lens on it is painted as the body over the lens, and that is a
  * gradient, not a colour.
  */
 export const GearLegend = ({
   items,
+  selected,
+  onSelect,
 }: {
   items: Array<{ label: string; colour: string | undefined }>;
+  selected: string | null;
+  onSelect: (label: string | null) => void;
 }) => (
   <div className={styles.gearLegend}>
     {items.map((item) => (
-      <div key={item.label} className={styles.gearLegendItem}>
+      <button
+        key={item.label}
+        type="button"
+        // Pressed, not checked: any one of them may be on, and none of them
+        // being on is the ordinary state rather than a missing answer.
+        aria-pressed={selected === item.label}
+        className={[styles.gearLegendItem, selected === item.label ? styles.gearLegendOn : ""]
+          .filter(Boolean)
+          .join(" ")}
+        onClick={() => onSelect(selected === item.label ? null : item.label)}
+      >
         <span
           aria-hidden="true"
           className={styles.gearLegendSwatch}
           style={{ background: item.colour }}
         />
         <span>{item.label}</span>
-      </div>
+      </button>
     ))}
   </div>
 );

@@ -103,12 +103,32 @@
   gap: var(--m-s) var(--m-m);
 }
 
+/* The key is also the filter, so it is a row of buttons. Quiet enough to read
+   as a legend until one is pressed. */
 .gearLegendItem {
   display: inline-flex;
   align-items: center;
   gap: var(--m);
+  padding: var(--size-2) var(--m-xs);
+  border: var(--size-1) solid transparent;
+  border-radius: var(--radius-pill);
+  background: none;
   color: var(--c-bg-contrast-light);
   font-size: var(--fs-s);
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.gearLegendItem:hover,
+.gearLegendItem:focus-visible {
+  color: var(--c-font);
+  border-color: color-mix(in oklch, var(--c-font) 20%, transparent);
+}
+
+.gearLegendOn {
+  color: var(--c-font);
+  border-color: color-mix(in oklch, var(--c-font) 45%, transparent);
+  background: color-mix(in oklch, var(--c-font) 8%, transparent);
 }
 
 .gearLegendSwatch {

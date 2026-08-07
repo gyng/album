@@ -127,6 +127,10 @@ export const ExploreGearSection = ({
   // fetched; see the tooltip in GearRibbon for why.
   const [preview, setPreview] = React.useState<string | null>(null);
   const [visibleCards, setVisibleCards] = React.useState(INITIAL_KIT_CARDS);
+  // A legend entry pressed keeps its own series and takes the rest away. Held
+  // per chart: the two are keyed by different things, and a band is not a kit.
+  const [onlyKit, setOnlyKit] = React.useState<string | null>(null);
+  const [onlyBand, setOnlyBand] = React.useState<string | null>(null);
 
   const profiles =
     grouping === "bodies" ? gear.bodies : grouping === "lenses" ? gear.lenses : gear.pairings;
@@ -199,8 +203,16 @@ export const ExploreGearSection = ({
     return grouped;
   }, [gear.frames]);
 
-  const busiestYear = Math.max(...gear.cameraYears.map((year) => year.total), 1);
-  const busiestFocalYear = Math.max(...gear.focalYears.map((year) => year.total), 1);
+  // Filtered to one series, a year is as long as that series' own frames — the
+  // year's total would say the bar was about something it is no longer showing.
+  const kitTotal = (year: { label: string; total: number }): number =>
+    onlyKit === null ? year.total : (kitYears.get(year.label)?.get(onlyKit) ?? 0);
+  const focalTotal = (year: { total: number; bands: Array<{ band: string; count: number }> }) =>
+    onlyBand === null
+      ? year.total
+      : (year.bands.find((band) => band.band === onlyBand)?.count ?? 0);
+  const busiestYear = Math.max(...gear.cameraYears.map(kitTotal), 1);
+  const busiestFocalYear = Math.max(...gear.focalYears.map(focalTotal), 1);
   const legend = [...named, ...(profiles.length > 0 ? [OTHER_KIT] : [])].map((label) => ({
     label,
     colour: kitColours.get(label),
@@ -223,6 +235,9 @@ export const ExploreGearSection = ({
         // dozen pairings a reader wanted to see.
         setGrouping(next);
         setVisibleCards(INITIAL_KIT_CARDS);
+        // A kit named under one grouping need not exist under the next, and a
+        // filter for something that is not there shows an empty chart.
+        setOnlyKit(null);
       }}
       options={[
         { value: "bodies" as const, label: "Bodies" },
@@ -281,17 +296,19 @@ export const ExploreGearSection = ({
               ]}
             />
           </GearSectionHeader>
-          <GearLegend items={legend} />
+          <GearLegend items={legend} selected={onlyKit} onSelect={setOnlyKit} />
           <div className={styles.gearYears}>
             {gear.cameraYears.map((year) => (
-              <GearYearRow key={year.label} label={year.label} total={year.total}>
+              <GearYearRow key={year.label} label={year.label} total={kitTotal(year)}>
                 {yearView === "stacked" ? (
                   <GearStackedBar
-                    width={(year.total / busiestYear) * 100}
+                    width={(kitTotal(year) / busiestYear) * 100}
                     segments={legend.flatMap((series) => {
+                      if (onlyKit !== null && series.label !== onlyKit) return [];
                       const count = kitYears.get(year.label)?.get(series.label) ?? 0;
                       if (count === 0) return [];
-                      const share = year.total > 0 ? (count / year.total) * 100 : 0;
+                      const share =
+                        onlyKit === null ? (count / Math.max(year.total, 1)) * 100 : 100;
 
                       return [
                         {
@@ -306,7 +323,9 @@ export const ExploreGearSection = ({
                 ) : (
                   <GearRibbon
                     chart="gear"
-                    frames={framesByYear.get(year.label) ?? []}
+                    frames={(framesByYear.get(year.label) ?? []).filter(
+                      (frame) => onlyKit === null || kitLabel(frame) === onlyKit,
+                    )}
                     colourOf={(frame) => kitColours.get(kitLabel(frame))}
                     captionOf={kitLabel}
                     active={preview}
@@ -345,28 +364,33 @@ export const ExploreGearSection = ({
               label: band,
               colour: bandColours.get(band),
             }))}
+            selected={onlyBand}
+            onSelect={setOnlyBand}
           />
           <div className={styles.gearYears}>
             {gear.focalYears.map((year) => (
-              <GearYearRow key={year.label} label={year.label} total={year.total}>
+              <GearYearRow key={year.label} label={year.label} total={focalTotal(year)}>
                 {focalView === "bands" ? (
                   <GearStackedBar
-                    width={(year.total / busiestFocalYear) * 100}
-                    segments={year.bands.map((band) => ({
-                      label: band.band,
-                      share: band.share,
-                      // Stacked, a segment is many frames from many bodies, so
-                      // it stays the band's own colour; only a single frame can
-                      // honestly name the body under it.
-                      colour: bandColours.get(band.band),
-                      title: `${band.band} in ${year.label}: ${formatCount(band.count)}, ${Math.round(band.share)}%`,
-                    }))}
+                    width={(focalTotal(year) / busiestFocalYear) * 100}
+                    segments={year.bands
+                      .filter((band) => onlyBand === null || band.band === onlyBand)
+                      .map((band) => ({
+                        label: band.band,
+                        share: onlyBand === null ? band.share : 100,
+                        // Stacked, a segment is many frames from many bodies, so
+                        // it stays the band's own colour; only a single frame can
+                        // honestly name the body under it.
+                        colour: bandColours.get(band.band),
+                        title: `${band.band} in ${year.label}: ${formatCount(band.count)}, ${Math.round(band.share)}%`,
+                      }))}
                   />
                 ) : (
                   <GearRibbon
                     chart="focal"
                     frames={(framesByYear.get(year.label) ?? []).filter(
-                      (frame) => frame.band !== null,
+                      (frame) =>
+                        frame.band !== null && (onlyBand === null || frame.band === onlyBand),
                     )}
                     colourOf={(frame) => focalPaint(frame.band, frame.camera)}
                     captionOf={(frame) => `${frame.band ?? ""} · ${frame.camera}`}
