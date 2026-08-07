@@ -1,6 +1,14 @@
 import type { Content, PhotoBlock } from "../services/types";
+import { encodePublicAssetPath } from "./encodePublicAssetPath";
 import { parseExifLocalDateTime } from "./exifTime";
-import { APERTURE_FACET, CAMERA_FACET, ISO_FACET, LENS_FACET } from "./photoBuckets";
+import { fillYearRange } from "./yearRange";
+import {
+  APERTURE_FACET,
+  CAMERA_FACET,
+  FOCAL_LENGTH_ACTUAL_FACET,
+  ISO_FACET,
+  LENS_FACET,
+} from "./photoBuckets";
 
 /**
  * What the gear section knows beyond an inventory.
@@ -17,20 +25,51 @@ export type CameraYearShare = {
   total: number;
   /** Busiest body first, so the handover reads down the page. */
   cameras: Array<{ camera: string; count: number; share: number }>;
-  /**
-   * Every frame of that year in the order it was taken, as a fraction of the
-   * way through it.
-   *
-   * The shares say a year was two thirds one body; only this says the change
-   * happened in June. A camera bought mid-year is invisible in a stacked bar.
-   */
-  frames: Array<{ position: number; camera: string }>;
+};
+
+/** A year divided by the focal length the frames in it were shot at. */
+export type FocalYearShare = {
+  label: string;
+  total: number;
+  /** Wide to long, in the fixed order of the bands, so a year reads left to right. */
+  bands: Array<{ band: string; count: number; share: number }>;
+};
+
+/**
+ * One photograph, where it falls in its year and what took it.
+ *
+ * The shares say a year was two thirds one body; only these say the change
+ * happened in June — a camera bought mid-year is invisible in a stacked bar.
+ * Held once and grouped by whoever needs it, because both ribbons on this page
+ * draw the same fifteen hundred frames and only differ in what they colour them
+ * by; two copies of the photograph's own details is what that would otherwise
+ * cost the payload.
+ */
+export type GearFrame = {
+  year: string;
+  /** 0 to 1 through the year. */
+  position: number;
+  camera: string;
+  /** What was on the front of it, where the frame names one. */
+  lens: string | null;
+  /** Which focal band it was shot at, or nothing where the frame records none. */
+  band: string | null;
+  src: string;
+  href: string;
+  label: string;
+  dateLabel: string;
 };
 
 export type CameraProfile = {
   camera: string;
   count: number;
-  /** Per cent of every dated, identified frame in the archive. */
+  /**
+   * Per cent of every identified frame in the archive, unrounded.
+   *
+   * Unrounded because the view has to be able to tell a share that is small
+   * from one that is nothing: six photographs of fifteen hundred rounded to
+   * "0%", which is the one thing they are not.
+   */
   share: number;
   /** First and last year it took a photograph, inclusive. */
   years: [number, number] | null;
@@ -70,9 +109,35 @@ export type LensFocalRange = {
 
 export type GearStats = {
   cameraYears: CameraYearShare[];
+  /**
+   * As recorded, never converted: barely half this archive's frames carry a
+   * 35mm equivalent and the ones that do not are a whole body's worth, so a
+   * chart of equivalents would quietly delete the years that body owned.
+   */
+  focalYears: FocalYearShare[];
+  focalCoverage: number;
+  frames: GearFrame[];
   cameraProfiles: CameraProfile[];
   lensFocalRanges: LensFocalRange[];
 };
+
+const MONTH_LABELS = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
+];
+
+/** Wide to long, the same bands the focal-length facet uses. */
+export const FOCAL_BAND_LABELS = FOCAL_LENGTH_ACTUAL_FACET.buckets.map((bucket) => bucket.label);
 
 /** Bins per lens: enough to show a gap at the middle of a zoom, few enough to read. */
 const FOCAL_BINS = 12;
@@ -197,18 +262,23 @@ const emptyFrames = (): CameraFrames => ({
 });
 
 export const computeGearStats = (albums: Content[]): GearStats => {
-  const photos = albums
+  const entries = albums
     .filter((album) => !isTestAlbum(album))
-    .flatMap((album) => album.blocks)
-    .filter((block): block is PhotoBlock => block.kind === "photo");
+    .flatMap((album) =>
+      album.blocks
+        .filter((block): block is PhotoBlock => block.kind === "photo")
+        .map((photo) => ({ album, photo })),
+    );
 
   const byCamera = new Map<string, CameraFrames>();
   const byYear = new Map<string, Map<string, number>>();
-  const yearFrames = new Map<string, Array<{ position: number; camera: string }>>();
+  const byFocalYear = new Map<string, Map<string, number>>();
+  const gearFrames: GearFrame[] = [];
   const byLens = new Map<string, Array<{ mm: number; year: number | null }>>();
   let identified = 0;
+  let banded = 0;
 
-  for (const photo of photos) {
+  for (const { album, photo } of entries) {
     const exif = photo._build?.exif;
     if (!exif) continue;
 
@@ -238,6 +308,11 @@ export const computeGearStats = (albums: Content[]): GearStats => {
     const place = placeOf(photo);
     if (place) frames.places.set(place, (frames.places.get(place) ?? 0) + 1);
 
+    const band = measured(focal)
+      ? (FOCAL_LENGTH_ACTUAL_FACET.buckets.find((bucket) => bucket.match(focal))?.label ?? null)
+      : null;
+    if (band) banded += 1;
+
     if (taken) {
       frames.hours.push(taken.hour);
       frames.firstYear = Math.min(frames.firstYear, taken.year);
@@ -247,18 +322,37 @@ export const computeGearStats = (albums: Content[]): GearStats => {
       const year = byYear.get(yearKey) ?? new Map<string, number>();
       year.set(camera, (year.get(camera) ?? 0) + 1);
       byYear.set(yearKey, year);
-      yearFrames.set(yearKey, [
-        ...(yearFrames.get(yearKey) ?? []),
-        { position: positionInYear(taken), camera },
-      ]);
+
+      if (band) {
+        const focalYear = byFocalYear.get(yearKey) ?? new Map<string, number>();
+        focalYear.set(band, (focalYear.get(band) ?? 0) + 1);
+        byFocalYear.set(yearKey, focalYear);
+      }
+
+      gearFrames.push({
+        year: yearKey,
+        position: positionInYear(taken),
+        camera,
+        lens,
+        band,
+        src: photo._build.srcset[0]?.src ?? encodePublicAssetPath(photo.data.src),
+        href: `/album/${album._build.slug}#${photo.id}`,
+        label: photo.data.title ?? photo.data.src.split("/").at(-1) ?? photo.id,
+        dateLabel: `${MONTH_LABELS[taken.month - 1]} ${taken.day}`,
+      });
     }
 
     byCamera.set(camera, frames);
   }
 
-  const cameraYears: CameraYearShare[] = [...byYear.entries()]
-    .sort((left, right) => Number(left[0]) - Number(right[0]))
-    .map(([label, counts]) => {
+  gearFrames.sort((left, right) =>
+    left.year === right.year
+      ? left.position - right.position
+      : Number(left.year) - Number(right.year),
+  );
+
+  const cameraYears: CameraYearShare[] = fillYearRange(byYear, () => new Map<string, number>()).map(
+    ([label, counts]) => {
       const total = [...counts.values()].reduce((sum, count) => sum + count, 0);
       return {
         label,
@@ -270,11 +364,26 @@ export const computeGearStats = (albums: Content[]): GearStats => {
             count,
             share: total > 0 ? (count / total) * 100 : 0,
           })),
-        frames: (yearFrames.get(label) ?? [])
-          .slice()
-          .sort((left, right) => left.position - right.position),
       };
-    });
+    },
+  );
+
+  const focalYears: FocalYearShare[] = fillYearRange(
+    byFocalYear,
+    () => new Map<string, number>(),
+  ).map(([label, counts]) => {
+    const total = [...counts.values()].reduce((sum, count) => sum + count, 0);
+    return {
+      label,
+      total,
+      // The fixed band order, not busiest first: a band has to sit in the same
+      // place in every bar to be followed down the page.
+      bands: FOCAL_BAND_LABELS.filter((band) => counts.has(band)).map((band) => {
+        const count = counts.get(band) ?? 0;
+        return { band, count, share: total > 0 ? (count / total) * 100 : 0 };
+      }),
+    };
+  });
 
   const cameraProfiles: CameraProfile[] = [...byCamera.entries()]
     .sort((left, right) => right[1].count - left[1].count || left[0].localeCompare(right[0]))
@@ -287,7 +396,7 @@ export const computeGearStats = (albums: Content[]): GearStats => {
       return {
         camera,
         count: frames.count,
-        share: identified > 0 ? Math.round((frames.count / identified) * 100) : 0,
+        share: identified > 0 ? (frames.count / identified) * 100 : 0,
         years: frames.firstYear === Infinity ? null : [frames.firstYear, frames.lastYear],
         focalLength: focalMedian === null ? null : { mm: focalMedian, equivalent },
         aperture: median(frames.apertures),
@@ -362,5 +471,12 @@ export const computeGearStats = (albums: Content[]): GearStats => {
     })
     .sort((left, right) => right.count - left.count || left.lens.localeCompare(right.lens));
 
-  return { cameraYears, cameraProfiles, lensFocalRanges };
+  return {
+    cameraYears,
+    focalYears,
+    focalCoverage: identified > 0 ? banded / identified : 0,
+    frames: gearFrames,
+    cameraProfiles,
+    lensFocalRanges,
+  };
 };

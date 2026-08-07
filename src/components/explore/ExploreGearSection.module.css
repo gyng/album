@@ -296,3 +296,50 @@
   inset-block: 0;
   inline-size: var(--size-2);
 }
+
+/* The ribbon clips its slivers; the tooltip has to leave it. */
+.gearYearRibbon:has(.gearTooltip) {
+  overflow: visible;
+}
+
+/* Built only for the sliver being pointed at, so a ribbon of fifteen hundred
+   photographs does not fetch fifteen hundred previews on scroll. */
+.gearTooltip {
+  position: absolute;
+  inset-inline-start: 50%;
+  inset-block-end: calc(100% + var(--m-s));
+  transform: translateX(-50%);
+  display: grid;
+  gap: var(--m-s);
+  inline-size: min(var(--size-220), calc(100dvw - (var(--m) * 2)));
+  padding: var(--m-s);
+  border: var(--popup-border);
+  border-radius: var(--popup-radius);
+  background-color: var(--c-bg);
+  box-shadow: var(--popup-shadow);
+  color: var(--c-font);
+  font-size: var(--fs-s);
+  line-height: 1.35;
+  pointer-events: none;
+  z-index: var(--z-control);
+}
+
+.gearTooltipImage {
+  inline-size: 100%;
+  block-size: var(--size-132);
+  border-radius: var(--m-s);
+  object-fit: cover;
+  background: color-mix(in oklch, var(--c-bg) 90%, var(--c-bg-contrast-dark));
+}
+
+.gearTooltipText {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--m) var(--m-s);
+  min-inline-size: 0;
+  overflow-wrap: anywhere;
+}
+
+.gearTooltipText span:last-child {
+  color: var(--c-bg-contrast-light);
+}

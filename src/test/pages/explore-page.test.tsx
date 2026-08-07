@@ -210,20 +210,36 @@ const makeStats = () => ({
   gearFlow: { nodes: [], links: [] },
   gear: {
     cameraYears: [
+      { label: "2023", total: 1, cameras: [{ camera: "Cam 1", count: 1, share: 100 }] },
+      { label: "2024", total: 1, cameras: [{ camera: "Cam 2", count: 1, share: 100 }] },
+    ],
+    focalYears: [
+      { label: "2023", total: 1, bands: [{ band: "23–34mm · normal", count: 1, share: 100 }] },
+      { label: "2024", total: 1, bands: [{ band: "23–34mm · normal", count: 1, share: 100 }] },
+    ],
+    focalCoverage: 0.9,
+    frames: [
       {
-        label: "2023",
-        total: 4,
-        cameras: [{ camera: "Cam 1", count: 4, share: 100 }],
-        frames: [{ position: 0.4, camera: "Cam 1" }],
+        year: "2023",
+        position: 0.4,
+        camera: "Cam 1",
+        lens: "Lens 1",
+        band: "23–34mm · normal",
+        src: "/one.avif",
+        href: "/album/one#a",
+        label: "One",
+        dateLabel: "4 May",
       },
       {
-        label: "2024",
-        total: 4,
-        cameras: [
-          { camera: "Cam 2", count: 3, share: 75 },
-          { camera: "Cam 1", count: 1, share: 25 },
-        ],
-        frames: [{ position: 0.7, camera: "Cam 2" }],
+        year: "2024",
+        position: 0.7,
+        camera: "Cam 2",
+        lens: null,
+        band: "23–34mm · normal",
+        src: "/two.avif",
+        href: "/album/two#b",
+        label: "Two",
+        dateLabel: "6 Jun",
       },
     ],
     cameraProfiles: [

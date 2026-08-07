@@ -542,13 +542,13 @@ describe("computePhotoStats", () => {
         swatch: "rgb(210, 70, 80)",
       }),
     );
-    expect(stats.colorYearStats).toEqual([
-      expect.objectContaining({
-        label: "2024",
-      }),
-      expect.objectContaining({
-        label: "2021",
-      }),
+    // Newest first, and every year in between: the years with no photographs
+    // are rows with nothing in them rather than years the axis skips.
+    expect(stats.colorYearStats.map((group) => group.label)).toEqual([
+      "2024",
+      "2023",
+      "2022",
+      "2021",
     ]);
     expect(stats.colorYearRibbons).toEqual([
       expect.objectContaining({
@@ -562,6 +562,8 @@ describe("computePhotoStats", () => {
           }),
         ]),
       }),
+      expect.objectContaining({ label: "2023", total: 0, slices: [], dominantFamily: null }),
+      expect.objectContaining({ label: "2022", total: 0, slices: [] }),
       expect.objectContaining({
         label: "2021",
         total: 1,

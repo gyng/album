@@ -1,7 +1,8 @@
 import React from "react";
 import { mergeCssModuleStyles } from "../../util/mergeCssModuleStyles";
 import { AppLink as Link } from "../platform";
-import type { CameraProfile, GearStats } from "../../util/computeGearStats";
+import type { CameraProfile, GearFrame, GearStats } from "../../util/computeGearStats";
+import { FOCAL_BAND_LABELS } from "../../util/computeGearStats";
 import type { VisualSamenessStats } from "../../util/computeEmbeddingStats";
 import { buildSearchFacetHref } from "../../util/searchFacets";
 import { Caption, Heading, SegmentedToggle, Thumb } from "../ui";
@@ -50,6 +51,9 @@ const styles = mergeCssModuleStyles(
     "gearLensYearBand",
     "gearYearRibbon",
     "gearYearSliver",
+    "gearTooltip",
+    "gearTooltipImage",
+    "gearTooltipText",
     "gearLenses",
   ],
   ["gearBodyCard", "gearYearSegment"],
@@ -68,12 +72,35 @@ const cameraColour = (index: number, total: number): string =>
 /**
  * A band's colour, from wide to long.
  *
- * Ordered data, so the ramp is ordered too: one hue getting darker rather than
- * four unrelated colours a reader would have to look up. That direction is the
- * legend, which is why there is not one.
+ * Ordered data, so the ramp is ordered too — and mixed from the accent every
+ * other bar on this page is drawn in, rather than a hue of its own, so a band
+ * follows the palette like the rest of the chrome. Wide is the muted end and
+ * long is full accent; that direction is the legend, which is why there is not
+ * one.
+ *
+ * Mixed towards a mid tone rather than towards transparency: two per cent of a
+ * ribbon's width is a two-pixel sliver, and a difference in alpha over a track
+ * that is itself translucent is not a difference anyone can see at that size.
  */
 const bandColour = (index: number, total: number): string =>
-  `oklch(${Math.round(84 - (index * 38) / Math.max(total - 1, 1))}% 0.1 250)`;
+  `color-mix(in oklch, var(--c-accent) ${Math.round(15 + (index * 85) / Math.max(total - 1, 1))}%, var(--c-bg-contrast-light))`;
+
+/** How many body-and-lens pairings get a colour of their own before "Other". */
+const MAX_COMBOS = 8;
+const OTHER_SERIES = "Other";
+
+/** What a frame is counted as, under whichever grouping is showing. */
+const seriesOf = (frame: GearFrame, grouping: "bodies" | "combos"): string =>
+  grouping === "bodies" || !frame.lens ? frame.camera : `${frame.camera} · ${frame.lens}`;
+
+/**
+ * A share, as small as it may be without becoming nothing.
+ *
+ * Six photographs of fifteen hundred round to zero, and "6 photos · 0%" says
+ * the count is a lie. Below half a per cent it is named as under one.
+ */
+const formatShare = (share: number): string =>
+  share > 0 && share < 0.5 ? "<1%" : `${Math.round(share)}%`;
 
 const HOUR_LABEL = (hour: number) => `${String(hour).padStart(2, "0")}:00`;
 
@@ -105,6 +132,71 @@ const traitsOf = (profile: CameraProfile): Array<{ label: string; value: string 
 };
 
 /**
+ * Every frame of one year, where it fell in it.
+ *
+ * Full width whatever the year held, unlike the stacked view beside it: this
+ * answers *when* inside the year, so January has to be January in every row.
+ * The tooltip is built only for the sliver being pointed at — a photograph in
+ * every one of fifteen hundred would fetch the whole archive on scroll.
+ */
+const GearRibbon = ({
+  chart,
+  frames,
+  colourOf,
+  captionOf,
+  active,
+  onActive,
+}: {
+  /** Which ribbon this is, so the two on the page cannot share a hovered key. */
+  chart: string;
+  frames: GearFrame[];
+  colourOf: (frame: GearFrame) => string | undefined;
+  captionOf: (frame: GearFrame) => string;
+  active: string | null;
+  onActive: (key: string | null) => void;
+}) => (
+  <div className={styles.gearYearRibbon}>
+    {frames.map((frame, index) => {
+      const key = `${chart}-${frame.year}-${index}`;
+
+      return (
+        <Link
+          key={key}
+          href={frame.href}
+          className={styles.gearYearSliver}
+          aria-label={`${captionOf(frame)}, ${frame.dateLabel} ${frame.year}`}
+          style={{
+            insetInlineStart: `min(${frame.position * 100}%, calc(100% - var(--size-2)))`,
+            backgroundColor: colourOf(frame),
+          }}
+          onMouseEnter={() => onActive(key)}
+          onFocus={() => onActive(key)}
+          onMouseLeave={() => onActive(null)}
+          onBlur={() => onActive(null)}
+        >
+          {active === key ? (
+            <span className={styles.gearTooltip} aria-hidden="true">
+              <img
+                src={frame.src}
+                alt={frame.label}
+                loading="lazy"
+                className={styles.gearTooltipImage}
+              />
+              <span className={styles.gearTooltipText}>
+                <span>{captionOf(frame)}</span>
+                <span>
+                  {frame.dateLabel} {frame.year}
+                </span>
+              </span>
+            </span>
+          ) : null}
+        </Link>
+      );
+    })}
+  </div>
+);
+
+/**
  * What the camera and lens counts cannot say.
  *
  * The counts are an inventory. These are the three questions a reader actually
@@ -120,10 +212,14 @@ export const ExploreGearSection = ({
   frames: VisualSamenessStats["cameraFrames"];
 }) => {
   // Every frame where it fell in its year, or each year as one bar of shares.
-  // The first shows a body arriving in June; the second is the only one that
-  // answers whether a year was mostly one camera.
-  const [yearView, setYearView] = React.useState<"frames" | "bodies">("bodies");
-  const framesByCamera = new Map(frames.map((frame) => [frame.camera, frame.photo]));
+  // The archive as it happened opens first, the way the colour ribbon does;
+  // the stacked view is the one to switch to for "was this year mostly one
+  // camera", which is the narrower question.
+  const [yearView, setYearView] = React.useState<"frames" | "bodies">("frames");
+  const [focalView, setFocalView] = React.useState<"frames" | "bands">("frames");
+  // Which sliver is pointed at, in either ribbon. Only that one's photograph is
+  // fetched; see the tooltip in GearRibbon for why.
+  const [preview, setPreview] = React.useState<string | null>(null);
   // The timeline and the cards key off the same order, so a body is the same
   // colour in both and the legend serves them together.
   const colours = new Map(
@@ -132,7 +228,70 @@ export const ExploreGearSection = ({
       cameraColour(index, gear.cameraProfiles.length),
     ]),
   );
+  const framesByCamera = new Map(frames.map((frame) => [frame.camera, frame.photo]));
+  const framesByYear = React.useMemo(() => {
+    const grouped = new Map<string, GearFrame[]>();
+    for (const frame of gear.frames) {
+      grouped.set(frame.year, [...(grouped.get(frame.year) ?? []), frame]);
+    }
+    return grouped;
+  }, [gear.frames]);
+  const bandColours = new Map(
+    FOCAL_BAND_LABELS.map((band, index) => [band, bandColour(index, FOCAL_BAND_LABELS.length)]),
+  );
+  // A body is one series; a body and the lens on it are another. The pairings
+  // are what a reader with two lenses actually changed between, and the bodies
+  // alone cannot show that — but there are more of them than a key can hold, so
+  // the busiest keep their own colour and the tail becomes one.
+  const [grouping, setGrouping] = React.useState<"bodies" | "combos">("bodies");
+  const series = React.useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const frame of gear.frames) {
+      const key = seriesOf(frame, grouping);
+      counts.set(key, (counts.get(key) ?? 0) + 1);
+    }
+
+    const ordered = [...counts.entries()]
+      .sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]))
+      .map(([label]) => label);
+    const named = ordered.slice(0, MAX_COMBOS);
+
+    return {
+      labels: named.length < ordered.length ? [...named, OTHER_SERIES] : named,
+      named: new Set(named),
+    };
+  }, [gear.frames, grouping]);
+  const labelOf = (frame: GearFrame): string => {
+    const key = seriesOf(frame, grouping);
+    return series.named.has(key) ? key : OTHER_SERIES;
+  };
+  // A body keeps the colour its card has; a pairing, which no card shows, takes
+  // one from the same wheel.
+  const seriesColours = new Map(
+    series.labels.map((label, index) => [
+      label,
+      label === OTHER_SERIES
+        ? "var(--c-bg-contrast-light)"
+        : (colours.get(label) ?? cameraColour(index, series.labels.length)),
+    ]),
+  );
+  // Counted here rather than at build time: the same frames answer both
+  // groupings, and shipping a second stacked series for a toggle the reader may
+  // never touch is a payload for nothing.
+  const seriesYears = React.useMemo(() => {
+    const years = new Map<string, Map<string, number>>();
+    for (const frame of gear.frames) {
+      const counts = years.get(frame.year) ?? new Map<string, number>();
+      const key = series.named.has(seriesOf(frame, grouping))
+        ? seriesOf(frame, grouping)
+        : OTHER_SERIES;
+      counts.set(key, (counts.get(key) ?? 0) + 1);
+      years.set(frame.year, counts);
+    }
+    return years;
+  }, [gear.frames, grouping, series.named]);
   const busiestYear = Math.max(...gear.cameraYears.map((year) => year.total), 1);
+  const busiestFocalYear = Math.max(...gear.focalYears.map((year) => year.total), 1);
 
   if (gear.cameraProfiles.length === 0) {
     return null;
@@ -180,7 +339,7 @@ export const ExploreGearSection = ({
                   </Link>
                 </div>
                 <Caption as="span" className={styles.gearBodyCount}>
-                  {profile.count.toLocaleString("en")} photos · {profile.share}%
+                  {profile.count.toLocaleString("en")} photos · {formatShare(profile.share)}
                   {profile.years
                     ? ` · ${profile.years[0]}${profile.years[1] === profile.years[0] ? "" : `–${profile.years[1]}`}`
                     : ""}
@@ -203,27 +362,36 @@ export const ExploreGearSection = ({
         <section className={`${styles.section} ${styles.sectionWide}`}>
           <div className={styles.sectionHeader}>
             <Heading level={2} as="h2">
-              Bodies over time
+              Gear over time
             </Heading>
             <SegmentedToggle
-              ariaLabel="How to show bodies over time"
+              ariaLabel="What to count over time"
+              value={grouping}
+              onChange={setGrouping}
+              options={[
+                { value: "bodies" as const, label: "Bodies" },
+                { value: "combos" as const, label: "With lenses" },
+              ]}
+            />
+            <SegmentedToggle
+              ariaLabel="How to show gear over time"
               value={yearView}
               onChange={setYearView}
               options={[
-                { value: "bodies" as const, label: "By body" },
                 { value: "frames" as const, label: "Every photo" },
+                { value: "bodies" as const, label: "Stacked" },
               ]}
             />
           </div>
           <div className={styles.gearLegend}>
-            {gear.cameraProfiles.map((profile) => (
-              <div key={profile.camera} className={styles.gearLegendItem}>
+            {series.labels.map((label) => (
+              <div key={label} className={styles.gearLegendItem}>
                 <span
                   aria-hidden="true"
                   className={styles.gearLegendSwatch}
-                  style={{ backgroundColor: colours.get(profile.camera) }}
+                  style={{ backgroundColor: seriesColours.get(label) }}
                 />
-                <span>{profile.camera}</span>
+                <span>{label}</span>
               </div>
             ))}
           </div>
@@ -242,45 +410,116 @@ export const ExploreGearSection = ({
                     className={styles.gearYearBar}
                     style={{ inlineSize: `${(year.total / busiestYear) * 100}%` }}
                   >
-                    {year.cameras.map((camera) => (
-                      <Link
-                        key={camera.camera}
-                        href={
-                          buildSearchFacetHref({ facetId: "camera", value: camera.camera }) ??
-                          "/search"
-                        }
-                        className={styles.gearYearSegment}
-                        title={`${camera.camera} in ${year.label}: ${camera.count.toLocaleString("en")} ${
-                          camera.count === 1 ? "photo" : "photos"
-                        }, ${Math.round(camera.share)}%`}
-                        style={{
-                          inlineSize: `${camera.share}%`,
-                          backgroundColor: colours.get(camera.camera),
-                        }}
-                      >
-                        <span className={styles.gearYearSegmentLabel}>
-                          {Math.round(camera.share)}%
+                    {series.labels.map((label) => {
+                      const count = seriesYears.get(year.label)?.get(label) ?? 0;
+                      if (count === 0) return null;
+                      const share = year.total > 0 ? (count / year.total) * 100 : 0;
+
+                      return (
+                        <span
+                          key={label}
+                          className={styles.gearYearSegment}
+                          title={`${label} in ${year.label}: ${count.toLocaleString("en")} ${
+                            count === 1 ? "photo" : "photos"
+                          }, ${Math.round(share)}%`}
+                          style={{
+                            inlineSize: `${share}%`,
+                            backgroundColor: seriesColours.get(label),
+                          }}
+                        >
+                          <span className={styles.gearYearSegmentLabel}>{Math.round(share)}%</span>
                         </span>
-                      </Link>
-                    ))}
+                      );
+                    })}
                   </div>
                 ) : (
-                  /* Every frame where it fell in the year. Full width here, not
-                     scaled by volume: this one is about when inside the year,
-                     and January has to be January in every row. */
-                  <div className={styles.gearYearRibbon}>
-                    {year.frames.map((frame, index) => (
+                  <GearRibbon
+                    chart="gear"
+                    frames={framesByYear.get(year.label) ?? []}
+                    colourOf={(frame) => seriesColours.get(labelOf(frame))}
+                    captionOf={(frame) => labelOf(frame)}
+                    active={preview}
+                    onActive={setPreview}
+                  />
+                )}
+              </div>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
+      {gear.focalYears.length > 1 ? (
+        <section className={`${styles.section} ${styles.sectionWide}`}>
+          <div className={styles.sectionHeader}>
+            <Heading level={2} as="h2">
+              Focal length over time
+            </Heading>
+            <SegmentedToggle
+              ariaLabel="How to show focal length over time"
+              value={focalView}
+              onChange={setFocalView}
+              options={[
+                { value: "frames" as const, label: "Every photo" },
+                { value: "bands" as const, label: "By band" },
+              ]}
+            />
+          </div>
+          {/* As recorded, never converted: barely half these frames carry a
+              35mm equivalent, and the ones that do not are a whole body's
+              worth — converting what can be converted would quietly delete the
+              years that body owned. */}
+          <Caption as="span">
+            As recorded, not 35mm-equivalent · {Math.round(gear.focalCoverage * 100)}% of frames
+          </Caption>
+          <div className={styles.gearLegend}>
+            {FOCAL_BAND_LABELS.map((band) => (
+              <div key={band} className={styles.gearLegendItem}>
+                <span
+                  aria-hidden="true"
+                  className={styles.gearLegendSwatch}
+                  style={{ backgroundColor: bandColours.get(band) }}
+                />
+                <span>{band}</span>
+              </div>
+            ))}
+          </div>
+          <div className={styles.gearYears}>
+            {gear.focalYears.map((year) => (
+              <div key={year.label} className={styles.gearYearRow}>
+                <div className={styles.gearYearMeta}>
+                  <span className={styles.gearYearLabel}>{year.label}</span>
+                  <span className={styles.gearYearDetail}>{year.total.toLocaleString("en")}</span>
+                </div>
+                {focalView === "bands" ? (
+                  <div
+                    className={styles.gearYearBar}
+                    style={{ inlineSize: `${(year.total / busiestFocalYear) * 100}%` }}
+                  >
+                    {year.bands.map((band) => (
                       <span
-                        key={`${frame.position}-${index}`}
-                        aria-hidden="true"
-                        className={styles.gearYearSliver}
+                        key={band.band}
+                        className={styles.gearYearSegment}
+                        title={`${band.band} in ${year.label}: ${band.count.toLocaleString("en")} ${
+                          band.count === 1 ? "photo" : "photos"
+                        }, ${Math.round(band.share)}%`}
                         style={{
-                          insetInlineStart: `min(${frame.position * 100}%, calc(100% - var(--size-2)))`,
-                          backgroundColor: colours.get(frame.camera),
+                          inlineSize: `${band.share}%`,
+                          backgroundColor: bandColours.get(band.band),
                         }}
                       />
                     ))}
                   </div>
+                ) : (
+                  <GearRibbon
+                    chart="focal"
+                    frames={(framesByYear.get(year.label) ?? []).filter(
+                      (frame) => frame.band !== null,
+                    )}
+                    colourOf={(frame) => (frame.band ? bandColours.get(frame.band) : undefined)}
+                    captionOf={(frame) => frame.band ?? ""}
+                    active={preview}
+                    onActive={setPreview}
+                  />
                 )}
               </div>
             ))}

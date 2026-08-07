@@ -6,26 +6,62 @@ import { fireEvent, render, screen, within } from "@testing-library/react";
 import type { GearStats } from "../../util/computeGearStats";
 import { ExploreGearSection } from "./ExploreGearSection";
 
+const frame = (
+  year: string,
+  position: number,
+  camera: string,
+  lens: string | null,
+  band: string | null,
+) => ({
+  year,
+  position,
+  camera,
+  lens,
+  band,
+  src: `/${camera}-${position}.avif`,
+  href: `/album/kyoto#${camera}-${position}`,
+  label: `${camera} frame`,
+  dateLabel: "4 May",
+});
+
 const gear = (overrides: Partial<GearStats> = {}): GearStats => ({
+  // Totals agree with the frames below, the way the build's do: the stacked
+  // view divides a year's total between series counted from those frames.
   cameraYears: [
     {
       label: "2023",
-      total: 4,
-      cameras: [{ camera: "X100T", count: 4, share: 100 }],
-      frames: [{ position: 0.1, camera: "X100T" }],
+      total: 1,
+      cameras: [{ camera: "X100T", count: 1, share: 100 }],
     },
     {
       label: "2024",
-      total: 4,
+      total: 2,
       cameras: [
-        { camera: "X-T5", count: 3, share: 75 },
-        { camera: "X100T", count: 1, share: 25 },
-      ],
-      frames: [
-        { position: 0.2, camera: "X100T" },
-        { position: 0.6, camera: "X-T5" },
+        { camera: "X100T", count: 1, share: 50 },
+        { camera: "X-T5", count: 1, share: 50 },
       ],
     },
+  ],
+  focalYears: [
+    {
+      label: "2023",
+      total: 1,
+      bands: [{ band: "23–34mm · normal", count: 1, share: 100 }],
+    },
+    {
+      label: "2024",
+      total: 2,
+      bands: [
+        { band: "23–34mm · normal", count: 1, share: 50 },
+        { band: "35–55mm · short tele", count: 1, share: 50 },
+      ],
+    },
+  ],
+  focalCoverage: 0.98,
+  frames: [
+    frame("2023", 0.1, "X100T", "23mm", "23–34mm · normal"),
+    frame("2024", 0.2, "X100T", "23mm", "23–34mm · normal"),
+    frame("2024", 0.6, "X-T5", "XF16-80mm", "35–55mm · short tele"),
   ],
   cameraProfiles: [
     {
@@ -43,7 +79,7 @@ const gear = (overrides: Partial<GearStats> = {}): GearStats => ({
     {
       camera: "GT-I9300",
       count: 3,
-      share: 38,
+      share: 0.2,
       years: null,
       focalLength: null,
       aperture: null,
@@ -127,14 +163,56 @@ describe("the gear section's own reporting", () => {
     expect(within(card).queryAllByRole("img")).toHaveLength(0);
   });
 
-  it("divides each year between the bodies that shot it, and links each share", () => {
+  // "6 photos · 0%" says the count beside it is a lie.
+  it("names a share too small to round as under one per cent", () => {
     render(<ExploreGearSection gear={gear()} frames={frames} />);
+
+    expect(screen.getByText(/3 photos · <1%/)).toBeInTheDocument();
+  });
+
+  it("divides each year between the bodies that shot it", () => {
+    render(<ExploreGearSection gear={gear()} frames={frames} />);
+    fireEvent.click(screen.getByRole("radio", { name: "Stacked" }));
 
     const shares = screen
       .getAllByTitle(/ in 2024: \d+ photos?,/)
       .map((segment) => segment.getAttribute("title"));
 
-    expect(shares).toEqual(["X-T5 in 2024: 3 photos, 75%", "X100T in 2024: 1 photo, 25%"]);
+    expect(shares).toEqual(["X100T in 2024: 1 photo, 50%", "X-T5 in 2024: 1 photo, 50%"]);
+  });
+
+  // Two bodies and two lenses are four things a reader might have changed
+  // between, and the bodies alone cannot show which.
+  it("counts the lens on the body when asked to", () => {
+    render(<ExploreGearSection gear={gear()} frames={frames} />);
+    fireEvent.click(screen.getByRole("radio", { name: "With lenses" }));
+    fireEvent.click(screen.getByRole("radio", { name: "Stacked" }));
+
+    expect(screen.getByTitle("X100T · 23mm in 2024: 1 photo, 50%")).toBeInTheDocument();
+    expect(screen.getByTitle("X-T5 · XF16-80mm in 2024: 1 photo, 50%")).toBeInTheDocument();
+  });
+
+  // The tooltip's photograph is built only for the sliver being pointed at: one
+  // in each of fifteen hundred would fetch the archive on scroll.
+  it("brings up a photograph for the sliver under the pointer", () => {
+    render(<ExploreGearSection gear={gear()} frames={frames} />);
+
+    // Queried through the DOM rather than by role: the tooltip repeats what the
+    // sliver's own accessible name already says, so it is hidden from the tree.
+    const preview = () => document.querySelectorAll('[class*="gearTooltipImage"]');
+    expect(preview()).toHaveLength(0);
+
+    fireEvent.focus(screen.getByRole("link", { name: /X-T5, 4 May 2024/ }));
+
+    expect(preview()).toHaveLength(1);
+    expect(preview()[0]?.getAttribute("alt")).toBe("X-T5 frame");
+  });
+
+  it("bands the same years by focal length as well", () => {
+    render(<ExploreGearSection gear={gear()} frames={frames} />);
+    fireEvent.click(screen.getByRole("radio", { name: "By band" }));
+
+    expect(screen.getByTitle("35–55mm · short tele in 2024: 1 photo, 50%")).toBeInTheDocument();
   });
 
   // One year is a bar, not a history — the timeline only earns its place once
@@ -148,7 +226,6 @@ describe("the gear section's own reporting", () => {
               label: "2024",
               total: 4,
               cameras: [{ camera: "X100T", count: 4, share: 100 }],
-              frames: [],
             },
           ],
         })}
@@ -186,21 +263,30 @@ describe("the gear section's own reporting", () => {
 
   // A stacked bar cannot show a body arriving in June, which is what the frames
   // are for.
-  it("switches the years between shares and every frame", () => {
+  // The archive as it happened opens first; a stacked bar cannot show a body
+  // arriving in June.
+  it("opens on every frame and switches to shares", () => {
     render(<ExploreGearSection gear={gear()} frames={frames} />);
 
-    expect(screen.getByTitle("X-T5 in 2024: 3 photos, 75%")).toBeInTheDocument();
+    expect(screen.queryByTitle(/X-T5 in 2024/)).not.toBeInTheDocument();
+    expect(document.querySelectorAll('[class*="gearYearSliver"]').length).toBeGreaterThan(0);
 
-    fireEvent.click(screen.getByRole("radio", { name: "Every photo" }));
+    fireEvent.click(screen.getAllByRole("radio", { name: "Stacked" })[0]!);
 
-    expect(screen.queryByTitle("X-T5 in 2024: 3 photos, 75%")).not.toBeInTheDocument();
-    expect(document.querySelectorAll('[class*="gearYearSliver"]')).toHaveLength(3);
+    expect(screen.getByTitle("X-T5 in 2024: 1 photo, 50%")).toBeInTheDocument();
   });
 
   it("renders nothing at all when no photograph names its camera", () => {
     const { container } = render(
       <ExploreGearSection
-        gear={{ cameraYears: [], cameraProfiles: [], lensFocalRanges: [] }}
+        gear={{
+          cameraYears: [],
+          focalYears: [],
+          focalCoverage: 0,
+          frames: [],
+          cameraProfiles: [],
+          lensFocalRanges: [],
+        }}
         frames={[]}
       />,
     );

@@ -52,8 +52,6 @@ const MAX_TRAVELLING_MOTIFS = 8;
 const MAX_AVERAGE_EXAMPLES = 12;
 const MAX_OUTLIER_EXAMPLES = 12;
 const MAX_VISUAL_ERAS = 6;
-/** Below this a body's "typical frame" is just one of the few frames it took. */
-const MIN_CAMERA_FRAMES = 12;
 const DEFAULT_EMBEDDINGS_DB_PATH = path.join(process.cwd(), "public", "search-embeddings.sqlite");
 const FALLBACK_EMBEDDINGS_DB_PATH = path.join(process.cwd(), "public", "search.sqlite");
 
@@ -960,8 +958,13 @@ export const computeVisualSamenessStats = async (
           byCamera.set(camera, [...(byCamera.get(camera) ?? []), row]);
         }
 
+        // Every body that took a photograph gets one, however few it took: the
+        // centroid of six frames is exactly as well defined as the centroid of
+        // six hundred, and a card with a hole where the others have a picture
+        // reads as a fault rather than as a small sample. A phone with six
+        // frames had one.
         return [...byCamera.entries()]
-          .filter(([, rows]) => rows.length >= MIN_CAMERA_FRAMES)
+          .filter(([, rows]) => rows.length > 0)
           .flatMap(([camera, rows]) => {
             // invariant: the filter above guarantees a first row
             const dimension = rows[0]!.vector.length;

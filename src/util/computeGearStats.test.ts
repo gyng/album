@@ -53,12 +53,11 @@ describe("computeGearStats", () => {
       ]),
     ]);
 
-    expect(stats.cameraYears.map((year) => ({ ...year, frames: year.frames.length }))).toEqual([
+    expect(stats.cameraYears).toEqual([
       {
         label: "2023",
         total: 2,
         cameras: [{ camera: "FUJIFILM X100T", count: 2, share: 100 }],
-        frames: 2,
       },
       {
         label: "2024",
@@ -67,9 +66,9 @@ describe("computeGearStats", () => {
           { camera: "FUJIFILM X-T5", count: 3, share: 75 },
           { camera: "FUJIFILM X100T", count: 1, share: 25 },
         ],
-        frames: 4,
       },
     ]);
+    expect(stats.frames).toHaveLength(6);
   });
 
   // A stacked bar says a year was two thirds one body; only the frames say the
@@ -83,7 +82,7 @@ describe("computeGearStats", () => {
       ]),
     ]);
 
-    const frames = stats.cameraYears[0]?.frames;
+    const frames = stats.frames;
 
     expect(frames?.map((frame) => frame.camera)).toEqual([
       "FUJIFILM X100T",
@@ -164,6 +163,22 @@ describe("computeGearStats", () => {
       expect(x100t.topLens).toEqual({ label: "23mm", share: 100 });
       expect(x100t.topPlace).toEqual({ label: "Tokyo, Japan", share: 67 });
       expect(x100t.years).toEqual([2024, 2024]);
+    });
+
+    // Rounded at build time, six photographs of fifteen hundred became "0%",
+    // and the view could no longer tell small from none.
+    it("keeps a small share small rather than rounding it away", () => {
+      const stats = computeGearStats([
+        album([
+          ...Array.from({ length: 300 }, (_, index) => photo(`many-${index}`, { camera: "X-T5" })),
+          photo("one", { camera: "Nexus" }),
+        ]),
+      ]);
+
+      const rare = stats.cameraProfiles.find((profile) => profile.camera === "FUJIFILM Nexus")!;
+
+      expect(rare.share).toBeGreaterThan(0);
+      expect(rare.share).toBeLessThan(0.5);
     });
 
     it("orders bodies by how much they were used", () => {
@@ -286,6 +301,13 @@ describe("computeGearStats", () => {
   it("has nothing to say about an archive with no EXIF at all", () => {
     const stats = computeGearStats([album([photo("a", {})])]);
 
-    expect(stats).toEqual({ cameraYears: [], cameraProfiles: [], lensFocalRanges: [] });
+    expect(stats).toEqual({
+      cameraYears: [],
+      focalYears: [],
+      focalCoverage: 0,
+      frames: [],
+      cameraProfiles: [],
+      lensFocalRanges: [],
+    });
   });
 });

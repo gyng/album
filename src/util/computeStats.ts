@@ -1,5 +1,6 @@
 import type { Content, PhotoBlock } from "../services/types";
 import { computeGearStats, type GearStats } from "./computeGearStats";
+import { fillYearRange } from "./yearRange";
 import { rgbToString } from "./colorDistance";
 import { encodePublicAssetPath } from "./encodePublicAssetPath";
 import {
@@ -1028,22 +1029,24 @@ function computeRichColorStats(albums: Content[]): {
     .filter((bucket) => bucket.count > 0 && bucket.photos.length > 0)
     .sort((left, right) => right.count - left.count || left.label.localeCompare(right.label));
 
-  const sortedYears = Array.from(yearCounts.keys())
-    .map((year) => Number(year))
-    .sort((left, right) => right - left)
-    .slice(0, 5);
+  // Every year the archive spans, newest first — not the five most recent that
+  // happen to hold a photograph. A five-year window hid two thirds of this
+  // archive's colour, and skipping the empty years would have put 2020 against
+  // 2022 as though nothing had happened in between.
+  const sortedYears = fillYearRange(yearCounts, () => new Map<string, number>())
+    .map(([year]) => Number(year))
+    .reverse();
 
   const colorYearStats = sortedYears.map((year) => ({
     label: String(year),
     data: COLOR_FAMILY_LABELS.map((label) => ({
       label,
-      count: yearCounts.get(String(year))!.get(label)!,
+      count: yearCounts.get(String(year))?.get(label) ?? 0,
     })),
   }));
   const colorYearRibbons = sortedYears.map((year) => {
     const yearKey = String(year);
-    const entries = yearPhotoColors
-      .get(yearKey)!
+    const entries = (yearPhotoColors.get(yearKey) ?? [])
       .slice()
       .sort((left, right) => left.sortKey - right.sortKey);
     const total = entries.length;
@@ -1057,12 +1060,12 @@ function computeRichColorStats(albums: Content[]): {
       photoLabel: entry.photoLabel,
     }));
 
-    const dominantFamily = colorYearStats
-      .find((group) => group.label === yearKey)!
-      .data.slice()
-      .sort(
-        (left, right) => right.count - left.count || left.label.localeCompare(right.label),
-      )[0]!.label;
+    const ranked = (colorYearStats.find((group) => group.label === yearKey)?.data ?? [])
+      .slice()
+      .sort((left, right) => right.count - left.count || left.label.localeCompare(right.label))[0];
+    // A year with no photographs has no dominant family, rather than the first
+    // family in the list with a count of nothing.
+    const dominantFamily = ranked && ranked.count > 0 ? ranked.label : null;
 
     return {
       label: yearKey,
