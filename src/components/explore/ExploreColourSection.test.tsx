@@ -156,9 +156,11 @@ describe("ExploreColourSection", () => {
       "href",
       "/search",
     );
+    // One photograph is one sliver of the same width in every year: sized as a
+    // share of its year, a year holding one frame drew it a bar wide.
     expect(screen.getByTitle("Red around 2023: 0 photos (0%)")).toHaveStyle({
-      inlineSize: "max(var(--size-3), 100%)",
-      left: "min(0%, calc(100% - max(var(--size-3), 100%)))",
+      inlineSize: "var(--size-3)",
+      left: "min(0%, calc(100% - var(--size-3)))",
     });
     expect(screen.getByText("—")).toBeInTheDocument();
     expect(

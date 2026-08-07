@@ -24,6 +24,7 @@ export const gearStyles = mergeCssModuleStyles(
     "gearBodyFrame",
     "gearBodyHeader",
     "gearBodyName",
+    "gearBodyLens",
     "gearBodyMark",
     "gearBodyCount",
     "gearBodyTraits",
@@ -87,7 +88,7 @@ const formatFocalLength = (focal: GearProfile["focalLength"]): string | null =>
 /** What a kit was typically set to, leaving out whatever it never recorded. */
 const traitsOf = (
   profile: GearProfile,
-  { withLens }: { withLens: boolean },
+  { withLens, withCamera }: { withLens: boolean; withCamera: boolean },
 ): Array<{ label: string; value: string }> => {
   const focal = formatFocalLength(profile.focalLength);
 
@@ -103,16 +104,31 @@ const traitsOf = (
             value: `${hourLabel(profile.busiestHours.from)}–${hourLabel((profile.busiestHours.to + 1) % 24)}`,
           },
         ]),
-    // Left out when the card is a pairing: its title already names the lens.
+    // Whichever half the title does not already name: a body says what was on
+    // it, a lens says what it was on, and a pairing names both and says
+    // neither.
     ...(profile.topLens === null || !withLens
       ? []
       : [{ label: "Usually on", value: `${profile.topLens.label} · ${profile.topLens.share}%` }]),
+    ...(profile.topCamera === null || !withCamera
+      ? []
+      : [
+          {
+            label: "Usually on",
+            value: `${profile.topCamera.label} · ${profile.topCamera.share}%`,
+          },
+        ]),
     ...(profile.topPlace === null
       ? []
       : [{ label: "Usually in", value: `${profile.topPlace.label} · ${profile.topPlace.share}%` }]),
   ];
 };
 
+/**
+ * `colour` is a background rather than a colour throughout these parts: a kit
+ * with a lens on it is painted as the body over the lens, and that is a
+ * gradient, not a colour.
+ */
 export const GearLegend = ({
   items,
 }: {
@@ -124,7 +140,7 @@ export const GearLegend = ({
         <span
           aria-hidden="true"
           className={styles.gearLegendSwatch}
-          style={{ backgroundColor: item.colour }}
+          style={{ background: item.colour }}
         />
         <span>{item.label}</span>
       </div>
@@ -138,12 +154,14 @@ export const GearProfileCard = ({
   photo,
   href,
   withLens,
+  withCamera,
 }: {
   profile: GearProfile;
   colour: string | undefined;
   photo: { src: string; href: string; label: string; swatch?: string } | undefined;
   href: string;
   withLens: boolean;
+  withCamera: boolean;
 }) => (
   <div className={styles.gearBodyCard}>
     {photo ? (
@@ -157,13 +175,14 @@ export const GearProfileCard = ({
       </Link>
     ) : null}
     <div className={styles.gearBodyHeader}>
-      <span
-        aria-hidden="true"
-        className={styles.gearBodyMark}
-        style={{ backgroundColor: colour }}
-      />
+      <span aria-hidden="true" className={styles.gearBodyMark} style={{ background: colour }} />
+      {/* The body and the lens on their own lines: as one string they wrap
+          mid-name, and "FUJIFILM X-T5 · XF16-" is not a name anybody reads. */}
       <Link href={href} className={styles.gearBodyName}>
-        {profile.label}
+        {profile.camera ? <span>{profile.camera}</span> : null}
+        {profile.lens ? (
+          <span className={profile.camera ? styles.gearBodyLens : undefined}>{profile.lens}</span>
+        ) : null}
       </Link>
     </div>
     <Caption as="span" className={styles.gearBodyCount}>
@@ -173,7 +192,7 @@ export const GearProfileCard = ({
         : ""}
     </Caption>
     <dl className={styles.gearBodyTraits}>
-      {traitsOf(profile, { withLens }).map((trait) => (
+      {traitsOf(profile, { withLens, withCamera }).map((trait) => (
         <div key={trait.label} className={styles.gearBodyTrait}>
           <dt className={styles.gearBodyTraitLabel}>{trait.label}</dt>
           <dd className={styles.gearBodyTraitValue}>{trait.value}</dd>
@@ -222,7 +241,7 @@ export const GearStackedBar = ({
         key={segment.label}
         className={styles.gearYearSegment}
         title={segment.title}
-        style={{ inlineSize: `${segment.share}%`, backgroundColor: segment.colour }}
+        style={{ inlineSize: `${segment.share}%`, background: segment.colour }}
       >
         <span className={styles.gearYearSegmentLabel}>{Math.round(segment.share)}%</span>
       </span>
@@ -266,7 +285,7 @@ export const GearRibbon = ({
           aria-label={`${captionOf(frame)}, ${frame.dateLabel} ${frame.year}`}
           style={{
             insetInlineStart: `min(${frame.position * 100}%, calc(100% - var(--size-2)))`,
-            backgroundColor: colourOf(frame),
+            background: colourOf(frame),
           }}
           onMouseEnter={() => onActive(key)}
           onFocus={() => onActive(key)}
@@ -356,7 +375,7 @@ export const GearLensChart = ({
                     title={`${band.from}–${band.to}mm in ${year.label}: ${band.count.toLocaleString("en")} of ${year.total.toLocaleString("en")}`}
                     style={{
                       inlineSize: `${band.share}%`,
-                      backgroundColor: bandColour(index, year.bands.length),
+                      background: bandColour(index, year.bands.length),
                     }}
                   />
                 ))}

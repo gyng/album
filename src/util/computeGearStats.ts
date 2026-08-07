@@ -66,7 +66,12 @@ export type GearFrame = {
  * counts as "the same kit" — so both go through this.
  */
 export type GearProfile = {
+  /** How it is named: a body, a lens, or a body with that lens on it. */
   label: string;
+  /** Null on a lens counted across every body it was mounted on. */
+  camera: string | null;
+  /** Null on a body counted across every lens that was on it. */
+  lens: string | null;
   count: number;
   /**
    * Per cent of every identified frame in the archive, unrounded.
@@ -89,6 +94,8 @@ export type GearProfile = {
   /** The four-hour stretch that holds most of its frames; `to` may wrap past midnight. */
   busiestHours: { from: number; to: number } | null;
   topLens: { label: string; share: number } | null;
+  /** What a lens was usually mounted on — the mirror of `topLens`, for a lens. */
+  topCamera: { label: string; share: number } | null;
   topPlace: { label: string; share: number } | null;
 };
 
@@ -130,6 +137,8 @@ export type GearStats = {
    * one frame each.
    */
   pairings: GearProfile[];
+  /** The same, per lens, counted across every body it was mounted on. */
+  lenses: GearProfile[];
   lensFocalRanges: LensFocalRange[];
 };
 
@@ -137,8 +146,17 @@ export type GearStats = {
 export const pairingLabel = (camera: string, lens: string | null): string =>
   lens ? `${camera} · ${lens}` : camera;
 
-/** Pairings that get a card and a colour of their own. */
-export const MAX_PAIRINGS = 8;
+/**
+ * Frames a piece of kit needs before it gets a card and a colour of its own.
+ *
+ * A count rather than a top-N: a fixed eight cut the XF27 off at ten frames
+ * while letting in whatever happened to be eighth, which is a threshold set by
+ * the length of the list instead of by the kit. Ten is where a body stops being
+ * something carried once — the compact this archive took seventeen frames with
+ * clears it, the phone that took six does not — and everything under it is
+ * counted into "Other" on the timeline rather than dropped.
+ */
+export const MIN_KIT_FRAMES = 10;
 
 const MONTH_LABELS = [
   "Jan",
@@ -255,6 +273,8 @@ const placeOf = (photo: PhotoBlock): string | null => {
 };
 
 type CameraFrames = {
+  camera: string | null;
+  lens: string | null;
   count: number;
   focal35: number[];
   focal: number[];
@@ -262,12 +282,15 @@ type CameraFrames = {
   isos: number[];
   hours: number[];
   lenses: Map<string, number>;
+  cameras: Map<string, number>;
   places: Map<string, number>;
   firstYear: number;
   lastYear: number;
 };
 
-const emptyFrames = (): CameraFrames => ({
+const emptyFrames = (camera: string | null, lens: string | null): CameraFrames => ({
+  camera,
+  lens,
   count: 0,
   focal35: [],
   focal: [],
@@ -275,6 +298,7 @@ const emptyFrames = (): CameraFrames => ({
   isos: [],
   hours: [],
   lenses: new Map(),
+  cameras: new Map(),
   places: new Map(),
   firstYear: Infinity,
   lastYear: -Infinity,
@@ -291,6 +315,7 @@ export const computeGearStats = (albums: Content[]): GearStats => {
 
   const byCamera = new Map<string, CameraFrames>();
   const byPairing = new Map<string, CameraFrames>();
+  const byLensKit = new Map<string, CameraFrames>();
   const byYear = new Map<string, Map<string, number>>();
   const byFocalYear = new Map<string, Map<string, number>>();
   const gearFrames: GearFrame[] = [];
@@ -316,20 +341,22 @@ export const computeGearStats = (albums: Content[]): GearStats => {
     // The same frame counted twice, once under the body and once under the body
     // with this lens on it: the two groupings are the same summary of the same
     // frames, so they are gathered together rather than computed twice.
-    const frames = byCamera.get(camera) ?? emptyFrames();
-    const pairing = byPairing.get(pairingLabel(camera, lens)) ?? emptyFrames();
+    const frames = byCamera.get(camera) ?? emptyFrames(camera, null);
+    const pairing = byPairing.get(pairingLabel(camera, lens)) ?? emptyFrames(camera, lens);
+    const lensKit = lens ? (byLensKit.get(lens) ?? emptyFrames(null, lens)) : null;
     const focal35 = exif.FocalLengthIn35mmFormat;
     const aperture = APERTURE_FACET.extract(exif, photo._build.tags ?? undefined);
     const iso = ISO_FACET.extract(exif, photo._build.tags ?? undefined);
     const place = placeOf(photo);
 
-    for (const kit of [frames, pairing]) {
+    for (const kit of lensKit ? [frames, pairing, lensKit] : [frames, pairing]) {
       kit.count += 1;
       if (measured(focal35)) kit.focal35.push(focal35);
       if (measured(focal)) kit.focal.push(focal);
       if (measured(aperture)) kit.apertures.push(aperture);
       if (measured(iso)) kit.isos.push(iso);
       if (lens) kit.lenses.set(lens, (kit.lenses.get(lens) ?? 0) + 1);
+      kit.cameras.set(camera, (kit.cameras.get(camera) ?? 0) + 1);
       if (place) kit.places.set(place, (kit.places.get(place) ?? 0) + 1);
       if (taken) {
         kit.hours.push(taken.hour);
@@ -370,6 +397,7 @@ export const computeGearStats = (albums: Content[]): GearStats => {
 
     byCamera.set(camera, frames);
     byPairing.set(pairingLabel(camera, lens), pairing);
+    if (lens && lensKit) byLensKit.set(lens, lensKit);
   }
 
   gearFrames.sort((left, right) =>
@@ -423,6 +451,8 @@ export const computeGearStats = (albums: Content[]): GearStats => {
 
         return {
           label,
+          camera: frames.camera,
+          lens: frames.lens,
           count: frames.count,
           share: identified > 0 ? (frames.count / identified) * 100 : 0,
           years: frames.firstYear === Infinity ? null : [frames.firstYear, frames.lastYear],
@@ -431,12 +461,21 @@ export const computeGearStats = (albums: Content[]): GearStats => {
           iso: median(frames.isos),
           busiestHours: busiestSpan(frames.hours),
           topLens: topOf(frames.lenses, frames.count),
+          topCamera: topOf(frames.cameras, frames.count),
           topPlace: topOf(frames.places, frames.count),
         };
       });
 
-  const bodies = profilesOf(byCamera);
-  const pairings = profilesOf(byPairing).slice(0, MAX_PAIRINGS);
+  // An archive whose busiest camera has not reached the threshold keeps it
+  // anyway: a small gallery should still see itself, and one card is not a wall.
+  const carried = (profiles: GearProfile[]): GearProfile[] => {
+    const kept = profiles.filter((profile) => profile.count >= MIN_KIT_FRAMES);
+    return kept.length > 0 ? kept : profiles.slice(0, 1);
+  };
+
+  const bodies = carried(profilesOf(byCamera));
+  const pairings = carried(profilesOf(byPairing));
+  const lenses = carried(profilesOf(byLensKit));
 
   /** Frames spread across a range in even bins, as counts and shares. */
   const distribute = (
@@ -509,6 +548,7 @@ export const computeGearStats = (albums: Content[]): GearStats => {
     frames: gearFrames,
     bodies,
     pairings,
+    lenses,
     lensFocalRanges,
   };
 };

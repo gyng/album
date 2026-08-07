@@ -247,6 +247,8 @@ const makeStats = () => ({
     bodies: [
       {
         label: "Cam 1",
+        camera: "Cam 1",
+        lens: null,
         count: 5,
         share: 62,
         years: [2023, 2024] as [number, number],
@@ -255,10 +257,13 @@ const makeStats = () => ({
         iso: 400,
         busiestHours: { from: 21, to: 0 },
         topLens: { label: "Lens 1", share: 90 },
+        topCamera: null,
         topPlace: { label: "Kyoto, Japan", share: 40 },
       },
       {
         label: "Cam 2",
+        camera: "Cam 2",
+        lens: null,
         count: 3,
         share: 38,
         years: null,
@@ -267,12 +272,15 @@ const makeStats = () => ({
         iso: null,
         busiestHours: null,
         topLens: null,
+        topCamera: null,
         topPlace: null,
       },
     ],
     pairings: [
       {
         label: "Cam 1 · Lens 1",
+        camera: "Cam 1",
+        lens: "Lens 1",
         count: 5,
         share: 62,
         years: [2023, 2024] as [number, number],
@@ -281,9 +289,11 @@ const makeStats = () => ({
         iso: 400,
         busiestHours: { from: 21, to: 0 },
         topLens: { label: "Lens 1", share: 90 },
+        topCamera: null,
         topPlace: { label: "Kyoto, Japan", share: 40 },
       },
     ],
+    lenses: [],
     lensFocalRanges: [
       {
         lens: "Lens 1",

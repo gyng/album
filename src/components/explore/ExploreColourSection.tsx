@@ -282,7 +282,6 @@ export const ExploreColourSection = ({
                         {year.slices.map((slice, index) => {
                           const sliceKey = `${year.label}-${slice.family}-${index}`;
                           const share = year.total > 0 ? (slice.count / year.total) * 100 : 0;
-                          const segmentWidth = 100 / Math.max(year.total, 1);
                           const segmentPosition = slice.position * 100;
                           return (
                             <Link
@@ -291,8 +290,13 @@ export const ExploreColourSection = ({
                               className={styles.colorTimeSegment}
                               title={`${slice.family} around ${year.label}: ${slice.count} photos (${Math.round(share)}%)`}
                               style={{
-                                left: `min(${segmentPosition}%, calc(100% - max(var(--size-3), ${segmentWidth}%)))`,
-                                inlineSize: `max(var(--size-3), ${segmentWidth}%)`,
+                                // One photograph is one sliver, the same width in
+                                // every year. Sized as a share of the year, the
+                                // eight frames of 2010 each came out an eighth of
+                                // the bar wide — a row of blocks that read as a
+                                // busy year rather than an empty one.
+                                left: `min(${segmentPosition}%, calc(100% - var(--size-3)))`,
+                                inlineSize: `var(--size-3)`,
                                 backgroundColor: slice.rgb,
                               }}
                               onMouseEnter={() => setActivePreview(sliceKey)}

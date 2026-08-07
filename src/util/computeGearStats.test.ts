@@ -106,44 +106,41 @@ describe("computeGearStats", () => {
   });
 
   describe("a body's own signature", () => {
+    // Ten frames each, so both kits clear MIN_KIT_FRAMES; the values are
+    // arranged so the middle of each is a number worth asserting.
+    const apertures = [2, 2, 2, 2, 2, 2, 2.8, 5.6, 5.6, 5.6, 5.6, 5.6];
+    const isos = [400, 400, 400, 400, 400, 400, 800, 1600, 1600, 1600, 1600, 1600];
+    const hours = [21, 22, 23, 21, 22, 23, 21, 22, 23, 21, 22, 23];
     const stats = () =>
       computeGearStats([
         album([
-          photo("a", {
-            camera: "X100T",
-            lens: "23mm",
-            focal35: 35,
-            aperture: 2,
-            iso: 400,
-            taken: "2024-05-04T21:00:00",
-            place: "Tokyo",
-          }),
-          photo("b", {
-            camera: "X100T",
-            lens: "23mm",
-            focal35: 35,
-            aperture: 2.8,
-            iso: 800,
-            taken: "2024-05-04T22:00:00",
-            place: "Tokyo",
-          }),
-          photo("c", {
-            camera: "X100T",
-            lens: "23mm",
-            focal35: 35,
-            aperture: 5.6,
-            iso: 1600,
-            taken: "2024-05-04T23:00:00",
-            place: "Osaka",
-          }),
-          photo("d", { camera: "X-T5", focal35: 80, aperture: 4, iso: 200, place: "Tokyo" }),
+          ...Array.from({ length: 12 }, (_, index) =>
+            photo(`a${index}`, {
+              camera: "X100T",
+              lens: "23mm",
+              focal35: 35,
+              aperture: apertures[index]!,
+              iso: isos[index]!,
+              taken: `2024-05-04T${hours[index]}:00:00`,
+              place: index < 8 ? "Tokyo" : "Osaka",
+            }),
+          ),
+          ...Array.from({ length: 10 }, (_, index) =>
+            photo(`d${index}`, {
+              camera: "X-T5",
+              focal35: 80,
+              aperture: 4,
+              iso: 200,
+              place: "Tokyo",
+            }),
+          ),
         ]),
       ]);
 
     it("reports the middle of what a body was set to, not its extremes", () => {
       const x100t = stats().bodies.find((profile) => profile.label === "FUJIFILM X100T")!;
 
-      expect(x100t.count).toBe(3);
+      expect(x100t.count).toBe(12);
       expect(x100t.focalLength).toEqual({ mm: 35, equivalent: true });
       expect(x100t.aperture).toBe(2.8);
       expect(x100t.iso).toBe(800);
@@ -170,8 +167,8 @@ describe("computeGearStats", () => {
     it("keeps a small share small rather than rounding it away", () => {
       const stats = computeGearStats([
         album([
-          ...Array.from({ length: 300 }, (_, index) => photo(`many-${index}`, { camera: "X-T5" })),
-          photo("one", { camera: "Nexus" }),
+          ...Array.from({ length: 3000 }, (_, index) => photo(`many-${index}`, { camera: "X-T5" })),
+          ...Array.from({ length: 10 }, (_, index) => photo(`few-${index}`, { camera: "Nexus" })),
         ]),
       ]);
 
@@ -190,7 +187,20 @@ describe("computeGearStats", () => {
         "FUJIFILM X100T · 23mm",
         "FUJIFILM X-T5",
       ]);
-      expect(pairings[0]).toMatchObject({ count: 3, aperture: 2.8 });
+      expect(pairings[0]).toMatchObject({ count: 12, aperture: 2.8, lens: "23mm" });
+    });
+
+    // The mirror of a pairing: one lens, counted across every body it was on.
+    it("summarises a lens across the bodies it was mounted on", () => {
+      const lenses = stats().lenses;
+
+      expect(lenses.map((profile) => profile.label)).toEqual(["23mm"]);
+      expect(lenses[0]).toMatchObject({
+        camera: null,
+        lens: "23mm",
+        count: 12,
+        topCamera: { label: "FUJIFILM X100T", share: 100 },
+      });
     });
 
     it("orders bodies by how much they were used", () => {
@@ -320,6 +330,7 @@ describe("computeGearStats", () => {
       frames: [],
       bodies: [],
       pairings: [],
+      lenses: [],
       lensFocalRanges: [],
     });
   });

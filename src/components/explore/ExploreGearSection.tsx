@@ -3,7 +3,7 @@ import type { GearFrame, GearProfile, GearStats } from "../../util/computeGearSt
 import { FOCAL_BAND_LABELS, pairingLabel } from "../../util/computeGearStats";
 import type { VisualSamenessStats } from "../../util/computeEmbeddingStats";
 import { buildSearchFacetHref, buildSearchHref } from "../../util/searchFacets";
-import { Caption, SegmentedToggle } from "../ui";
+import { Caption, PillButton, SegmentedToggle } from "../ui";
 import {
   formatCount,
   GearLegend,
@@ -27,6 +27,24 @@ const kitColour = (index: number, total: number): string =>
   `oklch(72% 0.13 ${Math.round((index * 360) / Math.max(total, 1) + 25) % 360})`;
 
 /**
+ * A lens's colour, from the same wheel as the bodies but darker and offset.
+ *
+ * A pairing's mark is the body over the lens, so the two halves have to be
+ * told apart at two pixels wide: a different tone does that where a different
+ * hue alone would not.
+ */
+const lensColour = (index: number, total: number): string =>
+  `oklch(52% 0.14 ${Math.round((index * 360) / Math.max(total, 1) + 205) % 360})`;
+
+/**
+ * What a series is painted with: one colour for a body, and the body over its
+ * lens for a pairing — split across the middle, so a mark says which body and
+ * which lens at once.
+ */
+const splitPaint = (body: string, lens: string): string =>
+  `linear-gradient(to bottom, ${body} 0 50%, ${lens} 50% 100%)`;
+
+/**
  * A band's colour, from wide to long.
  *
  * Ordered data, so the ramp is ordered too — and mixed from the accent every
@@ -44,9 +62,14 @@ const bandColour = (index: number, total: number): string =>
 
 const OTHER_KIT = "Other";
 
+type Grouping = "bodies" | "pairings" | "lenses";
+
 /** What a frame's kit is called, under whichever grouping is showing. */
-const kitOf = (frame: GearFrame, grouping: "bodies" | "pairings"): string =>
-  grouping === "bodies" ? frame.camera : pairingLabel(frame.camera, frame.lens);
+const kitOf = (frame: GearFrame, grouping: Grouping): string => {
+  if (grouping === "bodies") return frame.camera;
+  if (grouping === "lenses") return frame.lens ?? OTHER_KIT;
+  return pairingLabel(frame.camera, frame.lens);
+};
 
 /**
  * The search that finds a kit's photographs.
@@ -55,17 +78,17 @@ const kitOf = (frame: GearFrame, grouping: "bodies" | "pairings"): string =>
  * not index, and searching the camera facet for a lens name — which is what a
  * single-facet link had to do — finds nothing at all.
  */
-const kitSearchHref = (profile: GearProfile): string => {
-  const [camera, lens] = profile.label.split(" · ");
-  if (!camera) return "/search";
-
-  return buildSearchHref({
+const kitSearchHref = (profile: GearProfile): string =>
+  buildSearchHref({
     facets: [
-      { facetId: "camera", value: camera },
-      ...(lens ? [{ facetId: "lens", value: lens }] : []),
+      ...(profile.camera ? [{ facetId: "camera", value: profile.camera }] : []),
+      ...(profile.lens ? [{ facetId: "lens", value: profile.lens }] : []),
     ],
   });
-};
+
+/** Cards to open with, and to add on each press. */
+const INITIAL_KIT_CARDS = 6;
+const LOAD_MORE_KIT_CARDS = 6;
 
 /**
  * What the camera and lens counts cannot say.
@@ -89,7 +112,7 @@ export const ExploreGearSection = ({
   // A body, or a body with the lens that was on it. The cards, the legend and
   // the timeline all follow this: a pairing is a thing a reader changed
   // between, and the body alone cannot show which.
-  const [grouping, setGrouping] = React.useState<"bodies" | "pairings">("bodies");
+  const [grouping, setGrouping] = React.useState<Grouping>("bodies");
   // Every frame where it fell in its year, or each year as one bar of shares.
   // The archive as it happened opens first, the way the colour ribbon does.
   const [yearView, setYearView] = React.useState<"frames" | "stacked">("frames");
@@ -97,15 +120,46 @@ export const ExploreGearSection = ({
   // Which sliver is pointed at, in either ribbon. Only that one's photograph is
   // fetched; see the tooltip in GearRibbon for why.
   const [preview, setPreview] = React.useState<string | null>(null);
+  const [visibleCards, setVisibleCards] = React.useState(INITIAL_KIT_CARDS);
 
-  const profiles = grouping === "bodies" ? gear.bodies : gear.pairings;
+  const profiles =
+    grouping === "bodies" ? gear.bodies : grouping === "lenses" ? gear.lenses : gear.pairings;
   const photos = new Map(frames.map((frame) => [frame.label, frame.photo]));
+  // A body keeps one colour across both groupings, so switching to pairings
+  // reads as the same cameras splitting rather than as a new set of them.
+  const bodyOrder = gear.bodies.map((profile) => profile.camera);
+  const lensOrder = [
+    ...new Set(
+      [...gear.lenses, ...gear.pairings].flatMap((profile) => (profile.lens ? [profile.lens] : [])),
+    ),
+  ];
+  const paintOf = (camera: string | null, lens: string | null): string => {
+    const body =
+      camera === null ? null : kitColour(Math.max(bodyOrder.indexOf(camera), 0), bodyOrder.length);
+    const glass =
+      lens === null
+        ? null
+        : lensColour(Math.max(lensOrder.indexOf(lens), 0), Math.max(lensOrder.length, 1));
+
+    if (body && glass) return splitPaint(body, glass);
+    return body ?? glass ?? "var(--c-bg-contrast-light)";
+  };
   const colours = new Map(
-    profiles.map((profile, index) => [profile.label, kitColour(index, profiles.length)]),
+    profiles.map((profile) => [profile.label, paintOf(profile.camera, profile.lens)]),
   );
   const bandColours = new Map(
     FOCAL_BAND_LABELS.map((band, index) => [band, bandColour(index, FOCAL_BAND_LABELS.length)]),
   );
+  // The same split, one chart down: the band a frame was shot at over the body
+  // that shot it. The bands are a ramp and the bodies are a wheel, so the two
+  // halves never read as one colour.
+  const focalPaint = (band: string | null, camera: string): string | undefined => {
+    const above = band ? bandColours.get(band) : undefined;
+    if (!above) return undefined;
+
+    const below = kitColour(Math.max(bodyOrder.indexOf(camera), 0), bodyOrder.length);
+    return splitPaint(above, below);
+  };
   // Whatever falls outside the cards is one series rather than a dozen: a key
   // cannot hold eleven pairings, and the tail is a frame or two each.
   const named = new Set(profiles.map((profile) => profile.label));
@@ -153,20 +207,35 @@ export const ExploreGearSection = ({
   return (
     <>
       <section className={`${styles.section} ${styles.sectionWide}`}>
-        <GearSectionHeader title={grouping === "bodies" ? "Bodies" : "Bodies and lenses"}>
+        <GearSectionHeader
+          title={
+            grouping === "bodies"
+              ? "Bodies"
+              : grouping === "lenses"
+                ? "Lenses"
+                : "Bodies and lenses"
+          }
+        >
           <SegmentedToggle
             ariaLabel="What to count as one piece of kit"
             value={grouping}
-            onChange={setGrouping}
+            onChange={(next) => {
+              // Back to the first few: the groupings are different lengths, and
+              // an expanded list of seven bodies has nothing to say about how
+              // much of twelve pairings a reader wanted to see.
+              setGrouping(next);
+              setVisibleCards(INITIAL_KIT_CARDS);
+            }}
             options={[
               { value: "bodies" as const, label: "Bodies" },
               { value: "pairings" as const, label: "With lenses" },
+              { value: "lenses" as const, label: "Lenses" },
             ]}
           />
           <Caption as="span">The middle of what each was set to, and its own average frame</Caption>
         </GearSectionHeader>
         <div className={styles.gearBodies}>
-          {profiles.map((profile) => (
+          {profiles.slice(0, visibleCards).map((profile) => (
             <GearProfileCard
               key={profile.label}
               profile={profile}
@@ -174,9 +243,20 @@ export const ExploreGearSection = ({
               photo={photos.get(profile.label)}
               href={kitSearchHref(profile)}
               withLens={grouping === "bodies"}
+              withCamera={grouping === "lenses"}
             />
           ))}
         </div>
+        {profiles.length > visibleCards ? (
+          <PillButton
+            className={styles.loadMoreButton}
+            onClick={() => {
+              setVisibleCards((count) => Math.min(count + LOAD_MORE_KIT_CARDS, profiles.length));
+            }}
+          >
+            <span>Load more kit</span>
+          </PillButton>
+        ) : null}
       </section>
 
       {gear.cameraYears.length > 1 ? (
@@ -248,7 +328,8 @@ export const ExploreGearSection = ({
               worth — converting what can be converted would quietly delete the
               years that body owned. */}
           <Caption as="span">
-            As recorded, not 35mm-equivalent · {Math.round(gear.focalCoverage * 100)}% of frames
+            As recorded, not 35mm-equivalent · {Math.round(gear.focalCoverage * 100)}% of frames ·
+            every photo carries its band above the body that took it
           </Caption>
           <GearLegend
             items={FOCAL_BAND_LABELS.map((band) => ({
@@ -265,6 +346,9 @@ export const ExploreGearSection = ({
                     segments={year.bands.map((band) => ({
                       label: band.band,
                       share: band.share,
+                      // Stacked, a segment is many frames from many bodies, so
+                      // it stays the band's own colour; only a single frame can
+                      // honestly name the body under it.
                       colour: bandColours.get(band.band),
                       title: `${band.band} in ${year.label}: ${formatCount(band.count)}, ${Math.round(band.share)}%`,
                     }))}
@@ -275,8 +359,8 @@ export const ExploreGearSection = ({
                     frames={(framesByYear.get(year.label) ?? []).filter(
                       (frame) => frame.band !== null,
                     )}
-                    colourOf={(frame) => (frame.band ? bandColours.get(frame.band) : undefined)}
-                    captionOf={(frame) => frame.band ?? ""}
+                    colourOf={(frame) => focalPaint(frame.band, frame.camera)}
+                    captionOf={(frame) => `${frame.band ?? ""} · ${frame.camera}`}
                     active={preview}
                     onActive={setPreview}
                   />

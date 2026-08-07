@@ -33,22 +33,34 @@
 
 .gearBodyHeader {
   display: flex;
-  align-items: center;
+  align-items: start;
   gap: var(--m-s);
 }
 
 /* The same colour the timeline gives this body, so the two read as one key. */
 .gearBodyMark {
   flex: 0 0 auto;
+  margin-block-start: var(--size-4);
   inline-size: var(--size-10);
   block-size: var(--size-10);
   border-radius: var(--radius-pill);
 }
 
 .gearBodyName {
+  display: grid;
+  gap: var(--size-2);
   color: var(--c-font);
   font-size: var(--fs-sm);
   text-decoration: none;
+  min-inline-size: 0;
+  overflow-wrap: anywhere;
+}
+
+/* Quieter than the body above it, and on its own line: the two are one name
+   only in the sense that a lens is on a camera. */
+.gearBodyLens {
+  color: var(--c-bg-contrast-light);
+  font-size: var(--fs-s);
 }
 
 .gearBodyName:hover,

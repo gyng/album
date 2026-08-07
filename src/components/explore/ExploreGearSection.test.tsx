@@ -66,6 +66,8 @@ const gear = (overrides: Partial<GearStats> = {}): GearStats => ({
   bodies: [
     {
       label: "X100T",
+      camera: "X100T",
+      lens: null,
       count: 5,
       share: 62,
       years: [2023, 2024],
@@ -74,10 +76,13 @@ const gear = (overrides: Partial<GearStats> = {}): GearStats => ({
       iso: 400,
       busiestHours: { from: 21, to: 0 },
       topLens: { label: "23mm", share: 90 },
+      topCamera: { label: "X100T", share: 100 },
       topPlace: { label: "Kyoto, Japan", share: 40 },
     },
     {
       label: "X-T5",
+      camera: "X-T5",
+      lens: null,
       count: 3,
       share: 38,
       years: [2024, 2024],
@@ -86,10 +91,13 @@ const gear = (overrides: Partial<GearStats> = {}): GearStats => ({
       iso: 200,
       busiestHours: { from: 10, to: 13 },
       topLens: { label: "XF16-80mm", share: 100 },
+      topCamera: { label: "X-T5", share: 100 },
       topPlace: null,
     },
     {
       label: "GT-I9300",
+      camera: "GT-I9300",
+      lens: null,
       count: 3,
       share: 0.2,
       years: null,
@@ -98,12 +106,15 @@ const gear = (overrides: Partial<GearStats> = {}): GearStats => ({
       iso: null,
       busiestHours: null,
       topLens: null,
+      topCamera: null,
       topPlace: null,
     },
   ],
   pairings: [
     {
       label: "X100T · 23mm",
+      camera: "X100T",
+      lens: "23mm",
       count: 5,
       share: 62,
       years: [2023, 2024],
@@ -112,10 +123,13 @@ const gear = (overrides: Partial<GearStats> = {}): GearStats => ({
       iso: 400,
       busiestHours: { from: 21, to: 0 },
       topLens: { label: "23mm", share: 100 },
+      topCamera: { label: "X100T", share: 100 },
       topPlace: { label: "Kyoto, Japan", share: 40 },
     },
     {
       label: "X-T5 · XF16-80mm",
+      camera: "X-T5",
+      lens: "XF16-80mm",
       count: 3,
       share: 38,
       years: null,
@@ -124,6 +138,24 @@ const gear = (overrides: Partial<GearStats> = {}): GearStats => ({
       iso: null,
       busiestHours: null,
       topLens: { label: "XF16-80mm", share: 100 },
+      topCamera: { label: "X-T5", share: 100 },
+      topPlace: null,
+    },
+  ],
+  lenses: [
+    {
+      label: "23mm",
+      camera: null,
+      lens: "23mm",
+      count: 5,
+      share: 62,
+      years: [2023, 2024],
+      focalLength: { mm: 35, equivalent: true },
+      aperture: 2.8,
+      iso: 400,
+      busiestHours: { from: 21, to: 0 },
+      topLens: { label: "23mm", share: 100 },
+      topCamera: { label: "X100T", share: 100 },
       topPlace: null,
     },
   ],
@@ -225,7 +257,8 @@ describe("the gear section's own reporting", () => {
     render(<ExploreGearSection gear={gear()} frames={frames} />);
     fireEvent.click(screen.getByRole("radio", { name: "With lenses" }));
 
-    expect(screen.getByRole("link", { name: "X-T5 · XF16-80mm" })).toHaveAttribute(
+    // The name is two lines now, so the accessible name is the two joined.
+    expect(screen.getByRole("link", { name: "X-T5 XF16-80mm" })).toHaveAttribute(
       "href",
       "/search?facet=camera%3AX-T5&facet=lens%3AXF16-80mm",
     );
@@ -252,10 +285,33 @@ describe("the gear section's own reporting", () => {
     const preview = () => document.querySelectorAll('[class*="gearTooltipImage"]');
     expect(preview()).toHaveLength(0);
 
-    fireEvent.focus(screen.getByRole("link", { name: /X-T5, 4 May 2024/ }));
+    fireEvent.focus(screen.getByRole("link", { name: /^X-T5, 4 May 2024/ }));
 
     expect(preview()).toHaveLength(1);
     expect(preview()[0]?.getAttribute("alt")).toBe("X-T5 frame");
+  });
+
+  // A pairing's mark carries both halves of what it is: the body above the lens
+  // in the gear chart, and the band above the body in the focal one.
+  it("paints a pairing as its body over its lens", () => {
+    render(<ExploreGearSection gear={gear()} frames={frames} />);
+    fireEvent.click(screen.getByRole("radio", { name: "With lenses" }));
+
+    const sliver = screen.getByRole("link", { name: /^X-T5 · XF16-80mm, 4 May 2024/ });
+
+    expect(sliver.getAttribute("style")).toMatch(/linear-gradient\(to bottom, .+ 0 50%, .+ 50%/);
+  });
+
+  // A lens is the mirror of a body: the same summary, counted across whatever
+  // it was mounted on.
+  it("counts a lens on its own when asked to", () => {
+    render(<ExploreGearSection gear={gear()} frames={frames} />);
+    fireEvent.click(screen.getByRole("radio", { name: "Lenses" }));
+
+    const card = screen.getByRole("link", { name: "23mm" }).closest("div")!.parentElement!;
+
+    expect(within(card).getByText("Usually on")).toBeInTheDocument();
+    expect(within(card).getByText("X100T · 100%")).toBeInTheDocument();
   });
 
   it("bands the same years by focal length as well", () => {
@@ -337,6 +393,7 @@ describe("the gear section's own reporting", () => {
           frames: [],
           bodies: [],
           pairings: [],
+          lenses: [],
           lensFocalRanges: [],
         }}
         frames={[]}
