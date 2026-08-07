@@ -330,6 +330,40 @@ const buildPhotoTagLookup = (albums: Content[]): Map<string, string[]> => {
 };
 
 /**
+ * The shape of each photograph, as it is displayed.
+ *
+ * EXIF rotation is applied here the way the album page applies it: a portrait
+ * frame a camera turned in metadata is a portrait frame, and a sheet laid out
+ * from the raw numbers would put it on its side.
+ */
+const buildPhotoAspectLookup = (albums: Content[]): Map<string, number> => {
+  const lookup = new Map<string, number>();
+
+  albums.forEach((album) => {
+    if (isTestAlbum(album)) return;
+
+    album.blocks.forEach((block) => {
+      if (block.kind !== "photo") return;
+
+      const photo = block as PhotoBlock;
+      const indexedPath = photo._build.tags?.path;
+      const width = photo._build.width;
+      const height = photo._build.height;
+      if (!indexedPath || !width || !height) return;
+
+      const orientation = photo._build.exif?.Orientation ?? "";
+      const rotated = orientation.includes("270") || orientation.includes("90");
+      const aspect = rotated ? height / width : width / height;
+      if (Number.isFinite(aspect) && aspect > 0) {
+        lookup.set(indexedPath, Number(aspect.toFixed(3)));
+      }
+    });
+  });
+
+  return lookup;
+};
+
+/**
  * What took each photograph, keyed the way the embeddings are: the body, the
  * lens, and the two together — the gear section groups by any of the three, and
  * each grouping wants its own average frame.
@@ -1118,6 +1152,7 @@ export const loadEmbeddingSpacePoints = async (
     const tagLookup = buildPhotoTagLookup(albums);
     const albumLookup = buildPhotoAlbumLookup(albums);
     const dateLookup = buildPhotoDateLookup(albums);
+    const aspectLookup = buildPhotoAspectLookup(albums);
     const selectedPaths = [...photoLookup.keys()];
     if (selectedPaths.length < MIN_EMBEDDING_SAMPLE) {
       return empty;
@@ -1213,6 +1248,7 @@ export const loadEmbeddingSpacePoints = async (
           href: entry.photo.href,
           label: entry.photo.label,
           ...(taken ? { taken: taken.sortKey, year: taken.year } : {}),
+          ...(aspectLookup.has(entry.path) ? { aspect: aspectLookup.get(entry.path) } : {}),
           ...(album ? { album } : {}),
           ...(entry.photo.swatch ? { swatch: entry.photo.swatch } : {}),
           ...(tags.length > 0 ? { tags } : {}),

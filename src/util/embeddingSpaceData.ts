@@ -13,6 +13,8 @@ export type EmbeddingSpaceEntry = {
   /** Wall-clock sort key and year, where the photograph carries a date. */
   taken?: number;
   year?: number;
+  /** Displayed width over height, EXIF rotation included. */
+  aspect?: number;
   swatch?: string;
   /** What the captioner said is in it, most telling first. */
   tags?: string[];

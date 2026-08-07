@@ -77,6 +77,34 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* Above the frame it belongs to: at this density a caption in a corner is a
+   caption for the whole wall. */
+.tooltip {
+  position: absolute;
+  transform: translate(-50%, calc(-100% - var(--m-xs)));
+  display: flex;
+  align-items: baseline;
+  gap: var(--m-s);
+  max-inline-size: min(var(--size-280), 60vw);
+  margin: 0;
+  padding: var(--m-xs) var(--m-s);
+  border-radius: var(--radius-pill);
+  background: var(--c-bg);
+  box-shadow: var(--popup-shadow);
+  color: var(--c-font);
+  font-size: var(--fs-s);
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
+}
+
+.tooltipYear {
+  color: var(--c-bg-contrast-light);
+  font-variant-numeric: tabular-nums;
+}
+
 /* A canvas has no children, so the photographs are offered again as a list —
    hidden until one is focused, then brought where it can be read. */
 .hiddenList {

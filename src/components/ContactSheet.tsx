@@ -6,6 +6,7 @@ import {
   type EmbeddingSpaceEntry,
   fetchEmbeddingSpace,
 } from "../util/embeddingSpaceData";
+import { justifiedRows, type JustifiedLayout } from "../util/justifiedRows";
 import styles from "./ContactSheet.module.css";
 
 /**
@@ -16,20 +17,19 @@ import styles from "./ContactSheet.module.css";
  * can stand back from or walk up to. Zooming is the whole interaction — far out
  * it is the shape of fifteen years of shooting, close in it is a photograph.
  *
- * Canvas, and the same contact sheet the cloud draws from: fifteen hundred
- * `<img>` elements re-laid-out on every wheel tick is the cost the map already
- * measured and refused, and the sheet is one request for all of them. Cells
- * only fetch their own file once they are drawn larger than the sheet can
- * honestly fill.
+ * Canvas, and the cloud's own contact sheet, because fifteen hundred `<img>`
+ * elements re-laid-out on every wheel tick is the cost the map already measured
+ * and refused.
  */
 
-/** Cell sizes, in CSS pixels. The far end is the shape; the near end is a photograph. */
-const MIN_CELL = 12;
-const MAX_CELL = 320;
-const INITIAL_CELL = 56;
+/** Row heights, in CSS pixels. The far end is the shape; the near end is a photograph. */
+const MIN_ROW = 24;
+const MAX_ROW = 460;
+const INITIAL_ROW = 96;
+const ROW_GAP = 2;
 
-/** Above this, a sheet cell is being stretched and the real file is worth fetching. */
-const FULL_RESOLUTION_CELL = 72;
+/** Above this, a 48px sheet cell is being stretched and the real file is worth fetching. */
+const FULL_RESOLUTION_ROW = 84;
 
 /** New files started per frame, so a zoom does not fire five hundred requests. */
 const LOADS_PER_FRAME = 4;
@@ -37,28 +37,43 @@ const LOADS_PER_FRAME = 4;
 /** Movement past this, in pixels, makes a press a pan rather than a click. */
 const DRAG_SLOP = 5;
 
+/**
+ * How much of the remaining distance to the zoom's target is left after a
+ * second. A wheel tick sets the target and the sheet travels to it, so a
+ * gesture reads as one movement rather than a series of jumps.
+ */
+const ZOOM_REMAINING_PER_SECOND = 0.00001;
+
 const clamp = (value: number, low: number, high: number): number =>
   Math.min(high, Math.max(low, value));
 
-/** The middle of the frame, cropped square, the way a contact sheet crops. */
-const drawSquare = (
+/**
+ * A photograph drawn to fill its box, cropped rather than squashed.
+ *
+ * The source may itself be a square cell of the contact sheet, in which case
+ * this crops that square — a crop of a crop, which at a thumbnail's size reads
+ * as the same photograph and at any larger size has been replaced by the file.
+ */
+const drawCover = (
   context: CanvasRenderingContext2D,
-  image: HTMLImageElement,
-  x: number,
-  y: number,
-  size: number,
+  image: CanvasImageSource,
+  source: { x: number; y: number; width: number; height: number },
+  box: { x: number; y: number; width: number; height: number },
 ): void => {
-  const side = Math.min(image.naturalWidth, image.naturalHeight);
+  const scale = Math.max(box.width / source.width, box.height / source.height);
+  const takeWidth = Math.min(source.width, box.width / scale);
+  const takeHeight = Math.min(source.height, box.height / scale);
+
   context.drawImage(
     image,
-    (image.naturalWidth - side) / 2,
-    (image.naturalHeight - side) / 2,
-    side,
-    side,
-    x,
-    y,
-    size,
-    size,
+    source.x + (source.width - takeWidth) / 2,
+    source.y + (source.height - takeHeight) / 2,
+    takeWidth,
+    takeHeight,
+    box.x,
+    box.y,
+    box.width,
+    box.height,
   );
 };
 
@@ -68,22 +83,48 @@ export const ContactSheet: React.FC<ContactSheetProps> = ({ className }) => {
   const [entries, setEntries] = React.useState<EmbeddingSpaceEntry[]>([]);
   const [atlas, setAtlas] = React.useState<EmbeddingSpaceAtlas | null>(null);
   const [failed, setFailed] = React.useState(false);
-  const [hovered, setHovered] = React.useState<EmbeddingSpaceEntry | null>(null);
+  const [hovered, setHovered] = React.useState<{
+    entry: EmbeddingSpaceEntry;
+    x: number;
+    y: number;
+  } | null>(null);
   const [fullscreen, setFullscreen] = React.useState(false);
-  /** Shown as a number so a reader can tell a nudge from nothing happening. */
-  const [cellSize, setCellSize] = React.useState(INITIAL_CELL);
+  const [rowHeight, setRowHeight] = React.useState(INITIAL_ROW);
 
   const stageRef = React.useRef<HTMLDivElement | null>(null);
   const canvasRef = React.useRef<HTMLCanvasElement | null>(null);
-  const cellRef = React.useRef(INITIAL_CELL);
-  /** How far the sheet has been scrolled, in pixels of the current cell size. */
-  const offsetRef = React.useRef({ x: 0, y: 0 });
+  /** Where the zoom is, and where it is going. The gap between them is the animation. */
+  const heightRef = React.useRef(INITIAL_ROW);
+  const targetRef = React.useRef(INITIAL_ROW);
+  const offsetRef = React.useRef(0);
   const pointerRef = React.useRef<{ x: number; y: number } | null>(null);
   const draggingRef = React.useRef<{ x: number; y: number } | null>(null);
   const travelledRef = React.useRef(0);
   const sheetsRef = React.useRef<HTMLImageElement[]>([]);
   const filesRef = React.useRef(new Map<string, HTMLImageElement>());
-  const hitRef = React.useRef<((at: { x: number; y: number }) => number | null) | null>(null);
+  /**
+   * Each photograph resampled once at the size it is drawn, rather than on
+   * every frame.
+   *
+   * A four-thousand-pixel file scaled into a two-hundred-pixel box is a full
+   * resample, and sixty of those a second is where the lag was. Keyed by the
+   * power-of-two size bucket, so a zoom re-cuts each photograph a few times
+   * rather than continuously.
+   */
+  const scaledRef = React.useRef(new Map<string, { bucket: number; canvas: HTMLCanvasElement }>());
+  const layoutRef = React.useRef<JustifiedLayout>({ items: [], rows: [], total: 0 });
+  /**
+   * Whether anything has changed since the last frame.
+   *
+   * A sheet nobody is touching redrew sixty times a second for nothing. Every
+   * gesture, arriving image and resize raises this; the loop does nothing
+   * otherwise, which is the difference between a warm laptop and a cold one.
+   */
+  const dirtyRef = React.useRef(true);
+
+  const invalidate = React.useCallback(() => {
+    dirtyRef.current = true;
+  }, []);
 
   React.useEffect(() => {
     let cancelled = false;
@@ -98,6 +139,7 @@ export const ContactSheet: React.FC<ContactSheetProps> = ({ className }) => {
           ),
         );
         setAtlas(space.atlas);
+        invalidate();
       })
       .catch(() => {
         if (!cancelled) setFailed(true);
@@ -105,75 +147,119 @@ export const ContactSheet: React.FC<ContactSheetProps> = ({ className }) => {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [invalidate]);
 
   React.useEffect(() => {
     if (!atlas) return;
     sheetsRef.current = atlas.files.map((file) => {
       const image = new Image();
       image.decoding = "async";
+      image.addEventListener("load", invalidate);
       image.src = file;
       return image;
     });
-  }, [atlas]);
+  }, [atlas, invalidate]);
 
   React.useEffect(() => {
-    const sync = () => setFullscreen(document.fullscreenElement === stageRef.current);
+    const sync = () => {
+      setFullscreen(document.fullscreenElement === stageRef.current);
+      invalidate();
+    };
     document.addEventListener("fullscreenchange", sync);
-    return () => document.removeEventListener("fullscreenchange", sync);
-  }, []);
+    window.addEventListener("resize", invalidate);
+    return () => {
+      document.removeEventListener("fullscreenchange", sync);
+      window.removeEventListener("resize", invalidate);
+    };
+  }, [invalidate]);
+
+  const zoomTo = React.useCallback(
+    (next: number, at?: { x: number; y: number }) => {
+      const target = clamp(next, MIN_ROW, MAX_ROW);
+      if (target === targetRef.current) return;
+
+      // Zooming about a point keeps what is under it under it. Measured against
+      // the target rather than the current height, so a second tick mid-flight
+      // is measured from where the sheet is going.
+      const anchor = at?.y ?? (stageRef.current?.clientHeight ?? 0) / 2;
+      const scale = target / targetRef.current;
+      offsetRef.current = (offsetRef.current + anchor) * scale - anchor;
+      targetRef.current = target;
+      setRowHeight(Math.round(target));
+      invalidate();
+    },
+    [invalidate],
+  );
 
   /**
-   * The wheel zooms about the pointer, so the photograph under it stays under
-   * it — the thing a reader is looking at is the thing they are zooming into.
-   * Attached by hand because React registers `onWheel` passively, and only
-   * taken while there is room to zoom, so the page still scrolls at either end.
+   * Attached by hand because React registers `onWheel` passively, so it cannot
+   * take the gesture from the page — and only taken while there is room to
+   * zoom, so at either limit the page scrolls again.
    */
   React.useEffect(() => {
     const stage = stageRef.current;
     if (!stage) return;
 
     const onWheel = (event: WheelEvent) => {
-      const next = clamp(cellRef.current * Math.exp(-event.deltaY * 0.0015), MIN_CELL, MAX_CELL);
-      if (next === cellRef.current) return;
+      const next = clamp(targetRef.current * Math.exp(-event.deltaY * 0.0015), MIN_ROW, MAX_ROW);
+      if (next === targetRef.current) return;
 
       const bounds = stage.getBoundingClientRect();
-      const at = { x: event.clientX - bounds.left, y: event.clientY - bounds.top };
-      const scale = next / cellRef.current;
-      offsetRef.current = {
-        x: (offsetRef.current.x + at.x) * scale - at.x,
-        y: (offsetRef.current.y + at.y) * scale - at.y,
-      };
-      cellRef.current = next;
-      setCellSize(Math.round(next));
+      zoomTo(next, { x: event.clientX - bounds.left, y: event.clientY - bounds.top });
       event.preventDefault();
     };
 
     stage.addEventListener("wheel", onWheel, { passive: false });
     return () => stage.removeEventListener("wheel", onWheel);
-  }, []);
+  }, [zoomTo]);
 
-  const fullResolution = React.useCallback((src: string): HTMLImageElement => {
-    const held = filesRef.current.get(src);
-    if (held) return held;
+  const fullResolution = React.useCallback(
+    (src: string): HTMLImageElement => {
+      const held = filesRef.current.get(src);
+      if (held) return held;
 
-    const image = new Image();
-    image.decoding = "async";
-    image.src = src;
-    filesRef.current.set(src, image);
-    return image;
-  }, []);
+      const image = new Image();
+      image.decoding = "async";
+      image.addEventListener("load", invalidate);
+      image.src = src;
+      filesRef.current.set(src, image);
+      return image;
+    },
+    [invalidate],
+  );
 
   React.useEffect(() => {
     const canvas = canvasRef.current;
     const stage = stageRef.current;
-    if (!canvas || !stage || entries.length === 0) return;
+    if (!canvas || !stage) return;
 
     const context = canvas.getContext("2d");
     if (!context) return;
 
     let frame = 0;
-    const draw = () => {
+    let last = performance.now();
+
+    const draw = (now: number) => {
+      const elapsed = Math.min(0.05, (now - last) / 1000);
+      last = now;
+
+      // The zoom travels towards its target; while it travels, every frame is a
+      // change.
+      const distance = targetRef.current - heightRef.current;
+      if (Math.abs(distance) > 0.05) {
+        heightRef.current += distance * (1 - ZOOM_REMAINING_PER_SECOND ** elapsed);
+        dirtyRef.current = true;
+      } else if (heightRef.current !== targetRef.current) {
+        heightRef.current = targetRef.current;
+        dirtyRef.current = true;
+      }
+
+      if (!dirtyRef.current || entries.length === 0) {
+        frame = requestAnimationFrame(draw);
+        return;
+      }
+      dirtyRef.current = false;
+
       const width = stage.clientWidth;
       const height = stage.clientHeight;
       const ratio = Math.min(2, window.devicePixelRatio || 1);
@@ -182,52 +268,68 @@ export const ContactSheet: React.FC<ContactSheetProps> = ({ className }) => {
       context.setTransform(ratio, 0, 0, ratio, 0, 0);
       context.clearRect(0, 0, width, height);
 
-      const cell = cellRef.current;
-      const columns = Math.max(1, Math.floor(width / cell));
-      const rows = Math.ceil(entries.length / columns);
-      // Panned no further than the sheet goes: past its end there is nothing to
-      // look at, and a reader who overshoots has to find their way back.
-      const maxX = Math.max(0, columns * cell - width);
-      const maxY = Math.max(0, rows * cell - height);
-      offsetRef.current = {
-        x: clamp(offsetRef.current.x, 0, maxX),
-        y: clamp(offsetRef.current.y, 0, maxY),
-      };
-      const offset = offsetRef.current;
+      const row = heightRef.current;
+      const layout = justifiedRows(
+        entries.map((entry) => entry.aspect ?? 1.5),
+        width,
+        row,
+        ROW_GAP,
+      );
+      layoutRef.current = layout;
 
-      const firstRow = Math.max(0, Math.floor(offset.y / cell));
-      const lastRow = Math.min(rows - 1, Math.ceil((offset.y + height) / cell));
+      // Scrolled no further than the sheet goes: past its end there is nothing
+      // to look at, and a reader who overshoots has to find the way back.
+      offsetRef.current = clamp(offsetRef.current, 0, Math.max(0, layout.total - height));
+      const offset = offsetRef.current;
       const perRow = atlas ? Math.floor(atlas.sheet / atlas.cell) : 0;
       const pointer = pointerRef.current;
       let started = 0;
-      let under: number | null = null;
+      let under: { entry: EmbeddingSpaceEntry; x: number; y: number } | null = null;
 
-      hitRef.current = (at) => {
-        const column = Math.floor((at.x + offset.x) / cell);
-        const row = Math.floor((at.y + offset.y) / cell);
-        if (column < 0 || column >= columns || row < 0) return null;
-        const index = row * columns + column;
-        return index >= 0 && index < entries.length ? index : null;
-      };
+      for (const band of layout.rows) {
+        if (band.top + band.height < offset || band.top > offset + height) continue;
 
-      for (let row = firstRow; row <= lastRow; row += 1) {
-        for (let column = 0; column < columns; column += 1) {
-          const index = row * columns + column;
-          const entry = entries[index];
-          if (!entry) continue;
+        for (let index = band.from; index < band.to; index += 1) {
+          const item = layout.items[index];
+          const entry = item ? entries[item.index] : undefined;
+          if (!item || !entry) continue;
 
-          const x = Math.round(column * cell - offset.x);
-          const y = Math.round(row * cell - offset.y);
-          const size = Math.ceil(cell);
+          const box = {
+            x: Math.round(item.x),
+            y: Math.round(item.y - offset),
+            width: Math.ceil(item.width),
+            height: Math.ceil(item.height),
+          };
 
-          // Its own colour first, so a cell whose picture has not arrived is
+          // Its own colour first, so a frame whose picture has not arrived is
           // still the photograph's own tone rather than a hole.
           context.fillStyle = entry.swatch ?? "#8899aa";
-          context.fillRect(x, y, size, size);
+          context.fillRect(box.x, box.y, box.width, box.height);
 
-          const own = cell >= FULL_RESOLUTION_CELL ? filesRef.current.get(entry.src) : undefined;
+          const wantsFile = row >= FULL_RESOLUTION_ROW;
+          const own = wantsFile ? filesRef.current.get(entry.src) : undefined;
           if (own?.complete && own.naturalWidth > 0) {
-            drawSquare(context, own, x, y, size);
+            const bucket = 2 ** Math.ceil(Math.log2(Math.max(1, box.width)));
+            const held = scaledRef.current.get(entry.src);
+            let scaled = held?.bucket === bucket ? held.canvas : undefined;
+            if (!scaled) {
+              const cut = document.createElement("canvas");
+              const cutHeight = Math.max(1, Math.round((bucket * box.height) / box.width));
+              cut.width = bucket;
+              cut.height = cutHeight;
+              const into = cut.getContext("2d");
+              if (into) {
+                drawCover(
+                  into,
+                  own,
+                  { x: 0, y: 0, width: own.naturalWidth, height: own.naturalHeight },
+                  { x: 0, y: 0, width: bucket, height: cutHeight },
+                );
+                scaledRef.current.set(entry.src, { bucket, canvas: cut });
+                scaled = cut;
+              }
+            }
+            if (scaled) context.drawImage(scaled, box.x, box.y, box.width, box.height);
           } else {
             const sheet =
               atlas && entry.slot !== undefined
@@ -235,22 +337,22 @@ export const ContactSheet: React.FC<ContactSheetProps> = ({ className }) => {
                 : undefined;
             if (sheet?.complete && sheet.naturalWidth > 0 && atlas && entry.slot !== undefined) {
               const within = entry.slot % atlas.perSheet;
-              context.drawImage(
+              drawCover(
+                context,
                 sheet,
-                (within % perRow) * atlas.cell,
-                Math.floor(within / perRow) * atlas.cell,
-                atlas.cell,
-                atlas.cell,
-                x,
-                y,
-                size,
-                size,
+                {
+                  x: (within % perRow) * atlas.cell,
+                  y: Math.floor(within / perRow) * atlas.cell,
+                  width: atlas.cell,
+                  height: atlas.cell,
+                },
+                box,
               );
             }
             // Only what is on screen, and only a few per frame: a zoom that
             // fired every visible file at once would ask for a hundred images
             // in one gesture.
-            if (cell >= FULL_RESOLUTION_CELL && started < LOADS_PER_FRAME && !own) {
+            if (wantsFile && started < LOADS_PER_FRAME && !own) {
               started += 1;
               fullResolution(entry.src);
             }
@@ -258,31 +360,22 @@ export const ContactSheet: React.FC<ContactSheetProps> = ({ className }) => {
 
           if (
             pointer &&
-            pointer.x >= x &&
-            pointer.x < x + size &&
-            pointer.y >= y &&
-            pointer.y < y + size
+            pointer.x >= box.x &&
+            pointer.x < box.x + box.width &&
+            pointer.y >= box.y &&
+            pointer.y < box.y + box.height
           ) {
-            under = index;
+            under = { entry, x: box.x + box.width / 2, y: box.y };
+            context.strokeStyle = "rgba(255, 255, 255, 0.95)";
+            context.lineWidth = 2;
+            context.strokeRect(box.x + 1, box.y + 1, box.width - 2, box.height - 2);
           }
         }
       }
 
-      if (under !== null) {
-        const column = under % columns;
-        const row = Math.floor(under / columns);
-        context.strokeStyle = "rgba(255, 255, 255, 0.95)";
-        context.lineWidth = 2;
-        context.strokeRect(
-          Math.round(column * cell - offset.x) + 1,
-          Math.round(row * cell - offset.y) + 1,
-          Math.ceil(cell) - 2,
-          Math.ceil(cell) - 2,
-        );
-      }
-
-      const focused = under === null ? null : (entries[under] ?? null);
-      setHovered((current) => (current?.src === focused?.src ? current : focused));
+      setHovered((current) =>
+        current?.entry.src === under?.entry.src && current?.x === under?.x ? current : under,
+      );
 
       frame = requestAnimationFrame(draw);
     };
@@ -291,90 +384,77 @@ export const ContactSheet: React.FC<ContactSheetProps> = ({ className }) => {
     return () => cancelAnimationFrame(frame);
   }, [atlas, entries, fullResolution]);
 
-  const onPointerDown = (event: React.PointerEvent<HTMLCanvasElement>) => {
-    event.currentTarget.setPointerCapture(event.pointerId);
+  const at = (event: React.PointerEvent<HTMLCanvasElement>) => {
     const bounds = event.currentTarget.getBoundingClientRect();
-    pointerRef.current = { x: event.clientX - bounds.left, y: event.clientY - bounds.top };
-    draggingRef.current = { x: event.clientX, y: event.clientY };
-    travelledRef.current = 0;
+    return { x: event.clientX - bounds.left, y: event.clientY - bounds.top };
   };
 
-  const onPointerMove = (event: React.PointerEvent<HTMLCanvasElement>) => {
-    const bounds = event.currentTarget.getBoundingClientRect();
-    pointerRef.current = { x: event.clientX - bounds.left, y: event.clientY - bounds.top };
-
-    const dragging = draggingRef.current;
-    if (!dragging) return;
-
-    travelledRef.current += Math.hypot(event.clientX - dragging.x, event.clientY - dragging.y);
-    offsetRef.current = {
-      x: offsetRef.current.x - (event.clientX - dragging.x),
-      y: offsetRef.current.y - (event.clientY - dragging.y),
-    };
-    draggingRef.current = { x: event.clientX, y: event.clientY };
+  const entryUnder = (point: { x: number; y: number }): EmbeddingSpaceEntry | null => {
+    const offset = offsetRef.current;
+    const item = layoutRef.current.items.find(
+      (candidate) =>
+        point.x >= candidate.x &&
+        point.x < candidate.x + candidate.width &&
+        point.y >= candidate.y - offset &&
+        point.y < candidate.y - offset + candidate.height,
+    );
+    return item ? (entries[item.index] ?? null) : null;
   };
 
-  const endDrag = (event: React.PointerEvent<HTMLCanvasElement>) => {
-    draggingRef.current = null;
-    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-      event.currentTarget.releasePointerCapture(event.pointerId);
-    }
-  };
-
-  const openUnderPointer = () => {
-    // A press that travelled is a pan, not a choice.
-    if (travelledRef.current > DRAG_SLOP) return;
-    const at = pointerRef.current;
-    const index = at ? (hitRef.current?.(at) ?? null) : null;
-    const entry = index === null ? null : entries[index];
-    if (entry) globalThis.location.assign(entry.href);
-  };
-
-  // Only a failed payload takes the section away. The stage is rendered while
-  // the photographs are still on their way, because the wheel listener is
-  // attached to it once on mount: returning nothing until the data arrived left
-  // the listener bound to a stage that did not exist yet, and the sheet could
-  // not be zoomed at all.
-  if (failed) {
-    return null;
-  }
-
-  return (
+  return failed ? null : (
     <figure className={[styles.sheet, className].filter(Boolean).join(" ")}>
       <div ref={stageRef} className={styles.stage}>
         <canvas
           ref={canvasRef}
           className={styles.canvas}
-          onPointerDown={onPointerDown}
-          onPointerMove={onPointerMove}
-          onPointerUp={(event) => {
-            endDrag(event);
-            openUnderPointer();
+          onPointerDown={(event) => {
+            event.currentTarget.setPointerCapture(event.pointerId);
+            pointerRef.current = at(event);
+            draggingRef.current = { x: event.clientX, y: event.clientY };
+            travelledRef.current = 0;
           }}
-          onPointerCancel={endDrag}
-          onPointerLeave={(event) => {
-            endDrag(event);
+          onPointerMove={(event) => {
+            pointerRef.current = at(event);
+            invalidate();
+
+            const dragging = draggingRef.current;
+            if (!dragging) return;
+
+            travelledRef.current += Math.hypot(
+              event.clientX - dragging.x,
+              event.clientY - dragging.y,
+            );
+            offsetRef.current -= event.clientY - dragging.y;
+            draggingRef.current = { x: event.clientX, y: event.clientY };
+          }}
+          onPointerUp={(event) => {
+            draggingRef.current = null;
+            if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+              event.currentTarget.releasePointerCapture(event.pointerId);
+            }
+            // A press that travelled is a pan, not a choice.
+            if (travelledRef.current > DRAG_SLOP) return;
+            const entry = entryUnder(at(event));
+            if (entry) globalThis.location.assign(entry.href);
+          }}
+          onPointerCancel={(event) => {
+            draggingRef.current = null;
+            if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+              event.currentTarget.releasePointerCapture(event.pointerId);
+            }
+          }}
+          onPointerLeave={() => {
+            draggingRef.current = null;
             pointerRef.current = null;
+            invalidate();
           }}
         />
 
         <div className={styles.tools}>
-          <OverlayButton
-            aria-label="Zoom out"
-            onClick={() => {
-              cellRef.current = clamp(cellRef.current / 1.6, MIN_CELL, MAX_CELL);
-              setCellSize(Math.round(cellRef.current));
-            }}
-          >
+          <OverlayButton aria-label="Zoom out" onClick={() => zoomTo(targetRef.current / 1.8)}>
             −
           </OverlayButton>
-          <OverlayButton
-            aria-label="Zoom in"
-            onClick={() => {
-              cellRef.current = clamp(cellRef.current * 1.6, MIN_CELL, MAX_CELL);
-              setCellSize(Math.round(cellRef.current));
-            }}
-          >
+          <OverlayButton aria-label="Zoom in" onClick={() => zoomTo(targetRef.current * 1.8)}>
             +
           </OverlayButton>
           <OverlayButton
@@ -394,19 +474,25 @@ export const ContactSheet: React.FC<ContactSheetProps> = ({ className }) => {
           </OverlayButton>
         </div>
 
-        {/* What is under the pointer, named where it can be read rather than
-            painted into the canvas. */}
-        <p className={styles.caption} aria-live="off">
-          {hovered ? (
-            <>
-              <span>{hovered.label}</span>
-              {hovered.year ? <span className={styles.captionYear}>{hovered.year}</span> : null}
-            </>
-          ) : (
-            <span className={styles.captionYear}>
-              {entries.length.toLocaleString("en")} photographs · {cellSize}px
-            </span>
-          )}
+        {/* Above the frame it belongs to rather than in a corner: at this
+            density a caption anywhere else is a caption for the whole wall. */}
+        {hovered ? (
+          <p
+            className={styles.tooltip}
+            aria-hidden="true"
+            style={{ insetInlineStart: `${hovered.x}px`, insetBlockStart: `${hovered.y}px` }}
+          >
+            <span>{hovered.entry.label}</span>
+            {hovered.entry.year ? (
+              <span className={styles.tooltipYear}>{hovered.entry.year}</span>
+            ) : null}
+          </p>
+        ) : null}
+
+        <p className={styles.caption}>
+          <span className={styles.captionYear}>
+            {entries.length.toLocaleString("en")} photographs · {rowHeight}px rows
+          </span>
         </p>
 
         {/* A canvas has no children, so the photographs in it are offered again
