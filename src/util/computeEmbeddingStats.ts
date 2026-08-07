@@ -330,8 +330,9 @@ const buildPhotoTagLookup = (albums: Content[]): Map<string, string[]> => {
 };
 
 /**
- * What took each photograph, keyed the way the embeddings are: the body, and
- * the body with its lens, because the gear section groups by either.
+ * What took each photograph, keyed the way the embeddings are: the body, the
+ * lens, and the two together — the gear section groups by any of the three, and
+ * each grouping wants its own average frame.
  */
 const buildPhotoCameraLookup = (albums: Content[]): Map<string, string[]> => {
   const lookup = new Map<string, string[]>();
@@ -349,8 +350,7 @@ const buildPhotoCameraLookup = (albums: Content[]): Map<string, string[]> => {
       if (!indexedPath || !camera || !exif) return;
 
       const lens = LENS_FACET.extract(exif, photo._build.tags ?? undefined);
-      const pairing = pairingLabel(camera, lens);
-      lookup.set(indexedPath, pairing === camera ? [camera] : [camera, pairing]);
+      lookup.set(indexedPath, lens ? [camera, lens, pairingLabel(camera, lens)] : [camera]);
     });
   });
 

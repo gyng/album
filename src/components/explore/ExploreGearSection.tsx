@@ -86,9 +86,15 @@ const kitSearchHref = (profile: GearProfile): string =>
     ],
   });
 
-/** Cards to open with, and to add on each press. */
-const INITIAL_KIT_CARDS = 6;
-const LOAD_MORE_KIT_CARDS = 6;
+/**
+ * Cards to open with, and to add on each press.
+ *
+ * Eight, because seven bodies clear the threshold and a reader looking for one
+ * of their cameras should not have to guess that it is behind a button. The
+ * pairings, at a dozen, still get one.
+ */
+const INITIAL_KIT_CARDS = 8;
+const LOAD_MORE_KIT_CARDS = 8;
 
 /**
  * What the camera and lens counts cannot say.
@@ -204,34 +210,36 @@ export const ExploreGearSection = ({
     return null;
   }
 
+  // Rendered in every section that reads it, rather than once at the top: the
+  // charts are a screen apart, and a control that decides what both of them
+  // count should not be something a reader has to scroll back for.
+  const groupingToggle = (
+    <SegmentedToggle
+      ariaLabel="What to count as one piece of kit"
+      value={grouping}
+      onChange={(next) => {
+        // Back to the first few: the groupings are different lengths, and an
+        // expanded list of seven bodies has nothing to say about how much of a
+        // dozen pairings a reader wanted to see.
+        setGrouping(next);
+        setVisibleCards(INITIAL_KIT_CARDS);
+      }}
+      options={[
+        { value: "bodies" as const, label: "Bodies" },
+        { value: "pairings" as const, label: "With lenses" },
+        { value: "lenses" as const, label: "Lenses" },
+      ]}
+    />
+  );
+
   return (
     <>
       <section className={`${styles.section} ${styles.sectionWide}`}>
-        <GearSectionHeader
-          title={
-            grouping === "bodies"
-              ? "Bodies"
-              : grouping === "lenses"
-                ? "Lenses"
-                : "Bodies and lenses"
-          }
-        >
-          <SegmentedToggle
-            ariaLabel="What to count as one piece of kit"
-            value={grouping}
-            onChange={(next) => {
-              // Back to the first few: the groupings are different lengths, and
-              // an expanded list of seven bodies has nothing to say about how
-              // much of twelve pairings a reader wanted to see.
-              setGrouping(next);
-              setVisibleCards(INITIAL_KIT_CARDS);
-            }}
-            options={[
-              { value: "bodies" as const, label: "Bodies" },
-              { value: "pairings" as const, label: "With lenses" },
-              { value: "lenses" as const, label: "Lenses" },
-            ]}
-          />
+        {/* The title says what the section is about, not what the toggle is
+            currently set to: renaming it on a press moves everything under it
+            by however much longer the new word is. */}
+        <GearSectionHeader title="Bodies and lenses">
+          {groupingToggle}
           <Caption as="span">The middle of what each was set to, and its own average frame</Caption>
         </GearSectionHeader>
         <div className={styles.gearBodies}>
@@ -262,6 +270,7 @@ export const ExploreGearSection = ({
       {gear.cameraYears.length > 1 ? (
         <section className={`${styles.section} ${styles.sectionWide}`}>
           <GearSectionHeader title="Gear over time">
+            {groupingToggle}
             <SegmentedToggle
               ariaLabel="How to show gear over time"
               value={yearView}

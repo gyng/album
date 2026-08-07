@@ -255,7 +255,7 @@ describe("the gear section's own reporting", () => {
   // indexes: a single-facet link had to search the camera facet for a lens.
   it("links a pairing to both of its facets", () => {
     render(<ExploreGearSection gear={gear()} frames={frames} />);
-    fireEvent.click(screen.getByRole("radio", { name: "With lenses" }));
+    fireEvent.click(screen.getAllByRole("radio", { name: "With lenses" })[0]!);
 
     // The name is two lines now, so the accessible name is the two joined.
     expect(screen.getByRole("link", { name: "X-T5 XF16-80mm" })).toHaveAttribute(
@@ -268,7 +268,7 @@ describe("the gear section's own reporting", () => {
   // between, and the bodies alone cannot show which.
   it("counts the lens on the body when asked to", () => {
     render(<ExploreGearSection gear={gear()} frames={frames} />);
-    fireEvent.click(screen.getByRole("radio", { name: "With lenses" }));
+    fireEvent.click(screen.getAllByRole("radio", { name: "With lenses" })[0]!);
     fireEvent.click(screen.getByRole("radio", { name: "Stacked" }));
 
     expect(screen.getByTitle("X100T · 23mm in 2024: 1 photo, 50%")).toBeInTheDocument();
@@ -295,18 +295,44 @@ describe("the gear section's own reporting", () => {
   // in the gear chart, and the band above the body in the focal one.
   it("paints a pairing as its body over its lens", () => {
     render(<ExploreGearSection gear={gear()} frames={frames} />);
-    fireEvent.click(screen.getByRole("radio", { name: "With lenses" }));
+    fireEvent.click(screen.getAllByRole("radio", { name: "With lenses" })[0]!);
 
     const sliver = screen.getByRole("link", { name: /^X-T5 · XF16-80mm, 4 May 2024/ });
 
     expect(sliver.getAttribute("style")).toMatch(/linear-gradient\(to bottom, .+ 0 50%, .+ 50%/);
   });
 
+  // The charts are a screen apart, so the control that decides what both count
+  // is offered beside each of them rather than once at the top.
+  it("offers the grouping wherever it is read", () => {
+    render(<ExploreGearSection gear={gear()} frames={frames} />);
+
+    expect(screen.getAllByRole("radio", { name: "With lenses" }).length).toBeGreaterThan(1);
+
+    // And a press on either moves them all: they are one setting.
+    fireEvent.click(screen.getAllByRole("radio", { name: "With lenses" }).at(-1)!);
+
+    for (const radio of screen.getAllByRole("radio", { name: "With lenses" })) {
+      expect(radio).toHaveAttribute("aria-checked", "true");
+    }
+  });
+
+  // The heading names the section, not the setting: renaming it on a press
+  // moves everything under it by the difference in the words.
+  it("keeps its title still while the grouping changes", () => {
+    render(<ExploreGearSection gear={gear()} frames={frames} />);
+    const title = screen.getByRole("heading", { name: "Bodies and lenses" });
+
+    fireEvent.click(screen.getAllByRole("radio", { name: "Lenses" })[0]!);
+
+    expect(title).toHaveTextContent("Bodies and lenses");
+  });
+
   // A lens is the mirror of a body: the same summary, counted across whatever
   // it was mounted on.
   it("counts a lens on its own when asked to", () => {
     render(<ExploreGearSection gear={gear()} frames={frames} />);
-    fireEvent.click(screen.getByRole("radio", { name: "Lenses" }));
+    fireEvent.click(screen.getAllByRole("radio", { name: "Lenses" })[0]!);
 
     const card = screen.getByRole("link", { name: "23mm" }).closest("div")!.parentElement!;
 
