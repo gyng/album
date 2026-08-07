@@ -1,6 +1,6 @@
 import React from "react";
 import { AppLink } from "./platform";
-import { OverlayButton, overlayButtonStyles, pillStyles } from "./ui";
+import { OverlayButton, overlayButtonStyles, pillStyles, SegmentedToggle } from "./ui";
 import { useActiveTheme } from "./useActiveTheme";
 import {
   backToFront,
@@ -192,6 +192,17 @@ const SHEET_FULL_RESOLUTION_ROW = 84;
 const SETTLE_REMAINING_PER_SECOND = 0.00001;
 const MORPH_REMAINING_PER_SECOND = 0.004;
 
+/**
+ * How fast a held key moves things, per second: a little under a third of a
+ * turn, a little under a doubling, and two thirds of a row.
+ *
+ * Slow enough that a tap is a nudge and a hold is a journey, which is the
+ * difference between a control and a catapult.
+ */
+const KEY_TURN_PER_SECOND = 1.8;
+const KEY_ZOOM_PER_SECOND = 0.9;
+const KEY_SHEET_ROWS_PER_SECOND = 6;
+
 const clamp = (value: number, low: number, high: number): number =>
   Math.min(high, Math.max(low, value));
 
@@ -281,7 +292,7 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
    * distances rather than watch them foreshorten. Turning is meaningless there,
    * so a drag pans instead.
    */
-  const [flat, setFlat] = React.useState(false);
+
   /** How far in the eye is, as a multiple of where it starts. */
   const [zoom, setZoom] = React.useState(1);
 
@@ -300,7 +311,15 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
    * every photograph travels from where the model put it to where the calendar
    * puts it, which is the only way to see that they are the same photographs.
    */
-  const [sheet, setSheet] = React.useState(false);
+  /**
+   * Which of the three arrangements is showing.
+   *
+   * One value rather than two flags: as separate toggles a reader could ask for
+   * a flat sheet, which is not a thing, and neither control said which of the
+   * three they were looking at.
+   */
+  const [arrangement, setArrangement] = React.useState<"cloud" | "flat" | "sheet">("cloud");
+  const sheet = arrangement === "sheet";
   /** The sheet's row height, for the readout that names what the wheel is doing. */
   const [rowHeight, setRowHeight] = React.useState(SHEET_INITIAL_ROW);
   const sheetRef = React.useRef(false);
@@ -318,6 +337,8 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
   const rowTargetRef = React.useRef(SHEET_INITIAL_ROW);
   const sheetScaleRef = React.useRef(1);
   const sheetOffsetRef = React.useRef(0);
+  /** Which of WASD are down, read once per frame rather than on repeat. */
+  const heldKeysRef = React.useRef(new Set<string>());
   const sheetLayoutRef = React.useRef<{
     layout: JustifiedLayout;
     width: number;
@@ -384,7 +405,7 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
 
   driftingRef.current = drifting;
   chosenRef.current = chosen;
-  flatRef.current = flat;
+  flatRef.current = arrangement === "flat";
   sheetRef.current = sheet;
 
   React.useEffect(() => {
@@ -410,6 +431,49 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
     document.addEventListener("fullscreenchange", sync);
     return () => document.removeEventListener("fullscreenchange", sync);
   }, []);
+
+  /**
+   * WASD, but only with the screen to itself.
+   *
+   * Not on the page: W and S are how a reader scrolls, and a cloud halfway down
+   * an article has no business taking them. Given the whole screen there is
+   * nothing else those keys could be for, and a hand on the keyboard is a
+   * steadier way through fifteen hundred photographs than a wheel.
+   *
+   * The keys held are what is read each frame rather than the presses
+   * themselves: a key repeat is the operating system's cadence, not the
+   * cloud's, and moving on it makes a smooth turn stutter.
+   */
+  React.useEffect(() => {
+    if (!fullscreen) {
+      heldKeysRef.current.clear();
+      return;
+    }
+
+    const held = heldKeysRef.current;
+    const track = (event: KeyboardEvent, down: boolean) => {
+      const key = event.key.toLowerCase();
+      if (!"wasd".includes(key) || key.length !== 1) return;
+      if (down) held.add(key);
+      else held.delete(key);
+      event.preventDefault();
+    };
+
+    const onDown = (event: KeyboardEvent) => track(event, true);
+    const onUp = (event: KeyboardEvent) => track(event, false);
+    // Leaving the window with a key down would otherwise leave it held for good.
+    const release = () => held.clear();
+
+    document.addEventListener("keydown", onDown);
+    document.addEventListener("keyup", onUp);
+    window.addEventListener("blur", release);
+    return () => {
+      document.removeEventListener("keydown", onDown);
+      document.removeEventListener("keyup", onUp);
+      window.removeEventListener("blur", release);
+      held.clear();
+    };
+  }, [fullscreen]);
 
   /**
    * Scrolling over the cloud moves the eye in and out.
@@ -512,6 +576,35 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
       const engaged = pointerRef.current !== null || draggingRef.current !== null;
       if (driftingRef.current && !reduced && !engaged && !flatRef.current) {
         cameraRef.current.yaw += DRIFT * elapsed;
+      }
+
+      // The keys held, applied as movement rather than as presses. What each
+      // pair does follows the arrangement: in the cloud A and D turn it and W
+      // and S move the eye through it; on a wall there is nothing to turn, so
+      // W and S walk up and down it and A and D step back and in.
+      const held = heldKeysRef.current;
+      if (held.size > 0) {
+        if (sheetRef.current) {
+          const pace = rowTargetRef.current * KEY_SHEET_ROWS_PER_SECOND * elapsed;
+          if (held.has("w")) sheetOffsetRef.current -= pace;
+          if (held.has("s")) sheetOffsetRef.current += pace;
+          sheetOffsetRef.current = Math.max(0, sheetOffsetRef.current);
+          if (held.has("a") || held.has("d")) {
+            const step = Math.exp((held.has("d") ? 1 : -1) * KEY_ZOOM_PER_SECOND * elapsed);
+            rowTargetRef.current = clamp(rowTargetRef.current * step, SHEET_MIN_ROW, SHEET_MAX_ROW);
+          }
+        } else {
+          const camera = cameraRef.current;
+          if (held.has("a")) camera.yaw -= KEY_TURN_PER_SECOND * elapsed;
+          if (held.has("d")) camera.yaw += KEY_TURN_PER_SECOND * elapsed;
+          if (held.has("w") || held.has("s")) {
+            const step = Math.exp((held.has("s") ? 1 : -1) * KEY_ZOOM_PER_SECOND * elapsed);
+            camera.distance = Math.max(
+              MIN_DISTANCE,
+              Math.min(MAX_DISTANCE, camera.distance * step),
+            );
+          }
+        }
       }
 
       const ratio = Math.min(2, globalThis.devicePixelRatio || 1);
@@ -755,22 +848,27 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
           }
         }
 
-        // Everything below this is the cloud explaining itself, and none of it
-        // survives the journey.
-        if (eased > 0.99) {
-          for (const element of labelRefs.current) {
-            if (element) element.style.opacity = "0";
-          }
-          for (const element of driftingRefs.current) {
-            if (element) element.style.opacity = "0";
-          }
-          setHovered(null);
-          setShowcased(null);
-          frame = requestAnimationFrame(draw);
-          return;
+        // Nothing else draws a photograph while one is travelling. Letting the
+        // cloud's own pass run underneath, faded, drew every frame twice — once
+        // where it was going and once where it had been — which reads as two
+        // collections rather than one moving.
+        for (const element of labelRefs.current) {
+          if (element) element.style.opacity = "0";
         }
-
-        context.globalAlpha = 1 - eased;
+        for (const element of driftingRefs.current) {
+          if (element) element.style.opacity = "0";
+        }
+        setHovered(null);
+        setShowcased(null);
+        // The readout is on the far side of the early return, so it is written
+        // here too: on the sheet it had frozen at whatever the row height was
+        // when the journey started.
+        setRowHeight((current) => {
+          const next = Math.round(rowTargetRef.current);
+          return next === current ? current : next;
+        });
+        frame = requestAnimationFrame(draw);
+        return;
       }
 
       // The web first, so every photograph sits on top of its own lines.
@@ -1563,38 +1661,36 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
           >
             {fullscreen ? "Exit" : "Full"}
           </OverlayButton>
-          {/* Two arrangements of the same photographs. Not a link to another
-              section: seeing that they *are* the same photographs is the whole
-              of what the journey between them says. */}
-          <OverlayButton
-            aria-pressed={sheet}
-            className={sheet ? styles.toolActive : ""}
-            onClick={() => setSheet((current) => !current)}
-          >
-            {sheet ? "Cloud" : "Sheet"}
-          </OverlayButton>
-          <OverlayButton
-            aria-pressed={flat}
-            className={flat ? styles.toolActive : ""}
-            onClick={() => {
-              setFlat((current) => {
-                // Flat means straight on: a view left half-turned would be an
-                // oblique scatter plot, which is neither of the two things this
-                // control offers.
-                if (!current) {
-                  cameraRef.current.yaw = 0;
-                  cameraRef.current.pitch = 0;
-                } else {
-                  cameraRef.current.yaw = INITIAL_CAMERA.yaw;
-                  cameraRef.current.pitch = INITIAL_CAMERA.pitch;
-                }
+          {/* One control for one decision. As two buttons the three
+              arrangements could be asked for in combinations that do not
+              exist — flat *and* sheet — and neither button said which of them
+              was showing. */}
+          <SegmentedToggle
+            ariaLabel="How to arrange the photographs"
+            className={styles.arrangement}
+            value={arrangement}
+            onChange={(next) => {
+              // Flat means straight on: a view left half-turned would be an
+              // oblique scatter plot, which is neither of the things this
+              // control offers. The pose is set on the way in and put back on
+              // the way out, so the cloud is never left half-turned.
+              if (next === "flat") {
+                cameraRef.current.yaw = 0;
+                cameraRef.current.pitch = 0;
                 panRef.current = { x: 0, y: 0 };
-                return !current;
-              });
+              } else if (arrangement === "flat") {
+                cameraRef.current.yaw = INITIAL_CAMERA.yaw;
+                cameraRef.current.pitch = INITIAL_CAMERA.pitch;
+                panRef.current = { x: 0, y: 0 };
+              }
+              setArrangement(next);
             }}
-          >
-            {flat ? "3D" : "2D"}
-          </OverlayButton>
+            options={[
+              { value: "cloud" as const, label: "3D" },
+              { value: "flat" as const, label: "2D" },
+              { value: "sheet" as const, label: "Sheet" },
+            ]}
+          />
           <OverlayButton
             aria-pressed={!drifting}
             className={drifting ? "" : styles.toolActive}
