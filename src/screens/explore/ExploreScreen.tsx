@@ -312,6 +312,21 @@ const ExploreScreen = ({ stats, visualSameness }: ExploreScreenProps) => {
         <ExploreOverview sectionLinks={sectionLinks} cards={overviewCards} />
 
         <div className={styles.groups}>
+          {/* Everything else on this page counts something. This one does not:
+              it is the collection arranged by what the photographs are of, and
+              the only way to read it is to turn it around — so it is left to
+              speak for itself rather than introduced. */}
+          <StatGroup
+            id="embedding-space"
+            title="Cloud"
+            deferContent
+            deferredSummary="Every photograph, placed by what it is of."
+          >
+            <section className={`${styles.section} ${styles.sectionWide}`}>
+              <EmbeddingSpaceDeferred />
+            </section>
+          </StatGroup>
+
           {visualSameness ? (
             <StatGroup
               id="visual-sameness"
@@ -656,21 +671,6 @@ const ExploreScreen = ({ stats, visualSameness }: ExploreScreenProps) => {
             </StatGroup>
           ) : null}
 
-          {/* Everything else on this page counts something. This one does not:
-              it is the collection arranged by what the photographs are of, and
-              the only way to read it is to turn it around — so it is left to
-              speak for itself rather than introduced. */}
-          <StatGroup
-            id="embedding-space"
-            title="Cloud"
-            deferContent
-            deferredSummary="Every photograph, placed by what it is of."
-          >
-            <section className={`${styles.section} ${styles.sectionWide}`}>
-              <EmbeddingSpaceDeferred />
-            </section>
-          </StatGroup>
-
           <ExploreThisDaySection memories={stats.dayOfYearMemories} />
 
           <ExploreTripsSection trips={stats.trips} />
@@ -796,34 +796,43 @@ const ExploreScreen = ({ stats, visualSameness }: ExploreScreenProps) => {
             title="What you shoot with"
             deferContent
             deferredSummary={`Camera and lens relationships are summarised across ${gearFacets.length.toLocaleString("en")} searchable gear facets.`}
-            actions={
-              <SegmentedToggle
-                options={[
-                  { value: "sankey" as const, label: "Sankey" },
-                  { value: "bars" as const, label: "Bars" },
-                ]}
-                value={gearView}
-                onChange={setGearView}
-                ariaLabel="Gear chart view"
-              />
-            }
           >
-            {gearView === "sankey" && (
-              <div className={styles.desktopOnly}>
-                <SankeyChartDeferred flow={stats.gearFlow} />
-              </div>
-            )}
-            <div
-              className={[
-                styles.responsiveBarView,
-                gearView === "bars" ? "" : styles.desktopViewHidden,
-              ].join(" ")}
-            >
-              <div className={styles.stackedBarGroups}>{gearFacets.map(renderStringFacet)}</div>
-            </div>
-            {/* The counts above are the inventory; these are what is done with
-                it. Both belong to the same question, so they share its group. */}
+            {/* What is done with the kit comes first; the inventory of it is
+                what a reader turns to afterwards to check a number, so it sits
+                at the foot of the group rather than in front of everything. */}
             <ExploreGearSection gear={stats.gear} frames={visualSameness?.cameraFrames ?? []} />
+            <section className={`${styles.section} ${styles.sectionWide}`}>
+              <div className={styles.sectionHeader}>
+                <Heading level={2} as="h2">
+                  Every camera and lens
+                </Heading>
+                {/* Beside the chart it changes, not up in the group's header: a
+                    control a screen away from its own chart is a control a
+                    reader has to remember pressing. */}
+                <SegmentedToggle
+                  options={[
+                    { value: "sankey" as const, label: "Sankey" },
+                    { value: "bars" as const, label: "Bars" },
+                  ]}
+                  value={gearView}
+                  onChange={setGearView}
+                  ariaLabel="Gear chart view"
+                />
+              </div>
+              {gearView === "sankey" && (
+                <div className={styles.desktopOnly}>
+                  <SankeyChartDeferred flow={stats.gearFlow} />
+                </div>
+              )}
+              <div
+                className={[
+                  styles.responsiveBarView,
+                  gearView === "bars" ? "" : styles.desktopViewHidden,
+                ].join(" ")}
+              >
+                <div className={styles.stackedBarGroups}>{gearFacets.map(renderStringFacet)}</div>
+              </div>
+            </section>
           </StatGroup>
 
           <ExploreColourSection stats={stats} deferContent />

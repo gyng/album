@@ -65,6 +65,9 @@ describe("exploreViewModel", () => {
     expect(COLOR_FAMILY_ORDER).toEqual(Object.keys(COLOR_SWATCHES));
     expect(COLOR_FAMILY_ORDER).toEqual(Object.keys(COLOR_SEARCH_PARAMS));
     expect(EXPLORE_SECTION_LINKS.at(-1)).toEqual({ href: "#colour", label: "Colour" });
+    // The cloud opens the page: it is the only section that is not a count, and
+    // the one worth arriving at first.
+    expect(EXPLORE_SECTION_LINKS[0]).toEqual({ href: "#embedding-space", label: "Cloud" });
   });
 
   it("builds stable overview cards from archive statistics", () => {

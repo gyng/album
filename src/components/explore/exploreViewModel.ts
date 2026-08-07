@@ -62,8 +62,8 @@ export const COLOR_FAMILY_ORDER = [
 ] as const;
 
 export const EXPLORE_SECTION_LINKS = [
-  { href: "#visual-sameness", label: "Visual sameness" },
   { href: "#embedding-space", label: "Cloud" },
+  { href: "#visual-sameness", label: "Visual sameness" },
   { href: "#fun-stats", label: "Fun stats" },
   { href: "#recent-trends", label: "Recent trends" },
   { href: "#revisited-places", label: "Revisited places" },
