@@ -60,8 +60,13 @@ export type GearFrame = {
   dateLabel: string;
 };
 
-export type CameraProfile = {
-  camera: string;
+/**
+ * What one piece of kit is used for: a body on its own, or a body with a lens
+ * on it. Both are the same summary of the same frames, differing only in what
+ * counts as "the same kit" — so both go through this.
+ */
+export type GearProfile = {
+  label: string;
   count: number;
   /**
    * Per cent of every identified frame in the archive, unrounded.
@@ -117,9 +122,23 @@ export type GearStats = {
   focalYears: FocalYearShare[];
   focalCoverage: number;
   frames: GearFrame[];
-  cameraProfiles: CameraProfile[];
+  /** Busiest first, one per body. */
+  bodies: GearProfile[];
+  /**
+   * The same, per body-and-lens pairing, and only the busiest few: there are
+   * more pairings than a page of cards or a legend can hold, and the tail is
+   * one frame each.
+   */
+  pairings: GearProfile[];
   lensFocalRanges: LensFocalRange[];
 };
+
+/** How a frame's kit is named, under either grouping. */
+export const pairingLabel = (camera: string, lens: string | null): string =>
+  lens ? `${camera} · ${lens}` : camera;
+
+/** Pairings that get a card and a colour of their own. */
+export const MAX_PAIRINGS = 8;
 
 const MONTH_LABELS = [
   "Jan",
@@ -271,6 +290,7 @@ export const computeGearStats = (albums: Content[]): GearStats => {
     );
 
   const byCamera = new Map<string, CameraFrames>();
+  const byPairing = new Map<string, CameraFrames>();
   const byYear = new Map<string, Map<string, number>>();
   const byFocalYear = new Map<string, Map<string, number>>();
   const gearFrames: GearFrame[] = [];
@@ -293,20 +313,30 @@ export const computeGearStats = (albums: Content[]): GearStats => {
     if (!camera) continue;
 
     identified += 1;
+    // The same frame counted twice, once under the body and once under the body
+    // with this lens on it: the two groupings are the same summary of the same
+    // frames, so they are gathered together rather than computed twice.
     const frames = byCamera.get(camera) ?? emptyFrames();
-    frames.count += 1;
-
+    const pairing = byPairing.get(pairingLabel(camera, lens)) ?? emptyFrames();
     const focal35 = exif.FocalLengthIn35mmFormat;
-    if (measured(focal35)) frames.focal35.push(focal35);
-    if (measured(focal)) frames.focal.push(focal);
-
     const aperture = APERTURE_FACET.extract(exif, photo._build.tags ?? undefined);
-    if (measured(aperture)) frames.apertures.push(aperture);
     const iso = ISO_FACET.extract(exif, photo._build.tags ?? undefined);
-    if (measured(iso)) frames.isos.push(iso);
-    if (lens) frames.lenses.set(lens, (frames.lenses.get(lens) ?? 0) + 1);
     const place = placeOf(photo);
-    if (place) frames.places.set(place, (frames.places.get(place) ?? 0) + 1);
+
+    for (const kit of [frames, pairing]) {
+      kit.count += 1;
+      if (measured(focal35)) kit.focal35.push(focal35);
+      if (measured(focal)) kit.focal.push(focal);
+      if (measured(aperture)) kit.apertures.push(aperture);
+      if (measured(iso)) kit.isos.push(iso);
+      if (lens) kit.lenses.set(lens, (kit.lenses.get(lens) ?? 0) + 1);
+      if (place) kit.places.set(place, (kit.places.get(place) ?? 0) + 1);
+      if (taken) {
+        kit.hours.push(taken.hour);
+        kit.firstYear = Math.min(kit.firstYear, taken.year);
+        kit.lastYear = Math.max(kit.lastYear, taken.year);
+      }
+    }
 
     const band = measured(focal)
       ? (FOCAL_LENGTH_ACTUAL_FACET.buckets.find((bucket) => bucket.match(focal))?.label ?? null)
@@ -314,10 +344,6 @@ export const computeGearStats = (albums: Content[]): GearStats => {
     if (band) banded += 1;
 
     if (taken) {
-      frames.hours.push(taken.hour);
-      frames.firstYear = Math.min(frames.firstYear, taken.year);
-      frames.lastYear = Math.max(frames.lastYear, taken.year);
-
       const yearKey = String(taken.year);
       const year = byYear.get(yearKey) ?? new Map<string, number>();
       year.set(camera, (year.get(camera) ?? 0) + 1);
@@ -343,6 +369,7 @@ export const computeGearStats = (albums: Content[]): GearStats => {
     }
 
     byCamera.set(camera, frames);
+    byPairing.set(pairingLabel(camera, lens), pairing);
   }
 
   gearFrames.sort((left, right) =>
@@ -385,27 +412,31 @@ export const computeGearStats = (albums: Content[]): GearStats => {
     };
   });
 
-  const cameraProfiles: CameraProfile[] = [...byCamera.entries()]
-    .sort((left, right) => right[1].count - left[1].count || left[0].localeCompare(right[0]))
-    .map(([camera, frames]): CameraProfile => {
-      // The equivalent where the body reports one, and the physical length only
-      // where it never does — never one standing in for the other silently.
-      const equivalent = frames.focal35.length > 0;
-      const focalMedian = median(equivalent ? frames.focal35 : frames.focal);
+  const profilesOf = (kits: Map<string, CameraFrames>): GearProfile[] =>
+    [...kits.entries()]
+      .sort((left, right) => right[1].count - left[1].count || left[0].localeCompare(right[0]))
+      .map(([label, frames]): GearProfile => {
+        // The equivalent where the kit reports one, and the physical length only
+        // where it never does — never one standing in for the other silently.
+        const equivalent = frames.focal35.length > 0;
+        const focalMedian = median(equivalent ? frames.focal35 : frames.focal);
 
-      return {
-        camera,
-        count: frames.count,
-        share: identified > 0 ? (frames.count / identified) * 100 : 0,
-        years: frames.firstYear === Infinity ? null : [frames.firstYear, frames.lastYear],
-        focalLength: focalMedian === null ? null : { mm: focalMedian, equivalent },
-        aperture: median(frames.apertures),
-        iso: median(frames.isos),
-        busiestHours: busiestSpan(frames.hours),
-        topLens: topOf(frames.lenses, frames.count),
-        topPlace: topOf(frames.places, frames.count),
-      };
-    });
+        return {
+          label,
+          count: frames.count,
+          share: identified > 0 ? (frames.count / identified) * 100 : 0,
+          years: frames.firstYear === Infinity ? null : [frames.firstYear, frames.lastYear],
+          focalLength: focalMedian === null ? null : { mm: focalMedian, equivalent },
+          aperture: median(frames.apertures),
+          iso: median(frames.isos),
+          busiestHours: busiestSpan(frames.hours),
+          topLens: topOf(frames.lenses, frames.count),
+          topPlace: topOf(frames.places, frames.count),
+        };
+      });
+
+  const bodies = profilesOf(byCamera);
+  const pairings = profilesOf(byPairing).slice(0, MAX_PAIRINGS);
 
   /** Frames spread across a range in even bins, as counts and shares. */
   const distribute = (
@@ -476,7 +507,8 @@ export const computeGearStats = (albums: Content[]): GearStats => {
     focalYears,
     focalCoverage: identified > 0 ? banded / identified : 0,
     frames: gearFrames,
-    cameraProfiles,
+    bodies,
+    pairings,
     lensFocalRanges,
   };
 };

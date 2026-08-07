@@ -15,6 +15,8 @@ jest.mock("../../util/computeEmbeddingStats", () => ({
 jest.mock("../../util/searchFacets", () => ({
   buildSearchFacetHref: ({ facetId, value }: { facetId: string; value: string }) =>
     `/search?${facetId}=${value}`,
+  buildSearchHref: ({ facets }: { facets: Array<{ facetId: string; value: string }> }) =>
+    `/search?${facets.map((facet) => `${facet.facetId}=${facet.value}`).join("&")}`,
   isSearchableFacetId: (facetId: string) => facetId !== "iso" && facetId !== "lens",
 }));
 jest.mock("../../components/explore/exploreViewModel", () => ({
@@ -242,9 +244,9 @@ const makeStats = () => ({
         dateLabel: "6 Jun",
       },
     ],
-    cameraProfiles: [
+    bodies: [
       {
-        camera: "Cam 1",
+        label: "Cam 1",
         count: 5,
         share: 62,
         years: [2023, 2024] as [number, number],
@@ -256,7 +258,7 @@ const makeStats = () => ({
         topPlace: { label: "Kyoto, Japan", share: 40 },
       },
       {
-        camera: "Cam 2",
+        label: "Cam 2",
         count: 3,
         share: 38,
         years: null,
@@ -266,6 +268,20 @@ const makeStats = () => ({
         busiestHours: null,
         topLens: null,
         topPlace: null,
+      },
+    ],
+    pairings: [
+      {
+        label: "Cam 1 · Lens 1",
+        count: 5,
+        share: 62,
+        years: [2023, 2024] as [number, number],
+        focalLength: { mm: 35, equivalent: true },
+        aperture: 2.8,
+        iso: 400,
+        busiestHours: { from: 21, to: 0 },
+        topLens: { label: "Lens 1", share: 90 },
+        topPlace: { label: "Kyoto, Japan", share: 40 },
       },
     ],
     lensFocalRanges: [

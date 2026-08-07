@@ -141,7 +141,7 @@ describe("computeGearStats", () => {
       ]);
 
     it("reports the middle of what a body was set to, not its extremes", () => {
-      const x100t = stats().cameraProfiles.find((profile) => profile.camera === "FUJIFILM X100T")!;
+      const x100t = stats().bodies.find((profile) => profile.label === "FUJIFILM X100T")!;
 
       expect(x100t.count).toBe(3);
       expect(x100t.focalLength).toEqual({ mm: 35, equivalent: true });
@@ -152,13 +152,13 @@ describe("computeGearStats", () => {
     // A median hour reads as noon for a camera used at 23:00 and 01:00, so the
     // busiest stretch is found around the clock instead.
     it("finds the stretch of the day a body is carried, across midnight", () => {
-      const x100t = stats().cameraProfiles.find((profile) => profile.camera === "FUJIFILM X100T")!;
+      const x100t = stats().bodies.find((profile) => profile.label === "FUJIFILM X100T")!;
 
       expect(x100t.busiestHours).toEqual({ from: 20, to: 23 });
     });
 
     it("names what it is usually paired with and where it usually is", () => {
-      const x100t = stats().cameraProfiles.find((profile) => profile.camera === "FUJIFILM X100T")!;
+      const x100t = stats().bodies.find((profile) => profile.label === "FUJIFILM X100T")!;
 
       expect(x100t.topLens).toEqual({ label: "23mm", share: 100 });
       expect(x100t.topPlace).toEqual({ label: "Tokyo, Japan", share: 67 });
@@ -175,14 +175,26 @@ describe("computeGearStats", () => {
         ]),
       ]);
 
-      const rare = stats.cameraProfiles.find((profile) => profile.camera === "FUJIFILM Nexus")!;
+      const rare = stats.bodies.find((profile) => profile.label === "FUJIFILM Nexus")!;
 
       expect(rare.share).toBeGreaterThan(0);
       expect(rare.share).toBeLessThan(0.5);
     });
 
+    // A body with two lenses on it is two kits, and the settings that separate
+    // them are exactly what the body's own averages blur together.
+    it("summarises a body with a lens on it as its own kit", () => {
+      const pairings = stats().pairings;
+
+      expect(pairings.map((profile) => profile.label)).toEqual([
+        "FUJIFILM X100T · 23mm",
+        "FUJIFILM X-T5",
+      ]);
+      expect(pairings[0]).toMatchObject({ count: 3, aperture: 2.8 });
+    });
+
     it("orders bodies by how much they were used", () => {
-      expect(stats().cameraProfiles.map((profile) => profile.camera)).toEqual([
+      expect(stats().bodies.map((profile) => profile.label)).toEqual([
         "FUJIFILM X100T",
         "FUJIFILM X-T5",
       ]);
@@ -198,7 +210,7 @@ describe("computeGearStats", () => {
         ]),
       ]);
 
-      expect(stats.cameraProfiles[0]).toMatchObject({
+      expect(stats.bodies[0]).toMatchObject({
         focalLength: null,
         aperture: null,
         iso: null,
@@ -208,7 +220,7 @@ describe("computeGearStats", () => {
     it("says nothing about settings a body never recorded", () => {
       const stats = computeGearStats([album([photo("a", { camera: "X100T" })])]);
 
-      expect(stats.cameraProfiles[0]).toMatchObject({
+      expect(stats.bodies[0]).toMatchObject({
         focalLength: null,
         aperture: null,
         iso: null,
@@ -306,7 +318,8 @@ describe("computeGearStats", () => {
       focalYears: [],
       focalCoverage: 0,
       frames: [],
-      cameraProfiles: [],
+      bodies: [],
+      pairings: [],
       lensFocalRanges: [],
     });
   });

@@ -5,7 +5,8 @@ import type { Content, PhotoBlock } from "../services/types";
 import { measureBuild } from "../services/buildTiming";
 import { rgbToString } from "./colorDistance";
 import { parseExifLocalDateTime } from "./exifTime";
-import { CAMERA_FACET } from "./photoBuckets";
+import { pairingLabel } from "./computeGearStats";
+import { CAMERA_FACET, LENS_FACET } from "./photoBuckets";
 import {
   clusterPoints,
   distinctiveTag,
@@ -106,14 +107,17 @@ export type VisualSamenessStats = {
     lastYear: number;
   } | null;
   /**
-   * The most typical frame each body took: the one nearest that camera's own
+   * The most typical frame each piece of kit took: the one nearest its own
    * centroid, rather than the archive's.
    *
+   * Keyed by body and by body-and-lens both, since the gear section groups by
+   * either and a pairing's average frame is not its body's.
+   *
    * Gear is otherwise the only part of this page with nothing to look at, and a
-   * body's own average frame is the shortest answer to what it is carried for.
+   * kit's own average frame is the shortest answer to what it is carried for.
    */
   cameraFrames: Array<{
-    camera: string;
+    label: string;
     photo: VisualSamenessPhoto;
     count: number;
     centroidSimilarityPercent: number;
@@ -325,9 +329,12 @@ const buildPhotoTagLookup = (albums: Content[]): Map<string, string[]> => {
   return lookup;
 };
 
-/** Which body took each photograph, keyed the way the embeddings are. */
-const buildPhotoCameraLookup = (albums: Content[]): Map<string, string> => {
-  const lookup = new Map<string, string>();
+/**
+ * What took each photograph, keyed the way the embeddings are: the body, and
+ * the body with its lens, because the gear section groups by either.
+ */
+const buildPhotoCameraLookup = (albums: Content[]): Map<string, string[]> => {
+  const lookup = new Map<string, string[]>();
 
   albums.forEach((album) => {
     if (isTestAlbum(album)) return;
@@ -337,12 +344,13 @@ const buildPhotoCameraLookup = (albums: Content[]): Map<string, string> => {
 
       const photo = block as PhotoBlock;
       const indexedPath = photo._build.tags?.path;
-      const camera = photo._build.exif
-        ? CAMERA_FACET.extract(photo._build.exif, photo._build.tags ?? undefined)
-        : null;
-      if (!indexedPath || !camera) return;
+      const exif = photo._build.exif;
+      const camera = exif ? CAMERA_FACET.extract(exif, photo._build.tags ?? undefined) : null;
+      if (!indexedPath || !camera || !exif) return;
 
-      lookup.set(indexedPath, camera);
+      const lens = LENS_FACET.extract(exif, photo._build.tags ?? undefined);
+      const pairing = pairingLabel(camera, lens);
+      lookup.set(indexedPath, pairing === camera ? [camera] : [camera, pairing]);
     });
   });
 
@@ -953,9 +961,9 @@ export const computeVisualSamenessStats = async (
       const cameraFrames = (() => {
         const byCamera = new Map<string, typeof parsedRows>();
         for (const row of parsedRows) {
-          const camera = photoCameraLookup.get(row.path);
-          if (!camera) continue;
-          byCamera.set(camera, [...(byCamera.get(camera) ?? []), row]);
+          for (const key of photoCameraLookup.get(row.path) ?? []) {
+            byCamera.set(key, [...(byCamera.get(key) ?? []), row]);
+          }
         }
 
         // Every body that took a photograph gets one, however few it took: the
@@ -965,7 +973,7 @@ export const computeVisualSamenessStats = async (
         // frames had one.
         return [...byCamera.entries()]
           .filter(([, rows]) => rows.length > 0)
-          .flatMap(([camera, rows]) => {
+          .flatMap(([label, rows]) => {
             // invariant: the filter above guarantees a first row
             const dimension = rows[0]!.vector.length;
             const centre = Array.from({ length: dimension }, () => 0);
@@ -984,7 +992,7 @@ export const computeVisualSamenessStats = async (
 
             return [
               {
-                camera,
+                label,
                 photo,
                 count: rows.length,
                 centroidSimilarityPercent: Math.round(best.score * 100),

@@ -63,9 +63,9 @@ const gear = (overrides: Partial<GearStats> = {}): GearStats => ({
     frame("2024", 0.2, "X100T", "23mm", "23–34mm · normal"),
     frame("2024", 0.6, "X-T5", "XF16-80mm", "35–55mm · short tele"),
   ],
-  cameraProfiles: [
+  bodies: [
     {
-      camera: "X100T",
+      label: "X100T",
       count: 5,
       share: 62,
       years: [2023, 2024],
@@ -77,7 +77,19 @@ const gear = (overrides: Partial<GearStats> = {}): GearStats => ({
       topPlace: { label: "Kyoto, Japan", share: 40 },
     },
     {
-      camera: "GT-I9300",
+      label: "X-T5",
+      count: 3,
+      share: 38,
+      years: [2024, 2024],
+      focalLength: { mm: 80, equivalent: true },
+      aperture: 4,
+      iso: 200,
+      busiestHours: { from: 10, to: 13 },
+      topLens: { label: "XF16-80mm", share: 100 },
+      topPlace: null,
+    },
+    {
+      label: "GT-I9300",
       count: 3,
       share: 0.2,
       years: null,
@@ -86,6 +98,32 @@ const gear = (overrides: Partial<GearStats> = {}): GearStats => ({
       iso: null,
       busiestHours: null,
       topLens: null,
+      topPlace: null,
+    },
+  ],
+  pairings: [
+    {
+      label: "X100T · 23mm",
+      count: 5,
+      share: 62,
+      years: [2023, 2024],
+      focalLength: { mm: 35, equivalent: true },
+      aperture: 2.8,
+      iso: 400,
+      busiestHours: { from: 21, to: 0 },
+      topLens: { label: "23mm", share: 100 },
+      topPlace: { label: "Kyoto, Japan", share: 40 },
+    },
+    {
+      label: "X-T5 · XF16-80mm",
+      count: 3,
+      share: 38,
+      years: null,
+      focalLength: null,
+      aperture: null,
+      iso: null,
+      busiestHours: null,
+      topLens: { label: "XF16-80mm", share: 100 },
       topPlace: null,
     },
   ],
@@ -125,7 +163,7 @@ const gear = (overrides: Partial<GearStats> = {}): GearStats => ({
 
 const frames = [
   {
-    camera: "X100T",
+    label: "X100T",
     photo: {
       path: "../albums/kyoto/a.jpg",
       src: "/a.avif",
@@ -179,6 +217,18 @@ describe("the gear section's own reporting", () => {
       .map((segment) => segment.getAttribute("title"));
 
     expect(shares).toEqual(["X100T in 2024: 1 photo, 50%", "X-T5 in 2024: 1 photo, 50%"]);
+  });
+
+  // A pairing is two facets, and its own label is not a thing this site
+  // indexes: a single-facet link had to search the camera facet for a lens.
+  it("links a pairing to both of its facets", () => {
+    render(<ExploreGearSection gear={gear()} frames={frames} />);
+    fireEvent.click(screen.getByRole("radio", { name: "With lenses" }));
+
+    expect(screen.getByRole("link", { name: "X-T5 · XF16-80mm" })).toHaveAttribute(
+      "href",
+      "/search?facet=camera%3AX-T5&facet=lens%3AXF16-80mm",
+    );
   });
 
   // Two bodies and two lenses are four things a reader might have changed
@@ -249,9 +299,10 @@ describe("the gear section's own reporting", () => {
   it("puts numbers on the lens axis", () => {
     render(<ExploreGearSection gear={gear()} frames={frames} />);
 
-    expect(screen.getByText("16mm")).toBeInTheDocument();
-    expect(screen.getByText("80mm")).toBeInTheDocument();
-    expect(screen.getByText("most at 16–48mm · 75%")).toBeInTheDocument();
+    const axis = screen.getByText("most at 16–48mm · 75%").parentElement!;
+
+    expect(within(axis).getByText("16mm")).toBeInTheDocument();
+    expect(within(axis).getByText("80mm")).toBeInTheDocument();
   });
 
   it("follows a lens from year to year", () => {
@@ -284,7 +335,8 @@ describe("the gear section's own reporting", () => {
           focalYears: [],
           focalCoverage: 0,
           frames: [],
-          cameraProfiles: [],
+          bodies: [],
+          pairings: [],
           lensFocalRanges: [],
         }}
         frames={[]}
