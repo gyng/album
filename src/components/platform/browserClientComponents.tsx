@@ -26,9 +26,6 @@ export const browserClientComponents: ClientComponents = {
   EmbeddingSpace: clientOnly(() =>
     import("../EmbeddingSpace").then((module) => ({ default: module.EmbeddingSpace })),
   ),
-  ContactSheet: clientOnly(() =>
-    import("../ContactSheet").then((module) => ({ default: module.ContactSheet })),
-  ),
   Map: clientOnly(
     () => import("../Map"),
     <p className={mapStyles.loadingPlaceholder}>Loading map…</p>,

@@ -10,9 +10,6 @@ export const nextClientComponents: ClientComponents = {
     () => import("../../EmbeddingSpace").then((module) => module.EmbeddingSpace),
     { ssr: false },
   ),
-  ContactSheet: dynamic(() => import("../../ContactSheet").then((module) => module.ContactSheet), {
-    ssr: false,
-  }),
   Map: dynamic(() => import("../../Map"), {
     loading: () => <p className={mapStyles.loadingPlaceholder}>Loading map…</p>,
     ssr: false,

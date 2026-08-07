@@ -29,7 +29,6 @@ export const createPlatformAdapter = (
   // result and so not a `ClientComponents` at all — invisible until something
   // actually typechecked the test tree.
   clientComponents: {
-    ContactSheet: NullComponent,
     EmbeddingSpace: NullComponent,
     Map: NullComponent,
     MapWorld: NullComponent,

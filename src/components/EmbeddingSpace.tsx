@@ -13,6 +13,7 @@ import {
   type ProjectedPoint,
   withinFrame,
 } from "../util/embeddingSpace";
+import { justifiedRows, type JustifiedLayout } from "../util/justifiedRows";
 import { buildSearchHref, buildSimilaritySearchHref } from "../util/searchFacets";
 import {
   type EmbeddingSpaceAtlas,
@@ -167,6 +168,58 @@ const DRIFTING_TAG_FADE = 1300;
 type Placed = ProjectedPoint & { entry: EmbeddingSpaceEntry; index: number };
 
 /**
+ * The other way to look at the same photographs: not by what they are of, but
+ * by when they happened.
+ *
+ * One canvas holds both, because they are the same fifteen hundred frames drawn
+ * from the same contact sheet — and because a photograph that travels from
+ * where the model put it to where the calendar puts it says something neither
+ * arrangement says on its own.
+ */
+const SHEET_MIN_ROW = 24;
+const SHEET_MAX_ROW = 460;
+const SHEET_INITIAL_ROW = 110;
+const SHEET_GAP = 2;
+
+/** Above this a 48px sheet cell is being stretched, and the file is worth fetching. */
+const SHEET_FULL_RESOLUTION_ROW = 84;
+
+/**
+ * How much of the distance to a target is left after a second: a fast settle
+ * for the zoom, which should feel like a direct response, and a slower one for
+ * the journey between the two arrangements, which is the thing worth watching.
+ */
+const SETTLE_REMAINING_PER_SECOND = 0.00001;
+const MORPH_REMAINING_PER_SECOND = 0.004;
+
+const clamp = (value: number, low: number, high: number): number =>
+  Math.min(high, Math.max(low, value));
+
+/** A photograph drawn to fill its box, cropped rather than squashed. */
+const drawCover = (
+  context: CanvasRenderingContext2D,
+  image: CanvasImageSource,
+  source: { x: number; y: number; width: number; height: number },
+  box: { x: number; y: number; width: number; height: number },
+): void => {
+  const scale = Math.max(box.width / source.width, box.height / source.height);
+  const takeWidth = Math.min(source.width, box.width / scale);
+  const takeHeight = Math.min(source.height, box.height / scale);
+
+  context.drawImage(
+    image,
+    source.x + (source.width - takeWidth) / 2,
+    source.y + (source.height - takeHeight) / 2,
+    takeWidth,
+    takeHeight,
+    box.x,
+    box.y,
+    box.width,
+    box.height,
+  );
+};
+
+/**
  * Eases a value towards a target, framerate-independently.
  *
  * Everything in the cloud that appears — a thumbnail taking over from its dot,
@@ -242,6 +295,35 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
    * says "Exit" is a button lying about where the reader is.
    */
   const [fullscreen, setFullscreen] = React.useState(false);
+  /**
+   * Which arrangement is showing. The change is a journey rather than a switch:
+   * every photograph travels from where the model put it to where the calendar
+   * puts it, which is the only way to see that they are the same photographs.
+   */
+  const [sheet, setSheet] = React.useState(false);
+  /** The sheet's row height, for the readout that names what the wheel is doing. */
+  const [rowHeight, setRowHeight] = React.useState(SHEET_INITIAL_ROW);
+  const sheetRef = React.useRef(false);
+  /** 0 in the cloud, 1 on the sheet, and every frame in between is the journey. */
+  const morphRef = React.useRef(0);
+  /**
+   * The sheet's row height: where it is, and where it is going.
+   *
+   * The layout is computed at the target, never at the eased value in between.
+   * Re-flowing rows sixty times through a zoom moved every photograph between
+   * rows on the way — a churn the eye reads as the sheet fighting itself — so
+   * the animation scales a settled layout instead.
+   */
+  const rowRef = React.useRef(SHEET_INITIAL_ROW);
+  const rowTargetRef = React.useRef(SHEET_INITIAL_ROW);
+  const sheetScaleRef = React.useRef(1);
+  const sheetOffsetRef = React.useRef(0);
+  const sheetLayoutRef = React.useRef<{
+    layout: JustifiedLayout;
+    width: number;
+    row: number;
+    order: number[];
+  }>({ layout: { items: [], rows: [], total: 0 }, width: 0, row: 0, order: [] });
   const cameraRef = React.useRef<Camera>({ ...INITIAL_CAMERA });
   const placedRef = React.useRef<Placed[]>([]);
   const thumbnailsRef = React.useRef(new Map<string, HTMLImageElement>());
@@ -303,6 +385,7 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
   driftingRef.current = drifting;
   chosenRef.current = chosen;
   flatRef.current = flat;
+  sheetRef.current = sheet;
 
   React.useEffect(() => {
     let cancelled = false;
@@ -344,6 +427,26 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
     if (!stage) return;
 
     const onWheel = (event: WheelEvent) => {
+      if (sheetRef.current) {
+        // The sheet zooms by row height, about the pointer, so what is under it
+        // stays under it. Against the target rather than the eased value, so a
+        // second tick mid-flight is measured from where the sheet is going.
+        const next = clamp(
+          rowTargetRef.current * Math.exp(-event.deltaY * 0.0015),
+          SHEET_MIN_ROW,
+          SHEET_MAX_ROW,
+        );
+        if (next === rowTargetRef.current) return;
+
+        const bounds = stage.getBoundingClientRect();
+        const anchor = event.clientY - bounds.top;
+        const scale = next / rowTargetRef.current;
+        sheetOffsetRef.current = (sheetOffsetRef.current + anchor) * scale - anchor;
+        rowTargetRef.current = next;
+        event.preventDefault();
+        return;
+      }
+
       const camera = cameraRef.current;
       // Proportional rather than fixed: a step that moves the eye a tenth of
       // where it already is takes the same number of turns to cross the range
@@ -468,6 +571,67 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
       const ordered = backToFront(placed);
       placedRef.current = ordered;
 
+      // Where the sheet would put each of these, and how far along the journey
+      // between the two arrangements we are.
+      const settle = 1 - SETTLE_REMAINING_PER_SECOND ** elapsed;
+      const morphTarget = sheetRef.current ? 1 : 0;
+      if (Math.abs(morphTarget - morphRef.current) > 0.002) {
+        morphRef.current +=
+          (morphTarget - morphRef.current) * (1 - MORPH_REMAINING_PER_SECOND ** elapsed);
+      } else {
+        morphRef.current = morphTarget;
+      }
+      const morph = morphRef.current;
+
+      // The zoom eases as a scale over a settled layout rather than a re-flow:
+      // rows recomputed on every eased frame move photographs between rows the
+      // whole way down, which reads as the sheet fighting itself.
+      const rowDistance = rowTargetRef.current - rowRef.current;
+      if (Math.abs(rowDistance) > 0.05) {
+        rowRef.current += rowDistance * settle;
+      } else {
+        rowRef.current = rowTargetRef.current;
+      }
+      sheetScaleRef.current = rowRef.current / rowTargetRef.current;
+
+      let sheetLayout = sheetLayoutRef.current;
+      if (morph > 0) {
+        // Computed once per width and target height, not once per frame: it is
+        // fifteen hundred rows of arithmetic and it does not change while a
+        // zoom is settling.
+        if (sheetLayout.width !== width || sheetLayout.row !== rowTargetRef.current) {
+          const order = entries
+            .map((entry, index) => ({ index, taken: entry.taken ?? Infinity }))
+            .sort((left, right) => left.taken - right.taken)
+            .map((entry) => entry.index);
+          sheetLayout = {
+            layout: justifiedRows(
+              order.map((index) => entries[index]?.aspect ?? 1.5),
+              width,
+              rowTargetRef.current,
+              SHEET_GAP,
+            ),
+            width,
+            row: rowTargetRef.current,
+            order,
+          };
+          sheetLayoutRef.current = sheetLayout;
+        }
+      }
+
+      /** Where a photograph sits on the sheet, on screen, right now. */
+      const sheetBoxOf = (index: number) => {
+        const place = sheetLayout.layout.items[sheetLayout.order.indexOf(index)];
+        if (!place) return null;
+        const scale = sheetScaleRef.current;
+        return {
+          x: place.x * scale,
+          y: place.y * scale - sheetOffsetRef.current,
+          width: place.width * scale,
+          height: place.height * scale,
+        };
+      };
+
       // The cloud's own front and back this frame. Fading against these rather
       // than against absolute distance is what makes the depth read the same at
       // every zoom: tied to raw distance the whole cloud dimmed as it was
@@ -505,6 +669,109 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
       );
 
       const perRow = atlas ? Math.floor(atlas.sheet / atlas.cell) : 0;
+
+      // The journey, and the sheet at the end of it. While `morph` is anything
+      // but zero the photographs are drawn here instead — each one between the
+      // place the model gave it and the place its date gives it — and the
+      // cloud's own furniture (the web, the names, the showcase) fades out,
+      // because none of it means anything on a wall arranged by time.
+      if (morph > 0) {
+        const eased = morph * morph * (3 - 2 * morph);
+        let startedFiles = 0;
+
+        for (const point of ordered) {
+          const target = sheetBoxOf(point.index);
+          if (!target) continue;
+
+          // Off the sheet entirely once it has arrived: no reason to draw a
+          // frame nobody can see, and this is what keeps a wall of fifteen
+          // hundred to the few dozen on screen.
+          if (eased > 0.98 && (target.y + target.height < 0 || target.y > viewHeight)) continue;
+
+          const size = thumbnail * 1.2 * Math.max(0.7, point.scale);
+          const from = { x: point.x - size / 2, y: point.y - size / 2, width: size, height: size };
+          const box = {
+            x: from.x + (target.x - from.x) * eased,
+            y: from.y + (target.y - from.y) * eased,
+            width: from.width + (target.width - from.width) * eased,
+            height: from.height + (target.height - from.height) * eased,
+          };
+
+          context.globalAlpha = 1;
+          context.fillStyle = point.entry.swatch ?? "#8899aa";
+          context.fillRect(box.x, box.y, box.width, box.height);
+
+          const wantsFile = eased > 0.9 && rowRef.current >= SHEET_FULL_RESOLUTION_ROW;
+          const own = wantsFile ? thumbnailsRef.current.get(point.entry.src) : undefined;
+          if (own?.complete && own.naturalWidth > 0) {
+            drawCover(
+              context,
+              own,
+              { x: 0, y: 0, width: own.naturalWidth, height: own.naturalHeight },
+              box,
+            );
+          } else {
+            const cell =
+              atlas && point.entry.slot !== undefined
+                ? sheetsRef.current[Math.floor(point.entry.slot / atlas.perSheet)]
+                : undefined;
+            if (
+              cell?.complete &&
+              cell.naturalWidth > 0 &&
+              atlas &&
+              point.entry.slot !== undefined
+            ) {
+              const within = point.entry.slot % atlas.perSheet;
+              drawCover(
+                context,
+                cell,
+                {
+                  x: (within % perRow) * atlas.cell,
+                  y: Math.floor(within / perRow) * atlas.cell,
+                  width: atlas.cell,
+                  height: atlas.cell,
+                },
+                box,
+              );
+            }
+            if (wantsFile && !own && startedFiles < LOADS_PER_FRAME) {
+              startedFiles += 1;
+              fullResolution(point.entry.src);
+            }
+          }
+
+          if (pointerRef.current && eased > 0.9) {
+            const at = pointerRef.current;
+            if (
+              at.x >= box.x &&
+              at.x < box.x + box.width &&
+              at.y >= box.y &&
+              at.y < box.y + box.height
+            ) {
+              context.strokeStyle = "rgba(255, 255, 255, 0.95)";
+              context.lineWidth = 2;
+              context.strokeRect(box.x + 1, box.y + 1, box.width - 2, box.height - 2);
+            }
+          }
+        }
+
+        // Everything below this is the cloud explaining itself, and none of it
+        // survives the journey.
+        if (eased > 0.99) {
+          for (const element of labelRefs.current) {
+            if (element) element.style.opacity = "0";
+          }
+          for (const element of driftingRefs.current) {
+            if (element) element.style.opacity = "0";
+          }
+          setHovered(null);
+          setShowcased(null);
+          frame = requestAnimationFrame(draw);
+          return;
+        }
+
+        context.globalAlpha = 1 - eased;
+      }
 
       // The web first, so every photograph sits on top of its own lines.
       const onScreen = new Map(ordered.map((point) => [point.index, point]));
@@ -1060,6 +1327,10 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
         const next = Math.round((INITIAL_CAMERA.distance / camera.distance) * 10) / 10;
         return next === current ? current : next;
       });
+      setRowHeight((current) => {
+        const next = Math.round(rowTargetRef.current);
+        return next === current ? current : next;
+      });
 
       setShowcased((current) => {
         const next = showcaseStrength > 0.25 ? (star?.entry ?? null) : null;
@@ -1097,6 +1368,14 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
 
     const camera = cameraRef.current;
     travelledRef.current += Math.hypot(event.clientX - dragging.x, event.clientY - dragging.y);
+
+    if (sheetRef.current) {
+      // The sheet is a wall: a drag moves the wall, and there is nothing to
+      // turn.
+      sheetOffsetRef.current = Math.max(0, sheetOffsetRef.current - (event.clientY - dragging.y));
+      draggingRef.current = { x: event.clientX, y: event.clientY };
+      return;
+    }
 
     if (flatRef.current) {
       // Nothing to turn: a flat view is dragged around instead. Divided by the
@@ -1139,6 +1418,28 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
    */
   const resolvePress = () => {
     if (travelledRef.current > DRAG_SLOP) return;
+
+    // On the sheet a press opens whatever it landed on: the frames are laid out
+    // rather than scattered, so the box under the pointer is the answer and
+    // there is nothing to disambiguate by depth.
+    if (sheetRef.current) {
+      const at = pointerRef.current;
+      const sheetLayout = sheetLayoutRef.current;
+      const scale = sheetScaleRef.current;
+      const offset = sheetOffsetRef.current;
+      const place = at
+        ? sheetLayout.layout.items.find(
+            (item) =>
+              at.x >= item.x * scale &&
+              at.x < (item.x + item.width) * scale &&
+              at.y >= item.y * scale - offset &&
+              at.y < (item.y + item.height) * scale - offset,
+          )
+        : undefined;
+      const entry = place ? (entries ?? [])[sheetLayout.order[place.index] ?? -1] : undefined;
+      if (entry) globalThis.location.assign(entry.href);
+      return;
+    }
 
     // Asked of the pose on screen rather than of React's last render, because
     // a press resolves before the next frame has run.
@@ -1262,6 +1563,16 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
           >
             {fullscreen ? "Exit" : "Full"}
           </OverlayButton>
+          {/* Two arrangements of the same photographs. Not a link to another
+              section: seeing that they *are* the same photographs is the whole
+              of what the journey between them says. */}
+          <OverlayButton
+            aria-pressed={sheet}
+            className={sheet ? styles.toolActive : ""}
+            onClick={() => setSheet((current) => !current)}
+          >
+            {sheet ? "Cloud" : "Sheet"}
+          </OverlayButton>
           <OverlayButton
             aria-pressed={flat}
             className={flat ? styles.toolActive : ""}
@@ -1331,9 +1642,10 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
         ))}
 
         {/* What the wheel has done, in one number: a cloud with no edges and no
-            grid gives a reader nothing else to judge it by. */}
+            grid gives a reader nothing else to judge it by — and on the sheet
+            the same wheel is doing something else, so it says something else. */}
         <p className={styles.zoom} aria-live="off">
-          ×{zoom.toFixed(1)}
+          {sheet ? `${rowHeight}px rows` : `×${zoom.toFixed(1)}`}
         </p>
 
         {count === 0 ? <p className={styles.status}>Arranging the collection…</p> : null}

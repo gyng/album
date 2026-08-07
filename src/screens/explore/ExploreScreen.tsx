@@ -55,7 +55,6 @@ import {
 import { ExploreColourSection } from "../../components/explore/ExploreColourSection";
 import { ExploreGearSection } from "../../components/explore/ExploreGearSection";
 import { EmbeddingSpaceDeferred } from "../../components/EmbeddingSpaceDeferred";
-import { ContactSheetDeferred } from "../../components/ContactSheetDeferred";
 import { formatPageTitle } from "../../lib/seo";
 
 export type ExploreScreenProps = {
@@ -321,24 +320,10 @@ const ExploreScreen = ({ stats, visualSameness }: ExploreScreenProps) => {
             id="embedding-space"
             title="Cloud"
             deferContent
-            deferredSummary="Every photograph, placed by what it is of."
+            deferredSummary="Every photograph, placed by what it is of — or by when it happened."
           >
             <section className={`${styles.section} ${styles.sectionWide}`}>
               <EmbeddingSpaceDeferred />
-            </section>
-          </StatGroup>
-
-          {/* The cloud arranges the collection by what the photographs are of.
-              This arranges it by nothing but when: the other thing an archive
-              is, and the only one you can read by standing back from it. */}
-          <StatGroup
-            id="contact-sheet"
-            title="Contact sheet"
-            deferContent
-            deferredSummary="Every photograph, in the order it was taken."
-          >
-            <section className={`${styles.section} ${styles.sectionWide}`}>
-              <ContactSheetDeferred />
             </section>
           </StatGroup>
 
