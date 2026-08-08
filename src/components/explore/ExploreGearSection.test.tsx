@@ -196,14 +196,15 @@ const gear = (overrides: Partial<GearStats> = {}): GearStats => ({
 const frames = [
   {
     label: "X100T",
-    photo: {
-      path: "../albums/kyoto/a.jpg",
-      src: "/a.avif",
-      href: "/album/kyoto#a.jpg",
-      label: "A lane at night",
-    },
+    photos: [
+      {
+        path: "../albums/kyoto/a.jpg",
+        src: "/a.avif",
+        href: "/album/kyoto#a.jpg",
+        label: "A lane at night",
+      },
+    ],
     count: 5,
-    centroidSimilarityPercent: 88,
   },
 ];
 
@@ -300,6 +301,23 @@ describe("the gear section's own reporting", () => {
     const sliver = screen.getByRole("link", { name: /^X-T5 · XF16-80mm, 4 May 2024/ });
 
     expect(sliver.getAttribute("style")).toMatch(/linear-gradient\(to bottom, .+ 0 50%, .+ 50%/);
+  });
+
+  // A card showing the most typical frame shows the least surprising thing that
+  // camera ever did, and a reader who wants another needs somewhere to go.
+  it("shows a different frame when rerolled", () => {
+    const many = frames.map((frame) => ({
+      ...frame,
+      photos: [frame.photos[0]!, { ...frame.photos[0]!, src: "/b.avif", label: "A room at dusk" }],
+    }));
+    render(<ExploreGearSection gear={gear()} frames={many} />);
+
+    const shown = () => screen.getAllByRole("img").map((image) => image.getAttribute("alt"));
+    const before = shown();
+
+    fireEvent.click(screen.getByRole("button", { name: "Reroll" }));
+
+    expect(shown()).not.toEqual(before);
   });
 
   // The charts are a screen apart, so the control that decides what both count

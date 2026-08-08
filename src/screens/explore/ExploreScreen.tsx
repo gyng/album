@@ -62,17 +62,23 @@ export type ExploreScreenProps = {
   visualSameness: VisualSamenessStats | null;
 };
 
+/**
+ * Four at a time, everywhere: one row on a desktop, and a button that keeps
+ * giving rather than one that empties after two presses. Two of these sections
+ * opened with two examples and had eight to offer in total, so a reader who was
+ * interested ran out mid-thought.
+ */
 const INITIAL_AVERAGE_EXAMPLES = 4;
-const INITIAL_REPEATED_EXAMPLES = 2;
-const INITIAL_TRAVELLING_MOTIFS = 2;
+const INITIAL_REPEATED_EXAMPLES = 4;
+const INITIAL_TRAVELLING_MOTIFS = 4;
 const INITIAL_DISTINCT_EXAMPLES = 4;
 const INITIAL_RECURRING_LOOKS = 4;
 const INITIAL_LOOK_TIMELINE = 4;
 const LOAD_MORE_AVERAGE_EXAMPLES = 4;
-const LOAD_MORE_REPEATED_EXAMPLES = 2;
-const LOAD_MORE_TRAVELLING_MOTIFS = 2;
+const LOAD_MORE_REPEATED_EXAMPLES = 4;
+const LOAD_MORE_TRAVELLING_MOTIFS = 4;
 const LOAD_MORE_DISTINCT_EXAMPLES = 4;
-const LOAD_MORE_RECURRING_LOOKS = 2;
+const LOAD_MORE_RECURRING_LOOKS = 4;
 const LOAD_MORE_LOOK_TIMELINE = 4;
 
 const ExploreScreen = ({ stats, visualSameness }: ExploreScreenProps) => {

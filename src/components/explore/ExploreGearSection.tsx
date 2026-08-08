@@ -127,6 +127,15 @@ export const ExploreGearSection = ({
   // fetched; see the tooltip in GearRibbon for why.
   const [preview, setPreview] = React.useState<string | null>(null);
   const [visibleCards, setVisibleCards] = React.useState(INITIAL_KIT_CARDS);
+  /**
+   * Which of each kit's frames is showing.
+   *
+   * Random to begin with, so the wall is not the same eight photographs on
+   * every visit, and moved on by the reroll. One number for all the cards:
+   * rerolling is a request to see the collection again, not to fiddle with one
+   * card at a time.
+   */
+  const [roll, setRoll] = React.useState(() => Math.floor(Math.random() * 1000));
   // A legend entry pressed keeps its own series and takes the rest away. Held
   // per chart: the two are keyed by different things, and a band is not a kit.
   const [onlyKit, setOnlyKit] = React.useState<string | null>(null);
@@ -134,7 +143,7 @@ export const ExploreGearSection = ({
 
   const profiles =
     grouping === "bodies" ? gear.bodies : grouping === "lenses" ? gear.lenses : gear.pairings;
-  const photos = new Map(frames.map((frame) => [frame.label, frame.photo]));
+  const photos = new Map(frames.map((frame) => [frame.label, frame.photos]));
   // A body keeps one colour across both groupings, so switching to pairings
   // reads as the same cameras splitting rather than as a new set of them.
   const bodyOrder = gear.bodies.map((profile) => profile.camera);
@@ -255,15 +264,22 @@ export const ExploreGearSection = ({
             by however much longer the new word is. */}
         <GearSectionHeader title="Bodies and lenses">
           {groupingToggle}
-          <Caption as="span">The middle of what each was set to, and its own average frame</Caption>
+          {/* A different frame from each of them. Offset by the card's own
+              position as well as the roll, so one press changes every picture
+              rather than marching them all through the same order. */}
+          <PillButton className={styles.loadMoreButton} onClick={() => setRoll((at) => at + 1)}>
+            <span>Reroll</span>
+          </PillButton>
         </GearSectionHeader>
         <div className={styles.gearBodies}>
-          {profiles.slice(0, visibleCards).map((profile) => (
+          {profiles.slice(0, visibleCards).map((profile, index) => (
             <GearProfileCard
               key={profile.label}
               profile={profile}
               colour={colours.get(profile.label)}
-              photo={photos.get(profile.label)}
+              photo={((offered) => offered?.[(roll + index) % offered.length])(
+                photos.get(profile.label),
+              )}
               href={kitSearchHref(profile)}
               withLens={grouping === "bodies"}
               withCamera={grouping === "lenses"}

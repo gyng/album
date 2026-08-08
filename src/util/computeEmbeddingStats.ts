@@ -49,10 +49,30 @@ const MAX_VISUAL_EXAMPLES = 24;
  * across a street.
  */
 const TRAVELLING_MOTIF_THRESHOLD = 0.82;
-const MAX_TRAVELLING_MOTIFS = 8;
+/**
+ * How many pairs each of the paired sections carries.
+ *
+ * Deep enough that the load-more under it keeps giving: at eight, a reader who
+ * pressed it twice had seen everything there was and the button vanished
+ * mid-thought. These are two photographs each and a few tags, so the depth
+ * costs the payload tens of kilobytes rather than megabytes.
+ */
+const MAX_PAIR_EXAMPLES = 48;
+/** Frames offered per piece of kit, for the card and its reroll. */
+const MAX_KIT_FRAMES = 8;
+const MAX_TRAVELLING_MOTIFS = MAX_PAIR_EXAMPLES;
 const MAX_AVERAGE_EXAMPLES = 12;
 const MAX_OUTLIER_EXAMPLES = 12;
-const MAX_VISUAL_ERAS = 6;
+/**
+ * How many recurring looks to find, and how finely.
+ *
+ * One group per sixty frames rather than per two hundred and fifty: five looks
+ * across fifteen hundred photographs is a summary so coarse that the section
+ * had nothing to load more of, and sixty frames is still a recurring mode
+ * rather than a coincidence.
+ */
+const MAX_VISUAL_ERAS = 24;
+const FRAMES_PER_VISUAL_ERA = 60;
 const DEFAULT_EMBEDDINGS_DB_PATH = path.join(process.cwd(), "public", "search-embeddings.sqlite");
 const FALLBACK_EMBEDDINGS_DB_PATH = path.join(process.cwd(), "public", "search.sqlite");
 
@@ -107,20 +127,21 @@ export type VisualSamenessStats = {
     lastYear: number;
   } | null;
   /**
-   * The most typical frame each piece of kit took: the one nearest its own
-   * centroid, rather than the archive's.
+   * A handful of frames each piece of kit took, spread across its whole run.
+   *
+   * Not the one nearest its own centroid: a card showing the most typical frame
+   * is showing the least surprising thing that camera ever did, and a reader who
+   * wants another has nowhere to go. Spread evenly through the kit's frames
+   * instead, so a reroll changes the subject *and* the year.
    *
    * Keyed by body and by body-and-lens both, since the gear section groups by
-   * either and a pairing's average frame is not its body's.
-   *
-   * Gear is otherwise the only part of this page with nothing to look at, and a
-   * kit's own average frame is the shortest answer to what it is carried for.
+   * either. Gear is otherwise the only part of this page with nothing to look
+   * at.
    */
   cameraFrames: Array<{
     label: string;
-    photo: VisualSamenessPhoto;
+    photos: VisualSamenessPhoto[];
     count: number;
-    centroidSimilarityPercent: number;
   }>;
 };
 
@@ -704,7 +725,7 @@ export const computeVisualSamenessStats = async (
           .values(),
       )
         .sort((left, right) => right.similarityPercent - left.similarityPercent)
-        .slice(0, MAX_VISUAL_EXAMPLES);
+        .slice(0, MAX_PAIR_EXAMPLES);
 
       // Same look, different place: pairs the model reads as near-identical
       // whose two photographs were taken in towns that are not the same one.
@@ -809,7 +830,7 @@ export const computeVisualSamenessStats = async (
         if (centroidCandidates.length >= 48) {
           const visualEraCount = Math.min(
             MAX_VISUAL_ERAS,
-            Math.max(4, Math.floor(centroidCandidates.length / 250)),
+            Math.max(4, Math.floor(centroidCandidates.length / FRAMES_PER_VISUAL_ERA)),
           );
           // invariant: length >= 48 guard above ensures index 0 is present
           const seeds = [centroidCandidates[0]!];
@@ -989,9 +1010,7 @@ export const computeVisualSamenessStats = async (
         }
       }
 
-      // Each body's own average frame. The archive's centroid answers "what does
-      // this collection look like"; a camera's answers "what is this one carried
-      // for", which is the question the gear section asks and cannot show.
+      // A few frames from each piece of kit, spread across everything it took.
       const cameraFrames = (() => {
         const byCamera = new Map<string, typeof parsedRows>();
         for (const row of parsedRows) {
@@ -1008,30 +1027,15 @@ export const computeVisualSamenessStats = async (
         return [...byCamera.entries()]
           .filter(([, rows]) => rows.length > 0)
           .flatMap(([label, rows]) => {
-            // invariant: the filter above guarantees a first row
-            const dimension = rows[0]!.vector.length;
-            const centre = Array.from({ length: dimension }, () => 0);
-            for (const row of rows) {
-              for (let index = 0; index < dimension; index += 1) {
-                centre[index] = (centre[index] ?? 0) + (row.vector[index] ?? 0);
-              }
-            }
+            // Evenly spaced through the kit's own frames rather than the first
+            // few: the first few are one afternoon, and a reroll that stays in
+            // that afternoon is not a reroll.
+            const step = Math.max(1, rows.length / MAX_KIT_FRAMES);
+            const photos = Array.from({ length: Math.min(MAX_KIT_FRAMES, rows.length) }, (_, at) =>
+              photoLookup.get(rows[Math.floor(at * step)]?.path ?? ""),
+            ).filter((photo): photo is VisualSamenessPhoto => Boolean(photo));
 
-            const normalised = normalizeVector(centre);
-            const best = rows
-              .map((row) => ({ row, score: dotProduct(row.vector, normalised) }))
-              .sort((left, right) => right.score - left.score)[0];
-            const photo = best ? photoLookup.get(best.row.path) : undefined;
-            if (!best || !photo) return [];
-
-            return [
-              {
-                label,
-                photo,
-                count: rows.length,
-                centroidSimilarityPercent: Math.round(best.score * 100),
-              },
-            ];
+            return photos.length > 0 ? [{ label, photos, count: rows.length }] : [];
           })
           .sort((left, right) => right.count - left.count);
       })();

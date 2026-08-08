@@ -339,17 +339,17 @@ const makeVisualSameness = () =>
       photo: photo(`distinct-${index}`),
       nearestSimilarityPercent: 20,
     })),
-    repeatedExamples: Array.from({ length: 3 }, (_, index) => ({
+    repeatedExamples: Array.from({ length: 6 }, (_, index) => ({
       left: photo(`left-${index}`),
       right: photo(`right-${index}`),
       similarityPercent: 95,
     })),
-    travellingMotifs: Array.from({ length: 3 }, (_, index) => ({
+    travellingMotifs: Array.from({ length: 6 }, (_, index) => ({
       left: { ...photo(`here-${index}`), place: "Kyoto, Japan" },
       right: { ...photo(`there-${index}`), place: "Taipei, Taiwan" },
       similarityPercent: 88,
     })),
-    visualEras: Array.from({ length: 5 }, (_, index) => ({
+    visualEras: Array.from({ length: 8 }, (_, index) => ({
       label: `Era ${index}`,
       photos: [photo(`era-${index}`)],
       sharePercent: 20,
