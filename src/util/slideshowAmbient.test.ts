@@ -965,6 +965,40 @@ describe("describeRemix", () => {
     expect(describeRemix("shared-camera", [seed])).toBe("NIKON Z 7");
   });
 
+  test("shared-camera names the lens when every photo on the slide records it", () => {
+    const onTokina = (path: string): RandomPhotoRow => ({
+      path,
+      exif: "Image Make: FUJIFILM\nImage Model: X-T5\nEXIF LensModel: Tokina AT-X Macro 90mm f/2.5",
+      geocode: "",
+    });
+    expect(describeRemix("shared-camera", [onTokina("a/1.jpg"), onTokina("a/2.jpg")])).toBe(
+      "FUJIFILM X-T5 · Tokina AT-X Macro 90mm f/2.5",
+    );
+  });
+
+  test("shared-camera keeps just the body when lenses differ or are missing", () => {
+    const on = (path: string, lens: string | null): RandomPhotoRow => ({
+      path,
+      exif: [
+        "Image Make: FUJIFILM",
+        "Image Model: X-T5",
+        ...(lens === null ? [] : [`EXIF LensModel: ${lens}`]),
+      ].join("\n"),
+      geocode: "",
+    });
+    // Different lenses on the same body: naming either would be untrue.
+    expect(
+      describeRemix("shared-camera", [
+        on("a/1.jpg", "XF35mmF1.4 R"),
+        on("a/2.jpg", "XF23mmF2 R WR"),
+      ]),
+    ).toBe("FUJIFILM X-T5");
+    // One photo without a recorded lens (e.g. an unchipped manual lens).
+    expect(
+      describeRemix("shared-camera", [on("a/1.jpg", "XF35mmF1.4 R"), on("a/2.jpg", null)]),
+    ).toBe("FUJIFILM X-T5");
+  });
+
   test("descriptors return null when their required seed metadata is absent", () => {
     const empty = makePhoto("photo.jpg");
     expect(describeRemix("same-album", [])).toBeNull();

@@ -461,6 +461,21 @@ const extractCameraDisplayName = (exifString: string): string => {
   return [make, model].filter(Boolean).join(" ");
 };
 
+// The recorded lens, for the shared-camera descriptor. Matching stays on the
+// body alone — the strategy is about era and colour science — but when every
+// photo on the slide records the same glass, the badge can honestly name it.
+const extractLensModel = (exifString: string): string => {
+  if (!exifString) return "";
+  for (const line of exifString.split("\n")) {
+    const colonIdx = line.indexOf(":");
+    if (colonIdx === -1) continue;
+    if (line.slice(0, colonIdx).trim() === "EXIF LensModel") {
+      return line.slice(colonIdx + 1).trim();
+    }
+  }
+  return "";
+};
+
 const formatHourMinute = (date: Date): string => {
   const pad = (n: number) => String(n).padStart(2, "0");
   return `${pad(date.getHours())}:${pad(date.getMinutes())}`;
@@ -582,7 +597,11 @@ export const describeRemix = (
     case "shared-camera": {
       const seed = photos[0];
       const name = seed ? extractCameraDisplayName(seed.exif) : "";
-      return name || null;
+      if (!name) return null;
+      const present = photos.filter((p): p is RandomPhotoRow => p !== null);
+      const lens = present.length > 0 ? extractLensModel(present[0]?.exif ?? "") : "";
+      const shared = lens !== "" && present.every((p) => extractLensModel(p.exif) === lens);
+      return shared ? `${name} · ${lens}` : name;
     }
     default:
       return null;
