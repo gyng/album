@@ -122,6 +122,22 @@ describe("album page shell", () => {
     expect(scrollIntoView).toHaveBeenCalledTimes(1);
   });
 
+  it("scrolls to an encoded hash on first load, not only after a route change", () => {
+    // The framework's own mount-time hash scroll looks the element up by the
+    // raw hash, so "#sunset%20harbour.jpg" never matched "sunset harbour.jpg"
+    // and a shared link to that photo opened at the top of the album.
+    const target = document.createElement("div");
+    target.id = "sunset harbour.jpg";
+    const scrollIntoView = jest.fn();
+    target.scrollIntoView = scrollIntoView;
+    document.body.append(target);
+    window.history.replaceState(null, "", "/album/trip#sunset%20harbour.jpg");
+
+    render(<AlbumPage album={album({ blocks: [photo()] })} />);
+
+    expect(scrollIntoView).toHaveBeenCalledTimes(1);
+  });
+
   it("returns not-found when a build request has no album slug", async () => {
     await expect(getStaticProps({ params: {} } as never)).resolves.toEqual({ notFound: true });
   });

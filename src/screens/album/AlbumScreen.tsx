@@ -31,14 +31,16 @@ const AlbumScreen = ({ album }: AlbumScreenProps) => {
   // The grid stays the default. Trips is a second reading of the same photos,
   // and it is a URL so a particular album's journeys can be linked to.
   const view = ready && getSearchParam("view") === "trips" ? "trips" : "grid";
-  // Re-run the hash scroll after client-side navigation. Photo ids contain
-  // dots and other characters, so decode the hash before looking up the node.
-  const scrollToHash = React.useCallback(() => {
+  // Scroll to the photo the hash names and seek a linked moment in a clip.
+  // Photo ids contain dots and other characters, so the hash is decoded before
+  // the node is looked up — and this runs on first load as well as after
+  // client-side navigation. The framework's own mount-time hash scroll looks the
+  // element up by the raw hash, so a photo whose name has a space ("2015-10-18
+  // 16.10.22.jpg", which reaches the URL as %20) never matched it, and a shared
+  // link to that photo opened at the top of the album.
+  const applyHash = React.useCallback(() => {
     const hash = window.location.hash.slice(1);
-    if (!hash) return;
-    // Defer to the next frame so the freshly-navigated album's photo elements
-    // are in the DOM before looking the anchor up.
-    requestAnimationFrame(() => {
+    if (hash) {
       // A malformed percent-sequence (e.g. a bare "%") throws URIError; fall
       // back to the raw hash rather than crashing the navigation handler.
       let id = hash;
@@ -47,20 +49,23 @@ const AlbumScreen = ({ album }: AlbumScreenProps) => {
       } catch {
         id = hash;
       }
-      const target = document.getElementById(id);
-      target?.scrollIntoView();
-      seekLinkedMoment(getSearchParam);
-    });
+      document.getElementById(id)?.scrollIntoView();
+    }
+    seekLinkedMoment(getSearchParam);
   }, [getSearchParam]);
+
+  // Deferred a frame so the freshly-navigated album's photo elements are in the
+  // DOM before the anchor is looked up, and the video element exists to be
+  // seeked.
+  const scrollToHash = React.useCallback(() => {
+    requestAnimationFrame(applyHash);
+  }, [applyHash]);
   useAfterNavigation(scrollToHash);
 
-  // On first load the browser scrolls to the anchor itself, but nothing seeks
-  // the clip — so only that half runs on mount, deferred a frame so the video
-  // element exists to be seeked.
   React.useEffect(() => {
-    const frame = requestAnimationFrame(() => seekLinkedMoment(getSearchParam));
+    const frame = requestAnimationFrame(applyHash);
     return () => cancelAnimationFrame(frame);
-  }, [getSearchParam]);
+  }, [applyHash]);
 
   // SEO/Meta tag generation
   const title = album.title ?? album.name ?? album._build.slug;
