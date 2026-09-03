@@ -84,6 +84,26 @@ test.describe("World map interactions", () => {
     await expect(page.getByRole("combobox", { name: "Map style" })).toHaveValue("auto");
   });
 
+  test("on a phone the appearance pickers share the links' row", async ({ page }) => {
+    // Pinned beside the theme picker, the basemap picker made the pair wider
+    // than a phone's nav row: they wrapped to a band of their own, and with the
+    // search field below that the map opened under three rows of chrome. On a
+    // narrow viewport the pair joins the end of the scrolling list instead, so
+    // the chrome is the links' row and the search field.
+    await page.setViewportSize({ width: 390, height: 844 });
+    // Scoped to the nav: the map's fullscreen overlay carries a theme picker too.
+    const nav = page.getByRole("navigation");
+    const links = (await nav.getByRole("link", { name: "Search" }).boundingBox())!;
+    const centre = (box: { y: number; height: number }) => box.y + box.height / 2;
+    for (const name of ["Map style", "Theme"]) {
+      const picker = (await nav.getByRole("combobox", { name }).boundingBox())!;
+      expect(Math.abs(centre(picker) - centre(links))).toBeLessThan(4);
+    }
+    const field = (await page.locator('[role="search"]').boundingBox())!;
+    expect(field.y).toBeGreaterThan(links.y + links.height);
+    expect(field.y - (links.y + links.height)).toBeLessThan(24);
+  });
+
   // The legend positions itself by hand rather than sitting in a MapLibre
   // control container, so it did not follow when the date panel lifted the
   // scale and attribution: the years it explains ended up behind the histogram.

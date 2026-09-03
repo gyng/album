@@ -48,9 +48,10 @@ globs:
   `util/mapStyles.ts`, `MapStyleToggle` sets it and `MapWorld` reads it through `useMapStyleName`.
   **There is no metered provider** — every style is OpenFreeMap's or a document served from
   `public/map-styles/`, so no basemap needs a credential and none can be rate-limited away. A theme
-  with an obvious map of its own supplies the default; a stored choice outranks it. The picker sits in the nav beside the theme picker by choice; on a ~390px
-  viewport the two selects are wider than the nav row, so they wrap to a band of their own — a
-  deliberate trade, not an oversight, and a map overlay is the alternative if it is ever revisited. Keep every option free — a keyed style would bring back a credential, a quota and its own
+  with an obvious map of its own supplies the default; a stored choice outranks it. The picker sits in the nav beside the theme picker by choice. The pair is wider than a
+  phone's nav row, so at 720px and under `Nav` renders it a second time as the last item of the
+  scrolling list and hides the pinned copy — pinned, it took a band of its own and the map opened
+  under three rows of chrome. Keep every option free — a keyed style would bring back a credential, a quota and its own
   attribution requirement
 - **"Match theme" is a stored choice.** `AUTO_MAP_STYLE` sits in the preference like any basemap
   and is what the picker opens on; `useMapStyleChoice` binds the control, `useMapStyleName`

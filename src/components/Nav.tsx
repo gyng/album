@@ -133,6 +133,18 @@ export const Nav: React.FC<{
             </>
           ) : null}
           {props.extraItems}
+          {/* The same pair as the pinned group below, for narrow viewports: a
+              second appearance picker beside the theme's is wider than a
+              phone's nav row, so pinned they wrapped to a band of their own.
+              The breakpoint in the stylesheet shows one copy or the other. */}
+          {props.themeAdjacentItem ? (
+            <li className={styles.appearanceInList}>
+              <div className={styles.appearanceGroup}>
+                {props.themeAdjacentItem}
+                <ThemeToggle />
+              </div>
+            </li>
+          ) : null}
         </ul>
         {/* Outside the scrolling list, like the theme toggle: a control put here
             stays on screen at every width, and — because nothing on this side of
@@ -142,7 +154,15 @@ export const Nav: React.FC<{
         {props.trailingItem ? (
           <div className={styles.trailingItem}>{props.trailingItem}</div>
         ) : null}
-        <div className={styles.themeToggleItem}>
+        <div
+          className={[
+            styles.themeToggleItem,
+            styles.appearanceGroup,
+            props.themeAdjacentItem ? styles.themeToggleItemPair : "",
+          ]
+            .filter(Boolean)
+            .join(" ")}
+        >
           {props.themeAdjacentItem}
           <ThemeToggle />
         </div>

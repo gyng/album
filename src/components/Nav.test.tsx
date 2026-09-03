@@ -2,7 +2,7 @@
  * @jest-environment jsdom
  */
 
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { Nav } from "./Nav";
 
 jest.mock("./ThemeToggle", () => ({ ThemeToggle: () => <button type="button">Theme</button> }));
@@ -108,6 +108,15 @@ describe("Nav", () => {
     skip.dispatchEvent(event);
 
     expect(event.defaultPrevented).toBe(false);
+  });
+
+  it("offers a theme-adjacent picker inside the scrolling list as well as beside the theme", () => {
+    // On a phone the pinned pair is wider than the nav row and takes a band of
+    // its own; the copy inside the list is the one a narrow viewport shows.
+    render(<Nav themeAdjacentItem={<select aria-label="Map style" />} />);
+
+    const list = screen.getByRole("list");
+    expect(within(list).getByRole("combobox", { name: "Map style" })).toBeInTheDocument();
   });
 
   it("honours reduced-motion when revealing the current page", () => {
