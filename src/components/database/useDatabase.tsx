@@ -1,6 +1,7 @@
 import sqlite3InitModule, { Database, Sqlite3Static } from "@sqlite.org/sqlite-wasm";
 import { useState, useEffect, useCallback, useReducer, useRef } from "react";
 import { publicConfig, usePublicConfig } from "../platform";
+import { fetchWithDeadline } from "../../util/fetchWithDeadline";
 
 export const SEARCH_DATABASE_URL = publicConfig.searchDatabaseUrl;
 export const EMBEDDINGS_DATABASE_URL = publicConfig.searchEmbeddingsDatabaseUrl;
@@ -69,8 +70,9 @@ const fetchWithProgress = async (
   url: string,
   onProgress: (progress: number, details: { loaded: number; total: number }) => void,
   init?: RequestInit,
+  fetcher: typeof fetch = fetch,
 ) => {
-  const res = init ? await fetch(url, init) : await fetch(url);
+  const res = init ? await fetcher(url, init) : await fetcher(url);
   if (!res.ok) {
     throw new Error(`Failed to fetch ${url}: ${res.status} ${res.statusText}`);
   }
@@ -129,7 +131,7 @@ const loadRemoteDatabase = async (
 ) => {
   console.log("Running SQLite3 version", sqlite3.version.libVersion);
 
-  const response = await fetchWithProgress(url, setProgress || (() => {}), init);
+  const response = await fetchWithProgress(url, setProgress || (() => {}), init, fetchWithDeadline);
 
   const arrayBuffer = await response.arrayBuffer();
   const p = sqlite3.wasm.allocFromTypedArray(arrayBuffer);

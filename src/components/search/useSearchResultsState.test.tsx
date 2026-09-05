@@ -110,6 +110,21 @@ describe("useSearchResultsState", () => {
     expect(config.queryKey).not.toEqual(coreKey);
   });
 
+  it("shows keyword matches while the hybrid model is loading, then refines them", async () => {
+    const props = { ...baseProps(), searchMode: "hybrid" as const, searchInputValue: "cats" };
+    textVector.mockReturnValue({ ...baseVectorState(), isTextVectorLoading: true });
+    const { rerender } = renderHook(() => useSearchResultsState(props));
+    expect(config.enabled).toBe(true);
+    const earlyKey = config.queryKey;
+    await config.queryFn({ pageParam: 0 });
+    expect(fetchResults).toHaveBeenCalledWith(expect.objectContaining({ query: "cats" }));
+    textVector.mockReturnValue({ ...baseVectorState(), textVector: [1], textVectorQuery: "cats" });
+    rerender();
+    expect(config.queryKey).not.toEqual(earlyKey);
+    await config.queryFn({ pageParam: 0 });
+    expect(fetchHybridResults).toHaveBeenCalled();
+  });
+
   it.each([
     {},
     { colorSearch: [10, 20, 30] as RGB },
@@ -153,6 +168,7 @@ describe("useSearchResultsState", () => {
       searchMode: "keyword",
       needsTextVector: false,
       trimmedQuery: "cats  night",
+      warmupEnabled: false,
     });
   });
 

@@ -4,13 +4,17 @@ import { rgbToString } from "../util/colorDistance";
 const DAY_MS = 24 * 60 * 60 * 1000;
 const POPUP_WIDTH = 220;
 
+// One formatter for the whole archive. Constructing ICU formatters per cell
+// cost roughly half a second for 4,745 dates, before layout or hydration.
+const shortDateFormatter = new Intl.DateTimeFormat("en-GB", {
+  year: "numeric",
+  month: "short",
+  day: "numeric",
+  timeZone: "UTC",
+});
+
 export const formatCalendarShortDate = (date: string) =>
-  new Date(`${date}T00:00:00Z`).toLocaleDateString("en-GB", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-    timeZone: "UTC",
-  });
+  shortDateFormatter.format(new Date(`${date}T00:00:00Z`));
 
 export const formatCalendarLongDate = (date: string) =>
   new Date(`${date}T12:00:00`).toLocaleDateString("en-GB", {

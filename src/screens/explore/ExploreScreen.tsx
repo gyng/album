@@ -56,9 +56,12 @@ import { ExploreColourSection } from "../../components/explore/ExploreColourSect
 import { ExploreGearSection } from "../../components/explore/ExploreGearSection";
 import { EmbeddingSpaceDeferred } from "../../components/EmbeddingSpaceDeferred";
 import { formatPageTitle } from "../../lib/seo";
+import { unpackExploreStats, type PackedExploreStats } from "../../util/explorePageData";
 
-export type ExploreScreenProps = {
-  stats: PhotoStats;
+export type ExploreScreenProps = (
+  | { stats: PhotoStats; packedStats?: never }
+  | { packedStats: PackedExploreStats; stats?: never }
+) & {
   visualSameness: VisualSamenessStats | null;
 };
 
@@ -81,7 +84,15 @@ const LOAD_MORE_DISTINCT_EXAMPLES = 4;
 const LOAD_MORE_RECURRING_LOOKS = 4;
 const LOAD_MORE_LOOK_TIMELINE = 4;
 
-const ExploreScreen = ({ stats, visualSameness }: ExploreScreenProps) => {
+const ExploreScreen = ({
+  stats: suppliedStats,
+  packedStats,
+  visualSameness,
+}: ExploreScreenProps) => {
+  const stats = useMemo(
+    () => suppliedStats ?? unpackExploreStats(packedStats!),
+    [suppliedStats, packedStats],
+  );
   const [locationView, setLocationView] = useState<"map" | "sankey" | "bars">("map");
   const [gearView, setGearView] = useState<"sankey" | "bars">("sankey");
   const [selectedTechnicalCamera, setSelectedTechnicalCamera] = useState("all");
@@ -154,10 +165,11 @@ const ExploreScreen = ({ stats, visualSameness }: ExploreScreenProps) => {
   const activeTimeRelationships = scopeStats?.timeRelationships ?? stats.timeRelationships;
   const filteredTechnicalRelationships =
     scopeStats?.technicalRelationships ?? stats.technicalRelationships;
-  const renderScopeFilterControls = () => (
+  const renderScopeFilterControls = (scope: string) => (
     <div className={styles.sectionFilters}>
       <label className={styles.sectionFilter}>
         <Select
+          aria-label={`${scope} camera`}
           value={selectedTechnicalCamera}
           onChange={(event) => {
             setSelectedTechnicalCamera(event.target.value);
@@ -173,6 +185,7 @@ const ExploreScreen = ({ stats, visualSameness }: ExploreScreenProps) => {
       </label>
       <label className={styles.sectionFilter}>
         <Select
+          aria-label={`${scope} lens`}
           value={activeTechnicalLens}
           onChange={(event) => {
             setSelectedTechnicalLens(event.target.value);
@@ -688,7 +701,7 @@ const ExploreScreen = ({ stats, visualSameness }: ExploreScreenProps) => {
           <StatGroup
             id="when-you-shoot"
             title="When you shoot"
-            actions={renderScopeFilterControls()}
+            actions={renderScopeFilterControls("Time")}
             deferContent
             deferredSummary={`${formatCoverage(activeCalendarCoverage)}. Time relationships and archive cadence summarise when photos were made.`}
           >
@@ -725,7 +738,7 @@ const ExploreScreen = ({ stats, visualSameness }: ExploreScreenProps) => {
           <StatGroup
             id="how-you-shoot"
             title="How you shoot"
-            actions={renderScopeFilterControls()}
+            actions={renderScopeFilterControls("Settings")}
             deferContent
             deferredSummary={`Camera settings span ${activeTechnicalFacets.length.toLocaleString("en")} technical facets${filteredTechnicalRelationships ? `; settings relationships cover ${filteredTechnicalRelationships.total.toLocaleString("en")} photos` : ""}.`}
           >

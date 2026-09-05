@@ -2,6 +2,89 @@ const WORKER_BUILD_VERSION = new URL(self.location.href).searchParams.get("v") |
 const VERSION = `snapshots-pwa-${WORKER_BUILD_VERSION}`;
 const SHELL_CACHE = `${VERSION}-shell`;
 const RUNTIME_CACHE = `${VERSION}-runtime`;
+// A rolling outage buffer, independent of code generations. Never preload an
+// album: only successful slideshow requests enter, at most 24 × 2 MiB.
+const RECENT_PHOTO_CACHE = "snapshots-slideshow-recent-v1";
+const RECENT_PHOTO_LIMIT = 24;
+const RECENT_PHOTO_MAX_BYTES = 2 * 1024 * 1024;
+let recentPhotoWrites = Promise.resolve();
+
+const fetchWithNetworkDeadline = async (request, milliseconds = 8000) => {
+  const controller = new AbortController();
+  let timer;
+  try {
+    return await Promise.race([
+      fetch(request, { signal: controller.signal }),
+      new Promise((_, reject) => {
+        timer = setTimeout(() => {
+          controller.abort();
+          reject(new Error("Network request timed out"));
+        }, milliseconds);
+      }),
+    ]);
+  } finally {
+    clearTimeout(timer);
+  }
+};
+
+const storeRecentPhoto = async (request, response) => {
+  if (!response.ok || !response.headers.get("content-type")?.startsWith("image/") || !response.body)
+    return;
+  const reader = response.body.getReader();
+  const chunks = [];
+  let size = 0;
+  try {
+    while (true) {
+      let timer;
+      const { done, value } = await Promise.race([
+        reader.read(),
+        new Promise((_, reject) => {
+          timer = setTimeout(() => reject(new Error("Photo cache read timed out")), 15000);
+        }),
+      ]).finally(() => clearTimeout(timer));
+      if (done) break;
+      size += value.byteLength;
+      if (size > RECENT_PHOTO_MAX_BYTES) {
+        void reader.cancel().catch(() => {});
+        return;
+      }
+      chunks.push(value);
+    }
+  } catch {
+    void reader.cancel().catch(() => {});
+    return;
+  }
+  if (!size) return;
+  const store = async () => {
+    const cache = await caches.open(RECENT_PHOTO_CACHE);
+    // Evict before writing so even transient occupancy stays within the cap.
+    await cache.delete(request);
+    const keys = await cache.keys();
+    for (const key of keys.slice(0, Math.max(0, keys.length - RECENT_PHOTO_LIMIT + 1)))
+      await cache.delete(key);
+    await cache.put(request, new Response(new Blob(chunks), { headers: response.headers }));
+  };
+  recentPhotoWrites = recentPhotoWrites.then(store).catch(() => {});
+  await recentPhotoWrites;
+};
+
+const recentSlideshowPhoto = async (event) => {
+  try {
+    const response = await fetchWithNetworkDeadline(event.request, 4000);
+    if (response.ok) {
+      event.waitUntil(storeRecentPhoto(event.request, response.clone()).catch(() => {}));
+      return response;
+    }
+    const cache = await caches.open(RECENT_PHOTO_CACHE);
+    const cached = await cache.match(event.request);
+    return cached ?? response;
+  } catch (error) {
+    const cache = await caches.open(RECENT_PHOTO_CACHE);
+    const cached = await cache.match(event.request);
+    if (cached) return cached;
+    throw error;
+  }
+};
 
 const SHELL_DOCUMENTS = ["/", "/slideshow", "/slideshow/shell", "/slideshow/diagnostics"];
 const SHELL_STATIC_ASSETS = [
@@ -131,7 +214,7 @@ const networkFirst = async (
     (await cache.match(request)) ?? (fallbackRequest ? await cache.match(fallbackRequest) : null);
   let response;
   try {
-    response = await fetch(request);
+    response = await fetchWithNetworkDeadline(request);
   } catch (_error) {
     const cached = await matchFallback();
     if (cached) {
@@ -267,13 +350,31 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // Album media and other generated data belong to the browser HTTP cache.
+  // Only slideshow photographs get the bounded outage buffer. Map/gallery
+  // thumbnails retain the native HTTP-cache path, including in Firefox.
+  if (
+    event.request.destination === "image" &&
+    url.pathname.startsWith("/data/albums/") &&
+    url.pathname.endsWith(".avif")
+  ) {
+    let referrerPath = "";
+    try {
+      referrerPath = new URL(event.request.referrer).pathname;
+    } catch {
+      /* no referrer */
+    }
+    if (referrerPath === "/slideshow") {
+      event.respondWith(recentSlideshowPhoto(event));
+      return;
+    }
+  }
+
+  // Remaining album media and generated data belong to the browser HTTP cache.
   // Cache Storage duplicated hundreds of megabytes of compressed media, added
   // response plumbing to the thumbnail fast path, and made a dense Firefox map
   // compete with background Cache API writes. Returning without respondWith()
   // leaves the request on the browser's native network/cache path. The offline
-  // shell and databases remain explicit service-worker responsibilities above;
-  // individual slideshow photos are no longer guaranteed offline.
+  // shell, databases and the bounded slideshow buffer are handled above.
   if (
     event.request.destination === "image" ||
     event.request.destination === "video" ||

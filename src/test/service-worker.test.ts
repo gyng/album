@@ -7,6 +7,7 @@ type FetchEvent = {
     url: string;
     mode: string;
     destination: string;
+    referrer?: string;
   };
   respondWith: (response: Promise<Response>) => void;
   waitUntil?: (promise: Promise<unknown>) => void;
@@ -136,6 +137,9 @@ const loadFetchHandler = (options: {
     put: jest.fn(options.cachePut ?? (() => Promise.resolve())),
   };
   const context = {
+    setTimeout,
+    clearTimeout,
+    AbortController,
     URL,
     Response,
     caches: {
@@ -177,6 +181,116 @@ const request = (pathname: string, destination = "") => ({
   url: `https://photos.example.com${pathname}`,
   mode: "cors",
   destination,
+});
+
+it("falls back to a cached database when the network never answers", async () => {
+  jest.useFakeTimers();
+  try {
+    const handler = loadFetchHandler({
+      cachedResponse: new Response("offline db"),
+      networkFetch: () => new Promise(() => {}),
+    });
+    let response!: Promise<Response>;
+    handler({
+      request: request("/search.sqlite"),
+      respondWith: (value) => {
+        response = value;
+      },
+    });
+    await jest.advanceTimersByTimeAsync(8001);
+    expect(await (await response).text()).toBe("offline db");
+  } finally {
+    jest.useRealTimers();
+  }
+});
+
+it("serves a recently viewed slideshow photo offline without intercepting gallery images", async () => {
+  const handler = loadFetchHandler({
+    cachedResponse: new Response("cached photograph"),
+    networkError: new Error("offline"),
+  });
+  let response: Promise<Response> | undefined;
+  const imageRequest = {
+    ...request("/data/albums/test-simple/.resized_images/photo.jpg%401600.avif", "image"),
+    referrer: "https://photos.example.com/slideshow?mode=random",
+  };
+  handler({
+    request: imageRequest,
+    respondWith: (value) => {
+      response = value;
+    },
+  });
+  expect(response).toBeDefined();
+  expect(await (await response!).text()).toBe("cached photograph");
+  const untouched = jest.fn();
+  handler({
+    request: { ...imageRequest, referrer: "https://photos.example.com/map" },
+    respondWith: untouched,
+  });
+  expect(untouched).not.toHaveBeenCalled();
+});
+
+it("bounds the rolling photo cache by count and entry size, and never stores error bodies", async () => {
+  const entries = new Map<string, Response>();
+  const keyOf = (request: { url: string }) => request.url;
+  const cache = {
+    keys: async () => [...entries.keys()].map((url) => ({ url })),
+    match: async (request: { url: string }) => entries.get(keyOf(request))?.clone(),
+    delete: async (request: { url: string }) => entries.delete(keyOf(request)),
+    put: async (request: { url: string }, response: Response) => {
+      entries.set(keyOf(request), response);
+    },
+  };
+  const handlers = new Map<string, (event: FetchEvent) => void>();
+  let payload = new Response("photo", { headers: { "content-type": "image/avif" } });
+  vm.runInNewContext(fs.readFileSync("public/sw.js", "utf8"), {
+    URL,
+    Response,
+    Blob,
+    setTimeout,
+    clearTimeout,
+    AbortController,
+    caches: { open: async () => cache },
+    fetch: async () => payload.clone(),
+    self: {
+      location: {
+        origin: "https://photos.example.com",
+        href: "https://photos.example.com/sw.js?v=test",
+      },
+      addEventListener: (name: string, handler: (event: FetchEvent) => void) =>
+        handlers.set(name, handler),
+    },
+  });
+  const load = async (name: string) => {
+    let result!: Promise<Response>;
+    const writes: Promise<unknown>[] = [];
+    handlers.get("fetch")!({
+      request: {
+        ...request(`/data/albums/test-simple/${name}.avif`, "image"),
+        referrer: "https://photos.example.com/slideshow",
+      },
+      respondWith: (response) => {
+        result = response;
+      },
+      waitUntil: (promise) => {
+        writes.push(promise);
+      },
+    });
+    const response = await result;
+    await response.arrayBuffer();
+    await Promise.all(writes);
+  };
+  for (let i = 0; i < 26; i++) await load(String(i));
+  expect(entries.size).toBe(24);
+  expect([...entries.keys()].some((url) => url.endsWith("/0.avif"))).toBe(false);
+  payload = new Response(new Uint8Array(2 * 1024 * 1024 + 1), {
+    headers: { "content-type": "image/avif" },
+  });
+  await load("oversized");
+  payload = new Response("not a photo", { status: 503 });
+  await load("error");
+  expect(entries.size).toBe(24);
+  expect([...entries.keys()].some((url) => /oversized|error/.test(url))).toBe(false);
 });
 
 describe("service worker data caching", () => {

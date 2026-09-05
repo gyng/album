@@ -118,8 +118,13 @@ export const Search: React.FC<{
     Boolean(similarPath) ||
     Boolean(imageQuery) ||
     (searchInputValue.trim() !== "" && searchMode !== "keyword");
-  const [embeddingsDatabase, embeddingsProgress, embeddingsProgressDetails, embeddingsError] =
-    useEmbeddingsDatabase(needsEmbeddingsDatabase);
+  const [
+    embeddingsDatabase,
+    embeddingsProgress,
+    embeddingsProgressDetails,
+    embeddingsError,
+    retryEmbeddings,
+  ] = useEmbeddingsDatabase(needsEmbeddingsDatabase);
 
   const {
     canClear,
@@ -886,7 +891,17 @@ export const Search: React.FC<{
       {imageVectorError ? <div className={styles.inlineError}>{imageVectorError}</div> : null}
 
       {needsEmbeddingsDatabase && embeddingsError ? (
-        <div className={styles.inlineError}>Similarity search is unavailable right now.</div>
+        <div className={styles.inlineError}>
+          Similarity search is unavailable right now.{" "}
+          <button
+            type="button"
+            className={styles.retryButton}
+            aria-label="Retry similarity index"
+            onClick={() => retryEmbeddings()}
+          >
+            Try again
+          </button>
+        </div>
       ) : null}
 
       {isEmptyState ? (

@@ -278,8 +278,16 @@ describe("initializeSQLite", () => {
       databaseLoaderInternals.initializeSQLite("/search-embeddings.sqlite", "/search.sqlite"),
     ).resolves.toBeTruthy();
 
-    expect(global.fetch).toHaveBeenNthCalledWith(1, "/search-embeddings.sqlite");
-    expect(global.fetch).toHaveBeenNthCalledWith(2, "/search.sqlite");
+    expect(global.fetch).toHaveBeenNthCalledWith(
+      1,
+      "/search-embeddings.sqlite",
+      expect.objectContaining({ signal: expect.any(AbortSignal) }),
+    );
+    expect(global.fetch).toHaveBeenNthCalledWith(
+      2,
+      "/search.sqlite",
+      expect.objectContaining({ signal: expect.any(AbortSignal) }),
+    );
   });
 
   it("fails cleanly when SQLite cannot provide a database pointer", async () => {
@@ -422,8 +430,14 @@ describe("database cache", () => {
       database: expect.any(Object),
       embeddingsDatabase: expect.any(Object),
     });
-    expect(global.fetch).toHaveBeenCalledWith("/core.sqlite", { cache: "no-store" });
-    expect(global.fetch).toHaveBeenCalledWith("/vectors.sqlite", { cache: "no-store" });
+    expect(global.fetch).toHaveBeenCalledWith(
+      "/core.sqlite",
+      expect.objectContaining({ cache: "no-store" }),
+    );
+    expect(global.fetch).toHaveBeenCalledWith(
+      "/vectors.sqlite",
+      expect.objectContaining({ cache: "no-store" }),
+    );
   });
 
   it("invalidates dormant vectors so enabling them after a catalogue update loads fresh data", async () => {

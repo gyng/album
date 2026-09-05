@@ -42,6 +42,28 @@ test.describe("Search", () => {
     await expect(page.getByLabel("Explore browse mode")).toBeVisible();
   });
 
+  test("hybrid shows keyword matches while the semantic engine is still booting", async ({
+    page,
+  }) => {
+    // A silent worker represents a cold model download without transferring
+    // the real 155 MB model into a deterministic browser test.
+    await page.addInitScript(() => {
+      class PendingWorker extends EventTarget {
+        onmessage = null;
+        onerror = null;
+        postMessage() {}
+        terminate() {}
+      }
+      Object.defineProperty(window, "Worker", { value: PendingWorker, configurable: true });
+    });
+    await gotoHydrated(page, "/search?q=japan&mode=hybrid");
+    await expectJapanResults(page);
+    await expect(page.getByRole("textbox", { name: "Search photos" })).toHaveAttribute(
+      "aria-busy",
+      "true",
+    );
+  });
+
   test("keyword search returns only matching results", async ({ page }) => {
     await gotoHydrated(page, "/search");
 

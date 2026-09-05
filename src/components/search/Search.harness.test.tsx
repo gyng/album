@@ -5,6 +5,7 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 
 const mockRetryDatabase = jest.fn();
+const mockRetryEmbeddings = jest.fn();
 const mockStartImageQuery = jest.fn();
 const mockClearImageQuery = jest.fn();
 const mockFetchNextPage = jest.fn();
@@ -399,7 +400,13 @@ describe("Search parent orchestration", () => {
       new Error("database"),
       mockRetryDatabase,
     ];
-    mockEmbeddingsState = [null, 0, { loaded: 0, total: 10 }, new Error("embeddings")];
+    mockEmbeddingsState = [
+      null,
+      0,
+      { loaded: 0, total: 10 },
+      new Error("embeddings"),
+      mockRetryEmbeddings,
+    ];
     mockImageState.imageVectorError = "Image encoding failed";
     mockResultsState.textVectorError = "Text encoding failed";
     render(<Search />);
@@ -411,6 +418,8 @@ describe("Search parent orchestration", () => {
     expect(screen.getByText("Similarity search is unavailable right now.")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Try again" }));
     expect(mockRetryDatabase).toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Retry similarity index" }));
+    expect(mockRetryEmbeddings).toHaveBeenCalled();
   });
 
   it("reports similarity-index, image-model, and idle loading states", async () => {

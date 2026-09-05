@@ -2,7 +2,7 @@
  * @jest-environment jsdom
  */
 
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { Trip } from "../../util/computeTrips";
 import TripsScreen from "./TripsScreen";
 
@@ -55,8 +55,36 @@ const archive = [
 
 const headings = () =>
   screen.getAllByRole("heading", { level: 2 }).map((heading) => heading.textContent ?? "");
+const scrollIntoView = jest.fn();
 
 describe("TripsScreen", () => {
+  beforeEach(() => {
+    window.history.replaceState({}, "", "/trips");
+    scrollIntoView.mockClear();
+    HTMLElement.prototype.scrollIntoView = scrollIntoView;
+  });
+
+  it("reveals and scrolls to a linked trip beyond the first page", async () => {
+    const trips = Array.from({ length: 12 }, (_, i) => trip({ id: `journey-${i}` }));
+    window.history.replaceState({}, "", "/trips#trip-journey-9");
+    render(<TripsScreen trips={trips} />);
+    await waitFor(() => expect(document.getElementById("trip-journey-9")).not.toBeNull());
+    expect(scrollIntoView).toHaveBeenCalled();
+  });
+
+  it("restores filters from the URL and keeps unrelated parameters", async () => {
+    window.history.replaceState({}, "", "/trips?year=2015&kind=outings&sort=days&theme=ink");
+    render(<TripsScreen trips={archive} />);
+    await waitFor(() => expect(screen.getByLabelText("Year")).toHaveValue("2015"));
+    expect(headings()).toHaveLength(1);
+    expect(screen.getByLabelText("Sort trips")).toHaveValue("days");
+    fireEvent.change(screen.getByLabelText("Year"), { target: { value: "2022" } });
+    await waitFor(() =>
+      expect(new URLSearchParams(window.location.search).get("year")).toBe("2022"),
+    );
+    expect(new URLSearchParams(window.location.search).get("theme")).toBe("ink");
+  });
+
   it("opens on the most recent trip", () => {
     render(<TripsScreen trips={archive} />);
 

@@ -36,6 +36,20 @@ describe("useTextVector", () => {
     expect(view.result.current.textVector).toBeNull();
   });
 
+  it("does not download a model for an empty search page", () => {
+    renderHook(() =>
+      useTextVector({
+        isSimilarMode: false,
+        searchMode: "hybrid",
+        needsTextVector: false,
+        trimmedQuery: "",
+        warmupEnabled: false,
+      }),
+    );
+    expect(warmup).not.toHaveBeenCalled();
+    expect(encode).not.toHaveBeenCalled();
+  });
+
   it("reports warmup progress and readiness", async () => {
     let report!: Parameters<typeof warmup>[0];
     warmup.mockImplementation(async (onProgress) => {

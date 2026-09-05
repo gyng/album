@@ -80,6 +80,7 @@ export const useSearchResultsState = ({
     searchMode,
     needsTextVector,
     trimmedQuery,
+    warmupEnabled: needsTextVector && !isImageQueryMode,
   });
 
   const { textVector, textVectorError, textVectorQuery } = textVectorState;
@@ -119,7 +120,7 @@ export const useSearchResultsState = ({
             textVectorFailed ||
             // Hybrid may run before the embeddings DB finishes downloading: it
             // degrades to keyword-only ranking and re-fuses once vectors arrive.
-            (searchMode === "hybrid" && hasCurrentTextVector) ||
+            searchMode === "hybrid" ||
             // Pure semantic needs the vector DB — otherwise it stays pending.
             (searchMode === "semantic" && hasVectorDatabase && hasCurrentTextVector)
           : hasFacetFilters || isColorMode);

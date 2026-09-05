@@ -1052,7 +1052,8 @@ describe("Search", () => {
   });
 
   it("shows model download sizes while warming semantic search", async () => {
-    window.history.replaceState({}, "", "/search?mode=semantic");
+    window.history.replaceState({}, "", "/search?mode=semantic&q=harbor");
+    (encodeSearchText as jest.Mock).mockImplementation(() => new Promise(() => {}));
     // DB already loaded so the model-warmup progress is the active loader the
     // page surfaces (the bar now lives beside the heading, reported via
     // onNavStateChange rather than rendered inside the widget).

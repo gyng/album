@@ -154,16 +154,18 @@ export const useTextVector = ({
   searchMode,
   needsTextVector,
   trimmedQuery,
+  warmupEnabled = true,
 }: {
   isSimilarMode: boolean;
   searchMode: SearchMode;
   needsTextVector: boolean;
   trimmedQuery: string;
+  warmupEnabled?: boolean;
 }): TextVectorState => {
   const [state, dispatch] = useReducer(reducer, initialState);
 
   useEffect(() => {
-    if (isSimilarMode || searchMode === "keyword") {
+    if (!warmupEnabled || isSimilarMode || searchMode === "keyword") {
       return;
     }
 
@@ -179,7 +181,7 @@ export const useTextVector = ({
         console.warn("Failed to warm semantic search model", err);
         dispatch({ type: "warmup:error", outcome: classifyEncodeFailure(err) });
       });
-  }, [isSimilarMode, searchMode]);
+  }, [isSimilarMode, searchMode, warmupEnabled]);
 
   useEffect(() => {
     if (!needsTextVector) {

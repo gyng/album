@@ -388,7 +388,10 @@ describe("explore page", () => {
     const gearControls = screen.getByLabelText("Gear chart view");
     fireEvent.click(gearControls.querySelectorAll("button")[1]!);
 
-    const selects = screen.getAllByRole("combobox");
+    const selects = [
+      screen.getByRole("combobox", { name: "Time camera" }),
+      screen.getByRole("combobox", { name: "Time lens" }),
+    ];
     fireEvent.change(selects[0]!, { target: { value: "Cam 1" } });
     fireEvent.change(selects[1]!, { target: { value: "Lens 1" } });
     expect(screen.getAllByTestId("heatmaps").at(-1)).toHaveTextContent("11");

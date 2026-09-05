@@ -30,6 +30,10 @@ import { Seo } from "../../components/Seo";
 import { buildCollectionPageJsonLd, formatPageTitle } from "../../lib/seo";
 import { getPhotoAltText } from "../../lib/alt";
 import { navigateTo, reloadCurrentPage } from "../../util/navigate";
+import {
+  chooseRecentSlideshowPhoto,
+  readRecentSlideshowUrls,
+} from "../../util/recentSlideshowPhotos";
 import { handleSlideshowKeyboardShortcut } from "../../util/slideshowKeyboard";
 import {
   advanceQueued,
@@ -1741,9 +1745,40 @@ export const Slideshow: React.FC<{
   // through so a forward-history replay or a real advance only counts as user
   // navigation — and thus only stales an in-flight topic seed — when the user
   // actually asked for it.
+  const photoOutageUntilRef = React.useRef(0);
+  const cacheAdvanceTokenRef = React.useRef(0);
+  useEffect(() => {
+    const online = () => {
+      photoOutageUntilRef.current = 0;
+    };
+    window.addEventListener("online", online);
+    return () => {
+      cacheAdvanceTokenRef.current += 1;
+      window.removeEventListener("online", online);
+    };
+  }, []);
+
   const goNext = useCallback(
     (source: SlideChangeSource) => {
       if (!database) {
+        return;
+      }
+      const token = ++cacheAdvanceTokenRef.current;
+      if (!navigator.onLine || Date.now() < photoOutageUntilRef.current) {
+        userNavCountRef.current = advanceUserNavCount(userNavCountRef.current, source);
+        const history = historyStateRef.current;
+        const pool = randomPhotoPoolRef.current;
+        void readRecentSlideshowUrls().then((urls) => {
+          if (
+            token !== cacheAdvanceTokenRef.current ||
+            history !== historyStateRef.current ||
+            pool !== randomPhotoPoolRef.current
+          )
+            return;
+          const next = chooseRecentSlideshowPhoto(pool, urls, currentEntry(history)?.seed.path);
+          if (next) commitNextPhoto(next, { trackRecent: true });
+          else advanceRandomPhoto();
+        });
         return;
       }
 
@@ -1775,7 +1810,14 @@ export const Slideshow: React.FC<{
         advanceRandomPhoto({ trackRecent: true });
       });
     },
-    [advanceRandomPhoto, advanceSimilarPhoto, database, showHistoryPhoto, slideshowMode],
+    [
+      advanceRandomPhoto,
+      advanceSimilarPhoto,
+      commitNextPhoto,
+      database,
+      showHistoryPhoto,
+      slideshowMode,
+    ],
   );
 
   const goPrevious = useCallback(() => {
@@ -1884,6 +1926,9 @@ export const Slideshow: React.FC<{
   }, [advanceCurrentSlide]);
 
   const scheduleImageErrorRetry = useCallback(() => {
+    // navigator.onLine can remain true through a broken Wi-Fi connection.
+    // Briefly replay the bounded cache, then probe the normal queue again.
+    photoOutageUntilRef.current = Date.now() + 15_000;
     clearImageErrorRetry();
     imageErrorRetryTimerRef.current = window.setTimeout(() => {
       imageErrorRetryTimerRef.current = null;

@@ -6,6 +6,7 @@ import type { Trip } from "../../util/computeTrips";
 import { Caption, Footer, Heading, PillButton, SegmentedToggle, Select } from "../../components/ui";
 import { formatPageTitle } from "../../lib/seo";
 import styles from "./TripsScreen.module.css";
+import { useAfterNavigation, useUrlSearchParams } from "../../components/platform";
 
 export type TripsScreenProps = { trips: Trip[] };
 
@@ -41,9 +42,43 @@ const orderTrips = (trips: Trip[], order: Order): Trip[] => {
  */
 const TripsScreen = ({ trips }: TripsScreenProps) => {
   const [visible, setVisible] = React.useState(INITIAL_TRIPS);
-  const [kind, setKind] = React.useState<Kind>("all");
-  const [order, setOrder] = React.useState<Order>("date");
-  const [year, setYear] = React.useState<string>(ALL_YEARS);
+  const { ready, getSearchParam, searchParams, replaceSearchParams } = useUrlSearchParams();
+  const rawKind = ready ? getSearchParam("kind") : null;
+  const kind: Kind = rawKind === "journeys" || rawKind === "outings" ? rawKind : "all";
+  const rawOrder = ready ? getSearchParam("sort") : null;
+  const order: Order = rawOrder === "days" || rawOrder === "distance" ? rawOrder : "date";
+  const rawYear = ready ? getSearchParam("year") : null;
+  const year = rawYear && trips.some((trip) => yearOf(trip) === rawYear) ? rawYear : ALL_YEARS;
+  const [linkedTrip, setLinkedTrip] = React.useState<string | null>(null);
+  const seenHash = React.useRef<string | null>(null);
+  const readHash = React.useCallback(() => {
+    if (!ready || seenHash.current === window.location.hash) return;
+    seenHash.current = window.location.hash;
+    let hash: string;
+    try {
+      hash = decodeURIComponent(window.location.hash.slice(1));
+    } catch {
+      return;
+    }
+    const target = trips.find((trip) => `trip-${trip.id}` === hash);
+    if (!target) return;
+    setLinkedTrip(hash);
+    if (
+      (year !== ALL_YEARS && yearOf(target) !== year) ||
+      (kind !== "all" && target.isOuting !== (kind === "outings"))
+    ) {
+      const params = new URLSearchParams(searchParams);
+      params.delete("year");
+      params.delete("kind");
+      replaceSearchParams(params);
+    }
+  }, [ready, trips, year, kind, searchParams, replaceSearchParams]);
+  React.useEffect(readHash, [readHash]);
+  useAfterNavigation(readHash);
+  React.useEffect(() => {
+    window.addEventListener("hashchange", readHash);
+    return () => window.removeEventListener("hashchange", readHash);
+  }, [readHash]);
   const journeys = trips.filter((trip) => !trip.isOuting);
 
   const years = React.useMemo(
@@ -63,12 +98,24 @@ const TripsScreen = ({ trips }: TripsScreenProps) => {
   // A narrowed list starts from the top again: keeping a deep scroll position
   // after a filter shows the reader the middle of something they did not ask
   // for.
-  const reset =
-    <T,>(set: (value: T) => void) =>
-    (value: T) => {
-      set(value);
-      setVisible(INITIAL_TRIPS);
-    };
+  const updateFilter = (key: string, value: string, defaultValue: string) => {
+    const params = new URLSearchParams(searchParams);
+    if (value === defaultValue) params.delete(key);
+    else params.set(key, value);
+    replaceSearchParams(params);
+    setVisible(INITIAL_TRIPS);
+    setLinkedTrip(null);
+  };
+  const linkedIndex = linkedTrip
+    ? listed.findIndex((trip) => `trip-${trip.id}` === linkedTrip)
+    : -1;
+  const visibleCount = Math.max(visible, linkedIndex + 1);
+  React.useEffect(() => {
+    if (!linkedTrip || linkedIndex < 0) return;
+    document.getElementById(linkedTrip)?.scrollIntoView({ block: "start" });
+    setVisible((count) => Math.max(count, linkedIndex + 1));
+    setLinkedTrip(null);
+  }, [linkedTrip, linkedIndex]);
 
   return (
     <div className={styles.page}>
@@ -96,7 +143,7 @@ const TripsScreen = ({ trips }: TripsScreenProps) => {
             <SegmentedToggle
               ariaLabel="Which trips to show"
               value={kind}
-              onChange={reset<Kind>(setKind)}
+              onChange={(value) => updateFilter("kind", value, "all")}
               options={[
                 { value: "all", label: "All" },
                 { value: "journeys", label: "Journeys" },
@@ -109,7 +156,7 @@ const TripsScreen = ({ trips }: TripsScreenProps) => {
             <Select
               aria-label="Sort trips"
               value={order}
-              onChange={(event) => reset<Order>(setOrder)(event.target.value as Order)}
+              onChange={(event) => updateFilter("sort", event.target.value, "date")}
             >
               <option value="date">Most recent</option>
               <option value="days">Longest first</option>
@@ -118,7 +165,7 @@ const TripsScreen = ({ trips }: TripsScreenProps) => {
             <Select
               aria-label="Year"
               value={year}
-              onChange={(event) => reset<string>(setYear)(event.target.value)}
+              onChange={(event) => updateFilter("year", event.target.value, ALL_YEARS)}
             >
               <option value={ALL_YEARS}>Any year</option>
               {years.map((value) => (
@@ -131,7 +178,7 @@ const TripsScreen = ({ trips }: TripsScreenProps) => {
         </header>
 
         <div className={styles.trips}>
-          {listed.slice(0, visible).map((trip) => (
+          {listed.slice(0, visibleCount).map((trip) => (
             // Anchored so the timeline's trip list — and the reader — can link
             // straight to the whole journey rather than to the top of the page.
             <div key={trip.id} id={`trip-${trip.id}`} className={styles.anchored}>

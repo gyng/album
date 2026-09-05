@@ -123,10 +123,18 @@ describe("useDatabase", () => {
       expect(fetchMock).toHaveBeenCalledTimes(2);
     });
 
-    expect(fetchMock).toHaveBeenNthCalledWith(1, "/search.sqlite");
-    expect(fetchMock).toHaveBeenNthCalledWith(2, "/search.sqlite", {
-      cache: "no-store",
-    });
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      "/search.sqlite",
+      expect.objectContaining({ signal: expect.any(AbortSignal) }),
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      "/search.sqlite",
+      expect.objectContaining({
+        cache: "no-store",
+      }),
+    );
   });
 
   it("does not initialise the embeddings database while disabled", () => {
@@ -140,7 +148,10 @@ describe("useDatabase", () => {
     global.fetch = jest.fn().mockResolvedValue(okFetchResponse()) as typeof fetch;
     const { result } = renderHook(() => useEmbeddingsDatabase());
     await waitFor(() => expect(result.current[0]).not.toBeNull());
-    expect(global.fetch).toHaveBeenCalledWith(EMBEDDINGS_DATABASE_URL);
+    expect(global.fetch).toHaveBeenCalledWith(
+      EMBEDDINGS_DATABASE_URL,
+      expect.objectContaining({ signal: expect.any(AbortSignal) }),
+    );
     expect(SEARCH_DATABASE_URL).toBe("/search.sqlite");
   });
 
@@ -174,7 +185,10 @@ describe("useDatabase", () => {
     const { result } = renderHook(() => useEmbeddingsDatabase(), { wrapper });
 
     await waitFor(() => expect(result.current[0]).not.toBeNull());
-    expect(global.fetch).toHaveBeenCalledWith("/renderer-embeddings.sqlite");
+    expect(global.fetch).toHaveBeenCalledWith(
+      "/renderer-embeddings.sqlite",
+      expect.objectContaining({ signal: expect.any(AbortSignal) }),
+    );
   });
 
   it.each(["resolve", "reject"])("ignores a late database %s after unmount", async (outcome) => {
