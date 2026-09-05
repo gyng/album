@@ -49,6 +49,26 @@ describe("slideshow shell protocol", () => {
     expect(isSlideshowRuntimeMessage({ type: "unrelated" })).toBe(false);
   });
 
+  it("accepts bounded same-origin photo presentations but rejects malformed snapshots", () => {
+    const message = { type: SLIDESHOW_RUNTIME_STATE_MESSAGE, buildVersion: "build-2" };
+    expect(
+      isSlideshowRuntimeMessage({
+        ...message,
+        presentation: { sources: ["/i/photo.avif"], cover: true },
+      }),
+    ).toBe(true);
+    for (const presentation of [
+      { sources: [], cover: false },
+      { sources: Array(5).fill("/i/photo.avif"), cover: false },
+      { sources: ["//elsewhere.test/photo.avif"], cover: false },
+      { sources: ["/\\elsewhere.test/photo.avif"], cover: false },
+      { sources: ["/i/photo.avif"], cover: "false" },
+      null,
+    ]) {
+      expect(isSlideshowRuntimeMessage({ ...message, presentation })).toBe(false);
+    }
+  });
+
   it("treats modifier and non-primary-button clicks as browser-managed", () => {
     expect(isModifiedClick(click())).toBe(false);
     expect(isModifiedClick(click({ metaKey: true }))).toBe(true);

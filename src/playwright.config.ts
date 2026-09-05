@@ -107,6 +107,18 @@ export default defineConfig({
       use: { ...devices["Desktop Chrome"] },
     },
 
+    // Opt-in synthetic iPad coverage for the installed slideshow lifecycle.
+    // Desktop WebKit can check rendering/handover, not physical iPad Auto-Lock.
+    ...(process.env.PLAYWRIGHT_SLIDESHOW_WEBKIT === "1"
+      ? [
+          {
+            name: "ipad-webkit",
+            use: { ...devices["iPad Pro 11"] },
+            testMatch: "**/slideshow-shell.spec.ts",
+          },
+        ]
+      : []),
+
     // Run all browsers in CI, but only chromium locally for faster dev loop
     ...(process.env.CI
       ? [

@@ -17,6 +17,29 @@ export type SlideshowRuntimeStateMessage = {
   type: typeof SLIDESHOW_RUNTIME_STATE_MESSAGE;
   buildVersion: string;
   search?: string;
+  // Absent on boot/settings messages and in older runtimes. Only a decoded,
+  // fully revealed photograph may acknowledge a successful code handover.
+  presentation?: SlideshowPresentation;
+};
+
+export type SlideshowPresentation = { sources: string[]; cover: boolean };
+
+const isPresentation = (value: unknown): value is SlideshowPresentation => {
+  if (!value || typeof value !== "object") return false;
+  const presentation = value as Partial<SlideshowPresentation>;
+  return (
+    typeof presentation.cover === "boolean" &&
+    Array.isArray(presentation.sources) &&
+    presentation.sources.length > 0 &&
+    presentation.sources.length <= 4 &&
+    presentation.sources.every(
+      (src) =>
+        typeof src === "string" &&
+        src.startsWith("/") &&
+        !src.startsWith("//") &&
+        !src.includes("\\"),
+    )
+  );
 };
 
 export type SlideshowRuntimeMessage =
@@ -53,6 +76,7 @@ export const isSlideshowRuntimeMessage = (value: unknown): value is SlideshowRun
     "buildVersion" in message &&
     typeof message.buildVersion === "string" &&
     message.buildVersion.trim().length > 0 &&
+    (!("presentation" in message) || isPresentation(message.presentation)) &&
     (!("search" in message) ||
       typeof message.search === "undefined" ||
       (typeof message.search === "string" &&

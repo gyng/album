@@ -7,6 +7,7 @@ import { act, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import {
   AUTO_WAKE_SETTLE_MS,
   RUNTIME_READY_TIMEOUT_MS,
+  RUNTIME_RETRY_COOLDOWN_MS,
   WAKE_LOSS_RESET_MS,
   SlideshowShellScreen,
 } from "./SlideshowShellScreen";
@@ -53,6 +54,10 @@ const versionResponse = (buildVersion: string) =>
   } as Response);
 
 const pendingVersionResponse = () => new Promise<Response>(() => {});
+const mountedMessage = (buildVersion: string) => ({
+  type: "snapshots:slideshow-ready",
+  buildVersion,
+});
 
 describe("slideshow code shell", () => {
   beforeEach(() => {
@@ -140,7 +145,11 @@ describe("slideshow code shell", () => {
     fireEvent(
       window,
       new MessageEvent("message", {
-        data: { type: "snapshots:slideshow-ready", buildVersion: "build-current" },
+        data: {
+          type: "snapshots:slideshow-ready",
+          buildVersion: "build-current",
+          presentation: { sources: ["/photo.avif"], cover: false },
+        },
         origin: window.location.origin,
         source: (frame as HTMLIFrameElement).contentWindow,
       }),
@@ -162,6 +171,99 @@ describe("slideshow code shell", () => {
         (entry) => entry.category === "code" && entry.type === "reload",
       ),
     ).toMatchObject({ version: "build-next", reason: "build-update" });
+    expect(releaseWakeLock).not.toHaveBeenCalled();
+  });
+
+  it("does not accept a mounted runtime as a presented photograph", async () => {
+    global.fetch = jest.fn(() => versionResponse("build-current"));
+    render(<SlideshowShellScreen />);
+    const frame = screen.getByTitle("Slideshow") as HTMLIFrameElement;
+    fireEvent(
+      window,
+      new MessageEvent("message", {
+        data: mountedMessage("build-current"),
+        origin: window.location.origin,
+        source: frame.contentWindow,
+      }),
+    );
+    await waitFor(() => expect(screen.getByText(/checked /)).toBeInTheDocument());
+    expect(screen.getByRole("group", { name: "Slideshow diagnostics" })).not.toHaveAttribute(
+      "data-code-status",
+      "current",
+    );
+  });
+
+  it("abandons a hung version request so another check can recover", async () => {
+    jest.useFakeTimers();
+    const errors = jest.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const fetchMock = jest
+        .fn()
+        .mockImplementationOnce(
+          (_url: string, options: RequestInit) =>
+            new Promise((_resolve, reject) => {
+              options.signal!.addEventListener("abort", () =>
+                reject(new DOMException("Timed out", "AbortError")),
+              );
+            }),
+        )
+        .mockImplementation(() => versionResponse("build-next"));
+      global.fetch = fetchMock;
+      render(<SlideshowShellScreen />);
+      await act(async () => {
+        jest.advanceTimersByTime(16000);
+      });
+      fireEvent.click(screen.getByRole("button", { name: "Slideshow diagnostics" }));
+      await act(async () => {
+        fireEvent.click(screen.getByRole("button", { name: "Check for code update" }));
+      });
+      expect(screen.getByTitle("Slideshow")).toHaveAttribute(
+        "src",
+        expect.stringContaining("shellVersion=build-next"),
+      );
+    } finally {
+      errors.mockRestore();
+      jest.useRealTimers();
+    }
+  });
+
+  it("retains the last presentation while an update has mounted but not decoded a photo", async () => {
+    global.fetch = jest
+      .fn()
+      .mockImplementationOnce(() => versionResponse("build-current"))
+      .mockImplementation(() => versionResponse("build-next"));
+    render(<SlideshowShellScreen />);
+    const frame = screen.getByTitle("Slideshow") as HTMLIFrameElement;
+    fireEvent(
+      window,
+      new MessageEvent("message", {
+        data: {
+          type: "snapshots:slideshow-ready",
+          buildVersion: "build-current",
+          presentation: { sources: ["/last-good.avif"], cover: false },
+        },
+        origin: window.location.origin,
+        source: frame.contentWindow,
+      }),
+    );
+    await waitFor(() => expect(screen.getByText("Code current")).toBeInTheDocument());
+    const retained = screen.getByAltText("Last displayed photograph");
+    fireEvent.load(retained);
+    fireEvent.click(screen.getByRole("button", { name: "Slideshow diagnostics" }));
+    fireEvent.click(screen.getByRole("button", { name: "Check for code update" }));
+    await waitFor(() => expect(screen.getByTitle("Slideshow")).not.toBe(frame));
+    expect(retained).toBeInTheDocument();
+    expect(retained).toHaveAttribute("src", "/last-good.avif");
+    const next = screen.getByTitle("Slideshow") as HTMLIFrameElement;
+    fireEvent(
+      window,
+      new MessageEvent("message", {
+        data: mountedMessage("build-next"),
+        origin: window.location.origin,
+        source: next.contentWindow,
+      }),
+    );
+    expect(next).toHaveAttribute("data-ready", "false");
     expect(releaseWakeLock).not.toHaveBeenCalled();
   });
 
@@ -201,7 +303,7 @@ describe("slideshow code shell", () => {
     }
   });
 
-  it("stops rebooting the frame once a stuck build exhausts its retry budget", async () => {
+  it("backs off after a failed burst but retries the same build after a cooldown", async () => {
     // A frame that never reports it is ready drives the readiness-recovery path
     // to its cap. version.json keeps advertising the shell's own build so the
     // update path stays idle and only the recovery cap governs the reboots.
@@ -211,10 +313,10 @@ describe("slideshow code shell", () => {
       render(<SlideshowShellScreen />);
 
       // Advance well past every readiness deadline and escalating backoff.
-      for (let step = 0; step < 12; step++) {
+      for (let step = 0; step < 6; step++) {
         // eslint-disable-next-line no-await-in-loop
         await act(async () => {
-          jest.advanceTimersByTime(RUNTIME_READY_TIMEOUT_MS + RUNTIME_RELOAD_BASE_DELAY_MS * 4);
+          jest.advanceTimersByTime(RUNTIME_READY_TIMEOUT_MS + RUNTIME_RELOAD_BASE_DELAY_MS * 2);
           await Promise.resolve();
           await Promise.resolve();
         });
@@ -224,12 +326,20 @@ describe("slideshow code shell", () => {
       // Exactly the capped number of reboots (generations 1..3 past the initial 0).
       expect(settled).toBe("3");
 
-      // Further time must not reboot again until the target version changes.
+      // A short pause must not reboot again, but the cap cannot strand an
+      // unattended kiosk forever after connectivity or the server recovers.
       await act(async () => {
-        jest.advanceTimersByTime(RUNTIME_READY_TIMEOUT_MS * 20);
+        jest.advanceTimersByTime(RUNTIME_READY_TIMEOUT_MS);
         await Promise.resolve();
       });
       expect(screen.getByTitle("Slideshow").getAttribute("data-runtime-generation")).toBe("3");
+      await act(async () => {
+        jest.advanceTimersByTime(RUNTIME_RETRY_COOLDOWN_MS * 2);
+        await Promise.resolve();
+      });
+      expect(
+        Number(screen.getByTitle("Slideshow").getAttribute("data-runtime-generation")),
+      ).toBeGreaterThan(3);
     } finally {
       jest.useRealTimers();
     }
@@ -267,7 +377,11 @@ describe("slideshow code shell", () => {
         fireEvent(
           window,
           new MessageEvent("message", {
-            data: { type: "snapshots:slideshow-ready", buildVersion: "build-current" },
+            data: {
+              type: "snapshots:slideshow-ready",
+              buildVersion: "build-current",
+              presentation: { sources: ["/photo.avif"], cover: false },
+            },
             origin: window.location.origin,
             source: (frame as HTMLIFrameElement).contentWindow,
           }),
@@ -335,7 +449,11 @@ describe("slideshow code shell", () => {
         fireEvent(
           window,
           new MessageEvent("message", {
-            data: { type: "snapshots:slideshow-ready", buildVersion: "build-current" },
+            data: {
+              type: "snapshots:slideshow-ready",
+              buildVersion: "build-current",
+              presentation: { sources: ["/photo.avif"], cover: false },
+            },
             origin: window.location.origin,
             source: (frame as HTMLIFrameElement).contentWindow,
           }),
@@ -730,7 +848,11 @@ describe("slideshow code shell", () => {
     fireEvent(
       window,
       new MessageEvent("message", {
-        data: { type: "snapshots:slideshow-ready", buildVersion: "build-current" },
+        data: {
+          type: "snapshots:slideshow-ready",
+          buildVersion: "build-current",
+          presentation: { sources: ["/photo.avif"], cover: false },
+        },
         origin: window.location.origin,
         source: (frame as HTMLIFrameElement).contentWindow,
       }),
@@ -759,7 +881,11 @@ describe("slideshow code shell", () => {
     fireEvent(
       window,
       new MessageEvent("message", {
-        data: { type: "snapshots:slideshow-ready", buildVersion: "build-current" },
+        data: {
+          type: "snapshots:slideshow-ready",
+          buildVersion: "build-current",
+          presentation: { sources: ["/photo.avif"], cover: false },
+        },
         origin: window.location.origin,
         source: (frame as HTMLIFrameElement).contentWindow,
       }),
@@ -799,7 +925,11 @@ describe("slideshow code shell", () => {
         fireEvent(
           window,
           new MessageEvent("message", {
-            data: { type: "snapshots:slideshow-ready", buildVersion: "build-current" },
+            data: {
+              type: "snapshots:slideshow-ready",
+              buildVersion: "build-current",
+              presentation: { sources: ["/photo.avif"], cover: false },
+            },
             origin: window.location.origin,
             source: (frame as HTMLIFrameElement).contentWindow,
           }),

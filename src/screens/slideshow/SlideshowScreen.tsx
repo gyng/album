@@ -1846,6 +1846,8 @@ export const Slideshow: React.FC<{
     },
     [clearImageErrorRetry, goNext],
   );
+  const advanceCurrentSlideRef = React.useRef(advanceCurrentSlide);
+  advanceCurrentSlideRef.current = advanceCurrentSlide;
 
   // The manual next handler (keyboard / toolbar / gesture / click / remix): a
   // fresh user intent that supersedes an in-flight topic seed.
@@ -2416,6 +2418,19 @@ export const Slideshow: React.FC<{
   // same key just refreshes its snapshot. Resetting imageLoaded re-gates the
   // new top's single-image decode.
   const topKeyRef = React.useRef<string | null>(null);
+  const decodedCellsRef = React.useRef<{ key: string; sources: Set<string> } | null>(null);
+  const [decodedPresentationKey, setDecodedPresentationKey] = React.useState<string | null>(null);
+  const topLayerElementRef = React.useRef<HTMLElement | null>(null);
+  const markDecoded = useCallback((key: string, src: string, sources: string[]) => {
+    if (topKeyRef.current !== key) return;
+    if (decodedCellsRef.current?.key !== key) {
+      decodedCellsRef.current = { key, sources: new Set() };
+    }
+    decodedCellsRef.current.sources.add(src);
+    if (sources.every((source) => decodedCellsRef.current!.sources.has(source))) {
+      setDecodedPresentationKey(key);
+    }
+  }, []);
   useEffect(() => {
     if (!slideKey || !currentSnapshot) {
       topKeyRef.current = null;
@@ -2424,6 +2439,8 @@ export const Slideshow: React.FC<{
     }
     if (topKeyRef.current !== slideKey) {
       topKeyRef.current = slideKey;
+      decodedCellsRef.current = null;
+      setDecodedPresentationKey(null);
       setImageLoaded(false);
       // A new slide is on screen — drop any retry armed by the previous slide's
       // failed image so it can't fire late and skip this one.
@@ -2450,7 +2467,7 @@ export const Slideshow: React.FC<{
   const incomingReady = isIncomingReady({
     isRemix,
     imageLoaded,
-    remixGridReady: isRemixGridReady,
+    remixGridReady: isRemixGridReady && decodedPresentationKey === slideKey,
   });
 
   // Reveal the top layer once decoded: it fades in while every other layer
@@ -2469,10 +2486,52 @@ export const Slideshow: React.FC<{
     };
   }, [incomingReady, slideKey]);
 
-  // Safety net: if the top never signals ready (a load event that never fires,
-  // a hung request), reveal it anyway after a few seconds so a held backdrop
-  // can't pin the show. Mirrors useRemixGridReveal's per-cell net, which single
-  // images otherwise lack.
+  // Boot/settings messages deliberately do not claim readiness. A new runtime
+  // may replace the shell's retained photograph only once actual decode AND
+  // the reveal have completed. Checking the rendered opacity also handles
+  // reduced motion (which need not emit transitionend) and Safari resumption.
+  useEffect(() => {
+    if (
+      !props.managedCodeReload ||
+      !currentSnapshot ||
+      !slideKey ||
+      decodedPresentationKey !== slideKey ||
+      !layers.some((l) => l.key === slideKey && l.loaded)
+    ) {
+      return;
+    }
+    let frame = 0;
+    const reportWhenPresented = () => {
+      const element = topLayerElementRef.current;
+      if (!element || Number(getComputedStyle(element).opacity) < 0.999) {
+        frame = requestAnimationFrame(reportWhenPresented);
+        return;
+      }
+      window.parent.postMessage(
+        {
+          type: SLIDESHOW_RUNTIME_STATE_MESSAGE,
+          buildVersion: BUILD_VERSION,
+          presentation: {
+            sources: currentSnapshot.cells.map((cell) => cell.src),
+            cover: showCover,
+          },
+        },
+        window.location.origin,
+      );
+    };
+    frame = requestAnimationFrame(reportWhenPresented);
+    return () => cancelAnimationFrame(frame);
+  }, [
+    props.managedCodeReload,
+    currentSnapshot,
+    slideKey,
+    decodedPresentationKey,
+    layers,
+    showCover,
+  ]);
+
+  // A hung replacement must not erase the last good photograph. Skip/retry it
+  // instead of fabricating a successful decode after the deadline.
   const layersRef = React.useRef(layers);
   layersRef.current = layers;
   // A dragged layer can be removed by its opacity fade before its transform
@@ -2490,10 +2549,10 @@ export const Slideshow: React.FC<{
   useEffect(() => {
     if (!slideKey) return;
     const top = layersRef.current[layersRef.current.length - 1];
-    if (top?.key === slideKey && top.loaded) return;
-    const t = window.setTimeout(() => setLayers((prev) => revealLayers(prev, slideKey)), 6000);
+    if (top?.key === slideKey && top.loaded && decodedPresentationKey === slideKey) return;
+    const t = window.setTimeout(() => advanceCurrentSlideRef.current("app"), 6000);
     return () => window.clearTimeout(t);
-  }, [slideKey, layers]);
+  }, [slideKey, layers, decodedPresentationKey]);
 
   if (currentPhotoPath === null) {
     // Effective download progress for whichever database the current mode is
@@ -2958,6 +3017,13 @@ export const Slideshow: React.FC<{
             return (
               <div
                 key={layer.key}
+                ref={
+                  isTop
+                    ? (element) => {
+                        topLayerElementRef.current = element;
+                      }
+                    : null
+                }
                 className={[
                   styles.remixGrid,
                   hidden,
@@ -2985,17 +3051,21 @@ export const Slideshow: React.FC<{
                         {...(isTop
                           ? {
                               onLoad: (e: React.SyntheticEvent<HTMLImageElement>) => {
-                                // Mark the cell ready only once decoded, so the
-                                // grid reveals fully rendered rather than cell by
-                                // cell. Resolve on decode failure too, so one bad
-                                // cell can't pin the whole grid hidden.
                                 const img = e.currentTarget;
                                 img
                                   .decode()
-                                  .catch(() => {})
-                                  .finally(() => {
+                                  .then(() => {
+                                    if (topKeyRef.current !== layer.key) return;
+                                    markDecoded(
+                                      layer.key,
+                                      cell.src,
+                                      layer.slide.cells.map((c) => c.src),
+                                    );
                                     markRemixCellLoaded(cell.path);
                                     if (isSeed) setImageLoaded(true);
+                                  })
+                                  .catch(() => {
+                                    if (topKeyRef.current === layer.key) scheduleImageErrorRetry();
                                   });
                               },
                               onError: () => {
@@ -3020,6 +3090,13 @@ export const Slideshow: React.FC<{
           return (
             <img
               key={layer.key}
+              ref={
+                isTop
+                  ? (element) => {
+                      topLayerElementRef.current = element;
+                    }
+                  : null
+              }
               className={[
                 styles.image,
                 hidden,
@@ -3040,16 +3117,19 @@ export const Slideshow: React.FC<{
                 ? {
                     ...topImageHandlers,
                     onLoad: (e: React.SyntheticEvent<HTMLImageElement>) => {
-                      // Reveal only once the bitmap has actually decoded, so a
-                      // main-thread decode can't stutter the cross-fade. Resolve
-                      // on decode failure too — the load succeeded, so a broken
-                      // decode mustn't pin the layer hidden (the 6s safety net
-                      // would otherwise be the only escape).
                       const img = e.currentTarget;
                       img
                         .decode()
-                        .catch(() => {})
-                        .finally(() => setImageLoaded(true));
+                        .then(() => {
+                          if (topKeyRef.current !== layer.key) return;
+                          markDecoded(layer.key, layer.slide.cells[0]!.src, [
+                            layer.slide.cells[0]!.src,
+                          ]);
+                          setImageLoaded(true);
+                        })
+                        .catch(() => {
+                          if (topKeyRef.current === layer.key) scheduleImageErrorRetry();
+                        });
                     },
                     onError: () => scheduleImageErrorRetry(),
                   }

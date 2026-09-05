@@ -15,11 +15,54 @@
 }
 
 .runtime {
+  position: absolute;
+  inset: 0;
   display: block;
   inline-size: 100%;
   block-size: 100%;
   border: 0;
   background: var(--c-black);
+}
+
+/* Opacity, not display/visibility: the replacement must continue painting and
+   decoding before it can acknowledge its first photograph. */
+.runtime[data-retained="true"][data-ready="false"] {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.retainedPhoto {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-columns: repeat(var(--retained-columns, 1), minmax(0, 1fr));
+  grid-auto-rows: minmax(0, 1fr);
+  background: var(--c-black);
+}
+
+.retainedPhoto[data-count="2"],
+.retainedPhoto[data-count="4"] {
+  --retained-columns: 2;
+}
+
+.retainedPhoto:not([data-count="1"]) {
+  gap: var(--size-2);
+}
+
+.retainedPhoto[data-count="3"] {
+  --retained-columns: 3;
+}
+
+.retainedPhoto img {
+  inline-size: 100%;
+  block-size: 100%;
+  min-inline-size: 0;
+  min-block-size: 0;
+  object-fit: cover;
+}
+
+.retainedPhoto[data-count="1"][data-cover="false"] img {
+  object-fit: contain;
 }
 
 .bootStatus {

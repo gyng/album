@@ -103,6 +103,7 @@ jest.mock("../../util/navigate", () => ({
 }));
 
 const SlideshowScreen = require("./SlideshowScreen").default;
+const Slideshow = require("./SlideshowScreen").Slideshow;
 
 const readyDatabase = { db: true };
 const readyEmbeddings = { embeddings: true };
@@ -210,6 +211,55 @@ describe("SlideshowScreen touch gestures (screen-level)", () => {
     expect(document.querySelector('[data-touch-hold="true"]')).toBeNull();
     // A held release must not navigate: the slide is unchanged.
     expect(slideImage().getAttribute("src")).toBe(initialSrc);
+  });
+
+  it("does not report readiness until a real image decode and reveal complete", async () => {
+    jest.useFakeTimers();
+    const post = jest.spyOn(window.parent, "postMessage");
+    render(<Slideshow managedCodeReload />);
+    await flush();
+    expect(post.mock.calls.some(([message]) => message.presentation)).toBe(false);
+    const image = slideImage();
+    // CSS Modules are mocked in jsdom; supply the completed reveal at the
+    // browser boundary. The E2E handover checks the real animated image.
+    image.style.opacity = "1";
+    Object.defineProperty(image, "decode", { value: jest.fn().mockResolvedValue(undefined) });
+    fireEvent.load(image);
+    await flush();
+    await act(async () => {
+      jest.advanceTimersByTime(100);
+    });
+    await act(async () => {
+      jest.advanceTimersByTime(100);
+    });
+    expect(
+      post.mock.calls.some(([message]) =>
+        message.presentation?.sources.includes(image.getAttribute("src")),
+      ),
+    ).toBe(true);
+    post.mockRestore();
+  });
+
+  it("keeps the last decoded layer when its replacement hangs past the image deadline", async () => {
+    jest.useFakeTimers();
+    render(<SlideshowScreen />);
+    await flush();
+    const image = slideImage();
+    Object.defineProperty(image, "decode", { value: jest.fn().mockResolvedValue(undefined) });
+    fireEvent.load(image);
+    await flush();
+    await act(async () => {
+      jest.advanceTimersByTime(100);
+    });
+    fireEvent.click(image);
+    await flush();
+    await act(async () => {
+      jest.advanceTimersByTime(6100);
+    });
+    const fadeEnd = new Event("transitionend", { bubbles: true });
+    Object.defineProperty(fadeEnd, "propertyName", { value: "opacity" });
+    fireEvent(image, fadeEnd);
+    expect(image).toBeInTheDocument();
   });
 
   it("does not become a hold once the finger drifts into a swipe", async () => {

@@ -26,6 +26,7 @@ import {
   planRuntimeReload,
   recordRuntimeReload,
   RuntimeReloadTracker,
+  type SlideshowPresentation,
   SLIDESHOW_EXIT_MESSAGE,
   SLIDESHOW_NAVIGATE_MESSAGE,
   SLIDESHOW_SHELL_STATE_MESSAGE,
@@ -42,6 +43,8 @@ const VERSION_POLL_MS = 300000;
 // rescues a first-ever visit whose runtime request failed transiently: the
 // version poll cannot help because the advertised and running versions match.
 export const RUNTIME_READY_TIMEOUT_MS = 20000;
+export const RUNTIME_RETRY_COOLDOWN_MS = 300000;
+const VERSION_REQUEST_TIMEOUT_MS = 15000;
 // Give the browser's automatic (gesture-free) wake-lock acquisition a moment to
 // settle before offering the full-screen tap gate, so it does not flash and
 // swallow taps during the acquire window on every launch.
@@ -104,7 +107,10 @@ export const SlideshowShellScreen = () => {
   // The target version we last recorded a "retry cap reached" event for, so the
   // repeating version poll logs that milestone once per stuck deploy, not per poll.
   const retryCapVersionRef = React.useRef<string | null>(null);
+  const retryAfterRef = React.useRef(0);
   const [runtimeFrame, setRuntimeFrame] = React.useState<RuntimeFrame | null>(null);
+  const [runtimeVisible, setRuntimeVisible] = React.useState(false);
+  const [presentation, setPresentation] = React.useState<SlideshowPresentation | null>(null);
   const [runtimeVersion, setRuntimeVersion] = React.useState(BUILD_VERSION);
   const runtimeVersionRef = React.useRef(BUILD_VERSION);
   const [codeStatus, setCodeStatus] = React.useState<CodeStatus>("checking");
@@ -336,6 +342,7 @@ export const SlideshowShellScreen = () => {
 
   const reloadRuntime = React.useCallback((buildVersion: string, reason: CodeReloadReason) => {
     runtimeReadyRef.current = false;
+    setRuntimeVisible(false);
     setCodeStatus("reloading");
     setEventHistory(
       appendShellEvent({ category: "code", type: "reload", version: buildVersion, reason }),
@@ -357,13 +364,21 @@ export const SlideshowShellScreen = () => {
   // a single frame ever reloading.
   const attemptRuntimeReload = React.useCallback(
     (targetVersion: string, reason: CodeReloadReason) => {
+      if (reloadTrackerRef.current?.targetVersion !== targetVersion) {
+        retryAfterRef.current = 0;
+      }
+      if (retryAfterRef.current && Date.now() >= retryAfterRef.current) {
+        reloadTrackerRef.current = null;
+        retryAfterRef.current = 0;
+      }
       const plan = planRuntimeReload(targetVersion, reloadTrackerRef.current);
       if (!plan.shouldReload) {
-        // Budget exhausted — hold until the target version changes again. Record
+        // Budget exhausted — pause this burst, not recovery forever. Record
         // the cap once per target: the version poll keeps re-planning the same
         // exhausted target every few minutes, and an unguarded append would flood
         // the timeline out of every other event over a night.
         clearPendingReload();
+        if (!retryAfterRef.current) retryAfterRef.current = Date.now() + RUNTIME_RETRY_COOLDOWN_MS;
         setCodeStatus("retry");
         if (retryCapVersionRef.current !== targetVersion) {
           retryCapVersionRef.current = targetVersion;
@@ -511,8 +526,13 @@ export const SlideshowShellScreen = () => {
 
     checkInFlightRef.current = true;
     setCodeStatus("checking");
+    const controller = new AbortController();
+    const deadline = window.setTimeout(() => controller.abort(), VERSION_REQUEST_TIMEOUT_MS);
     try {
-      const response = await fetch("/version.json", { cache: "no-store" });
+      const response = await fetch("/version.json", {
+        cache: "no-store",
+        signal: controller.signal,
+      });
       if (!response.ok) {
         setCodeStatus("error");
         return;
@@ -542,6 +562,7 @@ export const SlideshowShellScreen = () => {
         // and cancel a pending backoff reload — the frame is fine, so a stale
         // timer would otherwise fire a spurious reboot.
         reloadTrackerRef.current = null;
+        retryAfterRef.current = 0;
         // The stuck episode is over — allow the NEXT one toward the same
         // target to log its own retry-cap event rather than being deduped
         // against a night that ended weeks ago.
@@ -549,7 +570,12 @@ export const SlideshowShellScreen = () => {
         clearPendingReload();
         setCodeStatus("current");
       } else {
-        setCodeStatus("loading");
+        setCodeStatus(retryAfterRef.current ? "retry" : "loading");
+        // The generation's one-shot deadline has already fired if its retry
+        // budget is cooling down. The periodic check must revive that path.
+        if (retryAfterRef.current && Date.now() >= retryAfterRef.current) {
+          attemptRuntimeReload(latestVersion, "runtime-timeout");
+        }
       }
     } catch (error) {
       console.error("Slideshow code update check failed", error);
@@ -557,6 +583,7 @@ export const SlideshowShellScreen = () => {
       setIsOnline(online);
       setCodeStatus(online ? "error" : "offline");
     } finally {
+      window.clearTimeout(deadline);
       checkInFlightRef.current = false;
     }
   }, [attemptRuntimeReload, clearPendingReload]);
@@ -676,9 +703,18 @@ export const SlideshowShellScreen = () => {
       if (typeof event.data.search === "string") {
         runtimeSearchRef.current = event.data.search;
       }
-      runtimeReadyRef.current = true;
       runtimeVersionRef.current = nextVersion;
       setRuntimeVersion(nextVersion);
+      if (event.data.presentation) {
+        setPresentation(event.data.presentation);
+        runtimeReadyRef.current = true;
+        setRuntimeVisible(true);
+      }
+      if (!runtimeReadyRef.current) {
+        setCodeStatus("loading");
+        sendShellState();
+        return;
+      }
       if (nextVersion === latestVersionRef.current) {
         // The frame loaded the intended build: cancel any pending backoff reload
         // (e.g. a slow first load that reports ready mid-backoff) so a stale
@@ -690,6 +726,7 @@ export const SlideshowShellScreen = () => {
         // retry toward the version that is still outstanding.
         clearPendingReload();
         reloadTrackerRef.current = null;
+        retryAfterRef.current = 0;
         lastSkewVersionRef.current = null;
         retryCapVersionRef.current = null;
       } else if (lastSkewVersionRef.current !== nextVersion) {
@@ -735,6 +772,22 @@ export const SlideshowShellScreen = () => {
         <meta name="theme-color" content="#000000" />
       </DocumentHead>
 
+      {presentation ? (
+        <div
+          className={styles.retainedPhoto}
+          data-count={presentation.sources.length}
+          data-cover={String(presentation.cover)}
+          aria-hidden={runtimeVisible}
+        >
+          {presentation.sources.map((src, index) => (
+            <img key={src} src={src} alt={index === 0 ? "Last displayed photograph" : ""} />
+          ))}
+        </div>
+      ) : (
+        <div className={styles.bootStatus} role="status">
+          Starting slideshow…
+        </div>
+      )}
       {runtimeFrame ? (
         <iframe
           key={runtimeFrame.generation}
@@ -743,14 +796,13 @@ export const SlideshowShellScreen = () => {
           src={runtimeFrame.src}
           title="Slideshow"
           data-runtime-generation={runtimeFrame.generation}
+          data-ready={String(runtimeVisible)}
+          data-retained={String(presentation !== null)}
+          aria-hidden={!runtimeVisible && presentation !== null}
           allow="fullscreen"
           allowFullScreen
         />
-      ) : (
-        <div className={styles.bootStatus} role="status">
-          Starting slideshow…
-        </div>
-      )}
+      ) : null}
 
       {autoWakeSettled && isWakeLockSupported && !isWakeLockActive && !wakePromptAcknowledged ? (
         <button

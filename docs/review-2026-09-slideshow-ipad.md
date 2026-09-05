@@ -2,6 +2,21 @@
 
 Reviewed 5 September 2026, against `f73dd7c` plus the swipe changes described below. The user primarily runs the slideshow as an iPad Home Screen PWA. The exact iPadOS version and whether the reported black screen is device sleep or a blank application remain unknown. No physical iPad was available for testing.
 
+## Follow-up: update-specific failure
+
+The user subsequently clarified that blackouts occur after code updates. The original swipe work and this review were committed and pushed as `fff8251` before implementing the following local fix:
+
+- A boot/settings message no longer acknowledges a successful update. The runtime sends a presentation only after actual decode and the layer's reveal finish. Late decode callbacks from an obsolete layer are ignored.
+- The parent retains the last presented photograph/grid while replacing the runtime. A replacement cannot cover that fallback until it presents a photograph itself. Initial launches without a fallback still expose loading/error controls, including offline controls.
+- Exhausted update-retry bursts cool down and retry the same version instead of giving up permanently. Version-manifest requests have a deadline so a hung request cannot suppress all later checks.
+- An image deadline skips a stuck replacement while retaining the last good layer; it no longer manufactures readiness. Remix readiness also requires actual decode rather than the older hook's timeout alone.
+
+Synthetic component tests first reproduced premature readiness and the absence of a retained photograph. Browser fault injection then served a replacement document that booted but never displayed a photo. Chromium and WebKit with the iPad Pro 11 viewport both retained the old photograph, retried after the readiness deadline/backoff, resumed the real runtime when responses recovered, and recorded zero releases of the parent wake-lock shim. This tests application lifecycle behaviour, not physical iPad Auto-Lock. The injected-network cases disable service workers because worker-owned requests otherwise bypass Playwright's page routing; real service-worker/offline coverage remains separate.
+
+The recommendations below describe the original review baseline. The update/image fixes above are now implemented locally; other findings, including the general wake-hook state-machine hardening and continuous runtime-health lease, remain recommendations. Deploying the fix will require an explicit reopen/reload of an already-running PWA shell.
+
+Final follow-up checks: lint and all three typechecks passed; 25 slideshow-related Jest suites / 450 tests passed; the isolated production build passed; all 24 targeted browser cases passed (19 Chromium, including the real offline-PWA journey, and five iPad-emulated WebKit cases). The failed-update cases use a fixed photograph and retain a screenshot in Playwright's test output. Their readiness assertions use the actual 20-second photo-ready contract, not the previous five-second JavaScript-mount assumption.
+
 ## Implemented: swipe presentation
 
 The neighbour preview now brightens with viewport-relative drag distance, capped at 42% opacity, with subtle scale and directional parallax. It remains mounted during release and fades away smoothly. Cancelled gestures spring back, including browser-owned pointer cancellation. Swiping backwards with no history no longer sends the only photograph off-screen. Reduced-motion mode removes the preview's scale and translation.

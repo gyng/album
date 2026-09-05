@@ -1,7 +1,13 @@
 import { expect, test } from "@playwright/test";
 import { gotoHydrated } from "./hydrated";
 
+// These cases replace network responses deliberately. A controlling worker
+// bypasses page.route and can silently serve the real app instead of the fault.
+// The real service-worker/offline journey lives in pwa-slideshow.spec.ts.
+test.use({ serviceWorkers: "block" });
+
 const slideshowImage = 'img[alt]:not([aria-hidden="true"])';
+const updateTestUrl = `/slideshow/shell?mode=random&filter=test-simple&delay=86400&photo=${encodeURIComponent("../albums/test-simple/DSCF2485-2.jpg")}`;
 
 test("the slideshow shell swaps code without releasing its wake lock", async ({ page }) => {
   test.setTimeout(45_000);
@@ -34,10 +40,11 @@ test("the slideshow shell swaps code without releasing its wake lock", async ({ 
     });
   });
 
-  await gotoHydrated(page, "/slideshow/shell?mode=random&delay=86400");
+  await gotoHydrated(page, updateTestUrl);
 
   const diagnostics = page.getByRole("group", { name: "Slideshow diagnostics" });
-  await expect(diagnostics).toHaveAttribute("data-code-status", "current");
+  // Readiness now includes database/image decode, not just mounting JavaScript.
+  await expect(diagnostics).toHaveAttribute("data-code-status", "current", { timeout: 20_000 });
   await page.getByRole("button", { name: "Slideshow diagnostics" }).click();
   await expect(diagnostics.getByText("Screen awake")).toBeVisible();
 
@@ -74,6 +81,14 @@ test("the slideshow shell swaps code without releasing its wake lock", async ({ 
         type: "snapshots:slideshow-ready",
         buildVersion: "future-build",
         search: window.location.search,
+        presentation: {
+          sources: [
+            document
+              .querySelector<HTMLImageElement>('img[alt]:not([aria-hidden="true"])')!
+              .getAttribute("src")!,
+          ],
+          cover: false,
+        },
       },
       window.location.origin,
     );
@@ -83,6 +98,89 @@ test("the slideshow shell swaps code without releasing its wake lock", async ({ 
     await page.evaluate(
       () => (window as Window & { __wakeLockReleaseCount?: number }).__wakeLockReleaseCount,
     ),
+  ).toBe(0);
+});
+
+test("a blank code update keeps the last photograph and recovers without releasing the lock", async ({
+  page,
+}) => {
+  test.setTimeout(60_000);
+  await page.addInitScript(() => {
+    localStorage.setItem("slideshow-status-pill", "on");
+    const state = window as Window & { __wakeReleases?: number };
+    state.__wakeReleases = 0;
+    Object.defineProperty(navigator, "wakeLock", {
+      configurable: true,
+      value: {
+        request: async () =>
+          Object.assign(new EventTarget(), {
+            release: async () => {
+              state.__wakeReleases = (state.__wakeReleases ?? 0) + 1;
+            },
+          }),
+      },
+    });
+  });
+  await gotoHydrated(page, updateTestUrl);
+  const diagnostics = page.getByRole("group", { name: "Slideshow diagnostics" });
+  const frame = page.locator('iframe[title="Slideshow"]');
+  await expect(diagnostics).toHaveAttribute("data-code-status", "current", { timeout: 20_000 });
+  const lastPhoto = page.getByAltText("Last displayed photograph");
+  await expect
+    .poll(() => lastPhoto.evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth > 0))
+    .toBe(true);
+  const source = await lastPhoto.getAttribute("src");
+  const originalVersion = (await (await page.request.get("/version.json")).json())
+    .buildVersion as string;
+  let advertisedVersion = "synthetic-update";
+  await page.route("**/version.json", (route) =>
+    route.fulfill({ json: { buildVersion: advertisedVersion } }),
+  );
+  let broken = true;
+  await page.route("**/slideshow?**shellVersion=**", async (route) => {
+    if (!broken) {
+      await route.continue();
+      return;
+    }
+    // Mimic the original bug: JavaScript boots and reports its build, but the
+    // photo/database part never arrives. A wake-lock shim alone cannot catch it.
+    await route.fulfill({
+      contentType: "text/html",
+      body: `<!doctype html><html><body style="background:black"><script>
+      parent.postMessage({type:"snapshots:slideshow-ready",buildVersion:"synthetic-update"},location.origin);
+    </script></body></html>`,
+    });
+  });
+  await page.getByRole("button", { name: "Slideshow diagnostics" }).click();
+  await diagnostics.getByRole("button", { name: "Check for code update" }).click();
+  await expect(frame).toHaveAttribute("src", /shellVersion=synthetic-update/);
+  await expect(frame).toHaveAttribute("data-ready", "false");
+  await expect(frame).toHaveCSS("opacity", "0");
+  await expect(lastPhoto).toHaveAttribute("src", source!);
+  await expect(lastPhoto).toBeVisible();
+  await expect(diagnostics).not.toHaveAttribute("data-code-status", "current");
+  await page.screenshot({
+    path: test.info().outputPath("retained-photo-during-broken-update.png"),
+  });
+
+  // Let the real readiness deadline run, without sleeps or pretending a photo
+  // has decoded. It must recover even though boot already acknowledged JS.
+  const generation = Number(await frame.getAttribute("data-runtime-generation"));
+  await expect
+    .poll(async () => Number(await frame.getAttribute("data-runtime-generation")), {
+      // 20s readiness deadline plus the first 15s retry backoff.
+      timeout: 40_000,
+    })
+    .toBeGreaterThan(generation);
+  await expect(lastPhoto).toHaveAttribute("src", source!);
+
+  broken = false;
+  advertisedVersion = originalVersion;
+  await diagnostics.getByRole("button", { name: "Check for code update" }).click();
+  await expect(frame).toHaveAttribute("data-ready", "true", { timeout: 20_000 });
+  await expect(diagnostics).toHaveAttribute("data-code-status", "current");
+  expect(
+    await page.evaluate(() => (window as Window & { __wakeReleases?: number }).__wakeReleases),
   ).toBe(0);
 });
 
