@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Track } from "@shared/gpsTrack";
 import {
   isLocated,
@@ -44,7 +44,11 @@ const EMPTY_LENS_DRAFT: LensDraft = {
 
 const loadPresets = (): LensPreset[] => {
   if (typeof window === "undefined") return [];
-  return parseLensPresets(window.localStorage.getItem(PRESET_STORAGE_KEY) ?? "[]");
+  try {
+    return parseLensPresets(window.localStorage.getItem(PRESET_STORAGE_KEY) ?? "[]");
+  } catch {
+    return [];
+  }
 };
 
 const presetId = (): string =>
@@ -67,6 +71,12 @@ export const App = () => {
   const [track, setTrack] = useState<Track | null>(null);
   const [lensPresets, setLensPresets] = useState<LensPreset[]>(loadPresets);
   const [lensDraft, setLensDraft] = useState<LensDraft>(EMPTY_LENS_DRAFT);
+  const folderGeneration = useRef(0);
+  const listingRequest = useRef(0);
+  const writingRef = useRef(false);
+  const draftsRef = useRef({ pending, pendingLens });
+  draftsRef.current = { pending, pendingLens };
+  const renderedFolderGeneration = folderGeneration.current;
 
   const folder = listing?.path ?? "";
   const folderParts = listing?.path.split(/[\\/]/).filter(Boolean) ?? [];
@@ -82,16 +92,30 @@ export const App = () => {
   }, [lensPresets]);
 
   const fetchInto = useCallback((folderPath: string | undefined) => {
+    const request = ++listingRequest.current;
     setLoading(true);
     setError(null);
     return listFolder(folderPath)
-      .then(setListing)
-      .catch((caught) => setError(String(caught)))
-      .finally(() => setLoading(false));
+      .then((next) => {
+        if (listingRequest.current === request) setListing(next);
+      })
+      .catch((caught) => {
+        if (listingRequest.current === request) setError(String(caught));
+      })
+      .finally(() => {
+        if (listingRequest.current === request) setLoading(false);
+      });
   }, []);
 
   const navigate = useCallback(
     (folderPath?: string) => {
+      const drafts = draftsRef.current;
+      if (
+        (Object.keys(drafts.pending).length || Object.keys(drafts.pendingLens).length) &&
+        !window.confirm("Discard pending assignments and open another folder?")
+      )
+        return;
+      folderGeneration.current += 1;
       setSelected(new Set());
       setPending({});
       setPendingLens({});
@@ -104,6 +128,10 @@ export const App = () => {
 
   useEffect(() => {
     void navigate();
+    return () => {
+      folderGeneration.current += 1;
+      listingRequest.current += 1;
+    };
   }, [navigate]);
 
   const located = useMemo(() => photos.filter(isLocated), [photos]);
@@ -128,7 +156,7 @@ export const App = () => {
     });
 
   const assignToSelected = (fix: PendingFix) => {
-    if (selected.size === 0) return;
+    if (selected.size === 0 || loading) return;
     setPending((previous) => {
       const next = { ...previous };
       for (const filename of selected) next[filename] = fix;
@@ -168,11 +196,13 @@ export const App = () => {
     });
 
   const selectAllMissing = () => {
-    const candidates = mode === "location" ? photos.filter((photo) => !isLocated(photo)) : missingLens;
+    const candidates =
+      mode === "location" ? photos.filter((photo) => !isLocated(photo)) : missingLens;
     setSelected(new Set(candidates.map((photo) => photo.filename)));
   };
 
   const applyLens = (lens: LensMetadata, target: "selected" | "missing") => {
+    if (loading) return;
     const filenames =
       target === "selected"
         ? selected
@@ -187,11 +217,19 @@ export const App = () => {
   };
 
   const writeLocations = async () => {
+    if (writingRef.current || loading) return;
+    const generation = folderGeneration.current;
     const items = Object.entries(pending)
       .map(([filename, fix]) => {
         const photo = byName.get(filename);
         return photo
-          ? { filename, path: photo.path, lat: fix.lat, lng: fix.lng, interpolated: fix.interpolated }
+          ? {
+              filename,
+              path: photo.path,
+              lat: fix.lat,
+              lng: fix.lng,
+              interpolated: fix.interpolated,
+            }
           : null;
       })
       .filter((item): item is NonNullable<typeof item> => item !== null);
@@ -202,27 +240,39 @@ export const App = () => {
     );
     if (!confirmed) return;
 
+    writingRef.current = true;
     setWriting(true);
     setError(null);
     try {
       const results = await writeGps(items, folder);
+      if (generation !== folderGeneration.current) return;
       setNotice({ kind: "location", results });
-      const written = new Set(results.filter((result) => result.ok).map((result) => result.filename));
+      const written = new Set(
+        results.filter((result) => result.ok).map((result) => result.filename),
+      );
+      const unchanged = new Set(
+        [...written].filter((name) => draftsRef.current.pending[name] === pending[name]),
+      );
       setPending((previous) => {
         const next = { ...previous };
-        for (const filename of written) delete next[filename];
+        for (const filename of written) {
+          if (previous[filename] === pending[filename]) delete next[filename];
+        }
         return next;
       });
-      setSelected((previous) => new Set([...previous].filter((name) => !written.has(name))));
+      setSelected((previous) => new Set([...previous].filter((name) => !unchanged.has(name))));
       if (written.size > 0) void fetchInto(folder);
     } catch (caught) {
-      setError(String(caught));
+      if (generation === folderGeneration.current) setError(String(caught));
     } finally {
+      writingRef.current = false;
       setWriting(false);
     }
   };
 
   const writeLenses = async () => {
+    if (writingRef.current || loading) return;
+    const generation = folderGeneration.current;
     const items = Object.entries(pendingLens)
       .map(([filename, lens]) => {
         const photo = byName.get(filename);
@@ -237,22 +287,32 @@ export const App = () => {
     );
     if (!confirmed) return;
 
+    writingRef.current = true;
     setWriting(true);
     setError(null);
     try {
       const results = await writeLensMetadata(items, folder);
+      if (generation !== folderGeneration.current) return;
       setNotice({ kind: "lens", results });
-      const written = new Set(results.filter((result) => result.ok).map((result) => result.filename));
+      const written = new Set(
+        results.filter((result) => result.ok).map((result) => result.filename),
+      );
+      const unchanged = new Set(
+        [...written].filter((name) => draftsRef.current.pendingLens[name] === pendingLens[name]),
+      );
       setPendingLens((previous) => {
         const next = { ...previous };
-        for (const filename of written) delete next[filename];
+        for (const filename of written) {
+          if (previous[filename] === pendingLens[filename]) delete next[filename];
+        }
         return next;
       });
-      setSelected((previous) => new Set([...previous].filter((name) => !written.has(name))));
+      setSelected((previous) => new Set([...previous].filter((name) => !unchanged.has(name))));
       if (written.size > 0) void fetchInto(folder);
     } catch (caught) {
-      setError(String(caught));
+      if (generation === folderGeneration.current) setError(String(caught));
     } finally {
+      writingRef.current = false;
       setWriting(false);
     }
   };
@@ -298,7 +358,11 @@ export const App = () => {
               : `${lensTaggedCount} / ${photos.length} lens-tagged`}
           {activePendingCount > 0 ? ` · ${activePendingCount} pending` : ""}
         </span>
-        {error ? <span className="error" role="alert">{error}</span> : null}
+        {error ? (
+          <span className="error" role="alert">
+            {error}
+          </span>
+        ) : null}
       </header>
 
       {listing ? <FolderBar listing={listing} onOpen={navigate} /> : null}
@@ -355,8 +419,15 @@ export const App = () => {
             <TrackPanel
               key={folder}
               photos={photos}
-              onTrack={setTrack}
-              onInterpolated={onInterpolated}
+              disabled={loading}
+              onTrack={(next) => {
+                if (!loading && folderGeneration.current === renderedFolderGeneration)
+                  setTrack(next);
+              }}
+              onInterpolated={(fixes) => {
+                if (!loading && folderGeneration.current === renderedFolderGeneration)
+                  onInterpolated(fixes);
+              }}
             />
           </div>
         </>
@@ -439,11 +510,17 @@ export const App = () => {
                   tabIndex={0}
                 >
                   <div className="card__image">
-                    <img src={thumbUrl(photo.path, mode === "lens" ? 260 : 200)} alt="" loading="lazy" />
+                    <img
+                      src={thumbUrl(photo.path, mode === "lens" ? 260 : 200)}
+                      alt=""
+                      loading="lazy"
+                    />
                     {selected.has(photo.filename) ? <span className="card__check">✓</span> : null}
                   </div>
                   <figcaption>
-                    <span className="card__name" title={photo.filename}>{photo.filename}</span>
+                    <span className="card__name" title={photo.filename}>
+                      {photo.filename}
+                    </span>
                     <span className="card__meta">
                       {photo.dateTimeOriginal?.replace("T", " ") ?? "no capture date"}
                       {photo.offsetTimeOriginal ? ` (${photo.offsetTimeOriginal})` : ""}
@@ -467,10 +544,14 @@ export const App = () => {
                               clearPending(photo.filename);
                             }}
                             aria-label={`Discard pending location for ${photo.filename}`}
-                          >×</button>
+                          >
+                            ×
+                          </button>
                         </span>
                       ) : hasLocation ? (
-                        <span className="card__badge">{photo.decLat!.toFixed(5)}, {photo.decLng!.toFixed(5)}</span>
+                        <span className="card__badge">
+                          {photo.decLat!.toFixed(5)}, {photo.decLng!.toFixed(5)}
+                        </span>
                       ) : (
                         <span className="card__badge card__badge--missing">no location</span>
                       )
@@ -484,7 +565,9 @@ export const App = () => {
                             clearPendingLens(photo.filename);
                           }}
                           aria-label={`Discard pending lens for ${photo.filename}`}
-                        >×</button>
+                        >
+                          ×
+                        </button>
                       </span>
                     ) : hasLens ? (
                       <span className="card__badge">
@@ -509,13 +592,19 @@ export const App = () => {
       {notice ? (
         <div className="results" role="status">
           <strong>
-            Wrote {notice.results.filter((result) => result.ok).length}/{notice.results.length} {notice.kind} tags.
+            Wrote {notice.results.filter((result) => result.ok).length}/{notice.results.length}{" "}
+            {notice.kind} tags.
           </strong>
           {notice.results.some((result) => !result.ok)
-            ? ` Failed: ${notice.results.filter((result) => !result.ok).map((result) => result.filename).join(", ")}`
+            ? ` Failed: ${notice.results
+                .filter((result) => !result.ok)
+                .map((result) => result.filename)
+                .join(", ")}`
             : " All good."}
           {notice.results.some((result) => result.ok) ? (
-            <span className="toolbar__hint">Run <code>index/do-retag.sh</code> to refresh search.</span>
+            <span className="toolbar__hint">
+              Run <code>index/do-retag.sh</code> to refresh search.
+            </span>
           ) : null}
           <button onClick={() => setNotice(null)}>Dismiss</button>
         </div>

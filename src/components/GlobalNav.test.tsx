@@ -28,7 +28,7 @@ describe("GlobalNav", () => {
 
     expect(
       screen.getByRole("link", { name: "Start a similar-photo slideshow from a random photo" }),
-    ).toHaveAttribute("href", "/slideshow?mode=similar&random=1");
+    ).toHaveAttribute("href", "/slideshow/shell?mode=similar&random=1");
     expect(screen.getByRole("link", { name: "Map" })).not.toHaveAttribute("aria-current");
     expect(screen.getByRole("link", { name: "Slideshow" })).toHaveAttribute("aria-current", "page");
   });

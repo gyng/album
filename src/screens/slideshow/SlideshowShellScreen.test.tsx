@@ -12,7 +12,7 @@ import {
   SlideshowShellScreen,
 } from "./SlideshowShellScreen";
 import { RUNTIME_RELOAD_BASE_DELAY_MS } from "../../util/slideshowShell";
-import { useWakeLock, type WakeLockEvent } from "../../components/useWakeLock";
+import { useWakeLock, type WakeLockEvent, type WakeLockStatus } from "../../components/useWakeLock";
 import { navigateTo } from "../../util/navigate";
 import {
   HEARTBEAT_INTERVAL_MS,
@@ -37,6 +37,8 @@ const subscribeWakeEvents = jest.fn((listener: (event: WakeLockEvent) => void) =
 });
 let mockWakeLockSupported = true;
 let mockWakeLockActive = true;
+let mockWakeStatus: WakeLockStatus = "held";
+let mockWakeRef = { current: new EventTarget() as unknown as WakeLockSentinel | null };
 
 jest.mock("../../lib/buildVersion", () => ({ BUILD_VERSION: "build-current" }));
 jest.mock("../../util/navigate", () => ({ navigateTo: jest.fn() }));
@@ -60,6 +62,127 @@ const mountedMessage = (buildVersion: string) => ({
 });
 
 describe("slideshow code shell", () => {
+  it("gives a backgrounded runtime time to resume before enforcing its health lease", async () => {
+    jest.useFakeTimers();
+    const visibility = jest.spyOn(document, "visibilityState", "get").mockReturnValue("visible");
+    try {
+      global.fetch = jest.fn(() => versionResponse("build-current"));
+      const { unmount } = render(<SlideshowShellScreen />);
+      const frame = screen.getByTitle("Slideshow") as HTMLIFrameElement;
+      const sendHealth = () => {
+        window.dispatchEvent(
+          new MessageEvent("message", {
+            origin: window.location.origin,
+            source: frame.contentWindow,
+            data: {
+              ...mountedMessage("build-current"),
+              presentation: { sources: ["/photo.jpg"], cover: false },
+              health: {
+                photo: "/photo.jpg",
+                presentedAt: Date.now(),
+                pendingSince: null,
+                paused: true,
+                nextAdvanceAt: null,
+              },
+            },
+          }),
+        );
+      };
+      act(sendHealth);
+      act(() => {
+        visibility.mockReturnValue("hidden");
+        document.dispatchEvent(new Event("visibilitychange"));
+      });
+      await act(async () => {
+        await jest.advanceTimersByTimeAsync(120000);
+      });
+      expect(screen.getByTitle("Slideshow")).toBe(frame);
+      act(() => {
+        visibility.mockReturnValue("visible");
+        document.dispatchEvent(new Event("visibilitychange"));
+      });
+      await act(async () => {
+        await jest.advanceTimersByTimeAsync(30000);
+      });
+      expect(screen.getByTitle("Slideshow")).toBe(frame);
+      act(sendHealth);
+      await act(async () => {
+        await jest.advanceTimersByTimeAsync(30000);
+      });
+      expect(screen.getByTitle("Slideshow")).toBe(frame);
+      unmount();
+    } finally {
+      visibility.mockRestore();
+      jest.useRealTimers();
+    }
+  });
+
+  it("only replaces the shell on explicit confirmation, retaining runtime settings", async () => {
+    global.fetch = jest.fn(pendingVersionResponse);
+    const confirm = jest.spyOn(window, "confirm").mockReturnValue(false);
+    const { unmount } = render(<SlideshowShellScreen />);
+    const frame = screen.getByTitle("Slideshow") as HTMLIFrameElement;
+    act(() => {
+      window.dispatchEvent(
+        new MessageEvent("message", {
+          origin: window.location.origin,
+          source: frame.contentWindow,
+          data: {
+            ...mountedMessage("new-build"),
+            search: "?shell=1&shellVersion=old&photo=a%2Fb.jpg&delay=30",
+          },
+        }),
+      );
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Slideshow diagnostics" }));
+    fireEvent.click(screen.getByRole("button", { name: "Update slideshow shell" }));
+    expect(mockNavigateTo).not.toHaveBeenCalled();
+    confirm.mockReturnValue(true);
+    fireEvent.click(screen.getByRole("button", { name: "Update slideshow shell" }));
+    expect(mockNavigateTo).toHaveBeenCalledWith("/slideshow/shell?photo=a%2Fb.jpg&delay=30");
+    expect(releaseWakeLock).not.toHaveBeenCalled();
+    unmount();
+    confirm.mockRestore();
+  });
+  it("recovers a runtime that presents a photo and then stops reporting health", async () => {
+    jest.useFakeTimers();
+    try {
+      global.fetch = jest.fn(() => versionResponse("build-current"));
+      const { unmount } = render(<SlideshowShellScreen />);
+      const frame = screen.getByTitle("Slideshow") as HTMLIFrameElement;
+      act(() => {
+        window.dispatchEvent(
+          new MessageEvent("message", {
+            origin: window.location.origin,
+            source: frame.contentWindow,
+            data: {
+              ...mountedMessage("build-current"),
+              presentation: { sources: ["/photo.jpg"], cover: false },
+              health: {
+                photo: "/photo.jpg",
+                presentedAt: Date.now(),
+                pendingSince: null,
+                paused: false,
+                nextAdvanceAt: Date.now() + 900000,
+              },
+            },
+          }),
+        );
+      });
+      await act(async () => {
+        await jest.advanceTimersByTimeAsync(61000);
+      });
+      expect(screen.getByTitle("Slideshow")).not.toBe(frame);
+      expect(screen.getByAltText("Last displayed photograph")).toHaveAttribute("src", "/photo.jpg");
+      expect(releaseWakeLock).not.toHaveBeenCalled();
+      expect(readShellLog()).toContainEqual(
+        expect.objectContaining({ category: "code", reason: "runtime-unresponsive" }),
+      );
+      unmount();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
   beforeEach(() => {
     jest.clearAllMocks();
     window.localStorage.clear();
@@ -72,9 +195,12 @@ describe("slideshow code shell", () => {
     // this to false and advances >= WAKE_LOSS_RESET_MS will re-render the
     // full-screen gate over the diagnostics UI — query around it accordingly.
     mockWakeLockActive = true;
+    mockWakeStatus = "held";
+    mockWakeRef = { current: new EventTarget() as unknown as WakeLockSentinel };
     mockUseWakeLock.mockImplementation(() => ({
       // A bare EventTarget stands in for the WakeLockSentinel the ref carries.
-      ref: { current: new EventTarget() as unknown as WakeLockSentinel },
+      ref: mockWakeRef,
+      status: mockWakeStatus,
       isSupported: mockWakeLockSupported,
       isActive: mockWakeLockActive,
       acquire: acquireWakeLock,
@@ -651,7 +777,7 @@ describe("slideshow code shell", () => {
 
       render(<SlideshowShellScreen />);
 
-      const promptName = "Tap once to keep this slideshow awake through code updates";
+      const promptName = "Keep slideshow awake";
       // Chrome may acquire without a gesture; the gate must not flash meanwhile.
       expect(screen.queryByRole("button", { name: promptName })).not.toBeInTheDocument();
       // The e2e specs key off this attribute to know when the gate decision is
@@ -666,7 +792,9 @@ describe("slideshow code shell", () => {
 
       expect(diagnostics).toHaveAttribute("data-wake-settled", "true");
       const prompt = screen.getByRole("button", { name: promptName });
-      fireEvent.click(prompt);
+      await act(async () => {
+        fireEvent.click(prompt);
+      });
 
       expect(acquireWakeLock).toHaveBeenCalledTimes(1);
       expect(screen.queryByRole("button", { name: promptName })).not.toBeInTheDocument();
@@ -701,13 +829,15 @@ describe("slideshow code shell", () => {
       global.fetch = jest.fn(() => versionResponse("build-current")) as jest.Mock;
 
       render(<SlideshowShellScreen />);
-      const promptName = "Tap once to keep this slideshow awake through code updates";
+      const promptName = "Keep slideshow awake";
 
       await act(async () => {
         jest.advanceTimersByTime(AUTO_WAKE_SETTLE_MS);
         await Promise.resolve();
       });
-      fireEvent.click(screen.getByRole("button", { name: promptName }));
+      await act(async () => {
+        fireEvent.click(screen.getByRole("button", { name: promptName }));
+      });
       expect(screen.queryByRole("button", { name: promptName })).not.toBeInTheDocument();
 
       await act(async () => {
@@ -731,7 +861,7 @@ describe("slideshow code shell", () => {
       global.fetch = jest.fn(() => versionResponse("build-current")) as jest.Mock;
 
       render(<SlideshowShellScreen />);
-      const promptName = "Tap once to keep this slideshow awake through code updates";
+      const promptName = "Keep slideshow awake";
 
       // Settle the auto-acquire window; the sustained-loss timer arms.
       await act(async () => {
@@ -744,7 +874,9 @@ describe("slideshow code shell", () => {
         jest.advanceTimersByTime(WAKE_LOSS_RESET_MS - 10000);
         await Promise.resolve();
       });
-      fireEvent.click(screen.getByRole("button", { name: promptName }));
+      await act(async () => {
+        fireEvent.click(screen.getByRole("button", { name: promptName }));
+      });
       expect(screen.queryByRole("button", { name: promptName })).not.toBeInTheDocument();
 
       // Past where the ORIGINAL window would have fired (t~=61s): the gate must
@@ -975,6 +1107,68 @@ describe("slideshow code shell", () => {
     expect(gap).toBeDefined();
     fireEvent.click(screen.getByRole("button", { name: "Slideshow diagnostics" }));
     expect(screen.getByText(/Page was not running for/)).toBeInTheDocument();
+  });
+
+  it("records an execution gap when a resumed interval runs before visibilitychange", async () => {
+    jest.useFakeTimers();
+    try {
+      global.fetch = jest.fn(pendingVersionResponse);
+      const { unmount } = render(<SlideshowShellScreen />);
+      jest.setSystemTime(Date.now() + 5 * 60000);
+      await act(async () => {
+        await jest.advanceTimersByTimeAsync(HEARTBEAT_INTERVAL_MS);
+      });
+      expect(
+        readShellLog().some((entry) => entry.category === "gap" && entry.durationMs >= 5 * 60000),
+      ).toBe(true);
+      unmount();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it("keeps wake settling false while the platform request is still pending", async () => {
+    jest.useFakeTimers();
+    try {
+      global.fetch = jest.fn(pendingVersionResponse);
+      mockWakeStatus = "requesting";
+      mockWakeLockActive = false;
+      const { unmount } = render(<SlideshowShellScreen />);
+      await act(async () => {
+        await jest.advanceTimersByTimeAsync(AUTO_WAKE_SETTLE_MS + 1000);
+      });
+      expect(screen.getByRole("group", { name: "Slideshow diagnostics" })).toHaveAttribute(
+        "data-wake-settled",
+        "false",
+      );
+      expect(
+        screen.queryByRole("button", { name: /Keep slideshow awake/ }),
+      ).not.toBeInTheDocument();
+      unmount();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it("keeps the wake recovery action available if tapping does not obtain a lock", async () => {
+    jest.useFakeTimers();
+    try {
+      global.fetch = jest.fn(pendingVersionResponse);
+      mockWakeLockActive = false;
+      mockWakeStatus = "blocked";
+      mockWakeRef.current = null;
+      const { unmount } = render(<SlideshowShellScreen />);
+      await act(async () => {
+        await jest.advanceTimersByTimeAsync(AUTO_WAKE_SETTLE_MS);
+      });
+      await act(async () => {
+        fireEvent.click(screen.getByRole("button", { name: /Keep slideshow awake/ }));
+      });
+      expect(screen.getByRole("button", { name: /Keep slideshow awake/ })).toBeInTheDocument();
+      unmount();
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   it("does not record a gap event for a heartbeat within the threshold", () => {

@@ -109,6 +109,9 @@ jobs:
         run: npm run build:e2e
       - name: Run Playwright tests
         run: npx playwright test --project=${{ matrix.browser }}
+      - name: Run iPad slideshow recovery tests
+        if: matrix.browser == 'webkit'
+        run: PLAYWRIGHT_SLIDESHOW_WEBKIT=1 npx playwright test --project=ipad-webkit
       - uses: actions/upload-artifact@v7
         if: ${{ !cancelled() }}
         with:

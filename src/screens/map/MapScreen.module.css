@@ -1,4 +1,13 @@
 .container {
+  --map-chrome-gutter: var(--m-l);
+  --map-control-rail-width: var(--tap-target);
+  --map-chrome-left: max(var(--map-chrome-gutter), env(safe-area-inset-left, 0px));
+  --map-chrome-right: max(var(--map-chrome-gutter), env(safe-area-inset-right, 0px));
+  --map-chrome-top: max(var(--map-chrome-gutter), env(safe-area-inset-top, 0px));
+  --map-chrome-bottom: max(var(--map-chrome-gutter), env(safe-area-inset-bottom, 0px));
+  --map-legend-bottom: calc(
+    var(--map-chrome-bottom) + var(--map-bottom-chrome) + var(--size-24) + var(--m-s)
+  );
   container-type: inline-size;
   position: relative;
   isolation: isolate;
@@ -16,7 +25,7 @@
 }
 
 .containerWithSlider {
-  /* The panel sits at bottom: var(--m-l) and is about 82px tall. */
+  /* Measured border-box height, with one shared gap above the panel. */
   --map-bottom-chrome: calc(var(--range-slider-clearance) + var(--m-s));
 }
 
@@ -27,8 +36,45 @@
    property being animated — `bottom` is a different longhand and never applied. */
 .container :global(.maplibregl-ctrl-bottom-left),
 .container :global(.maplibregl-ctrl-bottom-right) {
-  inset-block-end: calc(var(--m-l) + var(--map-bottom-chrome));
+  inset-block-end: calc(var(--map-chrome-bottom) + var(--map-bottom-chrome));
   transition: inset-block-end var(--t-base) var(--ease-out);
+}
+
+.container :global(.maplibregl-ctrl-bottom-left) {
+  inset-inline-start: var(--map-chrome-left);
+}
+
+.container :global(.maplibregl-ctrl-bottom-right) {
+  inset-inline-end: var(--map-chrome-right);
+}
+
+.container :global(.maplibregl-ctrl-bottom-left) > :global(.maplibregl-ctrl),
+.container :global(.maplibregl-ctrl-bottom-right) > :global(.maplibregl-ctrl),
+.container :global(.maplibregl-ctrl-top-right) > :global(.maplibregl-ctrl) {
+  margin: 0;
+}
+
+.container :global(.maplibregl-ctrl-bottom-left) > :global(.maplibregl-ctrl-scale) {
+  min-block-size: var(--size-24);
+}
+
+.container :global(.maplibregl-ctrl-top-right) {
+  inset-block-start: var(--map-chrome-top);
+  inset-inline-end: var(--map-chrome-right);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--m-s);
+}
+
+.container :global(.maplibregl-ctrl-group) {
+  border-radius: var(--m-s);
+  overflow: hidden;
+}
+
+.container :global(.maplibregl-ctrl-group) button {
+  inline-size: var(--tap-target);
+  block-size: var(--tap-target);
 }
 
 .map {
@@ -41,13 +87,15 @@
 .titleBar {
   position: fixed;
   z-index: var(--z-fullscreen);
-  inset-block-start: calc(var(--m-l) + var(--m-m));
-  left: var(--m-l);
+  /* Nav owns its block padding and a 1px list inset. Align the first control,
+     rather than its padded wrapper, with the native map control rail. */
+  inset-block-start: calc(var(--map-chrome-top) - var(--m-m) - var(--size-1));
+  inset-inline-start: var(--map-chrome-left);
   /* Reserve clearance on the right for MapLibre's stacked controls
      (NavigationControl, GeolocateControl, FullscreenControl all anchor
      top-right). Without this the nav's bounding box overlaps them on mobile,
      blocking taps even when the mask-image has faded the visible content. */
-  right: calc(var(--m-l) + var(--m-2xl));
+  inset-inline-end: calc(var(--map-chrome-right) + var(--map-control-rail-width) + var(--m-m));
   margin: 0;
 }
 
@@ -55,6 +103,11 @@
   display: inline-flex;
   flex-wrap: wrap;
   gap: var(--m-s);
+}
+
+/* Safe-area spacing belongs to the map's outer gutter, not both wrappers. */
+.titleBar nav {
+  padding-block-start: var(--m-m);
 }
 
 /* The field sits in the nav row, in the slot beside the theme toggle rather than
@@ -158,4 +211,34 @@
 .title {
   display: inline-block;
   margin: 0;
+}
+
+@media (max-width: 720px) {
+  .container {
+    --map-chrome-gutter: var(--m-m);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .container :global(.maplibregl-ctrl-bottom-left),
+  .container :global(.maplibregl-ctrl-bottom-right) {
+    transition: none;
+  }
+}
+
+/* Keep full-size targets clear of the date panel on short landscape screens.
+   Only the zoom/compass group changes orientation; every control stays present. */
+@media (min-width: 540px) and (max-height: 480px) {
+  .container {
+    --map-control-rail-width: calc(var(--tap-target) * 3);
+  }
+
+  .container :global(.maplibregl-ctrl-group) {
+    display: flex;
+  }
+
+  .container :global(.maplibregl-ctrl-group) button + button {
+    border-block-start: 0;
+    border-inline-start: var(--size-1) solid color-mix(in oklch, var(--c-font) 18%, transparent);
+  }
 }

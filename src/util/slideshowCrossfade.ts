@@ -78,7 +78,14 @@ export const pushLayer = (
   if (top && top.key === key) {
     return layers.map((layer) => (layer.key === key ? { ...layer, slide } : layer));
   }
-  return cap([...layers, { key, slide, loaded: false }]);
+  // Backtracking must move the existing keyed DOM layer, not mount a second
+  // copy of it. Keep its reveal state so returning before decode never blanks
+  // the photograph that was already visible.
+  const existing = layers.find((layer) => layer.key === key);
+  return cap([
+    ...layers.filter((layer) => layer.key !== key),
+    { key, slide, loaded: existing?.loaded ?? false },
+  ]);
 };
 
 // Reveal the layer with `key` (loaded) and start fading out every other layer —

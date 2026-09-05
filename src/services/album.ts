@@ -58,20 +58,7 @@ const listAlbumDirectories = (albumsPath: string): string[] => {
 };
 
 const isZoneIdentifierFile = (filename: string): boolean => {
-  return filename.toLowerCase().includes(":zone.identifier");
-};
-
-const removeZoneIdentifierSidecar = (sidecarPath: string): boolean => {
-  try {
-    if (fs.existsSync(sidecarPath)) {
-      fs.unlinkSync(sidecarPath);
-      console.log(`Deleted Zone.Identifier sidecar file: ${sidecarPath}`);
-    }
-  } catch (err) {
-    console.warn(`Failed to delete Zone.Identifier sidecar: ${sidecarPath}`, err);
-  }
-
-  return false;
+  return filename.toLowerCase().endsWith(":zone.identifier");
 };
 
 const listAlbumMediaFiles = (albumPath: string): string[] => {
@@ -79,13 +66,8 @@ const listAlbumMediaFiles = (albumPath: string): string[] => {
     .readdirSync(albumPath)
     .filter((it) => !fs.lstatSync(path.join(albumPath, it)).isDirectory())
     .filter((it) => !it.match(/\.json$/))
-    .filter((it) => {
-      if (!isZoneIdentifierFile(it)) {
-        return true;
-      }
-
-      return removeZoneIdentifierSidecar(path.join(albumPath, it));
-    });
+    // Discovery is read-only: ignore Windows sidecars, never delete sources.
+    .filter((it) => !isZoneIdentifierFile(it));
 
   const supported = candidates.filter(isSupportedMediaFile);
 
@@ -283,7 +265,6 @@ const appendExternalBlocks = (
     }
 
     if (isZoneIdentifierFile(ext.href)) {
-      removeZoneIdentifierSidecar(path.join(albumPath, ext.href));
       return;
     }
 

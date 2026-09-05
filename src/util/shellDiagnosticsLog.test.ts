@@ -370,6 +370,39 @@ describe("coalescing repeated events", () => {
 });
 
 describe("retry-cycle coalescing across the decay pattern", () => {
+  it("preserves the onset through an overnight stream of detailed rejected requests", () => {
+    const storage = makeStorage();
+    appendShellEvent({ category: "wake", type: "lost" }, 0, storage);
+    let at = 0;
+    for (let cycle = 0; cycle < 48; cycle++) {
+      for (let attempt = 0; attempt < 5; attempt++) {
+        appendShellEvent({ category: "wake", type: "request-start" }, ++at, storage);
+        appendShellEvent(
+          {
+            category: "wake",
+            type: "request-failed",
+            name: "NotAllowedError",
+            message: "Denied",
+            elapsedMs: 10,
+          },
+          ++at,
+          storage,
+        );
+        appendShellEvent({ category: "wake", type: "reacquire-failed" }, ++at, storage);
+      }
+      appendShellEvent({ category: "wake", type: "cap-reached" }, ++at, storage);
+      appendShellEvent({ category: "wake", type: "cap-decayed" }, (at += 600000), storage);
+    }
+    const log = readShellLog(storage);
+    expect(log).toHaveLength(6);
+    expect(log[0]).toMatchObject({ type: "lost", at: 0 });
+    expect(log.find((entry) => entry.type === "request-failed")).toMatchObject({
+      count: 240,
+      name: "NotAllowedError",
+      message: "Denied",
+    });
+  });
+
   it("keeps a whole night of decay cycles down to one entry per cycle type", () => {
     const storage = makeStorage();
     appendShellEvent({ category: "wake", type: "lost" }, 0, storage);

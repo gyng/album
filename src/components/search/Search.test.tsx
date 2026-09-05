@@ -1292,7 +1292,7 @@ describe("Search interaction edges", () => {
       await second;
     });
     expect(navigateTo).toHaveBeenCalledWith(
-      "/slideshow?mode=similar&seed=..%2Falbums%2Ftest-simple%2Fa%20b.jpg",
+      "/slideshow/shell?mode=similar&seed=..%2Falbums%2Ftest-simple%2Fa%20b.jpg",
     );
   });
 

@@ -2,6 +2,7 @@ import React, { useCallback, useEffect } from "react";
 
 type WakeLockSentinel = EventTarget & {
   release: () => Promise<void>;
+  readonly released?: boolean;
 };
 
 type WakeLockNavigator = Navigator & {
@@ -14,7 +15,20 @@ type WakeLockNavigator = Navigator & {
 // a rejected re-acquire, hitting the give-up cap, and decaying that cap to retry
 // unattended. The shell records lock acquisition/loss itself from `isActive`
 // transitions; the hook pushes only these facts it alone knows.
-export type WakeLockEvent = "reacquire-failed" | "cap-reached" | "cap-decayed";
+export type WakeLockEvent =
+  | "reacquire-failed"
+  | "cap-reached"
+  | "cap-decayed"
+  | "request-start"
+  | "request-held"
+  | "request-failed";
+export type WakeLockDetails = {
+  elapsedMs?: number;
+  name?: string;
+  message?: string;
+  released?: boolean;
+};
+export type WakeLockStatus = "idle" | "requesting" | "held" | "retrying" | "blocked";
 
 export type UseWakeLock = {
   // Live sentinel ref — consumers (e.g. the kiosk DB-update poll and the
@@ -22,12 +36,13 @@ export type UseWakeLock = {
   ref: React.RefObject<WakeLockSentinel | null>;
   isSupported: boolean;
   isActive: boolean;
+  status: WakeLockStatus;
   acquire: () => Promise<void>;
   release: () => Promise<void>;
   // Subscribe to internal outcomes for the persistent wake event log. Push-based
   // (not a polled ref) so the log is exact and the callback identity is stable,
   // never churning the hook's effects. Returns an unsubscribe.
-  subscribe: (listener: (event: WakeLockEvent) => void) => () => void;
+  subscribe: (listener: (event: WakeLockEvent, details?: WakeLockDetails) => void) => () => void;
 };
 
 // After the system silently drops a held lock (iPadOS does this for thermal /
@@ -35,6 +50,7 @@ export type UseWakeLock = {
 // before re-acquiring. The delay stops a tight loop if the platform instantly
 // re-releases the fresh lock.
 const SYSTEM_REACQUIRE_DELAY_MS = 1500;
+export const WAKE_REQUEST_TIMEOUT_MS = 8000;
 // A lock held at least this long counts as a genuine success and resets the
 // consecutive re-acquire counter — a brief blip is a fight, a long hold is not.
 const SUSTAINED_HOLD_MS = 30000;
@@ -63,11 +79,13 @@ const REACQUIRE_CAP_DECAY_MS = 600000;
 export const useWakeLock = (disabled: boolean): UseWakeLock => {
   const [isSupported, setIsSupported] = React.useState(false);
   const [isActive, setIsActive] = React.useState(false);
+  const [status, setStatus] = React.useState<WakeLockStatus>("idle");
   const wakeLockRef = React.useRef<WakeLockSentinel | null>(null);
   // Guards overlapping acquires: request() is async, so two callers could each
   // pass the "not currently held" check and each obtain a sentinel — leaking
   // the first (the screen would stay awake with an untracked lock).
   const isAcquiringRef = React.useRef(false);
+  const cancelRequestRef = React.useRef<(() => void) | null>(null);
   // Bumped on every release so an acquire that is still awaiting request() can
   // tell it was superseded (released / navigated away / disabled) and let go of
   // the late-arriving sentinel instead of storing it.
@@ -85,7 +103,9 @@ export const useWakeLock = (disabled: boolean): UseWakeLock => {
   const lastReacquireAttemptAtRef = React.useRef(0);
   // Subscribers to internal wake outcomes (the persistent event log). A plain
   // Set kept in a ref, so subscribing never re-runs the hook's effects.
-  const eventListenersRef = React.useRef(new Set<(event: WakeLockEvent) => void>());
+  const eventListenersRef = React.useRef(
+    new Set<(event: WakeLockEvent, details?: WakeLockDetails) => void>(),
+  );
   // Current `disabled` for the release listener / watchdog, whose closures must
   // not act on a stale value.
   const disabledRef = React.useRef(disabled);
@@ -107,18 +127,22 @@ export const useWakeLock = (disabled: boolean): UseWakeLock => {
     setIsSupported(typeof wakeLock?.request === "function");
   }, []);
 
-  const emitEvent = useCallback((event: WakeLockEvent) => {
+  const emitEvent = useCallback((event: WakeLockEvent, details?: WakeLockDetails) => {
     for (const listener of eventListenersRef.current) {
-      listener(event);
+      if (details) listener(event, details);
+      else listener(event);
     }
   }, []);
 
-  const subscribe = useCallback((listener: (event: WakeLockEvent) => void) => {
-    eventListenersRef.current.add(listener);
-    return () => {
-      eventListenersRef.current.delete(listener);
-    };
-  }, []);
+  const subscribe = useCallback(
+    (listener: (event: WakeLockEvent, details?: WakeLockDetails) => void) => {
+      eventListenersRef.current.add(listener);
+      return () => {
+        eventListenersRef.current.delete(listener);
+      };
+    },
+    [],
+  );
 
   const clearReacquireTimer = useCallback(() => {
     if (reacquireTimerRef.current !== null) {
@@ -131,10 +155,14 @@ export const useWakeLock = (disabled: boolean): UseWakeLock => {
     // Invalidate any in-flight acquire so its late sentinel is let go, not kept,
     // and cancel any pending system-release re-acquire.
     releaseGenerationRef.current += 1;
+    cancelRequestRef.current?.();
+    cancelRequestRef.current = null;
+    isAcquiringRef.current = false;
     clearReacquireTimer();
     const sentinel = wakeLockRef.current;
     wakeLockRef.current = null;
     setIsActive(false);
+    setStatus("idle");
 
     if (!sentinel) {
       return;
@@ -147,6 +175,24 @@ export const useWakeLock = (disabled: boolean): UseWakeLock => {
     }
   }, [clearReacquireTimer]);
 
+  const scheduleRetry = useCallback(() => {
+    if (disabledRef.current || document.visibilityState !== "visible") return;
+    if (systemReacquireCountRef.current >= MAX_SYSTEM_REACQUIRES) {
+      setStatus("blocked");
+      emitEvent("cap-reached");
+      return;
+    }
+    setStatus("retrying");
+    clearReacquireTimer();
+    // Immediate system releases keep a short settling delay. Rejected requests
+    // back off within this same finite budget; the watchdog is only a fallback.
+    const delay = Math.min(15000, SYSTEM_REACQUIRE_DELAY_MS * 2 ** systemReacquireCountRef.current);
+    reacquireTimerRef.current = window.setTimeout(() => {
+      reacquireTimerRef.current = null;
+      runAcquireRef.current(false);
+    }, delay);
+  }, [clearReacquireTimer, emitEvent]);
+
   // `resetGiveUp` distinguishes an intentional acquire (mount, visibility
   // resume, or a user gesture) — which clears the give-up counter and revives
   // the re-acquire loop — from an internal retry (release listener / watchdog),
@@ -158,7 +204,7 @@ export const useWakeLock = (disabled: boolean): UseWakeLock => {
       }
       const wakeLock = (navigator as WakeLockNavigator).wakeLock;
       if (
-        disabled ||
+        disabledRef.current ||
         document.visibilityState !== "visible" ||
         typeof wakeLock?.request !== "function"
       ) {
@@ -166,8 +212,13 @@ export const useWakeLock = (disabled: boolean): UseWakeLock => {
         return;
       }
 
+      if (wakeLockRef.current?.released) {
+        wakeLockRef.current = null;
+        setIsActive(false);
+      }
       if (wakeLockRef.current) {
         setIsActive(true);
+        setStatus("held");
         return;
       }
 
@@ -176,15 +227,61 @@ export const useWakeLock = (disabled: boolean): UseWakeLock => {
         return;
       }
       isAcquiringRef.current = true;
-      const generation = releaseGenerationRef.current;
+      clearReacquireTimer();
+      if (!resetGiveUp) systemReacquireCountRef.current += 1;
+      lastReacquireAttemptAtRef.current = Date.now();
+      const generation = ++releaseGenerationRef.current;
+      const startedAt = Date.now();
+      setStatus("requesting");
+      // Effects subscribing from the shell run before this microtask, including
+      // on the initial automatic acquire. The platform request stays synchronous
+      // with a user gesture where one initiated it.
+      queueMicrotask(() => emitEvent("request-start"));
 
       try {
-        const sentinel = await wakeLock.request("screen");
+        const sentinel = await new Promise<WakeLockSentinel | null>((resolve, reject) => {
+          let finished = false;
+          const deadline = window.setTimeout(() => {
+            finished = true;
+            reject(new DOMException("Screen wake-lock request timed out", "TimeoutError"));
+          }, WAKE_REQUEST_TIMEOUT_MS);
+          cancelRequestRef.current = () => {
+            finished = true;
+            window.clearTimeout(deadline);
+            resolve(null);
+          };
+          const onFailure = (error: unknown) => {
+            window.clearTimeout(deadline);
+            if (!finished) {
+              finished = true;
+              reject(error);
+            }
+          };
+          try {
+            wakeLock.request("screen").then((value) => {
+              window.clearTimeout(deadline);
+              if (finished || generation !== releaseGenerationRef.current) {
+                void value.release().catch(console.error);
+                return;
+              }
+              finished = true;
+              resolve(value);
+            }, onFailure);
+          } catch (error) {
+            onFailure(error);
+          }
+        });
+        if (!sentinel) return;
 
         // Superseded while awaiting — a release/unmount/disable happened, or a
         // parallel acquire already installed a lock. Let this sentinel go rather
         // than leak it (this is the Escape-nav "screen stays awake" case).
-        if (releaseGenerationRef.current !== generation || wakeLockRef.current) {
+        if (
+          releaseGenerationRef.current !== generation ||
+          wakeLockRef.current ||
+          disabledRef.current ||
+          document.visibilityState !== "visible"
+        ) {
           try {
             await sentinel.release();
           } catch (error) {
@@ -192,10 +289,14 @@ export const useWakeLock = (disabled: boolean): UseWakeLock => {
           }
           return;
         }
+        if (sentinel.released)
+          throw new DOMException("Wake lock was already released", "NotAllowedError");
 
         wakeLockRef.current = sentinel;
         acquiredAtRef.current = Date.now();
         setIsActive(true);
+        setStatus("held");
+        emitEvent("request-held", { elapsedMs: Date.now() - startedAt, released: false });
         sentinel.addEventListener("release", () => {
           // Only the currently-held sentinel may flip state off; a superseded
           // one firing its release event must not clear a newer lock. A
@@ -216,23 +317,16 @@ export const useWakeLock = (disabled: boolean): UseWakeLock => {
           if (disabledRef.current || document.visibilityState !== "visible") {
             return;
           }
-          if (systemReacquireCountRef.current >= MAX_SYSTEM_REACQUIRES) {
-            // Gave up fighting the OS — wait for a visibility change or gesture
-            // (public acquire()) to reset the counter, or for the watchdog to
-            // decay the cap after a long unattended gap.
-            emitEvent("cap-reached");
-            return;
-          }
-          systemReacquireCountRef.current += 1;
-          clearReacquireTimer();
-          reacquireTimerRef.current = window.setTimeout(() => {
-            reacquireTimerRef.current = null;
-            lastReacquireAttemptAtRef.current = Date.now();
-            runAcquireRef.current(false);
-          }, SYSTEM_REACQUIRE_DELAY_MS);
+          scheduleRetry();
         });
       } catch (error) {
         console.error(error);
+        if (generation !== releaseGenerationRef.current) return;
+        emitEvent("request-failed", {
+          elapsedMs: Date.now() - startedAt,
+          name: error instanceof Error ? error.name : "Error",
+          message: error instanceof Error ? error.message : String(error),
+        });
         // Don't clobber a lock another acquire may have installed meanwhile.
         if (!wakeLockRef.current) {
           setIsActive(false);
@@ -244,17 +338,17 @@ export const useWakeLock = (disabled: boolean): UseWakeLock => {
         // (low battery) would make the watchdog fire a doomed attempt each
         // minute forever, bypassing the cap and its decay entirely.
         if (!resetGiveUp) {
-          systemReacquireCountRef.current += 1;
           emitEvent("reacquire-failed");
-          if (systemReacquireCountRef.current >= MAX_SYSTEM_REACQUIRES) {
-            emitEvent("cap-reached");
-          }
         }
+        scheduleRetry();
       } finally {
-        isAcquiringRef.current = false;
+        if (generation === releaseGenerationRef.current) {
+          isAcquiringRef.current = false;
+          cancelRequestRef.current = null;
+        }
       }
     },
-    [disabled, release, clearReacquireTimer, emitEvent],
+    [release, clearReacquireTimer, emitEvent, scheduleRetry],
   );
 
   useEffect(() => {
@@ -290,7 +384,15 @@ export const useWakeLock = (disabled: boolean): UseWakeLock => {
   useEffect(() => {
     const syncWakeLockState = () => {
       if (document.visibilityState !== "visible") {
+        // Cancel pending requests on suspension; an old completion cannot hold
+        // a lock on behalf of a later visible session.
+        releaseGenerationRef.current += 1;
+        cancelRequestRef.current?.();
+        cancelRequestRef.current = null;
+        isAcquiringRef.current = false;
+        clearReacquireTimer();
         setIsActive(false);
+        setStatus("idle");
         return;
       }
 
@@ -314,7 +416,7 @@ export const useWakeLock = (disabled: boolean): UseWakeLock => {
       document.removeEventListener("visibilitychange", syncWakeLockState);
       window.removeEventListener("pageshow", handlePageShow);
     };
-  }, [disabled, acquire]);
+  }, [disabled, acquire, clearReacquireTimer]);
 
   useEffect(() => {
     if (disabled) {
@@ -330,7 +432,11 @@ export const useWakeLock = (disabled: boolean): UseWakeLock => {
       if (disabledRef.current || document.visibilityState !== "visible") {
         return;
       }
-      if (wakeLockRef.current || isAcquiringRef.current) {
+      if (
+        (wakeLockRef.current && !wakeLockRef.current.released) ||
+        isAcquiringRef.current ||
+        reacquireTimerRef.current !== null
+      ) {
         return;
       }
       if (systemReacquireCountRef.current >= MAX_SYSTEM_REACQUIRES) {
@@ -354,5 +460,5 @@ export const useWakeLock = (disabled: boolean): UseWakeLock => {
     };
   }, [release]);
 
-  return { ref: wakeLockRef, isSupported, isActive, acquire, release, subscribe };
+  return { ref: wakeLockRef, isSupported, isActive, status, acquire, release, subscribe };
 };

@@ -75,7 +75,7 @@ describe("SimilarTrailBar", () => {
     const slideshow = screen.getByRole("link", { name: "Start similarity trail slideshow" });
     expect(slideshow).toHaveAttribute(
       "href",
-      "/slideshow?mode=similar&seed=..%2Falbums%2Ftest-simple%2Fsource%20photo.jpg",
+      "/slideshow/shell?mode=similar&seed=..%2Falbums%2Ftest-simple%2Fsource%20photo.jpg",
     );
     fireEvent.click(slideshow);
     expect(navigate).toHaveBeenCalledWith(expect.anything(), slideshow.getAttribute("href"));

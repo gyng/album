@@ -96,6 +96,39 @@ describe("useSearchResultsState", () => {
     } = {},
   ) => renderHook(() => useSearchResultsState({ ...baseProps(), ...overrides }));
 
+  it("invalidates cached pages when a ready database is replaced", () => {
+    const props = { ...baseProps(), searchInputValue: "cat" };
+    const { rerender } = renderHook((value) => useSearchResultsState(value), {
+      initialProps: props,
+    });
+    const originalKey = config.queryKey;
+    const replacement = { name: "replacement" } as any;
+    rerender({ ...props, database: replacement });
+    expect(config.queryKey).not.toEqual(originalKey);
+    const coreKey = config.queryKey;
+    rerender({ ...props, database: replacement, embeddingsDatabase: {} as any });
+    expect(config.queryKey).not.toEqual(coreKey);
+  });
+
+  it.each([
+    {},
+    { colorSearch: [10, 20, 30] as RGB },
+    { selectedFacets: [{ facetId: "camera", value: "X" }] },
+  ])("waits for semantic vectors regardless of additional filters: %j", (filters) => {
+    textVector.mockReturnValue({
+      ...baseVectorState(),
+      textVector: [1],
+      textVectorQuery: "cat",
+    } as any);
+    renderState({
+      ...filters,
+      searchInputValue: "cat",
+      searchMode: "semantic",
+      embeddingsDatabase: null,
+    });
+    expect(config.enabled).toBe(false);
+  });
+
   it("derives display state and flattens query pages", () => {
     const { result } = renderState({
       searchInputValue: "cats, night",

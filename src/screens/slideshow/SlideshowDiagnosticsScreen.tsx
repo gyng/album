@@ -96,6 +96,7 @@ export const SlideshowDiagnosticsScreen = () => {
       sessionStart: current.status?.sessionStart ?? current.now,
       buildVersion: current.status?.shellVersion ?? BUILD_VERSION,
       runtimeVersion: current.status?.runtimeVersion ?? BUILD_VERSION,
+      ...(current.status?.runtimeHealth ? { runtimeHealth: current.status.runtimeHealth } : {}),
       codeStatus: current.status?.codeStatus ?? "unknown",
       wake: current.status?.wake ?? { supported: false, active: false, losses: 0 },
       online: current.status?.online ?? navigator.onLine,

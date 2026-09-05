@@ -26,7 +26,10 @@ test.describe("Smoke Tests", () => {
     await expect(page.locator('a[href="/map"]')).toBeVisible();
     await expect(page.locator('a[href="/timeline"]')).toBeVisible();
     await expect(page.locator('a[href="/search"]')).toBeVisible();
-    await expect(page.locator('a[href="/slideshow"]')).toBeVisible();
+    await expect(page.getByRole("link", { name: "Slideshow", exact: true })).toHaveAttribute(
+      "href",
+      "/slideshow/shell",
+    );
 
     // At least one album
     await expect(page.locator('a[href*="/album/"]').first()).toBeVisible();

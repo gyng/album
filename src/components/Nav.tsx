@@ -108,7 +108,7 @@ export const Nav: React.FC<{
               <li aria-hidden="true" className={commonStyles.navDivider} />
               <li>
                 <Link
-                  href={`/map?filter_album=${props.albumName}`}
+                  href={`/map?${new URLSearchParams({ filter_album: props.albumName })}`}
                   className={`${buttonStyles.base} ${commonStyles.navContext}`}
                 >
                   Album map
@@ -116,7 +116,7 @@ export const Nav: React.FC<{
               </li>
               <li>
                 <Link
-                  href={`/timeline?filter_album=${props.albumName}`}
+                  href={`/timeline?${new URLSearchParams({ filter_album: props.albumName })}`}
                   className={`${buttonStyles.base} ${commonStyles.navContext}`}
                 >
                   Album timeline
@@ -124,7 +124,7 @@ export const Nav: React.FC<{
               </li>
               <li>
                 <Link
-                  href={`/slideshow?filter=${props.albumName}`}
+                  href={`/slideshow/shell?${new URLSearchParams({ filter: props.albumName })}`}
                   className={`${buttonStyles.base} ${commonStyles.navContext}`}
                 >
                   Album slideshow

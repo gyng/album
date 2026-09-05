@@ -1,7 +1,12 @@
 // Client-side track parsing + interpolation, built entirely on the shared
 // src/util modules. tz-lookup is the only server round-trip (fetchTz).
 import { parseGpx, parseGoogleTakeout, sampleTrackAt, type Track } from "@shared/gpsTrack";
-import { localExifToUtc, parseExifOffset, resolveOffset, type ResolvedOffset } from "@shared/gpsOffset";
+import {
+  localExifToUtc,
+  parseExifOffset,
+  resolveOffset,
+  type ResolvedOffset,
+} from "@shared/gpsOffset";
 import { parseExifLocalDateTime } from "@shared/exifTime";
 import { fetchTz, type GeotagPhoto, type PendingFix } from "./api.ts";
 
@@ -15,19 +20,22 @@ export const trackFormatFor = (filename: string): TrackFormat =>
 
 /**
  * Interpolate a fix for every photo whose capture time falls within the track's
- * span. Per-photo OffsetTimeOriginal wins over the segment offset.
+ * span. Camera mode uses per-photo offsets where recorded; override mode uses
+ * the entered offset for every photo, including cameras with incorrect tags.
  */
 export const interpolatePhotos = (
   photos: GeotagPhoto[],
   track: Track,
   segmentOffsetMinutes: number,
+  offsetMode: "camera" | "override" = "camera",
 ): Record<string, PendingFix> => {
   const out: Record<string, PendingFix> = {};
   for (const photo of photos) {
     const parts = parseExifLocalDateTime(photo.dateTimeOriginal);
     if (!parts) continue;
     const perPhoto = photo.offsetTimeOriginal ? parseExifOffset(photo.offsetTimeOriginal) : null;
-    const offset = perPhoto ?? segmentOffsetMinutes;
+    const offset =
+      offsetMode === "override" ? segmentOffsetMinutes : (perPhoto ?? segmentOffsetMinutes);
     const sample = sampleTrackAt(track, localExifToUtc(parts, offset));
     if (sample) {
       out[photo.filename] = {
@@ -63,7 +71,10 @@ export const suggestSegmentOffset = async (
   return resolveOffset({
     offsetTimeOriginal: withOffset?.offsetTimeOriginal ?? undefined,
     gps: withGps
-      ? { localParts: parseExifLocalDateTime(withGps.dateTimeOriginal)!, gpsUtcMs: withGps.gpsUtcMs! }
+      ? {
+          localParts: parseExifLocalDateTime(withGps.dateTimeOriginal)!,
+          gpsUtcMs: withGps.gpsUtcMs!,
+        }
       : undefined,
     track: trackInput,
   });

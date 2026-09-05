@@ -1,15 +1,13 @@
 .legend {
   position: absolute;
-  /* Match MapLibre's own 10px control inset so this and the distance scale
-     form one clean left edge. */
-  inset-inline-start: var(--size-10);
-  /* Sits above the MapLibre scale control (bottom-left) without overlapping,
-     and clears whatever the map has along its bottom edge — the date-range
-     panel sets `--map-bottom-chrome` for exactly this. The `--m-l` term
-     mirrors MapScreen raising the bottom control containers by the same
-     amount: without it the scale's top (container + vendor margin + ~22px of
-     control) reaches past this edge and runs through the legend. */
-  inset-block-end: calc(var(--m-l) + var(--m-xl) + var(--map-bottom-chrome, 0px));
+  /* Share the screen's safe-area gutter; embedded maps keep the vendor inset. */
+  inset-inline-start: var(--map-chrome-left, var(--size-10));
+  /* MapScreen supplies the same bottom clearance as its native control rail,
+     plus the scale's height and gap. Other map consumers retain their inset. */
+  inset-block-end: var(
+    --map-legend-bottom,
+    calc(var(--m-l) + var(--m-xl) + var(--map-bottom-chrome, 0px))
+  );
   transition: inset-block-end var(--t-base) var(--ease-out);
   z-index: var(--z-float);
   pointer-events: none;
@@ -34,4 +32,10 @@
 
 .end {
   white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .legend {
+    transition: none;
+  }
 }

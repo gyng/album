@@ -292,6 +292,15 @@ export const buildContextRoutePoints = (
   }
 
   const route = buildMapRoute(photos.filter((photo) => photo.album === target.album));
+  return selectContextRoutePoints(route, targetHref, routeMode);
+};
+
+/** Select a hover/click context without rebuilding a route the map already owns. */
+export const selectContextRoutePoints = (
+  route: Pick<ReturnType<typeof buildMapRoute>, "fullPoints" | "simplifiedPoints">,
+  targetHref: string,
+  routeMode: RouteMode = "full",
+): RoutePoint[] | null => {
   const points = routeMode === "simplified" ? route.simplifiedPoints : route.fullPoints;
   const tripSpanDays = getTripSpanDays(points);
 

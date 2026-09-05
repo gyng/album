@@ -9,6 +9,7 @@ const mockUseDatabase = jest.fn();
 const mockUseEmbeddingsDatabase = jest.fn();
 const mockFetchSlideshowPhotos = jest.fn();
 const mockRefreshDatabase = jest.fn();
+const mockRefreshDatabasePair = jest.fn();
 const mockReloadCurrentPage = jest.fn();
 const mockNavigateTo = jest.fn();
 const mockBuildVersion = "test-build-version";
@@ -23,6 +24,7 @@ jest.mock("../../../components/database/useDatabase", () => ({
   SEARCH_DATABASE_URL: "/search.sqlite",
   useDatabase: () => mockUseDatabase(),
   useEmbeddingsDatabase: () => mockUseEmbeddingsDatabase(),
+  refreshDatabasePair: (...args: unknown[]) => mockRefreshDatabasePair(...args),
 }));
 
 jest.mock("../../../components/search/api", () => ({
@@ -189,7 +191,19 @@ describe("slideshow page", () => {
     expect(mockReloadCurrentPage).toHaveBeenCalledTimes(1);
   });
 
-  it("refreshes the database in place when the search DB changes", async () => {
+  it("refreshes the catalogue as one pair without replacing the current photo while it loads", async () => {
+    const oldDatabase = { db: "old" };
+    const newDatabase = { db: "new" };
+    const newEmbeddings = { vectors: "new" };
+    let finishRefresh!: (pair: {
+      database: typeof newDatabase;
+      embeddingsDatabase: typeof newEmbeddings;
+    }) => void;
+    mockRefreshDatabasePair.mockReturnValue(
+      new Promise((resolve) => {
+        finishRefresh = resolve;
+      }),
+    );
     let dbVersion = "db-v1";
     let dbLastModified = "Mon, 29 Jun 2026 12:00:00 GMT";
     (global.fetch as jest.Mock).mockImplementation((url: string) => {
@@ -215,7 +229,7 @@ describe("slideshow page", () => {
         json: async () => ({}),
       });
     });
-    mockUseDatabase.mockReturnValue([{ db: true }, 100, null, null, mockRefreshDatabase]);
+    mockUseDatabase.mockReturnValue([oldDatabase, 100, null, null, mockRefreshDatabase]);
     mockFetchSlideshowPhotos.mockResolvedValue([samplePhoto]);
 
     render(<SlideshowPage />);
@@ -239,7 +253,21 @@ describe("slideshow page", () => {
       await Promise.resolve();
     });
 
-    expect(mockRefreshDatabase).toHaveBeenCalledWith(true);
+    expect(mockRefreshDatabasePair).toHaveBeenCalledWith(
+      "/search.sqlite",
+      "/search-embeddings.sqlite",
+      true,
+    );
+    expect(mockFetchSlideshowPhotos).toHaveBeenLastCalledWith({ database: oldDatabase });
+    const photoBeforeRefresh = screen.getByRole("img", { name: /DSCF0506/ }).getAttribute("src");
+    await act(async () => {
+      finishRefresh({ database: newDatabase, embeddingsDatabase: newEmbeddings });
+    });
+    expect(mockFetchSlideshowPhotos).toHaveBeenLastCalledWith({ database: newDatabase });
+    expect(screen.getByRole("img", { name: /DSCF0506/ })).toHaveAttribute(
+      "src",
+      photoBeforeRefresh,
+    );
     expect(mockReloadCurrentPage).not.toHaveBeenCalled();
   });
 
@@ -404,7 +432,7 @@ describe("slideshow page", () => {
 
     expect(mockClipboardWriteText).toHaveBeenCalledTimes(1);
     const copiedUrl = new URL(mockClipboardWriteText.mock.calls[0][0]);
-    expect(copiedUrl.pathname).toBe("/slideshow");
+    expect(copiedUrl.pathname).toBe("/slideshow/shell");
     expect(copiedUrl.searchParams.get("mode")).toBe("weighted");
     expect(copiedUrl.searchParams.get("photo")).toBe(samplePhoto.path);
   });

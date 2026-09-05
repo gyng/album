@@ -120,7 +120,7 @@ export const applySlideshowUrlState = (
   return url.toString();
 };
 
-// getCurrentPhotoLink: a fresh /slideshow permalink to a specific photo (no
+// getCurrentPhotoLink: a persistent-shell permalink to a specific photo (no
 // delay; optional album filter).
 export const buildSlideshowPermalink = (opts: {
   origin: string;
@@ -129,7 +129,7 @@ export const buildSlideshowPermalink = (opts: {
   filter?: string;
   topic?: string;
 }): string => {
-  const url = new URL("/slideshow", opts.origin);
+  const url = new URL("/slideshow/shell", opts.origin);
   url.searchParams.set("mode", opts.mode);
   if (opts.filter) {
     url.searchParams.set("filter", opts.filter);

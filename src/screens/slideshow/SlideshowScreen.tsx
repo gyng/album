@@ -1,7 +1,13 @@
 import { AppLink as Link } from "../../components/platform";
 import React, { useEffect, useCallback } from "react";
-import { useDatabase, useEmbeddingsDatabase } from "../../components/database/useDatabase";
+import {
+  useDatabase,
+  useEmbeddingsDatabase,
+  refreshDatabasePair,
+  type DatabasePair,
+} from "../../components/database/useDatabase";
 import { usePublicConfig } from "../../components/platform";
+import { useSlideshowRuntimeHealth } from "../../components/useSlideshowRuntimeHealth";
 import type { PhotoBlock } from "../../services/types";
 import {
   fetchSlideshowPhotos,
@@ -253,7 +259,7 @@ export const Slideshow: React.FC<{
   shellWakeLock?: SlideshowShellWakeState | null;
   shellSessionStart?: number | null;
 }> = (props) => {
-  const { searchDatabaseUrl, siteOrigin } = usePublicConfig();
+  const { searchDatabaseUrl, searchEmbeddingsDatabaseUrl, siteOrigin } = usePublicConfig();
   // The server and first hydration render use the unmanaged UI snapshot. Keep
   // shell-owned external lifecycles disabled immediately in the browser,
   // though, so the frame cannot start a competing code poll or wake lock before
@@ -264,9 +270,19 @@ export const Slideshow: React.FC<{
       window.parent !== window &&
       new URLSearchParams(window.location.search).get("shell") === "1");
   const databaseState = useDatabase();
-  const [database, progress] = databaseState;
+  const [loadedDatabase, progress] = databaseState;
+  const [refreshedCatalogue, setRefreshedCatalogue] = React.useState<DatabasePair | null>(null);
+  const database = refreshedCatalogue?.database ?? loadedDatabase;
+  const refreshVectorsRef = React.useRef(false);
+  const dbCheckInFlightRef = React.useRef(false);
+  const catalogueMountedRef = React.useRef(true);
+  useEffect(() => {
+    catalogueMountedRef.current = true;
+    return () => {
+      catalogueMountedRef.current = false;
+    };
+  }, []);
   const databaseError = databaseState[3];
-  const refreshDatabase = databaseState[4];
   const buildVersionRef = React.useRef<string>(BUILD_VERSION);
   // When this document started playing, used as the session age when no shell
   // is hosting it (the shell's own start wins when there is one).
@@ -413,15 +429,18 @@ export const Slideshow: React.FC<{
   }, [delegateShellLifecycleImmediately]);
 
   const checkForDbUpdates = useCallback(async () => {
-    if (!database) {
+    if (!database || dbCheckInFlightRef.current) {
       return;
     }
-
+    dbCheckInFlightRef.current = true;
     setIsCheckingSearchDbVersion(true);
+    const controller = new AbortController();
+    const deadline = window.setTimeout(() => controller.abort(), 15000);
     try {
       const response = await fetch(searchDatabaseUrl, {
         method: "HEAD",
         cache: "no-store",
+        signal: controller.signal,
       });
       if (!response.ok) {
         return;
@@ -453,13 +472,20 @@ export const Slideshow: React.FC<{
       // without tearing down the document, and promote this pending version
       // only after the database object identity changes.
       pendingDbVersionRef.current = version.raw;
-      refreshDatabase(true);
+      const catalogue = await refreshDatabasePair(
+        searchDatabaseUrl,
+        searchEmbeddingsDatabaseUrl,
+        refreshVectorsRef.current,
+      );
+      if (catalogueMountedRef.current) setRefreshedCatalogue(catalogue);
     } catch (error) {
       console.error("DB update check failed", error);
     } finally {
-      setIsCheckingSearchDbVersion(false);
+      window.clearTimeout(deadline);
+      dbCheckInFlightRef.current = false;
+      if (catalogueMountedRef.current) setIsCheckingSearchDbVersion(false);
     }
-  }, [database, refreshDatabase, searchDatabaseUrl]);
+  }, [database, searchDatabaseUrl, searchEmbeddingsDatabaseUrl]);
 
   // Periodically HEAD-poll the search DB to notice when it has been
   // re-indexed without a full page rebuild (e.g. the user updates the photo
@@ -698,16 +724,17 @@ export const Slideshow: React.FC<{
   // lazily after the first vector roll meant the first ~37% of remixes
   // silently fell through to the next-priority sync strategy (same-album),
   // which dominated the badge in practice.
-  const [embeddingsDatabase, embeddingsProgress, , embeddingsError, retryEmbeddings] =
-    useEmbeddingsDatabase(
-      shouldEnableTopicEmbeddings({
-        mode: slideshowMode,
-        remixEnabled,
-        activeTopic: topic,
-        topicPending: topicBusy || topicAwaitingEmbeddings,
-        initialTopicPending: pendingInitialTopic !== null,
-      }),
-    );
+  const embeddingsEnabled = shouldEnableTopicEmbeddings({
+    mode: slideshowMode,
+    remixEnabled,
+    activeTopic: topic,
+    topicPending: topicBusy || topicAwaitingEmbeddings,
+    initialTopicPending: pendingInitialTopic !== null,
+  });
+  const [loadedEmbeddingsDatabase, embeddingsProgress, , embeddingsError, retryEmbeddings] =
+    useEmbeddingsDatabase(embeddingsEnabled);
+  const embeddingsDatabase = refreshedCatalogue?.embeddingsDatabase ?? loadedEmbeddingsDatabase;
+  refreshVectorsRef.current = embeddingsEnabled || Boolean(embeddingsDatabase);
   // Mirror the embeddings error into a ref so the topic submit can decide
   // whether to re-trigger the load without depending on the reactive value.
   embeddingsErrorRef.current = embeddingsError;
@@ -888,6 +915,7 @@ export const Slideshow: React.FC<{
   const advanceFromCadence = useCallback(() => goNextRef.current("app"), []);
   const {
     secondsLeft,
+    nextAdvanceAt,
     time,
     isPaused,
     togglePaused,
@@ -2461,6 +2489,46 @@ export const Slideshow: React.FC<{
     companionPaths: remixCompanionPaths,
   });
 
+  // A reversed cross-fade reuses its existing <img>, so the browser need not
+  // fire load again. Revalidate completed images in the incoming DOM layer;
+  // this also covers images that finished before hydration attached handlers.
+  useEffect(() => {
+    if (!slideKey || !currentSnapshot || decodedPresentationKey === slideKey) return;
+    const element = topLayerElementRef.current;
+    if (!element) return;
+    const images =
+      element instanceof HTMLImageElement ? [element] : Array.from(element.querySelectorAll("img"));
+    const sources = currentSnapshot.cells.map((cell) => cell.src);
+    let cancelled = false;
+    for (const image of images) {
+      const source = image.getAttribute("src");
+      const cell = currentSnapshot.cells.find((candidate) => candidate.src === source);
+      if (!cell || !image.complete || image.naturalWidth === 0) continue;
+      void image
+        .decode()
+        .then(() => {
+          if (cancelled || topKeyRef.current !== slideKey) return;
+          markDecoded(slideKey, cell.src, sources);
+          markRemixCellLoaded(cell.path);
+          if (cell === currentSnapshot.cells[0]) setImageLoaded(true);
+        })
+        .catch(() => {
+          if (!cancelled && topKeyRef.current === slideKey) scheduleImageErrorRetry();
+        });
+    }
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    slideKey,
+    currentSnapshot,
+    decodedPresentationKey,
+    layers,
+    markDecoded,
+    markRemixCellLoaded,
+    scheduleImageErrorRetry,
+  ]);
+
   // The incoming (top) slide is "ready" once it has fully decoded — a single
   // image, or EVERY cell of a remix grid (so the grid never pops in cell by
   // cell).
@@ -2490,6 +2558,13 @@ export const Slideshow: React.FC<{
   // may replace the shell's retained photograph only once actual decode AND
   // the reveal have completed. Checking the rendered opacity also handles
   // reduced motion (which need not emit transitionend) and Safari resumption.
+  const reportPresented = useSlideshowRuntimeHealth({
+    enabled: Boolean(props.managedCodeReload),
+    photo: currentPhotoPath?.path ?? null,
+    slideKey,
+    paused: isPaused,
+    nextAdvanceAt: nextAdvanceAt ?? null,
+  });
   useEffect(() => {
     if (
       !props.managedCodeReload ||
@@ -2518,6 +2593,7 @@ export const Slideshow: React.FC<{
         },
         window.location.origin,
       );
+      reportPresented(slideKey);
     };
     frame = requestAnimationFrame(reportWhenPresented);
     return () => cancelAnimationFrame(frame);
@@ -2528,6 +2604,7 @@ export const Slideshow: React.FC<{
     decodedPresentationKey,
     layers,
     showCover,
+    reportPresented,
   ]);
 
   // A hung replacement must not erase the last good photograph. Skip/retry it

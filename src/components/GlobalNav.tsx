@@ -111,7 +111,7 @@ export const GlobalNav: React.FC<Props> = ({
           <li>
             <div className={commonStyles.splitButton}>
               <Link
-                href="/slideshow"
+                href="/slideshow/shell"
                 className={cx(
                   commonStyles.splitButtonMain,
                   currentPage === "slideshow" ? commonStyles.navCurrent : undefined,
@@ -122,7 +122,7 @@ export const GlobalNav: React.FC<Props> = ({
               </Link>
               {slideshowAction ?? (
                 <Link
-                  href="/slideshow?mode=similar&random=1"
+                  href="/slideshow/shell?mode=similar&random=1"
                   className={commonStyles.splitButtonSub}
                   aria-label="Start a similar-photo slideshow from a random photo"
                   title="Start a similar-photo slideshow from a random photo"

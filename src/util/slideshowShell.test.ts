@@ -1,5 +1,6 @@
 import {
   buildSlideshowRuntimeUrl,
+  buildSlideshowShellUrl,
   isModifiedClick,
   isSlideshowRuntimeMessage,
   isSlideshowShellStateMessage,
@@ -23,6 +24,18 @@ const click = (overrides: Partial<Parameters<typeof isModifiedClick>[0]> = {}) =
 });
 
 describe("slideshow shell protocol", () => {
+  it("restarts the persistent shell with the runtime's settings but no private frame flags", () => {
+    const url = new URL(
+      buildSlideshowShellUrl("?shell=1&shellVersion=old&photo=a%2Fb.jpg&filter=A%26B&delay=15"),
+      "https://example.test",
+    );
+    expect(url.pathname).toBe("/slideshow/shell");
+    expect(Object.fromEntries(url.searchParams)).toEqual({
+      photo: "a/b.jpg",
+      filter: "A&B",
+      delay: "15",
+    });
+  });
   it("builds an explicitly managed runtime URL and replaces stale shell versions", () => {
     expect(buildSlideshowRuntimeUrl("?filter=favourites&shellVersion=old", "new build")).toBe(
       "/slideshow?filter=favourites&shell=1&shellVersion=new+build",

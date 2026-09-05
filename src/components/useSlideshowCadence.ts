@@ -2,6 +2,7 @@ import React, { useCallback, useEffect } from "react";
 import { getNextAlignedSlideshowChange } from "../util/slideshowTiming";
 
 export type UseSlideshowCadence = {
+  nextAdvanceAt: number | null;
   secondsLeft: number;
   time: Date | null;
   isPaused: boolean;
@@ -154,6 +155,7 @@ export const useSlideshowCadence = (input: {
   }, [controlsVisible, nextChangeAt, showClock]);
 
   return {
+    nextAdvanceAt: isPaused || !hasCurrentPhoto ? null : nextChangeAt.getTime(),
     secondsLeft,
     time,
     isPaused,

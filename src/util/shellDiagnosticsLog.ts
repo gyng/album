@@ -15,7 +15,12 @@
 // Pure and storage-injectable so the cap/FIFO/tolerant-parse rules are
 // unit-tested without a DOM; the shell passes real localStorage.
 
+import { isRuntimeHealth, type RuntimeHealthSnapshot } from "./slideshowRuntimeHealth";
+
 export type WakeEventType =
+  | "request-start"
+  | "request-held"
+  | "request-failed"
   | "acquired" // lock re-acquired after a loss
   | "lost" // system released a held lock
   | "reacquire-failed" // an internal re-acquire attempt was rejected
@@ -31,6 +36,7 @@ export type CodeReloadReason =
   | "build-update"
   | "service-worker-update"
   | "runtime-timeout"
+  | "runtime-unresponsive"
   | "manual";
 
 export type NetworkEventType = "online" | "offline";
@@ -44,9 +50,15 @@ export type GapEventType = "gap"; // the JS loop was frozen/asleep between beats
 // recent repeat. Without coalescing, a night of once-a-minute failures would
 // evict the whole capped log and destroy the onset evidence by morning.
 type Coalesced = { count?: number; lastAt?: number };
+type WakeRequestDetails = {
+  elapsedMs?: number;
+  name?: string;
+  message?: string;
+  released?: boolean;
+};
 
 export type ShellLogEntry =
-  | ({ at: number; category: "wake"; type: WakeEventType } & Coalesced)
+  | ({ at: number; category: "wake"; type: WakeEventType } & WakeRequestDetails & Coalesced)
   | ({
       at: number;
       category: "code";
@@ -60,7 +72,7 @@ export type ShellLogEntry =
 
 // The input to a record call: an entry minus its timestamp (the log stamps it).
 export type ShellLogInput =
-  | { category: "wake"; type: WakeEventType }
+  | ({ category: "wake"; type: WakeEventType } & WakeRequestDetails)
   | { category: "code"; type: CodeEventType; version?: string; reason?: CodeReloadReason }
   | { category: "network"; type: NetworkEventType }
   | { category: "visibility"; type: VisibilityEventType }
@@ -83,6 +95,9 @@ export const HEARTBEAT_GAP_THRESHOLD_MS = 90000;
 
 const KNOWN_TYPES: Record<ShellLogEntry["category"], ReadonlySet<string>> = {
   wake: new Set<WakeEventType>([
+    "request-start",
+    "request-held",
+    "request-failed",
     "acquired",
     "lost",
     "reacquire-failed",
@@ -95,6 +110,7 @@ const KNOWN_TYPES: Record<ShellLogEntry["category"], ReadonlySet<string>> = {
   gap: new Set<GapEventType>(["gap"]),
 };
 const KNOWN_RELOAD_REASONS = new Set<CodeReloadReason>([
+  "runtime-unresponsive",
   "build-update",
   "service-worker-update",
   "runtime-timeout",
@@ -187,6 +203,9 @@ export const appendShellEvent = (
     input.category !== "gap" &&
     candidate.category === input.category &&
     candidate.type === input.type &&
+    (candidate.category !== "wake" ||
+      input.category !== "wake" ||
+      (candidate.name === input.name && candidate.message === input.message)) &&
     (candidate.category !== "code" ||
       ((candidate as { version?: string }).version === (input as { version?: string }).version &&
         (candidate as { reason?: CodeReloadReason }).reason ===
@@ -200,11 +219,13 @@ export const appendShellEvent = (
   // cycle-type entries keeps a whole night at one entry per cycle type.
   const isWakeCycleType = (candidate: ShellLogEntry): boolean =>
     candidate.category === "wake" &&
-    (candidate.type === "reacquire-failed" ||
+    (candidate.type === "request-start" ||
+      candidate.type === "request-failed" ||
+      candidate.type === "reacquire-failed" ||
       candidate.type === "cap-reached" ||
       candidate.type === "cap-decayed");
   let mergeIndex = -1;
-  for (let i = existing.length - 1; i >= 0 && i >= existing.length - 3; i--) {
+  for (let i = existing.length - 1; i >= 0 && i >= existing.length - 5; i--) {
     const candidate = existing[i];
     // invariant: i stays within existing bounds, so candidate is defined
     if (candidate === undefined) continue;
@@ -294,6 +315,7 @@ export const detectHeartbeatGap = (previous: number | null, now: number): number
 export const SHELL_STATUS_STORAGE_KEY = "slideshow-shell-status";
 
 export type ShellStatusSnapshot = {
+  runtimeHealth?: RuntimeHealthSnapshot;
   at: number;
   sessionStart: number;
   shellVersion: string;
@@ -317,6 +339,11 @@ const isShellStatusSnapshot = (value: unknown): value is ShellStatusSnapshot => 
     typeof status.runtimeVersion === "string" &&
     typeof status.codeStatus === "string" &&
     typeof status.online === "boolean" &&
+    (status.runtimeHealth === undefined ||
+      (typeof status.runtimeHealth === "object" &&
+        status.runtimeHealth !== null &&
+        typeof (status.runtimeHealth as RuntimeHealthSnapshot).at === "number" &&
+        isRuntimeHealth((status.runtimeHealth as RuntimeHealthSnapshot).health))) &&
     typeof wake === "object" &&
     wake !== null &&
     typeof wake.supported === "boolean" &&
@@ -404,6 +431,8 @@ const reloadReasonLabel = (reason: CodeReloadReason): string => {
       return "service worker update";
     case "runtime-timeout":
       return "runtime did not become ready";
+    case "runtime-unresponsive":
+      return "runtime stopped responding or advancing";
     case "manual":
       return "manual request";
   }
@@ -440,6 +469,12 @@ const describeShellEventBase = (entry: ShellLogEntry): string => {
   switch (entry.category) {
     case "wake":
       switch (entry.type) {
+        case "request-start":
+          return "Requesting screen lock";
+        case "request-held":
+          return `Screen lock acquired (${entry.elapsedMs ?? 0}ms)`;
+        case "request-failed":
+          return `Screen lock refused: ${entry.name ?? "Error"}${entry.message ? ` — ${entry.message}` : ""} (${entry.elapsedMs ?? 0}ms)`;
         case "acquired":
           return "Screen lock re-acquired";
         case "lost":
@@ -495,6 +530,7 @@ const categoryLabel = (category: ShellLogEntry["category"]): string => {
 };
 
 export type DiagnosticsReport = {
+  runtimeHealth?: RuntimeHealthSnapshot;
   now: number;
   sessionStart: number;
   buildVersion: string;
@@ -525,6 +561,16 @@ export const serialiseDiagnostics = (report: DiagnosticsReport): string => {
     `Code status: ${report.codeStatus}`,
     `Wake lock: ${wakeState} (losses: ${report.wake.losses})`,
     `Network: ${report.online ? "online" : "offline"}`,
+    ...(report.runtimeHealth
+      ? [
+          `Runtime heartbeat: ${iso(report.runtimeHealth.at)}`,
+          `Runtime photo: ${report.runtimeHealth.health.photo ?? "none"}`,
+          `Last presentation: ${report.runtimeHealth.health.presentedAt === null ? "none" : iso(report.runtimeHealth.health.presentedAt)}`,
+          `Pending image since: ${report.runtimeHealth.health.pendingSince === null ? "none" : iso(report.runtimeHealth.health.pendingSince)}`,
+          `Paused: ${report.runtimeHealth.health.paused ? "yes" : "no"}`,
+          `Next advance: ${report.runtimeHealth.health.nextAdvanceAt === null ? "none" : iso(report.runtimeHealth.health.nextAdvanceAt)}`,
+        ]
+      : []),
     `User agent: ${report.device.userAgent}`,
     `Standalone: ${report.device.standalone ? "yes" : "no"}`,
     `Screen: ${report.device.screen.width}×${report.device.screen.height} @${report.device.devicePixelRatio}x`,

@@ -1,3 +1,5 @@
+import { isRuntimeHealth, type SlideshowRuntimeHealth } from "./slideshowRuntimeHealth";
+
 export const SLIDESHOW_RUNTIME_STATE_MESSAGE = "snapshots:slideshow-ready";
 export const SLIDESHOW_EXIT_MESSAGE = "snapshots:slideshow-exit";
 export const SLIDESHOW_NAVIGATE_MESSAGE = "snapshots:slideshow-navigate";
@@ -20,6 +22,7 @@ export type SlideshowRuntimeStateMessage = {
   // Absent on boot/settings messages and in older runtimes. Only a decoded,
   // fully revealed photograph may acknowledge a successful code handover.
   presentation?: SlideshowPresentation;
+  health?: SlideshowRuntimeHealth;
 };
 
 export type SlideshowPresentation = { sources: string[]; cover: boolean };
@@ -77,6 +80,7 @@ export const isSlideshowRuntimeMessage = (value: unknown): value is SlideshowRun
     typeof message.buildVersion === "string" &&
     message.buildVersion.trim().length > 0 &&
     (!("presentation" in message) || isPresentation(message.presentation)) &&
+    (!("health" in message) || isRuntimeHealth(message.health)) &&
     (!("search" in message) ||
       typeof message.search === "undefined" ||
       (typeof message.search === "string" &&
@@ -105,6 +109,14 @@ export const buildSlideshowRuntimeUrl = (search: string, buildVersion?: string):
   if (buildVersion) params.set("shellVersion", buildVersion);
   const query = params.toString();
   return `/slideshow${query ? `?${query}` : ""}`;
+};
+
+export const buildSlideshowShellUrl = (search: string): string => {
+  const params = new URLSearchParams(search);
+  params.delete("shell");
+  params.delete("shellVersion");
+  const query = params.toString();
+  return `/slideshow/shell${query ? `?${query}` : ""}`;
 };
 
 // A click the browser natively opens in a new tab/window (or is not a plain

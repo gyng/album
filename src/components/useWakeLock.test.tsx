@@ -37,6 +37,84 @@ describe("useWakeLock", () => {
   afterEach(() => {
     // @ts-expect-error - cleaning up the test shim
     delete (navigator as Navigator & { wakeLock?: unknown }).wakeLock;
+    jest.useRealTimers();
+  });
+
+  it("permits a new request after releasing a pending acquisition", async () => {
+    let finishOld!: (value: FakeSentinel) => void;
+    request.mockReturnValueOnce(
+      new Promise((resolve) => {
+        finishOld = resolve;
+      }),
+    );
+    const { result } = renderHook(() => useWakeLock(false));
+    await act(async () => {
+      await result.current.release();
+      await result.current.acquire();
+    });
+    expect(result.current.ref.current).toBe(sentinel);
+    const late = makeSentinel();
+    await act(async () => {
+      finishOld(late);
+    });
+    expect(late.release).toHaveBeenCalledTimes(1);
+    expect(result.current.ref.current).toBe(sentinel);
+  });
+
+  it("times out a hung request, retries, and releases its late sentinel", async () => {
+    jest.useFakeTimers();
+    let finishOld!: (value: FakeSentinel) => void;
+    request.mockReturnValueOnce(
+      new Promise((resolve) => {
+        finishOld = resolve;
+      }),
+    );
+    const { result } = renderHook(() => useWakeLock(false));
+    const events = jest.fn();
+    result.current.subscribe(events);
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(10000);
+    });
+    expect(result.current.isActive).toBe(true);
+    expect(events).toHaveBeenCalledWith(
+      "request-failed",
+      expect.objectContaining({ name: "TimeoutError" }),
+    );
+    const late = makeSentinel();
+    await act(async () => {
+      finishOld(late);
+    });
+    expect(late.release).toHaveBeenCalledTimes(1);
+    expect(result.current.ref.current).toBe(sentinel);
+  });
+
+  it("replaces a released sentinel even when its release event was missed", async () => {
+    const { result } = renderHook(() => useWakeLock(false));
+    await act(async () => {
+      await Promise.resolve();
+    });
+    Object.defineProperty(sentinel, "released", { value: true });
+    const replacement = makeSentinel();
+    request.mockResolvedValueOnce(replacement);
+    await act(async () => {
+      document.dispatchEvent(new Event("visibilitychange"));
+    });
+    expect(result.current.ref.current).toBe(replacement);
+  });
+
+  it("records the original public request failure and settles out of requesting", async () => {
+    request.mockRejectedValueOnce(new DOMException("Power policy", "NotAllowedError"));
+    const { result } = renderHook(() => useWakeLock(false));
+    const events = jest.fn();
+    result.current.subscribe(events);
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(events).toHaveBeenCalledWith(
+      "request-failed",
+      expect.objectContaining({ name: "NotAllowedError", message: "Power policy" }),
+    );
+    expect(result.current.status).toBe("retrying");
   });
 
   it("reports support when navigator.wakeLock.request exists", () => {
@@ -324,7 +402,7 @@ describe("useWakeLock", () => {
         // eslint-disable-next-line no-await-in-loop
         await act(async () => {
           latest.dispatchEvent(new Event("release"));
-          jest.advanceTimersByTime(1500);
+          await jest.advanceTimersByTimeAsync(15000);
           await Promise.resolve();
           await Promise.resolve();
         });
@@ -338,9 +416,7 @@ describe("useWakeLock", () => {
     }
   });
 
-  it("watchdog re-acquires a lost lock a minute later once conditions clear", async () => {
-    // Safari can reject a request transiently (e.g. low battery). The 60s
-    // watchdog retries so the lock recovers once the platform is willing again.
+  it("retries a transient refusal promptly without waiting for the watchdog", async () => {
     jest.useFakeTimers();
     try {
       const consoleError = jest.spyOn(console, "error").mockImplementation(() => undefined);
@@ -356,7 +432,7 @@ describe("useWakeLock", () => {
       expect(result.current.isActive).toBe(false);
 
       await act(async () => {
-        jest.advanceTimersByTime(60000);
+        await jest.advanceTimersByTimeAsync(1500);
         await Promise.resolve();
         await Promise.resolve();
       });
@@ -399,8 +475,8 @@ describe("useWakeLock", () => {
         // eslint-disable-next-line no-await-in-loop
         await act(async () => {
           latest.dispatchEvent(new Event("release"));
-          now += 1500;
-          jest.advanceTimersByTime(1500);
+          now += 15000;
+          await jest.advanceTimersByTimeAsync(15000);
           await Promise.resolve();
           await Promise.resolve();
         });
@@ -408,11 +484,11 @@ describe("useWakeLock", () => {
       // One mount acquire plus five capped re-acquires — the sixth gave up.
       expect(request).toHaveBeenCalledTimes(6);
 
-      // The last attempt landed at t=7500ms. Advance the watchdog to just under
+      // The last attempt landed at t=75000ms. Advance the watchdog to just under
       // ten minutes past it: the cap still holds, no new attempt.
-      now = 7500 + 9 * 60000;
+      now = 75000 + 9 * 60000;
       await act(async () => {
-        jest.advanceTimersByTime(9 * 60000);
+        await jest.advanceTimersByTimeAsync(9 * 60000);
         await Promise.resolve();
         await Promise.resolve();
       });
@@ -420,9 +496,9 @@ describe("useWakeLock", () => {
 
       // Now cross the ten-minute decay window: the watchdog resets the counter
       // and re-attempts, and the fresh lock holds.
-      now = 7500 + 11 * 60000;
+      now = 75000 + 11 * 60000;
       await act(async () => {
-        jest.advanceTimersByTime(2 * 60000);
+        await jest.advanceTimersByTimeAsync(2 * 60000);
         await Promise.resolve();
         await Promise.resolve();
       });
@@ -471,10 +547,10 @@ describe("useWakeLock", () => {
       });
       const mountAttempts = request.mock.calls.length;
 
-      for (let i = 0; i < 12; i++) {
+      for (let i = 0; i < 5; i++) {
         // eslint-disable-next-line no-await-in-loop
         await act(async () => {
-          jest.advanceTimersByTime(60000);
+          await jest.advanceTimersByTimeAsync(60000);
           await Promise.resolve();
           await Promise.resolve();
         });

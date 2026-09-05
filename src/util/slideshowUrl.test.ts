@@ -149,7 +149,7 @@ describe("buildSlideshowPermalink", () => {
       filter: "japan",
     });
     const u = new URL(out);
-    expect(u.pathname).toBe("/slideshow");
+    expect(u.pathname).toBe("/slideshow/shell");
     expect(u.searchParams.get("mode")).toBe("similar");
     expect(u.searchParams.get("filter")).toBe("japan");
     expect(u.searchParams.get("photo")).toBe("../albums/japan/IMG_1.jpg");

@@ -272,7 +272,8 @@ const MapScreen = (props: MapScreenProps) => {
 
     const observer = new ResizeObserver(([entry]) => {
       if (entry) {
-        setPanelHeight(entry.contentRect.height);
+        // Clearance includes padding and border, not just the chart's content.
+        setPanelHeight(entry.borderBoxSize?.[0]?.blockSize ?? panel.getBoundingClientRect().height);
       }
     });
     observer.observe(panel);

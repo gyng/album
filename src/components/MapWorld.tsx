@@ -16,7 +16,7 @@ import {
 } from "./map";
 import { ThemeToggle } from "./ThemeToggle";
 import {
-  buildContextRoutePoints,
+  selectContextRoutePoints,
   buildMapRoute,
   RouteGeoJson,
   RouteMode,
@@ -381,12 +381,13 @@ export const MMap: React.FC<MapWorldProps> = ({
     [activeRouteTarget, photosWithStyles],
   );
   const activeContextRoutePoints = React.useMemo(() => {
-    if (!activeRouteTarget) {
+    if (!activeRouteTarget || !activeRoutePhoto) {
       return null;
     }
 
-    return buildContextRoutePoints(timeFilteredPhotos, activeRouteTarget, routeMode);
-  }, [activeRouteTarget, routeMode, timeFilteredPhotos]);
+    const route = routeDataByAlbum.get(activeRoutePhoto.album);
+    return route ? selectContextRoutePoints(route, activeRouteTarget, routeMode) : null;
+  }, [activeRouteTarget, activeRoutePhoto, routeMode, routeDataByAlbum]);
   const activeContextRouteGeoJson = React.useMemo(
     () => toRouteGeoJson(activeContextRoutePoints ?? []),
     [activeContextRoutePoints],

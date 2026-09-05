@@ -85,7 +85,7 @@ export const SimilarTrailBar: React.FC<Props> = ({
       arr.slice(0, idx).filter((candidate) => candidate.path === item.path).length
     }`,
   }));
-  const slideshowHref = `/slideshow?mode=similar&seed=${encodeURIComponent(similarPath)}`;
+  const slideshowHref = `/slideshow/shell?mode=similar&seed=${encodeURIComponent(similarPath)}`;
 
   useSafeLayoutEffect(() => {
     const nextPositions: Record<string, DOMRect> = {};

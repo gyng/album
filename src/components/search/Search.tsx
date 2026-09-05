@@ -117,7 +117,7 @@ export const Search: React.FC<{
   const needsEmbeddingsDatabase =
     Boolean(similarPath) ||
     Boolean(imageQuery) ||
-    (!colorSearch && searchInputValue.trim() !== "" && searchMode !== "keyword");
+    (searchInputValue.trim() !== "" && searchMode !== "keyword");
   const [embeddingsDatabase, embeddingsProgress, embeddingsProgressDetails, embeddingsError] =
     useEmbeddingsDatabase(needsEmbeddingsDatabase);
 
@@ -556,7 +556,7 @@ export const Search: React.FC<{
         return;
       }
 
-      navigateTo(`/slideshow?mode=similar&seed=${encodeURIComponent(randomPhoto.path)}`);
+      navigateTo(`/slideshow/shell?mode=similar&seed=${encodeURIComponent(randomPhoto.path)}`);
     } catch (err) {
       console.error("Failed to load a random photo", err);
       setRandomExploreError("Couldn't start random explore right now.");

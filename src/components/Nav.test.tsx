@@ -46,15 +46,15 @@ describe("Nav", () => {
     expect(screen.getByRole("link", { name: "Albums" })).toHaveAttribute("aria-current", "page");
     expect(screen.getByRole("link", { name: "Album map" })).toHaveAttribute(
       "href",
-      "/map?filter_album=test manifest",
+      "/map?filter_album=test+manifest",
     );
     expect(screen.getByRole("link", { name: "Album timeline" })).toHaveAttribute(
       "href",
-      "/timeline?filter_album=test manifest",
+      "/timeline?filter_album=test+manifest",
     );
     expect(screen.getByRole("link", { name: "Album slideshow" })).toHaveAttribute(
       "href",
-      "/slideshow?filter=test manifest",
+      "/slideshow/shell?filter=test+manifest",
     );
     expect(screen.getByText("Extra action")).toBeInTheDocument();
     expect(scrollIntoView).toHaveBeenCalledWith({

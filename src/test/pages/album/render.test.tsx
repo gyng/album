@@ -59,6 +59,18 @@ const album = (overrides: Partial<Content> = {}): Content => ({
 });
 
 describe("album page shell", () => {
+  it("preserves reserved characters in album view filters", () => {
+    const name = "A&B + #summer";
+    render(<AlbumPage album={album({ _build: { slug: name, srcdir: `../albums/${name}` } })} />);
+    for (const [label, parameter] of [
+      ["Album map", "filter_album"],
+      ["Album timeline", "filter_album"],
+      ["Album slideshow", "filter"],
+    ] as const) {
+      const href = screen.getByRole("link", { name: label }).getAttribute("href")!;
+      expect(new URL(href, "https://example.test").searchParams.get(parameter)).toBe(name);
+    }
+  });
   beforeEach(() => {
     mockOn.mockClear();
     mockOff.mockClear();

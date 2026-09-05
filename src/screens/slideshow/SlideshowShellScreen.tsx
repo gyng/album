@@ -22,6 +22,7 @@ import {
 } from "../../util/shellDiagnosticsLog";
 import {
   buildSlideshowRuntimeUrl,
+  buildSlideshowShellUrl,
   isSlideshowRuntimeMessage,
   planRuntimeReload,
   recordRuntimeReload,
@@ -34,6 +35,12 @@ import {
 } from "../../util/slideshowShell";
 import styles from "./SlideshowShellScreen.module.css";
 import { formatPageTitle } from "../../lib/seo";
+import {
+  RUNTIME_HEARTBEAT_MS,
+  RUNTIME_HEALTH_TIMEOUT_MS,
+  runtimeHealthFailure,
+  type RuntimeHealthSnapshot,
+} from "../../util/slideshowRuntimeHealth";
 
 const useSafeLayoutEffect = typeof window === "undefined" ? React.useEffect : React.useLayoutEffect;
 
@@ -99,6 +106,7 @@ export const SlideshowShellScreen = () => {
   // can still attribute any resulting reload to the service worker.
   const serviceWorkerUpdatePendingRef = React.useRef(false);
   const runtimeReadyRef = React.useRef(false);
+  const runtimeHealthRef = React.useRef<RuntimeHealthSnapshot | null>(null);
   const reloadTrackerRef = React.useRef<RuntimeReloadTracker | null>(null);
   const reloadTimerRef = React.useRef<number | null>(null);
   // The target a pending backoff timer is aiming at, so a re-plan toward the same
@@ -122,7 +130,7 @@ export const SlideshowShellScreen = () => {
   // — a pill that appeared a moment after load would be its own distraction.
   const [statusPillVisible, setStatusPillVisible] = React.useState(false);
   const [wakePromptAcknowledged, setWakePromptAcknowledged] = React.useState(false);
-  const [autoWakeSettled, setAutoWakeSettled] = React.useState(false);
+  const [autoWakeDelayPassed, setAutoWakeDelayPassed] = React.useState(false);
   const [lastCheckedAt, setLastCheckedAt] = React.useState<Date | null>(null);
   const [pageVisible, setPageVisible] = React.useState(true);
   const [wakeLossCount, setWakeLossCount] = React.useState(0);
@@ -160,9 +168,12 @@ export const SlideshowShellScreen = () => {
   const {
     isSupported: isWakeLockSupported,
     isActive: isWakeLockActive,
+    status: wakeStatus,
+    ref: wakeRef,
     acquire: acquireWakeLock,
     subscribe: subscribeWakeEvents,
   } = useWakeLock(false);
+  const autoWakeSettled = autoWakeDelayPassed && wakeStatus !== "requesting";
   const prevWakeActiveRef = React.useRef(isWakeLockActive);
   // Whether a loss is currently outstanding, so a later true transition is
   // logged as a genuine "re-acquired after loss" rather than the initial acquire.
@@ -175,7 +186,7 @@ export const SlideshowShellScreen = () => {
   }, []);
 
   React.useEffect(() => {
-    const timer = window.setTimeout(() => setAutoWakeSettled(true), AUTO_WAKE_SETTLE_MS);
+    const timer = window.setTimeout(() => setAutoWakeDelayPassed(true), AUTO_WAKE_SETTLE_MS);
     return () => window.clearTimeout(timer);
   }, []);
 
@@ -203,11 +214,9 @@ export const SlideshowShellScreen = () => {
   // Heartbeat gap forensics. Every 60s overwrite ONE rolling storage key with the
   // current time — deliberately WITHOUT setState, so a days-long kiosk never
   // re-renders per beat. On mount and on every return to visibility, compare the
-  // last persisted beat against now: a gap past the freeze threshold means the JS
-  // loop was frozen/asleep in between (the device slept), which is distinct from
-  // "running but the lock was refused" — the key forensic ambiguity a field
-  // report otherwise cannot resolve. The interval and listener are both cleared
-  // on unmount.
+  // last persisted beat against now. Check before EVERY write: a resumed interval
+  // can run before visibilitychange. A gap is evidence of an execution pause,
+  // not proof of device sleep (suspension and a stalled main thread look alike).
   React.useEffect(() => {
     const recordGapIfAny = () => {
       const now = Date.now();
@@ -221,7 +230,7 @@ export const SlideshowShellScreen = () => {
     recordGapIfAny();
     const beat = window.setInterval(() => {
       const now = Date.now();
-      writeHeartbeat(now);
+      recordGapIfAny();
       // Re-stamp the mirrored status too: a kiosk can run for hours without a
       // single state change, and a snapshot frozen at launch would read to the
       // report page as hours-stale rather than as steady.
@@ -251,8 +260,8 @@ export const SlideshowShellScreen = () => {
   // reached/decayed) — the only wake facts the shell cannot see from isActive —
   // and append each to the persistent log.
   React.useEffect(() => {
-    return subscribeWakeEvents((event) => {
-      setEventHistory(appendShellEvent({ category: "wake", type: event }));
+    return subscribeWakeEvents((event, details) => {
+      setEventHistory(appendShellEvent({ category: "wake", type: event, ...details }));
     });
   }, [subscribeWakeEvents]);
 
@@ -292,6 +301,7 @@ export const SlideshowShellScreen = () => {
       codeStatus: codeStatusLabel(codeStatus),
       online: isOnline,
       wake: { supported: isWakeLockSupported, active: isWakeLockActive, losses: wakeLossCount },
+      ...(runtimeHealthRef.current ? { runtimeHealth: runtimeHealthRef.current } : {}),
     };
     statusRef.current = snapshot;
     writeShellStatus(snapshot);
@@ -342,6 +352,7 @@ export const SlideshowShellScreen = () => {
 
   const reloadRuntime = React.useCallback((buildVersion: string, reason: CodeReloadReason) => {
     runtimeReadyRef.current = false;
+    runtimeHealthRef.current = null;
     setRuntimeVisible(false);
     setCodeStatus("reloading");
     setEventHistory(
@@ -448,6 +459,7 @@ export const SlideshowShellScreen = () => {
       sessionStart: sessionStartRef.current,
       buildVersion: BUILD_VERSION,
       runtimeVersion: runtimeVersionRef.current,
+      ...(runtimeHealthRef.current ? { runtimeHealth: runtimeHealthRef.current } : {}),
       codeStatus,
       wake: {
         supported: isWakeLockSupported,
@@ -500,6 +512,43 @@ export const SlideshowShellScreen = () => {
   // help because the advertised and running versions already match. Each new
   // generation gets one readiness deadline; missing it triggers a capped,
   // backed-off reload toward the version we intend to run.
+  // A healthy first photograph is not a perpetual health certificate. Only
+  // runtimes speaking the health protocol get this lease; old runtimes retain
+  // the existing initial-readiness/version recovery contract.
+  React.useEffect(() => {
+    let lastCheck = Date.now();
+    let resumeGraceUntil = 0;
+    const resume = () => {
+      resumeGraceUntil = Date.now() + RUNTIME_HEALTH_TIMEOUT_MS;
+    };
+    const check = () => {
+      const now = Date.now();
+      const executionGap = now - lastCheck > RUNTIME_HEARTBEAT_MS * 2;
+      lastCheck = now;
+      if (document.visibilityState !== "visible") {
+        resume();
+        return;
+      }
+      // The parent's interval may resume before the child's timer or the
+      // browser's visibility event. Allow both documents time to catch up.
+      if (executionGap) resume();
+      if (now < resumeGraceUntil || !runtimeReadyRef.current || !runtimeHealthRef.current) return;
+      if (runtimeHealthFailure(runtimeHealthRef.current, now)) {
+        runtimeReadyRef.current = false;
+        setRuntimeVisible(false);
+        attemptRuntimeReload(latestVersionRef.current, "runtime-unresponsive");
+      }
+    };
+    const interval = window.setInterval(check, RUNTIME_HEARTBEAT_MS);
+    document.addEventListener("visibilitychange", resume);
+    window.addEventListener("pageshow", resume);
+    return () => {
+      window.clearInterval(interval);
+      document.removeEventListener("visibilitychange", resume);
+      window.removeEventListener("pageshow", resume);
+    };
+  }, [attemptRuntimeReload]);
+
   const generation = runtimeFrame?.generation;
   React.useEffect(() => {
     if (generation === undefined || runtimeReadyRef.current) {
@@ -700,6 +749,13 @@ export const SlideshowShellScreen = () => {
       }
 
       const nextVersion = event.data.buildVersion.trim();
+      if (event.data.health) {
+        runtimeHealthRef.current = { at: Date.now(), health: event.data.health };
+        if (statusRef.current) {
+          statusRef.current = { ...statusRef.current, runtimeHealth: runtimeHealthRef.current };
+          writeShellStatus(statusRef.current);
+        }
+      }
       if (typeof event.data.search === "string") {
         runtimeSearchRef.current = event.data.search;
       }
@@ -808,13 +864,15 @@ export const SlideshowShellScreen = () => {
         <button
           type="button"
           className={styles.wakeGate}
+          aria-label="Keep slideshow awake"
           onClick={() => {
-            setWakePromptAcknowledged(true);
-            void acquireWakeLock();
+            void acquireWakeLock().then(() => {
+              setWakePromptAcknowledged(Boolean(wakeRef.current && !wakeRef.current.released));
+            });
           }}
         >
           <span className={styles.wakeGateDot} aria-hidden="true" />
-          Tap once to keep this slideshow awake through code updates
+          Screen may lock · Retry
         </button>
       ) : null}
 
@@ -944,6 +1002,21 @@ export const SlideshowShellScreen = () => {
                 </button>
                 <button type="button" onClick={reloadRuntimeManually}>
                   Reload slideshow
+                </button>
+                <button
+                  type="button"
+                  disabled={!isOnline}
+                  onClick={() => {
+                    if (
+                      window.confirm(
+                        "Reload the slideshow shell to update screen-lock handling? The screen lock will be requested again after reopening.",
+                      )
+                    ) {
+                      navigateTo(buildSlideshowShellUrl(runtimeSearchRef.current));
+                    }
+                  }}
+                >
+                  Update slideshow shell
                 </button>
                 <button
                   type="button"

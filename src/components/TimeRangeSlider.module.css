@@ -1,7 +1,8 @@
 .container {
   position: absolute;
-  inset-block-end: var(--m-l);
-  inset-inline: var(--m-xl);
+  inset-block-end: var(--map-chrome-bottom, var(--m-l));
+  inset-inline-start: var(--map-chrome-left, var(--m-xl));
+  inset-inline-end: var(--map-chrome-right, var(--m-xl));
   z-index: var(--z-fullscreen-underlay);
   pointer-events: auto;
   background: var(--glass-surface-dark);
@@ -143,7 +144,8 @@
 
 @container (max-width: 720px) {
   .container {
-    inset-inline: var(--m-s);
+    inset-inline-start: var(--map-chrome-left, var(--m-s));
+    inset-inline-end: var(--map-chrome-right, var(--m-s));
     padding: var(--m-s) var(--m-m);
   }
 }

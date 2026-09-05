@@ -21,6 +21,67 @@ test.describe("World map interactions", () => {
     await expect(page.locator("canvas").first()).toBeVisible({ timeout: 10_000 });
   });
 
+  for (const [width, height] of [
+    [1440, 900],
+    [834, 1112],
+    [390, 844],
+    [844, 390],
+  ] as const) {
+    test(`aligns map chrome and keeps date controls clear at ${width}x${height}`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width, height });
+      await gotoHydrated(page, "/map?from=2020-01-01&to=2025-01-01");
+      const navLink = page
+        .getByRole("navigation")
+        .getByRole("link", { name: "Albums", exact: true });
+      const zoom = page.getByRole("button", { name: "Zoom in", exact: true });
+      const scale = page.locator(".maplibregl-ctrl-bottom-left .maplibregl-ctrl-scale");
+      const legend = page.locator('[data-map-legend="recency"]');
+      const panel = page.locator("#map-date-controls");
+      const rail = page.locator(".maplibregl-ctrl-top-right");
+      await expect(zoom).toBeVisible();
+      await expect
+        .poll(async () => {
+          const n = await navLink.boundingBox(),
+            z = await zoom.boundingBox();
+          return n && z ? Math.abs(n.y - z.y) : Infinity;
+        })
+        .toBeLessThan(2);
+      await expect
+        .poll(async () => {
+          const p = await panel.boundingBox(),
+            s = await scale.boundingBox();
+          return p && s ? Math.abs(p.y - s.y - s.height - 8) : Infinity;
+        })
+        .toBeLessThanOrEqual(1);
+      const n = (await page.getByRole("navigation").boundingBox())!,
+        p = (await panel.boundingBox())!,
+        s = (await scale.boundingBox())!,
+        l = (await legend.boundingBox())!,
+        z = (await zoom.boundingBox())!;
+      expect(Math.abs(n.x - p.x)).toBeLessThan(2);
+      expect(Math.abs(n.x - s.x)).toBeLessThan(2);
+      expect(Math.abs(n.x - l.x)).toBeLessThan(2);
+      const railBox = (await rail.boundingBox())!;
+      expect(Math.abs(p.x + p.width - railBox.x - railBox.width)).toBeLessThan(2);
+      expect(z.width).toBeGreaterThanOrEqual(44);
+      expect(z.height).toBeGreaterThanOrEqual(44);
+      const search = (await page.locator('[role="search"]').boundingBox())!;
+      expect(search.x + search.width).toBeLessThan(railBox.x);
+      const attribution = (await page.locator(".maplibregl-ctrl-bottom-right").boundingBox())!;
+      expect(attribution.y - railBox.y - railBox.height).toBeGreaterThanOrEqual(7);
+      await page.getByRole("button", { name: "Clear date filter" }).click();
+      await expect
+        .poll(async () => {
+          const p = await panel.boundingBox(),
+            s = await scale.boundingBox();
+          return p && s ? Math.abs(p.y - s.y - s.height - 8) : Infinity;
+        })
+        .toBeLessThanOrEqual(1);
+    });
+  }
+
   test("keeps the search field still while the result count changes under it", async ({ page }) => {
     // The count sits beside the field and the Fit/Tour actions hang below the
     // box, precisely so neither can move or resize the field. Typing swings the

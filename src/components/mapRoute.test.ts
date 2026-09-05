@@ -4,6 +4,7 @@ import {
   buildContextRouteGeoJson,
   buildContextRoutePoints,
   buildMapRoute,
+  selectContextRoutePoints,
   distanceMetersBetween,
   getDefaultRouteMode,
   toRouteGeoJson,
@@ -24,6 +25,26 @@ const makePhoto = (
 });
 
 describe("mapRoute", () => {
+  it.each(["full", "simplified"] as const)(
+    "selects the same %s context from an already prepared route",
+    (mode) => {
+      const photos = [
+        makePhoto({ href: "first", date: "2024-01-01T08:00:00" }),
+        makePhoto({ href: "nearby", date: "2024-01-01T08:01:00" }),
+        makePhoto({ href: "later", date: "2024-03-01T08:00:00", decLat: 36 }),
+      ];
+      const route = buildMapRoute(photos);
+      for (const photo of photos) {
+        expect(selectContextRoutePoints(route, photo.href, mode)).toEqual(
+          buildContextRoutePoints(photos, photo.href, mode),
+        );
+      }
+      expect(
+        selectContextRoutePoints(route, "nearby", mode)?.flatMap((p) => p.memberHrefs),
+      ).toEqual(["first", "nearby"]);
+    },
+  );
+
   it("measures geographic distance and omits lines with fewer than two points", () => {
     expect(distanceMetersBetween({ decLat: 0, decLng: 0 }, { decLat: 0, decLng: 0 })).toBe(0);
     expect(distanceMetersBetween({ decLat: 0, decLng: 0 }, { decLat: 0, decLng: 1 })).toBeCloseTo(

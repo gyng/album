@@ -11,7 +11,7 @@ type AlbumDirectoryEntry = {
 };
 
 const isZoneIdentifierFile = (filename: string): boolean => {
-  return filename.toLowerCase().includes(":zone.identifier");
+  return filename.toLowerCase().endsWith(":zone.identifier");
 };
 
 const formatSitemapDate = (timestampMs: number): string =>

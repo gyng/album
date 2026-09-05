@@ -5,7 +5,7 @@ jest.mock("@sqlite.org/sqlite-wasm", () => ({
   default: jest.fn(),
 }));
 
-import { databaseLoaderInternals } from "./useDatabase";
+import { databaseLoaderInternals, refreshDatabasePair } from "./useDatabase";
 
 describe("fetchWithProgress", () => {
   const originalFetch = global.fetch;
@@ -323,7 +323,7 @@ describe("database cache", () => {
 
   beforeEach(() => {
     databaseLoaderInternals.resetForTesting();
-    (sqlite3InitModule as jest.Mock).mockResolvedValue(sqlite);
+    (sqlite3InitModule as jest.Mock).mockReset().mockResolvedValue(sqlite);
     global.fetch = jest.fn().mockResolvedValue({
       ok: true,
       body: null,
@@ -334,6 +334,58 @@ describe("database cache", () => {
 
   afterEach(() => {
     global.fetch = originalFetch;
+  });
+
+  it("does not recache an old load that completes after a forced refresh", async () => {
+    let finishOld!: (value: typeof sqlite) => void;
+    (sqlite3InitModule as jest.Mock).mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finishOld = resolve;
+        }),
+    );
+    const old = databaseLoaderInternals.getDatabase("/race.sqlite");
+    const refreshed = await databaseLoaderInternals.getDatabase(
+      "/race.sqlite",
+      undefined,
+      undefined,
+      true,
+    );
+    finishOld(sqlite);
+    expect(await old).not.toBe(refreshed);
+    await expect(databaseLoaderInternals.getDatabase("/race.sqlite")).resolves.toBe(refreshed);
+  });
+
+  it("does not evict a newer in-flight refresh when the older load rejects", async () => {
+    let failOld!: (error: Error) => void;
+    let finishNew!: (value: typeof sqlite) => void;
+    (sqlite3InitModule as jest.Mock)
+      .mockImplementationOnce(
+        () =>
+          new Promise((_, reject) => {
+            failOld = reject;
+          }),
+      )
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            finishNew = resolve;
+          }),
+      );
+    const old = databaseLoaderInternals.getDatabase("/race.sqlite");
+    const failed = expect(old).rejects.toThrow();
+    const refreshed = databaseLoaderInternals.getDatabase(
+      "/race.sqlite",
+      undefined,
+      undefined,
+      true,
+    );
+    failOld(new Error("old download failed"));
+    await failed;
+    const concurrent = databaseLoaderInternals.getDatabase("/race.sqlite");
+    finishNew(sqlite);
+    expect(concurrent).toBe(refreshed);
+    await refreshed;
   });
 
   it("coalesces in-flight loads and serves the completed database from cache", async () => {
@@ -349,6 +401,35 @@ describe("database cache", () => {
     ).resolves.toBe(database);
     expect(progress).toHaveBeenCalledWith(100, { loaded: 0, total: 0 });
     expect(global.fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("promotes a refreshed catalogue only after both core and vectors finish", async () => {
+    let finishVectors!: (value: typeof sqlite) => void;
+    (sqlite3InitModule as jest.Mock).mockResolvedValueOnce(sqlite).mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finishVectors = resolve;
+        }),
+    );
+    const promoted = jest.fn();
+    const pair = refreshDatabasePair("/core.sqlite", "/vectors.sqlite", true).then(promoted);
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(promoted).not.toHaveBeenCalled();
+    finishVectors(sqlite);
+    await pair;
+    expect(promoted).toHaveBeenCalledWith({
+      database: expect.any(Object),
+      embeddingsDatabase: expect.any(Object),
+    });
+    expect(global.fetch).toHaveBeenCalledWith("/core.sqlite", { cache: "no-store" });
+    expect(global.fetch).toHaveBeenCalledWith("/vectors.sqlite", { cache: "no-store" });
+  });
+
+  it("invalidates dormant vectors so enabling them after a catalogue update loads fresh data", async () => {
+    const old = await databaseLoaderInternals.getDatabase("/vectors.sqlite");
+    await refreshDatabasePair("/core.sqlite", "/vectors.sqlite", false);
+    expect(await databaseLoaderInternals.getDatabase("/vectors.sqlite")).not.toBe(old);
   });
 
   it("evicts a failed promise so a retry refetches", async () => {

@@ -76,16 +76,21 @@
 
 .wakeGate {
   position: fixed;
-  inset: 0;
+  inset-block-end: calc(env(safe-area-inset-bottom, 0) + var(--m-xl));
+  inset-inline-start: 50%;
+  transform: translateX(-50%);
   z-index: var(--z-fullscreen-toast);
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   justify-content: center;
   gap: var(--m-s);
-  inline-size: 100%;
-  padding: var(--m-l) var(--m-l) calc(env(safe-area-inset-bottom, 0) + var(--m-xl));
-  border: 0;
-  background: color-mix(in oklch, var(--c-black) 4%, transparent);
+  inline-size: max-content;
+  max-inline-size: calc(100% - var(--m-xl));
+  min-block-size: var(--tap-target);
+  padding: var(--m-s) var(--m-l);
+  border: solid var(--size-1) var(--c-border-on-dark);
+  border-radius: var(--radius-pill);
+  background: color-mix(in oklch, var(--c-overlay-dark) 88%, transparent);
   color: var(--c-white);
   font: inherit;
   font-size: var(--fs-sm);

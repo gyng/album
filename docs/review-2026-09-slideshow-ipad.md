@@ -2,6 +2,10 @@
 
 Reviewed 5 September 2026, against `f73dd7c` plus the swipe changes described below. The user primarily runs the slideshow as an iPad Home Screen PWA. The exact iPadOS version and whether the reported black screen is device sleep or a blank application remain unknown. No physical iPad was available for testing.
 
+Subsequent implementation: [review fix checklist](review-fixes-2026-09.md) tracks the
+follow-up fixes and their final verification. The findings and counts below are
+historical review evidence, not the current implementation status.
+
 ## Follow-up: update-specific failure
 
 The user subsequently clarified that blackouts occur after code updates. The original swipe work and this review were committed and pushed as `fff8251` before implementing the following local fix:

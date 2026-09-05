@@ -15,6 +15,7 @@ import { RGB, rgbToHex } from "../../util/colorDistance";
 import { SearchMode, useTextVector } from "./useTextVector";
 import { parseSearchTerms, SimilarityOrder } from "./searchUtils";
 import { SearchFacetSelection } from "../../util/searchFacets";
+import { databaseIdentity } from "../../util/databaseIdentity";
 
 type Props = {
   database: Database | null;
@@ -109,18 +110,19 @@ export const useSearchResultsState = ({
   const canRunQuery =
     hasHydratedFromUrl &&
     Boolean(database) &&
-    ((hasImageVector && hasVectorDatabase) ||
-      (Boolean(similarPath) && hasVectorDatabase) ||
-      (isColorMode && !hasSearchQuery) ||
-      (hasSearchQuery &&
-        (searchMode === "keyword" ||
-          textVectorFailed ||
-          // Hybrid may run before the embeddings DB finishes downloading: it
-          // degrades to keyword-only ranking and re-fuses once vectors arrive.
-          (searchMode === "hybrid" && hasCurrentTextVector) ||
-          // Pure semantic needs the vector DB — otherwise it stays pending.
-          (searchMode === "semantic" && hasVectorDatabase && hasCurrentTextVector))) ||
-      (!isSimilarMode && (hasFacetFilters || isColorMode)));
+    (isImageQueryMode
+      ? hasImageVector && hasVectorDatabase
+      : isSimilarMode
+        ? hasVectorDatabase
+        : hasSearchQuery
+          ? searchMode === "keyword" ||
+            textVectorFailed ||
+            // Hybrid may run before the embeddings DB finishes downloading: it
+            // degrades to keyword-only ranking and re-fuses once vectors arrive.
+            (searchMode === "hybrid" && hasCurrentTextVector) ||
+            // Pure semantic needs the vector DB — otherwise it stays pending.
+            (searchMode === "semantic" && hasVectorDatabase && hasCurrentTextVector)
+          : hasFacetFilters || isColorMode);
 
   const similarFilename = similarPath?.split("/").at(-1) ?? null;
   const similarPreviewSrc = similarPath ? getResizedAlbumImageSrc(similarPath) : null;
@@ -129,8 +131,8 @@ export const useSearchResultsState = ({
     queryKey: [
       "results",
       {
-        database: !!database,
-        embeddingsDatabase: !!embeddingsDatabase,
+        database: databaseIdentity(database),
+        embeddingsDatabase: databaseIdentity(embeddingsDatabase),
         debouncedSearchQuery,
         similarPath,
         similarityOrder,

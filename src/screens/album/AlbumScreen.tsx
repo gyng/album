@@ -135,7 +135,7 @@ const AlbumScreen = ({ album }: AlbumScreenProps) => {
             </li>
             <li>
               <Link
-                href={`/map?filter_album=${albumName}`}
+                href={`/map?${new URLSearchParams({ filter_album: albumName })}`}
                 className={`${buttonStyles.base} ${commonStyles.navContext}`}
               >
                 Album map
@@ -143,7 +143,7 @@ const AlbumScreen = ({ album }: AlbumScreenProps) => {
             </li>
             <li>
               <Link
-                href={`/timeline?filter_album=${albumName}`}
+                href={`/timeline?${new URLSearchParams({ filter_album: albumName })}`}
                 className={`${buttonStyles.base} ${commonStyles.navContext}`}
               >
                 Album timeline
@@ -151,7 +151,7 @@ const AlbumScreen = ({ album }: AlbumScreenProps) => {
             </li>
             <li>
               <Link
-                href={`/slideshow?filter=${albumName}`}
+                href={`/slideshow/shell?${new URLSearchParams({ filter: albumName })}`}
                 className={`${buttonStyles.base} ${commonStyles.navContext}`}
               >
                 Album slideshow

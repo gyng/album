@@ -71,6 +71,22 @@ describe("isIncomingReady", () => {
 describe("layer stack", () => {
   const keys = (layers: CrossfadeLayer[]) => layers.map((l) => l.key);
 
+  it("reuses the visible layer when returning before the next photo loads", () => {
+    const initial = revealLayers(pushLayer([], "a", snap("a.jpg")), "a");
+    const returning = pushLayer(pushLayer(initial, "b", snap("b.jpg")), "a", snap("a.jpg"));
+    expect(keys(returning)).toEqual(["b", "a"]);
+    expect(returning.at(-1)?.loaded).toBe(true);
+    expect(keys(removeLayer(returning, "b"))).toEqual(["a"]);
+  });
+
+  it("reuses an outgoing layer when reversing an active cross-fade", () => {
+    let layers = revealLayers(pushLayer([], "a", snap("a.jpg")), "a");
+    layers = revealLayers(pushLayer(layers, "b", snap("b.jpg")), "b");
+    layers = pushLayer(layers, "a", snap("a.jpg"));
+    expect(keys(layers)).toEqual(["b", "a"]);
+    expect(revealLayers(layers, "a").filter((layer) => layer.loaded)).toHaveLength(1);
+  });
+
   it("pushes a new hidden top layer", () => {
     const after = pushLayer([], "a", snap("a.jpg"));
     expect(after).toEqual([{ key: "a", slide: snap("a.jpg"), loaded: false }]);

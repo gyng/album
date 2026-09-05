@@ -229,16 +229,40 @@ const getDatabase = (
 
   const databasePromise = initializeSQLite(url, fallbackUrl, setProgress, forceRefresh)
     .then((database) => {
-      cachedDatabases.set(url, database);
+      if (databasePromises.get(url) === databasePromise) {
+        cachedDatabases.set(url, database);
+      }
       return database;
     })
     .catch((err) => {
-      databasePromises.delete(url);
+      if (databasePromises.get(url) === databasePromise) {
+        databasePromises.delete(url);
+      }
       throw err;
     });
 
   databasePromises.set(url, databasePromise);
   return databasePromise;
+};
+
+export type DatabasePair = { database: Database; embeddingsDatabase: Database | null };
+
+// A live catalogue is one promotion: never return fresh rows with old vectors.
+// Dormant vectors stay lazy, but their cached generation must be invalidated.
+export const refreshDatabasePair = async (
+  coreUrl: string,
+  embeddingsUrl: string,
+  includeEmbeddings: boolean,
+): Promise<DatabasePair> => {
+  if (!includeEmbeddings) {
+    cachedDatabases.delete(embeddingsUrl);
+    databasePromises.delete(embeddingsUrl);
+  }
+  const [database, embeddingsDatabase] = await Promise.all([
+    getDatabase(coreUrl, undefined, undefined, true),
+    includeEmbeddings ? getDatabase(embeddingsUrl, coreUrl, undefined, true) : null,
+  ]);
+  return { database, embeddingsDatabase };
 };
 
 const useSqliteDatabase = (

@@ -400,7 +400,7 @@ describe("getAlbum", () => {
     }
   });
 
-  it("builds a manifest-free mixed-media album and removes Zone.Identifier files", async () => {
+  it("builds a mixed-media album without including or deleting Zone.Identifier files", async () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "album-media-test-"));
     const albumDir = path.join(root, "trip.newest-first");
     fs.mkdirSync(path.join(albumDir, "nested"), { recursive: true });
@@ -409,7 +409,6 @@ describe("getAlbum", () => {
     fs.writeFileSync(path.join(albumDir, "ignored.json"), "{}");
     const sidecar = path.join(albumDir, "cover.jpg:Zone.Identifier");
     fs.writeFileSync(sidecar, "zone");
-    const log = jest.spyOn(console, "log").mockImplementation(() => undefined);
 
     try {
       const result = await getAlbumWithoutManifest(albumDir);
@@ -417,30 +416,22 @@ describe("getAlbum", () => {
       expect(result.formatting.sort).toBe("newest-first");
       expect(result.cover).toMatchObject({ data: { src: "cover.jpg" } });
       expect(result.blocks.map(({ kind }) => kind)).toEqual(["text", "photo", "video"]);
-      expect(fs.existsSync(sidecar)).toBe(false);
-      expect(log).toHaveBeenCalledWith(expect.stringContaining("Deleted Zone.Identifier"));
+      expect(fs.existsSync(sidecar)).toBe(true);
     } finally {
       fs.rmSync(root, { recursive: true, force: true });
     }
   });
 
-  it("warns and continues if a Zone.Identifier sidecar cannot be removed", async () => {
+  it("preserves and includes a photo with sidecar-like text in its name", async () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "album-sidecar-test-"));
-    fs.writeFileSync(path.join(root, "photo.jpg:Zone.Identifier"), "zone");
-    const failure = new Error("permission denied");
-    jest.spyOn(fs, "unlinkSync").mockImplementation(() => {
-      throw failure;
-    });
-    const warn = jest.spyOn(console, "warn").mockImplementation(() => undefined);
+    const photo = path.join(root, "holiday:Zone.Identifier.jpg");
+    fs.writeFileSync(photo, "photo");
 
     try {
       const result = await getAlbumWithoutManifest(root);
 
-      expect(result.blocks).toHaveLength(1);
-      expect(warn).toHaveBeenCalledWith(
-        expect.stringContaining("Failed to delete Zone.Identifier sidecar"),
-        failure,
-      );
+      expect(result.blocks).toHaveLength(2);
+      expect(fs.readFileSync(photo, "utf8")).toBe("photo");
     } finally {
       jest.restoreAllMocks();
       fs.rmSync(root, { recursive: true, force: true });

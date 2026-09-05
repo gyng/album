@@ -9,6 +9,7 @@ const mockStartImageQuery = jest.fn();
 const mockClearImageQuery = jest.fn();
 const mockFetchNextPage = jest.fn();
 const mockDatabase = {};
+const mockUseEmbeddingsDatabase = jest.fn();
 let mockDatabaseState: unknown[];
 let mockEmbeddingsState: unknown[];
 let mockImageState: Record<string, unknown>;
@@ -21,7 +22,10 @@ const mockFetchRandomPhoto = jest.fn();
 
 jest.mock("../database/useDatabase", () => ({
   useDatabase: () => mockDatabaseState,
-  useEmbeddingsDatabase: () => mockEmbeddingsState,
+  useEmbeddingsDatabase: (enabled: boolean) => {
+    mockUseEmbeddingsDatabase(enabled);
+    return mockEmbeddingsState;
+  },
 }));
 
 jest.mock("./useImageQuery", () => ({
@@ -227,6 +231,12 @@ const resetState = () => {
 };
 
 describe("Search parent orchestration", () => {
+  it("loads embeddings for a text query even when a colour filter is active", async () => {
+    render(<Search />);
+    fireEvent.click(screen.getByRole("button", { name: "Apply terms" }));
+    fireEvent.click(screen.getByRole("button", { name: "Set facet colour" }));
+    await waitFor(() => expect(mockUseEmbeddingsDatabase).toHaveBeenLastCalledWith(true));
+  });
   beforeEach(() => {
     jest.clearAllMocks();
     window.history.replaceState({}, "", "/search");

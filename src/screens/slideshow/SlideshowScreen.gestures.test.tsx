@@ -262,6 +262,47 @@ describe("SlideshowScreen touch gestures (screen-level)", () => {
     expect(image).toBeInTheDocument();
   });
 
+  it("presents a reused image when backtracking without waiting for a second load event", async () => {
+    jest.useFakeTimers();
+    const post = jest.spyOn(window.parent, "postMessage");
+    render(<Slideshow managedCodeReload />);
+    await flush();
+    const image = slideImage();
+    image.style.opacity = "1";
+    Object.defineProperties(image, {
+      decode: { value: jest.fn().mockResolvedValue(undefined) },
+      complete: { value: true },
+      naturalWidth: { value: 800 },
+    });
+    fireEvent.load(image);
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(100);
+    });
+    fireEvent.click(image);
+    await flush();
+    expect(slideImage()).not.toBe(image);
+    post.mockClear();
+    fireEvent.keyDown(window, { key: "ArrowLeft" });
+    await flush();
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(100);
+    });
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(100);
+    });
+    expect(slideImage()).toBe(image);
+    expect(
+      post.mock.calls.some(([message]) =>
+        message.presentation?.sources.includes(image.getAttribute("src")),
+      ),
+    ).toBe(true);
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(6100);
+    });
+    expect(slideImage()).toBe(image);
+    post.mockRestore();
+  });
+
   it("does not become a hold once the finger drifts into a swipe", async () => {
     render(<SlideshowScreen />);
     await flush();

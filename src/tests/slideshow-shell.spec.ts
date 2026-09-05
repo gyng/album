@@ -9,6 +9,66 @@ test.use({ serviceWorkers: "block" });
 const slideshowImage = 'img[alt]:not([aria-hidden="true"])';
 const updateTestUrl = `/slideshow/shell?mode=random&filter=test-simple&delay=86400&photo=${encodeURIComponent("../albums/test-simple/DSCF2485-2.jpg")}`;
 
+test("a runtime that stops reporting health recovers without releasing the parent lock", async ({
+  page,
+}) => {
+  test.setTimeout(110_000);
+  await page.addInitScript(() => {
+    const state = window as Window & { __dropHealth?: boolean; __wakeReleases?: number };
+    state.__wakeReleases = 0;
+    Object.defineProperty(navigator, "wakeLock", {
+      configurable: true,
+      value: {
+        request: async () =>
+          Object.assign(new EventTarget(), {
+            released: false,
+            release: async () => {
+              state.__wakeReleases = (state.__wakeReleases ?? 0) + 1;
+            },
+          }),
+      },
+    });
+    window.addEventListener(
+      "message",
+      (event) => {
+        if (state.__dropHealth && event.data?.health) event.stopImmediatePropagation();
+      },
+      { capture: true },
+    );
+  });
+  await gotoHydrated(page, updateTestUrl);
+  const frame = page.locator('iframe[title="Slideshow"]');
+  await expect(frame).toHaveAttribute("data-ready", "true", { timeout: 20_000 });
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          JSON.parse(localStorage.getItem("slideshow-shell-status") ?? "null")?.runtimeHealth
+            ?.health?.presentedAt,
+      ),
+    )
+    .toBeTruthy();
+  const generation = Number(await frame.getAttribute("data-runtime-generation"));
+  const photo = page.getByAltText("Last displayed photograph");
+  const source = await photo.getAttribute("src");
+  await page.evaluate(() => {
+    (window as Window & { __dropHealth?: boolean }).__dropHealth = true;
+  });
+  await expect
+    .poll(async () => Number(await frame.getAttribute("data-runtime-generation")), {
+      timeout: 65_000,
+    })
+    .toBeGreaterThan(generation);
+  await expect(photo).toHaveAttribute("src", source!);
+  await page.evaluate(() => {
+    (window as Window & { __dropHealth?: boolean }).__dropHealth = false;
+  });
+  await expect(frame).toHaveAttribute("data-ready", "true", { timeout: 20_000 });
+  expect(
+    await page.evaluate(() => (window as Window & { __wakeReleases?: number }).__wakeReleases),
+  ).toBe(0);
+});
+
 test("the slideshow shell swaps code without releasing its wake lock", async ({ page }) => {
   test.setTimeout(45_000);
   // The corner status pill is opt-in — a kiosk shows photos, not a build hash —
@@ -199,11 +259,13 @@ test("wake-lock failure never blocks the embedded slideshow", async ({ page }) =
 
   await gotoHydrated(page, "/slideshow/shell?mode=random&delay=86400");
   const prompt = page.getByRole("button", {
-    name: "Tap once to keep this slideshow awake through code updates",
+    name: "Keep slideshow awake",
   });
   await expect(prompt).toBeVisible();
   await prompt.click();
-  await expect(prompt).toBeHidden();
+  // A refused request remains visible as a small recovery button, not a
+  // full-screen interception layer. The diagnostics control must stay usable.
+  await expect(prompt).toBeVisible();
 
   const runtime = page.frameLocator('iframe[title="Slideshow"]');
   await expect(runtime.locator(slideshowImage).first()).toBeVisible({ timeout: 15_000 });
@@ -215,21 +277,6 @@ test("slideshow exit controls leave the outer shell", async ({ page }) => {
   await gotoHydrated(page, "/slideshow/shell?mode=random&delay=86400");
   const runtime = page.frameLocator('iframe[title="Slideshow"]');
   await expect(runtime.locator(slideshowImage).first()).toBeVisible({ timeout: 15_000 });
-  const wakePrompt = page.getByRole("button", {
-    name: "Tap once to keep this slideshow awake through code updates",
-  });
-  // The wake gate only renders after the automatic acquisition attempt has
-  // settled; wait for that deterministic signal before deciding whether a
-  // dismissal tap is needed, or the gate can appear mid-test and swallow the
-  // link click below.
-  await expect(
-    page.locator('[aria-label="Slideshow diagnostics"][data-wake-settled="true"]'),
-  ).toBeAttached();
-  if (await wakePrompt.isVisible()) {
-    await wakePrompt.click();
-    await expect(wakePrompt).toBeHidden();
-  }
-
   await runtime.getByRole("link", { name: /Snapshots Slideshow/ }).click();
 
   await expect(page).toHaveURL(/\/$/);
@@ -237,26 +284,25 @@ test("slideshow exit controls leave the outer shell", async ({ page }) => {
 });
 
 test("slideshow context links leave the outer shell", async ({ page }) => {
-  await gotoHydrated(page, "/slideshow/shell?mode=random&delay=86400");
+  // This journey includes the photo-ready shell (up to 20s) followed by a
+  // second document navigation; the default 15s budget cannot cover both.
+  test.setTimeout(45_000);
+  // This case proves the outer-document handoff, not album rendering (covered
+  // by smoke.spec.ts). Keep the destination minimal: native video controls in
+  // Linux iPad-emulated WebKit can stall even a script-disabled album document.
+  await page.route("**/album/test-simple", (route) =>
+    route.fulfill({
+      contentType: "text/html",
+      body: "<!doctype html><title>Album destination</title><h1>Album destination</h1>",
+    }),
+  );
+  await gotoHydrated(page, updateTestUrl);
   const runtime = page.frameLocator('iframe[title="Slideshow"]');
   await expect(runtime.locator(slideshowImage).first()).toBeVisible({ timeout: 15_000 });
-  const wakePrompt = page.getByRole("button", {
-    name: "Tap once to keep this slideshow awake through code updates",
-  });
-  // The wake gate only renders after the automatic acquisition attempt has
-  // settled; wait for that deterministic signal before deciding whether a
-  // dismissal tap is needed, or the gate can appear mid-test and swallow the
-  // link click below.
-  await expect(
-    page.locator('[aria-label="Slideshow diagnostics"][data-wake-settled="true"]'),
-  ).toBeAttached();
-  if (await wakePrompt.isVisible()) {
-    await wakePrompt.click();
-    await expect(wakePrompt).toBeHidden();
-  }
 
+  const arrived = page.waitForURL(/\/album\/test-simple#/, { waitUntil: "domcontentloaded" });
   await runtime.getByRole("link", { name: / in / }).last().click();
-
-  await expect(page).toHaveURL(/\/album\//);
+  await arrived;
   await expect(page.locator('iframe[title="Slideshow"]')).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Album destination" })).toBeVisible();
 });

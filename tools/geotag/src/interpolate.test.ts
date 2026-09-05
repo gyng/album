@@ -26,6 +26,12 @@ const photo = (over: Partial<GeotagPhoto> = {}): GeotagPhoto => ({
 afterEach(() => vi.unstubAllGlobals());
 
 describe("interpolatePhotos", () => {
+  it("can override an incorrect camera offset without changing the capture wall clock", () => {
+    const input = photo({ offsetTimeOriginal: "+00:00" });
+    const fixes = interpolatePhotos([input], parseGpx(GPX), 540, "override");
+    expect(fixes["p.jpg"]?.lat).toBeCloseTo(35.1, 6);
+    expect(input.dateTimeOriginal).toBe("2024-03-22T19:05:00");
+  });
   it("places a photo mid-leg using the segment offset", () => {
     const fixes = interpolatePhotos([photo()], parseGpx(GPX), 540);
     expect(fixes["p.jpg"].lat).toBeCloseTo(35.1, 6);
@@ -47,7 +53,10 @@ describe("interpolatePhotos", () => {
 
 describe("suggestSegmentOffset", () => {
   it("returns the exif offset when a photo has OffsetTimeOriginal (no server call)", async () => {
-    const res = await suggestSegmentOffset([photo({ offsetTimeOriginal: "+09:00" })], parseGpx(GPX));
+    const res = await suggestSegmentOffset(
+      [photo({ offsetTimeOriginal: "+09:00" })],
+      parseGpx(GPX),
+    );
     expect(res).toEqual({ offsetMinutes: 540, source: "exif-offsettime" });
   });
 
