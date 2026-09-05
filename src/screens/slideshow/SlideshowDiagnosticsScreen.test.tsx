@@ -2,7 +2,7 @@
  * @jest-environment jsdom
  */
 
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { SlideshowDiagnosticsScreen } from "./SlideshowDiagnosticsScreen";
 import {
   readStatusPillVisible,
@@ -44,6 +44,7 @@ describe("slideshow diagnostics page", () => {
 
   afterEach(() => {
     jest.restoreAllMocks();
+    jest.useRealTimers();
   });
 
   it("turns the slideshow's status pill on and off, and reflects what is stored", () => {
@@ -98,8 +99,26 @@ describe("slideshow diagnostics page", () => {
     const events = screen.getAllByRole("listitem").map((item) => item.textContent ?? "");
     expect(events[0]).toContain("Re-acquire attempt failed");
     expect(events[0]).toContain("×47");
+    expect(events[0]).toContain(new Date(NOW - 1800000).toLocaleString("en-GB"));
+    expect(events[0]).toContain("30 minutes ago");
+    expect(events[0]).toContain(new Date(NOW - 60000).toLocaleString("en-GB"));
+    expect(events[0]).toContain("1 minute ago");
     expect(events[1]).toContain("Screen lock lost");
     expect(events[2]).toContain("Page was not running for 2 hours 15 minutes");
+  });
+
+  it("updates event ages while open without losing the absolute timestamp", () => {
+    jest.useFakeTimers({ doNotFake: ["Date"] });
+    seedLog([{ at: NOW - 5000, category: "wake", type: "lost" }]);
+    render(<SlideshowDiagnosticsScreen />);
+    const event = screen.getByRole("listitem");
+    expect(event).toHaveTextContent("5 seconds ago");
+    jest.mocked(Date.now).mockReturnValue(NOW + 1000);
+    act(() => {
+      jest.advanceTimersByTime(1000);
+    });
+    expect(event).toHaveTextContent("6 seconds ago");
+    expect(event).toHaveTextContent(new Date(NOW - 5000).toLocaleString("en-GB"));
   });
 
   it("explains that nothing has been recorded when the log is empty", () => {

@@ -16,6 +16,8 @@ type WakeLockNavigator = Navigator & {
 // unattended. The shell records lock acquisition/loss itself from `isActive`
 // transitions; the hook pushes only these facts it alone knows.
 export type WakeLockEvent =
+  | "released"
+  | "release-observed"
   | "reacquire-failed"
   | "cap-reached"
   | "cap-decayed"
@@ -23,6 +25,8 @@ export type WakeLockEvent =
   | "request-held"
   | "request-failed";
 export type WakeLockDetails = {
+  visibility?: "hidden" | "visible";
+  heldMs?: number;
   elapsedMs?: number;
   name?: string;
   message?: string;
@@ -213,6 +217,10 @@ export const useWakeLock = (disabled: boolean): UseWakeLock => {
       }
 
       if (wakeLockRef.current?.released) {
+        // This is the observation time, not the unknown moment of release.
+        emitEvent("release-observed", {
+          visibility: document.visibilityState,
+        });
         wakeLockRef.current = null;
         setIsActive(false);
       }
@@ -307,6 +315,9 @@ export const useWakeLock = (disabled: boolean): UseWakeLock => {
             return;
           }
           const heldMs = Date.now() - acquiredAtRef.current;
+          // Record synchronously, even while hidden: a React state transition
+          // observed later cannot reconstruct the order of release and sleep.
+          emitEvent("released", { visibility: document.visibilityState, heldMs });
           wakeLockRef.current = null;
           setIsActive(false);
           // A sustained hold that the system later dropped is not a fight —
@@ -401,20 +412,15 @@ export const useWakeLock = (disabled: boolean): UseWakeLock => {
       }
     };
 
-    // pageshow fires in Safari PWAs when the page is restored from the back/forward cache
-    // or resumed from background — more reliable than visibilitychange alone in that context.
-    const handlePageShow = (e: PageTransitionEvent) => {
-      if (!e.persisted) {
-        return;
-      }
-      syncWakeLockState();
-    };
-
+    // `persisted` describes the back/forward cache, not whether a wake lock
+    // survived. Recheck every pageshow and visible focus; held locks are no-ops.
     document.addEventListener("visibilitychange", syncWakeLockState);
-    window.addEventListener("pageshow", handlePageShow);
+    window.addEventListener("pageshow", syncWakeLockState);
+    window.addEventListener("focus", syncWakeLockState);
     return () => {
       document.removeEventListener("visibilitychange", syncWakeLockState);
-      window.removeEventListener("pageshow", handlePageShow);
+      window.removeEventListener("pageshow", syncWakeLockState);
+      window.removeEventListener("focus", syncWakeLockState);
     };
   }, [disabled, acquire, clearReacquireTimer]);
 

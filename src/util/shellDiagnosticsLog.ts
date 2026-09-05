@@ -18,6 +18,8 @@
 import { isRuntimeHealth, type RuntimeHealthSnapshot } from "./slideshowRuntimeHealth";
 
 export type WakeEventType =
+  | "released" // platform release event, including while hidden
+  | "release-observed" // a released sentinel found later, not its release time
   | "request-start"
   | "request-held"
   | "request-failed"
@@ -51,6 +53,8 @@ export type GapEventType = "gap"; // the JS loop was frozen/asleep between beats
 // evict the whole capped log and destroy the onset evidence by morning.
 type Coalesced = { count?: number; lastAt?: number };
 type WakeRequestDetails = {
+  visibility?: "hidden" | "visible";
+  heldMs?: number;
   elapsedMs?: number;
   name?: string;
   message?: string;
@@ -95,6 +99,8 @@ export const HEARTBEAT_GAP_THRESHOLD_MS = 90000;
 
 const KNOWN_TYPES: Record<ShellLogEntry["category"], ReadonlySet<string>> = {
   wake: new Set<WakeEventType>([
+    "released",
+    "release-observed",
     "request-start",
     "request-held",
     "request-failed",
@@ -205,7 +211,9 @@ export const appendShellEvent = (
     candidate.type === input.type &&
     (candidate.category !== "wake" ||
       input.category !== "wake" ||
-      (candidate.name === input.name && candidate.message === input.message)) &&
+      (candidate.name === input.name &&
+        candidate.message === input.message &&
+        candidate.visibility === input.visibility)) &&
     (candidate.category !== "code" ||
       ((candidate as { version?: string }).version === (input as { version?: string }).version &&
         (candidate as { reason?: CodeReloadReason }).reason ===
@@ -458,6 +466,12 @@ export const formatGapDuration = (ms: number): string => {
   return parts.length > 0 ? parts.join(" ") : `${totalMinutes} minutes`;
 };
 
+export const formatEventAge = (at: number, now: number): string => {
+  const delta = now - at;
+  if (Math.abs(delta) < 1000) return "just now";
+  return delta < 0 ? `in ${formatGapDuration(-delta)}` : `${formatGapDuration(delta)} ago`;
+};
+
 // British-English short label for one timeline entry, per category.
 export const describeShellEvent = (entry: ShellLogEntry): string => {
   const count = entry.category === "gap" ? undefined : entry.count;
@@ -469,6 +483,10 @@ const describeShellEventBase = (entry: ShellLogEntry): string => {
   switch (entry.category) {
     case "wake":
       switch (entry.type) {
+        case "released":
+          return `Screen lock released (${entry.visibility ?? "visibility unknown"}${entry.heldMs !== undefined ? `, held ${formatGapDuration(entry.heldMs)}` : ""})`;
+        case "release-observed":
+          return `Found screen lock already released (${entry.visibility ?? "visibility unknown"})`;
         case "request-start":
           return "Requesting screen lock";
         case "request-held":
@@ -581,8 +599,11 @@ export const serialiseDiagnostics = (report: DiagnosticsReport): string => {
           const lastAt = entry.category === "gap" ? undefined : entry.lastAt;
           // A coalesced entry spans onset..lastAt; the span end is the datum a
           // morning-after read needs to know when the episode stopped.
-          const span = lastAt !== undefined && lastAt !== entry.at ? ` until ${iso(lastAt)}` : "";
-          return `${iso(entry.at)}${span}  [${categoryLabel(entry.category)}] ${describeShellEvent(entry)}`;
+          const span =
+            lastAt !== undefined && lastAt !== entry.at
+              ? ` until ${iso(lastAt)} (${formatEventAge(lastAt, report.now)})`
+              : "";
+          return `${iso(entry.at)} (${formatEventAge(entry.at, report.now)})${span}  [${categoryLabel(entry.category)}] ${describeShellEvent(entry)}`;
         })
       : ["(no events recorded)"]),
   ];

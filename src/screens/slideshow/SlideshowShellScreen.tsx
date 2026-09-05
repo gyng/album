@@ -1,5 +1,7 @@
 import React from "react";
 import { useWakeLock } from "../../components/useWakeLock";
+import { useDiagnosticsClock } from "../../components/useDiagnosticsClock";
+import { SlideshowEventTime } from "./SlideshowEventTime";
 import { AppLink, DocumentHead } from "../../components/platform";
 import { BUILD_VERSION } from "../../lib/buildVersion";
 import { decideBuildUpdate } from "../../util/kioskRefresh";
@@ -136,6 +138,8 @@ export const SlideshowShellScreen = () => {
   const [wakeLossCount, setWakeLossCount] = React.useState(0);
   const [lastWakeLossAt, setLastWakeLossAt] = React.useState<Date | null>(null);
   const [eventHistory, setEventHistory] = React.useState<ShellLogEntry[]>([]);
+  const [historyOpen, setHistoryOpen] = React.useState(false);
+  const diagnosticsNow = useDiagnosticsClock(statusPillVisible && diagnosticsOpen && historyOpen);
   const [copiedDiagnostics, setCopiedDiagnostics] = React.useState(false);
   const copiedTimerRef = React.useRef<number | null>(null);
   // iPadOS can repaint its opaque PWA status-bar backing from the root
@@ -955,9 +959,10 @@ export const SlideshowShellScreen = () => {
                 <details
                   className={styles.wakeHistory}
                   onToggle={(event) => {
-                    // Refresh the rendered tail lazily, only when the disclosure is
-                    // opened — the timeline is never polled on a timer.
-                    if ((event.currentTarget as HTMLDetailsElement).open) {
+                    const open = event.currentTarget.open;
+                    setHistoryOpen(open);
+                    // Event storage is read on opening, not on each clock tick.
+                    if (open) {
                       setEventHistory(readShellLog());
                     }
                   }}
@@ -974,14 +979,7 @@ export const SlideshowShellScreen = () => {
                           data-category={entry.category}
                         >
                           <span>{describeShellEvent(entry)}</span>
-                          <time dateTime={new Date(entry.at).toISOString()}>
-                            {new Date(entry.at).toLocaleString("en-GB")}
-                            {entry.category !== "gap" &&
-                            entry.lastAt !== undefined &&
-                            entry.lastAt !== entry.at
-                              ? ` – ${new Date(entry.lastAt).toLocaleTimeString("en-GB")}`
-                              : null}
-                          </time>
+                          <SlideshowEventTime entry={entry} now={diagnosticsNow} />
                         </li>
                       ))}
                   </ul>

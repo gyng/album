@@ -17,6 +17,8 @@ import {
 } from "../../util/shellDiagnosticsLog";
 import styles from "./SlideshowDiagnosticsScreen.module.css";
 import { formatPageTitle } from "../../lib/seo";
+import { useDiagnosticsClock } from "../../components/useDiagnosticsClock";
+import { SlideshowEventTime } from "./SlideshowEventTime";
 
 type Reading = {
   now: number;
@@ -74,7 +76,11 @@ export const SlideshowDiagnosticsScreen = () => {
       }
     };
     document.addEventListener("visibilitychange", refresh);
-    return () => document.removeEventListener("visibilitychange", refresh);
+    window.addEventListener("storage", refresh);
+    return () => {
+      document.removeEventListener("visibilitychange", refresh);
+      window.removeEventListener("storage", refresh);
+    };
   }, []);
 
   React.useEffect(
@@ -86,7 +92,8 @@ export const SlideshowDiagnosticsScreen = () => {
     [],
   );
 
-  const { now, status, heartbeat, log } = reading;
+  const now = useDiagnosticsClock(true);
+  const { status, heartbeat, log } = reading;
   const shellAlive = heartbeat !== null && now - heartbeat <= HEARTBEAT_GAP_THRESHOLD_MS;
 
   const buildReport = React.useCallback((): string => {
@@ -291,14 +298,9 @@ export const SlideshowDiagnosticsScreen = () => {
                 data-category={entry.category}
               >
                 <span className={styles.eventLabel}>{describeShellEvent(entry)}</span>
-                <time className={styles.eventTime} dateTime={new Date(entry.at).toISOString()}>
-                  {timeOf(entry.at)}
-                  {entry.category !== "gap" &&
-                  entry.lastAt !== undefined &&
-                  entry.lastAt !== entry.at
-                    ? ` – ${new Date(entry.lastAt).toLocaleTimeString("en-GB")}`
-                    : null}
-                </time>
+                <div className={styles.eventTime}>
+                  <SlideshowEventTime entry={entry} now={now} />
+                </div>
               </li>
             ))}
           </ol>

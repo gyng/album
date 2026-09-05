@@ -1,0 +1,11 @@
+.timestamps {
+  display: grid;
+  gap: var(--m-s);
+  font-size: inherit;
+  font-variant-numeric: tabular-nums;
+}
+
+.stamp {
+  display: grid;
+  gap: var(--m);
+}

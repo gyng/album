@@ -94,12 +94,15 @@ describe("useWakeLock", () => {
       await Promise.resolve();
     });
     Object.defineProperty(sentinel, "released", { value: true });
+    const events = jest.fn();
+    result.current.subscribe(events);
     const replacement = makeSentinel();
     request.mockResolvedValueOnce(replacement);
     await act(async () => {
       document.dispatchEvent(new Event("visibilitychange"));
     });
     expect(result.current.ref.current).toBe(replacement);
+    expect(events).toHaveBeenCalledWith("release-observed", { visibility: "visible" });
   });
 
   it("records the original public request failure and settles out of requesting", async () => {
@@ -115,6 +118,46 @@ describe("useWakeLock", () => {
       expect.objectContaining({ name: "NotAllowedError", message: "Power policy" }),
     );
     expect(result.current.status).toBe("retrying");
+  });
+
+  it.each(["pageshow", "focus"])(
+    "recovers a released lock on %s without a visibility event",
+    async (type) => {
+      const { result } = renderHook(() => useWakeLock(false));
+      await act(async () => {
+        await Promise.resolve();
+      });
+      Object.defineProperty(sentinel, "released", { value: true });
+      const replacement = makeSentinel();
+      request.mockResolvedValueOnce(replacement);
+      await act(async () => {
+        window.dispatchEvent(
+          type === "pageshow"
+            ? new PageTransitionEvent(type, { persisted: false })
+            : new Event(type),
+        );
+      });
+      expect(result.current.ref.current).toBe(replacement);
+      expect(result.current.isActive).toBe(true);
+    },
+  );
+
+  it("records a browser release even after the document became hidden", async () => {
+    const { result } = renderHook(() => useWakeLock(false));
+    const events = jest.fn();
+    result.current.subscribe(events);
+    await act(async () => {
+      await Promise.resolve();
+    });
+    setVisibility("hidden");
+    await act(async () => {
+      sentinel.dispatchEvent(new Event("release"));
+    });
+    expect(events).toHaveBeenCalledWith(
+      "released",
+      expect.objectContaining({ visibility: "hidden", heldMs: expect.any(Number) }),
+    );
+    expect(result.current.isActive).toBe(false);
   });
 
   it("reports support when navigator.wakeLock.request exists", () => {
@@ -330,12 +373,13 @@ describe("useWakeLock", () => {
     consoleError.mockRestore();
   });
 
-  it("syncs only persisted page restores and stays idle while disabled", async () => {
+  it("stays idle on page restores and focus while disabled", async () => {
     const { result } = renderHook(() => useWakeLock(true));
 
     await act(async () => {
       window.dispatchEvent(new PageTransitionEvent("pageshow", { persisted: false }));
       window.dispatchEvent(new PageTransitionEvent("pageshow", { persisted: true }));
+      window.dispatchEvent(new Event("focus"));
       document.dispatchEvent(new Event("visibilitychange"));
       await Promise.resolve();
     });

@@ -67,7 +67,7 @@
 }
 
 .row dt {
-  color: var(--c-bg-contrast-dark);
+  color: color-mix(in oklch, var(--c-font) 75%, transparent);
 }
 
 .row dd {
@@ -94,7 +94,7 @@
 }
 
 .hint {
-  color: var(--c-bg-contrast-dark);
+  color: color-mix(in oklch, var(--c-font) 75%, transparent);
   font-size: var(--fs-s);
   font-variant-numeric: tabular-nums;
 }
@@ -131,8 +131,8 @@
 }
 
 .eventTime {
-  color: var(--c-bg-contrast-dark);
-  font-size: var(--fs-s);
+  color: color-mix(in oklch, var(--c-font) 75%, transparent);
+  font-size: var(--fs-sm);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }

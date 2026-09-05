@@ -3,6 +3,7 @@ import {
   describeShellEvent,
   detectHeartbeatGap,
   formatGapDuration,
+  formatEventAge,
   HEARTBEAT_GAP_THRESHOLD_MS,
   HEARTBEAT_STORAGE_KEY,
   readHeartbeat,
@@ -238,6 +239,14 @@ describe("formatGapDuration", () => {
   });
 });
 
+describe("formatEventAge", () => {
+  it("handles recent events and a clock moved behind the recorded time", () => {
+    expect(formatEventAge(1000, 1500)).toBe("just now");
+    expect(formatEventAge(1000, 6000)).toBe("5 seconds ago");
+    expect(formatEventAge(6000, 1000)).toBe("in 5 seconds");
+  });
+});
+
 describe("serialiseDiagnostics", () => {
   const baseReport = (): DiagnosticsReport => ({
     now: Date.UTC(2026, 6, 23, 2, 30, 0),
@@ -273,6 +282,31 @@ describe("serialiseDiagnostics", () => {
   it("handles an empty log without throwing", () => {
     const report = { ...baseReport(), log: [] };
     expect(serialiseDiagnostics(report)).toContain("(no events recorded)");
+  });
+
+  it("exports absolute and relative times for both ends of a repeated episode", () => {
+    const report = baseReport();
+    const at = report.now - 86400000;
+    const lastAt = report.now - 60000;
+    report.log = [{ at, lastAt, count: 2, category: "wake", type: "request-failed" }];
+    const text = serialiseDiagnostics(report);
+    expect(text).toContain(`${new Date(at).toISOString()} (24 hours ago)`);
+    expect(text).toContain(`${new Date(lastAt).toISOString()} (1 minute ago)`);
+  });
+
+  it("preserves browser-release evidence including hidden-page releases", () => {
+    const storage = makeStorage();
+    const event = {
+      category: "wake",
+      type: "released",
+      visibility: "hidden",
+      heldMs: 65000,
+    } as const;
+    appendShellEvent(event, 100000, storage);
+    const [stored] = readShellLog(storage);
+    expect(stored).toEqual({ ...event, at: 100000 });
+    expect(describeShellEvent(stored!)).toContain("hidden");
+    expect(describeShellEvent(stored!)).toContain("held 1 minute");
   });
 });
 

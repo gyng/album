@@ -204,6 +204,7 @@
 
 .wakeHistoryItem {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   gap: var(--m-s);
   padding-block: var(--m);
