@@ -330,8 +330,16 @@ test.describe("Slideshow touch mode", () => {
 
     await expect(peek).toHaveCount(1);
     expect(await peek.getAttribute("src")).not.toBe(currentSrc);
-    // It comes up with the gesture rather than arriving at full strength.
-    expect(Number(await peek.evaluate((el) => getComputedStyle(el).opacity))).toBeGreaterThan(0);
+    // Check the rendered treatment: the old preview was already 85% opaque
+    // here, and a missing/invalid opacity rule would make it fully opaque.
+    const previewStyle = await peek.evaluate((el) => {
+      const style = getComputedStyle(el);
+      return { opacity: Number(style.opacity), scale: Number(style.scale) };
+    });
+    expect(previewStyle.opacity).toBeGreaterThan(0);
+    expect(previewStyle.opacity).toBeLessThanOrEqual(0.42);
+    expect(previewStyle.scale).toBeGreaterThan(0.9);
+    expect(previewStyle.scale).toBeLessThan(1);
 
     // Once the swipe settles the incoming layer is the picture itself.
     await dispatchPointer(page, "up", x - 110, y);

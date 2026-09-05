@@ -262,7 +262,7 @@ describe("SlideshowScreen touch gestures (screen-level)", () => {
 
   // Dragging the slide aside used to reveal the page behind it — a black void
   // the width of the gesture — rather than where the swipe was going.
-  it("uncovers the photograph the drag is heading towards, and only while it lasts", async () => {
+  it("reveals the neighbour progressively and fades it away as the swipe settles", async () => {
     render(<SlideshowScreen />);
     await flush();
 
@@ -278,13 +278,49 @@ describe("SlideshowScreen touch gestures (screen-level)", () => {
     // The buffered next photograph, not the one on screen.
     expect(uncovered!.getAttribute("src")).not.toBe(image.getAttribute("src"));
     // It comes up with the gesture rather than appearing at full strength.
-    expect(uncovered!.style.getPropertyValue("--drag-peek-progress")).not.toBe("0");
+    const earlyProgress = Number(uncovered!.style.getPropertyValue("--drag-peek-progress"));
+    expect(earlyProgress).toBeGreaterThan(0);
+    expect(earlyProgress).toBeLessThan(0.5);
+    pointer(image, "pointermove", touchAt(180, 300));
+    expect(Number(peek()!.style.getPropertyValue("--drag-peek-progress"))).toBeGreaterThan(
+      earlyProgress,
+    );
 
-    // Once the gesture settles the incoming layer is the picture, so a peek
-    // under it would be the same photograph twice.
-    pointer(image, "pointerup", touchAt(240, 300));
+    // Release fades the existing preview out instead of removing it mid-drag.
+    pointer(image, "pointerup", touchAt(180, 300));
     await flush();
-    expect(peek()).toBeNull();
+    expect(peek()).toBe(uncovered);
+    expect(peek()).toHaveAttribute("data-settling", "true");
+  });
+
+  it("springs back when the browser cancels a swipe", async () => {
+    render(<SlideshowScreen />);
+    await flush();
+    const image = slideImage();
+    const src = image.getAttribute("src");
+    pointer(image, "pointerdown", touchAt(300, 300));
+    pointer(image, "pointermove", touchAt(200, 300));
+    pointer(image, "pointercancel", touchAt(200, 300));
+    expect(image.style.transform).toBe("translateX(0px)");
+    expect(slideImage().getAttribute("src")).toBe(src);
+    const settled = new Event("transitionend", { bubbles: true });
+    Object.defineProperty(settled, "propertyName", { value: "transform" });
+    fireEvent(image, settled);
+    expect(document.querySelector("[data-drag-peek]")).toBeNull();
+    expect(image.style.transform).toBe("");
+  });
+
+  it("keeps the first photograph in place when there is no previous slide", async () => {
+    render(<SlideshowScreen />);
+    await flush();
+    const image = slideImage();
+    const src = image.getAttribute("src");
+    pointer(image, "pointerdown", touchAt(300, 300));
+    pointer(image, "pointermove", touchAt(400, 300));
+    pointer(image, "pointerup", touchAt(400, 300));
+    await flush();
+    expect(slideImage().getAttribute("src")).toBe(src);
+    expect(image.style.transform).toBe("translateX(0px)");
   });
 
   it("drags the top layer with a committed horizontal swipe and settles it on release", async () => {

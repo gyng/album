@@ -673,6 +673,7 @@ export const Slideshow: React.FC<{
     x: number;
     key?: string;
     settling: boolean;
+    peek?: { src: string; progress: number; direction: number };
   } | null>(null);
   // The layer that should play the tap-acknowledgement dip (set on tap-zone
   // navigation, cleared when its animation ends).
@@ -1758,16 +1759,9 @@ export const Slideshow: React.FC<{
     showHistoryPhoto(historyStateRef.current.index - 1, "user");
   }, [showHistoryPhoto]);
 
-  // Which neighbour a live drag is uncovering: dragging left goes forward, right
-  // goes back. Only while the gesture is live — once it settles, the incoming
-  // layer is the picture, and a peek under it would be the same photograph
-  // twice.
-  const dragPeekSrc =
-    layerDrag === null || layerDrag.settling
-      ? null
-      : layerDrag.x < 0
-        ? bufferedPhotoSrc
-        : previousPhotoSrc;
+  // Freeze the preview with its gesture so a queue advance cannot replace the
+  // image underneath the finger. Keep it mounted through the release fade.
+  const dragPeek = layerDrag?.peek;
 
   const getUpcomingPhoto = useCallback((): RandomPhotoRow | null => {
     if (hasForwardEntry(historyStateRef.current)) {
@@ -2086,90 +2080,123 @@ export const Slideshow: React.FC<{
       setTouchSwipeProgress(0);
       setTouchPointerActive(false);
       setTouchArmed(false);
+      // Cancellation has no pointerup to settle the displaced photograph.
+      // The normal release handler can replace this spring-back with an exit.
+      const key = layersRef.current[layersRef.current.length - 1]?.key;
+      setLayerDrag((current) =>
+        current && key !== undefined ? { ...current, key, x: 0, settling: true } : null,
+      );
     },
     [setPaused],
   );
 
-  const handleImagePointerMove = useCallback((event: React.PointerEvent<HTMLElement>) => {
-    const gesture = pointerGestureRef.current;
-    if (!gesture || gesture.pointerId !== event.pointerId || !isTouchOrPen(gesture.pointerType)) {
-      return;
-    }
-
-    const deltaX = event.clientX - gesture.startX;
-    const deltaY = event.clientY - gesture.startY;
-
-    // While held (paused), the gesture is inert: no hints, no drag, and the
-    // release resolves to nothing. The finger resting or drifting must not
-    // start navigation out of a pause.
-    if (gesture.held) {
-      return;
-    }
-
-    // Clear drift cancels a pending hold — it is becoming a swipe or pull.
-    if (
-      gesture.holdTimerId !== undefined &&
-      (Math.abs(deltaX) > TAP_MAX_DRIFT_PX || Math.abs(deltaY) > TAP_MAX_DRIFT_PX)
-    ) {
-      window.clearTimeout(gesture.holdTimerId);
-      gesture.holdTimerId = undefined;
-    }
-
-    const result = resolvePointerMove({
-      deltaX,
-      deltaY,
-      ...(gesture.committedHorizontalDirection
-        ? { committedHorizontal: gesture.committedHorizontalDirection }
-        : {}),
-      ...(gesture.committedVerticalDirection
-        ? { committedVertical: gesture.committedVerticalDirection }
-        : {}),
-      controlsWereVisible: gesture.controlsWereVisible,
-    });
-
-    // The other axis is already committed — leave visuals untouched.
-    if (result.kind === "ignore") {
-      return;
-    }
-
-    // Persist any newly-committed axis direction for the rest of the gesture.
-    if (result.committedHorizontal) {
-      gesture.committedHorizontalDirection = result.committedHorizontal;
-    }
-    if (result.committedVertical) {
-      gesture.committedVerticalDirection = result.committedVertical;
-    }
-
-    setTouchGestureHint(result.hint);
-    setTouchPullProgress(result.pullProgress);
-    setTouchSwipeProgress(result.swipeProgress);
-
-    // Follow-the-finger: once horizontal commits, the live top layer tracks
-    // the drag 1:1 (transform is untransitioned outside the settle class).
-    const dragOffset = resolveDragOffset({
-      deltaX,
-      ...(gesture.committedHorizontalDirection
-        ? { committedHorizontal: gesture.committedHorizontalDirection }
-        : {}),
-      ...(gesture.committedVerticalDirection
-        ? { committedVertical: gesture.committedVerticalDirection }
-        : {}),
-    });
-    setLayerDrag(dragOffset === 0 ? null : { x: dragOffset, settling: false });
-
-    if (result.armed) {
-      setTouchArmed(true);
-      // Fire the commit haptic exactly once per gesture.
-      if (!gesture.hapticFired) {
-        gesture.hapticFired = true;
-        if (navigator.vibrate) {
-          navigator.vibrate(8);
-        }
+  const handleImagePointerMove = useCallback(
+    (event: React.PointerEvent<HTMLElement>) => {
+      const gesture = pointerGestureRef.current;
+      if (!gesture || gesture.pointerId !== event.pointerId || !isTouchOrPen(gesture.pointerType)) {
+        return;
       }
-    } else {
-      setTouchArmed(false);
-    }
-  }, []);
+
+      const deltaX = event.clientX - gesture.startX;
+      const deltaY = event.clientY - gesture.startY;
+
+      // While held (paused), the gesture is inert: no hints, no drag, and the
+      // release resolves to nothing. The finger resting or drifting must not
+      // start navigation out of a pause.
+      if (gesture.held) {
+        return;
+      }
+
+      // Clear drift cancels a pending hold — it is becoming a swipe or pull.
+      if (
+        gesture.holdTimerId !== undefined &&
+        (Math.abs(deltaX) > TAP_MAX_DRIFT_PX || Math.abs(deltaY) > TAP_MAX_DRIFT_PX)
+      ) {
+        window.clearTimeout(gesture.holdTimerId);
+        gesture.holdTimerId = undefined;
+      }
+
+      const result = resolvePointerMove({
+        deltaX,
+        deltaY,
+        ...(gesture.committedHorizontalDirection
+          ? { committedHorizontal: gesture.committedHorizontalDirection }
+          : {}),
+        ...(gesture.committedVerticalDirection
+          ? { committedVertical: gesture.committedVerticalDirection }
+          : {}),
+        controlsWereVisible: gesture.controlsWereVisible,
+      });
+
+      // The other axis is already committed — leave visuals untouched.
+      if (result.kind === "ignore") {
+        return;
+      }
+
+      // Persist any newly-committed axis direction for the rest of the gesture.
+      if (result.committedHorizontal) {
+        gesture.committedHorizontalDirection = result.committedHorizontal;
+      }
+      if (result.committedVertical) {
+        gesture.committedVerticalDirection = result.committedVertical;
+      }
+
+      setTouchGestureHint(result.hint);
+      setTouchPullProgress(result.pullProgress);
+      setTouchSwipeProgress(result.swipeProgress);
+
+      // Follow-the-finger: once horizontal commits, the live top layer tracks
+      // the drag 1:1 (transform is untransitioned outside the settle class).
+      const dragOffset = resolveDragOffset({
+        deltaX,
+        ...(gesture.committedHorizontalDirection
+          ? { committedHorizontal: gesture.committedHorizontalDirection }
+          : {}),
+        ...(gesture.committedVerticalDirection
+          ? { committedVertical: gesture.committedVerticalDirection }
+          : {}),
+      });
+      const previewSrc = dragOffset < 0 ? bufferedPhotoSrc : previousPhotoSrc;
+      // The commit cue fills after 48px; a photographic reveal needs the breadth
+      // of the screen. Keeping these separate avoids a near-opaque flash as soon
+      // as the gesture arms.
+      const previewProgress = Math.min(
+        1,
+        Math.abs(dragOffset) / Math.max(1, window.innerWidth * 0.6),
+      );
+      setLayerDrag(
+        dragOffset === 0
+          ? null
+          : {
+              x: dragOffset,
+              settling: false,
+              ...(previewSrc
+                ? {
+                    peek: {
+                      src: previewSrc,
+                      progress: previewProgress,
+                      direction: -Math.sign(dragOffset),
+                    },
+                  }
+                : {}),
+            },
+      );
+
+      if (result.armed) {
+        setTouchArmed(true);
+        // Fire the commit haptic exactly once per gesture.
+        if (!gesture.hapticFired) {
+          gesture.hapticFired = true;
+          if (navigator.vibrate) {
+            navigator.vibrate(8);
+          }
+        }
+      } else {
+        setTouchArmed(false);
+      }
+    },
+    [bufferedPhotoSrc, previousPhotoSrc],
+  );
 
   const handleImagePointerUp = useCallback(
     (event: React.PointerEvent<HTMLElement>) => {
@@ -2227,13 +2254,14 @@ export const Slideshow: React.FC<{
           : {}),
       });
       if (releaseDragOffset !== 0 && topLayerKey !== undefined) {
-        const exiting = action === "next" || action === "previous";
+        const exiting = action === "next" || (action === "previous" && canGoPrevious);
         const exitDistance = Math.max(window.innerWidth * 0.6, Math.abs(releaseDragOffset) + 160);
-        setLayerDrag({
+        setLayerDrag((current) => ({
+          ...current,
           key: topLayerKey,
           x: exiting ? Math.sign(releaseDragOffset) * exitDistance : 0,
           settling: true,
-        });
+        }));
       } else {
         setLayerDrag(null);
       }
@@ -2856,15 +2884,21 @@ export const Slideshow: React.FC<{
             photograph, right for the previous — and a remix slide peeks with its
             seed frame, since one image is the hint and the real layout arrives a
             moment later. */}
-        {dragPeekSrc ? (
+        {dragPeek ? (
           <img
             className={[styles.dragPeek, showCover ? styles.cover : ""].filter(Boolean).join(" ")}
-            src={dragPeekSrc}
+            src={dragPeek.src}
             alt=""
             aria-hidden="true"
             decoding="async"
             data-drag-peek="true"
-            style={{ "--drag-peek-progress": String(touchSwipeProgress) } as React.CSSProperties}
+            data-settling={String(layerDrag?.settling === true)}
+            style={
+              {
+                "--drag-peek-progress": dragPeek.progress,
+                "--drag-peek-direction": dragPeek.direction,
+              } as React.CSSProperties
+            }
           />
         ) : null}
 
