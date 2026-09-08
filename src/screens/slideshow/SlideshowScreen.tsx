@@ -82,6 +82,10 @@ import {
 } from "../../util/slideshowHistory";
 import { SlideshowToolbar } from "../../components/slideshow/SlideshowToolbar";
 import { SlideshowBottomBar } from "../../components/slideshow/SlideshowBottomBar";
+import {
+  SlideshowDragPreview,
+  type DragPeek,
+} from "../../components/slideshow/SlideshowDragPreview";
 import { decideBuildUpdate, decideDbUpdateAction } from "../../util/kioskRefresh";
 import { decideRemixPlan, mapVectorRemixResult } from "../../util/slideshowRemix";
 import {
@@ -703,7 +707,7 @@ export const Slideshow: React.FC<{
     x: number;
     key?: string;
     settling: boolean;
-    peek?: { src: string; progress: number; direction: number };
+    peek?: DragPeek;
   } | null>(null);
   // The layer that should play the tap-acknowledgement dip (set on tap-zone
   // navigation, cleared when its animation ends).
@@ -2159,7 +2163,9 @@ export const Slideshow: React.FC<{
       // The normal release handler can replace this spring-back with an exit.
       const key = layersRef.current[layersRef.current.length - 1]?.key;
       setLayerDrag((current) =>
-        current && key !== undefined ? { ...current, key, x: 0, settling: true } : null,
+        current && current.x !== 0 && key !== undefined
+          ? { ...current, key, x: 0, settling: true }
+          : null,
       );
     },
     [setPaused],
@@ -2239,9 +2245,15 @@ export const Slideshow: React.FC<{
         1,
         Math.abs(dragOffset) / Math.max(1, window.innerWidth * 0.6),
       );
-      setLayerDrag(
+      setLayerDrag((current) =>
         dragOffset === 0
-          ? null
+          ? gesture.committedHorizontalDirection && current
+            ? {
+                x: 0,
+                settling: false,
+                ...(current.peek ? { peek: { ...current.peek, progress: 0 } } : {}),
+              }
+            : null
           : {
               x: dragOffset,
               settling: false,
@@ -2785,6 +2797,7 @@ export const Slideshow: React.FC<{
         data-fullscreen-active={String(isFullscreenActive)}
         data-paused={String(isPaused)}
         data-touch-active={String(touchPointerActive)}
+        data-dragging={String(layerDrag !== null && !layerDrag.settling)}
         data-touch-armed={String(touchArmed)}
         data-touch-hold={String(touchHoldActive)}
         onPointerDownCapture={extendControlsHideDeadline}
@@ -3065,23 +3078,13 @@ export const Slideshow: React.FC<{
             photograph, right for the previous — and a remix slide peeks with its
             seed frame, since one image is the hint and the real layout arrives a
             moment later. */}
-        {dragPeek ? (
-          <img
-            className={[styles.dragPeek, showCover ? styles.cover : ""].filter(Boolean).join(" ")}
-            src={dragPeek.src}
-            alt=""
-            aria-hidden="true"
-            decoding="async"
-            data-drag-peek="true"
-            data-settling={String(layerDrag?.settling === true)}
-            style={
-              {
-                "--drag-peek-progress": dragPeek.progress,
-                "--drag-peek-direction": dragPeek.direction,
-              } as React.CSSProperties
-            }
-          />
-        ) : null}
+        <SlideshowDragPreview
+          nextSrc={bufferedPhotoSrc === photoBlock.data.src ? null : bufferedPhotoSrc}
+          previousSrc={previousPhotoSrc}
+          peek={dragPeek}
+          settling={layerDrag?.settling === true}
+          cover={showCover}
+        />
 
         {/* Cross-fade layer stack: the newest (last) layer is the interactive
             current slide; it fades in once decoded while older layers fade out.
@@ -3259,16 +3262,6 @@ export const Slideshow: React.FC<{
             />
           );
         })}
-
-        {bufferedPhotoSrc && bufferedPhotoSrc !== photoBlock.data.src ? (
-          <img
-            className={styles.preloadBuffer}
-            src={bufferedPhotoSrc}
-            alt=""
-            aria-hidden="true"
-            decoding="async"
-          />
-        ) : null}
       </div>
     </>
   );

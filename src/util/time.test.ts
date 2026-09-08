@@ -36,6 +36,36 @@ describe("getRelativeTimeString", () => {
     expect(getRelativeTimeString(now + 2 * 3_600_000, { lang: "en", short: true })).toBe("in 2h");
   });
 
+  it("reuses formatters across redraws without caching ages or mixing locale and style", () => {
+    const RelativeTimeFormat = Intl.RelativeTimeFormat;
+    const constructor = jest
+      .spyOn(Intl, "RelativeTimeFormat")
+      .mockImplementation((...args) => new RelativeTimeFormat(...args));
+    jest.isolateModules(() => {
+      const { getRelativeTimeString: format } =
+        jest.requireActual<typeof import("./time")>("./time");
+      for (let redraw = 1; redraw <= 10; redraw++) {
+        const date = now + redraw * 3_600_000;
+        for (const lang of ["en-GB", "fr"]) {
+          for (const short of [false, true]) {
+            expect(format(date, { lang, short })).toBe(
+              new RelativeTimeFormat(lang, {
+                numeric: "auto",
+                style: short ? "narrow" : "long",
+              }).format(redraw, "hour"),
+            );
+          }
+        }
+      }
+      const date = now + 2 * 3_600_000;
+      expect(format(date, { short: true })).toBe("in 2 hr");
+      jest.mocked(Date.now).mockReturnValue(now + 3_600_000);
+      expect(format(date, { short: true })).toBe("in 1 hr");
+      // Dragging redraws the slideshow chrome every frame; ICU setup must not.
+      expect(constructor).toHaveBeenCalledTimes(4);
+    });
+  });
+
   it("uses the runtime language when no options are supplied", () => {
     expect(getRelativeTimeString(now)).toEqual(expect.any(String));
   });

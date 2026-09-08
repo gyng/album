@@ -41,6 +41,24 @@ const styles = mergeCssModuleStyles(
 const SLIDE_MAP_STYLE = { inlineSize: "100%", blockSize: "100%" } as const;
 const SLIDE_MARKER_STYLE = { color: "var(--c-danger)" } as const;
 
+// Both overlay copies redraw during a drag. Reuse ICU formatters rather than
+// rebuilding them through Date.toLocale* on every frame, even for hidden chrome.
+const PHOTO_DATE_FORMAT = new Intl.DateTimeFormat("en-GB", {
+  year: "numeric",
+  month: "long",
+});
+const CLOCK_TIME_FORMAT = new Intl.DateTimeFormat("en-GB", {
+  hour: "numeric",
+  minute: "numeric",
+  hour12: false,
+});
+const CLOCK_DATE_FORMAT = new Intl.DateTimeFormat("en-GB", {
+  weekday: "long",
+  year: "numeric",
+  month: "long",
+  day: "numeric",
+});
+
 const REMIX_STRATEGY_LABEL: Record<RemixStrategy, string> = {
   "same-album": "from this album",
   "same-year": "from the same year",
@@ -143,10 +161,7 @@ export const SlideshowBottomBar: React.FC<SlideshowBottomBarProps> = (props) => 
         {photoDate ? (
           <div className={styles.detailsRow}>
             {photoRelative ? `${photoRelative} · ` : ""}
-            {photoDate.toLocaleDateString("en-GB", {
-              year: "numeric",
-              month: "long",
-            })}
+            {PHOTO_DATE_FORMAT.format(photoDate)}
           </div>
         ) : (
           <div className={styles.detailsRow}>&nbsp;</div>
@@ -236,23 +251,10 @@ export const SlideshowBottomBar: React.FC<SlideshowBottomBarProps> = (props) => 
           ].join(" ")}
         >
           <div className={styles.time}>
-            {props.time
-              ? props.time.toLocaleTimeString("en-GB", {
-                  hour: "numeric",
-                  minute: "numeric",
-                  hour12: false,
-                })
-              : null}
+            {props.time ? CLOCK_TIME_FORMAT.format(props.time) : null}
           </div>
           <div className={styles.date}>
-            {props.time
-              ? props.time.toLocaleDateString("en-GB", {
-                  weekday: "long",
-                  year: "numeric",
-                  month: "long",
-                  day: "numeric",
-                })
-              : null}
+            {props.time ? CLOCK_DATE_FORMAT.format(props.time) : null}
           </div>
         </div>
       </>

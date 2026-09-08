@@ -3,12 +3,9 @@
 @layer vendor, overrides;
 
 @layer overrides {
-  /* The map ships its own Helvetica stack, so the distance scale, the
-     attribution and our recency legend — which borrows the scale's classes —
-     were the only text on the page not in the site's typeface. `--font-sans` is
-     themeable, so this follows the palette's face too (slate sets Barlow), not
-     just the default one. Sizes are left to the vendor: this is map chrome, and
-     its 10-12px is deliberate. */
+  /* Keep vendor controls in the site's themeable typeface (slate uses Barlow).
+     Embedded maps retain the vendor's compact sizing; MapScreen sets a shared
+     type size for its bottom overlays. */
   .maplibregl-map,
   .maplibregl-ctrl-scale,
   .maplibregl-ctrl-attrib,
@@ -95,8 +92,7 @@
     text-decoration: none;
   }
 
-  /* The distance scale, and with it the recency legend — which wears the same
-     vendor classes so the two read as one set of controls down the left edge. */
+  /* The calibrated distance scale; the age legend owns its application styles. */
   .maplibregl-ctrl-scale {
     border-color: color-mix(in oklch, var(--c-font) 45%, transparent);
     background: color-mix(in oklch, var(--c-bg) 82%, transparent);

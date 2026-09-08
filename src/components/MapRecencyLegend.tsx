@@ -18,7 +18,7 @@ export const MapRecencyLegend = ({
   ramp?: RecencyRamp;
 }) => (
   <div
-    className={`${styles.legend} maplibregl-ctrl maplibregl-ctrl-scale`}
+    className={styles.legend}
     // A hook for the one thing about this that is worth asserting: it is
     // decorative chrome with no role of its own, and it has to stay clear of
     // whatever the map puts along its bottom edge.

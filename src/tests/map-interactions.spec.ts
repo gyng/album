@@ -222,9 +222,7 @@ test.describe("World map interactions", () => {
   test("aligns the map legends and uses the site typeface for search previews", async ({
     page,
   }) => {
-    const dateLegend = page.locator(".maplibregl-ctrl-scale").filter({
-      has: page.locator("span"),
-    });
+    const dateLegend = page.locator('[data-map-legend="recency"]');
     const distanceLegend = page.locator(".maplibregl-ctrl-bottom-left .maplibregl-ctrl-scale");
     const [dateLegendBox, distanceLegendBox] = await Promise.all([
       dateLegend.boundingBox(),
@@ -244,13 +242,16 @@ test.describe("World map interactions", () => {
     await input.fill("test-simple");
 
     // The map's own chrome is held to the same typeface: MapLibre ships a
-    // Helvetica stack, and the scale, the attribution and the recency legend
-    // that borrows the scale's classes were the only text on the page not in the
-    // site's face — which is themeable, so this follows the palette's too.
+    // Helvetica stack, and the scale, attribution and recency legend were the
+    // only text not in the site's themeable face.
     const bodyFont = await page
       .locator("body")
       .evaluate((body) => getComputedStyle(body).fontFamily);
-    for (const chrome of [".maplibregl-ctrl-scale", ".maplibregl-ctrl-attrib-inner"]) {
+    for (const chrome of [
+      '[data-map-legend="recency"]',
+      ".maplibregl-ctrl-scale",
+      ".maplibregl-ctrl-attrib-inner",
+    ]) {
       expect(
         await page
           .locator(chrome)
@@ -271,6 +272,38 @@ test.describe("World map interactions", () => {
 
     expect(typefaces.preview).toBe(typefaces.body);
   });
+});
+
+test("bottom map chrome shares a theme-aware surface", async ({ page }) => {
+  await stubExternalMapAssets(page);
+  const surfaces = new Set<string>();
+  for (const theme of ["light", "dark", "slate"]) {
+    await gotoHydrated(page, `/map?theme=${theme}&from=2020-01-01&to=2025-01-01`);
+    const legend = page.locator('[data-map-legend="recency"]');
+    await expect(legend).toBeVisible();
+    const appearance = (selector: string) =>
+      page.locator(selector).evaluate((el) => {
+        const style = getComputedStyle(el);
+        return {
+          surface: style.backgroundColor,
+          ink: style.color,
+          radius: style.borderRadius,
+          typeSize: style.fontSize,
+        };
+      });
+    const key = await appearance('[data-map-legend="recency"]');
+    surfaces.add(key.surface);
+    for (const selector of ["#map-date-controls", ".maplibregl-ctrl-attrib"]) {
+      expect(await appearance(selector)).toEqual(key);
+    }
+    const ruler = await appearance(".maplibregl-ctrl-bottom-left .maplibregl-ctrl-scale");
+    // A calibrated distance bar keeps its ruler shape, but shares the surface
+    // and typography of the other bottom overlays.
+    expect(ruler.surface).toBe(key.surface);
+    expect(ruler.ink).toBe(key.ink);
+    expect(ruler.typeSize).toBe(key.typeSize);
+  }
+  expect(surfaces.size).toBe(3);
 });
 
 test.describe("Map chrome inside the photo details panel", () => {

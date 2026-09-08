@@ -975,7 +975,9 @@ describe("slideshow code shell", () => {
 
     expect(screen.getByRole("group", { name: "Slideshow diagnostics" })).toBeInTheDocument();
     expect(screen.getByText("Screen awake")).toBeInTheDocument();
-    expect(screen.getByText("Online")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Slideshow diagnostics" })).toHaveTextContent(
+      "Online",
+    );
     const frame = screen.getByTitle("Slideshow");
     fireEvent(
       window,
@@ -1004,7 +1006,7 @@ describe("slideshow code shell", () => {
     await waitFor(() => expect(screen.getAllByText("Starting runtime")).not.toHaveLength(0));
   });
 
-  it("does not claim cached code is current while offline", () => {
+  it("does not claim cached code is current while offline", async () => {
     Object.defineProperty(navigator, "onLine", { configurable: true, value: false });
     global.fetch = jest.fn(() => versionResponse("build-current")) as jest.Mock;
 
@@ -1025,6 +1027,15 @@ describe("slideshow code shell", () => {
 
     expect(screen.getAllByText("Code check offline")).not.toHaveLength(0);
     expect(screen.queryByText("Code current")).not.toBeInTheDocument();
+    const chip = screen.getByRole("button", { name: "Slideshow diagnostics" });
+    expect(chip).toHaveTextContent("Offline");
+    Object.defineProperty(navigator, "onLine", { configurable: true, value: true });
+    await act(async () => {
+      fireEvent(window, new Event("online"));
+    });
+    expect(chip).toHaveTextContent("Online");
+    fireEvent(window, new Event("offline"));
+    expect(chip).toHaveTextContent("Offline");
   });
 
   it("beats the heartbeat to storage without ever re-rendering", async () => {

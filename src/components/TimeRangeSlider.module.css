@@ -5,9 +5,14 @@
   inset-inline-end: var(--map-chrome-right, var(--m-xl));
   z-index: var(--z-fullscreen-underlay);
   pointer-events: auto;
-  background: var(--glass-surface-dark);
-  border: solid var(--line-hairline) var(--glass-border-dark);
+  background: var(--map-chrome-surface, var(--c-bg));
+  border: solid var(--line-hairline) var(--map-chrome-border, var(--c-bg-contrast-light));
   border-radius: var(--m-s);
+  box-shadow: var(--map-chrome-shadow, none);
+  color: var(--c-font);
+  font-family: var(--font-sans);
+  font-size: var(--fs-s);
+  line-height: var(--size-20);
   padding: var(--m-s) var(--m-l) var(--m-s);
   backdrop-filter: blur(var(--glass-blur-surface));
 }
@@ -21,7 +26,7 @@
 }
 
 .sparklineBar {
-  fill: color-mix(in oklch, var(--c-on-dark) 18%, transparent);
+  fill: color-mix(in oklch, var(--c-font) 25%, transparent);
 }
 
 .sparklineBarActive {
@@ -44,7 +49,7 @@
   position: absolute;
   inset-inline: 0;
   block-size: calc(var(--line-hairline) * 3);
-  background: color-mix(in oklch, var(--c-on-dark) 12%, transparent);
+  background: color-mix(in oklch, var(--c-font) 18%, transparent);
   border-radius: calc(var(--line-hairline) * 2);
 }
 
@@ -82,7 +87,7 @@
   block-size: var(--fs-sm);
   border: solid var(--line-strong) var(--c-accent);
   border-radius: var(--radius-pill);
-  background: var(--c-on-dark);
+  background: var(--c-bg);
   content: "";
 }
 
@@ -107,14 +112,15 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  font-size: var(--fs-xs);
-  color: color-mix(in oklch, var(--c-on-dark) 50%, transparent);
+  font-size: inherit;
+  font-variant-numeric: tabular-nums;
+  color: color-mix(in oklch, var(--c-font) 70%, transparent);
   margin-block-start: calc(var(--line-hairline) * 2);
   line-height: 1;
 }
 
 .labelsActive {
-  color: color-mix(in oklch, var(--c-on-dark) 85%, transparent);
+  color: var(--c-font);
 }
 
 .label {
@@ -124,20 +130,20 @@
 
 .resetButton {
   appearance: none;
-  border: none;
+  border: solid var(--line-hairline) var(--map-chrome-border, var(--c-bg-contrast-light));
   min-block-size: var(--tap-target);
-  background: color-mix(in oklch, var(--c-on-dark) 10%, transparent);
-  color: color-mix(in oklch, var(--c-on-dark) 60%, transparent);
-  font-size: var(--fs-xs);
+  background: transparent;
+  color: var(--c-font);
+  font: inherit;
   cursor: pointer;
   padding: calc(var(--line-hairline) * 2) var(--m-s);
-  border-radius: var(--radius-pill);
+  border-radius: var(--m-s);
   line-height: 1;
 }
 
 .resetButton:hover {
-  background: color-mix(in oklch, var(--c-on-dark) 18%, transparent);
-  color: var(--c-on-dark);
+  background: color-mix(in oklch, var(--c-font) 10%, transparent);
+  color: var(--c-font);
 }
 
 /* --- Responsive --- */

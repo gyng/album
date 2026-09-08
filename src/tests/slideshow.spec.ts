@@ -315,6 +315,8 @@ test.describe("Slideshow touch mode", () => {
   test("a drag uncovers the photograph it is heading towards", async ({ page }) => {
     await gotoHydrated(page, "/slideshow?mode=random&filter=test-simple");
     await waitForSlideshow(page);
+    await page.getByRole("button", { name: "Hide controls", exact: true }).click();
+    await expect(page.locator("[data-paused]")).toHaveAttribute("data-controls-visible", "false");
 
     const image = page.locator(slideshowImg).first();
     const currentSrc = await image.getAttribute("src");
@@ -340,6 +342,17 @@ test.describe("Slideshow touch mode", () => {
     expect(previewStyle.opacity).toBeLessThanOrEqual(0.42);
     expect(previewStyle.scale).toBeGreaterThan(0.9);
     expect(previewStyle.scale).toBeLessThan(1);
+
+    // Returning through the centre must make the retained preview invisible,
+    // then reveal it again without a transition trailing the finger.
+    await dispatchPointer(page, "move", x, y);
+    await expect(peek).toHaveCSS("opacity", "0");
+    await dispatchPointer(page, "move", x - 110, y);
+    await expect
+      .poll(() => peek.evaluate((el) => Number(getComputedStyle(el).opacity)))
+      .toBeCloseTo(previewStyle.opacity, 3);
+    const cue = page.locator('[class*="touchSideAffordanceRight"]');
+    await expect(cue).toHaveCSS("backdrop-filter", "none");
 
     // Once the swipe settles the incoming layer is the picture itself.
     await dispatchPointer(page, "up", x - 110, y);

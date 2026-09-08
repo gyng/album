@@ -917,6 +917,7 @@ export const SlideshowShellScreen = () => {
                   ? shortVersion(runtimeVersion)
                   : codeStatusLabel(codeStatus)}
               </span>
+              <span className={styles.networkLabel}>{isOnline ? "Online" : "Offline"}</span>
             </button>
 
             <div className={styles.diagnosticsPanel} hidden={!diagnosticsOpen}>

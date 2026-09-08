@@ -257,16 +257,6 @@
    height rhythm with the description rows. Tighten the top margin so
    the badge feels like a continuation of the description block. */
 
-.preloadBuffer {
-  position: fixed;
-  inline-size: var(--size-1);
-  block-size: var(--size-1);
-  inset: auto auto calc(var(--size-10) * -1) calc(var(--size-10) * -1);
-  opacity: 0.001;
-  pointer-events: none;
-  user-select: none;
-}
-
 .container {
   isolation: isolate;
   /* Local dark-glass palette — one source of truth for the always-dark
@@ -476,6 +466,16 @@
   z-index: var(--z-details);
   pointer-events: none;
   color: color-mix(in oklch, var(--c-white) 72%, transparent);
+}
+
+/* Moving a full-screen photograph beneath live glass costs compositor time,
+   even when its controls are fading. Keep the surfaces and gesture cues, but
+   leave backdrop sampling out of the horizontal finger-follow path. */
+.container[data-dragging="true"] .toolbar,
+.container[data-dragging="true"] .toolbar::before,
+.container[data-dragging="true"] .toolbar *,
+.container[data-dragging="true"] .touchAffordances * {
+  backdrop-filter: none;
 }
 
 .touchBottomAffordance {

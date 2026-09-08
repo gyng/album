@@ -1,5 +1,9 @@
 // https://www.builder.io/blog/relative-time
 
+// ICU formatter construction is expensive enough to stall slideshow drags.
+// Cache the formatters, not their output: relative ages must keep advancing.
+const relativeTimeFormatters = new Map<string, Intl.RelativeTimeFormat>();
+
 /**
  * Convert a date to a relative time string, such as
  * "a minute ago", "in 2 hours", "yesterday", "3 months ago", etc.
@@ -51,11 +55,15 @@ export function getRelativeTimeString(
     return null;
   }
 
-  // Intl.RelativeTimeFormat do its magic
-  const rtf = new Intl.RelativeTimeFormat(lang, {
-    numeric: "auto",
-    style: short ? "narrow" : "long",
-  });
+  const key = JSON.stringify([lang, short]);
+  let rtf = relativeTimeFormatters.get(key);
+  if (!rtf) {
+    rtf = new Intl.RelativeTimeFormat(lang, {
+      numeric: "auto",
+      style: short ? "narrow" : "long",
+    });
+    relativeTimeFormatters.set(key, rtf);
+  }
 
   return rtf.format(Math.floor(deltaSeconds / divisor), unit);
 }

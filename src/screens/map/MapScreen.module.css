@@ -1,4 +1,9 @@
 .container {
+  /* One surface for the bottom overlays; the distance bar alone keeps its
+     calibrated ruler border rather than becoming another rounded card. */
+  --map-chrome-surface: color-mix(in oklch, var(--c-bg) 96%, transparent);
+  --map-chrome-border: color-mix(in oklch, var(--c-font) 22%, transparent);
+  --map-chrome-shadow: 0 var(--size-1) var(--m) color-mix(in oklch, var(--c-black) 12%, transparent);
   --map-chrome-gutter: var(--m-l);
   --map-control-rail-width: var(--tap-target);
   --map-chrome-left: max(var(--map-chrome-gutter), env(safe-area-inset-left, 0px));
@@ -56,6 +61,29 @@
 
 .container :global(.maplibregl-ctrl-bottom-left) > :global(.maplibregl-ctrl-scale) {
   min-block-size: var(--size-24);
+  background: var(--map-chrome-surface);
+  color: var(--c-font);
+  font-size: var(--fs-s);
+  line-height: var(--size-20);
+}
+
+.container :global(.maplibregl-ctrl-attrib) {
+  background: var(--map-chrome-surface);
+  color: var(--c-font);
+  border-radius: var(--m-s);
+  box-shadow:
+    0 0 0 var(--size-1) var(--map-chrome-border),
+    var(--map-chrome-shadow);
+  font-size: var(--fs-s);
+  line-height: var(--size-20);
+}
+
+.container :global(.maplibregl-ctrl-attrib) a {
+  color: inherit;
+}
+
+.container :global(.maplibregl-ctrl-attrib) a:hover {
+  text-decoration: underline;
 }
 
 .container :global(.maplibregl-ctrl-top-right) {

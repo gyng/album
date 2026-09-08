@@ -29,16 +29,8 @@ test.describe("Map tile rendering", () => {
       })
       .toBeGreaterThan(0);
 
-    // MapLibre fires `load` only once every source's tiles are in, and the
-    // adapter mounts the map's children on `load`. So a navigation control —
-    // a child of the map, put in the DOM by `addControl` on the live map
-    // instance — appearing means the fixture tile completed the round trip
-    // through the worker and the map genuinely rendered it.
-    //
-    // Deliberately not `.maplibregl-ctrl-scale`: `MapRecencyLegend` borrows
-    // that class for its own styling, so the selector matches an app element
-    // that renders with or without a map, and the assertion would quietly
-    // decay into "tiles were requested".
+    // The adapter mounts controls before the style and tiles finish loading.
+    // Their presence alone does not prove the tile worker rendered the map.
     await expectMapLoaded(page);
   });
 });

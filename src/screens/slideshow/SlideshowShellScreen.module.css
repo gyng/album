@@ -135,6 +135,12 @@
   box-shadow: 0 var(--m) var(--m-m) color-mix(in oklch, var(--c-black) 28%, transparent);
 }
 
+.networkLabel {
+  flex-shrink: 0;
+  padding-inline-start: var(--m);
+  border-inline-start: solid var(--size-1) var(--c-border-on-dark);
+}
+
 .diagnosticsCompactLabel {
   overflow: hidden;
   text-overflow: ellipsis;

@@ -92,12 +92,15 @@ export const computePoolStats = (photos: RandomPhotoRow[]): PoolStats => {
   return { count: photos.length, newestDate: newest };
 };
 
+// The toolbar asks for this on every drag redraw, not just when the pool changes.
+const NEWEST_PHOTO_DATE_FORMAT = new Intl.DateTimeFormat("en-GB", {
+  day: "numeric",
+  month: "short",
+  year: "numeric",
+});
+
 export const formatNewestPhotoDate = (date: Date): string =>
-  date.toLocaleDateString("en-GB", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
+  Number.isNaN(date.getTime()) ? "Invalid Date" : NEWEST_PHOTO_DATE_FORMAT.format(date);
 
 export const getSlideshowPhotoSrc = (photo: RandomPhotoRow | null): string | null => {
   if (!photo?.path) {

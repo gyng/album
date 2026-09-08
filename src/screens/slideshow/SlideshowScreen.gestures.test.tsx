@@ -401,6 +401,39 @@ describe("SlideshowScreen touch gestures (screen-level)", () => {
     expect(image.style.transform).toBe("");
   });
 
+  it("reuses both neighbour images through centre crossings and a cancelled re-drag", async () => {
+    render(<SlideshowScreen />);
+    await flush();
+    fireEvent.keyDown(window, { key: "ArrowRight" });
+    await flush();
+    const image = slideImage();
+    const src = image.getAttribute("src");
+    const buffers = Array.from(document.querySelectorAll<HTMLImageElement>("[data-drag-buffer]"));
+    expect(buffers).toHaveLength(2);
+    const sources = buffers.map((buffer) => buffer.getAttribute("src"));
+
+    const dragBothWays = () => {
+      pointer(image, "pointerdown", touchAt(300, 300));
+      for (const x of [240, 300, 280, 300, 360, 300, 320]) {
+        pointer(image, "pointermove", touchAt(x, 300));
+        expect(image.style.transform).toBe(`translateX(${x - 300}px)`);
+        expect(Array.from(document.querySelectorAll("[data-drag-buffer]"))).toEqual(buffers);
+        expect(buffers.map((buffer) => buffer.getAttribute("src"))).toEqual(sources);
+      }
+      pointer(image, "pointercancel", touchAt(320, 300));
+    };
+    dragBothWays();
+    // Interrupt the spring-back too: a second contact must not discard buffers.
+    dragBothWays();
+    expect(slideImage().getAttribute("src")).toBe(src);
+    pointer(image, "pointerdown", touchAt(300, 300));
+    pointer(image, "pointermove", touchAt(240, 300));
+    pointer(image, "pointermove", touchAt(300, 300));
+    pointer(image, "pointercancel", touchAt(300, 300));
+    // At rest there is no transform transition to deliver a cleanup event.
+    expect(document.querySelector("[data-drag-peek]")).toBeNull();
+  });
+
   it("keeps the first photograph in place when there is no previous slide", async () => {
     render(<SlideshowScreen />);
     await flush();
