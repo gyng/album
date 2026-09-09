@@ -326,6 +326,10 @@ test.describe("Slideshow touch mode", () => {
     // Hold the gesture open mid-drag rather than releasing it.
     const { x, y } = await imageCentre(page);
     await dispatchPointer(page, "down", x, y);
+    await dispatchPointer(page, "move", x - 16, y);
+    // Follow before the 24px hint threshold, including the actual browser
+    // transform rather than just the gesture resolver's desired offset.
+    await expect(image).toHaveCSS("transform", "matrix(1, 0, 0, 1, -16, 0)");
     for (const dx of [-20, -60, -110]) {
       await dispatchPointer(page, "move", x + dx, y);
     }

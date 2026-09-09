@@ -32,14 +32,20 @@ export const TAP_MAX_DRIFT_PX = 12;
 // How long a still touch must rest before it becomes a hold-to-pause.
 export const HOLD_TO_PAUSE_MS = 450;
 
-// The horizontal drag offset the top slide layer should follow. Zero until a
-// horizontal direction commits, so taps and vertical pulls never nudge the
-// photo sideways.
+// Finger-following is visual feedback, not a navigation decision. Respond to
+// horizontal motion immediately; the 24px hint and 48px release thresholds
+// still decide the gesture. Before an axis commits, vertical intent can win.
 export const resolveDragOffset = (input: {
   deltaX: number;
+  deltaY: number;
   committedHorizontal?: HorizontalDirection;
   committedVertical?: VerticalDirection;
-}): number => (input.committedHorizontal ? input.deltaX : 0);
+}): number => {
+  if (input.committedVertical) return 0;
+  return input.committedHorizontal || Math.abs(input.deltaX) > Math.abs(input.deltaY)
+    ? input.deltaX
+    : 0;
+};
 
 const progressFromDistance = (distance: number, hintPx: number, commitPx: number): number =>
   Math.max(0, Math.min(1, (distance - hintPx) / (commitPx - hintPx)));

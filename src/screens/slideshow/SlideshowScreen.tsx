@@ -91,6 +91,7 @@ import { decideRemixPlan, mapVectorRemixResult } from "../../util/slideshowRemix
 import {
   HOLD_TO_PAUSE_MS,
   TAP_MAX_DRIFT_PX,
+  DEFAULT_GESTURE_THRESHOLDS,
   resolveDragOffset,
   resolvePointerMove,
   resolvePointerUpAction,
@@ -2226,10 +2227,11 @@ export const Slideshow: React.FC<{
       setTouchPullProgress(result.pullProgress);
       setTouchSwipeProgress(result.swipeProgress);
 
-      // Follow-the-finger: once horizontal commits, the live top layer tracks
-      // the drag 1:1 (transform is untransitioned outside the settle class).
+      // Follow horizontal motion before the hint commits an axis. This must
+      // not lock navigation: a small diagonal start can still become a pull.
       const dragOffset = resolveDragOffset({
         deltaX,
+        deltaY,
         ...(gesture.committedHorizontalDirection
           ? { committedHorizontal: gesture.committedHorizontalDirection }
           : {}),
@@ -2247,7 +2249,7 @@ export const Slideshow: React.FC<{
       );
       setLayerDrag((current) =>
         dragOffset === 0
-          ? gesture.committedHorizontalDirection && current
+          ? (gesture.committedHorizontalDirection || (deltaX === 0 && deltaY === 0)) && current
             ? {
                 x: 0,
                 settling: false,
@@ -2333,6 +2335,7 @@ export const Slideshow: React.FC<{
       const topLayerKey = layersRef.current[layersRef.current.length - 1]?.key;
       const releaseDragOffset = resolveDragOffset({
         deltaX: event.clientX - gesture.startX,
+        deltaY: event.clientY - gesture.startY,
         ...(gesture.committedHorizontalDirection
           ? { committedHorizontal: gesture.committedHorizontalDirection }
           : {}),
@@ -2340,8 +2343,16 @@ export const Slideshow: React.FC<{
           ? { committedVertical: gesture.committedVerticalDirection }
           : {}),
       });
-      if (releaseDragOffset !== 0 && topLayerKey !== undefined) {
-        const exiting = action === "next" || (action === "previous" && canGoPrevious);
+      if (
+        isTouchOrPen(gesture.pointerType) &&
+        releaseDragOffset !== 0 &&
+        topLayerKey !== undefined
+      ) {
+        // Tap jitter now has visual feedback too, but is still a tap: only a
+        // committed swipe should send the photograph gliding off-screen.
+        const exiting =
+          Math.abs(releaseDragOffset) >= DEFAULT_GESTURE_THRESHOLDS.swipeCommitPx &&
+          (action === "next" || (action === "previous" && canGoPrevious));
         const exitDistance = Math.max(window.innerWidth * 0.6, Math.abs(releaseDragOffset) + 160);
         setLayerDrag((current) => ({
           ...current,

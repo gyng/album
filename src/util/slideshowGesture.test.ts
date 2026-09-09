@@ -295,14 +295,26 @@ describe("resolvePointerUpAction", () => {
 });
 
 describe("resolveDragOffset", () => {
-  it("returns 0 until a horizontal direction is committed", () => {
-    expect(resolveDragOffset({ deltaX: -40 })).toBe(0);
-    expect(resolveDragOffset({ deltaX: -40, committedVertical: "up" })).toBe(0);
+  it.each([-23, -8, -1, 1, 8, 23])(
+    "follows an initial %ipx horizontal move before the hint",
+    (deltaX) => {
+      expect(resolveDragOffset({ deltaX, deltaY: 0 })).toBe(deltaX);
+      expect(resolvePointerMove({ deltaX, deltaY: 0, controlsWereVisible: false })).toMatchObject({
+        hint: null,
+        armed: false,
+      });
+    },
+  );
+
+  it("leaves vertical and ambiguous diagonal movement free to choose its axis", () => {
+    expect(resolveDragOffset({ deltaX: 8, deltaY: 12 })).toBe(0);
+    expect(resolveDragOffset({ deltaX: 8, deltaY: 8 })).toBe(0);
+    expect(resolveDragOffset({ deltaX: -40, deltaY: 0, committedVertical: "up" })).toBe(0);
   });
 
   it("follows the finger once horizontal is committed", () => {
-    expect(resolveDragOffset({ deltaX: -40, committedHorizontal: "next" })).toBe(-40);
-    expect(resolveDragOffset({ deltaX: 72, committedHorizontal: "previous" })).toBe(72);
+    expect(resolveDragOffset({ deltaX: -40, deltaY: 0, committedHorizontal: "next" })).toBe(-40);
+    expect(resolveDragOffset({ deltaX: 72, deltaY: 0, committedHorizontal: "previous" })).toBe(72);
   });
 });
 

@@ -414,7 +414,7 @@ describe("SlideshowScreen touch gestures (screen-level)", () => {
 
     const dragBothWays = () => {
       pointer(image, "pointerdown", touchAt(300, 300));
-      for (const x of [240, 300, 280, 300, 360, 300, 320]) {
+      for (const x of [299, 296, 288, 277, 300, 304, 312, 323, 360, 300, 320]) {
         pointer(image, "pointermove", touchAt(x, 300));
         expect(image.style.transform).toBe(`translateX(${x - 300}px)`);
         expect(Array.from(document.querySelectorAll("[data-drag-buffer]"))).toEqual(buffers);
@@ -432,6 +432,34 @@ describe("SlideshowScreen touch gestures (screen-level)", () => {
     pointer(image, "pointercancel", touchAt(300, 300));
     // At rest there is no transform transition to deliver a cleanup event.
     expect(document.querySelector("[data-drag-peek]")).toBeNull();
+  });
+
+  it("lets a small horizontal start become a vertical gesture", async () => {
+    render(<SlideshowScreen />);
+    await flush();
+    const image = slideImage();
+    const src = image.getAttribute("src");
+    pointer(image, "pointerdown", touchAt(300, 300));
+    pointer(image, "pointermove", touchAt(308, 300));
+    expect(image.style.transform).toBe("translateX(8px)");
+    pointer(image, "pointermove", touchAt(308, 250));
+    expect(image.style.transform).toBe("");
+    pointer(image, "pointercancel", touchAt(308, 250));
+    expect(slideImage().getAttribute("src")).toBe(src);
+  });
+
+  it("keeps a slightly moving tap as tap navigation without an exit glide", async () => {
+    render(<SlideshowScreen />);
+    await flush();
+    const image = slideImage();
+    const src = image.getAttribute("src");
+    pointer(image, "pointerdown", touchAt(300, 300));
+    pointer(image, "pointermove", touchAt(304, 300));
+    expect(image.style.transform).toBe("translateX(4px)");
+    pointer(image, "pointerup", touchAt(304, 300));
+    await flush();
+    expect(slideImage().getAttribute("src")).not.toBe(src);
+    expect(image.style.transform).toBe("translateX(0px)");
   });
 
   it("keeps the first photograph in place when there is no previous slide", async () => {

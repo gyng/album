@@ -102,3 +102,36 @@ passed. A separate WebKit run with iPad Pro 11 emulation verified both-direction
 reversals, stable neighbour elements, zero opacity at the centre and no advance
 on cancellation, with no page errors. This is browser-engine coverage, not a
 physical-device performance measurement.
+
+## Initial movement follow-up
+
+The published `0c7347b` still waited for 24px of horizontal travel before moving
+the photograph. A browser check held the neighbour's image request open: the
+current photograph could move while that neighbour's `decode()` was pending.
+With decoding complete, the same 0–23px stationary region remained in both
+directions. No full AVIF decode occurred in the warm-gesture trace. This
+identifies a gesture-response delay, not a synchronous wait for an image.
+
+Finger-following now responds to the first horizontal-dominant movement rather
+than sharing the hint's threshold. The hint still starts at 24px and navigation
+still commits at 48px. Early movement does not commit the navigation axis, so a
+diagonal start can become a vertical pull. Centre crossings retain the existing
+preview buffers. The no-blur drag treatment consequently starts with that first
+movement too. Small tap movements keep tap navigation but spring back instead
+of being mistaken for a committed swipe's exit glide; mouse input is unchanged.
+
+Regression coverage exercises offsets down to 1px, both signs, centre crossings,
+re-grabbing during spring-back, vertical takeover and tap jitter. The browser
+preview test also checks the rendered transform at 16px, before the hint can
+start. This removes the measured distance threshold; it is not a claim of a
+particular frame rate on an iPad. The profiling host was heavily loaded during
+this follow-up, so its absolute timing measurements are not used as a speedup
+claim.
+
+Verification: all 2,885 unit tests passed across the full run and an isolated
+rerun of the serialization suite (the concurrent build had removed its generated
+fixture directory). Lint, typechecks and formatting passed. All 13 slideshow
+Chromium cases passed. WebKit with iPad Pro 11 emulation also followed early
+movement in both directions, retained the neighbour elements and returned the
+preview to zero opacity at the centre, without advancing on cancellation or
+reporting page errors. Physical iPad frame pacing remains unmeasured.
