@@ -9,7 +9,7 @@
     calc(var(--m-l) + var(--m-xl) + var(--map-bottom-chrome, 0px))
   );
   transition: inset-block-end var(--t-base) var(--ease-out);
-  z-index: var(--z-float);
+  z-index: var(--z-map-controls);
   pointer-events: none;
   display: flex;
   flex-direction: column;

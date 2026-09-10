@@ -283,8 +283,8 @@ textarea {
   --photo-description-measure: 900px;
   --immersive-title-offset-max: 400px;
 
-  /* Named stacking levels. Page roots establish local stacking contexts where
-     possible; the upper range coordinates full-screen and MapLibre overlays. */
+  /* Named stacking levels. Page roots and maps establish local stacking
+     contexts; the upper range coordinates full-screen overlays. */
   --z-behind: -1;
   --z-base: 0;
   --z-raised: 1;
@@ -298,11 +298,15 @@ textarea {
   --z-update-banner: 350;
   --z-drawer: 1000;
   --z-drawer-panel: 1001;
-  --z-map-vendor: 5000;
-  --z-map-controls: 5001;
-  --z-map-route: 5002;
-  --z-map-menu: 5003;
-  --z-map-overlay: 5004;
+  /* Map-local levels, above the isolated canvas/marker stack. */
+  --z-map-route: 1;
+  --z-map-preview: 2;
+  --z-map-popup: 3;
+  --z-map-controls: 4;
+  --z-map-overlay: 5;
+  /* Highest integer rank, confined to the canvas/marker stack. Even a large
+     catalogue or projected depth cannot outrank the hovered photograph. */
+  --z-map-marker-hover: 2147483647;
   --z-fullscreen-underlay: 9998;
   --z-fullscreen: 9999;
   --z-fullscreen-toolbar: 10000;

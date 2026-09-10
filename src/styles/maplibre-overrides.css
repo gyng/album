@@ -3,6 +3,21 @@
 @layer vendor, overrides;
 
 @layer overrides {
+  /* Rank photos inside the canvas stack, never against controls or popups.
+     Isolation does not change the containing block MapLibre positions against.
+     Isolate the map itself too so embedded maps cannot cover page chrome. */
+  .maplibregl-map,
+  .maplibregl-canvas-container {
+    isolation: isolate;
+  }
+
+  .maplibregl-ctrl-top-left,
+  .maplibregl-ctrl-top-right,
+  .maplibregl-ctrl-bottom-left,
+  .maplibregl-ctrl-bottom-right {
+    z-index: var(--z-map-controls);
+  }
+
   /* Keep vendor controls in the site's themeable typeface (slate uses Barlow).
      Embedded maps retain the vendor's compact sizing; MapScreen sets a shared
      type size for its bottom overlays. */
@@ -30,7 +45,10 @@
 
   @media (hover: hover) and (pointer: fine) {
     .maplibregl-marker:hover {
-      z-index: var(--z-map-vendor);
+      /* The renderer applies recency/depth inline. This deliberate override
+         lifts only the hovered marker within its isolated content stack. */
+      /* biome-ignore lint/complexity/noImportantStyles: hover must override the renderer's inline marker rank. */
+      z-index: var(--z-map-marker-hover) !important;
       filter: brightness(1.5);
     }
   }
