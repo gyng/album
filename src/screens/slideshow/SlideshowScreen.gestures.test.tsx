@@ -138,6 +138,12 @@ const touchAt = (clientX: number, clientY: number) => ({
 
 const slideImage = (): HTMLImageElement => screen.getByRole("img");
 
+const finishTransition = (element: Element, propertyName: string) => {
+  const event = new Event("transitionend", { bubbles: true });
+  Object.defineProperty(event, "propertyName", { value: propertyName });
+  fireEvent(element, event);
+};
+
 describe("SlideshowScreen touch gestures (screen-level)", () => {
   const originalFetch = global.fetch;
 
@@ -414,7 +420,7 @@ describe("SlideshowScreen touch gestures (screen-level)", () => {
 
     const dragBothWays = () => {
       pointer(image, "pointerdown", touchAt(300, 300));
-      for (const x of [299, 296, 288, 277, 300, 304, 312, 323, 360, 300, 320]) {
+      for (const x of [292, 299, 296, 288, 277, 300, 304, 312, 323, 360, 300, 320]) {
         pointer(image, "pointermove", touchAt(x, 300));
         expect(image.style.transform).toBe(`translateX(${x - 300}px)`);
         expect(Array.from(document.querySelectorAll("[data-drag-buffer]"))).toEqual(buffers);
@@ -448,17 +454,47 @@ describe("SlideshowScreen touch gestures (screen-level)", () => {
     expect(slideImage().getAttribute("src")).toBe(src);
   });
 
-  it("keeps a slightly moving tap as tap navigation without an exit glide", async () => {
+  it("keeps tap wobble still without a drag preview or exit glide", async () => {
     render(<SlideshowScreen />);
     await flush();
     const image = slideImage();
     const src = image.getAttribute("src");
     pointer(image, "pointerdown", touchAt(300, 300));
-    pointer(image, "pointermove", touchAt(304, 300));
-    expect(image.style.transform).toBe("translateX(4px)");
+    for (const x of [301, 304, 307, 300, 299, 296, 293, 304]) {
+      pointer(image, "pointermove", touchAt(x, 300));
+      expect(image.style.transform).toBe("");
+      expect(document.querySelector("[data-drag-peek]")).toBeNull();
+    }
     pointer(image, "pointerup", touchAt(304, 300));
     await flush();
     expect(slideImage().getAttribute("src")).not.toBe(src);
+    expect(image.style.transform).toBe("");
+  });
+
+  it("rearms wobble protection on a new contact after cancelling a drag", async () => {
+    render(<SlideshowScreen />);
+    await flush();
+    const image = slideImage();
+    pointer(image, "pointerdown", touchAt(300, 300));
+    pointer(image, "pointermove", touchAt(308, 300));
+    pointer(image, "pointermove", touchAt(304, 300));
+    expect(image.style.transform).toBe("translateX(4px)");
+    pointer(image, "pointercancel", touchAt(304, 300));
+    pointer(image, "pointerdown", touchAt(300, 300));
+    pointer(image, "pointermove", touchAt(304, 300));
+    expect(image.style.transform).toBe("");
+    pointer(image, "pointercancel", touchAt(304, 300));
+  });
+
+  it("settles an active drag released back inside the wobble tolerance", async () => {
+    render(<SlideshowScreen />);
+    await flush();
+    const image = slideImage();
+    pointer(image, "pointerdown", touchAt(300, 300));
+    pointer(image, "pointermove", touchAt(308, 300));
+    pointer(image, "pointermove", touchAt(304, 300));
+    expect(image.style.transform).toBe("translateX(4px)");
+    pointer(image, "pointerup", touchAt(304, 300));
     expect(image.style.transform).toBe("translateX(0px)");
   });
 
@@ -473,6 +509,50 @@ describe("SlideshowScreen touch gestures (screen-level)", () => {
     await flush();
     expect(slideImage().getAttribute("src")).toBe(src);
     expect(image.style.transform).toBe("translateX(0px)");
+  });
+
+  it.each(["exit finishes", "next contact starts"])(
+    "keeps the outgoing photo displaced when the %s before its fade ends",
+    async (interruption) => {
+      render(<SlideshowScreen />);
+      await flush();
+      const outgoing = slideImage();
+      pointer(outgoing, "pointerdown", touchAt(300, 300));
+      pointer(outgoing, "pointermove", touchAt(240, 300));
+      pointer(outgoing, "pointerup", touchAt(240, 300));
+      await flush();
+      const exitTransform = outgoing.style.transform;
+      expect(exitTransform).toMatch(/^translateX\(-/);
+      const incoming = slideImage();
+      expect(incoming).not.toBe(outgoing);
+      expect(outgoing.isConnected).toBe(true);
+
+      if (interruption === "exit finishes") {
+        finishTransition(outgoing, "transform");
+      } else {
+        pointer(incoming, "pointerdown", touchAt(300, 300));
+        pointer(incoming, "pointermove", touchAt(270, 300));
+        expect(incoming.style.transform).toBe("translateX(-30px)");
+      }
+      expect(outgoing.style.transform).toBe(exitTransform);
+      expect(outgoing.isConnected).toBe(true);
+      finishTransition(outgoing, "opacity");
+      expect(outgoing.isConnected).toBe(false);
+    },
+  );
+
+  it("centres a previously exited photo when navigating back to it mid-fade", async () => {
+    render(<SlideshowScreen />);
+    await flush();
+    const outgoing = slideImage();
+    pointer(outgoing, "pointerdown", touchAt(300, 300));
+    pointer(outgoing, "pointermove", touchAt(240, 300));
+    pointer(outgoing, "pointerup", touchAt(240, 300));
+    await flush();
+    fireEvent.keyDown(window, { key: "ArrowLeft" });
+    await flush();
+    expect(slideImage()).toBe(outgoing);
+    expect(outgoing.style.transform).toBe("");
   });
 
   it("drags the top layer with a committed horizontal swipe and settles it on release", async () => {

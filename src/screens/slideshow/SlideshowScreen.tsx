@@ -757,6 +757,9 @@ export const Slideshow: React.FC<{
     // held for the lifetime of the gesture so dragging back does not flip the action.
     committedHorizontalDirection?: "next" | "previous";
     committedVerticalDirection?: "down" | "up";
+    // Visual following has its own small tolerance, independent of axis intent.
+    // Once crossed, do not reapply it during centre crossings on this contact.
+    dragStarted?: boolean;
     // True once the gesture has crossed the commit threshold on its primary axis,
     // so we can fire the haptic exactly once per gesture.
     hapticFired?: boolean;
@@ -2232,6 +2235,7 @@ export const Slideshow: React.FC<{
       const dragOffset = resolveDragOffset({
         deltaX,
         deltaY,
+        dragStarted: gesture.dragStarted === true,
         ...(gesture.committedHorizontalDirection
           ? { committedHorizontal: gesture.committedHorizontalDirection }
           : {}),
@@ -2239,6 +2243,9 @@ export const Slideshow: React.FC<{
           ? { committedVertical: gesture.committedVerticalDirection }
           : {}),
       });
+      if (dragOffset !== 0) {
+        gesture.dragStarted = true;
+      }
       const previewSrc = dragOffset < 0 ? bufferedPhotoSrc : previousPhotoSrc;
       // The commit cue fills after 48px; a photographic reveal needs the breadth
       // of the screen. Keeping these separate avoids a near-opaque flash as soon
@@ -2336,6 +2343,7 @@ export const Slideshow: React.FC<{
       const releaseDragOffset = resolveDragOffset({
         deltaX: event.clientX - gesture.startX,
         deltaY: event.clientY - gesture.startY,
+        dragStarted: gesture.dragStarted === true,
         ...(gesture.committedHorizontalDirection
           ? { committedHorizontal: gesture.committedHorizontalDirection }
           : {}),
@@ -2354,6 +2362,12 @@ export const Slideshow: React.FC<{
           Math.abs(releaseDragOffset) >= DEFAULT_GESTURE_THRESHOLDS.swipeCommitPx &&
           (action === "next" || (action === "previous" && canGoPrevious));
         const exitDistance = Math.max(window.innerWidth * 0.6, Math.abs(releaseDragOffset) + 160);
+        if (exiting) {
+          const exitX = Math.sign(releaseDragOffset) * exitDistance;
+          setLayers((current) =>
+            current.map((layer) => (layer.key === topLayerKey ? { ...layer, exitX } : layer)),
+          );
+        }
         setLayerDrag((current) => ({
           ...current,
           key: topLayerKey,
@@ -3109,9 +3123,8 @@ export const Slideshow: React.FC<{
             if (e.propertyName === "opacity" && !layer.loaded) {
               setLayers((prev) => removeLayer(prev, layer.key));
             }
-            // A settled drag (spring-back or exit glide) has reached its
-            // target; drop the frozen offset so the layer's inline transform
-            // clears.
+            // Finish the gesture/preview, but an outgoing layer keeps its own
+            // exitX until its opacity fade removes it from the stack.
             if (
               e.propertyName === "transform" &&
               layerDrag?.settling &&
@@ -3120,15 +3133,19 @@ export const Slideshow: React.FC<{
               setLayerDrag(null);
             }
           };
-          // Follow-the-finger drag: while live (settling=false) the offset
-          // rides the top layer; once settling it stays pinned to the layer
-          // that was dragged, which may no longer be top after an advance.
+          // The gesture owns live movement and spring-back. Committed exits
+          // belong to each layer, so finishing a transform or starting the
+          // next swipe cannot reset a still-fading photograph to the centre.
           const dragsThisLayer =
-            layerDrag !== null && (layerDrag.settling ? layerDrag.key === layer.key : isTop);
-          const settlingClass = dragsThisLayer && layerDrag.settling ? styles.layerSettling : "";
+            layerDrag !== null &&
+            (layerDrag.settling ? layerDrag.key === layer.key && layerDrag.x === 0 : isTop);
+          const dragX = dragsThisLayer ? layerDrag.x : layer.exitX;
+          const settlingClass = (dragsThisLayer ? layerDrag.settling : layer.exitX !== undefined)
+            ? styles.layerSettling
+            : "";
           const motionStyle = {
             ...(isTop ? { touchAction: "none" as const } : {}),
-            ...(dragsThisLayer ? { transform: `translateX(${layerDrag.x}px)` } : {}),
+            ...(dragX !== undefined ? { transform: `translateX(${dragX}px)` } : {}),
           };
           // Pressed while the finger is down, on the `scale` property so it
           // composes with the drag translate. Both pointer types take this

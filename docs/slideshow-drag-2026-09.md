@@ -135,3 +135,27 @@ Chromium cases passed. WebKit with iPad Pro 11 emulation also followed early
 movement in both directions, retained the neighbour elements and returned the
 preview to zero opacity at the centre, without advancing on cancellation or
 reporting page errors. Physical iPad frame pacing remains unmeasured.
+
+## Resting-finger tolerance
+
+Immediate one-pixel following made tap wobble visibly distracting in use. Visual
+following now starts at 8px of horizontal-dominant travel. That tolerance applies
+only at the start of each contact: once crossed, the photograph still follows
+small movements and centre crossings, without another dead zone. It does not
+commit the navigation axis or change the existing tap, hint or advance thresholds.
+Unit and screen regressions cover initial wobble in both directions, the 8px
+boundary, continued following below it, vertical takeover, release near the centre
+and resetting the tolerance for the next touch.
+
+## Outgoing photograph flashing back to the centre
+
+The exit transform and the opacity fade have separate lifetimes. Clearing the
+shared drag state at `transform` transition completion restored the photograph's
+centred position even while its fade was still visible. Starting another contact
+cleared the same state and caused the same flash during rapid swiping.
+
+A committed exit now stores its horizontal position on the cross-fade layer
+itself. Gesture cleanup and subsequent contacts cannot erase it; removing the
+layer removes the position too. Deliberately backtracking to a retained layer
+discards its old exit position so the current photograph is centred again.
+Screen regressions reproduce both interruption paths and the backtracking case.

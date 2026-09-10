@@ -32,16 +32,24 @@ export const TAP_MAX_DRIFT_PX = 12;
 // How long a still touch must rest before it becomes a hold-to-pause.
 export const HOLD_TO_PAUSE_MS = 450;
 
-// Finger-following is visual feedback, not a navigation decision. Respond to
-// horizontal motion immediately; the 24px hint and 48px release thresholds
-// still decide the gesture. Before an axis commits, vertical intent can win.
+// Ignore resting-finger wobble only until a drag starts. Reapplying this at
+// the centre of an active drag would make reversals feel stuck again.
+const DRAG_START_PX = 8;
+
+// Finger-following is visual feedback, not a navigation decision. The 24px
+// hint and 48px release thresholds still decide the gesture. Before an axis
+// commits, vertical intent can win even after visual following has started.
 export const resolveDragOffset = (input: {
   deltaX: number;
   deltaY: number;
+  dragStarted?: boolean;
   committedHorizontal?: HorizontalDirection;
   committedVertical?: VerticalDirection;
 }): number => {
   if (input.committedVertical) return 0;
+  if (!input.dragStarted && !input.committedHorizontal && Math.abs(input.deltaX) < DRAG_START_PX) {
+    return 0;
+  }
   return input.committedHorizontal || Math.abs(input.deltaX) > Math.abs(input.deltaY)
     ? input.deltaX
     : 0;

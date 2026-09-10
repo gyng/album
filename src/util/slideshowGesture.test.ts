@@ -295,20 +295,26 @@ describe("resolvePointerUpAction", () => {
 });
 
 describe("resolveDragOffset", () => {
-  it.each([-23, -8, -1, 1, 8, 23])(
-    "follows an initial %ipx horizontal move before the hint",
-    (deltaX) => {
-      expect(resolveDragOffset({ deltaX, deltaY: 0 })).toBe(deltaX);
-      expect(resolvePointerMove({ deltaX, deltaY: 0, controlsWereVisible: false })).toMatchObject({
-        hint: null,
-        armed: false,
-      });
-    },
-  );
+  it.each([-7, -4, -1, 0, 1, 4, 7])("ignores initial %ipx finger wobble", (deltaX) => {
+    expect(resolveDragOffset({ deltaX, deltaY: 0 })).toBe(0);
+  });
+
+  it.each([-23, -8, 8, 23])("follows an initial %ipx horizontal move before the hint", (deltaX) => {
+    expect(resolveDragOffset({ deltaX, deltaY: 0 })).toBe(deltaX);
+    expect(resolvePointerMove({ deltaX, deltaY: 0, controlsWereVisible: false })).toMatchObject({
+      hint: null,
+      armed: false,
+    });
+  });
+
+  it.each([-7, -1, 0, 1, 7])("keeps following at %ipx once the drag has started", (deltaX) => {
+    expect(resolveDragOffset({ deltaX, deltaY: 0, dragStarted: true })).toBe(deltaX);
+  });
 
   it("leaves vertical and ambiguous diagonal movement free to choose its axis", () => {
     expect(resolveDragOffset({ deltaX: 8, deltaY: 12 })).toBe(0);
     expect(resolveDragOffset({ deltaX: 8, deltaY: 8 })).toBe(0);
+    expect(resolveDragOffset({ deltaX: 8, deltaY: 12, dragStarted: true })).toBe(0);
     expect(resolveDragOffset({ deltaX: -40, deltaY: 0, committedVertical: "up" })).toBe(0);
   });
 

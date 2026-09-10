@@ -22,6 +22,9 @@ export type CrossfadeLayer = {
   // true → at/animating-to full opacity (held or fading in); false → fading out
   // or not yet revealed.
   loaded: boolean;
+  // A completed swipe stays displaced until this layer is removed. Its exit
+  // can finish before the opacity fade, and a new gesture must not centre it.
+  exitX?: number;
 };
 
 // Build a snapshot of the slide on screen. Drops cells with no src (e.g. async
@@ -80,7 +83,8 @@ export const pushLayer = (
   }
   // Backtracking must move the existing keyed DOM layer, not mount a second
   // copy of it. Keep its reveal state so returning before decode never blanks
-  // the photograph that was already visible.
+  // the photograph that was already visible. Do not carry its old exitX:
+  // returning to this photograph makes it the centred current slide again.
   const existing = layers.find((layer) => layer.key === key);
   return cap([
     ...layers.filter((layer) => layer.key !== key),
