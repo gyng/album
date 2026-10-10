@@ -47,6 +47,10 @@ cannot resolve during a production build. Oxlint is pinned to `1.75.0` because
 newer releases enable React Compiler diagnostics that require a separate review
 of the existing effects, refs and memoisation.
 
+Playwright is pinned to `1.61.1`: the WebKit bundled with `1.64.0` stalls
+animation-frame callbacks in the iPad slideshow recovery tests, leaving decoded
+photographs hidden. The same application presents successfully with `1.61.1`.
+
 Local-file EXIF reads disable exifr's chunked reader: it passes a file path to
 `FileHandle.stat()`, which Node 26.11 rejects. Whole-file reads preserve the
 metadata and avoid leaking the handle when that call fails.
