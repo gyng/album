@@ -1148,6 +1148,15 @@ describe("day of year memories", () => {
     data: { src },
   });
 
+  it("uses the filename for an untitled photo without an id", () => {
+    const photo = onDate("2024:03:22 10:00:00", "/album/memory.jpg");
+    const { id: _id, ...withoutId } = photo;
+    // Older manifests can omit the id despite the current PhotoBlock contract.
+    const stats = computePhotoStats([makeAlbum([withoutId as PhotoBlock])]);
+
+    expect(stats.dayOfYearMemories[0]?.photos[0]?.label).toBe("memory.jpg");
+  });
+
   // The build cannot know what "today" is, so it indexes every calendar day and
   // the browser picks the one it is.
   it("indexes photos by calendar day so the browser can pick today", () => {

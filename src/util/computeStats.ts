@@ -1409,7 +1409,7 @@ function computeDayOfYearMemories(photos: PhotoBlock[]): PhotoStats["dayOfYearMe
           year,
           date,
           src: photoThumbSrc(photo),
-          label: photo.data.title ?? photo.id,
+          label: photo.data.title ?? photo.id ?? photo.data.src.split("/").at(-1) ?? "",
           ...photoSwatch(photo),
         })),
     }))
