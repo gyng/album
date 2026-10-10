@@ -59,7 +59,8 @@ describe("buildLensTags", () => {
           },
         },
       ]);
-      const exif = (await exifr.parse(target)) as Record<string, unknown>;
+      const options = { reviveValues: true, chunked: false };
+      const exif = (await exifr.parse(target, options)) as Record<string, unknown>;
 
       expect(result.ok).toBe(true);
       expect(exif.LensMake).toBe("Voigtländer");

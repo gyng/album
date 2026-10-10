@@ -70,8 +70,11 @@ export const gpsFixUtcMs = (exif: Record<string, unknown>): number | null => {
 const readPhoto = async (filepath: string, filename: string): Promise<GeotagPhoto> => {
   // Mirror src/services/photo.ts: reviveValues + read local getters so the
   // camera wall-clock is preserved without a timezone shift.
+  // exifr implements chunked but omits it from its Options declaration.
+  const options = { reviveValues: true, chunked: false };
   const exif = ((await exifr
-    .parse(filepath, { reviveValues: true })
+    // Avoid exifr's incompatible FileHandle.stat(path) call on newer Node 26.
+    .parse(filepath, options)
     .catch(() => null)) ?? {}) as Record<string, unknown>;
 
   const original = exif.DateTimeOriginal;

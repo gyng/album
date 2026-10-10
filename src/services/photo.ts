@@ -51,24 +51,30 @@ export const getPhotoSize = async (
 
 export const getNextJsSafeExif = async (filepath: string): Promise<Exif> => {
   return measureBuild("photo.getNextJsSafeExif", async () => {
-    return exifr
-      .parse(filepath, { reviveValues: true })
-      .then((res) => {
-        // Next.js can't serialise Date objects, and a plain JSON round-trip
-        // renders them as UTC — shifting the camera's zone-less wall-clock
-        // time by the build machine's offset. Serialise every Date back to
-        // its wall clock instead (naive ISO, no zone designator), which is
-        // what all date consumers (day keys, hour/year facets, labels) expect.
-        return JSON.parse(
-          JSON.stringify(res, function (key, value) {
-            const raw = (this as Record<string, unknown>)[key];
-            return raw instanceof Date ? dateToNaiveIso(raw) : value;
-          }),
-        );
-      })
-      .catch(() => {
-        return {};
-      });
+    // exifr implements chunked but omits it from its Options declaration.
+    const options = { reviveValues: true, chunked: false };
+    return (
+      exifr
+        // exifr's chunked reader passes a path to FileHandle.stat(), which newer
+        // Node 26 versions reject and can leave an open file handle behind.
+        .parse(filepath, options)
+        .then((res) => {
+          // Next.js can't serialise Date objects, and a plain JSON round-trip
+          // renders them as UTC — shifting the camera's zone-less wall-clock
+          // time by the build machine's offset. Serialise every Date back to
+          // its wall clock instead (naive ISO, no zone designator), which is
+          // what all date consumers (day keys, hour/year facets, labels) expect.
+          return JSON.parse(
+            JSON.stringify(res, function (key, value) {
+              const raw = (this as Record<string, unknown>)[key];
+              return raw instanceof Date ? dateToNaiveIso(raw) : value;
+            }),
+          );
+        })
+        .catch(() => {
+          return {};
+        })
+    );
   });
 };
 

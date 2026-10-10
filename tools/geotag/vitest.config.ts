@@ -8,6 +8,8 @@ export default defineConfig({
     alias: {
       "@shared": path.resolve(__dirname, "../../src/util"),
       "@sharedTypes": path.resolve(__dirname, "../../src/services"),
+      // Shared sources must use this standalone package's installed parser.
+      "fast-xml-parser": path.resolve(__dirname, "node_modules/fast-xml-parser/src/fxp.js"),
     },
   },
   test: {
