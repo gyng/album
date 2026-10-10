@@ -101,10 +101,19 @@ const subscribe = <Name extends MapEventName>(
         originalEvent: engineEvent.originalEvent,
       });
     };
-    map.on(event, handler);
+    // The engine's typed overloads require a single event name.
+    if (event === "click") {
+      map.on("click", handler);
+    } else {
+      map.on("contextmenu", handler);
+    }
 
     return () => {
-      map.off(event, handler);
+      if (event === "click") {
+        map.off("click", handler);
+      } else {
+        map.off("contextmenu", handler);
+      }
     };
   }
 
@@ -603,20 +612,18 @@ const toPointCollection = (
   points: readonly PointFeature[],
 ): FeatureCollection<Point, PointProperties> => ({
   type: "FeatureCollection",
-  features: points.map(
-    (point): Feature<Point, PointProperties> => ({
-      type: "Feature",
+  features: points.map((point): Feature<Point, PointProperties> => ({
+    type: "Feature",
+    id: point.id,
+    properties: {
       id: point.id,
-      properties: {
-        id: point.id,
-        ...(point.color !== undefined ? { color: point.color } : {}),
-        ...(point.radius !== undefined ? { radius: point.radius } : {}),
-        ...(point.opacity !== undefined ? { opacity: point.opacity } : {}),
-        ...(point.sortKey !== undefined ? { sortKey: point.sortKey } : {}),
-      },
-      geometry: { type: "Point", coordinates: [point.at.lng, point.at.lat] },
-    }),
-  ),
+      ...(point.color !== undefined ? { color: point.color } : {}),
+      ...(point.radius !== undefined ? { radius: point.radius } : {}),
+      ...(point.opacity !== undefined ? { opacity: point.opacity } : {}),
+      ...(point.sortKey !== undefined ? { sortKey: point.sortKey } : {}),
+    },
+    geometry: { type: "Point", coordinates: [point.at.lng, point.at.lat] },
+  })),
 });
 
 /** Names a dash pattern, so features and their layer can be matched up. */
@@ -626,24 +633,22 @@ const toLineCollection = (
   lines: readonly LineFeature[],
 ): FeatureCollection<LineString, LineProperties> => ({
   type: "FeatureCollection",
-  features: lines.map(
-    (line): Feature<LineString, LineProperties> => ({
-      type: "Feature",
+  features: lines.map((line): Feature<LineString, LineProperties> => ({
+    type: "Feature",
+    id: line.id,
+    properties: {
       id: line.id,
-      properties: {
-        id: line.id,
-        color: line.color,
-        width: line.width,
-        ...(line.opacity !== undefined ? { opacity: line.opacity } : {}),
-        ...(line.blur !== undefined ? { blur: line.blur } : {}),
-        ...(line.dash ? { dashKey: dashKey(line.dash) } : {}),
-      },
-      geometry: {
-        type: "LineString",
-        coordinates: line.path.map((at) => [at.lng, at.lat]),
-      },
-    }),
-  ),
+      color: line.color,
+      width: line.width,
+      ...(line.opacity !== undefined ? { opacity: line.opacity } : {}),
+      ...(line.blur !== undefined ? { blur: line.blur } : {}),
+      ...(line.dash ? { dashKey: dashKey(line.dash) } : {}),
+    },
+    geometry: {
+      type: "LineString",
+      coordinates: line.path.map((at) => [at.lng, at.lat]),
+    },
+  })),
 });
 
 /**

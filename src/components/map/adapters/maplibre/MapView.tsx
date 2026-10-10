@@ -258,7 +258,7 @@ const MapViewImpl = (
       setLoaded(true);
       propsRef.current.onLoad?.(event);
     };
-    const onError = (event: { error?: Error }) => {
+    const onError = (event: { error?: unknown }) => {
       report("runtime", event.error ?? new Error("The map reported an error."));
     };
     const applyProjection = () => {

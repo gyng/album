@@ -39,6 +39,17 @@ The wizard scans albums, reports GPS/EXIF/index health for new photos, runs inde
 
 Fast-track is now the default behavior, so `npm run publish:wizard` asks the index/build/deploy questions before indexing starts and then proceeds unattended. Use `--interactive` if you want the older step-by-step prompting.
 
+## Dependency compatibility
+
+The gallery uses Next.js 16.4 and React 19.3. Keep SQLite WASM on
+`3.51.2-build9`: `3.53.4-build2` introduces a dynamic worker URL that Turbopack
+cannot resolve during a production build. Oxlint is pinned to `1.75.0` because
+newer releases enable React Compiler diagnostics that require a separate review
+of the existing effects, refs and memoisation.
+
+The geotag tool retains its existing major-version bounds. The Python indexer's
+inference runtime bounds are documented in [index/README.md](../index/README.md).
+
 ## Search Database
 
 The search UI, album details similarity grid, and slideshow similarity mode use browser-loaded SQLite databases.

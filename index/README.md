@@ -56,6 +56,11 @@ The SQLite write path can be benchmarked independently of model loading with the
 
 This project uses [uv](https://docs.astral.sh/uv/) for dependency management.
 
+The inference extra keeps PyTorch on the tested `2.6` series with CUDA 12 and
+Transformers on `4.48`. Updating these bounds needs GPU inference validation;
+the model-free test suite cannot prove compatibility with the installed driver
+or the configured models.
+
 ```sh
 $ uv sync                    # lightweight CLI and test dependencies
 $ uv sync --extra inference  # required for model inference/indexing
