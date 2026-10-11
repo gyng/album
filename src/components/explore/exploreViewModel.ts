@@ -71,6 +71,7 @@ export const EXPLORE_SECTION_LINKS = [
   { href: "#how-you-shoot", label: "How" },
   { href: "#where-you-shoot", label: "Where" },
   { href: "#what-you-shoot-with", label: "What" },
+  { href: "#framing", label: "Framing" },
   { href: "#colour", label: "Colour" },
 ] as const;
 

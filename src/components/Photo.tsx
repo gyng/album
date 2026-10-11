@@ -29,6 +29,8 @@ import {
 import { exifRelativeTimestamp, formatExifWallClockDateTime } from "../util/exifTime";
 import { PhotoSimilarPhotosDeferred } from "./PhotoSimilarPhotosDeferred";
 import { MediaDetailsIcon } from "./MediaDetailsIcon";
+import { formatAspectRatio } from "../util/formatAspectRatio";
+import { getDisplayDimensions, isExifRotated } from "../util/photoDimensions";
 
 type ExifCoordinatesRowProps = {
   kind: "coordinates";
@@ -46,17 +48,6 @@ type ExifCoordinatesRowProps = {
     showMap: boolean;
     markerColour?: string;
   };
-};
-
-const isExifRotated = (block: PhotoBlock): boolean =>
-  Boolean(
-    block._build.exif.Orientation?.includes("270") || block._build.exif.Orientation?.includes("90"),
-  );
-
-const getDisplayDimensions = (block: PhotoBlock): { width: number; height: number } => {
-  return isExifRotated(block)
-    ? { width: block._build.height, height: block._build.width }
-    : { width: block._build.width, height: block._build.height };
 };
 
 const ExifCoordinatesRow: React.FC<{ row: ExifCoordinatesRowProps }> = (props) => {
@@ -568,11 +559,13 @@ export const PhotoBlockEl: React.FC<{
                     //   { kind: "kv", k: "Software", v: [props.block._build.exif.Software].join(" ") },
                     {
                       kind: "kv",
-                      k: "Original size",
-                      v: `${props.block._build.width}px × ${props.block._build.height}px (${(
-                        (props.block._build.width * props.block._build.height) /
+                      k: "Image dimensions",
+                      v: `${displayDimensions.width}px × ${displayDimensions.height}px (${(
+                        (displayDimensions.width * displayDimensions.height) /
                         1_000_000
-                      ).toPrecision(2)} MP) `,
+                      ).toPrecision(
+                        2,
+                      )} MP) · ${formatAspectRatio(displayDimensions.width, displayDimensions.height)}`,
                     },
                     {
                       kind: "kv",

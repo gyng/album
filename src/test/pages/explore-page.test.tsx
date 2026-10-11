@@ -2,7 +2,7 @@
  * @jest-environment jsdom
  */
 
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 
 jest.mock("../../services/album", () => ({ getAlbums: jest.fn() }));
 jest.mock("../../services/buildTiming", () => ({
@@ -365,6 +365,23 @@ const makeVisualSameness = () =>
   }) as unknown as VisualSamenessStats;
 
 describe("explore page", () => {
+  it("shows framing distributions alongside the existing archive sections", () => {
+    const stats = makeStats();
+    stats.stringFacets.push(
+      stringFacet("aspect-ratio", [{ label: "3:2", count: 3 }]),
+      stringFacet("orientation", [
+        { label: "Landscape", count: 3 },
+        { label: "Portrait", count: 2 },
+        { label: "Square", count: 1 },
+      ]),
+    );
+    render(<ExplorePage stats={stats as never} visualSameness={null} />);
+    const framing = within(screen.getByRole("region", { name: "Framing" }));
+    for (const label of ["3:2", "Landscape", "Portrait", "Square"]) {
+      expect(framing.getByTestId(`bar-${label}`)).toBeTruthy();
+    }
+  });
+
   it("switches charts, scopes technical data, and expands visual examples", () => {
     render(<ExplorePage stats={makeStats() as never} visualSameness={makeVisualSameness()} />);
 

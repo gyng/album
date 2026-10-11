@@ -25,6 +25,36 @@ const makeAlbum = (photos: PhotoBlock[], name = "test-album"): Content => ({
 });
 
 describe("computePhotoStats", () => {
+  it("counts published aspect ratios and orientations, respecting rotation and missing dimensions", () => {
+    const stats = computePhotoStats([
+      makeAlbum([
+        makePhoto({ width: 6000, height: 4000 }),
+        makePhoto({ width: 3000, height: 2000 }),
+        makePhoto({ width: 6000, height: 4000, exif: { Orientation: "Rotate 90 CW" } }),
+        makePhoto({ width: 1200, height: 1200 }),
+        makePhoto({ width: 4432, height: 2955 }),
+        makePhoto({ width: 0, height: 0 }),
+      ]),
+    ]);
+    expect(stats.stringFacets.find((facet) => facet.facetId === "aspect-ratio")).toMatchObject({
+      coverage: 5 / 6,
+      data: [
+        { label: "3:2", count: 2 },
+        { label: "≈1.50:1", count: 1 },
+        { label: "1:1", count: 1 },
+        { label: "2:3", count: 1 },
+      ],
+    });
+    expect(stats.stringFacets.find((facet) => facet.facetId === "orientation")).toMatchObject({
+      coverage: 5 / 6,
+      data: [
+        { label: "Landscape", count: 3 },
+        { label: "Portrait", count: 1 },
+        { label: "Square", count: 1 },
+      ],
+    });
+  });
+
   it("returns zeros for empty albums", () => {
     const stats = computePhotoStats([]);
     expect(stats.totalPhotos).toBe(0);

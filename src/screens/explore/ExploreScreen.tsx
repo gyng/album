@@ -228,6 +228,10 @@ const ExploreScreen = ({
   const gearFacets = [findStringFacet(stats, "camera"), findStringFacet(stats, "lens")].filter(
     Boolean,
   ) as StringFacetStat[];
+  const framingFacets = [
+    findStringFacet(stats, "aspect-ratio"),
+    findStringFacet(stats, "orientation"),
+  ].filter(Boolean) as StringFacetStat[];
 
   const repeatedExamples = visualSameness?.repeatedExamples.slice(0, visibleRepeatedExamples) ?? [];
   const travellingMotifs = visualSameness?.travellingMotifs.slice(0, visibleTravellingMotifs) ?? [];
@@ -852,6 +856,21 @@ const ExploreScreen = ({
                 <div className={styles.stackedBarGroups}>{gearFacets.map(renderStringFacet)}</div>
               </div>
             </section>
+          </StatGroup>
+
+          <StatGroup
+            id="framing"
+            title="Framing"
+            deferContent
+            deferredSummary={
+              findStringFacet(stats, "orientation")
+                ?.data.map(
+                  (bucket) => `${bucket.count.toLocaleString("en")} ${bucket.label.toLowerCase()}`,
+                )
+                .join(" · ") ?? ""
+            }
+          >
+            {framingFacets.map(renderStringFacet)}
           </StatGroup>
 
           <ExploreColourSection stats={stats} deferContent />

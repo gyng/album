@@ -25,6 +25,8 @@ import { parseExifLocalDateTime } from "./exifTime";
 import { computeTrips, summariseTrips, type TripSummary } from "./computeTrips";
 import { getMapPhotoHref } from "./mapSearchIndex";
 import { getDegLatLngFromExif } from "./dms2deg";
+import { getDisplayDimensions } from "./photoDimensions";
+import { formatAspectRatio } from "./formatAspectRatio";
 
 export type BucketedStat = {
   label: string;
@@ -1455,6 +1457,30 @@ function computeTripSummaries(albums: Content[]): TripSummary[] {
   return summariseTrips(trips, TRIP_SUMMARY_PHOTOS);
 }
 
+function computeFramingFacets(photos: PhotoBlock[]): StringFacetStat[] {
+  const ratios = new Map<string, number>();
+  const orientations = new Map<string, number>();
+  let validCount = 0;
+  for (const photo of photos) {
+    const { width, height } = getDisplayDimensions(photo);
+    const ratio = formatAspectRatio(width, height);
+    if (ratio === "—") continue;
+    validCount++;
+    ratios.set(ratio, (ratios.get(ratio) ?? 0) + 1);
+    const orientation = width === height ? "Square" : width > height ? "Landscape" : "Portrait";
+    orientations.set(orientation, (orientations.get(orientation) ?? 0) + 1);
+  }
+  const coverage = photos.length > 0 ? validCount / photos.length : 0;
+  const data = (counts: Map<string, number>): BucketedStat[] =>
+    Array.from(counts, ([label, count]) => ({ label, count })).sort(
+      (a, b) => b.count - a.count || a.label.localeCompare(b.label),
+    );
+  return [
+    { facetId: "aspect-ratio", displayName: "Aspect ratio", data: data(ratios), coverage },
+    { facetId: "orientation", displayName: "Orientation", data: data(orientations), coverage },
+  ];
+}
+
 export function computePhotoStats(albums: Content[]): PhotoStats {
   const photos = albums.flatMap((album) =>
     album.blocks.filter((b): b is PhotoBlock => b.kind === "photo"),
@@ -1497,7 +1523,10 @@ export function computePhotoStats(albums: Content[]): PhotoStats {
     totalAlbums: albums.length,
     dateRange,
     numericFacets: NUMERIC_FACETS.map((f) => computeNumericFacet(photos, f as PhotoFacet<number>)),
-    stringFacets: STRING_FACETS.map((f) => computeStringFacet(photos, f as PhotoFacet<string>)),
+    stringFacets: [
+      ...STRING_FACETS.map((f) => computeStringFacet(photos, f as PhotoFacet<string>)),
+      ...computeFramingFacets(photos),
+    ],
     gearFlow: computeGearFlow(photos),
     gear: computeGearStats(albums),
     locationFlow: computeLocationFlow(photos),

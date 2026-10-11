@@ -64,6 +64,17 @@ const openPhotoDetails = (container: HTMLElement): void => {
 };
 
 describe("PhotoBlockEl", () => {
+  it("reports portrait dimensions and aspect ratio after EXIF rotation", () => {
+    const block = createBlock({
+      width: 6000,
+      height: 4000,
+      exif: { Orientation: "Rotate 90 CW" },
+    });
+    const { container } = render(<PhotoBlockEl block={block} currentIndex={0} />);
+    openPhotoDetails(container);
+    expect(screen.getByText("4000px × 6000px (24 MP) · 2:3")).toBeTruthy();
+  });
+
   it("renders a PhotoBlock with Pictures", () => {
     const block = createBlock();
 
@@ -150,6 +161,7 @@ describe("PhotoBlockEl", () => {
     expect(screen.getByText("23mm (actual); 35mm (35mm equivalent)")).toBeTruthy();
     expect(screen.getByText("FUJIFILM XF23mmF2")).toBeTruthy();
     expect(screen.getByText("FUJIFILM X-T5")).toBeTruthy();
+    expect(screen.getByText("6000px × 4000px (24 MP) · 3:2")).toBeTruthy();
     expect(
       screen.getByText(
         (_, element) =>
