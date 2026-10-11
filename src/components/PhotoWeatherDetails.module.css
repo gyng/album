@@ -1,0 +1,41 @@
+.weather {
+  display: grid;
+  gap: 0.6em;
+  max-width: 32rem;
+}
+
+.summary {
+  font-weight: 600;
+}
+
+.metrics {
+  margin: 0;
+  display: grid;
+  gap: 0.25em;
+}
+
+.metrics > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25em 0.75em;
+  justify-content: space-between;
+}
+
+.metrics dt {
+  opacity: 0.7;
+}
+
+.metrics dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.source,
+.provenance {
+  font-size: 0.85em;
+}
+
+.provenance > summary {
+  cursor: pointer;
+  text-align: left;
+}

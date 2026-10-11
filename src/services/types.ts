@@ -1,3 +1,5 @@
+import type { WeatherMetadata } from "../util/weather";
+
 export interface Exif {
   CreateDate?: string;
   ModifyDate?: string;
@@ -33,6 +35,7 @@ export interface Exif {
 }
 
 export interface Tags {
+  weather?: WeatherMetadata;
   tags?: string[];
   colors?: [number, number, number][];
   alt_text?: string;

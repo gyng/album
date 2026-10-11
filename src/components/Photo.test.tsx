@@ -5,6 +5,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { PhotoBlock } from "../services/types";
 import { ExifRow, ExifTable, Picture, PhotoBlockEl, PhotoDescription } from "./Photo";
+import { weatherFixture } from "../test/fixtures/weather";
 
 jest.mock("./MapDeferred", () => ({
   MapDeferred: ({
@@ -64,6 +65,13 @@ const openPhotoDetails = (container: HTMLElement): void => {
 };
 
 describe("PhotoBlockEl", () => {
+  it("reveals indexed weather only in the open photo details", () => {
+    const block = createBlock({ tags: { weather: weatherFixture } });
+    const { container } = render(<PhotoBlockEl block={block} currentIndex={0} />);
+    expect(screen.queryByText("Overcast · 27.0°C")).toBeNull();
+    openPhotoDetails(container);
+    expect(screen.getByText("Overcast · 27.0°C")).toBeTruthy();
+  });
   it("reports portrait dimensions and aspect ratio after EXIF rotation", () => {
     const block = createBlock({
       width: 6000,

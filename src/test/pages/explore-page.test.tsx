@@ -365,6 +365,23 @@ const makeVisualSameness = () =>
   }) as unknown as VisualSamenessStats;
 
 describe("explore page", () => {
+  it("renders weather distributions only when weather coverage is available", () => {
+    const stats = makeStats();
+    stats.stringFacets.push(
+      stringFacet("weather-condition", [{ label: "Rain", count: 2 }]),
+      stringFacet("weather-temperature", [{ label: "20–29°C", count: 2 }]),
+    );
+    const { unmount } = render(<ExplorePage stats={stats as never} visualSameness={null} />);
+    const weather = within(screen.getByRole("region", { name: "Weather" }));
+    expect(weather.getByTestId("bar-Rain")).toBeTruthy();
+    expect(weather.getByRole("link", { name: "Weather data by Open-Meteo" })).toHaveAttribute(
+      "href",
+      "https://open-meteo.com/",
+    );
+    unmount();
+    render(<ExplorePage stats={makeStats() as never} visualSameness={null} />);
+    expect(screen.queryByRole("region", { name: "Weather" })).toBeNull();
+  });
   it("shows framing distributions alongside the existing archive sections", () => {
     const stats = makeStats();
     stats.stringFacets.push(

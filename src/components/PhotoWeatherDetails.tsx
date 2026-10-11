@@ -1,0 +1,62 @@
+import type { WeatherMetadata } from "../util/weather";
+import { weatherCondition } from "../util/weather";
+import styles from "./PhotoWeatherDetails.module.css";
+
+export const PhotoWeatherDetails = ({ weather }: { weather: WeatherMetadata }) => {
+  const metrics = [
+    ["Feels like", weather.apparent_temperature, "°C"],
+    ["Humidity", weather.relative_humidity_2m, "%"],
+    ["Cloud cover", weather.cloud_cover, "%"],
+    ["Wind", weather.wind_speed_10m, " km/h"],
+    ["Precipitation, preceding hour", weather.precipitation, " mm"],
+    [
+      "Snowfall, preceding hour",
+      weather.snowfall && weather.snowfall > 0 ? weather.snowfall : null,
+      " cm",
+    ],
+  ] as const;
+  return (
+    <div className={styles.weather}>
+      <div className={styles.summary}>
+        {weatherCondition(weather.weather_code)} · {weather.temperature_2m.toFixed(1)}°C
+      </div>
+      <dl className={styles.metrics}>
+        {metrics
+          .filter(([, value]) => value !== null)
+          .map(([label, value, unit]) => (
+            <div key={label}>
+              <dt>{label}</dt>
+              <dd>
+                {value}
+                {unit}
+              </dd>
+            </div>
+          ))}
+      </dl>
+      <div className={styles.source}>
+        Estimated hourly weather · {weather.model === "era5" ? "ERA5" : "ECMWF IFS"}
+        <br />
+        <a href="https://open-meteo.com/">Weather data by Open-Meteo</a>
+        {" · "}
+        <a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>
+      </div>
+      <details className={styles.provenance}>
+        <summary>Weather sample</summary>
+        <dl className={styles.metrics}>
+          <div>
+            <dt>Hour (UTC)</dt>
+            <dd>{weather.sampled_at.replace("T", " ").replace(":00Z", " UTC")}</dd>
+          </div>
+          {weather.grid_latitude !== null && weather.grid_longitude !== null ? (
+            <div>
+              <dt>Model grid</dt>
+              <dd>
+                {weather.grid_latitude.toFixed(3)}, {weather.grid_longitude.toFixed(3)}
+              </dd>
+            </div>
+          ) : null}
+        </dl>
+      </details>
+    </div>
+  );
+};

@@ -31,6 +31,7 @@ import { PhotoSimilarPhotosDeferred } from "./PhotoSimilarPhotosDeferred";
 import { MediaDetailsIcon } from "./MediaDetailsIcon";
 import { formatAspectRatio } from "../util/formatAspectRatio";
 import { getDisplayDimensions, isExifRotated } from "../util/photoDimensions";
+import { PhotoWeatherDetails } from "./PhotoWeatherDetails";
 
 type ExifCoordinatesRowProps = {
   kind: "coordinates";
@@ -567,6 +568,15 @@ export const PhotoBlockEl: React.FC<{
                         2,
                       )} MP) · ${formatAspectRatio(displayDimensions.width, displayDimensions.height)}`,
                     },
+                    ...(props.block._build.tags.weather
+                      ? [
+                          {
+                            kind: "kv" as const,
+                            k: "Weather",
+                            v: <PhotoWeatherDetails weather={props.block._build.tags.weather} />,
+                          },
+                        ]
+                      : []),
                     {
                       kind: "kv",
                       k: "Tags",

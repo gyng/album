@@ -38,6 +38,7 @@ import {
   deserializeVideoBlock,
 } from "./deserialize";
 import type { SerializedContent, SerializedPhotoBlock, SerializedVideoBlock } from "./types";
+import { weatherFixture } from "../test/fixtures/weather";
 
 const mockGetExif = jest.mocked(getNextJsSafeExif);
 const mockGetPhotoSize = jest.mocked(getPhotoSize);
@@ -325,6 +326,26 @@ describe("search index key mismatch", () => {
     const block = await deserializePhotoBlock(photo("a.jpg"), { dirname: "../albums/kanto" });
 
     expect(block._build.tags.alt_text).toBe("a cat");
+  });
+
+  it("retains derived zones and captions when an older database has no weather column", async () => {
+    db.rows.mockImplementation((sql: string) => {
+      if (sql.includes("metadata.weather_json"))
+        throw new Error("no such column: metadata.weather_json");
+      return { path: "../albums/kanto/a.jpg", alt_text: "a cat", tz_offset: "+09:00" };
+    });
+    const block = await deserializePhotoBlock(photo("a.jpg"), { dirname: "../albums/kanto" });
+    expect(block._build.tags).toMatchObject({ alt_text: "a cat", tz_offset: "+09:00" });
+    expect(block._build.tags.weather).toBeUndefined();
+  });
+
+  it("loads structured weather through the metadata join", async () => {
+    db.rows.mockImplementation(() => ({
+      path: "../albums/kanto/a.jpg",
+      weather_json: JSON.stringify(weatherFixture),
+    }));
+    const block = await deserializePhotoBlock(photo("a.jpg"), { dirname: "../albums/kanto" });
+    expect(block._build.tags.weather).toEqual(weatherFixture);
   });
 
   it("stays quiet when the lookup finds its row", async () => {

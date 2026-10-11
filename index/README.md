@@ -17,6 +17,7 @@ Indexes images for search with the following fields
 | metadata     | lat_deg             | map          |                                   |
 | metadata     | lng_deg             | map          |                                   |
 | metadata     | iso8601             |              | camera-local naive ISO timestamp  |
+| metadata     | weather_json        | details, Explore | hourly weather estimate and provenance |
 | metadata     | media_kind          | play badge   | `photo` or `video`                |
 | metadata     | duration_seconds    | play badge   | clip length, videos only          |
 | metadata     | scene_seconds       | moment badge | offset of a scene into its clip   |
@@ -30,6 +31,43 @@ Indexes images for search with the following fields
 | pipeline_state | path, stage        | indexing     | digest, version, model provenance  |
 
 The [FTS5 SQLite extension](https://www.sqlite.org/fts5.html) requires sqlite3 >= 3.34.0 and creates a virtual table.
+
+## Weather enrichment
+
+Full and embeddings indexing workflows enrich photos after indexing, before
+publishing the databases. This is independent of captions and embeddings and
+never turns an unavailable weather service into an indexing failure.
+
+To backfill or resume the source index without GPU work, run from `index/`:
+
+```sh
+uv run python index.py weather --dbpath search.sqlite
+```
+
+Open-Meteo supplies eight hourly variables: temperature, apparent temperature,
+humidity, precipitation, cloud cover, wind speed, WMO condition code and snowfall.
+Camera-local time is converted to UTC using the coordinate-derived offset. Photos
+without coordinates, a date or a derived offset remain unenriched. The selected
+sample is the UTC hour containing the capture instant; precipitation and snowfall
+describe the preceding hour, rather than rain at the exact shutter time.
+
+Older photos use ERA5; the last seven days use ECMWF IFS because ERA5 is delayed.
+A later run upgrades these recent estimates to ERA5. Missing hourly values remain
+pending and are retried; changed coordinates or capture times clear stale weather.
+Existing valid estimates survive service failures.
+
+Responses are cached by exact coordinates, UTC day, model and enrichment version.
+Default pacing is one request per second, with 2,000 requests per run. `--interval`
+and `--max-requests` adjust those defaults. A persistent request ledger, including
+failed calls, stops before 500/minute, 4,500/hour, 9,000/day or 270,000/31 days;
+HTTP 429/403 stops the run. These budgets assume one location, one model, one day
+and eight variables per request. The free API requires non-commercial use.
+
+`metadata.weather_json` reaches the published core database. The response cache
+and request ledger stay in the source database and are stripped during publish.
+UI displays credit Open-Meteo and link to CC BY 4.0. No browser weather requests
+are made. See [API documentation](https://open-meteo.com/en/docs/historical-weather-api)
+and [usage terms](https://open-meteo.com/en/terms).
 
 Videos are indexed too, through a poster frame. `npm run prepare:posters` (from
 `src/`) extracts one frame per clip and downloads a thumbnail for each YouTube

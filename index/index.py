@@ -2310,6 +2310,8 @@ class Sqlite3Client:
         for column in ("tz_name", "tz_offset"):
             if column not in metadata_columns:
                 cur.execute(f"ALTER TABLE metadata ADD COLUMN {column} TEXT")
+        if "weather_json" not in metadata_columns:
+            cur.execute("ALTER TABLE metadata ADD COLUMN weather_json TEXT")
         # Videos are indexed through an extracted poster frame and are otherwise
         # indistinguishable from photos in this table. Readers need to tell them
         # apart to render a play badge and a duration, so the kind is stored
@@ -3075,6 +3077,14 @@ class Sqlite3Client:
                 lat_lng_deg[1],
                 iso8601,
             ),
+        )
+        # Weather belongs to a location and instant. A metadata-only retag must
+        # clear the old estimate immediately, even if enrichment is offline.
+        cur.execute(
+            "UPDATE metadata SET weather_json = NULL WHERE path = ? AND "
+            "(lat_deg IS NOT ? OR lng_deg IS NOT ? OR iso8601 IS NOT ? OR "
+            "(? IS NOT NULL AND tz_offset IS NOT ?))",
+            (path, lat_lng_deg[0], lat_lng_deg[1], iso8601, tz_offset, tz_offset),
         )
         cur.execute(
             "UPDATE metadata SET lat_deg = ?, lng_deg = ?, iso8601 = ?, "
@@ -5685,6 +5695,8 @@ def publish_index_databases(
                 "schema_migrations",
                 "image_tags",
                 "caption_generation_metrics",
+                "weather_cache",
+                "weather_requests",
             ):
                 core.execute(f"DROP TABLE IF EXISTS {build_only_table}")
             core.execute("VACUUM")
@@ -7182,6 +7194,30 @@ def insert_analysed_images_batch(db, results: list[Mapping]):
 
         if tags_changed:
             db.rebuild_tag_counts(cur)
+
+
+@cli.command("weather")
+@click.option(
+    "--dbpath", required=True, help="Index database to enrich with hourly weather."
+)
+@click.option(
+    "--interval", default=1.0, type=click.FloatRange(min=0.1), show_default=True
+)
+@click.option(
+    "--max-requests", default=2000, type=click.IntRange(min=1), show_default=True
+)
+def weather_update(dbpath, interval, max_requests):
+    """Backfill missing weather without rerunning captions or embeddings."""
+    from weather import enrich_database
+
+    lock_fd = acquire_single_instance_lock(dbpath)
+    try:
+        db = Sqlite3Client(dbpath)
+        db.setup_tables()
+        db.con.close()
+        enrich_database(dbpath, interval=interval, max_requests=max_requests, log=log)
+    finally:
+        os.close(lock_fd)
 
 
 if __name__ == "__main__":

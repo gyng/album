@@ -22,6 +22,7 @@ uv run --extra inference python index.py index \
   --dbpath "$STAGING_DB" \
   --model-profile hybrid
 uv run python index.py prune --glob "$GLOB" --dbpath "$STAGING_DB"
+uv run python index.py weather --dbpath "$STAGING_DB" || echo "Weather enrichment unavailable; retaining indexed photo data."
 uv run python index.py validate \
   --glob "$GLOB" \
   --dbpath "$STAGING_DB" \

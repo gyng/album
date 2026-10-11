@@ -412,6 +412,34 @@ class TestMain(unittest.TestCase):
         # The clip is placed, so it is geocoded like any photo with coordinates.
         self.assertTrue(analysed["geocode"])
 
+    def test_metadata_edit_invalidates_weather_but_identical_metadata_preserves_it(
+        self,
+    ):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db = Sqlite3Client(str(Path(tmpdir) / "weather.sqlite"))
+            db.setup_tables()
+            db.insert_metadata(
+                "photo.jpg", (1.3, 103.8), "2024-01-01T12:00:00", tz_offset="+08:00"
+            )
+            db.con.execute(
+                "UPDATE metadata SET weather_json='weather' WHERE path='photo.jpg'"
+            )
+            db.con.commit()
+            db.insert_metadata(
+                "photo.jpg", (1.3, 103.8), "2024-01-01T12:00:00", tz_offset="+08:00"
+            )
+            self.assertEqual(
+                db.con.execute("SELECT weather_json FROM metadata").fetchone()[0],
+                "weather",
+            )
+            db.insert_metadata(
+                "photo.jpg", (1.4, 103.8), "2024-01-01T12:00:00", tz_offset="+08:00"
+            )
+            self.assertIsNone(
+                db.con.execute("SELECT weather_json FROM metadata").fetchone()[0]
+            )
+            db.con.close()
+
     def test_insert_metadata_records_media_kind_and_duration(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             dbpath = os.path.join(tmpdir, "media-kind.sqlite")
@@ -3702,6 +3730,12 @@ class TestDb(UsesTestexistsFixture, unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmpdir:
             dbpath = os.path.join(tmpdir, "source.sqlite")
             self._seed_validatable_db(dbpath, path)
+            source = sqlite3.connect(dbpath)
+            source.execute("UPDATE metadata SET weather_json=?", ('{"version":1}',))
+            source.execute("CREATE TABLE weather_cache (key TEXT, response TEXT)")
+            source.execute("CREATE TABLE weather_requests (requested_at REAL)")
+            source.commit()
+            source.close()
             core_output = os.path.join(tmpdir, "core.sqlite")
             embeddings_output = os.path.join(tmpdir, "embeddings.sqlite")
             publish_index_databases(dbpath, embeddings_output, core_output)
@@ -3714,6 +3748,18 @@ class TestDb(UsesTestexistsFixture, unittest.TestCase):
                 con.execute("SELECT COUNT(*) FROM metadata").fetchone()[0], 1
             )
             self.assertEqual(con.execute("SELECT COUNT(*) FROM tags").fetchone()[0], 1)
+            self.assertEqual(
+                con.execute("SELECT weather_json FROM metadata").fetchone()[0],
+                '{"version":1}',
+            )
+            tables = {
+                row[0]
+                for row in con.execute(
+                    "SELECT name FROM sqlite_master WHERE type='table'"
+                )
+            }
+            self.assertNotIn("weather_cache", tables)
+            self.assertNotIn("weather_requests", tables)
             con.close()
 
     def test_publish_leaves_live_outputs_untouched_when_generation_fails(self):

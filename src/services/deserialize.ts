@@ -18,6 +18,7 @@ import {
 } from "./types";
 import { incrementBuildCounter, measureBuild } from "./buildTiming";
 import { parseColorPalette } from "../util/colorDistance";
+import { parseWeatherMetadata } from "../util/weather";
 // Node's own SQLite, not the native `sqlite3` addon: the driver is compiled
 // into the runtime, so there is no per-platform binary to fetch, no ABI to
 // track, and nothing linked against a glibc other than this machine's. It is
@@ -218,9 +219,15 @@ const PHOTO_DETAILS_SQL_WITH_ZONE =
   "FROM images LEFT JOIN metadata ON metadata.path = images.path " +
   "WHERE images.path = ? LIMIT 1;";
 
+const PHOTO_DETAILS_SQL_WITH_WEATHER =
+  "SELECT images.*, metadata.tz_name, metadata.tz_offset, metadata.weather_json " +
+  "FROM images LEFT JOIN metadata ON metadata.path = images.path " +
+  "WHERE images.path = ? LIMIT 1;";
+
 const PHOTO_DETAILS_SQL_WITHOUT_ZONE = "SELECT * FROM images WHERE path = ? LIMIT 1;";
 
 let zoneColumnsMissing = false;
+let weatherColumnMissing = false;
 
 const isMissingZoneColumns = (err: unknown) =>
   err instanceof Error && /no such column/i.test(err.message);
@@ -257,6 +264,10 @@ const getPhotoDetailsFromSearchIndex = async (
       try {
         row = db.prepare(sql).get(path);
       } catch (err) {
+        if (sql === PHOTO_DETAILS_SQL_WITH_WEATHER && isMissingZoneColumns(err)) {
+          weatherColumnMissing = true;
+          return lookup(PHOTO_DETAILS_SQL_WITH_ZONE);
+        }
         if (sql === PHOTO_DETAILS_SQL_WITH_ZONE && isMissingZoneColumns(err)) {
           zoneColumnsMissing = true;
           return lookup(PHOTO_DETAILS_SQL_WITHOUT_ZONE);
@@ -266,6 +277,11 @@ const getPhotoDetailsFromSearchIndex = async (
 
       if (row?.colors) {
         row.colors = parseColorPalette(row.colors);
+      }
+      if (row) {
+        const weather = parseWeatherMetadata(row.weather_json);
+        if (weather) row.weather = weather;
+        delete row.weather_json;
       }
 
       if (!row) {
@@ -278,7 +294,13 @@ const getPhotoDetailsFromSearchIndex = async (
     // Kept promise-shaped: the cache dedupes concurrent lookups for one path,
     // and callers await it.
     const promise = (async () =>
-      lookup(zoneColumnsMissing ? PHOTO_DETAILS_SQL_WITHOUT_ZONE : PHOTO_DETAILS_SQL_WITH_ZONE))();
+      lookup(
+        zoneColumnsMissing
+          ? PHOTO_DETAILS_SQL_WITHOUT_ZONE
+          : weatherColumnMissing
+            ? PHOTO_DETAILS_SQL_WITH_ZONE
+            : PHOTO_DETAILS_SQL_WITH_WEATHER,
+      ))();
 
     photoSearchIndexCache.set(path, promise);
 
@@ -414,6 +436,7 @@ export const deserializeInternals = {
   resetForTesting: async () => {
     photoSearchIndexCache.clear();
     zoneColumnsMissing = false;
+    weatherColumnMissing = false;
     resetSearchIndexKeyMismatchWarning();
     await closeSearchDb();
   },

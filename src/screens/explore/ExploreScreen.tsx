@@ -232,6 +232,8 @@ const ExploreScreen = ({
     findStringFacet(stats, "aspect-ratio"),
     findStringFacet(stats, "orientation"),
   ].filter(Boolean) as StringFacetStat[];
+  const weatherFacets = stats.stringFacets.filter((facet) => facet.facetId.startsWith("weather-"));
+  const weatherCoverage = findStringFacet(stats, "weather-condition")?.coverage ?? 0;
 
   const repeatedExamples = visualSameness?.repeatedExamples.slice(0, visibleRepeatedExamples) ?? [];
   const travellingMotifs = visualSameness?.travellingMotifs.slice(0, visibleTravellingMotifs) ?? [];
@@ -242,7 +244,9 @@ const ExploreScreen = ({
     visualSameness?.lookTimeline.toReversed().slice(0, visibleLookTimeline) ?? [];
   const overviewCards = buildExploreOverviewCards(stats);
   const funStats = buildExploreFunStats(stats);
-  const sectionLinks = EXPLORE_SECTION_LINKS;
+  const sectionLinks = EXPLORE_SECTION_LINKS.filter(
+    (link) => link.href !== "#weather" || weatherCoverage > 0,
+  );
   const renderNumericFacet = (facet: NumericFacetStat) => {
     const max = Math.max(...facet.data.map((b) => b.count), 1);
     const hasData = facet.data.some((b) => b.count > 0);
@@ -873,6 +877,25 @@ const ExploreScreen = ({
             {framingFacets.map(renderStringFacet)}
           </StatGroup>
 
+          {weatherCoverage > 0 ? (
+            <StatGroup
+              id="weather"
+              title="Weather"
+              description="Estimated hourly conditions near each photograph."
+              deferContent
+              deferredSummary={formatCoverage(weatherCoverage)}
+            >
+              {weatherFacets.map(renderStringFacet)}
+              <section className={`${styles.section} ${styles.sectionWide}`}>
+                <Caption as="div">
+                  <a href="https://open-meteo.com/">Weather data by Open-Meteo</a>
+                  {" · "}
+                  <a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>
+                  {" · "}ERA5 and ECMWF IFS
+                </Caption>
+              </section>
+            </StatGroup>
+          ) : null}
           <ExploreColourSection stats={stats} deferContent />
         </div>
       </main>

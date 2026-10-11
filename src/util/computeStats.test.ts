@@ -1,5 +1,6 @@
 import { computePhotoStats } from "./computeStats";
 import { Content, PhotoBlock } from "../services/types";
+import { weatherFixture } from "../test/fixtures/weather";
 
 const makePhoto = (overrides: Partial<PhotoBlock["_build"]> = {}): PhotoBlock => ({
   kind: "photo",
@@ -25,6 +26,40 @@ const makeAlbum = (photos: PhotoBlock[], name = "test-album"): Content => ({
 });
 
 describe("computePhotoStats", () => {
+  it("counts weather estimates and reports coverage without treating missing weather as dry", () => {
+    const stats = computePhotoStats([
+      makeAlbum([
+        makePhoto({ tags: { weather: weatherFixture } }),
+        makePhoto({
+          tags: {
+            weather: { ...weatherFixture, temperature_2m: -2, weather_code: 73, precipitation: 2 },
+          },
+        }),
+        makePhoto(),
+      ]),
+    ]);
+    expect(stats.stringFacets.find((facet) => facet.facetId === "weather-condition")).toMatchObject(
+      {
+        coverage: 2 / 3,
+        data: expect.arrayContaining([
+          { label: "Overcast", count: 1 },
+          { label: "Snow", count: 1 },
+        ]),
+      },
+    );
+    expect(
+      stats.stringFacets.find((facet) => facet.facetId === "weather-precipitation")?.data,
+    ).toEqual([
+      { label: "Dry", count: 1 },
+      { label: "Precipitation", count: 1 },
+    ]);
+    expect(
+      stats.stringFacets.find((facet) => facet.facetId === "weather-temperature")?.data,
+    ).toEqual([
+      { label: "Below 0°C", count: 1 },
+      { label: "20–29°C", count: 1 },
+    ]);
+  });
   it("counts published aspect ratios and orientations, respecting rotation and missing dimensions", () => {
     const stats = computePhotoStats([
       makeAlbum([

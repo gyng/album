@@ -27,6 +27,7 @@ import { getMapPhotoHref } from "./mapSearchIndex";
 import { getDegLatLngFromExif } from "./dms2deg";
 import { getDisplayDimensions } from "./photoDimensions";
 import { formatAspectRatio } from "./formatAspectRatio";
+import { weatherCondition, type WeatherMetadata } from "./weather";
 
 export type BucketedStat = {
   label: string;
@@ -1457,6 +1458,84 @@ function computeTripSummaries(albums: Content[]): TripSummary[] {
   return summariseTrips(trips, TRIP_SUMMARY_PHOTOS);
 }
 
+function computeWeatherFacets(photos: PhotoBlock[]): StringFacetStat[] {
+  const specs: Array<{
+    id: string;
+    name: string;
+    labels: string[] | null;
+    value: (weather: WeatherMetadata) => string | null;
+  }> = [
+    {
+      id: "weather-condition",
+      name: "Conditions",
+      labels: null,
+      value: (weather) => weatherCondition(weather.weather_code),
+    },
+    {
+      id: "weather-temperature",
+      name: "Temperature",
+      labels: ["Below 0°C", "0–9°C", "10–19°C", "20–29°C", "30°C and above"],
+      value: (weather) =>
+        weather.temperature_2m < 0
+          ? "Below 0°C"
+          : weather.temperature_2m < 10
+            ? "0–9°C"
+            : weather.temperature_2m < 20
+              ? "10–19°C"
+              : weather.temperature_2m < 30
+                ? "20–29°C"
+                : "30°C and above",
+    },
+    {
+      id: "weather-precipitation",
+      name: "Precipitation in the preceding hour",
+      labels: ["Dry", "Precipitation"],
+      value: (weather) =>
+        weather.precipitation === null ? null : weather.precipitation > 0 ? "Precipitation" : "Dry",
+    },
+    {
+      id: "weather-cloud",
+      name: "Cloud cover",
+      labels: ["0–24%", "25–49%", "50–74%", "75–100%"],
+      value: (weather) =>
+        weather.cloud_cover === null
+          ? null
+          : weather.cloud_cover < 25
+            ? "0–24%"
+            : weather.cloud_cover < 50
+              ? "25–49%"
+              : weather.cloud_cover < 75
+                ? "50–74%"
+                : "75–100%",
+    },
+  ];
+  return specs.map((spec) => {
+    const counts = new Map<string, number>();
+    let count = 0;
+    for (const photo of photos) {
+      const weather = photo._build.tags?.weather;
+      if (!weather) continue;
+      const label = spec.value(weather);
+      if (label === null) continue;
+      count++;
+      counts.set(label, (counts.get(label) ?? 0) + 1);
+    }
+    const data = spec.labels
+      ? spec.labels
+          .filter((label) => counts.has(label))
+          .map((label) => ({ label, count: counts.get(label)! }))
+      : Array.from(counts, ([label, count]) => ({ label, count })).sort(
+          (a, b) => b.count - a.count || a.label.localeCompare(b.label),
+        );
+    return {
+      facetId: spec.id,
+      displayName: spec.name,
+      data,
+      coverage: photos.length ? count / photos.length : 0,
+    };
+  });
+}
+
 function computeFramingFacets(photos: PhotoBlock[]): StringFacetStat[] {
   const ratios = new Map<string, number>();
   const orientations = new Map<string, number>();
@@ -1526,6 +1605,7 @@ export function computePhotoStats(albums: Content[]): PhotoStats {
     stringFacets: [
       ...STRING_FACETS.map((f) => computeStringFacet(photos, f as PhotoFacet<string>)),
       ...computeFramingFacets(photos),
+      ...computeWeatherFacets(photos),
     ],
     gearFlow: computeGearFlow(photos),
     gear: computeGearStats(albums),
