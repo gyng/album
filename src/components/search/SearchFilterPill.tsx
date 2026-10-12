@@ -3,6 +3,7 @@ import styles from "./SearchFilterPill.module.css";
 
 type Props = {
   label: string;
+  labelPrefix?: React.ReactNode;
   count?: number | undefined;
   isActive?: boolean | undefined;
   disabled?: boolean | undefined;
@@ -11,6 +12,7 @@ type Props = {
 
 export const SearchFilterPill: React.FC<Props> = ({
   label,
+  labelPrefix,
   count,
   isActive,
   disabled,
@@ -26,6 +28,7 @@ export const SearchFilterPill: React.FC<Props> = ({
       aria-pressed={isActive}
       onClick={onClick}
     >
+      {labelPrefix ? <span className={styles.prefix}>{labelPrefix}</span> : null}
       {label}
       {count != null ? <span className={styles.count}>{count}</span> : null}
     </button>

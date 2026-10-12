@@ -8,6 +8,7 @@ import { SearchFilterPill } from "./SearchFilterPill";
 import { SearchTag } from "./SearchTag";
 import { hexToRgb, rgbToHex, RGB } from "../../util/colorDistance";
 import { Heading } from "../ui";
+import { WeatherIcon, weatherFacetIcon } from "../WeatherIcon";
 
 const styles = mergeCssModuleStyles(
   sharedStyles,
@@ -394,6 +395,11 @@ export const SearchFacetPanel: React.FC<Props> = ({
                       <SearchFilterPill
                         key={key}
                         label={option.value}
+                        labelPrefix={
+                          section.facetId.startsWith("weather-") ? (
+                            <WeatherIcon kind={weatherFacetIcon(section.facetId, option.value)} />
+                          ) : null
+                        }
                         count={option.count}
                         isActive={isActive}
                         disabled={isDisabled}

@@ -1,13 +1,23 @@
 import type { WeatherMetadata } from "../util/weather";
 import { weatherCondition } from "../util/weather";
-import { WeatherIcon, weatherConditionIcon } from "./WeatherIcon";
+import {
+  WeatherIcon,
+  weatherConditionIcon,
+  weatherTemperatureIcon,
+  weatherCloudIcon,
+} from "./WeatherIcon";
 import styles from "./PhotoWeatherDetails.module.css";
 
 export const PhotoWeatherDetails = ({ weather }: { weather: WeatherMetadata }) => {
   const metrics = [
-    ["Feels like", "temperature", weather.apparent_temperature, "°C"],
+    [
+      "Feels like",
+      weatherTemperatureIcon(weather.apparent_temperature),
+      weather.apparent_temperature,
+      "°C",
+    ],
     ["Humidity", "humidity", weather.relative_humidity_2m, "%"],
-    ["Cloud cover", "cloud", weather.cloud_cover, "%"],
+    ["Cloud cover", weatherCloudIcon(weather.cloud_cover), weather.cloud_cover, "%"],
     ["Wind", "wind", weather.wind_speed_10m, " km/h"],
     ["Precipitation, preceding hour", "rain", weather.precipitation, " mm"],
     [
@@ -21,7 +31,8 @@ export const PhotoWeatherDetails = ({ weather }: { weather: WeatherMetadata }) =
     <div className={styles.weather}>
       <div className={styles.summary}>
         <WeatherIcon kind={weatherConditionIcon(weatherCondition(weather.weather_code))} />{" "}
-        {weatherCondition(weather.weather_code)} · <WeatherIcon kind="temperature" />{" "}
+        {weatherCondition(weather.weather_code)} ·{" "}
+        <WeatherIcon kind={weatherTemperatureIcon(weather.temperature_2m)} />{" "}
         {weather.temperature_2m.toFixed(1)}°C
       </div>
       <dl className={styles.metrics}>

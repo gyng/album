@@ -5,7 +5,7 @@ import { MiniHistogram } from "../../components/MiniHistogram";
 import { SankeyChartDeferred } from "../../components/SankeyChartDeferred";
 import { Seo } from "../../components/Seo";
 import { ExploreFramingFacet } from "../../components/explore/ExploreFramingFacet";
-import { WeatherIcon, weatherConditionIcon } from "../../components/WeatherIcon";
+import { WeatherIcon, weatherFacetIcon } from "../../components/WeatherIcon";
 import { StatBar } from "../../components/StatBar";
 import { StatsWorldMap } from "../../components/StatsWorldMap";
 import { TechnicalHeatmaps } from "../../components/TechnicalHeatmaps";
@@ -310,19 +310,7 @@ const ExploreScreen = ({
               label={bucket.label}
               labelPrefix={
                 facet.facetId.startsWith("weather-") ? (
-                  <WeatherIcon
-                    kind={
-                      facet.facetId === "weather-condition"
-                        ? weatherConditionIcon(bucket.label)
-                        : facet.facetId === "weather-temperature"
-                          ? "temperature"
-                          : facet.facetId === "weather-cloud"
-                            ? "cloud"
-                            : bucket.label === "Dry"
-                              ? "sun"
-                              : "rain"
-                    }
-                  />
+                  <WeatherIcon kind={weatherFacetIcon(facet.facetId, bucket.label)} />
                 ) : null
               }
               count={bucket.count}

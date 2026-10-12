@@ -42,6 +42,11 @@
   color: inherit;
 }
 
+.prefix {
+  display: inline-flex;
+  margin-inline-end: var(--m);
+}
+
 .count {
   display: inline-block;
   margin-inline-start: var(--size-10);
