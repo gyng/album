@@ -5,7 +5,7 @@
 .main {
   max-inline-size: var(--size-1400);
   margin: 0 auto;
-  padding: var(--m-xl);
+  padding: var(--page-gutter);
   display: grid;
   gap: var(--m-xl);
 }
@@ -65,7 +65,7 @@
 .leftColumn {
   position: relative;
   display: grid;
-  gap: calc(var(--m-xl) * 1.35);
+  gap: var(--section-gap);
   min-inline-size: 0;
   z-index: var(--z-raised);
 }
@@ -239,7 +239,7 @@
 
 @media (max-width: 720px) {
   .main {
-    padding: var(--m-l);
+    padding: var(--page-gutter);
   }
 
   .layout {

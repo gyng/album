@@ -157,7 +157,7 @@
 
 .contextCoordinates {
   padding: var(--m-s) var(--m-m);
-  border-bottom: var(--size-1) solid var(--c-border-on-dark);
+  border-bottom: var(--line-hairline) solid var(--c-border);
   color: var(--c-bg-contrast-light);
   font-size: var(--fs-xs);
   font-variant-numeric: tabular-nums;
@@ -180,7 +180,7 @@
 
 .contextMenu a:hover,
 .contextMenu a:focus-visible {
-  background: color-mix(in oklch, var(--c-bg-contrast-light) 14%, transparent);
+  background: var(--c-selected);
 }
 
 .orbiting,

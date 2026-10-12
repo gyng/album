@@ -23,20 +23,15 @@ import {
 import commonStyles from "../../styles/common.module.css";
 import styles from "./DesignScreen.module.css";
 
-const spacingTokens = [
-  { name: "--m", value: 4 },
-  { name: "--m-xs", value: 6 },
-  { name: "--m-s", value: 8 },
-  { name: "--m-m", value: 12 },
-  { name: "--m-l", value: 20 },
-  { name: "--m-xl", value: 40 },
-  { name: "--m-2xl", value: 64 },
-];
+const spacingTokens = [4, 8, 12, 16, 24, 32, 40, 48, 64].map((value, index) => ({
+  name: `--space-${index + 1}`,
+  value,
+}));
 
 const fontTokens = [
   { name: "--fs-2xs", value: "9px", sample: "Micro — dense chart annotations" },
   { name: "--fs-xs", value: "10px", sample: "Extra small — chart labels, badges" },
-  { name: "--fs-s", value: "11px", sample: "Small — captions, metadata" },
+  { name: "--fs-s", value: "12px", sample: "Small — captions, metadata" },
   { name: "--fs-sm", value: "14px", sample: "Small-medium — body text, controls" },
   { name: "--fs-m", value: "18px", sample: "Medium — base font size" },
   { name: "--fs-l", value: "24px", sample: "Large — section headings" },
@@ -45,6 +40,11 @@ const fontTokens = [
 
 const colourTokens = [
   { name: "--c-bg", label: "Background" },
+  { name: "--c-surface", label: "Panel / control" },
+  { name: "--c-surface-hover", label: "Hover" },
+  { name: "--c-border", label: "Border" },
+  { name: "--c-selected", label: "Selected surface" },
+  { name: "--c-selected-border", label: "Selected border" },
   { name: "--c-font", label: "Text" },
   { name: "--c-bg-contrast-light", label: "Contrast light" },
   { name: "--c-bg-contrast-dark", label: "Contrast dark" },
@@ -69,6 +69,8 @@ const motionTokens = [
 ];
 
 const sections = [
+  "controls",
+  "surfaces",
   "spacing",
   "typography",
   "colours",
@@ -118,13 +120,80 @@ const DesignPage = () => {
           </nav>
         </header>
 
+        <section id="controls" className={styles.section}>
+          <div className={styles.sectionHeader}>
+            <Heading level={1}>Control geometry</Heading>
+            <Caption>Standard 44px; compact 32px, increasing to 44px on touch devices.</Caption>
+          </div>
+          <div className={styles.controlDemo} data-control-density="standard">
+            <Button>Browse photos</Button>
+            <Button variant="primary">Explore</Button>
+            <Button disabled>Unavailable</Button>
+            <Select aria-label="Standard density camera" defaultValue="all">
+              <option value="all">All cameras</option>
+            </Select>
+            <Input
+              className={styles.controlDemoInput}
+              aria-label="Standard density search"
+              placeholder="Search photographs"
+            />
+            <SegmentedToggle
+              ariaLabel="Standard density view"
+              value={toggleValue}
+              onChange={setToggleValue}
+              options={[
+                { value: "a", label: "Photos" },
+                { value: "b", label: "Details" },
+              ]}
+            />
+          </div>
+          <div className={styles.controlDemo} data-control-density="compact">
+            <PillButton size="compact">More</PillButton>
+            <PillButton size="compact" variant="ghost">
+              Mostly clear
+            </PillButton>
+            <PillButton size="compact" disabled>
+              Unavailable
+            </PillButton>
+            <Select variant="compact" aria-label="Compact density camera" defaultValue="all">
+              <option value="all">All cameras</option>
+            </Select>
+            <SegmentedToggle
+              size="compact"
+              ariaLabel="Compact density view"
+              value={toggleValue}
+              onChange={setToggleValue}
+              options={[
+                { value: "a", label: "Photos" },
+                { value: "b", label: "Details" },
+              ]}
+            />
+          </div>
+        </section>
+
+        <section id="surfaces" className={styles.section}>
+          <div className={styles.sectionHeader}>
+            <Heading level={1}>Surfaces and hierarchy</Heading>
+          </div>
+          <div className={styles.surfaceGrid}>
+            <Card>
+              <Heading level={2}>Photo details</Heading>
+              <Caption>12px metadata stays secondary to the photograph.</Caption>
+              <span>50mm · f/1.4 · ISO 200</span>
+            </Card>
+            <Card className={styles.selectedSurface}>
+              <Heading level={2}>Selected</Heading>
+              <Caption>Soft accent surface; focus has its own ring.</Caption>
+              <PillButton size="compact">View photographs</PillButton>
+            </Card>
+          </div>
+        </section>
+
         {/* Tokens: Spacing */}
         <section id="spacing" className={styles.section}>
           <div className={styles.sectionHeader}>
             <Heading level={1}>Spacing</Heading>
-            <Caption>
-              Seven-step scale from 4px to 64px. Used for gaps, padding, and margins.
-            </Caption>
+            <Caption>Adapted Radix scale: 4, 8, 12, 16, 24, 32, 40, 48 and 64px.</Caption>
           </div>
           <div className={styles.spacingScale}>
             {spacingTokens.map((t) => (
@@ -144,7 +213,7 @@ const DesignPage = () => {
         <section id="typography" className={styles.section}>
           <div className={styles.sectionHeader}>
             <Heading level={1}>Typography</Heading>
-            <Caption>Theme-responsive type systems. Seven sizes from 9px to 64px.</Caption>
+            <Caption>Labels 14px/20px, metadata 12px/16px, body 18px with 1.5 line height.</Caption>
           </div>
           <div className={styles.fontScale}>
             {fontTokens.map((t) => (

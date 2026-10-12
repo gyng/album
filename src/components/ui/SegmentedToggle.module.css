@@ -6,9 +6,9 @@
   align-items: center;
   padding: calc(var(--line-hairline) * 2);
   min-block-size: var(--tap-target);
-  border: solid var(--line-strong) var(--c-bg-contrast-light);
-  border-radius: var(--m-s);
-  background: var(--c-bg);
+  border: solid var(--line-hairline) var(--c-border);
+  border-radius: var(--radius-control);
+  background: var(--c-surface);
   transition:
     background-color var(--t-theme),
     color var(--t-theme),
@@ -29,10 +29,12 @@
   min-block-size: calc(var(--tap-target) - var(--m-s));
   background: transparent;
   color: var(--c-bg-contrast-light);
+  font-family: inherit;
   font-size: var(--fs-sm);
+  line-height: var(--lh-label);
   padding: var(--m-xs) var(--m-m);
   /* Nested inside the container's own corner, not a pill of its own. */
-  border-radius: calc(var(--m-s) - var(--line-strong));
+  border-radius: calc(var(--radius-control) - var(--size-3));
   cursor: pointer;
   transition:
     background-color var(--t-fast),
@@ -45,8 +47,9 @@
 }
 
 .buttonActive {
-  background: var(--c-font);
-  color: var(--c-bg);
+  background: var(--c-selected);
+  color: var(--c-font);
+  box-shadow: inset 0 0 0 var(--line-hairline) var(--c-selected-border);
 }
 
 /* Over a photograph, the control wears what the overlay buttons wear: the same
@@ -106,5 +109,5 @@
   padding: var(--m) var(--m-m);
   font-family: inherit;
   font-size: var(--fs-s);
-  line-height: 1.2;
+  line-height: var(--lh-caption);
 }

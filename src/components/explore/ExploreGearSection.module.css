@@ -11,9 +11,9 @@
   gap: var(--m-s);
   align-content: start;
   padding: var(--m-m);
-  border: var(--size-1) solid color-mix(in oklch, var(--c-font) 12%, transparent);
-  border-radius: var(--m);
-  background: color-mix(in oklch, var(--c-font) 4%, transparent);
+  border: var(--line-hairline) solid var(--c-border);
+  border-radius: var(--radius-panel);
+  background: var(--c-surface);
 }
 
 /* The body's own average frame, square so the cards line up whatever shape the

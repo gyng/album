@@ -9,6 +9,7 @@
   background-color: var(--c-overlay-dark);
   color: var(--c-on-dark);
   cursor: pointer;
+  font-family: inherit;
   font-size: var(--fs-s);
   line-height: 1;
   padding: var(--m-xs) var(--m-s);
@@ -39,5 +40,5 @@
   padding: var(--m) var(--m-m);
   gap: var(--m-s);
   font-family: inherit;
-  line-height: 1.2;
+  line-height: var(--lh-caption);
 }

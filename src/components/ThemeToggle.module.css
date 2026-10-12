@@ -1,3 +1,7 @@
+.picker {
+  min-block-size: var(--tap-target);
+}
+
 .themeToggle {
   display: inline-block;
 }
@@ -6,7 +10,7 @@
    compete with the page links. Keep the shared Select hover affordance for
    forms, but leave this picker's resting colours entirely unchanged. */
 .themeToggle .picker:hover {
-  border-color: var(--c-bg-contrast-light);
+  border-color: var(--c-border);
 }
 
 /* Scheme islands for the light/dark options: light-dark() tokens inside the

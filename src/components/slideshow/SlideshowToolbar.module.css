@@ -1,6 +1,13 @@
 /* Styles owned by SlideshowToolbar. Shared layout remains in slideshow.module.css. */
 
 .toolbar {
+  --c-font: var(--c-on-dark);
+  --c-surface: var(--glass-surface-dark);
+  --c-surface-hover: var(--c-overlay-dark-hover);
+  --c-border: var(--c-border-on-dark);
+  --c-border-hover: color-mix(in oklch, var(--c-white) 55%, transparent);
+  --c-selected: color-mix(in oklch, var(--c-accent) 24%, var(--c-overlay-dark));
+  --c-selected-border: var(--c-accent);
   position: fixed;
   inset-block-start: 0;
   inset-inline-start: 0;
@@ -396,13 +403,12 @@
    `.input` selector regardless of stylesheet order. */
 
 .topicForm .topicInput {
-  /* The shared Input primitive sets no font-family; inherit the toolbar's so
-     this field matches its sibling controls rather than the UA input face. */
+  /* Keep the shared input geometry on the toolbar's fixed dark glass. */
   font-family: inherit;
   inline-size: auto;
   padding: var(--m-s) var(--m-m);
   border: solid var(--size-1) var(--glass-border);
-  border-radius: var(--m-m);
+  border-radius: var(--radius-control);
   background: color-mix(in oklch, var(--c-black) 24%, transparent);
   color: var(--c-white);
 }
@@ -539,7 +545,7 @@
     min-block-size: var(--m-2xl);
     padding: var(--m-s) var(--m-m);
     border: 0;
-    border-radius: var(--m-m);
+    border-radius: var(--radius-control);
     background: color-mix(in oklch, var(--c-white) 8%, transparent);
     color: var(--c-white);
     font: inherit;
@@ -565,7 +571,7 @@
     min-block-size: var(--m-2xl);
     padding: var(--m-s) var(--m-m);
     border: solid var(--size-1) var(--c-slideshow-awake-border);
-    border-radius: var(--m-m);
+    border-radius: var(--radius-control);
     background: var(--c-slideshow-awake-bg);
     color: var(--c-white);
     font: inherit;
@@ -759,7 +765,7 @@
     min-block-size: var(--tap-target);
     padding: var(--m-s) var(--m-m);
     border: solid var(--size-1) var(--glass-border);
-    border-radius: var(--m-m);
+    border-radius: var(--radius-control);
     background: var(--glass-bg);
     color: var(--c-white);
     font: inherit;

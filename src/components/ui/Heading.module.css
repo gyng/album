@@ -1,5 +1,8 @@
 .heading {
   margin: 0;
+  line-height: var(--lh-heading);
+  letter-spacing: var(--tracking-heading);
+  font-weight: 600;
   text-wrap: balance;
 }
 

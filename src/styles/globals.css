@@ -29,6 +29,7 @@ body {
   margin: 0;
   font-family: var(--font-sans);
   font-size: var(--fs-m);
+  line-height: var(--lh-body);
   color: var(--c-font);
   background-color: var(--c-bg);
   scrollbar-gutter: stable;
@@ -167,6 +168,29 @@ textarea {
   --theme-background-position: 0 0;
   --theme-background-attachment: scroll;
   --theme-background-blend-mode: normal;
+
+  /* Adapted Radix spacing; geometry and legacy spacing aliases stay separate. */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 40px;
+  --space-8: 48px;
+  --space-9: 64px;
+  --page-gutter: var(--space-7);
+  --section-gap: var(--space-8);
+  --panel-padding: var(--space-4);
+  --control-padding-inline: var(--space-3);
+  --control-padding-block: var(--space-2);
+  --radius-control: 8px;
+  --radius-panel: 12px;
+  --lh-body: 1.5;
+  --lh-label: 20px;
+  --lh-caption: 16px;
+  --lh-heading: 1.25;
+  --tracking-heading: -0.015em;
 
   --m: 4px;
   --m-xs: 6px;
@@ -316,7 +340,7 @@ textarea {
   --fs-touch: 16px;
   --fs-2xs: 9px;
   --fs-xs: 10px;
-  --fs-s: 11px;
+  --fs-s: 12px;
   --fs-sm: 14px;
   --fs-m: 18px;
   --fs-l: 24px;
@@ -355,6 +379,14 @@ textarea {
   --c-bg-contrast-dark: light-dark(black, rgb(51 51 51));
   --c-accent: light-dark(oklch(52% 0.2 27), oklch(70% 0.2 27));
   --c-font: light-dark(black, white);
+  /* Theme-relative surfaces and states, including every named palette. */
+  --c-surface: color-mix(in oklch, var(--c-bg) 96%, var(--c-font));
+  --c-surface-hover: color-mix(in oklch, var(--c-bg) 92%, var(--c-font));
+  --c-border: color-mix(in oklch, var(--c-bg) 78%, var(--c-font));
+  --c-border-hover: color-mix(in oklch, var(--c-bg) 64%, var(--c-font));
+  --c-selected: color-mix(in oklch, var(--c-bg) 88%, var(--c-accent));
+  --c-selected-border: color-mix(in oklch, var(--c-bg) 42%, var(--c-accent));
+
   --c-overlay-dark: rgb(0 0 0 / 0.72);
   --c-border-on-dark: rgb(255 255 255 / 0.28);
   --c-on-dark: white;
@@ -404,6 +436,12 @@ textarea {
     color-mix(in oklch, var(--c-bg-contrast-light) 45%, transparent);
   --popup-radius: var(--m-s);
   --popup-shadow: 0 10px 30px rgb(0 0 0 / 0.18);
+}
+
+@media (max-width: 720px) {
+  :root {
+    --page-gutter: var(--space-5);
+  }
 }
 
 @media (hover: none), (pointer: coarse) {

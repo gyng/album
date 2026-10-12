@@ -1,4 +1,5 @@
 .base {
+  composes: base from "./Control.module.css";
   appearance: none;
   background: var(--c-bg);
   color: inherit;
@@ -10,17 +11,17 @@
 }
 
 .base:disabled {
-  opacity: 0.3;
+  opacity: 0.45;
   cursor: not-allowed;
 }
 
 /* Default: prominent form select with CSS arrow */
 .select {
-  border: solid var(--line-strong) var(--c-bg-contrast-light);
-  border-radius: var(--m-s);
+  border: solid var(--line-hairline) var(--c-border);
+  border-radius: var(--radius-control);
   font-size: var(--fs-sm);
-  padding-block: calc(var(--m-m) + var(--line-hairline));
-  padding-inline-start: calc(var(--m-m) + var(--line-hairline));
+  padding-block: var(--control-padding-block);
+  padding-inline-start: var(--control-padding-inline);
   padding-inline-end: calc(var(--m-xl) + var(--line-strong));
   min-block-size: var(--tap-target);
   background-image:
@@ -43,19 +44,18 @@
   border-color: var(--c-accent);
 }
 
-/* Compact: pill-shaped inline filter */
+/* Compact density uses the same geometry as buttons and segmented controls. */
 .compact {
-  min-block-size: var(--tap-target);
-  border: var(--line-hairline) solid var(--c-bg-contrast-light);
-  border-radius: var(--radius-pill);
+  min-block-size: var(--compact-control-size);
+  border: var(--line-hairline) solid var(--c-border);
+  border-radius: var(--radius-control);
   font-size: var(--fs-s);
-  padding-block: var(--m-xs);
+  padding-block: var(--space-1);
+  line-height: var(--lh-caption);
   padding-inline-start: var(--m-m);
   padding-inline-end: var(--size-36);
-  background: color-mix(in oklch, var(--c-bg) 98%, var(--c-bg-contrast-dark));
+  background: var(--c-surface);
   color: var(--c-font);
-  box-shadow: inset 0 0 0 var(--line-hairline)
-    color-mix(in oklch, var(--c-bg-contrast-dark) 55%, transparent);
   background-image:
     linear-gradient(45deg, transparent 50%, currentColor 50%),
     linear-gradient(135deg, currentColor 50%, transparent 50%);
@@ -69,7 +69,7 @@
 }
 
 .compact:hover {
-  background-color: color-mix(in oklch, var(--c-bg-contrast-light) 12%, transparent);
+  background-color: var(--c-surface-hover);
 }
 
 .compact:focus-visible {
@@ -97,8 +97,8 @@
     appearance: base-select;
     margin-block-start: var(--m);
     padding: var(--m);
-    border: solid var(--line-hairline) var(--c-bg-contrast-light);
-    border-radius: var(--m-s);
+    border: solid var(--line-hairline) var(--c-border);
+    border-radius: var(--radius-control);
     background: var(--c-bg);
     color: var(--c-font);
     box-shadow: 0 var(--size-4) var(--size-16) var(--c-overlay-dark);

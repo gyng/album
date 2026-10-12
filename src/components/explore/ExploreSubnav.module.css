@@ -1,7 +1,7 @@
 .nav {
   display: flex;
-  gap: var(--m-l);
-  border-block-end: var(--size-1) solid var(--c-bg-contrast-dark);
+  gap: var(--space-5);
+  border-block-end: var(--size-1) solid var(--c-border);
   overflow-x: auto;
 }
 .link {

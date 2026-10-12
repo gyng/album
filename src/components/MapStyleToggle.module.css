@@ -1,3 +1,7 @@
+.picker {
+  min-block-size: var(--tap-target);
+}
+
 /* One swatch per basemap, drawn exactly like the theme picker's: the rows
    themselves come from Select, so the two pickers match by construction. Only
    browsers with a styleable select see it; the rest keep the plain text menu,

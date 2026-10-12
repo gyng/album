@@ -1,6 +1,8 @@
 .navCurrent {
-  border-color: color-mix(in oklch, var(--c-bg-contrast-light) 65%, var(--c-bg));
-  background-color: color-mix(in oklch, var(--c-bg-contrast-light) 14%, var(--c-bg));
+  --c-surface-hover: var(--c-selected);
+  --c-border-hover: var(--c-selected-border);
+  border-color: var(--c-selected-border);
+  background-color: var(--c-selected);
 }
 
 /* Vertical rule separating contextual (e.g. album-scoped) actions from the
@@ -85,7 +87,7 @@
   box-sizing: border-box;
   display: inline-flex;
   align-items: stretch;
-  border: solid var(--line-strong) var(--c-bg-contrast-light);
+  border: solid var(--line-hairline) var(--c-border);
   border-radius: var(--m-s);
   overflow: clip;
   background-color: var(--c-bg);
@@ -120,7 +122,7 @@
 
 .splitButtonSub {
   padding: var(--m-s) var(--m-m);
-  border-inline-start: solid var(--line-strong) var(--c-bg-contrast-light);
+  border-inline-start: solid var(--line-hairline) var(--c-border);
   cursor: pointer;
   line-height: 1;
   min-inline-size: calc(var(--m-xl) * 1.5);
@@ -128,8 +130,8 @@
 
 .splitButtonMain:hover,
 .splitButtonSub:hover:not(:disabled) {
-  background-color: var(--c-bg-contrast-light);
-  color: var(--c-bg);
+  background-color: var(--c-surface-hover);
+  color: var(--c-font);
 }
 
 .splitButtonSub:disabled {
@@ -267,26 +269,28 @@
 
 .mediaDetailsContent {
   display: flex;
-  align-items: flex-end;
+  align-items: stretch;
   flex-direction: column;
   min-block-size: 0;
   max-block-size: calc(90svh - var(--tap-target) - var(--m-s));
-  /* The panel is sized by its content, and the raw-EXIF <pre> below is one long
-     unwrapped line — without a ceiling it stretched the panel past the viewport
-     on a phone (450px inside a 375px layout width).
+  /* Keep a readable measure even when raw EXIF is one long unwrapped line.
+     Without a viewport ceiling it stretched past a phone (450px inside a
+     375px layout width).
 
      The ceiling is in viewport units rather than `100%` on purpose: every
      ancestor here is shrink-to-fit, so a percentage has no definite containing
      block to resolve against and is simply ignored. `.mediaDetails` above
      already anchors to `100svw` for the same reason. */
   min-inline-size: 0;
-  max-inline-size: calc(100svw - var(--m-l) * 2);
+  inline-size: var(--overlay-width-wide);
+  max-inline-size: calc(100svw - var(--page-gutter) * 2);
   margin-block-start: var(--m-s);
-  padding: var(--m-m);
+  padding: var(--panel-padding);
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-gutter: stable;
-  border-radius: var(--m);
+  border: var(--line-hairline) solid var(--c-border);
+  border-radius: var(--radius-panel);
   background-color: var(--glass-surface);
   backdrop-filter: blur(var(--glass-blur-surface));
 }
@@ -299,10 +303,11 @@
 
 .mediaDetailsTable {
   font-size: var(--fs-s);
+  line-height: var(--lh-caption);
 }
 
 .mediaDetailsTable td {
-  padding-block: 0 var(--m);
+  padding-block: var(--space-1);
   padding-inline: 0 var(--m);
   vertical-align: baseline;
 }
@@ -328,6 +333,7 @@
 }
 
 .caption {
+  line-height: var(--lh-caption);
   color: var(--c-bg-contrast-light);
   font-size: var(--fs-s);
   margin: 0;
@@ -335,6 +341,7 @@
 }
 
 .captionSm {
+  line-height: var(--lh-label);
   color: var(--c-bg-contrast-light);
   font-size: var(--fs-sm);
   margin: 0;

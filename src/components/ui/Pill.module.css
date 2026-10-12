@@ -1,45 +1,29 @@
 .base {
+  composes: base from "./Control.module.css";
   display: inline-flex;
   align-items: center;
-  gap: var(--m);
-  padding: var(--m) var(--m-m);
-  min-block-size: var(--tap-target);
-  border: var(--line-hairline) solid var(--c-bg-contrast-dark);
-  border-radius: var(--radius-pill);
-  color: var(--c-bg-contrast-light);
-  text-decoration: none;
-  font-size: var(--fs-s);
+  justify-content: center;
+  justify-self: start;
+  gap: var(--space-2);
   cursor: pointer;
-  transition:
-    background-color var(--t-fast),
-    color var(--t-fast),
-    border-color var(--t-fast);
+  text-decoration: none;
 }
 
 .base:hover {
-  color: var(--c-font);
-  border-color: var(--c-bg-contrast-light);
+  background-color: var(--c-surface-hover);
 }
 
 .surface {
-  background: color-mix(in oklch, var(--c-bg) 97%, var(--c-bg-contrast-dark));
+  background-color: var(--c-surface);
 }
 
 .ghost {
-  background: transparent;
-}
-
-.ghost:hover {
-  background: color-mix(in oklch, var(--c-bg) 97%, var(--c-bg-contrast-dark));
+  background-color: transparent;
 }
 
 .compact {
-  appearance: none;
-  justify-content: center;
   min-block-size: var(--compact-control-size);
-  margin: 0;
-  padding: var(--m) var(--m-m);
-  gap: var(--m-s);
-  font-family: inherit;
-  line-height: 1.2;
+  padding-block: var(--space-1);
+  font-size: var(--fs-s);
+  line-height: var(--lh-caption);
 }

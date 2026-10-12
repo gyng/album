@@ -30,8 +30,11 @@
   display: inline-flex;
   align-items: center;
   justify-content: flex-start;
-  padding: var(--m-xs) var(--size-10);
-  border: solid var(--size-1) color-mix(in oklch, var(--c-bg-contrast-light) 25%, transparent);
+  padding: var(--space-1) var(--space-3);
+  min-block-size: var(--compact-control-size);
+  font-family: inherit;
+  line-height: var(--lh-caption);
+  border: solid var(--size-1) var(--c-border);
   border-radius: var(--m-s);
   background: transparent;
   color: var(--c-bg-contrast-light);
@@ -46,7 +49,7 @@
 }
 
 .facetCategoryTab:focus-visible {
-  outline: solid var(--size-2) var(--c-bg-contrast-light);
+  outline: var(--focus-ring);
   outline-offset: var(--size-2);
 }
 
@@ -57,9 +60,9 @@
 }
 
 .facetCategoryTabActive {
-  background: color-mix(in oklch, var(--c-bg-contrast-light) 18%, transparent);
+  background: var(--c-selected);
   color: var(--c-font);
-  border-color: var(--c-font);
+  border-color: var(--c-selected-border);
 }
 
 .facetCategoryContent {
@@ -186,7 +189,7 @@
    visible swatch. */
 
 .colorFacetCurrentSwatchButton:focus-within .colorFacetCurrentSwatch {
-  outline: solid var(--size-2) var(--c-bg-contrast-light);
+  outline: var(--focus-ring);
   outline-offset: var(--size-2);
 }
 
@@ -279,7 +282,7 @@
 }
 
 .colorFacetClearButton:focus-visible {
-  outline: solid var(--size-2) var(--c-bg-contrast-light);
+  outline: var(--focus-ring);
   outline-offset: var(--size-2);
 }
 

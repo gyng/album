@@ -1,24 +1,16 @@
 .input {
+  composes: base from "./Control.module.css";
   inline-size: 100%;
-  padding: var(--m-m);
-  color: var(--c-font);
+  font-weight: 400;
   background-color: var(--c-bg);
-  border: solid var(--line-strong) var(--c-bg-contrast-light);
-  border-radius: var(--m-s);
-  font-size: var(--fs-sm);
-  transition: opacity var(--t-fast) var(--ease-out);
-}
-
-.input:disabled {
-  opacity: 0.3;
-  cursor: not-allowed;
 }
 
 .input::placeholder {
+  color: var(--c-bg-contrast-light);
   user-select: none;
 }
 
-/* 16px on touch devices stops iOS Safari zooming the page on focus */
+/* 16px on touch devices stops iOS Safari zooming the page on focus. */
 @media (hover: none), (pointer: coarse) {
   .input {
     font-size: var(--fs-touch);

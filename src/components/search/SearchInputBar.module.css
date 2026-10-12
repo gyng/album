@@ -1,23 +1,13 @@
 /* Styles owned by SearchInputBar. Shared layout remains in Search.module.css. */
 
 .secondaryAction {
+  composes: base from "../ui/Control.module.css";
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: var(--m-s);
-  padding: var(--m-m);
-  border: solid var(--size-2) var(--c-bg-contrast-light);
-  border-radius: var(--m-s);
-  background-color: var(--c-bg);
-  color: inherit;
-  font-size: var(--fs-sm);
+  gap: var(--space-2);
   text-decoration: none;
   cursor: pointer;
-  min-block-size: var(--tap-target);
-  transition:
-    background-color var(--t-theme) var(--ease-out),
-    color var(--t-theme) var(--ease-out),
-    border-color var(--t-theme) var(--ease-out);
 }
 
 .secondaryAction:disabled {
@@ -26,15 +16,15 @@
 }
 
 .secondaryAction:not(:disabled):hover {
-  background-color: var(--c-bg-contrast-light);
+  background-color: var(--c-surface-hover);
 }
 
 .secondaryAction:not(:disabled):active {
-  background-color: var(--c-bg-contrast-light);
+  background-color: var(--c-surface-hover);
 }
 
 .secondaryAction:focus-visible {
-  outline: solid var(--size-2) var(--c-bg-contrast-light);
+  outline: var(--focus-ring);
   outline-offset: var(--size-2);
 }
 
@@ -143,7 +133,7 @@
 }
 
 .searchModeInfo:focus-visible {
-  outline: solid var(--size-2) var(--c-bg-contrast-light);
+  outline: var(--focus-ring);
   outline-offset: var(--size-2);
   border-radius: var(--radius-pill);
 }
@@ -234,12 +224,12 @@
 }
 
 .clearButton:hover {
-  background-color: var(--c-bg-contrast-light);
+  background-color: var(--c-surface-hover);
   color: var(--c-bg);
 }
 
 .clearButton:focus-visible {
-  outline: solid var(--size-2) var(--c-bg-contrast-light);
+  outline: var(--focus-ring);
 }
 
 @container (max-width: 720px) {

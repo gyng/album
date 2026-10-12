@@ -5,7 +5,7 @@
 .main {
   max-inline-size: var(--content-width-wide);
   margin: 0 auto;
-  padding: var(--m-xl);
+  padding: var(--page-gutter);
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: var(--m-2xl);
@@ -63,6 +63,7 @@
 
 .spacingScale {
   display: flex;
+  flex-wrap: wrap;
   align-items: flex-end;
   gap: var(--m-s);
 }
@@ -191,7 +192,7 @@
   flex-wrap: wrap;
   align-items: center;
   gap: var(--m-m);
-  padding: var(--m-l);
+  padding: var(--page-gutter);
   border-radius: var(--m-s);
   background: var(--c-bg-contrast-dark);
   position: relative;
@@ -268,7 +269,7 @@
 
 @media (max-width: 720px) {
   .main {
-    padding: var(--m-l);
+    padding: var(--page-gutter);
   }
 
   .spacingScale {
@@ -281,4 +282,26 @@
     flex-direction: column;
     gap: var(--m);
   }
+}
+
+.controlDemo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.controlDemoInput {
+  inline-size: min(100%, var(--design-input-min-width));
+}
+
+.surfaceGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, var(--size-280)), 1fr));
+  gap: var(--space-4);
+}
+
+.selectedSurface {
+  background: var(--c-selected);
+  border-color: var(--c-selected-border);
 }

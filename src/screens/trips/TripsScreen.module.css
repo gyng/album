@@ -7,7 +7,7 @@
 .main {
   max-inline-size: var(--size-1400);
   margin: 0 auto;
-  padding: var(--m-xl);
+  padding: var(--page-gutter);
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: var(--m-xl);

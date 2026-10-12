@@ -1,10 +1,10 @@
 .card {
   display: grid;
-  gap: var(--m);
-  padding: var(--m-m);
-  border: var(--line-hairline) solid var(--c-bg-contrast-dark);
-  border-radius: var(--m-s);
-  background: color-mix(in oklch, var(--c-bg) 97%, var(--c-bg-contrast-dark));
+  gap: var(--space-2);
+  padding: var(--panel-padding);
+  border: var(--line-hairline) solid var(--c-border);
+  border-radius: var(--radius-panel);
+  background: var(--c-surface);
   transition:
     background-color var(--t-theme),
     color var(--t-theme),

@@ -5,10 +5,10 @@
 .main {
   max-inline-size: var(--size-1400);
   margin: 0 auto;
-  padding: var(--m-xl);
+  padding: var(--page-gutter);
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  gap: calc(var(--m-xl) * 1.15);
+  gap: var(--section-gap);
 }
 
 .kicker {
@@ -21,7 +21,7 @@
 .groups {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  gap: calc(var(--m-xl) * 1.35);
+  gap: var(--section-gap);
 }
 
 .groupActionsStack {
@@ -67,7 +67,7 @@
 }
 
 .stackedBarGroups > * + * {
-  margin-block-start: calc(var(--m-l) * 1.15);
+  margin-block-start: var(--space-5);
 }
 
 .hidden {
@@ -483,7 +483,7 @@
 
 @media (max-width: 720px) {
   .main {
-    padding: var(--m-l);
+    padding: var(--page-gutter);
   }
 
   .desktopOnly {

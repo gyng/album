@@ -2,9 +2,9 @@
   /* One surface for the bottom overlays; the distance bar alone keeps its
      calibrated ruler border rather than becoming another rounded card. */
   --map-chrome-surface: color-mix(in oklch, var(--c-bg) 96%, transparent);
-  --map-chrome-border: color-mix(in oklch, var(--c-font) 22%, transparent);
+  --map-chrome-border: var(--c-border);
   --map-chrome-shadow: 0 var(--size-1) var(--m) color-mix(in oklch, var(--c-black) 12%, transparent);
-  --map-chrome-gutter: var(--m-l);
+  --map-chrome-gutter: var(--space-5);
   --map-control-rail-width: var(--tap-target);
   --map-chrome-left: max(var(--map-chrome-gutter), env(safe-area-inset-left, 0px));
   --map-chrome-right: max(var(--map-chrome-gutter), env(safe-area-inset-right, 0px));
