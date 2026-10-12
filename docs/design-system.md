@@ -94,6 +94,10 @@ look like a form control.
 - Compact badges, attribution, keyboard hints and chart annotations are read-only
   metadata, not 44px controls. A photograph/grid pagination tile can match the
   image tile it sits among. Continuation placeholders may use a dashed border.
+- Weather buckets may include up to four linked archive examples, spread across
+  the matching set. Keep sparse thumbnail rows at the same size as full rows.
+  Photo metadata uses a fixed two-column table so deferred maps and similarity
+  content cannot change its horizontal layout after opening.
 - Guess Where keeps its full-height photo/map layout and narrow canvas gutters.
   Lobby/results use readable document widths. Timer urgency, score reveals and
   map-pin feedback may animate; ordinary game buttons use shared hover/selection

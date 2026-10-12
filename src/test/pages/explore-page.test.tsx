@@ -90,6 +90,7 @@ jest.mock("../../components/explore/ExplorePrimitives", () => ({
   VisualSimilarityThumb: ({ photo }: { photo: { label: string } }) => <span>{photo.label}</span>,
 }));
 jest.mock("../../components/ui", () => ({
+  Thumb: jest.requireActual("../../components/ui/Thumb").Thumb,
   Footer: () => <footer />,
   Card: ({ children }: React.PropsWithChildren) => <article>{children}</article>,
   Caption: ({ children }: React.PropsWithChildren) => <span>{children}</span>,
@@ -136,7 +137,10 @@ const numeric = (facetId: string, data = [{ label: "Known", count: 2 }], coverag
   data,
   coverage,
 });
-const stringFacet = (facetId: string, data = [{ label: `${facetId} value`, count: 2 }]) => ({
+const stringFacet = (
+  facetId: string,
+  data = [{ label: `${facetId} value`, count: 2 }],
+): import("../../util/computeStats").StringFacetStat => ({
   facetId,
   displayName: facetId,
   data,
@@ -368,12 +372,21 @@ describe("explore page", () => {
   it("renders weather distributions only when weather coverage is available", () => {
     const stats = makeStats();
     stats.stringFacets.push(
-      stringFacet("weather-condition", [{ label: "Rain", count: 2 }]),
+      {
+        ...stringFacet("weather-condition", [{ label: "Rain", count: 2 }]),
+        examples: {
+          Rain: [
+            { src: "/rain.jpg", href: "/album/test-simple#rain.jpg", label: "Rain photograph" },
+          ],
+        },
+      },
       stringFacet("weather-temperature", [{ label: "20–29°C", count: 2 }]),
     );
     const { unmount } = render(<ExplorePage stats={stats as never} visualSameness={null} />);
     const weather = within(screen.getByRole("region", { name: "Weather" }));
     expect(weather.getByTestId("bar-Rain")).toBeTruthy();
+    const photograph = weather.getByRole("img", { name: "Rain photograph" });
+    expect(photograph.closest("a")).toHaveAttribute("href", "/album/test-simple#rain.jpg");
     expect(weather.getByRole("link", { name: "Weather data by Open-Meteo" })).toHaveAttribute(
       "href",
       "https://open-meteo.com/",

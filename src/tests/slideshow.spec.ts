@@ -313,7 +313,8 @@ test.describe("Slideshow touch mode", () => {
   // Dragging the slide aside used to reveal the page behind it — a black void
   // the width of the gesture — rather than the photograph the swipe leads to.
   test("a drag uncovers the photograph it is heading towards", async ({ page }) => {
-    await gotoHydrated(page, "/slideshow?mode=random&filter=test-simple");
+    // This checks the single-image transform; a randomly chosen remix moves its grid.
+    await gotoHydrated(page, "/slideshow?mode=random&filter=test-simple&remix=0");
     await waitForSlideshow(page);
     await page.getByRole("button", { name: "Hide controls", exact: true }).click();
     await expect(page.locator("[data-paused]")).toHaveAttribute("data-controls-visible", "false");

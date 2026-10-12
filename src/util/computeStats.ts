@@ -54,6 +54,7 @@ export type StringFacetStat = {
   /** Top N by count, descending */
   data: BucketedStat[];
   coverage: number;
+  examples?: Record<string, Array<{ src: string; href: string; label: string }>>;
 };
 
 export type PhotoStats = {
@@ -1456,17 +1457,28 @@ function computeTripSummaries(albums: Content[]): TripSummary[] {
   return summariseTrips(trips, TRIP_SUMMARY_PHOTOS);
 }
 
-function computeWeatherFacets(photos: PhotoBlock[]): StringFacetStat[] {
+function computeWeatherFacets(albums: Content[]): StringFacetStat[] {
+  const entries = albums.flatMap((album) =>
+    album.blocks.flatMap((photo) => (photo.kind === "photo" ? [{ album, photo }] : [])),
+  );
   return WEATHER_FACETS.map((spec) => {
     const counts = new Map<string, number>();
+    const candidates = new Map<string, Array<{ src: string; href: string; label: string }>>();
     let count = 0;
-    for (const photo of photos) {
+    for (const { album, photo } of entries) {
       const weather = photo._build.tags?.weather;
       if (!weather) continue;
       const label = spec.value(weather);
       if (label === null) continue;
       count++;
       counts.set(label, (counts.get(label) ?? 0) + 1);
+      const bucket = candidates.get(label) ?? [];
+      bucket.push({
+        src: photo._build.srcset[0]?.src ?? encodePublicAssetPath(photo.data.src),
+        href: `/album/${album._build.slug}#${encodeURIComponent(photo.id)}`,
+        label: photo.data.title ?? photo.data.src.split("/").at(-1)!,
+      });
+      candidates.set(label, bucket);
     }
     const data = spec.labels
       ? spec.labels
@@ -1479,7 +1491,21 @@ function computeWeatherFacets(photos: PhotoBlock[]): StringFacetStat[] {
       facetId: spec.id,
       displayName: spec.displayName,
       data,
-      coverage: photos.length ? count / photos.length : 0,
+      coverage: entries.length ? count / entries.length : 0,
+      examples: Object.fromEntries(
+        Array.from(candidates, ([label, photos]) => [
+          label,
+          Array.from(
+            { length: Math.min(4, photos.length) },
+            (_, index) =>
+              photos[
+                Math.round(
+                  (index * (photos.length - 1)) / Math.max(1, Math.min(4, photos.length) - 1),
+                )
+              ]!,
+          ),
+        ]),
+      ),
     };
   });
 }
@@ -1553,7 +1579,7 @@ export function computePhotoStats(albums: Content[]): PhotoStats {
     stringFacets: [
       ...STRING_FACETS.map((f) => computeStringFacet(photos, f as PhotoFacet<string>)),
       ...computeFramingFacets(photos),
-      ...computeWeatherFacets(photos),
+      ...computeWeatherFacets(albums),
     ],
     gearFlow: computeGearFlow(photos),
     gear: computeGearStats(albums),

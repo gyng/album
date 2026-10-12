@@ -306,6 +306,20 @@
   line-height: var(--lh-caption);
 }
 
+/* Deferred maps and similarity results must not renegotiate metadata columns. */
+.mediaDetailsTable > table {
+  inline-size: 100%;
+  table-layout: fixed;
+}
+
+.mediaDetailsTable > table > :is(thead, tbody) > tr > td:first-child {
+  inline-size: 34%;
+}
+
+.mediaDetailsTable > table td {
+  overflow-wrap: anywhere;
+}
+
 .mediaDetailsTable td {
   padding-block: var(--space-1);
   padding-inline: 0 var(--m);

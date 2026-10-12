@@ -6,6 +6,7 @@ import { SankeyChartDeferred } from "../../components/SankeyChartDeferred";
 import { Seo } from "../../components/Seo";
 import { ExploreFramingFacet } from "../../components/explore/ExploreFramingFacet";
 import { WeatherIcon, weatherFacetIcon } from "../../components/WeatherIcon";
+import weatherStyles from "./ExploreWeatherExamples.module.css";
 import { StatBar } from "../../components/StatBar";
 import { StatsWorldMap } from "../../components/StatsWorldMap";
 import { TechnicalHeatmaps } from "../../components/TechnicalHeatmaps";
@@ -26,6 +27,7 @@ import {
   PillButton,
   pillStyles,
   Select,
+  Thumb,
 } from "../../components/ui";
 import styles from "../../components/explore/ExploreShared.module.css";
 import { buildSearchFacetHref, isSearchableFacetId } from "../../util/searchFacets";
@@ -304,27 +306,38 @@ const ExploreScreen = ({
             value?: string;
           };
 
+          const examples = facet.examples?.[bucket.label] ?? [];
           return (
-            <StatBar
-              key={keyedBucket.key ?? bucket.label}
-              label={bucket.label}
-              labelPrefix={
-                facet.facetId.startsWith("weather-") ? (
-                  <WeatherIcon kind={weatherFacetIcon(facet.facetId, bucket.label)} />
-                ) : null
-              }
-              count={bucket.count}
-              maxCount={max}
-              actionHref={
-                isSearchableFacetId(facet.facetId)
-                  ? buildSearchFacetHref({
-                      facetId: facet.facetId,
-                      value: keyedBucket.value ?? bucket.label,
-                    })
-                  : null
-              }
-              actionLabel={`Find photos with ${facet.displayName.toLowerCase()} ${bucket.label}`}
-            />
+            <div key={keyedBucket.key ?? bucket.label} className={weatherStyles.bucket}>
+              <StatBar
+                label={bucket.label}
+                labelPrefix={
+                  facet.facetId.startsWith("weather-") ? (
+                    <WeatherIcon kind={weatherFacetIcon(facet.facetId, bucket.label)} />
+                  ) : null
+                }
+                count={bucket.count}
+                maxCount={max}
+                actionHref={
+                  isSearchableFacetId(facet.facetId)
+                    ? buildSearchFacetHref({
+                        facetId: facet.facetId,
+                        value: keyedBucket.value ?? bucket.label,
+                      })
+                    : null
+                }
+                actionLabel={`Find photos with ${facet.displayName.toLowerCase()} ${bucket.label}`}
+              />
+              {examples.length > 0 ? (
+                <div className={weatherStyles.photos} aria-label={`${bucket.label} photographs`}>
+                  {examples.map((photo) => (
+                    <Link key={photo.href} href={photo.href} className={weatherStyles.photo}>
+                      <Thumb src={photo.src} alt={photo.label} loading="lazy" />
+                    </Link>
+                  ))}
+                </div>
+              ) : null}
+            </div>
           );
         })}
       </StatSection>

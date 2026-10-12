@@ -26,6 +26,27 @@ const makeAlbum = (photos: PhotoBlock[], name = "test-album"): Content => ({
 });
 
 describe("computePhotoStats", () => {
+  it("selects bounded weather examples across each bucket without including missing estimates", () => {
+    const photos = Array.from({ length: 10 }, (_, index) => ({
+      ...makePhoto({ tags: { weather: weatherFixture } }),
+      id: `weather ${index}.jpg`,
+      data: { src: `/weather ${index}.jpg` },
+    }));
+    const stats = computePhotoStats([makeAlbum([...photos, makePhoto()])]);
+    const examples = stats.stringFacets.find((facet) => facet.facetId === "weather-condition")
+      ?.examples?.Overcast;
+    expect(examples).toHaveLength(4);
+    expect(examples?.map((photo) => photo.src)).toEqual([
+      "/weather%200.jpg",
+      "/weather%203.jpg",
+      "/weather%206.jpg",
+      "/weather%209.jpg",
+    ]);
+    expect(examples?.[0]?.href).toBe("/album/test-album#weather%200.jpg");
+    expect(
+      stats.stringFacets.find((facet) => facet.facetId === "weather-temperature")?.examples,
+    ).toHaveProperty("20–29°C");
+  });
   it("counts weather estimates and reports coverage without treating missing weather as dry", () => {
     const stats = computePhotoStats([
       makeAlbum([

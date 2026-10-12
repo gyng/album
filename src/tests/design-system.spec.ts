@@ -91,3 +91,34 @@ test("photo details stay within a readable desktop and mobile width", async ({ p
     );
   }
 });
+
+test("photo metadata keeps its columns while deferred content loads", async ({ page }) => {
+  await gotoHydrated(page, "/album/test-simple");
+  const pending: Array<() => void> = [];
+  await page.route(
+    "**/_next/static/**/*.js",
+    (route) =>
+      new Promise<void>((resolve) => {
+        pending.push(() => {
+          void route.continue().then(() => resolve());
+        });
+      }),
+  );
+  try {
+    const toggle = page.getByLabel("Photo details", { exact: true }).first();
+    await toggle.click();
+    const panel = toggle.locator("..").locator(":scope > div");
+    await expect(panel.getByText("Loading map…", { exact: true })).toBeVisible();
+    const table = panel.locator("table").first();
+    const before = await table.boundingBox();
+    for (const release of pending.splice(0)) release();
+    await page.unroute("**/_next/static/**/*.js");
+    await expect(panel.locator(".maplibregl-map")).toBeVisible({ timeout: 15_000 });
+    const after = await table.boundingBox();
+    expect(Math.abs(after!.x - before!.x)).toBeLessThan(1);
+    expect(Math.abs(after!.width - before!.width)).toBeLessThan(1);
+  } finally {
+    for (const release of pending.splice(0)) release();
+    await page.unrouteAll({ behavior: "ignoreErrors" });
+  }
+});
