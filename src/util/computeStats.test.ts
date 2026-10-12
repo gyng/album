@@ -642,7 +642,7 @@ describe("computePhotoStats", () => {
     );
   });
 
-  it("classifies every colour family, caps examples, and compares multi-year windows", () => {
+  it("classifies every colour family, retains examples beyond the first six, and compares multi-year windows", () => {
     const families: Array<{
       id: string;
       rgb: [number, number, number];
@@ -701,7 +701,7 @@ describe("computePhotoStats", () => {
     }
     expect(stats.paletteSizeStats.find((bucket) => bucket.label === "5+")?.count).toBe(1);
     expect(stats.colorFamilyExamples.find((bucket) => bucket.label === "Red")?.photos).toHaveLength(
-      6,
+      7,
     );
     expect(stats.colorFamilyExamples.find((bucket) => bucket.label === "Pink")?.photos[0]).toEqual(
       expect.objectContaining({ src: "/pink-thumb.jpg", label: "Pink study" }),

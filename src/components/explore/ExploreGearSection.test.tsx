@@ -209,6 +209,84 @@ const frames = [
 ];
 
 describe("the gear section's own reporting", () => {
+  it("randomises one card within its own kit without changing another card", () => {
+    const many = [
+      {
+        ...frames[0]!,
+        photos: [
+          frames[0]!.photos[0]!,
+          { ...frames[0]!.photos[0]!, src: "/b.avif", label: "Another X100T photo" },
+        ],
+      },
+      {
+        label: "X-T5",
+        count: 2,
+        photos: [
+          {
+            path: "../albums/test/a.jpg",
+            src: "/xt5-a.avif",
+            href: "/album/test#a",
+            label: "X-T5 A",
+          },
+          {
+            path: "../albums/test/b.jpg",
+            src: "/xt5-b.avif",
+            href: "/album/test#b",
+            label: "X-T5 B",
+          },
+        ],
+      },
+    ];
+    render(<ExploreGearSection gear={gear()} frames={many} />);
+    const card = (name: string) =>
+      screen.getByRole("button", { name: `Random photo for ${name}` }).closest("div")!
+        .parentElement!;
+    const shown = (name: string) => within(card(name)).getByRole("img").getAttribute("src");
+    const before = shown("X100T");
+    const other = shown("X-T5");
+    fireEvent.click(screen.getByRole("button", { name: "Random photo for X100T" }));
+    expect(shown("X100T")).not.toBe(before);
+    expect(["/a.avif", "/b.avif"]).toContain(shown("X100T"));
+    expect(shown("X-T5")).toBe(other);
+  });
+
+  it("omits the random button for a kit with only one available photo", () => {
+    render(<ExploreGearSection gear={gear()} frames={frames} />);
+    expect(screen.queryByRole("button", { name: "Random photo for X100T" })).toBeNull();
+  });
+
+  it.each(["Lenses", "With lenses"])("randomises within the selected %s kit", (mode) => {
+    const data = gear();
+    const profile = (mode === "Lenses" ? data.lenses : data.pairings)[0]!;
+    const offered = [
+      {
+        path: "../albums/test/kit-a.jpg",
+        src: "/kit-a.avif",
+        href: "/album/test#a",
+        label: "Kit A",
+      },
+      {
+        path: "../albums/test/kit-b.jpg",
+        src: "/kit-b.avif",
+        href: "/album/test#b",
+        label: "Kit B",
+      },
+    ];
+    render(
+      <ExploreGearSection
+        gear={data}
+        frames={[...frames, { label: profile.label, count: 2, photos: offered }]}
+      />,
+    );
+    fireEvent.click(screen.getAllByRole("radio", { name: mode })[0]!);
+    const button = screen.getByRole("button", { name: `Random photo for ${profile.label}` });
+    const picture = button.closest("div")!;
+    const before = within(picture).getByRole("img").getAttribute("src");
+    fireEvent.click(button);
+    const after = within(picture).getByRole("img").getAttribute("src");
+    expect(after).not.toBe(before);
+    expect(["/kit-a.avif", "/kit-b.avif"]).toContain(after);
+  });
   it("shows the latest year first in both histories and their alternative views", () => {
     render(<ExploreGearSection gear={gear()} frames={frames} />);
     const years = (title: string) => {

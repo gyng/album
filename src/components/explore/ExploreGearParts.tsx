@@ -1,7 +1,7 @@
 import { mergeCssModuleStyles } from "../../util/mergeCssModuleStyles";
 import { AppLink as Link } from "../platform";
 import type { GearFrame, GearProfile, LensFocalRange } from "../../util/computeGearStats";
-import { Caption, Heading, Thumb } from "../ui";
+import { Caption, Heading, PillButton, Thumb } from "../ui";
 import sharedStyles from "./ExploreShared.module.css";
 import localStyles from "./ExploreGearSection.module.css";
 
@@ -22,6 +22,8 @@ export const gearStyles = mergeCssModuleStyles(
     "gearBodies",
     "gearBodyCard",
     "gearBodyFrame",
+    "gearBodyPicture",
+    "gearBodyRandom",
     "gearBodyHeader",
     "gearBodyName",
     "gearBodyLens",
@@ -173,6 +175,7 @@ export const GearProfileCard = ({
   href,
   withLens,
   withCamera,
+  onRandom,
 }: {
   profile: GearProfile;
   colour: string | undefined;
@@ -180,17 +183,29 @@ export const GearProfileCard = ({
   href: string;
   withLens: boolean;
   withCamera: boolean;
+  onRandom?: () => void;
 }) => (
   <div className={styles.gearBodyCard}>
     {photo ? (
-      <Link href={photo.href} className={styles.gearBodyFrame}>
-        <Thumb
-          src={photo.src}
-          alt={photo.label}
-          loading="lazy"
-          {...(photo.swatch ? { style: { backgroundColor: photo.swatch } } : {})}
-        />
-      </Link>
+      <div className={styles.gearBodyPicture}>
+        <Link href={photo.href} className={styles.gearBodyFrame}>
+          <Thumb
+            src={photo.src}
+            alt={photo.label}
+            loading="lazy"
+            {...(photo.swatch ? { style: { backgroundColor: photo.swatch } } : {})}
+          />
+        </Link>
+        {onRandom ? (
+          <PillButton
+            className={styles.gearBodyRandom}
+            aria-label={`Random photo for ${profile.label}`}
+            onClick={onRandom}
+          >
+            Random
+          </PillButton>
+        ) : null}
+      </div>
     ) : null}
     <div className={styles.gearBodyHeader}>
       <span aria-hidden="true" className={styles.gearBodyMark} style={{ background: colour }} />

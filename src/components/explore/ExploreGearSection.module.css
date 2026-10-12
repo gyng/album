@@ -31,6 +31,17 @@
   object-fit: cover;
 }
 
+.gearBodyPicture {
+  position: relative;
+}
+
+.gearBodyRandom {
+  position: absolute;
+  inset-block-end: var(--m-s);
+  inset-inline-end: var(--m-s);
+  background: var(--c-bg);
+}
+
 .gearBodyHeader {
   display: flex;
   align-items: start;

@@ -3,7 +3,7 @@ import { mergeCssModuleStyles } from "../../util/mergeCssModuleStyles";
 import { AppLink as Link } from "../platform";
 import type { PhotoStats } from "../../util/computeStats";
 import { StatBar } from "../StatBar";
-import { Caption, Heading, SegmentedToggle, Thumb, pillStyles } from "../ui";
+import { Caption, Heading, PillButton, SegmentedToggle, Thumb, pillStyles } from "../ui";
 import { buildColourYearStacks } from "../../util/colourYearStacks";
 import sharedStyles from "./ExploreShared.module.css";
 import localStyles from "./ExploreColourSection.module.css";
@@ -66,6 +66,8 @@ export const ExploreColourSection = ({
   // Every photograph as its own sliver, or every year as one stacked bar. The
   // first is the archive as it happened; the second is the only one that
   // answers whether a year was greener than the one before.
+  const [visibleFamilies, setVisibleFamilies] = React.useState(4);
+  const [visiblePhotos, setVisiblePhotos] = React.useState<Record<string, number>>({});
   const [colourView, setColourView] = React.useState<"photos" | "families">("photos");
   const colourStacks = React.useMemo(
     () => buildColourYearStacks(stats.colorYearRibbons, COLOR_FAMILY_ORDER),
@@ -142,7 +144,7 @@ export const ExploreColourSection = ({
                 </Heading>
               </div>
               <div className={styles.colorFamilyRows}>
-                {stats.colorFamilyExamples.map((family) => {
+                {stats.colorFamilyExamples.slice(0, visibleFamilies).map((family) => {
                   const familyHref = buildColorSearchHref(family.label);
                   return (
                     <div key={family.label} className={styles.colorFamilyRow}>
@@ -172,29 +174,54 @@ export const ExploreColourSection = ({
                           </Link>
                         ) : null}
                       </div>
-                      <div className={styles.colorFamilyThumbs}>
-                        {family.photos.slice(0, 6).map((photo) => (
-                          <Link
-                            key={`${family.label}-${photo.href}-${photo.src}`}
-                            href={photo.href}
-                            className={styles.colorFamilyThumbLink}
+                      <div>
+                        <div className={styles.colorFamilyThumbs}>
+                          {family.photos.slice(0, visiblePhotos[family.label] ?? 6).map((photo) => (
+                            <Link
+                              key={`${family.label}-${photo.href}-${photo.src}`}
+                              href={photo.href}
+                              className={styles.colorFamilyThumbLink}
+                            >
+                              <Thumb
+                                src={photo.src}
+                                alt={photo.label}
+                                size="small"
+                                loading="lazy"
+                                {...(photo.swatch
+                                  ? { style: { backgroundColor: photo.swatch } }
+                                  : {})}
+                              />
+                            </Link>
+                          ))}
+                        </div>
+                        {family.photos.length > (visiblePhotos[family.label] ?? 6) ? (
+                          <PillButton
+                            className={localStyles.morePhotos}
+                            aria-label={`More photos with ${family.label.toLowerCase()} tones`}
+                            onClick={() =>
+                              setVisiblePhotos((current) => ({
+                                ...current,
+                                [family.label]: (current[family.label] ?? 6) + 6,
+                              }))
+                            }
                           >
-                            <Thumb
-                              src={photo.src}
-                              alt={photo.label}
-                              size="small"
-                              loading="lazy"
-                              {...(photo.swatch
-                                ? { style: { backgroundColor: photo.swatch } }
-                                : {})}
-                            />
-                          </Link>
-                        ))}
+                            More
+                          </PillButton>
+                        ) : null}
                       </div>
                     </div>
                   );
                 })}
               </div>
+              {stats.colorFamilyExamples.length > visibleFamilies ? (
+                <PillButton
+                  className={localStyles.moreFamilies}
+                  aria-label="More colour families"
+                  onClick={() => setVisibleFamilies((count) => count + 4)}
+                >
+                  More
+                </PillButton>
+              ) : null}
             </section>
           ) : null}
 

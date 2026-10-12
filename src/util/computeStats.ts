@@ -965,14 +965,12 @@ function computeRichColorStats(albums: Content[]): {
     const family = getColorFamilyLabel(dominant);
     const examples = exampleBuckets.get(family)!;
     const src = photo._build.srcset[0]?.src ?? encodePublicAssetPath(photo.data.src);
-    if (examples.length < 6) {
-      examples.push({
-        src,
-        href: `/album/${album._build.slug}#${photo.id}`,
-        label: photo.data.title ?? photo.data.src.split("/").at(-1)!,
-        swatch: rgbToString(dominant),
-      });
-    }
+    examples.push({
+      src,
+      href: `/album/${album._build.slug}#${photo.id}`,
+      label: photo.data.title ?? photo.data.src.split("/").at(-1)!,
+      swatch: rgbToString(dominant),
+    });
 
     const parsed = parseExifLocalDateTime(photo._build.exif.DateTimeOriginal);
     if (!parsed) {

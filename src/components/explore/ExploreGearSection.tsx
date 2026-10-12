@@ -130,15 +130,9 @@ export const ExploreGearSection = ({
   // fetched; see the tooltip in GearRibbon for why.
   const [preview, setPreview] = React.useState<string | null>(null);
   const [visibleCards, setVisibleCards] = React.useState(INITIAL_KIT_CARDS);
-  /**
-   * Which of each kit's frames is showing.
-   *
-   * Random to begin with, so the wall is not the same eight photographs on
-   * every visit, and moved on by the reroll. One number for all the cards:
-   * rerolling is a request to see the collection again, not to fiddle with one
-   * card at a time.
-   */
+  // The shared roll changes the collection; each card can also choose its own frame.
   const [roll, setRoll] = React.useState(() => Math.floor(Math.random() * 1000));
+  const [cardRolls, setCardRolls] = React.useState<Record<string, number>>({});
   // A legend entry pressed keeps its own series and takes the rest away. Held
   // per chart: the two are keyed by different things, and a band is not a kit.
   const [onlyKit, setOnlyKit] = React.useState<string | null>(null);
@@ -275,19 +269,34 @@ export const ExploreGearSection = ({
           </PillButton>
         </GearSectionHeader>
         <div className={styles.gearBodies}>
-          {profiles.slice(0, visibleCards).map((profile, index) => (
-            <GearProfileCard
-              key={profile.label}
-              profile={profile}
-              colour={colours.get(profile.label)}
-              photo={((offered) => offered?.[(roll + index) % offered.length])(
-                photos.get(profile.label),
-              )}
-              href={kitSearchHref(profile)}
-              withLens={grouping === "bodies"}
-              withCamera={grouping === "lenses"}
-            />
-          ))}
+          {profiles.slice(0, visibleCards).map((profile, index) => {
+            const offered = photos.get(profile.label) ?? [];
+            const key = `${grouping}:${profile.label}`;
+            const offset = cardRolls[key] ?? 0;
+            return (
+              <GearProfileCard
+                key={profile.label}
+                profile={profile}
+                colour={colours.get(profile.label)}
+                photo={offered[(roll + index + offset) % offered.length]}
+                {...(offered.length > 1
+                  ? {
+                      onRandom: () =>
+                        setCardRolls((current) => ({
+                          ...current,
+                          [key]:
+                            (current[key] ?? 0) +
+                            1 +
+                            Math.floor(Math.random() * (offered.length - 1)),
+                        })),
+                    }
+                  : {})}
+                href={kitSearchHref(profile)}
+                withLens={grouping === "bodies"}
+                withCamera={grouping === "lenses"}
+              />
+            );
+          })}
         </div>
         {profiles.length > visibleCards ? (
           <PillButton

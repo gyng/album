@@ -20,6 +20,14 @@
   align-content: start;
 }
 
+.morePhotos {
+  margin-block-start: var(--m-s);
+}
+
+.moreFamilies {
+  justify-self: start;
+}
+
 .colourFamilyPanel,
 .colourFullRowPanel {
   grid-column: 1 / -1;

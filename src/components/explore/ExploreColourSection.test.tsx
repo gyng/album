@@ -26,7 +26,7 @@ describe("ExploreColourSection", () => {
     ).toBe("/search?color=93%2C132%2C214");
   });
 
-  it("renders representative looks, caps examples, and omits unknown-family search", () => {
+  it("reveals more representative photos and omits unknown-family search", () => {
     const photos = Array.from({ length: 7 }, (_value, index) => ({
       src: `/blue-${index}.jpg`,
       href: `/album/test#blue-${index}.jpg`,
@@ -66,10 +66,36 @@ describe("ExploreColourSection", () => {
       backgroundColor: "rgb(0, 132, 214)",
     });
     expect(screen.queryByRole("img", { name: "Blue example 6" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "More photos with blue tones" }));
+    expect(screen.getByRole("img", { name: "Blue example 6" })).toBeInTheDocument();
     expect(screen.getByRole("img", { name: "Unknown look" })).toBeInTheDocument();
     const searchLinks = screen.getAllByRole("link", { name: "Search" });
     expect(searchLinks).toHaveLength(1);
     expect(searchLinks[0]).toHaveAttribute("href", "/search?color=93%2C132%2C214");
+  });
+
+  it("reveals additional colour families without resetting expanded photos", () => {
+    const stats = {
+      colorCoverage: 1,
+      colorStats: [],
+      colorYearRibbons: [],
+      colorFamilyExamples: ["Blue", "Red", "Green", "Orange", "Cyan"].map((label) => ({
+        label,
+        count: 7,
+        sharePercent: 20,
+        photos: Array.from({ length: 7 }, (_, index) => ({
+          src: `/${label}-${index}.jpg`,
+          href: `/album/test#${label}-${index}`,
+          label: `${label} ${index}`,
+        })),
+      })),
+    } as unknown as PhotoStats;
+    render(<ExploreColourSection stats={stats} />);
+    expect(screen.queryByRole("img", { name: "Cyan 0" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "More photos with blue tones" }));
+    fireEvent.click(screen.getByRole("button", { name: "More colour families" }));
+    expect(screen.getByRole("img", { name: "Cyan 0" })).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: "Blue 6" })).toBeInTheDocument();
   });
 
   it("renders colour history for populated and empty years", () => {
